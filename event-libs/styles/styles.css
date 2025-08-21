@@ -1,0 +1,133 @@
+/* 
+ * Put project specific base styles here.
+ *
+ * Note: The project does not load this file.
+ *       You will need to load these using scripts.js.
+ * 
+ *
+ */
+
+ :root {
+  --stroke-color-divider: #6E6E6E;
+  --color-red: #EB1000;
+}
+
+main a.con-button.no-event {
+  user-select: none;
+  pointer-events: none;
+  opacity: 0.5;
+}
+
+a.con-button.black {
+  border: 2px solid var(--color-gray-800);
+  background-color: var(--color-gray-800);
+  color: var(--color-white);
+  transition: background-color 0.2s, border-color 0.2s;
+}
+
+a.con-button.black:hover,
+a.con-button.black:focus {
+  border: 2px solid var(--color-black);
+  background-color: var(--color-black);
+}
+
+a.con-button.rsvp-btn {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  justify-content: center;
+}
+
+/* FIXME: workaround for fill button */
+.dark a.con-button.black {
+  border: 2px solid var(--color-white);
+  background-color: var(--color-white);
+  opacity: 0.9;
+  color: var(--color-black);
+  transition: opacity 0.2s;
+}
+
+.dark a.con-button.black:hover,
+.dark a.con-button.black:focus {
+  opacity: 1;
+}
+
+a.con-button.rsvp-btn.disabled {
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+p.display-event-date-time {
+  display: flex;
+  align-items: center;
+  font-size: var(--type-body-l-size);
+}
+
+svg.ecc-icon {
+  width: 28px;
+  min-width: 28px;
+  height: 28px;
+  vertical-align: text-top;
+}
+
+svg.ecc-icon:not(:last-child) {
+  margin-right: 12px;
+}
+
+.marquee p.body-m:has(> picture) {
+  display: flex;
+  gap: 12px;
+}
+
+.preserve-format {
+  white-space: pre-wrap;
+}
+
+fieldset {
+  border: none;
+  padding: 0;
+}
+
+.section:has(> .section-metadata:only-child) {
+  display: none;
+}
+
+.dark a:any-link {
+  color: var(--color-white);
+}
+
+@media (min-width: 900px) {
+  p.display-event-date-time {
+    font-size: var(--type-body-xl-size);
+  }
+}
+
+body.validating-page {
+  display: none;
+}
+
+.text-block[class*="column-text"] table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+
+.text-block[class*="column-text"] table td:last-child {
+  text-align: right;
+}
+
+.text-block.column-text-spacing-xs table {
+  margin: var(--spacing-xs) 0;
+}
+
+.text-block.column-text-spacing-s table {
+  margin: var(--spacing-s) 0;
+}
+
+.text-block.column-icon-spacing-xs table td:last-child a:not(:last-child) {
+  padding-right: var(--spacing-xs);
+}
+
+.text-block.column-icon-spacing-xxs table td:last-child a:not(:last-child) {
+  padding-right: var(--spacing-xxs);
+}
