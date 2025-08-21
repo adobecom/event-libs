@@ -607,7 +607,7 @@ function updateExtraMetaTags(parent) {
 }
 
 // data -> dom gills
-export default function autoUpdateContent(parent, miloDeps, extraData) {
+export function autoUpdateContent(parent, miloDeps, extraData) {
   const { getConfig, miloLibs } = miloDeps;
   if (!parent) {
     window.lana?.log('Error:page server block cannot find its parent element');
@@ -673,4 +673,53 @@ export default function autoUpdateContent(parent, miloDeps, extraData) {
   autoUpdateLinks(parent, miloLibs);
   decorateProfileCardsZPattern(parent);
   if (getEventServiceEnv() !== 'prod') updateExtraMetaTags(parent);
+}
+
+export default function decorateArea(area = document) {
+  const parsePhotosData = () => {
+    const output = {};
+
+    if (!area) return output;
+
+    try {
+      const photosData = JSON.parse(getMetadata('photos'));
+
+      photosData.forEach((photo) => {
+        output[photo.imageKind] = photo;
+      });
+    } catch (e) {
+      window.lana?.log(`Failed to parse photos metadata:\n${JSON.stringify(e, null, 2)}`);
+    }
+
+    return output;
+  };
+
+  const eagerLoad = (parent, selector) => {
+    const img = parent.querySelector(selector);
+    img?.removeAttribute('loading');
+  };
+
+  (async function loadLCPImage() {
+    const marquee = area.querySelector('.marquee');
+    if (!marquee) {
+      eagerLoad(area, 'img');
+      return;
+    }
+
+    // First image of first row
+    eagerLoad(marquee, 'div:first-child img');
+    // Last image of last column of last row
+    eagerLoad(marquee, 'div:last-child > div:last-child img');
+  }());
+
+  if (getMetadata('event-details-page') !== 'yes') return;
+
+  const photosData = parsePhotosData(area);
+
+  const miloDeps = {
+    miloLibs: LIBS,
+    getConfig,
+  };
+
+  autoUpdateContent(area, miloDeps, photosData);
 }
