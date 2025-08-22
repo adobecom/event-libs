@@ -1,6 +1,7 @@
 import { ICON_REG, META_REG, SERIES_404_MAP_PATH, ALLOWED_EMAIL_DOMAINS } from './constances.js';
 import BlockMediator from './deps/block-mediator.min.js';
 import { getEvent } from './esp-controller.js';
+import { dictionaryManager } from './dictionary-manager.js';
 import {
   getMetadata,
   setMetadata,
@@ -9,28 +10,17 @@ import {
   getSusiOptions,
   getEventServiceEnv,
   parseMetadataPath,
+  LIBS,
 } from './utils.js';
 
 const preserveFormatKeys = [
   'description',
 ];
 
+// Legacy function for backward compatibility - now uses DictionaryManager
 export async function miloReplaceKey(miloLibs, key, sheetName) {
-  try {
-    const [utils, placeholders] = await Promise.all([
-      import(`${miloLibs}/utils/utils.js`),
-      import(`${miloLibs}/features/placeholders.js`),
-    ]);
-
-    const { getConfig } = utils;
-    const { replaceKey } = placeholders;
-    const config = getConfig();
-
-    return await replaceKey(key, config, sheetName);
-  } catch (error) {
-    window.lana?.log(`Error trying to replace placeholder:\n${JSON.stringify(error, null, 2)}`);
-    return key;
-  }
+  // miloLibs and sheetName parameters are kept for backward compatibility but no longer used
+  return dictionaryManager.getValue(key);
 }
 
 export function updateAnalyticTag(el, newVal) {
@@ -69,7 +59,7 @@ function convertEccIcon(n) {
   });
 }
 
-async function setCtaState(targetState, rsvpBtn, miloLibs) {
+function setCtaState(targetState, rsvpBtn, miloLibs) {
   const checkRed = getIcon('check-circle-red');
 
   const enableBtn = () => {
@@ -85,35 +75,35 @@ async function setCtaState(targetState, rsvpBtn, miloLibs) {
   };
 
   const stateTrigger = {
-    registered: async () => {
-      const registeredText = await miloReplaceKey(miloLibs, 'registered-cta-text');
+    registered: () => {
+      const registeredText = dictionaryManager.getValue('registered-cta-text');
       enableBtn();
       updateAnalyticTag(rsvpBtn.el, registeredText);
       rsvpBtn.el.textContent = registeredText;
       rsvpBtn.el.prepend(checkRed);
     },
-    waitlisted: async () => {
-      const waitlistedText = await miloReplaceKey(miloLibs, 'waitlisted-cta-text');
+    waitlisted: () => {
+      const waitlistedText = dictionaryManager.getValue('waitlisted-cta-text');
       enableBtn();
       updateAnalyticTag(rsvpBtn.el, waitlistedText);
       rsvpBtn.el.textContent = waitlistedText;
       rsvpBtn.el.prepend(checkRed);
     },
-    toWaitlist: async () => {
-      const waitlistText = await miloReplaceKey(miloLibs, 'waitlist-cta-text');
+    toWaitlist: () => {
+      const waitlistText = dictionaryManager.getValue('waitlist-cta-text');
       enableBtn();
       updateAnalyticTag(rsvpBtn.el, waitlistText);
       rsvpBtn.el.textContent = waitlistText;
       checkRed.remove();
     },
-    eventClosed: async () => {
-      const closedText = await miloReplaceKey(miloLibs, 'event-full-cta-text');
+    eventClosed: () => {
+      const closedText = dictionaryManager.getValue('event-full-cta-text');
       disableBtn();
       updateAnalyticTag(rsvpBtn.el, closedText);
       rsvpBtn.el.textContent = closedText;
       checkRed.remove();
     },
-    default: async () => {
+    default: () => {
       enableBtn();
       updateAnalyticTag(rsvpBtn.el, rsvpBtn.originalText);
       rsvpBtn.el.textContent = rsvpBtn.originalText;
@@ -121,7 +111,7 @@ async function setCtaState(targetState, rsvpBtn, miloLibs) {
     },
   };
 
-  await stateTrigger[targetState]();
+  stateTrigger[targetState]();
 }
 
 export async function updateRSVPButtonState(rsvpBtn, miloLibs) {
@@ -140,17 +130,17 @@ export async function updateRSVPButtonState(rsvpBtn, miloLibs) {
   if (!rsvpData) {
     if (eventFull) {
       if (waitlistEnabled) {
-        await setCtaState('toWaitlist', rsvpBtn, miloLibs);
+        setCtaState('toWaitlist', rsvpBtn, miloLibs);
       } else {
-        await setCtaState('eventClosed', rsvpBtn, miloLibs);
+        setCtaState('eventClosed', rsvpBtn, miloLibs);
       }
     } else {
-      await setCtaState('default', rsvpBtn, miloLibs);
+      setCtaState('default', rsvpBtn, miloLibs);
     }
   } else if (rsvpData.registrationStatus === 'registered') {
-    await setCtaState('registered', rsvpBtn, miloLibs);
+    setCtaState('registered', rsvpBtn, miloLibs);
   } else if (rsvpData.registrationStatus === 'waitlisted') {
-    await setCtaState('waitlisted', rsvpBtn, miloLibs);
+    setCtaState('waitlisted', rsvpBtn, miloLibs);
   }
 }
 
@@ -260,7 +250,7 @@ export async function validatePageAndRedirect(miloLibs) {
 
 function autoUpdateLinks(scope, miloLibs) {
   const regHashCallbacks = {
-    '#rsvp-form': async (a) => {
+    '#rsvp-form': (a) => {
       const originalText = a.textContent.includes('|') ? a.textContent.split('|')[0] : a.textContent;
       const rsvpBtn = {
         el: a,
@@ -269,7 +259,7 @@ function autoUpdateLinks(scope, miloLibs) {
 
       a.classList.add('rsvp-btn', 'disabled');
 
-      const loadingText = await miloReplaceKey(miloLibs, 'rsvp-loading-cta-text');
+      const loadingText = dictionaryManager.getValue('rsvp-loading-cta-text');
       updateAnalyticTag(rsvpBtn.el, loadingText);
       a.textContent = loadingText;
       a.setAttribute('tabindex', -1);
@@ -283,7 +273,7 @@ function autoUpdateLinks(scope, miloLibs) {
         });
       }
     },
-    '#webinar-marketo-form': async (a) => {
+    '#webinar-marketo-form': (a) => {
       const rsvpBtn = {
         el: a,
         originalText: a.textContent,
@@ -294,18 +284,18 @@ function autoUpdateLinks(scope, miloLibs) {
 
       const rsvpData = BlockMediator.get('rsvpData');
       if (rsvpData && rsvpData.registrationStatus === 'registered') {
-        await setCtaState('registered', rsvpBtn, miloLibs);
+        setCtaState('registered', rsvpBtn, miloLibs);
       } else {
-        BlockMediator.subscribe('rsvpData', async ({ newValue }) => {
+        BlockMediator.subscribe('rsvpData', ({ newValue }) => {
           if (newValue?.registrationStatus === 'registered') {
-            await setCtaState('registered', rsvpBtn, miloLibs);
+            setCtaState('registered', rsvpBtn, miloLibs);
           }
         });
       }
     },
   };
 
-  scope.querySelectorAll('a[href*="#"]').forEach(async (a) => {
+  scope.querySelectorAll('a[href*="#"]').forEach((a) => {
     try {
       const url = new URL(a.href);
       const regCallbackKey = Object.keys(regHashCallbacks).find((key) => url.hash.startsWith(key));
@@ -324,7 +314,7 @@ function autoUpdateLinks(scope, miloLibs) {
       }
 
       if (regCallbackKey) {
-        await regHashCallbacks[regCallbackKey](a);
+        regHashCallbacks[regCallbackKey](a);
       } else if (a.href.endsWith('#event-template')) {
         let templateId;
 
@@ -346,7 +336,7 @@ function autoUpdateLinks(scope, miloLibs) {
         }
       } else if (a.href.endsWith('#host-email')) {
         if (getMetadata('host-email')) {
-          const emailSubject = `${await miloReplaceKey(miloLibs, 'mailto-subject-prefix')} ${getMetadata('event-title')}`;
+          const emailSubject = `${dictionaryManager.getValue('mailto-subject-prefix')} ${getMetadata('event-title')}`;
           a.href = `mailto:${getMetadata('host-email')}?subject=${encodeURIComponent(emailSubject)}`;
         } else {
           a.remove();
@@ -675,7 +665,16 @@ export function autoUpdateContent(parent, miloDeps, extraData) {
   if (getEventServiceEnv() !== 'prod') updateExtraMetaTags(parent);
 }
 
-export default function decorateArea(area = document) {
+export default async function decorateArea(area = document) {
+  // Initialize DictionaryManager with configuration
+  try {
+    const { getConfig } = await import(`${LIBS}/utils/utils.js`);
+    const config = getConfig();
+    await dictionaryManager.initialize(config);
+  } catch (error) {
+    window.lana?.log(`Failed to initialize DictionaryManager:\n${JSON.stringify(error, null, 2)}`);
+  }
+
   const parsePhotosData = () => {
     const output = {};
 

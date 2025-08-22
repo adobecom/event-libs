@@ -7,6 +7,12 @@ export class DictionaryManager {
     return `${path}${query}`;
   }
 
+  /**
+   * Fetch dictionary from placeholders.json
+   * @param {Object} params - Parameters for fetching dictionary
+   * @param {Object} params.config - Milo configuration
+   * @param {string} params.sheet - Sheet name (optional)
+   */
   async fetchDictionary({ config, sheet }) {
     try {
       const path = DictionaryManager.getPlaceholdersPath(config, sheet);
@@ -25,8 +31,22 @@ export class DictionaryManager {
     }
   }
 
+  /**
+   * Get value for a key from the dictionary
+   * @param {string} key - The key to look up
+   * @returns {string} The value for the key or the key itself if not found
+   */
   getValue(key) {
     return this.#dictionary[key] || key;
+  }
+
+  /**
+   * Initialize the dictionary manager with configuration
+   * @param {Object} config - Milo configuration
+   * @param {string} sheet - Sheet name (optional)
+   */
+  async initialize(config, sheet = 'default') {
+    await this.fetchDictionary({ config, sheet });
   }
 }
 

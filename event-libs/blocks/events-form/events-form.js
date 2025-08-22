@@ -1,7 +1,7 @@
 import { LIBS, getMetadata, getSusiOptions } from '../../scripts/utils.js';
 import { deleteAttendeeFromEvent, getAndCreateAndAddAttendee, getAttendee, getEvent } from '../../scripts/esp-controller.js';
 import BlockMediator from '../../scripts/deps/block-mediator.min.js';
-import autoUpdateContent, { miloReplaceKey, signIn } from '../../scripts/content-update.js';
+import { signIn, autoUpdateContent } from '../../scripts/decorate.js';
 import { dictionaryManager } from '../../scripts/dictionary-manager.js';
 
 const { createTag, getConfig } = await import(`${LIBS}/utils/utils.js`);
@@ -221,7 +221,7 @@ async function buildErrorMsg(parent, status) {
     existingErrors.forEach((err) => err.remove());
   }
 
-  const errorMsg = await miloReplaceKey(LIBS, errorKeyMap[status] || 'rsvp-error-msg');
+      const errorMsg = dictionaryManager.getValue(errorKeyMap[status] || 'rsvp-error-msg');
   const error = createTag('p', { class: 'error' }, errorMsg);
   parent.append(error);
   setTimeout(() => {
@@ -290,10 +290,10 @@ function createButton({ type, label }, bp) {
 
               if (eventFull) {
                 if (allowWaitlisting) {
-                  button.textContent = await miloReplaceKey(LIBS, 'waitlist-cta-text');
+                  button.textContent = dictionaryManager.getValue('waitlist-cta-text');
                   button.disabled = false;
                 } else {
-                  button.textContent = await miloReplaceKey(LIBS, 'event-full-cta-text');
+                  button.textContent = dictionaryManager.getValue('event-full-cta-text');
                   button.disabled = true;
                 }
               }
@@ -638,7 +638,7 @@ function decorateSuccessScreen(screen) {
 }
 
 async function addConsentSuite(form) {
-  const countryText = await miloReplaceKey(LIBS, 'country');
+      const countryText = dictionaryManager.getValue('country');
   const fieldWrapper = createTag('div', { class: 'field-wrapper events-form-select-wrapper', 'data-field-id': 'country', 'data-type': 'select' });
   const label = createTag('label', { for: 'consentStringId', class: 'required' }, countryText);
   const countrySelect = createTag('select', { id: 'consentStringId', required: 'required' });

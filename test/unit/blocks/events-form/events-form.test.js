@@ -42,8 +42,6 @@ describe('Events Form', () => {
       getValue: (text) => text,
       fetchDictionary: () => Promise.resolve(),
     };
-
-    window.miloReplaceKey = () => Promise.resolve('test');
     window.getAndCreateAndAddAttendee = () => Promise.resolve({ ok: true, data: {} });
     window.getEvent = () => Promise.resolve({ ok: true, data: {} });
     window.getAttendee = () => Promise.resolve({ ok: true, data: {} });
@@ -79,7 +77,7 @@ describe('Events Form', () => {
     // Clean up mocks
     delete window.BlockMediator;
     delete window.dictionaryManager;
-    delete window.miloReplaceKey;
+
     delete window.getAndCreateAndAddAttendee;
     delete window.getEvent;
     delete window.getAttendee;
