@@ -464,6 +464,50 @@ function updateTextContent(child, matchCallback) {
   }
 }
 
+export function replaceDotMedia(area = document) {
+  const { prefix } = getLocale(CONFIG.locales);
+  const currUrl = new URL(window.location);
+  const pathSeg = currUrl.pathname.split('/').length;
+  if ((prefix === '' && pathSeg >= 3) || (prefix !== '' && pathSeg >= 4)) return;
+  const resetAttributeBase = (tag, attr) => {
+    area.querySelectorAll(`${tag}[${attr}^="./media_"]`).forEach((el) => {
+      el[attr] = `${new URL(`${CONFIG.contentRoot}${el.getAttribute(attr).substring(1)}`, window.location).href}`;
+    });
+  };
+  resetAttributeBase('img', 'src');
+  resetAttributeBase('source', 'srcset');
+}
+
+export function shouldRenderWithNonProdMetadata(eventId, prodDomain) {
+  if (!eventId) return false;
+  const isLiveProd = getEventServiceEnv() === 'prod' && window.location.hostname === prodDomain;
+
+  if (!isLiveProd) return true;
+
+  const isPreviewMode = new URLSearchParams(window.location.search).get('previewMode');
+
+  if (isLiveProd && isPreviewMode) return true;
+
+  return false;
+}
+
+export const [setEventConfig, updateEventConfig, getEventConfig] = (() => {
+  let config = {};
+  return [
+    (ec, mc = {}) => {
+      config = { eventServiceEnv: getEventServiceEnv(), ...ec, miloConfig: mc };
+      const cmsType = ec.cmsType || 'DA';
+      if (cmsType = 'SP') {
+        const metadataLocation = '/events/default/';
+        config.metadataLocation = metadataLocation;
+      }
+      return config;
+    },
+    (ec, mc = {}) => (config = { ...ec, miloConfig: mc }),
+    () => config,
+  ];
+})();
+
 export async function getNonProdData(env) {
   const isPreviewMode = new URLSearchParams(window.location.search).get('previewMode')
   || window.location.hostname.includes('.hlx.page')
@@ -478,6 +522,7 @@ export async function getNonProdData(env) {
       Pragma: 'no-cache',
     },
   });
+
   if (resp.ok) {
     const json = await resp.json();
     let { pathname } = window.location;
@@ -721,4 +766,18 @@ export default async function decorateArea(area = document) {
   };
 
   autoUpdateContent(area, miloDeps, photosData);
+}
+
+
+export async function fetchAndDecorateArea() {
+  // Load non-prod data for stage and dev environments
+  let env = getEventServiceEnv();
+  if (env === 'local') env = 'dev';
+  const nonProdData = await getNonProdData(env);
+  if (!nonProdData) return;
+  Object.entries(nonProdData).forEach(([key, value]) => {
+    setMetadata(key, value);
+  });
+
+  decorateArea();
 }

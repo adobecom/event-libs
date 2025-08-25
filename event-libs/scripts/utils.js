@@ -15,23 +15,23 @@ export function getEventServiceEnv() {
   const usp = new URLSearchParams(search);
   const eccEnv = usp.get('eccEnv');
 
-  if (validEnvs.includes(eccEnv)) return eccEnv;
+  if (validEnvs.includes(eccEnv)) return ENV_MAP[eccEnv];
 
   if ((host.includes(`${SLD}.page`) || host.includes(`${SLD}.live`))) {
-    if (host.startsWith('dev--')) return 'dev';
-    if (host.startsWith('dev02--') || host.startsWith('main02--')) return 'dev02';
-    if (host.startsWith('stage--')) return 'stage';
-    if (host.startsWith('stage02--')) return 'stage02';
-    if (host.startsWith('main--')) return 'prod';
+    if (host.startsWith('dev--')) return ENV_MAP.dev;
+    if (host.startsWith('dev02--') || host.startsWith('main02--')) return ENV_MAP.dev02;
+    if (host.startsWith('stage--')) return ENV_MAP.stage;
+    if (host.startsWith('stage02--')) return ENV_MAP.stage02;
+    if (host.startsWith('main--')) return ENV_MAP.prod;
   }
 
-  if (host.includes('localhost')) return 'local';
+  if (host.includes('localhost')) return ENV_MAP.local;
 
   if (host.includes('stage.adobe')
     || host.includes('corp.adobe')
-    || host.includes('graybox.adobe')) return 'stage';
+    || host.includes('graybox.adobe')) return ENV_MAP.stage;
 
-  if (host.endsWith('adobe.com')) return 'prod';
+  if (host.endsWith('adobe.com')) return ENV_MAP.prod;
   // fallback to dev
   return 'dev';
 }
