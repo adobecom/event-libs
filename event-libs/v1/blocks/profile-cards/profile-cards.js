@@ -1,5 +1,5 @@
 import buildMiloCarousel from '../../features/milo-carousel.js';
-import { getMetadata, LIBS } from '../../scripts/utils.js';
+import { getMetadata, LIBS } from '../../utils/utils.js';
 
 const { createTag, getConfig } = await import(`${LIBS}/utils/utils.js`);
 

@@ -8,7 +8,7 @@ export const SUSI_OPTIONS = {
 };
 export const SERIES_404_MAP_PATH = '/events/default/series-404-map.json';
 export const ALLOWED_EMAIL_DOMAINS = ['@adobe.com', '@adobetest.com'];
-const ENV_MAP = {
+export const ENV_MAP = {
   dev: {
     name: 'dev',
     serviceApiEndpoints: {

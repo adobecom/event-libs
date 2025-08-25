@@ -10,14 +10,14 @@
  * governing permissions and limitations under the License.
  */
 
-import { lazyCaptureProfile } from './profile.js';
-import { getMetadata, LIBS } from './utils.js';
+import { lazyCaptureProfile } from '../v1/utils/profile.js';
+import { getMetadata, LIBS } from '../v1/utils/utils.js';
+import decorateArea from '../v1/utils/decorate.js';
 
 const {
   loadArea,
   setConfig,
   loadLana,
-  getLocale,
 } = await import(`${LIBS}/utils/utils.js`);
 
 

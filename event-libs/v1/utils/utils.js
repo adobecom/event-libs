@@ -1,4 +1,4 @@
-import { SUSI_OPTIONS } from './constances.js';
+import { SUSI_OPTIONS, ENV_MAP } from './constances.js';
 
 export const LIBS = (() => {
   const { hostname, search } = window.location;

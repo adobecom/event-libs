@@ -1,5 +1,5 @@
 import { getEventServiceEnv, LIBS } from './utils.js';
-import BlockMediator from './deps/block-mediator.min.js';
+import BlockMediator from '../../scripts/deps/block-mediator.min.js';
 import { getBaseAttendeePayload, getEventAttendeePayload } from './data-utils.js';
 
 const API_CONFIG = {

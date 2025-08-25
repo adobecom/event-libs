@@ -1,4 +1,3 @@
-/* global globalThis */
 /* eslint-disable no-unused-vars */
 import { expect } from '@esm-bundle/chai';
 import sinon from 'sinon';

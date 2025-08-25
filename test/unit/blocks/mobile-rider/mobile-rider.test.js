@@ -3,8 +3,6 @@ import { expect } from '@esm-bundle/chai';
 import sinon from 'sinon';
 import init from '../../../../events/blocks/mobile-rider/mobile-rider.js';
 
-/* global globalThis */
-
 const defaultHtml = `
 <div class="mobile-rider">
   <div>

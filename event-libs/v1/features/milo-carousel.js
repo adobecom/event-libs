@@ -1,4 +1,4 @@
-import { LIBS } from '../scripts/utils.js';
+import { LIBS } from '../utils/utils.js';
 
 const { createTag, MILO_EVENTS, loadStyle, getConfig } = await import(`${LIBS}/utils/utils.js`);
 

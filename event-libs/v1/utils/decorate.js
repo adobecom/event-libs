@@ -1,5 +1,5 @@
 import { ICON_REG, META_REG, SERIES_404_MAP_PATH, ALLOWED_EMAIL_DOMAINS } from './constances.js';
-import BlockMediator from './deps/block-mediator.min.js';
+import BlockMediator from '../../scripts/deps/block-mediator.min.js';
 import { getEvent } from './esp-controller.js';
 import { dictionaryManager } from './dictionary-manager.js';
 import {
@@ -11,6 +11,11 @@ import {
   getEventServiceEnv,
   parseMetadataPath,
   LIBS,
+  getConfig,
+  getLocale,
+  CONFIG,
+  PAGE_URL,
+  SLD,
 } from './utils.js';
 
 const preserveFormatKeys = [
@@ -18,8 +23,8 @@ const preserveFormatKeys = [
 ];
 
 // Legacy function for backward compatibility - now uses DictionaryManager
-export async function miloReplaceKey(miloLibs, key, sheetName) {
-  // miloLibs and sheetName parameters are kept for backward compatibility but no longer used
+export async function miloReplaceKey(miloLibs, key) {
+  // miloLibs parameter is kept for backward compatibility but no longer used
   return dictionaryManager.getValue(key);
 }
 
@@ -59,7 +64,7 @@ function convertEccIcon(n) {
   });
 }
 
-function setCtaState(targetState, rsvpBtn, miloLibs) {
+function setCtaState(targetState, rsvpBtn, miloLibs) { // eslint-disable-line no-unused-vars
   const checkRed = getIcon('check-circle-red');
 
   const enableBtn = () => {
@@ -497,10 +502,20 @@ export const [setEventConfig, updateEventConfig, getEventConfig] = (() => {
     (ec, mc = {}) => {
       config = { eventServiceEnv: getEventServiceEnv(), ...ec, miloConfig: mc };
       const cmsType = ec.cmsType || 'DA';
-      if (cmsType = 'SP') {
+      if (cmsType === 'SP') {
         const metadataLocation = '/events/default/';
         config.metadataLocation = metadataLocation;
       }
+
+      const origin = mc.origin || window.location.origin;
+      const pathname = mc.pathname || window.location.pathname;
+
+      config.codeRoot = mc.codeRoot ? `${origin}${mc.codeRoot}` : origin;
+      config.pathname = pathname;
+      config.locale.contentRoot = `${origin}${config.locale.prefix}${config.contentRoot ?? ''}`;
+      config.useDotHtml = !PAGE_URL.origin.includes(`.${SLD}.`)
+        && (config.useDotHtml ?? PAGE_URL.pathname.endsWith('.html'));
+
       return config;
     },
     (ec, mc = {}) => (config = { ...ec, miloConfig: mc }),
