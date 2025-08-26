@@ -1,25 +1,8 @@
 import { getEventServiceEnv, LIBS } from './utils.js';
 import BlockMediator from '../../scripts/deps/block-mediator.min.js';
 import { getBaseAttendeePayload, getEventAttendeePayload } from './data-utils.js';
-
-const API_CONFIG = {
-  esl: {
-    local: { host: 'https://wcms-events-service-layer-deploy-ethos102-stage-va-9c3ecd.stage.cloud.adobe.io' },
-    dev: { host: 'https://wcms-events-service-layer-deploy-ethos102-stage-va-9c3ecd.stage.cloud.adobe.io' },
-    dev02: { host: 'https://wcms-events-service-layer-deploy-ethos102-stage-va-d5dc93.stage.cloud.adobe.io' },
-    stage: { host: 'https://events-service-layer-stage.adobe.io' },
-    stage02: { host: 'https://wcms-events-service-layer-deploy-ethos105-stage-or-8f7ce1.stage.cloud.adobe.io' },
-    prod: { host: 'https://events-service-layer.adobe.io' },
-  },
-  esp: {
-    local: { host: 'https://wcms-events-service-platform-deploy-ethos102-stage-caff5f.stage.cloud.adobe.io' },
-    dev: { host: 'https://wcms-events-service-platform-deploy-ethos102-stage-caff5f.stage.cloud.adobe.io' },
-    dev02: { host: 'https://wcms-events-service-platform-deploy-ethos102-stage-c81eb6.stage.cloud.adobe.io' },
-    stage: { host: 'https://events-service-platform-stage.adobe.io' },
-    stage02: { host: 'https://wcms-events-service-platform-deploy-ethos105-stage-9a5fdc.stage.cloud.adobe.io' },
-    prod: { host: 'https://events-service-platform.adobe.io' },
-  },
-};
+import { ENV_MAP } from './constances.js';
+import { getEventConfig } from './decorate.js';
 
 export const getCaasTags = (() => {
   let cache;
@@ -88,11 +71,12 @@ export async function constructRequestOptions(method, body = null, waitForIMS = 
 }
 
 export async function getEvent(eventId) {
-  const { host } = API_CONFIG.esl[getEventServiceEnv()];
+  const { env } = getEventConfig();
+  const { serviceApiEndpoints } = ENV_MAP[env];
   const options = await constructRequestOptions('GET');
 
   try {
-    const response = await fetch(`${host}/v1/events/${eventId}`, options);
+    const response = await fetch(`${serviceApiEndpoints.esl}/v1/events/${eventId}`, options);
     const data = await response.json();
 
     if (!response.ok) {
@@ -108,11 +92,12 @@ export async function getEvent(eventId) {
 }
 
 export async function getEventAttendee(eventId) {
-  const { host } = API_CONFIG.esl[getEventServiceEnv()];
+  const { env } = getEventConfig();
+  const { serviceApiEndpoints } = ENV_MAP[env];
   const options = await constructRequestOptions('GET');
 
   try {
-    const response = await fetch(`${host}/v1/events/${eventId}/attendees/me`, options);
+    const response = await fetch(`${serviceApiEndpoints.esl}/v1/events/${eventId}/attendees/me`, options);
 
     if (!response.ok) {
       window.lana?.log(`Error: Failed to get attendee for event ${eventId}:${JSON.stringify(response)}`);
@@ -138,11 +123,12 @@ export async function getEventAttendee(eventId) {
 }
 
 export async function getAttendee() {
-  const { host } = API_CONFIG.esl[getEventServiceEnv()];
+  const { env } = getEventConfig();
+  const { serviceApiEndpoints } = ENV_MAP[env];
   const options = await constructRequestOptions('GET');
 
   try {
-    const response = await fetch(`${host}/v1/attendees/me`, options);
+    const response = await fetch(`${serviceApiEndpoints.esl}/v1/attendees/me`, options);
 
     if (!response.ok) {
       window.lana?.log(`Error: Failed to get attendee details. Status:${JSON.stringify(response)}`);
@@ -170,12 +156,13 @@ export async function getAttendee() {
 export async function createAttendee(attendeeData) {
   if (!attendeeData) return false;
 
-  const { host } = API_CONFIG.esl[getEventServiceEnv()];
+  const { env } = getEventConfig();
+  const { serviceApiEndpoints } = ENV_MAP[env];
   const raw = JSON.stringify(attendeeData);
   const options = await constructRequestOptions('POST', raw);
 
   try {
-    const response = await fetch(`${host}/v1/attendees`, options);
+    const response = await fetch(`${serviceApiEndpoints.esl}/v1/attendees`, options);
     const data = await response.json();
 
     if (!response.ok) {
@@ -193,12 +180,13 @@ export async function createAttendee(attendeeData) {
 export async function addAttendeeToEvent(eventId, attendee) {
   if (!eventId || !attendee) return false;
 
-  const { host } = API_CONFIG.esl[getEventServiceEnv()];
+  const { env } = getEventConfig();
+  const { serviceApiEndpoints } = ENV_MAP[env];
   const raw = JSON.stringify(attendee);
   const options = await constructRequestOptions('POST', raw);
 
   try {
-    const response = await fetch(`${host}/v1/events/${eventId}/attendees/${attendee.attendeeId}`, options);
+    const response = await fetch(`${serviceApiEndpoints.esl}/v1/events/${eventId}/attendees/${attendee.attendeeId}`, options);
     const data = await response.json();
 
     if (!response.ok) {
@@ -216,12 +204,13 @@ export async function addAttendeeToEvent(eventId, attendee) {
 export async function updateAttendee(attendeeData) {
   if (!attendeeData) return false;
 
-  const { host } = API_CONFIG.esl[getEventServiceEnv()];
+  const { env } = getEventConfig();
+  const { serviceApiEndpoints } = ENV_MAP[env];
   const raw = JSON.stringify(attendeeData);
   const options = await constructRequestOptions('PUT', raw);
 
   try {
-    const response = await fetch(`${host}/v1/attendees/me`, options);
+      const response = await fetch(`${serviceApiEndpoints.esl}/v1/attendees/me`, options);
     const data = await response.json();
 
     if (!response.ok) {
@@ -239,15 +228,16 @@ export async function updateAttendee(attendeeData) {
 export async function deleteAttendeeFromEvent(eventId, attendeeId = null) {
   if (!eventId) return false;
 
-  const { host } = API_CONFIG.esl[getEventServiceEnv()];
+  const { env } = getEventConfig();
+  const { serviceApiEndpoints } = ENV_MAP[env];
   const options = await constructRequestOptions('DELETE');
 
   try {
     let response;
     if (attendeeId) {
-      response = await fetch(`${host}/v1/events/${eventId}/attendees/${attendeeId}`, options);
+      response = await fetch(`${serviceApiEndpoints.esl}/v1/events/${eventId}/attendees/${attendeeId}`, options);
     } else {
-      response = await fetch(`${host}/v1/events/${eventId}/attendees/me`, options);
+      response = await fetch(`${serviceApiEndpoints.esl}/v1/events/${eventId}/attendees/me`, options);
     }
 
     if (!response.ok) {

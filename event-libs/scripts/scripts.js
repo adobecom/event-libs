@@ -57,7 +57,7 @@ const CONFIG = {
   },
 };
 
-setConfig({ ...CONFIG });
+setConfig(CONFIG);
 
 decorateArea();
 
