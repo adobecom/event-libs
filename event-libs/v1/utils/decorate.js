@@ -10,12 +10,6 @@ import {
   getSusiOptions,
   getEventServiceEnv,
   parseMetadataPath,
-  LIBS,
-  getConfig,
-  getLocale,
-  CONFIG,
-  PAGE_URL,
-  SLD,
 } from './utils.js';
 
 const preserveFormatKeys = [
@@ -64,7 +58,7 @@ function convertEccIcon(n) {
   });
 }
 
-function setCtaState(targetState, rsvpBtn, miloLibs) { // eslint-disable-line no-unused-vars
+function setCtaState(targetState, rsvpBtn) { // eslint-disable-line no-unused-vars
   const checkRed = getIcon('check-circle-red');
 
   const enableBtn = () => {
@@ -158,13 +152,13 @@ export function signIn(options) {
   window.adobeIMS?.signIn(options);
 }
 
-async function handleRSVPBtnBasedOnProfile(rsvpBtn, miloLibs, profile) {
-  const { getConfig } = await import(`${miloLibs}/utils/utils.js`);
+async function handleRSVPBtnBasedOnProfile(rsvpBtn, profile) {
+  const { miloConfig } = getEventConfig();
 
-  updateRSVPButtonState(rsvpBtn, miloLibs);
+  updateRSVPButtonState(rsvpBtn, miloConfig);
 
   BlockMediator.subscribe('rsvpData', () => {
-    updateRSVPButtonState(rsvpBtn, miloLibs);
+    updateRSVPButtonState(rsvpBtn, miloConfig);
   });
 
   if (profile?.noProfile || profile.account_type === 'guest') {
@@ -173,7 +167,8 @@ async function handleRSVPBtnBasedOnProfile(rsvpBtn, miloLibs, profile) {
     if (!allowGuestReg) {
       rsvpBtn.el.addEventListener('click', (e) => {
         e.preventDefault();
-        signIn({ ...getSusiOptions(getConfig()), redirect_uri: `${e.target.href}` });
+        const { miloConfig } = getEventConfig();
+        signIn({ ...getSusiOptions(miloConfig), redirect_uri: `${e.target.href}` });
       });
     }
   }
@@ -253,7 +248,7 @@ export async function validatePageAndRedirect(miloLibs) {
   document.body.classList.remove('validating-page');
 }
 
-function autoUpdateLinks(scope, miloLibs) {
+function autoUpdateLinks(scope) {
   const regHashCallbacks = {
     '#rsvp-form': (a) => {
       const originalText = a.textContent.includes('|') ? a.textContent.split('|')[0] : a.textContent;
@@ -271,10 +266,10 @@ function autoUpdateLinks(scope, miloLibs) {
 
       const profile = BlockMediator.get('imsProfile');
       if (profile) {
-        handleRSVPBtnBasedOnProfile(rsvpBtn, miloLibs, profile);
+        handleRSVPBtnBasedOnProfile(rsvpBtn, profile);
       } else {
         BlockMediator.subscribe('imsProfile', ({ newValue }) => {
-          handleRSVPBtnBasedOnProfile(rsvpBtn, miloLibs, newValue);
+          handleRSVPBtnBasedOnProfile(rsvpBtn, newValue);
         });
       }
     },
@@ -289,11 +284,11 @@ function autoUpdateLinks(scope, miloLibs) {
 
       const rsvpData = BlockMediator.get('rsvpData');
       if (rsvpData && rsvpData.registrationStatus === 'registered') {
-        setCtaState('registered', rsvpBtn, miloLibs);
+        setCtaState('registered', rsvpBtn);
       } else {
         BlockMediator.subscribe('rsvpData', ({ newValue }) => {
           if (newValue?.registrationStatus === 'registered') {
-            setCtaState('registered', rsvpBtn, miloLibs);
+            setCtaState('registered', rsvpBtn);
           }
         });
       }
@@ -469,20 +464,6 @@ function updateTextContent(child, matchCallback) {
   }
 }
 
-export function replaceDotMedia(area = document) {
-  const { prefix } = getLocale(CONFIG.locales);
-  const currUrl = new URL(window.location);
-  const pathSeg = currUrl.pathname.split('/').length;
-  if ((prefix === '' && pathSeg >= 3) || (prefix !== '' && pathSeg >= 4)) return;
-  const resetAttributeBase = (tag, attr) => {
-    area.querySelectorAll(`${tag}[${attr}^="./media_"]`).forEach((el) => {
-      el[attr] = `${new URL(`${CONFIG.contentRoot}${el.getAttribute(attr).substring(1)}`, window.location).href}`;
-    });
-  };
-  resetAttributeBase('img', 'src');
-  resetAttributeBase('source', 'srcset');
-}
-
 export function shouldRenderWithNonProdMetadata(eventId, prodDomain) {
   if (!eventId) return false;
   const isLiveProd = getEventServiceEnv() === 'prod' && window.location.hostname === prodDomain;
@@ -512,9 +493,6 @@ export const [setEventConfig, updateEventConfig, getEventConfig] = (() => {
 
       config.codeRoot = mc.codeRoot ? `${origin}${mc.codeRoot}` : origin;
       config.pathname = pathname;
-      config.locale.contentRoot = `${origin}${config.locale.prefix}${config.contentRoot ?? ''}`;
-      config.useDotHtml = !PAGE_URL.origin.includes(`.${SLD}.`)
-        && (config.useDotHtml ?? PAGE_URL.pathname.endsWith('.html'));
 
       return config;
     },
@@ -657,8 +635,7 @@ function updateExtraMetaTags(parent) {
 }
 
 // data -> dom gills
-export function autoUpdateContent(parent, miloDeps, extraData) {
-  const { getConfig, miloLibs } = miloDeps;
+export function autoUpdateContent(parent, extraData) {
   if (!parent) {
     window.lana?.log('Error:page server block cannot find its parent element');
     return;
@@ -684,7 +661,8 @@ export function autoUpdateContent(parent, miloDeps, extraData) {
 
     if (p1 === 'start-date' || p1 === 'end-date') {
       const date = new Date(content);
-      const localeString = getConfig().locale?.ietf || 'en-US';
+      const { miloConfig } = getEventConfig();
+      const localeString = miloConfig.locale?.ietf || 'en-US';
       content = date.toLocaleDateString(localeString, { month: 'long', day: 'numeric', year: 'numeric' });
     }
 
@@ -720,7 +698,7 @@ export function autoUpdateContent(parent, miloDeps, extraData) {
   });
 
   // handle link replacement. To keep when switching to metadata based rendering
-  autoUpdateLinks(parent, miloLibs);
+  autoUpdateLinks(parent);
   decorateProfileCardsZPattern(parent);
   if (getEventServiceEnv() !== 'prod') updateExtraMetaTags(parent);
 }
@@ -728,9 +706,8 @@ export function autoUpdateContent(parent, miloDeps, extraData) {
 export default async function decorateArea(area = document) {
   // Initialize DictionaryManager with configuration
   try {
-    const { getConfig } = await import(`${LIBS}/utils/utils.js`);
-    const config = getConfig();
-    await dictionaryManager.initialize(config);
+    const { miloConfig } = getEventConfig();
+    await dictionaryManager.initialize(miloConfig);
   } catch (error) {
     window.lana?.log(`Failed to initialize DictionaryManager:\n${JSON.stringify(error, null, 2)}`);
   }
@@ -774,13 +751,7 @@ export default async function decorateArea(area = document) {
   if (getMetadata('event-details-page') !== 'yes') return;
 
   const photosData = parsePhotosData(area);
-
-  const miloDeps = {
-    miloLibs: LIBS,
-    getConfig,
-  };
-
-  autoUpdateContent(area, miloDeps, photosData);
+  autoUpdateContent(area, photosData);
 }
 
 
