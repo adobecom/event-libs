@@ -1,4 +1,4 @@
-import { getEventServiceEnv, LIBS } from './utils.js';
+import { LIBS } from './utils.js';
 import BlockMediator from '../../scripts/deps/block-mediator.min.js';
 import { getBaseAttendeePayload, getEventAttendeePayload } from './data-utils.js';
 import { ENV_MAP } from './constances.js';
