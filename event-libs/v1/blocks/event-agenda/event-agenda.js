@@ -1,4 +1,4 @@
-import { LIBS, createOptimizedPicture } from '../../scripts/utils.js';
+import { LIBS, createOptimizedPicture } from '../../utils/utils.js';
 
 const { createTag, getMetadata, getConfig } = await import(`${LIBS}/utils/utils.js`);
 
@@ -18,7 +18,7 @@ export function convertToLocaleTimeFormat(time, locale) {
 }
 
 export default async function init(el) {
-  if (getMetadata('show-agenda-post-event') !== 'true' && document.body.classList.contains('timing-post-event')) {
+  if (getMetadata('show-agenda-post-event') !== 'true' && document.body.dataset.eventState === 'post-event') {
     el.remove();
     return;
   }
