@@ -16,12 +16,6 @@ const preserveFormatKeys = [
   'description',
 ];
 
-// Legacy function for backward compatibility - now uses DictionaryManager
-export async function miloReplaceKey(miloLibs, key) {
-  // miloLibs parameter is kept for backward compatibility but no longer used
-  return dictionaryManager.getValue(key);
-}
-
 export function updateAnalyticTag(el, newVal) {
   const eventTitle = getMetadata('event-title');
   const newDaaLL = `${newVal}${eventTitle ? `|${eventTitle}` : ''}`;
@@ -656,8 +650,28 @@ function flagEventState(parent) {
   }
 }
 
+function parsePhotosData(area) {
+  const output = {};
+
+  if (!area) return output;
+
+  try {
+    const photosData = JSON.parse(getMetadata('photos'));
+
+    photosData.forEach((photo) => {
+      output[photo.imageKind] = photo;
+    });
+  } catch (e) {
+    window.lana?.log(`Failed to parse photos metadata:\n${JSON.stringify(e, null, 2)}`);
+  }
+
+  return output;
+};
+
 // data -> dom gills
-export function autoUpdateContent(parent, extraData) {
+export function autoUpdateContent(parent) {
+  const extraData = parsePhotosData(parent);
+
   if (!parent) {
     window.lana?.log('Error:page server block cannot find its parent element');
     return;
@@ -729,30 +743,15 @@ export function autoUpdateContent(parent, extraData) {
 
 export default async function decorateArea(area = document) {
   // Initialize DictionaryManager with configuration
+  console.log('running decorateArea');
   try {
     const { miloConfig } = getEventConfig();
+    console.log('miloConfig', miloConfig);
     await dictionaryManager.initialize(miloConfig);
   } catch (error) {
     window.lana?.log(`Failed to initialize DictionaryManager:\n${JSON.stringify(error, null, 2)}`);
   }
 
-  const parsePhotosData = () => {
-    const output = {};
-
-    if (!area) return output;
-
-    try {
-      const photosData = JSON.parse(getMetadata('photos'));
-
-      photosData.forEach((photo) => {
-        output[photo.imageKind] = photo;
-      });
-    } catch (e) {
-      window.lana?.log(`Failed to parse photos metadata:\n${JSON.stringify(e, null, 2)}`);
-    }
-
-    return output;
-  };
 
   const eagerLoad = (parent, selector) => {
     const img = parent.querySelector(selector);
@@ -771,11 +770,6 @@ export default async function decorateArea(area = document) {
     // Last image of last column of last row
     eagerLoad(marquee, 'div:last-child > div:last-child img');
   }());
-
-  if (getMetadata('event-details-page') !== 'yes') return;
-
-  const photosData = parsePhotosData(area);
-  autoUpdateContent(area, photosData);
 }
 
 

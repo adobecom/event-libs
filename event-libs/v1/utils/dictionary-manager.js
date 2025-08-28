@@ -2,6 +2,7 @@ export class DictionaryManager {
   #dictionary = {};
 
   static getPlaceholdersPath(config, sheet) {
+    console.log('config', config);
     const path = `${config.locale.contentRoot}/placeholders.json`;
     const query = sheet !== 'default' && typeof sheet === 'string' && sheet.length ? `?sheet=${sheet}` : '';
     return `${path}${query}`;
@@ -46,6 +47,7 @@ export class DictionaryManager {
    * @param {string} sheet - Sheet name (optional)
    */
   async initialize(config, sheet = 'default') {
+    console.log('config', config);
     await this.fetchDictionary({ config, sheet });
   }
 }

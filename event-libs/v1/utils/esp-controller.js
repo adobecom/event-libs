@@ -71,8 +71,8 @@ export async function constructRequestOptions(method, body = null, waitForIMS = 
 }
 
 export async function getEvent(eventId) {
-  const { env } = getEventConfig();
-  const { serviceApiEndpoints } = ENV_MAP[env];
+  const { eventServiceEnv } = getEventConfig();
+  const { serviceApiEndpoints } = ENV_MAP[eventServiceEnv.name];
   const options = await constructRequestOptions('GET');
 
   try {
@@ -92,8 +92,8 @@ export async function getEvent(eventId) {
 }
 
 export async function getEventAttendee(eventId) {
-  const { env } = getEventConfig();
-  const { serviceApiEndpoints } = ENV_MAP[env];
+  const { eventServiceEnv } = getEventConfig();
+  const { serviceApiEndpoints } = ENV_MAP[eventServiceEnv.name];
   const options = await constructRequestOptions('GET');
 
   try {
@@ -123,8 +123,8 @@ export async function getEventAttendee(eventId) {
 }
 
 export async function getAttendee() {
-  const { env } = getEventConfig();
-  const { serviceApiEndpoints } = ENV_MAP[env];
+  const { eventServiceEnv } = getEventConfig();
+  const { serviceApiEndpoints } = ENV_MAP[eventServiceEnv.name];
   const options = await constructRequestOptions('GET');
 
   try {
@@ -156,8 +156,8 @@ export async function getAttendee() {
 export async function createAttendee(attendeeData) {
   if (!attendeeData) return false;
 
-  const { env } = getEventConfig();
-  const { serviceApiEndpoints } = ENV_MAP[env];
+  const { eventServiceEnv } = getEventConfig();
+  const { serviceApiEndpoints } = ENV_MAP[eventServiceEnv.name];
   const raw = JSON.stringify(attendeeData);
   const options = await constructRequestOptions('POST', raw);
 
@@ -180,8 +180,8 @@ export async function createAttendee(attendeeData) {
 export async function addAttendeeToEvent(eventId, attendee) {
   if (!eventId || !attendee) return false;
 
-  const { env } = getEventConfig();
-  const { serviceApiEndpoints } = ENV_MAP[env];
+  const { eventServiceEnv } = getEventConfig();
+  const { serviceApiEndpoints } = ENV_MAP[eventServiceEnv.name];
   const raw = JSON.stringify(attendee);
   const options = await constructRequestOptions('POST', raw);
 
@@ -204,8 +204,8 @@ export async function addAttendeeToEvent(eventId, attendee) {
 export async function updateAttendee(attendeeData) {
   if (!attendeeData) return false;
 
-  const { env } = getEventConfig();
-  const { serviceApiEndpoints } = ENV_MAP[env];
+  const { eventServiceEnv } = getEventConfig();
+  const { serviceApiEndpoints } = ENV_MAP[eventServiceEnv.name];
   const raw = JSON.stringify(attendeeData);
   const options = await constructRequestOptions('PUT', raw);
 
@@ -228,8 +228,8 @@ export async function updateAttendee(attendeeData) {
 export async function deleteAttendeeFromEvent(eventId, attendeeId = null) {
   if (!eventId) return false;
 
-  const { env } = getEventConfig();
-  const { serviceApiEndpoints } = ENV_MAP[env];
+  const { eventServiceEnv } = getEventConfig();
+  const { serviceApiEndpoints } = ENV_MAP[eventServiceEnv.name];
   const options = await constructRequestOptions('DELETE');
 
   try {
