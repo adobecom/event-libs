@@ -39,6 +39,14 @@ export default {
     <html>
       <head>
         <script type='module'>
+          // Import and setup global mocks
+          import { setupGlobalMocks, eventConfig } from './test/unit/scripts/mocks/event-config.js';
+          setupGlobalMocks();
+          
+          // Initialize event config for utils
+          import { setEventConfig } from './event-libs/v1/utils/utils.js';
+          setEventConfig(eventConfig, eventConfig.miloConfig);
+          
           const oldFetch = window.fetch;
           window.fetch = async (resource, options) => {
             if (!resource.startsWith('/') && !resource.startsWith('http://localhost')) {
@@ -53,7 +61,7 @@ export default {
           const oldXHROpen = XMLHttpRequest.prototype.open;
           XMLHttpRequest.prototype.open = async function (...args) {
             let [method, url, asyn] = args;
-            if (!resource.startsWith('/') && url.startsWith('http://localhost')) {
+            if (!url.startsWith('/') && !url.startsWith('http://localhost')) {
               console.error(
                 '** XMLHttpRequest request for an external resource is disallowed in unit tests, please find a way to mock! https://github.com/orgs/adobecom/discussions/814#discussioncomment-6060759 provides guidance on how to fix the issue.',
                 url

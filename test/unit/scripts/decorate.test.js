@@ -1,18 +1,17 @@
 import { readFile } from '@web/test-runner-commands';
 import { expect } from '@esm-bundle/chai';
 import sinon from 'sinon';
-import { LIBS, setMetadata } from '../../../event-libs/v1/utils/utils.js';
+import { LIBS, setMetadata, setEventConfig } from '../../../event-libs/v1/utils/utils.js';
 import BlockMediator from '../../../event-libs/v1/deps/block-mediator.min.js';
 
 const {
-  default: autoUpdateContent,
+  autoUpdateContent,
   updateAnalyticTag,
   signIn,
   validatePageAndRedirect,
   updatePictureElement,
   getNonProdData,
 } = await import('../../../event-libs/v1/utils/decorate.js');
-const { getConfig } = await import(`${LIBS}/utils/utils.js`);
 const head = await readFile({ path: './mocks/head.html' });
 const body = await readFile({ path: './mocks/full-event.html' });
 const defaultDoc = await readFile({ path: './mocks/event-default-doc.html' });
@@ -29,12 +28,18 @@ describe('Content Update Script', () => {
     document.body.innerHTML = '';
     document.head.innerHTML = head;
     window.isTestEnv = true;
+    setEventConfig({
+      cmsType: 'SP',
+    });
   });
 
   it('leaves no placeholders behind', () => {
     document.body.innerHTML = body;
     const miloDeps = {
-      getConfig,
+      getConfig: () => ({ 
+        locale: { ietf: 'en-US' },
+        miloConfig: { locale: { ietf: 'en-US' } }
+      }),
       miloLibs: LIBS,
     };
 
@@ -45,7 +50,10 @@ describe('Content Update Script', () => {
   it('handles #event-template special case', () => {
     document.body.innerHTML = defaultDoc;
     const miloDeps = {
-      getConfig,
+      getConfig: () => ({ 
+        locale: { ietf: 'en-US' },
+        miloConfig: { locale: { ietf: 'en-US' } }
+      }),
       miloLibs: LIBS,
     };
 
@@ -55,10 +63,6 @@ describe('Content Update Script', () => {
 
   it('handles RSVP buttons correctly', async () => {
     document.body.innerHTML = body;
-    const miloDeps = {
-      getConfig,
-      miloLibs: LIBS,
-    };
 
     const profile = {
       account_type: 'type3',
@@ -86,7 +90,7 @@ describe('Content Update Script', () => {
     BlockMediator.set('imsProfile', profile);
 
     const buttonOriginalText = document.querySelector('a[href$="#rsvp-form-1"]').textContent;
-    autoUpdateContent(document, miloDeps);
+    autoUpdateContent();
     BlockMediator.set('rsvpData', null);
 
     expect(document.querySelector('a[href$="#rsvp-form-1"]').textContent).to.be.equal(buttonOriginalText);
@@ -206,18 +210,8 @@ describe('autoUpdateContent - Array Iteration', () => {
       // Create test HTML with @array syntax
       container.innerHTML = '<p>Contact us: [[@array(contacts),]]</p>';
 
-      // Mock miloDeps
-      const miloDeps = {
-        getConfig: () => ({ locale: { ietf: 'en-US' } }),
-        miloLibs: '/libs',
-      };
-
       // Call autoUpdateContent
-      autoUpdateContent(container, miloDeps, {});
-
-      // Debug: log the actual content
-      console.log('Actual content:', container.textContent);
-      console.log('Expected content:', 'Contact us: John Doe,Jane Smith,Bob Johnson');
+      autoUpdateContent(container);
 
       // Verify the result - comma is used exactly as provided
       expect(container.textContent).to.equal('Contact us: John Doe,Jane Smith,Bob Johnson');
@@ -231,14 +225,8 @@ describe('autoUpdateContent - Array Iteration', () => {
       // Create test HTML with custom separator
       container.innerHTML = '<p>Contact us: [[@array(contacts) | ]]</p>';
 
-      // Mock miloDeps
-      const miloDeps = {
-        getConfig: () => ({ locale: { ietf: 'en-US' } }),
-        miloLibs: '/libs',
-      };
-
       // Call autoUpdateContent
-      autoUpdateContent(container, miloDeps, {});
+      autoUpdateContent(container);
 
       // Verify the result uses custom separator
       expect(container.textContent).to.equal('Contact us: John Doe | Jane Smith | Bob Johnson');
@@ -252,14 +240,8 @@ describe('autoUpdateContent - Array Iteration', () => {
       // Create test HTML with no separator
       container.innerHTML = '<p>Contact us: [[@array(contacts)]]</p>';
 
-      // Mock miloDeps
-      const miloDeps = {
-        getConfig: () => ({ locale: { ietf: 'en-US' } }),
-        miloLibs: '/libs',
-      };
-
       // Call autoUpdateContent
-      autoUpdateContent(container, miloDeps, {});
+      autoUpdateContent(container);
 
       // Verify the result uses space as default separator
       expect(container.textContent).to.equal('Contact us: John Doe Jane Smith Bob Johnson');
@@ -273,14 +255,8 @@ describe('autoUpdateContent - Array Iteration', () => {
       // Create test HTML with @array syntax
       container.innerHTML = '<p>連絡先: [[@array(contacts),]]</p>';
 
-      // Mock miloDeps with Japanese locale
-      const miloDeps = {
-        getConfig: () => ({ locale: { ietf: 'ja-JP' } }),
-        miloLibs: '/libs',
-      };
-
       // Call autoUpdateContent
-      autoUpdateContent(container, miloDeps, {});
+      autoUpdateContent(container);
 
       // Verify the result uses the comma as provided (no locale-specific handling)
       expect(container.textContent).to.equal('連絡先: 田中太郎,佐藤花子,鈴木一郎');
@@ -294,14 +270,8 @@ describe('autoUpdateContent - Array Iteration', () => {
       // Create test HTML with @array syntax
       container.innerHTML = '<p>联系人: [[@array(contacts),]]</p>';
 
-      // Mock miloDeps with Chinese locale
-      const miloDeps = {
-        getConfig: () => ({ locale: { ietf: 'zh-CN' } }),
-        miloLibs: '/libs',
-      };
-
       // Call autoUpdateContent
-      autoUpdateContent(container, miloDeps, {});
+      autoUpdateContent(container);
 
       // Verify the result uses the comma as provided (no locale-specific handling)
       expect(container.textContent).to.equal('联系人: 张三,李四,王五');
@@ -315,14 +285,8 @@ describe('autoUpdateContent - Array Iteration', () => {
       // Create test HTML with @array syntax
       container.innerHTML = '<p>Contact us: [[@array(contacts),]]</p>';
 
-      // Mock miloDeps
-      const miloDeps = {
-        getConfig: () => ({ locale: { ietf: 'en-US' } }),
-        miloLibs: '/libs',
-      };
-
       // Call autoUpdateContent
-      autoUpdateContent(container, miloDeps, {});
+      autoUpdateContent(container);
 
       // Verify the result is empty
       expect(container.textContent).to.equal('Contact us: ');
@@ -334,16 +298,10 @@ describe('autoUpdateContent - Array Iteration', () => {
       setMetadata('event-id', 'test-event');
 
       // Create test HTML with @array syntax
-      container.innerHTML = '<p>Contact us: [[@array(contacts),]]</p>';
-
-      // Mock miloDeps
-      const miloDeps = {
-        getConfig: () => ({ locale: { ietf: 'en-US' } }),
-        miloLibs: '/libs',
-      };
+      container.innerHTML = '<p>Contact us: [[@array(contacts),]]</p>';   
 
       // Call autoUpdateContent
-      autoUpdateContent(container, miloDeps, {});
+      autoUpdateContent(container);
 
       // Verify the result is empty (non-array returns empty string)
       expect(container.textContent).to.equal('Contact us: ');
@@ -357,14 +315,8 @@ describe('autoUpdateContent - Array Iteration', () => {
       // Create test HTML with @array syntax
       container.innerHTML = '<p>Contact us: [[@array(contacts),]]</p>';
 
-      // Mock miloDeps with unsupported locale
-      const miloDeps = {
-        getConfig: () => ({ locale: { ietf: 'xx-XX' } }),
-        miloLibs: '/libs',
-      };
-
       // Call autoUpdateContent
-      autoUpdateContent(container, miloDeps, {});
+      autoUpdateContent(container);
 
       // Verify the result uses the comma as provided (no locale-specific handling)
       expect(container.textContent).to.equal('Contact us: John Doe,Jane Smith');
@@ -381,14 +333,8 @@ describe('autoUpdateContent - Array Iteration', () => {
       // Create test HTML with nested @array syntax
       container.innerHTML = '<p>Contact us: [[@array(event-data.contacts),]]</p>';
 
-      // Mock miloDeps
-      const miloDeps = {
-        getConfig: () => ({ locale: { ietf: 'en-US' } }),
-        miloLibs: '/libs',
-      };
-
       // Call autoUpdateContent
-      autoUpdateContent(container, miloDeps, {});
+      autoUpdateContent(container);
 
       // Verify the result
       expect(container.textContent).to.equal('Contact us: John Doe,Jane Smith');
@@ -406,18 +352,8 @@ describe('autoUpdateContent - Array Iteration', () => {
       // Create test HTML with attribute extraction
       container.innerHTML = '<p>Speakers: [[@array(speakers.name),]]</p>';
 
-      // Mock miloDeps
-      const miloDeps = {
-        getConfig: () => ({ locale: { ietf: 'en-US' } }),
-        miloLibs: '/libs',
-      };
-
       // Call autoUpdateContent
-      autoUpdateContent(container, miloDeps, {});
-
-      // Debug: log the actual content
-      console.log('Actual content:', container.textContent);
-      console.log('Expected content:', 'Speakers: Dr. Alice Brown,Prof. Charlie Wilson,Jane Smith');
+      autoUpdateContent(container);
 
       // Verify the result extracts the 'name' attribute
       expect(container.textContent).to.equal('Speakers: Dr. Alice Brown,Prof. Charlie Wilson,Jane Smith');
@@ -434,14 +370,8 @@ describe('autoUpdateContent - Array Iteration', () => {
       // Create test HTML with attribute extraction and custom separator
       container.innerHTML = '<p>Speakers: [[@array(speakers.name) | ]]</p>';
 
-      // Mock miloDeps
-      const miloDeps = {
-        getConfig: () => ({ locale: { ietf: 'en-US' } }),
-        miloLibs: '/libs',
-      };
-
       // Call autoUpdateContent
-      autoUpdateContent(container, miloDeps, {});
+      autoUpdateContent(container);
 
       // Verify the result uses custom separator
       expect(container.textContent).to.equal('Speakers: Dr. Alice Brown | Prof. Charlie Wilson');
@@ -461,14 +391,8 @@ describe('autoUpdateContent - Array Iteration', () => {
       // Create test HTML with nested array and attribute extraction
       container.innerHTML = '<p>Speakers: [[@array(event-data.speakers.name),]]</p>';
 
-      // Mock miloDeps
-      const miloDeps = {
-        getConfig: () => ({ locale: { ietf: 'en-US' } }),
-        miloLibs: '/libs',
-      };
-
       // Call autoUpdateContent
-      autoUpdateContent(container, miloDeps, {});
+      autoUpdateContent(container);
 
       // Verify the result
       expect(container.textContent).to.equal('Speakers: Dr. Alice Brown,Prof. Charlie Wilson');
@@ -484,15 +408,9 @@ describe('autoUpdateContent - Array Iteration', () => {
 
       // Create test HTML without attribute specification
       container.innerHTML = '<p>Speakers: [[@array(speakers),]]</p>';
-
-      // Mock miloDeps
-      const miloDeps = {
-        getConfig: () => ({ locale: { ietf: 'en-US' } }),
-        miloLibs: '/libs',
-      };
-
+    
       // Call autoUpdateContent
-      autoUpdateContent(container, miloDeps, {});
+      autoUpdateContent(container);
 
       // Verify the result converts objects to JSON strings
       expect(container.textContent).to.include('Speakers: {"name":"Dr. Alice Brown","title":"Senior Researcher"},{"name":"Prof. Charlie Wilson","title":"Professor"}');
@@ -508,16 +426,10 @@ describe('autoUpdateContent - Array Iteration', () => {
       setMetadata('event-id', 'test-event');
 
       // Create test HTML with attribute extraction
-      container.innerHTML = '<p>Speakers: [[@array(speakers.name),]]</p>';
-
-      // Mock miloDeps
-      const miloDeps = {
-        getConfig: () => ({ locale: { ietf: 'en-US' } }),
-        miloLibs: '/libs',
-      };
+      container.innerHTML = '<p>Speakers: [[@array(speakers.name),]]</p>';      
 
       // Call autoUpdateContent
-      autoUpdateContent(container, miloDeps, {});
+      autoUpdateContent(container);
 
       // Verify the result handles missing attributes
       expect(container.textContent).to.equal('Speakers: Dr. Alice Brown,Prof. Charlie Wilson,');

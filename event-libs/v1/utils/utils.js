@@ -57,7 +57,7 @@ export function getEventServiceEnv() {
 
   if (host.endsWith('adobe.com')) return ENV_MAP.prod;
   // fallback to dev
-  return 'dev';
+  return ENV_MAP.dev;
 }
 
 export function createTag(tag, attributes, html, options = {}) {

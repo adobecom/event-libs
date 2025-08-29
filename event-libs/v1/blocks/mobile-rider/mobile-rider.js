@@ -1,6 +1,5 @@
 /* eslint-disable no-underscore-dangle */
-import { getEventConfig } from '../../utils/decorate.js';
-import { createTag } from '../../utils/utils.js';
+import { createTag, getEventConfig } from '../../utils/utils.js';
 
 const CONFIG = {
   ANALYTICS: { PROVIDER: 'adobe' },

@@ -322,7 +322,7 @@ function initRSVPHandler(link) {
   }
 }
 
-function autoUpdateLinks(parent) {
+function processLinks(parent) {
   const { cmsType } = getEventConfig();
   const links = parent.querySelectorAll('a[href*="#"]');
 
@@ -676,18 +676,7 @@ function parsePhotosData(area) {
   return output;
 };
 
-// data -> DOM gills
-export function autoUpdateContent(parent) {
-  // handle photos data parsing
-  const extraData = parsePhotosData(parent);
-
-  if (!parent) {
-    window.lana?.log('Error:page server block cannot find its parent element');
-    return;
-  }
-
-  if (!getMetadata('event-id')) return;
-
+function processTemplateInAllNodes(parent, extraData) {
   const getImgData = (_match, p1, n) => {
     const data = parseMetadataPath(p1, extraData);
 
@@ -741,13 +730,29 @@ export function autoUpdateContent(parent) {
       });
     }
   });
+}
+
+// data -> DOM gills
+export function autoUpdateContent(parent) {
+  // handle photos data parsing
+  const extraData = parsePhotosData(parent);
+  const { cmsType } = getEventConfig();
+
+  if (!parent) {
+    window.lana?.log('Error:page server block cannot find its parent element');
+    return;
+  }
+
+  if (!getMetadata('event-id')) return;
+
+  if (cmsType === 'SP') {
+    processTemplateInAllNodes(parent, extraData);
+    decorateProfileCardsZPattern(parent);
+  }
 
   flagEventState(parent);
-
-  // handle link replacement. To keep when switching to metadata based rendering
-  autoUpdateLinks(parent);
-  decorateProfileCardsZPattern(parent);
-  if (getEventServiceEnv() !== 'prod') updateExtraMetaTags(parent);
+  processLinks(parent);
+  if (getEventServiceEnv() !== 'prod' && cmsType === 'SP') updateExtraMetaTags(parent);
 }
 
 export default async function decorateArea(area = document) {
