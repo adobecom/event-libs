@@ -242,7 +242,7 @@ export async function validatePageAndRedirect(miloLibs) {
   document.body.classList.remove('validating-page');
 }
 
-function autoUpdateLinks(scope) {
+function initRSVPHandler(links) {
   const regHashCallbacks = {
     '#rsvp-form': (a) => {
       const originalText = a.textContent.includes('|') ? a.textContent.split('|')[0] : a.textContent;
@@ -289,65 +289,93 @@ function autoUpdateLinks(scope) {
     },
   };
 
-  scope.querySelectorAll('a[href*="#"]').forEach((a) => {
+  let RSVPLinks = [];
+
+  links.forEach((a) => {
     try {
       const url = new URL(a.href);
       const regCallbackKey = Object.keys(regHashCallbacks).find((key) => url.hash.startsWith(key));
-      let linkText = a.textContent;
-      let match = META_REG.exec(linkText);
-
-      while (match !== null) {
-        const innerMetadataPath = match[1];
-        const innerMetadataValue = parseMetadataPath(innerMetadataPath) || '';
-        linkText = linkText.replaceAll(`[[${innerMetadataPath}]]`, innerMetadataValue);
-        match = META_REG.exec(linkText);
-      }
-
-      if (linkText !== a.textContent) {
-        a.textContent = linkText;
-      }
 
       if (regCallbackKey) {
+        RSVPLinks.push(a);
         regHashCallbacks[regCallbackKey](a);
-      } else if (a.href.endsWith('#event-template')) {
-        let templateId;
-
-        try {
-          const seriesMetadata = JSON.parse(getMetadata('series'));
-          templateId = seriesMetadata?.templateId;
-        } catch (e) {
-          window.lana?.log(`Failed to parse series metadata. Attempt to fallback on event tempate ID attribute:\n${JSON.stringify(e, null, 2)}`);
-        }
-
-        if (!templateId && getMetadata('template-id')) {
-          templateId = getMetadata('template-id');
-        }
-
-        if (templateId) {
-          a.href = templateId;
-        } else {
-          window.lana?.log(`Error: Failed to find template ID for event ${getMetadata('event-id')}`);
-        }
-      } else if (a.href.endsWith('#host-email')) {
-        if (getMetadata('host-email')) {
-          const emailSubject = `${dictionaryManager.getValue('mailto-subject-prefix')} ${getMetadata('event-title')}`;
-          a.href = `mailto:${getMetadata('host-email')}?subject=${encodeURIComponent(emailSubject)}`;
-        } else {
-          a.remove();
-        }
-      } else if (url.hash) {
-        const metadataPath = url.hash.replace('#', '');
-        const metadataValue = parseMetadataPath(metadataPath);
-        if (metadataValue) {
-          a.href = metadataValue;
-        } else if (url.pathname.startsWith('/events-placeholder')) {
-          a.remove();
-        }
       }
+    } catch (e) {
+      window.lana?.log(`Error while attempting to process RSVP link ${a.href}:\n${JSON.stringify(e, null, 2)}`);
+    }
+  });
+
+  return RSVPLinks;
+}
+
+function autoUpdateLinks(parent) {
+  const { cmsType } = getEventConfig();
+  const links = parent.querySelectorAll('a[href*="#"]');
+
+  const RSVPLinks = initRSVPHandler(links);
+
+
+  links.forEach((a) => {
+    try {
+      if (cmsType === 'SP') {
+        const url = new URL(a.href);
+        const isPlaceholderLink = url.pathname.startsWith('/events-placeholder');
+        let linkText = a.textContent;
+        let match = META_REG.exec(linkText);
+  
+        while (match !== null) {
+          const innerMetadataPath = match[1];
+          const innerMetadataValue = parseMetadataPath(innerMetadataPath) || '';
+          linkText = linkText.replaceAll(`[[${innerMetadataPath}]]`, innerMetadataValue);
+          match = META_REG.exec(linkText);
+        }
+  
+        if (linkText !== a.textContent) {
+          a.textContent = linkText;
+        }
+      
+        if (a.href.endsWith('#event-template')) {
+          let templateId;
+
+          try {
+            const seriesMetadata = JSON.parse(getMetadata('series'));
+            templateId = seriesMetadata?.templateId;
+          } catch (e) {
+            window.lana?.log(`Failed to parse series metadata. Attempt to fallback on event tempate ID attribute:\n${JSON.stringify(e, null, 2)}`);
+          }
+
+          if (!templateId && getMetadata('template-id')) {
+            templateId = getMetadata('template-id');
+          }
+
+          if (templateId) {
+            a.href = templateId;
+          } else {
+            window.lana?.log(`Error: Failed to find template ID for event ${getMetadata('event-id')}`);
+          }
+        } else if (a.href.endsWith('#host-email')) {
+          if (getMetadata('host-email')) {
+            const emailSubject = `${dictionaryManager.getValue('mailto-subject-prefix')} ${getMetadata('event-title')}`;
+            a.href = `mailto:${getMetadata('host-email')}?subject=${encodeURIComponent(emailSubject)}`;
+          } else {
+            a.remove();
+          }
+        } else if (url.hash && !RSVPLinks.includes(a)) {
+          const metadataPath = url.hash.replace('#', '');
+          const metadataValue = parseMetadataPath(metadataPath);
+          if (metadataValue) {
+            a.href = metadataValue;
+          } else if (isPlaceholderLink) {
+            a.remove();
+          }
+        }
+      } 
     } catch (e) {
       window.lana?.log(`Error while attempting to replace link ${a.href}:\n${JSON.stringify(e, null, 2)}`);
     }
   });
+
+  
 }
 
 export function updatePictureElement(imageUrl, parentPic, altText) {
@@ -668,8 +696,9 @@ function parsePhotosData(area) {
   return output;
 };
 
-// data -> dom gills
+// data -> DOM gills
 export function autoUpdateContent(parent) {
+  // handle photos data parsing
   const extraData = parsePhotosData(parent);
 
   if (!parent) {
@@ -743,7 +772,6 @@ export function autoUpdateContent(parent) {
 
 export default async function decorateArea(area = document) {
   // Initialize DictionaryManager with configuration
-  console.log('running decorateArea');
   try {
     const { miloConfig } = getEventConfig();
     console.log('miloConfig', miloConfig);

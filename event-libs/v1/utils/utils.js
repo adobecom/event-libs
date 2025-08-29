@@ -1,4 +1,5 @@
 import { SUSI_OPTIONS, ENV_MAP } from './constances.js';
+import { getEventConfig } from './decorate.js';
 
 export const LIBS = (() => {
   const { hostname, search } = window.location;
@@ -180,12 +181,13 @@ function toClassName(name) {
     : '';
 }
 
-export function getSusiOptions(conf) {
-  const { env: { name: envName } } = conf;
+export function getSusiOptions() {
+  const eventConfig = getEventConfig();
+  console.log('accessing config', eventConfig);
   const { href, hash } = window.location;
 
   const susiOptions = Object.keys(SUSI_OPTIONS).reduce((opts, key) => {
-    opts[key] = SUSI_OPTIONS[key][envName] || SUSI_OPTIONS[key];
+    opts[key] = SUSI_OPTIONS[key][eventConfig.miloConfig.env.name] || SUSI_OPTIONS[key];
     return opts;
   }, {});
 
