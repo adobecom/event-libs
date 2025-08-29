@@ -1,7 +1,7 @@
 import { expect } from '@esm-bundle/chai';
 import sinon from 'sinon';
-import { getProfile, lazyCaptureProfile } from '../../../events/scripts/profile.js';
-import BlockMediator from '../../../events/scripts/deps/block-mediator.min.js';
+import { getProfile, lazyCaptureProfile } from '../../../event-libs/v1/utils/profile.js';
+import BlockMediator from '../../../event-libs/v1/deps/block-mediator.min.js';
 
 describe('Profile Functions', () => {
   let clock;

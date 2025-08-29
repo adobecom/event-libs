@@ -1,7 +1,7 @@
 import { expect } from '@esm-bundle/chai';
 import { readFile } from '@web/test-runner-commands';
-import init, { convertToLocaleTimeFormat } from '../../../../events/blocks/event-agenda/event-agenda.js';
-import { setMetadata } from '../../../../events/scripts/utils.js';
+import init, { convertToLocaleTimeFormat } from '../../../../event-libs/v1/blocks/event-agenda/event-agenda.js';
+import { setMetadata } from '../../../../event-libs/v1/utils/utils.js';
 
 const body = await readFile({ path: './mocks/default.html' });
 
@@ -183,8 +183,8 @@ describe('Agenda Module', () => {
       expect(el.parentNode).to.be.null;
     });
 
-    it('should remove element if metadata "show-agenda-post-event" is not "true" and body has class "timing-post-event"', async () => {
-      document.body.classList.add('timing-post-event');
+    it('should remove element if metadata "show-agenda-post-event" is not "true" and body has eventState "post-event"', async () => {
+      document.body.dataset.eventState = 'post-event';
       setMetadata('show-agenda-post-event', 'false');
 
       const el = document.querySelector('.event-agenda');

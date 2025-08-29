@@ -113,7 +113,7 @@ describe('Events Form', () => {
       form.appendChild(fieldWrapper);
 
       // Import and test the constructPayload function directly
-      import('../../../../events/blocks/events-form/events-form.js').then(() => {
+      import('../../../../event-libs/v1/blocks/events-form/events-form.js').then(() => {
         // Since constructPayload is not exported, we'll test the behavior through the form
         // submission. For now, let's just verify the checkbox is created correctly
         expect(checkbox.checked).to.be.true;

@@ -1,4 +1,4 @@
-import { readBlockConfig, LIBS, getMetadata } from '../../scripts/utils.js';
+import { readBlockConfig, getMetadata, getEventConfig, LIBS } from '../../utils/utils.js';
 
 function buildScheduleDoubleLinkedList(entries) {
   if (!entries.length) return null;
@@ -103,11 +103,14 @@ function setScheduleToScheduleWorker(schedule, plugins, tabId) {
 }
 
 export default async function init(el) {
+  const eventConfig = getEventConfig();
+  const miloLibs = eventConfig?.miloConfig?.miloLibs ? eventConfig.miloConfig.miloLibs : LIBS;
+
   const [{ default: loadFragment }, { createTag, getLocale, getConfig }] = await Promise.all([
-    import(`${LIBS}/blocks/fragment/fragment.js`),
-    import(`${LIBS}/utils/utils.js`),
-    import(`${LIBS}/features/spectrum-web-components/dist/theme.js`),
-    import(`${LIBS}/features/spectrum-web-components/dist/progress-circle.js`),
+    import(`${miloLibs}/blocks/fragment/fragment.js`),
+    import(`${miloLibs}/utils/utils.js`),
+    import(`${miloLibs}/features/spectrum-web-components/dist/theme.js`),
+    import(`${miloLibs}/features/spectrum-web-components/dist/progress-circle.js`),
   ]);
 
   const blockConfig = readBlockConfig(el);

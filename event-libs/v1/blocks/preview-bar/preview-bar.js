@@ -1,6 +1,4 @@
-import { LIBS, getIcon } from '../../scripts/utils.js';
-
-const { createTag, getMetadata } = await import(`${LIBS}/utils/utils.js`);
+import { createTag, getMetadata, getIcon } from '../../utils/utils.js';
 
 export function getEventStatus() {
   const publishedMeta = getMetadata('published')?.toLowerCase() === 'true' || getMetadata('status')?.toLowerCase() === 'live';

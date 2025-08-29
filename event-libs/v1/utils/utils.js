@@ -8,6 +8,30 @@ export const LIBS = (() => {
   return branch.includes('--') ? `https://${branch}.aem.live/libs` : `https://${branch}--milo--adobecom.aem.live/libs`;
 })();
 
+export const [setEventConfig, updateEventConfig, getEventConfig] = (() => {
+  let config = {};
+  return [
+    (ec, mc = {}) => {
+      config = { eventServiceEnv: getEventServiceEnv(), ...ec, miloConfig: mc };
+      const cmsType = ec.cmsType || 'DA';
+      if (cmsType === 'SP') {
+        const metadataLocation = '/events/default/';
+        config.metadataLocation = metadataLocation;
+      }
+
+      const origin = mc.origin || window.location.origin;
+      const pathname = mc.pathname || window.location.pathname;
+
+      config.codeRoot = mc.codeRoot ? `${origin}${mc.codeRoot}` : origin;
+      config.pathname = pathname;
+
+      return config;
+    },
+    (ec, mc = {}) => (config = { ...ec, miloConfig: mc }),
+    () => config,
+  ];
+})();
+
 export function getEventServiceEnv() {
   const validEnvs = ['dev', 'stage', 'prod'];
   const { host, search } = window.location;
@@ -33,7 +57,7 @@ export function getEventServiceEnv() {
 
   if (host.endsWith('adobe.com')) return ENV_MAP.prod;
   // fallback to dev
-  return 'dev';
+  return ENV_MAP.dev;
 }
 
 export function createTag(tag, attributes, html, options = {}) {
@@ -180,12 +204,12 @@ function toClassName(name) {
     : '';
 }
 
-export function getSusiOptions(conf) {
-  const { env: { name: envName } } = conf;
+export function getSusiOptions() {
+  const eventConfig = getEventConfig();
   const { href, hash } = window.location;
 
   const susiOptions = Object.keys(SUSI_OPTIONS).reduce((opts, key) => {
-    opts[key] = SUSI_OPTIONS[key][envName] || SUSI_OPTIONS[key];
+    opts[key] = SUSI_OPTIONS[key][eventConfig.miloConfig.env.name] || SUSI_OPTIONS[key];
     return opts;
   }, {});
 
