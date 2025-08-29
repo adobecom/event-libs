@@ -5,7 +5,7 @@ describe('Adobe Event Service API', () => {
   let api;
 
   before(async () => {
-    api = await import('../../../events/scripts/esp-controller.js');
+    api = await import('../../../event-libs/v1/utils/esp-controller.js');
   });
 
   describe('getCaasTags', () => {

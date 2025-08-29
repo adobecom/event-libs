@@ -1,4 +1,23 @@
 // Re-export all utilities from utils.js
+const EVENT_BLOCKS = [
+  'bento-cards',
+  'chrono-box',
+  'daa-injection',
+  'event-agenda',
+  'event-map',
+  'event-partners',
+  'event-product-blades',
+  'event-schema',
+  'event-subscription-form',
+  'events-form',
+  'mobile-rider',
+  'preview-bar',
+  'profile-cards',
+  'promotional-content',
+  'venue-additional-info',
+  'youtube-chat',
+];
+
 export {
   LIBS,
   getEventServiceEnv,
@@ -14,13 +33,13 @@ export {
   getIcon,
   getSusiOptions,
   readBlockConfig,
+  setEventConfig,
+  updateEventConfig,
+  getEventConfig,
 } from './utils/utils.js';
 
 // Re-export from decorate.js
 export {
-  setEventConfig,
-  updateEventConfig,
-  getEventConfig,
   getNonProdData,
   autoUpdateContent,
   validatePageAndRedirect,
@@ -61,3 +80,5 @@ export {
   getEventAttendeePayload,
   getBaseAttendeePayload,
 } from './utils/data-utils.js';
+
+export { EVENT_BLOCKS };

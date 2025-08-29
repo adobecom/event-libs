@@ -1,5 +1,5 @@
 import { expect } from '@esm-bundle/chai';
-import { DictionaryManager, dictionaryManager } from '../../../event-libs/scripts/dictionary-manager.js';
+import { DictionaryManager, dictionaryManager } from '../../../event-libs/v1/utils/dictionary-manager.js';
 
 describe('DictionaryManager', () => {
   let manager;

@@ -1,5 +1,5 @@
 import { ICON_REG, META_REG, SERIES_404_MAP_PATH, ALLOWED_EMAIL_DOMAINS } from './constances.js';
-import BlockMediator from '../../scripts/deps/block-mediator.min.js';
+import BlockMediator from '../deps/block-mediator.min.js';
 import { getEvent } from './esp-controller.js';
 import { dictionaryManager } from './dictionary-manager.js';
 import {
@@ -10,6 +10,7 @@ import {
   getSusiOptions,
   getEventServiceEnv,
   parseMetadataPath,
+  getEventConfig,
 } from './utils.js';
 
 const preserveFormatKeys = [
@@ -498,30 +499,6 @@ export function shouldRenderWithNonProdMetadata(eventId, prodDomain) {
 
   return false;
 }
-
-export const [setEventConfig, updateEventConfig, getEventConfig] = (() => {
-  let config = {};
-  return [
-    (ec, mc = {}) => {
-      config = { eventServiceEnv: getEventServiceEnv(), ...ec, miloConfig: mc };
-      const cmsType = ec.cmsType || 'DA';
-      if (cmsType === 'SP') {
-        const metadataLocation = '/events/default/';
-        config.metadataLocation = metadataLocation;
-      }
-
-      const origin = mc.origin || window.location.origin;
-      const pathname = mc.pathname || window.location.pathname;
-
-      config.codeRoot = mc.codeRoot ? `${origin}${mc.codeRoot}` : origin;
-      config.pathname = pathname;
-
-      return config;
-    },
-    (ec, mc = {}) => (config = { ...ec, miloConfig: mc }),
-    () => config,
-  ];
-})();
 
 export async function getNonProdData(env) {
   const isPreviewMode = new URLSearchParams(window.location.search).get('previewMode')

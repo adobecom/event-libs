@@ -1,8 +1,8 @@
 import { readFile } from '@web/test-runner-commands';
 import { expect } from '@esm-bundle/chai';
 import sinon from 'sinon';
-import { LIBS, setMetadata } from '../../../events/scripts/utils.js';
-import BlockMediator from '../../../events/scripts/deps/block-mediator.min.js';
+import { LIBS, setMetadata } from '../../../event-libs/v1/utils/utils.js';
+import BlockMediator from '../../../event-libs/v1/scripts/deps/block-mediator.min.js';
 
 const {
   default: autoUpdateContent,
@@ -11,7 +11,7 @@ const {
   validatePageAndRedirect,
   updatePictureElement,
   getNonProdData,
-} = await import('../../../events/scripts/content-update.js');
+} = await import('../../../event-libs/v1/utils/decorate.js');
 const { getConfig } = await import(`${LIBS}/utils/utils.js`);
 const head = await readFile({ path: './mocks/head.html' });
 const body = await readFile({ path: './mocks/full-event.html' });

@@ -1,4 +1,4 @@
-import { createTag, getEventServiceEnv } from '../../scripts/utils.js';
+import { createTag, getEventServiceEnv } from '../../utils/utils.js';
 import BlockMediator from '../../scripts/deps/block-mediator.min.js';
 
 const CONFIG = {

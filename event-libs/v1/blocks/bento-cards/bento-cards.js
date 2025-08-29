@@ -1,9 +1,8 @@
 import buildMiloCarousel from '../../features/milo-carousel.js';
-import { getEventConfig } from '../../utils/decorate.js';
+import { createTag, getEventConfig } from '../../utils/utils.js';
 
 const eventConfig = getEventConfig();
-const { createTag } = await import(`${eventConfig.miloConfig.miloLibs.utils}/utils.js`);
-const { decorateButtons } = await import(`${eventConfig.miloConfig.miloLibs.utils}/decorate.js`);
+const { decorateButtons } = await import(`${eventConfig.miloConfig.miloLibs}/decorate.js`);
 
 export function isReversed(card) {
   const twoImgsStart = !!card.children[0]?.querySelector('img') && !!card.children[1]?.querySelector('img');

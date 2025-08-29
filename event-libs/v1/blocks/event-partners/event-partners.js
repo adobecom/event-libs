@@ -1,7 +1,5 @@
-import { LIBS } from '../../scripts/utils.js';
-
-const { createTag, getMetadata } = await import(`${LIBS}/utils/utils.js`);
-
+import { createTag, getMetadata } from '../../utils/utils.js';
+ 
 export function isOdd(number) {
   return number % 2 !== 0;
 }

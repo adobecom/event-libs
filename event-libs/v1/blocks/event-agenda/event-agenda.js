@@ -1,6 +1,4 @@
-import { LIBS, createOptimizedPicture } from '../../utils/utils.js';
-
-const { createTag, getMetadata, getConfig } = await import(`${LIBS}/utils/utils.js`);
+import { createOptimizedPicture, createTag, getMetadata, getEventConfig } from '../../utils/utils.js';
 
 export function convertToLocaleTimeFormat(time, locale) {
   const [hours, minutes, seconds] = time.split(':').map(Number);
@@ -83,7 +81,7 @@ export default async function init(el) {
     container.classList.add('more-than-six');
   }
 
-  const localeString = getConfig().locale?.ietf || 'en-US';
+  const localeString = getEventConfig().miloConfig.locale?.ietf || 'en-US';
 
   const agendaItemContainer = createTag('div', { class: 'agenda-item-container' }, '', { parent: agendaItemsCol });
   const column1 = createTag('div', { class: 'column' }, '', { parent: agendaItemContainer });

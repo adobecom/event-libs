@@ -1,4 +1,4 @@
-import { LIBS, getMetadata } from '../../utils/utils.js';
+import { getMetadata, getEventConfig, LIBS } from '../../utils/utils.js';
 
 function decorateTextContainer(el, createTag, decorateButtons) {
   const wrapper = el.querySelector('.event-map-wrapper');
@@ -97,9 +97,12 @@ function decorateMap(el, createTag) {
 }
 
 export default async function init(el) {
+  const eventConfig = getEventConfig();
+  const miloLibs = eventConfig?.miloConfig?.miloLibs ? eventConfig.miloConfig.miloLibs : LIBS;
+
   const [{ createTag }, { decorateButtons }] = await Promise.all([
-    import(`${LIBS}/utils/utils.js`),
-    import(`${LIBS}/utils/decorate.js`),
+    import(`${miloLibs}/utils/utils.js`),
+    import(`${miloLibs}/utils/decorate.js`),
   ]);
   if (getMetadata('show-venue-post-event') !== 'true' && document.body.dataset.eventState === 'post-event') {
     el.remove();

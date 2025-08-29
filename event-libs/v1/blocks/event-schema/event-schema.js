@@ -1,4 +1,4 @@
-import { getMetadata } from '../../scripts/utils.js';
+import { getMetadata } from '../../utils/utils.js';
 
 export function injectEventSchema() {
   let venueObject;

@@ -23,7 +23,14 @@ export default {
       '**/deps/**',
     ],
   },
-  plugins: [importMapsPlugin({})],
+  plugins: [importMapsPlugin({
+    imports: {
+      'events/': '/event-libs/v1/',
+      'events/blocks/': '/event-libs/v1/blocks/',
+      'events/scripts/': '/event-libs/v1/utils/',
+      'events/features/': '/event-libs/v1/features/',
+    }
+  })],
   reporters: [
     defaultReporter({ reportTestResults: true, reportTestProgress: true }),
     customReporter(),

@@ -1,7 +1,7 @@
 /* eslint-disable no-unused-vars */
 import { expect } from '@esm-bundle/chai';
 import sinon from 'sinon';
-import createDrawer from '../../../../events/blocks/mobile-rider/drawer.js';
+import createDrawer from '../../../../event-libs/v1/blocks/mobile-rider/drawer.js';
 
 describe('Mobile Rider Drawer', () => {
   let mockLana;

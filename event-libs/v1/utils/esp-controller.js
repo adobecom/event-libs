@@ -1,8 +1,8 @@
 import { LIBS } from './utils.js';
-import BlockMediator from '../../scripts/deps/block-mediator.min.js';
+import BlockMediator from '../deps/block-mediator.min.js';
 import { getBaseAttendeePayload, getEventAttendeePayload } from './data-utils.js';
 import { ENV_MAP } from './constances.js';
-import { getEventConfig } from './decorate.js';
+import { getEventConfig } from './utils.js';
 
 export const getCaasTags = (() => {
   let cache;

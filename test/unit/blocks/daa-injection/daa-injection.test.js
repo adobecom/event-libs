@@ -1,6 +1,6 @@
 import { expect } from '@esm-bundle/chai';
 import { readFile } from '@web/test-runner-commands';
-import init from '../../../../events/blocks/daa-injection/daa-injection.js';
+import init from '../../../../event-libs/v1/blocks/daa-injection/daa-injection.js';
 
 const body = await readFile({ path: './mocks/default.html' });
 const noTarget = await readFile({ path: './mocks/no-target.html' });

@@ -1,14 +1,17 @@
-import { LIBS, getMetadata, getSusiOptions } from '../../scripts/utils.js';
-import { deleteAttendeeFromEvent, getAndCreateAndAddAttendee, getAttendee, getEvent } from '../../scripts/esp-controller.js';
+import { deleteAttendeeFromEvent, getAndCreateAndAddAttendee, getAttendee, getEvent } from '../../utils/esp-controller.js';
 import BlockMediator from '../../scripts/deps/block-mediator.min.js';
 import { signIn, autoUpdateContent } from '../../scripts/decorate.js';
 import { dictionaryManager } from '../../scripts/dictionary-manager.js';
+import { getEventConfig, LIBS, getMetadata, getSusiOptions } from '../../utils/utils.js';
 
-const { createTag, getConfig } = await import(`${LIBS}/utils/utils.js`);
-const { closeModal, sendAnalytics } = await import(`${LIBS}/blocks/modal/modal.js`);
-const { default: sanitizeComment } = await import(`${LIBS}/utils/sanitizeComment.js`);
-const { decorateDefaultLinkAnalytics } = await import(`${LIBS}/martech/attributes.js`);
-const { default: loadFragment } = await import(`${LIBS}/blocks/fragment/fragment.js`);
+const eventConfig = getEventConfig();
+const miloLibs = eventConfig?.miloConfig?.miloLibs ? eventConfig.miloConfig.miloLibs : LIBS;
+
+const { createTag, getConfig } = await import(`${miloLibs}/utils/utils.js`);
+const { closeModal, sendAnalytics } = await import(`${miloLibs}/blocks/modal/modal.js`);
+const { default: sanitizeComment } = await import(`${miloLibs}/utils/sanitizeComment.js`);
+const { decorateDefaultLinkAnalytics } = await import(`${miloLibs}/martech/attributes.js`);
+const { default: loadFragment } = await import(`${miloLibs}/blocks/fragment/fragment.js`);
 
 const RULE_OPERATORS = {
   equal: '=',

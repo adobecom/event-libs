@@ -1,4 +1,4 @@
-import { getMetadata, LIBS } from '../../scripts/utils.js';
+import { getMetadata, getEventConfig, LIBS } from '../../utils/utils.js';
 
 async function getPromotionalContent() {
   let promotionalItems = [];
@@ -12,8 +12,11 @@ async function getPromotionalContent() {
       return promotionalItems;
     }
   }
-  const { getConfig, getLocale } = await import(`${LIBS}/utils/utils.js`);
-  const { prefix } = getLocale(getConfig().locales);
+  const eventConfig = getEventConfig();
+  const miloLibs = eventConfig?.miloConfig?.miloLibs ? eventConfig.miloConfig.miloLibs : LIBS;
+  const { getLocale } = await import(`${miloLibs}/utils/utils.js`);
+
+  const { prefix } = getLocale(eventConfig.miloConfig.locales);
   const { data } = await fetch(`${prefix}/events/default/promotional-content.json`).then((res) => res.json());
 
   if (!data) {
@@ -40,12 +43,15 @@ export function addMediaReversedClass(el) {
 }
 
 export default async function init(el) {
+  const eventConfig = getEventConfig();
+  const miloLibs = eventConfig?.miloConfig?.miloLibs ? eventConfig.miloConfig.miloLibs : LIBS;
+
   const promotionalItems = await getPromotionalContent();
   if (!promotionalItems.length) return;
 
   const [{ default: loadFragment }, { createTag }] = await Promise.all([
-    import(`${LIBS}/blocks/fragment/fragment.js`),
-    import(`${LIBS}/utils/utils.js`),
+    import(`${miloLibs.blocks}/fragment/fragment.js`),
+    import(`${miloLibs}/utils.js`),
   ]);
 
   const fragmentPromotionalItemsPromises = promotionalItems.map(async (item) => {

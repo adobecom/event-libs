@@ -1,7 +1,6 @@
 /* eslint-disable no-underscore-dangle */
-import { LIBS } from '../../scripts/utils.js';
-
-const { createTag, getConfig } = await import(`${LIBS}/utils/utils.js`);
+import { getEventConfig } from '../../utils/decorate.js';
+import { createTag } from '../../utils/utils.js';
 
 const CONFIG = {
   ANALYTICS: { PROVIDER: 'adobe' },
@@ -34,7 +33,8 @@ async function loadScript() {
   if (scriptPromise) return scriptPromise;
 
   scriptPromise = new Promise((res) => {
-    const env = getConfig().env || 'prod';
+    const eventConfig = getEventConfig();
+    const env = eventConfig?.miloConfig?.miloLibs?.env || 'prod';
     const isProd = env === 'prod';
     const src = isProd ? CONFIG.SCRIPTS.PROD_URL : CONFIG.SCRIPTS.DEV_URL;
     const s = createTag('script', { src });
@@ -269,7 +269,8 @@ class MobileRider {
 
   static async getMediaStatus(id) {
     try {
-      const env = getConfig().env || 'prod';
+      const eventConfig = getEventConfig();
+      const env = eventConfig?.miloConfig?.miloLibs?.env || 'prod';
       const isLowerEnv = env !== 'prod';
       const baseUrl = isLowerEnv ? CONFIG.API.DEV_URL : CONFIG.API.PROD_URL;
       const res = await fetch(`${baseUrl}/api/media-status?ids=${id}`);

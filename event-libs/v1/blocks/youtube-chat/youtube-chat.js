@@ -1,4 +1,7 @@
-import { createTag, readBlockConfig } from '../../scripts/utils.js';
+import { getEventConfig } from '../../utils/decorate.js';
+import { createTag, readBlockConfig } from '../../utils/utils.js';
+
+const eventConfig = getEventConfig();
 
 const CONFIG = {
   PRELOAD_DOMAINS: [

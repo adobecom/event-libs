@@ -1,5 +1,4 @@
 import { SUSI_OPTIONS, ENV_MAP } from './constances.js';
-import { getEventConfig } from './decorate.js';
 
 export const LIBS = (() => {
   const { hostname, search } = window.location;
@@ -7,6 +6,30 @@ export const LIBS = (() => {
   const branch = new URLSearchParams(search).get('milolibs') || 'main';
   if (branch === 'local') return 'http://localhost:6456/libs';
   return branch.includes('--') ? `https://${branch}.aem.live/libs` : `https://${branch}--milo--adobecom.aem.live/libs`;
+})();
+
+export const [setEventConfig, updateEventConfig, getEventConfig] = (() => {
+  let config = {};
+  return [
+    (ec, mc = {}) => {
+      config = { eventServiceEnv: getEventServiceEnv(), ...ec, miloConfig: mc };
+      const cmsType = ec.cmsType || 'DA';
+      if (cmsType === 'SP') {
+        const metadataLocation = '/events/default/';
+        config.metadataLocation = metadataLocation;
+      }
+
+      const origin = mc.origin || window.location.origin;
+      const pathname = mc.pathname || window.location.pathname;
+
+      config.codeRoot = mc.codeRoot ? `${origin}${mc.codeRoot}` : origin;
+      config.pathname = pathname;
+
+      return config;
+    },
+    (ec, mc = {}) => (config = { ...ec, miloConfig: mc }),
+    () => config,
+  ];
 })();
 
 export function getEventServiceEnv() {
@@ -183,7 +206,6 @@ function toClassName(name) {
 
 export function getSusiOptions() {
   const eventConfig = getEventConfig();
-  console.log('accessing config', eventConfig);
   const { href, hash } = window.location;
 
   const susiOptions = Object.keys(SUSI_OPTIONS).reduce((opts, key) => {
