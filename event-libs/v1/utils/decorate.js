@@ -243,7 +243,23 @@ export async function validatePageAndRedirect(miloLibs) {
   document.body.classList.remove('validating-page');
 }
 
-function initRSVPHandler(links) {
+function processTemplateInLinkText(a) {
+  let linkText = a.textContent;
+  let match = META_REG.exec(linkText);
+
+  while (match !== null) {
+    const innerMetadataPath = match[1];
+    const innerMetadataValue = parseMetadataPath(innerMetadataPath) || '';
+    linkText = linkText.replaceAll(`[[${innerMetadataPath}]]`, innerMetadataValue);
+    match = META_REG.exec(linkText);
+  }
+
+  if (linkText !== a.textContent) {
+    a.textContent = linkText;
+  }
+}
+
+function initRSVPHandler(link) {
   const regHashCallbacks = {
     '#rsvp-form': (a) => {
       const originalText = a.textContent.includes('|') ? a.textContent.split('|')[0] : a.textContent;
@@ -290,52 +306,35 @@ function initRSVPHandler(links) {
     },
   };
 
-  let RSVPLinks = [];
+  try {
+    const url = new URL(link.href);
+    const regCallbackKey = Object.keys(regHashCallbacks).find((key) => url.hash.startsWith(key));
 
-  links.forEach((a) => {
-    try {
-      const url = new URL(a.href);
-      const regCallbackKey = Object.keys(regHashCallbacks).find((key) => url.hash.startsWith(key));
-
-      if (regCallbackKey) {
-        RSVPLinks.push(a);
-        regHashCallbacks[regCallbackKey](a);
-      }
-    } catch (e) {
-      window.lana?.log(`Error while attempting to process RSVP link ${a.href}:\n${JSON.stringify(e, null, 2)}`);
+    if (!regCallbackKey) {
+      return false;
     }
-  });
 
-  return RSVPLinks;
+    regHashCallbacks[regCallbackKey](link);
+    return true;
+  } catch (e) {
+    window.lana?.log(`Error while attempting to process RSVP link ${link.href}:\n${JSON.stringify(e, null, 2)}`);
+    return false;
+  }
 }
 
 function autoUpdateLinks(parent) {
   const { cmsType } = getEventConfig();
   const links = parent.querySelectorAll('a[href*="#"]');
 
-  const RSVPLinks = initRSVPHandler(links);
-
-
   links.forEach((a) => {
+    const url = new URL(a.href);
+    const isPlaceholderLink = url.pathname.startsWith('/events-placeholder');
     try {
       if (cmsType === 'SP') {
-        const url = new URL(a.href);
-        const isPlaceholderLink = url.pathname.startsWith('/events-placeholder');
-        let linkText = a.textContent;
-        let match = META_REG.exec(linkText);
-  
-        while (match !== null) {
-          const innerMetadataPath = match[1];
-          const innerMetadataValue = parseMetadataPath(innerMetadataPath) || '';
-          linkText = linkText.replaceAll(`[[${innerMetadataPath}]]`, innerMetadataValue);
-          match = META_REG.exec(linkText);
-        }
-  
-        if (linkText !== a.textContent) {
-          a.textContent = linkText;
-        }
-      
-        if (a.href.endsWith('#event-template')) {
+        processTemplateInLinkText(a);
+        const processedAsRSVPButton = initRSVPHandler(a);
+
+        if (a.href.endsWith('#event-template') && !processedAsRSVPButton) {
           let templateId;
 
           try {
@@ -361,7 +360,7 @@ function autoUpdateLinks(parent) {
           } else {
             a.remove();
           }
-        } else if (url.hash && !RSVPLinks.includes(a)) {
+        } else if (url.hash) {
           const metadataPath = url.hash.replace('#', '');
           const metadataValue = parseMetadataPath(metadataPath);
           if (metadataValue) {
@@ -370,7 +369,11 @@ function autoUpdateLinks(parent) {
             a.remove();
           }
         }
-      } 
+      }
+
+      if (cmsType === 'DA') {
+        initRSVPHandler(a);
+      }
     } catch (e) {
       window.lana?.log(`Error while attempting to replace link ${a.href}:\n${JSON.stringify(e, null, 2)}`);
     }

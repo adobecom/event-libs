@@ -2,7 +2,7 @@ import { readFile } from '@web/test-runner-commands';
 import { expect } from '@esm-bundle/chai';
 import sinon from 'sinon';
 import { LIBS, setMetadata } from '../../../event-libs/v1/utils/utils.js';
-import BlockMediator from '../../../event-libs/v1/scripts/deps/block-mediator.min.js';
+import BlockMediator from '../../../event-libs/v1/deps/block-mediator.min.js';
 
 const {
   default: autoUpdateContent,

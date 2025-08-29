@@ -1,7 +1,7 @@
 import { deleteAttendeeFromEvent, getAndCreateAndAddAttendee, getAttendee, getEvent } from '../../utils/esp-controller.js';
-import BlockMediator from '../../scripts/deps/block-mediator.min.js';
-import { signIn, autoUpdateContent } from '../../scripts/decorate.js';
-import { dictionaryManager } from '../../scripts/dictionary-manager.js';
+import BlockMediator from '../../deps/block-mediator.min.js';
+import { signIn, autoUpdateContent } from '../../utils/decorate.js';
+import { dictionaryManager } from '../../utils/dictionary-manager.js';
 import { getEventConfig, LIBS, getMetadata, getSusiOptions } from '../../utils/utils.js';
 
 const eventConfig = getEventConfig();
