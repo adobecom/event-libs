@@ -41,6 +41,7 @@ const {
   getEvent,
   getEventAttendee,
   // ... and many more
+  EVENT_BLOCKS, // Array of available event block names
 } = await import(`${EVENT_LIBS}/libs.js`);
 ```
 
@@ -61,3 +62,4 @@ The consolidated `libs.js` file exports all utilities from:
 2. **Better tree-shaking** - Bundlers can still optimize unused exports
 3. **Easier maintenance** - No need to manage multiple import paths
 4. **Consistent API** - All utilities available from one entry point
+5. **Block discovery** - `EVENT_BLOCKS` constant provides list of available event blocks
