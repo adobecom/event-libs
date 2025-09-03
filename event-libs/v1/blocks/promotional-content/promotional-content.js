@@ -1,4 +1,4 @@
-import { getMetadata, getEventConfig, LIBS } from '../../utils/utils.js';
+import { getMetadata, getEventConfig, LIBS, FALLBACK_LOCALES } from '../../utils/utils.js';
 
 async function getPromotionalContent() {
   let promotionalItems = [];
@@ -13,10 +13,11 @@ async function getPromotionalContent() {
     }
   }
   const eventConfig = getEventConfig();
-  const miloLibs = eventConfig?.miloConfig?.miloLibs ? eventConfig.miloConfig.miloLibs : LIBS;
+  const { miloConfig } = eventConfig;
+  const miloLibs = miloConfig?.miloLibs ? miloConfig.miloLibs : LIBS;
   const { getLocale } = await import(`${miloLibs}/utils/utils.js`);
 
-  const { prefix } = getLocale(eventConfig.miloConfig.locales);
+  const { prefix } = getLocale(miloConfig?.locales || FALLBACK_LOCALES);
   const { data } = await fetch(`${prefix}/events/default/promotional-content.json`).then((res) => res.json());
 
   if (!data) {

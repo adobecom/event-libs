@@ -1,4 +1,10 @@
-import { ICON_REG, META_REG, SERIES_404_MAP_PATH, ALLOWED_EMAIL_DOMAINS } from './constances.js';
+import { 
+  ICON_REG,
+  META_REG,
+  SERIES_404_MAP_PATH,
+  ALLOWED_EMAIL_DOMAINS,
+  FALLBACK_LOCALES,
+} from './constances.js';
 import BlockMediator from '../deps/block-mediator.min.js';
 import { getEvent } from './esp-controller.js';
 import { dictionaryManager } from './dictionary-manager.js';
@@ -11,6 +17,7 @@ import {
   getEventServiceEnv,
   parseMetadataPath,
   getEventConfig,
+  getFallbackLocale,
 } from './utils.js';
 
 const preserveFormatKeys = [
@@ -108,7 +115,7 @@ function setCtaState(targetState, rsvpBtn) { // eslint-disable-line no-unused-va
   stateTrigger[targetState]();
 }
 
-export async function updateRSVPButtonState(rsvpBtn, miloLibs) {
+export async function updateRSVPButtonState(rsvpBtn) {
   const eventInfo = await getEvent(getMetadata('event-id'));
   let eventFull = false;
   let waitlistEnabled = getMetadata('allow-wait-listing') === 'true';
@@ -124,17 +131,17 @@ export async function updateRSVPButtonState(rsvpBtn, miloLibs) {
   if (!rsvpData) {
     if (eventFull) {
       if (waitlistEnabled) {
-        setCtaState('toWaitlist', rsvpBtn, miloLibs);
+        setCtaState('toWaitlist', rsvpBtn);
       } else {
-        setCtaState('eventClosed', rsvpBtn, miloLibs);
+        setCtaState('eventClosed', rsvpBtn);
       }
     } else {
-      setCtaState('default', rsvpBtn, miloLibs);
+      setCtaState('default', rsvpBtn);
     }
   } else if (rsvpData.registrationStatus === 'registered') {
-    setCtaState('registered', rsvpBtn, miloLibs);
+    setCtaState('registered', rsvpBtn);
   } else if (rsvpData.registrationStatus === 'waitlisted') {
-    setCtaState('waitlisted', rsvpBtn, miloLibs);
+    setCtaState('waitlisted', rsvpBtn);
   }
 }
 
@@ -148,12 +155,10 @@ export function signIn(options) {
 }
 
 async function handleRSVPBtnBasedOnProfile(rsvpBtn, profile) {
-  const { miloConfig } = getEventConfig();
-
-  updateRSVPButtonState(rsvpBtn, miloConfig);
+  updateRSVPButtonState(rsvpBtn);
 
   BlockMediator.subscribe('rsvpData', () => {
-    updateRSVPButtonState(rsvpBtn, miloConfig);
+    updateRSVPButtonState(rsvpBtn);
   });
 
   if (profile?.noProfile || profile.account_type === 'guest') {
@@ -162,8 +167,7 @@ async function handleRSVPBtnBasedOnProfile(rsvpBtn, profile) {
     if (!allowGuestReg) {
       rsvpBtn.el.addEventListener('click', (e) => {
         e.preventDefault();
-        const { miloConfig } = getEventConfig();
-        signIn({ ...getSusiOptions(miloConfig), redirect_uri: `${e.target.href}` });
+        signIn({ ...getSusiOptions(), redirect_uri: `${e.target.href}` });
       });
     }
   }
@@ -233,7 +237,7 @@ export async function validatePageAndRedirect(miloLibs) {
   if (purposefulHitOnProdPreview) {
     BlockMediator.subscribe('imsProfile', ({ newValue }) => {
       if (newValue?.noProfile || newValue?.account_type === 'guest') {
-        signIn(getSusiOptions(getConfig()));
+        signIn(getSusiOptions());
       } else if (!ALLOWED_EMAIL_DOMAINS.some((d) => newValue.email?.toLowerCase().endsWith(d))) {
         window.location.replace(error404Location);
       }
@@ -696,7 +700,8 @@ function processTemplateInAllNodes(parent, extraData) {
     if (p1 === 'start-date' || p1 === 'end-date') {
       const date = new Date(content);
       const { miloConfig } = getEventConfig();
-      const localeString = miloConfig.locale?.ietf || 'en-US';
+
+      const localeString = miloConfig ? miloConfig.locale?.ietf : getFallbackLocale(FALLBACK_LOCALES);
       content = date.toLocaleDateString(localeString, { month: 'long', day: 'numeric', year: 'numeric' });
     }
 

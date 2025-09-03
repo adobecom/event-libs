@@ -204,12 +204,29 @@ function toClassName(name) {
     : '';
 }
 
+export function getFallbackLocale(locales, pathname = window.location.pathname) {
+  if (!locales) {
+    return { ietf: 'en-US', tk: 'hah7vzn.css', prefix: '' };
+  }
+  const split = pathname.split('/');
+  const localeString = split[1];
+  let locale = locales[localeString] || locales[''];
+  const isUS = locale.ietf === 'en-US';
+  locale.prefix = isUS ? '' : `/${localeString}`;
+  locale.region = isUS ? 'us' : localeString.split('_')[0];
+  return locale;
+}
+
 export function getSusiOptions() {
   const eventConfig = getEventConfig();
   const { href, hash } = window.location;
 
+  const { miloConfig } = eventConfig;
+
+  const envName = miloConfig ? miloConfig.env.name : getEventServiceEnv().name;
+
   const susiOptions = Object.keys(SUSI_OPTIONS).reduce((opts, key) => {
-    opts[key] = SUSI_OPTIONS[key][eventConfig.miloConfig.env.name] || SUSI_OPTIONS[key];
+    opts[key] = SUSI_OPTIONS[key][envName] || SUSI_OPTIONS[key];
     return opts;
   }, {});
 
