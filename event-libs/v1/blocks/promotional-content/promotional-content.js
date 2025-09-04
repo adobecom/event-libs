@@ -1,4 +1,5 @@
-import { getMetadata, getEventConfig, LIBS, FALLBACK_LOCALES } from '../../utils/utils.js';
+import { getMetadata, getEventConfig, LIBS } from '../../utils/utils.js';
+import { FALLBACK_LOCALES } from '../../utils/constances.js';
 
 async function getPromotionalContent() {
   let promotionalItems = [];
