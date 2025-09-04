@@ -1,6 +1,6 @@
 import { expect } from '@esm-bundle/chai';
 import { readFile } from '@web/test-runner-commands';
-import init from '../../../../events/blocks/bento-cards/bento-cards.js';
+import init from '../../../../event-libs/v1/blocks/bento-cards/bento-cards.js';
 
 const body = await readFile({ path: './mocks/default.html' });
 const show2 = await readFile({ path: './mocks/show-2.html' });

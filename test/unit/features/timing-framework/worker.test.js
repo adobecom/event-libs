@@ -1,6 +1,6 @@
 import { expect } from '@esm-bundle/chai';
 import sinon from 'sinon';
-import TimingWorker from '../../../../events/features/timing-framework/worker.js';
+import TimingWorker from '../../../../event-libs/v1/features/timing-framework/worker.js';
 
 // Mock BroadcastChannel
 class MockBroadcastChannel {

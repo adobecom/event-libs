@@ -1,4 +1,4 @@
-import { createTag } from '../../scripts/utils.js';
+import { createTag } from '../../utils/utils.js';
 
 class Drawer {
   constructor(root, cfg = {}) {

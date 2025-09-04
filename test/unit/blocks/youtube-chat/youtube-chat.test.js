@@ -20,7 +20,7 @@ describe('YouTube Chat Module', () => {
     let youtubeChat;
 
     beforeEach(async () => {
-      const { YouTubeChat } = await import('../../../../events/blocks/youtube-chat/youtube-chat.js');
+      const { YouTubeChat } = await import('../../../../event-libs/v1/blocks/youtube-chat/youtube-chat.js');
       youtubeChat = new YouTubeChat();
     });
 
@@ -170,7 +170,7 @@ describe('YouTube Chat Module', () => {
       it('should add preconnect links for YouTube domains', async () => {
         const originalHead = document.head.innerHTML;
 
-        const { YouTubeChat } = await import('../../../../events/blocks/youtube-chat/youtube-chat.js');
+        const { YouTubeChat } = await import('../../../../event-libs/v1/blocks/youtube-chat/youtube-chat.js');
         YouTubeChat.preconnect();
 
         const links = document.querySelectorAll('link[rel="preconnect"]');
@@ -186,7 +186,7 @@ describe('YouTube Chat Module', () => {
       it('should only add preconnect links once', async () => {
         const originalHead = document.head.innerHTML;
 
-        const { YouTubeChat } = await import('../../../../events/blocks/youtube-chat/youtube-chat.js');
+        const { YouTubeChat } = await import('../../../../event-libs/v1/blocks/youtube-chat/youtube-chat.js');
         YouTubeChat.preconnect();
         const firstCount = document.querySelectorAll('link[rel="preconnect"]').length;
 
@@ -296,7 +296,7 @@ describe('YouTube Chat Module', () => {
     });
 
     it('should export init function and handle initialization', async () => {
-      const { default: init, YouTubeChat } = await import('../../../../events/blocks/youtube-chat/youtube-chat.js');
+      const { default: init, YouTubeChat } = await import('../../../../event-libs/v1/blocks/youtube-chat/youtube-chat.js');
 
       expect(typeof init).to.equal('function');
       expect(typeof YouTubeChat).to.equal('function');

@@ -11,8 +11,8 @@ import {
   ARROW_NEXT_IMG,
   ARROW_PREVIOUS_IMG,
   KEY_CODES,
-} from '../../../events/features/milo-carousel.js';
-import { createTag } from '../../../events/scripts/utils.js';
+} from '../../../event-libs/v1/features/milo-carousel.js';
+import { createTag } from '../../../event-libs/v1/utils/utils.js';
 
 describe('Swipe Functions', () => {
   describe('getSwipeDistance', () => {

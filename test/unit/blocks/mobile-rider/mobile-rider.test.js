@@ -1,7 +1,7 @@
 /* eslint-disable no-underscore-dangle */
 import { expect } from '@esm-bundle/chai';
 import sinon from 'sinon';
-import init from '../../../../events/blocks/mobile-rider/mobile-rider.js';
+import init from '../../../../event-libs/v1/blocks/mobile-rider/mobile-rider.js';
 
 const defaultHtml = `
 <div class="mobile-rider">

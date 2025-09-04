@@ -1,6 +1,6 @@
 import { expect } from '@esm-bundle/chai';
 import { readFile } from '@web/test-runner-commands';
-import init, { getEventStatus, getPreviewTarget, getCloseBtn } from '../../../../events/blocks/preview-bar/preview-bar.js';
+import init, { getEventStatus, getPreviewTarget, getCloseBtn } from '../../../../event-libs/v1/blocks/preview-bar/preview-bar.js';
 
 const head = await readFile({ path: './mocks/head.html' });
 const body = await readFile({ path: './mocks/default.html' });

@@ -91,18 +91,18 @@ When you don't specify an attribute (e.g., `speakers`), objects are converted to
 
 ## Implementation Details
 
-The feature is implemented in `events/scripts/content-update.js`:
+The feature is implemented in `event-libs/v1/utils/utils.js`:
 
-1. **Detection**: The `getContent` function checks for `@array(` syntax
-2. **Processing**: The `processArrayIteration` function handles the array parsing
-3. **Path Resolution**: Uses `parseMetadataPath` to handle nested structures
+1. **Detection**: The `parseMetadataPath` function checks for `@array(` syntax using regex pattern matching
+2. **Processing**: Array iteration logic is integrated directly into `parseMetadataPath` function
+3. **Path Resolution**: Uses the same path parsing logic for nested structures
 4. **Attribute Extraction**: Extracts specific attributes from objects when specified
 5. **Separator Logic**: Uses provided separator, defaults to space if none provided
-6. **Integration**: Works seamlessly with existing placeholder processing
+6. **Integration**: Works seamlessly with existing placeholder processing through `updateTextNode` and `updateTextContent` functions
 
 ## Testing
 
-Comprehensive tests are available in `test/unit/scripts/content-update.test.js` covering:
+Comprehensive tests are available in `test/unit/scripts/decorate.test.js` covering:
 
 - Basic array iteration with commas
 - Object attribute extraction

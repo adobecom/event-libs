@@ -1,4 +1,4 @@
-import { createTag, readBlockConfig } from '../../scripts/utils.js';
+import { createTag, readBlockConfig } from '../../utils/utils.js';
 
 const CONFIG = {
   PRELOAD_DOMAINS: [
