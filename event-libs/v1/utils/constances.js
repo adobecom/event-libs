@@ -147,3 +147,4 @@ export const FALLBACK_LOCALES = {
   vn_vi: { ietf: 'vi', tk: 'qxw8hzm.css' },
   za: { ietf: 'en-GB', tk: 'hah7vzn.css' },
 };
+export const LATEST_VERSION = 'v1';

@@ -1,3 +1,4 @@
+import { LATEST_VERSION } from '../../utils/constances.js';
 import { readBlockConfig, getMetadata, getEventConfig, LIBS } from '../../utils/utils.js';
 
 function buildScheduleDoubleLinkedList(entries) {
@@ -68,7 +69,9 @@ function setScheduleToScheduleWorker(schedule, plugins, tabId) {
   // Add error handling for worker creation
   let worker;
   try {
-    worker = new Worker('/events/features/timing-framework/worker.js', { type: 'module' });
+    // get the current version of the event-libs
+    const version = getEventConfig().version || LATEST_VERSION;
+    worker = new Worker(`/event-libs/${version}/features/timing-framework/worker.js`, { type: 'module' });
   } catch (error) {
     window.lana?.log(`Error creating worker: ${JSON.stringify(error)}`);
     throw error;
