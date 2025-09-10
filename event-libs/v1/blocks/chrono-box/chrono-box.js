@@ -1,4 +1,3 @@
-import { LATEST_VERSION } from '../../utils/constances.js';
 import { readBlockConfig, getMetadata, getEventConfig, LIBS } from '../../utils/utils.js';
 
 function buildScheduleDoubleLinkedList(entries) {
@@ -42,7 +41,7 @@ async function initPlugins(schedule) {
   const pluginsNeeded = Object.keys(PLUGINS_MAP).filter(hasPlugin);
   const plugins = await Promise.all(pluginsNeeded.map((plugin) => {
     const pluginDir = PLUGINS_MAP[plugin];
-    return import(`../../features/timing-framework/plugins/${pluginDir}/plugin.js`);
+    return import(`${LIBS}/features/timing-framework/plugins/${pluginDir}/plugin.js`);
   }));
 
   // Get or create a global tabId that's shared across all chrono-boxes on this page
@@ -70,8 +69,8 @@ function setScheduleToScheduleWorker(schedule, plugins, tabId) {
   let worker;
   try {
     // get the current version of the event-libs
-    const version = getEventConfig().version || LATEST_VERSION;
-    worker = new Worker(`/event-libs/${version}/features/timing-framework/worker.js`, { type: 'module' });
+    const { eventLibs } = getEventConfig();
+    worker = new Worker(`${eventLibs}/features/timing-framework/worker.js`, { type: 'module' });
   } catch (error) {
     window.lana?.log(`Error creating worker: ${JSON.stringify(error)}`);
     throw error;
