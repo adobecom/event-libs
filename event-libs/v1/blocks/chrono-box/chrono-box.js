@@ -62,18 +62,46 @@ async function initPlugins(schedule) {
   return { plugins: pluginsModules, tabId };
 }
 
-function setScheduleToScheduleWorker(schedule, plugins, tabId) {
+async function createBlobWorker() {
+  // Get the current version of the event-libs
+  const { eventLibs } = getEventConfig();
+  const remoteWorkerUrl = `${eventLibs}/features/timing-framework/worker-traditional.js`;
+  
+  // Fetch the traditional worker file
+  const response = await fetch(remoteWorkerUrl);
+  if (!response.ok) {
+    throw new Error('Failed to fetch traditional worker');
+  }
+  
+  const workerCode = await response.text();
+  
+  // Create a Blob URL for the worker
+  const blob = new Blob([workerCode], { type: 'application/javascript' });
+  return URL.createObjectURL(blob);
+}
+
+async function setScheduleToScheduleWorker(schedule, plugins, tabId) {
   const scheduleLinkedList = buildScheduleDoubleLinkedList(schedule);
 
   // Add error handling for worker creation
   let worker;
+  let blobUrl;
+  
   try {
-    // get the current version of the event-libs
-    const { eventLibs } = getEventConfig();
-    worker = new Worker(`${eventLibs}/features/timing-framework/worker.js`, { type: 'module' });
-  } catch (error) {
-    window.lana?.log(`Error creating worker: ${JSON.stringify(error)}`);
-    throw error;
+    // Try to create a Blob-based worker first (for cross-origin scenarios)
+    blobUrl = await createBlobWorker();
+    worker = new Worker(blobUrl);
+  } catch (blobError) {
+    window.lana?.log(`Error creating blob worker, falling back to direct import: ${JSON.stringify(blobError)}`);
+    
+    try {
+      // Fallback to direct import (works for same-origin scenarios)
+      const { eventLibs } = getEventConfig();
+      worker = new Worker(`${eventLibs}/features/timing-framework/worker-traditional.js`);
+    } catch (directError) {
+      window.lana?.log(`Error creating direct worker: ${JSON.stringify(directError)}`);
+      throw directError;
+    }
   }
 
   // Get testing data from URL params
@@ -98,8 +126,15 @@ function setScheduleToScheduleWorker(schedule, plugins, tabId) {
     worker.postMessage(messageData);
   } catch (error) {
     window.lana?.log(`Error posting message to worker: ${JSON.stringify(error)}`);
+    // Clean up blob URL if it was created
+    if (blobUrl) {
+      URL.revokeObjectURL(blobUrl);
+    }
     throw error;
   }
+
+  // Store blob URL for cleanup later
+  worker._blobUrl = blobUrl;
 
   return worker;
 }
@@ -137,16 +172,32 @@ export default async function init(el) {
   el.innerHTML = '';
 
   const pluginsOutputs = await initPlugins(thisSchedule);
-  const worker = setScheduleToScheduleWorker(
-    thisSchedule,
-    pluginsOutputs.plugins,
-    pluginsOutputs.tabId,
-  );
+  let worker;
+  
+  try {
+    worker = await setScheduleToScheduleWorker(
+      thisSchedule,
+      pluginsOutputs.plugins,
+      pluginsOutputs.tabId,
+    );
+  } catch (error) {
+    window.lana?.log(`Error creating worker: ${JSON.stringify(error)}`);
+    el.innerHTML = '<div class="error-message">Unable to initialize timing system. Please refresh the page.</div>';
+    el.classList.add('error');
+    return Promise.resolve();
+  }
 
   // Create a promise that resolves when the first message is received
   return new Promise((resolve) => {
     const timeout = setTimeout(() => {
       window.lana?.log('Timeout waiting for first worker message, continuing without CLS prevention');
+      
+      // Clean up blob URL if it was used
+      if (worker._blobUrl) {
+        URL.revokeObjectURL(worker._blobUrl);
+        worker._blobUrl = null;
+      }
+      
       resolve(); // resolve the promise without waiting for the first message
     }, 3000); // 3 second timeout - balances CLS prevention with LCP/FCP
 
@@ -185,6 +236,12 @@ export default async function init(el) {
         el.innerHTML = '<div class="error-message">Unable to load content. Please refresh the page.</div>';
         el.classList.add('error');
       });
+
+      // Clean up blob URL if it was used
+      if (worker._blobUrl) {
+        URL.revokeObjectURL(worker._blobUrl);
+        worker._blobUrl = null;
+      }
 
       // Resolve the promise
       resolve();
