@@ -765,7 +765,6 @@ export default async function decorateArea(area = document) {
   // Initialize DictionaryManager with configuration
   try {
     const { miloConfig } = getEventConfig();
-    console.log('miloConfig', miloConfig);
     await dictionaryManager.initialize(miloConfig);
   } catch (error) {
     window.lana?.log(`Failed to initialize DictionaryManager:\n${JSON.stringify(error, null, 2)}`);
@@ -789,18 +788,4 @@ export default async function decorateArea(area = document) {
     // Last image of last column of last row
     eagerLoad(marquee, 'div:last-child > div:last-child img');
   }());
-}
-
-
-export async function fetchAndDecorateArea() {
-  // Load non-prod data for stage and dev environments
-  let env = getEventServiceEnv();
-  if (env === 'local') env = 'dev';
-  const nonProdData = await getNonProdData(env);
-  if (!nonProdData) return;
-  Object.entries(nonProdData).forEach(([key, value]) => {
-    setMetadata(key, value);
-  });
-
-  decorateArea();
 }
