@@ -1,12 +1,10 @@
-import { LIBS } from '../utils/utils.js';
+import { getEventConfig, LIBS } from '../utils/utils.js';
 
-const { createTag, MILO_EVENTS, loadStyle, getConfig } = await import(`${LIBS}/utils/utils.js`);
+const miloLibs = getEventConfig().miloConfig.miloLibs || LIBS;
+const { createTag, MILO_EVENTS, loadStyle } = await import(`${miloLibs}/utils/utils.js`);
 
-const { miloLibs, codeRoot } = getConfig();
-const base = miloLibs || codeRoot;
-
-export const ARROW_NEXT_IMG = `<img class="next-icon" alt="Next icon" src="${base}/blocks/carousel/img/arrow.svg" height="10" width="16">`;
-export const ARROW_PREVIOUS_IMG = `<img class="previous-icon" alt="Previous icon" src="${base}/blocks/carousel/img/arrow.svg" height="10" width="16">`;
+export const ARROW_NEXT_IMG = `<img class="next-icon" alt="Next icon" src="${miloLibs}/blocks/carousel/img/arrow.svg" height="10" width="16">`;
+export const ARROW_PREVIOUS_IMG = `<img class="previous-icon" alt="Previous icon" src="${miloLibs}/blocks/carousel/img/arrow.svg" height="10" width="16">`;
 
 export const KEY_CODES = {
   SPACE: 'Space',
@@ -277,7 +275,9 @@ function handleChangingSlides(carouselElements) {
 
 export default function buildMiloCarousel(el, slides) {
   return new Promise((resolve) => {
-    loadStyle(`${getConfig().codeRoot || '/events'}/features/milo-carousel.css`, () => {
+    const { miloConfig } = getEventConfig();
+    const codeRoot = miloConfig.codeRoot || '/';
+    loadStyle(`${codeRoot}/features/milo-carousel.css`, () => {
       const parentArea = el.closest('.fragment') || document;
       el.classList.add('carousel-plugin');
 

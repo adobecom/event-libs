@@ -825,7 +825,7 @@ async function createForm(bp, formData) {
     });
   });
 
-  autoUpdateContent(formEl, { getConfig, miloLibs: LIBS });
+  autoUpdateContent(formEl, { getConfig, miloLibs });
 
   return {
     formEl,
@@ -988,9 +988,9 @@ async function onProfile(bp, formData) {
 
 async function decorateToastArea() {
   await Promise.all([
-    import(`${LIBS}/deps/lit-all.min.js`),
-    import(`${LIBS}/features/spectrum-web-components/dist/theme.js`),
-    import(`${LIBS}/features/spectrum-web-components/dist/toast.js`),
+    import(`${miloLibs}/deps/lit-all.min.js`),
+    import(`${miloLibs}/features/spectrum-web-components/dist/theme.js`),
+    import(`${miloLibs}/features/spectrum-web-components/dist/toast.js`),
   ]);
   const toastArea = createTag('sp-theme', { color: 'light', scale: 'medium', class: 'toast-area' });
   document.body.append(toastArea);

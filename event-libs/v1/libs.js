@@ -19,7 +19,6 @@ const EVENT_BLOCKS = [
 ];
 
 export {
-  LIBS,
   getEventServiceEnv,
   createTag,
   yieldToMain,
