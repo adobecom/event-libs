@@ -18,6 +18,12 @@ async function getPromotionalContent() {
       return promotionalItems;
     }
   }
+  
+  // If no promotional items, return early to avoid unnecessary imports and fetch
+  if (promotionalItems.length === 0) {
+    return [];
+  }
+  
   const eventConfig = getEventConfig();
   const { miloConfig } = eventConfig;
   const miloLibs = miloConfig?.miloLibs ? miloConfig.miloLibs : LIBS;
@@ -57,7 +63,7 @@ export default async function init(el) {
   if (!promotionalItems.length) return;
 
   const [{ default: loadFragment }, { createTag }] = await Promise.all([
-    import(`${miloLibs.blocks}/fragment/fragment.js`),
+    import(`${miloLibs}/blocks/fragment/fragment.js`),
     import(`${miloLibs}/utils.js`),
   ]);
 

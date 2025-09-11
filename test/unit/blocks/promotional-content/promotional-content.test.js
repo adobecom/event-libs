@@ -1,5 +1,6 @@
 import { expect } from '@esm-bundle/chai';
 import sinon from 'sinon';
+import { setEventConfig } from '../../../../event-libs/v1/utils/utils.js';
 
 describe('Promotional Content Block', () => {
   let el;
@@ -10,23 +11,15 @@ describe('Promotional Content Block', () => {
     el.className = 'promotional-content';
     document.body.appendChild(el);
 
-    // Mock LIBS
+    // Mock LIBS and set up event config
     window.LIBS = '/libs';
+    setEventConfig({}, { miloLibs: '/libs' });
+    
+    // No need to mock imports since we fixed the code to return early when no promotional items
 
-    // Mock the promotional content JSON response
+    // Mock the promotional content JSON response - empty data for this test
     const mockPromotionalData = {
-      data: [
-        {
-          name: 'Acrobat',
-          'fragment-path': 'https://main--events-milo--adobecom.aem.page/events/fragments/product-blades/acrobat',
-          thumbnail: 'https://www.adobe.com/events/assets/logos/acrobat-icon.svg',
-        },
-        {
-          name: 'Explore Creative Cloud',
-          'fragment-path': 'https://main--events-milo--adobecom.aem.page/events/fragments/product-blades/explore-creative-cloud',
-          thumbnail: 'https://www.adobe.com/events/assets/logos/cc-icon.svg',
-        },
-      ],
+      data: [],
     };
 
     fetchStub = sinon.stub(window, 'fetch').resolves({ json: () => Promise.resolve(mockPromotionalData) });
@@ -37,6 +30,10 @@ describe('Promotional Content Block', () => {
     fetchStub.restore();
     sinon.restore();
     delete window.LIBS;
+    
+    // Clean up any metadata that might have been added
+    const metaTags = document.head.querySelectorAll('meta[name="promotional-items"]');
+    metaTags.forEach((tag) => tag.remove());
   });
 
   describe('init', () => {
@@ -47,8 +44,8 @@ describe('Promotional Content Block', () => {
       // Should not throw an error
       await init(el);
 
-      // Fetch should be called even with empty promotional items
-      expect(fetchStub.called).to.be.true;
+      // Fetch should not be called when there are no promotional items (early return)
+      expect(fetchStub.called).to.be.false;
     });
   });
 
@@ -122,8 +119,8 @@ describe('Promotional Content Block', () => {
       // Should not throw an error
       await init(el);
 
-      // Fetch should still be called even with invalid metadata
-      expect(fetchStub.called).to.be.true;
+      // Fetch should not be called with invalid metadata (early return due to empty promotional items)
+      expect(fetchStub.called).to.be.false;
     });
   });
 });

@@ -41,7 +41,8 @@ async function initPlugins(schedule) {
   const pluginsNeeded = Object.keys(PLUGINS_MAP).filter(hasPlugin);
   const plugins = await Promise.all(pluginsNeeded.map((plugin) => {
     const pluginDir = PLUGINS_MAP[plugin];
-    return import(`${LIBS}/features/timing-framework/plugins/${pluginDir}/plugin.js`);
+    const { eventLibs } = getEventConfig();
+    return import(`${eventLibs}/features/timing-framework/plugins/${pluginDir}/plugin.js`);
   }));
 
   // Get or create a global tabId that's shared across all chrono-boxes on this page
