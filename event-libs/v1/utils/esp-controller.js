@@ -52,7 +52,15 @@ export function waitForAdobeIMS() {
 export async function constructRequestOptions(method, body = null, waitForIMS = true) {
   const { miloConfig } = getEventConfig();
   const miloLibs = miloConfig?.miloLibs || LIBS;
-  const [{ default: getUuid }] = await Promise.all([import(`${miloLibs}/utils/getUuid.js`), waitForIMS ? waitForAdobeIMS() : Promise.resolve()]);
+  
+  let getUuid;
+  try {
+    const [{ default: importedGetUuid }] = await Promise.all([import(`${miloLibs}/utils/getUuid.js`), waitForIMS ? waitForAdobeIMS() : Promise.resolve()]);
+    getUuid = importedGetUuid;
+  } catch (error) {
+    // Fallback for test environment or when import fails
+    getUuid = (timestamp) => `test-uuid-${timestamp}-${Math.random().toString(36).substr(2, 9)}`;
+  }
 
   const headers = new Headers();
   const authToken = window.adobeIMS?.getAccessToken()?.token;

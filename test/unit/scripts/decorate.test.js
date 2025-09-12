@@ -106,8 +106,21 @@ describe('updateAnalyticTag', () => {
 });
 
 describe('signIn', () => {
+  let originalAdobeIMS;
+
+  beforeEach(() => {
+    originalAdobeIMS = window.adobeIMS;
+  });
+
+  afterEach(() => {
+    window.adobeIMS = originalAdobeIMS;
+  });
+
   it('calls the signIn method', () => {
-    window.adobeIMS = { signIn: () => {} };
+    window.adobeIMS = { 
+      signIn: () => {},
+      getAccessToken: () => ({ token: 'fake-token' })
+    };
     const signInSpy = sinon.spy(window.adobeIMS, 'signIn');
     signIn();
     expect(signInSpy.calledOnce).to.be.true;
@@ -116,7 +129,9 @@ describe('signIn', () => {
   it('should log a warning if the signIn method is not available', () => {
     window.lana = { log: () => {} };
     const logSpy = sinon.spy(window.lana, 'log');
-    window.adobeIMS = {};
+    window.adobeIMS = {
+      getAccessToken: () => ({ token: 'fake-token' })
+    };
     signIn();
     expect(logSpy.calledOnce).to.be.true;
   });

@@ -1,7 +1,6 @@
-import { getEventConfig, LIBS } from '../utils/utils.js';
+import { getEventConfig, LIBS, createTag, loadStyle } from '../utils/utils.js';
 
 const miloLibs = getEventConfig().miloConfig.miloLibs || LIBS;
-const { createTag, MILO_EVENTS, loadStyle } = await import(`${miloLibs}/utils/utils.js`);
 
 export const ARROW_NEXT_IMG = `<img class="next-icon" alt="Next icon" src="${miloLibs}/blocks/carousel/img/arrow.svg" height="10" width="16">`;
 export const ARROW_PREVIOUS_IMG = `<img class="previous-icon" alt="Previous icon" src="${miloLibs}/blocks/carousel/img/arrow.svg" height="10" width="16">`;
@@ -319,9 +318,9 @@ export default function buildMiloCarousel(el, slides) {
         images.forEach((img) => {
           img.removeAttribute('loading');
         });
-        parentArea.removeEventListener(MILO_EVENTS.DEFERRED, handleDeferredImages, true);
+        parentArea.removeEventListener('event-libs:deferred', handleDeferredImages, true);
       }
-      parentArea.addEventListener(MILO_EVENTS.DEFERRED, handleDeferredImages, true);
+      parentArea.addEventListener('event-libs:deferred', handleDeferredImages, true);
 
       slides[0].classList.add('active');
       const IndexOfShowClass = [...el.classList].findIndex((ele) => ele.includes('show-'));
