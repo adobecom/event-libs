@@ -8,6 +8,30 @@ export const LIBS = (() => {
   return branch.includes('--') ? `https://${branch}.aem.live/libs` : `https://${branch}--milo--adobecom.aem.live/libs`;
 })();
 
+export const [setEventConfig, updateEventConfig, getEventConfig] = (() => {
+  let config = {};
+  return [
+    (ec, mc = {}) => {
+      config = { eventServiceEnv: getEventServiceEnv(), ...ec, miloConfig: mc };
+      const cmsType = ec.cmsType || 'DA';
+      if (cmsType === 'SP') {
+        const metadataLocation = '/events/default/';
+        config.metadataLocation = metadataLocation;
+      }
+
+      const origin = mc.origin || window.location.origin;
+      const pathname = mc.pathname || window.location.pathname;
+
+      config.codeRoot = mc.codeRoot ? `${origin}${mc.codeRoot}` : origin;
+      config.pathname = pathname;
+
+      return config;
+    },
+    (ec, mc = {}) => (config = { ...ec, miloConfig: mc }),
+    () => config,
+  ];
+})();
+
 export function getEventServiceEnv() {
   const validEnvs = ['dev', 'stage', 'prod'];
   const { host, search } = window.location;
@@ -33,7 +57,7 @@ export function getEventServiceEnv() {
 
   if (host.endsWith('adobe.com')) return ENV_MAP.prod;
   // fallback to dev
-  return 'dev';
+  return ENV_MAP.dev;
 }
 
 export function createTag(tag, attributes, html, options = {}) {
@@ -180,9 +204,26 @@ function toClassName(name) {
     : '';
 }
 
-export function getSusiOptions(conf) {
-  const { env: { name: envName } } = conf;
+export function getFallbackLocale(locales, pathname = window.location.pathname) {
+  if (!locales) {
+    return { ietf: 'en-US', tk: 'hah7vzn.css', prefix: '' };
+  }
+  const split = pathname.split('/');
+  const localeString = split[1];
+  let locale = locales[localeString] || locales[''];
+  const isUS = locale.ietf === 'en-US';
+  locale.prefix = isUS ? '' : `/${localeString}`;
+  locale.region = isUS ? 'us' : localeString.split('_')[0];
+  return locale;
+}
+
+export function getSusiOptions() {
+  const eventConfig = getEventConfig();
   const { href, hash } = window.location;
+
+  const { miloConfig } = eventConfig;
+
+  const envName = miloConfig ? miloConfig.env.name : getEventServiceEnv().name;
 
   const susiOptions = Object.keys(SUSI_OPTIONS).reduce((opts, key) => {
     opts[key] = SUSI_OPTIONS[key][envName] || SUSI_OPTIONS[key];
@@ -365,4 +406,31 @@ export function parseMetadataPath(path, extraData = {}) {
 
   // If not an array, return empty string
   return '';
+}
+
+export function loadLink(href, {
+  id, as, callback, crossorigin, rel, fetchpriority,
+} = {}) {
+  let link = document.head.querySelector(`link[href="${href}"]`);
+  if (!link) {
+    link = document.createElement('link');
+    link.setAttribute('rel', rel);
+    if (id) link.setAttribute('id', id);
+    if (as) link.setAttribute('as', as);
+    if (crossorigin) link.setAttribute('crossorigin', crossorigin);
+    if (fetchpriority) link.setAttribute('fetchpriority', fetchpriority);
+    link.setAttribute('href', href);
+    if (callback) {
+      link.onload = (e) => callback(e.type);
+      link.onerror = (e) => callback(e.type);
+    }
+    document.head.appendChild(link);
+  } else if (callback) {
+    callback('noop');
+  }
+  return link;
+}
+
+export function loadStyle(href, callback) {
+  return loadLink(href, { rel: 'stylesheet', callback });
 }

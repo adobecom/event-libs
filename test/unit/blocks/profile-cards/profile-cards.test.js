@@ -1,6 +1,6 @@
 import { expect } from '@esm-bundle/chai';
 import { readFile } from '@web/test-runner-commands';
-import init, { createSocialIcon } from '../../../../events/blocks/profile-cards/profile-cards.js';
+import init, { createSocialIcon } from '../../../../event-libs/v1/blocks/profile-cards/profile-cards.js';
 
 const head = await readFile({ path: './mocks/head.html' });
 const body = await readFile({ path: './mocks/default.html' });

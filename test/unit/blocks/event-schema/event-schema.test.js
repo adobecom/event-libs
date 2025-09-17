@@ -1,6 +1,6 @@
 import { expect } from '@esm-bundle/chai';
-import init, { injectEventSchema } from '../../../../events/blocks/event-schema/event-schema.js';
-import { createTag, setMetadata } from '../../../../events/scripts/utils.js';
+import init, { injectEventSchema } from '../../../../event-libs/v1/blocks/event-schema/event-schema.js';
+import { createTag, setMetadata } from '../../../../event-libs/v1/utils/utils.js';
 
 describe('Event Schema Module', () => {
   describe('injectEventSchema', () => {

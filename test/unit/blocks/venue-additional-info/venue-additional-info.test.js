@@ -1,14 +1,14 @@
 import { readFile } from '@web/test-runner-commands';
 import { expect } from '@esm-bundle/chai';
-import { setMetadata } from '../../../../events/scripts/utils.js';
+import { setMetadata } from '../../../../event-libs/v1/utils/utils.js';
 
-const { default: init } = await import('../../../../events/blocks/venue-additional-info/venue-additional-info.js');
+const { default: init } = await import('../../../../event-libs/v1/blocks/venue-additional-info/venue-additional-info.js');
 const body = await readFile({ path: './mocks/default.html' });
 
 describe('Venue Additional Info', () => {
   beforeEach(() => {
     document.body.innerHTML = '';
-    document.body.classList.remove('timing-post-event');
+    delete document.body.dataset.eventState;
     document.head.innerHTML = '';
     window.isTestEnv = true;
   });

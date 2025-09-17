@@ -1,5 +1,11 @@
-import { ICON_REG, META_REG, SERIES_404_MAP_PATH, ALLOWED_EMAIL_DOMAINS } from './constances.js';
-import BlockMediator from '../../scripts/deps/block-mediator.min.js';
+import { 
+  ICON_REG,
+  META_REG,
+  SERIES_404_MAP_PATH,
+  ALLOWED_EMAIL_DOMAINS,
+  FALLBACK_LOCALES,
+} from './constances.js';
+import BlockMediator from '../deps/block-mediator.min.js';
 import { getEvent } from './esp-controller.js';
 import { dictionaryManager } from './dictionary-manager.js';
 import {
@@ -10,23 +16,13 @@ import {
   getSusiOptions,
   getEventServiceEnv,
   parseMetadataPath,
-  LIBS,
-  getConfig,
-  getLocale,
-  CONFIG,
-  PAGE_URL,
-  SLD,
+  getEventConfig,
+  getFallbackLocale,
 } from './utils.js';
 
 const preserveFormatKeys = [
   'description',
 ];
-
-// Legacy function for backward compatibility - now uses DictionaryManager
-export async function miloReplaceKey(miloLibs, key) {
-  // miloLibs parameter is kept for backward compatibility but no longer used
-  return dictionaryManager.getValue(key);
-}
 
 export function updateAnalyticTag(el, newVal) {
   const eventTitle = getMetadata('event-title');
@@ -64,7 +60,7 @@ function convertEccIcon(n) {
   });
 }
 
-function setCtaState(targetState, rsvpBtn, miloLibs) { // eslint-disable-line no-unused-vars
+function setCtaState(targetState, rsvpBtn) { // eslint-disable-line no-unused-vars
   const checkRed = getIcon('check-circle-red');
 
   const enableBtn = () => {
@@ -119,7 +115,7 @@ function setCtaState(targetState, rsvpBtn, miloLibs) { // eslint-disable-line no
   stateTrigger[targetState]();
 }
 
-export async function updateRSVPButtonState(rsvpBtn, miloLibs) {
+export async function updateRSVPButtonState(rsvpBtn) {
   const eventInfo = await getEvent(getMetadata('event-id'));
   let eventFull = false;
   let waitlistEnabled = getMetadata('allow-wait-listing') === 'true';
@@ -135,17 +131,17 @@ export async function updateRSVPButtonState(rsvpBtn, miloLibs) {
   if (!rsvpData) {
     if (eventFull) {
       if (waitlistEnabled) {
-        setCtaState('toWaitlist', rsvpBtn, miloLibs);
+        setCtaState('toWaitlist', rsvpBtn);
       } else {
-        setCtaState('eventClosed', rsvpBtn, miloLibs);
+        setCtaState('eventClosed', rsvpBtn);
       }
     } else {
-      setCtaState('default', rsvpBtn, miloLibs);
+      setCtaState('default', rsvpBtn);
     }
   } else if (rsvpData.registrationStatus === 'registered') {
-    setCtaState('registered', rsvpBtn, miloLibs);
+    setCtaState('registered', rsvpBtn);
   } else if (rsvpData.registrationStatus === 'waitlisted') {
-    setCtaState('waitlisted', rsvpBtn, miloLibs);
+    setCtaState('waitlisted', rsvpBtn);
   }
 }
 
@@ -158,13 +154,11 @@ export function signIn(options) {
   window.adobeIMS?.signIn(options);
 }
 
-async function handleRSVPBtnBasedOnProfile(rsvpBtn, miloLibs, profile) {
-  const { getConfig } = await import(`${miloLibs}/utils/utils.js`);
-
-  updateRSVPButtonState(rsvpBtn, miloLibs);
+async function handleRSVPBtnBasedOnProfile(rsvpBtn, profile) {
+  updateRSVPButtonState(rsvpBtn);
 
   BlockMediator.subscribe('rsvpData', () => {
-    updateRSVPButtonState(rsvpBtn, miloLibs);
+    updateRSVPButtonState(rsvpBtn);
   });
 
   if (profile?.noProfile || profile.account_type === 'guest') {
@@ -173,7 +167,7 @@ async function handleRSVPBtnBasedOnProfile(rsvpBtn, miloLibs, profile) {
     if (!allowGuestReg) {
       rsvpBtn.el.addEventListener('click', (e) => {
         e.preventDefault();
-        signIn({ ...getSusiOptions(getConfig()), redirect_uri: `${e.target.href}` });
+        signIn({ ...getSusiOptions(), redirect_uri: `${e.target.href}` });
       });
     }
   }
@@ -243,7 +237,7 @@ export async function validatePageAndRedirect(miloLibs) {
   if (purposefulHitOnProdPreview) {
     BlockMediator.subscribe('imsProfile', ({ newValue }) => {
       if (newValue?.noProfile || newValue?.account_type === 'guest') {
-        signIn(getSusiOptions(getConfig()));
+        signIn(getSusiOptions());
       } else if (!ALLOWED_EMAIL_DOMAINS.some((d) => newValue.email?.toLowerCase().endsWith(d))) {
         window.location.replace(error404Location);
       }
@@ -253,7 +247,23 @@ export async function validatePageAndRedirect(miloLibs) {
   document.body.classList.remove('validating-page');
 }
 
-function autoUpdateLinks(scope, miloLibs) {
+function processTemplateInLinkText(a) {
+  let linkText = a.textContent;
+  let match = META_REG.exec(linkText);
+
+  while (match !== null) {
+    const innerMetadataPath = match[1];
+    const innerMetadataValue = parseMetadataPath(innerMetadataPath) || '';
+    linkText = linkText.replaceAll(`[[${innerMetadataPath}]]`, innerMetadataValue);
+    match = META_REG.exec(linkText);
+  }
+
+  if (linkText !== a.textContent) {
+    a.textContent = linkText;
+  }
+}
+
+function initRSVPHandler(link) {
   const regHashCallbacks = {
     '#rsvp-form': (a) => {
       const originalText = a.textContent.includes('|') ? a.textContent.split('|')[0] : a.textContent;
@@ -271,10 +281,10 @@ function autoUpdateLinks(scope, miloLibs) {
 
       const profile = BlockMediator.get('imsProfile');
       if (profile) {
-        handleRSVPBtnBasedOnProfile(rsvpBtn, miloLibs, profile);
+        handleRSVPBtnBasedOnProfile(rsvpBtn, profile);
       } else {
         BlockMediator.subscribe('imsProfile', ({ newValue }) => {
-          handleRSVPBtnBasedOnProfile(rsvpBtn, miloLibs, newValue);
+          handleRSVPBtnBasedOnProfile(rsvpBtn, newValue);
         });
       }
     },
@@ -289,76 +299,91 @@ function autoUpdateLinks(scope, miloLibs) {
 
       const rsvpData = BlockMediator.get('rsvpData');
       if (rsvpData && rsvpData.registrationStatus === 'registered') {
-        setCtaState('registered', rsvpBtn, miloLibs);
+        setCtaState('registered', rsvpBtn);
       } else {
         BlockMediator.subscribe('rsvpData', ({ newValue }) => {
           if (newValue?.registrationStatus === 'registered') {
-            setCtaState('registered', rsvpBtn, miloLibs);
+            setCtaState('registered', rsvpBtn);
           }
         });
       }
     },
   };
 
-  scope.querySelectorAll('a[href*="#"]').forEach((a) => {
+  try {
+    const url = new URL(link.href);
+    const regCallbackKey = Object.keys(regHashCallbacks).find((key) => url.hash.startsWith(key));
+
+    if (!regCallbackKey) {
+      return false;
+    }
+
+    regHashCallbacks[regCallbackKey](link);
+    return true;
+  } catch (e) {
+    window.lana?.log(`Error while attempting to process RSVP link ${link.href}:\n${JSON.stringify(e, null, 2)}`);
+    return false;
+  }
+}
+
+function processLinks(parent) {
+  const { cmsType } = getEventConfig();
+  const links = parent.querySelectorAll('a[href*="#"]');
+
+  links.forEach((a) => {
+    const url = new URL(a.href);
+    const isPlaceholderLink = url.pathname.startsWith('/events-placeholder');
     try {
-      const url = new URL(a.href);
-      const regCallbackKey = Object.keys(regHashCallbacks).find((key) => url.hash.startsWith(key));
-      let linkText = a.textContent;
-      let match = META_REG.exec(linkText);
+      if (cmsType === 'SP') {
+        processTemplateInLinkText(a);
+        const processedAsRSVPButton = initRSVPHandler(a);
 
-      while (match !== null) {
-        const innerMetadataPath = match[1];
-        const innerMetadataValue = parseMetadataPath(innerMetadataPath) || '';
-        linkText = linkText.replaceAll(`[[${innerMetadataPath}]]`, innerMetadataValue);
-        match = META_REG.exec(linkText);
+        if (a.href.endsWith('#event-template') && !processedAsRSVPButton) {
+          let templateId;
+
+          try {
+            const seriesMetadata = JSON.parse(getMetadata('series'));
+            templateId = seriesMetadata?.templateId;
+          } catch (e) {
+            window.lana?.log(`Failed to parse series metadata. Attempt to fallback on event tempate ID attribute:\n${JSON.stringify(e, null, 2)}`);
+          }
+
+          if (!templateId && getMetadata('template-id')) {
+            templateId = getMetadata('template-id');
+          }
+
+          if (templateId) {
+            a.href = templateId;
+          } else {
+            window.lana?.log(`Error: Failed to find template ID for event ${getMetadata('event-id')}`);
+          }
+        } else if (a.href.endsWith('#host-email')) {
+          if (getMetadata('host-email')) {
+            const emailSubject = `${dictionaryManager.getValue('mailto-subject-prefix')} ${getMetadata('event-title')}`;
+            a.href = `mailto:${getMetadata('host-email')}?subject=${encodeURIComponent(emailSubject)}`;
+          } else {
+            a.remove();
+          }
+        } else if (url.hash) {
+          const metadataPath = url.hash.replace('#', '');
+          const metadataValue = parseMetadataPath(metadataPath);
+          if (metadataValue) {
+            a.href = metadataValue;
+          } else if (isPlaceholderLink) {
+            a.remove();
+          }
+        }
       }
 
-      if (linkText !== a.textContent) {
-        a.textContent = linkText;
-      }
-
-      if (regCallbackKey) {
-        regHashCallbacks[regCallbackKey](a);
-      } else if (a.href.endsWith('#event-template')) {
-        let templateId;
-
-        try {
-          const seriesMetadata = JSON.parse(getMetadata('series'));
-          templateId = seriesMetadata?.templateId;
-        } catch (e) {
-          window.lana?.log(`Failed to parse series metadata. Attempt to fallback on event tempate ID attribute:\n${JSON.stringify(e, null, 2)}`);
-        }
-
-        if (!templateId && getMetadata('template-id')) {
-          templateId = getMetadata('template-id');
-        }
-
-        if (templateId) {
-          a.href = templateId;
-        } else {
-          window.lana?.log(`Error: Failed to find template ID for event ${getMetadata('event-id')}`);
-        }
-      } else if (a.href.endsWith('#host-email')) {
-        if (getMetadata('host-email')) {
-          const emailSubject = `${dictionaryManager.getValue('mailto-subject-prefix')} ${getMetadata('event-title')}`;
-          a.href = `mailto:${getMetadata('host-email')}?subject=${encodeURIComponent(emailSubject)}`;
-        } else {
-          a.remove();
-        }
-      } else if (url.hash) {
-        const metadataPath = url.hash.replace('#', '');
-        const metadataValue = parseMetadataPath(metadataPath);
-        if (metadataValue) {
-          a.href = metadataValue;
-        } else if (url.pathname.startsWith('/events-placeholder')) {
-          a.remove();
-        }
+      if (cmsType === 'DA') {
+        initRSVPHandler(a);
       }
     } catch (e) {
       window.lana?.log(`Error while attempting to replace link ${a.href}:\n${JSON.stringify(e, null, 2)}`);
     }
   });
+
+  
 }
 
 export function updatePictureElement(imageUrl, parentPic, altText) {
@@ -469,20 +494,6 @@ function updateTextContent(child, matchCallback) {
   }
 }
 
-export function replaceDotMedia(area = document) {
-  const { prefix } = getLocale(CONFIG.locales);
-  const currUrl = new URL(window.location);
-  const pathSeg = currUrl.pathname.split('/').length;
-  if ((prefix === '' && pathSeg >= 3) || (prefix !== '' && pathSeg >= 4)) return;
-  const resetAttributeBase = (tag, attr) => {
-    area.querySelectorAll(`${tag}[${attr}^="./media_"]`).forEach((el) => {
-      el[attr] = `${new URL(`${CONFIG.contentRoot}${el.getAttribute(attr).substring(1)}`, window.location).href}`;
-    });
-  };
-  resetAttributeBase('img', 'src');
-  resetAttributeBase('source', 'srcset');
-}
-
 export function shouldRenderWithNonProdMetadata(eventId, prodDomain) {
   if (!eventId) return false;
   const isLiveProd = getEventServiceEnv() === 'prod' && window.location.hostname === prodDomain;
@@ -495,33 +506,6 @@ export function shouldRenderWithNonProdMetadata(eventId, prodDomain) {
 
   return false;
 }
-
-export const [setEventConfig, updateEventConfig, getEventConfig] = (() => {
-  let config = {};
-  return [
-    (ec, mc = {}) => {
-      config = { eventServiceEnv: getEventServiceEnv(), ...ec, miloConfig: mc };
-      const cmsType = ec.cmsType || 'DA';
-      if (cmsType === 'SP') {
-        const metadataLocation = '/events/default/';
-        config.metadataLocation = metadataLocation;
-      }
-
-      const origin = mc.origin || window.location.origin;
-      const pathname = mc.pathname || window.location.pathname;
-
-      config.codeRoot = mc.codeRoot ? `${origin}${mc.codeRoot}` : origin;
-      config.pathname = pathname;
-      config.locale.contentRoot = `${origin}${config.locale.prefix}${config.contentRoot ?? ''}`;
-      config.useDotHtml = !PAGE_URL.origin.includes(`.${SLD}.`)
-        && (config.useDotHtml ?? PAGE_URL.pathname.endsWith('.html'));
-
-      return config;
-    },
-    (ec, mc = {}) => (config = { ...ec, miloConfig: mc }),
-    () => config,
-  ];
-})();
 
 export async function getNonProdData(env) {
   const isPreviewMode = new URLSearchParams(window.location.search).get('previewMode')
@@ -656,16 +640,48 @@ function updateExtraMetaTags(parent) {
   }
 }
 
-// data -> dom gills
-export function autoUpdateContent(parent, miloDeps, extraData) {
-  const { getConfig, miloLibs } = miloDeps;
-  if (!parent) {
-    window.lana?.log('Error:page server block cannot find its parent element');
-    return;
+function flagEventState(parent) {
+  if (parent !== document) return;
+
+  const localStartMillis = getMetadata('local-start-time-millis');
+  const localEndMillis = getMetadata('local-end-time-millis');
+
+  if (!localStartMillis || !localEndMillis) return;
+
+  const timeStampInUSP = new URLSearchParams(window.location.search).get('timing');
+  const now = timeStampInUSP ? +timeStampInUSP : Date.now();
+  const isBeforeStart = now < localStartMillis;
+  const isAfterEnd = now > localEndMillis;
+  const isDuringEvent = now >= localStartMillis && now <= localEndMillis;
+
+  if (isBeforeStart) {
+    document.body.dataset.eventState = 'pre-event';
+  } else if (isAfterEnd) {
+    document.body.dataset.eventState = 'post-event';
+  } else if (isDuringEvent) {
+    document.body.dataset.eventState = 'during-event';
+  }
+}
+
+function parsePhotosData(area) {
+  const output = {};
+
+  if (!area) return output;
+
+  try {
+    const photosData = JSON.parse(getMetadata('photos'));
+
+    photosData.forEach((photo) => {
+      output[photo.imageKind] = photo;
+    });
+  } catch (e) {
+    window.lana?.log(`Failed to parse photos metadata:\n${JSON.stringify(e, null, 2)}`);
   }
 
-  if (!getMetadata('event-id')) return;
+  return output;
+};
 
+function processTemplateInAllNodes(parent, extraData) {
   const getImgData = (_match, p1, n) => {
     const data = parseMetadataPath(p1, extraData);
 
@@ -684,7 +700,9 @@ export function autoUpdateContent(parent, miloDeps, extraData) {
 
     if (p1 === 'start-date' || p1 === 'end-date') {
       const date = new Date(content);
-      const localeString = getConfig().locale?.ietf || 'en-US';
+      const { miloConfig } = getEventConfig();
+
+      const localeString = miloConfig ? miloConfig.locale?.ietf : getFallbackLocale(FALLBACK_LOCALES);
       content = date.toLocaleDateString(localeString, { month: 'long', day: 'numeric', year: 'numeric' });
     }
 
@@ -718,40 +736,40 @@ export function autoUpdateContent(parent, miloDeps, extraData) {
       });
     }
   });
+}
 
-  // handle link replacement. To keep when switching to metadata based rendering
-  autoUpdateLinks(parent, miloLibs);
-  decorateProfileCardsZPattern(parent);
-  if (getEventServiceEnv() !== 'prod') updateExtraMetaTags(parent);
+// data -> DOM gills
+export function autoUpdateContent(parent) {
+  // handle photos data parsing
+  const extraData = parsePhotosData(parent);
+  const { cmsType } = getEventConfig();
+
+  if (!parent) {
+    window.lana?.log('Error:page server block cannot find its parent element');
+    return;
+  }
+
+  if (!getMetadata('event-id')) return;
+
+  if (cmsType === 'SP') {
+    processTemplateInAllNodes(parent, extraData);
+    decorateProfileCardsZPattern(parent);
+  }
+
+  flagEventState(parent);
+  processLinks(parent);
+  if (getEventServiceEnv() !== 'prod' && cmsType === 'SP') updateExtraMetaTags(parent);
 }
 
 export default async function decorateArea(area = document) {
   // Initialize DictionaryManager with configuration
   try {
-    const { getConfig } = await import(`${LIBS}/utils/utils.js`);
-    const config = getConfig();
-    await dictionaryManager.initialize(config);
+    const { miloConfig } = getEventConfig();
+    await dictionaryManager.initialize(miloConfig);
   } catch (error) {
     window.lana?.log(`Failed to initialize DictionaryManager:\n${JSON.stringify(error, null, 2)}`);
   }
 
-  const parsePhotosData = () => {
-    const output = {};
-
-    if (!area) return output;
-
-    try {
-      const photosData = JSON.parse(getMetadata('photos'));
-
-      photosData.forEach((photo) => {
-        output[photo.imageKind] = photo;
-      });
-    } catch (e) {
-      window.lana?.log(`Failed to parse photos metadata:\n${JSON.stringify(e, null, 2)}`);
-    }
-
-    return output;
-  };
 
   const eagerLoad = (parent, selector) => {
     const img = parent.querySelector(selector);
@@ -770,29 +788,4 @@ export default async function decorateArea(area = document) {
     // Last image of last column of last row
     eagerLoad(marquee, 'div:last-child > div:last-child img');
   }());
-
-  if (getMetadata('event-details-page') !== 'yes') return;
-
-  const photosData = parsePhotosData(area);
-
-  const miloDeps = {
-    miloLibs: LIBS,
-    getConfig,
-  };
-
-  autoUpdateContent(area, miloDeps, photosData);
-}
-
-
-export async function fetchAndDecorateArea() {
-  // Load non-prod data for stage and dev environments
-  let env = getEventServiceEnv();
-  if (env === 'local') env = 'dev';
-  const nonProdData = await getNonProdData(env);
-  if (!nonProdData) return;
-  Object.entries(nonProdData).forEach(([key, value]) => {
-    setMetadata(key, value);
-  });
-
-  decorateArea();
 }

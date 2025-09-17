@@ -1,5 +1,5 @@
 import { expect } from '@esm-bundle/chai';
-import init from '../../../../events/blocks/event-product-blades/event-product-blades.js';
+import init from '../../../../event-libs/v1/blocks/event-product-blades/event-product-blades.js';
 
 describe('Media Blocks Module', () => {
   let el;

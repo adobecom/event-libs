@@ -1,5 +1,6 @@
 import { expect } from '@esm-bundle/chai';
 import sinon from 'sinon';
+import { setEventConfig } from '../../../../event-libs/v1/utils/utils.js';
 
 describe('Promotional Content Block', () => {
   let el;
@@ -10,23 +11,15 @@ describe('Promotional Content Block', () => {
     el.className = 'promotional-content';
     document.body.appendChild(el);
 
-    // Mock LIBS
+    // Mock LIBS and set up event config
     window.LIBS = '/libs';
+    setEventConfig({}, { miloLibs: '/libs' });
+    
+    // No need to mock imports since we fixed the code to return early when no promotional items
 
-    // Mock the promotional content JSON response
+    // Mock the promotional content JSON response - empty data for this test
     const mockPromotionalData = {
-      data: [
-        {
-          name: 'Acrobat',
-          'fragment-path': 'https://main--events-milo--adobecom.aem.page/events/fragments/product-blades/acrobat',
-          thumbnail: 'https://www.adobe.com/events/assets/logos/acrobat-icon.svg',
-        },
-        {
-          name: 'Explore Creative Cloud',
-          'fragment-path': 'https://main--events-milo--adobecom.aem.page/events/fragments/product-blades/explore-creative-cloud',
-          thumbnail: 'https://www.adobe.com/events/assets/logos/cc-icon.svg',
-        },
-      ],
+      data: [],
     };
 
     fetchStub = sinon.stub(window, 'fetch').resolves({ json: () => Promise.resolve(mockPromotionalData) });
@@ -37,18 +30,22 @@ describe('Promotional Content Block', () => {
     fetchStub.restore();
     sinon.restore();
     delete window.LIBS;
+    
+    // Clean up any metadata that might have been added
+    const metaTags = document.head.querySelectorAll('meta[name="promotional-items"]');
+    metaTags.forEach((tag) => tag.remove());
   });
 
   describe('init', () => {
     it('should handle empty promotional items gracefully', async () => {
       // This test verifies that the function doesn't crash when there are no promotional items
-      const init = (await import('../../../../events/blocks/promotional-content/promotional-content.js')).default;
+      const init = (await import('../../../../event-libs/v1/blocks/promotional-content/promotional-content.js')).default;
 
       // Should not throw an error
       await init(el);
 
-      // Fetch should be called even with empty promotional items
-      expect(fetchStub.called).to.be.true;
+      // Fetch should not be called when there are no promotional items (early return)
+      expect(fetchStub.called).to.be.false;
     });
   });
 
@@ -69,8 +66,8 @@ describe('Promotional Content Block', () => {
       meta.content = '["Acrobat"]';
       document.head.appendChild(meta);
 
-      const init = (await import('../../../../events/blocks/promotional-content/promotional-content.js')).default;
-      await init(el);
+      const { addMediaReversedClass } = (await import('../../../../event-libs/v1/blocks/promotional-content/promotional-content.js'));
+      addMediaReversedClass(el);
 
       const mediaBlocks = el.querySelectorAll('.media');
       mediaBlocks.forEach((block) => {
@@ -98,10 +95,11 @@ describe('Promotional Content Block', () => {
       meta.content = '["Acrobat"]';
       document.head.appendChild(meta);
 
-      const init = (await import('../../../../events/blocks/promotional-content/promotional-content.js')).default;
-      await init(el);
+      const { addMediaReversedClass } = (await import('../../../../event-libs/v1/blocks/promotional-content/promotional-content.js'));
+      addMediaReversedClass(el);
 
       const mediaBlocks = el.querySelectorAll('.media');
+
       expect(mediaBlocks[0].classList.contains('media-reversed')).to.be.false;
       expect(mediaBlocks[1].classList.contains('media-reversed')).to.be.true;
       expect(mediaBlocks[2].classList.contains('media-reversed')).to.be.false;
@@ -116,13 +114,13 @@ describe('Promotional Content Block', () => {
       meta.content = 'invalid json';
       document.head.appendChild(meta);
 
-      const init = (await import('../../../../events/blocks/promotional-content/promotional-content.js')).default;
+      const init = (await import('../../../../event-libs/v1/blocks/promotional-content/promotional-content.js')).default;
 
       // Should not throw an error
       await init(el);
 
-      // Fetch should still be called even with invalid metadata
-      expect(fetchStub.called).to.be.true;
+      // Fetch should not be called with invalid metadata (early return due to empty promotional items)
+      expect(fetchStub.called).to.be.false;
     });
   });
 });

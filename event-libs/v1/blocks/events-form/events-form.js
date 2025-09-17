@@ -1,14 +1,17 @@
-import { LIBS, getMetadata, getSusiOptions } from '../../scripts/utils.js';
-import { deleteAttendeeFromEvent, getAndCreateAndAddAttendee, getAttendee, getEvent } from '../../scripts/esp-controller.js';
-import BlockMediator from '../../scripts/deps/block-mediator.min.js';
-import { signIn, autoUpdateContent } from '../../scripts/decorate.js';
-import { dictionaryManager } from '../../scripts/dictionary-manager.js';
+import { deleteAttendeeFromEvent, getAndCreateAndAddAttendee, getAttendee, getEvent } from '../../utils/esp-controller.js';
+import BlockMediator from '../../deps/block-mediator.min.js';
+import { signIn, autoUpdateContent } from '../../utils/decorate.js';
+import { dictionaryManager } from '../../utils/dictionary-manager.js';
+import { getEventConfig, LIBS, getMetadata, getSusiOptions } from '../../utils/utils.js';
 
-const { createTag, getConfig } = await import(`${LIBS}/utils/utils.js`);
-const { closeModal, sendAnalytics } = await import(`${LIBS}/blocks/modal/modal.js`);
-const { default: sanitizeComment } = await import(`${LIBS}/utils/sanitizeComment.js`);
-const { decorateDefaultLinkAnalytics } = await import(`${LIBS}/martech/attributes.js`);
-const { default: loadFragment } = await import(`${LIBS}/blocks/fragment/fragment.js`);
+const eventConfig = getEventConfig();
+const miloLibs = eventConfig?.miloConfig?.miloLibs ? eventConfig.miloConfig.miloLibs : LIBS;
+
+const { createTag, getConfig } = await import(`${miloLibs}/utils/utils.js`);
+const { closeModal, sendAnalytics } = await import(`${miloLibs}/blocks/modal/modal.js`);
+const { default: sanitizeComment } = await import(`${miloLibs}/utils/sanitizeComment.js`);
+const { decorateDefaultLinkAnalytics } = await import(`${miloLibs}/martech/attributes.js`);
+const { default: loadFragment } = await import(`${miloLibs}/blocks/fragment/fragment.js`);
 
 const RULE_OPERATORS = {
   equal: '=',
@@ -270,9 +273,11 @@ function createButton({ type, label }, bp) {
         button.setAttribute('disabled', true);
         button.classList.add('submitting');
         const respJson = await submitForm(bp);
-        button.removeAttribute('disabled');
-        button.classList.remove('submitting');
-        if (!respJson) return;
+        if (!respJson) {
+          button.removeAttribute('disabled');
+          button.classList.remove('submitting');
+          return;
+        }
 
         if (respJson.ok) {
           BlockMediator.set('rsvpData', respJson.data);
@@ -280,8 +285,7 @@ function createButton({ type, label }, bp) {
         } else {
           const { status } = respJson;
 
-          if (status === 400 && respJson.error?.message === 'Request to ESP failed: Event is full') {
-            BlockMediator.set('rsvpData', null);
+          if (status === 400) {
             const eventResp = await getEvent(getMetadata('event-id'));
             if (eventResp.ok) {
               const { isFull, allowWaitlisting, attendeeCount, attendeeLimit } = eventResp.data;
@@ -298,10 +302,15 @@ function createButton({ type, label }, bp) {
                 }
               }
             }
+
+            BlockMediator.set('rsvpData', null);
           }
 
           buildErrorMsg(bp.form, status);
         }
+
+        button.removeAttribute('disabled');
+        button.classList.remove('submitting');
       }
     });
   }
@@ -822,7 +831,7 @@ async function createForm(bp, formData) {
     });
   });
 
-  autoUpdateContent(formEl, { getConfig, miloLibs: LIBS });
+  autoUpdateContent(formEl, { getConfig, miloLibs });
 
   return {
     formEl,
@@ -985,9 +994,9 @@ async function onProfile(bp, formData) {
 
 async function decorateToastArea() {
   await Promise.all([
-    import(`${LIBS}/deps/lit-all.min.js`),
-    import(`${LIBS}/features/spectrum-web-components/dist/theme.js`),
-    import(`${LIBS}/features/spectrum-web-components/dist/toast.js`),
+    import(`${miloLibs}/deps/lit-all.min.js`),
+    import(`${miloLibs}/features/spectrum-web-components/dist/theme.js`),
+    import(`${miloLibs}/features/spectrum-web-components/dist/toast.js`),
   ]);
   const toastArea = createTag('sp-theme', { color: 'light', scale: 'medium', class: 'toast-area' });
   document.body.append(toastArea);

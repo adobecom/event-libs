@@ -20,6 +20,8 @@ The Timing Framework is a robust system for managing dynamic content scheduling 
    - Handles time-based transitions with server-synchronized time
    - Manages plugin state via BroadcastChannel
    - Uses random intervals (500-1500ms) for polling to prevent thundering herd
+   - Supports both ES6 module (`worker.js`) and traditional JavaScript (`worker-traditional.js`) versions
+   - CSP-compatible with Blob URL fallback for cross-origin scenarios
 
 3. **Plugin System**
    - Extensible architecture for custom timing conditions
@@ -336,6 +338,52 @@ Benefits:
 - **Scalability**: Can handle complex schedules without impacting page performance
 - **Isolation**: Schedule logic is isolated from the main application
 
+#### Worker Implementation Options
+
+The framework provides two worker implementations to handle different deployment scenarios:
+
+**1. ES6 Module Worker (`worker.js`)**
+- Uses modern ES6 import/export syntax
+- Requires `{ type: 'module' }` option
+- Works well for same-origin deployments
+- Supports dynamic imports and modern JavaScript features
+
+**2. Traditional JavaScript Worker (`worker-traditional.js`)**
+- Uses classic JavaScript syntax (no ES6 imports)
+- Compatible with CSP restrictions
+- Supports cross-origin deployments via Blob URLs
+- Inlines all dependencies (TestingManager class)
+- Fallback option for strict security environments
+
+#### Cross-Origin and CSP Compatibility
+
+The framework automatically handles cross-origin and CSP scenarios:
+
+```javascript
+// Automatic fallback strategy
+try {
+  // Try Blob-based worker first (for cross-origin/CSP scenarios)
+  const blobUrl = await createBlobWorker();
+  worker = new Worker(blobUrl);
+} catch (blobError) {
+  // Fallback to direct import (for same-origin scenarios)
+  worker = new Worker(`${eventLibs}/features/timing-framework/worker-traditional.js`);
+}
+```
+
+**Blob Worker Creation Process:**
+1. Fetches the traditional worker file via `fetch()`
+2. Creates a Blob URL with the worker code
+3. Creates worker from Blob URL
+4. Automatically cleans up Blob URL to prevent memory leaks
+
+**Benefits:**
+- **CSP Compatible**: Works with strict Content Security Policies
+- **Cross-Origin Support**: Blob URLs bypass CORS restrictions
+- **Automatic Fallback**: Gracefully handles different deployment scenarios
+- **Memory Safe**: Proper cleanup of Blob URLs
+- **Testing Preserved**: All testing functionality works in both modes
+
 ### BroadcastChannel Communication
 The framework uses BroadcastChannel for plugin communication to:
 - Enable real-time updates across different parts of the application
@@ -494,3 +542,71 @@ export default function init(schedule) {
    - **Within-tab unification**: Multiple chrono-boxes share plugin state
    - **Session persistence**: TabId persists across page refreshes
    - **Clean separation**: No interference between different tabs
+
+## Deployment Considerations
+
+### Content Security Policy (CSP) Compatibility
+
+The framework is designed to work with strict CSP environments:
+
+**CSP Restrictions Handled:**
+- `script-src` restrictions on cross-origin workers
+- `worker-src` limitations
+- `connect-src` for API calls (time synchronization)
+
+**Automatic CSP Handling:**
+- Uses Blob URLs to bypass CSP worker restrictions
+- Fetches worker code via `fetch()` (respects `connect-src`)
+- Falls back gracefully when CSP blocks certain operations
+
+### Cross-Origin Deployment
+
+The framework supports cross-origin deployments through:
+
+**Blob URL Strategy:**
+```javascript
+// Fetches worker from cross-origin CDN
+const response = await fetch('https://cdn.example.com/worker-traditional.js');
+const workerCode = await response.text();
+const blob = new Blob([workerCode], { type: 'application/javascript' });
+const blobUrl = URL.createObjectURL(blob);
+const worker = new Worker(blobUrl);
+```
+
+**Benefits:**
+- Works with CDN deployments
+- Bypasses CORS restrictions for worker files
+- Maintains all functionality including testing
+- Automatic cleanup prevents memory leaks
+
+### File Structure
+
+```
+timing-framework/
+├── worker.js                 # ES6 module version (same-origin)
+├── worker-traditional.js     # Traditional JS version (cross-origin/CSP)
+├── testing.js               # TestingManager class (ES6 module)
+└── plugins/                 # Plugin implementations
+    ├── mobile-rider/
+    └── metadata/
+```
+
+**Usage Guidelines:**
+- Use `worker.js` for same-origin deployments with modern browsers
+- Use `worker-traditional.js` for cross-origin or CSP-restricted environments
+- Both versions provide identical functionality
+- Testing capabilities work in both modes
+
+### Browser Compatibility
+
+**ES6 Module Worker (`worker.js`):**
+- Chrome 80+
+- Firefox 82+
+- Safari 15+
+- Edge 80+
+
+**Traditional Worker (`worker-traditional.js`):**
+- All modern browsers
+- Internet Explorer 11+ (with polyfills)
+- Works in CSP-restricted environments
+- Compatible with older browser versions
