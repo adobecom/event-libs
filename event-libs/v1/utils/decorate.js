@@ -18,6 +18,7 @@ import {
   parseMetadataPath,
   getEventConfig,
   getFallbackLocale,
+  LIBS,
 } from './utils.js';
 
 const preserveFormatKeys = [
@@ -263,7 +264,17 @@ function processTemplateInLinkText(a) {
   }
 }
 
-function initRSVPHandler(link) {
+async function initRSVPHandler(link) {
+  const eventConfig = getEventConfig();
+  const miloLibs = eventConfig?.miloConfig?.miloLibs ? eventConfig.miloConfig.miloLibs : LIBS;
+
+  if (eventConfig.miloConfig) {
+    await dictionaryManager.initialize(eventConfig.miloConfig);
+  } else {
+    const { getConfig } = await import(`${miloLibs}/utils/utils.js`);
+    await dictionaryManager.initialize(getConfig);
+  }
+
   const regHashCallbacks = {
     '#rsvp-form': (a) => {
       const originalText = a.textContent.includes('|') ? a.textContent.split('|')[0] : a.textContent;
@@ -330,13 +341,13 @@ function processLinks(parent) {
   const { cmsType } = getEventConfig();
   const links = parent.querySelectorAll('a[href*="#"]');
 
-  links.forEach((a) => {
+  links.forEach(async (a) => {
     const url = new URL(a.href);
     const isPlaceholderLink = url.pathname.startsWith('/events-placeholder');
     try {
       if (cmsType === 'SP') {
         processTemplateInLinkText(a);
-        const processedAsRSVPButton = initRSVPHandler(a);
+        const processedAsRSVPButton = await initRSVPHandler(a);
 
         if (a.href.endsWith('#event-template') && !processedAsRSVPButton) {
           let templateId;
@@ -376,7 +387,7 @@ function processLinks(parent) {
       }
 
       if (cmsType === 'DA') {
-        initRSVPHandler(a);
+        await initRSVPHandler(a);
       }
     } catch (e) {
       window.lana?.log(`Error while attempting to replace link ${a.href}:\n${JSON.stringify(e, null, 2)}`);

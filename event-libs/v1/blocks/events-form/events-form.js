@@ -831,7 +831,7 @@ async function createForm(bp, formData) {
     });
   });
 
-  autoUpdateContent(formEl, { getConfig, miloLibs });
+  autoUpdateContent(formEl);
 
   return {
     formEl,
