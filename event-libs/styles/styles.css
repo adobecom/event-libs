@@ -1,0 +1,20 @@
+/* 
+ * Put project specific base styles here.
+ *
+ * Note: The project does not load this file.
+ *       You will need to load these using scripts.js.
+ * 
+ *
+ */
+
+ :root {
+  --stroke-color-divider: #6E6E6E;
+  --color-red: #EB1000;
+}
+
+.text.text-block.small pre {
+  padding: 8px;
+  font-size: 12px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
