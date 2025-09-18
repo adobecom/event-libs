@@ -39,10 +39,15 @@ async function initPlugins(schedule) {
   };
   const hasPlugin = (plugin) => schedule.some((item) => item[plugin]);
   const pluginsNeeded = Object.keys(PLUGINS_MAP).filter(hasPlugin);
+  
+  // Construct absolute path to features directory using import.meta.url
+  const currentScriptUrl = new URL(import.meta.url);
+  const baseUrl = new URL('../../features/', currentScriptUrl);
+  
   const plugins = await Promise.all(pluginsNeeded.map((plugin) => {
     const pluginDir = PLUGINS_MAP[plugin];
-    const { eventLibs } = getEventConfig();
-    return import(`${eventLibs}/features/timing-framework/plugins/${pluginDir}/plugin.js`);
+    const pluginUrl = new URL(`timing-framework/plugins/${pluginDir}/plugin.js`, baseUrl);
+    return import(pluginUrl.href);
   }));
 
   // Get or create a global tabId that's shared across all chrono-boxes on this page
@@ -64,12 +69,12 @@ async function initPlugins(schedule) {
 }
 
 async function createBlobWorker() {
-  // Get the current version of the event-libs
-  const { eventLibs } = getEventConfig();
-  const remoteWorkerUrl = `${eventLibs}/features/timing-framework/worker-traditional.js`;
+  // Construct absolute path to worker using import.meta.url
+  const currentScriptUrl = new URL(import.meta.url);
+  const workerUrl = new URL('../../features/timing-framework/worker-traditional.js', currentScriptUrl);
   
   // Fetch the traditional worker file
-  const response = await fetch(remoteWorkerUrl);
+  const response = await fetch(workerUrl.href);
   if (!response.ok) {
     throw new Error('Failed to fetch traditional worker');
   }
@@ -97,8 +102,9 @@ async function setScheduleToScheduleWorker(schedule, plugins, tabId) {
     
     try {
       // Fallback to direct import (works for same-origin scenarios)
-      const { eventLibs } = getEventConfig();
-      worker = new Worker(`${eventLibs}/features/timing-framework/worker-traditional.js`);
+      const currentScriptUrl = new URL(import.meta.url);
+      const workerUrl = new URL('../../features/timing-framework/worker-traditional.js', currentScriptUrl);
+      worker = new Worker(workerUrl.href);
     } catch (directError) {
       window.lana?.log(`Error creating direct worker: ${JSON.stringify(directError)}`);
       throw directError;

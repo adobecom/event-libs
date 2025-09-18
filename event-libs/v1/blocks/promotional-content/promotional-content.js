@@ -64,7 +64,7 @@ export default async function init(el) {
 
   const [{ default: loadFragment }, { createTag }] = await Promise.all([
     import(`${miloLibs}/blocks/fragment/fragment.js`),
-    import(`${miloLibs}/utils.js`),
+    import(`${miloLibs}/utils/utils.js`),
   ]);
 
   const fragmentPromotionalItemsPromises = promotionalItems.map(async (item) => {

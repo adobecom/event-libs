@@ -1,6 +1,6 @@
 import { deleteAttendeeFromEvent, getAndCreateAndAddAttendee, getAttendee, getEvent } from '../../utils/esp-controller.js';
 import BlockMediator from '../../deps/block-mediator.min.js';
-import { signIn, autoUpdateContent } from '../../utils/decorate.js';
+import { signIn, decorateEvent } from '../../utils/decorate.js';
 import { dictionaryManager } from '../../utils/dictionary-manager.js';
 import { getEventConfig, LIBS, getMetadata, getSusiOptions } from '../../utils/utils.js';
 
@@ -831,7 +831,7 @@ async function createForm(bp, formData) {
     });
   });
 
-  autoUpdateContent(formEl);
+  decorateEvent(formEl);
 
   return {
     formEl,

@@ -5,7 +5,7 @@ import { LIBS, setMetadata, setEventConfig } from '../../../event-libs/v1/utils/
 import BlockMediator from '../../../event-libs/v1/deps/block-mediator.min.js';
 
 const {
-  autoUpdateContent,
+  decorateEvent,
   updateAnalyticTag,
   signIn,
   validatePageAndRedirect,
@@ -43,7 +43,7 @@ describe('Content Update Script', () => {
       miloLibs: LIBS,
     };
 
-    autoUpdateContent(document, miloDeps);
+    decorateEvent(document, miloDeps);
     expect(checkForDoubleSquareBrackets()).to.be.false;
   });
 
@@ -57,7 +57,7 @@ describe('Content Update Script', () => {
       miloLibs: LIBS,
     };
 
-    autoUpdateContent(document, miloDeps);
+    decorateEvent(document, miloDeps);
     expect(checkForDoubleSquareBrackets()).to.be.false;
   });
 
@@ -90,7 +90,7 @@ describe('Content Update Script', () => {
     BlockMediator.set('imsProfile', profile);
 
     const buttonOriginalText = document.querySelector('a[href$="#rsvp-form-1"]').textContent;
-    autoUpdateContent();
+    decorateEvent();
     BlockMediator.set('rsvpData', null);
 
     expect(document.querySelector('a[href$="#rsvp-form-1"]').textContent).to.be.equal(buttonOriginalText);
@@ -188,7 +188,7 @@ describe('getNonProdData', () => {
   });
 });
 
-describe('autoUpdateContent - Array Iteration', () => {
+describe('decorateEvent - Array Iteration', () => {
   let container;
 
   beforeEach(() => {
@@ -220,13 +220,13 @@ describe('autoUpdateContent - Array Iteration', () => {
     it('should process @array(contacts) with English commas', () => {
       // Set up test metadata
       setMetadata('contacts', JSON.stringify(['John Doe', 'Jane Smith', 'Bob Johnson']));
-      setMetadata('event-id', 'test-event'); // Required for autoUpdateContent to run
+      setMetadata('event-id', 'test-event'); // Required for decorateEvent to run
 
       // Create test HTML with @array syntax
       container.innerHTML = '<p>Contact us: [[@array(contacts),]]</p>';
 
-      // Call autoUpdateContent
-      autoUpdateContent(container);
+      // Call decorateEvent
+      decorateEvent(container);
 
       // Verify the result - comma is used exactly as provided
       expect(container.textContent).to.equal('Contact us: John Doe,Jane Smith,Bob Johnson');
@@ -240,8 +240,8 @@ describe('autoUpdateContent - Array Iteration', () => {
       // Create test HTML with custom separator
       container.innerHTML = '<p>Contact us: [[@array(contacts) | ]]</p>';
 
-      // Call autoUpdateContent
-      autoUpdateContent(container);
+      // Call decorateEvent
+      decorateEvent(container);
 
       // Verify the result uses custom separator
       expect(container.textContent).to.equal('Contact us: John Doe | Jane Smith | Bob Johnson');
@@ -255,8 +255,8 @@ describe('autoUpdateContent - Array Iteration', () => {
       // Create test HTML with no separator
       container.innerHTML = '<p>Contact us: [[@array(contacts)]]</p>';
 
-      // Call autoUpdateContent
-      autoUpdateContent(container);
+      // Call decorateEvent
+      decorateEvent(container);
 
       // Verify the result uses space as default separator
       expect(container.textContent).to.equal('Contact us: John Doe Jane Smith Bob Johnson');
@@ -270,8 +270,8 @@ describe('autoUpdateContent - Array Iteration', () => {
       // Create test HTML with @array syntax
       container.innerHTML = '<p>連絡先: [[@array(contacts),]]</p>';
 
-      // Call autoUpdateContent
-      autoUpdateContent(container);
+      // Call decorateEvent
+      decorateEvent(container);
 
       // Verify the result uses the comma as provided (no locale-specific handling)
       expect(container.textContent).to.equal('連絡先: 田中太郎,佐藤花子,鈴木一郎');
@@ -285,8 +285,8 @@ describe('autoUpdateContent - Array Iteration', () => {
       // Create test HTML with @array syntax
       container.innerHTML = '<p>联系人: [[@array(contacts),]]</p>';
 
-      // Call autoUpdateContent
-      autoUpdateContent(container);
+      // Call decorateEvent
+      decorateEvent(container);
 
       // Verify the result uses the comma as provided (no locale-specific handling)
       expect(container.textContent).to.equal('联系人: 张三,李四,王五');
@@ -300,8 +300,8 @@ describe('autoUpdateContent - Array Iteration', () => {
       // Create test HTML with @array syntax
       container.innerHTML = '<p>Contact us: [[@array(contacts),]]</p>';
 
-      // Call autoUpdateContent
-      autoUpdateContent(container);
+      // Call decorateEvent
+      decorateEvent(container);
 
       // Verify the result is empty
       expect(container.textContent).to.equal('Contact us: ');
@@ -315,8 +315,8 @@ describe('autoUpdateContent - Array Iteration', () => {
       // Create test HTML with @array syntax
       container.innerHTML = '<p>Contact us: [[@array(contacts),]]</p>';   
 
-      // Call autoUpdateContent
-      autoUpdateContent(container);
+      // Call decorateEvent
+      decorateEvent(container);
 
       // Verify the result is empty (non-array returns empty string)
       expect(container.textContent).to.equal('Contact us: ');
@@ -330,8 +330,8 @@ describe('autoUpdateContent - Array Iteration', () => {
       // Create test HTML with @array syntax
       container.innerHTML = '<p>Contact us: [[@array(contacts),]]</p>';
 
-      // Call autoUpdateContent
-      autoUpdateContent(container);
+      // Call decorateEvent
+      decorateEvent(container);
 
       // Verify the result uses the comma as provided (no locale-specific handling)
       expect(container.textContent).to.equal('Contact us: John Doe,Jane Smith');
@@ -348,8 +348,8 @@ describe('autoUpdateContent - Array Iteration', () => {
       // Create test HTML with nested @array syntax
       container.innerHTML = '<p>Contact us: [[@array(event-data.contacts),]]</p>';
 
-      // Call autoUpdateContent
-      autoUpdateContent(container);
+      // Call decorateEvent
+      decorateEvent(container);
 
       // Verify the result
       expect(container.textContent).to.equal('Contact us: John Doe,Jane Smith');
@@ -367,8 +367,8 @@ describe('autoUpdateContent - Array Iteration', () => {
       // Create test HTML with attribute extraction
       container.innerHTML = '<p>Speakers: [[@array(speakers.name),]]</p>';
 
-      // Call autoUpdateContent
-      autoUpdateContent(container);
+      // Call decorateEvent
+      decorateEvent(container);
 
       // Verify the result extracts the 'name' attribute
       expect(container.textContent).to.equal('Speakers: Dr. Alice Brown,Prof. Charlie Wilson,Jane Smith');
@@ -385,8 +385,8 @@ describe('autoUpdateContent - Array Iteration', () => {
       // Create test HTML with attribute extraction and custom separator
       container.innerHTML = '<p>Speakers: [[@array(speakers.name) | ]]</p>';
 
-      // Call autoUpdateContent
-      autoUpdateContent(container);
+      // Call decorateEvent
+      decorateEvent(container);
 
       // Verify the result uses custom separator
       expect(container.textContent).to.equal('Speakers: Dr. Alice Brown | Prof. Charlie Wilson');
@@ -406,8 +406,8 @@ describe('autoUpdateContent - Array Iteration', () => {
       // Create test HTML with nested array and attribute extraction
       container.innerHTML = '<p>Speakers: [[@array(event-data.speakers.name),]]</p>';
 
-      // Call autoUpdateContent
-      autoUpdateContent(container);
+      // Call decorateEvent
+      decorateEvent(container);
 
       // Verify the result
       expect(container.textContent).to.equal('Speakers: Dr. Alice Brown,Prof. Charlie Wilson');
@@ -424,8 +424,8 @@ describe('autoUpdateContent - Array Iteration', () => {
       // Create test HTML without attribute specification
       container.innerHTML = '<p>Speakers: [[@array(speakers),]]</p>';
     
-      // Call autoUpdateContent
-      autoUpdateContent(container);
+      // Call decorateEvent
+      decorateEvent(container);
 
       // Verify the result converts objects to JSON strings
       expect(container.textContent).to.include('Speakers: {"name":"Dr. Alice Brown","title":"Senior Researcher"},{"name":"Prof. Charlie Wilson","title":"Professor"}');
@@ -443,8 +443,8 @@ describe('autoUpdateContent - Array Iteration', () => {
       // Create test HTML with attribute extraction
       container.innerHTML = '<p>Speakers: [[@array(speakers.name),]]</p>';      
 
-      // Call autoUpdateContent
-      autoUpdateContent(container);
+      // Call decorateEvent
+      decorateEvent(container);
 
       // Verify the result handles missing attributes
       expect(container.textContent).to.equal('Speakers: Dr. Alice Brown,Prof. Charlie Wilson,');

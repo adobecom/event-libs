@@ -750,7 +750,7 @@ function processTemplateInAllNodes(parent, extraData) {
 }
 
 // data -> DOM gills
-export function autoUpdateContent(parent) {
+export function decorateEvent(parent) {
   // handle photos data parsing
   const extraData = parsePhotosData(parent);
   const { cmsType } = getEventConfig();

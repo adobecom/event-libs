@@ -7,7 +7,7 @@ Previously, consumers had to import from multiple modules:
 ```javascript
 const [{
   setEventConfig,
-  autoUpdateContent,
+  decorateEvent,
   getNonProdData,
   validatePageAndRedirect,
 }, { lazyCaptureProfile }, { dictionaryManager }] = await Promise.all([
@@ -25,7 +25,7 @@ Now consumers can import everything from a single module:
 ```javascript
 const {
   setEventConfig,
-  autoUpdateContent,
+  decorateEvent,
   getNonProdData,
   validatePageAndRedirect,
   lazyCaptureProfile,

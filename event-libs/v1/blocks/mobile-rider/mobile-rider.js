@@ -59,8 +59,11 @@ class MobileRider {
     try {
       scriptPromise = loadScript();
       const storePromise = this.el.closest('.chrono-box')
-        ? import('../../features/timing-framework/plugins/mobile-rider/plugin.js')
-          .then(({ mobileRiderStore }) => {
+        ? (() => {
+            const currentScriptUrl = new URL(import.meta.url);
+            const pluginUrl = new URL('../../features/timing-framework/plugins/mobile-rider/plugin.js', currentScriptUrl);
+            return import(pluginUrl.href);
+          })().then(({ mobileRiderStore }) => {
             this.store = mobileRiderStore;
           })
           .catch((e) => {

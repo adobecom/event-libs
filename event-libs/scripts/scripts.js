@@ -10,8 +10,7 @@
  * governing permissions and limitations under the License.
  */
 
-import { lazyCaptureProfile } from '../v1/utils/profile.js';
-import { getMetadata, LIBS } from '../v1/utils/utils.js';
+import { LIBS } from '../v1/utils/utils.js';
 import decorateArea from '../v1/utils/decorate.js';
 
 const {
@@ -80,7 +79,5 @@ decorateArea();
 
 (async function loadPage() {
   await loadLana({ clientId: 'events-milo' });
-  await loadArea().then(() => {
-    if (getMetadata('event-details-page') === 'yes') lazyCaptureProfile();
-  });
+  await loadArea();
 }());

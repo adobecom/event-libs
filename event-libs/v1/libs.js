@@ -1,4 +1,4 @@
-// Re-export all utilities from utils.js
+// Core constants
 const EVENT_BLOCKS = [
   'bento-cards',
   'chrono-box',
@@ -18,66 +18,43 @@ const EVENT_BLOCKS = [
   'youtube-chat',
 ];
 
-export {
+// Import only the most essential utilities that are always needed
+// These are the functions that the importer's scripts.js actually uses
+import {
   getEventServiceEnv,
-  createTag,
-  yieldToMain,
   getMetadata,
   setMetadata,
-  handlize,
-  flattenObject,
-  getCurrentTabId,
-  parseMetadataPath,
-  createOptimizedPicture,
-  getIcon,
   getSusiOptions,
-  readBlockConfig,
   setEventConfig,
   updateEventConfig,
   getEventConfig,
 } from './utils/utils.js';
 
-// Re-export from decorate.js
-export {
+// Pre-load the most commonly used functions from decorate.js
+// This reduces the initial network load while keeping critical functions available
+import {
+  decorateEvent,
   getNonProdData,
-  autoUpdateContent,
   validatePageAndRedirect,
 } from './utils/decorate.js';
 
-// Re-export from profile.js
+// Core exports - always available (synchronous)
 export {
-  getProfile,
-  lazyCaptureProfile,
-} from './utils/profile.js';
+  getEventServiceEnv,
+  getMetadata,
+  setMetadata,
+  getSusiOptions,
+  setEventConfig,
+  updateEventConfig,
+  getEventConfig,
+  decorateEvent,
+  getNonProdData,
+  validatePageAndRedirect,
+  EVENT_BLOCKS,
+};
 
-// Re-export from dictionary-manager.js
-export {
-  DictionaryManager,
-  dictionaryManager,
-} from './utils/dictionary-manager.js';
-
-// Re-export from esp-controller.js
-export {
-  getCaasTags,
-  waitForAdobeIMS,
-  constructRequestOptions,
-  getEvent,
-  getEventAttendee,
-  getAttendee,
-  createAttendee,
-  addAttendeeToEvent,
-  updateAttendee,
-  deleteAttendeeFromEvent,
-  getAndCreateAndAddAttendee,
-} from './utils/esp-controller.js';
-
-// Re-export from data-utils.js
-export {
-  EVENT_ATTENDEE_DATA_FILTER,
-  BASE_ATTENDEE_DATA_FILTER,
-  isValidAttribute,
-  getEventAttendeePayload,
-  getBaseAttendeePayload,
-} from './utils/data-utils.js';
-
-export { EVENT_BLOCKS };
+// Lazy-loaded delayed actions for event pages
+export const eventsDelayedActions = async () => {
+  const { lazyCaptureProfile } = await import('./utils/profile.js');
+  lazyCaptureProfile();
+};

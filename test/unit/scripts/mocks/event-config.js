@@ -8,7 +8,6 @@ export const eventConfig = {
     },
     "cmsType": "SP",
     "version": "v1",
-    "eventLibs": "http://localhost:3868/event-libs/v1",
     "miloConfig": {
         "env": {
             "name": "local",

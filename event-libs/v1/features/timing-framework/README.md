@@ -367,7 +367,9 @@ try {
   worker = new Worker(blobUrl);
 } catch (blobError) {
   // Fallback to direct import (for same-origin scenarios)
-  worker = new Worker(`${eventLibs}/features/timing-framework/worker-traditional.js`);
+  const currentScriptUrl = new URL(import.meta.url);
+  const pluginUrl = new URL('../../features/timing-framework/worker-traditional.js', currentScriptUrl);
+  return import(pluginUrl.href);
 }
 ```
 
