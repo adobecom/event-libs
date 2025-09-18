@@ -1,4 +1,4 @@
-import { parseMetadataPath, getCurrentTabId } from '../../../../scripts/utils.js';
+import { parseMetadataPath, getCurrentTabId } from '../../../../utils/utils.js';
 
 const store = new Map();
 const channel = new BroadcastChannel('metadata-store');
