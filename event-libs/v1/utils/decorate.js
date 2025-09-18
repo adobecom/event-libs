@@ -761,16 +761,7 @@ export function autoUpdateContent(parent) {
   if (getEventServiceEnv() !== 'prod' && cmsType === 'SP') updateExtraMetaTags(parent);
 }
 
-export default async function decorateArea(area = document) {
-  // Initialize DictionaryManager with configuration
-  try {
-    const { miloConfig } = getEventConfig();
-    await dictionaryManager.initialize(miloConfig);
-  } catch (error) {
-    window.lana?.log(`Failed to initialize DictionaryManager:\n${JSON.stringify(error, null, 2)}`);
-  }
-
-
+export default function decorateArea(area = document) {
   const eagerLoad = (parent, selector) => {
     const img = parent.querySelector(selector);
     img?.removeAttribute('loading');
