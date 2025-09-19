@@ -33,6 +33,9 @@ export const [setEventConfig, updateEventConfig, getEventConfig] = (() => {
 })();
 
 export function getEventServiceEnv() {
+  const metadataEnv = getMetadata('event-service-env');
+  if (metadataEnv && ENV_MAP[metadataEnv]) return ENV_MAP[metadataEnv];
+
   const validEnvs = ['dev', 'stage', 'prod'];
   const { host, search } = window.location;
   const SLD = host.includes('.aem.') ? 'aem' : 'hlx';
@@ -42,11 +45,27 @@ export function getEventServiceEnv() {
   if (validEnvs.includes(eccEnv)) return ENV_MAP[eccEnv];
 
   if ((host.includes(`${SLD}.page`) || host.includes(`${SLD}.live`))) {
-    if (host.startsWith('dev--')) return ENV_MAP.dev;
-    if (host.startsWith('dev02--') || host.startsWith('main02--')) return ENV_MAP.dev02;
-    if (host.startsWith('stage--')) return ENV_MAP.stage;
-    if (host.startsWith('stage02--')) return ENV_MAP.stage02;
-    if (host.startsWith('main--')) return ENV_MAP.prod;
+    const { cmsType } = getEventConfig();
+
+    if (cmsType === 'SP') {
+      // Check for direct environment patterns: {envName}--
+      if (host.startsWith('dev--')) return ENV_MAP.dev;
+      if (host.startsWith('dev02--') || host.startsWith('main02--')) return ENV_MAP.dev02;
+      if (host.startsWith('stage--')) return ENV_MAP.stage;
+      if (host.startsWith('stage02--')) return ENV_MAP.stage02;
+      if (host.startsWith('main--')) return ENV_MAP.prod;
+    } else if (cmsType === 'DA') {
+      // Check for nested environment patterns: {any-string}--{any-string}-{envName}--
+      const nestedEnvMatch = host.match(/^[^-]+--[^-]+-(dev|dev02|stage|stage02|main)--/);
+      if (nestedEnvMatch) {
+        const envName = nestedEnvMatch[1];
+        if (envName === 'dev') return ENV_MAP.dev;
+        if (envName === 'dev02') return ENV_MAP.dev02;
+        if (envName === 'stage') return ENV_MAP.stage;
+        if (envName === 'stage02') return ENV_MAP.stage02;
+        if (envName === 'main') return ENV_MAP.prod;
+      }
+    }
   }
 
   if (host.includes('localhost')) return ENV_MAP.local;
