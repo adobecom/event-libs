@@ -1007,7 +1007,13 @@ function getFormLink(block, bp) {
   const legacyLink = block.querySelector(':scope > div:nth-of-type(2) a[href$=".json"]');
 
   const cloudType = getMetadata('cloud-type');
-  const form = createTag('a', { href: `/events/default/rsvp-form-configs/${cloudType.toLowerCase()}.json` });
+  const metaRsvpConfigLocation = getMetadata('rsvp-config-location');
+  const form = createTag('a', { href: metaRsvpConfigLocation });
+
+  const { cmsType } = getEventConfig();
+  if (!metaRsvpConfigLocation && cmsType === 'SP') {
+    form.href = `/events/default/rsvp-form-configs/${cloudType.toLowerCase()}.json`;
+  }
 
   if (legacyLink) {
     legacyLink.href = form.href;
