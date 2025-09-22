@@ -3,6 +3,7 @@ import BlockMediator from '../../deps/block-mediator.min.js';
 import { signIn, decorateEvent } from '../../utils/decorate.js';
 import { dictionaryManager } from '../../utils/dictionary-manager.js';
 import { getEventConfig, LIBS, getMetadata, getSusiOptions } from '../../utils/utils.js';
+import { FALLBACK_LOCALES } from '../../utils/constances.js';
 
 const eventConfig = getEventConfig();
 const miloLibs = eventConfig?.miloConfig?.miloLibs ? eventConfig.miloConfig.miloLibs : LIBS;
@@ -1003,15 +1004,21 @@ async function decorateToastArea() {
   return toastArea;
 }
 
-function getFormLink(block, bp) {
+async function getFormLink(block, bp) {
+  const eventConfig = getEventConfig();
+  const { miloConfig, cmsType } = eventConfig;
+  const miloLibs = miloConfig?.miloLibs ? miloConfig.miloLibs : LIBS;
+  const { getLocale } = await import(`${miloLibs}/utils/utils.js`);
+  const { prefix } = getLocale(miloConfig?.locales || FALLBACK_LOCALES);
+
   const legacyLink = block.querySelector(':scope > div:nth-of-type(2) a[href$=".json"]');
 
   const cloudType = getMetadata('cloud-type');
-  const metaRsvpConfigLocation = getMetadata('rsvp-config-location');
-  const form = createTag('a', { href: metaRsvpConfigLocation });
+  const configLocation = getMetadata('rsvp-config-location');
+  const form = createTag('a', { href: `${prefix}${configLocation.startsWith('/') ? configLocation : `/${configLocation}`}` });
 
-  const { cmsType } = getEventConfig();
-  if (!metaRsvpConfigLocation && cmsType === 'SP') {
+  if (!configLocation && cmsType === 'SP') {
+    
     form.href = `/events/default/rsvp-form-configs/${cloudType.toLowerCase()}.json`;
   }
 
@@ -1038,7 +1045,7 @@ export default async function decorate(block, formData = null) {
     waitlistSuccessScreen: block.querySelector(':scope > div:nth-of-type(5)'),
   };
 
-  bp.form = getFormLink(block, bp);
+  bp.form = await getFormLink(block, bp);
 
   await onProfile(bp, formData);
 }
