@@ -12,7 +12,10 @@ export const [setEventConfig, updateEventConfig, getEventConfig] = (() => {
   let config = {};
   return [
     (ec, mc = {}) => {
-      config = { eventServiceEnv: getEventServiceEnv(), ...ec, miloConfig: mc };
+      config = { eventServiceEnv: getEventServiceEnv(), ...ec};
+      if (mc) {
+        config.miloConfig = mc;
+      }
       const cmsType = ec.cmsType || 'DA';
       if (cmsType === 'SP') {
         const metadataLocation = '/events/default/';
@@ -27,7 +30,13 @@ export const [setEventConfig, updateEventConfig, getEventConfig] = (() => {
 
       return config;
     },
-    (ec, mc = {}) => (config = { ...ec, miloConfig: mc }),
+    (ec, mc = {}) => {
+      config = { ...ec };
+      if (mc) {
+        config.miloConfig = mc;
+      }
+      return config;
+    },
     () => config,
   ];
 })();

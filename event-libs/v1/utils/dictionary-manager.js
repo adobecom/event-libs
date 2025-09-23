@@ -1,5 +1,5 @@
 export class DictionaryManager {
-  #dictionary = {};
+  #dictionaries = {};
 
   static getPlaceholdersPath(config, sheet) {
     const path = `${config.locale.contentRoot}/placeholders.json`;
@@ -8,12 +8,12 @@ export class DictionaryManager {
   }
 
   /**
-   * Fetch dictionary from placeholders.json
-   * @param {Object} params - Parameters for fetching dictionary
+   * Add a new dictionary book from placeholders.json
+   * @param {Object} params - Parameters for adding dictionary book
    * @param {Object} params.config - Milo configuration
    * @param {string} params.sheet - Sheet name (optional)
    */
-  async fetchDictionary({ config, sheet }) {
+  async addBook({ config, sheet = 'default' }) {
     try {
       const path = DictionaryManager.getPlaceholdersPath(config, sheet);
       const response = await fetch(path);
@@ -21,23 +21,55 @@ export class DictionaryManager {
         throw new Error(`Failed to fetch dictionary: ${response.status}`);
       }
       const data = await response.json();
-      this.#dictionary = Object.freeze(data.data.reduce((acc, item) => {
+      const dictionary = data.data.reduce((acc, item) => {
         acc[item.key] = item.value;
         return acc;
-      }, {}));
+      }, {});
+      
+      // Store dictionary for this specific sheet
+      this.#dictionaries[sheet] = Object.freeze(dictionary);
     } catch (error) {
-      window.lana?.log(`Error fetching dictionary:\n${JSON.stringify(error)}`);
+      window.lana?.log(`Error adding dictionary book:\n${JSON.stringify(error)}`);
       throw error;
     }
   }
 
   /**
-   * Get value for a key from the dictionary
+   * Get value for a key from a specific sheet's dictionary
    * @param {string} key - The key to look up
+   * @param {string} sheet - The sheet name to look in (defaults to 'default')
    * @returns {string} The value for the key or the key itself if not found
    */
-  getValue(key) {
-    return this.#dictionary[key] || key;
+  getValue(key, sheet = 'default') {
+    const dictionary = this.#dictionaries[sheet];
+    return dictionary?.[key] || key;
+  }
+
+  /**
+   * Get all available sheet names
+   * @returns {string[]} Array of sheet names that have been loaded
+   */
+  getAvailableSheets() {
+    return Object.keys(this.#dictionaries);
+  }
+
+  /**
+   * Check if a sheet has been loaded
+   * @param {string} sheet - The sheet name to check
+   * @returns {boolean} True if the sheet has been loaded
+   */
+  hasSheet(sheet) {
+    return sheet in this.#dictionaries;
+  }
+
+  /**
+   * Get all keys for a specific sheet
+   * @param {string} sheet - The sheet name (defaults to 'default')
+   * @returns {string[]} Array of keys in the sheet
+   */
+  getKeys(sheet = 'default') {
+    const dictionary = this.#dictionaries[sheet];
+    return dictionary ? Object.keys(dictionary) : [];
   }
 
   /**
@@ -46,7 +78,7 @@ export class DictionaryManager {
    * @param {string} sheet - Sheet name (optional)
    */
   async initialize(config, sheet = 'default') {
-    await this.fetchDictionary({ config, sheet });
+    await this.addBook({ config, sheet });
   }
 }
 

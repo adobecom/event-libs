@@ -14,11 +14,11 @@ describe('DictionaryManager', () => {
     });
 
     it('should return the value if key exists in dictionary', async () => {
-      // Mock the dictionary by calling fetchDictionary with mock data
+      // Mock the dictionary by calling addBook with mock data
       const mockResponse = { ok: true, json: () => Promise.resolve({ data: [{ key: 'test-key', value: 'test-value' }] }) };
       globalThis.fetch = () => Promise.resolve(mockResponse);
       
-      await manager.fetchDictionary({ config: { locale: { contentRoot: '/content' } } });
+      await manager.addBook({ config: { locale: { contentRoot: '/content' } } });
       expect(manager.getValue('test-key')).to.equal('test-value');
     });
   });

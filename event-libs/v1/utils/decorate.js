@@ -269,11 +269,13 @@ async function initRSVPHandler(link) {
   const miloLibs = eventConfig?.miloConfig?.miloLibs ? eventConfig.miloConfig.miloLibs : LIBS;
 
   if (eventConfig.miloConfig) {
-    await dictionaryManager.initialize(eventConfig.miloConfig);
+    await dictionaryManager.addBook({ config: eventConfig.miloConfig });
   } else {
     const { getConfig } = await import(`${miloLibs}/utils/utils.js`);
-    await dictionaryManager.initialize(getConfig);
+    await dictionaryManager.addBook({ config: getConfig() });
   }
+
+  console.log('dictionaryManager', dictionaryManager);
 
   const regHashCallbacks = {
     '#rsvp-form': (a) => {
