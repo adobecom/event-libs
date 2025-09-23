@@ -275,8 +275,6 @@ async function initRSVPHandler(link) {
     await dictionaryManager.addBook({ config: getConfig() });
   }
 
-  console.log('dictionaryManager', dictionaryManager);
-
   const regHashCallbacks = {
     '#rsvp-form': (a) => {
       const originalText = a.textContent.includes('|') ? a.textContent.split('|')[0] : a.textContent;
