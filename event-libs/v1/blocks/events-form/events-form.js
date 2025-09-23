@@ -1015,10 +1015,12 @@ async function getFormLink(block, bp) {
 
   const cloudType = getMetadata('cloud-type');
   const configLocation = getMetadata('rsvp-config-location');
-  const form = createTag('a', { href: `${prefix}${configLocation.startsWith('/') ? configLocation : `/${configLocation}`}` });
+  const form = createTag('a');
 
   if (!configLocation || cmsType === 'SP') {
     form.href = `/events/default/rsvp-form-configs/${cloudType.toLowerCase()}.json`;
+  } else {
+    form.href = `${prefix}${configLocation.startsWith('/') ? configLocation : `/${configLocation}`}`;
   }
 
   if (legacyLink) {
