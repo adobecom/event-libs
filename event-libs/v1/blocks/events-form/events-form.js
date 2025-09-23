@@ -38,10 +38,10 @@ function createSelect(fd) {
   } = fd;
 
   const select = createTag('select', { id: field });
-  if (placeholder) select.append(createTag('option', { class: 'placeholder-option', selected: '', disabled: '', value: '' }, dictionaryManager.getValue(placeholder)));
+  if (placeholder) select.append(createTag('option', { class: 'placeholder-option', selected: '', disabled: '', value: '' }, dictionaryManager.getValue(placeholder, 'rsvp-fields')));
   options.split(';').forEach(async (o) => {
     const text = o.trim();
-    const optionText = dictionaryManager.getValue(text);
+    const optionText = dictionaryManager.getValue(text, 'rsvp-fields');
     const option = createTag('option', { value: text }, optionText);
     select.append(option);
     if (defval === text) select.value = text;
@@ -84,7 +84,7 @@ function createSelect(fd) {
 
     options.split(';').forEach((o) => {
       const text = o.trim();
-      const label = createTag('label', {}, dictionaryManager.getValue(text), { parent: customDropdown });
+      const label = createTag('label', {}, dictionaryManager.getValue(text, 'rsvp-fields'), { parent: customDropdown });
       createTag('input', { type: 'checkbox', value: text, class: 'no-submit' }, '', { parent: label });
     });
 
@@ -225,7 +225,7 @@ async function buildErrorMsg(parent, status) {
     existingErrors.forEach((err) => err.remove());
   }
 
-      const errorMsg = dictionaryManager.getValue(errorKeyMap[status] || 'rsvp-error-msg');
+      const errorMsg = dictionaryManager.getValue(errorKeyMap[status] || 'rsvp-error-msg', 'rsvp-fields');
   const error = createTag('p', { class: 'error' }, errorMsg);
   parent.append(error);
   setTimeout(() => {
@@ -266,7 +266,7 @@ function eventFormSendAnalytics(bp, view) {
 }
 
 function createButton({ type, label }, bp) {
-  const button = createTag('button', { class: 'button' }, dictionaryManager.getValue(label));
+  const button = createTag('button', { class: 'button' }, dictionaryManager.getValue(label, 'rsvp-fields'));
   if (type === 'submit') {
     button.addEventListener('click', async (event) => {
       if (bp.form.checkValidity()) {
@@ -295,10 +295,10 @@ function createButton({ type, label }, bp) {
 
               if (eventFull) {
                 if (allowWaitlisting) {
-                  button.textContent = dictionaryManager.getValue('waitlist-cta-text');
+                  button.textContent = dictionaryManager.getValue('waitlist-cta-text', 'rsvp-fields');
                   button.disabled = false;
                 } else {
-                  button.textContent = dictionaryManager.getValue('event-full-cta-text');
+                  button.textContent = dictionaryManager.getValue('event-full-cta-text', 'rsvp-fields');
                   button.disabled = true;
                 }
               }
@@ -328,25 +328,25 @@ function createButton({ type, label }, bp) {
 }
 
 function createHeading({ label }, el) {
-  return createTag(el, {}, dictionaryManager.getValue(label));
+  return createTag(el, {}, dictionaryManager.getValue(label, 'rsvp-fields'));
 }
 
 function createInput({ type, field, placeholder, required, defval }) {
-  const placeholderText = placeholder ? dictionaryManager.getValue(placeholder) : '';
+  const placeholderText = placeholder ? dictionaryManager.getValue(placeholder, 'rsvp-fields') : '';
   const input = createTag('input', { type, id: field, placeholder: placeholderText, value: defval });
   if (required === 'x') input.setAttribute('required', 'required');
   return input;
 }
 
 function createTextArea({ field, placeholder, required, defval }) {
-  const placeholderText = placeholder ? dictionaryManager.getValue(placeholder) : '';
+  const placeholderText = placeholder ? dictionaryManager.getValue(placeholder, 'rsvp-fields') : '';
   const input = createTag('textarea', { id: field, placeholder: placeholderText, value: defval });
   if (required === 'x') input.setAttribute('required', 'required');
   return input;
 }
 
 function createlabel({ field, label, required }) {
-  return createTag('label', { for: field, class: required ? 'required' : '' }, dictionaryManager.getValue(label));
+  return createTag('label', { for: field, class: required ? 'required' : '' }, dictionaryManager.getValue(label, 'rsvp-fields'));
 }
 
 function createCheckItem(item, type, id, def) {
@@ -354,7 +354,7 @@ function createCheckItem(item, type, id, def) {
   const defList = def.split(';').map((defItem) => defItem.trim());
   const pseudoEl = createTag('span', { class: `check-item-button ${type}-button` });
   const [customLabel, customVal] = item.split('::');
-  const label = createTag('label', { class: `check-item-label ${type}-label`, for: `${id}-${itemKebab}` }, dictionaryManager.getValue(customLabel) || item);
+  const label = createTag('label', { class: `check-item-label ${type}-label`, for: `${id}-${itemKebab}` }, dictionaryManager.getValue(customLabel, 'rsvp-fields') || item);
   const input = createTag(
     'input',
     { type, name: id, value: customVal || item, class: `check-item-input ${type}-input`, id: `${id}-${itemKebab}` },
@@ -648,7 +648,7 @@ function decorateSuccessScreen(screen) {
 }
 
 async function addConsentSuite(form) {
-      const countryText = dictionaryManager.getValue('country');
+      const countryText = dictionaryManager.getValue('country', 'rsvp-fields');
   const fieldWrapper = createTag('div', { class: 'field-wrapper events-form-select-wrapper', 'data-field-id': 'country', 'data-type': 'select' });
   const label = createTag('label', { for: 'consentStringId', class: 'required' }, countryText);
   const countrySelect = createTag('select', { id: 'consentStringId', required: 'required' });
@@ -737,7 +737,7 @@ async function createForm(bp, formData) {
   }
 
   const config = getConfig();
-  await dictionaryManager.fetchDictionary({
+  await dictionaryManager.addBook({
     config,
     sheet: 'rsvp-fields',
   });
