@@ -4,6 +4,7 @@ import {
   SERIES_404_MAP_PATH,
   ALLOWED_EMAIL_DOMAINS,
   FALLBACK_LOCALES,
+  CONDITIONAL_REG,
 } from './constances.js';
 import BlockMediator from '../deps/block-mediator.min.js';
 import { getEvent } from './esp-controller.js';
@@ -19,7 +20,9 @@ import {
   getEventConfig,
   getFallbackLocale,
   LIBS,
+  createContextualContent,
 } from './utils.js';
+import { massageMetadata } from './date-time-helper.js';
 
 const preserveFormatKeys = [
   'description',
@@ -126,6 +129,7 @@ export async function updateRSVPButtonState(rsvpBtn) {
     eventFull = isFull
       || (!allowWaitlisting && attendeeCount >= attendeeLimit);
     waitlistEnabled = allowWaitlisting;
+    BlockMediator.set('eventData', eventInfo.data);
   }
 
   const rsvpData = BlockMediator.get('rsvpData');
@@ -470,6 +474,8 @@ function updateTextNode(child, matchCallback) {
 
   if (replacedText === originalText) return;
 
+  if (child.parentElement.dataset.contextualContent) return;
+
   if (isHTMLString(replacedText)) {
     child.parentElement.innerHTML = replacedText;
   } else {
@@ -498,6 +504,8 @@ function updateTextContent(child, matchCallback) {
 
   if (replacedText === originalText) return;
 
+  if (child.parentElement.dataset.contextualContent) return;
+  
   if (isHTMLString(replacedText)) {
     child.parentElement.innerHTML = replacedText;
   } else {
@@ -517,6 +525,51 @@ export function shouldRenderWithNonProdMetadata(eventId, prodDomain) {
 
   return false;
 }
+
+function updateContextualContentElements(parent, extraData) {
+  // Find all elements with contextual content syntax
+  const contextualElements = parent.querySelectorAll('[data-contextual-content]');
+
+  contextualElements.forEach((element) => {
+    const originalContent = element.dataset.contextualContent;
+    if (originalContent) {
+      createContextualContent(element, originalContent, extraData);
+    }
+  });
+
+  // Also check for conditional content in text nodes that might not have been caught
+  const allTextNodes = [];
+  const walker = document.createTreeWalker(
+    parent,
+    NodeFilter.SHOW_TEXT,
+    null,
+    false,
+  );
+
+  let node = walker.nextNode();
+  while (node) {
+    if (node.textContent.includes('?(') && node.textContent.includes('):(')) {
+      allTextNodes.push(node);
+    }
+    node = walker.nextNode();
+  }
+
+  allTextNodes.forEach((textNode) => {
+    const { parentElement } = textNode;
+    if (parentElement && !parentElement.dataset.contextualContent) {
+      // Extract conditional content from the text
+      const text = textNode.textContent;
+      // Updated regex to handle complex conditions with @BM references and nested parentheses
+      const conditionalMatch = text.match(CONDITIONAL_REG);
+      if (conditionalMatch) {
+        const [fullMatch] = conditionalMatch;
+        parentElement.dataset.contextualContent = fullMatch;
+        createContextualContent(parentElement, fullMatch, extraData);
+      }
+    }
+  });
+}
+
 
 export async function getNonProdData(env) {
   const isPreviewMode = new URLSearchParams(window.location.search).get('previewMode')
@@ -709,14 +762,6 @@ function processTemplateInAllNodes(parent, extraData) {
       n.parentNode?.classList.add('preserve-format');
     }
 
-    if (p1 === 'start-date' || p1 === 'end-date') {
-      const date = new Date(content);
-      const { miloConfig } = getEventConfig();
-
-      const localeString = miloConfig ? miloConfig.locale?.ietf : getFallbackLocale(FALLBACK_LOCALES);
-      content = date.toLocaleDateString(localeString, { month: 'long', day: 'numeric', year: 'numeric' });
-    }
-
     return content;
   };
 
@@ -752,7 +797,7 @@ function processTemplateInAllNodes(parent, extraData) {
 // data -> DOM gills
 export function decorateEvent(parent) {
   // handle photos data parsing
-  const extraData = parsePhotosData(parent);
+  const photosData = parsePhotosData(parent);
   const { cmsType } = getEventConfig();
 
   if (!parent) {
@@ -761,15 +806,20 @@ export function decorateEvent(parent) {
   }
 
   if (!getMetadata('event-id')) return;
+  // Hydrate metadata with user-friendly transformations
+  const miloConfig = getEventConfig().miloConfig;
+  const locale = miloConfig ? miloConfig.locale?.ietf : getFallbackLocale(FALLBACK_LOCALES);
+  const massagedMetadata = massageMetadata(locale);
 
-  if (cmsType === 'SP') {
-    processTemplateInAllNodes(parent, extraData);
-    decorateProfileCardsZPattern(parent);
-  }
+  processTemplateInAllNodes(parent, { ...photosData, ...massagedMetadata });
+  decorateProfileCardsZPattern(parent);
 
   flagEventState(parent);
   processLinks(parent);
   if (getEventServiceEnv() !== 'prod' && cmsType === 'SP') updateExtraMetaTags(parent);
+
+  // handle contextual content with BlockMediator store reactivity
+  updateContextualContentElements(parent, { ...photosData, ...massagedMetadata });
 }
 
 export default function decorateArea(area = document) {
