@@ -570,16 +570,10 @@ describe('Metadata Massaging', () => {
     const resultEn = massageMetadata('en-US');
     const resultDe = massageMetadata('de-DE');
 
-    // Both should have the property and valid date formatting
+    // Both should have the property but with different formatting
     expect(resultEn).to.have.property('user-start-date-time');
     expect(resultDe).to.have.property('user-start-date-time');
-    expect(resultEn['user-start-date-time']).to.be.a('string');
-    expect(resultDe['user-start-date-time']).to.be.a('string');
-    expect(resultEn['user-start-date-time']).to.not.be.empty;
-    expect(resultDe['user-start-date-time']).to.not.be.empty;
-    // Note: In some test environments, browser locale data may not be available
-    // so we verify the function accepts locale parameter and returns formatted dates
-    // rather than strictly requiring different output formats
+    expect(resultEn['user-start-date-time']).to.not.equal(resultDe['user-start-date-time']);
   });
 
   it('should handle invalid metadata gracefully', () => {

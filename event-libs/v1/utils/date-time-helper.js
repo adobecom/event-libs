@@ -232,8 +232,7 @@ const METADATA_MASSAGE_RULES = {
  * @param {string} locale - Locale string for formatting (e.g., 'en-US')
  * @returns {Object} Updated extraData object with hydrated metadata
  */
-export function massageMetadata() {
-  const locale = getConfig().locale?.ietf || 'en-US';
+export function massageMetadata(locale = 'en-US') {
   const massagedData = {};
 
   // Process each hydration rule
