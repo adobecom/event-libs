@@ -1,5 +1,5 @@
 import { SUSI_OPTIONS, CONDITIONAL_REG, ENV_MAP } from './constances.js';
-import BlockMediator from './deps/block-mediator.min.js';
+import BlockMediator from '../deps/block-mediator.min.js';
 
 export const LIBS = (() => {
   const { hostname, search } = window.location;
