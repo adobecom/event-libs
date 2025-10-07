@@ -1,4 +1,4 @@
-import { getMetadata } from "./utils";
+import { getMetadata } from "./utils.js";
 
 /**
  * Converts a UTC timestamp (in milliseconds) to a user-friendly local date time string.
