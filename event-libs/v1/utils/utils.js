@@ -26,7 +26,7 @@ export const [setEventConfig, updateEventConfig, getEventConfig] = (() => {
       const origin = mc.origin || window.location.origin;
       const pathname = mc.pathname || window.location.pathname;
 
-      config.codeRoot = mc.codeRoot ? `${origin}${mc.codeRoot}` : origin;
+      config.codeRoot = mc.codeRoot ? mc.codeRoot : origin;
       config.pathname = pathname;
 
       return config;
