@@ -338,56 +338,49 @@ async function initRSVPHandler(link) {
 }
 
 function processLinks(parent) {
-  const { cmsType } = getEventConfig();
   const links = parent.querySelectorAll('a[href*="#"]');
 
   links.forEach(async (a) => {
     const url = new URL(a.href);
     const isPlaceholderLink = url.pathname.startsWith('/events-placeholder');
     try {
-      if (cmsType === 'SP') {
-        processTemplateInLinkText(a);
-        const processedAsRSVPButton = await initRSVPHandler(a);
+      processTemplateInLinkText(a);
+      const processedAsRSVPButton = await initRSVPHandler(a);
 
-        if (a.href.endsWith('#event-template') && !processedAsRSVPButton) {
-          let templateId;
+      if (a.href.endsWith('#event-template') && !processedAsRSVPButton) {
+        let templateId;
 
-          try {
-            const seriesMetadata = JSON.parse(getMetadata('series'));
-            templateId = seriesMetadata?.templateId;
-          } catch (e) {
-            window.lana?.log(`Failed to parse series metadata. Attempt to fallback on event tempate ID attribute:\n${JSON.stringify(e, null, 2)}`);
-          }
-
-          if (!templateId && getMetadata('template-id')) {
-            templateId = getMetadata('template-id');
-          }
-
-          if (templateId) {
-            a.href = templateId;
-          } else {
-            window.lana?.log(`Error: Failed to find template ID for event ${getMetadata('event-id')}`);
-          }
-        } else if (a.href.endsWith('#host-email')) {
-          if (getMetadata('host-email')) {
-            const emailSubject = `${dictionaryManager.getValue('mailto-subject-prefix')} ${getMetadata('event-title')}`;
-            a.href = `mailto:${getMetadata('host-email')}?subject=${encodeURIComponent(emailSubject)}`;
-          } else {
-            a.remove();
-          }
-        } else if (url.hash) {
-          const metadataPath = url.hash.replace('#', '');
-          const metadataValue = parseMetadataPath(metadataPath);
-          if (metadataValue) {
-            a.href = metadataValue;
-          } else if (isPlaceholderLink) {
-            a.remove();
-          }
+        try {
+          const seriesMetadata = JSON.parse(getMetadata('series'));
+          templateId = seriesMetadata?.templateId;
+        } catch (e) {
+          window.lana?.log(`Failed to parse series metadata. Attempt to fallback on event tempate ID attribute:\n${JSON.stringify(e, null, 2)}`);
         }
-      }
 
-      if (cmsType === 'DA') {
-        await initRSVPHandler(a);
+        if (!templateId && getMetadata('template-id')) {
+          templateId = getMetadata('template-id');
+        }
+
+        if (templateId) {
+          a.href = templateId;
+        } else {
+          window.lana?.log(`Error: Failed to find template ID for event ${getMetadata('event-id')}`);
+        }
+      } else if (a.href.endsWith('#host-email')) {
+        if (getMetadata('host-email')) {
+          const emailSubject = `${dictionaryManager.getValue('mailto-subject-prefix')} ${getMetadata('event-title')}`;
+          a.href = `mailto:${getMetadata('host-email')}?subject=${encodeURIComponent(emailSubject)}`;
+        } else {
+          a.remove();
+        }
+      } else if (url.hash) {
+        const metadataPath = url.hash.replace('#', '');
+        const metadataValue = parseMetadataPath(metadataPath);
+        if (metadataValue) {
+          a.href = metadataValue;
+        } else if (isPlaceholderLink) {
+          a.remove();
+        }
       }
     } catch (e) {
       window.lana?.log(`Error while attempting to replace link ${a.href}:\n${JSON.stringify(e, null, 2)}`);
