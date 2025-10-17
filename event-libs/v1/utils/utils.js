@@ -65,15 +65,11 @@ export function getEventServiceEnv() {
       if (host.startsWith('stage02--')) return ENV_MAP.stage02;
       if (host.startsWith('main--')) return ENV_MAP.prod;
     } else if (cmsType === 'DA') {
-      // Check for nested environment patterns: {any-string}--{any-string}-{envName}--
-      const nestedEnvMatch = host.match(/^[^-]+--[^-]+-(dev|dev02|stage|stage02|main)--/);
+      // Check for nested environment patterns: esp-{envName}--{any-string}--{any-string}--
+      const nestedEnvMatch = host.match(/^esp-(dev|dev02|stage|stage02|main)--[^-]+--[^-]+--/);
       if (nestedEnvMatch) {
         const envName = nestedEnvMatch[1];
-        if (envName === 'dev') return ENV_MAP.dev;
-        if (envName === 'dev02') return ENV_MAP.dev02;
-        if (envName === 'stage') return ENV_MAP.stage;
-        if (envName === 'stage02') return ENV_MAP.stage02;
-        if (envName === 'main') return ENV_MAP.prod;
+        return ENV_MAP[envName];
       }
     }
   }
