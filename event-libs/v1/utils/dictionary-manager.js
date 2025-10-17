@@ -20,8 +20,9 @@ export class DictionaryManager {
       if (!response.ok) {
         throw new Error(`Failed to fetch dictionary: ${response.status}`);
       }
-      const data = await response.json();
-      const dictionary = data.data.reduce((acc, item) => {
+      const json = await response.json();
+      const data = json[':type'] && json[':type'] === 'multi-sheet' ? json.data.data : json.data;
+      const dictionary = data.reduce((acc, item) => {
         acc[item.key] = item.value;
         return acc;
       }, {});
