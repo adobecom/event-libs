@@ -40,17 +40,18 @@ describe('TimingWorker', () => {
   });
 
   describe('getStartScheduleItemByToggleTime', () => {
-    it('should return the first item if no toggleTime has passed', async () => {
+    it('should return the first item if no toggleTime has passed', () => {
+      const now = Date.now();
       const schedule = {
-        toggleTime: Date.now() + 1000,
+        toggleTime: now + 1000,
         next: null,
       };
 
-      const result = await worker.getStartScheduleItemByToggleTime(schedule);
+      const result = worker.getStartScheduleItemByToggleTime(schedule, now);
       expect(result).to.equal(schedule);
     });
 
-    it('should return the last passed item if toggleTime has passed', async () => {
+    it('should return the last passed item if toggleTime has passed', () => {
       const now = Date.now();
       const schedule = {
         toggleTime: now - 2000,
@@ -63,11 +64,11 @@ describe('TimingWorker', () => {
         },
       };
 
-      const result = await worker.getStartScheduleItemByToggleTime(schedule);
+      const result = worker.getStartScheduleItemByToggleTime(schedule, now);
       expect(result).to.equal(schedule.next);
     });
 
-    it('should use testing time when in testing mode', async () => {
+    it('should use testing time when in testing mode', () => {
       const now = Date.now();
       const schedule = {
         toggleTime: now + 1000, // Future time
@@ -78,12 +79,12 @@ describe('TimingWorker', () => {
       // appear to be in the future
       worker.testingManager.init({ toggleTime: now + 2000 });
 
-      const result = await worker.getStartScheduleItemByToggleTime(schedule);
+      const result = worker.getStartScheduleItemByToggleTime(schedule, now);
       // Should return the schedule item because the testing time is in the future
       expect(result).to.equal(schedule);
     });
 
-    it('should use testing time when in testing mode - past time', async () => {
+    it('should use testing time when in testing mode - past time', () => {
       const now = Date.now();
       const schedule = {
         toggleTime: now - 1000, // Past time
@@ -97,7 +98,7 @@ describe('TimingWorker', () => {
       // appear to be in the past
       worker.testingManager.init({ toggleTime: now - 2000 });
 
-      const result = await worker.getStartScheduleItemByToggleTime(schedule);
+      const result = worker.getStartScheduleItemByToggleTime(schedule, now);
       // Should return the first item because the testing time is in the past
       expect(result).to.equal(schedule);
     });

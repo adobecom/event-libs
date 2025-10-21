@@ -13,11 +13,9 @@ class TimingWorker {
 
     // Time management properties - optimized for scale
     this.cachedApiTime = null;
-    this.lastApiCall = 0;
     this.lastApiCallPerformance = 0;
     this.apiCallInterval = 300000; // 5 minutes minimum between API calls
     this.cacheTtl = 600000; // 10 minutes cache TTL (longer for better scaling)
-    this.fallbackToLocal = true;
     this.consecutiveFailures = 0;
     this.maxFailures = 3;
     this.backoffMultiplier = 2;
@@ -34,8 +32,8 @@ class TimingWorker {
         if (channel && typeof channel.close === 'function') {
           channel.close();
         }
-      } catch (error) {
-        TimingWorker.logError('Error closing BroadcastChannel', error);
+      } catch {
+        // Ignore cleanup errors - non-critical
       }
     });
     this.channels.clear();
@@ -55,8 +53,8 @@ class TimingWorker {
           }
         };
         this.channels.set(pluginName, channel);
-      } catch (error) {
-        TimingWorker.logError(`Error setting up ${pluginName} BroadcastChannel`, error);
+      } catch {
+        // BroadcastChannel not supported or failed - cross-tab sync disabled
       }
     };
 
@@ -95,16 +93,14 @@ class TimingWorker {
                 performanceTimestamp: performance.now(),
               };
               this.consecutiveFailures = 0; // Reset failures when we get shared time
-            } else {
-              // Legacy format without performanceTimestamp - ignore for safety
-              window.lana?.log('Received time update in legacy format, ignoring for safety');
             }
+            // Note: Legacy format without performanceTimestamp is silently ignored for safety
           }
         }
       };
       this.channels.set('timeCache', timeChannel);
-    } catch (error) {
-      TimingWorker.logError('Error setting up time cache BroadcastChannel', error);
+    } catch {
+      // BroadcastChannel not supported or failed - cross-tab time sync disabled
     }
   }
 
@@ -127,16 +123,6 @@ class TimingWorker {
   }
 
   /**
-   * Helper to log errors properly
-   * @param {string} message
-   * @param {Error} error
-   */
-  static logError(message, error) {
-    const errorDetails = error?.message || error?.stack || String(error);
-    window.lana?.log(`${message}: ${errorDetails}`);
-  }
-
-  /**
    * @returns {number}
    * @description Returns the current time from the API with caching and rate limiting
    */
@@ -145,8 +131,8 @@ class TimingWorker {
       const response = await fetch('https://time.akamai.com/');
       const data = await response.text();
       return Number.parseInt(data, 10) * 1000;
-    } catch (error) {
-      TimingWorker.logError('Error fetching time from API', error);
+    } catch {
+      // Network errors are expected (offline, ad blockers, etc.) - return null to use fallback
       return null;
     }
   }
@@ -171,8 +157,8 @@ class TimingWorker {
       const drift = Math.abs(wallClockElapsed - monotonicElapsed);
 
       // If drift exceeds threshold, invalidate cache to force fresh API call
+      // This is normal operational behavior (NTP sync, timezone changes, etc.)
       if (drift > this.maxAllowedDrift) {
-        window.lana?.log(`Clock drift detected: ${drift}ms. Invalidating cache.`);
         this.cachedApiTime = null;
       }
     }
@@ -205,7 +191,6 @@ class TimingWorker {
     // Try to get fresh time from API
     try {
       const apiTime = await TimingWorker.getCurrentTimeFromAPI();
-      this.lastApiCall = now;
       this.lastApiCallPerformance = perfNow;
 
       if (apiTime !== null) {
@@ -226,22 +211,21 @@ class TimingWorker {
               data: this.cachedApiTime,
             });
           }
-        } catch (error) {
-          TimingWorker.logError('Error broadcasting time update', error);
+        } catch {
+          // Broadcasting failed - not critical, this tab still has the time
         }
 
         return apiTime;
       }
       // Increment failure count if API returns null
       this.consecutiveFailures = Math.min(this.consecutiveFailures + 1, this.maxFailures);
-    } catch (error) {
-      TimingWorker.logError('Error getting authoritative time', error);
-      // Increment failure count on error
+    } catch {
+      // API call failed - increment failure count for backoff
       this.consecutiveFailures = Math.min(this.consecutiveFailures + 1, this.maxFailures);
     }
 
-    // Fall back to cached time or local time depending on settings
-    if (this.cachedApiTime && !this.fallbackToLocal) {
+    // Fall back to cached time if available, otherwise use local time
+    if (this.cachedApiTime) {
       return this.getCachedTimeWithElapsed();
     }
     return now;
@@ -249,11 +233,11 @@ class TimingWorker {
 
   /**
    * @param {Object} scheduleRoot - The root of the schedule tree
+   * @param {number} currentTime - The current time to use for comparison
    * @returns {Object}
    * @description Returns the first schedule item that should be shown based on toggleTime
    */
-  async getStartScheduleItemByToggleTime(scheduleRoot) {
-    const currentTime = await this.getAuthoritativeTime();
+  getStartScheduleItemByToggleTime(scheduleRoot, currentTime) {
     const adjustedTime = this.testingManager.isTesting()
       ? this.testingManager.adjustTime(currentTime)
       : currentTime;
@@ -273,6 +257,25 @@ class TimingWorker {
     }
 
     return start || scheduleRoot;
+  }
+
+  /**
+   * Gets the best available time for initial schedule positioning
+   * Prioritizes cached authoritative time, falls back to wall clock
+   * @returns {number}
+   */
+  getFastInitialTime() {
+    // Check if we have recent cached authoritative time (from other tabs or previous calls)
+    const hasRecentCache = this.cachedApiTime
+      && (Date.now() - this.cachedApiTime.timestamp) < this.cacheTtl;
+
+    if (hasRecentCache) {
+      // Use cached authoritative time - still fast, more accurate
+      return this.getCachedTimeWithElapsed();
+    }
+
+    // Fall back to wall clock for maximum speed
+    return Date.now();
   }
 
   /**
@@ -447,23 +450,53 @@ class TimingWorker {
     }
 
     if (schedule) {
-      // Initialize schedule asynchronously since getStartScheduleItemByToggleTime is now async
+      // Initialize schedule with fast path for immediate first render
       this.initializeSchedule(schedule);
     }
   }
 
   /**
    * @param {Object} schedule - The schedule to initialize
-   * @description Initializes the schedule asynchronously
+   * @description Initializes the schedule synchronously for fast first render,
+   * then validates position in background
    */
   async initializeSchedule(schedule) {
-    this.nextScheduleItem = await this.getStartScheduleItemByToggleTime(schedule);
+    // Fast path: Get best available time without blocking on API call
+    const initialTime = this.getFastInitialTime();
+    
+    // Synchronously determine first schedule item
+    this.nextScheduleItem = this.getStartScheduleItemByToggleTime(schedule, initialTime);
     this.currentScheduleItem = this.nextScheduleItem?.prev || schedule;
     this.previouslySentItem = null;
 
     if (!this.nextScheduleItem) return;
 
+    // Start timer immediately - first tick will validate with authoritative time
     this.runTimer();
+
+    // Background validation: Ensure we're on the correct schedule item
+    // This will self-correct within 0.5-1.5 seconds if wall clock was inaccurate
+    this.validateSchedulePosition(schedule).catch(() => {
+      // Validation failed - timer will still run and self-correct on next tick
+    });
+  }
+
+  /**
+   * Validates schedule position against authoritative time
+   * Corrects position if wall clock was significantly off
+   * @param {Object} schedule - The schedule root
+   */
+  async validateSchedulePosition(schedule) {
+    // Get authoritative time (may trigger API call)
+    const authoritativeTime = await this.getAuthoritativeTime();
+    
+    // Find the correct schedule item based on authoritative time
+    const correctItem = this.getStartScheduleItemByToggleTime(schedule, authoritativeTime);
+    
+    // If we're on the wrong item, correct it on next timer tick
+    if (correctItem && correctItem !== this.currentScheduleItem) {
+      this.nextScheduleItem = correctItem;
+    }
   }
 
   setupMessageHandler() {
