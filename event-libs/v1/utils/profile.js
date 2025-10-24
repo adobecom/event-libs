@@ -24,17 +24,30 @@ export async function getProfile() {
 }
 
 export function lazyCaptureProfile() {
-  let counter = 0;
-  const profileRetryer = setInterval(async () => {
-    if (!window.adobeIMS) {
-      counter += 1;
-      return;
-    }
+  if (window.adobeIMS) {
+    captureProfile();
+    return;
+  }
 
-    if (counter >= 10) {
-      clearInterval(profileRetryer);
-    }
+  try {
+    let adobeIMSValue;
+    Object.defineProperty(window, 'adobeIMS', {
+      get() {
+        return adobeIMSValue;
+      },
+      set(value) {
+        adobeIMSValue = value;
+        if (value) {
+          captureProfile();
+        }
+      },
+      configurable: true,
+    });
+  } catch (e) {
+    pollForAdobeIMS();
+  }
 
+  async function captureProfile() {
     try {
       const profile = await getProfile();
       BlockMediator.set('imsProfile', profile);
@@ -43,15 +56,24 @@ export function lazyCaptureProfile() {
         const resp = await getEventAttendee(getMetadata('event-id'));
         BlockMediator.set('rsvpData', resp.data);
       }
-
-      clearInterval(profileRetryer);
     } catch {
       if (window.adobeIMS) {
-        clearInterval(profileRetryer);
         BlockMediator.set('imsProfile', { noProfile: true });
       }
-
-      counter += 1;
     }
-  }, 1000);
+  }
+
+  function pollForAdobeIMS() {
+    let counter = 0;
+    const maxAttempts = 100;
+    const interval = setInterval(() => {
+      if (window.adobeIMS) {
+        clearInterval(interval);
+        captureProfile();
+      } else if (counter >= maxAttempts) {
+        clearInterval(interval);
+      }
+      counter += 1;
+    }, 100);
+  }
 }
