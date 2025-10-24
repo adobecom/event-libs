@@ -56,7 +56,7 @@ export {
 // Lazy-loaded delayed actions for event pages
 export const eventsDelayedActions = async () => {
   const { lazyCaptureProfile } = await import('./utils/profile.js');
-  const { addPagePathIndexerWidget } = await import('./features/indexer-widget/page-schedule-indexer.js');
+  const { default: addPagePathIndexerWidget } = await import('./features/indexer-widget/page-schedule-indexer.js');
   lazyCaptureProfile();
   addPagePathIndexerWidget();
 };
