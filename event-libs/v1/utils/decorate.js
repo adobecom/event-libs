@@ -341,6 +341,38 @@ async function initRSVPHandler(link) {
   }
 }
 
+function processTemplateLinks(parent) {
+  const { cmsType } = getEventConfig();
+  if (cmsType !== 'SP') return;
+
+  const templateLinks = parent.querySelectorAll('a[href$="#event-template"]');
+
+  templateLinks.forEach((a) => {
+    try {
+      let templateId;
+
+      try {
+        const seriesMetadata = JSON.parse(getMetadata('series'));
+        templateId = seriesMetadata?.templateId;
+      } catch (e) {
+        window.lana?.log(`Failed to parse series metadata. Attempt to fallback on event tempate ID attribute:\n${JSON.stringify(e, null, 2)}`);
+      }
+
+      if (!templateId && getMetadata('template-id')) {
+        templateId = getMetadata('template-id');
+      }
+
+      if (templateId) {
+        a.href = templateId;
+      } else {
+        window.lana?.log(`Error: Failed to find template ID for event ${getMetadata('event-id')}`);
+      }
+    } catch (e) {
+      window.lana?.log(`Error while attempting to replace template link ${a.href}:\n${JSON.stringify(e, null, 2)}`);
+    }
+  });
+}
+
 function processLinks(parent) {
   const { cmsType } = getEventConfig();
   const links = parent.querySelectorAll('a[href*="#"]');
@@ -353,33 +385,14 @@ function processLinks(parent) {
         processTemplateInLinkText(a);
         const processedAsRSVPButton = await initRSVPHandler(a);
 
-        if (a.href.endsWith('#event-template') && !processedAsRSVPButton) {
-          let templateId;
-
-          try {
-            const seriesMetadata = JSON.parse(getMetadata('series'));
-            templateId = seriesMetadata?.templateId;
-          } catch (e) {
-            window.lana?.log(`Failed to parse series metadata. Attempt to fallback on event tempate ID attribute:\n${JSON.stringify(e, null, 2)}`);
-          }
-
-          if (!templateId && getMetadata('template-id')) {
-            templateId = getMetadata('template-id');
-          }
-
-          if (templateId) {
-            a.href = templateId;
-          } else {
-            window.lana?.log(`Error: Failed to find template ID for event ${getMetadata('event-id')}`);
-          }
-        } else if (a.href.endsWith('#host-email')) {
+        if (a.href.endsWith('#host-email')) {
           if (getMetadata('host-email')) {
             const emailSubject = `${dictionaryManager.getValue('mailto-subject-prefix')} ${getMetadata('event-title')}`;
             a.href = `mailto:${getMetadata('host-email')}?subject=${encodeURIComponent(emailSubject)}`;
           } else {
             a.remove();
           }
-        } else if (url.hash) {
+        } else if (url.hash && !a.href.endsWith('#event-template') && !processedAsRSVPButton) {
           const metadataPath = url.hash.replace('#', '');
           const metadataValue = parseMetadataPath(metadataPath);
           if (metadataValue) {
@@ -815,7 +828,13 @@ export function decorateEvent(parent) {
   decorateProfileCardsZPattern(parent);
 
   flagEventState(parent);
+  
+  // Process template links synchronously first (no dictionary needed)
+  processTemplateLinks(parent);
+  
+  // Process other links asynchronously (dictionary-dependent)
   processLinks(parent);
+  
   if (getEventServiceEnv() !== 'prod' && cmsType === 'SP') updateExtraMetaTags(parent);
 
   // handle contextual content with BlockMediator store reactivity
