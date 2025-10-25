@@ -21,6 +21,8 @@ import {
   getFallbackLocale,
   LIBS,
   createContextualContent,
+  parseEncodedConfig,
+  createTag,
 } from './utils.js';
 import { massageMetadata } from './date-time-helper.js';
 
@@ -373,7 +375,7 @@ function processTemplateLinks(parent) {
   });
 }
 
-function processLinks(parent) {
+function processHashtagLinks(parent) {
   const { cmsType } = getEventConfig();
   const links = parent.querySelectorAll('a[href*="#"]');
 
@@ -412,6 +414,77 @@ function processLinks(parent) {
   });
 
   
+}
+
+function prebuildAutoBlock(blockName, link) {
+  let blockEl;
+  const autoBlockBuilders = {
+    'chrono-box': (link) => {
+      const url = new URL(link.href);
+      const scheduleBase64 = url.searchParams.get('schedule');
+      const schedule = parseEncodedConfig(scheduleBase64);
+      
+      if (!schedule || !schedule.blocks || !Array.isArray(schedule.blocks)) {
+        return null;
+      }
+
+      console.log('schedule', schedule);
+      console.log('url', url);
+
+
+      // Transform schedule blocks into chrono-box format
+      const chronoBoxData = schedule.blocks.map(block => {
+        const item = {
+          pathToFragment: block.fragmentPath,
+          toggleTime: block.startDateTime
+        };
+
+        // Add mobileRider sessionId if the block includes a live stream
+        if (block.includeLiveStream && block.liveStream) {
+          const { streamId, provider } = block.liveStream;
+          if (provider === 'MobileRider' && streamId) {
+            item.mobileRider = { sessionId: streamId };
+          }
+        }
+
+        return item;
+      });
+
+      const labelDiv = createTag('div', {}, 'schedule');
+      const dataDiv = createTag('div', {}, JSON.stringify(chronoBoxData));
+      const innerDiv = createTag('div', {}, [labelDiv, dataDiv]);
+      const chronoBoxEl = createTag('div', {
+        class: 'chrono-box',
+        'data-schedule-id': schedule.scheduleId,
+        'data-schedule-title': schedule.title,
+        'data-schedule-maker-url': `${url.origin}${url.pathname}?scheduleId=${schedule.scheduleId}`,
+      }, innerDiv);
+
+      return chronoBoxEl;
+    }
+  }
+
+  if (autoBlockBuilders[blockName]) {
+    blockEl = autoBlockBuilders[blockName](link);
+  }
+
+  return blockEl;
+}
+
+function processAutoBlockLinks(parent) {
+  const autoBlockIdentifiers = {
+    'chrono-box': 'schedule-maker'
+  }
+
+  Object.keys(autoBlockIdentifiers).forEach((bn) => {
+    const link = parent.querySelector(`a[href*="${autoBlockIdentifiers[bn]}"]`);
+    if (link) {
+      const blockEl = prebuildAutoBlock(bn, link);
+      if (blockEl) {
+        link.closest('p') ? link.closest('p').replaceWith(blockEl) : link.replaceWith(blockEl);
+      }
+    }
+  });
 }
 
 export function updatePictureElement(imageUrl, parentPic, altText) {
@@ -833,7 +906,8 @@ export function decorateEvent(parent) {
   processTemplateLinks(parent);
   
   // Process other links asynchronously (dictionary-dependent)
-  processLinks(parent);
+  processAutoBlockLinks(parent);
+  processHashtagLinks(parent);
   
   if (getEventServiceEnv() !== 'prod' && cmsType === 'SP') updateExtraMetaTags(parent);
 

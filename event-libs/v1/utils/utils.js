@@ -113,6 +113,19 @@ export function yieldToMain() {
   });
 }
 
+export function b64ToUtf8(str) {
+  return decodeURIComponent(escape(window.atob(str)));
+}
+
+export function parseEncodedConfig(encodedConfig) {
+  try {
+    return JSON.parse(b64ToUtf8(decodeURIComponent(encodedConfig)));
+  } catch (e) {
+    console.log(e);
+  }
+  return null;
+}
+
 export function getMetadata(name, doc = document) {
   const attr = name && name.includes('og:') ? 'property' : 'name';
   const meta = doc.head.querySelector(`meta[${attr}="${name}"]`);
@@ -217,7 +230,7 @@ export function createOptimizedPicture(
 export function getIcon(tag) {
   const img = document.createElement('img');
   img.className = `icon icon-${tag}`;
-  img.src = `/events/icons/${tag}.svg`;
+  img.src = `${new URL(`../icons/${tag}.svg`, import.meta.url).href}`;
   img.alt = tag;
 
   return img;

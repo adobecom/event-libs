@@ -52,6 +52,13 @@
       font-size: var(--type-body-m-size);
     }
 
+    .page-path-indexer-schedule-id-item-status {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
     .page-path-indexer-schedule-id-item {
       display: flex;
       align-items: center;
@@ -61,7 +68,8 @@
       white-space: nowrap;
     }
 
-    .page-path-indexer-schedule-id-item-status-wrapper {
+    .page-path-indexer-schedule-status-wrapper,
+    .page-path-indexer-schedule-action-wrapper button {
       align-items: center;
       gap: 4px;
       display: none;
@@ -91,11 +99,11 @@
       color: var(--color-red);
     }
 
-    .page-path-indexer-schedule-id-item.indexed .page-path-indexer-schedule-id-item-status-wrapper.indexed {
+    .page-path-indexer-schedule-id-item.indexed .page-path-indexer-schedule-status-wrapper.indexed {
       display: flex;
     }
 
-    .page-path-indexer-schedule-id-item:not(.indexed) .page-path-indexer-schedule-id-item-status-wrapper.not-indexed {
+    .page-path-indexer-schedule-id-item:not(.indexed) .page-path-indexer-schedule-status-wrapper.not-indexed {
       display: flex;
     }
   }

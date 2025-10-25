@@ -1,3 +1,4 @@
+import { getSchedulePagePaths, indexPathToSchedule } from '../../utils/esp-controller.js';
 import { createTag, getIcon } from '../../utils/utils.js';
 
 async function loadWidgetCSS() {
@@ -9,7 +10,7 @@ async function loadWidgetCSS() {
   return new Promise((resolve, reject) => {
     const link = document.createElement('link');
     link.rel = 'stylesheet';
-    link.href = '/events/features/indexer-widget/page-schedule-indexer.css';
+    link.href = `${new URL('./page-schedule-indexer.css', import.meta.url).href}`;
     link.onload = resolve;
     link.onerror = reject;
     document.head.appendChild(link);
@@ -22,22 +23,16 @@ export default async function addPagePathIndexerWidget() {
     return;
   }
 
-  // const chronoBoxes = document.querySelectorAll('.chrono-box');
-  // const schedules = Array.from(chronoBoxes)
-  //   .map((chronoBox) => {
-  //   return {
-  //     id: chronoBox.dataset.scheduleId,
-  //     name: chronoBox.dataset.scheduleName,
-  //   };
-  // })
-  //   .filter((schedule) => schedule.id);
-
-  // TODO: remove mock schedules
-  const schedules = [
-    { id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890', name: 'Schedule 1' },
-    { id: 'f9e8d7c6-b5a4-3210-9876-543210fedcba', name: 'Schedule 2' },
-    { id: '12345678-9abc-def0-1234-56789abcdef0' },
-  ];
+  const chronoBoxes = document.querySelectorAll('.chrono-box');
+  const schedules = Array.from(chronoBoxes)
+    .map((chronoBox) => {
+    return {
+      id: chronoBox.dataset.scheduleId,
+      name: chronoBox.dataset.scheduleTitle,
+      url: chronoBox.dataset.scheduleMakerUrl,
+    };
+  })
+    .filter((schedule) => schedule.id);
 
   if (schedules.length === 0) return;
   await loadWidgetCSS();
@@ -55,67 +50,68 @@ export default async function addPagePathIndexerWidget() {
   const scheduleIdListItems = [];
   const individualIndexButtons = [];
 
-  // const allScheduleIndexedPagePaths = Promise.all(scheduleIds.map(async (id) => {
-  //   const indexedPagesForThisSchedule = await getSchedulePagePaths(id);
-  //   return { [id]: indexedPagesForThisSchedule };
-  // }));
+  const allScheduleIndexedPagePaths = {}
+  await Promise.all(schedules.map(async (schedule) => {
+    const { ok, data } = await getSchedulePagePaths(schedule.id);
+    if (ok) {
+      allScheduleIndexedPagePaths[schedule.id] = data;
+    }
+  }));
 
-  const mockedAllScheduleIndexedPagePaths = {
-    'a1b2c3d4-e5f6-7890-abcd-ef1234567890': [window.location.pathname, '/page-2', '/page-3'],
-    'f9e8d7c6-b5a4-3210-9876-543210fedcba': ['/page-2', '/page-3'],
-    '12345678-9abc-def0-1234-56789abcdef0': ['/page-7', '/page-8', '/page-9'],
-  };
-
-  schedules.forEach(async (schedule) => {
+  schedules.forEach((schedule) => {
     const scheduleIdItem = createTag('div', { class: 'page-path-indexer-schedule-id-item', 'data-schedule-id': schedule.id });
     createTag('span', { class: 'page-path-indexer-schedule-id-item-text' }, schedule.name || schedule.id, { parent: scheduleIdItem });
     const statusArea = createTag('div', { class: 'page-path-indexer-schedule-id-item-status' }, '', { parent: scheduleIdItem });
 
-    const indexedStatusWrapper = createTag('div', { class: 'page-path-indexer-schedule-id-item-status-wrapper indexed' }, '', { parent: statusArea });
+    const indexedStatusWrapper = createTag('div', { class: 'page-path-indexer-schedule-status-wrapper indexed' }, '', { parent: statusArea });
     const indexedStatusText = createTag('span', { class: 'page-path-indexer-schedule-id-item-status-text' }, 'Indexed', { parent: indexedStatusWrapper });
     const greenDot = getIcon('dot-green');
-    const notIndexedStatusWrapper = createTag('div', { class: 'page-path-indexer-schedule-id-item-status-wrapper not-indexed' }, '', { parent: statusArea });
-    const notIndexedStatusAction = createTag('button', {
-      class: 'page-path-indexer-schedule-id-item-status-text con-button outline',
+    const actionWrapper = createTag('div', { class: 'page-path-indexer-schedule-action-wrapper not-indexed' }, '', { parent: statusArea });
+    const indexBtn = createTag('button', {
+      class: 'page-path-indexer-schedule-action-text con-button outline',
       role: 'button',
       tabindex: 0,
       'aria-label': `Index this page for schedule ${schedule.id}`,
-    }, 'Index', { parent: notIndexedStatusWrapper });
+    }, 'Index', { parent: actionWrapper });
+    const backLinkToScheduleMaker = createTag('a', {
+      href: schedule.url,
+      style: 'height: 16px; width: 16px; display: flex; align-items: center; justify-content: center;',
+      target: '_blank',
+    }, getIcon('edit-pencil-white'), { parent: actionWrapper });
 
     indexedStatusWrapper.append(indexedStatusText, greenDot);
-    notIndexedStatusWrapper.append(notIndexedStatusAction);
+    actionWrapper.append(indexBtn, backLinkToScheduleMaker);
 
     scheduleIdList.append(scheduleIdItem);
     scheduleIdListItems.push(scheduleIdItem);
-    individualIndexButtons.push(notIndexedStatusAction);
+    individualIndexButtons.push(indexBtn);
 
-    const isThisPageIndexed = mockedAllScheduleIndexedPagePaths[schedule.id]
-      .includes(window.location.pathname);
+    const indexedPagePaths = allScheduleIndexedPagePaths[schedule.id]?.pagePaths || [];
+    const isThisPageIndexed = indexedPagePaths.find((p) => p.pagePath === window.location.pathname);
     if (isThisPageIndexed) {
       scheduleIdItem.classList.add('indexed');
     }
 
-    notIndexedStatusAction.addEventListener('click', () => {
-      notIndexedStatusAction.disabled = true;
-      // await indexPathToSchedule(id, pagePath);
-
-      // TODO: remove mock api calls response
-      setTimeout(() => {
-        console.log('mock api calls response', schedule.id, pagePath);
-        const mockApiCallsResponse = {
-          ok: true,
-          data: { message: 'Path indexed to schedule' },
-        };
-
-        scheduleIdItem.classList.toggle('indexed', mockApiCallsResponse.ok);
-        notIndexedStatusAction.removeAttribute('disabled');
-      }, 1000);
+    indexBtn.addEventListener('click', async () => {
+      indexBtn.disabled = true;
+      const response = await indexPathToSchedule(schedule.id, pagePath);
+      
+      if (response.ok) {
+        scheduleIdItem.classList.add('indexed');
+      } else {
+        scheduleIdItem.classList.remove('indexed');
+        indexBtn.removeAttribute('disabled');
+      }
     });
   });
 
   pagePathIndexerWidget.append(hoverTab);
   pagePathIndexerWidget.append(scheduleIdList);
   pagePathIndexerWidget.append(indexAllButton);
+  const allScheduledIndexed = Object.values(allScheduleIndexedPagePaths).every((p) => p.pagePaths.length > 0);
+  if (allScheduledIndexed) {
+    indexAllButton.disabled = true;
+  }
   document.body.append(pagePathIndexerWidget);
   // Auto-hide widget after 3 seconds of inactivity
   let hideTimeout;
@@ -149,20 +145,12 @@ export default async function addPagePathIndexerWidget() {
       if (scheduleIdItem && scheduleIdItem.classList.contains('indexed')) {
         return;
       }
-      // await indexPathToSchedule(scheduleId, pagePath);
-      // TODO: remove mock api calls response
-      await new Promise((resolve) => {
-        setTimeout(() => {
-          console.log('mock api calls response', schedule.id, pagePath);
-          const mockApiCallsResponse = {
-            ok: true,
-            data: { message: 'Path indexed to schedule' },
-          };
-
-          scheduleIdItem.classList.toggle('indexed', mockApiCallsResponse.ok);
-          resolve();
-        }, 1000);
-      });
+      const response = await indexPathToSchedule(schedule.id, pagePath);
+      if (response.ok) {
+        scheduleIdItem.classList.add('indexed');
+      } else {
+        scheduleIdItem.classList.remove('indexed');
+      }
     });
 
     await Promise.all(indexingPromises);
