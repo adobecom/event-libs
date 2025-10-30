@@ -28,7 +28,8 @@ describe('Preview Bar Module', () => {
 
       const closeBtn = getCloseBtn(el);
 
-      expect(getEventStatus()).to.equal('<span class="event-status"><img class="icon icon-dot-purple" src="/events/icons/dot-purple.svg" alt="dot-purple">Published</span>');
+      expect(getEventStatus()).to.include('<span class="event-status"><img class="icon icon-dot-purple" src=')
+        .and.to.include('event-libs/v1/icons/dot-purple.svg" alt="dot-purple">Published</span>');
       expect(getPreviewTarget()).to.equal('Event details');
       expect(closeBtn).to.not.be.null;
 
