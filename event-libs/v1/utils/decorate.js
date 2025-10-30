@@ -430,9 +430,6 @@ function prebuildAutoBlock(blockName, link) {
         return null;
       }
 
-      console.log('schedule', schedule);
-      console.log('url', url);
-
 
       // Transform schedule blocks into chrono-box format
       const chronoBoxData = schedule.blocks.map(block => {
@@ -473,7 +470,7 @@ function prebuildAutoBlock(blockName, link) {
   return blockEl;
 }
 
-function processAutoBlockLinks(parent) {
+export function processAutoBlockLinks(parent) {
   const autoBlockIdentifiers = {
     'chrono-box': 'schedule-maker'
   }
@@ -908,7 +905,6 @@ export function decorateEvent(parent) {
   processTemplateLinks(parent);
   
   // Process other links asynchronously (dictionary-dependent)
-  processAutoBlockLinks(parent);
   processHashtagLinks(parent);
   
   if (getEventServiceEnv() !== 'prod' && cmsType === 'SP') updateExtraMetaTags(parent);

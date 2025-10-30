@@ -36,6 +36,7 @@ import {
   decorateEvent,
   getNonProdData,
   validatePageAndRedirect,
+  processAutoBlockLinks,
 } from './utils/decorate.js';
 
 // Core exports - always available (synchronous)
@@ -50,6 +51,7 @@ export {
   decorateEvent,
   getNonProdData,
   validatePageAndRedirect,
+  processAutoBlockLinks,
   EVENT_BLOCKS,
 };
 

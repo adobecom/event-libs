@@ -69,9 +69,12 @@
     }
 
     .page-path-indexer-schedule-status-wrapper,
-    .page-path-indexer-schedule-action-wrapper button {
+    .page-path-indexer-schedule-action-wrapper {
       align-items: center;
-      gap: 4px;
+      display: none;
+    }
+
+    .page-path-indexer-schedule-action-wrapper button {
       display: none;
     }
 
@@ -95,7 +98,7 @@
       color: var(--color-green);
     }
 
-    .page-path-indexer-schedule-id-item-status-wrapper.not-indexed {
+    .page-path-indexer-schedule-id-item-status-wrapper:not(.indexed) {
       color: var(--color-red);
     }
 
@@ -103,8 +106,15 @@
       display: flex;
     }
 
-    .page-path-indexer-schedule-id-item:not(.indexed) .page-path-indexer-schedule-status-wrapper.not-indexed {
-      display: flex;
+    .page-path-indexer-schedule-id-item:not(.indexed) {
+      .page-path-indexer-schedule-action-wrapper:not(.indexed),
+      .page-path-indexer-schedule-status-wrapper:not(.indexed) {
+        display: flex;
+      }
+
+      .page-path-indexer-schedule-action-wrapper:not(.indexed) button {
+        display: block;
+      }
     }
   }
     

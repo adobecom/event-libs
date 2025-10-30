@@ -30,11 +30,15 @@ export default async function addPagePathIndexerWidget() {
       id: chronoBox.dataset.scheduleId,
       name: chronoBox.dataset.scheduleTitle,
       url: chronoBox.dataset.scheduleMakerUrl,
+      unindexable: false,
+      pagePaths: [],
+      indexed: false,
     };
   })
     .filter((schedule) => schedule.id);
 
   if (schedules.length === 0) return;
+
   await loadWidgetCSS();
 
   const pagePath = window.location.pathname;
@@ -50,11 +54,12 @@ export default async function addPagePathIndexerWidget() {
   const scheduleIdListItems = [];
   const individualIndexButtons = [];
 
-  const allScheduleIndexedPagePaths = {}
   await Promise.all(schedules.map(async (schedule) => {
     const { ok, data } = await getSchedulePagePaths(schedule.id);
     if (ok) {
-      allScheduleIndexedPagePaths[schedule.id] = data;
+      schedule.pagePaths = data;
+    } else {
+      schedule.unindexable = true;
     }
   }));
 
@@ -66,9 +71,9 @@ export default async function addPagePathIndexerWidget() {
     const indexedStatusWrapper = createTag('div', { class: 'page-path-indexer-schedule-status-wrapper indexed' }, '', { parent: statusArea });
     const indexedStatusText = createTag('span', { class: 'page-path-indexer-schedule-id-item-status-text' }, 'Indexed', { parent: indexedStatusWrapper });
     const greenDot = getIcon('dot-green');
-    const actionWrapper = createTag('div', { class: 'page-path-indexer-schedule-action-wrapper not-indexed' }, '', { parent: statusArea });
+    const actionWrapper = createTag('div', { class: 'page-path-indexer-schedule-action-wrapper' }, '', { parent: statusArea });
     const indexBtn = createTag('button', {
-      class: 'page-path-indexer-schedule-action-text con-button outline',
+      class: 'page-path-indexer-button con-button outline',
       role: 'button',
       tabindex: 0,
       'aria-label': `Index this page for schedule ${schedule.id}`,
@@ -79,6 +84,11 @@ export default async function addPagePathIndexerWidget() {
       target: '_blank',
     }, getIcon('edit-pencil-white'), { parent: actionWrapper });
 
+    if (schedule.unindexable) {
+      indexBtn.disabled = true;
+      indexBtn.textContent = 'Cannot index';
+    }
+
     indexedStatusWrapper.append(indexedStatusText, greenDot);
     actionWrapper.append(indexBtn, backLinkToScheduleMaker);
 
@@ -86,11 +96,8 @@ export default async function addPagePathIndexerWidget() {
     scheduleIdListItems.push(scheduleIdItem);
     individualIndexButtons.push(indexBtn);
 
-    const indexedPagePaths = allScheduleIndexedPagePaths[schedule.id]?.pagePaths || [];
-    const isThisPageIndexed = indexedPagePaths.find((p) => p.pagePath === window.location.pathname);
-    if (isThisPageIndexed) {
-      scheduleIdItem.classList.add('indexed');
-    }
+    const indexedPagePaths = schedule.pagePaths;
+    schedule.indexed = indexedPagePaths.some((p) => p.pagePath === window.location.pathname);
 
     indexBtn.addEventListener('click', async () => {
       indexBtn.disabled = true;
@@ -108,10 +115,8 @@ export default async function addPagePathIndexerWidget() {
   pagePathIndexerWidget.append(hoverTab);
   pagePathIndexerWidget.append(scheduleIdList);
   pagePathIndexerWidget.append(indexAllButton);
-  const allScheduledIndexed = Object.values(allScheduleIndexedPagePaths).every((p) => p.pagePaths.length > 0);
-  if (allScheduledIndexed) {
-    indexAllButton.disabled = true;
-  }
+  const allSchedulesIndexedOrUnindexable = schedules.every((schedule) => schedule.indexed || schedule.unindexable);
+  indexAllButton.disabled = allSchedulesIndexedOrUnindexable;
   document.body.append(pagePathIndexerWidget);
   // Auto-hide widget after 3 seconds of inactivity
   let hideTimeout;

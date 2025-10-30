@@ -24,6 +24,9 @@ export async function getProfile() {
 }
 
 export function lazyCaptureProfile() {
+  const isEventPage = getMetadata('event-id');
+  if (!isEventPage) return;
+
   if (window.adobeIMS) {
     captureProfile();
     return;
