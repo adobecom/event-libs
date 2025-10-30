@@ -24,6 +24,8 @@ import {
 } from './utils.js';
 import { massageMetadata } from './date-time-helper.js';
 
+const ICONS_BASE_URL = new URL('../icons/', import.meta.url).href;
+
 const preserveFormatKeys = [
   'description',
 ];
@@ -41,7 +43,7 @@ function createSVGIcon(iconName) {
   svgElement.setAttribute('class', 'ecc-icon');
 
   const useElement = document.createElementNS('http://www.w3.org/2000/svg', 'use');
-  useElement.setAttributeNS('http://www.w3.org/1999/xlink', 'href', `/events/icons/events-icons.svg#${iconName}`);
+  useElement.setAttributeNS('http://www.w3.org/1999/xlink', 'href', `${ICONS_BASE_URL}events-icons.svg#${iconName}`);
 
   svgElement.appendChild(useElement);
 
