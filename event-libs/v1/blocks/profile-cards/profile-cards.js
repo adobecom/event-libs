@@ -1,5 +1,5 @@
-import buildMiloCarousel from '../../features/milo-carousel.js';
-import { getMetadata, createTag, getEventConfig } from '../../utils/utils.js';
+import buildMiloCarousel from '../../utils/milo-carousel.js';
+import { getMetadata, createTag } from '../../utils/utils.js';
 
 function decorateImage(card, photo) {
   if (!photo) return;
@@ -80,8 +80,7 @@ async function decorateSocialIcons(cardContainer, socialLinks) {
 
   const SUPPORTED_PLATFORMS = [...Object.keys(PLATFORM_PATTERNS), 'web'];
 
-  const eventConfig = getEventConfig();
-  const svgPath = `${eventConfig?.miloConfig?.miloLibs?.codeRoot || '/events'}/icons/social-icons.svg`;
+  const svgPath = new URL('../../icons/social-icons.svg', import.meta.url).href;
   const socialList = createTag('ul', { class: 'card-social-icons' });
 
   const svgEls = await getSVGsfromFile(svgPath, SUPPORTED_PLATFORMS);

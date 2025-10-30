@@ -40,12 +40,9 @@ async function initPlugins(schedule) {
   const hasPlugin = (plugin) => schedule.some((item) => item[plugin]);
   const pluginsNeeded = Object.keys(PLUGINS_MAP).filter(hasPlugin);
   
-  const currentScriptUrl = new URL(import.meta.url);
-  const baseUrl = new URL('../../features/', currentScriptUrl);
-  
   const plugins = await Promise.all(pluginsNeeded.map((plugin) => {
     const pluginDir = PLUGINS_MAP[plugin];
-    const pluginUrl = new URL(`timing-framework/plugins/${pluginDir}/plugin.js`, baseUrl);
+    const pluginUrl = new URL(`../../features/timing-framework/plugins/${pluginDir}/plugin.js`, import.meta.url);
     return import(pluginUrl.href);
   }));
 
