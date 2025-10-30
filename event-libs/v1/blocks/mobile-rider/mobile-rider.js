@@ -1,6 +1,8 @@
 /* eslint-disable no-underscore-dangle */
 import { createTag, getEventConfig } from '../../utils/utils.js';
 
+const DRAWER_CSS_URL = new URL('./drawer.css', import.meta.url).href;
+
 const CONFIG = {
   ANALYTICS: { PROVIDER: 'adobe' },
   SCRIPTS: {
@@ -60,8 +62,7 @@ class MobileRider {
       scriptPromise = loadScript();
       const storePromise = this.el.closest('.chrono-box')
         ? (() => {
-            const currentScriptUrl = new URL(import.meta.url);
-            const pluginUrl = new URL('../../features/timing-framework/plugins/mobile-rider/plugin.js', currentScriptUrl);
+            const pluginUrl = new URL('../../features/timing-framework/plugins/mobile-rider/plugin.js', import.meta.url);
             return import(pluginUrl.href);
           })().then(({ mobileRiderStore }) => {
             this.store = mobileRiderStore;
@@ -197,7 +198,7 @@ class MobileRider {
     // Load drawer CSS dynamically
     const link = document.createElement('link');
     link.rel = 'stylesheet';
-    link.href = '/events/blocks/mobile-rider/drawer.css';
+    link.href = DRAWER_CSS_URL;
     document.head.appendChild(link);
   }
 
