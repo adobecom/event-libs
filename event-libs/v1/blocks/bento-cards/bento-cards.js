@@ -1,4 +1,4 @@
-import buildMiloCarousel from '../../utils/milo-carousel.js';
+import buildMiloCarousel from '../../features/milo-carousel.js';
 import { createTag, getEventConfig, LIBS } from '../../utils/utils.js';
 
 export function isReversed(card) {

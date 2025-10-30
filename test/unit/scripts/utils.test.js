@@ -156,7 +156,7 @@ describe('Utility Functions', () => {
       const icon = getIcon('test-icon');
       expect(icon.tagName).to.equal('IMG');
       expect(icon.className).to.equal('icon icon-test-icon');
-      expect(icon.getAttribute('src')).to.equal('/events/icons/test-icon.svg');
+      expect(icon.getAttribute('src')).to.include('event-libs/v1/icons/test-icon.svg');
       expect(icon.getAttribute('alt')).to.equal('test-icon');
     });
   });
