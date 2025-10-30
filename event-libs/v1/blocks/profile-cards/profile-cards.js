@@ -1,4 +1,4 @@
-import buildMiloCarousel from '../../utils/milo-carousel.js';
+import buildMiloCarousel from '../../features/milo-carousel.js';
 import { getMetadata, createTag } from '../../utils/utils.js';
 
 function decorateImage(card, photo) {
@@ -205,7 +205,7 @@ function parseStaticCard(row) {
 
 function decorateStaticCards(el) {
   const cardsWrapper = el.querySelector('.cards-wrapper');
-  const rows = Array.from(el.querySelectorAll(':scope > div'));
+  const rows = Array.from(el.querySelectorAll(':scope > div:not(.cards-wrapper)'));
   
   // First row is the heading, skip it
   const cardRows = rows.slice(1);
@@ -214,6 +214,10 @@ function decorateStaticCards(el) {
     el.remove();
     return;
   }
+
+  console.log('el', el);
+  console.log('cardRows', cardRows);
+  console.log('cardsWrapper', cardsWrapper);
 
   cardRows.forEach((row) => {
     const cardData = parseStaticCard(row);
@@ -229,10 +233,11 @@ function decorateStaticCards(el) {
   });
 
   const cardCount = cardsWrapper.querySelectorAll('.card-container').length;
+  const isGrid = el.classList.contains('grid');
   
   if (cardCount === 1) {
     el.classList.add('single');
-  } else if (cardCount > 3) {
+  } else if (cardCount > 3 && !isGrid) {
     cardsWrapper.classList.add('carousel-plugin', 'show-3');
     el.classList.add('with-carousel');
     buildMiloCarousel(cardsWrapper, Array.from(cardsWrapper.querySelectorAll('.card-container')));
@@ -262,9 +267,11 @@ function decorateCards(el, data) {
     cardsWrapper.append(cardContainer);
   });
 
+  const isGrid = el.classList.contains('grid');
+
   if (filteredData.length === 1) {
     el.classList.add('single');
-  } else if (filteredData.length > 3) {
+  } else if (filteredData.length > 3 && !isGrid) {
     cardsWrapper.classList.add('carousel-plugin', 'show-3');
     el.classList.add('with-carousel');
 
@@ -280,6 +287,14 @@ export default function init(el) {
   // Check if the first cell of configRow (if it exists) contains 'type'
   const firstCell = configRow?.querySelectorAll(':scope > div')?.[0];
   const isMetadataDriven = firstCell?.textContent.toLowerCase().trim() === 'type';
+
+  // Handle grid variant: add default three-up if no *-up class is present
+  if (el.classList.contains('grid')) {
+    const hasUpVariant = Array.from(el.classList).some((cls) => cls.endsWith('-up'));
+    if (!hasUpVariant) {
+      el.classList.add('three-up');
+    }
+  }
 
   const cardsWrapper = createTag('div', { class: 'cards-wrapper' });
   el.append(cardsWrapper);
@@ -303,7 +318,6 @@ export default function init(el) {
 
     decorateCards(el, data);
   } else {
-    // Static authoring mode
     decorateStaticCards(el);
   }
 }
