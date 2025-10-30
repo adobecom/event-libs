@@ -137,8 +137,17 @@ function decorateContent(cardContainer, data) {
   textContainer.append(title, name);
 
   if (data.bio) {
-    const description = createTag('p', { class: 'card-desc' }, data.bio);
-    textContainer.append(description);
+    // Check if bio contains HTML tags (from static authoring)
+    if (data.bio.includes('<')) {
+      // Bio is HTML - insert it directly
+      const bioContainer = createTag('div', { class: 'card-desc' });
+      bioContainer.innerHTML = data.bio;
+      textContainer.append(bioContainer);
+    } else {
+      // Bio is plain text (from metadata) - wrap in paragraph
+      const description = createTag('p', { class: 'card-desc' }, data.bio);
+      textContainer.append(description);
+    }
   }
 
   contentContainer.append(textContainer);
@@ -164,34 +173,66 @@ function parseStaticCard(row) {
     };
   }
 
-  // Extract all paragraphs and h3
-  const h3 = cell.querySelector('h3');
-  const paragraphs = Array.from(cell.querySelectorAll('p'));
-  
-  // Find name from h3
-  const name = h3?.textContent.trim() || '';
+  // Find the heading (h1-h6)
+  const heading = cell.querySelector('h1, h2, h3, h4, h5, h6');
+  const name = heading?.textContent.trim() || '';
   
   // Split name into first and last (simple split on space)
   const nameParts = name.split(' ');
   const firstName = nameParts[0] || '';
   const lastName = nameParts.slice(1).join(' ') || '';
 
-  // Find title (first paragraph without a link and without picture)
-  let title = '';
-  const titleParagraph = paragraphs.find((p) => !p.querySelector('picture') && !p.querySelector('a') && p.textContent.trim());
-  if (titleParagraph) {
-    title = titleParagraph.textContent.trim();
-  }
+  // Helper function to check if a paragraph is a social link
+  // Social links are typically <p><a>url</a></p> with just the URL as text
+  const isSocialLinkParagraph = (p) => {
+    const anchor = p.querySelector('a');
+    if (!anchor) return false;
+    
+    // Check if paragraph only contains the anchor (and whitespace)
+    const textContent = p.textContent.trim();
+    const anchorText = anchor.textContent.trim();
+    
+    // If the paragraph text matches the anchor text or anchor href, it's likely a social link
+    return textContent === anchorText || textContent === anchor.href;
+  };
 
-  // Extract social links (all anchor tags)
+  // Get all direct children of the cell
+  const children = Array.from(cell.children);
+  
+  let title = '';
+  const bioElements = [];
   const socialLinks = [];
-  const anchors = cell.querySelectorAll('a');
-  anchors.forEach((anchor) => {
-    const link = anchor.href;
-    if (link) {
-      socialLinks.push({ link });
+
+  children.forEach((child) => {
+    // Skip picture elements
+    if (child.tagName === 'PICTURE') return;
+    
+    // Check if this is before or after the heading
+    if (heading && child.compareDocumentPosition(heading) & Node.DOCUMENT_POSITION_FOLLOWING) {
+      // Element comes before heading - check if it's the title
+      if (!title && child.tagName === 'P' && child.textContent.trim()) {
+        title = child.textContent.trim();
+      }
+    } else if (heading && child.compareDocumentPosition(heading) & Node.DOCUMENT_POSITION_PRECEDING) {
+      // Element comes after heading
+      if (child.tagName === 'P' && isSocialLinkParagraph(child)) {
+        // This is a social link paragraph
+        const anchor = child.querySelector('a');
+        if (anchor?.href) {
+          socialLinks.push({ link: anchor.href });
+        }
+      } else if (child !== heading) {
+        // This is bio content - keep the HTML
+        bioElements.push(child);
+      }
     }
   });
+
+  // Combine bio elements into HTML string
+  let bio = '';
+  if (bioElements.length > 0) {
+    bio = bioElements.map((el) => el.outerHTML).join('');
+  }
 
   return {
     firstName,
@@ -199,7 +240,7 @@ function parseStaticCard(row) {
     title,
     photo,
     socialLinks,
-    bio: '', // Static authoring doesn't include bio in this format
+    bio,
   };
 }
 
