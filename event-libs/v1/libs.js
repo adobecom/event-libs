@@ -36,6 +36,7 @@ import {
   decorateEvent,
   getNonProdData,
   validatePageAndRedirect,
+  processAutoBlockLinks,
 } from './utils/decorate.js';
 
 // Core exports - always available (synchronous)
@@ -50,11 +51,14 @@ export {
   decorateEvent,
   getNonProdData,
   validatePageAndRedirect,
+  processAutoBlockLinks,
   EVENT_BLOCKS,
 };
 
 // Lazy-loaded delayed actions for event pages
 export const eventsDelayedActions = async () => {
   const { lazyCaptureProfile } = await import('./utils/profile.js');
+  const { default: addPagePathIndexerWidget } = await import('./features/indexer-widget/page-schedule-indexer.js');
   lazyCaptureProfile();
+  addPagePathIndexerWidget();
 };
