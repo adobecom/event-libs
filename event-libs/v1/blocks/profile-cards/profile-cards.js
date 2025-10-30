@@ -149,6 +149,97 @@ function decorateContent(cardContainer, data) {
   cardContainer.append(contentContainer);
 }
 
+function parseStaticCard(row) {
+  const cell = row.querySelector(':scope > div');
+  if (!cell) return null;
+
+  // Extract picture/image
+  const picture = cell.querySelector('picture');
+  const img = picture?.querySelector('img') || cell.querySelector('img');
+  
+  let photo = null;
+  if (img) {
+    photo = {
+      imageUrl: img.src,
+      altText: img.alt || '',
+    };
+  }
+
+  // Extract all paragraphs and h3
+  const h3 = cell.querySelector('h3');
+  const paragraphs = Array.from(cell.querySelectorAll('p'));
+  
+  // Find name from h3
+  const name = h3?.textContent.trim() || '';
+  
+  // Split name into first and last (simple split on space)
+  const nameParts = name.split(' ');
+  const firstName = nameParts[0] || '';
+  const lastName = nameParts.slice(1).join(' ') || '';
+
+  // Find title (first paragraph without a link and without picture)
+  let title = '';
+  const titleParagraph = paragraphs.find((p) => !p.querySelector('picture') && !p.querySelector('a') && p.textContent.trim());
+  if (titleParagraph) {
+    title = titleParagraph.textContent.trim();
+  }
+
+  // Extract social links (all anchor tags)
+  const socialLinks = [];
+  const anchors = cell.querySelectorAll('a');
+  anchors.forEach((anchor) => {
+    const link = anchor.href;
+    if (link) {
+      socialLinks.push({ link });
+    }
+  });
+
+  return {
+    firstName,
+    lastName,
+    title,
+    photo,
+    socialLinks,
+    bio: '', // Static authoring doesn't include bio in this format
+  };
+}
+
+function decorateStaticCards(el) {
+  const cardsWrapper = el.querySelector('.cards-wrapper');
+  const rows = Array.from(el.querySelectorAll(':scope > div'));
+  
+  // First row is the heading, skip it
+  const cardRows = rows.slice(1);
+
+  if (cardRows.length === 0) {
+    el.remove();
+    return;
+  }
+
+  cardRows.forEach((row) => {
+    const cardData = parseStaticCard(row);
+    if (!cardData) return;
+
+    const cardContainer = createTag('div', { class: 'card-container' });
+    decorateImage(cardContainer, cardData.photo);
+    decorateContent(cardContainer, cardData);
+    cardsWrapper.append(cardContainer);
+    
+    // Remove the original row
+    row.remove();
+  });
+
+  const cardCount = cardsWrapper.querySelectorAll('.card-container').length;
+  
+  if (cardCount === 1) {
+    el.classList.add('single');
+  } else if (cardCount > 3) {
+    cardsWrapper.classList.add('carousel-plugin', 'show-3');
+    el.classList.add('with-carousel');
+    buildMiloCarousel(cardsWrapper, Array.from(cardsWrapper.querySelectorAll('.card-container')));
+  }
+}
+
 function decorateCards(el, data) {
   const cardsWrapper = el.querySelector('.cards-wrapper');
   const rows = el.querySelectorAll(':scope > div');
@@ -183,23 +274,37 @@ function decorateCards(el, data) {
 }
 
 export default function init(el) {
-  let data = [];
-
-  try {
-    data = JSON.parse(getMetadata('speakers'));
-  } catch (error) {
-    window.lana?.log(`Failed to parse speakers metadata:\n${JSON.stringify(error, null, 2)}`);
-    el.remove();
-    return;
-  }
-
-  if (!data || data.length === 0) {
-    el.remove();
-    return;
-  }
+  const rows = el.querySelectorAll(':scope > div');
+  const configRow = rows[1];
+  
+  // Determine if this is metadata-driven or static authoring
+  // Check if the first cell of configRow (if it exists) contains 'type'
+  const firstCell = configRow?.querySelectorAll(':scope > div')?.[0];
+  const isMetadataDriven = firstCell?.textContent.toLowerCase().trim() === 'type';
 
   const cardsWrapper = createTag('div', { class: 'cards-wrapper' });
   el.append(cardsWrapper);
 
-  decorateCards(el, data);
+  if (isMetadataDriven) {
+    // Metadata-driven mode
+    let data = [];
+
+    try {
+      data = JSON.parse(getMetadata('speakers'));
+    } catch (error) {
+      window.lana?.log(`Failed to parse speakers metadata:\n${JSON.stringify(error, null, 2)}`);
+      el.remove();
+      return;
+    }
+
+    if (!data || data.length === 0) {
+      el.remove();
+      return;
+    }
+
+    decorateCards(el, data);
+  } else {
+    // Static authoring mode
+    decorateStaticCards(el);
+  }
 }
