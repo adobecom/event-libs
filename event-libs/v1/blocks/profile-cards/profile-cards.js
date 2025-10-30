@@ -256,10 +256,6 @@ function decorateStaticCards(el) {
     return;
   }
 
-  console.log('el', el);
-  console.log('cardRows', cardRows);
-  console.log('cardsWrapper', cardsWrapper);
-
   cardRows.forEach((row) => {
     const cardData = parseStaticCard(row);
     if (!cardData) return;
