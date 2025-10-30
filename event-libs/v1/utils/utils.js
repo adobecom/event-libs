@@ -1,6 +1,8 @@
 import { SUSI_OPTIONS, CONDITIONAL_REG, ENV_MAP } from './constances.js';
 import BlockMediator from '../deps/block-mediator.min.js';
 
+const ICONS_BASE_URL = new URL('../icons/', import.meta.url).href;
+
 export const LIBS = (() => {
   const { hostname, search } = window.location;
   if (!(hostname.includes('.hlx.') || hostname.includes('.aem.') || hostname.includes('local'))) return '/libs';
@@ -217,7 +219,7 @@ export function createOptimizedPicture(
 export function getIcon(tag) {
   const img = document.createElement('img');
   img.className = `icon icon-${tag}`;
-  img.src = `/events/icons/${tag}.svg`;
+  img.src = `${ICONS_BASE_URL}${tag}.svg`;
   img.alt = tag;
 
   return img;
