@@ -345,10 +345,7 @@ async function initRSVPHandler(link) {
   }
 }
 
-function processTemplateLinks(parent) {
-  const { cmsType } = getEventConfig();
-  if (cmsType !== 'SP') return;
-
+function processSPTemplateLinks(parent) {
   const templateLinks = parent.querySelectorAll('a[href$="#event-template"]');
 
   templateLinks.forEach((a) => {
@@ -372,7 +369,36 @@ function processTemplateLinks(parent) {
         window.lana?.log(`Error: Failed to find template ID for event ${getMetadata('event-id')}`);
       }
     } catch (e) {
-      window.lana?.log(`Error while attempting to replace template link ${a.href}:\n${JSON.stringify(e, null, 2)}`);
+      window.lana?.log(`Error while attempting to replace SP template link ${a.href}:\n${JSON.stringify(e, null, 2)}`);
+    }
+  });
+}
+
+function processDATemplateLinks(parent) {
+  const allLinks = parent.querySelectorAll('a');
+
+  allLinks.forEach((a) => {
+    try {
+      // Process link text with template syntax
+      processTemplateInLinkText(a);
+
+      // Process link href with encoded template syntax
+      const encodedHref = a.getAttribute('href');
+      if (!encodedHref) return;
+
+      // Decode the href to find [[]] patterns
+      const decodedHref = decodeURIComponent(encodedHref);
+      
+      // Replace all metadata placeholders in href
+      const processedHref = decodedHref.replace(META_REG, (_match, metadataPath) => {
+        return parseMetadataPath(metadataPath) || '';
+      });
+
+      if (processedHref !== decodedHref) {
+        a.href = processedHref;
+      }
+    } catch (e) {
+      window.lana?.log(`Error while attempting to replace DA template link ${a.href}:\n${JSON.stringify(e, null, 2)}`);
     }
   });
 }
@@ -902,7 +928,11 @@ export function decorateEvent(parent) {
   flagEventState(parent);
   
   // Process template links synchronously first (no dictionary needed)
-  processTemplateLinks(parent);
+  if (cmsType === 'SP') {
+    processSPTemplateLinks(parent);
+  } else if (cmsType === 'DA') {
+    processDATemplateLinks(parent);
+  }
   
   // Process other links asynchronously (dictionary-dependent)
   processHashtagLinks(parent);

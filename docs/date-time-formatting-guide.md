@@ -20,7 +20,7 @@ Simply use the placeholder in your content:
 ```
 
 **Output Examples:**
-- Same-day event: `"January 15, 2025 at 2:30 PM PST"`
+- Same-day event: `"January 15, 2025 2:30 PM - 3:30 PM PST"`
 - Multi-day event: `"January 15, 2025 at 2:30 PM PST - January 16, 2025 at 2:30 PM PST"`
 
 ### Custom Template Usage
@@ -46,9 +46,13 @@ Event: Jan 15 | 2:30 PM - 3:30 PM PST
 
 | Token | Description | Example Output |
 |-------|-------------|----------------|
+| `{YYYY}` | Full year | `2025`, `2026` |
+| `{YY}` | Short year (2 digits) | `25`, `26` |
+| `{LLLL}` | Full month name | `January`, `October`, `December` |
 | `{LLL}` | Short month name | `Jan`, `Oct`, `Dec` |
-| `{dd}` | Day of month (padded) | `01`, `15`, `31` |
+| `{dddd}` | Full day of week | `Monday`, `Tuesday`, `Wednesday` |
 | `{ddd}` | Short day of week | `Mon`, `Tue`, `Wed` |
+| `{dd}` | Day of month (padded) | `01`, `15`, `31` |
 | `{timeRange}` | Time interval | `13:00 - 14:45` |
 | `{timeZone}` | Timezone abbreviation | `PST`, `EDT`, `GMT` |
 
@@ -90,6 +94,60 @@ Template: {dd}/{LLL} {timeRange}
 Output: 20/Oct 13:00 - 14:45
 ```
 
+### With Full Year
+```
+Template: {ddd}, {LLL} {dd}, {YYYY} | {timeRange} {timeZone}
+Output: Fri, Oct 20, 2025 | 13:00 - 14:45 PDT
+```
+
+### With Short Year
+```
+Template: {dd}/{LLL}/{YY} {timeRange}
+Output: 20/Oct/25 13:00 - 14:45
+```
+
+### Year and Month Only
+```
+Template: {LLL} {YYYY}
+Output: Oct 2025
+```
+
+### With Full Month Name
+```
+Template: {LLLL} {dd}, {YYYY} | {timeRange} {timeZone}
+Output: October 20, 2025 | 13:00 - 14:45 PDT
+```
+
+### Verbose Format with Full Month
+```
+Template: {ddd}, {LLLL} {dd}, {YYYY} from {timeRange} {timeZone}
+Output: Fri, October 20, 2025 from 13:00 - 14:45 PDT
+```
+
+### Full Month and Year Only
+```
+Template: {LLLL} {YYYY}
+Output: October 2025
+```
+
+### With Full Day of Week
+```
+Template: {dddd}, {LLLL} {dd}, {YYYY}
+Output: Friday, October 20, 2025
+```
+
+### Full Day and Time Format
+```
+Template: {dddd}, {LLL} {dd} | {timeRange} {timeZone}
+Output: Friday, Oct 20 | 13:00 - 14:45 PDT
+```
+
+### Verbose Format with Full Day and Month
+```
+Template: {dddd}, {LLLL} {dd}, {YYYY} at {timeRange} {timeZone}
+Output: Friday, October 20, 2025 at 13:00 - 14:45 PDT
+```
+
 ## Localization Support
 
 The system automatically adapts to different locales while maintaining the same template structure:
@@ -109,6 +167,49 @@ Fr, Okt 20 | 13:00 - 14:45 PDT
 **French (fr-FR):**
 ```
 ven., oct. 20 | 13:00 - 14:45 PDT
+```
+
+### Full Month Name Localization
+
+**Template:** `{LLLL} {dd}, {YYYY}`
+
+**English (en-US):**
+```
+October 20, 2025
+```
+
+**German (de-DE):**
+```
+Oktober 20, 2025
+```
+
+**French (fr-FR):**
+```
+octobre 20, 2025
+```
+
+### Full Day of Week Localization
+
+**Template:** `{dddd}, {LLLL} {dd}, {YYYY}`
+
+**English (en-US):**
+```
+Friday, October 20, 2025
+```
+
+**German (de-DE):**
+```
+Freitag, Oktober 20, 2025
+```
+
+**French (fr-FR):**
+```
+vendredi, octobre 20, 2025
+```
+
+**Spanish (es-ES):**
+```
+viernes, octubre 20, 2025
 ```
 
 ## Implementation Guide
