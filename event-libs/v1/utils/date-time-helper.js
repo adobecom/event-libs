@@ -123,13 +123,33 @@ function getMonth(timestamp, locale) {
 }
 
 /**
- * Gets the localized day of the week
+ * Gets the localized full month name
+ * @param {number} timestamp - UTC timestamp in milliseconds
+ * @param {string} locale - Locale string
+ * @returns {string} Full month name (e.g., 'August', 'October')
+ */
+function getFullMonth(timestamp, locale) {
+  return new Date(timestamp).toLocaleDateString(locale, { month: 'long' });
+}
+
+/**
+ * Gets the localized day of the week (short)
  * @param {number} timestamp - UTC timestamp in milliseconds
  * @param {string} locale - Locale string
  * @returns {string} Day of week abbreviation (e.g., 'Tue', 'Fri')
  */
 function getDayOfTheWeek(timestamp, locale) {
   return new Date(timestamp).toLocaleDateString(locale, { weekday: 'short' });
+}
+
+/**
+ * Gets the localized full day of the week
+ * @param {number} timestamp - UTC timestamp in milliseconds
+ * @param {string} locale - Locale string
+ * @returns {string} Full day of week name (e.g., 'Tuesday', 'Friday')
+ */
+function getFullDayOfTheWeek(timestamp, locale) {
+  return new Date(timestamp).toLocaleDateString(locale, { weekday: 'long' });
 }
 
 /**
@@ -160,9 +180,11 @@ function getShortYear(timestamp, locale) {
  * @param {string} template - Format template with tokens:
  *   {YYYY} - Full year (e.g., '2025')
  *   {YY} - Short year (e.g., '25')
+ *   {LLLL} - Full month name (e.g., 'October')
  *   {LLL} - Short month name (e.g., 'Oct')
- *   {dd} - Day of month, padded (e.g., '20')
+ *   {dddd} - Full day of week (e.g., 'Friday')
  *   {ddd} - Short day of week (e.g., 'Fri')
+ *   {dd} - Day of month, padded (e.g., '20')
  *   {timeRange} - Time interval (e.g., '13:00 - 14:45')
  *   {timeZone} - Timezone abbreviation (e.g., 'PST')
  * @returns {string} Formatted date string
@@ -179,9 +201,11 @@ export function createTemplatedDateRange(startTimestamp, endTimestamp, locale, t
     return template
       .replace('{YYYY}', getFullYear(startNum, locale))
       .replace('{YY}', getShortYear(startNum, locale))
+      .replace('{LLLL}', getFullMonth(startNum, locale))
       .replace('{LLL}', getMonth(startNum, locale))
-      .replace('{dd}', getDay(startNum, locale))
+      .replace('{dddd}', getFullDayOfTheWeek(startNum, locale))
       .replace('{ddd}', getDayOfTheWeek(startNum, locale))
+      .replace('{dd}', getDay(startNum, locale))
       .replace('{timeRange}', getTimeInterval(startNum, endNum, locale))
       .replace('{timeZone}', getLocalTimeZone(startNum, locale));
   } catch (error) {
