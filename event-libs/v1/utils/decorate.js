@@ -4,6 +4,7 @@ import {
   SERIES_404_MAP_PATH,
   ALLOWED_EMAIL_DOMAINS,
   FALLBACK_LOCALES,
+  CONDITIONAL_REG,
 } from './constances.js';
 import BlockMediator from '../deps/block-mediator.min.js';
 import { getEvent } from './esp-controller.js';
@@ -19,7 +20,13 @@ import {
   getEventConfig,
   getFallbackLocale,
   LIBS,
+  createContextualContent,
+  parseEncodedConfig,
+  createTag,
 } from './utils.js';
+import { massageMetadata } from './date-time-helper.js';
+
+const ICONS_BASE_URL = new URL('../icons/', import.meta.url).href;
 
 const preserveFormatKeys = [
   'description',
@@ -38,7 +45,7 @@ function createSVGIcon(iconName) {
   svgElement.setAttribute('class', 'ecc-icon');
 
   const useElement = document.createElementNS('http://www.w3.org/2000/svg', 'use');
-  useElement.setAttributeNS('http://www.w3.org/1999/xlink', 'href', `/events/icons/events-icons.svg#${iconName}`);
+  useElement.setAttributeNS('http://www.w3.org/1999/xlink', 'href', `${ICONS_BASE_URL}events-icons.svg#${iconName}`);
 
   svgElement.appendChild(useElement);
 
@@ -126,6 +133,7 @@ export async function updateRSVPButtonState(rsvpBtn) {
     eventFull = isFull
       || (!allowWaitlisting && attendeeCount >= attendeeLimit);
     waitlistEnabled = allowWaitlisting;
+    BlockMediator.set('eventData', eventInfo.data);
   }
 
   const rsvpData = BlockMediator.get('rsvpData');
@@ -269,10 +277,10 @@ async function initRSVPHandler(link) {
   const miloLibs = eventConfig?.miloConfig?.miloLibs ? eventConfig.miloConfig.miloLibs : LIBS;
 
   if (eventConfig.miloConfig) {
-    await dictionaryManager.addBook({ config: eventConfig.miloConfig });
+    await dictionaryManager.addSheet({ config: eventConfig.miloConfig });
   } else {
     const { getConfig } = await import(`${miloLibs}/utils/utils.js`);
-    await dictionaryManager.addBook({ config: getConfig() });
+    await dictionaryManager.addSheet({ config: getConfig() });
   }
 
   const regHashCallbacks = {
@@ -337,50 +345,96 @@ async function initRSVPHandler(link) {
   }
 }
 
-function processLinks(parent) {
+function processSPTemplateLinks(parent) {
+  const templateLinks = parent.querySelectorAll('a[href$="#event-template"]');
+
+  templateLinks.forEach((a) => {
+    try {
+      let templateId;
+
+      try {
+        const seriesMetadata = JSON.parse(getMetadata('series'));
+        templateId = seriesMetadata?.templateId;
+      } catch (e) {
+        window.lana?.log(`Failed to parse series metadata. Attempt to fallback on event tempate ID attribute:\n${JSON.stringify(e, null, 2)}`);
+      }
+
+      if (!templateId && getMetadata('template-id')) {
+        templateId = getMetadata('template-id');
+      }
+
+      if (templateId) {
+        a.href = templateId;
+      } else {
+        window.lana?.log(`Error: Failed to find template ID for event ${getMetadata('event-id')}`);
+      }
+    } catch (e) {
+      window.lana?.log(`Error while attempting to replace SP template link ${a.href}:\n${JSON.stringify(e, null, 2)}`);
+    }
+  });
+}
+
+function processDATemplateLinks(parent) {
+  const allLinks = parent.querySelectorAll('a');
+
+  allLinks.forEach((a) => {
+    try {
+      // Process link text with template syntax
+      processTemplateInLinkText(a);
+
+      // Process link href with encoded template syntax
+      const encodedHref = a.getAttribute('href');
+      if (!encodedHref) return;
+
+      // Decode the href to find [[]] patterns
+      const decodedHref = decodeURIComponent(encodedHref);
+      
+      // Replace all metadata placeholders in href
+      const processedHref = decodedHref.replace(META_REG, (_match, metadataPath) => {
+        return parseMetadataPath(metadataPath) || '';
+      });
+
+      if (processedHref !== decodedHref) {
+        a.href = processedHref;
+      }
+    } catch (e) {
+      window.lana?.log(`Error while attempting to replace DA template link ${a.href}:\n${JSON.stringify(e, null, 2)}`);
+    }
+  });
+}
+
+function processHashtagLinks(parent) {
+  const { cmsType } = getEventConfig();
   const links = parent.querySelectorAll('a[href*="#"]');
 
   links.forEach(async (a) => {
     const url = new URL(a.href);
     const isPlaceholderLink = url.pathname.startsWith('/events-placeholder');
     try {
-      processTemplateInLinkText(a);
-      const processedAsRSVPButton = await initRSVPHandler(a);
+      if (cmsType === 'SP') {
+        processTemplateInLinkText(a);
+        const processedAsRSVPButton = await initRSVPHandler(a);
 
-      if (a.href.endsWith('#event-template') && !processedAsRSVPButton) {
-        let templateId;
+        if (a.href.endsWith('#host-email')) {
+          if (getMetadata('host-email')) {
+            const emailSubject = `${dictionaryManager.getValue('mailto-subject-prefix')} ${getMetadata('event-title')}`;
+            a.href = `mailto:${getMetadata('host-email')}?subject=${encodeURIComponent(emailSubject)}`;
+          } else {
+            a.remove();
+          }
+        } else if (url.hash && !a.href.endsWith('#event-template') && !processedAsRSVPButton) {
+          const metadataPath = url.hash.replace('#', '');
+          const metadataValue = parseMetadataPath(metadataPath);
+          if (metadataValue) {
+            a.href = metadataValue;
+          } else if (isPlaceholderLink) {
+            a.remove();
+          }
+        }
+      }
 
-        try {
-          const seriesMetadata = JSON.parse(getMetadata('series'));
-          templateId = seriesMetadata?.templateId;
-        } catch (e) {
-          window.lana?.log(`Failed to parse series metadata. Attempt to fallback on event tempate ID attribute:\n${JSON.stringify(e, null, 2)}`);
-        }
-
-        if (!templateId && getMetadata('template-id')) {
-          templateId = getMetadata('template-id');
-        }
-
-        if (templateId) {
-          a.href = templateId;
-        } else {
-          window.lana?.log(`Error: Failed to find template ID for event ${getMetadata('event-id')}`);
-        }
-      } else if (a.href.endsWith('#host-email')) {
-        if (getMetadata('host-email')) {
-          const emailSubject = `${dictionaryManager.getValue('mailto-subject-prefix')} ${getMetadata('event-title')}`;
-          a.href = `mailto:${getMetadata('host-email')}?subject=${encodeURIComponent(emailSubject)}`;
-        } else {
-          a.remove();
-        }
-      } else if (url.hash) {
-        const metadataPath = url.hash.replace('#', '');
-        const metadataValue = parseMetadataPath(metadataPath);
-        if (metadataValue) {
-          a.href = metadataValue;
-        } else if (isPlaceholderLink) {
-          a.remove();
-        }
+      if (cmsType === 'DA') {
+        await initRSVPHandler(a);
       }
     } catch (e) {
       window.lana?.log(`Error while attempting to replace link ${a.href}:\n${JSON.stringify(e, null, 2)}`);
@@ -388,6 +442,74 @@ function processLinks(parent) {
   });
 
   
+}
+
+function prebuildAutoBlock(blockName, link) {
+  let blockEl;
+  const autoBlockBuilders = {
+    'chrono-box': (link) => {
+      const url = new URL(link.href);
+      const scheduleBase64 = url.searchParams.get('schedule');
+      const schedule = parseEncodedConfig(scheduleBase64);
+      
+      if (!schedule || !schedule.blocks || !Array.isArray(schedule.blocks)) {
+        return null;
+      }
+
+
+      // Transform schedule blocks into chrono-box format
+      const chronoBoxData = schedule.blocks.map(block => {
+        const item = {
+          pathToFragment: block.fragmentPath,
+          toggleTime: block.startDateTime
+        };
+
+        // Add mobileRider sessionId if the block includes a live stream
+        if (block.includeLiveStream && block.liveStream) {
+          const { streamId, provider } = block.liveStream;
+          if (provider === 'MobileRider' && streamId) {
+            item.mobileRider = { sessionId: streamId };
+          }
+        }
+
+        return item;
+      });
+
+      const labelDiv = createTag('div', {}, 'schedule');
+      const dataDiv = createTag('div', {}, JSON.stringify(chronoBoxData));
+      const innerDiv = createTag('div', {}, [labelDiv, dataDiv]);
+      const chronoBoxEl = createTag('div', {
+        class: 'chrono-box',
+        'data-schedule-id': schedule.scheduleId,
+        'data-schedule-title': schedule.title,
+        'data-schedule-maker-url': `${url.origin}${url.pathname}?scheduleId=${schedule.scheduleId}`,
+      }, innerDiv);
+
+      return chronoBoxEl;
+    }
+  }
+
+  if (autoBlockBuilders[blockName]) {
+    blockEl = autoBlockBuilders[blockName](link);
+  }
+
+  return blockEl;
+}
+
+export function processAutoBlockLinks(parent) {
+  const autoBlockIdentifiers = {
+    'chrono-box': 'schedule-maker'
+  }
+
+  Object.keys(autoBlockIdentifiers).forEach((bn) => {
+    const link = parent.querySelector(`a[href*="${autoBlockIdentifiers[bn]}"]`);
+    if (link) {
+      const blockEl = prebuildAutoBlock(bn, link);
+      if (blockEl) {
+        link.closest('p') ? link.closest('p').replaceWith(blockEl) : link.replaceWith(blockEl);
+      }
+    }
+  });
 }
 
 export function updatePictureElement(imageUrl, parentPic, altText) {
@@ -463,6 +585,8 @@ function updateTextNode(child, matchCallback) {
 
   if (replacedText === originalText) return;
 
+  if (child.parentElement.dataset.contextualContent) return;
+
   if (isHTMLString(replacedText)) {
     child.parentElement.innerHTML = replacedText;
   } else {
@@ -491,6 +615,8 @@ function updateTextContent(child, matchCallback) {
 
   if (replacedText === originalText) return;
 
+  if (child.parentElement.dataset.contextualContent) return;
+  
   if (isHTMLString(replacedText)) {
     child.parentElement.innerHTML = replacedText;
   } else {
@@ -511,6 +637,51 @@ export function shouldRenderWithNonProdMetadata(eventId, prodDomain) {
   return false;
 }
 
+function updateContextualContentElements(parent, extraData) {
+  // Find all elements with contextual content syntax
+  const contextualElements = parent.querySelectorAll('[data-contextual-content]');
+
+  contextualElements.forEach((element) => {
+    const originalContent = element.dataset.contextualContent;
+    if (originalContent) {
+      createContextualContent(element, originalContent, extraData);
+    }
+  });
+
+  // Also check for conditional content in text nodes that might not have been caught
+  const allTextNodes = [];
+  const walker = document.createTreeWalker(
+    parent,
+    NodeFilter.SHOW_TEXT,
+    null,
+    false,
+  );
+
+  let node = walker.nextNode();
+  while (node) {
+    if (node.textContent.includes('?(') && node.textContent.includes('):(')) {
+      allTextNodes.push(node);
+    }
+    node = walker.nextNode();
+  }
+
+  allTextNodes.forEach((textNode) => {
+    const { parentElement } = textNode;
+    if (parentElement && !parentElement.dataset.contextualContent) {
+      // Extract conditional content from the text
+      const text = textNode.textContent;
+      // Updated regex to handle complex conditions with @BM references and nested parentheses
+      const conditionalMatch = text.match(CONDITIONAL_REG);
+      if (conditionalMatch) {
+        const [fullMatch] = conditionalMatch;
+        parentElement.dataset.contextualContent = fullMatch;
+        createContextualContent(parentElement, fullMatch, extraData);
+      }
+    }
+  });
+}
+
+
 export async function getNonProdData(env) {
   const isPreviewMode = new URLSearchParams(window.location.search).get('previewMode')
   || window.location.hostname.includes('.hlx.page')
@@ -530,7 +701,7 @@ export async function getNonProdData(env) {
     const json = await resp.json();
     let { pathname } = window.location;
     if (pathname.endsWith('.html')) pathname = pathname.slice(0, -5);
-    const pageData = json.data.find((d) => {
+    const pageData = json.data.reverse().find((d) => {
       let pageUrl = '';
 
       try {
@@ -702,14 +873,6 @@ function processTemplateInAllNodes(parent, extraData) {
       n.parentNode?.classList.add('preserve-format');
     }
 
-    if (p1 === 'start-date' || p1 === 'end-date') {
-      const date = new Date(content);
-      const { miloConfig } = getEventConfig();
-
-      const localeString = miloConfig ? miloConfig.locale?.ietf : getFallbackLocale(FALLBACK_LOCALES);
-      content = date.toLocaleDateString(localeString, { month: 'long', day: 'numeric', year: 'numeric' });
-    }
-
     return content;
   };
 
@@ -745,7 +908,7 @@ function processTemplateInAllNodes(parent, extraData) {
 // data -> DOM gills
 export function decorateEvent(parent) {
   // handle photos data parsing
-  const extraData = parsePhotosData(parent);
+  const photosData = parsePhotosData(parent);
   const { cmsType } = getEventConfig();
 
   if (!parent) {
@@ -754,15 +917,30 @@ export function decorateEvent(parent) {
   }
 
   if (!getMetadata('event-id')) return;
+  // Hydrate metadata with user-friendly transformations
+  const miloConfig = getEventConfig().miloConfig;
+  const locale = miloConfig ? miloConfig.locale?.ietf : getFallbackLocale(FALLBACK_LOCALES);
+  const massagedMetadata = massageMetadata(locale);
 
-  if (cmsType === 'SP') {
-    processTemplateInAllNodes(parent, extraData);
-    decorateProfileCardsZPattern(parent);
-  }
+  processTemplateInAllNodes(parent, { ...photosData, ...massagedMetadata });
+  decorateProfileCardsZPattern(parent);
 
   flagEventState(parent);
-  processLinks(parent);
+  
+  // Process template links synchronously first (no dictionary needed)
+  if (cmsType === 'SP') {
+    processSPTemplateLinks(parent);
+  } else if (cmsType === 'DA') {
+    processDATemplateLinks(parent);
+  }
+  
+  // Process other links asynchronously (dictionary-dependent)
+  processHashtagLinks(parent);
+  
   if (getEventServiceEnv() !== 'prod' && cmsType === 'SP') updateExtraMetaTags(parent);
+
+  // handle contextual content with BlockMediator store reactivity
+  updateContextualContentElements(parent, { ...photosData, ...massagedMetadata });
 }
 
 export default function decorateArea(area = document) {

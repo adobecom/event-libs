@@ -295,10 +295,10 @@ function createButton({ type, label }, bp) {
 
               if (eventFull) {
                 if (allowWaitlisting) {
-                  button.textContent = dictionaryManager.getValue('waitlist-cta-text', 'rsvp-fields');
+                  button.textContent = dictionaryManager.getValue('waitlist-cta-text');
                   button.disabled = false;
                 } else {
-                  button.textContent = dictionaryManager.getValue('event-full-cta-text', 'rsvp-fields');
+                  button.textContent = dictionaryManager.getValue('event-full-cta-text');
                   button.disabled = true;
                 }
               }
@@ -660,7 +660,8 @@ async function addConsentSuite(form) {
 
   fieldWrapper.append(label, countrySelect);
 
-  const consentStringsIndex = await fetch('/events/fragments/consents/consent-query-index.json').then((r) => r.json());
+  const queryIndexUrl = new URL('/event-libs/system/consent-query-index.json', import.meta.url);
+  const consentStringsIndex = await fetch(queryIndexUrl).then((r) => r.json());
 
   if (consentStringsIndex) {
     const { data } = consentStringsIndex;
@@ -737,10 +738,10 @@ async function createForm(bp, formData) {
   }
 
   const config = getConfig();
-  await dictionaryManager.addBook({
-    config,
-    sheet: 'rsvp-fields',
-  });
+  await Promise.all([
+    dictionaryManager.addSheet({ config, sheet: 'default' }),
+    dictionaryManager.addSheet({ config, sheet: 'rsvp-fields' }),
+  ]);
 
   if (rsvpFieldsData) {
     const { required, visible } = rsvpFieldsData;
@@ -1021,6 +1022,11 @@ async function getFormLink(block, bp) {
     form.href = `/events/default/rsvp-form-configs/${cloudType.toLowerCase()}.json`;
   } else {
     form.href = `${prefix}${configLocation.startsWith('/') ? configLocation : `/${configLocation}`}`;
+  }
+
+  if (!form.href) {
+    const configUrl = new URL(`/events/default/rsvp-form-configs/${cloudType.toLowerCase()}.json`, import.meta.url);
+    form.href = configUrl.toString();
   }
 
   if (legacyLink) {

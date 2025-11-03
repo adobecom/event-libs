@@ -1,4 +1,4 @@
-import { readBlockConfig, getMetadata, getEventConfig, LIBS } from '../../utils/utils.js';
+import { getMetadata, getEventConfig, LIBS } from '../../utils/utils.js';
 
 function buildScheduleDoubleLinkedList(entries) {
   if (!entries.length) return null;
@@ -20,8 +20,8 @@ function getSchedule(scheduleId) {
 
   try {
     thisSchedule = JSON.parse(scheduleJSONString)[scheduleId];
-  } catch (e) {
-    window.lana?.log(`Error parsing schedule: ${JSON.stringify(e)}`);
+  } catch (error) {
+    window.lana?.log(`Error parsing schedule: ${error.message}`);
   }
 
   if (!thisSchedule) {
@@ -40,19 +40,13 @@ async function initPlugins(schedule) {
   const hasPlugin = (plugin) => schedule.some((item) => item[plugin]);
   const pluginsNeeded = Object.keys(PLUGINS_MAP).filter(hasPlugin);
   
-  // Construct absolute path to features directory using import.meta.url
-  const currentScriptUrl = new URL(import.meta.url);
-  const baseUrl = new URL('../../features/', currentScriptUrl);
-  
   const plugins = await Promise.all(pluginsNeeded.map((plugin) => {
     const pluginDir = PLUGINS_MAP[plugin];
-    const pluginUrl = new URL(`timing-framework/plugins/${pluginDir}/plugin.js`, baseUrl);
+    const pluginUrl = new URL(`../../features/timing-framework/plugins/${pluginDir}/plugin.js`, import.meta.url);
     return import(pluginUrl.href);
   }));
 
-  // Get or create a global tabId that's shared across all chrono-boxes on this page
-  // This ensures that multiple chrono-boxes on the same page use the same tabId,
-  // allowing their plugin stores to communicate via BroadcastChannel correctly
+  // Shared tabId for BroadcastChannel communication across chrono-boxes
   let tabId = sessionStorage.getItem('chrono-box-tab-id');
   if (!tabId) {
     tabId = crypto.randomUUID();
@@ -68,55 +62,54 @@ async function initPlugins(schedule) {
   return { plugins: pluginsModules, tabId };
 }
 
-async function createBlobWorker() {
-  // Construct absolute path to worker using import.meta.url
-  const currentScriptUrl = new URL(import.meta.url);
-  const workerUrl = new URL('../../features/timing-framework/worker-traditional.js', currentScriptUrl);
-  
-  // Fetch the traditional worker file
-  const response = await fetch(workerUrl.href);
+// Creates blob-based worker for cross-origin scenarios
+async function createBlobWorker(workerUrl) {
+  const response = await fetch(workerUrl);
   if (!response.ok) {
-    throw new Error('Failed to fetch traditional worker');
+    throw new Error(`Failed to fetch worker: ${response.status} ${response.statusText}`);
   }
   
   const workerCode = await response.text();
-  
-  // Create a Blob URL for the worker
   const blob = new Blob([workerCode], { type: 'application/javascript' });
   return URL.createObjectURL(blob);
+}
+
+// Creates worker with automatic cross-origin fallback
+async function createWorker(workerUrl) {
+  let worker;
+  let blobUrl = null;
+
+  try {
+    // Try direct Worker first (optimal for same-origin)
+    worker = new Worker(workerUrl, { type: 'module' });
+    return { worker, blobUrl };
+  } catch (error) {
+    // Expected: falls back to blob worker for cross-origin
+  }
+
+  try {
+    // Fallback: blob-based worker for cross-origin
+    blobUrl = await createBlobWorker(workerUrl);
+    worker = new Worker(blobUrl);
+    return { worker, blobUrl };
+  } catch (error) {
+    window.lana?.log(`Failed to create worker: ${error.message}`);
+    throw new Error(`Failed to create worker: ${error.message}`);
+  }
 }
 
 async function setScheduleToScheduleWorker(schedule, plugins, tabId) {
   const scheduleLinkedList = buildScheduleDoubleLinkedList(schedule);
 
-  // Add error handling for worker creation
-  let worker;
-  let blobUrl;
-  
-  try {
-    // Try to create a Blob-based worker first (for cross-origin scenarios)
-    blobUrl = await createBlobWorker();
-    worker = new Worker(blobUrl);
-  } catch (blobError) {
-    window.lana?.log(`Error creating blob worker, falling back to direct import: ${JSON.stringify(blobError)}`);
-    
-    try {
-      // Fallback to direct import (works for same-origin scenarios)
-      const currentScriptUrl = new URL(import.meta.url);
-      const workerUrl = new URL('../../features/timing-framework/worker-traditional.js', currentScriptUrl);
-      worker = new Worker(workerUrl.href);
-    } catch (directError) {
-      window.lana?.log(`Error creating direct worker: ${JSON.stringify(directError)}`);
-      throw directError;
-    }
-  }
+  const currentScriptUrl = new URL(import.meta.url);
+  const workerUrl = new URL('../../features/timing-framework/worker-traditional.js', currentScriptUrl).href;
 
-  // Get testing data from URL params
+  const { worker, blobUrl } = await createWorker(workerUrl);
+
   const params = new URLSearchParams(document.location.search);
   const testTiming = params.get('timing');
   const testing = testTiming ? { toggleTime: testTiming } : null;
 
-  // Convert plugin instances to their serializable state
   const pluginStates = Object.fromEntries(
     Array.from(plugins.entries())
       .map(([n, p]) => [n, { type: n, data: p.getAll ? p.getAll() : p }]),
@@ -132,16 +125,16 @@ async function setScheduleToScheduleWorker(schedule, plugins, tabId) {
   try {
     worker.postMessage(messageData);
   } catch (error) {
-    window.lana?.log(`Error posting message to worker: ${JSON.stringify(error)}`);
-    // Clean up blob URL if it was created
+    window.lana?.log(`Error posting message to worker: ${error.message}`);
     if (blobUrl) {
       URL.revokeObjectURL(blobUrl);
     }
     throw error;
   }
 
-  // Store blob URL for cleanup later
-  worker._blobUrl = blobUrl;
+  if (blobUrl) {
+    worker._blobUrl = blobUrl;
+  }
 
   return worker;
 }
@@ -153,21 +146,30 @@ export default async function init(el) {
   const [{ default: loadFragment }, { createTag, getLocale, getConfig }] = await Promise.all([
     import(`${miloLibs}/blocks/fragment/fragment.js`),
     import(`${miloLibs}/utils/utils.js`),
-    import(`${miloLibs}/features/spectrum-web-components/dist/theme.js`),
-    import(`${miloLibs}/features/spectrum-web-components/dist/progress-circle.js`),
   ]);
 
-  const blockConfig = readBlockConfig(el);
-  const scheduleId = blockConfig?.['schedule-id'];
-  let staticSchedule;
+  const rows = el.querySelectorAll(':scope > div');
+  let scheduleId = null;
+  let staticSchedule = null;
 
-  if (blockConfig?.schedule) {
-    try {
-      staticSchedule = JSON.parse((blockConfig?.schedule));
-    } catch (e) {
-      window.lana?.log(`Error parsing static schedule: ${JSON.stringify(e)}`);
+  rows.forEach((row) => {
+    const cols = Array.from(row.children);
+    if (cols.length >= 2) {
+      const key = cols[0].textContent.trim().toLowerCase();
+      const value = cols[1].textContent.trim();
+
+      if (key === 'schedule-id') {
+        scheduleId = value;
+      } else if (key === 'schedule') {
+        try {
+          staticSchedule = JSON.parse(value);
+        } catch (error) {
+          window.lana?.log(`Error parsing static schedule: ${error.message}`);
+        }
+      }
     }
-  }
+  });
+
   const scheduleById = scheduleId ? getSchedule(scheduleId) : null;
   const thisSchedule = staticSchedule || scheduleById;
 
@@ -188,27 +190,21 @@ export default async function init(el) {
       pluginsOutputs.tabId,
     );
   } catch (error) {
-    window.lana?.log(`Error creating worker: ${JSON.stringify(error)}`);
+    window.lana?.log(`Error creating worker: ${error.message}`);
     el.innerHTML = '<div class="error-message">Unable to initialize timing system. Please refresh the page.</div>';
     el.classList.add('error');
     return Promise.resolve();
   }
 
-  // Create a promise that resolves when the first message is received
   return new Promise((resolve) => {
     const timeout = setTimeout(() => {
-      window.lana?.log('Timeout waiting for first worker message, continuing without CLS prevention');
-      
-      // Clean up blob URL if it was used
       if (worker._blobUrl) {
         URL.revokeObjectURL(worker._blobUrl);
         worker._blobUrl = null;
       }
-      
-      resolve(); // resolve the promise without waiting for the first message
-    }, 3000); // 3 second timeout - balances CLS prevention with LCP/FCP
+      resolve();
+    }, 3000);
 
-    // Set up the message handler that resolves the promise
     worker.onmessage = (event) => {
       clearTimeout(timeout);
 
@@ -216,41 +212,24 @@ export default async function init(el) {
       const { prefix } = getLocale(getConfig().locales);
       el.style.height = `${el.clientHeight}px`;
 
-      // load sp progress circle
-      const spTheme = createTag('sp-theme', { color: 'light', scale: 'medium', class: 'loading-screen' });
-      createTag('sp-progress-circle', { size: 'l', indeterminate: true }, '', { parent: spTheme });
       el.innerHTML = '';
-      el.classList.add('loading');
-      el.append(spTheme);
 
       const a = createTag('a', { href: `${prefix}${pathToFragment}` }, '', { parent: el });
 
       loadFragment(a).then(() => {
-        // set el height to current height
-        spTheme.remove();
         el.removeAttribute('style');
-        el.classList.remove('loading');
       }).catch((error) => {
-        // Handle fragment loading errors
-        window.lana?.log(`Error loading fragment ${pathToFragment}: ${JSON.stringify(error)}`);
-
-        // Remove loading state
-        spTheme.remove();
+        window.lana?.log(`Error loading fragment ${pathToFragment}: ${error.message}`);
         el.removeAttribute('style');
-        el.classList.remove('loading');
-
-        // Show error state to user
         el.innerHTML = '<div class="error-message">Unable to load content. Please refresh the page.</div>';
         el.classList.add('error');
       });
 
-      // Clean up blob URL if it was used
       if (worker._blobUrl) {
         URL.revokeObjectURL(worker._blobUrl);
         worker._blobUrl = null;
       }
 
-      // Resolve the promise
       resolve();
     };
   });

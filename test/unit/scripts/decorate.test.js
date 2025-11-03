@@ -3,6 +3,13 @@ import { expect } from '@esm-bundle/chai';
 import sinon from 'sinon';
 import { LIBS, setMetadata, setEventConfig } from '../../../event-libs/v1/utils/utils.js';
 import BlockMediator from '../../../event-libs/v1/deps/block-mediator.min.js';
+import {
+  convertUtcTimestampToLocalDateTime,
+  massageMetadata,
+  areTimestampsOnSameDay,
+  createSmartDateRange,
+  createTemplatedDateRange,
+} from '../../../event-libs/v1/utils/date-time-helper.js';
 
 const {
   decorateEvent,
@@ -185,6 +192,850 @@ describe('getNonProdData', () => {
     expect(data).to.not.be.null;
     expect(data).to.have.property('url', '/');
     fetchStub.restore();
+  });
+});
+
+describe('UTC Timestamp to Local DateTime Conversion', () => {
+  let originalLana;
+
+  beforeEach(() => {
+    // Mock lana for testing
+    originalLana = window.lana;
+    window.lana = { log: () => {} };
+  });
+
+  afterEach(() => {
+    window.lana = originalLana;
+  });
+
+  it('should convert valid UTC timestamp to local date time string', () => {
+    const timestamp = '1759251599990';
+    const result = convertUtcTimestampToLocalDateTime(timestamp);
+    
+    // Should return a formatted date string
+    expect(result).to.be.a('string');
+    expect(result).to.not.be.empty;
+    expect(result).to.match(/\d{4}/); // Should contain a year
+    expect(result).to.match(/\d{1,2}:\d{2}/); // Should contain time
+  });
+
+  it('should handle numeric timestamp input', () => {
+    const timestamp = 1759251599990;
+    const result = convertUtcTimestampToLocalDateTime(timestamp);
+    
+    expect(result).to.be.a('string');
+    expect(result).to.not.be.empty;
+  });
+
+  it('should return empty string for invalid timestamp', () => {
+    const result = convertUtcTimestampToLocalDateTime('invalid');
+    expect(result).to.equal('');
+  });
+
+  it('should return empty string for null/undefined timestamp', () => {
+    expect(convertUtcTimestampToLocalDateTime(null)).to.equal('');
+    expect(convertUtcTimestampToLocalDateTime(undefined)).to.equal('');
+    expect(convertUtcTimestampToLocalDateTime('')).to.equal('');
+  });
+
+  it('should use custom locale when provided', () => {
+    const timestamp = '1759251599990';
+    const resultEn = convertUtcTimestampToLocalDateTime(timestamp, 'en-US');
+    const resultDe = convertUtcTimestampToLocalDateTime(timestamp, 'de-DE');
+    
+    expect(resultEn).to.be.a('string');
+    expect(resultDe).to.be.a('string');
+    expect(resultEn).to.not.equal(resultDe); // Different locales should produce different formats
+  });
+
+  it('should handle edge case timestamps', () => {
+    // Test with current timestamp
+    const currentTimestamp = Date.now().toString();
+    const result = convertUtcTimestampToLocalDateTime(currentTimestamp);
+    expect(result).to.be.a('string');
+    expect(result).to.not.be.empty;
+  });
+
+  it('should log error for invalid timestamps', () => {
+    const logSpy = sinon.spy(window.lana, 'log');
+    
+    convertUtcTimestampToLocalDateTime('not-a-number');
+    expect(logSpy.calledWith(sinon.match(/Invalid timestamp provided/))).to.be.true;
+    
+    logSpy.restore();
+  });
+});
+
+describe('Date Range Utilities', () => {
+  let originalLana;
+
+  beforeEach(() => {
+    // Mock lana for testing
+    originalLana = window.lana;
+    window.lana = { log: () => {} };
+  });
+
+  afterEach(() => {
+    window.lana = originalLana;
+  });
+
+  describe('areTimestampsOnSameDay', () => {
+    it('should return true for timestamps on the same day', () => {
+      // Same day, different times
+      const startTimestamp = '1759251599990'; // Jan 15, 2025 2:30 PM
+      const endTimestamp = '1759255199990';   // Jan 15, 2025 3:30 PM
+      
+      expect(areTimestampsOnSameDay(startTimestamp, endTimestamp)).to.be.true;
+    });
+
+    it('should return false for timestamps on different days', () => {
+      // Different days
+      const startTimestamp = '1759251599990'; // Jan 15, 2025
+      const endTimestamp = '1759337999990';   // Jan 16, 2025
+      
+      expect(areTimestampsOnSameDay(startTimestamp, endTimestamp)).to.be.false;
+    });
+
+    it('should handle numeric timestamps', () => {
+      const startTimestamp = 1759251599990;
+      const endTimestamp = 1759255199990;
+      
+      expect(areTimestampsOnSameDay(startTimestamp, endTimestamp)).to.be.true;
+    });
+
+    it('should return false for invalid timestamps', () => {
+      expect(areTimestampsOnSameDay('invalid', '1759255199990')).to.be.false;
+      expect(areTimestampsOnSameDay('1759251599990', 'invalid')).to.be.false;
+      expect(areTimestampsOnSameDay(null, '1759255199990')).to.be.false;
+      expect(areTimestampsOnSameDay('1759251599990', undefined)).to.be.false;
+    });
+
+    it('should handle edge cases around midnight', () => {
+      // These are actually the same day, let's use a proper midnight crossing
+      const startTimestamp = '1759251599990'; // Jan 15, 2025 11:59 PM
+      const endTimestamp = '1759337999990';   // Jan 16, 2025 11:59 PM (next day)
+      
+      expect(areTimestampsOnSameDay(startTimestamp, endTimestamp)).to.be.false;
+    });
+  });
+
+  describe('createSmartDateRange', () => {
+    it('should return date with time range for same-day events', () => {
+      const startTimestamp = '1759251599990';
+      const endTimestamp = '1759255199990';
+      
+      const result = createSmartDateRange(startTimestamp, endTimestamp, 'en-US');
+      
+      expect(result).to.be.a('string');
+      expect(result).to.include(' - '); // Should contain time range separator
+      expect(result).to.match(/\d{4}/); // Should contain a year
+      expect(result).to.match(/\d{1,2}:\d{2}/); // Should contain times
+      // Pattern should be like "January 15, 2025 2:30 PM - 3:30 PM PST"
+    });
+
+    it('should return date range for multi-day events', () => {
+      const startTimestamp = '1759251599990'; // Jan 15, 2025
+      const endTimestamp = '1759337999990';   // Jan 16, 2025
+      
+      const result = createSmartDateRange(startTimestamp, endTimestamp, 'en-US');
+      
+      expect(result).to.be.a('string');
+      expect(result).to.include(' - '); // Should contain range separator
+      expect(result).to.match(/\d{4}/); // Should contain a year
+    });
+
+    it('should handle missing timestamps gracefully', () => {
+      expect(createSmartDateRange('', '1759255199990', 'en-US')).to.equal('');
+      expect(createSmartDateRange('1759251599990', '', 'en-US')).to.equal('');
+      expect(createSmartDateRange(null, '1759255199990', 'en-US')).to.equal('');
+      expect(createSmartDateRange('1759251599990', null, 'en-US')).to.equal('');
+    });
+
+    it('should use different locales for formatting', () => {
+      const startTimestamp = '1759251599990';
+      const endTimestamp = '1759337999990';
+      
+      const resultEn = createSmartDateRange(startTimestamp, endTimestamp, 'en-US');
+      const resultDe = createSmartDateRange(startTimestamp, endTimestamp, 'de-DE');
+      
+      expect(resultEn).to.be.a('string');
+      expect(resultDe).to.be.a('string');
+      expect(resultEn).to.not.equal(resultDe); // Different locales should produce different formats
+    });
+
+    it('should handle invalid timestamps gracefully', () => {
+      const result = createSmartDateRange('invalid', '1759255199990', 'en-US');
+      expect(result).to.equal('');
+    });
+  });
+
+  describe('createTemplatedDateRange', () => {
+    it('should format date using template tokens', () => {
+      const startTimestamp = '1759251599990'; // Jan 15, 2025
+      const endTimestamp = '1759255199990';   // Jan 15, 2025 (1 hour later)
+      const template = '{LLL} {dd} | {timeRange} {timeZone}';
+      
+      const result = createTemplatedDateRange(startTimestamp, endTimestamp, 'en-US', template);
+      
+      expect(result).to.be.a('string');
+      expect(result).to.match(/\w{3} \d{2} \| \d{1,2}:\d{2} [AP]M - \d{1,2}:\d{2} [AP]M \w{3}/); // Pattern like "Jan 15 | 2:30 PM - 3:30 PM PST"
+    });
+
+    it('should handle different template formats', () => {
+      const startTimestamp = '1759251599990';
+      const endTimestamp = '1759255199990';
+      
+      const template1 = '{ddd}, {LLL} {dd}';
+      const template2 = '{timeRange} {timeZone}';
+      const template3 = '{ddd}, {LLL} {dd} | {timeRange} {timeZone}';
+      
+      const result1 = createTemplatedDateRange(startTimestamp, endTimestamp, 'en-US', template1);
+      const result2 = createTemplatedDateRange(startTimestamp, endTimestamp, 'en-US', template2);
+      const result3 = createTemplatedDateRange(startTimestamp, endTimestamp, 'en-US', template3);
+      
+      expect(result1).to.match(/\w{3}, \w{3} \d{2}/); // "Wed, Jan 15"
+      expect(result2).to.match(/\d{1,2}:\d{2} [AP]M - \d{1,2}:\d{2} [AP]M \w{3}/); // "2:30 PM - 3:30 PM PST"
+      expect(result3).to.include('|'); // Should contain separator
+    });
+
+    it('should handle different locales', () => {
+      const startTimestamp = '1759251599990';
+      const endTimestamp = '1759255199990';
+      const template = '{ddd}, {LLL} {dd}';
+      
+      const resultEn = createTemplatedDateRange(startTimestamp, endTimestamp, 'en-US', template);
+      const resultDe = createTemplatedDateRange(startTimestamp, endTimestamp, 'de-DE', template);
+      
+      expect(resultEn).to.be.a('string');
+      expect(resultDe).to.be.a('string');
+      expect(resultEn).to.not.equal(resultDe); // Different locales should produce different formats
+    });
+
+    it('should handle missing parameters gracefully', () => {
+      expect(createTemplatedDateRange('', '1759255199990', 'en-US', '{LLL} {dd}')).to.equal('');
+      expect(createTemplatedDateRange('1759251599990', '', 'en-US', '{LLL} {dd}')).to.equal('');
+      expect(createTemplatedDateRange('1759251599990', '1759255199990', 'en-US', '')).to.equal('');
+      expect(createTemplatedDateRange('1759251599990', '1759255199990', 'en-US', null)).to.equal('');
+    });
+
+    it('should handle invalid timestamps gracefully', () => {
+      const template = '{LLL} {dd} | {timeRange} {timeZone}';
+      const result = createTemplatedDateRange('invalid', '1759255199990', 'en-US', template);
+      expect(result).to.equal('');
+    });
+
+    it('should handle numeric timestamps', () => {
+      const startTimestamp = 1759251599990;
+      const endTimestamp = 1759255199990;
+      const template = '{LLL} {dd}';
+      
+      const result = createTemplatedDateRange(startTimestamp, endTimestamp, 'en-US', template);
+      
+      expect(result).to.be.a('string');
+      expect(result).to.match(/\w{3} \d{2}/); // Should match pattern like "Jan 15"
+    });
+
+    it('should handle year tokens (YYYY and YY)', () => {
+      const startTimestamp = '1759251599990'; // Jan 15, 2025
+      const endTimestamp = '1759255199990';
+      
+      const templateFull = '{YYYY}-{LLL}-{dd}';
+      const templateShort = '{YY}/{LLL}/{dd}';
+      
+      const resultFull = createTemplatedDateRange(startTimestamp, endTimestamp, 'en-US', templateFull);
+      const resultShort = createTemplatedDateRange(startTimestamp, endTimestamp, 'en-US', templateShort);
+      
+      expect(resultFull).to.match(/2025-\w{3}-\d{2}/); // Should match pattern like "2025-Jan-15"
+      expect(resultShort).to.match(/25\/\w{3}\/\d{2}/); // Should match pattern like "25/Jan/15"
+    });
+
+    it('should handle full year in different templates', () => {
+      const startTimestamp = '1759251599990';
+      const endTimestamp = '1759255199990';
+      
+      const template1 = '{LLL} {dd}, {YYYY}';
+      const template2 = '{ddd}, {LLL} {dd}, {YYYY} | {timeRange}';
+      
+      const result1 = createTemplatedDateRange(startTimestamp, endTimestamp, 'en-US', template1);
+      const result2 = createTemplatedDateRange(startTimestamp, endTimestamp, 'en-US', template2);
+      
+      expect(result1).to.match(/\w{3} \d{2}, 2025/); // "Jan 15, 2025"
+      expect(result2).to.include('2025');
+      expect(result2).to.include('|');
+    });
+
+    it('should handle short year in different locales', () => {
+      const startTimestamp = '1759251599990';
+      const endTimestamp = '1759255199990';
+      const template = '{dd}/{LLL}/{YY}';
+      
+      const resultEn = createTemplatedDateRange(startTimestamp, endTimestamp, 'en-US', template);
+      const resultDe = createTemplatedDateRange(startTimestamp, endTimestamp, 'de-DE', template);
+      
+      expect(resultEn).to.be.a('string');
+      expect(resultDe).to.be.a('string');
+      expect(resultEn).to.include('/25'); // Should contain short year
+      expect(resultDe).to.include('/25'); // Should contain short year
+    });
+
+    it('should handle full month name token (LLLL)', () => {
+      const startTimestamp = '1759251599990'; // Sep 30, 2025
+      const endTimestamp = '1759255199990';
+      
+      const template = '{LLLL} {dd}, {YYYY}';
+      
+      const result = createTemplatedDateRange(startTimestamp, endTimestamp, 'en-US', template);
+      
+      expect(result).to.match(/\w+ \d{2}, 2025/); // Should match "September 30, 2025"
+      expect(result).to.include('September'); // Full month name
+    });
+
+    it('should handle full month name in different locales', () => {
+      const startTimestamp = '1759251599990';
+      const endTimestamp = '1759255199990';
+      const template = '{LLLL} {dd}, {YYYY}';
+      
+      const resultEn = createTemplatedDateRange(startTimestamp, endTimestamp, 'en-US', template);
+      const resultDe = createTemplatedDateRange(startTimestamp, endTimestamp, 'de-DE', template);
+      const resultFr = createTemplatedDateRange(startTimestamp, endTimestamp, 'fr-FR', template);
+      
+      expect(resultEn).to.be.a('string');
+      expect(resultDe).to.be.a('string');
+      expect(resultFr).to.be.a('string');
+      expect(resultEn).to.include('September'); // English month name
+      // Different locales may produce different formats
+      expect(resultEn).to.be.a('string').and.not.be.empty;
+      expect(resultDe).to.be.a('string').and.not.be.empty;
+    });
+
+    it('should handle templates with both short and full month names', () => {
+      const startTimestamp = '1759251599990';
+      const endTimestamp = '1759255199990';
+      
+      const template = '{LLLL} ({LLL})';
+      
+      const result = createTemplatedDateRange(startTimestamp, endTimestamp, 'en-US', template);
+      
+      expect(result).to.include('September'); // Full month name
+      expect(result).to.include('Sep'); // Short month name
+      expect(result).to.match(/\w+ \(\w{3}\)/); // Pattern like "September (Sep)"
+    });
+
+    it('should handle verbose templates with all new tokens', () => {
+      const startTimestamp = '1759251599990';
+      const endTimestamp = '1759255199990';
+      
+      const template = '{ddd}, {LLLL} {dd}, {YYYY} from {timeRange} {timeZone}';
+      
+      const result = createTemplatedDateRange(startTimestamp, endTimestamp, 'en-US', template);
+      
+      expect(result).to.be.a('string');
+      expect(result).to.include('September'); // Full month name
+      expect(result).to.include('2025'); // Full year
+      expect(result).to.include(' from ');
+      expect(result).to.match(/\d{1,2}:\d{2} [AP]M - \d{1,2}:\d{2} [AP]M/); // Time range
+    });
+
+    it('should handle full day of week token (dddd)', () => {
+      const startTimestamp = '1759251599990'; // Sep 30, 2025 (Tuesday)
+      const endTimestamp = '1759255199990';
+      
+      const template = '{dddd}, {LLLL} {dd}, {YYYY}';
+      
+      const result = createTemplatedDateRange(startTimestamp, endTimestamp, 'en-US', template);
+      
+      expect(result).to.be.a('string');
+      expect(result).to.include('Tuesday'); // Full day of week
+      expect(result).to.include('September'); // Full month name
+      expect(result).to.match(/\w+, \w+ \d{2}, 2025/); // Pattern like "Tuesday, September 30, 2025"
+    });
+
+    it('should handle full day of week in different locales', () => {
+      const startTimestamp = '1759251599990';
+      const endTimestamp = '1759255199990';
+      const template = '{dddd}, {LLLL} {dd}, {YYYY}';
+      
+      const resultEn = createTemplatedDateRange(startTimestamp, endTimestamp, 'en-US', template);
+      const resultDe = createTemplatedDateRange(startTimestamp, endTimestamp, 'de-DE', template);
+      const resultFr = createTemplatedDateRange(startTimestamp, endTimestamp, 'fr-FR', template);
+      const resultEs = createTemplatedDateRange(startTimestamp, endTimestamp, 'es-ES', template);
+      
+      expect(resultEn).to.be.a('string');
+      expect(resultDe).to.be.a('string');
+      expect(resultFr).to.be.a('string');
+      expect(resultEs).to.be.a('string');
+      expect(resultEn).to.include('Tuesday'); // English day name
+      // Different locales should produce different day names
+      expect(resultEn).to.be.a('string').and.not.be.empty;
+      expect(resultDe).to.be.a('string').and.not.be.empty;
+      expect(resultFr).to.be.a('string').and.not.be.empty;
+    });
+
+    it('should handle templates with both short and full day of week', () => {
+      const startTimestamp = '1759251599990';
+      const endTimestamp = '1759255199990';
+      
+      const template = '{dddd} ({ddd}), {LLL} {dd}';
+      
+      const result = createTemplatedDateRange(startTimestamp, endTimestamp, 'en-US', template);
+      
+      expect(result).to.include('Tuesday'); // Full day name
+      expect(result).to.include('Tue'); // Short day name
+      expect(result).to.match(/\w+ \(\w{3}\), \w{3} \d{2}/); // Pattern like "Tuesday (Tue), Sep 30"
+    });
+
+    it('should handle full day of week with time range', () => {
+      const startTimestamp = '1759251599990';
+      const endTimestamp = '1759255199990';
+      
+      const template = '{dddd}, {LLL} {dd} | {timeRange} {timeZone}';
+      
+      const result = createTemplatedDateRange(startTimestamp, endTimestamp, 'en-US', template);
+      
+      expect(result).to.be.a('string');
+      expect(result).to.include('Tuesday'); // Full day of week
+      expect(result).to.include('|');
+      expect(result).to.match(/\d{1,2}:\d{2} [AP]M - \d{1,2}:\d{2} [AP]M/); // Time range
+    });
+
+    it('should handle ultra verbose templates with all tokens including dddd', () => {
+      const startTimestamp = '1759251599990';
+      const endTimestamp = '1759255199990';
+      
+      const template = '{dddd}, {LLLL} {dd}, {YYYY} at {timeRange} {timeZone}';
+      
+      const result = createTemplatedDateRange(startTimestamp, endTimestamp, 'en-US', template);
+      
+      expect(result).to.be.a('string');
+      expect(result).to.include('Tuesday'); // Full day of week
+      expect(result).to.include('September'); // Full month name
+      expect(result).to.include('2025'); // Full year
+      expect(result).to.include(' at ');
+      expect(result).to.match(/\d{1,2}:\d{2} [AP]M - \d{1,2}:\d{2} [AP]M/); // Time range
+    });
+  });
+});
+
+describe('Metadata Massaging', () => {
+  let originalLana;
+
+  beforeEach(() => {
+    // Mock lana for testing
+    originalLana = window.lana;
+    window.lana = { log: () => {} };
+  });
+
+  afterEach(() => {
+    window.lana = originalLana;
+    // Clean up metadata
+    const startMeta = document.head.querySelector('meta[name="local-start-time-millis"]');
+    if (startMeta) document.head.removeChild(startMeta);
+    const endMeta = document.head.querySelector('meta[name="local-end-time-millis"]');
+    if (endMeta) document.head.removeChild(endMeta);
+    const templateMeta = document.head.querySelector('meta[name="custom-date-time-format"]');
+    if (templateMeta) document.head.removeChild(templateMeta);
+  });
+
+  it('should massage start time metadata', () => {
+    // Set up test metadata
+    setMetadata('local-start-time-millis', '1759251599990');
+
+    // Call massageMetadata
+    const result = massageMetadata('en-US');
+
+    // Verify the timestamp was converted
+    expect(result).to.have.property('user-start-date-time');
+    expect(result['user-start-date-time']).to.be.a('string');
+    expect(result['user-start-date-time']).to.not.be.empty;
+    expect(result['user-start-date-time']).to.match(/\d{4}/); // Should contain a year
+  });
+
+  it('should massage end time metadata', () => {
+    // Set up test metadata
+    setMetadata('local-end-time-millis', '1759251599990');
+
+    // Call massageMetadata
+    const result = massageMetadata('en-US');
+
+    // Verify the timestamp was converted
+    expect(result).to.have.property('user-end-date-time');
+    expect(result['user-end-date-time']).to.be.a('string');
+    expect(result['user-end-date-time']).to.not.be.empty;
+  });
+
+  it('should massage multiple metadata fields', () => {
+    // Set up test metadata
+    setMetadata('local-start-time-millis', '1759251599990');
+    setMetadata('local-end-time-millis', '1759255199990');
+
+    // Call massageMetadata
+    const result = massageMetadata('en-US');
+
+    // Verify both timestamps were converted
+    expect(result).to.have.property('user-start-date-time');
+    expect(result).to.have.property('user-end-date-time');
+    expect(result['user-start-date-time']).to.be.a('string');
+    expect(result['user-end-date-time']).to.be.a('string');
+  });
+
+  it('should massage smart date range for same-day events', () => {
+    // Set up test metadata for same-day event
+    setMetadata('local-start-time-millis', '1759251599990');
+    setMetadata('local-end-time-millis', '1759255199990');
+
+    // Call massageMetadata
+    const result = massageMetadata('en-US');
+
+    // Verify smart date range was created
+    expect(result).to.have.property('user-event-date-time-range');
+    expect(result['user-event-date-time-range']).to.be.a('string');
+    expect(result['user-event-date-time-range']).to.include(' - '); // Same day, with time range separator
+    expect(result['user-event-date-time-range']).to.match(/\d{1,2}:\d{2}/); // Should contain times
+  });
+
+  it('should massage smart date range for multi-day events', () => {
+    // Set up test metadata for multi-day event
+    setMetadata('local-start-time-millis', '1759251599990');
+    setMetadata('local-end-time-millis', '1759337999990');
+
+    // Call massageMetadata
+    const result = massageMetadata('en-US');
+
+    // Verify smart date range was created
+    expect(result).to.have.property('user-event-date-time-range');
+    expect(result['user-event-date-time-range']).to.be.a('string');
+    expect(result['user-event-date-time-range']).to.include(' - '); // Multi-day, should have range separator
+  });
+
+  it('should handle missing timestamps for smart date range', () => {
+    // Call massageMetadata without setting any timestamps
+    const result = massageMetadata('en-US');
+
+    // Should not have the smart date range for missing timestamps
+    expect(result).to.not.have.property('user-event-date-time-range');
+  });
+
+  it('should use custom template when provided', () => {
+    // Set up test metadata with custom template
+    setMetadata('local-start-time-millis', '1759251599990');
+    setMetadata('local-end-time-millis', '1759255199990');
+    setMetadata('custom-date-time-format', '{LLL} {dd} | {timeRange} {timeZone}');
+
+    // Call massageMetadata
+    const result = massageMetadata('en-US');
+
+    // Verify templated date range was created
+    expect(result).to.have.property('user-event-date-time-range');
+    expect(result['user-event-date-time-range']).to.be.a('string');
+    expect(result['user-event-date-time-range']).to.match(/\w{3} \d{2} \| \d{1,2}:\d{2} [AP]M - \d{1,2}:\d{2} [AP]M \w{3}/);
+  });
+
+  it('should use custom template with year tokens', () => {
+    // Set up test metadata with custom template containing year tokens
+    setMetadata('local-start-time-millis', '1759251599990');
+    setMetadata('local-end-time-millis', '1759255199990');
+    setMetadata('custom-date-time-format', '{LLL} {dd}, {YYYY}');
+
+    // Call massageMetadata
+    const result = massageMetadata('en-US');
+
+    // Verify templated date range was created with year
+    expect(result).to.have.property('user-event-date-time-range');
+    expect(result['user-event-date-time-range']).to.be.a('string');
+    expect(result['user-event-date-time-range']).to.match(/\w{3} \d{2}, 2025/);
+  });
+
+  it('should use custom template with full month name token', () => {
+    // Set up test metadata with custom template containing full month name
+    setMetadata('local-start-time-millis', '1759251599990');
+    setMetadata('local-end-time-millis', '1759255199990');
+    setMetadata('custom-date-time-format', '{LLLL} {dd}, {YYYY}');
+
+    // Call massageMetadata
+    const result = massageMetadata('en-US');
+
+    // Verify templated date range was created with full month name
+    expect(result).to.have.property('user-event-date-time-range');
+    expect(result['user-event-date-time-range']).to.be.a('string');
+    expect(result['user-event-date-time-range']).to.include('September');
+    expect(result['user-event-date-time-range']).to.match(/\w+ \d{2}, 2025/);
+  });
+
+  it('should use custom template with all new tokens', () => {
+    // Set up test metadata with custom template containing all new tokens
+    setMetadata('local-start-time-millis', '1759251599990');
+    setMetadata('local-end-time-millis', '1759255199990');
+    setMetadata('custom-date-time-format', '{ddd}, {LLLL} {dd}, {YYYY} | {timeRange} {timeZone}');
+
+    // Call massageMetadata
+    const result = massageMetadata('en-US');
+
+    // Verify templated date range was created with all tokens
+    expect(result).to.have.property('user-event-date-time-range');
+    expect(result['user-event-date-time-range']).to.be.a('string');
+    expect(result['user-event-date-time-range']).to.include('September');
+    expect(result['user-event-date-time-range']).to.include('2025');
+    expect(result['user-event-date-time-range']).to.include('|');
+  });
+
+  it('should use custom template with full day of week token', () => {
+    // Set up test metadata with custom template containing full day of week
+    setMetadata('local-start-time-millis', '1759251599990');
+    setMetadata('local-end-time-millis', '1759255199990');
+    setMetadata('custom-date-time-format', '{dddd}, {LLLL} {dd}, {YYYY}');
+
+    // Call massageMetadata
+    const result = massageMetadata('en-US');
+
+    // Verify templated date range was created with full day of week
+    expect(result).to.have.property('user-event-date-time-range');
+    expect(result['user-event-date-time-range']).to.be.a('string');
+    expect(result['user-event-date-time-range']).to.include('Tuesday');
+    expect(result['user-event-date-time-range']).to.include('September');
+    expect(result['user-event-date-time-range']).to.match(/\w+, \w+ \d{2}, 2025/);
+  });
+
+  it('should use custom template with full day of week and time range', () => {
+    // Set up test metadata with custom template containing full day of week and time
+    setMetadata('local-start-time-millis', '1759251599990');
+    setMetadata('local-end-time-millis', '1759255199990');
+    setMetadata('custom-date-time-format', '{dddd}, {LLL} {dd} | {timeRange} {timeZone}');
+
+    // Call massageMetadata
+    const result = massageMetadata('en-US');
+
+    // Verify templated date range was created with full day of week and time
+    expect(result).to.have.property('user-event-date-time-range');
+    expect(result['user-event-date-time-range']).to.be.a('string');
+    expect(result['user-event-date-time-range']).to.include('Tuesday');
+    expect(result['user-event-date-time-range']).to.include('|');
+  });
+
+  it('should fallback to smart date range when no custom template', () => {
+    // Set up test metadata without custom template
+    setMetadata('local-start-time-millis', '1759251599990');
+    setMetadata('local-end-time-millis', '1759255199990');
+
+    // Call massageMetadata
+    const result = massageMetadata('en-US');
+
+    // Verify smart date range was created (fallback behavior)
+    expect(result).to.have.property('user-event-date-time-range');
+    expect(result['user-event-date-time-range']).to.be.a('string');
+    expect(result['user-event-date-time-range']).to.include(' - '); // Same day, with time range separator
+    expect(result['user-event-date-time-range']).to.match(/\d{1,2}:\d{2}/); // Should contain times
+  });
+
+  it('should use custom locale for formatting', () => {
+    // Set up test metadata
+    setMetadata('local-start-time-millis', '1759251599990');
+
+    // Call massageMetadata with different locales
+    const resultEn = massageMetadata('en-US');
+    const resultDe = massageMetadata('de-DE');
+
+    // Both should have the property but with different formatting
+    expect(resultEn).to.have.property('user-start-date-time');
+    expect(resultDe).to.have.property('user-start-date-time');
+    expect(resultEn['user-start-date-time']).to.not.equal(resultDe['user-start-date-time']);
+  });
+
+  it('should handle invalid metadata gracefully', () => {
+    // Set up test metadata with invalid timestamp
+    setMetadata('local-start-time-millis', 'invalid-timestamp');
+
+    // Call massageMetadata
+    const result = massageMetadata('en-US');
+
+    // Should not have the hydrated field for invalid data
+    expect(result).to.not.have.property('user-start-date-time');
+  });
+
+  it('should log errors for transformation failures', () => {
+    // Set up test metadata with invalid timestamp
+    setMetadata('local-start-time-millis', 'invalid-timestamp');
+    const logSpy = sinon.spy(window.lana, 'log');
+
+    // Call massageMetadata
+    massageMetadata('en-US');
+
+    // Should log error for invalid timestamp
+    expect(logSpy.calledWith(sinon.match(/Invalid timestamp provided/))).to.be.true;
+
+    logSpy.restore();
+  });
+
+  it('should handle transformation errors gracefully', () => {
+    // Set up test metadata with invalid timestamp
+    setMetadata('local-start-time-millis', 'invalid');
+
+    // Call massageMetadata
+    const result = massageMetadata('en-US');
+
+    // Should handle error gracefully
+    expect(result).to.be.an('object');
+    expect(result).to.not.have.property('user-start-date-time');
+  });
+});
+
+describe('decorateEvent - Timestamp Integration', () => {
+  let container;
+
+  beforeEach(() => {
+    container = document.createElement('div');
+    document.body.appendChild(container);
+    // Mock lana for testing
+    window.lana = { log: () => {} };
+  });
+
+  afterEach(() => {
+    document.body.removeChild(container);
+    // Clean up metadata
+    const meta = document.head.querySelector('meta[name="local-start-time-millis"]');
+    if (meta) document.head.removeChild(meta);
+    const eventIdMeta = document.head.querySelector('meta[name="event-id"]');
+    if (eventIdMeta) document.head.removeChild(eventIdMeta);
+  });
+
+  it('should hydrate metadata and convert timestamps in decorateEvent', () => {
+    // Set up test metadata
+    setMetadata('local-start-time-millis', '1759251599990');
+    setMetadata('local-end-time-millis', '1759255199990');
+    setMetadata('event-id', 'test-event');
+
+    // Create test HTML that uses the converted timestamps
+    container.innerHTML = '<p>Event starts: [[user-start-date-time]] and ends: [[user-end-date-time]]</p>';
+
+    // Mock miloDeps
+    const miloDeps = {
+      getConfig: () => ({ locale: { ietf: 'en-US' } }),
+      miloLibs: '/libs',
+    };
+
+    // Call decorateEvent
+    decorateEvent(container, miloDeps, {});
+
+    // Verify both timestamps were converted and used
+    expect(container.textContent).to.not.include('[[');
+    expect(container.textContent).to.not.include(']]');
+    expect(container.textContent).to.match(/\d{4}/); // Should contain a year
+    expect(container.textContent).to.match(/\d{1,2}:\d{2}/); // Should contain time
+  });
+
+  it('should massage smart date range in decorateEvent for same-day events', () => {
+    // Set up test metadata for same-day event
+    setMetadata('local-start-time-millis', '1759251599990');
+    setMetadata('local-end-time-millis', '1759255199990');
+    setMetadata('event-id', 'test-event');
+
+    // Create test HTML that uses the smart date range
+    container.innerHTML = '<p>Event: [[user-event-date-time-range]]</p>';
+
+    // Mock miloDeps
+    const miloDeps = {
+      getConfig: () => ({ locale: { ietf: 'en-US' } }),
+      miloLibs: '/libs',
+    };
+
+    // Call decorateEvent
+    decorateEvent(container, miloDeps, {});
+
+    // Verify smart date range was used (should contain time range separator for same day)
+    expect(container.textContent).to.not.include('[[');
+    expect(container.textContent).to.not.include(']]');
+    expect(container.textContent).to.include(' - '); // Same day, with time range separator
+    expect(container.textContent).to.match(/\d{4}/); // Should contain a year
+    expect(container.textContent).to.match(/\d{1,2}:\d{2}/); // Should contain times
+  });
+
+  it('should massage smart date range in decorateEvent for multi-day events', () => {
+    // Set up test metadata for multi-day event
+    setMetadata('local-start-time-millis', '1759251599990');
+    setMetadata('local-end-time-millis', '1759337999990');
+    setMetadata('event-id', 'test-event');
+
+    // Create test HTML that uses the smart date range
+    container.innerHTML = '<p>Event: [[user-event-date-time-range]]</p>';
+
+    // Mock miloDeps
+    const miloDeps = {
+      getConfig: () => ({ locale: { ietf: 'en-US' } }),
+      miloLibs: '/libs',
+    };
+
+    // Call decorateEvent
+    decorateEvent(container, miloDeps, {});
+
+    // Verify smart date range was used (should contain range separator for multi-day)
+    expect(container.textContent).to.not.include('[[');
+    expect(container.textContent).to.not.include(']]');
+    expect(container.textContent).to.include(' - '); // Multi-day, should have range separator
+    expect(container.textContent).to.match(/\d{4}/); // Should contain a year
+  });
+
+  it('should handle missing local-start-time-millis gracefully', () => {
+    // Set up test metadata without timestamp
+    setMetadata('event-id', 'test-event');
+
+    // Create test HTML
+    container.innerHTML = '<p>Event starts: [[user-start-date-time]]</p>';
+
+    // Mock miloDeps
+    const miloDeps = {
+      getConfig: () => ({ locale: { ietf: 'en-US' } }),
+      miloLibs: '/libs',
+    };
+
+    // Call decorateEvent
+    decorateEvent(container, miloDeps, {});
+
+    // Should replace placeholder with empty string when no metadata
+    expect(container.textContent).to.equal('Event starts: ');
+  });
+
+  it('should use locale from config for timestamp conversion', () => {
+    // Set up test metadata
+    setMetadata('local-start-time-millis', '1759251599990');
+    setMetadata('event-id', 'test-event');
+
+    // Create test HTML
+    container.innerHTML = '<p>Event starts: [[user-start-date-time]]</p>';
+
+    // Mock miloDeps with German locale
+    const miloDeps = {
+      getConfig: () => ({ locale: { ietf: 'de-DE' } }),
+      miloLibs: '/libs',
+    };
+
+    // Call decorateEvent
+    decorateEvent(container, miloDeps, {});
+
+    // Verify the timestamp was converted using German locale
+    expect(container.textContent).to.not.include('[[');
+    expect(container.textContent).to.not.include(']]');
+    expect(container.textContent).to.be.a('string');
+    expect(container.textContent.length).to.be.greaterThan(0);
+  });
+
+  it('should handle invalid timestamp gracefully', () => {
+    // Set up test metadata with invalid timestamp
+    setMetadata('local-start-time-millis', 'invalid-timestamp');
+    setMetadata('event-id', 'test-event');
+
+    // Create test HTML
+    container.innerHTML = '<p>Event starts: [[user-start-date-time]]</p>';
+
+    // Mock miloDeps
+    const miloDeps = {
+      getConfig: () => ({ locale: { ietf: 'en-US' } }),
+      miloLibs: '/libs',
+    };
+
+    // Call decorateEvent
+    decorateEvent(container, miloDeps, {});
+
+    // Should replace placeholder with empty string for invalid timestamp
+    expect(container.textContent).to.equal('Event starts: ');
   });
 });
 
