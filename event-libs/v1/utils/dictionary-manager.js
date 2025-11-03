@@ -8,12 +8,17 @@ export class DictionaryManager {
   }
 
   /**
-   * Add a new dictionary book from placeholders.json
-   * @param {Object} params - Parameters for adding dictionary book
+   * Add a new dictionary sheet from placeholders.json
+   * @param {Object} params - Parameters for adding dictionary sheet
    * @param {Object} params.config - Milo configuration
    * @param {string} params.sheet - Sheet name (optional)
    */
-  async addBook({ config, sheet = 'default' }) {
+  async addSheet({ config, sheet = 'default' }) {
+    // Skip if already loaded
+    if (this.hasSheet(sheet)) {
+      return;
+    }
+
     try {
       const path = DictionaryManager.getPlaceholdersPath(config, sheet);
       const response = await fetch(path);
@@ -30,7 +35,7 @@ export class DictionaryManager {
       // Store dictionary for this specific sheet
       this.#dictionaries[sheet] = Object.freeze(dictionary);
     } catch (error) {
-      window.lana?.log(`Error adding dictionary book:\n${JSON.stringify(error)}`);
+      window.lana?.log(`Error adding dictionary sheet:\n${JSON.stringify(error)}`);
       throw error;
     }
   }
@@ -79,7 +84,7 @@ export class DictionaryManager {
    * @param {string} sheet - Sheet name (optional)
    */
   async initialize(config, sheet = 'default') {
-    await this.addBook({ config, sheet });
+    await this.addSheet({ config, sheet });
   }
 }
 
