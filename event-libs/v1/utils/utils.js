@@ -257,21 +257,21 @@ export function getFallbackLocale(locales, pathname = window.location.pathname) 
   return locale;
 }
 
-export function getSusiOptions() {
-  const eventConfig = getEventConfig();
+export function getSusiOptions(clientMiloConfig) {
   const { href, hash } = window.location;
-
-  const { miloConfig } = eventConfig;
-
-  const envName = miloConfig ? miloConfig.env.name : getEventServiceEnv().name;
-
-  const susiOptions = Object.keys(SUSI_OPTIONS).reduce((opts, key) => {
-    opts[key] = SUSI_OPTIONS[key][envName] || SUSI_OPTIONS[key];
-    return opts;
-  }, {});
+  const susiOptions = {};
 
   if (hash.includes('#rsvp-form')) {
-    susiOptions.redirect_uri = `${href}`;
+    susiOptions.redirect_uri = href;
+  }
+
+  const miloConfig = clientMiloConfig || getEventConfig()?.miloConfig;
+
+  if (miloConfig?.env?.name) {
+    const { env } = miloConfig;
+    Object.keys(SUSI_OPTIONS).forEach((key) => {
+      susiOptions[key] = SUSI_OPTIONS[key][env.name];
+    });
   }
 
   return susiOptions;

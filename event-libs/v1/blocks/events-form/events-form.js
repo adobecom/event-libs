@@ -295,10 +295,10 @@ function createButton({ type, label }, bp) {
 
               if (eventFull) {
                 if (allowWaitlisting) {
-                  button.textContent = dictionaryManager.getValue('waitlist-cta-text', 'rsvp-fields');
+                  button.textContent = dictionaryManager.getValue('waitlist-cta-text');
                   button.disabled = false;
                 } else {
-                  button.textContent = dictionaryManager.getValue('event-full-cta-text', 'rsvp-fields');
+                  button.textContent = dictionaryManager.getValue('event-full-cta-text');
                   button.disabled = true;
                 }
               }
@@ -738,10 +738,10 @@ async function createForm(bp, formData) {
   }
 
   const config = getConfig();
-  await dictionaryManager.addBook({
-    config,
-    sheet: 'rsvp-fields',
-  });
+  await Promise.all([
+    dictionaryManager.addSheet({ config, sheet: 'default' }),
+    dictionaryManager.addSheet({ config, sheet: 'rsvp-fields' }),
+  ]);
 
   if (rsvpFieldsData) {
     const { required, visible } = rsvpFieldsData;
