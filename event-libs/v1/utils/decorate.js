@@ -615,7 +615,8 @@ function updateTextContent(child, matchCallback) {
 
   if (replacedText === originalText) return;
 
-  if (child.parentElement.dataset.contextualContent) return;
+  // Check if the element has contextual content marked
+  if (child.dataset.contextualContent) return;
   
   if (isHTMLString(replacedText)) {
     child.parentElement.innerHTML = replacedText;
@@ -867,6 +868,17 @@ function processTemplateInAllNodes(parent, extraData) {
   };
 
   const getContent = (_match, p1, n) => {
+    // Check if this is conditional content that needs reactive handling
+    if (p1.includes('?(') && p1.includes('):(')) {
+      // Store the original content and mark for reactive processing
+      if (n.parentNode) {
+        n.parentNode.dataset.contextualContent = p1;
+      }
+      // Process the conditional content immediately to get initial value
+      const processedContent = parseMetadataPath(p1, extraData);
+      return processedContent;
+    }
+
     let content = parseMetadataPath(p1, extraData);
 
     if (preserveFormatKeys.includes(p1)) {
