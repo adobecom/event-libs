@@ -57,7 +57,7 @@ export default async function addPagePathIndexerWidget() {
   await Promise.all(schedules.map(async (schedule) => {
     const { ok, data } = await getSchedulePagePaths(schedule.id);
     if (ok) {
-      schedule.pagePaths = data;
+      schedule.pagePaths = data.pagePaths;
     } else {
       schedule.unindexable = true;
     }
