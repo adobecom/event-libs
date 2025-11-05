@@ -57,7 +57,9 @@ export default async function addPagePathIndexerWidget() {
   await Promise.all(schedules.map(async (schedule) => {
     const { ok, data } = await getSchedulePagePaths(schedule.id);
     if (ok) {
-      schedule.pagePaths = data.pagePaths;
+      const { pagePaths } = data;
+      schedule.pagePaths = pagePaths;
+      schedule.indexed = pagePaths.some((p) => p.pagePath === window.location.pathname);
     } else {
       schedule.unindexable = true;
     }
@@ -84,11 +86,6 @@ export default async function addPagePathIndexerWidget() {
       target: '_blank',
     }, getIcon('edit-pencil-white'), { parent: actionWrapper });
 
-    if (schedule.unindexable) {
-      indexBtn.disabled = true;
-      indexBtn.textContent = 'Cannot index';
-    }
-
     indexedStatusWrapper.append(indexedStatusText, greenDot);
     actionWrapper.append(indexBtn, backLinkToScheduleMaker);
 
@@ -96,8 +93,13 @@ export default async function addPagePathIndexerWidget() {
     scheduleIdListItems.push(scheduleIdItem);
     individualIndexButtons.push(indexBtn);
 
-    const indexedPagePaths = schedule.pagePaths;
-    schedule.indexed = indexedPagePaths.some((p) => p.pagePath === window.location.pathname);
+    if (schedule.unindexable) {
+      indexBtn.disabled = true;
+      indexBtn.textContent = 'Cannot index';
+    } else if (schedule.indexed) {
+      indexBtn.disabled = true;
+      scheduleIdItem.classList.add('indexed');
+    }
 
     indexBtn.addEventListener('click', async () => {
       indexBtn.disabled = true;
