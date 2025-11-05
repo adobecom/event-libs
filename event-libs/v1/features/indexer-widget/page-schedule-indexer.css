@@ -104,6 +104,7 @@
 
     .page-path-indexer-schedule-id-item.indexed .page-path-indexer-schedule-status-wrapper.indexed {
       display: flex;
+      gap: 8px;
     }
 
     .page-path-indexer-schedule-id-item:not(.indexed) {
