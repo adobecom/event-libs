@@ -1,4 +1,4 @@
-import { getMetadata, getEventConfig } from '../../utils/utils.js';
+import { getMetadata, getImageSource } from '../../utils/utils.js';
 
 export function injectEventSchema() {
   let venueObject;
@@ -14,8 +14,6 @@ export function injectEventSchema() {
   if (!venueObject || !photos) return;
 
   const imageHeroImage = photos.find((photo) => photo.imageKind === 'event-hero-image');
-  const eventConfig = getEventConfig();
-  const imageSrcCandidate = eventConfig.cmsType === 'SP' ? imageHeroImage?.sharepointUrl || imageHeroImage?.imageUrl : imageHeroImage?.imageUrl;
 
   const schemaData = {
     '@context': 'https://schema.org',
@@ -35,7 +33,7 @@ export function injectEventSchema() {
         addressCountry: venueObject.country,
       },
     },
-    image: imageSrcCandidate,
+    image: getImageSource(imageHeroImage),
     description: getMetadata('description') || '',
     organizer: {
       '@type': 'Organization',

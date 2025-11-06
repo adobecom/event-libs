@@ -1,4 +1,4 @@
-import { getMetadata, getEventConfig, LIBS } from '../../utils/utils.js';
+import { getMetadata, getEventConfig, getImageSource, LIBS } from '../../utils/utils.js';
 
 function decorateTextContainer(el, createTag, decorateButtons) {
   const wrapper = el.querySelector('.event-map-wrapper');
@@ -72,30 +72,7 @@ function decorateMap(el, createTag) {
   const mapContainer = createTag('div', { id: 'map-container', class: 'map-container' });
   wrapper.append(mapContainer);
 
-  const eventConfig = getEventConfig();
-  let imgUrl;
-
-  if (eventConfig.cmsType === 'SP') {
-    let spUrlObj;
-
-    if (venueMapImageObj.sharepointUrl?.startsWith('https')) {
-      try {
-        spUrlObj = new URL(venueMapImageObj.sharepointUrl);
-      } catch (e) {
-        window.lana?.log(`Error while parsing SharePoint URL:\n${JSON.stringify(e, null, 2)}`);
-      }
-    }
-
-    if (spUrlObj) {
-      imgUrl = spUrlObj.pathname;
-    } else {
-      imgUrl = venueMapImageObj.sharepointUrl || venueMapImageObj.imageUrl;
-    }
-  } else {
-    imgUrl = venueMapImageObj.imageUrl;
-  }
-
-  const img = createTag('img', { src: imgUrl, alt: venueMapImageObj.altText || '' });
+  const img = createTag('img', { src: getImageSource(venueMapImageObj), alt: venueMapImageObj.altText || '' });
   mapContainer.append(img);
   wrapper.append(mapContainer);
 }
