@@ -1,4 +1,4 @@
-import { createTag, getMetadata } from '../../utils/utils.js';
+import { createTag, getMetadata, getImageSource } from '../../utils/utils.js';
  
 export function isOdd(number) {
   return number % 2 !== 0;
@@ -41,7 +41,7 @@ export default function init(el) {
     eventPartners.append(logoWrapper);
 
     if (partner.image) {
-      createTag('img', { src: `${partner.image.sharepointUrl || partner.image.imageUrl}`, alt: partner.image.altText }, '', { parent: logoWrapper });
+      createTag('img', { src: getImageSource(partner.image), alt: partner.image.altText }, '', { parent: logoWrapper });
     }
 
     if (partner.link) {

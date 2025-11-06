@@ -18,6 +18,7 @@ import {
   getEventServiceEnv,
   parseMetadataPath,
   getEventConfig,
+  getImageSource,
   getFallbackLocale,
   LIBS,
   createContextualContent,
@@ -557,9 +558,9 @@ function updateImgTag(child, matchCallback, parentElement) {
 
   try {
     const photoData = JSON.parse(photoMeta);
-    const { sharepointUrl, imageUrl, altText } = photoData;
+    const { altText } = photoData;
 
-    const imgUrl = sharepointUrl || imageUrl;
+    const imgUrl = getImageSource(photoData);
 
     if (imgUrl && parentPic && imgUrl !== originalAlt) {
       updatePictureElement(imgUrl, parentPic, altText);

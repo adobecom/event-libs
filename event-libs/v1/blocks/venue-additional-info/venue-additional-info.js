@@ -1,4 +1,4 @@
-import { getMetadata, createTag } from '../../utils/utils.js';
+import { getMetadata, createTag, getImageSource } from '../../utils/utils.js';
 
 
 async function decorateTextContainer(el, createTag) {
@@ -40,26 +40,7 @@ function decorateImage(el, createTag) {
   const imageContainer = createTag('div', { id: 'additional-image-container', class: 'additional-image-container' });
   wrapper.append(imageContainer);
 
-  let spUrlObj;
-
-  if (venueAdditionalImageObj.sharepointUrl?.startsWith('https')) {
-    try {
-      spUrlObj = new URL(venueAdditionalImageObj.sharepointUrl);
-    } catch (e) {
-      window.lana?.log(`Error while parsing SharePoint URL:\n${JSON.stringify(e, null, 2)}`);
-    }
-  }
-
-  if (spUrlObj) {
-    const spUrl = spUrlObj.pathname;
-    const img = createTag('img', { src: `${spUrl}`, alt: venueAdditionalImageObj.altText || '' });
-    imageContainer.append(img);
-    wrapper.append(imageContainer);
-
-    return;
-  }
-
-  const img = createTag('img', { src: `${venueAdditionalImageObj.sharepointUrl || venueAdditionalImageObj.imageUrl}`, alt: venueAdditionalImageObj.altText || '' });
+  const img = createTag('img', { src: getImageSource(venueAdditionalImageObj), alt: venueAdditionalImageObj.altText || '' });
   imageContainer.append(img);
   wrapper.append(imageContainer);
 }
