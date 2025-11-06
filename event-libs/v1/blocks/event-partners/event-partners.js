@@ -1,4 +1,4 @@
-import { createTag, getMetadata } from '../../utils/utils.js';
+import { createTag, getMetadata, getEventConfig } from '../../utils/utils.js';
  
 export function isOdd(number) {
   return number % 2 !== 0;
@@ -36,12 +36,15 @@ export default function init(el) {
     }
   }
 
+  const eventConfig = getEventConfig();
+
   partnersData.forEach((partner) => {
     const logoWrapper = createTag('div', { class: 'logo' });
     eventPartners.append(logoWrapper);
 
     if (partner.image) {
-      createTag('img', { src: `${partner.image.sharepointUrl || partner.image.imageUrl}`, alt: partner.image.altText }, '', { parent: logoWrapper });
+      const imageSrcCandidate = eventConfig.cmsType === 'SP' ? partner.image.sharepointUrl || partner.image.imageUrl : partner.image.imageUrl;
+      createTag('img', { src: imageSrcCandidate, alt: partner.image.altText }, '', { parent: logoWrapper });
     }
 
     if (partner.link) {

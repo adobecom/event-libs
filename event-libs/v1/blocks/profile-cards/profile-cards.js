@@ -1,12 +1,14 @@
 import buildMiloCarousel from '../../features/milo-carousel.js';
-import { getMetadata, createTag } from '../../utils/utils.js';
+import { getMetadata, createTag, getEventConfig } from '../../utils/utils.js';
 
 function decorateImage(card, photo) {
   if (!photo) return;
 
   const { sharepointUrl, imageUrl, altText } = photo;
+  const eventConfig = getEventConfig();
+  const imageSrcCandidate = eventConfig.cmsType === 'SP' ? sharepointUrl || imageUrl : imageUrl;
   const imgElement = createTag('img', {
-    src: sharepointUrl || imageUrl,
+    src: imageSrcCandidate,
     class: 'card-image',
   });
 

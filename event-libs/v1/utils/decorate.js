@@ -559,7 +559,8 @@ function updateImgTag(child, matchCallback, parentElement) {
     const photoData = JSON.parse(photoMeta);
     const { sharepointUrl, imageUrl, altText } = photoData;
 
-    const imgUrl = sharepointUrl || imageUrl;
+    const eventConfig = getEventConfig();
+    const imgUrl = eventConfig.cmsType === 'SP' ? sharepointUrl || imageUrl : imageUrl;
 
     if (imgUrl && parentPic && imgUrl !== originalAlt) {
       updatePictureElement(imgUrl, parentPic, altText);

@@ -72,26 +72,30 @@ function decorateMap(el, createTag) {
   const mapContainer = createTag('div', { id: 'map-container', class: 'map-container' });
   wrapper.append(mapContainer);
 
-  let spUrlObj;
+  const eventConfig = getEventConfig();
+  let imgUrl;
 
-  if (venueMapImageObj.sharepointUrl?.startsWith('https')) {
-    try {
-      spUrlObj = new URL(venueMapImageObj.sharepointUrl);
-    } catch (e) {
-      window.lana?.log(`Error while parsing SharePoint URL:\n${JSON.stringify(e, null, 2)}`);
+  if (eventConfig.cmsType === 'SP') {
+    let spUrlObj;
+
+    if (venueMapImageObj.sharepointUrl?.startsWith('https')) {
+      try {
+        spUrlObj = new URL(venueMapImageObj.sharepointUrl);
+      } catch (e) {
+        window.lana?.log(`Error while parsing SharePoint URL:\n${JSON.stringify(e, null, 2)}`);
+      }
     }
+
+    if (spUrlObj) {
+      imgUrl = spUrlObj.pathname;
+    } else {
+      imgUrl = venueMapImageObj.sharepointUrl || venueMapImageObj.imageUrl;
+    }
+  } else {
+    imgUrl = venueMapImageObj.imageUrl;
   }
 
-  if (spUrlObj) {
-    const spUrl = spUrlObj.pathname;
-    const img = createTag('img', { src: `${spUrl}`, alt: venueMapImageObj.altText || '' });
-    mapContainer.append(img);
-    wrapper.append(mapContainer);
-
-    return;
-  }
-
-  const img = createTag('img', { src: `${venueMapImageObj.sharepointUrl || venueMapImageObj.imageUrl}`, alt: venueMapImageObj.altText || '' });
+  const img = createTag('img', { src: imgUrl, alt: venueMapImageObj.altText || '' });
   mapContainer.append(img);
   wrapper.append(mapContainer);
 }

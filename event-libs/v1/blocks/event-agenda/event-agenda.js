@@ -57,18 +57,24 @@ export default async function init(el) {
   agendaItemsCol.prepend(h2);
 
   if (venueImage) {
-    let spUrlObj;
-    let imgUrl = venueImage.imageUrl;
+    const eventConfig = getEventConfig();
+    let imgUrl;
 
-    if (venueImage.sharepointUrl?.startsWith('https://')) {
-      try {
-        spUrlObj = new URL(venueImage.sharepointUrl);
-        imgUrl = spUrlObj.pathname;
-      } catch (e) {
-        window.lana?.log(`Error while parsing SharePoint URL:\n${JSON.stringify(e, null, 2)}`);
+    if (eventConfig.cmsType === 'SP') {
+      let spUrlObj;
+
+      if (venueImage.sharepointUrl?.startsWith('https://')) {
+        try {
+          spUrlObj = new URL(venueImage.sharepointUrl);
+          imgUrl = spUrlObj.pathname;
+        } catch (e) {
+          window.lana?.log(`Error while parsing SharePoint URL:\n${JSON.stringify(e, null, 2)}`);
+        }
+      } else {
+        imgUrl = venueImage.sharepointUrl || venueImage.imageUrl;
       }
     } else {
-      imgUrl = venueImage.sharepointUrl || venueImage.imageUrl;
+      imgUrl = venueImage.imageUrl;
     }
 
     el.classList.add('blade');
