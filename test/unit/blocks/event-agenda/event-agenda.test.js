@@ -1,6 +1,6 @@
 import { expect } from '@esm-bundle/chai';
 import { readFile } from '@web/test-runner-commands';
-import init, { convertToLocaleTimeFormat } from '../../../../event-libs/v1/blocks/event-agenda/event-agenda.js';
+import init, { convertToLocaleTimeFormat, convertUtcToLocalTime } from '../../../../event-libs/v1/blocks/event-agenda/event-agenda.js';
 import { setMetadata } from '../../../../event-libs/v1/utils/utils.js';
 
 const body = await readFile({ path: './mocks/default.html' });
@@ -12,6 +12,38 @@ describe('Agenda Module', () => {
       const locale = 'en-US';
       const formattedTime = convertToLocaleTimeFormat(time, locale);
       expect(formattedTime).to.equal('1:45 PM');
+    });
+  });
+
+  describe('convertUtcToLocalTime', () => {
+    it('should convert UTC timestamp to local time format', () => {
+      // Create a UTC timestamp for a specific time
+      const date = new Date(Date.UTC(2025, 0, 15, 13, 45, 0)); // Jan 15, 2025, 13:45 UTC
+      const timestamp = date.getTime();
+      const locale = 'en-US';
+      const formattedTime = convertUtcToLocalTime(timestamp, locale);
+      
+      // The result will depend on the local timezone, but it should be a valid time format
+      expect(formattedTime).to.match(/\d{1,2}:\d{2}\s[AP]M/);
+    });
+
+    it('should handle string timestamps', () => {
+      const date = new Date(Date.UTC(2025, 0, 15, 9, 0, 0));
+      const timestamp = date.getTime().toString();
+      const locale = 'en-US';
+      const formattedTime = convertUtcToLocalTime(timestamp, locale);
+      
+      expect(formattedTime).to.match(/\d{1,2}:\d{2}\s[AP]M/);
+    });
+
+    it('should return empty string for invalid timestamp', () => {
+      const formattedTime = convertUtcToLocalTime('invalid', 'en-US');
+      expect(formattedTime).to.equal('');
+    });
+
+    it('should return empty string for empty timestamp', () => {
+      const formattedTime = convertUtcToLocalTime('', 'en-US');
+      expect(formattedTime).to.equal('');
     });
   });
 

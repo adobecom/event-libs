@@ -1,5 +1,50 @@
 import { createOptimizedPicture, createTag, getMetadata, getEventConfig, getImageSource } from '../../utils/utils.js';
 
+/**
+ * Converts a UTC timestamp to user's local time format
+ * @param {string|number} timestamp - UTC timestamp in milliseconds
+ * @param {string} locale - Locale string (e.g., 'en-US')
+ * @returns {string} Formatted local time string
+ */
+export function convertUtcToLocalTime(timestamp, locale) {
+  if (!timestamp) return '';
+
+  const timestampNum = typeof timestamp === 'string' ? parseInt(timestamp, 10) : timestamp;
+
+  if (Number.isNaN(timestampNum)) {
+    window.lana?.log(`Invalid timestamp provided: ${timestamp}`);
+    return '';
+  }
+
+  try {
+    const date = new Date(timestampNum);
+
+    // Check if date is valid
+    if (Number.isNaN(date.getTime())) {
+      window.lana?.log(`Invalid date created from timestamp: ${timestampNum}`);
+      return '';
+    }
+
+    const options = {
+      hour: 'numeric',
+      minute: 'numeric',
+      hour12: true,
+    };
+
+    return date.toLocaleTimeString(locale, options);
+  } catch (error) {
+    window.lana?.log(`Error converting timestamp to local time: ${JSON.stringify(error)}`);
+    return '';
+  }
+}
+
+/**
+ * Legacy function for backward compatibility - converts a time string to locale format
+ * Note: This does NOT handle timezone conversion, use convertUtcToLocalTime for proper timezone handling
+ * @param {string} time - Time string in HH:MM:SS format
+ * @param {string} locale - Locale string (e.g., 'en-US')
+ * @returns {string} Formatted time string
+ */
 export function convertToLocaleTimeFormat(time, locale) {
   const [hours, minutes, seconds] = time.split(':').map(Number);
   const date = new Date();
@@ -81,7 +126,18 @@ export default async function init(el) {
   const splitIndex = Math.ceil(agendaArray.length / 2);
   agendaArray.forEach((agenda, index) => {
     const agendaListItem = createTag('div', { class: 'agenda-list-item' }, '', { parent: (index >= splitIndex ? column2 : column1) });
-    createTag('span', { class: 'agenda-time' }, convertToLocaleTimeFormat(agenda.startTime, localeString), { parent: agendaListItem });
+    
+    // Use startTimeMillis (UTC timestamp) if available for proper timezone conversion
+    // Otherwise fall back to startTime (legacy format) for backward compatibility
+    let formattedTime = '';
+    if (agenda.startTimeMillis) {
+      formattedTime = convertUtcToLocalTime(agenda.startTimeMillis, localeString);
+    } else if (agenda.startTime) {
+      // Legacy support - does not handle timezone conversion
+      formattedTime = convertToLocaleTimeFormat(agenda.startTime, localeString);
+    }
+    
+    createTag('span', { class: 'agenda-time' }, formattedTime, { parent: agendaListItem });
 
     const agendaTitleDetailContainer = createTag('div', { class: 'agenda-title-detail-container' }, '', { parent: agendaListItem });
     const agendaTitleDetails = createTag('div', { class: 'agenda-title-detail' }, '', { parent: agendaTitleDetailContainer });
