@@ -1,6 +1,6 @@
 import { expect } from '@esm-bundle/chai';
 import { readFile } from '@web/test-runner-commands';
-import init, { convertToLocaleTimeFormat, convertUtcToLocalTime } from '../../../../event-libs/v1/blocks/event-agenda/event-agenda.js';
+import init, { convertToLocaleTimeFormat, convertEventTimeToLocalTime } from '../../../../event-libs/v1/blocks/event-agenda/event-agenda.js';
 import { setMetadata } from '../../../../event-libs/v1/utils/utils.js';
 
 const body = await readFile({ path: './mocks/default.html' });
@@ -15,34 +15,40 @@ describe('Agenda Module', () => {
     });
   });
 
-  describe('convertUtcToLocalTime', () => {
-    it('should convert UTC timestamp to local time format', () => {
-      // Create a UTC timestamp for a specific time
-      const date = new Date(Date.UTC(2025, 0, 15, 13, 45, 0)); // Jan 15, 2025, 13:45 UTC
-      const timestamp = date.getTime();
+  describe('convertEventTimeToLocalTime', () => {
+    it('should convert event timezone time to local time', () => {
+      // Event on Jan 15, 2025 at 9:00 AM in America/Los_Angeles
+      const eventDate = new Date('2025-01-15T00:00:00Z').getTime();
+      const time = '09:00:00';
+      const timezone = 'America/Los_Angeles';
       const locale = 'en-US';
-      const formattedTime = convertUtcToLocalTime(timestamp, locale);
       
-      // The result will depend on the local timezone, but it should be a valid time format
+      const formattedTime = convertEventTimeToLocalTime(time, timezone, eventDate, locale);
+      
+      // Result depends on user's timezone, but should be a valid time format
       expect(formattedTime).to.match(/\d{1,2}:\d{2}\s[AP]M/);
     });
 
-    it('should handle string timestamps', () => {
-      const date = new Date(Date.UTC(2025, 0, 15, 9, 0, 0));
-      const timestamp = date.getTime().toString();
+    it('should handle string event date', () => {
+      const eventDate = new Date('2025-01-15T00:00:00Z').getTime().toString();
+      const time = '14:30:00';
+      const timezone = 'America/New_York';
       const locale = 'en-US';
-      const formattedTime = convertUtcToLocalTime(timestamp, locale);
+      
+      const formattedTime = convertEventTimeToLocalTime(time, timezone, eventDate, locale);
       
       expect(formattedTime).to.match(/\d{1,2}:\d{2}\s[AP]M/);
     });
 
-    it('should return empty string for invalid timestamp', () => {
-      const formattedTime = convertUtcToLocalTime('invalid', 'en-US');
-      expect(formattedTime).to.equal('');
+    it('should return empty string when missing required parameters', () => {
+      expect(convertEventTimeToLocalTime('', 'America/Los_Angeles', 123456, 'en-US')).to.equal('');
+      expect(convertEventTimeToLocalTime('09:00:00', '', 123456, 'en-US')).to.equal('');
+      expect(convertEventTimeToLocalTime('09:00:00', 'America/Los_Angeles', '', 'en-US')).to.equal('');
     });
 
-    it('should return empty string for empty timestamp', () => {
-      const formattedTime = convertUtcToLocalTime('', 'en-US');
+    it('should return empty string for invalid time format', () => {
+      const eventDate = new Date('2025-01-15T00:00:00Z').getTime();
+      const formattedTime = convertEventTimeToLocalTime('invalid', 'America/Los_Angeles', eventDate, 'en-US');
       expect(formattedTime).to.equal('');
     });
   });

@@ -1,46 +1,97 @@
 import { createOptimizedPicture, createTag, getMetadata, getEventConfig, getImageSource } from '../../utils/utils.js';
 
 /**
- * Converts a UTC timestamp to user's local time format
- * @param {string|number} timestamp - UTC timestamp in milliseconds
- * @param {string} locale - Locale string (e.g., 'en-US')
- * @returns {string} Formatted local time string
+ * Converts event time to user's local timezone
+ * Takes a time string in the event's timezone and converts it to the user's local timezone,
+ * properly accounting for DST.
+ * 
+ * @param {string} time - Time string in HH:MM:SS format (e.g., "09:00:00")
+ * @param {string} eventTimezone - IANA timezone of the event (e.g., "America/Los_Angeles")  
+ * @param {string|number} eventDateMillis - Event date in milliseconds (provides the date context)
+ * @param {string} locale - Locale string for formatting (e.g., 'en-US')
+ * @returns {string} Formatted local time string (e.g., "9:00 AM" or "12:00 PM")
  */
-export function convertUtcToLocalTime(timestamp, locale) {
-  if (!timestamp) return '';
-
-  const timestampNum = typeof timestamp === 'string' ? parseInt(timestamp, 10) : timestamp;
-
-  if (Number.isNaN(timestampNum)) {
-    window.lana?.log(`Invalid timestamp provided: ${timestamp}`);
-    return '';
-  }
+export function convertEventTimeToLocalTime(time, eventTimezone, eventDateMillis, locale) {
+  if (!time || !eventTimezone || !eventDateMillis) return '';
 
   try {
-    const date = new Date(timestampNum);
-
-    // Check if date is valid
-    if (Number.isNaN(date.getTime())) {
-      window.lana?.log(`Invalid date created from timestamp: ${timestampNum}`);
+    // Parse the time string to get hours, minutes, seconds
+    const [hours, minutes, seconds = 0] = time.split(':').map(Number);
+    
+    if (Number.isNaN(hours) || Number.isNaN(minutes)) {
+      window.lana?.log(`Invalid time format: ${time}`);
       return '';
     }
 
+    // Parse the event date
+    const eventDateNum = typeof eventDateMillis === 'string' ? parseInt(eventDateMillis, 10) : eventDateMillis;
+    if (Number.isNaN(eventDateNum)) {
+      window.lana?.log(`Invalid event date: ${eventDateMillis}`);
+      return '';
+    }
+
+    const eventDate = new Date(eventDateNum);
+    
+    // Get the date components in the event's timezone (this handles DST correctly)
+    const eventDateStr = eventDate.toLocaleDateString('en-CA', {
+      timeZone: eventTimezone,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }); // Returns "YYYY-MM-DD"
+    
+    // To find the correct UTC time for this local time in the event timezone,
+    // we use a two-step process:
+    // 1. Create a reference date at the specified time
+    // 2. Find what time that represents in the event timezone and calculate the offset
+    
+    const [year, month, day] = eventDateStr.split('-').map(Number);
+    
+    // Create a date at the specified time in the local browser timezone
+    const localDate = new Date(year, month - 1, day, hours, minutes, seconds);
+    
+    // Get this date formatted in both UTC and the event timezone
+    const formatter = new Intl.DateTimeFormat('en-US', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: false,
+    });
+    
+    const utcFormatted = formatter.format(localDate).replace(/(\d+)\/(\d+)\/(\d+),\s*(\d+):(\d+):(\d+)/, '$3-$1-$2T$4:$5:$6');
+    const eventTzFormatted = new Intl.DateTimeFormat('en-US', {
+      ...formatter.resolvedOptions(),
+      timeZone: eventTimezone,
+    }).format(localDate).replace(/(\d+)\/(\d+)\/(\d+),\s*(\d+):(\d+):(\d+)/, '$3-$1-$2T$4:$5:$6');
+    
+    // Calculate the offset between UTC and event timezone at this date (accounts for DST)
+    const utcTime = new Date(utcFormatted).getTime();
+    const eventTzTime = new Date(eventTzFormatted).getTime();
+    const offset = utcTime - eventTzTime;
+    
+    // Apply the offset to get the correct UTC time
+    const correctUtcTime = localDate.getTime() - offset;
+    const correctDate = new Date(correctUtcTime);
+
+    // Format the result in the user's local timezone
     const options = {
       hour: 'numeric',
       minute: 'numeric',
       hour12: true,
     };
 
-    return date.toLocaleTimeString(locale, options);
+    return correctDate.toLocaleTimeString(locale, options);
   } catch (error) {
-    window.lana?.log(`Error converting timestamp to local time: ${JSON.stringify(error)}`);
+    window.lana?.log(`Error converting event time to local time: ${JSON.stringify(error)}`);
     return '';
   }
 }
 
 /**
- * Legacy function for backward compatibility - converts a time string to locale format
- * Note: This does NOT handle timezone conversion, use convertUtcToLocalTime for proper timezone handling
+ * Legacy function - converts a time string to locale format without timezone conversion
  * @param {string} time - Time string in HH:MM:SS format
  * @param {string} locale - Locale string (e.g., 'en-US')
  * @returns {string} Formatted time string
@@ -113,6 +164,8 @@ export default async function init(el) {
   }
 
   const localeString = getEventConfig().miloConfig.locale?.ietf || 'en-US';
+  const eventTimezone = getMetadata('timezone'); // e.g., "America/Los_Angeles"
+  const eventStartMillis = getMetadata('local-start-time-millis'); // Event date base
 
   const agendaItemContainer = createTag('div', { class: 'agenda-item-container' }, '', { parent: agendaItemsCol });
   const column1 = createTag('div', { class: 'column' }, '', { parent: agendaItemContainer });
@@ -127,13 +180,13 @@ export default async function init(el) {
   agendaArray.forEach((agenda, index) => {
     const agendaListItem = createTag('div', { class: 'agenda-list-item' }, '', { parent: (index >= splitIndex ? column2 : column1) });
     
-    // Use startTimeMillis (UTC timestamp) if available for proper timezone conversion
-    // Otherwise fall back to startTime (legacy format) for backward compatibility
+    // Convert agenda time from event timezone to user's local timezone
     let formattedTime = '';
-    if (agenda.startTimeMillis) {
-      formattedTime = convertUtcToLocalTime(agenda.startTimeMillis, localeString);
+    if (agenda.startTime && eventTimezone && eventStartMillis) {
+      // Timezone-aware conversion using event timezone
+      formattedTime = convertEventTimeToLocalTime(agenda.startTime, eventTimezone, eventStartMillis, localeString);
     } else if (agenda.startTime) {
-      // Legacy support - does not handle timezone conversion
+      // Fallback: no timezone conversion (legacy behavior)
       formattedTime = convertToLocaleTimeFormat(agenda.startTime, localeString);
     }
     

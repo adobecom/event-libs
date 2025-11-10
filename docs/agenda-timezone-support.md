@@ -13,18 +13,29 @@ Previously, agenda times were stored and displayed as simple time strings (e.g.,
 
 ## Solution
 
-### New Field: `startTimeMillis`
+### How It Works
 
-Agenda items can now include a `startTimeMillis` field containing a UTC timestamp in milliseconds. When present, this timestamp is automatically converted to the user's local timezone for display.
+The system now uses **three pieces of information** together:
+1. **`startTime`** in agenda items (e.g., "09:00:00")
+2. **`timezone`** metadata (e.g., "America/Los_Angeles") - tells us what timezone the startTime is in
+3. **`local-start-time-millis`** metadata - provides the event date
+
+These are combined to convert the agenda time from the event's timezone to the user's local timezone.
 
 ### Example
 
+**Metadata:**
+```
+timezone: America/Los_Angeles
+local-start-time-millis: 1736931600000
+```
+
+**Agenda Data:**
 ```json
 {
   "agenda": [
     {
-      "startTimeMillis": 1736931600000,  // UTC timestamp
-      "startTime": "09:00:00",           // Fallback for backward compatibility
+      "startTime": "09:00:00",
       "title": "Opening Keynote",
       "description": "Welcome and introduction"
     }
@@ -34,43 +45,71 @@ Agenda items can now include a `startTimeMillis` field containing a UTC timestam
 
 ### Behavior
 
-1. **With `startTimeMillis`**: Time is converted to user's local timezone
-2. **Without `startTimeMillis`**: Falls back to `startTime` (legacy behavior, no timezone conversion)
-3. **Both present**: `startTimeMillis` takes precedence
+1. **With `timezone` metadata**: Agenda times are converted from event timezone to user's local timezone
+2. **Without `timezone` metadata**: Falls back to legacy behavior (no timezone conversion)
+3. **DST-aware**: Automatically handles daylight saving time transitions
 
 ## Implementation Details
 
-### New Function: `convertUtcToLocalTime`
+### New Function: `convertEventTimeToLocalTime`
 
 ```javascript
-export function convertUtcToLocalTime(timestamp, locale)
+export function convertEventTimeToLocalTime(time, eventTimezone, eventDateMillis, locale)
 ```
 
-- Converts UTC timestamps to user's local time
-- Handles timezone offsets automatically
-- Returns formatted time string (e.g., "9:00 AM")
-- Includes error handling for invalid timestamps
+**Parameters:**
+- `time`: Time string in HH:MM:SS format (e.g., "09:00:00")
+- `eventTimezone`: IANA timezone identifier (e.g., "America/Los_Angeles")
+- `eventDateMillis`: Event date in milliseconds (from `local-start-time-millis` metadata)
+- `locale`: Locale string for formatting (e.g., "en-US")
 
-### Modified Function: `convertToLocaleTimeFormat`
+**Returns:** Formatted time string in user's local timezone (e.g., "9:00 AM")
 
-- Marked as legacy
+**Features:**
+- Converts times from event timezone to user's local timezone
+- Handles DST transitions correctly
+- Includes comprehensive error handling
+
+### Legacy Function: `convertToLocaleTimeFormat`
+
 - Still supported for backward compatibility
+- Used when `timezone` metadata is not available
 - Does NOT handle timezone conversion
 
 ## Usage for Content Authors
 
 ### Creating Agenda Items with Timezone Support
 
-1. Store event times as UTC timestamps in milliseconds
-2. Add both `startTimeMillis` (new) and `startTime` (legacy) fields
-3. The block will automatically display times in each user's local timezone
+1. **Set the timezone metadata** for your event (e.g., "America/Los_Angeles")
+2. **Use normal time strings** in agenda items (e.g., "09:00:00")
+3. The block automatically converts to each user's local timezone
 
-### Example Conversion
+### Example
 
-If your event starts at 9:00 AM PST (UTC-8):
-- Convert to UTC: 9:00 AM PST = 5:00 PM UTC
-- Calculate timestamp: January 15, 2025, 5:00 PM UTC = 1736960400000
-- Use in agenda: `"startTimeMillis": 1736960400000`
+If your event is in Los Angeles (PST/PDT) starting at 9:00 AM:
+
+**Metadata:**
+```
+timezone: America/Los_Angeles
+local-start-time-millis: 1736931600000
+```
+
+**Agenda:**
+```json
+{
+  "agenda": [
+    {
+      "startTime": "09:00:00",
+      "title": "Opening Keynote"
+    }
+  ]
+}
+```
+
+**Display:**
+- User in Los Angeles sees: "9:00 AM"
+- User in New York sees: "12:00 PM"
+- User in London sees: "5:00 PM"
 
 ### Benefits
 
@@ -90,15 +129,22 @@ If your event starts at 9:00 AM PST (UTC-8):
 
 ### For Existing Events
 
-No migration required - existing agendas with only `startTime` continue to work.
+No migration required:
+- Events without `timezone` metadata continue to work with legacy behavior
+- Agenda times display as-is without timezone conversion
 
-### For New Events
+### For New Events  
 
-Recommended to include both fields:
+Simply add the `timezone` metadata field:
+```
+timezone: America/Los_Angeles
+```
+
+Agenda items remain unchanged - just use `startTime` as before:
 ```json
 {
-  "startTimeMillis": 1736931600000,  // Primary (timezone-aware)
-  "startTime": "09:00:00"            // Fallback (backward compatible)
+  "startTime": "09:00:00",
+  "title": "Session Title"
 }
 ```
 
