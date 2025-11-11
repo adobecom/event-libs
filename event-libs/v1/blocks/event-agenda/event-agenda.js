@@ -1,4 +1,4 @@
-import { createOptimizedPicture, createTag, getMetadata, getEventConfig } from '../../utils/utils.js';
+import { createOptimizedPicture, createTag, getMetadata, getEventConfig, getImageSource } from '../../utils/utils.js';
 
 export function convertToLocaleTimeFormat(time, locale) {
   const [hours, minutes, seconds] = time.split(':').map(Number);
@@ -57,25 +57,11 @@ export default async function init(el) {
   agendaItemsCol.prepend(h2);
 
   if (venueImage) {
-    let spUrlObj;
-    let imgUrl = venueImage.imageUrl;
-
-    if (venueImage.sharepointUrl?.startsWith('https://')) {
-      try {
-        spUrlObj = new URL(venueImage.sharepointUrl);
-        imgUrl = spUrlObj.pathname;
-      } catch (e) {
-        window.lana?.log(`Error while parsing SharePoint URL:\n${JSON.stringify(e, null, 2)}`);
-      }
-    } else {
-      imgUrl = venueImage.sharepointUrl || venueImage.imageUrl;
-    }
-
     el.classList.add('blade');
     agendaItemsCol.classList.add('agenda-items-with-image');
 
     const venueImageCol = createTag('div', { class: 'venue-img-col' });
-    venueImageCol.append(createOptimizedPicture(imgUrl, venueImage.altText || '', false));
+    venueImageCol.append(createOptimizedPicture(getImageSource(venueImage), venueImage.altText || '', false));
     container.append(venueImageCol);
   } else if (agendaArray.length > 6) {
     container.classList.add('more-than-six');

@@ -18,9 +18,12 @@ import {
   getEventServiceEnv,
   parseMetadataPath,
   getEventConfig,
+  getImageSource,
   getFallbackLocale,
   LIBS,
   createContextualContent,
+  parseEncodedConfig,
+  createTag,
 } from './utils.js';
 import { massageMetadata } from './date-time-helper.js';
 
@@ -275,10 +278,10 @@ async function initRSVPHandler(link) {
   const miloLibs = eventConfig?.miloConfig?.miloLibs ? eventConfig.miloConfig.miloLibs : LIBS;
 
   if (eventConfig.miloConfig) {
-    await dictionaryManager.addBook({ config: eventConfig.miloConfig });
+    await dictionaryManager.addSheet({ config: eventConfig.miloConfig });
   } else {
     const { getConfig } = await import(`${miloLibs}/utils/utils.js`);
-    await dictionaryManager.addBook({ config: getConfig() });
+    await dictionaryManager.addSheet({ config: getConfig() });
   }
 
   const regHashCallbacks = {
@@ -343,10 +346,7 @@ async function initRSVPHandler(link) {
   }
 }
 
-function processTemplateLinks(parent) {
-  const { cmsType } = getEventConfig();
-  if (cmsType !== 'SP') return;
-
+function processSPTemplateLinks(parent) {
   const templateLinks = parent.querySelectorAll('a[href$="#event-template"]');
 
   templateLinks.forEach((a) => {
@@ -370,12 +370,41 @@ function processTemplateLinks(parent) {
         window.lana?.log(`Error: Failed to find template ID for event ${getMetadata('event-id')}`);
       }
     } catch (e) {
-      window.lana?.log(`Error while attempting to replace template link ${a.href}:\n${JSON.stringify(e, null, 2)}`);
+      window.lana?.log(`Error while attempting to replace SP template link ${a.href}:\n${JSON.stringify(e, null, 2)}`);
     }
   });
 }
 
-function processLinks(parent) {
+function processDATemplateLinks(parent) {
+  const allLinks = parent.querySelectorAll('a');
+
+  allLinks.forEach((a) => {
+    try {
+      // Process link text with template syntax
+      processTemplateInLinkText(a);
+
+      // Process link href with encoded template syntax
+      const encodedHref = a.getAttribute('href');
+      if (!encodedHref) return;
+
+      // Decode the href to find [[]] patterns
+      const decodedHref = decodeURIComponent(encodedHref);
+      
+      // Replace all metadata placeholders in href
+      const processedHref = decodedHref.replace(META_REG, (_match, metadataPath) => {
+        return parseMetadataPath(metadataPath) || '';
+      });
+
+      if (processedHref !== decodedHref) {
+        a.href = processedHref;
+      }
+    } catch (e) {
+      window.lana?.log(`Error while attempting to replace DA template link ${a.href}:\n${JSON.stringify(e, null, 2)}`);
+    }
+  });
+}
+
+function processHashtagLinks(parent) {
   const { cmsType } = getEventConfig();
   const links = parent.querySelectorAll('a[href*="#"]');
 
@@ -414,6 +443,74 @@ function processLinks(parent) {
   });
 
   
+}
+
+function prebuildAutoBlock(blockName, link) {
+  let blockEl;
+  const autoBlockBuilders = {
+    'chrono-box': (link) => {
+      const url = new URL(link.href);
+      const scheduleBase64 = url.searchParams.get('schedule');
+      const schedule = parseEncodedConfig(scheduleBase64);
+      
+      if (!schedule || !schedule.blocks || !Array.isArray(schedule.blocks)) {
+        return null;
+      }
+
+
+      // Transform schedule blocks into chrono-box format
+      const chronoBoxData = schedule.blocks.map(block => {
+        const item = {
+          pathToFragment: block.fragmentPath,
+          toggleTime: block.startDateTime
+        };
+
+        // Add mobileRider sessionId if the block includes a live stream
+        if (block.includeLiveStream && block.liveStream) {
+          const { streamId, provider } = block.liveStream;
+          if (provider === 'MobileRider' && streamId) {
+            item.mobileRider = { sessionId: streamId };
+          }
+        }
+
+        return item;
+      });
+
+      const labelDiv = createTag('div', {}, 'schedule');
+      const dataDiv = createTag('div', {}, JSON.stringify(chronoBoxData));
+      const innerDiv = createTag('div', {}, [labelDiv, dataDiv]);
+      const chronoBoxEl = createTag('div', {
+        class: 'chrono-box',
+        'data-schedule-id': schedule.scheduleId,
+        'data-schedule-title': schedule.title,
+        'data-schedule-maker-url': `${url.origin}${url.pathname}?scheduleId=${schedule.scheduleId}`,
+      }, innerDiv);
+
+      return chronoBoxEl;
+    }
+  }
+
+  if (autoBlockBuilders[blockName]) {
+    blockEl = autoBlockBuilders[blockName](link);
+  }
+
+  return blockEl;
+}
+
+export function processAutoBlockLinks(parent) {
+  const autoBlockIdentifiers = {
+    'chrono-box': 'schedule-maker'
+  }
+
+  Object.keys(autoBlockIdentifiers).forEach((bn) => {
+    const link = parent.querySelector(`a[href*="${autoBlockIdentifiers[bn]}"]`);
+    if (link) {
+      const blockEl = prebuildAutoBlock(bn, link);
+      if (blockEl) {
+        link.closest('p') ? link.closest('p').replaceWith(blockEl) : link.replaceWith(blockEl);
+      }
+    }
+  });
 }
 
 export function updatePictureElement(imageUrl, parentPic, altText) {
@@ -461,9 +558,9 @@ function updateImgTag(child, matchCallback, parentElement) {
 
   try {
     const photoData = JSON.parse(photoMeta);
-    const { sharepointUrl, imageUrl, altText } = photoData;
+    const { altText } = photoData;
 
-    const imgUrl = sharepointUrl || imageUrl;
+    const imgUrl = getImageSource(photoData);
 
     if (imgUrl && parentPic && imgUrl !== originalAlt) {
       updatePictureElement(imgUrl, parentPic, altText);
@@ -519,7 +616,8 @@ function updateTextContent(child, matchCallback) {
 
   if (replacedText === originalText) return;
 
-  if (child.parentElement.dataset.contextualContent) return;
+  // Check if the element has contextual content marked
+  if (child.dataset.contextualContent) return;
   
   if (isHTMLString(replacedText)) {
     child.parentElement.innerHTML = replacedText;
@@ -771,6 +869,17 @@ function processTemplateInAllNodes(parent, extraData) {
   };
 
   const getContent = (_match, p1, n) => {
+    // Check if this is conditional content that needs reactive handling
+    if (p1.includes('?(') && p1.includes('):(')) {
+      // Store the original content and mark for reactive processing
+      if (n.parentNode) {
+        n.parentNode.dataset.contextualContent = p1;
+      }
+      // Process the conditional content immediately to get initial value
+      const processedContent = parseMetadataPath(p1, extraData);
+      return processedContent;
+    }
+
     let content = parseMetadataPath(p1, extraData);
 
     if (preserveFormatKeys.includes(p1)) {
@@ -832,10 +941,14 @@ export function decorateEvent(parent) {
   flagEventState(parent);
   
   // Process template links synchronously first (no dictionary needed)
-  processTemplateLinks(parent);
+  if (cmsType === 'SP') {
+    processSPTemplateLinks(parent);
+  } else if (cmsType === 'DA') {
+    processDATemplateLinks(parent);
+  }
   
   // Process other links asynchronously (dictionary-dependent)
-  processLinks(parent);
+  processHashtagLinks(parent);
   
   if (getEventServiceEnv() !== 'prod' && cmsType === 'SP') updateExtraMetaTags(parent);
 

@@ -87,6 +87,39 @@ export function getEventServiceEnv() {
   return ENV_MAP.dev;
 }
 
+/**
+ * Resolves the appropriate image source URL based on CMS type configuration.
+ * For SharePoint CMS, it will prefer sharepointUrl and handle URL parsing.
+ * For other CMS types (e.g., DA), it will use imageUrl.
+ * 
+ * @param {Object} photo - Photo object containing image URLs
+ * @param {string} photo.sharepointUrl - SharePoint URL for the image
+ * @param {string} photo.imageUrl - Standard image URL
+ * @returns {string} The resolved image URL based on CMS type
+ */
+export function getImageSource(photo) {
+  if (!photo) return '';
+
+  const { sharepointUrl, imageUrl } = photo;
+  const eventConfig = getEventConfig();
+
+  if (eventConfig.cmsType === 'SP') {
+    // For SharePoint CMS, prefer sharepointUrl
+    if (sharepointUrl?.startsWith('https://')) {
+      try {
+        const spUrlObj = new URL(sharepointUrl);
+        return spUrlObj.pathname;
+      } catch (e) {
+        window.lana?.log(`Error while parsing SharePoint URL:\n${JSON.stringify(e, null, 2)}`);
+      }
+    }
+    return sharepointUrl || imageUrl;
+  }
+
+  // For other CMS types (DA, etc.), use imageUrl
+  return imageUrl;
+}
+
 export function createTag(tag, attributes, html, options = {}) {
   const el = document.createElement(tag);
   if (html) {
@@ -113,6 +146,19 @@ export function yieldToMain() {
   return new Promise((r) => {
     setTimeout(r, 0);
   });
+}
+
+export function b64ToUtf8(str) {
+  return decodeURIComponent(escape(window.atob(str)));
+}
+
+export function parseEncodedConfig(encodedConfig) {
+  try {
+    return JSON.parse(b64ToUtf8(decodeURIComponent(encodedConfig)));
+  } catch (e) {
+    console.log(e);
+  }
+  return null;
 }
 
 export function getMetadata(name, doc = document) {
@@ -244,21 +290,21 @@ export function getFallbackLocale(locales, pathname = window.location.pathname) 
   return locale;
 }
 
-export function getSusiOptions() {
-  const eventConfig = getEventConfig();
+export function getSusiOptions(clientMiloConfig) {
   const { href, hash } = window.location;
-
-  const { miloConfig } = eventConfig;
-
-  const envName = miloConfig ? miloConfig.env.name : getEventServiceEnv().name;
-
-  const susiOptions = Object.keys(SUSI_OPTIONS).reduce((opts, key) => {
-    opts[key] = SUSI_OPTIONS[key][envName] || SUSI_OPTIONS[key];
-    return opts;
-  }, {});
+  const susiOptions = {};
 
   if (hash.includes('#rsvp-form')) {
-    susiOptions.redirect_uri = `${href}`;
+    susiOptions.redirect_uri = href;
+  }
+
+  const miloConfig = clientMiloConfig || getEventConfig()?.miloConfig;
+
+  if (miloConfig?.env?.name) {
+    const { env } = miloConfig;
+    Object.keys(SUSI_OPTIONS).forEach((key) => {
+      susiOptions[key] = SUSI_OPTIONS[key][env.name];
+    });
   }
 
   return susiOptions;
