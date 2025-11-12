@@ -1,0 +1,10 @@
+/* Display the marquee picture inline with the text */
+.marquee p.body-m:has(> picture) {
+  display: flex;
+  gap: 12px;
+}
+
+/* Hide the section metadata if it's the only child of the section */
+.section:has(> .section-metadata:only-child) {
+  display: none;
+}
