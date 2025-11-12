@@ -87,6 +87,41 @@ export function getEventServiceEnv() {
   return ENV_MAP.dev;
 }
 
+/**
+ * Resolves the appropriate image source URL based on CMS type configuration.
+ * For SharePoint CMS, it will prefer sharepointUrl and handle URL parsing.
+ * For other CMS types (e.g., DA), it will use imageUrl.
+ * 
+ * @param {Object} photo - Photo object containing image URLs
+ * @param {string} photo.sharepointUrl - SharePoint URL for the image
+ * @param {string} photo.imageUrl - Standard image URL
+ * @returns {string} The resolved image URL based on CMS type
+ */
+export function getImageSource(photo) {
+  if (!photo) return '';
+
+  const { sharepointUrl, imageUrl } = photo;
+  const eventConfig = getEventConfig();
+
+  if (eventConfig.cmsType === 'SP') {
+    // For SharePoint CMS, prefer sharepointUrl
+    if (sharepointUrl?.startsWith('https://')) {
+      try {
+        const spUrlObj = new URL(sharepointUrl);
+        return spUrlObj.pathname;
+      } catch (e) {
+        window.lana?.log(`Error while parsing SharePoint URL:\n${JSON.stringify(e, null, 2)}`);
+        // Fallback to imageUrl if sharepointUrl is invalid
+        return imageUrl;
+      }
+    }
+    return sharepointUrl || imageUrl;
+  }
+
+  // For other CMS types (DA, etc.), use imageUrl
+  return imageUrl;
+}
+
 export function createTag(tag, attributes, html, options = {}) {
   const el = document.createElement(tag);
   if (html) {
@@ -191,10 +226,19 @@ export function createOptimizedPicture(
 ) {
   let url;
 
-  if (relative) {
-    url = new URL(src);
-  } else {
-    url = new URL(src, window.location.href);
+  try {
+    if (relative) {
+      url = new URL(src);
+    } else {
+      url = new URL(src, window.location.href);
+    }
+  } catch (e) {
+    window.lana?.log(`Invalid URL in createOptimizedPicture: ${src}`);
+    // Return a basic img element as fallback
+    const img = document.createElement('img');
+    img.setAttribute('src', src);
+    img.setAttribute('alt', alt);
+    return img;
   }
 
   const picture = document.createElement('picture');

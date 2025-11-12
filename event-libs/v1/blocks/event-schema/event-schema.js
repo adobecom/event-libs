@@ -1,4 +1,4 @@
-import { getMetadata } from '../../utils/utils.js';
+import { getMetadata, getImageSource } from '../../utils/utils.js';
 
 export function injectEventSchema() {
   let venueObject;
@@ -33,7 +33,7 @@ export function injectEventSchema() {
         addressCountry: venueObject.country,
       },
     },
-    image: imageHeroImage?.sharepointUrl || imageHeroImage?.imageUrl,
+    image: getImageSource(imageHeroImage),
     description: getMetadata('description') || '',
     organizer: {
       '@type': 'Organization',
