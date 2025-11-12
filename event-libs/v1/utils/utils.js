@@ -111,6 +111,8 @@ export function getImageSource(photo) {
         return spUrlObj.pathname;
       } catch (e) {
         window.lana?.log(`Error while parsing SharePoint URL:\n${JSON.stringify(e, null, 2)}`);
+        // Fallback to imageUrl if sharepointUrl is invalid
+        return imageUrl;
       }
     }
     return sharepointUrl || imageUrl;
@@ -224,10 +226,19 @@ export function createOptimizedPicture(
 ) {
   let url;
 
-  if (relative) {
-    url = new URL(src);
-  } else {
-    url = new URL(src, window.location.href);
+  try {
+    if (relative) {
+      url = new URL(src);
+    } else {
+      url = new URL(src, window.location.href);
+    }
+  } catch (e) {
+    window.lana?.log(`Invalid URL in createOptimizedPicture: ${src}`);
+    // Return a basic img element as fallback
+    const img = document.createElement('img');
+    img.setAttribute('src', src);
+    img.setAttribute('alt', alt);
+    return img;
   }
 
   const picture = document.createElement('picture');
