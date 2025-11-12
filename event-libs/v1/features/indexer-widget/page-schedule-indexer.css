@@ -99,7 +99,7 @@
     }
 
     .page-path-indexer-schedule-id-item-status-wrapper:not(.indexed) {
-      color: var(--color-red);
+      color: #EB1000;
     }
 
     .page-path-indexer-schedule-id-item.indexed .page-path-indexer-schedule-status-wrapper.indexed {
