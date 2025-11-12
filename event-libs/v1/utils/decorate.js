@@ -398,6 +398,12 @@ function processDATemplateLinks(parent) {
       if (processedHref !== decodedHref) {
         a.href = processedHref;
       }
+
+      // Remove link if href is null-ish after processing (e.g., cta array was empty)
+      const finalHref = a.getAttribute('href');
+      if (!finalHref || !finalHref.trim() || finalHref === 'null' || finalHref === 'undefined') {
+        a.remove();
+      }
     } catch (e) {
       window.lana?.log(`Error while attempting to replace DA template link ${a.href}:\n${JSON.stringify(e, null, 2)}`);
     }
