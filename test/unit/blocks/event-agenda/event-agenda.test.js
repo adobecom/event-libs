@@ -1,6 +1,6 @@
 import { expect } from '@esm-bundle/chai';
 import { readFile } from '@web/test-runner-commands';
-import init, { convertToLocaleTimeFormat } from '../../../../event-libs/v1/blocks/event-agenda/event-agenda.js';
+import init, { convertToLocaleTimeFormat, convertEventTimeToLocalTime } from '../../../../event-libs/v1/blocks/event-agenda/event-agenda.js';
 import { setMetadata } from '../../../../event-libs/v1/utils/utils.js';
 
 const body = await readFile({ path: './mocks/default.html' });
@@ -12,6 +12,44 @@ describe('Agenda Module', () => {
       const locale = 'en-US';
       const formattedTime = convertToLocaleTimeFormat(time, locale);
       expect(formattedTime).to.equal('1:45 PM');
+    });
+  });
+
+  describe('convertEventTimeToLocalTime', () => {
+    it('should convert event timezone time to local time', () => {
+      // Event on Jan 15, 2025 at 9:00 AM in America/Los_Angeles
+      const eventDate = new Date('2025-01-15T00:00:00Z').getTime();
+      const time = '09:00:00';
+      const timezone = 'America/Los_Angeles';
+      const locale = 'en-US';
+      
+      const formattedTime = convertEventTimeToLocalTime(time, timezone, eventDate, locale);
+      
+      // Result depends on user's timezone, but should be a valid time format
+      expect(formattedTime).to.match(/\d{1,2}:\d{2}\s[AP]M/);
+    });
+
+    it('should handle string event date', () => {
+      const eventDate = new Date('2025-01-15T00:00:00Z').getTime().toString();
+      const time = '14:30:00';
+      const timezone = 'America/New_York';
+      const locale = 'en-US';
+      
+      const formattedTime = convertEventTimeToLocalTime(time, timezone, eventDate, locale);
+      
+      expect(formattedTime).to.match(/\d{1,2}:\d{2}\s[AP]M/);
+    });
+
+    it('should return empty string when missing required parameters', () => {
+      expect(convertEventTimeToLocalTime('', 'America/Los_Angeles', 123456, 'en-US')).to.equal('');
+      expect(convertEventTimeToLocalTime('09:00:00', '', 123456, 'en-US')).to.equal('');
+      expect(convertEventTimeToLocalTime('09:00:00', 'America/Los_Angeles', '', 'en-US')).to.equal('');
+    });
+
+    it('should return empty string for invalid time format', () => {
+      const eventDate = new Date('2025-01-15T00:00:00Z').getTime();
+      const formattedTime = convertEventTimeToLocalTime('invalid', 'America/Los_Angeles', eventDate, 'en-US');
+      expect(formattedTime).to.equal('');
     });
   });
 

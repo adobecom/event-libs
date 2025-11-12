@@ -18,6 +18,7 @@ import {
   getEventServiceEnv,
   parseMetadataPath,
   getEventConfig,
+  getImageSource,
   getFallbackLocale,
   LIBS,
   createContextualContent,
@@ -557,9 +558,9 @@ function updateImgTag(child, matchCallback, parentElement) {
 
   try {
     const photoData = JSON.parse(photoMeta);
-    const { sharepointUrl, imageUrl, altText } = photoData;
+    const { altText } = photoData;
 
-    const imgUrl = sharepointUrl || imageUrl;
+    const imgUrl = getImageSource(photoData);
 
     if (imgUrl && parentPic && imgUrl !== originalAlt) {
       updatePictureElement(imgUrl, parentPic, altText);
@@ -917,7 +918,20 @@ function processTemplateInAllNodes(parent, extraData) {
   });
 }
 
-// data -> DOM gills
+function addStylesToEventPage() {
+  const styleId = 'event-libs-styles';
+  
+  // Check if styles are already loaded
+  if (document.getElementById(styleId)) return;
+  
+  // Create and append the stylesheet link
+  const link = document.createElement('link');
+  link.id = styleId;
+  link.rel = 'stylesheet';
+  link.href = new URL('../libs-styles.css', import.meta.url).href;
+  document.head.appendChild(link);
+}
+
 export function decorateEvent(parent) {
   // handle photos data parsing
   const photosData = parsePhotosData(parent);
@@ -930,6 +944,7 @@ export function decorateEvent(parent) {
 
   if (!getMetadata('event-id')) return;
   // Hydrate metadata with user-friendly transformations
+  addStylesToEventPage();
   const miloConfig = getEventConfig().miloConfig;
   const locale = miloConfig ? miloConfig.locale?.ietf : getFallbackLocale(FALLBACK_LOCALES);
   const massagedMetadata = massageMetadata(locale);

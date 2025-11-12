@@ -1,12 +1,12 @@
 import buildMiloCarousel from '../../features/milo-carousel.js';
-import { getMetadata, createTag } from '../../utils/utils.js';
+import { getMetadata, createTag, getImageSource } from '../../utils/utils.js';
 
 function decorateImage(card, photo) {
   if (!photo) return;
 
-  const { sharepointUrl, imageUrl, altText } = photo;
+  const { altText } = photo;
   const imgElement = createTag('img', {
-    src: sharepointUrl || imageUrl,
+    src: getImageSource(photo),
     class: 'card-image',
   });
 
@@ -137,8 +137,17 @@ function decorateContent(cardContainer, data) {
   textContainer.append(title, name);
 
   if (data.bio) {
-    const description = createTag('p', { class: 'card-desc' }, data.bio);
-    textContainer.append(description);
+    // Check if bio contains HTML tags (from static authoring)
+    if (data.bio.includes('<')) {
+      // Bio is HTML - insert it directly
+      const bioContainer = createTag('div', { class: 'card-desc' });
+      bioContainer.innerHTML = data.bio;
+      textContainer.append(bioContainer);
+    } else {
+      // Bio is plain text (from metadata) - wrap in paragraph
+      const description = createTag('p', { class: 'card-desc' }, data.bio);
+      textContainer.append(description);
+    }
   }
 
   contentContainer.append(textContainer);
@@ -146,6 +155,130 @@ function decorateContent(cardContainer, data) {
   decorateSocialIcons(contentContainer, data.socialLinks || data.socialMedia || []);
 
   cardContainer.append(contentContainer);
+}
+
+function parseStaticCard(row) {
+  const cell = row.querySelector(':scope > div');
+  if (!cell) return null;
+
+  // Extract picture/image
+  const picture = cell.querySelector('picture');
+  const img = picture?.querySelector('img') || cell.querySelector('img');
+  
+  let photo = null;
+  if (img) {
+    photo = {
+      imageUrl: img.src,
+      altText: img.alt || '',
+    };
+  }
+
+  // Find the heading (h1-h6)
+  const heading = cell.querySelector('h1, h2, h3, h4, h5, h6');
+  const name = heading?.textContent.trim() || '';
+  
+  // Split name into first and last (simple split on space)
+  const nameParts = name.split(' ');
+  const firstName = nameParts[0] || '';
+  const lastName = nameParts.slice(1).join(' ') || '';
+
+  // Helper function to check if a paragraph is a social link
+  // Social links are typically <p><a>url</a></p> with just the URL as text
+  const isSocialLinkParagraph = (p) => {
+    const anchor = p.querySelector('a');
+    if (!anchor) return false;
+    
+    // Check if paragraph only contains the anchor (and whitespace)
+    const textContent = p.textContent.trim();
+    const anchorText = anchor.textContent.trim();
+    
+    // If the paragraph text matches the anchor text or anchor href, it's likely a social link
+    return textContent === anchorText || textContent === anchor.href;
+  };
+
+  // Get all direct children of the cell
+  const children = Array.from(cell.children);
+  
+  let title = '';
+  const bioElements = [];
+  const socialLinks = [];
+
+  children.forEach((child) => {
+    // Skip picture elements
+    if (child.tagName === 'PICTURE') return;
+    
+    // Check if this is before or after the heading
+    if (heading && child.compareDocumentPosition(heading) & Node.DOCUMENT_POSITION_FOLLOWING) {
+      // Element comes before heading - check if it's the title
+      if (!title && child.tagName === 'P' && child.textContent.trim()) {
+        title = child.textContent.trim();
+      }
+    } else if (heading && child.compareDocumentPosition(heading) & Node.DOCUMENT_POSITION_PRECEDING) {
+      // Element comes after heading
+      if (child.tagName === 'P' && isSocialLinkParagraph(child)) {
+        // This is a social link paragraph
+        const anchor = child.querySelector('a');
+        if (anchor?.href) {
+          socialLinks.push({ link: anchor.href });
+        }
+      } else if (child !== heading) {
+        // This is bio content - keep the HTML
+        bioElements.push(child);
+      }
+    }
+  });
+
+  // Combine bio elements into HTML string
+  let bio = '';
+  if (bioElements.length > 0) {
+    bio = bioElements.map((el) => el.outerHTML).join('');
+  }
+
+  return {
+    firstName,
+    lastName,
+    title,
+    photo,
+    socialLinks,
+    bio,
+  };
+}
+
+function decorateStaticCards(el) {
+  const cardsWrapper = el.querySelector('.cards-wrapper');
+  const rows = Array.from(el.querySelectorAll(':scope > div:not(.cards-wrapper)'));
+  
+  // First row is the heading, skip it
+  const cardRows = rows.slice(1);
+
+  if (cardRows.length === 0) {
+    el.remove();
+    return;
+  }
+
+  cardRows.forEach((row) => {
+    const cardData = parseStaticCard(row);
+    if (!cardData) return;
+
+    const cardContainer = createTag('div', { class: 'card-container' });
+    decorateImage(cardContainer, cardData.photo);
+    decorateContent(cardContainer, cardData);
+    cardsWrapper.append(cardContainer);
+    
+    // Remove the original row
+    row.remove();
+  });
+
+  const cardCount = cardsWrapper.querySelectorAll('.card-container').length;
+  const isGrid = el.classList.contains('grid');
+  
+  if (cardCount === 1) {
+    el.classList.add('single');
+  } else if (cardCount > 3 && !isGrid) {
+    cardsWrapper.classList.add('carousel-plugin', 'show-3');
+    el.classList.add('with-carousel');
+    buildMiloCarousel(cardsWrapper, Array.from(cardsWrapper.querySelectorAll('.card-container')));
+  }
 }
 
 function decorateCards(el, data) {
@@ -171,9 +304,11 @@ function decorateCards(el, data) {
     cardsWrapper.append(cardContainer);
   });
 
+  const isGrid = el.classList.contains('grid');
+
   if (filteredData.length === 1) {
     el.classList.add('single');
-  } else if (filteredData.length > 3) {
+  } else if (filteredData.length > 3 && !isGrid) {
     cardsWrapper.classList.add('carousel-plugin', 'show-3');
     el.classList.add('with-carousel');
 
@@ -182,23 +317,44 @@ function decorateCards(el, data) {
 }
 
 export default function init(el) {
-  let data = [];
+  const rows = el.querySelectorAll(':scope > div');
+  const configRow = rows[1];
+  
+  // Determine if this is metadata-driven or static authoring
+  // Check if the first cell of configRow (if it exists) contains 'type'
+  const firstCell = configRow?.querySelectorAll(':scope > div')?.[0];
+  const isMetadataDriven = firstCell?.textContent.toLowerCase().trim() === 'type';
 
-  try {
-    data = JSON.parse(getMetadata('speakers'));
-  } catch (error) {
-    window.lana?.log(`Failed to parse speakers metadata:\n${JSON.stringify(error, null, 2)}`);
-    el.remove();
-    return;
-  }
-
-  if (!data || data.length === 0) {
-    el.remove();
-    return;
+  // Handle grid variant: add default three-up if no *-up class is present
+  if (el.classList.contains('grid')) {
+    const hasUpVariant = Array.from(el.classList).some((cls) => cls.endsWith('-up'));
+    if (!hasUpVariant) {
+      el.classList.add('three-up');
+    }
   }
 
   const cardsWrapper = createTag('div', { class: 'cards-wrapper' });
   el.append(cardsWrapper);
 
-  decorateCards(el, data);
+  if (isMetadataDriven) {
+    // Metadata-driven mode
+    let data = [];
+
+    try {
+      data = JSON.parse(getMetadata('speakers'));
+    } catch (error) {
+      window.lana?.log(`Failed to parse speakers metadata:\n${JSON.stringify(error, null, 2)}`);
+      el.remove();
+      return;
+    }
+
+    if (!data || data.length === 0) {
+      el.remove();
+      return;
+    }
+
+    decorateCards(el, data);
+  } else {
+    decorateStaticCards(el);
+  }
 }
