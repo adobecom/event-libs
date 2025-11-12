@@ -156,7 +156,7 @@
   .profile-cards.grid.four-up .cards-wrapper,
   .profile-cards.grid.five-up .cards-wrapper {
     grid-template-columns: repeat(2, 1fr);
-    padding: 40px 0;
+    padding: 40px 16px;
   }
 }
 
