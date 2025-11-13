@@ -375,6 +375,10 @@ function processSPTemplateLinks(parent) {
   });
 }
 
+function isInvalidHref(href) {
+  return !href || href === 'null' || href === 'undefined' || href === '' || href.includes('/events-placeholder');
+}
+
 function processDATemplateLinks(parent) {
   const allLinks = parent.querySelectorAll('a');
 
@@ -389,6 +393,7 @@ function processDATemplateLinks(parent) {
 
       // Decode the href to find [[]] patterns
       const decodedHref = decodeURIComponent(encodedHref);
+      const isHostEmailLink = decodedHref.includes('[[host-email]]');
       
       // Replace all metadata placeholders in href
       const processedHref = decodedHref.replace(META_REG, (_match, metadataPath) => {
@@ -399,17 +404,27 @@ function processDATemplateLinks(parent) {
         a.href = processedHref;
       }
 
+      // Handle host email links
+      if (isHostEmailLink) {
+        const hostEmail = getMetadata('host-email');
+        if (hostEmail) {
+          const emailSubject = `${dictionaryManager.getValue('mailto-subject-prefix')} ${getMetadata('event-title')}`;
+          a.href = `mailto:${hostEmail}?subject=${encodeURIComponent(emailSubject)}`;
+        } else {
+          a.remove();
+          return;
+        }
+      }
+
       // Remove link if href is null-ish after processing (e.g., cta array was empty)
-      const finalHref = a.getAttribute('href');
-      if (!finalHref || !finalHref.trim() || finalHref === 'null' || finalHref === 'undefined') {
+      if (isInvalidHref(a.getAttribute('href'))) {
         a.remove();
       }
     } catch (e) {
-      window.lana?.log(`Error while attempting to replace DA template link ${a.href}:\n${JSON.stringify(e, null, 2)}`);
+      window.lana?.log(`Error while attempting to replace DA template link ${a.href}:${JSON.stringify(e, null, 2)}`);
     }
   });
 }
-
 function processHashtagLinks(parent) {
   const { cmsType } = getEventConfig();
   const links = parent.querySelectorAll('a[href*="#"]');
