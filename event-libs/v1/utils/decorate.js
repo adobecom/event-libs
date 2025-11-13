@@ -400,7 +400,6 @@ function processDATemplateLinks(parent) {
 
       // Decode the href to find [[]] patterns
       const decodedHref = decodeURIComponent(encodedHref);
-      const isHostEmailLink = decodedHref.includes('[[host-email]]');
       
       // Replace all metadata placeholders in href
       const processedHref = decodedHref.replace(META_REG, (_match, metadataPath) => {
@@ -410,19 +409,7 @@ function processDATemplateLinks(parent) {
       if (processedHref !== decodedHref) {
         a.href = processedHref;
       }
-
-      // Handle host email links
-      if (isHostEmailLink) {
-        const hostEmail = getMetadata('host-email');
-        if (hostEmail) {
-          const emailSubject = `${dictionaryManager.getValue('mailto-subject-prefix')} ${getMetadata('event-title')}`;
-          a.href = `mailto:${hostEmail}?subject=${encodeURIComponent(emailSubject)}`;
-        } else {
-          a.remove();
-          return;
-        }
-      }
-
+      
       // Remove link if href is null-ish after processing (e.g., cta array was empty)
       if (isInvalidHref(a.getAttribute('href'))) {
         a.remove();

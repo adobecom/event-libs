@@ -1048,11 +1048,17 @@ export default async function decorate(block, formData = null) {
 
   const eventHero = block.querySelector(':scope > div:nth-of-type(1)');
   const hasLegacyLink = block.querySelector(':scope > div:nth-of-type(2) a[href$=".json"]');
-  let formContainer = createTag('div');
+  let formContainer;
   if (hasLegacyLink) {
     formContainer = block.querySelector(':scope > div:nth-of-type(2)');
   } else {
-    eventHero.after(formContainer);
+    const hasEmptyFormContainer = block.querySelector(':scope > div:nth-of-type(2)').innerHTML.trim() === '';
+    if (hasEmptyFormContainer) {
+      formContainer = createTag('div');
+      eventHero.after(formContainer);
+    } else {
+      formContainer = block.querySelector(':scope > div:nth-of-type(2)');
+    }
   }
 
   const bp = {
