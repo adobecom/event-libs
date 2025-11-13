@@ -1001,28 +1001,36 @@ async function decorateToastArea() {
   return toastArea;
 }
 
-async function getFormLink(block, bp) {
+async function getRsvpConfigUrl() {
   const eventConfig = getEventConfig();
-  const { miloConfig, cmsType } = eventConfig;
+  const { miloConfig } = eventConfig;
   const miloLibs = miloConfig?.miloLibs ? miloConfig.miloLibs : LIBS;
   const { getLocale } = await import(`${miloLibs}/utils/utils.js`);
+  
   const { prefix } = getLocale(miloConfig?.locales || FALLBACK_LOCALES);
-
-  const legacyLink = block.querySelector(':scope > div:nth-of-type(2) a[href$=".json"]');
-
+  
+  // Get the domain from import.meta.url
+  const moduleUrl = new URL(import.meta.url);
+  const domain = `${moduleUrl.protocol}//${moduleUrl.host}`;
+  
+  // Get cloud type (creativecloud or experiencecloud)
   const cloudType = getMetadata('cloud-type');
-  const configLocation = getMetadata('rsvp-config-location');
+  if (!cloudType) {
+    throw new Error('cloud-type metadata is required');
+  }
+  
+  return `${domain}${prefix}/event-libs/assets/configs/rsvp/${cloudType.toLowerCase()}.json`;
+}
+
+async function getFormLink(block, bp) {
+  const legacyLink = block.querySelector(':scope > div:nth-of-type(2) a[href$=".json"]');
   const form = createTag('a');
 
-  if (!configLocation && cmsType === 'SP') {
-    form.href = `/events/default/rsvp-form-configs/${cloudType.toLowerCase()}.json`;
-  } else {
-    form.href = `${prefix}${configLocation.startsWith('/') ? configLocation : `/${configLocation}`}`;
-  }
-
-  if (!form.href) {
-    const configUrl = new URL(`/events/default/rsvp-form-configs/${cloudType.toLowerCase()}.json`, import.meta.url);
-    form.href = configUrl.toString();
+  try {
+    form.href = await getRsvpConfigUrl();
+  } catch (error) {
+    window.lana?.log(`Error getting RSVP config URL: ${JSON.stringify(error)}`);
+    throw error;
   }
 
   if (legacyLink) {
