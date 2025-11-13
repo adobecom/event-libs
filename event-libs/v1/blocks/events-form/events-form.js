@@ -737,11 +737,7 @@ async function createForm(bp, formData) {
     json = await resp.json();
   }
 
-  const config = getConfig();
-  await Promise.all([
-    dictionaryManager.addSheet({ config, sheet: 'default' }),
-    dictionaryManager.addSheet({ config, sheet: 'rsvp-fields' }),
-  ]);
+  await dictionaryManager.initialize();
 
   if (rsvpFieldsData) {
     const { required, visible } = rsvpFieldsData;

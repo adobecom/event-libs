@@ -20,7 +20,6 @@ import {
   getEventConfig,
   getImageSource,
   getFallbackLocale,
-  LIBS,
   createContextualContent,
   parseEncodedConfig,
   createTag,
@@ -274,15 +273,7 @@ function processTemplateInLinkText(a) {
 }
 
 async function initRSVPHandler(link) {
-  const eventConfig = getEventConfig();
-  const miloLibs = eventConfig?.miloConfig?.miloLibs ? eventConfig.miloConfig.miloLibs : LIBS;
-
-  if (eventConfig.miloConfig) {
-    await dictionaryManager.addSheet({ config: eventConfig.miloConfig });
-  } else {
-    const { getConfig } = await import(`${miloLibs}/utils/utils.js`);
-    await dictionaryManager.addSheet({ config: getConfig() });
-  }
+  await dictionaryManager.initialize();
 
   const regHashCallbacks = {
     '#rsvp-form': (a) => {
