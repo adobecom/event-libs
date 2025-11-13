@@ -219,7 +219,9 @@ export default async function init(el) {
 
       loadFragment(a).then(() => {
         el.removeAttribute('style');
-        decorateEvent(el);
+        if (getMetadata('event-id')) {
+          decorateEvent(el);
+        }
       }).catch((error) => {
         window.lana?.log(`Error loading fragment ${pathToFragment}: ${error.message}`);
         el.removeAttribute('style');
