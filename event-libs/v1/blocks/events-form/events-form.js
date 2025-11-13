@@ -473,7 +473,7 @@ async function loadConsent(form, consentData) {
   termsWrapper.innerHTML = '';
   termsWrapper.classList.add('transparent');
 
-  const termsFragLink = createTag('a', { href: path, target: '_blank' }, path, { parent: termsWrapper });
+  const termsFragLink = createTag('a', { href: `${new URL(path, import.meta.url).href}`, target: '_blank' }, path, { parent: termsWrapper });
 
   await loadFragment(termsFragLink);
 
@@ -660,8 +660,8 @@ async function addConsentSuite(form) {
 
   fieldWrapper.append(label, countrySelect);
 
-  const queryIndexUrl = new URL('/event-libs/system/consent-query-index.json', import.meta.url);
-  const consentStringsIndex = await fetch(queryIndexUrl).then((r) => r.json());
+  const queryIndexUrl = new URL('/event-libs/assets/consents/consent-query-index.json', import.meta.url);
+  const consentStringsIndex = await fetch(queryIndexUrl.href).then((r) => r.json());
 
   if (consentStringsIndex) {
     const { data } = consentStringsIndex;
@@ -729,11 +729,10 @@ async function createForm(bp, formData) {
     window.lana?.log(`Failed to parse partners metadata:\n${JSON.stringify(error, null, 2)}`);
   }
 
-  const { pathname } = new URL(form.href);
   let json = formData;
   /* c8 ignore next 4 */
   if (!formData) {
-    const resp = await fetch(pathname);
+    const resp = await fetch(form.href);
     json = await resp.json();
   }
 
@@ -759,7 +758,7 @@ async function createForm(bp, formData) {
 
   const formEl = createTag('form');
   const rules = [];
-  const [action] = pathname.split('.json');
+  const [action] = new URL(form.href).pathname.split('.json');
   formEl.dataset.action = action;
 
   const typeToElement = {
@@ -1044,13 +1043,30 @@ async function getFormLink(block, bp) {
 
 export default async function decorate(block, formData = null) {
   block.classList.add('loading');
+
+  if (getMetadata('event-id')) {
+    const miloConfig = getEventConfig().miloConfig;
+    console.log('miloConfig', miloConfig);
+    console.log('decorateArea in miloConfig', miloConfig.decorateArea);
+    decorateEvent(block);
+  };
+
   const toastArea = await decorateToastArea();
+
+  const eventHero = block.querySelector(':scope > div:nth-of-type(1)');
+  const hasLegacyLink = block.querySelector(':scope > div:nth-of-type(2) a[href$=".json"]');
+  let formContainer = createTag('div');
+  if (hasLegacyLink) {
+    formContainer = block.querySelector(':scope > div:nth-of-type(2)');
+  } else {
+    eventHero.after(formContainer);
+  }
 
   const bp = {
     block,
     toastArea,
-    eventHero: block.querySelector(':scope > div:nth-of-type(1)'),
-    formContainer: block.querySelector(':scope > div:nth-of-type(2)'),
+    eventHero,
+    formContainer,
     terms: block.querySelector(':scope > div:nth-of-type(3)'),
     rsvpSuccessScreen: block.querySelector(':scope > div:nth-of-type(4)'),
     waitlistSuccessScreen: block.querySelector(':scope > div:nth-of-type(5)'),

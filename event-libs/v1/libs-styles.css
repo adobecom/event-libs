@@ -8,3 +8,10 @@
 .section:has(> .section-metadata:only-child) {
   display: none;
 }
+
+a.con-button.rsvp-btn {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  justify-content: center;
+}
