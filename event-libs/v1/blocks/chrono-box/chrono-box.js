@@ -1,5 +1,4 @@
 import { getMetadata, getEventConfig, LIBS } from '../../utils/utils.js';
-import { decorateEvent } from '../../utils/decorate.js';
 
 function buildScheduleDoubleLinkedList(entries) {
   if (!entries.length) return null;
@@ -219,9 +218,6 @@ export default async function init(el) {
 
       loadFragment(a).then(() => {
         el.removeAttribute('style');
-        if (getMetadata('event-id')) {
-          decorateEvent(el);
-        }
       }).catch((error) => {
         window.lana?.log(`Error loading fragment ${pathToFragment}: ${error.message}`);
         el.removeAttribute('style');

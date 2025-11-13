@@ -1044,13 +1044,6 @@ async function getFormLink(block, bp) {
 export default async function decorate(block, formData = null) {
   block.classList.add('loading');
 
-  if (getMetadata('event-id')) {
-    const miloConfig = getEventConfig().miloConfig;
-    console.log('miloConfig', miloConfig);
-    console.log('decorateArea in miloConfig', miloConfig.decorateArea);
-    decorateEvent(block);
-  };
-
   const toastArea = await decorateToastArea();
 
   const eventHero = block.querySelector(':scope > div:nth-of-type(1)');
