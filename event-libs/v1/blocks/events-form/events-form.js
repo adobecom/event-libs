@@ -3,7 +3,6 @@ import BlockMediator from '../../deps/block-mediator.min.js';
 import { signIn, decorateEvent } from '../../utils/decorate.js';
 import { dictionaryManager } from '../../utils/dictionary-manager.js';
 import { getEventConfig, LIBS, getMetadata, getSusiOptions } from '../../utils/utils.js';
-import { FALLBACK_LOCALES } from '../../utils/constances.js';
 
 const eventConfig = getEventConfig();
 const miloLibs = eventConfig?.miloConfig?.miloLibs ? eventConfig.miloConfig.miloLibs : LIBS;
@@ -1000,14 +999,7 @@ async function decorateToastArea() {
   return toastArea;
 }
 
-async function getRsvpConfigUrl() {
-  const eventConfig = getEventConfig();
-  const { miloConfig } = eventConfig;
-  const miloLibs = miloConfig?.miloLibs ? miloConfig.miloLibs : LIBS;
-  const { getLocale } = await import(`${miloLibs}/utils/utils.js`);
-  
-  const { prefix } = getLocale(miloConfig?.locales || FALLBACK_LOCALES);
-  
+function getRsvpConfigUrl() {
   // Get the domain from import.meta.url
   const moduleUrl = new URL(import.meta.url);
   const domain = `${moduleUrl.protocol}//${moduleUrl.host}`;
@@ -1018,15 +1010,15 @@ async function getRsvpConfigUrl() {
     throw new Error('cloud-type metadata is required');
   }
   
-  return `${domain}${prefix}/event-libs/assets/configs/rsvp/${cloudType.toLowerCase()}.json`;
+  return `${domain}/event-libs/assets/configs/rsvp/${cloudType.toLowerCase()}.json`;
 }
 
-async function getFormLink(block, bp) {
+function getFormLink(block, bp) {
   const legacyLink = block.querySelector(':scope > div:nth-of-type(2) a[href$=".json"]');
   const form = createTag('a');
 
   try {
-    form.href = await getRsvpConfigUrl();
+    form.href = getRsvpConfigUrl();
   } catch (error) {
     window.lana?.log(`Error getting RSVP config URL: ${JSON.stringify(error)}`);
     throw error;
@@ -1071,7 +1063,7 @@ export default async function decorate(block, formData = null) {
     waitlistSuccessScreen: block.querySelector(':scope > div:nth-of-type(5)'),
   };
 
-  bp.form = await getFormLink(block, bp);
+  bp.form = getFormLink(block, bp);
 
   await onProfile(bp, formData);
 }
