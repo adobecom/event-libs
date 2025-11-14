@@ -1,41 +1,98 @@
+import { LIBS, getEventConfig } from './utils.js';
+import { FALLBACK_LOCALES } from './constances.js';
+
 export class DictionaryManager {
   #dictionaries = {};
+  static #dictionaryCache = null;
+  static #dictionaryPromise = null;
 
-  static getPlaceholdersPath(config, sheet) {
-    const path = `${config.locale.contentRoot}/placeholders.json`;
-    const query = sheet !== 'default' && typeof sheet === 'string' && sheet.length ? `?sheet=${sheet}` : '';
-    return `${path}${query}`;
+  /**
+   * Get the dictionary URL using import.meta.url for domain and getLocale for prefix
+   * @returns {Promise<string>} The dictionary URL
+   */
+  static async getDictionaryPath() {
+    const eventConfig = getEventConfig();
+    const { miloConfig } = eventConfig;
+    const miloLibs = miloConfig?.miloLibs ? miloConfig.miloLibs : LIBS;
+    const { getLocale } = await import(`${miloLibs}/utils/utils.js`);
+    
+    const { prefix } = getLocale(miloConfig?.locales || FALLBACK_LOCALES);
+    
+    // Get the domain from import.meta.url
+    const moduleUrl = new URL(import.meta.url);
+    const domain = `${moduleUrl.protocol}//${moduleUrl.host}`;
+    
+    return `${domain}${prefix}/event-libs/assets/configs/dictionary.json`;
   }
 
   /**
-   * Add a new dictionary sheet from placeholders.json
-   * @param {Object} params - Parameters for adding dictionary sheet
-   * @param {Object} params.config - Milo configuration
-   * @param {string} params.sheet - Sheet name (optional)
+   * Fetch the dictionary JSON once and cache it
+   * @returns {Promise<Object>} The dictionary JSON
    */
-  async addSheet({ config, sheet = 'default' }) {
+  static async fetchDictionary() {
+    // Return cached dictionary if available
+    if (DictionaryManager.#dictionaryCache) {
+      return DictionaryManager.#dictionaryCache;
+    }
+
+    // Return existing promise if fetch is in progress
+    if (DictionaryManager.#dictionaryPromise) {
+      return DictionaryManager.#dictionaryPromise;
+    }
+
+    // Start new fetch
+    DictionaryManager.#dictionaryPromise = (async () => {
+      try {
+        const path = await DictionaryManager.getDictionaryPath();
+        const response = await fetch(path);
+        if (!response.ok) {
+          throw new Error(`Failed to fetch dictionary: ${response.status}`);
+        }
+        const json = await response.json();
+        DictionaryManager.#dictionaryCache = json;
+        return json;
+      } catch (error) {
+        window.lana?.log(`Error fetching dictionary:\n${JSON.stringify(error)}`);
+        // Clear the promise so retry is possible
+        DictionaryManager.#dictionaryPromise = null;
+        throw error;
+      }
+    })();
+
+    return DictionaryManager.#dictionaryPromise;
+  }
+
+  /**
+   * Load all sheets from the dictionary JSON
+   * Since we fetch all sheets in one JSON, we load them all at once
+   */
+  async loadAllSheets() {
     // Skip if already loaded
-    if (this.hasSheet(sheet)) {
+    if (Object.keys(this.#dictionaries).length > 0) {
       return;
     }
 
     try {
-      const path = DictionaryManager.getPlaceholdersPath(config, sheet);
-      const response = await fetch(path);
-      if (!response.ok) {
-        throw new Error(`Failed to fetch dictionary: ${response.status}`);
-      }
-      const json = await response.json();
-      const data = json[':type'] && json[':type'] === 'multi-sheet' ? json.data.data : json.data;
-      const dictionary = data.reduce((acc, item) => {
-        acc[item.key] = item.value;
-        return acc;
-      }, {});
+      const json = await DictionaryManager.fetchDictionary();
       
-      // Store dictionary for this specific sheet
-      this.#dictionaries[sheet] = Object.freeze(dictionary);
+      // Get all sheet names from the JSON
+      const sheetNames = json[':names'] || [];
+      
+      // Load each sheet
+      sheetNames.forEach((sheetName) => {
+        const sheetData = json[sheetName];
+        if (sheetData && sheetData.data) {
+          const data = sheetData.data;
+          const dictionary = data.reduce((acc, item) => {
+            acc[item.key] = item.value;
+            return acc;
+          }, {});
+          
+          this.#dictionaries[sheetName] = Object.freeze(dictionary);
+        }
+      });
     } catch (error) {
-      window.lana?.log(`Error adding dictionary sheet:\n${JSON.stringify(error)}`);
+      window.lana?.log(`Error loading dictionary sheets:\n${JSON.stringify(error)}`);
       throw error;
     }
   }
@@ -43,10 +100,10 @@ export class DictionaryManager {
   /**
    * Get value for a key from a specific sheet's dictionary
    * @param {string} key - The key to look up
-   * @param {string} sheet - The sheet name to look in (defaults to 'default')
+   * @param {string} sheet - The sheet name to look in (defaults to 'data')
    * @returns {string} The value for the key or the key itself if not found
    */
-  getValue(key, sheet = 'default') {
+  getValue(key, sheet = 'data') {
     const dictionary = this.#dictionaries[sheet];
     return dictionary?.[key] || key;
   }
@@ -70,21 +127,28 @@ export class DictionaryManager {
 
   /**
    * Get all keys for a specific sheet
-   * @param {string} sheet - The sheet name (defaults to 'default')
+   * @param {string} sheet - The sheet name (defaults to 'data')
    * @returns {string[]} Array of keys in the sheet
    */
-  getKeys(sheet = 'default') {
+  getKeys(sheet = 'data') {
     const dictionary = this.#dictionaries[sheet];
     return dictionary ? Object.keys(dictionary) : [];
   }
 
   /**
-   * Initialize the dictionary manager with configuration
-   * @param {Object} config - Milo configuration
-   * @param {string} sheet - Sheet name (optional)
+   * Initialize the dictionary manager by loading all sheets
    */
-  async initialize(config, sheet = 'default') {
-    await this.addSheet({ config, sheet });
+  async initialize() {
+    await this.loadAllSheets();
+  }
+
+  /**
+   * Clear the dictionary cache (for testing purposes)
+   * @private
+   */
+  static _clearCache() {
+    DictionaryManager.#dictionaryCache = null;
+    DictionaryManager.#dictionaryPromise = null;
   }
 }
 

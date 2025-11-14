@@ -1,6 +1,21 @@
 import { getMetadata, getEventConfig, LIBS } from '../../utils/utils.js';
 import { FALLBACK_LOCALES } from '../../utils/constances.js';
 
+async function getPromotionalContentUrl() {
+  const eventConfig = getEventConfig();
+  const { miloConfig } = eventConfig;
+  const miloLibs = miloConfig?.miloLibs ? miloConfig.miloLibs : LIBS;
+  const { getLocale } = await import(`${miloLibs}/utils/utils.js`);
+  
+  const { prefix } = getLocale(miloConfig?.locales || FALLBACK_LOCALES);
+  
+  // Get the domain from import.meta.url
+  const moduleUrl = new URL(import.meta.url);
+  const domain = `${moduleUrl.protocol}//${moduleUrl.host}`;
+  
+  return `${domain}${prefix}/event-libs/assets/configs/promotional-content.json`;
+}
+
 async function getPromotionalContent() {
   let promotionalItems = [];
   const eventPromotionalItemsMetadata = getMetadata('promotional-items');
@@ -24,25 +39,32 @@ async function getPromotionalContent() {
     return [];
   }
   
-  const eventConfig = getEventConfig();
-  const { miloConfig } = eventConfig;
-  const miloLibs = miloConfig?.miloLibs ? miloConfig.miloLibs : LIBS;
-  const { getLocale } = await import(`${miloLibs}/utils/utils.js`);
+  try {
+    const url = await getPromotionalContentUrl();
+    const response = await fetch(url);
+    
+    if (!response.ok) {
+      throw new Error(`Failed to fetch promotional content: ${response.status}`);
+    }
+    
+    const json = await response.json();
+    const data = json.data || [];
 
-  const { prefix } = getLocale(miloConfig?.locales || FALLBACK_LOCALES);
-  const { data } = await fetch(`${prefix}/events/default/promotional-content.json`).then((res) => res.json());
+    if (!data || data.length === 0) {
+      window.lana?.log(`Error: No promotional content found at ${url}`);
+      return [];
+    }
 
-  if (!data) {
-    window.lana?.log(`Error: No promotional content found in ${prefix}/events/default/promotional-content.json`);
+    const rehydratedPromotionalItems = promotionalItems.map((item) => {
+      const promotionalItem = data.find((content) => content.name === item);
+      return promotionalItem;
+    });
+
+    return rehydratedPromotionalItems;
+  } catch (error) {
+    window.lana?.log(`Error fetching promotional content: ${JSON.stringify(error)}`);
     return [];
   }
-
-  const rehydratedPromotionalItems = promotionalItems.map((item) => {
-    const promotionalItem = data.find((content) => content.name === item);
-    return promotionalItem;
-  });
-
-  return rehydratedPromotionalItems;
 }
 
 export function addMediaReversedClass(el) {
