@@ -20,7 +20,6 @@ import {
   getEventConfig,
   getImageSource,
   getFallbackLocale,
-  LIBS,
   createContextualContent,
   parseEncodedConfig,
   createTag,
@@ -114,9 +113,14 @@ function setCtaState(targetState, rsvpBtn) { // eslint-disable-line no-unused-va
       checkRed.remove();
     },
     default: () => {
+      // Use stored original text as fallback if current originalText is the loading text
+      const loadingText = dictionaryManager.getValue('rsvp-loading-cta-text');
+      const textToUse = rsvpBtn.originalText === loadingText && rsvpBtn.el.dataset.rsvpOriginalText
+        ? rsvpBtn.el.dataset.rsvpOriginalText
+        : rsvpBtn.originalText;
       enableBtn();
-      updateAnalyticTag(rsvpBtn.el, rsvpBtn.originalText);
-      rsvpBtn.el.textContent = rsvpBtn.originalText;
+      updateAnalyticTag(rsvpBtn.el, textToUse);
+      rsvpBtn.el.textContent = textToUse;
       checkRed.remove();
     },
   };
@@ -274,19 +278,22 @@ function processTemplateInLinkText(a) {
 }
 
 async function initRSVPHandler(link) {
-  const eventConfig = getEventConfig();
-  const miloLibs = eventConfig?.miloConfig?.miloLibs ? eventConfig.miloConfig.miloLibs : LIBS;
-
-  if (eventConfig.miloConfig) {
-    await dictionaryManager.addSheet({ config: eventConfig.miloConfig });
-  } else {
-    const { getConfig } = await import(`${miloLibs}/utils/utils.js`);
-    await dictionaryManager.addSheet({ config: getConfig() });
-  }
+  await dictionaryManager.initialize();
 
   const regHashCallbacks = {
     '#rsvp-form': (a) => {
+      // Check if button has already been initialized
+      if (a.dataset.rsvpInitialized === 'true') {
+        return;
+      }
+      
+      // Store the original text BEFORE any modifications
       const originalText = a.textContent.includes('|') ? a.textContent.split('|')[0] : a.textContent;
+      
+      // Mark as initialized and store original text in dataset
+      a.dataset.rsvpInitialized = 'true';
+      a.dataset.rsvpOriginalText = originalText;
+      
       const rsvpBtn = {
         el: a,
         originalText,
@@ -393,7 +400,6 @@ function processDATemplateLinks(parent) {
 
       // Decode the href to find [[]] patterns
       const decodedHref = decodeURIComponent(encodedHref);
-      const isHostEmailLink = decodedHref.includes('[[host-email]]');
       
       // Replace all metadata placeholders in href
       const processedHref = decodedHref.replace(META_REG, (_match, metadataPath) => {
@@ -403,19 +409,7 @@ function processDATemplateLinks(parent) {
       if (processedHref !== decodedHref) {
         a.href = processedHref;
       }
-
-      // Handle host email links
-      if (isHostEmailLink) {
-        const hostEmail = getMetadata('host-email');
-        if (hostEmail) {
-          const emailSubject = `${dictionaryManager.getValue('mailto-subject-prefix')} ${getMetadata('event-title')}`;
-          a.href = `mailto:${hostEmail}?subject=${encodeURIComponent(emailSubject)}`;
-        } else {
-          a.remove();
-          return;
-        }
-      }
-
+      
       // Remove link if href is null-ish after processing (e.g., cta array was empty)
       if (isInvalidHref(a.getAttribute('href'))) {
         a.remove();
