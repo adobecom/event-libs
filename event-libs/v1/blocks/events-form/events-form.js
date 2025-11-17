@@ -1046,10 +1046,10 @@ export default async function decorate(block, formData = null) {
   } else {
     const hasEmptyFormContainer = block.querySelector(':scope > div:nth-of-type(2)').innerHTML.trim() === '';
     if (hasEmptyFormContainer) {
+      formContainer = block.querySelector(':scope > div:nth-of-type(2)');
+    } else {
       formContainer = createTag('div');
       eventHero.after(formContainer);
-    } else {
-      formContainer = block.querySelector(':scope > div:nth-of-type(2)');
     }
   }
 
