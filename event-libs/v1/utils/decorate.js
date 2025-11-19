@@ -382,15 +382,12 @@ function processSPTemplateLinks(parent) {
   });
 }
 
-function isInvalidHref(href) {
-  return !href || href === 'null' || href === 'undefined' || href === '' || href.includes('/events-placeholder');
-}
-
 function processDATemplateLinks(parent) {
   const allLinks = parent.querySelectorAll('a');
 
   allLinks.forEach((a) => {
     try {
+      let removeLink = false;
       // Process link text with template syntax
       processTemplateInLinkText(a);
 
@@ -401,17 +398,20 @@ function processDATemplateLinks(parent) {
       // Decode the href to find [[]] patterns
       const decodedHref = decodeURIComponent(encodedHref);
       
-      // Replace all metadata placeholders in href
+
       const processedHref = decodedHref.replace(META_REG, (_match, metadataPath) => {
-        return parseMetadataPath(metadataPath) || '';
+        const metaValue = parseMetadataPath(metadataPath);
+        if (!metaValue) {
+          removeLink = true;
+        }
+        return metaValue || '';
       });
 
       if (processedHref !== decodedHref) {
         a.href = processedHref;
       }
-      
-      // Remove link if href is null-ish after processing (e.g., cta array was empty)
-      if (isInvalidHref(a.getAttribute('href'))) {
+
+      if (removeLink) {
         a.remove();
       }
     } catch (e) {
