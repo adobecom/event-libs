@@ -230,19 +230,19 @@ export async function validatePageAndRedirect(miloLibs) {
     import(`${miloLibs}/utils/utils.js`),
   ]);
 
-  const env = getEventServiceEnv();
+  const { name: envName } = getEventServiceEnv();
   const pagePublished = getMetadata('published') === 'true' || getMetadata('status') === 'live';
-  const invalidStagePage = env === 'stage' && window.location.hostname === 'www.stage.adobe.com' && !getMetadata('event-id');
+  const invalidStagePage = envName === 'stage' && window.location.hostname === 'www.stage.adobe.com' && !getMetadata('event-id');
   const isPreviewMode = new URLSearchParams(window.location.search).get('previewMode');
 
-  const organicHitUnpublishedOnProd = env === 'prod' && !pagePublished && !isPreviewMode;
-  const purposefulHitOnProdPreview = env === 'prod' && isPreviewMode;
+  const organicHitUnpublishedOnProd = envName === 'prod' && !pagePublished && !isPreviewMode;
+  const purposefulHitOnProdPreview = envName === 'prod' && isPreviewMode;
   const { prefix } = getLocale(getConfig().locales);
   const error404Location = `${series404.origin || ''}${prefix}${series404.path}`;
 
   if (organicHitUnpublishedOnProd || invalidStagePage) {
     await loadLana({ clientId: 'events-milo' });
-    await window.lana?.log(`Error: 404 page hit on ${env}: ${window.location.href}`);
+    await window.lana?.log(`Error: 404 page hit on ${envName}: ${window.location.href}`);
 
     window.location.replace(error404Location);
     return;
