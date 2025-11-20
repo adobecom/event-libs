@@ -16,6 +16,9 @@ export const [setEventConfig, updateEventConfig, getEventConfig] = (() => {
   return [
     (ec, mc = {}) => {
       config = { ...ec};
+      if (getEventServiceEnv()?.name !== 'prod') {
+        config.eventServiceEnv = getEventServiceEnv();
+      }
       if (mc) {
         config.miloConfig = mc;
       }
