@@ -447,8 +447,8 @@ function processHashtagLinks(parent) {
           }
         }
       }
-      
-      if (regHashCallbacks[a.hash]) {
+
+      if (Object.keys(regHashCallbacks).some((key) => a.href.includes(key))) {
         initRSVPHandler(a);
       }
     } catch (e) {
