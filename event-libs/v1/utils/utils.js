@@ -16,7 +16,7 @@ export const [setEventConfig, updateEventConfig, getEventConfig] = (() => {
   return [
     (ec, mc = {}) => {
       config = { ...ec};
-      if (getEventServiceEnv()?.name !== 'prod') {
+      if (getEventServiceEnv()?.name) {
         config.eventServiceEnv = getEventServiceEnv();
       }
       if (mc) {
