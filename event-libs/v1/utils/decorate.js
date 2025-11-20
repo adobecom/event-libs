@@ -643,7 +643,9 @@ function updateTextContent(child, matchCallback) {
 
 export function shouldRenderWithNonProdMetadata(eventId, prodDomain) {
   if (!eventId) return false;
-  const isLiveProd = getEventServiceEnv() === 'prod' && window.location.hostname === prodDomain;
+  const isESPProd = getEventServiceEnv()?.name === 'prod';
+  const isProdDomain = window.location.hostname === prodDomain;
+  const isLiveProd = isESPProd && isProdDomain;
 
   if (!isLiveProd) return true;
 
@@ -979,7 +981,7 @@ export function decorateEvent(parent) {
   // Process other links asynchronously (dictionary-dependent)
   processHashtagLinks(parent);
   
-  if (getEventServiceEnv() !== 'prod' && cmsType === 'SP') updateExtraMetaTags(parent);
+  if (getEventServiceEnv()?.name !== 'prod' && cmsType === 'SP') updateExtraMetaTags(parent);
 
   // handle contextual content with BlockMediator store reactivity
   updateContextualContentElements(parent, { ...photosData, ...massagedMetadata });
