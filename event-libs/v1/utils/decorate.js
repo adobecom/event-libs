@@ -277,65 +277,65 @@ function processTemplateInLinkText(a) {
   }
 }
 
+const regHashCallbacks = {
+  '#rsvp-form': (a) => {
+    // Check if button has already been initialized
+    if (a.dataset.rsvpInitialized === 'true') {
+      return;
+    }
+    
+    // Store the original text BEFORE any modifications
+    const originalText = a.textContent.includes('|') ? a.textContent.split('|')[0] : a.textContent;
+    
+    // Mark as initialized and store original text in dataset
+    a.dataset.rsvpInitialized = 'true';
+    a.dataset.rsvpOriginalText = originalText;
+    
+    const rsvpBtn = {
+      el: a,
+      originalText,
+    };
+
+    a.classList.add('rsvp-btn', 'disabled');
+
+    const loadingText = dictionaryManager.getValue('rsvp-loading-cta-text');
+    updateAnalyticTag(rsvpBtn.el, loadingText);
+    a.textContent = loadingText;
+    a.setAttribute('tabindex', -1);
+
+    const profile = BlockMediator.get('imsProfile');
+    if (profile) {
+      handleRSVPBtnBasedOnProfile(rsvpBtn, profile);
+    } else {
+      BlockMediator.subscribe('imsProfile', ({ newValue }) => {
+        handleRSVPBtnBasedOnProfile(rsvpBtn, newValue);
+      });
+    }
+  },
+  '#webinar-marketo-form': (a) => {
+    const rsvpBtn = {
+      el: a,
+      originalText: a.textContent,
+    };
+
+    const hrefWithoutHash = window.location.href.split('#')[0];
+    a.href = `${hrefWithoutHash}#webinar-marketo-form`;
+
+    const rsvpData = BlockMediator.get('rsvpData');
+    if (rsvpData && rsvpData.registrationStatus === 'registered') {
+      setCtaState('registered', rsvpBtn);
+    } else {
+      BlockMediator.subscribe('rsvpData', ({ newValue }) => {
+        if (newValue?.registrationStatus === 'registered') {
+          setCtaState('registered', rsvpBtn);
+        }
+      });
+    }
+  },
+};
+
 async function initRSVPHandler(link) {
   await dictionaryManager.initialize();
-
-  const regHashCallbacks = {
-    '#rsvp-form': (a) => {
-      // Check if button has already been initialized
-      if (a.dataset.rsvpInitialized === 'true') {
-        return;
-      }
-      
-      // Store the original text BEFORE any modifications
-      const originalText = a.textContent.includes('|') ? a.textContent.split('|')[0] : a.textContent;
-      
-      // Mark as initialized and store original text in dataset
-      a.dataset.rsvpInitialized = 'true';
-      a.dataset.rsvpOriginalText = originalText;
-      
-      const rsvpBtn = {
-        el: a,
-        originalText,
-      };
-
-      a.classList.add('rsvp-btn', 'disabled');
-
-      const loadingText = dictionaryManager.getValue('rsvp-loading-cta-text');
-      updateAnalyticTag(rsvpBtn.el, loadingText);
-      a.textContent = loadingText;
-      a.setAttribute('tabindex', -1);
-
-      const profile = BlockMediator.get('imsProfile');
-      if (profile) {
-        handleRSVPBtnBasedOnProfile(rsvpBtn, profile);
-      } else {
-        BlockMediator.subscribe('imsProfile', ({ newValue }) => {
-          handleRSVPBtnBasedOnProfile(rsvpBtn, newValue);
-        });
-      }
-    },
-    '#webinar-marketo-form': (a) => {
-      const rsvpBtn = {
-        el: a,
-        originalText: a.textContent,
-      };
-
-      const hrefWithoutHash = window.location.href.split('#')[0];
-      a.href = `${hrefWithoutHash}#webinar-marketo-form`;
-
-      const rsvpData = BlockMediator.get('rsvpData');
-      if (rsvpData && rsvpData.registrationStatus === 'registered') {
-        setCtaState('registered', rsvpBtn);
-      } else {
-        BlockMediator.subscribe('rsvpData', ({ newValue }) => {
-          if (newValue?.registrationStatus === 'registered') {
-            setCtaState('registered', rsvpBtn);
-          }
-        });
-      }
-    },
-  };
 
   try {
     const url = new URL(link.href);
@@ -423,13 +423,12 @@ function processHashtagLinks(parent) {
   const { cmsType } = getEventConfig();
   const links = parent.querySelectorAll('a[href*="#"]');
 
-  links.forEach(async (a) => {
+  links.forEach((a) => {
     const url = new URL(a.href);
     const isPlaceholderLink = url.pathname.startsWith('/events-placeholder');
     try {
       if (cmsType === 'SP') {
         processTemplateInLinkText(a);
-        const processedAsRSVPButton = await initRSVPHandler(a);
 
         if (a.href.endsWith('#host-email')) {
           if (getMetadata('host-email')) {
@@ -438,7 +437,7 @@ function processHashtagLinks(parent) {
           } else {
             a.remove();
           }
-        } else if (url.hash && !a.href.endsWith('#event-template') && !processedAsRSVPButton) {
+        } else if (url.hash && !a.href.endsWith('#event-template')) {
           const metadataPath = url.hash.replace('#', '');
           const metadataValue = parseMetadataPath(metadataPath);
           if (metadataValue) {
@@ -448,9 +447,9 @@ function processHashtagLinks(parent) {
           }
         }
       }
-
-      if (cmsType === 'DA') {
-        await initRSVPHandler(a);
+      
+      if (regHashCallbacks[a.hash]) {
+        initRSVPHandler(a);
       }
     } catch (e) {
       window.lana?.log(`Error while attempting to replace link ${a.href}:\n${JSON.stringify(e, null, 2)}`);
