@@ -2,7 +2,7 @@ import { LIBS } from './utils.js';
 import BlockMediator from '../deps/block-mediator.min.js';
 import { getBaseAttendeePayload, getEventAttendeePayload } from './data-utils.js';
 import { ENV_MAP } from './constances.js';
-import { getEventConfig } from './utils.js';
+import { getEventConfig, getEventServiceEnv } from './utils.js';
 
 export const getCaasTags = (() => {
   let cache;
@@ -81,7 +81,7 @@ export async function constructRequestOptions(method, body = null, waitForIMS = 
 }
 
 export async function getEvent(eventId) {
-  const { eventServiceEnv } = getEventConfig();
+  const eventServiceEnv = getEventServiceEnv();
   const { serviceApiEndpoints } = ENV_MAP[eventServiceEnv.name];
   const options = await constructRequestOptions('GET');
 
@@ -102,7 +102,7 @@ export async function getEvent(eventId) {
 }
 
 export async function getEventAttendee(eventId) {
-  const { eventServiceEnv } = getEventConfig();
+  const eventServiceEnv = getEventServiceEnv();
   const { serviceApiEndpoints } = ENV_MAP[eventServiceEnv.name];
   const options = await constructRequestOptions('GET');
 
@@ -133,7 +133,7 @@ export async function getEventAttendee(eventId) {
 }
 
 export async function getAttendee() {
-  const { eventServiceEnv } = getEventConfig();
+  const eventServiceEnv = getEventServiceEnv();
   const { serviceApiEndpoints } = ENV_MAP[eventServiceEnv.name];
   const options = await constructRequestOptions('GET');
 
@@ -166,7 +166,7 @@ export async function getAttendee() {
 export async function createAttendee(attendeeData) {
   if (!attendeeData) return false;
 
-  const { eventServiceEnv } = getEventConfig();
+  const eventServiceEnv = getEventServiceEnv();
   const { serviceApiEndpoints } = ENV_MAP[eventServiceEnv.name];
   const raw = JSON.stringify(attendeeData);
   const options = await constructRequestOptions('POST', raw);
@@ -190,7 +190,7 @@ export async function createAttendee(attendeeData) {
 export async function addAttendeeToEvent(eventId, attendee) {
   if (!eventId || !attendee) return false;
 
-  const { eventServiceEnv } = getEventConfig();
+  const eventServiceEnv = getEventServiceEnv();
   const { serviceApiEndpoints } = ENV_MAP[eventServiceEnv.name];
   const raw = JSON.stringify(attendee);
   const options = await constructRequestOptions('POST', raw);
@@ -214,7 +214,7 @@ export async function addAttendeeToEvent(eventId, attendee) {
 export async function updateAttendee(attendeeData) {
   if (!attendeeData) return false;
 
-  const { eventServiceEnv } = getEventConfig();
+  const eventServiceEnv = getEventServiceEnv();
   const { serviceApiEndpoints } = ENV_MAP[eventServiceEnv.name];
   const raw = JSON.stringify(attendeeData);
   const options = await constructRequestOptions('PUT', raw);
@@ -238,7 +238,7 @@ export async function updateAttendee(attendeeData) {
 export async function deleteAttendeeFromEvent(eventId, attendeeId = null) {
   if (!eventId) return false;
 
-  const { eventServiceEnv } = getEventConfig();
+  const eventServiceEnv = getEventServiceEnv();
   const { serviceApiEndpoints } = ENV_MAP[eventServiceEnv.name];
   const options = await constructRequestOptions('DELETE');
 
@@ -320,7 +320,7 @@ export async function getAndCreateAndAddAttendee(eventId, attendeeData) {
 }
 
 export async function indexPathToSchedule(scheduleId, pagePath) {
-  const { eventServiceEnv } = getEventConfig();
+  const eventServiceEnv = getEventServiceEnv();
   const { serviceApiEndpoints } = ENV_MAP[eventServiceEnv.name];
   const body = JSON.stringify({ pagePath });
   const options = await constructRequestOptions('POST', body);
@@ -341,7 +341,7 @@ export async function indexPathToSchedule(scheduleId, pagePath) {
 }
 
 export async function getSchedulePagePaths(scheduleId) {
-  const { eventServiceEnv } = getEventConfig();
+  const eventServiceEnv = getEventServiceEnv();
   const { serviceApiEndpoints } = ENV_MAP[eventServiceEnv.name];
   const options = await constructRequestOptions('GET');
 
