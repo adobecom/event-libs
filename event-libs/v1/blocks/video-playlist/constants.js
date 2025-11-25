@@ -151,13 +151,22 @@ const transformEntityCard = (item) => {
   };
 };
 
+// Helper to get mock file URL relative to current module location
+// Works when loaded as a library from any origin
+const getMockFileUrl = (filename) => {
+  const currentModuleUrl = new URL(import.meta.url);
+  const baseDir = currentModuleUrl.pathname.substring(0, currentModuleUrl.pathname.lastIndexOf('/'));
+  // Use the origin from import.meta.url to ensure correct domain/port
+  return `${currentModuleUrl.origin}${baseDir}/${filename}`;
+};
+
 export const MOCK_API={
   /* Tag-based playlist */
   async getSessions(){
     await delay(100);
     try {
       // Load mock data from JSON file matching actual API response format
-      const response = await fetch('/events/blocks/video-playlist/mock-chimera-response.json');
+      const response = await fetch(getMockFileUrl('mock-chimera-response.json'));
       if (response.ok) {
         const data = await response.json();
         return data;
@@ -173,7 +182,7 @@ export const MOCK_API={
     await delay(150);
     try {
       // Load mock entity lookup response (simulates ID lookup service)
-      const response = await fetch('/events/blocks/video-playlist/mock-entity-lookup-response.json');
+      const response = await fetch(getMockFileUrl('mock-entity-lookup-response.json'));
       if (response.ok) {
         const lookupData = await response.json();
         const paths = (config.sessionPath || '').split(',').map(s => s.trim()).filter(Boolean);
@@ -205,7 +214,7 @@ export const MOCK_API={
     await delay(200);
     try {
       // Load mock featured cards response (simulates Chimera featuredCards API)
-      const response = await fetch('/events/blocks/video-playlist/mock-featured-cards-response.json');
+      const response = await fetch(getMockFileUrl('mock-featured-cards-response.json'));
       if (response.ok) {
         const featuredData = await response.json();
         // Transform entity lookup format to card format

@@ -16,6 +16,7 @@ const EVENT_BLOCKS = [
   'promotional-content',
   'venue-additional-info',
   'youtube-chat',
+  'video-playlist',
 ];
 
 // Import only the most essential utilities that are always needed
