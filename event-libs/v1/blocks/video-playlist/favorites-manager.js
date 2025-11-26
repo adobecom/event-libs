@@ -54,7 +54,7 @@ export class FavoritesManager {
     );
 
     sessionsWrapper
-      .querySelectorAll('.video-playlist-container__sessions__wrapper__session')
+      .querySelectorAll('.session')
       .forEach((sessionEl, index) => {
         const videoId = sessionEl.getAttribute('data-video-id');
         const card = byVideoId.get(videoId) || cards[index];
@@ -70,7 +70,7 @@ export class FavoritesManager {
 
   createFavoriteButton(card, isFavorite) {
     const button = createTag('button', {
-      class: 'video-playlist-container__sessions__wrapper__session__favorite',
+      class: 'session-favorite',
       'daa-ll': isFavorite ? ANALYTICS.UNFAVORITE : ANALYTICS.FAVORITE,
       'aria-label': `${this.config.favoritesTooltipText} ${card.contentArea.title}`,
       'data-tooltip': this.config.favoritesTooltipText,

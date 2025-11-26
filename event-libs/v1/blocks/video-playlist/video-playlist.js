@@ -19,8 +19,8 @@ const { createTag } = await import(`${LIBS}/utils/utils.js`);
 /* --- Global Constants and Selectors --- */
 const SELECTORS = {
   HEADER_CHECKBOX: `#${PLAYLIST_PLAY_ALL_ID}`,
-  SESSION_CARD: '.video-playlist-container__sessions__wrapper__session',
-  PROGRESS_BAR: '.video-playlist-container__sessions__wrapper__session__thumbnail__progress__bar',
+  SESSION_CARD: '.session',
+  PROGRESS_BAR: '.session-thumb-progress-bar',
 };
 
 const DEFAULT_CFG = {
@@ -83,11 +83,11 @@ const prepareCards = (cards = []) => cards.filter((card) => card.search?.thumbna
 
 const renderHeaderMarkup = (cfg, socialMarkup, checked) => {
   return `
-    <div class="video-playlist-container__header__upper">
-      <div class="video-playlist-container__header__upper__skipLink">
-        <a href="#${PLAYLIST_SKIP_TO_ID}" class="video-playlist-container__header__upper__skipLink__link button">${cfg.skipPlaylistText}</a>
+    <div class="header-upper">
+      <div class="header-skip">
+        <a href="#${PLAYLIST_SKIP_TO_ID}" class="header-skip-link button">${cfg.skipPlaylistText}</a>
       </div>
-      <div class="video-playlist-container__header__toggle">
+      <div class="header-toggle">
         <div class="consonant-switch consonant-switch--sizeM">
           <input type="checkbox" class="consonant-switch-input" id="${PLAYLIST_PLAY_ALL_ID}" daa-ll="${
             checked ? ANALYTICS.TOGGLE_OFF : ANALYTICS.TOGGLE_ON
@@ -97,12 +97,12 @@ const renderHeaderMarkup = (cfg, socialMarkup, checked) => {
         </div>
       </div>
     </div>
-    <div class="video-playlist-container__header__content">
-      <div class="video-playlist-container__header__content__left">
-        <p class="video-playlist-container__header__content__left__topic">${cfg.topicEyebrow}</p>
-        <h3 class="video-playlist-container__header__content__left__title">${cfg.playlistTitle}</h3>
+    <div class="header-content">
+      <div class="header-left">
+        <p class="header-topic">${cfg.topicEyebrow}</p>
+        <h3 class="header-title">${cfg.playlistTitle}</h3>
       </div>
-      <div class="video-playlist-container__header__content__right">
+      <div class="header-right">
         ${socialMarkup}
       </div>
     </div>`;
@@ -114,19 +114,19 @@ const renderSessionsMarkup = (cards) => {
     .map((card) => {
       const videoId = card.search.mpcVideoId || card.search.videoId;
       return `
-        <div daa-lh="${card.contentArea.title}" class="video-playlist-container__sessions__wrapper__session" data-video-id="${videoId}">
-          <a daa-ll="${ANALYTICS.VIDEO_SELECT}" href="${card.overlayLink}" class="video-playlist-container__sessions__wrapper__session__link">
-            <div class="video-playlist-container__sessions__wrapper__session__thumbnail">
+        <div daa-lh="${card.contentArea.title}" class="session" data-video-id="${videoId}">
+          <a daa-ll="${ANALYTICS.VIDEO_SELECT}" href="${card.overlayLink}" class="session-link">
+            <div class="session-thumb">
               <img src="${card.search.thumbnailUrl}" alt="${card.contentArea.title}" loading="lazy"/>
-              <div class="video-playlist-container__sessions__wrapper__session__thumbnail__play-icon">
+              <div class="session-thumb-play-icon">
                 <svg xmlns="http://www.w3.org/2000/svg" height="40" viewBox="0 0 18 18" width="40"><rect opacity="0" width="18" height="18"/><path fill="#e5e5e5" d="M9,1a8,8,0,1,0,8,8A8,8,0,0,0,9,1Zm4.2685,8.43L7.255,12.93A.50009.50009,0,0,1,7,13H6.5a.5.5,0,0,1-.5-.5v-7A.5.5,0,0,1,6.5,5H7a.50009.50009,0,0,1,.255.07l6.0135,3.5a.5.5,0,0,1,0,.86Z"/></svg>
               </div>
-              <div class="video-playlist-container__sessions__wrapper__session__thumbnail__duration"><p class="video-playlist-container__sessions__wrapper__session__thumbnail__duration__text">${card.search.videoDuration}</p></div>
-              <div class="video-playlist-container__sessions__wrapper__session__thumbnail__progress"><div class="video-playlist-container__sessions__wrapper__session__thumbnail__progress__bar"></div></div>
+              <div class="session-thumb-duration"><p class="session-thumb-duration">${card.search.videoDuration}</p></div>
+              <div class="session-thumb-progress"><div class="session-thumb-progress-bar"></div></div>
             </div>
-            <div class="video-playlist-container__sessions__wrapper__session__info">
-              <h4 class="video-playlist-container__sessions__wrapper__session__info__title">${card.contentArea.title}</h4>
-              <p class="video-playlist-container__sessions__wrapper__session__info__description">${card.contentArea.description}</p>
+            <div class="session-info">
+              <h4 class="session-title">${card.contentArea.title}</h4>
+              <p class="session-desc">${card.contentArea.description}</p>
             </div>
           </a>
         </div>`;
@@ -137,10 +137,10 @@ const renderSessionsMarkup = (cards) => {
 
 const getToastIcon = (type) => {
   if (type === 'positive') {
-    return '<svg xmlns="http://www.w3.org/2000/svg" height="18" viewBox="0 0 18 18" width="18" class="video-playlist-container__toast-icon"><path d="M9,1a8,8,0,1,0,8,8A8,8,0,0,0,9,1Zm5.333,4.54L8.009,13.6705a.603.603,0,0,1-.4375.2305H7.535a.6.6,0,0,1-.4245-.1755L3.218,9.829a.6.6,0,0,1-.00147-.84853L3.218,8.979l.663-.6625A.6.6,0,0,1,4.72953,8.315L4.731,8.3165,7.4,10.991l5.257-6.7545a.6.6,0,0,1,.8419-.10586L13.5,4.1315l.7275.5685A.6.6,0,0,1,14.333,5.54Z"></path></svg>';
+    return '<svg xmlns="http://www.w3.org/2000/svg" height="18" viewBox="0 0 18 18" width="18" class="toast-icon"><path d="M9,1a8,8,0,1,0,8,8A8,8,0,0,0,9,1Zm5.333,4.54L8.009,13.6705a.603.603,0,0,1-.4375.2305H7.535a.6.6,0,0,1-.4245-.1755L3.218,9.829a.6.6,0,0,1-.00147-.84853L3.218,8.979l.663-.6625A.6.6,0,0,1,4.72953,8.315L4.731,8.3165,7.4,10.991l5.257-6.7545a.6.6,0,0,1,.8419-.10586L13.5,4.1315l.7275.5685A.6.6,0,0,1,14.333,5.54Z"></path></svg>';
   }
   if (type === 'info') {
-    return '<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 18 18" fill="none" class="video-playlist-container__toast-icon"><circle cx="8" cy="8" r="7" stroke="currentColor" stroke-width="1.5" fill="none"/><path d="M8 4v4M8 11h.01" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>';
+    return '<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 18 18" fill="none" class="toast-icon"><circle cx="8" cy="8" r="7" stroke="currentColor" stroke-width="1.5" fill="none"/><path d="M8 4v4M8 11h.01" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>';
   }
   return '';
 };
@@ -203,7 +203,7 @@ class VideoPlaylist {
   }
 
   createRoot() {
-    const container = createTag('div', { class: 'video-playlist-container' });
+    const container = createTag('div', { class: 'container' });
     if (this.cfg.theme) container.classList.add(`consonant--${this.cfg.theme}`);
     container.style.display = 'none'; // Keep hidden until fully rendered
     return container;
@@ -314,7 +314,7 @@ class VideoPlaylist {
 
   async renderHeader() {
     const header = createTag('div', {
-      class: 'video-playlist-container__header',
+      class: 'header',
     });
     const checked = getLocalStorageShouldAutoPlay();
     
@@ -367,10 +367,10 @@ class VideoPlaylist {
 
   renderSessions(cards) {
     const outer = createTag('div', {
-      class: 'video-playlist-container__sessions',
+      class: 'sessions',
     });
     this.sessionsWrapper = createTag('div', {
-      class: 'video-playlist-container__sessions__wrapper',
+      class: 'sessions',
     });
     
     this.sessionsWrapper.innerHTML = renderSessionsMarkup(cards);
@@ -462,13 +462,13 @@ class VideoPlaylist {
     
     const modifier =
       type === 'positive'
-        ? 'video-playlist-container__toast--positive'
+        ? 'toast--positive'
         : type === 'info'
-        ? 'video-playlist-container__toast--info'
+        ? 'toast--info'
         : '';
         
     const toast = createTag('div', {
-      class: `video-playlist-container__toast ${modifier}`.trim(),
+      class: `toast ${modifier}`.trim(),
       role: 'alert',
       'aria-live': 'assertive',
       'aria-atomic': 'true',
@@ -477,29 +477,29 @@ class VideoPlaylist {
     const icon = getToastIcon(type); 
 
     const buttonHtml = button 
-      ? `<button class="video-playlist-container__toast-button" daa-ll="${button.daaLL}"><span class="video-playlist-container__toast-button-label">${button.text}</span></button>`
+      ? `<button class="toast-button" daa-ll="${button.daaLL}"><span class="toast-button-label">${button.text}</span></button>`
       : '';
       
     toast.innerHTML = `
       ${icon}
-      <div class="video-playlist-container__toast-body">
-        <div class="video-playlist-container__toast-content">${message}</div>
+      <div class="toast-body">
+        <div class="toast-content">${message}</div>
         ${buttonHtml}
       </div>
-      <div class="video-playlist-container__toast-buttons">
-        <button aria-label="close" class="video-playlist-container__toast-close" label="Close" daa-ll="${ANALYTICS.CLOSE_FAVORITE_NOTIFICATION}">
-          <svg class="video-playlist-container__toast-close-icon" viewBox="0 0 8 8"><path d="m5.238 4 2.456-2.457A.875.875 0 1 0 6.456.306L4 2.763 1.543.306A.875.875 0 0 0 .306 1.544L2.763 4 .306 6.457a.875.875 0 1 0 1.238 1.237L4 5.237l2.456 2.457a.875.875 0 1 0 1.238-1.237z"></path></svg>
+      <div class="toast-buttons">
+        <button aria-label="close" class="toast-close" label="Close" daa-ll="${ANALYTICS.CLOSE_FAVORITE_NOTIFICATION}">
+          <svg class="toast-close-icon" viewBox="0 0 8 8"><path d="m5.238 4 2.456-2.457A.875.875 0 1 0 6.456.306L4 2.763 1.543.306A.875.875 0 0 0 .306 1.544L2.763 4 .306 6.457a.875.875 0 1 0 1.238 1.237L4 5.237l2.456 2.457a.875.875 0 1 0 1.238-1.237z"></path></svg>
         </button>
       </div>`;
       
     container.appendChild(toast);
     
     // Wire up event listeners
-    const closeButton = toast.querySelector('.video-playlist-container__toast-close');
+    const closeButton = toast.querySelector('.toast-close');
     closeButton.addEventListener('click', () => toast.remove());
     
     if (button) {
-      const buttonEl = toast.querySelector('.video-playlist-container__toast-button');
+      const buttonEl = toast.querySelector('.toast-button');
       buttonEl?.addEventListener('click', () => {
         if (button.link) window.location.href = button.link;
       });

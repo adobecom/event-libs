@@ -1,7 +1,7 @@
 import { SOCIAL_ICONS } from './constants.js';
 
 const SHARE_MENU_SELECTOR = '.share-menu-wrapper';
-const SHARE_TRIGGER_SELECTOR = '.video-playlist-container__social-share';
+const SHARE_TRIGGER_SELECTOR = '.social-share';
 const ACTIVE_CLASS = 'active';
 
 const qs = (selector, root = document) => root.querySelector(selector);
@@ -52,7 +52,7 @@ export function createSocialShareMarkup(config) {
   const list = items
     .map(
       (item) => `<li>
-        <a class="video-playlist-container__social-share-menu__item"
+        <a class="social-share-menu-item"
            data-platform="${item.key}"
            daa-ll="${item.daa}"
            aria-label="${item.alt}"
@@ -67,14 +67,14 @@ export function createSocialShareMarkup(config) {
     .join('');
 
   return `
-    <div class="video-playlist-container__social-share-wrapper">
-      <button class="video-playlist-container__social-share" daa-ll="Social_Share" aria-expanded="false">
+    <div class="social-share-wrapper">
+      <button class="social-share" daa-ll="Social_Share" aria-expanded="false">
         <svg width="16" height="16" viewBox="0 0 16 16">
           <path d="M12 6c.8 0 1.5.7 1.5 1.5S12.8 9 12 9s-1.5-.7-1.5-1.5S11.2 6 12 6zM4 6c.8 0 1.5.7 1.5 1.5S4.8 9 4 9s-1.5-.7-1.5-1.5S3.2 6 4 6zM8 6c.8 0 1.5.7 1.5 1.5S8.8 9 8 9s-1.5-.7-1.5-1.5S7.2 6 8 6z"/>
         </svg>
       </button>
       <div class="share-menu-wrapper">
-        <ul class="video-playlist-container__social-share-menu">${list}</ul>
+        <ul class="social-share-menu">${list}</ul>
       </div>
     </div>`;
 }
