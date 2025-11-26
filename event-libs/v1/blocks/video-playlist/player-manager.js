@@ -164,9 +164,11 @@ export class PlayerManager {
     if (!getLocalStorageShouldAutoPlay()) return;
 
     const cards = this.getCards?.() ?? [];
+    // Convert videoId to string for comparison (data.id might be number, card.search values are strings)
+    const videoIdStr = String(videoId);
     const index = cards.findIndex(
       (card) =>
-        card.search.mpcVideoId === videoId || card.search.videoId === videoId,
+        String(card.search.mpcVideoId) === videoIdStr || String(card.search.videoId) === videoIdStr,
     );
     if (index === -1 || index >= cards.length - 1) return;
 
