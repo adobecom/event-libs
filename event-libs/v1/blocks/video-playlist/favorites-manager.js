@@ -1,4 +1,4 @@
-import { LIBS } from '../../scripts/utils.js';
+import { LIBS } from '../../utils/utils.js';
 import { ANALYTICS } from './constants.js';
 import { initAPI, ENDPOINTS } from './api.js';
 
