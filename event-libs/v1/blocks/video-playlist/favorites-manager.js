@@ -1,6 +1,7 @@
 import { LIBS } from '../../utils/utils.js';
 import { ANALYTICS } from './constants.js';
 import { initAPI, ENDPOINTS } from './api.js';
+import { normalizeVideoId, findCardByVideoId, logError } from './utils.js';
 
 const { createTag } = await import(`${LIBS}/utils/utils.js`);
 
@@ -26,7 +27,7 @@ export class FavoritesManager {
       );
       this.injectFavoriteButtons(favoriteIds);
     } catch (err) {
-      console.error('Favorites setup failed:', err);
+      logError(err, 'FavoritesManager.setup');
     }
   }
 
@@ -46,18 +47,11 @@ export class FavoritesManager {
     const sessionsWrapper = this.getSessionsWrapper?.();
     if (!sessionsWrapper) return;
 
-    const byVideoId = new Map(
-      cards.map((card) => [
-        card.search.mpcVideoId || card.search.videoId,
-        card,
-      ]),
-    );
-
     sessionsWrapper
       .querySelectorAll('.session')
       .forEach((sessionEl, index) => {
-        const videoId = sessionEl.getAttribute('data-video-id');
-        const card = byVideoId.get(videoId) || cards[index];
+        const videoId = normalizeVideoId(sessionEl.getAttribute('data-video-id'));
+        const card = findCardByVideoId(cards, videoId) || cards[index];
         if (!card) return;
 
         const button = this.createFavoriteButton(
@@ -106,7 +100,7 @@ export class FavoritesManager {
 
       this.updateButtonState(button, card);
     } catch (err) {
-      console.error('Favorite toggle failed:', err);
+      logError(err, 'FavoritesManager.toggleFavorite');
     } finally {
       button.disabled = false;
     }

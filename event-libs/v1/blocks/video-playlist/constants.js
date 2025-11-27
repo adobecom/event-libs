@@ -12,6 +12,8 @@ export const MPC_STATUS='mpcStatus';
 export const RESTART_THRESHOLD=30;
 export const PROGRESS_SAVE_INTERVAL=5;
 export const VIDEO_ORIGIN='https://video.tv.adobe.com';
+export const PROGRESS_BAR_COLOR='#1473e6';
+export const MAX_PERCENTAGE=100;
 // TODO: Re-enable when AEM playlist ID implementation is ready
 // export const VIDEO_PLAYLIST_ID_URL_KEY='videoPlaylistId';
 

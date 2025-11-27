@@ -3,6 +3,9 @@ import {
   getLocalStorageVideos,
   getLocalStorageShouldAutoPlay,
   saveShouldAutoPlayToLocalStorage,
+  normalizeVideoId,
+  logError,
+  convertDurationStringToSeconds,
 } from './utils.js';
 import {
   PLAYLIST_PLAY_ALL_ID,
@@ -10,6 +13,8 @@ import {
   ANALYTICS,
   MOCK_API,
   PLAYLIST_SKIP_TO_ID,
+  PROGRESS_BAR_COLOR,
+  MAX_PERCENTAGE,
 } from './constants.js';
 import { PlayerManager } from './player-manager.js';
 
@@ -112,7 +117,7 @@ const renderHeaderMarkup = (cfg, socialMarkup, checked) => {
 const renderSessionsMarkup = (cards) => {
   return cards
     .map((card) => {
-      const videoId = card.search.mpcVideoId || card.search.videoId;
+      const videoId = normalizeVideoId(card.search.mpcVideoId || card.search.videoId);
       return `
         <div daa-lh="${card.contentArea.title}" class="session" data-video-id="${videoId}">
           <a daa-ll="${ANALYTICS.VIDEO_SELECT}" href="${card.overlayLink}" class="session-link">
@@ -168,7 +173,7 @@ class VideoPlaylist {
       await this.loadAndRender();
       this.initPlayerManager();
     } catch (err) {
-      console.error('VideoPlaylist init error:', err);
+      logError(err, 'VideoPlaylist.init');
       this.root?.style.removeProperty('display'); 
     }
   }
@@ -198,6 +203,12 @@ class VideoPlaylist {
         config[normalizedKey] = coerceValue(normalizedKey, value, DEFAULT_CFG);
       }
     });
+
+    // Validate critical config values
+    if (config.minimumSessions < 1) {
+      logError('minimumSessions must be >= 1', 'VideoPlaylist.parseCfg', { value: config.minimumSessions });
+      config.minimumSessions = DEFAULT_CFG.minimumSessions;
+    }
 
     return config;
   }
@@ -230,19 +241,6 @@ class VideoPlaylist {
     
     const sorted = [...cards];
 
-    // Convert duration strings (HH:MM:SS or MM:SS) to seconds for proper numeric comparison
-    const durationToSeconds = (duration) => {
-      if (!duration || typeof duration !== 'string') return 0;
-      const parts = duration.split(':').map(Number);
-      if (parts.length === 3) {
-        return parts[0] * 3600 + parts[1] * 60 + parts[2]; // hours, minutes, seconds
-      }
-      if (parts.length === 2) {
-        return parts[0] * 60 + parts[1]; // minutes, seconds
-      }
-      return parts[0] || 0; // just seconds
-    };
-
     // Sort by title
     if (this.cfg.sort === 'titleAscending') {
       sorted.sort((a, b) => a.contentArea.title.localeCompare(b.contentArea.title));
@@ -252,14 +250,14 @@ class VideoPlaylist {
     // Sort by time (duration)
     else if (this.cfg.sort === 'timeAscending') {
       sorted.sort((a, b) => {
-        const aSeconds = durationToSeconds(a.search.videoDuration);
-        const bSeconds = durationToSeconds(b.search.videoDuration);
+        const aSeconds = convertDurationStringToSeconds(a.search.videoDuration);
+        const bSeconds = convertDurationStringToSeconds(b.search.videoDuration);
         return aSeconds - bSeconds; // shortest to longest
       });
     } else if (this.cfg.sort === 'timeDescending') {
       sorted.sort((a, b) => {
-        const aSeconds = durationToSeconds(a.search.videoDuration);
-        const bSeconds = durationToSeconds(b.search.videoDuration);
+        const aSeconds = convertDurationStringToSeconds(a.search.videoDuration);
+        const bSeconds = convertDurationStringToSeconds(b.search.videoDuration);
         return bSeconds - aSeconds; // longest to shortest
       });
     }
@@ -273,12 +271,16 @@ class VideoPlaylist {
       const raw = await this.fetchCards();
       this.cards = this.sortCards(raw);
       if (this.cards.length < this.cfg.minimumSessions) {
-        console.warn(`Not enough sessions: ${this.cards.length} of ${this.cfg.minimumSessions} required.`);
+        logError(
+          `Not enough sessions: ${this.cards.length} of ${this.cfg.minimumSessions} required.`,
+          'VideoPlaylist.loadAndRender',
+          { cardCount: this.cards.length, minimum: this.cfg.minimumSessions }
+        );
         return;
       }
       await this.render(this.cards);
     } catch (err) {
-      console.error('Failed to load sessions:', err);
+      logError(err, 'VideoPlaylist.loadAndRender');
     }
   }
 
@@ -304,7 +306,7 @@ class VideoPlaylist {
           });
           await this.favoritesManager.setup();
       } catch (error) {
-        console.error('Failed to load favorites manager module:', error);
+        logError(error, 'VideoPlaylist.render.favoritesManager');
       }
     }
     this.root.appendChild(
@@ -325,7 +327,7 @@ class VideoPlaylist {
         socialModule = await import('./social.js');
         socialMarkup = socialModule.createSocialShareMarkup(this.cfg);
       } catch (error) {
-        console.error('Failed to load social sharing module:', error);
+        logError(error, 'VideoPlaylist.renderHeader.socialSharing');
       }
     }
     
@@ -358,7 +360,7 @@ class VideoPlaylist {
         });
         if (disposer) this.disposers.push(disposer);
       } catch (error) {
-        console.error('Failed to wire social sharing:', error);
+        logError(error, 'VideoPlaylist.renderHeader.socialSharing');
       }
     }
 
@@ -384,17 +386,20 @@ class VideoPlaylist {
     const videos = getLocalStorageVideos();
     [...wrapper.querySelectorAll(SELECTORS.SESSION_CARD)].forEach(
       (session) => {
-        const videoId = session.getAttribute('data-video-id');
-        const data = videos[videoId];
+        const videoId = normalizeVideoId(session.getAttribute('data-video-id'));
+        if (!videoId) return;
+        
+        // Try both normalized and original key formats for backward compatibility
+        const data = videos[videoId] || videos[session.getAttribute('data-video-id')];
         if (data?.length && data.secondsWatched > 0) {
           const bar = session.querySelector(SELECTORS.PROGRESS_BAR);
           if (bar) {
             const percentage = Math.min(
-              100,
-              (data.secondsWatched / data.length) * 100,
+              MAX_PERCENTAGE,
+              (data.secondsWatched / data.length) * MAX_PERCENTAGE,
             );
             bar.style.width = `${percentage}%`;
-            bar.style.backgroundColor = '#1473e6';
+            bar.style.backgroundColor = PROGRESS_BAR_COLOR;
             bar.style.display = 'block';
           }
         }
@@ -403,12 +408,22 @@ class VideoPlaylist {
   }
 
   highlightSession(videoId) {
-    if (!this.sessionsWrapper) return;
-    [...this.sessionsWrapper.querySelectorAll('.highlighted')].forEach((element) =>
-      element.classList.remove('highlighted'),
-    );
-    if (!videoId) return;
-    const target = this.sessionsWrapper.querySelector(`[data-video-id="${videoId}"]`);
+    if (!this.sessionsWrapper || !videoId) return;
+    
+    // Remove highlight from all sessions
+    const highlighted = this.sessionsWrapper.querySelectorAll('.highlighted');
+    highlighted.forEach((element) => element.classList.remove('highlighted'));
+    
+    // Find and highlight target session using normalized videoId
+    const normalizedId = normalizeVideoId(videoId);
+    if (!normalizedId) return;
+    
+    const sessions = this.sessionsWrapper.querySelectorAll(SELECTORS.SESSION_CARD);
+    const target = Array.from(sessions).find((session) => {
+      const sessionVideoId = normalizeVideoId(session.getAttribute('data-video-id'));
+      return sessionVideoId === normalizedId;
+    });
+    
     if (target) {
       target.classList.add('highlighted');
       target.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
@@ -416,16 +431,26 @@ class VideoPlaylist {
   }
 
   updateProgress(videoId, current, length) {
-    if (!this.sessionsWrapper) return;
-    const container = this.sessionsWrapper.querySelector(`[data-video-id="${videoId}"]`);
+    if (!this.sessionsWrapper || !videoId || !length) return;
+    
+    const normalizedId = normalizeVideoId(videoId);
+    if (!normalizedId) return;
+    
+    // Find session by normalized videoId
+    const sessions = this.sessionsWrapper.querySelectorAll(SELECTORS.SESSION_CARD);
+    const container = Array.from(sessions).find((session) => {
+      const sessionVideoId = normalizeVideoId(session.getAttribute('data-video-id'));
+      return sessionVideoId === normalizedId;
+    });
+    
     if (!container) return;
 
     const bar = container.querySelector(SELECTORS.PROGRESS_BAR);
     if (!bar) return;
     
-    const percentage = Math.min(100, (current / length) * 100);
+    const percentage = Math.min(MAX_PERCENTAGE, (current / length) * MAX_PERCENTAGE);
     bar.style.width = `${percentage}%`;
-    bar.style.backgroundColor = '#1473e6';
+    bar.style.backgroundColor = PROGRESS_BAR_COLOR;
     bar.style.display = 'block';
   }
 
@@ -526,7 +551,7 @@ class VideoPlaylist {
     try {
       document.execCommand('copy');
     } catch (err) {
-      console.error('Copy failed', err);
+      logError(err, 'VideoPlaylist.legacyCopy');
     }
     document.body.removeChild(textarea);
   }

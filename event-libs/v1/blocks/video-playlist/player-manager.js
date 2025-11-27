@@ -12,6 +12,8 @@ import {
   getLocalStorageShouldAutoPlay,
   findVideoIdFromIframeSrc,
   startVideoFromSecond,
+  findCardByVideoId,
+  logError,
 } from './utils.js';
 
 const qs = (selector, root = document) => root.querySelector(selector);
@@ -164,12 +166,10 @@ export class PlayerManager {
     if (!getLocalStorageShouldAutoPlay()) return;
 
     const cards = this.getCards?.() ?? [];
-    // Convert videoId to string for comparison (data.id might be number, card.search values are strings)
-    const videoIdStr = String(videoId);
-    const index = cards.findIndex(
-      (card) =>
-        String(card.search.mpcVideoId) === videoIdStr || String(card.search.videoId) === videoIdStr,
-    );
+    const currentCard = findCardByVideoId(cards, videoId);
+    if (!currentCard) return;
+    
+    const index = cards.indexOf(currentCard);
     if (index === -1 || index >= cards.length - 1) return;
 
     const nextUrl = cards[index + 1].overlayLink;
@@ -251,7 +251,7 @@ export class PlayerManager {
       this.cleanupFns.push(() => iframe.removeEventListener('load', onLoad));
       iframe.src = url.toString();
     } catch (err) {
-      console.error('YT iframe modify error:', err);
+      logError(err, 'PlayerManager.modifyYTIframe');
     }
   }
 
@@ -270,7 +270,7 @@ export class PlayerManager {
         },
       });
     } catch (err) {
-      console.error('YT.Player error:', err);
+      logError(err, 'PlayerManager.setupYouTubeHook');
     }
   }
 
@@ -343,7 +343,7 @@ export class PlayerManager {
         this.updateProgress(videoId, current, duration);
       }
     } catch (err) {
-      console.error('YT progress error:', err);
+      logError(err, 'PlayerManager.tickYT');
     }
   }
 }
