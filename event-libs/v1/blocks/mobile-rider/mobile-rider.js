@@ -35,7 +35,7 @@ async function loadScript() {
 
   scriptPromise = new Promise((res) => {
     const eventConfig = getEventConfig();
-    const env = eventConfig?.miloConfig?.miloLibs?.env || 'prod';
+    const env = eventConfig?.miloConfig?.env?.name || 'prod';
     const isProd = env === 'prod';
     const src = isProd ? CONFIG.SCRIPTS.PROD_URL : CONFIG.SCRIPTS.DEV_URL;
     const s = createTag('script', { src });
