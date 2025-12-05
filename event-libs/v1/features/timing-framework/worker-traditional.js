@@ -309,7 +309,10 @@ class TimingWorker {
       if (mobileRiderStore) {
         const { sessionId } = scheduleItem.mobileRider;
         const isActive = mobileRiderStore.get(sessionId);
-        if (!isActive) return true;
+        if (!isActive) {
+          this.nextScheduleItem = scheduleItem.next;
+          return true;
+        }
       }
     }
 
