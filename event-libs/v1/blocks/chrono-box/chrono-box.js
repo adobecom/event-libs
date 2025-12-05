@@ -102,7 +102,7 @@ async function setScheduleToScheduleWorker(schedule, plugins, tabId) {
   const scheduleLinkedList = buildScheduleDoubleLinkedList(schedule);
 
   const currentScriptUrl = new URL(import.meta.url);
-  const workerUrl = new URL('../../features/timing-framework/worker.js', currentScriptUrl).href;
+  const workerUrl = new URL('../../features/timing-framework/worker-traditional.js', currentScriptUrl).href;
 
   const { worker, blobUrl } = await createWorker(workerUrl);
 
