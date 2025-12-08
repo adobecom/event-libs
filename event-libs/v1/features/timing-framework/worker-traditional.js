@@ -312,6 +312,8 @@ class TimingWorker {
         if (!isActive) {
           this.nextScheduleItem = scheduleItem.next;
           return true;
+        } else {
+          return true;
         }
       }
     }
