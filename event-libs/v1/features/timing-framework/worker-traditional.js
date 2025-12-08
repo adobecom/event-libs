@@ -309,6 +309,7 @@ class TimingWorker {
       if (mobileRiderStore) {
         const { sessionId } = scheduleItem.mobileRider;
         const isActive = mobileRiderStore.get(sessionId);
+        if (isActive) return true;
         if (!isActive) {
           // Current session ended, find the next valid item to load
           let nextItem = scheduleItem.next;
