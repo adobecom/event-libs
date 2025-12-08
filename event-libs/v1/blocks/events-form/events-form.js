@@ -3,7 +3,6 @@ import BlockMediator from '../../deps/block-mediator.min.js';
 import { signIn, decorateEvent } from '../../utils/decorate.js';
 import { dictionaryManager } from '../../utils/dictionary-manager.js';
 import { getEventConfig, LIBS, getMetadata, getSusiOptions } from '../../utils/utils.js';
-import { FALLBACK_LOCALES } from '../../utils/constances.js';
 
 const eventConfig = getEventConfig();
 const miloLibs = eventConfig?.miloConfig?.miloLibs ? eventConfig.miloConfig.miloLibs : LIBS;
@@ -473,7 +472,7 @@ async function loadConsent(form, consentData) {
   termsWrapper.innerHTML = '';
   termsWrapper.classList.add('transparent');
 
-  const termsFragLink = createTag('a', { href: path, target: '_blank' }, path, { parent: termsWrapper });
+  const termsFragLink = createTag('a', { href: `${new URL(path, import.meta.url).href}`, target: '_blank' }, path, { parent: termsWrapper });
 
   await loadFragment(termsFragLink);
 
@@ -660,8 +659,8 @@ async function addConsentSuite(form) {
 
   fieldWrapper.append(label, countrySelect);
 
-  const queryIndexUrl = new URL('/event-libs/system/consent-query-index.json', import.meta.url);
-  const consentStringsIndex = await fetch(queryIndexUrl).then((r) => r.json());
+  const queryIndexUrl = new URL('/event-libs/assets/consents/consent-query-index.json', import.meta.url);
+  const consentStringsIndex = await fetch(queryIndexUrl.href).then((r) => r.json());
 
   if (consentStringsIndex) {
     const { data } = consentStringsIndex;
@@ -729,19 +728,14 @@ async function createForm(bp, formData) {
     window.lana?.log(`Failed to parse partners metadata:\n${JSON.stringify(error, null, 2)}`);
   }
 
-  const { pathname } = new URL(form.href);
   let json = formData;
   /* c8 ignore next 4 */
   if (!formData) {
-    const resp = await fetch(pathname);
+    const resp = await fetch(form.href);
     json = await resp.json();
   }
 
-  const config = getConfig();
-  await Promise.all([
-    dictionaryManager.addSheet({ config, sheet: 'default' }),
-    dictionaryManager.addSheet({ config, sheet: 'rsvp-fields' }),
-  ]);
+  await dictionaryManager.initialize();
 
   if (rsvpFieldsData) {
     const { required, visible } = rsvpFieldsData;
@@ -763,7 +757,7 @@ async function createForm(bp, formData) {
 
   const formEl = createTag('form');
   const rules = [];
-  const [action] = pathname.split('.json');
+  const [action] = new URL(form.href).pathname.split('.json');
   formEl.dataset.action = action;
 
   const typeToElement = {
@@ -1005,28 +999,29 @@ async function decorateToastArea() {
   return toastArea;
 }
 
-async function getFormLink(block, bp) {
-  const eventConfig = getEventConfig();
-  const { miloConfig, cmsType } = eventConfig;
-  const miloLibs = miloConfig?.miloLibs ? miloConfig.miloLibs : LIBS;
-  const { getLocale } = await import(`${miloLibs}/utils/utils.js`);
-  const { prefix } = getLocale(miloConfig?.locales || FALLBACK_LOCALES);
-
-  const legacyLink = block.querySelector(':scope > div:nth-of-type(2) a[href$=".json"]');
-
+function getRsvpConfigUrl() {
+  // Get the domain from import.meta.url
+  const moduleUrl = new URL(import.meta.url);
+  const domain = `${moduleUrl.protocol}//${moduleUrl.host}`;
+  
+  // Get cloud type (creativecloud or experiencecloud)
   const cloudType = getMetadata('cloud-type');
-  const configLocation = getMetadata('rsvp-config-location');
+  if (!cloudType) {
+    throw new Error('cloud-type metadata is required');
+  }
+  
+  return `${domain}/event-libs/assets/configs/rsvp/${cloudType.toLowerCase()}.json`;
+}
+
+function getFormLink(block, bp) {
+  const legacyLink = block.querySelector(':scope > div:nth-of-type(2) a[href$=".json"]');
   const form = createTag('a');
 
-  if (!configLocation && cmsType === 'SP') {
-    form.href = `/events/default/rsvp-form-configs/${cloudType.toLowerCase()}.json`;
-  } else {
-    form.href = `${prefix}${configLocation.startsWith('/') ? configLocation : `/${configLocation}`}`;
-  }
-
-  if (!form.href) {
-    const configUrl = new URL(`/events/default/rsvp-form-configs/${cloudType.toLowerCase()}.json`, import.meta.url);
-    form.href = configUrl.toString();
+  try {
+    form.href = getRsvpConfigUrl();
+  } catch (error) {
+    window.lana?.log(`Error getting RSVP config URL: ${JSON.stringify(error)}`);
+    throw error;
   }
 
   if (legacyLink) {
@@ -1040,19 +1035,35 @@ async function getFormLink(block, bp) {
 
 export default async function decorate(block, formData = null) {
   block.classList.add('loading');
+
   const toastArea = await decorateToastArea();
+
+  const eventHero = block.querySelector(':scope > div:nth-of-type(1)');
+  const hasLegacyLink = block.querySelector(':scope > div:nth-of-type(2) a[href$=".json"]');
+  let formContainer;
+  if (hasLegacyLink) {
+    formContainer = block.querySelector(':scope > div:nth-of-type(2)');
+  } else {
+    const hasEmptyFormContainer = block.querySelector(':scope > div:nth-of-type(2)').innerHTML.trim() === '';
+    if (hasEmptyFormContainer) {
+      formContainer = block.querySelector(':scope > div:nth-of-type(2)');
+    } else {
+      formContainer = createTag('div');
+      eventHero.after(formContainer);
+    }
+  }
 
   const bp = {
     block,
     toastArea,
-    eventHero: block.querySelector(':scope > div:nth-of-type(1)'),
-    formContainer: block.querySelector(':scope > div:nth-of-type(2)'),
+    eventHero,
+    formContainer,
     terms: block.querySelector(':scope > div:nth-of-type(3)'),
     rsvpSuccessScreen: block.querySelector(':scope > div:nth-of-type(4)'),
     waitlistSuccessScreen: block.querySelector(':scope > div:nth-of-type(5)'),
   };
 
-  bp.form = await getFormLink(block, bp);
+  bp.form = getFormLink(block, bp);
 
   await onProfile(bp, formData);
 }
