@@ -310,10 +310,27 @@ class TimingWorker {
         const { sessionId } = scheduleItem.mobileRider;
         const isActive = mobileRiderStore.get(sessionId);
         if (!isActive) {
-          this.nextScheduleItem = scheduleItem.next;
-          return true;
-        } else {
-          return true;
+          // Current session ended, find the next valid item to load
+          let nextItem = scheduleItem.next;
+          // Quick check: If next item doesn't have mobileRider, assign and return immediately
+          if (nextItem && !nextItem.mobileRider) {
+            this.nextScheduleItem = nextItem;
+            return true;
+          }
+          while (nextItem) {
+            if (!nextItem.mobileRider) {
+              this.nextScheduleItem = nextItem;
+              return true;
+            }
+            const nextSessionId = nextItem.mobileRider.sessionId;
+            const nextIsActive = mobileRiderStore.get(nextSessionId);
+            if (nextIsActive) {
+              this.nextScheduleItem = nextItem;
+              return true;
+            }
+            nextItem = nextItem.next;
+          }
+          return false;
         }
       }
     }
