@@ -292,7 +292,8 @@ class TimingWorker {
    */
   async shouldTriggerNextSchedule(scheduleItem) {
     if (!scheduleItem) return false;
-    let streamEnd = false;
+    let liveStreamEnd = false;
+    let validNextItem = false;
     // Check if previous item has mobileRider that's still active (overrun)
     if (this.currentScheduleItem?.mobileRider) {
       const mobileRiderStore = this.plugins.get('mobileRider');
@@ -302,7 +303,7 @@ class TimingWorker {
         if (isActive) {
           return false; // Wait for session to end
         } else {
-          streamEnd = true;
+          liveStreamEnd = true;
         }
       }
     }
@@ -320,22 +321,26 @@ class TimingWorker {
           // Quick check: If next item doesn't have mobileRider, assign and return immediately
           if (nextItem && !nextItem.mobileRider) {
             this.nextScheduleItem = nextItem;
-            return true;
-          }
-          while (nextItem) {
-            if (!nextItem.mobileRider) {
-              this.nextScheduleItem = nextItem;
-              return true;
+            validNextItem = true;
+          } else {
+            while (nextItem) {
+              if (!nextItem.mobileRider) {
+                this.nextScheduleItem = nextItem;
+                validNextItem = true;
+                break;
+              }
+              const nextSessionId = nextItem.mobileRider.sessionId;
+              const nextIsActive = mobileRiderStore.get(nextSessionId);
+              if (nextIsActive) {
+                this.nextScheduleItem = nextItem;
+                validNextItem = true;
+                break;
+              }
+              nextItem = nextItem.next;
             }
-            const nextSessionId = nextItem.mobileRider.sessionId;
-            const nextIsActive = mobileRiderStore.get(nextSessionId);
-            if (nextIsActive) {
-              this.nextScheduleItem = nextItem;
-              return true;
-            }
-            nextItem = nextItem.next;
           }
-          return false;
+          if (!validNextItem) return false;
+          scheduleItem = this.nextScheduleItem;
         }
       }
     }
@@ -358,7 +363,7 @@ class TimingWorker {
         return allConditionMet;
       }
     }
-    if (streamEnd) return true;
+    if (liveStreamEnd || validNextItem) return true;
 
     // If no plugins are blocking, check toggleTime
     const { toggleTime } = scheduleItem;
