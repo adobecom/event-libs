@@ -108,7 +108,14 @@ async function setScheduleToScheduleWorker(schedule, plugins, tabId) {
 
   const params = new URLSearchParams(document.location.search);
   const testTiming = params.get('timing');
-  const testing = testTiming ? { toggleTime: testTiming } : null;
+  const serverTime = params.get('serverTime');
+  const avoidStreamEndFlag = params.get('avoidStreamEndFlag');
+  
+  const testing = (testTiming || serverTime || avoidStreamEndFlag) ? {
+    toggleTime: testTiming,
+    serverTime,
+    avoidStreamEndFlag,
+  } : null;
 
   const pluginStates = Object.fromEntries(
     Array.from(plugins.entries())
