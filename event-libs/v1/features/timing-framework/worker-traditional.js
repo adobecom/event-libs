@@ -475,7 +475,7 @@ class TimingWorker {
     this.nextScheduleItem = await this.getStartScheduleItemByToggleTime(schedule);
     this.currentScheduleItem = this.nextScheduleItem?.prev || schedule;
     this.previouslySentItem = null;
-
+    console.log('initializeSchedule nextScheduleItem', this.nextScheduleItem);
     if (!this.nextScheduleItem) return;
 
     this.runTimer();
