@@ -258,7 +258,7 @@ class TimingWorker {
       start = pointer;
       pointer = pointer.next;
     }
-
+    console.log('getStartScheduleItemByToggleTime start in the while Loop', start);
     return start || scheduleRoot;
   }
 
