@@ -16,7 +16,6 @@ class TestingManager {
         this.timeOffset = toggleTime - currentTime;
       } else {
         // Use console.log instead of window.lana in worker context
-        console.log(`Invalid toggleTime provided for testing: ${testingData.toggleTime}`);
         this.isTestMode = false;
         this.timeOffset = 0;
       }
@@ -189,7 +188,6 @@ class TimingWorker {
       this.lastApiCall = now;
 
       if (apiTime !== null) {
-        console.log('getAuthoritativeTime', apiTime);
         this.cachedApiTime = {
           time: apiTime,
           timestamp: now,
@@ -201,7 +199,6 @@ class TimingWorker {
         try {
           const timeChannel = this.channels.get('timeCache');
           if (timeChannel) {
-            console.log('getAuthoritativeTime broadcasting time update', timeChannel);
             timeChannel.postMessage({
               type: 'time-update',
               data: this.cachedApiTime,
@@ -210,7 +207,6 @@ class TimingWorker {
         } catch (error) {
           console.log(`Error broadcasting time update: ${JSON.stringify(error)}`);
         }
-        console.log('getAuthoritativeTime returning apiTime', apiTime);
         return apiTime;
       }
       // Increment failure count if API returns null
@@ -254,13 +250,11 @@ class TimingWorker {
       // Convert toggleTime to number if it's a string, like in shouldTriggerNextSchedule
       const numericToggleTime = typeof t === 'string' ? parseInt(t, 10) : t;
       const toggleTimePassed = typeof numericToggleTime !== 'number' || adjustedTime > numericToggleTime;
-      console.log('adjustedTime > numericToggleTime', adjustedTime , numericToggleTime, start);
       if (!toggleTimePassed) break;
 
       start = pointer;
       pointer = pointer.next;
     }
-    console.log('getStartScheduleItemByToggleTime start in the while Loop', start);
     return start || scheduleRoot;
   }
 
@@ -293,11 +287,11 @@ class TimingWorker {
    * @description Returns true if the next schedule item should be triggered based on plugins
    */
   async shouldTriggerNextSchedule(scheduleItem) {
+    console.log('shouldTriggerNextSchedule scheduleItem', scheduleItem);
     if (!scheduleItem) return false;
     let liveStreamEnd = false;
     let validNextItem = false;
     // Check if previous item has mobileRider that's still active (overrun)
-    console.log('shouldTriggerNextSchedule currentScheduleItem', this.currentScheduleItem, scheduleItem);
     if (this.currentScheduleItem?.mobileRider) {
       const mobileRiderStore = this.plugins.get('mobileRider');
       if (mobileRiderStore) {
@@ -313,6 +307,7 @@ class TimingWorker {
 
     // Check if current item has mobileRider that's ended (underrun)
     if (scheduleItem.mobileRider) {
+      console.log('shouldTriggerNextSchedule scheduleItem.mobileRider', scheduleItem.mobileRider);
       const mobileRiderStore = this.plugins.get('mobileRider');
       if (mobileRiderStore) {
         const { sessionId } = scheduleItem.mobileRider;
@@ -367,34 +362,27 @@ class TimingWorker {
       }
     }
     if (liveStreamEnd || validNextItem) return true;
-    console.log('liveStreamEnd validNextItem', this.currentScheduleItem, scheduleItem);
     // If no plugins are blocking, check toggleTime
     const { toggleTime } = scheduleItem;
     if (toggleTime) {
-      console.log('inside the toggleTime');
       const currentTime = await this.getCurrentTime();
       // Convert toggleTime to number if it's a string
       const numericToggleTime = typeof toggleTime === 'string' ? parseInt(toggleTime, 10) : toggleTime;
       const timePassed = currentTime > numericToggleTime;
-      console.log('inside the toggleTime', timePassed, currentTime, numericToggleTime);
       return timePassed;
     }
-    console.log('outside the toggleTime');
     return true;
   }
 
   async runTimer() {
     const shouldTrigger = await this.shouldTriggerNextSchedule(this.nextScheduleItem);
-
+    console.log('shouldTrigger determines it should be triggered', shouldTrigger);
     let itemToSend = null;
-    console.log('shouldTrigger FirstTime', shouldTrigger);
     if (shouldTrigger) {
-      console.log('shouldTrigger FirstTime inside IF', shouldTrigger);
       itemToSend = this.nextScheduleItem;
       this.currentScheduleItem = { ...this.nextScheduleItem };
       this.nextScheduleItem = this.nextScheduleItem.next;
     } else {
-      console.log('shouldTrigger FirstTime inside else', shouldTrigger);
       // If no items are triggered, send the current schedule item
       // This handles cases where mobileRider is still active or other blocking conditions
       itemToSend = this.currentScheduleItem;
@@ -409,7 +397,6 @@ class TimingWorker {
     const isSameItem = (itemToSend && this.previouslySentItem)
       && itemToSend.pathToFragment === this.previouslySentItem.pathToFragment;
     if (itemToSend && !isSameItem) {
-      console.log('shouldTrigger FirstTime inside the itemToSend && !isSameItem', shouldTrigger);
       postMessage(itemToSend);
       this.previouslySentItem = itemToSend;
     }
@@ -477,7 +464,6 @@ class TimingWorker {
     this.nextScheduleItem = await this.getStartScheduleItemByToggleTime(schedule);
     this.currentScheduleItem = this.nextScheduleItem?.prev || schedule;
     this.previouslySentItem = null;
-    console.log('initializeSchedule nextScheduleItem', this.nextScheduleItem);
     if (!this.nextScheduleItem) return;
 
     this.runTimer();
