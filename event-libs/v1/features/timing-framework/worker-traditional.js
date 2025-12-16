@@ -382,12 +382,14 @@ class TimingWorker {
     const shouldTrigger = await this.shouldTriggerNextSchedule(this.nextScheduleItem);
 
     let itemToSend = null;
-
+    console.log('shouldTrigger FirstTime', shouldTrigger);
     if (shouldTrigger) {
+      console.log('shouldTrigger FirstTime inside IF', shouldTrigger);
       itemToSend = this.nextScheduleItem;
       this.currentScheduleItem = { ...this.nextScheduleItem };
       this.nextScheduleItem = this.nextScheduleItem.next;
     } else {
+      console.log('shouldTrigger FirstTime inside else', shouldTrigger);
       // If no items are triggered, send the current schedule item
       // This handles cases where mobileRider is still active or other blocking conditions
       itemToSend = this.currentScheduleItem;
@@ -402,6 +404,7 @@ class TimingWorker {
     const isSameItem = (itemToSend && this.previouslySentItem)
       && itemToSend.pathToFragment === this.previouslySentItem.pathToFragment;
     if (itemToSend && !isSameItem) {
+      console.log('shouldTrigger FirstTime inside the itemToSend && !isSameItem', shouldTrigger);
       postMessage(itemToSend);
       this.previouslySentItem = itemToSend;
     }
