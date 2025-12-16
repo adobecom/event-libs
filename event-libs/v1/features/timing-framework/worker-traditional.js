@@ -252,7 +252,7 @@ class TimingWorker {
       // Convert toggleTime to number if it's a string, like in shouldTriggerNextSchedule
       const numericToggleTime = typeof t === 'string' ? parseInt(t, 10) : t;
       const toggleTimePassed = typeof numericToggleTime !== 'number' || adjustedTime > numericToggleTime;
-
+      console.log('adjustedTime > numericToggleTime', adjustedTime > numericToggleTime);
       if (!toggleTimePassed) break;
 
       start = pointer;
