@@ -16,7 +16,6 @@ class TestingManager {
         this.timeOffset = toggleTime - currentTime;
       } else {
         // Use console.log instead of window.lana in worker context
-        console.log(`Invalid toggleTime provided for testing: ${testingData.toggleTime}`);
         this.isTestMode = false;
         this.timeOffset = 0;
       }
@@ -208,7 +207,6 @@ class TimingWorker {
         } catch (error) {
           console.log(`Error broadcasting time update: ${JSON.stringify(error)}`);
         }
-
         return apiTime;
       }
       // Increment failure count if API returns null
@@ -252,13 +250,11 @@ class TimingWorker {
       // Convert toggleTime to number if it's a string, like in shouldTriggerNextSchedule
       const numericToggleTime = typeof t === 'string' ? parseInt(t, 10) : t;
       const toggleTimePassed = typeof numericToggleTime !== 'number' || adjustedTime > numericToggleTime;
-
       if (!toggleTimePassed) break;
 
       start = pointer;
       pointer = pointer.next;
     }
-
     return start || scheduleRoot;
   }
 
@@ -291,25 +287,68 @@ class TimingWorker {
    * @description Returns true if the next schedule item should be triggered based on plugins
    */
   async shouldTriggerNextSchedule(scheduleItem) {
+    console.log('shouldTriggerNextSchedule scheduleItem', scheduleItem);
     if (!scheduleItem) return false;
-
+    let liveStreamEnd = false;
+    let validNextItem = false;
     // Check if previous item has mobileRider that's still active (overrun)
     if (this.currentScheduleItem?.mobileRider) {
       const mobileRiderStore = this.plugins.get('mobileRider');
       if (mobileRiderStore) {
         const { sessionId } = this.currentScheduleItem.mobileRider;
         const isActive = mobileRiderStore.get(sessionId);
-        if (isActive) return false; // Wait for session to end
+        if (isActive) {
+          return false; // Wait for session to end
+        } else {
+          liveStreamEnd = true;
+        }
       }
     }
 
     // Check if current item has mobileRider that's ended (underrun)
     if (scheduleItem.mobileRider) {
+      const { toggleTime } = scheduleItem;
+      if (toggleTime) {
+        const currentTime = await this.getCurrentTime();
+        // Convert toggleTime to number if it's a string
+        const numericToggleTime = typeof toggleTime === 'string' ? parseInt(toggleTime, 10) : toggleTime;
+        const timePassed = currentTime > numericToggleTime;
+        console.log('yes Returning because time not passed', timePassed);
+        if (!timePassed) return false;
+      }
+      console.log('shouldTriggerNextSchedule scheduleItem.mobileRider', scheduleItem.mobileRider);
       const mobileRiderStore = this.plugins.get('mobileRider');
       if (mobileRiderStore) {
         const { sessionId } = scheduleItem.mobileRider;
         const isActive = mobileRiderStore.get(sessionId);
-        if (!isActive) return true;
+        if (isActive) return true;
+        if (!isActive) {
+          // Current session ended, find the next valid item to load
+          let nextItem = scheduleItem.next;
+          // Quick check: If next item doesn't have mobileRider, assign and return immediately
+          if (nextItem && !nextItem.mobileRider) {
+            this.nextScheduleItem = nextItem;
+            validNextItem = true;
+          } else {
+            while (nextItem) {
+              if (!nextItem.mobileRider) {
+                this.nextScheduleItem = nextItem;
+                validNextItem = true;
+                break;
+              }
+              const nextSessionId = nextItem.mobileRider.sessionId;
+              const nextIsActive = mobileRiderStore.get(nextSessionId);
+              if (nextIsActive) {
+                this.nextScheduleItem = nextItem;
+                validNextItem = true;
+                break;
+              }
+              nextItem = nextItem.next;
+            }
+          }
+          if (!validNextItem) return false;
+          scheduleItem = this.nextScheduleItem;
+        }
       }
     }
 
@@ -331,7 +370,7 @@ class TimingWorker {
         return allConditionMet;
       }
     }
-
+    if (liveStreamEnd || validNextItem) return true;
     // If no plugins are blocking, check toggleTime
     const { toggleTime } = scheduleItem;
     if (toggleTime) {
@@ -341,15 +380,13 @@ class TimingWorker {
       const timePassed = currentTime > numericToggleTime;
       return timePassed;
     }
-
     return true;
   }
 
   async runTimer() {
     const shouldTrigger = await this.shouldTriggerNextSchedule(this.nextScheduleItem);
-
+    console.log('shouldTrigger determines it should be triggered', shouldTrigger);
     let itemToSend = null;
-
     if (shouldTrigger) {
       itemToSend = this.nextScheduleItem;
       this.currentScheduleItem = { ...this.nextScheduleItem };
@@ -376,7 +413,7 @@ class TimingWorker {
     if (!this.nextScheduleItem) return;
 
     // Stop polling in testing mode - we want to see exact state at the simulated timestamp
-    if (this.testingManager.isTesting()) return;
+    // if (this.testingManager.isTesting()) return;
 
     this.timerId = setTimeout(() => this.runTimer(), TimingWorker.getRandomInterval());
   }
@@ -436,7 +473,6 @@ class TimingWorker {
     this.nextScheduleItem = await this.getStartScheduleItemByToggleTime(schedule);
     this.currentScheduleItem = this.nextScheduleItem?.prev || schedule;
     this.previouslySentItem = null;
-
     if (!this.nextScheduleItem) return;
 
     this.runTimer();

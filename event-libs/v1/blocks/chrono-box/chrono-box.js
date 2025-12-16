@@ -215,7 +215,7 @@ export default async function init(el) {
       el.innerHTML = '';
 
       const a = createTag('a', { href: `${prefix}${pathToFragment}` }, '', { parent: el });
-
+      console.log('Selected Fragment', a);
       loadFragment(a).then(() => {
         el.removeAttribute('style');
       }).catch((error) => {
