@@ -376,7 +376,7 @@ class TimingWorker {
       // Convert toggleTime to number if it's a string
       const numericToggleTime = typeof toggleTime === 'string' ? parseInt(toggleTime, 10) : toggleTime;
       const timePassed = currentTime > numericToggleTime;
-      console.log('inside the toggleTime', timePassed);
+      console.log('inside the toggleTime', timePassed, currentTime, numericToggleTime);
       return timePassed;
     }
     console.log('outside the toggleTime');
