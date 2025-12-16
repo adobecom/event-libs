@@ -189,6 +189,7 @@ class TimingWorker {
       this.lastApiCall = now;
 
       if (apiTime !== null) {
+        console.log('getAuthoritativeTime', apiTime);
         this.cachedApiTime = {
           time: apiTime,
           timestamp: now,
@@ -200,6 +201,7 @@ class TimingWorker {
         try {
           const timeChannel = this.channels.get('timeCache');
           if (timeChannel) {
+            console.log('getAuthoritativeTime broadcasting time update', timeChannel);
             timeChannel.postMessage({
               type: 'time-update',
               data: this.cachedApiTime,
@@ -208,7 +210,7 @@ class TimingWorker {
         } catch (error) {
           console.log(`Error broadcasting time update: ${JSON.stringify(error)}`);
         }
-
+        console.log('getAuthoritativeTime returning apiTime', apiTime);
         return apiTime;
       }
       // Increment failure count if API returns null
