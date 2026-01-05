@@ -29,6 +29,24 @@ const CONFIG = {
 
 let scriptPromise = null;
 
+/**
+ * Checks if the user is registered for the event
+ * @returns {Promise<boolean>} - True if user is registered, false otherwise
+ */
+function isUserRegistered() {
+  if (
+    !window.feds
+    || !window.feds.utilities
+    || !window.feds.utilities.getEventData
+  ) {
+    return Promise.resolve(false);
+  }
+  return window.feds.utilities
+    .getEventData()
+    .then((data) => data.isRegistered)
+    .catch(() => false);
+}
+
 async function loadScript() {
   if (window.mobilerider) return null;
   if (scriptPromise) return scriptPromise;
@@ -46,6 +64,74 @@ async function loadScript() {
   return scriptPromise;
 }
 
+/**
+ * Finds a video in the videos array whose title matches the concurrentVideoTitle from sessionStorage.
+ * Returns the video object or undefined if not found.
+ * @param {Array} videos - All videos including default/first video
+ * @returns {Object|undefined} - The matched video or undefined
+ */
+function getConcurrentVideoBySessionStorage(videos) {
+  const concurrentVideoTitle = (sessionStorage?.getItem('concurrentVideoTitle') || '').trim();
+  if (!concurrentVideoTitle) return undefined;
+
+  const selectedVideo = videos.find(
+    (video) => video.title?.trim() === concurrentVideoTitle,
+  );
+
+  // Remove from sessionStorage after use
+  if (selectedVideo) {
+    sessionStorage?.removeItem('concurrentVideoTitle');
+  }
+
+  return selectedVideo;
+}
+
+/**
+ * Finds video(s) in the videos array whose title matches scheduled session titles.
+ * If multiple matches found, defaults to the first video.
+ * If single match found, returns that video.
+ * If no matches found, returns undefined.
+ * Only checks if user has scheduled sessions (mySchedule is only populated when user is registered).
+ * @param {Array} videos - All videos including default/first video
+ * @param {Array} mySchedule - User's scheduled sessions
+ * @returns {Object|undefined} - The matched video or undefined
+ */
+function getScheduledVideoMatch(videos, mySchedule = []) {
+  // Only proceed if user has scheduled sessions
+  if (!mySchedule || mySchedule.length === 0) {
+    return undefined;
+  }
+  if (!videos || videos.length === 0) {
+    return undefined;
+  }
+
+  // Find ALL videos that match scheduled session titles
+  const matchedVideos = videos.filter((video) => {
+    const videoTitle = video.title?.trim() || '';
+    if (!videoTitle) return false;
+
+    const match = mySchedule.find((scheduledSession) => {
+      const sessionTitle = scheduledSession.title?.trim() || '';
+      return sessionTitle && videoTitle === sessionTitle;
+    });
+
+    return !!match;
+  });
+
+  if (matchedVideos.length === 0) {
+    return undefined;
+  }
+
+  // If multiple matches found, default to first video
+  if (matchedVideos.length > 1) {
+    return videos[0];
+  }
+
+  // Single match - return it
+  return matchedVideos[0];
+}
+
+
 class MobileRider {
   constructor(el) {
     this.el = el;
@@ -54,6 +140,8 @@ class MobileRider {
     this.root = null;
     this.store = null;
     this.mainID = null;
+    this.scheduleLoaded = false;
+    this.cachedSchedule = null;
     this.init();
   }
 
@@ -81,16 +169,32 @@ class MobileRider {
 
       const isConcurrent = this.cfg.concurrentenabled;
       const videos = isConcurrent ? this.cfg.concurrentVideos : [this.cfg];
+      const defaultVideo = videos[0];
 
-      const { videoid, aslid } = videos[0];
-      if (!videoid) {
+      if (!defaultVideo?.videoid) {
         window.lana?.log('Missing video-id in config.');
         return;
       }
 
-      // Set mainID for concurrent streams
+      // Select video - only runs selection logic when concurrent videos are enabled
+      const { video: selectedVideo, source } = isConcurrent
+        ? await this.selectVideo(videos, defaultVideo)
+        : { video: defaultVideo, source: 'default' };
+
+      const { videoid, aslid } = selectedVideo;
+      if (!videoid) {
+        window.lana?.log('Missing video-id in selected video.');
+        return;
+      }
+
+      // Set mainID for concurrent streams (use selected video's ID)
       if (isConcurrent && this.store) {
-        this.mainID = videos[0].videoid;
+        this.mainID = selectedVideo.videoid;
+      }
+
+      // Log selection source for debugging
+      if (source !== 'default' && window.lana) {
+        window.lana.log(`Mobile-rider video selected via ${source}: ${videoid}`);
       }
 
       await this.loadPlayer(videoid, aslid);
@@ -402,6 +506,111 @@ class MobileRider {
       description: meta[`concurrentdescription${i}`] || '',
       thumbnail: meta[`concurrentthumbnail${i}`] || '',
     }));
+  }
+
+  /**
+   * Determines which video to play based on priority cascade.
+   * Priority: URL param > SessionStorage > Scheduled > Default
+   * Only fetches schedule if URL param and SessionStorage don't match
+   * @param {Array} allVideos - All available videos
+   * @param {Object} defaultVideo - Default/first video
+   * @returns {Promise<Object>} - { video, source } where source is 'param'|'sessionStorage'|'scheduled'|'default'
+   */
+  async selectVideo(allVideos, defaultVideo) {
+    // Priority 1: URL parameter (explicit intent, sharable links)
+    // Check synchronously first to avoid unnecessary network calls
+    const urlParams = new URLSearchParams(window.location.search);
+    const videoParam = urlParams.get('video') ? parseInt(urlParams.get('video'), 10) : null;
+    
+    if (videoParam && videoParam >= 1 && videoParam <= allVideos.length) {
+      return {
+        video: allVideos[videoParam - 1], // videoParam is 1-based, array is 0-based
+        source: 'param',
+      };
+    }
+
+    // Priority 2: SessionStorage (user's session preference from carousel)
+    // Must search ALL videos including the default/first video
+    const selectedVideo = getConcurrentVideoBySessionStorage(allVideos);
+    if (selectedVideo) {
+      return {
+        video: selectedVideo,
+        source: 'sessionStorage',
+      };
+    }
+
+    // Priority 3: Scheduled session match (automation for logged-in users)
+    // Only fetch schedule if URL param and SessionStorage didn't match
+    const mySchedule = await this.getMySchedule();
+    const scheduledVideo = getScheduledVideoMatch(allVideos, mySchedule);
+    if (scheduledVideo) {
+      return {
+        video: scheduledVideo,
+        source: 'scheduled',
+      };
+    }
+
+    // Priority 4: Default video (fallback)
+    return {
+      video: defaultVideo,
+      source: 'default',
+    };
+  }
+
+  /**
+   * Fetches user's scheduled sessions from API if needed
+   * @returns {Promise<Array>} - Array of scheduled sessions
+   */
+  async getMySchedule() {
+    // Check if user is logged in
+    const isLoggedIn = window?.feds?.utilities?.isUserLoggedIn?.() || false;
+    if (!isLoggedIn) {
+      return [];
+    }
+
+    // Check if user is registered for the event
+    const isRegistered = await isUserRegistered();
+    if (!isRegistered) {
+      return [];
+    }
+
+    // Check if schedule already loaded
+    if (this.scheduleLoaded) {
+      return this.cachedSchedule || [];
+    }
+
+    // Mark as loading to prevent duplicate fetches
+    this.scheduleLoaded = true;
+
+    try {
+      // TODO: Replace with actual API endpoint when available
+      // Mock implementation for now
+      const eventConfig = getEventConfig();
+      const eventId = eventConfig?.eventId;
+      
+      if (!eventId) {
+        return [];
+      }
+
+      // Mock API call - replace with actual endpoint
+      // const response = await fetch(`/api/schedule?eventId=${eventId}`);
+      // if (!response.ok) {
+      //   throw new Error('Failed to fetch schedule');
+      // }
+      // const data = await response.json();
+      // this.cachedSchedule = data.mySchedule || [];
+      
+      // Mock response structure (remove when real API is available)
+      // Expected structure: { mySchedule: [{ title: '...', ... }] }
+      this.cachedSchedule = [];
+      
+      return this.cachedSchedule;
+    } catch (e) {
+      // Silently fail - schedule matching is an enhancement, not critical
+      window.lana?.log(`Failed to fetch schedule: ${e.message}`);
+      this.scheduleLoaded = false; // Allow retry on next page load
+      return [];
+    }
   }
 }
 
