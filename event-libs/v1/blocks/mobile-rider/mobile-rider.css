@@ -31,3 +31,7 @@
   width: 100%;
   height: 100%;
 }
+
+.mobile-rider .mobile-rider-container h2#title_container {
+  line-height: 1.25;
+}
