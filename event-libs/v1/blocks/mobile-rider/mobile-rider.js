@@ -142,6 +142,7 @@ class MobileRider {
     this.mainID = null;
     this.scheduleLoaded = false;
     this.cachedSchedule = null;
+    this.selectedVideoId = null;
     this.init();
   }
 
@@ -198,7 +199,11 @@ class MobileRider {
       }
 
       await this.loadPlayer(videoid, aslid);
-      if (isConcurrent && videos.length > 1) await this.initDrawer(videos);
+      if (isConcurrent && videos.length > 1) {
+        // Store selected video ID only when drawer will be initialized
+        this.selectedVideoId = videoid;
+        await this.initDrawer(videos);
+      }
     } catch (e) {
       window.lana?.log(`MobileRider Init error: ${e.message}`);
     }
@@ -352,6 +357,11 @@ class MobileRider {
         renderItem,
         onItemClick: (_, v) => this.onDrawerClick(v),
       });
+
+      // Set the active drawer item to match the selected video
+      if (this.selectedVideoId && drawer?.setActiveById) {
+        drawer.setActiveById(this.selectedVideoId);
+      }
 
       const itemsList = drawer?.itemsEl;
       if (itemsList?.firstChild) {
