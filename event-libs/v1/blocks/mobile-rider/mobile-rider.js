@@ -87,6 +87,23 @@ function getConcurrentVideoBySessionStorage(videos) {
 }
 
 /**
+ * Finds a video in the videos array by the last manually selected video ID from sessionStorage.
+ * Returns the video object or undefined if not found.
+ * @param {Array} videos - All videos including default/first video
+ * @returns {Object|undefined} - The matched video or undefined
+ */
+function getLastSelectedVideoBySessionStorage(videos) {
+  const lastSelectedVideoId = (sessionStorage?.getItem('lastSelectedVideoId') || '').trim();
+  if (!lastSelectedVideoId) return undefined;
+
+  const selectedVideo = videos.find(
+    (video) => video.videoid?.trim() === lastSelectedVideoId,
+  );
+
+  return selectedVideo;
+}
+
+/**
  * Finds video(s) in the videos array whose title matches scheduled session titles.
  * If multiple matches found, defaults to the first video.
  * If single match found, returns that video.
@@ -378,6 +395,13 @@ class MobileRider {
         const live = await this.checkLive(v);
         if (!live) window.lana?.log(`This stream is not currently live: ${v.videoid}`);
       }
+      
+      // Save the manually selected video ID to sessionStorage for persistence across page refreshes
+      if (v.videoid) {
+        sessionStorage?.setItem('lastSelectedVideoId', v.videoid);
+        this.selectedVideoId = v.videoid; // Update instance property for drawer state
+      }
+      
       this.injectPlayer(v.videoid, this.cfg.skinid, v.aslid);
     } catch (e) {
       window.lana?.log(`Drawer item click error: ${e.message}`);
@@ -520,11 +544,11 @@ class MobileRider {
 
   /**
    * Determines which video to play based on priority cascade.
-   * Priority: URL param > SessionStorage > Scheduled > Default
-   * Only fetches schedule if URL param and SessionStorage don't match
+   * Priority: URL param > ConcurrentVideoTitle (one-time) > LastSelectedVideoId (persistent) > Scheduled > Default
+   * Only fetches schedule if URL param and SessionStorage didn't match
    * @param {Array} allVideos - All available videos
    * @param {Object} defaultVideo - Default/first video
-   * @returns {Promise<Object>} - { video, source } where source is 'param'|'sessionStorage'|'scheduled'|'default'
+   * @returns {Promise<Object>} - { video, source } where source is 'param'|'sessionStorage'|'lastSelected'|'scheduled'|'default'
    */
   async selectVideo(allVideos, defaultVideo) {
     // Priority 1: URL parameter (explicit intent, sharable links)
@@ -539,7 +563,7 @@ class MobileRider {
       };
     }
 
-    // Priority 2: SessionStorage (user's session preference from carousel)
+    // Priority 2: SessionStorage concurrentVideoTitle (one-time navigation from carousel)
     // Must search ALL videos including the default/first video
     const selectedVideo = getConcurrentVideoBySessionStorage(allVideos);
     if (selectedVideo) {
@@ -549,7 +573,16 @@ class MobileRider {
       };
     }
 
-    // Priority 3: Scheduled session match (automation for logged-in users)
+    // Priority 3: Last manually selected video (persistent across page refreshes)
+    const lastSelectedVideo = getLastSelectedVideoBySessionStorage(allVideos);
+    if (lastSelectedVideo) {
+      return {
+        video: lastSelectedVideo,
+        source: 'lastSelected',
+      };
+    }
+
+    // Priority 4: Scheduled session match (automation for logged-in users)
     // Only fetch schedule if URL param and SessionStorage didn't match
     const mySchedule = await this.getMySchedule();
     const scheduledVideo = getScheduledVideoMatch(allVideos, mySchedule);
@@ -560,7 +593,7 @@ class MobileRider {
       };
     }
 
-    // Priority 4: Default video (fallback)
+    // Priority 5: Default video (fallback)
     return {
       video: defaultVideo,
       source: 'default',
