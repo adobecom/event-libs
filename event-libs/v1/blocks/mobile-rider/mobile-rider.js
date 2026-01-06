@@ -121,23 +121,6 @@ function showPosterPlaceholder(container, poster, altText = 'Video poster') {
   return () => img?.remove();
 }
 
-/**
- * Checks if the user is registered for the event
- * @returns {Promise<boolean>} - True if user is registered, false otherwise
- */
-function isUserRegistered() {
-  if (
-    !window.feds
-    || !window.feds.utilities
-    || !window.feds.utilities.getEventData
-  ) {
-    return Promise.resolve(false);
-  }
-  return window.feds.utilities
-    .getEventData()
-    .then((data) => data.isRegistered)
-    .catch(() => false);
-}
 
 async function loadScript() {
   if (window.mobilerider) return null;
@@ -179,50 +162,6 @@ function getConcurrentVideoBySessionStorage(videos) {
 }
 
 
-/**
- * Finds video(s) in the videos array whose title matches scheduled session titles.
- * If multiple matches found, defaults to the first video.
- * If single match found, returns that video.
- * If no matches found, returns undefined.
- * Only checks if user has scheduled sessions (mySchedule is only populated when user is registered).
- * @param {Array} videos - All videos including default/first video
- * @param {Array} mySchedule - User's scheduled sessions
- * @returns {Object|undefined} - The matched video or undefined
- */
-function getScheduledVideoMatch(videos, mySchedule = []) {
-  // Only proceed if user has scheduled sessions
-  if (!mySchedule || mySchedule.length === 0) {
-    return undefined;
-  }
-  if (!videos || videos.length === 0) {
-    return undefined;
-  }
-
-  // Find ALL videos that match scheduled session titles
-  const matchedVideos = videos.filter((video) => {
-    const videoTitle = video.title?.trim() || '';
-    if (!videoTitle) return false;
-
-    const match = mySchedule.find((scheduledSession) => {
-      const sessionTitle = scheduledSession.title?.trim() || '';
-      return sessionTitle && videoTitle === sessionTitle;
-    });
-
-    return !!match;
-  });
-
-  if (matchedVideos.length === 0) {
-    return undefined;
-  }
-
-  // If multiple matches found, default to first video
-  if (matchedVideos.length > 1) {
-    return videos[0];
-  }
-
-  // Single match - return it
-  return matchedVideos[0];
-}
 
 
 class MobileRider {
@@ -233,8 +172,6 @@ class MobileRider {
     this.root = null;
     this.store = null;
     this.mainID = null;
-    this.scheduleLoaded = false;
-    this.cachedSchedule = null;
     this.selectedVideoId = null;
     this.currentVideoId = null;
     this.drawer = null;
@@ -302,9 +239,9 @@ class MobileRider {
 
       await this.loadPlayer(videoid, aslid);
       // Save the initial video state for concurrent streams
-      if (isConcurrent) {
-        saveCurrentVideo(videoid, this.mainID);
-      }
+      // if (isConcurrent) {
+      //   saveCurrentVideo(videoid, this.mainID);
+      // }
 
       if (isConcurrent && videos.length > 1) {
         // Store selected video ID only when drawer will be initialized
@@ -365,10 +302,11 @@ class MobileRider {
     }
 
     const poster = this.cfg.poster || this.cfg.thumbnail;
+    let removePoster = null;
     if (poster) {
       preloadPoster(poster);
+      removePoster = showPosterPlaceholder(con, poster, this.cfg.title || 'Video poster');
     }
-    const removePoster = showPosterPlaceholder(con, poster, this.cfg.title || 'Video poster');
 
     window.__mr_player?.dispose();
     con.querySelector(`#${CONFIG.PLAYER.VIDEO_ID}`)?.remove();
@@ -386,9 +324,20 @@ class MobileRider {
 
     if (!window.mobilerider) return;
 
-    const cleanup = () => removePoster();
-    video.addEventListener('loadeddata', cleanup, { once: true });
-    setTimeout(cleanup, 4000);
+    // Only set up cleanup if poster was shown
+    if (removePoster) {
+      let cleanupCalled = false;
+      const cleanup = () => {
+        if (cleanupCalled) return;
+        cleanupCalled = true;
+        removePoster();
+      };
+      const timeoutId = setTimeout(cleanup, 4000);
+      video.addEventListener('loadeddata', () => {
+        clearTimeout(timeoutId);
+        cleanup();
+      }, { once: true });
+    }
 
     window.mobilerider.embed(video.id, vid, skin, {
       ...this.getPlayerOptions(),
@@ -423,7 +372,6 @@ class MobileRider {
       }
       this.setStatus(vid, false);
       MobileRider.dispose();
-      clearCurrentVideo();
     });
   }
 
@@ -670,11 +618,10 @@ class MobileRider {
 
   /**
    * Determines which video to play based on priority cascade.
-   * Priority: URL param > ConcurrentVideoTitle (one-time) > SavedCurrentVideo (persistent) > Scheduled > Default
-   * Only fetches schedule if URL param and SessionStorage didn't match
+   * Priority: URL param > ConcurrentVideoTitle (one-time) > SavedCurrentVideo (persistent) > Default
    * @param {Array} allVideos - All available videos
    * @param {Object} defaultVideo - Default/first video
-   * @returns {Promise<Object>} - { video, source } where source is 'param'|'sessionStorage'|'saved'|'scheduled'|'default'
+   * @returns {Promise<Object>} - { video, source } where source is 'param'|'sessionStorage'|'saved'|'default'
    */
   async selectVideo(allVideos, defaultVideo) {
     // Priority 1: URL parameter (explicit intent, sharable links)
@@ -716,79 +663,22 @@ class MobileRider {
       }
     }
 
-    // Priority 4: Scheduled session match (automation for logged-in users)
-    // Only fetch schedule if URL param and SessionStorage didn't match
-    const mySchedule = await this.getMySchedule();
-    const scheduledVideo = getScheduledVideoMatch(allVideos, mySchedule);
-    if (scheduledVideo) {
-      return {
-        video: scheduledVideo,
-        source: 'scheduled',
-      };
-    }
+    // TODO: Priority 4 - Scheduled session match (automation for logged-in users)
+    // Once the schedule API is ready, implement:
+    // 1. Add getMySchedule() method to fetch user's scheduled sessions from API
+    // 2. Add getScheduledVideoMatch() function to match videos with scheduled sessions
+    // 3. Add isUserRegistered() helper function to check user registration status
+    // 4. Add scheduleLoaded and cachedSchedule properties to class
+    // 5. Insert scheduled video matching as Priority 4 before default fallback
+    // Expected API structure: { mySchedule: [{ title: '...', ... }] }
 
-    // Priority 5: Default video (fallback)
+    // Priority 4: Default video (fallback)
     return {
       video: defaultVideo,
       source: 'default',
     };
   }
 
-  /**
-   * Fetches user's scheduled sessions from API if needed
-   * @returns {Promise<Array>} - Array of scheduled sessions
-   */
-  async getMySchedule() {
-    // Check if user is logged in
-    const isLoggedIn = window?.feds?.utilities?.isUserLoggedIn?.() || false;
-    if (!isLoggedIn) {
-      return [];
-    }
-
-    // Check if user is registered for the event
-    const isRegistered = await isUserRegistered();
-    if (!isRegistered) {
-      return [];
-    }
-
-    // Check if schedule already loaded
-    if (this.scheduleLoaded) {
-      return this.cachedSchedule || [];
-    }
-
-    // Mark as loading to prevent duplicate fetches
-    this.scheduleLoaded = true;
-
-    try {
-      // TODO: Replace with actual API endpoint when available
-      // Mock implementation for now
-      const eventConfig = getEventConfig();
-      const eventId = eventConfig?.eventId;
-      
-      if (!eventId) {
-        return [];
-      }
-
-      // Mock API call - replace with actual endpoint
-      // const response = await fetch(`/api/schedule?eventId=${eventId}`);
-      // if (!response.ok) {
-      //   throw new Error('Failed to fetch schedule');
-      // }
-      // const data = await response.json();
-      // this.cachedSchedule = data.mySchedule || [];
-      
-      // Mock response structure (remove when real API is available)
-      // Expected structure: { mySchedule: [{ title: '...', ... }] }
-      this.cachedSchedule = [];
-      
-      return this.cachedSchedule;
-    } catch (e) {
-      // Silently fail - schedule matching is an enhancement, not critical
-      window.lana?.log(`Failed to fetch schedule: ${e.message}`);
-      this.scheduleLoaded = false; // Allow retry on next page load
-      return [];
-    }
-  }
 }
 
 export default function init(el) {
