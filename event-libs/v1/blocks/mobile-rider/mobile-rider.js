@@ -1,8 +1,6 @@
 /* eslint-disable no-underscore-dangle */
 import { createTag, getEventConfig } from '../../utils/utils.js';
-
 const DRAWER_CSS_URL = new URL('./drawer.css', import.meta.url).href;
-
 const CONFIG = {
   ANALYTICS: { PROVIDER: 'adobe' },
   SCRIPTS: {
@@ -32,8 +30,6 @@ const CONFIG = {
 
 let scriptPromise = null;
 
-// --- Storage helpers ---------------------------------------------------------
-
 /**
  * Save the current video state to sessionStorage
  * @param {string} videoId - The video ID that is currently playing
@@ -58,9 +54,7 @@ function saveCurrentVideo(videoId, mainId = null) {
 function getCurrentVideo() {
   try {
     const data = sessionStorage.getItem(CONFIG.STORAGE.CURRENT_VIDEO_KEY);
-
     if (!data) return null;
-
     return JSON.parse(data);
   } catch (e) {
     window.lana?.log(`Failed to get current video state: ${e.message}`);
@@ -78,8 +72,6 @@ function clearCurrentVideo() {
     window.lana?.log(`Failed to clear current video state: ${e.message}`);
   }
 }
-
-// --- LCP helpers -------------------------------------------------------------
 
 /**
  * Preload poster image for better LCP performance
@@ -148,21 +140,15 @@ async function loadScript() {
 function getConcurrentVideoBySessionStorage(videos) {
   const concurrentVideoTitle = (sessionStorage?.getItem('concurrentVideoTitle') || '').trim();
   if (!concurrentVideoTitle) return undefined;
-
   const selectedVideo = videos.find(
     (video) => video.title?.trim() === concurrentVideoTitle,
   );
-
   // Remove from sessionStorage after use
   if (selectedVideo) {
     sessionStorage?.removeItem('concurrentVideoTitle');
   }
-
   return selectedVideo;
 }
-
-
-
 
 class MobileRider {
   constructor(el) {
@@ -236,13 +222,7 @@ class MobileRider {
       if (source !== 'default' && window.lana) {
         window.lana.log(`Mobile-rider video selected via ${source}: ${videoid}`);
       }
-
       await this.loadPlayer(videoid, aslid);
-      // Save the initial video state for concurrent streams
-      // if (isConcurrent) {
-      //   saveCurrentVideo(videoid, this.mainID);
-      // }
-
       if (isConcurrent && videos.length > 1) {
         // Store selected video ID only when drawer will be initialized
         this.selectedVideoId = videoid;
