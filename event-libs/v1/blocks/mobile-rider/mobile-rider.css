@@ -9,7 +9,16 @@
   margin: 0 auto;
   box-sizing: border-box;
 }
-    
+
+.mobile-rider .mobile-rider-container { position: relative; }
+
+.mobile-rider .mobile-rider-container .mr-poster {
+  position: absolute;
+  inset: 0;
+  width: 100%; height: 100%;
+  object-fit: cover; display: block;
+}
+
 .mobile-rider > :not(.mobile-rider-player) {
   display: none;
 }
@@ -32,6 +41,6 @@
   height: 100%;
 }
 
-.mobile-rider .mobile-rider-container h2#title_container {
-  line-height: 1.25;
+.mobile-rider h2#title_container {
+  line-height: 1;
 }
