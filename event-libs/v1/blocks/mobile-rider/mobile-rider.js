@@ -314,9 +314,27 @@ class MobileRider {
       removePoster = showPosterPlaceholder(con, poster, this.cfg.title || 'Video poster');
     }
 
-    window.__mr_player?.dispose();
-    con.querySelector(`#${CONFIG.PLAYER.VIDEO_ID}`)?.remove();
+    // Dispose player and clean up old video element
+    // Do this carefully to avoid library errors with null references
+    const oldVideo = con.querySelector(`#${CONFIG.PLAYER.VIDEO_ID}`);
+    
+    if (window.__mr_player) {
+      try {
+        // Dispose player first while old video element still exists
+        window.__mr_player.dispose();
+      } catch (e) {
+        window.lana?.log(`Error disposing player: ${e.message}`);
+      }
+      // Clear reference after disposal
+      window.__mr_player = null;
+    }
 
+    // Remove old video element after player is disposed
+    if (oldVideo && oldVideo.parentNode) {
+      oldVideo.remove();
+    }
+
+    // Create new video element
     const videoAttrs = {
       id: CONFIG.PLAYER.VIDEO_ID,
       class: CONFIG.PLAYER.VIDEO_CLASS,
@@ -326,9 +344,22 @@ class MobileRider {
     };
     if (poster) videoAttrs.poster = poster; // Also set poster on <video>
     const video = createTag('video', videoAttrs);
+    
+    // Append video to container and ensure it's in the DOM
     con.appendChild(video);
 
-    if (!window.mobilerider) return;
+    // Verify video is properly in DOM before proceeding
+    if (!video.parentNode || !window.mobilerider) {
+      window.lana?.log('Video element not in DOM or mobilerider not available');
+      return;
+    }
+
+    // Verify video element exists in document
+    const videoInDoc = document.getElementById(CONFIG.PLAYER.VIDEO_ID);
+    if (!videoInDoc || videoInDoc !== video) {
+      window.lana?.log('Video element not found in document');
+      return;
+    }
 
     // Only set up cleanup if poster was shown
     if (removePoster) {
@@ -345,27 +376,47 @@ class MobileRider {
       }, { once: true });
     }
 
-    window.mobilerider.embed(video.id, vid, skin, {
-      ...this.getPlayerOptions(),
-      analytics: { provider: CONFIG.ANALYTICS.PROVIDER },
-      identifier1: vid,
-      identifier2: asl,
-      sessionId: vid,
-    });
+    // Ensure container is visible before embedding (library may need it)
+    con.classList.remove('is-hidden');
 
-    if (asl) this.initASL();
-    // Check store existence first, then check mainID or vid in store
-    if (this.store) {
-      let key = null;
-      if (this.mainID && this.store.get(this.mainID) !== undefined) {
-        key = this.mainID;
-      } else if (this.store.get(vid) !== undefined) {
-        key = vid;
+    // Use requestAnimationFrame to ensure DOM is ready before embedding
+    requestAnimationFrame(() => {
+      // Double-check video element still exists and is in DOM
+      const videoElement = document.getElementById(CONFIG.PLAYER.VIDEO_ID);
+      if (!videoElement || videoElement !== video || !window.mobilerider) {
+        window.lana?.log('Video element not ready for embedding');
+        return;
       }
 
-      if (key) this.onStreamEnd(vid);
-    }
-    con.classList.remove('is-hidden');
+      // Embed player - ensure video element is valid
+      try {
+        window.mobilerider.embed(video.id, vid, skin, {
+          ...this.getPlayerOptions(),
+          analytics: { provider: CONFIG.ANALYTICS.PROVIDER },
+          identifier1: vid,
+          identifier2: asl,
+          sessionId: vid,
+        });
+      } catch (e) {
+        window.lana?.log(`Error embedding player: ${e.message}`);
+        // Re-hide container on error
+        con.classList.add('is-hidden');
+        return;
+      }
+
+      if (asl) this.initASL();
+      // Check store existence first, then check mainID or vid in store
+      if (this.store) {
+        let key = null;
+        if (this.mainID && this.store.get(this.mainID) !== undefined) {
+          key = this.mainID;
+        } else if (this.store.get(vid) !== undefined) {
+          key = vid;
+        }
+
+        if (key) this.onStreamEnd(vid);
+      }
+    });
   }
 
   onStreamEnd(vid) {
