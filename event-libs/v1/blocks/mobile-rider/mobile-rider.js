@@ -298,7 +298,7 @@ class MobileRider {
       preload: 'metadata',
       playsinline: '',
     };
-    if (poster) videoAttrs.poster = poster; // Also set poster on <video>
+    // if (poster) videoAttrs.poster = poster; // Also set poster on <video>
     const video = createTag('video', videoAttrs);
     con.appendChild(video);
 
