@@ -59,10 +59,18 @@ class Drawer {
   }
 
   setActiveById(id) {
-    const el = this.itemsEl?.querySelector(`[data-id="${id}"]`);
-    if (el) {
-      // Only update visual state, don't trigger click handler
-      this.itemsEl?.querySelectorAll('.drawer-item.current')
+    if (!this.itemsEl) return;
+    const el = this.itemsEl.querySelector(`[data-id="${id}"]`);
+    if (!el) return;
+    // Find the corresponding item data by matching the id with videoid
+    const item = this.items.find((itemData) => itemData.videoid === id || itemData.id === id);
+
+    if (item) {
+      // Call setActive to maintain consistency with click behavior
+      this.setActive(el, item);
+    } else {
+      // Fallback: only update visual state if item data not found
+      this.itemsEl.querySelectorAll('.drawer-item.current')
         .forEach((i) => i.classList.remove('current'));
       el.classList.add('current');
     }
