@@ -281,12 +281,12 @@ class MobileRider {
       Object.assign(con.dataset, { videoid: vid, skinid: skin, aslid: asl });
     }
 
-    const poster = this.cfg.poster || this.cfg.thumbnail;
-    let removePoster = null;
-    if (poster) {
-      preloadPoster(poster);
-      removePoster = showPosterPlaceholder(con, poster, this.cfg.title || 'Video poster');
-    }
+    // const poster = this.cfg.poster || this.cfg.thumbnail;
+    // let removePoster = null;
+    // if (poster) {
+    //   preloadPoster(poster);
+    //   removePoster = showPosterPlaceholder(con, poster, this.cfg.title || 'Video poster');
+    // }
 
     window.__mr_player?.dispose();
     con.querySelector(`#${CONFIG.PLAYER.VIDEO_ID}`)?.remove();
@@ -305,9 +305,9 @@ class MobileRider {
     if (!window.mobilerider) return;
 
     // Only set up cleanup if poster was shown
-    if (removePoster) {
-      let cleanupCalled = false;
-      const cleanup = () => {
+    //if (removePoster) {
+      // let cleanupCalled = false;
+      /*const cleanup = () => {
         if (cleanupCalled) return;
         cleanupCalled = true;
         removePoster();
@@ -317,7 +317,7 @@ class MobileRider {
         clearTimeout(timeoutId);
         cleanup();
       }, { once: true });
-    }
+    } */
 
     window.mobilerider.embed(video.id, vid, skin, {
       ...this.getPlayerOptions(),
@@ -325,7 +325,6 @@ class MobileRider {
       identifier1: vid,
       identifier2: asl,
       sessionId: vid,
-      poster,
     });
 
     if (asl) this.initASL();
