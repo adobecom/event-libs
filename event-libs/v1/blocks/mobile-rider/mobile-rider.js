@@ -120,7 +120,7 @@ async function loadScript() {
 
   scriptPromise = new Promise((res) => {
     const eventConfig = getEventConfig();
-    const env = eventConfig?.miloConfig?.env?.name || 'prod';
+    const env = eventConfig?.miloConfig?.miloLibs?.env || 'prod';
     const isProd = env === 'prod';
     const src = isProd ? CONFIG.SCRIPTS.PROD_URL : CONFIG.SCRIPTS.DEV_URL;
     const s = createTag('script', { src });
@@ -132,8 +132,29 @@ async function loadScript() {
 }
 
 /**
+ * Updates the URL with video parameter
+ * @param {number|null} videoIndex - 1-based video index, or null to remove the parameter
+ */
+function updateVideoUrlParam(videoIndex) {
+  try {
+    const url = new URL(window.location.href);
+    if (videoIndex === null || videoIndex === 1) {
+      // Remove param for video 1 or null
+      url.searchParams.delete('video');
+    } else {
+      // Add/update param for video 2+
+      url.searchParams.set('video', videoIndex.toString());
+    }
+    window.history.replaceState({}, '', url);
+  } catch (e) {
+    window.lana?.log(`Failed to update video URL parameter: ${e.message}`);
+  }
+}
+
+/**
  * Finds a video in the videos array whose title matches the concurrentVideoTitle from sessionStorage.
  * Returns the video object or undefined if not found.
+ * Also updates URL parameter if a match is found.
  * @param {Array} videos - All videos including default/first video
  * @returns {Object|undefined} - The matched video or undefined
  */
@@ -146,6 +167,11 @@ function getConcurrentVideoBySessionStorage(videos) {
   // Remove from sessionStorage after use
   if (selectedVideo) {
     sessionStorage?.removeItem('concurrentVideoTitle');
+    // Find the 1-based index and update URL
+    const videoIndex = videos.findIndex((v) => v.videoid === selectedVideo.videoid) + 1;
+    if (videoIndex > 0) {
+      updateVideoUrlParam(videoIndex);
+    }
   }
   return selectedVideo;
 }
@@ -281,12 +307,12 @@ class MobileRider {
       Object.assign(con.dataset, { videoid: vid, skinid: skin, aslid: asl });
     }
 
-    // const poster = this.cfg.poster || this.cfg.thumbnail;
-    // let removePoster = null;
-    // if (poster) {
-    //   preloadPoster(poster);
-    //   removePoster = showPosterPlaceholder(con, poster, this.cfg.title || 'Video poster');
-    // }
+    const poster = this.cfg.poster || this.cfg.thumbnail;
+    let removePoster = null;
+    if (poster) {
+      preloadPoster(poster);
+      removePoster = showPosterPlaceholder(con, poster, this.cfg.title || 'Video poster');
+    }
 
     window.__mr_player?.dispose();
     con.querySelector(`#${CONFIG.PLAYER.VIDEO_ID}`)?.remove();
@@ -298,16 +324,16 @@ class MobileRider {
       preload: 'metadata',
       playsinline: '',
     };
-    // if (poster) videoAttrs.poster = poster; // Also set poster on <video>
+    if (poster) videoAttrs.poster = poster; // Also set poster on <video>
     const video = createTag('video', videoAttrs);
     con.appendChild(video);
 
     if (!window.mobilerider) return;
 
     // Only set up cleanup if poster was shown
-    //if (removePoster) {
-      // let cleanupCalled = false;
-      /*const cleanup = () => {
+    if (removePoster) {
+      let cleanupCalled = false;
+      const cleanup = () => {
         if (cleanupCalled) return;
         cleanupCalled = true;
         removePoster();
@@ -317,7 +343,7 @@ class MobileRider {
         clearTimeout(timeoutId);
         cleanup();
       }, { once: true });
-    } */
+    }
 
     window.mobilerider.embed(video.id, vid, skin, {
       ...this.getPlayerOptions(),
@@ -445,9 +471,11 @@ class MobileRider {
         this.selectedVideoId = v.videoid;
       }
       
-      // Save the current video state when user switches videos (for persistence across page refreshes)
-      if (this.cfg.concurrentenabled) {
-        saveCurrentVideo(v.videoid, this.mainID);
+      // Find the video index in the concurrent videos array to update URL parameter
+      if (this.cfg.concurrentenabled && this.cfg.concurrentVideos) {
+        const videoIndex = this.cfg.concurrentVideos.findIndex((video) => video.videoid === v.videoid) + 1;
+        // Update URL parameter: video=1 removes param, video=2+ adds/updates param
+        updateVideoUrlParam(videoIndex > 0 ? videoIndex : null);
       }
       
       this.injectPlayer(v.videoid, this.cfg.skinid, v.aslid);
@@ -597,10 +625,10 @@ class MobileRider {
 
   /**
    * Determines which video to play based on priority cascade.
-   * Priority: URL param > ConcurrentVideoTitle (one-time) > SavedCurrentVideo (persistent) > Default
+   * Priority: URL param > ConcurrentVideoTitle (one-time) > Default
    * @param {Array} allVideos - All available videos
    * @param {Object} defaultVideo - Default/first video
-   * @returns {Promise<Object>} - { video, source } where source is 'param'|'sessionStorage'|'saved'|'default'
+   * @returns {Promise<Object>} - { video, source } where source is 'param'|'sessionStorage'|'default'
    */
   async selectVideo(allVideos, defaultVideo) {
     // Priority 1: URL parameter (explicit intent, sharable links)
@@ -617,6 +645,7 @@ class MobileRider {
 
     // Priority 2: SessionStorage concurrentVideoTitle (one-time navigation from carousel)
     // Must search ALL videos including the default/first video
+    // This will also update the URL parameter if a match is found
     const selectedVideo = getConcurrentVideoBySessionStorage(allVideos);
     if (selectedVideo) {
       return {
@@ -625,33 +654,16 @@ class MobileRider {
       };
     }
 
-    // Priority 3: Saved current video state (from beforeunload, drawer click, or previous session)
-    const savedVideo = getCurrentVideo();
-    if (savedVideo?.videoId) {
-      const savedVideoObj = allVideos.find((v) => v.videoid?.trim() === savedVideo.videoId);
-      if (savedVideoObj) {
-        // Restore mainID if available
-        if (savedVideo.mainId && this.store) {
-          this.mainID = savedVideo.mainId;
-        }
-        window.lana?.log(`Restoring saved video: ${savedVideo.videoId}`);
-        return {
-          video: savedVideoObj,
-          source: 'saved',
-        };
-      }
-    }
-
-    // TODO: Priority 4 - Scheduled session match (automation for logged-in users)
+    // TODO: Priority 3 - Scheduled session match (automation for logged-in users)
     // Once the schedule API is ready, implement:
     // 1. Add getMySchedule() method to fetch user's scheduled sessions from API
     // 2. Add getScheduledVideoMatch() function to match videos with scheduled sessions
     // 3. Add isUserRegistered() helper function to check user registration status
     // 4. Add scheduleLoaded and cachedSchedule properties to class
-    // 5. Insert scheduled video matching as Priority 4 before default fallback
+    // 5. Insert scheduled video matching as Priority 3 before default fallback
     // Expected API structure: { mySchedule: [{ title: '...', ... }] }
 
-    // Priority 4: Default video (fallback)
+    // Priority 3: Default video (fallback)
     return {
       video: defaultVideo,
       source: 'default',
