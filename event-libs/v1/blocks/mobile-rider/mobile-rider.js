@@ -112,11 +112,15 @@ function updateVideoUrlParam(videoIndex) {
     if (videoIndex === null || videoIndex === 1) {
       // Remove param for video 1 or null
       url.searchParams.delete('video');
-    } else {
+    } else if (videoIndex > 1) {
       // Add/update param for video 2+
       url.searchParams.set('video', videoIndex.toString());
     }
-    window.history.replaceState({}, '', url);
+    // Only update if URL actually changed to avoid unnecessary history entries
+    const newUrl = url.toString();
+    if (newUrl !== window.location.href) {
+      window.history.replaceState({}, '', url);
+    }
   } catch (e) {
     window.lana?.log(`Failed to update video URL parameter: ${e.message}`);
   }
@@ -583,14 +587,25 @@ class MobileRider {
         this.selectedVideoId = v.videoid;
       }
       
-      // Find the 1-based video index in all videos array to update URL parameter
-      // video=1 removes param, video=2+ adds/updates param
-      if (this.allVideos && this.allVideos.length > 0) {
-        const videoIndex = this.allVideos.findIndex((video) => video.videoid === v.videoid) + 1;
-        if (videoIndex > 0) {
-          // video=1 removes param, video=2+ adds/updates param
-          updateVideoUrlParam(videoIndex === 1 ? null : videoIndex);
+      // Find the 1-based video index to update URL parameter
+      // Use drawer.items if available, otherwise fallback to allVideos
+      const videosArray = this.drawer?.items || this.allVideos;
+      let videoIndex = null;
+      
+      if (videosArray && videosArray.length > 0 && v.videoid) {
+        const index = videosArray.findIndex((video) => video.videoid === v.videoid);
+        if (index >= 0) {
+          videoIndex = index + 1; // Convert to 1-based index
         }
+      }
+      
+      // Always update URL parameter when a video is clicked
+      // video=1 removes param, video=2+ adds/updates param
+      if (videoIndex !== null) {
+        updateVideoUrlParam(videoIndex === 1 ? null : videoIndex);
+      } else {
+        // Fallback: if we can't find the index, still try to update based on videoid
+        window.lana?.log(`Could not find video index for ${v.videoid}, URL param not updated`);
       }
       
       this.injectPlayer(v.videoid, this.cfg.skinid, v.aslid);
