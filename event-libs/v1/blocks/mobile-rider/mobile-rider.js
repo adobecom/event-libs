@@ -164,6 +164,7 @@ class MobileRider {
     this.currentVideoId = null;
     this.drawer = null;
     this.allVideos = null; // Store all videos array for index calculation
+    this.isEmbedding = false; // Flag to prevent concurrent embeds
     this.init();
   }
 
@@ -281,6 +282,10 @@ class MobileRider {
     } else {
       Object.assign(con.dataset, { videoid: vid, skinid: skin, aslid: asl });
     }
+    // Ensure container is properly attached to wrap
+    if (!con.parentNode && this.wrap) {
+      this.wrap.appendChild(con);
+    }
     return con;
   }
 
@@ -307,16 +312,26 @@ class MobileRider {
     if (window.__mr_player) {
       try {
         // Dispose player first while old video element still exists
+        // Use a small delay to ensure disposal completes before removing elements
         window.__mr_player.dispose();
+        // Clear reference immediately after disposal
+        window.__mr_player = null;
       } catch (e) {
         window.lana?.log(`Error disposing player: ${e.message}`);
+        window.__mr_player = null;
       }
-      window.__mr_player = null;
     }
 
     // Remove old video element after player is disposed
+    // Use setTimeout to ensure disposal callbacks complete
     if (oldVideo?.parentNode) {
+      // Remove event listeners and clear references before removing
+      const parent = oldVideo.parentNode;
       oldVideo.remove();
+      // Ensure container still exists and is valid
+      if (!container.parentNode) {
+        window.lana?.log('Container was removed from DOM during cleanup');
+      }
     }
   }
 
@@ -399,6 +414,22 @@ class MobileRider {
    * @param {HTMLElement} container - Container element
    */
   embedPlayer(video, vid, skin, asl, container) {
+    // Final validation before embedding
+    if (!video || !video.parentNode || !container || !container.parentNode) {
+      const error = 'Video or container not properly attached to DOM';
+      window.lana?.log(`Error embedding player: ${error}`);
+      container.classList.add('is-hidden');
+      throw new Error(error);
+    }
+
+    // Ensure video element is still in the container
+    if (video.parentNode !== container) {
+      const error = 'Video element parent mismatch';
+      window.lana?.log(`Error embedding player: ${error}`);
+      container.classList.add('is-hidden');
+      throw new Error(error);
+    }
+
     try {
       window.mobilerider.embed(video.id, vid, skin, {
         ...this.getPlayerOptions(),
@@ -432,10 +463,22 @@ class MobileRider {
 
   injectPlayer(vid, skin, asl = null) {
     if (!this.wrap) return;
+    
+    // Prevent concurrent embeds
+    if (this.isEmbedding) {
+      window.lana?.log('Embed already in progress, skipping');
+      return;
+    }
+    
     this.currentVideoId = vid;
 
     // Get or create container
     const con = this.getOrCreateContainer(vid, skin, asl);
+    
+    // Ensure container is attached to wrap
+    if (!con.parentNode && this.wrap) {
+      this.wrap.appendChild(con);
+    }
 
     // Setup poster if available
     const removePoster = this.setupPoster(con);
@@ -456,15 +499,43 @@ class MobileRider {
 
     // Make container visible (library may need it)
     con.classList.remove('is-hidden');
+    
+    // Set embedding flag
+    this.isEmbedding = true;
 
-    // Use requestAnimationFrame to ensure DOM is ready
+    // Ensure container and video are stable before embedding
+    // Use requestAnimationFrame to ensure DOM is ready and stable
     requestAnimationFrame(() => {
-      // Re-validate video element exists in DOM
+      // Re-validate container and video element exist in DOM
+      if (!this.wrap || !con.parentNode || con.parentNode !== this.wrap) {
+        window.lana?.log('Container or wrap removed from DOM');
+        con.classList.add('is-hidden');
+        return;
+      }
+
       const videoElement = document.getElementById(CONFIG.PLAYER.VIDEO_ID);
       if (!videoElement || videoElement !== video || !window.mobilerider) {
         window.lana?.log('Video element not ready for embedding');
         con.classList.add('is-hidden');
         return;
+      }
+
+      // Ensure video element is still in the container and container is in wrap
+      if (videoElement.parentNode !== con || con.parentNode !== this.wrap) {
+        window.lana?.log('Video element or container parent mismatch');
+        con.classList.add('is-hidden');
+        return;
+      }
+
+      // Ensure container has the video as a child (player library may check this)
+      if (!con.contains(videoElement) || con.firstElementChild !== videoElement) {
+        // Video might not be first child if poster image was added
+        // Just ensure it's contained
+        if (!con.contains(videoElement)) {
+          window.lana?.log('Video element not contained in container');
+          con.classList.add('is-hidden');
+          return;
+        }
       }
 
       // Embed player
@@ -480,6 +551,12 @@ class MobileRider {
         this.setupStreamEndListener(vid);
       } catch (e) {
         // Error already logged in embedPlayer
+        con.classList.add('is-hidden');
+      } finally {
+        // Clear embedding flag after a short delay to allow player to initialize
+        setTimeout(() => {
+          this.isEmbedding = false;
+        }, 100);
       }
     });
   }
