@@ -687,10 +687,9 @@ class MobileRider {
       
       this.injectPlayer(v.videoid, this.cfg.skinid, v.aslid);
       
-      // Update drawer active state
-      if (this.drawer?.setActiveById) {
-        this.drawer.setActiveById(v.videoid);
-      }
+      // Note: No need to call setActiveById here because setActive was already called
+      // by the drawer click handler, which updated the visual state. Calling it again
+      // would cause an infinite loop since setActiveById -> setActive -> onClick -> onDrawerClick
     } catch (e) {
       window.lana?.log(`Drawer item click error: ${e.message}`);
     }
