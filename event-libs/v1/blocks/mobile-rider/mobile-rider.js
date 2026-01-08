@@ -26,41 +26,12 @@ const CONFIG = {
   STORAGE: {
     CURRENT_VIDEO_KEY: 'mobile-rider-current-video',
   },
+  POSTER: {
+    CLEANUP_TIMEOUT_MS: 4000,
+  },
 };
 
 let scriptPromise = null;
-
-/**
- * Save the current video state to sessionStorage
- * @param {string} videoId - The video ID that is currently playing
- * @param {string} mainId - The main session ID for concurrent streams
- */
-function saveCurrentVideo(videoId, mainId = null) {
-  try {
-    const data = {
-      videoId,
-      mainId,
-    };
-    sessionStorage.setItem(CONFIG.STORAGE.CURRENT_VIDEO_KEY, JSON.stringify(data));
-  } catch (e) {
-    window.lana?.log(`Failed to save current video state: ${e.message}`);
-  }
-}
-
-/**
- * Get the saved current video state from sessionStorage
- * @returns {Object|null} The saved video state or null if not found
- */
-function getCurrentVideo() {
-  try {
-    const data = sessionStorage.getItem(CONFIG.STORAGE.CURRENT_VIDEO_KEY);
-    if (!data) return null;
-    return JSON.parse(data);
-  } catch (e) {
-    window.lana?.log(`Failed to get current video state: ${e.message}`);
-    return null;
-  }
-}
 
 /**
  * Clear the saved current video state
@@ -168,9 +139,10 @@ function getConcurrentVideoBySessionStorage(videos) {
   if (selectedVideo) {
     sessionStorage?.removeItem('concurrentVideoTitle');
     // Find the 1-based index and update URL
+    // video=1 removes param, video=2+ adds/updates param
     const videoIndex = videos.findIndex((v) => v.videoid === selectedVideo.videoid) + 1;
     if (videoIndex > 0) {
-      updateVideoUrlParam(videoIndex);
+      updateVideoUrlParam(videoIndex === 1 ? null : videoIndex);
     }
   }
   return selectedVideo;
@@ -187,14 +159,8 @@ class MobileRider {
     this.selectedVideoId = null;
     this.currentVideoId = null;
     this.drawer = null;
+    this.allVideos = null; // Store all videos array for index calculation
     this.init();
-
-    // Save current video state before page unload
-    window.addEventListener('beforeunload', () => {
-      if (this.currentVideoId && this.cfg?.concurrentenabled) {
-        saveCurrentVideo(this.currentVideoId, this.mainID);
-      }
-    });
   }
 
   async init() {
@@ -221,6 +187,7 @@ class MobileRider {
 
       const isConcurrent = this.cfg.concurrentenabled;
       const videos = isConcurrent ? this.cfg.concurrentVideos : [this.cfg];
+      this.allVideos = videos; // Store for use in onDrawerClick
       const defaultVideo = videos[0];
 
       if (!defaultVideo?.videoid) {
@@ -289,10 +256,14 @@ class MobileRider {
     };
   }
 
-  injectPlayer(vid, skin, asl = null) {
-    if (!this.wrap) return;
-    this.currentVideoId = vid;
-
+  /**
+   * Gets or creates the player container element
+   * @param {string} vid - Video ID
+   * @param {string} skin - Skin ID
+   * @param {string|null} asl - ASL ID
+   * @returns {HTMLElement} Container element
+   */
+  getOrCreateContainer(vid, skin, asl) {
     let con = this.wrap.querySelector('.mobile-rider-container');
     if (!con) {
       con = createTag('div', {
@@ -306,18 +277,29 @@ class MobileRider {
     } else {
       Object.assign(con.dataset, { videoid: vid, skinid: skin, aslid: asl });
     }
+    return con;
+  }
 
+  /**
+   * Sets up poster placeholder if poster is available
+   * @param {HTMLElement} container - Container element
+   * @returns {Function|null} Cleanup function to remove poster, or null
+   */
+  setupPoster(container) {
     const poster = this.cfg.poster || this.cfg.thumbnail;
-    let removePoster = null;
-    if (poster) {
-      preloadPoster(poster);
-      removePoster = showPosterPlaceholder(con, poster, this.cfg.title || 'Video poster');
-    }
+    if (!poster) return null;
 
-    // Dispose player and clean up old video element
-    // Do this carefully to avoid library errors with null references
-    const oldVideo = con.querySelector(`#${CONFIG.PLAYER.VIDEO_ID}`);
-    
+    preloadPoster(poster);
+    return showPosterPlaceholder(container, poster, this.cfg.title || 'Video poster');
+  }
+
+  /**
+   * Disposes the previous player instance and removes old video element
+   * @param {HTMLElement} container - Container element
+   */
+  cleanupPreviousPlayer(container) {
+    const oldVideo = container.querySelector(`#${CONFIG.PLAYER.VIDEO_ID}`);
+
     if (window.__mr_player) {
       try {
         // Dispose player first while old video element still exists
@@ -325,16 +307,22 @@ class MobileRider {
       } catch (e) {
         window.lana?.log(`Error disposing player: ${e.message}`);
       }
-      // Clear reference after disposal
       window.__mr_player = null;
     }
 
     // Remove old video element after player is disposed
-    if (oldVideo && oldVideo.parentNode) {
+    if (oldVideo?.parentNode) {
       oldVideo.remove();
     }
+  }
 
-    // Create new video element
+  /**
+   * Creates and appends the video element to the container
+   * @param {HTMLElement} container - Container element
+   * @returns {HTMLVideoElement} Created video element
+   */
+  createVideoElement(container) {
+    const poster = this.cfg.poster || this.cfg.thumbnail;
     const videoAttrs = {
       id: CONFIG.PLAYER.VIDEO_ID,
       class: CONFIG.PLAYER.VIDEO_CLASS,
@@ -342,79 +330,152 @@ class MobileRider {
       preload: 'metadata',
       playsinline: '',
     };
-    if (poster) videoAttrs.poster = poster; // Also set poster on <video>
-    const video = createTag('video', videoAttrs);
-    
-    // Append video to container and ensure it's in the DOM
-    con.appendChild(video);
-
-    // Verify video is properly in DOM before proceeding
-    if (!video.parentNode || !window.mobilerider) {
-      window.lana?.log('Video element not in DOM or mobilerider not available');
-      return;
+    if (poster) {
+      videoAttrs.poster = poster;
     }
 
-    // Verify video element exists in document
+    const video = createTag('video', videoAttrs);
+    container.appendChild(video);
+    return video;
+  }
+
+  /**
+   * Sets up poster cleanup when video loads
+   * @param {HTMLVideoElement} video - Video element
+   * @param {Function} removePoster - Function to remove poster
+   */
+  setupPosterCleanup(video, removePoster) {
+    if (!removePoster) return;
+
+    let cleanupCalled = false;
+    const cleanup = () => {
+      if (cleanupCalled) return;
+      cleanupCalled = true;
+      removePoster();
+    };
+
+    const timeoutId = setTimeout(cleanup, CONFIG.POSTER.CLEANUP_TIMEOUT_MS);
+    video.addEventListener('loadeddata', () => {
+      clearTimeout(timeoutId);
+      cleanup();
+    }, { once: true });
+  }
+
+  /**
+   * Validates that the video element is ready for embedding
+   * @param {HTMLVideoElement} video - Video element to validate
+   * @returns {boolean} True if video is ready, false otherwise
+   */
+  validateVideoElement(video) {
+    if (!video.parentNode) {
+      window.lana?.log('Video element not in DOM');
+      return false;
+    }
+
+    if (!window.mobilerider) {
+      window.lana?.log('mobilerider library not available');
+      return false;
+    }
+
     const videoInDoc = document.getElementById(CONFIG.PLAYER.VIDEO_ID);
     if (!videoInDoc || videoInDoc !== video) {
       window.lana?.log('Video element not found in document');
+      return false;
+    }
+
+    return true;
+  }
+
+  /**
+   * Embeds the MobileRider player
+   * @param {HTMLVideoElement} video - Video element
+   * @param {string} vid - Video ID
+   * @param {string} skin - Skin ID
+   * @param {string|null} asl - ASL ID
+   * @param {HTMLElement} container - Container element
+   */
+  embedPlayer(video, vid, skin, asl, container) {
+    try {
+      window.mobilerider.embed(video.id, vid, skin, {
+        ...this.getPlayerOptions(),
+        analytics: { provider: CONFIG.ANALYTICS.PROVIDER },
+        identifier1: vid,
+        identifier2: asl,
+        sessionId: vid,
+      });
+    } catch (e) {
+      window.lana?.log(`Error embedding player: ${e.message}`);
+      container.classList.add('is-hidden');
+      throw e;
+    }
+  }
+
+  /**
+   * Sets up stream end handler if video has ended
+   * @param {string} vid - Video ID
+   */
+  setupStreamEndListener(vid) {
+    if (!this.store) return;
+
+    const key = (this.mainID && this.store.get(this.mainID) !== undefined)
+      ? this.mainID
+      : (this.store.get(vid) !== undefined ? vid : null);
+
+    if (key) {
+      this.onStreamEnd(vid);
+    }
+  }
+
+  injectPlayer(vid, skin, asl = null) {
+    if (!this.wrap) return;
+    this.currentVideoId = vid;
+
+    // Get or create container
+    const con = this.getOrCreateContainer(vid, skin, asl);
+
+    // Setup poster if available
+    const removePoster = this.setupPoster(con);
+
+    // Cleanup previous player and video element
+    this.cleanupPreviousPlayer(con);
+
+    // Create new video element
+    const video = this.createVideoElement(con);
+
+    // Validate video element before proceeding
+    if (!this.validateVideoElement(video)) {
       return;
     }
 
-    // Only set up cleanup if poster was shown
-    if (removePoster) {
-      let cleanupCalled = false;
-      const cleanup = () => {
-        if (cleanupCalled) return;
-        cleanupCalled = true;
-        removePoster();
-      };
-      const timeoutId = setTimeout(cleanup, 4000);
-      video.addEventListener('loadeddata', () => {
-        clearTimeout(timeoutId);
-        cleanup();
-      }, { once: true });
-    }
+    // Setup poster cleanup if poster was shown
+    this.setupPosterCleanup(video, removePoster);
 
-    // Ensure container is visible before embedding (library may need it)
+    // Make container visible (library may need it)
     con.classList.remove('is-hidden');
 
-    // Use requestAnimationFrame to ensure DOM is ready before embedding
+    // Use requestAnimationFrame to ensure DOM is ready
     requestAnimationFrame(() => {
-      // Double-check video element still exists and is in DOM
+      // Re-validate video element exists in DOM
       const videoElement = document.getElementById(CONFIG.PLAYER.VIDEO_ID);
       if (!videoElement || videoElement !== video || !window.mobilerider) {
         window.lana?.log('Video element not ready for embedding');
-        return;
-      }
-
-      // Embed player - ensure video element is valid
-      try {
-        window.mobilerider.embed(video.id, vid, skin, {
-          ...this.getPlayerOptions(),
-          analytics: { provider: CONFIG.ANALYTICS.PROVIDER },
-          identifier1: vid,
-          identifier2: asl,
-          sessionId: vid,
-        });
-      } catch (e) {
-        window.lana?.log(`Error embedding player: ${e.message}`);
-        // Re-hide container on error
         con.classList.add('is-hidden');
         return;
       }
 
-      if (asl) this.initASL();
-      // Check store existence first, then check mainID or vid in store
-      if (this.store) {
-        let key = null;
-        if (this.mainID && this.store.get(this.mainID) !== undefined) {
-          key = this.mainID;
-        } else if (this.store.get(vid) !== undefined) {
-          key = vid;
+      // Embed player
+      try {
+        this.embedPlayer(video, vid, skin, asl, con);
+
+        // Initialize ASL if needed
+        if (asl) {
+          this.initASL();
         }
 
-        if (key) this.onStreamEnd(vid);
+        // Setup stream end listener if video has ended
+        this.setupStreamEndListener(vid);
+      } catch (e) {
+        // Error already logged in embedPlayer
       }
     });
   }
@@ -522,11 +583,14 @@ class MobileRider {
         this.selectedVideoId = v.videoid;
       }
       
-      // Find the video index in the concurrent videos array to update URL parameter
-      if (this.cfg.concurrentenabled && this.cfg.concurrentVideos) {
-        const videoIndex = this.cfg.concurrentVideos.findIndex((video) => video.videoid === v.videoid) + 1;
-        // Update URL parameter: video=1 removes param, video=2+ adds/updates param
-        updateVideoUrlParam(videoIndex > 0 ? videoIndex : null);
+      // Find the 1-based video index in all videos array to update URL parameter
+      // video=1 removes param, video=2+ adds/updates param
+      if (this.allVideos && this.allVideos.length > 0) {
+        const videoIndex = this.allVideos.findIndex((video) => video.videoid === v.videoid) + 1;
+        if (videoIndex > 0) {
+          // video=1 removes param, video=2+ adds/updates param
+          updateVideoUrlParam(videoIndex === 1 ? null : videoIndex);
+        }
       }
       
       this.injectPlayer(v.videoid, this.cfg.skinid, v.aslid);
