@@ -27,8 +27,7 @@ const CONFIG = {
   },
 };
 
-/** * GLOBAL UTILITIES 
- */
+/** * GLOBAL UTILITIES */
 const getEnv = () => getEventConfig()?.miloConfig?.env?.name || 'prod';
 const isProd = () => getEnv() === 'prod';
 
@@ -54,8 +53,7 @@ async function loadMobileRiderScript() {
   return scriptPromise;
 }
 
-/** * MAIN CLASS 
- */
+/** * MAIN CLASS */
 class MobileRider {
   constructor(el) {
     this.el = el;
@@ -75,7 +73,6 @@ class MobileRider {
     try {
       this.cfg = this.#parseConfig();
       
-      // Load dependencies (Script & Store)
       const deps = [loadMobileRiderScript()];
       if (this.el.closest('.chrono-box')) deps.push(this.#loadStore());
       await Promise.all(deps);
@@ -87,11 +84,8 @@ class MobileRider {
       if (this.cfg.concurrentenabled) this.state.mainID = videos[0]?.videoid;
 
       const selected = await this.#determineInitialVideo(videos);
-      
-      // Initial Player Load
       await this.renderPlayer(selected);
 
-      // Setup Drawer if multiple videos exist
       if (this.cfg.concurrentenabled && videos.length > 1) {
         await this.#initDrawer(videos, selected.videoid);
       }
@@ -148,9 +142,7 @@ class MobileRider {
       const domain = isProd() ? CONFIG.API.PROD_URL : CONFIG.API.DEV_URL;
       const res = await fetch(`https://${domain}/api/media-status?ids=${id}`);
       return res.ok ? await res.json() : { active: [] };
-    } catch (e) {
-      return { active: [] };
-    }
+    } catch (e) { return { active: [] }; }
   }
 
   async #checkLiveStatus(videoObj) {
@@ -175,18 +167,15 @@ class MobileRider {
 
     await this.#checkLiveStatus(videoObj);
 
-    // Cleanup previous player
     if (window.__mr_player) {
       try { window.__mr_player.dispose(); } catch (e) { /* ignore */ }
       window.__mr_player = null;
     }
+
     this.wrap.innerHTML = '';
-
-    const container = createTag('div', {
-      class: 'mobile-rider-container',
-      id: CONFIG.PLAYER.CONTAINER_ID,
-    }, '', this.wrap);
-
+    const container = createTag('div', { class: 'mobile-rider-container', id: CONFIG.PLAYER.CONTAINER_ID }, '', this.wrap);
+    
+    // Create Video Element
     const videoEl = createTag('video', {
       id: CONFIG.PLAYER.VIDEO_ID,
       class: CONFIG.PLAYER.VIDEO_CLASS,
@@ -195,21 +184,31 @@ class MobileRider {
       poster: videoObj.thumbnail || this.cfg.poster || '',
     }, '', container);
 
-    try {
-      window.mobilerider.embed(videoEl.id, videoObj.videoid, this.cfg.skinid, {
-        ...CONFIG.PLAYER.DEFAULT_OPTIONS,
-        analytics: { provider: CONFIG.ANALYTICS.PROVIDER },
-        identifier1: videoObj.videoid,
-        identifier2: videoObj.aslid || '',
-      });
+    // CRITICAL: requestAnimationFrame ensures the videoEl is painted in the DOM
+    // before the mobilerider library attempts to query it.
+    requestAnimationFrame(() => {
+      if (!document.getElementById(CONFIG.PLAYER.VIDEO_ID)) {
+        this.#log('Video element missing from DOM during embed attempt');
+        this.state.isEmbedding = false;
+        return;
+      }
 
-      if (videoObj.aslid) this.#initASL(container);
-      this.#attachStreamEndListener(videoObj.videoid);
-    } catch (e) {
-      this.#log(`Embed Error: ${e.message}`);
-    } finally {
-      this.state.isEmbedding = false;
-    }
+      try {
+        window.mobilerider.embed(videoEl.id, videoObj.videoid, this.cfg.skinid, {
+          ...CONFIG.PLAYER.DEFAULT_OPTIONS,
+          analytics: { provider: CONFIG.ANALYTICS.PROVIDER },
+          identifier1: videoObj.videoid,
+          identifier2: videoObj.aslid || '',
+        });
+
+        if (videoObj.aslid) this.#initASL(container);
+        this.#attachStreamEndListener(videoObj.videoid);
+      } catch (e) {
+        this.#log(`Embed Error: ${e.message}`);
+      } finally {
+        this.state.isEmbedding = false;
+      }
+    });
   }
 
   #attachStreamEndListener(vid) {
@@ -237,14 +236,11 @@ class MobileRider {
       });
       this.state.drawer?.setActiveById?.(activeId);
       
-      // Inject Header
       const header = createTag('div', { class: 'now-playing-header' });
       header.innerHTML = `<p class="now-playing-title">${this.cfg.drawertitle || 'Now Playing'}</p>
                           <span class="now-playing-subtitle">${this.cfg.drawersubtitle || 'Select a session'}</span>`;
       this.state.drawer?.itemsEl?.prepend(header);
-    } catch (e) {
-      this.#log('Drawer failed to load');
-    }
+    } catch (e) { this.#log('Drawer failed to load'); }
   }
 
   #renderDrawerItem(v) {
