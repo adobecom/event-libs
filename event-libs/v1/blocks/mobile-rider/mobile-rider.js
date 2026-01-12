@@ -5,18 +5,24 @@ const DRAWER_CSS_URL = new URL('./drawer.css', import.meta.url).href;
 
 const CONFIG = {
   ANALYTICS: { PROVIDER: 'adobe' },
-  SCRIPTS: { DEV_URL: '//assets.mobilerider.com/p/player-adobe-integration/player.min.js', PROD_URL: '//assets.mobilerider.com/p/adobe/player.min.js' },
+  SCRIPTS: {
+    DEV_URL: '//assets.mobilerider.com/p/player-adobe-integration/player.min.js', // Leading // for protocol-relative or adjust to your dev path
+    PROD_URL: '//assets.mobilerider.com/p/adobe/player.min.js',
+  },
   PLAYER: {
     DEFAULT_OPTIONS: { autoplay: true, controls: true, muted: true },
     CONTAINER_ID: 'mr-adobe',
     VIDEO_ID: 'idPlayer',
     VIDEO_CLASS: 'mobileRider_viewport',
   },
+  API: {
+    PROD_URL: 'https://overlay-admin-integration.mobilerider.com',
+    DEV_URL: 'https://overlay-admin-integration.mobilerider.com',
+  },
   ASL: { TOGGLE_CLASS: 'isASL', BUTTON_ID: 'asl-button', CHECK_INTERVAL: 100, MAX_CHECKS: 50 },
-  API: { PROD_URL: 'https://overlay-admin-integration.mobilerider.com', DEV_URL: 'https://overlay-admin-integration.mobilerider.com' },
 };
 
-/** * HELPER UTILITIES */
+/** * UTILITIES */
 const getEnv = () => getEventConfig()?.miloConfig?.env?.name || 'prod';
 const isProd = () => getEnv() === 'prod';
 const toBool = (v) => (typeof v === 'string' ? v.trim().toLowerCase() === 'true' || (v.trim().toLowerCase() === 'false' ? false : v) : v);
@@ -27,10 +33,9 @@ async function loadScript() {
   if (!scriptPromise) {
     const src = isProd() ? CONFIG.SCRIPTS.PROD_URL : CONFIG.SCRIPTS.DEV_URL;
     scriptPromise = new Promise((res, rej) => {
-      const s = createTag('script', { src, async: true });
+      const s = createTag('script', { src, async: true }, '', { parent: document.head });
       s.onload = res;
       s.onerror = () => { scriptPromise = null; rej(new Error('Script Load Fail')); };
-      document.head.appendChild(s);
     });
   }
   return scriptPromise;
@@ -66,30 +71,30 @@ class MobileRider {
   }
 
   #setupDOM() {
-    this.root = this.el.querySelector('.mobile-rider-player') || createTag('div', { class: 'mobile-rider-player' }, '', this.el);
-    this.wrap = this.root.querySelector('.video-wrapper') || createTag('div', { class: 'video-wrapper' }, '', this.root);
+    this.root = this.el.querySelector('.mobile-rider-player') 
+                || createTag('div', { class: 'mobile-rider-player' }, '', { parent: this.el });
+    
+    this.wrap = this.root.querySelector('.video-wrapper') 
+                || createTag('div', { class: 'video-wrapper' }, '', { parent: this.root });
   }
 
-  /**
-   * Adopted Strict Injection Logic
-   */
   async injectPlayer(vid, skin, asl = null) {
     if (!this.wrap || this.isEmbedding) return;
     this.isEmbedding = true;
 
-    // 1. Cleanup previous instance
     if (window.__mr_player) {
-      try { window.__mr_player.dispose(); } catch (e) { this.log(e.message); }
+      try { window.__mr_player.dispose(); } catch (e) { /* ignore */ }
       window.__mr_player = null;
     }
 
-    // 2. Build Container & Video
     this.wrap.innerHTML = '';
+
+    // Corrected createTag usage with { parent: ... }
     const container = createTag('div', {
       class: 'mobile-rider-container',
       id: CONFIG.PLAYER.CONTAINER_ID,
       'data-videoid': vid,
-    }, '', this.wrap);
+    }, '', { parent: this.wrap });
 
     const video = createTag('video', {
       id: CONFIG.PLAYER.VIDEO_ID,
@@ -97,23 +102,19 @@ class MobileRider {
       controls: true,
       playsinline: '',
       poster: this.cfg.poster || this.cfg.thumbnail || '',
-    }, '', container);
+    }, '', { parent: container });
 
-    // 3. Adoption of the strict verification check from actual file
     requestAnimationFrame(() => {
-      const fail = (msg) => {
-        this.log(msg);
-        this.isEmbedding = false;
-      };
-
-      // Ensure elements are still in the document
       const videoInDoc = document.getElementById(CONFIG.PLAYER.VIDEO_ID);
-      if (!videoInDoc || videoInDoc !== video) return fail('Video element not found in document');
-      if (!container.parentNode || !container.contains(videoInDoc)) return fail('DOM Hierarchy mismatch');
-      if (!window.mobilerider) return fail('Library not loaded');
+      
+      if (!videoInDoc || !window.mobilerider) {
+        this.log('DOM or Library not ready');
+        this.isEmbedding = false;
+        return;
+      }
 
       try {
-        window.mobilerider.embed(video.id, vid, skin, {
+        window.mobilerider.embed(videoInDoc.id, vid, skin, {
           ...CONFIG.PLAYER.DEFAULT_OPTIONS,
           ...this.#getOverrides(),
           analytics: { provider: CONFIG.ANALYTICS.PROVIDER },
@@ -125,20 +126,18 @@ class MobileRider {
         if (asl) this.#initASL(container);
         this.#attachEndListener(vid);
       } catch (e) {
-        fail(`Embed Error: ${e.message}`);
+        this.log(`Embed Error: ${e.message}`);
       }
-
-      // Small delay before unlocking to ensure stability
+      
       setTimeout(() => { this.isEmbedding = false; }, 100);
     });
   }
 
   #getOverrides() {
-    const overrides = {};
-    Object.keys(CONFIG.PLAYER.DEFAULT_OPTIONS).forEach(key => {
-      if (key in this.cfg) overrides[key] = toBool(this.cfg[key]);
-    });
-    return overrides;
+    return Object.keys(CONFIG.PLAYER.DEFAULT_OPTIONS).reduce((acc, k) => {
+      if (k in this.cfg) acc[k] = toBool(this.cfg[k]);
+      return acc;
+    }, {});
   }
 
   #attachEndListener(vid) {
@@ -148,8 +147,6 @@ class MobileRider {
       window.__mr_player?.dispose?.();
     });
   }
-
-  // ... (Utility methods like #parseCfg, #parseConcurrent, #loadStore remain identical to your working code)
 
   async #selectInitialVideo(videos) {
     const urlIdx = new URLSearchParams(window.location.search).get('video');
@@ -168,7 +165,7 @@ class MobileRider {
 
   async #initDrawer(videos, activeId) {
     if (!document.querySelector('link[href*="drawer.css"]')) {
-      createTag('link', { rel: 'stylesheet', href: DRAWER_CSS_URL }, '', document.head);
+      createTag('link', { rel: 'stylesheet', href: DRAWER_CSS_URL }, '', { parent: document.head });
     }
     const { default: createDrawer } = await import('./drawer.js');
     this.drawer = createDrawer(this.root, {
