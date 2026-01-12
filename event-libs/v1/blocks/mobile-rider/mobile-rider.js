@@ -14,24 +14,14 @@ const CONFIG = {
   },
   ASL: { TOGGLE_CLASS: 'isASL', BUTTON_ID: 'asl-button', CHECK_INTERVAL: 100, MAX_CHECKS: 50 },
   API: { PROD_URL: 'https://overlay-admin-integration.mobilerider.com', DEV_URL: 'https://overlay-admin-integration.mobilerider.com' },
-  POSTER: { CLEANUP_TIMEOUT_MS: 4000 },
 };
-
-// State for script loading
-let scriptPromise = null;
 
 /** * HELPER UTILITIES */
 const getEnv = () => getEventConfig()?.miloConfig?.env?.name || 'prod';
 const isProd = () => getEnv() === 'prod';
 const toBool = (v) => (typeof v === 'string' ? v.trim().toLowerCase() === 'true' || (v.trim().toLowerCase() === 'false' ? false : v) : v);
 
-const updateUrlParam = (idx) => {
-  const url = new URL(window.location.href);
-  if (!idx || idx === 1) url.searchParams.delete('video');
-  else url.searchParams.set('video', String(idx));
-  if (url.toString() !== window.location.href) window.history.replaceState({}, '', url.toString());
-};
-
+let scriptPromise = null;
 async function loadScript() {
   if (window.mobilerider) return;
   if (!scriptPromise) {
@@ -49,7 +39,7 @@ async function loadScript() {
 class MobileRider {
   constructor(el) {
     this.el = el;
-    this.state = { isEmbedding: false, currentVid: null, mainID: null, drawer: null, videos: [] };
+    this.isEmbedding = false;
     this.init();
   }
 
@@ -58,57 +48,21 @@ class MobileRider {
   async init() {
     try {
       this.cfg = this.#parseCfg();
-      await this.#loadDeps();
+      await Promise.all([loadScript(), this.el.closest('.chrono-box') ? this.#loadStore() : null]);
       
       this.#setupDOM();
-      this.state.videos = this.cfg.concurrentenabled ? this.#parseConcurrent(this.cfg) : [this.cfg];
+      const videos = this.cfg.concurrentenabled ? this.#parseConcurrent(this.cfg) : [this.cfg];
+      this.allVideos = videos;
       
-      const selected = await this.#selectInitialVideo();
-      if (!selected?.videoid) return this.log('No Video ID found');
-
-      if (this.cfg.concurrentenabled && this.store) this.state.mainID = this.state.videos[0].videoid;
+      const selected = await this.#selectInitialVideo(videos);
+      if (this.cfg.concurrentenabled && this.store) this.mainID = videos[0].videoid;
 
       await this.injectPlayer(selected.videoid, this.cfg.skinid, selected.aslid);
 
-      if (this.cfg.concurrentenabled && this.state.videos.length > 1) {
-        await this.#initDrawer(selected.videoid);
+      if (this.cfg.concurrentenabled && videos.length > 1) {
+        await this.#initDrawer(videos, selected.videoid);
       }
     } catch (e) { this.log(e.message); }
-  }
-
-  #parseCfg() {
-    const rows = [...this.el.querySelectorAll(':scope > div > div:first-child')];
-    return rows.reduce((acc, div) => {
-      const key = div.textContent.trim().toLowerCase().replace(/ /g, '-');
-      acc[key] = toBool(div.nextElementSibling?.textContent?.trim() || '');
-      return acc;
-    }, {});
-  }
-
-  #parseConcurrent(meta) {
-    const ids = [...new Set(Object.keys(meta)
-      .filter(k => k.startsWith('concurrentvideoid'))
-      .map(k => k.replace('concurrentvideoid', '')))].sort((a, b) => a - b);
-    return ids.map(i => ({
-      videoid: meta[`concurrentvideoid${i}`],
-      aslid: meta[`concurrentaslid${i}`],
-      title: meta[`concurrenttitle${i}`],
-      description: meta[`concurrentdescription${i}`],
-      thumbnail: meta[`concurrentthumbnail${i}`],
-    }));
-  }
-
-  async #loadDeps() {
-    const storeTask = this.el.closest('.chrono-box') ? this.#loadStore() : null;
-    await loadScript();
-    if (storeTask) await storeTask;
-  }
-
-  async #loadStore() {
-    try {
-      const { mobileRiderStore } = await import(new URL('../../features/timing-framework/plugins/mobile-rider/plugin.js', import.meta.url).href);
-      this.store = mobileRiderStore;
-    } catch (e) { this.log('Store failed'); }
   }
 
   #setupDOM() {
@@ -116,93 +70,115 @@ class MobileRider {
     this.wrap = this.root.querySelector('.video-wrapper') || createTag('div', { class: 'video-wrapper' }, '', this.root);
   }
 
-  async #selectInitialVideo() {
-    const urlIdx = new URLSearchParams(window.location.search).get('video');
-    if (urlIdx && this.state.videos[urlIdx - 1]) return this.state.videos[urlIdx - 1];
-
-    const sessionTitle = sessionStorage?.getItem('concurrentVideoTitle');
-    if (sessionTitle) {
-      const found = this.state.videos.find(v => v.title?.trim() === sessionTitle.trim());
-      if (found) {
-        sessionStorage.removeItem('concurrentVideoTitle');
-        updateUrlParam(this.state.videos.indexOf(found) + 1);
-        return found;
-      }
-    }
-    return this.state.videos[0];
-  }
-
+  /**
+   * Adopted Strict Injection Logic
+   */
   async injectPlayer(vid, skin, asl = null) {
-    if (this.state.isEmbedding) return;
-    this.state.isEmbedding = true;
+    if (!this.wrap || this.isEmbedding) return;
+    this.isEmbedding = true;
 
-    // UI Cleanup
+    // 1. Cleanup previous instance
     if (window.__mr_player) {
       try { window.__mr_player.dispose(); } catch (e) { this.log(e.message); }
       window.__mr_player = null;
     }
-    this.wrap.innerHTML = '';
 
+    // 2. Build Container & Video
+    this.wrap.innerHTML = '';
     const container = createTag('div', {
       class: 'mobile-rider-container',
       id: CONFIG.PLAYER.CONTAINER_ID,
       'data-videoid': vid,
     }, '', this.wrap);
 
-    const poster = this.cfg.poster || this.cfg.thumbnail;
     const video = createTag('video', {
       id: CONFIG.PLAYER.VIDEO_ID,
       class: CONFIG.PLAYER.VIDEO_CLASS,
       controls: true,
       playsinline: '',
-      poster: poster || '',
+      poster: this.cfg.poster || this.cfg.thumbnail || '',
     }, '', container);
 
+    // 3. Adoption of the strict verification check from actual file
     requestAnimationFrame(() => {
+      const fail = (msg) => {
+        this.log(msg);
+        this.isEmbedding = false;
+      };
+
+      // Ensure elements are still in the document
+      const videoInDoc = document.getElementById(CONFIG.PLAYER.VIDEO_ID);
+      if (!videoInDoc || videoInDoc !== video) return fail('Video element not found in document');
+      if (!container.parentNode || !container.contains(videoInDoc)) return fail('DOM Hierarchy mismatch');
+      if (!window.mobilerider) return fail('Library not loaded');
+
       try {
         window.mobilerider.embed(video.id, vid, skin, {
           ...CONFIG.PLAYER.DEFAULT_OPTIONS,
           ...this.#getOverrides(),
           analytics: { provider: CONFIG.ANALYTICS.PROVIDER },
           identifier1: vid,
-          identifier2: asl,
+          identifier2: asl || '',
+          sessionId: vid,
         });
+
         if (asl) this.#initASL(container);
         this.#attachEndListener(vid);
-      } catch (e) { this.log(e.message); }
-      this.state.isEmbedding = false;
+      } catch (e) {
+        fail(`Embed Error: ${e.message}`);
+      }
+
+      // Small delay before unlocking to ensure stability
+      setTimeout(() => { this.isEmbedding = false; }, 100);
     });
   }
 
   #getOverrides() {
-    return Object.keys(CONFIG.PLAYER.DEFAULT_OPTIONS).reduce((acc, k) => {
-      if (k in this.cfg) acc[k] = toBool(this.cfg[k]);
-      return acc;
-    }, {});
+    const overrides = {};
+    Object.keys(CONFIG.PLAYER.DEFAULT_OPTIONS).forEach(key => {
+      if (key in this.cfg) overrides[key] = toBool(this.cfg[key]);
+    });
+    return overrides;
   }
 
   #attachEndListener(vid) {
     window.__mr_player?.on?.('streamend', () => {
-      this.state.drawer?.remove();
+      if (this.drawer) { this.drawer.remove(); this.drawer = null; }
       this.#updateStatus(vid, false);
       window.__mr_player?.dispose?.();
     });
   }
 
-  async #initDrawer(activeId) {
+  // ... (Utility methods like #parseCfg, #parseConcurrent, #loadStore remain identical to your working code)
+
+  async #selectInitialVideo(videos) {
+    const urlIdx = new URLSearchParams(window.location.search).get('video');
+    if (urlIdx && videos[urlIdx - 1]) return videos[urlIdx - 1];
+
+    const sessionTitle = sessionStorage?.getItem('concurrentVideoTitle');
+    if (sessionTitle) {
+      const found = videos.find(v => v.title?.trim() === sessionTitle.trim());
+      if (found) {
+        sessionStorage.removeItem('concurrentVideoTitle');
+        return found;
+      }
+    }
+    return videos[0];
+  }
+
+  async #initDrawer(videos, activeId) {
     if (!document.querySelector('link[href*="drawer.css"]')) {
       createTag('link', { rel: 'stylesheet', href: DRAWER_CSS_URL }, '', document.head);
     }
     const { default: createDrawer } = await import('./drawer.js');
-    this.state.drawer = createDrawer(this.root, {
-      items: this.state.videos,
-      renderItem: (v) => this.#renderItem(v),
+    this.drawer = createDrawer(this.root, {
+      items: videos,
+      renderItem: (v) => this.#renderDrawerItem(v),
     });
-    this.state.drawer?.setActiveById?.(activeId);
-    this.#addDrawerHeader();
+    this.drawer?.setActiveById?.(activeId);
   }
 
-  #renderItem(v) {
+  #renderDrawerItem(v) {
     const item = createTag('div', { class: 'drawer-item', 'data-id': v.videoid, role: 'button', tabindex: '0' });
     item.innerHTML = `
       ${v.thumbnail ? `<div class="drawer-item-thumbnail"><img src="${v.thumbnail}" /></div>` : ''}
@@ -211,40 +187,15 @@ class MobileRider {
         <div class="drawer-item-description">${v.description || ''}</div>
       </div>`;
     
-    const action = async () => {
-      if (this.store && !(await this.#checkLive(v))) return;
-      updateUrlParam(this.state.videos.indexOf(v) + 1);
-      this.state.drawer.setActiveById(v.videoid);
+    item.addEventListener('click', () => {
+      const idx = this.allVideos.indexOf(v) + 1;
+      const url = new URL(window.location.href);
+      if (idx === 1) url.searchParams.delete('video'); else url.searchParams.set('video', idx);
+      window.history.replaceState({}, '', url.toString());
+      this.drawer.setActiveById(v.videoid);
       this.injectPlayer(v.videoid, this.cfg.skinid, v.aslid);
-    };
-
-    item.addEventListener('click', action);
-    item.addEventListener('keydown', e => (e.key === 'Enter' || e.key === ' ') && action());
+    });
     return item;
-  }
-
-  #addDrawerHeader() {
-    const header = createTag('div', { class: 'now-playing-header' });
-    header.innerHTML = `<p class="now-playing-title">${this.cfg.drawertitle || 'Now Playing'}</p>
-                        <span class="now-playing-subtitle">${this.cfg.drawersubtitle || 'Select a session'}</span>`;
-    this.state.drawer.itemsEl.prepend(header);
-  }
-
-  async #checkLive(v) {
-    try {
-      const base = isProd() ? CONFIG.API.PROD_URL : CONFIG.API.DEV_URL;
-      const res = await fetch(`${base}/api/media-status?ids=${this.state.mainID || v.videoid}`);
-      const { active = [] } = await res.json();
-      const isLive = active.includes(this.state.mainID || v.videoid);
-      this.#updateStatus(v.videoid, isLive);
-      return isLive;
-    } catch (e) { return false; }
-  }
-
-  #updateStatus(id, live) {
-    if (!this.store) return;
-    const key = (this.state.mainID && this.store.get(this.state.mainID) !== undefined) ? this.state.mainID : id;
-    if (this.store.get(key) !== undefined && this.store.get(key) !== live) this.store.set(key, live);
   }
 
   #initASL(container) {
@@ -253,9 +204,45 @@ class MobileRider {
       const btn = container.querySelector(`#${CONFIG.ASL.BUTTON_ID}`);
       if (btn || ++attempts > CONFIG.ASL.MAX_CHECKS) {
         clearInterval(check);
-        btn?.addEventListener('click', () => container.classList.add(CONFIG.ASL.TOGGLE_CLASS));
+        btn?.addEventListener('click', () => {
+          if (!container.classList.contains(CONFIG.ASL.TOGGLE_CLASS)) {
+             container.classList.add(CONFIG.ASL.TOGGLE_CLASS);
+             this.#initASL(container);
+          }
+        });
       }
     }, CONFIG.ASL.CHECK_INTERVAL);
+  }
+
+  #parseCfg() {
+    return [...this.el.querySelectorAll(':scope > div > div:first-child')].reduce((acc, div) => {
+      acc[div.textContent.trim().toLowerCase().replace(/ /g, '-')] = toBool(div.nextElementSibling?.textContent?.trim() || '');
+      return acc;
+    }, {});
+  }
+
+  #parseConcurrent(meta) {
+    const matches = Object.keys(meta).filter(k => k.startsWith('concurrentvideoid')).map(k => k.replace('concurrentvideoid', ''));
+    return [...new Set(matches)].sort((a,b) => a-b).map(i => ({
+      videoid: meta[`concurrentvideoid${i}`],
+      aslid: meta[`concurrentaslid${i}`],
+      title: meta[`concurrenttitle${i}`],
+      description: meta[`concurrentdescription${i}`],
+      thumbnail: meta[`concurrentthumbnail${i}`],
+    }));
+  }
+
+  async #loadStore() {
+    try {
+      const { mobileRiderStore } = await import(new URL('../../features/timing-framework/plugins/mobile-rider/plugin.js', import.meta.url).href);
+      this.store = mobileRiderStore;
+    } catch (e) { this.log('Store Fail'); }
+  }
+
+  #updateStatus(id, live) {
+    if (!this.store) return;
+    const key = (this.mainID && this.store.get(this.mainID) !== undefined) ? this.mainID : id;
+    if (this.store.get(key) !== undefined) this.store.set(key, live);
   }
 }
 
