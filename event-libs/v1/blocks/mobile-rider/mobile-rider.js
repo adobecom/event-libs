@@ -5,7 +5,7 @@ const DRAWER_CSS_URL = new URL('./drawer.css', import.meta.url).href;
 
 const CONFIG = {
   ANALYTICS: { PROVIDER: 'adobe' },
-  SCRIPTS: { DEV_URL: '//player.min.js', PROD_URL: 'player.min.js' },
+  SCRIPTS: { DEV_URL: '//assets.mobilerider.com/p/player-adobe-integration/player.min.js', PROD_URL: '//assets.mobilerider.com/p/adobe/player.min.js' },
   PLAYER: {
     DEFAULT_OPTIONS: { autoplay: true, controls: true, muted: true },
     CONTAINER_ID: 'mr-adobe',
@@ -13,7 +13,7 @@ const CONFIG = {
     VIDEO_CLASS: 'mobileRider_viewport',
   },
   ASL: { TOGGLE_CLASS: 'isASL', BUTTON_ID: 'asl-button', CHECK_INTERVAL: 100, MAX_CHECKS: 50 },
-  API: { PROD_URL: 'mobilerider.com', DEV_URL: 'mobilerider.com' },
+  API: { PROD_URL: 'https://overlay-admin-integration.mobilerider.com', DEV_URL: 'https://overlay-admin-integration.mobilerider.com' },
   POSTER: { CLEANUP_TIMEOUT_MS: 4000 },
 };
 
