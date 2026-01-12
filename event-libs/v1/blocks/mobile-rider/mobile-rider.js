@@ -142,9 +142,20 @@ class MobileRider {
 
   #attachEndListener(vid) {
     window.__mr_player?.on?.('streamend', () => {
-      if (this.drawer) { this.drawer.remove(); this.drawer = null; }
-      this.#updateStatus(vid, false);
+      // 1. Always cleanup the UI regardless of store
+      if (this.drawer) { 
+        this.drawer.remove(); 
+        this.drawer = null; 
+      }
+  
+      // 2. Only update the store if it actually exists
+      if (this.store) {
+        this.#updateStatus(vid, false);
+      }
+  
+      // 3. Clean up the player instance
       window.__mr_player?.dispose?.();
+      window.__mr_player = null;
     });
   }
 

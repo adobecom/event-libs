@@ -292,14 +292,18 @@ class TimingWorker {
    */
   async shouldTriggerNextSchedule(scheduleItem) {
     if (!scheduleItem) return false;
-
+    let liveStreamEnd = false;
     // Check if previous item has mobileRider that's still active (overrun)
     if (this.currentScheduleItem?.mobileRider) {
       const mobileRiderStore = this.plugins.get('mobileRider');
       if (mobileRiderStore) {
         const { sessionId } = this.currentScheduleItem.mobileRider;
         const isActive = mobileRiderStore.get(sessionId);
-        if (isActive) return false; // Wait for session to end
+        if (isActive) {
+          return false; // Wait for session to end
+        } else {
+          liveStreamEnd = true;
+        }
       }
     }
 
@@ -332,6 +336,8 @@ class TimingWorker {
       }
     }
 
+    if (liveStreamEnd || validNextItem) return true;
+    
     // If no plugins are blocking, check toggleTime
     const { toggleTime } = scheduleItem;
     if (toggleTime) {
