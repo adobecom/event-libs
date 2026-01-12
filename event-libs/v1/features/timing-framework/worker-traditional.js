@@ -336,8 +336,8 @@ class TimingWorker {
       }
     }
 
-    if (liveStreamEnd || validNextItem) return true;
-    
+    if (liveStreamEnd) return true;
+
     // If no plugins are blocking, check toggleTime
     const { toggleTime } = scheduleItem;
     if (toggleTime) {
