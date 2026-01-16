@@ -34,9 +34,9 @@ async function loadScript() {
     const src = isProd() ? CONFIG.SCRIPTS.PROD_URL : CONFIG.SCRIPTS.DEV_URL;
     scriptPromise = new Promise((res, rej) => {
       const s = createTag('script', { src, async: true }, '', { parent: document.head });
-      s.onload = res;
+    s.onload = res;
       s.onerror = () => { scriptPromise = null; rej(new Error('Script Load Fail')); };
-    });
+  });
   }
   return scriptPromise;
 }
@@ -92,8 +92,8 @@ class MobileRider {
     // Corrected createTag usage with { parent: ... }
     const container = createTag('div', {
       class: 'mobile-rider-container',
-      id: CONFIG.PLAYER.CONTAINER_ID,
-      'data-videoid': vid,
+        id: CONFIG.PLAYER.CONTAINER_ID,
+        'data-videoid': vid,
     }, '', { parent: this.wrap });
 
     const video = createTag('video', {
@@ -117,11 +117,11 @@ class MobileRider {
         window.mobilerider.embed(videoInDoc.id, vid, skin, {
           ...CONFIG.PLAYER.DEFAULT_OPTIONS,
           ...this.#getOverrides(),
-          analytics: { provider: CONFIG.ANALYTICS.PROVIDER },
-          identifier1: vid,
+      analytics: { provider: CONFIG.ANALYTICS.PROVIDER },
+      identifier1: vid,
           identifier2: asl || '',
-          sessionId: vid,
-        });
+      sessionId: vid,
+    });
 
         if (asl) this.#initASL(container);
         this.#attachEndListener(vid);
@@ -216,9 +216,9 @@ class MobileRider {
           if (!container.classList.contains(CONFIG.ASL.TOGGLE_CLASS)) {
              container.classList.add(CONFIG.ASL.TOGGLE_CLASS);
              this.#initASL(container);
-          }
-        });
       }
+    });
+  }
     }, CONFIG.ASL.CHECK_INTERVAL);
   }
 
@@ -228,10 +228,25 @@ class MobileRider {
       return acc;
     }, {});
     
-    // If video-id was extracted from anchor href (stored in dataset), use it
+    // If parameters were extracted from anchor href (stored in dataset), use them
     const extractedVideoId = this.el.dataset.extractedVideoId;
     if (extractedVideoId && !cfg.videoid) {
       cfg.videoid = extractedVideoId;
+    }
+    
+    const extractedSkinId = this.el.dataset.extractedSkinId;
+    if (extractedSkinId && !cfg.skinid) {
+      cfg.skinid = extractedSkinId;
+    }
+    
+    const extractedAutoplay = this.el.dataset.extractedAutoplay;
+    if (extractedAutoplay && !cfg.autoplay) {
+      cfg.autoplay = extractedAutoplay;
+    }
+    
+    const extractedThumbnail = this.el.dataset.extractedThumbnail;
+    if (extractedThumbnail && !cfg.thumbnail) {
+      cfg.thumbnail = extractedThumbnail;
     }
     
     return cfg;
@@ -263,18 +278,27 @@ class MobileRider {
 }
 
 /**
- * Extracts video ID from anchor href query params
+ * Extracts video parameters from anchor href query params
  * @param {HTMLAnchorElement} anchor - Anchor element
- * @returns {string|null} Video ID or null
+ * @returns {Object|null} Object with videoId, skinId, autoplay, thumbnail or null
  */
-function extractVideoIdFromHref(anchor) {
+function extractVideoParamsFromHref(anchor) {
   try {
     const href = anchor.getAttribute('href');
     if (!href) return null;
     
     const url = new URL(href, window.location.href);
-    // Try 'id' first (as in the example), then 'video-id'
-    return url.searchParams.get('id') || url.searchParams.get('video-id') || null;
+    const params = {
+      videoId: url.searchParams.get('videoId') || url.searchParams.get('id') || url.searchParams.get('video-id'),
+      skinId: url.searchParams.get('skinId'),
+      autoplay: url.searchParams.get('autoplay'),
+      thumbnail: url.searchParams.get('thumbnail'),
+    };
+    
+    // Return null if no videoId found
+    if (!params.videoId) return null;
+    
+    return params;
   } catch (e) {
     return null;
   }
@@ -290,8 +314,8 @@ function handleAnchorElement(anchor) {
     return anchor;
   }
 
-  const videoId = extractVideoIdFromHref(anchor);
-  if (!videoId) {
+  const params = extractVideoParamsFromHref(anchor);
+  if (!params || !params.videoId) {
     window.lana?.log?.('[MobileRider] Could not extract video-id from anchor href');
     return anchor;
   }
@@ -299,8 +323,17 @@ function handleAnchorElement(anchor) {
   // Create new div element with mobile-rider class
   const mobileRiderDiv = createTag('div', { class: 'mobile-rider' });
   
-  // Store extracted video-id on the element for later use
-  mobileRiderDiv.dataset.extractedVideoId = videoId;
+  // Store extracted parameters on the element for later use
+  mobileRiderDiv.dataset.extractedVideoId = params.videoId;
+  if (params.skinId) {
+    mobileRiderDiv.dataset.extractedSkinId = params.skinId;
+  }
+  if (params.autoplay) {
+    mobileRiderDiv.dataset.extractedAutoplay = params.autoplay;
+  }
+  if (params.thumbnail) {
+    mobileRiderDiv.dataset.extractedThumbnail = params.thumbnail;
+  }
   
   // Insert after anchor and remove anchor
   anchor.insertAdjacentElement('afterend', mobileRiderDiv);
