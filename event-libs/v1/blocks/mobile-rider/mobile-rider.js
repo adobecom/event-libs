@@ -117,14 +117,23 @@ class MobileRider {
         window.mobilerider.embed(videoInDoc.id, vid, skin, {
           ...CONFIG.PLAYER.DEFAULT_OPTIONS,
           ...this.#getOverrides(),
-      analytics: { provider: CONFIG.ANALYTICS.PROVIDER },
-      identifier1: vid,
+          analytics: { provider: CONFIG.ANALYTICS.PROVIDER },
+          identifier1: vid,
           identifier2: asl || '',
-      sessionId: vid,
-    });
+          sessionId: vid,
+        });
 
         if (asl) this.#initASL(container);
-        this.#attachEndListener(vid);
+        if (this.store) {
+          let key = null;
+          if (this.mainID && this.store.get(this.mainID) !== undefined) {
+            key = this.mainID;
+          } else if (this.store.get(vid) !== undefined) {
+            key = vid;
+          }
+
+          if (key) this.attachEndListener(vid);
+        }
       } catch (e) {
         this.log(`Embed Error: ${e.message}`);
       }
