@@ -223,10 +223,18 @@ class MobileRider {
   }
 
   #parseCfg() {
-    return [...this.el.querySelectorAll(':scope > div > div:first-child')].reduce((acc, div) => {
+    const cfg = [...this.el.querySelectorAll(':scope > div > div:first-child')].reduce((acc, div) => {
       acc[div.textContent.trim().toLowerCase().replace(/ /g, '-')] = toBool(div.nextElementSibling?.textContent?.trim() || '');
       return acc;
     }, {});
+    
+    // If video-id was extracted from anchor href (stored in dataset), use it
+    const extractedVideoId = this.el.dataset.extractedVideoId;
+    if (extractedVideoId && !cfg.videoid) {
+      cfg.videoid = extractedVideoId;
+    }
+    
+    return cfg;
   }
 
   #parseConcurrent(meta) {
@@ -254,4 +262,57 @@ class MobileRider {
   }
 }
 
-export default (el) => new MobileRider(el);
+/**
+ * Extracts video ID from anchor href query params
+ * @param {HTMLAnchorElement} anchor - Anchor element
+ * @returns {string|null} Video ID or null
+ */
+function extractVideoIdFromHref(anchor) {
+  try {
+    const href = anchor.getAttribute('href');
+    if (!href) return null;
+    
+    const url = new URL(href, window.location.href);
+    // Try 'id' first (as in the example), then 'video-id'
+    return url.searchParams.get('id') || url.searchParams.get('video-id') || null;
+  } catch (e) {
+    return null;
+  }
+}
+
+/**
+ * Handles anchor tag conversion to mobile-rider div
+ * @param {HTMLAnchorElement} anchor - Anchor element to convert
+ * @returns {HTMLElement} New div element or original anchor
+ */
+function handleAnchorElement(anchor) {
+  if (anchor.tagName !== 'A' || !anchor.classList.contains('link-block')) {
+    return anchor;
+  }
+
+  const videoId = extractVideoIdFromHref(anchor);
+  if (!videoId) {
+    window.lana?.log?.('[MobileRider] Could not extract video-id from anchor href');
+    return anchor;
+  }
+
+  // Create new div element with mobile-rider class
+  const mobileRiderDiv = createTag('div', { class: 'mobile-rider' });
+  
+  // Store extracted video-id on the element for later use
+  mobileRiderDiv.dataset.extractedVideoId = videoId;
+  
+  // Insert after anchor and remove anchor
+  anchor.insertAdjacentElement('afterend', mobileRiderDiv);
+  anchor.remove();
+  
+  return mobileRiderDiv;
+}
+
+export default (el) => {
+  // Handle anchor tag conversion if needed
+  const processedEl = handleAnchorElement(el);
+  
+  // Create MobileRider instance (extractedVideoId is already in dataset)
+  return new MobileRider(processedEl);
+};
