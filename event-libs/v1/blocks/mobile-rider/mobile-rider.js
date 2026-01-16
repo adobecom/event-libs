@@ -330,7 +330,7 @@ function handleAnchorElement(anchor) {
   }
 
   // Create new div element with mobile-rider class
-  const mobileRiderDiv = createTag('div', { class: 'mobile-rider' });
+  const mobileRiderDiv = createTag('div', { class: 'mobile-rider milo-video' });
   
   // Store extracted parameters on the element for later use
   mobileRiderDiv.dataset.extractedVideoId = params.videoId;
