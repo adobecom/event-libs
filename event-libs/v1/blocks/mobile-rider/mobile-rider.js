@@ -6,7 +6,7 @@ const DRAWER_CSS_URL = new URL('./drawer.css', import.meta.url).href;
 const CONFIG = {
   ANALYTICS: { PROVIDER: 'adobe' },
   SCRIPTS: {
-    DEV_URL: '//assets.mobilerider.com/p/player-adobe-integration/player.min.js', // Leading // for protocol-relative or adjust to your dev path
+    DEV_URL: '//assets.mobilerider.com/p/player-adobe-integration/player.min.js',
     PROD_URL: '//assets.mobilerider.com/p/adobe/player.min.js',
   },
   PLAYER: {
@@ -34,9 +34,9 @@ async function loadScript() {
     const src = isProd() ? CONFIG.SCRIPTS.PROD_URL : CONFIG.SCRIPTS.DEV_URL;
     scriptPromise = new Promise((res, rej) => {
       const s = createTag('script', { src, async: true }, '', { parent: document.head });
-    s.onload = res;
+      s.onload = res;
       s.onerror = () => { scriptPromise = null; rej(new Error('Script Load Fail')); };
-  });
+    });
   }
   return scriptPromise;
 }
@@ -89,11 +89,10 @@ class MobileRider {
 
     this.wrap.innerHTML = '';
 
-    // Corrected createTag usage with { parent: ... }
     const container = createTag('div', {
       class: 'mobile-rider-container',
-        id: CONFIG.PLAYER.CONTAINER_ID,
-        'data-videoid': vid,
+      id: CONFIG.PLAYER.CONTAINER_ID,
+      'data-videoid': vid,
     }, '', { parent: this.wrap });
 
     const video = createTag('video', {
@@ -112,7 +111,6 @@ class MobileRider {
         this.isEmbedding = false;
         return;
       }
-
       try {
         window.mobilerider.embed(videoInDoc.id, vid, skin, {
           ...CONFIG.PLAYER.DEFAULT_OPTIONS,
@@ -122,22 +120,21 @@ class MobileRider {
           identifier2: asl || '',
           sessionId: vid,
         });
-
+      
         if (asl) this.#initASL(container);
+      
+        // STRICT STORE CHECK: Only attach listener if the ID exists in the Timing Framework
         if (this.store) {
-          let key = null;
-          if (this.mainID && this.store.get(this.mainID) !== undefined) {
-            key = this.mainID;
-          } else if (this.store.get(vid) !== undefined) {
-            key = vid;
+          const isMainIdTracked = this.mainID && this.store.get(this.mainID) !== undefined;
+          const isVidTracked = this.store.get(vid) !== undefined;
+      
+          if (isMainIdTracked || isVidTracked) {
+            this.#attachEndListener(vid);
           }
-
-          if (key) this.attachEndListener(vid);
         }
       } catch (e) {
         this.log(`Embed Error: ${e.message}`);
       }
-      
       setTimeout(() => { this.isEmbedding = false; }, 100);
     });
   }
@@ -151,18 +148,15 @@ class MobileRider {
 
   #attachEndListener(vid) {
     window.__mr_player?.on?.('streamend', () => {
-      // 1. Always cleanup the UI regardless of store
       if (this.drawer) { 
         this.drawer.remove(); 
         this.drawer = null; 
       }
   
-      // 2. Only update the store if it actually exists
       if (this.store) {
         this.#updateStatus(vid, false);
       }
   
-      // 3. Clean up the player instance
       window.__mr_player?.dispose?.();
       window.__mr_player = null;
     });
@@ -208,7 +202,11 @@ class MobileRider {
       const idx = this.allVideos.indexOf(v) + 1;
       const url = new URL(window.location.href);
       if (idx === 1) url.searchParams.delete('video'); else url.searchParams.set('video', idx);
-      window.history.replaceState({}, '', url.toString());
+      
+      if (url.toString() !== window.location.href) {
+        window.history.replaceState({}, '', url.toString());
+      }
+
       this.drawer.setActiveById(v.videoid);
       this.injectPlayer(v.videoid, this.cfg.skinid, v.aslid);
     });
@@ -224,26 +222,24 @@ class MobileRider {
         btn?.addEventListener('click', () => {
           if (!container.classList.contains(CONFIG.ASL.TOGGLE_CLASS)) {
              container.classList.add(CONFIG.ASL.TOGGLE_CLASS);
-             this.#initASL(container);
+             // Re-init check if needed or just toggle UI
+          }
+        });
       }
-    });
-  }
     }, CONFIG.ASL.CHECK_INTERVAL);
   }
 
   #parseCfg() {
-    // 1. Priority: Check if data was extracted from an Anchor Link
     if (this.el.dataset.extractedVideoId) {
       return {
         videoid: this.el.dataset.extractedVideoId,
         skinid: this.el.dataset.extractedSkinId || '',
         autoplay: toBool(this.el.dataset.extractedAutoplay || 'true'),
         poster: this.el.dataset.extractedThumbnail || '',
-        concurrentenabled: false, // Links usually represent a single video
+        concurrentenabled: false,
       };
     }
   
-    // 2. Fallback: Standard Table-Row parsing (for authored blocks)
     return [...this.el.querySelectorAll(':scope > div > div:first-child')].reduce((acc, div) => {
       const key = div.textContent.trim().toLowerCase().replace(/ /g, '-');
       acc[key] = toBool(div.nextElementSibling?.textContent?.trim() || '');
@@ -277,9 +273,7 @@ class MobileRider {
 }
 
 /**
- * Extracts video parameters from anchor href query params
- * @param {HTMLAnchorElement} anchor - Anchor element
- * @returns {Object|null} Object with videoId, skinId, autoplay, thumbnail or null
+ * URL/Anchor Helpers
  */
 function extractVideoParamsFromHref(anchor) {
   try {
@@ -287,12 +281,11 @@ function extractVideoParamsFromHref(anchor) {
     if (!href) return null;
     const url = new URL(href, window.location.href);
 
-    // Support query params AND path-based IDs (e.g., /video/12345)
     const videoId = url.searchParams.get('videoId') 
                  || url.searchParams.get('id') 
-                 || url.pathname.split('/').pop(); // Grabs the last segment of the path
+                 || url.pathname.split('/').pop();
 
-    if (!videoId || videoId.includes('.html')) return null; // Avoid catching page names
+    if (!videoId || videoId.includes('.html')) return null;
 
     return {
       videoId,
@@ -303,38 +296,21 @@ function extractVideoParamsFromHref(anchor) {
   } catch (e) { return null; }
 }
 
-/**
- * Handles anchor tag conversion to mobile-rider div
- * @param {HTMLAnchorElement} anchor - Anchor element to convert
- * @returns {HTMLElement} New div element or original anchor
- */
 function handleAnchorElement(anchor) {
   if (anchor.tagName !== 'A' || !anchor.classList.contains('link-block')) {
     return anchor;
   }
 
   const params = extractVideoParamsFromHref(anchor);
-  if (!params || !params.videoId) {
-    window.lana?.log?.('[MobileRider] Could not extract video-id from anchor href');
-    return anchor;
-  }
+  if (!params || !params.videoId) return anchor;
 
-  // Create new div element with mobile-rider class
-  const mobileRiderDiv = createTag('div', { class: 'mobile-rider milo-video' });
+  const mobileRiderDiv = createTag('div', { class: 'mobile-rider' });
   
-  // Store extracted parameters on the element for later use
   mobileRiderDiv.dataset.extractedVideoId = params.videoId;
-  if (params.skinId) {
-    mobileRiderDiv.dataset.extractedSkinId = params.skinId;
-  }
-  if (params.autoplay) {
-    mobileRiderDiv.dataset.extractedAutoplay = params.autoplay;
-  }
-  if (params.thumbnail) {
-    mobileRiderDiv.dataset.extractedThumbnail = params.thumbnail;
-  }
+  if (params.skinId) mobileRiderDiv.dataset.extractedSkinId = params.skinId;
+  if (params.autoplay) mobileRiderDiv.dataset.extractedAutoplay = params.autoplay;
+  if (params.thumbnail) mobileRiderDiv.dataset.extractedThumbnail = params.thumbnail;
   
-  // Insert after anchor and remove anchor
   anchor.insertAdjacentElement('afterend', mobileRiderDiv);
   anchor.remove();
   
