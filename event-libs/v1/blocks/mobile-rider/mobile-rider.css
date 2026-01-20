@@ -44,3 +44,9 @@
 .mobile-rider h2#title_container {
   line-height: 1;
 }
+
+.marquee .asset .mobile-rider img,
+.marquee .asset .mobile-rider video {
+  max-width: none !important;
+  min-height: auto !important;
+}
