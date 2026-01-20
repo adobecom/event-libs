@@ -232,33 +232,23 @@ class MobileRider {
   }
 
   #parseCfg() {
-    const cfg = [...this.el.querySelectorAll(':scope > div > div:first-child')].reduce((acc, div) => {
-      acc[div.textContent.trim().toLowerCase().replace(/ /g, '-')] = toBool(div.nextElementSibling?.textContent?.trim() || '');
+    // 1. Priority: Check if data was extracted from an Anchor Link
+    if (this.el.dataset.extractedVideoId) {
+      return {
+        videoid: this.el.dataset.extractedVideoId,
+        skinid: this.el.dataset.extractedSkinId || '',
+        autoplay: toBool(this.el.dataset.extractedAutoplay || 'true'),
+        poster: this.el.dataset.extractedThumbnail || '',
+        concurrentenabled: false, // Links usually represent a single video
+      };
+    }
+  
+    // 2. Fallback: Standard Table-Row parsing (for authored blocks)
+    return [...this.el.querySelectorAll(':scope > div > div:first-child')].reduce((acc, div) => {
+      const key = div.textContent.trim().toLowerCase().replace(/ /g, '-');
+      acc[key] = toBool(div.nextElementSibling?.textContent?.trim() || '');
       return acc;
     }, {});
-    
-    // If parameters were extracted from anchor href (stored in dataset), use them
-    const extractedVideoId = this.el.dataset.extractedVideoId;
-    if (extractedVideoId && !cfg.videoid) {
-      cfg.videoid = extractedVideoId;
-    }
-    
-    const extractedSkinId = this.el.dataset.extractedSkinId;
-    if (extractedSkinId && !cfg.skinid) {
-      cfg.skinid = extractedSkinId;
-    }
-    
-    const extractedAutoplay = this.el.dataset.extractedAutoplay;
-    if (extractedAutoplay && !cfg.autoplay) {
-      cfg.autoplay = extractedAutoplay;
-    }
-    
-    const extractedThumbnail = this.el.dataset.extractedThumbnail;
-    if (extractedThumbnail && !cfg.thumbnail) {
-      cfg.thumbnail = extractedThumbnail;
-    }
-    
-    return cfg;
   }
 
   #parseConcurrent(meta) {
@@ -295,22 +285,22 @@ function extractVideoParamsFromHref(anchor) {
   try {
     const href = anchor.getAttribute('href');
     if (!href) return null;
-    
     const url = new URL(href, window.location.href);
-    const params = {
-      videoId: url.searchParams.get('videoId') || url.searchParams.get('id') || url.searchParams.get('video-id'),
+
+    // Support query params AND path-based IDs (e.g., /video/12345)
+    const videoId = url.searchParams.get('videoId') 
+                 || url.searchParams.get('id') 
+                 || url.pathname.split('/').pop(); // Grabs the last segment of the path
+
+    if (!videoId || videoId.includes('.html')) return null; // Avoid catching page names
+
+    return {
+      videoId,
       skinId: url.searchParams.get('skinId'),
       autoplay: url.searchParams.get('autoplay'),
       thumbnail: url.searchParams.get('thumbnail'),
     };
-    
-    // Return null if no videoId found
-    if (!params.videoId) return null;
-    
-    return params;
-  } catch (e) {
-    return null;
-  }
+  } catch (e) { return null; }
 }
 
 /**
@@ -352,9 +342,6 @@ function handleAnchorElement(anchor) {
 }
 
 export default (el) => {
-  // Handle anchor tag conversion if needed
   const processedEl = handleAnchorElement(el);
-  
-  // Create MobileRider instance (extractedVideoId is already in dataset)
   return new MobileRider(processedEl);
 };
