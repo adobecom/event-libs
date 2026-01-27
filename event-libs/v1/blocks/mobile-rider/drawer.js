@@ -24,16 +24,10 @@ class Drawer {
       class: 'drawer',
       'aria-label': this.cfg.ariaLabel || 'Drawer',
     }, '', { parent: this.root });
-
-    // 2. Create Content & Items Wrapper
     const content = createTag('div', { class: 'drawer-content' }, '', { parent: drawer });
     
     this.itemsEl = createTag('div', { class: 'drawer-items' }, '', { parent: content });
-
-    // 3. Render and Append Items
     this.items.forEach((data, i) => {
-      // Pass this.itemsEl as the parent to renderItem if your render function supports it, 
-      // otherwise append manually as done below to ensure logic is safe.
       const el = this.renderItem(data, i);
       if (!el) return;
 

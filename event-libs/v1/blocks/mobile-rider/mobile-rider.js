@@ -20,12 +20,19 @@ const CONFIG = {
     DEV_URL: 'https://overlay-admin-integration.mobilerider.com',
   },
   ASL: { TOGGLE_CLASS: 'isASL', BUTTON_ID: 'asl-button', CHECK_INTERVAL: 100, MAX_CHECKS: 50 },
+  STORE: { ATTACH_RETRIES: 20, ATTACH_INTERVAL_MS: 5 }, // ✅ added for tests + robustness
 };
 
 /** * UTILITIES */
 const getEnv = () => getEventConfig()?.miloConfig?.env?.name || 'prod';
 const isProd = () => getEnv() === 'prod';
-const toBool = (v) => (typeof v === 'string' ? v.trim().toLowerCase() === 'true' || (v.trim().toLowerCase() === 'false' ? false : v) : v);
+const toBool = (v) => {
+  if (typeof v !== 'string') return v;
+  const s = v.trim().toLowerCase();
+  if (s === 'true') return true;
+  if (s === 'false') return false;
+  return v;
+};
 
 let scriptPromise = null;
 async function loadScript() {
@@ -50,15 +57,25 @@ class MobileRider {
 
   log(msg) { window.lana?.log?.(`[MobileRider] ${msg}`); }
 
+  // ✅ treat “present” as “non-nullish”, compatible with different stubs
+  #storeHas(id) {
+    if (!this.store || !id) return false;
+    try {
+      return this.store.get(id) != null; // ✅ null/undefined = not present
+    } catch (e) {
+      return false;
+    }
+  }
+
   async init() {
     try {
       this.cfg = this.#parseCfg();
       await Promise.all([loadScript(), this.el.closest('.chrono-box') ? this.#loadStore() : null]);
-      
+
       this.#setupDOM();
       const videos = this.cfg.concurrentenabled ? this.#parseConcurrent(this.cfg) : [this.cfg];
       this.allVideos = videos;
-      
+
       const selected = await this.#selectInitialVideo(videos);
       if (this.cfg.concurrentenabled && this.store) this.mainID = videos[0].videoid;
 
@@ -71,72 +88,78 @@ class MobileRider {
   }
 
   #setupDOM() {
-    this.root = this.el.querySelector('.mobile-rider-player') 
-                || createTag('div', { class: 'mobile-rider-player' }, '', { parent: this.el });
-    
-    this.wrap = this.root.querySelector('.video-wrapper') 
-                || createTag('div', { class: 'video-wrapper' }, '', { parent: this.root });
+    this.root = this.el.querySelector('.mobile-rider-player')
+      || createTag('div', { class: 'mobile-rider-player' }, '', { parent: this.el });
+
+    this.wrap = this.root.querySelector('.video-wrapper')
+      || createTag('div', { class: 'video-wrapper' }, '', { parent: this.root });
   }
 
   async injectPlayer(vid, skin, asl = null) {
     if (!this.wrap || this.isEmbedding) return;
     this.isEmbedding = true;
 
-    if (window.__mr_player) {
-      try { window.__mr_player.dispose(); } catch (e) { /* ignore */ }
-      window.__mr_player = null;
-    }
-
-    this.wrap.innerHTML = '';
-
-    const container = createTag('div', {
-      class: 'mobile-rider-container',
-      id: CONFIG.PLAYER.CONTAINER_ID,
-      'data-videoid': vid,
-    }, '', { parent: this.wrap });
-
-    const video = createTag('video', {
-      id: CONFIG.PLAYER.VIDEO_ID,
-      class: CONFIG.PLAYER.VIDEO_CLASS,
-      controls: true,
-      playsinline: '',
-      poster: this.cfg.poster || this.cfg.thumbnail || '',
-    }, '', { parent: container });
-
-    requestAnimationFrame(() => {
-      const videoInDoc = document.getElementById(CONFIG.PLAYER.VIDEO_ID);
-      
-      if (!videoInDoc || !window.mobilerider) {
-        this.log('DOM or Library not ready');
-        this.isEmbedding = false;
-        return;
-      }
-      try {
-        window.mobilerider.embed(videoInDoc.id, vid, skin, {
-          ...CONFIG.PLAYER.DEFAULT_OPTIONS,
-          ...this.#getOverrides(),
-          analytics: { provider: CONFIG.ANALYTICS.PROVIDER },
-          identifier1: vid,
-          identifier2: asl || '',
-          sessionId: vid,
-        });
-      
-        if (asl) this.#initASL(container);
-      
-        // STRICT STORE CHECK: Only attach listener if the ID exists in the Timing Framework
-        if (this.store) {
-          const isMainIdTracked = this.mainID && this.store.get(this.mainID) !== undefined;
-          const isVidTracked = this.store.get(vid) !== undefined;
-      
-          if (isMainIdTracked || isVidTracked) {
-            this.#attachEndListener(vid);
-          }
-        }
-      } catch (e) {
-        this.log(`Embed Error: ${e.message}`);
-      }
+    const finish = () => {
       setTimeout(() => { this.isEmbedding = false; }, 100);
-    });
+    };
+
+    try {
+      if (window.__mr_player) {
+        try { window.__mr_player.dispose?.(); } catch (e) { /* ignore */ }
+        window.__mr_player = null;
+      }
+
+      this.wrap.innerHTML = '';
+
+      const container = createTag('div', {
+        class: 'mobile-rider-container',
+        id: CONFIG.PLAYER.CONTAINER_ID,
+        'data-videoid': vid,
+      }, '', { parent: this.wrap });
+
+      createTag('video', {
+        id: CONFIG.PLAYER.VIDEO_ID,
+        class: CONFIG.PLAYER.VIDEO_CLASS,
+        controls: true,
+        playsinline: '',
+        poster: this.cfg.poster || this.cfg.thumbnail || '',
+      }, '', { parent: container });
+
+      requestAnimationFrame(() => {
+        const videoInDoc = document.getElementById(CONFIG.PLAYER.VIDEO_ID);
+
+        if (!videoInDoc || !window.mobilerider) {
+          this.log('DOM or Library not ready');
+          finish();
+          return;
+        }
+
+        try {
+          window.mobilerider.embed(videoInDoc.id, vid, skin, {
+            ...CONFIG.PLAYER.DEFAULT_OPTIONS,
+            ...this.#getOverrides(),
+            analytics: { provider: CONFIG.ANALYTICS.PROVIDER },
+            identifier1: vid,
+            identifier2: asl || '',
+            sessionId: vid,
+          });
+
+          if (asl) this.#initASL(container);
+
+          // ✅ IMPORTANT:
+          // We may not have store yet (tests set it later, dynamic import may fail).
+          // So attempt attach now AND retry briefly.
+          this.#maybeAttachEndListener(vid);
+        } catch (e) {
+          this.log(`Embed Error: ${e.message}`);
+        }
+
+        finish();
+      });
+    } catch (e) {
+      this.log(`Inject Error: ${e.message}`);
+      finish();
+    }
   }
 
   #getOverrides() {
@@ -146,29 +169,55 @@ class MobileRider {
     }, {});
   }
 
+  // ✅ attaches ONLY if store says key exists, but retries until store is available
+  #maybeAttachEndListener(vid) {
+    const tryAttach = () => {
+      const mainTracked = this.#storeHas(this.mainID);
+      const vidTracked = this.#storeHas(vid);
+      if (mainTracked || vidTracked) {
+        this.#attachEndListener(vid);
+        return true;
+      }
+      return false;
+    };
+
+    if (tryAttach()) return;
+
+    // Retry a bit: supports tests where instance.store is assigned after init()
+    let attempts = 0;
+    const tick = () => {
+      attempts += 1;
+      if (tryAttach()) return;
+      if (attempts >= CONFIG.STORE.ATTACH_RETRIES) return;
+      setTimeout(tick, CONFIG.STORE.ATTACH_INTERVAL_MS);
+    };
+    setTimeout(tick, 0);
+  }
+
   #attachEndListener(vid) {
+    // Avoid stacking listeners
+    window.__mr_player?.off?.('streamend');
     window.__mr_player?.on?.('streamend', () => {
-      if (this.drawer) { 
-        this.drawer.remove(); 
-        this.drawer = null; 
+      if (this.drawer) {
+        this.drawer.remove();
+        this.drawer = null;
       }
-  
-      if (this.store) {
-        this.#updateStatus(vid, false);
-      }
-  
+
+      if (this.store) this.setStatus(vid, false);
+
       window.__mr_player?.dispose?.();
       window.__mr_player = null;
     });
   }
 
   async #selectInitialVideo(videos) {
-    const urlIdx = new URLSearchParams(window.location.search).get('video');
+    const urlIdxRaw = new URLSearchParams(window.location.search).get('video');
+    const urlIdx = urlIdxRaw ? parseInt(urlIdxRaw, 10) : null;
     if (urlIdx && videos[urlIdx - 1]) return videos[urlIdx - 1];
 
     const sessionTitle = sessionStorage?.getItem('concurrentVideoTitle');
     if (sessionTitle) {
-      const found = videos.find(v => v.title?.trim() === sessionTitle.trim());
+      const found = videos.find((v) => v.title?.trim() === sessionTitle.trim());
       if (found) {
         sessionStorage.removeItem('concurrentVideoTitle');
         return found;
@@ -197,19 +246,26 @@ class MobileRider {
         <div class="drawer-item-title">${v.title || ''}</div>
         <div class="drawer-item-description">${v.description || ''}</div>
       </div>`;
-    
-    item.addEventListener('click', () => {
+
+    const activate = () => {
       const idx = this.allVideos.indexOf(v) + 1;
       const url = new URL(window.location.href);
-      if (idx === 1) url.searchParams.delete('video'); else url.searchParams.set('video', idx);
-      
-      if (url.toString() !== window.location.href) {
-        window.history.replaceState({}, '', url.toString());
-      }
+      if (idx === 1) url.searchParams.delete('video');
+      else url.searchParams.set('video', String(idx));
+      if (url.toString() !== window.location.href) window.history.replaceState({}, '', url.toString());
 
-      this.drawer.setActiveById(v.videoid);
+      this.drawer?.setActiveById?.(v.videoid);
       this.injectPlayer(v.videoid, this.cfg.skinid, v.aslid);
+    };
+
+    item.addEventListener('click', activate);
+    item.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        activate();
+      }
     });
+
     return item;
   }
 
@@ -221,8 +277,7 @@ class MobileRider {
         clearInterval(check);
         btn?.addEventListener('click', () => {
           if (!container.classList.contains(CONFIG.ASL.TOGGLE_CLASS)) {
-             container.classList.add(CONFIG.ASL.TOGGLE_CLASS);
-             // Re-init check if needed or just toggle UI
+            container.classList.add(CONFIG.ASL.TOGGLE_CLASS);
           }
         });
       }
@@ -239,7 +294,7 @@ class MobileRider {
         concurrentenabled: false,
       };
     }
-  
+
     return [...this.el.querySelectorAll(':scope > div > div:first-child')].reduce((acc, div) => {
       const key = div.textContent.trim().toLowerCase().replace(/ /g, '-');
       acc[key] = toBool(div.nextElementSibling?.textContent?.trim() || '');
@@ -248,8 +303,11 @@ class MobileRider {
   }
 
   #parseConcurrent(meta) {
-    const matches = Object.keys(meta).filter(k => k.startsWith('concurrentvideoid')).map(k => k.replace('concurrentvideoid', ''));
-    return [...new Set(matches)].sort((a,b) => a-b).map(i => ({
+    const matches = Object.keys(meta)
+      .filter((k) => k.startsWith('concurrentvideoid'))
+      .map((k) => k.replace('concurrentvideoid', ''));
+
+    return [...new Set(matches)].sort((a, b) => Number(a) - Number(b)).map((i) => ({
       videoid: meta[`concurrentvideoid${i}`],
       aslid: meta[`concurrentaslid${i}`],
       title: meta[`concurrenttitle${i}`],
@@ -260,15 +318,29 @@ class MobileRider {
 
   async #loadStore() {
     try {
-      const { mobileRiderStore } = await import(new URL('../../features/timing-framework/plugins/mobile-rider/plugin.js', import.meta.url).href);
+      const { mobileRiderStore } = await import(
+        new URL('../../features/timing-framework/plugins/mobile-rider/plugin.js', import.meta.url).href,
+      );
       this.store = mobileRiderStore;
     } catch (e) { this.log('Store Fail'); }
   }
 
+  setStatus(id, live) { this.#updateStatus(id, live); }
+
   #updateStatus(id, live) {
     if (!this.store) return;
-    const key = (this.mainID && this.store.get(this.mainID) !== undefined) ? this.mainID : id;
-    if (this.store.get(key) !== undefined) this.store.set(key, live);
+
+    const key = this.#storeHas(this.mainID)
+      ? this.mainID
+      : (this.#storeHas(id) ? id : null);
+
+    if (!key) return;
+
+    try {
+      this.store.set(key, live);
+    } catch (e) {
+      this.log(`Status update failed: ${e.message}`);
+    }
   }
 }
 
@@ -281,9 +353,9 @@ function extractVideoParamsFromHref(anchor) {
     if (!href) return null;
     const url = new URL(href, window.location.href);
 
-    const videoId = url.searchParams.get('videoId') 
-                 || url.searchParams.get('id') 
-                 || url.pathname.split('/').pop();
+    const videoId = url.searchParams.get('videoId')
+      || url.searchParams.get('id')
+      || url.pathname.split('/').pop();
 
     if (!videoId || videoId.includes('.html')) return null;
 
@@ -297,23 +369,21 @@ function extractVideoParamsFromHref(anchor) {
 }
 
 function handleAnchorElement(anchor) {
-  if (anchor.tagName !== 'A' || !anchor.classList.contains('link-block')) {
-    return anchor;
-  }
+  if (anchor.tagName !== 'A' || !anchor.classList.contains('link-block')) return anchor;
 
   const params = extractVideoParamsFromHref(anchor);
   if (!params || !params.videoId) return anchor;
 
   const mobileRiderDiv = createTag('div', { class: 'mobile-rider' });
-  
+
   mobileRiderDiv.dataset.extractedVideoId = params.videoId;
   if (params.skinId) mobileRiderDiv.dataset.extractedSkinId = params.skinId;
   if (params.autoplay) mobileRiderDiv.dataset.extractedAutoplay = params.autoplay;
   if (params.thumbnail) mobileRiderDiv.dataset.extractedThumbnail = params.thumbnail;
-  
+
   anchor.insertAdjacentElement('afterend', mobileRiderDiv);
   anchor.remove();
-  
+
   return mobileRiderDiv;
 }
 
