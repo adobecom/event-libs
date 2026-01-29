@@ -11629,8 +11629,10 @@ class DetailedAgenda {
 
         return `
                 <div class="agenda-block__track-label" style="border-left: 4px solid ${track.color}; height: ${numberOfRows * 140 + (numberOfRows - 1) * 6}px;">
-                    <div class="agenda-block__track-title-in-label">${track.title}</div>
-                    ${track.description ? `<button class="agenda-block__track-info-icon" aria-label="Track information" data-description="${track.description.replace(/"/g, '&quot;')}"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 12 12" focusable="false" class="tracks_title-hint-icon"><g><circle cx="6" cy="6" r="6" stroke="none"></circle><circle cx="6" cy="6" r="5.75"></circle></g><path d="M6.7 3.47a.7.7 0 1 1-.7-.7.7.7 0 0 1 .7.7m-.02 4.96-.15-.04V5.03a.18.18 0 0 0-.17-.14H5.32s-.52-.02-.52.41.52.4.52.4h.15v2.73h-.15s-.52-.02-.52.41.52.39.52.39h1.36s.52.04.52-.39-.51-.41-.51-.41"></path></svg></button>` : ''}
+                    <div class="agenda-block__track-title-wrapper">
+                        <div class="agenda-block__track-title-in-label">${track.title}</div>
+                        ${track.description ? `<button class="agenda-block__track-info-icon" aria-label="Track information" data-description="${track.description.replace(/"/g, '&quot;')}"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 12 12" focusable="false" class="tracks_title-hint-icon"><g><circle cx="6" cy="6" r="6" stroke="none"></circle><circle cx="6" cy="6" r="5.75"></circle></g><path d="M6.7 3.47a.7.7 0 1 1-.7-.7.7.7 0 0 1 .7.7m-.02 4.96-.15-.04V5.03a.18.18 0 0 0-.17-.14H5.32s-.52-.02-.52.41.52.4.52.4h.15v2.73h-.15s-.52-.02-.52.41.52.39.52.39h1.36s.52.04.52-.39-.51-.41-.51-.41"></path></svg></button>` : ''}
+                    </div>
             </div>
         `;
         }).join('');
