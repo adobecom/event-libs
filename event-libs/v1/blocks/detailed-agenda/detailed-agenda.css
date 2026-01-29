@@ -247,11 +247,88 @@
     line-height: 1.4;
 }
 
-.agenda-block__track-description-in-label {
-    margin: 0;
+.agenda-block__track-info-icon {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    margin-top: 0.5rem;
+    padding: 0;
+    background-color: #ffffff;
+    border: none;
+    border-radius: 50%;
+    cursor: pointer;
     font-size: 0.75rem;
-    color: #e0e0e0;
-    line-height: 1.4;
+    font-weight: 600;
+    color: #4a4a4a;
+    line-height: 1;
+    transition: opacity 0.2s ease;
+}
+
+.agenda-block__track-info-icon:hover {
+    opacity: 0.9;
+}
+
+.agenda-block__track-info-icon span {
+    display: block;
+    font-style: italic;
+    font-weight: 600;
+}
+
+.agenda-block__track-info-icon::after {
+    content: attr(data-description);
+    position: absolute;
+    bottom: calc(100% + 12px);
+    left: 50%;
+    transform: translateX(-50%);
+    width: 280px;
+    padding: 12px 16px;
+    background-color: #1473e6;
+    color: #ffffff;
+    font-size: 0.875rem;
+    line-height: 1.5;
+    border-radius: 4px;
+    white-space: normal;
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transition: opacity 0.2s ease, visibility 0.2s ease;
+    z-index: 1000;
+    text-align: left;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.agenda-block__track-info-icon::before {
+    content: '';
+    position: absolute;
+    bottom: calc(100% + 2px);
+    left: 50%;
+    transform: translateX(-50%);
+    width: 0;
+    height: 0;
+    border-left: 8px solid transparent;
+    border-right: 8px solid transparent;
+    border-top: 10px solid #1473e6;
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transition: opacity 0.2s ease, visibility 0.2s ease;
+    z-index: 1001;
+}
+
+.agenda-block__track-info-icon:hover::after,
+.agenda-block__track-info-icon:hover::before {
+    opacity: 1;
+    visibility: visible;
+}
+
+@media (max-width: 768px) {
+    .agenda-block__track-info-icon::after {
+        width: 240px;
+        font-size: 0.8125rem;
+    }
 }
 
 .agenda-block__day-dropdown-toggle {

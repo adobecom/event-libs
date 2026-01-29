@@ -11630,7 +11630,7 @@ class DetailedAgenda {
         return `
                 <div class="agenda-block__track-label" style="border-left: 4px solid ${track.color}; height: ${numberOfRows * 140 + (numberOfRows - 1) * 6}px;">
                     <div class="agenda-block__track-title-in-label">${track.title}</div>
-                    ${track.description ? `<div class="agenda-block__track-description-in-label">${track.description}</div>` : ''}
+                    ${track.description ? `<button class="agenda-block__track-info-icon" aria-label="Track information" data-description="${track.description.replace(/"/g, '&quot;')}"><span>i</span></button>` : ''}
             </div>
         `;
         }).join('');
