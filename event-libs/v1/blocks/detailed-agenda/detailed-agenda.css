@@ -378,10 +378,22 @@
 
 .agenda-block__time-header {
     display: grid;
-    grid-template-columns: repeat(6, 1fr);
+    grid-template-columns: 200px repeat(5, 1fr);
     gap: 6px;
     flex: 1;
     height: 100%;
+}
+
+@media (max-width: 1024px) {
+    .agenda-block__time-header {
+        grid-template-columns: 150px repeat(5, 1fr);
+    }
+}
+
+@media (max-width: 768px) {
+    .agenda-block__time-header {
+        grid-template-columns: 100px repeat(5, 1fr);
+    }
 }
 
 .agenda-block__time-cell {
