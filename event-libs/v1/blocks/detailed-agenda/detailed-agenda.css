@@ -247,6 +247,8 @@
     gap: 0.5rem;
     flex-wrap: wrap;
     margin-bottom: 0.25rem;
+    position: relative;
+    overflow: visible;
 }
 
 .agenda-block__track-title-in-label {
@@ -329,7 +331,7 @@
     visibility: hidden;
     pointer-events: none;
     transition: opacity 0.2s ease, visibility 0.2s ease;
-    z-index: 1000;
+    z-index: 10000;
     text-align: left;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
