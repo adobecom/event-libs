@@ -276,6 +276,7 @@
 
 .agenda-block__track-info-icon svg circle:first-child {
     fill: transparent;
+    transition: fill 0.2s ease;
 }
 
 .agenda-block__track-info-icon svg circle:last-child {
@@ -286,6 +287,15 @@
 
 .agenda-block__track-info-icon svg path {
     fill: #ffffff;
+    transition: fill 0.2s ease;
+}
+
+.agenda-block__track-info-icon:hover svg circle:first-child {
+    fill: #ffffff;
+}
+
+.agenda-block__track-info-icon:hover svg path {
+    fill: #000000;
 }
 
 .agenda-block__track-info-icon::after {
