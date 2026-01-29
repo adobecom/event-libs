@@ -301,7 +301,7 @@
 .agenda-block__track-info-icon::after {
     content: attr(data-description);
     position: absolute;
-    bottom: calc(100% + 12px);
+    top: calc(100% + 12px);
     left: 50%;
     transform: translateX(-50%);
     width: 280px;
@@ -324,14 +324,14 @@
 .agenda-block__track-info-icon::before {
     content: '';
     position: absolute;
-    bottom: calc(100% + 2px);
+    top: calc(100% - 2px);
     left: 50%;
     transform: translateX(-50%);
     width: 0;
     height: 0;
     border-left: 8px solid transparent;
     border-right: 8px solid transparent;
-    border-top: 10px solid #1473e6;
+    border-bottom: 10px solid #1473e6;
     opacity: 0;
     visibility: hidden;
     pointer-events: none;
