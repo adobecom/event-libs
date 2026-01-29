@@ -256,14 +256,10 @@
     height: 20px;
     margin-top: 0.5rem;
     padding: 0;
-    background-color: #ffffff;
-    border: 1px solid #e0e0e0;
-    border-radius: 50%;
+    background-color: transparent;
+    border: none;
+    border-radius: 0;
     cursor: pointer;
-    font-size: 0.75rem;
-    font-weight: 700;
-    color: #000000;
-    line-height: 1;
     transition: opacity 0.2s ease;
     flex-shrink: 0;
 }
@@ -272,11 +268,24 @@
     opacity: 0.9;
 }
 
-.agenda-block__track-info-icon span {
+.agenda-block__track-info-icon svg {
+    width: 100%;
+    height: 100%;
     display: block;
-    font-style: italic;
-    font-weight: 700;
-    font-family: sans-serif;
+}
+
+.agenda-block__track-info-icon svg circle:first-child {
+    fill: #ffffff;
+}
+
+.agenda-block__track-info-icon svg circle:last-child {
+    fill: none;
+    stroke: #e0e0e0;
+    stroke-width: 0.5;
+}
+
+.agenda-block__track-info-icon svg path {
+    fill: #000000;
 }
 
 .agenda-block__track-info-icon::after {
