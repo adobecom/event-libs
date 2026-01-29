@@ -237,6 +237,7 @@
     display: flex;
     flex-direction: column;
     box-sizing: border-box;
+    overflow: visible;
 }
 
 .agenda-block__track-title-wrapper {
@@ -313,7 +314,7 @@
 .agenda-block__track-info-icon::after {
     content: attr(data-description);
     position: absolute;
-    top: calc(100% + 14px);
+    bottom: calc(100% + 14px);
     left: 50%;
     transform: translateX(-50%);
     width: 280px;
@@ -336,14 +337,14 @@
 .agenda-block__track-info-icon::before {
     content: '';
     position: absolute;
-    top: calc(100% + 4px);
+    bottom: calc(100% + 4px);
     left: 50%;
     transform: translateX(-50%);
     width: 0;
     height: 0;
     border-left: 8px solid transparent;
     border-right: 8px solid transparent;
-    border-bottom: 10px solid #1473e6;
+    border-top: 10px solid #1473e6;
     opacity: 0;
     visibility: hidden;
     pointer-events: none;
@@ -474,6 +475,7 @@
     background-color: #f5f5f5;
     border-right: 1px solid #e0e0e0;
     padding: 6px 0;
+    overflow: visible;
 }
 
 .agenda-block__tracks-column > .agenda-block__track-label:first-child {
