@@ -212,6 +212,20 @@
     align-items: center;
     background-color: rgb(248, 248, 248);
     padding: 6px 0;
+    width: 200px;
+    box-sizing: border-box;
+}
+
+@media (max-width: 1024px) {
+    .agenda-block__day-dropdown-container {
+        width: 150px;
+    }
+}
+
+@media (max-width: 768px) {
+    .agenda-block__day-dropdown-container {
+        width: 100px;
+    }
 }
 
 .agenda-block__track-label {
