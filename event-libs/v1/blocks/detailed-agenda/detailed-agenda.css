@@ -257,14 +257,15 @@
     margin-top: 0.5rem;
     padding: 0;
     background-color: #ffffff;
-    border: 1px solid rgba(255, 255, 255, 0.5);
+    border: 1px solid #e0e0e0;
     border-radius: 50%;
     cursor: pointer;
     font-size: 0.75rem;
-    font-weight: 600;
+    font-weight: 700;
     color: #000000;
     line-height: 1;
     transition: opacity 0.2s ease;
+    flex-shrink: 0;
 }
 
 .agenda-block__track-info-icon:hover {
@@ -274,7 +275,8 @@
 .agenda-block__track-info-icon span {
     display: block;
     font-style: italic;
-    font-weight: 600;
+    font-weight: 700;
+    font-family: sans-serif;
 }
 
 .agenda-block__track-info-icon::after {
