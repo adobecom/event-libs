@@ -16,6 +16,7 @@ const EVENT_BLOCKS = [
   'promotional-content',
   'venue-additional-info',
   'youtube-chat',
+  'image-links',
 ];
 
 // Import only the most essential utilities that are always needed
@@ -28,6 +29,7 @@ import {
   setEventConfig,
   updateEventConfig,
   getEventConfig,
+  hydrateBlocks,
 } from './utils/utils.js';
 
 // Pre-load the most commonly used functions from decorate.js
@@ -53,6 +55,7 @@ export {
   validatePageAndRedirect,
   processAutoBlockLinks,
   EVENT_BLOCKS,
+  hydrateBlocks,
 };
 
 // Lazy-loaded delayed actions for event pages
