@@ -1,4 +1,4 @@
-import { LIBS, getEventConfig } from './utils.js';
+import { LIBS, getEventConfig, getMetadata } from './utils.js';
 import { FALLBACK_LOCALES } from './constances.js';
 
 export class DictionaryManager {
@@ -11,6 +11,11 @@ export class DictionaryManager {
    * @returns {Promise<string>} The dictionary URL
    */
   static async getDictionaryPath() {
+    const customDictionaryLocation = getMetadata('dictionary-location');
+    if (customDictionaryLocation) {
+      return customDictionaryLocation;
+    }
+
     const eventConfig = getEventConfig();
     const { miloConfig } = eventConfig;
     const miloLibs = miloConfig?.miloLibs ? miloConfig.miloLibs : LIBS;

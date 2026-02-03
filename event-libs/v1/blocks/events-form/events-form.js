@@ -224,7 +224,7 @@ async function buildErrorMsg(parent, status) {
     existingErrors.forEach((err) => err.remove());
   }
 
-      const errorMsg = dictionaryManager.getValue(errorKeyMap[status] || 'rsvp-error-msg', 'rsvp-fields');
+  const errorMsg = dictionaryManager.getValue(errorKeyMap[status] || 'rsvp-error-msg');
   const error = createTag('p', { class: 'error' }, errorMsg);
   parent.append(error);
   setTimeout(() => {
