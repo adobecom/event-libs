@@ -6,11 +6,6 @@
   text-align: center;
 }
 
-.image-links .image-links-title {
-  margin: 0;
-  font-size: var(--type-heading-l-size);
-}
-
 .image-links .image-links-container {
   margin: auto;
   max-width: 200px;

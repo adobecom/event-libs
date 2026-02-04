@@ -29,7 +29,7 @@ describe('Image Links Block', () => {
       expect(wrapper).to.not.be.null;
     });
 
-    it('should extract and display header', () => {
+    it('should use first row as header with image-links-header class', () => {
       document.body.innerHTML = defaultBody;
       const el = document.querySelector('.image-links');
       init(el);
@@ -37,7 +37,7 @@ describe('Image Links Block', () => {
       const headerContainer = el.querySelector('.image-links-header');
       expect(headerContainer).to.not.be.null;
 
-      const title = headerContainer.querySelector('.image-links-title');
+      const title = headerContainer.querySelector('h2');
       expect(title).to.not.be.null;
       expect(title.textContent).to.equal('Our Sponsors');
     });
@@ -54,16 +54,34 @@ describe('Image Links Block', () => {
       expect(imageItems).to.have.lengthOf(2);
     });
 
-    it('should wrap images with links when available', () => {
+    it('should preserve links inside image items', () => {
       document.body.innerHTML = defaultBody;
       const el = document.querySelector('.image-links');
       init(el);
 
-      const links = el.querySelectorAll('.image-links-container > a');
-      expect(links).to.have.lengthOf(2);
-      expect(links[0].href).to.equal('https://example.com/sponsor1');
-      expect(links[0].target).to.equal('_blank');
-      expect(links[1].href).to.equal('https://example.com/sponsor2');
+      const items = el.querySelectorAll('.image-links-item');
+      expect(items).to.have.lengthOf(2);
+
+      const link1 = items[0].querySelector('a');
+      expect(link1).to.not.be.null;
+      expect(link1.href).to.equal('https://example.com/sponsor1');
+      expect(link1.target).to.equal('_blank');
+
+      const link2 = items[1].querySelector('a');
+      expect(link2).to.not.be.null;
+      expect(link2.href).to.equal('https://example.com/sponsor2');
+    });
+
+    it('should preserve original target attribute from links', () => {
+      document.body.innerHTML = defaultBody;
+      const el = document.querySelector('.image-links');
+      init(el);
+
+      const items = el.querySelectorAll('.image-links-item');
+      // First link has target="_blank"
+      expect(items[0].querySelector('a').target).to.equal('_blank');
+      // Second link has no target
+      expect(items[1].querySelector('a').target).to.equal('');
     });
 
     it('should handle images without links', () => {
@@ -72,17 +90,21 @@ describe('Image Links Block', () => {
       init(el);
 
       const imagesContainer = el.querySelector('.image-links-container');
-      const directItems = imagesContainer.querySelectorAll(':scope > .image-links-item');
+      const directItems = imagesContainer.querySelectorAll('.image-links-item');
       expect(directItems).to.have.lengthOf(2);
+
+      // Images should not have link wrappers
+      const links = imagesContainer.querySelectorAll('a');
+      expect(links).to.have.lengthOf(0);
     });
 
-    it('should not add header container if no header found', () => {
+    it('should still have header row even if empty', () => {
       document.body.innerHTML = noHeaderBody;
       const el = document.querySelector('.image-links');
       init(el);
 
       const headerContainer = el.querySelector('.image-links-header');
-      expect(headerContainer).to.be.null;
+      expect(headerContainer).to.not.be.null;
     });
 
     it('should add "single" class when only one image', () => {
@@ -90,6 +112,9 @@ describe('Image Links Block', () => {
         <main>
           <div>
             <div class="image-links">
+              <div>
+                <div><h2>Header</h2></div>
+              </div>
               <div>
                 <div>
                   <picture>
@@ -114,16 +139,15 @@ describe('Image Links Block', () => {
           <div>
             <div class="image-links">
               <div>
+                <div><h2>Header</h2></div>
+              </div>
+              <div>
                 <div>
                   <img alt="Image 1" src="./image1.png">
                 </div>
-              </div>
-              <div>
                 <div>
                   <img alt="Image 2" src="./image2.png">
                 </div>
-              </div>
-              <div>
                 <div>
                   <img alt="Image 3" src="./image3.png">
                 </div>
@@ -159,7 +183,7 @@ describe('Image Links Block', () => {
       expect(document.querySelector('.image-links')).to.be.null;
     });
 
-    it('should clone images correctly', () => {
+    it('should preserve images correctly', () => {
       document.body.innerHTML = defaultBody;
       const el = document.querySelector('.image-links');
       init(el);
@@ -168,6 +192,36 @@ describe('Image Links Block', () => {
       expect(images).to.have.lengthOf(2);
       expect(images[0].alt).to.equal('Sponsor 1');
       expect(images[1].alt).to.equal('Sponsor 2');
+    });
+
+    it('should preserve header content as-is including any elements', () => {
+      document.body.innerHTML = `
+        <main>
+          <div>
+            <div class="image-links">
+              <div>
+                <div>
+                  <h2>Title</h2>
+                  <p>Description text</p>
+                  <a href="/link">Learn more</a>
+                </div>
+              </div>
+              <div>
+                <div>
+                  <img alt="Image" src="./image.png">
+                </div>
+              </div>
+            </div>
+          </div>
+        </main>
+      `;
+      const el = document.querySelector('.image-links');
+      init(el);
+
+      const headerContainer = el.querySelector('.image-links-header');
+      expect(headerContainer.querySelector('h2')).to.not.be.null;
+      expect(headerContainer.querySelector('p')).to.not.be.null;
+      expect(headerContainer.querySelector('a')).to.not.be.null;
     });
   });
 });
