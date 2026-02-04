@@ -789,7 +789,7 @@ const HYDRATOR_CONFIG = {
       imageKey: 'image',
       linkKey: 'link',
       nameKey: 'name',
-      tierKeywords: ['platinum', 'diamond', 'gold', 'silver', 'bronze', 'engagement', 'partner'],
+      tierKeywords: ['platinum', 'diamond', 'gold', 'silver', 'bronze', 'engagement'],
     }
   },
 };
