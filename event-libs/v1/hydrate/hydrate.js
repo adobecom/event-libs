@@ -1,16 +1,19 @@
-import hydrateImageLinks from './image-links.js';
-
-const HYDRATORS = {
-  'image-links': hydrateImageLinks,
-};
-
 /**
  * Hydrates blocks in the document that need dynamic content from metadata.
  * Call this before blocks are initialized.
  */
-export function hydrateBlocks(area = document) {
-  Object.entries(HYDRATORS).forEach(([blockName, hydrator]) => {
-    const blocks = area.querySelectorAll(`.${blockName}`);
-    blocks.forEach((block) => hydrator(block));
-  });
+export async function hydrateBlocks(area = document) {
+  const blocks = area.querySelectorAll('.hydrate');
+  
+  for (const block of blocks) {
+    // Extract block name from class list (first class is typically the block name)
+    const blockName = block.classList[0];
+    
+    try {
+      const { default: hydrate } = await import(`./${blockName}.js`);
+      hydrate(block);
+    } catch (e) {
+      window.lana?.log(`Hydrator not found for block: ${blockName}`);
+    }
+  }
 }
