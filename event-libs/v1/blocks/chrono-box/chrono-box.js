@@ -1,4 +1,5 @@
 import { getMetadata, getEventConfig, LIBS } from '../../utils/utils.js';
+import { processDATemplateLinks } from '../../utils/decorate.js';
 
 function buildScheduleDoubleLinkedList(entries) {
   if (!entries.length) return null;
@@ -217,6 +218,11 @@ export default async function init(el) {
       const a = createTag('a', { href: `${pathToFragment.startsWith('/') ? prefix : ''}${pathToFragment}` }, '', { parent: el });
 
       loadFragment(a).then(() => {
+        // Process template links in the loaded fragment for DA cmsType
+        const { cmsType } = getEventConfig();
+        if (cmsType === 'DA') {
+          processDATemplateLinks(el);
+        }
         el.removeAttribute('style');
       }).catch((error) => {
         window.lana?.log(`Error loading fragment ${pathToFragment}: ${error.message}`);

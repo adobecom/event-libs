@@ -1,5 +1,6 @@
 import { getMetadata, getEventConfig, LIBS } from '../../utils/utils.js';
 import { FALLBACK_LOCALES } from '../../utils/constances.js';
+import { processDATemplateLinks } from '../../utils/decorate.js';
 
 async function getPromotionalContentUrl() {
   const customPromotionalContentLocation = getMetadata('promotional-content-location');
@@ -103,5 +104,12 @@ export default async function init(el) {
   });
 
   await Promise.all(fragmentPromotionalItemsPromises);
+
+  // Process template links in loaded fragments for DA cmsType
+  const { cmsType } = eventConfig;
+  if (cmsType === 'DA') {
+    processDATemplateLinks(el);
+  }
+
   addMediaReversedClass(el);
 }

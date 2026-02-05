@@ -383,7 +383,7 @@ function processSPTemplateLinks(parent) {
   });
 }
 
-function processDATemplateLinks(parent) {
+export function processDATemplateLinks(parent) {
   const allLinks = parent.querySelectorAll('a');
 
   allLinks.forEach((a) => {
