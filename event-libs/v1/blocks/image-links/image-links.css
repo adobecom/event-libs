@@ -18,7 +18,6 @@
 }
 
 .image-links .image-links-container.odd {
-  justify-content: flex-start;
   max-width: 300px;
 }
 
@@ -27,8 +26,8 @@
 }
 
 .image-links .image-links-item {
-  width: 89px;
-  height: 59px;
+  max-width: 89px;
+  max-height: 59px;
 }
 
 .image-links .image-links-item img {
@@ -73,7 +72,7 @@
   }
 
   .image-links .image-links-item {
-    width: 306px;
-    height: 181px;
+    max-width: 306px;
+    max-height: 181px;
   }
 }
