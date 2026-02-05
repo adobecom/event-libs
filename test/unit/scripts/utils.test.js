@@ -9,8 +9,6 @@ import {
   flattenObject,
   createOptimizedPicture,
   getIcon,
-  getImageSource,
-  setEventConfig,
 } from '../../../event-libs/v1/utils/utils.js';
 
 describe('Utility Functions', () => {
@@ -160,53 +158,6 @@ describe('Utility Functions', () => {
       expect(icon.className).to.equal('icon icon-test-icon');
       expect(icon.getAttribute('src')).to.include('event-libs/v1/icons/test-icon.svg');
       expect(icon.getAttribute('alt')).to.equal('test-icon');
-    });
-  });
-
-  describe('getImageSource', () => {
-    beforeEach(() => {
-      // Reset event config to ensure clean state
-      setEventConfig({});
-    });
-
-    it('should return empty string for null input', () => {
-      expect(getImageSource(null)).to.equal('');
-    });
-
-    it('should return empty string for undefined input', () => {
-      expect(getImageSource(undefined)).to.equal('');
-    });
-
-    it('should return imageUrl when cmsType is not SP', () => {
-      setEventConfig({ cmsType: 'DA' });
-      const photo = {
-        sharepointUrl: 'https://sharepoint.example.com/image.jpg',
-        imageUrl: 'https://example.com/image.jpg',
-      };
-      expect(getImageSource(photo)).to.equal('https://example.com/image.jpg');
-    });
-
-    it('should return pathname from sharepointUrl when cmsType is SP', () => {
-      setEventConfig({ cmsType: 'SP' });
-      const photo = {
-        sharepointUrl: 'https://sharepoint.example.com/image.jpg',
-        imageUrl: 'https://example.com/image.jpg',
-      };
-      expect(getImageSource(photo)).to.equal('/image.jpg');
-    });
-
-    it('should return imageUrl when sharepointUrl is not available', () => {
-      setEventConfig({ cmsType: 'DA' });
-      const photo = {
-        imageUrl: 'https://example.com/image.jpg',
-      };
-      expect(getImageSource(photo)).to.equal('https://example.com/image.jpg');
-    });
-
-    it('should return undefined when neither URL is available', () => {
-      setEventConfig({ cmsType: 'DA' });
-      const photo = {};
-      expect(getImageSource(photo)).to.be.undefined;
     });
   });
 });
