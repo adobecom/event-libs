@@ -10,6 +10,7 @@ import {
   createOptimizedPicture,
   getIcon,
   getImageSource,
+  setEventConfig,
 } from '../../../event-libs/v1/utils/utils.js';
 
 describe('Utility Functions', () => {
@@ -163,6 +164,11 @@ describe('Utility Functions', () => {
   });
 
   describe('getImageSource', () => {
+    beforeEach(() => {
+      // Reset event config to ensure clean state
+      setEventConfig({});
+    });
+
     it('should return empty string for null input', () => {
       expect(getImageSource(null)).to.equal('');
     });
@@ -171,24 +177,36 @@ describe('Utility Functions', () => {
       expect(getImageSource(undefined)).to.equal('');
     });
 
-    it('should return sharepointUrl when available', () => {
+    it('should return imageUrl when cmsType is not SP', () => {
+      setEventConfig({ cmsType: 'DA' });
       const photo = {
         sharepointUrl: 'https://sharepoint.example.com/image.jpg',
         imageUrl: 'https://example.com/image.jpg',
       };
-      expect(getImageSource(photo)).to.equal('https://sharepoint.example.com/image.jpg');
+      expect(getImageSource(photo)).to.equal('https://example.com/image.jpg');
+    });
+
+    it('should return pathname from sharepointUrl when cmsType is SP', () => {
+      setEventConfig({ cmsType: 'SP' });
+      const photo = {
+        sharepointUrl: 'https://sharepoint.example.com/image.jpg',
+        imageUrl: 'https://example.com/image.jpg',
+      };
+      expect(getImageSource(photo)).to.equal('/image.jpg');
     });
 
     it('should return imageUrl when sharepointUrl is not available', () => {
+      setEventConfig({ cmsType: 'DA' });
       const photo = {
         imageUrl: 'https://example.com/image.jpg',
       };
       expect(getImageSource(photo)).to.equal('https://example.com/image.jpg');
     });
 
-    it('should return empty string when neither URL is available', () => {
+    it('should return undefined when neither URL is available', () => {
+      setEventConfig({ cmsType: 'DA' });
       const photo = {};
-      expect(getImageSource(photo)).to.equal('');
+      expect(getImageSource(photo)).to.be.undefined;
     });
   });
 });
