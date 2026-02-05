@@ -398,18 +398,11 @@ function processDATemplateLinks(parent) {
 
       // Decode the href to find [[]] patterns
       const decodedHref = decodeURIComponent(encodedHref);
-      const isMailtoLink = decodedHref.startsWith('mailto:');
-
+      const isBrokenMailtoLink = decodedHref.startsWith('mailto:?');
+      if (isBrokenMailtoLink) removeLink = true;
       const processedHref = decodedHref.replace(META_REG, (_match, metadataPath) => {
         const metaValue = parseMetadataPath(metadataPath);
-        if (!metaValue) {
-          // For mailto: links with [[host-email]], remove the link if host-email is missing
-          if (isMailtoLink && metadataPath === 'host-email') {
-            removeLink = true;
-          } else if (!isMailtoLink) {
-            removeLink = true;
-          }
-        }
+        if (!metaValue) removeLink = true;
         return metaValue || '';
       });
 
