@@ -25,6 +25,7 @@ import {
   createTag,
 } from './utils.js';
 import { massageMetadata } from './date-time-helper.js';
+import { hydrateBlocks } from '../hydrate/hydrate.js';
 
 const ICONS_BASE_URL = new URL('../icons/', import.meta.url).href;
 
@@ -949,6 +950,8 @@ function addStylesToEventPage() {
 }
 
 export function decorateEvent(parent) {
+  hydrateBlocks(parent);
+
   // handle photos data parsing
   const photosData = parsePhotosData(parent);
   const { cmsType } = getEventConfig();

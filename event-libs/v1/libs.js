@@ -29,7 +29,6 @@ import {
   setEventConfig,
   updateEventConfig,
   getEventConfig,
-  hydrateBlocks,
 } from './utils/utils.js';
 
 // Pre-load the most commonly used functions from decorate.js
@@ -55,7 +54,6 @@ export {
   validatePageAndRedirect,
   processAutoBlockLinks,
   EVENT_BLOCKS,
-  hydrateBlocks,
 };
 
 // Lazy-loaded delayed actions for event pages

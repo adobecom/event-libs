@@ -773,5 +773,3 @@ export function loadStyle(href, callback) {
   return loadLink(href, { rel: 'stylesheet', callback });
 }
 
-export { hydrateBlocks } from '../hydrate/hydrate.js';
-
