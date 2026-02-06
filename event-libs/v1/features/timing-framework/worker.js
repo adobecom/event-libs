@@ -329,7 +329,9 @@ class TimingWorker {
       if (mobileRiderStore) {
         const { sessionId } = this.currentScheduleItem.mobileRider;
         const isActive = mobileRiderStore.get(sessionId);
-        if (isActive) return false; // Wait for session to end
+        // If avoidStreamEndFlag is set, treat all streams as ended
+        const shouldTreatAsActive = this.testingManager.shouldAvoidStreamEnd() ? false : isActive;
+        if (shouldTreatAsActive) return false; // Wait for session to end
       }
     }
 
@@ -342,7 +344,9 @@ class TimingWorker {
       if (mobileRiderStore) {
         const { sessionId } = scheduleItem.mobileRider;
         const isActive = mobileRiderStore.get(sessionId);
-        if (!isActive) {
+        // If avoidStreamEndFlag is set, treat all streams as ended (skip forward)
+        const shouldTreatAsEnded = this.testingManager.shouldAvoidStreamEnd() ? true : !isActive;
+        if (shouldTreatAsEnded) {
           this.nextScheduleItem = scheduleItem.next;
           return true;
         }
@@ -402,8 +406,8 @@ class TimingWorker {
 
     if (!this.nextScheduleItem) return;
 
-    // Stop polling in testing mode - we want to see exact state at the simulated timestamp
-    if (this.testingManager.isTesting()) return;
+    // Stop polling only if time is frozen (timing param) - serverTime and avoidStreamEndFlag should continue polling
+    if (this.testingManager.isFrozen()) return;
 
     this.timerId = setTimeout(() => this.runTimer(), TimingWorker.getRandomInterval());
   }

@@ -25,6 +25,7 @@ import {
   createTag,
 } from './utils.js';
 import { massageMetadata } from './date-time-helper.js';
+import { hydrateBlocks } from '../hydrate/hydrate.js';
 
 const ICONS_BASE_URL = new URL('../icons/', import.meta.url).href;
 
@@ -397,13 +398,11 @@ function processDATemplateLinks(parent) {
 
       // Decode the href to find [[]] patterns
       const decodedHref = decodeURIComponent(encodedHref);
-      
-
+      const isBrokenMailtoLink = decodedHref.startsWith('mailto:?');
+      if (isBrokenMailtoLink) removeLink = true;
       const processedHref = decodedHref.replace(META_REG, (_match, metadataPath) => {
         const metaValue = parseMetadataPath(metadataPath);
-        if (!metaValue) {
-          removeLink = true;
-        }
+        if (!metaValue) removeLink = true;
         return metaValue || '';
       });
 
@@ -949,6 +948,8 @@ function addStylesToEventPage() {
 }
 
 export function decorateEvent(parent) {
+  hydrateBlocks(parent);
+
   // handle photos data parsing
   const photosData = parsePhotosData(parent);
   const { cmsType } = getEventConfig();
