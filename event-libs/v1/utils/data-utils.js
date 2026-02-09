@@ -40,6 +40,8 @@ export const BASE_ATTENDEE_DATA_FILTER = {
   primaryProductOfInterest: { type: 'string', submittable: true },
   companySize: { type: 'string', submittable: true },
   specialRequirements: { type: 'string', submittable: true },
+  primarySocialMediaAccount: { type: 'string', submittable: true },
+  approximateFollowerCount: { type: 'string', submittable: true },
   website: { type: 'string', submittable: true },
   employeesInOrganization: { type: 'string', submittable: true },
   department: { type: 'string', submittable: true },
