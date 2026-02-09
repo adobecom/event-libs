@@ -186,7 +186,7 @@ export default async function init(el) {
   }
 
   // Expose parsed schedule on DOM for consumers (e.g. Chrome extensions)
-  el.setAttribute('data-event-libs-schedule-json', JSON.stringify(thisSchedule));
+  el.setAttribute('data-tf-schedule-json', JSON.stringify(thisSchedule));
   el.innerHTML = '';
 
   const pluginsOutputs = await initPlugins(thisSchedule);
