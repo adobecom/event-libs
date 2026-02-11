@@ -1,9 +1,14 @@
-import { getEventConfig, LIBS, createTag, loadStyle } from '../utils/utils.js';
+import { createTag, loadStyle } from '../utils/utils.js';
 
-const miloLibs = getEventConfig().miloConfig.miloLibs || LIBS;
+export const ARROW_NEXT_IMG = `<svg xmlns="http://www.w3.org/2000/svg" width="21" height="21" viewBox="0 0 21 21">
+<title>Next slide arrow</title>
+<path d="M19.2214 10.8918C19.3516 10.5773 19.3516 10.2226 19.2214 9.90808C19.1562 9.75098 19.0621 9.60895 18.9435 9.49041L12.9241 3.47092C12.4226 2.96819 11.6076 2.96819 11.1061 3.47092C10.604 3.97239 10.604 4.78743 11.1061 5.2889L14.9312 9.11399H2.4314C1.72109 9.11399 1.146 9.69036 1.146 10.4C1.146 11.1097 1.72109 11.6861 2.4314 11.6861H14.9312L11.1061 15.5112C10.604 16.0126 10.604 16.8277 11.1061 17.3291C11.3568 17.5805 11.6863 17.7062 12.0151 17.7062C12.3439 17.7062 12.6733 17.5805 12.9241 17.3291L18.9436 11.3097C19.0622 11.1911 19.1562 11.0491 19.2214 10.8918Z"/>
+</svg>`;
 
-export const ARROW_NEXT_IMG = `<img class="next-icon" alt="Next icon" src="${miloLibs}/blocks/carousel/img/arrow.svg" height="10" width="16">`;
-export const ARROW_PREVIOUS_IMG = `<img class="previous-icon" alt="Previous icon" src="${miloLibs}/blocks/carousel/img/arrow.svg" height="10" width="16">`;
+export const ARROW_PREVIOUS_IMG = `<svg xmlns="http://www.w3.org/2000/svg" width="21" height="21" viewBox="0 0 21 21">
+<title>Previous slide arrow</title>
+<path d="M19.2214 10.8918C19.3516 10.5773 19.3516 10.2226 19.2214 9.90808C19.1562 9.75098 19.0621 9.60895 18.9435 9.49041L12.9241 3.47092C12.4226 2.96819 11.6076 2.96819 11.1061 3.47092C10.604 3.97239 10.604 4.78743 11.1061 5.2889L14.9312 9.11399H2.4314C1.72109 9.11399 1.146 9.69036 1.146 10.4C1.146 11.1097 1.72109 11.6861 2.4314 11.6861H14.9312L11.1061 15.5112C10.604 16.0126 10.604 16.8277 11.1061 17.3291C11.3568 17.5805 11.6863 17.7062 12.0151 17.7062C12.3439 17.7062 12.6733 17.5805 12.9241 17.3291L18.9436 11.3097C19.0622 11.1911 19.1562 11.0491 19.2214 10.8918Z"/>
+</svg>`;
 
 export const KEY_CODES = {
   SPACE: 'Space',
@@ -13,12 +18,32 @@ export const KEY_CODES = {
   ARROW_RIGHT: 'ArrowRight',
 };
 
-export function decorateNextPreviousBtns() {
+const FOCUSABLE_SELECTOR = 'a';
+
+function getPreviousAriaLabel(currentIndex, totalSlides) {
+  return currentIndex === 0 && totalSlides > 0
+    ? `Previous slide, slide ${currentIndex + 1} of ${totalSlides}`
+    : 'Previous slide';
+}
+
+function updatePreviousAriaLabel(carouselElements) {
+  const { slides, nextPreviousBtns, currentActiveIndex } = carouselElements;
+  if (!nextPreviousBtns?.[0]) return;
+
+  nextPreviousBtns[0].setAttribute(
+    'aria-label',
+    getPreviousAriaLabel(currentActiveIndex, slides.length),
+  );
+}
+
+export function decorateNextPreviousBtns(slides) {
+  const totalSlides = slides ? slides.length : 0;
+
   const previousBtn = createTag(
     'button',
     {
-      class: 'carousel-button carousel-previous',
-      'aria-label': 'Previous',
+      class: 'carousel-button carousel-previous is-delayed',
+      'aria-label': getPreviousAriaLabel(0, totalSlides),
       'data-toggle': 'previous',
     },
     ARROW_PREVIOUS_IMG,
@@ -27,8 +52,8 @@ export function decorateNextPreviousBtns() {
   const nextBtn = createTag(
     'button',
     {
-      class: 'carousel-button carousel-next',
-      'aria-label': 'Next',
+      class: 'carousel-button carousel-next is-delayed',
+      'aria-label': 'Next slide',
       'data-toggle': 'next',
     },
     ARROW_NEXT_IMG,
@@ -42,17 +67,13 @@ export function decorateSlideIndicators(slides) {
   for (let i = 0; i < slides.length; i += 1) {
     const li = createTag('li', {
       class: 'carousel-indicator',
-      role: 'tab',
-      tabindex: -1,
       'data-index': i,
-      'aria-selected': false,
-      'aria-labelledby': `Viewing Slide ${i + 1}`,
     });
 
-    // Set inital active state
+    // Set initial active state
     if (i === 0) {
       li.classList.add('active');
-      li.setAttribute('tabindex', 0);
+      li.setAttribute('aria-current', 'location');
     }
     indicatorDots.push(li);
   }
@@ -73,15 +94,51 @@ export function handlePrevious(previousElment, elements) {
   return elements[elements.length - 1];
 }
 
-export function jumpToDirection(activeSlideIndex, jumpToIndex, slideContainer) {
-  if (activeSlideIndex < jumpToIndex) {
-    slideContainer.classList.remove('is-reversing');
+function setAriaHiddenAndTabIndex({ el: block, slides }, activeEl) {
+  const active = activeEl ?? block.querySelector('.carousel-slide.active');
+  const activeIdx = slides.findIndex((s) => s === active);
+  const showClass = [...block.classList].find((cls) => cls.startsWith('show-'));
+  const visible = (showClass && parseInt(showClass.split('-')[1], 10)) || 1;
+  const ordered = activeIdx > 0
+    ? [...slides.slice(activeIdx), ...slides.slice(0, activeIdx)] : slides;
+  ordered.forEach((slide, i) => {
+    const isVisible = i < visible;
+    slide.setAttribute('aria-hidden', !isVisible);
+    slide.querySelectorAll(FOCUSABLE_SELECTOR).forEach((el) => {
+      el.setAttribute('tabindex', isVisible ? 0 : -1);
+    });
+  });
+}
+
+// Sets a multiplier variable, used by CSS, to move the indicator dots.
+function setIndicatorMultiplier(carouselElements, activeSlideIndicator, event) {
+  const { slides, direction } = carouselElements;
+  const maxViewableIndicators = 6;
+  if (slides.length <= maxViewableIndicators) return;
+
+  const { currentTarget, key } = event;
+  const eventDirection = currentTarget.dataset.toggle || direction;
+  const keyNavDirection = key === KEY_CODES.ARROW_RIGHT || undefined;
+  const multiplierOffset = (eventDirection === 'next' || eventDirection === 'left')
+    || keyNavDirection ? 4 : 3;
+  const activeSlideIndex = Number(activeSlideIndicator.dataset.index);
+  if (activeSlideIndex > multiplierOffset && activeSlideIndex <= slides.length) {
+    /*
+      * Stop adding to the multiplier if it equals the difference
+      * between the slides length and maxViewableIndicators
+    */
+    const multiplier = activeSlideIndex - multiplierOffset >= slides.length - maxViewableIndicators
+      ? slides.length - maxViewableIndicators
+      : activeSlideIndex - multiplierOffset;
+    activeSlideIndicator.parentElement.classList.add('move-indicators');
+    activeSlideIndicator.parentElement.style = `--indicator-multiplier: ${multiplier}`;
   } else {
-    slideContainer.classList.add('is-reversing');
+    const multiplier = 0;
+    activeSlideIndicator.parentElement.style = `--indicator-multiplier: ${multiplier}`;
   }
 }
 
-export function moveSlides(event, carouselElements, jumpToIndex) {
+export function moveSlides(event, carouselElements) {
   const {
     slideContainer,
     slides,
@@ -89,12 +146,14 @@ export function moveSlides(event, carouselElements, jumpToIndex) {
     slideIndicators,
     controlsContainer,
     direction,
+    ariaLive,
   } = carouselElements;
+
+  if (ariaLive) ariaLive.textContent = '';
 
   let referenceSlide = slideContainer.querySelector('.reference-slide');
   let activeSlide = slideContainer.querySelector('.active');
   let activeSlideIndicator = controlsContainer.querySelector('.active');
-  const activeSlideIndex = activeSlideIndicator.dataset.index;
 
   // Track reference slide - last slide initially
   if (!referenceSlide) {
@@ -107,28 +166,8 @@ export function moveSlides(event, carouselElements, jumpToIndex) {
   referenceSlide.classList.remove('reference-slide');
   referenceSlide.style.order = null;
   activeSlide.classList.remove('active');
-  activeSlide.querySelectorAll('a').forEach((focusableElement) => { focusableElement.setAttribute('tabindex', -1); });
   activeSlideIndicator.classList.remove('active');
-  activeSlideIndicator.setAttribute('tabindex', -1);
-
-  /*
-   * If indicator dot buttons are clicked update:
-   * reference slide, active indicator dot, and active slide
-  */
-  if (jumpToIndex >= 0) {
-    if (jumpToIndex === 0) {
-      referenceSlide = slides[slides.length - 1];
-    } else if (jumpToIndex === slides.length - 1) {
-      referenceSlide = slides[slides.length - 2];
-    } else {
-      referenceSlide = slides[jumpToIndex - 1];
-    }
-    referenceSlide.classList.add('reference-slide');
-    referenceSlide.style.order = '1';
-    activeSlideIndicator = slideIndicators[jumpToIndex];
-    activeSlide = slides[jumpToIndex];
-    jumpToDirection(activeSlideIndex, jumpToIndex, slideContainer);
-  }
+  activeSlideIndicator.removeAttribute('aria-current');
 
   // Next arrow button, swipe, keyboard navigation
   if ((event.currentTarget).dataset.toggle === 'next'
@@ -139,6 +178,8 @@ export function moveSlides(event, carouselElements, jumpToIndex) {
     activeSlideIndicator = handleNext(activeSlideIndicator, slideIndicators);
     activeSlide = handleNext(activeSlide, slides);
     slideContainer?.classList.remove('is-reversing');
+    carouselElements.currentActiveIndex = (carouselElements.currentActiveIndex + 1)
+      % slides.length;
   }
 
   // Previous arrow button, swipe, keyboard navigation
@@ -150,6 +191,8 @@ export function moveSlides(event, carouselElements, jumpToIndex) {
     activeSlideIndicator = handlePrevious(activeSlideIndicator, slideIndicators);
     activeSlide = handlePrevious(activeSlide, slides);
     slideContainer.classList.add('is-reversing');
+    carouselElements.currentActiveIndex = (carouselElements.currentActiveIndex - 1
+      + slides.length) % slides.length;
   }
 
   // Update reference slide attributes
@@ -158,24 +201,11 @@ export function moveSlides(event, carouselElements, jumpToIndex) {
 
   // Update active slide and indicator dot attributes
   activeSlide.classList.add('active');
-  const indexOfActive = [...activeSlide.parentElement.children]
-    .findIndex((ele) => activeSlide.isSameNode(ele));
-  const IndexOfShowClass = [...carouselElements.el.classList].findIndex((ele) => ele.includes('show-'));
-  const tempSlides = [...slides.slice(indexOfActive), ...slides.slice(0, indexOfActive)];
-  if (IndexOfShowClass >= 0) {
-    const show = parseInt(carouselElements.el.classList[IndexOfShowClass].split('-')[1], 10);
-    tempSlides.forEach((slide, index) => {
-      let tabIndex = -1;
-      if (index < show) {
-        tabIndex = 0;
-      }
-      slide.querySelectorAll('a').forEach((focusableElement) => { focusableElement.setAttribute('tabindex', tabIndex); });
-    });
-  } else {
-    activeSlide.querySelectorAll('a').forEach((focusableElement) => { focusableElement.setAttribute('tabindex', 0); });
-  }
+  setAriaHiddenAndTabIndex(carouselElements, activeSlide);
+
   activeSlideIndicator.classList.add('active');
-  activeSlideIndicator.setAttribute('tabindex', 0);
+  activeSlideIndicator.setAttribute('aria-current', 'location');
+  setIndicatorMultiplier(carouselElements, activeSlideIndicator, event);
 
   // Loop over all slide siblings to update their order
   for (let i = 2; i <= slides.length; i += 1) {
@@ -183,13 +213,13 @@ export function moveSlides(event, carouselElements, jumpToIndex) {
     referenceSlide.style.order = i;
   }
 
+  updatePreviousAriaLabel(carouselElements);
+
   /*
    * Activates slide animation.
    * Delay time matches animation time for next/previous controls.
-   * JumpToInidex uses a shorter delay that better supports
-   * non-linear slide navigation.
   */
-  const slideDelay = jumpToIndex >= 0 ? 10 : 50;
+  const slideDelay = 25;
   slideContainer.classList.remove('is-ready');
   return setTimeout(() => slideContainer.classList.add('is-ready'), slideDelay);
 }
@@ -221,12 +251,20 @@ export function mobileSwipeDetect(carouselElements) {
   el.addEventListener('touchstart', (event) => {
     const touch = event.touches[0];
     swipe.xStart = touch.screenX;
-  }, { passive: true });
+    swipe.yStart = touch.screenY;
+  });
 
   el.addEventListener('touchmove', (event) => {
     const touch = event.touches[0];
     swipe.xEnd = touch.screenX;
-  }, { passive: true });
+    swipe.yEnd = touch.screenY;
+    const xDistance = Math.abs(swipe.xEnd - swipe.xStart);
+    const yDistance = Math.abs(swipe.yEnd - swipe.yStart);
+    // If horizontal movement is greater than vertical, prevent default to stop vertical scrolling
+    if (xDistance > yDistance && xDistance > 10) {
+      event.preventDefault();
+    }
+  });
 
   el.addEventListener('touchend', (event) => {
     const swipeDistance = {};
@@ -245,7 +283,7 @@ export function mobileSwipeDetect(carouselElements) {
 }
 
 function handleChangingSlides(carouselElements) {
-  const { el, nextPreviousBtns, slideIndicators } = carouselElements;
+  const { el, nextPreviousBtns } = carouselElements;
 
   // Handle Next/Previous Buttons
   [...nextPreviousBtns].forEach((btn) => {
@@ -258,14 +296,6 @@ function handleChangingSlides(carouselElements) {
   el.addEventListener('keydown', (event) => {
     if (event.key === KEY_CODES.ARROW_RIGHT
       || event.key === KEY_CODES.ARROW_LEFT) { moveSlides(event, carouselElements); }
-  });
-
-  // Handle slide indictors
-  [...slideIndicators].forEach((li) => {
-    li.addEventListener('click', (event) => {
-      const jumpToIndex = Number(li.dataset.index);
-      moveSlides(event, carouselElements, jumpToIndex);
-    });
   });
 
   // Swipe Events
@@ -281,12 +311,18 @@ export default function buildMiloCarousel(el, slides) {
       el.classList.add('carousel-plugin');
 
       const fragment = new DocumentFragment();
-      const nextPreviousBtns = decorateNextPreviousBtns();
+      const nextPreviousBtns = decorateNextPreviousBtns(slides);
       const slideIndicators = decorateSlideIndicators(slides);
-      const controlsContainer = createTag('div', { class: 'carousel-controls' });
+      const controlsContainer = createTag('div', { class: 'carousel-controls is-delayed' });
+      const nextPreviousContainer = createTag('div', { class: 'carousel-button-container' });
 
       fragment.append(...slides);
       const slideWrapper = createTag('div', { class: 'carousel-wrapper' });
+      const ariaLive = createTag('div', {
+        class: 'aria-live-container',
+        'aria-live': 'polite',
+      });
+      slideWrapper.appendChild(ariaLive);
       const slideContainer = createTag('div', { class: 'carousel-slides' }, fragment);
       const carouselElements = {
         el,
@@ -296,6 +332,8 @@ export default function buildMiloCarousel(el, slides) {
         slideIndicators,
         controlsContainer,
         direction: undefined,
+        ariaLive,
+        currentActiveIndex: 0,
       };
 
       slideWrapper.append(slideContainer);
@@ -303,15 +341,11 @@ export default function buildMiloCarousel(el, slides) {
       el.textContent = '';
       el.append(slideWrapper);
 
-      const dotsUl = createTag('ul', {
-        class: 'carousel-indicators',
-        role: 'tablist',
-        tabindex: 0,
-      });
+      const dotsUl = createTag('ul', { class: 'carousel-indicators' });
       dotsUl.append(...slideIndicators);
       controlsContainer.append(dotsUl);
-
-      el.append(...nextPreviousBtns, controlsContainer);
+      nextPreviousContainer.append(...nextPreviousBtns, controlsContainer);
+      el.append(nextPreviousContainer);
 
       function handleDeferredImages() {
         const images = el.querySelectorAll('img[loading="lazy"]');
@@ -322,13 +356,14 @@ export default function buildMiloCarousel(el, slides) {
       }
       parentArea.addEventListener('event-libs:deferred', handleDeferredImages, true);
 
-      slides[0].classList.add('active');
-      const IndexOfShowClass = [...el.classList].findIndex((ele) => ele.includes('show-'));
-      let NoOfVisibleSlides = 1;
-      if (IndexOfShowClass >= 0) {
-        NoOfVisibleSlides = parseInt(el.classList[IndexOfShowClass].split('-')[1], 10);
+      function handleLateLoadingNavigation() {
+        [...el.querySelectorAll('.is-delayed')].forEach((item) => item.classList.remove('is-delayed'));
+        parentArea.removeEventListener('event-libs:deferred', handleLateLoadingNavigation, true);
       }
-      slides.slice(NoOfVisibleSlides).forEach((slide) => slide.querySelectorAll('a').forEach((focusableElement) => { focusableElement.setAttribute('tabindex', -1); }));
+      parentArea.addEventListener('event-libs:deferred', handleLateLoadingNavigation, true);
+
+      slides[0].classList.add('active');
+      setAriaHiddenAndTabIndex(carouselElements, slides[0]);
       handleChangingSlides(carouselElements);
       resolve();
     });

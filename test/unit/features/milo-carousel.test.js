@@ -6,10 +6,7 @@ import {
   decorateSlideIndicators,
   handleNext,
   handlePrevious,
-  jumpToDirection,
   moveSlides,
-  ARROW_NEXT_IMG,
-  ARROW_PREVIOUS_IMG,
   KEY_CODES,
 } from '../../../event-libs/v1/features/milo-carousel.js';
 import { createTag } from '../../../event-libs/v1/utils/utils.js';
@@ -60,13 +57,21 @@ describe('Carousel Functions', () => {
       const [previousBtn, nextBtn] = decorateNextPreviousBtns();
       expect(previousBtn.tagName).to.equal('BUTTON');
       expect(previousBtn.classList.contains('carousel-previous')).to.be.true;
-      expect(previousBtn.getAttribute('aria-label')).to.equal('Previous');
-      expect(previousBtn.innerHTML).to.equal(ARROW_PREVIOUS_IMG);
+      expect(previousBtn.classList.contains('is-delayed')).to.be.true;
+      expect(previousBtn.getAttribute('aria-label')).to.equal('Previous slide');
+      expect(previousBtn.querySelector('svg')).to.not.be.null;
 
       expect(nextBtn.tagName).to.equal('BUTTON');
       expect(nextBtn.classList.contains('carousel-next')).to.be.true;
-      expect(nextBtn.getAttribute('aria-label')).to.equal('Next');
-      expect(nextBtn.innerHTML).to.equal(ARROW_NEXT_IMG);
+      expect(nextBtn.classList.contains('is-delayed')).to.be.true;
+      expect(nextBtn.getAttribute('aria-label')).to.equal('Next slide');
+      expect(nextBtn.querySelector('svg')).to.not.be.null;
+    });
+
+    it('should include slide count in previous aria-label when slides provided', () => {
+      const slides = new Array(5).fill(null);
+      const [previousBtn] = decorateNextPreviousBtns(slides);
+      expect(previousBtn.getAttribute('aria-label')).to.equal('Previous slide, slide 1 of 5');
     });
   });
 
@@ -82,10 +87,10 @@ describe('Carousel Functions', () => {
         expect(indicator.getAttribute('data-index')).to.equal(String(index));
         if (index === 0) {
           expect(indicator.classList.contains('active')).to.be.true;
-          expect(indicator.getAttribute('tabindex')).to.equal('0');
+          expect(indicator.getAttribute('aria-current')).to.equal('location');
         } else {
           expect(indicator.classList.contains('active')).to.be.false;
-          expect(indicator.getAttribute('tabindex')).to.equal('-1');
+          expect(indicator.getAttribute('aria-current')).to.be.null;
         }
       });
     });
@@ -121,17 +126,6 @@ describe('Carousel Functions', () => {
     });
   });
 
-  describe('jumpToDirection', () => {
-    it('should add or remove "is-reversing" class based on slide direction', () => {
-      const slideContainer = document.createElement('div');
-      jumpToDirection(0, 1, slideContainer);
-      expect(slideContainer.classList.contains('is-reversing')).to.be.false;
-
-      jumpToDirection(1, 0, slideContainer);
-      expect(slideContainer.classList.contains('is-reversing')).to.be.true;
-    });
-  });
-
   describe('moveSlides', () => {
     let carouselElements;
 
@@ -153,19 +147,29 @@ describe('Carousel Functions', () => {
         controlsContainer.appendChild(li);
         return li;
       });
-      const nextPreviousBtns = [document.createElement('button'), document.createElement('button')];
+      const prevBtn = document.createElement('button');
+      prevBtn.setAttribute('data-toggle', 'previous');
+      const nextBtn = document.createElement('button');
+      nextBtn.setAttribute('data-toggle', 'next');
+      const nextPreviousBtns = [prevBtn, nextBtn];
+      const ariaLive = document.createElement('div');
+
+      const el = document.createElement('div');
 
       carouselElements = {
-        el: document.createElement('div'),
+        el,
         slideContainer,
         slides,
         nextPreviousBtns,
         slideIndicators,
         controlsContainer,
+        ariaLive,
+        currentActiveIndex: 0,
       };
 
       slides[0].classList.add('active');
       slideIndicators[0].classList.add('active');
+      slideIndicators[0].setAttribute('aria-current', 'location');
     });
 
     it('should handle next button click', () => {
@@ -175,10 +179,10 @@ describe('Carousel Functions', () => {
         type: 'click',
       };
 
-      moveSlides(event, carouselElements, -1);
+      moveSlides(event, carouselElements);
 
-      expect(carouselElements.slides[0].style.order).to.equal('2');
-      expect(carouselElements.slideIndicators[1].tabIndex).to.equal(-1);
+      expect(carouselElements.slides[1].classList.contains('active')).to.be.true;
+      expect(carouselElements.currentActiveIndex).to.equal(1);
     });
 
     it('should handle previous button click', () => {
@@ -188,10 +192,10 @@ describe('Carousel Functions', () => {
         type: 'click',
       };
 
-      moveSlides(event, carouselElements, -1);
+      moveSlides(event, carouselElements);
 
-      expect(carouselElements.slides[2].style.order).to.equal('1');
-      expect(carouselElements.slideIndicators[0].tabIndex).to.equal(0);
+      expect(carouselElements.slides[2].classList.contains('active')).to.be.true;
+      expect(carouselElements.currentActiveIndex).to.equal(2);
     });
 
     it('should handle right arrow key press', () => {
@@ -201,10 +205,11 @@ describe('Carousel Functions', () => {
         type: 'keydown',
       };
 
-      moveSlides(event, carouselElements, -1);
+      moveSlides(event, carouselElements);
 
       expect(carouselElements.slides[1].classList.contains('active')).to.be.true;
       expect(carouselElements.slideIndicators[1].classList.contains('active')).to.be.true;
+      expect(carouselElements.slideIndicators[1].getAttribute('aria-current')).to.equal('location');
     });
 
     it('should handle left arrow key press', () => {
@@ -214,23 +219,36 @@ describe('Carousel Functions', () => {
         type: 'keydown',
       };
 
-      moveSlides(event, carouselElements, -1);
+      moveSlides(event, carouselElements);
 
       expect(carouselElements.slides[2].classList.contains('active')).to.be.true;
       expect(carouselElements.slideIndicators[2].classList.contains('active')).to.be.true;
+      expect(carouselElements.slideIndicators[2].getAttribute('aria-current')).to.equal('location');
     });
 
-    it('should handle slide indicator click', () => {
+    it('should update aria-hidden and tabindex on slides', () => {
       const event = {
-        currentTarget: carouselElements.slideIndicators[2],
-        key: null,
-        type: 'click',
+        currentTarget: carouselElements.el,
+        key: KEY_CODES.ARROW_RIGHT,
+        type: 'keydown',
       };
 
-      moveSlides(event, carouselElements, 2);
+      moveSlides(event, carouselElements);
 
-      expect(carouselElements.slides[2].classList.contains('active')).to.be.true;
-      expect(carouselElements.slideIndicators[2].classList.contains('active')).to.be.true;
+      expect(carouselElements.slides[1].getAttribute('aria-hidden')).to.equal('false');
+      expect(carouselElements.slides[0].getAttribute('aria-hidden')).to.equal('true');
+    });
+
+    it('should clear ariaLive text before updating', () => {
+      carouselElements.ariaLive.textContent = 'Previous content';
+      const event = {
+        currentTarget: carouselElements.el,
+        key: KEY_CODES.ARROW_RIGHT,
+        type: 'keydown',
+      };
+
+      moveSlides(event, carouselElements);
+      expect(carouselElements.ariaLive.textContent).to.equal('');
     });
   });
 });
