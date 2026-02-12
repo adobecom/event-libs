@@ -8,7 +8,7 @@ import {
   handlePrevious,
   moveSlides,
   KEY_CODES,
-} from '../../../event-libs/v1/features/milo-carousel.js';
+} from '../../../event-libs/v1/features/carousel/milo-carousel.js';
 import { createTag } from '../../../event-libs/v1/utils/utils.js';
 
 describe('Swipe Functions', () => {

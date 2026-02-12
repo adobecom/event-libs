@@ -1,4 +1,4 @@
-import buildMiloCarousel from '../../features/milo-carousel.js';
+import buildMiloCarousel from '../../features/carousel/milo-carousel.js';
 import { getMetadata, createTag, getImageSource } from '../../utils/utils.js';
 
 function decorateImage(card, photo) {

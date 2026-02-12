@@ -44,7 +44,6 @@
 }
 
 .profile-cards.with-carousel .cards-wrapper {
-  flex-direction: unset;
   margin-bottom: 0;
 }
 
@@ -176,7 +175,6 @@
 
   .profile-cards .cards-wrapper {
     gap: 0;
-    flex-direction: row;
     padding: 56px 0;
   }
 
