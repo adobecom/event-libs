@@ -60,6 +60,8 @@ export {
 export const eventsDelayedActions = async () => {
   const { lazyCaptureProfile } = await import('./utils/profile.js');
   const { default: addPagePathIndexerWidget } = await import('./features/indexer-widget/page-schedule-indexer.js');
+  const { default: initMetaPixel } = await import('../scripts/meta-pixel.js');
   lazyCaptureProfile();
   addPagePathIndexerWidget();
+  initMetaPixel();
 };

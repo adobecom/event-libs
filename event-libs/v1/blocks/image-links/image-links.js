@@ -4,7 +4,13 @@ function isOdd(number) {
   return number % 2 !== 0;
 }
 
-export default function init(el) {
+export default async function init(el) {
+  if (el.classList.contains('hydrate')) {
+    const { getHydrationPromise } = await import('../../hydrate/hydrate.js');
+    const hydrationPromise = getHydrationPromise();
+    if (hydrationPromise) await hydrationPromise;
+  }
+
   const rows = [...el.querySelectorAll(':scope > div')];
 
   if (!rows.length) {
