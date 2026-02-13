@@ -2,10 +2,15 @@
  * Meta Pixel tracking integration for RSVP flows.
  *
  * Loaded during the delayed phase to avoid blocking LCP.
- * Gated on the `meta-pixel-id` metadata value which supplies the Pixel client ID.
+ * Gated on the `meta-pixel` metadata value which controls two modes:
+ *
+ *   "martech"  – Adobe Launch manages the pixel script; we only attach
+ *                the RSVP event triggers (ViewContent, Lead, CompleteRegistration).
+ *   <pixel-id> – We bootstrap the pixel ourselves with the given ID and
+ *                attach the RSVP triggers.
  *
  * Tracking events:
- *   PageView             – fired when the pixel initialises
+ *   PageView             – fired when the pixel initialises (self-hosted mode only)
  *   ViewContent          – fired when an RSVP button scrolls into the viewport
  *   Lead                 – fired when an RSVP button is clicked
  *   CompleteRegistration – fired on successful RSVP registration
@@ -154,13 +159,22 @@ function attachCompleteRegistrationTracking() {
 
 /**
  * Main entry point – called from eventsDelayedActions() in libs.js.
- * No-ops when the `meta-pixel-id` metadata tag is absent.
+ * No-ops when the `meta-pixel` metadata tag is absent.
+ *
+ * Two modes:
+ *   "martech"  – skip pixel bootstrap (Adobe Launch owns it), attach triggers only.
+ *   <pixel-id> – bootstrap the pixel with the given ID, then attach triggers.
  */
 export default function init() {
-  const pixelId = getMetadata('meta-pixel-id');
-  if (!pixelId) return;
+  const metaPixel = getMetadata('meta-pixel');
+  if (!metaPixel) return;
 
-  loadPixelScript(pixelId);
+  const isMartech = metaPixel.toLowerCase() === 'martech';
+
+  if (!isMartech) {
+    loadPixelScript(metaPixel);
+  }
+
   attachViewContentTracking();
   attachLeadTracking();
   attachCompleteRegistrationTracking();
