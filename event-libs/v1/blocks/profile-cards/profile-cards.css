@@ -44,7 +44,6 @@
 }
 
 .profile-cards.with-carousel .cards-wrapper {
-  flex-direction: unset;
   margin-bottom: 0;
 }
 
@@ -176,7 +175,6 @@
 
   .profile-cards .cards-wrapper {
     gap: 0;
-    flex-direction: row;
     padding: 56px 0;
   }
 
@@ -214,14 +212,6 @@
 
   .profile-cards.single .cards-wrapper .card-social-icons {
     margin-left: 15px;
-  }
-
-  .profile-cards .carousel-plugin .carousel-previous {
-    left: 2px;
-  }
-
-  .profile-cards .carousel-plugin .carousel-next {
-    right: 2px;
   }
 
   /* Grid variants: Desktop */

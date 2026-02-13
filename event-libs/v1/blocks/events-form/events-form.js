@@ -330,9 +330,12 @@ function createHeading({ label }, el) {
   return createTag(el, {}, dictionaryManager.getValue(label, 'rsvp-fields'));
 }
 
-function createInput({ type, field, placeholder, required, defval }) {
+function createInput({ type, field, placeholder, required, defval, pattern, title }) {
   const placeholderText = placeholder ? dictionaryManager.getValue(placeholder, 'rsvp-fields') : '';
-  const input = createTag('input', { type, id: field, placeholder: placeholderText, value: defval });
+  const attrs = { type, id: field, placeholder: placeholderText, value: defval };
+  if (pattern) attrs.pattern = pattern;
+  if (title) attrs.title = title;
+  const input = createTag('input', attrs);
   if (required === 'x') input.setAttribute('required', 'required');
   return input;
 }

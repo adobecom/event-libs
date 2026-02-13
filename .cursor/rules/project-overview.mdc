@@ -1,0 +1,78 @@
+---
+description: Project architecture, domain concepts, and codebase map for event-libs
+alwaysApply: true
+---
+
+# Event-Libs Project Overview
+
+## What This Project Is
+
+An Adobe AEM/Helix **event page component library** (`@adobecom/college`). It provides reusable UI blocks, utilities, and features for Adobe event pages (conferences, webinars, meetups). Runs entirely in the browser as ES modules — no bundler, no build step.
+
+## Tech Stack
+
+| Layer | Technology |
+|-------|------------|
+| Language | JavaScript (ES modules, `"type": "module"`) |
+| Runtime | Browser-only (no server-side Node code in lib) |
+| CMS | Adobe Experience Manager (AEM) / Helix |
+| Framework | Milo (`@adobecom/milo`) — Preact/htm based |
+| State | BlockMediator (pub/sub store), BroadcastChannel (cross-tab) |
+| Tests | Web Test Runner + Chai + Sinon |
+| Linting | ESLint (Airbnb), Stylelint |
+| CI | GitHub Actions (Node 18, CodeQL, branch sync) |
+
+## Directory Map
+
+```
+event-libs/
+├── scripts/
+│   ├── scripts.js          # Entry point: loads Milo, sets config, runs decorateArea
+│   └── fallback.js         # Legacy browser fallback
+├── styles/styles.css       # Base styles
+└── v1/
+    ├── libs.js             # Public API barrel — re-exports core utils
+    ├── blocks/             # 17 UI block components (event-agenda, chrono-box, etc.)
+    ├── deps/               # Vendored deps (BlockMediator, html-sanitizer)
+    ├── features/           # Larger features (timing-framework, indexer-widget, milo-carousel)
+    ├── hydrate/            # Block hydration system
+    ├── icons/              # SVG icon assets
+    └── utils/              # Core utilities (decorate, utils, esp-controller, profile, etc.)
+test/unit/                  # Mirrors source tree structure
+docs/                       # Feature documentation and guides
+```
+
+## Key Domain Concepts
+
+- **Block** — Self-contained UI component with `export default async function init(el)` entry point
+- **Decorate** — Transform static AEM-authored DOM into interactive components
+- **Hydrate** — Pre-process DOM elements before block initialization (`.hydrate` class)
+- **BlockMediator** — Reactive pub/sub store for cross-block state (`get`/`set`/`subscribe`)
+- **ESP / ESL** — Event Service Platform / Event Service Layer (backend APIs)
+- **Milo** — Adobe's shared web framework (provides `loadArea`, `setConfig`, `createTag`, etc.)
+- **Schedule** — Doubly-linked list of timed items for chrono-box / timing features
+- **RSVP** — Event registration flow (tied to Adobe IMS identity)
+- **Fragment** — Reusable AEM content block loaded by URL path
+
+## Data Flow
+
+1. `scripts.js` → `setConfig(CONFIG)` → `decorateArea()` → `decorateEvent(parent)`
+2. Metadata extracted from `<meta>` tags via `getMetadata(name)`
+3. Event data fetched from ESP via `esp-controller.js`
+4. BlockMediator coordinates reactive state across blocks (`eventData`, `rsvpData`, `imsProfile`)
+5. Blocks lazy-loaded by name from `v1/blocks/<name>/<name>.js`
+
+## Import Maps (Test Environment)
+
+- `events/` → `/event-libs/v1/`
+- `events/blocks/` → `/event-libs/v1/blocks/`
+- `events/scripts/` → `/event-libs/v1/utils/`
+- `events/features/` → `/event-libs/v1/features/`
+
+## Environment Detection
+
+Environments resolved via hostname patterns or `eccEnv` query param:
+- `dev` / `dev02` — Development
+- `stage` / `stage02` — Staging
+- `prod` / `main` — Production
+- `local` — Local development (localhost:6456 for Milo)

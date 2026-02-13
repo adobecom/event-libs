@@ -1,0 +1,115 @@
+---
+description: Testing patterns, mocking strategies, and conventions for event-libs tests
+globs: test/**/*.js
+alwaysApply: false
+---
+
+# Testing Conventions
+
+## Framework & Tools
+
+- **Runner:** `@web/test-runner` (WTR)
+- **Assertions:** Chai (`@esm-bundle/chai`) — use `expect` style
+- **Mocks/Stubs:** Sinon (`sinon`)
+- **Fixtures:** HTML files in `mocks/` directories, loaded via `readFile`
+
+## File Layout
+
+Tests mirror the source tree:
+
+```
+test/unit/
+├── blocks/<block-name>/
+│   ├── <block-name>.test.js
+│   └── mocks/
+│       └── default.html          # HTML fixtures
+├── features/<feature-name>/
+│   └── <feature-name>.test.js
+├── hydrate/
+│   └── hydrate.test.js
+└── scripts/
+    ├── decorate.test.js
+    ├── utils.test.js
+    └── mocks/
+        └── event-config.js       # Global mock setup
+```
+
+## Naming
+
+- Test files: `<module-name>.test.js`
+- Fixture files: `default.html`, `<variant>.html` in `mocks/` subfolder
+
+## Imports
+
+Use relative paths back to source (no import map aliases in test files):
+
+```javascript
+import { expect } from '@esm-bundle/chai';
+import { readFile } from '@web/test-runner-commands';
+import init from '../../../../event-libs/v1/blocks/<block-name>/<block-name>.js';
+import { setMetadata } from '../../../../event-libs/v1/utils/utils.js';
+```
+
+## Global Mocks
+
+`test/unit/scripts/mocks/event-config.js` provides `setupGlobalMocks()` which stubs:
+- `window.getConfig` — Milo config
+- `window.lana` — logging
+- `window.adobeIMS` — Adobe identity
+- `window.feds` — FEDS header/footer
+- `BlockMediator` — reactive store
+
+This runs automatically via `web-test-runner.config.js` test HTML.
+
+## Writing Tests
+
+### Block Tests
+
+```javascript
+const body = await readFile({ path: './mocks/default.html' });
+
+describe('BlockName', () => {
+  beforeEach(() => {
+    document.body.innerHTML = body;
+    document.head.innerHTML = '';
+  });
+
+  it('should initialize and create expected DOM', async () => {
+    const el = document.querySelector('.block-name');
+    await init(el);
+    expect(el.querySelector('.expected-class')).to.not.be.null;
+  });
+});
+```
+
+### Utility Tests
+
+```javascript
+describe('functionName', () => {
+  it('should handle valid input', () => {
+    const result = functionName('input');
+    expect(result).to.equal('expected');
+  });
+
+  it('should return fallback for invalid input', () => {
+    expect(functionName('')).to.equal('');
+  });
+});
+```
+
+## Key Rules
+
+1. **No external network calls** — fetch and XMLHttpRequest are restricted to localhost in the test harness
+2. **No external scripts** — MutationObserver blocks external `<script>` injection during tests
+3. **Reset DOM** in `beforeEach` — set `document.body.innerHTML` and `document.head.innerHTML`
+4. **`console.log` is allowed** in test files (`no-console` ESLint rule disabled)
+5. **Use `chai-friendly/no-unused-expressions`** — enables `expect(x).to.be.true` without ESLint errors
+
+## Running Tests
+
+```bash
+npm test                    # Run all tests with coverage
+npm run test:watch          # Watch mode
+```
+
+Coverage excludes: `mocks/`, `node_modules/`, `test/`, `deps/`
