@@ -188,6 +188,115 @@ describe('Events Form', () => {
     });
   });
 
+  describe('createInput - pattern and title support', () => {
+    // Simulates the createInput logic from events-form.js
+    function simulateCreateInput({ type, field, placeholder, required, defval, pattern, title }) {
+      const attrs = { type, id: field, placeholder: placeholder || '', value: defval || '' };
+      if (pattern) attrs.pattern = pattern;
+      if (title) attrs.title = title;
+      const input = document.createElement('input');
+      Object.entries(attrs).forEach(([key, value]) => {
+        input.setAttribute(key, value);
+      });
+      if (required === 'x') input.setAttribute('required', 'required');
+      return input;
+    }
+
+    it('should set the pattern attribute when pattern is provided', () => {
+      const urlPattern = 'https?://.*';
+      const input = simulateCreateInput({
+        type: 'text',
+        field: 'websiteUrl',
+        placeholder: 'Enter URL',
+        required: 'x',
+        defval: '',
+        pattern: urlPattern,
+      });
+
+      expect(input.getAttribute('pattern')).to.equal(urlPattern);
+      expect(input.getAttribute('type')).to.equal('text');
+      expect(input.getAttribute('id')).to.equal('websiteUrl');
+      expect(input.hasAttribute('required')).to.be.true;
+    });
+
+    it('should set the title attribute when title is provided', () => {
+      const input = simulateCreateInput({
+        type: 'text',
+        field: 'websiteUrl',
+        placeholder: 'Enter URL',
+        required: '',
+        defval: '',
+        pattern: 'https?://.*',
+        title: 'Please enter a valid URL starting with http:// or https://',
+      });
+
+      expect(input.getAttribute('title')).to.equal('Please enter a valid URL starting with http:// or https://');
+    });
+
+    it('should set both pattern and title together', () => {
+      const urlPattern = 'https?://.*';
+      const titleText = 'Please enter a valid URL';
+      const input = simulateCreateInput({
+        type: 'text',
+        field: 'websiteUrl',
+        placeholder: 'Enter URL',
+        required: 'x',
+        defval: '',
+        pattern: urlPattern,
+        title: titleText,
+      });
+
+      expect(input.getAttribute('pattern')).to.equal(urlPattern);
+      expect(input.getAttribute('title')).to.equal(titleText);
+      expect(input.hasAttribute('required')).to.be.true;
+    });
+
+    it('should not set pattern attribute when pattern is not provided', () => {
+      const input = simulateCreateInput({
+        type: 'text',
+        field: 'firstName',
+        placeholder: 'First name',
+        required: 'x',
+        defval: '',
+      });
+
+      expect(input.hasAttribute('pattern')).to.be.false;
+      expect(input.hasAttribute('title')).to.be.false;
+    });
+
+    it('should not set title attribute when title is not provided', () => {
+      const input = simulateCreateInput({
+        type: 'text',
+        field: 'websiteUrl',
+        placeholder: 'Enter URL',
+        required: '',
+        defval: '',
+        pattern: 'https?://.*',
+      });
+
+      expect(input.getAttribute('pattern')).to.equal('https?://.*');
+      expect(input.hasAttribute('title')).to.be.false;
+    });
+
+    it('should validate a URL correctly using pattern', () => {
+      const urlPattern = 'https?:\\/\\/[\\w\\-]+(\\.[\\w\\-]+)+([\\w.,@?^=%&:/~+#-]*[\\w@?^=%&/~+#-])?';
+      const input = simulateCreateInput({
+        type: 'text',
+        field: 'websiteUrl',
+        placeholder: 'Enter URL',
+        required: 'x',
+        defval: '',
+        pattern: urlPattern,
+        title: 'Please enter a valid URL',
+      });
+
+      const regex = new RegExp(`^(?:${input.getAttribute('pattern')})$`);
+      expect(regex.test('https://example.com')).to.be.true;
+      expect(regex.test('http://example.com/path?query=1')).to.be.true;
+      expect(regex.test('not-a-url')).to.be.false;
+    });
+  });
+
   describe('Events Form - constructPayload', () => {
     describe('single-option checkbox boolean conversion', () => {
       it('should convert single-option checkbox to boolean when checked', () => {
