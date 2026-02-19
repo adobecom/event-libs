@@ -1,0 +1,83 @@
+---
+description: Milo framework integration patterns and AEM/Helix conventions
+alwaysApply: true
+---
+
+# Milo & AEM/Helix Integration
+
+## What is Milo
+
+`@adobecom/milo` is Adobe's shared web framework. It provides core page infrastructure, DOM utilities, and the block-loading system. This project extends Milo with event-specific blocks and features.
+
+## LIBS Resolution
+
+Milo libraries are resolved dynamically based on hostname:
+
+```javascript
+// from utils.js
+export const LIBS = (() => {
+  const { hostname, search } = window.location;
+  if (!(hostname.includes('.hlx.') || hostname.includes('.aem.') || hostname.includes('local'))) return '/libs';
+  const branch = new URLSearchParams(search).get('milolibs') || 'main';
+  if (branch === 'local') return 'http://localhost:6456/libs';
+  return branch.includes('--') ? `https://${branch}.aem.live/libs` : `https://${branch}--milo--adobecom.aem.live/libs`;
+})();
+```
+
+- Never hardcode Milo URLs — always use `LIBS` constant
+- Use `?milolibs=local` for local Milo development
+
+## Config Setup
+
+In `scripts.js`, Milo is configured via `setConfig(CONFIG)`:
+
+```javascript
+const CONFIG = {
+  codeRoot: '/event-libs',
+  contentRoot: '/event-libs',
+  imsClientId: 'events-milo',
+  miloLibs: LIBS,
+  prodDomains,
+  decorateArea,             // Custom page decorator
+  locales: { '': { ietf: 'en-US', tk: 'hah7vzn.css' } },
+  adobeid: { /* IMS config */ },
+};
+```
+
+## Milo Utilities (imported dynamically)
+
+These come from Milo and are used throughout the project:
+
+- `loadArea()` — Loads and decorates the page content
+- `setConfig(config)` — Sets Milo configuration
+- `loadLana({ clientId })` — Initializes error logging
+- `createTag(tag, attrs, html, opts)` — DOM element factory
+- `createOptimizedPicture(src, alt, eager, breakpoints)` — Responsive images
+- `getConfig()` — Retrieves Milo config (via `window.getConfig` in tests)
+
+## Decoration Flow
+
+1. `scripts.js` calls `setConfig(CONFIG)` then `decorateArea()`
+2. `decorateArea` (from `decorate.js`) orchestrates event-specific decoration
+3. `decorateEvent(parent)` handles metadata, icons, RSVP links, and block hydration
+4. Milo's `loadArea()` handles standard Milo block loading after event decoration
+
+## AEM / Helix Conventions
+
+- Content authored in AEM and delivered via Helix CDN
+- Blocks map to authored content sections with specific CSS class names
+- Fragments loaded by URL path (e.g., `/events/fragments/header`)
+- `.hlxignore` controls which files are excluded from Helix publishing
+
+## IMS (Adobe Identity)
+
+- Client ID: `events-milo`
+- Guest accounts enabled
+- Profile data flows through BlockMediator (`imsProfile` key)
+- RSVP functionality requires authenticated IMS session
+
+## Important: Do Not Duplicate Milo
+
+- Never reimplement utilities that Milo provides (`createTag`, `getConfig`, `loadArea`, etc.)
+- Import Milo utilities via `${LIBS}/utils/utils.js` or similar dynamic paths
+- Event-specific utilities belong in `event-libs/v1/utils/`

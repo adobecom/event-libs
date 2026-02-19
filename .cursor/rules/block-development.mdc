@@ -1,0 +1,101 @@
+---
+description: Patterns and conventions for developing event-libs blocks
+globs: event-libs/v1/blocks/**/*.js
+alwaysApply: false
+---
+
+# Block Development Guide
+
+## Block Structure
+
+Every block lives at `event-libs/v1/blocks/<block-name>/` with:
+- `<block-name>.js` — JavaScript logic
+- `<block-name>.css` — Scoped styles
+
+## Entry Point Signature
+
+Every block **must** export a default `init` function that receives the block's root DOM element:
+
+```javascript
+export default async function init(el) {
+  // Decorate the block element
+}
+```
+
+- Use `async` when the block needs to fetch data or dynamically import modules
+- The `el` parameter is the `.block` wrapper element from AEM authoring
+- Do not return a value — modify `el` in place
+
+## Common Imports
+
+```javascript
+import { createTag, getMetadata, getEventConfig, createOptimizedPicture } from '../../utils/utils.js';
+import BlockMediator from '../../deps/block-mediator.min.js';
+```
+
+- Import utilities from `../../utils/utils.js` (relative to block dir)
+- Import BlockMediator from `../../deps/block-mediator.min.js`
+- Always use relative paths with `.js` extensions
+
+## BlockMediator Usage
+
+Use BlockMediator for cross-block reactive state:
+
+```javascript
+// Read state
+const profile = BlockMediator.get('imsProfile');
+
+// Write state
+BlockMediator.set('rsvpData', { status: 'registered' });
+
+// Subscribe to changes
+BlockMediator.subscribe('eventData', ({ newValue }) => {
+  updateUI(newValue);
+});
+```
+
+Common keys: `imsProfile`, `rsvpData`, `eventData`, `espData`
+
+## Block Registration
+
+Add new blocks to the `EVENT_BLOCKS` array in `event-libs/v1/libs.js`:
+
+```javascript
+const EVENT_BLOCKS = [
+  'your-new-block',
+  // ... existing blocks
+];
+```
+
+## DOM Construction
+
+- Use `createTag` for element creation, not raw `document.createElement`
+- CSS classes use kebab-case matching the block name
+- Keep DOM manipulation in the `init` function or well-named helper functions
+
+```javascript
+const container = createTag('div', { class: 'agenda-container' });
+const title = createTag('h2', { class: 'agenda-title' }, titleText);
+container.append(title);
+el.append(container);
+```
+
+## Metadata Access
+
+Read page-level configuration from `<meta>` tags:
+
+```javascript
+const agenda = getMetadata('agenda');       // Returns string value
+const photos = getMetadata('photos');       // Often JSON strings
+const parsed = JSON.parse(agenda);          // Parse in try/catch
+```
+
+## Error Handling in Blocks
+
+- Wrap `init` body in try/catch for resilient page rendering
+- Log via `window.lana?.log()` — include block name in message
+- Never let a block error crash the entire page
+
+## Existing Blocks Reference
+
+`bento-cards`, `chrono-box`, `daa-injection`, `event-agenda`, `event-map`, `event-partners`, `event-product-blades`, `event-schema`, `event-subscription-form`, `events-form`, `image-links`, `mobile-rider`, `preview-bar`, `profile-cards`, `promotional-content`, `venue-additional-info`, `youtube-chat`

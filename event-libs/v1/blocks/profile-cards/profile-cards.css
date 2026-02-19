@@ -36,16 +36,16 @@
 .profile-cards .cards-wrapper {
   display: flex;
   flex-flow: row nowrap;
-  flex-direction: column;
   justify-content: center;
+  flex-direction: column;
   align-items: stretch;
   overflow: hidden;
   gap: 32px;
 }
 
 .profile-cards.with-carousel .cards-wrapper {
-  flex-direction: unset;
   margin-bottom: 0;
+  flex-direction: column;
 }
 
 .profile-cards.single .card-container {
@@ -214,14 +214,6 @@
 
   .profile-cards.single .cards-wrapper .card-social-icons {
     margin-left: 15px;
-  }
-
-  .profile-cards .carousel-plugin .carousel-previous {
-    left: 2px;
-  }
-
-  .profile-cards .carousel-plugin .carousel-next {
-    right: 2px;
   }
 
   /* Grid variants: Desktop */
