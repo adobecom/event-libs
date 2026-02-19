@@ -36,7 +36,6 @@
 .profile-cards .cards-wrapper {
   display: flex;
   flex-flow: row nowrap;
-  flex-direction: column;
   justify-content: center;
   align-items: stretch;
   overflow: hidden;
@@ -45,6 +44,7 @@
 
 .profile-cards.with-carousel .cards-wrapper {
   margin-bottom: 0;
+  flex-direction: column;
 }
 
 .profile-cards.single .card-container {
