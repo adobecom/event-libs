@@ -17,6 +17,7 @@ const EVENT_BLOCKS = [
   'venue-additional-info',
   'youtube-chat',
   'image-links',
+  'venue-map',
 ];
 
 // Import only the most essential utilities that are always needed
