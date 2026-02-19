@@ -205,6 +205,22 @@ export default async function init(el) {
     return Promise.resolve();
   }
 
+  // When the URL hash already matches a modal trigger's target, clicking
+  // the link won't fire hashchange. Clear the hash first so the subsequent
+  // navigation produces an event that Milo's modal listener can act on.
+  el.addEventListener('click', (e) => {
+    const link = e.target.closest('a[data-modal-hash]');
+    if (!link) return;
+
+    const targetHash = link.dataset.modalHash;
+    if (targetHash && window.location.hash === targetHash) {
+      e.preventDefault();
+      const { pathname, search } = window.location;
+      window.history.replaceState(null, '', `${pathname}${search}`);
+      window.location.hash = targetHash;
+    }
+  });
+
   return new Promise((resolve) => {
     const timeout = setTimeout(() => {
       if (worker._blobUrl) {
@@ -227,6 +243,23 @@ export default async function init(el) {
 
       loadFragment(a).then(() => {
         el.removeAttribute('style');
+
+        // Handle deep-linking for modals in late-loaded timing fragments.
+        // The initial loadArea(document) already checked the hash before this
+        // fragment existed, so re-trigger hashchange now that the modal
+        // trigger is in the DOM.
+        const currentHash = window.location.hash;
+        if (currentHash) {
+          const modalLinks = el.querySelectorAll('a[data-modal-hash]');
+          const match = Array.from(modalLinks).find(
+            (link) => link.dataset.modalHash === currentHash,
+          );
+          if (match) {
+            const { pathname, search } = window.location;
+            window.history.replaceState(null, '', `${pathname}${search}`);
+            window.location.hash = currentHash;
+          }
+        }
       }).catch((error) => {
         window.lana?.log(`Error loading fragment ${pathToFragment}: ${error.message}`);
         el.removeAttribute('style');
