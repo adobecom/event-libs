@@ -57,7 +57,7 @@ export function getEventServiceEnv() {
   const metadataEnv = getMetadata('event-service-env');
   if (metadataEnv && ENV_MAP[metadataEnv]) return ENV_MAP[metadataEnv];
   
-  return ENV_MAP.dev;
+  return ENV_MAP.prod;
 }
 
 /**
