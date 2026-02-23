@@ -49,7 +49,7 @@ function flipToBack(bp) {
  */
 async function subscribe(payload) {
   // If you have an API key, you can use it here.
-  const campaignUrl = CONFIG.ENDPOINTS[getEventServiceEnv()].host;
+  const campaignUrl = CONFIG.ENDPOINTS[getEventServiceEnv().name].host;
   const response = await fetch(campaignUrl, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
