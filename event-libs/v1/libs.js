@@ -60,9 +60,19 @@ export {
 // Lazy-loaded delayed actions for event pages
 export const eventsDelayedActions = async () => {
   const { lazyCaptureProfile } = await import('./utils/profile.js');
-  const { default: addPagePathIndexerWidget } = await import('./features/indexer-widget/page-schedule-indexer.js');
-  const { default: initMetaPixel } = await import('../scripts/meta-pixel.js');
   lazyCaptureProfile();
-  addPagePathIndexerWidget();
-  initMetaPixel();
+
+  const chronoBoxesWithSchedule = document.querySelectorAll('.chrono-box[data-schedule-id]');
+  const hasSchedulableChronoBoxes = chronoBoxesWithSchedule.length > 0;
+  const envName = getEventConfig()?.miloConfig?.env?.name;
+  const isProd = envName === 'prod';
+  if (hasSchedulableChronoBoxes && !isProd) {
+    const { default: autoIndexPageSchedules } = await import('./features/indexer-widget/page-schedule-indexer.js');
+    await autoIndexPageSchedules();
+  }
+
+  if (getMetadata('meta-pixel')) {
+    const { default: initMetaPixel } = await import('../scripts/meta-pixel.js');
+    initMetaPixel();
+  }
 };
