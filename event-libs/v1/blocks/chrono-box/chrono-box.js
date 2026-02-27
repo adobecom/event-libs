@@ -189,6 +189,27 @@ export default async function init(el) {
   el.setAttribute('data-tf-schedule-json', JSON.stringify(thisSchedule));
   el.innerHTML = '';
 
+  // When the URL hash already matches a modal trigger's target, clicking the link
+  // won't fire hashchange. Clear the hash first so the subsequent navigation
+  // produces an event that Milo's modal listener can act on. Skip if the modal
+  // is already rendered (e.g. from cache/timing) to avoid double-triggering.
+  el.addEventListener('click', (e) => {
+    const link = e.target.closest('a[data-modal-hash]');
+    if (!link) return;
+
+    const targetHash = link.dataset.modalHash;
+    if (!targetHash || window.location.hash !== targetHash) return;
+
+    const modalId = targetHash.slice(1);
+    const existingModal = document.getElementById(modalId);
+    if (existingModal?.classList.contains('dialog-modal')) return;
+
+    e.preventDefault();
+    const { pathname, search } = window.location;
+    window.history.replaceState(null, '', `${pathname}${search}`);
+    window.location.hash = targetHash;
+  });
+
   const pluginsOutputs = await initPlugins(thisSchedule);
   let worker;
   
