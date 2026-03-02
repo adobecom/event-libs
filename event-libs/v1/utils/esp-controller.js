@@ -90,6 +90,9 @@ export async function getEvent(eventId) {
     const data = await response.json();
 
     if (!response.ok) {
+      if (response.status === 404) {
+        window.lana?.log(`Event ${eventId} not found on "${eventServiceEnv.name}" ESP env. Verify the event exists in this environment or switch using ?espenv=<env>.`);
+      }
       window.lana?.log(`Error: Failed to get details for event ${eventId}. Status:${JSON.stringify(response)}`);
       return { ok: response.ok, status: response.status, error: data };
     }
