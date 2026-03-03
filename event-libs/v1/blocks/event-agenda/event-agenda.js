@@ -103,6 +103,21 @@ export function convertToLocaleTimeFormat(time, locale) {
   return new Intl.DateTimeFormat(locale, TIME_FORMAT_OPTIONS).format(date);
 }
 
+function formatSingleTime(time, eventTimezone, eventStartMillis, locale) {
+  if (!time) return '';
+  if (eventTimezone && eventStartMillis) {
+    return convertEventTimeToLocalTime(time, eventTimezone, eventStartMillis, locale);
+  }
+  return convertToLocaleTimeFormat(time, locale);
+}
+
+export function formatTimeRange(agenda, eventTimezone, eventStartMillis, locale) {
+  const start = formatSingleTime(agenda.startTime, eventTimezone, eventStartMillis, locale);
+  if (!agenda.endTime) return start;
+  const end = formatSingleTime(agenda.endTime, eventTimezone, eventStartMillis, locale);
+  return end ? `${start} \u2013 ${end}` : start;
+}
+
 export default async function init(el) {
   if (getMetadata('show-agenda-post-event') !== 'true' && document.body.dataset.eventState === 'post-event') {
     el.remove();
@@ -115,10 +130,12 @@ export default async function init(el) {
   const agendaMeta = getMetadata('agenda');
   let venueImage;
 
-  try {
-    venueImage = JSON.parse(getMetadata('photos')).find((p) => p.imageKind === 'venue-image');
-  } catch (error) {
-    window.lana?.log(`Failed to parse venue image metadata:\n${JSON.stringify(error, null, 2)}`);
+  if (!el.classList.contains('no-image')) {
+    try {
+      venueImage = JSON.parse(getMetadata('photos')).find((p) => p.imageKind === 'venue-image');
+    } catch (error) {
+      window.lana?.log(`Failed to parse venue image metadata:\n${JSON.stringify(error, null, 2)}`);
+    }
   }
 
   if (!agendaMeta) {
@@ -168,18 +185,13 @@ export default async function init(el) {
     column2 = createTag('div', { class: 'column' }, '', { parent: agendaItemContainer });
   }
 
+  const isCollapsible = el.classList.contains('collapsible');
+
   const splitIndex = Math.ceil(agendaArray.length / 2);
   agendaArray.forEach((agenda, index) => {
     const agendaListItem = createTag('div', { class: 'agenda-list-item' }, '', { parent: (index >= splitIndex ? column2 : column1) });
-    
-    // Format time with timezone conversion if metadata available, otherwise use legacy format
-    let formattedTime = '';
-    if (agenda.startTime && eventTimezone && eventStartMillis) {
-      formattedTime = convertEventTimeToLocalTime(agenda.startTime, eventTimezone, eventStartMillis, localeString);
-    } else if (agenda.startTime) {
-      formattedTime = convertToLocaleTimeFormat(agenda.startTime, localeString);
-    }
-    
+
+    const formattedTime = formatTimeRange(agenda, eventTimezone, eventStartMillis, localeString);
     createTag('span', { class: 'agenda-time' }, formattedTime, { parent: agendaListItem });
 
     const agendaTitleDetailContainer = createTag('div', { class: 'agenda-title-detail-container' }, '', { parent: agendaListItem });
@@ -190,6 +202,20 @@ export default async function init(el) {
 
     if (agenda.description) {
       createTag('div', { class: 'agenda-details' }, agenda.description, { parent: agendaTitleDetails });
+    }
+
+    if (isCollapsible && agenda.title && agenda.description) {
+      agendaListItem.classList.add('expandable');
+      const toggle = createTag('button', {
+        class: 'agenda-toggle',
+        'aria-expanded': 'false',
+        'aria-label': 'Toggle details',
+      }, '', { parent: agendaTitleDetailContainer });
+
+      agendaTitleDetailContainer.addEventListener('click', () => {
+        const expanded = agendaListItem.classList.toggle('expanded');
+        toggle.setAttribute('aria-expanded', String(expanded));
+      });
     }
   });
 }
