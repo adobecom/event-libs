@@ -14,6 +14,7 @@ export const EVENT_ATTENDEE_DATA_FILTER = {
   invitedBy: { type: 'string', submittable: true },
   shareInfoWithPartners: { type: 'boolean', submittable: true },
   ccSentiment: { type: 'string', submittable: true },
+  campaignId: { type: 'string', submittable: true },
 };
 
 /**
