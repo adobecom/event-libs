@@ -13,6 +13,8 @@ const { default: sanitizeComment } = await import(`${miloLibs}/utils/sanitizeCom
 const { decorateDefaultLinkAnalytics } = await import(`${miloLibs}/martech/attributes.js`);
 const { default: loadFragment } = await import(`${miloLibs}/blocks/fragment/fragment.js`);
 
+const CAMPAIGN_ID_PATTERN = /^[\w-]{1,128}$/;
+
 const RULE_OPERATORS = {
   equal: '=',
   notEqual: '!=',
@@ -198,6 +200,11 @@ async function submitForm(bp) {
   }, true);
 
   if (!isValid) return false;
+
+  const campaignId = new URLSearchParams(window.location.search).get('campaign');
+  if (campaignId && CAMPAIGN_ID_PATTERN.test(campaignId)) {
+    payload.campaignId = campaignId;
+  }
 
   return getAndCreateAndAddAttendee(getMetadata('event-id'), payload);
 }
