@@ -14,6 +14,7 @@ const { decorateDefaultLinkAnalytics } = await import(`${miloLibs}/martech/attri
 const { default: loadFragment } = await import(`${miloLibs}/blocks/fragment/fragment.js`);
 
 const CAMPAIGN_ID_PATTERN = /^[\w-]{1,128}$/;
+const VALID_REGISTRATION_STATUS = ['registered', 'waitlisted'];
 
 const RULE_OPERATORS = {
   equal: '=',
@@ -894,19 +895,31 @@ function getCookie(name) {
   return null;
 }
 
-async function initFormBasedOnRSVPData(bp) {
-  const validRegistrationStatus = ['registered', 'waitlisted'];
+export async function initFormBasedOnRSVPData(bp) {
   const { block } = bp;
   const profile = BlockMediator.get('imsProfile');
-  const rsvpData = BlockMediator.get('rsvpData');
-
-  if (validRegistrationStatus.includes(rsvpData?.registrationStatus)) {
+  let confirmationViewTracked = false;
+  const syncUIWithRSVPStatus = (rsvpData = BlockMediator.get('rsvpData')) => {
+    if (!VALID_REGISTRATION_STATUS.includes(rsvpData?.registrationStatus)) return false;
     showSuccessMsgFirstScreen(bp);
-    eventFormSendAnalytics(bp, 'Confirmation Modal View');
-  } else if (profile.account_type !== 'guest') {
+    if (!confirmationViewTracked) {
+      eventFormSendAnalytics(bp, 'Confirmation Modal View');
+      confirmationViewTracked = true;
+    }
+    return true;
+  };
+
+  BlockMediator.subscribe('rsvpData', ({ newValue }) => {
+    syncUIWithRSVPStatus(newValue);
+  });
+
+  if (syncUIWithRSVPStatus()) return;
+
+  if (profile.account_type !== 'guest') {
     let existingAttendeeData = {};
     const attendeeResp = await getAttendee();
     if (attendeeResp.ok) existingAttendeeData = attendeeResp.data;
+    if (syncUIWithRSVPStatus()) return;
     personalizeForm(block, { profile, existingAttendeeData });
   } else {
     const countryInput = block.querySelector('select#consentStringId');
@@ -945,13 +958,6 @@ async function initFormBasedOnRSVPData(bp) {
     }
   }
 
-  BlockMediator.subscribe('rsvpData', ({ newValue }) => {
-    if (validRegistrationStatus.includes(newValue?.registrationStatus)) {
-      showSuccessMsgFirstScreen(bp);
-      eventFormSendAnalytics(bp, 'Confirmation Modal View');
-    }
-  });
-
   if (bp.block.querySelector('.form-success-msg.hidden')) {
     eventFormSendAnalytics(bp, 'Form View');
   }
@@ -961,8 +967,12 @@ async function onProfile(bp, formData) {
   const { block, eventHero } = bp;
   const profile = BlockMediator.get('imsProfile');
   const allowGuestReg = getMetadata('allow-guest-registration') === 'true';
-  if (profile) {
-    if ((profile.noProfile || profile.account_type === 'guest')
+  let hasHandledProfile = false;
+  const handleProfile = (resolvedProfile) => {
+    if (!resolvedProfile || hasHandledProfile) return;
+    hasHandledProfile = true;
+
+    if ((resolvedProfile.noProfile || resolvedProfile.account_type === 'guest')
       && /#rsvp-form.*/.test(window.location.hash)
       && !allowGuestReg) {
       // TODO: also check for guestCheckout enablement for future iterations
@@ -977,23 +987,14 @@ async function onProfile(bp, formData) {
         block.classList.remove('loading');
       });
     }
+  };
+
+  if (profile) {
+    handleProfile(profile);
   } else {
-    BlockMediator.subscribe('imsProfile', ({ newValue }) => {
-      if ((newValue?.noProfile || newValue?.account_type === 'guest')
-        && /#rsvp-form.*/.test(window.location.hash)
-        && !allowGuestReg) {
-        // TODO: also check for guestCheckout enablement for future iterations
-        signIn(getSusiOptions(getConfig()));
-      } else {
-        eventHero.classList.remove('loading');
-        decorateHero(bp.eventHero);
-        buildEventform(bp, formData).then(() => {
-          initFormBasedOnRSVPData(bp);
-        }).finally(() => {
-          decorateDefaultLinkAnalytics(block);
-          block.classList.remove('loading');
-        });
-      }
+    const unsubscribe = BlockMediator.subscribe('imsProfile', ({ newValue }) => {
+      handleProfile(newValue);
+      if (hasHandledProfile) unsubscribe();
     });
   }
 }
