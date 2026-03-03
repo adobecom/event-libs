@@ -53,6 +53,25 @@ describe('Profile Cards Module', () => {
 
       expect(noSpeakers).to.be.null;
     });
+
+    it('should render simple variant with only image, title and name (no bio or social icons)', () => {
+      const el = document.querySelector('#simple-cards');
+      init(el);
+
+      const cards = el.querySelectorAll('.card-container');
+
+      expect(el).to.not.be.null;
+      expect(cards).to.have.lengthOf(3);
+
+      cards.forEach((card) => {
+        expect(card.querySelector('.card-image-container')).to.not.be.null;
+        expect(card.querySelector('.card-content')).to.not.be.null;
+        expect(card.querySelector('.card-title')).to.not.be.null;
+        expect(card.querySelector('.card-name')).to.not.be.null;
+        expect(card.querySelector('.card-desc')).to.be.null;
+        expect(card.querySelector('.card-social-icons')).to.be.null;
+      });
+    });
   });
 
   describe('createSocialIcon', () => {

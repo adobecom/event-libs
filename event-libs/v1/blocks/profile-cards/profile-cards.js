@@ -157,6 +157,17 @@ function decorateContent(cardContainer, data) {
   cardContainer.append(contentContainer);
 }
 
+function decorateContentSimple(cardContainer, data) {
+  const contentContainer = createTag('div', { class: 'card-content' });
+  const textContainer = createTag('div', { class: 'card-text-container' });
+  const title = createTag('p', { class: 'card-title' }, data.title);
+  const name = createTag('h3', { class: 'card-name' }, `${data.firstName} ${data.lastName}`);
+
+  textContainer.append(title, name);
+  contentContainer.append(textContainer);
+  cardContainer.append(contentContainer);
+}
+
 function parseStaticCard(row) {
   const cell = row.querySelector(':scope > div');
   if (!cell) return null;
@@ -281,7 +292,7 @@ function decorateStaticCards(el) {
   }
 }
 
-function decorateCards(el, data) {
+function decorateCards(el, data, { simple } = {}) {
   const cardsWrapper = el.querySelector('.cards-wrapper');
   const rows = el.querySelectorAll(':scope > div');
   const configRow = rows[1];
@@ -299,7 +310,11 @@ function decorateCards(el, data) {
     const cardContainer = createTag('div', { class: 'card-container' });
 
     decorateImage(cardContainer, speaker.photo);
-    decorateContent(cardContainer, speaker);
+    if (simple) {
+      decorateContentSimple(cardContainer, speaker);
+    } else {
+      decorateContent(cardContainer, speaker);
+    }
 
     cardsWrapper.append(cardContainer);
   });
@@ -353,7 +368,8 @@ export default function init(el) {
       return;
     }
 
-    decorateCards(el, data);
+    const isSimple = el.classList.contains('simple');
+    decorateCards(el, data, { simple: isSimple });
   } else {
     decorateStaticCards(el);
   }
