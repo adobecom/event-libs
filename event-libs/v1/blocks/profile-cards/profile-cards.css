@@ -162,22 +162,52 @@
   display: flex;
   flex-direction: column;
   gap: 24px;
+  padding: 24px;
 }
 
 .profile-cards-modal .profile-cards-modal-text .card-title {
+  font-size: var(--type-body-xs-size);
+  line-height: var(--type-body-xs-lh);;
+  font-family: var(--body-font-family);
+  font-style: normal;
+  font-weight: 400;
+  margin-top: 0;
   margin-bottom: 8px;
 }
 
 .profile-cards-modal .profile-cards-modal-text .card-name {
-  margin-bottom: 12px;
+  margin-top: 0;
+  font-size: var(--type-heading-l-size);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  align-self: stretch;
+  margin-bottom: 14px;
 }
 
 .profile-cards-modal .profile-cards-modal-text .card-desc {
-  margin-bottom: 12px;
+  color: #2C2C2C;
+  font-family: var(--body-font-family);
+  font-size: var(--type-body-xs-size);
+  font-style: normal;
+  font-weight: 400;
+  line-height: 21px;
+  margin-top: 0;
+  margin-bottom: 24px;
 }
 
 .profile-cards-modal .profile-cards-modal-text .card-social-icons {
-  margin-top: 0;
+  display: flex;
+  align-items: flex-end;
+  gap: 17px;
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  margin-top: 4px;
+}
+
+.profile-cards-modal .profile-cards-modal-text .card-social-icon a {
+  color: var(--color-black);
 }
 
 .profile-cards-modal .profile-cards-modal-image .card-image-container {
@@ -185,6 +215,7 @@
   max-width: 385px;
   height: auto;
   border-radius: 14px;
+  overflow: hidden;
   margin: 0 auto;
 }
 
@@ -193,6 +224,7 @@
   height: auto;
   aspect-ratio: 385 / 217;
   object-fit: cover;
+  display: block;
 }
 
 /* Tablet and up */
@@ -208,6 +240,7 @@
 
   .profile-cards-modal .profile-cards-modal-content {
     gap: 28px;
+    padding: 32px;
   }
 }
 
@@ -289,9 +322,9 @@
   }
 
   .profile-cards-modal .profile-cards-modal-content {
-    align-items: flex-start;
+    align-items: center;
     flex-direction: row;
-    gap: 32px;
+    gap: 40px;
   }
 
   .profile-cards-modal .profile-cards-modal-text {
