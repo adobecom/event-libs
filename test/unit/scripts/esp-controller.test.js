@@ -1,5 +1,6 @@
 import { expect } from '@esm-bundle/chai';
 import sinon from 'sinon';
+import BlockMediator from '../../../event-libs/v1/deps/block-mediator.min.js';
 
 describe('Adobe Event Service API', () => {
   let api;
@@ -147,6 +148,157 @@ describe('Adobe Event Service API', () => {
       const error = await api.deleteAttendeeFromEvent('123');
       expect(error).to.be.an('object');
       expect(error.ok).to.be.false;
+    });
+  });
+
+  describe('getCampaign', () => {
+    it('should fetch campaign details', async () => {
+      const campaignData = {
+        campaignId: 'camp-1',
+        name: 'Test Campaign',
+        status: 'Active',
+        attendeeLimit: 100,
+        attendeeCount: 50,
+        waitlistAttendeeCount: 0,
+      };
+      sandbox.stub(window, 'fetch').resolves({ json: () => campaignData, ok: true });
+
+      const result = await api.getCampaign('event-1', 'camp-1');
+      expect(result.ok).to.be.true;
+      expect(result.data).to.deep.equal(campaignData);
+    });
+
+    it('should return an error if campaign fetch fails', async () => {
+      sandbox.stub(window, 'fetch').resolves({ json: () => ({ message: 'Not found' }), ok: false, status: 404 });
+
+      const result = await api.getCampaign('event-1', 'camp-1');
+      expect(result.ok).to.be.false;
+      expect(result.status).to.equal(404);
+    });
+
+    it('should handle network errors', async () => {
+      sandbox.stub(window, 'fetch').rejects(new Error('Network failure'));
+
+      const result = await api.getCampaign('event-1', 'camp-1');
+      expect(result.ok).to.be.false;
+      expect(result.status).to.equal('Network Error');
+    });
+  });
+
+  describe('getAndCreateAndAddAttendee', () => {
+    const eventId = 'event-123';
+    const attendeeData = { firstName: 'John', lastName: 'Doe', email: 'john@test.com' };
+    const attendeeResp = { attendeeId: 'att-1', firstName: 'John', lastName: 'Doe', email: 'john@test.com' };
+
+    beforeEach(() => {
+      BlockMediator.set('imsProfile', { account_type: 'type1' });
+    });
+
+    it('should register when event is not full and no campaign', async () => {
+      const fetchStub = sandbox.stub(window, 'fetch');
+      fetchStub.onCall(0).resolves({ json: () => ({ eventId, isFull: false }), ok: true });
+      fetchStub.onCall(1).resolves({ json: () => (attendeeResp), ok: true, status: 200 });
+      fetchStub.onCall(2).resolves({ json: () => (attendeeResp), ok: true });
+      fetchStub.onCall(3).resolves({ json: () => ({ registrationStatus: 'registered' }), ok: true });
+
+      const result = await api.getAndCreateAndAddAttendee(eventId, attendeeData);
+      expect(result.ok).to.be.true;
+      expect(result.data.registrationStatus).to.equal('registered');
+    });
+
+    it('should waitlist when event is full regardless of campaign', async () => {
+      BlockMediator.set('imsProfile', { account_type: 'guest' });
+      const fetchStub = sandbox.stub(window, 'fetch');
+      fetchStub.onCall(0).resolves({ json: () => ({ eventId, isFull: true }), ok: true });
+      fetchStub.onCall(1).resolves({ json: () => (attendeeResp), ok: true });
+      fetchStub.onCall(2).resolves({ json: () => ({ registrationStatus: 'waitlisted' }), ok: true });
+
+      const dataWithCampaign = { ...attendeeData, campaignId: 'camp-1' };
+      const result = await api.getAndCreateAndAddAttendee(eventId, dataWithCampaign);
+      expect(result.ok).to.be.true;
+      expect(fetchStub.callCount).to.equal(3);
+    });
+
+    it('should register with campaign when campaign has no attendeeLimit', async () => {
+      BlockMediator.set('imsProfile', { account_type: 'guest' });
+      const fetchStub = sandbox.stub(window, 'fetch');
+      fetchStub.onCall(0).resolves({ json: () => ({ eventId, isFull: false }), ok: true });
+      fetchStub.onCall(1).resolves({ json: () => (attendeeResp), ok: true });
+      fetchStub.onCall(2).resolves({
+        json: () => ({ campaignId: 'camp-1', attendeeCount: 50, waitlistAttendeeCount: 0 }),
+        ok: true,
+      });
+      fetchStub.onCall(3).resolves({ json: () => ({ registrationStatus: 'registered', campaignId: 'camp-1' }), ok: true });
+
+      const dataWithCampaign = { ...attendeeData, campaignId: 'camp-1' };
+      const result = await api.getAndCreateAndAddAttendee(eventId, dataWithCampaign);
+      expect(result.ok).to.be.true;
+      expect(result.data.registrationStatus).to.equal('registered');
+    });
+
+    it('should register when campaign has capacity and no waitlist', async () => {
+      BlockMediator.set('imsProfile', { account_type: 'guest' });
+      const fetchStub = sandbox.stub(window, 'fetch');
+      fetchStub.onCall(0).resolves({ json: () => ({ eventId, isFull: false }), ok: true });
+      fetchStub.onCall(1).resolves({ json: () => (attendeeResp), ok: true });
+      fetchStub.onCall(2).resolves({
+        json: () => ({ campaignId: 'camp-1', attendeeLimit: 100, attendeeCount: 50, waitlistAttendeeCount: 0 }),
+        ok: true,
+      });
+      fetchStub.onCall(3).resolves({ json: () => ({ registrationStatus: 'registered', campaignId: 'camp-1' }), ok: true });
+
+      const dataWithCampaign = { ...attendeeData, campaignId: 'camp-1' };
+      const result = await api.getAndCreateAndAddAttendee(eventId, dataWithCampaign);
+      expect(result.ok).to.be.true;
+      expect(result.data.registrationStatus).to.equal('registered');
+    });
+
+    it('should waitlist when campaign attendeeLimit equals attendeeCount', async () => {
+      BlockMediator.set('imsProfile', { account_type: 'guest' });
+      const fetchStub = sandbox.stub(window, 'fetch');
+      fetchStub.onCall(0).resolves({ json: () => ({ eventId, isFull: false }), ok: true });
+      fetchStub.onCall(1).resolves({ json: () => (attendeeResp), ok: true });
+      fetchStub.onCall(2).resolves({
+        json: () => ({ campaignId: 'camp-1', attendeeLimit: 100, attendeeCount: 100, waitlistAttendeeCount: 0 }),
+        ok: true,
+      });
+      fetchStub.onCall(3).resolves({ json: () => ({ registrationStatus: 'waitlisted', campaignId: 'camp-1' }), ok: true });
+
+      const dataWithCampaign = { ...attendeeData, campaignId: 'camp-1' };
+      const result = await api.getAndCreateAndAddAttendee(eventId, dataWithCampaign);
+      expect(result.ok).to.be.true;
+      expect(result.data.registrationStatus).to.equal('waitlisted');
+    });
+
+    it('should waitlist when campaign has capacity but waitlist backlog exists', async () => {
+      BlockMediator.set('imsProfile', { account_type: 'guest' });
+      const fetchStub = sandbox.stub(window, 'fetch');
+      fetchStub.onCall(0).resolves({ json: () => ({ eventId, isFull: false }), ok: true });
+      fetchStub.onCall(1).resolves({ json: () => (attendeeResp), ok: true });
+      fetchStub.onCall(2).resolves({
+        json: () => ({ campaignId: 'camp-1', attendeeLimit: 100, attendeeCount: 80, waitlistAttendeeCount: 5 }),
+        ok: true,
+      });
+      fetchStub.onCall(3).resolves({ json: () => ({ registrationStatus: 'waitlisted', campaignId: 'camp-1' }), ok: true });
+
+      const dataWithCampaign = { ...attendeeData, campaignId: 'camp-1' };
+      const result = await api.getAndCreateAndAddAttendee(eventId, dataWithCampaign);
+      expect(result.ok).to.be.true;
+      expect(result.data.registrationStatus).to.equal('waitlisted');
+    });
+
+    it('should fall back to event-level status when campaign lookup fails', async () => {
+      BlockMediator.set('imsProfile', { account_type: 'guest' });
+      const fetchStub = sandbox.stub(window, 'fetch');
+      fetchStub.onCall(0).resolves({ json: () => ({ eventId, isFull: false }), ok: true });
+      fetchStub.onCall(1).resolves({ json: () => (attendeeResp), ok: true });
+      fetchStub.onCall(2).resolves({ json: () => ({ message: 'Not found' }), ok: false, status: 404 });
+      fetchStub.onCall(3).resolves({ json: () => ({ registrationStatus: 'registered', campaignId: 'camp-1' }), ok: true });
+
+      const dataWithCampaign = { ...attendeeData, campaignId: 'camp-1' };
+      const result = await api.getAndCreateAndAddAttendee(eventId, dataWithCampaign);
+      expect(result.ok).to.be.true;
+      expect(result.data.registrationStatus).to.equal('registered');
     });
   });
 });
