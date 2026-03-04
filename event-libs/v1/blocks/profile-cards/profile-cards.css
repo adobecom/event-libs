@@ -241,6 +241,7 @@
   .profile-cards-modal .profile-cards-modal-content {
     gap: 28px;
     padding: 32px;
+    align-items: flex-start;
   }
 }
 
@@ -333,5 +334,9 @@
 
   .profile-cards-modal .profile-cards-modal-image {
     flex: 0 0 auto;
+  }
+
+  .profile-cards-modal .profile-cards-modal-text .card-desc {
+    max-width: 385px;
   }
 }
