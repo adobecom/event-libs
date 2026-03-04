@@ -1,5 +1,13 @@
 import buildMiloCarousel from '../../features/carousel/milo-carousel.js';
-import { getMetadata, createTag, getImageSource } from '../../utils/utils.js';
+import {
+  getMetadata,
+  createTag,
+  getImageSource,
+  getEventConfig,
+  LIBS,
+} from '../../utils/utils.js';
+
+let modalLoader;
 
 function decorateImage(card, photo) {
   if (!photo) return;
@@ -168,6 +176,109 @@ function decorateContentSimple(cardContainer, data) {
   cardContainer.append(contentContainer);
 }
 
+function getProfileName(data) {
+  return `${data?.firstName || ''} ${data?.lastName || ''}`.trim();
+}
+
+function getSocialLinks(data) {
+  return data?.socialLinks || data?.socialMedia || [];
+}
+
+function appendBio(contentContainer, bio) {
+  const trimmedBio = typeof bio === 'string' ? bio.trim() : '';
+  if (!trimmedBio) return;
+
+  if (trimmedBio.includes('<')) {
+    const bioContainer = createTag('div', { class: 'card-desc' });
+    bioContainer.innerHTML = trimmedBio;
+    contentContainer.append(bioContainer);
+    return;
+  }
+
+  const description = createTag('p', { class: 'card-desc' }, trimmedBio);
+  contentContainer.append(description);
+}
+
+function getModalId(data, index) {
+  const fullName = getProfileName(data);
+  const slug = fullName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+  return `profile-cards-modal-${slug || index + 1}`;
+}
+
+async function loadMiloModal() {
+  if (!modalLoader) {
+    modalLoader = (async () => {
+      const eventConfig = getEventConfig();
+      const modalBasePath = eventConfig?.miloConfig?.miloLibs || LIBS;
+      const { getModal } = await import(`${modalBasePath}/blocks/modal/modal.js`);
+      return getModal;
+    })();
+  }
+
+  return modalLoader;
+}
+
+async function buildModalContent(profileData) {
+  const content = new DocumentFragment();
+  const modalContent = createTag('div', { class: 'profile-cards-modal-content' });
+  const textContainer = createTag('div', { class: 'profile-cards-modal-text' });
+  const imageContainer = createTag('div', { class: 'profile-cards-modal-image' });
+  const fullName = getProfileName(profileData);
+  const title = createTag('p', { class: 'card-title' }, profileData?.title || '');
+  const name = createTag('h3', { class: 'card-name' }, fullName);
+
+  textContainer.append(title, name);
+  appendBio(textContainer, profileData?.bio);
+  await decorateSocialIcons(textContainer, getSocialLinks(profileData));
+  decorateImage(imageContainer, profileData?.photo);
+
+  modalContent.append(textContainer, imageContainer);
+  content.append(modalContent);
+  return content;
+}
+
+async function openProfileModal(profileData, index) {
+  try {
+    const getModal = await loadMiloModal();
+    const fullName = getProfileName(profileData) || `Profile ${index + 1}`;
+    const content = await buildModalContent(profileData);
+
+    await getModal(null, {
+      id: getModalId(profileData, index),
+      title: `Profile: ${fullName}`,
+      content,
+      class: 'profile-cards-modal',
+    });
+  } catch (error) {
+    window.lana?.log(`Failed to open profile modal:\n${JSON.stringify(error, null, 2)}`);
+  }
+}
+
+function decorateModalTrigger(cardContainer, profileData, index) {
+  const fullName = getProfileName(profileData) || `Profile ${index + 1}`;
+  const openModal = () => {
+    openProfileModal(profileData, index);
+  };
+
+  cardContainer.classList.add('modal-trigger');
+  cardContainer.setAttribute('role', 'button');
+  cardContainer.setAttribute('tabindex', '0');
+  cardContainer.setAttribute('aria-haspopup', 'dialog');
+  cardContainer.setAttribute('aria-label', `Open profile modal for ${fullName}`);
+
+  cardContainer.addEventListener('click', (event) => {
+    if (event.target.closest('a')) return;
+    openModal();
+  });
+
+  cardContainer.addEventListener('keydown', (event) => {
+    if (event.key !== 'Enter' && event.key !== ' ') return;
+    if (event.target.closest('a')) return;
+    event.preventDefault();
+    openModal();
+  });
+}
+
 function parseStaticCard(row) {
   const cell = row.querySelector(':scope > div');
   if (!cell) return null;
@@ -255,7 +366,7 @@ function parseStaticCard(row) {
   };
 }
 
-function decorateStaticCards(el) {
+function decorateStaticCards(el, { modal } = {}) {
   const cardsWrapper = el.querySelector('.cards-wrapper');
   const rows = Array.from(el.querySelectorAll(':scope > div:not(.cards-wrapper)'));
   
@@ -267,13 +378,16 @@ function decorateStaticCards(el) {
     return;
   }
 
-  cardRows.forEach((row) => {
+  cardRows.forEach((row, index) => {
     const cardData = parseStaticCard(row);
     if (!cardData) return;
 
     const cardContainer = createTag('div', { class: 'card-container' });
     decorateImage(cardContainer, cardData.photo);
     decorateContent(cardContainer, cardData);
+    if (modal) {
+      decorateModalTrigger(cardContainer, cardData, index);
+    }
     cardsWrapper.append(cardContainer);
     
     // Remove the original row
@@ -292,7 +406,7 @@ function decorateStaticCards(el) {
   }
 }
 
-function decorateCards(el, data, { simple } = {}) {
+function decorateCards(el, data, { simple, modal } = {}) {
   const cardsWrapper = el.querySelector('.cards-wrapper');
   const rows = el.querySelectorAll(':scope > div');
   const configRow = rows[1];
@@ -306,7 +420,7 @@ function decorateCards(el, data, { simple } = {}) {
 
   configRow.remove();
 
-  filteredData.forEach((speaker) => {
+  filteredData.forEach((speaker, index) => {
     const cardContainer = createTag('div', { class: 'card-container' });
 
     decorateImage(cardContainer, speaker.photo);
@@ -314,6 +428,9 @@ function decorateCards(el, data, { simple } = {}) {
       decorateContentSimple(cardContainer, speaker);
     } else {
       decorateContent(cardContainer, speaker);
+    }
+    if (modal) {
+      decorateModalTrigger(cardContainer, speaker, index);
     }
 
     cardsWrapper.append(cardContainer);
@@ -339,6 +456,7 @@ export default function init(el) {
   // Check if the first cell of configRow (if it exists) contains 'type'
   const firstCell = configRow?.querySelectorAll(':scope > div')?.[0];
   const isMetadataDriven = firstCell?.textContent.toLowerCase().trim() === 'type';
+  const isModal = el.classList.contains('modal');
 
   // Handle grid variant: add default three-up if no *-up class is present
   if (el.classList.contains('grid')) {
@@ -369,8 +487,8 @@ export default function init(el) {
     }
 
     const isSimple = el.classList.contains('simple');
-    decorateCards(el, data, { simple: isSimple });
+    decorateCards(el, data, { simple: isSimple, modal: isModal });
   } else {
-    decorateStaticCards(el);
+    decorateStaticCards(el, { modal: isModal });
   }
 }

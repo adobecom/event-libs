@@ -72,6 +72,42 @@ describe('Profile Cards Module', () => {
         expect(card.querySelector('.card-social-icons')).to.be.null;
       });
     });
+
+    it('should make metadata-driven modal cards interactive', () => {
+      const el = document.querySelector('#modal-speakers-cards');
+      init(el);
+
+      const cards = el.querySelectorAll('.card-container');
+      const firstCard = cards[0];
+      const keydownEvent = new KeyboardEvent('keydown', {
+        key: 'Enter',
+        bubbles: true,
+        cancelable: true,
+      });
+
+      firstCard.dispatchEvent(keydownEvent);
+
+      expect(cards).to.have.lengthOf(3);
+      expect(firstCard.getAttribute('role')).to.equal('button');
+      expect(firstCard.getAttribute('tabindex')).to.equal('0');
+      expect(firstCard.getAttribute('aria-haspopup')).to.equal('dialog');
+      expect(firstCard.getAttribute('aria-label')).to.include('Open profile modal for');
+      expect(keydownEvent.defaultPrevented).to.be.true;
+    });
+
+    it('should make static-authored modal cards interactive', () => {
+      const el = document.querySelector('#static-modal-cards');
+      init(el);
+
+      const cards = el.querySelectorAll('.card-container');
+      const firstCard = cards[0];
+
+      expect(cards).to.have.lengthOf(1);
+      expect(firstCard.getAttribute('role')).to.equal('button');
+      expect(firstCard.getAttribute('tabindex')).to.equal('0');
+      expect(firstCard.getAttribute('aria-haspopup')).to.equal('dialog');
+      expect(firstCard.getAttribute('aria-label')).to.equal('Open profile modal for Static Speaker');
+    });
   });
 
   describe('createSocialIcon', () => {
