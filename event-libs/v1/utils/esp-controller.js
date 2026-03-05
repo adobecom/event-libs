@@ -90,6 +90,9 @@ export async function getEvent(eventId) {
     const data = await response.json();
 
     if (!response.ok) {
+      if (response.status === 404) {
+        window.lana?.log(`Event ${eventId} not found on "${eventServiceEnv.name}" ESP env. Verify the event exists in this environment or switch using ?espenv=<env>.`);
+      }
       window.lana?.log(`Error: Failed to get details for event ${eventId}. Status:${JSON.stringify(response)}`);
       return { ok: response.ok, status: response.status, error: data };
     }
@@ -274,6 +277,30 @@ export async function deleteAttendeeFromEvent(eventId, attendeeId = null) {
   }
 }
 
+export async function getCampaign(eventId, campaignId) {
+  const eventServiceEnv = getEventServiceEnv();
+  const { serviceApiEndpoints } = ENV_MAP[eventServiceEnv.name];
+  const options = await constructRequestOptions('GET');
+
+  try {
+    const response = await fetch(
+      `${serviceApiEndpoints.esl}/v1/events/${eventId}/campaigns/${campaignId}`,
+      options,
+    );
+    const data = await response.json();
+
+    if (!response.ok) {
+      window.lana?.log(`Error: Failed to get campaign ${campaignId} for event ${eventId}. Status:${JSON.stringify(response)}`);
+      return { ok: false, status: response.status, error: data };
+    }
+
+    return { ok: true, data };
+  } catch (error) {
+    window.lana?.log(`Error: Failed to get campaign ${campaignId} for event ${eventId}:${JSON.stringify(error)}`);
+    return { ok: false, status: 'Network Error', error: error.message };
+  }
+}
+
 // compound helper functions
 export async function getAndCreateAndAddAttendee(eventId, attendeeData) {
   const profile = BlockMediator.get('imsProfile');
@@ -308,6 +335,17 @@ export async function getAndCreateAndAddAttendee(eventId, attendeeData) {
   const newAttendeeData = attendee.data;
 
   if (eventObj.data.isFull) registrationStatus = 'waitlisted';
+
+  if (attendeeData.campaignId && registrationStatus !== 'waitlisted') {
+    const campaign = await getCampaign(eventId, attendeeData.campaignId);
+    if (campaign.ok && campaign.data.attendeeLimit != null) {
+      const { attendeeLimit, attendeeCount, waitlistAttendeeCount } = campaign.data;
+      if (attendeeLimit === attendeeCount
+        || (attendeeLimit > attendeeCount && waitlistAttendeeCount > 0)) {
+        registrationStatus = 'waitlisted';
+      }
+    }
+  }
 
   // Use EventAttendee filter for adding attendee to event
   const eventAttendeePayload = getEventAttendeePayload({

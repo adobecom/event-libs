@@ -17,6 +17,7 @@ const EVENT_BLOCKS = [
   'venue-additional-info',
   'youtube-chat',
   'image-links',
+  'venue-map',
 ];
 
 // Import only the most essential utilities that are always needed
@@ -59,9 +60,19 @@ export {
 // Lazy-loaded delayed actions for event pages
 export const eventsDelayedActions = async () => {
   const { lazyCaptureProfile } = await import('./utils/profile.js');
-  const { default: addPagePathIndexerWidget } = await import('./features/indexer-widget/page-schedule-indexer.js');
-  const { default: initMetaPixel } = await import('../scripts/meta-pixel.js');
   lazyCaptureProfile();
-  addPagePathIndexerWidget();
-  initMetaPixel();
+
+  const chronoBoxesWithSchedule = document.querySelectorAll('.chrono-box[data-schedule-id]');
+  const hasSchedulableChronoBoxes = chronoBoxesWithSchedule.length > 0;
+  const envName = getEventConfig()?.miloConfig?.env?.name;
+  const isProd = envName === 'prod';
+  if (hasSchedulableChronoBoxes && !isProd) {
+    const { default: autoIndexPageSchedules } = await import('./features/indexer-widget/page-schedule-indexer.js');
+    await autoIndexPageSchedules();
+  }
+
+  if (getMetadata('meta-pixel')) {
+    const { default: initMetaPixel } = await import('../scripts/meta-pixel.js');
+    initMetaPixel();
+  }
 };

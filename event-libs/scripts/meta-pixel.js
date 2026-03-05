@@ -128,7 +128,7 @@ function attachLeadTracking() {
       rsvpFormInteracted = true;
       safeFbq('track', 'Lead');
     }
-  });
+  }, { capture: true });
 }
 
 /**
