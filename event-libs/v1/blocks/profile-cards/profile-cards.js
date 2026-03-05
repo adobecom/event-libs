@@ -316,6 +316,11 @@ function decorateCards(el, data) {
   }
 }
 
+function sortDataByOrdinals(data) {
+  // sort by ordinal. if no ordinal, append to the end
+  return data.sort((a, b) => (a.ordinal || 0) - (b.ordinal || 0));
+}
+
 export default function init(el) {
   const rows = el.querySelectorAll(':scope > div');
   const configRow = rows[1];
@@ -353,7 +358,8 @@ export default function init(el) {
       return;
     }
 
-    decorateCards(el, data);
+    const sortedData = sortDataByOrdinals(data);
+    decorateCards(el, sortedData);
   } else {
     decorateStaticCards(el);
   }
