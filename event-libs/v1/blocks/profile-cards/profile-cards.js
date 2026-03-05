@@ -317,9 +317,16 @@ function decorateCards(el, data) {
 }
 
 function sortDataByOrdinals(data) {
-  // sort by ordinal. if no ordinal, append to the end
-  return data.sort((a, b) => (a.ordinal || 0) - (b.ordinal || 0));
+  return [...data].sort((a, b) => {
+    const aHas = a.ordinal != null;
+    const bHas = b.ordinal != null;
+    if (aHas && bHas) return a.ordinal - b.ordinal;
+    if (aHas) return -1;
+    if (bHas) return 1;
+    return 0;
+  });
 }
+
 
 export default function init(el) {
   const rows = el.querySelectorAll(':scope > div');
