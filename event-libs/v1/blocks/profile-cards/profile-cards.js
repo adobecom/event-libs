@@ -448,6 +448,18 @@ function decorateCards(el, data, { simple, modal } = {}) {
   }
 }
 
+function sortDataByOrdinals(data) {
+  return [...data].sort((a, b) => {
+    const aHas = a.ordinal != null;
+    const bHas = b.ordinal != null;
+    if (aHas && bHas) return a.ordinal - b.ordinal;
+    if (aHas) return -1;
+    if (bHas) return 1;
+    return 0;
+  });
+}
+
+
 export default function init(el) {
   const rows = el.querySelectorAll(':scope > div');
   const configRow = rows[1];
@@ -487,7 +499,8 @@ export default function init(el) {
     }
 
     const isSimple = el.classList.contains('simple');
-    decorateCards(el, data, { simple: isSimple, modal: isModal });
+    const sortedData = sortDataByOrdinals(data);
+    decorateCards(el, sortedData, { simple: isSimple, modal: isModal });
   } else {
     decorateStaticCards(el, { modal: isModal });
   }
