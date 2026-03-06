@@ -3,6 +3,7 @@ import BlockMediator from '../../deps/block-mediator.min.js';
 import { signIn, decorateEvent } from '../../utils/decorate.js';
 import { dictionaryManager } from '../../utils/dictionary-manager.js';
 import { getEventConfig, LIBS, getMetadata, getSusiOptions } from '../../utils/utils.js';
+import { FALLBACK_LOCALES } from '../../utils/constances.js';
 
 const eventConfig = getEventConfig();
 const miloLibs = eventConfig?.miloConfig?.miloLibs ? eventConfig.miloConfig.miloLibs : LIBS;
@@ -176,6 +177,15 @@ function constructPayload(form) {
 async function submitForm(bp) {
   const { form, sanitizeList } = bp;
   const payload = constructPayload(form);
+
+  const countrySelect = form.querySelector('select#consentStringId');
+  if (countrySelect) {
+    const selectedOption = countrySelect.options[countrySelect.selectedIndex];
+    if (selectedOption?.dataset?.countryCode) {
+      payload.countryRegion = selectedOption.dataset.countryCode;
+    }
+  }
+
   const isValid = Object.keys(payload).reduce((valid, key) => {
     const field = form.querySelector(`[data-field-id=${key}]`);
 
@@ -656,8 +666,19 @@ function decorateSuccessScreen(screen) {
   screen.classList.add('hidden');
 }
 
+async function getConsentQueryIndexUrl() {
+  const eventConfig = getEventConfig();
+  const miloConfig = eventConfig?.miloConfig;
+  const libs = miloConfig?.miloLibs || LIBS;
+  const { getLocale } = await import(`${libs}/utils/utils.js`);
+  const { prefix } = getLocale(miloConfig?.locales || FALLBACK_LOCALES);
+  const moduleUrl = new URL(import.meta.url);
+  const domain = `${moduleUrl.protocol}//${moduleUrl.host}`;
+  return `${domain}${prefix}/event-libs/assets/consents/consent-query-index.json`;
+}
+
 async function addConsentSuite(form) {
-      const countryText = dictionaryManager.getValue('country', 'rsvp-fields');
+  const countryText = dictionaryManager.getValue('country', 'rsvp-fields');
   const fieldWrapper = createTag('div', { class: 'field-wrapper events-form-select-wrapper', 'data-field-id': 'country', 'data-type': 'select' });
   const label = createTag('label', { for: 'consentStringId', class: 'required' }, countryText);
   const countrySelect = createTag('select', { id: 'consentStringId', required: 'required' });
@@ -669,8 +690,8 @@ async function addConsentSuite(form) {
 
   fieldWrapper.append(label, countrySelect);
 
-  const queryIndexUrl = new URL('/event-libs/assets/consents/consent-query-index.json', import.meta.url);
-  const consentStringsIndex = await fetch(queryIndexUrl.href).then((r) => r.json());
+  const queryIndexUrl = await getConsentQueryIndexUrl();
+  const consentStringsIndex = await fetch(queryIndexUrl).then((r) => r.json());
 
   if (consentStringsIndex) {
     const { data } = consentStringsIndex;
@@ -816,7 +837,9 @@ async function createForm(bp, formData) {
   addTerms(formEl, terms);
 
   const profile = BlockMediator.get('imsProfile');
-  if (getMetadata('allow-guest-registration') === 'true' && profile.account_type === 'guest') await addConsentSuite(formEl);
+  const showConsentForGuest = getMetadata('allow-guest-registration') === 'true' && profile?.account_type === 'guest';
+  const forceConsent = getMetadata('force-consent-collection') === 'true';
+  if (showConsentForGuest || forceConsent) await addConsentSuite(formEl);
 
   formEl.addEventListener('input', () => applyRules(formEl, rules));
   applyRules(formEl, rules);
@@ -908,10 +931,10 @@ async function initFormBasedOnRSVPData(bp) {
     const attendeeResp = await getAttendee();
     if (attendeeResp.ok) existingAttendeeData = attendeeResp.data;
     personalizeForm(block, { profile, existingAttendeeData });
-  } else {
-    const countryInput = block.querySelector('select#consentStringId');
-    if (!countryInput) return;
+  }
 
+  const countryInput = block.querySelector('select#consentStringId');
+  if (countryInput) {
     const options = Array.from(countryInput.options);
     const internationalCookie = getCookie('international_cookie');
 
@@ -930,7 +953,7 @@ async function initFormBasedOnRSVPData(bp) {
       }
     } else {
       const countryInNavigator = window.navigator.language.toLowerCase().split('-')[1];
-      const option = options.find(async (o) => {
+      const option = options.find((o) => {
         const countryCode = o.dataset.countryCode?.toLowerCase();
 
         if (!countryCode) return false;
