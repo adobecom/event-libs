@@ -947,37 +947,23 @@ export async function initFormBasedOnRSVPData(bp) {
   }
 
   const countryInput = block.querySelector('select#consentStringId');
-  if (countryInput) {
+  if (countryInput && countryInput.value === '') {
     const options = Array.from(countryInput.options);
-    const internationalCookie = getCookie('international_cookie');
-
-    if (internationalCookie) {
-      const option = options.find((o) => {
-        const countryCode = o.dataset.countryCode?.toLowerCase();
-
-        if (!countryCode) return false;
-
-        return countryCode === internationalCookie.toLowerCase();
-      });
-      if (option) {
-        option.selected = true;
-        countryInput.value = option.value;
-        countryInput.dispatchEvent(new Event('change'));
-      }
-    } else {
-      const countryInNavigator = window.navigator.language.toLowerCase().split('-')[1];
-      const option = options.find((o) => {
-        const countryCode = o.dataset.countryCode?.toLowerCase();
-
-        if (!countryCode) return false;
-
-        return countryCode === countryInNavigator;
-      });
-      if (option) {
-        option.selected = true;
-        countryInput.value = option.value;
-        countryInput.dispatchEvent(new Event('change'));
-      }
+    const findOptionByCountryCode = (code) => {
+      if (!code || typeof code !== 'string') return undefined;
+      const lower = code.toLowerCase();
+      return options.find((o) => o.dataset.countryCode?.toLowerCase() === lower);
+    };
+    const profileCode = profile?.countryCode;
+    const cookieCode = getCookie('international_cookie');
+    const navigatorRegion = window.navigator.language.toLowerCase().split('-')[1];
+    const option = findOptionByCountryCode(profileCode)
+      ?? findOptionByCountryCode(cookieCode)
+      ?? (navigatorRegion ? findOptionByCountryCode(navigatorRegion) : undefined);
+    if (option) {
+      option.selected = true;
+      countryInput.value = option.value;
+      countryInput.dispatchEvent(new Event('change'));
     }
   }
 
