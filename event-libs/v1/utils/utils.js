@@ -1,4 +1,4 @@
-import { SUSI_OPTIONS, CONDITIONAL_REG, ENV_MAP } from './constances.js';
+import { SUSI_OPTIONS, CONDITIONAL_REG, ENV_MAP, CAMPAIGN_ID_PATTERN } from './constances.js';
 import BlockMediator from '../deps/block-mediator.min.js';
 
 const ICONS_BASE_URL = new URL('../icons/', import.meta.url).href;
@@ -292,6 +292,17 @@ export function getSusiOptions(clientMiloConfig) {
   }
 
   return susiOptions;
+}
+
+/**
+ * Returns the campaign ID from the current URL search params if present and valid.
+ * @param {URLSearchParams} [searchParams] - Optional search params (defaults to window.location.search).
+ * @returns {string|null} Valid campaign ID or null.
+ */
+export function getValidCampaignIdFromUrl(searchParams) {
+  const search = searchParams != null ? searchParams.toString() : window.location.search;
+  const campaignId = new URLSearchParams(search).get('campaign');
+  return campaignId && CAMPAIGN_ID_PATTERN.test(campaignId) ? campaignId : null;
 }
 
 export function readBlockConfig(block) {

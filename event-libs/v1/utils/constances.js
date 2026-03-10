@@ -8,6 +8,7 @@ export const SUSI_OPTIONS = {
   },
 };
 export const SERIES_404_MAP_PATH = '/events/default/series-404-map.json';
+export const CAMPAIGN_ID_PATTERN = /^[\w-]{1,128}$/;
 export const ALLOWED_EMAIL_DOMAINS = ['@adobe.com', '@adobetest.com'];
 export const ENV_MAP = {
   dev: {
