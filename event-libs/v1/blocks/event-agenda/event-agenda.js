@@ -105,7 +105,8 @@ export function convertToLocaleTimeFormat(time, locale) {
 
 function formatSingleTime(time, eventTimezone, eventStartMillis, locale) {
   if (!time) return '';
-  if (eventTimezone && eventStartMillis) {
+  const eventType = getMetadata('event-type');
+  if (eventType !== 'InPerson' && eventTimezone && eventStartMillis) {
     return convertEventTimeToLocalTime(time, eventTimezone, eventStartMillis, locale);
   }
   return convertToLocaleTimeFormat(time, locale);
@@ -123,6 +124,9 @@ export default async function init(el) {
     el.remove();
     return;
   }
+
+  const is24HourFormat = el.classList.contains('24h');
+  TIME_FORMAT_OPTIONS.hour12 = !is24HourFormat;
 
   const container = createTag('div', { class: 'agenda-container' }, '', { parent: el });
   const agendaItemsCol = createTag('div', { class: 'agenda-items' }, '', { parent: container });
@@ -179,14 +183,15 @@ export default async function init(el) {
   const agendaItemContainer = createTag('div', { class: 'agenda-item-container' }, '', { parent: agendaItemsCol });
   const column1 = createTag('div', { class: 'column' }, '', { parent: agendaItemContainer });
 
+  const isCollapsible = el.classList.contains('collapsible');
+  const isSingleCol = el.classList.contains('single-col');
+
   // Use two columns if no venue image and more than 6 items
   let column2 = column1;
-  if (!venueImage && agendaArray.length > 6) {
+  if (!venueImage && agendaArray.length > 6 && (!isSingleCol || !isCollapsible)) {
     column2 = createTag('div', { class: 'column' }, '', { parent: agendaItemContainer });
   }
-
-  const isCollapsible = el.classList.contains('collapsible');
-
+  
   const splitIndex = Math.ceil(agendaArray.length / 2);
   agendaArray.forEach((agenda, index) => {
     const agendaListItem = createTag('div', { class: 'agenda-list-item' }, '', { parent: (index >= splitIndex ? column2 : column1) });
