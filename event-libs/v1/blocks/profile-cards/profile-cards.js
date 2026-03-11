@@ -85,14 +85,12 @@ async function decorateSocialIcons(cardContainer, socialLinks) {
 
   const svgEls = await getSVGsfromFile(svgPath, SUPPORTED_PLATFORMS);
   if (!svgEls || svgEls.length === 0) return;
-  socialLinks.forEach((social) => {
-    const { link } = social;
-
-    if (!link) return;
+  socialLinks.forEach((link) => {
+    if (!link || !(link instanceof HTMLAnchorElement)) return;
 
     let platform = 'web'; // Default fallback
     try {
-      const url = new URL(link);
+      const url = new URL(link.href);
       const hostname = url.hostname.toLowerCase();
 
       // Find the platform by testing against regex patterns
@@ -110,13 +108,11 @@ async function decorateSocialIcons(cardContainer, socialLinks) {
     const li = createTag('li', { class: 'card-social-icon' });
     const icon = createSocialIcon(svgEl.svg, platform);
 
-    const a = createTag('a', {
-      href: link,
-      target: '_blank',
-      rel: 'noopener noreferrer',
-      'aria-label': platform,
-    });
+    const a = link.cloneNode(true);
+    a.setAttribute('target', '_blank');
+    a.setAttribute('rel', 'noopener noreferrer');
     a.textContent = '';
+
     a.append(icon);
     li.append(a);
     socialList.append(li);
@@ -152,12 +148,13 @@ function decorateContent(cardContainer, data) {
 
   contentContainer.append(textContainer);
 
-  decorateSocialIcons(contentContainer, data.socialLinks || data.socialMedia || []);
+  decorateSocialIcons(contentContainer, data.socialLinks);
 
   cardContainer.append(contentContainer);
 }
 
 function parseStaticCard(row) {
+  console.log(row.cloneNode(true).innerHTML);
   const cell = row.querySelector(':scope > div');
   if (!cell) return null;
 
@@ -219,7 +216,7 @@ function parseStaticCard(row) {
         // This is a social link paragraph
         const anchor = child.querySelector('a');
         if (anchor?.href) {
-          socialLinks.push({ link: anchor.href });
+          socialLinks.push(anchor);
         }
       } else if (child !== heading) {
         // This is bio content - keep the HTML
