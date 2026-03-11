@@ -310,7 +310,13 @@ export function createSmartDateRange(startTimestamp, endTimestamp, locale) {
 const METADATA_MASSAGE_RULES = {
   'local-start-time-millis': {
     outputKey: 'user-start-date-time',
-    transform: (originalValue, locale) => convertUtcTimestampToLocalDateTime(originalValue, locale),
+    transform: (originalValue, locale) => {
+      const eventType = getMetadata('event-type');
+      if (eventType !== 'InPerson') {
+        return convertUtcTimestampToLocalDateTime(originalValue, locale);
+      }
+      // TODO: For webinar, just format the time without converting to local time
+    }
   },
   'local-end-time-millis': {
     outputKey: 'user-end-date-time',
@@ -350,7 +356,7 @@ const METADATA_MASSAGE_RULES = {
  * @param {string} locale - Locale string for formatting (e.g., 'en-US')
  * @returns {Object} Updated extraData object with hydrated metadata
  */
-export function massageMetadata(locale = 'en-US') {
+export function massageMetadata(userLocale = 'en-US') {
   const massagedData = {};
 
   // Process each hydration rule
@@ -360,12 +366,12 @@ export function massageMetadata(locale = 'en-US') {
 
       if (rule.isComputed) {
         // Computed rules don't depend on a specific metadata field
-        transformedValue = rule.transform(locale);
+        transformedValue = rule.transform(userLocale);
       } else {
         // Standard rules depend on a specific metadata field
         const metadataValue = getMetadata(metadataKey);
         if (metadataValue) {
-          transformedValue = rule.transform(metadataValue, locale);
+          transformedValue = rule.transform(metadataValue, userLocale);
         }
       }
 
