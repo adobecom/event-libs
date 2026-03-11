@@ -154,7 +154,6 @@ function decorateContent(cardContainer, data) {
 }
 
 function parseStaticCard(row) {
-  console.log(row.cloneNode(true).innerHTML);
   const cell = row.querySelector(':scope > div');
   if (!cell) return null;
 
