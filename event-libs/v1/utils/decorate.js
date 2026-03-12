@@ -23,6 +23,7 @@ import {
   createContextualContent,
   parseEncodedConfig,
   createTag,
+  getValidCampaignIdFromUrl,
 } from './utils.js';
 import { massageMetadata } from './date-time-helper.js';
 import { hydrateBlocks, setHydrationPromise } from '../hydrate/hydrate.js';
@@ -113,6 +114,17 @@ function setCtaState(targetState, rsvpBtn) { // eslint-disable-line no-unused-va
       rsvpBtn.el.textContent = closedText;
       checkRed.remove();
     },
+    inviteOnlyNoCampaign: () => {
+      const INVITE_ONLY_KEY = 'rsvp-invite-only-no-campaign-cta-text';
+      let text = dictionaryManager.getValue(INVITE_ONLY_KEY);
+      if (text === INVITE_ONLY_KEY) {
+        text = 'Registration is by invitation only. Use your invitation link to register.';
+      }
+      disableBtn();
+      updateAnalyticTag(rsvpBtn.el, text);
+      rsvpBtn.el.textContent = text;
+      checkRed.remove();
+    },
     default: () => {
       // Use stored original text as fallback if current originalText is the loading text
       const loadingText = dictionaryManager.getValue('rsvp-loading-cta-text');
@@ -135,11 +147,16 @@ export async function updateRSVPButtonState(rsvpBtn) {
   let waitlistEnabled = getMetadata('allow-wait-listing') === 'true';
 
   if (eventInfo.ok) {
-    const { isFull, allowWaitlisting, attendeeCount, attendeeLimit } = eventInfo.data;
+    const { isFull, allowWaitlisting, attendeeCount, attendeeLimit, inviteOnly } = eventInfo.data;
     eventFull = isFull
       || (!allowWaitlisting && attendeeCount >= attendeeLimit);
     waitlistEnabled = allowWaitlisting;
     BlockMediator.set('eventData', eventInfo.data);
+
+    if (inviteOnly && !getValidCampaignIdFromUrl()) {
+      setCtaState('inviteOnlyNoCampaign', rsvpBtn);
+      return;
+    }
   }
 
   const rsvpData = BlockMediator.get('rsvpData');

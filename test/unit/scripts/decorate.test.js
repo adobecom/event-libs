@@ -14,6 +14,7 @@ import {
 const {
   decorateEvent,
   updateAnalyticTag,
+  updateRSVPButtonState,
   signIn,
   validatePageAndRedirect,
   updatePictureElement,
@@ -101,6 +102,68 @@ describe('Content Update Script', () => {
     BlockMediator.set('rsvpData', null);
 
     expect(document.querySelector('a[href$="#rsvp-form-1"]').textContent).to.be.equal(buttonOriginalText);
+  });
+});
+
+describe('updateRSVPButtonState', () => {
+  let fetchStub;
+  let originalLocationSearch;
+
+  beforeEach(() => {
+    document.body.innerHTML = '';
+    document.head.innerHTML = head;
+    setMetadata('event-id', 'test-event-id');
+    BlockMediator.set('rsvpData', null);
+    BlockMediator.set('eventData', null);
+    originalLocationSearch = window.location.search;
+  });
+
+  afterEach(() => {
+    fetchStub?.restore();
+    if (originalLocationSearch !== undefined) {
+      window.history.replaceState(null, '', window.location.pathname + window.location.hash + originalLocationSearch);
+    }
+  });
+
+  it('disables RSVP button when event is inviteOnly and URL has no valid campaign', async () => {
+    fetchStub = sinon.stub(window, 'fetch').resolves({
+      ok: true,
+      json: () => Promise.resolve({ inviteOnly: true, isFull: false, allowWaitlisting: false, attendeeCount: 0, attendeeLimit: 100 }),
+    });
+    window.history.replaceState(null, '', window.location.pathname + window.location.hash);
+
+    const anchor = document.createElement('a');
+    anchor.href = '#rsvp-form';
+    anchor.textContent = 'Register';
+    anchor.dataset.modalHash = '#rsvp-form';
+    const rsvpBtn = { el: anchor, originalText: 'Register' };
+
+    await updateRSVPButtonState(rsvpBtn);
+
+    expect(anchor.classList.contains('disabled')).to.be.true;
+    expect(anchor.getAttribute('href')).to.equal('');
+    expect(anchor.getAttribute('tabindex')).to.equal('-1');
+    expect(anchor.textContent).to.include('invitation');
+  });
+
+  it('enables RSVP button (default state) when event is inviteOnly but URL has valid campaign', async () => {
+    fetchStub = sinon.stub(window, 'fetch').resolves({
+      ok: true,
+      json: () => Promise.resolve({ inviteOnly: true, isFull: false, allowWaitlisting: false, attendeeCount: 0, attendeeLimit: 100 }),
+    });
+    window.history.replaceState(null, '', `${window.location.pathname}?campaign=valid-campaign-id${window.location.hash}`);
+
+    const anchor = document.createElement('a');
+    anchor.href = '#rsvp-form';
+    anchor.textContent = 'Register';
+    anchor.dataset.modalHash = '#rsvp-form';
+    const rsvpBtn = { el: anchor, originalText: 'Register' };
+
+    await updateRSVPButtonState(rsvpBtn);
+
+    expect(anchor.classList.contains('disabled')).to.be.false;
+    expect(anchor.getAttribute('href')).to.equal('#rsvp-form');
+    expect(anchor.textContent).to.equal('Register');
   });
 });
 
