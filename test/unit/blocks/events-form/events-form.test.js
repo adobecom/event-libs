@@ -1,4 +1,5 @@
 import { expect } from '@esm-bundle/chai';
+import sinon from 'sinon';
 
 describe('Events Form', () => {
   let block;
@@ -455,6 +456,93 @@ describe('Events Form', () => {
         expect(payload.interests).to.include('Design');
         expect(payload.interests).to.not.include('Marketing');
       });
+    });
+  });
+
+  describe('initFormBasedOnRSVPData', () => {
+    function createStore(initialValue = null) {
+      let value = initialValue;
+      const subscribers = [];
+      return {
+        get: () => value,
+        set: (nextValue) => {
+          value = nextValue;
+          subscribers.forEach((callback) => callback({ newValue: nextValue }));
+        },
+        subscribe: (callback) => subscribers.push(callback),
+      };
+    }
+
+    async function simulateRsvpFirstInit({
+      store,
+      profile,
+      getAttendee,
+      personalizeForm,
+      showSuccess,
+    }) {
+      const validRegistrationStatus = ['registered', 'waitlisted'];
+      const isRegistered = (rsvpData = store.get()) => validRegistrationStatus.includes(rsvpData?.registrationStatus);
+      store.subscribe(({ newValue }) => {
+        if (isRegistered(newValue)) showSuccess();
+      });
+
+      if (isRegistered()) {
+        showSuccess();
+        return;
+      }
+
+      if (profile.account_type !== 'guest') {
+        await getAttendee();
+        if (isRegistered()) {
+          showSuccess();
+          return;
+        }
+        personalizeForm();
+      }
+    }
+
+    it('subscribes early enough to catch RSVP during attendee request', async () => {
+      const store = createStore(null);
+      const personalizeForm = sinon.stub();
+      const showSuccess = sinon.stub();
+
+      let resolveAttendee;
+      const getAttendee = sinon.stub().returns(new Promise((resolve) => {
+        resolveAttendee = resolve;
+      }));
+
+      const initPromise = simulateRsvpFirstInit({
+        store,
+        profile: { account_type: 'type1' },
+        getAttendee,
+        personalizeForm,
+        showSuccess,
+      });
+
+      store.set({ registrationStatus: 'registered' });
+      resolveAttendee();
+      await initPromise;
+
+      expect(showSuccess.called).to.be.true;
+      expect(personalizeForm.called).to.be.false;
+    });
+
+    it('personalizes for non-registered users once attendee data resolves', async () => {
+      const store = createStore(null);
+      const personalizeForm = sinon.stub();
+      const showSuccess = sinon.stub();
+      const getAttendee = sinon.stub().resolves({});
+
+      await simulateRsvpFirstInit({
+        store,
+        profile: { account_type: 'type1' },
+        getAttendee,
+        personalizeForm,
+        showSuccess,
+      });
+
+      expect(showSuccess.called).to.be.false;
+      expect(personalizeForm.calledOnce).to.be.true;
     });
   });
 });
