@@ -1,6 +1,7 @@
 import { expect } from '@esm-bundle/chai';
 import sinon from 'sinon';
 import { getProfile, lazyCaptureProfile } from '../../../event-libs/v1/utils/profile.js';
+import { setEventConfig } from '../../../event-libs/v1/utils/utils.js';
 import BlockMediator from '../../../event-libs/v1/deps/block-mediator.min.js';
 
 describe('Profile Functions', () => {
@@ -13,6 +14,12 @@ describe('Profile Functions', () => {
     window.adobeProfile = null;
     window.fedsConfig = null;
     window.adobeIMS = null;
+    setEventConfig({}, {
+      miloLibs: '/libs',
+      env: { name: 'local' },
+      origin: window.location.origin,
+      pathname: window.location.pathname,
+    });
 
     // Clear BlockMediator state
     BlockMediator.set('imsProfile', undefined);
@@ -82,7 +89,7 @@ describe('Profile Functions', () => {
     await clock.tick(3000);
     const profile = await getProfile();
     expect(profile).to.equal(null);
-    expect(BlockMediator.get('rsvpData')).to.be.undefined;
+    expect(BlockMediator.get('rsvpData')).to.equal(null);
     expect(BlockMediator.get('imsProfile')).to.deep.equal({ noProfile: true });
   });
 
@@ -104,5 +111,17 @@ describe('Profile Functions', () => {
     // Verify that no profile capture was initiated
     expect(BlockMediator.get('imsProfile')).to.be.undefined;
     expect(BlockMediator.get('rsvpData')).to.be.undefined;
+  });
+
+  it('should set rsvpData to null when profile capture fails', async () => {
+    window.adobeIMS = {
+      getProfile: () => Promise.reject(new Error('failed profile lookup')),
+    };
+
+    lazyCaptureProfile();
+    await clock.tickAsync(50);
+    await Promise.resolve();
+
+    expect(BlockMediator.get('rsvpData')).to.equal(null);
   });
 });

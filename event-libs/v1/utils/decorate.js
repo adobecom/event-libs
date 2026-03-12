@@ -512,17 +512,15 @@ function prebuildAutoBlock(blockName, link) {
 
 export function processAutoBlockLinks(parent) {
   const autoBlockIdentifiers = {
-    'chrono-box': 'schedule-maker'
-  }
-
-  Object.keys(autoBlockIdentifiers).forEach((bn) => {
-    const link = parent.querySelector(`a[href*="${autoBlockIdentifiers[bn]}"]`);
-    if (link) {
-      const blockEl = prebuildAutoBlock(bn, link);
-      if (blockEl) {
-        link.closest('p') ? link.closest('p').replaceWith(blockEl) : link.replaceWith(blockEl);
-      }
-    }
+    'chrono-box': 'schedule-maker',
+  };
+  Object.entries(autoBlockIdentifiers).forEach(([blockName, identifier]) => {
+    const links = parent.querySelectorAll(`a[href*="${identifier}"]`);
+    links.forEach((link) => {
+      const blockEl = prebuildAutoBlock(blockName, link);
+      if (!blockEl) return;
+      link.closest('p') ? link.closest('p').replaceWith(blockEl) : link.replaceWith(blockEl);
+    });
   });
 }
 
