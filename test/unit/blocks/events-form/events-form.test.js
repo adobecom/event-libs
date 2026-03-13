@@ -545,4 +545,146 @@ describe('Events Form', () => {
       expect(personalizeForm.calledOnce).to.be.true;
     });
   });
+
+  describe('getFullState and buildErrorMsg (campaign-aware 400)', () => {
+    let sandbox;
+    let originalHref;
+    let getFullState;
+    let buildErrorMsg;
+
+    before(async () => {
+      const module = await import('../../../../event-libs/v1/blocks/events-form/events-form.js');
+      getFullState = module.getFullState;
+      buildErrorMsg = module.buildErrorMsg;
+    });
+
+    beforeEach(() => {
+      sandbox = sinon.createSandbox();
+      originalHref = window.location.href;
+      window.adobeIMS = window.adobeIMS || { getAccessToken: () => ({ token: 'test-token' }) };
+    });
+
+    afterEach(() => {
+      sandbox.restore();
+      window.history.replaceState({}, '', originalHref);
+    });
+
+    function stubFetchByUrl(eventResponse, campaignResponse = null) {
+      sandbox.stub(window, 'fetch').callsFake((url) => {
+        if (typeof url === 'string' && url.includes('/campaigns/')) {
+          return Promise.resolve(campaignResponse != null ? campaignResponse : { json: () => ({}), ok: false, status: 404 });
+        }
+        return Promise.resolve(eventResponse);
+      });
+    }
+
+    it('getFullState returns event-based full when no campaign in URL', async () => {
+      stubFetchByUrl({
+        json: () => ({
+          isFull: true,
+          allowWaitlisting: false,
+          attendeeCount: 100,
+          attendeeLimit: 100,
+        }),
+        ok: true,
+      });
+      const state = await getFullState('test-event-id');
+      expect(state.full).to.be.true;
+      expect(state.usedCampaign).to.be.false;
+      expect(state.waitlistEnabled).to.be.false;
+    });
+
+    it('getFullState returns campaign-based full when campaign in URL and campaign full', async () => {
+      window.history.replaceState({}, '', `${originalHref.split('?')[0]}?campaign=camp-1`);
+      stubFetchByUrl(
+        {
+          json: () => ({
+            isFull: false,
+            allowWaitlisting: true,
+            attendeeCount: 50,
+            attendeeLimit: 100,
+          }),
+          ok: true,
+        },
+        {
+          json: () => ({
+            campaignId: 'camp-1',
+            attendeeLimit: 100,
+            attendeeCount: 100,
+            waitlistAttendeeCount: 0,
+          }),
+          ok: true,
+        },
+      );
+      const state = await getFullState('test-event-id');
+      expect(state.full).to.be.true;
+      expect(state.usedCampaign).to.be.true;
+      expect(state.waitlistEnabled).to.be.true;
+    });
+
+    it('getFullState falls back to event when campaign in URL but getCampaign fails', async () => {
+      window.history.replaceState({}, '', `${originalHref.split('?')[0]}?campaign=camp-1`);
+      stubFetchByUrl(
+        {
+          json: () => ({
+            isFull: true,
+            allowWaitlisting: false,
+            attendeeCount: 100,
+            attendeeLimit: 100,
+          }),
+          ok: true,
+        },
+        { json: () => ({ message: 'Not found' }), ok: false, status: 404 },
+      );
+      const state = await getFullState('test-event-id');
+      expect(state.full).to.be.true;
+      expect(state.usedCampaign).to.be.false;
+    });
+
+    it('buildErrorMsg uses campaign-full error key when status 400 and campaign full', async () => {
+      window.history.replaceState({}, '', `${originalHref.split('?')[0]}?campaign=camp-1`);
+      stubFetchByUrl(
+        {
+          json: () => ({
+            isFull: false,
+            allowWaitlisting: true,
+            attendeeCount: 50,
+            attendeeLimit: 100,
+          }),
+          ok: true,
+        },
+        {
+          json: () => ({
+            campaignId: 'camp-1',
+            attendeeLimit: 100,
+            attendeeCount: 100,
+            waitlistAttendeeCount: 0,
+          }),
+          ok: true,
+        },
+      );
+      const form = document.createElement('form');
+      await buildErrorMsg(form, 400);
+      const errorEl = form.querySelector('.error');
+      expect(errorEl).to.not.be.null;
+      expect(errorEl.textContent).to.equal('campaign-full-error-msg');
+    });
+
+    it('buildErrorMsg uses event-full error key when status 400 and no campaign in URL', async () => {
+      stubFetchByUrl({
+        json: () => ({
+          isFull: true,
+          allowWaitlisting: false,
+          attendeeCount: 100,
+          attendeeLimit: 100,
+        }),
+        ok: true,
+      });
+      const form = document.createElement('form');
+      await buildErrorMsg(form, 400);
+      const errorEl = form.querySelector('.error');
+      expect(errorEl).to.not.be.null;
+      expect(errorEl.textContent).to.equal('event-full-no-waitlist-error-msg');
+    });
+  });
 });
