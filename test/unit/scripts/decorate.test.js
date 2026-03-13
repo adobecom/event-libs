@@ -14,6 +14,7 @@ import {
 const {
   decorateEvent,
   updateAnalyticTag,
+  updateRSVPButtonState,
   signIn,
   validatePageAndRedirect,
   updatePictureElement,
@@ -109,6 +110,199 @@ describe('updateAnalyticTag', () => {
     const element = document.createElement('div');
     updateAnalyticTag(element, 'new text');
     expect(element.getAttribute('daa-ll')).to.equal('new text|Create Now Chicago 2024 Test');
+  });
+});
+
+describe('updateRSVPButtonState', () => {
+  let sandbox;
+  let rsvpBtn;
+  let originalHref;
+
+  function stubFetchByUrl(sandbox, { eventResponse, campaignResponse }) {
+    sandbox.stub(window, 'fetch').callsFake((url) => {
+      if (typeof url === 'string' && url.includes('/campaigns/')) {
+        return Promise.resolve(campaignResponse != null ? campaignResponse : { json: () => ({}), ok: false, status: 404 });
+      }
+      return Promise.resolve(eventResponse);
+    });
+  }
+
+  beforeEach(() => {
+    sandbox = sinon.createSandbox();
+    originalHref = window.location.href;
+    setMetadata('event-id', 'ev-1');
+    BlockMediator.set('rsvpData', null);
+    window.adobeIMS = window.adobeIMS || { getAccessToken: () => ({ token: 'test-token' }) };
+    const el = document.createElement('a');
+    el.href = '#rsvp-form';
+    el.dataset.modalHash = '#rsvp-form';
+    el.textContent = 'Register';
+    rsvpBtn = { el, originalText: 'Register' };
+  });
+
+  afterEach(() => {
+    sandbox.restore();
+    window.history.replaceState({}, '', originalHref);
+  });
+
+  it('uses event capacity when no campaign in URL', async () => {
+    setMetadata('allow-wait-listing', 'false');
+    stubFetchByUrl(sandbox, {
+      eventResponse: {
+        json: () => ({
+          isFull: true,
+          allowWaitlisting: false,
+          attendeeCount: 100,
+          attendeeLimit: 100,
+        }),
+        ok: true,
+      },
+    });
+    await updateRSVPButtonState(rsvpBtn);
+    expect(rsvpBtn.el.classList.contains('disabled')).to.be.true;
+    expect(rsvpBtn.el.getAttribute('tabindex')).to.equal('-1');
+  });
+
+  it('uses event capacity when campaign in URL but getCampaign fails', async () => {
+    setMetadata('allow-wait-listing', 'false');
+    window.history.replaceState({}, '', `${originalHref.split('?')[0]}?campaign=camp-1`);
+    stubFetchByUrl(sandbox, {
+      eventResponse: {
+        json: () => ({
+          isFull: true,
+          allowWaitlisting: false,
+          attendeeCount: 100,
+          attendeeLimit: 100,
+        }),
+        ok: true,
+      },
+      campaignResponse: { json: () => ({ message: 'Not found' }), ok: false, status: 404 },
+    });
+    await updateRSVPButtonState(rsvpBtn);
+    expect(rsvpBtn.el.classList.contains('disabled')).to.be.true;
+  });
+
+  it('uses campaign capacity when campaign in URL and campaign has capacity', async () => {
+    setMetadata('allow-wait-listing', 'true');
+    window.history.replaceState({}, '', `${originalHref.split('?')[0]}?campaign=camp-1`);
+    stubFetchByUrl(sandbox, {
+      eventResponse: {
+        json: () => ({
+          isFull: false,
+          allowWaitlisting: true,
+          attendeeCount: 50,
+          attendeeLimit: 100,
+        }),
+        ok: true,
+      },
+      campaignResponse: {
+        json: () => ({
+          campaignId: 'camp-1',
+          attendeeLimit: 100,
+          attendeeCount: 50,
+          waitlistAttendeeCount: 0,
+        }),
+        ok: true,
+      },
+    });
+    await updateRSVPButtonState(rsvpBtn);
+    expect(rsvpBtn.el.classList.contains('disabled')).to.be.false;
+  });
+
+  it('shows toWaitlist when campaign in URL and campaign full and waitlist enabled', async () => {
+    setMetadata('allow-wait-listing', 'true');
+    window.history.replaceState({}, '', `${originalHref.split('?')[0]}?campaign=camp-1`);
+    stubFetchByUrl(sandbox, {
+      eventResponse: {
+        json: () => ({
+          isFull: false,
+          allowWaitlisting: true,
+          attendeeCount: 50,
+          attendeeLimit: 100,
+        }),
+        ok: true,
+      },
+      campaignResponse: {
+        json: () => ({
+          campaignId: 'camp-1',
+          attendeeLimit: 100,
+          attendeeCount: 100,
+          waitlistAttendeeCount: 0,
+        }),
+        ok: true,
+      },
+    });
+    await updateRSVPButtonState(rsvpBtn);
+    expect(rsvpBtn.el.classList.contains('disabled')).to.be.false;
+    expect(rsvpBtn.el.getAttribute('tabindex')).to.equal('0');
+  });
+
+  it('shows eventClosed when campaign in URL and campaign full and waitlist disabled', async () => {
+    setMetadata('allow-wait-listing', 'false');
+    window.history.replaceState({}, '', `${originalHref.split('?')[0]}?campaign=camp-1`);
+    stubFetchByUrl(sandbox, {
+      eventResponse: {
+        json: () => ({
+          isFull: false,
+          allowWaitlisting: false,
+          attendeeCount: 50,
+          attendeeLimit: 100,
+        }),
+        ok: true,
+      },
+      campaignResponse: {
+        json: () => ({
+          campaignId: 'camp-1',
+          attendeeLimit: 100,
+          attendeeCount: 100,
+          waitlistAttendeeCount: 0,
+        }),
+        ok: true,
+      },
+    });
+    await updateRSVPButtonState(rsvpBtn);
+    expect(rsvpBtn.el.classList.contains('disabled')).to.be.true;
+    expect(rsvpBtn.el.getAttribute('tabindex')).to.equal('-1');
+  });
+
+  it('falls back to event capacity when campaign in URL but campaign has no attendeeLimit', async () => {
+    setMetadata('allow-wait-listing', 'false');
+    window.history.replaceState({}, '', `${originalHref.split('?')[0]}?campaign=camp-1`);
+    stubFetchByUrl(sandbox, {
+      eventResponse: {
+        json: () => ({
+          isFull: true,
+          allowWaitlisting: false,
+          attendeeCount: 100,
+          attendeeLimit: 100,
+        }),
+        ok: true,
+      },
+      campaignResponse: {
+        json: () => ({ campaignId: 'camp-1' }),
+        ok: true,
+      },
+    });
+    await updateRSVPButtonState(rsvpBtn);
+    expect(rsvpBtn.el.classList.contains('disabled')).to.be.true;
+  });
+
+  it('ignores invalid campaign ID in URL', async () => {
+    setMetadata('allow-wait-listing', 'false');
+    window.history.replaceState({}, '', `${originalHref.split('?')[0]}?campaign=<>`);
+    stubFetchByUrl(sandbox, {
+      eventResponse: {
+        json: () => ({
+          isFull: true,
+          allowWaitlisting: false,
+          attendeeCount: 100,
+          attendeeLimit: 100,
+        }),
+        ok: true,
+      },
+    });
+    await updateRSVPButtonState(rsvpBtn);
+    expect(rsvpBtn.el.classList.contains('disabled')).to.be.true;
   });
 });
 

@@ -5,9 +5,10 @@ import {
   ALLOWED_EMAIL_DOMAINS,
   FALLBACK_LOCALES,
   CONDITIONAL_REG,
+  CAMPAIGN_ID_PATTERN,
 } from './constances.js';
 import BlockMediator from '../deps/block-mediator.min.js';
-import { getEvent } from './esp-controller.js';
+import { getEvent, getCampaign } from './esp-controller.js';
 import { dictionaryManager } from './dictionary-manager.js';
 import {
   getMetadata,
@@ -140,6 +141,17 @@ export async function updateRSVPButtonState(rsvpBtn) {
       || (!allowWaitlisting && attendeeCount >= attendeeLimit);
     waitlistEnabled = allowWaitlisting;
     BlockMediator.set('eventData', eventInfo.data);
+  }
+
+  const campaignId = new URLSearchParams(window.location.search).get('campaign');
+  if (campaignId && CAMPAIGN_ID_PATTERN.test(campaignId)) {
+    const campaignInfo = await getCampaign(getMetadata('event-id'), campaignId);
+    if (campaignInfo.ok && campaignInfo.data.attendeeLimit != null) {
+      const { attendeeLimit, attendeeCount, waitlistAttendeeCount } = campaignInfo.data;
+      const campaignFull = attendeeLimit === attendeeCount
+        || (attendeeLimit > attendeeCount && waitlistAttendeeCount > 0);
+      eventFull = campaignFull;
+    }
   }
 
   const rsvpData = BlockMediator.get('rsvpData');
