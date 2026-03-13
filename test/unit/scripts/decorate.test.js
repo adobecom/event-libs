@@ -304,6 +304,31 @@ describe('updateRSVPButtonState', () => {
     await updateRSVPButtonState(rsvpBtn);
     expect(rsvpBtn.el.classList.contains('disabled')).to.be.true;
   });
+
+  it('uses event capacity when campaign in URL but no IMS token (avoids 403)', async () => {
+    setMetadata('allow-wait-listing', 'false');
+    window.history.replaceState({}, '', `${originalHref.split('?')[0]}?campaign=camp-1`);
+    window.adobeIMS = { getAccessToken: () => ({}) };
+    let campaignUrlCalled = false;
+    sandbox.stub(window, 'fetch').callsFake((url) => {
+      if (typeof url === 'string' && url.includes('/campaigns/')) {
+        campaignUrlCalled = true;
+        return Promise.resolve({ json: () => ({}), ok: false, status: 404 });
+      }
+      return Promise.resolve({
+        json: () => ({
+          isFull: true,
+          allowWaitlisting: false,
+          attendeeCount: 100,
+          attendeeLimit: 100,
+        }),
+        ok: true,
+      });
+    });
+    await updateRSVPButtonState(rsvpBtn);
+    expect(rsvpBtn.el.classList.contains('disabled')).to.be.true;
+    expect(campaignUrlCalled).to.be.false;
+  });
 });
 
 describe('signIn', () => {
