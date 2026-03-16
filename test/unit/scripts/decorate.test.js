@@ -132,6 +132,7 @@ describe('updateRSVPButtonState', () => {
     originalHref = window.location.href;
     setMetadata('event-id', 'ev-1');
     BlockMediator.set('rsvpData', null);
+    BlockMediator.set('imsProfile', { account_type: 'type3' });
     window.adobeIMS = window.adobeIMS || { getAccessToken: () => ({ token: 'test-token' }) };
     const el = document.createElement('a');
     el.href = '#rsvp-form';
@@ -305,10 +306,10 @@ describe('updateRSVPButtonState', () => {
     expect(rsvpBtn.el.classList.contains('disabled')).to.be.true;
   });
 
-  it('uses event capacity when campaign in URL but no IMS token (avoids 403)', async () => {
+  it('uses event capacity when campaign in URL but user is guest (avoids 403)', async () => {
     setMetadata('allow-wait-listing', 'false');
     window.history.replaceState({}, '', `${originalHref.split('?')[0]}?campaign=camp-1`);
-    window.adobeIMS = { getAccessToken: () => ({}) };
+    BlockMediator.set('imsProfile', { account_type: 'guest' });
     let campaignUrlCalled = false;
     sandbox.stub(window, 'fetch').callsFake((url) => {
       if (typeof url === 'string' && url.includes('/campaigns/')) {

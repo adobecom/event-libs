@@ -144,8 +144,9 @@ export async function updateRSVPButtonState(rsvpBtn) {
   }
 
   const campaignId = new URLSearchParams(window.location.search).get('campaign');
-  const hasImsToken = !!window.adobeIMS?.getAccessToken()?.token;
-  if (campaignId && CAMPAIGN_ID_PATTERN.test(campaignId) && hasImsToken) {
+  const profile = BlockMediator.get('imsProfile');
+  const isLoggedInNonGuest = profile && !profile.noProfile && profile.account_type !== 'guest';
+  if (campaignId && CAMPAIGN_ID_PATTERN.test(campaignId) && isLoggedInNonGuest) {
     const campaignInfo = await getCampaign(getMetadata('event-id'), campaignId);
     if (campaignInfo.ok && campaignInfo.data.attendeeLimit != null) {
       const { attendeeLimit, attendeeCount, waitlistAttendeeCount } = campaignInfo.data;
