@@ -102,6 +102,18 @@ Button text is managed through the dictionary system. The following keys are use
 - `waitlist-cta-text` - Join waitlist text
 - `event-full-cta-text` - Event full text
 
+### Form error messages (RSVP form submit)
+
+When the form submit returns 400 (capacity full), the following keys are used:
+
+- `event-full-error-msg` - Shown when the **event** is full and waitlisting is allowed
+- `event-full-no-waitlist-error-msg` - Shown when the **event** is full and waitlisting is disabled
+- `campaign-full-error-msg` - Shown when the **campaign** (URL param `?campaign=...`) is full and waitlisting is allowed
+- `campaign-full-no-waitlist-error-msg` - Shown when the **campaign** is full and waitlisting is disabled
+- `rsvp-error-msg` - Generic RSVP error for other failure statuses
+
+Campaign-full keys are used only when the user submitted with a valid campaign ID in the URL and the capacity limit that was reached is the campaign's, not the event's.
+
 ## User Authentication Handling
 
 ### Guest Users

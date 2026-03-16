@@ -1,9 +1,9 @@
-import { deleteAttendeeFromEvent, getAndCreateAndAddAttendee, getAttendee, getEvent } from '../../utils/esp-controller.js';
+import { deleteAttendeeFromEvent, getAndCreateAndAddAttendee, getAttendee, getEvent, getCampaign } from '../../utils/esp-controller.js';
 import BlockMediator from '../../deps/block-mediator.min.js';
 import { signIn, decorateEvent } from '../../utils/decorate.js';
 import { dictionaryManager } from '../../utils/dictionary-manager.js';
 import { getEventConfig, LIBS, getMetadata, getSusiOptions } from '../../utils/utils.js';
-import { FALLBACK_LOCALES } from '../../utils/constances.js';
+import { FALLBACK_LOCALES, CAMPAIGN_ID_PATTERN } from '../../utils/constances.js';
 
 const eventConfig = getEventConfig();
 const miloLibs = eventConfig?.miloConfig?.miloLibs ? eventConfig.miloConfig.miloLibs : LIBS;
@@ -14,7 +14,6 @@ const { default: sanitizeComment } = await import(`${miloLibs}/utils/sanitizeCom
 const { decorateDefaultLinkAnalytics } = await import(`${miloLibs}/martech/attributes.js`);
 const { default: loadFragment } = await import(`${miloLibs}/blocks/fragment/fragment.js`);
 
-const CAMPAIGN_ID_PATTERN = /^[\w-]{1,128}$/;
 const VALID_REGISTRATION_STATUS = ['registered', 'waitlisted'];
 
 const RULE_OPERATORS = {
@@ -230,19 +229,62 @@ function clearForm(form) {
   });
 }
 
-async function buildErrorMsg(parent, status) {
-  const eventObj = await getEvent(getMetadata('event-id'));
+/**
+ * Resolves full state from event and optionally campaign (when campaign ID in URL).
+ * @param {string} eventId - Event ID
+ * @returns {Promise<{ full: boolean, waitlistEnabled: boolean, usedCampaign: boolean }>}
+ */
+export async function getFullState(eventId) {
+  const eventObj = await getEvent(eventId);
+  let full = false;
+  let waitlistEnabled = false;
+  let usedCampaign = false;
+
+  if (!eventObj.ok) {
+    return { full: false, waitlistEnabled: false, usedCampaign: false };
+  }
+
+  const { isFull, allowWaitlisting, attendeeCount, attendeeLimit } = eventObj.data;
+  full = isFull || (!allowWaitlisting && +attendeeCount >= +attendeeLimit);
+  waitlistEnabled = allowWaitlisting;
+
+  const campaignId = new URLSearchParams(window.location.search).get('campaign');
+  if (campaignId && CAMPAIGN_ID_PATTERN.test(campaignId)) {
+    const campaignInfo = await getCampaign(eventId, campaignId);
+    if (campaignInfo.ok && campaignInfo.data.attendeeLimit != null) {
+      const { attendeeLimit: campLimit, attendeeCount: campCount, waitlistAttendeeCount } = campaignInfo.data;
+      full = campLimit === campCount
+        || (campLimit > campCount && waitlistAttendeeCount > 0);
+      usedCampaign = true;
+    }
+  }
+
+  return { full, waitlistEnabled, usedCampaign };
+}
+
+export async function buildErrorMsg(parent, status) {
+  const eventId = getMetadata('event-id');
+  const eventObj = await getEvent(eventId);
 
   if (!eventObj.ok) return;
-  const eventInfo = eventObj.data;
-  const errorKeyMap = { 400: eventInfo?.allowWaitlisting === 'true' ? 'event-full-error-msg' : 'event-full-no-waitlist-error-msg' };
+
+  let errorKey = 'rsvp-error-msg';
+  if (status === 400) {
+    const { full, waitlistEnabled, usedCampaign } = await getFullState(eventId);
+    if (full && usedCampaign) {
+      errorKey = waitlistEnabled ? 'campaign-full-error-msg' : 'campaign-full-no-waitlist-error-msg';
+    } else {
+      const eventInfo = eventObj.data;
+      errorKey = eventInfo?.allowWaitlisting === 'true' ? 'event-full-error-msg' : 'event-full-no-waitlist-error-msg';
+    }
+  }
 
   const existingErrors = parent.querySelectorAll('.error');
   if (existingErrors.length) {
     existingErrors.forEach((err) => err.remove());
   }
 
-  const errorMsg = dictionaryManager.getValue(errorKeyMap[status] || 'rsvp-error-msg');
+  const errorMsg = dictionaryManager.getValue(errorKey);
   const error = createTag('p', { class: 'error' }, errorMsg);
   parent.append(error);
   setTimeout(() => {
@@ -304,20 +346,14 @@ function createButton({ type, label }, bp) {
           const { status } = respJson;
 
           if (status === 400) {
-            const eventResp = await getEvent(getMetadata('event-id'));
-            if (eventResp.ok) {
-              const { isFull, allowWaitlisting, attendeeCount, attendeeLimit } = eventResp.data;
-              const eventFull = isFull
-              || (!allowWaitlisting && +attendeeCount >= +attendeeLimit);
-
-              if (eventFull) {
-                if (allowWaitlisting) {
-                  button.textContent = dictionaryManager.getValue('waitlist-cta-text');
-                  button.disabled = false;
-                } else {
-                  button.textContent = dictionaryManager.getValue('event-full-cta-text');
-                  button.disabled = true;
-                }
+            const fullState = await getFullState(getMetadata('event-id'));
+            if (fullState.full) {
+              if (fullState.waitlistEnabled) {
+                button.textContent = dictionaryManager.getValue('waitlist-cta-text');
+                button.disabled = false;
+              } else {
+                button.textContent = dictionaryManager.getValue('event-full-cta-text');
+                button.disabled = true;
               }
             }
 
