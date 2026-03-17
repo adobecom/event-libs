@@ -4,6 +4,7 @@ import { signIn, decorateEvent } from '../../utils/decorate.js';
 import { dictionaryManager } from '../../utils/dictionary-manager.js';
 import { getEventConfig, LIBS, getMetadata, getSusiOptions } from '../../utils/utils.js';
 import { FALLBACK_LOCALES, CAMPAIGN_ID_PATTERN } from '../../utils/constances.js';
+import { BASE_ATTENDEE_DATA_FILTER } from '../../utils/data-utils.js';
 
 const eventConfig = getEventConfig();
 const miloLibs = eventConfig?.miloConfig?.miloLibs ? eventConfig.miloConfig.miloLibs : LIBS;
@@ -165,6 +166,8 @@ function constructPayload(form) {
     if (fieldWrapper && (fieldWrapper.dataset.type === 'checkbox' || fieldWrapper.dataset.type === 'checkbox-group')) {
       const checkboxes = fieldWrapper.querySelectorAll('input[type="checkbox"]');
       if (checkboxes.length === 1 && Array.isArray(payload[key]) && payload[key].length <= 1) {
+        // Base attendee array fields (e.g. contactMethods) must stay arrays for the API
+        if (BASE_ATTENDEE_DATA_FILTER[key]?.type === 'array') return;
         // Single option checkbox with at most one value - convert to boolean
         payload[key] = payload[key].length > 0;
       }
@@ -189,7 +192,9 @@ async function submitForm(bp) {
   const isValid = Object.keys(payload).reduce((valid, key) => {
     const field = form.querySelector(`[data-field-id=${key}]`);
 
-    if (!payload[key] && field.querySelector('.group-container.required')) {
+    const missingSelection = !payload[key]
+      || (Array.isArray(payload[key]) && payload[key].length === 0);
+    if (missingSelection && field?.querySelector('.group-container.required')) {
       const el = form.querySelector(`input[name="${key}"]`);
       el.setCustomValidity('A selection is required');
       el.reportValidity();

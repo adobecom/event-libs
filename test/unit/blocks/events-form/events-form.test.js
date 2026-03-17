@@ -1,5 +1,6 @@
 import { expect } from '@esm-bundle/chai';
 import sinon from 'sinon';
+import { BASE_ATTENDEE_DATA_FILTER } from '../../../../event-libs/v1/utils/data-utils.js';
 
 describe('Events Form', () => {
   let block;
@@ -335,6 +336,7 @@ describe('Events Form', () => {
           if (fieldWrapperEl && (fieldWrapperEl.dataset.type === 'checkbox' || fieldWrapperEl.dataset.type === 'checkbox-group')) {
             const checkboxes = fieldWrapperEl.querySelectorAll('input[type="checkbox"]');
             if (checkboxes.length === 1 && Array.isArray(payload[key]) && payload[key].length <= 1) {
+              if (BASE_ATTENDEE_DATA_FILTER[key]?.type === 'array') return;
               payload[key] = payload[key].length > 0;
             }
           }
@@ -380,6 +382,7 @@ describe('Events Form', () => {
           if (fieldWrapperEl && (fieldWrapperEl.dataset.type === 'checkbox' || fieldWrapperEl.dataset.type === 'checkbox-group')) {
             const checkboxes = fieldWrapperEl.querySelectorAll('input[type="checkbox"]');
             if (checkboxes.length === 1 && Array.isArray(payload[key]) && payload[key].length <= 1) {
+              if (BASE_ATTENDEE_DATA_FILTER[key]?.type === 'array') return;
               payload[key] = payload[key].length > 0;
             }
           }
@@ -442,6 +445,7 @@ describe('Events Form', () => {
           if (fieldWrapperEl && (fieldWrapperEl.dataset.type === 'checkbox' || fieldWrapperEl.dataset.type === 'checkbox-group')) {
             const checkboxElements = fieldWrapperEl.querySelectorAll('input[type="checkbox"]');
             if (checkboxElements.length === 1 && Array.isArray(payload[key]) && payload[key].length <= 1) {
+              if (BASE_ATTENDEE_DATA_FILTER[key]?.type === 'array') return;
               payload[key] = payload[key].length > 0;
             }
           }
@@ -486,6 +490,7 @@ describe('Events Form', () => {
           if (fieldWrapperEl && (fieldWrapperEl.dataset.type === 'checkbox' || fieldWrapperEl.dataset.type === 'checkbox-group')) {
             const checkboxes = fieldWrapperEl.querySelectorAll('input[type="checkbox"]');
             if (checkboxes.length === 1 && Array.isArray(payload[key]) && payload[key].length <= 1) {
+              if (BASE_ATTENDEE_DATA_FILTER[key]?.type === 'array') return;
               payload[key] = payload[key].length > 0;
             }
           }
@@ -493,6 +498,47 @@ describe('Events Form', () => {
 
         expect(payload.contactMethods).to.deep.equal(['email', 'phone']);
         expect(Array.isArray(payload.contactMethods)).to.be.true;
+      });
+
+      it('should keep contactMethods as empty array when single checkbox unchecked', () => {
+        const form = document.createElement('form');
+        const fieldWrapper = document.createElement('div');
+        fieldWrapper.setAttribute('data-field-id', 'contactMethods');
+        fieldWrapper.setAttribute('data-type', 'checkbox-group');
+        const checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        checkbox.name = 'contactMethods';
+        checkbox.value = 'email+phone';
+        checkbox.checked = false;
+        fieldWrapper.appendChild(checkbox);
+        form.appendChild(fieldWrapper);
+
+        const payload = {};
+        if (checkbox.checked) {
+          const valueList = checkbox.value.split('+').map((v) => v.trim());
+          if (valueList.length > 1) {
+            valueList.forEach((v) => {
+              payload[checkbox.name] = payload[checkbox.name] ? [...payload[checkbox.name], v] : [v];
+            });
+          } else {
+            payload[checkbox.name] = [checkbox.value];
+          }
+        } else {
+          payload[checkbox.name] = [];
+        }
+
+        Object.keys(payload).forEach((key) => {
+          const fieldWrapperEl = form.querySelector(`[data-field-id="${key}"]`);
+          if (fieldWrapperEl && (fieldWrapperEl.dataset.type === 'checkbox' || fieldWrapperEl.dataset.type === 'checkbox-group')) {
+            const checkboxes = fieldWrapperEl.querySelectorAll('input[type="checkbox"]');
+            if (checkboxes.length === 1 && Array.isArray(payload[key]) && payload[key].length <= 1) {
+              if (BASE_ATTENDEE_DATA_FILTER[key]?.type === 'array') return;
+              payload[key] = payload[key].length > 0;
+            }
+          }
+        });
+
+        expect(payload.contactMethods).to.deep.equal([]);
       });
     });
   });
