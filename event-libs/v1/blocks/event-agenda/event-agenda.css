@@ -148,6 +148,7 @@
   padding: 20px 16px;
   flex-grow: 1;
   background-color: #fff;
+  display: flex;
 }
 
 /* Collapsible variant */
