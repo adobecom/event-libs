@@ -128,9 +128,20 @@ Use an **Explore agent** when:
 
 Single-file reads don't need an agent — use `Read` directly.
 
-### Skills
+### Custom commands (`.claude/commands/`)
 
-- `/simplify` — run after completing a new block or utility to catch redundancy and reuse opportunities before committing
+Project-specific slash commands:
+
+- `/new-block <name>` — scaffold a complete block: JS stub, test file, mock fixture, and `EVENT_BLOCKS` registration in one shot
+- `/test-block <name>` — run WTR for a single block; auto-fixes failures
+- `/audit-block <name>` — check a block against all coding standards (imports, DOM, async, lana logging, style)
+- `/find-util <description>` — search utils/ and features/ for existing code before writing new code
+- `/coverage-gaps` — inventory every block/utility and flag missing or shallow tests
+- `/pr-ready` — lint + test + changed-file review + commit message check before opening a PR
+
+### Built-in skills
+
+- `/simplify` — review changed code for redundancy and reuse opportunities before committing
 - `/commit` — generates a correctly formatted commit message; use instead of writing manually
 
 ### Linting
