@@ -203,11 +203,11 @@
   display: block;
   width: 18px;
   height: 18px;
-  background: url("./icons/expand.svg") no-repeat center / contain;
+  background: url("../../icons/expand.svg") no-repeat center / contain;
 }
 
 .event-agenda.collapsible .agenda-list-item.expanded .agenda-toggle::before {
-  background-image: url("./icons/collapse.svg");
+  background-image: url("../../icons/collapse.svg");
 }
 
 @media (min-width: 900px) {
