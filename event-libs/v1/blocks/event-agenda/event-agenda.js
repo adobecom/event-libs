@@ -215,9 +215,9 @@ export default async function init(el) {
         class: 'agenda-toggle',
         'aria-expanded': 'false',
         'aria-label': 'Toggle details',
-      }, '', { parent: agendaTitleDetailContainer });
+      }, '', { parent: agendaListItem });
 
-      agendaTitleDetailContainer.addEventListener('click', () => {
+      agendaListItem.addEventListener('click', () => {
         const expanded = agendaListItem.classList.toggle('expanded');
         toggle.setAttribute('aria-expanded', String(expanded));
       });
