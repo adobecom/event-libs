@@ -164,9 +164,9 @@ function constructPayload(form) {
     const fieldWrapper = form.querySelector(`[data-field-id="${key}"]`);
     if (fieldWrapper && (fieldWrapper.dataset.type === 'checkbox' || fieldWrapper.dataset.type === 'checkbox-group')) {
       const checkboxes = fieldWrapper.querySelectorAll('input[type="checkbox"]');
-      if (checkboxes.length === 1) {
-        // Single option checkbox - convert to boolean
-        payload[key] = payload[key] && payload[key].length > 0;
+      if (checkboxes.length === 1 && Array.isArray(payload[key]) && payload[key].length <= 1) {
+        // Single option checkbox with at most one value - convert to boolean
+        payload[key] = payload[key].length > 0;
       }
     }
   });
