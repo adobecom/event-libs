@@ -35,6 +35,19 @@ function snakeToCamel(str) {
     .join('');
 }
 
+/** Consent select uses query-index countryCode as option value; consentId lives on data-consent-id. */
+function applyConsentCountrySelectValue(selectEl, stored) {
+  if (!stored || typeof stored !== 'string') return;
+  const opts = [...selectEl.options].filter((o) => o.value !== '');
+  const byCode = opts.find((o) => o.value.toLowerCase() === stored.toLowerCase());
+  if (byCode) {
+    selectEl.value = byCode.value;
+    return;
+  }
+  const byConsentId = opts.find((o) => o.dataset.consentId === stored);
+  if (byConsentId) selectEl.value = byConsentId.value;
+}
+
 function createSelect(fd) {
   const {
     field, placeholder, options, defval, required, type,
@@ -186,6 +199,10 @@ async function submitForm(bp) {
     const selectedOption = countrySelect.options[countrySelect.selectedIndex];
     if (selectedOption?.dataset?.countryCode) {
       payload.countryRegion = selectedOption.dataset.countryCode;
+    }
+    const consentId = selectedOption?.dataset?.consentId;
+    if (consentId) {
+      payload.consentStringId = consentId;
     }
   }
 
@@ -741,13 +758,17 @@ async function addConsentSuite(form) {
     countrySelect.append(defaultOption);
 
     data.forEach((c) => {
-      const option = createTag('option', { value: c.consentId, 'data-country-code': c.countryCode }, c.countryName);
+      const option = createTag('option', {
+        value: c.countryCode,
+        'data-country-code': c.countryCode,
+        'data-consent-id': c.consentId,
+      }, c.countryName);
       countrySelect.append(option);
     });
 
     countrySelect.addEventListener('change', async (e) => {
       const selectedOption = e.target.options[e.target.selectedIndex];
-      const consentData = data.find((c) => c.countryCode === selectedOption.dataset.countryCode);
+      const consentData = data.find((c) => c.countryCode === selectedOption?.dataset?.countryCode);
 
       if (consentData) {
         await loadConsent(form, consentData);
@@ -922,6 +943,9 @@ function personalizeForm(form, data) {
             const option = matchedInput.querySelector(`option[value="${val}"]`);
             if (option) option.selected = true;
           });
+        } else if (matchedInput.id === 'consentStringId') {
+          applyConsentCountrySelectValue(matchedInput, v);
+          if (key === 'profile') matchedInput.disabled = true;
         } else {
           matchedInput.value = v;
           if (key === 'profile') matchedInput.disabled = true;
