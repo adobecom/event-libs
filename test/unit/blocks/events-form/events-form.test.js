@@ -1,4 +1,6 @@
 import { expect } from '@esm-bundle/chai';
+import sinon from 'sinon';
+import { BASE_ATTENDEE_DATA_FILTER } from '../../../../event-libs/v1/utils/data-utils.js';
 
 describe('Events Form', () => {
   let block;
@@ -333,9 +335,9 @@ describe('Events Form', () => {
           const fieldWrapperEl = form.querySelector(`[data-field-id="${key}"]`);
           if (fieldWrapperEl && (fieldWrapperEl.dataset.type === 'checkbox' || fieldWrapperEl.dataset.type === 'checkbox-group')) {
             const checkboxes = fieldWrapperEl.querySelectorAll('input[type="checkbox"]');
-            if (checkboxes.length === 1) {
-              // Single option checkbox - convert to boolean
-              payload[key] = payload[key] && payload[key].length > 0;
+            if (checkboxes.length === 1 && Array.isArray(payload[key]) && payload[key].length <= 1) {
+              if (BASE_ATTENDEE_DATA_FILTER[key]?.type === 'array') return;
+              payload[key] = payload[key].length > 0;
             }
           }
         });
@@ -379,9 +381,9 @@ describe('Events Form', () => {
           const fieldWrapperEl = form.querySelector(`[data-field-id="${key}"]`);
           if (fieldWrapperEl && (fieldWrapperEl.dataset.type === 'checkbox' || fieldWrapperEl.dataset.type === 'checkbox-group')) {
             const checkboxes = fieldWrapperEl.querySelectorAll('input[type="checkbox"]');
-            if (checkboxes.length === 1) {
-              // Single option checkbox - convert to boolean
-              payload[key] = payload[key] && payload[key].length > 0;
+            if (checkboxes.length === 1 && Array.isArray(payload[key]) && payload[key].length <= 1) {
+              if (BASE_ATTENDEE_DATA_FILTER[key]?.type === 'array') return;
+              payload[key] = payload[key].length > 0;
             }
           }
         });
@@ -442,9 +444,9 @@ describe('Events Form', () => {
           const fieldWrapperEl = form.querySelector(`[data-field-id="${key}"]`);
           if (fieldWrapperEl && (fieldWrapperEl.dataset.type === 'checkbox' || fieldWrapperEl.dataset.type === 'checkbox-group')) {
             const checkboxElements = fieldWrapperEl.querySelectorAll('input[type="checkbox"]');
-            if (checkboxElements.length === 1) {
-              // Single option checkbox - convert to boolean
-              payload[key] = payload[key] && payload[key].length > 0;
+            if (checkboxElements.length === 1 && Array.isArray(payload[key]) && payload[key].length <= 1) {
+              if (BASE_ATTENDEE_DATA_FILTER[key]?.type === 'array') return;
+              payload[key] = payload[key].length > 0;
             }
           }
         });
@@ -455,6 +457,318 @@ describe('Events Form', () => {
         expect(payload.interests).to.include('Design');
         expect(payload.interests).to.not.include('Marketing');
       });
+
+      it('should keep contactMethods as array when one checkbox value splits on +', () => {
+        const form = document.createElement('form');
+        const fieldWrapper = document.createElement('div');
+        fieldWrapper.setAttribute('data-field-id', 'contactMethods');
+        fieldWrapper.setAttribute('data-type', 'checkbox-group');
+        const checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        checkbox.name = 'contactMethods';
+        checkbox.value = 'email+phone';
+        checkbox.checked = true;
+        fieldWrapper.appendChild(checkbox);
+        form.appendChild(fieldWrapper);
+
+        const payload = {};
+        if (checkbox.checked) {
+          const valueList = checkbox.value.split('+').map((v) => v.trim());
+          if (valueList.length > 1) {
+            valueList.forEach((v) => {
+              payload[checkbox.name] = payload[checkbox.name] ? [...payload[checkbox.name], v] : [v];
+            });
+          } else {
+            payload[checkbox.name] = [checkbox.value];
+          }
+        } else {
+          payload[checkbox.name] = [];
+        }
+
+        Object.keys(payload).forEach((key) => {
+          const fieldWrapperEl = form.querySelector(`[data-field-id="${key}"]`);
+          if (fieldWrapperEl && (fieldWrapperEl.dataset.type === 'checkbox' || fieldWrapperEl.dataset.type === 'checkbox-group')) {
+            const checkboxes = fieldWrapperEl.querySelectorAll('input[type="checkbox"]');
+            if (checkboxes.length === 1 && Array.isArray(payload[key]) && payload[key].length <= 1) {
+              if (BASE_ATTENDEE_DATA_FILTER[key]?.type === 'array') return;
+              payload[key] = payload[key].length > 0;
+            }
+          }
+        });
+
+        expect(payload.contactMethods).to.deep.equal(['email', 'phone']);
+        expect(Array.isArray(payload.contactMethods)).to.be.true;
+      });
+
+      it('should keep contactMethods as empty array when single checkbox unchecked', () => {
+        const form = document.createElement('form');
+        const fieldWrapper = document.createElement('div');
+        fieldWrapper.setAttribute('data-field-id', 'contactMethods');
+        fieldWrapper.setAttribute('data-type', 'checkbox-group');
+        const checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        checkbox.name = 'contactMethods';
+        checkbox.value = 'email+phone';
+        checkbox.checked = false;
+        fieldWrapper.appendChild(checkbox);
+        form.appendChild(fieldWrapper);
+
+        const payload = {};
+        if (checkbox.checked) {
+          const valueList = checkbox.value.split('+').map((v) => v.trim());
+          if (valueList.length > 1) {
+            valueList.forEach((v) => {
+              payload[checkbox.name] = payload[checkbox.name] ? [...payload[checkbox.name], v] : [v];
+            });
+          } else {
+            payload[checkbox.name] = [checkbox.value];
+          }
+        } else {
+          payload[checkbox.name] = [];
+        }
+
+        Object.keys(payload).forEach((key) => {
+          const fieldWrapperEl = form.querySelector(`[data-field-id="${key}"]`);
+          if (fieldWrapperEl && (fieldWrapperEl.dataset.type === 'checkbox' || fieldWrapperEl.dataset.type === 'checkbox-group')) {
+            const checkboxes = fieldWrapperEl.querySelectorAll('input[type="checkbox"]');
+            if (checkboxes.length === 1 && Array.isArray(payload[key]) && payload[key].length <= 1) {
+              if (BASE_ATTENDEE_DATA_FILTER[key]?.type === 'array') return;
+              payload[key] = payload[key].length > 0;
+            }
+          }
+        });
+
+        expect(payload.contactMethods).to.deep.equal([]);
+      });
+    });
+  });
+
+  describe('initFormBasedOnRSVPData', () => {
+    function createStore(initialValue = null) {
+      let value = initialValue;
+      const subscribers = [];
+      return {
+        get: () => value,
+        set: (nextValue) => {
+          value = nextValue;
+          subscribers.forEach((callback) => callback({ newValue: nextValue }));
+        },
+        subscribe: (callback) => subscribers.push(callback),
+      };
+    }
+
+    async function simulateRsvpFirstInit({
+      store,
+      profile,
+      getAttendee,
+      personalizeForm,
+      showSuccess,
+    }) {
+      const validRegistrationStatus = ['registered', 'waitlisted'];
+      const isRegistered = (rsvpData = store.get()) => validRegistrationStatus.includes(rsvpData?.registrationStatus);
+      store.subscribe(({ newValue }) => {
+        if (isRegistered(newValue)) showSuccess();
+      });
+
+      if (isRegistered()) {
+        showSuccess();
+        return;
+      }
+
+      if (profile.account_type !== 'guest') {
+        await getAttendee();
+        if (isRegistered()) {
+          showSuccess();
+          return;
+        }
+        personalizeForm();
+      }
+    }
+
+    it('subscribes early enough to catch RSVP during attendee request', async () => {
+      const store = createStore(null);
+      const personalizeForm = sinon.stub();
+      const showSuccess = sinon.stub();
+
+      let resolveAttendee;
+      const getAttendee = sinon.stub().returns(new Promise((resolve) => {
+        resolveAttendee = resolve;
+      }));
+
+      const initPromise = simulateRsvpFirstInit({
+        store,
+        profile: { account_type: 'type1' },
+        getAttendee,
+        personalizeForm,
+        showSuccess,
+      });
+
+      store.set({ registrationStatus: 'registered' });
+      resolveAttendee();
+      await initPromise;
+
+      expect(showSuccess.called).to.be.true;
+      expect(personalizeForm.called).to.be.false;
+    });
+
+    it('personalizes for non-registered users once attendee data resolves', async () => {
+      const store = createStore(null);
+      const personalizeForm = sinon.stub();
+      const showSuccess = sinon.stub();
+      const getAttendee = sinon.stub().resolves({});
+
+      await simulateRsvpFirstInit({
+        store,
+        profile: { account_type: 'type1' },
+        getAttendee,
+        personalizeForm,
+        showSuccess,
+      });
+
+      expect(showSuccess.called).to.be.false;
+      expect(personalizeForm.calledOnce).to.be.true;
+    });
+  });
+
+  describe('getFullState and buildErrorMsg (campaign-aware 400)', () => {
+    let sandbox;
+    let originalHref;
+    let getFullState;
+    let buildErrorMsg;
+
+    before(async () => {
+      const module = await import('../../../../event-libs/v1/blocks/events-form/events-form.js');
+      getFullState = module.getFullState;
+      buildErrorMsg = module.buildErrorMsg;
+    });
+
+    beforeEach(() => {
+      sandbox = sinon.createSandbox();
+      originalHref = window.location.href;
+      window.adobeIMS = window.adobeIMS || { getAccessToken: () => ({ token: 'test-token' }) };
+    });
+
+    afterEach(() => {
+      sandbox.restore();
+      window.history.replaceState({}, '', originalHref);
+    });
+
+    function stubFetchByUrl(eventResponse, campaignResponse = null) {
+      sandbox.stub(window, 'fetch').callsFake((url) => {
+        if (typeof url === 'string' && url.includes('/campaigns/')) {
+          return Promise.resolve(campaignResponse != null ? campaignResponse : { json: () => ({}), ok: false, status: 404 });
+        }
+        return Promise.resolve(eventResponse);
+      });
+    }
+
+    it('getFullState returns event-based full when no campaign in URL', async () => {
+      stubFetchByUrl({
+        json: () => ({
+          isFull: true,
+          allowWaitlisting: false,
+          attendeeCount: 100,
+          attendeeLimit: 100,
+        }),
+        ok: true,
+      });
+      const state = await getFullState('test-event-id');
+      expect(state.full).to.be.true;
+      expect(state.usedCampaign).to.be.false;
+      expect(state.waitlistEnabled).to.be.false;
+    });
+
+    it('getFullState returns campaign-based full when campaign in URL and campaign full', async () => {
+      window.history.replaceState({}, '', `${originalHref.split('?')[0]}?campaign=camp-1`);
+      stubFetchByUrl(
+        {
+          json: () => ({
+            isFull: false,
+            allowWaitlisting: true,
+            attendeeCount: 50,
+            attendeeLimit: 100,
+          }),
+          ok: true,
+        },
+        {
+          json: () => ({
+            campaignId: 'camp-1',
+            attendeeLimit: 100,
+            attendeeCount: 100,
+            waitlistAttendeeCount: 0,
+          }),
+          ok: true,
+        },
+      );
+      const state = await getFullState('test-event-id');
+      expect(state.full).to.be.true;
+      expect(state.usedCampaign).to.be.true;
+      expect(state.waitlistEnabled).to.be.true;
+    });
+
+    it('getFullState falls back to event when campaign in URL but getCampaign fails', async () => {
+      window.history.replaceState({}, '', `${originalHref.split('?')[0]}?campaign=camp-1`);
+      stubFetchByUrl(
+        {
+          json: () => ({
+            isFull: true,
+            allowWaitlisting: false,
+            attendeeCount: 100,
+            attendeeLimit: 100,
+          }),
+          ok: true,
+        },
+        { json: () => ({ message: 'Not found' }), ok: false, status: 404 },
+      );
+      const state = await getFullState('test-event-id');
+      expect(state.full).to.be.true;
+      expect(state.usedCampaign).to.be.false;
+    });
+
+    it('buildErrorMsg uses campaign-full error key when status 400 and campaign full', async () => {
+      window.history.replaceState({}, '', `${originalHref.split('?')[0]}?campaign=camp-1`);
+      stubFetchByUrl(
+        {
+          json: () => ({
+            isFull: false,
+            allowWaitlisting: true,
+            attendeeCount: 50,
+            attendeeLimit: 100,
+          }),
+          ok: true,
+        },
+        {
+          json: () => ({
+            campaignId: 'camp-1',
+            attendeeLimit: 100,
+            attendeeCount: 100,
+            waitlistAttendeeCount: 0,
+          }),
+          ok: true,
+        },
+      );
+      const form = document.createElement('form');
+      await buildErrorMsg(form, 400);
+      const errorEl = form.querySelector('.error');
+      expect(errorEl).to.not.be.null;
+      expect(errorEl.textContent).to.equal('campaign-full-error-msg');
+    });
+
+    it('buildErrorMsg uses event-full error key when status 400 and no campaign in URL', async () => {
+      stubFetchByUrl({
+        json: () => ({
+          isFull: true,
+          allowWaitlisting: false,
+          attendeeCount: 100,
+          attendeeLimit: 100,
+        }),
+        ok: true,
+      });
+      const form = document.createElement('form');
+      await buildErrorMsg(form, 400);
+      const errorEl = form.querySelector('.error');
+      expect(errorEl).to.not.be.null;
+      expect(errorEl.textContent).to.equal('event-full-no-waitlist-error-msg');
     });
   });
 });
