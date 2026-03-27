@@ -85,12 +85,27 @@ async function decorateSocialIcons(cardContainer, socialLinks) {
 
   const svgEls = await getSVGsfromFile(svgPath, SUPPORTED_PLATFORMS);
   if (!svgEls || svgEls.length === 0) return;
-  socialLinks.forEach((link) => {
-    if (!link || !(link instanceof HTMLAnchorElement)) return;
+
+  (socialLinks || []).forEach((entry) => {
+    let href = '';
+    let sourceAnchor = null;
+    let metadataEntry = null;
+
+    if (entry instanceof HTMLAnchorElement) {
+      sourceAnchor = entry;
+      href = entry.href;
+    } else if (typeof entry === 'string' && entry.trim()) {
+      href = entry.trim();
+    } else if (entry && typeof entry === 'object' && typeof entry.link === 'string' && entry.link.trim()) {
+      metadataEntry = entry;
+      href = entry.link.trim();
+    } else {
+      return;
+    }
 
     let platform = 'web'; // Default fallback
     try {
-      const url = new URL(link.href);
+      const url = new URL(href);
       const hostname = url.hostname.toLowerCase();
 
       // Find the platform by testing against regex patterns
@@ -108,10 +123,21 @@ async function decorateSocialIcons(cardContainer, socialLinks) {
     const li = createTag('li', { class: 'card-social-icon' });
     const icon = createSocialIcon(svgEl.svg, platform);
 
-    const a = link.cloneNode(true);
-    a.setAttribute('target', '_blank');
-    a.setAttribute('rel', 'noopener noreferrer');
-    a.textContent = '';
+    let a;
+    if (sourceAnchor) {
+      a = sourceAnchor.cloneNode(true);
+      a.setAttribute('target', '_blank');
+      a.setAttribute('rel', 'noopener noreferrer');
+      a.textContent = '';
+    } else {
+      const ariaLabel = metadataEntry?.serviceName || platform;
+      a = createTag('a', {
+        href,
+        target: '_blank',
+        rel: 'noopener noreferrer',
+        'aria-label': ariaLabel,
+      });
+    }
 
     a.append(icon);
     li.append(a);
@@ -148,7 +174,7 @@ function decorateContent(cardContainer, data) {
 
   contentContainer.append(textContainer);
 
-  decorateSocialIcons(contentContainer, data.socialLinks);
+  decorateSocialIcons(contentContainer, data.socialLinks || data.socialMedia || []);
 
   cardContainer.append(contentContainer);
 }

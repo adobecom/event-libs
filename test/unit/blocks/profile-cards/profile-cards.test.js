@@ -5,6 +5,14 @@ import init, { createSocialIcon } from '../../../../event-libs/v1/blocks/profile
 const head = await readFile({ path: './mocks/head.html' });
 const body = await readFile({ path: './mocks/default.html' });
 
+async function waitForSocialIcons(el, timeoutMs = 5000) {
+  const start = Date.now();
+  while (Date.now() - start < timeoutMs) {
+    if (el.querySelector('.card-social-icons a')) return;
+    await new Promise((r) => setTimeout(r, 20));
+  }
+}
+
 describe('Profile Cards Module', () => {
   describe('init', () => {
     beforeEach(() => {
@@ -43,6 +51,15 @@ describe('Profile Cards Module', () => {
       expect(el).to.not.be.null;
       expect(hostCards).to.have.lengthOf(1);
       expect(el.classList.contains('single')).to.be.true;
+    });
+
+    it('should render social icons for metadata-driven speakers', async () => {
+      const el = document.querySelector('#speakers-cards');
+      init(el);
+      await waitForSocialIcons(el);
+
+      const socialAnchors = el.querySelectorAll('.card-social-icons a');
+      expect(socialAnchors.length).to.be.greaterThan(0);
     });
 
     it('show remove block if no related profile types found', () => {
