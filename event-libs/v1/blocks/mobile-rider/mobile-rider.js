@@ -15,401 +15,361 @@ const CONFIG = {
     VIDEO_ID: 'idPlayer',
     VIDEO_CLASS: 'mobileRider_viewport',
   },
-  ASL: {
-    TOGGLE_CLASS: 'isASL',
-    BUTTON_ID: 'asl-button',
-    CHECK_INTERVAL: 100,
-    MAX_CHECKS: 50,
-  },
-  API: {
-    PROD_URL: 'https://overlay-admin-integration.mobilerider.com',
-    DEV_URL: 'https://overlay-admin-integration.mobilerider.com',
-  },
+  ASL: { TOGGLE_CLASS: 'isASL', BUTTON_ID: 'asl-button', CHECK_INTERVAL: 100, MAX_CHECKS: 50 },
+  STORE: { ATTACH_RETRIES: 20, ATTACH_INTERVAL_MS: 5 },
+};
+
+/** * UTILITIES */
+const getEnv = () => getEventConfig()?.miloConfig?.env?.name || 'prod';
+const isProd = () => getEnv() === 'prod';
+const toBool = (v) => {
+  if (typeof v !== 'string') return v;
+  const s = v.trim().toLowerCase();
+  if (s === 'true') return true;
+  if (s === 'false') return false;
+  return v;
 };
 
 let scriptPromise = null;
-
 async function loadScript() {
-  if (window.mobilerider) return null;
-  if (scriptPromise) return scriptPromise;
-
-  scriptPromise = new Promise((res) => {
-    const eventConfig = getEventConfig();
-    const env = eventConfig?.miloConfig?.miloLibs?.env || 'prod';
-    const isProd = env === 'prod';
-    const src = isProd ? CONFIG.SCRIPTS.PROD_URL : CONFIG.SCRIPTS.DEV_URL;
-    const s = createTag('script', { src });
-    s.onload = res;
-    document.head.appendChild(s);
-  });
-
+  if (window.mobilerider) return;
+  if (!scriptPromise) {
+    const src = isProd() ? CONFIG.SCRIPTS.PROD_URL : CONFIG.SCRIPTS.DEV_URL;
+    scriptPromise = new Promise((res, rej) => {
+      const s = createTag('script', { src, async: true }, '', { parent: document.head });
+      s.onload = res;
+      s.onerror = () => { scriptPromise = null; rej(new Error('Script Load Fail')); };
+    });
+  }
   return scriptPromise;
 }
 
 class MobileRider {
   constructor(el) {
     this.el = el;
-    this.cfg = null;
-    this.wrap = null;
-    this.root = null;
-    this.store = null;
-    this.mainID = null;
+    this.isEmbedding = false;
     this.init();
   }
 
-  async init() {
+  log(msg) { window.lana?.log?.(`[MobileRider] ${msg}`); }
+
+  #storeHas(id) {
+    if (!this.store || !id) return false;
     try {
-      scriptPromise = loadScript();
-      const storePromise = this.el.closest('.chrono-box')
-        ? (() => {
-            const pluginUrl = new URL('../../features/timing-framework/plugins/mobile-rider/plugin.js', import.meta.url);
-            return import(pluginUrl.href);
-          })().then(({ mobileRiderStore }) => {
-            this.store = mobileRiderStore;
-          })
-          .catch((e) => {
-            window.lana?.log(`Failed to import mobileRiderStore: ${e.message}`);
-          })
-        : null;
-
-      await scriptPromise;
-      if (storePromise) await storePromise;
-      this.cfg = this.parseCfg();
-      const { container, wrapper } = this.createDOM();
-      this.root = container;
-      this.wrap = wrapper;
-
-      const isConcurrent = this.cfg.concurrentenabled;
-      const videos = isConcurrent ? this.cfg.concurrentVideos : [this.cfg];
-
-      const { videoid, aslid } = videos[0];
-      if (!videoid) {
-        window.lana?.log('Missing video-id in config.');
-        return;
-      }
-
-      // Set mainID for concurrent streams
-      if (isConcurrent && this.store) {
-        this.mainID = videos[0].videoid;
-      }
-
-      await this.loadPlayer(videoid, aslid);
-      if (isConcurrent && videos.length > 1) await this.initDrawer(videos);
+      return this.store.get(id) != null;
     } catch (e) {
-      window.lana?.log(`MobileRider Init error: ${e.message}`);
-    }
-  }
-
-  async loadPlayer(vid, asl) {
-    try {
-      this.injectPlayer(vid, this.cfg.skinid, asl);
-    } catch (e) {
-      window.lana?.log(`Failed to initialize the player: ${e.message}`);
-    }
-  }
-
-  extractPlayerOverrides() {
-    const overrides = {};
-    Object.keys(CONFIG.PLAYER.DEFAULT_OPTIONS).forEach((key) => {
-      if (key in this.cfg) {
-        const val = this.cfg[key];
-        overrides[key] = String(val).toLowerCase() === 'true';
-      }
-    });
-    return overrides;
-  }
-
-  getPlayerOptions() {
-    return {
-      ...CONFIG.PLAYER.DEFAULT_OPTIONS,
-      ...this.extractPlayerOverrides(),
-    };
-  }
-
-  injectPlayer(vid, skin, asl = null) {
-    if (!this.wrap) return;
-
-    let con = this.wrap.querySelector('.mobile-rider-container');
-    if (!con) {
-      con = createTag('div', {
-        class: 'mobile-rider-container is-hidden',
-        id: CONFIG.PLAYER.CONTAINER_ID,
-        'data-videoid': vid,
-        'data-skinid': skin,
-        'data-aslid': asl,
-      });
-      this.wrap.appendChild(con);
-    } else {
-      Object.assign(con.dataset, { videoid: vid, skinid: skin, aslid: asl });
-    }
-
-    window.__mr_player?.dispose();
-    con.querySelector(`#${CONFIG.PLAYER.VIDEO_ID}`)?.remove();
-
-    const video = createTag('video', {
-      id: CONFIG.PLAYER.VIDEO_ID,
-      class: CONFIG.PLAYER.VIDEO_CLASS,
-      controls: true,
-    });
-    con.appendChild(video);
-
-    if (!window.mobilerider) return;
-    window.mobilerider.embed(video.id, vid, skin, {
-      ...this.getPlayerOptions(),
-      analytics: { provider: CONFIG.ANALYTICS.PROVIDER },
-      identifier1: vid,
-      identifier2: asl,
-      sessionId: vid,
-    });
-
-    if (asl) this.initASL();
-    // Check store existence first, then check mainID or vid in store
-    if (this.store) {
-      let key = null;
-      if (this.mainID && this.store.get(this.mainID) !== undefined) {
-        key = this.mainID;
-      } else if (this.store.get(vid) !== undefined) {
-        key = vid;
-      }
-
-      if (key) this.onStreamEnd(vid);
-    }
-    con.classList.remove('is-hidden');
-  }
-
-  onStreamEnd(vid) {
-    window.__mr_player?.off('streamend');
-    window.__mr_player?.on('streamend', () => {
-      this.setStatus(vid, false);
-      MobileRider.dispose();
-    });
-  }
-
-  static dispose() {
-    window.__mr_player?.dispose();
-    window.__mr_player = null;
-    window.__mr_stream_published = null;
-  }
-
-  static loadDrawerCSS() {
-    // Check if drawer CSS is already loaded
-    if (document.querySelector('link[href*="drawer.css"]')) return;
-
-    // Load drawer CSS dynamically
-    const link = document.createElement('link');
-    link.rel = 'stylesheet';
-    link.href = DRAWER_CSS_URL;
-    document.head.appendChild(link);
-  }
-
-  drawerHeading() {
-    const title = this.cfg.drawertitle || 'Now Playing';
-    const subtitle = this.cfg.drawersubtitle || 'Select a live session';
-
-    const header = createTag('div', { class: 'now-playing-header' });
-    header.innerHTML = `
-      <p class="now-playing-title">${title}</p>
-      <span class="now-playing-subtitle">${subtitle}</span>
-    `;
-    return header;
-  }
-
-  async initDrawer(videos) {
-    try {
-      // Load drawer CSS dynamically
-      MobileRider.loadDrawerCSS();
-      const { default: createDrawer } = await import('./drawer.js');
-
-      const renderItem = (v) => {
-        const item = createTag('div', {
-          class: 'drawer-item',
-          'data-id': v.videoid,
-          role: 'button',
-          tabindex: '0',
-        });
-
-        if (v.thumbnail) {
-          const thumbImg = createTag('div', { class: 'drawer-item-thumbnail' });
-          thumbImg.appendChild(createTag('img', { src: v.thumbnail, alt: v.title || 'video thumbnail' }));
-          item.appendChild(thumbImg);
-        }
-
-        const vidCon = createTag('div', { class: 'drawer-item-content' });
-        if (v.title) vidCon.appendChild(createTag('div', { class: 'drawer-item-title' }, v.title));
-        if (v.description) vidCon.appendChild(createTag('div', { class: 'drawer-item-description' }, v.description));
-        item.appendChild(vidCon);
-
-        return item;
-      };
-
-      const drawer = createDrawer(this.root, {
-        items: videos,
-        ariaLabel: 'Videos',
-        renderItem,
-        onItemClick: (_, v) => this.onDrawerClick(v),
-      });
-
-      const itemsList = drawer?.itemsEl;
-      if (itemsList?.firstChild) {
-        itemsList.insertBefore(this.drawerHeading(), itemsList.firstChild);
-      }
-    } catch (e) {
-      window.lana?.log(`Drawer load failed: ${e.message}`);
-    }
-  }
-
-  async onDrawerClick(v) {
-    try {
-      if (this.store) {
-        const live = await this.checkLive(v);
-        if (!live) window.lana?.log(`This stream is not currently live: ${v.videoid}`);
-      }
-      this.injectPlayer(v.videoid, this.cfg.skinid, v.aslid);
-    } catch (e) {
-      window.lana?.log(`Drawer item click error: ${e.message}`);
-    }
-  }
-
-  static async getMediaStatus(id) {
-    try {
-      const eventConfig = getEventConfig();
-      const env = eventConfig?.miloConfig?.miloLibs?.env || 'prod';
-      const isLowerEnv = env !== 'prod';
-      const baseUrl = isLowerEnv ? CONFIG.API.DEV_URL : CONFIG.API.PROD_URL;
-      const res = await fetch(`${baseUrl}/api/media-status?ids=${id}`);
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.message || 'Failed to get media status');
-      }
-      return res.json();
-    } catch (e) {
-      window.lana?.log(`getMediaStatus error: ${e.message}`);
-      throw e;
-    }
-  }
-
-  async checkLive(v) {
-    if (!v?.videoid) return false;
-    try {
-      // Use mainID if available, otherwise use the provided video ID
-      const videoIDToCheck = this.mainID || v.videoid;
-
-      const { active } = await MobileRider.getMediaStatus(videoIDToCheck);
-      const isActive = active.includes(videoIDToCheck);
-
-      // Only update store if status has actually changed
-      this.setStatus(v.videoid, isActive);
-      return isActive;
-    } catch (e) {
-      window.lana?.log?.(`checkLive failed: ${e.message}`);
       return false;
     }
   }
 
-  setStatus(id, live) {
-    if (!id || !this.store) return;
+  async init() {
+    try {
+      this.cfg = this.#parseCfg();
+      await Promise.all([loadScript(), this.el.closest('.chrono-box') ? this.#loadStore() : null]);
+
+      this.#setupDOM();
+      const videos = this.cfg.concurrentenabled ? this.#parseConcurrent(this.cfg) : [this.cfg];
+      this.allVideos = videos;
+
+      const selected = await this.#selectInitialVideo(videos);
+      if (this.cfg.concurrentenabled && this.store) this.mainID = videos[0].videoid;
+
+      await this.injectPlayer(selected.videoid, this.cfg.skinid, selected.aslid);
+
+      if (this.cfg.concurrentenabled && videos.length > 1) {
+        await this.#initDrawer(videos, selected.videoid);
+      }
+    } catch (e) { this.log(e.message); }
+  }
+
+  #setupDOM() {
+    this.root = this.el.querySelector('.mobile-rider-player')
+      || createTag('div', { class: 'mobile-rider-player' }, '', { parent: this.el });
+
+    this.wrap = this.root.querySelector('.video-wrapper')
+      || createTag('div', { class: 'video-wrapper' }, '', { parent: this.root });
+  }
+
+  async injectPlayer(vid, skin, asl = null) {
+    if (!this.wrap || this.isEmbedding) return;
+    this.isEmbedding = true;
+
+    const finish = () => {
+      setTimeout(() => { this.isEmbedding = false; }, 100);
+    };
 
     try {
-      let storeKey = null;
-
-      if (this.mainID && this.store.get(this.mainID) !== undefined) {
-        storeKey = this.mainID;
-      } else if (this.store.get(id) !== undefined) {
-        storeKey = id;
+      if (window.__mr_player) {
+        try { window.__mr_player.dispose?.(); } catch (e) { /* ignore */ }
+        window.__mr_player = null;
       }
 
-      if (!storeKey) return;
+      this.wrap.innerHTML = '';
 
-      const currentStatus = this.store.get(storeKey);
-      if (currentStatus !== live) {
-        this.store.set(storeKey, live);
-        window.lana?.log?.(`Status updated for ${storeKey}: ${live}`);
-      }
+      const container = createTag('div', {
+        class: 'mobile-rider-container',
+        id: CONFIG.PLAYER.CONTAINER_ID,
+        'data-videoid': vid,
+      }, '', { parent: this.wrap });
+
+      createTag('video', {
+        id: CONFIG.PLAYER.VIDEO_ID,
+        class: CONFIG.PLAYER.VIDEO_CLASS,
+        controls: true,
+        playsinline: '',
+        poster: this.cfg.poster || this.cfg.thumbnail || '',
+      }, '', { parent: container });
+
+      requestAnimationFrame(() => {
+        const videoInDoc = document.getElementById(CONFIG.PLAYER.VIDEO_ID);
+
+        if (!videoInDoc || !window.mobilerider) {
+          this.log('DOM or Library not ready');
+          finish();
+          return;
+        }
+
+        try {
+          window.mobilerider.embed(videoInDoc.id, vid, skin, {
+            ...CONFIG.PLAYER.DEFAULT_OPTIONS,
+            ...this.#getOverrides(),
+            analytics: { provider: CONFIG.ANALYTICS.PROVIDER },
+            identifier1: vid,
+            identifier2: asl || '',
+            sessionId: vid,
+          });
+
+          if (asl) this.#initASL(container);
+          this.#maybeAttachEndListener(vid);
+        } catch (e) {
+          this.log(`Embed Error: ${e.message}`);
+        }
+
+        finish();
+      });
     } catch (e) {
-      window.lana?.log?.(`setStatus error for ${this.mainID || id}: ${e.message}`);
+      this.log(`Inject Error: ${e.message}`);
+      finish();
     }
   }
 
-  initASL() {
-    const con = this.wrap?.querySelector('.mobile-rider-container');
-    if (!con) return;
-
-    let attempts = 0;
-    const check = () => {
-      const btn = con.querySelector(`#${CONFIG.ASL.BUTTON_ID}`);
-      if (btn) {
-        this.setupASL(btn, con);
-        return;
-      }
-      attempts += 1;
-      if (attempts < CONFIG.ASL.MAX_CHECKS) setTimeout(check, CONFIG.ASL.CHECK_INTERVAL);
-    };
-    check();
+  #getOverrides() {
+    return Object.keys(CONFIG.PLAYER.DEFAULT_OPTIONS).reduce((acc, k) => {
+      if (k in this.cfg) acc[k] = toBool(this.cfg[k]);
+      return acc;
+    }, {});
   }
 
-  setupASL(btn, con) {
-    btn.addEventListener('click', () => {
-      if (!con.classList.contains(CONFIG.ASL.TOGGLE_CLASS)) {
-        con.classList.add(CONFIG.ASL.TOGGLE_CLASS);
-        this.initASL();
+  #maybeAttachEndListener(vid) {
+    const tryAttach = () => {
+      const mainTracked = this.#storeHas(this.mainID);
+      const vidTracked = this.#storeHas(vid);
+      if (mainTracked || vidTracked) {
+        this.#attachEndListener(vid);
+        return true;
       }
+      return false;
+    };
+
+    if (tryAttach()) return;
+
+    // Retry a bit: supports tests where instance.store is assigned after init()
+    let attempts = 0;
+    const tick = () => {
+      attempts += 1;
+      if (tryAttach()) return;
+      if (attempts >= CONFIG.STORE.ATTACH_RETRIES) return;
+      setTimeout(tick, CONFIG.STORE.ATTACH_INTERVAL_MS);
+    };
+    setTimeout(tick, 0);
+  }
+
+  #attachEndListener(vid) {
+    // Avoid stacking listeners
+    window.__mr_player?.off?.('streamend');
+    window.__mr_player?.on?.('streamend', () => {
+      if (this.drawer) {
+        this.drawer.remove();
+        this.drawer = null;
+      }
+
+      if (this.store) this.setStatus(vid, false);
+
+      window.__mr_player?.dispose?.();
+      window.__mr_player = null;
     });
   }
 
-  createDOM() {
-    let root = this.el.querySelector('.mobile-rider-player');
-    if (!root) {
-      root = createTag('div', { class: 'mobile-rider-player' });
-      this.el.appendChild(root);
-    }
+  async #selectInitialVideo(videos) {
+    const urlIdxRaw = new URLSearchParams(window.location.search).get('video');
+    const urlIdx = urlIdxRaw ? parseInt(urlIdxRaw, 10) : null;
+    if (urlIdx && videos[urlIdx - 1]) return videos[urlIdx - 1];
 
-    let wrap = root.querySelector('.video-wrapper');
-    if (!wrap) {
-      wrap = createTag('div', { class: 'video-wrapper' });
-      root.appendChild(wrap);
+    const sessionTitle = sessionStorage?.getItem('concurrentVideoTitle');
+    if (sessionTitle) {
+      const found = videos.find((v) => v.title?.trim() === sessionTitle.trim());
+      if (found) {
+        sessionStorage.removeItem('concurrentVideoTitle');
+        return found;
+      }
     }
-
-    return { container: root, wrapper: wrap };
+    return videos[0];
   }
 
-  parseCfg() {
-    const meta = Object.fromEntries(
-      [...this.el.querySelectorAll(':scope > div > div:first-child')].map((div) => [
-        div.textContent.trim().toLowerCase().replace(/ /g, '-'),
-        div.nextElementSibling?.textContent?.trim() || '',
-      ]),
-    );
-
-    if (meta.concurrentenabled === 'true') {
-      meta.concurrentenabled = true;
-      meta.concurrentVideos = MobileRider.parseConcurrent(meta);
+  async #initDrawer(videos, activeId) {
+    if (!document.querySelector('link[href*="drawer.css"]')) {
+      createTag('link', { rel: 'stylesheet', href: DRAWER_CSS_URL }, '', { parent: document.head });
     }
-
-    return meta;
+    const { default: createDrawer } = await import('./drawer.js');
+    this.drawer = createDrawer(this.root, {
+      items: videos,
+      renderItem: (v) => this.#renderDrawerItem(v),
+      onItemClick: (_el, v) => this.#activateVideo(v),
+    });
+    this.drawer?.setActiveById?.(activeId);
   }
 
-  static parseConcurrent(meta) {
-    const keys = Object.keys(meta)
+  #activateVideo(v) {
+    const idx = this.allVideos.indexOf(v) + 1;
+    const url = new URL(window.location.href);
+    if (idx === 1) url.searchParams.delete('video');
+    else url.searchParams.set('video', String(idx));
+    if (url.toString() !== window.location.href) window.history.replaceState({}, '', url.toString());
+    this.injectPlayer(v.videoid, this.cfg.skinid, v.aslid);
+  }
+
+  #renderDrawerItem(v) {
+    const item = createTag('div', { class: 'drawer-item', 'data-id': v.videoid, role: 'button', tabindex: '0' });
+    if (v.thumbnail) {
+      const thumb = createTag('div', { class: 'drawer-item-thumbnail' }, '', { parent: item });
+      createTag('img', { src: v.thumbnail }, '', { parent: thumb });
+    }
+    const content = createTag('div', { class: 'drawer-item-content' }, '', { parent: item });
+    createTag('div', { class: 'drawer-item-title' }, v.title || '', { parent: content });
+    createTag('div', { class: 'drawer-item-description' }, v.description || '', { parent: content });
+    return item;
+  }
+
+  #initASL(container) {
+    let attempts = 0;
+    const check = setInterval(() => {
+      const btn = container.querySelector(`#${CONFIG.ASL.BUTTON_ID}`);
+      if (btn || ++attempts > CONFIG.ASL.MAX_CHECKS) {
+        clearInterval(check);
+        btn?.addEventListener('click', () => {
+          if (!container.classList.contains(CONFIG.ASL.TOGGLE_CLASS)) {
+            container.classList.add(CONFIG.ASL.TOGGLE_CLASS);
+          }
+        });
+      }
+    }, CONFIG.ASL.CHECK_INTERVAL);
+  }
+
+  #parseCfg() {
+    if (this.el.dataset.extractedVideoId) {
+      return {
+        videoid: this.el.dataset.extractedVideoId,
+        skinid: this.el.dataset.extractedSkinId || '',
+        autoplay: toBool(this.el.dataset.extractedAutoplay || 'true'),
+        poster: this.el.dataset.extractedThumbnail || '',
+        concurrentenabled: false,
+      };
+    }
+
+    return [...this.el.querySelectorAll(':scope > div > div:first-child')].reduce((acc, div) => {
+      const key = div.textContent.trim().toLowerCase().replace(/ /g, '-');
+      acc[key] = toBool(div.nextElementSibling?.textContent?.trim() || '');
+      return acc;
+    }, {});
+  }
+
+  #parseConcurrent(meta) {
+    const matches = Object.keys(meta)
       .filter((k) => k.startsWith('concurrentvideoid'))
       .map((k) => k.replace('concurrentvideoid', ''));
 
-    const uniq = [...new Set(keys)].sort((a, b) => Number(a) - Number(b));
-
-    return uniq.map((i) => ({
-      videoid: meta[`concurrentvideoid${i}`] || '',
-      aslid: meta[`concurrentaslid${i}`] || '',
-      title: meta[`concurrenttitle${i}`] || '',
-      description: meta[`concurrentdescription${i}`] || '',
-      thumbnail: meta[`concurrentthumbnail${i}`] || '',
+    return [...new Set(matches)].sort((a, b) => Number(a) - Number(b)).map((i) => ({
+      videoid: meta[`concurrentvideoid${i}`],
+      aslid: meta[`concurrentaslid${i}`],
+      title: meta[`concurrenttitle${i}`],
+      description: meta[`concurrentdescription${i}`],
+      thumbnail: meta[`concurrentthumbnail${i}`],
     }));
   }
-}
 
-export default function init(el) {
-  try {
-    return new MobileRider(el);
-  } catch (e) {
-    window.lana?.log(`Mobile Rider init failed: ${e.message}`);
-    return null;
+  async #loadStore() {
+    try {
+      const { mobileRiderStore } = await import(
+        new URL('../../features/timing-framework/plugins/mobile-rider/plugin.js', import.meta.url).href,
+      );
+      this.store = mobileRiderStore;
+    } catch (e) { this.log('Store Fail'); }
+  }
+
+  setStatus(id, live) { this.#updateStatus(id, live); }
+
+  #updateStatus(id, live) {
+    if (!this.store) return;
+
+    const key = this.#storeHas(this.mainID)
+      ? this.mainID
+      : (this.#storeHas(id) ? id : null);
+
+    if (!key) return;
+
+    try {
+      if (this.store.get(key) === live) return;
+      this.store.set(key, live);
+    } catch (e) {
+      this.log(`Status update failed: ${e.message}`);
+    }
   }
 }
+
+/**
+ * URL/Anchor Helpers
+ */
+function extractVideoParamsFromHref(anchor) {
+  try {
+    const href = anchor.getAttribute('href');
+    if (!href) return null;
+    const url = new URL(href, window.location.href);
+
+    const videoId = url.searchParams.get('videoId')
+      || url.searchParams.get('id')
+      || url.pathname.split('/').pop();
+
+    if (!videoId || videoId.includes('.html')) return null;
+
+    return {
+      videoId,
+      skinId: url.searchParams.get('skinId'),
+      autoplay: url.searchParams.get('autoplay'),
+      thumbnail: url.searchParams.get('thumbnail'),
+    };
+  } catch (e) { return null; }
+}
+
+function handleAnchorElement(anchor) {
+  if (anchor.tagName !== 'A' || !anchor.classList.contains('link-block')) return anchor;
+
+  const params = extractVideoParamsFromHref(anchor);
+  if (!params || !params.videoId) return anchor;
+
+  const mobileRiderDiv = createTag('div', { class: 'mobile-rider' });
+
+  mobileRiderDiv.dataset.extractedVideoId = params.videoId;
+  if (params.skinId) mobileRiderDiv.dataset.extractedSkinId = params.skinId;
+  if (params.autoplay) mobileRiderDiv.dataset.extractedAutoplay = params.autoplay;
+  if (params.thumbnail) mobileRiderDiv.dataset.extractedThumbnail = params.thumbnail;
+
+  anchor.insertAdjacentElement('afterend', mobileRiderDiv);
+  anchor.remove();
+
+  return mobileRiderDiv;
+}
+
+export default (el) => {
+  const processedEl = handleAnchorElement(el);
+  return new MobileRider(processedEl);
+};
