@@ -15,7 +15,8 @@ import {
   registerForSessionTime,
 } from '../../utils/esp-controller.js';
 
-const PREVIEW_LEN = 120;
+const CALENDAR_ICON = '<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" xmlns="http://www.w3.org/2000/svg"><rect x="1" y="3" width="14" height="12" rx="1.5" ry="1.5"/><path d="M1 7h14M5 1v4M11 1v4"/></svg>';
+const PIN_ICON = '<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" xmlns="http://www.w3.org/2000/svg"><path d="M8 14s-5-4.686-5-8a5 5 0 0 1 10 0c0 3.314-5 8-5 8z"/><circle cx="8" cy="6" r="2"/></svg>';
 
 // ─── Module-level state singleton ──────────────────────────────────────────
 
@@ -90,6 +91,12 @@ function debounce(fn, delay) {
   };
 }
 
+function createIcon(svgString) {
+  const span = createTag('span', { class: 'sc-icon', 'aria-hidden': 'true' });
+  span.innerHTML = svgString;
+  return span;
+}
+
 // ─── Social icon platform detection ─────────────────────────────────────────
 
 function detectPlatform(href) {
@@ -104,11 +111,8 @@ function detectPlatform(href) {
 
 // ─── Data loading ────────────────────────────────────────────────────────────
 
-async function resolveEventData(el) {
-  const existing = BlockMediator.get('eventData');
-  if (existing?.eventId) return existing;
-
-  const eventId = el.dataset.eventId || getMetadata('event-id');
+async function resolveEventData() {
+  const eventId = getMetadata('event-id');
   if (!eventId) return null;
 
   const resp = await getEvent(eventId);
@@ -264,12 +268,10 @@ function renderCTAGroup(session, isEventRegistered) {
   } else if (!session.isRegistered) {
     group.append(createTag('button', { class: 'sc-btn sc-btn-register-session', type: 'button' }, 'Register for session'));
   } else {
-    group.append(createTag('button', {
-      class: 'sc-btn sc-btn-cal',
-      type: 'button',
-      'aria-label': 'Download to calendar',
-    }, '⬇ Calendar'));
-    group.append(createTag('span', { class: 'sc-registered-badge' }, 'Registered'));
+    const calBtn = createTag('button', { class: 'sc-btn sc-btn-cal', type: 'button' });
+    calBtn.append(createIcon(CALENDAR_ICON), ' Download to calendar');
+    group.append(calBtn);
+    group.append(createTag('span', { class: 'sc-registered-badge' }, '\u2713 Registered'));
   }
 
   return group;
@@ -325,36 +327,48 @@ function renderSessionCard(session, isEventRegistered) {
     'data-session-id': session.sessionId,
   });
 
-  const body = createTag('div', { class: 'sc-card-body' });
+  // Expand/collapse toggle (absolute, top-right)
+  card.append(createTag('button', {
+    class: 'sc-expand-btn',
+    type: 'button',
+    'aria-label': 'Expand session',
+  }, '+'));
 
-  // Header (click to expand)
-  const header = createTag('div', { class: 'sc-card-header' });
-  header.append(createTag('h3', { class: 'sc-card-title' }, session.title));
-  if (timeStr) header.append(createTag('div', { class: 'sc-card-time' }, timeStr));
+  // ── Left column ──────────────────────────────────────────────────────────
+  const left = createTag('div', { class: 'sc-card-left' });
 
-  // Meta row: location + tags
-  const meta = createTag('div', { class: 'sc-card-meta' });
-  if (locationName) meta.append(createTag('span', { class: 'sc-card-location' }, locationName));
-  if (session.tags.length) meta.append(renderTagPills(session.tags));
+  left.append(createTag('h3', { class: 'sc-card-title' }, session.title));
 
-  // Speaker avatars
-  const avatarsEl = session.speakers.length ? renderSpeakerAvatars(session.speakers) : null;
+  if (timeStr) {
+    const timeEl = createTag('div', { class: 'sc-card-time' });
+    timeEl.append(createIcon(CALENDAR_ICON), ` ${timeStr}`);
+    left.append(timeEl);
+  }
 
-  // Description preview (truncated)
-  const previewText = session.description.length > PREVIEW_LEN
-    ? `${session.description.slice(0, PREVIEW_LEN)}\u2026`
-    : session.description;
-  const preview = createTag('div', { class: 'sc-card-desc-preview' }, previewText);
+  if (locationName) {
+    const locEl = createTag('div', { class: 'sc-card-location' });
+    locEl.append(createIcon(PIN_ICON), ` ${locationName}`);
+    left.append(locEl);
+  }
 
-  // Expanded content
-  const expanded = createTag('div', { class: 'sc-card-expanded' });
-  expanded.append(createTag('p', { class: 'sc-card-desc-full' }, session.description));
+  if (session.tags.length) left.append(renderTagPills(session.tags));
 
-  body.append(header, meta);
-  if (avatarsEl) body.append(avatarsEl);
-  body.append(preview, expanded);
+  if (session.speakers.length) {
+    const speakersWrap = createTag('div', { class: 'sc-card-speakers' });
+    speakersWrap.append(createTag('span', { class: 'sc-speakers-label' }, 'Speakers'));
+    speakersWrap.append(renderSpeakerAvatars(session.speakers));
+    left.append(speakersWrap);
+  }
 
-  card.append(body, renderCTAGroup(session, isEventRegistered));
+  // ── Right column ─────────────────────────────────────────────────────────
+  const right = createTag('div', { class: 'sc-card-right' });
+
+  const desc = createTag('div', { class: 'sc-card-desc' });
+  desc.append(createTag('p', { class: 'sc-card-desc-text' }, session.description));
+  desc.append(createTag('button', { class: 'sc-read-more', type: 'button' }, 'Read more'));
+  right.append(desc, renderCTAGroup(session, isEventRegistered));
+
+  card.append(left, right);
   return card;
 }
 
@@ -398,6 +412,8 @@ function renderFilterPanel(sessions) {
 function renderToolbar(state) {
   const toolbar = createTag('div', { class: 'sc-toolbar', role: 'search' });
   const toggle = renderTabToggle(state.isEventRegistered);
+
+  const searchRow = createTag('div', { class: 'sc-search-row' });
   const search = createTag('input', {
     class: 'sc-search',
     type: 'search',
@@ -406,8 +422,9 @@ function renderToolbar(state) {
   });
   const filterBtn = createTag('button', { class: 'sc-filter-btn', type: 'button', 'aria-expanded': 'false' }, 'Filter');
   const filterPanel = renderFilterPanel(state.sessions);
+  searchRow.append(search, filterBtn, filterPanel);
 
-  toolbar.append(toggle, search, filterBtn, filterPanel);
+  toolbar.append(toggle, searchRow);
   return toolbar;
 }
 
@@ -607,8 +624,11 @@ function bindCardEvents(listEl, state) {
     if (!card) return;
     const sessionId = card.dataset.sessionId;
 
-    if (e.target.closest('.sc-card-header')) {
-      card.classList.toggle('expanded');
+    if (e.target.closest('.sc-expand-btn') || e.target.closest('.sc-read-more')) {
+      const isExpanded = card.classList.toggle('expanded');
+      const expandBtn = card.querySelector('.sc-expand-btn');
+      expandBtn.textContent = isExpanded ? '\u2212' : '+';
+      expandBtn.setAttribute('aria-label', isExpanded ? 'Collapse session' : 'Expand session');
       return;
     }
 
@@ -673,14 +693,8 @@ function bindMediatorSubscriptions(el, bannerEl) {
 
 // ─── init ────────────────────────────────────────────────────────────────────
 
-export default async function init(el) {
-  // Clean up any previous instance
-  if (rsvpUnsubscribe) { rsvpUnsubscribe(); rsvpUnsubscribe = null; }
-  if (modalOverlay) closeSpeakerModal();
-  setFilterState({ query: '', activeTags: new Set(), activeTab: 'all' });
-  el.innerHTML = '';
-
-  const eventData = await resolveEventData(el);
+async function loadBlock(el) {
+  const eventData = await resolveEventData();
   if (!eventData?.eventId) {
     el.remove();
     return;
@@ -730,4 +744,26 @@ export default async function init(el) {
   bindToolbarEvents(toolbar, listEl, state);
   bindCardEvents(listEl, state);
   bindMediatorSubscriptions(el, bannerEl);
+}
+
+export default async function init(el) {
+  if (new URLSearchParams(window.location.search).has('mockSessions')) {
+    await import('./sessions-catalogue.mock.js');
+  }
+
+  if (rsvpUnsubscribe) { rsvpUnsubscribe(); rsvpUnsubscribe = null; }
+  if (modalOverlay) closeSpeakerModal();
+  setFilterState({ query: '', activeTags: new Set(), activeTab: 'all' });
+  el.innerHTML = '';
+
+  const profile = BlockMediator.get('imsProfile');
+  if (profile) {
+    await loadBlock(el);
+  } else {
+    const unsub = BlockMediator.subscribe('imsProfile', async ({ newValue }) => {
+      if (!newValue) return;
+      unsub();
+      await loadBlock(el);
+    });
+  }
 }
