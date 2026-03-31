@@ -1,5 +1,145 @@
 import { getMetadata, getEventConfig, LIBS } from '../../utils/utils.js';
 
+/** `?chronoDebug=1` or `true` — logs worker handoff and fragment loads. */
+function chronoDebugEnabled() {
+  try {
+    const v = new URLSearchParams(window.location.search).get('chronoDebug');
+    return v === '1' || v === 'true';
+  } catch {
+    return false;
+  }
+}
+
+function chronoDebugLog(...args) {
+  if (!chronoDebugEnabled()) return;
+  console.log('[chrono-box]', new Date().toISOString(), ...args);
+}
+
+/** @param {HTMLElement} host */
+function ensureReparentSet(host) {
+  if (!host._chronoBoxReparentedRoots) {
+    host._chronoBoxReparentedRoots = new Set();
+  }
+  return host._chronoBoxReparentedRoots;
+}
+
+/** Record element nodes removed from the chrono-box subtree (e.g. Milo hoisting a section to `main`). */
+function ingestReparentedRemovedNodes(host, records) {
+  const roots = ensureReparentSet(host);
+  records.forEach((record) => {
+    record.removedNodes.forEach((node) => {
+      if (node.nodeType === Node.ELEMENT_NODE) roots.add(node);
+    });
+  });
+}
+
+/**
+ * Optional fragment teardown when content leaves this `.chrono-box` (teleport hooks, Milo misses).
+ * @param {HTMLElement} chronoBoxEl
+ * @param {() => void} teardown
+ */
+export function registerChronoBoxOutboundCleanup(chronoBoxEl, teardown) {
+  if (!chronoBoxEl || typeof teardown !== 'function') return;
+  if (!Array.isArray(chronoBoxEl._chronoBoxOutboundCleanup)) {
+    chronoBoxEl._chronoBoxOutboundCleanup = [];
+  }
+  chronoBoxEl._chronoBoxOutboundCleanup.push(teardown);
+}
+
+/**
+ * Observe reparents before `loadFragment` so Milo (sticky-section, tabs, etc.) can be cleaned on swap.
+ * @param {HTMLElement} chronoBoxEl
+ */
+export function ensureChronoBoxReparentObserver(chronoBoxEl) {
+  if (!chronoBoxEl) return;
+  ensureReparentSet(chronoBoxEl);
+  if (!chronoBoxEl._chronoBoxReparentObserver) {
+    chronoBoxEl._chronoBoxReparentObserver = new MutationObserver((records) => {
+      ingestReparentedRemovedNodes(chronoBoxEl, records);
+    });
+  }
+  chronoBoxEl._chronoBoxReparentObserver.observe(chronoBoxEl, {
+    childList: true,
+    subtree: true,
+  });
+}
+
+function disconnectReparentObserverAndRemoveOrphans(chronoBoxEl) {
+  if (!chronoBoxEl) return;
+  const obs = chronoBoxEl._chronoBoxReparentObserver;
+  if (obs) {
+    ingestReparentedRemovedNodes(chronoBoxEl, obs.takeRecords());
+    obs.disconnect();
+  }
+  const roots = chronoBoxEl._chronoBoxReparentedRoots;
+  if (!(roots instanceof Set)) return;
+  let removed = 0;
+  roots.forEach((node) => {
+    try {
+      if (node?.isConnected) {
+        node.remove();
+        removed += 1;
+      }
+    } catch (error) {
+      window.lana?.log(`chrono-box reparent cleanup: ${error.message}`);
+    }
+  });
+  roots.clear();
+  chronoDebugLog('reparent cleanup', { removedStillConnected: removed });
+}
+
+/**
+ * Before the next fragment: `before-swap` event, registered cleanups, reparent orphans, teleport markers.
+ * @param {HTMLElement} chronoBoxEl
+ */
+export function cleanupChronoBoxOutboundNodes(chronoBoxEl) {
+  if (!chronoBoxEl) return;
+
+  const instanceId = chronoBoxEl.dataset?.chronoBoxInstance;
+
+  try {
+    if (instanceId) {
+      chronoBoxEl.dispatchEvent(new CustomEvent('chrono-box:before-swap', {
+        bubbles: true,
+        detail: { root: chronoBoxEl, instanceId },
+      }));
+    }
+  } catch (error) {
+    window.lana?.log(`chrono-box:before-swap event: ${error.message}`);
+  }
+
+  const fns = chronoBoxEl._chronoBoxOutboundCleanup;
+  if (Array.isArray(fns)) {
+    fns.forEach((fn) => {
+      try {
+        fn();
+      } catch (error) {
+        window.lana?.log(`chrono-box outbound cleanup: ${error.message}`);
+      }
+    });
+    chronoBoxEl._chronoBoxOutboundCleanup = [];
+  }
+
+  disconnectReparentObserverAndRemoveOrphans(chronoBoxEl);
+
+  if (instanceId) {
+    document.querySelectorAll(`[data-chrono-box-teleport="${instanceId}"]`).forEach((node) => {
+      node.remove();
+    });
+  }
+}
+
+function summarizeScheduleForDebug(schedule) {
+  if (!Array.isArray(schedule)) return schedule;
+  return schedule.map((row, i) => ({
+    i,
+    pathToFragment: row.pathToFragment,
+    toggleTime: row.toggleTime,
+    hasMobileRider: Boolean(row.mobileRider),
+    hasMetadata: Boolean(row.metadata?.length),
+  }));
+}
+
 function buildScheduleDoubleLinkedList(entries) {
   if (!entries.length) return null;
 
@@ -39,14 +179,13 @@ async function initPlugins(schedule) {
   };
   const hasPlugin = (plugin) => schedule.some((item) => item[plugin]);
   const pluginsNeeded = Object.keys(PLUGINS_MAP).filter(hasPlugin);
-  
+
   const plugins = await Promise.all(pluginsNeeded.map((plugin) => {
     const pluginDir = PLUGINS_MAP[plugin];
     const pluginUrl = new URL(`../../features/timing-framework/plugins/${pluginDir}/plugin.js`, import.meta.url);
     return import(pluginUrl.href);
   }));
 
-  // Shared tabId for BroadcastChannel communication across chrono-boxes
   let tabId = sessionStorage.getItem('chrono-box-tab-id');
   if (!tabId) {
     tabId = crypto.randomUUID();
@@ -62,33 +201,29 @@ async function initPlugins(schedule) {
   return { plugins: pluginsModules, tabId };
 }
 
-// Creates blob-based worker for cross-origin scenarios
 async function createBlobWorker(workerUrl) {
   const response = await fetch(workerUrl);
   if (!response.ok) {
     throw new Error(`Failed to fetch worker: ${response.status} ${response.statusText}`);
   }
-  
+
   const workerCode = await response.text();
   const blob = new Blob([workerCode], { type: 'application/javascript' });
   return URL.createObjectURL(blob);
 }
 
-// Creates worker with automatic cross-origin fallback
 async function createWorker(workerUrl) {
   let worker;
   let blobUrl = null;
 
   try {
-    // Try direct Worker first (optimal for same-origin)
     worker = new Worker(workerUrl, { type: 'module' });
     return { worker, blobUrl };
   } catch (error) {
-    // Expected: falls back to blob worker for cross-origin
+    // cross-origin: fall through to blob worker
   }
 
   try {
-    // Fallback: blob-based worker for cross-origin
     blobUrl = await createBlobWorker(workerUrl);
     worker = new Worker(blobUrl);
     return { worker, blobUrl };
@@ -110,12 +245,21 @@ async function setScheduleToScheduleWorker(schedule, plugins, tabId) {
   const testTiming = params.get('timing');
   const serverTime = params.get('serverTime');
   const avoidStreamEndFlag = params.get('avoidStreamEndFlag');
-  
+
   const testing = (testTiming || serverTime || avoidStreamEndFlag) ? {
     toggleTime: testTiming,
     serverTime,
     avoidStreamEndFlag,
   } : null;
+
+  chronoDebugLog('worker init', {
+    workerUrl,
+    usesBlobWorker: Boolean(blobUrl),
+    tabId,
+    testing,
+    pluginsLoaded: Array.from(plugins.keys()),
+    scheduleRows: summarizeScheduleForDebug(schedule),
+  });
 
   const pluginStates = Object.fromEntries(
     Array.from(plugins.entries())
@@ -142,6 +286,15 @@ async function setScheduleToScheduleWorker(schedule, plugins, tabId) {
   if (blobUrl) {
     worker._blobUrl = blobUrl;
   }
+
+  worker.addEventListener('error', (event) => {
+    chronoDebugLog('worker error event', {
+      message: event.message,
+      filename: event.filename,
+      lineno: event.lineno,
+      colno: event.colno,
+    });
+  });
 
   return worker;
 }
@@ -185,14 +338,18 @@ export default async function init(el) {
     return Promise.resolve();
   }
 
-  // Expose parsed schedule on DOM for consumers (e.g. Chrome extensions)
+  chronoDebugLog('schedule resolved', {
+    source: staticSchedule ? 'block' : 'metadata',
+    scheduleId: scheduleId || null,
+    rowCount: Array.isArray(thisSchedule) ? thisSchedule.length : null,
+    scheduleSummary: summarizeScheduleForDebug(thisSchedule),
+  });
+
   el.setAttribute('data-tf-schedule-json', JSON.stringify(thisSchedule));
+  el.dataset.chronoBoxInstance = crypto.randomUUID();
   el.innerHTML = '';
 
-  // When the URL hash already matches a modal trigger's target, clicking the link
-  // won't fire hashchange. Clear the hash first so the subsequent navigation
-  // produces an event that Milo's modal listener can act on. Skip if the modal
-  // is already rendered (e.g. from cache/timing) to avoid double-triggering.
+  // Modal hash: clear URL hash so Milo sees a real hashchange when the link target already matches.
   el.addEventListener('click', (e) => {
     const link = e.target.closest('a[data-modal-hash]');
     if (!link) return;
@@ -212,7 +369,7 @@ export default async function init(el) {
 
   const pluginsOutputs = await initPlugins(thisSchedule);
   let worker;
-  
+
   try {
     worker = await setScheduleToScheduleWorker(
       thisSchedule,
@@ -238,17 +395,25 @@ export default async function init(el) {
     worker.onmessage = (event) => {
       clearTimeout(timeout);
 
+      chronoDebugLog('worker message', event.data);
+
       const { pathToFragment } = event.data;
       const { prefix } = getLocale(getConfig().locales);
       el.style.height = `${el.clientHeight}px`;
+
+      cleanupChronoBoxOutboundNodes(el);
 
       el.innerHTML = '';
 
       const a = createTag('a', { href: `${pathToFragment.startsWith('/') ? prefix : ''}${pathToFragment}` }, '', { parent: el });
 
+      ensureChronoBoxReparentObserver(el);
+
       loadFragment(a).then(() => {
+        chronoDebugLog('fragment loaded', { pathToFragment });
         el.removeAttribute('style');
       }).catch((error) => {
+        chronoDebugLog('fragment load failed', { pathToFragment, error: error.message });
         window.lana?.log(`Error loading fragment ${pathToFragment}: ${error.message}`);
         el.removeAttribute('style');
         el.innerHTML = '<div class="error-message">Unable to load content. Please refresh the page.</div>';
