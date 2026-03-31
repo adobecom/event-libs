@@ -343,7 +343,9 @@ export default async function init(el) {
     worker.onmessage = (event) => {
       clearTimeout(timeout);
 
-      const { pathToFragment } = event.data;
+      const rawPath = event.data?.pathToFragment;
+      const fragmentPath = typeof rawPath === 'string' ? rawPath.trim() : '';
+
       const { prefix } = getLocale(getConfig().locales);
       el.style.height = `${el.clientHeight}px`;
 
@@ -351,14 +353,26 @@ export default async function init(el) {
 
       el.innerHTML = '';
 
-      const a = createTag('a', { href: `${pathToFragment.startsWith('/') ? prefix : ''}${pathToFragment}` }, '', { parent: el });
+      // href="" resolves to the current page; loadFragment would fetch and inject the full
+      // document (including nested chrono-box blocks), causing unbounded recursion.
+      if (!fragmentPath) {
+        el.removeAttribute('style');
+        if (worker._blobUrl) {
+          URL.revokeObjectURL(worker._blobUrl);
+          worker._blobUrl = null;
+        }
+        resolve();
+        return;
+      }
+
+      const a = createTag('a', { href: `${fragmentPath.startsWith('/') ? prefix : ''}${fragmentPath}` }, '', { parent: el });
 
       ensureChronoBoxReparentObserver(el);
 
       loadFragment(a).then(() => {
         el.removeAttribute('style');
       }).catch((error) => {
-        window.lana?.log(`Error loading fragment ${pathToFragment}: ${error.message}`);
+        window.lana?.log(`Error loading fragment ${fragmentPath}: ${error.message}`);
         el.removeAttribute('style');
         el.innerHTML = '<div class="error-message">Unable to load content. Please refresh the page.</div>';
         el.classList.add('error');
