@@ -1,20 +1,5 @@
 import { getMetadata, getEventConfig, LIBS } from '../../utils/utils.js';
 
-/** `?chronoDebug=1` or `true` — logs worker handoff and fragment loads. */
-function chronoDebugEnabled() {
-  try {
-    const v = new URLSearchParams(window.location.search).get('chronoDebug');
-    return v === '1' || v === 'true';
-  } catch {
-    return false;
-  }
-}
-
-function chronoDebugLog(...args) {
-  if (!chronoDebugEnabled()) return;
-  console.log('[chrono-box]', new Date().toISOString(), ...args);
-}
-
 /** @param {HTMLElement} host */
 function ensureReparentSet(host) {
   if (!host._chronoBoxReparentedRoots) {
@@ -73,19 +58,14 @@ function disconnectReparentObserverAndRemoveOrphans(chronoBoxEl) {
   }
   const roots = chronoBoxEl._chronoBoxReparentedRoots;
   if (!(roots instanceof Set)) return;
-  let removed = 0;
   roots.forEach((node) => {
     try {
-      if (node?.isConnected) {
-        node.remove();
-        removed += 1;
-      }
+      if (node?.isConnected) node.remove();
     } catch (error) {
       window.lana?.log(`chrono-box reparent cleanup: ${error.message}`);
     }
   });
   roots.clear();
-  chronoDebugLog('reparent cleanup', { removedStillConnected: removed });
 }
 
 /**
@@ -127,17 +107,6 @@ export function cleanupChronoBoxOutboundNodes(chronoBoxEl) {
       node.remove();
     });
   }
-}
-
-function summarizeScheduleForDebug(schedule) {
-  if (!Array.isArray(schedule)) return schedule;
-  return schedule.map((row, i) => ({
-    i,
-    pathToFragment: row.pathToFragment,
-    toggleTime: row.toggleTime,
-    hasMobileRider: Boolean(row.mobileRider),
-    hasMetadata: Boolean(row.metadata?.length),
-  }));
 }
 
 function buildScheduleDoubleLinkedList(entries) {
@@ -252,15 +221,6 @@ async function setScheduleToScheduleWorker(schedule, plugins, tabId) {
     avoidStreamEndFlag,
   } : null;
 
-  chronoDebugLog('worker init', {
-    workerUrl,
-    usesBlobWorker: Boolean(blobUrl),
-    tabId,
-    testing,
-    pluginsLoaded: Array.from(plugins.keys()),
-    scheduleRows: summarizeScheduleForDebug(schedule),
-  });
-
   const pluginStates = Object.fromEntries(
     Array.from(plugins.entries())
       .map(([n, p]) => [n, { type: n, data: p.getAll ? p.getAll() : p }]),
@@ -288,12 +248,7 @@ async function setScheduleToScheduleWorker(schedule, plugins, tabId) {
   }
 
   worker.addEventListener('error', (event) => {
-    chronoDebugLog('worker error event', {
-      message: event.message,
-      filename: event.filename,
-      lineno: event.lineno,
-      colno: event.colno,
-    });
+    window.lana?.log(`chrono-box worker error: ${event.message || 'unknown'}`);
   });
 
   return worker;
@@ -337,13 +292,6 @@ export default async function init(el) {
     el.remove();
     return Promise.resolve();
   }
-
-  chronoDebugLog('schedule resolved', {
-    source: staticSchedule ? 'block' : 'metadata',
-    scheduleId: scheduleId || null,
-    rowCount: Array.isArray(thisSchedule) ? thisSchedule.length : null,
-    scheduleSummary: summarizeScheduleForDebug(thisSchedule),
-  });
 
   el.setAttribute('data-tf-schedule-json', JSON.stringify(thisSchedule));
   el.dataset.chronoBoxInstance = crypto.randomUUID();
@@ -395,8 +343,6 @@ export default async function init(el) {
     worker.onmessage = (event) => {
       clearTimeout(timeout);
 
-      chronoDebugLog('worker message', event.data);
-
       const { pathToFragment } = event.data;
       const { prefix } = getLocale(getConfig().locales);
       el.style.height = `${el.clientHeight}px`;
@@ -410,10 +356,8 @@ export default async function init(el) {
       ensureChronoBoxReparentObserver(el);
 
       loadFragment(a).then(() => {
-        chronoDebugLog('fragment loaded', { pathToFragment });
         el.removeAttribute('style');
       }).catch((error) => {
-        chronoDebugLog('fragment load failed', { pathToFragment, error: error.message });
         window.lana?.log(`Error loading fragment ${pathToFragment}: ${error.message}`);
         el.removeAttribute('style');
         el.innerHTML = '<div class="error-message">Unable to load content. Please refresh the page.</div>';
