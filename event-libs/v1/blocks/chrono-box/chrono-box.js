@@ -254,11 +254,49 @@ async function setScheduleToScheduleWorker(schedule, plugins, tabId) {
   return worker;
 }
 
+function requestAnimationFramePromise() {
+  return new Promise((r) => {
+    requestAnimationFrame(r);
+  });
+}
+
+/**
+ * After fragment load and height unlock: wait for layout, then scroll to the page hash.
+ * Bounded rAF retry so ids from async nested blocks can appear before scrolling.
+ * @param {(hash: string) => void} scrollToHashedElement
+ */
+async function scrollToHashAfterFragmentLayout(scrollToHashedElement) {
+  const hash = window.location.hash;
+  if (!hash || hash.includes('=')) return;
+
+  await requestAnimationFramePromise();
+  await requestAnimationFramePromise();
+
+  let id = '';
+  try {
+    id = decodeURIComponent(hash.slice(1));
+  } catch {
+    id = hash.slice(1);
+  }
+
+  const maxAttempts = 12;
+  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+    if (!id || document.getElementById(id)) {
+      scrollToHashedElement(hash);
+      return;
+    }
+    await requestAnimationFramePromise();
+  }
+  scrollToHashedElement(hash);
+}
+
 export default async function init(el) {
   const eventConfig = getEventConfig();
   const miloLibs = eventConfig?.miloConfig?.miloLibs ? eventConfig.miloConfig.miloLibs : LIBS;
 
-  const [{ default: loadFragment }, { createTag, getLocale, getConfig }] = await Promise.all([
+  const [{ default: loadFragment }, {
+    createTag, getLocale, getConfig, scrollToHashedElement,
+  }] = await Promise.all([
     import(`${miloLibs}/blocks/fragment/fragment.js`),
     import(`${miloLibs}/utils/utils.js`),
   ]);
@@ -369,21 +407,30 @@ export default async function init(el) {
 
       ensureChronoBoxReparentObserver(el);
 
-      loadFragment(a).then(() => {
-        el.removeAttribute('style');
-      }).catch((error) => {
-        window.lana?.log(`Error loading fragment ${fragmentPath}: ${error.message}`);
-        el.removeAttribute('style');
-        el.innerHTML = '<div class="error-message">Unable to load content. Please refresh the page.</div>';
-        el.classList.add('error');
-      });
-
       if (worker._blobUrl) {
         URL.revokeObjectURL(worker._blobUrl);
         worker._blobUrl = null;
       }
 
-      resolve();
+      loadFragment(a)
+        .then(async () => {
+          el.removeAttribute('style');
+          if (typeof scrollToHashedElement === 'function') {
+            try {
+              await scrollToHashAfterFragmentLayout(scrollToHashedElement);
+            } catch (error) {
+              window.lana?.log(`chrono-box hash scroll: ${error.message}`);
+            }
+          }
+          resolve();
+        })
+        .catch((error) => {
+          window.lana?.log(`Error loading fragment ${fragmentPath}: ${error.message}`);
+          el.removeAttribute('style');
+          el.innerHTML = '<div class="error-message">Unable to load content. Please refresh the page.</div>';
+          el.classList.add('error');
+          resolve();
+        });
     };
   });
 }
