@@ -255,6 +255,72 @@ async function setScheduleToScheduleWorker(schedule, plugins, tabId) {
   return worker;
 }
 
+function requestAnimationFramePromise() {
+  return new Promise((r) => {
+    requestAnimationFrame(r);
+  });
+}
+
+function anchorWithModalHashExists(hash) {
+  return Array.from(document.querySelectorAll('a[data-modal-hash]')).some(
+    (a) => a.getAttribute('data-modal-hash') === hash,
+  );
+}
+
+function modalDialogForHashIsOpen(hash) {
+  if (!hash || hash.length < 2) return false;
+  let modalId;
+  try {
+    modalId = decodeURIComponent(hash.slice(1));
+  } catch {
+    modalId = hash.slice(1);
+  }
+  const existing = document.getElementById(modalId);
+  return Boolean(existing?.classList.contains('dialog-modal'));
+}
+
+/**
+ * Collapse duplicate `modal:open` in the same burst (Milo nested loadArea + chrono-box + extra worker ticks).
+ * Keep the window short so closing the modal and a quick fragment retry can still reopen within a few hundred ms.
+ */
+let chronoBoxLastModalOpenDispatch = { hash: '', at: 0 };
+const CHRONO_BOX_MODAL_OPEN_DEDUPE_MS = 350;
+
+function dispatchModalOpenOnceForHash(hash) {
+  if (!hash) return;
+  if (modalDialogForHashIsOpen(hash)) return;
+
+  const now = Date.now();
+  const { hash: prev, at } = chronoBoxLastModalOpenDispatch;
+  if (hash === prev && now - at < CHRONO_BOX_MODAL_OPEN_DEDUPE_MS) return;
+
+  chronoBoxLastModalOpenDispatch = { hash, at: now };
+  window.dispatchEvent(new CustomEvent('modal:open', { bubbles: true, detail: { hash } }));
+}
+
+/**
+ * Re-run Milo modal opening for the current URL hash after scheduled fragment content is in the DOM.
+ * Milo listens on `window` for `modal:open` (see utils initModalEventListener). Optional rAF deferral
+ * and bounded polling give RSVP / async blocks time to expose `a[data-modal-hash]`.
+ */
+async function openModalFromPageHashAfterFragment() {
+  const hash = window.location.hash;
+  if (!hash) return;
+
+  await requestAnimationFramePromise();
+  await requestAnimationFramePromise();
+
+  const maxAttempts = 12;
+  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+    if (anchorWithModalHashExists(hash)) {
+      dispatchModalOpenOnceForHash(hash);
+      return;
+    }
+    await requestAnimationFramePromise();
+  }
+  dispatchModalOpenOnceForHash(hash);
+}
+
 export default async function init(el) {
   const eventConfig = getEventConfig();
   const miloLibs = eventConfig?.miloConfig?.miloLibs ? eventConfig.miloConfig.miloLibs : LIBS;
@@ -370,21 +436,28 @@ export default async function init(el) {
 
       ensureChronoBoxReparentObserver(el);
 
-      loadFragment(a).then(() => {
-        el.removeAttribute('style');
-      }).catch((error) => {
-        window.lana?.log(`Error loading fragment ${fragmentPath}: ${error.message}`);
-        el.removeAttribute('style');
-        el.innerHTML = '<div class="error-message">Unable to load content. Please refresh the page.</div>';
-        el.classList.add('error');
-      });
-
       if (worker._blobUrl) {
         URL.revokeObjectURL(worker._blobUrl);
         worker._blobUrl = null;
       }
 
-      resolve();
+      loadFragment(a)
+        .then(async () => {
+          el.removeAttribute('style');
+          try {
+            await openModalFromPageHashAfterFragment();
+          } catch (error) {
+            window.lana?.log(`chrono-box modal hash: ${error.message}`);
+          }
+          resolve();
+        })
+        .catch((error) => {
+          window.lana?.log(`Error loading fragment ${fragmentPath}: ${error.message}`);
+          el.removeAttribute('style');
+          el.innerHTML = '<div class="error-message">Unable to load content. Please refresh the page.</div>';
+          el.classList.add('error');
+          resolve();
+        });
     };
   });
 }
