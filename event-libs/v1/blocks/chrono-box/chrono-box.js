@@ -60,7 +60,8 @@ function disconnectReparentObserverAndRemoveOrphans(chronoBoxEl) {
   if (!(roots instanceof Set)) return;
   roots.forEach((node) => {
     try {
-      if (node?.isConnected) node.remove();
+      // Only detach nodes Milo moved outside the host; innerHTML handles the rest on swap.
+      if (node?.isConnected && !chronoBoxEl.contains(node)) node.remove();
     } catch (error) {
       window.lana?.log(`chrono-box reparent cleanup: ${error.message}`);
     }
