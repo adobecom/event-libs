@@ -94,5 +94,31 @@ describe('Chrono Box', () => {
       cleanupChronoBoxOutboundNodes(host);
       expect(main.contains(section)).to.equal(false);
     });
+
+    it('does not remove nodes that were only moved within chrono-box (reorder)', async () => {
+      const {
+        cleanupChronoBoxOutboundNodes,
+        ensureChronoBoxReparentObserver,
+      } = await import('../../../../event-libs/v1/blocks/chrono-box/chrono-box.js');
+
+      const host = document.createElement('div');
+      host.dataset.chronoBoxInstance = 'reorder-test';
+      document.body.append(host);
+
+      const inner = document.createElement('div');
+      const section = document.createElement('section');
+      host.append(inner);
+      inner.append(section);
+      expect(inner.contains(section)).to.equal(true);
+
+      ensureChronoBoxReparentObserver(host);
+      host.append(section);
+
+      expect(host.contains(section)).to.equal(true);
+      expect(inner.contains(section)).to.equal(false);
+
+      cleanupChronoBoxOutboundNodes(host);
+      expect(host.contains(section)).to.equal(true);
+    });
   });
 });
