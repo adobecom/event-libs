@@ -1,6 +1,6 @@
 import { expect } from '@esm-bundle/chai';
 import { readFile } from '@web/test-runner-commands';
-import init from '../../../../event-libs/v1/blocks/sessions-catalogue/sessions-catalogue.js';
+import init from '../../../../event-libs/v1/blocks/sessions-hub/sessions-hub.js';
 import BlockMediator from '../../../../event-libs/v1/deps/block-mediator.min.js';
 
 const body = await readFile({ path: './mocks/default.html' });
@@ -368,7 +368,7 @@ describe('normalizeSessions', () => {
 
 // ─── init (DOM integration) ──────────────────────────────────────────────────
 
-describe('sessions-catalogue init', () => {
+describe('sessions-hub init', () => {
   let originalFetch;
 
   function stubFetch(handlers) {
@@ -382,48 +382,56 @@ describe('sessions-catalogue init', () => {
     };
   }
 
-  // Default fetch stub — covers all endpoints a normal init call makes
-  function stubDefaultFetch(sessionOverrides = []) {
-    const sessions = sessionOverrides.length ? sessionOverrides : [makeSession()];
+  // Default fetch stub — covers all endpoints a normal init call makes.
+  // Sessions come from <meta name="sessions"> (not a fetch call), so set
+  // the metadata separately via setSessionsMeta().
+  function stubDefaultFetch() {
     stubFetch([
-      ['/v1/sessions?eventId', () => ({ sessions })],
-      ['/v1/session-times', () => ({ sessionTimes: [] })],
-      ['sessions/session-1/speakers', () => ({ speakers: [] })],
-      ['sessions/s1/speakers', () => ({ speakers: [] })],
-      ['sessions/s2/speakers', () => ({ speakers: [] })],
+      ['/v1/events/', () => makeEventData()],
       ['/v1/series/', () => ({ speakers: [] })],
       ['/v1/venues/', () => ({ name: 'Main Hall', locationId: 'loc-1' })],
       ['/v1/attendees/me/events/', () => ({ sessionIds: [] })],
     ]);
   }
 
+  function setSessionsMeta(sessions) {
+    const meta = document.createElement('meta');
+    meta.name = 'sessions';
+    meta.content = JSON.stringify(sessions);
+    document.head.appendChild(meta);
+  }
+
   beforeEach(() => {
     document.body.innerHTML = body;
-    document.head.innerHTML = '';
+    document.head.innerHTML = '<meta name="event-id" content="event-123">';
     originalFetch = window.fetch;
 
     // Use real BlockMediator (same instance the block imports)
+    BlockMediator.set('imsProfile', { userId: 'test-user' });
     BlockMediator.set('eventData', makeEventData());
     BlockMediator.set('rsvpData', null);
   });
 
   afterEach(() => {
     window.fetch = originalFetch;
+    BlockMediator.set('imsProfile', undefined);
     BlockMediator.set('eventData', undefined);
     BlockMediator.set('rsvpData', undefined);
     document.querySelectorAll('.sc-modal-overlay, .sc-event-banner').forEach((el) => el.remove());
   });
 
-  it('removes block when no sessions are returned', async () => {
-    stubFetch([['/v1/sessions', () => ({ sessions: [] })]]);
-    const el = document.querySelector('.sessions-catalogue');
+  it('removes block when no sessions metadata is present', async () => {
+    stubDefaultFetch();
+    // No sessions metadata set — loadBlock should remove the element
+    const el = document.querySelector('.sessions-hub');
     await init(el);
-    expect(document.querySelector('.sessions-catalogue')).to.be.null;
+    expect(document.querySelector('.sessions-hub')).to.be.null;
   });
 
   it('renders toolbar with search and filter button when sessions are present', async () => {
     stubDefaultFetch();
-    const el = document.querySelector('.sessions-catalogue');
+    setSessionsMeta([makeSession()]);
+    const el = document.querySelector('.sessions-hub');
     await init(el);
     expect(el.querySelector('.sc-toolbar')).to.not.be.null;
     expect(el.querySelector('.sc-search')).to.not.be.null;
@@ -432,7 +440,8 @@ describe('sessions-catalogue init', () => {
 
   it('does NOT render tab toggle when user is not event-registered (rsvpData null)', async () => {
     stubDefaultFetch();
-    const el = document.querySelector('.sessions-catalogue');
+    setSessionsMeta([makeSession()]);
+    const el = document.querySelector('.sessions-hub');
     await init(el);
     const toggle = el.querySelector('.sc-tab-toggle');
     expect(toggle?.hidden).to.be.true;
@@ -441,15 +450,17 @@ describe('sessions-catalogue init', () => {
   it('renders tab toggle visible when user IS event-registered', async () => {
     BlockMediator.set('rsvpData', { registrationStatus: 'registered' });
     stubDefaultFetch();
-    const el = document.querySelector('.sessions-catalogue');
+    setSessionsMeta([makeSession()]);
+    const el = document.querySelector('.sessions-hub');
     await init(el);
     const toggle = el.querySelector('.sc-tab-toggle');
     expect(toggle?.hidden).to.be.false;
   });
 
   it('renders one .sc-card per session', async () => {
-    stubDefaultFetch([makeSession({ sessionId: 's1' }), makeSession({ sessionId: 's2' })]);
-    const el = document.querySelector('.sessions-catalogue');
+    stubDefaultFetch();
+    setSessionsMeta([makeSession({ sessionId: 's1' }), makeSession({ sessionId: 's2' })]);
+    const el = document.querySelector('.sessions-hub');
     await init(el);
     const cards = el.querySelectorAll('.sc-card');
     expect(cards.length).to.equal(2);
@@ -457,7 +468,8 @@ describe('sessions-catalogue init', () => {
 
   it('renders sticky event banner when user is not event-registered', async () => {
     stubDefaultFetch();
-    const el = document.querySelector('.sessions-catalogue');
+    setSessionsMeta([makeSession()]);
+    const el = document.querySelector('.sessions-hub');
     await init(el);
     const banner = document.querySelector('.sc-event-banner');
     expect(banner).to.not.be.null;

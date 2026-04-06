@@ -6,9 +6,6 @@ import {
 import { convertUtcTimestampToLocalDateTime } from '../../utils/date-time-helper.js';
 import {
   getEvent,
-  getSessions,
-  getSessionTimes,
-  getSessionSpeakers,
   getAllSeriesSpeakers,
   getVenueLocation,
   getMyEventSessions,
@@ -17,6 +14,11 @@ import {
 
 const CALENDAR_ICON = '<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" xmlns="http://www.w3.org/2000/svg"><rect x="1" y="3" width="14" height="12" rx="1.5" ry="1.5"/><path d="M1 7h14M5 1v4M11 1v4"/></svg>';
 const PIN_ICON = '<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" xmlns="http://www.w3.org/2000/svg"><path d="M8 14s-5-4.686-5-8a5 5 0 0 1 10 0c0 3.314-5 8-5 8z"/><circle cx="8" cy="6" r="2"/></svg>';
+const PLUS_CIRCLE_ICON = '<svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M10 18.7793C5.1748 18.7793 1.25 14.8545 1.25 10.0293C1.25 5.2041 5.1748 1.2793 10 1.2793C14.8252 1.2793 18.75 5.2041 18.75 10.0293C18.75 14.8545 14.8252 18.7793 10 18.7793ZM10 2.7793C6.00195 2.7793 2.75 6.03125 2.75 10.0293C2.75 14.0273 6.00195 17.2793 10 17.2793C13.998 17.2793 17.25 14.0273 17.25 10.0293C17.25 6.03125 13.998 2.7793 10 2.7793Z" fill="#292929"/><path d="M13.25 9.25H10.75V6.75C10.75 6.33594 10.4141 6 10 6C9.58594 6 9.25 6.33594 9.25 6.75V9.25H6.75C6.33594 9.25 6 9.58594 6 10C6 10.4141 6.33594 10.75 6.75 10.75H9.25V13.25C9.25 13.6641 9.58594 14 10 14C10.4141 14 10.75 13.6641 10.75 13.25V10.75H13.25C13.6641 10.75 14 10.4141 14 10C14 9.58594 13.6641 9.25 13.25 9.25Z" fill="#292929"/></svg>';
+const MINUS_CIRCLE_ICON = '<svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M10 18.7793C5.1748 18.7793 1.25 14.8545 1.25 10.0293C1.25 5.2041 5.1748 1.2793 10 1.2793C14.8252 1.2793 18.75 5.2041 18.75 10.0293C18.75 14.8545 14.8252 18.7793 10 18.7793ZM10 2.7793C6.00195 2.7793 2.75 6.03125 2.75 10.0293C2.75 14.0273 6.00195 17.2793 10 17.2793C13.998 17.2793 17.25 14.0273 17.25 10.0293C17.25 6.03125 13.998 2.7793 10 2.7793Z" fill="#292929"/><path d="M13.25 10.75H6.75C6.33594 10.75 6 10.4141 6 10C6 9.58594 6.33594 9.25 6.75 9.25H13.25C13.6641 9.25 14 9.58594 14 10C14 10.4141 13.6641 10.75 13.25 10.75Z" fill="#292929"/></svg>';
+const FILTER_ICON = '<svg width="26" height="26" viewBox="0 0 26 26" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M11.6986 24.3472C11.2314 24.3472 10.7668 24.2196 10.3504 23.9663C9.56709 23.4909 9.09991 22.66 9.09991 21.744V13.6374C9.09991 13.3956 9.01104 13.1645 8.84982 12.9855L3.41622 6.94887C2.7167 6.18144 2.54024 5.10742 2.963 4.15083C3.38448 3.19424 4.29601 2.6001 5.3421 2.6001H20.6577C21.7038 2.6001 22.6153 3.19424 23.0368 4.15083C23.4596 5.10742 23.2831 6.18144 22.5785 6.95332L17.15 12.9855C16.9888 13.1645 16.8999 13.3956 16.8999 13.6374V20.1964C16.8999 21.2933 16.2956 22.288 15.3232 22.7926L12.8984 24.0514C12.5188 24.2488 12.1074 24.3472 11.6986 24.3472ZM5.3421 4.5501C4.95871 4.5501 4.79874 4.82115 4.74669 4.93794C4.69464 5.05473 4.60323 5.35625 4.86095 5.63936L10.2996 11.6804C10.7833 12.2181 11.0499 12.9131 11.0499 13.6374V21.744C11.0499 22.0741 11.2683 22.2423 11.3622 22.2994C11.4562 22.3572 11.7075 22.4714 11.9995 22.321L14.4243 21.0616C14.7493 20.8934 14.9499 20.5621 14.9499 20.1964V13.6374C14.9499 12.9131 15.2165 12.2181 15.7002 11.6804L21.1338 5.6438C21.3966 5.35625 21.3052 5.05474 21.2531 4.93794C21.2011 4.82113 21.0411 4.5501 20.6577 4.5501H5.3421Z" fill="#292929"/></svg>';
+const SEARCH_ICON = '<svg width="26" height="26" viewBox="0 0 26 26" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="11" cy="11" r="7.25" stroke="#6e6e6e" stroke-width="2"/><path d="M16.5 16.5L23 23" stroke="#6e6e6e" stroke-width="2" stroke-linecap="round"/></svg>';
+const CHEVRON_DOWN_ICON = '<svg width="14" height="14" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M4,7.01a1,1,0,0,1,1.7055-.7055l3.289,3.286,3.289-3.286a1,1,0,0,1,1.437,1.3865l-.0245.0245L9.7,11.7075a1,1,0,0,1-1.4125,0L4.293,7.716A.9945.9945,0,0,1,4,7.01Z" fill="#505050"/></svg>';
 
 // ─── Module-level state singleton ──────────────────────────────────────────
 
@@ -119,17 +121,6 @@ async function resolveEventData() {
   if (!resp.ok) return null;
 
   return resp.data;
-}
-
-async function fetchSessionDetails(sessions) {
-  await Promise.all(sessions.map(async (session) => {
-    const [timesResp, speakersResp] = await Promise.all([
-      getSessionTimes(session.sessionId),
-      getSessionSpeakers(session.sessionId),
-    ]);
-    session.rawTimes = timesResp.ok ? timesResp.data : [];
-    session.rawSpeakers = speakersResp.ok ? speakersResp.data : [];
-  }));
 }
 
 async function buildSpeakerMap(seriesId) {
@@ -328,11 +319,13 @@ function renderSessionCard(session, isEventRegistered) {
   });
 
   // Expand/collapse toggle (absolute, top-right)
-  card.append(createTag('button', {
+  const expandBtn = createTag('button', {
     class: 'sc-expand-btn',
     type: 'button',
     'aria-label': 'Expand session',
-  }, '+'));
+  });
+  expandBtn.innerHTML = PLUS_CIRCLE_ICON;
+  card.append(expandBtn);
 
   // ── Left column ──────────────────────────────────────────────────────────
   const left = createTag('div', { class: 'sc-card-left' });
@@ -394,38 +387,55 @@ function renderFilterPanel(sessions) {
   const panel = createTag('div', { class: 'sc-filter-panel hidden', 'aria-hidden': 'true' });
   const { tags } = collectFilterOptions(sessions);
 
-  if (tags.length) {
-    const fs = createTag('fieldset', { class: 'sc-filter-fieldset' });
-    fs.append(createTag('legend', {}, 'Tags'));
-    tags.forEach((tag) => {
-      const lbl = createTag('label', { class: 'sc-filter-label' });
-      lbl.append(createTag('input', { type: 'checkbox', value: tag, 'data-filter-type': 'tag' }));
-      lbl.append(` ${tag}`);
-      fs.append(lbl);
-    });
-    panel.append(fs);
-  }
+  tags.forEach((tag) => {
+    const lbl = createTag('label', { class: 'sc-filter-item' });
+    lbl.append(createTag('input', { type: 'checkbox', value: tag, 'data-filter-type': 'tag' }));
+    lbl.append(createTag('span', {}, tag));
+    panel.append(lbl);
+  });
 
   return panel;
 }
 
 function renderToolbar(state) {
   const toolbar = createTag('div', { class: 'sc-toolbar', role: 'search' });
+  const inner = createTag('div', { class: 'sc-toolbar-inner' });
   const toggle = renderTabToggle(state.isEventRegistered);
+  const spacer = createTag('div', { class: 'sc-toolbar-spacer' });
 
   const searchRow = createTag('div', { class: 'sc-search-row' });
-  const search = createTag('input', {
+  const searchWrap = createTag('div', { class: 'sc-search-wrap' });
+  searchWrap.append(createIcon(SEARCH_ICON));
+  searchWrap.append(createTag('input', {
     class: 'sc-search',
     type: 'search',
-    placeholder: 'Search sessions\u2026',
+    placeholder: 'Search sessions',
     'aria-label': 'Search sessions',
-  });
-  const filterBtn = createTag('button', { class: 'sc-filter-btn', type: 'button', 'aria-expanded': 'false' }, 'Filter');
-  const filterPanel = renderFilterPanel(state.sessions);
-  searchRow.append(search, filterBtn, filterPanel);
+  }));
 
-  toolbar.append(toggle, searchRow);
+  const filterWrap = createTag('div', { class: 'sc-filter-wrap' });
+  const filterBtn = createTag('button', { class: 'sc-filter-btn', type: 'button', 'aria-expanded': 'false' });
+  filterBtn.append(createIcon(FILTER_ICON), createTag('span', {}, 'Filter'), createIcon(CHEVRON_DOWN_ICON));
+  const filterPanel = renderFilterPanel(state.sessions);
+  filterWrap.append(filterBtn, filterPanel);
+
+  searchRow.append(searchWrap, filterWrap);
+  inner.append(toggle, spacer, searchRow);
+  toolbar.append(inner);
   return toolbar;
+}
+
+function setToolbarStickyOffset(toolbarEl) {
+  const gnav = document.querySelector('header');
+  const update = () => {
+    const offset = gnav?.offsetHeight ?? 0;
+    toolbarEl.style.setProperty('--toolbar-top', `${offset}px`);
+  };
+  update();
+  if (gnav) {
+    const ro = new ResizeObserver(update);
+    ro.observe(gnav);
+  }
 }
 
 // ─── Render: sticky event banner ─────────────────────────────────────────────
@@ -568,6 +578,15 @@ function bindToolbarEvents(toolbarEl, listEl, state) {
     filterPanel.setAttribute('aria-hidden', String(isHidden));
   });
 
+  document.addEventListener('click', (e) => {
+    const filterWrap = toolbarEl.querySelector('.sc-filter-wrap');
+    if (!filterWrap?.contains(e.target)) {
+      filterPanel.classList.add('hidden');
+      filterBtn.setAttribute('aria-expanded', 'false');
+      filterPanel.setAttribute('aria-hidden', 'true');
+    }
+  });
+
   filterPanel.addEventListener('change', (e) => {
     const cb = e.target;
     if (cb.type !== 'checkbox') return;
@@ -627,7 +646,7 @@ function bindCardEvents(listEl, state) {
     if (e.target.closest('.sc-expand-btn') || e.target.closest('.sc-read-more')) {
       const isExpanded = card.classList.toggle('expanded');
       const expandBtn = card.querySelector('.sc-expand-btn');
-      expandBtn.textContent = isExpanded ? '\u2212' : '+';
+      expandBtn.innerHTML = isExpanded ? MINUS_CIRCLE_ICON : PLUS_CIRCLE_ICON;
       expandBtn.setAttribute('aria-label', isExpanded ? 'Collapse session' : 'Expand session');
       return;
     }
@@ -653,7 +672,7 @@ function bindCardEvents(listEl, state) {
 
     if (e.target.closest('.sc-btn-register-event')) {
       // Redirect to or trigger event registration — TBD with PM
-      window.dispatchEvent(new CustomEvent('sessions-catalogue:event-register', { detail: { eventId: state.eventData.eventId } }));
+      window.dispatchEvent(new CustomEvent('sessions-hub:event-register', { detail: { eventId: state.eventData.eventId } }));
     }
   });
 }
@@ -700,18 +719,25 @@ async function loadBlock(el) {
     return;
   }
 
-  const sessionsResp = await getSessions(eventData.eventId);
-  if (!sessionsResp.ok || !sessionsResp.data.length) {
+  let rawSessions;
+  try {
+    rawSessions = JSON.parse(getMetadata('sessions'));
+  } catch (e) {
+    window.lana?.log(`Failed to parse sessions metadata:\n${e.message}`);
+  }
+  if (!rawSessions?.length) {
     el.remove();
     return;
   }
-
-  await fetchSessionDetails(sessionsResp.data);
+  rawSessions.forEach((s) => {
+    s.rawTimes = s.sessionTimes || [];
+    s.rawSpeakers = s.speakers || [];
+  });
 
   const { venueId } = eventData;
   const [speakerMap, locationMap] = await Promise.all([
     buildSpeakerMap(eventData.seriesId),
-    buildLocationMap(venueId, sessionsResp.data),
+    buildLocationMap(venueId, rawSessions),
   ]);
 
   const rsvpData = BlockMediator.get('rsvpData');
@@ -719,7 +745,7 @@ async function loadBlock(el) {
   const registeredSessionIds = await resolveRegistrationState(eventData.eventId, isEventRegistered);
 
   const sessions = normalizeSessions(
-    sessionsResp.data, speakerMap, locationMap, registeredSessionIds, venueId,
+    rawSessions, speakerMap, locationMap, registeredSessionIds, venueId,
   );
 
   const state = {
@@ -733,6 +759,7 @@ async function loadBlock(el) {
   setState(state);
 
   const toolbar = renderToolbar(state);
+  setToolbarStickyOffset(toolbar);
   const listEl = renderSessionList(sessions, isEventRegistered);
   el.append(toolbar, listEl);
 
@@ -748,7 +775,7 @@ async function loadBlock(el) {
 
 export default async function init(el) {
   if (new URLSearchParams(window.location.search).has('mockSessions')) {
-    await import('./sessions-catalogue.mock.js');
+    await import('./sessions-hub.mock.js');
   }
 
   if (rsvpUnsubscribe) { rsvpUnsubscribe(); rsvpUnsubscribe = null; }

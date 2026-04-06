@@ -1,5 +1,5 @@
 /**
- * sessions-catalogue.mock.js
+ * sessions-hub.mock.js
  *
  * Dev-only fetch interceptor for the sessions catalogue block.
  * Loaded automatically when ?mockSessions is present in the URL.
@@ -259,48 +259,48 @@ window.fetch = async (url, options) => {
   const urlStr = typeof url === 'string' ? url : url.toString();
 
   if (matchEvent(urlStr)) {
-    console.log('[sessions-catalogue mock] GET event');
+    console.log('[sessions-hub mock] GET event');
     return jsonResponse(MOCK_EVENT);
   }
 
   if (matchEventAttendeeMe(urlStr)) {
-    console.log('[sessions-catalogue mock] GET event attendee/me');
+    console.log('[sessions-hub mock] GET event attendee/me');
     return jsonResponse({ registrationStatus: 'registered' });
   }
 
   if (matchMyEventSessions(urlStr)) {
-    console.log('[sessions-catalogue mock] GET my event sessions');
+    console.log('[sessions-hub mock] GET my event sessions');
     return jsonResponse({ sessionIds: MOCK_MY_SESSION_IDS });
   }
 
   if (matchSessions(urlStr)) {
-    console.log('[sessions-catalogue mock] GET sessions');
+    console.log('[sessions-hub mock] GET sessions');
     return jsonResponse({ sessions: MOCK_SESSIONS, count: MOCK_SESSIONS.length });
   }
 
   if (matchSessionTimes(urlStr)) {
     const match = urlStr.match(/sessionId=([^&]+)/);
     const sessionId = match ? match[1] : null;
-    console.log('[sessions-catalogue mock] GET session-times for', sessionId);
+    console.log('[sessions-hub mock] GET session-times for', sessionId);
     return jsonResponse({ sessionTimes: MOCK_SESSION_TIMES[sessionId] || [] });
   }
 
   if (matchSessionSpeakers(urlStr)) {
     const match = urlStr.match(/\/sessions\/([^/]+)\/speakers/);
     const sessionId = match ? match[1] : null;
-    console.log('[sessions-catalogue mock] GET session speakers for', sessionId);
+    console.log('[sessions-hub mock] GET session speakers for', sessionId);
     return jsonResponse({ speakers: MOCK_SESSION_SPEAKERS[sessionId] || [] });
   }
 
   if (matchSeriesSpeakers(urlStr)) {
-    console.log('[sessions-catalogue mock] GET series speakers');
+    console.log('[sessions-hub mock] GET series speakers');
     return jsonResponse({ speakers: MOCK_SERIES_SPEAKERS });
   }
 
   if (matchVenueLocation(urlStr)) {
     const match = urlStr.match(/\/locations\/([^/]+)$/);
     const locationId = match ? match[1] : null;
-    console.log('[sessions-catalogue mock] GET venue location', locationId);
+    console.log('[sessions-hub mock] GET venue location', locationId);
     const loc = MOCK_LOCATIONS[locationId] || { locationId, name: locationId };
     return jsonResponse(loc);
   }
@@ -308,7 +308,7 @@ window.fetch = async (url, options) => {
   if (matchRegisterSessionTime(urlStr)) {
     const match = urlStr.match(/\/session-times\/([^/]+)\/attendees/);
     const sessionTimeId = match ? match[1] : null;
-    console.log('[sessions-catalogue mock] POST register session time', sessionTimeId);
+    console.log('[sessions-hub mock] POST register session time', sessionTimeId);
     return jsonResponse({ sessionTimeId, registrationStatus: 'registered' });
   }
 
@@ -338,4 +338,4 @@ BlockMediator.set('imsProfile', {
   userId: 'mock-user-id',
 });
 
-console.log('[sessions-catalogue mock] installed — fetch interceptor + IMS stubs active');
+console.log('[sessions-hub mock] installed — fetch interceptor + IMS stubs active');
