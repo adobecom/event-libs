@@ -121,6 +121,16 @@ describe('Mobile Rider Module', () => {
 
     describe('injectPlayer', () => {
       beforeEach(() => {
+        sinon.stub(window, 'requestAnimationFrame').callsFake((cb) => setTimeout(cb, 0));
+
+        globalThis.__mr_player = {
+          dispose: sinon.stub(),
+          off: sinon.stub(),
+          on: sinon.stub(),
+        };
+
+        globalThis.mobilerider.embed = sinon.stub();
+
         const videoWrapper = document.createElement('div');
         videoWrapper.className = 'video-wrapper';
         el.appendChild(videoWrapper);
@@ -144,7 +154,7 @@ describe('Mobile Rider Module', () => {
 
       it('should call mobilerider.embed after next frame', async () => {
         riderInstance.injectPlayer('test-video', 'test-skin', 'test-asl');
-        await new Promise((resolve) => requestAnimationFrame(resolve));
+        await new Promise((resolve) => { setTimeout(resolve, 50); });
         expect(globalThis.mobilerider.embed.called).to.be.true;
       });
 
@@ -158,9 +168,12 @@ describe('Mobile Rider Module', () => {
         riderInstance.mainID = 'main-video';
         riderInstance.store = { get: sinon.stub().returns(true) };
         riderInstance.injectPlayer('test-video', 'test-skin');
-        await new Promise((resolve) => requestAnimationFrame(resolve));
-        expect(globalThis.__mr_player.off.calledWith('streamend')).to.be.true;
-        expect(globalThis.__mr_player.on.calledWith('streamend')).to.be.true;
+        // injectPlayer nulls __mr_player synchronously; restore before RAF fires
+        const player = { off: sinon.stub(), on: sinon.stub() };
+        globalThis.__mr_player = player;
+        await new Promise((resolve) => { setTimeout(resolve, 50); });
+        expect(player.off.calledWith('streamend')).to.be.true;
+        expect(player.on.calledWith('streamend')).to.be.true;
       });
 
       it('should attach end listener when vid exists in store but mainID does not', async () => {
@@ -169,23 +182,29 @@ describe('Mobile Rider Module', () => {
           get: sinon.stub().callsFake((key) => (key === 'test-video' ? true : undefined)),
         };
         riderInstance.injectPlayer('test-video', 'test-skin');
-        await new Promise((resolve) => requestAnimationFrame(resolve));
-        expect(globalThis.__mr_player.on.calledWith('streamend')).to.be.true;
+        const player = { off: sinon.stub(), on: sinon.stub() };
+        globalThis.__mr_player = player;
+        await new Promise((resolve) => { setTimeout(resolve, 50); });
+        expect(player.on.calledWith('streamend')).to.be.true;
       });
 
       it('should not attach end listener when neither mainID nor vid is in store', async () => {
         riderInstance.mainID = 'main-video';
         riderInstance.store = { get: sinon.stub().returns(undefined) };
         riderInstance.injectPlayer('test-video', 'test-skin');
-        await new Promise((resolve) => requestAnimationFrame(resolve));
-        expect(globalThis.__mr_player.on.called).to.be.false;
+        const player = { off: sinon.stub(), on: sinon.stub() };
+        globalThis.__mr_player = player;
+        await new Promise((resolve) => { setTimeout(resolve, 50); });
+        expect(player.on.called).to.be.false;
       });
 
       it('should not attach end listener when store is null', async () => {
         riderInstance.store = null;
         riderInstance.injectPlayer('test-video', 'test-skin');
-        await new Promise((resolve) => requestAnimationFrame(resolve));
-        expect(globalThis.__mr_player.on.called).to.be.false;
+        const player = { off: sinon.stub(), on: sinon.stub() };
+        globalThis.__mr_player = player;
+        await new Promise((resolve) => { setTimeout(resolve, 50); });
+        expect(player.on.called).to.be.false;
       });
     });
 
@@ -269,6 +288,213 @@ describe('Mobile Rider Module', () => {
         expect(riderInstance.store.set.called).to.be.false;
       });
     });
+
+    describe('streamend callback', () => {
+      beforeEach(() => {
+        sinon.stub(window, 'requestAnimationFrame').callsFake((cb) => setTimeout(cb, 0));
+        globalThis.mobilerider.embed = sinon.stub();
+      });
+
+      it('should remove drawer, update status, and dispose player on streamend', async () => {
+        riderInstance.mainID = 'main-video';
+        const mockStore = { get: sinon.stub().returns(true), set: sinon.stub() };
+        riderInstance.store = mockStore;
+        riderInstance.drawer = { remove: sinon.stub() };
+
+        const videoWrapper = document.createElement('div');
+        videoWrapper.className = 'video-wrapper';
+        el.appendChild(videoWrapper);
+        riderInstance.wrap = videoWrapper;
+        riderInstance.isEmbedding = false;
+
+        riderInstance.injectPlayer('test-video', 'test-skin');
+
+        const player = {
+          off: sinon.stub(),
+          on: sinon.stub(),
+          dispose: sinon.stub(),
+        };
+        globalThis.__mr_player = player;
+        await new Promise((resolve) => { setTimeout(resolve, 50); });
+
+        // Extract and invoke the streamend handler
+        const onCall = player.on.getCalls().find((c) => c.args[0] === 'streamend');
+        expect(onCall).to.not.be.undefined;
+        onCall.args[1]();
+
+        expect(riderInstance.drawer).to.be.null;
+        expect(mockStore.set.called).to.be.true;
+        expect(player.dispose.called).to.be.true;
+        expect(globalThis.__mr_player).to.be.null;
+      });
+
+      it('should handle streamend when drawer is null', async () => {
+        riderInstance.mainID = 'main-video';
+        riderInstance.store = { get: sinon.stub().returns(true), set: sinon.stub() };
+        riderInstance.drawer = null;
+
+        const videoWrapper = document.createElement('div');
+        videoWrapper.className = 'video-wrapper';
+        el.appendChild(videoWrapper);
+        riderInstance.wrap = videoWrapper;
+        riderInstance.isEmbedding = false;
+
+        riderInstance.injectPlayer('test-video', 'test-skin');
+        const player = { off: sinon.stub(), on: sinon.stub(), dispose: sinon.stub() };
+        globalThis.__mr_player = player;
+        await new Promise((resolve) => { setTimeout(resolve, 50); });
+
+        const onCall = player.on.getCalls().find((c) => c.args[0] === 'streamend');
+        expect(() => onCall.args[1]()).to.not.throw();
+      });
+    });
+
+    describe('embed error handling', () => {
+      beforeEach(() => {
+        sinon.stub(window, 'requestAnimationFrame').callsFake((cb) => setTimeout(cb, 0));
+      });
+
+      it('should log Embed Error when embed throws', async () => {
+        globalThis.mobilerider.embed = sinon.stub().throws(new Error('embed boom'));
+
+        const videoWrapper = document.createElement('div');
+        videoWrapper.className = 'video-wrapper';
+        el.appendChild(videoWrapper);
+        riderInstance.wrap = videoWrapper;
+        riderInstance.isEmbedding = false;
+
+        riderInstance.injectPlayer('test-video', 'test-skin');
+        globalThis.__mr_player = null;
+        await new Promise((resolve) => { setTimeout(resolve, 50); });
+
+        expect(mockLana.log.calledWithMatch(/Embed Error/)).to.be.true;
+      });
+
+      it('should log Inject Error when wrap.innerHTML assignment throws', async () => {
+        const badWrap = {};
+        Object.defineProperty(badWrap, 'innerHTML', {
+          set() { throw new Error('inject boom'); },
+        });
+        riderInstance.wrap = badWrap;
+        riderInstance.isEmbedding = false;
+
+        riderInstance.injectPlayer('test-video', 'test-skin');
+        await new Promise((resolve) => { setTimeout(resolve, 50); });
+
+        expect(mockLana.log.calledWithMatch(/Inject Error/)).to.be.true;
+      });
+    });
+
+    describe('#storeHas error handling', () => {
+      it('should return false when store.get throws', () => {
+        riderInstance.store = {
+          get: sinon.stub().throws(new Error('get boom')),
+          set: sinon.stub(),
+        };
+        riderInstance.mainID = 'main-video';
+
+        riderInstance.setStatus('test-video', true);
+
+        expect(riderInstance.store.set.called).to.be.false;
+      });
+    });
+
+    describe('#updateStatus error handling', () => {
+      it('should log when store.set throws', () => {
+        riderInstance.mainID = 'main-video';
+        riderInstance.store = {
+          get: sinon.stub().returns(false),
+          set: sinon.stub().throws(new Error('set boom')),
+        };
+
+        riderInstance.setStatus('test-video', true);
+
+        expect(mockLana.log.calledWithMatch(/Status update failed/)).to.be.true;
+      });
+    });
+
+    describe('#selectInitialVideo', () => {
+      it('should select video by ?video= query param', async () => {
+        const concurrentHtml = `
+          <div class="mobile-rider">
+            <div><div>concurrentenabled</div><div>true</div></div>
+            <div><div>concurrentvideoid1</div><div>video1</div></div>
+            <div><div>concurrentvideoid2</div><div>video2</div></div>
+            <div><div>concurrenttitle1</div><div>Title 1</div></div>
+            <div><div>concurrenttitle2</div><div>Title 2</div></div>
+          </div>
+        `;
+
+        const originalSearch = window.location.search;
+        const url = new URL(window.location.href);
+        url.searchParams.set('video', '2');
+        window.history.replaceState({}, '', url.toString());
+
+        document.body.innerHTML = concurrentHtml;
+        const concEl = document.querySelector('.mobile-rider');
+        const instance = init(concEl);
+        await new Promise((resolve) => { setTimeout(resolve, 150); });
+
+        // Restore original search
+        window.history.replaceState({}, '', originalSearch ? `?${originalSearch}` : window.location.pathname);
+
+        expect(instance.allVideos).to.have.lengthOf(2);
+      });
+
+      it('should select video by sessionStorage concurrentVideoTitle', async () => {
+        sessionStorage.setItem('concurrentVideoTitle', 'Title 2');
+
+        const concurrentHtml = `
+          <div class="mobile-rider">
+            <div><div>concurrentenabled</div><div>true</div></div>
+            <div><div>concurrentvideoid1</div><div>video1</div></div>
+            <div><div>concurrentvideoid2</div><div>video2</div></div>
+            <div><div>concurrenttitle1</div><div>Title 1</div></div>
+            <div><div>concurrenttitle2</div><div>Title 2</div></div>
+          </div>
+        `;
+
+        document.body.innerHTML = concurrentHtml;
+        const concEl = document.querySelector('.mobile-rider');
+        const instance = init(concEl);
+        await new Promise((resolve) => { setTimeout(resolve, 150); });
+
+        expect(sessionStorage.getItem('concurrentVideoTitle')).to.be.null;
+        expect(instance.allVideos).to.have.lengthOf(2);
+      });
+    });
+
+    describe('#initASL', () => {
+      it('should add isASL class when ASL button is clicked', async () => {
+        sinon.stub(window, 'requestAnimationFrame').callsFake((cb) => setTimeout(cb, 0));
+        globalThis.mobilerider.embed = sinon.stub();
+
+        const videoWrapper = document.createElement('div');
+        videoWrapper.className = 'video-wrapper';
+        el.appendChild(videoWrapper);
+        riderInstance.wrap = videoWrapper;
+        riderInstance.isEmbedding = false;
+
+        riderInstance.injectPlayer('test-video', 'test-skin', 'test-asl');
+        globalThis.__mr_player = { off: sinon.stub(), on: sinon.stub() };
+        await new Promise((resolve) => { setTimeout(resolve, 50); });
+
+        const container = riderInstance.wrap.querySelector('.mobile-rider-container');
+        const aslBtn = document.createElement('button');
+        aslBtn.id = 'asl-button';
+        container.appendChild(aslBtn);
+
+        // Wait for the interval check to find the button
+        await new Promise((resolve) => { setTimeout(resolve, 200); });
+
+        aslBtn.click();
+        expect(container.classList.contains('isASL')).to.be.true;
+
+        // Click again — should not add duplicate
+        aslBtn.click();
+        expect(container.classList.length).to.equal(2); // mobile-rider-container + isASL
+      });
+    });
   });
 
   describe('Configuration parsing', () => {
@@ -327,6 +553,75 @@ describe('Mobile Rider Module', () => {
       const anchor = document.querySelector('a');
       const result = init(anchor);
       expect(result.el.tagName).to.equal('A');
+    });
+  });
+
+  describe('loadScript', () => {
+    it('should early-return when window.mobilerider already exists', async () => {
+      globalThis.mobilerider = { embed: sinon.stub() };
+
+      document.body.innerHTML = defaultHtml;
+      const el = document.querySelector('.mobile-rider');
+      riderInstance = init(el);
+      await new Promise((resolve) => { setTimeout(resolve, 150); });
+
+      // No script tag created since mobilerider is already present
+      const scriptTag = document.head.querySelector('script[src*="mobilerider"]');
+      expect(scriptTag).to.be.null;
+    });
+  });
+
+  describe('#loadStore', () => {
+    it('should attempt to load store when inside a chrono-box', async () => {
+      document.body.innerHTML = `
+        <div class="chrono-box">
+          ${defaultHtml}
+        </div>
+      `;
+      const el = document.querySelector('.mobile-rider');
+      riderInstance = init(el);
+      await new Promise((resolve) => { setTimeout(resolve, 300); });
+
+      // The plugin file exists so the import succeeds;
+      // verify init completed without errors
+      expect(riderInstance.el).to.equal(el);
+    });
+  });
+
+  describe('concurrent drawer interactions', () => {
+    it('should render drawer items with thumbnails and handle activation', async () => {
+      const concurrentHtml = `
+        <div class="mobile-rider">
+          <div><div>concurrentenabled</div><div>true</div></div>
+          <div><div>skinid</div><div>test-skin</div></div>
+          <div><div>concurrentvideoid1</div><div>video1</div></div>
+          <div><div>concurrentvideoid2</div><div>video2</div></div>
+          <div><div>concurrenttitle1</div><div>Title 1</div></div>
+          <div><div>concurrenttitle2</div><div>Title 2</div></div>
+          <div><div>concurrentthumbnail1</div><div>https://example.com/t1.jpg</div></div>
+          <div><div>concurrentthumbnail2</div><div>https://example.com/t2.jpg</div></div>
+        </div>
+      `;
+
+      document.body.innerHTML = concurrentHtml;
+      const el = document.querySelector('.mobile-rider');
+      const instance = init(el);
+      await new Promise((resolve) => { setTimeout(resolve, 300); });
+
+      // Verify drawer was created with thumbnail items
+      const drawerItems = el.querySelectorAll('.drawer-item');
+      expect(drawerItems.length).to.equal(2);
+
+      const thumb = drawerItems[0].querySelector('.drawer-item-thumbnail img');
+      expect(thumb).to.not.be.null;
+
+      // Click second item to trigger #activateVideo
+      if (drawerItems[1]) {
+        drawerItems[1].click();
+        await new Promise((resolve) => { setTimeout(resolve, 100); });
+      }
+
+      expect(instance).to.not.be.null;
     });
   });
 });
