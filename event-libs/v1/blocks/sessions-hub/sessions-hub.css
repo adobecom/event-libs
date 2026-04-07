@@ -203,7 +203,7 @@
   gap: 16px;
   max-width: 1200px;
   margin: 0 auto;
-  padding: 24px 24px 160px;
+  padding: 24px 24px 100px;
 }
 
 /* ─── Session card ───────────────────────────────────────────────────────── */
@@ -652,13 +652,12 @@
 /* ─── Sticky event banner ────────────────────────────────────────────────── */
 
 .sh-event-banner {
-  position: fixed;
+  position: sticky;
   bottom: 0;
-  left: 0;
-  right: 0;
   z-index: 500;
   background: #2c2c2c;
   color: var(--color-white, #fff);
+  font-family: var(--body-font-family, sans-serif);
   padding: 40px 0;
   box-shadow: 0 -4px 16px rgb(0 0 0 / 20%);
 }

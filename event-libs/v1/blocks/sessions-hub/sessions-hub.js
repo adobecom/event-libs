@@ -4,7 +4,7 @@ import { signIn } from '../../utils/decorate.js';
 import {
   getSVGsfromFile, createSocialIcon, PLATFORM_PATTERNS, SUPPORTED_PLATFORMS,
 } from '../profile-cards/profile-cards.js';
-import { convertUtcTimestampToLocalDateTime } from '../../utils/date-time-helper.js';
+import { convertUtcTimestampToLocalDateTime, createSmartDateRange, areTimestampsOnSameDay } from '../../utils/date-time-helper.js';
 import {
   getEvent,
   getAllSeriesSpeakers,
@@ -475,16 +475,36 @@ function setToolbarStickyOffset(toolbarEl) {
 
 // ─── Render: sticky event banner ─────────────────────────────────────────────
 
-function renderEventBanner(eventData, rsvpConfig) {
+function buildBannerDateString() {
+  const startMillis = getMetadata('local-start-time-millis');
+  const endMillis = getMetadata('local-end-time-millis');
+  if (!startMillis || !endMillis) return '';
+
+  const eventType = getMetadata('event-type');
+  const timezone = eventType === 'InPerson' ? getMetadata('timezone') : null;
+
+  if (areTimestampsOnSameDay(startMillis, endMillis, timezone)) {
+    return createSmartDateRange(startMillis, endMillis, 'en-US', timezone);
+  }
+
+  const opts = { year: 'numeric', month: 'long', day: 'numeric' };
+  if (timezone) opts.timeZone = timezone;
+  const startDate = new Date(parseInt(startMillis, 10));
+  const endDate = new Date(parseInt(endMillis, 10));
+  return `${startDate.toLocaleDateString('en-US', opts)} – ${endDate.toLocaleDateString('en-US', opts)}`;
+}
+
+function renderEventBanner(rsvpConfig) {
   const banner = createTag('div', { class: 'sh-event-banner' });
   const inner = createTag('div', { class: 'sh-banner-inner' });
   const info = createTag('div', { class: 'sh-banner-info' });
 
-  if (eventData.title) {
-    info.append(createTag('span', { class: 'sh-banner-title' }, eventData.title));
+  const title = getMetadata('event-title');
+  if (title) {
+    info.append(createTag('span', { class: 'sh-banner-title' }, title));
   }
 
-  const dateStr = getMetadata('user-event-date-time-range') || eventData.startDate;
+  const dateStr = buildBannerDateString();
   if (dateStr) {
     const dateRow = createTag('span', { class: 'sh-banner-date' });
     const icon = createTag('span', { class: 'sh-icon' });
@@ -865,10 +885,10 @@ async function loadBlock(el, rsvpConfig) {
   el.append(toolbar, listEl);
 
   // Always append banner; hide it if user is already registered
-  document.body.querySelector('.sh-event-banner')?.remove();
-  const bannerEl = renderEventBanner(eventData, rsvpConfig);
+  el.querySelector('.sh-event-banner')?.remove();
+  const bannerEl = renderEventBanner(rsvpConfig);
   if (isEventRegistered) bannerEl.classList.add('hidden');
-  document.body.append(bannerEl);
+  el.append(bannerEl);
 
   bindToolbarEvents(toolbar, listEl, state);
   bindCardEvents(listEl, state);
