@@ -1,10 +1,11 @@
 import BlockMediator from '../../deps/block-mediator.min.js';
-import { createTag, getMetadata, getSusiOptions } from '../../utils/utils.js';
+import { createTag, getMetadata, getSusiOptions, LIBS, getEventConfig } from '../../utils/utils.js';
+import { dictionaryManager } from '../../utils/dictionary-manager.js';
 import { signIn } from '../../utils/decorate.js';
 import {
   getSVGsfromFile, createSocialIcon, PLATFORM_PATTERNS, SUPPORTED_PLATFORMS,
 } from '../profile-cards/profile-cards.js';
-import { convertUtcTimestampToLocalDateTime, createSmartDateRange, areTimestampsOnSameDay } from '../../utils/date-time-helper.js';
+import { createSmartDateRange } from '../../utils/date-time-helper.js';
 import {
   getEvent,
   getAllSeriesSpeakers,
@@ -270,15 +271,15 @@ function renderCTAGroup(session, isEventRegistered) {
   const group = createTag('div', { class: 'sh-cta-group' });
 
   if (!isEventRegistered) {
-    group.append(createTag('button', { class: 'sh-btn sh-btn-register-event', type: 'button' }, 'Register for session'));
+    group.append(createTag('button', { class: 'sh-btn sh-btn-register-event', type: 'button' }, dictionaryManager.getValue('Register for session')));
   } else if (!session.isRegistered) {
-    group.append(createTag('button', { class: 'sh-btn sh-btn-register-session', type: 'button' }, 'Register for session'));
+    group.append(createTag('button', { class: 'sh-btn sh-btn-register-session', type: 'button' }, dictionaryManager.getValue('Register for session')));
   } else {
     const calBtn = createTag('button', { class: 'sh-btn sh-btn-cal', type: 'button' });
-    calBtn.append(createIcon(CTA_CALENDAR_ICON), createTag('span', {}, 'Download to calendar'));
+    calBtn.append(createIcon(CTA_CALENDAR_ICON), createTag('span', {}, dictionaryManager.getValue('Download to calendar')));
     group.append(calBtn);
     const badge = createTag('span', { class: 'sh-registered-badge' });
-    badge.append(createIcon(CHECKMARK_ICON), createTag('span', {}, 'Registered'));
+    badge.append(createIcon(CHECKMARK_ICON), createTag('span', {}, dictionaryManager.getValue('Registered')));
     group.append(badge);
   }
 
@@ -326,7 +327,7 @@ function renderSpeakerAvatars(speakers) {
 function renderSessionCard(session, isEventRegistered) {
   const primaryTime = session.sessionTimes[0];
   const timeStr = primaryTime
-    ? convertUtcTimestampToLocalDateTime(primaryTime.startTimeMillis, 'en-US', primaryTime.timezone)
+    ? createSmartDateRange(primaryTime.startTimeMillis, primaryTime.endTimeMillis, 'en-US', primaryTime.timezone)
     : '';
   const locationName = primaryTime?.locationName || '';
 
@@ -339,7 +340,7 @@ function renderSessionCard(session, isEventRegistered) {
   const expandBtn = createTag('button', {
     class: 'sh-expand-btn',
     type: 'button',
-    'aria-label': 'Expand session',
+    'aria-label': dictionaryManager.getValue('Expand session'),
   });
   expandBtn.hidden = true;
   expandBtn.innerHTML = PLUS_CIRCLE_ICON;
@@ -366,7 +367,7 @@ function renderSessionCard(session, isEventRegistered) {
 
   if (session.speakers.length) {
     const speakersWrap = createTag('div', { class: 'sh-card-speakers' });
-    speakersWrap.append(createTag('span', { class: 'sh-speakers-label' }, 'Speakers'));
+    speakersWrap.append(createTag('span', { class: 'sh-speakers-label' }, dictionaryManager.getValue('Speakers')));
     speakersWrap.append(renderSpeakerAvatars(session.speakers));
     left.append(speakersWrap);
   }
@@ -382,7 +383,7 @@ function renderSessionCard(session, isEventRegistered) {
 
   desc.append(descText);
   if (needsTruncation) {
-    desc.append(createTag('button', { class: 'sh-read-more', type: 'button' }, 'Read more'));
+    desc.append(createTag('button', { class: 'sh-read-more', type: 'button' }, dictionaryManager.getValue('Read more')));
   }
 
   expandBtn.hidden = !needsTruncation;
@@ -405,8 +406,8 @@ function renderTabToggle(isEventRegistered) {
   const wrap = createTag('div', { class: 'sh-tab-toggle' });
   if (!isEventRegistered) wrap.hidden = true;
   wrap.append(
-    createTag('button', { class: 'sh-tab active', type: 'button', 'data-tab': 'all' }, 'All sessions'),
-    createTag('button', { class: 'sh-tab', type: 'button', 'data-tab': 'my' }, 'My sessions'),
+    createTag('button', { class: 'sh-tab active', type: 'button', 'data-tab': 'all' }, dictionaryManager.getValue('All sessions')),
+    createTag('button', { class: 'sh-tab', type: 'button', 'data-tab': 'my' }, dictionaryManager.getValue('My sessions')),
   );
   return wrap;
 }
@@ -437,8 +438,8 @@ function renderToolbar(state) {
   searchWrap.append(createTag('input', {
     class: 'sh-search',
     type: 'search',
-    placeholder: 'Search sessions',
-    'aria-label': 'Search sessions',
+    placeholder: dictionaryManager.getValue('Search sessions'),
+    'aria-label': dictionaryManager.getValue('Search sessions'),
   }));
 
   const filterWrap = createTag('div', { class: 'sh-filter-wrap' });
@@ -450,7 +451,7 @@ function renderToolbar(state) {
     'aria-expanded': 'false',
     ...(hasFilters ? {} : { disabled: '' }),
   });
-  filterBtn.append(createIcon(FILTER_ICON), createTag('span', {}, 'Filter'), createIcon(CHEVRON_DOWN_ICON));
+  filterBtn.append(createIcon(FILTER_ICON), createTag('span', {}, dictionaryManager.getValue('Filter')), createIcon(CHEVRON_DOWN_ICON));
   const filterPanel = renderFilterPanel(state.sessions);
   filterWrap.append(filterBtn, filterPanel);
 
@@ -483,15 +484,7 @@ function buildBannerDateString() {
   const eventType = getMetadata('event-type');
   const timezone = eventType === 'InPerson' ? getMetadata('timezone') : null;
 
-  if (areTimestampsOnSameDay(startMillis, endMillis, timezone)) {
-    return createSmartDateRange(startMillis, endMillis, 'en-US', timezone);
-  }
-
-  const opts = { year: 'numeric', month: 'long', day: 'numeric' };
-  if (timezone) opts.timeZone = timezone;
-  const startDate = new Date(parseInt(startMillis, 10));
-  const endDate = new Date(parseInt(endMillis, 10));
-  return `${startDate.toLocaleDateString('en-US', opts)} – ${endDate.toLocaleDateString('en-US', opts)}`;
+  return createSmartDateRange(startMillis, endMillis, 'en-US', timezone);
 }
 
 function renderEventBanner(rsvpConfig) {
@@ -513,7 +506,7 @@ function renderEventBanner(rsvpConfig) {
     info.append(dateRow);
   }
 
-  const btn = createTag('button', { class: 'sh-btn sh-btn-event-register', type: 'button' }, 'Register');
+  const btn = createTag('button', { class: 'sh-btn sh-btn-event-register', type: 'button' }, dictionaryManager.getValue('Register'));
   btn.addEventListener('click', () => {
     const profile = BlockMediator.get('imsProfile');
     const isSignedOut = !profile || profile.noProfile || profile.account_type === 'guest';
@@ -536,48 +529,10 @@ function syncBannerVisibility(bannerEl, isEventRegistered) {
 
 // ─── Speaker modal ───────────────────────────────────────────────────────────
 
-let modalOverlay = null;
-let previousFocus = null;
-
-function closeSpeakerModal() {
-  if (modalOverlay) {
-    modalOverlay.remove();
-    modalOverlay = null;
-  }
-  if (previousFocus) {
-    previousFocus.focus();
-    previousFocus = null;
-  }
-  document.removeEventListener('keydown', handleModalKeydown);
-}
-
-function handleModalKeydown(e) {
-  if (e.key === 'Escape') closeSpeakerModal();
-}
-
-async function openSpeakerModal(speaker) {
-  if (!speaker) return;
-  if (modalOverlay) closeSpeakerModal();
-
-  previousFocus = document.activeElement;
-
-  const overlay = createTag('div', {
-    class: 'sh-modal-overlay',
-    role: 'dialog',
-    'aria-modal': 'true',
-    'aria-label': `${speaker.firstName} ${speaker.lastName}`,
-  });
-
-  const modal = createTag('div', { class: 'sh-modal' });
-  const closeBtn = createTag('button', {
-    class: 'sh-modal-close',
-    type: 'button',
-    'aria-label': 'Close',
-  }, '\u00D7');
-
+async function buildSpeakerModalContent(speaker) {
+  const content = createTag('div', { class: 'sh-speaker-modal' });
   const modalBody = createTag('div', { class: 'sh-modal-body' });
 
-  // Photo
   if (speaker.photo?.imageUrl) {
     modalBody.append(createTag('img', {
       class: 'sh-modal-photo',
@@ -586,14 +541,12 @@ async function openSpeakerModal(speaker) {
     }));
   }
 
-  // Speaker info
   const info = createTag('div', { class: 'sh-modal-info' });
   if (speaker.title) info.append(createTag('p', { class: 'sh-modal-speaker-title' }, speaker.title));
   info.append(createTag('h2', { class: 'sh-modal-name' }, `${speaker.firstName} ${speaker.lastName}`));
   if (speaker.company) info.append(createTag('p', { class: 'sh-modal-company' }, speaker.company));
   if (speaker.bio) info.append(createTag('p', { class: 'sh-modal-bio' }, speaker.bio));
 
-  // Social icons
   if (speaker.socialLinks?.length) {
     const svgPath = new URL('../../icons/social-icons.svg', import.meta.url).href;
     const svgEls = await getSVGsfromFile(svgPath, SUPPORTED_PLATFORMS);
@@ -614,26 +567,29 @@ async function openSpeakerModal(speaker) {
           'aria-label': typeof entry === 'object' ? (entry.serviceName || platform) : platform,
         });
         a.append(icon);
-        const li = createTag('li', {});
-        li.append(a);
-        socialList.append(li);
+        socialList.append(createTag('li', {}, a));
       });
       info.append(socialList);
     }
   }
 
   modalBody.append(info);
-  modal.append(closeBtn, modalBody);
-  overlay.append(modal);
-  document.body.append(overlay);
-  modalOverlay = overlay;
+  content.append(modalBody);
+  return content;
+}
 
-  closeBtn.focus();
-  document.addEventListener('keydown', handleModalKeydown);
+async function openSpeakerModal(speaker) {
+  if (!speaker) return;
 
-  closeBtn.addEventListener('click', closeSpeakerModal);
-  overlay.addEventListener('click', (e) => {
-    if (e.target === overlay) closeSpeakerModal();
+  const miloLibs = getEventConfig()?.miloConfig?.miloLibs || LIBS;
+  const { getModal } = await import(`${miloLibs}/blocks/modal/modal.js`);
+
+  const content = await buildSpeakerModalContent(speaker);
+  await getModal(null, {
+    id: `sh-speaker-${speaker.speakerId}`,
+    content,
+    class: 'sh-speaker-modal-dialog',
+    title: `${speaker.firstName} ${speaker.lastName}`,
   });
 }
 
@@ -697,7 +653,7 @@ async function handleSessionRegistration(cardEl, sessionId, state) {
   const btn = cardEl.querySelector('.sh-btn-register-session');
   if (btn) {
     btn.disabled = true;
-    btn.textContent = 'Registering\u2026';
+    btn.textContent = dictionaryManager.getValue('Registering\u2026');
   }
 
   const resp = await registerForSessionTime(firstTime.sessionTimeId, 'me', { registrationStatus: 'registered' });
@@ -710,7 +666,7 @@ async function handleSessionRegistration(cardEl, sessionId, state) {
     window.lana?.log(`Error: Failed to register for session ${sessionId}. Error:${JSON.stringify(resp.error)}`);
     if (btn) {
       btn.disabled = false;
-      btn.textContent = 'Register for session';
+      btn.textContent = dictionaryManager.getValue('Register for session');
     }
   }
 }
@@ -725,7 +681,7 @@ function bindCardEvents(listEl, state) {
       const isExpanded = card.classList.toggle('expanded');
       const expandBtn = card.querySelector('.sh-expand-btn');
       expandBtn.innerHTML = isExpanded ? MINUS_CIRCLE_ICON : PLUS_CIRCLE_ICON;
-      expandBtn.setAttribute('aria-label', isExpanded ? 'Collapse session' : 'Expand session');
+      expandBtn.setAttribute('aria-label', isExpanded ? dictionaryManager.getValue('Collapse session') : dictionaryManager.getValue('Expand session'));
       return;
     }
 
@@ -763,14 +719,14 @@ function bindCardEvents(listEl, state) {
         console.log('[sessions-hub] Signed-in, not event-registered. Opening RSVP modal for pending session:', sessionId);
         pendingSessionId = sessionId;
         const btn = e.target.closest('.sh-btn-register-event');
-        if (btn) { btn.disabled = true; btn.textContent = 'Registering\u2026'; }
+        if (btn) { btn.disabled = true; btn.textContent = dictionaryManager.getValue('Registering\u2026'); }
 
         const onHashChange = () => {
           if (!window.location.hash.includes('rsvp-form')) {
             if (pendingSessionId === sessionId) {
               console.log('[sessions-hub] RSVP modal closed without completing. Re-enabling button for session:', sessionId);
               pendingSessionId = null;
-              if (btn) { btn.disabled = false; btn.textContent = 'Register for session'; }
+              if (btn) { btn.disabled = false; btn.textContent = dictionaryManager.getValue('Register for session'); }
             }
             window.removeEventListener('hashchange', onHashChange);
           }
@@ -784,7 +740,7 @@ function bindCardEvents(listEl, state) {
   });
 }
 
-function bindMediatorSubscriptions(el, bannerEl) {
+function bindMediatorSubscriptions(el, bannerEl, listEl) {
   rsvpUnsubscribe = BlockMediator.subscribe('rsvpData', async ({ newValue }) => {
     const state = getState();
     const isRegistered = newValue != null;
@@ -821,12 +777,25 @@ function bindMediatorSubscriptions(el, bannerEl) {
         }
       }
     } else {
+      state.registeredSessionIds = new Set();
       state.sessions.forEach((session) => {
         session.isRegistered = false;
         const cardEl = cardMap.get(session.sessionId);
         if (cardEl) updateCTAGroup(cardEl, session, false);
       });
+
+      // Reset to "All sessions" tab when user un-registers
+      const fs = getFilterState();
+      if (fs.activeTab === 'my') {
+        setFilterState({ ...fs, activeTab: 'all' });
+        const allTab = el.querySelector('.sh-tab[data-tab="all"]');
+        const myTab = el.querySelector('.sh-tab[data-tab="my"]');
+        if (allTab) allTab.classList.add('active');
+        if (myTab) myTab.classList.remove('active');
+      }
     }
+
+    applyFilter(listEl, state);
   });
 }
 
@@ -892,7 +861,7 @@ async function loadBlock(el, rsvpConfig) {
 
   bindToolbarEvents(toolbar, listEl, state);
   bindCardEvents(listEl, state);
-  bindMediatorSubscriptions(el, bannerEl);
+  bindMediatorSubscriptions(el, bannerEl, listEl);
 
   const storedPendingId = sessionStorage.getItem('sessions-hub:pendingSessionId');
   if (storedPendingId) {
@@ -922,7 +891,6 @@ export default async function init(el) {
   }
 
   if (rsvpUnsubscribe) { rsvpUnsubscribe(); rsvpUnsubscribe = null; }
-  if (modalOverlay) closeSpeakerModal();
   setFilterState({ query: '', activeTags: new Set(), activeTab: 'all' });
 
   let rsvpConfig = null;
