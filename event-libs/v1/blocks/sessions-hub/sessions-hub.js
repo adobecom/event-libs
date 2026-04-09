@@ -159,7 +159,7 @@ async function resolveRegistrationState(eventId, isEventRegistered) {
   return new Set(resp.data?.sessionIds || []);
 }
 
-function normalizeSessions(rawSessions, locationMap, registeredSessionIds, venueId) {
+function normalizeSessions(rawSessions, locationMap, registeredSessionIds, venueId, isEventRegistered) {
   return rawSessions.map((session) => {
     const sessionTimes = (session.rawTimes || []).map((t) => ({
       sessionTimeId: t.sessionTimeId,
@@ -169,6 +169,7 @@ function normalizeSessions(rawSessions, locationMap, registeredSessionIds, venue
       locationId: t.locationId,
       locationName: locationMap.get(`${venueId}:${t.locationId}`)?.name || '',
       isFull: t.isFull,
+      isAutoRegistrationEnabled: t.isAutoRegistrationEnabled ?? false,
     }));
 
     const speakers = (session.rawSpeakers || [])
@@ -192,7 +193,8 @@ function normalizeSessions(rawSessions, locationMap, registeredSessionIds, venue
       tags: deriveTagLabels(session.tags),
       sessionTimes,
       speakers,
-      isRegistered: registeredSessionIds.has(session.sessionId),
+      isRegistered: registeredSessionIds.has(session.sessionId)
+        || (isEventRegistered && sessionTimes.some((t) => t.isAutoRegistrationEnabled)),
       expanded: false,
     };
   });
@@ -686,7 +688,8 @@ function bindMediatorSubscriptions(el, bannerEl, listEl) {
       const ids = await resolveRegistrationState(state.eventData.eventId, true);
       state.registeredSessionIds = ids;
       state.sessions.forEach((session) => {
-        session.isRegistered = ids.has(session.sessionId);
+        session.isRegistered = ids.has(session.sessionId)
+          || session.sessionTimes.some((t) => t.isAutoRegistrationEnabled);
         const cardEl = cardMap.get(session.sessionId);
         if (cardEl) updateCTAGroup(cardEl, session, true);
       });
@@ -754,7 +757,7 @@ async function loadBlock(el, rsvpConfig) {
   const isEventRegistered = rsvpData?.registrationStatus === 'registered';
   const registeredSessionIds = await resolveRegistrationState(eventData.eventId, isEventRegistered);
 
-  const sessions = normalizeSessions(rawSessions, locationMap, registeredSessionIds, venueId);
+  const sessions = normalizeSessions(rawSessions, locationMap, registeredSessionIds, venueId, isEventRegistered);
 
   const speakerMap = new Map();
   sessions.forEach((session) => {
