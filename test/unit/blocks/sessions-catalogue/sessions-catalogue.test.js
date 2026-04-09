@@ -417,7 +417,7 @@ describe('sessions-hub init', () => {
     BlockMediator.set('imsProfile', undefined);
     BlockMediator.set('eventData', undefined);
     BlockMediator.set('rsvpData', undefined);
-    document.querySelectorAll('.sc-modal-overlay, .sc-event-banner').forEach((el) => el.remove());
+    document.querySelectorAll('.sh-modal-overlay, .sh-event-banner').forEach((el) => el.remove());
   });
 
   it('removes block when no sessions metadata is present', async () => {
@@ -433,9 +433,9 @@ describe('sessions-hub init', () => {
     setSessionsMeta([makeSession()]);
     const el = document.querySelector('.sessions-hub');
     await init(el);
-    expect(el.querySelector('.sc-toolbar')).to.not.be.null;
-    expect(el.querySelector('.sc-search')).to.not.be.null;
-    expect(el.querySelector('.sc-filter-btn')).to.not.be.null;
+    expect(el.querySelector('.sh-toolbar')).to.not.be.null;
+    expect(el.querySelector('.sh-search')).to.not.be.null;
+    expect(el.querySelector('.sh-filter-btn')).to.not.be.null;
   });
 
   it('does NOT render tab toggle when user is not event-registered (rsvpData null)', async () => {
@@ -443,7 +443,7 @@ describe('sessions-hub init', () => {
     setSessionsMeta([makeSession()]);
     const el = document.querySelector('.sessions-hub');
     await init(el);
-    const toggle = el.querySelector('.sc-tab-toggle');
+    const toggle = el.querySelector('.sh-tab-toggle');
     expect(toggle?.hidden).to.be.true;
   });
 
@@ -453,16 +453,16 @@ describe('sessions-hub init', () => {
     setSessionsMeta([makeSession()]);
     const el = document.querySelector('.sessions-hub');
     await init(el);
-    const toggle = el.querySelector('.sc-tab-toggle');
+    const toggle = el.querySelector('.sh-tab-toggle');
     expect(toggle?.hidden).to.be.false;
   });
 
-  it('renders one .sc-card per session', async () => {
+  it('renders one .sh-card per session', async () => {
     stubDefaultFetch();
     setSessionsMeta([makeSession({ sessionId: 's1' }), makeSession({ sessionId: 's2' })]);
     const el = document.querySelector('.sessions-hub');
     await init(el);
-    const cards = el.querySelectorAll('.sc-card');
+    const cards = el.querySelectorAll('.sh-card');
     expect(cards.length).to.equal(2);
   });
 
@@ -471,7 +471,7 @@ describe('sessions-hub init', () => {
     setSessionsMeta([makeSession()]);
     const el = document.querySelector('.sessions-hub');
     await init(el);
-    const banner = document.querySelector('.sc-event-banner');
+    const banner = document.querySelector('.sh-event-banner');
     expect(banner).to.not.be.null;
     expect(banner.classList.contains('hidden')).to.be.false;
   });

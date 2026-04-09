@@ -1,14 +1,11 @@
 import BlockMediator from '../../deps/block-mediator.min.js';
-import { createTag, getMetadata, getSusiOptions, LIBS, getEventConfig } from '../../utils/utils.js';
+import { createTag, getMetadata, getSusiOptions, LIBS, getEventConfig, loadStyle } from '../../utils/utils.js';
 import { dictionaryManager } from '../../utils/dictionary-manager.js';
 import { signIn } from '../../utils/decorate.js';
-import {
-  getSVGsfromFile, createSocialIcon, PLATFORM_PATTERNS, SUPPORTED_PLATFORMS,
-} from '../profile-cards/profile-cards.js';
+import { buildModalContent } from '../profile-cards/profile-cards.js';
 import { createSmartDateRange } from '../../utils/date-time-helper.js';
 import {
   getEvent,
-  getAllSeriesSpeakers,
   getVenueLocation,
   getMyEventSessions,
   registerForSessionTime,
@@ -36,12 +33,15 @@ const [getState, setState] = (() => {
 let rsvpUnsubscribe = null;
 let pendingSessionId = null;
 
-function openRsvpModal(hash) {
-  if (window.location.hash === hash) {
-    const { pathname, search } = window.location;
-    window.history.replaceState(null, '', `${pathname}${search}`);
-  }
-  window.location.hash = hash;
+async function openRsvpModal({ hash, path }) {
+  const miloLibs = getEventConfig()?.miloConfig?.miloLibs || LIBS;
+  const { getModal } = await import(`${miloLibs}/blocks/modal/modal.js`);
+  // Update URL for deep-link / page-refresh support.
+  // pushState rather than location.hash= so the hashchange listener doesn't fire
+  // (Milo's hashchange handler looks for a[data-modal-hash] which is gone after
+  // el.innerHTML='', causing findDetails to return a null path and skip the modal).
+  window.history.pushState(null, '', `${window.location.pathname}${window.location.search}${hash}`);
+  return getModal({ id: hash.slice(1), path });
 }
 
 // ─── Filter state ───────────────────────────────────────────────────────────
@@ -108,24 +108,12 @@ function debounce(fn, delay) {
   };
 }
 
-
 function createIcon(svgString) {
   const span = createTag('span', { class: 'sh-icon', 'aria-hidden': 'true' });
   span.innerHTML = svgString;
   return span;
 }
 
-// ─── Social icon platform detection ─────────────────────────────────────────
-
-function detectPlatform(href) {
-  try {
-    const { hostname } = new URL(href);
-    const matched = Object.entries(PLATFORM_PATTERNS).find(([, re]) => re.test(hostname.toLowerCase()));
-    return matched ? matched[0] : 'web';
-  } catch {
-    return 'web';
-  }
-}
 
 // ─── Data loading ────────────────────────────────────────────────────────────
 
@@ -137,15 +125,6 @@ async function resolveEventData() {
   if (!resp.ok) return null;
 
   return resp.data;
-}
-
-async function buildSpeakerMap(seriesId) {
-  const resp = await getAllSeriesSpeakers(seriesId);
-  const map = new Map();
-  if (resp.ok) {
-    resp.data.forEach((s) => map.set(s.speakerId, s));
-  }
-  return map;
 }
 
 async function buildLocationMap(venueId, sessions) {
@@ -180,7 +159,7 @@ async function resolveRegistrationState(eventId, isEventRegistered) {
   return new Set(resp.data?.sessionIds || []);
 }
 
-function normalizeSessions(rawSessions, speakerMap, locationMap, registeredSessionIds, venueId) {
+function normalizeSessions(rawSessions, locationMap, registeredSessionIds, venueId) {
   return rawSessions.map((session) => {
     const sessionTimes = (session.rawTimes || []).map((t) => ({
       sessionTimeId: t.sessionTimeId,
@@ -194,20 +173,17 @@ function normalizeSessions(rawSessions, speakerMap, locationMap, registeredSessi
 
     const speakers = (session.rawSpeakers || [])
       .sort((a, b) => (a.ordinal ?? 0) - (b.ordinal ?? 0))
-      .map((s) => {
-        const full = speakerMap.get(s.speakerId) || {};
-        return {
-          speakerId: s.speakerId,
-          speakerType: s.speakerType,
-          firstName: full.firstName || '',
-          lastName: full.lastName || '',
-          title: full.localizations?.['en-US']?.title || full.title || '',
-          bio: full.localizations?.['en-US']?.bio || full.bio || '',
-          photo: full.photo || null,
-          socialLinks: full.socialLinks || [],
-          company: full.company || '',
-        };
-      });
+      .map((s) => ({
+        speakerId: s.speakerId,
+        speakerType: s.speakerType,
+        firstName: s.firstName || '',
+        lastName: s.lastName || '',
+        title: s.localizations?.['en-US']?.title || s.title || '',
+        bio: s.localizations?.['en-US']?.bio || s.bio || '',
+        photo: s.photo || null,
+        socialLinks: s.socialLinks || [],
+        company: s.company || '',
+      }));
 
     return {
       sessionId: session.sessionId,
@@ -393,7 +369,6 @@ function renderSessionCard(session, isEventRegistered) {
   return card;
 }
 
-
 function renderSessionList(sessions, isEventRegistered) {
   const list = createTag('div', { class: 'sh-session-list' });
   sessions.forEach((s) => list.append(renderSessionCard(s, isEventRegistered)));
@@ -513,7 +488,7 @@ function renderEventBanner(rsvpConfig) {
     if (isSignedOut) {
       signIn({ ...getSusiOptions(), redirect_uri: window.location.href });
     } else if (rsvpConfig) {
-      openRsvpModal(rsvpConfig.hash);
+      openRsvpModal(rsvpConfig);
     }
   });
 
@@ -529,66 +504,21 @@ function syncBannerVisibility(bannerEl, isEventRegistered) {
 
 // ─── Speaker modal ───────────────────────────────────────────────────────────
 
-async function buildSpeakerModalContent(speaker) {
-  const content = createTag('div', { class: 'sh-speaker-modal' });
-  const modalBody = createTag('div', { class: 'sh-modal-body' });
-
-  if (speaker.photo?.imageUrl) {
-    modalBody.append(createTag('img', {
-      class: 'sh-modal-photo',
-      src: speaker.photo.imageUrl,
-      alt: speaker.photo.altText || `${speaker.firstName} ${speaker.lastName}`,
-    }));
-  }
-
-  const info = createTag('div', { class: 'sh-modal-info' });
-  if (speaker.title) info.append(createTag('p', { class: 'sh-modal-speaker-title' }, speaker.title));
-  info.append(createTag('h2', { class: 'sh-modal-name' }, `${speaker.firstName} ${speaker.lastName}`));
-  if (speaker.company) info.append(createTag('p', { class: 'sh-modal-company' }, speaker.company));
-  if (speaker.bio) info.append(createTag('p', { class: 'sh-modal-bio' }, speaker.bio));
-
-  if (speaker.socialLinks?.length) {
-    const svgPath = new URL('../../icons/social-icons.svg', import.meta.url).href;
-    const svgEls = await getSVGsfromFile(svgPath, SUPPORTED_PLATFORMS);
-    if (svgEls?.length) {
-      const socialList = createTag('ul', { class: 'sh-modal-social-icons' });
-      speaker.socialLinks.forEach((entry) => {
-        const href = typeof entry === 'string' ? entry : entry.link;
-        if (!href?.trim()) return;
-        const platform = detectPlatform(href);
-        const svgEl = svgEls.find((el) => el?.name === platform);
-        if (!svgEl) return;
-        const icon = createSocialIcon(svgEl.svg, platform);
-        if (!icon) return;
-        const a = createTag('a', {
-          href,
-          target: '_blank',
-          rel: 'noopener noreferrer',
-          'aria-label': typeof entry === 'object' ? (entry.serviceName || platform) : platform,
-        });
-        a.append(icon);
-        socialList.append(createTag('li', {}, a));
-      });
-      info.append(socialList);
-    }
-  }
-
-  modalBody.append(info);
-  content.append(modalBody);
-  return content;
-}
-
 async function openSpeakerModal(speaker) {
   if (!speaker) return;
 
+  const profileCardsCssUrl = new URL('../profile-cards/profile-cards.css', import.meta.url).href;
   const miloLibs = getEventConfig()?.miloConfig?.miloLibs || LIBS;
-  const { getModal } = await import(`${miloLibs}/blocks/modal/modal.js`);
+  const [{ getModal }] = await Promise.all([
+    import(`${miloLibs}/blocks/modal/modal.js`),
+    new Promise((resolve) => { loadStyle(profileCardsCssUrl, resolve); }),
+  ]);
 
-  const content = await buildSpeakerModalContent(speaker);
+  const content = await buildModalContent(speaker);
   await getModal(null, {
     id: `sh-speaker-${speaker.speakerId}`,
     content,
-    class: 'sh-speaker-modal-dialog',
+    class: 'profile-cards-modal',
     title: `${speaker.firstName} ${speaker.lastName}`,
   });
 }
@@ -709,31 +639,28 @@ function bindCardEvents(listEl, state) {
       const isSignedOut = !profile || profile.noProfile || profile.account_type === 'guest';
 
       if (isSignedOut) {
-        console.log('[sessions-hub] Signed-out user clicked register. Storing pending session and triggering SUSI:', sessionId);
         sessionStorage.setItem('sessions-hub:pendingSessionId', sessionId);
         signIn({ ...getSusiOptions(), redirect_uri: window.location.href });
         return;
       }
 
       if (state.rsvpConfig) {
-        console.log('[sessions-hub] Signed-in, not event-registered. Opening RSVP modal for pending session:', sessionId);
         pendingSessionId = sessionId;
         const btn = e.target.closest('.sh-btn-register-event');
         if (btn) { btn.disabled = true; btn.textContent = dictionaryManager.getValue('Registering\u2026'); }
 
-        const onHashChange = () => {
-          if (!window.location.hash.includes('rsvp-form')) {
-            if (pendingSessionId === sessionId) {
-              console.log('[sessions-hub] RSVP modal closed without completing. Re-enabling button for session:', sessionId);
-              pendingSessionId = null;
-              if (btn) { btn.disabled = false; btn.textContent = dictionaryManager.getValue('Register for session'); }
-            }
-            window.removeEventListener('hashchange', onHashChange);
+        // Milo's closeModal uses pushState (not location.hash=) so hashchange never fires.
+        // Listen for the milo:modal:closed event instead to detect cancellation.
+        const onModalClose = () => {
+          window.removeEventListener('milo:modal:closed', onModalClose);
+          if (pendingSessionId === sessionId) {
+            pendingSessionId = null;
+            if (btn) { btn.disabled = false; btn.textContent = dictionaryManager.getValue('Register for session'); }
           }
         };
-        window.addEventListener('hashchange', onHashChange);
+        window.addEventListener('milo:modal:closed', onModalClose);
 
-        openRsvpModal(state.rsvpConfig.hash);
+        openRsvpModal(state.rsvpConfig);
       }
       return;
     }
@@ -743,7 +670,7 @@ function bindCardEvents(listEl, state) {
 function bindMediatorSubscriptions(el, bannerEl, listEl) {
   rsvpUnsubscribe = BlockMediator.subscribe('rsvpData', async ({ newValue }) => {
     const state = getState();
-    const isRegistered = newValue != null;
+    const isRegistered = newValue?.registrationStatus === 'registered';
     state.isEventRegistered = isRegistered;
 
     syncBannerVisibility(bannerEl, isRegistered);
@@ -767,13 +694,10 @@ function bindMediatorSubscriptions(el, bannerEl, listEl) {
       if (pendingSessionId) {
         const pid = pendingSessionId;
         pendingSessionId = null;
-        console.log('[sessions-hub] RSVP completed. Auto-registering for pending session:', pid);
         const pendingSession = state.sessions.find((s) => s.sessionId === pid);
         const pendingCard = cardMap.get(pid);
         if (pendingSession && pendingCard && !pendingSession.isRegistered) {
           await handleSessionRegistration(pendingCard, pid, state);
-        } else {
-          console.log('[sessions-hub] Pending session not found or already registered:', pid);
         }
       }
     } else {
@@ -824,18 +748,20 @@ async function loadBlock(el, rsvpConfig) {
   });
 
   const { venueId } = eventData;
-  const [speakerMap, locationMap] = await Promise.all([
-    buildSpeakerMap(eventData.seriesId),
-    buildLocationMap(venueId, rawSessions),
-  ]);
+  const locationMap = await buildLocationMap(venueId, rawSessions);
 
   const rsvpData = BlockMediator.get('rsvpData');
-  const isEventRegistered = rsvpData != null;
+  const isEventRegistered = rsvpData?.registrationStatus === 'registered';
   const registeredSessionIds = await resolveRegistrationState(eventData.eventId, isEventRegistered);
 
-  const sessions = normalizeSessions(
-    rawSessions, speakerMap, locationMap, registeredSessionIds, venueId,
-  );
+  const sessions = normalizeSessions(rawSessions, locationMap, registeredSessionIds, venueId);
+
+  const speakerMap = new Map();
+  sessions.forEach((session) => {
+    session.speakers.forEach((sp) => {
+      if (!speakerMap.has(sp.speakerId)) speakerMap.set(sp.speakerId, sp);
+    });
+  });
 
   const state = {
     eventData,
@@ -866,21 +792,16 @@ async function loadBlock(el, rsvpConfig) {
   const storedPendingId = sessionStorage.getItem('sessions-hub:pendingSessionId');
   if (storedPendingId) {
     sessionStorage.removeItem('sessions-hub:pendingSessionId');
-    console.log('[sessions-hub] Found pending session from previous page load:', storedPendingId);
 
     if (isEventRegistered) {
-      console.log('[sessions-hub] User is event-registered. Attempting direct session registration:', storedPendingId);
       const pendingSession = sessions.find((s) => s.sessionId === storedPendingId);
       const pendingCard = listEl.querySelector(`[data-session-id="${storedPendingId}"]`);
       if (pendingSession && pendingCard && !pendingSession.isRegistered) {
         await handleSessionRegistration(pendingCard, storedPendingId, state);
-      } else {
-        console.log('[sessions-hub] Pending session not found or already registered:', storedPendingId);
       }
     } else if (rsvpConfig) {
-      console.log('[sessions-hub] User not event-registered. Auto-opening RSVP modal for pending session:', storedPendingId);
       pendingSessionId = storedPendingId;
-      openRsvpModal(rsvpConfig.hash);
+      openRsvpModal(rsvpConfig);
     }
   }
 }
@@ -902,8 +823,17 @@ export default async function init(el) {
       if (link) {
         try {
           const url = new URL(link.href);
-          rsvpConfig = { hash: url.hash };
-          console.log('[sessions-hub] Parsed RSVP config from authored HTML:', rsvpConfig);
+          // Strip any secondary modifier (e.g. #_button-fill) from the hash so the resulting
+          // modal id is a valid CSS id selector. Milo's closeModal uses querySelectorAll('#id')
+          // and a compound id like 'rsvp-form-1#_button-fill' never matches any element.
+          const cleanId = url.hash.replace(/^#/, '').split('#')[0];
+          // Milo's decorateLinksAsync runs before block init and transforms the RSVP link:
+          //   href → just the hash  (so url.pathname now resolves to the current page)
+          //   data-modal-path → the ORIGINAL pathname (e.g. the events-form fragment page)
+          // We must read data-modal-path first so getPathModal → fragment.js fetches the
+          // correct fragment URL.  Fall back to url.pathname for un-decorated links.
+          const path = link.dataset.modalPath || url.pathname;
+          rsvpConfig = { hash: `#${cleanId}`, path };
         } catch (e) {
           window.lana?.log(`Failed to parse RSVP form link: ${link.href}`);
         }

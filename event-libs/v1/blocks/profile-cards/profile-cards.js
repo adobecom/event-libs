@@ -248,7 +248,7 @@ async function loadMiloModal() {
   return modalLoader;
 }
 
-async function buildModalContent(profileData) {
+export async function buildModalContent(profileData) {
   const content = new DocumentFragment();
   const modalContent = createTag('div', { class: 'profile-cards-modal-content' });
   const textContainer = createTag('div', { class: 'profile-cards-modal-text' });
