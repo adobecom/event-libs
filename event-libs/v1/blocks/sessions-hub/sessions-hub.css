@@ -661,7 +661,7 @@
 @media (min-width: 601px) {
   .sessions-hub .sh-search-row {
     flex-direction: row;
-    width: auto;
+    width: 100%;
   }
 
   .sessions-hub .sh-tab-toggle {
