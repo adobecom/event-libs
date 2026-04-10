@@ -613,6 +613,8 @@ async function handleSessionRegistration(cardEl, sessionId, state) {
     session.isRegistered = true;
     state.registeredSessionIds.add(sessionId);
     updateCTAGroup(cardEl, session, true);
+    const existing = BlockMediator.get('registeredSessionIds') || new Set();
+    BlockMediator.set('registeredSessionIds', new Set([...existing, sessionId]));
   } else {
     window.lana?.log(`Error: Failed to register for session ${sessionId}. Error:${JSON.stringify(resp.error)}`);
     if (btn) {
@@ -706,22 +708,14 @@ function bindMediatorSubscriptions(el, bannerEl, listEl) {
 
     if (isRegistered) {
       const ids = await resolveRegistrationState(state.eventData.eventId, true);
-      state.registeredSessionIds = ids;
+      const alreadyRegistered = BlockMediator.get('registeredSessionIds') || new Set();
+      const mergedIds = new Set([...ids, ...alreadyRegistered]);
+      state.registeredSessionIds = mergedIds;
       state.sessions.forEach((session) => {
-        session.isRegistered = ids.has(session.sessionId);
+        session.isRegistered = mergedIds.has(session.sessionId);
         const cardEl = cardMap.get(session.sessionId);
         if (cardEl) updateCTAGroup(cardEl, session, true);
       });
-
-      const autoRegSessions = state.sessions.filter(
-        (s) => !s.isRegistered && s.sessionTimes.some((t) => t.isAutoRegistrationEnabled),
-      );
-      await Promise.all(
-        autoRegSessions.map((s) => {
-          const cardEl = cardMap.get(s.sessionId);
-          return cardEl ? handleSessionRegistration(cardEl, s.sessionId, state) : Promise.resolve();
-        }),
-      );
 
       if (pendingSessionId) {
         const pid = pendingSessionId;
@@ -752,6 +746,22 @@ function bindMediatorSubscriptions(el, bannerEl, listEl) {
     }
 
     applyFilter(listEl, state);
+  });
+
+  BlockMediator.subscribe('registeredSessionIds', ({ newValue }) => {
+    const state = getState();
+    if (!newValue?.size || !state?.sessions) return;
+    const cardMap = new Map(
+      [...el.querySelectorAll('.sh-card')].map((c) => [c.dataset.sessionId, c]),
+    );
+    state.sessions.forEach((session) => {
+      if (newValue.has(session.sessionId) && !session.isRegistered) {
+        session.isRegistered = true;
+        state.registeredSessionIds.add(session.sessionId);
+        const cardEl = cardMap.get(session.sessionId);
+        if (cardEl) updateCTAGroup(cardEl, session, state.isEventRegistered);
+      }
+    });
   });
 }
 
