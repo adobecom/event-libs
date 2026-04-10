@@ -256,7 +256,7 @@ function renderCTAGroup(session, isEventRegistered) {
     const calBtn = createTag('button', { class: 'sh-btn sh-btn-cal', type: 'button' });
     calBtn.append(createIcon(CTA_CALENDAR_ICON), createTag('span', {}, dictionaryManager.getValue('Download to calendar')));
     group.append(calBtn);
-    const badge = createTag('span', { class: 'sh-registered-badge' });
+    const badge = createTag('span', { class: 'sh-registered-badge', role: 'status' });
     badge.append(createIcon(CHECKMARK_ICON), createTag('span', {}, dictionaryManager.getValue('Registered')));
     group.append(badge);
   }
@@ -272,7 +272,7 @@ function updateCTAGroup(cardEl, session, isEventRegistered) {
 // ─── Render: session card ────────────────────────────────────────────────────
 
 function renderTagPills(tags) {
-  const list = createTag('ul', { class: 'sh-tag-list' });
+  const list = createTag('ul', { class: 'sh-tag-list', 'aria-label': dictionaryManager.getValue('Tags') });
   tags.forEach((tag) => list.append(createTag('li', { class: 'sh-tag-pill' }, tag)));
   return list;
 }
@@ -341,6 +341,10 @@ function renderSessionCard(session, isEventRegistered) {
     left.append(locEl);
   }
 
+  if (primaryTime?.isFull) {
+    left.append(createTag('span', { class: 'sh-full-badge' }, dictionaryManager.getValue('Session full')));
+  }
+
   if (session.tags.length) left.append(renderTagPills(session.tags));
 
   if (session.speakers.length) {
@@ -393,9 +397,10 @@ function renderFilterPanel(sessions) {
   const panel = createTag('div', { class: 'sh-filter-panel hidden', 'aria-hidden': 'true' });
   const { tags } = collectFilterOptions(sessions);
 
-  tags.forEach((tag) => {
-    const lbl = createTag('label', { class: 'sh-filter-item' });
-    lbl.append(createTag('input', { type: 'checkbox', value: tag, 'data-filter-type': 'tag' }));
+  tags.forEach((tag, i) => {
+    const id = `sh-filter-tag-${i}`;
+    const lbl = createTag('label', { class: 'sh-filter-item', for: id });
+    lbl.append(createTag('input', { id, type: 'checkbox', value: tag, 'data-filter-type': 'tag' }));
     lbl.append(createTag('span', {}, tag));
     panel.append(lbl);
   });
@@ -465,7 +470,7 @@ function buildBannerDateString() {
 }
 
 function renderEventBanner(rsvpConfig) {
-  const banner = createTag('div', { class: 'sh-event-banner' });
+  const banner = createTag('aside', { class: 'sh-event-banner', 'aria-label': dictionaryManager.getValue('Event registration') });
   const inner = createTag('div', { class: 'sh-banner-inner' });
   const info = createTag('div', { class: 'sh-banner-info' });
 
@@ -542,14 +547,28 @@ function bindToolbarEvents(toolbarEl, listEl, state) {
     const isHidden = filterPanel.classList.toggle('hidden');
     filterBtn.setAttribute('aria-expanded', String(!isHidden));
     filterPanel.setAttribute('aria-hidden', String(isHidden));
+    if (!isHidden) {
+      const firstCheckbox = filterPanel.querySelector('input[type="checkbox"]');
+      if (firstCheckbox) setTimeout(() => firstCheckbox.focus(), 0);
+    }
+  });
+
+  filterPanel.addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape') return;
+    filterPanel.classList.add('hidden');
+    filterBtn.setAttribute('aria-expanded', 'false');
+    filterPanel.setAttribute('aria-hidden', 'true');
+    filterBtn.focus();
   });
 
   document.addEventListener('click', (e) => {
     const filterWrap = toolbarEl.querySelector('.sh-filter-wrap');
     if (!filterWrap?.contains(e.target)) {
+      const wasOpen = !filterPanel.classList.contains('hidden');
       filterPanel.classList.add('hidden');
       filterBtn.setAttribute('aria-expanded', 'false');
       filterPanel.setAttribute('aria-hidden', 'true');
+      if (wasOpen) filterBtn.focus();
     }
   });
 
@@ -585,6 +604,7 @@ async function handleSessionRegistration(cardEl, sessionId, state) {
   const btn = cardEl.querySelector('.sh-btn-register-session');
   if (btn) {
     btn.disabled = true;
+    btn.setAttribute('aria-busy', 'true');
     btn.textContent = dictionaryManager.getValue('Registering\u2026');
   }
 
@@ -598,6 +618,7 @@ async function handleSessionRegistration(cardEl, sessionId, state) {
     window.lana?.log(`Error: Failed to register for session ${sessionId}. Error:${JSON.stringify(resp.error)}`);
     if (btn) {
       btn.disabled = false;
+      btn.removeAttribute('aria-busy');
       btn.textContent = dictionaryManager.getValue('Register for session');
     }
   }
