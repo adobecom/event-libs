@@ -193,8 +193,7 @@ function normalizeSessions(rawSessions, locationMap, registeredSessionIds, venue
       tags: deriveTagLabels(session.tags),
       sessionTimes,
       speakers,
-      isRegistered: registeredSessionIds.has(session.sessionId)
-        || (isEventRegistered && sessionTimes.some((t) => t.isAutoRegistrationEnabled)),
+      isRegistered: registeredSessionIds.has(session.sessionId),
       expanded: false,
     };
   });
@@ -709,11 +708,20 @@ function bindMediatorSubscriptions(el, bannerEl, listEl) {
       const ids = await resolveRegistrationState(state.eventData.eventId, true);
       state.registeredSessionIds = ids;
       state.sessions.forEach((session) => {
-        session.isRegistered = ids.has(session.sessionId)
-          || session.sessionTimes.some((t) => t.isAutoRegistrationEnabled);
+        session.isRegistered = ids.has(session.sessionId);
         const cardEl = cardMap.get(session.sessionId);
         if (cardEl) updateCTAGroup(cardEl, session, true);
       });
+
+      const autoRegSessions = state.sessions.filter(
+        (s) => !s.isRegistered && s.sessionTimes.some((t) => t.isAutoRegistrationEnabled),
+      );
+      await Promise.all(
+        autoRegSessions.map((s) => {
+          const cardEl = cardMap.get(s.sessionId);
+          return cardEl ? handleSessionRegistration(cardEl, s.sessionId, state) : Promise.resolve();
+        }),
+      );
 
       if (pendingSessionId) {
         const pid = pendingSessionId;
