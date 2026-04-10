@@ -457,8 +457,14 @@ export async function getSessionTimeAttendee(sessionTimeId) {
   }
 }
 
+function isSessionDryrun() {
+  return new URLSearchParams(window.location.search).get('sessionDryrun') !== null;
+}
+
 // NOTE: exact path for session-time registration needs backend confirmation before production use
 export async function registerForSessionTime(sessionTimeId, attendeeId, registrationData) {
+  if (isSessionDryrun()) return { ok: true, data: {} };
+
   const eventServiceEnv = getEventServiceEnv();
   const { serviceApiEndpoints } = ENV_MAP[eventServiceEnv.name];
   const raw = JSON.stringify(registrationData);
@@ -476,6 +482,32 @@ export async function registerForSessionTime(sessionTimeId, attendeeId, registra
     return { ok: true, data };
   } catch (error) {
     window.lana?.log(`Error: Failed to register for session time ${sessionTimeId}. Error:${JSON.stringify(error)}`);
+    return { ok: false, status: 'Network Error', error: error.message };
+  }
+}
+
+export async function unregisterFromSessionTime(sessionTimeId) {
+  if (isSessionDryrun()) return { ok: true };
+
+  const eventServiceEnv = getEventServiceEnv();
+  const { serviceApiEndpoints } = ENV_MAP[eventServiceEnv.name];
+  const options = await constructRequestOptions('DELETE');
+
+  try {
+    const response = await fetch(
+      `${serviceApiEndpoints.esl}/v1/session-times/${sessionTimeId}/attendees/me`,
+      options,
+    );
+
+    if (!response.ok) {
+      window.lana?.log(`Error: Failed to unregister from session time ${sessionTimeId}. Status:${JSON.stringify(response)}`);
+      return { ok: false, status: response.status };
+    }
+
+    if (response.status === 204) return { ok: true };
+    return { ok: true, data: await response.json() };
+  } catch (error) {
+    window.lana?.log(`Error: Failed to unregister from session time ${sessionTimeId}. Error:${JSON.stringify(error)}`);
     return { ok: false, status: 'Network Error', error: error.message };
   }
 }

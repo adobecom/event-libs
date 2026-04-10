@@ -9,6 +9,7 @@ import {
   getVenueLocation,
   getMyEventSessions,
   registerForSessionTime,
+  unregisterFromSessionTime,
 } from '../../utils/esp-controller.js';
 
 const CALENDAR_ICON = '<svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M8.25 15H6.75C5.78516 15 5 14.2148 5 13.25V11.75C5 10.7852 5.78516 10 6.75 10H8.25C9.21484 10 10 10.7852 10 11.75V13.25C10 14.2148 9.21484 15 8.25 15ZM6.75 11.5C6.6123 11.5 6.5 11.6123 6.5 11.75V13.25C6.5 13.3877 6.6123 13.5 6.75 13.5H8.25C8.3877 13.5 8.5 13.3877 8.5 13.25V11.75C8.5 11.6123 8.3877 11.5 8.25 11.5H6.75Z" fill="#292929"/><path d="M15.75 3H13.75V2C13.75 1.58594 13.4141 1.25 13 1.25C12.5859 1.25 12.25 1.58594 12.25 2V3H7.75V2C7.75 1.58594 7.41406 1.25 7 1.25C6.58594 1.25 6.25 1.58594 6.25 2V3H4.25C3.00977 3 2 4.00977 2 5.25V15.75C2 16.9902 3.00977 18 4.25 18H15.75C16.9902 18 18 16.9902 18 15.75V5.25C18 4.00977 16.9902 3 15.75 3ZM4.25 4.5H6.25V5C6.25 5.41406 6.58594 5.75 7 5.75C7.41406 5.75 7.75 5.41406 7.75 5V4.5H12.25V5C12.25 5.41406 12.5859 5.75 13 5.75C13.4141 5.75 13.75 5.41406 13.75 5V4.5H15.75C16.1631 4.5 16.5 4.83691 16.5 5.25V7H3.5V5.25C3.5 4.83691 3.83691 4.5 4.25 4.5ZM15.75 16.5H4.25C3.83691 16.5 3.5 16.1631 3.5 15.75V8.5H16.5V15.75C16.5 16.1631 16.1631 16.5 15.75 16.5Z" fill="#292929"/></svg>';
@@ -159,7 +160,22 @@ async function resolveRegistrationState(eventId, isEventRegistered) {
   return new Set(resp.data?.sessionIds || []);
 }
 
-function normalizeSessions(rawSessions, locationMap, registeredSessionIds, venueId, isEventRegistered) {
+function findConflictingSession(newSession, state) {
+  const newTime = newSession.sessionTimes[0];
+  if (!newTime) return null;
+  for (const session of state.sessions) {
+    if (!session.isRegistered || session.sessionId === newSession.sessionId) continue;
+    const regTime = session.sessionTimes[0];
+    if (!regTime) continue;
+    if (newTime.startTimeMillis < regTime.endTimeMillis
+        && regTime.startTimeMillis < newTime.endTimeMillis) {
+      return session;
+    }
+  }
+  return null;
+}
+
+function normalizeSessions(rawSessions, locationMap, registeredSessionIds, venueId) {
   return rawSessions.map((session) => {
     const sessionTimes = (session.rawTimes || []).map((t) => ({
       sessionTimeId: t.sessionTimeId,
@@ -167,7 +183,7 @@ function normalizeSessions(rawSessions, locationMap, registeredSessionIds, venue
       endTimeMillis: t.endTimeMillis,
       timezone: t.timezone,
       locationId: t.locationId,
-      locationName: locationMap.get(`${venueId}:${t.locationId}`)?.name || '',
+      locationName: locationMap.get(`${venueId}:${t.locationId}`)?.name || t.location?.name || '',
       isFull: t.isFull,
       isAutoRegistrationEnabled: t.isAutoRegistrationEnabled ?? false,
     }));
@@ -255,9 +271,25 @@ function renderCTAGroup(session, isEventRegistered) {
     const calBtn = createTag('button', { class: 'sh-btn sh-btn-cal', type: 'button' });
     calBtn.append(createIcon(CTA_CALENDAR_ICON), createTag('span', {}, dictionaryManager.getValue('Download to calendar')));
     group.append(calBtn);
-    const badge = createTag('span', { class: 'sh-registered-badge', role: 'status' });
+
+    const badge = createTag('button', { class: 'sh-btn sh-registered-badge', type: 'button', disabled: '' });
     badge.append(createIcon(CHECKMARK_ICON), createTag('span', {}, dictionaryManager.getValue('Registered')));
     group.append(badge);
+
+    setTimeout(() => { badge.disabled = false; }, 2000);
+
+    const setRegisteredContent = () => {
+      badge.innerHTML = '';
+      badge.classList.remove('sh-unregister-mode');
+      badge.append(createIcon(CHECKMARK_ICON), createTag('span', {}, dictionaryManager.getValue('Registered')));
+    };
+    const setUnregisterContent = () => {
+      badge.innerHTML = '';
+      badge.classList.add('sh-unregister-mode');
+      badge.append(createTag('span', {}, dictionaryManager.getValue('Unregister')));
+    };
+    badge.addEventListener('mouseenter', () => { if (!badge.disabled) setUnregisterContent(); });
+    badge.addEventListener('mouseleave', () => { if (!badge.disabled) setRegisteredContent(); });
   }
 
   return group;
@@ -508,6 +540,112 @@ function syncBannerVisibility(bannerEl, isEventRegistered) {
   bannerEl.classList.toggle('hidden', isEventRegistered);
 }
 
+// ─── Conflict modal ──────────────────────────────────────────────────────────
+
+function buildConflictOption(session) {
+  const primaryTime = session.sessionTimes[0];
+  const timeStr = primaryTime
+    ? createSmartDateRange(primaryTime.startTimeMillis, primaryTime.endTimeMillis, 'en-US', primaryTime.timezone)
+    : '';
+  const locationName = primaryTime?.locationName || '';
+
+  const option = createTag('div', {
+    class: 'sh-conflict-option',
+    'data-session-id': session.sessionId,
+    role: 'radio',
+    tabindex: '0',
+    'aria-checked': 'false',
+  });
+  option.append(createTag('span', { class: 'sh-conflict-radio', 'aria-hidden': 'true' }));
+
+  const content = createTag('div', { class: 'sh-conflict-option-content' });
+  content.append(createTag('p', { class: 'sh-conflict-option-title' }, session.title));
+
+  if (timeStr) {
+    const timeEl = createTag('div', { class: 'sh-conflict-option-meta' });
+    timeEl.append(createIcon(CALENDAR_ICON), ` ${timeStr}`);
+    content.append(timeEl);
+  }
+
+  if (locationName) {
+    const locEl = createTag('div', { class: 'sh-conflict-option-meta' });
+    locEl.append(createIcon(PIN_ICON), ` ${locationName}`);
+    content.append(locEl);
+  }
+
+  option.append(content);
+  return option;
+}
+
+function buildConflictModalContent(newSession, conflictingSession) {
+  const wrapper = createTag('div', { class: 'sh-conflict-wrapper' });
+
+  const heading = createTag('div', { class: 'sh-conflict-heading' });
+  heading.append(
+    createTag('p', { class: 'sh-conflict-title' }, dictionaryManager.getValue('You have conflicting sessions')),
+    createTag('p', { class: 'sh-conflict-subtitle' }, dictionaryManager.getValue('Select which session you want to keep.')),
+  );
+
+  const optionsEl = createTag('div', { class: 'sh-conflict-options', role: 'radiogroup' });
+  const existingOption = buildConflictOption(conflictingSession);
+  const newOption = buildConflictOption(newSession);
+  newOption.classList.add('selected');
+  newOption.setAttribute('aria-checked', 'true');
+  optionsEl.append(existingOption, newOption);
+
+  optionsEl.addEventListener('click', (e) => {
+    const opt = e.target.closest('.sh-conflict-option');
+    if (!opt) return;
+    optionsEl.querySelectorAll('.sh-conflict-option').forEach((o) => {
+      o.classList.remove('selected');
+      o.setAttribute('aria-checked', 'false');
+    });
+    opt.classList.add('selected');
+    opt.setAttribute('aria-checked', 'true');
+  });
+
+  optionsEl.addEventListener('keydown', (e) => {
+    if (e.key !== 'Enter' && e.key !== ' ') return;
+    const opt = e.target.closest('.sh-conflict-option');
+    if (!opt) return;
+    e.preventDefault();
+    opt.click();
+  });
+
+  const confirmBtn = createTag('button', {
+    class: 'sh-btn sh-conflict-confirm',
+    type: 'button',
+  }, dictionaryManager.getValue('Add session'));
+
+  wrapper.append(heading, optionsEl, confirmBtn);
+  return { content: wrapper, confirmBtn, optionsEl };
+}
+
+async function openConflictModal(newSession, conflictingSession) {
+  const miloLibs = getEventConfig()?.miloConfig?.miloLibs || LIBS;
+  const { getModal, closeModal } = await import(`${miloLibs}/blocks/modal/modal.js`);
+  const { content, confirmBtn, optionsEl } = buildConflictModalContent(newSession, conflictingSession);
+
+  return new Promise((resolve) => {
+    let confirmed = false;
+
+    confirmBtn.addEventListener('click', () => {
+      confirmed = true;
+      const sel = optionsEl.querySelector('.sh-conflict-option.selected');
+      closeModal();
+      resolve(sel?.dataset.sessionId || newSession.sessionId);
+    });
+
+    const onClose = () => {
+      window.removeEventListener('milo:modal:closed', onClose);
+      if (!confirmed) resolve(null);
+    };
+    window.addEventListener('milo:modal:closed', onClose);
+
+    getModal(null, { id: 'sh-conflict-modal', content, class: 'sh-conflict-modal' });
+  });
+}
+
 // ─── Speaker modal ───────────────────────────────────────────────────────────
 
 async function openSpeakerModal(speaker) {
@@ -600,6 +738,33 @@ async function handleSessionRegistration(cardEl, sessionId, state) {
   const firstTime = session.sessionTimes[0];
   if (!firstTime) return;
 
+  // ── Conflict detection ────────────────────────────────────────────────────
+  const conflictingSession = findConflictingSession(session, state);
+  if (conflictingSession) {
+    const selectedId = await openConflictModal(session, conflictingSession);
+    if (!selectedId) return; // dismissed
+    if (selectedId === conflictingSession.sessionId) return; // user kept existing
+
+    // User chose new session → unregister from conflicting first
+    const conflictTime = conflictingSession.sessionTimes[0];
+    if (conflictTime) {
+      const unregResp = await unregisterFromSessionTime(conflictTime.sessionTimeId);
+      if (!unregResp.ok) {
+        window.lana?.log(`Error: Failed to unregister conflicting session ${conflictingSession.sessionId}`);
+        return;
+      }
+      conflictingSession.isRegistered = false;
+      state.registeredSessionIds.delete(conflictingSession.sessionId);
+      const conflictCard = cardEl.closest('.sh-session-list')
+        ?.querySelector(`[data-session-id="${conflictingSession.sessionId}"]`);
+      if (conflictCard) updateCTAGroup(conflictCard, conflictingSession, true);
+      const existing = BlockMediator.get('registeredSessionIds') || new Set();
+      const updated = new Set([...existing]);
+      updated.delete(conflictingSession.sessionId);
+      BlockMediator.set('registeredSessionIds', updated);
+    }
+  }
+
   const btn = cardEl.querySelector('.sh-btn-register-session');
   if (btn) {
     btn.disabled = true;
@@ -621,6 +786,42 @@ async function handleSessionRegistration(cardEl, sessionId, state) {
       btn.disabled = false;
       btn.removeAttribute('aria-busy');
       btn.textContent = dictionaryManager.getValue('Register for session');
+    }
+  }
+}
+
+async function handleSessionUnregistration(cardEl, sessionId, state) {
+  const session = state.sessions.find((s) => s.sessionId === sessionId);
+  if (!session) return;
+
+  const firstTime = session.sessionTimes[0];
+  if (!firstTime) return;
+
+  const badge = cardEl.querySelector('.sh-registered-badge');
+  if (badge) {
+    badge.disabled = true;
+    badge.setAttribute('aria-busy', 'true');
+    badge.textContent = dictionaryManager.getValue('Unregistering\u2026');
+  }
+
+  const resp = await unregisterFromSessionTime(firstTime.sessionTimeId);
+
+  if (resp.ok) {
+    session.isRegistered = false;
+    state.registeredSessionIds.delete(sessionId);
+    updateCTAGroup(cardEl, session, true);
+    const existing = BlockMediator.get('registeredSessionIds') || new Set();
+    const updated = new Set([...existing]);
+    updated.delete(sessionId);
+    BlockMediator.set('registeredSessionIds', updated);
+  } else {
+    window.lana?.log(`Error: Failed to unregister from session ${sessionId}. Error:${JSON.stringify(resp.error)}`);
+    if (badge) {
+      badge.disabled = false;
+      badge.removeAttribute('aria-busy');
+      badge.classList.remove('sh-unregister-mode');
+      badge.innerHTML = '';
+      badge.append(createIcon(CHECKMARK_ICON), createTag('span', {}, dictionaryManager.getValue('Registered')));
     }
   }
 }
@@ -648,6 +849,11 @@ function bindCardEvents(listEl, state) {
 
     if (e.target.closest('.sh-btn-register-session')) {
       await handleSessionRegistration(card, sessionId, state);
+      return;
+    }
+
+    if (e.target.closest('.sh-registered-badge:not(:disabled)')) {
+      await handleSessionUnregistration(card, sessionId, state);
       return;
     }
 
@@ -796,7 +1002,7 @@ async function loadBlock(el, rsvpConfig) {
   const isEventRegistered = rsvpData?.registrationStatus === 'registered';
   const registeredSessionIds = await resolveRegistrationState(eventData.eventId, isEventRegistered);
 
-  const sessions = normalizeSessions(rawSessions, locationMap, registeredSessionIds, venueId, isEventRegistered);
+  const sessions = normalizeSessions(rawSessions, locationMap, registeredSessionIds, venueId);
 
   const speakerMap = new Map();
   sessions.forEach((session) => {
@@ -849,10 +1055,6 @@ async function loadBlock(el, rsvpConfig) {
 }
 
 export default async function init(el) {
-  if (new URLSearchParams(window.location.search).has('mockSessions')) {
-    await import('./sessions-hub.mock.js');
-  }
-
   if (rsvpUnsubscribe) { rsvpUnsubscribe(); rsvpUnsubscribe = null; }
   setFilterState({ query: '', activeTags: new Set(), activeTab: 'all' });
 
