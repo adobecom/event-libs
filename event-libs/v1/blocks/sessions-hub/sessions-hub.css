@@ -79,8 +79,6 @@
 .sessions-hub .sh-tab.active {
   background: #292929;
   color: #fff;
-  text-decoration: underline;
-  text-underline-offset: 3px;
 }
 
 /* Search + filter row */
@@ -135,6 +133,8 @@
 .sessions-hub .sh-search:focus {
   border-color: var(--color-accent, #1473e6);
   box-shadow: 0 0 0 2px rgb(20 115 230 / 20%);
+  outline: 2px solid var(--color-accent, #1473e6);
+  outline-offset: 2px;
 }
 
 /* Filter button + wrapper */
@@ -166,6 +166,11 @@
 .sessions-hub .sh-filter-btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+.sessions-hub .sh-filter-btn:focus-visible {
+  outline: 2px solid var(--color-accent, #1473e6);
+  outline-offset: 2px;
 }
 
 .sessions-hub .sh-filter-btn:hover:not(:disabled) {
@@ -472,6 +477,11 @@
   color: var(--color-gray-700, #444);
 }
 
+.sessions-hub .sh-read-more:focus-visible {
+  outline: 2px solid var(--color-accent, #1473e6);
+  outline-offset: 2px;
+}
+
 .sessions-hub .sh-card.expanded .sh-read-more {
   display: none;
 }
@@ -732,8 +742,6 @@
 
 .sessions-hub .sh-tab:focus-visible,
 .sessions-hub .sh-expand-btn:focus-visible,
-.sessions-hub .sh-read-more:focus-visible,
-.sessions-hub .sh-filter-btn:focus-visible,
 .sessions-hub .sh-btn:focus-visible,
 .sessions-hub .sh-avatar-btn:focus-visible {
   outline: 2px solid var(--color-accent, #1473e6);
@@ -741,11 +749,6 @@
 }
 
 .sessions-hub .sh-filter-item input[type='checkbox']:focus-visible {
-  outline: 2px solid var(--color-accent, #1473e6);
-  outline-offset: 2px;
-}
-
-.sessions-hub .sh-search:focus {
   outline: 2px solid var(--color-accent, #1473e6);
   outline-offset: 2px;
 }
