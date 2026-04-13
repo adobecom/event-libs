@@ -74,13 +74,34 @@ function convertEccIcon(n) {
 function setCtaState(targetState, rsvpBtn) { // eslint-disable-line no-unused-vars
   const checkRed = getIcon('check-circle-red');
 
+  const showBtn = () => {
+    rsvpBtn.el.style.display = '';
+    rsvpBtn.el.removeAttribute('aria-hidden');
+    rsvpBtn.el.parentElement?.querySelector('.rsvp-btn-message')?.remove();
+  };
+
+  const hideBtn = (text) => {
+    rsvpBtn.el.style.display = 'none';
+    rsvpBtn.el.setAttribute('aria-hidden', 'true');
+    rsvpBtn.el.setAttribute('tabindex', -1);
+    let msgEl = rsvpBtn.el.parentElement?.querySelector('.rsvp-btn-message');
+    if (!msgEl) {
+      msgEl = document.createElement('span');
+      msgEl.className = 'rsvp-btn-message';
+      rsvpBtn.el.insertAdjacentElement('afterend', msgEl);
+    }
+    msgEl.textContent = text;
+  };
+
   const enableBtn = () => {
+    showBtn();
     rsvpBtn.el.classList.remove('disabled');
     rsvpBtn.el.href = rsvpBtn.el.dataset.modalHash;
     rsvpBtn.el.setAttribute('tabindex', 0);
   };
 
   const disableBtn = () => {
+    showBtn();
     rsvpBtn.el.setAttribute('tabindex', -1);
     rsvpBtn.el.href = '';
     rsvpBtn.el.classList.add('disabled');
@@ -119,11 +140,10 @@ function setCtaState(targetState, rsvpBtn) { // eslint-disable-line no-unused-va
       const INVITE_ONLY_KEY = 'rsvp-invite-only-no-campaign-cta-text';
       let text = dictionaryManager.getValue(INVITE_ONLY_KEY);
       if (text === INVITE_ONLY_KEY) {
-        text = 'Registration is by invitation only. Use your invitation link to register.';
+        text = 'Registration is only available through a valid invitation link.';
       }
-      disableBtn();
+      hideBtn(text);
       updateAnalyticTag(rsvpBtn.el, text);
-      rsvpBtn.el.textContent = text;
       checkRed.remove();
     },
     default: () => {

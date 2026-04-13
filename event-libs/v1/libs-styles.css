@@ -21,6 +21,10 @@ a.con-button.rsvp-btn.disabled {
   pointer-events: none;
 }
 
+.rsvp-btn-message {
+  font-style: italic;
+}
+
 a.con-button.no-event {
   user-select: none;
   pointer-events: none;

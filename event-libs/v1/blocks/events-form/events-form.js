@@ -1066,7 +1066,7 @@ async function onProfile(bp, formData) {
           const INVITE_ONLY_KEY = 'rsvp-invite-only-no-campaign-cta-text';
           let msg = dictionaryManager.getValue(INVITE_ONLY_KEY);
           if (msg === INVITE_ONLY_KEY) {
-            msg = 'Registration is by invitation only. Please use your invitation link to register.';
+            msg = 'Registration is only available through a valid invitation link.';
           }
           const error = createTag('p', { class: 'error' }, msg);
           bp.formContainer.append(error);
