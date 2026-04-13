@@ -67,6 +67,16 @@
   height: 100%;
 }
 
+.profile-cards.modal .card-container {
+  cursor: pointer;
+  transition: box-shadow 0.3s ease;
+}
+
+.profile-cards.modal .card-container:hover,
+.profile-cards.modal .card-container:focus-visible {
+  box-shadow: 0 0 10px 0 rgb(0 0 0 / 15%);
+}
+
 .profile-cards.grid .card-image-container {
   height: 213px;
 }
@@ -148,6 +158,75 @@
   color: var(--color-black);
 }
 
+.profile-cards-modal .profile-cards-modal-content {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  padding: 24px;
+}
+
+.profile-cards-modal .profile-cards-modal-text .card-title {
+  font-size: var(--type-body-xs-size);
+  line-height: var(--type-body-xs-lh);;
+  font-family: var(--body-font-family);
+  font-style: normal;
+  font-weight: 400;
+  margin-top: 0;
+  margin-bottom: 8px;
+}
+
+.profile-cards-modal .profile-cards-modal-text .card-name {
+  margin-top: 0;
+  font-size: var(--type-heading-l-size);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  align-self: stretch;
+  margin-bottom: 14px;
+}
+
+.profile-cards-modal .profile-cards-modal-text .card-desc {
+  color: #2C2C2C;
+  font-family: var(--body-font-family);
+  font-size: var(--type-body-xs-size);
+  font-style: normal;
+  font-weight: 400;
+  line-height: 21px;
+  margin-top: 0;
+  margin-bottom: 24px;
+}
+
+.profile-cards-modal .profile-cards-modal-text .card-social-icons {
+  display: flex;
+  align-items: flex-end;
+  gap: 17px;
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  margin-top: 4px;
+}
+
+.profile-cards-modal .profile-cards-modal-text .card-social-icon a {
+  color: var(--color-black);
+}
+
+.profile-cards-modal .profile-cards-modal-image .card-image-container {
+  width: 100%;
+  max-width: 385px;
+  height: auto;
+  border-radius: 14px;
+  overflow: hidden;
+  margin: 0 auto;
+}
+
+.profile-cards-modal .profile-cards-modal-image .card-image-container img {
+  width: 100%;
+  height: auto;
+  aspect-ratio: 385 / 217;
+  object-fit: cover;
+  display: block;
+}
+
 /* Tablet and up */
 @media screen and (min-width: 600px) {
   /* Grid variants: Tablet - all variants get 2 columns */
@@ -157,6 +236,12 @@
   .profile-cards.grid.five-up .cards-wrapper {
     grid-template-columns: repeat(2, 1fr);
     padding: 40px 16px;
+  }
+
+  .profile-cards-modal .profile-cards-modal-content {
+    gap: 28px;
+    padding: 32px;
+    align-items: flex-start;
   }
 }
 
@@ -235,5 +320,23 @@
 
   .profile-cards.grid.five-up .cards-wrapper {
     grid-template-columns: repeat(5, 1fr);
+  }
+
+  .profile-cards-modal .profile-cards-modal-content {
+    align-items: center;
+    flex-direction: row;
+    gap: 40px;
+  }
+
+  .profile-cards-modal .profile-cards-modal-text {
+    flex: 1 1 0;
+  }
+
+  .profile-cards-modal .profile-cards-modal-image {
+    flex: 0 0 auto;
+  }
+
+  .profile-cards-modal .profile-cards-modal-text .card-desc {
+    max-width: 385px;
   }
 }

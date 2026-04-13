@@ -5,9 +5,10 @@ import { getMetadata } from "./utils.js";
  * The output is DST sensitive and follows locale format without localization.
  * @param {string|number} timestamp - UTC timestamp in milliseconds
  * @param {string} locale - Locale string (e.g., 'en-US')
+ * @param {string|null} timezone - Optional IANA timezone (e.g., 'America/Los_Angeles'); if null, uses viewer's local timezone
  * @returns {string} Formatted local date time string
  */
-export function convertUtcTimestampToLocalDateTime(timestamp, locale = 'en-US') {
+export function convertUtcTimestampToLocalDateTime(timestamp, locale = 'en-US', timezone = null) {
   if (!timestamp) return '';
 
   const timestampNum = typeof timestamp === 'string' ? parseInt(timestamp, 10) : timestamp;
@@ -27,7 +28,7 @@ export function convertUtcTimestampToLocalDateTime(timestamp, locale = 'en-US') 
     }
 
     // Format the date using locale-specific formatting
-    // This will automatically handle DST and local timezone
+    // This will automatically handle DST and local timezone (or specified timezone)
     const options = {
       year: 'numeric',
       month: 'long',
@@ -37,6 +38,7 @@ export function convertUtcTimestampToLocalDateTime(timestamp, locale = 'en-US') 
       hour12: true,
       timeZoneName: 'short',
     };
+    if (timezone) options.timeZone = timezone;
 
     return date.toLocaleString(locale, options);
   } catch (error) {
@@ -46,12 +48,13 @@ export function convertUtcTimestampToLocalDateTime(timestamp, locale = 'en-US') 
 }
 
 /**
- * Checks if two timestamps are on the same day in the local timezone.
+ * Checks if two timestamps are on the same day in the given (or local) timezone.
  * @param {string|number} startTimestamp - Start timestamp in milliseconds
  * @param {string|number} endTimestamp - End timestamp in milliseconds
+ * @param {string|null} timezone - Optional IANA timezone; if null, uses viewer's local timezone
  * @returns {boolean} True if both timestamps are on the same day
  */
-export function areTimestampsOnSameDay(startTimestamp, endTimestamp) {
+export function areTimestampsOnSameDay(startTimestamp, endTimestamp, timezone = null) {
   if (!startTimestamp || !endTimestamp) return false;
 
   try {
@@ -65,10 +68,9 @@ export function areTimestampsOnSameDay(startTimestamp, endTimestamp) {
 
     if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime())) return false;
 
-    // Compare year, month, and day
-    return startDate.getFullYear() === endDate.getFullYear()
-           && startDate.getMonth() === endDate.getMonth()
-           && startDate.getDate() === endDate.getDate();
+    const opts = timezone ? { timeZone: timezone } : {};
+    const toDateStr = (ts) => new Date(ts).toLocaleDateString('en-CA', opts);
+    return toDateStr(startNum) === toDateStr(endNum);
   } catch (error) {
     window.lana?.log(`Error comparing timestamps: ${JSON.stringify(error)}`);
     return false;
@@ -79,11 +81,13 @@ export function areTimestampsOnSameDay(startTimestamp, endTimestamp) {
  * Gets the localized timezone abbreviation
  * @param {number} timestamp - UTC timestamp in milliseconds
  * @param {string} locale - Locale string
+ * @param {string|null} timezone - Optional IANA timezone; if null, uses viewer's local timezone
  * @returns {string} Timezone abbreviation (e.g., 'PST', 'EDT')
  */
-function getLocalTimeZone(timestamp, locale) {
-  return new Date(timestamp)
-    .toLocaleTimeString(locale, { timeZoneName: 'short' }).split(' ').slice(-1)[0];
+function getLocalTimeZone(timestamp, locale, timezone = null) {
+  const opts = { timeZoneName: 'short' };
+  if (timezone) opts.timeZone = timezone;
+  return new Date(timestamp).toLocaleTimeString(locale, opts).split(' ').slice(-1)[0];
 }
 
 /**
@@ -91,10 +95,12 @@ function getLocalTimeZone(timestamp, locale) {
  * @param {number} startTimestamp - Start timestamp in milliseconds
  * @param {number} endTimestamp - End timestamp in milliseconds
  * @param {string} locale - Locale string
+ * @param {string|null} timezone - Optional IANA timezone; if null, uses viewer's local timezone
  * @returns {string} Time interval (e.g., '13:00 - 14:45')
  */
-function getTimeInterval(startTimestamp, endTimestamp, locale) {
+function getTimeInterval(startTimestamp, endTimestamp, locale, timezone = null) {
   const options = { hour: '2-digit', minute: '2-digit' };
+  if (timezone) options.timeZone = timezone;
 
   const startTime = new Date(startTimestamp).toLocaleTimeString(locale, options);
   const endTime = new Date(endTimestamp).toLocaleTimeString(locale, options);
@@ -106,70 +112,91 @@ function getTimeInterval(startTimestamp, endTimestamp, locale) {
  * Gets the localized day of month
  * @param {number} timestamp - UTC timestamp in milliseconds
  * @param {string} locale - Locale string
+ * @param {string|null} timezone - Optional IANA timezone; if null, uses viewer's local timezone
  * @returns {string} Day of month, padded (e.g., '06', '20')
  */
-function getDay(timestamp, locale) {
-  return new Date(timestamp).toLocaleDateString(locale, { day: '2-digit' });
+function getDay(timestamp, locale, timezone = null) {
+  const options = { day: '2-digit' };
+  if (timezone) options.timeZone = timezone;
+  return new Date(timestamp).toLocaleDateString(locale, options);
 }
 
 /**
  * Gets the localized month abbreviation
  * @param {number} timestamp - UTC timestamp in milliseconds
  * @param {string} locale - Locale string
+ * @param {string|null} timezone - Optional IANA timezone; if null, uses viewer's local timezone
  * @returns {string} Month abbreviation (e.g., 'Aug', 'Oct')
  */
-function getMonth(timestamp, locale) {
-  return new Date(timestamp).toLocaleDateString(locale, { month: 'short' });
+function getMonth(timestamp, locale, timezone = null) {
+  const options = { month: 'short' };
+  if (timezone) options.timeZone = timezone;
+  return new Date(timestamp).toLocaleDateString(locale, options);
 }
 
 /**
  * Gets the localized full month name
  * @param {number} timestamp - UTC timestamp in milliseconds
  * @param {string} locale - Locale string
+ * @param {string|null} timezone - Optional IANA timezone; if null, uses viewer's local timezone
  * @returns {string} Full month name (e.g., 'August', 'October')
  */
-function getFullMonth(timestamp, locale) {
-  return new Date(timestamp).toLocaleDateString(locale, { month: 'long' });
+function getFullMonth(timestamp, locale, timezone = null) {
+  const options = { month: 'long' };
+  if (timezone) options.timeZone = timezone;
+  return new Date(timestamp).toLocaleDateString(locale, options);
 }
 
 /**
  * Gets the localized day of the week (short)
  * @param {number} timestamp - UTC timestamp in milliseconds
  * @param {string} locale - Locale string
+ * @param {string|null} timezone - Optional IANA timezone; if null, uses viewer's local timezone
  * @returns {string} Day of week abbreviation (e.g., 'Tue', 'Fri')
  */
-function getDayOfTheWeek(timestamp, locale) {
-  return new Date(timestamp).toLocaleDateString(locale, { weekday: 'short' });
+function getDayOfTheWeek(timestamp, locale, timezone = null) {
+  const options = { weekday: 'short' };
+  if (timezone) options.timeZone = timezone;
+  return new Date(timestamp).toLocaleDateString(locale, options);
 }
 
 /**
  * Gets the localized full day of the week
  * @param {number} timestamp - UTC timestamp in milliseconds
  * @param {string} locale - Locale string
+ * @param {string|null} timezone - Optional IANA timezone; if null, uses viewer's local timezone
  * @returns {string} Full day of week name (e.g., 'Tuesday', 'Friday')
  */
-function getFullDayOfTheWeek(timestamp, locale) {
-  return new Date(timestamp).toLocaleDateString(locale, { weekday: 'long' });
+function getFullDayOfTheWeek(timestamp, locale, timezone = null) {
+  const options = { weekday: 'long' };
+  if (timezone) options.timeZone = timezone;
+  return new Date(timestamp).toLocaleDateString(locale, options);
 }
 
 /**
  * Gets the full year
  * @param {number} timestamp - UTC timestamp in milliseconds
  * @param {string} locale - Locale string
+ * @param {string|null} timezone - Optional IANA timezone; if null, uses viewer's local timezone
  * @returns {string} Full year (e.g., '2025')
  */
-function getFullYear(timestamp, locale) {
-  return new Date(timestamp).toLocaleDateString(locale, { year: 'numeric' });
+function getFullYear(timestamp, locale, timezone = null) {
+  const options = { year: 'numeric' };
+  if (timezone) options.timeZone = timezone;
+  return new Date(timestamp).toLocaleDateString(locale, options);
 }
 
 /**
  * Gets the short year (last two digits)
  * @param {number} timestamp - UTC timestamp in milliseconds
  * @param {string} locale - Locale string
+ * @param {string|null} timezone - Optional IANA timezone; if null, uses viewer's local timezone
  * @returns {string} Short year (e.g., '25')
  */
-function getShortYear(timestamp, locale) {
-  return new Date(timestamp).toLocaleDateString(locale, { year: '2-digit' });
+function getShortYear(timestamp, locale, timezone = null) {
+  const options = { year: '2-digit' };
+  if (timezone) options.timeZone = timezone;
+  return new Date(timestamp).toLocaleDateString(locale, options);
 }
 
 /**
@@ -187,9 +214,10 @@ function getShortYear(timestamp, locale) {
  *   {dd} - Day of month, padded (e.g., '20')
  *   {timeRange} - Time interval (e.g., '13:00 - 14:45')
  *   {timeZone} - Timezone abbreviation (e.g., 'PST')
+ * @param {string|null} timezone - Optional IANA timezone; if null, uses viewer's local timezone
  * @returns {string} Formatted date string
  */
-export function createTemplatedDateRange(startTimestamp, endTimestamp, locale, template) {
+export function createTemplatedDateRange(startTimestamp, endTimestamp, locale, template, timezone = null) {
   if (!startTimestamp || !endTimestamp || !template) return '';
 
   const startNum = typeof startTimestamp === 'string' ? parseInt(startTimestamp, 10) : startTimestamp;
@@ -199,15 +227,15 @@ export function createTemplatedDateRange(startTimestamp, endTimestamp, locale, t
 
   try {
     return template
-      .replace('{YYYY}', getFullYear(startNum, locale))
-      .replace('{YY}', getShortYear(startNum, locale))
-      .replace('{LLLL}', getFullMonth(startNum, locale))
-      .replace('{LLL}', getMonth(startNum, locale))
-      .replace('{dddd}', getFullDayOfTheWeek(startNum, locale))
-      .replace('{ddd}', getDayOfTheWeek(startNum, locale))
-      .replace('{dd}', getDay(startNum, locale))
-      .replace('{timeRange}', getTimeInterval(startNum, endNum, locale))
-      .replace('{timeZone}', getLocalTimeZone(startNum, locale));
+      .replace('{YYYY}', getFullYear(startNum, locale, timezone))
+      .replace('{YY}', getShortYear(startNum, locale, timezone))
+      .replace('{LLLL}', getFullMonth(startNum, locale, timezone))
+      .replace('{LLL}', getMonth(startNum, locale, timezone))
+      .replace('{dddd}', getFullDayOfTheWeek(startNum, locale, timezone))
+      .replace('{ddd}', getDayOfTheWeek(startNum, locale, timezone))
+      .replace('{dd}', getDay(startNum, locale, timezone))
+      .replace('{timeRange}', getTimeInterval(startNum, endNum, locale, timezone))
+      .replace('{timeZone}', getLocalTimeZone(startNum, locale, timezone));
   } catch (error) {
     window.lana?.log(`Error creating templated date range: ${JSON.stringify(error)}`);
     return '';
@@ -218,9 +246,10 @@ export function createTemplatedDateRange(startTimestamp, endTimestamp, locale, t
  * Gets the date portion of a timestamp (without time)
  * @param {string|number} timestamp - UTC timestamp in milliseconds
  * @param {string} locale - Locale string
+ * @param {string|null} timezone - Optional IANA timezone; if null, uses viewer's local timezone
  * @returns {string} Formatted date string
  */
-function getDateOnly(timestamp, locale) {
+function getDateOnly(timestamp, locale, timezone = null) {
   const timestampNum = typeof timestamp === 'string' ? parseInt(timestamp, 10) : timestamp;
   if (Number.isNaN(timestampNum)) return '';
 
@@ -233,6 +262,7 @@ function getDateOnly(timestamp, locale) {
       month: 'long',
       day: 'numeric',
     };
+    if (timezone) options.timeZone = timezone;
 
     return date.toLocaleDateString(locale, options);
   } catch (error) {
@@ -245,10 +275,12 @@ function getDateOnly(timestamp, locale) {
  * Gets the time portion of a timestamp with timezone (without date)
  * @param {string|number} timestamp - UTC timestamp in milliseconds
  * @param {string} locale - Locale string
- * @param {boolean} includeTimeZone - Whether to include timezone abbreviation
+ * @param {Object} [opts={}] - Options
+ * @param {boolean} [opts.includeTimeZone=false] - Whether to include timezone abbreviation
+ * @param {string|null} [opts.timezone=null] - Optional IANA timezone; if null, uses viewer's local timezone
  * @returns {string} Formatted time string
  */
-function getTimeOnly(timestamp, locale, includeTimeZone = false) {
+function getTimeOnly(timestamp, locale, { includeTimeZone = false, timezone = null } = {}) {
   const timestampNum = typeof timestamp === 'string' ? parseInt(timestamp, 10) : timestamp;
   if (Number.isNaN(timestampNum)) return '';
 
@@ -261,10 +293,8 @@ function getTimeOnly(timestamp, locale, includeTimeZone = false) {
       minute: '2-digit',
       hour12: true,
     };
-
-    if (includeTimeZone) {
-      options.timeZoneName = 'short';
-    }
+    if (includeTimeZone) options.timeZoneName = 'short';
+    if (timezone) options.timeZone = timezone;
 
     return date.toLocaleTimeString(locale, options);
   } catch (error) {
@@ -278,24 +308,25 @@ function getTimeOnly(timestamp, locale, includeTimeZone = false) {
  * @param {string} startTimestamp - Start timestamp
  * @param {string} endTimestamp - End timestamp
  * @param {string} locale - Locale string
+ * @param {string|null} timezone - Optional IANA timezone; if null, uses viewer's local timezone
  * @returns {string} Smart date range string
  */
-export function createSmartDateRange(startTimestamp, endTimestamp, locale) {
+export function createSmartDateRange(startTimestamp, endTimestamp, locale, timezone = null) {
   if (!startTimestamp || !endTimestamp) return '';
 
-  const startDateTime = convertUtcTimestampToLocalDateTime(startTimestamp, locale);
-  const endDateTime = convertUtcTimestampToLocalDateTime(endTimestamp, locale);
+  const startDateTime = convertUtcTimestampToLocalDateTime(startTimestamp, locale, timezone);
+  const endDateTime = convertUtcTimestampToLocalDateTime(endTimestamp, locale, timezone);
 
   if (!startDateTime || !endDateTime) return '';
 
   // If same day, return date with time range: "January 15, 2025 2:30 PM - 3:30 PM PST"
-  if (areTimestampsOnSameDay(startTimestamp, endTimestamp)) {
-    const date = getDateOnly(startTimestamp, locale);
-    const startTime = getTimeOnly(startTimestamp, locale, false);
-    const endTime = getTimeOnly(endTimestamp, locale, true);
-    
+  if (areTimestampsOnSameDay(startTimestamp, endTimestamp, timezone)) {
+    const date = getDateOnly(startTimestamp, locale, timezone);
+    const startTime = getTimeOnly(startTimestamp, locale, { timezone });
+    const endTime = getTimeOnly(endTimestamp, locale, { includeTimeZone: true, timezone });
+
     if (!date || !startTime || !endTime) return startDateTime;
-    
+
     return `${date} ${startTime} - ${endTime}`;
   }
 
@@ -310,11 +341,19 @@ export function createSmartDateRange(startTimestamp, endTimestamp, locale) {
 const METADATA_MASSAGE_RULES = {
   'local-start-time-millis': {
     outputKey: 'user-start-date-time',
-    transform: (originalValue, locale) => convertUtcTimestampToLocalDateTime(originalValue, locale),
+    transform: (originalValue, locale) => {
+      const eventType = getMetadata('event-type');
+      const timezone = eventType === 'InPerson' ? getMetadata('timezone') : null;
+      return convertUtcTimestampToLocalDateTime(originalValue, locale, timezone);
+    },
   },
   'local-end-time-millis': {
     outputKey: 'user-end-date-time',
-    transform: (originalValue, locale) => convertUtcTimestampToLocalDateTime(originalValue, locale),
+    transform: (originalValue, locale) => {
+      const eventType = getMetadata('event-type');
+      const timezone = eventType === 'InPerson' ? getMetadata('timezone') : null;
+      return convertUtcTimestampToLocalDateTime(originalValue, locale, timezone);
+    },
   },
   // Smart date range that shows single date for same-day events, range for multi-day events
   // This is a computed rule that doesn't depend on a specific metadata field
@@ -325,14 +364,16 @@ const METADATA_MASSAGE_RULES = {
       const startTimestamp = getMetadata('local-start-time-millis');
       const endTimestamp = getMetadata('local-end-time-millis');
       const customTemplate = getMetadata('custom-date-time-format');
+      const eventType = getMetadata('event-type');
+      const timezone = eventType === 'InPerson' ? getMetadata('timezone') : null;
 
       // If custom template is provided, use templated formatting
       if (customTemplate) {
-        return createTemplatedDateRange(startTimestamp, endTimestamp, locale, customTemplate);
+        return createTemplatedDateRange(startTimestamp, endTimestamp, locale, customTemplate, timezone);
       }
 
       // Otherwise, use smart date range (fallback)
-      return createSmartDateRange(startTimestamp, endTimestamp, locale);
+      return createSmartDateRange(startTimestamp, endTimestamp, locale, timezone);
     },
   },
   // Future hydration rules can be added here
@@ -350,7 +391,7 @@ const METADATA_MASSAGE_RULES = {
  * @param {string} locale - Locale string for formatting (e.g., 'en-US')
  * @returns {Object} Updated extraData object with hydrated metadata
  */
-export function massageMetadata(locale = 'en-US') {
+export function massageMetadata(userLocale = 'en-US') {
   const massagedData = {};
 
   // Process each hydration rule
@@ -360,12 +401,12 @@ export function massageMetadata(locale = 'en-US') {
 
       if (rule.isComputed) {
         // Computed rules don't depend on a specific metadata field
-        transformedValue = rule.transform(locale);
+        transformedValue = rule.transform(userLocale);
       } else {
         // Standard rules depend on a specific metadata field
         const metadataValue = getMetadata(metadataKey);
         if (metadataValue) {
-          transformedValue = rule.transform(metadataValue, locale);
+          transformedValue = rule.transform(metadataValue, userLocale);
         }
       }
 

@@ -1,9 +1,10 @@
-import { deleteAttendeeFromEvent, getAndCreateAndAddAttendee, getAttendee, getEvent } from '../../utils/esp-controller.js';
+import { deleteAttendeeFromEvent, getAndCreateAndAddAttendee, getAttendee, getEvent, getCampaign } from '../../utils/esp-controller.js';
 import BlockMediator from '../../deps/block-mediator.min.js';
 import { signIn, decorateEvent } from '../../utils/decorate.js';
 import { dictionaryManager } from '../../utils/dictionary-manager.js';
 import { getEventConfig, LIBS, getMetadata, getSusiOptions, getValidCampaignIdFromUrl } from '../../utils/utils.js';
-import { FALLBACK_LOCALES } from '../../utils/constances.js';
+import { FALLBACK_LOCALES, CAMPAIGN_ID_PATTERN } from '../../utils/constances.js';
+import { BASE_ATTENDEE_DATA_FILTER } from '../../utils/data-utils.js';
 
 const eventConfig = getEventConfig();
 const miloLibs = eventConfig?.miloConfig?.miloLibs ? eventConfig.miloConfig.miloLibs : LIBS;
@@ -32,6 +33,19 @@ function snakeToCamel(str) {
     .split('_')
     .map((word, index) => (index === 0 ? word : word.charAt(0).toUpperCase() + word.slice(1)))
     .join('');
+}
+
+/** Consent select uses query-index countryCode as option value; consentId lives on data-consent-id. */
+function applyConsentCountrySelectValue(selectEl, stored) {
+  if (!stored || typeof stored !== 'string') return;
+  const opts = [...selectEl.options].filter((o) => o.value !== '');
+  const byCode = opts.find((o) => o.value.toLowerCase() === stored.toLowerCase());
+  if (byCode) {
+    selectEl.value = byCode.value;
+    return;
+  }
+  const byConsentId = opts.find((o) => o.dataset.consentId === stored);
+  if (byConsentId) selectEl.value = byConsentId.value;
 }
 
 function createSelect(fd) {
@@ -164,9 +178,11 @@ function constructPayload(form) {
     const fieldWrapper = form.querySelector(`[data-field-id="${key}"]`);
     if (fieldWrapper && (fieldWrapper.dataset.type === 'checkbox' || fieldWrapper.dataset.type === 'checkbox-group')) {
       const checkboxes = fieldWrapper.querySelectorAll('input[type="checkbox"]');
-      if (checkboxes.length === 1) {
-        // Single option checkbox - convert to boolean
-        payload[key] = payload[key] && payload[key].length > 0;
+      if (checkboxes.length === 1 && Array.isArray(payload[key]) && payload[key].length <= 1) {
+        // Base attendee array fields (e.g. contactMethods) must stay arrays for the API
+        if (BASE_ATTENDEE_DATA_FILTER[key]?.type === 'array') return;
+        // Single option checkbox with at most one value - convert to boolean
+        payload[key] = payload[key].length > 0;
       }
     }
   });
@@ -184,12 +200,18 @@ async function submitForm(bp) {
     if (selectedOption?.dataset?.countryCode) {
       payload.countryRegion = selectedOption.dataset.countryCode;
     }
+    const consentId = selectedOption?.dataset?.consentId;
+    if (consentId) {
+      payload.consentStringId = consentId;
+    }
   }
 
   const isValid = Object.keys(payload).reduce((valid, key) => {
     const field = form.querySelector(`[data-field-id=${key}]`);
 
-    if (!payload[key] && field.querySelector('.group-container.required')) {
+    const missingSelection = !payload[key]
+      || (Array.isArray(payload[key]) && payload[key].length === 0);
+    if (missingSelection && field?.querySelector('.group-container.required')) {
       const el = form.querySelector(`input[name="${key}"]`);
       el.setCustomValidity('A selection is required');
       el.reportValidity();
@@ -229,19 +251,62 @@ function clearForm(form) {
   });
 }
 
-async function buildErrorMsg(parent, status) {
-  const eventObj = await getEvent(getMetadata('event-id'));
+/**
+ * Resolves full state from event and optionally campaign (when campaign ID in URL).
+ * @param {string} eventId - Event ID
+ * @returns {Promise<{ full: boolean, waitlistEnabled: boolean, usedCampaign: boolean }>}
+ */
+export async function getFullState(eventId) {
+  const eventObj = await getEvent(eventId);
+  let full = false;
+  let waitlistEnabled = false;
+  let usedCampaign = false;
+
+  if (!eventObj.ok) {
+    return { full: false, waitlistEnabled: false, usedCampaign: false };
+  }
+
+  const { isFull, allowWaitlisting, attendeeCount, attendeeLimit } = eventObj.data;
+  full = isFull || (!allowWaitlisting && +attendeeCount >= +attendeeLimit);
+  waitlistEnabled = allowWaitlisting;
+
+  const campaignId = new URLSearchParams(window.location.search).get('campaign');
+  if (campaignId && CAMPAIGN_ID_PATTERN.test(campaignId)) {
+    const campaignInfo = await getCampaign(eventId, campaignId);
+    if (campaignInfo.ok && campaignInfo.data.attendeeLimit != null) {
+      const { attendeeLimit: campLimit, attendeeCount: campCount, waitlistAttendeeCount } = campaignInfo.data;
+      full = campLimit === campCount
+        || (campLimit > campCount && waitlistAttendeeCount > 0);
+      usedCampaign = true;
+    }
+  }
+
+  return { full, waitlistEnabled, usedCampaign };
+}
+
+export async function buildErrorMsg(parent, status) {
+  const eventId = getMetadata('event-id');
+  const eventObj = await getEvent(eventId);
 
   if (!eventObj.ok) return;
-  const eventInfo = eventObj.data;
-  const errorKeyMap = { 400: eventInfo?.allowWaitlisting === 'true' ? 'event-full-error-msg' : 'event-full-no-waitlist-error-msg' };
+
+  let errorKey = 'rsvp-error-msg';
+  if (status === 400) {
+    const { full, waitlistEnabled, usedCampaign } = await getFullState(eventId);
+    if (full && usedCampaign) {
+      errorKey = waitlistEnabled ? 'campaign-full-error-msg' : 'campaign-full-no-waitlist-error-msg';
+    } else {
+      const eventInfo = eventObj.data;
+      errorKey = eventInfo?.allowWaitlisting === 'true' ? 'event-full-error-msg' : 'event-full-no-waitlist-error-msg';
+    }
+  }
 
   const existingErrors = parent.querySelectorAll('.error');
   if (existingErrors.length) {
     existingErrors.forEach((err) => err.remove());
   }
 
-  const errorMsg = dictionaryManager.getValue(errorKeyMap[status] || 'rsvp-error-msg');
+  const errorMsg = dictionaryManager.getValue(errorKey);
   const error = createTag('p', { class: 'error' }, errorMsg);
   parent.append(error);
   setTimeout(() => {
@@ -303,20 +368,14 @@ function createButton({ type, label }, bp) {
           const { status } = respJson;
 
           if (status === 400) {
-            const eventResp = await getEvent(getMetadata('event-id'));
-            if (eventResp.ok) {
-              const { isFull, allowWaitlisting, attendeeCount, attendeeLimit } = eventResp.data;
-              const eventFull = isFull
-              || (!allowWaitlisting && +attendeeCount >= +attendeeLimit);
-
-              if (eventFull) {
-                if (allowWaitlisting) {
-                  button.textContent = dictionaryManager.getValue('waitlist-cta-text');
-                  button.disabled = false;
-                } else {
-                  button.textContent = dictionaryManager.getValue('event-full-cta-text');
-                  button.disabled = true;
-                }
+            const fullState = await getFullState(getMetadata('event-id'));
+            if (fullState.full) {
+              if (fullState.waitlistEnabled) {
+                button.textContent = dictionaryManager.getValue('waitlist-cta-text');
+                button.disabled = false;
+              } else {
+                button.textContent = dictionaryManager.getValue('event-full-cta-text');
+                button.disabled = true;
               }
             }
 
@@ -699,13 +758,17 @@ async function addConsentSuite(form) {
     countrySelect.append(defaultOption);
 
     data.forEach((c) => {
-      const option = createTag('option', { value: c.consentId, 'data-country-code': c.countryCode }, c.countryName);
+      const option = createTag('option', {
+        value: c.countryCode,
+        'data-country-code': c.countryCode,
+        'data-consent-id': c.consentId,
+      }, c.countryName);
       countrySelect.append(option);
     });
 
     countrySelect.addEventListener('change', async (e) => {
       const selectedOption = e.target.options[e.target.selectedIndex];
-      const consentData = data.find((c) => c.countryCode === selectedOption.dataset.countryCode);
+      const consentData = data.find((c) => c.countryCode === selectedOption?.dataset?.countryCode);
 
       if (consentData) {
         await loadConsent(form, consentData);
@@ -880,6 +943,9 @@ function personalizeForm(form, data) {
             const option = matchedInput.querySelector(`option[value="${val}"]`);
             if (option) option.selected = true;
           });
+        } else if (matchedInput.id === 'consentStringId') {
+          applyConsentCountrySelectValue(matchedInput, v);
+          if (key === 'profile') matchedInput.disabled = true;
         } else {
           matchedInput.value = v;
           if (key === 'profile') matchedInput.disabled = true;
@@ -946,37 +1012,23 @@ export async function initFormBasedOnRSVPData(bp) {
   }
 
   const countryInput = block.querySelector('select#consentStringId');
-  if (countryInput) {
+  if (countryInput && countryInput.value === '') {
     const options = Array.from(countryInput.options);
-    const internationalCookie = getCookie('international_cookie');
-
-    if (internationalCookie) {
-      const option = options.find((o) => {
-        const countryCode = o.dataset.countryCode?.toLowerCase();
-
-        if (!countryCode) return false;
-
-        return countryCode === internationalCookie.toLowerCase();
-      });
-      if (option) {
-        option.selected = true;
-        countryInput.value = option.value;
-        countryInput.dispatchEvent(new Event('change'));
-      }
-    } else {
-      const countryInNavigator = window.navigator.language.toLowerCase().split('-')[1];
-      const option = options.find((o) => {
-        const countryCode = o.dataset.countryCode?.toLowerCase();
-
-        if (!countryCode) return false;
-
-        return countryCode === countryInNavigator;
-      });
-      if (option) {
-        option.selected = true;
-        countryInput.value = option.value;
-        countryInput.dispatchEvent(new Event('change'));
-      }
+    const findOptionByCountryCode = (code) => {
+      if (!code || typeof code !== 'string') return undefined;
+      const lower = code.toLowerCase();
+      return options.find((o) => o.dataset.countryCode?.toLowerCase() === lower);
+    };
+    const profileCode = profile?.countryCode;
+    const cookieCode = getCookie('international_cookie');
+    const navigatorRegion = window.navigator.language.toLowerCase().split('-')[1];
+    const option = findOptionByCountryCode(profileCode)
+      ?? findOptionByCountryCode(cookieCode)
+      ?? (navigatorRegion ? findOptionByCountryCode(navigatorRegion) : undefined);
+    if (option) {
+      option.selected = true;
+      countryInput.value = option.value;
+      countryInput.dispatchEvent(new Event('change'));
     }
   }
 

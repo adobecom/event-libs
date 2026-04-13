@@ -39,6 +39,8 @@ const waitlistText = dictionaryManager.getValue('waitlist-cta-text');
 const closedText = dictionaryManager.getValue('event-full-cta-text');
 ```
 
+Form error messages (events-form, on submit 400): `event-full-error-msg`, `event-full-no-waitlist-error-msg`, `campaign-full-error-msg`, `campaign-full-no-waitlist-error-msg`, `rsvp-error-msg`.
+
 ## Benefits of the Current Implementation
 
 1. **Unified Interface**: All key replacement functionality is handled through a single `DictionaryManager` class
