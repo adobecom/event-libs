@@ -467,7 +467,7 @@ export async function registerForSessionTime(sessionTimeId, attendeeId, registra
 
   const eventServiceEnv = getEventServiceEnv();
   const { serviceApiEndpoints } = ENV_MAP[eventServiceEnv.name];
-  const raw = JSON.stringify(registrationData);
+  const raw = JSON.stringify({ attendeeId, ...registrationData });
   const options = await constructRequestOptions('POST', raw);
 
   try {
