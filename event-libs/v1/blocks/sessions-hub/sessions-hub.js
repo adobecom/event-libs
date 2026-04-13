@@ -276,7 +276,10 @@ function renderCTAGroup(session, isEventRegistered) {
     badge.append(createIcon(CHECKMARK_ICON), createTag('span', {}, dictionaryManager.getValue('Registered')));
     group.append(badge);
 
-    setTimeout(() => { badge.disabled = false; }, 2000);
+    setTimeout(() => {
+      badge.style.minWidth = `${badge.offsetWidth}px`;
+      badge.disabled = false;
+    }, 2000);
 
     const setRegisteredContent = () => {
       badge.innerHTML = '';
