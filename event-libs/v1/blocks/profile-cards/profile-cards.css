@@ -6,7 +6,7 @@
   margin: auto;
 }
 
-.profile-cards h2 {
+.profile-cards > div:first-child h2 {
   text-align: center;
 }
 
@@ -131,10 +131,10 @@
 .profile-cards .card-desc {
   color: #2C2C2C;
   font-family: var(--body-font-family);
-  font-size: var(--type-body-xs-size);
+  font-size: var(--type-body-l-size);
   font-style: normal;
   font-weight: 400;
-  line-height: 21px;
+  line-height: var(--type-body-l-lh);
   margin-top: 0;
 }
 
@@ -188,12 +188,16 @@
 .profile-cards-modal .profile-cards-modal-text .card-desc {
   color: #2C2C2C;
   font-family: var(--body-font-family);
-  font-size: var(--type-body-xs-size);
+  font-size: var(--type-body-l-size);
   font-style: normal;
   font-weight: 400;
-  line-height: 21px;
+  line-height: var(--type-body-l-lh);
   margin-top: 0;
   margin-bottom: 24px;
+}
+
+.profile-cards-modal .card-name:focus {
+  outline: none;
 }
 
 .profile-cards-modal .profile-cards-modal-text .card-social-icons {
@@ -247,7 +251,7 @@
 
 /* Desktop and up */
 @media screen and (min-width: 900px) {
-  .profile-cards h2 {
+  .profile-cards > div:first-child h2 {
     margin-top: 13px;
     text-align: center;
     font-size: var(--type-heading-xl-size);

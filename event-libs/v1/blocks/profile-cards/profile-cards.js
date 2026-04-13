@@ -162,7 +162,7 @@ function decorateContent(cardContainer, data) {
 
   const textContainer = createTag('div', { class: 'card-text-container' });
   const title = createTag('p', { class: 'card-title' }, data.title);
-  const name = createTag('h3', { class: 'card-name' }, `${data.firstName} ${data.lastName}`);
+  const name = createTag('h2', { class: 'card-name' }, `${data.firstName} ${data.lastName}`);
 
   textContainer.append(title, name);
 
@@ -191,7 +191,7 @@ function decorateContentSimple(cardContainer, data) {
   const contentContainer = createTag('div', { class: 'card-content' });
   const textContainer = createTag('div', { class: 'card-text-container' });
   const title = createTag('p', { class: 'card-title' }, data.title);
-  const name = createTag('h3', { class: 'card-name' }, `${data.firstName} ${data.lastName}`);
+  const name = createTag('h2', { class: 'card-name' }, `${data.firstName} ${data.lastName}`);
 
   textContainer.append(title, name);
   contentContainer.append(textContainer);
@@ -247,7 +247,7 @@ async function buildModalContent(profileData) {
   const imageContainer = createTag('div', { class: 'profile-cards-modal-image' });
   const fullName = getProfileName(profileData);
   const title = createTag('p', { class: 'card-title' }, profileData?.title || '');
-  const name = createTag('h3', { class: 'card-name' }, fullName);
+  const name = createTag('h2', { class: 'card-name' }, fullName);
 
   textContainer.append(title, name);
   appendBio(textContainer, profileData?.bio);
