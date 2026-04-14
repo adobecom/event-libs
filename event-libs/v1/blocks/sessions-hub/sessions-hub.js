@@ -527,6 +527,7 @@ function renderEventBanner(rsvpConfig) {
     const profile = BlockMediator.get('imsProfile');
     const isSignedOut = !profile || profile.noProfile || profile.account_type === 'guest';
     if (isSignedOut) {
+      sessionStorage.setItem('sessions-hub:pendingEventRsvp', '1');
       signIn({ ...getSusiOptions(), redirect_uri: window.location.href });
     } else if (rsvpConfig) {
       openRsvpModal(rsvpConfig);
@@ -852,11 +853,13 @@ function bindCardEvents(listEl, state) {
 
     if (e.target.closest('.sh-btn-register-session')) {
       await handleSessionRegistration(card, sessionId, state);
+      applyFilter(listEl, state);
       return;
     }
 
     if (e.target.closest('.sh-registered-badge:not(:disabled)')) {
       await handleSessionUnregistration(card, sessionId, state);
+      applyFilter(listEl, state);
       return;
     }
 
@@ -971,6 +974,7 @@ function bindMediatorSubscriptions(el, bannerEl, listEl) {
         if (cardEl) updateCTAGroup(cardEl, session, state.isEventRegistered);
       }
     });
+    applyFilter(listEl, state);
   });
 }
 
@@ -1041,6 +1045,9 @@ async function loadBlock(el, rsvpConfig) {
   bindMediatorSubscriptions(el, bannerEl, listEl);
 
   const storedPendingId = sessionStorage.getItem('sessions-hub:pendingSessionId');
+  const storedEventRsvp = sessionStorage.getItem('sessions-hub:pendingEventRsvp');
+  if (storedEventRsvp) sessionStorage.removeItem('sessions-hub:pendingEventRsvp');
+
   if (storedPendingId) {
     sessionStorage.removeItem('sessions-hub:pendingSessionId');
 
@@ -1054,6 +1061,8 @@ async function loadBlock(el, rsvpConfig) {
       pendingSessionId = storedPendingId;
       openRsvpModal(rsvpConfig);
     }
+  } else if (storedEventRsvp && !isEventRegistered && rsvpConfig) {
+    openRsvpModal(rsvpConfig);
   }
 }
 
