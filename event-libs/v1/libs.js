@@ -13,6 +13,7 @@ const EVENT_BLOCKS = [
   'mobile-rider',
   'preview-bar',
   'profile-cards',
+  'sessions-hub',
   'promotional-content',
   'venue-additional-info',
   'youtube-chat',

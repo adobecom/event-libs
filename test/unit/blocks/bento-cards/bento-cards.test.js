@@ -1,5 +1,6 @@
 import { expect } from '@esm-bundle/chai';
 import { readFile } from '@web/test-runner-commands';
+import { setEventConfig } from '../../../../event-libs/v1/utils/utils.js';
 import init from '../../../../event-libs/v1/blocks/bento-cards/bento-cards.js';
 
 const body = await readFile({ path: './mocks/default.html' });
@@ -9,6 +10,7 @@ describe('Bento Cards Module', () => {
   describe('init', () => {
     beforeEach(() => {
       document.head.innerHTML = '';
+      setEventConfig({}, { miloLibs: '/test/unit/blocks/bento-cards/mocks/libs' });
     });
 
     it('should add specific classes to cards and move elements into content container', async () => {
