@@ -865,6 +865,7 @@ async function createForm(bp, formData) {
     json.data = json.data
       .map((obj) => {
         const lowkey = lowercaseKeys(obj);
+        if (typeof lowkey.field === 'string') lowkey.field = lowkey.field.trim();
         if (required.includes(lowkey.field)) lowkey.required = 'x';
         return lowkey;
       })
@@ -873,6 +874,7 @@ async function createForm(bp, formData) {
     json.data = json.data
       .map((obj) => {
         const lowkey = lowercaseKeys(obj);
+        if (typeof lowkey.field === 'string') lowkey.field = lowkey.field.trim();
         return lowkey;
       })
       .filter((f) => ['clear', 'submit'].includes(f.field));
