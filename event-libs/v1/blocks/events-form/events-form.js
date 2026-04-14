@@ -1,4 +1,4 @@
-import { deleteAttendeeFromEvent, getAndCreateAndAddAttendee, getAttendee, getEvent, getCampaign } from '../../utils/esp-controller.js';
+import { deleteAttendeeFromEvent, getAndCreateAndAddAttendee, getAttendee, getEvent, getCampaign, registerForSessionTime } from '../../utils/esp-controller.js';
 import BlockMediator from '../../deps/block-mediator.min.js';
 import { signIn, decorateEvent } from '../../utils/decorate.js';
 import { dictionaryManager } from '../../utils/dictionary-manager.js';
@@ -346,6 +346,34 @@ function eventFormSendAnalytics(bp, view) {
   sendAnalytics(event);
 }
 
+async function autoRegisterSessions() {
+  let sessions;
+  try {
+    sessions = JSON.parse(getMetadata('sessions') || '[]');
+  } catch (e) {
+    return;
+  }
+
+  const autoRegTimes = sessions.flatMap(
+    (s) => (s.sessionTimes || []).filter((t) => t.isAutoRegistrationEnabled),
+  );
+  if (!autoRegTimes.length) return;
+
+  const results = await Promise.allSettled(
+    autoRegTimes.map((t) => registerForSessionTime(t.sessionTimeId, 'me', { registrationStatus: 'registered' })),
+  );
+
+  const newIds = new Set();
+  results.forEach((r, i) => {
+    if (r.status === 'fulfilled' && r.value.ok) newIds.add(autoRegTimes[i].sessionId);
+    else window.lana?.log(`Auto-registration failed for session time ${autoRegTimes[i]?.sessionTimeId}`);
+  });
+
+  if (!newIds.size) return;
+  const existing = BlockMediator.get('registeredSessionIds') || new Set();
+  BlockMediator.set('registeredSessionIds', new Set([...existing, ...newIds]));
+}
+
 function createButton({ type, label }, bp) {
   const button = createTag('button', { class: 'button' }, dictionaryManager.getValue(label, 'rsvp-fields'));
   if (type === 'submit') {
@@ -364,6 +392,7 @@ function createButton({ type, label }, bp) {
         if (respJson.ok) {
           BlockMediator.set('rsvpData', respJson.data);
           eventFormSendAnalytics(bp, 'Form Submit');
+          if (respJson.data?.registrationStatus === 'registered') autoRegisterSessions();
         } else {
           const { status } = respJson;
 
@@ -836,6 +865,7 @@ async function createForm(bp, formData) {
     json.data = json.data
       .map((obj) => {
         const lowkey = lowercaseKeys(obj);
+        if (typeof lowkey.field === 'string') lowkey.field = lowkey.field.trim();
         if (required.includes(lowkey.field)) lowkey.required = 'x';
         return lowkey;
       })
@@ -844,6 +874,7 @@ async function createForm(bp, formData) {
     json.data = json.data
       .map((obj) => {
         const lowkey = lowercaseKeys(obj);
+        if (typeof lowkey.field === 'string') lowkey.field = lowkey.field.trim();
         return lowkey;
       })
       .filter((f) => ['clear', 'submit'].includes(f.field));
