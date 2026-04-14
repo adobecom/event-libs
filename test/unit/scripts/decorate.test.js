@@ -448,6 +448,17 @@ describe('validatePageAndRedirect', () => {
 });
 
 describe('updatePictureElement', () => {
+  beforeEach(() => {
+    document.body.innerHTML = `
+      <picture>
+        <source type="image/webp" srcset="./media_placeholder.png?width=2000&amp;format=webply&amp;optimize=medium" media="(min-width: 600px)">
+        <source type="image/webp" srcset="./media_placeholder.png?width=750&amp;format=webply&amp;optimize=medium">
+        <source type="image/png" srcset="./media_placeholder.png?width=2000&amp;format=png&amp;optimize=medium" media="(min-width: 600px)">
+        <img loading="lazy" alt="" src="./media_placeholder.png?width=750&amp;format=png&amp;optimize=medium" width="600" height="300">
+      </picture>
+    `;
+  });
+
   it('updates the srcset attribute of a picture element', () => {
     const picture = document.querySelector('picture');
     const img = document.createElement('img');
@@ -455,9 +466,10 @@ describe('updatePictureElement', () => {
 
     picture.append(img);
     updatePictureElement(img.src, picture, 'alt-text');
+    const expectedSrcsetPrefix = `${img.src}?`;
     const sources = picture.querySelectorAll('source');
     sources.forEach((source) => {
-      expect(source.srcset.startsWith('http://localhost:2000/mock-image-url.jpg?')).to.be.true;
+      expect(source.srcset.startsWith(expectedSrcsetPrefix)).to.be.true;
     });
   });
 
