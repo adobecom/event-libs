@@ -90,6 +90,28 @@ describe('Profile Cards Module', () => {
       });
     });
 
+    it('should set alt text on profile images from metadata', () => {
+      const el = document.querySelector('#speakers-cards');
+      init(el);
+
+      const images = el.querySelectorAll('.card-image');
+      images.forEach((img) => {
+        expect(img.hasAttribute('alt')).to.be.true;
+        expect(img.getAttribute('alt')).to.not.be.empty;
+        expect(img.hasAttribute('role')).to.be.false;
+      });
+    });
+
+    it('should mark images without alt text as decorative', () => {
+      const el = document.querySelector('#static-no-alt-cards');
+      init(el);
+
+      const img = el.querySelector('.card-image');
+      expect(img).to.not.be.null;
+      expect(img.getAttribute('alt')).to.equal('');
+      expect(img.getAttribute('role')).to.equal('presentation');
+    });
+
     it('should make metadata-driven modal cards interactive', () => {
       const el = document.querySelector('#modal-speakers-cards');
       init(el);

@@ -13,14 +13,13 @@ function decorateImage(card, photo) {
   if (!photo) return;
 
   const { altText } = photo;
-  const imgElement = createTag('img', {
+  const attrs = {
     src: getImageSource(photo),
     class: 'card-image',
-  });
-
-  if (altText) {
-    imgElement.setAttribute('alt', altText);
-  }
+    alt: altText || '',
+  };
+  if (!altText) attrs.role = 'presentation';
+  const imgElement = createTag('img', attrs);
 
   const imgContainer = createTag('div', { class: 'card-image-container' });
   imgContainer.append(imgElement);
