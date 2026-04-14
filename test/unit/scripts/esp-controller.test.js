@@ -151,6 +151,45 @@ describe('Adobe Event Service API', () => {
     });
   });
 
+  describe('registerForSessionTime', () => {
+    it('should register for a session time and include attendeeId in body', async () => {
+      const fetchStub = sandbox.stub(window, 'fetch').resolves({
+        json: () => ({ registrationStatus: 'registered' }),
+        ok: true,
+      });
+
+      const result = await api.registerForSessionTime('time-1', 'me', { registrationStatus: 'registered' });
+      expect(result.ok).to.be.true;
+      expect(result.data).to.have.property('registrationStatus', 'registered');
+
+      const [url, options] = fetchStub.firstCall.args;
+      expect(url).to.include('/v1/session-times/time-1/attendees/me');
+      const body = JSON.parse(options.body);
+      expect(body).to.have.property('attendeeId', 'me');
+      expect(body).to.have.property('registrationStatus', 'registered');
+    });
+
+    it('should return an error if registration fails', async () => {
+      sandbox.stub(window, 'fetch').resolves({
+        json: () => ({ message: 'Conflict' }),
+        ok: false,
+        status: 409,
+      });
+
+      const result = await api.registerForSessionTime('time-1', 'me', { registrationStatus: 'registered' });
+      expect(result.ok).to.be.false;
+      expect(result.status).to.equal(409);
+    });
+
+    it('should handle network errors', async () => {
+      sandbox.stub(window, 'fetch').rejects(new Error('Network failure'));
+
+      const result = await api.registerForSessionTime('time-1', 'me', { registrationStatus: 'registered' });
+      expect(result.ok).to.be.false;
+      expect(result.status).to.equal('Network Error');
+    });
+  });
+
   describe('getCampaign', () => {
     it('should fetch campaign details', async () => {
       const campaignData = {

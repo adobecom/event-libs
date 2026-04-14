@@ -226,7 +226,7 @@
 .profile-cards-modal .profile-cards-modal-image .card-image-container img {
   width: 100%;
   height: auto;
-  aspect-ratio: 385 / 217;
+  aspect-ratio: 385 / 256;
   object-fit: cover;
   display: block;
 }

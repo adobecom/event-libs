@@ -26,8 +26,29 @@ function decorateImage(card, photo) {
   card.append(imgContainer);
 }
 
+export const PLATFORM_PATTERNS = {
+  instagram: /^(?:www\.)?(?:instagram\.[a-z]{2,}(?:\.[a-z]{2,})?|instagr\.am)$/,
+  facebook: /^(?:www\.)?(?:facebook\.[a-z]{2,}(?:\.[a-z]{2,})?|fb\.com)$/,
+  twitter: /^(?:www\.)?(?:twitter\.com|t\.co|tweetdeck\.twitter\.com)$/,
+  linkedin: /^(?:www\.)?(?:linkedin\.[a-z]{2,}(?:\.[a-z]{2,})?|lnkd\.in)$/,
+  youtube: /^(?:www\.)?(?:youtube\.[a-z]{2,}(?:\.[a-z]{2,})?|youtu\.be|m\.youtube\.com)$/,
+  pinterest: /^(?:www\.)?(?:pinterest\.[a-z]{2,}(?:\.[a-z]{2,})?|pin\.it)$/,
+  discord: /^(?:www\.)?(?:discord\.com|discord\.gg)$/,
+  behance: /^(?:www\.)?behance\.net$/,
+  x: /^(?:www\.)?(?:x\.com|twitter\.com)$/,
+  tiktok: /^(?:www\.)?(?:tiktok\.[a-z]{2,}(?:\.[a-z]{2,})?|vm\.tiktok\.com)$/,
+};
+
+export const SUPPORTED_PLATFORMS = [...Object.keys(PLATFORM_PATTERNS), 'web'];
+
+const svgFileCache = new Map();
+
 export async function getSVGsfromFile(path, selectors) {
   if (!path) return null;
+
+  const cacheKey = `${path}:${Array.isArray(selectors) ? selectors.join(',') : selectors || '*'}`;
+  if (svgFileCache.has(cacheKey)) return svgFileCache.get(cacheKey);
+
   const resp = await fetch(path);
   if (!resp.ok) return null;
 
@@ -46,7 +67,7 @@ export async function getSVGsfromFile(path, selectors) {
     selectors = [selectors];
   }
 
-  return selectors.map((selector) => {
+  const result = selectors.map((selector) => {
     const symbol = doc.querySelector(`#${selector}`);
     if (!symbol) return null;
     const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
@@ -57,6 +78,9 @@ export async function getSVGsfromFile(path, selectors) {
     svg.removeAttribute('id');
     return { svg, name: selector };
   });
+
+  svgFileCache.set(cacheKey, result);
+  return result;
 }
 
 export function createSocialIcon(svg, platform) {
@@ -71,22 +95,6 @@ export function createSocialIcon(svg, platform) {
 }
 
 async function decorateSocialIcons(cardContainer, socialLinks) {
-  // Define platform detection patterns using pure regex - no predefined lists needed
-  const PLATFORM_PATTERNS = {
-    instagram: /^(?:www\.)?(?:instagram\.[a-z]{2,}(?:\.[a-z]{2,})?|instagr\.am)$/,
-    facebook: /^(?:www\.)?(?:facebook\.[a-z]{2,}(?:\.[a-z]{2,})?|fb\.com)$/,
-    twitter: /^(?:www\.)?(?:twitter\.com|t\.co|tweetdeck\.twitter\.com)$/,
-    linkedin: /^(?:www\.)?(?:linkedin\.[a-z]{2,}(?:\.[a-z]{2,})?|lnkd\.in)$/,
-    youtube: /^(?:www\.)?(?:youtube\.[a-z]{2,}(?:\.[a-z]{2,})?|youtu\.be|m\.youtube\.com)$/,
-    pinterest: /^(?:www\.)?(?:pinterest\.[a-z]{2,}(?:\.[a-z]{2,})?|pin\.it)$/,
-    discord: /^(?:www\.)?(?:discord\.com|discord\.gg)$/,
-    behance: /^(?:www\.)?behance\.net$/,
-    x: /^(?:www\.)?(?:x\.com|twitter\.com)$/, // x.com and legacy twitter.com
-    tiktok: /^(?:www\.)?(?:tiktok\.[a-z]{2,}(?:\.[a-z]{2,})?|vm\.tiktok\.com)$/,
-  };
-
-  const SUPPORTED_PLATFORMS = [...Object.keys(PLATFORM_PATTERNS), 'web'];
-
   const svgPath = new URL('../../icons/social-icons.svg', import.meta.url).href;
   const socialList = createTag('ul', { class: 'card-social-icons' });
 
@@ -239,7 +247,7 @@ async function loadMiloModal() {
   return modalLoader;
 }
 
-async function buildModalContent(profileData) {
+export async function buildModalContent(profileData) {
   const content = new DocumentFragment();
   const modalContent = createTag('div', { class: 'profile-cards-modal-content' });
   const textContainer = createTag('div', { class: 'profile-cards-modal-text' });
