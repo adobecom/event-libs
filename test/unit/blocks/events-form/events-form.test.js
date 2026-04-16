@@ -1,5 +1,6 @@
 import { expect } from '@esm-bundle/chai';
 import sinon from 'sinon';
+import { getValidCampaignIdFromUrl } from '../../../../event-libs/v1/utils/utils.js';
 import { BASE_ATTENDEE_DATA_FILTER } from '../../../../event-libs/v1/utils/data-utils.js';
 
 describe('Events Form', () => {
@@ -540,6 +541,22 @@ describe('Events Form', () => {
 
         expect(payload.contactMethods).to.deep.equal([]);
       });
+    });
+  });
+
+  describe('inviteOnly + campaign gate', () => {
+    it('invite-only block condition: should block when eventData.inviteOnly and no valid campaign in URL', () => {
+      const eventDataInviteOnly = { inviteOnly: true };
+      const campaignFromUrl = getValidCampaignIdFromUrl(new URLSearchParams(''));
+      const shouldBlock = eventDataInviteOnly?.inviteOnly && !campaignFromUrl;
+      expect(shouldBlock).to.equal(true);
+    });
+
+    it('invite-only block condition: should not block when eventData.inviteOnly but URL has valid campaign', () => {
+      const eventDataInviteOnly = { inviteOnly: true };
+      const campaignFromUrl = getValidCampaignIdFromUrl(new URLSearchParams('campaign=valid-camp-1'));
+      const shouldBlock = eventDataInviteOnly?.inviteOnly && !campaignFromUrl;
+      expect(shouldBlock).to.equal(false);
     });
   });
 

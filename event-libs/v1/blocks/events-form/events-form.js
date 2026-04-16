@@ -2,7 +2,7 @@ import { deleteAttendeeFromEvent, getAndCreateAndAddAttendee, getAttendee, getEv
 import BlockMediator from '../../deps/block-mediator.min.js';
 import { signIn, decorateEvent } from '../../utils/decorate.js';
 import { dictionaryManager } from '../../utils/dictionary-manager.js';
-import { getEventConfig, LIBS, getMetadata, getSusiOptions } from '../../utils/utils.js';
+import { getEventConfig, LIBS, getMetadata, getSusiOptions, getValidCampaignIdFromUrl } from '../../utils/utils.js';
 import { FALLBACK_LOCALES, CAMPAIGN_ID_PATTERN } from '../../utils/constances.js';
 import { BASE_ATTENDEE_DATA_FILTER } from '../../utils/data-utils.js';
 
@@ -233,8 +233,8 @@ async function submitForm(bp) {
 
   if (!isValid) return false;
 
-  const campaignId = new URLSearchParams(window.location.search).get('campaign');
-  if (campaignId && CAMPAIGN_ID_PATTERN.test(campaignId)) {
+  const campaignId = getValidCampaignIdFromUrl();
+  if (campaignId) {
     payload.campaignId = campaignId;
   }
 
@@ -1085,9 +1085,27 @@ async function onProfile(bp, formData) {
     } else {
       eventHero.classList.remove('loading');
       decorateHero(bp.eventHero);
-      buildEventform(bp, formData).then(() => {
-        initFormBasedOnRSVPData(bp);
-      }).finally(() => {
+      (async () => {
+        let eventData = BlockMediator.get('eventData');
+        if (!eventData) {
+          const eventResp = await getEvent(getMetadata('event-id'));
+          if (eventResp.ok) BlockMediator.set('eventData', eventResp.data);
+          eventData = BlockMediator.get('eventData');
+        }
+        if (eventData?.inviteOnly && !getValidCampaignIdFromUrl()) {
+          await dictionaryManager.initialize();
+          const INVITE_ONLY_KEY = 'rsvp-invite-only-no-campaign-cta-text';
+          let msg = dictionaryManager.getValue(INVITE_ONLY_KEY);
+          if (msg === INVITE_ONLY_KEY) {
+            msg = 'Registration is only available through a valid invitation link.';
+          }
+          const error = createTag('p', { class: 'error' }, msg);
+          bp.formContainer.append(error);
+        } else {
+          await buildEventform(bp, formData);
+          initFormBasedOnRSVPData(bp);
+        }
+      })().finally(() => {
         decorateDefaultLinkAnalytics(block);
         block.classList.remove('loading');
       });
