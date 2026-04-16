@@ -22,8 +22,6 @@ const FILTER_ICON = '<svg width="26" height="26" viewBox="0 0 26 26" fill="none"
 const SEARCH_ICON = '<svg width="26" height="26" viewBox="0 0 26 26" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="11" cy="11" r="7.25" stroke="#6e6e6e" stroke-width="2"/><path d="M16.5 16.5L23 23" stroke="#6e6e6e" stroke-width="2" stroke-linecap="round"/></svg>';
 const CHEVRON_DOWN_ICON = '<svg width="14" height="14" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M4,7.01a1,1,0,0,1,1.7055-.7055l3.289,3.286,3.289-3.286a1,1,0,0,1,1.437,1.3865l-.0245.0245L9.7,11.7075a1,1,0,0,1-1.4125,0L4.293,7.716A.9945.9945,0,0,1,4,7.01Z" fill="#505050"/></svg>';
 
-const DESC_CHAR_LIMIT = 500;
-
 // ─── Module-level state singleton ──────────────────────────────────────────
 
 const [getState, setState] = (() => {
@@ -33,6 +31,7 @@ const [getState, setState] = (() => {
 
 let rsvpUnsubscribe = null;
 let pendingSessionId = null;
+let disconnectDescOverflowObserver = null;
 
 async function openRsvpModal({ hash, path }) {
   const miloLibs = getEventConfig()?.miloConfig?.miloLibs || LIBS;
@@ -256,6 +255,7 @@ function applyFilter(listEl, state) {
   listEl.querySelectorAll('.sh-card').forEach((card) => {
     card.hidden = !filteredIds.has(card.dataset.sessionId);
   });
+  scheduleSyncSessionDescriptionsOverflow(listEl);
 }
 
 // ─── Render: CTA group ───────────────────────────────────────────────────────
@@ -301,6 +301,76 @@ function renderCTAGroup(session, isEventRegistered) {
 function updateCTAGroup(cardEl, session, isEventRegistered) {
   const old = cardEl.querySelector('.sh-cta-group');
   if (old) old.replaceWith(renderCTAGroup(session, isEventRegistered));
+}
+
+// ─── Session description overflow (matches CSS -webkit-line-clamp) ───────────
+
+function syncSessionCardDescriptionOverflow(card) {
+  const descText = card.querySelector('.sh-card-desh-text');
+  const expandBtn = card.querySelector('.sh-expand-btn');
+  if (!descText || !expandBtn) return;
+
+  if (card.hidden) return;
+
+  if (card.classList.contains('expanded')) {
+    expandBtn.hidden = false;
+    const readMoreEl = card.querySelector('.sh-read-more');
+    if (readMoreEl) readMoreEl.hidden = false;
+    return;
+  }
+
+  const truncated = descText.scrollHeight > descText.clientHeight;
+  expandBtn.hidden = !truncated;
+
+  const desc = card.querySelector('.sh-card-desc');
+  let readMore = card.querySelector('.sh-read-more');
+  if (truncated) {
+    if (!readMore && desc) {
+      readMore = createTag('button', { class: 'sh-read-more', type: 'button' }, dictionaryManager.getValue('Read more'));
+      desc.append(readMore);
+    } else if (readMore) {
+      readMore.hidden = false;
+    }
+  } else if (readMore) {
+    readMore.remove();
+  }
+}
+
+export function syncSessionDescriptionsOverflow(listEl) {
+  if (!listEl) return;
+  listEl.querySelectorAll('.sh-card').forEach((card) => {
+    syncSessionCardDescriptionOverflow(card);
+  });
+}
+
+function scheduleSyncSessionDescriptionsOverflow(listEl) {
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      syncSessionDescriptionsOverflow(listEl);
+    });
+  });
+}
+
+function connectSessionDescriptionsOverflowObserver(listEl) {
+  if (typeof ResizeObserver === 'undefined') return;
+  disconnectSessionDescriptionsOverflow();
+  const debouncedSync = debounce(() => {
+    syncSessionDescriptionsOverflow(listEl);
+  }, 100);
+  const ro = new ResizeObserver(() => {
+    debouncedSync();
+  });
+  ro.observe(listEl);
+  disconnectDescOverflowObserver = () => {
+    ro.disconnect();
+    disconnectDescOverflowObserver = null;
+  };
+}
+
+function disconnectSessionDescriptionsOverflow() {
+  if (disconnectDescOverflowObserver) {
+    disconnectDescOverflowObserver();
+  }
 }
 
 // ─── Render: session card ────────────────────────────────────────────────────
@@ -395,14 +465,8 @@ function renderSessionCard(session, isEventRegistered) {
   const descText = createTag('div', { class: 'sh-card-desh-text' });
   const fullDesc = session.description || '';
   descText.innerHTML = fullDesc;
-  const needsTruncation = descText.textContent.length > DESC_CHAR_LIMIT;
 
   desc.append(descText);
-  if (needsTruncation) {
-    desc.append(createTag('button', { class: 'sh-read-more', type: 'button' }, dictionaryManager.getValue('Read more')));
-  }
-
-  expandBtn.hidden = !needsTruncation;
   right.append(desc, renderCTAGroup(session, isEventRegistered));
 
   card.append(left, right);
@@ -625,6 +689,26 @@ function buildConflictModalContent(newSession, conflictingSession) {
   return { content: wrapper, confirmBtn, optionsEl };
 }
 
+function setSwapConflictModalPending(confirmBtn, optionsEl) {
+  confirmBtn.disabled = true;
+  confirmBtn.setAttribute('aria-busy', 'true');
+  confirmBtn.textContent = dictionaryManager.getValue('Registering\u2026');
+  optionsEl.classList.add('sh-conflict-options-pending');
+  optionsEl.querySelectorAll('.sh-conflict-option').forEach((o) => {
+    o.setAttribute('tabindex', '-1');
+  });
+}
+
+function restoreSwapConflictModalUi(confirmBtn, optionsEl) {
+  confirmBtn.disabled = false;
+  confirmBtn.removeAttribute('aria-busy');
+  confirmBtn.textContent = dictionaryManager.getValue('Add session');
+  optionsEl.classList.remove('sh-conflict-options-pending');
+  optionsEl.querySelectorAll('.sh-conflict-option').forEach((o) => {
+    o.setAttribute('tabindex', '0');
+  });
+}
+
 async function openConflictModal(newSession, conflictingSession) {
   const miloLibs = getEventConfig()?.miloConfig?.miloLibs || LIBS;
   const { getModal, closeModal } = await import(`${miloLibs}/blocks/modal/modal.js`);
@@ -636,8 +720,25 @@ async function openConflictModal(newSession, conflictingSession) {
     confirmBtn.addEventListener('click', () => {
       confirmed = true;
       const sel = optionsEl.querySelector('.sh-conflict-option.selected');
-      closeModal();
-      resolve(sel?.dataset.sessionId || newSession.sessionId);
+      const selectedId = sel?.dataset.sessionId || newSession.sessionId;
+
+      if (selectedId === conflictingSession.sessionId) {
+        closeModal();
+        resolve({ selectedId, finalize: () => {} });
+        return;
+      }
+
+      setSwapConflictModalPending(confirmBtn, optionsEl);
+      resolve({
+        selectedId,
+        finalize: (ok) => {
+          if (ok) {
+            closeModal();
+          } else {
+            restoreSwapConflictModalUi(confirmBtn, optionsEl);
+          }
+        },
+      });
     });
 
     const onClose = () => {
@@ -744,10 +845,15 @@ async function handleSessionRegistration(cardEl, sessionId, state) {
 
   // ── Conflict detection ────────────────────────────────────────────────────
   const conflictingSession = findConflictingSession(session, state);
+  let conflictFinalize = null;
+  let isDeferredSwap = false;
   if (conflictingSession) {
-    const selectedId = await openConflictModal(session, conflictingSession);
-    if (!selectedId) return; // dismissed
-    if (selectedId === conflictingSession.sessionId) return; // user kept existing
+    const outcome = await openConflictModal(session, conflictingSession);
+    if (!outcome) return; // dismissed
+    if (outcome.selectedId === conflictingSession.sessionId) return; // user kept existing
+
+    conflictFinalize = outcome.finalize;
+    isDeferredSwap = true;
 
     // User chose new session → unregister from conflicting first
     const conflictTime = conflictingSession.sessionTimes[0];
@@ -755,6 +861,7 @@ async function handleSessionRegistration(cardEl, sessionId, state) {
       const unregResp = await unregisterFromSessionTime(conflictTime.sessionTimeId);
       if (!unregResp.ok) {
         window.lana?.log(`Error: Failed to unregister conflicting session ${conflictingSession.sessionId}`);
+        conflictFinalize(false);
         return;
       }
       conflictingSession.isRegistered = false;
@@ -770,7 +877,7 @@ async function handleSessionRegistration(cardEl, sessionId, state) {
   }
 
   const btn = cardEl.querySelector('.sh-btn-register-session');
-  if (btn) {
+  if (!isDeferredSwap && btn) {
     btn.disabled = true;
     btn.setAttribute('aria-busy', 'true');
     btn.textContent = dictionaryManager.getValue('Registering\u2026');
@@ -784,9 +891,12 @@ async function handleSessionRegistration(cardEl, sessionId, state) {
     updateCTAGroup(cardEl, session, true);
     const existing = BlockMediator.get('registeredSessionIds') || new Set();
     BlockMediator.set('registeredSessionIds', new Set([...existing, sessionId]));
+    if (conflictFinalize) conflictFinalize(true);
   } else {
     window.lana?.log(`Error: Failed to register for session ${sessionId}. Error:${JSON.stringify(resp.error)}`);
-    if (btn) {
+    if (conflictFinalize) {
+      conflictFinalize(false);
+    } else if (btn) {
       btn.disabled = false;
       btn.removeAttribute('aria-busy');
       btn.textContent = dictionaryManager.getValue('Register for session');
@@ -841,6 +951,9 @@ function bindCardEvents(listEl, state) {
       const expandBtn = card.querySelector('.sh-expand-btn');
       expandBtn.innerHTML = isExpanded ? MINUS_CIRCLE_ICON : PLUS_CIRCLE_ICON;
       expandBtn.setAttribute('aria-label', isExpanded ? dictionaryManager.getValue('Collapse session') : dictionaryManager.getValue('Expand session'));
+      if (!isExpanded) {
+        syncSessionCardDescriptionOverflow(card);
+      }
       return;
     }
 
@@ -1044,6 +1157,14 @@ async function loadBlock(el, rsvpConfig) {
   bindCardEvents(listEl, state);
   bindMediatorSubscriptions(el, bannerEl, listEl);
 
+  try {
+    await document.fonts?.ready;
+  } catch {
+    // ignore font loading errors
+  }
+  scheduleSyncSessionDescriptionsOverflow(listEl);
+  connectSessionDescriptionsOverflowObserver(listEl);
+
   const storedPendingId = sessionStorage.getItem('sessions-hub:pendingSessionId');
   const storedEventRsvp = sessionStorage.getItem('sessions-hub:pendingEventRsvp');
   if (storedEventRsvp) sessionStorage.removeItem('sessions-hub:pendingEventRsvp');
@@ -1068,6 +1189,7 @@ async function loadBlock(el, rsvpConfig) {
 
 export default async function init(el) {
   if (rsvpUnsubscribe) { rsvpUnsubscribe(); rsvpUnsubscribe = null; }
+  disconnectSessionDescriptionsOverflow();
   setFilterState({ query: '', activeTags: new Set(), activeTab: 'all' });
 
   let rsvpConfig = null;

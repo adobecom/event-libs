@@ -812,6 +812,11 @@
   gap: 24px;
 }
 
+.sh-conflict-options.sh-conflict-options-pending {
+  pointer-events: none;
+  opacity: 0.6;
+}
+
 .sh-conflict-option {
   position: relative;
   display: flex;
@@ -894,6 +899,17 @@
 
 .sh-conflict-confirm:hover {
   background: #404040;
+}
+
+.sh-conflict-confirm:disabled,
+.sh-conflict-confirm[aria-busy='true'] {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.sh-conflict-confirm:hover:disabled,
+.sh-conflict-confirm:hover[aria-busy='true'] {
+  background: #292929;
 }
 
 /* ─── Reduced motion ─────────────────────────────────────────────────────── */
