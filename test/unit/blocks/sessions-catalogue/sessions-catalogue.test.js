@@ -1,6 +1,6 @@
 import { expect } from '@esm-bundle/chai';
 import { readFile } from '@web/test-runner-commands';
-import init from '../../../../event-libs/v1/blocks/sessions-hub/sessions-hub.js';
+import init, { syncSessionDescriptionsOverflow } from '../../../../event-libs/v1/blocks/sessions-hub/sessions-hub.js';
 import BlockMediator from '../../../../event-libs/v1/deps/block-mediator.min.js';
 
 const body = await readFile({ path: './mocks/default.html' });
@@ -474,6 +474,44 @@ describe('sessions-hub init', () => {
     const banner = document.querySelector('.sh-event-banner');
     expect(banner).to.not.be.null;
     expect(banner.classList.contains('hidden')).to.be.false;
+  });
+
+  it('shows expand and read-more when description scrollHeight exceeds clientHeight', async () => {
+    stubDefaultFetch();
+    setSessionsMeta([makeSession()]);
+    const el = document.querySelector('.sessions-hub');
+    await init(el);
+    await new Promise((r) => { requestAnimationFrame(() => requestAnimationFrame(r)); });
+
+    const listEl = el.querySelector('.sh-session-list');
+    const descText = el.querySelector('.sh-card-desh-text');
+    const card = el.querySelector('.sh-card');
+    Object.defineProperty(descText, 'scrollHeight', { configurable: true, get: () => 400 });
+    Object.defineProperty(descText, 'clientHeight', { configurable: true, get: () => 100 });
+
+    syncSessionDescriptionsOverflow(listEl);
+
+    expect(card.querySelector('.sh-expand-btn').hidden).to.be.false;
+    expect(card.querySelector('.sh-read-more')).to.not.be.null;
+  });
+
+  it('hides expand and omits read-more when description fits within clamp', async () => {
+    stubDefaultFetch();
+    setSessionsMeta([makeSession()]);
+    const el = document.querySelector('.sessions-hub');
+    await init(el);
+    await new Promise((r) => { requestAnimationFrame(() => requestAnimationFrame(r)); });
+
+    const listEl = el.querySelector('.sh-session-list');
+    const descText = el.querySelector('.sh-card-desh-text');
+    const card = el.querySelector('.sh-card');
+    Object.defineProperty(descText, 'scrollHeight', { configurable: true, get: () => 120 });
+    Object.defineProperty(descText, 'clientHeight', { configurable: true, get: () => 120 });
+
+    syncSessionDescriptionsOverflow(listEl);
+
+    expect(card.querySelector('.sh-expand-btn').hidden).to.be.true;
+    expect(card.querySelector('.sh-read-more')).to.be.null;
   });
 });
 
