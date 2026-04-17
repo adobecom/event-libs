@@ -2,9 +2,38 @@ import { deleteAttendeeFromEvent, getAndCreateAndAddAttendee, getAttendee, getEv
 import BlockMediator from '../../deps/block-mediator.min.js';
 import { signIn, decorateEvent } from '../../utils/decorate.js';
 import { dictionaryManager } from '../../utils/dictionary-manager.js';
-import { getEventConfig, LIBS, getMetadata, getSusiOptions, getValidCampaignIdFromUrl } from '../../utils/utils.js';
+import {
+  getEventConfig, LIBS, getMetadata, getSusiOptions, getValidCampaignIdFromUrl,
+} from '../../utils/utils.js';
 import { FALLBACK_LOCALES, CAMPAIGN_ID_PATTERN } from '../../utils/constances.js';
 import { BASE_ATTENDEE_DATA_FILTER } from '../../utils/data-utils.js';
+
+/**
+ * Parses the RSVP form `limit` column: max character length only.
+ * Value must be a positive integer — JSON number or string of digits (e.g. `30`).
+ * @param {unknown} raw
+ * @returns {number|undefined} Integer ≥ 1, or undefined when unset/invalid
+ */
+function parseRsvpFieldLimit(raw) {
+  if (raw == null || raw === '') return undefined;
+  if (typeof raw === 'number') {
+    const n = Math.trunc(raw);
+    if (Number.isFinite(n) && n >= 1) return n;
+    window.lana?.log('events-form: limit must be a positive integer');
+    return undefined;
+  }
+  if (typeof raw === 'string') {
+    const s = raw.trim();
+    if (!s) return undefined;
+    if (!/^\d+$/.test(s)) {
+      window.lana?.log('events-form: limit must be a positive integer (digits only)');
+      return undefined;
+    }
+    return parseInt(s, 10);
+  }
+  window.lana?.log('events-form: limit must be a positive integer');
+  return undefined;
+}
 
 const eventConfig = getEventConfig();
 const miloLibs = eventConfig?.miloConfig?.miloLibs ? eventConfig.miloConfig.miloLibs : LIBS;
@@ -435,19 +464,24 @@ function createHeading({ label }, el) {
   return createTag(el, {}, dictionaryManager.getValue(label, 'rsvp-fields'));
 }
 
-function createInput({ type, field, placeholder, required, defval, pattern, title }) {
+function createInput({
+  type, field, placeholder, required, defval, pattern, title, limit,
+}) {
   const placeholderText = placeholder ? dictionaryManager.getValue(placeholder, 'rsvp-fields') : '';
   const attrs = { type, id: field, placeholder: placeholderText, value: defval };
   if (pattern) attrs.pattern = pattern;
   if (title) attrs.title = title;
+  if (limit != null) attrs.maxlength = limit;
   const input = createTag('input', attrs);
   if (required === 'x') input.setAttribute('required', 'required');
   return input;
 }
 
-function createTextArea({ field, placeholder, required, defval }) {
+function createTextArea({ field, placeholder, required, defval, limit }) {
   const placeholderText = placeholder ? dictionaryManager.getValue(placeholder, 'rsvp-fields') : '';
-  const input = createTag('textarea', { id: field, placeholder: placeholderText, value: defval });
+  const attrs = { id: field, placeholder: placeholderText, value: defval };
+  if (limit != null) attrs.maxlength = limit;
+  const input = createTag('textarea', attrs);
   if (required === 'x') input.setAttribute('required', 'required');
   return input;
 }
@@ -904,6 +938,7 @@ async function createForm(bp, formData) {
 
   json.data.forEach(async (fd) => {
     fd.type = fd.type || 'text';
+    fd.limit = parseRsvpFieldLimit(fd.limit);
     if (fd.type === 'text') sanitizeList.push(fd.field);
     const style = fd.extra ? ` events-form-${fd.extra}` : '';
     const fieldWrapper = createTag(
