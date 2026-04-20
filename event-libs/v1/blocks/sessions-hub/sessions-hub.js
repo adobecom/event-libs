@@ -175,7 +175,7 @@ function findConflictingSession(newSession, state) {
 }
 
 function normalizeSessions(rawSessions, locationMap, registeredSessionIds, venueId) {
-  return rawSessions.map((session) => {
+  const mapped = rawSessions.map((session) => {
     const sessionTimes = (session.rawTimes || []).map((t) => ({
       sessionTimeId: t.sessionTimeId,
       startTimeMillis: t.startTimeMillis,
@@ -211,6 +211,11 @@ function normalizeSessions(rawSessions, locationMap, registeredSessionIds, venue
       isRegistered: registeredSessionIds.has(session.sessionId),
       expanded: false,
     };
+  });
+  return mapped.sort((a, b) => {
+    const aMin = Math.min(...a.sessionTimes.map((t) => t.startTimeMillis).filter(Boolean));
+    const bMin = Math.min(...b.sessionTimes.map((t) => t.startTimeMillis).filter(Boolean));
+    return (isFinite(aMin) ? aMin : Infinity) - (isFinite(bMin) ? bMin : Infinity);
   });
 }
 
@@ -714,6 +719,7 @@ async function openConflictModal(newSession, conflictingSession) {
   const { getModal, closeModal } = await import(`${miloLibs}/blocks/modal/modal.js`);
   const { content, confirmBtn, optionsEl } = buildConflictModalContent(newSession, conflictingSession);
 
+  let dialogEl;
   return new Promise((resolve) => {
     let confirmed = false;
 
@@ -723,7 +729,7 @@ async function openConflictModal(newSession, conflictingSession) {
       const selectedId = sel?.dataset.sessionId || newSession.sessionId;
 
       if (selectedId === conflictingSession.sessionId) {
-        closeModal();
+        closeModal(dialogEl);
         resolve({ selectedId, finalize: () => {} });
         return;
       }
@@ -733,7 +739,7 @@ async function openConflictModal(newSession, conflictingSession) {
         selectedId,
         finalize: (ok) => {
           if (ok) {
-            closeModal();
+            closeModal(dialogEl);
           } else {
             restoreSwapConflictModalUi(confirmBtn, optionsEl);
           }
@@ -747,7 +753,8 @@ async function openConflictModal(newSession, conflictingSession) {
     };
     window.addEventListener('milo:modal:closed', onClose);
 
-    getModal(null, { id: 'sh-conflict-modal', content, class: 'sh-conflict-modal' });
+    getModal(null, { id: 'sh-conflict-modal', content, class: 'sh-conflict-modal' })
+      .then((modal) => { dialogEl = modal; });
   });
 }
 
