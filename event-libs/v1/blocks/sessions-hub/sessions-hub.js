@@ -48,30 +48,32 @@ async function openRsvpModal({ hash, path }) {
 // ─── Filter state ───────────────────────────────────────────────────────────
 
 const [getFilterState, setFilterState] = (() => {
-  let fs = { query: '', activeTags: new Set(), activeTab: 'all' };
+  let fs = { query: '', activeTags: new Map(), activeTab: 'all' };
   return [() => fs, (s) => { fs = s; }];
 })();
 
 // ─── Utilities ──────────────────────────────────────────────────────────────
 
-function resolveTagTitle(tagId, tagsData) {
+function resolveTagWithGroup(tagId, tagsData) {
   const colonIdx = tagId.indexOf(':');
-  if (colonIdx === -1 || !tagsData) return '';
+  if (colonIdx === -1 || !tagsData) return { label: '', group: '' };
   const ns = tagId.slice(0, colonIdx);
-  const path = tagId.slice(colonIdx + 1);
+  const segs = tagId.slice(colonIdx + 1).split('/');
   let node = tagsData.namespaces?.[ns];
-  for (const seg of path.split('/')) {
+  let parentNode = null;
+  for (const seg of segs) {
+    parentNode = node;
     node = node?.tags?.[seg];
   }
-  return node?.title || '';
+  return { label: node?.title || '', group: parentNode?.title || '' };
 }
 
-function resolveTagLabels(tagIdList, tagsData) {
+function resolveTagObjects(tagIdList, tagsData) {
   if (!tagIdList) return [];
   return tagIdList
     .split(',')
-    .map((id) => resolveTagTitle(id.trim(), tagsData))
-    .filter(Boolean);
+    .map((id) => resolveTagWithGroup(id.trim(), tagsData))
+    .filter((t) => t.label);
 }
 
 function formatICSDate(millis) {
@@ -215,7 +217,7 @@ function normalizeSessions(rawSessions, locationMap, registeredSessionIds, venue
       sessionId: session.sessionId,
       title: session.localizations?.['en-US']?.title || session.title || session.enTitle || '',
       description: session.localizations?.['en-US']?.description || session.description || '',
-      tags: resolveTagLabels(session.tags, tagsData),
+      tags: resolveTagObjects(session.tags, tagsData),
       sessionTimes,
       speakers,
       isRegistered: registeredSessionIds.has(session.sessionId),
@@ -231,10 +233,19 @@ function normalizeSessions(rawSessions, locationMap, registeredSessionIds, venue
 
 // ─── Filter / search ─────────────────────────────────────────────────────────
 
-function collectFilterOptions(sessions) {
-  const tags = new Set();
-  sessions.forEach((s) => s.tags.forEach((t) => tags.add(t)));
-  return { tags: [...tags].sort() };
+function collectFilterGroups(sessions) {
+  const groups = new Map();
+  sessions.forEach((s) => s.tags.forEach(({ label, group }) => {
+    if (!label) return;
+    const key = group || '';
+    if (!groups.has(key)) groups.set(key, new Set());
+    groups.get(key).add(label);
+  }));
+  const sorted = new Map();
+  [...groups.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .forEach(([g, tagSet]) => sorted.set(g, [...tagSet].sort()));
+  return sorted;
 }
 
 function filterSessions(sessions, { query, activeTags, activeTab, registeredSessionIds }) {
@@ -242,7 +253,11 @@ function filterSessions(sessions, { query, activeTags, activeTab, registeredSess
   return sessions.filter((s) => {
     if (activeTab === 'my' && !registeredSessionIds.has(s.sessionId)) return false;
 
-    if (activeTags.size > 0 && !s.tags.some((t) => activeTags.has(t))) return false;
+    if (activeTags.size > 0) {
+      for (const [, groupSet] of activeTags) {
+        if (groupSet.size > 0 && !s.tags.some((t) => groupSet.has(t.label))) return false;
+      }
+    }
 
     if (q) {
       const hay = [
@@ -392,7 +407,7 @@ function disconnectSessionDescriptionsOverflow() {
 
 function renderTagPills(tags) {
   const list = createTag('ul', { class: 'sh-tag-list', 'aria-label': dictionaryManager.getValue('Tags') });
-  tags.forEach((tag) => list.append(createTag('li', { class: 'sh-tag-pill' }, tag)));
+  tags.forEach((tag) => list.append(createTag('li', { class: 'sh-tag-pill' }, tag.label)));
   return list;
 }
 
@@ -508,16 +523,28 @@ function renderTabToggle(isEventRegistered) {
 
 function renderFilterPanel(sessions) {
   const panel = createTag('div', { class: 'sh-filter-panel hidden', 'aria-hidden': 'true' });
-  const { tags } = collectFilterOptions(sessions);
-
-  tags.forEach((tag, i) => {
-    const id = `sh-filter-tag-${i}`;
-    const lbl = createTag('label', { class: 'sh-filter-item', for: id });
-    lbl.append(createTag('input', { id, type: 'checkbox', value: tag, 'data-filter-type': 'tag' }));
-    lbl.append(createTag('span', {}, tag));
-    panel.append(lbl);
+  const groups = collectFilterGroups(sessions);
+  let tagIdx = 0;
+  groups.forEach((tagLabels, groupName) => {
+    const section = createTag('div', { class: 'sh-filter-group' });
+    if (groupName) {
+      section.append(createTag('span', { class: 'sh-filter-group-label' }, groupName));
+    }
+    tagLabels.forEach((tag) => {
+      const id = `sh-filter-tag-${tagIdx++}`;
+      const lbl = createTag('label', { class: 'sh-filter-item', for: id });
+      lbl.append(createTag('input', {
+        id,
+        type: 'checkbox',
+        value: tag,
+        'data-filter-type': 'tag',
+        'data-filter-group': groupName,
+      }));
+      lbl.append(createTag('span', {}, tag));
+      section.append(lbl);
+    });
+    panel.append(section);
   });
-
   return panel;
 }
 
@@ -538,8 +565,8 @@ function renderToolbar(state) {
   }));
 
   const filterWrap = createTag('div', { class: 'sh-filter-wrap' });
-  const { tags: filterTags } = collectFilterOptions(state.sessions);
-  const hasFilters = filterTags.length > 0;
+  const filterGroups = collectFilterGroups(state.sessions);
+  const hasFilters = filterGroups.size > 0;
   const filterBtn = createTag('button', {
     class: 'sh-filter-btn',
     type: 'button',
@@ -835,9 +862,13 @@ function bindToolbarEvents(toolbarEl, listEl, state) {
     const cb = e.target;
     if (cb.type !== 'checkbox') return;
     const fs = getFilterState();
-    const newTags = new Set(fs.activeTags);
+    const newTags = new Map(fs.activeTags);
     if (cb.dataset.filterType === 'tag') {
-      cb.checked ? newTags.add(cb.value) : newTags.delete(cb.value);
+      const group = cb.dataset.filterGroup || '';
+      const groupSet = new Set(newTags.get(group));
+      cb.checked ? groupSet.add(cb.value) : groupSet.delete(cb.value);
+      if (groupSet.size === 0) newTags.delete(group);
+      else newTags.set(group, groupSet);
     }
     setFilterState({ ...fs, activeTags: newTags });
     applyFilter(listEl, state);
@@ -1210,7 +1241,7 @@ async function loadBlock(el, rsvpConfig) {
 export default async function init(el) {
   if (rsvpUnsubscribe) { rsvpUnsubscribe(); rsvpUnsubscribe = null; }
   disconnectSessionDescriptionsOverflow();
-  setFilterState({ query: '', activeTags: new Set(), activeTab: 'all' });
+  setFilterState({ query: '', activeTags: new Map(), activeTab: 'all' });
 
   let rsvpConfig = null;
   const rows = [...el.querySelectorAll(':scope > div')];
