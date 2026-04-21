@@ -42,10 +42,38 @@ function makeEventData(overrides = {}) {
 // We import helper functions via dynamic import to avoid triggering side-effects
 // from the full block init (which makes network calls in the constructor).
 
-let deriveTagLabels;
+let resolveTagTitle;
+let resolveTagLabels;
 let generateICS;
 let filterSessions;
 let normalizeSessions;
+
+const mockTagsData = {
+  namespaces: {
+    caas: {
+      tags: {
+        events: {
+          tags: {
+            type: {
+              tags: {
+                workshop: { title: 'Workshop' },
+                lab: { title: 'Lab' },
+                demo: { title: 'Demo' },
+                'two-word-tag': { title: 'Two Word Tag' },
+                'deep-dive': { title: 'Deep Dive' },
+              },
+            },
+            level: {
+              tags: {
+                beginner: { title: 'Beginner' },
+              },
+            },
+          },
+        },
+      },
+    },
+  },
+};
 
 before(async () => {
   // Import isolated helpers by re-exporting them in tests via dynamic import.
@@ -55,14 +83,23 @@ before(async () => {
   // Inline the pure functions under test to avoid circular-import issues with
   // the block's top-level side-effect-free closures.
 
-  deriveTagLabels = (tagIdList) => {
+  resolveTagTitle = (tagId, tagsData) => {
+    const colonIdx = tagId.indexOf(':');
+    if (colonIdx === -1 || !tagsData) return '';
+    const ns = tagId.slice(0, colonIdx);
+    const path = tagId.slice(colonIdx + 1);
+    let node = tagsData.namespaces?.[ns];
+    for (const seg of path.split('/')) {
+      node = node?.tags?.[seg];
+    }
+    return node?.title || '';
+  };
+
+  resolveTagLabels = (tagIdList, tagsData) => {
     if (!tagIdList) return [];
     return tagIdList
       .split(',')
-      .map((id) => {
-        const seg = id.trim().split('/').at(-1);
-        return seg ? seg.charAt(0).toUpperCase() + seg.slice(1) : '';
-      })
+      .map((id) => resolveTagTitle(id.trim(), tagsData))
       .filter(Boolean);
   };
 
@@ -105,7 +142,7 @@ before(async () => {
     });
   };
 
-  normalizeSessions = (rawSessions, speakerMap, locationMap, registeredSessionIds, venueId) => rawSessions.map((session) => {
+  normalizeSessions = (rawSessions, speakerMap, locationMap, registeredSessionIds, venueId, tagsData) => rawSessions.map((session) => {
     const sessionTimes = (session.rawTimes || []).map((t) => ({
       sessionTimeId: t.sessionTimeId,
       startTimeMillis: t.startTimeMillis,
@@ -137,7 +174,7 @@ before(async () => {
       sessionId: session.sessionId,
       title: session.localizations?.['en-US']?.title || session.title || session.enTitle || '',
       description: session.localizations?.['en-US']?.description || session.description || '',
-      tags: deriveTagLabels(session.tags),
+      tags: resolveTagLabels(session.tags, tagsData),
       sessionTimes,
       speakers,
       isRegistered: registeredSessionIds.has(session.sessionId),
@@ -146,29 +183,67 @@ before(async () => {
   });
 });
 
-// ─── deriveTagLabels ─────────────────────────────────────────────────────────
+// ─── resolveTagTitle ─────────────────────────────────────────────────────────
 
-describe('deriveTagLabels', () => {
+describe('resolveTagTitle', () => {
+  it('returns title from tagsData for a known tag', () => {
+    expect(resolveTagTitle('caas:events/type/workshop', mockTagsData)).to.equal('Workshop');
+  });
+
+  it('returns multi-word title for a hyphenated tag ID', () => {
+    expect(resolveTagTitle('caas:events/type/two-word-tag', mockTagsData)).to.equal('Two Word Tag');
+  });
+
+  it('returns empty string for unknown tag path', () => {
+    expect(resolveTagTitle('caas:events/type/unknown', mockTagsData)).to.equal('');
+  });
+
+  it('returns empty string when tagsData is null', () => {
+    expect(resolveTagTitle('caas:events/type/workshop', null)).to.equal('');
+  });
+
+  it('returns empty string when tag has no colon separator', () => {
+    expect(resolveTagTitle('no-colon-tag', mockTagsData)).to.equal('');
+  });
+});
+
+// ─── resolveTagLabels ────────────────────────────────────────────────────────
+
+describe('resolveTagLabels', () => {
   it('returns empty array for null', () => {
-    expect(deriveTagLabels(null)).to.deep.equal([]);
+    expect(resolveTagLabels(null, mockTagsData)).to.deep.equal([]);
   });
 
   it('returns empty array for empty string', () => {
-    expect(deriveTagLabels('')).to.deep.equal([]);
+    expect(resolveTagLabels('', mockTagsData)).to.deep.equal([]);
   });
 
-  it('capitalizes last path segment of a single CaaS tag', () => {
-    expect(deriveTagLabels('caas:events/type/workshop')).to.deep.equal(['Workshop']);
+  it('resolves a single tag to its chimera title', () => {
+    expect(resolveTagLabels('caas:events/type/workshop', mockTagsData)).to.deep.equal(['Workshop']);
   });
 
-  it('handles multiple comma-separated tags', () => {
-    const result = deriveTagLabels('caas:events/type/workshop,caas:events/level/beginner');
+  it('resolves multiple comma-separated tags', () => {
+    const result = resolveTagLabels('caas:events/type/workshop,caas:events/level/beginner', mockTagsData);
     expect(result).to.deep.equal(['Workshop', 'Beginner']);
   });
 
   it('trims whitespace around tag ids', () => {
-    const result = deriveTagLabels(' caas:events/type/lab , caas:events/type/demo ');
+    const result = resolveTagLabels(' caas:events/type/lab , caas:events/type/demo ', mockTagsData);
     expect(result).to.deep.equal(['Lab', 'Demo']);
+  });
+
+  it('resolves hyphenated two-word tag to its title', () => {
+    const result = resolveTagLabels('caas:events/type/two-word-tag,caas:events/type/deep-dive', mockTagsData);
+    expect(result).to.deep.equal(['Two Word Tag', 'Deep Dive']);
+  });
+
+  it('filters out unknown tags when tagsData has no match', () => {
+    const result = resolveTagLabels('caas:events/type/unknown', mockTagsData);
+    expect(result).to.deep.equal([]);
+  });
+
+  it('returns empty array when tagsData is null', () => {
+    expect(resolveTagLabels('caas:events/type/workshop', null)).to.deep.equal([]);
   });
 });
 
@@ -316,9 +391,9 @@ describe('normalizeSessions', () => {
   ]);
   const registeredSessionIds = new Set(['session-1']);
 
-  it('parses tagIdList into capitalized pill labels', () => {
+  it('resolves tag IDs to chimera titles', () => {
     const raw = [makeSession({ tags: 'caas:events/type/workshop,caas:events/level/beginner' })];
-    const result = normalizeSessions(raw, speakerMap, locationMap, registeredSessionIds, 'venue-xyz');
+    const result = normalizeSessions(raw, speakerMap, locationMap, registeredSessionIds, 'venue-xyz', mockTagsData);
     expect(result[0].tags).to.deep.equal(['Workshop', 'Beginner']);
   });
 
@@ -391,6 +466,7 @@ describe('sessions-hub init', () => {
       ['/v1/series/', () => ({ speakers: [] })],
       ['/v1/venues/', () => ({ name: 'Main Hall', locationId: 'loc-1' })],
       ['/v1/attendees/me/events/', () => ({ sessionIds: [] })],
+      ['chimera-api/tags', () => mockTagsData],
     ]);
   }
 

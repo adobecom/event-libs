@@ -5,6 +5,7 @@ import { signIn } from '../../utils/decorate.js';
 import { buildModalContent } from '../profile-cards/profile-cards.js';
 import { createSmartDateRange } from '../../utils/date-time-helper.js';
 import {
+  getCaasTags,
   getEvent,
   getVenueLocation,
   getMyEventSessions,
@@ -53,14 +54,23 @@ const [getFilterState, setFilterState] = (() => {
 
 // ─── Utilities ──────────────────────────────────────────────────────────────
 
-function deriveTagLabels(tagIdList) {
+function resolveTagTitle(tagId, tagsData) {
+  const colonIdx = tagId.indexOf(':');
+  if (colonIdx === -1 || !tagsData) return '';
+  const ns = tagId.slice(0, colonIdx);
+  const path = tagId.slice(colonIdx + 1);
+  let node = tagsData.namespaces?.[ns];
+  for (const seg of path.split('/')) {
+    node = node?.tags?.[seg];
+  }
+  return node?.title || '';
+}
+
+function resolveTagLabels(tagIdList, tagsData) {
   if (!tagIdList) return [];
   return tagIdList
     .split(',')
-    .map((id) => {
-      const seg = id.trim().split('/').at(-1);
-      return seg ? seg.charAt(0).toUpperCase() + seg.slice(1) : '';
-    })
+    .map((id) => resolveTagTitle(id.trim(), tagsData))
     .filter(Boolean);
 }
 
@@ -174,7 +184,7 @@ function findConflictingSession(newSession, state) {
   return null;
 }
 
-function normalizeSessions(rawSessions, locationMap, registeredSessionIds, venueId) {
+function normalizeSessions(rawSessions, locationMap, registeredSessionIds, venueId, tagsData) {
   const mapped = rawSessions.map((session) => {
     const sessionTimes = (session.rawTimes || []).map((t) => ({
       sessionTimeId: t.sessionTimeId,
@@ -205,7 +215,7 @@ function normalizeSessions(rawSessions, locationMap, registeredSessionIds, venue
       sessionId: session.sessionId,
       title: session.localizations?.['en-US']?.title || session.title || session.enTitle || '',
       description: session.localizations?.['en-US']?.description || session.description || '',
-      tags: deriveTagLabels(session.tags),
+      tags: resolveTagLabels(session.tags, tagsData),
       sessionTimes,
       speakers,
       isRegistered: registeredSessionIds.has(session.sessionId),
@@ -1127,9 +1137,12 @@ async function loadBlock(el, rsvpConfig) {
 
   const rsvpData = BlockMediator.get('rsvpData');
   const isEventRegistered = rsvpData?.registrationStatus === 'registered';
-  const registeredSessionIds = await resolveRegistrationState(eventData.eventId, isEventRegistered);
+  const [registeredSessionIds, tagsData] = await Promise.all([
+    resolveRegistrationState(eventData.eventId, isEventRegistered),
+    Promise.resolve(getCaasTags()).catch(() => null),
+  ]);
 
-  const sessions = normalizeSessions(rawSessions, locationMap, registeredSessionIds, venueId);
+  const sessions = normalizeSessions(rawSessions, locationMap, registeredSessionIds, venueId, tagsData);
 
   const speakerMap = new Map();
   sessions.forEach((session) => {
