@@ -9,6 +9,7 @@ import {
   flattenObject,
   createOptimizedPicture,
   getIcon,
+  getValidCampaignIdFromUrl,
 } from '../../../event-libs/v1/utils/utils.js';
 
 describe('Utility Functions', () => {
@@ -158,6 +159,25 @@ describe('Utility Functions', () => {
       expect(icon.className).to.equal('icon icon-test-icon');
       expect(icon.getAttribute('src')).to.include('event-libs/v1/icons/test-icon.svg');
       expect(icon.getAttribute('alt')).to.equal('test-icon');
+    });
+  });
+
+  describe('getValidCampaignIdFromUrl', () => {
+    it('should return campaign ID when valid (word chars and hyphens, 1-128 chars)', () => {
+      expect(getValidCampaignIdFromUrl(new URLSearchParams('campaign=abc-123'))).to.equal('abc-123');
+      expect(getValidCampaignIdFromUrl(new URLSearchParams('campaign=camp_1'))).to.equal('camp_1');
+    });
+
+    it('should return null when campaign param is missing', () => {
+      expect(getValidCampaignIdFromUrl(new URLSearchParams(''))).to.be.null;
+      expect(getValidCampaignIdFromUrl(new URLSearchParams('other=1'))).to.be.null;
+    });
+
+    it('should return null when campaign param is invalid (over 128 chars or invalid chars)', () => {
+      expect(getValidCampaignIdFromUrl(new URLSearchParams('campaign=inv@lid'))).to.be.null;
+      expect(getValidCampaignIdFromUrl(new URLSearchParams('campaign=has space'))).to.be.null;
+      const long = 'a'.repeat(129);
+      expect(getValidCampaignIdFromUrl(new URLSearchParams(`campaign=${long}`))).to.be.null;
     });
   });
 });

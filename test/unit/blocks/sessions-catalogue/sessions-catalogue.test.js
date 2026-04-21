@@ -481,7 +481,6 @@ describe('sessions-hub init', () => {
     setSessionsMeta([makeSession()]);
     const el = document.querySelector('.sessions-hub');
     await init(el);
-    await new Promise((r) => { requestAnimationFrame(() => requestAnimationFrame(r)); });
 
     const listEl = el.querySelector('.sh-session-list');
     const descText = el.querySelector('.sh-card-desh-text');
@@ -500,7 +499,6 @@ describe('sessions-hub init', () => {
     setSessionsMeta([makeSession()]);
     const el = document.querySelector('.sessions-hub');
     await init(el);
-    await new Promise((r) => { requestAnimationFrame(() => requestAnimationFrame(r)); });
 
     const listEl = el.querySelector('.sh-session-list');
     const descText = el.querySelector('.sh-card-desh-text');
