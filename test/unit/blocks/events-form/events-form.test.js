@@ -2,6 +2,7 @@ import { expect } from '@esm-bundle/chai';
 import sinon from 'sinon';
 import { getValidCampaignIdFromUrl } from '../../../../event-libs/v1/utils/utils.js';
 import { BASE_ATTENDEE_DATA_FILTER } from '../../../../event-libs/v1/utils/data-utils.js';
+import { stripTags } from '../../../../event-libs/v1/utils/sanitize-utils.js';
 
 describe('Events Form', () => {
   let block;
@@ -787,5 +788,32 @@ describe('Events Form', () => {
       expect(errorEl).to.not.be.null;
       expect(errorEl.textContent).to.equal('event-full-no-waitlist-error-msg');
     });
+  });
+});
+
+describe('stripTags', () => {
+  it('removes script tags and keeps inner text', () => {
+    expect(stripTags('<script>alert()</script>')).to.equal('alert()');
+  });
+
+  it('removes inline tags and keeps surrounding text', () => {
+    expect(stripTags('hello <b>world</b>')).to.equal('hello world');
+  });
+
+  it('passes through plain text unchanged', () => {
+    expect(stripTags('no tags here')).to.equal('no tags here');
+  });
+
+  it('returns empty string unchanged', () => {
+    expect(stripTags('')).to.equal('');
+  });
+
+  it('returns falsy values unchanged', () => {
+    expect(stripTags(null)).to.equal(null);
+    expect(stripTags(undefined)).to.equal(undefined);
+  });
+
+  it('strips nested tags and event handler attributes', () => {
+    expect(stripTags('<a href="x"><img onerror="y">text</a>')).to.equal('text');
   });
 });

@@ -7,33 +7,7 @@ import {
 } from '../../utils/utils.js';
 import { FALLBACK_LOCALES, CAMPAIGN_ID_PATTERN } from '../../utils/constances.js';
 import { BASE_ATTENDEE_DATA_FILTER } from '../../utils/data-utils.js';
-
-/**
- * Parses the RSVP form `limit` column: max character length only.
- * Value must be a positive integer — JSON number or string of digits (e.g. `30`).
- * @param {unknown} raw
- * @returns {number|undefined} Integer ≥ 1, or undefined when unset/invalid
- */
-function parseRsvpFieldLimit(raw) {
-  if (raw == null || raw === '') return undefined;
-  if (typeof raw === 'number') {
-    const n = Math.trunc(raw);
-    if (Number.isFinite(n) && n >= 1) return n;
-    window.lana?.log('events-form: limit must be a positive integer');
-    return undefined;
-  }
-  if (typeof raw === 'string') {
-    const s = raw.trim();
-    if (!s) return undefined;
-    if (!/^\d+$/.test(s)) {
-      window.lana?.log('events-form: limit must be a positive integer (digits only)');
-      return undefined;
-    }
-    return parseInt(s, 10);
-  }
-  window.lana?.log('events-form: limit must be a positive integer');
-  return undefined;
-}
+import { parseRsvpFieldLimit, stripTags } from '../../utils/sanitize-utils.js';
 
 const eventConfig = getEventConfig();
 const miloLibs = eventConfig?.miloConfig?.miloLibs ? eventConfig.miloConfig.miloLibs : LIBS;
@@ -254,7 +228,7 @@ async function submitForm(bp) {
     }
 
     if (sanitizeList.includes(key)) {
-      payload[key] = sanitizeComment(payload[key]);
+      payload[key] = sanitizeComment(stripTags(payload[key]));
     }
 
     return valid;
@@ -939,7 +913,7 @@ async function createForm(bp, formData) {
   json.data.forEach(async (fd) => {
     fd.type = fd.type || 'text';
     fd.limit = parseRsvpFieldLimit(fd.limit);
-    if (fd.type === 'text') sanitizeList.push(fd.field);
+    if (fd.type === 'text' || fd.type === 'text-area') sanitizeList.push(fd.field);
     const style = fd.extra ? ` events-form-${fd.extra}` : '';
     const fieldWrapper = createTag(
       'div',
