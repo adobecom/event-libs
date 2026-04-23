@@ -42,10 +42,40 @@ function makeEventData(overrides = {}) {
 // We import helper functions via dynamic import to avoid triggering side-effects
 // from the full block init (which makes network calls in the constructor).
 
-let deriveTagLabels;
+let resolveTagWithGroup;
+let resolveTagObjects;
 let generateICS;
 let filterSessions;
 let normalizeSessions;
+
+const mockTagsData = {
+  namespaces: {
+    caas: {
+      tags: {
+        events: {
+          tags: {
+            type: {
+              title: 'Session Type',
+              tags: {
+                workshop: { title: 'Workshop' },
+                lab: { title: 'Lab' },
+                demo: { title: 'Demo' },
+                'two-word-tag': { title: 'Two Word Tag' },
+                'deep-dive': { title: 'Deep Dive' },
+              },
+            },
+            level: {
+              title: 'Level',
+              tags: {
+                beginner: { title: 'Beginner' },
+              },
+            },
+          },
+        },
+      },
+    },
+  },
+};
 
 before(async () => {
   // Import isolated helpers by re-exporting them in tests via dynamic import.
@@ -55,15 +85,26 @@ before(async () => {
   // Inline the pure functions under test to avoid circular-import issues with
   // the block's top-level side-effect-free closures.
 
-  deriveTagLabels = (tagIdList) => {
+  resolveTagWithGroup = (tagId, tagsData) => {
+    const colonIdx = tagId.indexOf(':');
+    if (colonIdx === -1 || !tagsData) return { label: '', group: '' };
+    const ns = tagId.slice(0, colonIdx);
+    const segs = tagId.slice(colonIdx + 1).split('/');
+    let node = tagsData.namespaces?.[ns];
+    let parentNode = null;
+    for (const seg of segs) {
+      parentNode = node;
+      node = node?.tags?.[seg];
+    }
+    return { label: node?.title || '', group: parentNode?.title || '' };
+  };
+
+  resolveTagObjects = (tagIdList, tagsData) => {
     if (!tagIdList) return [];
     return tagIdList
       .split(',')
-      .map((id) => {
-        const seg = id.trim().split('/').at(-1);
-        return seg ? seg.charAt(0).toUpperCase() + seg.slice(1) : '';
-      })
-      .filter(Boolean);
+      .map((id) => resolveTagWithGroup(id.trim(), tagsData))
+      .filter((t) => t.label);
   };
 
   generateICS = (sessionTime, title, locationName) => {
@@ -92,7 +133,11 @@ before(async () => {
     const q = query.toLowerCase();
     return sessions.filter((s) => {
       if (activeTab === 'my' && !registeredSessionIds.has(s.sessionId)) return false;
-      if (activeTags.size > 0 && !s.tags.some((t) => activeTags.has(t))) return false;
+      if (activeTags.size > 0) {
+        for (const [, groupSet] of activeTags) {
+          if (groupSet.size > 0 && !s.tags.some((t) => groupSet.has(t.label))) return false;
+        }
+      }
       if (q) {
         const hay = [
           s.title,
@@ -105,7 +150,7 @@ before(async () => {
     });
   };
 
-  normalizeSessions = (rawSessions, speakerMap, locationMap, registeredSessionIds, venueId) => rawSessions.map((session) => {
+  normalizeSessions = (rawSessions, speakerMap, locationMap, registeredSessionIds, venueId, tagsData) => rawSessions.map((session) => {
     const sessionTimes = (session.rawTimes || []).map((t) => ({
       sessionTimeId: t.sessionTimeId,
       startTimeMillis: t.startTimeMillis,
@@ -137,7 +182,7 @@ before(async () => {
       sessionId: session.sessionId,
       title: session.localizations?.['en-US']?.title || session.title || session.enTitle || '',
       description: session.localizations?.['en-US']?.description || session.description || '',
-      tags: deriveTagLabels(session.tags),
+      tags: resolveTagObjects(session.tags, tagsData),
       sessionTimes,
       speakers,
       isRegistered: registeredSessionIds.has(session.sessionId),
@@ -146,29 +191,82 @@ before(async () => {
   });
 });
 
-// ─── deriveTagLabels ─────────────────────────────────────────────────────────
+// ─── resolveTagWithGroup ─────────────────────────────────────────────────────
 
-describe('deriveTagLabels', () => {
+describe('resolveTagWithGroup', () => {
+  it('returns label and group from tagsData for a known tag', () => {
+    expect(resolveTagWithGroup('caas:events/type/workshop', mockTagsData))
+      .to.deep.equal({ label: 'Workshop', group: 'Session Type' });
+  });
+
+  it('returns multi-word label for a hyphenated tag ID', () => {
+    expect(resolveTagWithGroup('caas:events/type/two-word-tag', mockTagsData))
+      .to.deep.equal({ label: 'Two Word Tag', group: 'Session Type' });
+  });
+
+  it('returns empty label for unknown tag path', () => {
+    expect(resolveTagWithGroup('caas:events/type/unknown', mockTagsData))
+      .to.deep.equal({ label: '', group: 'Session Type' });
+  });
+
+  it('returns empty label and group when tagsData is null', () => {
+    expect(resolveTagWithGroup('caas:events/type/workshop', null))
+      .to.deep.equal({ label: '', group: '' });
+  });
+
+  it('returns empty label and group when tag has no colon separator', () => {
+    expect(resolveTagWithGroup('no-colon-tag', mockTagsData))
+      .to.deep.equal({ label: '', group: '' });
+  });
+});
+
+// ─── resolveTagObjects ───────────────────────────────────────────────────────
+
+describe('resolveTagObjects', () => {
   it('returns empty array for null', () => {
-    expect(deriveTagLabels(null)).to.deep.equal([]);
+    expect(resolveTagObjects(null, mockTagsData)).to.deep.equal([]);
   });
 
   it('returns empty array for empty string', () => {
-    expect(deriveTagLabels('')).to.deep.equal([]);
+    expect(resolveTagObjects('', mockTagsData)).to.deep.equal([]);
   });
 
-  it('capitalizes last path segment of a single CaaS tag', () => {
-    expect(deriveTagLabels('caas:events/type/workshop')).to.deep.equal(['Workshop']);
+  it('resolves a single tag to its label and group', () => {
+    expect(resolveTagObjects('caas:events/type/workshop', mockTagsData))
+      .to.deep.equal([{ label: 'Workshop', group: 'Session Type' }]);
   });
 
-  it('handles multiple comma-separated tags', () => {
-    const result = deriveTagLabels('caas:events/type/workshop,caas:events/level/beginner');
-    expect(result).to.deep.equal(['Workshop', 'Beginner']);
+  it('resolves multiple comma-separated tags', () => {
+    const result = resolveTagObjects('caas:events/type/workshop,caas:events/level/beginner', mockTagsData);
+    expect(result).to.deep.equal([
+      { label: 'Workshop', group: 'Session Type' },
+      { label: 'Beginner', group: 'Level' },
+    ]);
   });
 
   it('trims whitespace around tag ids', () => {
-    const result = deriveTagLabels(' caas:events/type/lab , caas:events/type/demo ');
-    expect(result).to.deep.equal(['Lab', 'Demo']);
+    const result = resolveTagObjects(' caas:events/type/lab , caas:events/type/demo ', mockTagsData);
+    expect(result).to.deep.equal([
+      { label: 'Lab', group: 'Session Type' },
+      { label: 'Demo', group: 'Session Type' },
+    ]);
+  });
+
+  it('resolves hyphenated two-word tags to their titles', () => {
+    const result = resolveTagObjects('caas:events/type/two-word-tag,caas:events/type/deep-dive', mockTagsData);
+    expect(result).to.deep.equal([
+      { label: 'Two Word Tag', group: 'Session Type' },
+      { label: 'Deep Dive', group: 'Session Type' },
+    ]);
+  });
+
+  it('filters out unknown tags when tagsData has no match', () => {
+    const result = resolveTagObjects('caas:events/type/unknown', mockTagsData);
+    expect(result).to.deep.equal([]);
+  });
+
+  it('returns empty array when tagsData is null', () => {
+    expect(resolveTagObjects('caas:events/type/workshop', null)).to.deep.equal([]);
   });
 });
 
@@ -222,35 +320,38 @@ describe('filterSessions', () => {
       sessionId: 's1',
       title: 'Intro to Photoshop',
       description: 'Learn the basics',
-      tags: ['Workshop'],
+      tags: [
+        { label: 'Workshop', group: 'Session Type' },
+        { label: 'Beginner', group: 'Level' },
+      ],
       speakers: [{ firstName: 'Alice', lastName: 'Smith' }],
     },
     {
       sessionId: 's2',
       title: 'Advanced Illustrator',
       description: 'For power users',
-      tags: ['Lab'],
+      tags: [{ label: 'Lab', group: 'Session Type' }],
       speakers: [{ firstName: 'Bob', lastName: 'Jones' }],
     },
     {
       sessionId: 's3',
       title: 'Color Theory',
       description: 'Understanding color',
-      tags: ['Workshop'],
+      tags: [{ label: 'Workshop', group: 'Session Type' }],
       speakers: [],
     },
   ];
 
   it('returns all sessions when no filters active', () => {
     const result = filterSessions(sessions, {
-      query: '', activeTags: new Set(), activeTab: 'all', registeredSessionIds: new Set(),
+      query: '', activeTags: new Map(), activeTab: 'all', registeredSessionIds: new Set(),
     });
     expect(result).to.have.lengthOf(3);
   });
 
   it('filters by title substring (case-insensitive)', () => {
     const result = filterSessions(sessions, {
-      query: 'photoshop', activeTags: new Set(), activeTab: 'all', registeredSessionIds: new Set(),
+      query: 'photoshop', activeTags: new Map(), activeTab: 'all', registeredSessionIds: new Set(),
     });
     expect(result).to.have.lengthOf(1);
     expect(result[0].sessionId).to.equal('s1');
@@ -258,7 +359,7 @@ describe('filterSessions', () => {
 
   it('filters by description substring', () => {
     const result = filterSessions(sessions, {
-      query: 'power users', activeTags: new Set(), activeTab: 'all', registeredSessionIds: new Set(),
+      query: 'power users', activeTags: new Map(), activeTab: 'all', registeredSessionIds: new Set(),
     });
     expect(result).to.have.lengthOf(1);
     expect(result[0].sessionId).to.equal('s2');
@@ -266,23 +367,50 @@ describe('filterSessions', () => {
 
   it('filters by speaker name', () => {
     const result = filterSessions(sessions, {
-      query: 'bob', activeTags: new Set(), activeTab: 'all', registeredSessionIds: new Set(),
+      query: 'bob', activeTags: new Map(), activeTab: 'all', registeredSessionIds: new Set(),
     });
     expect(result).to.have.lengthOf(1);
     expect(result[0].sessionId).to.equal('s2');
   });
 
-  it('filters by active tag', () => {
+  it('filters by active tag (OR within group)', () => {
     const result = filterSessions(sessions, {
-      query: '', activeTags: new Set(['Lab']), activeTab: 'all', registeredSessionIds: new Set(),
+      query: '',
+      activeTags: new Map([['Session Type', new Set(['Lab'])]]),
+      activeTab: 'all',
+      registeredSessionIds: new Set(),
     });
     expect(result).to.have.lengthOf(1);
     expect(result[0].sessionId).to.equal('s2');
+  });
+
+  it('OR logic within group: returns sessions matching any selected tag in a group', () => {
+    const result = filterSessions(sessions, {
+      query: '',
+      activeTags: new Map([['Session Type', new Set(['Workshop', 'Lab'])]]),
+      activeTab: 'all',
+      registeredSessionIds: new Set(),
+    });
+    expect(result).to.have.lengthOf(3);
+  });
+
+  it('AND logic across groups: sessions must match at least one tag per selected group', () => {
+    const result = filterSessions(sessions, {
+      query: '',
+      activeTags: new Map([
+        ['Session Type', new Set(['Workshop'])],
+        ['Level', new Set(['Beginner'])],
+      ]),
+      activeTab: 'all',
+      registeredSessionIds: new Set(),
+    });
+    expect(result).to.have.lengthOf(1);
+    expect(result[0].sessionId).to.equal('s1');
   });
 
   it('filters to registered sessions in "my" tab mode', () => {
     const result = filterSessions(sessions, {
-      query: '', activeTags: new Set(), activeTab: 'my', registeredSessionIds: new Set(['s1', 's3']),
+      query: '', activeTags: new Map(), activeTab: 'my', registeredSessionIds: new Set(['s1', 's3']),
     });
     expect(result).to.have.lengthOf(2);
     expect(result.map((s) => s.sessionId)).to.deep.equal(['s1', 's3']);
@@ -290,7 +418,7 @@ describe('filterSessions', () => {
 
   it('returns empty array in "my" mode with no registered sessions', () => {
     const result = filterSessions(sessions, {
-      query: '', activeTags: new Set(), activeTab: 'my', registeredSessionIds: new Set(),
+      query: '', activeTags: new Map(), activeTab: 'my', registeredSessionIds: new Set(),
     });
     expect(result).to.have.lengthOf(0);
   });
@@ -316,10 +444,13 @@ describe('normalizeSessions', () => {
   ]);
   const registeredSessionIds = new Set(['session-1']);
 
-  it('parses tagIdList into capitalized pill labels', () => {
+  it('resolves tag IDs to label+group objects', () => {
     const raw = [makeSession({ tags: 'caas:events/type/workshop,caas:events/level/beginner' })];
-    const result = normalizeSessions(raw, speakerMap, locationMap, registeredSessionIds, 'venue-xyz');
-    expect(result[0].tags).to.deep.equal(['Workshop', 'Beginner']);
+    const result = normalizeSessions(raw, speakerMap, locationMap, registeredSessionIds, 'venue-xyz', mockTagsData);
+    expect(result[0].tags).to.deep.equal([
+      { label: 'Workshop', group: 'Session Type' },
+      { label: 'Beginner', group: 'Level' },
+    ]);
   });
 
   it('marks session as isRegistered when sessionId is in registeredSessionIds', () => {
@@ -391,6 +522,7 @@ describe('sessions-hub init', () => {
       ['/v1/series/', () => ({ speakers: [] })],
       ['/v1/venues/', () => ({ name: 'Main Hall', locationId: 'loc-1' })],
       ['/v1/attendees/me/events/', () => ({ sessionIds: [] })],
+      ['chimera-api/tags', () => mockTagsData],
     ]);
   }
 
