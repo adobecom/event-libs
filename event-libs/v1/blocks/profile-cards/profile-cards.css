@@ -214,6 +214,10 @@
   color: var(--color-black);
 }
 
+.profile-cards-modal .card-social-icon a:focus:not(:focus-visible) {
+  outline: none;
+}
+
 .profile-cards-modal .profile-cards-modal-image .card-image-container {
   width: 100%;
   max-width: 385px;
