@@ -254,7 +254,7 @@ export async function buildModalContent(profileData) {
   const imageContainer = createTag('div', { class: 'profile-cards-modal-image' });
   const fullName = getProfileName(profileData);
   const title = createTag('p', { class: 'card-title' }, profileData?.title || '');
-  const name = createTag('h2', { class: 'card-name' }, fullName);
+  const name = createTag('h2', { class: 'card-name', tabindex: '0' }, fullName);
 
   textContainer.append(title, name);
   appendBio(textContainer, profileData?.bio);
