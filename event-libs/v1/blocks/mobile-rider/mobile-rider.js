@@ -300,7 +300,7 @@ class MobileRider {
   async #loadStore() {
     try {
       const { mobileRiderStore } = await import(
-        new URL('../../features/timing-framework/plugins/mobile-rider/plugin.js', import.meta.url).href,
+        new URL('../../features/timing-framework/plugins/mobile-rider/plugin.js', import.meta.url).href
       );
       this.store = mobileRiderStore;
     } catch (e) { this.log('Store Fail'); }
