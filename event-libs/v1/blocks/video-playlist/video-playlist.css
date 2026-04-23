@@ -134,6 +134,14 @@
   }
 }
 
+.video-playlist .container.is-hidden {
+  display: none;
+}
+
+.video-playlist .playlist-skip-to {
+  height: 1px;
+}
+
 .video-playlist .container {
   /* Color Variables */
   --container-background-color: #000;

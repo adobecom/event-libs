@@ -1,44 +1,41 @@
 /* constants.js */
 
 /* ---------- Storage Keys ---------- */
-export const AUTOPLAY_PLAYLIST_KEY='shouldAutoPlayPlaylist';
-export const PLAYLIST_VIDEOS_KEY='playlistVideos';
-export const PLAYLIST_PLAY_ALL_ID='playlist-play-all';
-export const PLAYLIST_SKIP_TO_ID='playlist-skip-to';
-export const TOAST_CONTAINER_ID='playlist-toasts-container';
+export const AUTOPLAY_PLAYLIST_KEY = 'shouldAutoPlayPlaylist';
+export const PLAYLIST_VIDEOS_KEY = 'playlistVideos';
+export const PLAYLIST_PLAY_ALL_ID = 'playlist-play-all';
+export const PLAYLIST_SKIP_TO_ID = 'playlist-skip-to';
+export const TOAST_CONTAINER_ID = 'playlist-toasts-container';
 
 /* ---------- Video / MPC ---------- */
-export const MPC_STATUS='mpcStatus';
-export const RESTART_THRESHOLD=30;
-export const PROGRESS_SAVE_INTERVAL=5;
-export const VIDEO_ORIGIN='https://video.tv.adobe.com';
-export const PROGRESS_BAR_COLOR='#1473e6';
-export const MAX_PERCENTAGE=100;
-// TODO: Re-enable when AEM playlist ID implementation is ready
-// export const VIDEO_PLAYLIST_ID_URL_KEY='videoPlaylistId';
+export const MPC_STATUS = 'mpcStatus';
+export const RESTART_THRESHOLD = 30;
+export const PROGRESS_SAVE_INTERVAL = 5;
+export const VIDEO_ORIGIN = 'https://video.tv.adobe.com';
+export const MAX_PERCENTAGE = 100;
 
 /* ---------- Event States ---------- */
-export const EVENT_STATES=Object.freeze({
-  LOAD:'load',
-  PAUSE:'pause',
-  TICK:'tick',
-  COMPLETE:'complete',
+export const EVENT_STATES = Object.freeze({
+  LOAD: 'load',
+  PAUSE: 'pause',
+  TICK: 'tick',
+  COMPLETE: 'complete',
 });
 
 /* ---------- Analytics ---------- */
-export const ANALYTICS=Object.freeze({
-  PLAYLIST:'Playlist',
-  TOGGLE_OFF:'Play all_Off',
-  TOGGLE_ON:'Play all_On',
-  VIDEO_SELECT:'Video Select',
-  FAVORITE:'Favorite',
-  UNFAVORITE:'Unfavorite',
-  CLOSE_FAVORITE_NOTIFICATION:'Close Favorite Notification',
-  VIEW_SCHEDULE:'View Schedule',
+export const ANALYTICS = Object.freeze({
+  PLAYLIST: 'Playlist',
+  TOGGLE_OFF: 'Play all_Off',
+  TOGGLE_ON: 'Play all_On',
+  VIDEO_SELECT: 'Video Select',
+  FAVORITE: 'Favorite',
+  UNFAVORITE: 'Unfavorite',
+  CLOSE_FAVORITE_NOTIFICATION: 'Close Favorite Notification',
+  VIEW_SCHEDULE: 'View Schedule',
 });
 
 /* ---------- Social Icons (inline SVG) ---------- */
-export const SOCIAL_ICONS=Object.freeze({
+export const SOCIAL_ICONS = Object.freeze({
   facebook:'<path d="M15 2.5C14.9774 1.84415 14.7067 1.22133 14.2427 0.757298C13.7787 0.29327 13.1558 0.0226174 12.5 0L2.5 0C1.84415 0.0226174 1.22133 0.29327 0.757298 0.757298C0.29327 1.22133 0.0226174 1.84415 0 2.5L0 12.5C0.0226174 13.1558 0.29327 13.7787 0.757298 14.2427C1.22133 14.7067 1.84415 14.9774 2.5 15H7.5V9.33333H5.66667V6.83333H7.5V5.85917C7.46729 5.0672 7.7415 4.29316 8.26546 3.6984C8.78943 3.10364 9.52273 2.73405 10.3125 2.66667H12.3333V5.16667H10.3125C10.0917 5.16667 9.83333 5.435 9.83333 5.83333V6.83333H12.3333V9.33333H9.83333V15H12.5C13.1558 14.9774 13.7787 14.7067 14.2427 14.2427C14.7067 13.7787 14.9774 13.1558 15 12.5V2.5Z" fill="currentColor"/>',
   twitter:'<path d="M714.163 519.284L1160.89 0H1055.03L667.137 450.887L357.328 0H0L468.492 681.821L0 1226.37H105.866L515.491 750.218L842.672 1226.37H1200L714.137 519.284H714.163ZM569.165 687.828L521.697 619.934L144.011 79.6944H306.615L611.412 515.685L658.88 583.579L1055.08 1150.3H892.476L569.165 687.854V687.828Z" fill="currentColor"/>',
   linkedin:'<path d="M4.35803 14.9983H1.25053V4.98415H4.35803V14.9983ZM2.80136 3.61832C2.44359 3.61996 2.09335 3.51548 1.79495 3.3181C1.49654 3.12071 1.26336 2.83928 1.12488 2.50938C0.986411 2.17948 0.948862 1.81593 1.01699 1.46469C1.08511 1.11346 1.25585 0.790304 1.50761 0.536094C1.75937 0.281884 2.08086 0.10803 2.43142 0.0365126C2.78198 -0.0350043 3.14588 -0.000972847 3.4771 0.134304C3.80832 0.269582 4.092 0.50003 4.29226 0.796514C4.49252 1.093 4.60038 1.4422 4.6022 1.79998C4.60287 2.27942 4.41392 2.73966 4.07655 3.08031C3.73918 3.42096 3.28078 3.61436 2.80136 3.61832ZM16.0005 14.9983H12.8939V10.1233C12.8939 8.96165 12.8705 7.47165 11.2772 7.47165C9.66053 7.47165 9.4122 8.73415 9.4122 10.04V14.9983H6.30637V4.98415H9.28886V6.34998H9.33386C9.63207 5.83935 10.0633 5.41921 10.5815 5.13435C11.0996 4.84949 11.6854 4.7106 12.2764 4.73248C15.4222 4.73332 16.0005 6.80582 16.0005 9.49831V14.9983Z" fill="currentColor"/>',
@@ -46,208 +43,23 @@ export const SOCIAL_ICONS=Object.freeze({
 });
 
 /* ---------- Chimera API Config ---------- */
-export const CHIMERA_API=Object.freeze({
-  baseUrl:'https://chimera-api.adobe.com', // Hardcoded for now
-  endpoints:Object.freeze({
-    featuredCards:'/api/v1/featured-cards',
-    sessions:'/api/v1/sessions',
+export const CHIMERA_API = Object.freeze({
+  baseUrl: 'https://chimera-api.adobe.com',
+  endpoints: Object.freeze({
+    featuredCards: '/api/v1/featured-cards',
+    sessions: '/api/v1/sessions',
   }),
 });
 
-export const CHIMERA_COLLECTION_DEFAULT_PARAMS=Object.freeze({
-  contentSource:'Northstar',
-  originSelection:'Northstar',
-  language:'en',
-  country:'US',
-  environment:'prod',
+export const CHIMERA_COLLECTION_DEFAULT_PARAMS = Object.freeze({
+  contentSource: 'Northstar',
+  originSelection: 'Northstar',
+  language: 'en',
+  country: 'US',
+  environment: 'prod',
 });
 
-export const TAG_COLLECTION_URL='/chimera-api/collection';
-export const FEATURED_COLLECTION_URL='/chimera-api/collection';
-export const ENTITY_LOOKUP_URL='https://14257-chidlookupservice.adobeio-static.net/api/v1/web/chidlookupservice-0.0.1/__id-lookup';
+export const TAG_COLLECTION_URL = '/chimera-api/collection';
+export const FEATURED_COLLECTION_URL = '/chimera-api/collection';
+export const ENTITY_LOOKUP_URL = 'https://14257-chidlookupservice.adobeio-static.net/api/v1/web/chidlookupservice-0.0.1/__id-lookup';
 
-/* ---------- MOCK API (dev only) ---------- */
-const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-
-const ONE_DAY_MS = 86400000;
-const baseThumbnail = 'https://images-tv.adobe.com/mpcv3/b8f920e0-0298-4d82-9ec3-c17d4c9ceda9/38f837a1-0b27-4319-9a7c-2429d88e3058/61f09647c0884bc3840da53bd2c2ffc0_1742533829-200x113.jpg';
-
-const makeWindow = () => {
-  const now = Date.now();
-  return {
-    startDate: new Date(now - ONE_DAY_MS).toISOString(),
-    endDate: new Date(now + ONE_DAY_MS).toISOString(),
-  };
-};
-
-const makeCard = ({ id, mpcVideoId, videoId, sessionId, sessionCode, title, description, overlay }) => {
-  const { startDate, endDate } = makeWindow();
-  return {
-    id: String(id),
-    search: {
-      thumbnailUrl: baseThumbnail,
-      videoDuration: '00:51:53',
-      mpcVideoId,
-      videoId,
-      videoService: 'mpc',
-      sessionId,
-      sessionCode,
-    },
-    contentArea: {
-      title,
-      description,
-    },
-    overlayLink: overlay,
-    startDate,
-    endDate,
-  };
-};
-
-// Helper to extract values from arbitrary array format
-// Arbitrary array contains objects like [{ "sessionId": "..." }, { "videoId": "..." }]
-const extractFromArbitrary = (arbitrary, key) => {
-  if (!Array.isArray(arbitrary)) return null;
-  
-  const entry = arbitrary.find(
-    (item) => item && typeof item === 'object' && key in item
-  );
-  
-  return entry ? entry[key] : null;
-};
-
-// Transform entity lookup/featured cards response to card format
-const transformEntityCard = (item) => {
-  const arbitrary = item.arbitrary || [];
-  
-  const search = {
-    thumbnailUrl: extractFromArbitrary(arbitrary, 'thumbnailUrl') || item.thumbnail?.url || '',
-    videoDuration: extractFromArbitrary(arbitrary, 'videoDuration') || item.cardData?.details || '',
-    mpcVideoId: extractFromArbitrary(arbitrary, 'mpcVideoId') || '',
-    videoId: extractFromArbitrary(arbitrary, 'videoId') || extractFromArbitrary(arbitrary, 'mpcVideoId') || '',
-    videoService: extractFromArbitrary(arbitrary, 'videoService') || 'adobeTv',
-    sessionId: extractFromArbitrary(arbitrary, 'sessionId') || '',
-    sessionCode: extractFromArbitrary(arbitrary, 'sessionCode') || '',
-    sessionTimeId: extractFromArbitrary(arbitrary, 'sessionTimeID') || '',
-  };
-  
-  let contentUrl = item.cardData?.cta?.primaryCta?.url || item.url || '';
-  
-  // Convert relative URLs to absolute if needed
-  if (contentUrl && !contentUrl.startsWith('http') && contentUrl.startsWith('/')) {
-    contentUrl = `https://www.adobe.com${contentUrl}`;
-  }
-  
-  const contentArea = {
-    title: item.cardData?.headline || item.title || '',
-    description: item.description || item.cardData?.description || extractFromArbitrary(arbitrary, 'sessionDescription') || '',
-    url: contentUrl,
-  };
-  
-  const overlayLink = contentUrl;
-  
-  return {
-    id: item.entityId || item.contentId || '',
-    search,
-    contentArea,
-    overlayLink,
-  };
-};
-
-// Helper to get mock file URL relative to current module location
-// Works when loaded as a library from any origin
-const getMockFileUrl = (filename) => {
-  const currentModuleUrl = new URL(import.meta.url);
-  const baseDir = currentModuleUrl.pathname.substring(0, currentModuleUrl.pathname.lastIndexOf('/'));
-  // Use the origin from import.meta.url to ensure correct domain/port
-  return `${currentModuleUrl.origin}${baseDir}/${filename}`;
-};
-
-export const MOCK_API={
-  /* Tag-based playlist */
-  async getSessions(){
-    await delay(100);
-    try {
-      // Load mock data from JSON file matching actual API response format
-      const response = await fetch(getMockFileUrl('mock-chimera-response.json'));
-      if (response.ok) {
-        const data = await response.json();
-        return data;
-      }
-    } catch (error) {
-      console.error('Failed to load mock-chimera-response.json:', error);
-      throw error;
-    }
-  },
-
-  /* User-authored playlist - simulates entity lookup from sessionPath */
-  async getUserAuthoredPlaylist(config){
-    await delay(150);
-    try {
-      // Load mock entity lookup response (simulates ID lookup service)
-      const response = await fetch(getMockFileUrl('mock-entity-lookup-response.json'));
-      if (response.ok) {
-        const lookupData = await response.json();
-        const paths = (config.sessionPath || '').split(',').map(s => s.trim()).filter(Boolean);
-        const sessions = lookupData.slice(0, paths.length).map((item, i) => {
-          const arbitrary = item.arbitrary || [];
-          const sessionCode = extractFromArbitrary(arbitrary, 'sessionCode') || `S${6000 + i}`;
-          const entityId = item.entityId || item.contentId || '';
-          return {
-            sessionCode,
-            entityId,
-            sessionPath: paths[i] || '',
-          };
-        });
-        return {
-          playlistID: config.playlistId || '123',
-          playlistTitle: config.playlistTitle || 'Sample playlistTitle',
-          topicEyebrow: config.topicEyebrow || 'Eyebrow text',
-          sessions,
-        };
-      }
-    } catch (error) {
-      console.error('Failed to load mock-entity-lookup-response.json:', error);
-      throw error;
-    }
-  },
-
-  /* Chimera Featured Cards for user-authored - simulates featuredCards API call */
-  async getChimeraFeaturedCards(entityIds){
-    await delay(200);
-    try {
-      // Load mock featured cards response (simulates Chimera featuredCards API)
-      const response = await fetch(getMockFileUrl('mock-featured-cards-response.json'));
-      if (response.ok) {
-        const featuredData = await response.json();
-        // Transform entity lookup format to card format
-        const cards = featuredData
-          .slice(0, entityIds.length)
-          .map(transformEntityCard)
-          .filter(card => card.search?.thumbnailUrl);
-        return { cards };
-      }
-    } catch (error) {
-      console.error('Failed to load mock-featured-cards-response.json:', error);
-      throw error;
-    }
-  },
-
-  async getFavorites(){
-    await delay(50);
-    const raw=localStorage.getItem('mockFavorites');
-    const arr=raw?JSON.parse(raw):['sess_001','sess_003'];
-    return {sessionInterests:arr.map(id=>({sessionID:id}))};
-  },
-
-  async toggleFavorite(sessionId){
-    await delay(200);
-    const key='mockFavorites';
-    const raw=localStorage.getItem(key);
-    const set=new Set(raw?JSON.parse(raw):['sess_001','sess_003']);
-    set.has(sessionId)?set.delete(sessionId):set.add(sessionId);
-    localStorage.setItem(key,JSON.stringify([...set]));
-    return {success:true};
-  },
-
-  async isUserRegistered(){ await delay(100); return true; },
-};

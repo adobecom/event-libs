@@ -7,7 +7,7 @@ const readJSON = (key, defaultValue) => {
     const value = localStorage.getItem(key);
     return value ? JSON.parse(value) : defaultValue;
   } catch (error) {
-    console.error(`localStorage read error for key "${key}":`, error);
+    window.lana?.log(`[VideoPlaylist.utils] localStorage read error for key "${key}": ${error.message}`);
     return defaultValue;
   }
 };
@@ -16,18 +16,18 @@ const writeJSON = (key, value) => {
   try {
     localStorage.setItem(key, JSON.stringify(value));
   } catch (error) {
-    console.error(`localStorage write error for key "${key}":`, error);
+    window.lana?.log(`[VideoPlaylist.utils] localStorage write error for key "${key}": ${error.message}`);
   }
 };
 
-export const getLocalStorageVideos=()=>readJSON(PLAYLIST_VIDEOS_KEY,{});
-export const saveLocalStorageVideos=(videos)=>writeJSON(PLAYLIST_VIDEOS_KEY,videos);
-export const getLocalStorageShouldAutoPlay=()=>readJSON(AUTOPLAY_PLAYLIST_KEY,true);
-export const saveShouldAutoPlayToLocalStorage=(v)=>writeJSON(AUTOPLAY_PLAYLIST_KEY,v);
+export const getLocalStorageVideos = () => readJSON(PLAYLIST_VIDEOS_KEY, {});
+export const saveLocalStorageVideos = (videos) => writeJSON(PLAYLIST_VIDEOS_KEY, videos);
+export const getLocalStorageShouldAutoPlay = () => readJSON(AUTOPLAY_PLAYLIST_KEY, true);
+export const saveShouldAutoPlayToLocalStorage = (v) => writeJSON(AUTOPLAY_PLAYLIST_KEY, v);
 
 /* ---------- Duration fetching (memoized) ---------- */
-const durationCache=new Map(); // id -> seconds
-const inflight=new Map(); // id -> Promise<number|null>
+const durationCache = new Map(); // id -> seconds
+const inflight = new Map(); // id -> Promise<number|null>
 
 const fetchVideoDuration = async (id) => {
   // Return cached duration if available
@@ -56,7 +56,7 @@ const fetchVideoDuration = async (id) => {
       
       return seconds;
     } catch (error) {
-      console.error(`Failed to fetch video duration for ID "${id}":`, error);
+      window.lana?.log(`[VideoPlaylist.utils] Failed to fetch video duration for ID "${id}": ${error.message}`);
       return null;
     } finally {
       // Clean up inflight tracking
@@ -214,41 +214,8 @@ export const findCardByVideoId = (cards, videoId) => {
 };
 
 /* ---------- Error Handling ---------- */
-/**
- * Safe error logging with optional context
- * @param {Error|string} error - Error object or message
- * @param {string} context - Context where error occurred
- * @param {Object} metadata - Additional metadata
- */
 export const logError = (error, context = 'VideoPlaylist', metadata = {}) => {
   const message = error instanceof Error ? error.message : String(error);
-  const errorData = {
-    message,
-    context,
-    ...metadata,
-  };
-  
-  if (window.lana?.log) {
-    window.lana.log(JSON.stringify(errorData));
-  } else {
-    console.error(`[${context}]`, message, metadata);
-  }
-};
-
-/**
- * Wraps async function with error handling
- * @param {Function} fn - Async function to wrap
- * @param {string} context - Context for error logging
- * @param {*} defaultValue - Default value to return on error
- * @returns {Function} Wrapped function
- */
-export const withErrorHandling = (fn, context, defaultValue = null) => {
-  return async (...args) => {
-    try {
-      return await fn(...args);
-    } catch (error) {
-      logError(error, context, { args });
-      return defaultValue;
-    }
-  };
+  const extra = Object.keys(metadata).length ? ` ${JSON.stringify(metadata)}` : '';
+  window.lana?.log(`[${context}] ${message}${extra}`);
 };

@@ -1,9 +1,7 @@
-import { LIBS } from '../../utils/utils.js';
+import { createTag } from '../../utils/utils.js';
 import { ANALYTICS } from './constants.js';
-import { initAPI, ENDPOINTS } from './api.js';
+import { getFavorites, toggleFavorite as toggleFavoriteApi } from './api.js';
 import { normalizeVideoId, findCardByVideoId, logError } from './utils.js';
-
-const { createTag } = await import(`${LIBS}/utils/utils.js`);
 
 const qs = (selector, root = document) => root.querySelector(selector);
 
@@ -19,7 +17,7 @@ export class FavoritesManager {
   async setup() {
     // User registration check is already done before loading this module
     try {
-      const favorites = await initAPI(ENDPOINTS.GET_FAVORITES);
+      const favorites = await getFavorites();
       if (!favorites?.sessionInterests) return;
 
       const favoriteIds = new Set(
@@ -91,11 +89,7 @@ export class FavoritesManager {
       button.disabled = true;
       const sessionTimeId = card.search.sessionTimeId || card.search.sessionId;
       const sessionId = card.search.sessionId;
-      const response = await initAPI(
-        ENDPOINTS.TOGGLE_FAVORITES,
-        sessionTimeId,
-        sessionId,
-      );
+      const response = await toggleFavoriteApi(sessionTimeId, sessionId);
       if (!response) throw new Error('toggle failed');
 
       this.updateButtonState(button, card);

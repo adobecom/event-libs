@@ -1,4 +1,4 @@
-import { LIBS } from '../../utils/utils.js';
+import { createTag } from '../../utils/utils.js';
 import {
   getLocalStorageVideos,
   getLocalStorageShouldAutoPlay,
@@ -11,15 +11,16 @@ import {
   PLAYLIST_PLAY_ALL_ID,
   TOAST_CONTAINER_ID,
   ANALYTICS,
-  MOCK_API,
   PLAYLIST_SKIP_TO_ID,
-  PROGRESS_BAR_COLOR,
   MAX_PERCENTAGE,
 } from './constants.js';
+import {
+  getSessions,
+  getUserAuthoredPlaylist,
+  getChimeraFeaturedCards,
+  isUserRegistered,
+} from './api.js';
 import { PlayerManager } from './player-manager.js';
-
-// Assume 'createTag' is now available globally or imported from LIBS
-const { createTag } = await import(`${LIBS}/utils/utils.js`);
 
 /* --- Global Constants and Selectors --- */
 const SELECTORS = {
@@ -85,60 +86,47 @@ const coerceValue = (key, value, defaults) => {
 
 const prepareCards = (cards = []) => cards.filter((card) => card.search?.thumbnailUrl);
 
+const PLAY_ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" height="40" viewBox="0 0 18 18" width="40"><rect opacity="0" width="18" height="18"/><path fill="#e5e5e5" d="M9,1a8,8,0,1,0,8,8A8,8,0,0,0,9,1Zm4.2685,8.43L7.255,12.93A.50009.50009,0,0,1,7,13H6.5a.5.5,0,0,1-.5-.5v-7A.5.5,0,0,1,6.5,5H7a.50009.50009,0,0,1,.255.07l6.0135,3.5a.5.5,0,0,1,0,.86Z"/></svg>';
 
-const renderHeaderMarkup = (cfg, socialMarkup, checked) => {
-  return `
-    <div class="header-upper">
-      <div class="header-skip">
-        <a href="#${PLAYLIST_SKIP_TO_ID}" class="header-skip-link button">${cfg.skipPlaylistText}</a>
-      </div>
-      <div class="header-toggle">
-        <div class="consonant-switch consonant-switch--sizeM">
-          <input type="checkbox" class="consonant-switch-input" id="${PLAYLIST_PLAY_ALL_ID}" daa-ll="${
-            checked ? ANALYTICS.TOGGLE_OFF : ANALYTICS.TOGGLE_ON
-          }" ${checked ? 'checked' : ''}/>
-          <span class="consonant-switch-switch"></span>
-          <label class="consonant-switch-label" for="${PLAYLIST_PLAY_ALL_ID}">${cfg.autoplayText.toUpperCase()}</label>
-        </div>
-      </div>
-    </div>
-    <div class="header-content">
-      <div class="header-left">
-        <p class="header-topic">${cfg.topicEyebrow}</p>
-        <h3 class="header-title">${cfg.playlistTitle}</h3>
-      </div>
-      <div class="header-right">
-        ${socialMarkup}
-      </div>
-    </div>`;
+const buildSessionCard = (card) => {
+  const videoId = normalizeVideoId(card.search.mpcVideoId || card.search.videoId);
+  const session = createTag('div', {
+    'daa-lh': card.contentArea.title,
+    class: 'session',
+    'data-video-id': videoId,
+  });
+  const link = createTag('a', {
+    'daa-ll': ANALYTICS.VIDEO_SELECT,
+    href: card.overlayLink,
+    class: 'session-link',
+  }, '', { parent: session });
+
+  const thumb = createTag('div', { class: 'session-thumb' }, '', { parent: link });
+  createTag('img', {
+    src: card.search.thumbnailUrl,
+    alt: card.contentArea.title,
+    loading: 'lazy',
+  }, '', { parent: thumb });
+  createTag('div', { class: 'session-thumb-play-icon' }, PLAY_ICON_SVG, { parent: thumb });
+  const duration = createTag('div', { class: 'session-thumb-duration' }, '', { parent: thumb });
+  createTag('p', { class: 'session-thumb-duration' }, card.search.videoDuration, { parent: duration });
+  const progress = createTag('div', { class: 'session-thumb-progress' }, '', { parent: thumb });
+  createTag('div', { class: 'session-thumb-progress-bar' }, '', { parent: progress });
+
+  const info = createTag('div', { class: 'session-info' }, '', { parent: link });
+  createTag('h4', { class: 'session-title' }, card.contentArea.title, { parent: info });
+  createTag('p', { class: 'session-desc' }, card.contentArea.description, { parent: info });
+
+  return session;
 };
 
 
-const renderSessionsMarkup = (cards) => {
-  return cards
-    .map((card) => {
-      const videoId = normalizeVideoId(card.search.mpcVideoId || card.search.videoId);
-      return `
-        <div daa-lh="${card.contentArea.title}" class="session" data-video-id="${videoId}">
-          <a daa-ll="${ANALYTICS.VIDEO_SELECT}" href="${card.overlayLink}" class="session-link">
-            <div class="session-thumb">
-              <img src="${card.search.thumbnailUrl}" alt="${card.contentArea.title}" loading="lazy"/>
-              <div class="session-thumb-play-icon">
-                <svg xmlns="http://www.w3.org/2000/svg" height="40" viewBox="0 0 18 18" width="40"><rect opacity="0" width="18" height="18"/><path fill="#e5e5e5" d="M9,1a8,8,0,1,0,8,8A8,8,0,0,0,9,1Zm4.2685,8.43L7.255,12.93A.50009.50009,0,0,1,7,13H6.5a.5.5,0,0,1-.5-.5v-7A.5.5,0,0,1,6.5,5H7a.50009.50009,0,0,1,.255.07l6.0135,3.5a.5.5,0,0,1,0,.86Z"/></svg>
-              </div>
-              <div class="session-thumb-duration"><p class="session-thumb-duration">${card.search.videoDuration}</p></div>
-              <div class="session-thumb-progress"><div class="session-thumb-progress-bar"></div></div>
-            </div>
-            <div class="session-info">
-              <h4 class="session-title">${card.contentArea.title}</h4>
-              <p class="session-desc">${card.contentArea.description}</p>
-            </div>
-          </a>
-        </div>`;
-    })
-    .join('');
+const TOAST_MODIFIERS = {
+  positive: 'toast--positive',
+  info: 'toast--info',
 };
 
+const TOAST_CLOSE_SVG = '<svg class="toast-close-icon" viewBox="0 0 8 8"><path d="m5.238 4 2.456-2.457A.875.875 0 1 0 6.456.306L4 2.763 1.543.306A.875.875 0 0 0 .306 1.544L2.763 4 .306 6.457a.875.875 0 1 0 1.238 1.237L4 5.237l2.456 2.457a.875.875 0 1 0 1.238-1.237z"></path></svg>';
 
 const getToastIcon = (type) => {
   if (type === 'positive') {
@@ -174,7 +162,7 @@ class VideoPlaylist {
       this.initPlayerManager();
     } catch (err) {
       logError(err, 'VideoPlaylist.init');
-      this.root?.style.removeProperty('display'); 
+      this.root?.classList.remove('is-hidden');
     }
   }
 
@@ -214,25 +202,24 @@ class VideoPlaylist {
   }
 
   createRoot() {
-    const container = createTag('div', { class: 'container' });
+    const container = createTag('div', { class: 'container is-hidden' });
     if (this.cfg.theme) container.classList.add(`consonant--${this.cfg.theme}`);
-    container.style.display = 'none'; // Keep hidden until fully rendered
     return container;
   }
 
   /* data */
   async fetchCards() {
     if (this.cfg.isTagbased) {
-      const { cards = [] } = await MOCK_API.getSessions();
+      const { cards = [] } = await getSessions();
       return prepareCards(cards);
     }
 
-    const playlist = await MOCK_API.getUserAuthoredPlaylist(this.cfg);
+    const playlist = await getUserAuthoredPlaylist(this.cfg);
     this.cfg.playlistTitle = playlist.playlistTitle || this.cfg.playlistTitle;
     this.cfg.topicEyebrow = playlist.topicEyebrow || this.cfg.topicEyebrow;
-    
+
     const ids = (playlist.sessions || []).map((session) => session.entityId);
-    const { cards = [] } = await MOCK_API.getChimeraFeaturedCards(ids);
+    const { cards = [] } = await getChimeraFeaturedCards(ids);
     return prepareCards(cards);
   }
 
@@ -285,7 +272,7 @@ class VideoPlaylist {
   }
 
   async render(cards) {
-    this.root.style.removeProperty('display'); 
+    this.root.classList.remove('is-hidden');
     const header = await this.renderHeader();
     this.root.appendChild(header);
     this.root.appendChild(this.renderSessions(cards));
@@ -293,8 +280,7 @@ class VideoPlaylist {
     // 3. Initialize Favorites Manager (only if enabled AND user is registered)
     if (this.cfg.favoritesEnabled) {
       try {
-        // Check if user is signed in and registered for the event Currently Mock API is used need to move actual logic once the real API is known.
-        const isRegistered = await MOCK_API.isUserRegistered();
+        const isRegistered = await isUserRegistered();
         if (!isRegistered) return;
           this.favoritesManager?.cleanup();
           const { FavoritesManager } = await import('./favorites-manager.js');
@@ -310,46 +296,65 @@ class VideoPlaylist {
       }
     }
     this.root.appendChild(
-      createTag('div', { id: PLAYLIST_SKIP_TO_ID, style: 'height:1px;' }),
+      createTag('div', { id: PLAYLIST_SKIP_TO_ID, class: 'playlist-skip-to' }),
     );
   }
 
   async renderHeader() {
-    const header = createTag('div', {
-      class: 'header',
-    });
+    const header = createTag('div', { class: 'header' });
     const checked = getLocalStorageShouldAutoPlay();
-    
+
+    const upper = createTag('div', { class: 'header-upper' }, '', { parent: header });
+    const skip = createTag('div', { class: 'header-skip' }, '', { parent: upper });
+    createTag('a', {
+      href: `#${PLAYLIST_SKIP_TO_ID}`,
+      class: 'header-skip-link button',
+    }, this.cfg.skipPlaylistText, { parent: skip });
+
+    const toggle = createTag('div', { class: 'header-toggle' }, '', { parent: upper });
+    const switchEl = createTag('div', { class: 'consonant-switch consonant-switch--sizeM' }, '', { parent: toggle });
+    const checkbox = createTag('input', {
+      type: 'checkbox',
+      class: 'consonant-switch-input',
+      id: PLAYLIST_PLAY_ALL_ID,
+      'daa-ll': checked ? ANALYTICS.TOGGLE_OFF : ANALYTICS.TOGGLE_ON,
+    }, '', { parent: switchEl });
+    if (checked) checkbox.checked = true;
+    createTag('span', { class: 'consonant-switch-switch' }, '', { parent: switchEl });
+    createTag('label', {
+      class: 'consonant-switch-label',
+      for: PLAYLIST_PLAY_ALL_ID,
+    }, this.cfg.autoplayText.toUpperCase(), { parent: switchEl });
+
+    const content = createTag('div', { class: 'header-content' }, '', { parent: header });
+    const left = createTag('div', { class: 'header-left' }, '', { parent: content });
+    createTag('p', { class: 'header-topic' }, this.cfg.topicEyebrow, { parent: left });
+    createTag('h3', { class: 'header-title' }, this.cfg.playlistTitle, { parent: left });
+    const right = createTag('div', { class: 'header-right' }, '', { parent: content });
+
     let socialModule = null;
-    let socialMarkup = '';
     if (this.cfg.socialSharing) {
       try {
         socialModule = await import('./social.js');
-        socialMarkup = socialModule.createSocialShareMarkup(this.cfg);
+        const socialMarkup = socialModule.createSocialShareMarkup(this.cfg);
+        if (socialMarkup) right.insertAdjacentHTML('beforeend', socialMarkup);
       } catch (error) {
         logError(error, 'VideoPlaylist.renderHeader.socialSharing');
       }
     }
-    
-    header.innerHTML = renderHeaderMarkup(this.cfg, socialMarkup, checked);
 
-    // --- Wiring Logic (Separated from Markup) ---
-    
-    // 1. Autoplay Toggle
-    const checkbox = header.querySelector(SELECTORS.HEADER_CHECKBOX);
-    if (checkbox) {
-      const handler = (event) => {
-        saveShouldAutoPlayToLocalStorage(event.target.checked);
-        event.target.setAttribute(
-          'daa-ll',
-          event.target.checked ? ANALYTICS.TOGGLE_ON : ANALYTICS.TOGGLE_OFF,
-        );
-      };
-      checkbox.addEventListener('change', handler);
-      this.disposers.push(() => checkbox.removeEventListener('change', handler));
-    }
+    // Autoplay toggle wiring
+    const onToggleChange = (event) => {
+      saveShouldAutoPlayToLocalStorage(event.target.checked);
+      event.target.setAttribute(
+        'daa-ll',
+        event.target.checked ? ANALYTICS.TOGGLE_ON : ANALYTICS.TOGGLE_OFF,
+      );
+    };
+    checkbox.addEventListener('change', onToggleChange);
+    this.disposers.push(() => checkbox.removeEventListener('change', onToggleChange));
 
-    // 2. Social Sharing Wiring
+    // Social sharing wiring
     if (this.cfg.socialSharing && socialModule) {
       try {
         const disposer = socialModule.wireSocialShare(header, {
@@ -368,16 +373,9 @@ class VideoPlaylist {
   }
 
   renderSessions(cards) {
-    const outer = createTag('div', {
-      class: 'sessions',
-    });
-    this.sessionsWrapper = createTag('div', {
-      class: 'sessions',
-    });
-    
-    this.sessionsWrapper.innerHTML = renderSessionsMarkup(cards);
-    
-    outer.appendChild(this.sessionsWrapper);
+    const outer = createTag('div', { class: 'sessions' });
+    this.sessionsWrapper = createTag('div', { class: 'sessions' }, '', { parent: outer });
+    cards.forEach((card) => this.sessionsWrapper.appendChild(buildSessionCard(card)));
     this.initProgressBars(this.sessionsWrapper);
     return outer;
   }
@@ -399,8 +397,6 @@ class VideoPlaylist {
               (data.secondsWatched / data.length) * MAX_PERCENTAGE,
             );
             bar.style.width = `${percentage}%`;
-            bar.style.backgroundColor = PROGRESS_BAR_COLOR;
-            bar.style.display = 'block';
           }
         }
       },
@@ -450,8 +446,6 @@ class VideoPlaylist {
     
     const percentage = Math.min(MAX_PERCENTAGE, (current / length) * MAX_PERCENTAGE);
     bar.style.width = `${percentage}%`;
-    bar.style.backgroundColor = PROGRESS_BAR_COLOR;
-    bar.style.display = 'block';
   }
 
   /**
@@ -484,59 +478,54 @@ class VideoPlaylist {
 
   toast(message, type = 'default', button = null) {
     const container = this.getToastContainer();
-    
-    const modifier =
-      type === 'positive'
-        ? 'toast--positive'
-        : type === 'info'
-        ? 'toast--info'
-        : '';
-        
+    const modifier = TOAST_MODIFIERS[type] || '';
+    const toastClass = modifier ? `toast ${modifier}` : 'toast';
+
     const toast = createTag('div', {
-      class: `toast ${modifier}`.trim(),
+      class: toastClass,
       role: 'alert',
       'aria-live': 'assertive',
       'aria-atomic': 'true',
     });
-    
-    const icon = getToastIcon(type); 
 
-    const buttonHtml = button 
-      ? `<button class="toast-button" daa-ll="${button.daaLL}"><span class="toast-button-label">${button.text}</span></button>`
-      : '';
-      
-    toast.innerHTML = `
-      ${icon}
-      <div class="toast-body">
-        <div class="toast-content">${message}</div>
-        ${buttonHtml}
-      </div>
-      <div class="toast-buttons">
-        <button aria-label="close" class="toast-close" label="Close" daa-ll="${ANALYTICS.CLOSE_FAVORITE_NOTIFICATION}">
-          <svg class="toast-close-icon" viewBox="0 0 8 8"><path d="m5.238 4 2.456-2.457A.875.875 0 1 0 6.456.306L4 2.763 1.543.306A.875.875 0 0 0 .306 1.544L2.763 4 .306 6.457a.875.875 0 1 0 1.238 1.237L4 5.237l2.456 2.457a.875.875 0 1 0 1.238-1.237z"></path></svg>
-        </button>
-      </div>`;
-      
-    container.appendChild(toast);
-    
-    // Wire up event listeners
-    const closeButton = toast.querySelector('.toast-close');
-    closeButton.addEventListener('click', () => toast.remove());
-    
+    const iconMarkup = getToastIcon(type);
+    if (iconMarkup) toast.insertAdjacentHTML('beforeend', iconMarkup);
+
+    const body = createTag('div', { class: 'toast-body' }, '', { parent: toast });
+    createTag('div', { class: 'toast-content' }, message, { parent: body });
+
     if (button) {
-      const buttonEl = toast.querySelector('.toast-button');
-      buttonEl?.addEventListener('click', () => {
+      const buttonEl = createTag('button', {
+        class: 'toast-button',
+        'daa-ll': button.daaLL,
+      }, '', { parent: body });
+      createTag('span', { class: 'toast-button-label' }, button.text, { parent: buttonEl });
+      buttonEl.addEventListener('click', () => {
         if (button.link) window.location.href = button.link;
       });
     }
+
+    const buttons = createTag('div', { class: 'toast-buttons' }, '', { parent: toast });
+    const closeButton = createTag('button', {
+      'aria-label': 'close',
+      class: 'toast-close',
+      label: 'Close',
+      'daa-ll': ANALYTICS.CLOSE_FAVORITE_NOTIFICATION,
+    }, TOAST_CLOSE_SVG, { parent: buttons });
+    closeButton.addEventListener('click', () => toast.remove());
+
+    container.appendChild(toast);
   }
 
-  copy(text) {
+  async copy(text) {
     if (navigator.clipboard && window.isSecureContext) {
-      navigator.clipboard
-        .writeText(text)
-        .catch(() => this.legacyCopy(text));
-      return;
+      try {
+        await navigator.clipboard.writeText(text);
+        return;
+      } catch {
+        this.legacyCopy(text);
+        return;
+      }
     }
     this.legacyCopy(text);
   }
