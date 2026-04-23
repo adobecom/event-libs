@@ -295,7 +295,7 @@ class TimingWorker {
       pointer = pointer.next;
     }
 
-    return start || scheduleRoot;
+    return start;
   }
 
   /**
@@ -402,11 +402,6 @@ class TimingWorker {
       // If no items are triggered, send the current schedule item
       // This handles cases where mobileRider is still active or other blocking conditions
       itemToSend = this.currentScheduleItem;
-
-      // If we don't have a current item, fall back to the first item
-      if (!itemToSend) {
-        itemToSend = this.getFirstScheduleItem();
-      }
     }
 
     // Send the item if it's different from what we previously sent
@@ -423,15 +418,6 @@ class TimingWorker {
     if (this.testingManager.isFrozen()) return;
 
     this.timerId = setTimeout(() => this.runTimer(), TimingWorker.getRandomInterval());
-  }
-
-  getFirstScheduleItem() {
-    // Find the first item in the schedule by traversing backwards from current
-    let item = this.currentScheduleItem;
-    while (item?.prev) {
-      item = item.prev;
-    }
-    return item;
   }
 
   handleMessage(event) {
@@ -477,8 +463,9 @@ class TimingWorker {
    * @description Initializes the schedule asynchronously
    */
   async initializeSchedule(schedule) {
-    this.nextScheduleItem = await this.getStartScheduleItemByToggleTime(schedule);
-    this.currentScheduleItem = this.nextScheduleItem?.prev || schedule;
+    const startItem = await this.getStartScheduleItemByToggleTime(schedule);
+    this.nextScheduleItem = startItem || schedule;
+    this.currentScheduleItem = startItem?.prev || null;
     this.previouslySentItem = null;
 
     if (!this.nextScheduleItem) return;

@@ -301,6 +301,217 @@ export async function getCampaign(eventId, campaignId) {
   }
 }
 
+export async function getSessions(eventId) {
+  const eventServiceEnv = getEventServiceEnv();
+  const { serviceApiEndpoints } = ENV_MAP[eventServiceEnv.name];
+  const allSessions = [];
+  let pageToken = null;
+
+  try {
+    const options = await constructRequestOptions('GET');
+    const base = `${serviceApiEndpoints.esl}/v1/sessions?eventId=${eventId}`;
+    do {
+      const url = pageToken ? `${base}&pageToken=${pageToken}` : base;
+      const response = await fetch(url, options);
+      const data = await response.json();
+
+      if (!response.ok) {
+        window.lana?.log(`Error: Failed to get sessions for event ${eventId}. Status:${JSON.stringify(response)}`);
+        return { ok: false, status: response.status, error: data };
+      }
+
+      allSessions.push(...(data.sessions || []));
+      pageToken = data.nextPageToken || null;
+    } while (pageToken);
+
+    return { ok: true, data: allSessions };
+  } catch (error) {
+    window.lana?.log(`Error: Failed to get sessions for event ${eventId}. Error:${JSON.stringify(error)}`);
+    return { ok: false, status: 'Network Error', error: error.message };
+  }
+}
+
+export async function getSessionTimes(sessionId) {
+  const eventServiceEnv = getEventServiceEnv();
+  const { serviceApiEndpoints } = ENV_MAP[eventServiceEnv.name];
+  const options = await constructRequestOptions('GET');
+
+  try {
+    const response = await fetch(`${serviceApiEndpoints.esl}/v1/session-times?sessionId=${sessionId}`, options);
+    const data = await response.json();
+
+    if (!response.ok) {
+      window.lana?.log(`Error: Failed to get session times for session ${sessionId}. Status:${JSON.stringify(response)}`);
+      return { ok: false, status: response.status, error: data };
+    }
+
+    return { ok: true, data: data.sessionTimes || [] };
+  } catch (error) {
+    window.lana?.log(`Error: Failed to get session times for session ${sessionId}. Error:${JSON.stringify(error)}`);
+    return { ok: false, status: 'Network Error', error: error.message };
+  }
+}
+
+export async function getSessionSpeakers(sessionId) {
+  const eventServiceEnv = getEventServiceEnv();
+  const { serviceApiEndpoints } = ENV_MAP[eventServiceEnv.name];
+  const options = await constructRequestOptions('GET');
+
+  try {
+    const response = await fetch(`${serviceApiEndpoints.esl}/v1/sessions/${sessionId}/speakers`, options);
+    const data = await response.json();
+
+    if (!response.ok) {
+      window.lana?.log(`Error: Failed to get speakers for session ${sessionId}. Status:${JSON.stringify(response)}`);
+      return { ok: false, status: response.status, error: data };
+    }
+
+    return { ok: true, data: data.speakers || [] };
+  } catch (error) {
+    window.lana?.log(`Error: Failed to get speakers for session ${sessionId}. Error:${JSON.stringify(error)}`);
+    return { ok: false, status: 'Network Error', error: error.message };
+  }
+}
+
+export async function getAllSeriesSpeakers(seriesId) {
+  const eventServiceEnv = getEventServiceEnv();
+  const { serviceApiEndpoints } = ENV_MAP[eventServiceEnv.name];
+  const options = await constructRequestOptions('GET');
+
+  try {
+    const response = await fetch(`${serviceApiEndpoints.esl}/v1/series/${seriesId}/speakers`, options);
+    const data = await response.json();
+
+    if (!response.ok) {
+      window.lana?.log(`Error: Failed to get speakers for series ${seriesId}. Status:${JSON.stringify(response)}`);
+      return { ok: false, status: response.status, error: data };
+    }
+
+    return { ok: true, data: data.speakers || [] };
+  } catch (error) {
+    window.lana?.log(`Error: Failed to get speakers for series ${seriesId}. Error:${JSON.stringify(error)}`);
+    return { ok: false, status: 'Network Error', error: error.message };
+  }
+}
+
+export async function getVenueLocation(venueId, locationId) {
+  const eventServiceEnv = getEventServiceEnv();
+  const { serviceApiEndpoints } = ENV_MAP[eventServiceEnv.name];
+  const options = await constructRequestOptions('GET');
+
+  try {
+    const response = await fetch(`${serviceApiEndpoints.esl}/v1/venues/${venueId}/locations/${locationId}`, options);
+    const data = await response.json();
+
+    if (!response.ok) {
+      window.lana?.log(`Error: Failed to get location ${locationId} for venue ${venueId}. Status:${JSON.stringify(response)}`);
+      return { ok: false, status: response.status, error: data };
+    }
+
+    return { ok: true, data };
+  } catch (error) {
+    window.lana?.log(`Error: Failed to get location ${locationId} for venue ${venueId}. Error:${JSON.stringify(error)}`);
+    return { ok: false, status: 'Network Error', error: error.message };
+  }
+}
+
+export async function getMyEventSessions(eventId) {
+  const eventServiceEnv = getEventServiceEnv();
+  const { serviceApiEndpoints } = ENV_MAP[eventServiceEnv.name];
+  const options = await constructRequestOptions('GET');
+
+  try {
+    const response = await fetch(`${serviceApiEndpoints.esl}/v1/attendees/me/events/${eventId}/sessions`, options);
+    const data = await response.json();
+
+    if (!response.ok) {
+      window.lana?.log(`Error: Failed to get my sessions for event ${eventId}. Status:${JSON.stringify(response)}`);
+      return { ok: false, status: response.status, error: data };
+    }
+
+    return { ok: true, data };
+  } catch (error) {
+    window.lana?.log(`Error: Failed to get my sessions for event ${eventId}. Error:${JSON.stringify(error)}`);
+    return { ok: false, status: 'Network Error', error: error.message };
+  }
+}
+
+export async function getSessionTimeAttendee(sessionTimeId) {
+  const eventServiceEnv = getEventServiceEnv();
+  const { serviceApiEndpoints } = ENV_MAP[eventServiceEnv.name];
+  const options = await constructRequestOptions('GET');
+
+  try {
+    const response = await fetch(`${serviceApiEndpoints.esl}/v1/session-times/${sessionTimeId}/attendees/me`, options);
+    const data = await response.json();
+
+    if (!response.ok) {
+      window.lana?.log(`Error: Failed to get attendee for session time ${sessionTimeId}. Status:${JSON.stringify(response)}`);
+      return { ok: false, status: response.status, error: data };
+    }
+
+    return { ok: true, data };
+  } catch (error) {
+    window.lana?.log(`Error: Failed to get attendee for session time ${sessionTimeId}. Error:${JSON.stringify(error)}`);
+    return { ok: false, status: 'Network Error', error: error.message };
+  }
+}
+
+function isSessionDryrun() {
+  return new URLSearchParams(window.location.search).get('sessionDryrun') !== null;
+}
+
+// NOTE: exact path for session-time registration needs backend confirmation before production use
+export async function registerForSessionTime(sessionTimeId, attendeeId, registrationData) {
+  if (isSessionDryrun()) return { ok: true, data: {} };
+
+  const eventServiceEnv = getEventServiceEnv();
+  const { serviceApiEndpoints } = ENV_MAP[eventServiceEnv.name];
+  const raw = JSON.stringify({ attendeeId, ...registrationData });
+  const options = await constructRequestOptions('POST', raw);
+
+  try {
+    const response = await fetch(`${serviceApiEndpoints.esl}/v1/session-times/${sessionTimeId}/attendees/${attendeeId}`, options);
+    const data = await response.json();
+
+    if (!response.ok) {
+      window.lana?.log(`Error: Failed to register for session time ${sessionTimeId}. Status:${JSON.stringify(response)}`);
+      return { ok: false, status: response.status, error: data };
+    }
+
+    return { ok: true, data };
+  } catch (error) {
+    window.lana?.log(`Error: Failed to register for session time ${sessionTimeId}. Error:${JSON.stringify(error)}`);
+    return { ok: false, status: 'Network Error', error: error.message };
+  }
+}
+
+export async function unregisterFromSessionTime(sessionTimeId) {
+  if (isSessionDryrun()) return { ok: true };
+
+  const eventServiceEnv = getEventServiceEnv();
+  const { serviceApiEndpoints } = ENV_MAP[eventServiceEnv.name];
+  const options = await constructRequestOptions('DELETE');
+
+  try {
+    const response = await fetch(
+      `${serviceApiEndpoints.esl}/v1/session-times/${sessionTimeId}/attendees/me`,
+      options,
+    );
+
+    if (!response.ok) {
+      window.lana?.log(`Error: Failed to unregister from session time ${sessionTimeId}. Status:${JSON.stringify(response)}`);
+      return { ok: false, status: response.status };
+    }
+
+    if (response.status === 204) return { ok: true };
+    return { ok: true, data: await response.json() };
+  } catch (error) {
+    window.lana?.log(`Error: Failed to unregister from session time ${sessionTimeId}. Error:${JSON.stringify(error)}`);
+    return { ok: false, status: 'Network Error', error: error.message };
+  }
+}
+
 // compound helper functions
 export async function getAndCreateAndAddAttendee(eventId, attendeeData) {
   const profile = BlockMediator.get('imsProfile');

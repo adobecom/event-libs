@@ -105,6 +105,81 @@ describe('Content Update Script', () => {
   });
 });
 
+describe('updateRSVPButtonState', () => {
+  let fetchStub;
+  let originalLocationSearch;
+
+  beforeEach(() => {
+    document.body.innerHTML = '';
+    document.head.innerHTML = head;
+    setMetadata('event-id', 'test-event-id');
+    BlockMediator.set('rsvpData', null);
+    BlockMediator.set('eventData', null);
+    originalLocationSearch = window.location.search;
+  });
+
+  afterEach(() => {
+    fetchStub?.restore();
+    if (originalLocationSearch !== undefined) {
+      window.history.replaceState(null, '', window.location.pathname + window.location.hash + originalLocationSearch);
+    }
+  });
+
+  it('hides RSVP button and shows message when event is inviteOnly and URL has no valid campaign', async () => {
+    fetchStub = sinon.stub(window, 'fetch').resolves({
+      ok: true,
+      json: () => Promise.resolve({ inviteOnly: true, isFull: false, allowWaitlisting: false, attendeeCount: 0, attendeeLimit: 100 }),
+    });
+    window.history.replaceState(null, '', window.location.pathname + window.location.hash);
+
+    const wrapper = document.createElement('p');
+    const anchor = document.createElement('a');
+    anchor.href = '#rsvp-form';
+    anchor.textContent = 'Register';
+    anchor.dataset.modalHash = '#rsvp-form';
+    wrapper.appendChild(anchor);
+    document.body.appendChild(wrapper);
+    const rsvpBtn = { el: anchor, originalText: 'Register' };
+
+    await updateRSVPButtonState(rsvpBtn);
+
+    expect(anchor.style.display).to.equal('none');
+    expect(anchor.getAttribute('aria-hidden')).to.equal('true');
+    expect(anchor.getAttribute('tabindex')).to.equal('-1');
+    const msgEl = wrapper.querySelector('.rsvp-btn-message');
+    expect(msgEl).to.not.be.null;
+    expect(msgEl.textContent).to.include('invitation');
+
+    wrapper.remove();
+  });
+
+  it('enables RSVP button (default state) when event is inviteOnly but URL has valid campaign', async () => {
+    fetchStub = sinon.stub(window, 'fetch').resolves({
+      ok: true,
+      json: () => Promise.resolve({ inviteOnly: true, isFull: false, allowWaitlisting: false, attendeeCount: 0, attendeeLimit: 100 }),
+    });
+    window.history.replaceState(null, '', `${window.location.pathname}?campaign=valid-campaign-id${window.location.hash}`);
+
+    const wrapper = document.createElement('p');
+    const anchor = document.createElement('a');
+    anchor.href = '#rsvp-form';
+    anchor.textContent = 'Register';
+    anchor.dataset.modalHash = '#rsvp-form';
+    wrapper.appendChild(anchor);
+    document.body.appendChild(wrapper);
+    const rsvpBtn = { el: anchor, originalText: 'Register' };
+
+    await updateRSVPButtonState(rsvpBtn);
+
+    expect(anchor.classList.contains('disabled')).to.be.false;
+    expect(anchor.getAttribute('href')).to.equal('#rsvp-form');
+    expect(anchor.textContent).to.equal('Register');
+    expect(wrapper.querySelector('.rsvp-btn-message')).to.be.null;
+
+    wrapper.remove();
+  });
+});
+
 describe('updateAnalyticTag', () => {
   it('updates the text content of an element', () => {
     const element = document.createElement('div');
@@ -373,6 +448,17 @@ describe('validatePageAndRedirect', () => {
 });
 
 describe('updatePictureElement', () => {
+  beforeEach(() => {
+    document.body.innerHTML = `
+      <picture>
+        <source type="image/webp" srcset="./media_placeholder.png?width=2000&amp;format=webply&amp;optimize=medium" media="(min-width: 600px)">
+        <source type="image/webp" srcset="./media_placeholder.png?width=750&amp;format=webply&amp;optimize=medium">
+        <source type="image/png" srcset="./media_placeholder.png?width=2000&amp;format=png&amp;optimize=medium" media="(min-width: 600px)">
+        <img loading="lazy" alt="" src="./media_placeholder.png?width=750&amp;format=png&amp;optimize=medium" width="600" height="300">
+      </picture>
+    `;
+  });
+
   it('updates the srcset attribute of a picture element', () => {
     const picture = document.querySelector('picture');
     const img = document.createElement('img');
@@ -380,9 +466,10 @@ describe('updatePictureElement', () => {
 
     picture.append(img);
     updatePictureElement(img.src, picture, 'alt-text');
+    const expectedSrcsetPrefix = `${img.src}?`;
     const sources = picture.querySelectorAll('source');
     sources.forEach((source) => {
-      expect(source.srcset.startsWith('http://localhost:2000/mock-image-url.jpg?')).to.be.true;
+      expect(source.srcset.startsWith(expectedSrcsetPrefix)).to.be.true;
     });
   });
 
