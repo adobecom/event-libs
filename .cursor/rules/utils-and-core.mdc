@@ -1,0 +1,102 @@
+---
+description: Patterns for event-libs core utilities, decoration, and ESP controller
+globs: event-libs/v1/utils/**/*.js,event-libs/v1/libs.js
+alwaysApply: false
+---
+
+# Utils & Core Module Conventions
+
+## Key Modules
+
+| File | Responsibility |
+|------|---------------|
+| `utils.js` | Config management, metadata, DOM helpers, env detection, LIBS resolution |
+| `decorate.js` | Page decoration orchestration, RSVP links, icon/metadata replacement |
+| `esp-controller.js` | ESP/ESL API communication |
+| `profile.js` | Adobe IMS profile handling |
+| `constances.js` | Shared constants and regex patterns |
+| `dictionary-manager.js` | i18n dictionary management |
+| `date-time-helper.js` | Date/time formatting and timezone utilities |
+| `data-utils.js` | Data transformation helpers |
+| `libs.js` | Public barrel file — re-exports core APIs |
+
+## Config Pattern (Closure-Based Singleton)
+
+Config uses an IIFE returning a getter/setter tuple:
+
+```javascript
+export const [setEventConfig, updateEventConfig, getEventConfig] = (() => {
+  let config = {};
+  return [
+    (ec, mc = {}) => { config = { ...ec }; /* ... */ return config; },
+    (ec, mc = {}) => { config = { ...ec }; /* ... */ return config; },
+    () => config,
+  ];
+})();
+```
+
+Follow this pattern for any new module-level singletons.
+
+## Metadata Access
+
+```javascript
+export function getMetadata(name, doc = document) { /* reads <meta name="..." content="..."> */ }
+export function setMetadata(name, value, doc = document) { /* creates/updates meta tag */ }
+```
+
+- Metadata keys use `kebab-case` (e.g., `event-id`, `local-start-time-millis`)
+- Values are strings — parse JSON in a try/catch when structured data is expected
+
+## Template / Placeholder Replacement
+
+The decoration system replaces patterns in DOM text:
+- `[[metadata-path]]` — replaced with metadata values
+- `@@icon-name@@` — replaced with SVG icon markup
+- Conditional expressions via `CONDITIONAL_REG`
+
+## Adding New Utilities
+
+1. Place in `event-libs/v1/utils/` with a descriptive kebab-case filename
+2. Use **named exports** for all public functions
+3. Add **JSDoc** with `@param`, `@returns`, `@description` tags
+4. If the utility is needed by blocks at load time, re-export via `libs.js`
+5. If heavy or rarely used, keep it lazy-loadable via dynamic `import()`
+
+## JSDoc Style
+
+```javascript
+/**
+ * Converts event time to user's local timezone with DST awareness.
+ * @param {string} time - Time in HH:MM:SS format
+ * @param {string} eventTimezone - IANA timezone identifier
+ * @param {string|number} eventDateMillis - Event date for DST context
+ * @returns {string} Formatted local time string
+ */
+```
+
+## ESP Controller
+
+- API calls go through `esp-controller.js`
+- Environment-aware — uses `getEventServiceEnv()` to resolve API base URL
+- Returns parsed JSON; throws `Error` on HTTP failures
+- Cache event data in BlockMediator after first fetch
+
+## Class Pattern (When Needed)
+
+Use private fields and static caching:
+
+```javascript
+export class DictionaryManager {
+  #dictionaries = {};
+  static #dictionaryCache = null;
+  static #dictionaryPromise = null;
+  // ...
+}
+```
+
+## Export from libs.js
+
+`libs.js` is the public API surface. When adding new core functionality:
+1. Import from the source module
+2. Re-export in the `export { ... }` block
+3. For heavy modules, add to `eventsDelayedActions` instead

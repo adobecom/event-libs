@@ -1,0 +1,62 @@
+---
+description: JavaScript coding conventions and style rules for event-libs
+alwaysApply: true
+---
+
+# Coding Standards
+
+## Module System
+
+- **ES modules only** — `import`/`export`, never `require`/`module.exports`
+- **Always include `.js` extensions** in import paths (ESLint enforced)
+- Use **named exports** for utilities; **default exports** for block `init` functions and singletons
+
+## Naming
+
+- `camelCase` for variables, functions, methods
+- `UPPER_SNAKE_CASE` for constants (`EVENT_BLOCKS`, `META_REG`, `SUSI_OPTIONS`)
+- `kebab-case` for file names, CSS classes, block names, metadata keys (`event-id`, `host-email`)
+- Class names use `PascalCase` (`DictionaryManager`, `TimingWorker`)
+
+## Formatting (enforced by `.editorconfig` + ESLint Airbnb)
+
+- **2 spaces** indentation
+- **Single quotes** for strings
+- **Semicolons** required
+- **LF** line endings
+- **Final newline** required
+- Object destructuring multiline at 6+ properties
+
+## Functions
+
+- **Regular `function`** for top-level exports and public APIs
+- **Arrow functions** for callbacks, closures, `map`/`filter`/`forEach`
+- **`async/await`** for all async code — no raw `.then()` chains
+- Use **default parameters** (e.g., `function getMetadata(name, doc = document)`)
+
+## Error Handling
+
+- Log errors via **`window.lana?.log()`** (Adobe Lana) — never `console.error` in production code
+- Use **optional chaining** (`?.`) when accessing Lana or other potentially absent globals
+- Wrap JSON parsing, network calls, and critical logic in **`try/catch`**
+- Prefer **graceful fallbacks** (return `''`, `null`, `[]`) over throwing in UI-facing code
+- `throw new Error(...)` is acceptable for programmer errors and invalid API state
+
+## DOM Patterns
+
+- Use **`createTag(tag, attributes, html, options)`** for element creation — not raw `document.createElement`
+- Use `getMetadata(name)` / `setMetadata(name, value)` for `<meta>` tag access
+- Use `createOptimizedPicture()` for image elements
+
+## Code Splitting
+
+- Use **dynamic `import()`** for lazy-loading non-critical modules
+- Blocks are loaded on-demand by block name
+- Heavy features (profile, indexer) loaded in `eventsDelayedActions`
+
+## ESLint Rules of Note
+
+- `no-param-reassign` — allowed for properties (`{ props: false }`)
+- `import/extensions` — `.js` always required
+- `no-unused-expressions` — disabled in favor of `chai-friendly` variant
+- `no-console` — off only in test files

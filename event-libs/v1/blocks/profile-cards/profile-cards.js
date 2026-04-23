@@ -1,26 +1,54 @@
-import buildMiloCarousel from '../../features/milo-carousel.js';
-import { getMetadata, createTag, getImageSource } from '../../utils/utils.js';
+import buildMiloCarousel from '../../features/carousel/milo-carousel.js';
+import {
+  getMetadata,
+  createTag,
+  getImageSource,
+  getEventConfig,
+  LIBS,
+} from '../../utils/utils.js';
+
+let modalLoader;
 
 function decorateImage(card, photo) {
   if (!photo) return;
 
   const { altText } = photo;
-  const imgElement = createTag('img', {
+  const attrs = {
     src: getImageSource(photo),
     class: 'card-image',
-  });
-
-  if (altText) {
-    imgElement.setAttribute('alt', altText);
-  }
+    alt: altText || '',
+  };
+  if (!altText) attrs.role = 'presentation';
+  const imgElement = createTag('img', attrs);
 
   const imgContainer = createTag('div', { class: 'card-image-container' });
   imgContainer.append(imgElement);
   card.append(imgContainer);
 }
 
+export const PLATFORM_PATTERNS = {
+  instagram: /^(?:www\.)?(?:instagram\.[a-z]{2,}(?:\.[a-z]{2,})?|instagr\.am)$/,
+  facebook: /^(?:www\.)?(?:facebook\.[a-z]{2,}(?:\.[a-z]{2,})?|fb\.com)$/,
+  twitter: /^(?:www\.)?(?:twitter\.com|t\.co|tweetdeck\.twitter\.com)$/,
+  linkedin: /^(?:www\.)?(?:linkedin\.[a-z]{2,}(?:\.[a-z]{2,})?|lnkd\.in)$/,
+  youtube: /^(?:www\.)?(?:youtube\.[a-z]{2,}(?:\.[a-z]{2,})?|youtu\.be|m\.youtube\.com)$/,
+  pinterest: /^(?:www\.)?(?:pinterest\.[a-z]{2,}(?:\.[a-z]{2,})?|pin\.it)$/,
+  discord: /^(?:www\.)?(?:discord\.com|discord\.gg)$/,
+  behance: /^(?:www\.)?behance\.net$/,
+  x: /^(?:www\.)?(?:x\.com|twitter\.com)$/,
+  tiktok: /^(?:www\.)?(?:tiktok\.[a-z]{2,}(?:\.[a-z]{2,})?|vm\.tiktok\.com)$/,
+};
+
+export const SUPPORTED_PLATFORMS = [...Object.keys(PLATFORM_PATTERNS), 'web'];
+
+const svgFileCache = new Map();
+
 export async function getSVGsfromFile(path, selectors) {
   if (!path) return null;
+
+  const cacheKey = `${path}:${Array.isArray(selectors) ? selectors.join(',') : selectors || '*'}`;
+  if (svgFileCache.has(cacheKey)) return svgFileCache.get(cacheKey);
+
   const resp = await fetch(path);
   if (!resp.ok) return null;
 
@@ -39,7 +67,7 @@ export async function getSVGsfromFile(path, selectors) {
     selectors = [selectors];
   }
 
-  return selectors.map((selector) => {
+  const result = selectors.map((selector) => {
     const symbol = doc.querySelector(`#${selector}`);
     if (!symbol) return null;
     const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
@@ -50,6 +78,9 @@ export async function getSVGsfromFile(path, selectors) {
     svg.removeAttribute('id');
     return { svg, name: selector };
   });
+
+  svgFileCache.set(cacheKey, result);
+  return result;
 }
 
 export function createSocialIcon(svg, platform) {
@@ -64,35 +95,32 @@ export function createSocialIcon(svg, platform) {
 }
 
 async function decorateSocialIcons(cardContainer, socialLinks) {
-  // Define platform detection patterns using pure regex - no predefined lists needed
-  const PLATFORM_PATTERNS = {
-    instagram: /^(?:www\.)?(?:instagram\.[a-z]{2,}(?:\.[a-z]{2,})?|instagr\.am)$/,
-    facebook: /^(?:www\.)?(?:facebook\.[a-z]{2,}(?:\.[a-z]{2,})?|fb\.com)$/,
-    twitter: /^(?:www\.)?(?:twitter\.com|t\.co|tweetdeck\.twitter\.com)$/,
-    linkedin: /^(?:www\.)?(?:linkedin\.[a-z]{2,}(?:\.[a-z]{2,})?|lnkd\.in)$/,
-    youtube: /^(?:www\.)?(?:youtube\.[a-z]{2,}(?:\.[a-z]{2,})?|youtu\.be|m\.youtube\.com)$/,
-    pinterest: /^(?:www\.)?(?:pinterest\.[a-z]{2,}(?:\.[a-z]{2,})?|pin\.it)$/,
-    discord: /^(?:www\.)?(?:discord\.com|discord\.gg)$/,
-    behance: /^(?:www\.)?behance\.net$/,
-    x: /^(?:www\.)?(?:x\.com|twitter\.com)$/, // x.com and legacy twitter.com
-    tiktok: /^(?:www\.)?(?:tiktok\.[a-z]{2,}(?:\.[a-z]{2,})?|vm\.tiktok\.com)$/,
-  };
-
-  const SUPPORTED_PLATFORMS = [...Object.keys(PLATFORM_PATTERNS), 'web'];
-
   const svgPath = new URL('../../icons/social-icons.svg', import.meta.url).href;
   const socialList = createTag('ul', { class: 'card-social-icons' });
 
   const svgEls = await getSVGsfromFile(svgPath, SUPPORTED_PLATFORMS);
   if (!svgEls || svgEls.length === 0) return;
-  socialLinks.forEach((social) => {
-    const { link } = social;
 
-    if (!link) return;
+  (socialLinks || []).forEach((entry) => {
+    let href = '';
+    let sourceAnchor = null;
+    let metadataEntry = null;
+
+    if (entry instanceof HTMLAnchorElement) {
+      sourceAnchor = entry;
+      href = entry.href;
+    } else if (typeof entry === 'string' && entry.trim()) {
+      href = entry.trim();
+    } else if (entry && typeof entry === 'object' && typeof entry.link === 'string' && entry.link.trim()) {
+      metadataEntry = entry;
+      href = entry.link.trim();
+    } else {
+      return;
+    }
 
     let platform = 'web'; // Default fallback
     try {
-      const url = new URL(link);
+      const url = new URL(href);
       const hostname = url.hostname.toLowerCase();
 
       // Find the platform by testing against regex patterns
@@ -110,13 +138,22 @@ async function decorateSocialIcons(cardContainer, socialLinks) {
     const li = createTag('li', { class: 'card-social-icon' });
     const icon = createSocialIcon(svgEl.svg, platform);
 
-    const a = createTag('a', {
-      href: link,
-      target: '_blank',
-      rel: 'noopener noreferrer',
-      'aria-label': platform,
-    });
-    a.textContent = '';
+    let a;
+    if (sourceAnchor) {
+      a = sourceAnchor.cloneNode(true);
+      a.setAttribute('target', '_blank');
+      a.setAttribute('rel', 'noopener noreferrer');
+      a.textContent = '';
+    } else {
+      const ariaLabel = metadataEntry?.serviceName || platform;
+      a = createTag('a', {
+        href,
+        target: '_blank',
+        rel: 'noopener noreferrer',
+        'aria-label': ariaLabel,
+      });
+    }
+
     a.append(icon);
     li.append(a);
     socialList.append(li);
@@ -132,7 +169,7 @@ function decorateContent(cardContainer, data) {
 
   const textContainer = createTag('div', { class: 'card-text-container' });
   const title = createTag('p', { class: 'card-title' }, data.title);
-  const name = createTag('h3', { class: 'card-name' }, `${data.firstName} ${data.lastName}`);
+  const name = createTag('h2', { class: 'card-name' }, `${data.firstName} ${data.lastName}`);
 
   textContainer.append(title, name);
 
@@ -155,6 +192,120 @@ function decorateContent(cardContainer, data) {
   decorateSocialIcons(contentContainer, data.socialLinks || data.socialMedia || []);
 
   cardContainer.append(contentContainer);
+}
+
+function decorateContentSimple(cardContainer, data) {
+  const contentContainer = createTag('div', { class: 'card-content' });
+  const textContainer = createTag('div', { class: 'card-text-container' });
+  const title = createTag('p', { class: 'card-title' }, data.title);
+  const name = createTag('h2', { class: 'card-name' }, `${data.firstName} ${data.lastName}`);
+
+  textContainer.append(title, name);
+  contentContainer.append(textContainer);
+  cardContainer.append(contentContainer);
+}
+
+function getProfileName(data) {
+  return `${data?.firstName || ''} ${data?.lastName || ''}`.trim();
+}
+
+function getSocialLinks(data) {
+  return data?.socialLinks || data?.socialMedia || [];
+}
+
+function appendBio(contentContainer, bio) {
+  const trimmedBio = typeof bio === 'string' ? bio.trim() : '';
+  if (!trimmedBio) return;
+
+  if (trimmedBio.includes('<')) {
+    const bioContainer = createTag('div', { class: 'card-desc' });
+    bioContainer.innerHTML = trimmedBio;
+    contentContainer.append(bioContainer);
+    return;
+  }
+
+  const description = createTag('p', { class: 'card-desc' }, trimmedBio);
+  contentContainer.append(description);
+}
+
+function getModalId(data, index) {
+  const fullName = getProfileName(data);
+  const slug = fullName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+  return `profile-cards-modal-${slug || index + 1}`;
+}
+
+async function loadMiloModal() {
+  if (!modalLoader) {
+    modalLoader = (async () => {
+      const eventConfig = getEventConfig();
+      const modalBasePath = eventConfig?.miloConfig?.miloLibs || LIBS;
+      const { getModal } = await import(`${modalBasePath}/blocks/modal/modal.js`);
+      return getModal;
+    })();
+  }
+
+  return modalLoader;
+}
+
+export async function buildModalContent(profileData) {
+  const content = new DocumentFragment();
+  const modalContent = createTag('div', { class: 'profile-cards-modal-content' });
+  const textContainer = createTag('div', { class: 'profile-cards-modal-text' });
+  const imageContainer = createTag('div', { class: 'profile-cards-modal-image' });
+  const fullName = getProfileName(profileData);
+  const title = createTag('p', { class: 'card-title' }, profileData?.title || '');
+  const name = createTag('h2', { class: 'card-name' }, fullName);
+
+  textContainer.append(title, name);
+  appendBio(textContainer, profileData?.bio);
+  await decorateSocialIcons(textContainer, getSocialLinks(profileData));
+  decorateImage(imageContainer, profileData?.photo);
+
+  modalContent.append(textContainer, imageContainer);
+  content.append(modalContent);
+  return content;
+}
+
+async function openProfileModal(profileData, index) {
+  try {
+    const getModal = await loadMiloModal();
+    const fullName = getProfileName(profileData) || `Profile ${index + 1}`;
+    const content = await buildModalContent(profileData);
+
+    await getModal(null, {
+      id: getModalId(profileData, index),
+      title: `Profile: ${fullName}`,
+      content,
+      class: 'profile-cards-modal',
+    });
+  } catch (error) {
+    window.lana?.log(`Failed to open profile modal:\n${JSON.stringify(error, null, 2)}`);
+  }
+}
+
+function decorateModalTrigger(cardContainer, profileData, index) {
+  const fullName = getProfileName(profileData) || `Profile ${index + 1}`;
+  const openModal = () => {
+    openProfileModal(profileData, index);
+  };
+
+  cardContainer.classList.add('modal-trigger');
+  cardContainer.setAttribute('role', 'button');
+  cardContainer.setAttribute('tabindex', '0');
+  cardContainer.setAttribute('aria-haspopup', 'dialog');
+  cardContainer.setAttribute('aria-label', `Open profile modal for ${fullName}`);
+
+  cardContainer.addEventListener('click', (event) => {
+    if (event.target.closest('a')) return;
+    openModal();
+  });
+
+  cardContainer.addEventListener('keydown', (event) => {
+    if (event.key !== 'Enter' && event.key !== ' ') return;
+    if (event.target.closest('a')) return;
+    event.preventDefault();
+    openModal();
+  });
 }
 
 function parseStaticCard(row) {
@@ -219,7 +370,7 @@ function parseStaticCard(row) {
         // This is a social link paragraph
         const anchor = child.querySelector('a');
         if (anchor?.href) {
-          socialLinks.push({ link: anchor.href });
+          socialLinks.push(anchor);
         }
       } else if (child !== heading) {
         // This is bio content - keep the HTML
@@ -244,7 +395,7 @@ function parseStaticCard(row) {
   };
 }
 
-function decorateStaticCards(el) {
+function decorateStaticCards(el, { modal } = {}) {
   const cardsWrapper = el.querySelector('.cards-wrapper');
   const rows = Array.from(el.querySelectorAll(':scope > div:not(.cards-wrapper)'));
   
@@ -256,13 +407,16 @@ function decorateStaticCards(el) {
     return;
   }
 
-  cardRows.forEach((row) => {
+  cardRows.forEach((row, index) => {
     const cardData = parseStaticCard(row);
     if (!cardData) return;
 
     const cardContainer = createTag('div', { class: 'card-container' });
     decorateImage(cardContainer, cardData.photo);
     decorateContent(cardContainer, cardData);
+    if (modal) {
+      decorateModalTrigger(cardContainer, cardData, index);
+    }
     cardsWrapper.append(cardContainer);
     
     // Remove the original row
@@ -281,7 +435,7 @@ function decorateStaticCards(el) {
   }
 }
 
-function decorateCards(el, data) {
+function decorateCards(el, data, { simple, modal } = {}) {
   const cardsWrapper = el.querySelector('.cards-wrapper');
   const rows = el.querySelectorAll(':scope > div');
   const configRow = rows[1];
@@ -295,11 +449,18 @@ function decorateCards(el, data) {
 
   configRow.remove();
 
-  filteredData.forEach((speaker) => {
+  filteredData.forEach((speaker, index) => {
     const cardContainer = createTag('div', { class: 'card-container' });
 
     decorateImage(cardContainer, speaker.photo);
-    decorateContent(cardContainer, speaker);
+    if (simple) {
+      decorateContentSimple(cardContainer, speaker);
+    } else {
+      decorateContent(cardContainer, speaker);
+    }
+    if (modal) {
+      decorateModalTrigger(cardContainer, speaker, index);
+    }
 
     cardsWrapper.append(cardContainer);
   });
@@ -316,6 +477,18 @@ function decorateCards(el, data) {
   }
 }
 
+function sortDataByOrdinals(data) {
+  return [...data].sort((a, b) => {
+    const aHas = a.ordinal != null;
+    const bHas = b.ordinal != null;
+    if (aHas && bHas) return a.ordinal - b.ordinal;
+    if (aHas) return -1;
+    if (bHas) return 1;
+    return 0;
+  });
+}
+
+
 export default function init(el) {
   const rows = el.querySelectorAll(':scope > div');
   const configRow = rows[1];
@@ -324,6 +497,7 @@ export default function init(el) {
   // Check if the first cell of configRow (if it exists) contains 'type'
   const firstCell = configRow?.querySelectorAll(':scope > div')?.[0];
   const isMetadataDriven = firstCell?.textContent.toLowerCase().trim() === 'type';
+  const isModal = el.classList.contains('modal');
 
   // Handle grid variant: add default three-up if no *-up class is present
   if (el.classList.contains('grid')) {
@@ -353,8 +527,10 @@ export default function init(el) {
       return;
     }
 
-    decorateCards(el, data);
+    const isSimple = el.classList.contains('simple');
+    const sortedData = sortDataByOrdinals(data);
+    decorateCards(el, sortedData, { simple: isSimple, modal: isModal });
   } else {
-    decorateStaticCards(el);
+    decorateStaticCards(el, { modal: isModal });
   }
 }

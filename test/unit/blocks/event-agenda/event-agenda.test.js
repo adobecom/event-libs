@@ -1,9 +1,10 @@
 import { expect } from '@esm-bundle/chai';
 import { readFile } from '@web/test-runner-commands';
-import init, { convertToLocaleTimeFormat, convertEventTimeToLocalTime } from '../../../../event-libs/v1/blocks/event-agenda/event-agenda.js';
+import init, { convertToLocaleTimeFormat, convertEventTimeToLocalTime, formatTimeRange } from '../../../../event-libs/v1/blocks/event-agenda/event-agenda.js';
 import { setMetadata } from '../../../../event-libs/v1/utils/utils.js';
 
 const body = await readFile({ path: './mocks/default.html' });
+const collapsibleBody = await readFile({ path: './mocks/collapsible.html' });
 
 describe('Agenda Module', () => {
   describe('convertToLocaleTimeFormat', () => {
@@ -57,6 +58,7 @@ describe('Agenda Module', () => {
     beforeEach(() => {
       document.body.innerHTML = body;
       document.head.innerHTML = '';
+      delete document.body.dataset.eventState;
     });
 
     it('should create agenda container and items based on metadata', async () => {
@@ -229,6 +231,173 @@ describe('Agenda Module', () => {
       await init(el);
 
       expect(el.parentNode).to.be.null;
+    });
+
+    it('should show time range when endTime is provided', async () => {
+      setMetadata('agenda', JSON.stringify([{ startTime: '09:00:00', endTime: '17:00:00', title: 'Full Day', description: 'All day event' }]));
+      setMetadata('photos', JSON.stringify([{ imageKind: 'venue-image', imageUrl: 'http://example.com/image.jpg' }]));
+
+      const el = document.querySelector('.event-agenda');
+      await init(el);
+
+      const agendaItem = el.querySelector('.agenda-list-item');
+      const timeText = agendaItem.querySelector('.agenda-time').textContent;
+      expect(timeText).to.include('\u2013');
+      expect(timeText).to.match(/\d{1,2}:\d{2}\s[AP]M/);
+    });
+
+    it('should show only start time when endTime is missing', async () => {
+      setMetadata('agenda', JSON.stringify([{ startTime: '09:00:00', title: 'Morning', description: 'Opening' }]));
+      setMetadata('photos', JSON.stringify([{ imageKind: 'venue-image', imageUrl: 'http://example.com/image.jpg' }]));
+
+      const el = document.querySelector('.event-agenda');
+      await init(el);
+
+      const agendaItem = el.querySelector('.agenda-list-item');
+      const timeText = agendaItem.querySelector('.agenda-time').textContent;
+      expect(timeText).to.not.include('\u2013');
+      expect(timeText).to.equal('9:00 AM');
+    });
+
+    it('should skip venue image when no-image variant is used', async () => {
+      setMetadata('agenda', JSON.stringify([{ startTime: '09:00:00', title: 'Title', description: 'Opening' }]));
+      setMetadata('photos', JSON.stringify([{ imageKind: 'venue-image', imageUrl: 'http://example.com/image.jpg' }]));
+
+      const el = document.querySelector('.event-agenda');
+      el.classList.add('no-image');
+      await init(el);
+
+      expect(el.classList.contains('blade')).to.be.false;
+      expect(el.querySelector('.venue-img-col')).to.be.null;
+      expect(el.querySelector('.agenda-list-item')).to.not.be.null;
+    });
+  });
+
+  describe('formatTimeRange', () => {
+    it('should format start and end time as a range', () => {
+      const result = formatTimeRange({ startTime: '09:00:00', endTime: '17:00:00' }, null, null, 'en-US');
+      expect(result).to.equal('9:00 AM \u2013 5:00 PM');
+    });
+
+    it('should return only start time when endTime is absent', () => {
+      const result = formatTimeRange({ startTime: '09:00:00' }, null, null, 'en-US');
+      expect(result).to.equal('9:00 AM');
+    });
+
+    it('should return empty string when startTime is absent', () => {
+      const result = formatTimeRange({}, null, null, 'en-US');
+      expect(result).to.equal('');
+    });
+  });
+
+  describe('collapsible variant', () => {
+    beforeEach(() => {
+      document.body.innerHTML = collapsibleBody;
+      document.head.innerHTML = '';
+      delete document.body.dataset.eventState;
+    });
+
+    it('should add expandable class and toggle button to items with descriptions', async () => {
+      setMetadata('agenda', JSON.stringify([
+        { startTime: '09:00:00', title: 'Keynote', description: 'Main talk' },
+        { startTime: '10:00:00', title: 'Break' },
+      ]));
+
+      const el = document.querySelector('.event-agenda');
+      await init(el);
+
+      const items = el.querySelectorAll('.agenda-list-item');
+      expect(items.length).to.equal(2);
+
+      expect(items[0].classList.contains('expandable')).to.be.true;
+      expect(items[0].querySelector('.agenda-toggle')).to.not.be.null;
+      expect(items[0].querySelector('.agenda-toggle').getAttribute('aria-expanded')).to.equal('false');
+
+      expect(items[1].classList.contains('expandable')).to.be.false;
+      expect(items[1].querySelector('.agenda-toggle')).to.be.null;
+    });
+
+    it('should toggle expanded state on click', async () => {
+      setMetadata('agenda', JSON.stringify([
+        { startTime: '09:00:00', title: 'Session', description: 'Details here' },
+      ]));
+
+      const el = document.querySelector('.event-agenda');
+      await init(el);
+
+      const item = el.querySelector('.agenda-list-item');
+      const toggle = item.querySelector('.agenda-toggle');
+
+      expect(item.classList.contains('expanded')).to.be.false;
+      expect(toggle.getAttribute('aria-expanded')).to.equal('false');
+
+      toggle.click();
+      expect(item.classList.contains('expanded')).to.be.true;
+      expect(toggle.getAttribute('aria-expanded')).to.equal('true');
+
+      toggle.click();
+      expect(item.classList.contains('expanded')).to.be.false;
+      expect(toggle.getAttribute('aria-expanded')).to.equal('false');
+    });
+
+    it('should not add toggle in default (non-collapsible) variant', async () => {
+      document.body.innerHTML = body;
+      document.head.innerHTML = '';
+      setMetadata('agenda', JSON.stringify([
+        { startTime: '09:00:00', title: 'Session', description: 'Details here' },
+      ]));
+      setMetadata('photos', JSON.stringify([{ imageKind: 'venue-image', imageUrl: 'http://example.com/image.jpg' }]));
+
+      const el = document.querySelector('.event-agenda');
+      await init(el);
+
+      const item = el.querySelector('.agenda-list-item');
+      expect(item.classList.contains('expandable')).to.be.false;
+      expect(item.querySelector('.agenda-toggle')).to.be.null;
+    });
+
+    it('should not add toggle to items without a title even if they have a description', async () => {
+      setMetadata('agenda', JSON.stringify([
+        { startTime: '09:00:00', description: 'Always visible description' },
+        { startTime: '10:00:00', title: 'Keynote', description: 'Collapsible' },
+      ]));
+
+      const el = document.querySelector('.event-agenda');
+      await init(el);
+
+      const items = el.querySelectorAll('.agenda-list-item');
+      expect(items.length).to.equal(2);
+
+      expect(items[0].classList.contains('expandable')).to.be.false;
+      expect(items[0].querySelector('.agenda-toggle')).to.be.null;
+      expect(items[0].querySelector('.agenda-details').textContent).to.equal('Always visible description');
+
+      expect(items[1].classList.contains('expandable')).to.be.true;
+      expect(items[1].querySelector('.agenda-toggle')).to.not.be.null;
+    });
+  });
+
+  describe('background variant', () => {
+    beforeEach(() => {
+      document.body.innerHTML = body;
+      document.head.innerHTML = '';
+      delete document.body.dataset.eventState;
+    });
+
+    it('should apply background class and render items normally', async () => {
+      setMetadata('agenda', JSON.stringify([
+        { startTime: '09:00:00', title: 'Session', description: 'Details' },
+      ]));
+
+      const el = document.querySelector('.event-agenda');
+      el.classList.add('background');
+      await init(el);
+
+      expect(el.classList.contains('background')).to.be.true;
+      const item = el.querySelector('.agenda-list-item');
+      expect(item).to.not.be.null;
+      expect(item.querySelector('.agenda-title').textContent).to.equal('Session');
+      expect(item.querySelector('.agenda-details').textContent).to.equal('Details');
     });
   });
 });

@@ -5,6 +5,14 @@ import init, { createSocialIcon } from '../../../../event-libs/v1/blocks/profile
 const head = await readFile({ path: './mocks/head.html' });
 const body = await readFile({ path: './mocks/default.html' });
 
+async function waitForSocialIcons(el, timeoutMs = 5000) {
+  const start = Date.now();
+  while (Date.now() - start < timeoutMs) {
+    if (el.querySelector('.card-social-icons a')) return;
+    await new Promise((r) => setTimeout(r, 20));
+  }
+}
+
 describe('Profile Cards Module', () => {
   describe('init', () => {
     beforeEach(() => {
@@ -45,6 +53,15 @@ describe('Profile Cards Module', () => {
       expect(el.classList.contains('single')).to.be.true;
     });
 
+    it('should render social icons for metadata-driven speakers', async () => {
+      const el = document.querySelector('#speakers-cards');
+      init(el);
+      await waitForSocialIcons(el);
+
+      const socialAnchors = el.querySelectorAll('.card-social-icons a');
+      expect(socialAnchors.length).to.be.greaterThan(0);
+    });
+
     it('show remove block if no related profile types found', () => {
       const el = document.querySelector('#keynotes-cards');
       init(el);
@@ -52,6 +69,83 @@ describe('Profile Cards Module', () => {
       const noSpeakers = document.querySelector('#keynotes-cards');
 
       expect(noSpeakers).to.be.null;
+    });
+
+    it('should render simple variant with only image, title and name (no bio or social icons)', () => {
+      const el = document.querySelector('#simple-cards');
+      init(el);
+
+      const cards = el.querySelectorAll('.card-container');
+
+      expect(el).to.not.be.null;
+      expect(cards).to.have.lengthOf(3);
+
+      cards.forEach((card) => {
+        expect(card.querySelector('.card-image-container')).to.not.be.null;
+        expect(card.querySelector('.card-content')).to.not.be.null;
+        expect(card.querySelector('.card-title')).to.not.be.null;
+        expect(card.querySelector('.card-name')).to.not.be.null;
+        expect(card.querySelector('.card-desc')).to.be.null;
+        expect(card.querySelector('.card-social-icons')).to.be.null;
+      });
+    });
+
+    it('should set alt text on profile images from metadata', () => {
+      const el = document.querySelector('#speakers-cards');
+      init(el);
+
+      const images = el.querySelectorAll('.card-image');
+      images.forEach((img) => {
+        expect(img.hasAttribute('alt')).to.be.true;
+        expect(img.getAttribute('alt')).to.not.be.empty;
+        expect(img.hasAttribute('role')).to.be.false;
+      });
+    });
+
+    it('should mark images without alt text as decorative', () => {
+      const el = document.querySelector('#static-no-alt-cards');
+      init(el);
+
+      const img = el.querySelector('.card-image');
+      expect(img).to.not.be.null;
+      expect(img.getAttribute('alt')).to.equal('');
+      expect(img.getAttribute('role')).to.equal('presentation');
+    });
+
+    it('should make metadata-driven modal cards interactive', () => {
+      const el = document.querySelector('#modal-speakers-cards');
+      init(el);
+
+      const cards = el.querySelectorAll('.card-container');
+      const firstCard = cards[0];
+      const keydownEvent = new KeyboardEvent('keydown', {
+        key: 'Enter',
+        bubbles: true,
+        cancelable: true,
+      });
+
+      firstCard.dispatchEvent(keydownEvent);
+
+      expect(cards).to.have.lengthOf(3);
+      expect(firstCard.getAttribute('role')).to.equal('button');
+      expect(firstCard.getAttribute('tabindex')).to.equal('0');
+      expect(firstCard.getAttribute('aria-haspopup')).to.equal('dialog');
+      expect(firstCard.getAttribute('aria-label')).to.include('Open profile modal for');
+      expect(keydownEvent.defaultPrevented).to.be.true;
+    });
+
+    it('should make static-authored modal cards interactive', () => {
+      const el = document.querySelector('#static-modal-cards');
+      init(el);
+
+      const cards = el.querySelectorAll('.card-container');
+      const firstCard = cards[0];
+
+      expect(cards).to.have.lengthOf(1);
+      expect(firstCard.getAttribute('role')).to.equal('button');
+      expect(firstCard.getAttribute('tabindex')).to.equal('0');
+      expect(firstCard.getAttribute('aria-haspopup')).to.equal('dialog');
+      expect(firstCard.getAttribute('aria-label')).to.equal('Open profile modal for Static Speaker');
     });
   });
 

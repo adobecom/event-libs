@@ -40,7 +40,7 @@ describe('TimingWorker', () => {
   });
 
   describe('getStartScheduleItemByToggleTime', () => {
-    it('should return the first item if no toggleTime has passed', () => {
+    it('should return null if no toggleTime has passed', () => {
       const now = Date.now();
       const schedule = {
         toggleTime: now + 1000,
@@ -48,7 +48,7 @@ describe('TimingWorker', () => {
       };
 
       const result = worker.getStartScheduleItemByToggleTime(schedule, now);
-      expect(result).to.equal(schedule);
+      expect(result).to.be.null;
     });
 
     it('should return the last passed item if toggleTime has passed', () => {
@@ -84,23 +84,24 @@ describe('TimingWorker', () => {
       expect(result).to.equal(schedule);
     });
 
-    it('should use testing time when in testing mode - past time', () => {
+    it('should return null when testing time is before all toggleTimes', () => {
       const now = Date.now();
       const schedule = {
-        toggleTime: now - 1000, // Past time
+        toggleTime: now - 1000, // Past time relative to wall clock
         next: {
           toggleTime: now + 1000, // Future time
           next: null,
         },
       };
 
-      // Set up testing mode with a time offset that makes the current time
-      // appear to be in the past
+      // Set up testing mode with a time offset that makes the adjusted time
+      // earlier than all toggleTimes
       worker.testingManager.init({ toggleTime: now - 2000 });
 
       const result = worker.getStartScheduleItemByToggleTime(schedule, now);
-      // Should return the first item because the testing time is in the past
-      expect(result).to.equal(schedule);
+      // Adjusted time (now - 2000) is before first toggleTime (now - 1000),
+      // so nothing qualifies
+      expect(result).to.be.null;
     });
   });
 
@@ -831,6 +832,50 @@ describe('TimingWorker', () => {
 
       // Cache should not be updated for safety
       expect(sharedWorker.cachedApiTime).to.be.null;
+    });
+  });
+
+  describe('No conditions met behavior', () => {
+    it('should not send any message when currentScheduleItem is null', async () => {
+      const clock = sinon.useFakeTimers();
+      const perfStub = sinon.stub(performance, 'now');
+      perfStub.returns(1000);
+
+      worker.testingManager.init(null);
+      worker.nextScheduleItem = {
+        toggleTime: Date.now() + 10000,
+        pathToFragment: '/future-item',
+        next: { toggleTime: Date.now() + 20000, pathToFragment: '/later', next: null },
+      };
+      worker.currentScheduleItem = null;
+      worker.previouslySentItem = null;
+
+      await worker.runTimer();
+
+      expect(mockPostMessage.called).to.be.false;
+      expect(worker.timerId).to.not.be.null;
+
+      clock.restore();
+      perfStub.restore();
+    });
+
+    it('should set currentScheduleItem to null when no toggleTime has passed', () => {
+      const now = Date.now();
+      const schedule = {
+        toggleTime: now + 10000,
+        pathToFragment: '/future',
+        next: null,
+        prev: null,
+      };
+
+      const runTimerStub = sinon.stub(worker, 'runTimer');
+
+      worker.initializeSchedule(schedule);
+
+      expect(worker.nextScheduleItem).to.equal(schedule);
+      expect(worker.currentScheduleItem).to.be.null;
+
+      runTimerStub.restore();
     });
   });
 

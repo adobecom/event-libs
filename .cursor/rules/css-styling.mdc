@@ -1,0 +1,44 @@
+---
+description: CSS conventions and styling patterns for event-libs blocks and pages
+globs: "**/*.css"
+alwaysApply: false
+---
+
+# CSS Styling Conventions
+
+## Linting
+
+Enforced by **Stylelint** with `stylelint-config-standard` + Prettier integration.
+
+```bash
+npm run lint:css                   # Check
+npm run lint:css -- --fix          # Auto-fix
+```
+
+Scoped to: `event-libs/v1/blocks/**/*.css` and `event-libs/v1/styles/*.css`
+
+## File Organization
+
+- **Block styles** — `event-libs/v1/blocks/<block-name>/<block-name>.css` (one per block)
+- **Global styles** — `event-libs/styles/styles.css` (page-level base styles)
+- **Lib styles** — `event-libs/v1/libs-styles.css` (shared block styles)
+
+## Naming
+
+- Use **kebab-case** for all class names
+- Prefix block-scoped classes with the block name: `.event-agenda .agenda-container`
+- Avoid generic class names that could collide across blocks
+
+## Key Patterns
+
+- No CSS-in-JS — all styles are vanilla CSS files
+- No CSS preprocessors (no Sass/Less)
+- No CSS modules — scoping is by block-name class convention
+- Use CSS custom properties (variables) where provided by Milo
+- Media queries for responsive behavior — no CSS framework
+
+## Formatting
+
+- 2-space indentation
+- LF line endings
+- Final newline required

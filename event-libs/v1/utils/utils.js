@@ -1,4 +1,4 @@
-import { SUSI_OPTIONS, CONDITIONAL_REG, ENV_MAP } from './constances.js';
+import { SUSI_OPTIONS, CONDITIONAL_REG, ENV_MAP, CAMPAIGN_ID_PATTERN } from './constances.js';
 import BlockMediator from '../deps/block-mediator.min.js';
 
 const ICONS_BASE_URL = new URL('../icons/', import.meta.url).href;
@@ -7,6 +7,7 @@ export const LIBS = (() => {
   const { hostname, search } = window.location;
   if (!(hostname.includes('.hlx.') || hostname.includes('.aem.') || hostname.includes('local'))) return '/libs';
   const branch = new URLSearchParams(search).get('milolibs') || 'main';
+  if (!/^[a-zA-Z0-9_-]+$/.test(branch)) throw new Error('Invalid branch name.');
   if (branch === 'local') return 'http://localhost:6456/libs';
   return branch.includes('--') ? `https://${branch}.aem.live/libs` : `https://${branch}--milo--adobecom.aem.live/libs`;
 })();
@@ -48,46 +49,16 @@ export const [setEventConfig, updateEventConfig, getEventConfig] = (() => {
 })();
 
 export function getEventServiceEnv() {
+  const { search } = window.location;
+  const usp = new URLSearchParams(search);
+  const espEnv = usp.get('espenv') || usp.get('eccEnv');
+
+  if (espEnv && ENV_MAP[espEnv]) return ENV_MAP[espEnv];
+
   const metadataEnv = getMetadata('event-service-env');
   if (metadataEnv && ENV_MAP[metadataEnv]) return ENV_MAP[metadataEnv];
-
-  const validEnvs = ['dev', 'stage', 'prod'];
-  const { host, search } = window.location;
-  const SLD = host.includes('.aem.') ? 'aem' : 'hlx';
-  const usp = new URLSearchParams(search);
-  const eccEnv = usp.get('eccEnv');
-
-  if (validEnvs.includes(eccEnv)) return ENV_MAP[eccEnv];
-
-  if ((host.includes(`${SLD}.page`) || host.includes(`${SLD}.live`))) {
-    const { cmsType } = getEventConfig();
-
-    if (cmsType === 'SP') {
-      // Check for direct environment patterns: {envName}--
-      if (host.startsWith('dev--')) return ENV_MAP.dev;
-      if (host.startsWith('dev02--') || host.startsWith('main02--')) return ENV_MAP.dev02;
-      if (host.startsWith('stage--')) return ENV_MAP.stage;
-      if (host.startsWith('stage02--')) return ENV_MAP.stage02;
-      if (host.startsWith('main--')) return ENV_MAP.prod;
-    } else if (cmsType === 'DA') {
-      // Check for nested environment patterns: esp-{envName}--{any-string}--{any-string}--
-      const nestedEnvMatch = host.match(/^esp-(dev|dev02|stage|stage02|main)--[^-]+--[^-]+--/);
-      if (nestedEnvMatch) {
-        const envName = nestedEnvMatch[1];
-        return ENV_MAP[envName];
-      }
-    }
-  }
-
-  if (host.includes('localhost')) return ENV_MAP.local;
-
-  if (host.includes('stage.adobe')
-    || host.includes('corp.adobe')
-    || host.includes('graybox.adobe')) return ENV_MAP.stage;
-
-  if (host.endsWith('adobe.com')) return ENV_MAP.prod;
-  // fallback to dev
-  return ENV_MAP.dev;
+  
+  return ENV_MAP.prod;
 }
 
 /**
@@ -322,6 +293,17 @@ export function getSusiOptions(clientMiloConfig) {
   }
 
   return susiOptions;
+}
+
+/**
+ * Returns the campaign ID from the current URL search params if present and valid.
+ * @param {URLSearchParams} [searchParams] - Optional search params (defaults to window.location.search).
+ * @returns {string|null} Valid campaign ID or null.
+ */
+export function getValidCampaignIdFromUrl(searchParams) {
+  const search = searchParams != null ? searchParams.toString() : window.location.search;
+  const campaignId = new URLSearchParams(search).get('campaign');
+  return campaignId && CAMPAIGN_ID_PATTERN.test(campaignId) ? campaignId : null;
 }
 
 export function readBlockConfig(block) {

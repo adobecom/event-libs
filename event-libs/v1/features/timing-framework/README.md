@@ -284,12 +284,17 @@ The framework uses a sophisticated trigger system that considers multiple factor
 ### Testing
 
 The framework includes a testing system that allows:
-- Time manipulation via URL parameters (`?timing=1234567890`)
+- Time manipulation via URL parameters (`?timing=1234567890`, `?serverTime=1234567890`)
+- Mobile Rider stream simulation via URL parameters (`?avoidStreamEndFlag=true`)
 - Simulation of plugin conditions via BroadcastChannel
 - Testing of schedule transitions
 - Server time synchronization testing
 
-#### Testing Mode Behavior
+#### Testing Parameters
+
+The timing framework supports three testing URL parameters:
+
+##### 1. `timing` - Frozen Time Testing
 
 When testing mode is enabled via the `timing` URL parameter:
 
@@ -309,7 +314,46 @@ This would simulate the page as if it were running at December 31, 2021 (timesta
 - Debug timing-sensitive content transitions
 - Test edge cases around schedule boundaries
 
-**Note**: In testing mode, the worker stops continuous polling since you're viewing a fixed point in time. This provides a more accurate representation of what users would see at that exact timestamp.
+**Note**: In testing mode with `timing`, the worker stops continuous polling since you're viewing a fixed point in time. This provides a more accurate representation of what users would see at that exact timestamp.
+
+##### 2. `serverTime` - Running Time Testing
+
+The `serverTime` parameter is similar to `timing`, but instead of freezing time at a specific point, it starts the clock at that timestamp and allows time to progress normally.
+
+**Example Usage:**
+```
+https://your-site.com/event-page?serverTime=1745510395000
+```
+
+This would simulate the page as if "now" is the specified timestamp, but time continues to advance from that point. Use this when you want to:
+- Test dynamic transitions without waiting for real time
+- Simulate future events while maintaining normal time flow
+- Test schedule progression from a specific starting point
+- Debug transitions that depend on continuous time
+
+**Note**: Unlike `timing`, the worker continues polling with `serverTime`, so you'll see content transitions happen as they would in production, just starting from your specified time.
+
+##### 3. `avoidStreamEndFlag` - Mobile Rider Stream Testing
+
+The `avoidStreamEndFlag` parameter treats all Mobile Rider streams as having already ended, allowing the schedule to progress past any Mobile Rider sessions.
+
+**Example Usage:**
+```
+https://your-site.com/event-page?avoidStreamEndFlag=true
+```
+
+This is useful for:
+- Testing content that appears after Mobile Rider streams
+- Verifying schedule behavior without waiting for streams to end
+- Debugging transitions blocked by active streams
+- Testing fallback content when streams are unavailable
+
+You can combine this with `timing` or `serverTime`:
+```
+https://your-site.com/event-page?serverTime=1745510395000&avoidStreamEndFlag=true
+```
+
+**Note**: This flag only affects Mobile Rider stream checks. Other timing and metadata conditions are still evaluated normally.
 
 ## Error Handling
 

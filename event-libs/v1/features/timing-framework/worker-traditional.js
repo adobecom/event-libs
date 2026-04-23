@@ -3,26 +3,54 @@ class TestingManager {
   constructor() {
     this.timeOffset = 0;
     this.isTestMode = false;
+    this.isFrozenTime = false;
+    this.avoidStreamEndFlag = false;
   }
 
   init(testingData) {
-    if (testingData?.toggleTime) {
+    // Reset state
+    this.isTestMode = false;
+    this.isFrozenTime = false;
+    this.timeOffset = 0;
+    this.avoidStreamEndFlag = false;
+
+    if (!testingData) return;
+
+    // Handle avoidStreamEndFlag parameter
+    if (testingData.avoidStreamEndFlag === 'true' || testingData.avoidStreamEndFlag === true) {
+      this.avoidStreamEndFlag = true;
+      this.isTestMode = true;
+    }
+
+    // Handle serverTime parameter (non-frozen time starting at specific timestamp)
+    if (testingData.serverTime) {
+      const serverTime = parseInt(testingData.serverTime, 10);
+
+      if (!Number.isNaN(serverTime) && Number.isFinite(serverTime)) {
+        this.isTestMode = true;
+        this.isFrozenTime = false;
+        const currentTime = new Date().getTime();
+        this.timeOffset = serverTime - currentTime;
+      } else {
+        // Use console.log instead of window.lana in worker context
+        console.log(`Invalid serverTime provided for testing: ${testingData.serverTime}`);
+      }
+    }
+
+    // Handle toggleTime parameter (frozen time at specific timestamp)
+    // This takes precedence over serverTime if both are provided
+    if (testingData.toggleTime) {
       const toggleTime = parseInt(testingData.toggleTime, 10);
 
-      // Validate that toggleTime is a valid number
       if (!Number.isNaN(toggleTime) && Number.isFinite(toggleTime)) {
         this.isTestMode = true;
+        this.isFrozenTime = true;
         const currentTime = new Date().getTime();
         this.timeOffset = toggleTime - currentTime;
       } else {
         // Use console.log instead of window.lana in worker context
         console.log(`Invalid toggleTime provided for testing: ${testingData.toggleTime}`);
-        this.isTestMode = false;
-        this.timeOffset = 0;
       }
-    } else {
-      this.isTestMode = false;
-      this.timeOffset = 0;
     }
   }
 
@@ -32,6 +60,14 @@ class TestingManager {
 
   isTesting() {
     return this.isTestMode;
+  }
+
+  isFrozen() {
+    return this.isFrozenTime;
+  }
+
+  shouldAvoidStreamEnd() {
+    return this.avoidStreamEndFlag;
   }
 }
 
@@ -259,7 +295,7 @@ class TimingWorker {
       pointer = pointer.next;
     }
 
-    return start || scheduleRoot;
+    return start;
   }
 
   /**
@@ -299,7 +335,9 @@ class TimingWorker {
       if (mobileRiderStore) {
         const { sessionId } = this.currentScheduleItem.mobileRider;
         const isActive = mobileRiderStore.get(sessionId);
-        if (isActive) return false; // Wait for session to end
+        // If avoidStreamEndFlag is set, treat all streams as ended
+        const shouldTreatAsActive = this.testingManager.shouldAvoidStreamEnd() ? false : isActive;
+        if (shouldTreatAsActive) return false; // Wait for session to end
       }
     }
 
@@ -309,7 +347,9 @@ class TimingWorker {
       if (mobileRiderStore) {
         const { sessionId } = scheduleItem.mobileRider;
         const isActive = mobileRiderStore.get(sessionId);
-        if (!isActive) return true;
+        // If avoidStreamEndFlag is set, treat all streams as ended (skip forward)
+        const shouldTreatAsEnded = this.testingManager.shouldAvoidStreamEnd() ? true : !isActive;
+        if (shouldTreatAsEnded) return true;
       }
     }
 
@@ -358,11 +398,6 @@ class TimingWorker {
       // If no items are triggered, send the current schedule item
       // This handles cases where mobileRider is still active or other blocking conditions
       itemToSend = this.currentScheduleItem;
-
-      // If we don't have a current item, fall back to the first item
-      if (!itemToSend) {
-        itemToSend = this.getFirstScheduleItem();
-      }
     }
 
     // Send the item if it's different from what we previously sent
@@ -375,19 +410,10 @@ class TimingWorker {
 
     if (!this.nextScheduleItem) return;
 
-    // Stop polling in testing mode - we want to see exact state at the simulated timestamp
-    if (this.testingManager.isTesting()) return;
+    // Stop polling only if time is frozen (timing param) - serverTime and avoidStreamEndFlag should continue polling
+    if (this.testingManager.isFrozen()) return;
 
     this.timerId = setTimeout(() => this.runTimer(), TimingWorker.getRandomInterval());
-  }
-
-  getFirstScheduleItem() {
-    // Find the first item in the schedule by traversing backwards from current
-    let item = this.currentScheduleItem;
-    while (item?.prev) {
-      item = item.prev;
-    }
-    return item;
   }
 
   handleMessage(event) {
@@ -433,8 +459,9 @@ class TimingWorker {
    * @description Initializes the schedule asynchronously
    */
   async initializeSchedule(schedule) {
-    this.nextScheduleItem = await this.getStartScheduleItemByToggleTime(schedule);
-    this.currentScheduleItem = this.nextScheduleItem?.prev || schedule;
+    const startItem = await this.getStartScheduleItemByToggleTime(schedule);
+    this.nextScheduleItem = startItem || schedule;
+    this.currentScheduleItem = startItem?.prev || null;
     this.previouslySentItem = null;
 
     if (!this.nextScheduleItem) return;

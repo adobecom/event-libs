@@ -5,9 +5,10 @@ import {
   ALLOWED_EMAIL_DOMAINS,
   FALLBACK_LOCALES,
   CONDITIONAL_REG,
+  CAMPAIGN_ID_PATTERN,
 } from './constances.js';
 import BlockMediator from '../deps/block-mediator.min.js';
-import { getEvent } from './esp-controller.js';
+import { getEvent, getCampaign } from './esp-controller.js';
 import { dictionaryManager } from './dictionary-manager.js';
 import {
   getMetadata,
@@ -23,8 +24,10 @@ import {
   createContextualContent,
   parseEncodedConfig,
   createTag,
+  getValidCampaignIdFromUrl,
 } from './utils.js';
 import { massageMetadata } from './date-time-helper.js';
+import { hydrateBlocks, setHydrationPromise } from '../hydrate/hydrate.js';
 
 const ICONS_BASE_URL = new URL('../icons/', import.meta.url).href;
 
@@ -71,13 +74,34 @@ function convertEccIcon(n) {
 function setCtaState(targetState, rsvpBtn) { // eslint-disable-line no-unused-vars
   const checkRed = getIcon('check-circle-red');
 
+  const showBtn = () => {
+    rsvpBtn.el.style.display = '';
+    rsvpBtn.el.removeAttribute('aria-hidden');
+    rsvpBtn.el.parentElement?.querySelector('.rsvp-btn-message')?.remove();
+  };
+
+  const hideBtn = (text) => {
+    rsvpBtn.el.style.display = 'none';
+    rsvpBtn.el.setAttribute('aria-hidden', 'true');
+    rsvpBtn.el.setAttribute('tabindex', -1);
+    let msgEl = rsvpBtn.el.parentElement?.querySelector('.rsvp-btn-message');
+    if (!msgEl) {
+      msgEl = document.createElement('span');
+      msgEl.className = 'rsvp-btn-message';
+      rsvpBtn.el.insertAdjacentElement('afterend', msgEl);
+    }
+    msgEl.textContent = text;
+  };
+
   const enableBtn = () => {
+    showBtn();
     rsvpBtn.el.classList.remove('disabled');
     rsvpBtn.el.href = rsvpBtn.el.dataset.modalHash;
     rsvpBtn.el.setAttribute('tabindex', 0);
   };
 
   const disableBtn = () => {
+    showBtn();
     rsvpBtn.el.setAttribute('tabindex', -1);
     rsvpBtn.el.href = '';
     rsvpBtn.el.classList.add('disabled');
@@ -112,6 +136,16 @@ function setCtaState(targetState, rsvpBtn) { // eslint-disable-line no-unused-va
       rsvpBtn.el.textContent = closedText;
       checkRed.remove();
     },
+    inviteOnlyNoCampaign: () => {
+      const INVITE_ONLY_KEY = 'rsvp-invite-only-no-campaign-cta-text';
+      let text = dictionaryManager.getValue(INVITE_ONLY_KEY);
+      if (text === INVITE_ONLY_KEY) {
+        text = 'Registration is only available through a valid invitation link.';
+      }
+      hideBtn(text);
+      updateAnalyticTag(rsvpBtn.el, text);
+      checkRed.remove();
+    },
     default: () => {
       // Use stored original text as fallback if current originalText is the loading text
       const loadingText = dictionaryManager.getValue('rsvp-loading-cta-text');
@@ -134,11 +168,29 @@ export async function updateRSVPButtonState(rsvpBtn) {
   let waitlistEnabled = getMetadata('allow-wait-listing') === 'true';
 
   if (eventInfo.ok) {
-    const { isFull, allowWaitlisting, attendeeCount, attendeeLimit } = eventInfo.data;
+    const { isFull, allowWaitlisting, attendeeCount, attendeeLimit, inviteOnly } = eventInfo.data;
     eventFull = isFull
       || (!allowWaitlisting && attendeeCount >= attendeeLimit);
     waitlistEnabled = allowWaitlisting;
     BlockMediator.set('eventData', eventInfo.data);
+
+    if (inviteOnly && !getValidCampaignIdFromUrl()) {
+      setCtaState('inviteOnlyNoCampaign', rsvpBtn);
+      return;
+    }
+  }
+
+  const campaignId = new URLSearchParams(window.location.search).get('campaign');
+  const profile = BlockMediator.get('imsProfile');
+  const isLoggedInNonGuest = profile && !profile.noProfile && profile.account_type !== 'guest';
+  if (campaignId && CAMPAIGN_ID_PATTERN.test(campaignId) && isLoggedInNonGuest) {
+    const campaignInfo = await getCampaign(getMetadata('event-id'), campaignId);
+    if (campaignInfo.ok && campaignInfo.data.attendeeLimit != null) {
+      const { attendeeLimit, attendeeCount, waitlistAttendeeCount } = campaignInfo.data;
+      const campaignFull = attendeeLimit === attendeeCount
+        || (attendeeLimit > attendeeCount && waitlistAttendeeCount > 0);
+      eventFull = campaignFull;
+    }
   }
 
   const rsvpData = BlockMediator.get('rsvpData');
@@ -397,13 +449,11 @@ function processDATemplateLinks(parent) {
 
       // Decode the href to find [[]] patterns
       const decodedHref = decodeURIComponent(encodedHref);
-      
-
+      const isBrokenMailtoLink = decodedHref.startsWith('mailto:?');
+      if (isBrokenMailtoLink) removeLink = true;
       const processedHref = decodedHref.replace(META_REG, (_match, metadataPath) => {
         const metaValue = parseMetadataPath(metadataPath);
-        if (!metaValue) {
-          removeLink = true;
-        }
+        if (!metaValue) removeLink = true;
         return metaValue || '';
       });
 
@@ -513,17 +563,15 @@ function prebuildAutoBlock(blockName, link) {
 
 export function processAutoBlockLinks(parent) {
   const autoBlockIdentifiers = {
-    'chrono-box': 'schedule-maker'
-  }
-
-  Object.keys(autoBlockIdentifiers).forEach((bn) => {
-    const link = parent.querySelector(`a[href*="${autoBlockIdentifiers[bn]}"]`);
-    if (link) {
-      const blockEl = prebuildAutoBlock(bn, link);
-      if (blockEl) {
-        link.closest('p') ? link.closest('p').replaceWith(blockEl) : link.replaceWith(blockEl);
-      }
-    }
+    'chrono-box': 'schedule-maker',
+  };
+  Object.entries(autoBlockIdentifiers).forEach(([blockName, identifier]) => {
+    const links = parent.querySelectorAll(`a[href*="${identifier}"]`);
+    links.forEach((link) => {
+      const blockEl = prebuildAutoBlock(blockName, link);
+      if (!blockEl) return;
+      link.closest('p') ? link.closest('p').replaceWith(blockEl) : link.replaceWith(blockEl);
+    });
   });
 }
 
@@ -949,6 +997,8 @@ function addStylesToEventPage() {
 }
 
 export function decorateEvent(parent) {
+  setHydrationPromise(hydrateBlocks(parent));
+
   // handle photos data parsing
   const photosData = parsePhotosData(parent);
   const { cmsType } = getEventConfig();

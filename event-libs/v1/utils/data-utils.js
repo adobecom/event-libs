@@ -14,6 +14,7 @@ export const EVENT_ATTENDEE_DATA_FILTER = {
   invitedBy: { type: 'string', submittable: true },
   shareInfoWithPartners: { type: 'boolean', submittable: true },
   ccSentiment: { type: 'string', submittable: true },
+  campaignId: { type: 'string', submittable: true },
 };
 
 /**
@@ -40,6 +41,11 @@ export const BASE_ATTENDEE_DATA_FILTER = {
   primaryProductOfInterest: { type: 'string', submittable: true },
   companySize: { type: 'string', submittable: true },
   specialRequirements: { type: 'string', submittable: true },
+  primarySocialMediaAccount: { type: 'string', submittable: true },
+  approximateFollowerCount: { type: 'string', submittable: true },
+  dietaryRestrictions: { type: 'string', submittable: true },
+  executiveAssistantName: { type: 'string', submittable: true },
+  executiveAssistantEmail: { type: 'string', submittable: true },
   website: { type: 'string', submittable: true },
   employeesInOrganization: { type: 'string', submittable: true },
   department: { type: 'string', submittable: true },

@@ -256,7 +256,7 @@ class TimingWorker {
       pointer = pointer.next;
     }
 
-    return start || scheduleRoot;
+    return start;
   }
 
   /**
@@ -329,7 +329,9 @@ class TimingWorker {
       if (mobileRiderStore) {
         const { sessionId } = this.currentScheduleItem.mobileRider;
         const isActive = mobileRiderStore.get(sessionId);
-        if (isActive) return false; // Wait for session to end
+        // If avoidStreamEndFlag is set, treat all streams as ended
+        const shouldTreatAsActive = this.testingManager.shouldAvoidStreamEnd() ? false : isActive;
+        if (shouldTreatAsActive) return false; // Wait for session to end
       }
     }
 
@@ -342,7 +344,9 @@ class TimingWorker {
       if (mobileRiderStore) {
         const { sessionId } = scheduleItem.mobileRider;
         const isActive = mobileRiderStore.get(sessionId);
-        if (!isActive) {
+        // If avoidStreamEndFlag is set, treat all streams as ended (skip forward)
+        const shouldTreatAsEnded = this.testingManager.shouldAvoidStreamEnd() ? true : !isActive;
+        if (shouldTreatAsEnded) {
           this.nextScheduleItem = scheduleItem.next;
           return true;
         }
@@ -385,11 +389,6 @@ class TimingWorker {
       // If no items are triggered, send the current schedule item
       // This handles cases where mobileRider is still active or other blocking conditions
       itemToSend = this.currentScheduleItem;
-
-      // If we don't have a current item, fall back to the first item
-      if (!itemToSend) {
-        itemToSend = this.getFirstScheduleItem();
-      }
     }
 
     // Send the item if it's different from what we previously sent
@@ -402,19 +401,10 @@ class TimingWorker {
 
     if (!this.nextScheduleItem) return;
 
-    // Stop polling in testing mode - we want to see exact state at the simulated timestamp
-    if (this.testingManager.isTesting()) return;
+    // Stop polling only if time is frozen (timing param) - serverTime and avoidStreamEndFlag should continue polling
+    if (this.testingManager.isFrozen()) return;
 
     this.timerId = setTimeout(() => this.runTimer(), TimingWorker.getRandomInterval());
-  }
-
-  getFirstScheduleItem() {
-    // Find the first item in the schedule by traversing backwards from current
-    let item = this.currentScheduleItem;
-    while (item?.prev) {
-      item = item.prev;
-    }
-    return item;
   }
 
   handleMessage(event) {
@@ -465,8 +455,9 @@ class TimingWorker {
     const initialTime = this.getFastInitialTime();
     
     // Synchronously determine first schedule item
-    this.nextScheduleItem = this.getStartScheduleItemByToggleTime(schedule, initialTime);
-    this.currentScheduleItem = this.nextScheduleItem?.prev || schedule;
+    const startItem = this.getStartScheduleItemByToggleTime(schedule, initialTime);
+    this.nextScheduleItem = startItem || schedule;
+    this.currentScheduleItem = startItem?.prev || null;
     this.previouslySentItem = null;
 
     if (!this.nextScheduleItem) return;
@@ -496,6 +487,11 @@ class TimingWorker {
     // If we're on the wrong item, correct it on next timer tick
     if (correctItem && correctItem !== this.currentScheduleItem) {
       this.nextScheduleItem = correctItem;
+    } else if (!correctItem && this.currentScheduleItem) {
+      // Authoritative time says nothing qualifies yet — reset
+      this.nextScheduleItem = schedule;
+      this.currentScheduleItem = null;
+      this.previouslySentItem = null;
     }
   }
 

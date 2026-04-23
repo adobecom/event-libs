@@ -57,9 +57,10 @@ export function lazyCaptureProfile() {
 
       if (!profile.noProfile && profile.account_type !== 'guest') {
         const resp = await getEventAttendee(getMetadata('event-id'));
-        BlockMediator.set('rsvpData', resp.data);
+        BlockMediator.set('rsvpData', resp.ok ? resp.data : null);
       }
     } catch {
+      BlockMediator.set('rsvpData', null);
       if (window.adobeIMS) {
         BlockMediator.set('imsProfile', { noProfile: true });
       }

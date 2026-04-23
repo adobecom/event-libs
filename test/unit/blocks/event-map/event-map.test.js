@@ -1,6 +1,6 @@
 import { readFile } from '@web/test-runner-commands';
 import { expect } from '@esm-bundle/chai';
-import { setMetadata } from '../../../../event-libs/v1/utils/utils.js';
+import { setMetadata, setEventConfig } from '../../../../event-libs/v1/utils/utils.js';
 
 const { default: init } = await import('../../../../event-libs/v1/blocks/event-map/event-map.js');
 const body = await readFile({ path: './mocks/default.html' });
@@ -12,6 +12,7 @@ describe('Event Map', () => {
     delete document.body.dataset.eventState;
     document.head.innerHTML = '';
     window.isTestEnv = true;
+    setEventConfig({ cmsType: 'SP' }, { miloLibs: '/test/unit/blocks/event-map/mocks/libs' });
     setMetadata('venue', JSON.stringify({
       venueName: 'Morgan MF',
       address: '401 North Morgan Street',

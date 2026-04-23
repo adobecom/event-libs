@@ -2,6 +2,11 @@ import { getMetadata, getEventConfig, LIBS } from '../../utils/utils.js';
 import { FALLBACK_LOCALES } from '../../utils/constances.js';
 
 async function getPromotionalContentUrl() {
+  const customPromotionalContentLocation = getMetadata('promotional-content-location');
+  if (customPromotionalContentLocation) {
+    return customPromotionalContentLocation;
+  }
+
   const eventConfig = getEventConfig();
   const { miloConfig } = eventConfig;
   const miloLibs = miloConfig?.miloLibs ? miloConfig.miloLibs : LIBS;

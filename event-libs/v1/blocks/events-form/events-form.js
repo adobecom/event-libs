@@ -1,8 +1,10 @@
-import { deleteAttendeeFromEvent, getAndCreateAndAddAttendee, getAttendee, getEvent } from '../../utils/esp-controller.js';
+import { deleteAttendeeFromEvent, getAndCreateAndAddAttendee, getAttendee, getEvent, getCampaign, registerForSessionTime } from '../../utils/esp-controller.js';
 import BlockMediator from '../../deps/block-mediator.min.js';
 import { signIn, decorateEvent } from '../../utils/decorate.js';
 import { dictionaryManager } from '../../utils/dictionary-manager.js';
-import { getEventConfig, LIBS, getMetadata, getSusiOptions } from '../../utils/utils.js';
+import { getEventConfig, LIBS, getMetadata, getSusiOptions, getValidCampaignIdFromUrl } from '../../utils/utils.js';
+import { FALLBACK_LOCALES, CAMPAIGN_ID_PATTERN } from '../../utils/constances.js';
+import { BASE_ATTENDEE_DATA_FILTER } from '../../utils/data-utils.js';
 
 const eventConfig = getEventConfig();
 const miloLibs = eventConfig?.miloConfig?.miloLibs ? eventConfig.miloConfig.miloLibs : LIBS;
@@ -12,6 +14,8 @@ const { closeModal, sendAnalytics } = await import(`${miloLibs}/blocks/modal/mod
 const { default: sanitizeComment } = await import(`${miloLibs}/utils/sanitizeComment.js`);
 const { decorateDefaultLinkAnalytics } = await import(`${miloLibs}/martech/attributes.js`);
 const { default: loadFragment } = await import(`${miloLibs}/blocks/fragment/fragment.js`);
+
+const VALID_REGISTRATION_STATUS = ['registered', 'waitlisted'];
 
 const RULE_OPERATORS = {
   equal: '=',
@@ -29,6 +33,19 @@ function snakeToCamel(str) {
     .split('_')
     .map((word, index) => (index === 0 ? word : word.charAt(0).toUpperCase() + word.slice(1)))
     .join('');
+}
+
+/** Consent select uses query-index countryCode as option value; consentId lives on data-consent-id. */
+function applyConsentCountrySelectValue(selectEl, stored) {
+  if (!stored || typeof stored !== 'string') return;
+  const opts = [...selectEl.options].filter((o) => o.value !== '');
+  const byCode = opts.find((o) => o.value.toLowerCase() === stored.toLowerCase());
+  if (byCode) {
+    selectEl.value = byCode.value;
+    return;
+  }
+  const byConsentId = opts.find((o) => o.dataset.consentId === stored);
+  if (byConsentId) selectEl.value = byConsentId.value;
 }
 
 function createSelect(fd) {
@@ -161,9 +178,11 @@ function constructPayload(form) {
     const fieldWrapper = form.querySelector(`[data-field-id="${key}"]`);
     if (fieldWrapper && (fieldWrapper.dataset.type === 'checkbox' || fieldWrapper.dataset.type === 'checkbox-group')) {
       const checkboxes = fieldWrapper.querySelectorAll('input[type="checkbox"]');
-      if (checkboxes.length === 1) {
-        // Single option checkbox - convert to boolean
-        payload[key] = payload[key] && payload[key].length > 0;
+      if (checkboxes.length === 1 && Array.isArray(payload[key]) && payload[key].length <= 1) {
+        // Base attendee array fields (e.g. contactMethods) must stay arrays for the API
+        if (BASE_ATTENDEE_DATA_FILTER[key]?.type === 'array') return;
+        // Single option checkbox with at most one value - convert to boolean
+        payload[key] = payload[key].length > 0;
       }
     }
   });
@@ -174,10 +193,25 @@ function constructPayload(form) {
 async function submitForm(bp) {
   const { form, sanitizeList } = bp;
   const payload = constructPayload(form);
+
+  const countrySelect = form.querySelector('select#consentStringId');
+  if (countrySelect) {
+    const selectedOption = countrySelect.options[countrySelect.selectedIndex];
+    if (selectedOption?.dataset?.countryCode) {
+      payload.countryRegion = selectedOption.dataset.countryCode;
+    }
+    const consentId = selectedOption?.dataset?.consentId;
+    if (consentId) {
+      payload.consentStringId = consentId;
+    }
+  }
+
   const isValid = Object.keys(payload).reduce((valid, key) => {
     const field = form.querySelector(`[data-field-id=${key}]`);
 
-    if (!payload[key] && field.querySelector('.group-container.required')) {
+    const missingSelection = !payload[key]
+      || (Array.isArray(payload[key]) && payload[key].length === 0);
+    if (missingSelection && field?.querySelector('.group-container.required')) {
       const el = form.querySelector(`input[name="${key}"]`);
       el.setCustomValidity('A selection is required');
       el.reportValidity();
@@ -199,6 +233,11 @@ async function submitForm(bp) {
 
   if (!isValid) return false;
 
+  const campaignId = getValidCampaignIdFromUrl();
+  if (campaignId) {
+    payload.campaignId = campaignId;
+  }
+
   return getAndCreateAndAddAttendee(getMetadata('event-id'), payload);
 }
 
@@ -212,19 +251,62 @@ function clearForm(form) {
   });
 }
 
-async function buildErrorMsg(parent, status) {
-  const eventObj = await getEvent(getMetadata('event-id'));
+/**
+ * Resolves full state from event and optionally campaign (when campaign ID in URL).
+ * @param {string} eventId - Event ID
+ * @returns {Promise<{ full: boolean, waitlistEnabled: boolean, usedCampaign: boolean }>}
+ */
+export async function getFullState(eventId) {
+  const eventObj = await getEvent(eventId);
+  let full = false;
+  let waitlistEnabled = false;
+  let usedCampaign = false;
+
+  if (!eventObj.ok) {
+    return { full: false, waitlistEnabled: false, usedCampaign: false };
+  }
+
+  const { isFull, allowWaitlisting, attendeeCount, attendeeLimit } = eventObj.data;
+  full = isFull || (!allowWaitlisting && +attendeeCount >= +attendeeLimit);
+  waitlistEnabled = allowWaitlisting;
+
+  const campaignId = new URLSearchParams(window.location.search).get('campaign');
+  if (campaignId && CAMPAIGN_ID_PATTERN.test(campaignId)) {
+    const campaignInfo = await getCampaign(eventId, campaignId);
+    if (campaignInfo.ok && campaignInfo.data.attendeeLimit != null) {
+      const { attendeeLimit: campLimit, attendeeCount: campCount, waitlistAttendeeCount } = campaignInfo.data;
+      full = campLimit === campCount
+        || (campLimit > campCount && waitlistAttendeeCount > 0);
+      usedCampaign = true;
+    }
+  }
+
+  return { full, waitlistEnabled, usedCampaign };
+}
+
+export async function buildErrorMsg(parent, status) {
+  const eventId = getMetadata('event-id');
+  const eventObj = await getEvent(eventId);
 
   if (!eventObj.ok) return;
-  const eventInfo = eventObj.data;
-  const errorKeyMap = { 400: eventInfo?.allowWaitlisting === 'true' ? 'event-full-error-msg' : 'event-full-no-waitlist-error-msg' };
+
+  let errorKey = 'rsvp-error-msg';
+  if (status === 400) {
+    const { full, waitlistEnabled, usedCampaign } = await getFullState(eventId);
+    if (full && usedCampaign) {
+      errorKey = waitlistEnabled ? 'campaign-full-error-msg' : 'campaign-full-no-waitlist-error-msg';
+    } else {
+      const eventInfo = eventObj.data;
+      errorKey = eventInfo?.allowWaitlisting === 'true' ? 'event-full-error-msg' : 'event-full-no-waitlist-error-msg';
+    }
+  }
 
   const existingErrors = parent.querySelectorAll('.error');
   if (existingErrors.length) {
     existingErrors.forEach((err) => err.remove());
   }
 
-      const errorMsg = dictionaryManager.getValue(errorKeyMap[status] || 'rsvp-error-msg', 'rsvp-fields');
+  const errorMsg = dictionaryManager.getValue(errorKey);
   const error = createTag('p', { class: 'error' }, errorMsg);
   parent.append(error);
   setTimeout(() => {
@@ -264,6 +346,34 @@ function eventFormSendAnalytics(bp, view) {
   sendAnalytics(event);
 }
 
+async function autoRegisterSessions() {
+  let sessions;
+  try {
+    sessions = JSON.parse(getMetadata('sessions') || '[]');
+  } catch (e) {
+    return;
+  }
+
+  const autoRegTimes = sessions.flatMap(
+    (s) => (s.sessionTimes || []).filter((t) => t.isAutoRegistrationEnabled),
+  );
+  if (!autoRegTimes.length) return;
+
+  const results = await Promise.allSettled(
+    autoRegTimes.map((t) => registerForSessionTime(t.sessionTimeId, 'me', { registrationStatus: 'registered' })),
+  );
+
+  const newIds = new Set();
+  results.forEach((r, i) => {
+    if (r.status === 'fulfilled' && r.value.ok) newIds.add(autoRegTimes[i].sessionId);
+    else window.lana?.log(`Auto-registration failed for session time ${autoRegTimes[i]?.sessionTimeId}`);
+  });
+
+  if (!newIds.size) return;
+  const existing = BlockMediator.get('registeredSessionIds') || new Set();
+  BlockMediator.set('registeredSessionIds', new Set([...existing, ...newIds]));
+}
+
 function createButton({ type, label }, bp) {
   const button = createTag('button', { class: 'button' }, dictionaryManager.getValue(label, 'rsvp-fields'));
   if (type === 'submit') {
@@ -282,24 +392,19 @@ function createButton({ type, label }, bp) {
         if (respJson.ok) {
           BlockMediator.set('rsvpData', respJson.data);
           eventFormSendAnalytics(bp, 'Form Submit');
+          if (respJson.data?.registrationStatus === 'registered') autoRegisterSessions();
         } else {
           const { status } = respJson;
 
           if (status === 400) {
-            const eventResp = await getEvent(getMetadata('event-id'));
-            if (eventResp.ok) {
-              const { isFull, allowWaitlisting, attendeeCount, attendeeLimit } = eventResp.data;
-              const eventFull = isFull
-              || (!allowWaitlisting && +attendeeCount >= +attendeeLimit);
-
-              if (eventFull) {
-                if (allowWaitlisting) {
-                  button.textContent = dictionaryManager.getValue('waitlist-cta-text');
-                  button.disabled = false;
-                } else {
-                  button.textContent = dictionaryManager.getValue('event-full-cta-text');
-                  button.disabled = true;
-                }
+            const fullState = await getFullState(getMetadata('event-id'));
+            if (fullState.full) {
+              if (fullState.waitlistEnabled) {
+                button.textContent = dictionaryManager.getValue('waitlist-cta-text');
+                button.disabled = false;
+              } else {
+                button.textContent = dictionaryManager.getValue('event-full-cta-text');
+                button.disabled = true;
               }
             }
 
@@ -330,9 +435,12 @@ function createHeading({ label }, el) {
   return createTag(el, {}, dictionaryManager.getValue(label, 'rsvp-fields'));
 }
 
-function createInput({ type, field, placeholder, required, defval }) {
+function createInput({ type, field, placeholder, required, defval, pattern, title }) {
   const placeholderText = placeholder ? dictionaryManager.getValue(placeholder, 'rsvp-fields') : '';
-  const input = createTag('input', { type, id: field, placeholder: placeholderText, value: defval });
+  const attrs = { type, id: field, placeholder: placeholderText, value: defval };
+  if (pattern) attrs.pattern = pattern;
+  if (title) attrs.title = title;
+  const input = createTag('input', attrs);
   if (required === 'x') input.setAttribute('required', 'required');
   return input;
 }
@@ -646,8 +754,19 @@ function decorateSuccessScreen(screen) {
   screen.classList.add('hidden');
 }
 
+async function getConsentQueryIndexUrl() {
+  const eventConfig = getEventConfig();
+  const miloConfig = eventConfig?.miloConfig;
+  const libs = miloConfig?.miloLibs || LIBS;
+  const { getLocale } = await import(`${libs}/utils/utils.js`);
+  const { prefix } = getLocale(miloConfig?.locales || FALLBACK_LOCALES);
+  const moduleUrl = new URL(import.meta.url);
+  const domain = `${moduleUrl.protocol}//${moduleUrl.host}`;
+  return `${domain}${prefix}/event-libs/assets/consents/consent-query-index.json`;
+}
+
 async function addConsentSuite(form) {
-      const countryText = dictionaryManager.getValue('country', 'rsvp-fields');
+  const countryText = dictionaryManager.getValue('country', 'rsvp-fields');
   const fieldWrapper = createTag('div', { class: 'field-wrapper events-form-select-wrapper', 'data-field-id': 'country', 'data-type': 'select' });
   const label = createTag('label', { for: 'consentStringId', class: 'required' }, countryText);
   const countrySelect = createTag('select', { id: 'consentStringId', required: 'required' });
@@ -659,8 +778,8 @@ async function addConsentSuite(form) {
 
   fieldWrapper.append(label, countrySelect);
 
-  const queryIndexUrl = new URL('/event-libs/assets/consents/consent-query-index.json', import.meta.url);
-  const consentStringsIndex = await fetch(queryIndexUrl.href).then((r) => r.json());
+  const queryIndexUrl = await getConsentQueryIndexUrl();
+  const consentStringsIndex = await fetch(queryIndexUrl).then((r) => r.json());
 
   if (consentStringsIndex) {
     const { data } = consentStringsIndex;
@@ -668,13 +787,17 @@ async function addConsentSuite(form) {
     countrySelect.append(defaultOption);
 
     data.forEach((c) => {
-      const option = createTag('option', { value: c.consentId, 'data-country-code': c.countryCode }, c.countryName);
+      const option = createTag('option', {
+        value: c.countryCode,
+        'data-country-code': c.countryCode,
+        'data-consent-id': c.consentId,
+      }, c.countryName);
       countrySelect.append(option);
     });
 
     countrySelect.addEventListener('change', async (e) => {
       const selectedOption = e.target.options[e.target.selectedIndex];
-      const consentData = data.find((c) => c.countryCode === selectedOption.dataset.countryCode);
+      const consentData = data.find((c) => c.countryCode === selectedOption?.dataset?.countryCode);
 
       if (consentData) {
         await loadConsent(form, consentData);
@@ -742,6 +865,7 @@ async function createForm(bp, formData) {
     json.data = json.data
       .map((obj) => {
         const lowkey = lowercaseKeys(obj);
+        if (typeof lowkey.field === 'string') lowkey.field = lowkey.field.trim();
         if (required.includes(lowkey.field)) lowkey.required = 'x';
         return lowkey;
       })
@@ -750,6 +874,7 @@ async function createForm(bp, formData) {
     json.data = json.data
       .map((obj) => {
         const lowkey = lowercaseKeys(obj);
+        if (typeof lowkey.field === 'string') lowkey.field = lowkey.field.trim();
         return lowkey;
       })
       .filter((f) => ['clear', 'submit'].includes(f.field));
@@ -806,7 +931,9 @@ async function createForm(bp, formData) {
   addTerms(formEl, terms);
 
   const profile = BlockMediator.get('imsProfile');
-  if (getMetadata('allow-guest-registration') === 'true' && profile.account_type === 'guest') await addConsentSuite(formEl);
+  const showConsentForGuest = getMetadata('allow-guest-registration') === 'true' && profile?.account_type === 'guest';
+  const forceConsent = getMetadata('force-consent-collection') === 'true';
+  if (showConsentForGuest || forceConsent) await addConsentSuite(formEl);
 
   formEl.addEventListener('input', () => applyRules(formEl, rules));
   applyRules(formEl, rules);
@@ -847,6 +974,9 @@ function personalizeForm(form, data) {
             const option = matchedInput.querySelector(`option[value="${val}"]`);
             if (option) option.selected = true;
           });
+        } else if (matchedInput.id === 'consentStringId') {
+          applyConsentCountrySelectValue(matchedInput, v);
+          if (key === 'profile') matchedInput.disabled = true;
         } else {
           matchedInput.value = v;
           if (key === 'profile') matchedInput.disabled = true;
@@ -884,63 +1014,54 @@ function getCookie(name) {
   return null;
 }
 
-async function initFormBasedOnRSVPData(bp) {
-  const validRegistrationStatus = ['registered', 'waitlisted'];
+export async function initFormBasedOnRSVPData(bp) {
   const { block } = bp;
   const profile = BlockMediator.get('imsProfile');
-  const rsvpData = BlockMediator.get('rsvpData');
-
-  if (validRegistrationStatus.includes(rsvpData?.registrationStatus)) {
+  let confirmationViewTracked = false;
+  const syncUIWithRSVPStatus = (rsvpData = BlockMediator.get('rsvpData')) => {
+    if (!VALID_REGISTRATION_STATUS.includes(rsvpData?.registrationStatus)) return false;
     showSuccessMsgFirstScreen(bp);
-    eventFormSendAnalytics(bp, 'Confirmation Modal View');
-  } else if (profile.account_type !== 'guest') {
+    if (!confirmationViewTracked) {
+      eventFormSendAnalytics(bp, 'Confirmation Modal View');
+      confirmationViewTracked = true;
+    }
+    return true;
+  };
+
+  BlockMediator.subscribe('rsvpData', ({ newValue }) => {
+    syncUIWithRSVPStatus(newValue);
+  });
+
+  if (syncUIWithRSVPStatus()) return;
+
+  if (profile.account_type !== 'guest') {
     let existingAttendeeData = {};
     const attendeeResp = await getAttendee();
     if (attendeeResp.ok) existingAttendeeData = attendeeResp.data;
+    if (syncUIWithRSVPStatus()) return;
     personalizeForm(block, { profile, existingAttendeeData });
-  } else {
-    const countryInput = block.querySelector('select#consentStringId');
-    if (!countryInput) return;
-
-    const options = Array.from(countryInput.options);
-    const internationalCookie = getCookie('international_cookie');
-
-    if (internationalCookie) {
-      const option = options.find((o) => {
-        const countryCode = o.dataset.countryCode?.toLowerCase();
-
-        if (!countryCode) return false;
-
-        return countryCode === internationalCookie.toLowerCase();
-      });
-      if (option) {
-        option.selected = true;
-        countryInput.value = option.value;
-        countryInput.dispatchEvent(new Event('change'));
-      }
-    } else {
-      const countryInNavigator = window.navigator.language.toLowerCase().split('-')[1];
-      const option = options.find(async (o) => {
-        const countryCode = o.dataset.countryCode?.toLowerCase();
-
-        if (!countryCode) return false;
-
-        return countryCode === countryInNavigator;
-      });
-      if (option) {
-        option.selected = true;
-        countryInput.value = option.value;
-        countryInput.dispatchEvent(new Event('change'));
-      }
-    }
   }
 
-  BlockMediator.subscribe('rsvpData', ({ newValue }) => {
-    if (validRegistrationStatus.includes(newValue?.registrationStatus)) {
-      showSuccessMsgFirstScreen(bp);
-      eventFormSendAnalytics(bp, 'Confirmation Modal View');
+  const countryInput = block.querySelector('select#consentStringId');
+  if (countryInput && countryInput.value === '') {
+    const options = Array.from(countryInput.options);
+    const findOptionByCountryCode = (code) => {
+      if (!code || typeof code !== 'string') return undefined;
+      const lower = code.toLowerCase();
+      return options.find((o) => o.dataset.countryCode?.toLowerCase() === lower);
+    };
+    const profileCode = profile?.countryCode;
+    const cookieCode = getCookie('international_cookie');
+    const navigatorRegion = window.navigator.language.toLowerCase().split('-')[1];
+    const option = findOptionByCountryCode(profileCode)
+      ?? findOptionByCountryCode(cookieCode)
+      ?? (navigatorRegion ? findOptionByCountryCode(navigatorRegion) : undefined);
+    if (option) {
+      option.selected = true;
+      countryInput.value = option.value;
+      countryInput.dispatchEvent(new Event('change'));
     }
-  });
+  }
 
   if (bp.block.querySelector('.form-success-msg.hidden')) {
     eventFormSendAnalytics(bp, 'Form View');
@@ -951,8 +1072,12 @@ async function onProfile(bp, formData) {
   const { block, eventHero } = bp;
   const profile = BlockMediator.get('imsProfile');
   const allowGuestReg = getMetadata('allow-guest-registration') === 'true';
-  if (profile) {
-    if ((profile.noProfile || profile.account_type === 'guest')
+  let hasHandledProfile = false;
+  const handleProfile = (resolvedProfile) => {
+    if (!resolvedProfile || hasHandledProfile) return;
+    hasHandledProfile = true;
+
+    if ((resolvedProfile.noProfile || resolvedProfile.account_type === 'guest')
       && /#rsvp-form.*/.test(window.location.hash)
       && !allowGuestReg) {
       // TODO: also check for guestCheckout enablement for future iterations
@@ -960,30 +1085,39 @@ async function onProfile(bp, formData) {
     } else {
       eventHero.classList.remove('loading');
       decorateHero(bp.eventHero);
-      buildEventform(bp, formData).then(() => {
-        initFormBasedOnRSVPData(bp);
-      }).finally(() => {
+      (async () => {
+        let eventData = BlockMediator.get('eventData');
+        if (!eventData) {
+          const eventResp = await getEvent(getMetadata('event-id'));
+          if (eventResp.ok) BlockMediator.set('eventData', eventResp.data);
+          eventData = BlockMediator.get('eventData');
+        }
+        if (eventData?.inviteOnly && !getValidCampaignIdFromUrl()) {
+          await dictionaryManager.initialize();
+          const INVITE_ONLY_KEY = 'rsvp-invite-only-no-campaign-cta-text';
+          let msg = dictionaryManager.getValue(INVITE_ONLY_KEY);
+          if (msg === INVITE_ONLY_KEY) {
+            msg = 'Registration is only available through a valid invitation link.';
+          }
+          const error = createTag('p', { class: 'error' }, msg);
+          bp.formContainer.append(error);
+        } else {
+          await buildEventform(bp, formData);
+          initFormBasedOnRSVPData(bp);
+        }
+      })().finally(() => {
         decorateDefaultLinkAnalytics(block);
         block.classList.remove('loading');
       });
     }
+  };
+
+  if (profile) {
+    handleProfile(profile);
   } else {
-    BlockMediator.subscribe('imsProfile', ({ newValue }) => {
-      if ((newValue?.noProfile || newValue?.account_type === 'guest')
-        && /#rsvp-form.*/.test(window.location.hash)
-        && !allowGuestReg) {
-        // TODO: also check for guestCheckout enablement for future iterations
-        signIn(getSusiOptions(getConfig()));
-      } else {
-        eventHero.classList.remove('loading');
-        decorateHero(bp.eventHero);
-        buildEventform(bp, formData).then(() => {
-          initFormBasedOnRSVPData(bp);
-        }).finally(() => {
-          decorateDefaultLinkAnalytics(block);
-          block.classList.remove('loading');
-        });
-      }
+    const unsubscribe = BlockMediator.subscribe('imsProfile', ({ newValue }) => {
+      handleProfile(newValue);
+      if (hasHandledProfile) unsubscribe();
     });
   }
 }
