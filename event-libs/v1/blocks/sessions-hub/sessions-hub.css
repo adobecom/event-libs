@@ -338,6 +338,7 @@
 .sessions-hub .sh-full-badge {
   display: inline-flex;
   align-items: center;
+  max-width: max-content;
   font-size: 12px;
   font-weight: 700;
   line-height: 16px;
