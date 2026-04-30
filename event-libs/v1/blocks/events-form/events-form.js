@@ -17,6 +17,9 @@ const { default: loadFragment } = await import(`${miloLibs}/blocks/fragment/frag
 
 const VALID_REGISTRATION_STATUS = ['registered', 'waitlisted'];
 
+const PHONE_FIELD_RE = /phone/i;
+const PHONE_PATTERN = '^\\+?[\\d\\s\\(\\)\\.\\-]{7,20}$';
+
 const RULE_OPERATORS = {
   equal: '=',
   notEqual: '!=',
@@ -437,8 +440,14 @@ function createHeading({ label }, el) {
 
 function createInput({ type, field, placeholder, required, defval, pattern, title }) {
   const placeholderText = placeholder ? dictionaryManager.getValue(placeholder, 'rsvp-fields') : '';
-  const attrs = { type, id: field, placeholder: placeholderText, value: defval };
-  if (pattern) attrs.pattern = pattern;
+  const isPhoneField = type === 'tel' || type === 'phone' || (typeof field === 'string' && PHONE_FIELD_RE.test(field));
+  const attrs = { type: isPhoneField ? 'tel' : type, id: field, placeholder: placeholderText, value: defval };
+  if (isPhoneField) {
+    attrs.inputmode = 'tel';
+    attrs.autocomplete = 'tel';
+  }
+  const resolvedPattern = pattern || (isPhoneField ? PHONE_PATTERN : null);
+  if (resolvedPattern) attrs.pattern = resolvedPattern;
   if (title) attrs.title = title;
   const input = createTag('input', attrs);
   if (required === 'x') input.setAttribute('required', 'required');
