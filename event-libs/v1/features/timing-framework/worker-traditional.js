@@ -338,10 +338,9 @@ class TimingWorker {
         // If avoidStreamEndFlag is set, treat all streams as ended
         const shouldTreatAsActive = this.testingManager.shouldAvoidStreamEnd() ? false : isActive;
         if (shouldTreatAsActive) {
-          return false
-        } else {
-          liveStreamEnd = true;
+          return false;
         }
+        liveStreamEnd = true;
       }
     }
 
