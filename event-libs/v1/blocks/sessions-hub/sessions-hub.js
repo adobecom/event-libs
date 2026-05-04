@@ -298,10 +298,14 @@ function applyFilter(listEl, state) {
 
 // ─── Render: CTA group ───────────────────────────────────────────────────────
 
-function renderCTAGroup(session, isEventRegistered) {
+function renderCTAGroup(session, isEventRegistered, isEventWaitlisted = false) {
   const group = createTag('div', { class: 'sh-cta-group' });
 
-  if (!isEventRegistered) {
+  if (isEventWaitlisted && !isEventRegistered) {
+    const badge = createTag('button', { class: 'sh-btn sh-registered-badge sh-event-waitlisted-badge', type: 'button', disabled: '' });
+    badge.append(createIcon(CHECKMARK_ICON), createTag('span', {}, dictionaryManager.getValue('waitlisted-cta-text')));
+    group.append(badge);
+  } else if (!isEventRegistered) {
     group.append(createTag('button', { class: 'sh-btn sh-btn-register-event', type: 'button' }, dictionaryManager.getValue('Register for session')));
   } else if (!session.isRegistered && !session.isWaitlisted) {
     group.append(createTag('button', { class: 'sh-btn sh-btn-register-session', type: 'button' }, dictionaryManager.getValue('Register for session')));
@@ -344,9 +348,9 @@ function renderCTAGroup(session, isEventRegistered) {
   return group;
 }
 
-function updateCTAGroup(cardEl, session, isEventRegistered) {
+function updateCTAGroup(cardEl, session, isEventRegistered, isEventWaitlisted = false) {
   const old = cardEl.querySelector('.sh-cta-group');
-  if (old) old.replaceWith(renderCTAGroup(session, isEventRegistered));
+  if (old) old.replaceWith(renderCTAGroup(session, isEventRegistered, isEventWaitlisted));
 }
 
 // ─── Session description overflow (matches CSS -webkit-line-clamp) ───────────
@@ -452,7 +456,7 @@ function renderSpeakerAvatars(speakers) {
   return wrap;
 }
 
-function renderSessionCard(session, isEventRegistered) {
+function renderSessionCard(session, isEventRegistered, isEventWaitlisted = false) {
   const primaryTime = session.sessionTimes[0];
   const timeStr = primaryTime
     ? createSmartDateRange(primaryTime.startTimeMillis, primaryTime.endTimeMillis, 'en-US', primaryTime.timezone)
@@ -513,15 +517,15 @@ function renderSessionCard(session, isEventRegistered) {
   descText.innerHTML = fullDesc;
 
   desc.append(descText);
-  right.append(desc, renderCTAGroup(session, isEventRegistered));
+  right.append(desc, renderCTAGroup(session, isEventRegistered, isEventWaitlisted));
 
   card.append(left, right);
   return card;
 }
 
-function renderSessionList(sessions, isEventRegistered) {
+function renderSessionList(sessions, isEventRegistered, isEventWaitlisted = false) {
   const list = createTag('div', { class: 'sh-session-list' });
-  sessions.forEach((s) => list.append(renderSessionCard(s, isEventRegistered)));
+  sessions.forEach((s) => list.append(renderSessionCard(s, isEventRegistered, isEventWaitlisted)));
   return list;
 }
 
@@ -1106,9 +1110,11 @@ function bindMediatorSubscriptions(el, bannerEl, listEl) {
   rsvpUnsubscribe = BlockMediator.subscribe('rsvpData', async ({ newValue }) => {
     const state = getState();
     const isRegistered = newValue?.registrationStatus === 'registered';
+    const isWaitlisted = newValue?.registrationStatus === 'waitlisted';
     state.isEventRegistered = isRegistered;
+    state.isEventWaitlisted = isWaitlisted;
 
-    syncBannerVisibility(bannerEl, isRegistered);
+    syncBannerVisibility(bannerEl, isRegistered || isWaitlisted);
 
     const toggle = el.querySelector('.sh-tab-toggle');
     if (toggle) toggle.hidden = !isRegistered;
@@ -1125,7 +1131,7 @@ function bindMediatorSubscriptions(el, bannerEl, listEl) {
       state.sessions.forEach((session) => {
         session.isRegistered = mergedIds.has(session.sessionId);
         const cardEl = cardMap.get(session.sessionId);
-        if (cardEl) updateCTAGroup(cardEl, session, true);
+        if (cardEl) updateCTAGroup(cardEl, session, true, false);
       });
 
       if (pendingSessionId) {
@@ -1142,7 +1148,7 @@ function bindMediatorSubscriptions(el, bannerEl, listEl) {
       state.sessions.forEach((session) => {
         session.isRegistered = false;
         const cardEl = cardMap.get(session.sessionId);
-        if (cardEl) updateCTAGroup(cardEl, session, false);
+        if (cardEl) updateCTAGroup(cardEl, session, false, isWaitlisted);
       });
 
       // Reset to "All sessions" tab when user un-registers
@@ -1170,7 +1176,7 @@ function bindMediatorSubscriptions(el, bannerEl, listEl) {
         session.isRegistered = true;
         state.registeredSessionIds.add(session.sessionId);
         const cardEl = cardMap.get(session.sessionId);
-        if (cardEl) updateCTAGroup(cardEl, session, state.isEventRegistered);
+        if (cardEl) updateCTAGroup(cardEl, session, state.isEventRegistered, state.isEventWaitlisted);
       }
     });
     applyFilter(listEl, state);
@@ -1206,6 +1212,7 @@ async function loadBlock(el, rsvpConfig) {
 
   const rsvpData = BlockMediator.get('rsvpData');
   const isEventRegistered = rsvpData?.registrationStatus === 'registered';
+  const isEventWaitlisted = rsvpData?.registrationStatus === 'waitlisted';
   const [registeredSessionIds, tagsData] = await Promise.all([
     resolveRegistrationState(eventData.eventId, isEventRegistered),
     Promise.resolve(getCaasTags()).catch(() => null),
@@ -1227,19 +1234,20 @@ async function loadBlock(el, rsvpConfig) {
     locationMap,
     registeredSessionIds,
     isEventRegistered,
+    isEventWaitlisted,
     rsvpConfig,
   };
   setState(state);
 
   const toolbar = renderToolbar(state);
   setToolbarStickyOffset(toolbar);
-  const listEl = renderSessionList(sessions, isEventRegistered);
+  const listEl = renderSessionList(sessions, isEventRegistered, isEventWaitlisted);
   el.append(toolbar, listEl);
 
-  // Always append banner; hide it if user is already registered
+  // Always append banner; hide it if user is already registered or waitlisted
   el.querySelector('.sh-event-banner')?.remove();
   const bannerEl = renderEventBanner(rsvpConfig);
-  if (isEventRegistered) bannerEl.classList.add('hidden');
+  if (isEventRegistered || isEventWaitlisted) bannerEl.classList.add('hidden');
   el.append(bannerEl);
 
   bindToolbarEvents(toolbar, listEl, state);
