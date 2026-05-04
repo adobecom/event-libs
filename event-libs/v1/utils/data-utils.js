@@ -54,6 +54,8 @@ export const BASE_ATTENDEE_DATA_FILTER = {
   age: { type: 'string', submittable: true },
   jobLevel: { type: 'string', submittable: true },
   contactMethods: { type: 'array', submittable: true },
+  emailConsent: { type: 'string', submittable: true },
+  phoneConsent: { type: 'string', submittable: true },
   isGuest: { type: 'boolean', submittable: true },
   consentStringId: { type: 'string', submittable: true },
   modificationTime: { type: 'string', submittable: true },

@@ -339,5 +339,46 @@ describe('Adobe Event Service API', () => {
       expect(result.ok).to.be.true;
       expect(result.data.registrationStatus).to.equal('registered');
     });
+
+    it('should include consent fields on create (guest)', async () => {
+      BlockMediator.set('imsProfile', { account_type: 'guest' });
+      const fetchStub = sandbox.stub(window, 'fetch');
+      fetchStub.onCall(0).resolves({ json: () => ({ eventId, isFull: false }), ok: true });
+      fetchStub.onCall(1).resolves({ json: () => (attendeeResp), ok: true, status: 200 });
+      fetchStub.onCall(2).resolves({ json: () => ({ registrationStatus: 'registered' }), ok: true });
+
+      const dataWithConsent = {
+        ...attendeeData,
+        emailConsent: 'Y',
+        phoneConsent: 'Y',
+      };
+      const result = await api.getAndCreateAndAddAttendee(eventId, dataWithConsent);
+      expect(result.ok).to.be.true;
+
+      const createBody = JSON.parse(fetchStub.getCall(1).args[1].body);
+      expect(createBody.emailConsent).to.equal('Y');
+      expect(createBody.phoneConsent).to.equal('Y');
+    });
+
+    it('should omit consent fields from update payload when attendee already exists', async () => {
+      BlockMediator.set('imsProfile', { account_type: 'registered' });
+      const fetchStub = sandbox.stub(window, 'fetch');
+      fetchStub.onCall(0).resolves({ json: () => ({ eventId, isFull: false }), ok: true });
+      fetchStub.onCall(1).resolves({ json: () => ({ ...attendeeResp, attendeeId: 'att-1' }), ok: true });
+      fetchStub.onCall(2).resolves({ json: () => ({ ...attendeeResp, attendeeId: 'att-1' }), ok: true });
+      fetchStub.onCall(3).resolves({ json: () => ({ registrationStatus: 'registered' }), ok: true });
+
+      const dataWithConsent = {
+        ...attendeeData,
+        emailConsent: 'Y',
+        phoneConsent: 'Y',
+      };
+      const result = await api.getAndCreateAndAddAttendee(eventId, dataWithConsent);
+      expect(result.ok).to.be.true;
+
+      const putBody = JSON.parse(fetchStub.getCall(2).args[1].body);
+      expect(putBody).to.not.have.property('emailConsent');
+      expect(putBody).to.not.have.property('phoneConsent');
+    });
   });
 });
