@@ -5,7 +5,6 @@ import { dictionaryManager } from '../../utils/dictionary-manager.js';
 import { getEventConfig, LIBS, getMetadata, getSusiOptions, getValidCampaignIdFromUrl } from '../../utils/utils.js';
 import { FALLBACK_LOCALES, CAMPAIGN_ID_PATTERN } from '../../utils/constances.js';
 import { BASE_ATTENDEE_DATA_FILTER } from '../../utils/data-utils.js';
-import { applyImplicitConsentToPayload } from '../../utils/rsvp-consent.js';
 
 const eventConfig = getEventConfig();
 const miloLibs = eventConfig?.miloConfig?.miloLibs ? eventConfig.miloConfig.miloLibs : LIBS;
@@ -209,8 +208,6 @@ async function submitForm(bp) {
       payload.consentStringId = consentId;
     }
   }
-
-  applyImplicitConsentToPayload(form, payload);
 
   const isValid = Object.keys(payload).reduce((valid, key) => {
     const field = form.querySelector(`[data-field-id=${key}]`);

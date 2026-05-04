@@ -534,12 +534,8 @@ export async function getAndCreateAndAddAttendee(eventId, attendeeData) {
       const filteredPayload = getBaseAttendeePayload(attendeeData);
       attendee = await createAttendee(filteredPayload);
     } else if (attendeeResp.data?.attendeeId) {
-      // Use BaseAttendee filter for updating existing attendee.
-      // New registrations only — do not send RSVP-derived consent fields on attendee update.
-      const attendeeDataWithoutConsent = { ...attendeeData };
-      delete attendeeDataWithoutConsent.emailConsent;
-      delete attendeeDataWithoutConsent.phoneConsent;
-      const payload = { ...attendeeResp.data, ...attendeeDataWithoutConsent };
+      // Use BaseAttendee filter for updating existing attendee
+      const payload = { ...attendeeResp.data, ...attendeeData };
       const filteredPayload = getBaseAttendeePayload(payload);
       attendee = await updateAttendee(filteredPayload);
     }
