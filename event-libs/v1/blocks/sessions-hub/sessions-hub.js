@@ -171,6 +171,13 @@ async function resolveRegistrationState(eventId, isEventRegistered) {
   return new Set(resp.data?.sessionIds || []);
 }
 
+function isSessionTimeFullError(resp) {
+  const err = resp?.error;
+  if (!err) return false;
+  const candidates = [err.code, err.errorCode, err.error, err.type, err.message];
+  return candidates.some((v) => typeof v === 'string' && v.includes('SessionTimeFull'));
+}
+
 function findConflictingSession(newSession, state) {
   const newTime = newSession.sessionTimes[0];
   if (!newTime) return null;
@@ -221,6 +228,7 @@ function normalizeSessions(rawSessions, locationMap, registeredSessionIds, venue
       sessionTimes,
       speakers,
       isRegistered: registeredSessionIds.has(session.sessionId),
+      isWaitlisted: false,
       expanded: false,
     };
   });
@@ -295,15 +303,23 @@ function renderCTAGroup(session, isEventRegistered) {
 
   if (!isEventRegistered) {
     group.append(createTag('button', { class: 'sh-btn sh-btn-register-event', type: 'button' }, dictionaryManager.getValue('Register for session')));
-  } else if (!session.isRegistered) {
+  } else if (!session.isRegistered && !session.isWaitlisted) {
     group.append(createTag('button', { class: 'sh-btn sh-btn-register-session', type: 'button' }, dictionaryManager.getValue('Register for session')));
   } else {
     const calBtn = createTag('button', { class: 'sh-btn sh-btn-cal', type: 'button' });
     calBtn.append(createIcon(CTA_CALENDAR_ICON), createTag('span', {}, dictionaryManager.getValue('Download to calendar')));
     group.append(calBtn);
 
+    const isWaitlisted = !session.isRegistered && session.isWaitlisted;
+    const badgeLabel = isWaitlisted
+      ? dictionaryManager.getValue('waitlisted-cta-text')
+      : dictionaryManager.getValue('Registered');
+    const unregisterLabel = isWaitlisted
+      ? dictionaryManager.getValue('Leave waitlist')
+      : dictionaryManager.getValue('Unregister');
+
     const badge = createTag('button', { class: 'sh-btn sh-registered-badge', type: 'button', disabled: '' });
-    badge.append(createIcon(CHECKMARK_ICON), createTag('span', {}, dictionaryManager.getValue('Registered')));
+    badge.append(createIcon(CHECKMARK_ICON), createTag('span', {}, badgeLabel));
     group.append(badge);
 
     setTimeout(() => {
@@ -311,18 +327,18 @@ function renderCTAGroup(session, isEventRegistered) {
       badge.disabled = false;
     }, 2000);
 
-    const setRegisteredContent = () => {
+    const setIdleContent = () => {
       badge.innerHTML = '';
       badge.classList.remove('sh-unregister-mode');
-      badge.append(createIcon(CHECKMARK_ICON), createTag('span', {}, dictionaryManager.getValue('Registered')));
+      badge.append(createIcon(CHECKMARK_ICON), createTag('span', {}, badgeLabel));
     };
     const setUnregisterContent = () => {
       badge.innerHTML = '';
       badge.classList.add('sh-unregister-mode');
-      badge.append(createTag('span', {}, dictionaryManager.getValue('Unregister')));
+      badge.append(createTag('span', {}, unregisterLabel));
     };
     badge.addEventListener('mouseenter', () => { if (!badge.disabled) setUnregisterContent(); });
-    badge.addEventListener('mouseleave', () => { if (!badge.disabled) setRegisteredContent(); });
+    badge.addEventListener('mouseleave', () => { if (!badge.disabled) setIdleContent(); });
   }
 
   return group;
@@ -931,14 +947,31 @@ async function handleSessionRegistration(cardEl, sessionId, state) {
     btn.textContent = dictionaryManager.getValue('Registering\u2026');
   }
 
-  const resp = await registerForSessionTime(firstTime.sessionTimeId, 'me', { registrationStatus: 'registered' });
+  let resp = await registerForSessionTime(firstTime.sessionTimeId, 'me', { registrationStatus: 'registered' });
+  let waitlisted = resp.ok && resp.data?.registrationStatus === 'waitlisted';
+
+  if (!resp.ok && isSessionTimeFullError(resp)) {
+    const retry = await registerForSessionTime(firstTime.sessionTimeId, 'me', { registrationStatus: 'waitlisted' });
+    if (retry.ok) {
+      resp = retry;
+      waitlisted = true;
+    } else {
+      resp = retry;
+    }
+  }
 
   if (resp.ok) {
-    session.isRegistered = true;
-    state.registeredSessionIds.add(sessionId);
+    if (waitlisted) {
+      session.isWaitlisted = true;
+      session.isRegistered = false;
+    } else {
+      session.isRegistered = true;
+      session.isWaitlisted = false;
+      state.registeredSessionIds.add(sessionId);
+      const existing = BlockMediator.get('registeredSessionIds') || new Set();
+      BlockMediator.set('registeredSessionIds', new Set([...existing, sessionId]));
+    }
     updateCTAGroup(cardEl, session, true);
-    const existing = BlockMediator.get('registeredSessionIds') || new Set();
-    BlockMediator.set('registeredSessionIds', new Set([...existing, sessionId]));
     if (conflictFinalize) conflictFinalize(true);
   } else {
     window.lana?.log(`Error: Failed to register for session ${sessionId}. Error:${JSON.stringify(resp.error)}`);
@@ -966,10 +999,12 @@ async function handleSessionUnregistration(cardEl, sessionId, state) {
     badge.textContent = dictionaryManager.getValue('Unregistering\u2026');
   }
 
+  const wasWaitlisted = session.isWaitlisted;
   const resp = await unregisterFromSessionTime(firstTime.sessionTimeId);
 
   if (resp.ok) {
     session.isRegistered = false;
+    session.isWaitlisted = false;
     state.registeredSessionIds.delete(sessionId);
     updateCTAGroup(cardEl, session, true);
     const existing = BlockMediator.get('registeredSessionIds') || new Set();
@@ -983,7 +1018,10 @@ async function handleSessionUnregistration(cardEl, sessionId, state) {
       badge.removeAttribute('aria-busy');
       badge.classList.remove('sh-unregister-mode');
       badge.innerHTML = '';
-      badge.append(createIcon(CHECKMARK_ICON), createTag('span', {}, dictionaryManager.getValue('Registered')));
+      const restoreLabel = wasWaitlisted
+        ? dictionaryManager.getValue('waitlisted-cta-text')
+        : dictionaryManager.getValue('Registered');
+      badge.append(createIcon(CHECKMARK_ICON), createTag('span', {}, restoreLabel));
     }
   }
 }

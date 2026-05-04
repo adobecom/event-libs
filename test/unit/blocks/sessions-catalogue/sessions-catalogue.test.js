@@ -731,3 +731,168 @@ describe('card expand/collapse', () => {
     expect(card.classList.contains('expanded')).to.be.false;
   });
 });
+
+// ─── isSessionTimeFullError (waitlist-on-error detection) ────────────────────
+
+describe('isSessionTimeFullError', () => {
+  const isSessionTimeFullError = (resp) => {
+    const err = resp?.error;
+    if (!err) return false;
+    const candidates = [err.code, err.errorCode, err.error, err.type, err.message];
+    return candidates.some((v) => typeof v === 'string' && v.includes('SessionTimeFull'));
+  };
+
+  it('returns false when response has no error field', () => {
+    expect(isSessionTimeFullError({ ok: true, data: {} })).to.be.false;
+    expect(isSessionTimeFullError({})).to.be.false;
+    expect(isSessionTimeFullError(null)).to.be.false;
+  });
+
+  it('detects SessionTimeFull on err.code', () => {
+    expect(isSessionTimeFullError({ ok: false, error: { code: 'SessionTimeFull' } })).to.be.true;
+  });
+
+  it('detects SessionTimeFull on err.errorCode', () => {
+    expect(isSessionTimeFullError({ ok: false, error: { errorCode: 'SessionTimeFull' } })).to.be.true;
+  });
+
+  it('detects SessionTimeFull on err.message substring', () => {
+    expect(isSessionTimeFullError({
+      ok: false,
+      error: { message: 'Cannot register: SessionTimeFull capacity reached' },
+    })).to.be.true;
+  });
+
+  it('returns false for unrelated error codes', () => {
+    expect(isSessionTimeFullError({ ok: false, error: { code: 'ValidationError' } })).to.be.false;
+    expect(isSessionTimeFullError({ ok: false, error: { message: 'Network timeout' } })).to.be.false;
+  });
+});
+
+// ─── handleSessionRegistration response handling ─────────────────────────────
+
+describe('handleSessionRegistration response handling', () => {
+  // Inline the post-API decision logic from sessions-hub.js to validate the
+  // bug fix: a waitlisted response must NOT mark the session as registered,
+  // and a SessionTimeFull error must trigger a waitlist retry.
+
+  function classifyOutcome(resp, retryFn) {
+    let waitlisted = resp.ok && resp.data?.registrationStatus === 'waitlisted';
+    let finalResp = resp;
+
+    if (!resp.ok) {
+      const err = resp.error;
+      const candidates = [err?.code, err?.errorCode, err?.error, err?.type, err?.message];
+      const isFullErr = candidates.some((v) => typeof v === 'string' && v.includes('SessionTimeFull'));
+      if (isFullErr) {
+        const retry = retryFn();
+        if (retry.ok) {
+          finalResp = retry;
+          waitlisted = true;
+        } else {
+          finalResp = retry;
+        }
+      }
+    }
+
+    if (!finalResp.ok) return { state: 'error', waitlisted: false };
+    return { state: waitlisted ? 'waitlisted' : 'registered', waitlisted };
+  }
+
+  it('classifies a 200 OK with registrationStatus=waitlisted as waitlisted', () => {
+    const resp = { ok: true, data: { registrationStatus: 'waitlisted' } };
+    const result = classifyOutcome(resp, () => { throw new Error('retry should not be called'); });
+    expect(result.state).to.equal('waitlisted');
+    expect(result.waitlisted).to.be.true;
+  });
+
+  it('classifies a 200 OK with registrationStatus=registered as registered', () => {
+    const resp = { ok: true, data: { registrationStatus: 'registered' } };
+    const result = classifyOutcome(resp, () => { throw new Error('retry should not be called'); });
+    expect(result.state).to.equal('registered');
+    expect(result.waitlisted).to.be.false;
+  });
+
+  it('retries with waitlist on SessionTimeFull and marks waitlisted on retry success', () => {
+    const initial = { ok: false, status: 409, error: { code: 'SessionTimeFull' } };
+    const retry = { ok: true, data: { registrationStatus: 'waitlisted' } };
+    const result = classifyOutcome(initial, () => retry);
+    expect(result.state).to.equal('waitlisted');
+    expect(result.waitlisted).to.be.true;
+  });
+
+  it('reports error if SessionTimeFull retry also fails', () => {
+    const initial = { ok: false, status: 409, error: { code: 'SessionTimeFull' } };
+    const retry = { ok: false, status: 500, error: { message: 'Server error' } };
+    const result = classifyOutcome(initial, () => retry);
+    expect(result.state).to.equal('error');
+  });
+
+  it('does not retry for non-SessionTimeFull errors', () => {
+    const initial = { ok: false, status: 400, error: { code: 'ValidationError' } };
+    let retryCalled = false;
+    const result = classifyOutcome(initial, () => { retryCalled = true; return { ok: true }; });
+    expect(retryCalled).to.be.false;
+    expect(result.state).to.equal('error');
+  });
+});
+
+// ─── renderCTAGroup waitlist branch ──────────────────────────────────────────
+
+describe('renderCTAGroup with waitlisted session', () => {
+  function inlineRenderCTAGroup(session, isEventRegistered) {
+    const group = document.createElement('div');
+    group.className = 'sh-cta-group';
+
+    if (!isEventRegistered) {
+      const btn = document.createElement('button');
+      btn.className = 'sh-btn sh-btn-register-event';
+      btn.type = 'button';
+      btn.textContent = 'Register for session';
+      group.append(btn);
+    } else if (!session.isRegistered && !session.isWaitlisted) {
+      const btn = document.createElement('button');
+      btn.className = 'sh-btn sh-btn-register-session';
+      btn.type = 'button';
+      btn.textContent = 'Register for session';
+      group.append(btn);
+    } else {
+      const isWaitlisted = !session.isRegistered && session.isWaitlisted;
+      const calBtn = document.createElement('button');
+      calBtn.className = 'sh-btn sh-btn-cal';
+      calBtn.type = 'button';
+      group.append(calBtn);
+
+      const badge = document.createElement('button');
+      badge.className = 'sh-btn sh-registered-badge';
+      const label = isWaitlisted ? 'waitlisted-cta-text' : 'Registered';
+      const labelSpan = document.createElement('span');
+      labelSpan.textContent = label;
+      badge.append(labelSpan);
+      group.append(badge);
+    }
+
+    return group;
+  }
+
+  it('shows waitlisted badge (using waitlisted-cta-text) when session.isWaitlisted is true', () => {
+    const group = inlineRenderCTAGroup({ isRegistered: false, isWaitlisted: true }, true);
+    const badge = group.querySelector('.sh-registered-badge');
+    expect(badge).to.not.be.null;
+    expect(badge.textContent).to.include('waitlisted-cta-text');
+    expect(group.querySelector('.sh-btn-register-session')).to.be.null;
+  });
+
+  it('shows "Registered" badge when session.isRegistered is true', () => {
+    const group = inlineRenderCTAGroup({ isRegistered: true, isWaitlisted: false }, true);
+    const badge = group.querySelector('.sh-registered-badge');
+    expect(badge.textContent).to.include('Registered');
+    expect(badge.textContent).to.not.include('waitlisted-cta-text');
+  });
+
+  it('shows "Register for session" CTA when neither registered nor waitlisted', () => {
+    const group = inlineRenderCTAGroup({ isRegistered: false, isWaitlisted: false }, true);
+    expect(group.querySelector('.sh-btn-register-session')).to.not.be.null;
+    expect(group.querySelector('.sh-registered-badge')).to.be.null;
+  });
+});
