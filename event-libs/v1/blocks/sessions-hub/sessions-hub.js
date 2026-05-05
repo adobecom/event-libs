@@ -302,9 +302,9 @@ function renderCTAGroup(session, isEventRegistered, isEventWaitlisted = false) {
   const group = createTag('div', { class: 'sh-cta-group' });
 
   if (isEventWaitlisted && !isEventRegistered) {
-    const badge = createTag('button', { class: 'sh-btn sh-registered-badge sh-event-waitlisted-badge', type: 'button', disabled: '' });
-    badge.append(createIcon(CHECKMARK_ICON), createTag('span', {}, dictionaryManager.getValue('waitlisted-cta-text')));
-    group.append(badge);
+    const btn = createTag('button', { class: 'sh-btn sh-btn-register-event sh-event-waitlisted-badge', type: 'button' });
+    btn.append(createIcon(CHECKMARK_ICON), createTag('span', {}, dictionaryManager.getValue('waitlisted-cta-text')));
+    group.append(btn);
   } else if (!isEventRegistered) {
     group.append(createTag('button', { class: 'sh-btn sh-btn-register-event', type: 'button' }, dictionaryManager.getValue('Register for session')));
   } else if (!session.isRegistered && !session.isWaitlisted) {
@@ -1074,6 +1074,17 @@ function bindCardEvents(listEl, state) {
     }
 
     if (e.target.closest('.sh-btn-register-event')) {
+      const btn = e.target.closest('.sh-btn-register-event');
+      const isAlreadyWaitlisted = btn?.classList.contains('sh-event-waitlisted-badge');
+
+      if (isAlreadyWaitlisted) {
+        // User is already on the event waitlist \u2014 just re-open the modal so
+        // they can cancel waitlist or review status. Do not set pendingSessionId
+        // or relabel the button.
+        if (state.rsvpConfig) openRsvpModal(state.rsvpConfig);
+        return;
+      }
+
       const profile = BlockMediator.get('imsProfile');
       const isSignedOut = !profile || profile.noProfile || profile.account_type === 'guest';
 
@@ -1085,7 +1096,6 @@ function bindCardEvents(listEl, state) {
 
       if (state.rsvpConfig) {
         pendingSessionId = sessionId;
-        const btn = e.target.closest('.sh-btn-register-event');
         if (btn) { btn.disabled = true; btn.textContent = dictionaryManager.getValue('Registering\u2026'); }
 
         // Milo's closeModal uses pushState (not location.hash=) so hashchange never fires.
