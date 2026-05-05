@@ -1,7 +1,7 @@
 import { deleteAttendeeFromEvent, getAndCreateAndAddAttendee, getAttendee, getEvent, getCampaign, registerForSessionTime } from '../../utils/esp-controller.js';
 import BlockMediator from '../../deps/block-mediator.min.js';
 import { signIn, decorateEvent } from '../../utils/decorate.js';
-import { dictionaryManager } from '../../utils/dictionary-manager.js';
+import { dictionaryManager, getInviteOnlyNoCampaignMessage } from '../../utils/dictionary-manager.js';
 import { getEventConfig, LIBS, getMetadata, getSusiOptions, getValidCampaignIdFromUrl } from '../../utils/utils.js';
 import { FALLBACK_LOCALES, CAMPAIGN_ID_PATTERN } from '../../utils/constances.js';
 import { BASE_ATTENDEE_DATA_FILTER } from '../../utils/data-utils.js';
@@ -1103,11 +1103,7 @@ async function onProfile(bp, formData) {
         }
         if (eventData?.inviteOnly && !getValidCampaignIdFromUrl()) {
           await dictionaryManager.initialize();
-          const INVITE_ONLY_KEY = 'rsvp-invite-only-no-campaign-cta-text';
-          let msg = dictionaryManager.getValue(INVITE_ONLY_KEY);
-          if (msg === INVITE_ONLY_KEY) {
-            msg = 'Registration is only available through a valid invitation link.';
-          }
+          const msg = getInviteOnlyNoCampaignMessage(dictionaryManager);
           const error = createTag('p', { class: 'error' }, msg);
           bp.formContainer.append(error);
         } else {

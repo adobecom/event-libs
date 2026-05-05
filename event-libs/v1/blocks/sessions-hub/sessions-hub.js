@@ -1,6 +1,14 @@
 import BlockMediator from '../../deps/block-mediator.min.js';
-import { createTag, getMetadata, getSusiOptions, LIBS, getEventConfig, loadStyle } from '../../utils/utils.js';
-import { dictionaryManager } from '../../utils/dictionary-manager.js';
+import {
+  createTag,
+  getMetadata,
+  getSusiOptions,
+  LIBS,
+  getEventConfig,
+  loadStyle,
+  getValidCampaignIdFromUrl,
+} from '../../utils/utils.js';
+import { dictionaryManager, getInviteOnlyNoCampaignMessage } from '../../utils/dictionary-manager.js';
 import { signIn } from '../../utils/decorate.js';
 import { buildModalContent } from '../profile-cards/profile-cards.js';
 import { createSmartDateRange } from '../../utils/date-time-helper.js';
@@ -290,11 +298,15 @@ function applyFilter(listEl, state) {
 
 // ─── Render: CTA group ───────────────────────────────────────────────────────
 
-function renderCTAGroup(session, isEventRegistered) {
+function renderCTAGroup(session, isEventRegistered, inviteOnlyBlocked, inviteOnlyMessage) {
   const group = createTag('div', { class: 'sh-cta-group' });
 
   if (!isEventRegistered) {
-    group.append(createTag('button', { class: 'sh-btn sh-btn-register-event', type: 'button' }, dictionaryManager.getValue('Register for session')));
+    if (inviteOnlyBlocked) {
+      group.append(createTag('p', { class: 'sh-invite-only-msg', role: 'status' }, inviteOnlyMessage));
+    } else {
+      group.append(createTag('button', { class: 'sh-btn sh-btn-register-event', type: 'button' }, dictionaryManager.getValue('Register for session')));
+    }
   } else if (!session.isRegistered) {
     group.append(createTag('button', { class: 'sh-btn sh-btn-register-session', type: 'button' }, dictionaryManager.getValue('Register for session')));
   } else {
@@ -329,8 +341,16 @@ function renderCTAGroup(session, isEventRegistered) {
 }
 
 function updateCTAGroup(cardEl, session, isEventRegistered) {
+  const state = getState();
   const old = cardEl.querySelector('.sh-cta-group');
-  if (old) old.replaceWith(renderCTAGroup(session, isEventRegistered));
+  if (old && state) {
+    old.replaceWith(renderCTAGroup(
+      session,
+      isEventRegistered,
+      state.inviteOnlyBlocked,
+      state.inviteOnlyMessage,
+    ));
+  }
 }
 
 // ─── Session description overflow (matches CSS -webkit-line-clamp) ───────────
@@ -436,7 +456,7 @@ function renderSpeakerAvatars(speakers) {
   return wrap;
 }
 
-function renderSessionCard(session, isEventRegistered) {
+function renderSessionCard(session, isEventRegistered, inviteOnlyBlocked, inviteOnlyMessage) {
   const primaryTime = session.sessionTimes[0];
   const timeStr = primaryTime
     ? createSmartDateRange(primaryTime.startTimeMillis, primaryTime.endTimeMillis, 'en-US', primaryTime.timezone)
@@ -497,15 +517,20 @@ function renderSessionCard(session, isEventRegistered) {
   descText.innerHTML = fullDesc;
 
   desc.append(descText);
-  right.append(desc, renderCTAGroup(session, isEventRegistered));
+  right.append(desc, renderCTAGroup(session, isEventRegistered, inviteOnlyBlocked, inviteOnlyMessage));
 
   card.append(left, right);
   return card;
 }
 
-function renderSessionList(sessions, isEventRegistered) {
+function renderSessionList(sessions, isEventRegistered, inviteOnlyBlocked, inviteOnlyMessage) {
   const list = createTag('div', { class: 'sh-session-list' });
-  sessions.forEach((s) => list.append(renderSessionCard(s, isEventRegistered)));
+  sessions.forEach((s) => list.append(renderSessionCard(
+    s,
+    isEventRegistered,
+    inviteOnlyBlocked,
+    inviteOnlyMessage,
+  )));
   return list;
 }
 
@@ -609,7 +634,7 @@ function buildBannerDateString() {
   return createSmartDateRange(startMillis, endMillis, 'en-US', timezone);
 }
 
-function renderEventBanner(rsvpConfig) {
+function renderEventBanner(rsvpConfig, inviteOnlyBlocked, inviteOnlyMessage) {
   const banner = createTag('aside', { class: 'sh-event-banner', 'aria-label': dictionaryManager.getValue('Event registration') });
   const inner = createTag('div', { class: 'sh-banner-inner' });
   const info = createTag('div', { class: 'sh-banner-info' });
@@ -628,19 +653,26 @@ function renderEventBanner(rsvpConfig) {
     info.append(dateRow);
   }
 
-  const btn = createTag('button', { class: 'sh-btn sh-btn-event-register', type: 'button' }, dictionaryManager.getValue('Register'));
-  btn.addEventListener('click', () => {
-    const profile = BlockMediator.get('imsProfile');
-    const isSignedOut = !profile || profile.noProfile || profile.account_type === 'guest';
-    if (isSignedOut) {
-      sessionStorage.setItem('sessions-hub:pendingEventRsvp', '1');
-      signIn({ ...getSusiOptions(), redirect_uri: window.location.href });
-    } else if (rsvpConfig) {
-      openRsvpModal(rsvpConfig);
-    }
-  });
+  if (inviteOnlyBlocked) {
+    inner.append(
+      info,
+      createTag('p', { class: 'sh-banner-invite-only-msg', role: 'status' }, inviteOnlyMessage),
+    );
+  } else {
+    const btn = createTag('button', { class: 'sh-btn sh-btn-event-register', type: 'button' }, dictionaryManager.getValue('Register'));
+    btn.addEventListener('click', () => {
+      const profile = BlockMediator.get('imsProfile');
+      const isSignedOut = !profile || profile.noProfile || profile.account_type === 'guest';
+      if (isSignedOut) {
+        sessionStorage.setItem('sessions-hub:pendingEventRsvp', '1');
+        signIn({ ...getSusiOptions(), redirect_uri: window.location.href });
+      } else if (rsvpConfig) {
+        openRsvpModal(rsvpConfig);
+      }
+    });
+    inner.append(info, btn);
+  }
 
-  inner.append(info, btn);
   banner.append(inner);
   return banner;
 }
@@ -1032,6 +1064,7 @@ function bindCardEvents(listEl, state) {
     }
 
     if (e.target.closest('.sh-btn-register-event')) {
+      if (state.inviteOnlyBlocked) return;
       const profile = BlockMediator.get('imsProfile');
       const isSignedOut = !profile || profile.noProfile || profile.account_type === 'guest';
 
@@ -1148,6 +1181,15 @@ async function loadBlock(el, rsvpConfig) {
     return;
   }
 
+  try {
+    await dictionaryManager.initialize();
+  } catch (err) {
+    window.lana?.log(`sessions-hub: dictionary initialize failed: ${err?.message || err}`);
+  }
+
+  const inviteOnlyBlocked = Boolean(eventData.inviteOnly && !getValidCampaignIdFromUrl());
+  const inviteOnlyMessage = getInviteOnlyNoCampaignMessage(dictionaryManager);
+
   let rawSessions;
   try {
     rawSessions = JSON.parse(getMetadata('sessions'));
@@ -1190,17 +1232,19 @@ async function loadBlock(el, rsvpConfig) {
     registeredSessionIds,
     isEventRegistered,
     rsvpConfig,
+    inviteOnlyBlocked,
+    inviteOnlyMessage,
   };
   setState(state);
 
   const toolbar = renderToolbar(state);
   setToolbarStickyOffset(toolbar);
-  const listEl = renderSessionList(sessions, isEventRegistered);
+  const listEl = renderSessionList(sessions, isEventRegistered, inviteOnlyBlocked, inviteOnlyMessage);
   el.append(toolbar, listEl);
 
   // Always append banner; hide it if user is already registered
   el.querySelector('.sh-event-banner')?.remove();
-  const bannerEl = renderEventBanner(rsvpConfig);
+  const bannerEl = renderEventBanner(rsvpConfig, inviteOnlyBlocked, inviteOnlyMessage);
   if (isEventRegistered) bannerEl.classList.add('hidden');
   el.append(bannerEl);
 
@@ -1229,11 +1273,11 @@ async function loadBlock(el, rsvpConfig) {
       if (pendingSession && pendingCard && !pendingSession.isRegistered) {
         await handleSessionRegistration(pendingCard, storedPendingId, state);
       }
-    } else if (rsvpConfig) {
+    } else if (rsvpConfig && !inviteOnlyBlocked) {
       pendingSessionId = storedPendingId;
       openRsvpModal(rsvpConfig);
     }
-  } else if (storedEventRsvp && !isEventRegistered && rsvpConfig) {
+  } else if (storedEventRsvp && !isEventRegistered && rsvpConfig && !inviteOnlyBlocked) {
     openRsvpModal(rsvpConfig);
   }
 }

@@ -2,6 +2,7 @@ import { expect } from '@esm-bundle/chai';
 import { readFile } from '@web/test-runner-commands';
 import init, { syncSessionDescriptionsOverflow } from '../../../../event-libs/v1/blocks/sessions-hub/sessions-hub.js';
 import BlockMediator from '../../../../event-libs/v1/deps/block-mediator.min.js';
+import { DictionaryManager, dictionaryManager } from '../../../../event-libs/v1/utils/dictionary-manager.js';
 
 const body = await readFile({ path: './mocks/default.html' });
 
@@ -523,6 +524,12 @@ describe('sessions-hub init', () => {
       ['/v1/venues/', () => ({ name: 'Main Hall', locationId: 'loc-1' })],
       ['/v1/attendees/me/events/', () => ({ sessionIds: [] })],
       ['chimera-api/tags', () => mockTagsData],
+      ['dictionary.json', () => ({
+        data: { total: 0, offset: 0, limit: 0, data: [] },
+        ':names': ['data'],
+        ':version': 3,
+        ':type': 'multi-sheet',
+      })],
     ]);
   }
 
@@ -537,6 +544,8 @@ describe('sessions-hub init', () => {
     document.body.innerHTML = body;
     document.head.innerHTML = '<meta name="event-id" content="event-123">';
     originalFetch = window.fetch;
+    DictionaryManager._clearCache();
+    dictionaryManager.resetLoadedSheetsForTests();
 
     // Use real BlockMediator (same instance the block imports)
     BlockMediator.set('imsProfile', { userId: 'test-user' });
