@@ -692,7 +692,8 @@
   background: #fff;
 }
 
-.sh-event-banner .sh-banner-invite-only-msg {
+.sh-event-banner .sh-banner-invite-only-msg,
+.sh-event-banner .sh-banner-waitlist-msg {
   font-size: 16px;
   line-height: 1.4;
   max-width: 420px;
