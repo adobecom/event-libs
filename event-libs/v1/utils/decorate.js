@@ -9,7 +9,7 @@ import {
 } from './constances.js';
 import BlockMediator from '../deps/block-mediator.min.js';
 import { getEvent, getCampaign } from './esp-controller.js';
-import { dictionaryManager } from './dictionary-manager.js';
+import { dictionaryManager, getInviteOnlyNoCampaignMessage } from './dictionary-manager.js';
 import {
   getMetadata,
   setMetadata,
@@ -137,11 +137,7 @@ function setCtaState(targetState, rsvpBtn) { // eslint-disable-line no-unused-va
       checkRed.remove();
     },
     inviteOnlyNoCampaign: () => {
-      const INVITE_ONLY_KEY = 'rsvp-invite-only-no-campaign-cta-text';
-      let text = dictionaryManager.getValue(INVITE_ONLY_KEY);
-      if (text === INVITE_ONLY_KEY) {
-        text = 'Registration is only available through a valid invitation link.';
-      }
+      const text = getInviteOnlyNoCampaignMessage(dictionaryManager);
       hideBtn(text);
       updateAnalyticTag(rsvpBtn.el, text);
       checkRed.remove();

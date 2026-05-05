@@ -141,6 +141,13 @@ export class DictionaryManager {
   }
 
   /**
+   * Clears loaded sheets so the next `initialize()` refetches (unit tests only).
+   */
+  resetLoadedSheetsForTests() {
+    this.#dictionaries = {};
+  }
+
+  /**
    * Initialize the dictionary manager by loading all sheets
    */
   async initialize() {
@@ -158,3 +165,18 @@ export class DictionaryManager {
 }
 
 export const dictionaryManager = new DictionaryManager();
+
+/** Dictionary key shared with decorate/events-form RSVP gate (fallback matches legacy hardcoded copy). */
+export const INVITE_ONLY_NO_CAMPAIGN_MESSAGE_KEY = 'rsvp-invite-only-no-campaign-cta-text';
+
+/**
+ * Localized message when invite-only events are opened without a valid campaign URL param.
+ * @param {DictionaryManager} manager - Initialized dictionary manager instance
+ * @returns {string}
+ */
+export function getInviteOnlyNoCampaignMessage(manager) {
+  const text = manager.getValue(INVITE_ONLY_NO_CAMPAIGN_MESSAGE_KEY);
+  return text === INVITE_ONLY_NO_CAMPAIGN_MESSAGE_KEY
+    ? 'Registration is only available through a valid invitation link.'
+    : text;
+}

@@ -1,6 +1,14 @@
 import BlockMediator from '../../deps/block-mediator.min.js';
-import { createTag, getMetadata, getSusiOptions, LIBS, getEventConfig, loadStyle } from '../../utils/utils.js';
-import { dictionaryManager } from '../../utils/dictionary-manager.js';
+import {
+  createTag,
+  getMetadata,
+  getSusiOptions,
+  LIBS,
+  getEventConfig,
+  loadStyle,
+  getValidCampaignIdFromUrl,
+} from '../../utils/utils.js';
+import { dictionaryManager, getInviteOnlyNoCampaignMessage } from '../../utils/dictionary-manager.js';
 import { signIn } from '../../utils/decorate.js';
 import { buildModalContent } from '../profile-cards/profile-cards.js';
 import { createSmartDateRange } from '../../utils/date-time-helper.js';
@@ -298,7 +306,7 @@ function applyFilter(listEl, state) {
 
 // ─── Render: CTA group ───────────────────────────────────────────────────────
 
-function renderCTAGroup(session, isEventRegistered, isEventWaitlisted = false) {
+function renderCTAGroup(session, isEventRegistered, inviteOnlyBlocked, inviteOnlyMessage, isEventWaitlisted = false) {
   const group = createTag('div', { class: 'sh-cta-group' });
 
   if (isEventWaitlisted && !isEventRegistered) {
@@ -306,7 +314,11 @@ function renderCTAGroup(session, isEventRegistered, isEventWaitlisted = false) {
     btn.append(createIcon(CHECKMARK_ICON), createTag('span', {}, dictionaryManager.getValue('waitlisted-cta-text')));
     group.append(btn);
   } else if (!isEventRegistered) {
-    group.append(createTag('button', { class: 'sh-btn sh-btn-register-event', type: 'button' }, dictionaryManager.getValue('Register for session')));
+    if (inviteOnlyBlocked) {
+      group.append(createTag('p', { class: 'sh-invite-only-msg', role: 'status' }, inviteOnlyMessage));
+    } else {
+      group.append(createTag('button', { class: 'sh-btn sh-btn-register-event', type: 'button' }, dictionaryManager.getValue('Register for session')));
+    }
   } else if (!session.isRegistered && !session.isWaitlisted) {
     group.append(createTag('button', { class: 'sh-btn sh-btn-register-session', type: 'button' }, dictionaryManager.getValue('Register for session')));
   } else {
@@ -349,8 +361,16 @@ function renderCTAGroup(session, isEventRegistered, isEventWaitlisted = false) {
 }
 
 function updateCTAGroup(cardEl, session, isEventRegistered, isEventWaitlisted = false) {
+  const state = getState();
   const old = cardEl.querySelector('.sh-cta-group');
-  if (old) old.replaceWith(renderCTAGroup(session, isEventRegistered, isEventWaitlisted));
+  if (!old) return;
+  old.replaceWith(renderCTAGroup(
+    session,
+    isEventRegistered,
+    state?.inviteOnlyBlocked ?? false,
+    state?.inviteOnlyMessage ?? '',
+    isEventWaitlisted,
+  ));
 }
 
 // ─── Session description overflow (matches CSS -webkit-line-clamp) ───────────
@@ -456,7 +476,7 @@ function renderSpeakerAvatars(speakers) {
   return wrap;
 }
 
-function renderSessionCard(session, isEventRegistered, isEventWaitlisted = false) {
+function renderSessionCard(session, isEventRegistered, inviteOnlyBlocked, inviteOnlyMessage, isEventWaitlisted = false) {
   const primaryTime = session.sessionTimes[0];
   const timeStr = primaryTime
     ? createSmartDateRange(primaryTime.startTimeMillis, primaryTime.endTimeMillis, 'en-US', primaryTime.timezone)
@@ -517,15 +537,21 @@ function renderSessionCard(session, isEventRegistered, isEventWaitlisted = false
   descText.innerHTML = fullDesc;
 
   desc.append(descText);
-  right.append(desc, renderCTAGroup(session, isEventRegistered, isEventWaitlisted));
+  right.append(desc, renderCTAGroup(session, isEventRegistered, inviteOnlyBlocked, inviteOnlyMessage, isEventWaitlisted));
 
   card.append(left, right);
   return card;
 }
 
-function renderSessionList(sessions, isEventRegistered, isEventWaitlisted = false) {
+function renderSessionList(sessions, isEventRegistered, inviteOnlyBlocked, inviteOnlyMessage, isEventWaitlisted = false) {
   const list = createTag('div', { class: 'sh-session-list' });
-  sessions.forEach((s) => list.append(renderSessionCard(s, isEventRegistered, isEventWaitlisted)));
+  sessions.forEach((s) => list.append(renderSessionCard(
+    s,
+    isEventRegistered,
+    inviteOnlyBlocked,
+    inviteOnlyMessage,
+    isEventWaitlisted,
+  )));
   return list;
 }
 
@@ -629,7 +655,7 @@ function buildBannerDateString() {
   return createSmartDateRange(startMillis, endMillis, 'en-US', timezone);
 }
 
-function renderEventBanner(rsvpConfig) {
+function renderEventBanner(rsvpConfig, inviteOnlyBlocked, inviteOnlyMessage) {
   const banner = createTag('aside', { class: 'sh-event-banner', 'aria-label': dictionaryManager.getValue('Event registration') });
   const inner = createTag('div', { class: 'sh-banner-inner' });
   const info = createTag('div', { class: 'sh-banner-info' });
@@ -648,19 +674,26 @@ function renderEventBanner(rsvpConfig) {
     info.append(dateRow);
   }
 
-  const btn = createTag('button', { class: 'sh-btn sh-btn-event-register', type: 'button' }, dictionaryManager.getValue('Register'));
-  btn.addEventListener('click', () => {
-    const profile = BlockMediator.get('imsProfile');
-    const isSignedOut = !profile || profile.noProfile || profile.account_type === 'guest';
-    if (isSignedOut) {
-      sessionStorage.setItem('sessions-hub:pendingEventRsvp', '1');
-      signIn({ ...getSusiOptions(), redirect_uri: window.location.href });
-    } else if (rsvpConfig) {
-      openRsvpModal(rsvpConfig);
-    }
-  });
+  if (inviteOnlyBlocked) {
+    inner.append(
+      info,
+      createTag('p', { class: 'sh-banner-invite-only-msg', role: 'status' }, inviteOnlyMessage),
+    );
+  } else {
+    const btn = createTag('button', { class: 'sh-btn sh-btn-event-register', type: 'button' }, dictionaryManager.getValue('Register'));
+    btn.addEventListener('click', () => {
+      const profile = BlockMediator.get('imsProfile');
+      const isSignedOut = !profile || profile.noProfile || profile.account_type === 'guest';
+      if (isSignedOut) {
+        sessionStorage.setItem('sessions-hub:pendingEventRsvp', '1');
+        signIn({ ...getSusiOptions(), redirect_uri: window.location.href });
+      } else if (rsvpConfig) {
+        openRsvpModal(rsvpConfig);
+      }
+    });
+    inner.append(info, btn);
+  }
 
-  inner.append(info, btn);
   banner.append(inner);
   return banner;
 }
@@ -936,7 +969,7 @@ async function handleSessionRegistration(cardEl, sessionId, state) {
       state.registeredSessionIds.delete(conflictingSession.sessionId);
       const conflictCard = cardEl.closest('.sh-session-list')
         ?.querySelector(`[data-session-id="${conflictingSession.sessionId}"]`);
-      if (conflictCard) updateCTAGroup(conflictCard, conflictingSession, true);
+      if (conflictCard) updateCTAGroup(conflictCard, conflictingSession, true, state.isEventWaitlisted);
       const existing = BlockMediator.get('registeredSessionIds') || new Set();
       const updated = new Set([...existing]);
       updated.delete(conflictingSession.sessionId);
@@ -975,7 +1008,7 @@ async function handleSessionRegistration(cardEl, sessionId, state) {
       const existing = BlockMediator.get('registeredSessionIds') || new Set();
       BlockMediator.set('registeredSessionIds', new Set([...existing, sessionId]));
     }
-    updateCTAGroup(cardEl, session, true);
+    updateCTAGroup(cardEl, session, true, state.isEventWaitlisted);
     if (conflictFinalize) conflictFinalize(true);
   } else {
     window.lana?.log(`Error: Failed to register for session ${sessionId}. Error:${JSON.stringify(resp.error)}`);
@@ -1010,7 +1043,7 @@ async function handleSessionUnregistration(cardEl, sessionId, state) {
     session.isRegistered = false;
     session.isWaitlisted = false;
     state.registeredSessionIds.delete(sessionId);
-    updateCTAGroup(cardEl, session, true);
+    updateCTAGroup(cardEl, session, true, state.isEventWaitlisted);
     const existing = BlockMediator.get('registeredSessionIds') || new Set();
     const updated = new Set([...existing]);
     updated.delete(sessionId);
@@ -1076,6 +1109,8 @@ function bindCardEvents(listEl, state) {
     if (e.target.closest('.sh-btn-register-event')) {
       const btn = e.target.closest('.sh-btn-register-event');
       const isAlreadyWaitlisted = btn?.classList.contains('sh-event-waitlisted-badge');
+
+      if (state.inviteOnlyBlocked) return;
 
       if (isAlreadyWaitlisted) {
         // User is already on the event waitlist \u2014 just re-open the modal so
@@ -1202,6 +1237,15 @@ async function loadBlock(el, rsvpConfig) {
     return;
   }
 
+  try {
+    await dictionaryManager.initialize();
+  } catch (err) {
+    window.lana?.log(`sessions-hub: dictionary initialize failed: ${err?.message || err}`);
+  }
+
+  const inviteOnlyBlocked = Boolean(eventData.inviteOnly && !getValidCampaignIdFromUrl());
+  const inviteOnlyMessage = getInviteOnlyNoCampaignMessage(dictionaryManager);
+
   let rawSessions;
   try {
     rawSessions = JSON.parse(getMetadata('sessions'));
@@ -1246,17 +1290,19 @@ async function loadBlock(el, rsvpConfig) {
     isEventRegistered,
     isEventWaitlisted,
     rsvpConfig,
+    inviteOnlyBlocked,
+    inviteOnlyMessage,
   };
   setState(state);
 
   const toolbar = renderToolbar(state);
   setToolbarStickyOffset(toolbar);
-  const listEl = renderSessionList(sessions, isEventRegistered, isEventWaitlisted);
+  const listEl = renderSessionList(sessions, isEventRegistered, inviteOnlyBlocked, inviteOnlyMessage, isEventWaitlisted);
   el.append(toolbar, listEl);
 
   // Always append banner; hide it if user is already registered or waitlisted
   el.querySelector('.sh-event-banner')?.remove();
-  const bannerEl = renderEventBanner(rsvpConfig);
+  const bannerEl = renderEventBanner(rsvpConfig, inviteOnlyBlocked, inviteOnlyMessage);
   if (isEventRegistered || isEventWaitlisted) bannerEl.classList.add('hidden');
   el.append(bannerEl);
 
@@ -1285,11 +1331,11 @@ async function loadBlock(el, rsvpConfig) {
       if (pendingSession && pendingCard && !pendingSession.isRegistered) {
         await handleSessionRegistration(pendingCard, storedPendingId, state);
       }
-    } else if (rsvpConfig) {
+    } else if (rsvpConfig && !inviteOnlyBlocked) {
       pendingSessionId = storedPendingId;
       openRsvpModal(rsvpConfig);
     }
-  } else if (storedEventRsvp && !isEventRegistered && rsvpConfig) {
+  } else if (storedEventRsvp && !isEventRegistered && rsvpConfig && !inviteOnlyBlocked) {
     openRsvpModal(rsvpConfig);
   }
 }
