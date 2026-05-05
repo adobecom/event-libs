@@ -179,6 +179,13 @@ async function resolveRegistrationState(eventId, isEventRegistered) {
   return new Set(resp.data?.sessionIds || []);
 }
 
+function isSessionTimeFullError(resp) {
+  const err = resp?.error;
+  if (!err) return false;
+  const candidates = [err.code, err.errorCode, err.error, err.type, err.message];
+  return candidates.some((v) => typeof v === 'string' && v.includes('SessionTimeFull'));
+}
+
 function findConflictingSession(newSession, state) {
   const newTime = newSession.sessionTimes[0];
   if (!newTime) return null;
@@ -229,6 +236,7 @@ function normalizeSessions(rawSessions, locationMap, registeredSessionIds, venue
       sessionTimes,
       speakers,
       isRegistered: registeredSessionIds.has(session.sessionId),
+      isWaitlisted: false,
       expanded: false,
     };
   });
@@ -298,24 +306,36 @@ function applyFilter(listEl, state) {
 
 // ─── Render: CTA group ───────────────────────────────────────────────────────
 
-function renderCTAGroup(session, isEventRegistered, inviteOnlyBlocked, inviteOnlyMessage) {
+function renderCTAGroup(session, isEventRegistered, inviteOnlyBlocked, inviteOnlyMessage, isEventWaitlisted = false) {
   const group = createTag('div', { class: 'sh-cta-group' });
 
-  if (!isEventRegistered) {
+  if (isEventWaitlisted && !isEventRegistered) {
+    const btn = createTag('button', { class: 'sh-btn sh-btn-register-event sh-event-waitlisted-badge', type: 'button' });
+    btn.append(createIcon(CHECKMARK_ICON), createTag('span', {}, dictionaryManager.getValue('waitlisted-cta-text')));
+    group.append(btn);
+  } else if (!isEventRegistered) {
     if (inviteOnlyBlocked) {
       group.append(createTag('p', { class: 'sh-invite-only-msg', role: 'status' }, inviteOnlyMessage));
     } else {
       group.append(createTag('button', { class: 'sh-btn sh-btn-register-event', type: 'button' }, dictionaryManager.getValue('Register for session')));
     }
-  } else if (!session.isRegistered) {
+  } else if (!session.isRegistered && !session.isWaitlisted) {
     group.append(createTag('button', { class: 'sh-btn sh-btn-register-session', type: 'button' }, dictionaryManager.getValue('Register for session')));
   } else {
     const calBtn = createTag('button', { class: 'sh-btn sh-btn-cal', type: 'button' });
     calBtn.append(createIcon(CTA_CALENDAR_ICON), createTag('span', {}, dictionaryManager.getValue('Download to calendar')));
     group.append(calBtn);
 
+    const isWaitlisted = !session.isRegistered && session.isWaitlisted;
+    const badgeLabel = isWaitlisted
+      ? dictionaryManager.getValue('waitlisted-cta-text')
+      : dictionaryManager.getValue('Registered');
+    const unregisterLabel = isWaitlisted
+      ? dictionaryManager.getValue('Leave waitlist')
+      : dictionaryManager.getValue('Unregister');
+
     const badge = createTag('button', { class: 'sh-btn sh-registered-badge', type: 'button', disabled: '' });
-    badge.append(createIcon(CHECKMARK_ICON), createTag('span', {}, dictionaryManager.getValue('Registered')));
+    badge.append(createIcon(CHECKMARK_ICON), createTag('span', {}, badgeLabel));
     group.append(badge);
 
     setTimeout(() => {
@@ -323,34 +343,34 @@ function renderCTAGroup(session, isEventRegistered, inviteOnlyBlocked, inviteOnl
       badge.disabled = false;
     }, 2000);
 
-    const setRegisteredContent = () => {
+    const setIdleContent = () => {
       badge.innerHTML = '';
       badge.classList.remove('sh-unregister-mode');
-      badge.append(createIcon(CHECKMARK_ICON), createTag('span', {}, dictionaryManager.getValue('Registered')));
+      badge.append(createIcon(CHECKMARK_ICON), createTag('span', {}, badgeLabel));
     };
     const setUnregisterContent = () => {
       badge.innerHTML = '';
       badge.classList.add('sh-unregister-mode');
-      badge.append(createTag('span', {}, dictionaryManager.getValue('Unregister')));
+      badge.append(createTag('span', {}, unregisterLabel));
     };
     badge.addEventListener('mouseenter', () => { if (!badge.disabled) setUnregisterContent(); });
-    badge.addEventListener('mouseleave', () => { if (!badge.disabled) setRegisteredContent(); });
+    badge.addEventListener('mouseleave', () => { if (!badge.disabled) setIdleContent(); });
   }
 
   return group;
 }
 
-function updateCTAGroup(cardEl, session, isEventRegistered) {
+function updateCTAGroup(cardEl, session, isEventRegistered, isEventWaitlisted = false) {
   const state = getState();
   const old = cardEl.querySelector('.sh-cta-group');
-  if (old && state) {
-    old.replaceWith(renderCTAGroup(
-      session,
-      isEventRegistered,
-      state.inviteOnlyBlocked,
-      state.inviteOnlyMessage,
-    ));
-  }
+  if (!old) return;
+  old.replaceWith(renderCTAGroup(
+    session,
+    isEventRegistered,
+    state?.inviteOnlyBlocked ?? false,
+    state?.inviteOnlyMessage ?? '',
+    isEventWaitlisted,
+  ));
 }
 
 // ─── Session description overflow (matches CSS -webkit-line-clamp) ───────────
@@ -456,7 +476,7 @@ function renderSpeakerAvatars(speakers) {
   return wrap;
 }
 
-function renderSessionCard(session, isEventRegistered, inviteOnlyBlocked, inviteOnlyMessage) {
+function renderSessionCard(session, isEventRegistered, inviteOnlyBlocked, inviteOnlyMessage, isEventWaitlisted = false) {
   const primaryTime = session.sessionTimes[0];
   const timeStr = primaryTime
     ? createSmartDateRange(primaryTime.startTimeMillis, primaryTime.endTimeMillis, 'en-US', primaryTime.timezone)
@@ -517,19 +537,20 @@ function renderSessionCard(session, isEventRegistered, inviteOnlyBlocked, invite
   descText.innerHTML = fullDesc;
 
   desc.append(descText);
-  right.append(desc, renderCTAGroup(session, isEventRegistered, inviteOnlyBlocked, inviteOnlyMessage));
+  right.append(desc, renderCTAGroup(session, isEventRegistered, inviteOnlyBlocked, inviteOnlyMessage, isEventWaitlisted));
 
   card.append(left, right);
   return card;
 }
 
-function renderSessionList(sessions, isEventRegistered, inviteOnlyBlocked, inviteOnlyMessage) {
+function renderSessionList(sessions, isEventRegistered, inviteOnlyBlocked, inviteOnlyMessage, isEventWaitlisted = false) {
   const list = createTag('div', { class: 'sh-session-list' });
   sessions.forEach((s) => list.append(renderSessionCard(
     s,
     isEventRegistered,
     inviteOnlyBlocked,
     inviteOnlyMessage,
+    isEventWaitlisted,
   )));
   return list;
 }
@@ -948,7 +969,7 @@ async function handleSessionRegistration(cardEl, sessionId, state) {
       state.registeredSessionIds.delete(conflictingSession.sessionId);
       const conflictCard = cardEl.closest('.sh-session-list')
         ?.querySelector(`[data-session-id="${conflictingSession.sessionId}"]`);
-      if (conflictCard) updateCTAGroup(conflictCard, conflictingSession, true);
+      if (conflictCard) updateCTAGroup(conflictCard, conflictingSession, true, state.isEventWaitlisted);
       const existing = BlockMediator.get('registeredSessionIds') || new Set();
       const updated = new Set([...existing]);
       updated.delete(conflictingSession.sessionId);
@@ -963,14 +984,31 @@ async function handleSessionRegistration(cardEl, sessionId, state) {
     btn.textContent = dictionaryManager.getValue('Registering\u2026');
   }
 
-  const resp = await registerForSessionTime(firstTime.sessionTimeId, 'me', { registrationStatus: 'registered' });
+  let resp = await registerForSessionTime(firstTime.sessionTimeId, 'me', { registrationStatus: 'registered' });
+  let waitlisted = resp.ok && resp.data?.registrationStatus === 'waitlisted';
+
+  if (!resp.ok && isSessionTimeFullError(resp)) {
+    const retry = await registerForSessionTime(firstTime.sessionTimeId, 'me', { registrationStatus: 'waitlisted' });
+    if (retry.ok) {
+      resp = retry;
+      waitlisted = true;
+    } else {
+      resp = retry;
+    }
+  }
 
   if (resp.ok) {
-    session.isRegistered = true;
-    state.registeredSessionIds.add(sessionId);
-    updateCTAGroup(cardEl, session, true);
-    const existing = BlockMediator.get('registeredSessionIds') || new Set();
-    BlockMediator.set('registeredSessionIds', new Set([...existing, sessionId]));
+    if (waitlisted) {
+      session.isWaitlisted = true;
+      session.isRegistered = false;
+    } else {
+      session.isRegistered = true;
+      session.isWaitlisted = false;
+      state.registeredSessionIds.add(sessionId);
+      const existing = BlockMediator.get('registeredSessionIds') || new Set();
+      BlockMediator.set('registeredSessionIds', new Set([...existing, sessionId]));
+    }
+    updateCTAGroup(cardEl, session, true, state.isEventWaitlisted);
     if (conflictFinalize) conflictFinalize(true);
   } else {
     window.lana?.log(`Error: Failed to register for session ${sessionId}. Error:${JSON.stringify(resp.error)}`);
@@ -998,12 +1036,14 @@ async function handleSessionUnregistration(cardEl, sessionId, state) {
     badge.textContent = dictionaryManager.getValue('Unregistering\u2026');
   }
 
+  const wasWaitlisted = session.isWaitlisted;
   const resp = await unregisterFromSessionTime(firstTime.sessionTimeId);
 
   if (resp.ok) {
     session.isRegistered = false;
+    session.isWaitlisted = false;
     state.registeredSessionIds.delete(sessionId);
-    updateCTAGroup(cardEl, session, true);
+    updateCTAGroup(cardEl, session, true, state.isEventWaitlisted);
     const existing = BlockMediator.get('registeredSessionIds') || new Set();
     const updated = new Set([...existing]);
     updated.delete(sessionId);
@@ -1015,7 +1055,10 @@ async function handleSessionUnregistration(cardEl, sessionId, state) {
       badge.removeAttribute('aria-busy');
       badge.classList.remove('sh-unregister-mode');
       badge.innerHTML = '';
-      badge.append(createIcon(CHECKMARK_ICON), createTag('span', {}, dictionaryManager.getValue('Registered')));
+      const restoreLabel = wasWaitlisted
+        ? dictionaryManager.getValue('waitlisted-cta-text')
+        : dictionaryManager.getValue('Registered');
+      badge.append(createIcon(CHECKMARK_ICON), createTag('span', {}, restoreLabel));
     }
   }
 }
@@ -1064,7 +1107,19 @@ function bindCardEvents(listEl, state) {
     }
 
     if (e.target.closest('.sh-btn-register-event')) {
+      const btn = e.target.closest('.sh-btn-register-event');
+      const isAlreadyWaitlisted = btn?.classList.contains('sh-event-waitlisted-badge');
+
       if (state.inviteOnlyBlocked) return;
+
+      if (isAlreadyWaitlisted) {
+        // User is already on the event waitlist \u2014 just re-open the modal so
+        // they can cancel waitlist or review status. Do not set pendingSessionId
+        // or relabel the button.
+        if (state.rsvpConfig) openRsvpModal(state.rsvpConfig);
+        return;
+      }
+
       const profile = BlockMediator.get('imsProfile');
       const isSignedOut = !profile || profile.noProfile || profile.account_type === 'guest';
 
@@ -1076,7 +1131,6 @@ function bindCardEvents(listEl, state) {
 
       if (state.rsvpConfig) {
         pendingSessionId = sessionId;
-        const btn = e.target.closest('.sh-btn-register-event');
         if (btn) { btn.disabled = true; btn.textContent = dictionaryManager.getValue('Registering\u2026'); }
 
         // Milo's closeModal uses pushState (not location.hash=) so hashchange never fires.
@@ -1101,9 +1155,11 @@ function bindMediatorSubscriptions(el, bannerEl, listEl) {
   rsvpUnsubscribe = BlockMediator.subscribe('rsvpData', async ({ newValue }) => {
     const state = getState();
     const isRegistered = newValue?.registrationStatus === 'registered';
+    const isWaitlisted = newValue?.registrationStatus === 'waitlisted';
     state.isEventRegistered = isRegistered;
+    state.isEventWaitlisted = isWaitlisted;
 
-    syncBannerVisibility(bannerEl, isRegistered);
+    syncBannerVisibility(bannerEl, isRegistered || isWaitlisted);
 
     const toggle = el.querySelector('.sh-tab-toggle');
     if (toggle) toggle.hidden = !isRegistered;
@@ -1120,7 +1176,7 @@ function bindMediatorSubscriptions(el, bannerEl, listEl) {
       state.sessions.forEach((session) => {
         session.isRegistered = mergedIds.has(session.sessionId);
         const cardEl = cardMap.get(session.sessionId);
-        if (cardEl) updateCTAGroup(cardEl, session, true);
+        if (cardEl) updateCTAGroup(cardEl, session, true, false);
       });
 
       if (pendingSessionId) {
@@ -1137,7 +1193,7 @@ function bindMediatorSubscriptions(el, bannerEl, listEl) {
       state.sessions.forEach((session) => {
         session.isRegistered = false;
         const cardEl = cardMap.get(session.sessionId);
-        if (cardEl) updateCTAGroup(cardEl, session, false);
+        if (cardEl) updateCTAGroup(cardEl, session, false, isWaitlisted);
       });
 
       // Reset to "All sessions" tab when user un-registers
@@ -1165,7 +1221,7 @@ function bindMediatorSubscriptions(el, bannerEl, listEl) {
         session.isRegistered = true;
         state.registeredSessionIds.add(session.sessionId);
         const cardEl = cardMap.get(session.sessionId);
-        if (cardEl) updateCTAGroup(cardEl, session, state.isEventRegistered);
+        if (cardEl) updateCTAGroup(cardEl, session, state.isEventRegistered, state.isEventWaitlisted);
       }
     });
     applyFilter(listEl, state);
@@ -1210,6 +1266,7 @@ async function loadBlock(el, rsvpConfig) {
 
   const rsvpData = BlockMediator.get('rsvpData');
   const isEventRegistered = rsvpData?.registrationStatus === 'registered';
+  const isEventWaitlisted = rsvpData?.registrationStatus === 'waitlisted';
   const [registeredSessionIds, tagsData] = await Promise.all([
     resolveRegistrationState(eventData.eventId, isEventRegistered),
     Promise.resolve(getCaasTags()).catch(() => null),
@@ -1231,6 +1288,7 @@ async function loadBlock(el, rsvpConfig) {
     locationMap,
     registeredSessionIds,
     isEventRegistered,
+    isEventWaitlisted,
     rsvpConfig,
     inviteOnlyBlocked,
     inviteOnlyMessage,
@@ -1239,13 +1297,13 @@ async function loadBlock(el, rsvpConfig) {
 
   const toolbar = renderToolbar(state);
   setToolbarStickyOffset(toolbar);
-  const listEl = renderSessionList(sessions, isEventRegistered, inviteOnlyBlocked, inviteOnlyMessage);
+  const listEl = renderSessionList(sessions, isEventRegistered, inviteOnlyBlocked, inviteOnlyMessage, isEventWaitlisted);
   el.append(toolbar, listEl);
 
-  // Always append banner; hide it if user is already registered
+  // Always append banner; hide it if user is already registered or waitlisted
   el.querySelector('.sh-event-banner')?.remove();
   const bannerEl = renderEventBanner(rsvpConfig, inviteOnlyBlocked, inviteOnlyMessage);
-  if (isEventRegistered) bannerEl.classList.add('hidden');
+  if (isEventRegistered || isEventWaitlisted) bannerEl.classList.add('hidden');
   el.append(bannerEl);
 
   bindToolbarEvents(toolbar, listEl, state);
