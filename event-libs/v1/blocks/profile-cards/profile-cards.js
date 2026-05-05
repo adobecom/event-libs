@@ -228,6 +228,16 @@ function appendBio(contentContainer, bio) {
   contentContainer.append(description);
 }
 
+function modalJobTitlePlainText(title) {
+  if (title == null || typeof title !== 'string') return '';
+  const trimmed = title.trim();
+  if (!trimmed) return '';
+  if (!trimmed.includes('<')) return trimmed;
+  const wrapper = document.createElement('div');
+  wrapper.innerHTML = trimmed;
+  return wrapper.textContent.replace(/\s+/g, ' ').trim();
+}
+
 function getModalId(data, index) {
   const fullName = getProfileName(data);
   const slug = fullName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
@@ -253,7 +263,7 @@ export async function buildModalContent(profileData) {
   const textContainer = createTag('div', { class: 'profile-cards-modal-text' });
   const imageContainer = createTag('div', { class: 'profile-cards-modal-image' });
   const fullName = getProfileName(profileData);
-  const title = createTag('p', { class: 'card-title' }, profileData?.title || '');
+  const title = createTag('p', { class: 'card-title' }, modalJobTitlePlainText(profileData?.title));
   const name = createTag('h2', { class: 'card-name', tabindex: '0' }, fullName);
 
   textContainer.append(title, name);
