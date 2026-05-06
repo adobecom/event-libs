@@ -129,7 +129,7 @@ describe('Mobile Rider Drawer', () => {
       };
       const onItemClick = sinon.stub();
 
-      const drawer = createDrawer(root, {
+      createDrawer(root, {
         items,
         ariaLabel: 'Test Drawer',
         renderItem,
@@ -365,72 +365,67 @@ describe('Mobile Rider Drawer', () => {
   });
 
   describe('Drawer methods coverage', () => {
-    let drawer; let items; let
-      itemsEl;
+    let drawer;
+    let items;
+    let root;
 
     beforeEach(() => {
       items = [
         { videoid: 'vid1', title: 'Video 1' },
         { videoid: 'vid2', title: 'Video 2' },
       ];
-      itemsEl = document.createElement('div');
-      const el1 = document.createElement('div');
-      el1.setAttribute('data-id', 'vid1');
-      itemsEl.appendChild(el1);
-
-      const root = document.createElement('div');
-      drawer = createDrawer(root, { items });
-      drawer.itemsEl = itemsEl;
-      drawer.items = items;
-      sinon.stub(drawer, 'setActive');
+      root = document.createElement('div');
+      document.body.appendChild(root);
+      const renderItem = (item) => {
+        const div = document.createElement('div');
+        div.className = 'drawer-item';
+        div.setAttribute('data-id', item.videoid);
+        return div;
+      };
+      drawer = createDrawer(root, { items, renderItem });
     });
 
     afterEach(() => {
       sinon.restore();
     });
 
-    it('should call setActive with correct element and item in setActiveById', () => {
-      drawer.setActiveById('vid1');
-      expect(drawer.setActive.calledOnce).to.be.true;
-      expect(drawer.setActive.firstCall.args[0].getAttribute('data-id')).to.equal('vid1');
-      expect(drawer.setActive.firstCall.args[1]).to.deep.equal(items[0]);
+    it('should apply current class to target element in setActiveById', () => {
+      drawer.setActiveById('vid2');
+      const vid1El = drawer.itemsEl.querySelector('[data-id="vid1"]');
+      const vid2El = drawer.itemsEl.querySelector('[data-id="vid2"]');
+      expect(vid1El.classList.contains('current')).to.be.false;
+      expect(vid2El.classList.contains('current')).to.be.true;
     });
 
     it('should do nothing if id not found in setActiveById', () => {
-      drawer.setActiveById('vidX');
-      expect(drawer.setActive.called).to.be.false;
+      const vid1El = drawer.itemsEl.querySelector('[data-id="vid1"]');
+      expect(() => drawer.setActiveById('vidX')).to.not.throw();
+      expect(vid1El.classList.contains('current')).to.be.true;
     });
 
-    it('should handle setActiveById when itemsEl is null', () => {
+    it('should do nothing when itemsEl is null', () => {
       drawer.itemsEl = null;
-      drawer.setActiveById('vid1');
-      expect(drawer.setActive.called).to.be.false;
+      expect(() => drawer.setActiveById('vid1')).to.not.throw();
     });
 
-    it('should handle setActiveById when element is not found', () => {
-      // Remove the element with data-id="vid1"
-      itemsEl.innerHTML = '';
-      drawer.setActiveById('vid1');
-      expect(drawer.setActive.called).to.be.false;
+    it('should do nothing when id is not provided', () => {
+      expect(() => drawer.setActiveById(null)).to.not.throw();
     });
 
-    it('should handle clicks when no onItemClick is provided', () => {
-      const root = document.createElement('div');
-      const testDrawer = createDrawer(root, { items });
-      const item = testDrawer.itemsEl.firstChild;
-      // Should not throw when clicked without a handler
-      expect(() => {
-        item.click();
-      }).to.not.throw();
+    it('should not throw when clicked without onItemClick handler', () => {
+      const item = drawer.itemsEl.firstChild;
+      expect(() => { item.click(); }).to.not.throw();
     });
 
-    it('should handle default handler gracefully', () => {
-      const root = document.createElement('div');
-      const testDrawer = createDrawer(root, { items });
-      const item = testDrawer.itemsEl.firstChild;
-      expect(() => {
-        item.click();
-      }).to.not.throw();
+    it('remove() should remove the drawer element from the root', () => {
+      expect(root.querySelector('.drawer')).to.not.be.null;
+      drawer.remove();
+      expect(root.querySelector('.drawer')).to.be.null;
+    });
+
+    it('remove() should not throw when drawer element is already gone', () => {
+      drawer.remove();
+      expect(() => drawer.remove()).to.not.throw();
     });
   });
 });
