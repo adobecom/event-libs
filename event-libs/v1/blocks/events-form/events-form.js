@@ -1,7 +1,7 @@
 import { deleteAttendeeFromEvent, getAndCreateAndAddAttendee, getAttendee, getEvent, getCampaign, registerForSessionTime } from '../../utils/esp-controller.js';
 import BlockMediator from '../../deps/block-mediator.min.js';
 import { signIn, decorateEvent } from '../../utils/decorate.js';
-import { dictionaryManager } from '../../utils/dictionary-manager.js';
+import { dictionaryManager, getInviteOnlyNoCampaignMessage } from '../../utils/dictionary-manager.js';
 import {
   getEventConfig, LIBS, getMetadata, getSusiOptions, getValidCampaignIdFromUrl,
 } from '../../utils/utils.js';
@@ -19,6 +19,9 @@ const { decorateDefaultLinkAnalytics } = await import(`${miloLibs}/martech/attri
 const { default: loadFragment } = await import(`${miloLibs}/blocks/fragment/fragment.js`);
 
 const VALID_REGISTRATION_STATUS = ['registered', 'waitlisted'];
+
+const PHONE_FIELD_RE = /phone/i;
+const PHONE_PATTERN = '^\\+?[\\d\\s\\(\\)\\.\\-]{7,20}$';
 
 const RULE_OPERATORS = {
   equal: '=',
@@ -442,8 +445,14 @@ function createInput({
   type, field, placeholder, required, defval, pattern, title, limit,
 }) {
   const placeholderText = placeholder ? dictionaryManager.getValue(placeholder, 'rsvp-fields') : '';
-  const attrs = { type, id: field, placeholder: placeholderText, value: defval };
-  if (pattern) attrs.pattern = pattern;
+  const isPhoneField = type === 'tel' || type === 'phone' || (typeof field === 'string' && PHONE_FIELD_RE.test(field));
+  const attrs = { type: isPhoneField ? 'tel' : type, id: field, placeholder: placeholderText, value: defval };
+  if (isPhoneField) {
+    attrs.inputmode = 'tel';
+    attrs.autocomplete = 'tel';
+  }
+  const resolvedPattern = pattern || (isPhoneField ? PHONE_PATTERN : null);
+  if (resolvedPattern) attrs.pattern = resolvedPattern;
   if (title) attrs.title = title;
   if (limit != null) attrs.maxlength = limit;
   const input = createTag('input', attrs);
@@ -1103,11 +1112,7 @@ async function onProfile(bp, formData) {
         }
         if (eventData?.inviteOnly && !getValidCampaignIdFromUrl()) {
           await dictionaryManager.initialize();
-          const INVITE_ONLY_KEY = 'rsvp-invite-only-no-campaign-cta-text';
-          let msg = dictionaryManager.getValue(INVITE_ONLY_KEY);
-          if (msg === INVITE_ONLY_KEY) {
-            msg = 'Registration is only available through a valid invitation link.';
-          }
+          const msg = getInviteOnlyNoCampaignMessage(dictionaryManager);
           const error = createTag('p', { class: 'error' }, msg);
           bp.formContainer.append(error);
         } else {

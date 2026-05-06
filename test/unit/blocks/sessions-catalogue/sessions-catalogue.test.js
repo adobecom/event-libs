@@ -2,6 +2,7 @@ import { expect } from '@esm-bundle/chai';
 import { readFile } from '@web/test-runner-commands';
 import init, { syncSessionDescriptionsOverflow } from '../../../../event-libs/v1/blocks/sessions-hub/sessions-hub.js';
 import BlockMediator from '../../../../event-libs/v1/deps/block-mediator.min.js';
+import { DictionaryManager, dictionaryManager } from '../../../../event-libs/v1/utils/dictionary-manager.js';
 
 const body = await readFile({ path: './mocks/default.html' });
 
@@ -42,10 +43,40 @@ function makeEventData(overrides = {}) {
 // We import helper functions via dynamic import to avoid triggering side-effects
 // from the full block init (which makes network calls in the constructor).
 
-let deriveTagLabels;
+let resolveTagWithGroup;
+let resolveTagObjects;
 let generateICS;
 let filterSessions;
 let normalizeSessions;
+
+const mockTagsData = {
+  namespaces: {
+    caas: {
+      tags: {
+        events: {
+          tags: {
+            type: {
+              title: 'Session Type',
+              tags: {
+                workshop: { title: 'Workshop' },
+                lab: { title: 'Lab' },
+                demo: { title: 'Demo' },
+                'two-word-tag': { title: 'Two Word Tag' },
+                'deep-dive': { title: 'Deep Dive' },
+              },
+            },
+            level: {
+              title: 'Level',
+              tags: {
+                beginner: { title: 'Beginner' },
+              },
+            },
+          },
+        },
+      },
+    },
+  },
+};
 
 before(async () => {
   // Import isolated helpers by re-exporting them in tests via dynamic import.
@@ -55,15 +86,26 @@ before(async () => {
   // Inline the pure functions under test to avoid circular-import issues with
   // the block's top-level side-effect-free closures.
 
-  deriveTagLabels = (tagIdList) => {
+  resolveTagWithGroup = (tagId, tagsData) => {
+    const colonIdx = tagId.indexOf(':');
+    if (colonIdx === -1 || !tagsData) return { label: '', group: '' };
+    const ns = tagId.slice(0, colonIdx);
+    const segs = tagId.slice(colonIdx + 1).split('/');
+    let node = tagsData.namespaces?.[ns];
+    let parentNode = null;
+    for (const seg of segs) {
+      parentNode = node;
+      node = node?.tags?.[seg];
+    }
+    return { label: node?.title || '', group: parentNode?.title || '' };
+  };
+
+  resolveTagObjects = (tagIdList, tagsData) => {
     if (!tagIdList) return [];
     return tagIdList
       .split(',')
-      .map((id) => {
-        const seg = id.trim().split('/').at(-1);
-        return seg ? seg.charAt(0).toUpperCase() + seg.slice(1) : '';
-      })
-      .filter(Boolean);
+      .map((id) => resolveTagWithGroup(id.trim(), tagsData))
+      .filter((t) => t.label);
   };
 
   generateICS = (sessionTime, title, locationName) => {
@@ -92,7 +134,11 @@ before(async () => {
     const q = query.toLowerCase();
     return sessions.filter((s) => {
       if (activeTab === 'my' && !registeredSessionIds.has(s.sessionId)) return false;
-      if (activeTags.size > 0 && !s.tags.some((t) => activeTags.has(t))) return false;
+      if (activeTags.size > 0) {
+        for (const [, groupSet] of activeTags) {
+          if (groupSet.size > 0 && !s.tags.some((t) => groupSet.has(t.label))) return false;
+        }
+      }
       if (q) {
         const hay = [
           s.title,
@@ -105,7 +151,7 @@ before(async () => {
     });
   };
 
-  normalizeSessions = (rawSessions, speakerMap, locationMap, registeredSessionIds, venueId) => rawSessions.map((session) => {
+  normalizeSessions = (rawSessions, speakerMap, locationMap, registeredSessionIds, venueId, tagsData) => rawSessions.map((session) => {
     const sessionTimes = (session.rawTimes || []).map((t) => ({
       sessionTimeId: t.sessionTimeId,
       startTimeMillis: t.startTimeMillis,
@@ -137,7 +183,7 @@ before(async () => {
       sessionId: session.sessionId,
       title: session.localizations?.['en-US']?.title || session.title || session.enTitle || '',
       description: session.localizations?.['en-US']?.description || session.description || '',
-      tags: deriveTagLabels(session.tags),
+      tags: resolveTagObjects(session.tags, tagsData),
       sessionTimes,
       speakers,
       isRegistered: registeredSessionIds.has(session.sessionId),
@@ -146,29 +192,82 @@ before(async () => {
   });
 });
 
-// ─── deriveTagLabels ─────────────────────────────────────────────────────────
+// ─── resolveTagWithGroup ─────────────────────────────────────────────────────
 
-describe('deriveTagLabels', () => {
+describe('resolveTagWithGroup', () => {
+  it('returns label and group from tagsData for a known tag', () => {
+    expect(resolveTagWithGroup('caas:events/type/workshop', mockTagsData))
+      .to.deep.equal({ label: 'Workshop', group: 'Session Type' });
+  });
+
+  it('returns multi-word label for a hyphenated tag ID', () => {
+    expect(resolveTagWithGroup('caas:events/type/two-word-tag', mockTagsData))
+      .to.deep.equal({ label: 'Two Word Tag', group: 'Session Type' });
+  });
+
+  it('returns empty label for unknown tag path', () => {
+    expect(resolveTagWithGroup('caas:events/type/unknown', mockTagsData))
+      .to.deep.equal({ label: '', group: 'Session Type' });
+  });
+
+  it('returns empty label and group when tagsData is null', () => {
+    expect(resolveTagWithGroup('caas:events/type/workshop', null))
+      .to.deep.equal({ label: '', group: '' });
+  });
+
+  it('returns empty label and group when tag has no colon separator', () => {
+    expect(resolveTagWithGroup('no-colon-tag', mockTagsData))
+      .to.deep.equal({ label: '', group: '' });
+  });
+});
+
+// ─── resolveTagObjects ───────────────────────────────────────────────────────
+
+describe('resolveTagObjects', () => {
   it('returns empty array for null', () => {
-    expect(deriveTagLabels(null)).to.deep.equal([]);
+    expect(resolveTagObjects(null, mockTagsData)).to.deep.equal([]);
   });
 
   it('returns empty array for empty string', () => {
-    expect(deriveTagLabels('')).to.deep.equal([]);
+    expect(resolveTagObjects('', mockTagsData)).to.deep.equal([]);
   });
 
-  it('capitalizes last path segment of a single CaaS tag', () => {
-    expect(deriveTagLabels('caas:events/type/workshop')).to.deep.equal(['Workshop']);
+  it('resolves a single tag to its label and group', () => {
+    expect(resolveTagObjects('caas:events/type/workshop', mockTagsData))
+      .to.deep.equal([{ label: 'Workshop', group: 'Session Type' }]);
   });
 
-  it('handles multiple comma-separated tags', () => {
-    const result = deriveTagLabels('caas:events/type/workshop,caas:events/level/beginner');
-    expect(result).to.deep.equal(['Workshop', 'Beginner']);
+  it('resolves multiple comma-separated tags', () => {
+    const result = resolveTagObjects('caas:events/type/workshop,caas:events/level/beginner', mockTagsData);
+    expect(result).to.deep.equal([
+      { label: 'Workshop', group: 'Session Type' },
+      { label: 'Beginner', group: 'Level' },
+    ]);
   });
 
   it('trims whitespace around tag ids', () => {
-    const result = deriveTagLabels(' caas:events/type/lab , caas:events/type/demo ');
-    expect(result).to.deep.equal(['Lab', 'Demo']);
+    const result = resolveTagObjects(' caas:events/type/lab , caas:events/type/demo ', mockTagsData);
+    expect(result).to.deep.equal([
+      { label: 'Lab', group: 'Session Type' },
+      { label: 'Demo', group: 'Session Type' },
+    ]);
+  });
+
+  it('resolves hyphenated two-word tags to their titles', () => {
+    const result = resolveTagObjects('caas:events/type/two-word-tag,caas:events/type/deep-dive', mockTagsData);
+    expect(result).to.deep.equal([
+      { label: 'Two Word Tag', group: 'Session Type' },
+      { label: 'Deep Dive', group: 'Session Type' },
+    ]);
+  });
+
+  it('filters out unknown tags when tagsData has no match', () => {
+    const result = resolveTagObjects('caas:events/type/unknown', mockTagsData);
+    expect(result).to.deep.equal([]);
+  });
+
+  it('returns empty array when tagsData is null', () => {
+    expect(resolveTagObjects('caas:events/type/workshop', null)).to.deep.equal([]);
   });
 });
 
@@ -222,35 +321,38 @@ describe('filterSessions', () => {
       sessionId: 's1',
       title: 'Intro to Photoshop',
       description: 'Learn the basics',
-      tags: ['Workshop'],
+      tags: [
+        { label: 'Workshop', group: 'Session Type' },
+        { label: 'Beginner', group: 'Level' },
+      ],
       speakers: [{ firstName: 'Alice', lastName: 'Smith' }],
     },
     {
       sessionId: 's2',
       title: 'Advanced Illustrator',
       description: 'For power users',
-      tags: ['Lab'],
+      tags: [{ label: 'Lab', group: 'Session Type' }],
       speakers: [{ firstName: 'Bob', lastName: 'Jones' }],
     },
     {
       sessionId: 's3',
       title: 'Color Theory',
       description: 'Understanding color',
-      tags: ['Workshop'],
+      tags: [{ label: 'Workshop', group: 'Session Type' }],
       speakers: [],
     },
   ];
 
   it('returns all sessions when no filters active', () => {
     const result = filterSessions(sessions, {
-      query: '', activeTags: new Set(), activeTab: 'all', registeredSessionIds: new Set(),
+      query: '', activeTags: new Map(), activeTab: 'all', registeredSessionIds: new Set(),
     });
     expect(result).to.have.lengthOf(3);
   });
 
   it('filters by title substring (case-insensitive)', () => {
     const result = filterSessions(sessions, {
-      query: 'photoshop', activeTags: new Set(), activeTab: 'all', registeredSessionIds: new Set(),
+      query: 'photoshop', activeTags: new Map(), activeTab: 'all', registeredSessionIds: new Set(),
     });
     expect(result).to.have.lengthOf(1);
     expect(result[0].sessionId).to.equal('s1');
@@ -258,7 +360,7 @@ describe('filterSessions', () => {
 
   it('filters by description substring', () => {
     const result = filterSessions(sessions, {
-      query: 'power users', activeTags: new Set(), activeTab: 'all', registeredSessionIds: new Set(),
+      query: 'power users', activeTags: new Map(), activeTab: 'all', registeredSessionIds: new Set(),
     });
     expect(result).to.have.lengthOf(1);
     expect(result[0].sessionId).to.equal('s2');
@@ -266,23 +368,50 @@ describe('filterSessions', () => {
 
   it('filters by speaker name', () => {
     const result = filterSessions(sessions, {
-      query: 'bob', activeTags: new Set(), activeTab: 'all', registeredSessionIds: new Set(),
+      query: 'bob', activeTags: new Map(), activeTab: 'all', registeredSessionIds: new Set(),
     });
     expect(result).to.have.lengthOf(1);
     expect(result[0].sessionId).to.equal('s2');
   });
 
-  it('filters by active tag', () => {
+  it('filters by active tag (OR within group)', () => {
     const result = filterSessions(sessions, {
-      query: '', activeTags: new Set(['Lab']), activeTab: 'all', registeredSessionIds: new Set(),
+      query: '',
+      activeTags: new Map([['Session Type', new Set(['Lab'])]]),
+      activeTab: 'all',
+      registeredSessionIds: new Set(),
     });
     expect(result).to.have.lengthOf(1);
     expect(result[0].sessionId).to.equal('s2');
+  });
+
+  it('OR logic within group: returns sessions matching any selected tag in a group', () => {
+    const result = filterSessions(sessions, {
+      query: '',
+      activeTags: new Map([['Session Type', new Set(['Workshop', 'Lab'])]]),
+      activeTab: 'all',
+      registeredSessionIds: new Set(),
+    });
+    expect(result).to.have.lengthOf(3);
+  });
+
+  it('AND logic across groups: sessions must match at least one tag per selected group', () => {
+    const result = filterSessions(sessions, {
+      query: '',
+      activeTags: new Map([
+        ['Session Type', new Set(['Workshop'])],
+        ['Level', new Set(['Beginner'])],
+      ]),
+      activeTab: 'all',
+      registeredSessionIds: new Set(),
+    });
+    expect(result).to.have.lengthOf(1);
+    expect(result[0].sessionId).to.equal('s1');
   });
 
   it('filters to registered sessions in "my" tab mode', () => {
     const result = filterSessions(sessions, {
-      query: '', activeTags: new Set(), activeTab: 'my', registeredSessionIds: new Set(['s1', 's3']),
+      query: '', activeTags: new Map(), activeTab: 'my', registeredSessionIds: new Set(['s1', 's3']),
     });
     expect(result).to.have.lengthOf(2);
     expect(result.map((s) => s.sessionId)).to.deep.equal(['s1', 's3']);
@@ -290,7 +419,7 @@ describe('filterSessions', () => {
 
   it('returns empty array in "my" mode with no registered sessions', () => {
     const result = filterSessions(sessions, {
-      query: '', activeTags: new Set(), activeTab: 'my', registeredSessionIds: new Set(),
+      query: '', activeTags: new Map(), activeTab: 'my', registeredSessionIds: new Set(),
     });
     expect(result).to.have.lengthOf(0);
   });
@@ -316,10 +445,13 @@ describe('normalizeSessions', () => {
   ]);
   const registeredSessionIds = new Set(['session-1']);
 
-  it('parses tagIdList into capitalized pill labels', () => {
+  it('resolves tag IDs to label+group objects', () => {
     const raw = [makeSession({ tags: 'caas:events/type/workshop,caas:events/level/beginner' })];
-    const result = normalizeSessions(raw, speakerMap, locationMap, registeredSessionIds, 'venue-xyz');
-    expect(result[0].tags).to.deep.equal(['Workshop', 'Beginner']);
+    const result = normalizeSessions(raw, speakerMap, locationMap, registeredSessionIds, 'venue-xyz', mockTagsData);
+    expect(result[0].tags).to.deep.equal([
+      { label: 'Workshop', group: 'Session Type' },
+      { label: 'Beginner', group: 'Level' },
+    ]);
   });
 
   it('marks session as isRegistered when sessionId is in registeredSessionIds', () => {
@@ -391,6 +523,13 @@ describe('sessions-hub init', () => {
       ['/v1/series/', () => ({ speakers: [] })],
       ['/v1/venues/', () => ({ name: 'Main Hall', locationId: 'loc-1' })],
       ['/v1/attendees/me/events/', () => ({ sessionIds: [] })],
+      ['chimera-api/tags', () => mockTagsData],
+      ['dictionary.json', () => ({
+        data: { total: 0, offset: 0, limit: 0, data: [] },
+        ':names': ['data'],
+        ':version': 3,
+        ':type': 'multi-sheet',
+      })],
     ]);
   }
 
@@ -405,6 +544,8 @@ describe('sessions-hub init', () => {
     document.body.innerHTML = body;
     document.head.innerHTML = '<meta name="event-id" content="event-123">';
     originalFetch = window.fetch;
+    DictionaryManager._clearCache();
+    dictionaryManager.resetLoadedSheetsForTests();
 
     // Use real BlockMediator (same instance the block imports)
     BlockMediator.set('imsProfile', { userId: 'test-user' });
@@ -597,5 +738,297 @@ describe('card expand/collapse', () => {
     card.classList.add('expanded');
     card.classList.toggle('expanded');
     expect(card.classList.contains('expanded')).to.be.false;
+  });
+});
+
+// ─── isSessionTimeFullError (waitlist-on-error detection) ────────────────────
+
+describe('isSessionTimeFullError', () => {
+  const isSessionTimeFullError = (resp) => {
+    const err = resp?.error;
+    if (!err) return false;
+    const candidates = [err.code, err.errorCode, err.error, err.type, err.message];
+    return candidates.some((v) => typeof v === 'string' && v.includes('SessionTimeFull'));
+  };
+
+  it('returns false when response has no error field', () => {
+    expect(isSessionTimeFullError({ ok: true, data: {} })).to.be.false;
+    expect(isSessionTimeFullError({})).to.be.false;
+    expect(isSessionTimeFullError(null)).to.be.false;
+  });
+
+  it('detects SessionTimeFull on err.code', () => {
+    expect(isSessionTimeFullError({ ok: false, error: { code: 'SessionTimeFull' } })).to.be.true;
+  });
+
+  it('detects SessionTimeFull on err.errorCode', () => {
+    expect(isSessionTimeFullError({ ok: false, error: { errorCode: 'SessionTimeFull' } })).to.be.true;
+  });
+
+  it('detects SessionTimeFull on err.message substring', () => {
+    expect(isSessionTimeFullError({
+      ok: false,
+      error: { message: 'Cannot register: SessionTimeFull capacity reached' },
+    })).to.be.true;
+  });
+
+  it('returns false for unrelated error codes', () => {
+    expect(isSessionTimeFullError({ ok: false, error: { code: 'ValidationError' } })).to.be.false;
+    expect(isSessionTimeFullError({ ok: false, error: { message: 'Network timeout' } })).to.be.false;
+  });
+});
+
+// ─── handleSessionRegistration response handling ─────────────────────────────
+
+describe('handleSessionRegistration response handling', () => {
+  // Inline the post-API decision logic from sessions-hub.js to validate the
+  // bug fix: a waitlisted response must NOT mark the session as registered,
+  // and a SessionTimeFull error must trigger a waitlist retry.
+
+  function classifyOutcome(resp, retryFn) {
+    let waitlisted = resp.ok && resp.data?.registrationStatus === 'waitlisted';
+    let finalResp = resp;
+
+    if (!resp.ok) {
+      const err = resp.error;
+      const candidates = [err?.code, err?.errorCode, err?.error, err?.type, err?.message];
+      const isFullErr = candidates.some((v) => typeof v === 'string' && v.includes('SessionTimeFull'));
+      if (isFullErr) {
+        const retry = retryFn();
+        if (retry.ok) {
+          finalResp = retry;
+          waitlisted = true;
+        } else {
+          finalResp = retry;
+        }
+      }
+    }
+
+    if (!finalResp.ok) return { state: 'error', waitlisted: false };
+    return { state: waitlisted ? 'waitlisted' : 'registered', waitlisted };
+  }
+
+  it('classifies a 200 OK with registrationStatus=waitlisted as waitlisted', () => {
+    const resp = { ok: true, data: { registrationStatus: 'waitlisted' } };
+    const result = classifyOutcome(resp, () => { throw new Error('retry should not be called'); });
+    expect(result.state).to.equal('waitlisted');
+    expect(result.waitlisted).to.be.true;
+  });
+
+  it('classifies a 200 OK with registrationStatus=registered as registered', () => {
+    const resp = { ok: true, data: { registrationStatus: 'registered' } };
+    const result = classifyOutcome(resp, () => { throw new Error('retry should not be called'); });
+    expect(result.state).to.equal('registered');
+    expect(result.waitlisted).to.be.false;
+  });
+
+  it('retries with waitlist on SessionTimeFull and marks waitlisted on retry success', () => {
+    const initial = { ok: false, status: 409, error: { code: 'SessionTimeFull' } };
+    const retry = { ok: true, data: { registrationStatus: 'waitlisted' } };
+    const result = classifyOutcome(initial, () => retry);
+    expect(result.state).to.equal('waitlisted');
+    expect(result.waitlisted).to.be.true;
+  });
+
+  it('reports error if SessionTimeFull retry also fails', () => {
+    const initial = { ok: false, status: 409, error: { code: 'SessionTimeFull' } };
+    const retry = { ok: false, status: 500, error: { message: 'Server error' } };
+    const result = classifyOutcome(initial, () => retry);
+    expect(result.state).to.equal('error');
+  });
+
+  it('does not retry for non-SessionTimeFull errors', () => {
+    const initial = { ok: false, status: 400, error: { code: 'ValidationError' } };
+    let retryCalled = false;
+    const result = classifyOutcome(initial, () => { retryCalled = true; return { ok: true }; });
+    expect(retryCalled).to.be.false;
+    expect(result.state).to.equal('error');
+  });
+});
+
+// ─── isSessionRegistrationBlocked predicate ─────────────────────────────────
+
+describe('isSessionRegistrationBlocked', () => {
+  const isSessionRegistrationBlocked = ({ isEventWaitlisted, isEventClosed, inviteOnlyBlocked }) => Boolean(
+    isEventWaitlisted || isEventClosed || inviteOnlyBlocked,
+  );
+
+  it('returns false when no gating flag is set', () => {
+    expect(isSessionRegistrationBlocked({})).to.be.false;
+    expect(isSessionRegistrationBlocked({ isEventWaitlisted: false, isEventClosed: false, inviteOnlyBlocked: false })).to.be.false;
+  });
+
+  it('returns true when event is waitlisted', () => {
+    expect(isSessionRegistrationBlocked({ isEventWaitlisted: true })).to.be.true;
+  });
+
+  it('returns true when event is closed', () => {
+    expect(isSessionRegistrationBlocked({ isEventClosed: true })).to.be.true;
+  });
+
+  it('returns true when invite-only is blocked', () => {
+    expect(isSessionRegistrationBlocked({ inviteOnlyBlocked: true })).to.be.true;
+  });
+
+  it('returns true when any combination of flags is set', () => {
+    expect(isSessionRegistrationBlocked({ isEventWaitlisted: true, isEventClosed: true })).to.be.true;
+    expect(isSessionRegistrationBlocked({ isEventClosed: true, inviteOnlyBlocked: true })).to.be.true;
+  });
+});
+
+// ─── computeIsEventClosed ───────────────────────────────────────────────────
+
+describe('computeIsEventClosed', () => {
+  const computeIsEventClosed = (eventData) => {
+    if (!eventData?.isFull) return false;
+    const waitlistEnabled = eventData.allowWaitlisting === true
+      || eventData.allowWaitlisting === 'true';
+    return !waitlistEnabled;
+  };
+
+  it('returns false for missing eventData', () => {
+    expect(computeIsEventClosed(null)).to.be.false;
+    expect(computeIsEventClosed(undefined)).to.be.false;
+  });
+
+  it('returns false when not full', () => {
+    expect(computeIsEventClosed({ isFull: false, allowWaitlisting: 'false' })).to.be.false;
+  });
+
+  it('returns false when full but waitlist is enabled (string "true")', () => {
+    expect(computeIsEventClosed({ isFull: true, allowWaitlisting: 'true' })).to.be.false;
+  });
+
+  it('returns false when full but waitlist is enabled (boolean true)', () => {
+    expect(computeIsEventClosed({ isFull: true, allowWaitlisting: true })).to.be.false;
+  });
+
+  it('returns true when full and waitlist is not enabled (string "false")', () => {
+    expect(computeIsEventClosed({ isFull: true, allowWaitlisting: 'false' })).to.be.true;
+  });
+
+  it('returns true when full and waitlist is missing/falsy', () => {
+    expect(computeIsEventClosed({ isFull: true })).to.be.true;
+    expect(computeIsEventClosed({ isFull: true, allowWaitlisting: false })).to.be.true;
+    expect(computeIsEventClosed({ isFull: true, allowWaitlisting: null })).to.be.true;
+  });
+});
+
+// ─── renderCTAGroup 3-state design ──────────────────────────────────────────
+
+describe('renderCTAGroup three-state design', () => {
+  // Inline reproduction of the 3-state branch in renderCTAGroup so we can
+  // exercise it in isolation without bootstrapping the full block.
+  function inlineRenderCTAGroup(session, { isEventRegistered = false, isBlocked = false } = {}) {
+    const group = document.createElement('div');
+    group.className = 'sh-cta-group';
+
+    // State 1: registered or waitlisted for THIS session — badge
+    if (isEventRegistered && (session.isRegistered || session.isWaitlisted)) {
+      const calBtn = document.createElement('button');
+      calBtn.className = 'sh-btn sh-btn-cal';
+      group.append(calBtn);
+
+      const isWaitlisted = !session.isRegistered && session.isWaitlisted;
+      const badge = document.createElement('button');
+      badge.className = 'sh-btn sh-registered-badge';
+      badge.disabled = true;
+      const label = isWaitlisted ? 'waitlisted-cta-text' : 'Registered';
+      const labelSpan = document.createElement('span');
+      labelSpan.textContent = label;
+      badge.append(labelSpan);
+      group.append(badge);
+      return group;
+    }
+
+    // State 3: blocked — disabled button
+    if (isBlocked) {
+      const btn = document.createElement('button');
+      btn.className = 'sh-btn sh-btn-blocked';
+      btn.type = 'button';
+      btn.disabled = true;
+      btn.setAttribute('aria-disabled', 'true');
+      btn.textContent = 'Registration unavailable';
+      group.append(btn);
+      return group;
+    }
+
+    // State 2: able to register — direct-API button
+    if (isEventRegistered) {
+      const btn = document.createElement('button');
+      btn.className = 'sh-btn sh-btn-register-session';
+      btn.type = 'button';
+      btn.textContent = 'Register for session';
+      group.append(btn);
+      return group;
+    }
+
+    // Default: not yet event-registered, not blocked
+    const btn = document.createElement('button');
+    btn.className = 'sh-btn sh-btn-register-event';
+    btn.type = 'button';
+    btn.textContent = 'Register for session';
+    group.append(btn);
+    return group;
+  }
+
+  it('renders disabled blocked button when isBlocked is true (event-waitlisted)', () => {
+    const group = inlineRenderCTAGroup({ isRegistered: false, isWaitlisted: false }, { isEventRegistered: false, isBlocked: true });
+    const blocked = group.querySelector('.sh-btn-blocked');
+    expect(blocked).to.not.be.null;
+    expect(blocked.disabled).to.be.true;
+    expect(blocked.getAttribute('aria-disabled')).to.equal('true');
+    expect(blocked.textContent).to.include('Registration unavailable');
+    expect(group.querySelector('.sh-btn-register-session')).to.be.null;
+    expect(group.querySelector('.sh-btn-register-event')).to.be.null;
+  });
+
+  it('renders blocked button when event-registered but blocked (defensive case)', () => {
+    const group = inlineRenderCTAGroup({ isRegistered: false, isWaitlisted: false }, { isEventRegistered: true, isBlocked: true });
+    expect(group.querySelector('.sh-btn-blocked')).to.not.be.null;
+    expect(group.querySelector('.sh-btn-register-session')).to.be.null;
+  });
+
+  it('renders direct-API "Register for session" when event-registered and able to register', () => {
+    const group = inlineRenderCTAGroup({ isRegistered: false, isWaitlisted: false }, { isEventRegistered: true, isBlocked: false });
+    expect(group.querySelector('.sh-btn-register-session')).to.not.be.null;
+    expect(group.querySelector('.sh-btn-blocked')).to.be.null;
+    expect(group.querySelector('.sh-btn-register-event')).to.be.null;
+  });
+
+  it('renders modal-opening "Register for session" when not event-registered and not blocked', () => {
+    const group = inlineRenderCTAGroup({ isRegistered: false, isWaitlisted: false }, { isEventRegistered: false, isBlocked: false });
+    expect(group.querySelector('.sh-btn-register-event')).to.not.be.null;
+    expect(group.querySelector('.sh-btn-register-session')).to.be.null;
+    expect(group.querySelector('.sh-btn-blocked')).to.be.null;
+  });
+
+  it('renders Registered badge when session.isRegistered (event-registered)', () => {
+    const group = inlineRenderCTAGroup({ isRegistered: true, isWaitlisted: false }, { isEventRegistered: true, isBlocked: false });
+    const badge = group.querySelector('.sh-registered-badge');
+    expect(badge).to.not.be.null;
+    expect(badge.textContent).to.include('Registered');
+    expect(badge.textContent).to.not.include('waitlisted-cta-text');
+  });
+
+  it('renders waitlisted badge when session.isWaitlisted (event-registered)', () => {
+    const group = inlineRenderCTAGroup({ isRegistered: false, isWaitlisted: true }, { isEventRegistered: true, isBlocked: false });
+    const badge = group.querySelector('.sh-registered-badge');
+    expect(badge).to.not.be.null;
+    expect(badge.textContent).to.include('waitlisted-cta-text');
+  });
+
+  it('blocked takes precedence over the "able to register" path', () => {
+    const group = inlineRenderCTAGroup({ isRegistered: false, isWaitlisted: false }, { isEventRegistered: true, isBlocked: true });
+    expect(group.querySelector('.sh-btn-blocked')).to.not.be.null;
+    expect(group.querySelector('.sh-btn-register-session')).to.be.null;
+  });
+
+  it('registered-for-session badge takes precedence over blocked', () => {
+    // A user who already registered for a session before the event went into
+    // a blocked state should still see their badge, not a sudden "blocked" button.
+    const group = inlineRenderCTAGroup({ isRegistered: true, isWaitlisted: false }, { isEventRegistered: true, isBlocked: true });
+    expect(group.querySelector('.sh-registered-badge')).to.not.be.null;
+    expect(group.querySelector('.sh-btn-blocked')).to.be.null;
   });
 });

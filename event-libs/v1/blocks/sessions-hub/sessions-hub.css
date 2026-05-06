@@ -221,6 +221,23 @@
   background: var(--color-gray-100, #f5f5f5);
 }
 
+.sessions-hub .sh-filter-group + .sh-filter-group {
+  border-top: 1px solid var(--color-gray-200, #e8e8e8);
+  margin-top: 4px;
+  padding-top: 4px;
+}
+
+.sessions-hub .sh-filter-group-label {
+  display: block;
+  font-family: var(--body-font-family, sans-serif);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-gray-500, #6e6e6e);
+  padding: 8px 15px 4px;
+}
+
 /* ─── Session list ───────────────────────────────────────────────────────── */
 
 .sessions-hub .sh-session-list {
@@ -321,6 +338,7 @@
 .sessions-hub .sh-full-badge {
   display: inline-flex;
   align-items: center;
+  max-width: max-content;
   font-size: 12px;
   font-weight: 700;
   line-height: 16px;
@@ -672,6 +690,25 @@
 
 .sh-event-banner .sh-btn-event-register:hover {
   background: #fff;
+}
+
+.sh-event-banner .sh-banner-invite-only-msg,
+.sh-event-banner .sh-banner-waitlist-msg {
+  font-size: 16px;
+  line-height: 1.4;
+  max-width: 420px;
+  margin: 0;
+  flex-shrink: 0;
+  color: var(--color-white, #fff);
+  opacity: 0.95;
+}
+
+.sessions-hub .sh-invite-only-msg {
+  font-size: 14px;
+  line-height: 1.4;
+  color: #505050;
+  margin: 0;
+  text-align: right;
 }
 
 /* ─── Responsive ─────────────────────────────────────────────────────────── */

@@ -122,6 +122,20 @@ describe('TimingWorker', () => {
       expect(result).to.be.false;
     });
 
+    it('should trigger next item after prior mobileRider stream ended even when toggleTime is in the future', async () => {
+      const currentItem = { mobileRider: { sessionId: 'session1' } };
+      const nextItem = {
+        toggleTime: Date.now() + 600000,
+        pathToFragment: '/next',
+      };
+
+      worker.currentScheduleItem = currentItem;
+      worker.plugins.set('mobileRider', new Map([['session1', false]]));
+
+      const result = await worker.shouldTriggerNextSchedule(nextItem);
+      expect(result).to.be.true;
+    });
+
     it('should handle mobileRider underrun scenario', async () => {
       const nextItem = {
         mobileRider: { sessionId: 'session1' },
