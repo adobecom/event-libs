@@ -1,5 +1,5 @@
 import { expect } from '@esm-bundle/chai';
-import { DictionaryManager, dictionaryManager } from '../../../event-libs/v1/utils/dictionary-manager.js';
+import { DictionaryManager, dictionaryManager, getInviteOnlyNoCampaignMessage } from '../../../event-libs/v1/utils/dictionary-manager.js';
 import { setEventConfig } from '../../../event-libs/v1/utils/utils.js';
 
 describe('DictionaryManager', () => {
@@ -130,5 +130,51 @@ describe('DictionaryManager', () => {
 describe('dictionaryManager instance', () => {
   it('should be an instance of DictionaryManager', () => {
     expect(dictionaryManager).to.be.instanceOf(DictionaryManager);
+  });
+});
+
+describe('getInviteOnlyNoCampaignMessage', () => {
+  let originalFetch;
+
+  beforeEach(() => {
+    originalFetch = globalThis.fetch;
+    DictionaryManager._clearCache();
+    setEventConfig({}, {
+      miloLibs: 'http://localhost:2000/test/unit/blocks/promotional-content/mocks/libs',
+      locales: { '': { ietf: 'en-US', tk: 'hah7vzn.css' } },
+    });
+  });
+
+  afterEach(() => {
+    globalThis.fetch = originalFetch;
+    DictionaryManager._clearCache();
+  });
+
+  it('returns fallback English copy when key is not in dictionary', () => {
+    const manager = new DictionaryManager();
+    expect(getInviteOnlyNoCampaignMessage(manager)).to.equal(
+      'Registration is only available through a valid invitation link.',
+    );
+  });
+
+  it('returns configured dictionary value when present', async () => {
+    const manager = new DictionaryManager();
+    const mockResponse = {
+      ok: true,
+      json: () => Promise.resolve({
+        data: {
+          total: 1,
+          offset: 0,
+          limit: 1,
+          data: [{ key: 'rsvp-invite-only-no-campaign-cta-text', value: 'Invitation-only copy from sheet.' }],
+        },
+        ':version': 3,
+        ':names': ['data'],
+        ':type': 'multi-sheet',
+      }),
+    };
+    globalThis.fetch = () => Promise.resolve(mockResponse);
+    await manager.initialize();
+    expect(getInviteOnlyNoCampaignMessage(manager)).to.equal('Invitation-only copy from sheet.');
   });
 });

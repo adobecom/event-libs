@@ -1,10 +1,19 @@
 import BlockMediator from '../../deps/block-mediator.min.js';
-import { createTag, getMetadata, getSusiOptions, LIBS, getEventConfig, loadStyle } from '../../utils/utils.js';
-import { dictionaryManager } from '../../utils/dictionary-manager.js';
+import {
+  createTag,
+  getMetadata,
+  getSusiOptions,
+  LIBS,
+  getEventConfig,
+  loadStyle,
+  getValidCampaignIdFromUrl,
+} from '../../utils/utils.js';
+import { dictionaryManager, getInviteOnlyNoCampaignMessage } from '../../utils/dictionary-manager.js';
 import { signIn } from '../../utils/decorate.js';
 import { buildModalContent } from '../profile-cards/profile-cards.js';
 import { createSmartDateRange } from '../../utils/date-time-helper.js';
 import {
+  getCaasTags,
   getEvent,
   getVenueLocation,
   getMyEventSessions,
@@ -47,21 +56,32 @@ async function openRsvpModal({ hash, path }) {
 // ─── Filter state ───────────────────────────────────────────────────────────
 
 const [getFilterState, setFilterState] = (() => {
-  let fs = { query: '', activeTags: new Set(), activeTab: 'all' };
+  let fs = { query: '', activeTags: new Map(), activeTab: 'all' };
   return [() => fs, (s) => { fs = s; }];
 })();
 
 // ─── Utilities ──────────────────────────────────────────────────────────────
 
-function deriveTagLabels(tagIdList) {
+function resolveTagWithGroup(tagId, tagsData) {
+  const colonIdx = tagId.indexOf(':');
+  if (colonIdx === -1 || !tagsData) return { label: '', group: '' };
+  const ns = tagId.slice(0, colonIdx);
+  const segs = tagId.slice(colonIdx + 1).split('/');
+  let node = tagsData.namespaces?.[ns];
+  let parentNode = null;
+  for (const seg of segs) {
+    parentNode = node;
+    node = node?.tags?.[seg];
+  }
+  return { label: node?.title || '', group: parentNode?.title || '' };
+}
+
+function resolveTagObjects(tagIdList, tagsData) {
   if (!tagIdList) return [];
   return tagIdList
     .split(',')
-    .map((id) => {
-      const seg = id.trim().split('/').at(-1);
-      return seg ? seg.charAt(0).toUpperCase() + seg.slice(1) : '';
-    })
-    .filter(Boolean);
+    .map((id) => resolveTagWithGroup(id.trim(), tagsData))
+    .filter((t) => t.label);
 }
 
 function formatICSDate(millis) {
@@ -159,6 +179,13 @@ async function resolveRegistrationState(eventId, isEventRegistered) {
   return new Set(resp.data?.sessionIds || []);
 }
 
+function isSessionTimeFullError(resp) {
+  const err = resp?.error;
+  if (!err) return false;
+  const candidates = [err.code, err.errorCode, err.error, err.type, err.message];
+  return candidates.some((v) => typeof v === 'string' && v.includes('SessionTimeFull'));
+}
+
 function findConflictingSession(newSession, state) {
   const newTime = newSession.sessionTimes[0];
   if (!newTime) return null;
@@ -174,7 +201,7 @@ function findConflictingSession(newSession, state) {
   return null;
 }
 
-function normalizeSessions(rawSessions, locationMap, registeredSessionIds, venueId) {
+function normalizeSessions(rawSessions, locationMap, registeredSessionIds, venueId, tagsData) {
   const mapped = rawSessions.map((session) => {
     const sessionTimes = (session.rawTimes || []).map((t) => ({
       sessionTimeId: t.sessionTimeId,
@@ -205,10 +232,11 @@ function normalizeSessions(rawSessions, locationMap, registeredSessionIds, venue
       sessionId: session.sessionId,
       title: session.localizations?.['en-US']?.title || session.title || session.enTitle || '',
       description: session.localizations?.['en-US']?.description || session.description || '',
-      tags: deriveTagLabels(session.tags),
+      tags: resolveTagObjects(session.tags, tagsData),
       sessionTimes,
       speakers,
       isRegistered: registeredSessionIds.has(session.sessionId),
+      isWaitlisted: false,
       expanded: false,
     };
   });
@@ -221,10 +249,19 @@ function normalizeSessions(rawSessions, locationMap, registeredSessionIds, venue
 
 // ─── Filter / search ─────────────────────────────────────────────────────────
 
-function collectFilterOptions(sessions) {
-  const tags = new Set();
-  sessions.forEach((s) => s.tags.forEach((t) => tags.add(t)));
-  return { tags: [...tags].sort() };
+function collectFilterGroups(sessions) {
+  const groups = new Map();
+  sessions.forEach((s) => s.tags.forEach(({ label, group }) => {
+    if (!label) return;
+    const key = group || '';
+    if (!groups.has(key)) groups.set(key, new Set());
+    groups.get(key).add(label);
+  }));
+  const sorted = new Map();
+  [...groups.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .forEach(([g, tagSet]) => sorted.set(g, [...tagSet].sort()));
+  return sorted;
 }
 
 function filterSessions(sessions, { query, activeTags, activeTab, registeredSessionIds }) {
@@ -232,7 +269,11 @@ function filterSessions(sessions, { query, activeTags, activeTab, registeredSess
   return sessions.filter((s) => {
     if (activeTab === 'my' && !registeredSessionIds.has(s.sessionId)) return false;
 
-    if (activeTags.size > 0 && !s.tags.some((t) => activeTags.has(t))) return false;
+    if (activeTags.size > 0) {
+      for (const [, groupSet] of activeTags) {
+        if (groupSet.size > 0 && !s.tags.some((t) => groupSet.has(t.label))) return false;
+      }
+    }
 
     if (q) {
       const hay = [
@@ -265,20 +306,36 @@ function applyFilter(listEl, state) {
 
 // ─── Render: CTA group ───────────────────────────────────────────────────────
 
-function renderCTAGroup(session, isEventRegistered) {
+function renderCTAGroup(session, isEventRegistered, inviteOnlyBlocked, inviteOnlyMessage, isEventWaitlisted = false) {
   const group = createTag('div', { class: 'sh-cta-group' });
 
-  if (!isEventRegistered) {
-    group.append(createTag('button', { class: 'sh-btn sh-btn-register-event', type: 'button' }, dictionaryManager.getValue('Register for session')));
-  } else if (!session.isRegistered) {
+  if (isEventWaitlisted && !isEventRegistered) {
+    const btn = createTag('button', { class: 'sh-btn sh-btn-register-event sh-event-waitlisted-badge', type: 'button' });
+    btn.append(createIcon(CHECKMARK_ICON), createTag('span', {}, dictionaryManager.getValue('waitlisted-cta-text')));
+    group.append(btn);
+  } else if (!isEventRegistered) {
+    if (inviteOnlyBlocked) {
+      group.append(createTag('p', { class: 'sh-invite-only-msg', role: 'status' }, inviteOnlyMessage));
+    } else {
+      group.append(createTag('button', { class: 'sh-btn sh-btn-register-event', type: 'button' }, dictionaryManager.getValue('Register for session')));
+    }
+  } else if (!session.isRegistered && !session.isWaitlisted) {
     group.append(createTag('button', { class: 'sh-btn sh-btn-register-session', type: 'button' }, dictionaryManager.getValue('Register for session')));
   } else {
     const calBtn = createTag('button', { class: 'sh-btn sh-btn-cal', type: 'button' });
     calBtn.append(createIcon(CTA_CALENDAR_ICON), createTag('span', {}, dictionaryManager.getValue('Download to calendar')));
     group.append(calBtn);
 
+    const isWaitlisted = !session.isRegistered && session.isWaitlisted;
+    const badgeLabel = isWaitlisted
+      ? dictionaryManager.getValue('waitlisted-cta-text')
+      : dictionaryManager.getValue('Registered');
+    const unregisterLabel = isWaitlisted
+      ? dictionaryManager.getValue('Leave waitlist')
+      : dictionaryManager.getValue('Unregister');
+
     const badge = createTag('button', { class: 'sh-btn sh-registered-badge', type: 'button', disabled: '' });
-    badge.append(createIcon(CHECKMARK_ICON), createTag('span', {}, dictionaryManager.getValue('Registered')));
+    badge.append(createIcon(CHECKMARK_ICON), createTag('span', {}, badgeLabel));
     group.append(badge);
 
     setTimeout(() => {
@@ -286,26 +343,34 @@ function renderCTAGroup(session, isEventRegistered) {
       badge.disabled = false;
     }, 2000);
 
-    const setRegisteredContent = () => {
+    const setIdleContent = () => {
       badge.innerHTML = '';
       badge.classList.remove('sh-unregister-mode');
-      badge.append(createIcon(CHECKMARK_ICON), createTag('span', {}, dictionaryManager.getValue('Registered')));
+      badge.append(createIcon(CHECKMARK_ICON), createTag('span', {}, badgeLabel));
     };
     const setUnregisterContent = () => {
       badge.innerHTML = '';
       badge.classList.add('sh-unregister-mode');
-      badge.append(createTag('span', {}, dictionaryManager.getValue('Unregister')));
+      badge.append(createTag('span', {}, unregisterLabel));
     };
     badge.addEventListener('mouseenter', () => { if (!badge.disabled) setUnregisterContent(); });
-    badge.addEventListener('mouseleave', () => { if (!badge.disabled) setRegisteredContent(); });
+    badge.addEventListener('mouseleave', () => { if (!badge.disabled) setIdleContent(); });
   }
 
   return group;
 }
 
-function updateCTAGroup(cardEl, session, isEventRegistered) {
+function updateCTAGroup(cardEl, session, isEventRegistered, isEventWaitlisted = false) {
+  const state = getState();
   const old = cardEl.querySelector('.sh-cta-group');
-  if (old) old.replaceWith(renderCTAGroup(session, isEventRegistered));
+  if (!old) return;
+  old.replaceWith(renderCTAGroup(
+    session,
+    isEventRegistered,
+    state?.inviteOnlyBlocked ?? false,
+    state?.inviteOnlyMessage ?? '',
+    isEventWaitlisted,
+  ));
 }
 
 // ─── Session description overflow (matches CSS -webkit-line-clamp) ───────────
@@ -382,7 +447,7 @@ function disconnectSessionDescriptionsOverflow() {
 
 function renderTagPills(tags) {
   const list = createTag('ul', { class: 'sh-tag-list', 'aria-label': dictionaryManager.getValue('Tags') });
-  tags.forEach((tag) => list.append(createTag('li', { class: 'sh-tag-pill' }, tag)));
+  tags.forEach((tag) => list.append(createTag('li', { class: 'sh-tag-pill' }, tag.label)));
   return list;
 }
 
@@ -411,7 +476,7 @@ function renderSpeakerAvatars(speakers) {
   return wrap;
 }
 
-function renderSessionCard(session, isEventRegistered) {
+function renderSessionCard(session, isEventRegistered, inviteOnlyBlocked, inviteOnlyMessage, isEventWaitlisted = false) {
   const primaryTime = session.sessionTimes[0];
   const timeStr = primaryTime
     ? createSmartDateRange(primaryTime.startTimeMillis, primaryTime.endTimeMillis, 'en-US', primaryTime.timezone)
@@ -472,15 +537,21 @@ function renderSessionCard(session, isEventRegistered) {
   descText.innerHTML = fullDesc;
 
   desc.append(descText);
-  right.append(desc, renderCTAGroup(session, isEventRegistered));
+  right.append(desc, renderCTAGroup(session, isEventRegistered, inviteOnlyBlocked, inviteOnlyMessage, isEventWaitlisted));
 
   card.append(left, right);
   return card;
 }
 
-function renderSessionList(sessions, isEventRegistered) {
+function renderSessionList(sessions, isEventRegistered, inviteOnlyBlocked, inviteOnlyMessage, isEventWaitlisted = false) {
   const list = createTag('div', { class: 'sh-session-list' });
-  sessions.forEach((s) => list.append(renderSessionCard(s, isEventRegistered)));
+  sessions.forEach((s) => list.append(renderSessionCard(
+    s,
+    isEventRegistered,
+    inviteOnlyBlocked,
+    inviteOnlyMessage,
+    isEventWaitlisted,
+  )));
   return list;
 }
 
@@ -498,16 +569,28 @@ function renderTabToggle(isEventRegistered) {
 
 function renderFilterPanel(sessions) {
   const panel = createTag('div', { class: 'sh-filter-panel hidden', 'aria-hidden': 'true' });
-  const { tags } = collectFilterOptions(sessions);
-
-  tags.forEach((tag, i) => {
-    const id = `sh-filter-tag-${i}`;
-    const lbl = createTag('label', { class: 'sh-filter-item', for: id });
-    lbl.append(createTag('input', { id, type: 'checkbox', value: tag, 'data-filter-type': 'tag' }));
-    lbl.append(createTag('span', {}, tag));
-    panel.append(lbl);
+  const groups = collectFilterGroups(sessions);
+  let tagIdx = 0;
+  groups.forEach((tagLabels, groupName) => {
+    const section = createTag('div', { class: 'sh-filter-group' });
+    if (groupName) {
+      section.append(createTag('span', { class: 'sh-filter-group-label' }, groupName));
+    }
+    tagLabels.forEach((tag) => {
+      const id = `sh-filter-tag-${tagIdx++}`;
+      const lbl = createTag('label', { class: 'sh-filter-item', for: id });
+      lbl.append(createTag('input', {
+        id,
+        type: 'checkbox',
+        value: tag,
+        'data-filter-type': 'tag',
+        'data-filter-group': groupName,
+      }));
+      lbl.append(createTag('span', {}, tag));
+      section.append(lbl);
+    });
+    panel.append(section);
   });
-
   return panel;
 }
 
@@ -528,8 +611,8 @@ function renderToolbar(state) {
   }));
 
   const filterWrap = createTag('div', { class: 'sh-filter-wrap' });
-  const { tags: filterTags } = collectFilterOptions(state.sessions);
-  const hasFilters = filterTags.length > 0;
+  const filterGroups = collectFilterGroups(state.sessions);
+  const hasFilters = filterGroups.size > 0;
   const filterBtn = createTag('button', {
     class: 'sh-filter-btn',
     type: 'button',
@@ -572,7 +655,7 @@ function buildBannerDateString() {
   return createSmartDateRange(startMillis, endMillis, 'en-US', timezone);
 }
 
-function renderEventBanner(rsvpConfig) {
+function renderEventBanner(rsvpConfig, inviteOnlyBlocked, inviteOnlyMessage) {
   const banner = createTag('aside', { class: 'sh-event-banner', 'aria-label': dictionaryManager.getValue('Event registration') });
   const inner = createTag('div', { class: 'sh-banner-inner' });
   const info = createTag('div', { class: 'sh-banner-info' });
@@ -591,19 +674,26 @@ function renderEventBanner(rsvpConfig) {
     info.append(dateRow);
   }
 
-  const btn = createTag('button', { class: 'sh-btn sh-btn-event-register', type: 'button' }, dictionaryManager.getValue('Register'));
-  btn.addEventListener('click', () => {
-    const profile = BlockMediator.get('imsProfile');
-    const isSignedOut = !profile || profile.noProfile || profile.account_type === 'guest';
-    if (isSignedOut) {
-      sessionStorage.setItem('sessions-hub:pendingEventRsvp', '1');
-      signIn({ ...getSusiOptions(), redirect_uri: window.location.href });
-    } else if (rsvpConfig) {
-      openRsvpModal(rsvpConfig);
-    }
-  });
+  if (inviteOnlyBlocked) {
+    inner.append(
+      info,
+      createTag('p', { class: 'sh-banner-invite-only-msg', role: 'status' }, inviteOnlyMessage),
+    );
+  } else {
+    const btn = createTag('button', { class: 'sh-btn sh-btn-event-register', type: 'button' }, dictionaryManager.getValue('Register'));
+    btn.addEventListener('click', () => {
+      const profile = BlockMediator.get('imsProfile');
+      const isSignedOut = !profile || profile.noProfile || profile.account_type === 'guest';
+      if (isSignedOut) {
+        sessionStorage.setItem('sessions-hub:pendingEventRsvp', '1');
+        signIn({ ...getSusiOptions(), redirect_uri: window.location.href });
+      } else if (rsvpConfig) {
+        openRsvpModal(rsvpConfig);
+      }
+    });
+    inner.append(info, btn);
+  }
 
-  inner.append(info, btn);
   banner.append(inner);
   return banner;
 }
@@ -825,9 +915,13 @@ function bindToolbarEvents(toolbarEl, listEl, state) {
     const cb = e.target;
     if (cb.type !== 'checkbox') return;
     const fs = getFilterState();
-    const newTags = new Set(fs.activeTags);
+    const newTags = new Map(fs.activeTags);
     if (cb.dataset.filterType === 'tag') {
-      cb.checked ? newTags.add(cb.value) : newTags.delete(cb.value);
+      const group = cb.dataset.filterGroup || '';
+      const groupSet = new Set(newTags.get(group));
+      cb.checked ? groupSet.add(cb.value) : groupSet.delete(cb.value);
+      if (groupSet.size === 0) newTags.delete(group);
+      else newTags.set(group, groupSet);
     }
     setFilterState({ ...fs, activeTags: newTags });
     applyFilter(listEl, state);
@@ -875,7 +969,7 @@ async function handleSessionRegistration(cardEl, sessionId, state) {
       state.registeredSessionIds.delete(conflictingSession.sessionId);
       const conflictCard = cardEl.closest('.sh-session-list')
         ?.querySelector(`[data-session-id="${conflictingSession.sessionId}"]`);
-      if (conflictCard) updateCTAGroup(conflictCard, conflictingSession, true);
+      if (conflictCard) updateCTAGroup(conflictCard, conflictingSession, true, state.isEventWaitlisted);
       const existing = BlockMediator.get('registeredSessionIds') || new Set();
       const updated = new Set([...existing]);
       updated.delete(conflictingSession.sessionId);
@@ -890,14 +984,31 @@ async function handleSessionRegistration(cardEl, sessionId, state) {
     btn.textContent = dictionaryManager.getValue('Registering\u2026');
   }
 
-  const resp = await registerForSessionTime(firstTime.sessionTimeId, 'me', { registrationStatus: 'registered' });
+  let resp = await registerForSessionTime(firstTime.sessionTimeId, 'me', { registrationStatus: 'registered' });
+  let waitlisted = resp.ok && resp.data?.registrationStatus === 'waitlisted';
+
+  if (!resp.ok && isSessionTimeFullError(resp)) {
+    const retry = await registerForSessionTime(firstTime.sessionTimeId, 'me', { registrationStatus: 'waitlisted' });
+    if (retry.ok) {
+      resp = retry;
+      waitlisted = true;
+    } else {
+      resp = retry;
+    }
+  }
 
   if (resp.ok) {
-    session.isRegistered = true;
-    state.registeredSessionIds.add(sessionId);
-    updateCTAGroup(cardEl, session, true);
-    const existing = BlockMediator.get('registeredSessionIds') || new Set();
-    BlockMediator.set('registeredSessionIds', new Set([...existing, sessionId]));
+    if (waitlisted) {
+      session.isWaitlisted = true;
+      session.isRegistered = false;
+    } else {
+      session.isRegistered = true;
+      session.isWaitlisted = false;
+      state.registeredSessionIds.add(sessionId);
+      const existing = BlockMediator.get('registeredSessionIds') || new Set();
+      BlockMediator.set('registeredSessionIds', new Set([...existing, sessionId]));
+    }
+    updateCTAGroup(cardEl, session, true, state.isEventWaitlisted);
     if (conflictFinalize) conflictFinalize(true);
   } else {
     window.lana?.log(`Error: Failed to register for session ${sessionId}. Error:${JSON.stringify(resp.error)}`);
@@ -925,12 +1036,14 @@ async function handleSessionUnregistration(cardEl, sessionId, state) {
     badge.textContent = dictionaryManager.getValue('Unregistering\u2026');
   }
 
+  const wasWaitlisted = session.isWaitlisted;
   const resp = await unregisterFromSessionTime(firstTime.sessionTimeId);
 
   if (resp.ok) {
     session.isRegistered = false;
+    session.isWaitlisted = false;
     state.registeredSessionIds.delete(sessionId);
-    updateCTAGroup(cardEl, session, true);
+    updateCTAGroup(cardEl, session, true, state.isEventWaitlisted);
     const existing = BlockMediator.get('registeredSessionIds') || new Set();
     const updated = new Set([...existing]);
     updated.delete(sessionId);
@@ -942,7 +1055,10 @@ async function handleSessionUnregistration(cardEl, sessionId, state) {
       badge.removeAttribute('aria-busy');
       badge.classList.remove('sh-unregister-mode');
       badge.innerHTML = '';
-      badge.append(createIcon(CHECKMARK_ICON), createTag('span', {}, dictionaryManager.getValue('Registered')));
+      const restoreLabel = wasWaitlisted
+        ? dictionaryManager.getValue('waitlisted-cta-text')
+        : dictionaryManager.getValue('Registered');
+      badge.append(createIcon(CHECKMARK_ICON), createTag('span', {}, restoreLabel));
     }
   }
 }
@@ -991,6 +1107,19 @@ function bindCardEvents(listEl, state) {
     }
 
     if (e.target.closest('.sh-btn-register-event')) {
+      const btn = e.target.closest('.sh-btn-register-event');
+      const isAlreadyWaitlisted = btn?.classList.contains('sh-event-waitlisted-badge');
+
+      if (state.inviteOnlyBlocked) return;
+
+      if (isAlreadyWaitlisted) {
+        // User is already on the event waitlist \u2014 just re-open the modal so
+        // they can cancel waitlist or review status. Do not set pendingSessionId
+        // or relabel the button.
+        if (state.rsvpConfig) openRsvpModal(state.rsvpConfig);
+        return;
+      }
+
       const profile = BlockMediator.get('imsProfile');
       const isSignedOut = !profile || profile.noProfile || profile.account_type === 'guest';
 
@@ -1002,7 +1131,6 @@ function bindCardEvents(listEl, state) {
 
       if (state.rsvpConfig) {
         pendingSessionId = sessionId;
-        const btn = e.target.closest('.sh-btn-register-event');
         if (btn) { btn.disabled = true; btn.textContent = dictionaryManager.getValue('Registering\u2026'); }
 
         // Milo's closeModal uses pushState (not location.hash=) so hashchange never fires.
@@ -1027,9 +1155,11 @@ function bindMediatorSubscriptions(el, bannerEl, listEl) {
   rsvpUnsubscribe = BlockMediator.subscribe('rsvpData', async ({ newValue }) => {
     const state = getState();
     const isRegistered = newValue?.registrationStatus === 'registered';
+    const isWaitlisted = newValue?.registrationStatus === 'waitlisted';
     state.isEventRegistered = isRegistered;
+    state.isEventWaitlisted = isWaitlisted;
 
-    syncBannerVisibility(bannerEl, isRegistered);
+    syncBannerVisibility(bannerEl, isRegistered || isWaitlisted);
 
     const toggle = el.querySelector('.sh-tab-toggle');
     if (toggle) toggle.hidden = !isRegistered;
@@ -1046,7 +1176,7 @@ function bindMediatorSubscriptions(el, bannerEl, listEl) {
       state.sessions.forEach((session) => {
         session.isRegistered = mergedIds.has(session.sessionId);
         const cardEl = cardMap.get(session.sessionId);
-        if (cardEl) updateCTAGroup(cardEl, session, true);
+        if (cardEl) updateCTAGroup(cardEl, session, true, false);
       });
 
       if (pendingSessionId) {
@@ -1063,7 +1193,7 @@ function bindMediatorSubscriptions(el, bannerEl, listEl) {
       state.sessions.forEach((session) => {
         session.isRegistered = false;
         const cardEl = cardMap.get(session.sessionId);
-        if (cardEl) updateCTAGroup(cardEl, session, false);
+        if (cardEl) updateCTAGroup(cardEl, session, false, isWaitlisted);
       });
 
       // Reset to "All sessions" tab when user un-registers
@@ -1091,7 +1221,7 @@ function bindMediatorSubscriptions(el, bannerEl, listEl) {
         session.isRegistered = true;
         state.registeredSessionIds.add(session.sessionId);
         const cardEl = cardMap.get(session.sessionId);
-        if (cardEl) updateCTAGroup(cardEl, session, state.isEventRegistered);
+        if (cardEl) updateCTAGroup(cardEl, session, state.isEventRegistered, state.isEventWaitlisted);
       }
     });
     applyFilter(listEl, state);
@@ -1106,6 +1236,15 @@ async function loadBlock(el, rsvpConfig) {
     el.remove();
     return;
   }
+
+  try {
+    await dictionaryManager.initialize();
+  } catch (err) {
+    window.lana?.log(`sessions-hub: dictionary initialize failed: ${err?.message || err}`);
+  }
+
+  const inviteOnlyBlocked = Boolean(eventData.inviteOnly && !getValidCampaignIdFromUrl());
+  const inviteOnlyMessage = getInviteOnlyNoCampaignMessage(dictionaryManager);
 
   let rawSessions;
   try {
@@ -1127,9 +1266,13 @@ async function loadBlock(el, rsvpConfig) {
 
   const rsvpData = BlockMediator.get('rsvpData');
   const isEventRegistered = rsvpData?.registrationStatus === 'registered';
-  const registeredSessionIds = await resolveRegistrationState(eventData.eventId, isEventRegistered);
+  const isEventWaitlisted = rsvpData?.registrationStatus === 'waitlisted';
+  const [registeredSessionIds, tagsData] = await Promise.all([
+    resolveRegistrationState(eventData.eventId, isEventRegistered),
+    Promise.resolve(getCaasTags()).catch(() => null),
+  ]);
 
-  const sessions = normalizeSessions(rawSessions, locationMap, registeredSessionIds, venueId);
+  const sessions = normalizeSessions(rawSessions, locationMap, registeredSessionIds, venueId, tagsData);
 
   const speakerMap = new Map();
   sessions.forEach((session) => {
@@ -1145,19 +1288,22 @@ async function loadBlock(el, rsvpConfig) {
     locationMap,
     registeredSessionIds,
     isEventRegistered,
+    isEventWaitlisted,
     rsvpConfig,
+    inviteOnlyBlocked,
+    inviteOnlyMessage,
   };
   setState(state);
 
   const toolbar = renderToolbar(state);
   setToolbarStickyOffset(toolbar);
-  const listEl = renderSessionList(sessions, isEventRegistered);
+  const listEl = renderSessionList(sessions, isEventRegistered, inviteOnlyBlocked, inviteOnlyMessage, isEventWaitlisted);
   el.append(toolbar, listEl);
 
-  // Always append banner; hide it if user is already registered
+  // Always append banner; hide it if user is already registered or waitlisted
   el.querySelector('.sh-event-banner')?.remove();
-  const bannerEl = renderEventBanner(rsvpConfig);
-  if (isEventRegistered) bannerEl.classList.add('hidden');
+  const bannerEl = renderEventBanner(rsvpConfig, inviteOnlyBlocked, inviteOnlyMessage);
+  if (isEventRegistered || isEventWaitlisted) bannerEl.classList.add('hidden');
   el.append(bannerEl);
 
   bindToolbarEvents(toolbar, listEl, state);
@@ -1185,11 +1331,11 @@ async function loadBlock(el, rsvpConfig) {
       if (pendingSession && pendingCard && !pendingSession.isRegistered) {
         await handleSessionRegistration(pendingCard, storedPendingId, state);
       }
-    } else if (rsvpConfig) {
+    } else if (rsvpConfig && !inviteOnlyBlocked) {
       pendingSessionId = storedPendingId;
       openRsvpModal(rsvpConfig);
     }
-  } else if (storedEventRsvp && !isEventRegistered && rsvpConfig) {
+  } else if (storedEventRsvp && !isEventRegistered && rsvpConfig && !inviteOnlyBlocked) {
     openRsvpModal(rsvpConfig);
   }
 }
@@ -1197,7 +1343,7 @@ async function loadBlock(el, rsvpConfig) {
 export default async function init(el) {
   if (rsvpUnsubscribe) { rsvpUnsubscribe(); rsvpUnsubscribe = null; }
   disconnectSessionDescriptionsOverflow();
-  setFilterState({ query: '', activeTags: new Set(), activeTab: 'all' });
+  setFilterState({ query: '', activeTags: new Map(), activeTab: 'all' });
 
   let rsvpConfig = null;
   const rows = [...el.querySelectorAll(':scope > div')];
