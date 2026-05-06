@@ -846,62 +846,189 @@ describe('handleSessionRegistration response handling', () => {
   });
 });
 
-// ─── renderCTAGroup waitlist branch ──────────────────────────────────────────
+// ─── isSessionRegistrationBlocked predicate ─────────────────────────────────
 
-describe('renderCTAGroup with waitlisted session', () => {
-  function inlineRenderCTAGroup(session, isEventRegistered) {
+describe('isSessionRegistrationBlocked', () => {
+  const isSessionRegistrationBlocked = ({ isEventWaitlisted, isEventClosed, inviteOnlyBlocked }) => Boolean(
+    isEventWaitlisted || isEventClosed || inviteOnlyBlocked,
+  );
+
+  it('returns false when no gating flag is set', () => {
+    expect(isSessionRegistrationBlocked({})).to.be.false;
+    expect(isSessionRegistrationBlocked({ isEventWaitlisted: false, isEventClosed: false, inviteOnlyBlocked: false })).to.be.false;
+  });
+
+  it('returns true when event is waitlisted', () => {
+    expect(isSessionRegistrationBlocked({ isEventWaitlisted: true })).to.be.true;
+  });
+
+  it('returns true when event is closed', () => {
+    expect(isSessionRegistrationBlocked({ isEventClosed: true })).to.be.true;
+  });
+
+  it('returns true when invite-only is blocked', () => {
+    expect(isSessionRegistrationBlocked({ inviteOnlyBlocked: true })).to.be.true;
+  });
+
+  it('returns true when any combination of flags is set', () => {
+    expect(isSessionRegistrationBlocked({ isEventWaitlisted: true, isEventClosed: true })).to.be.true;
+    expect(isSessionRegistrationBlocked({ isEventClosed: true, inviteOnlyBlocked: true })).to.be.true;
+  });
+});
+
+// ─── computeIsEventClosed ───────────────────────────────────────────────────
+
+describe('computeIsEventClosed', () => {
+  const computeIsEventClosed = (eventData) => {
+    if (!eventData?.isFull) return false;
+    const waitlistEnabled = eventData.allowWaitlisting === true
+      || eventData.allowWaitlisting === 'true';
+    return !waitlistEnabled;
+  };
+
+  it('returns false for missing eventData', () => {
+    expect(computeIsEventClosed(null)).to.be.false;
+    expect(computeIsEventClosed(undefined)).to.be.false;
+  });
+
+  it('returns false when not full', () => {
+    expect(computeIsEventClosed({ isFull: false, allowWaitlisting: 'false' })).to.be.false;
+  });
+
+  it('returns false when full but waitlist is enabled (string "true")', () => {
+    expect(computeIsEventClosed({ isFull: true, allowWaitlisting: 'true' })).to.be.false;
+  });
+
+  it('returns false when full but waitlist is enabled (boolean true)', () => {
+    expect(computeIsEventClosed({ isFull: true, allowWaitlisting: true })).to.be.false;
+  });
+
+  it('returns true when full and waitlist is not enabled (string "false")', () => {
+    expect(computeIsEventClosed({ isFull: true, allowWaitlisting: 'false' })).to.be.true;
+  });
+
+  it('returns true when full and waitlist is missing/falsy', () => {
+    expect(computeIsEventClosed({ isFull: true })).to.be.true;
+    expect(computeIsEventClosed({ isFull: true, allowWaitlisting: false })).to.be.true;
+    expect(computeIsEventClosed({ isFull: true, allowWaitlisting: null })).to.be.true;
+  });
+});
+
+// ─── renderCTAGroup 3-state design ──────────────────────────────────────────
+
+describe('renderCTAGroup three-state design', () => {
+  // Inline reproduction of the 3-state branch in renderCTAGroup so we can
+  // exercise it in isolation without bootstrapping the full block.
+  function inlineRenderCTAGroup(session, { isEventRegistered = false, isBlocked = false } = {}) {
     const group = document.createElement('div');
     group.className = 'sh-cta-group';
 
-    if (!isEventRegistered) {
-      const btn = document.createElement('button');
-      btn.className = 'sh-btn sh-btn-register-event';
-      btn.type = 'button';
-      btn.textContent = 'Register for session';
-      group.append(btn);
-    } else if (!session.isRegistered && !session.isWaitlisted) {
-      const btn = document.createElement('button');
-      btn.className = 'sh-btn sh-btn-register-session';
-      btn.type = 'button';
-      btn.textContent = 'Register for session';
-      group.append(btn);
-    } else {
-      const isWaitlisted = !session.isRegistered && session.isWaitlisted;
+    // State 1: registered or waitlisted for THIS session — badge
+    if (isEventRegistered && (session.isRegistered || session.isWaitlisted)) {
       const calBtn = document.createElement('button');
       calBtn.className = 'sh-btn sh-btn-cal';
-      calBtn.type = 'button';
       group.append(calBtn);
 
+      const isWaitlisted = !session.isRegistered && session.isWaitlisted;
       const badge = document.createElement('button');
       badge.className = 'sh-btn sh-registered-badge';
+      badge.disabled = true;
       const label = isWaitlisted ? 'waitlisted-cta-text' : 'Registered';
       const labelSpan = document.createElement('span');
       labelSpan.textContent = label;
       badge.append(labelSpan);
       group.append(badge);
+      return group;
     }
 
+    // State 3: blocked — disabled button
+    if (isBlocked) {
+      const btn = document.createElement('button');
+      btn.className = 'sh-btn sh-btn-blocked';
+      btn.type = 'button';
+      btn.disabled = true;
+      btn.setAttribute('aria-disabled', 'true');
+      btn.textContent = 'Registration unavailable';
+      group.append(btn);
+      return group;
+    }
+
+    // State 2: able to register — direct-API button
+    if (isEventRegistered) {
+      const btn = document.createElement('button');
+      btn.className = 'sh-btn sh-btn-register-session';
+      btn.type = 'button';
+      btn.textContent = 'Register for session';
+      group.append(btn);
+      return group;
+    }
+
+    // Default: not yet event-registered, not blocked
+    const btn = document.createElement('button');
+    btn.className = 'sh-btn sh-btn-register-event';
+    btn.type = 'button';
+    btn.textContent = 'Register for session';
+    group.append(btn);
     return group;
   }
 
-  it('shows waitlisted badge (using waitlisted-cta-text) when session.isWaitlisted is true', () => {
-    const group = inlineRenderCTAGroup({ isRegistered: false, isWaitlisted: true }, true);
-    const badge = group.querySelector('.sh-registered-badge');
-    expect(badge).to.not.be.null;
-    expect(badge.textContent).to.include('waitlisted-cta-text');
+  it('renders disabled blocked button when isBlocked is true (event-waitlisted)', () => {
+    const group = inlineRenderCTAGroup({ isRegistered: false, isWaitlisted: false }, { isEventRegistered: false, isBlocked: true });
+    const blocked = group.querySelector('.sh-btn-blocked');
+    expect(blocked).to.not.be.null;
+    expect(blocked.disabled).to.be.true;
+    expect(blocked.getAttribute('aria-disabled')).to.equal('true');
+    expect(blocked.textContent).to.include('Registration unavailable');
+    expect(group.querySelector('.sh-btn-register-session')).to.be.null;
+    expect(group.querySelector('.sh-btn-register-event')).to.be.null;
+  });
+
+  it('renders blocked button when event-registered but blocked (defensive case)', () => {
+    const group = inlineRenderCTAGroup({ isRegistered: false, isWaitlisted: false }, { isEventRegistered: true, isBlocked: true });
+    expect(group.querySelector('.sh-btn-blocked')).to.not.be.null;
     expect(group.querySelector('.sh-btn-register-session')).to.be.null;
   });
 
-  it('shows "Registered" badge when session.isRegistered is true', () => {
-    const group = inlineRenderCTAGroup({ isRegistered: true, isWaitlisted: false }, true);
+  it('renders direct-API "Register for session" when event-registered and able to register', () => {
+    const group = inlineRenderCTAGroup({ isRegistered: false, isWaitlisted: false }, { isEventRegistered: true, isBlocked: false });
+    expect(group.querySelector('.sh-btn-register-session')).to.not.be.null;
+    expect(group.querySelector('.sh-btn-blocked')).to.be.null;
+    expect(group.querySelector('.sh-btn-register-event')).to.be.null;
+  });
+
+  it('renders modal-opening "Register for session" when not event-registered and not blocked', () => {
+    const group = inlineRenderCTAGroup({ isRegistered: false, isWaitlisted: false }, { isEventRegistered: false, isBlocked: false });
+    expect(group.querySelector('.sh-btn-register-event')).to.not.be.null;
+    expect(group.querySelector('.sh-btn-register-session')).to.be.null;
+    expect(group.querySelector('.sh-btn-blocked')).to.be.null;
+  });
+
+  it('renders Registered badge when session.isRegistered (event-registered)', () => {
+    const group = inlineRenderCTAGroup({ isRegistered: true, isWaitlisted: false }, { isEventRegistered: true, isBlocked: false });
     const badge = group.querySelector('.sh-registered-badge');
+    expect(badge).to.not.be.null;
     expect(badge.textContent).to.include('Registered');
     expect(badge.textContent).to.not.include('waitlisted-cta-text');
   });
 
-  it('shows "Register for session" CTA when neither registered nor waitlisted', () => {
-    const group = inlineRenderCTAGroup({ isRegistered: false, isWaitlisted: false }, true);
-    expect(group.querySelector('.sh-btn-register-session')).to.not.be.null;
-    expect(group.querySelector('.sh-registered-badge')).to.be.null;
+  it('renders waitlisted badge when session.isWaitlisted (event-registered)', () => {
+    const group = inlineRenderCTAGroup({ isRegistered: false, isWaitlisted: true }, { isEventRegistered: true, isBlocked: false });
+    const badge = group.querySelector('.sh-registered-badge');
+    expect(badge).to.not.be.null;
+    expect(badge.textContent).to.include('waitlisted-cta-text');
+  });
+
+  it('blocked takes precedence over the "able to register" path', () => {
+    const group = inlineRenderCTAGroup({ isRegistered: false, isWaitlisted: false }, { isEventRegistered: true, isBlocked: true });
+    expect(group.querySelector('.sh-btn-blocked')).to.not.be.null;
+    expect(group.querySelector('.sh-btn-register-session')).to.be.null;
+  });
+
+  it('registered-for-session badge takes precedence over blocked', () => {
+    // A user who already registered for a session before the event went into
+    // a blocked state should still see their badge, not a sudden "blocked" button.
+    const group = inlineRenderCTAGroup({ isRegistered: true, isWaitlisted: false }, { isEventRegistered: true, isBlocked: true });
+    expect(group.querySelector('.sh-registered-badge')).to.not.be.null;
+    expect(group.querySelector('.sh-btn-blocked')).to.be.null;
   });
 });

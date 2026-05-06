@@ -8,7 +8,7 @@ import {
   loadStyle,
   getValidCampaignIdFromUrl,
 } from '../../utils/utils.js';
-import { dictionaryManager, getInviteOnlyNoCampaignMessage } from '../../utils/dictionary-manager.js';
+import { dictionaryManager, getInviteOnlyNoCampaignMessage, getEventWaitlistBannerMessage } from '../../utils/dictionary-manager.js';
 import { signIn } from '../../utils/decorate.js';
 import { buildModalContent } from '../profile-cards/profile-cards.js';
 import { createSmartDateRange } from '../../utils/date-time-helper.js';
@@ -186,6 +186,19 @@ function isSessionTimeFullError(resp) {
   return candidates.some((v) => typeof v === 'string' && v.includes('SessionTimeFull'));
 }
 
+function computeIsEventClosed(eventData) {
+  if (!eventData?.isFull) return false;
+  // ESP returns allowWaitlisting as either boolean `true` or string `'true'` depending on source.
+  // Match both — anything truthy that isn't the literal string 'false' counts as enabled.
+  const waitlistEnabled = eventData.allowWaitlisting === true
+    || eventData.allowWaitlisting === 'true';
+  return !waitlistEnabled;
+}
+
+function isSessionRegistrationBlocked({ isEventWaitlisted, isEventClosed, inviteOnlyBlocked }) {
+  return Boolean(isEventWaitlisted || isEventClosed || inviteOnlyBlocked);
+}
+
 function findConflictingSession(newSession, state) {
   const newTime = newSession.sessionTimes[0];
   if (!newTime) return null;
@@ -306,22 +319,11 @@ function applyFilter(listEl, state) {
 
 // ─── Render: CTA group ───────────────────────────────────────────────────────
 
-function renderCTAGroup(session, isEventRegistered, inviteOnlyBlocked, inviteOnlyMessage, isEventWaitlisted = false) {
+function renderCTAGroup(session, { isEventRegistered = false, isBlocked = false } = {}) {
   const group = createTag('div', { class: 'sh-cta-group' });
 
-  if (isEventWaitlisted && !isEventRegistered) {
-    const btn = createTag('button', { class: 'sh-btn sh-btn-register-event sh-event-waitlisted-badge', type: 'button' });
-    btn.append(createIcon(CHECKMARK_ICON), createTag('span', {}, dictionaryManager.getValue('waitlisted-cta-text')));
-    group.append(btn);
-  } else if (!isEventRegistered) {
-    if (inviteOnlyBlocked) {
-      group.append(createTag('p', { class: 'sh-invite-only-msg', role: 'status' }, inviteOnlyMessage));
-    } else {
-      group.append(createTag('button', { class: 'sh-btn sh-btn-register-event', type: 'button' }, dictionaryManager.getValue('Register for session')));
-    }
-  } else if (!session.isRegistered && !session.isWaitlisted) {
-    group.append(createTag('button', { class: 'sh-btn sh-btn-register-session', type: 'button' }, dictionaryManager.getValue('Register for session')));
-  } else {
+  // State 1: registered or waitlisted for THIS session — badge with hover-to-unregister
+  if (isEventRegistered && (session.isRegistered || session.isWaitlisted)) {
     const calBtn = createTag('button', { class: 'sh-btn sh-btn-cal', type: 'button' });
     calBtn.append(createIcon(CTA_CALENDAR_ICON), createTag('span', {}, dictionaryManager.getValue('Download to calendar')));
     group.append(calBtn);
@@ -355,22 +357,36 @@ function renderCTAGroup(session, isEventRegistered, inviteOnlyBlocked, inviteOnl
     };
     badge.addEventListener('mouseenter', () => { if (!badge.disabled) setUnregisterContent(); });
     badge.addEventListener('mouseleave', () => { if (!badge.disabled) setIdleContent(); });
+    return group;
   }
 
+  // State 3: blocked — disabled button (event-waitlisted, event-closed, or invite-only without campaign)
+  if (isBlocked) {
+    const btn = createTag('button', {
+      class: 'sh-btn sh-btn-blocked',
+      type: 'button',
+      disabled: '',
+      'aria-disabled': 'true',
+    }, dictionaryManager.getValue('Registration unavailable'));
+    group.append(btn);
+    return group;
+  }
+
+  // State 2: able to register — direct-API button (no modal)
+  if (isEventRegistered) {
+    group.append(createTag('button', { class: 'sh-btn sh-btn-register-session', type: 'button' }, dictionaryManager.getValue('Register for session')));
+    return group;
+  }
+
+  // Default: not yet event-registered, not blocked — opens RSVP modal
+  group.append(createTag('button', { class: 'sh-btn sh-btn-register-event', type: 'button' }, dictionaryManager.getValue('Register for session')));
   return group;
 }
 
-function updateCTAGroup(cardEl, session, isEventRegistered, isEventWaitlisted = false) {
-  const state = getState();
+function updateCTAGroup(cardEl, session, opts = {}) {
   const old = cardEl.querySelector('.sh-cta-group');
   if (!old) return;
-  old.replaceWith(renderCTAGroup(
-    session,
-    isEventRegistered,
-    state?.inviteOnlyBlocked ?? false,
-    state?.inviteOnlyMessage ?? '',
-    isEventWaitlisted,
-  ));
+  old.replaceWith(renderCTAGroup(session, opts));
 }
 
 // ─── Session description overflow (matches CSS -webkit-line-clamp) ───────────
@@ -476,7 +492,7 @@ function renderSpeakerAvatars(speakers) {
   return wrap;
 }
 
-function renderSessionCard(session, isEventRegistered, inviteOnlyBlocked, inviteOnlyMessage, isEventWaitlisted = false) {
+function renderSessionCard(session, opts = {}) {
   const primaryTime = session.sessionTimes[0];
   const timeStr = primaryTime
     ? createSmartDateRange(primaryTime.startTimeMillis, primaryTime.endTimeMillis, 'en-US', primaryTime.timezone)
@@ -537,21 +553,15 @@ function renderSessionCard(session, isEventRegistered, inviteOnlyBlocked, invite
   descText.innerHTML = fullDesc;
 
   desc.append(descText);
-  right.append(desc, renderCTAGroup(session, isEventRegistered, inviteOnlyBlocked, inviteOnlyMessage, isEventWaitlisted));
+  right.append(desc, renderCTAGroup(session, opts));
 
   card.append(left, right);
   return card;
 }
 
-function renderSessionList(sessions, isEventRegistered, inviteOnlyBlocked, inviteOnlyMessage, isEventWaitlisted = false) {
+function renderSessionList(sessions, opts = {}) {
   const list = createTag('div', { class: 'sh-session-list' });
-  sessions.forEach((s) => list.append(renderSessionCard(
-    s,
-    isEventRegistered,
-    inviteOnlyBlocked,
-    inviteOnlyMessage,
-    isEventWaitlisted,
-  )));
+  sessions.forEach((s) => list.append(renderSessionCard(s, opts)));
   return list;
 }
 
@@ -655,7 +665,7 @@ function buildBannerDateString() {
   return createSmartDateRange(startMillis, endMillis, 'en-US', timezone);
 }
 
-function renderEventBanner(rsvpConfig, inviteOnlyBlocked, inviteOnlyMessage) {
+function renderEventBanner(rsvpConfig, { inviteOnlyBlocked = false, inviteOnlyMessage = '', isEventWaitlisted = false, waitlistBannerMessage = '' } = {}) {
   const banner = createTag('aside', { class: 'sh-event-banner', 'aria-label': dictionaryManager.getValue('Event registration') });
   const inner = createTag('div', { class: 'sh-banner-inner' });
   const info = createTag('div', { class: 'sh-banner-info' });
@@ -680,7 +690,13 @@ function renderEventBanner(rsvpConfig, inviteOnlyBlocked, inviteOnlyMessage) {
       createTag('p', { class: 'sh-banner-invite-only-msg', role: 'status' }, inviteOnlyMessage),
     );
   } else {
-    const btn = createTag('button', { class: 'sh-btn sh-btn-event-register', type: 'button' }, dictionaryManager.getValue('Register'));
+    const btn = createTag('button', { class: 'sh-btn sh-btn-event-register', type: 'button' });
+    if (isEventWaitlisted) {
+      btn.classList.add('sh-event-register-waitlisted');
+      btn.append(createIcon(CHECKMARK_ICON), createTag('span', {}, dictionaryManager.getValue('waitlisted-cta-text')));
+    } else {
+      btn.append(createTag('span', {}, dictionaryManager.getValue('Register')));
+    }
     btn.addEventListener('click', () => {
       const profile = BlockMediator.get('imsProfile');
       const isSignedOut = !profile || profile.noProfile || profile.account_type === 'guest';
@@ -691,7 +707,13 @@ function renderEventBanner(rsvpConfig, inviteOnlyBlocked, inviteOnlyMessage) {
         openRsvpModal(rsvpConfig);
       }
     });
-    inner.append(info, btn);
+
+    if (isEventWaitlisted) {
+      const msg = createTag('p', { class: 'sh-banner-waitlist-msg', role: 'status' }, waitlistBannerMessage);
+      inner.append(info, msg, btn);
+    } else {
+      inner.append(info, btn);
+    }
   }
 
   banner.append(inner);
@@ -944,6 +966,15 @@ async function handleSessionRegistration(cardEl, sessionId, state) {
   const firstTime = session.sessionTimes[0];
   if (!firstTime) return;
 
+  // Defensive: never attempt session registration when blocked at the event level.
+  // The disabled CTA prevents clicks, but an auto-fired flow (e.g. pendingSessionId)
+  // could still reach this point.
+  if (isSessionRegistrationBlocked({
+    isEventWaitlisted: state.isEventWaitlisted,
+    isEventClosed: state.isEventClosed,
+    inviteOnlyBlocked: state.inviteOnlyBlocked,
+  })) return;
+
   // ── Conflict detection ────────────────────────────────────────────────────
   const conflictingSession = findConflictingSession(session, state);
   let conflictFinalize = null;
@@ -969,7 +1000,7 @@ async function handleSessionRegistration(cardEl, sessionId, state) {
       state.registeredSessionIds.delete(conflictingSession.sessionId);
       const conflictCard = cardEl.closest('.sh-session-list')
         ?.querySelector(`[data-session-id="${conflictingSession.sessionId}"]`);
-      if (conflictCard) updateCTAGroup(conflictCard, conflictingSession, true, state.isEventWaitlisted);
+      if (conflictCard) updateCTAGroup(conflictCard, conflictingSession, { isEventRegistered: true, isBlocked: false });
       const existing = BlockMediator.get('registeredSessionIds') || new Set();
       const updated = new Set([...existing]);
       updated.delete(conflictingSession.sessionId);
@@ -1008,7 +1039,7 @@ async function handleSessionRegistration(cardEl, sessionId, state) {
       const existing = BlockMediator.get('registeredSessionIds') || new Set();
       BlockMediator.set('registeredSessionIds', new Set([...existing, sessionId]));
     }
-    updateCTAGroup(cardEl, session, true, state.isEventWaitlisted);
+    updateCTAGroup(cardEl, session, { isEventRegistered: true, isBlocked: false });
     if (conflictFinalize) conflictFinalize(true);
   } else {
     window.lana?.log(`Error: Failed to register for session ${sessionId}. Error:${JSON.stringify(resp.error)}`);
@@ -1043,7 +1074,7 @@ async function handleSessionUnregistration(cardEl, sessionId, state) {
     session.isRegistered = false;
     session.isWaitlisted = false;
     state.registeredSessionIds.delete(sessionId);
-    updateCTAGroup(cardEl, session, true, state.isEventWaitlisted);
+    updateCTAGroup(cardEl, session, { isEventRegistered: true, isBlocked: false });
     const existing = BlockMediator.get('registeredSessionIds') || new Set();
     const updated = new Set([...existing]);
     updated.delete(sessionId);
@@ -1108,17 +1139,8 @@ function bindCardEvents(listEl, state) {
 
     if (e.target.closest('.sh-btn-register-event')) {
       const btn = e.target.closest('.sh-btn-register-event');
-      const isAlreadyWaitlisted = btn?.classList.contains('sh-event-waitlisted-badge');
 
       if (state.inviteOnlyBlocked) return;
-
-      if (isAlreadyWaitlisted) {
-        // User is already on the event waitlist \u2014 just re-open the modal so
-        // they can cancel waitlist or review status. Do not set pendingSessionId
-        // or relabel the button.
-        if (state.rsvpConfig) openRsvpModal(state.rsvpConfig);
-        return;
-      }
 
       const profile = BlockMediator.get('imsProfile');
       const isSignedOut = !profile || profile.noProfile || profile.account_type === 'guest';
@@ -1151,15 +1173,32 @@ function bindCardEvents(listEl, state) {
   });
 }
 
-function bindMediatorSubscriptions(el, bannerEl, listEl) {
-  rsvpUnsubscribe = BlockMediator.subscribe('rsvpData', async ({ newValue }) => {
+function refreshEventBanner(el, rsvpConfig, opts) {
+  const current = el.querySelector('.sh-event-banner');
+  const wasHidden = current?.classList.contains('hidden') ?? false;
+  const fresh = renderEventBanner(rsvpConfig, opts);
+  if (wasHidden) fresh.classList.add('hidden');
+  if (current) current.replaceWith(fresh);
+  else el.append(fresh);
+  return fresh;
+}
+
+function bindMediatorSubscriptions(el, listEl) {
+  const handleRsvpDataChange = async (newValue) => {
     const state = getState();
     const isRegistered = newValue?.registrationStatus === 'registered';
     const isWaitlisted = newValue?.registrationStatus === 'waitlisted';
     state.isEventRegistered = isRegistered;
     state.isEventWaitlisted = isWaitlisted;
 
-    syncBannerVisibility(bannerEl, isRegistered || isWaitlisted);
+    // Re-render banner so its button reflects waitlist state, then apply visibility
+    const newBanner = refreshEventBanner(el, state.rsvpConfig, {
+      inviteOnlyBlocked: state.inviteOnlyBlocked,
+      inviteOnlyMessage: state.inviteOnlyMessage,
+      isEventWaitlisted: isWaitlisted,
+      waitlistBannerMessage: state.waitlistBannerMessage,
+    });
+    syncBannerVisibility(newBanner, isRegistered);
 
     const toggle = el.querySelector('.sh-tab-toggle');
     if (toggle) toggle.hidden = !isRegistered;
@@ -1167,6 +1206,12 @@ function bindMediatorSubscriptions(el, bannerEl, listEl) {
     const cardMap = new Map(
       [...el.querySelectorAll('.sh-card')].map((c) => [c.dataset.sessionId, c]),
     );
+
+    const isBlocked = isSessionRegistrationBlocked({
+      isEventWaitlisted: isWaitlisted,
+      isEventClosed: state.isEventClosed,
+      inviteOnlyBlocked: state.inviteOnlyBlocked,
+    });
 
     if (isRegistered) {
       const ids = await resolveRegistrationState(state.eventData.eventId, true);
@@ -1176,7 +1221,7 @@ function bindMediatorSubscriptions(el, bannerEl, listEl) {
       state.sessions.forEach((session) => {
         session.isRegistered = mergedIds.has(session.sessionId);
         const cardEl = cardMap.get(session.sessionId);
-        if (cardEl) updateCTAGroup(cardEl, session, true, false);
+        if (cardEl) updateCTAGroup(cardEl, session, { isEventRegistered: true, isBlocked: false });
       });
 
       if (pendingSessionId) {
@@ -1193,7 +1238,7 @@ function bindMediatorSubscriptions(el, bannerEl, listEl) {
       state.sessions.forEach((session) => {
         session.isRegistered = false;
         const cardEl = cardMap.get(session.sessionId);
-        if (cardEl) updateCTAGroup(cardEl, session, false, isWaitlisted);
+        if (cardEl) updateCTAGroup(cardEl, session, { isEventRegistered: false, isBlocked });
       });
 
       // Reset to "All sessions" tab when user un-registers
@@ -1208,7 +1253,23 @@ function bindMediatorSubscriptions(el, bannerEl, listEl) {
     }
 
     applyFilter(listEl, state);
-  });
+  };
+
+  rsvpUnsubscribe = BlockMediator.subscribe('rsvpData', ({ newValue }) => handleRsvpDataChange(newValue));
+
+  // Reconcile against the current rsvpData snapshot in case captureProfile
+  // (in profile.js) or the events-form modal set it BETWEEN the initial
+  // loadBlock read and this subscription registration. BlockMediator does not
+  // replay current values to new subscribers, so we manually apply them once.
+  const state = getState();
+  const currentRsvp = BlockMediator.get('rsvpData');
+  const currentStatus = currentRsvp?.registrationStatus;
+  const renderedStatus = state.isEventRegistered
+    ? 'registered'
+    : (state.isEventWaitlisted ? 'waitlisted' : null);
+  if (currentStatus !== renderedStatus) {
+    handleRsvpDataChange(currentRsvp);
+  }
 
   BlockMediator.subscribe('registeredSessionIds', ({ newValue }) => {
     const state = getState();
@@ -1216,12 +1277,17 @@ function bindMediatorSubscriptions(el, bannerEl, listEl) {
     const cardMap = new Map(
       [...el.querySelectorAll('.sh-card')].map((c) => [c.dataset.sessionId, c]),
     );
+    const isBlocked = isSessionRegistrationBlocked({
+      isEventWaitlisted: state.isEventWaitlisted,
+      isEventClosed: state.isEventClosed,
+      inviteOnlyBlocked: state.inviteOnlyBlocked,
+    });
     state.sessions.forEach((session) => {
       if (newValue.has(session.sessionId) && !session.isRegistered) {
         session.isRegistered = true;
         state.registeredSessionIds.add(session.sessionId);
         const cardEl = cardMap.get(session.sessionId);
-        if (cardEl) updateCTAGroup(cardEl, session, state.isEventRegistered, state.isEventWaitlisted);
+        if (cardEl) updateCTAGroup(cardEl, session, { isEventRegistered: state.isEventRegistered, isBlocked });
       }
     });
     applyFilter(listEl, state);
@@ -1245,6 +1311,9 @@ async function loadBlock(el, rsvpConfig) {
 
   const inviteOnlyBlocked = Boolean(eventData.inviteOnly && !getValidCampaignIdFromUrl());
   const inviteOnlyMessage = getInviteOnlyNoCampaignMessage(dictionaryManager);
+  const waitlistBannerMessage = getEventWaitlistBannerMessage(dictionaryManager, {
+    eventTitle: getMetadata('event-title') || '',
+  });
 
   let rawSessions;
   try {
@@ -1267,6 +1336,7 @@ async function loadBlock(el, rsvpConfig) {
   const rsvpData = BlockMediator.get('rsvpData');
   const isEventRegistered = rsvpData?.registrationStatus === 'registered';
   const isEventWaitlisted = rsvpData?.registrationStatus === 'waitlisted';
+  const isEventClosed = computeIsEventClosed(eventData);
   const [registeredSessionIds, tagsData] = await Promise.all([
     resolveRegistrationState(eventData.eventId, isEventRegistered),
     Promise.resolve(getCaasTags()).catch(() => null),
@@ -1289,26 +1359,31 @@ async function loadBlock(el, rsvpConfig) {
     registeredSessionIds,
     isEventRegistered,
     isEventWaitlisted,
+    isEventClosed,
     rsvpConfig,
     inviteOnlyBlocked,
     inviteOnlyMessage,
+    waitlistBannerMessage,
   };
   setState(state);
 
+  const isBlocked = isSessionRegistrationBlocked({ isEventWaitlisted, isEventClosed, inviteOnlyBlocked });
+
   const toolbar = renderToolbar(state);
   setToolbarStickyOffset(toolbar);
-  const listEl = renderSessionList(sessions, isEventRegistered, inviteOnlyBlocked, inviteOnlyMessage, isEventWaitlisted);
+  const listEl = renderSessionList(sessions, { isEventRegistered, isBlocked });
   el.append(toolbar, listEl);
 
-  // Always append banner; hide it if user is already registered or waitlisted
+  // Always append banner; hide it only if user is already event-registered.
+  // (Waitlisted users keep the banner visible so they can manage their waitlist.)
   el.querySelector('.sh-event-banner')?.remove();
-  const bannerEl = renderEventBanner(rsvpConfig, inviteOnlyBlocked, inviteOnlyMessage);
-  if (isEventRegistered || isEventWaitlisted) bannerEl.classList.add('hidden');
+  const bannerEl = renderEventBanner(rsvpConfig, { inviteOnlyBlocked, inviteOnlyMessage, isEventWaitlisted, waitlistBannerMessage });
+  if (isEventRegistered) bannerEl.classList.add('hidden');
   el.append(bannerEl);
 
   bindToolbarEvents(toolbar, listEl, state);
   bindCardEvents(listEl, state);
-  bindMediatorSubscriptions(el, bannerEl, listEl);
+  bindMediatorSubscriptions(el, listEl);
 
   try {
     await document.fonts?.ready;

@@ -107,7 +107,7 @@ describe('sessions-hub invite-only RSVP gate', () => {
     window.history.replaceState({}, '', `${window.location.pathname}`);
   });
 
-  it('shows invite-only message on banner and cards when event is invite-only and URL has no campaign', async () => {
+  it('shows invite-only message on banner and disabled "blocked" CTA on cards when event is invite-only and URL has no campaign', async () => {
     stubDefaultFetch({ inviteOnly: true });
     setSessionsMeta([makeSession()]);
     const el = document.querySelector('.sessions-hub');
@@ -119,10 +119,13 @@ describe('sessions-hub invite-only RSVP gate', () => {
     expect(bannerMsg).to.not.be.null;
     expect(bannerMsg.textContent).to.equal(INVITE_FALLBACK);
 
-    const cardMsg = el.querySelector('.sh-card .sh-invite-only-msg');
-    expect(cardMsg).to.not.be.null;
-    expect(cardMsg.textContent).to.equal(INVITE_FALLBACK);
-    expect(el.querySelector('.sh-btn-register-event')).to.be.null;
+    // Cards now share the unified blocked state with event-waitlisted/event-closed:
+    // a disabled `.sh-btn-blocked` button labeled "Registration unavailable".
+    const blockedBtn = el.querySelector('.sh-card .sh-btn-blocked');
+    expect(blockedBtn).to.not.be.null;
+    expect(blockedBtn.disabled).to.be.true;
+    expect(el.querySelector('.sh-card .sh-btn-register-event')).to.be.null;
+    expect(el.querySelector('.sh-card .sh-btn-register-session')).to.be.null;
   });
 
   it('shows Register UI when event is invite-only but URL has a valid campaign param', async () => {
