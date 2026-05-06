@@ -184,5 +184,20 @@ describe('Profile Cards Module', () => {
       expect(focusables[0].classList.contains('card-name')).to.be.true;
       expect(focusables[0].tagName.toLowerCase()).to.equal('h2');
     });
+
+    it('should decode HTML entities in plain-text titles without using innerHTML', async () => {
+      const fragment = await buildModalContent({
+        firstName: 'Jane',
+        lastName: 'Doe',
+        title: 'Lead, AT&amp;T &amp; Partners',
+        bio: '',
+        socialLinks: [],
+      });
+
+      const host = document.createElement('div');
+      host.append(fragment);
+
+      expect(host.querySelector('.card-title').textContent.trim()).to.equal('Lead, AT&T & Partners');
+    });
   });
 });
