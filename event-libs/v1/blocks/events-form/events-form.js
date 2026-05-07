@@ -3,7 +3,7 @@ import BlockMediator from '../../deps/block-mediator.min.js';
 import { signIn, decorateEvent } from '../../utils/decorate.js';
 import { dictionaryManager, getInviteOnlyNoCampaignMessage } from '../../utils/dictionary-manager.js';
 import { getEventConfig, LIBS, getMetadata, getSusiOptions, getValidCampaignIdFromUrl } from '../../utils/utils.js';
-import { FALLBACK_LOCALES, CAMPAIGN_ID_PATTERN } from '../../utils/constances.js';
+import { FALLBACK_LOCALES, CAMPAIGN_ID_PATTERN, PHONE_FIELD_RE, PHONE_PATTERN  } from '../../utils/constances.js';
 import { BASE_ATTENDEE_DATA_FILTER } from '../../utils/data-utils.js';
 
 const eventConfig = getEventConfig();
@@ -16,9 +16,6 @@ const { decorateDefaultLinkAnalytics } = await import(`${miloLibs}/martech/attri
 const { default: loadFragment } = await import(`${miloLibs}/blocks/fragment/fragment.js`);
 
 const VALID_REGISTRATION_STATUS = ['registered', 'waitlisted'];
-
-const PHONE_FIELD_RE = /phone/i;
-const PHONE_PATTERN = '^\\+?[\\d\\s\\(\\)\\.\\-]{7,20}$';
 
 const RULE_OPERATORS = {
   equal: '=',
@@ -849,27 +846,53 @@ function addTerms(form, terms) {
   submitWrapper.before(termsWrapper);
 }
 
+function getRsvpConfigFromMeta() {
+  const raw = getMetadata('rsvp-config');
+  if (!raw) return null;
+
+  try {
+    const config = JSON.parse(raw);
+    if (!config.rsvpFormFields?.length) return null;
+
+    const data = config.rsvpFormFields.map((f) => {
+      const field = lowercaseKeys(f);
+      if (typeof field.field === 'string') field.field = field.field.trim();
+      field.required = field.required === true ? 'x' : '';
+      return field;
+    });
+
+    return { data };
+  } catch (error) {
+    window.lana?.log(`Failed to parse rsvp-config metadata: ${JSON.stringify(error)}`);
+    return null;
+  }
+}
+
 async function createForm(bp, formData) {
   const { form, terms } = bp;
 
-  let rsvpFieldsData;
+  const rsvpConfigData = getRsvpConfigFromMeta();
 
-  try {
-    rsvpFieldsData = JSON.parse(getMetadata('rsvp-form-fields'));
-  } catch (error) {
-    window.lana?.log(`Failed to parse partners metadata:\n${JSON.stringify(error, null, 2)}`);
+  let rsvpFieldsData;
+  if (!rsvpConfigData) {
+    try {
+      rsvpFieldsData = JSON.parse(getMetadata('rsvp-form-fields'));
+    } catch (error) {
+      window.lana?.log(`Failed to parse partners metadata:\n${JSON.stringify(error, null, 2)}`);
+    }
   }
 
-  let json = formData;
+  let json = rsvpConfigData || formData;
   /* c8 ignore next 4 */
-  if (!formData) {
+  if (!json) {
     const resp = await fetch(form.href);
     json = await resp.json();
   }
 
   await dictionaryManager.initialize();
 
-  if (rsvpFieldsData) {
+  if (rsvpConfigData) {
+  } else if (rsvpFieldsData) {
     const { required, visible } = rsvpFieldsData;
     json.data = json.data
       .map((obj) => {
@@ -891,8 +914,10 @@ async function createForm(bp, formData) {
 
   const formEl = createTag('form');
   const rules = [];
-  const [action] = new URL(form.href).pathname.split('.json');
-  formEl.dataset.action = action;
+  if (form.href) {
+    const [action] = new URL(form.href).pathname.split('.json');
+    formEl.dataset.action = action;
+  }
 
   const typeToElement = {
     'multi-select': { fn: createSelect, params: [], label: true, classes: [] },
@@ -1156,16 +1181,18 @@ function getFormLink(block, bp) {
   const legacyLink = block.querySelector(':scope > div:nth-of-type(2) a[href$=".json"]');
   const form = createTag('a');
 
-  try {
-    form.href = getRsvpConfigUrl();
-  } catch (error) {
-    window.lana?.log(`Error getting RSVP config URL: ${JSON.stringify(error)}`);
-    throw error;
-  }
+  if (!getRsvpConfigFromMeta()) {
+    try {
+      form.href = getRsvpConfigUrl();
+    } catch (error) {
+      window.lana?.log(`Error getting RSVP config URL: ${JSON.stringify(error)}`);
+      throw error;
+    }
 
-  if (legacyLink) {
-    legacyLink.href = form.href;
-    return legacyLink;
+    if (legacyLink) {
+      legacyLink.href = form.href;
+      return legacyLink;
+    }
   }
 
   bp.formContainer.append(form);
