@@ -858,6 +858,9 @@ function getRsvpConfigFromMeta() {
       const field = lowercaseKeys(f);
       if (typeof field.field === 'string') field.field = field.field.trim();
       field.required = field.required === true ? 'x' : '';
+      if (Array.isArray(field.options)) {
+        field.options = field.options.map((o) => (typeof o === 'object' ? o.value : o)).join(';');
+      }
       return field;
     });
 
