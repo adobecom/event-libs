@@ -247,10 +247,6 @@
     padding: 32px;
     align-items: flex-start;
   }
-
-  .profile-cards-modal .profile-cards-modal-image .card-image-container img {
-    min-width: 385px;
-  }
 }
 
 /* Desktop and up */

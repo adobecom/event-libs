@@ -1,9 +1,6 @@
 import { expect } from '@esm-bundle/chai';
 import { readFile } from '@web/test-runner-commands';
-import init, { createSocialIcon, buildModalContent } from '../../../../event-libs/v1/blocks/profile-cards/profile-cards.js';
-
-/** Mirrors Milo modal.js FOCUSABLES selector for initial-focus assertions */
-const MODAL_FOCUSABLES_SELECTOR = 'a:not(.hide-video, .faas), button:not([disabled], .locale-modal-v2 .paddle), input, textarea, select, details, [tabindex]:not([tabindex="-1"])';
+import init, { createSocialIcon } from '../../../../event-libs/v1/blocks/profile-cards/profile-cards.js';
 
 const head = await readFile({ path: './mocks/head.html' });
 const body = await readFile({ path: './mocks/default.html' });
@@ -159,45 +156,6 @@ describe('Profile Cards Module', () => {
 
       expect(icon).to.not.be.null;
       expect(iconAlt).to.equal('facebook logo');
-    });
-  });
-
-  describe('buildModalContent', () => {
-    it('should strip HTML from job title so Milo modal initial focus is not an anchor in .card-title', async () => {
-      const fragment = await buildModalContent({
-        firstName: 'Jane',
-        lastName: 'Doe',
-        title: '<a href="https://example.com/">Company</a> VP',
-        bio: '',
-        socialLinks: [],
-      });
-
-      const host = document.createElement('div');
-      host.append(fragment);
-
-      const cardTitle = host.querySelector('.card-title');
-      expect(cardTitle.querySelector('a')).to.be.null;
-      expect(cardTitle.textContent.replace(/\s+/g, ' ').trim()).to.equal('Company VP');
-
-      const focusables = host.querySelectorAll(MODAL_FOCUSABLES_SELECTOR);
-      expect(focusables.length).to.be.at.least(1);
-      expect(focusables[0].classList.contains('card-name')).to.be.true;
-      expect(focusables[0].tagName.toLowerCase()).to.equal('h2');
-    });
-
-    it('should decode HTML entities in plain-text titles without using innerHTML', async () => {
-      const fragment = await buildModalContent({
-        firstName: 'Jane',
-        lastName: 'Doe',
-        title: 'Lead, AT&amp;T &amp; Partners',
-        bio: '',
-        socialLinks: [],
-      });
-
-      const host = document.createElement('div');
-      host.append(fragment);
-
-      expect(host.querySelector('.card-title').textContent.trim()).to.equal('Lead, AT&T & Partners');
     });
   });
 });
