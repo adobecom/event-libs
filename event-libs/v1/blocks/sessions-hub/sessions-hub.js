@@ -262,6 +262,35 @@ function normalizeSessions(rawSessions, locationMap, registeredSessionIds, venue
 
 // ─── Filter / search ─────────────────────────────────────────────────────────
 
+const DEFAULT_SEARCH_CONFIG = { includeDescription: false };
+
+function parseSearchConfig(blockEl) {
+  return {
+    includeDescription: Boolean(blockEl?.classList?.contains('search-include-description')),
+  };
+}
+
+function getEffectiveSearchQuery(rawQuery) {
+  const t = (rawQuery || '').trim().toLowerCase();
+  return t.length >= 2 ? t : '';
+}
+
+function speakerMatchesQuery(sp, q) {
+  const fn = (sp.firstName || '').toLowerCase();
+  const ln = (sp.lastName || '').toLowerCase();
+  const full = `${fn} ${ln}`.trim();
+  return fn.includes(q) || ln.includes(q) || full.includes(q);
+}
+
+function sessionMatchesTextSearch(s, q, searchConfig) {
+  const cfg = searchConfig || DEFAULT_SEARCH_CONFIG;
+  if ((s.title || '').toLowerCase().includes(q)) return true;
+  if (s.speakers.some((sp) => speakerMatchesQuery(sp, q))) return true;
+  if (s.tags.some((t) => t.label && t.label.toLowerCase().includes(q))) return true;
+  if (cfg.includeDescription && (s.description || '').toLowerCase().includes(q)) return true;
+  return false;
+}
+
 function collectFilterGroups(sessions) {
   const groups = new Map();
   sessions.forEach((s) => s.tags.forEach(({ label, group }) => {
@@ -277,8 +306,14 @@ function collectFilterGroups(sessions) {
   return sorted;
 }
 
-function filterSessions(sessions, { query, activeTags, activeTab, registeredSessionIds }) {
-  const q = query.toLowerCase();
+export function filterSessions(sessions, {
+  query,
+  activeTags,
+  activeTab,
+  registeredSessionIds,
+  searchConfig = DEFAULT_SEARCH_CONFIG,
+}) {
+  const q = getEffectiveSearchQuery(query);
   return sessions.filter((s) => {
     if (activeTab === 'my' && !registeredSessionIds.has(s.sessionId)) return false;
 
@@ -288,33 +323,44 @@ function filterSessions(sessions, { query, activeTags, activeTab, registeredSess
       }
     }
 
-    if (q) {
-      const hay = [
-        s.title,
-        s.description,
-        ...s.speakers.map((sp) => `${sp.firstName} ${sp.lastName}`),
-      ].join(' ').toLowerCase();
-      if (!hay.includes(q)) return false;
-    }
+    if (q && !sessionMatchesTextSearch(s, q, searchConfig)) return false;
 
     return true;
   });
 }
 
-function applyFilter(listEl, state) {
+function getSessionListRoot(sessionAreaOrList) {
+  if (sessionAreaOrList?.classList?.contains('sh-session-area')) {
+    return sessionAreaOrList.querySelector('.sh-session-list') || sessionAreaOrList;
+  }
+  return sessionAreaOrList;
+}
+
+function applyFilter(sessionAreaEl, state) {
   const fs = getFilterState();
   const filtered = filterSessions(state.sessions, {
     query: fs.query,
     activeTags: fs.activeTags,
     activeTab: fs.activeTab,
     registeredSessionIds: state.registeredSessionIds,
+    searchConfig: state.searchConfig || DEFAULT_SEARCH_CONFIG,
   });
   const filteredIds = new Set(filtered.map((s) => s.sessionId));
+  const effectiveQuery = getEffectiveSearchQuery(fs.query);
 
-  listEl.querySelectorAll('.sh-card').forEach((card) => {
+  const listRoot = getSessionListRoot(sessionAreaEl);
+  listRoot.querySelectorAll('.sh-card').forEach((card) => {
     card.hidden = !filteredIds.has(card.dataset.sessionId);
   });
-  scheduleSyncSessionDescriptionsOverflow(listEl);
+
+  const emptyEl = sessionAreaEl.querySelector('.sh-no-results');
+  if (emptyEl) {
+    const showEmpty = effectiveQuery.length >= 2 && filtered.length === 0;
+    emptyEl.hidden = !showEmpty;
+    listRoot.hidden = showEmpty;
+  }
+
+  scheduleSyncSessionDescriptionsOverflow(sessionAreaEl);
 }
 
 // ─── Render: CTA group ───────────────────────────────────────────────────────
@@ -422,9 +468,9 @@ function syncSessionCardDescriptionOverflow(card) {
   }
 }
 
-export function syncSessionDescriptionsOverflow(listEl) {
-  if (!listEl) return;
-  listEl.querySelectorAll('.sh-card').forEach((card) => {
+export function syncSessionDescriptionsOverflow(sessionAreaOrList) {
+  if (!sessionAreaOrList) return;
+  sessionAreaOrList.querySelectorAll('.sh-card').forEach((card) => {
     syncSessionCardDescriptionOverflow(card);
   });
 }
@@ -437,16 +483,17 @@ function scheduleSyncSessionDescriptionsOverflow(listEl) {
   });
 }
 
-function connectSessionDescriptionsOverflowObserver(listEl) {
+function connectSessionDescriptionsOverflowObserver(sessionAreaEl) {
   if (typeof ResizeObserver === 'undefined') return;
   disconnectSessionDescriptionsOverflow();
+  const observeEl = getSessionListRoot(sessionAreaEl);
   const debouncedSync = debounce(() => {
-    syncSessionDescriptionsOverflow(listEl);
+    syncSessionDescriptionsOverflow(sessionAreaEl);
   }, 100);
   const ro = new ResizeObserver(() => {
     debouncedSync();
   });
-  ro.observe(listEl);
+  ro.observe(observeEl);
   disconnectDescOverflowObserver = () => {
     ro.disconnect();
     disconnectDescOverflowObserver = null;
@@ -560,9 +607,19 @@ function renderSessionCard(session, opts = {}) {
 }
 
 function renderSessionList(sessions, opts = {}) {
+  const area = createTag('div', { class: 'sh-session-area' });
   const list = createTag('div', { class: 'sh-session-list' });
+  const empty = createTag('div', {
+    class: 'sh-no-results',
+    hidden: '',
+    role: 'status',
+    'aria-live': 'polite',
+    'aria-atomic': 'true',
+  });
+  empty.append(createTag('p', {}, dictionaryManager.getValue('No matching sessions')));
   sessions.forEach((s) => list.append(renderSessionCard(s, opts)));
-  return list;
+  area.append(list, empty);
+  return area;
 }
 
 // ─── Render: toolbar ────────────────────────────────────────────────────────
@@ -1297,6 +1354,8 @@ function bindMediatorSubscriptions(el, listEl) {
 // ─── init ────────────────────────────────────────────────────────────────────
 
 async function loadBlock(el, rsvpConfig) {
+  const searchConfig = parseSearchConfig(el);
+
   const eventData = await resolveEventData();
   if (!eventData?.eventId) {
     el.remove();
@@ -1364,6 +1423,7 @@ async function loadBlock(el, rsvpConfig) {
     inviteOnlyBlocked,
     inviteOnlyMessage,
     waitlistBannerMessage,
+    searchConfig,
   };
   setState(state);
 
