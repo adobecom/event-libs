@@ -8,6 +8,7 @@ import {
 import { FALLBACK_LOCALES, CAMPAIGN_ID_PATTERN } from '../../utils/constances.js';
 import { BASE_ATTENDEE_DATA_FILTER } from '../../utils/data-utils.js';
 import { parseRsvpFieldLimit, stripTags } from '../../utils/sanitize-utils.js';
+import { applyImplicitContactMethodsToPayload, getImplicitConsentRaw } from '../../utils/rsvp-consent.js';
 
 const eventConfig = getEventConfig();
 const miloLibs = eventConfig?.miloConfig?.miloLibs ? eventConfig.miloConfig.miloLibs : LIBS;
@@ -211,6 +212,8 @@ async function submitForm(bp) {
       payload.consentStringId = consentId;
     }
   }
+
+  applyImplicitContactMethodsToPayload(form, payload);
 
   const isValid = Object.keys(payload).reduce((valid, key) => {
     const field = form.querySelector(`[data-field-id=${key}]`);
@@ -602,6 +605,14 @@ async function loadConsent(form, consentData) {
   await loadFragment(termsFragLink);
 
   termsWrapper.classList.remove('transparent');
+
+  const implicitRaw = getImplicitConsentRaw(termsWrapper, consentData);
+  if (implicitRaw) {
+    termsWrapper.dataset.implicitConsent = implicitRaw;
+  } else {
+    delete termsWrapper.dataset.implicitConsent;
+  }
+
   const uls = termsWrapper.querySelectorAll('ul');
 
   const defval = '';
