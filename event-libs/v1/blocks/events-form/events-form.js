@@ -2,9 +2,12 @@ import { deleteAttendeeFromEvent, getAndCreateAndAddAttendee, getAttendee, getEv
 import BlockMediator from '../../deps/block-mediator.min.js';
 import { signIn, decorateEvent } from '../../utils/decorate.js';
 import { dictionaryManager, getInviteOnlyNoCampaignMessage } from '../../utils/dictionary-manager.js';
-import { getEventConfig, LIBS, getMetadata, getSusiOptions, getValidCampaignIdFromUrl } from '../../utils/utils.js';
+import {
+  getEventConfig, LIBS, getMetadata, getSusiOptions, getValidCampaignIdFromUrl,
+} from '../../utils/utils.js';
 import { FALLBACK_LOCALES, CAMPAIGN_ID_PATTERN } from '../../utils/constances.js';
 import { BASE_ATTENDEE_DATA_FILTER } from '../../utils/data-utils.js';
+import { parseRsvpFieldLimit, stripTags } from '../../utils/sanitize-utils.js';
 import { applyImplicitContactMethodsToPayload, getImplicitConsentRaw } from '../../utils/rsvp-consent.js';
 
 const eventConfig = getEventConfig();
@@ -231,7 +234,7 @@ async function submitForm(bp) {
     }
 
     if (sanitizeList.includes(key)) {
-      payload[key] = sanitizeComment(payload[key]);
+      payload[key] = sanitizeComment(stripTags(payload[key]));
     }
 
     return valid;
@@ -441,7 +444,9 @@ function createHeading({ label }, el) {
   return createTag(el, {}, dictionaryManager.getValue(label, 'rsvp-fields'));
 }
 
-function createInput({ type, field, placeholder, required, defval, pattern, title }) {
+function createInput({
+  type, field, placeholder, required, defval, pattern, title, limit,
+}) {
   const placeholderText = placeholder ? dictionaryManager.getValue(placeholder, 'rsvp-fields') : '';
   const isPhoneField = type === 'tel' || type === 'phone' || (typeof field === 'string' && PHONE_FIELD_RE.test(field));
   const attrs = { type: isPhoneField ? 'tel' : type, id: field, placeholder: placeholderText, value: defval };
@@ -452,14 +457,17 @@ function createInput({ type, field, placeholder, required, defval, pattern, titl
   const resolvedPattern = pattern || (isPhoneField ? PHONE_PATTERN : null);
   if (resolvedPattern) attrs.pattern = resolvedPattern;
   if (title) attrs.title = title;
+  if (limit != null) attrs.maxlength = limit;
   const input = createTag('input', attrs);
   if (required === 'x') input.setAttribute('required', 'required');
   return input;
 }
 
-function createTextArea({ field, placeholder, required, defval }) {
+function createTextArea({ field, placeholder, required, defval, limit }) {
   const placeholderText = placeholder ? dictionaryManager.getValue(placeholder, 'rsvp-fields') : '';
-  const input = createTag('textarea', { id: field, placeholder: placeholderText, value: defval });
+  const attrs = { id: field, placeholder: placeholderText, value: defval };
+  if (limit != null) attrs.maxlength = limit;
+  const input = createTag('textarea', attrs);
   if (required === 'x') input.setAttribute('required', 'required');
   return input;
 }
@@ -924,7 +932,8 @@ async function createForm(bp, formData) {
 
   json.data.forEach(async (fd) => {
     fd.type = fd.type || 'text';
-    if (fd.type === 'text') sanitizeList.push(fd.field);
+    fd.limit = parseRsvpFieldLimit(fd.limit);
+    if (fd.type === 'text' || fd.type === 'text-area') sanitizeList.push(fd.field);
     const style = fd.extra ? ` events-form-${fd.extra}` : '';
     const fieldWrapper = createTag(
       'div',
