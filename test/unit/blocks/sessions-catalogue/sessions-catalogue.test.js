@@ -1,6 +1,6 @@
 import { expect } from '@esm-bundle/chai';
 import { readFile } from '@web/test-runner-commands';
-import init, { syncSessionDescriptionsOverflow } from '../../../../event-libs/v1/blocks/sessions-hub/sessions-hub.js';
+import init, { filterSessions, syncSessionDescriptionsOverflow } from '../../../../event-libs/v1/blocks/sessions-hub/sessions-hub.js';
 import BlockMediator from '../../../../event-libs/v1/deps/block-mediator.min.js';
 import { DictionaryManager, dictionaryManager } from '../../../../event-libs/v1/utils/dictionary-manager.js';
 
@@ -46,7 +46,6 @@ function makeEventData(overrides = {}) {
 let resolveTagWithGroup;
 let resolveTagObjects;
 let generateICS;
-let filterSessions;
 let normalizeSessions;
 
 const mockTagsData = {
@@ -128,27 +127,6 @@ before(async () => {
     if (locationName) lines.push(`LOCATION:${locationName.replace(/\n/g, '\\n')}`);
     lines.push('END:VEVENT', 'END:VCALENDAR');
     return lines.join('\r\n');
-  };
-
-  filterSessions = (sessions, { query, activeTags, activeTab, registeredSessionIds }) => {
-    const q = query.toLowerCase();
-    return sessions.filter((s) => {
-      if (activeTab === 'my' && !registeredSessionIds.has(s.sessionId)) return false;
-      if (activeTags.size > 0) {
-        for (const [, groupSet] of activeTags) {
-          if (groupSet.size > 0 && !s.tags.some((t) => groupSet.has(t.label))) return false;
-        }
-      }
-      if (q) {
-        const hay = [
-          s.title,
-          s.description,
-          ...s.speakers.map((sp) => `${sp.firstName} ${sp.lastName}`),
-        ].join(' ').toLowerCase();
-        if (!hay.includes(q)) return false;
-      }
-      return true;
-    });
   };
 
   normalizeSessions = (rawSessions, speakerMap, locationMap, registeredSessionIds, venueId, tagsData) => rawSessions.map((session) => {
@@ -350,6 +328,21 @@ describe('filterSessions', () => {
     expect(result).to.have.lengthOf(3);
   });
 
+  it('does not apply text search for whitespace-only query', () => {
+    const result = filterSessions(sessions, {
+      query: '   ', activeTags: new Map(), activeTab: 'all', registeredSessionIds: new Set(),
+    });
+    expect(result).to.have.lengthOf(3);
+  });
+
+  it('applies text search for two-character query', () => {
+    const result = filterSessions(sessions, {
+      query: 'ph', activeTags: new Map(), activeTab: 'all', registeredSessionIds: new Set(),
+    });
+    expect(result).to.have.lengthOf(1);
+    expect(result[0].sessionId).to.equal('s1');
+  });
+
   it('filters by title substring (case-insensitive)', () => {
     const result = filterSessions(sessions, {
       query: 'photoshop', activeTags: new Map(), activeTab: 'all', registeredSessionIds: new Set(),
@@ -358,12 +351,53 @@ describe('filterSessions', () => {
     expect(result[0].sessionId).to.equal('s1');
   });
 
-  it('filters by description substring', () => {
+  it('does not match description-only text by default', () => {
     const result = filterSessions(sessions, {
       query: 'power users', activeTags: new Map(), activeTab: 'all', registeredSessionIds: new Set(),
     });
+    expect(result).to.have.lengthOf(0);
+  });
+
+  it('matches description when searchConfig.includeDescription is true', () => {
+    const result = filterSessions(sessions, {
+      query: 'power users',
+      activeTags: new Map(),
+      activeTab: 'all',
+      registeredSessionIds: new Set(),
+      searchConfig: { includeDescription: true },
+    });
     expect(result).to.have.lengthOf(1);
     expect(result[0].sessionId).to.equal('s2');
+  });
+
+  it('does not apply text search for a single-character query', () => {
+    const result = filterSessions(sessions, {
+      query: 'p', activeTags: new Map(), activeTab: 'all', registeredSessionIds: new Set(),
+    });
+    expect(result).to.have.lengthOf(3);
+  });
+
+  it('filters by tag label substring', () => {
+    const result = filterSessions(sessions, {
+      query: 'work', activeTags: new Map(), activeTab: 'all', registeredSessionIds: new Set(),
+    });
+    expect(result.map((s) => s.sessionId).sort()).to.deep.equal(['s1', 's3']);
+  });
+
+  it('filters by speaker last name substring', () => {
+    const result = filterSessions(sessions, {
+      query: 'smith', activeTags: new Map(), activeTab: 'all', registeredSessionIds: new Set(),
+    });
+    expect(result).to.have.lengthOf(1);
+    expect(result[0].sessionId).to.equal('s1');
+  });
+
+  it('filters by full speaker name phrase', () => {
+    const result = filterSessions(sessions, {
+      query: 'alice smith', activeTags: new Map(), activeTab: 'all', registeredSessionIds: new Set(),
+    });
+    expect(result).to.have.lengthOf(1);
+    expect(result[0].sessionId).to.equal('s1');
   });
 
   it('filters by speaker name', () => {
@@ -605,6 +639,39 @@ describe('sessions-hub init', () => {
     await init(el);
     const cards = el.querySelectorAll('.sh-card');
     expect(cards.length).to.equal(2);
+  });
+
+  it('shows no-results state when search matches no sessions', async () => {
+    stubDefaultFetch();
+    setSessionsMeta([makeSession()]);
+    const el = document.querySelector('.sessions-hub');
+    await init(el);
+    const search = el.querySelector('.sh-search');
+    search.value = 'zzznomatch';
+    search.dispatchEvent(new Event('input', { bubbles: true }));
+    await new Promise((r) => setTimeout(r, 250));
+    const empty = el.querySelector('.sh-no-results');
+    const list = el.querySelector('.sh-session-list');
+    expect(empty.hidden).to.be.false;
+    expect(list.hidden).to.be.true;
+  });
+
+  it('restores session list when search is cleared after no matches', async () => {
+    stubDefaultFetch();
+    setSessionsMeta([makeSession()]);
+    const el = document.querySelector('.sessions-hub');
+    await init(el);
+    const search = el.querySelector('.sh-search');
+    search.value = 'zzznomatch';
+    search.dispatchEvent(new Event('input', { bubbles: true }));
+    await new Promise((r) => setTimeout(r, 250));
+    search.value = '';
+    search.dispatchEvent(new Event('input', { bubbles: true }));
+    await new Promise((r) => setTimeout(r, 250));
+    const empty = el.querySelector('.sh-no-results');
+    const list = el.querySelector('.sh-session-list');
+    expect(empty.hidden).to.be.true;
+    expect(list.hidden).to.be.false;
   });
 
   it('renders sticky event banner when user is not event-registered', async () => {
