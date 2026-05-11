@@ -4,21 +4,21 @@ import { getEventAttendeePayload } from '../../../event-libs/v1/utils/data-utils
 
 describe('data-utils', () => {
   describe('getEventAttendeePayload', () => {
-    it('includes requiresSxswTicket when true', () => {
+    it('includes requiresTicket when true', () => {
       const out = getEventAttendeePayload({
         email: 'a@b.com',
-        requiresSxswTicket: true,
+        requiresTicket: true,
         unknownCustomFlag: true,
       });
-      expect(out.requiresSxswTicket).to.be.true;
+      expect(out.requiresTicket).to.be.true;
       expect(out).to.not.have.property('unknownCustomFlag');
     });
 
-    it('includes requiresSxswTicket when false', () => {
+    it('includes requiresTicket when false', () => {
       const out = getEventAttendeePayload({
-        requiresSxswTicket: false,
+        requiresTicket: false,
       });
-      expect(out.requiresSxswTicket).to.be.false;
+      expect(out.requiresTicket).to.be.false;
     });
 
     it('drops unknown keys', () => {
