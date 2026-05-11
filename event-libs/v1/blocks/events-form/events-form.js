@@ -890,6 +890,7 @@ async function createForm(bp, formData) {
 
   if (rsvpFieldsData) {
     const { required, visible } = rsvpFieldsData;
+    // Sheet-backed fields (e.g. requiresSxswTicket) must appear in `visible` or they are dropped before render.
     json.data = json.data
       .map((obj) => {
         const lowkey = lowercaseKeys(obj);
