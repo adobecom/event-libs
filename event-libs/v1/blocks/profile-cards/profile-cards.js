@@ -228,6 +228,52 @@ function appendBio(contentContainer, bio) {
   contentContainer.append(description);
 }
 
+function decodeHtmlEntities(str) {
+  return str
+    .replace(/&#x([0-9a-f]{1,6});?/gi, (full, hex) => {
+      const cp = parseInt(hex, 16);
+      if (!Number.isFinite(cp) || cp < 0 || cp > 0x10FFFF) return full;
+      try {
+        return String.fromCodePoint(cp);
+      } catch {
+        return full;
+      }
+    })
+    .replace(/&#(\d{1,7});?/g, (full, dec) => {
+      const cp = parseInt(dec, 10);
+      if (!Number.isFinite(cp) || cp < 0 || cp > 0x10FFFF) return full;
+      try {
+        return String.fromCodePoint(cp);
+      } catch {
+        return full;
+      }
+    })
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&quot;/g, '"')
+    .replace(/&apos;/g, "'")
+    .replace(/&#39;/g, "'")
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&amp;/g, '&');
+}
+
+function escapeHtmlPcdata(text) {
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+
+function modalJobTitlePlainText(title) {
+  if (title == null || typeof title !== 'string') return '';
+  const trimmed = title.trim();
+  if (!trimmed) return '';
+  const withoutTags = trimmed.includes('<')
+    ? trimmed.replace(/<[^>]+>/g, ' ')
+    : trimmed;
+  return decodeHtmlEntities(withoutTags).replace(/\s+/g, ' ').trim();
+}
+
 function getModalId(data, index) {
   const fullName = getProfileName(data);
   const slug = fullName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
@@ -253,7 +299,7 @@ export async function buildModalContent(profileData) {
   const textContainer = createTag('div', { class: 'profile-cards-modal-text' });
   const imageContainer = createTag('div', { class: 'profile-cards-modal-image' });
   const fullName = getProfileName(profileData);
-  const title = createTag('p', { class: 'card-title' }, profileData?.title || '');
+  const title = createTag('p', { class: 'card-title' }, escapeHtmlPcdata(modalJobTitlePlainText(profileData?.title)));
   const name = createTag('h2', { class: 'card-name', tabindex: '0' }, fullName);
 
   textContainer.append(title, name);
