@@ -64,11 +64,34 @@ export function isValidAttribute(attr) {
   return (attr !== undefined && attr !== null && attr !== '') || attr === false;
 }
 
+const BOOLEAN_TRUE_TOKENS = new Set(['yes', 'true', '1', 'y', 'on']);
+const BOOLEAN_FALSE_TOKENS = new Set(['no', 'false', '0', 'n', 'off']);
+
+function coerceEventAttendeeBoolean(key, value) {
+  if (typeof value === 'boolean') return value;
+  if (Array.isArray(value)) {
+    if (value.length === 0) return undefined;
+    if (value.length === 1) return coerceEventAttendeeBoolean(key, value[0]);
+    window.lana?.log(`getEventAttendeePayload: unexpected boolean field shape for ${key}`);
+    return undefined;
+  }
+  if (typeof value === 'string') {
+    const t = value.trim().toLowerCase();
+    if (BOOLEAN_TRUE_TOKENS.has(t)) return true;
+    if (BOOLEAN_FALSE_TOKENS.has(t)) return false;
+    return undefined;
+  }
+  return undefined;
+}
+
 export function getEventAttendeePayload(attendeeData) {
   if (!attendeeData) return attendeeData;
   return Object.entries(attendeeData).reduce((acc, [key, value]) => {
-    if (EVENT_ATTENDEE_DATA_FILTER[key]?.submittable && isValidAttribute(value)) {
-      acc[key] = value;
+    const nextValue = EVENT_ATTENDEE_DATA_FILTER[key]?.type === 'boolean'
+      ? coerceEventAttendeeBoolean(key, value)
+      : value;
+    if (EVENT_ATTENDEE_DATA_FILTER[key]?.submittable && isValidAttribute(nextValue)) {
+      acc[key] = nextValue;
     }
     return acc;
   }, {});

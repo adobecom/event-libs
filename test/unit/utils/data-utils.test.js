@@ -21,6 +21,21 @@ describe('data-utils', () => {
       expect(out.requiresTicket).to.be.false;
     });
 
+    it('coerces requiresTicket from radio-group array (Yes/No)', () => {
+      expect(getEventAttendeePayload({ requiresTicket: ['Yes'] }).requiresTicket).to.be.true;
+      expect(getEventAttendeePayload({ requiresTicket: ['No'] }).requiresTicket).to.be.false;
+    });
+
+    it('coerces requiresTicket from string Yes/No', () => {
+      expect(getEventAttendeePayload({ requiresTicket: 'Yes' }).requiresTicket).to.be.true;
+      expect(getEventAttendeePayload({ requiresTicket: 'No' }).requiresTicket).to.be.false;
+    });
+
+    it('omits requiresTicket when empty array (optional unanswered)', () => {
+      const out = getEventAttendeePayload({ requiresTicket: [] });
+      expect(out).to.not.have.property('requiresTicket');
+    });
+
     it('drops unknown keys', () => {
       const out = getEventAttendeePayload({
         firstName: 'Ada',
