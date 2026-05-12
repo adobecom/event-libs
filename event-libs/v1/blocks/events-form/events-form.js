@@ -911,25 +911,26 @@ async function createForm(bp, formData) {
 
   await dictionaryManager.initialize();
 
-  if (rsvpConfigData) {
-  } else if (rsvpFieldsData) {
-    const { required, visible } = rsvpFieldsData;
-    json.data = json.data
-      .map((obj) => {
-        const lowkey = lowercaseKeys(obj);
-        if (typeof lowkey.field === 'string') lowkey.field = lowkey.field.trim();
-        if (required.includes(lowkey.field)) lowkey.required = 'x';
-        return lowkey;
-      })
-      .filter((f) => visible.includes(f.field) || ['clear', 'submit'].includes(f.field));
-  } else {
-    json.data = json.data
-      .map((obj) => {
-        const lowkey = lowercaseKeys(obj);
-        if (typeof lowkey.field === 'string') lowkey.field = lowkey.field.trim();
-        return lowkey;
-      })
-      .filter((f) => ['clear', 'submit'].includes(f.field));
+  if (!rsvpConfigData) {
+    if (rsvpFieldsData) {
+      const { required, visible } = rsvpFieldsData;
+      json.data = json.data
+        .map((obj) => {
+          const lowkey = lowercaseKeys(obj);
+          if (typeof lowkey.field === 'string') lowkey.field = lowkey.field.trim();
+          if (required.includes(lowkey.field)) lowkey.required = 'x';
+          return lowkey;
+        })
+        .filter((f) => visible.includes(f.field) || ['clear', 'submit'].includes(f.field));
+    } else {
+      json.data = json.data
+        .map((obj) => {
+          const lowkey = lowercaseKeys(obj);
+          if (typeof lowkey.field === 'string') lowkey.field = lowkey.field.trim();
+          return lowkey;
+        })
+        .filter((f) => ['clear', 'submit'].includes(f.field));
+    }
   }
 
   const formEl = createTag('form');
