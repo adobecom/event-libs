@@ -607,7 +607,7 @@ export function updatePictureElement(imageUrl, parentPic, altText) {
   });
 }
 
-function updateImgTag(child, matchCallback) {
+function updateImgTag(child, matchCallback, parentElement) {
   const parentPic = child.closest('picture');
   const originalAlt = child.alt;
   const photoMeta = originalAlt.replace(META_REG, (_match, p1) => matchCallback(_match, p1, child));
@@ -622,11 +622,16 @@ function updateImgTag(child, matchCallback) {
 
     if (imgUrl && parentPic && imgUrl !== originalAlt) {
       updatePictureElement(imgUrl, parentPic, altText);
-    } else if (originalAlt.match(META_REG)) {
-      // Placeholder didn't resolve — keep the authored <picture> as a fallback
-      // (e.g. section-metadata backgrounds) and just strip the [[...]] from alt
-      // so it doesn't leak to the UI.
+      return;
+    }
+
+    if (!originalAlt.match(META_REG)) return;
+
+    // Keep section-metadata pictures (authored fallbacks); drop other unresolved placeholders.
+    if (parentPic?.parentElement?.closest('.section-metadata')) {
       child.alt = altText || '';
+    } else {
+      parentElement.remove();
     }
   } catch (e) {
     window.lana?.log(`Error while attempting to update image:\n${JSON.stringify(e, null, 2)}`);
@@ -962,7 +967,7 @@ function processTemplateInAllNodes(parent, extraData) {
     if (element.childNodes.length) {
       element.childNodes.forEach((n) => {
         if (isImage(n)) {
-          updateImgTag(n, getImgData);
+          updateImgTag(n, getImgData, element);
         }
 
         if (isPlainTextNode(n)) {
