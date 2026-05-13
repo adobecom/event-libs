@@ -138,6 +138,7 @@ Project-specific slash commands:
 - `/find-util <description>` — search utils/ and features/ for existing code before writing new code
 - `/coverage-gaps` — inventory every block/utility and flag missing or shallow tests
 - `/pr-ready` — lint + test + changed-file review + commit message check before opening a PR
+- `/pr-review` — review branch changes for correctness, JS best practices, and performance; produces a per-file report with before/after examples and a severity summary table
 
 ### Built-in skills
 
