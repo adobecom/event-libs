@@ -1006,6 +1006,7 @@ function addStylesToEventPage() {
 }
 
 export function decorateEvent(parent) {
+  processAutoBlockLinks(parent);
   setHydrationPromise(hydrateBlocks(parent));
 
   // handle photos data parsing
