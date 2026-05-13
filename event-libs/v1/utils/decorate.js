@@ -560,6 +560,7 @@ function prebuildAutoBlock(blockName, link) {
 export function processAutoBlockLinks(parent) {
   const autoBlockIdentifiers = {
     'chrono-box': 'schedule-maker',
+    'mobile-rider': 'mobilerider.com',
   };
   Object.entries(autoBlockIdentifiers).forEach(([blockName, identifier]) => {
     const links = parent.querySelectorAll(`a[href*="${identifier}"]`);
