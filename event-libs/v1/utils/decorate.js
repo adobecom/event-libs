@@ -547,7 +547,19 @@ function prebuildAutoBlock(blockName, link) {
       }, innerDiv);
 
       return chronoBoxEl;
-    }
+    },
+    'mobile-rider': (l) => {
+      const url = new URL(l.href);
+      const videoId = url.searchParams.get('videoId');
+      if (!videoId) return null;
+      return createTag('div', {
+        class: 'mobile-rider',
+        'data-extracted-video-id': videoId,
+        'data-extracted-skin-id': url.searchParams.get('skinId') || '',
+        'data-extracted-autoplay': url.searchParams.get('autoplay') || 'true',
+        'data-extracted-thumbnail': url.searchParams.get('thumbnail') || '',
+      });
+    },
   }
 
   if (autoBlockBuilders[blockName]) {
