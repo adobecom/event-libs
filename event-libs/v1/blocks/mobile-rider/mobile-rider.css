@@ -41,7 +41,7 @@
   height: 100%;
 }
 
-.mobile-rider h2#title-container {
+.mobile-rider h2[id="title_container"] {
   line-height: 1;
 }
 
