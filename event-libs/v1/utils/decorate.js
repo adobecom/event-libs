@@ -548,18 +548,6 @@ function prebuildAutoBlock(blockName, link) {
 
       return chronoBoxEl;
     },
-    'mobile-rider': (l) => {
-      const url = new URL(l.href);
-      const videoId = url.searchParams.get('videoId');
-      if (!videoId) return null;
-      return createTag('div', {
-        class: 'mobile-rider',
-        'data-extracted-video-id': videoId,
-        'data-extracted-skin-id': url.searchParams.get('skinId') || '',
-        'data-extracted-autoplay': url.searchParams.get('autoplay') || 'true',
-        'data-extracted-thumbnail': url.searchParams.get('thumbnail') || '',
-      });
-    },
   }
 
   if (autoBlockBuilders[blockName]) {
@@ -574,16 +562,23 @@ export function processAutoBlockLinks(parent) {
     'chrono-box': 'schedule-maker',
     'mobile-rider': 'mobilerider.com',
   };
+  // Blocks embedded inside already-loaded blocks (e.g. marquee) won't be picked
+  // up by Milo's scanner — mirror Milo's autoblock pattern: add link-block class
+  // and call init() directly with the anchor so the block handles its own conversion.
+  const directInitBlocks = new Set(['mobile-rider']);
+
   Object.entries(autoBlockIdentifiers).forEach(([blockName, identifier]) => {
     const links = parent.querySelectorAll(`a[href*="${identifier}"]`);
     links.forEach(async (link) => {
+      if (directInitBlocks.has(blockName)) {
+        link.className = `${blockName} link-block`;
+        const { default: initBlock } = await import(`../blocks/${blockName}/${blockName}.js`);
+        initBlock(link);
+        return;
+      }
       const blockEl = prebuildAutoBlock(blockName, link);
       if (!blockEl) return;
       link.closest('p') ? link.closest('p').replaceWith(blockEl) : link.replaceWith(blockEl);
-      if (blockName === 'mobile-rider') {
-        const { default: initMobileRider } = await import('../blocks/mobile-rider/mobile-rider.js');
-        initMobileRider(blockEl);
-      }
     });
   });
 }
