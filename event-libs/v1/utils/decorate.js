@@ -576,10 +576,14 @@ export function processAutoBlockLinks(parent) {
   };
   Object.entries(autoBlockIdentifiers).forEach(([blockName, identifier]) => {
     const links = parent.querySelectorAll(`a[href*="${identifier}"]`);
-    links.forEach((link) => {
+    links.forEach(async (link) => {
       const blockEl = prebuildAutoBlock(blockName, link);
       if (!blockEl) return;
       link.closest('p') ? link.closest('p').replaceWith(blockEl) : link.replaceWith(blockEl);
+      if (blockName === 'mobile-rider') {
+        const { default: initMobileRider } = await import('../blocks/mobile-rider/mobile-rider.js');
+        initMobileRider(blockEl);
+      }
     });
   });
 }
