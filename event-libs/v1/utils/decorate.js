@@ -547,7 +547,7 @@ function prebuildAutoBlock(blockName, link) {
       }, innerDiv);
 
       return chronoBoxEl;
-    }
+    },
   }
 
   if (autoBlockBuilders[blockName]) {
@@ -558,12 +558,22 @@ function prebuildAutoBlock(blockName, link) {
 }
 
 export function processAutoBlockLinks(parent) {
+  // selfInit: true — block lives inside an already-loaded parent (e.g. marquee);
+  // Milo won't re-scan it, so we import and call init() directly with the anchor.
   const autoBlockIdentifiers = {
-    'chrono-box': 'schedule-maker',
+    'chrono-box': { pattern: 'schedule-maker' },
+    'mobile-rider': { pattern: 'mobilerider.com', selfInit: true },
   };
-  Object.entries(autoBlockIdentifiers).forEach(([blockName, identifier]) => {
-    const links = parent.querySelectorAll(`a[href*="${identifier}"]`);
-    links.forEach((link) => {
+
+  Object.entries(autoBlockIdentifiers).forEach(([blockName, { pattern, selfInit }]) => {
+    const links = parent.querySelectorAll(`a[href*="${pattern}"]`);
+    links.forEach(async (link) => {
+      if (selfInit) {
+        link.classList.add(blockName, 'link-block');
+        const { default: initBlock } = await import(`../blocks/${blockName}/${blockName}.js`);
+        initBlock(link);
+        return;
+      }
       const blockEl = prebuildAutoBlock(blockName, link);
       if (!blockEl) return;
       link.closest('p') ? link.closest('p').replaceWith(blockEl) : link.replaceWith(blockEl);

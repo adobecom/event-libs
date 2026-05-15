@@ -2,6 +2,7 @@
 import { createTag, getEventConfig } from '../../utils/utils.js';
 
 const DRAWER_CSS_URL = new URL('./drawer.css', import.meta.url).href;
+const BLOCK_CSS_URL = new URL('./mobile-rider.css', import.meta.url).href;
 
 const CONFIG = {
   ANALYTICS: { PROVIDER: 'adobe' },
@@ -64,6 +65,9 @@ class MobileRider {
 
   async init() {
     try {
+      if (!document.querySelector('link[href*="mobile-rider.css"]')) {
+        createTag('link', { rel: 'stylesheet', href: BLOCK_CSS_URL }, '', { parent: document.head });
+      }
       this.cfg = this.#parseCfg();
       await Promise.all([loadScript(), this.el.closest('.chrono-box') ? this.#loadStore() : null]);
 
