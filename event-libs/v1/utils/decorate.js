@@ -558,20 +558,18 @@ function prebuildAutoBlock(blockName, link) {
 }
 
 export function processAutoBlockLinks(parent) {
+  // selfInit: true — block lives inside an already-loaded parent (e.g. marquee);
+  // Milo won't re-scan it, so we import and call init() directly with the anchor.
   const autoBlockIdentifiers = {
-    'chrono-box': 'schedule-maker',
-    'mobile-rider': 'mobilerider.com',
+    'chrono-box': { pattern: 'schedule-maker' },
+    'mobile-rider': { pattern: 'mobilerider.com', selfInit: true },
   };
-  // Blocks embedded inside already-loaded blocks (e.g. marquee) won't be picked
-  // up by Milo's scanner — mirror Milo's autoblock pattern: add link-block class
-  // and call init() directly with the anchor so the block handles its own conversion.
-  const directInitBlocks = new Set(['mobile-rider']);
 
-  Object.entries(autoBlockIdentifiers).forEach(([blockName, identifier]) => {
-    const links = parent.querySelectorAll(`a[href*="${identifier}"]`);
+  Object.entries(autoBlockIdentifiers).forEach(([blockName, { pattern, selfInit }]) => {
+    const links = parent.querySelectorAll(`a[href*="${pattern}"]`);
     links.forEach(async (link) => {
-      if (directInitBlocks.has(blockName)) {
-        link.className = `${blockName} link-block`;
+      if (selfInit) {
+        link.classList.add(blockName, 'link-block');
         const { default: initBlock } = await import(`../blocks/${blockName}/${blockName}.js`);
         initBlock(link);
         return;
