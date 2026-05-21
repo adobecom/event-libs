@@ -142,8 +142,7 @@ class MobileRider {
             identifier2: asl || '',
             sessionId: vid,
           });
-
-          if (asl) this.#initASL(container);
+          if (asl) this.#initASL(container, vid);
           this.#maybeAttachEndListener(vid);
         } catch (e) {
           this.log(`Embed Error: ${e.message}`);
