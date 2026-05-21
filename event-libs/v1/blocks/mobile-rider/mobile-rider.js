@@ -254,13 +254,14 @@ class MobileRider {
     return item;
   }
 
-  #initASL(container) {
+  #initASL(container, vid) {
     let attempts = 0;
     const check = setInterval(() => {
       const btn = container.querySelector(`#${CONFIG.ASL.BUTTON_ID}`);
       if (btn || ++attempts > CONFIG.ASL.MAX_CHECKS) {
         clearInterval(check);
         btn?.addEventListener('click', () => {
+          if (this.store) this.#attachEndListener(vid);
           if (!container.classList.contains(CONFIG.ASL.TOGGLE_CLASS)) {
             container.classList.add(CONFIG.ASL.TOGGLE_CLASS);
           }
