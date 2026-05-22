@@ -254,20 +254,24 @@ class MobileRider {
   }
 
   #initASL(container, vid) {
-    let attempts = 0;
-    const check = setInterval(() => {
-      const btn = container.querySelector(`#${CONFIG.ASL.BUTTON_ID}`);
-      if (btn || ++attempts > CONFIG.ASL.MAX_CHECKS) {
-        clearInterval(check);
-        btn?.addEventListener('click', () => {
-          if (this.store) this.#attachEndListener(vid);
-          console.log('ASL button clicked - attached end listener');
-          if (!container.classList.contains(CONFIG.ASL.TOGGLE_CLASS)) {
-            container.classList.add(CONFIG.ASL.TOGGLE_CLASS);
-          }
-        });
-      }
-    }, CONFIG.ASL.CHECK_INTERVAL);
+    const poll = () => {
+      let attempts = 0;
+      const check = setInterval(() => {
+        const btn = container.querySelector(`#${CONFIG.ASL.BUTTON_ID}`);
+        if (btn || ++attempts > CONFIG.ASL.MAX_CHECKS) {
+          clearInterval(check);
+          btn?.addEventListener('click', () => {
+            if (this.store) this.#attachEndListener(vid);
+            if (!container.classList.contains(CONFIG.ASL.TOGGLE_CLASS)) {
+              container.classList.add(CONFIG.ASL.TOGGLE_CLASS);
+            }
+            // Player re-renders its UI after ASL toggle — re-poll for the new button
+            poll();
+          });
+        }
+      }, CONFIG.ASL.CHECK_INTERVAL);
+    };
+    poll();
   }
 
   #parseCfg() {
