@@ -261,6 +261,7 @@ class MobileRider {
         clearInterval(check);
         btn?.addEventListener('click', () => {
           if (this.store) this.#attachEndListener(vid);
+          console.log('ASL button clicked - attached end listener');
           if (!container.classList.contains(CONFIG.ASL.TOGGLE_CLASS)) {
             container.classList.add(CONFIG.ASL.TOGGLE_CLASS);
           }
