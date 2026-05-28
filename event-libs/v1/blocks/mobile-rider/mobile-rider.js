@@ -254,20 +254,22 @@ class MobileRider {
   }
 
   #initASL(container, vid) {
+    let currentCheck = null;
     const poll = () => {
+      clearInterval(currentCheck);
       let attempts = 0;
-      const check = setInterval(() => {
+      currentCheck = setInterval(() => {
         const btn = container.querySelector(`#${CONFIG.ASL.BUTTON_ID}`);
         if (btn || ++attempts > CONFIG.ASL.MAX_CHECKS) {
-          clearInterval(check);
+          clearInterval(currentCheck);
+          currentCheck = null;
           btn?.addEventListener('click', () => {
             if (this.store) this.#attachEndListener(vid);
             if (!container.classList.contains(CONFIG.ASL.TOGGLE_CLASS)) {
               container.classList.add(CONFIG.ASL.TOGGLE_CLASS);
             }
-            // Player re-renders its UI after ASL toggle — re-poll for the new button
             poll();
-          });
+          }, { once: true });
         }
       }, CONFIG.ASL.CHECK_INTERVAL);
     };
