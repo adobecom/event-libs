@@ -1,6 +1,7 @@
 import { expect } from '@esm-bundle/chai';
 import { readFile } from '@web/test-runner-commands';
 import init, { createSocialIcon, buildModalContent } from '../../../../event-libs/v1/blocks/profile-cards/profile-cards.js';
+import { setMetadata } from '../../../../event-libs/v1/utils/utils.js';
 
 /** Mirrors Milo modal.js FOCUSABLES selector for initial-focus assertions */
 const MODAL_FOCUSABLES_SELECTOR = 'a:not(.hide-video, .faas), button:not([disabled], .locale-modal-v2 .paddle), input, textarea, select, details, [tabindex]:not([tabindex="-1"])';
@@ -135,6 +136,74 @@ describe('Profile Cards Module', () => {
       expect(firstCard.getAttribute('aria-haspopup')).to.equal('dialog');
       expect(firstCard.getAttribute('aria-label')).to.include('Open profile modal for');
       expect(keydownEvent.defaultPrevented).to.be.true;
+    });
+
+    it('renders all speakers when type cell is empty', () => {
+      const container = document.createElement('div');
+      container.innerHTML = `
+        <div id="all-cards" class="profile-cards">
+          <div><div><h2>Everyone</h2></div></div>
+          <div><div>type</div><div></div></div>
+        </div>
+      `;
+      document.body.appendChild(container);
+      const el = container.querySelector('#all-cards');
+      init(el);
+
+      const cards = el.querySelectorAll('.card-container');
+      // head mock contains 9 speakers across speaker/judge/host types
+      expect(cards).to.have.lengthOf(9);
+    });
+
+    it('renders all speakers when type cell is "all"', () => {
+      const container = document.createElement('div');
+      container.innerHTML = `
+        <div id="all-keyword-cards" class="profile-cards">
+          <div><div><h2>Everyone</h2></div></div>
+          <div><div>type</div><div>all</div></div>
+        </div>
+      `;
+      document.body.appendChild(container);
+      const el = container.querySelector('#all-keyword-cards');
+      init(el);
+
+      const cards = el.querySelectorAll('.card-container');
+      expect(cards).to.have.lengthOf(9);
+    });
+
+    it('treats "ALL" case-insensitively', () => {
+      const container = document.createElement('div');
+      container.innerHTML = `
+        <div id="all-upper-cards" class="profile-cards">
+          <div><div><h2>Everyone</h2></div></div>
+          <div><div>type</div><div>ALL</div></div>
+        </div>
+      `;
+      document.body.appendChild(container);
+      const el = container.querySelector('#all-upper-cards');
+      init(el);
+
+      expect(el.querySelectorAll('.card-container')).to.have.lengthOf(9);
+    });
+
+    it('does not throw when a speaker entry has no speakerType and type cell is empty', () => {
+      setMetadata('speakers', JSON.stringify([
+        { firstName: 'A', lastName: 'One', title: 't', bio: '', socialLinks: [] },
+        { firstName: 'B', lastName: 'Two', title: 't', bio: '', socialLinks: [], speakerType: 'Speaker' },
+      ]));
+
+      const container = document.createElement('div');
+      container.innerHTML = `
+        <div id="loose-cards" class="profile-cards">
+          <div><div><h2>Anyone</h2></div></div>
+          <div><div>type</div><div></div></div>
+        </div>
+      `;
+      document.body.appendChild(container);
+      const el = container.querySelector('#loose-cards');
+
+      expect(() => init(el)).to.not.throw();
+      expect(el.querySelectorAll('.card-container')).to.have.lengthOf(2);
     });
 
     it('should make static-authored modal cards interactive', () => {
