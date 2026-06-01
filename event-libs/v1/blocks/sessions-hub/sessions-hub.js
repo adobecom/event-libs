@@ -676,13 +676,39 @@ function renderViewDropdown(isEventRegistered) {
 function renderFilterPanel(sessions) {
   const panel = createTag('div', { class: 'sh-filter-panel hidden', 'aria-hidden': 'true' });
   const groups = collectFilterGroups(sessions);
+  const categories = [...groups.keys()];
+  const sidebar = createTag('div', { class: 'sh-filter-sidebar' });
+  sidebar.append(createTag('p', { class: 'sh-filter-heading' }, dictionaryManager.getValue('Filters')));
+
+  const nav = createTag('div', { class: 'sh-filter-nav', role: 'tablist' });
+  categories.forEach((cat, i) => {
+    nav.append(createTag('button', {
+      class: `sh-filter-cat${i === 0 ? ' active' : ''}`,
+      type: 'button',
+      role: 'tab',
+      'data-category': cat,
+      'aria-selected': i === 0 ? 'true' : 'false',
+    }, cat || dictionaryManager.getValue('Other')));
+  });
+  sidebar.append(nav);
+
+  const actions = createTag('div', { class: 'sh-filter-actions' });
+  actions.append(
+    createTag('button', { class: 'sh-filter-apply', type: 'button' }, dictionaryManager.getValue('Apply')),
+    createTag('button', { class: 'sh-filter-reset', type: 'button' }, dictionaryManager.getValue('Reset all')),
+  );
+  sidebar.append(actions);
+
+  const optionsWrap = createTag('div', { class: 'sh-filter-options' });
   let tagIdx = 0;
-  groups.forEach((tagLabels, groupName) => {
-    const section = createTag('div', { class: 'sh-filter-group' });
-    if (groupName) {
-      section.append(createTag('span', { class: 'sh-filter-group-label' }, groupName));
-    }
-    tagLabels.forEach((tag) => {
+  categories.forEach((cat, i) => {
+    const grid = createTag('div', {
+      class: `sh-filter-option-grid${i === 0 ? ' active' : ''}`,
+      'data-category': cat,
+      role: 'group',
+      'aria-label': cat || dictionaryManager.getValue('Other'),
+    });
+    groups.get(cat).forEach((tag) => {
       const id = `sh-filter-tag-${tagIdx++}`;
       const lbl = createTag('label', { class: 'sh-filter-item', for: id });
       lbl.append(createTag('input', {
@@ -690,14 +716,81 @@ function renderFilterPanel(sessions) {
         type: 'checkbox',
         value: tag,
         'data-filter-type': 'tag',
-        'data-filter-group': groupName,
+        'data-filter-group': cat,
       }));
-      lbl.append(createTag('span', {}, tag));
-      section.append(lbl);
+      lbl.append(createTag('span', { class: 'sh-filter-item-label' }, tag));
+      const check = createTag('span', { class: 'sh-filter-check', 'aria-hidden': 'true' });
+      check.innerHTML = CHECKMARK_ICON;
+      lbl.append(check);
+      grid.append(lbl);
     });
-    panel.append(section);
+    optionsWrap.append(grid);
   });
+
+  panel.append(sidebar, optionsWrap);
   return panel;
+}
+
+function cloneActiveTags(map) {
+  const clone = new Map();
+  map.forEach((set, key) => clone.set(key, new Set(set)));
+  return clone;
+}
+
+function getActiveTagList(activeTags) {
+  const list = [];
+  activeTags.forEach((set, group) => set.forEach((label) => list.push({ group, label })));
+  return list;
+}
+
+function updateActiveFilters(containerEl, listEl, state) {
+  if (!containerEl) return;
+  const list = getActiveTagList(getFilterState().activeTags);
+  containerEl.innerHTML = '';
+  if (!list.length) {
+    containerEl.hidden = true;
+    return;
+  }
+  containerEl.hidden = false;
+  const inner = createTag('div', { class: 'sh-active-filters-inner' });
+  list.forEach(({ group, label }) => {
+    const tag = createTag('span', { class: 'sh-filter-tag' });
+    tag.append(createTag('span', { class: 'sh-filter-tag-label' }, label));
+    const remove = createTag('button', {
+      class: 'sh-filter-tag-remove',
+      type: 'button',
+      'aria-label': `${dictionaryManager.getValue('Remove')} ${label}`,
+      'data-group': group,
+      'data-value': label,
+    });
+    remove.append(createIcon(CLOSE_ICON));
+    tag.append(remove);
+    inner.append(tag);
+  });
+  inner.append(createTag('button', { class: 'sh-filter-clear-all', type: 'button' }, dictionaryManager.getValue('Clear all')));
+  containerEl.append(inner);
+
+  inner.addEventListener('click', (e) => {
+    const removeBtn = e.target.closest('.sh-filter-tag-remove');
+    const clearAll = e.target.closest('.sh-filter-clear-all');
+    const fs = getFilterState();
+    if (clearAll) {
+      setFilterState({ ...fs, activeTags: new Map() });
+    } else if (removeBtn) {
+      const { group, value } = removeBtn.dataset;
+      const newTags = cloneActiveTags(fs.activeTags);
+      const groupSet = newTags.get(group);
+      if (groupSet) {
+        groupSet.delete(value);
+        if (groupSet.size === 0) newTags.delete(group);
+      }
+      setFilterState({ ...fs, activeTags: newTags });
+    } else {
+      return;
+    }
+    applyFilter(listEl, state);
+    updateActiveFilters(containerEl, listEl, state);
+  });
 }
 
 function renderToolbar(state) {
@@ -1035,6 +1128,8 @@ function bindToolbarEvents(toolbarEl, listEl, state) {
   const searchWrap = toolbarEl.querySelector('.sh-search-wrap');
   const searchToggle = toolbarEl.querySelector('.sh-search-toggle');
   const searchClear = toolbarEl.querySelector('.sh-search-clear');
+  const activeFilters = toolbarEl.parentElement?.querySelector('.sh-active-filters');
+  let pendingTags = cloneActiveTags(getFilterState().activeTags);
 
   searchInput.addEventListener('input', debounce(() => {
     setFilterState({ ...getFilterState(), query: searchInput.value });
@@ -1073,9 +1168,52 @@ function bindToolbarEvents(toolbarEl, listEl, state) {
     filterBtn.setAttribute('aria-expanded', String(!isHidden));
     filterPanel.setAttribute('aria-hidden', String(isHidden));
     if (!isHidden) {
-      const firstCheckbox = filterPanel.querySelector('input[type="checkbox"]');
-      if (firstCheckbox) setTimeout(() => firstCheckbox.focus(), 0);
+      pendingTags = cloneActiveTags(getFilterState().activeTags);
+      filterPanel.querySelectorAll('input[type="checkbox"]').forEach((cb) => {
+        const checked = pendingTags.get(cb.dataset.filterGroup || '')?.has(cb.value) || false;
+        cb.checked = checked;
+        cb.closest('.sh-filter-item')?.classList.toggle('checked', checked);
+      });
+      const firstCat = filterPanel.querySelector('.sh-filter-cat');
+      if (firstCat) setTimeout(() => firstCat.focus(), 0);
     }
+  });
+
+  filterPanel.addEventListener('click', (e) => {
+    const cat = e.target.closest('.sh-filter-cat');
+    if (!cat) return;
+    const { category } = cat.dataset;
+    filterPanel.querySelectorAll('.sh-filter-cat').forEach((c) => {
+      const isActive = c === cat;
+      c.classList.toggle('active', isActive);
+      c.setAttribute('aria-selected', String(isActive));
+    });
+    filterPanel.querySelectorAll('.sh-filter-option-grid').forEach((g) => {
+      g.classList.toggle('active', g.dataset.category === category);
+    });
+  });
+
+  const applyBtn = filterPanel.querySelector('.sh-filter-apply');
+  applyBtn?.addEventListener('click', () => {
+    setFilterState({ ...getFilterState(), activeTags: cloneActiveTags(pendingTags) });
+    applyFilter(listEl, state);
+    updateActiveFilters(activeFilters, listEl, state);
+    filterPanel.classList.add('hidden');
+    filterBtn.setAttribute('aria-expanded', 'false');
+    filterPanel.setAttribute('aria-hidden', 'true');
+    filterBtn.focus();
+  });
+
+  const resetBtn = filterPanel.querySelector('.sh-filter-reset');
+  resetBtn?.addEventListener('click', () => {
+    pendingTags = new Map();
+    filterPanel.querySelectorAll('input[type="checkbox"]').forEach((cb) => {
+      cb.checked = false;
+      cb.closest('.sh-filter-item')?.classList.remove('checked');
+    });
+    setFilterState({ ...getFilterState(), activeTags: new Map() });
+    applyFilter(listEl, state);
+    updateActiveFilters(activeFilters, listEl, state);
   });
 
   filterPanel.addEventListener('keydown', (e) => {
@@ -1099,18 +1237,13 @@ function bindToolbarEvents(toolbarEl, listEl, state) {
 
   filterPanel.addEventListener('change', (e) => {
     const cb = e.target;
-    if (cb.type !== 'checkbox') return;
-    const fs = getFilterState();
-    const newTags = new Map(fs.activeTags);
-    if (cb.dataset.filterType === 'tag') {
-      const group = cb.dataset.filterGroup || '';
-      const groupSet = new Set(newTags.get(group));
-      cb.checked ? groupSet.add(cb.value) : groupSet.delete(cb.value);
-      if (groupSet.size === 0) newTags.delete(group);
-      else newTags.set(group, groupSet);
-    }
-    setFilterState({ ...fs, activeTags: newTags });
-    applyFilter(listEl, state);
+    if (cb.type !== 'checkbox' || cb.dataset.filterType !== 'tag') return;
+    const group = cb.dataset.filterGroup || '';
+    const groupSet = new Set(pendingTags.get(group));
+    cb.checked ? groupSet.add(cb.value) : groupSet.delete(cb.value);
+    if (groupSet.size === 0) pendingTags.delete(group);
+    else pendingTags.set(group, groupSet);
+    cb.closest('.sh-filter-item')?.classList.toggle('checked', cb.checked);
   });
 
   const viewDropdown = toolbarEl.querySelector('.sh-view-dropdown');
@@ -1576,8 +1709,9 @@ async function loadBlock(el, rsvpConfig) {
 
   const toolbar = renderToolbar(state);
   setToolbarStickyOffset(toolbar);
+  const activeFilters = createTag('div', { class: 'sh-active-filters', hidden: '' });
   const listEl = renderSessionList(sessions, { isEventRegistered, isBlocked });
-  el.append(toolbar, listEl);
+  el.append(toolbar, activeFilters, listEl);
 
   // Always append banner; hide it only if user is already event-registered.
   // (Waitlisted users keep the banner visible so they can manage their waitlist.)
