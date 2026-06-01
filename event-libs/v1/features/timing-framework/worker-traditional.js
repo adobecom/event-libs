@@ -335,24 +335,26 @@ class TimingWorker {
       if (mobileRiderStore) {
         const { sessionId } = this.currentScheduleItem.mobileRider;
         const isActive = mobileRiderStore.get(sessionId);
-        // If avoidStreamEndFlag is set, treat all streams as ended
-        const shouldTreatAsActive = this.testingManager.shouldAvoidStreamEnd() ? false : isActive;
+        const avoidingStreamEnd = this.testingManager.shouldAvoidStreamEnd();
+        const shouldTreatAsActive = avoidingStreamEnd ? false : isActive;
         if (shouldTreatAsActive) {
           return false;
         }
-        liveStreamEnd = true;
+        if (!avoidingStreamEnd && !isActive) {
+          liveStreamEnd = true;
+        }
       }
     }
 
-    // Check if current item has mobileRider that's ended (underrun)
+    // Check if next item has mobileRider that's ended early (underrun)
     if (scheduleItem.mobileRider) {
       const mobileRiderStore = this.plugins.get('mobileRider');
       if (mobileRiderStore) {
         const { sessionId } = scheduleItem.mobileRider;
         const isActive = mobileRiderStore.get(sessionId);
-        // If avoidStreamEndFlag is set, treat all streams as ended (skip forward)
-        const shouldTreatAsEnded = this.testingManager.shouldAvoidStreamEnd() ? true : !isActive;
-        if (shouldTreatAsEnded) return true;
+        if (!this.testingManager.shouldAvoidStreamEnd() && !isActive) {
+          return true;
+        }
       }
     }
 

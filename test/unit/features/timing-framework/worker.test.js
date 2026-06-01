@@ -224,6 +224,63 @@ describe('TimingWorker', () => {
       const result = await worker.shouldTriggerNextSchedule(nextItem);
       expect(result).to.be.true;
     });
+
+    it('should not trigger future MR slot when avoidStreamEndFlag is set', async () => {
+      const now = Date.now();
+      const nextItem = {
+        toggleTime: now + 600000,
+        pathToFragment: '/future-session',
+        mobileRider: { sessionId: 'session2' },
+      };
+
+      worker.testingManager.init({ avoidStreamEndFlag: true });
+      worker.currentScheduleItem = {
+        mobileRider: { sessionId: 'session1' },
+        pathToFragment: '/current-session',
+      };
+      worker.plugins.set('mobileRider', new Map([
+        ['session1', true],
+        ['session2', true],
+      ]));
+
+      const result = await worker.shouldTriggerNextSchedule(nextItem);
+      expect(result).to.be.false;
+    });
+
+    it('should trigger next item when prior MR stream ended naturally and toggleTime is in future', async () => {
+      const nextItem = {
+        toggleTime: Date.now() + 600000,
+        pathToFragment: '/next',
+      };
+
+      worker.testingManager.init(null);
+      worker.currentScheduleItem = {
+        mobileRider: { sessionId: 'session1' },
+        pathToFragment: '/current-session',
+      };
+      worker.plugins.set('mobileRider', new Map([['session1', false]]));
+
+      const result = await worker.shouldTriggerNextSchedule(nextItem);
+      expect(result).to.be.true;
+    });
+
+    it('should not set liveStreamEnd when avoidStreamEndFlag is set on current MR item', async () => {
+      const now = Date.now();
+      const nextItem = {
+        toggleTime: now + 600000,
+        pathToFragment: '/future',
+      };
+
+      worker.testingManager.init({ avoidStreamEndFlag: true });
+      worker.currentScheduleItem = {
+        mobileRider: { sessionId: 'session1' },
+        pathToFragment: '/current',
+      };
+      worker.plugins.set('mobileRider', new Map([['session1', true]]));
+
+      const result = await worker.shouldTriggerNextSchedule(nextItem);
+      expect(result).to.be.false;
+    });
   });
 
   describe('handleMessage', () => {

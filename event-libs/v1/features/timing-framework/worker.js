@@ -330,17 +330,18 @@ class TimingWorker {
       if (mobileRiderStore) {
         const { sessionId } = this.currentScheduleItem.mobileRider;
         const isActive = mobileRiderStore.get(sessionId);
-        // If avoidStreamEndFlag is set, treat all streams as ended
-        const shouldTreatAsActive = this.testingManager.shouldAvoidStreamEnd() ? false : isActive;
+        const avoidingStreamEnd = this.testingManager.shouldAvoidStreamEnd();
+        const shouldTreatAsActive = avoidingStreamEnd ? false : isActive;
         if (shouldTreatAsActive) {
           return false; // Wait for session to end
         }
-        liveStreamEnd = true;
+        if (!avoidingStreamEnd && !isActive) {
+          liveStreamEnd = true;
+        }
       }
     }
 
     if (scheduleItem.mobileRider) {
-      // Check if toggleTime has passed before checking mobileRider status
       const timePassed = await this.hasToggleTimePassed(scheduleItem);
       if (!timePassed) return false;
 
@@ -348,10 +349,7 @@ class TimingWorker {
       if (mobileRiderStore) {
         const { sessionId } = scheduleItem.mobileRider;
         const isActive = mobileRiderStore.get(sessionId);
-        // If avoidStreamEndFlag is set, treat all streams as ended (skip forward)
-        const shouldTreatAsEnded = this.testingManager.shouldAvoidStreamEnd() ? true : !isActive;
-        if (shouldTreatAsEnded) {
-          this.nextScheduleItem = scheduleItem.next;
+        if (!this.testingManager.shouldAvoidStreamEnd() && !isActive) {
           return true;
         }
       }
