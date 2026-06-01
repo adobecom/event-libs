@@ -639,8 +639,8 @@ timing-framework/
 
 **Usage Guidelines:**
 - Use `worker.js` for same-origin deployments with modern browsers
-- Use `worker-traditional.js` for cross-origin or CSP-restricted environments
-- Both versions provide identical functionality
+- Use `worker-traditional.js` for cross-origin or CSP-restricted environments (chrono-box production path)
+- **Keep both workers behaviorally aligned** — schedule trigger, time cache, and init paths must match; unit tests in `worker.test.js` exercise the module worker as the reference implementation
 - Testing capabilities work in both modes
 
 ### Browser Compatibility

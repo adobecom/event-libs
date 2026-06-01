@@ -225,6 +225,27 @@ describe('TimingWorker', () => {
       expect(result).to.be.true;
     });
 
+    it('should not underrun future MR slot before toggleTime even when next stream ended', async () => {
+      const nextItem = {
+        toggleTime: Date.now() + 600000,
+        pathToFragment: '/future-session',
+        mobileRider: { sessionId: 'session2' },
+      };
+
+      worker.testingManager.init(null);
+      worker.currentScheduleItem = {
+        mobileRider: { sessionId: 'session1' },
+        pathToFragment: '/current-session',
+      };
+      worker.plugins.set('mobileRider', new Map([
+        ['session1', true],
+        ['session2', false],
+      ]));
+
+      const result = await worker.shouldTriggerNextSchedule(nextItem);
+      expect(result).to.be.false;
+    });
+
     it('should not trigger future MR slot when avoidStreamEndFlag is set', async () => {
       const now = Date.now();
       const nextItem = {
