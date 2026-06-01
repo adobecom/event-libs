@@ -846,7 +846,7 @@ function syncBannerVisibility(bannerEl, isEventRegistered) {
 
 // ─── Conflict modal ──────────────────────────────────────────────────────────
 
-function buildConflictOption(session) {
+function buildConflictOption(session, { registered = false } = {}) {
   const primaryTime = session.sessionTimes[0];
   const timeStr = primaryTime
     ? createSmartDateRange(primaryTime.startTimeMillis, primaryTime.endTimeMillis, 'en-US', primaryTime.timezone)
@@ -863,7 +863,12 @@ function buildConflictOption(session) {
   option.append(createTag('span', { class: 'sh-conflict-radio', 'aria-hidden': 'true' }));
 
   const content = createTag('div', { class: 'sh-conflict-option-content' });
-  content.append(createTag('p', { class: 'sh-conflict-option-title' }, session.title));
+  const titleRow = createTag('div', { class: 'sh-conflict-option-title-row' });
+  titleRow.append(createTag('p', { class: 'sh-conflict-option-title' }, session.title));
+  if (registered) {
+    titleRow.append(createTag('span', { class: 'sh-conflict-badge' }, dictionaryManager.getValue('Registered')));
+  }
+  content.append(titleRow);
 
   if (timeStr) {
     const timeEl = createTag('div', { class: 'sh-conflict-option-meta' });
@@ -886,16 +891,16 @@ function buildConflictModalContent(newSession, conflictingSession) {
 
   const heading = createTag('div', { class: 'sh-conflict-heading' });
   heading.append(
-    createTag('p', { class: 'sh-conflict-title' }, dictionaryManager.getValue('You have conflicting sessions')),
-    createTag('p', { class: 'sh-conflict-subtitle' }, dictionaryManager.getValue('Select which session you want to keep.')),
+    createTag('p', { class: 'sh-conflict-title' }, dictionaryManager.getValue('You are registered for a session at this time')),
+    createTag('p', { class: 'sh-conflict-subtitle' }, dictionaryManager.getValue('Select the session you would like to keep.')),
   );
 
   const optionsEl = createTag('div', { class: 'sh-conflict-options', role: 'radiogroup' });
-  const existingOption = buildConflictOption(conflictingSession);
   const newOption = buildConflictOption(newSession);
-  newOption.classList.add('selected');
-  newOption.setAttribute('aria-checked', 'true');
-  optionsEl.append(existingOption, newOption);
+  const existingOption = buildConflictOption(conflictingSession, { registered: true });
+  existingOption.classList.add('selected');
+  existingOption.setAttribute('aria-checked', 'true');
+  optionsEl.append(newOption, existingOption);
 
   optionsEl.addEventListener('click', (e) => {
     const opt = e.target.closest('.sh-conflict-option');
@@ -916,13 +921,19 @@ function buildConflictModalContent(newSession, conflictingSession) {
     opt.click();
   });
 
+  const footer = createTag('div', { class: 'sh-conflict-footer' });
+  const cancelBtn = createTag('button', {
+    class: 'sh-conflict-cancel',
+    type: 'button',
+  }, dictionaryManager.getValue('Cancel'));
   const confirmBtn = createTag('button', {
     class: 'sh-btn sh-conflict-confirm',
     type: 'button',
-  }, dictionaryManager.getValue('Add session'));
+  }, dictionaryManager.getValue('Confirm session'));
+  footer.append(cancelBtn, confirmBtn);
 
-  wrapper.append(heading, optionsEl, confirmBtn);
-  return { content: wrapper, confirmBtn, optionsEl };
+  wrapper.append(heading, optionsEl, footer);
+  return { content: wrapper, confirmBtn, cancelBtn, optionsEl };
 }
 
 function setSwapConflictModalPending(confirmBtn, optionsEl) {
@@ -938,7 +949,7 @@ function setSwapConflictModalPending(confirmBtn, optionsEl) {
 function restoreSwapConflictModalUi(confirmBtn, optionsEl) {
   confirmBtn.disabled = false;
   confirmBtn.removeAttribute('aria-busy');
-  confirmBtn.textContent = dictionaryManager.getValue('Add session');
+  confirmBtn.textContent = dictionaryManager.getValue('Confirm session');
   optionsEl.classList.remove('sh-conflict-options-pending');
   optionsEl.querySelectorAll('.sh-conflict-option').forEach((o) => {
     o.setAttribute('tabindex', '0');
@@ -948,11 +959,15 @@ function restoreSwapConflictModalUi(confirmBtn, optionsEl) {
 async function openConflictModal(newSession, conflictingSession) {
   const miloLibs = getEventConfig()?.miloConfig?.miloLibs || LIBS;
   const { getModal, closeModal } = await import(`${miloLibs}/blocks/modal/modal.js`);
-  const { content, confirmBtn, optionsEl } = buildConflictModalContent(newSession, conflictingSession);
+  const {
+    content, confirmBtn, cancelBtn, optionsEl,
+  } = buildConflictModalContent(newSession, conflictingSession);
 
   let dialogEl;
   return new Promise((resolve) => {
     let confirmed = false;
+
+    cancelBtn.addEventListener('click', () => closeModal(dialogEl));
 
     confirmBtn.addEventListener('click', () => {
       confirmed = true;
