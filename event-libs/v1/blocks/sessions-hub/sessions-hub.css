@@ -423,6 +423,11 @@
   overflow-y: auto;
 }
 
+/* Drill-in header is mobile-only; hidden on desktop/tablet. */
+.sessions-hub .sh-filter-detail-header {
+  display: none;
+}
+
 .sessions-hub .sh-filter-option-grid {
   display: none;
   grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
@@ -1114,22 +1119,134 @@
   }
 }
 
-/* Mobile fallback: stack the panel. The full mobile drill-in nav from the
-   design (separate category screens) is not implemented here. */
+/* Mobile: bottom-sheet filter modal (full-viewport backdrop + drill-in). */
 @media (max-width: 600px) {
+  /* Panel becomes a full-viewport overlay; its children form the bottom sheet. */
   .sessions-hub .sh-filter-panel {
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+    display: flex;
     flex-direction: column;
-    width: min(360px, calc(100vw - 24px));
+    justify-content: flex-end;
+    width: 100vw;
+    max-width: none;
+    max-height: none;
+    padding: 0;
+    background: rgb(0 0 0 / 32%);
+    border: none;
+    border-radius: 0;
+    box-shadow: none;
   }
 
   .sessions-hub .sh-filter-sidebar {
     flex: none;
+    width: 100%;
+    gap: 24px;
+    padding: 24px;
+    background: var(--color-white, #fff);
+    border-radius: 20px 20px 0 0;
+    box-shadow: 0 -14px 30px rgb(0 0 0 / 10%);
+    box-sizing: border-box;
+    max-height: 90vh;
+    overflow-y: auto;
   }
 
   .sessions-hub .sh-filter-nav {
-    flex-flow: row wrap;
-    margin-top: 16px;
-    margin-bottom: 16px;
+    flex-direction: column;
+    gap: 0;
+    margin-top: 0;
+    margin-bottom: 0;
+    border-top: 1px solid var(--color-gray-200, #dadada);
+  }
+
+  .sessions-hub .sh-filter-cat {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    padding: 16px 4px;
+    border-bottom: 1px solid var(--color-gray-200, #dadada);
+    opacity: 1;
+  }
+
+  /* Right-pointing chevron affordance on each category row. */
+  .sessions-hub .sh-filter-cat::after {
+    content: '';
+    width: 8px;
+    height: 8px;
+    border-top: 2px solid var(--color-gray-800, #292929);
+    border-right: 2px solid var(--color-gray-800, #292929);
+    transform: rotate(45deg);
+  }
+
+  .sessions-hub .sh-filter-actions {
+    gap: 16px;
+  }
+
+  .sessions-hub .sh-filter-apply,
+  .sessions-hub .sh-filter-reset {
+    width: 100%;
+    padding: 12px 24px;
+  }
+
+  /* Detail view: options pane becomes the bottom sheet, sidebar hides. */
+  .sessions-hub .sh-filter-options {
+    display: none;
+    width: 100%;
+    padding: 0;
+    background: var(--color-gray-100, #f3f3f3);
+    border-radius: 20px 20px 0 0;
+    box-shadow: 0 -14px 30px rgb(0 0 0 / 10%);
+    box-sizing: border-box;
+    max-height: 90vh;
+    overflow-y: auto;
+  }
+
+  .sessions-hub .sh-filter-panel.sh-detail-open .sh-filter-sidebar {
+    display: none;
+  }
+
+  .sessions-hub .sh-filter-panel.sh-detail-open .sh-filter-options {
+    display: flex;
+    flex-direction: column;
+    padding: 24px;
+  }
+
+  .sessions-hub .sh-filter-detail-header {
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 12px;
+    margin: 0 0 16px;
+    padding-bottom: 8px;
+  }
+
+  .sessions-hub .sh-filter-back {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 4px;
+    border: none;
+    background: none;
+    cursor: pointer;
+  }
+
+  .sessions-hub .sh-filter-detail-title {
+    flex: 1;
+    text-align: center;
+    margin-right: 24px;
+    font-family: var(--body-font-family, sans-serif);
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--color-black, #000);
+  }
+
+  /* Stack option pills full-width on the detail screen. */
+  .sessions-hub .sh-filter-option-grid.active {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
   }
 }
 

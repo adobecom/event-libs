@@ -32,6 +32,7 @@ const SEARCH_ICON = '<svg width="26" height="26" viewBox="0 0 26 26" fill="none"
 const DOWNLOAD_ICON = '<svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M10 13.25a.747.747 0 0 1-.53-.22l-3.5-3.5a.75.75 0 1 1 1.06-1.06l2.22 2.22V3.5a.75.75 0 0 1 1.5 0v7.19l2.22-2.22a.75.75 0 1 1 1.06 1.06l-3.5 3.5a.747.747 0 0 1-.53.22Z" fill="#292929"/><path d="M15.25 16.5H4.75a.75.75 0 0 1 0-1.5h10.5a.75.75 0 0 1 0 1.5Z" fill="#292929"/></svg>';
 const CLOSE_ICON = '<svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M7.06 6l3.47-3.47a.75.75 0 1 0-1.06-1.06L6 4.94 2.53 1.47a.75.75 0 0 0-1.06 1.06L4.94 6 1.47 9.47a.75.75 0 1 0 1.06 1.06L6 7.06l3.47 3.47a.75.75 0 0 0 1.06-1.06L7.06 6Z" fill="#292929"/></svg>';
 const CHEVRON_DOWN_ICON = '<svg width="14" height="14" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M4,7.01a1,1,0,0,1,1.7055-.7055l3.289,3.286,3.289-3.286a1,1,0,0,1,1.437,1.3865l-.0245.0245L9.7,11.7075a1,1,0,0,1-1.4125,0L4.293,7.716A.9945.9945,0,0,1,4,7.01Z" fill="#000"/></svg>';
+const ARROW_LEFT_ICON = '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M10.5 3.5 6 8l4.5 4.5" stroke="#292929" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 
 // ─── Module-level state singleton ──────────────────────────────────────────
 
@@ -700,6 +701,16 @@ function renderFilterPanel(sessions) {
   sidebar.append(actions);
 
   const optionsWrap = createTag('div', { class: 'sh-filter-options' });
+  const detailHeader = createTag('div', { class: 'sh-filter-detail-header' });
+  const backBtn = createTag('button', {
+    class: 'sh-filter-back',
+    type: 'button',
+    'aria-label': dictionaryManager.getValue('Back'),
+  });
+  backBtn.append(createIcon(ARROW_LEFT_ICON));
+  detailHeader.append(backBtn, createTag('span', { class: 'sh-filter-detail-title' }));
+  optionsWrap.append(detailHeader);
+
   let tagIdx = 0;
   categories.forEach((cat, i) => {
     const grid = createTag('div', {
@@ -1168,6 +1179,7 @@ function bindToolbarEvents(toolbarEl, listEl, state) {
     filterBtn.setAttribute('aria-expanded', String(!isHidden));
     filterPanel.setAttribute('aria-hidden', String(isHidden));
     if (!isHidden) {
+      filterPanel.classList.remove('sh-detail-open');
       pendingTags = cloneActiveTags(getFilterState().activeTags);
       filterPanel.querySelectorAll('input[type="checkbox"]').forEach((cb) => {
         const checked = pendingTags.get(cb.dataset.filterGroup || '')?.has(cb.value) || false;
@@ -1178,6 +1190,8 @@ function bindToolbarEvents(toolbarEl, listEl, state) {
       if (firstCat) setTimeout(() => firstCat.focus(), 0);
     }
   });
+
+  const detailTitle = filterPanel.querySelector('.sh-filter-detail-title');
 
   filterPanel.addEventListener('click', (e) => {
     const cat = e.target.closest('.sh-filter-cat');
@@ -1191,6 +1205,12 @@ function bindToolbarEvents(toolbarEl, listEl, state) {
     filterPanel.querySelectorAll('.sh-filter-option-grid').forEach((g) => {
       g.classList.toggle('active', g.dataset.category === category);
     });
+    if (detailTitle) detailTitle.textContent = cat.textContent;
+    filterPanel.classList.add('sh-detail-open');
+  });
+
+  filterPanel.querySelector('.sh-filter-back')?.addEventListener('click', () => {
+    filterPanel.classList.remove('sh-detail-open');
   });
 
   const applyBtn = filterPanel.querySelector('.sh-filter-apply');
@@ -1222,6 +1242,13 @@ function bindToolbarEvents(toolbarEl, listEl, state) {
     filterBtn.setAttribute('aria-expanded', 'false');
     filterPanel.setAttribute('aria-hidden', 'true');
     filterBtn.focus();
+  });
+
+  filterPanel.addEventListener('click', (e) => {
+    if (e.target !== filterPanel) return;
+    filterPanel.classList.add('hidden');
+    filterBtn.setAttribute('aria-expanded', 'false');
+    filterPanel.setAttribute('aria-hidden', 'true');
   });
 
   document.addEventListener('click', (e) => {
