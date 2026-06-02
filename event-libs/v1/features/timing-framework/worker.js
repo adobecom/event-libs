@@ -247,6 +247,11 @@ class TimingWorker {
 
     while (pointer) {
       const { toggleTime } = pointer;
+      if (!toggleTime) {
+        start = pointer;
+        pointer = pointer.next;
+        continue;
+      }
       const numericToggleTime = TimingWorker.parseToggleTime(toggleTime);
       const toggleTimePassed = typeof numericToggleTime !== 'number' || adjustedTime > numericToggleTime;
 
@@ -487,7 +492,7 @@ class TimingWorker {
     
     // Find the correct schedule item based on authoritative time
     const correctItem = this.getStartScheduleItemByToggleTime(schedule, authoritativeTime);
-    
+
     // If we're on the wrong item, correct it on next timer tick
     if (correctItem && correctItem !== this.currentScheduleItem) {
       this.nextScheduleItem = correctItem;

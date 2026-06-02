@@ -268,6 +268,11 @@ class TimingWorker {
 
     while (pointer) {
       const { toggleTime } = pointer;
+      if (!toggleTime) {
+        start = pointer;
+        pointer = pointer.next;
+        continue;
+      }
       const numericToggleTime = TimingWorker.parseToggleTime(toggleTime);
       const toggleTimePassed = typeof numericToggleTime !== 'number' || adjustedTime > numericToggleTime;
 

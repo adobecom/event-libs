@@ -103,6 +103,25 @@ describe('TimingWorker', () => {
       // so nothing qualifies
       expect(result).to.be.null;
     });
+
+    it('should skip items with no toggleTime and return the last item with a passed toggleTime', () => {
+      const now = Date.now();
+      const item2 = { toggleTime: now + 1000, next: null };
+      const item1 = { toggleTime: now - 1000, next: item2 };
+      const item0 = { next: item1 }; // no toggleTime — represents pre-event state
+
+      const result = worker.getStartScheduleItemByToggleTime(item0, now);
+      expect(result).to.equal(item1);
+    });
+
+    it('should return the no-toggleTime item when no subsequent toggleTime has passed', () => {
+      const now = Date.now();
+      const item1 = { toggleTime: now + 1000, next: null };
+      const item0 = { next: item1 }; // no toggleTime
+
+      const result = worker.getStartScheduleItemByToggleTime(item0, now);
+      expect(result).to.equal(item0);
+    });
   });
 
   describe('shouldTriggerNextSchedule', () => {
