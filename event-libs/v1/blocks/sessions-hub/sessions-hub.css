@@ -495,10 +495,14 @@
 /* ─── Active filter tags ─────────────────────────────────────────────────── */
 
 .sessions-hub .sh-active-filters {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
   max-width: 1200px;
   width: 100%;
   margin: 0 auto;
-  padding: 16px 24px 0;
+  padding: 8px 32px 0;
   box-sizing: border-box;
 }
 
@@ -506,11 +510,19 @@
   display: none;
 }
 
+.sessions-hub .sh-active-filters-count {
+  font-family: var(--body-font-family, sans-serif);
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--color-gray-600, #505050);
+}
+
 .sessions-hub .sh-active-filters-inner {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 8px;
+  width: 100%;
 }
 
 .sessions-hub .sh-filter-tag {
@@ -539,23 +551,25 @@
   color: var(--color-gray-800, #292929);
 }
 
-.sessions-hub .sh-filter-clear-all {
+.sessions-hub .sh-filter-see-all {
   padding: 4px 9px;
   border: none;
+  border-radius: 7px;
   background: none;
   font-family: var(--body-font-family, sans-serif);
   font-size: 12px;
   font-weight: 500;
+  line-height: 16px;
   color: var(--color-gray-800, #292929);
   cursor: pointer;
 }
 
-.sessions-hub .sh-filter-clear-all:hover {
+.sessions-hub .sh-filter-see-all:hover {
   text-decoration: underline;
 }
 
 .sessions-hub .sh-filter-tag-remove:focus-visible,
-.sessions-hub .sh-filter-clear-all:focus-visible {
+.sessions-hub .sh-filter-see-all:focus-visible {
   outline: 2px solid var(--color-accent, #1473e6);
   outline-offset: 2px;
 }

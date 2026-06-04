@@ -754,17 +754,35 @@ function getActiveTagList(activeTags) {
   return list;
 }
 
+const ACTIVE_FILTERS_COLLAPSED_COUNT = 3;
+
 function updateActiveFilters(containerEl, listEl, state) {
   if (!containerEl) return;
   const list = getActiveTagList(getFilterState().activeTags);
   containerEl.innerHTML = '';
   if (!list.length) {
     containerEl.hidden = true;
+    containerEl.removeAttribute('data-expanded');
     return;
   }
   containerEl.hidden = false;
+
+  const overflow = list.length > ACTIVE_FILTERS_COLLAPSED_COUNT;
+  const expanded = containerEl.dataset.expanded === 'true';
+  const visible = overflow && !expanded ? list.slice(0, ACTIVE_FILTERS_COLLAPSED_COUNT) : list;
+
+  // Count indicator on its own label row above the tags — only once the active
+  // filter count exceeds the collapsed threshold.
+  if (overflow) {
+    containerEl.append(createTag(
+      'p',
+      { class: 'sh-active-filters-count' },
+      `${list.length} ${dictionaryManager.getValue('filters')}`,
+    ));
+  }
+
   const inner = createTag('div', { class: 'sh-active-filters-inner' });
-  list.forEach(({ group, label }) => {
+  visible.forEach(({ group, label }) => {
     const tag = createTag('span', { class: 'sh-filter-tag' });
     tag.append(createTag('span', { class: 'sh-filter-tag-label' }, label));
     const remove = createTag('button', {
@@ -778,27 +796,35 @@ function updateActiveFilters(containerEl, listEl, state) {
     tag.append(remove);
     inner.append(tag);
   });
-  inner.append(createTag('button', { class: 'sh-filter-clear-all', type: 'button' }, dictionaryManager.getValue('Clear all')));
+
+  // See all / See less chip at the end of the tag row when more than the collapsed count.
+  if (overflow) {
+    inner.append(createTag('button', {
+      class: 'sh-filter-see-all',
+      type: 'button',
+      'aria-expanded': String(expanded),
+    }, dictionaryManager.getValue(expanded ? 'See less' : 'See all')));
+  }
   containerEl.append(inner);
 
   inner.addEventListener('click', (e) => {
-    const removeBtn = e.target.closest('.sh-filter-tag-remove');
-    const clearAll = e.target.closest('.sh-filter-clear-all');
-    const fs = getFilterState();
-    if (clearAll) {
-      setFilterState({ ...fs, activeTags: new Map() });
-    } else if (removeBtn) {
-      const { group, value } = removeBtn.dataset;
-      const newTags = cloneActiveTags(fs.activeTags);
-      const groupSet = newTags.get(group);
-      if (groupSet) {
-        groupSet.delete(value);
-        if (groupSet.size === 0) newTags.delete(group);
-      }
-      setFilterState({ ...fs, activeTags: newTags });
-    } else {
+    const seeAll = e.target.closest('.sh-filter-see-all');
+    if (seeAll) {
+      containerEl.dataset.expanded = expanded ? 'false' : 'true';
+      updateActiveFilters(containerEl, listEl, state);
       return;
     }
+    const removeBtn = e.target.closest('.sh-filter-tag-remove');
+    if (!removeBtn) return;
+    const fs = getFilterState();
+    const { group, value } = removeBtn.dataset;
+    const newTags = cloneActiveTags(fs.activeTags);
+    const groupSet = newTags.get(group);
+    if (groupSet) {
+      groupSet.delete(value);
+      if (groupSet.size === 0) newTags.delete(group);
+    }
+    setFilterState({ ...fs, activeTags: newTags });
     applyFilter(listEl, state);
     updateActiveFilters(containerEl, listEl, state);
   });
