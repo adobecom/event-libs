@@ -622,7 +622,15 @@ function updateImgTag(child, matchCallback, parentElement) {
 
     if (imgUrl && parentPic && imgUrl !== originalAlt) {
       updatePictureElement(imgUrl, parentPic, altText);
-    } else if (originalAlt.match(META_REG)) {
+      return;
+    }
+
+    if (!originalAlt.match(META_REG)) return;
+
+    // Keep section-metadata pictures (authored fallbacks); drop other unresolved placeholders.
+    if (parentPic?.parentElement?.closest('.section-metadata')) {
+      child.alt = altText || '';
+    } else {
       parentElement.remove();
     }
   } catch (e) {
