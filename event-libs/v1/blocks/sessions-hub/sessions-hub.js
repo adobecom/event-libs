@@ -771,8 +771,6 @@ function updateActiveFilters(containerEl, listEl, state) {
   const expanded = containerEl.dataset.expanded === 'true';
   const visible = overflow && !expanded ? list.slice(0, ACTIVE_FILTERS_COLLAPSED_COUNT) : list;
 
-  // Count indicator on its own label row above the tags — only once the active
-  // filter count exceeds the collapsed threshold.
   if (overflow) {
     containerEl.append(createTag(
       'p',
@@ -797,7 +795,6 @@ function updateActiveFilters(containerEl, listEl, state) {
     inner.append(tag);
   });
 
-  // See all / See less chip at the end of the tag row when more than the collapsed count.
   if (overflow) {
     inner.append(createTag('button', {
       class: 'sh-filter-see-all',
