@@ -613,23 +613,23 @@ describe('sessions-hub init', () => {
     expect(el.querySelector('.sh-filter-btn')).to.not.be.null;
   });
 
-  it('does NOT render tab toggle when user is not event-registered (rsvpData null)', async () => {
+  it('does NOT render view dropdown when user is not event-registered (rsvpData null)', async () => {
     stubDefaultFetch();
     setSessionsMeta([makeSession()]);
     const el = document.querySelector('.sessions-hub');
     await init(el);
-    const toggle = el.querySelector('.sh-tab-toggle');
-    expect(toggle?.hidden).to.be.true;
+    const dropdown = el.querySelector('.sh-view-dropdown');
+    expect(dropdown?.hidden).to.be.true;
   });
 
-  it('renders tab toggle visible when user IS event-registered', async () => {
+  it('renders view dropdown visible when user IS event-registered', async () => {
     BlockMediator.set('rsvpData', { registrationStatus: 'registered' });
     stubDefaultFetch();
     setSessionsMeta([makeSession()]);
     const el = document.querySelector('.sessions-hub');
     await init(el);
-    const toggle = el.querySelector('.sh-tab-toggle');
-    expect(toggle?.hidden).to.be.false;
+    const dropdown = el.querySelector('.sh-view-dropdown');
+    expect(dropdown?.hidden).to.be.false;
   });
 
   it('renders one .sh-card per session', async () => {
