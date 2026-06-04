@@ -1100,9 +1100,9 @@ describe('renderCTAGroup three-state design', () => {
   });
 });
 
-// ─── MWPW-195684: toolbar + filter panel + active tags + conflict modal ───────
+// ─── Toolbar, filter panel, active filter tags, conflict modal ───────────────
 
-describe('sessions-hub toolbar redesign', () => {
+describe('sessions-hub toolbar, filter panel and active filter tags', () => {
   let originalFetch;
 
   function stubFetch(handlers) {
