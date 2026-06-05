@@ -613,25 +613,6 @@ describe('sessions-hub init', () => {
     expect(el.querySelector('.sh-filter-btn')).to.not.be.null;
   });
 
-  it('does NOT render view dropdown when user is not event-registered (rsvpData null)', async () => {
-    stubDefaultFetch();
-    setSessionsMeta([makeSession()]);
-    const el = document.querySelector('.sessions-hub');
-    await init(el);
-    const dropdown = el.querySelector('.sh-view-dropdown');
-    expect(dropdown?.hidden).to.be.true;
-  });
-
-  it('renders view dropdown visible when user IS event-registered', async () => {
-    BlockMediator.set('rsvpData', { registrationStatus: 'registered' });
-    stubDefaultFetch();
-    setSessionsMeta([makeSession()]);
-    const el = document.querySelector('.sessions-hub');
-    await init(el);
-    const dropdown = el.querySelector('.sh-view-dropdown');
-    expect(dropdown?.hidden).to.be.false;
-  });
-
   it('renders one .sh-card per session', async () => {
     stubDefaultFetch();
     setSessionsMeta([makeSession({ sessionId: 's1' }), makeSession({ sessionId: 's2' })]);

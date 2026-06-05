@@ -700,6 +700,8 @@ function renderFilterPanel(sessions) {
   );
   sidebar.append(actions);
 
+  const backdrop = createTag('div', { class: 'sh-filter-backdrop', 'aria-hidden': 'true' });
+
   const optionsWrap = createTag('div', { class: 'sh-filter-options' });
   const detailHeader = createTag('div', { class: 'sh-filter-detail-header' });
   const backBtn = createTag('button', {
@@ -738,7 +740,7 @@ function renderFilterPanel(sessions) {
     optionsWrap.append(grid);
   });
 
-  panel.append(sidebar, optionsWrap);
+  panel.append(backdrop, sidebar, optionsWrap);
   return panel;
 }
 
@@ -803,28 +805,6 @@ function updateActiveFilters(containerEl, listEl, state) {
     }, dictionaryManager.getValue(expanded ? 'See less' : 'See all')));
   }
   containerEl.append(inner);
-
-  inner.addEventListener('click', (e) => {
-    const seeAll = e.target.closest('.sh-filter-see-all');
-    if (seeAll) {
-      containerEl.dataset.expanded = expanded ? 'false' : 'true';
-      updateActiveFilters(containerEl, listEl, state);
-      return;
-    }
-    const removeBtn = e.target.closest('.sh-filter-tag-remove');
-    if (!removeBtn) return;
-    const fs = getFilterState();
-    const { group, value } = removeBtn.dataset;
-    const newTags = cloneActiveTags(fs.activeTags);
-    const groupSet = newTags.get(group);
-    if (groupSet) {
-      groupSet.delete(value);
-      if (groupSet.size === 0) newTags.delete(group);
-    }
-    setFilterState({ ...fs, activeTags: newTags });
-    applyFilter(listEl, state);
-    updateActiveFilters(containerEl, listEl, state);
-  });
 }
 
 function renderToolbar(state) {
@@ -1165,6 +1145,29 @@ function bindToolbarEvents(toolbarEl, listEl, state) {
   const activeFilters = toolbarEl.parentElement?.querySelector('.sh-active-filters');
   let pendingTags = cloneActiveTags(getFilterState().activeTags);
 
+  activeFilters?.addEventListener('click', (e) => {
+    const seeAll = e.target.closest('.sh-filter-see-all');
+    if (seeAll) {
+      const expanded = activeFilters.dataset.expanded === 'true';
+      activeFilters.dataset.expanded = expanded ? 'false' : 'true';
+      updateActiveFilters(activeFilters, listEl, state);
+      return;
+    }
+    const removeBtn = e.target.closest('.sh-filter-tag-remove');
+    if (!removeBtn) return;
+    const fs = getFilterState();
+    const { group, value } = removeBtn.dataset;
+    const newTags = cloneActiveTags(fs.activeTags);
+    const groupSet = newTags.get(group);
+    if (groupSet) {
+      groupSet.delete(value);
+      if (groupSet.size === 0) newTags.delete(group);
+    }
+    setFilterState({ ...fs, activeTags: newTags });
+    applyFilter(listEl, state);
+    updateActiveFilters(activeFilters, listEl, state);
+  });
+
   searchInput.addEventListener('input', debounce(() => {
     setFilterState({ ...getFilterState(), query: searchInput.value });
     applyFilter(listEl, state);
@@ -1194,6 +1197,12 @@ function bindToolbarEvents(toolbarEl, listEl, state) {
   downloadBtn?.addEventListener('click', () => {
     const registered = state.sessions.filter((s) => state.registeredSessionIds?.has(s.sessionId));
     downloadAllSessionsICS(registered);
+  });
+
+  filterPanel.querySelector('.sh-filter-backdrop')?.addEventListener('click', () => {
+    filterPanel.classList.add('hidden');
+    filterBtn.setAttribute('aria-expanded', 'false');
+    filterPanel.setAttribute('aria-hidden', 'true');
   });
 
   filterBtn.addEventListener('click', () => {

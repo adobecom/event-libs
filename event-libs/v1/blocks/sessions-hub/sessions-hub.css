@@ -297,6 +297,10 @@
   border-color: var(--color-gray-800, #292929);
 }
 
+.sessions-hub .sh-filter-backdrop {
+  display: none;
+}
+
 /* Filter panel (two-column overlay) */
 
 .sessions-hub .sh-filter-panel {
@@ -402,7 +406,7 @@
 
 .sessions-hub .sh-filter-reset {
   background: transparent;
-  border: 1px solid #c6c6c6;
+  border: 1px solid var(--color-gray-300, #c6c6c6);
   color: var(--color-black, #000);
 }
 
@@ -1135,6 +1139,12 @@
 
 /* Mobile: bottom-sheet filter modal (full-viewport backdrop + drill-in). */
 @media (max-width: 600px) {
+  .sessions-hub .sh-filter-backdrop {
+    display: block;
+    position: absolute;
+    inset: 0;
+  }
+
   /* Panel becomes a full-viewport overlay; its children form the bottom sheet. */
   .sessions-hub .sh-filter-panel {
     position: fixed;
