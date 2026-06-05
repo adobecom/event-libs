@@ -255,10 +255,7 @@ class MobileRider {
 
   #initASL(container, vid) {
     let currentCheck = null;
-    let pollCount = 0;
     const poll = () => {
-      pollCount += 1;
-      console.log(`[ASL] poll() call #${pollCount} — clearing previous interval:`, currentCheck);
       clearInterval(currentCheck);
       let attempts = 0;
       currentCheck = setInterval(() => {
@@ -266,19 +263,13 @@ class MobileRider {
         if (btn || ++attempts > CONFIG.ASL.MAX_CHECKS) {
           clearInterval(currentCheck);
           currentCheck = null;
-          if (btn) {
-            console.log(`[ASL] button found on poll #${pollCount} — attaching { once: true } listener`);
-            btn.addEventListener('click', () => {
-              console.log(`[ASL] button clicked (poll #${pollCount}) — handler firing once then removing itself`);
-              if (this.store) this.#attachEndListener(vid);
-              if (!container.classList.contains(CONFIG.ASL.TOGGLE_CLASS)) {
-                container.classList.add(CONFIG.ASL.TOGGLE_CLASS);
-              }
-              poll();
-            }, { once: true });
-          } else {
-            console.log('[ASL] max attempts reached — button not found');
-          }
+          btn?.addEventListener('click', () => {
+            if (this.store) this.#attachEndListener(vid);
+            if (!container.classList.contains(CONFIG.ASL.TOGGLE_CLASS)) {
+              container.classList.add(CONFIG.ASL.TOGGLE_CLASS);
+            }
+            poll();
+          }, { once: true });
         }
       }, CONFIG.ASL.CHECK_INTERVAL);
     };
