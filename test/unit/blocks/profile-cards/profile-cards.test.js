@@ -155,35 +155,21 @@ describe('Profile Cards Module', () => {
       expect(cards).to.have.lengthOf(9);
     });
 
-    it('renders all speakers when type cell is "all"', () => {
+    it('filters by type when type cell has a value', () => {
       const container = document.createElement('div');
       container.innerHTML = `
-        <div id="all-keyword-cards" class="profile-cards">
-          <div><div><h2>Everyone</h2></div></div>
-          <div><div>type</div><div>all</div></div>
+        <div id="filtered-cards" class="profile-cards">
+          <div><div><h2>Speakers only</h2></div></div>
+          <div><div>type</div><div>speaker</div></div>
         </div>
       `;
       document.body.appendChild(container);
-      const el = container.querySelector('#all-keyword-cards');
+      const el = container.querySelector('#filtered-cards');
       init(el);
 
       const cards = el.querySelectorAll('.card-container');
-      expect(cards).to.have.lengthOf(9);
-    });
-
-    it('treats "ALL" case-insensitively', () => {
-      const container = document.createElement('div');
-      container.innerHTML = `
-        <div id="all-upper-cards" class="profile-cards">
-          <div><div><h2>Everyone</h2></div></div>
-          <div><div>type</div><div>ALL</div></div>
-        </div>
-      `;
-      document.body.appendChild(container);
-      const el = container.querySelector('#all-upper-cards');
-      init(el);
-
-      expect(el.querySelectorAll('.card-container')).to.have.lengthOf(9);
+      expect(cards.length).to.be.greaterThan(0);
+      expect(cards.length).to.be.lessThan(9);
     });
 
     it('does not throw when a speaker entry has no speakerType and type cell is empty', () => {

@@ -486,10 +486,9 @@ function decorateCards(el, data, { simple, modal } = {}) {
   const rows = el.querySelectorAll(':scope > div');
   const configRow = rows[1];
   const speakerType = configRow?.querySelectorAll(':scope > div')?.[1]?.textContent.toLowerCase().trim();
-  const showAll = !speakerType || speakerType === 'all';
-  const filteredData = showAll
-    ? [...data]
-    : data.filter((speaker) => speaker.speakerType?.toLowerCase() === speakerType);
+  const filteredData = speakerType
+    ? data.filter((speaker) => speaker.speakerType?.toLowerCase() === speakerType)
+    : [...data];
 
   if (filteredData.length === 0) {
     el.remove();
