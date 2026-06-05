@@ -65,8 +65,8 @@ class MobileRider {
 
   async init() {
     try {
-      if (!document.querySelector('link[href*="mobile-rider.css"]')) {
-        createTag('link', { rel: 'stylesheet', href: BLOCK_CSS_URL }, '', { parent: document.head });
+      if (!document.getElementById('mobile-rider-css')) {
+        createTag('link', { rel: 'stylesheet', href: BLOCK_CSS_URL, id: 'mobile-rider-css' }, '', { parent: document.head });
       }
       this.cfg = this.#parseCfg();
       await Promise.all([loadScript(), this.el.closest('.chrono-box') ? this.#loadStore() : null]);
@@ -220,8 +220,8 @@ class MobileRider {
   }
 
   async #initDrawer(videos, activeId) {
-    if (!document.querySelector('link[href*="drawer.css"]')) {
-      createTag('link', { rel: 'stylesheet', href: DRAWER_CSS_URL }, '', { parent: document.head });
+    if (!document.getElementById('mobile-rider-drawer-css')) {
+      createTag('link', { rel: 'stylesheet', href: DRAWER_CSS_URL, id: 'mobile-rider-drawer-css' }, '', { parent: document.head });
     }
     const { default: createDrawer } = await import('./drawer.js');
     this.drawer = createDrawer(this.root, {
@@ -255,7 +255,10 @@ class MobileRider {
 
   #initASL(container, vid) {
     let currentCheck = null;
+    let pollCount = 0;
     const poll = () => {
+      pollCount += 1;
+      console.log(`[ASL] poll() call #${pollCount} — clearing previous interval:`, currentCheck);
       clearInterval(currentCheck);
       let attempts = 0;
       currentCheck = setInterval(() => {
@@ -263,13 +266,19 @@ class MobileRider {
         if (btn || ++attempts > CONFIG.ASL.MAX_CHECKS) {
           clearInterval(currentCheck);
           currentCheck = null;
-          btn?.addEventListener('click', () => {
-            if (this.store) this.#attachEndListener(vid);
-            if (!container.classList.contains(CONFIG.ASL.TOGGLE_CLASS)) {
-              container.classList.add(CONFIG.ASL.TOGGLE_CLASS);
-            }
-            poll();
-          }, { once: true });
+          if (btn) {
+            console.log(`[ASL] button found on poll #${pollCount} — attaching { once: true } listener`);
+            btn.addEventListener('click', () => {
+              console.log(`[ASL] button clicked (poll #${pollCount}) — handler firing once then removing itself`);
+              if (this.store) this.#attachEndListener(vid);
+              if (!container.classList.contains(CONFIG.ASL.TOGGLE_CLASS)) {
+                container.classList.add(CONFIG.ASL.TOGGLE_CLASS);
+              }
+              poll();
+            }, { once: true });
+          } else {
+            console.log('[ASL] max attempts reached — button not found');
+          }
         }
       }, CONFIG.ASL.CHECK_INTERVAL);
     };
