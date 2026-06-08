@@ -367,6 +367,8 @@ function applyFilter(sessionAreaEl, state) {
 
 function renderCTAGroup(session, { isEventRegistered = false, isBlocked = false } = {}) {
   const group = createTag('div', { class: 'sh-cta-group' });
+  const primaryTime = session.sessionTimes?.[0];
+  const isSessionFull = !session.isRegistered && !session.isWaitlisted && Boolean(primaryTime?.isFull);
 
   // State 1: registered or waitlisted for THIS session — badge with hover-to-unregister
   if (isEventRegistered && (session.isRegistered || session.isWaitlisted)) {
@@ -420,12 +422,16 @@ function renderCTAGroup(session, { isEventRegistered = false, isBlocked = false 
 
   // State 2: able to register — direct-API button (no modal)
   if (isEventRegistered) {
-    group.append(createTag('button', { class: 'sh-btn sh-btn-register-session', type: 'button' }, dictionaryManager.getValue('Register for session')));
+    const attrs = { class: 'sh-btn sh-btn-register-session', type: 'button' };
+    if (isSessionFull) { attrs.disabled = ''; attrs['aria-disabled'] = 'true'; }
+    group.append(createTag('button', attrs, dictionaryManager.getValue('Register for session')));
     return group;
   }
 
   // Default: not yet event-registered, not blocked — opens RSVP modal
-  group.append(createTag('button', { class: 'sh-btn sh-btn-register-event', type: 'button' }, dictionaryManager.getValue('Register for session')));
+  const attrs = { class: 'sh-btn sh-btn-register-event', type: 'button' };
+  if (isSessionFull) { attrs.disabled = ''; attrs['aria-disabled'] = 'true'; }
+  group.append(createTag('button', attrs, dictionaryManager.getValue('Register for session')));
   return group;
 }
 
