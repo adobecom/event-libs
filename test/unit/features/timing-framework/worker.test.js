@@ -1084,4 +1084,142 @@ describe('TimingWorker', () => {
       perfStub.restore();
     });
   });
+
+  describe('getStartScheduleItemByToggleTime — null-toggleTime ordering', () => {
+    it('should not let a null-toggleTime item override the last activated timed item when a future timed item stops traversal', () => {
+      const now = Date.now();
+      // [null_pre → T1_past → null_trans → T2_future]
+      // With adjustedTime between T1 and T2, result must be T1_past, not null_trans.
+      const t2Future = { toggleTime: now + 3600000, pathToFragment: '/second-xf', next: null };
+      const nullTrans = { pathToFragment: '/transition', next: t2Future };
+      const t1Past = { toggleTime: now - 3600000, pathToFragment: '/first-xf', next: nullTrans };
+      const nullPre = { pathToFragment: '/pre-event', next: t1Past };
+
+      const result = worker.getStartScheduleItemByToggleTime(nullPre, now);
+      expect(result).to.equal(t1Past);
+    });
+
+    it('should return a post-event null-toggleTime item when it is the last item and all timed items have passed', () => {
+      const now = Date.now();
+      // [null_pre → T1_past → T2_past → null_post] — natural end of list, null_post is correct
+      const nullPost = { pathToFragment: '/post-event', next: null };
+      const t2Past = { toggleTime: now - 1000, pathToFragment: '/second-xf', next: nullPost };
+      const t1Past = { toggleTime: now - 7200000, pathToFragment: '/first-xf', next: t2Past };
+      const nullPre = { pathToFragment: '/pre-event', next: t1Past };
+
+      const result = worker.getStartScheduleItemByToggleTime(nullPre, now);
+      expect(result).to.equal(nullPost);
+    });
+
+    it('should return the pre-event null item when no timed item has activated yet and a null-trans follows', () => {
+      const now = Date.now();
+      // [null_pre → T1_future → null_trans → T2_future]
+      // Nothing has activated — should return null_pre (the only item before the future break)
+      const t2Future = { toggleTime: now + 7200000, pathToFragment: '/second-xf', next: null };
+      const nullTrans = { pathToFragment: '/transition', next: t2Future };
+      const t1Future = { toggleTime: now + 3600000, pathToFragment: '/first-xf', next: nullTrans };
+      const nullPre = { pathToFragment: '/pre-event', next: t1Future };
+
+      const result = worker.getStartScheduleItemByToggleTime(nullPre, now);
+      expect(result).to.equal(nullPre);
+    });
+  });
+
+  describe('validateSchedulePosition — semantic comparison', () => {
+    it('should not reset nextScheduleItem when correctItem has the same path as currentScheduleItem', async () => {
+      const now = Date.now();
+      const item2 = { toggleTime: now + 3600000, pathToFragment: '/second-xf', next: null };
+      const item1 = { toggleTime: now - 3600000, pathToFragment: '/first-xf', next: item2 };
+      const item0 = { pathToFragment: '/pre-event', next: item1 };
+
+      // Simulate: timer already advanced past item1, nextScheduleItem is item2
+      worker.currentScheduleItem = { ...item1 }; // spread copy (as runTimer sets it)
+      worker.nextScheduleItem = item2;
+
+      await worker.validateSchedulePosition(item0);
+
+      // correctItem = item1 (same path as currentScheduleItem) → should NOT reset
+      expect(worker.nextScheduleItem).to.equal(item2);
+    });
+
+    it('should reset nextScheduleItem when correctItem has a different path than currentScheduleItem', async () => {
+      const now = Date.now();
+      const item2 = { toggleTime: now + 3600000, pathToFragment: '/second-xf', next: null };
+      const item1 = { toggleTime: now - 3600000, pathToFragment: '/first-xf', next: item2 };
+
+      // Simulate: timer is incorrectly on item2 but correctItem is item1
+      worker.currentScheduleItem = { ...item2 }; // wrong position
+      worker.nextScheduleItem = item2.next; // null
+
+      await worker.validateSchedulePosition(item1);
+
+      // correctItem = item1, which differs from currentScheduleItem (/second-xf) → reset
+      expect(worker.nextScheduleItem).to.equal(item1);
+    });
+  });
+
+  describe('avoidStreamEndFlag with interleaved null-toggleTime items', () => {
+    it('should show the first timed XF, not an interleaved null item, when avoidStreamEndFlag and serverTime position inside first XF period', async () => {
+      const clock = sinon.useFakeTimers();
+      const perfStub = sinon.stub(performance, 'now').returns(1000);
+
+      // serverTime is 1 hour after T1, 1 hour before T2
+      const t1 = Date.now() - 3600000;
+      const t2 = Date.now() + 3600000;
+      const serverTime = Date.now(); // exactly between T1 and T2
+
+      // Schedule: [null_pre → T1_MR → null_trans → T2_MR]
+      const t2Item = {
+        toggleTime: t2,
+        pathToFragment: '/second-xf',
+        mobileRider: { sessionId: 'session2' },
+        next: null,
+        prev: null,
+      };
+      const nullTrans = {
+        pathToFragment: '/transition',
+        next: t2Item,
+        prev: null,
+      };
+      const t1Item = {
+        toggleTime: t1,
+        pathToFragment: '/first-xf',
+        mobileRider: { sessionId: 'session1' },
+        next: nullTrans,
+        prev: null,
+      };
+      const nullPre = {
+        pathToFragment: '/pre-event',
+        next: t1Item,
+        prev: null,
+      };
+      nullPre.next = t1Item; t1Item.prev = nullPre;
+      t1Item.next = nullTrans; nullTrans.prev = t1Item;
+      nullTrans.next = t2Item; t2Item.prev = nullTrans;
+
+      worker.testingManager.init({ serverTime: String(serverTime), avoidStreamEndFlag: 'true' });
+      worker.plugins.set('mobileRider', {
+        get: (id) => (id === 'session1' ? false : false),
+        set: () => {},
+        getAll: () => ({}),
+      });
+
+      const startItem = worker.getStartScheduleItemByToggleTime(nullPre, Date.now());
+      expect(startItem).to.equal(t1Item, 'getStartScheduleItemByToggleTime must return first timed XF, not the transition null item');
+
+      // Also verify shouldTriggerNextSchedule correctly allows t1Item to trigger
+      worker.currentScheduleItem = { ...nullPre };
+      worker.nextScheduleItem = t1Item;
+      const shouldTrigger = await worker.shouldTriggerNextSchedule(t1Item);
+      expect(shouldTrigger).to.be.true;
+
+      // And that t2Item is correctly blocked because its time has not passed
+      worker.currentScheduleItem = { ...t1Item };
+      const shouldTriggerT2 = await worker.shouldTriggerNextSchedule(t2Item);
+      expect(shouldTriggerT2).to.be.false;
+
+      clock.restore();
+      perfStub.restore();
+    });
+  });
 });

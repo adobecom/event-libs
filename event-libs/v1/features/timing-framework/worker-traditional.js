@@ -265,6 +265,8 @@ class TimingWorker {
 
     let pointer = scheduleRoot;
     let start = null;
+    let lastTimedStart = null;
+    let brokeOnFuture = false;
 
     while (pointer) {
       const { toggleTime } = pointer;
@@ -276,13 +278,21 @@ class TimingWorker {
       const numericToggleTime = TimingWorker.parseToggleTime(toggleTime);
       const toggleTimePassed = typeof numericToggleTime !== 'number' || adjustedTime > numericToggleTime;
 
-      if (!toggleTimePassed) break;
+      if (!toggleTimePassed) {
+        brokeOnFuture = true;
+        break;
+      }
 
       start = pointer;
+      lastTimedStart = pointer;
       pointer = pointer.next;
     }
 
-    return start;
+    // When a future-timed item stopped traversal, a null-toggleTime item that appeared
+    // between the last active timed item and the stopping point must not override the
+    // timed item's position (e.g. a transition/catch-all slot interleaved mid-schedule).
+    // When traversal reaches the end naturally, the final item (timed or null) is correct.
+    return brokeOnFuture ? (lastTimedStart || start) : start;
   }
 
   getFastInitialTime() {
@@ -478,7 +488,8 @@ class TimingWorker {
     const authoritativeTime = await this.getAuthoritativeTime();
     const correctItem = this.getStartScheduleItemByToggleTime(schedule, authoritativeTime);
 
-    if (correctItem && correctItem !== this.currentScheduleItem) {
+    const isSamePosition = correctItem?.pathToFragment === this.currentScheduleItem?.pathToFragment;
+    if (correctItem && !isSamePosition) {
       this.nextScheduleItem = correctItem;
     } else if (!correctItem && this.currentScheduleItem) {
       this.nextScheduleItem = schedule;
