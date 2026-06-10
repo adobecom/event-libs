@@ -1127,6 +1127,14 @@
   position: relative;
 }
 
+/* Mobile: transparent passthrough — the cards scroll natively inside.
+   Desktop overrides this to be the clipping window for the carousel. */
+.sg-time-row__viewport {
+  width: 100%;
+  min-width: 0;
+  overflow: visible;
+}
+
 .sg-time-row__cards {
   display: flex;
   flex-direction: row;
@@ -1137,7 +1145,7 @@
   width: 100%;
   padding: 0;
   height: auto;
-  transform: none !important;
+  transform: none;
   scroll-snap-type: none;
   -webkit-overflow-scrolling: touch;
   scrollbar-width: none;
@@ -1169,7 +1177,7 @@
   font-size: 20px;
   line-height: 1;
   color: #000;
-  z-index: 2;
+  z-index: 3;
   opacity: 0;
   pointer-events: none;
   transition: opacity 0.15s ease, background 0.15s;
@@ -1962,6 +1970,15 @@
   }
 
   .sg-time-row__track {
+    overflow: visible;
+    width: auto;
+  }
+
+  /* The viewport does the horizontal clipping (windowing) instead of the
+     track, so the arrows — which live in the track, outside the viewport —
+     can overhang the edges without being clipped. overflow-x:clip +
+     overflow-y:visible is an allowed combo, so card shadows still show. */
+  .sg-time-row__viewport {
     overflow-x: clip;
     overflow-y: visible;
     width: auto;
@@ -1970,12 +1987,13 @@
   .sg-time-row__cards {
     flex-direction: row;
     gap: var(--s2a-spacing-md);
-    overflow-x: clip;
-    overflow-y: visible;
+    /* This element gets the translateX; it must stay overflow:visible so its
+       clip box doesn't travel with the transform (and so hovered cards can
+       grow past the strip's tight content box). The static viewport clips. */
+    overflow: visible;
     width: auto;
     padding: 0;
     height: 124px;
-    transform: none;
     scroll-snap-type: none;
     -webkit-overflow-scrolling: auto;
     scrollbar-width: auto;

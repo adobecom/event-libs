@@ -37,8 +37,10 @@ export function buildTimeSlotRow(preact, store) {
             aria-label="Previous"
             type="button"
           >‹</button>`}
-          <div class="sg-time-row__cards" ref=${stripRef} style=${'transform:translateX(-' + translateX + 'px)'}>
-            ${sessions.map((s) => html`<div class="sg-time-row__card-wrap" key=${s.id}><${SessionCard} session=${s} /></div>`)}
+          <div class="sg-time-row__viewport">
+            <div class="sg-time-row__cards" ref=${stripRef} style=${'transform:translateX(-' + translateX + 'px)'}>
+              ${sessions.map((s) => html`<div class="sg-time-row__card-wrap" key=${s.id}><${SessionCard} session=${s} /></div>`)}
+            </div>
           </div>
           ${offset < maxOffset && html`<button
             class="sg-time-row__arrow sg-time-row__arrow--next"
