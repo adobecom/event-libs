@@ -481,11 +481,8 @@ function decorateStaticCards(el, { modal } = {}) {
   }
 }
 
-function decorateCards(el, data, { simple, modal } = {}) {
+function decorateCards(el, data, { simple, modal, speakerType } = {}) {
   const cardsWrapper = el.querySelector('.cards-wrapper');
-  const rows = el.querySelectorAll(':scope > div');
-  const configRow = rows[1];
-  const speakerType = configRow?.querySelectorAll(':scope > div')?.[1]?.textContent.toLowerCase().trim();
   const filteredData = speakerType
     ? data.filter((speaker) => speaker.speakerType?.toLowerCase() === speakerType)
     : [...data];
@@ -494,8 +491,6 @@ function decorateCards(el, data, { simple, modal } = {}) {
     el.remove();
     return;
   }
-
-  configRow.remove();
 
   filteredData.forEach((speaker, index) => {
     const cardContainer = createTag('div', { class: 'card-container' });
@@ -536,15 +531,35 @@ function sortDataByOrdinals(data) {
   });
 }
 
+function sortDataByField(data, field, direction) {
+  return [...data].sort((a, b) => {
+    const aVal = (a[field] ?? '').toString().toLowerCase();
+    const bVal = (b[field] ?? '').toString().toLowerCase();
+    const cmp = aVal.localeCompare(bVal);
+    return direction === 'desc' ? -cmp : cmp;
+  });
+}
+
+
+function parseConfigRows(el) {
+  const config = {};
+  const configRowEls = [];
+  const rows = Array.from(el.querySelectorAll(':scope > div'));
+
+  rows.slice(1).forEach((row) => {
+    const cells = row.querySelectorAll(':scope > div');
+    const key = cells[0]?.textContent.toLowerCase().trim();
+    const value = cells[1]?.textContent.trim();
+    if (key) {
+      config[key] = value || '';
+      configRowEls.push(row);
+    }
+  });
+
+  return { config, configRowEls };
+}
 
 export default function init(el) {
-  const rows = el.querySelectorAll(':scope > div');
-  const configRow = rows[1];
-  
-  // Determine if this is metadata-driven or static authoring
-  // Check if the first cell of configRow (if it exists) contains 'type'
-  const firstCell = configRow?.querySelectorAll(':scope > div')?.[0];
-  const isMetadataDriven = firstCell?.textContent.toLowerCase().trim() === 'type';
   const isModal = el.classList.contains('modal');
 
   // Handle grid variant: add default three-up if no *-up class is present
@@ -558,8 +573,10 @@ export default function init(el) {
   const cardsWrapper = createTag('div', { class: 'cards-wrapper' });
   el.append(cardsWrapper);
 
+  const { config, configRowEls } = parseConfigRows(el);
+  const isMetadataDriven = 'type' in config;
+
   if (isMetadataDriven) {
-    // Metadata-driven mode
     let data = [];
 
     try {
@@ -575,9 +592,20 @@ export default function init(el) {
       return;
     }
 
+    configRowEls.forEach((row) => row.remove());
+
     const isSimple = el.classList.contains('simple');
-    const sortedData = sortDataByOrdinals(data);
-    decorateCards(el, sortedData, { simple: isSimple, modal: isModal });
+    const speakerType = config.type?.toLowerCase() || '';
+
+    let sortedData;
+    if ('order' in config) {
+      const direction = el.classList.contains('desc') ? 'desc' : 'asc';
+      sortedData = config.order ? sortDataByField(data, config.order, direction) : sortDataByOrdinals(data);
+    } else {
+      sortedData = sortDataByOrdinals(data);
+    }
+
+    decorateCards(el, sortedData, { simple: isSimple, modal: isModal, speakerType });
   } else {
     decorateStaticCards(el, { modal: isModal });
   }
