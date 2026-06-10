@@ -574,6 +574,8 @@ export default function init(el) {
   el.append(cardsWrapper);
 
   const { config, configRowEls } = parseConfigRows(el);
+  // Determine if this is metadata-driven or static authoring
+  // Check if the configRows (if it exists) contains 'type'
   const isMetadataDriven = 'type' in config;
 
   if (isMetadataDriven) {
