@@ -335,7 +335,7 @@ This would simulate the page as if "now" is the specified timestamp, but time co
 
 ##### 3. `avoidStreamEndFlag` - Mobile Rider Stream Testing
 
-The `avoidStreamEndFlag` parameter treats all Mobile Rider streams as having already ended, allowing the schedule to progress past any Mobile Rider sessions.
+The `avoidStreamEndFlag` parameter treats all Mobile Rider streams as inactive for **blocking** purposes (no overrun hold on an active stream), so time-based schedule positioning can proceed. It does **not** skip `toggleTime` windows or fast-forward to later fragments; only natural stream-end underrun advances before `toggleTime`.
 
 **Example Usage:**
 ```
@@ -639,8 +639,8 @@ timing-framework/
 
 **Usage Guidelines:**
 - Use `worker.js` for same-origin deployments with modern browsers
-- Use `worker-traditional.js` for cross-origin or CSP-restricted environments
-- Both versions provide identical functionality
+- Use `worker-traditional.js` for cross-origin or CSP-restricted environments (chrono-box production path)
+- **Keep both workers behaviorally aligned** — schedule trigger, time cache, and init paths must match; unit tests in `worker.test.js` exercise the module worker as the reference implementation
 - Testing capabilities work in both modes
 
 ### Browser Compatibility

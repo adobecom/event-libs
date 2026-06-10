@@ -1,4 +1,4 @@
-// Inline TestingManager class (converted from ES6 module)
+// Keep in sync with testing.js (classic worker cannot import ES modules)
 class TestingManager {
   constructor() {
     this.timeOffset = 0;
@@ -82,157 +82,157 @@ class TimingWorker {
     this.previouslySentItem = null;
     this.testingManager = new TestingManager();
 
-    // Time management properties - optimized for scale
+    // Time management — keep aligned with worker.js
     this.cachedApiTime = null;
-    this.lastApiCall = 0;
+    this.lastApiCallPerformance = 0;
     this.apiCallInterval = 300000; // 5 minutes minimum between API calls
-    this.cacheTtl = 600000; // 10 minutes cache TTL (longer for better scaling)
-    this.fallbackToLocal = true;
+    this.cacheTtl = 600000; // 10 minutes cache TTL
     this.consecutiveFailures = 0;
     this.maxFailures = 3;
     this.backoffMultiplier = 2;
     this.maxBackoffInterval = 1800000; // 30 minutes max backoff
+    this.maxAllowedDrift = 60000; // 1 minute max drift before cache invalidation
 
     this.setupMessageHandler();
   }
 
   setupBroadcastChannels(plugins) {
-    // Close any existing channels
     this.channels.forEach((channel) => {
       try {
         if (channel && typeof channel.close === 'function') {
           channel.close();
         }
-      } catch (error) {
-        console.log(`Error closing BroadcastChannel: ${JSON.stringify(error)}`);
+      } catch {
+        // Ignore cleanup errors - non-critical
       }
     });
     this.channels.clear();
 
-    // Only set up channels for enabled plugins
-    if (plugins.has('metadata')) {
+    const createPluginChannel = (channelName, pluginName, messageHandler) => {
       try {
-        const channel = new BroadcastChannel('metadata-store');
+        const channel = new BroadcastChannel(channelName);
         channel.onmessage = (event) => {
-          const { tabId, key, value } = event.data;
-          // Only process messages from this tab
+          const { tabId } = event.data;
           if (tabId === this.tabId) {
-            const metadataStore = this.plugins.get('metadata');
-            if (metadataStore) {
-              metadataStore.set(key, value);
+            const store = this.plugins.get(pluginName);
+            if (store) {
+              messageHandler(event.data, store);
             }
           }
         };
-        this.channels.set('metadata', channel);
-      } catch (error) {
-        console.log(`Error setting up metadata BroadcastChannel: ${JSON.stringify(error)}`);
+        this.channels.set(pluginName, channel);
+      } catch {
+        // BroadcastChannel not supported or failed - cross-tab sync disabled
       }
+    };
+
+    if (plugins.has('metadata')) {
+      createPluginChannel('metadata-store', 'metadata', (data, store) => {
+        store.set(data.key, data.value);
+      });
     }
 
     if (plugins.has('mobileRider')) {
-      try {
-        const channel = new BroadcastChannel('mobile-rider-store');
-        channel.onmessage = (event) => {
-          const { tabId, sessionId, isActive } = event.data;
-          // Only process messages from this tab
-          if (tabId === this.tabId) {
-            const mobileRiderStore = this.plugins.get('mobileRider');
-            if (mobileRiderStore) {
-              mobileRiderStore.set(sessionId, isActive);
-            }
-          }
-        };
-        this.channels.set('mobileRider', channel);
-      } catch (error) {
-        console.log(`Error setting up mobileRider BroadcastChannel: ${JSON.stringify(error)}`);
-      }
+      createPluginChannel('mobile-rider-store', 'mobileRider', (data, store) => {
+        store.set(data.sessionId, data.isActive);
+      });
     }
 
-    // Set up shared time cache channel
     try {
       const timeChannel = new BroadcastChannel('time-cache-store');
       timeChannel.onmessage = (event) => {
         const { type, data } = event.data;
         if (type === 'time-update' && data) {
-          // Update local cache with shared time data
-          this.cachedApiTime = data;
-          this.consecutiveFailures = 0; // Reset failures when we get shared time
+          const now = Date.now();
+          const age = now - data.timestamp;
+
+          if (age < this.cacheTtl && age >= 0) {
+            if (data.performanceTimestamp !== undefined) {
+              this.cachedApiTime = {
+                time: data.time + age,
+                timestamp: now,
+                performanceTimestamp: performance.now(),
+              };
+              this.consecutiveFailures = 0;
+            }
+          }
         }
       };
       this.channels.set('timeCache', timeChannel);
-    } catch (error) {
-      console.log(`Error setting up time cache BroadcastChannel: ${JSON.stringify(error)}`);
+    } catch {
+      // BroadcastChannel not supported or failed - cross-tab time sync disabled
     }
   }
 
-  /**
-   * @returns {number}
-   * @description Returns the current time from the API with caching and rate limiting
-   */
+  getCachedTimeWithElapsed() {
+    const elapsedMs = performance.now() - this.cachedApiTime.performanceTimestamp;
+    return this.cachedApiTime.time + elapsedMs;
+  }
+
+  static parseToggleTime(toggleTime) {
+    return typeof toggleTime === 'string' ? parseInt(toggleTime, 10) : toggleTime;
+  }
+
   static async getCurrentTimeFromAPI() {
     try {
       const response = await fetch('https://time.akamai.com/');
       const data = await response.text();
-      const currentTimeInMs = Number.parseInt(data, 10) * 1000;
-      return currentTimeInMs;
-    } catch (error) {
-      console.log(`Error fetching time from API: ${JSON.stringify(error)}`);
+      return Number.parseInt(data, 10) * 1000;
+    } catch {
       return null;
     }
   }
 
-  /**
-   * @returns {Promise<number>}
-   * @description Returns the authoritative current time, using API with fallback to local
-   */
   async getAuthoritativeTime() {
     const now = Date.now();
+    const perfNow = performance.now();
 
-    // If in testing mode, skip API calls and use local time
     if (this.testingManager.isTesting()) {
       return now;
     }
 
-    // If we have a valid cached API time, use it
-    if (this.cachedApiTime && (now - this.cachedApiTime.timestamp) < this.cacheTtl) {
-      const timeSinceCache = now - this.cachedApiTime.timestamp;
-      return this.cachedApiTime.time + timeSinceCache;
+    if (this.cachedApiTime) {
+      const wallClockElapsed = now - this.cachedApiTime.timestamp;
+      const monotonicElapsed = perfNow - this.cachedApiTime.performanceTimestamp;
+      const drift = Math.abs(wallClockElapsed - monotonicElapsed);
+
+      if (drift > this.maxAllowedDrift) {
+        this.cachedApiTime = null;
+      }
     }
 
-    // Calculate backoff interval based on consecutive failures
+    if (this.cachedApiTime && (now - this.cachedApiTime.timestamp) < this.cacheTtl) {
+      return this.getCachedTimeWithElapsed();
+    }
+
     const backoffInterval = Math.min(
       this.apiCallInterval * (this.backoffMultiplier ** this.consecutiveFailures),
       this.maxBackoffInterval,
     );
 
-    // Add jitter to prevent thundering herd (random offset between 0-30% of interval)
     const jitter = Math.random() * 0.3 * backoffInterval;
     const effectiveInterval = backoffInterval + jitter;
 
-    // Check if enough time has passed since last API call (with backoff)
-    if (now - this.lastApiCall < effectiveInterval) {
-      // Use cached time if available, otherwise fall back to local
-      if (this.cachedApiTime) {
-        const timeSinceCache = now - this.cachedApiTime.timestamp;
-        return this.cachedApiTime.time + timeSinceCache;
-      }
-      return now;
+    const timeSinceLastCall = this.lastApiCallPerformance > 0
+      ? perfNow - this.lastApiCallPerformance
+      : Infinity;
+
+    if (timeSinceLastCall < effectiveInterval) {
+      return this.cachedApiTime ? this.getCachedTimeWithElapsed() : now;
     }
 
-    // Try to get fresh time from API
     try {
       const apiTime = await TimingWorker.getCurrentTimeFromAPI();
-      this.lastApiCall = now;
+      this.lastApiCallPerformance = perfNow;
 
       if (apiTime !== null) {
         this.cachedApiTime = {
           time: apiTime,
           timestamp: now,
+          performanceTimestamp: perfNow,
         };
-        // Reset failure count on success
         this.consecutiveFailures = 0;
 
-        // Broadcast the new time to other tabs to reduce API calls
         try {
           const timeChannel = this.channels.get('timeCache');
           if (timeChannel) {
@@ -241,61 +241,69 @@ class TimingWorker {
               data: this.cachedApiTime,
             });
           }
-        } catch (error) {
-          console.log(`Error broadcasting time update: ${JSON.stringify(error)}`);
+        } catch {
+          // Broadcasting failed - not critical
         }
 
         return apiTime;
       }
-      // Increment failure count if API returns null
       this.consecutiveFailures = Math.min(this.consecutiveFailures + 1, this.maxFailures);
-    } catch (error) {
-      console.log(`Error getting authoritative time: ${JSON.stringify(error)}`);
-      // Increment failure count on error
+    } catch {
       this.consecutiveFailures = Math.min(this.consecutiveFailures + 1, this.maxFailures);
     }
 
-    // Fall back to local time if API fails or returns null
-    if (this.fallbackToLocal) {
-      return now;
-    }
-
-    // If fallback is disabled and API failed, use cached time or current time
     if (this.cachedApiTime) {
-      const timeSinceCache = now - this.cachedApiTime.timestamp;
-      return this.cachedApiTime.time + timeSinceCache;
+      return this.getCachedTimeWithElapsed();
     }
-
     return now;
   }
 
-  /**
-   * @param {Object} scheduleRoot - The root of the schedule tree
-   * @returns {Object}
-   * @description Returns the first schedule item that should be shown based on toggleTime
-   */
-  async getStartScheduleItemByToggleTime(scheduleRoot) {
-    const currentTime = await this.getAuthoritativeTime();
+  getStartScheduleItemByToggleTime(scheduleRoot, currentTime) {
     const adjustedTime = this.testingManager.isTesting()
       ? this.testingManager.adjustTime(currentTime)
       : currentTime;
 
     let pointer = scheduleRoot;
     let start = null;
+    let lastTimedStart = null;
+    let brokeOnFuture = false;
 
     while (pointer) {
-      const { toggleTime: t } = pointer;
-      // Convert toggleTime to number if it's a string, like in shouldTriggerNextSchedule
-      const numericToggleTime = typeof t === 'string' ? parseInt(t, 10) : t;
+      const { toggleTime } = pointer;
+      if (!toggleTime) {
+        start = pointer;
+        pointer = pointer.next;
+        continue;
+      }
+      const numericToggleTime = TimingWorker.parseToggleTime(toggleTime);
       const toggleTimePassed = typeof numericToggleTime !== 'number' || adjustedTime > numericToggleTime;
 
-      if (!toggleTimePassed) break;
+      if (!toggleTimePassed) {
+        brokeOnFuture = true;
+        break;
+      }
 
       start = pointer;
+      lastTimedStart = pointer;
       pointer = pointer.next;
     }
 
-    return start;
+    // When a future-timed item stopped traversal, a null-toggleTime item that appeared
+    // between the last active timed item and the stopping point must not override the
+    // timed item's position (e.g. a transition/catch-all slot interleaved mid-schedule).
+    // When traversal reaches the end naturally, the final item (timed or null) is correct.
+    return brokeOnFuture ? (lastTimedStart || start) : start;
+  }
+
+  getFastInitialTime() {
+    const hasRecentCache = this.cachedApiTime
+      && (Date.now() - this.cachedApiTime.timestamp) < this.cacheTtl;
+
+    if (hasRecentCache) {
+      return this.getCachedTimeWithElapsed();
+    }
+
+    return Date.now();
   }
 
   /**
@@ -321,6 +329,15 @@ class TimingWorker {
     return adjustedTime;
   }
 
+  async hasToggleTimePassed(scheduleItem) {
+    const { toggleTime } = scheduleItem;
+    if (!toggleTime) return true;
+
+    const currentTime = await this.getCurrentTime();
+    const numericToggleTime = TimingWorker.parseToggleTime(toggleTime);
+    return currentTime > numericToggleTime;
+  }
+
   /**
    * @param {Object} scheduleItem
    * @returns {boolean}
@@ -335,24 +352,28 @@ class TimingWorker {
       if (mobileRiderStore) {
         const { sessionId } = this.currentScheduleItem.mobileRider;
         const isActive = mobileRiderStore.get(sessionId);
-        // If avoidStreamEndFlag is set, treat all streams as ended
-        const shouldTreatAsActive = this.testingManager.shouldAvoidStreamEnd() ? false : isActive;
+        const avoidingStreamEnd = this.testingManager.shouldAvoidStreamEnd();
+        const shouldTreatAsActive = avoidingStreamEnd ? false : isActive;
         if (shouldTreatAsActive) {
           return false;
         }
-        liveStreamEnd = true;
+        if (!avoidingStreamEnd && !isActive) {
+          liveStreamEnd = true;
+        }
       }
     }
 
-    // Check if current item has mobileRider that's ended (underrun)
     if (scheduleItem.mobileRider) {
+      const timePassed = await this.hasToggleTimePassed(scheduleItem);
+      if (!timePassed) return false;
+
       const mobileRiderStore = this.plugins.get('mobileRider');
       if (mobileRiderStore) {
         const { sessionId } = scheduleItem.mobileRider;
         const isActive = mobileRiderStore.get(sessionId);
-        // If avoidStreamEndFlag is set, treat all streams as ended (skip forward)
-        const shouldTreatAsEnded = this.testingManager.shouldAvoidStreamEnd() ? true : !isActive;
-        if (shouldTreatAsEnded) return true;
+        if (!this.testingManager.shouldAvoidStreamEnd() && !isActive) {
+          return true;
+        }
       }
     }
 
@@ -375,17 +396,8 @@ class TimingWorker {
       }
     }
     if (liveStreamEnd) return true;
-    // If no plugins are blocking, check toggleTime
-    const { toggleTime } = scheduleItem;
-    if (toggleTime) {
-      const currentTime = await this.getCurrentTime();
-      // Convert toggleTime to number if it's a string
-      const numericToggleTime = typeof toggleTime === 'string' ? parseInt(toggleTime, 10) : toggleTime;
-      const timePassed = currentTime > numericToggleTime;
-      return timePassed;
-    }
 
-    return true;
+    return this.hasToggleTimePassed(scheduleItem);
   }
 
   async runTimer() {
@@ -452,17 +464,13 @@ class TimingWorker {
     }
 
     if (schedule) {
-      // Initialize schedule asynchronously since getStartScheduleItemByToggleTime is now async
       this.initializeSchedule(schedule);
     }
   }
 
-  /**
-   * @param {Object} schedule - The schedule to initialize
-   * @description Initializes the schedule asynchronously
-   */
   async initializeSchedule(schedule) {
-    const startItem = await this.getStartScheduleItemByToggleTime(schedule);
+    const initialTime = this.getFastInitialTime();
+    const startItem = this.getStartScheduleItemByToggleTime(schedule, initialTime);
     this.nextScheduleItem = startItem || schedule;
     this.currentScheduleItem = startItem?.prev || null;
     this.previouslySentItem = null;
@@ -470,6 +478,24 @@ class TimingWorker {
     if (!this.nextScheduleItem) return;
 
     this.runTimer();
+
+    this.validateSchedulePosition(schedule).catch(() => {
+      // Validation failed - timer will still run and self-correct on next tick
+    });
+  }
+
+  async validateSchedulePosition(schedule) {
+    const authoritativeTime = await this.getAuthoritativeTime();
+    const correctItem = this.getStartScheduleItemByToggleTime(schedule, authoritativeTime);
+
+    const isSamePosition = correctItem?.pathToFragment === this.currentScheduleItem?.pathToFragment;
+    if (correctItem && !isSamePosition) {
+      this.nextScheduleItem = correctItem;
+    } else if (!correctItem && this.currentScheduleItem) {
+      this.nextScheduleItem = schedule;
+      this.currentScheduleItem = null;
+      this.previouslySentItem = null;
+    }
   }
 
   setupMessageHandler() {
