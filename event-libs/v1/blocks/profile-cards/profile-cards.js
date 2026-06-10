@@ -535,7 +535,7 @@ function sortDataByField(data, field, direction) {
   return [...data].sort((a, b) => {
     const aVal = (a[field] ?? '').toString().toLowerCase();
     const bVal = (b[field] ?? '').toString().toLowerCase();
-    const cmp = aVal.localeCompare(bVal);
+    const cmp = aVal.localeCompare(bVal, undefined, { sensitivity: 'base' });
     return direction === 'desc' ? -cmp : cmp;
   });
 }

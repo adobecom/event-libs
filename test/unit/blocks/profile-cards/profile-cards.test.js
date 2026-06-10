@@ -290,6 +290,22 @@ describe('Profile Cards Module', () => {
       expect(getCardNames(el)).to.deep.equal(['Bob Apple', 'Alice Mango', 'Charlie Zebra']);
     });
 
+    it('treats unknown order field as stable sort (all values empty, original order preserved)', () => {
+      const el = makeBlock('asc', `
+        <div><div>type</div><div>speaker</div></div>
+        <div><div>order</div><div>nonExistentField</div></div>
+      `);
+      init(el);
+      expect(getCardNames(el)).to.have.lengthOf(3);
+    });
+
+    it('removes the block when type filter matches zero speakers', () => {
+      const el = makeBlock('', '<div><div>type</div><div>panelist</div></div>');
+      document.body.appendChild(el);
+      init(el);
+      expect(document.body.contains(el)).to.be.false;
+    });
+
     it('removes the order config row from the DOM', () => {
       const el = makeBlock('asc', `
         <div><div>type</div><div>speaker</div></div>
