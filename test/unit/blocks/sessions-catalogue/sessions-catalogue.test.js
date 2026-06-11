@@ -613,25 +613,6 @@ describe('sessions-hub init', () => {
     expect(el.querySelector('.sh-filter-btn')).to.not.be.null;
   });
 
-  it('does NOT render tab toggle when user is not event-registered (rsvpData null)', async () => {
-    stubDefaultFetch();
-    setSessionsMeta([makeSession()]);
-    const el = document.querySelector('.sessions-hub');
-    await init(el);
-    const toggle = el.querySelector('.sh-tab-toggle');
-    expect(toggle?.hidden).to.be.true;
-  });
-
-  it('renders tab toggle visible when user IS event-registered', async () => {
-    BlockMediator.set('rsvpData', { registrationStatus: 'registered' });
-    stubDefaultFetch();
-    setSessionsMeta([makeSession()]);
-    const el = document.querySelector('.sessions-hub');
-    await init(el);
-    const toggle = el.querySelector('.sh-tab-toggle');
-    expect(toggle?.hidden).to.be.false;
-  });
-
   it('renders one .sh-card per session', async () => {
     stubDefaultFetch();
     setSessionsMeta([makeSession({ sessionId: 's1' }), makeSession({ sessionId: 's2' })]);
@@ -1097,5 +1078,331 @@ describe('renderCTAGroup three-state design', () => {
     const group = inlineRenderCTAGroup({ isRegistered: true, isWaitlisted: false }, { isEventRegistered: true, isBlocked: true });
     expect(group.querySelector('.sh-registered-badge')).to.not.be.null;
     expect(group.querySelector('.sh-btn-blocked')).to.be.null;
+  });
+});
+
+// ─── Toolbar, filter panel, active filter tags, conflict modal ───────────────
+
+describe('sessions-hub toolbar, filter panel and active filter tags', () => {
+  let originalFetch;
+
+  function stubFetch(handlers) {
+    window.fetch = async (url) => {
+      for (const [pattern, handler] of handlers) {
+        if (url.includes(pattern)) return { ok: true, status: 200, json: async () => handler(url) };
+      }
+      return { ok: false, status: 404, json: async () => ({}) };
+    };
+  }
+
+  // Reuse the module-level mockTagsData (caas:events/type/workshop,lab,demo,deep-dive,beginner).
+  function stubDefaultFetch(eventOverrides = {}) {
+    stubFetch([
+      ['/v1/events/', () => ({ eventId: 'event-123', title: 'E', seriesId: 'series-abc', venueId: 'venue-xyz', ...eventOverrides })],
+      ['/v1/series/', () => ({ speakers: [] })],
+      ['/v1/venues/', () => ({ name: 'Main Hall', locationId: 'loc-1' })],
+      ['/v1/attendees/me/events/', () => ({ sessionIds: [] })],
+      ['chimera-api/tags', () => mockTagsData],
+      ['dictionary.json', () => ({ data: { total: 0, offset: 0, limit: 0, data: [] }, ':names': ['data'], ':version': 3, ':type': 'multi-sheet' })],
+    ]);
+  }
+
+  function setSessionsMeta(sessions) {
+    const meta = document.createElement('meta');
+    meta.name = 'sessions';
+    meta.content = JSON.stringify(sessions);
+    document.head.appendChild(meta);
+  }
+
+  // Use sessionTimes (the raw meta format — the block aliases it to rawTimes internally).
+  // Tags must exist in module-level mockTagsData: caas:events/type/{workshop,lab,demo,deep-dive}
+  function makeSession(overrides = {}) {
+    return {
+      sessionId: 'session-1', title: 'My Session', description: 'Desc.',
+      tags: 'caas:events/type/workshop',
+      sessionTimes: [{ sessionTimeId: 'time-1', startTimeMillis: 1722960000000, endTimeMillis: 1722970800000, timezone: 'America/Los_Angeles', locationId: 'loc-1' }],
+      speakers: [],
+      ...overrides,
+    };
+  }
+
+  beforeEach(() => {
+    document.body.innerHTML = body; // shared fixture from top of file
+    document.head.innerHTML = '<meta name="event-id" content="event-123">';
+    originalFetch = window.fetch;
+    DictionaryManager._clearCache();
+    dictionaryManager.resetLoadedSheetsForTests();
+    BlockMediator.set('imsProfile', { userId: 'test-user' });
+    BlockMediator.set('eventData', { eventId: 'event-123', title: 'E', seriesId: 'series-abc', venueId: 'venue-xyz' });
+    BlockMediator.set('rsvpData', null);
+  });
+
+  afterEach(() => {
+    window.fetch = originalFetch;
+    BlockMediator.set('imsProfile', undefined);
+    BlockMediator.set('eventData', undefined);
+    BlockMediator.set('rsvpData', undefined);
+  });
+
+  // ── View dropdown ─────────────────────────────────────────────────────────
+
+  it('view dropdown is not shown to unregistered users', async () => {
+    stubDefaultFetch();
+    setSessionsMeta([makeSession()]);
+    const el = document.querySelector('.sessions-hub');
+    await init(el);
+    expect(el.querySelector('.sh-view-dropdown')?.hidden).to.be.true;
+  });
+
+  it('view dropdown is shown to registered users', async () => {
+    BlockMediator.set('rsvpData', { registrationStatus: 'registered' });
+    stubDefaultFetch();
+    setSessionsMeta([makeSession()]);
+    const el = document.querySelector('.sessions-hub');
+    await init(el);
+    expect(el.querySelector('.sh-view-dropdown')?.hidden).to.be.false;
+  });
+
+  // ── Download button ───────────────────────────────────────────────────────
+
+  it('download button is not visible by default (All sessions view)', async () => {
+    BlockMediator.set('rsvpData', { registrationStatus: 'registered' });
+    stubDefaultFetch();
+    setSessionsMeta([makeSession()]);
+    const el = document.querySelector('.sessions-hub');
+    await init(el);
+    expect(el.querySelector('.sh-download-btn')?.hidden).to.be.true;
+  });
+
+  it('download button becomes visible after switching to My sessions', async () => {
+    BlockMediator.set('rsvpData', { registrationStatus: 'registered' });
+    stubDefaultFetch();
+    setSessionsMeta([makeSession()]);
+    const el = document.querySelector('.sessions-hub');
+    await init(el);
+    el.querySelector('.sh-view-toggle').click();
+    el.querySelector('.sh-view-option[data-tab="my"]').click();
+    expect(el.querySelector('.sh-download-btn')?.hidden).to.be.false;
+  });
+
+  it('download button is hidden again after switching back to All sessions', async () => {
+    BlockMediator.set('rsvpData', { registrationStatus: 'registered' });
+    stubDefaultFetch();
+    setSessionsMeta([makeSession()]);
+    const el = document.querySelector('.sessions-hub');
+    await init(el);
+    el.querySelector('.sh-view-toggle').click();
+    el.querySelector('.sh-view-option[data-tab="my"]').click();
+    el.querySelector('.sh-view-toggle').click();
+    el.querySelector('.sh-view-option[data-tab="all"]').click();
+    expect(el.querySelector('.sh-download-btn')?.hidden).to.be.true;
+  });
+
+  // ── Collapsible search ────────────────────────────────────────────────────
+
+  it('search filters sessions when text is entered after expanding', async () => {
+    stubDefaultFetch();
+    setSessionsMeta([
+      makeSession({ sessionId: 's1', title: 'Alpha Session' }),
+      makeSession({ sessionId: 's2', title: 'Beta Session' }),
+    ]);
+    const el = document.querySelector('.sessions-hub');
+    await init(el);
+    el.querySelector('.sh-search-toggle').click();
+    const input = el.querySelector('.sh-search');
+    input.value = 'Alpha';
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    await new Promise((r) => setTimeout(r, 250));
+    const visible = [...el.querySelectorAll('.sh-card')].filter((c) => !c.hidden);
+    expect(visible.length).to.equal(1);
+  });
+
+  it('search clear restores all sessions', async () => {
+    stubDefaultFetch();
+    setSessionsMeta([
+      makeSession({ sessionId: 's1', title: 'Alpha Session' }),
+      makeSession({ sessionId: 's2', title: 'Beta Session' }),
+    ]);
+    const el = document.querySelector('.sessions-hub');
+    await init(el);
+    el.querySelector('.sh-search-toggle').click();
+    const input = el.querySelector('.sh-search');
+    input.value = 'Alpha';
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    await new Promise((r) => setTimeout(r, 250));
+    el.querySelector('.sh-search-clear').click();
+    const visible = [...el.querySelectorAll('.sh-card')].filter((c) => !c.hidden);
+    expect(visible.length).to.equal(2);
+  });
+
+  // ── Staged filtering (Apply commits, not live) ────────────────────────────
+
+  it('checking a filter does NOT filter sessions until Apply is clicked', async () => {
+    stubDefaultFetch();
+    setSessionsMeta([
+      makeSession({ sessionId: 's1', tags: 'caas:events/type/workshop' }),
+      makeSession({ sessionId: 's2', tags: 'caas:events/type/lab' }),
+    ]);
+    const el = document.querySelector('.sessions-hub');
+    await init(el);
+    el.querySelector('.sh-filter-btn').click();
+    const cb = el.querySelector('.sh-filter-option-grid.active input[type="checkbox"]');
+    cb.click();
+    // Still both cards visible — filter not applied yet
+    const visibleCards = [...el.querySelectorAll('.sh-card')].filter((c) => !c.hidden);
+    expect(visibleCards.length).to.equal(2);
+  });
+
+  it('Apply commits staged filters and closes the panel', async () => {
+    stubDefaultFetch();
+    setSessionsMeta([
+      makeSession({ sessionId: 's1', tags: 'caas:events/type/workshop' }),
+      makeSession({ sessionId: 's2', tags: 'caas:events/type/lab' }),
+    ]);
+    const el = document.querySelector('.sessions-hub');
+    await init(el);
+    el.querySelector('.sh-filter-btn').click();
+    el.querySelector('.sh-filter-option-grid.active input[type="checkbox"]').click();
+    el.querySelector('.sh-filter-apply').click();
+    const panel = el.querySelector('.sh-filter-panel');
+    expect(panel.classList.contains('hidden')).to.be.true;
+    const visibleCards = [...el.querySelectorAll('.sh-card')].filter((c) => !c.hidden);
+    expect(visibleCards.length).to.equal(1);
+  });
+
+  it('Reset all clears staged and applied filters', async () => {
+    stubDefaultFetch();
+    setSessionsMeta([
+      makeSession({ sessionId: 's1', tags: 'caas:events/type/workshop' }),
+      makeSession({ sessionId: 's2', tags: 'caas:events/type/lab' }),
+    ]);
+    const el = document.querySelector('.sessions-hub');
+    await init(el);
+    // Apply a filter first
+    el.querySelector('.sh-filter-btn').click();
+    el.querySelector('.sh-filter-option-grid.active input[type="checkbox"]').click();
+    el.querySelector('.sh-filter-apply').click();
+    // Now reset
+    el.querySelector('.sh-filter-btn').click();
+    el.querySelector('.sh-filter-reset').click();
+    const visibleCards = [...el.querySelectorAll('.sh-card')].filter((c) => !c.hidden);
+    expect(visibleCards.length).to.equal(2);
+  });
+
+  it('reopening the panel resets staged checkboxes to applied state', async () => {
+    stubDefaultFetch();
+    setSessionsMeta([makeSession({ sessionId: 's1', tags: 'caas:events/type/workshop' })]);
+    const el = document.querySelector('.sessions-hub');
+    await init(el);
+    // Check + apply a filter
+    el.querySelector('.sh-filter-btn').click();
+    const cb = el.querySelector('.sh-filter-option-grid.active input[type="checkbox"]');
+    cb.click();
+    el.querySelector('.sh-filter-apply').click();
+    // Close and reopen
+    el.querySelector('.sh-filter-btn').click();
+    const reopenedCb = el.querySelector('.sh-filter-option-grid.active input[type="checkbox"]');
+    expect(reopenedCb.checked).to.be.true;
+  });
+
+  // ── Active filter tags ────────────────────────────────────────────────────
+
+  it('active filter row is not shown when no filters are applied', async () => {
+    stubDefaultFetch();
+    setSessionsMeta([makeSession()]);
+    const el = document.querySelector('.sessions-hub');
+    await init(el);
+    expect(el.querySelector('.sh-active-filters')?.hidden).to.be.true;
+  });
+
+  it('applying a filter shows a chip for that filter', async () => {
+    stubDefaultFetch();
+    setSessionsMeta([makeSession({ sessionId: 's1', tags: 'caas:events/type/workshop' })]);
+    const el = document.querySelector('.sessions-hub');
+    await init(el);
+    el.querySelector('.sh-filter-btn').click();
+    el.querySelector('.sh-filter-option-grid.active input[type="checkbox"]').click();
+    el.querySelector('.sh-filter-apply').click();
+    expect(el.querySelector('.sh-active-filters')?.hidden).to.be.false;
+    expect(el.querySelectorAll('.sh-filter-tag').length).to.equal(1);
+  });
+
+  it('removing an active filter chip restores the full session list', async () => {
+    stubDefaultFetch();
+    setSessionsMeta([
+      makeSession({ sessionId: 's1', tags: 'caas:events/type/workshop' }),
+      makeSession({ sessionId: 's2', tags: 'caas:events/type/lab' }),
+    ]);
+    const el = document.querySelector('.sessions-hub');
+    await init(el);
+    el.querySelector('.sh-filter-btn').click();
+    el.querySelector('.sh-filter-option-grid.active input[type="checkbox"]').click();
+    el.querySelector('.sh-filter-apply').click();
+    el.querySelector('.sh-filter-tag-remove').click();
+    expect(el.querySelector('.sh-active-filters')?.hidden).to.be.true;
+    const visible = [...el.querySelectorAll('.sh-card')].filter((c) => !c.hidden);
+    expect(visible.length).to.equal(2);
+  });
+
+  it('collapses to first 3 chips with a count and See all when more than 3 filters are active', async () => {
+    stubDefaultFetch();
+    setSessionsMeta([makeSession({ sessionId: 's1', tags: 'caas:events/type/workshop,caas:events/type/lab,caas:events/type/demo,caas:events/type/deep-dive' })]);
+    const el = document.querySelector('.sessions-hub');
+    await init(el);
+    el.querySelector('.sh-filter-btn').click();
+    el.querySelectorAll('.sh-filter-option-grid.active input[type="checkbox"]').forEach((cb) => cb.click());
+    el.querySelector('.sh-filter-apply').click();
+    expect(el.querySelectorAll('.sh-filter-tag').length).to.equal(3);
+    expect(el.querySelector('.sh-active-filters-count').textContent).to.equal('4 filters');
+    expect(el.querySelector('.sh-filter-see-all').textContent).to.equal('See all');
+  });
+
+  it('does not show count or See all when 3 or fewer filters are active', async () => {
+    stubDefaultFetch();
+    setSessionsMeta([makeSession({ sessionId: 's1', tags: 'caas:events/type/workshop,caas:events/type/lab,caas:events/type/demo' })]);
+    const el = document.querySelector('.sessions-hub');
+    await init(el);
+    el.querySelector('.sh-filter-btn').click();
+    el.querySelectorAll('.sh-filter-option-grid.active input[type="checkbox"]').forEach((cb) => cb.click());
+    el.querySelector('.sh-filter-apply').click();
+    expect(el.querySelectorAll('.sh-filter-tag').length).to.equal(3);
+    expect(el.querySelector('.sh-active-filters-count')).to.be.null;
+    expect(el.querySelector('.sh-filter-see-all')).to.be.null;
+  });
+
+  it('See all expands all chips and See less collapses back to 3', async () => {
+    stubDefaultFetch();
+    setSessionsMeta([makeSession({ sessionId: 's1', tags: 'caas:events/type/workshop,caas:events/type/lab,caas:events/type/demo,caas:events/type/deep-dive' })]);
+    const el = document.querySelector('.sessions-hub');
+    await init(el);
+    el.querySelector('.sh-filter-btn').click();
+    el.querySelectorAll('.sh-filter-option-grid.active input[type="checkbox"]').forEach((cb) => cb.click());
+    el.querySelector('.sh-filter-apply').click();
+    el.querySelector('.sh-filter-see-all').click();
+    expect(el.querySelectorAll('.sh-filter-tag').length).to.equal(4);
+    expect(el.querySelector('.sh-filter-see-all').textContent).to.equal('See less');
+    el.querySelector('.sh-filter-see-all').click();
+    expect(el.querySelectorAll('.sh-filter-tag').length).to.equal(3);
+  });
+
+  // ── Bulk ICS helpers ──────────────────────────────────────────────────────
+
+  it('filterSessions filters to My sessions tab when activeTab is "my"', () => {
+    const sessions = [
+      { sessionId: 'a', title: 'A', tags: [], sessionTimes: [] },
+      { sessionId: 'b', title: 'B', tags: [], sessionTimes: [] },
+    ];
+    const registeredSessionIds = new Set(['a']);
+    const result = filterSessions(sessions, { query: '', activeTags: new Map(), activeTab: 'my', registeredSessionIds });
+    expect(result.map((s) => s.sessionId)).to.deep.equal(['a']);
+  });
+
+  it('filterSessions shows all sessions when activeTab is "all"', () => {
+    const sessions = [
+      { sessionId: 'a', title: 'A', tags: [], sessionTimes: [] },
+      { sessionId: 'b', title: 'B', tags: [], sessionTimes: [] },
+    ];
+    const result = filterSessions(sessions, { query: '', activeTags: new Map(), activeTab: 'all', registeredSessionIds: new Set() });
+    expect(result.length).to.equal(2);
   });
 });

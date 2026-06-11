@@ -39,6 +39,13 @@ function makeEventData(overrides = {}) {
   };
 }
 
+function setSessionsMeta(sessions) {
+  const meta = document.createElement('meta');
+  meta.name = 'sessions';
+  meta.content = JSON.stringify(sessions);
+  document.head.appendChild(meta);
+}
+
 const mockTagsData = {
   namespaces: {},
 };
@@ -73,13 +80,6 @@ describe('sessions-hub invite-only RSVP gate', () => {
         ':type': 'multi-sheet',
       })],
     ]);
-  }
-
-  function setSessionsMeta(sessions) {
-    const meta = document.createElement('meta');
-    meta.name = 'sessions';
-    meta.content = JSON.stringify(sessions);
-    document.head.appendChild(meta);
   }
 
   beforeEach(() => {
@@ -153,5 +153,138 @@ describe('sessions-hub invite-only RSVP gate', () => {
 
     const rsvpPushes = pushStateSpy.getCalls().filter((c) => String(c.args[2] || '').includes('rsvp-form'));
     expect(rsvpPushes.length).to.equal(0);
+  });
+});
+
+const SESSION_NOT_FULL = makeSession({ sessionId: 'session-not-full' });
+const SESSION_FULL = makeSession({ sessionId: 'session-full', sessionTimes: [{ sessionTimeId: 'time-full', isFull: true }] });
+
+describe('sessions-hub full session', () => {
+  let originalFetch;
+
+  function stubFetch(handlers) {
+    window.fetch = async (url) => {
+      const u = typeof url === 'string' ? url : url.url || '';
+      for (const [pattern, handler] of handlers) {
+        if (u.includes(pattern)) {
+          return { ok: true, status: 200, json: async () => handler(u) };
+        }
+      }
+      return { ok: false, status: 404, json: async () => ({}) };
+    };
+  }
+
+  function stubDefaultFetch(eventOverrides = {}) {
+    stubFetch([
+      ['/v1/events/', () => makeEventData(eventOverrides)],
+      ['/v1/series/', () => ({ speakers: [] })],
+      ['/v1/venues/', () => ({ name: 'Main Hall', locationId: 'loc-1' })],
+      ['/v1/attendees/me/events/', () => ({ sessionIds: [] })],
+      ['chimera-api/tags', () => ({ namespaces: {} })],
+      ['dictionary.json', () => ({
+        data: { total: 0, offset: 0, limit: 0, data: [] },
+        ':names': ['data'],
+        ':version': 3,
+        ':type': 'multi-sheet',
+      })],
+    ]);
+  }
+
+  beforeEach(() => {
+    document.body.innerHTML = body;
+    document.head.innerHTML = '<meta name="event-id" content="event-123">';
+    originalFetch = window.fetch;
+    DictionaryManager._clearCache();
+    dictionaryManager.resetLoadedSheetsForTests();
+    BlockMediator.set('imsProfile', { userId: 'test-user', account_type: 'type1' });
+    BlockMediator.set('rsvpData', null);
+  });
+
+  afterEach(() => {
+    window.fetch = originalFetch;
+    BlockMediator.set('imsProfile', undefined);
+    BlockMediator.set('rsvpData', undefined);
+  });
+
+  it('disables Register button for a full session when user is not event-registered', async () => {
+    stubDefaultFetch();
+    setSessionsMeta([SESSION_FULL]);
+
+    const el = document.querySelector('.sessions-hub');
+    await init(el);
+
+    const card = el.querySelector(`[data-session-id="${SESSION_FULL.sessionId}"]`);
+    const registerBtn = card.querySelector('.sh-btn-register-event');
+    expect(registerBtn).to.not.be.null;
+    expect(registerBtn.disabled).to.be.true;
+    expect(registerBtn.getAttribute('aria-disabled')).to.equal('true');
+  });
+
+  it('disables Register for session button for a full session when user is event-registered', async () => {
+    stubDefaultFetch();
+    setSessionsMeta([SESSION_FULL]);
+    BlockMediator.set('rsvpData', { registrationStatus: 'registered' });
+
+    const el = document.querySelector('.sessions-hub');
+    await init(el);
+
+    const card = el.querySelector(`[data-session-id="${SESSION_FULL.sessionId}"]`);
+    const registerBtn = card.querySelector('.sh-btn-register-session');
+    expect(registerBtn).to.not.be.null;
+    expect(registerBtn.disabled).to.be.true;
+    expect(registerBtn.getAttribute('aria-disabled')).to.equal('true');
+  });
+
+  it('keeps Register button enabled for a session that is not full', async () => {
+    stubDefaultFetch();
+    setSessionsMeta([SESSION_NOT_FULL]);
+
+    const el = document.querySelector('.sessions-hub');
+    await init(el);
+
+    const card = el.querySelector(`[data-session-id="${SESSION_NOT_FULL.sessionId}"]`);
+    const registerBtn = card.querySelector('.sh-btn-register-event');
+    expect(registerBtn).to.not.be.null;
+    expect(registerBtn.disabled).to.be.false;
+  });
+
+  it('shows Registered badge (not a disabled register button) when user is already registered for a full session', async () => {
+    stubFetch([
+      ['/v1/events/', () => makeEventData()],
+      ['/v1/series/', () => ({ speakers: [] })],
+      ['/v1/venues/', () => ({ name: 'Main Hall', locationId: 'loc-1' })],
+      ['/v1/attendees/me/events/', () => ({ sessionIds: [SESSION_FULL.sessionId] })],
+      ['chimera-api/tags', () => ({ namespaces: {} })],
+      ['dictionary.json', () => ({
+        data: { total: 0, offset: 0, limit: 0, data: [] },
+        ':names': ['data'],
+        ':version': 3,
+        ':type': 'multi-sheet',
+      })],
+    ]);
+    setSessionsMeta([SESSION_FULL]);
+    BlockMediator.set('rsvpData', { registrationStatus: 'registered' });
+
+    const el = document.querySelector('.sessions-hub');
+    await init(el);
+
+    const card = el.querySelector(`[data-session-id="${SESSION_FULL.sessionId}"]`);
+    expect(card.querySelector('.sh-btn-register-session')).to.be.null;
+    expect(card.querySelector('.sh-btn-register-event')).to.be.null;
+    expect(card.querySelector('.sh-registered-badge')).to.not.be.null;
+  });
+
+  it('correctly handles a mix of full and non-full sessions on the same page', async () => {
+    stubDefaultFetch();
+    setSessionsMeta([SESSION_NOT_FULL, SESSION_FULL]);
+
+    const el = document.querySelector('.sessions-hub');
+    await init(el);
+
+    const notFullCard = el.querySelector(`[data-session-id="${SESSION_NOT_FULL.sessionId}"]`);
+    const fullCard = el.querySelector(`[data-session-id="${SESSION_FULL.sessionId}"]`);
+
+    expect(notFullCard.querySelector('.sh-btn-register-event').disabled).to.be.false;
+    expect(fullCard.querySelector('.sh-btn-register-event').disabled).to.be.true;
   });
 });

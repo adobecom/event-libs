@@ -70,6 +70,7 @@
 
 .event-agenda.collapsible .agenda-item-container .agenda-list-item .agenda-title-detail-container {
   border-inline-start: none;
+  padding-inline-end: 52px; /* .agenda-toggle width (28px) + right (16px) + gap (8px) */
 }
 
 .event-agenda .agenda-item-container .agenda-list-item  .agenda-title-detail {
@@ -257,6 +258,12 @@
   .event-agenda.collapsible.background .agenda-item-container .agenda-list-item.expanded .agenda-time {
     background: linear-gradient(180deg, #FAFAFA 22.33%, rgb(255 255 255 / 0%) 99.96%);
   }
+
+  /* 52px = .agenda-toggle width (28px) + right (16px) + gap (8px) */
+  .event-agenda.collapsible.background .agenda-item-container .agenda-list-item .agenda-title-detail-container {
+    padding-inline-end: 52px;
+  }
+
 }
 
 @media (min-width: 1440px) {

@@ -134,6 +134,7 @@
   font-size: 12px;
   font-weight: 700;
   line-height: 1.25;
+  /* stylelint-disable-next-line value-no-vendor-prefix -- required for -webkit-line-clamp */
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
@@ -148,6 +149,7 @@
   font-weight: 100;
   overflow: hidden;
   text-overflow: ellipsis;
+  /* stylelint-disable-next-line value-no-vendor-prefix -- required for -webkit-line-clamp */
   display: -webkit-box;
   -webkit-line-clamp: 1;
   -webkit-box-orient: vertical;
