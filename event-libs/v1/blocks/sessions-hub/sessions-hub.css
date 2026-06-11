@@ -427,8 +427,9 @@
   overflow-y: auto;
 }
 
-/* Drill-in header is mobile-only; hidden on desktop/tablet. */
-.sessions-hub .sh-filter-detail-header {
+/* Drill-in header and save footer are mobile-only; hidden on desktop/tablet. */
+.sessions-hub .sh-filter-detail-header,
+.sessions-hub .sh-filter-save-actions {
   display: none;
 }
 
@@ -1276,6 +1277,29 @@
     display: flex;
     flex-direction: column;
     gap: 12px;
+  }
+
+  .sessions-hub .sh-filter-save-actions {
+    position: sticky;
+    bottom: 0;
+    margin: 16px -24px -24px;
+    padding: 24px;
+    background: var(--color-white, #fff);
+    border-top: 1px solid var(--color-gray-200, #dadada);
+  }
+
+  .sessions-hub .sh-filter-save {
+    width: 100%;
+    padding: 16px 24px;
+    border: 1px solid var(--color-gray-400, #c6c6c6);
+    border-radius: 75px;
+    background: none;
+    font-family: var(--body-font-family, sans-serif);
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--color-black, #000);
+    cursor: pointer;
+    box-sizing: border-box;
   }
 }
 

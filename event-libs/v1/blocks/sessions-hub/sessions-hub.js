@@ -711,6 +711,10 @@ function renderFilterPanel(sessions) {
   });
   backBtn.append(createIcon(ARROW_LEFT_ICON));
   detailHeader.append(backBtn, createTag('span', { class: 'sh-filter-detail-title' }));
+  const saveActions = createTag('div', { class: 'sh-filter-save-actions' });
+  saveActions.append(
+    createTag('button', { class: 'sh-filter-save', type: 'button' }, dictionaryManager.getValue('Save')),
+  );
   optionsWrap.append(detailHeader);
 
   let tagIdx = 0;
@@ -739,6 +743,7 @@ function renderFilterPanel(sessions) {
     });
     optionsWrap.append(grid);
   });
+  optionsWrap.append(saveActions);
 
   panel.append(backdrop, sidebar, optionsWrap);
   return panel;
@@ -1247,6 +1252,17 @@ function bindToolbarEvents(toolbarEl, listEl, state) {
 
   const applyBtn = filterPanel.querySelector('.sh-filter-apply');
   applyBtn?.addEventListener('click', () => {
+    setFilterState({ ...getFilterState(), activeTags: cloneActiveTags(pendingTags) });
+    applyFilter(listEl, state);
+    updateActiveFilters(activeFilters, listEl, state);
+    filterPanel.classList.add('hidden');
+    filterBtn.setAttribute('aria-expanded', 'false');
+    filterPanel.setAttribute('aria-hidden', 'true');
+    filterBtn.focus();
+  });
+
+  const saveBtn = filterPanel.querySelector('.sh-filter-save');
+  saveBtn?.addEventListener('click', () => {
     setFilterState({ ...getFilterState(), activeTags: cloneActiveTags(pendingTags) });
     applyFilter(listEl, state);
     updateActiveFilters(activeFilters, listEl, state);
