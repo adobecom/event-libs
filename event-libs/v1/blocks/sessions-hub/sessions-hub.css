@@ -22,6 +22,7 @@
 }
 
 .sessions-hub .sh-toolbar-inner {
+  position: relative;
   max-width: 1200px;
   margin: 0 auto;
   padding: 16px 24px;
@@ -248,7 +249,6 @@
 /* Filter button + wrapper */
 
 .sessions-hub .sh-filter-wrap {
-  position: relative;
   flex: none;
 }
 
@@ -310,7 +310,7 @@
   z-index: 200;
   display: flex;
   gap: 24px;
-  width: min(1133px, calc(100vw - 48px));
+  width: min(1133px, 100%);
   max-height: min(560px, calc(100vh - 160px));
   padding: 24px;
   background: var(--color-white, #fff);
@@ -1102,7 +1102,7 @@
 
 @media (min-width: 769px) {
   .sessions-hub .sh-toolbar-inner {
-    padding: 24px 32px;
+    padding: 16px 32px;
   }
 
   .sessions-hub .sh-card {
@@ -1137,6 +1137,7 @@
   }
 }
 
+
 /* Mobile: bottom-sheet filter modal (full-viewport backdrop + drill-in). */
 @media (max-width: 600px) {
   .sessions-hub .sh-filter-backdrop {
@@ -1164,6 +1165,8 @@
   }
 
   .sessions-hub .sh-filter-sidebar {
+    position: relative;
+    z-index: 1;
     flex: none;
     width: 100%;
     gap: 24px;
@@ -1216,6 +1219,8 @@
 
   /* Detail view: options pane becomes the bottom sheet, sidebar hides. */
   .sessions-hub .sh-filter-options {
+    position: relative;
+    z-index: 1;
     display: none;
     width: 100%;
     padding: 0;
