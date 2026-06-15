@@ -1619,12 +1619,17 @@ describe('decorateEvent - Array Iteration', () => {
       link.href = 'https://assets.mobilerider.com/embed?videoId=abc123';
       parent.appendChild(link);
 
-      // We verify side effects: class addition (dynamic import runs in module scope, not patchable here)
       processAutoBlockLinks(parent);
       await new Promise((resolve) => { setTimeout(resolve, 50); });
 
+      // Classes are added synchronously before the dynamic import
       expect(link.classList.contains('mobile-rider')).to.be.true;
       expect(link.classList.contains('link-block')).to.be.true;
+
+      // initBlock(link) is confirmed called: handleAnchorElement replaces the <a>
+      // with a .mobile-rider div and removes the original anchor from the DOM
+      expect(parent.querySelector('.mobile-rider')).to.not.be.null;
+      expect(parent.querySelector('a')).to.be.null;
     });
 
     it('should not throw when Promise.all rejects on a bad import', async () => {
