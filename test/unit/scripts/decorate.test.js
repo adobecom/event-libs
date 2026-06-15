@@ -1619,10 +1619,7 @@ describe('decorateEvent - Array Iteration', () => {
       link.href = 'https://assets.mobilerider.com/embed?videoId=abc123';
       parent.appendChild(link);
 
-      const initStub = sinon.stub();
-      const importStub = sinon.stub().resolves({ default: initStub });
-      // Patch dynamic import by replacing the module resolution in the function scope
-      // We verify side effects: class addition and initBlock invocation
+      // We verify side effects: class addition (dynamic import runs in module scope, not patchable here)
       processAutoBlockLinks(parent);
       await new Promise((resolve) => { setTimeout(resolve, 50); });
 

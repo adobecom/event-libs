@@ -352,11 +352,7 @@ class TimingWorker {
         const isActive = mobileRiderStore.get(sessionId);
         // If avoidStreamEndFlag is set, treat all streams as ended (skip forward)
         const shouldTreatAsEnded = this.testingManager.shouldAvoidStreamEnd() ? true : !isActive;
-        if (shouldTreatAsEnded) {
-          // Advance past the ended-stream item so runTimer loads the item after it
-          this.nextScheduleItem = scheduleItem.next;
-          return true;
-        }
+        if (shouldTreatAsEnded) return true;
       }
     }
 
@@ -400,7 +396,7 @@ class TimingWorker {
     if (shouldTrigger) {
       itemToSend = this.nextScheduleItem;
       this.currentScheduleItem = { ...this.nextScheduleItem };
-      this.nextScheduleItem = this.nextScheduleItem?.next ?? null;
+      this.nextScheduleItem = this.nextScheduleItem.next;
     } else {
       // If no items are triggered, send the current schedule item
       // This handles cases where mobileRider is still active or other blocking conditions
