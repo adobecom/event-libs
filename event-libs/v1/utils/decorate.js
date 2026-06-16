@@ -577,7 +577,7 @@ export function processAutoBlockLinks(parent) {
       const blockEl = prebuildAutoBlock(blockName, link);
       if (!blockEl) return;
       link.closest('p') ? link.closest('p').replaceWith(blockEl) : link.replaceWith(blockEl);
-    }));
+    })).catch((e) => window.lana?.log(`[${blockName}] autoblock init failed: ${e.message}`));
   });
 }
 

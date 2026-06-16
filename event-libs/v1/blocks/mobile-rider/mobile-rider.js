@@ -264,7 +264,11 @@ class MobileRider {
           clearInterval(currentCheck);
           currentCheck = null;
           btn?.addEventListener('click', () => {
-            if (this.store) this.#attachEndListener(vid);
+            try {
+              if (this.store) this.#attachEndListener(vid);
+            } catch (e) {
+              this.log(`ASL end-listener error: ${e.message}`);
+            }
             if (!container.classList.contains(CONFIG.ASL.TOGGLE_CLASS)) {
               container.classList.add(CONFIG.ASL.TOGGLE_CLASS);
             }
