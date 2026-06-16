@@ -698,8 +698,6 @@ function renderFilterPanel(sessions) {
     createTag('button', { class: 'sh-filter-apply', type: 'button' }, dictionaryManager.getValue('Apply')),
     createTag('button', { class: 'sh-filter-reset', type: 'button' }, dictionaryManager.getValue('Reset all')),
   );
-  sidebar.append(actions);
-
   const backdrop = createTag('div', { class: 'sh-filter-backdrop', 'aria-hidden': 'true' });
 
   const optionsWrap = createTag('div', { class: 'sh-filter-options' });
@@ -745,6 +743,8 @@ function renderFilterPanel(sessions) {
   });
   optionsWrap.append(saveActions);
 
+  sidebar.append(actions);
+
   panel.append(backdrop, sidebar, optionsWrap);
   return panel;
 }
@@ -763,7 +763,7 @@ function getActiveTagList(activeTags) {
 
 const ACTIVE_FILTERS_COLLAPSED_COUNT = 3;
 
-function updateActiveFilters(containerEl, listEl, state) {
+function updateActiveFilters(containerEl) {
   if (!containerEl) return;
   const list = getActiveTagList(getFilterState().activeTags);
   containerEl.innerHTML = '';
@@ -1157,7 +1157,7 @@ function bindToolbarEvents(toolbarEl, listEl, state) {
     if (seeAll) {
       const expanded = activeFilters.dataset.expanded === 'true';
       activeFilters.dataset.expanded = expanded ? 'false' : 'true';
-      updateActiveFilters(activeFilters, listEl, state);
+      updateActiveFilters(activeFilters);
       return;
     }
     const removeBtn = e.target.closest('.sh-filter-tag-remove');
@@ -1172,7 +1172,7 @@ function bindToolbarEvents(toolbarEl, listEl, state) {
     }
     setFilterState({ ...fs, activeTags: newTags });
     applyFilter(listEl, state);
-    updateActiveFilters(activeFilters, listEl, state);
+    updateActiveFilters(activeFilters);
   });
 
   searchInput.addEventListener('input', debounce(() => {
@@ -1216,7 +1216,11 @@ function bindToolbarEvents(toolbarEl, listEl, state) {
     if (filterBtn.disabled) return;
     const isHidden = filterPanel.classList.toggle('hidden');
     filterBtn.setAttribute('aria-expanded', String(!isHidden));
-    filterPanel.setAttribute('aria-hidden', String(isHidden));
+    if (isHidden) {
+      filterPanel.setAttribute('aria-hidden', 'true');
+    } else {
+      filterPanel.removeAttribute('aria-hidden');
+    }
     if (!isHidden) {
       filterPanel.classList.remove('sh-detail-open');
       pendingTags = cloneActiveTags(getFilterState().activeTags);
@@ -1232,9 +1236,7 @@ function bindToolbarEvents(toolbarEl, listEl, state) {
 
   const detailTitle = filterPanel.querySelector('.sh-filter-detail-title');
 
-  filterPanel.addEventListener('click', (e) => {
-    const cat = e.target.closest('.sh-filter-cat');
-    if (!cat) return;
+  const activateCategoryDrillIn = (cat, moveFocus = false) => {
     const { category } = cat.dataset;
     filterPanel.querySelectorAll('.sh-filter-cat').forEach((c) => {
       const isActive = c === cat;
@@ -1246,6 +1248,34 @@ function bindToolbarEvents(toolbarEl, listEl, state) {
     });
     if (detailTitle) detailTitle.textContent = cat.textContent;
     filterPanel.classList.add('sh-detail-open');
+    if (moveFocus) {
+      const firstCb = filterPanel.querySelector(`.sh-filter-option-grid.active input[type="checkbox"]`);
+      if (firstCb) setTimeout(() => firstCb.focus(), 0);
+    }
+  };
+
+  filterPanel.addEventListener('click', (e) => {
+    const cat = e.target.closest('.sh-filter-cat');
+    if (!cat) return;
+    activateCategoryDrillIn(cat, false);
+  });
+
+  filterPanel.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      filterPanel.classList.add('hidden');
+      filterBtn.setAttribute('aria-expanded', 'false');
+      filterPanel.setAttribute('aria-hidden', 'true');
+      filterBtn.focus();
+      return;
+    }
+    if (e.key === 'Enter' || e.key === ' ') {
+      const cat = e.target.closest('.sh-filter-cat');
+      if (cat) {
+        e.preventDefault();
+        activateCategoryDrillIn(cat, true);
+        return;
+      }
+    }
   });
 
   filterPanel.querySelector('.sh-filter-back')?.addEventListener('click', () => {
@@ -1256,7 +1286,7 @@ function bindToolbarEvents(toolbarEl, listEl, state) {
   applyBtn?.addEventListener('click', () => {
     setFilterState({ ...getFilterState(), activeTags: cloneActiveTags(pendingTags) });
     applyFilter(listEl, state);
-    updateActiveFilters(activeFilters, listEl, state);
+    updateActiveFilters(activeFilters);
     filterPanel.classList.add('hidden');
     filterBtn.setAttribute('aria-expanded', 'false');
     filterPanel.setAttribute('aria-hidden', 'true');
@@ -1267,7 +1297,7 @@ function bindToolbarEvents(toolbarEl, listEl, state) {
   saveBtn?.addEventListener('click', () => {
     setFilterState({ ...getFilterState(), activeTags: cloneActiveTags(pendingTags) });
     applyFilter(listEl, state);
-    updateActiveFilters(activeFilters, listEl, state);
+    updateActiveFilters(activeFilters);
     filterPanel.classList.add('hidden');
     filterBtn.setAttribute('aria-expanded', 'false');
     filterPanel.setAttribute('aria-hidden', 'true');
@@ -1283,16 +1313,9 @@ function bindToolbarEvents(toolbarEl, listEl, state) {
     });
     setFilterState({ ...getFilterState(), activeTags: new Map() });
     applyFilter(listEl, state);
-    updateActiveFilters(activeFilters, listEl, state);
+    updateActiveFilters(activeFilters);
   });
 
-  filterPanel.addEventListener('keydown', (e) => {
-    if (e.key !== 'Escape') return;
-    filterPanel.classList.add('hidden');
-    filterBtn.setAttribute('aria-expanded', 'false');
-    filterPanel.setAttribute('aria-hidden', 'true');
-    filterBtn.focus();
-  });
 
   filterPanel.addEventListener('click', (e) => {
     if (e.target !== filterPanel) return;
