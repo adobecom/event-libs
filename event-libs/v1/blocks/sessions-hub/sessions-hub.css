@@ -158,7 +158,7 @@
   height: 40px;
   border-radius: 50%;
   background: var(--color-white, #fff);
-  border: 2px solid var(--color-gray-200, #e9e9e9);
+  border: none;
   cursor: pointer;
   display: inline-flex;
   align-items: center;
@@ -196,9 +196,15 @@
   display: none;
 }
 
-/* Expanded state — the icon button morphs into a pill input */
+/* Search row — hidden until expanded; shown inline in the actions row */
 
-.sessions-hub .sh-search-wrap.expanded {
+.sessions-hub .sh-search-row {
+  display: none;
+  align-items: center;
+}
+
+.sessions-hub .sh-toolbar-actions:has(.sh-search-wrap.expanded) .sh-search-row {
+  display: inline-flex;
   height: 40px;
   padding: 0 4px 0 14px;
   border: 2px solid var(--color-gray-900, #131313);
@@ -207,16 +213,13 @@
   box-sizing: border-box;
 }
 
-.sessions-hub .sh-search-wrap.expanded .sh-search-toggle {
-  width: auto;
-  height: auto;
-  border: none;
-  background: transparent;
-  pointer-events: none;
+.sessions-hub .sh-search-row svg {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
 }
 
-.sessions-hub .sh-search-wrap.expanded .sh-search {
-  display: block;
+.sessions-hub .sh-search-row .sh-search {
   width: 200px;
   min-width: 0;
   height: 36px;
@@ -229,7 +232,12 @@
   color: var(--color-gray-900, #131313);
 }
 
-.sessions-hub .sh-search-wrap.expanded .sh-search-clear {
+.sessions-hub .sh-search-row .sh-search,
+.sessions-hub .sh-search-row .sh-search-clear {
+  display: block;
+}
+
+.sessions-hub .sh-search-row .sh-search-clear {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -242,8 +250,14 @@
   flex-shrink: 0;
 }
 
-.sessions-hub .sh-search-wrap.expanded .sh-search-clear:hover {
+.sessions-hub .sh-search-row .sh-search-clear:hover {
   background: var(--color-gray-100, #f3f3f3);
+}
+
+@media (min-width: 601px) {
+  .sessions-hub .sh-search-wrap.expanded .sh-search-toggle {
+    display: none;
+  }
 }
 
 /* Filter button + wrapper */
@@ -492,7 +506,7 @@
   display: inline-flex;
 }
 
-.sessions-hub .sh-filter-item:focus-within {
+.sessions-hub .sh-filter-item:has(input:focus-visible) {
   outline: 2px solid var(--color-accent, #1473e6);
   outline-offset: 2px;
 }
@@ -1136,11 +1150,50 @@
   .sessions-hub .sh-filter-btn-label {
     display: none;
   }
+
+  .sessions-hub .sh-toolbar-actions:has(.sh-view-dropdown[hidden]) .sh-filter-wrap {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .sessions-hub .sh-toolbar-actions:has(.sh-view-dropdown[hidden]) .sh-filter-btn {
+    width: 100%;
+    padding: 0 16px;
+    border-radius: 20px;
+  }
+
+  .sessions-hub .sh-toolbar-actions:has(.sh-view-dropdown[hidden]) .sh-filter-btn-label {
+    display: inline;
+  }
 }
 
 
 /* Mobile: bottom-sheet filter modal (full-viewport backdrop + drill-in). */
 @media (max-width: 600px) {
+  .sessions-hub .sh-toolbar-actions {
+    align-self: stretch;
+    flex-wrap: wrap;
+  }
+
+  .sessions-hub .sh-view-dropdown {
+    flex: 1;
+  }
+
+  .sessions-hub .sh-toolbar-actions:has(.sh-search-wrap.expanded) .sh-search-row {
+    display: flex;
+    flex: 1 0 100%;
+    order: 99;
+  }
+
+  .sessions-hub .sh-search-row .sh-search {
+    flex: 1;
+    width: auto;
+  }
+
+  .sessions-hub .sh-search-wrap.expanded .sh-search-toggle {
+    background: var(--color-gray-200, #e9e9e9);
+  }
+
   .sessions-hub .sh-filter-backdrop {
     display: block;
     position: absolute;
@@ -1283,10 +1336,7 @@
     display: block;
     position: sticky;
     bottom: 0;
-    margin-top: auto;
-    margin-right: -24px;
-    margin-bottom: -24px;
-    margin-left: -24px;
+    margin: auto -24px -24px;
     padding: 24px;
     background: var(--color-white, #fff);
     border-top: 1px solid var(--color-gray-200, #dadada);
@@ -1320,10 +1370,6 @@
   outline-offset: 2px;
 }
 
-.sessions-hub .sh-filter-item input[type='checkbox']:focus-visible {
-  outline: 2px solid var(--color-accent, #1473e6);
-  outline-offset: 2px;
-}
 
 .sh-event-banner .sh-btn-event-register:focus-visible {
   outline: 2px solid #fff;

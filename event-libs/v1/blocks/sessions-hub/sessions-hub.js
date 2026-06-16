@@ -862,9 +862,11 @@ function renderToolbar(state) {
     'aria-label': dictionaryManager.getValue('Clear search'),
   });
   searchClear.append(createIcon(CLOSE_ICON));
-  searchWrap.append(searchToggle, searchInput, searchClear);
+  const searchRow = createTag('div', { class: 'sh-search-row' });
+  searchRow.append(createIcon(SEARCH_ICON), searchInput, searchClear);
+  searchWrap.append(searchToggle);
 
-  actions.append(downloadBtn, dropdown, filterWrap, searchWrap);
+  actions.append(downloadBtn, dropdown, filterWrap, searchWrap, searchRow);
   inner.append(actions);
   toolbar.append(inner);
   return toolbar;
