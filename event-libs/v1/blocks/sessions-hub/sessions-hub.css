@@ -1082,20 +1082,13 @@
 
 /* ─── Responsive ─────────────────────────────────────────────────────────── */
 
-<<<<<<< Updated upstream
-/* ─── Tablet (768px–899px) and above ─────────────────────────────────────── */
-
-@media (min-width: 768px) {
-=======
 /* ─── Tablet and above (≥ 600px) ────────────────────────────────────────── */
 
 @media (min-width: 600px) {
->>>>>>> Stashed changes
   .sessions-hub .sh-toolbar-inner {
     flex-direction: row;
     justify-content: flex-end;
     align-items: center;
-    padding: 16px 32px;
   }
 
   .sessions-hub .sh-btn,
@@ -1104,21 +1097,9 @@
   }
 }
 
-<<<<<<< Updated upstream
-  .sessions-hub .sh-cta-group {
-    justify-content: flex-end;
-  }
-
-}
-
-/* ─── Tablet banner (768px – 899px) ─────────────────────────────────────── */
-
-@media (min-width: 768px) and (max-width: 899px) {
-=======
 /* ─── Tablet banner (600px – 899px) ─────────────────────────────────────── */
 
 @media (min-width: 600px) and (max-width: 899px) {
->>>>>>> Stashed changes
   .sh-event-banner {
     padding: 40px 0;
   }
@@ -1128,13 +1109,10 @@
     align-items: stretch;
     padding: 0 40px;
     gap: 32px;
-<<<<<<< Updated upstream
   }
 
   .sh-event-banner .sh-btn-event-register {
     width: 100%;
-=======
->>>>>>> Stashed changes
   }
 
   .sh-banner-title {
@@ -1146,47 +1124,6 @@
   }
 }
 
-<<<<<<< Updated upstream
-/* ─── Desktop (≥ 900px) ──────────────────────────────────────────────────── */
-
-@media (min-width: 900px) {
-  .sessions-hub .sh-toolbar {
-    top: var(--toolbar-top, 0);
-=======
-/* ─── Tablet and below (≤ 899px) ────────────────────────────────────────── */
-
-@media (max-width: 899px) {
-  .sessions-hub .sh-card-desh-text {
-    -webkit-line-clamp: 4;
-    line-clamp: 4;
->>>>>>> Stashed changes
-  }
-
-  .sessions-hub .sh-card {
-    row-gap: 16px;
-  }
-
-<<<<<<< Updated upstream
-  .sessions-hub .sh-card-left {
-    padding-right: 0;
-  }
-
-  .sh-event-banner {
-    padding: 40px 0;
-  }
-
-  .sh-banner-inner {
-    flex-wrap: nowrap;
-    padding: 0 24px;
-    gap: 56px;
-    align-items: center;
-  }
-
-  .sh-event-banner .sh-btn-event-register {
-    width: auto;
-  }
-}
-
 /* ─── Tablet and below (≤ 899px) ────────────────────────────────────────── */
 
 @media (max-width: 899px) {
@@ -1199,8 +1136,6 @@
     row-gap: 16px;
   }
 
-=======
->>>>>>> Stashed changes
   .sessions-hub .sh-filter-btn {
     width: 40px;
     padding: 0;
@@ -1212,11 +1147,6 @@
   }
 }
 
-<<<<<<< Updated upstream
-/* ─── Mobile (≤ 767px) ───────────────────────────────────────────────────── */
-
-@media (max-width: 767px) {
-=======
 /* ─── Desktop (≥ 900px) ──────────────────────────────────────────────────── */
 
 @media (min-width: 900px) {
@@ -1259,7 +1189,6 @@
 /* ─── Mobile (< 600px) ───────────────────────────────────────────────────── */
 
 @media (max-width: 599px) {
->>>>>>> Stashed changes
   .sessions-hub .sh-toolbar-actions {
     align-self: stretch;
     flex-wrap: wrap;
