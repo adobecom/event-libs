@@ -189,6 +189,8 @@ class MobileRider {
   }
 
   #attachEndListener(vid) {
+    if (new URLSearchParams(window.location.search).get('avoidStreamEndFlag') === 'true') return;
+    // Avoid stacking listeners
     window.__mr_player?.off?.('streamend');
     window.__mr_player?.on?.('streamend', () => {
       if (this.drawer) {

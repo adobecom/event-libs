@@ -206,6 +206,18 @@ describe('Mobile Rider Module', () => {
         await new Promise((resolve) => { setTimeout(resolve, 50); });
         expect(player.on.called).to.be.false;
       });
+
+      it('should not attach end listener when avoidStreamEndFlag=true', async () => {
+        window.history.replaceState({}, '', '?avoidStreamEndFlag=true');
+        riderInstance.mainID = 'main-video';
+        riderInstance.store = { get: sinon.stub().returns(true) };
+        riderInstance.injectPlayer('test-video', 'test-skin');
+        const player = { off: sinon.stub(), on: sinon.stub() };
+        globalThis.__mr_player = player;
+        await new Promise((resolve) => { setTimeout(resolve, 50); });
+        expect(player.on.calledWith('streamend')).to.be.false;
+        window.history.replaceState({}, '', window.location.pathname);
+      });
     });
 
     describe('setStatus', () => {
