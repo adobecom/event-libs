@@ -1040,6 +1040,21 @@ export function decorateEvent(parent) {
   updateContextualContentElements(parent, { ...photosData, ...massagedMetadata });
 }
 
+export function applyPageMode(area = document) {
+  try {
+    const customAttributes = JSON.parse(getMetadata('custom-attributes'));
+    const mode = customAttributes?.value;
+    if (mode === 'dark' || mode === 'light') {
+      area.querySelectorAll('main > div > div[class]').forEach((block) => {
+        block.classList.remove('dark', 'light');
+        block.classList.add(mode);
+      });
+    }
+  } catch {
+    // no-op: custom-attributes absent or not valid JSON
+  }
+}
+
 export default function decorateArea(area = document) {
   const eagerLoad = (parent, selector) => {
     const img = parent.querySelector(selector);
@@ -1058,4 +1073,8 @@ export default function decorateArea(area = document) {
     // Last image of last column of last row
     eagerLoad(marquee, 'div:last-child > div:last-child img');
   }());
+
+  applyPageMode(area);
 }
+
+
