@@ -1099,18 +1099,24 @@
     justify-content: flex-end;
   }
 
+}
+
+/* ─── Tablet banner (768px – 899px) ─────────────────────────────────────── */
+
+@media (min-width: 768px) and (max-width: 899px) {
   .sh-event-banner {
     padding: 40px 0;
   }
 
-  .sh-event-banner .sh-btn-event-register {
-    width: auto;
+  .sh-banner-inner {
+    flex-direction: column;
+    align-items: stretch;
+    padding: 0 40px;
+    gap: 32px;
   }
 
-  .sh-banner-inner {
-    padding: 0 24px;
-    gap: 56px;
-    flex-wrap: nowrap;
+  .sh-event-banner .sh-btn-event-register {
+    width: 100%;
   }
 
   .sh-banner-title {
@@ -1135,6 +1141,21 @@
 
   .sessions-hub .sh-card-left {
     padding-right: 0;
+  }
+
+  .sh-event-banner {
+    padding: 40px 0;
+  }
+
+  .sh-banner-inner {
+    flex-wrap: nowrap;
+    padding: 0 24px;
+    gap: 56px;
+    align-items: center;
+  }
+
+  .sh-event-banner .sh-btn-event-register {
+    width: auto;
   }
 }
 
@@ -1168,6 +1189,17 @@
     align-self: stretch;
     flex-wrap: wrap;
     justify-content: flex-end;
+  }
+
+  .sh-banner-inner {
+    flex-direction: column;
+    align-items: stretch;
+    padding: 0 32px;
+    gap: 32px;
+  }
+
+  .sh-banner-title {
+    font-size: 24px;
   }
 
   .sessions-hub .sh-view-dropdown {
