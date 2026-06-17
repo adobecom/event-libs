@@ -49,6 +49,7 @@ class MobileRider {
   constructor(el) {
     this.el = el;
     this.isEmbedding = false;
+    this._endListenerAttached = false;
     this.init();
   }
 
@@ -188,7 +189,6 @@ class MobileRider {
   }
 
   #attachEndListener(vid) {
-    // Avoid stacking listeners
     window.__mr_player?.off?.('streamend');
     window.__mr_player?.on?.('streamend', () => {
       if (this.drawer) {
@@ -200,6 +200,7 @@ class MobileRider {
 
       window.__mr_player?.dispose?.();
       window.__mr_player = null;
+      this._endListenerAttached = false;
     });
   }
 
@@ -260,12 +261,15 @@ class MobileRider {
       let attempts = 0;
       currentCheck = setInterval(() => {
         const btn = container.querySelector(`#${CONFIG.ASL.BUTTON_ID}`);
-        if (btn || ++attempts > CONFIG.ASL.MAX_CHECKS) {
+        if (btn) {
           clearInterval(currentCheck);
           currentCheck = null;
-          btn?.addEventListener('click', () => {
+          btn.addEventListener('click', () => {
             try {
-              if (this.store) this.#attachEndListener(vid);
+              if (this.store && !this._endListenerAttached) {
+                this._endListenerAttached = true;
+                this.#attachEndListener(vid);
+              }
             } catch (e) {
               this.log(`ASL end-listener error: ${e.message}`);
             }
@@ -274,6 +278,9 @@ class MobileRider {
             }
             poll();
           }, { once: true });
+        } else if (++attempts > CONFIG.ASL.MAX_CHECKS) {
+          clearInterval(currentCheck);
+          currentCheck = null;
         }
       }, CONFIG.ASL.CHECK_INTERVAL);
     };

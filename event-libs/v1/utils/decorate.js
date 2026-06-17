@@ -571,7 +571,7 @@ export function processAutoBlockLinks(parent) {
       if (selfInit) {
         link.classList.add(blockName, 'link-block');
         const { default: initBlock } = await import(`../blocks/${blockName}/${blockName}.js`);
-        initBlock(link);
+        await initBlock(link);
         return;
       }
       const blockEl = prebuildAutoBlock(blockName, link);
