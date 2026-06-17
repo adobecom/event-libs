@@ -18,6 +18,7 @@ function parseConfig(el) {
     title: '',
     rfApiUrl: '',
     rfApiProfileId: '',
+    registerUrl: '/register',
     showConflictModal: false,
     filterCategories: DEFAULT_FILTER_CATEGORIES,
     trackIcons: {},
@@ -35,6 +36,7 @@ function parseConfig(el) {
       case 'event-title': config.title = val; break;
       case 'rainfocus-api-url': config.rfApiUrl = val; break;
       case 'rainfocus-api-profile-id': config.rfApiProfileId = val; break;
+      case 'register-url': if (val) config.registerUrl = val; break;
       case 'show-conflict-modal': config.showConflictModal = val.toLowerCase() === 'true'; break;
       case 'manual-on-demand-transition-time': config.manualOnDemandTransitionTime = val || null; break;
       case 'theme': if (val) config.theme = val; break;

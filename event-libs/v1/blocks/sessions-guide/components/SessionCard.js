@@ -23,13 +23,14 @@ export function buildSessionCard(preact, store) {
   return function SessionCard({ session }) {
     const { state, dispatch } = useSessionGuide();
     const {
-      scheduled, favorited, isRegistered, eventConfig,
+      scheduled, favorited, isLoggedIn, isRegistered, eventConfig,
     } = state;
     const pendingActions = state.pendingActions || new Set();
     const sessions = state.sessions || [];
     const {
       userTz, surface, trackColors, trackIcons,
       rfApiProfileId, rfApiUrl, showConflictModal,
+      title: eventTitle, registerUrl,
     } = eventConfig;
 
     const isScheduled = scheduled.has(session.id);
@@ -56,9 +57,36 @@ export function buildSessionCard(preact, store) {
       isPending ? 'is-pending' : '',
     ].filter(Boolean).join(' ');
 
+    function showAuthToast(action) {
+      if (isLoggedIn !== true) {
+        dispatch({
+          type: 'SHOW_TOAST',
+          message: `Login required to ${action}`,
+          variant: 'informative',
+          ctaLabel: 'Login to Adobe',
+          ctaAction: () => window.adobeIMS?.signIn(),
+          duration: null,
+        });
+        return true;
+      }
+      if (isRegistered !== true) {
+        const eventName = eventTitle ? ` for ${eventTitle}` : '';
+        dispatch({
+          type: 'SHOW_TOAST',
+          message: `Registration${eventName} required to ${action}`,
+          variant: 'informative',
+          ctaLabel: 'Register',
+          ctaHref: registerUrl || '/register',
+          duration: null,
+        });
+        return true;
+      }
+      return false;
+    }
+
     async function handleSchedule(e) {
       e.stopPropagation();
-      if (isRegistered !== true) { dispatch({ type: 'SHOW_REG_PROMPT' }); return; }
+      if (showAuthToast('add to schedule')) return;
       if (isPending) return;
 
       dispatch({ type: 'SET_PENDING', sessionId: session.id, pending: true });
@@ -106,7 +134,7 @@ export function buildSessionCard(preact, store) {
 
     async function handleFavorite(e) {
       e.stopPropagation();
-      if (isRegistered !== true) { dispatch({ type: 'SHOW_REG_PROMPT' }); return; }
+      if (showAuthToast('add to favorites')) return;
       if (isPending) return;
 
       dispatch({ type: 'SET_PENDING', sessionId: session.id, pending: true });

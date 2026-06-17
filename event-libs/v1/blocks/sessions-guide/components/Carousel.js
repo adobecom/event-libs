@@ -20,9 +20,11 @@ export function buildCarousel(preact, store) {
       const strip = stripRef.current;
       if (!strip) return;
       const maxScroll = strip.scrollWidth - strip.clientWidth;
-      setEdges({
-        atStart: strip.scrollLeft <= 1,
-        atEnd: strip.scrollLeft >= maxScroll - 1,
+      const atStart = strip.scrollLeft <= 1;
+      const atEnd = strip.scrollLeft >= maxScroll - 1;
+      setEdges((prev) => {
+        if (prev.atStart === atStart && prev.atEnd === atEnd) return prev;
+        return { atStart, atEnd };
       });
     };
 

@@ -41,7 +41,7 @@ export function buildInitialState(eventConfig, initialSessions = []) {
     eventConfig: eventConfig || {},
     // Phase 4 — interactions
     activeSessionId: null,       // session detail overlay (Phase 6)
-    toast: null,                 // { id, message, variant: 'default'|'success'|'error' }
+    toast: null,                 // { id, message, variant, ctaLabel, ctaAction, ctaHref, duration }
     pendingActions: new Set(),   // session IDs currently being mutated via RF API
     regPromptOpen: false,        // registration prompt modal
     conflictModal: null,         // { existing, incoming, onConfirm: async fn }
@@ -139,7 +139,18 @@ export function reducer(state, action) {
 
     // Phase 4 — toast notifications
     case 'SHOW_TOAST':
-      return { ...state, toast: { id: Date.now(), message: action.message, variant: action.variant || 'default' } };
+      return {
+        ...state,
+        toast: {
+          id: Date.now(),
+          message: action.message,
+          variant: action.variant || 'default',
+          ctaLabel: action.ctaLabel || null,
+          ctaAction: action.ctaAction || null,
+          ctaHref: action.ctaHref || null,
+          duration: action.duration !== undefined ? action.duration : 1500,
+        },
+      };
     case 'HIDE_TOAST':
       return { ...state, toast: null };
 

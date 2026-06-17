@@ -12,7 +12,7 @@ export function buildDrawerHeader(preact, store) {
     const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
     const mobileSearchRef = useRef(null);
     const { activeFilters } = state;
-    const title = state.eventConfig.title || 'Sessions';
+    const title = state.eventConfig.title || 'See what’s happening at MAX';
 
     const activeFilterCount = Object.values(activeFilters).reduce(
       (sum, set) => sum + (set instanceof Set ? set.size : 0),
