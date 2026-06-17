@@ -254,7 +254,7 @@
   background: var(--color-gray-100, #f3f3f3);
 }
 
-@media (min-width: 601px) {
+@media (min-width: 768px) {
   .sessions-hub .sh-search-wrap.expanded .sh-search-toggle {
     display: none;
   }
@@ -1080,16 +1080,23 @@
 
 /* ─── Responsive ─────────────────────────────────────────────────────────── */
 
-@media (min-width: 601px) {
+/* ─── Tablet (768px–899px) and above ─────────────────────────────────────── */
+
+@media (min-width: 768px) {
   .sessions-hub .sh-toolbar-inner {
     flex-direction: row;
     justify-content: flex-end;
     align-items: center;
+    padding: 16px 32px;
   }
 
   .sessions-hub .sh-btn,
   .sessions-hub .sh-registered-badge {
     width: auto;
+  }
+
+  .sessions-hub .sh-cta-group {
+    justify-content: flex-end;
   }
 
   .sh-event-banner {
@@ -1115,9 +1122,11 @@
   }
 }
 
-@media (min-width: 769px) {
-  .sessions-hub .sh-toolbar-inner {
-    padding: 16px 32px;
+/* ─── Desktop (≥ 900px) ──────────────────────────────────────────────────── */
+
+@media (min-width: 900px) {
+  .sessions-hub .sh-toolbar {
+    top: var(--toolbar-top, 0);
   }
 
   .sessions-hub .sh-card {
@@ -1127,30 +1136,20 @@
   .sessions-hub .sh-card-left {
     padding-right: 0;
   }
-
-  .sessions-hub .sh-cta-group {
-    justify-content: flex-end;
-  }
 }
 
-@media (max-width: 768px) {
+/* ─── Tablet and below (≤ 899px) ────────────────────────────────────────── */
+
+@media (max-width: 899px) {
   .sessions-hub .sh-card-desh-text {
     -webkit-line-clamp: 4;
     line-clamp: 4;
   }
+
   .sessions-hub .sh-card {
     row-gap: 16px;
   }
-}
 
-@media (min-width: 901px) {
-  .sessions-hub .sh-toolbar {
-    top: var(--toolbar-top, 0);
-  }
-}
-
-/* Tablet (and below): filter collapses to an icon-only */
-@media (max-width: 768px) {
   .sessions-hub .sh-filter-btn {
     width: 40px;
     padding: 0;
@@ -1160,29 +1159,15 @@
   .sessions-hub .sh-filter-btn-label {
     display: none;
   }
-
-  .sessions-hub .sh-toolbar-actions:has(.sh-view-dropdown[hidden]) .sh-filter-wrap {
-    flex: 1;
-    min-width: 0;
-  }
-
-  .sessions-hub .sh-toolbar-actions:has(.sh-view-dropdown[hidden]) .sh-filter-btn {
-    width: 100%;
-    padding: 0 16px;
-    border-radius: 20px;
-  }
-
-  .sessions-hub .sh-toolbar-actions:has(.sh-view-dropdown[hidden]) .sh-filter-btn-label {
-    display: inline;
-  }
 }
 
+/* ─── Mobile (≤ 767px) ───────────────────────────────────────────────────── */
 
-/* Mobile: bottom-sheet filter modal (full-viewport backdrop + drill-in). */
-@media (max-width: 360px) {
+@media (max-width: 767px) {
   .sessions-hub .sh-toolbar-actions {
     align-self: stretch;
     flex-wrap: wrap;
+    justify-content: flex-end;
   }
 
   .sessions-hub .sh-view-dropdown {
