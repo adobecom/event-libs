@@ -1133,6 +1133,16 @@
   }
 }
 
+@media (max-width: 768px) {
+  .sessions-hub .sh-card-desh-text {
+    -webkit-line-clamp: 4;
+    line-clamp: 4;
+  }
+  .sessions-hub .sh-card {
+    row-gap: 16px;
+  }
+}
+
 @media (min-width: 901px) {
   .sessions-hub .sh-toolbar {
     top: var(--toolbar-top, 0);
@@ -1140,7 +1150,7 @@
 }
 
 /* Tablet (and below): filter collapses to an icon-only */
-@media (max-width: 900px) {
+@media (max-width: 768px) {
   .sessions-hub .sh-filter-btn {
     width: 40px;
     padding: 0;
@@ -1169,7 +1179,7 @@
 
 
 /* Mobile: bottom-sheet filter modal (full-viewport backdrop + drill-in). */
-@media (max-width: 600px) {
+@media (max-width: 360px) {
   .sessions-hub .sh-toolbar-actions {
     align-self: stretch;
     flex-wrap: wrap;
