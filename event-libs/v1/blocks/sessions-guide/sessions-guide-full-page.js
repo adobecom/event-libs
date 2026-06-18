@@ -68,14 +68,11 @@ export default async function init(el) {
   const eventConfig = parseConfig(el);
 
   const preact = await loadPreact();
-
   const { render } = preact;
-  const { buildStore } = await import('./store/index.js');
+
+  const { SessionGuideProvider } = await import('./store/index.js');
+  const { App } = await import('./components/App.js');
   const { fetchSessions } = await import('./services/sessions-api.js');
-  const store = buildStore(preact);
-  const { SessionGuideProvider } = store;
-  const { buildApp } = await import('./components/App.js');
-  const App = buildApp(preact, store);
 
   const initialSessions = await fetchSessions(eventConfig.rfApiUrl).catch(() => []);
 
