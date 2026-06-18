@@ -1,10 +1,14 @@
 import {
-  createContext, useReducer, useEffect, useContext, h,
+  createContext, useReducer, useEffect, useContext, useRef, h,
 } from '../../../deps/htm-preact.js';
+import BlockMediator from '../../../deps/block-mediator.min.js';
 import { injectDispatch, startPolling, stopPolling } from '../services/poller.js';
 import { fetchSessions } from '../services/sessions-api.js';
 import { getNowMs, getSessionDayKey } from '../utils/time.js';
 import { deriveSessionState } from '../utils/session-state.js';
+
+const LS_SCHEDULED = 'sg:scheduled';
+const LS_FAVORITED = 'sg:favorited';
 
 function deriveEventDays(sessions, userTz) {
   const tz = userTz || Intl.DateTimeFormat().resolvedOptions().timeZone;
@@ -25,12 +29,33 @@ function getDefaultDay(eventDays, userTz) {
 export function buildInitialState(eventConfig, initialSessions = []) {
   const userTz = eventConfig && eventConfig.userTz;
   const eventDays = deriveEventDays(initialSessions, userTz);
+
+  let scheduled = new Set();
+  let favorited = new Set();
+  let isLoggedIn = null;
+  let isRegistered = undefined;
+  let userFirstName = null;
+  try {
+    scheduled = new Set(JSON.parse(localStorage.getItem(LS_SCHEDULED) || '[]'));
+    favorited = new Set(JSON.parse(localStorage.getItem(LS_FAVORITED) || '[]'));
+    let devAuth = JSON.parse(localStorage.getItem('sg:dev-auth') || 'null');
+    if (!devAuth && ['localhost', '127.0.0.1'].includes(window.location.hostname)) {
+      devAuth = { isLoggedIn: true, isRegistered: true, userFirstName: 'Dev' };
+      localStorage.setItem('sg:dev-auth', JSON.stringify(devAuth));
+    }
+    if (devAuth) {
+      isLoggedIn = devAuth.isLoggedIn ?? null;
+      isRegistered = devAuth.isRegistered ?? undefined;
+      userFirstName = devAuth.userFirstName ?? null;
+    }
+  } catch { /* localStorage unavailable */ }
+
   return {
     sessions: initialSessions,
     sessionsStatus: initialSessions.length > 0 ? 'ready' : 'loading',
     drawerState: 'hidden',
-    scheduled: new Set(),
-    favorited: new Set(),
+    scheduled,
+    favorited,
     liveStreamActiveIds: new Set(),
     activeView: 'live-upcoming',
     eventDays,
@@ -38,9 +63,9 @@ export function buildInitialState(eventConfig, initialSessions = []) {
     activeFilters: {},
     searchQuery: '',
     mySessionsTab: 'upcoming',
-    isLoggedIn: null,
-    isRegistered: undefined,
-    userFirstName: null,
+    isLoggedIn,
+    isRegistered,
+    userFirstName,
     eventConfig: eventConfig || {},
     activeSessionId: null,
     toast: null,
@@ -179,6 +204,48 @@ export const SessionGuideContext = createContext(null);
 
 export function SessionGuideProvider({ eventConfig, initialSessions = [], children }) {
   const [state, dispatch] = useReducer(reducer, buildInitialState(eventConfig, initialSessions));
+  const didMount = useRef(false);
+
+  // Sync logged-in / registered state from BlockMediator (imsProfile + rsvpData).
+  // sg:dev-auth in localStorage takes priority — prevents Milo's guest IMS from
+  // overwriting a dev-mode user after the block renders.
+  useEffect(() => {
+    function syncAuth() {
+      try {
+        const devAuth = JSON.parse(localStorage.getItem('sg:dev-auth') || 'null');
+        if (devAuth) {
+          dispatch({
+            type: 'IMS_UPDATE',
+            isLoggedIn: devAuth.isLoggedIn ?? null,
+            isRegistered: devAuth.isRegistered ?? undefined,
+            userFirstName: devAuth.userFirstName ?? null,
+          });
+          return;
+        }
+      } catch { /* ignore */ }
+      const profile = BlockMediator.get('imsProfile');
+      if (profile === undefined) return;
+      const rsvp = BlockMediator.get('rsvpData');
+      const isLoggedIn = !!(profile && !profile.noProfile && profile.account_type !== 'guest');
+      const isRegistered = rsvp?.registered === true;
+      const userFirstName = profile?.first_name ?? null;
+      dispatch({ type: 'IMS_UPDATE', isLoggedIn, isRegistered, userFirstName });
+    }
+    syncAuth();
+    const unsubProfile = BlockMediator.subscribe('imsProfile', syncAuth);
+    const unsubRsvp = BlockMediator.subscribe('rsvpData', syncAuth);
+    return () => { unsubProfile(); unsubRsvp(); };
+  }, []);
+
+  // Persist scheduled/favorited to localStorage on every change (skip initial mount
+  // since buildInitialState already loaded the persisted values).
+  useEffect(() => {
+    if (!didMount.current) { didMount.current = true; return; }
+    try {
+      localStorage.setItem(LS_SCHEDULED, JSON.stringify([...state.scheduled]));
+      localStorage.setItem(LS_FAVORITED, JSON.stringify([...state.favorited]));
+    } catch { /* localStorage unavailable */ }
+  }, [state.scheduled, state.favorited]);
 
   useEffect(() => {
     if (initialSessions.length > 0) return;
