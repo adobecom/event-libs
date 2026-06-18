@@ -22,13 +22,15 @@ export function IconButton({
   variant = 'solid',
   context = 'on-light',
   size = 'md',
+  extraClass,
 }) {
   const cls = [
     'sg-icon-btn',
     `sg-icon-btn--${variant}`,
     `sg-icon-btn--${context}`,
     `sg-icon-btn--${size}`,
-  ].join(' ');
+    extraClass,
+  ].filter(Boolean).join(' ');
 
   return html`
     <button

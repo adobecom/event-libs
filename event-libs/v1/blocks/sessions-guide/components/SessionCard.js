@@ -73,6 +73,7 @@ export function SessionCard({ session }) {
         <p class="sg-card__desc">${session.description}</p>
         <div class="sg-card__footer">
           <span class="sg-card__track sg-card__track--footer" style=${'color:' + trackColor}>${session.track}</span>
+          <span class="sg-card__footer-badge"><${CategoryBadge} category=${session.category} size="sm" /></span>
           <span class="sg-card__time">${timeLabel}</span>
         </div>
       </div>
@@ -81,6 +82,7 @@ export function SessionCard({ session }) {
           variant="outlined"
           context="on-light"
           size="md"
+          extraClass="sg-card__btn--schedule"
           label=${isScheduled ? 'Remove from schedule' : 'Add to schedule'}
           onclick=${handleSchedule}
           pressed=${isScheduled}
@@ -95,6 +97,7 @@ export function SessionCard({ session }) {
           variant="outlined"
           context="on-light"
           size="md"
+          extraClass="sg-card__btn--favorite"
           label=${isFavorited ? 'Remove from favorites' : 'Add to favorites'}
           onclick=${handleFavorite}
           pressed=${isFavorited}
