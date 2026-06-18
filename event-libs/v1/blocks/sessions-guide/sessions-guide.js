@@ -1,10 +1,8 @@
-import { LIBS, getEventConfig } from '../../utils/utils.js';
+import { h, render } from '../../deps/htm-preact.js';
 import { detectUserTimezone } from './utils/time.js';
-
-async function loadPreact() {
-  const miloLibs = getEventConfig()?.miloConfig?.miloLibs ?? LIBS;
-  return import(`${miloLibs}/deps/htm-preact.js`);
-}
+import { SessionGuideProvider } from './store/index.js';
+import { App } from './components/App.js';
+import { fetchSessions } from './services/sessions-api.js';
 
 // Default filter categories — override via block authoring table (filter-categories: JSON)
 // Each entry: { id: string (maps to session property), label: string (display name) }
@@ -66,25 +64,13 @@ function parseConfig(el) {
 
 export default async function init(el) {
   const eventConfig = parseConfig(el);
-
-  const preact = await loadPreact();
-
-  const { render } = preact;
-  const { buildStore } = await import('./store/index.js');
-  const { fetchSessions } = await import('./services/sessions-api.js');
-  const store = buildStore(preact);
-  const { SessionGuideProvider } = store;
-  const { buildApp } = await import('./components/App.js');
-  const App = buildApp(preact, store);
-
-  // Pre-fetch so the initial render already has sessions (required in stub/SSR
-  // environments where useEffect is a no-op).
   const initialSessions = await fetchSessions(eventConfig.rfApiUrl).catch(() => []);
 
   el.innerHTML = '';
 
-  // Lazy factory — defers App() until after SessionGuideProvider sets context.
-  const appFactory = () => preact.h(App, null);
+  // appFactory defers App() until after SessionGuideProvider sets _current,
+  // so useContext works when App is called directly inside the provider function.
+  const appFactory = () => h(App, null);
 
   if (eventConfig.surface === 'widget') {
     const portal = document.createElement('div');
@@ -92,13 +78,13 @@ export default async function init(el) {
     portal.dataset.theme = eventConfig.theme;
     document.body.appendChild(portal);
     render(
-      preact.h(SessionGuideProvider, { eventConfig, initialSessions }, appFactory),
+      h(SessionGuideProvider, { eventConfig, initialSessions }, appFactory),
       portal,
     );
   } else {
     el.dataset.theme = eventConfig.theme;
     render(
-      preact.h(SessionGuideProvider, { eventConfig, initialSessions }, appFactory),
+      h(SessionGuideProvider, { eventConfig, initialSessions }, appFactory),
       el,
     );
   }

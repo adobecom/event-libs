@@ -1,3 +1,6 @@
+import {
+  createContext, useReducer, useEffect, useContext, h,
+} from '../../../deps/htm-preact.js';
 import { injectDispatch, startPolling, stopPolling } from '../services/poller.js';
 import { fetchSessions } from '../services/sessions-api.js';
 import { getNowMs, getSessionDayKey } from '../utils/time.js';
@@ -39,12 +42,11 @@ export function buildInitialState(eventConfig, initialSessions = []) {
     isRegistered: undefined,
     userFirstName: null,
     eventConfig: eventConfig || {},
-    // Phase 4 — interactions
-    activeSessionId: null,       // session detail overlay (Phase 6)
-    toast: null,                 // { id, message, variant, ctaLabel, ctaAction, ctaHref, duration }
-    pendingActions: new Set(),   // session IDs currently being mutated via RF API
-    regPromptOpen: false,        // registration prompt modal
-    conflictModal: null,         // { existing, incoming, onConfirm: async fn }
+    activeSessionId: null,
+    toast: null,
+    pendingActions: new Set(),
+    regPromptOpen: false,
+    conflictModal: null,
   };
 }
 
@@ -58,7 +60,6 @@ export function reducer(state, action) {
       };
     }
 
-    // Phase 5: auto-transition to on-demand view when all sessions end
     case 'LIVE_STATUS_UPDATE': {
       const next = { ...state, liveStreamActiveIds: action.active };
       const now = action.now || getNowMs();
@@ -133,11 +134,9 @@ export function reducer(state, action) {
     case 'SET_DRAWER':
       return { ...state, drawerState: action.drawer };
 
-    // Phase 6 — session detail overlay
     case 'SET_ACTIVE_SESSION':
       return { ...state, activeSessionId: action.sessionId };
 
-    // Phase 4 — toast notifications
     case 'SHOW_TOAST':
       return {
         ...state,
@@ -154,7 +153,6 @@ export function reducer(state, action) {
     case 'HIDE_TOAST':
       return { ...state, toast: null };
 
-    // Phase 4 — pessimistic mutation loading state
     case 'SET_PENDING': {
       const pendingActions = new Set(state.pendingActions);
       if (action.pending) pendingActions.add(action.sessionId);
@@ -162,13 +160,11 @@ export function reducer(state, action) {
       return { ...state, pendingActions };
     }
 
-    // Phase 4 — registration prompt modal
     case 'SHOW_REG_PROMPT':
       return { ...state, regPromptOpen: true };
     case 'HIDE_REG_PROMPT':
       return { ...state, regPromptOpen: false };
 
-    // Phase 4 — conflict modal (stores callback fn — intentional, not serialized)
     case 'SHOW_CONFLICT':
       return { ...state, conflictModal: action.conflict };
     case 'HIDE_CONFLICT':
@@ -179,51 +175,50 @@ export function reducer(state, action) {
   }
 }
 
-export function buildStore(preact) {
-  const { createContext, useReducer, useEffect, useContext } = preact;
+export const SessionGuideContext = createContext(null);
 
-  const SessionGuideContext = createContext(null);
+export function SessionGuideProvider({ eventConfig, initialSessions = [], children }) {
+  const [state, dispatch] = useReducer(reducer, buildInitialState(eventConfig, initialSessions));
 
-  function SessionGuideProvider({ eventConfig, initialSessions = [], children }) {
-    const [state, dispatch] = useReducer(reducer, buildInitialState(eventConfig, initialSessions));
+  useEffect(() => {
+    if (initialSessions.length > 0) return;
+    const apiUrl = eventConfig && eventConfig.rfApiUrl;
+    fetchSessions(apiUrl)
+      .then((sessions) => {
+        dispatch({ type: 'SESSIONS_LOADED', sessions });
+      })
+      .catch((err) => {
+        window.lana?.log(`[sessions-guide] sessions fetch failed: ${err.message}`);
+        dispatch({ type: 'SET_SESSIONS_STATUS', status: 'error' });
+      });
+  }, []);
 
-    // Effect 1: fetch sessions on mount (skipped when initialSessions already populated)
-    useEffect(() => {
-      if (initialSessions.length > 0) return;
-      const apiUrl = eventConfig && eventConfig.rfApiUrl;
-      fetchSessions(apiUrl)
-        .then((sessions) => {
-          dispatch({ type: 'SESSIONS_LOADED', sessions });
-        })
-        .catch((err) => {
-          window.lana?.log(`[sessions-guide] sessions fetch failed: ${err.message}`);
-          dispatch({ type: 'SET_SESSIONS_STATUS', status: 'error' });
-        });
-    }, []);
+  useEffect(() => {
+    if (state.sessionsStatus !== 'ready') return undefined;
+    injectDispatch(dispatch);
+    const mrSessions = state.sessions.filter((s) => s.mrStreamId);
+    const timerId = startPolling(mrSessions, eventConfig.mrEnv);
+    return () => {
+      stopPolling();
+      if (timerId) clearInterval(timerId);
+    };
+  }, [state.sessionsStatus]);
 
-    // Effect 2: start polling when sessions are ready
-    useEffect(() => {
-      if (state.sessionsStatus !== 'ready') return undefined;
-      injectDispatch(dispatch);
-      const mrSessions = state.sessions.filter((s) => s.mrStreamId);
-      const timerId = startPolling(mrSessions, eventConfig.mrEnv);
-      return () => {
-        stopPolling();
-        if (timerId) clearInterval(timerId);
-      };
-    }, [state.sessionsStatus]);
+  // App is invoked directly via children() (appFactory), not through Preact's reconciler,
+  // so _current is the only way useContext returns the right value in that direct call.
+  SessionGuideContext._current = { state, dispatch };
+  const resolved = typeof children === 'function' ? children() : children;
+  return h(SessionGuideContext.Provider, { value: { state, dispatch } }, resolved);
+}
 
-    // App is invoked directly (not through Preact's reconciler), so real Preact's
-    // context propagation doesn't apply. Setting _current here is the only way
-    // useContext(SessionGuideContext) works inside that direct call.
-    SessionGuideContext._current = { state, dispatch };
-    const resolved = typeof children === 'function' ? children() : children;
-    return preact.h(SessionGuideContext.Provider, { value: { state, dispatch } }, resolved);
-  }
+export function useSessionGuide() {
+  return useContext(SessionGuideContext);
+}
 
-  function useSessionGuide() {
-    return useContext(SessionGuideContext);
-  }
-
-  return { SessionGuideContext, SessionGuideProvider, useSessionGuide };
+// Compatibility shim for tests — returns a store-like object whose
+// SessionGuideContext IS the module-level context, so tests can inject
+// state via store.SessionGuideContext._current and the static-import
+// components will pick it up via useSessionGuide().
+export function buildStore() {
+  return { SessionGuideContext, useSessionGuide };
 }

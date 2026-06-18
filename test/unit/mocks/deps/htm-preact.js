@@ -65,6 +65,8 @@ export function useReducer(fn, initial, init) {
   return [state, () => {}];
 }
 
+export function signal(initial) { return { value: initial }; }
+
 export function h(type, props, ...children) {
   if (typeof type === 'function') {
     const childVal = children.length === 1 ? children[0] : children;
