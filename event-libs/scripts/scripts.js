@@ -62,6 +62,7 @@ const CONFIG = {
 
 setConfig(CONFIG);
 
+// Will be removed once real IMS login and Rainfocus registration APIs are wired up.
 if (['localhost', '127.0.0.1'].includes(window.location.hostname)) {
   const { setupDevUser, seedDevStorage } = await import('../v1/blocks/sessions-guide/services/dev-mock.js');
   setupDevUser();
