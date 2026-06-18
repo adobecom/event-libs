@@ -1781,8 +1781,10 @@
     letter-spacing: -0.16px;
     color: #000;
     white-space: normal;
-    overflow: visible;
     text-overflow: clip;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
   }
 
   .sg-live-card:hover .sg-live-card__desc { color: #fff; }
