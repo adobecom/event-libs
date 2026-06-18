@@ -42,16 +42,9 @@ export function DrawerShell() {
     if (drawerState === 'peek') {
       expandedRef.current = false;
       document.body.style.overflow = 'hidden';
-      const headerEl = el.querySelector('.sg-header');
-      const liveEl = el.querySelector('.sg-live-section');
-      const rowEl = el.querySelector('.sg-time-row');
-      const headerH = headerEl ? headerEl.offsetHeight : 80;
-      const liveH = (liveEl && liveEl.offsetHeight > 0) ? liveEl.offsetHeight : 0;
-      const rowH = rowEl ? rowEl.offsetHeight : 0;
-      const peekTop = Math.max(
-        getTopMargin(),
-        Math.round(window.innerHeight - (headerH + liveH + rowH * 0.5)),
-      );
+      // ≤1440px viewport width → ~500px peek; >1440px (e.g. 1920px) → ~890px peek
+      const peekHeight = window.innerWidth > 1440 ? 890 : 500;
+      const peekTop = Math.max(getTopMargin(), window.innerHeight - peekHeight);
       el.style.transition = 'none';
       el.style.top = '100vh';
       requestAnimationFrame(() => {

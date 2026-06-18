@@ -57,7 +57,7 @@ export function buildInitialState(eventConfig, initialSessions = []) {
     scheduled,
     favorited,
     liveStreamActiveIds: new Set(),
-    activeView: 'live-upcoming',
+    activeView: isRegistered ? 'my-sessions' : 'live-upcoming',
     eventDays,
     activeDay: getDefaultDay(eventDays, userTz),
     activeFilters: {},
@@ -156,8 +156,15 @@ export function reducer(state, action) {
     }
     case 'SET_SESSIONS_STATUS':
       return { ...state, sessionsStatus: action.status };
-    case 'SET_DRAWER':
-      return { ...state, drawerState: action.drawer };
+    case 'SET_DRAWER': {
+      const next = { ...state, drawerState: action.drawer };
+      // On every open, snap to the auth-appropriate default view so the user
+      // always lands on the right tab regardless of when IMS resolved.
+      if (action.drawer !== 'hidden' && state.drawerState === 'hidden') {
+        next.activeView = state.isRegistered ? 'my-sessions' : 'live-upcoming';
+      }
+      return next;
+    }
 
     case 'SET_ACTIVE_SESSION':
       return { ...state, activeSessionId: action.sessionId };
