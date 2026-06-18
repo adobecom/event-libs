@@ -1347,6 +1347,27 @@
 
   .sg-upcoming-title {
     font-size: var(--s2a-font-size-2xl);
+    margin: 0;
+    padding: var(--s2a-spacing-lg) var(--s2a-spacing-lg) var(--s2a-spacing-sm);
+    border-bottom: 1px solid #e8e8e8;
+  }
+
+  /* ── Time slot rows ────────────────────────────────────── */
+
+  .sg-time-row {
+    flex-direction: row;
+    align-items: center;
+    gap: 36px;
+    padding: var(--s2a-spacing-md) 0 var(--s2a-spacing-lg) var(--s2a-spacing-lg);
+    border-bottom: 1px solid #e8e8e8;
+    background: #fff;
+  }
+
+  .sg-time-row__label {
+    font-size: var(--s2a-font-size-md);
+    color: var(--s2a-color-gray-800);
+    white-space: nowrap;
+    width: 60px;
   }
 
   .sg-carousel__header {
