@@ -1,10 +1,15 @@
-/* ── Toast (Phase 4) ─────────────────────────────────────────── */
+/* ── Toast ─────────────────────────────────────────────────────── */
 
+/* Base state: hidden and offset. JS mounts the element here, paints one frame,
+   then adds .sg-toast--visible to trigger the CSS transition (no @keyframes flash). */
 .sg-toast {
   position: fixed;
   bottom: 80px;
   left: 50%;
-  transform: translateX(-50%);
+  opacity: 0;
+  transform: translateX(-50%) translateY(calc(100% + 12px));
+  pointer-events: none;
+  transition: opacity 400ms ease, transform 400ms ease;
   display: flex;
   align-items: stretch;
   min-width: 220px;
@@ -16,18 +21,25 @@
   box-shadow: 0 4px 20px rgb(0 0 0 / 20%);
   overflow: hidden;
   z-index: 200;
-  animation: sg-toast-in 0.2s ease;
 }
 
-@keyframes sg-toast-in {
-  from {
-    opacity: 0;
-    transform: translateX(-50%) translateY(8px);
+.sg-toast--visible {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+  pointer-events: auto;
+}
+
+/* Desktop: anchored bottom-right, slides in/out from the right */
+@media (min-width: 1280px) {
+  .sg-toast {
+    bottom: 56px;
+    left: auto;
+    right: 56px;
+    transform: translateX(calc(100% + 56px));
   }
 
-  to {
-    opacity: 1;
-    transform: translateX(-50%) translateY(0);
+  .sg-toast--visible {
+    transform: translateX(0);
   }
 }
 

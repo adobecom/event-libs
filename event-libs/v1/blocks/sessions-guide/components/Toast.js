@@ -1,4 +1,4 @@
-import { html, useEffect } from '../../../deps/htm-preact.js';
+import { html, useEffect, useState, useRef } from '../../../deps/htm-preact.js';
 import { useSessionGuide } from '../store/index.js';
 
 function InfoIcon() {
@@ -40,29 +40,64 @@ export function Toast() {
   const { state, dispatch } = useSessionGuide();
   const { toast } = state;
 
+  // `displayed` holds the toast data while it is on screen (including during exit transition).
+  // `visible` drives the CSS transition: false = hidden/offset, true = fully shown.
+  const [displayed, setDisplayed] = useState(null);
+  const [visible, setVisible] = useState(false);
+  const rafRef = useRef(null);
+
+  // When a new toast arrives, mount it in the hidden state, then trigger the
+  // enter transition after two rAFs so the browser paints the hidden state first.
   useEffect(() => {
     if (!toast) return undefined;
-    const duration = toast.duration === null ? null : (toast.duration || 1500);
-    if (duration === null) return undefined;
-    const id = setTimeout(() => dispatch({ type: 'HIDE_TOAST' }), duration);
-    return () => clearTimeout(id);
+    cancelAnimationFrame(rafRef.current);
+    setDisplayed(toast);
+    setVisible(false);
+    // Double rAF: first frame mounts the element hidden, second triggers the transition.
+    rafRef.current = requestAnimationFrame(() => {
+      rafRef.current = requestAnimationFrame(() => setVisible(true));
+    });
+    return () => cancelAnimationFrame(rafRef.current);
   }, [toast && toast.id]); // eslint-disable-line
 
-  if (!toast) return null;
+  // Auto-dismiss: start the countdown only after the toast is fully visible.
+  useEffect(() => {
+    if (!visible || !displayed) return undefined;
+    const duration = displayed.duration === null ? null : (displayed.duration || 1500);
+    if (duration === null) return undefined;
+    const id = setTimeout(() => setVisible(false), duration);
+    return () => clearTimeout(id);
+  }, [visible, displayed && displayed.id]); // eslint-disable-line
 
-  const variant = toast.variant || 'neutral';
+  // After the exit transition ends, remove the toast from the store and unmount.
+  function handleTransitionEnd(e) {
+    if (!visible && e.propertyName === 'opacity') {
+      dispatch({ type: 'HIDE_TOAST' });
+      setDisplayed(null);
+    }
+  }
+
+  if (!displayed) return null;
+
+  const dismiss = () => setVisible(false);
+  const variant = displayed.variant || 'neutral';
   const Icon = ICONS[variant];
-  const dismiss = () => dispatch({ type: 'HIDE_TOAST' });
+  const cls = ['sg-toast', `sg-toast--${variant}`, visible && 'sg-toast--visible'].filter(Boolean).join(' ');
 
   return html`
-    <div class=${'sg-toast sg-toast--' + variant} role="status" aria-live="polite">
+    <div
+      class=${cls}
+      role="status"
+      aria-live="polite"
+      ontransitionend=${handleTransitionEnd}
+    >
       ${Icon && html`<span class="sg-toast__icon-wrap"><${Icon} /></span>`}
-      <span class="sg-toast__msg">${toast.message}</span>
-      ${toast.ctaLabel && toast.ctaHref && html`
-        <a class="sg-toast__cta" href=${toast.ctaHref}>${toast.ctaLabel}</a>
+      <span class="sg-toast__msg">${displayed.message}</span>
+      ${displayed.ctaLabel && displayed.ctaHref && html`
+        <a class="sg-toast__cta" href=${displayed.ctaHref}>${displayed.ctaLabel}</a>
       `}
-      ${toast.ctaLabel && !toast.ctaHref && toast.ctaAction && html`
-        <button class="sg-toast__cta" onclick=${toast.ctaAction} type="button">${toast.ctaLabel}</button>
+      ${displayed.ctaLabel && !displayed.ctaHref && displayed.ctaAction && html`
+        <button class="sg-toast__cta" onclick=${displayed.ctaAction} type="button">${displayed.ctaLabel}</button>
       `}
       <button class="sg-toast__close" onclick=${dismiss} aria-label="Dismiss notification" type="button">
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10" width="10" height="10" aria-hidden="true" focusable="false">
