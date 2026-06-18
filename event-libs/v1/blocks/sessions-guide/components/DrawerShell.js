@@ -155,7 +155,12 @@ export function buildDrawerShell(preact, store) {
       if (found) dispatch({ type: 'SET_ACTIVE_SESSION', sessionId: found.id });
     }, [state.sessionsStatus]);
 
+    // Keep sessionsRef current so the popstate handler always sees the latest list
+    const sessionsRef = useRef(state.sessions);
+    useEffect(() => { sessionsRef.current = state.sessions; }, [state.sessions]);
+
     // popstate listener — restores state from URL without pushing new history entries
+    // Registered once (stable []); reads sessions via ref to avoid re-registering on every poll.
     useEffect(() => {
       function handlePopState() {
         const params = new URLSearchParams(window.location.search);
@@ -163,7 +168,7 @@ export function buildDrawerShell(preact, store) {
           const sessionParam = params.get('session');
           const lastDash = sessionParam.lastIndexOf('-');
           const rfCode = lastDash >= 0 ? sessionParam.slice(lastDash + 1) : sessionParam;
-          const found = state.sessions.find((s) => s.rfCode === rfCode || s.id === sessionParam);
+          const found = sessionsRef.current.find((s) => s.rfCode === rfCode || s.id === sessionParam);
           dispatch({ type: 'SET_DRAWER', drawer: 'expanded' });
           dispatch({ type: 'SET_ACTIVE_SESSION', sessionId: found ? found.id : null });
         } else if (params.has('sessions')) {
@@ -176,7 +181,7 @@ export function buildDrawerShell(preact, store) {
       }
       window.addEventListener('popstate', handlePopState);
       return () => window.removeEventListener('popstate', handlePopState);
-    }, [state.sessions]);
+    }, []);
 
     const { drawerState, sessionsStatus, activeSessionId } = state;
     const isOpen = drawerState !== 'hidden';

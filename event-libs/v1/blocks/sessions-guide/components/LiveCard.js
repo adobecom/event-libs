@@ -1,5 +1,5 @@
 import { formatShortTime, getNowMs } from '../utils/time.js';
-import { addSession, removeSession, toggleSessionInterest } from '../services/rainfocus.js';
+import { scheduleAction, favoriteAction } from '../services/session-actions.js';
 import { setSessionParam } from '../utils/url.js';
 import { buildCategoryBadge } from './CategoryBadge.js';
 
@@ -17,14 +17,9 @@ export function buildLiveCard(preact, store) {
 
   return function LiveCard({ session }) {
     const { state, dispatch } = useSessionGuide();
-    const {
-      scheduled, favorited, isRegistered, eventConfig,
-    } = state;
+    const { scheduled, favorited, eventConfig } = state;
     const pendingActions = state.pendingActions || new Set();
-    const sessions = state.sessions || [];
-    const {
-      userTz, trackColors, rfApiProfileId, rfApiUrl, showConflictModal, surface,
-    } = eventConfig;
+    const { userTz, trackColors, surface } = eventConfig;
 
     const isScheduled = scheduled.has(session.id);
     const isFavorited = favorited.has(session.id);
@@ -49,81 +44,14 @@ export function buildLiveCard(preact, store) {
       isPending ? 'is-pending' : '',
     ].filter(Boolean).join(' ');
 
-    function hasTimeConflict(a, b) {
-      const aStart = Date.parse(a.startTimeUtc);
-      const aEnd = Date.parse(a.endTimeUtc);
-      const bStart = Date.parse(b.startTimeUtc);
-      const bEnd = Date.parse(b.endTimeUtc);
-      return aStart < bEnd && aEnd > bStart;
-    }
-
     async function handleSchedule(e) {
       e.stopPropagation();
-      if (isRegistered !== true) { dispatch({ type: 'SHOW_REG_PROMPT' }); return; }
-      if (isPending) return;
-
-      dispatch({ type: 'SET_PENDING', sessionId: session.id, pending: true });
-      try {
-        if (isScheduled) {
-          // TODO: replace null credentials with real rfAuthToken/clientId from auth integration
-          await removeSession(session.rfCode, null, null, rfApiProfileId, rfApiUrl);
-          dispatch({ type: 'SCHEDULE_REMOVE', sessionId: session.id });
-          dispatch({ type: 'SHOW_TOAST', message: 'Removed from schedule', variant: 'default' });
-        } else {
-          if (showConflictModal) {
-            const conflict = sessions.find(
-              (s) => s.id !== session.id && scheduled.has(s.id) && hasTimeConflict(s, session),
-            );
-            if (conflict) {
-              dispatch({
-                type: 'SHOW_CONFLICT',
-                conflict: {
-                  existing: conflict,
-                  incoming: session,
-                  onConfirm: async (keep) => {
-                    if (keep.id === session.id) {
-                      await removeSession(conflict.rfCode, null, null, rfApiProfileId, rfApiUrl);
-                      dispatch({ type: 'SCHEDULE_REMOVE', sessionId: conflict.id });
-                      await addSession(session.rfCode, null, null, rfApiProfileId, rfApiUrl);
-                      dispatch({ type: 'SCHEDULE_ADD', sessionId: session.id });
-                    }
-                    dispatch({ type: 'SHOW_TOAST', message: 'Schedule updated', variant: 'success' });
-                  },
-                },
-              });
-              dispatch({ type: 'SET_PENDING', sessionId: session.id, pending: false });
-              return;
-            }
-          }
-          await addSession(session.rfCode, null, null, rfApiProfileId, rfApiUrl);
-          dispatch({ type: 'SCHEDULE_ADD', sessionId: session.id });
-          dispatch({ type: 'SHOW_TOAST', message: 'Added to schedule', variant: 'success' });
-        }
-      } catch (err) {
-        window.lana?.log(`[sessions-guide] live card schedule failed: ${err.message}`);
-        dispatch({ type: 'SHOW_TOAST', message: 'Something went wrong. Please try again.', variant: 'error' });
-      } finally {
-        dispatch({ type: 'SET_PENDING', sessionId: session.id, pending: false });
-      }
+      await scheduleAction(session, state, dispatch);
     }
 
     async function handleFavorite(e) {
       e.stopPropagation();
-      if (isRegistered !== true) { dispatch({ type: 'SHOW_REG_PROMPT' }); return; }
-      if (isPending) return;
-
-      dispatch({ type: 'SET_PENDING', sessionId: session.id, pending: true });
-      try {
-        // TODO: replace null credentials with real rfAuthToken/clientId from auth integration
-        await toggleSessionInterest(session.rfCode, session.id, null, null, rfApiProfileId, rfApiUrl);
-        dispatch({ type: isFavorited ? 'FAVORITE_REMOVE' : 'FAVORITE_ADD', sessionId: session.id });
-        dispatch({ type: 'SHOW_TOAST', message: isFavorited ? 'Removed from favorites' : 'Added to favorites', variant: isFavorited ? 'default' : 'success' });
-      } catch (err) {
-        window.lana?.log(`[sessions-guide] live card favorite failed: ${err.message}`);
-        dispatch({ type: 'SHOW_TOAST', message: 'Something went wrong. Please try again.', variant: 'error' });
-      } finally {
-        dispatch({ type: 'SET_PENDING', sessionId: session.id, pending: false });
-      }
+      await favoriteAction(session, state, dispatch);
     }
 
     function handleCardClick() {
