@@ -2183,6 +2183,7 @@
   flex-direction: column;
   min-height: 100px;
   position: relative;
+  background: var(--s2a-color-background-default);
 }
 
 .sg-full-page__header-wrap {
