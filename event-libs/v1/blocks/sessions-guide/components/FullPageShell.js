@@ -34,17 +34,33 @@ export function FullPageShell() {
     }
   }, []);
 
-  // Sync state → URL (replaceState — no new history entry per interaction)
+  // Sync state → URL (replaceState — no new history entry per interaction).
+  // Start from the current search string so unrelated params (milolibs, eccEnv, etc.)
+  // are preserved; only manage the three params this component owns.
   useEffect(() => {
-    const params = new URLSearchParams();
-    if (activeView && activeView !== 'live-upcoming') params.set('view', activeView);
-    if (searchQuery) params.set('search', searchQuery);
+    const params = new URLSearchParams(window.location.search);
+
+    if (activeView && activeView !== 'live-upcoming') {
+      params.set('view', activeView);
+    } else {
+      params.delete('view');
+    }
+
+    if (searchQuery) {
+      params.set('search', searchQuery);
+    } else {
+      params.delete('search');
+    }
 
     const filterPairs = [];
     Object.entries(activeFilters).forEach(([cat, valSet]) => {
       if (valSet instanceof Set) valSet.forEach((v) => filterPairs.push(`${cat}:${v}`));
     });
-    if (filterPairs.length > 0) params.set('filter', filterPairs.join(','));
+    if (filterPairs.length > 0) {
+      params.set('filter', filterPairs.join(','));
+    } else {
+      params.delete('filter');
+    }
 
     const qs = params.toString();
     const url = qs ? `${window.location.pathname}?${qs}` : window.location.pathname;
