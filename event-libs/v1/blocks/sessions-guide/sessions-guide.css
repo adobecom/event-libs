@@ -1534,7 +1534,7 @@
   /* ── Drawer ────────────────────────────────────────────────── */
 
   .sg-drawer {
-    width: min(1400px, 100%);
+    width: min(1400px, calc(100% - 40px));
     max-width: none;
   }
 
