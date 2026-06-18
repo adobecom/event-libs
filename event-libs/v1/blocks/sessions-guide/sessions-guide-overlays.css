@@ -265,21 +265,6 @@
 
 /* ── Download Button (Phase 4) ───────────────────────────────── */
 
-.sg-my-sessions-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: var(--s2a-spacing-md) var(--s2a-spacing-lg) 0;
-}
-
-.sg-my-sessions-greeting {
-  font-family: var(--s2a-font-family-adobe-clean-display);
-  font-weight: var(--s2a-font-weight-adobe-clean-display-black);
-  font-size: var(--s2a-font-size-lg);
-  color: var(--s2a-color-content-default);
-  margin: 0;
-}
-
 .sg-download-btn {
   width: 36px;
   height: 36px;

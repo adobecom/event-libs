@@ -22,7 +22,7 @@ function parseConfig(el) {
     trackIcons: {},
     trackColors: {},
     manualOnDemandTransitionTime: null,
-    theme: 'dark',
+    theme: null,
     mrEnv: 'dev',
   };
   [...el.querySelectorAll(':scope > div')].forEach((row) => {
@@ -59,6 +59,12 @@ function parseConfig(el) {
   });
   config.surface = el.classList.contains('page') ? 'page' : 'widget';
   config.userTz = detectUserTimezone();
+  // Default theme by surface when not explicitly authored:
+  // widget → dark (overlaid drawer sits on any host page background)
+  // page   → light (full-page layout; dark tokens cascade into all rendered content)
+  if (!config.theme) {
+    config.theme = config.surface === 'page' ? 'light' : 'dark';
+  }
   return config;
 }
 

@@ -2,12 +2,13 @@ import { html, useState, useEffect, useRef } from '../../../deps/htm-preact.js';
 import { useSessionGuide } from '../store/index.js';
 import { DateTabs } from './DateTabs.js';
 import { ViewDropdown } from './ViewDropdown.js';
+import { DownloadButton } from './DownloadButton.js';
 
 export function DrawerHeader({ onClose, onFilterToggle, filterOpen, hideClose }) {
   const { state, dispatch } = useSessionGuide();
   const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
   const mobileSearchRef = useRef(null);
-  const { activeFilters } = state;
+  const { activeFilters, activeView } = state;
   const title = state.eventConfig.title || "See what's happening at MAX";
 
   const activeFilterCount = Object.values(activeFilters).reduce(
@@ -54,6 +55,7 @@ export function DrawerHeader({ onClose, onFilterToggle, filterOpen, hideClose })
       <div class=${`sg-header-controls${mobileSearchOpen ? ' sg-header-controls--search-active' : ''}`}>
         <${DateTabs} />
         <div class="sg-right-controls">
+          ${activeView === 'my-sessions' && html`<${DownloadButton} />`}
           <${ViewDropdown} />
           <div class="sg-filter-wrap">
             <button

@@ -3,7 +3,6 @@ import { useSessionGuide } from '../store/index.js';
 import { RegistrationPrompt } from './RegistrationPrompt.js';
 import { TimeSlotRow } from './TimeSlotRow.js';
 import { SessionCard } from './SessionCard.js';
-import { DownloadButton } from './DownloadButton.js';
 import {
   groupByStartTime, onDemandSessions, filterSessions,
 } from '../utils/session-filters.js';
@@ -14,7 +13,7 @@ export const buildMySessionsView = () => MySessionsView;
 
 export function MySessionsView() {
   const { state, dispatch } = useSessionGuide();
-  const { isRegistered, sessions, scheduled, mySessionsTab, userFirstName } = state;
+  const { isRegistered, sessions, scheduled, mySessionsTab } = state;
   const liveStreamActiveIds = state.liveStreamActiveIds || new Set();
   const activeFilters = state.activeFilters || {};
   const searchQuery = state.searchQuery || '';
@@ -40,10 +39,6 @@ export function MySessionsView() {
 
   return html`
     <div class="sg-view sg-view--my-sessions">
-      <div class="sg-my-sessions-header">
-        ${userFirstName && html`<p class="sg-my-sessions-greeting">Hi, ${userFirstName}</p>`}
-        <${DownloadButton} />
-      </div>
       <div class="sg-my-sessions-tab-bar">
         <button
           class=${'sg-my-sessions-tab' + (mySessionsTab === 'upcoming' ? ' sg-my-sessions-tab--active' : '')}
