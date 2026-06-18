@@ -48,7 +48,8 @@
 .sg-backdrop {
   position: fixed;
   inset: 0;
-  background: rgb(0 0 0 / 50%);
+  background: rgb(255 255 255 / 10%);
+  backdrop-filter: blur(12px);
   z-index: 49;
   transition: opacity 0.35s ease;
 }
