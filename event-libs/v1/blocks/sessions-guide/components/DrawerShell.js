@@ -215,6 +215,7 @@ export function DrawerShell() {
           onClose=${closeDrawer}
           onFilterToggle=${handleFilterToggle}
           filterOpen=${filterOpen}
+          hideControls=${hasDetail}
         />
         <div class="sg-drawer__body">
           <div class=${`sg-body-scroll${isExpanded ? ' sg-body-scroll--scrollable' : ''}`}>

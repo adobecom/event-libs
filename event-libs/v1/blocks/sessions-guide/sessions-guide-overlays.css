@@ -346,10 +346,34 @@
 /* Mobile-first: flat white layout (Figma 9145:48433). Tablet/desktop card
    layout (Figma 9145:48558) lives in the min-width:768px block below. */
 .sg-detail__body {
+  display: flex;
+  flex-direction: column;
+}
+
+/* Back button wrapper — mobile: sticky at top, desktop: left column */
+.sg-detail__back-wrap {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  padding: var(--s2a-spacing-md) var(--s2a-spacing-lg);
+  background: var(--s2a-color-background-default);
+  border-bottom: 1px solid var(--s2a-color-border-subtle);
+  flex-shrink: 0;
+}
+
+/* Column containers — stacked on mobile */
+.sg-detail__cols {
   padding: var(--s2a-spacing-lg);
   display: flex;
   flex-direction: column;
   gap: var(--s2a-spacing-3xl);
+  flex: 1;
+}
+
+.sg-detail__col {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s2a-spacing-lg);
 }
 
 .sg-detail__group {
@@ -761,14 +785,49 @@
 /* ── Tablet & desktop (Figma 9145:48558) ─────────────────── */
 
 @media (min-width: 768px) {
-  .sg-detail__header {
+  .sg-detail__body {
+    display: flex;
+    flex-direction: row;
+    align-items: flex-start;
+    padding: var(--s2a-spacing-lg);
+    gap: var(--s2a-spacing-sm);
     background: var(--s2a-color-background-subtle);
   }
 
-  .sg-detail__body {
-    padding: 0 var(--s2a-spacing-lg) var(--s2a-spacing-lg);
+  .sg-detail__back-wrap {
+    width: 60px;
+    flex-shrink: 0;
+    position: sticky;
+    top: var(--s2a-spacing-lg);
+    align-self: flex-start;
+    padding: 0;
+    background: transparent;
+    border-bottom: none;
+    z-index: auto;
+  }
+
+  .sg-detail__cols {
+    padding: 0;
+    flex: 1;
+    min-width: 0;
+    flex-direction: row;
     gap: var(--s2a-spacing-xs);
-    background: var(--s2a-color-background-subtle);
+    align-items: flex-start;
+  }
+
+  .sg-detail__col--main {
+    flex: 1;
+    min-width: 0;
+    gap: var(--s2a-spacing-xs);
+  }
+
+  .sg-detail__col--side {
+    width: 383px;
+    flex-shrink: 0;
+    position: sticky;
+    top: var(--s2a-spacing-lg);
+    align-self: flex-start;
+    gap: 0;
   }
 
   .sg-detail__group {
@@ -802,9 +861,9 @@
   }
 
   .sg-detail__speakers {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: var(--s2a-spacing-lg);
+    display: flex;
+    flex-direction: column;
+    gap: var(--s2a-spacing-md);
   }
 
   .sg-detail__products {
