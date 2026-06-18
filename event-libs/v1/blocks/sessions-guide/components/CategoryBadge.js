@@ -103,13 +103,14 @@ const BADGE_MAP = {
   },
 };
 
-export function CategoryBadge({ category }) {
+export function CategoryBadge({ category, size }) {
   if (!category) return null;
   const key = category.toLowerCase().replace(/[\s_]+/g, '-').replace(/[^a-z0-9-]/g, '');
   const config = BADGE_MAP[key];
   if (!config) return null;
+  const cls = size === 'sm' ? 'sg-category-badge sg-category-badge--sm' : 'sg-category-badge';
   return html`
-    <span class="sg-category-badge">
+    <span class=${cls}>
       ${config.renderIcon()}
       <span class="sg-category-badge__label">${config.label}</span>
     </span>

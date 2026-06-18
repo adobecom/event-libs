@@ -143,7 +143,7 @@ export function reducer(state, action) {
         toast: {
           id: Date.now(),
           message: action.message,
-          variant: action.variant || 'default',
+          variant: action.variant || 'neutral',
           ctaLabel: action.ctaLabel || null,
           ctaAction: action.ctaAction || null,
           ctaHref: action.ctaHref || null,

@@ -98,21 +98,21 @@ describe('SessionCard', () => {
 
   it('shows schedule button for upcoming session', () => {
     const html = renderCard(UPCOMING_SESSION);
-    expect(html).to.include('sg-card__btn--schedule');
+    expect(html).to.include('Add to schedule');
   });
 
   it('shows on-demand label and hides schedule button for on-demand session', () => {
     const html = renderCard(ONDEMAND_SESSION);
     expect(html).to.include('On demand');
-    expect(html).to.not.include('sg-card__btn--schedule');
+    expect(html).to.not.include('Add to schedule');
     expect(html).to.include('sg-card--on-demand');
   });
 
   it('always shows favorite button', () => {
     const upcoming = renderCard(UPCOMING_SESSION);
     const onDemand = renderCard(ONDEMAND_SESSION);
-    expect(upcoming).to.include('sg-card__btn--favorite');
-    expect(onDemand).to.include('sg-card__btn--favorite');
+    expect(upcoming).to.include('Add to favorites');
+    expect(onDemand).to.include('Add to favorites');
   });
 
   it('shows aria-pressed=true on schedule button when scheduled', () => {
@@ -135,7 +135,7 @@ describe('SessionCard', () => {
     const SessionCard = buildSessionCard(preact, store);
     const rendered = SessionCard({ session: UPCOMING_SESSION });
     // Extract onclick from rendered HTML is not straightforward; test dispatch guard instead
-    expect(rendered).to.include('sg-card__btn--schedule');
+    expect(rendered).to.include('Add to schedule');
   });
 
   it('does not dispatch when isRegistered is not true (no-op guard)', () => {

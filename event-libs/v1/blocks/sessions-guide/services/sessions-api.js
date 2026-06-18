@@ -59,7 +59,7 @@ const MOCK_SESSIONS = [
   },
   {
     id: 's-003', slug: 'premiere-pro-speed', rfCode: 'S003',
-    title: 'Premiere Pro: Edit at the Speed of Thought',
+    title: 'Premiere Pro: Edit Faster',
     description: 'From rough cut to final delivery in record time. This session covers the newest AI-assisted editing tools in Premiere Pro: Speech to Text transcription, auto-reframe, and scene detection.',
     startTimeUtc: '2026-11-10T21:30:00.000Z', endTimeUtc: '2026-11-10T22:30:00.000Z', duration: 60,
     track: 'Video', type: 'Breakout', technicalLevel: 'Intermediate',
@@ -74,7 +74,7 @@ const MOCK_SESSIONS = [
   },
   {
     id: 's-003b', slug: 'lightroom-color-science', rfCode: 'S003B',
-    title: 'Color Science in Lightroom: Profiles, Curves & HSL',
+    title: 'Color Science in Lightroom: Profiles, Curves & HSL Adjustments for Photographers',
     description: 'Go beyond presets. Learn to read histograms, use tone curves to shape light, and deploy HSL masking for selective hue shifts that hold up in any output medium.',
     startTimeUtc: '2026-11-10T21:30:00.000Z', endTimeUtc: '2026-11-10T22:30:00.000Z', duration: 60,
     track: 'Photography', type: 'Breakout', technicalLevel: 'Intermediate',
@@ -235,7 +235,7 @@ const MOCK_SESSIONS = [
   },
   {
     id: 's-008', slug: 'hands-on-3d-workshop', rfCode: 'S008',
-    title: 'Hands-On: Sculpting in Substance Modeler',
+    title: 'Hands-On: Sculpting in Substance Modeler and Substance Painter',
     description: 'A convention-floor in-person workshop. Bring your VR headset or use one of our demo stations to sculpt organic forms in Substance Modeler using pressure-sensitive sculpting tools.',
     startTimeUtc: '2026-11-10T16:00:00.000Z', endTimeUtc: '2026-11-10T17:30:00.000Z', duration: 90,
     track: '3D & AR', type: 'Workshop', technicalLevel: 'Intermediate',

@@ -56,7 +56,7 @@ export function SessionDetailOverlay({ onBack }) {
         await navigator.share({ title: session.title, url: shareUrl });
       } else if (navigator.clipboard?.writeText) {
         await navigator.clipboard.writeText(shareUrl);
-        dispatch({ type: 'SHOW_TOAST', message: 'Link copied', variant: 'success' });
+        dispatch({ type: 'SHOW_TOAST', message: 'Link copied', variant: 'positive' });
       }
     } catch (err) {
       // Swallow the user-cancelled share dialog; log anything else.

@@ -59,7 +59,7 @@ export async function scheduleAction(session, state, dispatch) {
       // TODO: replace null credentials with real rfAuthToken/clientId from auth integration
       await removeSession(session.rfCode, null, null, rfApiProfileId, rfApiUrl);
       dispatch({ type: 'SCHEDULE_REMOVE', sessionId: session.id });
-      dispatch({ type: 'SHOW_TOAST', message: 'Removed from schedule', variant: 'default' });
+      dispatch({ type: 'SHOW_TOAST', message: 'Removed from schedule', variant: 'neutral' });
     } else {
       if (showConflictModal) {
         const conflict = findScheduleConflict(session, sessions, scheduled);
@@ -76,7 +76,7 @@ export async function scheduleAction(session, state, dispatch) {
                   await addSession(session.rfCode, null, null, rfApiProfileId, rfApiUrl);
                   dispatch({ type: 'SCHEDULE_ADD', sessionId: session.id });
                 }
-                dispatch({ type: 'SHOW_TOAST', message: 'Schedule updated', variant: 'success' });
+                dispatch({ type: 'SHOW_TOAST', message: 'Schedule updated', variant: 'positive' });
               },
             },
           });
@@ -86,11 +86,11 @@ export async function scheduleAction(session, state, dispatch) {
       }
       await addSession(session.rfCode, null, null, rfApiProfileId, rfApiUrl);
       dispatch({ type: 'SCHEDULE_ADD', sessionId: session.id });
-      dispatch({ type: 'SHOW_TOAST', message: 'Added to schedule', variant: 'success' });
+      dispatch({ type: 'SHOW_TOAST', message: 'Added to schedule', variant: 'positive' });
     }
   } catch (err) {
     window.lana?.log(`[sessions-guide] schedule action failed: ${err.message}`);
-    dispatch({ type: 'SHOW_TOAST', message: 'Something went wrong. Please try again.', variant: 'error' });
+    dispatch({ type: 'SHOW_TOAST', message: 'Something went wrong. Please try again.', variant: 'negative' });
   } finally {
     dispatch({ type: 'SET_PENDING', sessionId: session.id, pending: false });
   }
@@ -113,11 +113,11 @@ export async function favoriteAction(session, state, dispatch) {
     dispatch({
       type: 'SHOW_TOAST',
       message: isFavorited ? 'Removed from favorites' : 'Added to favorites',
-      variant: isFavorited ? 'default' : 'success',
+      variant: isFavorited ? 'neutral' : 'positive',
     });
   } catch (err) {
     window.lana?.log(`[sessions-guide] favorite action failed: ${err.message}`);
-    dispatch({ type: 'SHOW_TOAST', message: 'Something went wrong. Please try again.', variant: 'error' });
+    dispatch({ type: 'SHOW_TOAST', message: 'Something went wrong. Please try again.', variant: 'negative' });
   } finally {
     dispatch({ type: 'SET_PENDING', sessionId: session.id, pending: false });
   }
