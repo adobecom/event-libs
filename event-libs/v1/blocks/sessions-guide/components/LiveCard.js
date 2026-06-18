@@ -23,7 +23,7 @@ export function buildLiveCard(preact, store) {
     const pendingActions = state.pendingActions || new Set();
     const sessions = state.sessions || [];
     const {
-      userTz, trackColors, trackIcons, rfApiProfileId, rfApiUrl, showConflictModal, surface,
+      userTz, trackColors, rfApiProfileId, rfApiUrl, showConflictModal, surface,
     } = eventConfig;
 
     const isScheduled = scheduled.has(session.id);
@@ -38,8 +38,6 @@ export function buildLiveCard(preact, store) {
     const durationLabel = duration >= 0 ? formatDuration(duration) : '';
 
     const trackColor = (trackColors && trackColors[session.track]) || '';
-    // eslint-disable-next-line no-unused-vars
-    const trackIcon = (trackIcons && trackIcons[session.track]) || '';
     const startTime = formatShortTime(session.startTimeUtc, userTz);
     const endTime = session.endTimeUtc ? formatShortTime(session.endTimeUtc, userTz) : '';
     const timeRange = endTime ? `${startTime} – ${endTime}` : startTime;

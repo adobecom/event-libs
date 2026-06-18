@@ -634,8 +634,5 @@ function normalizeSessions(rawSessions) {
 // TODO: replace with real API call when endpoint is ready
 // eslint-disable-next-line no-unused-vars
 export async function fetchSessions(apiUrl) {
-  const sessions = normalizeSessions(MOCK_SESSIONS);
-  // eslint-disable-next-line no-console
-  console.log('[sessions-guide] fetchSessions ->', sessions);
-  return sessions;
+  return normalizeSessions(MOCK_SESSIONS);
 }

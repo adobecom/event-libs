@@ -94,14 +94,14 @@ describe('session-filters/liveSessions', () => {
 
 describe('session-filters/upcomingSessions', () => {
   it('returns sessions starting in the future for the active day', () => {
-    const result = upcomingSessions([LIVE, UPCOMING, PAST], UPCOMING_DAY, TZ, NOW);
+    const result = upcomingSessions([LIVE, UPCOMING, PAST], new Set(), UPCOMING_DAY, TZ, NOW);
     expect(result.map((s) => s.id)).to.deep.equal(['upcoming']);
   });
 });
 
 describe('session-filters/onDemandSessions', () => {
   it('returns sessions that have ended', () => {
-    const result = onDemandSessions([LIVE, UPCOMING, PAST], NOW);
+    const result = onDemandSessions([LIVE, UPCOMING, PAST], new Set(), NOW);
     expect(result.map((s) => s.id)).to.deep.equal(['past']);
   });
 });

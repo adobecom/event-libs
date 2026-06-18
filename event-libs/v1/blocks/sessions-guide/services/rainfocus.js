@@ -1,6 +1,7 @@
 // TODO: implement real Rainfocus API calls when integration is ready.
 // Credentials required: rfAuthToken (from FEDS), clientId (IMS userId),
 // rfApiProfileId and rfApiUrl (from eventConfig).
+/* eslint-disable no-unused-vars */
 
 export async function fetchScheduled(rfAuthToken, clientId, rfApiProfileId, rfApiUrl) {
   return ['session-1', 'session-3'];

@@ -21,6 +21,7 @@ async function tick(mrSessions, env) {
 }
 
 export function startPolling(mrSessions, env, intervalMs = 30_000) {
+  stopPolling();
   if (!mrSessions.length) return null;
   tick(mrSessions, env);
   _timerId = setInterval(() => tick(mrSessions, env), intervalMs);

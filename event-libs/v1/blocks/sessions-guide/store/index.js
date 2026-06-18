@@ -187,8 +187,9 @@ export function buildStore(preact) {
   function SessionGuideProvider({ eventConfig, initialSessions = [], children }) {
     const [state, dispatch] = useReducer(reducer, buildInitialState(eventConfig, initialSessions));
 
-    // Effect 1: fetch sessions on mount
+    // Effect 1: fetch sessions on mount (skipped when initialSessions already populated)
     useEffect(() => {
+      if (initialSessions.length > 0) return;
       const apiUrl = eventConfig && eventConfig.rfApiUrl;
       fetchSessions(apiUrl)
         .then((sessions) => {
@@ -212,8 +213,9 @@ export function buildStore(preact) {
       };
     }, [state.sessionsStatus]);
 
-    // Stub compatibility: set _current before resolving children so useContext
-    // returns state even when h() calls components eagerly (test/demo stub).
+    // App is invoked directly (not through Preact's reconciler), so real Preact's
+    // context propagation doesn't apply. Setting _current here is the only way
+    // useContext(SessionGuideContext) works inside that direct call.
     SessionGuideContext._current = { state, dispatch };
     const resolved = typeof children === 'function' ? children() : children;
     return preact.h(SessionGuideContext.Provider, { value: { state, dispatch } }, resolved);

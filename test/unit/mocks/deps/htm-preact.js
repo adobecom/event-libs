@@ -47,7 +47,8 @@ export function createContext(defaultValue) {
   const ctx = { defaultValue, _current: defaultValue };
   ctx.Provider = ({ value, children }) => {
     ctx._current = value !== undefined ? value : defaultValue;
-    return children ?? null;
+    const resolved = typeof children === 'function' ? children() : children;
+    return resolved ?? null;
   };
   return ctx;
 }

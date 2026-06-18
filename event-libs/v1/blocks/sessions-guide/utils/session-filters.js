@@ -28,44 +28,26 @@ export function groupByTrack(sessions) {
 // Live Now section: MR sessions use poll status; non-MR sessions use time window.
 export function liveSessions(sessions, liveStreamActiveIds, activeDay, userTz, nowMs) {
   return sessions.filter((s) => {
-    if (!getSessionDayKey(s, userTz) === activeDay) return false;
+    if (getSessionDayKey(s, userTz) !== activeDay) return false;
     if (s.mrStreamId) return isInLiveNow(s, liveStreamActiveIds, nowMs);
-    return isSessionLive(s, nowMs) && getSessionDayKey(s, userTz) === activeDay;
+    return isSessionLive(s, nowMs);
   });
 }
 
 // Upcoming sessions: MR sessions use poll status; non-MR use time window.
 export function upcomingSessions(sessions, liveStreamActiveIds, activeDay, userTz, nowMs) {
-  // Support old 4-arg call signature: (sessions, activeDay, userTz, nowMs)
-  let activeIds = liveStreamActiveIds;
-  let day = activeDay;
-  let tz = userTz;
-  let now = nowMs;
-  if (!(liveStreamActiveIds instanceof Set)) {
-    activeIds = new Set();
-    day = liveStreamActiveIds;
-    tz = activeDay;
-    now = userTz;
-  }
   return sessions.filter((s) => {
-    if (getSessionDayKey(s, tz) !== day) return false;
-    if (s.mrStreamId) return deriveSessionState(s, activeIds, now) === 'upcoming';
-    return isSessionUpcoming(s, now);
+    if (getSessionDayKey(s, userTz) !== activeDay) return false;
+    if (s.mrStreamId) return deriveSessionState(s, liveStreamActiveIds, nowMs) === 'upcoming';
+    return isSessionUpcoming(s, nowMs);
   });
 }
 
 // On-demand sessions: MR sessions use poll status; non-MR use time window.
 export function onDemandSessions(sessions, liveStreamActiveIds, nowMs) {
-  // Support old 2-arg call signature: (sessions, nowMs)
-  let activeIds = liveStreamActiveIds;
-  let now = nowMs;
-  if (!(liveStreamActiveIds instanceof Set)) {
-    activeIds = new Set();
-    now = liveStreamActiveIds;
-  }
   return sessions.filter((s) => {
-    if (s.mrStreamId) return deriveSessionState(s, activeIds, now) === 'on-demand';
-    return !isSessionLive(s, now) && !isSessionUpcoming(s, now);
+    if (s.mrStreamId) return deriveSessionState(s, liveStreamActiveIds, nowMs) === 'on-demand';
+    return !isSessionLive(s, nowMs) && !isSessionUpcoming(s, nowMs);
   });
 }
 
