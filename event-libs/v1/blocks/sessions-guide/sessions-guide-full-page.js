@@ -25,7 +25,7 @@ function parseConfig(el) {
     trackIcons: {},
     trackColors: {},
     manualOnDemandTransitionTime: null,
-    theme: 'dark',
+    theme: 'light',
     mrEnv: 'dev',
     surface: 'page', // always page for this block
   };
