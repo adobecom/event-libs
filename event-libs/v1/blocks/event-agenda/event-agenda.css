@@ -266,6 +266,37 @@
 
 }
 
+/* ── Three-RTE layout ─────────────────────────────────────────────────────── */
+/* Mobile: stack all three RTE columns vertically (graceful degradation) */
+.event-agenda.three-rte .agenda-item-container {
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+}
+
+.event-agenda.three-rte .agenda-item-container .column {
+  flex: 1 1 100%;
+  min-width: 0;
+}
+
+/* Desktop: render exactly 3 equal-width RTE columns side-by-side */
+@media (min-width: 900px) {
+  .event-agenda.three-rte .agenda-container {
+    max-width: 1400px;
+  }
+
+  .event-agenda.three-rte .agenda-item-container {
+    flex-direction: row;
+    align-items: flex-start;
+    column-gap: 32px;
+  }
+
+  .event-agenda.three-rte .agenda-item-container .column {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+}
+
 @media (min-width: 1440px) {
   .event-agenda .agenda-items-with-image {
     padding-left: calc((100% - var(--grid-container-width)) / 2)

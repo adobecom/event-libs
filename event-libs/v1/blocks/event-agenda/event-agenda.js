@@ -1,5 +1,62 @@
 import { createOptimizedPicture, createTag, getMetadata, getEventConfig, getImageSource } from '../../utils/utils.js';
 
+/**
+ * The three valid RTE (Room/Track/Experience) identifiers for the EMCv2 agenda.
+ * Exactly 3 RTEs are supported. Any session assigned to an identifier outside
+ * this set is considered invalid and will be rejected by validateRteId().
+ */
+export const RTE_IDS = ['rte-1', 'rte-2', 'rte-3'];
+
+/**
+ * Validates that a session's rteId is one of the three defined RTEs.
+ * @param {string} rteId - The RTE identifier to validate.
+ * @returns {boolean} true if valid, false otherwise.
+ */
+export function validateRteId(rteId) {
+  return RTE_IDS.includes(rteId);
+}
+
+/**
+ * Detects time-slot overlaps within each RTE.
+ * Two sessions overlap when one starts before the other ends (and both share the same rteId).
+ * Sessions without an rteId are ignored by this check.
+ *
+ * @param {Array<{rteId?: string, startTime?: string, endTime?: string}>} sessions
+ * @returns {Array<{rteId: string, a: object, b: object}>} Array of overlap descriptors.
+ */
+export function detectOverlaps(sessions) {
+  const byRte = {};
+  sessions.forEach((s) => {
+    if (!s.rteId) return;
+    if (!byRte[s.rteId]) byRte[s.rteId] = [];
+    byRte[s.rteId].push(s);
+  });
+
+  const toMinutes = (t) => {
+    if (!t) return null;
+    const parts = t.split(':').map(Number);
+    return parts[0] * 60 + (parts[1] || 0);
+  };
+
+  const overlaps = [];
+  Object.entries(byRte).forEach(([rteId, rteSessions]) => {
+    for (let i = 0; i < rteSessions.length; i++) {
+      for (let j = i + 1; j < rteSessions.length; j++) {
+        const a = rteSessions[i];
+        const b = rteSessions[j];
+        const aStart = toMinutes(a.startTime);
+        const aEnd = toMinutes(a.endTime) ?? aStart;
+        const bStart = toMinutes(b.startTime);
+        const bEnd = toMinutes(b.endTime) ?? bStart;
+        if (aStart !== null && bStart !== null && aStart < bEnd && bStart < aEnd) {
+          overlaps.push({ rteId, a, b });
+        }
+      }
+    }
+  });
+  return overlaps;
+}
+
 const TIME_FORMAT_OPTIONS = {
   hour: 'numeric',
   minute: 'numeric',
@@ -185,16 +242,32 @@ export default async function init(el) {
 
   const isCollapsible = el.classList.contains('collapsible');
   const isSingleCol = el.classList.contains('single-col');
+  const isThreeRte = el.classList.contains('three-rte');
 
-  // Use two columns if no venue image and more than 6 items
-  let column2 = column1;
-  if (!venueImage && agendaArray.length > 6 && (!isSingleCol || !isCollapsible)) {
-    column2 = createTag('div', { class: 'column' }, '', { parent: agendaItemContainer });
+  // Determine column layout:
+  //   three-rte class  → 3 columns (RTE_IDS: rte-1, rte-2, rte-3)
+  //   >6 items, no image, not single-col/collapsible → 2 columns (legacy)
+  //   otherwise → 1 column
+  let columns;
+  if (isThreeRte && !venueImage) {
+    const column2 = createTag('div', { class: 'column' }, '', { parent: agendaItemContainer });
+    const column3 = createTag('div', { class: 'column' }, '', { parent: agendaItemContainer });
+    columns = [column1, column2, column3];
+  } else {
+    let column2 = column1;
+    if (!venueImage && agendaArray.length > 6 && (!isSingleCol || !isCollapsible)) {
+      column2 = createTag('div', { class: 'column' }, '', { parent: agendaItemContainer });
+    }
+    columns = [column1, column2];
   }
-  
-  const splitIndex = Math.ceil(agendaArray.length / 2);
+
+  const numColumns = isThreeRte && !venueImage ? 3 : columns.filter((c, i, a) => a.indexOf(c) === i).length;
+  const splitSize = Math.ceil(agendaArray.length / numColumns);
+
   agendaArray.forEach((agenda, index) => {
-    const agendaListItem = createTag('div', { class: 'agenda-list-item' }, '', { parent: (index >= splitIndex ? column2 : column1) });
+    const colIndex = Math.min(Math.floor(index / splitSize), numColumns - 1);
+    const targetColumn = columns[colIndex];
+    const agendaListItem = createTag('div', { class: 'agenda-list-item' }, '', { parent: targetColumn });
 
     const formattedTime = formatTimeRange(agenda, eventTimezone, eventStartMillis, localeString);
     createTag('span', { class: 'agenda-time' }, formattedTime, { parent: agendaListItem });
