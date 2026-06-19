@@ -598,6 +598,7 @@
 .sessions-hub .sh-session-area {
   max-width: 1200px;
   margin: 0 auto;
+  padding: 0 24px;
 }
 
 .sessions-hub .sh-no-results {
@@ -617,7 +618,7 @@
   display: flex;
   flex-direction: column;
   gap: 32px;
-  padding: 24px 24px 100px;
+  padding: 24px 0 100px;
 }
 
 /* ─── Session card ───────────────────────────────────────────────────────── */
@@ -1174,6 +1175,10 @@
 
   .sessions-hub .sh-toolbar-inner {
     padding: 16px 32px;
+  }
+
+  .sessions-hub .sh-session-area {
+    padding: 0 32px;
   }
 
 
