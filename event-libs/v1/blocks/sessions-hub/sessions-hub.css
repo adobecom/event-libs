@@ -835,6 +835,7 @@
   line-height: 1.5;
   color: black;
   overflow: hidden;
+  max-height: calc(8 * 1.5em);
   line-clamp: 8;
   /* stylelint-disable-next-line value-no-vendor-prefix -- Safari needs -webkit-box for line clamp */
   display: -webkit-box;
@@ -844,6 +845,7 @@
 
 .sessions-hub .sh-card.expanded .sh-card-desh-text {
   display: block;
+  max-height: none;
   line-clamp: unset;
   -webkit-line-clamp: unset;
   overflow: visible;
@@ -1130,6 +1132,7 @@
   .sessions-hub .sh-card-desh-text {
     -webkit-line-clamp: 4;
     line-clamp: 4;
+    max-height: calc(4 * 1.5em);
   }
 
   .sessions-hub .sh-card {
@@ -1172,6 +1175,7 @@
   .sessions-hub .sh-toolbar-inner {
     padding: 16px 32px;
   }
+
 
   .sessions-hub .sh-card {
     grid-template-columns: 340px 1fr;
