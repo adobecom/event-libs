@@ -1145,6 +1145,21 @@
   .sessions-hub .sh-filter-btn-label {
     display: none;
   }
+
+  .sessions-hub .sh-toolbar-actions:has(.sh-view-dropdown[hidden]) .sh-filter-wrap {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .sessions-hub .sh-toolbar-actions:has(.sh-view-dropdown[hidden]) .sh-filter-btn {
+    width: 100%;
+    padding: 0 16px;
+    border-radius: 20px;
+  }
+
+  .sessions-hub .sh-toolbar-actions:has(.sh-view-dropdown[hidden]) .sh-filter-btn-label {
+    display: inline;
+  }
 }
 
 /* ─── Desktop (≥ 900px) ──────────────────────────────────────────────────── */
