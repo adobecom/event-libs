@@ -1,6 +1,14 @@
 // Adobe MAX 2026 — November 10–12, Los Angeles (PST = UTC−8)
 export const MOCK_EVENT_DAYS = ['2026-11-10', '2026-11-11', '2026-11-12'];
 
+// Featured session IDs surfaced in the live carousel when nothing is currently live.
+// Covers all three days so the right ones are shown per active day.
+export const MOCK_FEATURED_IDS = [
+  'k-001', 's-007', 's-001',    // Day 1: opening keynote, design systems, AI workflows
+  's-009', 's-010', 's-022',    // Day 2: trends keynote, Express for teams, AE expressions
+  's-012', 's-030', 's-013',    // Day 3: closing keynote, design tokens, motion graphics
+];
+
 const MOCK_SESSIONS = [
   // ─── DAY 1 (NOV 10) ──────────────────────────────────────────────────────
   {

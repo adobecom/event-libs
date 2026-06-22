@@ -3,7 +3,7 @@ import { useSessionGuide } from '../store/index.js';
 import { Carousel } from './Carousel.js';
 import { TimeSlotRow } from './TimeSlotRow.js';
 import {
-  liveSessions, upcomingSessions, groupByStartTime, filterSessions,
+  liveSessions, upcomingSessions, groupByStartTime, filterSessions, getFeaturedSessions,
 } from '../utils/session-filters.js';
 import { getNowMs, formatShortTime } from '../utils/time.js';
 
@@ -15,12 +15,17 @@ export function LiveUpcomingView() {
   const liveStreamActiveIds = state.liveStreamActiveIds || new Set();
   const activeFilters = state.activeFilters || {};
   const searchQuery = state.searchQuery || '';
-  const { userTz } = eventConfig;
+  const { userTz, featuredSessionIds } = eventConfig;
   const nowMs = getNowMs();
 
   // Live section shows regardless of active filters
   const live = liveSessions(sessions, liveStreamActiveIds, activeDay, userTz, nowMs)
     .sort((a, b) => (a.startTimeUtc < b.startTimeUtc ? -1 : 1));
+
+  // Featured sessions fill the live carousel when nothing is currently live
+  const featured = live.length === 0
+    ? getFeaturedSessions(sessions, featuredSessionIds || [], activeDay, userTz)
+    : [];
 
   // Upcoming sessions have filters + search applied
   const upcomingRaw = upcomingSessions(sessions, liveStreamActiveIds, activeDay, userTz, nowMs);
@@ -38,10 +43,19 @@ export function LiveUpcomingView() {
           />
         </div>
       `}
+      ${featured.length > 0 && html`
+        <div class="sg-live-section sg-live-section--featured">
+          <${Carousel}
+            sessions=${featured}
+            title="Featured"
+            formatTime=${(s) => formatShortTime(s.startTimeUtc, userTz)}
+          />
+        </div>
+      `}
       <div class="sg-upcoming-section">
         ${timeSlots.length > 0 && html`<h3 class="sg-upcoming-title">Upcoming</h3>`}
         ${timeSlots.map((slot) => html`<${TimeSlotRow} sessions=${slot} />`)}
-        ${timeSlots.length === 0 && !live.length && html`
+        ${timeSlots.length === 0 && !live.length && !featured.length && html`
           <div class="sg-empty">No sessions scheduled for this day.</div>
         `}
       </div>

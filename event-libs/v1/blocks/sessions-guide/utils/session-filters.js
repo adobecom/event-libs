@@ -52,6 +52,33 @@ export function onDemandSessions(sessions, liveStreamActiveIds, nowMs) {
 }
 
 /**
+ * Featured sessions for the active day, shown in the live carousel when nothing is live.
+ * When featuredIds is non-empty, maps them to sessions on the active day (max 3).
+ * Falls back to a deterministic random selection of up to 3 day sessions when no ids configured.
+ */
+export function getFeaturedSessions(sessions, featuredIds, activeDay, userTz) {
+  const daySessions = sessionsForDay(sessions, activeDay, userTz);
+
+  if (featuredIds && featuredIds.length > 0) {
+    const idSet = new Set(featuredIds);
+    return daySessions.filter((s) => idSet.has(s.id)).slice(0, 3);
+  }
+
+  return deterministicShuffle(daySessions, activeDay).slice(0, 3);
+}
+
+function deterministicShuffle(arr, seed) {
+  const result = [...arr];
+  let s = [...seed].reduce((acc, c) => acc + c.charCodeAt(0), 0);
+  for (let i = result.length - 1; i > 0; i--) {
+    s = Math.abs(Math.sin(s + i) * 10000);
+    const j = Math.floor(s) % (i + 1);
+    [result[i], result[j]] = [result[j], result[i]];
+  }
+  return result;
+}
+
+/**
  * Apply activeFilters + searchQuery to a session list.
  * activeFilters: { [categoryId]: Set<string> }
  * Returns a new array; does not mutate input.

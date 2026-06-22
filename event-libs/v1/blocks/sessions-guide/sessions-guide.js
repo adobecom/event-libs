@@ -2,7 +2,7 @@ import { h, render } from '../../deps/htm-preact.js';
 import { detectUserTimezone } from './utils/time.js';
 import { SessionGuideProvider } from './store/index.js';
 import { App } from './components/App.js';
-import { fetchSessions } from './services/sessions-api.js';
+import { fetchSessions, MOCK_FEATURED_IDS } from './services/sessions-api.js';
 import { setupDevUser, seedDevStorage } from './services/dev-mock.js';
 
 // Default filter categories — override via block authoring table (filter-categories: JSON)
@@ -23,6 +23,7 @@ function parseConfig(el) {
     trackIcons: {},
     trackColors: {},
     manualOnDemandTransitionTime: null,
+    featuredSessionIds: [],
     theme: null,
     mrEnv: 'dev',
   };
@@ -55,6 +56,11 @@ function parseConfig(el) {
           window.lana?.log('[sessions-guide] invalid track-colors JSON');
         }
         break;
+      case 'featured-sessions':
+        try { config.featuredSessionIds = JSON.parse(val); } catch {
+          window.lana?.log('[sessions-guide] invalid featured-sessions JSON');
+        }
+        break;
       default: break;
     }
   });
@@ -75,6 +81,10 @@ export default async function init(el) {
   seedDevStorage();
 
   const eventConfig = parseConfig(el);
+  // TODO: remove once featured-sessions is authored via block config
+  if (!eventConfig.featuredSessionIds.length) {
+    eventConfig.featuredSessionIds = MOCK_FEATURED_IDS;
+  }
   const initialSessions = await fetchSessions(eventConfig.rfApiUrl).catch(() => []);
 
   el.innerHTML = '';
