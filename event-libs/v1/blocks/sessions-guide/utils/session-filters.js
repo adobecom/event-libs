@@ -12,7 +12,7 @@ export function groupByStartTime(sessions) {
     if (!map.has(key)) map.set(key, []);
     map.get(key).push(s);
   }
-  return [...map.values()];
+  return [...map.entries()].sort(([a], [b]) => (a < b ? -1 : 1)).map(([, v]) => v);
 }
 
 export function groupByTrack(sessions) {

@@ -27,12 +27,12 @@ const BASE_CONFIG = {
   filterCategories: [], mrEnv: 'dev', theme: 'dark', manualOnDemandTransitionTime: null,
 };
 
-function makeStore({ isRegistered = true, isLoggedIn = true, sessions = [], scheduled = new Set(), mySessionsTab = 'upcoming' } = {}) {
+function makeStore({ isRegistered = true, isLoggedIn = true, sessions = [], scheduled = new Set(), mySessionsTab = 'upcoming', activeDay = new Intl.DateTimeFormat('en-CA', { timeZone: BASE_CONFIG.userTz }).format(new Date()) } = {}) {
   const store = buildStore(preact);
   store.SessionGuideContext._current = {
     state: {
       isRegistered, isLoggedIn, sessions, scheduled, favorited: new Set(),
-      mySessionsTab, eventConfig: { ...BASE_CONFIG },
+      mySessionsTab, activeDay, eventConfig: { ...BASE_CONFIG },
     },
     dispatch: () => {},
   };

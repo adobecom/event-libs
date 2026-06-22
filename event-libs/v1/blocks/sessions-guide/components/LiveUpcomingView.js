@@ -19,7 +19,8 @@ export function LiveUpcomingView() {
   const nowMs = getNowMs();
 
   // Live section shows regardless of active filters
-  const live = liveSessions(sessions, liveStreamActiveIds, activeDay, userTz, nowMs);
+  const live = liveSessions(sessions, liveStreamActiveIds, activeDay, userTz, nowMs)
+    .sort((a, b) => (a.startTimeUtc < b.startTimeUtc ? -1 : 1));
 
   // Upcoming sessions have filters + search applied
   const upcomingRaw = upcomingSessions(sessions, liveStreamActiveIds, activeDay, userTz, nowMs);

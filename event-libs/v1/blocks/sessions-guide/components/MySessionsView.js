@@ -4,7 +4,7 @@ import { RegistrationPrompt } from './RegistrationPrompt.js';
 import { TimeSlotRow } from './TimeSlotRow.js';
 import { SessionCard } from './SessionCard.js';
 import {
-  groupByStartTime, onDemandSessions, filterSessions,
+  groupByStartTime, onDemandSessions, filterSessions, sessionsForDay,
 } from '../utils/session-filters.js';
 import { getNowMs } from '../utils/time.js';
 import { deriveSessionState } from '../utils/session-state.js';
@@ -13,21 +13,23 @@ export const buildMySessionsView = () => MySessionsView;
 
 export function MySessionsView() {
   const { state, dispatch } = useSessionGuide();
-  const { isRegistered, sessions, scheduled, mySessionsTab } = state;
+  const { isRegistered, sessions, scheduled, mySessionsTab, activeDay } = state;
   const liveStreamActiveIds = state.liveStreamActiveIds || new Set();
   const activeFilters = state.activeFilters || {};
   const searchQuery = state.searchQuery || '';
+  const userTz = state.eventConfig?.userTz;
   const nowMs = getNowMs();
 
   if (isRegistered !== true) return html`<${RegistrationPrompt} />`;
 
   const scheduledSessions = sessions.filter((s) => scheduled.has(s.id));
+  const dayScheduled = sessionsForDay(scheduledSessions, activeDay, userTz);
 
-  const activeAndUpcoming = scheduledSessions.filter((s) => {
+  const activeAndUpcoming = dayScheduled.filter((s) => {
     const st = deriveSessionState(s, liveStreamActiveIds, nowMs);
     return st === 'upcoming' || st === 'live';
   });
-  const onDemandRaw = onDemandSessions(scheduledSessions, liveStreamActiveIds, nowMs);
+  const onDemandRaw = onDemandSessions(dayScheduled, liveStreamActiveIds, nowMs);
 
   const filteredUpcoming = filterSessions(activeAndUpcoming, activeFilters, searchQuery);
   const filteredOnDemand = filterSessions(onDemandRaw, activeFilters, searchQuery);

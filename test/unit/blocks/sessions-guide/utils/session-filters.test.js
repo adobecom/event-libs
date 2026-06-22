@@ -67,6 +67,12 @@ describe('session-filters/groupByStartTime', () => {
   it('returns empty array for no sessions', () => {
     expect(groupByStartTime([])).to.deep.equal([]);
   });
+
+  it('returns groups sorted by start time ascending', () => {
+    const groups = groupByStartTime([UPCOMING, LIVE]);
+    expect(groups[0][0].id).to.equal('live');
+    expect(groups[1][0].id).to.equal('upcoming');
+  });
 });
 
 describe('session-filters/groupByTrack', () => {

@@ -2,18 +2,20 @@ import { html } from '../../../deps/htm-preact.js';
 import { useSessionGuide } from '../store/index.js';
 import { RegistrationPrompt } from './RegistrationPrompt.js';
 import { TimeSlotRow } from './TimeSlotRow.js';
-import { groupByStartTime, filterSessions } from '../utils/session-filters.js';
+import { groupByStartTime, filterSessions, sessionsForDay } from '../utils/session-filters.js';
 
 export function MyFavoritesView() {
   const { state } = useSessionGuide();
-  const { isRegistered, sessions, favorited } = state;
+  const { isRegistered, sessions, favorited, activeDay } = state;
   const activeFilters = state.activeFilters || {};
   const searchQuery = state.searchQuery || '';
+  const userTz = state.eventConfig?.userTz;
 
   if (isRegistered !== true) return html`<${RegistrationPrompt} />`;
 
   const favoritedRaw = sessions.filter((s) => favorited.has(s.id));
-  const favoritedSessions = filterSessions(favoritedRaw, activeFilters, searchQuery);
+  const dayFavorited = sessionsForDay(favoritedRaw, activeDay, userTz);
+  const favoritedSessions = filterSessions(dayFavorited, activeFilters, searchQuery);
   const timeSlots = groupByStartTime(favoritedSessions);
 
   return html`
