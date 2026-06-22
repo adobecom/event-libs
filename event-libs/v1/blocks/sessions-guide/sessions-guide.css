@@ -2350,8 +2350,11 @@
 /* ── solid / on-light ──────────────────────────────────────────────── */
 
 .sg-icon-btn--solid.sg-icon-btn--on-light {
-  background: var(--s2a-color-background-knockout, #000);
-  color: var(--s2a-color-content-knockout, #fff);
+  border-radius: var(--s2a-radius-corner-full, 2000px);
+  border: var(--s2a-border-width-sm) solid var(--s2a-color-gray-100);
+  background: rgb(255 255 255 / 80%);
+  backdrop-filter: blur(4.6875px);
+  color: var(--s2a-color-content-default, #000);
 }
 
 .sg-icon-btn--solid.sg-icon-btn--on-light:hover:not(:disabled) {
@@ -2369,6 +2372,7 @@
 .sg-icon-btn--solid.sg-icon-btn--on-dark {
   background: var(--s2a-color-background-default, #fff);
   color: var(--s2a-color-content-default, #000);
+  border: var(--s2a-border-width-sm) solid var(--s2a-color-gray-100, #e0e0e0);
 }
 
 .sg-icon-btn--solid.sg-icon-btn--on-dark:hover:not(:disabled) {
