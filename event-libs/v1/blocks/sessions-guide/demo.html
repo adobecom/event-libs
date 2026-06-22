@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<!--
+  Sessions Guide — Dev Preview
+  Serve from project root with either:
+    npm run test:watch   → http://localhost:2000/event-libs/v1/blocks/sessions-guide/demo.html
+    npx serve .         → http://localhost:3000/event-libs/v1/blocks/sessions-guide/demo.html
+
+  Uses the local Preact stub (test/unit/mocks/deps/htm-preact.js) so no Milo or AEM needed.
+  Static render only — reactivity (useState, useEffect) is no-op in the stub.
+-->
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sessions Guide — Dev Preview</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: adobe-clean, 'Source Sans Pro', sans-serif; background: #1a1a2e; color: #fff; min-height: 100vh; }
+    .demo-nav { display: flex; align-items: center; gap: 24px; padding: 14px 24px; background: rgba(255,255,255,0.06); border-bottom: 1px solid rgba(255,255,255,0.1); }
+    .demo-nav strong { font-size: 14px; color: #aaa; }
+    .demo-nav a { font-size: 13px; color: #58a6ff; text-decoration: none; }
+    .demo-nav a:hover { text-decoration: underline; }
+    .demo-surface { padding: 24px; }
+    .demo-surface h2 { font-size: 13px; letter-spacing: .08em; text-transform: uppercase; color: #666; margin-bottom: 16px; }
+    .sessions-guide { border: 1px dashed rgba(255,255,255,.15); border-radius: 8px; }
+  </style>
+  <!-- Link block CSS if it exists -->
+  <link rel="stylesheet" href="sessions-guide.css" />
+</head>
+<body>
+
+<nav class="demo-nav">
+  <strong>Sessions Guide · Dev Preview</strong>
+  <a href="#widget">Widget</a>
+  <a href="#page">Page</a>
+  <span style="color:#666;font-size:12px;margin-left:auto">Static render — no Milo required</span>
+</nav>
+
+<!-- ══ WIDGET SURFACE ══════════════════════════════════════════════════════ -->
+<section class="demo-surface" id="widget">
+  <h2>Widget surface (drawer)</h2>
+  <div class="sessions-guide widget" id="sg-widget">
+    <div><div>event-title</div><div>Adobe MAX 2026</div></div>
+    <div><div>show-conflict-modal</div><div>true</div></div>
+    <div><div>theme</div><div>dark</div></div>
+    <div><div>mr-env</div><div>dev</div></div>
+  </div>
+</section>
+
+<!-- ══ PAGE SURFACE ════════════════════════════════════════════════════════ -->
+<section class="demo-surface" id="page" style="margin-top:48px">
+  <h2>Page surface (inline)</h2>
+  <div class="sessions-guide page" id="sg-page">
+    <div><div>event-title</div><div>Adobe MAX 2026</div></div>
+    <div><div>show-conflict-modal</div><div>true</div></div>
+    <div><div>theme</div><div>dark</div></div>
+    <div><div>mr-env</div><div>dev</div></div>
+  </div>
+</section>
+
+<script type="module">
+  import { setEventConfig } from '/event-libs/v1/utils/utils.js';
+  import init from '/event-libs/v1/blocks/sessions-guide/sessions-guide.js';
+
+  // Point miloLibs at the local test stub so no Milo CDN needed.
+  // Event days are now derived automatically from the fetched sessions.
+  const miloLibs = `${window.location.origin}/test/unit/mocks`;
+  setEventConfig(
+    { miloConfig: { miloLibs } },
+    { miloLibs },
+  );
+
+  window.lana = { log: (msg) => console.warn('[lana]', msg) };
+  window.adobeIMS = { isSignedInUser: () => false };
+
+  await init(document.getElementById('sg-widget'));
+  await init(document.getElementById('sg-page'));
+</script>
+</body>
+</html>
