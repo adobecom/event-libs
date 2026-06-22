@@ -21,6 +21,12 @@ const MOCK_SESSIONS = [
 ];
 
 describe('store/buildInitialState', () => {
+  beforeEach(() => {
+    localStorage.removeItem('sg:dev-auth');
+    localStorage.removeItem('sg:scheduled');
+    localStorage.removeItem('sg:favorited');
+  });
+
   it('initializes sessions from initialSessions param', () => {
     const state = buildInitialState(MOCK_CONFIG, MOCK_SESSIONS);
     expect(state.sessions).to.deep.equal(MOCK_SESSIONS);

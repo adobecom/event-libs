@@ -38,11 +38,7 @@ export function buildInitialState(eventConfig, initialSessions = []) {
   try {
     scheduled = new Set(JSON.parse(localStorage.getItem(LS_SCHEDULED) || '[]'));
     favorited = new Set(JSON.parse(localStorage.getItem(LS_FAVORITED) || '[]'));
-    let devAuth = JSON.parse(localStorage.getItem('sg:dev-auth') || 'null');
-    if (!devAuth && ['localhost', '127.0.0.1'].includes(window.location.hostname)) {
-      devAuth = { isLoggedIn: true, isRegistered: true, userFirstName: 'Dev' };
-      localStorage.setItem('sg:dev-auth', JSON.stringify(devAuth));
-    }
+    const devAuth = JSON.parse(localStorage.getItem('sg:dev-auth') || 'null');
     if (devAuth) {
       isLoggedIn = devAuth.isLoggedIn ?? null;
       isRegistered = devAuth.isRegistered ?? undefined;
