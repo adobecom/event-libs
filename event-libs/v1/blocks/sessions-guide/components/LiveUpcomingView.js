@@ -4,6 +4,7 @@ import { Carousel } from './Carousel.js';
 import { TimeSlotRow } from './TimeSlotRow.js';
 import {
   liveSessions, upcomingSessions, groupByStartTime, filterSessions, getFeaturedSessions,
+  sessionsForDay,
 } from '../utils/session-filters.js';
 import { getNowMs, formatShortTime } from '../utils/time.js';
 
@@ -32,6 +33,11 @@ export function LiveUpcomingView() {
   const upcoming = filterSessions(upcomingRaw, activeFilters, searchQuery);
   const timeSlots = groupByStartTime(upcoming);
 
+  // Previously aired: all sessions for the day, shown when nothing is upcoming or live
+  const previouslyAiredSlots = (timeSlots.length === 0 && live.length === 0)
+    ? groupByStartTime(sessionsForDay(sessions, activeDay, userTz))
+    : [];
+
   return html`
     <div class="sg-view sg-view--live-upcoming">
       ${live.length > 0 && html`
@@ -55,7 +61,11 @@ export function LiveUpcomingView() {
       <div class="sg-upcoming-section">
         ${timeSlots.length > 0 && html`<h3 class="sg-upcoming-title">Upcoming</h3>`}
         ${timeSlots.map((slot) => html`<${TimeSlotRow} sessions=${slot} />`)}
-        ${timeSlots.length === 0 && !live.length && !featured.length && html`
+        ${previouslyAiredSlots.length > 0 && html`
+          <h3 class="sg-upcoming-title">Previously aired</h3>
+          ${previouslyAiredSlots.map((slot) => html`<${TimeSlotRow} sessions=${slot} forceOnDemand=${true} />`)}
+        `}
+        ${timeSlots.length === 0 && !live.length && !featured.length && !previouslyAiredSlots.length && html`
           <div class="sg-empty">No sessions scheduled for this day.</div>
         `}
       </div>

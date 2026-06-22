@@ -8,7 +8,7 @@ import { IconButton } from './IconButton.js';
 
 export const buildSessionCard = () => SessionCard;
 
-export function SessionCard({ session }) {
+export function SessionCard({ session, forceOnDemand = false }) {
   const { state, dispatch } = useSessionGuide();
   const { scheduled, favorited, eventConfig } = state;
   const pendingActions = state.pendingActions || new Set();
@@ -17,13 +17,16 @@ export function SessionCard({ session }) {
   const isScheduled = scheduled.has(session.id);
   const isFavorited = favorited.has(session.id);
   const isPending = pendingActions.has(session.id);
-  const onDemand = isSessionOnDemand(session, getNowMs());
+  const onDemandNatural = isSessionOnDemand(session, getNowMs());
+  const onDemand = forceOnDemand || onDemandNatural;
   const trackColor = (trackColors && trackColors[session.track]) || '';
 
   // eslint-disable-next-line no-nested-ternary
-  const timeLabel = onDemand
-    ? (session.inPerson && !session.videoAvailable ? 'Recording coming soon' : 'On demand')
-    : formatSessionTime(session.startTimeUtc, userTz);
+  const timeLabel = forceOnDemand
+    ? 'ON DEMAND'
+    : (onDemandNatural
+      ? (session.inPerson && !session.videoAvailable ? 'Recording coming soon' : 'On demand')
+      : formatSessionTime(session.startTimeUtc, userTz));
   const endShort = (!onDemand && session.endTimeUtc) ? formatShortTime(session.endTimeUtc, userTz) : '';
   const timeRange = onDemand
     ? timeLabel
@@ -34,6 +37,7 @@ export function SessionCard({ session }) {
     isScheduled ? 'is-scheduled' : '',
     isFavorited ? 'is-favorited' : '',
     onDemand ? 'sg-card--on-demand' : '',
+    forceOnDemand ? 'sg-card--previously-aired' : '',
     isPending ? 'is-pending' : '',
   ].filter(Boolean).join(' ');
 
@@ -45,6 +49,11 @@ export function SessionCard({ session }) {
   async function handleFavorite(e) {
     e.stopPropagation();
     await favoriteAction(session, state, dispatch);
+  }
+
+  function handlePlay(e) {
+    e.stopPropagation();
+    if (session.sessionPageUrl) window.location.href = session.sessionPageUrl;
   }
 
   function handleClick() {
@@ -78,7 +87,17 @@ export function SessionCard({ session }) {
         </div>
       </div>
       <div class="sg-card__actions" data-time=${timeRange}>
-        ${!onDemand && html`<${IconButton}
+        ${forceOnDemand && html`<${IconButton}
+          variant="outlined"
+          context="on-light"
+          size="md"
+          extraClass="sg-card__btn--play"
+          label="Play session"
+          onclick=${handlePlay}
+        >
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false"><path d="M6.5 4L15.5 10L6.5 16V4Z" fill="currentColor"/></svg>
+        </${IconButton}>`}
+        ${!forceOnDemand && !onDemand && html`<${IconButton}
           variant="outlined"
           context="on-light"
           size="md"
