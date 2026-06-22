@@ -12,6 +12,7 @@
 
 import { LIBS } from '../v1/utils/utils.js';
 import decorateArea from '../v1/utils/decorate.js';
+import { EVENT_BLOCKS } from '../v1/libs.js';
 
 const {
   loadArea,
@@ -33,6 +34,9 @@ const CONFIG = {
   imsClientId: 'events-milo',
   miloLibs: LIBS,
   prodDomains,
+  externalLibs: [
+    { base: '/event-libs/v1', blocks: EVENT_BLOCKS },
+  ],
   htmlExclude: [
     /www\.adobe\.com\/(\w\w(_\w\w)?\/)?express(\/.*)?/,
     /www\.adobe\.com\/(\w\w(_\w\w)?\/)?go(\/.*)?/,

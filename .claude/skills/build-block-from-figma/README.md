@@ -1,6 +1,6 @@
 # build-block-from-figma
 
-Builds a new event-libs block from Figma designs. Reads Figma frames, generates block JS and CSS under `event-libs/v1/blocks/`, registers the block in `EVENT_BLOCKS`, scaffolds a WTR test, then runs a visual comparison loop (Playwright), an axe-core accessibility audit (WCAG 2.2 AA), and a Lighthouse performance audit. Supports localhost dev servers and DA-published (`.aem.live`) pages via a feature branch tested with `?eventlibs=`.
+Builds a new C2 block component from Figma designs. Reads Figma frames, generates block JS and CSS under `libs/c2/blocks/`, then runs a visual comparison loop (Playwright), an axe-core accessibility audit (WCAG 2.2 AA), and a Lighthouse performance audit. Supports localhost dev servers and DA-published (`.aem.live`) pages via a remote feature branch.
 
 ---
 
@@ -59,14 +59,6 @@ nvm install 22 && nvm alias default 22
 npm install --save-dev lighthouse chrome-launcher @axe-core/playwright
 ```
 
-### Dev server
-
-The event-libs AEM dev server must be running at port 3868:
-
-```sh
-npm run event-libs   # in event-libs/
-```
-
 ---
 
 ## Run
@@ -79,12 +71,12 @@ The skill will prompt for:
 
 | Input | Required | Example |
 |-------|----------|---------|
-| Preview URL | Yes | `http://localhost:3868/path`, `https://main--repo--org.aem.page/path`, or `https://main--repo--org.aem.live/path` |
+| Preview URL | Yes | `http://localhost:6456/path` or `https://main--repo--org.aem.live/path` |
 | Figma URL — Mobile (≤767 px) | At least one | Figma frame link |
 | Figma URL — Tablet (768–1279 px) | No | Figma frame link |
 | Figma URL — Desktop (≥1280 px) | No | Figma frame link |
-| Base branch | No (default: `main`) | `feature/my-branch` |
+| Base branch | No (default: `stage`) | `feature/my-branch` |
 
 ## Output
 
-New files at `event-libs/v1/blocks/<name>/<name>.js` and `.css`, the block name added to `EVENT_BLOCKS` in `event-libs/v1/libs.js`, a WTR test scaffold at `test/unit/blocks/<name>/<name>.test.js`, an optional feature branch on `adobecom/event-libs`, and a final summary with accessibility and performance results.
+New files at `libs/c2/blocks/<name>/<name>.js` and `.css`, the block name registered in `C2_BLOCKS` in `utils.js`, a feature branch (remote mode), and a final summary with accessibility and performance results.

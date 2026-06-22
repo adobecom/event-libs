@@ -23,6 +23,14 @@ export default {
       '**/deps/**',
     ],
   },
+  middleware: [
+    async function mockVendoredPreact(ctx, next) {
+      if (ctx.path === '/event-libs/v1/deps/htm-preact.js') {
+        ctx.path = '/test/unit/mocks/deps/htm-preact.js';
+      }
+      return next();
+    },
+  ],
   plugins: [importMapsPlugin({
     imports: {
       'events/': '/event-libs/v1/',
