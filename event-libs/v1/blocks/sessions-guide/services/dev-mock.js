@@ -1,5 +1,5 @@
-// Dev-only: simulate a logged-in, registered user.
-// Imported by scripts/scripts.js on localhost only.
+// Temporary: simulate a logged-in, registered user across all environments.
+// Imported by sessions-guide.js until real IMS/Rainfocus auth is wired up.
 //
 // Uses localStorage (sg:dev-auth) rather than BlockMediator so that Milo's
 // own IMS flow — which sets imsProfile to a guest profile on unauthenticated

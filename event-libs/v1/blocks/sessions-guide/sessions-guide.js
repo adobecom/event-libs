@@ -3,6 +3,7 @@ import { detectUserTimezone } from './utils/time.js';
 import { SessionGuideProvider } from './store/index.js';
 import { App } from './components/App.js';
 import { fetchSessions } from './services/sessions-api.js';
+import { setupDevUser, seedDevStorage } from './services/dev-mock.js';
 
 // Default filter categories — override via block authoring table (filter-categories: JSON)
 // Each entry: { id: string (maps to session property), label: string (display name) }
@@ -69,6 +70,10 @@ function parseConfig(el) {
 }
 
 export default async function init(el) {
+  // TODO: remove once real IMS/Rainfocus auth is wired up.
+  setupDevUser();
+  seedDevStorage();
+
   const eventConfig = parseConfig(el);
   const initialSessions = await fetchSessions(eventConfig.rfApiUrl).catch(() => []);
 
