@@ -254,7 +254,7 @@
   background: var(--color-gray-100, #f3f3f3);
 }
 
-@media (min-width: 601px) {
+@media (min-width: 600px) {
   .sessions-hub .sh-search-wrap.expanded .sh-search-toggle {
     display: none;
   }
@@ -598,6 +598,7 @@
 .sessions-hub .sh-session-area {
   max-width: 1200px;
   margin: 0 auto;
+  padding: 0 24px;
 }
 
 .sessions-hub .sh-no-results {
@@ -617,7 +618,7 @@
   display: flex;
   flex-direction: column;
   gap: 32px;
-  padding: 24px 24px 100px;
+  padding: 24px 0 100px;
 }
 
 /* ─── Session card ───────────────────────────────────────────────────────── */
@@ -825,6 +826,8 @@
 
 .sessions-hub .sh-card-desc {
   flex: 1;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .sessions-hub .sh-card-desh-text {
@@ -833,6 +836,7 @@
   line-height: 1.5;
   color: black;
   overflow: hidden;
+  max-height: calc(8 * 1.5em);
   line-clamp: 8;
   /* stylelint-disable-next-line value-no-vendor-prefix -- Safari needs -webkit-box for line clamp */
   display: -webkit-box;
@@ -842,6 +846,7 @@
 
 .sessions-hub .sh-card.expanded .sh-card-desh-text {
   display: block;
+  max-height: none;
   line-clamp: unset;
   -webkit-line-clamp: unset;
   overflow: visible;
@@ -1080,7 +1085,9 @@
 
 /* ─── Responsive ─────────────────────────────────────────────────────────── */
 
-@media (min-width: 601px) {
+/* ─── Tablet and above (≥ 600px) ────────────────────────────────────────── */
+
+@media (min-width: 600px) {
   .sessions-hub .sh-toolbar-inner {
     flex-direction: row;
     justify-content: flex-end;
@@ -1091,19 +1098,24 @@
   .sessions-hub .sh-registered-badge {
     width: auto;
   }
+}
 
+/* ─── Tablet banner (600px – 899px) ─────────────────────────────────────── */
+
+@media (min-width: 600px) and (max-width: 899px) {
   .sh-event-banner {
     padding: 40px 0;
   }
 
-  .sh-event-banner .sh-btn-event-register {
-    width: auto;
+  .sh-banner-inner {
+    flex-direction: column;
+    align-items: stretch;
+    padding: 0 40px;
+    gap: 32px;
   }
 
-  .sh-banner-inner {
-    padding: 0 24px;
-    gap: 56px;
-    flex-wrap: nowrap;
+  .sh-event-banner .sh-btn-event-register {
+    width: 100%;
   }
 
   .sh-banner-title {
@@ -1115,32 +1127,19 @@
   }
 }
 
-@media (min-width: 769px) {
-  .sessions-hub .sh-toolbar-inner {
-    padding: 16px 32px;
+/* ─── Tablet and below (≤ 899px) ────────────────────────────────────────── */
+
+@media (max-width: 899px) {
+  .sessions-hub .sh-card-desh-text {
+    -webkit-line-clamp: 4;
+    line-clamp: 4;
+    max-height: calc(4 * 1.5em);
   }
 
   .sessions-hub .sh-card {
-    grid-template-columns: 340px 1fr;
+    row-gap: 16px;
   }
 
-  .sessions-hub .sh-card-left {
-    padding-right: 0;
-  }
-
-  .sessions-hub .sh-cta-group {
-    justify-content: flex-end;
-  }
-}
-
-@media (min-width: 901px) {
-  .sessions-hub .sh-toolbar {
-    top: var(--toolbar-top, 0);
-  }
-}
-
-/* Tablet (and below): filter collapses to an icon-only */
-@media (max-width: 900px) {
   .sessions-hub .sh-filter-btn {
     width: 40px;
     padding: 0;
@@ -1167,12 +1166,68 @@
   }
 }
 
+/* ─── Desktop (≥ 900px) ──────────────────────────────────────────────────── */
 
-/* Mobile: bottom-sheet filter modal (full-viewport backdrop + drill-in). */
-@media (max-width: 600px) {
+@media (min-width: 900px) {
+  .sessions-hub .sh-toolbar {
+    top: var(--toolbar-top, 0);
+  }
+
+  .sessions-hub .sh-toolbar-inner {
+    padding: 16px 32px;
+  }
+
+  .sessions-hub .sh-session-area {
+    padding: 0 32px;
+  }
+
+
+  .sessions-hub .sh-card {
+    grid-template-columns: 340px 1fr;
+  }
+
+  .sessions-hub .sh-card-left {
+    padding-right: 0;
+  }
+
+  .sessions-hub .sh-cta-group {
+    justify-content: flex-end;
+  }
+
+  .sh-event-banner {
+    padding: 40px 0;
+  }
+
+  .sh-banner-inner {
+    flex-wrap: nowrap;
+    padding: 0 24px;
+    gap: 56px;
+    align-items: center;
+  }
+
+  .sh-event-banner .sh-btn-event-register {
+    width: auto;
+  }
+}
+
+/* ─── Mobile (< 600px) ───────────────────────────────────────────────────── */
+
+@media (max-width: 599px) {
   .sessions-hub .sh-toolbar-actions {
     align-self: stretch;
     flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+
+  .sh-banner-inner {
+    flex-direction: column;
+    align-items: stretch;
+    padding: 0 32px;
+    gap: 32px;
+  }
+
+  .sh-banner-title {
+    font-size: 24px;
   }
 
   .sessions-hub .sh-view-dropdown {
