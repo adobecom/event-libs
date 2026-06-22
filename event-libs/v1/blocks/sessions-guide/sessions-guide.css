@@ -1818,11 +1818,6 @@
     padding: 0 var(--s2a-spacing-lg);
   }
 
-  .sg-live-card__btn--favorite.is-favorited {
-    background: #000;
-    color: #fff;
-  }
-
   .sg-live-card__btn-label {
     display: inline;
   }
@@ -1831,12 +1826,6 @@
     background: transparent;
     border-color: #fff;
     color: #fff;
-  }
-
-  .sg-live-card:hover .sg-live-card__btn--favorite.is-favorited {
-    background: #fff;
-    border-color: #fff;
-    color: #000;
   }
 
   /* ── Time slot rows ────────────────────────────────────────── */
