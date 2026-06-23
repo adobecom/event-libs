@@ -9,6 +9,7 @@ import { deriveSessionState } from '../utils/session-state.js';
 
 const LS_SCHEDULED = 'sg:scheduled';
 const LS_FAVORITED = 'sg:favorited';
+const SS_LAST_VIEW = 'sg:last-view';
 
 function deriveEventDays(sessions, userTz) {
   const tz = userTz || Intl.DateTimeFormat().resolvedOptions().timeZone;
@@ -122,8 +123,10 @@ export function reducer(state, action) {
       return { ...state, favorited };
     }
 
-    case 'SET_VIEW':
+    case 'SET_VIEW': {
+      try { sessionStorage.setItem(SS_LAST_VIEW, action.view); } catch { /* unavailable */ }
       return { ...state, activeView: action.view };
+    }
     case 'SET_DAY':
       return { ...state, activeDay: action.day };
     case 'SET_FILTERS':
@@ -154,10 +157,11 @@ export function reducer(state, action) {
       return { ...state, sessionsStatus: action.status };
     case 'SET_DRAWER': {
       const next = { ...state, drawerState: action.drawer };
-      // On every open, snap to the auth-appropriate default view so the user
-      // always lands on the right tab regardless of when IMS resolved.
       if (action.drawer !== 'hidden' && state.drawerState === 'hidden') {
-        next.activeView = state.isRegistered ? 'my-sessions' : 'live-upcoming';
+        // Restore the last view the user was on; fall back to auth-appropriate default.
+        let lastView = null;
+        try { lastView = sessionStorage.getItem(SS_LAST_VIEW); } catch { /* unavailable */ }
+        next.activeView = lastView || (state.isRegistered ? 'my-sessions' : 'live-upcoming');
       }
       return next;
     }

@@ -2073,7 +2073,7 @@
     opacity: 0;
     pointer-events: none;
     align-items: center;
-    justify-content: center;
+    justify-content: start;
     border-top: none;
     transition: width 0.32s cubic-bezier(0.22, 1, 0.36, 1),
                 padding-left 0.32s cubic-bezier(0.22, 1, 0.36, 1),
@@ -2098,15 +2098,26 @@
     display: none;
   }
 
+  .sg-card:not(:hover) .sg-card__btn--play {
+    display: none;
+  }
+
   .sg-card__btn {
     transition: background 0.15s;
   }
 }
 
-/* ── Suppress card hover effects on touch devices (mobile + tablet) ── */
+/* ── Suppress card hover effects on touch desktops (≥1280px, hover: none) ──
+   Mobile/tablet base styles already group :hover with the rest state, so
+   no suppression is needed below 1280px — these resets are desktop-specific. */
 
-@media (hover: none) {
-  .sg-card:hover {
+@media (hover: none) and (min-width: 1280px) {
+  /* Kill transitions so tap-triggered :hover resets are instant */
+  .sg-card { transition: none; }
+
+  .sg-card:hover,
+  .sg-card.is-scheduled:hover,
+  .sg-card.is-favorited:hover {
     width: 379px;
     min-height: 124px;
     background: var(--s2a-color-gray-50);

@@ -56,6 +56,19 @@ export function SessionCard({ session, forceOnDemand = false }) {
     if (session.sessionPageUrl) window.location.href = session.sessionPageUrl;
   }
 
+  // iOS mis-routes the synthetic click to the card div when the touch target is
+  // inside a transform + overflow:hidden ancestor (sg-time-row__cards/viewport).
+  // Handle the action on touchend and preventDefault to kill the synthetic click.
+  async function handleActionsTouchEnd(e) {
+    e.preventDefault();
+    const touch = e.changedTouches[0];
+    const el = document.elementFromPoint(touch.clientX, touch.clientY);
+    if (!el) return;
+    if (el.closest('.sg-card__btn--schedule')) { await handleSchedule(e); return; }
+    if (el.closest('.sg-card__btn--favorite')) { await handleFavorite(e); return; }
+    if (el.closest('.sg-card__btn--play')) handlePlay(e);
+  }
+
   function handleClick() {
     if (surface === 'page') {
       if (session.sessionPageUrl) window.location.href = session.sessionPageUrl;
@@ -86,7 +99,7 @@ export function SessionCard({ session, forceOnDemand = false }) {
           <span class="sg-card__time">${timeLabel}</span>
         </div>
       </div>
-      <div class="sg-card__actions" data-time=${timeRange}>
+      <div class="sg-card__actions" data-time=${timeRange} onclick=${(e) => e.stopPropagation()} ontouchend=${handleActionsTouchEnd}>
         ${forceOnDemand && html`<${IconButton}
           variant="solid"
           context="on-dark"

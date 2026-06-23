@@ -54,7 +54,7 @@ export function LiveUpcomingView() {
           <${Carousel}
             sessions=${featured}
             title="Featured"
-            formatTime=${(s) => formatShortTime(s.startTimeUtc, userTz)}
+            formatTime=${() => 'For you'}
           />
         </div>
       `}
