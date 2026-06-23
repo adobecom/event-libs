@@ -836,7 +836,6 @@
   line-height: 1.5;
   color: black;
   overflow: hidden;
-  max-height: calc(8 * 1.5em);
   line-clamp: 8;
   /* stylelint-disable-next-line value-no-vendor-prefix -- Safari needs -webkit-box for line clamp */
   display: -webkit-box;
