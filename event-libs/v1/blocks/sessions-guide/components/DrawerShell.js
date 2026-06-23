@@ -42,8 +42,8 @@ export function DrawerShell() {
     if (drawerState === 'peek') {
       expandedRef.current = false;
       document.body.style.overflow = 'hidden';
-      // ≤1440px viewport width → ~500px peek; >1440px (e.g. 1920px) → ~890px peek
-      const peekHeight = window.innerWidth > 1440 ? 890 : 500;
+      // ≤1440px viewport width → 55% of viewport height; >1440px → 65%
+      const peekHeight = Math.round(window.innerHeight * (window.innerWidth > 1440 ? 0.65 : 0.55));
       const peekTop = Math.max(getTopMargin(), window.innerHeight - peekHeight);
       el.style.transition = 'none';
       el.style.top = '100vh';
@@ -183,8 +183,8 @@ export function DrawerShell() {
   }
 
   function openDrawer() {
-    const isMobile = window.matchMedia('(max-width: 767px)').matches;
-    dispatch({ type: 'SET_DRAWER', drawer: isMobile ? 'expanded' : 'peek' });
+    const isNarrow = window.matchMedia('(max-width: 1279px)').matches;
+    dispatch({ type: 'SET_DRAWER', drawer: isNarrow ? 'expanded' : 'peek' });
     history.pushState({}, '', setSessionsParam());
   }
 
