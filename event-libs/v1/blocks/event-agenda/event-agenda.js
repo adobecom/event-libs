@@ -195,7 +195,7 @@ export default async function init(el) {
     container.classList.add('more-than-six');
   }
 
-  const localeString = getEventConfig().miloConfig.locale?.ietf || 'en-US';
+  const localeString = getMetadata('default-locale') ||getEventConfig().miloConfig.locale?.ietf || 'en-US';
   const eventTimezone = getMetadata('timezone');
   const eventStartMillis = getMetadata('local-start-time-millis');
 
