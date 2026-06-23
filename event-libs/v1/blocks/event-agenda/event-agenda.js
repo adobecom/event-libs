@@ -1,7 +1,11 @@
 import { createOptimizedPicture, createTag, getMetadata, getEventConfig, getImageSource } from '../../utils/utils.js';
 import { LOCALE_FORMATTERS, applyLocaleFormat } from '../../utils/date-time-helper.js';
 
-const DEFAULT_TIME_FORMAT_OPTIONS = { hour: 'numeric', minute: 'numeric', hour12: true };
+const TIME_FORMAT_OPTIONS = {
+  hour: 'numeric',
+  minute: 'numeric',
+  hour12: true,
+};
 
 /**
  * Parses event date from various formats (milliseconds, ISO string, or numeric string)
@@ -71,8 +75,8 @@ export function convertEventTimeToLocalTime(time, eventTimezone, eventDateMillis
       const [, gotHour, gotMin, gotSec] = match.map(Number);
       
       if (gotHour === hours && gotMin === minutes && gotSec === seconds) {
-        if (LOCALE_FORMATTERS[locale]) return LOCALE_FORMATTERS[locale](gotHour, gotMin);
-        return guess.toLocaleTimeString(locale, DEFAULT_TIME_FORMAT_OPTIONS);
+        if (TIME_FORMAT_OPTIONS.hour12 && LOCALE_FORMATTERS[locale]) return LOCALE_FORMATTERS[locale](gotHour, gotMin);
+        return guess.toLocaleTimeString(locale, TIME_FORMAT_OPTIONS);
       }
       
       const wantedSeconds = hours * 3600 + minutes * 60 + seconds;
@@ -80,18 +84,8 @@ export function convertEventTimeToLocalTime(time, eventTimezone, eventDateMillis
       guess = new Date(guess.getTime() + (wantedSeconds - gotSeconds) * 1000);
     }
     
-    if (LOCALE_FORMATTERS[locale]) {
-      const parts = new Intl.DateTimeFormat('en-US', {
-        timeZone: eventTimezone,
-        hour: 'numeric',
-        minute: 'numeric',
-        hour12: false,
-      }).formatToParts(guess);
-      const h = Number(parts.find((p) => p.type === 'hour').value);
-      const m = Number(parts.find((p) => p.type === 'minute').value);
-      return LOCALE_FORMATTERS[locale](h, m);
-    }
-    return guess.toLocaleTimeString(locale, DEFAULT_TIME_FORMAT_OPTIONS);
+    if (TIME_FORMAT_OPTIONS.hour12 && LOCALE_FORMATTERS[locale]) return LOCALE_FORMATTERS[locale](hours, minutes);
+    return guess.toLocaleTimeString(locale, TIME_FORMAT_OPTIONS);
   } catch (error) {
     window.lana?.log(`Error converting event time: ${error.message}`);
     return '';
@@ -106,8 +100,11 @@ export function convertEventTimeToLocalTime(time, eventTimezone, eventDateMillis
  * @returns {string} Formatted time string
  */
 export function convertToLocaleTimeFormat(time, locale) {
-  const [hours, minutes] = time.split(':').map(Number);
-  return applyLocaleFormat(hours, minutes, locale);
+  const [hours, minutes, seconds] = time.split(':').map(Number);
+  if (TIME_FORMAT_OPTIONS.hour12) return applyLocaleFormat(hours, minutes, locale);
+  const date = new Date();
+  date.setHours(hours, minutes, seconds, 0);
+  return new Intl.DateTimeFormat(locale, TIME_FORMAT_OPTIONS).format(date);
 }
 
 function formatSingleTime(time, eventTimezone, eventStartMillis, locale) {
@@ -131,6 +128,9 @@ export default async function init(el) {
     el.remove();
     return;
   }
+
+  const is24HourFormat = el.classList.contains('24h');
+  TIME_FORMAT_OPTIONS.hour12 = !is24HourFormat;
 
   const container = createTag('div', { class: 'agenda-container' }, '', { parent: el });
   const agendaItemsCol = createTag('div', { class: 'agenda-items' }, '', { parent: container });
@@ -180,7 +180,7 @@ export default async function init(el) {
     container.classList.add('more-than-six');
   }
 
-  const localeString = getMetadata('locale') ||getEventConfig().miloConfig.locale?.ietf || 'en-US';
+  const localeString = getMetadata('locale') || getEventConfig().miloConfig.locale?.ietf || 'en-US';
   const eventTimezone = getMetadata('timezone');
   const eventStartMillis = getMetadata('local-start-time-millis');
 
