@@ -1,6 +1,6 @@
 import { expect } from '@esm-bundle/chai';
 import { readFile } from '@web/test-runner-commands';
-import init, { convertToLocaleTimeFormat, convertEventTimeToLocalTime, formatTimeRange } from '../../../../event-libs/v1/blocks/event-agenda/event-agenda.js';
+import init, { convertToLocaleTimeFormat, convertEventTimeToLocalTime, formatTimeRange, LOCALE_FORMATTERS } from '../../../../event-libs/v1/blocks/event-agenda/event-agenda.js';
 import { setMetadata } from '../../../../event-libs/v1/utils/utils.js';
 
 const body = await readFile({ path: './mocks/default.html' });
@@ -13,6 +13,48 @@ describe('Agenda Module', () => {
       const locale = 'en-US';
       const formattedTime = convertToLocaleTimeFormat(time, locale);
       expect(formattedTime).to.equal('1:45 PM');
+    });
+
+    it('fr-FR: whole hour omits minutes', () => {
+      expect(convertToLocaleTimeFormat('09:00:00', 'fr-FR')).to.equal('9h');
+    });
+
+    it('fr-FR: whole hour with no leading zero', () => {
+      expect(convertToLocaleTimeFormat('13:00:00', 'fr-FR')).to.equal('13h');
+    });
+
+    it('fr-FR: non-zero minutes use h separator with zero-padded minutes', () => {
+      expect(convertToLocaleTimeFormat('13:45:00', 'fr-FR')).to.equal('13h45');
+    });
+
+    it('fr-FR: single-digit minutes are zero-padded', () => {
+      expect(convertToLocaleTimeFormat('09:05:00', 'fr-FR')).to.equal('9h05');
+    });
+
+    it('en-GB: uses 12h AM/PM format', () => {
+      const result = convertToLocaleTimeFormat('09:00:00', 'en-GB');
+      expect(result).to.match(/9:00\s?(AM|am)/i);
+    });
+  });
+
+  describe('LOCALE_FORMATTERS', () => {
+    it('fr-FR formatter is defined', () => {
+      expect(LOCALE_FORMATTERS['fr-FR']).to.be.a('function');
+    });
+
+    it('fr-FR range: 9h – 10h', () => {
+      const result = formatTimeRange({ startTime: '09:00:00', endTime: '10:00:00' }, null, null, 'fr-FR');
+      expect(result).to.equal('9h – 10h');
+    });
+
+    it('fr-FR range with minutes: 13h45 – 17h00', () => {
+      const result = formatTimeRange({ startTime: '13:45:00', endTime: '17:00:00' }, null, null, 'fr-FR');
+      expect(result).to.equal('13h45 – 17h');
+    });
+
+    it('unknown locale falls back to 12h AM/PM', () => {
+      const result = convertToLocaleTimeFormat('09:00:00', 'ja-JP');
+      expect(result).to.be.a('string').and.not.be.empty;
     });
   });
 
