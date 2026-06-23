@@ -1,6 +1,7 @@
 import { expect } from '@esm-bundle/chai';
 import { readFile } from '@web/test-runner-commands';
-import init, { convertToLocaleTimeFormat, convertEventTimeToLocalTime, formatTimeRange, LOCALE_FORMATTERS } from '../../../../event-libs/v1/blocks/event-agenda/event-agenda.js';
+import init, { convertToLocaleTimeFormat, convertEventTimeToLocalTime, formatTimeRange } from '../../../../event-libs/v1/blocks/event-agenda/event-agenda.js';
+import { LOCALE_FORMATTERS } from '../../../../event-libs/v1/utils/date-time-helper.js';
 import { setMetadata } from '../../../../event-libs/v1/utils/utils.js';
 
 const body = await readFile({ path: './mocks/default.html' });

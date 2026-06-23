@@ -1,22 +1,7 @@
 import { createOptimizedPicture, createTag, getMetadata, getEventConfig, getImageSource } from '../../utils/utils.js';
+import { LOCALE_FORMATTERS, applyLocaleFormat } from '../../utils/date-time-helper.js';
 
-const DEFAULT_TIME_FORMAT_OPTIONS = {
-  hour: 'numeric',
-  minute: 'numeric',
-  hour12: true,
-};
-
-export const LOCALE_FORMATTERS = {
-  'fr-FR': (h, m) => (m === 0 ? `${h}h` : `${h}h${String(m).padStart(2, '0')}`),
-};
-
-function applyLocaleFormat(hours, minutes, locale) {
-  const formatter = LOCALE_FORMATTERS[locale];
-  if (formatter) return formatter(hours, minutes);
-  const date = new Date();
-  date.setHours(hours, minutes, 0, 0);
-  return new Intl.DateTimeFormat(locale, DEFAULT_TIME_FORMAT_OPTIONS).format(date);
-}
+const DEFAULT_TIME_FORMAT_OPTIONS = { hour: 'numeric', minute: 'numeric', hour12: true };
 
 /**
  * Parses event date from various formats (milliseconds, ISO string, or numeric string)

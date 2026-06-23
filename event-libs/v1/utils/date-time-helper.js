@@ -1,5 +1,19 @@
 import { getMetadata } from "./utils.js";
 
+export const LOCALE_FORMATTERS = {
+  'fr-FR': (h, m) => (m === 0 ? `${h}h` : `${h}h${String(m).padStart(2, '0')}`),
+};
+
+const DEFAULT_TIME_FORMAT_OPTIONS = { hour: 'numeric', minute: 'numeric', hour12: true };
+
+export function applyLocaleFormat(hours, minutes, locale) {
+  const formatter = LOCALE_FORMATTERS[locale];
+  if (formatter) return formatter(hours, minutes);
+  const date = new Date();
+  date.setHours(hours, minutes, 0, 0);
+  return new Intl.DateTimeFormat(locale, DEFAULT_TIME_FORMAT_OPTIONS).format(date);
+}
+
 /**
  * Converts a UTC timestamp (in milliseconds) to a user-friendly local date time string.
  * The output is DST sensitive and follows locale format without localization.
