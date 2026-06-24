@@ -1752,7 +1752,7 @@ async function loadBlock(el, rsvpConfig) {
     window.lana?.log(`sessions-hub: dictionary initialize failed: ${err?.message || err}`);
   }
 
-  const inviteOnlyBlocked = Boolean(eventData.inviteOnly && !await getValidCampaignIdFromUrl());
+  const inviteOnlyBlocked = Boolean(eventData.inviteOnly && !getValidCampaignIdFromUrl());
   const inviteOnlyMessage = getInviteOnlyNoCampaignMessage(dictionaryManager);
   const waitlistBannerMessage = getEventWaitlistBannerMessage(dictionaryManager, {
     eventTitle: getMetadata('event-title') || '',

@@ -326,23 +326,32 @@ export { resetCampaignMapCache };
 
 /**
  * Returns the campaign ID from the current URL search params if present and valid.
- * Loads /event-libs/assets/configs/campaign-map.json and applies any matching
- * {old, new} routing rule before returning.
  * @param {URLSearchParams} [searchParams] - Optional search params (defaults to window.location.search).
- * @returns {Promise<string|null>} Valid campaign ID or null.
+ * @returns {string|null} Valid campaign ID or null.
  */
-export async function getValidCampaignIdFromUrl(searchParams) {
+export function getValidCampaignIdFromUrl(searchParams) {
   const search = searchParams != null ? searchParams.toString() : window.location.search;
-  let campaignId = new URLSearchParams(search).get('campaign');
-  if (!campaignId || !CAMPAIGN_ID_PATTERN.test(campaignId)) return null;
+  const campaignId = new URLSearchParams(search).get('campaign');
+  return campaignId && CAMPAIGN_ID_PATTERN.test(campaignId) ? campaignId : null;
+}
+
+/**
+ * Returns the campaign ID from the URL, applying any routing rules from
+ * /event-libs/assets/configs/campaign-map.json. Use at RSVP submit time
+ * where the routed ID must be sent to the API.
+ * @returns {Promise<string|null>} Routed campaign ID or null.
+ */
+export async function resolveRoutedCampaignId(searchParams) {
+  const campaignId = getValidCampaignIdFromUrl(searchParams);
+  if (!campaignId) return null;
 
   const map = await fetchCampaignMap();
   if (Array.isArray(map)) {
     const match = map.find((r) => r.old === campaignId);
-    if (match?.new) campaignId = match.new;
+    if (match?.new && CAMPAIGN_ID_PATTERN.test(match.new)) return match.new;
   }
 
-  return CAMPAIGN_ID_PATTERN.test(campaignId) ? campaignId : null;
+  return campaignId;
 }
 
 export function readBlockConfig(block) {
