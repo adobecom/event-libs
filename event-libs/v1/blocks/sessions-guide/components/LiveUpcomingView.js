@@ -62,10 +62,10 @@ export function LiveUpcomingView() {
       `}
       <div class="sg-upcoming-section">
         ${timeSlots.length > 0 && html`<h3 class="sg-upcoming-title">Upcoming</h3>`}
-        ${timeSlots.map((slot) => html`<${TimeSlotRow} sessions=${slot} />`)}
+        ${timeSlots.map((slot) => html`<${TimeSlotRow} key=${slot[0].startTimeUtc} sessions=${slot} />`)}
         ${previouslyAiredSlots.length > 0 && html`
           <h3 class="sg-upcoming-title">Previously aired</h3>
-          ${previouslyAiredSlots.map((slot) => html`<${TimeSlotRow} sessions=${slot} forceOnDemand=${true} />`)}
+          ${previouslyAiredSlots.map((slot) => html`<${TimeSlotRow} key=${slot[0].startTimeUtc} sessions=${slot} forceOnDemand=${true} />`)}
         `}
         ${timeSlots.length === 0 && !live.length && !featured.length && !previouslyAiredSlots.length && html`
           <div class="sg-empty">No sessions scheduled for this day.</div>

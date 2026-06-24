@@ -86,7 +86,7 @@ export function MyFavoritesView() {
         </div>
         ${effectiveTab === 'upcoming' && html`
           <div class="sg-my-favorites__upcoming">
-            ${timeSlots.map((slot) => html`<${TimeSlotRow} sessions=${slot} />`)}
+            ${timeSlots.map((slot) => html`<${TimeSlotRow} key=${slot[0].startTimeUtc} sessions=${slot} />`)}
           </div>
         `}
         ${effectiveTab === 'on-demand' && html`
