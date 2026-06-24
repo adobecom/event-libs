@@ -25,7 +25,7 @@ export function SessionCard({ session, forceOnDemand = false }) {
   const timeLabel = forceOnDemand
     ? 'ON DEMAND'
     : (onDemandNatural
-      ? (session.inPerson && !session.videoAvailable ? 'Recording coming soon' : 'On demand')
+      ? (session.inPerson && !session.videoAvailable ? 'Recording coming soon' : 'ON DEMAND')
       : formatSessionTime(session.startTimeUtc, userTz));
   const endShort = (!onDemand && session.endTimeUtc) ? formatShortTime(session.endTimeUtc, userTz) : '';
   const timeRange = onDemand
