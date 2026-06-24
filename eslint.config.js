@@ -2,6 +2,7 @@ import js from "@eslint/js";
 import globals from "globals";
 
 export default [
+  { ignores: ['event-libs/v1/deps/**', 'event-libs/scripts/deps/**'] },
   js.configs.recommended,
   {
     files: ["**/*.{js,mjs,cjs}"],

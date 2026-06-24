@@ -2,7 +2,7 @@ import { deleteAttendeeFromEvent, getAndCreateAndAddAttendee, getAttendee, getEv
 import BlockMediator from '../../deps/block-mediator.min.js';
 import { signIn, decorateEvent } from '../../utils/decorate.js';
 import { dictionaryManager, getInviteOnlyNoCampaignMessage } from '../../utils/dictionary-manager.js';
-import { getEventConfig, LIBS, getMetadata, getSusiOptions, getValidCampaignIdFromUrl } from '../../utils/utils.js';
+import { getEventConfig, LIBS, getMetadata, getSusiOptions, getValidCampaignIdFromUrl, resolveRoutedCampaignId } from '../../utils/utils.js';
 import { FALLBACK_LOCALES, CAMPAIGN_ID_PATTERN, PHONE_FIELD_RE, PHONE_PATTERN  } from '../../utils/constances.js';
 import { BASE_ATTENDEE_DATA_FILTER } from '../../utils/data-utils.js';
 import { parseRsvpFieldLimit, stripTags } from '../../utils/sanitize-utils.js';
@@ -237,7 +237,7 @@ async function submitForm(bp) {
 
   if (!isValid) return false;
 
-  const campaignId = getValidCampaignIdFromUrl();
+  const campaignId = await resolveRoutedCampaignId();
   if (campaignId) {
     payload.campaignId = campaignId;
   }

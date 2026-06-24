@@ -295,6 +295,35 @@ export function getSusiOptions(clientMiloConfig) {
   return susiOptions;
 }
 
+const { fetchCampaignMap, resetCampaignMapCache } = (() => {
+  let cache = null;
+  let pending = null;
+  return {
+    resetCampaignMapCache: () => { cache = null; pending = null; },
+    fetchCampaignMap: async () => {
+      if (cache) return cache;
+      if (pending) return pending;
+      pending = (async () => {
+        try {
+          const { origin } = new URL(import.meta.url);
+          const resp = await fetch(`${origin}/event-libs/assets/configs/campaign-map.json`);
+          if (!resp.ok) throw new Error(`Failed to fetch campaign map: ${resp.status}`);
+          cache = (await resp.json()).data;
+          pending = null;
+          return cache;
+        } catch (e) {
+          window.lana?.log(`Error fetching campaign map:\n${e.message}`);
+          pending = null;
+          return null;
+        }
+      })();
+      return pending;
+    },
+  };
+})();
+
+export { resetCampaignMapCache };
+
 /**
  * Returns the campaign ID from the current URL search params if present and valid.
  * @param {URLSearchParams} [searchParams] - Optional search params (defaults to window.location.search).
@@ -304,6 +333,25 @@ export function getValidCampaignIdFromUrl(searchParams) {
   const search = searchParams != null ? searchParams.toString() : window.location.search;
   const campaignId = new URLSearchParams(search).get('campaign');
   return campaignId && CAMPAIGN_ID_PATTERN.test(campaignId) ? campaignId : null;
+}
+
+/**
+ * Returns the campaign ID from the URL, applying any routing rules from
+ * /event-libs/assets/configs/campaign-map.json. Use at RSVP submit time
+ * where the routed ID must be sent to the API.
+ * @returns {Promise<string|null>} Routed campaign ID or null.
+ */
+export async function resolveRoutedCampaignId(searchParams) {
+  const campaignId = getValidCampaignIdFromUrl(searchParams);
+  if (!campaignId) return null;
+
+  const map = await fetchCampaignMap();
+  if (Array.isArray(map)) {
+    const match = map.find((r) => r.old === campaignId);
+    if (match?.new && CAMPAIGN_ID_PATTERN.test(match.new)) return match.new;
+  }
+
+  return campaignId;
 }
 
 export function readBlockConfig(block) {
