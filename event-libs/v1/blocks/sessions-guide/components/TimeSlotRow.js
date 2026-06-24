@@ -14,6 +14,11 @@ export function TimeSlotRow({ sessions, forceOnDemand = false }) {
   const stripRef = useRef(null);
   const cardWidthRef = useRef(0);
 
+  // Reset scroll position when the time slot changes (e.g. day switch).
+  useEffect(() => {
+    setOffset(0);
+  }, [sessions[0]?.startTimeUtc]);
+
   // DOM-compute card width once after first render
   useEffect(() => {
     if (!stripRef.current) return;
