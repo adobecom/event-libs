@@ -74,8 +74,8 @@ export function SessionCard({ session, forceOnDemand = false }) {
       if (session.sessionPageUrl) window.location.href = session.sessionPageUrl;
       return;
     }
-    // Widget: navigate for available on-demand, otherwise open detail overlay
-    if (onDemand && session.videoAvailable) {
+    // Widget: on-demand and previously-aired cards always navigate to session page
+    if (onDemand) {
       if (session.sessionPageUrl) window.location.href = session.sessionPageUrl;
       return;
     }
