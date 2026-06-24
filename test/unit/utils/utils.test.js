@@ -1,101 +1,72 @@
 import { expect } from '@esm-bundle/chai';
 
-import { getValidCampaignIdFromUrl } from '../../../event-libs/v1/utils/utils.js';
+import { getValidCampaignIdFromUrl, resetCampaignMapCache } from '../../../event-libs/v1/utils/utils.js';
 
-function setMeta(name, content) {
-  const meta = document.createElement('meta');
-  meta.name = name;
-  meta.content = content;
-  document.head.appendChild(meta);
+function mockCampaignMap(rules) {
+  window.fetch = async (url) => {
+    if (url.includes('campaign-map.json')) {
+      return { ok: true, json: async () => ({ data: rules }) };
+    }
+    return { ok: false, status: 404 };
+  };
 }
 
 describe('getValidCampaignIdFromUrl', () => {
-  beforeEach(() => {
-    document.head.innerHTML = '';
+  let originalFetch;
+  before(() => { originalFetch = window.fetch; });
+  afterEach(() => {
+    window.fetch = originalFetch;
+    resetCampaignMapCache();
   });
 
-  describe('no metadata routing rules', () => {
-    it('returns valid campaign ID from URL', () => {
-      const params = new URLSearchParams('?campaign=abc123');
-      expect(getValidCampaignIdFromUrl(params)).to.equal('abc123');
+  describe('no routing rules (fetch fails)', () => {
+    beforeEach(() => { window.fetch = async () => ({ ok: false, status: 500 }); });
+
+    it('returns valid campaign ID from URL', async () => {
+      expect(await getValidCampaignIdFromUrl(new URLSearchParams('?campaign=abc123'))).to.equal('abc123');
     });
 
-    it('returns null when campaign param is absent', () => {
-      const params = new URLSearchParams('');
-      expect(getValidCampaignIdFromUrl(params)).to.be.null;
+    it('returns null when campaign param is absent', async () => {
+      expect(await getValidCampaignIdFromUrl(new URLSearchParams(''))).to.be.null;
     });
 
-    it('returns null when campaign param fails pattern validation', () => {
-      const params = new URLSearchParams('?campaign=bad/id!');
-      expect(getValidCampaignIdFromUrl(params)).to.be.null;
+    it('returns null when campaign param fails pattern validation', async () => {
+      expect(await getValidCampaignIdFromUrl(new URLSearchParams('?campaign=bad/id!'))).to.be.null;
     });
 
-    it('returns null when campaign param exceeds 128 chars', () => {
-      const params = new URLSearchParams(`?campaign=${'a'.repeat(129)}`);
-      expect(getValidCampaignIdFromUrl(params)).to.be.null;
-    });
-  });
-
-  describe('with campaign-id routing rules', () => {
-    it('replaces campaign ID when old matches', () => {
-      setMeta('campaign-id', JSON.stringify([{ old: 'abc', new: 'def' }]));
-      const params = new URLSearchParams('?campaign=abc');
-      expect(getValidCampaignIdFromUrl(params)).to.equal('def');
-    });
-
-    it('returns original ID when no rule matches', () => {
-      setMeta('campaign-id', JSON.stringify([{ old: 'xyz', new: 'def' }]));
-      const params = new URLSearchParams('?campaign=abc');
-      expect(getValidCampaignIdFromUrl(params)).to.equal('abc');
-    });
-
-    it('uses the first matching rule in the array', () => {
-      setMeta('campaign-id', JSON.stringify([
-        { old: 'abc', new: 'first' },
-        { old: 'abc', new: 'second' },
-      ]));
-      const params = new URLSearchParams('?campaign=abc');
-      expect(getValidCampaignIdFromUrl(params)).to.equal('first');
-    });
-
-    it('applies the correct rule when multiple rules exist', () => {
-      setMeta('campaign-id', JSON.stringify([
-        { old: 'abc', new: 'def' },
-        { old: 'xyz', new: 'uvw' },
-      ]));
-      const params = new URLSearchParams('?campaign=xyz');
-      expect(getValidCampaignIdFromUrl(params)).to.equal('uvw');
-    });
-
-    it('returns null when the new ID fails pattern validation', () => {
-      setMeta('campaign-id', JSON.stringify([{ old: 'abc', new: 'bad/id!' }]));
-      const params = new URLSearchParams('?campaign=abc');
-      expect(getValidCampaignIdFromUrl(params)).to.be.null;
-    });
-
-    it('returns null when campaign param is absent even with rules present', () => {
-      setMeta('campaign-id', JSON.stringify([{ old: 'abc', new: 'def' }]));
-      expect(getValidCampaignIdFromUrl(new URLSearchParams(''))).to.be.null;
+    it('returns null when campaign param exceeds 128 chars', async () => {
+      expect(await getValidCampaignIdFromUrl(new URLSearchParams(`?campaign=${'a'.repeat(129)}`))).to.be.null;
     });
   });
 
-  describe('malformed metadata', () => {
-    it('falls back to original campaign ID when metadata is not valid JSON', () => {
-      setMeta('campaign-id', 'not-json');
-      const params = new URLSearchParams('?campaign=abc');
-      expect(getValidCampaignIdFromUrl(params)).to.equal('abc');
+  describe('with campaign-map.json routing rules', () => {
+    beforeEach(() => mockCampaignMap([
+      { old: 'abc', new: 'def' },
+      { old: 'xyz', new: 'uvw' },
+    ]));
+
+    it('replaces campaign ID when old matches', async () => {
+      expect(await getValidCampaignIdFromUrl(new URLSearchParams('?campaign=abc'))).to.equal('def');
     });
 
-    it('falls back to original campaign ID when metadata is a JSON object (not array)', () => {
-      setMeta('campaign-id', JSON.stringify({ old: 'abc', new: 'def' }));
-      const params = new URLSearchParams('?campaign=abc');
-      expect(getValidCampaignIdFromUrl(params)).to.equal('abc');
+    it('applies the correct rule when multiple rules exist', async () => {
+      expect(await getValidCampaignIdFromUrl(new URLSearchParams('?campaign=xyz'))).to.equal('uvw');
     });
 
-    it('falls back to original campaign ID when metadata is an empty array', () => {
-      setMeta('campaign-id', '[]');
-      const params = new URLSearchParams('?campaign=abc');
-      expect(getValidCampaignIdFromUrl(params)).to.equal('abc');
+    it('returns original ID when no rule matches', async () => {
+      expect(await getValidCampaignIdFromUrl(new URLSearchParams('?campaign=other'))).to.equal('other');
+    });
+
+    it('returns null when campaign param is absent', async () => {
+      expect(await getValidCampaignIdFromUrl(new URLSearchParams(''))).to.be.null;
+    });
+  });
+
+  describe('invalid new ID in rules', () => {
+    beforeEach(() => mockCampaignMap([{ old: 'abc', new: 'bad/id!' }]));
+
+    it('returns null when the new ID fails pattern validation', async () => {
+      expect(await getValidCampaignIdFromUrl(new URLSearchParams('?campaign=abc'))).to.be.null;
     });
   });
 });

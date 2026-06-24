@@ -237,7 +237,7 @@ async function submitForm(bp) {
 
   if (!isValid) return false;
 
-  const campaignId = getValidCampaignIdFromUrl();
+  const campaignId = await getValidCampaignIdFromUrl();
   if (campaignId) {
     payload.campaignId = campaignId;
   }
@@ -1148,7 +1148,7 @@ async function onProfile(bp, formData) {
           if (eventResp.ok) BlockMediator.set('eventData', eventResp.data);
           eventData = BlockMediator.get('eventData');
         }
-        if (eventData?.inviteOnly && !getValidCampaignIdFromUrl()) {
+        if (eventData?.inviteOnly && !await getValidCampaignIdFromUrl()) {
           await dictionaryManager.initialize();
           const msg = getInviteOnlyNoCampaignMessage(dictionaryManager);
           const error = createTag('p', { class: 'error' }, msg);

@@ -295,26 +295,51 @@ export function getSusiOptions(clientMiloConfig) {
   return susiOptions;
 }
 
+const { fetchCampaignMap, resetCampaignMapCache } = (() => {
+  let cache = null;
+  let pending = null;
+  return {
+    resetCampaignMapCache: () => { cache = null; pending = null; },
+    fetchCampaignMap: async () => {
+      if (cache) return cache;
+      if (pending) return pending;
+      pending = (async () => {
+        try {
+          const { origin } = new URL(import.meta.url);
+          const resp = await fetch(`${origin}/event-libs/assets/configs/campaign-map.json`);
+          if (!resp.ok) throw new Error(`Failed to fetch campaign map: ${resp.status}`);
+          cache = (await resp.json()).data;
+          pending = null;
+          return cache;
+        } catch (e) {
+          window.lana?.log(`Error fetching campaign map:\n${e.message}`);
+          pending = null;
+          return null;
+        }
+      })();
+      return pending;
+    },
+  };
+})();
+
+export { resetCampaignMapCache };
+
 /**
  * Returns the campaign ID from the current URL search params if present and valid.
- * If metadata defines a `campaign-id` tag with a JSON array of {old, new} routing rules,
- * and the URL campaign matches an `old` value, the corresponding `new` value is returned.
+ * Loads /event-libs/assets/configs/campaign-map.json and applies any matching
+ * {old, new} routing rule before returning.
  * @param {URLSearchParams} [searchParams] - Optional search params (defaults to window.location.search).
- * @returns {string|null} Valid campaign ID or null.
+ * @returns {Promise<string|null>} Valid campaign ID or null.
  */
-export function getValidCampaignIdFromUrl(searchParams) {
+export async function getValidCampaignIdFromUrl(searchParams) {
   const search = searchParams != null ? searchParams.toString() : window.location.search;
   let campaignId = new URLSearchParams(search).get('campaign');
   if (!campaignId || !CAMPAIGN_ID_PATTERN.test(campaignId)) return null;
 
-  try {
-    const rules = JSON.parse(getMetadata('campaign-id') || 'null');
-    if (Array.isArray(rules)) {
-      const match = rules.find((r) => r.old === campaignId);
-      if (match?.new) campaignId = match.new;
-    }
-  } catch {
-    // malformed metadata — use original campaign ID
+  const map = await fetchCampaignMap();
+  if (Array.isArray(map)) {
+    const match = map.find((r) => r.old === campaignId);
+    if (match?.new) campaignId = match.new;
   }
 
   return CAMPAIGN_ID_PATTERN.test(campaignId) ? campaignId : null;

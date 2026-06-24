@@ -170,7 +170,7 @@ export async function updateRSVPButtonState(rsvpBtn) {
     waitlistEnabled = allowWaitlisting;
     BlockMediator.set('eventData', eventInfo.data);
 
-    if (inviteOnly && !getValidCampaignIdFromUrl()) {
+    if (inviteOnly && !await getValidCampaignIdFromUrl()) {
       setCtaState('inviteOnlyNoCampaign', rsvpBtn);
       return;
     }
