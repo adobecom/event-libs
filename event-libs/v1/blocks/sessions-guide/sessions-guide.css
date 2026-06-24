@@ -1215,6 +1215,42 @@
   color: rgb(0 0 0 / 60%);
 }
 
+.sg-my-sessions__empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--s2a-spacing-lg);
+  padding: var(--s2a-spacing-4xl) var(--s2a-spacing-lg);
+  text-align: center;
+}
+
+.sg-my-sessions__empty p {
+  margin: 0;
+  font-size: var(--s2a-font-size-md);
+  color: var(--s2a-color-content-default);
+}
+
+.sg-my-sessions__see-live-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--s2a-spacing-sm) var(--s2a-spacing-xl);
+  font-family: var(--s2a-font-family-adobe-clean);
+  font-size: var(--s2a-font-size-md);
+  font-weight: var(--s2a-font-weight-adobe-clean-regular);
+  color: var(--s2a-color-content-default);
+  background: none;
+  border: 1.5px solid var(--s2a-color-content-default);
+  border-radius: 9999px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.sg-my-sessions__see-live-btn:hover {
+  background: rgb(0 0 0 / 5%);
+}
+
 /* ── Registration Prompt ─────────────────────────────────── */
 
 .sg-reg-prompt {

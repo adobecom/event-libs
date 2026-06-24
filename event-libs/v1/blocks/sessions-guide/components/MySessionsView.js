@@ -3,10 +3,11 @@ import { useSessionGuide } from '../store/index.js';
 import { RegistrationPrompt } from './RegistrationPrompt.js';
 import { TimeSlotRow } from './TimeSlotRow.js';
 import { SessionCard } from './SessionCard.js';
+import { Carousel } from './Carousel.js';
 import {
-  groupByStartTime, onDemandSessions, filterSessions, sessionsForDay,
+  groupByStartTime, onDemandSessions, filterSessions, sessionsForDay, liveSessions,
 } from '../utils/session-filters.js';
-import { getNowMs } from '../utils/time.js';
+import { getNowMs, formatShortTime } from '../utils/time.js';
 import { deriveSessionState } from '../utils/session-state.js';
 
 export const buildMySessionsView = () => MySessionsView;
@@ -25,9 +26,12 @@ export function MySessionsView() {
   const scheduledSessions = sessions.filter((s) => scheduled.has(s.id));
   const dayScheduled = sessionsForDay(scheduledSessions, activeDay, userTz);
 
+  const live = liveSessions(scheduledSessions, liveStreamActiveIds, activeDay, userTz, nowMs)
+    .sort((a, b) => (a.startTimeUtc < b.startTimeUtc ? -1 : 1));
+
   const activeAndUpcoming = dayScheduled.filter((s) => {
     const st = deriveSessionState(s, liveStreamActiveIds, nowMs);
-    return st === 'upcoming' || st === 'live';
+    return st === 'upcoming';
   });
   const onDemandRaw = onDemandSessions(dayScheduled, liveStreamActiveIds, nowMs);
 
@@ -35,39 +39,61 @@ export function MySessionsView() {
   const filteredOnDemand = filterSessions(onDemandRaw, activeFilters, searchQuery);
   const timeSlots = groupByStartTime(filteredUpcoming);
 
+  const hasUpcoming = timeSlots.length > 0;
+  const hasOnDemand = filteredOnDemand.length > 0;
+  const bothEmpty = !hasUpcoming && !hasOnDemand;
+
+  let effectiveTab = mySessionsTab;
+  if (effectiveTab === 'upcoming' && !hasUpcoming) effectiveTab = 'on-demand';
+  if (effectiveTab === 'on-demand' && !hasOnDemand) effectiveTab = 'upcoming';
+
   function setTab(tab) {
     dispatch({ type: 'SET_MY_TAB', tab });
   }
 
   return html`
     <div class="sg-view sg-view--my-sessions">
-      <div class="sg-my-sessions-tab-bar">
-        <button
-          class=${'sg-my-sessions-tab' + (mySessionsTab === 'upcoming' ? ' sg-my-sessions-tab--active' : '')}
-          onclick=${() => setTab('upcoming')}
-          type="button"
-        >Upcoming</button>
-        <button
-          class=${'sg-my-sessions-tab' + (mySessionsTab === 'on-demand' ? ' sg-my-sessions-tab--active' : '')}
-          onclick=${() => setTab('on-demand')}
-          type="button"
-        >On Demand</button>
-      </div>
-      ${mySessionsTab === 'upcoming' && html`
-        <div class="sg-my-sessions__upcoming">
-          ${timeSlots.map((slot) => html`<${TimeSlotRow} sessions=${slot} />`)}
-          ${timeSlots.length === 0 && html`
-            <div class="sg-empty">No upcoming sessions in your schedule.</div>
-          `}
+      ${live.length > 0 && html`
+        <div class="sg-live-section">
+          <${Carousel}
+            sessions=${live}
+            title="Live now"
+            formatTime=${(s) => formatShortTime(s.startTimeUtc, userTz)}
+          />
         </div>
       `}
-      ${mySessionsTab === 'on-demand' && html`
-        <div class="sg-my-sessions__on-demand">
-          ${filteredOnDemand.map((s) => html`<${SessionCard} session=${s} />`)}
-          ${filteredOnDemand.length === 0 && html`
-            <div class="sg-empty">No on-demand sessions in your schedule yet.</div>
-          `}
+      ${bothEmpty ? html`
+        <div class="sg-my-sessions__empty">
+          <p>You currently have no scheduled sessions.</p>
+          <button
+            class="sg-my-sessions__see-live-btn"
+            type="button"
+            onclick=${() => dispatch({ type: 'SET_VIEW', view: 'live-upcoming' })}
+          >See Live &amp; Upcoming</button>
         </div>
+      ` : html`
+        <div class="sg-my-sessions-tab-bar">
+          ${hasUpcoming && html`<button
+            class=${'sg-my-sessions-tab' + (effectiveTab === 'upcoming' ? ' sg-my-sessions-tab--active' : '')}
+            onclick=${() => setTab('upcoming')}
+            type="button"
+          >Upcoming</button>`}
+          ${hasOnDemand && html`<button
+            class=${'sg-my-sessions-tab' + (effectiveTab === 'on-demand' ? ' sg-my-sessions-tab--active' : '')}
+            onclick=${() => setTab('on-demand')}
+            type="button"
+          >On Demand</button>`}
+        </div>
+        ${effectiveTab === 'upcoming' && html`
+          <div class="sg-my-sessions__upcoming">
+            ${timeSlots.map((slot) => html`<${TimeSlotRow} sessions=${slot} />`)}
+          </div>
+        `}
+        ${effectiveTab === 'on-demand' && html`
+          <div class="sg-my-sessions__on-demand">
+            ${filteredOnDemand.map((s) => html`<${SessionCard} session=${s} />`)}
+          </div>
+        `}
       `}
     </div>
   `;
