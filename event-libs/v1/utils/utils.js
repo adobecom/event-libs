@@ -297,13 +297,21 @@ export function getSusiOptions(clientMiloConfig) {
 
 /**
  * Returns the campaign ID from the current URL search params if present and valid.
+ * If metadata defines `old-campaign-id` and `new-campaign-id`, and the URL campaign
+ * matches `old-campaign-id`, the returned ID is replaced with `new-campaign-id`.
  * @param {URLSearchParams} [searchParams] - Optional search params (defaults to window.location.search).
  * @returns {string|null} Valid campaign ID or null.
  */
 export function getValidCampaignIdFromUrl(searchParams) {
   const search = searchParams != null ? searchParams.toString() : window.location.search;
-  const campaignId = new URLSearchParams(search).get('campaign');
-  return campaignId && CAMPAIGN_ID_PATTERN.test(campaignId) ? campaignId : null;
+  let campaignId = new URLSearchParams(search).get('campaign');
+  if (!campaignId || !CAMPAIGN_ID_PATTERN.test(campaignId)) return null;
+
+  const oldId = getMetadata('old-campaign-id');
+  const newId = getMetadata('new-campaign-id');
+  if (oldId && newId && campaignId === oldId) campaignId = newId;
+
+  return CAMPAIGN_ID_PATTERN.test(campaignId) ? campaignId : null;
 }
 
 export function readBlockConfig(block) {
