@@ -46,6 +46,7 @@ export function LiveUpcomingView() {
             sessions=${live}
             title="Live now"
             formatTime=${(s) => formatShortTime(s.startTimeUtc, userTz)}
+            variant="live"
           />
         </div>
       `}
@@ -55,6 +56,7 @@ export function LiveUpcomingView() {
             sessions=${featured}
             title="Featured"
             formatTime=${() => 'For you'}
+            variant="featured"
           />
         </div>
       `}

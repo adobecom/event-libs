@@ -1,6 +1,7 @@
 import { html } from '../../../deps/htm-preact.js';
 import { useSessionGuide } from '../store/index.js';
 import { formatShortTime, getNowMs } from '../utils/time.js';
+import { deriveSessionState } from '../utils/session-state.js';
 import { scheduleAction, favoriteAction } from '../services/session-actions.js';
 import { setSessionParam } from '../utils/url.js';
 import { CategoryBadge } from './CategoryBadge.js';
@@ -14,20 +15,24 @@ function formatDuration(ms) {
 
 export const buildLiveCard = () => LiveCard;
 
-export function LiveCard({ session }) {
+export function LiveCard({ session, variant = 'live' }) {
   const { state, dispatch } = useSessionGuide();
   const { scheduled, favorited, eventConfig } = state;
   const pendingActions = state.pendingActions || new Set();
+  const liveStreamActiveIds = state.liveStreamActiveIds || new Set();
   const { userTz, trackColors, surface } = eventConfig;
 
   const isScheduled = scheduled.has(session.id);
   const isFavorited = favorited.has(session.id);
   const isPending = pendingActions.has(session.id);
 
+  const nowMs = getNowMs();
+  const sessionState = deriveSessionState(session, liveStreamActiveIds, nowMs);
+
   const startMs = Date.parse(session.startTimeUtc);
   const endMs = Date.parse(session.endTimeUtc);
   const duration = endMs - startMs;
-  const elapsed = Math.min(Math.max(getNowMs() - startMs, 0), duration);
+  const elapsed = Math.min(Math.max(nowMs - startMs, 0), duration);
   const progressPct = duration > 0 ? Math.round((elapsed / duration) * 100) : 0;
   const durationLabel = duration >= 0 ? formatDuration(duration) : '';
 
@@ -51,6 +56,32 @@ export function LiveCard({ session }) {
   async function handleFavorite(e) {
     e.stopPropagation();
     await favoriteAction(session, state, dispatch);
+  }
+
+  const watchHref = session.watchUrl || session.sessionPageUrl;
+
+  let primaryCta;
+  if (variant === 'featured') {
+    if (sessionState === 'upcoming') {
+      primaryCta = html`<button
+        class=${'sg-live-card__btn sg-live-card__btn--watch' + (isScheduled ? ' is-scheduled' : '') + (isPending ? ' is-pending' : '')}
+        onclick=${handleSchedule}
+        disabled=${isPending}
+        type="button"
+      >${isScheduled ? 'Added to schedule' : 'Add to schedule'}</button>`;
+    } else if (sessionState === 'on-demand' && watchHref) {
+      primaryCta = html`<button
+        class="sg-live-card__btn sg-live-card__btn--watch"
+        onclick=${(e) => { e.stopPropagation(); window.location.href = watchHref; }}
+        type="button"
+      >Watch on demand</button>`;
+    }
+  } else if (session.watchUrl) {
+    primaryCta = html`<button
+      class="sg-live-card__btn sg-live-card__btn--watch"
+      onclick=${(e) => { e.stopPropagation(); window.location.href = session.watchUrl; }}
+      type="button"
+    ><svg class="sg-live-card__play-icon" width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false"><path d="M4.74902 18.004C4.35107 18.004 3.95361 17.8966 3.5957 17.6827C2.90966 17.2726 2.5 16.5499 2.5 15.7511V4.24912C2.5 3.45029 2.90967 2.72764 3.5957 2.31748C4.28125 1.9083 5.11084 1.88779 5.81494 2.26768L16.5161 8.01866C17.2466 8.41124 17.7002 9.171 17.7002 10.0001C17.7002 10.8292 17.2466 11.589 16.5161 11.9816L5.81494 17.7325C5.47851 17.9142 5.11328 18.004 4.74902 18.004ZM4.75244 3.49619C4.57422 3.49619 4.43408 3.56455 4.36523 3.60557C4.25537 3.671 4 3.86534 4 4.24912V15.7511C4 16.1349 4.25537 16.3292 4.36523 16.3946C4.47509 16.4601 4.7666 16.5929 5.10498 16.4122L15.8057 10.6612C16.1616 10.4688 16.2002 10.1349 16.2002 10.0001C16.2002 9.86533 16.1616 9.53134 15.8057 9.33896L5.10498 3.58799C4.97852 3.52061 4.85889 3.49619 4.75244 3.49619Z" fill="currentColor"/></svg>Watch now</button>`;
   }
 
   function handleCardClick() {
@@ -84,11 +115,7 @@ export function LiveCard({ session }) {
         <p class="sg-live-card__title">${session.title}</p>
         <p class="sg-live-card__desc">${session.description}</p>
         <div class="sg-live-card__actions">
-          ${session.watchUrl && html`<button
-            class="sg-live-card__btn sg-live-card__btn--watch"
-            onclick=${(e) => { e.stopPropagation(); window.location.href = session.watchUrl; }}
-            type="button"
-          ><svg class="sg-live-card__play-icon" width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false"><path d="M4.74902 18.004C4.35107 18.004 3.95361 17.8966 3.5957 17.6827C2.90966 17.2726 2.5 16.5499 2.5 15.7511V4.24912C2.5 3.45029 2.90967 2.72764 3.5957 2.31748C4.28125 1.9083 5.11084 1.88779 5.81494 2.26768L16.5161 8.01866C17.2466 8.41124 17.7002 9.171 17.7002 10.0001C17.7002 10.8292 17.2466 11.589 16.5161 11.9816L5.81494 17.7325C5.47851 17.9142 5.11328 18.004 4.74902 18.004ZM4.75244 3.49619C4.57422 3.49619 4.43408 3.56455 4.36523 3.60557C4.25537 3.671 4 3.86534 4 4.24912V15.7511C4 16.1349 4.25537 16.3292 4.36523 16.3946C4.47509 16.4601 4.7666 16.5929 5.10498 16.4122L15.8057 10.6612C16.1616 10.4688 16.2002 10.1349 16.2002 10.0001C16.2002 9.86533 16.1616 9.53134 15.8057 9.33896L5.10498 3.58799C4.97852 3.52061 4.85889 3.49619 4.75244 3.49619Z" fill="currentColor"/></svg>Watch now</button>`}
+          ${primaryCta}
           <button
             class=${'sg-live-card__btn sg-live-card__btn--schedule' + (isScheduled ? ' is-scheduled' : '') + (isPending ? ' is-pending' : '')}
             onclick=${handleSchedule}
