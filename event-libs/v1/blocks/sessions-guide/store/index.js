@@ -60,6 +60,7 @@ export function buildInitialState(eventConfig, initialSessions = []) {
     activeFilters: {},
     searchQuery: '',
     mySessionsTab: 'upcoming',
+    myFavoritesTab: 'upcoming',
     isLoggedIn,
     isRegistered,
     userFirstName,
@@ -135,6 +136,8 @@ export function reducer(state, action) {
       return { ...state, searchQuery: action.query };
     case 'SET_MY_TAB':
       return { ...state, mySessionsTab: action.tab };
+    case 'SET_MY_FAVORITES_TAB':
+      return { ...state, myFavoritesTab: action.tab };
     case 'IMS_UPDATE':
       return {
         ...state,
