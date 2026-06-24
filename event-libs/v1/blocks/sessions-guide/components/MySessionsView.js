@@ -2,10 +2,10 @@ import { html } from '../../../deps/htm-preact.js';
 import { useSessionGuide } from '../store/index.js';
 import { RegistrationPrompt } from './RegistrationPrompt.js';
 import { TimeSlotRow } from './TimeSlotRow.js';
-import { SessionCard } from './SessionCard.js';
+import { TrackRow } from './TrackRow.js';
 import { Carousel } from './Carousel.js';
 import {
-  groupByStartTime, onDemandSessions, filterSessions, sessionsForDay, liveSessions,
+  groupByStartTime, groupByTrack, onDemandSessions, filterSessions, sessionsForDay, liveSessions,
 } from '../utils/session-filters.js';
 import { getNowMs, formatShortTime } from '../utils/time.js';
 import { deriveSessionState } from '../utils/session-state.js';
@@ -69,7 +69,7 @@ export function MySessionsView() {
             class="sg-my-sessions__see-live-btn"
             type="button"
             onclick=${() => dispatch({ type: 'SET_VIEW', view: 'live-upcoming' })}
-          >See Live &amp; Upcoming</button>
+          >See Live & Upcoming</button>
         </div>
       ` : html`
         <div class="sg-my-sessions-tab-bar">
@@ -91,7 +91,9 @@ export function MySessionsView() {
         `}
         ${effectiveTab === 'on-demand' && html`
           <div class="sg-my-sessions__on-demand">
-            ${filteredOnDemand.map((s) => html`<${SessionCard} session=${s} />`)}
+            ${groupByTrack(filteredOnDemand).map(([track, trackSessions]) => html`
+              <${TrackRow} track=${track} sessions=${trackSessions} />
+            `)}
           </div>
         `}
       `}
