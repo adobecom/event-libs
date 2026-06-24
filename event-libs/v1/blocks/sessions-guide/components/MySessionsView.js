@@ -54,7 +54,7 @@ export function MySessionsView() {
   return html`
     <div class="sg-view sg-view--my-sessions">
       ${live.length > 0 && html`
-        <div class="sg-live-section">
+        <div class="sg-carousel-section sg-carousel-section--live">
           <${Carousel}
             sessions=${live}
             title="Live now"

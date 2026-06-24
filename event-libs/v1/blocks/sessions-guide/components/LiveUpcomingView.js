@@ -41,7 +41,7 @@ export function LiveUpcomingView() {
   return html`
     <div class="sg-view sg-view--live-upcoming">
       ${live.length > 0 && html`
-        <div class="sg-live-section">
+        <div class="sg-carousel-section sg-carousel-section--live">
           <${Carousel}
             sessions=${live}
             title="Live now"
@@ -50,7 +50,7 @@ export function LiveUpcomingView() {
         </div>
       `}
       ${featured.length > 0 && html`
-        <div class="sg-live-section sg-live-section--featured">
+        <div class="sg-carousel-section sg-carousel-section--featured">
           <${Carousel}
             sessions=${featured}
             title="Featured"

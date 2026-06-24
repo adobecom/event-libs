@@ -473,7 +473,7 @@
   padding: 0 0 var(--s2a-spacing-3xl);
 }
 
-.sg-live-section {
+.sg-carousel-section {
   padding: var(--s2a-spacing-lg) 0 var(--s2a-spacing-lg) var(--s2a-spacing-lg);
   background: var(--s2a-color-gray-50);
   overflow: visible;
@@ -491,7 +491,7 @@
   gap: var(--s2a-spacing-xs);
 }
 
-.sg-section-title::before {
+.sg-carousel-section--live .sg-section-title::before {
   content: '';
   display: inline-block;
   width: 8px;
@@ -661,6 +661,10 @@
   display: flex;
   align-items: center;
   gap: 12px;
+}
+
+.sg-carousel-section--featured .sg-live-card__progress-row {
+  display: none;
 }
 
 .sg-live-card__progress {
@@ -1386,7 +1390,7 @@
 
   /* ── Live section / Carousel ───────────────────────────────── */
 
-  .sg-live-section {
+  .sg-carousel-section {
     background: var(--s2a-color-gray-75);
     overflow: visible;
   }
@@ -1689,7 +1693,7 @@
 
   /* ── Section headers ───────────────────────────────────────── */
 
-  .sg-live-section {
+  .sg-carousel-section {
     padding: 36px 20px var(--s2a-spacing-3xl) 20px;
     overflow: visible;
   }
@@ -1700,7 +1704,7 @@
     font-size: var(--s2a-font-size-2xl);
   }
 
-  .sg-section-title::before {
+  .sg-carousel-section--live .sg-section-title::before {
     width: 8px;
     height: 8px;
   }

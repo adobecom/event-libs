@@ -54,7 +54,7 @@ export function MyFavoritesView() {
   return html`
     <div class="sg-view sg-view--my-favorites">
       ${live.length > 0 && html`
-        <div class="sg-live-section">
+        <div class="sg-carousel-section sg-carousel-section--live">
           <${Carousel}
             sessions=${live}
             title="Live now"

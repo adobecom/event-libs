@@ -61,7 +61,7 @@ describe('LiveUpcomingView', () => {
   it('shows live section when live sessions exist', () => {
     const store = makeStore([LIVE_SESSION]);
     const View = buildLiveUpcomingView(preact, store);
-    expect(View({})).to.include('sg-live-section');
+    expect(View({})).to.include('sg-carousel-section');
     expect(View({})).to.include('Live now');
   });
 
