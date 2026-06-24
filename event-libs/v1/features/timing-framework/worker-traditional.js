@@ -338,6 +338,28 @@ class TimingWorker {
     return currentTime > numericToggleTime;
   }
 
+  async shouldSkipInactiveMrSlot(scheduleItem) {
+    if (!scheduleItem?.mobileRider) return false;
+
+    const timePassed = await this.hasToggleTimePassed(scheduleItem);
+    if (!timePassed) return false;
+
+    const mobileRiderStore = this.plugins.get('mobileRider');
+    if (!mobileRiderStore) return false;
+
+    const { sessionId } = scheduleItem.mobileRider;
+    const isActive = mobileRiderStore.get(sessionId);
+    const avoidingStreamEnd = this.testingManager.shouldAvoidStreamEnd();
+    return !avoidingStreamEnd && !isActive;
+  }
+
+  async advancePastInactiveMrSlots() {
+    while (this.nextScheduleItem && await this.shouldSkipInactiveMrSlot(this.nextScheduleItem)) {
+      this.currentScheduleItem = { ...this.nextScheduleItem };
+      this.nextScheduleItem = this.nextScheduleItem.next;
+    }
+  }
+
   /**
    * @param {Object} scheduleItem
    * @returns {boolean}
@@ -365,16 +387,7 @@ class TimingWorker {
 
     if (scheduleItem.mobileRider) {
       const timePassed = await this.hasToggleTimePassed(scheduleItem);
-      if (!timePassed) return false;
-
-      const mobileRiderStore = this.plugins.get('mobileRider');
-      if (mobileRiderStore) {
-        const { sessionId } = scheduleItem.mobileRider;
-        const isActive = mobileRiderStore.get(sessionId);
-        if (!this.testingManager.shouldAvoidStreamEnd() && !isActive) {
-          return true;
-        }
-      }
+      if (!timePassed && !liveStreamEnd) return false;
     }
 
     // Check metadata conditions if present
@@ -401,6 +414,8 @@ class TimingWorker {
   }
 
   async runTimer() {
+    await this.advancePastInactiveMrSlots();
+
     const shouldTrigger = await this.shouldTriggerNextSchedule(this.nextScheduleItem);
 
     let itemToSend = null;

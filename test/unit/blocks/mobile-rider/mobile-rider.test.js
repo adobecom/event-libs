@@ -359,6 +359,41 @@ describe('Mobile Rider Module', () => {
         const onCall = player.on.getCalls().find((c) => c.args[0] === 'streamend');
         expect(() => onCall.args[1]()).to.not.throw();
       });
+
+      it('should not re-embed after streamend when pending rAF has not run', async () => {
+        globalThis.mobilerider.embed = sinon.stub();
+        riderInstance.mainID = 'main-video';
+        riderInstance.store = { get: sinon.stub().returns(true), set: sinon.stub() };
+
+        const videoWrapper = document.createElement('div');
+        videoWrapper.className = 'video-wrapper';
+        el.appendChild(videoWrapper);
+        riderInstance.wrap = videoWrapper;
+        riderInstance.isEmbedding = false;
+
+        riderInstance.injectPlayer('test-video', 'test-skin');
+        globalThis.__mr_player = { off: sinon.stub(), on: sinon.stub(), dispose: sinon.stub() };
+        await new Promise((resolve) => { setTimeout(resolve, 50); });
+
+        const embedCountAfterFirst = globalThis.mobilerider.embed.callCount;
+        const onCall = globalThis.__mr_player.on.getCalls().find((c) => c.args[0] === 'streamend');
+        expect(onCall).to.not.be.undefined;
+
+        let pendingRaf = null;
+        window.requestAnimationFrame.restore();
+        sinon.stub(window, 'requestAnimationFrame').callsFake((cb) => {
+          pendingRaf = cb;
+          return 2;
+        });
+        riderInstance.isEmbedding = false;
+        riderInstance.injectPlayer('test-video', 'test-skin');
+
+        onCall.args[1]();
+        expect(riderInstance.wrap.querySelector('.mobile-rider-container.is-hidden')).to.not.be.null;
+
+        pendingRaf?.();
+        expect(globalThis.mobilerider.embed.callCount).to.equal(embedCountAfterFirst);
+      });
     });
 
     describe('embed error handling', () => {
@@ -597,6 +632,27 @@ describe('Mobile Rider Module', () => {
       // The plugin file exists so the import succeeds;
       // verify init completed without errors
       expect(riderInstance.el).to.equal(el);
+    });
+
+    it('should not embed player when stream is already inactive in chrono-box', async () => {
+      sessionStorage.setItem('chrono-box-tab-id', 'test-tab-id');
+
+      const { mobileRiderStore } = await import(
+        '../../../../event-libs/v1/features/timing-framework/plugins/mobile-rider/plugin.js'
+      );
+      mobileRiderStore.set('test-video-123', false);
+
+      document.body.innerHTML = `
+        <div class="chrono-box">
+          ${defaultHtml}
+        </div>
+      `;
+      const el = document.querySelector('.mobile-rider');
+      riderInstance = init(el);
+      await new Promise((resolve) => { setTimeout(resolve, 300); });
+
+      expect(globalThis.mobilerider.embed.called).to.be.false;
+      expect(el.querySelector('.mobile-rider-player.is-hidden')).to.not.be.null;
     });
   });
 
