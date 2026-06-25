@@ -55,7 +55,7 @@ export function LiveUpcomingView() {
           <${Carousel}
             sessions=${featured}
             title="Featured"
-            formatTime=${() => 'For you'}
+            formatTime=${() => 'Trending'}
             variant="featured"
           />
         </div>
