@@ -1,10 +1,15 @@
 import { html, useState, useRef, useEffect } from '../../../deps/htm-preact.js';
+import { useSessionGuide } from '../store/index.js';
 import { SessionCard } from './SessionCard.js';
 
 export const buildTrackRow = () => TrackRow;
 
 export function TrackRow({ track, sessions }) {
   if (!sessions || !sessions.length) return null;
+
+  const { state } = useSessionGuide();
+  const dismissingIds = state.dismissingIds || new Set();
+  const allDismissing = sessions.every((s) => dismissingIds.has(s.id));
 
   const [offset, setOffset] = useState(0);
   const stripRef = useRef(null);
@@ -22,7 +27,7 @@ export function TrackRow({ track, sessions }) {
   const translateX = offset * (cardWidthRef.current || 280);
 
   return html`
-    <div class="sg-time-row">
+    <div class=${'sg-time-row' + (allDismissing ? ' sg-time-row--collapsing' : '')}>
       <div class="sg-time-row__label">${track}</div>
       <div class="sg-time-row__track">
         ${offset > 0 && html`<button

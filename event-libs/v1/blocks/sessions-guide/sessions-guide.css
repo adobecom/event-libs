@@ -2186,14 +2186,14 @@
     display: none;
   }
 
-  /* Heart slides down into its correct position as schedule reveals above it */
-  .sg-card.is-favorited:not(.is-scheduled):hover .sg-card__btn--favorite {
+  /* Heart slides down into its correct position as schedule reveals above it.
+     Classes set on mouseenter only — prevents re-trigger on state change while hovered. */
+  .sg-card--anim-fav .sg-card__btn--favorite {
     animation: sg-card-heart-slide 0.3s cubic-bezier(0.22, 1, 0.36, 1) both;
   }
 
-  /* Schedule fades in while heart slides — heart also fades in for scheduled-only */
-  .sg-card.is-favorited:not(.is-scheduled):hover .sg-card__btn--schedule,
-  .sg-card.is-scheduled:not(.is-favorited):hover .sg-card__btn--favorite {
+  .sg-card--anim-fav .sg-card__btn--schedule,
+  .sg-card--anim-sched .sg-card__btn--favorite {
     animation: sg-card-btn-reveal 0.22s ease both;
   }
 
@@ -2209,6 +2209,32 @@
 
   .sg-card__btn {
     transition: background 0.15s;
+  }
+
+  /* Card dismiss: collapses horizontally + fades out */
+  .sg-card--collapsing {
+    opacity: 0 !important;
+    max-width: 0 !important;
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+    pointer-events: none;
+    overflow: hidden;
+  }
+
+  /* Row dismiss: collapses vertically + fades out */
+  .sg-time-row--collapsing {
+    opacity: 0 !important;
+    max-height: 0 !important;
+    margin-top: 0 !important;
+    margin-bottom: 0 !important;
+    padding-top: 0 !important;
+    padding-bottom: 0 !important;
+    border-top-width: 0 !important;
+    border-bottom-width: 0 !important;
+    pointer-events: none;
+    overflow: hidden;
   }
 }
 

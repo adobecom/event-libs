@@ -10,6 +10,8 @@ export function TimeSlotRow({ sessions, forceOnDemand = false }) {
 
   const { state } = useSessionGuide();
   const userTz = state.eventConfig.userTz;
+  const dismissingIds = state.dismissingIds || new Set();
+  const allDismissing = sessions.every((s) => dismissingIds.has(s.id));
   const [offset, setOffset] = useState(0);
   const stripRef = useRef(null);
   const cardWidthRef = useRef(0);
@@ -27,7 +29,7 @@ export function TimeSlotRow({ sessions, forceOnDemand = false }) {
   const translateX = offset * (cardWidthRef.current || 280);
 
   return html`
-    <div class="sg-time-row">
+    <div class=${'sg-time-row' + (allDismissing ? ' sg-time-row--collapsing' : '')}>
       <div class="sg-time-row__label">${formatShortTime(sessions[0].startTimeUtc, userTz)}</div>
       <div class="sg-time-row__track">
         ${offset > 0 && html`<button

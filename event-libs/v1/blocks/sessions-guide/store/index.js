@@ -68,6 +68,7 @@ export function buildInitialState(eventConfig, initialSessions = []) {
     activeSessionId: null,
     toast: null,
     pendingActions: new Set(),
+    dismissingIds: new Set(),
     regPromptOpen: false,
     conflictModal: null,
   };
@@ -204,6 +205,14 @@ export function reducer(state, action) {
       return { ...state, conflictModal: action.conflict };
     case 'HIDE_CONFLICT':
       return { ...state, conflictModal: null };
+
+    case 'ADD_DISMISSING_ID':
+      return { ...state, dismissingIds: new Set([...state.dismissingIds, action.id]) };
+    case 'REMOVE_DISMISSING_ID': {
+      const next = new Set(state.dismissingIds);
+      next.delete(action.id);
+      return { ...state, dismissingIds: next };
+    }
 
     default:
       return state;

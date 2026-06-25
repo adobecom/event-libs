@@ -1,4 +1,4 @@
-import { html } from '../../../deps/htm-preact.js';
+import { html, useState } from '../../../deps/htm-preact.js';
 import { useSessionGuide } from '../store/index.js';
 import { isSessionOnDemand, formatSessionTime, formatShortTime, getNowMs } from '../utils/time.js';
 import { scheduleAction, favoriteAction } from '../services/session-actions.js';
@@ -11,13 +11,15 @@ export const buildSessionCard = () => SessionCard;
 
 export function SessionCard({ session, forceOnDemand = false }) {
   const { state, dispatch } = useSessionGuide();
-  const { scheduled, favorited, eventConfig } = state;
+  const { scheduled, favorited, eventConfig, activeView } = state;
   const pendingActions = state.pendingActions || new Set();
+  const dismissingIds = state.dismissingIds || new Set();
   const { userTz, surface, trackColors } = eventConfig;
 
   const isScheduled = scheduled.has(session.id);
   const isFavorited = favorited.has(session.id);
   const isPending = pendingActions.has(session.id);
+  const [hoverAnim, setHoverAnim] = useState(null);
   const onDemandNatural = isSessionOnDemand(session, getNowMs());
   const onDemand = forceOnDemand || onDemandNatural;
   const trackColor = (trackColors && trackColors[session.track]) || '';
@@ -40,16 +42,39 @@ export function SessionCard({ session, forceOnDemand = false }) {
     onDemand ? 'sg-card--on-demand' : '',
     forceOnDemand ? 'sg-card--previously-aired' : '',
     isPending ? 'is-pending' : '',
+    hoverAnim === 'fav' ? 'sg-card--anim-fav' : '',
+    hoverAnim === 'sched' ? 'sg-card--anim-sched' : '',
+    dismissingIds.has(session.id) ? 'sg-card--collapsing' : '',
   ].filter(Boolean).join(' ');
+
+  function onMouseEnter() {
+    if (isFavorited && !isScheduled) setHoverAnim('fav');
+    else if (isScheduled && !isFavorited) setHoverAnim('sched');
+  }
+  function onMouseLeave() {
+    setHoverAnim(null);
+  }
 
   async function handleSchedule(e) {
     e.stopPropagation();
+    const willDismiss = activeView === 'my-sessions' && isScheduled;
+    if (willDismiss) {
+      dispatch({ type: 'ADD_DISMISSING_ID', id: session.id });
+      await new Promise((r) => setTimeout(r, 450));
+    }
     await scheduleAction(session, state, dispatch);
+    if (willDismiss) dispatch({ type: 'REMOVE_DISMISSING_ID', id: session.id });
   }
 
   async function handleFavorite(e) {
     e.stopPropagation();
+    const willDismiss = activeView === 'my-favorites' && isFavorited;
+    if (willDismiss) {
+      dispatch({ type: 'ADD_DISMISSING_ID', id: session.id });
+      await new Promise((r) => setTimeout(r, 450));
+    }
     await favoriteAction(session, state, dispatch);
+    if (willDismiss) dispatch({ type: 'REMOVE_DISMISSING_ID', id: session.id });
   }
 
   function handlePlay(e) {
@@ -87,7 +112,8 @@ export function SessionCard({ session, forceOnDemand = false }) {
   }
 
   return html`
-    <div class=${cardClass} onclick=${handleClick} role="button" tabindex="0">
+    <div class=${cardClass} onclick=${handleClick} role="button" tabindex="0"
+      onmouseenter=${onMouseEnter} onmouseleave=${onMouseLeave}>
       <div class="sg-card__body">
         <div class="sg-card__badge-row">
           <${CategoryBadge} category=${session.category} size="sm" />
