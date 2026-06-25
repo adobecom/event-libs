@@ -73,7 +73,7 @@ export function TrackRow({ track, sessions }) {
         ><svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false"><path fill-rule="evenodd" clip-rule="evenodd" d="M2.67915 6.76384L11.2053 6.76384C11.6361 6.76384 11.9853 6.41462 11.9853 5.98384C11.9853 5.55306 11.6361 5.20384 11.2053 5.20384L2.67935 5.20384L5.44863 2.43455C5.75324 2.12994 5.75324 1.63607 5.44863 1.33146C5.14402 1.02686 4.65015 1.02686 4.34555 1.33147L0.244622 5.4324C-0.0599855 5.737 -0.0599849 6.23087 0.244624 6.53548L4.34556 10.6364C4.65017 10.941 5.14403 10.941 5.44864 10.6364C5.75325 10.3318 5.75325 9.83793 5.44864 9.53332L2.67915 6.76384Z" fill="currentColor"/></svg></button>`}
         <div class="sg-time-row__viewport" ref=${viewportRef}>
           <div class="sg-time-row__cards" ref=${stripRef} style=${'transform:translateX(-' + tx + 'px)'}>
-            ${sessions.map((s) => html`<div class="sg-time-row__card-wrap" key=${s.id}><${SessionCard} session=${s} forceOnDemand=${true} /></div>`)}
+            ${sessions.map((s) => html`<div class=${'sg-time-row__card-wrap' + (dismissingIds.has(s.id) ? ' sg-time-row__card-wrap--collapsing' : '')} key=${s.id}><${SessionCard} session=${s} forceOnDemand=${true} /></div>`)}
           </div>
         </div>
         ${showNext && html`<button

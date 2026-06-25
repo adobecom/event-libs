@@ -937,6 +937,12 @@
   scroll-snap-align: none;
   min-width: 0;
   width: 255px;
+  transition: max-width 0.45s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.sg-time-row__card-wrap--collapsing {
+  max-width: 0 !important;
+  overflow: hidden;
 }
 
 .sg-time-row__arrow {

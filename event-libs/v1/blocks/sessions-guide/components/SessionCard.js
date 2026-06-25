@@ -59,6 +59,12 @@ export function SessionCard({ session, forceOnDemand = false }) {
     e.stopPropagation();
     const willDismiss = activeView === 'my-sessions' && isScheduled;
     if (willDismiss) {
+      const cardWrap = e.currentTarget.closest('.sg-card')?.parentElement;
+      if (cardWrap) {
+        cardWrap.style.maxWidth = `${cardWrap.offsetWidth}px`;
+        // eslint-disable-next-line no-unused-expressions
+        cardWrap.offsetHeight; // force reflow so transition starts from current width, not none
+      }
       dispatch({ type: 'ADD_DISMISSING_ID', id: session.id });
       await new Promise((r) => setTimeout(r, 450));
     }
@@ -70,6 +76,12 @@ export function SessionCard({ session, forceOnDemand = false }) {
     e.stopPropagation();
     const willDismiss = activeView === 'my-favorites' && isFavorited;
     if (willDismiss) {
+      const cardWrap = e.currentTarget.closest('.sg-card')?.parentElement;
+      if (cardWrap) {
+        cardWrap.style.maxWidth = `${cardWrap.offsetWidth}px`;
+        // eslint-disable-next-line no-unused-expressions
+        cardWrap.offsetHeight; // force reflow so transition starts from current width, not none
+      }
       dispatch({ type: 'ADD_DISMISSING_ID', id: session.id });
       await new Promise((r) => setTimeout(r, 450));
     }
