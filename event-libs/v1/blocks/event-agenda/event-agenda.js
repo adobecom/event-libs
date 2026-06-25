@@ -1,4 +1,5 @@
 import { createOptimizedPicture, createTag, getMetadata, getEventConfig, getImageSource } from '../../utils/utils.js';
+import { LOCALE_FORMATTERS, applyLocaleFormat } from '../../utils/date-time-helper.js';
 
 const TIME_FORMAT_OPTIONS = {
   hour: 'numeric',
@@ -74,6 +75,7 @@ export function convertEventTimeToLocalTime(time, eventTimezone, eventDateMillis
       const [, gotHour, gotMin, gotSec] = match.map(Number);
       
       if (gotHour === hours && gotMin === minutes && gotSec === seconds) {
+        if (TIME_FORMAT_OPTIONS.hour12 && LOCALE_FORMATTERS[locale]) return LOCALE_FORMATTERS[locale](gotHour, gotMin);
         return guess.toLocaleTimeString(locale, TIME_FORMAT_OPTIONS);
       }
       
@@ -82,6 +84,7 @@ export function convertEventTimeToLocalTime(time, eventTimezone, eventDateMillis
       guess = new Date(guess.getTime() + (wantedSeconds - gotSeconds) * 1000);
     }
     
+    if (TIME_FORMAT_OPTIONS.hour12 && LOCALE_FORMATTERS[locale]) return LOCALE_FORMATTERS[locale](hours, minutes);
     return guess.toLocaleTimeString(locale, TIME_FORMAT_OPTIONS);
   } catch (error) {
     window.lana?.log(`Error converting event time: ${error.message}`);
@@ -98,6 +101,7 @@ export function convertEventTimeToLocalTime(time, eventTimezone, eventDateMillis
  */
 export function convertToLocaleTimeFormat(time, locale) {
   const [hours, minutes, seconds] = time.split(':').map(Number);
+  if (TIME_FORMAT_OPTIONS.hour12) return applyLocaleFormat(hours, minutes, locale);
   const date = new Date();
   date.setHours(hours, minutes, seconds, 0);
   return new Intl.DateTimeFormat(locale, TIME_FORMAT_OPTIONS).format(date);
@@ -176,7 +180,7 @@ export default async function init(el) {
     container.classList.add('more-than-six');
   }
 
-  const localeString = getEventConfig().miloConfig.locale?.ietf || 'en-US';
+  const localeString = getMetadata('locale') || getEventConfig().miloConfig.locale?.ietf || 'en-US';
   const eventTimezone = getMetadata('timezone');
   const eventStartMillis = getMetadata('local-start-time-millis');
 
