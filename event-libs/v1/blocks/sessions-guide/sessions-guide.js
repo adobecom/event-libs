@@ -12,6 +12,21 @@ const DEFAULT_FILTER_CATEGORIES = [
   { id: 'type', label: 'Session Type' },
 ];
 
+// TODO: remove once category-colors is authored via block config
+const MOCK_CATEGORY_COLORS = {
+  'social-media': '#FF6B35',
+  'design-and-illustration': '#9D50BB',
+  'mainstage': '#E91E63',
+  '3d': '#00BCD4',
+  'photography': '#4CAF50',
+  'business': '#2196F3',
+  'content-creator': '#FF9800',
+  'education': '#FF5722',
+  'branding': '#607D8B',
+  'generative-ai': '#8BC34A',
+  'video': '#F44336',
+};
+
 function parseConfig(el) {
   const config = {
     title: '',
@@ -22,6 +37,7 @@ function parseConfig(el) {
     filterCategories: DEFAULT_FILTER_CATEGORIES,
     trackIcons: {},
     trackColors: {},
+    categoryColors: {},
     manualOnDemandTransitionTime: null,
     featuredSessionIds: [],
     theme: null,
@@ -56,6 +72,11 @@ function parseConfig(el) {
           window.lana?.log('[sessions-guide] invalid track-colors JSON');
         }
         break;
+      case 'category-colors':
+        try { config.categoryColors = JSON.parse(val); } catch {
+          window.lana?.log('[sessions-guide] invalid category-colors JSON');
+        }
+        break;
       case 'featured-sessions':
         try { config.featuredSessionIds = JSON.parse(val); } catch {
           window.lana?.log('[sessions-guide] invalid featured-sessions JSON');
@@ -84,6 +105,10 @@ export default async function init(el) {
   // TODO: remove once featured-sessions is authored via block config
   if (!eventConfig.featuredSessionIds.length) {
     eventConfig.featuredSessionIds = MOCK_FEATURED_IDS;
+  }
+  // TODO: remove once category-colors is authored via block config
+  if (!Object.keys(eventConfig.categoryColors).length) {
+    eventConfig.categoryColors = MOCK_CATEGORY_COLORS;
   }
   const initialSessions = await fetchSessions(eventConfig.rfApiUrl).catch(() => []);
 

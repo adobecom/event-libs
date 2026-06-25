@@ -1,4 +1,5 @@
 import { html } from '../../../deps/htm-preact.js';
+import { useSessionGuide } from '../store/index.js';
 
 const BADGE_MAP = {
   'social-media': {
@@ -109,9 +110,13 @@ export function CategoryBadge({ category, size }) {
   const config = BADGE_MAP[key];
   if (!config) return null;
   const cls = size === 'sm' ? 'sg-category-badge sg-category-badge--sm' : 'sg-category-badge';
+  const { state } = useSessionGuide();
+  const color = (state.eventConfig?.categoryColors || {})[key];
   return html`
     <span class=${cls}>
-      ${config.renderIcon()}
+      <span class="sg-category-badge__icon-color" style=${color ? `color:${color}` : ''}>
+        ${config.renderIcon()}
+      </span>
       <span class="sg-category-badge__label">${config.label}</span>
     </span>
   `;

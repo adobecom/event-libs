@@ -2351,11 +2351,17 @@
   white-space: nowrap;
 }
 
+.sg-category-badge__icon-color {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
 .sg-category-badge__icon {
-  display: inline-block;
+  display: block;
   width: 20px;
   height: 20px;
-  flex-shrink: 0;
 }
 
 .sg-category-badge__label {
