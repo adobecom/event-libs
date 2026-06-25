@@ -2186,6 +2186,27 @@
     display: none;
   }
 
+  /* Heart slides down into its correct position as schedule reveals above it */
+  .sg-card.is-favorited:not(.is-scheduled):hover .sg-card__btn--favorite {
+    animation: sg-card-heart-slide 0.3s cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+
+  /* Schedule fades in while heart slides — heart also fades in for scheduled-only */
+  .sg-card.is-favorited:not(.is-scheduled):hover .sg-card__btn--schedule,
+  .sg-card.is-scheduled:not(.is-favorited):hover .sg-card__btn--favorite {
+    animation: sg-card-btn-reveal 0.22s ease both;
+  }
+
+  @keyframes sg-card-heart-slide {
+    from { transform: translateY(-48px); }
+    to { transform: translateY(0); }
+  }
+
+  @keyframes sg-card-btn-reveal {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+
   .sg-card__btn {
     transition: background 0.15s;
   }
