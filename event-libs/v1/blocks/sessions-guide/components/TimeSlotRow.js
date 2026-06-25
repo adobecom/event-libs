@@ -7,9 +7,16 @@ export const buildTimeSlotRow = () => TimeSlotRow;
 
 export function TimeSlotRow({ sessions, forceOnDemand = false }) {
   const { state } = useSessionGuide();
-  const userTz = state.eventConfig.userTz;
-  const dismissingIds = state.dismissingIds || new Set();
+  const { scheduled, favorited, eventConfig, dismissingIds: rawDismissing } = state;
+  const userTz = eventConfig.userTz;
+  const dismissingIds = rawDismissing || new Set();
   const allDismissing = sessions.every((s) => dismissingIds.has(s.id));
+
+  // Encodes scheduled/favorited state of every card in this row.
+  // Changes value whenever a card gains or loses a state that widens it,
+  // so useLayoutEffect re-measures with the actual post-layout card widths.
+  const cardStateKey = sessions.map((s) => (scheduled.has(s.id) ? 1 : 0) + (favorited.has(s.id) ? 2 : 0)).join('');
+
   const [offset, setOffset] = useState(0);
   const [{ tx, showNext }, setMeasure] = useState({ tx: 0, showNext: false });
   const stripRef = useRef(null);
@@ -34,7 +41,7 @@ export function TimeSlotRow({ sessions, forceOnDemand = false }) {
     const HOVER_CARD_WIDTH = 427;
     const effectiveTotal = totalWidth - cards[cards.length - 1].offsetWidth + HOVER_CARD_WIDTH;
     setMeasure({ tx: newTx, showNext: effectiveTotal - newTx > viewport.offsetWidth + 1 });
-  }, [offset]);
+  }, [offset, cardStateKey]);
 
   if (!sessions || !sessions.length) return null;
 
