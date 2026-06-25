@@ -45,6 +45,12 @@ async function loadScript() {
 }
 
 class MobileRider {
+  #embedRafId = null;
+
+  #embedGeneration = 0;
+
+  #streamEnded = false;
+
   constructor(el) {
     this.el = el;
     this.isEmbedding = false;
@@ -62,6 +68,22 @@ class MobileRider {
     }
   }
 
+  #isStreamInactive(vid) {
+    if (!this.store || !vid) return false;
+
+    const key = this.#storeHas(this.mainID)
+      ? this.mainID
+      : (this.#storeHas(vid) ? vid : null);
+
+    if (!key) return false;
+
+    try {
+      return this.store.get(key) === false;
+    } catch (e) {
+      return false;
+    }
+  }
+
   async init() {
     try {
       this.cfg = this.#parseCfg();
@@ -74,7 +96,13 @@ class MobileRider {
       const selected = await this.#selectInitialVideo(videos);
       if (this.cfg.concurrentenabled && this.store) this.mainID = videos[0].videoid;
 
-      await this.injectPlayer(selected.videoid, this.cfg.skinid, selected.aslid);
+      const videoId = selected.videoid || selected['video-id'];
+      if (this.#isStreamInactive(videoId)) {
+        this.root?.classList.add('is-hidden');
+        return;
+      }
+
+      await this.injectPlayer(videoId, this.cfg.skinid, selected.aslid);
 
       if (this.cfg.concurrentenabled && videos.length > 1) {
         await this.#initDrawer(videos, selected.videoid);
@@ -90,9 +118,20 @@ class MobileRider {
       || createTag('div', { class: 'video-wrapper' }, '', { parent: this.root });
   }
 
+  #cancelPendingEmbed() {
+    if (this.#embedRafId != null) {
+      cancelAnimationFrame(this.#embedRafId);
+      this.#embedRafId = null;
+    }
+  }
+
   async injectPlayer(vid, skin, asl = null) {
     if (!this.wrap || this.isEmbedding) return;
     this.isEmbedding = true;
+    this.#streamEnded = false;
+    this.#cancelPendingEmbed();
+    const generation = this.#embedGeneration + 1;
+    this.#embedGeneration = generation;
 
     const finish = () => {
       setTimeout(() => { this.isEmbedding = false; }, 100);
@@ -120,7 +159,14 @@ class MobileRider {
         poster: this.cfg.poster || this.cfg.thumbnail || '',
       }, '', { parent: container });
 
-      requestAnimationFrame(() => {
+      this.#embedRafId = requestAnimationFrame(() => {
+        this.#embedRafId = null;
+
+        if (generation !== this.#embedGeneration || this.#streamEnded) {
+          finish();
+          return;
+        }
+
         const videoInDoc = document.getElementById(CONFIG.PLAYER.VIDEO_ID);
 
         if (!videoInDoc || !window.mobilerider) {
@@ -189,6 +235,11 @@ class MobileRider {
     // Avoid stacking listeners
     window.__mr_player?.off?.('streamend');
     window.__mr_player?.on?.('streamend', () => {
+      this.#streamEnded = true;
+      this.#cancelPendingEmbed();
+
+      this.wrap?.querySelector('.mobile-rider-container')?.classList.add('is-hidden');
+
       if (this.drawer) {
         this.drawer.remove();
         this.drawer = null;

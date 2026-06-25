@@ -155,6 +155,44 @@ describe('TimingWorker', () => {
       expect(result).to.be.true;
     });
 
+    it('should advance to next MR slot when prior stream ended even if next toggleTime is in the future', async () => {
+      const nextItem = {
+        toggleTime: Date.now() + 600000,
+        pathToFragment: '/session2',
+        mobileRider: { sessionId: 'session2' },
+      };
+
+      worker.currentScheduleItem = {
+        mobileRider: { sessionId: 'session1' },
+        pathToFragment: '/session1',
+      };
+      worker.plugins.set('mobileRider', new Map([
+        ['session1', false],
+        ['session2', true],
+      ]));
+
+      const result = await worker.shouldTriggerNextSchedule(nextItem);
+      expect(result).to.be.true;
+    });
+
+    it('should skip inactive MR slots on load and post the next fragment', async () => {
+      worker.currentScheduleItem = { pathToFragment: '/prev' };
+      worker.nextScheduleItem = {
+        mobileRider: { sessionId: 'session1' },
+        pathToFragment: '/mr-ended',
+        next: {
+          pathToFragment: '/next',
+          next: null,
+        },
+      };
+      worker.plugins.set('mobileRider', new Map([['session1', false]]));
+
+      await worker.runTimer();
+
+      expect(mockPostMessage.calledOnce).to.be.true;
+      expect(mockPostMessage.firstCall.args[0].pathToFragment).to.equal('/next');
+    });
+
     it('should handle mobileRider underrun scenario', async () => {
       const nextItem = {
         mobileRider: { sessionId: 'session1' },
