@@ -2223,10 +2223,12 @@
     overflow: hidden;
   }
 
-  /* Row dismiss: collapses vertically + fades out */
+  /* Row dismiss: collapses vertically + fades out.
+     max-height is driven by JS (TimeSlotRow/TrackRow) so the transition starts
+     from the row's actual rendered height instead of the 600px CSS baseline,
+     keeping the vertical slide in sync with the card's horizontal collapse. */
   .sg-time-row--collapsing {
     opacity: 0 !important;
-    max-height: 0 !important;
     margin-top: 0 !important;
     margin-bottom: 0 !important;
     padding-top: 0 !important;

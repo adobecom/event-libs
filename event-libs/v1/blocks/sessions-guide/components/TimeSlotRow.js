@@ -21,6 +21,31 @@ export function TimeSlotRow({ sessions, forceOnDemand = false }) {
   const [{ tx, showNext }, setMeasure] = useState({ tx: 0, showNext: false });
   const stripRef = useRef(null);
   const viewportRef = useRef(null);
+  const rowRef = useRef(null);
+  const rowHeightRef = useRef(0);
+  const collapsingRef = useRef(false);
+
+  // Runs after every render. When the row is not collapsing, keep rowHeightRef
+  // current so we always have the real height ready when a collapse starts.
+  // When collapsing begins, pin max-height to that captured value then animate
+  // to 0 — this makes the transition start from the actual height instead of
+  // the 600px CSS baseline, so the vertical slide syncs with the card collapse.
+  useLayoutEffect(() => {
+    const row = rowRef.current;
+    if (!row) return;
+    if (!allDismissing) {
+      rowHeightRef.current = row.offsetHeight;
+      collapsingRef.current = false;
+      row.style.maxHeight = '';
+    } else if (!collapsingRef.current) {
+      collapsingRef.current = true;
+      const h = rowHeightRef.current || row.scrollHeight;
+      row.style.maxHeight = `${h}px`;
+      // eslint-disable-next-line no-unused-expressions
+      row.offsetHeight; // force reflow so transition starts from h, not 600px
+      row.style.maxHeight = '0px';
+    }
+  });
 
   useLayoutEffect(() => {
     const strip = stripRef.current;
@@ -46,7 +71,7 @@ export function TimeSlotRow({ sessions, forceOnDemand = false }) {
   if (!sessions || !sessions.length) return null;
 
   return html`
-    <div class=${'sg-time-row' + (allDismissing ? ' sg-time-row--collapsing' : '')}>
+    <div class=${'sg-time-row' + (allDismissing ? ' sg-time-row--collapsing' : '')} ref=${rowRef}>
       <div class="sg-time-row__label">${formatShortTime(sessions[0].startTimeUtc, userTz)}</div>
       <div class="sg-time-row__track">
         ${offset > 0 && html`<button

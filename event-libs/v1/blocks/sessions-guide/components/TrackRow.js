@@ -17,6 +17,26 @@ export function TrackRow({ track, sessions }) {
   const [{ tx, showNext }, setMeasure] = useState({ tx: 0, showNext: false });
   const stripRef = useRef(null);
   const viewportRef = useRef(null);
+  const rowRef = useRef(null);
+  const rowHeightRef = useRef(0);
+  const collapsingRef = useRef(false);
+
+  useLayoutEffect(() => {
+    const row = rowRef.current;
+    if (!row) return;
+    if (!allDismissing) {
+      rowHeightRef.current = row.offsetHeight;
+      collapsingRef.current = false;
+      row.style.maxHeight = '';
+    } else if (!collapsingRef.current) {
+      collapsingRef.current = true;
+      const h = rowHeightRef.current || row.scrollHeight;
+      row.style.maxHeight = `${h}px`;
+      // eslint-disable-next-line no-unused-expressions
+      row.offsetHeight; // force reflow so transition starts from h, not 600px
+      row.style.maxHeight = '0px';
+    }
+  });
 
   useLayoutEffect(() => {
     const strip = stripRef.current;
@@ -42,7 +62,7 @@ export function TrackRow({ track, sessions }) {
   if (!sessions || !sessions.length) return null;
 
   return html`
-    <div class=${'sg-time-row' + (allDismissing ? ' sg-time-row--collapsing' : '')}>
+    <div class=${'sg-time-row' + (allDismissing ? ' sg-time-row--collapsing' : '')} ref=${rowRef}>
       <div class="sg-time-row__label">${track}</div>
       <div class="sg-time-row__track">
         ${offset > 0 && html`<button
