@@ -28,7 +28,11 @@ export function TrackRow({ track, sessions }) {
       if (i < offset) newTx += w + gap;
       totalWidth += w + (i < cards.length - 1 ? gap : 0);
     });
-    setMeasure({ tx: newTx, showNext: totalWidth - newTx > viewport.offsetWidth + 1 });
+    // Reserve room for the last card's hover-expanded width (427px per .sg-card:hover)
+    // so its action buttons stay reachable when the viewport is tight.
+    const HOVER_CARD_WIDTH = 427;
+    const effectiveTotal = totalWidth - cards[cards.length - 1].offsetWidth + HOVER_CARD_WIDTH;
+    setMeasure({ tx: newTx, showNext: effectiveTotal - newTx > viewport.offsetWidth + 1 });
   }, [offset]);
 
   if (!sessions || !sessions.length) return null;
