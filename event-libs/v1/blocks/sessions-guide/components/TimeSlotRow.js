@@ -6,8 +6,6 @@ import { SessionCard } from './SessionCard.js';
 export const buildTimeSlotRow = () => TimeSlotRow;
 
 export function TimeSlotRow({ sessions, forceOnDemand = false }) {
-  if (!sessions || !sessions.length) return null;
-
   const { state } = useSessionGuide();
   const userTz = state.eventConfig.userTz;
   const dismissingIds = state.dismissingIds || new Set();
@@ -24,6 +22,8 @@ export function TimeSlotRow({ sessions, forceOnDemand = false }) {
     const gap = parseFloat(getComputedStyle(stripRef.current).columnGap || '16') || 16;
     cardWidthRef.current = firstCard.offsetWidth + gap;
   }, []);
+
+  if (!sessions || !sessions.length) return null;
 
   const maxOffset = sessions.length - 1;
   const translateX = offset * (cardWidthRef.current || 280);

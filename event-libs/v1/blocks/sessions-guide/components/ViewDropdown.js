@@ -13,7 +13,7 @@ export function ViewDropdown() {
   const [open, setOpen] = useState(false);
   const wrapRef = useRef(null);
 
-  const activeLabel = VIEWS.find((v) => v.value === state.activeView)?.label || 'Live & Upcoming';
+  const activeLabel = VIEWS.find((v) => v.value === state.activeView)?.label || 'Live & upcoming';
 
   useEffect(() => {
     if (!open) return undefined;

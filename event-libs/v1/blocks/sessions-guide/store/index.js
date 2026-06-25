@@ -170,6 +170,9 @@ export function reducer(state, action) {
       return next;
     }
 
+    case 'CLOSE_DRAWER':
+      return { ...state, drawerState: 'hidden', activeSessionId: null };
+
     case 'SET_ACTIVE_SESSION':
       return { ...state, activeSessionId: action.sessionId };
 
@@ -269,14 +272,15 @@ export function SessionGuideProvider({ eventConfig, initialSessions = [], childr
   useEffect(() => {
     if (initialSessions.length > 0) return;
     const apiUrl = eventConfig && eventConfig.rfApiUrl;
-    fetchSessions(apiUrl)
-      .then((sessions) => {
+    (async () => {
+      try {
+        const sessions = await fetchSessions(apiUrl);
         dispatch({ type: 'SESSIONS_LOADED', sessions });
-      })
-      .catch((err) => {
+      } catch (err) {
         window.lana?.log(`[sessions-guide] sessions fetch failed: ${err.message}`);
         dispatch({ type: 'SET_SESSIONS_STATUS', status: 'error' });
-      });
+      }
+    })();
   }, []);
 
   useEffect(() => {

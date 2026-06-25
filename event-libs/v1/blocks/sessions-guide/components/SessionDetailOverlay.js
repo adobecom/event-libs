@@ -4,7 +4,7 @@ import { useSessionGuide } from '../store/index.js';
 import { formatSessionTime, formatShortTime, getNowMs } from '../utils/time.js';
 import { scheduleAction, favoriteAction } from '../services/session-actions.js';
 import { deriveSessionState } from '../utils/session-state.js';
-import { setSessionParam } from '../utils/url.js';
+import { setSessionParam, safeUrl } from '../utils/url.js';
 import { IconHeartFilled, IconHeartOutline } from './icons.js';
 
 export function SessionDetailOverlay({ onBack }) {
@@ -106,7 +106,7 @@ export function SessionDetailOverlay({ onBack }) {
     ? html`
                         <a
                           class=${'sg-detail__btn sg-detail__btn--primary sg-detail__btn--watch' + (session.watchUrl ? '' : ' is-disabled')}
-                          href=${session.watchUrl || undefined}
+                          href=${safeUrl(session.watchUrl)}
                           aria-disabled=${session.watchUrl ? undefined : 'true'}
                         >
                           <span class="sg-detail__btn-icon sg-detail__btn-icon--play" aria-hidden="true"></span>
@@ -198,7 +198,7 @@ export function SessionDetailOverlay({ onBack }) {
                 <h3 class="sg-detail__section-label">Session resources</h3>
                 <div class="sg-detail__resources">
                   ${session.resources.map((r) => html`
-                    <a class="sg-detail__resource-card" href=${r.url} target="_blank" rel="noopener noreferrer">
+                    <a class="sg-detail__resource-card" href=${safeUrl(r.url)} target="_blank" rel="noopener noreferrer">
                       <span class="sg-detail__resource-name">${r.title || r.label || r.url}</span>
                       <span class="sg-detail__resource-action">Download</span>
                     </a>

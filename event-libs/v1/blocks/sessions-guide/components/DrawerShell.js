@@ -163,8 +163,7 @@ export function DrawerShell() {
         dispatch({ type: 'SET_DRAWER', drawer: 'expanded' });
         dispatch({ type: 'SET_ACTIVE_SESSION', sessionId: null });
       } else {
-        dispatch({ type: 'SET_DRAWER', drawer: 'hidden' });
-        dispatch({ type: 'SET_ACTIVE_SESSION', sessionId: null });
+        dispatch({ type: 'CLOSE_DRAWER' });
       }
     }
     window.addEventListener('popstate', handlePopState);
@@ -177,8 +176,7 @@ export function DrawerShell() {
   const hasDetail = !!activeSessionId;
 
   function closeDrawer() {
-    dispatch({ type: 'SET_DRAWER', drawer: 'hidden' });
-    dispatch({ type: 'SET_ACTIVE_SESSION', sessionId: null });
+    dispatch({ type: 'CLOSE_DRAWER' });
     history.pushState({}, '', clearSessionParams());
   }
 

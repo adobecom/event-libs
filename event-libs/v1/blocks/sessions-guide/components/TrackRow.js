@@ -5,8 +5,6 @@ import { SessionCard } from './SessionCard.js';
 export const buildTrackRow = () => TrackRow;
 
 export function TrackRow({ track, sessions }) {
-  if (!sessions || !sessions.length) return null;
-
   const { state } = useSessionGuide();
   const dismissingIds = state.dismissingIds || new Set();
   const allDismissing = sessions.every((s) => dismissingIds.has(s.id));
@@ -22,6 +20,8 @@ export function TrackRow({ track, sessions }) {
     const gap = parseFloat(getComputedStyle(stripRef.current).columnGap || '16') || 16;
     cardWidthRef.current = firstCard.offsetWidth + gap;
   }, []);
+
+  if (!sessions || !sessions.length) return null;
 
   const maxOffset = sessions.length - 1;
   const translateX = offset * (cardWidthRef.current || 280);

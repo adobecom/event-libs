@@ -2,7 +2,7 @@ import { html, useState } from '../../../deps/htm-preact.js';
 import { useSessionGuide } from '../store/index.js';
 import { isSessionOnDemand, formatSessionTime, formatShortTime, getNowMs } from '../utils/time.js';
 import { scheduleAction, favoriteAction } from '../services/session-actions.js';
-import { setSessionParam } from '../utils/url.js';
+import { setSessionParam, safeUrl } from '../utils/url.js';
 import { CategoryBadge } from './CategoryBadge.js';
 import { IconButton } from './IconButton.js';
 import { IconPlay, IconCalendarCheck, IconCalendarPlus, IconHeartFilled, IconHeartOutline } from './icons.js';
@@ -79,7 +79,8 @@ export function SessionCard({ session, forceOnDemand = false }) {
 
   function handlePlay(e) {
     e.stopPropagation();
-    if (session.sessionPageUrl) window.location.href = session.sessionPageUrl;
+    const dest = safeUrl(session.sessionPageUrl);
+    if (dest) window.location.href = dest;
   }
 
   // iOS mis-routes the synthetic click to the card div when the touch target is
@@ -97,12 +98,14 @@ export function SessionCard({ session, forceOnDemand = false }) {
 
   function handleClick() {
     if (surface === 'page') {
-      if (session.sessionPageUrl) window.location.href = session.sessionPageUrl;
+      const dest = safeUrl(session.sessionPageUrl);
+      if (dest) window.location.href = dest;
       return;
     }
     // Widget: on-demand and previously-aired cards always navigate to session page
     if (onDemand) {
-      if (session.sessionPageUrl) window.location.href = session.sessionPageUrl;
+      const dest = safeUrl(session.sessionPageUrl);
+      if (dest) window.location.href = dest;
       return;
     }
     dispatch({ type: 'SET_ACTIVE_SESSION', sessionId: session.id });
@@ -113,6 +116,7 @@ export function SessionCard({ session, forceOnDemand = false }) {
 
   return html`
     <div class=${cardClass} onclick=${handleClick} role="button" tabindex="0"
+      onkeydown=${(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleClick(); } }}
       onmouseenter=${onMouseEnter} onmouseleave=${onMouseLeave}>
       <div class="sg-card__body">
         <div class="sg-card__badge-row">

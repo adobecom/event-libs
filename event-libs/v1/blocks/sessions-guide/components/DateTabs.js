@@ -16,7 +16,7 @@ export function DateTabs() {
       ${(eventDays || []).map((day) => html`
         <button
           class=${`sg-date-tab${activeDay === day ? ' sg-date-tab--active' : ''}`}
-          onclick=${() => !disabled && dispatch({ type: 'SET_DAY', day })}
+          onclick=${() => dispatch({ type: 'SET_DAY', day })}
           role="tab"
           aria-selected=${activeDay === day}
           type="button"

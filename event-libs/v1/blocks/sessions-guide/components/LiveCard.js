@@ -4,7 +4,7 @@ import { formatShortTime, getNowMs } from '../utils/time.js';
 import { deriveSessionState } from '../utils/session-state.js';
 import { scheduleAction, favoriteAction } from '../services/session-actions.js';
 import { IconPlay, IconCalendarCheck, IconCalendarPlus, IconHeartFilled, IconHeartOutline } from './icons.js';
-import { setSessionParam } from '../utils/url.js';
+import { setSessionParam, safeUrl } from '../utils/url.js';
 import { CategoryBadge } from './CategoryBadge.js';
 
 function formatDuration(ms) {
@@ -59,7 +59,7 @@ export function LiveCard({ session, variant = 'live' }) {
     await favoriteAction(session, state, dispatch);
   }
 
-  const watchHref = session.watchUrl || session.sessionPageUrl;
+  const watchHref = safeUrl(session.watchUrl || session.sessionPageUrl);
 
   let primaryCta;
   if (variant === 'featured') {
@@ -83,7 +83,7 @@ export function LiveCard({ session, variant = 'live' }) {
   } else if (session.watchUrl) {
     primaryCta = html`<button
       class="sg-live-card__btn sg-live-card__btn--watch"
-      onclick=${(e) => { e.stopPropagation(); window.location.href = session.watchUrl; }}
+      onclick=${(e) => { e.stopPropagation(); if (watchHref) window.location.href = watchHref; }}
       type="button"
     ><${IconPlay} />Watch now</button>`;
   }
@@ -97,7 +97,8 @@ export function LiveCard({ session, variant = 'live' }) {
   }
 
   return html`
-    <div class=${cardClass} onclick=${handleCardClick} role="button" tabindex="0">
+    <div class=${cardClass} onclick=${handleCardClick} role="button" tabindex="0"
+      onkeydown=${(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleCardClick(); } }}>
       <div class="sg-live-card__image">
         ${session.thumbnailUrl
     ? html`<img src=${session.thumbnailUrl} alt=${session.title} loading="lazy" />`
