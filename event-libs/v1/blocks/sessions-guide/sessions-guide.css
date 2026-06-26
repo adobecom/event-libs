@@ -1574,7 +1574,7 @@
 
 /* ── Tablet only: floating carousel arrows ───────────────────────────────── */
 
-@media (min-width: 768px) and (max-width: 1279px) {
+@media (min-width: 768px) and (max-width: 1023px) {
   /* Cards scroll natively here; the arrows float over the strip as glass
      buttons, vertically centered on the card. Only the actionable direction
      shows, matching the current scroll position. */
@@ -1600,6 +1600,192 @@
   .sg-carousel__arrow--next { right: var(--s2a-spacing-sm); }
 
   .sg-carousel__arrow[disabled] { display: none; }
+}
+
+/* ── Intermediate Tablet (1024px–1279px) — desktop-style live section ─────── */
+
+@media (min-width: 1024px) and (max-width: 1279px) {
+  .sg-carousel-section {
+    padding: var(--s2a-spacing-2xl) 20px var(--s2a-spacing-3xl);
+    overflow: visible;
+  }
+
+  .sg-section-time {
+    display: none;
+  }
+
+  .sg-carousel__cards {
+    overflow: visible;
+    scroll-snap-type: none;
+    -webkit-overflow-scrolling: auto;
+    scrollbar-width: auto;
+    padding-right: 0;
+  }
+
+  .sg-carousel__card-wrap {
+    scroll-snap-align: none;
+  }
+
+  .sg-carousel__nav {
+    display: flex;
+    position: absolute;
+    top: 0;
+    right: 0;
+  }
+
+  .sg-carousel__body {
+    position: relative;
+    align-items: center;
+    gap: 36px;
+  }
+
+  .sg-carousel__time {
+    display: flex;
+    align-items: center;
+    flex-shrink: 0;
+    width: 50px;
+    font-family: var(--s2a-font-family-adobe-clean);
+    font-weight: var(--s2a-font-weight-adobe-clean-bold);
+    font-size: var(--s2a-font-size-md);
+    color: var(--s2a-color-gray-800);
+    white-space: nowrap;
+  }
+
+  /* ── Live card ─────────────────────────────────────────────── */
+
+  .sg-live-card {
+    flex-direction: row;
+    width: 100%;
+    max-width: 900px;
+    border: 4px solid #fff;
+    border-radius: 20px;
+  }
+
+  .sg-live-card:hover {
+    background: #000;
+    border-color: #000;
+  }
+
+  .sg-live-card__image {
+    width: 425px;
+    height: 240px;
+    border-radius: var(--s2a-border-radius-md);
+    border: none;
+  }
+
+  .sg-live-card__progress-row {
+    top: auto;
+    bottom: 13px;
+    left: 27px;
+    right: 20px;
+  }
+
+  .sg-live-card__body {
+    flex: none;
+    width: 425px;
+    padding: var(--s2a-spacing-lg);
+    justify-content: space-between;
+    gap: 2px;
+  }
+
+  .sg-live-card__meta {
+    flex-direction: row;
+    align-items: center;
+    justify-content: flex-start;
+    gap: var(--s2a-spacing-sm);
+    margin: 0;
+  }
+
+  .sg-live-card__track-row { gap: 6px; }
+
+  .sg-live-card__track-icon {
+    width: 24px;
+    height: 24px;
+  }
+
+  .sg-live-card__track {
+    font-size: var(--s2a-font-size-sm);
+    font-weight: 500;
+    color: #000;
+  }
+
+  .sg-live-card:hover .sg-live-card__track { color: #fff; }
+  .sg-live-card:hover .sg-live-card__track-row { color: #fff; }
+
+  .sg-live-card__time {
+    font-size: var(--s2a-font-size-sm);
+    color: var(--s2a-color-gray-700);
+    white-space: nowrap;
+    margin: 0;
+  }
+
+  .sg-live-card__time::before {
+    content: '';
+    display: inline-block;
+    width: 1px;
+    height: 12px;
+    margin-right: var(--s2a-spacing-sm);
+    background: var(--s2a-color-gray-300);
+    vertical-align: middle;
+  }
+
+  .sg-live-card:hover .sg-live-card__time { color: #fff; }
+
+  .sg-live-card:hover .sg-live-card__time::before { background: rgb(255 255 255 / 40%); }
+
+  .sg-live-card__title {
+    font-size: var(--s2a-font-size-2xl);
+    color: #000;
+  }
+
+  .sg-live-card:hover .sg-live-card__title { color: #fff; }
+
+  .sg-live-card__desc {
+    font-size: var(--s2a-font-size-sm);
+    color: #000;
+    letter-spacing: -0.14px;
+    white-space: normal;
+    text-overflow: clip;
+    /* stylelint-disable-next-line value-no-vendor-prefix */
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .sg-live-card:hover .sg-live-card__desc { color: #fff; }
+
+  .sg-live-card__actions { gap: var(--s2a-spacing-sm); }
+
+  .sg-live-card__btn-label { display: inline; }
+
+  .sg-live-card__btn--watch {
+    background: var(--s2a-color-gray-800);
+    color: #fff;
+    min-width: auto;
+    padding: 0 var(--s2a-spacing-lg);
+  }
+
+  .sg-live-card:hover .sg-live-card__btn--watch {
+    background: #fff;
+    color: #111;
+  }
+
+  .sg-live-card__btn--schedule { display: none; }
+
+  .sg-live-card__btn--favorite {
+    background: #fff;
+    border: 2px solid #000;
+    color: #000;
+    width: auto;
+    padding: 0 var(--s2a-spacing-lg);
+  }
+
+  .sg-live-card:hover .sg-live-card__btn--favorite {
+    background: transparent;
+    border-color: #fff;
+    color: #fff;
+  }
 }
 
 /* ── Desktop (min-width: 1280px) ─────────────────────────────────────────── */
@@ -2199,6 +2385,7 @@
   }
 
   .sg-card--anim-fav .sg-card__btn--schedule,
+  .sg-card--anim-fav .sg-card__btn--play,
   .sg-card--anim-sched .sg-card__btn--favorite {
     animation: sg-card-btn-reveal 0.22s ease both;
   }

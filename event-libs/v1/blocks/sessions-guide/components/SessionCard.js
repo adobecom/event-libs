@@ -51,7 +51,8 @@ export function SessionCard({ session, forceOnDemand = false, timeDisplay = 'dur
   ].filter(Boolean).join(' ');
 
   function onMouseEnter() {
-    if (isFavorited && !isScheduled) setHoverAnim('fav');
+    // On-demand: Play always reveals above Favorite — same slide-down geometry as --anim-fav.
+    if (onDemand || (isFavorited && !isScheduled)) setHoverAnim('fav');
     else if (isScheduled && !isFavorited) setHoverAnim('sched');
   }
   function onMouseLeave() {
