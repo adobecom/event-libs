@@ -82,7 +82,7 @@ export function MySessionsView() {
             class=${'sg-my-sessions-tab' + (effectiveTab === 'on-demand' ? ' sg-my-sessions-tab--active' : '')}
             onclick=${() => setTab('on-demand')}
             type="button"
-          >On Demand</button>`}
+          >On demand</button>`}
         </div>
         ${effectiveTab === 'upcoming' && html`
           <div class="sg-my-sessions__upcoming">
