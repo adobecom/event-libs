@@ -1,3 +1,6 @@
+// Swap to a real photo for visual testing of the speaker details view.
+const TEST_SPEAKER_PHOTO = 'https://MWPW-199065--event-libs--adobecom.aem.live/event-libs/v1/blocks/sessions-guide/assets/Kristy-Campbell.jpg';
+
 // Adobe MAX 2026 — November 10–12, Los Angeles (PST = UTC−8)
 export const MOCK_EVENT_DAYS = ['2026-11-10', '2026-11-11', '2026-11-12'];
 
@@ -625,7 +628,7 @@ function normalizeSessions(rawSessions) {
     technicalLevel: s.technicalLevel || '',
     category: s.category || '',
     audience: s.audience || '',
-    speakers: s.speakers || [],
+    speakers: (s.speakers || []).map((sp) => ({ ...sp, photo: TEST_SPEAKER_PHOTO })),
     products: s.products || [],
     resources: s.resources || [],
     mrStreamId: s.mrStreamId ?? null,
