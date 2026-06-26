@@ -69,7 +69,7 @@ export function MyFavoritesView() {
             class="sg-my-favorites__see-live-btn"
             type="button"
             onclick=${() => dispatch({ type: 'SET_VIEW', view: 'live-upcoming' })}
-          >See Live & Upcoming</button>
+          >See Live & upcoming</button>
         </div>
       ` : html`
         <div class="sg-my-sessions-tab-bar">
