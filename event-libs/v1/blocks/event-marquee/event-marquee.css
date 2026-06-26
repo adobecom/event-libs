@@ -1,0 +1,47 @@
+/* Base visual styles (.rm-slide, .rm-content, .rm-background, etc.) are loaded from
+   milo's router-marquee.css at runtime. This file adds only the foreground video layout. */
+
+/* Desktop: 2-col layout when a foreground video is present */
+@media (width >= 1280px) {
+  .event-marquee .rm-slide.has-foreground-video .rm-content-wrapper {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    align-items: center;
+    gap: var(--s2a-spacing-48);
+  }
+
+  .event-marquee .rm-slide.has-foreground-video .rm-content {
+    max-width: none;
+  }
+
+  .event-marquee .rm-slide.has-foreground-video .rm-body {
+    max-width: none;
+  }
+
+  .rm-foreground-video {
+    position: relative;
+    z-index: 2;
+    aspect-ratio: 16 / 9;
+    border-radius: var(--s2a-border-radius-16);
+    overflow: hidden;
+  }
+
+  .rm-foreground-video iframe,
+  .rm-foreground-video video {
+    display: block;
+    width: 100%;
+    height: 100%;
+  }
+
+  .rm-foreground-video-mobile-rider {
+    aspect-ratio: unset;
+    min-height: 280px;
+  }
+}
+
+/* Hide foreground video on tablet and mobile — full-bleed bg is the visual focus */
+@media (width < 1280px) {
+  .rm-foreground-video {
+    display: none;
+  }
+}

@@ -9,6 +9,7 @@ const EVENT_BLOCKS = [
   'event-product-blades',
   'event-schema',
   'event-subscription-form',
+  'event-marquee',
   'events-form',
   'mobile-rider',
   'preview-bar',
