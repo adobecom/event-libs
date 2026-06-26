@@ -21,6 +21,8 @@ import {
   unregisterFromSessionTime,
 } from '../../utils/esp-controller.js';
 
+const getLocaleString = () => getMetadata('locale') || getEventConfig().miloConfig.locale?.ietf || 'en-US';
+
 const CALENDAR_ICON = '<svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M8.25 15H6.75C5.78516 15 5 14.2148 5 13.25V11.75C5 10.7852 5.78516 10 6.75 10H8.25C9.21484 10 10 10.7852 10 11.75V13.25C10 14.2148 9.21484 15 8.25 15ZM6.75 11.5C6.6123 11.5 6.5 11.6123 6.5 11.75V13.25C6.5 13.3877 6.6123 13.5 6.75 13.5H8.25C8.3877 13.5 8.5 13.3877 8.5 13.25V11.75C8.5 11.6123 8.3877 11.5 8.25 11.5H6.75Z" fill="#292929"/><path d="M15.75 3H13.75V2C13.75 1.58594 13.4141 1.25 13 1.25C12.5859 1.25 12.25 1.58594 12.25 2V3H7.75V2C7.75 1.58594 7.41406 1.25 7 1.25C6.58594 1.25 6.25 1.58594 6.25 2V3H4.25C3.00977 3 2 4.00977 2 5.25V15.75C2 16.9902 3.00977 18 4.25 18H15.75C16.9902 18 18 16.9902 18 15.75V5.25C18 4.00977 16.9902 3 15.75 3ZM4.25 4.5H6.25V5C6.25 5.41406 6.58594 5.75 7 5.75C7.41406 5.75 7.75 5.41406 7.75 5V4.5H12.25V5C12.25 5.41406 12.5859 5.75 13 5.75C13.4141 5.75 13.75 5.41406 13.75 5V4.5H15.75C16.1631 4.5 16.5 4.83691 16.5 5.25V7H3.5V5.25C3.5 4.83691 3.83691 4.5 4.25 4.5ZM15.75 16.5H4.25C3.83691 16.5 3.5 16.1631 3.5 15.75V8.5H16.5V15.75C16.5 16.1631 16.1631 16.5 15.75 16.5Z" fill="#292929"/></svg>';
 const PIN_ICON = '<svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M10 9.99023C8.62109 9.99023 7.5 8.86914 7.5 7.49023C7.5 6.11132 8.62109 4.99023 10 4.99023C11.3789 4.99023 12.5 6.11132 12.5 7.49023C12.5 8.86914 11.3789 9.99023 10 9.99023ZM10 6.49023C9.44824 6.49023 9 6.93847 9 7.49023C9 8.04199 9.44824 8.49023 10 8.49023C10.5518 8.49023 11 8.04199 11 7.49023C11 6.93847 10.5518 6.49023 10 6.49023Z" fill="#292929"/><path d="M10.0049 18.583H10.001C9.44434 18.582 8.92969 18.335 8.58789 17.9043C6.68848 15.5137 3.5 10.9805 3.5 7.49023C3.5 4.04394 6.41602 1.24023 10 1.24023C13.584 1.24023 16.5 4.04394 16.5 7.49023C16.5 11.04 13.3145 15.542 11.416 17.9111C11.0742 18.3379 10.5596 18.583 10.0049 18.583ZM10 2.74022C7.24317 2.74022 5.00001 4.87108 5.00001 7.49022C5.00001 10.6377 8.33106 15.1699 9.76271 16.9717C9.84279 17.0723 9.95802 17.083 10.0039 17.083C10.0498 17.083 10.166 17.0723 10.2442 16.9736C11.6739 15.1904 15 10.6973 15 7.49022C15 4.87108 12.7569 2.74022 10 2.74022Z" fill="#292929"/></svg>';
 const PLUS_CIRCLE_ICON = '<svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M10 18.7793C5.1748 18.7793 1.25 14.8545 1.25 10.0293C1.25 5.2041 5.1748 1.2793 10 1.2793C14.8252 1.2793 18.75 5.2041 18.75 10.0293C18.75 14.8545 14.8252 18.7793 10 18.7793ZM10 2.7793C6.00195 2.7793 2.75 6.03125 2.75 10.0293C2.75 14.0273 6.00195 17.2793 10 17.2793C13.998 17.2793 17.25 14.0273 17.25 10.0293C17.25 6.03125 13.998 2.7793 10 2.7793Z" fill="#292929"/><path d="M13.25 9.25H10.75V6.75C10.75 6.33594 10.4141 6 10 6C9.58594 6 9.25 6.33594 9.25 6.75V9.25H6.75C6.33594 9.25 6 9.58594 6 10C6 10.4141 6.33594 10.75 6.75 10.75H9.25V13.25C9.25 13.6641 9.58594 14 10 14C10.4141 14 10.75 13.6641 10.75 13.25V10.75H13.25C13.6641 10.75 14 10.4141 14 10C14 9.58594 13.6641 9.25 13.25 9.25Z" fill="#292929"/></svg>';
@@ -571,7 +573,7 @@ function renderSpeakerAvatars(speakers) {
 function renderSessionCard(session, opts = {}) {
   const primaryTime = session.sessionTimes[0];
   const timeStr = primaryTime
-    ? createSmartDateRange(primaryTime.startTimeMillis, primaryTime.endTimeMillis, 'en-US', primaryTime.timezone)
+    ? createSmartDateRange(primaryTime.startTimeMillis, primaryTime.endTimeMillis, 'fr-FR', primaryTime.timezone)
     : '';
   const locationName = primaryTime?.locationName || '';
 
@@ -901,7 +903,7 @@ function buildBannerDateString() {
   const eventType = getMetadata('event-type');
   const timezone = eventType === 'InPerson' ? getMetadata('timezone') : null;
 
-  return createSmartDateRange(startMillis, endMillis, 'en-US', timezone);
+  return createSmartDateRange(startMillis, endMillis, getLocaleString(), timezone);
 }
 
 function renderEventBanner(rsvpConfig, { inviteOnlyBlocked = false, inviteOnlyMessage = '', isEventWaitlisted = false, waitlistBannerMessage = '' } = {}) {
@@ -969,7 +971,7 @@ function syncBannerVisibility(bannerEl, isEventRegistered) {
 function buildConflictOption(session, { registered = false } = {}) {
   const primaryTime = session.sessionTimes[0];
   const timeStr = primaryTime
-    ? createSmartDateRange(primaryTime.startTimeMillis, primaryTime.endTimeMillis, 'en-US', primaryTime.timezone)
+    ? createSmartDateRange(primaryTime.startTimeMillis, primaryTime.endTimeMillis, getLocaleString(), primaryTime.timezone)
     : '';
   const locationName = primaryTime?.locationName || '';
 
