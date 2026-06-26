@@ -103,7 +103,7 @@ describe('SessionCard', () => {
 
   it('shows on-demand label and hides schedule button for on-demand session', () => {
     const html = renderCard(ONDEMAND_SESSION);
-    expect(html).to.include('On demand');
+    expect(html).to.include('ON DEMAND');
     expect(html).to.not.include('Add to schedule');
     expect(html).to.include('sg-card--on-demand');
   });
@@ -136,6 +136,24 @@ describe('SessionCard', () => {
     const rendered = SessionCard({ session: UPCOMING_SESSION });
     // Extract onclick from rendered HTML is not straightforward; test dispatch guard instead
     expect(rendered).to.include('Add to schedule');
+  });
+
+  it('shows duration by default for upcoming sessions', () => {
+    const html = renderCard(UPCOMING_SESSION);
+    // UPCOMING_SESSION is 1 hour long
+    expect(html).to.include('1 hr');
+    expect(html).to.not.include('sg-card--on-demand');
+  });
+
+  it('shows start time when timeDisplay is "time"', () => {
+    const store = buildStore(preact);
+    store.SessionGuideContext._current = makeCtx();
+    const SessionCard = buildSessionCard(preact, store);
+    const html = SessionCard({ session: UPCOMING_SESSION, timeDisplay: 'time' });
+    // Should NOT show duration format
+    expect(html).to.not.include('1 hr');
+    // Should show a time string (contains AM or PM)
+    expect(html).to.match(/\d+(:\d+)?\s*(AM|PM)/i);
   });
 
   it('does not dispatch when isRegistered is not true (no-op guard)', () => {

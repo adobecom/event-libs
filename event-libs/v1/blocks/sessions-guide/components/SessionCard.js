@@ -1,6 +1,6 @@
 import { html, useState } from '../../../deps/htm-preact.js';
 import { useSessionGuide } from '../store/index.js';
-import { isSessionOnDemand, formatSessionTime, formatShortTime, getNowMs } from '../utils/time.js';
+import { isSessionOnDemand, formatSessionTime, formatShortTime, formatDuration, getNowMs } from '../utils/time.js';
 import { scheduleAction, favoriteAction } from '../services/session-actions.js';
 import { setSessionParam, safeUrl } from '../utils/url.js';
 import { CategoryBadge } from './CategoryBadge.js';
@@ -9,7 +9,7 @@ import { IconPlay, IconCalendarCheck, IconCalendarPlus, IconHeartFilled, IconHea
 
 export const buildSessionCard = () => SessionCard;
 
-export function SessionCard({ session, forceOnDemand = false }) {
+export function SessionCard({ session, forceOnDemand = false, timeDisplay = 'duration' }) {
   const { state, dispatch } = useSessionGuide();
   const { scheduled, favorited, eventConfig, activeView } = state;
   const pendingActions = state.pendingActions || new Set();
@@ -24,12 +24,15 @@ export function SessionCard({ session, forceOnDemand = false }) {
   const onDemand = forceOnDemand || onDemandNatural;
   const trackColor = (trackColors && trackColors[session.track]) || '';
 
+  const upcomingTimeLabel = (timeDisplay === 'duration' && session.endTimeUtc)
+    ? formatDuration(session.startTimeUtc, session.endTimeUtc)
+    : formatSessionTime(session.startTimeUtc, userTz);
   // eslint-disable-next-line no-nested-ternary
   const timeLabel = forceOnDemand
     ? 'ON DEMAND'
     : (onDemandNatural
       ? (session.inPerson && !session.videoAvailable ? 'Recording coming soon' : 'ON DEMAND')
-      : formatSessionTime(session.startTimeUtc, userTz));
+      : upcomingTimeLabel);
   const endShort = (!onDemand && session.endTimeUtc) ? formatShortTime(session.endTimeUtc, userTz) : '';
   const timeRange = onDemand
     ? timeLabel
