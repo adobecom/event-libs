@@ -505,7 +505,7 @@
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: var(--s2a-color-gray-1000);
+  background: #eb1000;
   flex-shrink: 0;
 }
 
