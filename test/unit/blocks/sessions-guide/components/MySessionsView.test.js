@@ -59,18 +59,21 @@ describe('MySessionsView', () => {
     expect(View({})).to.include('sg-view--my-sessions');
   });
 
-  it('shows sub-tabs', () => {
-    const store = makeStore();
+  it('shows sub-tabs when both upcoming and on-demand sessions are scheduled', () => {
+    const store = makeStore({
+      sessions: [UPCOMING_SESSION, PAST_SESSION],
+      scheduled: new Set(['u-1', 'p-1']),
+    });
     const View = buildMySessionsView(preact, store);
     const html = View({});
     expect(html).to.include('Upcoming');
-    expect(html).to.include('On Demand');
+    expect(html).to.include('On demand');
   });
 
-  it('shows empty state in upcoming tab when no scheduled sessions', () => {
+  it('shows empty state when no sessions are scheduled', () => {
     const store = makeStore({ sessions: [UPCOMING_SESSION] });
     const View = buildMySessionsView(preact, store);
-    expect(View({})).to.include('No upcoming sessions');
+    expect(View({})).to.include('sg-my-sessions__empty');
   });
 
   it('shows scheduled upcoming sessions', () => {
@@ -87,9 +90,9 @@ describe('MySessionsView', () => {
     expect(View({})).to.include('sg-my-sessions__on-demand');
   });
 
-  it('shows empty on-demand state when no scheduled on-demand sessions', () => {
+  it('shows empty state when no sessions are scheduled on the on-demand tab', () => {
     const store = makeStore({ mySessionsTab: 'on-demand' });
     const View = buildMySessionsView(preact, store);
-    expect(View({})).to.include('No on-demand sessions');
+    expect(View({})).to.include('sg-my-sessions__empty');
   });
 });

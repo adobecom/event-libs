@@ -55,6 +55,7 @@ export function createContext(defaultValue) {
 
 export function useState(initial) { return [initial, () => {}]; }
 export function useEffect() {}
+export function useLayoutEffect() {}
 export function useRef(val) { return { current: val }; }
 export function useCallback(fn) { return fn; }
 export function useMemo(fn) { return fn(); }

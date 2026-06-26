@@ -8,10 +8,10 @@ export function TrackRow({ track, sessions }) {
   const { state } = useSessionGuide();
   const { favorited, dismissingIds: rawDismissing } = state;
   const dismissingIds = rawDismissing || new Set();
-  const allDismissing = sessions.every((s) => dismissingIds.has(s.id));
+  const allDismissing = sessions?.every((s) => dismissingIds.has(s.id)) || false;
 
   // TrackRow cards are on-demand (no schedule button), only favorited widens them.
-  const cardStateKey = sessions.map((s) => (favorited.has(s.id) ? 1 : 0)).join('');
+  const cardStateKey = sessions?.map((s) => (favorited.has(s.id) ? 1 : 0)).join('') || '';
 
   const [offset, setOffset] = useState(0);
   const [{ tx, showNext }, setMeasure] = useState({ tx: 0, showNext: false });

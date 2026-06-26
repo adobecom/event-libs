@@ -10,12 +10,12 @@ export function TimeSlotRow({ sessions, forceOnDemand = false }) {
   const { scheduled, favorited, eventConfig, dismissingIds: rawDismissing } = state;
   const userTz = eventConfig.userTz;
   const dismissingIds = rawDismissing || new Set();
-  const allDismissing = sessions.every((s) => dismissingIds.has(s.id));
+  const allDismissing = sessions?.every((s) => dismissingIds.has(s.id)) || false;
 
   // Encodes scheduled/favorited state of every card in this row.
   // Changes value whenever a card gains or loses a state that widens it,
   // so useLayoutEffect re-measures with the actual post-layout card widths.
-  const cardStateKey = sessions.map((s) => (scheduled.has(s.id) ? 1 : 0) + (favorited.has(s.id) ? 2 : 0)).join('');
+  const cardStateKey = sessions?.map((s) => (scheduled.has(s.id) ? 1 : 0) + (favorited.has(s.id) ? 2 : 0)).join('') || '';
 
   const [offset, setOffset] = useState(0);
   const [{ tx, showNext }, setMeasure] = useState({ tx: 0, showNext: false });

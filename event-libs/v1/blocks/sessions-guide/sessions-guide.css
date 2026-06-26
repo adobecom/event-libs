@@ -2376,25 +2376,6 @@
 
 /* ── Track section (On Demand) ───────────────────────────────── */
 
-.sg-track-section {
-  margin-bottom: var(--s2a-spacing-xl);
-}
-
-.sg-track-title {
-  font-family: var(--s2a-font-family-adobe-clean-display);
-  font-weight: var(--s2a-font-weight-adobe-clean-display-black);
-  font-size: var(--s2a-font-size-xl);
-  color: var(--s2a-color-content-default);
-  margin: 0 0 var(--s2a-spacing-md);
-  padding: 0 var(--s2a-spacing-lg);
-}
-
-.sg-track-cards {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--s2a-spacing-sm);
-  padding: 0 var(--s2a-spacing-md);
-}
 
 
 /* ── Category Badge ──────────────────────────────────────── */

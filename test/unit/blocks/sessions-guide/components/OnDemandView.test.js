@@ -20,7 +20,7 @@ const PAST_VIDEO = {
   mrStreamId: null, thumbnailUrl: null,
 };
 const UPCOMING = {
-  id: 'u-1', title: 'Upcoming', description: '', track: 'Design',
+  id: 'u-1', title: 'Upcoming', description: '', track: 'Dev',
   startTimeUtc: h(2), endTimeUtc: h(3),
   videoAvailable: false, inPerson: false, sessionPageUrl: '/u-1', watchUrl: '',
   mrStreamId: null, thumbnailUrl: null,
@@ -38,6 +38,8 @@ function makeStore(sessions) {
   store.SessionGuideContext._current = {
     state: {
       sessions, scheduled: new Set(), favorited: new Set(), isRegistered: true,
+      dismissingIds: new Set(), pendingActions: new Set(), liveStreamActiveIds: new Set(),
+      activeView: 'on-demand', activeFilters: {}, searchQuery: '',
       eventConfig: { ...BASE_CONFIG },
     },
     dispatch: () => {},
@@ -58,11 +60,11 @@ describe('OnDemandView', () => {
     expect(View({})).to.include('sg-empty');
   });
 
-  it('renders track sections for on-demand sessions', () => {
+  it('renders track rows for on-demand sessions', () => {
     const store = makeStore([PAST_DESIGN, PAST_VIDEO]);
     const View = buildOnDemandView(preact, store);
     const html = View({});
-    expect(html).to.include('sg-track-section');
+    expect(html).to.include('sg-time-row');
     expect(html).to.include('Design');
     expect(html).to.include('Video');
   });
@@ -71,14 +73,14 @@ describe('OnDemandView', () => {
     const store = makeStore([PAST_DESIGN, UPCOMING]);
     const View = buildOnDemandView(preact, store);
     const html = View({});
-    expect(html).to.include('Design Talk');
-    expect(html).to.not.include('Upcoming');
+    expect(html).to.include('Design'); // on-demand session track label appears
+    expect(html).to.not.include('Dev'); // upcoming session track does not appear
   });
 
-  it('groups cards under their track heading', () => {
+  it('groups cards in a carousel strip per track', () => {
     const store = makeStore([PAST_DESIGN, PAST_VIDEO]);
     const View = buildOnDemandView(preact, store);
     const html = View({});
-    expect(html).to.include('sg-track-cards');
+    expect(html).to.include('sg-time-row__cards');
   });
 });
