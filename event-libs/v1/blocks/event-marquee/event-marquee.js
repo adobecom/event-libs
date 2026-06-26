@@ -1,7 +1,5 @@
 import { LIBS, createTag } from '../../utils/utils.js';
 
-const { getConfig } = await import(`${LIBS}/utils/utils.js`);
-
 const BREAKPOINTS = ['mobile', 'tablet', 'desktop'];
 
 // --- Viewport grouping (same authoring pattern as router-marquee) ---
@@ -150,7 +148,7 @@ async function buildVideoEmbed(anchor) {
 
 // --- Slide decoration ---
 
-async function decorateSlide(slide) {
+async function decorateSlide(slide, videoUrl) {
   const cols = slide.querySelectorAll(':scope > div');
   const [textCol, imageCol, videoCol] = cols;
 
@@ -168,24 +166,24 @@ async function decorateSlide(slide) {
   decorateText(textCol);
   decorateCtas(textCol);
 
-  if (videoCol) {
-    const anchor = videoCol.querySelector('a[href]');
-    videoCol.remove();
-    if (anchor) {
-      const embed = await buildVideoEmbed(anchor);
-      if (embed) {
-        contentWrapper.append(embed);
-        slide.classList.add('has-foreground-video');
-      }
+  // Remove the video column regardless — we use the pre-captured URL
+  videoCol?.remove();
+
+  if (videoUrl) {
+    const anchor = Object.assign(document.createElement('a'), { href: videoUrl });
+    const embed = await buildVideoEmbed(anchor);
+    if (embed) {
+      contentWrapper.append(embed);
+      slide.classList.add('has-foreground-video');
     }
   }
 }
 
 // --- Viewport building ---
 
-async function buildViewport(viewport, slides) {
+async function buildViewport(viewport, slides, videoUrls) {
   const container = createTag('div', { class: 'rm-viewport', 'data-viewport': viewport });
-  await Promise.all(slides.map((slide) => decorateSlide(slide)));
+  await Promise.all(slides.map((slide) => decorateSlide(slide, videoUrls.get(slide))));
   container.append(...slides);
   return container;
 }
@@ -193,6 +191,17 @@ async function buildViewport(viewport, slides) {
 // --- Init ---
 
 export default async function init(el) {
+  // Synchronously capture video URLs from each row's 3rd column BEFORE any await.
+  // milo processes auto-blocks (e.g. adobetv) concurrently during async yields,
+  // which can remove or replace the anchor before we read it.
+  const videoUrls = new Map();
+  [...el.children].forEach((row) => {
+    const cols = row.querySelectorAll(':scope > div');
+    const anchor = cols[2]?.querySelector('a[href]');
+    if (anchor) videoUrls.set(row, anchor.href);
+  });
+
+  const { getConfig } = await import(`${LIBS}/utils/utils.js`);
   const { miloLibs } = getConfig();
 
   // Load router-marquee CSS for all shared visual styles (.rm-slide, .rm-content, etc.)
@@ -203,7 +212,7 @@ export default async function init(el) {
 
   const viewports = groupByViewport(el);
   const containers = await Promise.all(
-    Object.entries(viewports).map(([vp, slides]) => buildViewport(vp, slides)),
+    Object.entries(viewports).map(([vp, slides]) => buildViewport(vp, slides, videoUrls)),
   );
   el.replaceChildren(...containers);
 }
