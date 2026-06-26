@@ -1,4 +1,6 @@
-import { getConfig, createTag } from '../../utils/utils.js';
+import { LIBS, createTag } from '../../utils/utils.js';
+
+const { getConfig } = await import(`${LIBS}/utils/utils.js`);
 
 const BREAKPOINTS = ['mobile', 'tablet', 'desktop'];
 
