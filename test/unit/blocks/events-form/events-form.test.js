@@ -857,6 +857,83 @@ describe('Events Form', () => {
       expect(errorEl.textContent).to.equal('event-full-no-waitlist-error-msg');
     });
   });
+
+  describe('getRsvpConfigFromMeta', () => {
+    let metaEl;
+
+    afterEach(() => {
+      metaEl?.remove();
+      metaEl = null;
+      document.head.querySelectorAll('meta[name="rsvp-config"]').forEach((el) => el.remove());
+    });
+
+    function setRsvpConfigMeta(value) {
+      metaEl = document.createElement('meta');
+      metaEl.setAttribute('name', 'rsvp-config');
+      metaEl.content = JSON.stringify(value);
+      document.head.appendChild(metaEl);
+    }
+
+    it('returns null when rsvp-config meta is absent', async () => {
+      const { getRsvpConfigFromMeta } = await import('../../../../event-libs/v1/blocks/events-form/events-form.js');
+      expect(getRsvpConfigFromMeta()).to.equal(null);
+    });
+
+    it('returns null when rsvpFormFields is empty', async () => {
+      const { getRsvpConfigFromMeta } = await import('../../../../event-libs/v1/blocks/events-form/events-form.js');
+      setRsvpConfigMeta({ rsvpFormFields: [] });
+      expect(getRsvpConfigFromMeta()).to.equal(null);
+    });
+
+    it('appends a submit field when none exists in rsvpFormFields', async () => {
+      const { getRsvpConfigFromMeta } = await import('../../../../event-libs/v1/blocks/events-form/events-form.js');
+      setRsvpConfigMeta({
+        rsvpFormFields: [
+          { field: 'industry', label: 'Industry', type: 'select', required: true, options: [] },
+        ],
+      });
+      const result = getRsvpConfigFromMeta();
+      const submitField = result.data.find((f) => f.type === 'submit');
+      expect(submitField).to.exist;
+      expect(submitField.field).to.equal('Submit');
+      expect(submitField.label).to.equal('Submit');
+    });
+
+    it('does not append a duplicate submit field when one already exists', async () => {
+      const { getRsvpConfigFromMeta } = await import('../../../../event-libs/v1/blocks/events-form/events-form.js');
+      setRsvpConfigMeta({
+        rsvpFormFields: [
+          { field: 'industry', label: 'Industry', type: 'select', required: false, options: [] },
+          { field: 'Submit', label: 'Submit', type: 'submit', required: false, options: [] },
+        ],
+      });
+      const result = getRsvpConfigFromMeta();
+      const submitFields = result.data.filter((f) => f.type === 'submit');
+      expect(submitFields).to.have.lengthOf(1);
+    });
+
+    it('maps required boolean true to "x"', async () => {
+      const { getRsvpConfigFromMeta } = await import('../../../../event-libs/v1/blocks/events-form/events-form.js');
+      setRsvpConfigMeta({
+        rsvpFormFields: [
+          { field: 'title', label: 'Title', type: 'text', required: true, options: [] },
+        ],
+      });
+      const result = getRsvpConfigFromMeta();
+      expect(result.data[0].required).to.equal('x');
+    });
+
+    it('maps required boolean false to empty string', async () => {
+      const { getRsvpConfigFromMeta } = await import('../../../../event-libs/v1/blocks/events-form/events-form.js');
+      setRsvpConfigMeta({
+        rsvpFormFields: [
+          { field: 'title', label: 'Title', type: 'text', required: false, options: [] },
+        ],
+      });
+      const result = getRsvpConfigFromMeta();
+      expect(result.data[0].required).to.equal('');
+    });
+  });
 });
 
 describe('stripTags', () => {

@@ -863,7 +863,7 @@ function addTerms(form, terms) {
   submitWrapper.before(termsWrapper);
 }
 
-function getRsvpConfigFromMeta() {
+export function getRsvpConfigFromMeta() {
   const raw = getMetadata('rsvp-config');
   if (!raw) return null;
 
@@ -880,6 +880,10 @@ function getRsvpConfigFromMeta() {
       }
       return field;
     });
+
+    if (!data.some((f) => f.type === 'submit')) {
+      data.push({ field: 'Submit', type: 'submit', label: 'Submit', required: '', options: '' });
+    }
 
     return { data };
   } catch (error) {
