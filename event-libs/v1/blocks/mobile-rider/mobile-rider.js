@@ -95,6 +95,8 @@ class MobileRider {
       await Promise.all([loadScript(), this.el.closest('.chrono-box') ? this.#loadStore() : null]);
 
       this.#setupDOM();
+      const meta = this.#renderMeta();
+      this.#initFavoriteButton(meta);
       const videos = this.cfg.concurrentenabled ? this.#parseConcurrent(this.cfg) : [this.cfg];
       this.allVideos = videos;
 
@@ -121,6 +123,45 @@ class MobileRider {
 
     this.wrap = this.root.querySelector('.video-wrapper')
       || createTag('div', { class: 'video-wrapper' }, '', { parent: this.root });
+  }
+
+  #renderMeta() {
+    const title = this.cfg['video-title'];
+    const description = this.cfg['video-description'];
+
+    const meta = createTag('div', { class: 'mobile-rider-meta' }, '', { parent: this.root });
+    const text = createTag('div', { class: 'mobile-rider-meta-text' }, '', { parent: meta });
+    if (title) createTag('h3', { class: 'mobile-rider-title' }, title, { parent: text });
+    if (description) createTag('p', { class: 'mobile-rider-description' }, description, { parent: text });
+
+    return meta;
+  }
+
+  // Spike: proving Preact (htm-preact.js) can mount inside a vanilla createTag block.
+  // No auth-gating or persistence yet — that lands once the approach is confirmed.
+  async #initFavoriteButton(parent) {
+    try {
+      const { html, render, useState } = await import(new URL('../../deps/htm-preact.js', import.meta.url).href);
+
+      function FavoriteButton() {
+        const [active, setActive] = useState(false);
+        return html`
+          <button
+            type="button"
+            class="favorite-button ${active ? 'is-active' : ''}"
+            onClick=${() => setActive(!active)}
+          >
+            <span class="favorite-icon">${active ? '♥' : '♡'}</span>
+            Favorite
+          </button>
+        `;
+      }
+
+      const mount = createTag('div', { class: 'favorite-button-mount' }, '', { parent: parent || this.root });
+      render(html`<${FavoriteButton} />`, mount);
+    } catch (e) {
+      this.log(`Favorite button spike failed: ${e.message}`);
+    }
   }
 
   #cancelPendingEmbed() {
