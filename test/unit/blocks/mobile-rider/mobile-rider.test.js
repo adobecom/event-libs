@@ -656,6 +656,102 @@ describe('Mobile Rider Module', () => {
     });
   });
 
+  describe('stylesheet injection', () => {
+    it('should use id guard instead of href substring for mobile-rider.css', async () => {
+      document.body.innerHTML = defaultHtml;
+      document.head.innerHTML = '';
+      const el = document.querySelector('.mobile-rider');
+      init(el);
+      await new Promise((resolve) => { setTimeout(resolve, 100); });
+      const link = document.getElementById('mobile-rider-css');
+      expect(link).to.not.be.null;
+      expect(link.rel).to.equal('stylesheet');
+    });
+
+    it('should not inject mobile-rider.css twice', async () => {
+      document.body.innerHTML = defaultHtml;
+      document.head.innerHTML = '';
+      const el = document.querySelector('.mobile-rider');
+      init(el);
+      await new Promise((resolve) => { setTimeout(resolve, 100); });
+      // second init — should not add a duplicate
+      document.body.innerHTML = defaultHtml;
+      init(document.querySelector('.mobile-rider'));
+      await new Promise((resolve) => { setTimeout(resolve, 100); });
+      expect(document.querySelectorAll('#mobile-rider-css').length).to.equal(1);
+    });
+  });
+
+  describe('#initASL poll-on-click', () => {
+    let el;
+
+    beforeEach(async () => {
+      sinon.stub(window, 'requestAnimationFrame').callsFake((cb) => setTimeout(cb, 0));
+      globalThis.mobilerider.embed = sinon.stub();
+
+      document.body.innerHTML = defaultHtml;
+      el = document.querySelector('.mobile-rider');
+      riderInstance = init(el);
+      await new Promise((resolve) => { setTimeout(resolve, 100); });
+
+      const videoWrapper = document.createElement('div');
+      videoWrapper.className = 'video-wrapper';
+      el.appendChild(videoWrapper);
+      riderInstance.wrap = videoWrapper;
+      riderInstance.isEmbedding = false;
+    });
+
+    it('re-attaches listener after player replaces the ASL button', async () => {
+      riderInstance.injectPlayer('vid', 'skin', 'asl-id');
+      globalThis.__mr_player = { off: sinon.stub(), on: sinon.stub() };
+      // Wait for RAF callback to fire
+      await new Promise((resolve) => { setTimeout(resolve, 50); });
+
+      // injectPlayer creates the real container — grab it from the wrap
+      const container = riderInstance.wrap.querySelector('.mobile-rider-container');
+
+      const btn1 = document.createElement('button');
+      btn1.id = 'asl-button';
+      container.appendChild(btn1);
+      // Wait for poll interval to find btn1 and attach { once: true } listener
+      await new Promise((resolve) => { setTimeout(resolve, 200); });
+
+      btn1.click();
+      expect(container.classList.contains('isASL')).to.be.true;
+
+      // Simulate player replacing the button node
+      btn1.remove();
+      const btn2 = document.createElement('button');
+      btn2.id = 'asl-button';
+      container.appendChild(btn2);
+      // Wait for re-poll to find btn2
+      await new Promise((resolve) => { setTimeout(resolve, 200); });
+
+      btn2.click();
+      expect(container.classList.contains('isASL')).to.be.true;
+    });
+
+    it('fires the handler exactly once per button due to { once: true }', async () => {
+      riderInstance.injectPlayer('vid', 'skin', 'asl-id');
+      globalThis.__mr_player = { off: sinon.stub(), on: sinon.stub() };
+      await new Promise((resolve) => { setTimeout(resolve, 50); });
+
+      const container = riderInstance.wrap.querySelector('.mobile-rider-container');
+      const btn = document.createElement('button');
+      btn.id = 'asl-button';
+      container.appendChild(btn);
+      await new Promise((resolve) => { setTimeout(resolve, 200); });
+
+      let addCount = 0;
+      const origAdd = container.classList.add.bind(container.classList);
+      container.classList.add = (cls) => { if (cls === 'isASL') addCount += 1; origAdd(cls); };
+
+      btn.click();
+      btn.click(); // second click on same node — { once: true } already removed the handler
+      expect(addCount).to.equal(1);
+    });
+  });
+
   describe('concurrent drawer interactions', () => {
     it('should render drawer items with thumbnails and handle activation', async () => {
       const concurrentHtml = `

@@ -2,6 +2,7 @@
 import { createTag, getEventConfig } from '../../utils/utils.js';
 
 const DRAWER_CSS_URL = new URL('./drawer.css', import.meta.url).href;
+const BLOCK_CSS_URL = new URL('./mobile-rider.css', import.meta.url).href;
 
 const CONFIG = {
   ANALYTICS: { PROVIDER: 'adobe' },
@@ -54,6 +55,7 @@ class MobileRider {
   constructor(el) {
     this.el = el;
     this.isEmbedding = false;
+    this._endListenerAttached = false;
     this.init();
   }
 
@@ -86,6 +88,9 @@ class MobileRider {
 
   async init() {
     try {
+      if (!document.getElementById('mobile-rider-css')) {
+        createTag('link', { rel: 'stylesheet', href: BLOCK_CSS_URL, id: 'mobile-rider-css' }, '', { parent: document.head });
+      }
       this.cfg = this.#parseCfg();
       await Promise.all([loadScript(), this.el.closest('.chrono-box') ? this.#loadStore() : null]);
 
@@ -184,8 +189,7 @@ class MobileRider {
             identifier2: asl || '',
             sessionId: vid,
           });
-
-          if (asl) this.#initASL(container);
+          if (asl) this.#initASL(container, vid);
           this.#maybeAttachEndListener(vid);
         } catch (e) {
           this.log(`Embed Error: ${e.message}`);
@@ -249,6 +253,7 @@ class MobileRider {
 
       window.__mr_player?.dispose?.();
       window.__mr_player = null;
+      this._endListenerAttached = false;
     });
   }
 
@@ -269,8 +274,8 @@ class MobileRider {
   }
 
   async #initDrawer(videos, activeId) {
-    if (!document.querySelector('link[href*="drawer.css"]')) {
-      createTag('link', { rel: 'stylesheet', href: DRAWER_CSS_URL }, '', { parent: document.head });
+    if (!document.getElementById('mobile-rider-drawer-css')) {
+      createTag('link', { rel: 'stylesheet', href: DRAWER_CSS_URL, id: 'mobile-rider-drawer-css' }, '', { parent: document.head });
     }
     const { default: createDrawer } = await import('./drawer.js');
     this.drawer = createDrawer(this.root, {
@@ -302,19 +307,37 @@ class MobileRider {
     return item;
   }
 
-  #initASL(container) {
-    let attempts = 0;
-    const check = setInterval(() => {
-      const btn = container.querySelector(`#${CONFIG.ASL.BUTTON_ID}`);
-      if (btn || ++attempts > CONFIG.ASL.MAX_CHECKS) {
-        clearInterval(check);
-        btn?.addEventListener('click', () => {
-          if (!container.classList.contains(CONFIG.ASL.TOGGLE_CLASS)) {
-            container.classList.add(CONFIG.ASL.TOGGLE_CLASS);
-          }
-        });
-      }
-    }, CONFIG.ASL.CHECK_INTERVAL);
+  #initASL(container, vid) {
+    let currentCheck = null;
+    const poll = () => {
+      clearInterval(currentCheck);
+      let attempts = 0;
+      currentCheck = setInterval(() => {
+        const btn = container.querySelector(`#${CONFIG.ASL.BUTTON_ID}`);
+        if (btn) {
+          clearInterval(currentCheck);
+          currentCheck = null;
+          btn.addEventListener('click', () => {
+            try {
+              if (this.store && !this._endListenerAttached) {
+                this._endListenerAttached = true;
+                this.#attachEndListener(vid);
+              }
+            } catch (e) {
+              this.log(`ASL end-listener error: ${e.message}`);
+            }
+            if (!container.classList.contains(CONFIG.ASL.TOGGLE_CLASS)) {
+              container.classList.add(CONFIG.ASL.TOGGLE_CLASS);
+            }
+            poll();
+          }, { once: true });
+        } else if (++attempts > CONFIG.ASL.MAX_CHECKS) {
+          clearInterval(currentCheck);
+          currentCheck = null;
+        }
+      }, CONFIG.ASL.CHECK_INTERVAL);
+    };
+    poll();
   }
 
   #parseCfg() {

@@ -19,6 +19,7 @@ const {
   validatePageAndRedirect,
   updatePictureElement,
   getNonProdData,
+  processAutoBlockLinks,
 } = await import('../../../event-libs/v1/utils/decorate.js');
 const head = await readFile({ path: './mocks/head.html' });
 const body = await readFile({ path: './mocks/full-event.html' });
@@ -1606,6 +1607,40 @@ describe('decorateEvent - Array Iteration', () => {
 
       // Verify the result handles missing attributes
       expect(container.textContent).to.equal('Speakers: Dr. Alice Brown,Prof. Charlie Wilson,');
+    });
+  });
+
+  describe('processAutoBlockLinks', () => {
+    afterEach(() => sinon.restore());
+
+    it('should add link-block class and call initBlock for selfInit blocks', async () => {
+      const parent = document.createElement('div');
+      const link = document.createElement('a');
+      link.href = 'https://assets.mobilerider.com/embed?videoId=abc123';
+      parent.appendChild(link);
+
+      processAutoBlockLinks(parent);
+      await new Promise((resolve) => { setTimeout(resolve, 50); });
+
+      // Classes are added synchronously before the dynamic import
+      expect(link.classList.contains('mobile-rider')).to.be.true;
+      expect(link.classList.contains('link-block')).to.be.true;
+
+      // initBlock(link) is confirmed called: handleAnchorElement replaces the <a>
+      // with a .mobile-rider div and removes the original anchor from the DOM
+      expect(parent.querySelector('.mobile-rider')).to.not.be.null;
+      expect(parent.querySelector('a')).to.be.null;
+    });
+
+    it('should not throw when Promise.all rejects on a bad import', async () => {
+      const parent = document.createElement('div');
+      const link = document.createElement('a');
+      link.href = 'https://assets.mobilerider.com/embed?videoId=bad';
+      parent.appendChild(link);
+
+      // processAutoBlockLinks should not throw even if the dynamic import fails
+      expect(() => processAutoBlockLinks(parent)).to.not.throw();
+      await new Promise((resolve) => { setTimeout(resolve, 50); });
     });
   });
 });
