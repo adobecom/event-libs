@@ -126,8 +126,8 @@ class MobileRider {
   }
 
   #renderMeta() {
-    const title = this.cfg['video-title'];
-    const description = this.cfg['video-description'];
+    const title = this.cfg.videotitle;
+    const description = this.cfg.videodescription;
 
     const meta = createTag('div', { class: 'mobile-rider-meta' }, '', { parent: this.root });
     const text = createTag('div', { class: 'mobile-rider-meta-text' }, '', { parent: meta });
