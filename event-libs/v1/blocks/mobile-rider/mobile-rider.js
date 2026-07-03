@@ -121,8 +121,11 @@ class MobileRider {
     this.root = this.el.querySelector('.mobile-rider-player')
       || createTag('div', { class: 'mobile-rider-player' }, '', { parent: this.el });
 
-    this.wrap = this.root.querySelector('.video-wrapper')
-      || createTag('div', { class: 'video-wrapper' }, '', { parent: this.root });
+    this.card = this.root.querySelector('.mobile-rider-card')
+      || createTag('div', { class: 'mobile-rider-card' }, '', { parent: this.root });
+
+    this.wrap = this.card.querySelector('.video-wrapper')
+      || createTag('div', { class: 'video-wrapper' }, '', { parent: this.card });
   }
 
   #renderMeta() {
@@ -319,7 +322,7 @@ class MobileRider {
       createTag('link', { rel: 'stylesheet', href: DRAWER_CSS_URL, id: 'mobile-rider-drawer-css' }, '', { parent: document.head });
     }
     const { default: createDrawer } = await import('./drawer.js');
-    this.drawer = createDrawer(this.root, {
+    this.drawer = createDrawer(this.card, {
       items: videos,
       renderItem: (v) => this.#renderDrawerItem(v),
       onItemClick: (_el, v) => this.#activateVideo(v),
