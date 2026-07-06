@@ -302,7 +302,7 @@ describe('Events Form', () => {
   });
 
   describe('createInput - phone field defaults', () => {
-    const PHONE_FIELD_RE = /phone/i;
+    const PHONE_FIELD_RE = /phone(?![a-z])/i;
     const PHONE_PATTERN = '^\\+?[\\d\\s\\(\\)\\.\\-]{7,20}$';
 
     function simulateCreatePhoneAwareInput({ type, field, pattern, title }) {
@@ -337,6 +337,13 @@ describe('Events Form', () => {
 
     it('does not apply phone defaults for non-phone fields', () => {
       const input = simulateCreatePhoneAwareInput({ type: 'text', field: 'firstName' });
+      expect(input.getAttribute('type')).to.equal('text');
+      expect(input.hasAttribute('pattern')).to.be.false;
+      expect(input.hasAttribute('inputmode')).to.be.false;
+    });
+
+    it('does not apply phone defaults for fields that contain "phone" as a substring (e.g. Phonetic First Name)', () => {
+      const input = simulateCreatePhoneAwareInput({ type: 'text', field: 'Phonetic First Name' });
       expect(input.getAttribute('type')).to.equal('text');
       expect(input.hasAttribute('pattern')).to.be.false;
       expect(input.hasAttribute('inputmode')).to.be.false;
