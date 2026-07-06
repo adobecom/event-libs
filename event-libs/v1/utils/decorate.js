@@ -1012,7 +1012,7 @@ export function applyAreaTheme(area = document) {
     const isDocument = area === document;
     const blocks = isDocument
       ? area.body.querySelectorAll('main > div > div[class]')
-      : area.querySelectorAll(':scope > div[class]');
+      : area.querySelectorAll('div[class]');
     blocks.forEach((block) => {
       const isSectionMetadata = block.classList.contains('section-metadata');
       if (isSectionMetadata) {
