@@ -302,11 +302,11 @@ describe('Events Form', () => {
   });
 
   describe('createInput - phone field defaults', () => {
-    const PHONE_FIELD_RE = /phone(?![a-z])/i;
+    const PHONE_FIELD_RE = /phone/i;
     const PHONE_PATTERN = '^\\+?[\\d\\s\\(\\)\\.\\-]{7,20}$';
 
     function simulateCreatePhoneAwareInput({ type, field, pattern, title }) {
-      const isPhoneField = type === 'tel' || type === 'phone' || (typeof field === 'string' && PHONE_FIELD_RE.test(field));
+      const isPhoneField = type === 'tel' || type === 'phone' || (type !== 'text' && typeof field === 'string' && PHONE_FIELD_RE.test(field));
       const attrs = { type: isPhoneField ? 'tel' : type, id: field };
       if (isPhoneField) {
         attrs.inputmode = 'tel';
@@ -320,8 +320,8 @@ describe('Events Form', () => {
       return input;
     }
 
-    it('applies tel type, pattern, inputmode for businessPhone field', () => {
-      const input = simulateCreatePhoneAwareInput({ type: 'text', field: 'businessPhone' });
+    it('applies tel type, pattern, inputmode for businessPhone field (legacy: no explicit type)', () => {
+      const input = simulateCreatePhoneAwareInput({ type: undefined, field: 'businessPhone' });
       expect(input.getAttribute('type')).to.equal('tel');
       expect(input.getAttribute('inputmode')).to.equal('tel');
       expect(input.getAttribute('autocomplete')).to.equal('tel');
@@ -329,10 +329,17 @@ describe('Events Form', () => {
       expect(input.hasAttribute('title')).to.be.false;
     });
 
-    it('applies same defaults for mobilePhone field', () => {
-      const input = simulateCreatePhoneAwareInput({ type: 'text', field: 'mobilePhone' });
+    it('applies same defaults for mobilePhone field (legacy: no explicit type)', () => {
+      const input = simulateCreatePhoneAwareInput({ type: undefined, field: 'mobilePhone' });
       expect(input.getAttribute('type')).to.equal('tel');
       expect(input.getAttribute('pattern')).to.equal(PHONE_PATTERN);
+    });
+
+    it('does not apply phone defaults when explicit type is text, even if field name contains phone', () => {
+      const input = simulateCreatePhoneAwareInput({ type: 'text', field: 'businessPhone' });
+      expect(input.getAttribute('type')).to.equal('text');
+      expect(input.hasAttribute('pattern')).to.be.false;
+      expect(input.hasAttribute('inputmode')).to.be.false;
     });
 
     it('does not apply phone defaults for non-phone fields', () => {

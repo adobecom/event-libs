@@ -443,7 +443,7 @@ function createInput({
   type, field, placeholder, required, defval, pattern, title, limit,
 }) {
   const placeholderText = placeholder ? dictionaryManager.getValue(placeholder, 'rsvp-fields') : '';
-  const isPhoneField = type === 'tel' || type === 'phone' || (typeof field === 'string' && PHONE_FIELD_RE.test(field));
+  const isPhoneField = type === 'tel' || type === 'phone' || (type !== 'text' && typeof field === 'string' && PHONE_FIELD_RE.test(field));
   const attrs = { type: isPhoneField ? 'tel' : type, id: field, placeholder: placeholderText, value: defval };
   if (isPhoneField) {
     attrs.inputmode = 'tel';
