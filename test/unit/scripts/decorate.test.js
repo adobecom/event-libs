@@ -19,6 +19,7 @@ const {
   validatePageAndRedirect,
   updatePictureElement,
   getNonProdData,
+  applyAreaTheme,
 } = await import('../../../event-libs/v1/utils/decorate.js');
 const head = await readFile({ path: './mocks/head.html' });
 const body = await readFile({ path: './mocks/full-event.html' });
@@ -481,6 +482,144 @@ describe('updatePictureElement', () => {
     sources.forEach((source) => {
       expect(source.srcset.startsWith('/mock-image-url.jpg?')).to.be.true;
     });
+  });
+});
+
+describe('applyAreaTheme', () => {
+  beforeEach(() => {
+    document.body.innerHTML = '';
+    document.head.innerHTML = head;
+  });
+
+  function setThemeAttribute(attribute, value) {
+    setMetadata('custom-attributes', JSON.stringify([
+      { attribute, values: [{ value }] },
+    ]));
+  }
+
+  it('does nothing when custom-attributes metadata is absent', () => {
+    document.body.innerHTML = '<main><div><div class="foo"></div></div></main>';
+    expect(() => applyAreaTheme()).to.not.throw();
+    const block = document.querySelector('.foo');
+    expect(block.classList.contains('dark')).to.be.false;
+    expect(block.classList.contains('light')).to.be.false;
+  });
+
+  it('does nothing when custom-attributes metadata is invalid JSON', () => {
+    setMetadata('custom-attributes', '{not valid json');
+    document.body.innerHTML = '<main><div><div class="foo"></div></div></main>';
+    expect(() => applyAreaTheme()).to.not.throw();
+    const block = document.querySelector('.foo');
+    expect(block.classList.contains('dark')).to.be.false;
+    expect(block.classList.contains('light')).to.be.false;
+  });
+
+  it('does nothing when there is no theme attribute', () => {
+    setMetadata('custom-attributes', JSON.stringify([
+      { attribute: 'other', values: [{ value: 'dark' }] },
+    ]));
+    document.body.innerHTML = '<main><div><div class="foo"></div></div></main>';
+    applyAreaTheme();
+    const block = document.querySelector('.foo');
+    expect(block.classList.contains('dark')).to.be.false;
+  });
+
+  it('does nothing when the theme value is neither dark nor light', () => {
+    setThemeAttribute('theme', 'blue');
+    document.body.innerHTML = '<main><div><div class="foo"></div></div></main>';
+    applyAreaTheme();
+    const block = document.querySelector('.foo');
+    expect(block.classList.contains('blue')).to.be.false;
+    expect(block.classList.contains('dark')).to.be.false;
+    expect(block.classList.contains('light')).to.be.false;
+  });
+
+  it('applies the dark class to blocks under document via the main selector', () => {
+    setThemeAttribute('theme', 'dark');
+    document.body.innerHTML = '<main><div><div class="foo"></div></div></main>';
+    applyAreaTheme();
+    const block = document.querySelector('.foo');
+    expect(block.classList.contains('dark')).to.be.true;
+  });
+
+  it('applies the light class to blocks under document', () => {
+    setThemeAttribute('theme', 'light');
+    document.body.innerHTML = '<main><div><div class="foo"></div></div></main>';
+    applyAreaTheme();
+    const block = document.querySelector('.foo');
+    expect(block.classList.contains('light')).to.be.true;
+  });
+
+  it('replaces a pre-existing opposite theme class', () => {
+    setThemeAttribute('theme', 'light');
+    document.body.innerHTML = '<main><div><div class="foo dark"></div></div></main>';
+    applyAreaTheme();
+    const block = document.querySelector('.foo');
+    expect(block.classList.contains('light')).to.be.true;
+    expect(block.classList.contains('dark')).to.be.false;
+  });
+
+  it('applies the theme class to blocks when area is a specific element', () => {
+    setThemeAttribute('theme', 'dark');
+    document.body.innerHTML = '<div id="area"><div class="foo"></div></div>';
+    const area = document.getElementById('area');
+    applyAreaTheme(area);
+    const block = area.querySelector('.foo');
+    expect(block.classList.contains('dark')).to.be.true;
+  });
+
+  it('appends the theme value to an existing style row in section-metadata', () => {
+    setThemeAttribute('theme', 'dark');
+    document.body.innerHTML = `
+      <main><div>
+        <div class="section-metadata">
+          <div><div>style</div><div>xxl-spacing</div></div>
+        </div>
+      </div></main>
+    `;
+    applyAreaTheme();
+    const cols = document.querySelectorAll('.section-metadata > div > div');
+    expect(cols[1].textContent).to.equal('xxl-spacing, dark');
+  });
+
+  it('does not duplicate the theme value in an existing style row', () => {
+    setThemeAttribute('theme', 'dark');
+    document.body.innerHTML = `
+      <main><div>
+        <div class="section-metadata">
+          <div><div>style</div><div>xxl-spacing, dark</div></div>
+        </div>
+      </div></main>
+    `;
+    applyAreaTheme();
+    const cols = document.querySelectorAll('.section-metadata > div > div');
+    expect(cols[1].textContent).to.equal('xxl-spacing, dark');
+  });
+
+  it('creates a new style row in section-metadata when none exists', () => {
+    setThemeAttribute('theme', 'dark');
+    document.body.innerHTML = `
+      <main><div>
+        <div class="section-metadata">
+          <div><div>other</div><div>value</div></div>
+        </div>
+      </div></main>
+    `;
+    applyAreaTheme();
+    const rows = document.querySelectorAll('.section-metadata > div');
+    const styleRow = Array.from(rows).find(
+      (row) => row.querySelectorAll(':scope > div')[0]?.textContent.trim().toLowerCase() === 'style',
+    );
+    expect(styleRow).to.not.be.undefined;
+    expect(styleRow.querySelectorAll(':scope > div')[1].textContent).to.equal('dark');
+  });
+
+  it('resolves the theme attribute and value regardless of case or whitespace', () => {
+    setThemeAttribute(' Theme ', ' DARK ');
+    document.body.innerHTML = '<main><div><div class="foo"></div></div></main>';
+    applyAreaTheme();
+    const block = document.querySelector('.foo');
+    expect(block.classList.contains('dark')).to.be.true;
   });
 });
 
