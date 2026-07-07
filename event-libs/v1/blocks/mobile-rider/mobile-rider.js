@@ -131,6 +131,7 @@ class MobileRider {
   #renderMeta() {
     const title = this.cfg.videotitle;
     const description = this.cfg.videodescription;
+    if (!title && !description) return null;
 
     const meta = createTag('div', { class: 'mobile-rider-meta' }, '', { parent: this.root });
     const text = createTag('div', { class: 'mobile-rider-meta-text' }, '', { parent: meta });
@@ -141,8 +142,10 @@ class MobileRider {
   }
 
   // Spike: proving Preact (htm-preact.js) can mount inside a vanilla createTag block.
-  // No auth-gating or persistence yet — that lands once the approach is confirmed.
+  // No login/registration gating or persistence yet — that lands once the approach is confirmed.
   async #initFavoriteButton(parent) {
+    if (!parent || !toBool(this.cfg.favoriteenabled)) return;
+
     try {
       const { html, render, useState } = await import(new URL('../../deps/htm-preact.js', import.meta.url).href);
 
@@ -160,7 +163,7 @@ class MobileRider {
         `;
       }
 
-      const mount = createTag('div', { class: 'favorite-button-mount' }, '', { parent: parent || this.root });
+      const mount = createTag('div', { class: 'favorite-button-mount' }, '', { parent });
       render(html`<${FavoriteButton} />`, mount);
     } catch (e) {
       this.log(`Favorite button spike failed: ${e.message}`);
