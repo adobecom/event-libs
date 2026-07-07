@@ -244,19 +244,34 @@ class TimingWorker {
 
     let pointer = scheduleRoot;
     let start = null;
+    let lastTimedStart = null;
+    let brokeOnFuture = false;
 
     while (pointer) {
       const { toggleTime } = pointer;
+      if (!toggleTime) {
+        start = pointer;
+        pointer = pointer.next;
+        continue;
+      }
       const numericToggleTime = TimingWorker.parseToggleTime(toggleTime);
       const toggleTimePassed = typeof numericToggleTime !== 'number' || adjustedTime > numericToggleTime;
 
-      if (!toggleTimePassed) break;
+      if (!toggleTimePassed) {
+        brokeOnFuture = true;
+        break;
+      }
 
       start = pointer;
+      lastTimedStart = pointer;
       pointer = pointer.next;
     }
 
-    return start;
+    // When a future-timed item stopped traversal, a null-toggleTime item that appeared
+    // between the last active timed item and the stopping point must not override the
+    // timed item's position (e.g. a transition/catch-all slot interleaved mid-schedule).
+    // When traversal reaches the end naturally, the final item (timed or null) is correct.
+    return brokeOnFuture ? (lastTimedStart || start) : start;
   }
 
   /**
@@ -315,6 +330,28 @@ class TimingWorker {
     return currentTime > numericToggleTime;
   }
 
+  async shouldSkipInactiveMrSlot(scheduleItem) {
+    if (!scheduleItem?.mobileRider) return false;
+
+    const timePassed = await this.hasToggleTimePassed(scheduleItem);
+    if (!timePassed) return false;
+
+    const mobileRiderStore = this.plugins.get('mobileRider');
+    if (!mobileRiderStore) return false;
+
+    const { sessionId } = scheduleItem.mobileRider;
+    const isActive = mobileRiderStore.get(sessionId);
+    const avoidingStreamEnd = this.testingManager.shouldAvoidStreamEnd();
+    return !avoidingStreamEnd && !isActive;
+  }
+
+  async advancePastInactiveMrSlots() {
+    while (this.nextScheduleItem && await this.shouldSkipInactiveMrSlot(this.nextScheduleItem)) {
+      this.currentScheduleItem = { ...this.nextScheduleItem };
+      this.nextScheduleItem = this.nextScheduleItem.next;
+    }
+  }
+
   /**
    * @param {Object} scheduleItem
    * @returns {boolean}
@@ -322,6 +359,7 @@ class TimingWorker {
    */
   async shouldTriggerNextSchedule(scheduleItem) {
     if (!scheduleItem) return false;
+    let liveStreamEnd = false;
 
     // Check if previous item has mobileRider that's still active (overrun)
     if (this.currentScheduleItem?.mobileRider) {
@@ -329,28 +367,20 @@ class TimingWorker {
       if (mobileRiderStore) {
         const { sessionId } = this.currentScheduleItem.mobileRider;
         const isActive = mobileRiderStore.get(sessionId);
-        // If avoidStreamEndFlag is set, treat all streams as ended
-        const shouldTreatAsActive = this.testingManager.shouldAvoidStreamEnd() ? false : isActive;
-        if (shouldTreatAsActive) return false; // Wait for session to end
+        const avoidingStreamEnd = this.testingManager.shouldAvoidStreamEnd();
+        const shouldTreatAsActive = avoidingStreamEnd ? false : isActive;
+        if (shouldTreatAsActive) {
+          return false; // Wait for session to end
+        }
+        if (!avoidingStreamEnd && !isActive) {
+          liveStreamEnd = true;
+        }
       }
     }
 
     if (scheduleItem.mobileRider) {
-      // Check if toggleTime has passed before checking mobileRider status
       const timePassed = await this.hasToggleTimePassed(scheduleItem);
-      if (!timePassed) return false;
-
-      const mobileRiderStore = this.plugins.get('mobileRider');
-      if (mobileRiderStore) {
-        const { sessionId } = scheduleItem.mobileRider;
-        const isActive = mobileRiderStore.get(sessionId);
-        // If avoidStreamEndFlag is set, treat all streams as ended (skip forward)
-        const shouldTreatAsEnded = this.testingManager.shouldAvoidStreamEnd() ? true : !isActive;
-        if (shouldTreatAsEnded) {
-          this.nextScheduleItem = scheduleItem.next;
-          return true;
-        }
-      }
+      if (!timePassed && !liveStreamEnd) return false;
     }
 
     // Check metadata conditions if present
@@ -372,11 +402,15 @@ class TimingWorker {
       }
     }
 
+    if (liveStreamEnd) return true;
+
     // If no plugins are blocking, check toggleTime
     return this.hasToggleTimePassed(scheduleItem);
   }
 
   async runTimer() {
+    await this.advancePastInactiveMrSlots();
+
     const shouldTrigger = await this.shouldTriggerNextSchedule(this.nextScheduleItem);
 
     let itemToSend = null;
@@ -483,9 +517,11 @@ class TimingWorker {
     
     // Find the correct schedule item based on authoritative time
     const correctItem = this.getStartScheduleItemByToggleTime(schedule, authoritativeTime);
-    
-    // If we're on the wrong item, correct it on next timer tick
-    if (correctItem && correctItem !== this.currentScheduleItem) {
+
+    // If we're on the wrong item, correct it on next timer tick (compare by path, not reference,
+    // because currentScheduleItem is always a spread copy and reference equality is always false)
+    const isSamePosition = correctItem?.pathToFragment === this.currentScheduleItem?.pathToFragment;
+    if (correctItem && !isSamePosition) {
       this.nextScheduleItem = correctItem;
     } else if (!correctItem && this.currentScheduleItem) {
       // Authoritative time says nothing qualifies yet — reset

@@ -2,6 +2,7 @@ import { expect } from '@esm-bundle/chai';
 import sinon from 'sinon';
 import { getValidCampaignIdFromUrl } from '../../../../event-libs/v1/utils/utils.js';
 import { BASE_ATTENDEE_DATA_FILTER } from '../../../../event-libs/v1/utils/data-utils.js';
+import { stripTags } from '../../../../event-libs/v1/utils/sanitize-utils.js';
 
 describe('Events Form', () => {
   let block;
@@ -297,6 +298,74 @@ describe('Events Form', () => {
       expect(regex.test('https://example.com')).to.be.true;
       expect(regex.test('http://example.com/path?query=1')).to.be.true;
       expect(regex.test('not-a-url')).to.be.false;
+    });
+  });
+
+  describe('createInput - phone field defaults', () => {
+    const PHONE_FIELD_RE = /phone/i;
+    const PHONE_PATTERN = '^\\+?[\\d\\s\\(\\)\\.\\-]{7,20}$';
+
+    function simulateCreatePhoneAwareInput({ type, field, pattern, title }) {
+      const isPhoneField = type === 'tel' || type === 'phone' || (typeof field === 'string' && PHONE_FIELD_RE.test(field));
+      const attrs = { type: isPhoneField ? 'tel' : type, id: field };
+      if (isPhoneField) {
+        attrs.inputmode = 'tel';
+        attrs.autocomplete = 'tel';
+      }
+      const resolvedPattern = pattern || (isPhoneField ? PHONE_PATTERN : null);
+      if (resolvedPattern) attrs.pattern = resolvedPattern;
+      if (title) attrs.title = title;
+      const input = document.createElement('input');
+      Object.entries(attrs).forEach(([k, v]) => input.setAttribute(k, v));
+      return input;
+    }
+
+    it('applies tel type, pattern, inputmode for businessPhone field', () => {
+      const input = simulateCreatePhoneAwareInput({ type: 'text', field: 'businessPhone' });
+      expect(input.getAttribute('type')).to.equal('tel');
+      expect(input.getAttribute('inputmode')).to.equal('tel');
+      expect(input.getAttribute('autocomplete')).to.equal('tel');
+      expect(input.getAttribute('pattern')).to.equal(PHONE_PATTERN);
+      expect(input.hasAttribute('title')).to.be.false;
+    });
+
+    it('applies same defaults for mobilePhone field', () => {
+      const input = simulateCreatePhoneAwareInput({ type: 'text', field: 'mobilePhone' });
+      expect(input.getAttribute('type')).to.equal('tel');
+      expect(input.getAttribute('pattern')).to.equal(PHONE_PATTERN);
+    });
+
+    it('does not apply phone defaults for non-phone fields', () => {
+      const input = simulateCreatePhoneAwareInput({ type: 'text', field: 'firstName' });
+      expect(input.getAttribute('type')).to.equal('text');
+      expect(input.hasAttribute('pattern')).to.be.false;
+      expect(input.hasAttribute('inputmode')).to.be.false;
+    });
+
+    it('keeps explicit pattern and title from field config when provided', () => {
+      const input = simulateCreatePhoneAwareInput({
+        type: 'text',
+        field: 'businessPhone',
+        pattern: '^[0-9]+$',
+        title: 'Digits only',
+      });
+      expect(input.getAttribute('pattern')).to.equal('^[0-9]+$');
+      expect(input.getAttribute('title')).to.equal('Digits only');
+    });
+
+    it('phone pattern rejects letters and stray symbols (bug repro)', () => {
+      const regex = new RegExp(`^(?:${PHONE_PATTERN})$`);
+      expect(regex.test('Testing 123!@#')).to.be.false;
+      expect(regex.test('abc')).to.be.false;
+      expect(regex.test('555$$$')).to.be.false;
+    });
+
+    it('phone pattern accepts common phone formats', () => {
+      const regex = new RegExp(`^(?:${PHONE_PATTERN})$`);
+      expect(regex.test('+1 (555) 123-4567')).to.be.true;
+      expect(regex.test('555-123-4567')).to.be.true;
+      expect(regex.test('+15551234567')).to.be.true;
+      expect(regex.test('5551234567')).to.be.true;
     });
   });
 
@@ -787,5 +856,32 @@ describe('Events Form', () => {
       expect(errorEl).to.not.be.null;
       expect(errorEl.textContent).to.equal('event-full-no-waitlist-error-msg');
     });
+  });
+});
+
+describe('stripTags', () => {
+  it('removes script tags and keeps inner text', () => {
+    expect(stripTags('<script>alert()</script>')).to.equal('alert()');
+  });
+
+  it('removes inline tags and keeps surrounding text', () => {
+    expect(stripTags('hello <b>world</b>')).to.equal('hello world');
+  });
+
+  it('passes through plain text unchanged', () => {
+    expect(stripTags('no tags here')).to.equal('no tags here');
+  });
+
+  it('returns empty string unchanged', () => {
+    expect(stripTags('')).to.equal('');
+  });
+
+  it('returns falsy values unchanged', () => {
+    expect(stripTags(null)).to.equal(null);
+    expect(stripTags(undefined)).to.equal(undefined);
+  });
+
+  it('strips nested tags and event handler attributes', () => {
+    expect(stripTags('<a href="x"><img onerror="y">text</a>')).to.equal('text');
   });
 });

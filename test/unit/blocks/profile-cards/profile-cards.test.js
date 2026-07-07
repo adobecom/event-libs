@@ -1,6 +1,10 @@
 import { expect } from '@esm-bundle/chai';
 import { readFile } from '@web/test-runner-commands';
-import init, { createSocialIcon } from '../../../../event-libs/v1/blocks/profile-cards/profile-cards.js';
+import init, { createSocialIcon, buildModalContent } from '../../../../event-libs/v1/blocks/profile-cards/profile-cards.js';
+import { setMetadata } from '../../../../event-libs/v1/utils/utils.js';
+
+/** Mirrors Milo modal.js FOCUSABLES selector for initial-focus assertions */
+const MODAL_FOCUSABLES_SELECTOR = 'a:not(.hide-video, .faas), button:not([disabled], .locale-modal-v2 .paddle), input, textarea, select, details, [tabindex]:not([tabindex="-1"])';
 
 const head = await readFile({ path: './mocks/head.html' });
 const body = await readFile({ path: './mocks/default.html' });
@@ -134,6 +138,60 @@ describe('Profile Cards Module', () => {
       expect(keydownEvent.defaultPrevented).to.be.true;
     });
 
+    it('renders all speakers when type cell is empty', () => {
+      const container = document.createElement('div');
+      container.innerHTML = `
+        <div id="all-cards" class="profile-cards">
+          <div><div><h2>Everyone</h2></div></div>
+          <div><div>type</div><div></div></div>
+        </div>
+      `;
+      document.body.appendChild(container);
+      const el = container.querySelector('#all-cards');
+      init(el);
+
+      const cards = el.querySelectorAll('.card-container');
+      // head mock contains 9 speakers across speaker/judge/host types
+      expect(cards).to.have.lengthOf(9);
+    });
+
+    it('filters by type when type cell has a value', () => {
+      const container = document.createElement('div');
+      container.innerHTML = `
+        <div id="filtered-cards" class="profile-cards">
+          <div><div><h2>Speakers only</h2></div></div>
+          <div><div>type</div><div>speaker</div></div>
+        </div>
+      `;
+      document.body.appendChild(container);
+      const el = container.querySelector('#filtered-cards');
+      init(el);
+
+      const cards = el.querySelectorAll('.card-container');
+      expect(cards.length).to.be.greaterThan(0);
+      expect(cards.length).to.be.lessThan(9);
+    });
+
+    it('does not throw when a speaker entry has no speakerType and type cell is empty', () => {
+      setMetadata('speakers', JSON.stringify([
+        { firstName: 'A', lastName: 'One', title: 't', bio: '', socialLinks: [] },
+        { firstName: 'B', lastName: 'Two', title: 't', bio: '', socialLinks: [], speakerType: 'Speaker' },
+      ]));
+
+      const container = document.createElement('div');
+      container.innerHTML = `
+        <div id="loose-cards" class="profile-cards">
+          <div><div><h2>Anyone</h2></div></div>
+          <div><div>type</div><div></div></div>
+        </div>
+      `;
+      document.body.appendChild(container);
+      const el = container.querySelector('#loose-cards');
+
+      expect(() => init(el)).to.not.throw();
+      expect(el.querySelectorAll('.card-container')).to.have.lengthOf(2);
+    });
+
     it('should make static-authored modal cards interactive', () => {
       const el = document.querySelector('#static-modal-cards');
       init(el);
@@ -149,6 +207,116 @@ describe('Profile Cards Module', () => {
     });
   });
 
+  describe('sorting', () => {
+    const speakers = [
+      { firstName: 'Charlie', lastName: 'Zebra', speakerType: 'Speaker', ordinal: 2 },
+      { firstName: 'Alice', lastName: 'Mango', speakerType: 'Speaker', ordinal: 0 },
+      { firstName: 'Bob', lastName: 'Apple', speakerType: 'Speaker', ordinal: 1 },
+    ];
+
+    function makeBlock(classes, configRows) {
+      const el = document.createElement('div');
+      el.className = `profile-cards ${classes}`;
+      el.innerHTML = `<div><div><h2>Heading</h2></div></div>${configRows}`;
+      document.body.appendChild(el);
+      return el;
+    }
+
+    function getCardNames(el) {
+      return Array.from(el.querySelectorAll('.card-name')).map((n) => n.textContent.trim());
+    }
+
+    beforeEach(() => {
+      setMetadata('speakers', JSON.stringify(speakers));
+    });
+
+    it('falls back to ordinal order when no order row is present', () => {
+      const el = makeBlock('', '<div><div>type</div><div>speaker</div></div>');
+      init(el);
+      expect(getCardNames(el)).to.deep.equal(['Alice Mango', 'Bob Apple', 'Charlie Zebra']);
+    });
+
+    it('sorts by lastName ascending when order row is present and class is asc', () => {
+      const el = makeBlock('asc', `
+        <div><div>type</div><div>speaker</div></div>
+        <div><div>order</div><div>lastName</div></div>
+      `);
+      init(el);
+      expect(getCardNames(el)).to.deep.equal(['Bob Apple', 'Alice Mango', 'Charlie Zebra']);
+    });
+
+    it('sorts by lastName descending when class is desc', () => {
+      const el = makeBlock('desc', `
+        <div><div>type</div><div>speaker</div></div>
+        <div><div>order</div><div>lastName</div></div>
+      `);
+      init(el);
+      expect(getCardNames(el)).to.deep.equal(['Charlie Zebra', 'Alice Mango', 'Bob Apple']);
+    });
+
+    it('sorts by firstName ascending', () => {
+      const el = makeBlock('asc', `
+        <div><div>type</div><div>speaker</div></div>
+        <div><div>order</div><div>firstName</div></div>
+      `);
+      init(el);
+      expect(getCardNames(el)).to.deep.equal(['Alice Mango', 'Bob Apple', 'Charlie Zebra']);
+    });
+
+    it('applies explicit sort when order row comes before type row', () => {
+      const el = makeBlock('asc', `
+        <div><div>order</div><div>lastName</div></div>
+        <div><div>type</div><div>speaker</div></div>
+      `);
+      init(el);
+      expect(getCardNames(el)).to.deep.equal(['Bob Apple', 'Alice Mango', 'Charlie Zebra']);
+    });
+
+    it('falls back to ordinal order when order row has no field value', () => {
+      const el = makeBlock('asc', `
+        <div><div>type</div><div>speaker</div></div>
+        <div><div>order</div><div></div></div>
+      `);
+      init(el);
+      expect(getCardNames(el)).to.deep.equal(['Alice Mango', 'Bob Apple', 'Charlie Zebra']);
+    });
+
+    it('treats missing asc/desc class as ascending', () => {
+      const el = makeBlock('', `
+        <div><div>type</div><div>speaker</div></div>
+        <div><div>order</div><div>lastName</div></div>
+      `);
+      init(el);
+      expect(getCardNames(el)).to.deep.equal(['Bob Apple', 'Alice Mango', 'Charlie Zebra']);
+    });
+
+    it('treats unknown order field as stable sort (all values empty, original order preserved)', () => {
+      const el = makeBlock('asc', `
+        <div><div>type</div><div>speaker</div></div>
+        <div><div>order</div><div>nonExistentField</div></div>
+      `);
+      init(el);
+      expect(getCardNames(el)).to.have.lengthOf(3);
+    });
+
+    it('removes the block when type filter matches zero speakers', () => {
+      const el = makeBlock('', '<div><div>type</div><div>panelist</div></div>');
+      document.body.appendChild(el);
+      init(el);
+      expect(document.body.contains(el)).to.be.false;
+    });
+
+    it('removes the order config row from the DOM', () => {
+      const el = makeBlock('asc', `
+        <div><div>type</div><div>speaker</div></div>
+        <div><div>order</div><div>lastName</div></div>
+      `);
+      init(el);
+      const configRows = Array.from(el.querySelectorAll(':scope > div:not(.cards-wrapper)')).slice(1);
+      expect(configRows).to.have.lengthOf(0);
+    });
+  });
+
   describe('createSocialIcon', () => {
     it('should return a social icon element', () => {
       const icon = createSocialIcon(document.createElement('svg'), 'facebook');
@@ -156,6 +324,45 @@ describe('Profile Cards Module', () => {
 
       expect(icon).to.not.be.null;
       expect(iconAlt).to.equal('facebook logo');
+    });
+  });
+
+  describe('buildModalContent', () => {
+    it('should strip HTML from job title so Milo modal initial focus is not an anchor in .card-title', async () => {
+      const fragment = await buildModalContent({
+        firstName: 'Jane',
+        lastName: 'Doe',
+        title: '<a href="https://example.com/">Company</a> VP',
+        bio: '',
+        socialLinks: [],
+      });
+
+      const host = document.createElement('div');
+      host.append(fragment);
+
+      const cardTitle = host.querySelector('.card-title');
+      expect(cardTitle.querySelector('a')).to.be.null;
+      expect(cardTitle.textContent.replace(/\s+/g, ' ').trim()).to.equal('Company VP');
+
+      const focusables = host.querySelectorAll(MODAL_FOCUSABLES_SELECTOR);
+      expect(focusables.length).to.be.at.least(1);
+      expect(focusables[0].classList.contains('card-name')).to.be.true;
+      expect(focusables[0].tagName.toLowerCase()).to.equal('h2');
+    });
+
+    it('should decode HTML entities in plain-text titles without using innerHTML', async () => {
+      const fragment = await buildModalContent({
+        firstName: 'Jane',
+        lastName: 'Doe',
+        title: 'Lead, AT&amp;T &amp; Partners',
+        bio: '',
+        socialLinks: [],
+      });
+
+      const host = document.createElement('div');
+      host.append(fragment);
+
+      expect(host.querySelector('.card-title').textContent.trim()).to.equal('Lead, AT&T & Partners');
     });
   });
 });

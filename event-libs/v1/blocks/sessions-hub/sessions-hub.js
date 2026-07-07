@@ -1,10 +1,19 @@
 import BlockMediator from '../../deps/block-mediator.min.js';
-import { createTag, getMetadata, getSusiOptions, LIBS, getEventConfig, loadStyle } from '../../utils/utils.js';
-import { dictionaryManager } from '../../utils/dictionary-manager.js';
+import {
+  createTag,
+  getMetadata,
+  getSusiOptions,
+  LIBS,
+  getEventConfig,
+  loadStyle,
+  getValidCampaignIdFromUrl,
+} from '../../utils/utils.js';
+import { dictionaryManager, getInviteOnlyNoCampaignMessage, getEventWaitlistBannerMessage } from '../../utils/dictionary-manager.js';
 import { signIn } from '../../utils/decorate.js';
 import { buildModalContent } from '../profile-cards/profile-cards.js';
 import { createSmartDateRange } from '../../utils/date-time-helper.js';
 import {
+  getCaasTags,
   getEvent,
   getVenueLocation,
   getMyEventSessions,
@@ -20,7 +29,10 @@ const CTA_CALENDAR_ICON = '<svg width="22" height="22" viewBox="0 0 22 22" fill=
 const CHECKMARK_ICON = '<svg width="22" height="22" viewBox="0 0 22 22" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M8.65072 17.3078C8.40579 17.3078 8.17377 17.1994 8.01693 17.0114L3.89515 12.0635C3.60297 11.7133 3.6513 11.1923 4.00042 10.9012C4.34954 10.609 4.86946 10.6552 5.16272 11.0065L8.63138 15.1712L16.8148 4.75559C17.0962 4.39681 17.6161 4.33557 17.9728 4.61595C18.3316 4.89739 18.3939 5.41624 18.1124 5.77395L9.29953 16.992C9.14591 17.1886 8.91173 17.3046 8.66252 17.3078L8.65072 17.3078Z" fill="currentColor"/></svg>';
 const FILTER_ICON = '<svg width="26" height="26" viewBox="0 0 26 26" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M11.6986 24.3472C11.2314 24.3472 10.7668 24.2196 10.3504 23.9663C9.56709 23.4909 9.09991 22.66 9.09991 21.744V13.6374C9.09991 13.3956 9.01104 13.1645 8.84982 12.9855L3.41622 6.94887C2.7167 6.18144 2.54024 5.10742 2.963 4.15083C3.38448 3.19424 4.29601 2.6001 5.3421 2.6001H20.6577C21.7038 2.6001 22.6153 3.19424 23.0368 4.15083C23.4596 5.10742 23.2831 6.18144 22.5785 6.95332L17.15 12.9855C16.9888 13.1645 16.8999 13.3956 16.8999 13.6374V20.1964C16.8999 21.2933 16.2956 22.288 15.3232 22.7926L12.8984 24.0514C12.5188 24.2488 12.1074 24.3472 11.6986 24.3472ZM5.3421 4.5501C4.95871 4.5501 4.79874 4.82115 4.74669 4.93794C4.69464 5.05473 4.60323 5.35625 4.86095 5.63936L10.2996 11.6804C10.7833 12.2181 11.0499 12.9131 11.0499 13.6374V21.744C11.0499 22.0741 11.2683 22.2423 11.3622 22.2994C11.4562 22.3572 11.7075 22.4714 11.9995 22.321L14.4243 21.0616C14.7493 20.8934 14.9499 20.5621 14.9499 20.1964V13.6374C14.9499 12.9131 15.2165 12.2181 15.7002 11.6804L21.1338 5.6438C21.3966 5.35625 21.3052 5.05474 21.2531 4.93794C21.2011 4.82113 21.0411 4.5501 20.6577 4.5501H5.3421Z" fill="#292929"/></svg>';
 const SEARCH_ICON = '<svg width="26" height="26" viewBox="0 0 26 26" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="11" cy="11" r="7.25" stroke="#6e6e6e" stroke-width="2"/><path d="M16.5 16.5L23 23" stroke="#6e6e6e" stroke-width="2" stroke-linecap="round"/></svg>';
-const CHEVRON_DOWN_ICON = '<svg width="14" height="14" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M4,7.01a1,1,0,0,1,1.7055-.7055l3.289,3.286,3.289-3.286a1,1,0,0,1,1.437,1.3865l-.0245.0245L9.7,11.7075a1,1,0,0,1-1.4125,0L4.293,7.716A.9945.9945,0,0,1,4,7.01Z" fill="#505050"/></svg>';
+const DOWNLOAD_ICON = '<svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M10 13.25a.747.747 0 0 1-.53-.22l-3.5-3.5a.75.75 0 1 1 1.06-1.06l2.22 2.22V3.5a.75.75 0 0 1 1.5 0v7.19l2.22-2.22a.75.75 0 1 1 1.06 1.06l-3.5 3.5a.747.747 0 0 1-.53.22Z" fill="#292929"/><path d="M15.25 16.5H4.75a.75.75 0 0 1 0-1.5h10.5a.75.75 0 0 1 0 1.5Z" fill="#292929"/></svg>';
+const CLOSE_ICON = '<svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M7.06 6l3.47-3.47a.75.75 0 1 0-1.06-1.06L6 4.94 2.53 1.47a.75.75 0 0 0-1.06 1.06L4.94 6 1.47 9.47a.75.75 0 1 0 1.06 1.06L6 7.06l3.47 3.47a.75.75 0 0 0 1.06-1.06L7.06 6Z" fill="#292929"/></svg>';
+const CHEVRON_DOWN_ICON = '<svg width="14" height="14" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M4,7.01a1,1,0,0,1,1.7055-.7055l3.289,3.286,3.289-3.286a1,1,0,0,1,1.437,1.3865l-.0245.0245L9.7,11.7075a1,1,0,0,1-1.4125,0L4.293,7.716A.9945.9945,0,0,1,4,7.01Z" fill="#000"/></svg>';
+const ARROW_LEFT_ICON = '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M10.5 3.5 6 8l4.5 4.5" stroke="#292929" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 
 // ─── Module-level state singleton ──────────────────────────────────────────
 
@@ -47,57 +59,88 @@ async function openRsvpModal({ hash, path }) {
 // ─── Filter state ───────────────────────────────────────────────────────────
 
 const [getFilterState, setFilterState] = (() => {
-  let fs = { query: '', activeTags: new Set(), activeTab: 'all' };
+  let fs = { query: '', activeTags: new Map(), activeTab: 'all' };
   return [() => fs, (s) => { fs = s; }];
 })();
 
 // ─── Utilities ──────────────────────────────────────────────────────────────
 
-function deriveTagLabels(tagIdList) {
+function resolveTagWithGroup(tagId, tagsData) {
+  const colonIdx = tagId.indexOf(':');
+  if (colonIdx === -1 || !tagsData) return { label: '', group: '' };
+  const ns = tagId.slice(0, colonIdx);
+  const segs = tagId.slice(colonIdx + 1).split('/');
+  let node = tagsData.namespaces?.[ns];
+  let parentNode = null;
+  for (const seg of segs) {
+    parentNode = node;
+    node = node?.tags?.[seg];
+  }
+  return { label: node?.title || '', group: parentNode?.title || '' };
+}
+
+function resolveTagObjects(tagIdList, tagsData) {
   if (!tagIdList) return [];
   return tagIdList
     .split(',')
-    .map((id) => {
-      const seg = id.trim().split('/').at(-1);
-      return seg ? seg.charAt(0).toUpperCase() + seg.slice(1) : '';
-    })
-    .filter(Boolean);
+    .map((id) => resolveTagWithGroup(id.trim(), tagsData))
+    .filter((t) => t.label);
 }
 
 function formatICSDate(millis) {
   return new Date(millis).toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
 }
 
-function generateICS(sessionTime, title, locationName) {
-  const start = formatICSDate(sessionTime.startTimeMillis);
-  const end = formatICSDate(sessionTime.endTimeMillis);
-  const uid = `${sessionTime.sessionTimeId}@aem-event-libs`;
-  const now = formatICSDate(Date.now());
+function buildVEvent(sessionTime, title, locationName) {
   const lines = [
-    'BEGIN:VCALENDAR',
-    'VERSION:2.0',
-    'PRODID:-//Adobe Event Libs//Sessions Catalogue//EN',
     'BEGIN:VEVENT',
-    `UID:${uid}`,
-    `DTSTAMP:${now}`,
-    `DTSTART:${start}`,
-    `DTEND:${end}`,
+    `UID:${sessionTime.sessionTimeId}@aem-event-libs`,
+    `DTSTAMP:${formatICSDate(Date.now())}`,
+    `DTSTART:${formatICSDate(sessionTime.startTimeMillis)}`,
+    `DTEND:${formatICSDate(sessionTime.endTimeMillis)}`,
     `SUMMARY:${title.replace(/\n/g, '\\n')}`,
   ];
   if (locationName) lines.push(`LOCATION:${locationName.replace(/\n/g, '\\n')}`);
-  lines.push('END:VEVENT', 'END:VCALENDAR');
-  return lines.join('\r\n');
+  lines.push('END:VEVENT');
+  return lines;
 }
 
-function downloadICS(sessionTime, title, locationName) {
-  const ics = generateICS(sessionTime, title, locationName);
+function wrapVCalendar(eventLines) {
+  return [
+    'BEGIN:VCALENDAR',
+    'VERSION:2.0',
+    'PRODID:-//Adobe Event Libs//Sessions Catalogue//EN',
+    ...eventLines,
+    'END:VCALENDAR',
+  ].join('\r\n');
+}
+
+function generateICS(sessionTime, title, locationName) {
+  return wrapVCalendar(buildVEvent(sessionTime, title, locationName));
+}
+
+function triggerICSDownload(ics, filename) {
   const blob = new Blob([ics], { type: 'text/calendar;charset=utf-8' });
   const url = URL.createObjectURL(blob);
-  const a = createTag('a', { href: url, download: `${title.replace(/\s+/g, '-')}.ics` });
+  const a = createTag('a', { href: url, download: filename });
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
+}
+
+function downloadICS(sessionTime, title, locationName) {
+  triggerICSDownload(generateICS(sessionTime, title, locationName), `${title.replace(/\s+/g, '-')}.ics`);
+}
+
+function downloadAllSessionsICS(sessions) {
+  const events = sessions.flatMap((s) => {
+    const time = s.sessionTimes?.[0];
+    return time ? buildVEvent(time, s.title, time.locationName) : [];
+  });
+  if (!events.length) return;
+  const eventTitle = getMetadata('event-title') || 'My-sessions';
+  triggerICSDownload(wrapVCalendar(events), `${eventTitle.replace(/\s+/g, '-')}-schedule.ics`);
 }
 
 function debounce(fn, delay) {
@@ -159,6 +202,26 @@ async function resolveRegistrationState(eventId, isEventRegistered) {
   return new Set(resp.data?.sessionIds || []);
 }
 
+function isSessionTimeFullError(resp) {
+  const err = resp?.error;
+  if (!err) return false;
+  const candidates = [err.code, err.errorCode, err.error, err.type, err.message];
+  return candidates.some((v) => typeof v === 'string' && v.includes('SessionTimeFull'));
+}
+
+function computeIsEventClosed(eventData) {
+  if (!eventData?.isFull) return false;
+  // ESP returns allowWaitlisting as either boolean `true` or string `'true'` depending on source.
+  // Match both — anything truthy that isn't the literal string 'false' counts as enabled.
+  const waitlistEnabled = eventData.allowWaitlisting === true
+    || eventData.allowWaitlisting === 'true';
+  return !waitlistEnabled;
+}
+
+function isSessionRegistrationBlocked({ isEventWaitlisted, isEventClosed, inviteOnlyBlocked }) {
+  return Boolean(isEventWaitlisted || isEventClosed || inviteOnlyBlocked);
+}
+
 function findConflictingSession(newSession, state) {
   const newTime = newSession.sessionTimes[0];
   if (!newTime) return null;
@@ -174,7 +237,7 @@ function findConflictingSession(newSession, state) {
   return null;
 }
 
-function normalizeSessions(rawSessions, locationMap, registeredSessionIds, venueId) {
+function normalizeSessions(rawSessions, locationMap, registeredSessionIds, venueId, tagsData) {
   const mapped = rawSessions.map((session) => {
     const sessionTimes = (session.rawTimes || []).map((t) => ({
       sessionTimeId: t.sessionTimeId,
@@ -205,10 +268,11 @@ function normalizeSessions(rawSessions, locationMap, registeredSessionIds, venue
       sessionId: session.sessionId,
       title: session.localizations?.['en-US']?.title || session.title || session.enTitle || '',
       description: session.localizations?.['en-US']?.description || session.description || '',
-      tags: deriveTagLabels(session.tags),
+      tags: resolveTagObjects(session.tags, tagsData),
       sessionTimes,
       speakers,
       isRegistered: registeredSessionIds.has(session.sessionId),
+      isWaitlisted: false,
       expanded: false,
     };
   });
@@ -221,64 +285,130 @@ function normalizeSessions(rawSessions, locationMap, registeredSessionIds, venue
 
 // ─── Filter / search ─────────────────────────────────────────────────────────
 
-function collectFilterOptions(sessions) {
-  const tags = new Set();
-  sessions.forEach((s) => s.tags.forEach((t) => tags.add(t)));
-  return { tags: [...tags].sort() };
+const DEFAULT_SEARCH_CONFIG = { includeDescription: false };
+
+function parseSearchConfig(blockEl) {
+  return {
+    includeDescription: Boolean(blockEl?.classList?.contains('search-include-description')),
+  };
 }
 
-function filterSessions(sessions, { query, activeTags, activeTab, registeredSessionIds }) {
-  const q = query.toLowerCase();
+function getEffectiveSearchQuery(rawQuery) {
+  const t = (rawQuery || '').trim().toLowerCase();
+  return t.length >= 2 ? t : '';
+}
+
+function speakerMatchesQuery(sp, q) {
+  const fn = (sp.firstName || '').toLowerCase();
+  const ln = (sp.lastName || '').toLowerCase();
+  const full = `${fn} ${ln}`.trim();
+  return fn.includes(q) || ln.includes(q) || full.includes(q);
+}
+
+function sessionMatchesTextSearch(s, q, searchConfig) {
+  const cfg = searchConfig || DEFAULT_SEARCH_CONFIG;
+  if ((s.title || '').toLowerCase().includes(q)) return true;
+  if (s.speakers.some((sp) => speakerMatchesQuery(sp, q))) return true;
+  if (s.tags.some((t) => t.label && t.label.toLowerCase().includes(q))) return true;
+  if (cfg.includeDescription && (s.description || '').toLowerCase().includes(q)) return true;
+  return false;
+}
+
+function collectFilterGroups(sessions) {
+  const groups = new Map();
+  sessions.forEach((s) => s.tags.forEach(({ label, group }) => {
+    if (!label) return;
+    const key = group || '';
+    if (!groups.has(key)) groups.set(key, new Set());
+    groups.get(key).add(label);
+  }));
+  const sorted = new Map();
+  [...groups.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .forEach(([g, tagSet]) => sorted.set(g, [...tagSet].sort()));
+  return sorted;
+}
+
+export function filterSessions(sessions, {
+  query,
+  activeTags,
+  activeTab,
+  registeredSessionIds,
+  searchConfig = DEFAULT_SEARCH_CONFIG,
+}) {
+  const q = getEffectiveSearchQuery(query);
   return sessions.filter((s) => {
     if (activeTab === 'my' && !registeredSessionIds.has(s.sessionId)) return false;
 
-    if (activeTags.size > 0 && !s.tags.some((t) => activeTags.has(t))) return false;
-
-    if (q) {
-      const hay = [
-        s.title,
-        s.description,
-        ...s.speakers.map((sp) => `${sp.firstName} ${sp.lastName}`),
-      ].join(' ').toLowerCase();
-      if (!hay.includes(q)) return false;
+    if (activeTags.size > 0) {
+      for (const [, groupSet] of activeTags) {
+        if (groupSet.size > 0 && !s.tags.some((t) => groupSet.has(t.label))) return false;
+      }
     }
+
+    if (q && !sessionMatchesTextSearch(s, q, searchConfig)) return false;
 
     return true;
   });
 }
 
-function applyFilter(listEl, state) {
+function getSessionListRoot(sessionAreaOrList) {
+  if (sessionAreaOrList?.classList?.contains('sh-session-area')) {
+    return sessionAreaOrList.querySelector('.sh-session-list') || sessionAreaOrList;
+  }
+  return sessionAreaOrList;
+}
+
+function applyFilter(sessionAreaEl, state) {
   const fs = getFilterState();
   const filtered = filterSessions(state.sessions, {
     query: fs.query,
     activeTags: fs.activeTags,
     activeTab: fs.activeTab,
     registeredSessionIds: state.registeredSessionIds,
+    searchConfig: state.searchConfig || DEFAULT_SEARCH_CONFIG,
   });
   const filteredIds = new Set(filtered.map((s) => s.sessionId));
+  const effectiveQuery = getEffectiveSearchQuery(fs.query);
 
-  listEl.querySelectorAll('.sh-card').forEach((card) => {
+  const listRoot = getSessionListRoot(sessionAreaEl);
+  listRoot.querySelectorAll('.sh-card').forEach((card) => {
     card.hidden = !filteredIds.has(card.dataset.sessionId);
   });
-  scheduleSyncSessionDescriptionsOverflow(listEl);
+
+  const emptyEl = sessionAreaEl.querySelector('.sh-no-results');
+  if (emptyEl) {
+    const showEmpty = effectiveQuery.length >= 2 && filtered.length === 0;
+    emptyEl.hidden = !showEmpty;
+    listRoot.hidden = showEmpty;
+  }
+
+  scheduleSyncSessionDescriptionsOverflow(sessionAreaEl);
 }
 
 // ─── Render: CTA group ───────────────────────────────────────────────────────
 
-function renderCTAGroup(session, isEventRegistered) {
+function renderCTAGroup(session, { isEventRegistered = false, isBlocked = false } = {}) {
   const group = createTag('div', { class: 'sh-cta-group' });
+  const primaryTime = session.sessionTimes?.[0];
+  const isSessionFull = !session.isRegistered && !session.isWaitlisted && Boolean(primaryTime?.isFull);
 
-  if (!isEventRegistered) {
-    group.append(createTag('button', { class: 'sh-btn sh-btn-register-event', type: 'button' }, dictionaryManager.getValue('Register for session')));
-  } else if (!session.isRegistered) {
-    group.append(createTag('button', { class: 'sh-btn sh-btn-register-session', type: 'button' }, dictionaryManager.getValue('Register for session')));
-  } else {
+  // State 1: registered or waitlisted for THIS session — badge with hover-to-unregister
+  if (isEventRegistered && (session.isRegistered || session.isWaitlisted)) {
     const calBtn = createTag('button', { class: 'sh-btn sh-btn-cal', type: 'button' });
     calBtn.append(createIcon(CTA_CALENDAR_ICON), createTag('span', {}, dictionaryManager.getValue('Download to calendar')));
     group.append(calBtn);
 
+    const isWaitlisted = !session.isRegistered && session.isWaitlisted;
+    const badgeLabel = isWaitlisted
+      ? dictionaryManager.getValue('waitlisted-cta-text')
+      : dictionaryManager.getValue('Registered');
+    const unregisterLabel = isWaitlisted
+      ? dictionaryManager.getValue('Leave waitlist')
+      : dictionaryManager.getValue('Unregister');
+
     const badge = createTag('button', { class: 'sh-btn sh-registered-badge', type: 'button', disabled: '' });
-    badge.append(createIcon(CHECKMARK_ICON), createTag('span', {}, dictionaryManager.getValue('Registered')));
+    badge.append(createIcon(CHECKMARK_ICON), createTag('span', {}, badgeLabel));
     group.append(badge);
 
     setTimeout(() => {
@@ -286,26 +416,52 @@ function renderCTAGroup(session, isEventRegistered) {
       badge.disabled = false;
     }, 2000);
 
-    const setRegisteredContent = () => {
+    const setIdleContent = () => {
       badge.innerHTML = '';
       badge.classList.remove('sh-unregister-mode');
-      badge.append(createIcon(CHECKMARK_ICON), createTag('span', {}, dictionaryManager.getValue('Registered')));
+      badge.append(createIcon(CHECKMARK_ICON), createTag('span', {}, badgeLabel));
     };
     const setUnregisterContent = () => {
       badge.innerHTML = '';
       badge.classList.add('sh-unregister-mode');
-      badge.append(createTag('span', {}, dictionaryManager.getValue('Unregister')));
+      badge.append(createTag('span', {}, unregisterLabel));
     };
     badge.addEventListener('mouseenter', () => { if (!badge.disabled) setUnregisterContent(); });
-    badge.addEventListener('mouseleave', () => { if (!badge.disabled) setRegisteredContent(); });
+    badge.addEventListener('mouseleave', () => { if (!badge.disabled) setIdleContent(); });
+    return group;
   }
 
+  // State 3: blocked — disabled button (event-waitlisted, event-closed, or invite-only without campaign)
+  if (isBlocked) {
+    const btn = createTag('button', {
+      class: 'sh-btn sh-btn-blocked',
+      type: 'button',
+      disabled: '',
+      'aria-disabled': 'true',
+    }, dictionaryManager.getValue('Registration unavailable'));
+    group.append(btn);
+    return group;
+  }
+
+  // State 2: able to register — direct-API button (no modal)
+  if (isEventRegistered) {
+    const attrs = { class: 'sh-btn sh-btn-register-session', type: 'button' };
+    if (isSessionFull) { attrs.disabled = ''; attrs['aria-disabled'] = 'true'; }
+    group.append(createTag('button', attrs, dictionaryManager.getValue('Register for session')));
+    return group;
+  }
+
+  // Default: not yet event-registered, not blocked — opens RSVP modal
+  const attrs = { class: 'sh-btn sh-btn-register-event', type: 'button' };
+  if (isSessionFull) { attrs.disabled = ''; attrs['aria-disabled'] = 'true'; }
+  group.append(createTag('button', attrs, dictionaryManager.getValue('Register for session')));
   return group;
 }
 
-function updateCTAGroup(cardEl, session, isEventRegistered) {
+function updateCTAGroup(cardEl, session, opts = {}) {
   const old = cardEl.querySelector('.sh-cta-group');
-  if (old) old.replaceWith(renderCTAGroup(session, isEventRegistered));
+  if (!old) return;
+  old.replaceWith(renderCTAGroup(session, opts));
 }
 
 // ─── Session description overflow (matches CSS -webkit-line-clamp) ───────────
@@ -341,9 +497,9 @@ function syncSessionCardDescriptionOverflow(card) {
   }
 }
 
-export function syncSessionDescriptionsOverflow(listEl) {
-  if (!listEl) return;
-  listEl.querySelectorAll('.sh-card').forEach((card) => {
+export function syncSessionDescriptionsOverflow(sessionAreaOrList) {
+  if (!sessionAreaOrList) return;
+  sessionAreaOrList.querySelectorAll('.sh-card').forEach((card) => {
     syncSessionCardDescriptionOverflow(card);
   });
 }
@@ -356,16 +512,17 @@ function scheduleSyncSessionDescriptionsOverflow(listEl) {
   });
 }
 
-function connectSessionDescriptionsOverflowObserver(listEl) {
+function connectSessionDescriptionsOverflowObserver(sessionAreaEl) {
   if (typeof ResizeObserver === 'undefined') return;
   disconnectSessionDescriptionsOverflow();
+  const observeEl = getSessionListRoot(sessionAreaEl);
   const debouncedSync = debounce(() => {
-    syncSessionDescriptionsOverflow(listEl);
+    syncSessionDescriptionsOverflow(sessionAreaEl);
   }, 100);
   const ro = new ResizeObserver(() => {
     debouncedSync();
   });
-  ro.observe(listEl);
+  ro.observe(observeEl);
   disconnectDescOverflowObserver = () => {
     ro.disconnect();
     disconnectDescOverflowObserver = null;
@@ -382,7 +539,7 @@ function disconnectSessionDescriptionsOverflow() {
 
 function renderTagPills(tags) {
   const list = createTag('ul', { class: 'sh-tag-list', 'aria-label': dictionaryManager.getValue('Tags') });
-  tags.forEach((tag) => list.append(createTag('li', { class: 'sh-tag-pill' }, tag)));
+  tags.forEach((tag) => list.append(createTag('li', { class: 'sh-tag-pill' }, tag.label)));
   return list;
 }
 
@@ -411,7 +568,7 @@ function renderSpeakerAvatars(speakers) {
   return wrap;
 }
 
-function renderSessionCard(session, isEventRegistered) {
+function renderSessionCard(session, opts = {}) {
   const primaryTime = session.sessionTimes[0];
   const timeStr = primaryTime
     ? createSmartDateRange(primaryTime.startTimeMillis, primaryTime.endTimeMillis, 'en-US', primaryTime.timezone)
@@ -472,76 +629,251 @@ function renderSessionCard(session, isEventRegistered) {
   descText.innerHTML = fullDesc;
 
   desc.append(descText);
-  right.append(desc, renderCTAGroup(session, isEventRegistered));
+  right.append(desc, renderCTAGroup(session, opts));
 
   card.append(left, right);
   return card;
 }
 
-function renderSessionList(sessions, isEventRegistered) {
+function renderSessionList(sessions, opts = {}) {
+  const area = createTag('div', { class: 'sh-session-area' });
   const list = createTag('div', { class: 'sh-session-list' });
-  sessions.forEach((s) => list.append(renderSessionCard(s, isEventRegistered)));
-  return list;
+  const empty = createTag('div', {
+    class: 'sh-no-results',
+    hidden: '',
+    role: 'status',
+    'aria-live': 'polite',
+    'aria-atomic': 'true',
+  });
+  empty.append(createTag('p', {}, dictionaryManager.getValue('No matching sessions')));
+  sessions.forEach((s) => list.append(renderSessionCard(s, opts)));
+  area.append(list, empty);
+  return area;
 }
 
 // ─── Render: toolbar ────────────────────────────────────────────────────────
 
-function renderTabToggle(isEventRegistered) {
-  const wrap = createTag('div', { class: 'sh-tab-toggle' });
+function renderViewDropdown(isEventRegistered) {
+  const wrap = createTag('div', { class: 'sh-view-dropdown' });
   if (!isEventRegistered) wrap.hidden = true;
-  wrap.append(
-    createTag('button', { class: 'sh-tab active', type: 'button', 'data-tab': 'all' }, dictionaryManager.getValue('All sessions')),
-    createTag('button', { class: 'sh-tab', type: 'button', 'data-tab': 'my' }, dictionaryManager.getValue('My sessions')),
+  const toggle = createTag('button', {
+    class: 'sh-view-toggle',
+    type: 'button',
+    'aria-haspopup': 'listbox',
+    'aria-expanded': 'false',
+  });
+  toggle.append(
+    createTag('span', { class: 'sh-view-label' }, dictionaryManager.getValue('All sessions')),
+    createIcon(CHEVRON_DOWN_ICON),
   );
+  const menu = createTag('div', { class: 'sh-view-menu hidden', role: 'listbox', 'aria-hidden': 'true' });
+  [['all', 'All sessions'], ['my', 'My sessions']].forEach(([tab, label], i) => {
+    menu.append(createTag('button', {
+      class: `sh-view-option${i === 0 ? ' active' : ''}`,
+      type: 'button',
+      role: 'option',
+      'data-tab': tab,
+      'aria-selected': i === 0 ? 'true' : 'false',
+    }, dictionaryManager.getValue(label)));
+  });
+  wrap.append(toggle, menu);
   return wrap;
 }
 
 function renderFilterPanel(sessions) {
   const panel = createTag('div', { class: 'sh-filter-panel hidden', 'aria-hidden': 'true' });
-  const { tags } = collectFilterOptions(sessions);
+  const groups = collectFilterGroups(sessions);
+  const categories = [...groups.keys()];
+  const sidebar = createTag('div', { class: 'sh-filter-sidebar' });
+  sidebar.append(createTag('p', { class: 'sh-filter-heading' }, dictionaryManager.getValue('Filters')));
 
-  tags.forEach((tag, i) => {
-    const id = `sh-filter-tag-${i}`;
-    const lbl = createTag('label', { class: 'sh-filter-item', for: id });
-    lbl.append(createTag('input', { id, type: 'checkbox', value: tag, 'data-filter-type': 'tag' }));
-    lbl.append(createTag('span', {}, tag));
-    panel.append(lbl);
+  const nav = createTag('div', { class: 'sh-filter-nav', role: 'tablist' });
+  categories.forEach((cat, i) => {
+    nav.append(createTag('button', {
+      class: `sh-filter-cat${i === 0 ? ' active' : ''}`,
+      type: 'button',
+      role: 'tab',
+      'data-category': cat,
+      'aria-selected': i === 0 ? 'true' : 'false',
+    }, cat || dictionaryManager.getValue('Other')));
+  });
+  sidebar.append(nav);
+
+  const actions = createTag('div', { class: 'sh-filter-actions' });
+  actions.append(
+    createTag('button', { class: 'sh-filter-apply', type: 'button' }, dictionaryManager.getValue('Apply')),
+    createTag('button', { class: 'sh-filter-reset', type: 'button' }, dictionaryManager.getValue('Reset all')),
+  );
+  const backdrop = createTag('div', { class: 'sh-filter-backdrop', 'aria-hidden': 'true' });
+
+  const optionsWrap = createTag('div', { class: 'sh-filter-options' });
+  const detailHeader = createTag('div', { class: 'sh-filter-detail-header' });
+  const backBtn = createTag('button', {
+    class: 'sh-filter-back',
+    type: 'button',
+    'aria-label': dictionaryManager.getValue('Back'),
+  });
+  backBtn.append(createIcon(ARROW_LEFT_ICON));
+  detailHeader.append(backBtn, createTag('span', { class: 'sh-filter-detail-title' }));
+  const saveActions = createTag('div', { class: 'sh-filter-save-actions' });
+  saveActions.append(
+    createTag('button', { class: 'sh-filter-save', type: 'button' }, dictionaryManager.getValue('Save')),
+  );
+  optionsWrap.append(detailHeader);
+
+  let tagIdx = 0;
+  categories.forEach((cat, i) => {
+    const grid = createTag('div', {
+      class: `sh-filter-option-grid${i === 0 ? ' active' : ''}`,
+      'data-category': cat,
+      role: 'group',
+      'aria-label': cat || dictionaryManager.getValue('Other'),
+    });
+    groups.get(cat).forEach((tag) => {
+      const id = `sh-filter-tag-${tagIdx++}`;
+      const lbl = createTag('label', { class: 'sh-filter-item', for: id });
+      lbl.append(createTag('input', {
+        id,
+        type: 'checkbox',
+        value: tag,
+        'data-filter-type': 'tag',
+        'data-filter-group': cat,
+      }));
+      lbl.append(createTag('span', { class: 'sh-filter-item-label' }, tag));
+      const check = createTag('span', { class: 'sh-filter-check', 'aria-hidden': 'true' });
+      check.innerHTML = CHECKMARK_ICON;
+      lbl.append(check);
+      grid.append(lbl);
+    });
+    optionsWrap.append(grid);
+  });
+  optionsWrap.append(saveActions);
+
+  sidebar.append(actions);
+
+  panel.append(backdrop, sidebar, optionsWrap);
+  return panel;
+}
+
+function cloneActiveTags(map) {
+  const clone = new Map();
+  map.forEach((set, key) => clone.set(key, new Set(set)));
+  return clone;
+}
+
+function getActiveTagList(activeTags) {
+  const list = [];
+  activeTags.forEach((set, group) => set.forEach((label) => list.push({ group, label })));
+  return list;
+}
+
+const ACTIVE_FILTERS_COLLAPSED_COUNT = 3;
+
+function updateActiveFilters(containerEl) {
+  if (!containerEl) return;
+  const list = getActiveTagList(getFilterState().activeTags);
+  containerEl.innerHTML = '';
+  if (!list.length) {
+    containerEl.hidden = true;
+    containerEl.removeAttribute('data-expanded');
+    return;
+  }
+  containerEl.hidden = false;
+
+  const overflow = list.length > ACTIVE_FILTERS_COLLAPSED_COUNT;
+  const expanded = containerEl.dataset.expanded === 'true';
+  const visible = overflow && !expanded ? list.slice(0, ACTIVE_FILTERS_COLLAPSED_COUNT) : list;
+
+  if (overflow) {
+    containerEl.append(createTag(
+      'p',
+      { class: 'sh-active-filters-count' },
+      `${list.length} ${dictionaryManager.getValue('filters')}`,
+    ));
+  }
+
+  const inner = createTag('div', { class: 'sh-active-filters-inner' });
+  visible.forEach(({ group, label }) => {
+    const tag = createTag('span', { class: 'sh-filter-tag' });
+    tag.append(createTag('span', { class: 'sh-filter-tag-label' }, label));
+    const remove = createTag('button', {
+      class: 'sh-filter-tag-remove',
+      type: 'button',
+      'aria-label': `${dictionaryManager.getValue('Remove')} ${label}`,
+      'data-group': group,
+      'data-value': label,
+    });
+    remove.append(createIcon(CLOSE_ICON));
+    tag.append(remove);
+    inner.append(tag);
   });
 
-  return panel;
+  if (overflow) {
+    inner.append(createTag('button', {
+      class: 'sh-filter-see-all',
+      type: 'button',
+      'aria-expanded': String(expanded),
+    }, dictionaryManager.getValue(expanded ? 'See less' : 'See all')));
+  }
+  containerEl.append(inner);
 }
 
 function renderToolbar(state) {
   const toolbar = createTag('div', { class: 'sh-toolbar', role: 'search' });
   const inner = createTag('div', { class: 'sh-toolbar-inner' });
-  const toggle = renderTabToggle(state.isEventRegistered);
-  const spacer = createTag('div', { class: 'sh-toolbar-spacer' });
-
-  const searchRow = createTag('div', { class: 'sh-search-row' });
-  const searchWrap = createTag('div', { class: 'sh-search-wrap' });
-  searchWrap.append(createIcon(SEARCH_ICON));
-  searchWrap.append(createTag('input', {
-    class: 'sh-search',
-    type: 'search',
-    placeholder: dictionaryManager.getValue('Search sessions'),
-    'aria-label': dictionaryManager.getValue('Search sessions'),
-  }));
+  const dropdown = renderViewDropdown(state.isEventRegistered);
+  const downloadBtn = createTag('button', {
+    class: 'sh-download-btn',
+    type: 'button',
+    'aria-label': dictionaryManager.getValue('Download my schedule'),
+    title: dictionaryManager.getValue('Download my schedule'),
+    hidden: '',
+  });
+  downloadBtn.append(createIcon(DOWNLOAD_ICON));
+  const actions = createTag('div', { class: 'sh-toolbar-actions' });
 
   const filterWrap = createTag('div', { class: 'sh-filter-wrap' });
-  const { tags: filterTags } = collectFilterOptions(state.sessions);
-  const hasFilters = filterTags.length > 0;
+  const filterGroups = collectFilterGroups(state.sessions);
+  const hasFilters = filterGroups.size > 0;
   const filterBtn = createTag('button', {
     class: 'sh-filter-btn',
     type: 'button',
     'aria-expanded': 'false',
     ...(hasFilters ? {} : { disabled: '' }),
   });
-  filterBtn.append(createIcon(FILTER_ICON), createTag('span', {}, dictionaryManager.getValue('Filter')), createIcon(CHEVRON_DOWN_ICON));
+  filterBtn.append(
+    createIcon(FILTER_ICON),
+    createTag('span', { class: 'sh-filter-btn-label' }, dictionaryManager.getValue('Filter')),
+  );
   const filterPanel = renderFilterPanel(state.sessions);
   filterWrap.append(filterBtn, filterPanel);
 
-  searchRow.append(searchWrap, filterWrap);
-  inner.append(toggle, spacer, searchRow);
+  const searchWrap = createTag('div', { class: 'sh-search-wrap' });
+  const searchToggle = createTag('button', {
+    class: 'sh-search-toggle',
+    type: 'button',
+    'aria-label': dictionaryManager.getValue('Search sessions'),
+    'aria-expanded': 'false',
+  });
+  searchToggle.append(createIcon(SEARCH_ICON));
+  const searchInput = createTag('input', {
+    class: 'sh-search',
+    type: 'search',
+    placeholder: dictionaryManager.getValue('Search sessions'),
+    'aria-label': dictionaryManager.getValue('Search sessions'),
+  });
+  const searchClear = createTag('button', {
+    class: 'sh-search-clear',
+    type: 'button',
+    'aria-label': dictionaryManager.getValue('Clear search'),
+  });
+  searchClear.append(createIcon(CLOSE_ICON));
+  const searchRow = createTag('div', { class: 'sh-search-row' });
+  searchRow.append(createIcon(SEARCH_ICON), searchInput, searchClear);
+  searchWrap.append(searchToggle);
+
+  actions.append(downloadBtn, dropdown, filterWrap, searchWrap, searchRow);
+  inner.append(actions);
   toolbar.append(inner);
   return toolbar;
 }
@@ -572,7 +904,7 @@ function buildBannerDateString() {
   return createSmartDateRange(startMillis, endMillis, 'en-US', timezone);
 }
 
-function renderEventBanner(rsvpConfig) {
+function renderEventBanner(rsvpConfig, { inviteOnlyBlocked = false, inviteOnlyMessage = '', isEventWaitlisted = false, waitlistBannerMessage = '' } = {}) {
   const banner = createTag('aside', { class: 'sh-event-banner', 'aria-label': dictionaryManager.getValue('Event registration') });
   const inner = createTag('div', { class: 'sh-banner-inner' });
   const info = createTag('div', { class: 'sh-banner-info' });
@@ -591,19 +923,38 @@ function renderEventBanner(rsvpConfig) {
     info.append(dateRow);
   }
 
-  const btn = createTag('button', { class: 'sh-btn sh-btn-event-register', type: 'button' }, dictionaryManager.getValue('Register'));
-  btn.addEventListener('click', () => {
-    const profile = BlockMediator.get('imsProfile');
-    const isSignedOut = !profile || profile.noProfile || profile.account_type === 'guest';
-    if (isSignedOut) {
-      sessionStorage.setItem('sessions-hub:pendingEventRsvp', '1');
-      signIn({ ...getSusiOptions(), redirect_uri: window.location.href });
-    } else if (rsvpConfig) {
-      openRsvpModal(rsvpConfig);
+  if (inviteOnlyBlocked) {
+    inner.append(
+      info,
+      createTag('p', { class: 'sh-banner-invite-only-msg', role: 'status' }, inviteOnlyMessage),
+    );
+  } else {
+    const btn = createTag('button', { class: 'sh-btn sh-btn-event-register', type: 'button' });
+    if (isEventWaitlisted) {
+      btn.classList.add('sh-event-register-waitlisted');
+      btn.append(createIcon(CHECKMARK_ICON), createTag('span', {}, dictionaryManager.getValue('waitlisted-cta-text')));
+    } else {
+      btn.append(createTag('span', {}, dictionaryManager.getValue('Register')));
     }
-  });
+    btn.addEventListener('click', () => {
+      const profile = BlockMediator.get('imsProfile');
+      const isSignedOut = !profile || profile.noProfile || profile.account_type === 'guest';
+      if (isSignedOut) {
+        sessionStorage.setItem('sessions-hub:pendingEventRsvp', '1');
+        signIn({ ...getSusiOptions(), redirect_uri: window.location.href });
+      } else if (rsvpConfig) {
+        openRsvpModal(rsvpConfig);
+      }
+    });
 
-  inner.append(info, btn);
+    if (isEventWaitlisted) {
+      const msg = createTag('p', { class: 'sh-banner-waitlist-msg', role: 'status' }, waitlistBannerMessage);
+      inner.append(info, msg, btn);
+    } else {
+      inner.append(info, btn);
+    }
+  }
+
   banner.append(inner);
   return banner;
 }
@@ -615,7 +966,7 @@ function syncBannerVisibility(bannerEl, isEventRegistered) {
 
 // ─── Conflict modal ──────────────────────────────────────────────────────────
 
-function buildConflictOption(session) {
+function buildConflictOption(session, { registered = false } = {}) {
   const primaryTime = session.sessionTimes[0];
   const timeStr = primaryTime
     ? createSmartDateRange(primaryTime.startTimeMillis, primaryTime.endTimeMillis, 'en-US', primaryTime.timezone)
@@ -632,7 +983,12 @@ function buildConflictOption(session) {
   option.append(createTag('span', { class: 'sh-conflict-radio', 'aria-hidden': 'true' }));
 
   const content = createTag('div', { class: 'sh-conflict-option-content' });
-  content.append(createTag('p', { class: 'sh-conflict-option-title' }, session.title));
+  const titleRow = createTag('div', { class: 'sh-conflict-option-title-row' });
+  titleRow.append(createTag('p', { class: 'sh-conflict-option-title' }, session.title));
+  if (registered) {
+    titleRow.append(createTag('span', { class: 'sh-conflict-badge' }, dictionaryManager.getValue('Registered')));
+  }
+  content.append(titleRow);
 
   if (timeStr) {
     const timeEl = createTag('div', { class: 'sh-conflict-option-meta' });
@@ -655,16 +1011,16 @@ function buildConflictModalContent(newSession, conflictingSession) {
 
   const heading = createTag('div', { class: 'sh-conflict-heading' });
   heading.append(
-    createTag('p', { class: 'sh-conflict-title' }, dictionaryManager.getValue('You have conflicting sessions')),
-    createTag('p', { class: 'sh-conflict-subtitle' }, dictionaryManager.getValue('Select which session you want to keep.')),
+    createTag('p', { class: 'sh-conflict-title' }, dictionaryManager.getValue('You are registered for a session at this time')),
+    createTag('p', { class: 'sh-conflict-subtitle' }, dictionaryManager.getValue('Select the session you would like to keep.')),
   );
 
   const optionsEl = createTag('div', { class: 'sh-conflict-options', role: 'radiogroup' });
-  const existingOption = buildConflictOption(conflictingSession);
   const newOption = buildConflictOption(newSession);
-  newOption.classList.add('selected');
-  newOption.setAttribute('aria-checked', 'true');
-  optionsEl.append(existingOption, newOption);
+  const existingOption = buildConflictOption(conflictingSession, { registered: true });
+  existingOption.classList.add('selected');
+  existingOption.setAttribute('aria-checked', 'true');
+  optionsEl.append(newOption, existingOption);
 
   optionsEl.addEventListener('click', (e) => {
     const opt = e.target.closest('.sh-conflict-option');
@@ -685,13 +1041,19 @@ function buildConflictModalContent(newSession, conflictingSession) {
     opt.click();
   });
 
+  const footer = createTag('div', { class: 'sh-conflict-footer' });
+  const cancelBtn = createTag('button', {
+    class: 'sh-conflict-cancel',
+    type: 'button',
+  }, dictionaryManager.getValue('Cancel'));
   const confirmBtn = createTag('button', {
     class: 'sh-btn sh-conflict-confirm',
     type: 'button',
-  }, dictionaryManager.getValue('Add session'));
+  }, dictionaryManager.getValue('Confirm session'));
+  footer.append(cancelBtn, confirmBtn);
 
-  wrapper.append(heading, optionsEl, confirmBtn);
-  return { content: wrapper, confirmBtn, optionsEl };
+  wrapper.append(heading, optionsEl, footer);
+  return { content: wrapper, confirmBtn, cancelBtn, optionsEl };
 }
 
 function setSwapConflictModalPending(confirmBtn, optionsEl) {
@@ -707,7 +1069,7 @@ function setSwapConflictModalPending(confirmBtn, optionsEl) {
 function restoreSwapConflictModalUi(confirmBtn, optionsEl) {
   confirmBtn.disabled = false;
   confirmBtn.removeAttribute('aria-busy');
-  confirmBtn.textContent = dictionaryManager.getValue('Add session');
+  confirmBtn.textContent = dictionaryManager.getValue('Confirm session');
   optionsEl.classList.remove('sh-conflict-options-pending');
   optionsEl.querySelectorAll('.sh-conflict-option').forEach((o) => {
     o.setAttribute('tabindex', '0');
@@ -717,11 +1079,15 @@ function restoreSwapConflictModalUi(confirmBtn, optionsEl) {
 async function openConflictModal(newSession, conflictingSession) {
   const miloLibs = getEventConfig()?.miloConfig?.miloLibs || LIBS;
   const { getModal, closeModal } = await import(`${miloLibs}/blocks/modal/modal.js`);
-  const { content, confirmBtn, optionsEl } = buildConflictModalContent(newSession, conflictingSession);
+  const {
+    content, confirmBtn, cancelBtn, optionsEl,
+  } = buildConflictModalContent(newSession, conflictingSession);
 
   let dialogEl;
   return new Promise((resolve) => {
     let confirmed = false;
+
+    cancelBtn.addEventListener('click', () => closeModal(dialogEl));
 
     confirmBtn.addEventListener('click', () => {
       confirmed = true;
@@ -785,29 +1151,183 @@ function bindToolbarEvents(toolbarEl, listEl, state) {
   const searchInput = toolbarEl.querySelector('.sh-search');
   const filterBtn = toolbarEl.querySelector('.sh-filter-btn');
   const filterPanel = toolbarEl.querySelector('.sh-filter-panel');
+  const downloadBtn = toolbarEl.querySelector('.sh-download-btn');
+  const searchWrap = toolbarEl.querySelector('.sh-search-wrap');
+  const searchToggle = toolbarEl.querySelector('.sh-search-toggle');
+  const searchClear = toolbarEl.querySelector('.sh-search-clear');
+  const activeFilters = toolbarEl.parentElement?.querySelector('.sh-active-filters');
+  let pendingTags = cloneActiveTags(getFilterState().activeTags);
+
+  activeFilters?.addEventListener('click', (e) => {
+    const seeAll = e.target.closest('.sh-filter-see-all');
+    if (seeAll) {
+      const expanded = activeFilters.dataset.expanded === 'true';
+      activeFilters.dataset.expanded = expanded ? 'false' : 'true';
+      updateActiveFilters(activeFilters);
+      return;
+    }
+    const removeBtn = e.target.closest('.sh-filter-tag-remove');
+    if (!removeBtn) return;
+    const fs = getFilterState();
+    const { group, value } = removeBtn.dataset;
+    const newTags = cloneActiveTags(fs.activeTags);
+    const groupSet = newTags.get(group);
+    if (groupSet) {
+      groupSet.delete(value);
+      if (groupSet.size === 0) newTags.delete(group);
+    }
+    setFilterState({ ...fs, activeTags: newTags });
+    applyFilter(listEl, state);
+    updateActiveFilters(activeFilters);
+  });
 
   searchInput.addEventListener('input', debounce(() => {
     setFilterState({ ...getFilterState(), query: searchInput.value });
     applyFilter(listEl, state);
   }, 200));
 
+  searchToggle.addEventListener('click', () => {
+    const expanded = searchWrap.classList.toggle('expanded');
+    searchToggle.setAttribute('aria-expanded', String(expanded));
+    if (expanded) setTimeout(() => searchInput.focus(), 0);
+  });
+
+  searchInput.addEventListener('blur', () => {
+    if (searchInput.value) return;
+    searchWrap.classList.remove('expanded');
+    searchToggle.setAttribute('aria-expanded', 'false');
+  });
+
+  searchClear.addEventListener('click', () => {
+    searchInput.value = '';
+    setFilterState({ ...getFilterState(), query: '' });
+    applyFilter(listEl, state);
+    searchWrap.classList.remove('expanded');
+    searchToggle.setAttribute('aria-expanded', 'false');
+    searchToggle.focus();
+  });
+
+  downloadBtn?.addEventListener('click', () => {
+    const registered = state.sessions.filter((s) => state.registeredSessionIds?.has(s.sessionId));
+    downloadAllSessionsICS(registered);
+  });
+
+  filterPanel.querySelector('.sh-filter-backdrop')?.addEventListener('click', () => {
+    filterPanel.classList.add('hidden');
+    filterBtn.setAttribute('aria-expanded', 'false');
+    filterPanel.setAttribute('aria-hidden', 'true');
+  });
+
   filterBtn.addEventListener('click', () => {
     if (filterBtn.disabled) return;
     const isHidden = filterPanel.classList.toggle('hidden');
     filterBtn.setAttribute('aria-expanded', String(!isHidden));
-    filterPanel.setAttribute('aria-hidden', String(isHidden));
+    if (isHidden) {
+      filterPanel.setAttribute('aria-hidden', 'true');
+    } else {
+      filterPanel.removeAttribute('aria-hidden');
+    }
     if (!isHidden) {
-      const firstCheckbox = filterPanel.querySelector('input[type="checkbox"]');
-      if (firstCheckbox) setTimeout(() => firstCheckbox.focus(), 0);
+      filterPanel.classList.remove('sh-detail-open');
+      pendingTags = cloneActiveTags(getFilterState().activeTags);
+      filterPanel.querySelectorAll('input[type="checkbox"]').forEach((cb) => {
+        const checked = pendingTags.get(cb.dataset.filterGroup || '')?.has(cb.value) || false;
+        cb.checked = checked;
+        cb.closest('.sh-filter-item')?.classList.toggle('checked', checked);
+      });
+      const firstCat = filterPanel.querySelector('.sh-filter-cat');
+      if (firstCat) setTimeout(() => firstCat.focus(), 0);
     }
   });
 
+  const detailTitle = filterPanel.querySelector('.sh-filter-detail-title');
+
+  const activateCategoryDrillIn = (cat, moveFocus = false) => {
+    const { category } = cat.dataset;
+    filterPanel.querySelectorAll('.sh-filter-cat').forEach((c) => {
+      const isActive = c === cat;
+      c.classList.toggle('active', isActive);
+      c.setAttribute('aria-selected', String(isActive));
+    });
+    filterPanel.querySelectorAll('.sh-filter-option-grid').forEach((g) => {
+      g.classList.toggle('active', g.dataset.category === category);
+    });
+    if (detailTitle) detailTitle.textContent = cat.textContent;
+    filterPanel.classList.add('sh-detail-open');
+    if (moveFocus) {
+      const firstCb = filterPanel.querySelector(`.sh-filter-option-grid.active input[type="checkbox"]`);
+      if (firstCb) setTimeout(() => firstCb.focus(), 0);
+    }
+  };
+
+  filterPanel.addEventListener('click', (e) => {
+    const cat = e.target.closest('.sh-filter-cat');
+    if (!cat) return;
+    activateCategoryDrillIn(cat, false);
+  });
+
   filterPanel.addEventListener('keydown', (e) => {
-    if (e.key !== 'Escape') return;
+    if (e.key === 'Escape') {
+      filterPanel.classList.add('hidden');
+      filterBtn.setAttribute('aria-expanded', 'false');
+      filterPanel.setAttribute('aria-hidden', 'true');
+      filterBtn.focus();
+      return;
+    }
+    if (e.key === 'Enter' || e.key === ' ') {
+      const cat = e.target.closest('.sh-filter-cat');
+      if (cat) {
+        e.preventDefault();
+        activateCategoryDrillIn(cat, true);
+        return;
+      }
+    }
+  });
+
+  filterPanel.querySelector('.sh-filter-back')?.addEventListener('click', () => {
+    filterPanel.classList.remove('sh-detail-open');
+  });
+
+  const applyBtn = filterPanel.querySelector('.sh-filter-apply');
+  applyBtn?.addEventListener('click', () => {
+    setFilterState({ ...getFilterState(), activeTags: cloneActiveTags(pendingTags) });
+    applyFilter(listEl, state);
+    updateActiveFilters(activeFilters);
     filterPanel.classList.add('hidden');
     filterBtn.setAttribute('aria-expanded', 'false');
     filterPanel.setAttribute('aria-hidden', 'true');
     filterBtn.focus();
+  });
+
+  const saveBtn = filterPanel.querySelector('.sh-filter-save');
+  saveBtn?.addEventListener('click', () => {
+    setFilterState({ ...getFilterState(), activeTags: cloneActiveTags(pendingTags) });
+    applyFilter(listEl, state);
+    updateActiveFilters(activeFilters);
+    filterPanel.classList.add('hidden');
+    filterBtn.setAttribute('aria-expanded', 'false');
+    filterPanel.setAttribute('aria-hidden', 'true');
+    filterBtn.focus();
+  });
+
+  const resetBtn = filterPanel.querySelector('.sh-filter-reset');
+  resetBtn?.addEventListener('click', () => {
+    pendingTags = new Map();
+    filterPanel.querySelectorAll('input[type="checkbox"]').forEach((cb) => {
+      cb.checked = false;
+      cb.closest('.sh-filter-item')?.classList.remove('checked');
+    });
+    setFilterState({ ...getFilterState(), activeTags: new Map() });
+    applyFilter(listEl, state);
+    updateActiveFilters(activeFilters);
+  });
+
+
+  filterPanel.addEventListener('click', (e) => {
+    if (e.target !== filterPanel) return;
+    filterPanel.classList.add('hidden');
+    filterBtn.setAttribute('aria-expanded', 'false');
+    filterPanel.setAttribute('aria-hidden', 'true');
   });
 
   document.addEventListener('click', (e) => {
@@ -823,23 +1343,55 @@ function bindToolbarEvents(toolbarEl, listEl, state) {
 
   filterPanel.addEventListener('change', (e) => {
     const cb = e.target;
-    if (cb.type !== 'checkbox') return;
-    const fs = getFilterState();
-    const newTags = new Set(fs.activeTags);
-    if (cb.dataset.filterType === 'tag') {
-      cb.checked ? newTags.add(cb.value) : newTags.delete(cb.value);
-    }
-    setFilterState({ ...fs, activeTags: newTags });
+    if (cb.type !== 'checkbox' || cb.dataset.filterType !== 'tag') return;
+    const group = cb.dataset.filterGroup || '';
+    const groupSet = new Set(pendingTags.get(group));
+    cb.checked ? groupSet.add(cb.value) : groupSet.delete(cb.value);
+    if (groupSet.size === 0) pendingTags.delete(group);
+    else pendingTags.set(group, groupSet);
+    cb.closest('.sh-filter-item')?.classList.toggle('checked', cb.checked);
+  });
+
+  const viewDropdown = toolbarEl.querySelector('.sh-view-dropdown');
+  const viewToggle = toolbarEl.querySelector('.sh-view-toggle');
+  const viewMenu = toolbarEl.querySelector('.sh-view-menu');
+  const viewLabel = toolbarEl.querySelector('.sh-view-label');
+
+  const closeViewMenu = () => {
+    viewMenu?.classList.add('hidden');
+    viewToggle?.setAttribute('aria-expanded', 'false');
+    viewMenu?.setAttribute('aria-hidden', 'true');
+  };
+
+  viewToggle?.addEventListener('click', () => {
+    const isHidden = viewMenu.classList.toggle('hidden');
+    viewToggle.setAttribute('aria-expanded', String(!isHidden));
+    viewMenu.setAttribute('aria-hidden', String(isHidden));
+  });
+
+  viewMenu?.addEventListener('click', (e) => {
+    const opt = e.target.closest('.sh-view-option');
+    if (!opt) return;
+    viewMenu.querySelectorAll('.sh-view-option').forEach((o) => {
+      const isActive = o === opt;
+      o.classList.toggle('active', isActive);
+      o.setAttribute('aria-selected', String(isActive));
+    });
+    viewLabel.textContent = opt.textContent;
+    setFilterState({ ...getFilterState(), activeTab: opt.dataset.tab });
+    if (downloadBtn) downloadBtn.hidden = opt.dataset.tab !== 'my';
+    closeViewMenu();
     applyFilter(listEl, state);
   });
 
-  toolbarEl.addEventListener('click', (e) => {
-    const tab = e.target.closest('.sh-tab');
-    if (!tab) return;
-    toolbarEl.querySelectorAll('.sh-tab').forEach((t) => t.classList.remove('active'));
-    tab.classList.add('active');
-    setFilterState({ ...getFilterState(), activeTab: tab.dataset.tab });
-    applyFilter(listEl, state);
+  viewDropdown?.addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape') return;
+    closeViewMenu();
+    viewToggle.focus();
+  });
+
+  document.addEventListener('click', (e) => {
+    if (!viewDropdown?.contains(e.target)) closeViewMenu();
   });
 }
 
@@ -849,6 +1401,15 @@ async function handleSessionRegistration(cardEl, sessionId, state) {
 
   const firstTime = session.sessionTimes[0];
   if (!firstTime) return;
+
+  // Defensive: never attempt session registration when blocked at the event level.
+  // The disabled CTA prevents clicks, but an auto-fired flow (e.g. pendingSessionId)
+  // could still reach this point.
+  if (isSessionRegistrationBlocked({
+    isEventWaitlisted: state.isEventWaitlisted,
+    isEventClosed: state.isEventClosed,
+    inviteOnlyBlocked: state.inviteOnlyBlocked,
+  })) return;
 
   // ── Conflict detection ────────────────────────────────────────────────────
   const conflictingSession = findConflictingSession(session, state);
@@ -875,7 +1436,7 @@ async function handleSessionRegistration(cardEl, sessionId, state) {
       state.registeredSessionIds.delete(conflictingSession.sessionId);
       const conflictCard = cardEl.closest('.sh-session-list')
         ?.querySelector(`[data-session-id="${conflictingSession.sessionId}"]`);
-      if (conflictCard) updateCTAGroup(conflictCard, conflictingSession, true);
+      if (conflictCard) updateCTAGroup(conflictCard, conflictingSession, { isEventRegistered: true, isBlocked: false });
       const existing = BlockMediator.get('registeredSessionIds') || new Set();
       const updated = new Set([...existing]);
       updated.delete(conflictingSession.sessionId);
@@ -890,14 +1451,31 @@ async function handleSessionRegistration(cardEl, sessionId, state) {
     btn.textContent = dictionaryManager.getValue('Registering\u2026');
   }
 
-  const resp = await registerForSessionTime(firstTime.sessionTimeId, 'me', { registrationStatus: 'registered' });
+  let resp = await registerForSessionTime(firstTime.sessionTimeId, 'me', { registrationStatus: 'registered' });
+  let waitlisted = resp.ok && resp.data?.registrationStatus === 'waitlisted';
+
+  if (!resp.ok && isSessionTimeFullError(resp)) {
+    const retry = await registerForSessionTime(firstTime.sessionTimeId, 'me', { registrationStatus: 'waitlisted' });
+    if (retry.ok) {
+      resp = retry;
+      waitlisted = true;
+    } else {
+      resp = retry;
+    }
+  }
 
   if (resp.ok) {
-    session.isRegistered = true;
-    state.registeredSessionIds.add(sessionId);
-    updateCTAGroup(cardEl, session, true);
-    const existing = BlockMediator.get('registeredSessionIds') || new Set();
-    BlockMediator.set('registeredSessionIds', new Set([...existing, sessionId]));
+    if (waitlisted) {
+      session.isWaitlisted = true;
+      session.isRegistered = false;
+    } else {
+      session.isRegistered = true;
+      session.isWaitlisted = false;
+      state.registeredSessionIds.add(sessionId);
+      const existing = BlockMediator.get('registeredSessionIds') || new Set();
+      BlockMediator.set('registeredSessionIds', new Set([...existing, sessionId]));
+    }
+    updateCTAGroup(cardEl, session, { isEventRegistered: true, isBlocked: false });
     if (conflictFinalize) conflictFinalize(true);
   } else {
     window.lana?.log(`Error: Failed to register for session ${sessionId}. Error:${JSON.stringify(resp.error)}`);
@@ -925,12 +1503,14 @@ async function handleSessionUnregistration(cardEl, sessionId, state) {
     badge.textContent = dictionaryManager.getValue('Unregistering\u2026');
   }
 
+  const wasWaitlisted = session.isWaitlisted;
   const resp = await unregisterFromSessionTime(firstTime.sessionTimeId);
 
   if (resp.ok) {
     session.isRegistered = false;
+    session.isWaitlisted = false;
     state.registeredSessionIds.delete(sessionId);
-    updateCTAGroup(cardEl, session, true);
+    updateCTAGroup(cardEl, session, { isEventRegistered: true, isBlocked: false });
     const existing = BlockMediator.get('registeredSessionIds') || new Set();
     const updated = new Set([...existing]);
     updated.delete(sessionId);
@@ -942,7 +1522,10 @@ async function handleSessionUnregistration(cardEl, sessionId, state) {
       badge.removeAttribute('aria-busy');
       badge.classList.remove('sh-unregister-mode');
       badge.innerHTML = '';
-      badge.append(createIcon(CHECKMARK_ICON), createTag('span', {}, dictionaryManager.getValue('Registered')));
+      const restoreLabel = wasWaitlisted
+        ? dictionaryManager.getValue('waitlisted-cta-text')
+        : dictionaryManager.getValue('Registered');
+      badge.append(createIcon(CHECKMARK_ICON), createTag('span', {}, restoreLabel));
     }
   }
 }
@@ -991,6 +1574,10 @@ function bindCardEvents(listEl, state) {
     }
 
     if (e.target.closest('.sh-btn-register-event')) {
+      const btn = e.target.closest('.sh-btn-register-event');
+
+      if (state.inviteOnlyBlocked) return;
+
       const profile = BlockMediator.get('imsProfile');
       const isSignedOut = !profile || profile.noProfile || profile.account_type === 'guest';
 
@@ -1002,7 +1589,6 @@ function bindCardEvents(listEl, state) {
 
       if (state.rsvpConfig) {
         pendingSessionId = sessionId;
-        const btn = e.target.closest('.sh-btn-register-event');
         if (btn) { btn.disabled = true; btn.textContent = dictionaryManager.getValue('Registering\u2026'); }
 
         // Milo's closeModal uses pushState (not location.hash=) so hashchange never fires.
@@ -1023,20 +1609,45 @@ function bindCardEvents(listEl, state) {
   });
 }
 
-function bindMediatorSubscriptions(el, bannerEl, listEl) {
-  rsvpUnsubscribe = BlockMediator.subscribe('rsvpData', async ({ newValue }) => {
+function refreshEventBanner(el, rsvpConfig, opts) {
+  const current = el.querySelector('.sh-event-banner');
+  const wasHidden = current?.classList.contains('hidden') ?? false;
+  const fresh = renderEventBanner(rsvpConfig, opts);
+  if (wasHidden) fresh.classList.add('hidden');
+  if (current) current.replaceWith(fresh);
+  else el.append(fresh);
+  return fresh;
+}
+
+function bindMediatorSubscriptions(el, listEl) {
+  const handleRsvpDataChange = async (newValue) => {
     const state = getState();
     const isRegistered = newValue?.registrationStatus === 'registered';
+    const isWaitlisted = newValue?.registrationStatus === 'waitlisted';
     state.isEventRegistered = isRegistered;
+    state.isEventWaitlisted = isWaitlisted;
 
-    syncBannerVisibility(bannerEl, isRegistered);
+    // Re-render banner so its button reflects waitlist state, then apply visibility
+    const newBanner = refreshEventBanner(el, state.rsvpConfig, {
+      inviteOnlyBlocked: state.inviteOnlyBlocked,
+      inviteOnlyMessage: state.inviteOnlyMessage,
+      isEventWaitlisted: isWaitlisted,
+      waitlistBannerMessage: state.waitlistBannerMessage,
+    });
+    syncBannerVisibility(newBanner, isRegistered);
 
-    const toggle = el.querySelector('.sh-tab-toggle');
-    if (toggle) toggle.hidden = !isRegistered;
+    const viewDropdown = el.querySelector('.sh-view-dropdown');
+    if (viewDropdown) viewDropdown.hidden = !isRegistered;
 
     const cardMap = new Map(
       [...el.querySelectorAll('.sh-card')].map((c) => [c.dataset.sessionId, c]),
     );
+
+    const isBlocked = isSessionRegistrationBlocked({
+      isEventWaitlisted: isWaitlisted,
+      isEventClosed: state.isEventClosed,
+      inviteOnlyBlocked: state.inviteOnlyBlocked,
+    });
 
     if (isRegistered) {
       const ids = await resolveRegistrationState(state.eventData.eventId, true);
@@ -1046,7 +1657,7 @@ function bindMediatorSubscriptions(el, bannerEl, listEl) {
       state.sessions.forEach((session) => {
         session.isRegistered = mergedIds.has(session.sessionId);
         const cardEl = cardMap.get(session.sessionId);
-        if (cardEl) updateCTAGroup(cardEl, session, true);
+        if (cardEl) updateCTAGroup(cardEl, session, { isEventRegistered: true, isBlocked: false });
       });
 
       if (pendingSessionId) {
@@ -1063,22 +1674,43 @@ function bindMediatorSubscriptions(el, bannerEl, listEl) {
       state.sessions.forEach((session) => {
         session.isRegistered = false;
         const cardEl = cardMap.get(session.sessionId);
-        if (cardEl) updateCTAGroup(cardEl, session, false);
+        if (cardEl) updateCTAGroup(cardEl, session, { isEventRegistered: false, isBlocked });
       });
 
-      // Reset to "All sessions" tab when user un-registers
+      // Reset to "All sessions" view when user un-registers
       const fs = getFilterState();
       if (fs.activeTab === 'my') {
         setFilterState({ ...fs, activeTab: 'all' });
-        const allTab = el.querySelector('.sh-tab[data-tab="all"]');
-        const myTab = el.querySelector('.sh-tab[data-tab="my"]');
-        if (allTab) allTab.classList.add('active');
-        if (myTab) myTab.classList.remove('active');
+        el.querySelectorAll('.sh-view-option').forEach((o) => {
+          const isAll = o.dataset.tab === 'all';
+          o.classList.toggle('active', isAll);
+          o.setAttribute('aria-selected', String(isAll));
+        });
+        const viewLabel = el.querySelector('.sh-view-label');
+        if (viewLabel) viewLabel.textContent = dictionaryManager.getValue('All sessions');
       }
+      const downloadBtn = el.querySelector('.sh-download-btn');
+      if (downloadBtn) downloadBtn.hidden = true;
     }
 
     applyFilter(listEl, state);
-  });
+  };
+
+  rsvpUnsubscribe = BlockMediator.subscribe('rsvpData', ({ newValue }) => handleRsvpDataChange(newValue));
+
+  // Reconcile against the current rsvpData snapshot in case captureProfile
+  // (in profile.js) or the events-form modal set it BETWEEN the initial
+  // loadBlock read and this subscription registration. BlockMediator does not
+  // replay current values to new subscribers, so we manually apply them once.
+  const state = getState();
+  const currentRsvp = BlockMediator.get('rsvpData');
+  const currentStatus = currentRsvp?.registrationStatus;
+  const renderedStatus = state.isEventRegistered
+    ? 'registered'
+    : (state.isEventWaitlisted ? 'waitlisted' : null);
+  if (currentStatus !== renderedStatus) {
+    handleRsvpDataChange(currentRsvp);
+  }
 
   BlockMediator.subscribe('registeredSessionIds', ({ newValue }) => {
     const state = getState();
@@ -1086,12 +1718,17 @@ function bindMediatorSubscriptions(el, bannerEl, listEl) {
     const cardMap = new Map(
       [...el.querySelectorAll('.sh-card')].map((c) => [c.dataset.sessionId, c]),
     );
+    const isBlocked = isSessionRegistrationBlocked({
+      isEventWaitlisted: state.isEventWaitlisted,
+      isEventClosed: state.isEventClosed,
+      inviteOnlyBlocked: state.inviteOnlyBlocked,
+    });
     state.sessions.forEach((session) => {
       if (newValue.has(session.sessionId) && !session.isRegistered) {
         session.isRegistered = true;
         state.registeredSessionIds.add(session.sessionId);
         const cardEl = cardMap.get(session.sessionId);
-        if (cardEl) updateCTAGroup(cardEl, session, state.isEventRegistered);
+        if (cardEl) updateCTAGroup(cardEl, session, { isEventRegistered: state.isEventRegistered, isBlocked });
       }
     });
     applyFilter(listEl, state);
@@ -1101,11 +1738,25 @@ function bindMediatorSubscriptions(el, bannerEl, listEl) {
 // ─── init ────────────────────────────────────────────────────────────────────
 
 async function loadBlock(el, rsvpConfig) {
+  const searchConfig = parseSearchConfig(el);
+
   const eventData = await resolveEventData();
   if (!eventData?.eventId) {
     el.remove();
     return;
   }
+
+  try {
+    await dictionaryManager.initialize();
+  } catch (err) {
+    window.lana?.log(`sessions-hub: dictionary initialize failed: ${err?.message || err}`);
+  }
+
+  const inviteOnlyBlocked = Boolean(eventData.inviteOnly && !getValidCampaignIdFromUrl());
+  const inviteOnlyMessage = getInviteOnlyNoCampaignMessage(dictionaryManager);
+  const waitlistBannerMessage = getEventWaitlistBannerMessage(dictionaryManager, {
+    eventTitle: getMetadata('event-title') || '',
+  });
 
   let rawSessions;
   try {
@@ -1127,9 +1778,14 @@ async function loadBlock(el, rsvpConfig) {
 
   const rsvpData = BlockMediator.get('rsvpData');
   const isEventRegistered = rsvpData?.registrationStatus === 'registered';
-  const registeredSessionIds = await resolveRegistrationState(eventData.eventId, isEventRegistered);
+  const isEventWaitlisted = rsvpData?.registrationStatus === 'waitlisted';
+  const isEventClosed = computeIsEventClosed(eventData);
+  const [registeredSessionIds, tagsData] = await Promise.all([
+    resolveRegistrationState(eventData.eventId, isEventRegistered),
+    Promise.resolve(getCaasTags()).catch(() => null),
+  ]);
 
-  const sessions = normalizeSessions(rawSessions, locationMap, registeredSessionIds, venueId);
+  const sessions = normalizeSessions(rawSessions, locationMap, registeredSessionIds, venueId, tagsData);
 
   const speakerMap = new Map();
   sessions.forEach((session) => {
@@ -1145,24 +1801,34 @@ async function loadBlock(el, rsvpConfig) {
     locationMap,
     registeredSessionIds,
     isEventRegistered,
+    isEventWaitlisted,
+    isEventClosed,
     rsvpConfig,
+    inviteOnlyBlocked,
+    inviteOnlyMessage,
+    waitlistBannerMessage,
+    searchConfig,
   };
   setState(state);
 
+  const isBlocked = isSessionRegistrationBlocked({ isEventWaitlisted, isEventClosed, inviteOnlyBlocked });
+
   const toolbar = renderToolbar(state);
   setToolbarStickyOffset(toolbar);
-  const listEl = renderSessionList(sessions, isEventRegistered);
-  el.append(toolbar, listEl);
+  const activeFilters = createTag('div', { class: 'sh-active-filters', hidden: '' });
+  const listEl = renderSessionList(sessions, { isEventRegistered, isBlocked });
+  el.append(toolbar, activeFilters, listEl);
 
-  // Always append banner; hide it if user is already registered
+  // Always append banner; hide it only if user is already event-registered.
+  // (Waitlisted users keep the banner visible so they can manage their waitlist.)
   el.querySelector('.sh-event-banner')?.remove();
-  const bannerEl = renderEventBanner(rsvpConfig);
+  const bannerEl = renderEventBanner(rsvpConfig, { inviteOnlyBlocked, inviteOnlyMessage, isEventWaitlisted, waitlistBannerMessage });
   if (isEventRegistered) bannerEl.classList.add('hidden');
   el.append(bannerEl);
 
   bindToolbarEvents(toolbar, listEl, state);
   bindCardEvents(listEl, state);
-  bindMediatorSubscriptions(el, bannerEl, listEl);
+  bindMediatorSubscriptions(el, listEl);
 
   try {
     await document.fonts?.ready;
@@ -1185,11 +1851,11 @@ async function loadBlock(el, rsvpConfig) {
       if (pendingSession && pendingCard && !pendingSession.isRegistered) {
         await handleSessionRegistration(pendingCard, storedPendingId, state);
       }
-    } else if (rsvpConfig) {
+    } else if (rsvpConfig && !inviteOnlyBlocked) {
       pendingSessionId = storedPendingId;
       openRsvpModal(rsvpConfig);
     }
-  } else if (storedEventRsvp && !isEventRegistered && rsvpConfig) {
+  } else if (storedEventRsvp && !isEventRegistered && rsvpConfig && !inviteOnlyBlocked) {
     openRsvpModal(rsvpConfig);
   }
 }
@@ -1197,7 +1863,7 @@ async function loadBlock(el, rsvpConfig) {
 export default async function init(el) {
   if (rsvpUnsubscribe) { rsvpUnsubscribe(); rsvpUnsubscribe = null; }
   disconnectSessionDescriptionsOverflow();
-  setFilterState({ query: '', activeTags: new Set(), activeTab: 'all' });
+  setFilterState({ query: '', activeTags: new Map(), activeTab: 'all' });
 
   let rsvpConfig = null;
   const rows = [...el.querySelectorAll(':scope > div')];

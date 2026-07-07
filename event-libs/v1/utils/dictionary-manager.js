@@ -141,6 +141,13 @@ export class DictionaryManager {
   }
 
   /**
+   * Clears loaded sheets so the next `initialize()` refetches (unit tests only).
+   */
+  resetLoadedSheetsForTests() {
+    this.#dictionaries = {};
+  }
+
+  /**
    * Initialize the dictionary manager by loading all sheets
    */
   async initialize() {
@@ -158,3 +165,37 @@ export class DictionaryManager {
 }
 
 export const dictionaryManager = new DictionaryManager();
+
+/** Dictionary key shared with decorate/events-form RSVP gate (fallback matches legacy hardcoded copy). */
+export const INVITE_ONLY_NO_CAMPAIGN_MESSAGE_KEY = 'rsvp-invite-only-no-campaign-cta-text';
+
+/**
+ * Localized message when invite-only events are opened without a valid campaign URL param.
+ * @param {DictionaryManager} manager - Initialized dictionary manager instance
+ * @returns {string}
+ */
+export function getInviteOnlyNoCampaignMessage(manager) {
+  const text = manager.getValue(INVITE_ONLY_NO_CAMPAIGN_MESSAGE_KEY);
+  return text === INVITE_ONLY_NO_CAMPAIGN_MESSAGE_KEY
+    ? 'Registration is only available through a valid invitation link.'
+    : text;
+}
+
+export const EVENT_WAITLIST_BANNER_MESSAGE_KEY = 'event-waitlist-banner-msg';
+
+/**
+ * Localized banner message shown when the user is on the event-level waitlist.
+ * Supports optional `{eventTitle}` token substitution to mirror the events-form
+ * waitlist success modal copy ("You've been added to the waitlist for {eventTitle}").
+ * @param {DictionaryManager} manager - Initialized dictionary manager instance
+ * @param {Object} [tokens] - Tokens to interpolate into the dictionary value
+ * @param {string} [tokens.eventTitle] - Event title to substitute for `{eventTitle}`
+ * @returns {string}
+ */
+export function getEventWaitlistBannerMessage(manager, { eventTitle = '' } = {}) {
+  const raw = manager.getValue(EVENT_WAITLIST_BANNER_MESSAGE_KEY);
+  const text = raw === EVENT_WAITLIST_BANNER_MESSAGE_KEY
+    ? "You're on the event waitlist. Session registration will be available if a spot opens up."
+    : raw;
+  return text.replace(/\{eventTitle\}/g, eventTitle);
+}

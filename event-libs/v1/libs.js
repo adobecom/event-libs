@@ -20,6 +20,8 @@ const EVENT_BLOCKS = [
   'video-playlist',
   'image-links',
   'venue-map',
+  'sessions-guide',
+  'sessions-guide-full-page',
 ];
 
 // Import only the most essential utilities that are always needed

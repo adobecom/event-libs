@@ -228,6 +228,52 @@ function appendBio(contentContainer, bio) {
   contentContainer.append(description);
 }
 
+function decodeHtmlEntities(str) {
+  return str
+    .replace(/&#x([0-9a-f]{1,6});?/gi, (full, hex) => {
+      const cp = parseInt(hex, 16);
+      if (!Number.isFinite(cp) || cp < 0 || cp > 0x10FFFF) return full;
+      try {
+        return String.fromCodePoint(cp);
+      } catch {
+        return full;
+      }
+    })
+    .replace(/&#(\d{1,7});?/g, (full, dec) => {
+      const cp = parseInt(dec, 10);
+      if (!Number.isFinite(cp) || cp < 0 || cp > 0x10FFFF) return full;
+      try {
+        return String.fromCodePoint(cp);
+      } catch {
+        return full;
+      }
+    })
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&quot;/g, '"')
+    .replace(/&apos;/g, "'")
+    .replace(/&#39;/g, "'")
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&amp;/g, '&');
+}
+
+function escapeHtmlPcdata(text) {
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+
+function modalJobTitlePlainText(title) {
+  if (title == null || typeof title !== 'string') return '';
+  const trimmed = title.trim();
+  if (!trimmed) return '';
+  const withoutTags = trimmed.includes('<')
+    ? trimmed.replace(/<[^>]+>/g, ' ')
+    : trimmed;
+  return decodeHtmlEntities(withoutTags).replace(/\s+/g, ' ').trim();
+}
+
 function getModalId(data, index) {
   const fullName = getProfileName(data);
   const slug = fullName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
@@ -253,8 +299,8 @@ export async function buildModalContent(profileData) {
   const textContainer = createTag('div', { class: 'profile-cards-modal-text' });
   const imageContainer = createTag('div', { class: 'profile-cards-modal-image' });
   const fullName = getProfileName(profileData);
-  const title = createTag('p', { class: 'card-title' }, profileData?.title || '');
-  const name = createTag('h2', { class: 'card-name' }, fullName);
+  const title = createTag('p', { class: 'card-title' }, escapeHtmlPcdata(modalJobTitlePlainText(profileData?.title)));
+  const name = createTag('h2', { class: 'card-name', tabindex: '0' }, fullName);
 
   textContainer.append(title, name);
   appendBio(textContainer, profileData?.bio);
@@ -435,19 +481,16 @@ function decorateStaticCards(el, { modal } = {}) {
   }
 }
 
-function decorateCards(el, data, { simple, modal } = {}) {
+function decorateCards(el, data, { simple, modal, speakerType } = {}) {
   const cardsWrapper = el.querySelector('.cards-wrapper');
-  const rows = el.querySelectorAll(':scope > div');
-  const configRow = rows[1];
-  const speakerType = configRow?.querySelectorAll(':scope > div')?.[1]?.textContent.toLowerCase().trim();
-  const filteredData = data.filter((speaker) => speaker.speakerType.toLowerCase() === speakerType);
+  const filteredData = speakerType
+    ? data.filter((speaker) => speaker.speakerType?.toLowerCase() === speakerType)
+    : [...data];
 
   if (filteredData.length === 0) {
     el.remove();
     return;
   }
-
-  configRow.remove();
 
   filteredData.forEach((speaker, index) => {
     const cardContainer = createTag('div', { class: 'card-container' });
@@ -488,15 +531,35 @@ function sortDataByOrdinals(data) {
   });
 }
 
+function sortDataByField(data, field, direction) {
+  return [...data].sort((a, b) => {
+    const aVal = (a[field] ?? '').toString().toLowerCase();
+    const bVal = (b[field] ?? '').toString().toLowerCase();
+    const cmp = aVal.localeCompare(bVal, undefined, { sensitivity: 'base' });
+    return direction === 'desc' ? -cmp : cmp;
+  });
+}
+
+
+function parseConfigRows(el) {
+  const config = {};
+  const configRowEls = [];
+  const rows = Array.from(el.querySelectorAll(':scope > div'));
+
+  rows.slice(1).forEach((row) => {
+    const cells = row.querySelectorAll(':scope > div');
+    const key = cells[0]?.textContent.toLowerCase().trim();
+    const value = cells[1]?.textContent.trim();
+    if (key) {
+      config[key] = value || '';
+      configRowEls.push(row);
+    }
+  });
+
+  return { config, configRowEls };
+}
 
 export default function init(el) {
-  const rows = el.querySelectorAll(':scope > div');
-  const configRow = rows[1];
-  
-  // Determine if this is metadata-driven or static authoring
-  // Check if the first cell of configRow (if it exists) contains 'type'
-  const firstCell = configRow?.querySelectorAll(':scope > div')?.[0];
-  const isMetadataDriven = firstCell?.textContent.toLowerCase().trim() === 'type';
   const isModal = el.classList.contains('modal');
 
   // Handle grid variant: add default three-up if no *-up class is present
@@ -510,8 +573,12 @@ export default function init(el) {
   const cardsWrapper = createTag('div', { class: 'cards-wrapper' });
   el.append(cardsWrapper);
 
+  const { config, configRowEls } = parseConfigRows(el);
+  // Determine if this is metadata-driven or static authoring
+  // Check if the configRows (if it exists) contains 'type'
+  const isMetadataDriven = 'type' in config;
+
   if (isMetadataDriven) {
-    // Metadata-driven mode
     let data = [];
 
     try {
@@ -527,9 +594,20 @@ export default function init(el) {
       return;
     }
 
+    configRowEls.forEach((row) => row.remove());
+
     const isSimple = el.classList.contains('simple');
-    const sortedData = sortDataByOrdinals(data);
-    decorateCards(el, sortedData, { simple: isSimple, modal: isModal });
+    const speakerType = config.type?.toLowerCase() || '';
+
+    let sortedData;
+    if ('order' in config) {
+      const direction = el.classList.contains('desc') ? 'desc' : 'asc';
+      sortedData = config.order ? sortDataByField(data, config.order, direction) : sortDataByOrdinals(data);
+    } else {
+      sortedData = sortDataByOrdinals(data);
+    }
+
+    decorateCards(el, sortedData, { simple: isSimple, modal: isModal, speakerType });
   } else {
     decorateStaticCards(el, { modal: isModal });
   }
