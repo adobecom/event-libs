@@ -55,7 +55,6 @@ class MobileRider {
   constructor(el) {
     this.el = el;
     this.isEmbedding = false;
-    this._endListenerAttached = false;
     this.init();
   }
 
@@ -214,7 +213,7 @@ class MobileRider {
     const tryAttach = () => {
       const mainTracked = this.#storeHas(this.mainID);
       const vidTracked = this.#storeHas(vid);
-      if (mainTracked || vidTracked) {
+      if ((mainTracked || vidTracked) && window.__mr_player?.on) {
         this.#attachEndListener(vid);
         return true;
       }
@@ -253,7 +252,6 @@ class MobileRider {
 
       window.__mr_player?.dispose?.();
       window.__mr_player = null;
-      this._endListenerAttached = false;
     });
   }
 
@@ -318,16 +316,18 @@ class MobileRider {
           clearInterval(currentCheck);
           currentCheck = null;
           btn.addEventListener('click', () => {
-            try {
-              if (this.store && !this._endListenerAttached) {
-                this._endListenerAttached = true;
-                this.#attachEndListener(vid);
-              }
-            } catch (e) {
-              this.log(`ASL end-listener error: ${e.message}`);
-            }
             if (!container.classList.contains(CONFIG.ASL.TOGGLE_CLASS)) {
               container.classList.add(CONFIG.ASL.TOGGLE_CLASS);
+            }
+            // ASL toggle may replace window.__mr_player; defer so new player is ready
+            if (this.store) {
+              requestAnimationFrame(() => {
+                try {
+                  this.#maybeAttachEndListener(vid);
+                } catch (e) {
+                  this.log(`ASL end-listener error: ${e.message}`);
+                }
+              });
             }
             poll();
           }, { once: true });

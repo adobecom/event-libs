@@ -218,6 +218,23 @@ describe('Mobile Rider Module', () => {
         expect(player.on.calledWith('streamend')).to.be.false;
         window.history.replaceState({}, '', window.location.pathname);
       });
+
+      it('should retry attaching end listener until window.__mr_player is ready', async () => {
+        riderInstance.mainID = 'main-video';
+        riderInstance.store = { get: sinon.stub().returns(true) };
+
+        // Player absent when RAF fires — tryAttach must not silently drop the listener
+        globalThis.__mr_player = null;
+        riderInstance.injectPlayer('test-video', 'test-skin');
+        await new Promise((resolve) => { setTimeout(resolve, 30); });
+
+        const player = { off: sinon.stub(), on: sinon.stub() };
+        globalThis.__mr_player = player;
+        // Wait for retry tick (ATTACH_INTERVAL_MS = 5ms)
+        await new Promise((resolve) => { setTimeout(resolve, 30); });
+
+        expect(player.on.calledWith('streamend')).to.be.true;
+      });
     });
 
     describe('setStatus', () => {
@@ -749,6 +766,74 @@ describe('Mobile Rider Module', () => {
       btn.click();
       btn.click(); // second click on same node — { once: true } already removed the handler
       expect(addCount).to.equal(1);
+    });
+
+    it('re-attaches streamend listener to the new player on each ASL toggle', async () => {
+      riderInstance.mainID = 'vid';
+      riderInstance.store = { get: sinon.stub().returns(true) };
+
+      riderInstance.injectPlayer('vid', 'skin', 'asl-id');
+      const player1 = { off: sinon.stub(), on: sinon.stub() };
+      globalThis.__mr_player = player1;
+      await new Promise((resolve) => { setTimeout(resolve, 50); });
+
+      const container = riderInstance.wrap.querySelector('.mobile-rider-container');
+      const btn1 = document.createElement('button');
+      btn1.id = 'asl-button';
+      container.appendChild(btn1);
+      await new Promise((resolve) => { setTimeout(resolve, 200); });
+
+      // First toggle: switch to ASL — new player instance appears
+      const player2 = { off: sinon.stub(), on: sinon.stub() };
+      globalThis.__mr_player = player2;
+      btn1.click();
+      await new Promise((resolve) => { setTimeout(resolve, 50); });
+      expect(player2.on.calledWith('streamend')).to.be.true;
+
+      // Second toggle: switch back — another player swap
+      btn1.remove();
+      const btn2 = document.createElement('button');
+      btn2.id = 'asl-button';
+      container.appendChild(btn2);
+      await new Promise((resolve) => { setTimeout(resolve, 200); });
+
+      const player3 = { off: sinon.stub(), on: sinon.stub() };
+      globalThis.__mr_player = player3;
+      btn2.click();
+      await new Promise((resolve) => { setTimeout(resolve, 50); });
+      expect(player3.on.calledWith('streamend')).to.be.true;
+    });
+
+    it('streamend on ASL player updates store and disposes player', async () => {
+      riderInstance.mainID = 'vid';
+      const mockStore = { get: sinon.stub().returns(true), set: sinon.stub() };
+      riderInstance.store = mockStore;
+
+      riderInstance.injectPlayer('vid', 'skin', 'asl-id');
+      const initialPlayer = { off: sinon.stub(), on: sinon.stub(), dispose: sinon.stub() };
+      globalThis.__mr_player = initialPlayer;
+      await new Promise((resolve) => { setTimeout(resolve, 50); });
+
+      const container = riderInstance.wrap.querySelector('.mobile-rider-container');
+      const btn = document.createElement('button');
+      btn.id = 'asl-button';
+      container.appendChild(btn);
+      await new Promise((resolve) => { setTimeout(resolve, 200); });
+
+      // Click ASL — player replaced by ASL player
+      const aslPlayer = { off: sinon.stub(), on: sinon.stub(), dispose: sinon.stub() };
+      globalThis.__mr_player = aslPlayer;
+      btn.click();
+      await new Promise((resolve) => { setTimeout(resolve, 50); });
+
+      const onCall = aslPlayer.on.getCalls().find((c) => c.args[0] === 'streamend');
+      expect(onCall, 'streamend listener attached to ASL player').to.not.be.undefined;
+
+      // Fire streamend on ASL player
+      onCall.args[1]();
+      expect(mockStore.set.calledWith('vid', false)).to.be.true;
+      expect(aslPlayer.dispose.called).to.be.true;
+      expect(globalThis.__mr_player).to.be.null;
     });
   });
 
