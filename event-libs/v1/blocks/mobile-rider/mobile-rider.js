@@ -2,6 +2,7 @@
 import { createTag, getEventConfig } from '../../utils/utils.js';
 
 const DRAWER_CSS_URL = new URL('./drawer.css', import.meta.url).href;
+const BLOCK_CSS_URL = new URL('./mobile-rider.css', import.meta.url).href;
 
 const CONFIG = {
   ANALYTICS: { PROVIDER: 'adobe' },
@@ -45,6 +46,12 @@ async function loadScript() {
 }
 
 class MobileRider {
+  #embedRafId = null;
+
+  #embedGeneration = 0;
+
+  #streamEnded = false;
+
   constructor(el) {
     this.el = el;
     this.isEmbedding = false;
@@ -62,8 +69,27 @@ class MobileRider {
     }
   }
 
+  #isStreamInactive(vid) {
+    if (!this.store || !vid) return false;
+
+    const key = this.#storeHas(this.mainID)
+      ? this.mainID
+      : (this.#storeHas(vid) ? vid : null);
+
+    if (!key) return false;
+
+    try {
+      return this.store.get(key) === false;
+    } catch (e) {
+      return false;
+    }
+  }
+
   async init() {
     try {
+      if (!document.getElementById('mobile-rider-css')) {
+        createTag('link', { rel: 'stylesheet', href: BLOCK_CSS_URL, id: 'mobile-rider-css' }, '', { parent: document.head });
+      }
       this.cfg = this.#parseCfg();
       await Promise.all([loadScript(), this.el.closest('.chrono-box') ? this.#loadStore() : null]);
 
@@ -74,7 +100,13 @@ class MobileRider {
       const selected = await this.#selectInitialVideo(videos);
       if (this.cfg.concurrentenabled && this.store) this.mainID = videos[0].videoid;
 
-      await this.injectPlayer(selected.videoid, this.cfg.skinid, selected.aslid);
+      const videoId = selected.videoid || selected['video-id'];
+      if (this.#isStreamInactive(videoId)) {
+        this.root?.classList.add('is-hidden');
+        return;
+      }
+
+      await this.injectPlayer(videoId, this.cfg.skinid, selected.aslid);
 
       if (this.cfg.concurrentenabled && videos.length > 1) {
         await this.#initDrawer(videos, selected.videoid);
@@ -90,9 +122,20 @@ class MobileRider {
       || createTag('div', { class: 'video-wrapper' }, '', { parent: this.root });
   }
 
+  #cancelPendingEmbed() {
+    if (this.#embedRafId != null) {
+      cancelAnimationFrame(this.#embedRafId);
+      this.#embedRafId = null;
+    }
+  }
+
   async injectPlayer(vid, skin, asl = null) {
     if (!this.wrap || this.isEmbedding) return;
     this.isEmbedding = true;
+    this.#streamEnded = false;
+    this.#cancelPendingEmbed();
+    const generation = this.#embedGeneration + 1;
+    this.#embedGeneration = generation;
 
     const finish = () => {
       setTimeout(() => { this.isEmbedding = false; }, 100);
@@ -120,7 +163,14 @@ class MobileRider {
         poster: this.cfg.poster || this.cfg.thumbnail || '',
       }, '', { parent: container });
 
-      requestAnimationFrame(() => {
+      this.#embedRafId = requestAnimationFrame(() => {
+        this.#embedRafId = null;
+
+        if (generation !== this.#embedGeneration || this.#streamEnded) {
+          finish();
+          return;
+        }
+
         const videoInDoc = document.getElementById(CONFIG.PLAYER.VIDEO_ID);
 
         if (!videoInDoc || !window.mobilerider) {
@@ -138,8 +188,7 @@ class MobileRider {
             identifier2: asl || '',
             sessionId: vid,
           });
-
-          if (asl) this.#initASL(container);
+          if (asl) this.#initASL(container, vid);
           this.#maybeAttachEndListener(vid);
         } catch (e) {
           this.log(`Embed Error: ${e.message}`);
@@ -164,7 +213,7 @@ class MobileRider {
     const tryAttach = () => {
       const mainTracked = this.#storeHas(this.mainID);
       const vidTracked = this.#storeHas(vid);
-      if (mainTracked || vidTracked) {
+      if ((mainTracked || vidTracked) && window.__mr_player?.on) {
         this.#attachEndListener(vid);
         return true;
       }
@@ -189,6 +238,11 @@ class MobileRider {
     // Avoid stacking listeners
     window.__mr_player?.off?.('streamend');
     window.__mr_player?.on?.('streamend', () => {
+      this.#streamEnded = true;
+      this.#cancelPendingEmbed();
+
+      this.wrap?.querySelector('.mobile-rider-container')?.classList.add('is-hidden');
+
       if (this.drawer) {
         this.drawer.remove();
         this.drawer = null;
@@ -218,8 +272,8 @@ class MobileRider {
   }
 
   async #initDrawer(videos, activeId) {
-    if (!document.querySelector('link[href*="drawer.css"]')) {
-      createTag('link', { rel: 'stylesheet', href: DRAWER_CSS_URL }, '', { parent: document.head });
+    if (!document.getElementById('mobile-rider-drawer-css')) {
+      createTag('link', { rel: 'stylesheet', href: DRAWER_CSS_URL, id: 'mobile-rider-drawer-css' }, '', { parent: document.head });
     }
     const { default: createDrawer } = await import('./drawer.js');
     this.drawer = createDrawer(this.root, {
@@ -251,19 +305,39 @@ class MobileRider {
     return item;
   }
 
-  #initASL(container) {
-    let attempts = 0;
-    const check = setInterval(() => {
-      const btn = container.querySelector(`#${CONFIG.ASL.BUTTON_ID}`);
-      if (btn || ++attempts > CONFIG.ASL.MAX_CHECKS) {
-        clearInterval(check);
-        btn?.addEventListener('click', () => {
-          if (!container.classList.contains(CONFIG.ASL.TOGGLE_CLASS)) {
-            container.classList.add(CONFIG.ASL.TOGGLE_CLASS);
-          }
-        });
-      }
-    }, CONFIG.ASL.CHECK_INTERVAL);
+  #initASL(container, vid) {
+    let currentCheck = null;
+    const poll = () => {
+      clearInterval(currentCheck);
+      let attempts = 0;
+      currentCheck = setInterval(() => {
+        const btn = container.querySelector(`#${CONFIG.ASL.BUTTON_ID}`);
+        if (btn) {
+          clearInterval(currentCheck);
+          currentCheck = null;
+          btn.addEventListener('click', () => {
+            if (!container.classList.contains(CONFIG.ASL.TOGGLE_CLASS)) {
+              container.classList.add(CONFIG.ASL.TOGGLE_CLASS);
+            }
+            // ASL toggle may replace window.__mr_player; defer so new player is ready
+            if (this.store) {
+              requestAnimationFrame(() => {
+                try {
+                  this.#maybeAttachEndListener(vid);
+                } catch (e) {
+                  this.log(`ASL end-listener error: ${e.message}`);
+                }
+              });
+            }
+            poll();
+          }, { once: true });
+        } else if (++attempts > CONFIG.ASL.MAX_CHECKS) {
+          clearInterval(currentCheck);
+          currentCheck = null;
+        }
+      }, CONFIG.ASL.CHECK_INTERVAL);
+    };
+    poll();
   }
 
   #parseCfg() {

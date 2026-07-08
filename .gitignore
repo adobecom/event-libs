@@ -6,3 +6,11 @@ node_modules/*
 .DS_Store
 .idea
 *.pem
+
+# PIM local state
+.pim/
+.pim.json
+
+# Claude
+.claude/projects/*
+.claude/settings.json
