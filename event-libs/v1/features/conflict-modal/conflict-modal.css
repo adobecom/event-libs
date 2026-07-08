@@ -1,116 +1,128 @@
-/* ── Modal backdrop (shared) ─────────────────────────────────── */
+/* ── Conflict Modal content ───────────────────────────────────────
+   Positioning, backdrop, focus trap, Escape-to-close, close (X) button, and
+   scroll lock are all owned by Milo's shared modal (blocks/modal/modal.js) —
+   this file only styles the content passed in as `custom.content`.
+   Matches Figma: https://www.figma.com/design/pvyJnydCu9sE6msA1BHz9Z/Sessions-Guide-FINAL_Eng-Handoff-051526?node-id=9173-1502546 ── */
 
-.sg-modal-backdrop {
-  position: fixed;
-  inset: 0;
-  background: rgb(0 0 0 / 55%);
-  z-index: 150;
+/* Milo's own curtain (backdrop) defaults to a lighter overlay than the design —
+   scope the override to our dialog's id so other Milo modals on the page are
+   unaffected (the curtain is a generic-classed sibling inserted after the dialog). */
+#sg-conflict-modal ~ .modal-curtain {
+  background: rgb(0 0 0 / 60%);
 }
-
-/* ── Conflict Modal ───────────────────────────────────────────── */
 
 .sg-conflict-modal {
-  position: fixed;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  background: var(--s2a-color-background-default, #fff);
-  border-radius: var(--s2a-border-radius-md);
-  box-shadow: 0 12px 40px rgb(0 0 0 / 25%);
-  z-index: 160;
-  width: min(480px, calc(100vw - 32px));
-  padding: var(--s2a-spacing-xl);
+  box-sizing: border-box;
   display: flex;
   flex-direction: column;
-  gap: var(--s2a-spacing-lg);
-}
-
-.sg-conflict-modal[hidden] {
-  display: none;
+  gap: 24px;
+  width: 100%;
+  max-width: 480px;
+  padding: 33px 40px;
 }
 
 .sg-conflict-modal__title {
   font-family: var(--s2a-font-family-adobe-clean-display);
   font-weight: var(--s2a-font-weight-adobe-clean-display-black);
-  font-size: var(--s2a-font-size-xl);
-  margin: 0;
-  color: var(--s2a-color-content-default);
+  font-size: 22px;
+  line-height: 26px;
+  margin: 0 0 8px;
+  color: var(--s2a-color-content-default, #000);
 }
 
 .sg-conflict-modal__desc {
-  font-size: var(--s2a-font-size-sm);
-  color: var(--s2a-color-content-subtle);
+  font-size: 16px;
+  line-height: 1.5;
+  color: var(--s2a-color-content-default, #000);
   margin: 0;
 }
 
 .sg-conflict-modal__options {
   display: flex;
   flex-direction: column;
-  gap: var(--s2a-spacing-sm);
+  gap: 25px;
 }
 
 .sg-conflict-option {
+  position: relative;
   display: flex;
-  align-items: flex-start;
-  gap: var(--s2a-spacing-sm);
-  padding: var(--s2a-spacing-md);
-  border: 2px solid var(--s2a-color-border-subtle);
-  border-radius: var(--s2a-border-radius-sm);
+  flex-direction: column;
+  gap: 16px;
+  padding: 24px 40px;
+  background: #fff;
+  border: 1px solid #f8f8f8;
+  border-radius: 16px;
+  box-shadow: 0 0 2px rgb(0 0 0 / 12%), 0 2px 6px rgb(0 0 0 / 4%), 0 4px 12px rgb(0 0 0 / 8%);
   cursor: pointer;
-  transition: border-color 0.15s;
 }
 
 .sg-conflict-option--selected {
-  border-color: var(--s2a-color-border-default);
+  border: 2px solid #000;
+  box-shadow: none;
 }
 
-.sg-conflict-option input[type="radio"] {
-  flex-shrink: 0;
-  margin-top: 2px;
-  accent-color: var(--s2a-color-content-default);
+.sg-conflict-option__radio {
+  position: absolute;
+  top: 10px;
+  left: 11px;
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  appearance: none;
+  border-radius: 50%;
+  border: 2px solid var(--s2a-color-border-default, #6e6e6e);
+  background: #fff;
+  cursor: pointer;
 }
 
-.sg-conflict-option__badge {
-  display: block;
-  font-size: var(--s2a-font-size-xs);
-  font-weight: var(--s2a-font-weight-adobe-clean-bold);
-  color: var(--s2a-color-content-subtle);
-  margin-bottom: 2px;
+.sg-conflict-option__radio:checked {
+  border-color: #000;
+  background: #000;
+  box-shadow: inset 0 0 0 3px #fff;
+}
+
+.sg-conflict-option__radio:focus-visible {
+  outline: 2px solid #000;
+  outline-offset: 2px;
 }
 
 .sg-conflict-option__title {
-  font-size: var(--s2a-font-size-sm);
+  font-size: 18px;
+  line-height: 22px;
   font-weight: var(--s2a-font-weight-adobe-clean-bold);
-  color: var(--s2a-color-content-default);
+  color: var(--s2a-color-content-default, #131313);
   margin: 0;
+}
+
+.sg-conflict-option__meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  font-size: 12px;
+  color: var(--s2a-color-content-subtle, rgb(0 0 0 / 64%));
 }
 
 .sg-conflict-modal__footer {
   display: flex;
   justify-content: flex-end;
-  gap: var(--s2a-spacing-sm);
 }
 
 .sg-conflict-modal__btn {
   height: 40px;
-  padding: 0 var(--s2a-spacing-lg);
-  border-radius: var(--s2a-border-radius-round);
+  min-width: 90px;
+  padding: 0 24px;
+  border-radius: 20px;
   font-family: var(--s2a-font-family-adobe-clean);
   font-weight: var(--s2a-font-weight-adobe-clean-bold);
-  font-size: var(--s2a-font-size-sm);
+  font-size: 14px;
   cursor: pointer;
   border: none;
   transition: opacity 0.15s;
 }
 
-.sg-conflict-modal__btn--cancel {
-  background: var(--s2a-color-background-subtle);
-  color: var(--s2a-color-content-default);
-  border: 1px solid var(--s2a-color-border-subtle);
-}
-
 .sg-conflict-modal__btn--save {
-  background: var(--s2a-color-gray-800);
+  background: var(--s2ac-color-content-default, #292929);
   color: #fff;
 }
 

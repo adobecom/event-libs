@@ -40,6 +40,8 @@ export async function runSessionAction(actionFn, {
             showToast({ message: 'Schedule updated', variant: 'positive' });
           }
         },
+      }).catch((modalErr) => {
+        window.lana?.log(`[sessions-guide] ${actionLabel} conflict modal failed: ${modalErr.message}`);
       });
     } else {
       window.lana?.log(`[sessions-guide] ${actionLabel} failed: ${err.message}`);

@@ -1,105 +1,30 @@
 import { expect } from '@esm-bundle/chai';
 
 import {
-  conflict, showConflictModal, hideConflictModal, mountConflictModal,
+  conflict, showConflictModal, hideConflictModal,
 } from '../../../../event-libs/v1/features/conflict-modal/conflict-modal.js';
 
-// mountConflictModal() is an idempotent, page-level singleton by design (mirrors
-// initSessionState()'s `initialized` guard) — like toast.test.js, this file doesn't
-// reset document.body between tests since the mount is meant to happen once per page.
-describe('utils/conflict-modal', () => {
+// Prototype: conflict-modal.js now defers rendering to Milo's shared modal
+// (dynamic import of `${miloLibs}/blocks/modal/modal.js`), so the DOM-level
+// behavior (radio selection, save/cancel, backdrop dismiss, focus trap, etc.)
+// is no longer unit-testable here without mocking that import — it needs a
+// real browser + real Milo to exercise, which is exactly what's being tried
+// manually before this lands. This file only covers the synchronous part of
+// the contract: the `conflict` signal is still set/cleared as before.
+describe('features/conflict-modal (Milo modal prototype)', () => {
   beforeEach(() => {
     conflict.value = null;
   });
 
-  it('showConflictModal sets the signal, hideConflictModal clears it', () => {
+  it('showConflictModal sets the signal synchronously', () => {
     const data = { existing: { id: 'a' }, incoming: { id: 'b' }, onConfirm: () => {} };
-    showConflictModal(data);
+    showConflictModal(data).catch(() => { /* Milo modal unavailable in the test harness */ });
     expect(conflict.value).to.equal(data);
-    hideConflictModal();
-    expect(conflict.value).to.be.null;
   });
 
-  describe('mountConflictModal', () => {
-    let backdrop;
-    let modal;
-
-    before(() => {
-      mountConflictModal();
-      [backdrop, modal] = document.body.querySelectorAll('.sg-modal-backdrop, .sg-conflict-modal');
-    });
-
-    it('mounts a hidden backdrop and modal to document.body', () => {
-      expect(backdrop).to.exist;
-      expect(modal).to.exist;
-      expect(modal.hidden).to.be.true;
-    });
-
-    it('is idempotent — calling it again does not duplicate the elements', () => {
-      mountConflictModal();
-      expect(document.body.querySelectorAll('.sg-conflict-modal')).to.have.lengthOf(1);
-    });
-
-    it('reveals the modal with existing/incoming titles when a conflict is shown', () => {
-      showConflictModal({
-        existing: { id: 'a', title: 'Existing session' },
-        incoming: { id: 'b', title: 'Incoming session' },
-        onConfirm: () => {},
-      });
-      expect(modal.hidden).to.be.false;
-      expect(modal.textContent).to.include('Existing session');
-      expect(modal.textContent).to.include('Incoming session');
-    });
-
-    it('keeps Save disabled until an option is selected, then invokes onConfirm and hides', async () => {
-      const incoming = { id: 'b', title: 'Incoming session' };
-      let confirmedWith = null;
-      showConflictModal({
-        existing: { id: 'a', title: 'Existing session' },
-        incoming,
-        onConfirm: async (keep) => { confirmedWith = keep; },
-      });
-
-      const saveBtn = modal.querySelector('.sg-conflict-modal__btn--save');
-      const incomingRadio = modal.querySelector('input[value="incoming"]');
-      expect(saveBtn.disabled).to.be.true;
-
-      incomingRadio.checked = true;
-      incomingRadio.dispatchEvent(new Event('change'));
-      expect(saveBtn.disabled).to.be.false;
-
-      saveBtn.click();
-      // The click handler is async — let its microtasks flush before asserting.
-      await new Promise((r) => setTimeout(r, 0));
-
-      expect(confirmedWith).to.equal(incoming);
-      expect(conflict.value).to.be.null;
-      expect(modal.hidden).to.be.true;
-    });
-
-    it('Cancel hides the modal without invoking onConfirm', () => {
-      let called = false;
-      showConflictModal({
-        existing: { id: 'a', title: 'Existing session' },
-        incoming: { id: 'b', title: 'Incoming session' },
-        onConfirm: () => { called = true; },
-      });
-      modal.querySelector('.sg-conflict-modal__btn--cancel').click();
-      expect(called).to.be.false;
-      expect(conflict.value).to.be.null;
-      expect(modal.hidden).to.be.true;
-    });
-
-    it('clicking the backdrop dismisses without invoking onConfirm', () => {
-      let called = false;
-      showConflictModal({
-        existing: { id: 'a', title: 'Existing session' },
-        incoming: { id: 'b', title: 'Incoming session' },
-        onConfirm: () => { called = true; },
-      });
-      backdrop.click();
-      expect(called).to.be.false;
-      expect(conflict.value).to.be.null;
-    });
+  it('hideConflictModal clears the signal when no dialog is open', async () => {
+    conflict.value = { existing: {}, incoming: {}, onConfirm: () => {} };
+    await hideConflictModal();
+    expect(conflict.value).to.be.null;
   });
 });

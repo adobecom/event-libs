@@ -1,119 +1,115 @@
 import { signal } from '../../deps/htm-preact.js';
-import { createTag, loadStyle } from '../../utils/utils.js';
+import {
+  createTag, loadStyle, LIBS, getEventConfig,
+} from '../../utils/utils.js';
 
-// Page-level, framework-agnostic schedule-conflict modal — mirrors features/toast/toast.js
-// so any block (Preact or vanilla) that opts into scheduleAction's showConflictModal can
-// surface it, not just sessions-guide.
+// Page-level, framework-agnostic schedule-conflict modal — built on Milo's shared
+// modal component (the same one sessions-hub.js already uses for its own conflict
+// flow) instead of a hand-rolled backdrop + div. Milo's modal already provides a
+// focus trap, Escape-to-close, body scroll lock, focus restoration, close (X)
+// button, and backdrop-dismiss, so this module only owns the inner content.
 export const conflict = signal(null);
 
-export function showConflictModal(data) {
-  conflict.value = data;
+let dialogEl = null;
+
+async function getMiloModal() {
+  const miloLibs = getEventConfig()?.miloConfig?.miloLibs || LIBS;
+  return import(`${miloLibs}/blocks/modal/modal.js`);
 }
 
-export function hideConflictModal() {
-  conflict.value = null;
+function formatDuration(startUtc, endUtc) {
+  const totalMin = Math.round((Date.parse(endUtc) - Date.parse(startUtc)) / 60000);
+  const h = Math.floor(totalMin / 60);
+  const m = totalMin % 60;
+  if (h === 0) return `${m}m`;
+  if (m === 0) return `${h}h`;
+  return `${h}h ${m}m`;
 }
 
-let mounted = false;
+function buildOption(name, value, session, onSelect) {
+  const option = createTag('label', { class: 'sg-conflict-option' });
+  const input = createTag('input', { class: 'sg-conflict-option__radio', type: 'radio', name, value });
+  input.addEventListener('change', () => onSelect(value, option));
 
-export function mountConflictModal() {
-  if (mounted) return;
-  mounted = true;
+  const titleEl = createTag('p', { class: 'sg-conflict-option__title' });
+  titleEl.textContent = session.title;
 
-  loadStyle(new URL('./conflict-modal.css', import.meta.url).href);
+  const meta = createTag('div', { class: 'sg-conflict-option__meta' });
+  const track = createTag('span', { class: 'sg-conflict-option__track' });
+  track.textContent = session.track || '';
+  const duration = createTag('span', { class: 'sg-conflict-option__duration' });
+  if (session.startTimeUtc && session.endTimeUtc) duration.textContent = formatDuration(session.startTimeUtc, session.endTimeUtc);
+  meta.append(track, duration);
 
-  const backdrop = createTag('div', { class: 'sg-modal-backdrop' }, '', { parent: document.body });
-  const modal = createTag('div', {
-    class: 'sg-conflict-modal', role: 'dialog', 'aria-modal': 'true', 'aria-label': 'Schedule conflict',
-  }, '', { parent: document.body });
-  backdrop.hidden = true;
-  modal.hidden = true;
+  option.append(input, titleEl, meta);
+  return option;
+}
 
-  let selected = null;
+function buildContent(data, dismiss) {
+  const { existing, incoming } = data;
+  let selected = 'incoming';
   let saving = false;
 
-  function dismiss() {
-    hideConflictModal();
-  }
+  const wrapper = createTag('div', { class: 'sg-conflict-modal' });
+  const title = createTag('h3', { class: 'sg-conflict-modal__title' });
+  title.textContent = 'You have conflicting sessions';
+  const desc = createTag('p', { class: 'sg-conflict-modal__desc' });
+  desc.textContent = 'Select which session you want to keep.';
 
-  backdrop.addEventListener('click', dismiss);
+  const optionsEl = createTag('div', { class: 'sg-conflict-modal__options' });
 
-  function renderContent(data) {
-    modal.textContent = '';
-    const { existing, incoming } = data;
-
-    const title = createTag('h3', { class: 'sg-conflict-modal__title' });
-    title.textContent = 'Schedule Conflict';
-    const desc = createTag('p', { class: 'sg-conflict-modal__desc' });
-    desc.textContent = 'These sessions overlap. Choose which one to keep.';
-
-    const optionsEl = createTag('div', { class: 'sg-conflict-modal__options' });
-
-    function buildOption(value, badge, session) {
-      const label = createTag('label', { class: 'sg-conflict-option' });
-      const input = createTag('input', { type: 'radio', name: 'sg-conflict', value });
-      input.addEventListener('change', () => {
-        selected = value;
-        updateSelection();
-        updateSaveState();
-      });
-      const body = createTag('div', { class: 'sg-conflict-option__body' });
-      const badgeEl = createTag('span', { class: 'sg-conflict-option__badge' });
-      badgeEl.textContent = badge;
-      const titleEl = createTag('p', { class: 'sg-conflict-option__title' });
-      titleEl.textContent = session.title;
-      body.append(badgeEl, titleEl);
-      label.append(input, body);
-      return label;
-    }
-
-    const existingOption = buildOption('existing', 'Currently scheduled', existing);
-    const incomingOption = buildOption('incoming', 'New session', incoming);
-    optionsEl.append(existingOption, incomingOption);
-
-    function updateSelection() {
-      existingOption.classList.toggle('sg-conflict-option--selected', selected === 'existing');
-      incomingOption.classList.toggle('sg-conflict-option--selected', selected === 'incoming');
-    }
-
-    const footer = createTag('div', { class: 'sg-conflict-modal__footer' });
-    const cancelBtn = createTag('button', { class: 'sg-conflict-modal__btn sg-conflict-modal__btn--cancel', type: 'button' }, 'Cancel');
-    const saveBtn = createTag('button', { class: 'sg-conflict-modal__btn sg-conflict-modal__btn--save', type: 'button' }, 'Save');
-    cancelBtn.addEventListener('click', dismiss);
-
-    function updateSaveState() {
-      saveBtn.disabled = !selected || saving;
-      saveBtn.textContent = saving ? 'Saving…' : 'Save';
-    }
-    updateSaveState();
-
-    saveBtn.addEventListener('click', async () => {
-      if (!selected || saving) return;
-      saving = true;
-      updateSaveState();
-      try {
-        const keep = selected === 'incoming' ? incoming : existing;
-        await data.onConfirm(keep);
-      } finally {
-        saving = false;
-        hideConflictModal();
-      }
+  function selectOption(value, option) {
+    selected = value;
+    optionsEl.querySelectorAll('.sg-conflict-option').forEach((el) => {
+      el.classList.toggle('sg-conflict-option--selected', el === option);
     });
-
-    footer.append(cancelBtn, saveBtn);
-    modal.append(title, desc, optionsEl, footer);
   }
 
-  conflict.subscribe((data) => {
-    if (data) {
-      selected = null;
+  const existingOption = buildOption('sg-conflict', 'existing', existing, selectOption);
+  const incomingOption = buildOption('sg-conflict', 'incoming', incoming, selectOption);
+  incomingOption.querySelector('.sg-conflict-option__radio').checked = true;
+  incomingOption.classList.add('sg-conflict-option--selected');
+  optionsEl.append(existingOption, incomingOption);
+
+  const footer = createTag('div', { class: 'sg-conflict-modal__footer' });
+  const saveBtn = createTag('button', { class: 'sg-conflict-modal__btn sg-conflict-modal__btn--save', type: 'button' }, 'Save');
+
+  function updateSaveState() {
+    saveBtn.disabled = saving;
+    saveBtn.textContent = saving ? 'Saving…' : 'Save';
+  }
+  updateSaveState();
+
+  saveBtn.addEventListener('click', async () => {
+    if (saving) return;
+    saving = true;
+    updateSaveState();
+    try {
+      const keep = selected === 'incoming' ? incoming : existing;
+      await data.onConfirm(keep);
+    } finally {
       saving = false;
-      backdrop.hidden = false;
-      modal.hidden = false;
-      renderContent(data);
-    } else {
-      backdrop.hidden = true;
-      modal.hidden = true;
+      dismiss();
     }
   });
+
+  footer.append(saveBtn);
+  wrapper.append(title, desc, optionsEl, footer);
+  return wrapper;
+}
+
+export async function showConflictModal(data) {
+  conflict.value = data;
+  loadStyle(new URL('./conflict-modal.css', import.meta.url).href);
+  const { getModal } = await getMiloModal();
+  const content = buildContent(data, () => hideConflictModal());
+  dialogEl = await getModal(null, { id: 'sg-conflict-modal', content });
+}
+
+export async function hideConflictModal() {
+  conflict.value = null;
+  if (!dialogEl) return;
+  const { closeModal } = await getMiloModal();
+  closeModal(dialogEl);
+  dialogEl = null;
 }
