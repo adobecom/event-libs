@@ -21,16 +21,38 @@ async function getPromotionalContentUrl() {
   return `${domain}${prefix}/event-libs/assets/configs/promotional-content.json`;
 }
 
-function getPromotionalContent() {
+async function resolveFragmentUrl(path) {
+  if (!path || /^https?:\/\//i.test(path)) return path;
+
+  let prefix = '';
+  try {
+    const eventConfig = getEventConfig();
+    const { miloConfig } = eventConfig;
+    const miloLibs = miloConfig?.miloLibs ? miloConfig.miloLibs : LIBS;
+    const { getLocale } = await import(`${miloLibs}/utils/utils.js`);
+    ({ prefix } = getLocale(miloConfig?.locales || FALLBACK_LOCALES));
+  } catch (error) {
+    window.lana?.log(`Error resolving locale for promotional content: ${JSON.stringify(error)}`);
+  }
+
+  const moduleUrl = new URL(import.meta.url);
+  const domain = `${moduleUrl.protocol}//${moduleUrl.host}`;
+  return `${domain}${prefix}${path}`;
+}
+
+export async function getPromotionalContent() {
   const customAttributesMetadata = getMetadata('custom-attributes');
   if (!customAttributesMetadata) return [];
 
   try {
     const customAttributes = JSON.parse(customAttributesMetadata);
-    return customAttributes
-      .filter((attr) => attr.name === 'promotionalItems')
-      .flatMap((attr) => (Array.isArray(attr.values) ? attr.values.map((v) => v?.value) : [attr.value]))
-      .filter(Boolean);
+    const promotionalItemsAttr = customAttributes.find((attr) => attr.name === 'promotionalItems' && attr.values);
+    if (!promotionalItemsAttr) return [];
+
+    const fragmentUrls = await Promise.all(
+      promotionalItemsAttr.values.map((v) => resolveFragmentUrl(v?.value)),
+    );
+    return fragmentUrls.filter(Boolean);
   } catch (error) {
     window.lana?.log(`Error parsing custom-attributes: ${JSON.stringify(error)}`);
     return [];
@@ -102,7 +124,7 @@ export default async function init(el) {
   const eventConfig = getEventConfig();
   const miloLibs = eventConfig?.miloConfig?.miloLibs ? eventConfig.miloConfig.miloLibs : LIBS;
 
-  let fragmentUrls = getPromotionalContent();
+  let fragmentUrls = await getPromotionalContent();
 
   if (!fragmentUrls.length) {
     const legacyItems = await getLegacyPromotionalContent();

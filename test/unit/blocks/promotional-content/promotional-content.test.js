@@ -1,10 +1,23 @@
 import { expect } from '@esm-bundle/chai';
 import sinon from 'sinon';
 import { setEventConfig } from '../../../../event-libs/v1/utils/utils.js';
-import init, { addMediaReversedClass } from '../../../../event-libs/v1/blocks/promotional-content/promotional-content.js';
+import init, { addMediaReversedClass, getPromotionalContent } from '../../../../event-libs/v1/blocks/promotional-content/promotional-content.js';
 
 // Real EMC shape: matched by `name`, fragment paths are the option `value`s directly.
+const PRIMARY_PRODUCT_NAME_ATTR = {
+  name: 'primaryProductName',
+  attributeId: 'e324ff52-f484-4e61-8c29-a2510861c882',
+  inputType: 'single-select',
+  label: 'Primary Product Name',
+  enabled: true,
+  values: [
+    { valueId: '819b2874-8e3a-4413-96ce-88b5cf2112b1', label: 'acrobat', value: 'Acrobat', ordinal: 0 },
+    { valueId: '142f74ca-2258-4876-8b30-3e23aef996d7', label: 'acrobat-sign', value: 'Acrobat Sign', ordinal: 1 },
+  ],
+};
+
 const CUSTOM_ATTRS_WITH_PROMO = JSON.stringify([
+  PRIMARY_PRODUCT_NAME_ATTR,
   {
     name: 'promotionalItems',
     attributeId: '0d433aa1-0a5a-4836-9146-c6a97bdf08bc',
@@ -28,9 +41,7 @@ const CUSTOM_ATTRS_WITH_PROMO = JSON.stringify([
   },
 ]);
 
-const CUSTOM_ATTRS_WITHOUT_PROMO = JSON.stringify([
-  { name: 'primaryProductName', attributeId: '09180aab', value: 'Acrobat' },
-]);
+const CUSTOM_ATTRS_WITHOUT_PROMO = JSON.stringify([PRIMARY_PRODUCT_NAME_ATTR]);
 
 // Bypasses the /libs/utils/utils.js dynamic import (404s in unit tests) so the legacy
 // fetch path can be exercised end-to-end.
@@ -92,6 +103,46 @@ describe('Promotional Content Block', () => {
 
       const configFetched = fetchStub.args.some(([url]) => String(url).includes('promotional-content.json'));
       expect(configFetched).to.be.false;
+    });
+
+    it('resolves relative fragment paths against the current domain', async () => {
+      addMeta('custom-attributes', CUSTOM_ATTRS_WITH_PROMO);
+
+      const fragmentUrls = await getPromotionalContent();
+
+      expect(fragmentUrls).to.deep.equal([
+        `${window.location.origin}/events/events-shared/fragments/product-blades/firefly`,
+        `${window.location.origin}/events/events-shared/fragments/product-blades/creative-apprenticeship.html`,
+      ]);
+    });
+
+    it('leaves absolute https fragment URLs untouched', async () => {
+      const customAttrsWithAbsoluteUrl = JSON.stringify([
+        {
+          name: 'promotionalItems',
+          attributeId: '0d433aa1-0a5a-4836-9146-c6a97bdf08bc',
+          values: [
+            { valueId: '1', value: 'https://example.com/fragments/product-blades/firefly' },
+          ],
+        },
+      ]);
+      addMeta('custom-attributes', customAttrsWithAbsoluteUrl);
+
+      const fragmentUrls = await getPromotionalContent();
+
+      expect(fragmentUrls).to.deep.equal(['https://example.com/fragments/product-blades/firefly']);
+    });
+
+    it('prepends the locale prefix to relative fragment paths', async () => {
+      setEventConfig({}, { miloLibs: '/test/unit/blocks/promotional-content/mocks/libs' });
+      addMeta('custom-attributes', CUSTOM_ATTRS_WITH_PROMO);
+
+      const fragmentUrls = await getPromotionalContent();
+
+      expect(fragmentUrls).to.deep.equal([
+        `${window.location.origin}/uk/events/events-shared/fragments/product-blades/firefly`,
+        `${window.location.origin}/uk/events/events-shared/fragments/product-blades/creative-apprenticeship.html`,
+      ]);
     });
   });
 
