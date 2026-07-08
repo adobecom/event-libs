@@ -3,26 +3,33 @@ import sinon from 'sinon';
 import { setEventConfig } from '../../../../event-libs/v1/utils/utils.js';
 import init, { addMediaReversedClass } from '../../../../event-libs/v1/blocks/promotional-content/promotional-content.js';
 
+// Real EMC shape: matched by `name`, fragment paths are the option `value`s directly.
 const CUSTOM_ATTRS_WITH_PROMO = JSON.stringify([
-  { attributeId: '09180aab', attribute: 'primaryProductName', value: 'Acrobat' },
-  { attributeId: '732fdd75', attribute: 'promotionalItems', value: 'Acrobat' },
-  { attributeId: '50578a75', attribute: 'technicalLevel', value: 'advanced' },
+  {
+    name: 'promotionalItems',
+    attributeId: '0d433aa1-0a5a-4836-9146-c6a97bdf08bc',
+    inputType: 'multi-select',
+    label: 'Promotional Items',
+    enabled: true,
+    values: [
+      {
+        valueId: '25506162-447f-471c-8419-e397f1d19022',
+        label: 'Adobe Firefly',
+        value: '/events/events-shared/fragments/product-blades/firefly',
+        ordinal: 0,
+      },
+      {
+        valueId: '4dbc5426-c8e7-4b94-becd-3048b265c61c',
+        label: 'Creative Apprenticeship',
+        value: '/events/events-shared/fragments/product-blades/creative-apprenticeship.html',
+        ordinal: 1,
+      },
+    ],
+  },
 ]);
 
 const CUSTOM_ATTRS_WITHOUT_PROMO = JSON.stringify([
-  { attributeId: '09180aab', attribute: 'primaryProductName', value: 'Acrobat' },
-]);
-
-// Real EMC shape: attribute label is "Promotional Items" and values are nested objects.
-const CUSTOM_ATTRS_WITH_PROMO_VALUES_SHAPE = JSON.stringify([
-  {
-    attributeId: '0d433aa1-0a5a-4836-9146-c6a97bdf08bc',
-    attribute: 'Promotional Items',
-    values: [
-      { valueId: '4dbc5426-c8e7-4b94-becd-3048b265c61c', value: 'Creative Apprenticeship' },
-      { value: 'Adobe Firefly' },
-    ],
-  },
+  { name: 'primaryProductName', attributeId: '09180aab', value: 'Acrobat' },
 ]);
 
 // Bypasses the /libs/utils/utils.js dynamic import (404s in unit tests) so the legacy
@@ -73,13 +80,9 @@ describe('Promotional Content Block', () => {
       expect(fetchStub.called).to.be.false;
     });
 
-    it('rehydrates the promotional item name via promotional-content.json', async () => {
+    it('does not fetch promotional-content.json when custom-attributes provides fragment paths', async () => {
       addMeta('custom-attributes', CUSTOM_ATTRS_WITH_PROMO);
-      addMeta('promotional-content-location', MOCK_PROMO_CONFIG_URL);
-      fetchStub.resolves({
-        ok: true,
-        json: () => Promise.resolve({ data: [{ name: 'Acrobat', 'fragment-path': '/fragments/acrobat' }] }),
-      });
+      fetchStub.resolves({ ok: true, text: () => Promise.resolve('<div></div>') });
 
       try {
         await init(el);
@@ -88,32 +91,7 @@ describe('Promotional Content Block', () => {
       }
 
       const configFetched = fetchStub.args.some(([url]) => String(url).includes('promotional-content.json'));
-      expect(configFetched).to.be.true;
-    });
-
-    it('rehydrates promotional items from the "Promotional Items" / values[] shape', async () => {
-      addMeta('custom-attributes', CUSTOM_ATTRS_WITH_PROMO_VALUES_SHAPE);
-      addMeta('promotional-content-location', MOCK_PROMO_CONFIG_URL);
-      fetchStub.resolves({
-        ok: true,
-        json: () => Promise.resolve({
-          data: [
-            { name: 'Creative Apprenticeship', 'fragment-path': '/fragments/creative-apprenticeship' },
-            { name: 'Adobe Firefly', 'fragment-path': '/fragments/adobe-firefly' },
-          ],
-        }),
-      });
-
-      try {
-        await init(el);
-      } catch (e) {
-        // loadFragment dynamic import is not available in unit test env
-      }
-
-      const configFetchedForValuesShape = fetchStub.args.some(
-        ([url]) => String(url).includes('promotional-content.json'),
-      );
-      expect(configFetchedForValuesShape).to.be.true;
+      expect(configFetched).to.be.false;
     });
   });
 

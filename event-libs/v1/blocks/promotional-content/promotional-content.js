@@ -47,24 +47,20 @@ async function rehydratePromotionalItems(promotionalItems) {
   }
 }
 
-async function getPromotionalContent() {
+function getPromotionalContent() {
   const customAttributesMetadata = getMetadata('custom-attributes');
   if (!customAttributesMetadata) return [];
 
-  let promotionalItems = [];
   try {
     const customAttributes = JSON.parse(customAttributesMetadata);
-    promotionalItems = customAttributes
-      .filter((attr) => attr.attribute?.replace(/\s+/g, '').toLowerCase() === 'promotionalitems')
-      .flatMap((attr) => (Array.isArray(attr.values)
-        ? attr.values.map((v) => v?.value).filter(Boolean)
-        : [attr.value]).filter(Boolean));
+    return customAttributes
+      .filter((attr) => attr.name === 'promotionalItems')
+      .flatMap((attr) => (Array.isArray(attr.values) ? attr.values.map((v) => v?.value) : [attr.value]))
+      .filter(Boolean);
   } catch (error) {
     window.lana?.log(`Error parsing custom-attributes: ${JSON.stringify(error)}`);
     return [];
   }
-
-  return rehydratePromotionalItems(promotionalItems);
 }
 
 async function getLegacyPromotionalContent() {
@@ -102,13 +98,12 @@ export default async function init(el) {
   const eventConfig = getEventConfig();
   const miloLibs = eventConfig?.miloConfig?.miloLibs ? eventConfig.miloConfig.miloLibs : LIBS;
 
-  let rehydratedItems = await getPromotionalContent();
+  let fragmentUrls = getPromotionalContent();
 
-  if (!rehydratedItems.length) {
-    rehydratedItems = await getLegacyPromotionalContent();
+  if (!fragmentUrls.length) {
+    const legacyItems = await getLegacyPromotionalContent();
+    fragmentUrls = (legacyItems ?? []).map((item) => item?.['fragment-path']).filter(Boolean);
   }
-
-  const fragmentUrls = (rehydratedItems ?? []).map((item) => item?.['fragment-path']).filter(Boolean);
 
   if (!fragmentUrls?.length) return;
 
