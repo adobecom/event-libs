@@ -28,8 +28,9 @@ function getPromotionalContent() {
   try {
     const customAttributes = JSON.parse(customAttributesMetadata);
     return customAttributes
-      .filter((attr) => attr.attribute === 'promotionalItems' && attr.value)
-      .map((attr) => attr.value);
+      .filter((attr) => attr.name === 'promotionalItems')
+      .flatMap((attr) => (Array.isArray(attr.values) ? attr.values.map((v) => v?.value) : [attr.value]))
+      .filter(Boolean);
   } catch (error) {
     window.lana?.log(`Error parsing custom-attributes: ${JSON.stringify(error)}`);
     return [];

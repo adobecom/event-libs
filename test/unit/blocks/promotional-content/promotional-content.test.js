@@ -3,14 +3,33 @@ import sinon from 'sinon';
 import { setEventConfig } from '../../../../event-libs/v1/utils/utils.js';
 import init, { addMediaReversedClass } from '../../../../event-libs/v1/blocks/promotional-content/promotional-content.js';
 
+// Real EMC shape: matched by `name`, fragment paths are the option `value`s directly.
 const CUSTOM_ATTRS_WITH_PROMO = JSON.stringify([
-  { attributeId: '09180aab', attribute: 'primaryProductName', value: 'Acrobat' },
-  { attributeId: '732fdd75', attribute: 'promotionalItems', value: 'https://example.com/fragments/acrobat' },
-  { attributeId: '50578a75', attribute: 'technicalLevel', value: 'advanced' },
+  {
+    name: 'promotionalItems',
+    attributeId: '0d433aa1-0a5a-4836-9146-c6a97bdf08bc',
+    inputType: 'multi-select',
+    label: 'Promotional Items',
+    enabled: true,
+    values: [
+      {
+        valueId: '25506162-447f-471c-8419-e397f1d19022',
+        label: 'Adobe Firefly',
+        value: '/events/events-shared/fragments/product-blades/firefly',
+        ordinal: 0,
+      },
+      {
+        valueId: '4dbc5426-c8e7-4b94-becd-3048b265c61c',
+        label: 'Creative Apprenticeship',
+        value: '/events/events-shared/fragments/product-blades/creative-apprenticeship.html',
+        ordinal: 1,
+      },
+    ],
+  },
 ]);
 
 const CUSTOM_ATTRS_WITHOUT_PROMO = JSON.stringify([
-  { attributeId: '09180aab', attribute: 'primaryProductName', value: 'Acrobat' },
+  { name: 'primaryProductName', attributeId: '09180aab', value: 'Acrobat' },
 ]);
 
 // Bypasses the /libs/utils/utils.js dynamic import (404s in unit tests) so the legacy
@@ -61,7 +80,7 @@ describe('Promotional Content Block', () => {
       expect(fetchStub.called).to.be.false;
     });
 
-    it('does not fetch promotional-content.json when custom-attributes provides a fragment URL', async () => {
+    it('does not fetch promotional-content.json when custom-attributes provides fragment paths', async () => {
       addMeta('custom-attributes', CUSTOM_ATTRS_WITH_PROMO);
       fetchStub.resolves({ ok: true, text: () => Promise.resolve('<div></div>') });
 
