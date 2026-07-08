@@ -97,6 +97,13 @@ export function signal(initial) {
   };
 }
 
+// Real @preact/signals `batch()` just needs to run the callback and coalesce the
+// resulting subscriber notifications — this mock's `signal()` has no render pass to
+// coalesce, so running the callback synchronously is behaviorally equivalent.
+export function batch(fn) {
+  return fn();
+}
+
 export function h(type, props, ...children) {
   if (typeof type !== 'function') return null;
   const childVal = children.length === 1 ? children[0] : children;

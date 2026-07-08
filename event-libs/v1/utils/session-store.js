@@ -1,11 +1,10 @@
-import { signal } from '../deps/htm-preact.js';
+import { signal, batch } from '../deps/htm-preact.js';
 import BlockMediator from '../deps/block-mediator.min.js';
 import { getMetadata, getEventServiceEnv } from './utils.js';
 import { fetchSessions } from '../services/sessions/sessions-api.js';
 import { startPolling } from '../services/sessions/poller.js';
 import { addSession, removeSession, toggleSessionInterest } from '../services/sessions/rainfocus.js';
 import { mountToast } from '../features/toast/toast.js';
-import { mountConflictModal } from '../features/conflict-modal/conflict-modal.js';
 
 const LS_SCHEDULED = 'sessions:scheduled';
 const LS_FAVORITED = 'sessions:favorited';
@@ -130,7 +129,6 @@ export function initSessionState() {
   };
 
   mountToast();
-  mountConflictModal();
   seedDevData();
   loadPersisted();
   syncAuth();
@@ -160,17 +158,22 @@ export async function scheduleSession(session) {
   const isScheduled = scheduled.value.has(session.id);
   setPending(session.id, true);
   try {
+    // TODO: replace null credentials with real rfAuthToken/clientId from auth integration
     if (isScheduled) {
-      // TODO: replace null credentials with real rfAuthToken/clientId from auth integration
       await removeSession(session.rfCode, null, null, apiConfig.profileId, apiConfig.apiUrl);
-      removeFromSet(scheduled, session.id);
     } else {
       await addSession(session.rfCode, null, null, apiConfig.profileId, apiConfig.apiUrl);
-      addToSet(scheduled, session.id);
     }
-  } finally {
+  } catch (err) {
     setPending(session.id, false);
+    throw err;
   }
+  // Batched so components reading both `scheduled` and `pendingActions` re-render once.
+  batch(() => {
+    if (isScheduled) removeFromSet(scheduled, session.id);
+    else addToSet(scheduled, session.id);
+    setPending(session.id, false);
+  });
 }
 
 export async function favoriteSession(session) {
@@ -179,9 +182,13 @@ export async function favoriteSession(session) {
   try {
     // TODO: replace null credentials with real rfAuthToken/clientId from auth integration
     await toggleSessionInterest(session.rfCode, session.id, null, null, apiConfig.profileId, apiConfig.apiUrl);
+  } catch (err) {
+    setPending(session.id, false);
+    throw err;
+  }
+  batch(() => {
     if (isFavorited) removeFromSet(favorited, session.id);
     else addToSet(favorited, session.id);
-  } finally {
     setPending(session.id, false);
-  }
+  });
 }
