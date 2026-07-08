@@ -105,18 +105,18 @@ describe('Promotional Content Block', () => {
       expect(configFetched).to.be.false;
     });
 
-    it('resolves relative fragment paths against the current domain', async () => {
+    it('returns fragment paths as authored, without altering them', () => {
       addMeta('custom-attributes', CUSTOM_ATTRS_WITH_PROMO);
 
-      const fragmentUrls = await getPromotionalContent();
+      const fragmentUrls = getPromotionalContent();
 
       expect(fragmentUrls).to.deep.equal([
-        `${window.location.origin}/events/events-shared/fragments/product-blades/firefly`,
-        `${window.location.origin}/events/events-shared/fragments/product-blades/creative-apprenticeship.html`,
+        '/events/events-shared/fragments/product-blades/firefly',
+        '/events/events-shared/fragments/product-blades/creative-apprenticeship.html',
       ]);
     });
 
-    it('leaves absolute https fragment URLs untouched', async () => {
+    it('leaves absolute https fragment URLs untouched', () => {
       const customAttrsWithAbsoluteUrl = JSON.stringify([
         {
           name: 'promotionalItems',
@@ -128,21 +128,9 @@ describe('Promotional Content Block', () => {
       ]);
       addMeta('custom-attributes', customAttrsWithAbsoluteUrl);
 
-      const fragmentUrls = await getPromotionalContent();
+      const fragmentUrls = getPromotionalContent();
 
       expect(fragmentUrls).to.deep.equal(['https://example.com/fragments/product-blades/firefly']);
-    });
-
-    it('prepends the locale prefix to relative fragment paths', async () => {
-      setEventConfig({}, { miloLibs: '/test/unit/blocks/promotional-content/mocks/libs' });
-      addMeta('custom-attributes', CUSTOM_ATTRS_WITH_PROMO);
-
-      const fragmentUrls = await getPromotionalContent();
-
-      expect(fragmentUrls).to.deep.equal([
-        `${window.location.origin}/uk/events/events-shared/fragments/product-blades/firefly`,
-        `${window.location.origin}/uk/events/events-shared/fragments/product-blades/creative-apprenticeship.html`,
-      ]);
     });
   });
 
