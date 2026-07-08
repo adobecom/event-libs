@@ -1,20 +1,18 @@
 import {
-  createContext, useReducer, useEffect, useContext, useRef, h,
+  createContext, useReducer, useContext, useEffect, h,
 } from '../../../deps/htm-preact.js';
-import BlockMediator from '../../../deps/block-mediator.min.js';
-import { injectDispatch, startPolling, stopPolling } from '../services/poller.js';
-import { fetchSessions } from '../services/sessions-api.js';
+import {
+  sessions, sessionsStatus, liveStreamActiveIds, auth, getApiConfig,
+} from '../../../utils/session-store.js';
+import { deriveSessionState } from '../../../utils/session-state.js';
 import { getNowMs, getSessionDayKey } from '../utils/time.js';
-import { deriveSessionState } from '../utils/session-state.js';
 
-const LS_SCHEDULED = 'sg:scheduled';
-const LS_FAVORITED = 'sg:favorited';
 const SS_LAST_VIEW = 'sg:last-view';
 
-function deriveEventDays(sessions, userTz) {
+function deriveEventDays(sessionList, userTz) {
   const tz = userTz || Intl.DateTimeFormat().resolvedOptions().timeZone;
   const daySet = new Set();
-  sessions.forEach((s) => { if (s.startTimeUtc) daySet.add(getSessionDayKey(s, tz)); });
+  sessionList.forEach((s) => { if (s.startTimeUtc) daySet.add(getSessionDayKey(s, tz)); });
   return [...daySet].sort();
 }
 
@@ -27,102 +25,32 @@ function getDefaultDay(eventDays, userTz) {
   return eventDays[eventDays.length - 1];
 }
 
-export function buildInitialState(eventConfig, initialSessions = []) {
-  const userTz = eventConfig && eventConfig.userTz;
-  const eventDays = deriveEventDays(initialSessions, userTz);
-
-  let scheduled = new Set();
-  let favorited = new Set();
-  let isLoggedIn = null;
-  let isRegistered = undefined;
-  let userFirstName = null;
-  try {
-    scheduled = new Set(JSON.parse(localStorage.getItem(LS_SCHEDULED) || '[]'));
-    favorited = new Set(JSON.parse(localStorage.getItem(LS_FAVORITED) || '[]'));
-    const devAuth = JSON.parse(localStorage.getItem('sg:dev-auth') || 'null');
-    if (devAuth) {
-      isLoggedIn = devAuth.isLoggedIn ?? null;
-      isRegistered = devAuth.isRegistered ?? undefined;
-      userFirstName = devAuth.userFirstName ?? null;
-    }
-  } catch { /* localStorage unavailable */ }
-
+// UI-only state for this block's own widget chrome — cross-block data (sessions,
+// favorited, scheduled, auth) lives in event-libs/v1/utils/session-store.js instead.
+export function buildInitialState(eventConfig) {
   return {
-    sessions: initialSessions,
-    sessionsStatus: initialSessions.length > 0 ? 'ready' : 'loading',
     drawerState: 'hidden',
-    scheduled,
-    favorited,
-    liveStreamActiveIds: new Set(),
-    activeView: isRegistered ? 'my-sessions' : 'live-upcoming',
-    eventDays,
-    activeDay: getDefaultDay(eventDays, userTz),
+    activeView: auth.value.isRegistered ? 'my-sessions' : 'live-upcoming',
+    eventDays: [],
+    activeDay: '',
     activeFilters: {},
     searchQuery: '',
     mySessionsTab: 'upcoming',
     myFavoritesTab: 'upcoming',
-    isLoggedIn,
-    isRegistered,
-    userFirstName,
     eventConfig: eventConfig || {},
     activeSessionId: null,
-    toast: null,
-    pendingActions: new Set(),
     dismissingIds: new Set(),
     regPromptOpen: false,
-    conflictModal: null,
   };
 }
 
 export function reducer(state, action) {
   switch (action.type) {
-    case 'INIT_USER_DATA': {
-      return {
-        ...state,
-        scheduled: action.scheduled instanceof Set ? action.scheduled : new Set(action.scheduled),
-        favorited: action.favorited instanceof Set ? action.favorited : new Set(action.favorited),
-      };
-    }
-
-    case 'LIVE_STATUS_UPDATE': {
-      const next = { ...state, liveStreamActiveIds: action.active };
-      const now = action.now || getNowMs();
-
-      const manualCutoff = state.eventConfig.manualOnDemandTransitionTime
-        ? Date.parse(state.eventConfig.manualOnDemandTransitionTime)
-        : null;
-      const pastManualCutoff = manualCutoff !== null && now >= manualCutoff;
-
-      const allEnded = state.sessions.length > 0 && state.sessions.every(
-        (s) => deriveSessionState(s, action.active, now) === 'on-demand',
-      );
-
-      if ((allEnded || pastManualCutoff) && next.activeView === 'live-upcoming') {
-        next.activeView = 'on-demand';
-      }
-
-      return next;
-    }
-
-    case 'SCHEDULE_ADD': {
-      const scheduled = new Set(state.scheduled);
-      scheduled.add(action.sessionId);
-      return { ...state, scheduled };
-    }
-    case 'SCHEDULE_REMOVE': {
-      const scheduled = new Set(state.scheduled);
-      scheduled.delete(action.sessionId);
-      return { ...state, scheduled };
-    }
-    case 'FAVORITE_ADD': {
-      const favorited = new Set(state.favorited);
-      favorited.add(action.sessionId);
-      return { ...state, favorited };
-    }
-    case 'FAVORITE_REMOVE': {
-      const favorited = new Set(state.favorited);
-      favorited.delete(action.sessionId);
-      return { ...state, favorited };
+    case 'SET_EVENT_DAYS': {
+      const activeDay = action.eventDays.includes(state.activeDay)
+        ? state.activeDay
+        : getDefaultDay(action.eventDays, state.eventConfig.userTz);
+      return { ...state, eventDays: action.eventDays, activeDay };
     }
 
     case 'SET_VIEW': {
@@ -139,33 +67,15 @@ export function reducer(state, action) {
       return { ...state, mySessionsTab: action.tab };
     case 'SET_MY_FAVORITES_TAB':
       return { ...state, myFavoritesTab: action.tab };
-    case 'IMS_UPDATE':
-      return {
-        ...state,
-        isLoggedIn: action.isLoggedIn,
-        isRegistered: action.isRegistered,
-        userFirstName: action.userFirstName ?? state.userFirstName,
-      };
 
-    case 'SESSIONS_LOADED': {
-      const userTz = state.eventConfig && state.eventConfig.userTz;
-      const eventDays = deriveEventDays(action.sessions, userTz);
-      const activeDay = eventDays.includes(state.activeDay)
-        ? state.activeDay
-        : getDefaultDay(eventDays, userTz);
-      return {
-        ...state, sessions: action.sessions, sessionsStatus: 'ready', eventDays, activeDay,
-      };
-    }
-    case 'SET_SESSIONS_STATUS':
-      return { ...state, sessionsStatus: action.status };
     case 'SET_DRAWER': {
       const next = { ...state, drawerState: action.drawer };
       if (action.drawer !== 'hidden' && state.drawerState === 'hidden') {
-        // Restore the last view the user was on; fall back to auth-appropriate default.
+        // Restore the last view the user was on; fall back to auth-appropriate default
+        // (computed by the caller, which can read the shared auth signal).
         let lastView = null;
         try { lastView = sessionStorage.getItem(SS_LAST_VIEW); } catch { /* unavailable */ }
-        next.activeView = lastView || (state.isRegistered ? 'my-sessions' : 'live-upcoming');
+        next.activeView = lastView || action.defaultView || state.activeView;
       }
       return next;
     }
@@ -176,38 +86,10 @@ export function reducer(state, action) {
     case 'SET_ACTIVE_SESSION':
       return { ...state, activeSessionId: action.sessionId };
 
-    case 'SHOW_TOAST':
-      return {
-        ...state,
-        toast: {
-          id: Date.now(),
-          message: action.message,
-          variant: action.variant || 'neutral',
-          ctaLabel: action.ctaLabel || null,
-          ctaAction: action.ctaAction || null,
-          ctaHref: action.ctaHref || null,
-          duration: action.duration !== undefined ? action.duration : 1500,
-        },
-      };
-    case 'HIDE_TOAST':
-      return { ...state, toast: null };
-
-    case 'SET_PENDING': {
-      const pendingActions = new Set(state.pendingActions);
-      if (action.pending) pendingActions.add(action.sessionId);
-      else pendingActions.delete(action.sessionId);
-      return { ...state, pendingActions };
-    }
-
     case 'SHOW_REG_PROMPT':
       return { ...state, regPromptOpen: true };
     case 'HIDE_REG_PROMPT':
       return { ...state, regPromptOpen: false };
-
-    case 'SHOW_CONFLICT':
-      return { ...state, conflictModal: action.conflict };
-    case 'HIDE_CONFLICT':
-      return { ...state, conflictModal: null };
 
     case 'ADD_DISMISSING_ID':
       return { ...state, dismissingIds: new Set([...state.dismissingIds, action.id]) };
@@ -224,81 +106,39 @@ export function reducer(state, action) {
 
 export const SessionGuideContext = createContext(null);
 
-export function SessionGuideProvider({ eventConfig, initialSessions = [], children }) {
-  const [state, dispatch] = useReducer(reducer, buildInitialState(eventConfig, initialSessions));
-  const didMount = useRef(false);
+export function SessionGuideProvider({ eventConfig, children }) {
+  const [state, dispatch] = useReducer(reducer, buildInitialState(eventConfig));
 
-  // Sync logged-in / registered state from BlockMediator (imsProfile + rsvpData).
-  // sg:dev-auth in localStorage takes priority — prevents Milo's guest IMS from
-  // overwriting a dev-mode user after the block renders.
+  // Recompute the day-tab list whenever the shared sessions data changes.
   useEffect(() => {
-    function syncAuth() {
-      try {
-        const devAuth = JSON.parse(localStorage.getItem('sg:dev-auth') || 'null');
-        if (devAuth) {
-          dispatch({
-            type: 'IMS_UPDATE',
-            isLoggedIn: devAuth.isLoggedIn ?? null,
-            isRegistered: devAuth.isRegistered ?? undefined,
-            userFirstName: devAuth.userFirstName ?? null,
-          });
-          return;
-        }
-      } catch { /* ignore */ }
-      const profile = BlockMediator.get('imsProfile');
-      if (profile === undefined) return;
-      const rsvp = BlockMediator.get('rsvpData');
-      const isLoggedIn = !!(profile && !profile.noProfile && profile.account_type !== 'guest');
-      const isRegistered = rsvp?.registered === true;
-      const userFirstName = profile?.first_name ?? null;
-      dispatch({ type: 'IMS_UPDATE', isLoggedIn, isRegistered, userFirstName });
+    function recomputeDays() {
+      dispatch({ type: 'SET_EVENT_DAYS', eventDays: deriveEventDays(sessions.value, eventConfig.userTz) });
     }
-    syncAuth();
-    const unsubProfile = BlockMediator.subscribe('imsProfile', syncAuth);
-    const unsubRsvp = BlockMediator.subscribe('rsvpData', syncAuth);
-    return () => { unsubProfile(); unsubRsvp(); };
+    recomputeDays();
+    return sessions.subscribe(recomputeDays);
   }, []);
 
-  // Persist scheduled/favorited to localStorage on every change (skip initial mount
-  // since buildInitialState already loaded the persisted values).
+  // Auto-switch out of "live-upcoming" once every session has gone on-demand, or
+  // once the authored manual cutoff time has passed — whichever comes first.
   useEffect(() => {
-    if (!didMount.current) { didMount.current = true; return; }
-    try {
-      localStorage.setItem(LS_SCHEDULED, JSON.stringify([...state.scheduled]));
-      localStorage.setItem(LS_FAVORITED, JSON.stringify([...state.favorited]));
-    } catch { /* localStorage unavailable */ }
-  }, [state.scheduled, state.favorited]);
+    function checkAutoTransition() {
+      if (state.activeView !== 'live-upcoming') return;
+      if (sessionsStatus.value !== 'ready' || !sessions.value.length) return;
+      const now = getNowMs();
+      const manualCutoff = getApiConfig()?.manualCutoff;
+      const pastManualCutoff = manualCutoff ? now >= Date.parse(manualCutoff) : false;
+      const allEnded = sessions.value.every(
+        (s) => deriveSessionState(s, liveStreamActiveIds.value, now) === 'on-demand',
+      );
+      if (allEnded || pastManualCutoff) dispatch({ type: 'SET_VIEW', view: 'on-demand' });
+    }
+    checkAutoTransition();
+    const unsubSessions = sessions.subscribe(checkAutoTransition);
+    const unsubLive = liveStreamActiveIds.subscribe(checkAutoTransition);
+    return () => { unsubSessions(); unsubLive(); };
+  }, [state.activeView]);
 
-  useEffect(() => {
-    if (initialSessions.length > 0) return;
-    const apiUrl = eventConfig && eventConfig.rfApiUrl;
-    (async () => {
-      try {
-        const sessions = await fetchSessions(apiUrl);
-        dispatch({ type: 'SESSIONS_LOADED', sessions });
-      } catch (err) {
-        window.lana?.log(`[sessions-guide] sessions fetch failed: ${err.message}`);
-        dispatch({ type: 'SET_SESSIONS_STATUS', status: 'error' });
-      }
-    })();
-  }, []);
-
-  useEffect(() => {
-    if (state.sessionsStatus !== 'ready') return undefined;
-    injectDispatch(dispatch);
-    const mrSessions = state.sessions.filter((s) => s.mrStreamId);
-    const timerId = startPolling(mrSessions, eventConfig.mrEnv);
-    return () => {
-      stopPolling();
-      if (timerId) clearInterval(timerId);
-    };
-  }, [state.sessionsStatus]);
-
-  // App is invoked directly via children() (appFactory), not through Preact's reconciler,
-  // so _current is the only way useContext returns the right value in that direct call.
-  SessionGuideContext._current = { state, dispatch };
-  const resolved = typeof children === 'function' ? children() : children;
-  return h(SessionGuideContext.Provider, { value: { state, dispatch } }, resolved);
+  return h(SessionGuideContext.Provider, { value: { state, dispatch } }, children);
 }
 
 export function useSessionGuide() {

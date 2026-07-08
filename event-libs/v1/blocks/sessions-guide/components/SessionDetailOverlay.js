@@ -2,29 +2,30 @@ import { html, useState } from '../../../deps/htm-preact.js';
 import { IconButton } from './IconButton.js';
 import { useSessionGuide } from '../store/index.js';
 import { formatSessionTime, formatShortTime, getNowMs } from '../utils/time.js';
-import { scheduleAction, favoriteAction } from '../services/session-actions.js';
-import { deriveSessionState } from '../utils/session-state.js';
+import {
+  sessions, scheduled, favorited, pendingActions, liveStreamActiveIds,
+} from '../../../utils/session-store.js';
+import { scheduleWithFeedback, favoriteWithFeedback } from '../../../services/sessions/action-feedback.js';
+import { showToast } from '../../../features/toast/toast.js';
+import { deriveSessionState } from '../../../utils/session-state.js';
 import { setSessionParam, safeUrl } from '../utils/url.js';
 import { IconHeartFilled, IconHeartOutline } from './icons.js';
 
 export function SessionDetailOverlay({ onBack }) {
-  const { state, dispatch } = useSessionGuide();
-  const {
-    sessions, activeSessionId, scheduled, favorited, pendingActions,
-    liveStreamActiveIds, eventConfig,
-  } = state;
+  const { state } = useSessionGuide();
+  const { activeSessionId, eventConfig } = state;
   const { userTz, trackIcons } = eventConfig;
 
   const [descExpanded, setDescExpanded] = useState(false);
 
-  const session = sessions.find((s) => s.id === activeSessionId);
+  const session = sessions.value.find((s) => s.id === activeSessionId);
   if (!session) return null;
 
   const nowMs = getNowMs();
-  const sessionState = deriveSessionState(session, liveStreamActiveIds, nowMs);
-  const isScheduled = scheduled.has(session.id);
-  const isFavorited = favorited.has(session.id);
-  const isPending = pendingActions.has(session.id);
+  const sessionState = deriveSessionState(session, liveStreamActiveIds.value, nowMs);
+  const isScheduled = scheduled.value.has(session.id);
+  const isFavorited = favorited.value.has(session.id);
+  const isPending = pendingActions.value.has(session.id);
   const isLive = sessionState === 'live';
   const onDemand = sessionState === 'on-demand';
   const recordingComing = onDemand && session.inPerson && !session.videoAvailable;
@@ -40,12 +41,12 @@ export function SessionDetailOverlay({ onBack }) {
 
   async function handleSchedule(e) {
     e.stopPropagation();
-    await scheduleAction(session, state, dispatch);
+    await scheduleWithFeedback(session, { eventConfig, isScheduled });
   }
 
   async function handleFavorite(e) {
     e.stopPropagation();
-    await favoriteAction(session, state, dispatch);
+    await favoriteWithFeedback(session, { eventConfig, isFavorited });
   }
 
   async function handleShare(e) {
@@ -58,7 +59,7 @@ export function SessionDetailOverlay({ onBack }) {
         await navigator.share({ title: session.title, url: shareUrl });
       } else if (navigator.clipboard?.writeText) {
         await navigator.clipboard.writeText(shareUrl);
-        dispatch({ type: 'SHOW_TOAST', message: 'Link copied', variant: 'positive' });
+        showToast({ message: 'Link copied', variant: 'positive' });
       }
     } catch (err) {
       // Swallow the user-cancelled share dialog; log anything else.

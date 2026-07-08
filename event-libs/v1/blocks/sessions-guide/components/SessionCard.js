@@ -1,7 +1,8 @@
 import { html, useState } from '../../../deps/htm-preact.js';
 import { useSessionGuide } from '../store/index.js';
 import { isSessionOnDemand, formatSessionTime, formatShortTime, formatDuration, getNowMs } from '../utils/time.js';
-import { scheduleAction, favoriteAction } from '../services/session-actions.js';
+import { scheduled, favorited, pendingActions } from '../../../utils/session-store.js';
+import { scheduleWithFeedback, favoriteWithFeedback } from '../../../services/sessions/action-feedback.js';
 import { setSessionParam, safeUrl } from '../utils/url.js';
 import { CategoryBadge } from './CategoryBadge.js';
 import { IconButton } from './IconButton.js';
@@ -11,14 +12,13 @@ export const buildSessionCard = () => SessionCard;
 
 export function SessionCard({ session, forceOnDemand = false, timeDisplay = 'duration' }) {
   const { state, dispatch } = useSessionGuide();
-  const { scheduled, favorited, eventConfig, activeView } = state;
-  const pendingActions = state.pendingActions || new Set();
+  const { eventConfig, activeView } = state;
   const dismissingIds = state.dismissingIds || new Set();
   const { userTz, surface, trackColors } = eventConfig;
 
-  const isScheduled = scheduled.has(session.id);
-  const isFavorited = favorited.has(session.id);
-  const isPending = pendingActions.has(session.id);
+  const isScheduled = scheduled.value.has(session.id);
+  const isFavorited = favorited.value.has(session.id);
+  const isPending = pendingActions.value.has(session.id);
   const [hoverAnim, setHoverAnim] = useState(null);
   const onDemandNatural = isSessionOnDemand(session, getNowMs());
   const onDemand = forceOnDemand || onDemandNatural;
@@ -59,9 +59,10 @@ export function SessionCard({ session, forceOnDemand = false, timeDisplay = 'dur
     setHoverAnim(null);
   }
 
-  async function handleSchedule(e) {
-    e.stopPropagation();
-    const willDismiss = activeView === 'my-sessions' && isScheduled;
+  // Shared by handleSchedule/handleFavorite: when a card is about to leave its own
+  // list (e.g. unscheduling from "My sessions"), collapse it before the action runs
+  // so the exit animation isn't cut short by the list re-rendering underneath it.
+  async function withDismissAnimation(e, willDismiss, actionFn) {
     if (willDismiss) {
       const cardWrap = e.currentTarget.closest('.sg-card')?.parentElement;
       if (cardWrap) {
@@ -72,25 +73,26 @@ export function SessionCard({ session, forceOnDemand = false, timeDisplay = 'dur
       dispatch({ type: 'ADD_DISMISSING_ID', id: session.id });
       await new Promise((r) => setTimeout(r, 450));
     }
-    await scheduleAction(session, state, dispatch);
+    await actionFn();
     if (willDismiss) dispatch({ type: 'REMOVE_DISMISSING_ID', id: session.id });
+  }
+
+  async function handleSchedule(e) {
+    e.stopPropagation();
+    await withDismissAnimation(
+      e,
+      activeView === 'my-sessions' && isScheduled,
+      () => scheduleWithFeedback(session, { eventConfig, isScheduled }),
+    );
   }
 
   async function handleFavorite(e) {
     e.stopPropagation();
-    const willDismiss = activeView === 'my-favorites' && isFavorited;
-    if (willDismiss) {
-      const cardWrap = e.currentTarget.closest('.sg-card')?.parentElement;
-      if (cardWrap) {
-        cardWrap.style.maxWidth = `${cardWrap.offsetWidth}px`;
-        // eslint-disable-next-line no-unused-expressions
-        cardWrap.offsetHeight; // force reflow so transition starts from current width, not none
-      }
-      dispatch({ type: 'ADD_DISMISSING_ID', id: session.id });
-      await new Promise((r) => setTimeout(r, 450));
-    }
-    await favoriteAction(session, state, dispatch);
-    if (willDismiss) dispatch({ type: 'REMOVE_DISMISSING_ID', id: session.id });
+    await withDismissAnimation(
+      e,
+      activeView === 'my-favorites' && isFavorited,
+      () => favoriteWithFeedback(session, { eventConfig, isFavorited }),
+    );
   }
 
   function handlePlay(e) {

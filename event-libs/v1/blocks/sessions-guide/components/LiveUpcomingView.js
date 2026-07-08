@@ -1,5 +1,8 @@
 import { html } from '../../../deps/htm-preact.js';
 import { useSessionGuide } from '../store/index.js';
+import {
+  sessions as sessionsSignal, liveStreamActiveIds as liveStreamActiveIdsSignal,
+} from '../../../utils/session-store.js';
 import { Carousel } from './Carousel.js';
 import { TimeSlotRow } from './TimeSlotRow.js';
 import {
@@ -12,8 +15,9 @@ export const buildLiveUpcomingView = () => LiveUpcomingView;
 
 export function LiveUpcomingView() {
   const { state } = useSessionGuide();
-  const { sessions, activeDay, eventConfig } = state;
-  const liveStreamActiveIds = state.liveStreamActiveIds || new Set();
+  const { activeDay, eventConfig } = state;
+  const sessions = sessionsSignal.value;
+  const liveStreamActiveIds = liveStreamActiveIdsSignal.value;
   const activeFilters = state.activeFilters || {};
   const searchQuery = state.searchQuery || '';
   const { userTz, featuredSessionIds } = eventConfig;

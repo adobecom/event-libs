@@ -36,10 +36,22 @@ export function html(strings, ...values) {
   }, '');
 }
 
+// `h()` builds a lazy vnode instead of invoking `type` immediately, so a
+// Context.Provider gets a chance to run (and set its context value) before
+// its children are evaluated — matching real Preact's deferred-vnode model.
+const VNODE = Symbol('vnode');
+
+function resolve(node) {
+  if (node && node[VNODE]) return resolve(node.type(node.props));
+  if (Array.isArray(node)) return node.map(resolve).join('');
+  return node ?? '';
+}
+
 export function render(content, container) {
-  if (typeof content === 'string') {
+  const resolved = resolve(content);
+  if (typeof resolved === 'string') {
     // eslint-disable-next-line no-param-reassign
-    container.innerHTML = content;
+    container.innerHTML = resolved;
   }
 }
 
@@ -47,8 +59,7 @@ export function createContext(defaultValue) {
   const ctx = { defaultValue, _current: defaultValue };
   ctx.Provider = ({ value, children }) => {
     ctx._current = value !== undefined ? value : defaultValue;
-    const resolved = typeof children === 'function' ? children() : children;
-    return resolved ?? null;
+    return typeof children === 'function' ? children() : children;
   };
   return ctx;
 }
@@ -66,12 +77,28 @@ export function useReducer(fn, initial, init) {
   return [state, () => {}];
 }
 
-export function signal(initial) { return { value: initial }; }
+// Real @preact/signals `.subscribe()` fires immediately with the current value, then
+// again on every `.value` write — mirrored here since some shared, non-Preact modules
+// (e.g. utils/session-store.js, features/toast/toast.js) subscribe outside of a useEffect, which
+// this mock otherwise no-ops.
+export function signal(initial) {
+  const subscribers = new Set();
+  return {
+    get value() { return initial; },
+    set value(next) {
+      initial = next;
+      subscribers.forEach((fn) => fn(initial));
+    },
+    subscribe(fn) {
+      subscribers.add(fn);
+      fn(initial);
+      return () => subscribers.delete(fn);
+    },
+  };
+}
 
 export function h(type, props, ...children) {
-  if (typeof type === 'function') {
-    const childVal = children.length === 1 ? children[0] : children;
-    return type({ ...(props || {}), children: childVal });
-  }
-  return null;
+  if (typeof type !== 'function') return null;
+  const childVal = children.length === 1 ? children[0] : children;
+  return { [VNODE]: true, type, props: { ...(props || {}), children: childVal } };
 }

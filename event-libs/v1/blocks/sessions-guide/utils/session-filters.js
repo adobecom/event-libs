@@ -1,5 +1,5 @@
 import { getSessionDayKey, isSessionLive, isSessionUpcoming } from './time.js';
-import { deriveSessionState, isInLiveNow } from './session-state.js';
+import { deriveSessionState, isInLiveNow } from '../../../utils/session-state.js';
 
 export function sessionsForDay(sessions, activeDay, userTz) {
   return sessions.filter((s) => getSessionDayKey(s, userTz) === activeDay);

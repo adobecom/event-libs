@@ -2,6 +2,7 @@ import { expect } from '@esm-bundle/chai';
 import * as preact from '../../../mocks/deps/htm-preact.js';
 import { buildStore } from '../../../../../event-libs/v1/blocks/sessions-guide/store/index.js';
 import { buildOnDemandView } from '../../../../../event-libs/v1/blocks/sessions-guide/components/OnDemandView.js';
+import { sessions, liveStreamActiveIds } from '../../../../../event-libs/v1/utils/session-store.js';
 
 function h(offsetHours) {
   return new Date(Date.now() + offsetHours * 3_600_000).toISOString();
@@ -28,17 +29,15 @@ const UPCOMING = {
 
 const BASE_CONFIG = {
   userTz: 'America/Los_Angeles', surface: 'page', trackColors: {}, trackIcons: {},
-  title: '',
-  rfApiUrl: '', rfApiProfileId: '', showConflictModal: false,
-  filterCategories: [], mrEnv: 'dev', theme: 'dark', manualOnDemandTransitionTime: null,
+  title: '', showConflictModal: false, filterCategories: [], theme: 'dark',
 };
 
-function makeStore(sessions) {
+function makeStore(sessionList) {
+  sessions.value = sessionList;
+  liveStreamActiveIds.value = new Set();
   const store = buildStore(preact);
   store.SessionGuideContext._current = {
     state: {
-      sessions, scheduled: new Set(), favorited: new Set(), isRegistered: true,
-      dismissingIds: new Set(), pendingActions: new Set(), liveStreamActiveIds: new Set(),
       activeView: 'on-demand', activeFilters: {}, searchQuery: '',
       eventConfig: { ...BASE_CONFIG },
     },

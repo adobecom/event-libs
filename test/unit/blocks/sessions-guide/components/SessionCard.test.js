@@ -2,22 +2,19 @@ import { expect } from '@esm-bundle/chai';
 import * as preact from '../../../mocks/deps/htm-preact.js';
 import { buildStore } from '../../../../../event-libs/v1/blocks/sessions-guide/store/index.js';
 import { buildSessionCard } from '../../../../../event-libs/v1/blocks/sessions-guide/components/SessionCard.js';
+import {
+  scheduled, favorited, pendingActions, auth,
+} from '../../../../../event-libs/v1/utils/session-store.js';
 
 const BASE_CONFIG = {
   title: 'Adobe MAX 2026',
-
-
   userTz: 'America/Los_Angeles',
   surface: 'page',
   trackColors: { Design: '#0066cc' },
   trackIcons: {},
-  rfApiUrl: '',
-  rfApiProfileId: '',
   showConflictModal: false,
   filterCategories: [],
-  mrEnv: 'dev',
   theme: 'dark',
-  manualOnDemandTransitionTime: null,
 };
 
 // A future session (not on-demand)
@@ -50,9 +47,6 @@ const ONDEMAND_SESSION = {
 
 function makeCtx(overrides = {}) {
   const state = {
-    scheduled: new Set(),
-    favorited: new Set(),
-    isRegistered: true,
     eventConfig: { ...BASE_CONFIG },
     ...overrides,
   };
@@ -67,6 +61,13 @@ function renderCard(session, ctxOverrides = {}) {
 }
 
 describe('SessionCard', () => {
+  beforeEach(() => {
+    scheduled.value = new Set();
+    favorited.value = new Set();
+    pendingActions.value = new Set();
+    auth.value = { isLoggedIn: true, isRegistered: true, userFirstName: null };
+  });
+
   it('renders without throwing', () => {
     expect(() => renderCard(UPCOMING_SESSION)).to.not.throw();
   });
@@ -82,12 +83,14 @@ describe('SessionCard', () => {
   });
 
   it('applies is-scheduled class when session is scheduled', () => {
-    const html = renderCard(UPCOMING_SESSION, { scheduled: new Set(['session-1']) });
+    scheduled.value = new Set(['session-1']);
+    const html = renderCard(UPCOMING_SESSION);
     expect(html).to.include('is-scheduled');
   });
 
   it('applies is-favorited class when session is favorited', () => {
-    const html = renderCard(UPCOMING_SESSION, { favorited: new Set(['session-1']) });
+    favorited.value = new Set(['session-1']);
+    const html = renderCard(UPCOMING_SESSION);
     expect(html).to.include('is-favorited');
   });
 
@@ -116,7 +119,8 @@ describe('SessionCard', () => {
   });
 
   it('shows aria-pressed=true on schedule button when scheduled', () => {
-    const html = renderCard(UPCOMING_SESSION, { scheduled: new Set(['session-1']) });
+    scheduled.value = new Set(['session-1']);
+    const html = renderCard(UPCOMING_SESSION);
     expect(html).to.include('aria-pressed=true');
   });
 
@@ -129,7 +133,7 @@ describe('SessionCard', () => {
     const dispatched = [];
     const store = buildStore(preact);
     store.SessionGuideContext._current = {
-      state: { ...makeCtx().state },
+      state: makeCtx().state,
       dispatch: (action) => dispatched.push(action),
     };
     const SessionCard = buildSessionCard(preact, store);
@@ -157,9 +161,10 @@ describe('SessionCard', () => {
   });
 
   it('does not dispatch when isRegistered is not true (no-op guard)', () => {
+    auth.value = { isLoggedIn: true, isRegistered: false, userFirstName: null };
     const dispatched = [];
     const store = buildStore(preact);
-    const ctx = makeCtx({ isRegistered: false });
+    const ctx = makeCtx();
     ctx.dispatch = (action) => dispatched.push(action);
     store.SessionGuideContext._current = ctx;
     const SessionCard = buildSessionCard(preact, store);

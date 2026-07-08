@@ -2,89 +2,113 @@
 
 Remove or replace every item below once real IMS login and Rainfocus registration APIs are wired up.
 
+> **Note (MWPW-199065):** the dev-mock scaffolding and the Rainfocus/Mobile Rider/sessions services all moved out of this block into shared, page-level modules (`event-libs/v1/utils/session-store.js` and `event-libs/v1/services/sessions/`) so other blocks on the same page can read the same session/auth state. The steps below reference the new locations.
+
 ---
 
-## 1. Delete the entire dev-mock service
+## 1. Delete the dev-seeding logic in the shared store
 
-**File:** `services/dev-mock.js`
+**File:** `event-libs/v1/utils/session-store.js`
 
-Delete the whole file. It exists only to seed localStorage with a fake logged-in user.
-
-Also remove its call from `event-libs/scripts/scripts.js`:
+Delete `seedDevData()` and its call inside `initSessionState()`:
 
 ```js
-// DELETE these lines:
-if (['localhost', '127.0.0.1'].includes(window.location.hostname)) {
-  const { setupDevUser, seedDevStorage } = await import('../v1/blocks/sessions-guide/services/dev-mock.js');
-  setupDevUser();
-  seedDevStorage();
+// DELETE this function and its call site:
+function seedDevData() {
+  try {
+    if (!localStorage.getItem('sg:dev-auth')) {
+      localStorage.setItem('sg:dev-auth', JSON.stringify({
+        isLoggedIn: true,
+        isRegistered: true,
+        userFirstName: 'Dev',
+      }));
+    }
+    if (!localStorage.getItem(LS_SCHEDULED)) {
+      localStorage.setItem(LS_SCHEDULED, JSON.stringify(SEED_SCHEDULED));
+    }
+    if (!localStorage.getItem(LS_FAVORITED)) {
+      localStorage.setItem(LS_FAVORITED, JSON.stringify(SEED_FAVORITED));
+    }
+  } catch { /* ignore */ }
 }
 ```
 
----
-
-## 2. Remove the localhost self-bootstrap in the store
-
-**File:** `store/index.js` — inside `buildInitialState()`
-
-```js
-// DELETE this block:
-let devAuth = JSON.parse(localStorage.getItem('sg:dev-auth') || 'null');
-if (!devAuth && ['localhost', '127.0.0.1'].includes(window.location.hostname)) {
-  devAuth = { isLoggedIn: true, isRegistered: true, userFirstName: 'Dev' };
-  localStorage.setItem('sg:dev-auth', JSON.stringify(devAuth));
-}
-```
-
-Also remove the `sg:dev-auth` read that follows it — initial auth state should come entirely from the `IMS_UPDATE` dispatch in the `syncAuth` effect once BlockMediator has a real profile.
+This used to live in a standalone `services/dev-mock.js` inside this block, called from `sessions-guide.js`'s `init()`. It moved into the shared store because `initSessionState()` now runs from `decorateEvent()` — before any block's `init()` — so seeding has to happen at the same, earlier point or the store reads empty localStorage on first load.
 
 ---
 
-## 3. Remove the `sg:dev-auth` priority check in `syncAuth`
+## 2. Remove the `sg:dev-auth` priority check in `syncAuth`
 
-**File:** `store/index.js` — inside the `syncAuth` function in `useEffect`
+**File:** `event-libs/v1/utils/session-store.js` — inside `syncAuth()`
 
 ```js
 // DELETE this block:
 try {
   const devAuth = JSON.parse(localStorage.getItem('sg:dev-auth') || 'null');
   if (devAuth) {
-    dispatch({
-      type: 'IMS_UPDATE',
+    auth.value = {
       isLoggedIn: devAuth.isLoggedIn ?? null,
       isRegistered: devAuth.isRegistered ?? undefined,
       userFirstName: devAuth.userFirstName ?? null,
-    });
+    };
     return;
   }
 } catch { /* ignore */ }
 ```
 
-After removal, `syncAuth` falls through directly to reading `imsProfile` and `rsvpData` from BlockMediator, which is the correct production path.
+After removal, `syncAuth()` falls through directly to reading `imsProfile` and `rsvpData` from `BlockMediator`, which is the correct production path. This affects every block reading the shared `auth` signal, not just this one.
+
+---
+
+## 3. Move `rainfocus-api-url` / `rainfocus-api-profile-id` from mock metadata to real values
+
+**Where:** page `<meta>` tags, read by `getMetadata()` in `initSessionState()` (`event-libs/v1/utils/session-store.js`)
+
+```html
+<meta name="rainfocus-api-url" content="...">
+<meta name="rainfocus-api-profile-id" content="...">
+```
+
+These already live in page metadata (not this block's authoring table) so the shared bootstrap can start fetching before any block mounts — just point them at the real Rainfocus endpoint/profile once it exists. Optional `register-url` and `manual-on-demand-transition-time` metadata follow the same pattern.
 
 ---
 
 ## 4. Implement real Rainfocus API calls
 
-**File:** `services/rainfocus.js`
+**File:** `event-libs/v1/services/sessions/rainfocus.js`
 
 Every function is currently a stub returning hardcoded data. Replace with real `fetch` calls to the Rainfocus API.
 
-Credentials needed per call: `rfAuthToken` (from FEDS/IMS), `clientId` (IMS userId), `rfApiProfileId` and `rfApiUrl` (from `eventConfig`).
+Credentials needed per call: `rfAuthToken` (from FEDS/IMS), `clientId` (IMS userId), `rfApiProfileId` and `rfApiUrl` (from `session-store.js`'s `getApiConfig()`).
 
 ---
 
-## 5. Pass real credentials in session actions
+## 5. Implement the real Mobile Rider API call
 
-**File:** `services/session-actions.js`
+**File:** `event-libs/v1/services/sessions/mobile-rider.js`
 
-Two call sites pass `null` for `rfAuthToken` and `clientId`:
+`fetchLiveStatus(mrStreamIds, env)` currently returns `{ active: new Set(), inactive: new Set(mrStreamIds) }` (always inactive). Replace with the real MR batch status endpoint.
 
-- Line ~59: `await removeSession(session.rfCode, null, null, rfApiProfileId, rfApiUrl)`
-- Line ~110: `await toggleSessionInterest(session.rfCode, session.id, null, null, rfApiProfileId, rfApiUrl)`
-- (and `addSession` just above line 59)
+---
 
-Replace the `null` values with the real token and user ID sourced from the IMS profile on BlockMediator.
+## 6. Implement the real sessions API call
+
+**File:** `event-libs/v1/services/sessions/sessions-api.js`
+
+`fetchSessions(apiUrl)` currently returns `normalizeSessions(MOCK_SESSIONS)`. Replace with the real event sessions endpoint; keep `normalizeSessions()`'s output shape.
+
+---
+
+## 7. Pass real credentials in session actions
+
+**File:** `event-libs/v1/services/sessions/session-actions.js`
+
+Call sites pass `null` for `rfAuthToken` and `clientId` (via `event-libs/v1/utils/session-store.js`'s `scheduleSession()` / `favoriteSession()`, which these call):
+
+- `scheduleSession()` → `addSession(session.rfCode, null, null, apiConfig.profileId, apiConfig.apiUrl)` / `removeSession(...)`
+- `favoriteSession()` → `toggleSessionInterest(session.rfCode, session.id, null, null, apiConfig.profileId, apiConfig.apiUrl)`
+
+Replace the `null` values with the real token and user ID sourced from the IMS profile on `BlockMediator`.
 
 ---
 
@@ -92,8 +116,8 @@ Replace the `null` values with the real token and user ID sourced from the IMS p
 
 | Key | Purpose |
 |-----|---------|
-| `sg:dev-auth` | Fake logged-in user — written by `setupDevUser()` and the store self-bootstrap |
-| `sg:scheduled` | Persisted scheduled session IDs — keep this, it maps to real user data |
-| `sg:favorited` | Persisted favorited session IDs — keep this, it maps to real user data |
+| `sg:dev-auth` | Fake logged-in user — written by `seedDevData()` and read by `syncAuth()`, both in `session-store.js` |
+| `sessions:scheduled` | Persisted scheduled session IDs — keep this, it maps to real user data |
+| `sessions:favorited` | Persisted favorited session IDs — keep this, it maps to real user data |
 
-`sg:scheduled` and `sg:favorited` are production-worthy; they provide offline persistence and should remain. Only `sg:dev-auth` is mock-only.
+`sessions:scheduled` and `sessions:favorited` are production-worthy; they provide offline persistence and should remain. Only `sg:dev-auth` is mock-only. (These keys were renamed from `sg:scheduled` / `sg:favorited` when the store became shared/page-level rather than specific to this block.)

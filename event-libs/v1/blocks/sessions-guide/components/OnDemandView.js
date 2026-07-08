@@ -1,5 +1,8 @@
 import { html } from '../../../deps/htm-preact.js';
 import { useSessionGuide } from '../store/index.js';
+import {
+  sessions as sessionsSignal, liveStreamActiveIds as liveStreamActiveIdsSignal,
+} from '../../../utils/session-store.js';
 import { TrackRow } from './TrackRow.js';
 import { onDemandSessions, groupByTrack, filterSessions } from '../utils/session-filters.js';
 import { getNowMs } from '../utils/time.js';
@@ -8,8 +11,8 @@ export const buildOnDemandView = () => OnDemandView;
 
 export function OnDemandView() {
   const { state } = useSessionGuide();
-  const { sessions } = state;
-  const liveStreamActiveIds = state.liveStreamActiveIds || new Set();
+  const sessions = sessionsSignal.value;
+  const liveStreamActiveIds = liveStreamActiveIdsSignal.value;
   const activeFilters = state.activeFilters || {};
   const searchQuery = state.searchQuery || '';
   const nowMs = getNowMs();

@@ -1,5 +1,6 @@
 import { html, useEffect, useRef, useState } from '../../../deps/htm-preact.js';
 import { useSessionGuide } from '../store/index.js';
+import { sessions, sessionsStatus, auth } from '../../../utils/session-store.js';
 import { DrawerHeader } from './DrawerHeader.js';
 import { ViewRouter } from './ViewRouter.js';
 import { SessionDetailOverlay } from './SessionDetailOverlay.js';
@@ -126,26 +127,30 @@ export function DrawerShell() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     if (params.has('sessions') || params.has('session')) {
-      dispatch({ type: 'SET_DRAWER', drawer: 'expanded' });
+      dispatch({
+        type: 'SET_DRAWER',
+        drawer: 'expanded',
+        defaultView: auth.value.isRegistered ? 'my-sessions' : 'live-upcoming',
+      });
     }
   }, []);
 
   // URL deep-linking: resolve ?session=slug once sessions are loaded
   useEffect(() => {
-    if (state.sessionsStatus !== 'ready') return;
+    if (sessionsStatus.value !== 'ready') return;
     const params = new URLSearchParams(window.location.search);
     const sessionParam = params.get('session');
     if (!sessionParam) return;
     // URL format: slug-rfCode (rfCode is after the last dash)
     const lastDash = sessionParam.lastIndexOf('-');
     const rfCode = lastDash >= 0 ? sessionParam.slice(lastDash + 1) : sessionParam;
-    const found = state.sessions.find((s) => s.rfCode === rfCode || s.id === sessionParam);
+    const found = sessions.value.find((s) => s.rfCode === rfCode || s.id === sessionParam);
     if (found) dispatch({ type: 'SET_ACTIVE_SESSION', sessionId: found.id });
-  }, [state.sessionsStatus]);
+  }, [sessionsStatus.value]);
 
   // Keep sessionsRef current so the popstate handler always sees the latest list
-  const sessionsRef = useRef(state.sessions);
-  useEffect(() => { sessionsRef.current = state.sessions; }, [state.sessions]);
+  const sessionsRef = useRef(sessions.value);
+  useEffect(() => sessions.subscribe((v) => { sessionsRef.current = v; }), []);
 
   // popstate listener — restores state from URL without pushing new history entries
   // Registered once (stable []); reads sessions via ref to avoid re-registering on every poll.
@@ -157,10 +162,12 @@ export function DrawerShell() {
         const lastDash = sessionParam.lastIndexOf('-');
         const rfCode = lastDash >= 0 ? sessionParam.slice(lastDash + 1) : sessionParam;
         const found = sessionsRef.current.find((s) => s.rfCode === rfCode || s.id === sessionParam);
-        dispatch({ type: 'SET_DRAWER', drawer: 'expanded' });
+        const defaultView = auth.value.isRegistered ? 'my-sessions' : 'live-upcoming';
+        dispatch({ type: 'SET_DRAWER', drawer: 'expanded', defaultView });
         dispatch({ type: 'SET_ACTIVE_SESSION', sessionId: found ? found.id : null });
       } else if (params.has('sessions')) {
-        dispatch({ type: 'SET_DRAWER', drawer: 'expanded' });
+        const defaultView = auth.value.isRegistered ? 'my-sessions' : 'live-upcoming';
+        dispatch({ type: 'SET_DRAWER', drawer: 'expanded', defaultView });
         dispatch({ type: 'SET_ACTIVE_SESSION', sessionId: null });
       } else {
         dispatch({ type: 'CLOSE_DRAWER' });
@@ -170,7 +177,7 @@ export function DrawerShell() {
     return () => window.removeEventListener('popstate', handlePopState);
   }, []);
 
-  const { drawerState, sessionsStatus, activeSessionId } = state;
+  const { drawerState, activeSessionId } = state;
   const isOpen = drawerState !== 'hidden';
   const isExpanded = drawerState === 'expanded';
   const hasDetail = !!activeSessionId;
@@ -182,7 +189,11 @@ export function DrawerShell() {
 
   function openDrawer() {
     const isNarrow = window.matchMedia('(max-width: 1279px)').matches;
-    dispatch({ type: 'SET_DRAWER', drawer: isNarrow ? 'expanded' : 'peek' });
+    dispatch({
+      type: 'SET_DRAWER',
+      drawer: isNarrow ? 'expanded' : 'peek',
+      defaultView: auth.value.isRegistered ? 'my-sessions' : 'live-upcoming',
+    });
     history.pushState({}, '', setSessionsParam());
   }
 
@@ -217,9 +228,9 @@ export function DrawerShell() {
         />
         <div class="sg-drawer__body">
           <div class=${`sg-body-scroll${isExpanded ? ' sg-body-scroll--scrollable' : ''}`}>
-            ${sessionsStatus === 'loading' && html`<div class="sg-loading">Loading sessions…</div>`}
-            ${sessionsStatus === 'error' && html`<div class="sg-error">Failed to load sessions.</div>`}
-            ${sessionsStatus === 'ready' && html`<${ViewRouter} />`}
+            ${sessionsStatus.value === 'loading' && html`<div class="sg-loading">Loading sessions…</div>`}
+            ${sessionsStatus.value === 'error' && html`<div class="sg-error">Failed to load sessions.</div>`}
+            ${sessionsStatus.value === 'ready' && html`<${ViewRouter} />`}
           </div>
           <div class=${'sg-detail-panel' + (hasDetail ? ' sg-detail-panel--open' : '')}>
             ${hasDetail && html`<${SessionDetailOverlay} onBack=${handleDetailBack} />`}

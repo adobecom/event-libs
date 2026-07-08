@@ -1,5 +1,8 @@
 import { html, useState, useRef, useLayoutEffect } from '../../../deps/htm-preact.js';
 import { useSessionGuide } from '../store/index.js';
+import {
+  scheduled as scheduledSignal, favorited as favoritedSignal,
+} from '../../../utils/session-store.js';
 import { formatShortTime } from '../utils/time.js';
 import { SessionCard } from './SessionCard.js';
 
@@ -7,7 +10,9 @@ export const buildTimeSlotRow = () => TimeSlotRow;
 
 export function TimeSlotRow({ sessions, forceOnDemand = false }) {
   const { state } = useSessionGuide();
-  const { scheduled, favorited, eventConfig, dismissingIds: rawDismissing } = state;
+  const { eventConfig, dismissingIds: rawDismissing } = state;
+  const scheduled = scheduledSignal.value;
+  const favorited = favoritedSignal.value;
   const userTz = eventConfig.userTz;
   const dismissingIds = rawDismissing || new Set();
   const allDismissing = sessions?.every((s) => dismissingIds.has(s.id)) || false;

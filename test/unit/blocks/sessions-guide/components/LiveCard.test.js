@@ -2,22 +2,19 @@ import { expect } from '@esm-bundle/chai';
 import * as preact from '../../../mocks/deps/htm-preact.js';
 import { buildStore } from '../../../../../event-libs/v1/blocks/sessions-guide/store/index.js';
 import { buildLiveCard } from '../../../../../event-libs/v1/blocks/sessions-guide/components/LiveCard.js';
+import {
+  scheduled, favorited, pendingActions, liveStreamActiveIds,
+} from '../../../../../event-libs/v1/utils/session-store.js';
 
 const BASE_CONFIG = {
   title: 'Adobe MAX 2026',
-
-
   userTz: 'America/Los_Angeles',
   surface: 'widget',
   trackColors: { Featured: '#ff0000' },
   trackIcons: {},
-  rfApiUrl: '',
-  rfApiProfileId: '',
   showConflictModal: false,
   filterCategories: [],
-  mrEnv: 'dev',
   theme: 'dark',
-  manualOnDemandTransitionTime: null,
 };
 
 const LIVE_SESSION = {
@@ -36,22 +33,23 @@ const LIVE_SESSION = {
 
 const NO_THUMB_SESSION = { ...LIVE_SESSION, id: 'session-no-thumb', thumbnailUrl: null };
 
-function makeStore(overrides = {}) {
+function makeStore() {
   const store = buildStore(preact);
   store.SessionGuideContext._current = {
-    state: {
-      scheduled: new Set(),
-      favorited: new Set(),
-      isRegistered: true,
-      eventConfig: { ...BASE_CONFIG },
-      ...overrides,
-    },
+    state: { eventConfig: { ...BASE_CONFIG } },
     dispatch: () => {},
   };
   return store;
 }
 
 describe('LiveCard', () => {
+  beforeEach(() => {
+    scheduled.value = new Set();
+    favorited.value = new Set();
+    pendingActions.value = new Set();
+    liveStreamActiveIds.value = new Set();
+  });
+
   it('renders without throwing', () => {
     const store = makeStore();
     const LiveCard = buildLiveCard(preact, store);
@@ -94,7 +92,8 @@ describe('LiveCard', () => {
   });
 
   it('applies is-favorited class when favorited', () => {
-    const store = makeStore({ favorited: new Set(['session-keynote']) });
+    favorited.value = new Set(['session-keynote']);
+    const store = makeStore();
     const LiveCard = buildLiveCard(preact, store);
     expect(LiveCard({ session: LIVE_SESSION })).to.include('is-favorited');
   });

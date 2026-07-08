@@ -1,5 +1,9 @@
 import { html } from '../../../deps/htm-preact.js';
 import { useSessionGuide } from '../store/index.js';
+import {
+  sessions as sessionsSignal, favorited as favoritedSignal,
+  liveStreamActiveIds as liveStreamActiveIdsSignal, auth,
+} from '../../../utils/session-store.js';
 import { RegistrationPrompt } from './RegistrationPrompt.js';
 import { TimeSlotRow } from './TimeSlotRow.js';
 import { TrackRow } from './TrackRow.js';
@@ -8,20 +12,22 @@ import {
   groupByStartTime, groupByTrack, onDemandSessions, filterSessions, sessionsForDay, liveSessions,
 } from '../utils/session-filters.js';
 import { getNowMs, formatShortTime } from '../utils/time.js';
-import { deriveSessionState } from '../utils/session-state.js';
+import { deriveSessionState } from '../../../utils/session-state.js';
 
 export const buildMyFavoritesView = () => MyFavoritesView;
 
 export function MyFavoritesView() {
   const { state, dispatch } = useSessionGuide();
-  const { isRegistered, sessions, favorited, myFavoritesTab, activeDay } = state;
-  const liveStreamActiveIds = state.liveStreamActiveIds || new Set();
+  const { myFavoritesTab, activeDay } = state;
+  const sessions = sessionsSignal.value;
+  const favorited = favoritedSignal.value;
+  const liveStreamActiveIds = liveStreamActiveIdsSignal.value;
   const activeFilters = state.activeFilters || {};
   const searchQuery = state.searchQuery || '';
   const userTz = state.eventConfig?.userTz;
   const nowMs = getNowMs();
 
-  if (isRegistered !== true) return html`<${RegistrationPrompt} />`;
+  if (auth.value.isRegistered !== true) return html`<${RegistrationPrompt} />`;
 
   const favoritedSessions = sessions.filter((s) => favorited.has(s.id));
   const dayFavorited = sessionsForDay(favoritedSessions, activeDay, userTz);

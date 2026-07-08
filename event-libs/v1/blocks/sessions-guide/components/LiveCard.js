@@ -1,8 +1,11 @@
 import { html } from '../../../deps/htm-preact.js';
 import { useSessionGuide } from '../store/index.js';
 import { formatShortTime, getNowMs } from '../utils/time.js';
-import { deriveSessionState } from '../utils/session-state.js';
-import { scheduleAction, favoriteAction } from '../services/session-actions.js';
+import { deriveSessionState } from '../../../utils/session-state.js';
+import {
+  scheduled, favorited, pendingActions, liveStreamActiveIds,
+} from '../../../utils/session-store.js';
+import { scheduleWithFeedback, favoriteWithFeedback } from '../../../services/sessions/action-feedback.js';
 import { IconPlay, IconCalendarCheck, IconCalendarPlus, IconHeartFilled, IconHeartOutline } from './icons.js';
 import { setSessionParam, safeUrl } from '../utils/url.js';
 import { CategoryBadge } from './CategoryBadge.js';
@@ -18,17 +21,15 @@ export const buildLiveCard = () => LiveCard;
 
 export function LiveCard({ session, variant = 'live' }) {
   const { state, dispatch } = useSessionGuide();
-  const { scheduled, favorited, eventConfig } = state;
-  const pendingActions = state.pendingActions || new Set();
-  const liveStreamActiveIds = state.liveStreamActiveIds || new Set();
+  const { eventConfig } = state;
   const { userTz, trackColors, surface } = eventConfig;
 
-  const isScheduled = scheduled.has(session.id);
-  const isFavorited = favorited.has(session.id);
-  const isPending = pendingActions.has(session.id);
+  const isScheduled = scheduled.value.has(session.id);
+  const isFavorited = favorited.value.has(session.id);
+  const isPending = pendingActions.value.has(session.id);
 
   const nowMs = getNowMs();
-  const sessionState = deriveSessionState(session, liveStreamActiveIds, nowMs);
+  const sessionState = deriveSessionState(session, liveStreamActiveIds.value, nowMs);
 
   const startMs = Date.parse(session.startTimeUtc);
   const endMs = Date.parse(session.endTimeUtc);
@@ -51,12 +52,12 @@ export function LiveCard({ session, variant = 'live' }) {
 
   async function handleSchedule(e) {
     e.stopPropagation();
-    await scheduleAction(session, state, dispatch);
+    await scheduleWithFeedback(session, { eventConfig, isScheduled });
   }
 
   async function handleFavorite(e) {
     e.stopPropagation();
-    await favoriteAction(session, state, dispatch);
+    await favoriteWithFeedback(session, { eventConfig, isFavorited });
   }
 
   const watchHref = safeUrl(session.watchUrl || session.sessionPageUrl);

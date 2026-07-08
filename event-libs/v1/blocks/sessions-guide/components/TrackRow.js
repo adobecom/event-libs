@@ -1,12 +1,14 @@
 import { html, useState, useRef, useLayoutEffect } from '../../../deps/htm-preact.js';
 import { useSessionGuide } from '../store/index.js';
+import { favorited as favoritedSignal } from '../../../utils/session-store.js';
 import { SessionCard } from './SessionCard.js';
 
 export const buildTrackRow = () => TrackRow;
 
 export function TrackRow({ track, sessions }) {
   const { state } = useSessionGuide();
-  const { favorited, dismissingIds: rawDismissing } = state;
+  const { dismissingIds: rawDismissing } = state;
+  const favorited = favoritedSignal.value;
   const dismissingIds = rawDismissing || new Set();
   const allDismissing = sessions?.every((s) => dismissingIds.has(s.id)) || false;
 

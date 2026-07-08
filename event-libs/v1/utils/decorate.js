@@ -28,6 +28,7 @@ import {
 } from './utils.js';
 import { massageMetadata } from './date-time-helper.js';
 import { hydrateBlocks, setHydrationPromise } from '../hydrate/hydrate.js';
+import { initSessionState } from './session-store.js';
 
 const ICONS_BASE_URL = new URL('../icons/', import.meta.url).href;
 
@@ -1013,6 +1014,11 @@ export function decorateEvent(parent) {
   }
 
   if (!getMetadata('event-id')) return;
+
+  // Bootstraps shared, page-level session state (sessions, favorites, scheduled,
+  // auth) ahead of any block's own init() — no-ops when rainfocus-api-url isn't authored.
+  initSessionState();
+
   // Hydrate metadata with user-friendly transformations
   addStylesToEventPage();
   const miloConfig = getEventConfig().miloConfig;
