@@ -11,60 +11,29 @@ async function getPromotionalContentUrl() {
   const { miloConfig } = eventConfig;
   const miloLibs = miloConfig?.miloLibs ? miloConfig.miloLibs : LIBS;
   const { getLocale } = await import(`${miloLibs}/utils/utils.js`);
-
+  
   const { prefix } = getLocale(miloConfig?.locales || FALLBACK_LOCALES);
-
+  
   // Get the domain from import.meta.url
   const moduleUrl = new URL(import.meta.url);
   const domain = `${moduleUrl.protocol}//${moduleUrl.host}`;
-
+  
   return `${domain}${prefix}/event-libs/assets/configs/promotional-content.json`;
 }
 
-async function rehydratePromotionalItems(promotionalItems) {
-  if (promotionalItems.length === 0) return [];
-
-  try {
-    const url = await getPromotionalContentUrl();
-    const response = await fetch(url);
-
-    if (!response.ok) {
-      throw new Error(`Failed to fetch promotional content: ${response.status}`);
-    }
-
-    const json = await response.json();
-    const data = json.data || [];
-
-    if (!data || data.length === 0) {
-      window.lana?.log(`Error: No promotional content found at ${url}`);
-      return [];
-    }
-
-    return promotionalItems.map((item) => data.find((content) => content.name === item));
-  } catch (error) {
-    window.lana?.log(`Error fetching promotional content: ${JSON.stringify(error)}`);
-    return [];
-  }
-}
-
-async function getPromotionalContent() {
+function getPromotionalContent() {
   const customAttributesMetadata = getMetadata('custom-attributes');
   if (!customAttributesMetadata) return [];
 
-  let promotionalItems = [];
   try {
     const customAttributes = JSON.parse(customAttributesMetadata);
-    promotionalItems = customAttributes
-      .filter((attr) => attr.attribute?.replace(/\s+/g, '').toLowerCase() === 'promotionalitems')
-      .flatMap((attr) => (Array.isArray(attr.values)
-        ? attr.values.map((v) => v?.value).filter(Boolean)
-        : [attr.value]).filter(Boolean));
+    return customAttributes
+      .filter((attr) => attr.attribute === 'promotionalItems' && attr.value)
+      .map((attr) => attr.value);
   } catch (error) {
     window.lana?.log(`Error parsing custom-attributes: ${JSON.stringify(error)}`);
     return [];
   }
-
-  return rehydratePromotionalItems(promotionalItems);
 }
 
 async function getLegacyPromotionalContent() {
@@ -85,7 +54,37 @@ async function getLegacyPromotionalContent() {
     }
   }
 
-  return rehydratePromotionalItems(promotionalItems);
+  // If no promotional items, return early to avoid unnecessary imports and fetch
+  if (promotionalItems.length === 0) {
+    return [];
+  }
+
+  try {
+    const url = await getPromotionalContentUrl();
+    const response = await fetch(url);
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch promotional content: ${response.status}`);
+    }
+
+    const json = await response.json();
+    const data = json.data || [];
+
+    if (!data || data.length === 0) {
+      window.lana?.log(`Error: No promotional content found at ${url}`);
+      return [];
+    }
+
+    const rehydratedPromotionalItems = promotionalItems.map((item) => {
+      const promotionalItem = data.find((content) => content.name === item);
+      return promotionalItem;
+    });
+
+    return rehydratedPromotionalItems;
+  } catch (error) {
+    window.lana?.log(`Error fetching promotional content: ${JSON.stringify(error)}`);
+    return [];
+  }
 }
 
 export function addMediaReversedClass(el) {
@@ -102,13 +101,12 @@ export default async function init(el) {
   const eventConfig = getEventConfig();
   const miloLibs = eventConfig?.miloConfig?.miloLibs ? eventConfig.miloConfig.miloLibs : LIBS;
 
-  let rehydratedItems = await getPromotionalContent();
+  let fragmentUrls = getPromotionalContent();
 
-  if (!rehydratedItems.length) {
-    rehydratedItems = await getLegacyPromotionalContent();
+  if (!fragmentUrls.length) {
+    const legacyItems = await getLegacyPromotionalContent();
+    fragmentUrls = (legacyItems ?? []).map((item) => item?.['fragment-path']).filter(Boolean);
   }
-
-  const fragmentUrls = (rehydratedItems ?? []).map((item) => item?.['fragment-path']).filter(Boolean);
 
   if (!fragmentUrls?.length) return;
 
