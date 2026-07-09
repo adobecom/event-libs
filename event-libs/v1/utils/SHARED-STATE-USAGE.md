@@ -120,10 +120,10 @@ import { showToast } from '../../features/toast/toast.js';
 showToast({ message: 'Link copied', variant: 'positive' });
 ```
 
-See `PLAN.md`'s Phase 4.3/4.4 sections in this directory for the full option shapes.
+See `../blocks/sessions-guide/PLAN.md`'s Phase 4.3/4.4 sections for the full option shapes.
 
 ## Reference
 
-- `auth` shape and registration-state table: "User registration states" in `PLAN.md`
-- `Session` interface: "State Shape" in `PLAN.md`
-- Full mock/real-API status per module: `REAL-API-CHECKLIST.md`
+- `auth` shape and registration-state table: "User registration states" in `../blocks/sessions-guide/PLAN.md`
+- `Session` interface: "State Shape" in `../blocks/sessions-guide/PLAN.md`
+- Full mock/real-API status per module: `../blocks/sessions-guide/REAL-API-CHECKLIST.md`
