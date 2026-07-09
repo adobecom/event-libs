@@ -1,3 +1,7 @@
+import { constructRequestOptions } from '../../utils/esp-controller.js';
+import { getEventServiceEnv } from '../../utils/utils.js';
+import { ENV_MAP } from '../../utils/constances.js';
+
 // Swap to a real photo for visual testing of the speaker details view.
 const TEST_SPEAKER_PHOTO = 'https://MWPW-199065--event-libs--adobecom.aem.live/event-libs/v1/blocks/sessions-guide/assets/Kristy-Campbell.jpg';
 
@@ -646,4 +650,25 @@ function normalizeSessions(rawSessions) {
 // eslint-disable-next-line no-unused-vars
 export async function fetchSessions(apiUrl) {
   return normalizeSessions(MOCK_SESSIONS);
+}
+
+// TEMP: ESL just became available — this probes the real endpoint so we can inspect its
+// payload shape in the console before wiring it in. Not awaited by callers, never throws,
+// and doesn't touch app state. Remove once fetchSessions() above is replaced with a real call.
+// Event ID is hardcoded to the example confirmed to exist on the stage env — this page's
+// own `event-id` metadata is mock-only and doesn't resolve on the real backend.
+const ESL_PROBE_EVENT_ID = 'ce15d0f5-b836-4118-9b3f-1a0614208112';
+
+export async function probeEslPayload() {
+  try {
+    const { serviceApiEndpoints } = ENV_MAP[getEventServiceEnv().name];
+    const options = await constructRequestOptions('GET');
+    const res = await fetch(`${serviceApiEndpoints.esp}/v1/events/${ESL_PROBE_EVENT_ID}/sessions`, options);
+    const data = await res.json();
+    // eslint-disable-next-line no-console
+    console.log('[ESL probe] payload:', data);
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.log('[ESL probe] failed:', err);
+  }
 }

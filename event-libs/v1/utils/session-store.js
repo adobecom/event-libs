@@ -1,7 +1,7 @@
 import { signal, batch } from '../deps/htm-preact.js';
 import BlockMediator from '../deps/block-mediator.min.js';
 import { getMetadata, getEventServiceEnv } from './utils.js';
-import { fetchSessions } from '../services/sessions/sessions-api.js';
+import { fetchSessions, probeEslPayload } from '../services/sessions/sessions-api.js';
 import { startPolling } from '../services/sessions/poller.js';
 import { addSession, removeSession, toggleSessionInterest } from '../services/sessions/rainfocus.js';
 import { mountToast } from '../features/toast/toast.js';
@@ -96,9 +96,14 @@ function syncAuth() {
 
 async function loadSessions() {
   sessionsStatus.value = 'loading';
+  probeEslPayload(); // TEMP: fire-and-forget, see sessions-api.js for why
   try {
-    sessions.value = await fetchSessions(apiConfig.apiUrl);
-    sessionsStatus.value = 'ready';
+    const fetched = await fetchSessions(apiConfig.apiUrl);
+    // Batched so components reading both `sessions` and `sessionsStatus` re-render once.
+    batch(() => {
+      sessions.value = fetched;
+      sessionsStatus.value = 'ready';
+    });
     const mrSessions = sessions.value.filter((s) => s.mrStreamId);
     startPolling(mrSessions, apiConfig.mrEnv, (active) => { liveStreamActiveIds.value = active; });
   } catch (err) {

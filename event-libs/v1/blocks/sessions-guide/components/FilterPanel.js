@@ -1,4 +1,4 @@
-import { html, useState, useMemo } from '../../../deps/htm-preact.js';
+import { html, useState, useComputed } from '../../../deps/htm-preact.js';
 import { useSessionGuide } from '../store/index.js';
 import { sessions } from '../../../utils/session-store.js';
 
@@ -21,8 +21,9 @@ export function FilterPanel({ onClose }) {
     filterCategories && filterCategories.length > 0 ? filterCategories[0].id : null,
   );
 
-  // Derive unique option values from sessions for each category
-  const categoryOptions = useMemo(() => {
+  // Derive unique option values from sessions for each category — auto-tracks
+  // `sessions.value` and only recomputes when it actually changes.
+  const categoryOptions = useComputed(() => {
     const opts = {};
     if (!filterCategories) return opts;
     filterCategories.forEach(({ id }) => {
@@ -35,7 +36,7 @@ export function FilterPanel({ onClose }) {
       opts[id] = [...values].sort();
     });
     return opts;
-  }, [sessions.value, filterCategories]);
+  }).value;
 
   // Count of active filters across all categories
   const totalActiveCount = Object.values(activeFilters).reduce(

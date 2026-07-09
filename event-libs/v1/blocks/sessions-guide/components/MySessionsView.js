@@ -1,4 +1,4 @@
-import { html } from '../../../deps/htm-preact.js';
+import { html, useMemo } from '../../../deps/htm-preact.js';
 import { useSessionGuide } from '../store/index.js';
 import {
   sessions as sessionsSignal, scheduled as scheduledSignal,
@@ -29,21 +29,28 @@ export function MySessionsView() {
 
   if (auth.value.isRegistered !== true) return html`<${RegistrationPrompt} />`;
 
-  const scheduledSessions = sessions.filter((s) => scheduled.has(s.id));
-  const dayScheduled = sessionsForDay(scheduledSessions, activeDay, userTz);
+  // Memoized: this component re-renders on every context dispatch (e.g. opening the
+  // detail overlay), not just when the inputs below actually change.
+  const { live, timeSlots, filteredOnDemand } = useMemo(() => {
+    const scheduledSessions = sessions.filter((s) => scheduled.has(s.id));
+    const dayScheduled = sessionsForDay(scheduledSessions, activeDay, userTz);
 
-  const live = liveSessions(scheduledSessions, liveStreamActiveIds, activeDay, userTz, nowMs)
-    .sort((a, b) => (a.startTimeUtc < b.startTimeUtc ? -1 : 1));
+    const liveNow = liveSessions(scheduledSessions, liveStreamActiveIds, activeDay, userTz, nowMs)
+      .sort((a, b) => (a.startTimeUtc < b.startTimeUtc ? -1 : 1));
 
-  const activeAndUpcoming = dayScheduled.filter((s) => {
-    const st = deriveSessionState(s, liveStreamActiveIds, nowMs);
-    return st === 'upcoming';
-  });
-  const onDemandRaw = onDemandSessions(dayScheduled, liveStreamActiveIds, nowMs);
+    const activeAndUpcoming = dayScheduled.filter((s) => {
+      const st = deriveSessionState(s, liveStreamActiveIds, nowMs);
+      return st === 'upcoming';
+    });
+    const onDemandRaw = onDemandSessions(dayScheduled, liveStreamActiveIds, nowMs);
 
-  const filteredUpcoming = filterSessions(activeAndUpcoming, activeFilters, searchQuery);
-  const filteredOnDemand = filterSessions(onDemandRaw, activeFilters, searchQuery);
-  const timeSlots = groupByStartTime(filteredUpcoming);
+    const filteredUpcomingSessions = filterSessions(activeAndUpcoming, activeFilters, searchQuery);
+    return {
+      live: liveNow,
+      timeSlots: groupByStartTime(filteredUpcomingSessions),
+      filteredOnDemand: filterSessions(onDemandRaw, activeFilters, searchQuery),
+    };
+  }, [sessions, scheduled, liveStreamActiveIds, activeDay, userTz, nowMs, activeFilters, searchQuery]);
 
   const hasUpcoming = timeSlots.length > 0;
   const hasOnDemand = filteredOnDemand.length > 0;

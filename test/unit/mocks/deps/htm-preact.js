@@ -104,6 +104,13 @@ export function batch(fn) {
   return fn();
 }
 
+// Real @preact/signals `useComputed()` returns a memoized signal; this mock re-derives
+// on every `.value` read (like the `useMemo` stub above) since there's no render pass to
+// cache across.
+export function useComputed(fn) {
+  return { get value() { return fn(); } };
+}
+
 export function h(type, props, ...children) {
   if (typeof type !== 'function') return null;
   const childVal = children.length === 1 ? children[0] : children;
