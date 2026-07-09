@@ -1017,7 +1017,12 @@ export function decorateEvent(parent) {
 
   // Bootstraps shared, page-level session state (sessions, favorites, scheduled,
   // auth) ahead of any block's own init() — no-ops when rainfocus-api-url isn't authored.
-  initSessionState();
+  // Additionally gated on tier-1-event-state-enabled since event-id alone is already
+  // authored broadly in prod; we don't want to seed sessions-guide's mock data on every
+  // event page that happens to have it.
+  if (getMetadata('tier-1-event-state-enabled') === 'true') {
+    initSessionState();
+  }
 
   // Hydrate metadata with user-friendly transformations
   addStylesToEventPage();

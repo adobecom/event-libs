@@ -71,6 +71,14 @@ After removal, `syncAuth()` falls through directly to reading `imsProfile` and `
 
 These already live in page metadata (not this block's authoring table) so the shared bootstrap can start fetching before any block mounts — just point them at the real Rainfocus endpoint/profile once it exists. Optional `register-url` and `manual-on-demand-transition-time` metadata follow the same pattern.
 
+**Also required:** `tier-1-event-state-enabled` metadata, checked in `decorateEvent()` (`event-libs/v1/utils/decorate.js`) *before* `initSessionState()` is even called:
+
+```html
+<meta name="tier-1-event-state-enabled" content="true">
+```
+
+`event-id` alone is already authored on prod event pages for unrelated purposes, so gating the shared session-store bootstrap on it alone would seed mock data on pages that don't want it. Pages that actually want the sessions-guide store must opt in with both `tier-1-event-state-enabled="true"` and `rainfocus-api-url`.
+
 ---
 
 ## 4. Implement real Rainfocus API calls
