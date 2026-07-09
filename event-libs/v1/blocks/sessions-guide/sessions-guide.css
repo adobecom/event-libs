@@ -2369,15 +2369,6 @@
     pointer-events: auto;
   }
 
-  .sg-card:not(:hover).is-scheduled:not(.is-favorited) .sg-card__btn--favorite,
-  .sg-card:not(:hover).is-favorited:not(.is-scheduled) .sg-card__btn--schedule {
-    display: none;
-  }
-
-  .sg-card:not(:hover) .sg-card__btn--play {
-    display: none;
-  }
-
   /* Heart slides down into its correct position as schedule reveals above it.
      Classes set on mouseenter only — prevents re-trigger on state change while hovered. */
   .sg-card--anim-fav .sg-card__btn--favorite {
@@ -2388,6 +2379,15 @@
   .sg-card--anim-fav .sg-card__btn--play,
   .sg-card--anim-sched .sg-card__btn--favorite {
     animation: sg-card-btn-reveal 0.22s ease both;
+  }
+
+  .sg-card:not(:hover).is-scheduled:not(.is-favorited) .sg-card__btn--favorite,
+  .sg-card:not(:hover).is-favorited:not(.is-scheduled) .sg-card__btn--schedule {
+    display: none;
+  }
+
+  .sg-card:not(:hover) .sg-card__btn--play {
+    display: none;
   }
 
   @keyframes sg-card-heart-slide {

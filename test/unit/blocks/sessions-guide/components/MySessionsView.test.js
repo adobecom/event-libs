@@ -6,8 +6,24 @@ import {
   sessions, scheduled, favorited, liveStreamActiveIds, auth,
 } from '../../../../../event-libs/v1/utils/session-store.js';
 
+// Offset from real "now" (the component derives session state from the real clock, so
+// the sign must stay relative to it), but clamped to never cross the LA midnight boundary
+// in either direction — otherwise this flakes whenever the suite runs near LA midnight,
+// since `activeDay` below is pinned to "today" in LA time. Clamping is monotonic in the
+// requested magnitude, so relative ordering between two calls (e.g. a session's start vs
+// end) is always preserved.
 function h(offsetHours) {
-  return new Date(Date.now() + offsetHours * 3_600_000).toISOString();
+  const now = new Date();
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/Los_Angeles', hour: 'numeric', minute: 'numeric', second: 'numeric', hour12: false,
+  }).formatToParts(now).reduce((acc, p) => ({ ...acc, [p.type]: Number(p.value) }), {});
+  const msSinceMidnightLA = ((parts.hour % 24) * 3600 + parts.minute * 60 + parts.second) * 1000;
+  const msUntilMidnightLA = 24 * 3_600_000 - msSinceMidnightLA;
+  const requestedMs = offsetHours * 3_600_000;
+  const safeMs = requestedMs >= 0
+    ? Math.min(requestedMs, msUntilMidnightLA / 2)
+    : -Math.min(-requestedMs, msSinceMidnightLA / 2);
+  return new Date(now.getTime() + safeMs).toISOString();
 }
 
 const UPCOMING_SESSION = {
