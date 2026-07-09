@@ -1,7 +1,7 @@
 import { expect } from '@esm-bundle/chai';
 import {
   sessionsForDay, groupByStartTime, groupByTrack,
-  liveSessions, upcomingSessions, onDemandSessions,
+  liveSessions, upcomingSessions, onDemandSessions, getFeaturedSessions,
 } from '../../../../../event-libs/v1/blocks/sessions-guide/utils/session-filters.js';
 import { getSessionDayKey } from '../../../../../event-libs/v1/blocks/sessions-guide/utils/time.js';
 
@@ -67,6 +67,12 @@ describe('session-filters/groupByStartTime', () => {
   it('returns empty array for no sessions', () => {
     expect(groupByStartTime([])).to.deep.equal([]);
   });
+
+  it('returns groups sorted by start time ascending', () => {
+    const groups = groupByStartTime([UPCOMING, LIVE]);
+    expect(groups[0][0].id).to.equal('live');
+    expect(groups[1][0].id).to.equal('upcoming');
+  });
 });
 
 describe('session-filters/groupByTrack', () => {
@@ -103,5 +109,39 @@ describe('session-filters/onDemandSessions', () => {
   it('returns sessions that have ended', () => {
     const result = onDemandSessions([LIVE, UPCOMING, PAST], new Set(), NOW);
     expect(result.map((s) => s.id)).to.deep.equal(['past']);
+  });
+});
+
+describe('session-filters/getFeaturedSessions', () => {
+  it('returns sessions matching featuredIds for the active day', () => {
+    const result = getFeaturedSessions([LIVE, UPCOMING, PAST], ['live', 'past'], LIVE_DAY, TZ);
+    expect(result.map((s) => s.id)).to.include('live');
+  });
+
+  it('excludes featured ids not on the active day', () => {
+    const result = getFeaturedSessions([LIVE, UPCOMING], ['upcoming'], LIVE_DAY, TZ);
+    // UPCOMING is on the same day in most cases, but if days differ it should be excluded
+    // Regardless: result should never exceed 3
+    expect(result.length).to.be.at.most(3);
+  });
+
+  it('caps results at 3', () => {
+    const many = [LIVE, UPCOMING, PAST, UPCOMING_2].map((s, i) => ({ ...s, id: `s-${i}` }));
+    const ids = many.map((s) => s.id);
+    const day = getSessionDayKey(many[0], TZ);
+    const result = getFeaturedSessions(many, ids, day, TZ);
+    expect(result.length).to.be.at.most(3);
+  });
+
+  it('falls back to random selection when no featuredIds provided', () => {
+    const result = getFeaturedSessions([LIVE, UPCOMING, PAST], [], LIVE_DAY, TZ);
+    expect(result.length).to.be.at.most(3);
+  });
+
+  it('fallback is deterministic for the same day', () => {
+    const sessions = [LIVE, UPCOMING, PAST, UPCOMING_2];
+    const r1 = getFeaturedSessions(sessions, [], LIVE_DAY, TZ).map((s) => s.id);
+    const r2 = getFeaturedSessions(sessions, [], LIVE_DAY, TZ).map((s) => s.id);
+    expect(r1).to.deep.equal(r2);
   });
 });

@@ -1,6 +1,9 @@
 import { html } from '../../../deps/htm-preact.js';
 import { useSessionGuide } from '../store/index.js';
-import { SessionCard } from './SessionCard.js';
+import {
+  sessions as sessionsSignal, liveStreamActiveIds as liveStreamActiveIdsSignal,
+} from '../../../utils/session-store.js';
+import { TrackRow } from './TrackRow.js';
 import { onDemandSessions, groupByTrack, filterSessions } from '../utils/session-filters.js';
 import { getNowMs } from '../utils/time.js';
 
@@ -8,8 +11,8 @@ export const buildOnDemandView = () => OnDemandView;
 
 export function OnDemandView() {
   const { state } = useSessionGuide();
-  const { sessions } = state;
-  const liveStreamActiveIds = state.liveStreamActiveIds || new Set();
+  const sessions = sessionsSignal.value;
+  const liveStreamActiveIds = liveStreamActiveIdsSignal.value;
   const activeFilters = state.activeFilters || {};
   const searchQuery = state.searchQuery || '';
   const nowMs = getNowMs();
@@ -20,14 +23,7 @@ export function OnDemandView() {
 
   return html`
     <div class="sg-view sg-view--on-demand">
-      ${byTrack.map(([track, trackSessions]) => html`
-        <div class="sg-track-section">
-          <h3 class="sg-track-title">${track}</h3>
-          <div class="sg-track-cards">
-            ${trackSessions.map((s) => html`<${SessionCard} session=${s} />`)}
-          </div>
-        </div>
-      `)}
+      ${byTrack.map(([track, trackSessions]) => html`<${TrackRow} key=${track} track=${track} sessions=${trackSessions} />`)}
       ${byTrack.length === 0 && html`
         <div class="sg-empty">Sessions will be available on demand after the event.</div>
       `}

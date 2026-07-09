@@ -29,3 +29,9 @@ export function clearSessionParams() {
   params.delete('session');
   return buildUrl(params);
 }
+
+// Returns url only if it starts with https://, http://, or / — blocks javascript: URIs.
+export function safeUrl(url) {
+  if (!url) return undefined;
+  return /^(https?:\/\/|\/)/.test(url) ? url : undefined;
+}
