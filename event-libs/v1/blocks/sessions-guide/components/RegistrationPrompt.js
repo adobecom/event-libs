@@ -1,13 +1,10 @@
 import { html } from '../../../deps/htm-preact.js';
-import { useSessionGuide } from '../store/index.js';
+import { auth } from '../../../utils/session-store.js';
 
 export const buildRegistrationPrompt = () => RegistrationPrompt;
 
 export function RegistrationPrompt() {
-  const { state } = useSessionGuide();
-  const { isLoggedIn } = state;
-
-  if (isLoggedIn === false) {
+  if (auth.value.isLoggedIn === false) {
     return html`
       <div class="sg-reg-prompt">
         <p class="sg-reg-prompt__message">Sign in and register for the event to access this view.</p>

@@ -2,6 +2,7 @@ import { expect } from '@esm-bundle/chai';
 import { readFile } from '@web/test-runner-commands';
 import { setEventConfig } from '../../../../event-libs/v1/utils/utils.js';
 import { eventConfig } from '../../scripts/mocks/event-config.js';
+import { sessions, sessionsStatus } from '../../../../event-libs/v1/utils/session-store.js';
 import init from '../../../../event-libs/v1/blocks/sessions-guide/sessions-guide.js';
 
 const body = await readFile({ path: './mocks/default.html' });
@@ -19,6 +20,10 @@ describe('sessions-guide', () => {
     document.body.innerHTML = body;
     document.head.innerHTML = '';
     el = document.querySelector('.sessions-guide');
+    // The shared session-store is normally bootstrapped by decorateEvent before any
+    // block's init() runs; simulate that here since this test drives init() directly.
+    sessions.value = [];
+    sessionsStatus.value = 'ready';
   });
 
   it('renders .sg-app into the block', async () => {

@@ -129,8 +129,8 @@ This method:
 After finding the initial position, the framework then validates this position against other conditions:
 
 1. **Mobile Rider Status**
-   - If the initial position has an active MR session, it stays
-   - If the previous position has an active MR session, it may need to go back
+   - On each timer tick, `advancePastInactiveMrSlots()` may skip dead MR slots whose `toggleTime` has passed (landing / late visitor)
+   - Background `validateSchedulePosition()` may adjust position once authoritative time is available
 
 2. **Metadata Conditions**
    - Validates metadata conditions for the initial position
@@ -140,7 +140,7 @@ This two-phase approach ensures:
 - Quick initial positioning based on time
 - Accurate final position based on all conditions
 - Efficient handling of schedule navigation
-- Proper handling of edge cases (like MR overrun)
+- Proper handling of edge cases (MR overrun, underrun, landing on dead MR slots)
 
 ### Example
 
@@ -166,10 +166,10 @@ This two-phase approach ensures:
 
 If current time is 1234567900:
 1. Phase 1: Finds "/session1" as initial position (last passed toggleTime)
-2. Phase 2: 
-   - Checks if session1 is still active
-   - If active, stays on "/session1"
-   - If ended, proceeds to "/post-event"
+2. Phase 2:
+   - If session1 is still active, stays on "/session1" (overrun)
+   - If session1 has ended and "/post-event" toggleTime has passed, proceeds to "/post-event"
+   - If session1 has ended but "/post-event" toggleTime is still future, advances early via natural stream-end underrun (see below)
 
 ## Schedule Trigger Mechanism
 
@@ -177,23 +177,54 @@ The framework uses a sophisticated trigger system that considers multiple factor
 
 ### Trigger Evaluation Order
 
-1. **Mobile Rider (MR) Status**
-   - Overrun Check: If current item has MR and session is still active, stay on current item
-   - Underrun Check: If next item has MR and session has ended, proceed to next item
-   - MR takes precedence over time-based triggers
-   - Uses BroadcastChannel for real-time status updates
+Each `runTimer()` tick calls `advancePastInactiveMrSlots()` first, then `shouldTriggerNextSchedule()`:
 
-2. **Metadata Conditions**
-   - Checks if metadata key matches expected value
-   - If condition not met, blocks transition regardless of time
-   - Can be used to force specific content based on external state
-   - Updates via BroadcastChannel for dynamic changes
+1. **Mobile Rider (MR) status** — see [Mobile Rider edge cases](#mobile-rider-edge-cases) below
+2. **Metadata conditions** — all conditions on the next item must pass
+3. **Time-based trigger (`toggleTime`)** — server-synchronized via Akamai time API
 
-3. **Time-based Trigger (toggleTime)**
-   - Only evaluated if no MR or metadata conditions are blocking
-   - Uses server-synchronized time to prevent client clock manipulation
-   - Supports testing mode via URL parameters
-   - Random polling interval to prevent server load
+MR stream status uses BroadcastChannel (`mobile-rider-store`) for real-time updates within the same tab.
+
+### Mobile Rider edge cases
+
+#### Overrun
+
+**Current slot is MR and the stream is still live** (`store: true`), even if the next slot's `toggleTime` has passed.
+
+- Worker **stays** on the current MR fragment until the stream ends.
+- Schedule clock alone does not force the transition.
+
+#### Natural stream-end underrun (`liveStreamEnd`)
+
+**Current slot is MR and the stream has ended** (`store: false`) while the user is on that slot.
+
+- Worker advances to the **next** schedule item **before** that item's `toggleTime`, if needed.
+- Applies to **MR → plain fragment** and **MR → MR** (next session can be shown early if its stream is already live).
+- Does **not** apply when only the *next* slot's stream is dead but the *current* slot is still live.
+
+#### Landing on a dead MR slot
+
+**User loads the page** after an MR session ended, and schedule positioning lands on that MR slot (`toggleTime` already passed, `store: false`).
+
+- `advancePastInactiveMrSlots()` walks past the dead slot **before** the first `postMessage`, so chrono-box never loads the MR fragment (no player flash).
+- Requires the dead slot's `toggleTime` to have passed; future MR windows are not entered early by this path alone.
+
+#### Future MR window
+
+**Next slot is MR and its `toggleTime` is still in the future.**
+
+- Worker does **not** advance into that slot early, even if that session's stream is already live or already dead in the store.
+- Exception: **natural stream-end underrun** — if the *current* MR stream just ended, advance into the next MR slot even when its `toggleTime` is still future.
+
+#### `avoidStreamEndFlag` (QA / preview only)
+
+When `?avoidStreamEndFlag=true`:
+
+- **Disables overrun hold** — active streams do not block `toggleTime`-based transitions.
+- **Disables `liveStreamEnd`** — stream ending does not trigger early advance.
+- **Disables landing skip** — `advancePastInactiveMrSlots()` does not skip dead MR slots.
+
+Schedule positioning follows **`toggleTime` only** (plus metadata). Use with `?serverTime=` to preview a specific moment without live MR streams affecting the timeline.
 
 ### Example Scenarios
 
@@ -236,6 +267,35 @@ The framework uses a sophisticated trigger system that considers multiple factor
 - If session1 is still active: Stays on current content
 - If session1 has ended: Proceeds to session2
 - Time trigger is ignored if MR session is active
+
+#### Scenario 2b: Mobile Rider natural underrun (MR → MR)
+
+```json
+{
+  "schedule": [
+    {
+      "pathToFragment": "/session1",
+      "toggleTime": 1234567890,
+      "mobileRider": { "sessionId": "session1" }
+    },
+    {
+      "pathToFragment": "/session2",
+      "toggleTime": 1234567899,
+      "mobileRider": { "sessionId": "session2" }
+    }
+  ]
+}
+```
+
+- Session1 ends at 1234567895 (before session2's `toggleTime`)
+- Worker advances to "/session2" immediately when session1 ends — even if session2's stream is already live
+- Does not wait until 1234567899 unless `avoidStreamEndFlag=true`
+
+#### Scenario 2c: Landing on a dead MR slot
+
+- User opens the page at 1234567900; schedule positions at "/session1" but session1 already ended
+- `advancePastInactiveMrSlots()` skips "/session1" before the first fragment load
+- User sees the next non-dead slot directly (no MR player flash)
 
 #### Scenario 3: Metadata-based Control
 ```json
@@ -335,7 +395,13 @@ This would simulate the page as if "now" is the specified timestamp, but time co
 
 ##### 3. `avoidStreamEndFlag` - Mobile Rider Stream Testing
 
-The `avoidStreamEndFlag` parameter treats all Mobile Rider streams as inactive for **blocking** purposes (no overrun hold on an active stream), so time-based schedule positioning can proceed. It does **not** skip `toggleTime` windows or fast-forward to later fragments; only natural stream-end underrun advances before `toggleTime`.
+The `avoidStreamEndFlag` parameter **disables MR stream status for schedule decisions** so authors can preview time-based positioning:
+
+- No **overrun hold** (active streams do not block transitions)
+- No **`liveStreamEnd` underrun** (stream ending does not advance early)
+- No **landing skip** of dead MR slots (`advancePastInactiveMrSlots` is off)
+
+With the flag set, the worker follows **`toggleTime` only** (plus metadata). Combine with `serverTime` to preview a specific schedule window without waiting for live streams.
 
 **Example Usage:**
 ```
@@ -343,10 +409,9 @@ https://your-site.com/event-page?avoidStreamEndFlag=true
 ```
 
 This is useful for:
-- Testing content that appears after Mobile Rider streams
-- Verifying schedule behavior without waiting for streams to end
-- Debugging transitions blocked by active streams
-- Testing fallback content when streams are unavailable
+- Previewing which fragment `toggleTime` selects at a given `serverTime`
+- Verifying schedule authoring without live MR streams blocking or skipping slots
+- Debugging transitions blocked by active streams in production (compare with and without the flag)
 
 You can combine this with `timing` or `serverTime`:
 ```

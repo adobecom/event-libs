@@ -1,12 +1,13 @@
 import { html, useEffect, useState } from '../../../deps/htm-preact.js';
 import { useSessionGuide } from '../store/index.js';
+import { sessionsStatus } from '../../../utils/session-store.js';
 import { DrawerHeader } from './DrawerHeader.js';
 import { ViewRouter } from './ViewRouter.js';
 import { FilterPanel } from './FilterPanel.js';
 
 export function FullPageShell() {
   const { state, dispatch } = useSessionGuide();
-  const { sessionsStatus, activeView, activeFilters, searchQuery } = state;
+  const { activeView, activeFilters, searchQuery } = state;
   const [filterOpen, setFilterOpen] = useState(false);
 
   // On mount: read URL params and populate store
@@ -75,9 +76,9 @@ export function FullPageShell() {
         <${DrawerHeader} onClose=${noop} onFilterToggle=${() => setFilterOpen((o) => !o)} filterOpen=${filterOpen} hideClose=${true} />
       </div>
       <div class="sg-full-page__body">
-        ${sessionsStatus === 'loading' && html`<div class="sg-loading">Loading sessions…</div>`}
-        ${sessionsStatus === 'error' && html`<div class="sg-error">Failed to load sessions.</div>`}
-        ${sessionsStatus === 'ready' && html`<${ViewRouter} />`}
+        ${sessionsStatus.value === 'loading' && html`<div class="sg-loading">Loading sessions…</div>`}
+        ${sessionsStatus.value === 'error' && html`<div class="sg-error">Failed to load sessions.</div>`}
+        ${sessionsStatus.value === 'ready' && html`<${ViewRouter} />`}
       </div>
       ${filterOpen && html`<${FilterPanel} onClose=${() => setFilterOpen(false)} />`}
     </div>
