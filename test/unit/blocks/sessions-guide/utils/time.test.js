@@ -3,6 +3,7 @@ import {
   detectUserTimezone,
   formatSessionTime,
   formatSessionDate,
+  formatDuration,
   isSessionLive,
   isSessionUpcoming,
   isSessionOnDemand,
@@ -110,6 +111,21 @@ describe('utils/time', () => {
       // 2026-10-28T17:00:00Z = 2026-10-28T10:00:00-07:00 in LA
       const key = getSessionDayKey(SESSION, TZ);
       expect(key).to.equal('2026-10-28');
+    });
+  });
+
+  describe('formatDuration', () => {
+    it('formats minutes only', () => {
+      expect(formatDuration('2026-10-28T17:00:00Z', '2026-10-28T17:30:00Z')).to.equal('30 min');
+    });
+    it('formats whole hours', () => {
+      expect(formatDuration('2026-10-28T17:00:00Z', '2026-10-28T18:00:00Z')).to.equal('1 hr');
+    });
+    it('formats hours and minutes', () => {
+      expect(formatDuration('2026-10-28T17:00:00Z', '2026-10-28T18:45:00Z')).to.equal('1 hr 45 min');
+    });
+    it('formats multiple whole hours', () => {
+      expect(formatDuration('2026-10-28T17:00:00Z', '2026-10-28T19:00:00Z')).to.equal('2 hr');
     });
   });
 });

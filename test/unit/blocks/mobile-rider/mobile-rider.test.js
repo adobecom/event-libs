@@ -218,6 +218,23 @@ describe('Mobile Rider Module', () => {
         expect(player.on.calledWith('streamend')).to.be.false;
         window.history.replaceState({}, '', window.location.pathname);
       });
+
+      it('should retry attaching end listener until window.__mr_player is ready', async () => {
+        riderInstance.mainID = 'main-video';
+        riderInstance.store = { get: sinon.stub().returns(true) };
+
+        // Player absent when RAF fires — tryAttach must not silently drop the listener
+        globalThis.__mr_player = null;
+        riderInstance.injectPlayer('test-video', 'test-skin');
+        await new Promise((resolve) => { setTimeout(resolve, 30); });
+
+        const player = { off: sinon.stub(), on: sinon.stub() };
+        globalThis.__mr_player = player;
+        // Wait for retry tick (ATTACH_INTERVAL_MS = 5ms)
+        await new Promise((resolve) => { setTimeout(resolve, 30); });
+
+        expect(player.on.calledWith('streamend')).to.be.true;
+      });
     });
 
     describe('setStatus', () => {
@@ -358,6 +375,41 @@ describe('Mobile Rider Module', () => {
 
         const onCall = player.on.getCalls().find((c) => c.args[0] === 'streamend');
         expect(() => onCall.args[1]()).to.not.throw();
+      });
+
+      it('should not re-embed after streamend when pending rAF has not run', async () => {
+        globalThis.mobilerider.embed = sinon.stub();
+        riderInstance.mainID = 'main-video';
+        riderInstance.store = { get: sinon.stub().returns(true), set: sinon.stub() };
+
+        const videoWrapper = document.createElement('div');
+        videoWrapper.className = 'video-wrapper';
+        el.appendChild(videoWrapper);
+        riderInstance.wrap = videoWrapper;
+        riderInstance.isEmbedding = false;
+
+        riderInstance.injectPlayer('test-video', 'test-skin');
+        globalThis.__mr_player = { off: sinon.stub(), on: sinon.stub(), dispose: sinon.stub() };
+        await new Promise((resolve) => { setTimeout(resolve, 50); });
+
+        const embedCountAfterFirst = globalThis.mobilerider.embed.callCount;
+        const onCall = globalThis.__mr_player.on.getCalls().find((c) => c.args[0] === 'streamend');
+        expect(onCall).to.not.be.undefined;
+
+        let pendingRaf = null;
+        window.requestAnimationFrame.restore();
+        sinon.stub(window, 'requestAnimationFrame').callsFake((cb) => {
+          pendingRaf = cb;
+          return 2;
+        });
+        riderInstance.isEmbedding = false;
+        riderInstance.injectPlayer('test-video', 'test-skin');
+
+        onCall.args[1]();
+        expect(riderInstance.wrap.querySelector('.mobile-rider-container.is-hidden')).to.not.be.null;
+
+        pendingRaf?.();
+        expect(globalThis.mobilerider.embed.callCount).to.equal(embedCountAfterFirst);
       });
     });
 
@@ -597,6 +649,191 @@ describe('Mobile Rider Module', () => {
       // The plugin file exists so the import succeeds;
       // verify init completed without errors
       expect(riderInstance.el).to.equal(el);
+    });
+
+    it('should not embed player when stream is already inactive in chrono-box', async () => {
+      sessionStorage.setItem('chrono-box-tab-id', 'test-tab-id');
+
+      const { mobileRiderStore } = await import(
+        '../../../../event-libs/v1/features/timing-framework/plugins/mobile-rider/plugin.js'
+      );
+      mobileRiderStore.set('test-video-123', false);
+
+      document.body.innerHTML = `
+        <div class="chrono-box">
+          ${defaultHtml}
+        </div>
+      `;
+      const el = document.querySelector('.mobile-rider');
+      riderInstance = init(el);
+      await new Promise((resolve) => { setTimeout(resolve, 300); });
+
+      expect(globalThis.mobilerider.embed.called).to.be.false;
+      expect(el.querySelector('.mobile-rider-player.is-hidden')).to.not.be.null;
+    });
+  });
+
+  describe('stylesheet injection', () => {
+    it('should use id guard instead of href substring for mobile-rider.css', async () => {
+      document.body.innerHTML = defaultHtml;
+      document.head.innerHTML = '';
+      const el = document.querySelector('.mobile-rider');
+      init(el);
+      await new Promise((resolve) => { setTimeout(resolve, 100); });
+      const link = document.getElementById('mobile-rider-css');
+      expect(link).to.not.be.null;
+      expect(link.rel).to.equal('stylesheet');
+    });
+
+    it('should not inject mobile-rider.css twice', async () => {
+      document.body.innerHTML = defaultHtml;
+      document.head.innerHTML = '';
+      const el = document.querySelector('.mobile-rider');
+      init(el);
+      await new Promise((resolve) => { setTimeout(resolve, 100); });
+      // second init — should not add a duplicate
+      document.body.innerHTML = defaultHtml;
+      init(document.querySelector('.mobile-rider'));
+      await new Promise((resolve) => { setTimeout(resolve, 100); });
+      expect(document.querySelectorAll('#mobile-rider-css').length).to.equal(1);
+    });
+  });
+
+  describe('#initASL poll-on-click', () => {
+    let el;
+
+    beforeEach(async () => {
+      sinon.stub(window, 'requestAnimationFrame').callsFake((cb) => setTimeout(cb, 0));
+      globalThis.mobilerider.embed = sinon.stub();
+
+      document.body.innerHTML = defaultHtml;
+      el = document.querySelector('.mobile-rider');
+      riderInstance = init(el);
+      await new Promise((resolve) => { setTimeout(resolve, 100); });
+
+      const videoWrapper = document.createElement('div');
+      videoWrapper.className = 'video-wrapper';
+      el.appendChild(videoWrapper);
+      riderInstance.wrap = videoWrapper;
+      riderInstance.isEmbedding = false;
+    });
+
+    it('re-attaches listener after player replaces the ASL button', async () => {
+      riderInstance.injectPlayer('vid', 'skin', 'asl-id');
+      globalThis.__mr_player = { off: sinon.stub(), on: sinon.stub() };
+      // Wait for RAF callback to fire
+      await new Promise((resolve) => { setTimeout(resolve, 50); });
+
+      // injectPlayer creates the real container — grab it from the wrap
+      const container = riderInstance.wrap.querySelector('.mobile-rider-container');
+
+      const btn1 = document.createElement('button');
+      btn1.id = 'asl-button';
+      container.appendChild(btn1);
+      // Wait for poll interval to find btn1 and attach { once: true } listener
+      await new Promise((resolve) => { setTimeout(resolve, 200); });
+
+      btn1.click();
+      expect(container.classList.contains('isASL')).to.be.true;
+
+      // Simulate player replacing the button node
+      btn1.remove();
+      const btn2 = document.createElement('button');
+      btn2.id = 'asl-button';
+      container.appendChild(btn2);
+      // Wait for re-poll to find btn2
+      await new Promise((resolve) => { setTimeout(resolve, 200); });
+
+      btn2.click();
+      expect(container.classList.contains('isASL')).to.be.true;
+    });
+
+    it('fires the handler exactly once per button due to { once: true }', async () => {
+      riderInstance.injectPlayer('vid', 'skin', 'asl-id');
+      globalThis.__mr_player = { off: sinon.stub(), on: sinon.stub() };
+      await new Promise((resolve) => { setTimeout(resolve, 50); });
+
+      const container = riderInstance.wrap.querySelector('.mobile-rider-container');
+      const btn = document.createElement('button');
+      btn.id = 'asl-button';
+      container.appendChild(btn);
+      await new Promise((resolve) => { setTimeout(resolve, 200); });
+
+      let addCount = 0;
+      const origAdd = container.classList.add.bind(container.classList);
+      container.classList.add = (cls) => { if (cls === 'isASL') addCount += 1; origAdd(cls); };
+
+      btn.click();
+      btn.click(); // second click on same node — { once: true } already removed the handler
+      expect(addCount).to.equal(1);
+    });
+
+    it('re-attaches streamend listener to the new player on each ASL toggle', async () => {
+      riderInstance.mainID = 'vid';
+      riderInstance.store = { get: sinon.stub().returns(true) };
+
+      riderInstance.injectPlayer('vid', 'skin', 'asl-id');
+      const player1 = { off: sinon.stub(), on: sinon.stub() };
+      globalThis.__mr_player = player1;
+      await new Promise((resolve) => { setTimeout(resolve, 50); });
+
+      const container = riderInstance.wrap.querySelector('.mobile-rider-container');
+      const btn1 = document.createElement('button');
+      btn1.id = 'asl-button';
+      container.appendChild(btn1);
+      await new Promise((resolve) => { setTimeout(resolve, 200); });
+
+      // First toggle: switch to ASL — new player instance appears
+      const player2 = { off: sinon.stub(), on: sinon.stub() };
+      globalThis.__mr_player = player2;
+      btn1.click();
+      await new Promise((resolve) => { setTimeout(resolve, 50); });
+      expect(player2.on.calledWith('streamend')).to.be.true;
+
+      // Second toggle: switch back — another player swap
+      btn1.remove();
+      const btn2 = document.createElement('button');
+      btn2.id = 'asl-button';
+      container.appendChild(btn2);
+      await new Promise((resolve) => { setTimeout(resolve, 200); });
+
+      const player3 = { off: sinon.stub(), on: sinon.stub() };
+      globalThis.__mr_player = player3;
+      btn2.click();
+      await new Promise((resolve) => { setTimeout(resolve, 50); });
+      expect(player3.on.calledWith('streamend')).to.be.true;
+    });
+
+    it('streamend on ASL player updates store and disposes player', async () => {
+      riderInstance.mainID = 'vid';
+      const mockStore = { get: sinon.stub().returns(true), set: sinon.stub() };
+      riderInstance.store = mockStore;
+
+      riderInstance.injectPlayer('vid', 'skin', 'asl-id');
+      const initialPlayer = { off: sinon.stub(), on: sinon.stub(), dispose: sinon.stub() };
+      globalThis.__mr_player = initialPlayer;
+      await new Promise((resolve) => { setTimeout(resolve, 50); });
+
+      const container = riderInstance.wrap.querySelector('.mobile-rider-container');
+      const btn = document.createElement('button');
+      btn.id = 'asl-button';
+      container.appendChild(btn);
+      await new Promise((resolve) => { setTimeout(resolve, 200); });
+
+      // Click ASL — player replaced by ASL player
+      const aslPlayer = { off: sinon.stub(), on: sinon.stub(), dispose: sinon.stub() };
+      globalThis.__mr_player = aslPlayer;
+      btn.click();
+      await new Promise((resolve) => { setTimeout(resolve, 50); });
+
+      const onCall = aslPlayer.on.getCalls().find((c) => c.args[0] === 'streamend');
+      expect(onCall, 'streamend listener attached to ASL player').to.not.be.undefined;
+
+      // Fire streamend on ASL player
+      onCall.args[1]();
+      expect(mockStore.set.calledWith('vid', false)).to.be.true;
+      expect(aslPlayer.dispose.called).to.be.true;
+      expect(globalThis.__mr_player).to.be.null;
     });
   });
 

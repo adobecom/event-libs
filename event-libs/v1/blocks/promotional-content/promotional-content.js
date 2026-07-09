@@ -21,15 +21,16 @@ async function getPromotionalContentUrl() {
   return `${domain}${prefix}/event-libs/assets/configs/promotional-content.json`;
 }
 
-function getPromotionalContent() {
+export function getPromotionalContent() {
   const customAttributesMetadata = getMetadata('custom-attributes');
   if (!customAttributesMetadata) return [];
 
   try {
     const customAttributes = JSON.parse(customAttributesMetadata);
-    return customAttributes
-      .filter((attr) => attr.attribute === 'promotionalItems' && attr.value)
-      .map((attr) => attr.value);
+    const promotionalItemsAttr = customAttributes.find((attr) => attr.name === 'promotionalItems' && attr.values);
+    if (!promotionalItemsAttr) return [];
+
+    return promotionalItemsAttr.values.map((v) => v?.value).filter(Boolean);
   } catch (error) {
     window.lana?.log(`Error parsing custom-attributes: ${JSON.stringify(error)}`);
     return [];
