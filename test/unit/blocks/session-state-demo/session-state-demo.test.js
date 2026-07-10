@@ -2,9 +2,11 @@ import { expect } from '@esm-bundle/chai';
 import { readFile } from '@web/test-runner-commands';
 import init from '../../../../event-libs/v1/blocks/session-state-demo/session-state-demo.js';
 import {
-  sessions, sessionsStatus, favorited, scheduled, auth, pendingActions, initSessionState,
+  sessions, sessionsStatus, favorited, scheduled, auth, pendingActions,
+  liveStreamActiveIds, sessionStateVersion, initSessionState,
 } from '../../../../event-libs/v1/utils/session-store.js';
 import { setMetadata } from '../../../../event-libs/v1/utils/utils.js';
+import { deriveSessionState, getNowMs } from '../../../../event-libs/v1/utils/session-state.js';
 
 const body = await readFile({ path: './mocks/default.html' });
 
@@ -55,6 +57,32 @@ describe('session-state-demo block', () => {
     expect(rowValue('Scheduled')).to.equal('0');
     expect(rowValue('Logged in')).to.equal('true');
     expect(rowValue('Registered')).to.equal('true');
+    const expectedState = deriveSessionState(sessions.value[0], liveStreamActiveIds.value, getNowMs());
+    expect(rowValue('First session state')).to.equal(expectedState);
+  });
+
+  it('recomputes the first session state row when sessionStateVersion changes', async () => {
+    const now = Date.now();
+    const previousSessions = sessions.value;
+    await init(el);
+
+    sessions.value = [{
+      id: 'demo-live',
+      startTimeUtc: new Date(now - 1_000).toISOString(),
+      endTimeUtc: new Date(now + 3_600_000).toISOString(),
+    }];
+    sessionStateVersion.value += 1; // simulates a real session-state-ticker notification
+    expect(rowValue('First session state')).to.equal('live');
+
+    sessions.value = [{
+      id: 'demo-live',
+      startTimeUtc: new Date(now - 7_200_000).toISOString(),
+      endTimeUtc: new Date(now - 3_600_000).toISOString(),
+    }];
+    sessionStateVersion.value += 1;
+    expect(rowValue('First session state')).to.equal('on-demand');
+
+    sessions.value = previousSessions;
   });
 
   it('updates live when a signal changes after init', async () => {
