@@ -947,6 +947,69 @@ describe('Events Form', () => {
       const result = getRsvpConfigFromMeta();
       expect(result.data[0].required).to.equal('');
     });
+
+    it('remaps checkbox + displayAs "dropdown" to multi-select', async () => {
+      const { getRsvpConfigFromMeta } = await import('../../../../event-libs/v1/blocks/events-form/events-form.js');
+      setRsvpConfigMeta({
+        rsvpFormFields: [
+          {
+            field: 'interests', label: 'Interests', type: 'checkbox', displayAs: 'dropdown', required: false, options: [],
+          },
+        ],
+      });
+      const result = getRsvpConfigFromMeta();
+      expect(result.data[0].type).to.equal('multi-select');
+    });
+
+    it('leaves checkbox + displayAs "checkbox" (default) as checkbox', async () => {
+      const { getRsvpConfigFromMeta } = await import('../../../../event-libs/v1/blocks/events-form/events-form.js');
+      setRsvpConfigMeta({
+        rsvpFormFields: [
+          {
+            field: 'interests', label: 'Interests', type: 'checkbox', displayAs: 'checkbox', required: false, options: [],
+          },
+        ],
+      });
+      const result = getRsvpConfigFromMeta();
+      expect(result.data[0].type).to.equal('checkbox');
+    });
+
+    it('leaves checkbox with no displayAs as checkbox (default, backward compatible)', async () => {
+      const { getRsvpConfigFromMeta } = await import('../../../../event-libs/v1/blocks/events-form/events-form.js');
+      setRsvpConfigMeta({
+        rsvpFormFields: [
+          { field: 'interests', label: 'Interests', type: 'checkbox', required: false, options: [] },
+        ],
+      });
+      const result = getRsvpConfigFromMeta();
+      expect(result.data[0].type).to.equal('checkbox');
+    });
+
+    it('remaps select + displayAs "radio" to radio-group', async () => {
+      const { getRsvpConfigFromMeta } = await import('../../../../event-libs/v1/blocks/events-form/events-form.js');
+      setRsvpConfigMeta({
+        rsvpFormFields: [
+          {
+            field: 'industry', label: 'Industry', type: 'select', displayAs: 'radio', required: false, options: [],
+          },
+        ],
+      });
+      const result = getRsvpConfigFromMeta();
+      expect(result.data[0].type).to.equal('radio-group');
+    });
+
+    it('leaves select + displayAs "dropdown" (default) as select', async () => {
+      const { getRsvpConfigFromMeta } = await import('../../../../event-libs/v1/blocks/events-form/events-form.js');
+      setRsvpConfigMeta({
+        rsvpFormFields: [
+          {
+            field: 'industry', label: 'Industry', type: 'select', displayAs: 'dropdown', required: false, options: [],
+          },
+        ],
+      });
+      const result = getRsvpConfigFromMeta();
+      expect(result.data[0].type).to.equal('select');
+    });
   });
 });
 

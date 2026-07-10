@@ -878,6 +878,13 @@ export function getRsvpConfigFromMeta() {
       if (Array.isArray(field.options)) {
         field.options = field.options.map((o) => (typeof o === 'object' ? o.value : o)).join(';');
       }
+      // ESP's field type enum has no dedicated multi-select value — `select` is
+      // single-choice and `checkbox` is multi-choice. `displayas` (EMC's
+      // displayAs, already stored by ESP) carries the render-style hint; remap
+      // to the widget types this file already implements for the legacy
+      // per-cloud JSON path so scope-config-driven fields get the same options.
+      if (field.type === 'select' && field.displayas === 'radio') field.type = 'radio-group';
+      if (field.type === 'checkbox' && field.displayas === 'dropdown') field.type = 'multi-select';
       return field;
     });
 
