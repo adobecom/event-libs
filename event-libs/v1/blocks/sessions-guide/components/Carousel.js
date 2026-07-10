@@ -3,7 +3,7 @@ import { LiveCard } from './LiveCard.js';
 
 export const buildCarousel = () => Carousel;
 
-export function Carousel({ sessions, title, formatTime }) {
+export function Carousel({ sessions, title, formatTime, variant = 'live' }) {
   if (!sessions || !sessions.length) return null;
 
   const [offset, setOffset] = useState(0);
@@ -79,7 +79,7 @@ export function Carousel({ sessions, title, formatTime }) {
         ${timeLabel && html`<div class="sg-carousel__time">${timeLabel}</div>`}
         <div class="sg-carousel__track">
           <div class="sg-carousel__cards" ref=${stripRef} onscroll=${refreshEdges} style=${'transform:translateX(-' + translateX + 'px)'}>
-            ${sessions.map((s) => html`<div class="sg-carousel__card-wrap" key=${s.id}><${LiveCard} session=${s} /></div>`)}
+            ${sessions.map((s) => html`<div class="sg-carousel__card-wrap" key=${s.id}><${LiveCard} session=${s} variant=${variant} /></div>`)}
           </div>
         </div>
         ${sessions.length > 1 && html`

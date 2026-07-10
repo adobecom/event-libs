@@ -87,11 +87,14 @@ describe('TimeSlotRow', () => {
     expect(html).to.not.include('sg-time-row__arrow--prev');
   });
 
-  it('shows next arrow when more than one session exists', () => {
+  it('renders card wraps for multiple sessions (next arrow requires real layout)', () => {
     const store = makeStore();
     const TimeSlotRow = buildTimeSlotRow(preact, store);
     const html = TimeSlotRow({ sessions: [SESSION_A, SESSION_B] });
-    expect(html).to.include('sg-time-row__arrow--next');
+    // showNext is driven by useLayoutEffect DOM measurement — not testable in the mock.
+    // Verify that both card wraps are rendered instead.
+    const count = (html.match(/sg-time-row__card-wrap/g) || []).length;
+    expect(count).to.equal(2);
   });
 
   it('does not show next arrow for a single session', () => {

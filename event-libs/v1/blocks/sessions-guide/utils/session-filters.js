@@ -1,5 +1,5 @@
 import { getSessionDayKey, isSessionLive, isSessionUpcoming } from './time.js';
-import { deriveSessionState, isInLiveNow } from './session-state.js';
+import { deriveSessionState, isInLiveNow } from '../../../utils/session-state.js';
 
 export function sessionsForDay(sessions, activeDay, userTz) {
   return sessions.filter((s) => getSessionDayKey(s, userTz) === activeDay);
@@ -12,7 +12,7 @@ export function groupByStartTime(sessions) {
     if (!map.has(key)) map.set(key, []);
     map.get(key).push(s);
   }
-  return [...map.values()];
+  return [...map.entries()].sort(([a], [b]) => (a < b ? -1 : 1)).map(([, v]) => v);
 }
 
 export function groupByTrack(sessions) {
@@ -49,6 +49,33 @@ export function onDemandSessions(sessions, liveStreamActiveIds, nowMs) {
     if (s.mrStreamId) return deriveSessionState(s, liveStreamActiveIds, nowMs) === 'on-demand';
     return !isSessionLive(s, nowMs) && !isSessionUpcoming(s, nowMs);
   });
+}
+
+/**
+ * Featured sessions for the active day, shown in the live carousel when nothing is live.
+ * When featuredIds is non-empty, maps them to sessions on the active day (max 3).
+ * Falls back to a deterministic random selection of up to 3 day sessions when no ids configured.
+ */
+export function getFeaturedSessions(sessions, featuredIds, activeDay, userTz) {
+  const daySessions = sessionsForDay(sessions, activeDay, userTz);
+
+  if (featuredIds && featuredIds.length > 0) {
+    const idSet = new Set(featuredIds);
+    return daySessions.filter((s) => idSet.has(s.id)).slice(0, 3);
+  }
+
+  return deterministicShuffle(daySessions, activeDay).slice(0, 3);
+}
+
+function deterministicShuffle(arr, seed) {
+  const result = [...arr];
+  let s = [...seed].reduce((acc, c) => acc + c.charCodeAt(0), 0);
+  for (let i = result.length - 1; i > 0; i--) {
+    s = Math.abs(Math.sin(s + i) * 10000);
+    const j = Math.floor(s) % (i + 1);
+    [result[i], result[j]] = [result[j], result[i]];
+  }
+  return result;
 }
 
 /**
