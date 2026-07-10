@@ -1,4 +1,4 @@
-import { useEffect, useRef } from '../../../v1/deps/htm-preact.js';
+import { useEffect, useRef } from '../../v1/deps/htm-preact.js';
 import { html } from '../htm-wrapper.js';
 
 export default function Modal({

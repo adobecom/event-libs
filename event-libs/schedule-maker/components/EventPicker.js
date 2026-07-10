@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useRef } from '../../../v1/deps/htm-preact.js';
+import { useState, useCallback, useEffect, useRef } from '../../v1/deps/htm-preact.js';
 import { html } from '../htm-wrapper.js';
 import Modal from './Modal.js';
 import { useDAContext } from '../context/DAContext.js';

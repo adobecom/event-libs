@@ -1,5 +1,5 @@
-// import { useEffect, useRef } from '../../v1/deps/htm-preact.js'; // restored below without restore logic
-import { useEffect } from '../../v1/deps/htm-preact.js';
+// import { useEffect, useRef } from '../v1/deps/htm-preact.js'; // restored below without restore logic
+import { useEffect } from '../v1/deps/htm-preact.js';
 import { html } from './htm-wrapper.js';
 // import Home from './pages/Home.js'; // Home page bypassed — always show Schedules
 import Schedules from './pages/Schedules.js';

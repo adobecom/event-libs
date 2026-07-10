@@ -1,4 +1,4 @@
-import { useState, useEffect } from '../../../v1/deps/htm-preact.js';
+import { useState, useEffect } from '../../v1/deps/htm-preact.js';
 import { html } from '../htm-wrapper.js';
 import Modal from './Modal.js';
 import { useSchedulesUI, useSchedulesOperations, useSchedulesData } from '../context/SchedulesContext.js';

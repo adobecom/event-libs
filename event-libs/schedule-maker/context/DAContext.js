@@ -1,4 +1,4 @@
-import { createContext, useState, useContext, useEffect } from '../../../v1/deps/htm-preact.js';
+import { createContext, useState, useContext, useEffect } from '../../v1/deps/htm-preact.js';
 import { html } from '../htm-wrapper.js';
 import { setDaToken, setDaFetch } from '../scripts/da-controller.js';
 

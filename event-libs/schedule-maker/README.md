@@ -151,54 +151,56 @@ The app contains **no custom permission logic**. It relies on DA's native repo p
 
 ## Local Development
 
-DA proxies the app to `localhost` when you append `?ref=local`:
+DA proxies the app to `localhost` when you append `?ref=local` — using the **same path as production** so one URL works both ways:
 
 ```
-https://da.live/app/adobecom/da-events/schedule-maker?ref=local
+https://da.live/app/adobecom/da-events/tools/da-apps/schedule-maker?ref=local
 ```
 
-Serve from the **inner repo root** (which contains both `schedule-maker/` and `v1/`) so that DA's `/schedule-maker` request resolves and the `../../v1/deps` imports resolve:
+Serve from the **inner repo root** (which contains `tools/`, `schedule-maker/`, and `v1/`) so the entry path and the `../../v1/deps` imports both resolve:
 
 ```bash
 cd event-libs/event-libs      # the directory that holds schedule-maker/ and v1/
 npx serve . --listen 3000
 ```
 
-- DA requests `/schedule-maker` → `serve` returns [index.html](index.html).
-- `index.html` loads assets via absolute paths (`/schedule-maker/...`), so the trailing-slash of the request URL doesn't matter.
+- DA requests `/tools/da-apps/schedule-maker` → `serve` returns [tools/da-apps/schedule-maker.html](../tools/da-apps/schedule-maker.html), the local-dev entry.
+- That entry loads assets via absolute paths (`/schedule-maker/...`), so its own location and the request's trailing slash don't matter. It loads the **local** code — distinct from the da-events entry, which loads deployed code from aem.live.
 - Milo/Spectrum can be pointed at a local Milo with `?milolibs=local` (→ `http://localhost:6456/libs`) or any branch via `?milolibs=<url>`.
 
 ## Deployment
 
 - The app **code** is distributed from `adobecom/event-libs` under `schedule-maker/`.
 - On aem.live it is served at `https://main--event-libs--adobecom.aem.live/event-libs/schedule-maker/…` (the repo nests content under an `event-libs/` prefix).
-- Each content repo (`da-events`, `da-events-fg-pink`, …) registers its **own** entry point at `/schedule-maker.html` that loads the code from event-libs via absolute aem.live URLs and lets the DA SDK scope it to that repo. Adding a new repo requires only a new entry point — no app code changes.
+- Each content repo (`da-events`, `da-events-fg-pink`, …) registers its **own** entry point (e.g. `tools/da-apps/schedule-maker.html`) that loads the code from event-libs via absolute aem.live URLs and lets the DA SDK scope it to that repo. The entry can read `context.ref` (and an `?eventlibs=<branch>` override) to load the matching event-libs branch. Adding a new repo requires only a new entry point — no app code changes.
+- Floodgate content spaces (e.g. `da-events-fg-pink`) share the parent repo's code, so the same entry serves them automatically — no separate file.
 
 ## File Structure
 
 ```
-schedule-maker/
-├── index.html                 # entry (local dev stand-in for the da-events entry)
-├── schedule-maker.js          # bootstrap: load Spectrum, render provider tree
-├── schedule-maker.css         # app styles (imports component CSS)
-├── ScheduleMaker.js           # root component (loading / error / layout)
-├── constants.js               # DA origin, default fragment path, page config
-├── utils.js                   # schedule/block validation, (de)serialization, share URL
-├── htm-wrapper.js             # re-exports html/h from v1 deps
-├── context/
-│   ├── DAContext.js           # DA SDK init → token + org/repo
-│   ├── NavigationContext.js   # page/mode + unsaved-changes state
-│   └── SchedulesContext.js    # central state store + CRUD/sync operations
-├── scripts/
-│   └── da-controller.js       # admin.da.live wrapper: CRUD, sync, ETag locking, scanner
-├── pages/
-│   ├── Home.js                # bypassed
-│   └── Schedules.js           # two-panel layout (Sidebar + Editor)
-└── components/
-    ├── Sidebar.js  EventPicker.js  SearchInput.js  SheetImporter.js
-    ├── ScheduleEditor.js  Modal.js  *Modal.js
-    └── editor/
-        ├── ScheduleHeader.js  BlockEditor.js  FragmentPathBrowser.js
+event-libs/ (inner repo root — served locally)
+├── tools/da-apps/schedule-maker.html   # local-dev entry (mirrors the da-events app path)
+└── schedule-maker/
+    ├── schedule-maker.js       # bootstrap: load Spectrum, render provider tree
+    ├── schedule-maker.css      # app styles (imports component CSS)
+    ├── ScheduleMaker.js        # root component (loading / error / layout)
+    ├── constants.js            # DA origin, default fragment path, page config
+    ├── utils.js                # schedule/block validation, (de)serialization, share URL
+    ├── htm-wrapper.js          # re-exports html/h from v1 deps
+    ├── context/
+    │   ├── DAContext.js        # DA SDK init → token + org/repo
+    │   ├── NavigationContext.js  # page/mode + unsaved-changes state
+    │   └── SchedulesContext.js   # central state store + CRUD/sync operations
+    ├── scripts/
+    │   └── da-controller.js    # admin.da.live wrapper: CRUD, sync, ETag locking, scanner
+    ├── pages/
+    │   ├── Home.js             # bypassed
+    │   └── Schedules.js        # two-panel layout (Sidebar + Editor)
+    └── components/
+        ├── Sidebar.js  EventPicker.js  SearchInput.js  SheetImporter.js
+        ├── ScheduleEditor.js  Modal.js  *Modal.js
+        └── editor/
+            ├── ScheduleHeader.js  BlockEditor.js  FragmentPathBrowser.js
 ```
 
 ## Error Handling

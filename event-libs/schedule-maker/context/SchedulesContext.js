@@ -1,5 +1,5 @@
 /* eslint-disable max-len */
-import { createContext, useState, useContext, useCallback, useEffect, useMemo } from '../../../v1/deps/htm-preact.js';
+import { createContext, useState, useContext, useCallback, useEffect, useMemo } from '../../v1/deps/htm-preact.js';
 import { html } from '../htm-wrapper.js';
 import {
   getSchedules as getSchedulesController,

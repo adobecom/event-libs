@@ -1,4 +1,4 @@
-import { useState } from '../../../v1/deps/htm-preact.js';
+import { useState } from '../../v1/deps/htm-preact.js';
 import { html } from '../htm-wrapper.js';
 import { useSchedulesData, useSchedulesOperations } from '../context/SchedulesContext.js';
 import ScheduleHeader from './editor/ScheduleHeader.js';

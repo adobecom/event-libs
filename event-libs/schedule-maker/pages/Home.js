@@ -1,4 +1,4 @@
-import { useState } from '../../../../v1/deps/htm-preact.js';
+import { useState } from '../../v1/deps/htm-preact.js';
 import { html } from '../htm-wrapper.js';
 import BuildTableIcon from '../components/BuildTableIcon.js';
 import CreateManuallyScheduleModal from '../components/CreateManuallyScheduleModal.js';

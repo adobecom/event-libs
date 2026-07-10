@@ -1,4 +1,4 @@
-import { render } from '../../v1/deps/htm-preact.js';
+import { render } from '../v1/deps/htm-preact.js';
 import { html } from './htm-wrapper.js';
 import { DAProvider } from './context/DAContext.js';
 import { SchedulesProvider } from './context/SchedulesContext.js';

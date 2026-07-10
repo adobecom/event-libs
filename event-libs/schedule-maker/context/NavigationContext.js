@@ -1,4 +1,4 @@
-import { useState, useContext, useCallback, createContext } from '../../../v1/deps/htm-preact.js';
+import { useState, useContext, useCallback, createContext } from '../../v1/deps/htm-preact.js';
 import { html } from '../htm-wrapper.js';
 import { PAGES_CONFIG } from '../constants.js';
 

@@ -1,5 +1,5 @@
 import { html } from '../htm-wrapper.js';
-import { useState, useEffect } from '../../../v1/deps/htm-preact.js';
+import { useState, useEffect } from '../../v1/deps/htm-preact.js';
 import { useSchedulesOperations, useSchedulesData } from '../context/SchedulesContext.js';
 import { useNavigation } from '../context/NavigationContext.js';
 
