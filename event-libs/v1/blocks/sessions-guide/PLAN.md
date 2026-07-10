@@ -51,6 +51,7 @@ All template output uses `` html`...` `` from `htm-preact.js`. File extensions a
 | Layer | Tool | Purpose |
 |---|---|---|
 | Shared, page-level state | Preact `signal()` (`event-libs/v1/utils/session-store.js`) | Sessions, favorited, scheduled, auth, live-stream status, pending actions — single source of truth, readable by **any** block on the page, not just this one |
+| Shared, page-level re-render trigger | Preact `signal()` (`sessionStateVersion` in `event-libs/v1/utils/session-store.js`) | Bumped only when a session's derived state (upcoming/live/on-demand) actually changes due to time passing — see "Session-state ticker" below |
 | Shared, page-level feedback UI | Preact `signal()` + vanilla DOM (`event-libs/v1/features/toast/toast.js`, `event-libs/v1/features/conflict-modal/conflict-modal.js`) | Toast and schedule-conflict modal — mounted once by `initSessionState()`, rendered with plain DOM so any block (Preact or vanilla) can trigger them via `showToast()`/`showConflictModal()`, not just this one |
 | Block-local UI state | Preact Context + `useReducer` (`store/index.js`) | Drawer state, active view, active day, filters, search — this widget's own chrome, not needed elsewhere |
 | Local component state | `useState` | Carousel index, filter panel open/closed, mobile search open |
@@ -75,6 +76,11 @@ So the split is: `BlockMediator` still owns what it already owned (`imsProfile`,
 ### Polling architecture
 A single `setInterval` (30 s) starts inside `session-store.js` after sessions are loaded (when `sessionsStatus.value === 'ready'`). It calls the Mobile Rider batch API for all sessions that have an `mrStreamId`. The polling engine self-stops when all MR sessions report inactive (stream day over). `poller.js`'s `startPolling(mrSessions, env, onUpdate, intervalMs)` takes a plain callback instead of a dispatch function — decoupling it from ever being tied to a specific reducer.
 
+### Session-state ticker
+MR polling only gives components an ambient re-render on a live-status change — a page with only non-MR sessions had no mechanism to notice a session crossing its start/end time purely because the clock moved forward, short of a user interacting with something else first. `event-libs/v1/services/sessions/session-state-ticker.js`'s `startSessionStateTicker(getSessions, getLiveStreamActiveIds, onChange, { intervalMs, getNow })` runs on its own 15 s interval (also started from `session-store.js`, unconditionally — not gated on MR sessions existing), diffs `deriveSessionState()` per session against its last-known value, and only calls `onChange` when at least one session's bucket actually changed. `session-store.js` wires `onChange` to bump the shared `sessionStateVersion` signal. It self-stops once every session is on-demand, mirroring the MR poller's own self-stop.
+
+Components don't read `sessionStateVersion`'s value for anything — they read it purely to establish a Preact-signals re-render dependency (a bare `sessionStateVersion.value;` read, `eslint-disable`d for `no-unused-expressions`), then compute `nowMs`/`deriveSessionState()` fresh as normal. Currently read by `LiveUpcomingView`, `MySessionsView`, `MyFavoritesView`, `OnDemandView`, and `SessionDetailOverlay` — child components (`SessionCard`, `LiveCard`, `TimeSlotRow`, etc.) don't need it, since they re-render via the normal cascade when their parent view re-renders. The auto-transition effect in `store/index.js` also subscribes to it directly (via `.subscribe()`, since it's inside a `useEffect` rather than a render body), so the on-demand auto-switch fires from pure time passing too, not just from a `sessions`/`liveStreamActiveIds` write.
+
 ### Auth architecture
 Auth state is synced entirely inside `session-store.js`'s `syncAuth()`, from two sources:
 1. `localStorage` (`sg:dev-auth`) — checked first; dev-mode override that prevents Milo's guest IMS from overwriting the dev user. Seeded by `session-store.js` itself (see Phase 0.3).
@@ -85,7 +91,7 @@ The block's own components (and any other block) read `auth.value` directly — 
 Real FEDS token (`getFedsToken()`) and RF credential wiring are implemented but not yet activated — Rainfocus service methods currently return mock data.
 
 ### Timezone
-All session times come from the event API in UTC. `detectUserTimezone()` detects the user's timezone via `Intl.DateTimeFormat().resolvedOptions().timeZone` at init and stores it as `eventConfig.userTz`. Cards and overlays read `userTz` from context. A `?serverTime=<ms>` URL parameter overrides `Date.now()` for testing via `getNowMs()`.
+All session times come from the event API in UTC. `detectUserTimezone()` detects the user's timezone via `Intl.DateTimeFormat().resolvedOptions().timeZone` at init and stores it as `eventConfig.userTz`. Cards and overlays read `userTz` from context. A `?serverTime=<ms>` URL parameter lets `getNowMs()` simulate landing on the page at a specific instant — time then keeps advancing from there at the real clock's rate, rather than freezing forever, matching the same-named parameter's semantics in `features/timing-framework`.
 
 ### User registration states
 Three distinct states drive the UI:
@@ -169,6 +175,7 @@ State is split across two modules — shared signals (readable by any block) and
     userFirstName: string | null,
   },
   pendingActions: Set<string>,       // session IDs with in-flight RF API calls
+  sessionStateVersion: number,       // bumped only on a real upcoming/live/on-demand transition; see session-state-ticker.js
 }
 ```
 
@@ -328,11 +335,11 @@ All service files exist and export the correct API surface; all currently return
 
 `SessionGuideProvider` runs two `useEffect` hooks (down from four — fetching, auth sync, and persistence moved to `session-store.js`):
 1. Recompute `eventDays`/`activeDay` whenever the shared `sessions` signal changes
-2. Auto-switch out of `'live-upcoming'` once all sessions are on-demand or the manual cutoff has passed, watching the shared `sessions`/`liveStreamActiveIds` signals
+2. Auto-switch out of `'live-upcoming'` once all sessions are on-demand or the manual cutoff has passed, watching the shared `sessions`/`liveStreamActiveIds`/`sessionStateVersion` signals
 
 ### 0.5 Time utilities ✅
-`utils/time.js`:
-- `getNowMs()` — `Date.now()` with `?serverTime=<ms>` URL override for testing
+`utils/time.js` (re-exports `getNowMs` from `event-libs/v1/utils/session-state.js`, promoted there since the shared session-state-ticker needs it):
+- `getNowMs()` — `Date.now()`, or a `?serverTime=<ms>` origin that keeps advancing at the real clock's rate rather than freezing
 - `detectUserTimezone()` — `Intl.DateTimeFormat().resolvedOptions().timeZone` with `'UTC'` fallback
 - `formatSessionTime(utcIso, userTz)` — localized with timezone abbreviation
 - `formatShortTime(utcIso, userTz)` — localized without timezone abbreviation
@@ -859,8 +866,8 @@ Shared, page-level modules now live outside this block's directory — anything 
 
 ```
 event-libs/v1/utils/
-  session-store.js               # SHARED, page-level: sessions/sessionsStatus/liveStreamActiveIds/favorited/scheduled/auth/pendingActions signals; initSessionState(), getApiConfig(), scheduleSession(), favoriteSession(); also calls mountToast()/mountConflictModal()
-  session-state.js                # SHARED: deriveSessionState, isInLiveNow — pure functions (moved out of this block)
+  session-store.js               # SHARED, page-level: sessions/sessionsStatus/liveStreamActiveIds/favorited/scheduled/auth/pendingActions/sessionStateVersion signals; initSessionState(), getApiConfig(), scheduleSession(), favoriteSession(); also calls mountToast()/mountConflictModal()
+  session-state.js                # SHARED: getNowMs, deriveSessionState, isInLiveNow — pure functions (moved out of this block)
   decorate.js                     # calls initSessionState() from decorateEvent(), before any block's init()
 
 event-libs/v1/features/           # SHARED, non-block reusable rendering logic — imported directly by whichever
@@ -877,6 +884,7 @@ event-libs/v1/services/sessions/  # SHARED service layer (moved out of this bloc
   rainfocus.js                    # stub: fetchScheduled, fetchFavorited, addSession, removeSession, toggleSessionInterest
   mobile-rider.js                 # stub: fetchLiveStatus (returns all-inactive)
   poller.js                       # startPolling, stopPolling — takes a plain onUpdate callback, no dispatch coupling
+  session-state-ticker.js          # startSessionStateTicker, stopSessionStateTicker — diffs deriveSessionState() per session on an interval, only calls onChange on a real transition
   session-actions.js              # scheduleAction, favoriteAction, hasTimeConflict, resolveScheduleConflict, SessionActionError — UI-agnostic; throws instead of dispatching toasts
   action-feedback.js              # runSessionAction(), scheduleWithFeedback(), favoriteWithFeedback() — translate SessionActionError into showToast()/showConflictModal() calls; no dispatch argument, usable by any block
 
@@ -950,6 +958,7 @@ test/unit/features/conflict-modal/
 
 test/unit/services/sessions/
   action-feedback.test.js        # services/sessions/action-feedback.js — SessionActionError reason → toast/conflict-modal mapping
+  session-state-ticker.test.js   # services/sessions/session-state-ticker.js — diff-and-notify, self-stop, injectable clock
 ```
 
 Test files for code that stayed block-local (`store/index.js`, `services/feds.js`, everything under `components/`) were **not** relocated when their imports moved to shared paths — they stayed under `test/unit/blocks/sessions-guide/` and just updated their import paths. `toast.js`, `conflict-modal.js`, and `action-feedback.js` are the first modules whose tests actually moved to sit next to the shared code they cover (`test/unit/features/`, `test/unit/services/sessions/`) rather than staying under this block's test tree — the pattern to follow for any future promotion out of this block.

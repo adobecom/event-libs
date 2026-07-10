@@ -1,7 +1,7 @@
 import { html } from '../../../deps/htm-preact.js';
 import { useSessionGuide } from '../store/index.js';
 import {
-  sessions as sessionsSignal, liveStreamActiveIds as liveStreamActiveIdsSignal,
+  sessions as sessionsSignal, liveStreamActiveIds as liveStreamActiveIdsSignal, sessionStateVersion,
 } from '../../../utils/session-store.js';
 import { TrackRow } from './TrackRow.js';
 import { onDemandSessions, groupByTrack, filterSessions } from '../utils/session-filters.js';
@@ -15,6 +15,10 @@ export function OnDemandView() {
   const liveStreamActiveIds = liveStreamActiveIdsSignal.value;
   const activeFilters = state.activeFilters || {};
   const searchQuery = state.searchQuery || '';
+  // Read purely to establish a re-render dependency on time-driven session-state
+  // transitions (see sessionStateVersion in session-store.js) — value itself is unused.
+  // eslint-disable-next-line no-unused-expressions
+  sessionStateVersion.value;
   const nowMs = getNowMs();
 
   const onDemandRaw = onDemandSessions(sessions, liveStreamActiveIds, nowMs);

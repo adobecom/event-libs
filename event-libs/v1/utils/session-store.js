@@ -3,6 +3,7 @@ import BlockMediator from '../deps/block-mediator.min.js';
 import { getMetadata, getEventServiceEnv } from './utils.js';
 import { fetchSessions, probeEslPayload } from '../services/sessions/sessions-api.js';
 import { startPolling } from '../services/sessions/poller.js';
+import { startSessionStateTicker } from '../services/sessions/session-state-ticker.js';
 import { addSession, removeSession, toggleSessionInterest } from '../services/sessions/rainfocus.js';
 import { mountToast } from '../features/toast/toast.js';
 
@@ -18,6 +19,10 @@ export const favorited = signal(new Set());
 export const scheduled = signal(new Set());
 export const auth = signal({ isLoggedIn: null, isRegistered: undefined, userFirstName: null });
 export const pendingActions = signal(new Set());
+// Bumped only when a session's derived state (upcoming/live/on-demand) actually changes —
+// see session-state-ticker.js. Components read this purely to establish a re-render
+// dependency; the value itself carries no meaning beyond "something transitioned."
+export const sessionStateVersion = signal(0);
 
 let initialized = false;
 let apiConfig = null;
@@ -106,6 +111,13 @@ async function loadSessions() {
     });
     const mrSessions = sessions.value.filter((s) => s.mrStreamId);
     startPolling(mrSessions, apiConfig.mrEnv, (active) => { liveStreamActiveIds.value = active; });
+    // Unlike MR polling, this always runs — a page with only non-MR sessions still needs
+    // upcoming/live/on-demand transitions to happen without waiting for a user interaction.
+    startSessionStateTicker(
+      () => sessions.value,
+      () => liveStreamActiveIds.value,
+      () => { sessionStateVersion.value += 1; },
+    );
   } catch (err) {
     window.lana?.log(`[session-store] sessions fetch failed: ${err.message}`);
     sessionsStatus.value = 'error';

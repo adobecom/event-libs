@@ -3,7 +3,7 @@ import { IconButton } from './IconButton.js';
 import { useSessionGuide } from '../store/index.js';
 import { formatSessionTime, formatShortTime, getNowMs } from '../utils/time.js';
 import {
-  sessions, scheduled, favorited, pendingActions, liveStreamActiveIds,
+  sessions, scheduled, favorited, pendingActions, liveStreamActiveIds, sessionStateVersion,
 } from '../../../utils/session-store.js';
 import { scheduleWithFeedback, favoriteWithFeedback } from '../../../services/sessions/action-feedback.js';
 import { showToast } from '../../../features/toast/toast.js';
@@ -21,6 +21,10 @@ export function SessionDetailOverlay({ onBack }) {
   const session = sessions.value.find((s) => s.id === activeSessionId);
   if (!session) return null;
 
+  // Read purely to establish a re-render dependency on time-driven session-state
+  // transitions (see sessionStateVersion in session-store.js) — value itself is unused.
+  // eslint-disable-next-line no-unused-expressions
+  sessionStateVersion.value;
   const nowMs = getNowMs();
   const sessionState = deriveSessionState(session, liveStreamActiveIds.value, nowMs);
   const isScheduled = scheduled.value.has(session.id);

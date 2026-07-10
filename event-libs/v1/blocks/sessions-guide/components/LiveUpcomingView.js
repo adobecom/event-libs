@@ -1,7 +1,7 @@
 import { html } from '../../../deps/htm-preact.js';
 import { useSessionGuide } from '../store/index.js';
 import {
-  sessions as sessionsSignal, liveStreamActiveIds as liveStreamActiveIdsSignal,
+  sessions as sessionsSignal, liveStreamActiveIds as liveStreamActiveIdsSignal, sessionStateVersion,
 } from '../../../utils/session-store.js';
 import { Carousel } from './Carousel.js';
 import { TimeSlotRow } from './TimeSlotRow.js';
@@ -21,6 +21,10 @@ export function LiveUpcomingView() {
   const activeFilters = state.activeFilters || {};
   const searchQuery = state.searchQuery || '';
   const { userTz, featuredSessionIds } = eventConfig;
+  // Read purely to establish a re-render dependency on time-driven session-state
+  // transitions (see sessionStateVersion in session-store.js) — value itself is unused.
+  // eslint-disable-next-line no-unused-expressions
+  sessionStateVersion.value;
   const nowMs = getNowMs();
 
   // Live section shows regardless of active filters

@@ -1,17 +1,7 @@
-// Read once at module load — frozen for the lifetime of the page.
-const SERVER_TIME = (() => {
-  try {
-    const raw = new URLSearchParams(window.location.search).get('serverTime');
-    const ms = raw ? parseInt(raw, 10) : NaN;
-    return Number.isFinite(ms) ? ms : null;
-  } catch {
-    return null;
-  }
-})();
-
-export function getNowMs() {
-  return SERVER_TIME ?? Date.now();
-}
+// Promoted to ../../../utils/session-state.js since the shared session-state-ticker
+// needs it and utils/ shouldn't reach back into this block's directory. Re-exported here
+// so existing call sites in this block don't need to change their import path.
+export { getNowMs } from '../../../utils/session-state.js';
 
 export function detectUserTimezone() {
   try {

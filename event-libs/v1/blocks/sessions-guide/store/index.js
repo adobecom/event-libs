@@ -2,7 +2,7 @@ import {
   createContext, useReducer, useContext, useEffect, h,
 } from '../../../deps/htm-preact.js';
 import {
-  sessions, sessionsStatus, liveStreamActiveIds, auth, getApiConfig,
+  sessions, sessionsStatus, liveStreamActiveIds, auth, getApiConfig, sessionStateVersion,
 } from '../../../utils/session-store.js';
 import { deriveSessionState } from '../../../utils/session-state.js';
 import { getNowMs, getSessionDayKey } from '../utils/time.js';
@@ -135,7 +135,10 @@ export function SessionGuideProvider({ eventConfig, children }) {
     checkAutoTransition();
     const unsubSessions = sessions.subscribe(checkAutoTransition);
     const unsubLive = liveStreamActiveIds.subscribe(checkAutoTransition);
-    return () => { unsubSessions(); unsubLive(); };
+    // Catches the case where time alone crosses allEnded/pastManualCutoff, with no
+    // accompanying sessions/liveStreamActiveIds write (e.g. an event with no MR sessions).
+    const unsubVersion = sessionStateVersion.subscribe(checkAutoTransition);
+    return () => { unsubSessions(); unsubLive(); unsubVersion(); };
   }, [state.activeView]);
 
   return h(SessionGuideContext.Provider, { value: { state, dispatch } }, children);

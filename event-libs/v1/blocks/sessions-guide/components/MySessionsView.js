@@ -2,7 +2,7 @@ import { html, useMemo } from '../../../deps/htm-preact.js';
 import { useSessionGuide } from '../store/index.js';
 import {
   sessions as sessionsSignal, scheduled as scheduledSignal,
-  liveStreamActiveIds as liveStreamActiveIdsSignal, auth,
+  liveStreamActiveIds as liveStreamActiveIdsSignal, auth, sessionStateVersion,
 } from '../../../utils/session-store.js';
 import { RegistrationPrompt } from './RegistrationPrompt.js';
 import { TimeSlotRow } from './TimeSlotRow.js';
@@ -25,6 +25,10 @@ export function MySessionsView() {
   const activeFilters = state.activeFilters || {};
   const searchQuery = state.searchQuery || '';
   const userTz = state.eventConfig?.userTz;
+  // Read purely to establish a re-render dependency on time-driven session-state
+  // transitions (see sessionStateVersion in session-store.js) — value itself is unused.
+  // eslint-disable-next-line no-unused-expressions
+  sessionStateVersion.value;
   const nowMs = getNowMs();
 
   if (auth.value.isRegistered !== true) return html`<${RegistrationPrompt} />`;
