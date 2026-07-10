@@ -625,6 +625,77 @@ describe('Events Form', () => {
         expect(payload.contactMethods).to.deep.equal([]);
       });
     });
+
+    describe('radio group string conversion', () => {
+      function simulateRadioGroupPostProcess(form, payload) {
+        Object.keys(payload).forEach((key) => {
+          const fieldWrapperEl = form.querySelector(`[data-field-id="${key}"]`);
+          if (fieldWrapperEl && fieldWrapperEl.dataset.type === 'radio-group' && Array.isArray(payload[key])) {
+            if (BASE_ATTENDEE_DATA_FILTER[key]?.type === 'array') return;
+            payload[key] = payload[key].length > 0 ? payload[key][0] : undefined;
+          }
+        });
+      }
+
+      it('collapses a checked radio group (single choice) to a plain string, not an array', () => {
+        // Radio inputs sharing a name are mutually exclusive by native browser
+        // semantics, so exactly one is checked here — mirrors real rendering.
+        const form = document.createElement('form');
+        const fieldWrapper = document.createElement('div');
+        fieldWrapper.setAttribute('data-field-id', 'industry');
+        fieldWrapper.setAttribute('data-type', 'radio-group');
+
+        const radio1 = document.createElement('input');
+        radio1.type = 'radio';
+        radio1.name = 'industry';
+        radio1.value = 'Technology';
+        radio1.checked = true;
+
+        const radio2 = document.createElement('input');
+        radio2.type = 'radio';
+        radio2.name = 'industry';
+        radio2.value = 'Retail';
+        radio2.checked = false;
+
+        fieldWrapper.append(radio1, radio2);
+        form.appendChild(fieldWrapper);
+
+        const payload = {};
+        [radio1, radio2].forEach((r) => {
+          if (r.checked) {
+            payload[r.name] = payload[r.name] ? [...payload[r.name], r.value] : [r.value];
+          } else {
+            payload[r.name] = payload[r.name] || [];
+          }
+        });
+
+        simulateRadioGroupPostProcess(form, payload);
+
+        expect(payload.industry).to.equal('Technology');
+        expect(typeof payload.industry).to.equal('string');
+      });
+
+      it('collapses an unchecked radio group to undefined', () => {
+        const form = document.createElement('form');
+        const fieldWrapper = document.createElement('div');
+        fieldWrapper.setAttribute('data-field-id', 'industry');
+        fieldWrapper.setAttribute('data-type', 'radio-group');
+
+        const radio1 = document.createElement('input');
+        radio1.type = 'radio';
+        radio1.name = 'industry';
+        radio1.value = 'Technology';
+        radio1.checked = false;
+
+        fieldWrapper.append(radio1);
+        form.appendChild(fieldWrapper);
+
+        const payload = { industry: [] };
+        simulateRadioGroupPostProcess(form, payload);
+
+        expect(payload.industry).to.equal(undefined);
+      });
+    });
   });
 
   describe('inviteOnly + campaign gate', () => {

@@ -175,14 +175,25 @@ function constructPayload(form) {
     if (fe.value) payload[fe.id] = fe.value;
   });
 
-  // Post-process checkbox groups to convert single-option groups to booleans
+  // Post-process checkbox/radio groups. Single-option checkbox groups convert to
+  // booleans. Radio groups are mutually exclusive by native radio semantics (shared
+  // `name`), so their payload array always has 0 or 1 entries — collapse it to a
+  // plain string, since string-typed attendee fields (e.g. industry, jobTitle) have
+  // no array-to-string coercion downstream.
   Object.keys(payload).forEach((key) => {
     const fieldWrapper = form.querySelector(`[data-field-id="${key}"]`);
-    if (fieldWrapper && (fieldWrapper.dataset.type === 'checkbox' || fieldWrapper.dataset.type === 'checkbox-group')) {
+    if (!fieldWrapper || !Array.isArray(payload[key])) return;
+    // Base attendee array fields (e.g. contactMethods) must stay arrays for the API
+    if (BASE_ATTENDEE_DATA_FILTER[key]?.type === 'array') return;
+
+    if (fieldWrapper.dataset.type === 'radio-group') {
+      payload[key] = payload[key].length > 0 ? payload[key][0] : undefined;
+      return;
+    }
+
+    if (fieldWrapper.dataset.type === 'checkbox' || fieldWrapper.dataset.type === 'checkbox-group') {
       const checkboxes = fieldWrapper.querySelectorAll('input[type="checkbox"]');
-      if (checkboxes.length === 1 && Array.isArray(payload[key]) && payload[key].length <= 1) {
-        // Base attendee array fields (e.g. contactMethods) must stay arrays for the API
-        if (BASE_ATTENDEE_DATA_FILTER[key]?.type === 'array') return;
+      if (checkboxes.length === 1 && payload[key].length <= 1) {
         // Single option checkbox with at most one value - convert to boolean
         payload[key] = payload[key].length > 0;
       }
