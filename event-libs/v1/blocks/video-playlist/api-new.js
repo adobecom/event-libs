@@ -94,15 +94,15 @@ function mockAdapter() {
   return {
     async getSessions() {
       await delay(100);
-      const response = await fetch(getMockFileUrl('mock-chimera-response.json'));
+      const response = await fetch(getMockFileUrl('mock-chimera-response-new.json'));
       if (!response.ok) throw new Error('Failed to load mock-chimera-response.json');
       return response.json();
     },
 
     async getUserAuthoredPlaylist(config) {
       await delay(150);
-      const response = await fetch(getMockFileUrl('mock-entity-lookup-response.json'));
-      if (!response.ok) throw new Error('Failed to load mock-entity-lookup-response.json');
+      const response = await fetch(getMockFileUrl('mock-entity-lookup-response-new.json'));
+      if (!response.ok) throw new Error('Failed to load mock-entity-lookup-response-new.json');
       const lookupData = await response.json();
       const paths = (config.sessionPath || '').split(',').map((s) => s.trim()).filter(Boolean);
       const sessions = lookupData.slice(0, paths.length).map((item, i) => ({
@@ -120,7 +120,7 @@ function mockAdapter() {
 
     async getChimeraFeaturedCards(entityIds) {
       await delay(200);
-      const response = await fetch(getMockFileUrl('mock-featured-cards-response.json'));
+      const response = await fetch(getMockFileUrl('mock-featured-cards-response-new.json'));
       if (!response.ok) throw new Error('Failed to load mock-featured-cards-response.json');
       const featuredData = await response.json();
       const cards = featuredData
