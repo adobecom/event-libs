@@ -56,7 +56,7 @@ export default function DeleteConfirmationModal({
       confirmText=${isDeleting ? 'Deleting...' : 'Delete'} \
       cancelText="Cancel" \
       onConfirm=${handleConfirm} \
-      confirmDisabled=${isScanning || !!scanError} \
+      confirmDisabled=${isScanning || !!scanError || isDeleting} \
       size="small" \
     >
       <div class="delete-confirmation">
