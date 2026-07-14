@@ -5,15 +5,7 @@ import { SchedulesProvider } from './context/SchedulesContext.js';
 import { NavigationProvider } from './context/NavigationContext.js';
 import ScheduleMaker from './ScheduleMaker.js';
 
-function getMiloLibs() {
-  const params = new URLSearchParams(window.location.search);
-  const milolibs = params.get('milolibs');
-  if (milolibs === 'local') return 'http://localhost:6456/libs';
-  if (milolibs) return milolibs;
-  return 'https://www.adobe.com/libs';
-}
-
-const LIBS = getMiloLibs();
+const LIBS = 'https://www.adobe.com/libs';
 
 async function loadSpectrumComponents() {
   await Promise.all([
