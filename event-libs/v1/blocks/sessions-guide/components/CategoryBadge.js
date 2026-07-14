@@ -156,10 +156,17 @@ const BADGE_MAP = {
   },
 };
 
+// Sessions with no Track value at all (e.g. real ancillary/overflow sessions) get this
+// instead of showing no badge — reuses the mainstage icon rather than commissioning new
+// artwork for a "no track" case.
+const DEFAULT_BADGE = {
+  label: 'General',
+  renderIcon: BADGE_MAP.mainstage.renderIcon,
+};
+
 export function CategoryBadge({ category, size }) {
-  if (!category) return null;
-  const key = category.toLowerCase().replace(/[\s_]+/g, '-').replace(/[^a-z0-9-]/g, '');
-  const config = BADGE_MAP[key];
+  const key = category ? category.toLowerCase().replace(/[\s_]+/g, '-').replace(/[^a-z0-9-]/g, '') : 'mainstage';
+  const config = category ? BADGE_MAP[key] : DEFAULT_BADGE;
   if (!config) return null;
   const cls = size === 'sm' ? 'sg-category-badge sg-category-badge--sm' : 'sg-category-badge';
   const { state } = useSessionGuide();
