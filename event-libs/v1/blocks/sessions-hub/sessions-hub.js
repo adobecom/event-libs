@@ -636,7 +636,7 @@ function renderSessionCard(session, opts = {}) {
 }
 
 function renderSessionList(sessions, opts = {}) {
-  const area = createTag('div', { class: 'sh-session-area' });
+  const area = createTag('section', { class: 'sh-session-area', 'aria-label': dictionaryManager.getValue('Sessions') });
   const list = createTag('div', { class: 'sh-session-list' });
   const empty = createTag('div', {
     class: 'sh-no-results',
@@ -1735,6 +1735,53 @@ function bindMediatorSubscriptions(el, listEl) {
   });
 }
 
+// ─── Structured data ─────────────────────────────────────────────────────────
+
+function buildSessionStructuredData(session, eventData) {
+  const primaryTime = session.sessionTimes?.[0];
+  const entry = {
+    '@type': 'Event',
+    name: session.title,
+    eventAttendanceMode: eventData?.eventType === 'Virtual'
+      ? 'https://schema.org/OnlineEventAttendanceMode'
+      : 'https://schema.org/OfflineEventAttendanceMode',
+    eventStatus: 'https://schema.org/EventScheduled',
+  };
+  if (session.description) entry.description = session.description;
+  if (primaryTime?.startTimeMillis) entry.startDate = new Date(primaryTime.startTimeMillis).toISOString();
+  if (primaryTime?.endTimeMillis) entry.endDate = new Date(primaryTime.endTimeMillis).toISOString();
+  if (primaryTime?.locationName) {
+    entry.location = { '@type': 'Place', name: primaryTime.locationName };
+  }
+  if (session.speakers?.length) {
+    entry.performer = session.speakers.map((sp) => ({
+      '@type': 'Person',
+      name: `${sp.firstName} ${sp.lastName}`.trim(),
+    }));
+  }
+  return entry;
+}
+
+function injectSessionsStructuredData(el, sessions, eventData) {
+  el.querySelector('script[type="application/ld+json"].sh-structured-data')?.remove();
+  if (!sessions?.length) return;
+
+  const itemList = {
+    '@context': 'https://schema.org',
+    '@type': 'ItemList',
+    name: getMetadata('event-title') || dictionaryManager.getValue('Sessions'),
+    itemListElement: sessions.map((session, i) => ({
+      '@type': 'ListItem',
+      position: i + 1,
+      item: buildSessionStructuredData(session, eventData),
+    })),
+  };
+
+  const script = createTag('script', { type: 'application/ld+json', class: 'sh-structured-data' });
+  script.textContent = JSON.stringify(itemList);
+  el.append(script);
+}
+
 // ─── init ────────────────────────────────────────────────────────────────────
 
 async function loadBlock(el, rsvpConfig) {
@@ -1829,6 +1876,7 @@ async function loadBlock(el, rsvpConfig) {
   bindToolbarEvents(toolbar, listEl, state);
   bindCardEvents(listEl, state);
   bindMediatorSubscriptions(el, listEl);
+  injectSessionsStructuredData(el, sessions, eventData);
 
   try {
     await document.fonts?.ready;

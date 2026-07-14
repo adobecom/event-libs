@@ -213,6 +213,36 @@ function getSocialLinks(data) {
   return data?.socialLinks || data?.socialMedia || [];
 }
 
+function getSocialLinkUrls(data) {
+  return getSocialLinks(data)
+    .map((entry) => {
+      if (entry instanceof HTMLAnchorElement) return entry.href;
+      if (typeof entry === 'string') return entry.trim();
+      if (entry && typeof entry === 'object' && typeof entry.link === 'string') return entry.link.trim();
+      return '';
+    })
+    .filter(Boolean);
+}
+
+function injectPersonStructuredData(cardContainer, data) {
+  const fullName = getProfileName(data);
+  if (!fullName) return;
+
+  const person = {
+    '@context': 'https://schema.org',
+    '@type': 'Person',
+    name: fullName,
+  };
+  if (data?.title) person.jobTitle = modalJobTitlePlainText(data.title);
+  if (data?.photo?.imageUrl) person.image = data.photo.imageUrl;
+  const sameAs = getSocialLinkUrls(data);
+  if (sameAs.length) person.sameAs = sameAs;
+
+  const script = createTag('script', { type: 'application/ld+json' });
+  script.textContent = JSON.stringify(person);
+  cardContainer.append(script);
+}
+
 function appendBio(contentContainer, bio) {
   const trimmedBio = typeof bio === 'string' ? bio.trim() : '';
   if (!trimmedBio) return;
@@ -457,9 +487,10 @@ function decorateStaticCards(el, { modal } = {}) {
     const cardData = parseStaticCard(row);
     if (!cardData) return;
 
-    const cardContainer = createTag('div', { class: 'card-container' });
+    const cardContainer = createTag('article', { class: 'card-container' });
     decorateImage(cardContainer, cardData.photo);
     decorateContent(cardContainer, cardData);
+    injectPersonStructuredData(cardContainer, cardData);
     if (modal) {
       decorateModalTrigger(cardContainer, cardData, index);
     }
@@ -493,7 +524,7 @@ function decorateCards(el, data, { simple, modal, speakerType } = {}) {
   }
 
   filteredData.forEach((speaker, index) => {
-    const cardContainer = createTag('div', { class: 'card-container' });
+    const cardContainer = createTag('article', { class: 'card-container' });
 
     decorateImage(cardContainer, speaker.photo);
     if (simple) {
@@ -501,6 +532,7 @@ function decorateCards(el, data, { simple, modal, speakerType } = {}) {
     } else {
       decorateContent(cardContainer, speaker);
     }
+    injectPersonStructuredData(cardContainer, speaker);
     if (modal) {
       decorateModalTrigger(cardContainer, speaker, index);
     }
