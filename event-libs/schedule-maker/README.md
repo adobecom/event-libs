@@ -15,7 +15,7 @@ Schedule Maker is a standalone [Document Authoring (DA)](https://da.live) app fo
 
 1. **Entry / bootstrap** ([schedule-maker.js](schedule-maker.js), [index.html](index.html))
    - `index.html` mounts `#app` and loads the module.
-   - `schedule-maker.js` loads Spectrum components from Milo libs (overridable via `?milolibs=`), then renders the provider tree and root component.
+   - `schedule-maker.js` loads Spectrum components from `https://www.adobe.com/libs`, then renders the provider tree and root component.
 
 2. **Context providers** (`context/`)
    - **[DAContext](context/DAContext.js)** — initializes the DA SDK, exposes `{ token, org, repo, isLoading, error }`, and pushes the token + authenticated `daFetch` into the controller.
@@ -166,7 +166,7 @@ npx serve . --listen 3000
 
 - DA requests `/tools/da-apps/schedule-maker` → `serve` returns [tools/da-apps/schedule-maker.html](../tools/da-apps/schedule-maker.html), the local-dev entry.
 - That entry loads assets via absolute paths (`/schedule-maker/...`), so its own location and the request's trailing slash don't matter. It loads the **local** code — distinct from the da-events entry, which loads deployed code from aem.live.
-- Milo/Spectrum can be pointed at a local Milo with `?milolibs=local` (→ `http://localhost:6456/libs`) or any branch via `?milolibs=<url>`.
+- Milo/Spectrum is loaded from `https://www.adobe.com/libs`. To test against a different Milo build, edit the `LIBS` constant in `schedule-maker.js` directly — `?milolibs=` params on the parent DA page are not visible to the iframe.
 
 ## Deployment
 
