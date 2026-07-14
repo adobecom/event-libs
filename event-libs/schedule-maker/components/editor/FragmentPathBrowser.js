@@ -3,20 +3,19 @@ import { html } from '../../htm-wrapper.js';
 import Modal from '../Modal.js';
 import { useDAContext } from '../../context/DAContext.js';
 import { DEFAULT_FRAGMENT_PATH } from '../../constants.js';
+import { listFolder } from '../../scripts/da-controller.js';
 
-async function fetchDAItems(org, repo, contentPath, token) {
-  const opts = token ? { headers: { Authorization: `Bearer ${token}` } } : {};
-  const resp = await fetch(`https://admin.da.live/list/${org}/${repo}${contentPath}`, opts);
-  if (resp.status === 401) throw new Error('Unauthorized — you may need DA access. Try signing in at da.live first.');
-  if (!resp.ok) throw new Error(`Failed to load (${resp.status})`);
-  const items = await resp.json();
-  return items
-    .filter((item) => !item.ext || item.ext === 'html')
-    .sort((a, b) => {
-      if (!a.ext && b.ext) return -1;
-      if (a.ext && !b.ext) return 1;
-      return a.path.localeCompare(b.path);
-    });
+// Lists folders + HTML files through the shared DA client (listFolder), so this
+// component uses the same authenticated fetch (the SDK's daFetch when available,
+// else the Bearer token) as the rest of the app instead of its own client.
+// Throws on error so the callers' 401/auth-error handling still applies.
+async function fetchDAItems(org, repo, contentPath) {
+  const result = await listFolder(org, repo, contentPath);
+  if (!result.ok) {
+    if (result.status === 401) throw new Error('Unauthorized — you may need DA access. Try signing in at da.live first.');
+    throw new Error(`Failed to load (${result.status})`);
+  }
+  return (result.data || []).filter((item) => !item.ext || item.ext === 'html');
 }
 
 function getItemName(fullPath) {
@@ -33,7 +32,7 @@ export default function FragmentPathBrowser({
   onSelect,
   selectedPath = null,
 }) {
-  const { org, repo, token } = useDAContext();
+  const { org, repo } = useDAContext();
 
   const [columnPaths, setColumnPaths] = useState([]);
   const [columnItems, setColumnItems] = useState([]);
@@ -55,7 +54,7 @@ export default function FragmentPathBrowser({
     setLoadingColIndex(colIndex);
     setError(null);
     try {
-      const items = await fetchDAItems(org, repo, contentPath, token);
+      const items = await fetchDAItems(org, repo, contentPath);
       setColumnItems((prev) => { const next = prev.slice(0, colIndex); next[colIndex] = items; return next; });
       setColumnPaths((prev) => { const next = prev.slice(0, colIndex); next[colIndex] = contentPath; return next; });
     } catch (err) {
@@ -65,7 +64,7 @@ export default function FragmentPathBrowser({
     } finally {
       setLoadingColIndex(null);
     }
-  }, [org, repo, token]);
+  }, [org, repo]);
 
   // Loads each segment of targetPath as its own column so the full hierarchy is visible.
   const expandToPath = useCallback(async (targetPath) => {
@@ -84,7 +83,7 @@ export default function FragmentPathBrowser({
       setLoadingColIndex(i);
       try {
         // eslint-disable-next-line no-await-in-loop
-        const items = await fetchDAItems(org, repo, uniquePaths[i], token);
+        const items = await fetchDAItems(org, repo, uniquePaths[i]);
         setColumnItems((prev) => { const next = [...prev]; next[i] = items; return next; });
         setColumnPaths((prev) => { const next = [...prev]; next[i] = uniquePaths[i]; return next; });
         if (i < uniquePaths.length - 1) {
@@ -100,7 +99,7 @@ export default function FragmentPathBrowser({
       }
     }
     setLoadingColIndex(null);
-  }, [org, repo, token]);
+  }, [org, repo]);
 
   useEffect(() => {
     if (!isOpen || !org || !repo) return;

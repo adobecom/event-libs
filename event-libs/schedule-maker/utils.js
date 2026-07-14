@@ -13,7 +13,9 @@ function isScheduleComplete(schedule) {
 function isValidUrl(url) {
   if (!url || url.trim() === '') return true;
   if (url.startsWith('/')) {
-    return /^\/[\w\-./]*$/.test(url);
+    // Relative path sanity check — allow slugs plus %-encoding, query strings,
+    // and hashes; still rejects whitespace/quotes and other broken pastes.
+    return /^\/[\w\-./%?=&#~]*$/.test(url);
   }
   try {
     const urlObject = new URL(url);

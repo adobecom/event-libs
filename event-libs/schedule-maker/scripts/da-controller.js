@@ -317,22 +317,39 @@ async function fetchText(org, repo, path) {
   return { ok: false };
 }
 
+// Recursively lists every file under a path. Traverses breadth-first, one level
+// at a time through the bounded pool, so peak concurrent /list requests stay
+// capped at SCAN_CONCURRENCY — a naive recursive Promise.all would fan out
+// unboundedly (hundreds of simultaneous listings on a wide/deep tree like /).
 async function listAllFiles(org, repo, path) {
-  const result = await daFetch(`/list/${org}/${repo}${path}`, getHeaders('GET'));
-  if (!result.ok) return [];
-  const items = Array.isArray(result.data) ? result.data : [];
   const files = [];
-  const folderFetches = [];
-  items.forEach((item) => {
-    const itemPath = item.path.replace(`/${org}/${repo}`, '');
-    if (!item.ext) {
-      folderFetches.push(listAllFiles(org, repo, itemPath));
-    } else {
-      files.push(itemPath);
-    }
-  });
-  const nested = await Promise.all(folderFetches);
-  return [...files, ...nested.flat()];
+  let frontier = [path];
+
+  while (frontier.length > 0) {
+    // eslint-disable-next-line no-await-in-loop
+    const levelResults = await mapWithConcurrency(frontier, SCAN_CONCURRENCY, async (folderPath) => {
+      const result = await daFetch(`/list/${org}/${repo}${folderPath}`, getHeaders('GET'));
+      if (!result.ok) return { files: [], folders: [] };
+      const items = Array.isArray(result.data) ? result.data : [];
+      const levelFiles = [];
+      const levelFolders = [];
+      items.forEach((item) => {
+        const itemPath = item.path.replace(`/${org}/${repo}`, '');
+        if (!item.ext) levelFolders.push(itemPath);
+        else levelFiles.push(itemPath);
+      });
+      return { files: levelFiles, folders: levelFolders };
+    });
+
+    const nextFrontier = [];
+    levelResults.forEach(({ files: levelFiles, folders }) => {
+      files.push(...levelFiles);
+      nextFrontier.push(...folders);
+    });
+    frontier = nextFrontier;
+  }
+
+  return files;
 }
 
 // One-pass sync: scans all HTML docs, updates active/draft for every known schedule,
@@ -507,14 +524,28 @@ export async function findScheduleReferences(org, repo, scheduleId, scanPath = '
   return { ok: true, data: affected };
 }
 
-async function removeScheduleFromDocs(org, repo, affectedPaths, scheduleId) {
+// Removes the schedule's anchor from a single doc under optimistic locking:
+// GET (capturing the ETag) → strip the anchor → conditional POST (If-Match).
+// A concurrent edit between GET and POST fails the write with 412, which we
+// re-read and retry — same protection as the sheet writes, so a doc edit made
+// in parallel isn't silently clobbered. Returns true on success (incl. no-op
+// cases: doc gone / link already absent), false if it couldn't be updated.
+async function removeScheduleFromDoc(org, repo, filePath, scheduleId) {
   // Matches a full <a ...href="...?schedule=<b64>...">...</a> element
   const anchorRe = /<a\s[^>]*href=["']([^"']*)["'][^>]*>[\s\S]*?<\/a>/gi;
+  const url = `${DA_ADMIN_ORIGIN}/source/${org}/${repo}${filePath}`;
 
-  await Promise.all(affectedPaths.map(async (filePath) => {
-    const url = `${DA_ADMIN_ORIGIN}/source/${org}/${repo}${filePath}`;
-    const resp = await doFetch(url, getHeaders('GET'));
-    if (!resp.ok) return;
+  for (let attempt = 0; attempt <= MAX_WRITE_RETRIES; attempt += 1) {
+    let resp;
+    try {
+      // eslint-disable-next-line no-await-in-loop
+      resp = await doFetch(url, getHeaders('GET'));
+    } catch {
+      return false;
+    }
+    if (!resp.ok) return resp.status === 404; // gone → nothing to remove (not a failure)
+    const etag = normalizeEtag(resp.headers.get('ETag'));
+    // eslint-disable-next-line no-await-in-loop
     const text = await resp.text();
     let changed = false;
     const cleaned = text.replace(anchorRe, (match, href) => {
@@ -525,18 +556,55 @@ async function removeScheduleFromDocs(org, repo, affectedPaths, scheduleId) {
       }
       return match;
     });
-    if (!changed) return;
+    if (!changed) return true; // link already absent — nothing to write
+
     const mimeType = filePath.endsWith('.json') ? 'application/json' : 'text/html';
     const formData = new FormData();
     formData.append('data', new Blob([cleaned], { type: mimeType }), filePath.split('/').pop());
     const headers = new Headers();
     if (daToken) headers.append('Authorization', `Bearer ${daToken}`);
-    await doFetch(url, { method: 'POST', headers, body: formData });
+    if (etag) headers.append('If-Match', etag);
+
+    let writeResp;
+    try {
+      // eslint-disable-next-line no-await-in-loop
+      writeResp = await doFetch(url, { method: 'POST', headers, body: formData });
+    } catch {
+      return false;
+    }
+    if (writeResp.ok) return true;
+    if (writeResp.status === 412) continue; // concurrent edit — re-read and retry
+    return false;
+  }
+  return false; // retries exhausted (persistent conflict)
+}
+
+// Removes the schedule's anchor from each affected doc (source only). Reports
+// per-file success/failure so the caller can avoid deleting the sheet row while
+// a stale link still lingers in a doc. Returns { ok, failed }.
+async function removeScheduleFromDocs(org, repo, affectedPaths, scheduleId) {
+  const failed = [];
+  await Promise.all(affectedPaths.map(async (filePath) => {
+    const ok = await removeScheduleFromDoc(org, repo, filePath, scheduleId);
+    if (!ok) failed.push(filePath);
   }));
+  return { ok: failed.length === 0, failed };
 }
 
 export async function deleteSchedule(org, repo, eventFolder, scheduleId, affectedPaths = []) {
-  if (affectedPaths.length > 0) await removeScheduleFromDocs(org, repo, affectedPaths, scheduleId);
+  // Strip the link from every referencing doc FIRST. If any couldn't be updated,
+  // abort — deleting the row while a stale ?schedule= link remains embedded would
+  // break the promise shown in the confirmation ("removes those references").
+  if (affectedPaths.length > 0) {
+    const removal = await removeScheduleFromDocs(org, repo, affectedPaths, scheduleId);
+    if (!removal.ok) {
+      return {
+        ok: false,
+        status: 502,
+        error: `Schedule not deleted: could not remove its link from ${removal.failed.length} document(s). Please retry.`,
+      };
+    }
+  }
   const basePath = eventFolder.startsWith('/') ? eventFolder : `/${eventFolder}`;
   const activePath = `${basePath}/schedules-active.json`;
   const draftPath = `${basePath}/schedules-draft.json`;
@@ -556,60 +624,4 @@ export async function deleteSchedule(org, repo, eventFolder, scheduleId, affecte
 
   if (!found) return { ok: false, status: 404, error: 'Schedule not found' };
   return { ok: true };
-}
-
-export async function refreshScheduleStatus(org, repo, eventFolder, scheduleId) {
-  const searchResult = await findScheduleReferences(org, repo, scheduleId);
-  // Don't misclassify on a failed scan — propagate the error so the caller retries.
-  if (!searchResult.ok) return searchResult;
-  const isActive = searchResult.data.length > 0;
-
-  const basePath = eventFolder.startsWith('/') ? eventFolder : `/${eventFolder}`;
-  const activePath = `${basePath}/schedules-active.json`;
-  const draftPath = `${basePath}/schedules-draft.json`;
-
-  // Moving a row between two sheets isn't a single atomic op, so make it
-  // idempotent: remove from both, add to the correct one, and only write the
-  // sheets that actually change. Retry on 412 — recomputing from a fresh read
-  // converges even after a partial (one-sheet-succeeded) write.
-  for (let attempt = 0; attempt <= MAX_WRITE_RETRIES; attempt += 1) {
-    // eslint-disable-next-line no-await-in-loop
-    const [activeResult, draftResult] = await Promise.all([
-      readSheet(org, repo, activePath),
-      readSheet(org, repo, draftPath),
-    ]);
-    const activeRows = activeResult.ok ? (activeResult.data || []) : [];
-    const draftRows = draftResult.ok ? (draftResult.data || []) : [];
-    const inActive = activeRows.findIndex((r) => r.scheduleId === scheduleId);
-    const inDraft = draftRows.findIndex((r) => r.scheduleId === scheduleId);
-
-    const row = inActive !== -1 ? activeRows[inActive] : (inDraft !== -1 ? draftRows[inDraft] : null);
-    if (!row) return { ok: false, status: 404, error: 'Schedule not found' };
-
-    const wasInActive = inActive !== -1;
-    const wasInDraft = inDraft !== -1;
-    const activeChanged = isActive ? !wasInActive : wasInActive;
-    const draftChanged = isActive ? wasInDraft : !wasInDraft;
-
-    if (!activeChanged && !draftChanged) {
-      return { ok: true, data: { status: isActive ? 'active' : 'draft' } };
-    }
-
-    const nextActive = activeRows.filter((r) => r.scheduleId !== scheduleId);
-    const nextDraft = draftRows.filter((r) => r.scheduleId !== scheduleId);
-    if (isActive) nextActive.push(row);
-    else nextDraft.push(row);
-
-    const writes = [];
-    if (activeChanged) writes.push(writeSheet(org, repo, activePath, nextActive, activeResult.ok ? { etag: normalizeEtag(activeResult.etag) } : { create: true }));
-    if (draftChanged) writes.push(writeSheet(org, repo, draftPath, nextDraft, draftResult.ok ? { etag: normalizeEtag(draftResult.etag) } : { create: true }));
-    // eslint-disable-next-line no-await-in-loop
-    const results = await Promise.all(writes);
-    if (results.every((r) => r.ok)) {
-      return { ok: true, data: { status: isActive ? 'active' : 'draft' } };
-    }
-    if (results.some((r) => r.status === 412)) continue;
-    return results.find((r) => !r.ok);
-  }
-  return { ok: false, status: 412, error: CONFLICT_ERROR };
 }
