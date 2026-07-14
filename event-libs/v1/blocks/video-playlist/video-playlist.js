@@ -136,6 +136,7 @@ const buildSessionCard = (card) => {
 const TOAST_MODIFIERS = {
   positive: 'toast--positive',
   info: 'toast--info',
+  negative: 'toast--negative'
 };
 
 const TOAST_CLOSE_SVG = '<svg class="toast-close-icon" viewBox="0 0 8 8"><path d="m5.238 4 2.456-2.457A.875.875 0 1 0 6.456.306L4 2.763 1.543.306A.875.875 0 0 0 .306 1.544L2.763 4 .306 6.457a.875.875 0 1 0 1.238 1.237L4 5.237l2.456 2.457a.875.875 0 1 0 1.238-1.237z"></path></svg>';
