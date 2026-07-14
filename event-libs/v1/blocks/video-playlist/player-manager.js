@@ -4,7 +4,7 @@ import {
   PROGRESS_SAVE_INTERVAL,
   RESTART_THRESHOLD,
   VIDEO_ORIGIN,
-} from './constants.js';
+} from './constants-new.js';
 import {
   saveCurrentVideoProgress,
   getLocalStorageVideos,

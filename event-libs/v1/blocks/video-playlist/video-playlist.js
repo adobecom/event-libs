@@ -13,13 +13,13 @@ import {
   ANALYTICS,
   PLAYLIST_SKIP_TO_ID,
   MAX_PERCENTAGE,
-} from './constants.js';
+} from './constants-new.js';
 import {
   getSessions,
   getUserAuthoredPlaylist,
   getChimeraFeaturedCards,
   isUserRegistered,
-} from './api.js';
+} from './api-new.js';
 import { PlayerManager } from './player-manager.js';
 
 /* --- Global Constants and Selectors --- */

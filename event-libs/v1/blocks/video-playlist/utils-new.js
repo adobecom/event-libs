@@ -1,5 +1,5 @@
 /* utils.js */
-import { PLAYLIST_VIDEOS_KEY, AUTOPLAY_PLAYLIST_KEY, VIDEO_ORIGIN } from './constants.js';
+import { PLAYLIST_VIDEOS_KEY, AUTOPLAY_PLAYLIST_KEY, VIDEO_ORIGIN } from './constants-new.js';
 
 /* ---------- localStorage ---------- */
 const readJSON = (key, defaultValue) => {

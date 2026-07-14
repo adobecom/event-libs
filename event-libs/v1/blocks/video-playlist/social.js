@@ -1,4 +1,4 @@
-import { SOCIAL_ICONS } from './constants.js';
+import { SOCIAL_ICONS } from './constants-new.js';
 
 const SHARE_MENU_SELECTOR = '.share-menu-wrapper';
 const SHARE_TRIGGER_SELECTOR = '.social-share';
