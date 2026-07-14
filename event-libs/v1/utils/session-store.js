@@ -1,7 +1,7 @@
 import { signal, batch } from '../deps/htm-preact.js';
 import BlockMediator from '../deps/block-mediator.min.js';
 import { getMetadata, getEventServiceEnv } from './utils.js';
-import { fetchSessions, probeEslPayload } from '../services/sessions/sessions-api.js';
+import { fetchSessions } from '../services/sessions/sessions-api.js';
 import { startPolling } from '../services/sessions/poller.js';
 import { startSessionStateTicker } from '../services/sessions/session-state-ticker.js';
 import { addSession, removeSession, toggleSessionInterest } from '../services/sessions/rainfocus.js';
@@ -101,9 +101,8 @@ function syncAuth() {
 
 async function loadSessions() {
   sessionsStatus.value = 'loading';
-  probeEslPayload(); // TEMP: fire-and-forget, see sessions-api.js for why
   try {
-    const fetched = await fetchSessions(apiConfig.apiUrl);
+    const fetched = await fetchSessions(apiConfig.eventId);
     // Batched so components reading both `sessions` and `sessionsStatus` re-render once.
     batch(() => {
       sessions.value = fetched;
@@ -139,6 +138,7 @@ export function initSessionState() {
 
   apiConfig = {
     apiUrl,
+    eventId: getMetadata('event-id'),
     profileId: getMetadata('rainfocus-api-profile-id'),
     registerUrl: getMetadata('register-url') || '/register',
     manualCutoff: getMetadata('manual-on-demand-transition-time') || null,

@@ -114,7 +114,7 @@ export function LiveCard({ session, variant = 'live' }) {
       <div class="sg-live-card__body">
         <div class="sg-live-card__meta">
           <div class="sg-live-card__track-row">
-            ${html`<${CategoryBadge} category=${session.category} />`}
+            ${html`<${CategoryBadge} category=${session.category?.[0]} />`}
           </div>
           <p class="sg-live-card__time">${timeRange}</p>
         </div>

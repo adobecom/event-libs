@@ -76,8 +76,8 @@ export function SessionDetailOverlay({ onBack }) {
   const attrs = [
     ['Technical level', session.technicalLevel],
     ['Track', session.track],
-    ['Content category', session.category],
-    ['Audience', session.audience],
+    ['Content category', session.contentCategory?.join(', ')],
+    ['Audience', session.audience?.join(', ')],
   ].filter(([, value]) => value);
 
   return html`

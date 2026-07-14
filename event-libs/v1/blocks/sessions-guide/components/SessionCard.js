@@ -138,13 +138,13 @@ export function SessionCard({ session, forceOnDemand = false, timeDisplay = 'dur
       onmouseenter=${onMouseEnter} onmouseleave=${onMouseLeave}>
       <div class="sg-card__body">
         <div class="sg-card__badge-row">
-          <${CategoryBadge} category=${session.category} size="sm" />
+          <${CategoryBadge} category=${session.category?.[0]} size="sm" />
         </div>
         <p class="sg-card__title">${session.title}</p>
         <p class="sg-card__desc">${session.description}</p>
         <div class="sg-card__footer">
           <span class="sg-card__track sg-card__track--footer" style=${'color:' + trackColor}>${session.track}</span>
-          <span class="sg-card__footer-badge"><${CategoryBadge} category=${session.category} size="sm" /></span>
+          <span class="sg-card__footer-badge"><${CategoryBadge} category=${session.category?.[0]} size="sm" /></span>
           <span class="sg-card__time">${timeLabel}</span>
         </div>
       </div>

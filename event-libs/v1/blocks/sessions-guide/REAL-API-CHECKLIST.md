@@ -99,11 +99,29 @@ Credentials needed per call: `rfAuthToken` (from FEDS/IMS), `clientId` (IMS user
 
 ---
 
-## 6. Implement the real sessions API call
+## 6. Real sessions API call — done, pending real `event-id` metadata
 
 **File:** `event-libs/v1/services/sessions/sessions-api.js`
 
-`fetchSessions(apiUrl)` currently returns `normalizeSessions(MOCK_SESSIONS)`. Replace with the real event sessions endpoint; keep `normalizeSessions()`'s output shape.
+`fetchSessions(eventId)` now calls the real ESL/ESP catalog endpoint
+(`GET {serviceApiEndpoints.esp}/v1/events/{eventId}/sessions`) via `fetchEslSessions()` +
+`mapEslPayloadToRawSessions()`, and only falls back to `MOCK_SESSIONS` when `eventId` is
+falsy. `event-id` metadata is read in `session-store.js`'s `initSessionState()` and passed
+through — **no further code change needed here**; this activates automatically once a page
+authors real `event-id` metadata (today, per item 3's note, `event-id` is already present
+on prod pages for unrelated purposes, but hasn't been verified to resolve against the real
+ESL/ESP backend for sessions-guide specifically).
+
+Known gaps in the real mapping (not blockers, just incomplete real-data coverage):
+- `resources[]` always `[]` — backend hasn't shipped this field yet.
+- `mrStreamId` always `null` — video/stream data is deliberately stripped from this public
+  endpoint until a session goes live; needs a different, likely time-gated/authenticated
+  fetch once that's designed.
+- Sessions with multiple `sessionTimes` (recurring/repeated) only surface their earliest
+  occurrence.
+- `CategoryBadge`'s icon set (`BADGE_MAP`) and `eventConfig.trackIcons` were built for mock
+  vocabulary and don't cover all real `Track`/`Primary Track for Agenda` label values yet —
+  a content/design task, not a code gap.
 
 ---
 

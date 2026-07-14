@@ -617,7 +617,15 @@ const MOCK_SESSIONS = [
   },
 ];
 
-function normalizeSessions(rawSessions) {
+// Real category/audience customAttributes are multi-select; mock fixtures still store a
+// single string. Coerces either shape to an array so normalizeSessions() always returns
+// the same shape regardless of source.
+function coerceArray(value) {
+  if (Array.isArray(value)) return value;
+  return value ? [value] : [];
+}
+
+export function normalizeSessions(rawSessions) {
   return rawSessions.map((s) => ({
     id: s.id || '',
     slug: s.slug || '',
@@ -630,8 +638,9 @@ function normalizeSessions(rawSessions) {
     track: s.track || '',
     type: s.type || '',
     technicalLevel: s.technicalLevel || '',
-    category: s.category || '',
-    audience: s.audience || '',
+    category: coerceArray(s.category),
+    contentCategory: coerceArray(s.contentCategory),
+    audience: coerceArray(s.audience),
     speakers: (s.speakers || []).map((sp) => ({ ...sp, photo: TEST_SPEAKER_PHOTO })),
     products: s.products || [],
     resources: s.resources || [],
@@ -646,29 +655,181 @@ function normalizeSessions(rawSessions) {
   }));
 }
 
-// TODO: replace with real API call when endpoint is ready
-// eslint-disable-next-line no-unused-vars
-export async function fetchSessions(apiUrl) {
-  return normalizeSessions(MOCK_SESSIONS);
+// Event ID is mock-only on every page today (no page authors real `event-id` metadata
+// yet) — fetchSessions() falls back to MOCK_SESSIONS whenever it's absent, and only
+// attempts the real ESL/ESP call once one is provided.
+
+// customAttributes carry things like track/audience/technical-level as name+values pairs
+// rather than plain session fields. `values[]` holds the value(s) actually selected for
+// that session (see events-service-platform's resolveCustomAttributes), not the full
+// option list.
+function extractCustomAttributeValues(session, name) {
+  const attr = (session.customAttributes || []).find((a) => a?.name === name);
+  return (attr?.values || []).map((v) => v?.label ?? v?.value).filter(Boolean);
 }
 
-// TEMP: ESL just became available — this probes the real endpoint so we can inspect its
-// payload shape in the console before wiring it in. Not awaited by callers, never throws,
-// and doesn't touch app state. Remove once fetchSessions() above is replaced with a real call.
-// Event ID is hardcoded to the example confirmed to exist on the stage env — this page's
-// own `event-id` metadata is mock-only and doesn't resolve on the real backend.
-const ESL_PROBE_EVENT_ID = 'ce15d0f5-b836-4118-9b3f-1a0614208112';
+function extractCustomAttributeValue(session, name) {
+  return extractCustomAttributeValues(session, name)[0] || '';
+}
 
-export async function probeEslPayload() {
-  try {
-    const { serviceApiEndpoints } = ENV_MAP[getEventServiceEnv().name];
-    const options = await constructRequestOptions('GET');
-    const res = await fetch(`${serviceApiEndpoints.esp}/v1/events/${ESL_PROBE_EVENT_ID}/sessions`, options);
-    const data = await res.json();
-    // eslint-disable-next-line no-console
-    console.log('[ESL probe] payload:', data);
-  } catch (err) {
-    // eslint-disable-next-line no-console
-    console.log('[ESL probe] failed:', err);
+// The `Watch ` customAttribute's value is a raw HTML anchor (e.g.
+// `<a href="...">Watch</a>`) rather than a bare URL — pull the href out of it.
+function extractWatchUrl(session) {
+  const html = extractCustomAttributeValue(session, 'Watch ');
+  return /href="([^"]+)"/.exec(html)?.[1] || '';
+}
+
+// `sessions[].url` is an internal drafts/staging link, not usable as a production page
+// URL — but its last path segment is exactly the slug we want.
+function slugFromUrl(url) {
+  if (!url) return '';
+  const segments = url.split('?')[0].split('#')[0].split('/').filter(Boolean);
+  return segments[segments.length - 1] || '';
+}
+
+// Joins the ESL/ESP catalog payload's flat, relational arrays (sessions/sessionTimes/
+// speakers, related by id) into objects shaped like MOCK_SESSIONS entries, so the result
+// can be piped straight through the existing normalizeSessions().
+export function mapEslPayloadToRawSessions(payload) {
+  const speakersById = new Map((payload.speakers || []).map((sp) => [sp.speakerId, sp]));
+  const timesBySessionId = new Map();
+  (payload.sessionTimes || []).forEach((t) => {
+    if (!timesBySessionId.has(t.sessionId)) timesBySessionId.set(t.sessionId, []);
+    timesBySessionId.get(t.sessionId).push(t);
+  });
+
+  return (payload.sessions || []).map((session) => {
+    // Some real sessions (canceled, TBD, overflow-room placeholders) have no scheduled
+    // sessionTime yet — startTimeUtc/endTimeUtc fall through to '' below, and
+    // utils/time.js's formatters/getSessionDayKey() are guarded to handle that gracefully.
+    const times = (timesBySessionId.get(session.sessionId) || [])
+      .slice()
+      .sort((a, b) => (a.startTimeMillis ?? 0) - (b.startTimeMillis ?? 0));
+    const [firstTime] = times;
+
+    const speakers = (session.speakers || [])
+      .slice()
+      .sort((a, b) => (a.ordinal ?? 0) - (b.ordinal ?? 0))
+      .map((ref) => speakersById.get(ref.speakerId))
+      .filter(Boolean)
+      .map((sp) => ({
+        name: `${sp.firstName || ''} ${sp.lastName || ''}`.trim(),
+        title: sp.localizations?.['en-US']?.title || '',
+        photo: null,
+      }));
+
+    const formatValues = extractCustomAttributeValues(session, 'Format');
+    const type = extractCustomAttributeValue(session, 'Session Type');
+    const slug = slugFromUrl(session.url);
+    const thumbnail = (session.images || []).find((img) => img.imageKind === 'session-card-image');
+
+    return {
+      id: session.sessionId,
+      slug,
+      rfCode: session.sessionCode || '',
+      title: session.localizations?.['en-US']?.title || session.enTitle || '',
+      description: session.localizations?.['en-US']?.description || '',
+      startTimeUtc: firstTime ? new Date(firstTime.startTimeMillis).toISOString() : '',
+      endTimeUtc: firstTime ? new Date(firstTime.endTimeMillis).toISOString() : '',
+      duration: session.sessionLengthInMinutes || 0,
+      // "Track" is topic-like (drives the card icon); "Primary Track for Agenda" is the
+      // single value shown as the card/detail track name — two distinct real attributes.
+      track: extractCustomAttributeValue(session, 'Primary Track for Agenda (Digital Agenda)'),
+      category: extractCustomAttributeValues(session, 'Track'),
+      contentCategory: extractCustomAttributeValues(session, 'Programming Category'),
+      type,
+      technicalLevel: extractCustomAttributeValue(session, 'Technical Level'),
+      audience: extractCustomAttributeValues(session, 'Audience'),
+      speakers,
+      products: extractCustomAttributeValues(session, 'Product'),
+      inPerson: formatValues.includes('In person'),
+      videoAvailable: formatValues.includes('Online') || formatValues.includes('On demand, post event'),
+      sessionPageUrl: slug ? `/sessions/${slug}` : '',
+      watchUrl: extractWatchUrl(session),
+      isKeynote: type === 'Keynote',
+      thumbnailUrl: thumbnail?.imageUrl ?? null,
+      copyrightDisclaimer: extractCustomAttributeValue(session, 'LegalDisclaimer') || undefined,
+      // resources[]/mrStreamId intentionally omitted — no source in this payload yet
+      // (resources still in development backend-side; video/stream data is deliberately
+      // withheld from this public endpoint until the session goes live). normalizeSessions()
+      // defaults both to empty/null.
+    };
+  });
+}
+
+// TODO: remove this debug logging block (KNOWN_CATEGORY_BADGE_KEYS, categoryBadgeKey,
+// logCategoryBadgeCoverage, and its call site in fetchEslSessions below) once we're done
+// auditing real Track values against CategoryBadge.js's BADGE_MAP.
+//
+// TEMP debug: CategoryBadge.js's BADGE_MAP was built for the mock's topic vocabulary and
+// only covers a fixed icon set. Mirrors its kebab-case key derivation here (duplicated
+// rather than imported, so this data-layer file doesn't reach into a Preact component)
+// to see which real sessions' primary category — session.category[0], the one actually
+// rendered on cards via <CategoryBadge category=${session.category?.[0]} /> — has no
+// matching icon.
+const KNOWN_CATEGORY_BADGE_KEYS = new Set([
+  'social-media', 'design-and-illustration', 'mainstage', '3d', 'photography',
+  'business', 'content-creator', 'education', 'branding', 'generative-ai', 'video',
+  'video-audio-and-motion', 'social-media-and-marketing', 'graphic-design-and-illustration',
+  'creator', 'creativity-and-marketing-in-business',
+]);
+
+function categoryBadgeKey(category) {
+  return category ? category.toLowerCase().replace(/[\s_]+/g, '-').replace(/[^a-z0-9-]/g, '') : '';
+}
+
+// Reads the raw ESL sessions (not the already-flattened rawSessions from
+// mapEslPayloadToRawSessions) so we still have each Track value's `label` and `value`
+// separately — the mock-shaped `category` array only kept whichever string
+// extractCustomAttributeValues() picked.
+function logCategoryBadgeCoverage(sessions) {
+  const noCategory = [];
+  const noMatchingBadge = [];
+  sessions.forEach((session) => {
+    const trackAttr = (session.customAttributes || []).find((a) => a?.name === 'Track');
+    const primary = trackAttr?.values?.[0];
+    const title = session.localizations?.['en-US']?.title || session.enTitle || '';
+    if (!primary) {
+      noCategory.push(session);
+      return;
+    }
+    const key = categoryBadgeKey(primary.label ?? primary.value);
+    if (!KNOWN_CATEGORY_BADGE_KEYS.has(key)) {
+      noMatchingBadge.push({ id: session.sessionId, title, label: primary.label, value: primary.value, derivedKey: key });
+    }
+  });
+  // eslint-disable-next-line no-console
+  console.log('[ESL debug] CategoryBadge icon coverage:', {
+    totalSessions: sessions.length,
+    noCategoryAtAll: noCategory.length,
+    noCategoryAtAllFull: noCategory,
+    hasCategoryButNoIconMatch: noMatchingBadge.length,
+    noIconMatchSample: noMatchingBadge.slice(0, 15),
+  });
+  const distinctLabelValuePairs = [...new Map(
+    noMatchingBadge.map((s) => [`${s.label}|${s.value}`, { label: s.label, value: s.value }]),
+  ).values()];
+  // eslint-disable-next-line no-console
+  console.log('[ESL debug] distinct category label/value pairs with no matching badge:', distinctLabelValuePairs);
+}
+
+async function fetchEslSessions(eventId) {
+  const { serviceApiEndpoints } = ENV_MAP[getEventServiceEnv().name];
+  const options = await constructRequestOptions('GET');
+  const res = await fetch(`${serviceApiEndpoints.esp}/v1/events/${eventId}/sessions`, options);
+  if (!res.ok) {
+    throw new Error(`ESL sessions fetch failed for event ${eventId}: ${res.status}`);
   }
+  const payload = await res.json();
+  console.log('[ESL debug] payload:', payload);
+  const rawSessions = mapEslPayloadToRawSessions(payload);
+  console.log('[ESL debug] rawSessions:', rawSessions);
+  logCategoryBadgeCoverage(payload.sessions || []);
+  return rawSessions;
+}
+
+export async function fetchSessions(eventId) {
+  if (!eventId) return normalizeSessions(MOCK_SESSIONS);
+  const rawSessions = await fetchEslSessions(eventId);
+  return normalizeSessions(rawSessions);
 }
