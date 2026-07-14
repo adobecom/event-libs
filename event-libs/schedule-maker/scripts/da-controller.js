@@ -65,7 +65,10 @@ function getHeaders(method = 'GET', body = null) {
   const headers = new Headers();
   if (daToken) headers.append('Authorization', `Bearer ${daToken}`);
   if (body) headers.append('content-type', 'application/json');
-  return { method, headers, body: body ? JSON.stringify(body) : undefined };
+  // no-store bypasses the browser cache so every source read gets the current
+  // ETag from the server — without this, a cached stale ETag causes 412s on
+  // conditional writes (the same effect as Chrome DevTools "Disable cache").
+  return { method, headers, body: body ? JSON.stringify(body) : undefined, cache: 'no-store' };
 }
 
 async function daFetch(path, options = {}) {
@@ -190,6 +193,8 @@ const CONFLICT_ERROR = 'Conflict: the schedule sheet was changed by someone else
 async function mutateSheet(org, repo, path, mutate) {
   for (let attempt = 0; attempt <= MAX_WRITE_RETRIES; attempt += 1) {
     // eslint-disable-next-line no-await-in-loop
+    if (attempt > 0) await sleep(retryDelay(attempt - 1));
+    // eslint-disable-next-line no-await-in-loop
     const read = await readSheet(org, repo, path);
     if (!read.ok && read.status !== 404) return read;
     const rows = read.ok ? (read.data || []) : [];
@@ -250,6 +255,8 @@ export async function updateSchedule(org, repo, eventFolder, scheduleId, updates
   // Read both sheets to locate the schedule, then conditionally write the one
   // it lives in. If a concurrent sync moved/changed it (412), re-read and retry.
   for (let attempt = 0; attempt <= MAX_WRITE_RETRIES; attempt += 1) {
+    // eslint-disable-next-line no-await-in-loop
+    if (attempt > 0) await sleep(retryDelay(attempt - 1));
     // eslint-disable-next-line no-await-in-loop
     const [activeResult, draftResult] = await Promise.all([
       readSheet(org, repo, activePath),
@@ -408,6 +415,8 @@ export async function syncSchedules(org, repo, eventFolder, scanPath = null) {
   let newlyDiscovered = [];
   for (let attempt = 0; attempt <= MAX_WRITE_RETRIES; attempt += 1) {
     // eslint-disable-next-line no-await-in-loop
+    if (attempt > 0) await sleep(retryDelay(attempt - 1));
+    // eslint-disable-next-line no-await-in-loop
     const [activeResult, draftResult] = await Promise.all([
       readSheet(org, repo, activePath),
       readSheet(org, repo, draftPath),
@@ -536,6 +545,8 @@ async function removeScheduleFromDoc(org, repo, filePath, scheduleId) {
   const url = `${DA_ADMIN_ORIGIN}/source/${org}/${repo}${filePath}`;
 
   for (let attempt = 0; attempt <= MAX_WRITE_RETRIES; attempt += 1) {
+    // eslint-disable-next-line no-await-in-loop
+    if (attempt > 0) await sleep(retryDelay(attempt - 1));
     let resp;
     try {
       // eslint-disable-next-line no-await-in-loop
