@@ -1,13 +1,10 @@
 import { html } from '../../../deps/htm-preact.js';
-import { useSessionGuide } from '../store/index.js';
+import { sessions, scheduled } from '../../../utils/session-store.js';
 import { downloadICS } from '../utils/ics.js';
 
 export function DownloadButton() {
-  const { state } = useSessionGuide();
-  const { sessions, scheduled } = state;
-
   function handleDownload() {
-    const scheduledSessions = sessions.filter((s) => scheduled.has(s.id));
+    const scheduledSessions = sessions.value.filter((s) => scheduled.value.has(s.id));
     downloadICS(scheduledSessions);
   }
 

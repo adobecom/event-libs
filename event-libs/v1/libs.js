@@ -22,6 +22,7 @@ const EVENT_BLOCKS = [
   'venue-map',
   'sessions-guide',
   'sessions-guide-full-page',
+  'session-state-demo',
 ];
 
 // Import only the most essential utilities that are always needed

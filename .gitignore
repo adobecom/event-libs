@@ -16,3 +16,6 @@ node_modules/*
 .claude/settings.json
 
 .env
+
+# Sessions guide prototype
+event-libs/v1/blocks/sessions-guide/prototype/

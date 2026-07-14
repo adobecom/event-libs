@@ -2,10 +2,10 @@ import { html, useState, useEffect, useRef } from '../../../deps/htm-preact.js';
 import { useSessionGuide } from '../store/index.js';
 
 const VIEWS = [
-  { value: 'live-upcoming', label: 'Live & Upcoming' },
-  { value: 'my-sessions', label: 'My Sessions' },
-  { value: 'my-favorites', label: 'My Favorites' },
-  { value: 'on-demand', label: 'On Demand' },
+  { value: 'live-upcoming', label: 'Live & upcoming' },
+  { value: 'my-sessions', label: 'My sessions' },
+  { value: 'my-favorites', label: 'My favorites' },
+  { value: 'on-demand', label: 'On demand' },
 ];
 
 export function ViewDropdown() {
@@ -13,7 +13,7 @@ export function ViewDropdown() {
   const [open, setOpen] = useState(false);
   const wrapRef = useRef(null);
 
-  const activeLabel = VIEWS.find((v) => v.value === state.activeView)?.label || 'Live & Upcoming';
+  const activeLabel = VIEWS.find((v) => v.value === state.activeView)?.label || 'Live & upcoming';
 
   useEffect(() => {
     if (!open) return undefined;

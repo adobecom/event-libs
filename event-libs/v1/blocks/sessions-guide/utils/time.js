@@ -65,6 +65,15 @@ export function allSessionsEnded(sessions, nowMs) {
   return sessions.length > 0 && sessions.every((s) => nowMs > Date.parse(s.endTimeUtc));
 }
 
+export function formatDuration(startUtc, endUtc) {
+  const totalMin = Math.round((Date.parse(endUtc) - Date.parse(startUtc)) / 60000);
+  const h = Math.floor(totalMin / 60);
+  const m = totalMin % 60;
+  if (h === 0) return `${m} min`;
+  if (m === 0) return `${h} hr`;
+  return `${h} hr ${m} min`;
+}
+
 export function getSessionDayKey(session, userTz) {
   return new Intl.DateTimeFormat('en-CA', {
     year: 'numeric',
