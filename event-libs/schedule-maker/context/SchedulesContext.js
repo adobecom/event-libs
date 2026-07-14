@@ -7,7 +7,7 @@ import {
   updateSchedule as updateScheduleController,
   deleteSchedule as deleteScheduleController,
   syncSchedules as syncSchedulesController,
-  findScheduleReferences,
+  findScheduleReferences as findScheduleReferencesImpl,
 } from '../scripts/da-controller.js';
 import {
   processSchedules,
@@ -237,6 +237,11 @@ const SchedulesProvider = ({ children }) => {
   const clearToastError = useCallback(() => setToastError(null), []);
   const clearToastSuccess = useCallback(() => setToastSuccess(null), []);
 
+  const findScheduleReferencesStable = useCallback(
+    (sid, scanPath) => findScheduleReferencesImpl(org, repo, sid, scanPath),
+    [org, repo],
+  );
+
   useEffect(() => {
     if (eventFolder) {
       localStorage.setItem('sm-last-event-folder', eventFolder);
@@ -272,7 +277,7 @@ const SchedulesProvider = ({ children }) => {
     updateBlockLocally,
     deleteBlockLocally,
     discardChangesToActiveSchedule,
-    findScheduleReferences: (scheduleId, scanPath) => findScheduleReferences(org, repo, scheduleId, scanPath),
+    findScheduleReferences: findScheduleReferencesStable,
     syncSchedules,
   };
 
