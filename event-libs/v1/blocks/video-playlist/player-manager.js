@@ -14,7 +14,7 @@ import {
   startVideoFromSecond,
   findCardByVideoId,
   logError,
-} from './utils.js';
+} from './utils-new.js';
 
 const qs = (selector, root = document) => root.querySelector(selector);
 

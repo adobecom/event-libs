@@ -6,7 +6,7 @@ import {
   normalizeVideoId,
   logError,
   convertDurationStringToSeconds,
-} from './utils.js';
+} from './utils-new.js';
 import {
   PLAYLIST_PLAY_ALL_ID,
   TOAST_CONTAINER_ID,

@@ -1,7 +1,7 @@
 import { createTag } from '../../utils/utils.js';
 import { ANALYTICS } from './constants.js';
 import { getFavorites, toggleFavorite as toggleFavoriteApi } from './api.js';
-import { normalizeVideoId, findCardByVideoId, logError } from './utils.js';
+import { normalizeVideoId, findCardByVideoId, logError } from './utils-new.js';
 
 const qs = (selector, root = document) => root.querySelector(selector);
 
