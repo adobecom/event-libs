@@ -138,7 +138,7 @@ The per-document `source` fetch is the sync bottleneck. Scanning is done with a 
 | **Event folder picker** | [EventPicker](components/EventPicker.js) | Lists folders via `admin.da.live/list`; last folder remembered in `localStorage`. `/` = whole repo. |
 | **Fragment path browser** | [FragmentPathBrowser](components/editor/FragmentPathBrowser.js) | Column navigation over folders/HTML; defaults to `/events/events-shared/fragments`, or pre-navigates to the current path. |
 | **Epoch datetime input** | [BlockEditor](components/editor/BlockEditor.js) | Local-time picker synced with an epoch-ms field. |
-| **Excel import** | [SheetImporter](components/SheetImporter.js) | Imports schedules as drafts into the current event folder. |
+| **Excel import** | [SheetImporter](components/SheetImporter.js) | Imports schedules as drafts into the current event folder. Uses SheetJS (`v1/deps/xlsx.mjs`), vendored from `cdn.sheetjs.com/xlsx-0.20.3`. |
 | **URL share** | [utils.js](utils.js) | Copies a base64-encoded schedule link for embedding in DA docs. |
 | **Delete flow** | [DeleteConfirmationModal](components/DeleteConfirmationModal.js) | Scans for referencing docs, warns that deletion strips links and publishes staged changes, then hard-deletes the row. |
 
