@@ -9,81 +9,36 @@
   display: none !important;
 }
 
-/* Hide the div containing "video-url(video-container)" - it's the first div in the video container */
-.video-playlist > div:has(.milo-video) > div:first-child {
-  display: none !important;
-}
-
-.video-playlist > div:has(.youtube.link-block) {
+.video-playlist div:has(.youtube.link-block) {
   opacity: 0 !important;
   pointer-events: none !important;
   display: block !important;
 }
 
+/* Hide the div containing "video-url(video-container)" - it's the first div in the video container.
+   Descendant (not child) selector: JS relocates the video wrapper inside .container. */
+.video-playlist div:has(.milo-video) > div:first-child {
+  display: none !important;
+}
+
+/* Full-width breakout: the whole block (video + container) escapes the Milo grid,
+   leaving a fixed 24px gutter on each side regardless of viewport. */
 .video-playlist {
   display: flex;
   justify-content: center;
+  width: 100vw;
+  margin-left: calc(50% - 50vw);
+  margin-right: calc(50% - 50vw);
+  padding: 0 24px;
+  box-sizing: border-box;
 }
 
-/* For screens > 1575px: Side-by-side layout with fixed height */
-@media (min-width: 1576px) {
-  .video-playlist {
-    flex-direction: row; /* Side-by-side layout */
-  }
-  
-  .video-playlist .container {
-    height: 675px; /* Fixed height for large screens */
-    min-height: 675px;
-    max-width: 360px;
-  }
-  
-  .video-playlist .sessions {
-    margin-bottom: 0;
-  }
-  
-  .video-playlist > div:has(.milo-video) {
-    flex: 1; /* Video takes remaining space */
-    max-width: 1200px;
-  }
+.video-playlist .sessions {
+  overflow-x: auto;
 }
-
-/* For screens <= 1575px: Stacked layout */
-@media (max-width: 1575px) {
-  .video-playlist {
-    flex-direction: column; /* Stacked layout */
-    margin: 0 auto; /* Center the container */
-    align-items: center;
-    max-width: 83.4%;
-  }
-  
-  .video-playlist .container {
-    max-width: 1200px; /* Max width constraint */
-    width: 100%;
-  }
-  
-  .video-playlist .sessions { /* Horizontal layout for sessions */
-    overflow-x: auto; /* Enable horizontal scrolling */
-    padding: 8px;
-  }
-  
-  .video-playlist .session {
-    min-width: 280px; /* Fixed width for horizontal cards */
-    width: 280px;
-    flex-shrink: 0; /* Prevent cards from shrinking */
-  }
-  
-  .video-playlist > div:has(.milo-video) {
-    width: 100%;
-    height: auto;
-    max-width: 1200px;
-  }
-}
-
-
 
 .video-playlist .milo-video {
   width: 100%;
-  max-width: 1200px;
   display: block;
 }
 
@@ -168,6 +123,7 @@
   --switch-btn-border-color: #B2B2B2;
   --switch-btn-border-color-checked: #D1D1D1;
   flex-shrink: 0;
+  width: 100%;
   background-color: var(--container-background-color);
   color: var(--text-color);
   margin: 0;
@@ -195,6 +151,8 @@
   --switch-btn-background-color: #FDFDFD;
   --switch-btn-border-color: #6D6D6D;
   --switch-btn-border-color-checked: #464646;
+  border-radius: 16px;
+  overflow: hidden;
 }
 
 /* Light theme social share button */
@@ -208,6 +166,53 @@
   background: none;
 }
 
+/* Playlist overlay: toggle button + drawer, anchored over the video */
+.video-playlist .playlist-toggle {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  z-index: 2;
+  padding: 8px 16px;
+  border: none;
+  border-radius: 999px;
+  background: #fff;
+  color: #000;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.video-playlist .playlist-drawer {
+  display: none;
+  position: absolute;
+  top: 0;
+  right: 0;
+  z-index: 3;
+  width: 360px;
+  max-width: calc(100% - 32px);
+  max-height: 100%;
+  overflow-y: auto;
+  flex-direction: column;
+  background: var(--header-background-color);
+  box-shadow: -2px 0 12px 0 rgb(0 0 0 / 40%);
+}
+
+.video-playlist .playlist-drawer.is-open {
+  display: flex;
+}
+
+.video-playlist .playlist-drawer-close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 1;
+  border: none;
+  background: transparent;
+  color: var(--text-color);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+}
 
 /* Header Styles */
 .video-playlist .header {
@@ -258,6 +263,14 @@
   line-height: 1.25;
   font-weight: 700;
   margin: 0;
+}
+
+.video-playlist .container.consonant--light .header-title {
+  font-family: 'Adobe Clean Display', var(--body-font-family, 'Adobe Clean'), sans-serif;
+  font-weight: 900;
+  font-size: 18px;
+  line-height: 18px;
+  letter-spacing: -0.2px;
 }
 
 .video-playlist .header-right {
@@ -407,9 +420,17 @@
   min-height: 0;
 }
 
+/* Inside the drawer the session list is a vertical, full-width stack instead of
+   the horizontal scroll strip used elsewhere. */
+.video-playlist .playlist-drawer .sessions {
+  flex-direction: column;
+  overflow-x: visible;
+}
+
 .video-playlist .session {
   position: relative;
   display: flex;
+  flex-direction: column;
   width: 300px;
   min-width: 300px;
   padding: var(--sessions-session-vertical-padding) var(--sessions-session-horizontal-padding);
@@ -417,9 +438,25 @@
   border-radius: 5px;
 }
 
+.video-playlist .playlist-drawer .session {
+  width: 100%;
+  min-width: 0;
+}
+
+.video-playlist .container.consonant--light .session {
+  background-color: #f8f8f8;
+  opacity: 1;
+  border-radius: 8px;
+  padding: 4px 16px 4px 4px;
+}
+
 .video-playlist .session a {
   text-decoration: none;
   color: var(--text-color);
+}
+
+.video-playlist .session-row {
+  display: flex;
 }
 
 .video-playlist .session-link {
@@ -437,6 +474,11 @@
   opacity: 1;
   background-color: var(--highlighted-background-color);
   box-shadow: 0 1px 4px 0 rgb(0 0 0 / 40%);
+}
+
+.video-playlist .container.consonant--light .session.highlighted {
+  background-color: #f8f8f8;
+  box-shadow: 0 0 0 2px var(--sessions-session-thumb-progress-color);
 }
 
 .video-playlist .session-thumb {
@@ -478,16 +520,37 @@
   margin: 0;
 }
 
+.video-playlist .session-progress {
+  margin-top: 8px;
+}
+
+.video-playlist .session-progress-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 4px;
+}
+
+.video-playlist .session-progress-label,
+.video-playlist .session-progress-value {
+  font-size: 11px;
+  line-height: 1;
+  margin: 0;
+  color: var(--text-color);
+}
+
 .video-playlist .session-thumb-progress {
   background-color: var(--progress-track-color);
-  height: 7px;
+  height: 4px;
   width: 100%;
+  border-radius: 2px;
 }
 
 .video-playlist .session-thumb-progress-bar {
   background-color: var(--sessions-session-thumb-progress-color);
   height: 100%;
   width: 0;
+  border-radius: 2px;
 }
 
 .video-playlist .session-info {

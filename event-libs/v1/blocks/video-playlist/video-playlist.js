@@ -27,7 +27,10 @@ const SELECTORS = {
   HEADER_CHECKBOX: `#${PLAYLIST_PLAY_ALL_ID}`,
   SESSION_CARD: '.session',
   PROGRESS_BAR: '.session-thumb-progress-bar',
+  PROGRESS_VALUE: '.session-progress-value',
 };
+
+const PLAYLIST_DRAWER_ID = 'video-playlist-drawer';
 
 const DEFAULT_CFG = {
   playlistId: null,
@@ -35,6 +38,8 @@ const DEFAULT_CFG = {
   autoplayText: 'Play All',
   topicEyebrow: '',
   skipPlaylistText: 'Skip playlist',
+  viewPlaylistText: 'View playlist',
+  closePlaylistText: 'Close playlist',
   minimumSessions: 4,
   isTagbased: true,
   tags: '',
@@ -95,11 +100,13 @@ const buildSessionCard = (card) => {
     class: 'session',
     'data-video-id': videoId,
   });
+
+  const row = createTag('div', { class: 'session-row' }, '', { parent: session });
   const link = createTag('a', {
     'daa-ll': ANALYTICS.VIDEO_SELECT,
     href: card.overlayLink,
     class: 'session-link',
-  }, '', { parent: session });
+  }, '', { parent: row });
 
   const thumb = createTag('div', { class: 'session-thumb' }, '', { parent: link });
   createTag('img', {
@@ -110,12 +117,17 @@ const buildSessionCard = (card) => {
   createTag('div', { class: 'session-thumb-play-icon' }, PLAY_ICON_SVG, { parent: thumb });
   const duration = createTag('div', { class: 'session-thumb-duration' }, '', { parent: thumb });
   createTag('p', { class: 'session-thumb-duration' }, card.search.videoDuration, { parent: duration });
-  const progress = createTag('div', { class: 'session-thumb-progress' }, '', { parent: thumb });
-  createTag('div', { class: 'session-thumb-progress-bar' }, '', { parent: progress });
 
   const info = createTag('div', { class: 'session-info' }, '', { parent: link });
   createTag('h4', { class: 'session-title' }, card.contentArea.title, { parent: info });
   createTag('p', { class: 'session-desc' }, card.contentArea.description, { parent: info });
+
+  const progress = createTag('div', { class: 'session-progress' }, '', { parent: session });
+  const progressHeader = createTag('div', { class: 'session-progress-header' }, '', { parent: progress });
+  createTag('p', { class: 'session-progress-label' }, 'Progress', { parent: progressHeader });
+  createTag('p', { class: 'session-progress-value' }, '0%', { parent: progressHeader });
+  const track = createTag('div', { class: 'session-thumb-progress' }, '', { parent: progress });
+  createTag('div', { class: 'session-thumb-progress-bar' }, '', { parent: track });
 
   return session;
 };
@@ -158,12 +170,25 @@ class VideoPlaylist {
       this.cfg = this.parseCfg();
       this.root = this.createRoot();
       this.el.appendChild(this.root);
+      this.relocateVideoWrapper();
       await this.loadAndRender();
       this.initPlayerManager();
     } catch (err) {
       logError(err, 'VideoPlaylist.init');
       this.root?.classList.remove('is-hidden');
     }
+  }
+
+  /**
+   * The video is authored as a sibling row inside this block (a div wrapping
+   * .milo-video). Move it inside .container so the player and the playlist
+   * drawer share one positioning context.
+   */
+  relocateVideoWrapper() {
+    const wrapper = [...this.el.children].find(
+      (child) => child !== this.root && child.querySelector('.milo-video'),
+    );
+    if (wrapper) this.root.appendChild(wrapper);
   }
 
   cleanup() {
@@ -274,9 +299,11 @@ class VideoPlaylist {
   async render(cards) {
     this.root.classList.remove('is-hidden');
     const header = await this.renderHeader();
-    this.root.appendChild(header);
-    this.root.appendChild(this.renderSessions(cards));
-    
+    const sessions = this.renderSessions(cards);
+    this.drawer = this.renderPlaylistDrawer(header, sessions);
+    this.root.appendChild(this.renderPlaylistToggle());
+    this.root.appendChild(this.drawer);
+
     // 3. Initialize Favorites Manager (only if enabled AND user is registered)
     if (this.cfg.favoritesEnabled) {
       try {
@@ -298,6 +325,58 @@ class VideoPlaylist {
     this.root.appendChild(
       createTag('div', { id: PLAYLIST_SKIP_TO_ID, class: 'playlist-skip-to' }),
     );
+  }
+
+  renderPlaylistToggle() {
+    const button = createTag('button', {
+      type: 'button',
+      class: 'playlist-toggle',
+      'aria-expanded': 'false',
+      'aria-controls': PLAYLIST_DRAWER_ID,
+    }, this.cfg.viewPlaylistText);
+
+    const onClick = () => this.togglePlaylistDrawer();
+    button.addEventListener('click', onClick);
+    this.disposers.push(() => button.removeEventListener('click', onClick));
+
+    this.playlistToggleBtn = button;
+    return button;
+  }
+
+  renderPlaylistDrawer(header, sessions) {
+    const drawer = createTag('div', { id: PLAYLIST_DRAWER_ID, class: 'playlist-drawer' });
+
+    const closeButton = createTag('button', {
+      type: 'button',
+      class: 'playlist-drawer-close',
+      'aria-label': this.cfg.closePlaylistText,
+    }, '✕', { parent: drawer });
+    const onClose = () => this.togglePlaylistDrawer(false);
+    closeButton.addEventListener('click', onClose);
+    this.disposers.push(() => closeButton.removeEventListener('click', onClose));
+
+    drawer.appendChild(header);
+    drawer.appendChild(sessions);
+    return drawer;
+  }
+
+  /**
+   * Opens/closes the playlist drawer. Per fit criteria, expanding the drawer
+   * should guarantee autoplay-to-next is active (reuses the existing
+   * navigate-to-next-session behavior already driven by handleComplete()).
+   */
+  togglePlaylistDrawer(forceOpen) {
+    if (!this.drawer || !this.playlistToggleBtn) return;
+
+    const nextOpen = typeof forceOpen === 'boolean' ? forceOpen : !this.drawer.classList.contains('is-open');
+    this.drawer.classList.toggle('is-open', nextOpen);
+    this.playlistToggleBtn.setAttribute('aria-expanded', String(nextOpen));
+
+    if (nextOpen) {
+      saveShouldAutoPlayToLocalStorage(true);
+      const checkbox = this.root.querySelector(SELECTORS.HEADER_CHECKBOX);
+      if (checkbox) checkbox.checked = true;
+    }
   }
 
   async renderHeader() {
@@ -380,24 +459,29 @@ class VideoPlaylist {
     return outer;
   }
 
+  setSessionProgress(session, percentage) {
+    const bar = session.querySelector(SELECTORS.PROGRESS_BAR);
+    if (bar) bar.style.width = `${percentage}%`;
+
+    const value = session.querySelector(SELECTORS.PROGRESS_VALUE);
+    if (value) value.textContent = `${Math.round(percentage)}%`;
+  }
+
   initProgressBars(wrapper) {
     const videos = getLocalStorageVideos();
     [...wrapper.querySelectorAll(SELECTORS.SESSION_CARD)].forEach(
       (session) => {
         const videoId = normalizeVideoId(session.getAttribute('data-video-id'));
         if (!videoId) return;
-        
+
         // Try both normalized and original key formats for backward compatibility
         const data = videos[videoId] || videos[session.getAttribute('data-video-id')];
         if (data?.length && data.secondsWatched > 0) {
-          const bar = session.querySelector(SELECTORS.PROGRESS_BAR);
-          if (bar) {
-            const percentage = Math.min(
-              MAX_PERCENTAGE,
-              (data.secondsWatched / data.length) * MAX_PERCENTAGE,
-            );
-            bar.style.width = `${percentage}%`;
-          }
+          const percentage = Math.min(
+            MAX_PERCENTAGE,
+            (data.secondsWatched / data.length) * MAX_PERCENTAGE,
+          );
+          this.setSessionProgress(session, percentage);
         }
       },
     );
@@ -441,11 +525,8 @@ class VideoPlaylist {
     
     if (!container) return;
 
-    const bar = container.querySelector(SELECTORS.PROGRESS_BAR);
-    if (!bar) return;
-    
     const percentage = Math.min(MAX_PERCENTAGE, (current / length) * MAX_PERCENTAGE);
-    bar.style.width = `${percentage}%`;
+    this.setSessionProgress(container, percentage);
   }
 
   /**

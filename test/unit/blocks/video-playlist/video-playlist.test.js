@@ -147,6 +147,32 @@ describe('video-playlist block', () => {
   });
 
   // ------------------------------------------------------------------ //
+  // 5b. Playlist drawer opens/closes and forces autoplay on when expanded
+  // ------------------------------------------------------------------ //
+  it('opens/closes the playlist drawer via the toggle and forces autoplay on when expanded', async () => {
+    const el = document.querySelector('.video-playlist');
+    init(el);
+
+    await waitFor(() => !!el.querySelector('.playlist-toggle'));
+
+    const toggle = el.querySelector('.playlist-toggle');
+    const drawer = el.querySelector('.playlist-drawer');
+    const checkbox = el.querySelector('#playlist-play-all');
+    expect(drawer.classList.contains('is-open'), 'drawer starts closed').to.be.false;
+    expect(toggle.getAttribute('aria-expanded')).to.equal('false');
+
+    toggle.click();
+    expect(drawer.classList.contains('is-open'), 'drawer opens on toggle click').to.be.true;
+    expect(toggle.getAttribute('aria-expanded')).to.equal('true');
+    expect(checkbox.checked, 'autoplay checkbox is checked once expanded').to.be.true;
+    expect(JSON.parse(localStorage.getItem('shouldAutoPlayPlaylist'))).to.be.true;
+
+    el.querySelector('.playlist-drawer-close').click();
+    expect(drawer.classList.contains('is-open'), 'drawer closes on close button click').to.be.false;
+    expect(toggle.getAttribute('aria-expanded')).to.equal('false');
+  });
+
+  // ------------------------------------------------------------------ //
   // 6. Social sharing disabled — no .social-share-wrapper in the header
   // ------------------------------------------------------------------ //
   it('omits .social-share-wrapper when socialSharing is false', async () => {

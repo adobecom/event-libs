@@ -56,7 +56,7 @@ export class FavoritesManager {
           card,
           favoriteIds.has(card.search.sessionId),
         );
-        sessionEl.appendChild(button);
+        (sessionEl.querySelector('.session-row') || sessionEl).appendChild(button);
       });
   }
 
