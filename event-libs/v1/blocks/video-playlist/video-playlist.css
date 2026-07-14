@@ -39,8 +39,15 @@
   overflow-x: auto;
 }
 
+/* Override Milo's height:0 + padding-bottom:56.25% aspect-ratio hack with the
+   modern aspect-ratio property: more robust inside our flex/full-width layout,
+   since it doesn't depend on percentage-padding resolving against a
+   containing-block width that can end up 0 in nested flex contexts. */
 .video-playlist .milo-video {
   width: 100%;
+  height: auto;
+  aspect-ratio: 16 / 9;
+  padding-bottom: 0;
   display: block;
 }
 
