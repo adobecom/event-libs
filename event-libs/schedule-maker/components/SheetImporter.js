@@ -31,7 +31,7 @@ export default function SheetImporter() {
   useEffect(() => {
     const fetchLibrary = async () => {
       try {
-        const { default: XLSX } = await import('https://cdn.sheetjs.com/xlsx-0.20.3/package/xlsx.mjs');
+        const { default: XLSX } = await import('../../v1/deps/xlsx.mjs');
         setXlsx(XLSX);
       } catch (err) {
         window.lana?.log(`Failed to load xlsx library: ${err}`);
@@ -77,11 +77,11 @@ export default function SheetImporter() {
   const renderPreviewRows = () => {
     const rows = sheetData.slice(1, 4);
     const mappedColumns = Object.entries(columnMapping).filter(([, col]) => col);
+    const headers = getAvailableColumns();
+    const colIndexMap = {};
+    mappedColumns.forEach(([, col]) => { colIndexMap[col] = headers.indexOf(col); });
     return rows.map((row) => {
-      const cells = mappedColumns.map(([, col]) => {
-        const colIndex = getAvailableColumns().indexOf(col);
-        return html`<td>${row[colIndex] || ''}</td>`;
-      });
+      const cells = mappedColumns.map(([, col]) => html`<td>${row[colIndexMap[col]] || ''}</td>`);
       return html`<tr>${cells}</tr>`;
     });
   };
@@ -93,12 +93,14 @@ export default function SheetImporter() {
   const convertToBlocks = () => {
     if (sheetData.length < 2) return [];
     const headers = sheetData[0];
+    const colIndexMap = {};
+    Object.values(columnMapping).forEach((col) => { if (col) colIndexMap[col] = headers.indexOf(col); });
     const rows = sheetData.slice(1);
     return rows.map((row) => {
       const block = {};
       Object.entries(columnMapping).forEach(([property, columnName]) => {
-        if (columnName && headers.includes(columnName)) {
-          const value = row[headers.indexOf(columnName)] || '';
+        if (columnName && colIndexMap[columnName] >= 0) {
+          const value = row[colIndexMap[columnName]] || '';
           if (property === 'streamId') {
             block.liveStream = { provider: 'MobileRider', streamId: value };
             block.includeLiveStream = Boolean(value);

@@ -22,8 +22,6 @@ const DAProvider = ({ children }) => {
         setDaToken(sdkToken);
         if (actions?.daFetch) setDaFetch(actions.daFetch);
       } catch (err) {
-        // eslint-disable-next-line no-console
-        console.error('DA SDK init error:', err);
         window.lana?.log(`DA SDK init error: ${err}`);
         setError('Failed to initialize DA SDK. Please reload the page.');
       } finally {

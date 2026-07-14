@@ -153,7 +153,7 @@ async function writeSheet(org, repo, path, rows, { etag, create } = {}) {
     data: serialized,
   });
 
-  const url = `https://admin.da.live/source/${org}/${repo}${path}`;
+  const url = `${DA_ADMIN_ORIGIN}/source/${org}/${repo}${path}`;
   const formData = new FormData();
   formData.append('data', new Blob([payload], { type: 'application/json' }), 'blob');
 
@@ -359,6 +359,8 @@ async function listAllFiles(org, repo, path) {
   return files;
 }
 
+const SCHEDULE_PARAM_RE = /\?schedule=([A-Za-z0-9+/=%-]{20,})/g;
+
 // One-pass sync: scans all HTML docs, updates active/draft for every known schedule,
 // and discovers any new schedules embedded in docs but not yet in any sheet.
 export async function syncSchedules(org, repo, eventFolder, scanPath = null) {
@@ -377,13 +379,12 @@ export async function syncSchedules(org, repo, eventFolder, scanPath = null) {
   const foundData = new Map(); // scheduleId → decoded object (for new discoveries)
   // Fetch + scan docs in parallel (bounded). Scanning happens inside the worker
   // so each doc's text can be garbage-collected before the next batch.
-  let unreadable = 0;
   const perDocFinds = await mapWithConcurrency(docFiles, SCAN_CONCURRENCY, async (filePath) => {
     const res = await fetchText(org, repo, filePath);
-    if (!res.ok) { unreadable += 1; return []; }
+    if (!res.ok) return null;
     if (!res.text) return [];
     const finds = [];
-    const re = /schedule=([A-Za-z0-9+/=%-]{20,})/g;
+    const re = new RegExp(SCHEDULE_PARAM_RE.source, 'g');
     let m;
     // eslint-disable-next-line no-cond-assign
     while ((m = re.exec(res.text)) !== null) {
@@ -394,6 +395,7 @@ export async function syncSchedules(org, repo, eventFolder, scanPath = null) {
   });
   // Abort rather than misclassify: a doc we couldn't read might reference a
   // schedule, so treating it as empty could wrongly demote active → draft.
+  const unreadable = perDocFinds.filter((r) => r === null).length;
   if (unreadable > 0) {
     return {
       ok: false,
@@ -477,9 +479,6 @@ export async function syncSchedules(org, repo, eventFolder, scanPath = null) {
   }
   return { ok: false, status: 412, error: 'Conflict during sync — the sheets changed. Please retry.' };
 }
-
-
-const SCHEDULE_PARAM_RE = /\?schedule=([A-Za-z0-9+/=%-]{20,})/g;
 
 // Handles both correctly-encoded links (single decodeURIComponent) and legacy
 // double-encoded links where encodeURIComponent was applied before searchParams.set.

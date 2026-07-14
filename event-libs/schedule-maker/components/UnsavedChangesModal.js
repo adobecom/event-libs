@@ -1,12 +1,8 @@
 import { html } from '../htm-wrapper.js';
 import Modal from './Modal.js';
-import { useSchedulesOperations } from '../context/SchedulesContext.js';
 
 export default function UnsavedChangesModal({ isOpen, onClose, onProceed }) {
-  const { discardChangesToActiveSchedule } = useSchedulesOperations();
-
   const handleDiscard = () => {
-    discardChangesToActiveSchedule();
     onProceed();
     onClose();
   };

@@ -1,21 +1,7 @@
-// import { useEffect, useRef } from '../v1/deps/htm-preact.js'; // restored below without restore logic
-import { useEffect } from '../v1/deps/htm-preact.js';
 import { html } from './htm-wrapper.js';
-// import Home from './pages/Home.js'; // Home page bypassed — always show Schedules
 import Schedules from './pages/Schedules.js';
-// import { PAGES } from './constants.js';
-// import { useNavigation } from './context/NavigationContext.js';
 import { useSchedulesUI } from './context/SchedulesContext.js';
 import { useDA } from './context/DAContext.js';
-
-// Home page bypassed: always render Schedules (two-panel layout).
-// EventPicker + Sync moved into Sidebar. To revert, restore the commented imports
-// and replace <${Schedules} /> with <${PAGES_COMPONENTS[activePage.pageComponent]} />.
-//
-// const PAGES_COMPONENTS = {
-//   [PAGES.home]: Home,
-//   [PAGES.schedules]: Schedules,
-// };
 
 export default function ScheduleMaker() {
   const { isLoading: isDaLoading, error: daError } = useDA();
@@ -27,26 +13,6 @@ export default function ScheduleMaker() {
     isInitialLoading,
     error: schedulesError,
   } = useSchedulesUI();
-
-  // Home page restore logic (localStorage schedule ID) commented out — no longer needed
-  // since the Sidebar is always visible and handles selection state.
-  //
-  // const { schedules, setActiveSchedule } = useSchedulesData();
-  // const { activePage, goToEditSchedule } = useNavigation();
-  // const didRestoreSchedule = useRef(false);
-  // useEffect(() => {
-  //   if (isInitialLoading || didRestoreSchedule.current) return;
-  //   const savedId = localStorage.getItem('sm-last-schedule-id');
-  //   if (!savedId) { didRestoreSchedule.current = true; return; }
-  //   const schedule = schedules.find((s) => s.scheduleId === savedId);
-  //   if (!schedule) return;
-  //   didRestoreSchedule.current = true;
-  //   setActiveSchedule(schedule);
-  //   goToEditSchedule();
-  // }, [isInitialLoading, schedules]);
-
-  // suppress unused-import lint for useEffect kept for future hooks
-  useEffect(() => {}, []);
 
   if (isDaLoading) {
     return html`

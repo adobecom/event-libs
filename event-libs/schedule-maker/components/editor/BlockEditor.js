@@ -4,8 +4,54 @@ import { useSchedulesOperations } from '../../context/SchedulesContext.js';
 import { useDAContext } from '../../context/DAContext.js';
 import FragmentPathBrowser from './FragmentPathBrowser.js';
 
+const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+
+const localFormatter = new Intl.DateTimeFormat('en-US', {
+  timeZone: userTimezone,
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+  hour: '2-digit',
+  minute: '2-digit',
+  hour12: false,
+});
+
+const ptFormatter = new Intl.DateTimeFormat('en-US', {
+  timeZone: 'America/Los_Angeles',
+  month: '2-digit',
+  day: '2-digit',
+  year: 'numeric',
+  hour: '2-digit',
+  minute: '2-digit',
+  hour12: true,
+});
+
 function getFragmentPreviewUrl(org, repo, fragmentPath) {
   return `https://da.live/edit#/${org}/${repo}${fragmentPath}`;
+}
+
+function epochToLocalInput(timestamp) {
+  if (!timestamp) return '';
+  const parts = localFormatter.formatToParts(new Date(timestamp));
+  const get = (type) => parts.find((p) => p.type === type).value;
+  const hr = get('hour') === '24' ? '00' : get('hour');
+  return `${get('year')}-${get('month')}-${get('day')}T${hr}:${get('minute')}`;
+}
+
+function formatPtHint(timestamp) {
+  return ptFormatter.format(new Date(timestamp));
+}
+
+// DST-safe: probes actual UTC offset via Intl for the given local datetime string
+function localInputToEpoch(localIsoString) {
+  if (!localIsoString) return 0;
+  const naiveUtc = new Date(`${localIsoString}:00Z`);
+  const parts = localFormatter.formatToParts(naiveUtc);
+  const get = (type) => parseInt(parts.find((p) => p.type === type).value, 10);
+  const tzMs = Date.UTC(get('year'), get('month') - 1, get('day'), get('hour') % 24, get('minute'));
+  const [y, mo, d, h, mi] = localIsoString.split(/[-T:]/).map(Number);
+  const wantedMs = Date.UTC(y, mo - 1, d, h, mi);
+  return naiveUtc.getTime() - (tzMs - wantedMs);
 }
 
 export default function BlockEditor({ block, editingBlockId, setEditingBlockId }) {
@@ -13,60 +59,11 @@ export default function BlockEditor({ block, editingBlockId, setEditingBlockId }
   const { org, repo } = useDAContext();
   const [isBrowserOpen, setIsBrowserOpen] = useState(false);
 
-  const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
-
-  const epochToLocalInput = (timestamp, timezone) => {
-    if (!timestamp) return '';
-    const date = new Date(timestamp);
-    const parts = new Intl.DateTimeFormat('en-US', {
-      timeZone: timezone,
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: false,
-    }).formatToParts(date);
-    const get = (type) => parts.find((p) => p.type === type).value;
-    const hr = get('hour') === '24' ? '00' : get('hour');
-    return `${get('year')}-${get('month')}-${get('day')}T${hr}:${get('minute')}`;
-  };
-
-  const formatPtHint = (timestamp) => new Intl.DateTimeFormat('en-US', {
-    timeZone: 'America/Los_Angeles',
-    month: '2-digit',
-    day: '2-digit',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: true,
-  }).format(new Date(timestamp));
-
-  // DST-safe: probes actual UTC offset via Intl for the given local datetime string
-  const localInputToEpoch = (localIsoString, timezone) => {
-    if (!localIsoString) return 0;
-    const naiveUtc = new Date(`${localIsoString}:00Z`);
-    const parts = new Intl.DateTimeFormat('en-US', {
-      timeZone: timezone,
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: false,
-    }).formatToParts(naiveUtc);
-    const get = (type) => parseInt(parts.find((p) => p.type === type).value, 10);
-    const tzMs = Date.UTC(get('year'), get('month') - 1, get('day'), get('hour') % 24, get('minute'));
-    const [y, mo, d, h, mi] = localIsoString.split(/[-T:]/).map(Number);
-    const wantedMs = Date.UTC(y, mo - 1, d, h, mi);
-    return naiveUtc.getTime() - (tzMs - wantedMs);
-  };
-
   const handleEditBlockTitle = (blockId) => {
     updateBlockLocally(blockId, { isEditingBlockTitle: true });
     const blockTitleInput = document.getElementById(`${blockId}-block-title-input`);
-    const inputElement = blockTitleInput.shadowRoot.querySelector('input');
-    requestAnimationFrame(() => { inputElement.focus(); });
+    const inputElement = blockTitleInput?.shadowRoot?.querySelector('input');
+    requestAnimationFrame(() => { inputElement?.focus(); });
   };
 
   const handleBlockTitleChange = (blockId, event) => {
@@ -78,7 +75,7 @@ export default function BlockEditor({ block, editingBlockId, setEditingBlockId }
   };
 
   const handleStartDateTimeChange = (blockId, event) => {
-    const timestamp = localInputToEpoch(event.target.value, userTimezone);
+    const timestamp = localInputToEpoch(event.target.value);
     updateBlockLocally(blockId, { startDateTime: timestamp || 0 });
   };
 
@@ -154,7 +151,7 @@ export default function BlockEditor({ block, editingBlockId, setEditingBlockId }
           <input \
             type="datetime-local" \
             id="${block.id}-start-datetime-input" \
-            value=${epochToLocalInput(block.startDateTime, userTimezone)} \
+            value=${epochToLocalInput(block.startDateTime)} \
             onInput=${(e) => handleStartDateTimeChange(block.id, e)} \
             class="sm-input--datetime" \
             placeholder="Enter block start date and time" \

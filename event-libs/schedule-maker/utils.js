@@ -50,7 +50,7 @@ function validateSchedule(schedule) {
 }
 
 function sortBlocks(blocks) {
-  return blocks?.sort((a, b) => a.startDateTime - b.startDateTime);
+  return blocks ? [...blocks].sort((a, b) => a.startDateTime - b.startDateTime) : blocks;
 }
 
 function assignIdToBlocks(schedule) {
@@ -79,7 +79,8 @@ function prepareScheduleForServer(schedule) {
 
 function prepareScheduleForClient(schedule) {
   if (!schedule) return null;
-  schedule.blocks.forEach((block) => {
+  const s = JSON.parse(JSON.stringify(schedule));
+  s.blocks.forEach((block) => {
     block.id = `block-${crypto.randomUUID()}`;
     block.isEditingBlockTitle = false;
     if (!block.liveStream) {
@@ -87,21 +88,21 @@ function prepareScheduleForClient(schedule) {
     }
     block.isComplete = isBlockComplete(block);
   });
-  schedule.blocks = sortBlocks(schedule.blocks);
-  schedule.isComplete = isScheduleComplete(schedule);
-  return schedule;
+  s.blocks = sortBlocks(s.blocks);
+  s.isComplete = isScheduleComplete(s);
+  return s;
 }
 
 function processSchedules(schedules) {
-  const sorted = schedules?.sort((a, b) => new Date(b.modificationTime) - new Date(a.modificationTime));
-  return sorted?.map((schedule) => prepareScheduleForClient(schedule));
+  const sorted = schedules ? [...schedules].sort((a, b) => new Date(b.modificationTime) - new Date(a.modificationTime)) : [];
+  return sorted.map((schedule) => prepareScheduleForClient(schedule));
 }
 
 class ScheduleURLUtility {
   static createScheduleURL(scheduleObject) {
     try {
       const jsonString = JSON.stringify(scheduleObject);
-      const base64JsonString = btoa(jsonString);
+      const base64JsonString = btoa(unescape(encodeURIComponent(jsonString)));
       const currentURL = new URL(window.location.origin + window.location.pathname);
       currentURL.searchParams.set('schedule', base64JsonString);
       return currentURL.toString();

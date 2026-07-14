@@ -71,13 +71,16 @@ const SchedulesProvider = ({ children }) => {
 
   const setActiveScheduleWithOriginal = useCallback((schedule) => {
     if (schedule) {
-      assignIdToBlocks(schedule);
-      localStorage.setItem('sm-last-schedule-id', schedule.scheduleId);
+      const cloned = JSON.parse(JSON.stringify(schedule));
+      assignIdToBlocks(cloned);
+      localStorage.setItem('sm-last-schedule-id', cloned.scheduleId);
+      setOriginalActiveSchedule(cloned);
+      setActiveScheduleState(cloned);
     } else {
       localStorage.removeItem('sm-last-schedule-id');
+      setOriginalActiveSchedule(null);
+      setActiveScheduleState(null);
     }
-    setOriginalActiveSchedule(schedule);
-    setActiveScheduleState(schedule);
   }, []);
 
   const createAndAddSchedule = useCallback(async (schedule) => {

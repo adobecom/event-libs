@@ -113,7 +113,7 @@ export default function FragmentPathBrowser({
         expandToPath(DEFAULT_FRAGMENT_PATH);
       }
     })();
-  }, [isOpen, org, repo]);
+  }, [isOpen, org, repo, expandToPath]);
 
   const handleFolderClick = (colIndex, item) => {
     const contentPath = stripOrgRepo(item.path, org, repo);
@@ -167,7 +167,7 @@ export default function FragmentPathBrowser({
       ${items.map((item) => {
         const isFolder = !item.ext;
         const rawPath = stripOrgRepo(item.path, org, repo);
-        const contentPath = isFolder ? rawPath : (item.ext ? rawPath.slice(0, -(item.ext.length + 1)) : rawPath);
+        const contentPath = isFolder ? rawPath : rawPath.slice(0, -(item.ext.length + 1));
         const isActiveFolder = isFolder && activeFolderPaths[colIndex] === rawPath;
         const isSelectedFile = !isFolder && selectedFilePath === contentPath;
 

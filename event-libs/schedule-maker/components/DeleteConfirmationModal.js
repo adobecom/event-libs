@@ -1,4 +1,4 @@
-import { useState, useEffect } from '../../v1/deps/htm-preact.js';
+import { useState, useEffect, useCallback } from '../../v1/deps/htm-preact.js';
 import { html } from '../htm-wrapper.js';
 import Modal from './Modal.js';
 import { useSchedulesUI, useSchedulesOperations, useSchedulesData } from '../context/SchedulesContext.js';
@@ -17,23 +17,24 @@ export default function DeleteConfirmationModal({
   const [isScanning, setIsScanning] = useState(false);
   const [scanError, setScanError] = useState(null);
 
-  const runScan = () => {
+  const runScan = useCallback(async () => {
     if (!scheduleId || !eventFolder) return;
     setIsScanning(true);
     setScanError(null);
     setAffectedPaths([]);
-    findScheduleReferences(scheduleId, eventFolder)
-      .then((result) => {
-        if (result.ok) setAffectedPaths(result.data || []);
-        else setScanError(result.error || 'Could not scan documents for references.');
-      })
-      .finally(() => setIsScanning(false));
-  };
+    try {
+      const result = await findScheduleReferences(scheduleId, eventFolder);
+      if (result.ok) setAffectedPaths(result.data || []);
+      else setScanError(result.error || 'Could not scan documents for references.');
+    } finally {
+      setIsScanning(false);
+    }
+  }, [scheduleId, eventFolder, findScheduleReferences]);
 
   useEffect(() => {
     if (!isOpen) return;
     runScan();
-  }, [isOpen, scheduleId, eventFolder]);
+  }, [isOpen, scheduleId, eventFolder, runScan]);
 
   const handleConfirm = async () => {
     // Block deletion until the reference scan succeeds — deleting on an

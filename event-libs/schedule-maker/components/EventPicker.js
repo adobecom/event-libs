@@ -3,14 +3,15 @@ import { html } from '../htm-wrapper.js';
 import Modal from './Modal.js';
 import { useDAContext } from '../context/DAContext.js';
 import { useSchedulesData, useSchedulesOperations } from '../context/SchedulesContext.js';
+import { listFolder } from '../scripts/da-controller.js';
 
-async function fetchFolders(org, repo, path, token) {
-  const opts = token ? { headers: { Authorization: `Bearer ${token}` } } : {};
-  const resp = await fetch(`https://admin.da.live/list/${org}/${repo}${path}`, opts);
-  if (resp.status === 401) throw new Error('Unauthorized — sign in at da.live first.');
-  if (!resp.ok) throw new Error(`Failed to load (${resp.status})`);
-  const items = await resp.json();
-  return items.filter((item) => !item.ext).sort((a, b) => a.path.localeCompare(b.path));
+async function fetchFolders(org, repo, path) {
+  const result = await listFolder(org, repo, path);
+  if (!result.ok) {
+    if (result.status === 401) throw new Error('Unauthorized — sign in at da.live first.');
+    throw new Error(`Failed to load (${result.status})`);
+  }
+  return (result.data || []).filter((item) => !item.ext);
 }
 
 function getItemName(fullPath) {
@@ -22,7 +23,7 @@ function stripOrgRepo(fullPath, org, repo) {
 }
 
 function FolderBrowser({ isOpen, onClose, onSelect, initialPath }) {
-  const { org, repo, token } = useDAContext();
+  const { org, repo } = useDAContext();
 
   const [columnPaths, setColumnPaths] = useState([]);
   const [columnItems, setColumnItems] = useState([]);
@@ -43,7 +44,7 @@ function FolderBrowser({ isOpen, onClose, onSelect, initialPath }) {
     setLoadingColIndex(colIndex);
     setError(null);
     try {
-      const items = await fetchFolders(org, repo, path, token);
+      const items = await fetchFolders(org, repo, path);
       setColumnItems((prev) => { const next = prev.slice(0, colIndex); next[colIndex] = items; return next; });
       setColumnPaths((prev) => { const next = prev.slice(0, colIndex); next[colIndex] = path; return next; });
     } catch (err) {
@@ -51,7 +52,7 @@ function FolderBrowser({ isOpen, onClose, onSelect, initialPath }) {
     } finally {
       setLoadingColIndex(null);
     }
-  }, [org, repo, token]);
+  }, [org, repo]);
 
   useEffect(() => {
     if (!isOpen || !org || !repo) return;
@@ -70,10 +71,10 @@ function FolderBrowser({ isOpen, onClose, onSelect, initialPath }) {
       const newActiveFolderPaths = [];
       let path = '/';
 
-      for (let i = 0; i <= segments.length; i++) {
+      for (let i = 0; i <= segments.length; i += 1) {
         setLoadingColIndex(i);
         try {
-          const items = await fetchFolders(org, repo, path, token);
+          const items = await fetchFolders(org, repo, path);
           newColumnItems.push(items);
           newColumnPaths.push(path);
           if (i < segments.length) {
