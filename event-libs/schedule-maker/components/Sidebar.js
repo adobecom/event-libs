@@ -19,7 +19,7 @@ function Sidebar({ setIsAddScheduleModalOpen }) {
   const [pendingAction, setPendingAction] = useState(null);
   const [pendingSchedule, setPendingSchedule] = useState(null);
   const { goToEditSchedule } = useNavigation();
-  const { schedules, activeSchedule, setActiveSchedule, hasUnsavedChanges } = useSchedulesData();
+  const { schedules, activeSchedule, setActiveSchedule, hasUnsavedChanges, eventFolder } = useSchedulesData();
   const { discardChangesToActiveSchedule } = useSchedulesOperations();
 
   const handleAddSchedule = () => {
@@ -73,7 +73,7 @@ function Sidebar({ setIsAddScheduleModalOpen }) {
         <${EventPicker} />
       </div>
       <div class="sm-sidebar__header">
-        <sp-button class="sm-sidebar__button" size="l" static-color="black" onclick=${handleAddSchedule}>
+        <sp-button class="sm-sidebar__button" size="l" static-color="black" onclick=${handleAddSchedule} disabled=${!eventFolder}>
           <sp-icon slot="icon">
             <svg width="22" height="22" viewBox="0 0 22 22" fill="none" xmlns="http://www.w3.org/2000/svg">
               <mask id="mask0_2489_9865" style="mask-type:alpha" maskUnits="userSpaceOnUse" x="0" y="0" width="22" height="22">
