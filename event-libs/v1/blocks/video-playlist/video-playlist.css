@@ -131,6 +131,8 @@
   display: flex;
   flex-direction: column;
   position: relative;
+  border-radius: 16px;
+  overflow: hidden;
 }
 
 .video-playlist .container.consonant--light {
@@ -152,8 +154,6 @@
   --switch-btn-background-color: #FDFDFD;
   --switch-btn-border-color: #6D6D6D;
   --switch-btn-border-color-checked: #464646;
-  border-radius: 16px;
-  overflow: hidden;
 }
 
 /* Light theme social share button */
