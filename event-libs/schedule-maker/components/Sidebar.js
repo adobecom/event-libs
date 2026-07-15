@@ -2,6 +2,7 @@ import { useState } from '../../v1/deps/htm-preact.js';
 import { html } from '../htm-wrapper.js';
 import { useSchedulesData, useSchedulesOperations } from '../context/SchedulesContext.js';
 import { useNavigation } from '../context/NavigationContext.js';
+import Modal from './Modal.js';
 import UnsavedChangesModal from './UnsavedChangesModal.js';
 import SearchInput from './SearchInput.js';
 import EventPicker from './EventPicker.js';
@@ -15,6 +16,7 @@ function StatusBadge({ status }) {
 
 function Sidebar({ setIsAddScheduleModalOpen }) {
   const [search, setSearch] = useState('');
+  const [isNoFolderModalOpen, setIsNoFolderModalOpen] = useState(false);
   const [isUnsavedChangesModalOpen, setIsUnsavedChangesModalOpen] = useState(false);
   const [pendingAction, setPendingAction] = useState(null);
   const [pendingSchedule, setPendingSchedule] = useState(null);
@@ -23,6 +25,10 @@ function Sidebar({ setIsAddScheduleModalOpen }) {
   const { discardChangesToActiveSchedule } = useSchedulesOperations();
 
   const handleAddSchedule = () => {
+    if (!eventFolder) {
+      setIsNoFolderModalOpen(true);
+      return;
+    }
     if (hasUnsavedChanges) {
       setPendingAction('add');
       setIsUnsavedChangesModalOpen(true);
@@ -73,7 +79,7 @@ function Sidebar({ setIsAddScheduleModalOpen }) {
         <${EventPicker} />
       </div>
       <div class="sm-sidebar__header">
-        <sp-button class="sm-sidebar__button" size="l" static-color="black" onclick=${handleAddSchedule} disabled=${!eventFolder}>
+        <sp-button class="sm-sidebar__button" size="l" static-color="black" onclick=${handleAddSchedule}>
           <sp-icon slot="icon">
             <svg width="22" height="22" viewBox="0 0 22 22" fill="none" xmlns="http://www.w3.org/2000/svg">
               <mask id="mask0_2489_9865" style="mask-type:alpha" maskUnits="userSpaceOnUse" x="0" y="0" width="22" height="22">
@@ -120,6 +126,18 @@ function Sidebar({ setIsAddScheduleModalOpen }) {
         `)}
       </div>
 
+      <${Modal} \
+        isOpen=${isNoFolderModalOpen} \
+        onClose=${() => setIsNoFolderModalOpen(false)} \
+        title="Select a folder first" \
+        showActions=${false} \
+        size="small" \
+      >
+        <p>Please select an event folder before creating a schedule.</p>
+        <div class="modal-actions">
+          <sp-button size="l" static-color="black" onClick=${() => setIsNoFolderModalOpen(false)}>OK</sp-button>
+        </div>
+      </${Modal}>
       <${UnsavedChangesModal} \
         isOpen=${isUnsavedChangesModalOpen} \
         onClose=${handleCloseUnsavedChangesModal} \
