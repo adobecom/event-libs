@@ -186,20 +186,38 @@ class VideoPlaylist {
    * drawer share one positioning context.
    */
   relocateVideoWrapper() {
-    const wrapper = [...this.el.children].find(
+    const findWrapper = () => [...this.el.children].find(
       (child) => child !== this.root && child.querySelector('.milo-video'),
     );
-    if (!wrapper) return;
 
-    // Remove the authored "videoUrl" label row directly, instead of hiding it via
-    // a :has()-based CSS selector that risks matching .milo-video too. Keep only
-    // the direct child that itself wraps .milo-video.
-    const valueDiv = [...wrapper.children].find((child) => child.querySelector('.milo-video'));
-    [...wrapper.children].forEach((child) => {
-      if (child !== valueDiv) child.remove();
+    const relocate = (wrapper) => {
+      // Remove the authored "videoUrl" label row directly, instead of hiding it via
+      // a :has()-based CSS selector that risks matching .milo-video too. Keep only
+      // the direct child that itself wraps .milo-video.
+      const valueDiv = [...wrapper.children].find((child) => child.querySelector('.milo-video'));
+      [...wrapper.children].forEach((child) => {
+        if (child !== valueDiv) child.remove();
+      });
+      this.root.appendChild(wrapper);
+    };
+
+    const existing = findWrapper();
+    if (existing) {
+      relocate(existing);
+      return;
+    }
+
+    // Milo decorates the authored video link into .milo-video asynchronously
+    // (YouTube in particular does async setup), so it may not exist yet at this
+    // point. Watch for it instead of silently giving up.
+    const observer = new MutationObserver(() => {
+      const wrapper = findWrapper();
+      if (!wrapper) return;
+      observer.disconnect();
+      relocate(wrapper);
     });
-
-    this.root.appendChild(wrapper);
+    observer.observe(this.el, { childList: true, subtree: true });
+    this.disposers.push(() => observer.disconnect());
   }
 
   cleanup() {
