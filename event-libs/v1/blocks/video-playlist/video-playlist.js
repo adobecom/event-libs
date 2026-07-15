@@ -189,7 +189,17 @@ class VideoPlaylist {
     const wrapper = [...this.el.children].find(
       (child) => child !== this.root && child.querySelector('.milo-video'),
     );
-    if (wrapper) this.root.appendChild(wrapper);
+    if (!wrapper) return;
+
+    // Remove the authored "videoUrl" label row directly, instead of hiding it via
+    // a :has()-based CSS selector that risks matching .milo-video too. Keep only
+    // the direct child that itself wraps .milo-video.
+    const valueDiv = [...wrapper.children].find((child) => child.querySelector('.milo-video'));
+    [...wrapper.children].forEach((child) => {
+      if (child !== valueDiv) child.remove();
+    });
+
+    this.root.appendChild(wrapper);
   }
 
   cleanup() {

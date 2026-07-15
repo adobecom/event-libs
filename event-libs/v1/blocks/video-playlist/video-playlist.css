@@ -15,14 +15,6 @@
   display: block !important;
 }
 
-/* Hide the div containing "video-url(video-container)" - it's the first div in the video container.
-   Descendant (not child) selector: JS relocates the video wrapper inside .container.
-   :not(.milo-video) guards against :has() also matching the value-div that directly
-   wraps .milo-video, whose own first (and only) child is .milo-video itself. */
-.video-playlist div:has(.milo-video) > div:first-child:not(.milo-video) {
-  display: none !important;
-}
-
 /* Full-width breakout: the whole block (video + container) escapes the Milo grid,
    leaving a fixed 24px gutter on each side regardless of viewport. */
 .video-playlist {
