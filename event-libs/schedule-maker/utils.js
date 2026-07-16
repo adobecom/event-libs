@@ -1,4 +1,4 @@
-import { DA_ORIGIN } from './constants.js';
+import { DA_ORIGIN, DA_APP_PATH } from './constants.js';
 
 function isBlockComplete(block) {
   if (block.includeLiveStream && !block.liveStream?.streamId) {
@@ -106,7 +106,7 @@ class ScheduleURLUtility {
       const serverSchedule = prepareScheduleForServer(scheduleObject);
       const jsonString = JSON.stringify(serverSchedule);
       const base64JsonString = btoa(unescape(encodeURIComponent(jsonString)));
-      const url = new URL(`${DA_ORIGIN}/app/${org}/${repo}/schedule-maker`);
+      const url = new URL(`${DA_ORIGIN}/app/${org}/${repo}/${DA_APP_PATH}`);
       url.searchParams.set('schedule', base64JsonString);
       url.hash = `scheduleId=${scheduleObject.scheduleId}`;
       return url.toString();

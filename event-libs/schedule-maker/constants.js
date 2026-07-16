@@ -26,10 +26,13 @@ const DA_ADMIN_ORIGIN = 'https://admin.da.live';
 
 const DA_ORIGIN = 'https://da.live';
 
+const DA_APP_PATH = 'tools/da-apps/schedule-maker';
+
 export {
   PAGES,
   PAGES_CONFIG,
   DEFAULT_FRAGMENT_PATH,
   DA_ADMIN_ORIGIN,
   DA_ORIGIN,
+  DA_APP_PATH,
 };
