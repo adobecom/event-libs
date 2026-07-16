@@ -37,6 +37,8 @@ function createTextField({
     attrs.pattern = pattern || PHONE_PATTERN;
   } else if (type === 'email') {
     attrs.type = 'email';
+  } else if (type === 'url') {
+    attrs.type = 'url';
   }
   if (limit != null) attrs.maxlength = limit;
   if (required === 'x') attrs.required = '';

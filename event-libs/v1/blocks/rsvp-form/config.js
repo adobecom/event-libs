@@ -1,6 +1,10 @@
 import { getMetadata } from '../../utils/utils.js';
 import { parseRsvpFieldLimit } from '../../utils/sanitize-utils.js';
 
+/** Valid `displayAs` flavors for the `text` substrate; each is also a valid
+ * native `<input type>` (or `text-area`, handled by its own dispatch entry). */
+const TEXT_DISPLAY_AS = new Set(['text', 'email', 'phone', 'number', 'date', 'url', 'text-area']);
+
 function lowercaseKeys(obj) {
   return Object.keys(obj).reduce((acc, key) => {
     acc[key.toLowerCase() === 'default' ? 'defval' : key.toLowerCase()] = obj[key];
@@ -34,12 +38,26 @@ export function resolveRsvpConfig() {
         field.options = field.options.map((o) => (typeof o === 'object' ? o.value : o)).join(';');
       }
 
-      // ESP's field type enum has no dedicated multi-select value — `select` is
-      // single-choice and `checkbox` is multi-choice. `displayas` (EMC's
-      // displayAs) carries the render-style hint; remap to the widget types
-      // this block implements.
-      if (field.type === 'select' && field.displayas === 'radio') field.type = 'radio-group';
-      if (field.type === 'checkbox' && field.displayas === 'dropdown') field.type = 'multi-select';
+      // ESP's field `type` names only the substrate (text/select/multi-select);
+      // `displayas` (EMC's displayAs) picks the concrete widget within it.
+      // Remap to the internal dispatch types this block implements. Any other
+      // `type` (heading/legal/divider/submit/clear, or a legacy direct value
+      // like `email`/`checkbox` from before this taxonomy) passes through
+      // untouched.
+      const da = field.displayas;
+      if (field.type === 'text') {
+        field.type = TEXT_DISPLAY_AS.has(da) ? da : 'text';
+      }
+      else if (field.type === 'select') {
+        field.type = da === 'radio' ? 'radio-group' : 'select';
+      }
+      else if (field.type === 'multi-select') {
+        field.type = da === 'combobox' ? 'multi-select' : 'checkbox-group';
+      }
+      else if (field.type === 'checkbox') {
+        // Legacy wire value from before the substrate/displayAs taxonomy.
+        field.type = da === 'dropdown' ? 'multi-select' : 'checkbox-group';
+      }
       return field;
     });
 

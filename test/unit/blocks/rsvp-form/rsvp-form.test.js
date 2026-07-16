@@ -121,6 +121,72 @@ describe('rsvp-form', () => {
       const { fields } = resolveRsvpConfig();
       expect(fields.find((f) => f.field === 'productsOfInterest').type).to.equal('multi-select');
     });
+
+    // Substrate/displayAs taxonomy: Type names only the substrate (text/select/
+    // multi-select); displayAs picks the concrete widget within it.
+    [
+      [undefined, 'text'],
+      ['text', 'text'],
+      ['email', 'email'],
+      ['phone', 'phone'],
+      ['number', 'number'],
+      ['date', 'date'],
+      ['url', 'url'],
+      ['text-area', 'text-area'],
+      ['not-a-real-flavor', 'text'],
+    ].forEach(([displayAs, expected]) => {
+      it(`remaps text substrate + displayAs "${displayAs}" to "${expected}"`, () => {
+        setRsvpConfigMeta({
+          rsvpFormFields: [{ Field: 'title', Type: 'text', displayAs }],
+        });
+        const { fields } = resolveRsvpConfig();
+        expect(fields.find((f) => f.field === 'title').type).to.equal(expected);
+      });
+    });
+
+    it('remaps select+picker (default) displayAs to select', () => {
+      setRsvpConfigMeta({
+        rsvpFormFields: [{ Field: 'industry', Type: 'select', displayAs: 'picker', Options: ['Tech'] }],
+      });
+      const { fields } = resolveRsvpConfig();
+      expect(fields.find((f) => f.field === 'industry').type).to.equal('select');
+    });
+
+    it('remaps multi-select+checkbox (default) displayAs to checkbox-group', () => {
+      setRsvpConfigMeta({
+        rsvpFormFields: [{ Field: 'interests', Type: 'multi-select', displayAs: 'checkbox', Options: ['A'] }],
+      });
+      const { fields } = resolveRsvpConfig();
+      expect(fields.find((f) => f.field === 'interests').type).to.equal('checkbox-group');
+    });
+
+    it('leaves multi-select with no displayAs as checkbox-group (default)', () => {
+      setRsvpConfigMeta({
+        rsvpFormFields: [{ Field: 'interests', Type: 'multi-select', Options: ['A'] }],
+      });
+      const { fields } = resolveRsvpConfig();
+      expect(fields.find((f) => f.field === 'interests').type).to.equal('checkbox-group');
+    });
+
+    it('remaps multi-select+combobox displayAs to the compact multi-select widget', () => {
+      setRsvpConfigMeta({
+        rsvpFormFields: [{ Field: 'interests', Type: 'multi-select', displayAs: 'combobox', Options: ['A'] }],
+      });
+      const { fields } = resolveRsvpConfig();
+      expect(fields.find((f) => f.field === 'interests').type).to.equal('multi-select');
+    });
+
+    it('leaves non-taxonomy types (e.g. heading, divider) untouched', () => {
+      setRsvpConfigMeta({
+        rsvpFormFields: [
+          { Field: 'intro', Type: 'heading', Label: 'Welcome' },
+          { Field: 'sep', Type: 'divider' },
+        ],
+      });
+      const { fields } = resolveRsvpConfig();
+      expect(fields.find((f) => f.field === 'intro').type).to.equal('heading');
+      expect(fields.find((f) => f.field === 'sep').type).to.equal('divider');
+    });
   });
 
   describe('fields.js buildField', () => {
@@ -172,6 +238,25 @@ describe('rsvp-form', () => {
       });
       expect(wrapper.querySelectorAll('sp-checkbox')).to.have.lengthOf(2);
       expect(wrapper.querySelector('.rsvp-form-checkbox-group').id).to.equal('contactMethods');
+    });
+
+    it('sets sp-textfield type to email/url for those substrate flavors', () => {
+      const email = buildField({ field: 'email', type: 'email', label: 'Email' });
+      expect(email.querySelector('sp-textfield').getAttribute('type')).to.equal('email');
+      const url = buildField({ field: 'website', type: 'url', label: 'Website' });
+      expect(url.querySelector('sp-textfield').getAttribute('type')).to.equal('url');
+    });
+
+    // Known pre-existing gap (not introduced by the substrate/displayAs taxonomy):
+    // FIELD_BUILDERS has no number/date entry, so these fall to createTextField,
+    // which has no number/date branch either — plain sp-textfield, no type attr.
+    it('falls back to a plain sp-textfield for number/date (no dedicated control yet)', () => {
+      const number = buildField({ field: 'years', type: 'number', label: 'Years' });
+      expect(number.dataset.type).to.equal('number');
+      expect(number.querySelector('sp-textfield').getAttribute('type')).to.equal(null);
+      const date = buildField({ field: 'eventDate', type: 'date', label: 'Date' });
+      expect(date.dataset.type).to.equal('date');
+      expect(date.querySelector('sp-textfield').getAttribute('type')).to.equal(null);
     });
   });
 
