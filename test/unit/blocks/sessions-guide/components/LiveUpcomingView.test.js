@@ -29,7 +29,7 @@ const TODAY = fmt(Date.parse(LIVE_SESSION.startTimeUtc));
 const UPCOMING_DAY = fmt(Date.parse(UPCOMING_SESSION.startTimeUtc));
 
 const BASE_CONFIG = {
-  userTz: TZ, surface: 'page', trackColors: {}, trackIcons: {},
+  userTz: TZ, surface: 'page',
   title: '', showConflictModal: false, filterCategories: [], theme: 'dark',
 };
 

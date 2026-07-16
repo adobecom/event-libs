@@ -10,11 +10,13 @@ import { showToast } from '../../../features/toast/toast.js';
 import { deriveSessionState } from '../../../utils/session-state.js';
 import { setSessionParam, safeUrl } from '../utils/url.js';
 import { IconHeartFilled, IconHeartOutline } from './icons.js';
+import { Icon } from '../../../features/icons/Icon.js';
+import { getTrackIcon } from '../../../utils/track-icon-config.js';
 
 export function SessionDetailOverlay({ onBack }) {
   const { state } = useSessionGuide();
   const { activeSessionId, eventConfig } = state;
-  const { userTz, trackIcons } = eventConfig;
+  const { userTz } = eventConfig;
 
   const [descExpanded, setDescExpanded] = useState(false);
 
@@ -36,7 +38,7 @@ export function SessionDetailOverlay({ onBack }) {
   // Live / on-demand sessions surface "Watch now"; upcoming sessions surface "Add to schedule".
   const showWatch = isLive || onDemand;
 
-  const trackIcon = (trackIcons && trackIcons[session.track]) || '';
+  const trackIconName = getTrackIcon(session.track)?.icon || '';
   const startShort = session.startTimeUtc ? formatShortTime(session.startTimeUtc, userTz) : '';
   const endShort = session.endTimeUtc ? formatShortTime(session.endTimeUtc, userTz) : '';
   const timeRange = showWatch && !endShort
@@ -96,7 +98,7 @@ export function SessionDetailOverlay({ onBack }) {
               <div class="sg-detail__summary">
                 <div class="sg-detail__summary-top">
                   <div class="sg-detail__channel">
-                    ${trackIcon && html`<img class="sg-detail__channel-icon" src=${trackIcon} alt="" aria-hidden="true" />`}
+                    ${trackIconName && html`<${Icon} name=${trackIconName} size=${20} className="sg-detail__channel-icon" />`}
                     <span class="sg-detail__channel-name">${session.track}</span>
                   </div>
                   ${timeRange && html`<span class="sg-detail__time">${timeRange}</span>`}

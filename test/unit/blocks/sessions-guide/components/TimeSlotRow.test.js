@@ -6,8 +6,6 @@ import { buildTimeSlotRow } from '../../../../../event-libs/v1/blocks/sessions-g
 const BASE_CONFIG = {
   userTz: 'America/Los_Angeles',
   surface: 'page',
-  trackColors: {},
-  trackIcons: {},
   rfApiUrl: '',
   rfApiProfileId: '',
   showConflictModal: false,

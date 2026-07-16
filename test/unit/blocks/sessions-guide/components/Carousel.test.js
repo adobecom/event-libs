@@ -6,8 +6,6 @@ import { buildCarousel } from '../../../../../event-libs/v1/blocks/sessions-guid
 const BASE_CONFIG = {
   userTz: 'America/Los_Angeles',
   surface: 'widget',
-  trackColors: {},
-  trackIcons: {},
   rfApiUrl: '',
   rfApiProfileId: '',
   showConflictModal: false,

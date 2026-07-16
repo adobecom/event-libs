@@ -21,8 +21,6 @@ function parseConfig(el) {
     title: '',
     showConflictModal: false,
     filterCategories: DEFAULT_FILTER_CATEGORIES,
-    trackIcons: {},
-    trackColors: {},
     theme: 'light',
     surface: 'page', // always page for this block
   };
@@ -38,16 +36,6 @@ function parseConfig(el) {
       case 'filter-categories':
         try { config.filterCategories = JSON.parse(val); } catch {
           window.lana?.log('[sessions-guide-full-page] invalid filter-categories JSON');
-        }
-        break;
-      case 'track-icons':
-        try { config.trackIcons = JSON.parse(val); } catch {
-          window.lana?.log('[sessions-guide-full-page] invalid track-icons JSON');
-        }
-        break;
-      case 'track-colors':
-        try { config.trackColors = JSON.parse(val); } catch {
-          window.lana?.log('[sessions-guide-full-page] invalid track-colors JSON');
         }
         break;
       default: break;

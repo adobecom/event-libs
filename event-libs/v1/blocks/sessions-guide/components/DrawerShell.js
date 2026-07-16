@@ -5,6 +5,7 @@ import { DrawerHeader } from './DrawerHeader.js';
 import { ViewRouter } from './ViewRouter.js';
 import { SessionDetailOverlay } from './SessionDetailOverlay.js';
 import { FilterPanel } from './FilterPanel.js';
+import { LoadingState } from './LoadingState.js';
 import { setSessionsParam, clearSessionParams } from '../utils/url.js';
 
 // No top gap on mobile/tablet (drawer covers the full screen); 20px gap on desktop.
@@ -228,7 +229,7 @@ export function DrawerShell() {
         />
         <div class="sg-drawer__body">
           <div class=${`sg-body-scroll${isExpanded ? ' sg-body-scroll--scrollable' : ''}`}>
-            ${sessionsStatus.value === 'loading' && html`<div class="sg-loading">Loading sessions…</div>`}
+            ${sessionsStatus.value === 'loading' && html`<${LoadingState} />`}
             ${sessionsStatus.value === 'error' && html`<div class="sg-error">Failed to load sessions.</div>`}
             ${sessionsStatus.value === 'ready' && html`<${ViewRouter} />`}
           </div>

@@ -9,7 +9,7 @@ import {
   liveSessions, upcomingSessions, groupByStartTime, filterSessions, getFeaturedSessions,
   sessionsForDay,
 } from '../utils/session-filters.js';
-import { getNowMs, formatShortTime } from '../utils/time.js';
+import { getNowMs, formatShortTime, formatTimezoneAbbr } from '../utils/time.js';
 
 export const buildLiveUpcomingView = () => LiveUpcomingView;
 
@@ -54,6 +54,7 @@ export function LiveUpcomingView() {
             sessions=${live}
             title="Live now"
             formatTime=${(s) => formatShortTime(s.startTimeUtc, userTz)}
+            formatTimezone=${(s) => formatTimezoneAbbr(s.startTimeUtc, userTz)}
             variant="live"
           />
         </div>

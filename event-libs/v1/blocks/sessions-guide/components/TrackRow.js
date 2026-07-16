@@ -65,7 +65,7 @@ export function TrackRow({ track, sessions }) {
 
   return html`
     <div class=${'sg-time-row' + (allDismissing ? ' sg-time-row--collapsing' : '')} ref=${rowRef}>
-      <div class="sg-time-row__label">${track}</div>
+      <div class="sg-time-row__label sg-time-row__label--category">${track}</div>
       <div class="sg-time-row__track">
         ${offset > 0 && html`<button
           class="sg-time-row__arrow sg-time-row__arrow--prev"

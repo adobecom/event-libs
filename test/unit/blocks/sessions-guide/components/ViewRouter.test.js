@@ -8,7 +8,7 @@ import {
 
 const BASE_CONFIG = {
   userTz: 'America/Los_Angeles', surface: 'page',
-  trackColors: {}, trackIcons: {}, title: '',
+  title: '',
   showConflictModal: false, filterCategories: [], theme: 'dark',
 };
 

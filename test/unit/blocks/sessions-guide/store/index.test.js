@@ -7,8 +7,6 @@ const MOCK_CONFIG = {
   userTz: 'America/Los_Angeles',
   showConflictModal: true,
   filterCategories: [],
-  trackIcons: {},
-  trackColors: {},
   theme: 'dark',
 };
 

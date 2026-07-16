@@ -9,6 +9,7 @@ import { scheduleWithFeedback, favoriteWithFeedback } from '../../../services/se
 import { IconPlay, IconCalendarCheck, IconCalendarPlus, IconHeartFilled, IconHeartOutline } from './icons.js';
 import { setSessionParam, safeUrl } from '../utils/url.js';
 import { CategoryBadge } from './CategoryBadge.js';
+import { getTrackIcon } from '../../../utils/track-icon-config.js';
 
 function formatDuration(ms) {
   const h = Math.floor(ms / 3600000);
@@ -22,7 +23,7 @@ export const buildLiveCard = () => LiveCard;
 export function LiveCard({ session, variant = 'live' }) {
   const { state, dispatch } = useSessionGuide();
   const { eventConfig } = state;
-  const { userTz, trackColors, surface } = eventConfig;
+  const { userTz, surface } = eventConfig;
 
   const isScheduled = scheduled.value.has(session.id);
   const isFavorited = favorited.value.has(session.id);
@@ -38,7 +39,7 @@ export function LiveCard({ session, variant = 'live' }) {
   const progressPct = duration > 0 ? Math.round((elapsed / duration) * 100) : 0;
   const durationLabel = duration >= 0 ? formatDuration(duration) : '';
 
-  const trackColor = (trackColors && trackColors[session.track]) || '';
+  const trackColor = getTrackIcon(session.track)?.color || '';
   const startTime = formatShortTime(session.startTimeUtc, userTz);
   const endTime = session.endTimeUtc ? formatShortTime(session.endTimeUtc, userTz) : '';
   const timeRange = endTime ? `${startTime} – ${endTime}` : startTime;

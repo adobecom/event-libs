@@ -7,6 +7,7 @@ import { setSessionParam, safeUrl } from '../utils/url.js';
 import { CategoryBadge } from './CategoryBadge.js';
 import { IconButton } from './IconButton.js';
 import { IconPlay, IconCalendarCheck, IconCalendarPlus, IconHeartFilled, IconHeartOutline } from './icons.js';
+import { getTrackIcon } from '../../../utils/track-icon-config.js';
 
 export const buildSessionCard = () => SessionCard;
 
@@ -14,7 +15,7 @@ export function SessionCard({ session, forceOnDemand = false, timeDisplay = 'dur
   const { state, dispatch } = useSessionGuide();
   const { eventConfig, activeView } = state;
   const dismissingIds = state.dismissingIds || new Set();
-  const { userTz, surface, trackColors } = eventConfig;
+  const { userTz, surface } = eventConfig;
 
   const isScheduled = scheduled.value.has(session.id);
   const isFavorited = favorited.value.has(session.id);
@@ -22,7 +23,7 @@ export function SessionCard({ session, forceOnDemand = false, timeDisplay = 'dur
   const [hoverAnim, setHoverAnim] = useState(null);
   const onDemandNatural = isSessionOnDemand(session, getNowMs());
   const onDemand = forceOnDemand || onDemandNatural;
-  const trackColor = (trackColors && trackColors[session.track]) || '';
+  const trackColor = getTrackIcon(session.track)?.color || '';
 
   const upcomingTimeLabel = (timeDisplay === 'duration' && session.endTimeUtc)
     ? formatDuration(session.startTimeUtc, session.endTimeUtc)

@@ -11,7 +11,7 @@ import { Carousel } from './Carousel.js';
 import {
   groupByStartTime, groupByTrack, onDemandSessions, filterSessions, sessionsForDay, liveSessions,
 } from '../utils/session-filters.js';
-import { getNowMs, formatShortTime } from '../utils/time.js';
+import { getNowMs, formatShortTime, formatTimezoneAbbr } from '../utils/time.js';
 import { deriveSessionState } from '../../../utils/session-state.js';
 
 export const buildMySessionsView = () => MySessionsView;
@@ -76,6 +76,7 @@ export function MySessionsView() {
             sessions=${live}
             title="Live now"
             formatTime=${(s) => formatShortTime(s.startTimeUtc, userTz)}
+            formatTimezone=${(s) => formatTimezoneAbbr(s.startTimeUtc, userTz)}
           />
         </div>
       `}

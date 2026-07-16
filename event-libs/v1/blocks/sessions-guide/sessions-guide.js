@@ -2,7 +2,6 @@ import { h, render } from '../../deps/htm-preact.js';
 import { detectUserTimezone } from './utils/time.js';
 import { SessionGuideProvider } from './store/index.js';
 import { App } from './components/App.js';
-import { MOCK_FEATURED_IDS } from '../../services/sessions/sessions-api.js';
 import { getApiConfig } from '../../utils/session-store.js';
 
 // Default filter categories — override via block authoring table (filter-categories: JSON)
@@ -12,29 +11,22 @@ const DEFAULT_FILTER_CATEGORIES = [
   { id: 'type', label: 'Session Type' },
 ];
 
-// TODO: remove once category-colors is authored via block config
-const MOCK_CATEGORY_COLORS = {
-  'social-media': '#FF6B35',
-  'design-and-illustration': '#9D50BB',
-  'mainstage': '#E91E63',
-  '3d': '#00BCD4',
-  'photography': '#4CAF50',
-  'business': '#2196F3',
-  'content-creator': '#FF9800',
-  'education': '#FF5722',
-  'branding': '#607D8B',
-  'generative-ai': '#8BC34A',
-  'video': '#F44336',
-};
+// TODO: remove once featured-sessions is authored via block config. Real Adobe MAX 2025
+// session ids (Oct 26-30), 3 per day (fewer on 10-26, which only has 2 real sessions).
+// Skips titles marked "(FULL)" where a non-full alternative was available for that day.
+const REAL_FEATURED_IDS = [
+  '9de49a56-cfd9-4b72-b13d-571869471ff7', 'e5fc404a-4de1-4a05-8a8b-5254e2d9b4ec', // 10-26
+  '0adf74b7-0962-4b7f-b7db-dada61bd0d48', '2becf60c-a551-4097-a55b-b76291a64582', '4721b332-490d-46af-b33c-86ea735295ff', // 10-27
+  '7e2c6316-518b-45f8-a033-000ec25fd2ec', '8a9b20ec-3eac-4e52-9077-361ebc793e6d', 'e810bca1-42d0-428f-92a9-ee55cc949df0', // 10-28
+  'a0807397-e7bd-4cee-a917-86381a8b7e5c', '31b386e6-2ba5-4f1d-8dda-32f421afb563', '9a52dadb-2849-431c-bafd-99687d8d6f52', // 10-29
+  '15fe5cb7-3fb2-4a48-bac4-7ad47f9f450b', '37eb706b-4739-4776-a5d3-37e345fb1fc0', 'b5cce795-6656-44ac-a978-4c26053e1350', // 10-30
+];
 
 function parseConfig(el) {
   const config = {
     title: '',
     showConflictModal: false,
     filterCategories: DEFAULT_FILTER_CATEGORIES,
-    trackIcons: {},
-    trackColors: {},
-    categoryColors: {},
     featuredSessionIds: [],
     theme: null,
   };
@@ -50,21 +42,6 @@ function parseConfig(el) {
       case 'filter-categories':
         try { config.filterCategories = JSON.parse(val); } catch {
           window.lana?.log('[sessions-guide] invalid filter-categories JSON');
-        }
-        break;
-      case 'track-icons':
-        try { config.trackIcons = JSON.parse(val); } catch {
-          window.lana?.log('[sessions-guide] invalid track-icons JSON');
-        }
-        break;
-      case 'track-colors':
-        try { config.trackColors = JSON.parse(val); } catch {
-          window.lana?.log('[sessions-guide] invalid track-colors JSON');
-        }
-        break;
-      case 'category-colors':
-        try { config.categoryColors = JSON.parse(val); } catch {
-          window.lana?.log('[sessions-guide] invalid category-colors JSON');
         }
         break;
       case 'featured-sessions':
@@ -90,11 +67,7 @@ export default async function init(el) {
   const eventConfig = parseConfig(el);
   // TODO: remove once featured-sessions is authored via block config
   if (!eventConfig.featuredSessionIds.length) {
-    eventConfig.featuredSessionIds = MOCK_FEATURED_IDS;
-  }
-  // TODO: remove once category-colors is authored via block config
-  if (!Object.keys(eventConfig.categoryColors).length) {
-    eventConfig.categoryColors = MOCK_CATEGORY_COLORS;
+    eventConfig.featuredSessionIds = REAL_FEATURED_IDS;
   }
   // registerUrl is sourced from page metadata (shared across blocks) via session-store,
   // already bootstrapped by decorateEvent before this block's init() runs.

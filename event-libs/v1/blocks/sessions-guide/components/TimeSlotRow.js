@@ -3,7 +3,7 @@ import { useSessionGuide } from '../store/index.js';
 import {
   scheduled as scheduledSignal, favorited as favoritedSignal,
 } from '../../../utils/session-store.js';
-import { formatShortTime } from '../utils/time.js';
+import { formatShortTime, formatTimezoneAbbr } from '../utils/time.js';
 import { SessionCard } from './SessionCard.js';
 
 export const buildTimeSlotRow = () => TimeSlotRow;
@@ -77,7 +77,10 @@ export function TimeSlotRow({ sessions, forceOnDemand = false }) {
 
   return html`
     <div class=${'sg-time-row' + (allDismissing ? ' sg-time-row--collapsing' : '')} ref=${rowRef}>
-      <div class="sg-time-row__label">${formatShortTime(sessions[0].startTimeUtc, userTz)}</div>
+      <div class="sg-time-row__label">
+        <span class="sg-time-row__time-value">${formatShortTime(sessions[0].startTimeUtc, userTz)}</span>
+        <span class="sg-time-row__time-tz">${formatTimezoneAbbr(sessions[0].startTimeUtc, userTz)}</span>
+      </div>
       <div class="sg-time-row__track">
         ${offset > 0 && html`<button
           class="sg-time-row__arrow sg-time-row__arrow--prev"

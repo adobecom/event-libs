@@ -757,62 +757,6 @@ export function mapEslPayloadToRawSessions(payload) {
   });
 }
 
-// TODO: remove this debug logging block (KNOWN_CATEGORY_BADGE_KEYS, categoryBadgeKey,
-// logCategoryBadgeCoverage, and its call site in fetchEslSessions below) once we're done
-// auditing real Track values against CategoryBadge.js's BADGE_MAP.
-//
-// TEMP debug: CategoryBadge.js's BADGE_MAP was built for the mock's topic vocabulary and
-// only covers a fixed icon set. Mirrors its kebab-case key derivation here (duplicated
-// rather than imported, so this data-layer file doesn't reach into a Preact component)
-// to see which real sessions' primary category — session.category[0], the one actually
-// rendered on cards via <CategoryBadge category=${session.category?.[0]} /> — has no
-// matching icon.
-const KNOWN_CATEGORY_BADGE_KEYS = new Set([
-  'social-media', 'design-and-illustration', 'mainstage', '3d', 'photography',
-  'business', 'content-creator', 'education', 'branding', 'generative-ai', 'video',
-  'video-audio-and-motion', 'social-media-and-marketing', 'graphic-design-and-illustration',
-  'creator', 'creativity-and-marketing-in-business',
-]);
-
-function categoryBadgeKey(category) {
-  return category ? category.toLowerCase().replace(/[\s_]+/g, '-').replace(/[^a-z0-9-]/g, '') : '';
-}
-
-// Reads the raw ESL sessions (not the already-flattened rawSessions from
-// mapEslPayloadToRawSessions) so we still have each Track value's `label` and `value`
-// separately — the mock-shaped `category` array only kept whichever string
-// extractCustomAttributeValues() picked.
-function logCategoryBadgeCoverage(sessions) {
-  const noCategory = [];
-  const noMatchingBadge = [];
-  sessions.forEach((session) => {
-    const trackAttr = (session.customAttributes || []).find((a) => a?.name === 'Track');
-    const primary = trackAttr?.values?.[0];
-    const title = session.localizations?.['en-US']?.title || session.enTitle || '';
-    if (!primary) {
-      noCategory.push(session);
-      return;
-    }
-    const key = categoryBadgeKey(primary.label ?? primary.value);
-    if (!KNOWN_CATEGORY_BADGE_KEYS.has(key)) {
-      noMatchingBadge.push({ id: session.sessionId, title, label: primary.label, value: primary.value, derivedKey: key });
-    }
-  });
-  // eslint-disable-next-line no-console
-  console.log('[ESL debug] CategoryBadge icon coverage:', {
-    totalSessions: sessions.length,
-    noCategoryAtAll: noCategory.length,
-    noCategoryAtAllFull: noCategory,
-    hasCategoryButNoIconMatch: noMatchingBadge.length,
-    noIconMatchSample: noMatchingBadge.slice(0, 15),
-  });
-  const distinctLabelValuePairs = [...new Map(
-    noMatchingBadge.map((s) => [`${s.label}|${s.value}`, { label: s.label, value: s.value }]),
-  ).values()];
-  // eslint-disable-next-line no-console
-  console.log('[ESL debug] distinct category label/value pairs with no matching badge:', distinctLabelValuePairs);
-}
-
 async function fetchEslSessions(eventId) {
   const { serviceApiEndpoints } = ENV_MAP[getEventServiceEnv().name];
   const options = await constructRequestOptions('GET');
@@ -824,7 +768,6 @@ async function fetchEslSessions(eventId) {
   console.log('[ESL debug] payload:', payload);
   const rawSessions = mapEslPayloadToRawSessions(payload);
   console.log('[ESL debug] rawSessions:', rawSessions);
-  logCategoryBadgeCoverage(payload.sessions || []);
   return rawSessions;
 }
 

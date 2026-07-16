@@ -42,6 +42,16 @@ export function formatShortTime(utcIso, userTz) {
   }).format(date);
 }
 
+export function formatTimezoneAbbr(utcIso, userTz) {
+  const date = safeDate(utcIso);
+  if (!date) return '';
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: userTz,
+    timeZoneName: 'short',
+  }).formatToParts(date);
+  return parts.find((p) => p.type === 'timeZoneName')?.value || '';
+}
+
 export function formatSessionDate(utcIso, userTz) {
   const date = safeDate(utcIso);
   if (!date) return '';
