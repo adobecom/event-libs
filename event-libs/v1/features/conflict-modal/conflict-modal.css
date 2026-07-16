@@ -1,0 +1,132 @@
+/* ── Conflict Modal content ───────────────────────────────────────
+   Positioning, backdrop, focus trap, Escape-to-close, close (X) button, and
+   scroll lock are all owned by Milo's shared modal (blocks/modal/modal.js) —
+   this file only styles the content passed in as `custom.content`.
+   Matches Figma: https://www.figma.com/design/pvyJnydCu9sE6msA1BHz9Z/Sessions-Guide-FINAL_Eng-Handoff-051526?node-id=9173-1502546 ── */
+
+/* Milo's own curtain (backdrop) defaults to a lighter overlay than the design —
+   scope the override to our dialog's id so other Milo modals on the page are
+   unaffected (the curtain is a generic-classed sibling inserted after the dialog). */
+#sg-conflict-modal ~ .modal-curtain {
+  background: rgb(0 0 0 / 60%);
+}
+
+.sg-conflict-modal {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  width: 100%;
+  max-width: 480px;
+  padding: 33px 40px;
+}
+
+.sg-conflict-modal__title {
+  font-family: var(--s2a-font-family-adobe-clean-display);
+  font-weight: var(--s2a-font-weight-adobe-clean-display-black);
+  font-size: 22px;
+  line-height: 26px;
+  margin: 0 0 8px;
+  color: var(--s2a-color-content-default, #000);
+}
+
+.sg-conflict-modal__desc {
+  font-size: 16px;
+  line-height: 1.5;
+  color: var(--s2a-color-content-default, #000);
+  margin: 0;
+}
+
+.sg-conflict-modal__options {
+  display: flex;
+  flex-direction: column;
+  gap: 25px;
+}
+
+.sg-conflict-option {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 24px 40px;
+  background: #fff;
+  border: 1px solid #f8f8f8;
+  border-radius: 16px;
+  box-shadow: 0 0 2px rgb(0 0 0 / 12%), 0 2px 6px rgb(0 0 0 / 4%), 0 4px 12px rgb(0 0 0 / 8%);
+  cursor: pointer;
+}
+
+.sg-conflict-option--selected {
+  border: 2px solid #000;
+  box-shadow: none;
+}
+
+.sg-conflict-option__radio {
+  position: absolute;
+  top: 10px;
+  left: 11px;
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  appearance: none;
+  border-radius: 50%;
+  border: 2px solid var(--s2a-color-border-default, #6e6e6e);
+  background: #fff;
+  cursor: pointer;
+}
+
+.sg-conflict-option__radio:checked {
+  border-color: #000;
+  background: #000;
+  box-shadow: inset 0 0 0 3px #fff;
+}
+
+.sg-conflict-option__radio:focus-visible {
+  outline: 2px solid #000;
+  outline-offset: 2px;
+}
+
+.sg-conflict-option__title {
+  font-size: 18px;
+  line-height: 22px;
+  font-weight: var(--s2a-font-weight-adobe-clean-bold);
+  color: var(--s2a-color-content-default, #131313);
+  margin: 0;
+}
+
+.sg-conflict-option__meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  font-size: 12px;
+  color: var(--s2a-color-content-subtle, rgb(0 0 0 / 64%));
+}
+
+.sg-conflict-modal__footer {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.sg-conflict-modal__btn {
+  height: 40px;
+  min-width: 90px;
+  padding: 0 24px;
+  border-radius: 20px;
+  font-family: var(--s2a-font-family-adobe-clean);
+  font-weight: var(--s2a-font-weight-adobe-clean-bold);
+  font-size: 14px;
+  cursor: pointer;
+  border: none;
+  transition: opacity 0.15s;
+}
+
+.sg-conflict-modal__btn--save {
+  background: var(--s2ac-color-content-default, #292929);
+  color: #fff;
+}
+
+.sg-conflict-modal__btn:disabled {
+  opacity: 0.4;
+  pointer-events: none;
+}

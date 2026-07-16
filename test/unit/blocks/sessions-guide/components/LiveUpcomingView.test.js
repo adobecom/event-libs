@@ -2,6 +2,7 @@ import { expect } from '@esm-bundle/chai';
 import * as preact from '../../../mocks/deps/htm-preact.js';
 import { buildStore } from '../../../../../event-libs/v1/blocks/sessions-guide/store/index.js';
 import { buildLiveUpcomingView } from '../../../../../event-libs/v1/blocks/sessions-guide/components/LiveUpcomingView.js';
+import { sessions, liveStreamActiveIds } from '../../../../../event-libs/v1/utils/session-store.js';
 
 function h(offsetHours) {
   return new Date(Date.now() + offsetHours * 3_600_000).toISOString();
@@ -29,23 +30,15 @@ const UPCOMING_DAY = fmt(Date.parse(UPCOMING_SESSION.startTimeUtc));
 
 const BASE_CONFIG = {
   userTz: TZ, surface: 'page', trackColors: {}, trackIcons: {},
-  title: '',
-  rfApiUrl: '', rfApiProfileId: '', showConflictModal: false,
-  filterCategories: [], mrEnv: 'dev', theme: 'dark', manualOnDemandTransitionTime: null,
+  title: '', showConflictModal: false, filterCategories: [], theme: 'dark',
 };
 
-function makeStore(sessions, activeDay = TODAY) {
+function makeStore(sessionList, activeDay = TODAY) {
+  sessions.value = sessionList;
+  liveStreamActiveIds.value = new Set();
   const store = buildStore(preact);
   store.SessionGuideContext._current = {
-    state: {
-      sessions,
-      activeDay,
-      liveStreamActiveIds: new Set(),
-      scheduled: new Set(),
-      favorited: new Set(),
-      isRegistered: true,
-      eventConfig: { ...BASE_CONFIG },
-    },
+    state: { activeDay, eventConfig: { ...BASE_CONFIG } },
     dispatch: () => {},
   };
   return store;
@@ -61,7 +54,7 @@ describe('LiveUpcomingView', () => {
   it('shows live section when live sessions exist', () => {
     const store = makeStore([LIVE_SESSION]);
     const View = buildLiveUpcomingView(preact, store);
-    expect(View({})).to.include('sg-live-section');
+    expect(View({})).to.include('sg-carousel-section');
     expect(View({})).to.include('Live now');
   });
 

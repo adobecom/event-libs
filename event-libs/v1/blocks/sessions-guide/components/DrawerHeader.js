@@ -1,5 +1,6 @@
 import { html, useState, useEffect, useRef } from '../../../deps/htm-preact.js';
 import { useSessionGuide } from '../store/index.js';
+import { auth } from '../../../utils/session-store.js';
 import { DateTabs } from './DateTabs.js';
 import { ViewDropdown } from './ViewDropdown.js';
 import { DownloadButton } from './DownloadButton.js';
@@ -9,8 +10,8 @@ export function DrawerHeader({ onClose, onFilterToggle, filterOpen, hideClose, h
   const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
   const mobileSearchRef = useRef(null);
   const { activeFilters, activeView } = state;
-  const title = (state.isLoggedIn && state.userFirstName)
-    ? `${state.userFirstName}, see what's happening`
+  const title = (auth.value.isLoggedIn && auth.value.userFirstName)
+    ? `${auth.value.userFirstName}, see what's happening`
     : (state.eventConfig.title || "See what's happening at MAX");
 
   const activeFilterCount = Object.values(activeFilters).reduce(

@@ -1,9 +1,10 @@
-import { html, useState, useMemo } from '../../../deps/htm-preact.js';
+import { html, useState, useComputed } from '../../../deps/htm-preact.js';
 import { useSessionGuide } from '../store/index.js';
+import { sessions } from '../../../utils/session-store.js';
 
 export function FilterPanel({ onClose }) {
   const { state, dispatch } = useSessionGuide();
-  const { sessions, activeFilters, eventConfig } = state;
+  const { activeFilters, eventConfig } = state;
   const { filterCategories } = eventConfig;
 
   const [localFilters, setLocalFilters] = useState(() => {
@@ -20,13 +21,14 @@ export function FilterPanel({ onClose }) {
     filterCategories && filterCategories.length > 0 ? filterCategories[0].id : null,
   );
 
-  // Derive unique option values from sessions for each category
-  const categoryOptions = useMemo(() => {
+  // Derive unique option values from sessions for each category — auto-tracks
+  // `sessions.value` and only recomputes when it actually changes.
+  const categoryOptions = useComputed(() => {
     const opts = {};
     if (!filterCategories) return opts;
     filterCategories.forEach(({ id }) => {
       const values = new Set();
-      sessions.forEach((s) => {
+      sessions.value.forEach((s) => {
         const v = s[id];
         if (Array.isArray(v)) v.forEach((x) => x && values.add(x));
         else if (v) values.add(v);
@@ -34,7 +36,7 @@ export function FilterPanel({ onClose }) {
       opts[id] = [...values].sort();
     });
     return opts;
-  }, [sessions, filterCategories]);
+  }).value;
 
   // Count of active filters across all categories
   const totalActiveCount = Object.values(activeFilters).reduce(
