@@ -1,10 +1,12 @@
 import { useState } from '../../../v1/deps/htm-preact.js';
 import { html } from '../../htm-wrapper.js';
 import { useSchedulesData, useSchedulesOperations, useSchedulesUI } from '../../context/SchedulesContext.js';
+import { useDA } from '../../context/DAContext.js';
 import { ScheduleURLUtility, validateSchedule } from '../../utils.js';
 import DeleteConfirmationModal from '../DeleteConfirmationModal.js';
 
 export default function ScheduleHeader() {
+  const { org, repo } = useDA();
   const { activeSchedule, hasUnsavedChanges } = useSchedulesData();
   const {
     updateScheduleLocally,
@@ -32,7 +34,7 @@ export default function ScheduleHeader() {
   const handleCopyLink = async () => {
     if (!activeSchedule) return;
     try {
-      const didCopy = await ScheduleURLUtility.copyScheduleToClipboard(activeSchedule);
+      const didCopy = await ScheduleURLUtility.copyScheduleToClipboard(activeSchedule, org, repo);
       if (didCopy) {
         setToastSuccess('Link copied to clipboard');
       } else {

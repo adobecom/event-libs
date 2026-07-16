@@ -1,3 +1,5 @@
+import { DA_ORIGIN } from './constants.js';
+
 function isBlockComplete(block) {
   if (block.includeLiveStream && !block.liveStream?.streamId) {
     return false;
@@ -99,13 +101,15 @@ function processSchedules(schedules) {
 }
 
 class ScheduleURLUtility {
-  static createScheduleURL(scheduleObject) {
+  static createScheduleURL(scheduleObject, org, repo) {
     try {
-      const jsonString = JSON.stringify(scheduleObject);
+      const serverSchedule = prepareScheduleForServer(scheduleObject);
+      const jsonString = JSON.stringify(serverSchedule);
       const base64JsonString = btoa(unescape(encodeURIComponent(jsonString)));
-      const currentURL = new URL(window.location.origin + window.location.pathname);
-      currentURL.searchParams.set('schedule', base64JsonString);
-      return currentURL.toString();
+      const url = new URL(`${DA_ORIGIN}/app/${org}/${repo}/schedule-maker`);
+      url.searchParams.set('schedule', base64JsonString);
+      url.hash = `scheduleId=${scheduleObject.scheduleId}`;
+      return url.toString();
     } catch (error) {
       window.lana?.log(`Error creating schedule URL: ${error}`);
       throw new Error('Failed to create schedule URL');
@@ -127,9 +131,9 @@ class ScheduleURLUtility {
     }
   }
 
-  static async copyScheduleToClipboard(scheduleObject) {
+  static async copyScheduleToClipboard(scheduleObject, org, repo) {
     try {
-      const scheduleURL = this.createScheduleURL(scheduleObject);
+      const scheduleURL = this.createScheduleURL(scheduleObject, org, repo);
       const { title, modificationTime } = scheduleObject;
       const formattedDate = modificationTime
         ? new Date(modificationTime).toLocaleString('en-US', {

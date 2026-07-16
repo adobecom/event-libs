@@ -24,9 +24,12 @@ const DEFAULT_FRAGMENT_PATH = '/events/events-shared/fragments';
 
 const DA_ADMIN_ORIGIN = 'https://admin.da.live';
 
+const DA_ORIGIN = 'https://da.live';
+
 export {
   PAGES,
   PAGES_CONFIG,
   DEFAULT_FRAGMENT_PATH,
   DA_ADMIN_ORIGIN,
+  DA_ORIGIN,
 };
