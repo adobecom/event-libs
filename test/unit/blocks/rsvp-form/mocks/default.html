@@ -1,0 +1,48 @@
+<!--
+  Reference authoring fixture for the rsvp-form block. The field list itself
+  is NOT authored here — it comes from the `rsvp-config` page metadata (see
+  config.js's resolveRsvpConfig). This markup shows the four optional,
+  class-named rows the block reads via classifyRows() in rsvp-form.js.
+-->
+<meta name="event-id" content="test-event-id" />
+<meta name="cloud-type" content="creativecloud" />
+<meta name="allow-guest-registration" content="true" />
+<meta
+  name="rsvp-config"
+  content='{"rsvpFormFields":[{"Field":"firstName","Type":"text","Label":"First Name","Required":true},{"Field":"email","Type":"email","Label":"Email","Required":true},{"Field":"Submit","Type":"submit","Label":"Submit"}]}'
+/>
+
+<div class="rsvp-form">
+  <div class="rsvp-form-hero">
+    <div>
+      <h2>Join us</h2>
+    </div>
+  </div>
+  <div class="rsvp-form-terms">
+    <p>By registering, you agree to receive event-related communications.</p>
+  </div>
+  <div class="rsvp-form-success">
+    <div>
+      <p>Confirmed</p>
+      <h3>You're registered!</h3>
+      <a href="#cancel">Cancel registration</a>
+      <a href="#ok">Done</a>
+    </div>
+    <div>
+      <h3>Registration cancelled</h3>
+      <a href="#ok">Close</a>
+    </div>
+  </div>
+  <div class="rsvp-form-waitlist-success">
+    <div>
+      <p>Waitlisted</p>
+      <h3>You're on the waitlist</h3>
+      <a href="#cancel">Leave waitlist</a>
+      <a href="#ok">Done</a>
+    </div>
+    <div>
+      <h3>Removed from waitlist</h3>
+      <a href="#ok">Close</a>
+    </div>
+  </div>
+</div>

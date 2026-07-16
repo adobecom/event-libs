@@ -1,0 +1,272 @@
+.rsvp-form {
+  border-radius: var(--card-border-radius-l);
+  filter: var(--image-filter-drop-shadow-small);
+  border: solid 1px var(--bg-color-grey);
+  box-sizing: border-box;
+  max-width: 800px;
+  margin: 0 auto;
+  color: #2c2c2c;
+  transition: opacity 0.4s;
+}
+
+.rsvp-form.loading {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.rsvp-form .rsvp-form-hero-decorated {
+  display: flex;
+  flex-direction: column-reverse;
+  align-items: center;
+  gap: 16px;
+  padding: var(--spacing-xl);
+  background-color: var(--color-black);
+  color: var(--color-white);
+}
+
+.rsvp-form .rsvp-form-hero-decorated img {
+  display: block;
+}
+
+.rsvp-form-container {
+  padding: var(--spacing-xl);
+  padding-top: 24px;
+  box-sizing: border-box;
+}
+
+/* sp-theme is the field-wrapper flex/grid container; internal sp-* controls
+   render in shadow DOM, so only layout (not control chrome) is styled here. */
+.rsvp-form-fields {
+  display: flex;
+  flex-wrap: wrap;
+  width: 100%;
+}
+
+.rsvp-form-fields .field-wrapper {
+  margin-bottom: var(--spacing-xxs);
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xxs);
+  padding: var(--spacing-xs) 0;
+}
+
+.rsvp-form-fields .field-wrapper.hidden {
+  display: none;
+}
+
+.rsvp-form-combobox {
+  position: relative;
+}
+
+.rsvp-form-fields sp-textfield,
+.rsvp-form-fields sp-picker,
+.rsvp-form-fields sp-combobox,
+.rsvp-form-fields .rsvp-form-combobox {
+  width: 100%;
+}
+
+.rsvp-form-fields .field-wrapper.is-invalid sp-help-text.rsvp-form-required-msg {
+  display: block;
+}
+
+.rsvp-form-checkbox-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xxs);
+}
+
+/* Hand-rolled radio-group fallback (handroll-fallback.js), styled to
+   approximate the sp-radio look until Milo ships sp-radio-group. */
+.rsvp-form-radio-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+}
+
+.rsvp-form-radio-item {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-xxs);
+}
+
+.rsvp-form-radio-input {
+  opacity: 0;
+  position: absolute;
+  inset: 0;
+  cursor: pointer;
+  z-index: 1;
+}
+
+.rsvp-form-radio-marker {
+  position: relative;
+  display: block;
+  inline-size: 16px;
+  block-size: 16px;
+  min-width: 16px;
+  border-radius: 50%;
+  border: 2px solid var(--color-gray-600);
+  background: var(--color-white);
+}
+
+.rsvp-form-radio-input:checked + .rsvp-form-radio-marker {
+  border-width: 5px;
+  border-color: var(--color-accent, var(--link-color));
+}
+
+.rsvp-form-radio-label {
+  font-size: var(--type-body-s-size);
+  cursor: pointer;
+}
+
+.rsvp-form-radio-group.is-invalid .rsvp-form-radio-marker {
+  border-color: #eb1000;
+}
+
+/* Hand-rolled combobox fallback (handroll-fallback.js), styled to
+   approximate the sp-combobox look until Milo ships sp-combobox. */
+.rsvp-form-combobox-trigger {
+  width: 100%;
+  text-align: left;
+  font-family: var(--body-font-family);
+  font-size: var(--type-body-xs-size);
+  border: solid 1px var(--color-gray-500);
+  border-radius: var(--input-border-radius, 4px);
+  padding: var(--spacing-xxs) var(--spacing-xs);
+  background: var(--color-white);
+  cursor: pointer;
+}
+
+.rsvp-form-combobox.is-invalid .rsvp-form-combobox-trigger {
+  border-color: #eb1000;
+}
+
+.rsvp-form-combobox-listbox {
+  position: absolute;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border: 1px solid var(--color-gray-500);
+  background: var(--color-white);
+  z-index: 10;
+  max-height: 256px;
+  overflow-y: auto;
+}
+
+.rsvp-form-combobox-listbox.hidden {
+  display: none;
+}
+
+.rsvp-form-combobox-listbox li {
+  padding: var(--spacing-xxs) var(--spacing-xs);
+  font-size: var(--type-body-xs-size);
+  cursor: pointer;
+}
+
+.rsvp-form-event-terms p,
+.rsvp-form-event-terms li {
+  font-size: var(--type-body-xxs-size);
+  line-height: var(--type-body-xxs-lh);
+  font-style: italic;
+}
+
+.rsvp-form-combobox-listbox li:hover,
+.rsvp-form-combobox-listbox li[aria-selected="true"] {
+  background: var(--color-gray-200);
+}
+
+.terms-and-conditions-wrapper {
+  transition: opacity 0.2s;
+}
+
+.terms-and-conditions-wrapper.transparent {
+  opacity: 0;
+}
+
+.rsvp-form-fields sp-button[data-action] {
+  margin-top: var(--spacing-s);
+}
+
+.rsvp-form-fields sp-button.submitting {
+  cursor: progress;
+}
+
+.rsvp-form .form-success-msg {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  position: relative;
+  text-align: center;
+  padding: 80px 40px;
+  min-height: 300px;
+}
+
+.rsvp-form .form-success-msg > div:not(.hidden) {
+  height: 100%;
+  min-height: 300px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.rsvp-form .form-success-msg h1,
+.rsvp-form .form-success-msg h2,
+.rsvp-form .form-success-msg h3,
+.rsvp-form .form-success-msg h4,
+.rsvp-form .form-success-msg h5,
+.rsvp-form .form-success-msg p {
+  max-width: 630px;
+  margin-top: 0;
+}
+
+.rsvp-form .form-success-msg p.eyebrow {
+  font-size: var(--type-heading-s-size);
+  line-height: var(--type-heading-s-lh);
+}
+
+.rsvp-form .form-success-msg .post-rsvp-button-wrapper {
+  display: flex;
+  justify-content: center;
+  margin-top: 40px;
+  gap: 1rem;
+}
+
+.rsvp-form *.hidden {
+  display: none;
+}
+
+.rsvp-form p.error {
+  margin: 0;
+  justify-self: center;
+  padding: 8px 16px;
+  border-radius: 8px;
+  background-color: #eb1000;
+  color: white;
+}
+
+@media screen and (min-width: 600px) {
+  .rsvp-form-fields {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0 var(--spacing-l);
+    align-items: start;
+  }
+
+  .rsvp-form-fields :is([data-action="submit"], [data-action="clear"], .rsvp-form-heading-wrapper, .rsvp-form-full-width) {
+    grid-column: 1 / 3;
+    justify-self: center;
+  }
+}
+
+@media screen and (min-width: 900px) {
+  .rsvp-form .rsvp-form-hero-decorated {
+    flex-direction: row;
+  }
+
+  .rsvp-form .form-success-msg {
+    min-width: 720px;
+  }
+}
