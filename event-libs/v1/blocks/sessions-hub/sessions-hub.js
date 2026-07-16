@@ -573,7 +573,7 @@ function renderSpeakerAvatars(speakers) {
 function renderSessionCard(session, opts = {}) {
   const primaryTime = session.sessionTimes[0];
   const timeStr = primaryTime
-    ? createSmartDateRange(primaryTime.startTimeMillis, primaryTime.endTimeMillis, 'fr-FR', primaryTime.timezone)
+    ? createSmartDateRange(primaryTime.startTimeMillis, primaryTime.endTimeMillis, getLocaleString(), primaryTime.timezone)
     : '';
   const locationName = primaryTime?.locationName || '';
 
