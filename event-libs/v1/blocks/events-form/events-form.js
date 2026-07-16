@@ -889,6 +889,7 @@ export function getRsvpConfigFromMeta() {
     const data = config.rsvpFormFields.map((f) => {
       const field = lowercaseKeys(f);
       if (typeof field.field === 'string') field.field = field.field.trim();
+      field.type = field.type || 'text';
       field.required = field.required === true ? 'x' : '';
       if (Array.isArray(field.options)) {
         field.options = field.options.map((o) => (typeof o === 'object' ? o.value : o)).join(';');
@@ -897,9 +898,11 @@ export function getRsvpConfigFromMeta() {
       // `displayas` (EMC's displayAs, already stored by ESP) picks the concrete
       // widget within it. Remap to the internal dispatch types this file already
       // implements for the legacy per-cloud JSON path, so scope-config-driven
-      // fields render identically. Any other `type` (heading/legal/divider/
-      // submit/clear, or a legacy direct value like `email`/`checkbox` from
-      // before this taxonomy) passes through untouched.
+      // fields render identically. `checkbox` is a legacy wire value from before
+      // this taxonomy, remapped to its own pre-existing default rather than
+      // passed through, so old data keeps rendering exactly as it did. Any other
+      // `type` (heading/legal/divider/submit/clear, or a legacy direct value
+      // like `email`/`text-area`) passes through untouched.
       const da = field.displayas;
       if (field.type === 'text') {
         field.type = TEXT_DISPLAY_AS.has(da) ? da : 'text';
@@ -911,8 +914,7 @@ export function getRsvpConfigFromMeta() {
         field.type = da === 'combobox' ? 'multi-select' : 'checkbox-group';
       }
       else if (field.type === 'checkbox') {
-        // Legacy wire value from before the substrate/displayAs taxonomy.
-        field.type = da === 'dropdown' ? 'multi-select' : 'checkbox-group';
+        field.type = da === 'dropdown' ? 'multi-select' : 'checkbox';
       }
       return field;
     });
