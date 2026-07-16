@@ -1,17 +1,47 @@
 import { expect } from '@esm-bundle/chai';
 import sinon from 'sinon';
 import { setEventConfig } from '../../../../event-libs/v1/utils/utils.js';
-import init, { addMediaReversedClass } from '../../../../event-libs/v1/blocks/promotional-content/promotional-content.js';
+import init, { addMediaReversedClass, getPromotionalContent } from '../../../../event-libs/v1/blocks/promotional-content/promotional-content.js';
+
+// Real EMC shape: matched by `name`, fragment paths are the option `value`s directly.
+const PRIMARY_PRODUCT_NAME_ATTR = {
+  name: 'primaryProductName',
+  attributeId: 'e324ff52-f484-4e61-8c29-a2510861c882',
+  inputType: 'single-select',
+  label: 'Primary Product Name',
+  enabled: true,
+  values: [
+    { valueId: '819b2874-8e3a-4413-96ce-88b5cf2112b1', label: 'acrobat', value: 'Acrobat', ordinal: 0 },
+    { valueId: '142f74ca-2258-4876-8b30-3e23aef996d7', label: 'acrobat-sign', value: 'Acrobat Sign', ordinal: 1 },
+  ],
+};
 
 const CUSTOM_ATTRS_WITH_PROMO = JSON.stringify([
-  { attributeId: '09180aab', attribute: 'primaryProductName', value: 'Acrobat' },
-  { attributeId: '732fdd75', attribute: 'promotionalItems', value: 'https://example.com/fragments/acrobat' },
-  { attributeId: '50578a75', attribute: 'technicalLevel', value: 'advanced' },
+  PRIMARY_PRODUCT_NAME_ATTR,
+  {
+    name: 'promotionalItems',
+    attributeId: '0d433aa1-0a5a-4836-9146-c6a97bdf08bc',
+    inputType: 'multi-select',
+    label: 'Promotional Items',
+    enabled: true,
+    values: [
+      {
+        valueId: '25506162-447f-471c-8419-e397f1d19022',
+        label: 'Adobe Firefly',
+        value: '/events/events-shared/fragments/product-blades/firefly',
+        ordinal: 0,
+      },
+      {
+        valueId: '4dbc5426-c8e7-4b94-becd-3048b265c61c',
+        label: 'Creative Apprenticeship',
+        value: '/events/events-shared/fragments/product-blades/creative-apprenticeship.html',
+        ordinal: 1,
+      },
+    ],
+  },
 ]);
 
-const CUSTOM_ATTRS_WITHOUT_PROMO = JSON.stringify([
-  { attributeId: '09180aab', attribute: 'primaryProductName', value: 'Acrobat' },
-]);
+const CUSTOM_ATTRS_WITHOUT_PROMO = JSON.stringify([PRIMARY_PRODUCT_NAME_ATTR]);
 
 // Bypasses the /libs/utils/utils.js dynamic import (404s in unit tests) so the legacy
 // fetch path can be exercised end-to-end.
@@ -61,7 +91,7 @@ describe('Promotional Content Block', () => {
       expect(fetchStub.called).to.be.false;
     });
 
-    it('does not fetch promotional-content.json when custom-attributes provides a fragment URL', async () => {
+    it('does not fetch promotional-content.json when custom-attributes provides fragment paths', async () => {
       addMeta('custom-attributes', CUSTOM_ATTRS_WITH_PROMO);
       fetchStub.resolves({ ok: true, text: () => Promise.resolve('<div></div>') });
 
@@ -73,6 +103,34 @@ describe('Promotional Content Block', () => {
 
       const configFetched = fetchStub.args.some(([url]) => String(url).includes('promotional-content.json'));
       expect(configFetched).to.be.false;
+    });
+
+    it('returns fragment paths as authored, without altering them', () => {
+      addMeta('custom-attributes', CUSTOM_ATTRS_WITH_PROMO);
+
+      const fragmentUrls = getPromotionalContent();
+
+      expect(fragmentUrls).to.deep.equal([
+        '/events/events-shared/fragments/product-blades/firefly',
+        '/events/events-shared/fragments/product-blades/creative-apprenticeship.html',
+      ]);
+    });
+
+    it('leaves absolute https fragment URLs untouched', () => {
+      const customAttrsWithAbsoluteUrl = JSON.stringify([
+        {
+          name: 'promotionalItems',
+          attributeId: '0d433aa1-0a5a-4836-9146-c6a97bdf08bc',
+          values: [
+            { valueId: '1', value: 'https://example.com/fragments/product-blades/firefly' },
+          ],
+        },
+      ]);
+      addMeta('custom-attributes', customAttrsWithAbsoluteUrl);
+
+      const fragmentUrls = getPromotionalContent();
+
+      expect(fragmentUrls).to.deep.equal(['https://example.com/fragments/product-blades/firefly']);
     });
   });
 

@@ -2,7 +2,7 @@ import { deleteAttendeeFromEvent, getAndCreateAndAddAttendee, getAttendee, getEv
 import BlockMediator from '../../deps/block-mediator.min.js';
 import { signIn, decorateEvent } from '../../utils/decorate.js';
 import { dictionaryManager, getInviteOnlyNoCampaignMessage } from '../../utils/dictionary-manager.js';
-import { getEventConfig, LIBS, getMetadata, getSusiOptions, getValidCampaignIdFromUrl } from '../../utils/utils.js';
+import { getEventConfig, LIBS, getMetadata, getSusiOptions, getValidCampaignIdFromUrl, resolveRoutedCampaignId } from '../../utils/utils.js';
 import { FALLBACK_LOCALES, CAMPAIGN_ID_PATTERN, PHONE_FIELD_RE, PHONE_PATTERN  } from '../../utils/constances.js';
 import { BASE_ATTENDEE_DATA_FILTER } from '../../utils/data-utils.js';
 import { parseRsvpFieldLimit, stripTags } from '../../utils/sanitize-utils.js';
@@ -175,14 +175,25 @@ function constructPayload(form) {
     if (fe.value) payload[fe.id] = fe.value;
   });
 
-  // Post-process checkbox groups to convert single-option groups to booleans
+  // Post-process checkbox/radio groups. Single-option checkbox groups convert to
+  // booleans. Radio groups are mutually exclusive by native radio semantics (shared
+  // `name`), so their payload array always has 0 or 1 entries — collapse it to a
+  // plain string, since string-typed attendee fields (e.g. industry, jobTitle) have
+  // no array-to-string coercion downstream.
   Object.keys(payload).forEach((key) => {
     const fieldWrapper = form.querySelector(`[data-field-id="${key}"]`);
-    if (fieldWrapper && (fieldWrapper.dataset.type === 'checkbox' || fieldWrapper.dataset.type === 'checkbox-group')) {
+    if (!fieldWrapper || !Array.isArray(payload[key])) return;
+    // Base attendee array fields (e.g. contactMethods) must stay arrays for the API
+    if (BASE_ATTENDEE_DATA_FILTER[key]?.type === 'array') return;
+
+    if (fieldWrapper.dataset.type === 'radio-group') {
+      payload[key] = payload[key].length > 0 ? payload[key][0] : undefined;
+      return;
+    }
+
+    if (fieldWrapper.dataset.type === 'checkbox' || fieldWrapper.dataset.type === 'checkbox-group') {
       const checkboxes = fieldWrapper.querySelectorAll('input[type="checkbox"]');
-      if (checkboxes.length === 1 && Array.isArray(payload[key]) && payload[key].length <= 1) {
-        // Base attendee array fields (e.g. contactMethods) must stay arrays for the API
-        if (BASE_ATTENDEE_DATA_FILTER[key]?.type === 'array') return;
+      if (checkboxes.length === 1 && payload[key].length <= 1) {
         // Single option checkbox with at most one value - convert to boolean
         payload[key] = payload[key].length > 0;
       }
@@ -237,7 +248,7 @@ async function submitForm(bp) {
 
   if (!isValid) return false;
 
-  const campaignId = getValidCampaignIdFromUrl();
+  const campaignId = await resolveRoutedCampaignId();
   if (campaignId) {
     payload.campaignId = campaignId;
   }
@@ -443,7 +454,7 @@ function createInput({
   type, field, placeholder, required, defval, pattern, title, limit,
 }) {
   const placeholderText = placeholder ? dictionaryManager.getValue(placeholder, 'rsvp-fields') : '';
-  const isPhoneField = type === 'tel' || type === 'phone' || (typeof field === 'string' && PHONE_FIELD_RE.test(field));
+  const isPhoneField = type === 'tel' || type === 'phone' || (type !== 'text' && typeof field === 'string' && PHONE_FIELD_RE.test(field));
   const attrs = { type: isPhoneField ? 'tel' : type, id: field, placeholder: placeholderText, value: defval };
   if (isPhoneField) {
     attrs.inputmode = 'tel';
@@ -863,7 +874,7 @@ function addTerms(form, terms) {
   submitWrapper.before(termsWrapper);
 }
 
-function getRsvpConfigFromMeta() {
+export function getRsvpConfigFromMeta() {
   const raw = getMetadata('rsvp-config');
   if (!raw) return null;
 
@@ -878,8 +889,19 @@ function getRsvpConfigFromMeta() {
       if (Array.isArray(field.options)) {
         field.options = field.options.map((o) => (typeof o === 'object' ? o.value : o)).join(';');
       }
+      // ESP's field type enum has no dedicated multi-select value — `select` is
+      // single-choice and `checkbox` is multi-choice. `displayas` (EMC's
+      // displayAs, already stored by ESP) carries the render-style hint; remap
+      // to the widget types this file already implements for the legacy
+      // per-cloud JSON path so scope-config-driven fields get the same options.
+      if (field.type === 'select' && field.displayas === 'radio') field.type = 'radio-group';
+      if (field.type === 'checkbox' && field.displayas === 'dropdown') field.type = 'multi-select';
       return field;
     });
+
+    if (!data.some((f) => f.type === 'submit')) {
+      data.push({ field: 'Submit', type: 'submit', label: 'Submit', required: '', options: '' });
+    }
 
     return { data };
   } catch (error) {

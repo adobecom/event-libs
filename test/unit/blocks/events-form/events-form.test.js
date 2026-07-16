@@ -306,7 +306,7 @@ describe('Events Form', () => {
     const PHONE_PATTERN = '^\\+?[\\d\\s\\(\\)\\.\\-]{7,20}$';
 
     function simulateCreatePhoneAwareInput({ type, field, pattern, title }) {
-      const isPhoneField = type === 'tel' || type === 'phone' || (typeof field === 'string' && PHONE_FIELD_RE.test(field));
+      const isPhoneField = type === 'tel' || type === 'phone' || (type !== 'text' && typeof field === 'string' && PHONE_FIELD_RE.test(field));
       const attrs = { type: isPhoneField ? 'tel' : type, id: field };
       if (isPhoneField) {
         attrs.inputmode = 'tel';
@@ -320,8 +320,8 @@ describe('Events Form', () => {
       return input;
     }
 
-    it('applies tel type, pattern, inputmode for businessPhone field', () => {
-      const input = simulateCreatePhoneAwareInput({ type: 'text', field: 'businessPhone' });
+    it('applies tel type, pattern, inputmode for businessPhone field (legacy: no explicit type)', () => {
+      const input = simulateCreatePhoneAwareInput({ type: undefined, field: 'businessPhone' });
       expect(input.getAttribute('type')).to.equal('tel');
       expect(input.getAttribute('inputmode')).to.equal('tel');
       expect(input.getAttribute('autocomplete')).to.equal('tel');
@@ -329,14 +329,28 @@ describe('Events Form', () => {
       expect(input.hasAttribute('title')).to.be.false;
     });
 
-    it('applies same defaults for mobilePhone field', () => {
-      const input = simulateCreatePhoneAwareInput({ type: 'text', field: 'mobilePhone' });
+    it('applies same defaults for mobilePhone field (legacy: no explicit type)', () => {
+      const input = simulateCreatePhoneAwareInput({ type: undefined, field: 'mobilePhone' });
       expect(input.getAttribute('type')).to.equal('tel');
       expect(input.getAttribute('pattern')).to.equal(PHONE_PATTERN);
     });
 
+    it('does not apply phone defaults when explicit type is text, even if field name contains phone', () => {
+      const input = simulateCreatePhoneAwareInput({ type: 'text', field: 'businessPhone' });
+      expect(input.getAttribute('type')).to.equal('text');
+      expect(input.hasAttribute('pattern')).to.be.false;
+      expect(input.hasAttribute('inputmode')).to.be.false;
+    });
+
     it('does not apply phone defaults for non-phone fields', () => {
       const input = simulateCreatePhoneAwareInput({ type: 'text', field: 'firstName' });
+      expect(input.getAttribute('type')).to.equal('text');
+      expect(input.hasAttribute('pattern')).to.be.false;
+      expect(input.hasAttribute('inputmode')).to.be.false;
+    });
+
+    it('does not apply phone defaults for fields that contain "phone" as a substring (e.g. Phonetic First Name)', () => {
+      const input = simulateCreatePhoneAwareInput({ type: 'text', field: 'Phonetic First Name' });
       expect(input.getAttribute('type')).to.equal('text');
       expect(input.hasAttribute('pattern')).to.be.false;
       expect(input.hasAttribute('inputmode')).to.be.false;
@@ -611,6 +625,77 @@ describe('Events Form', () => {
         expect(payload.contactMethods).to.deep.equal([]);
       });
     });
+
+    describe('radio group string conversion', () => {
+      function simulateRadioGroupPostProcess(form, payload) {
+        Object.keys(payload).forEach((key) => {
+          const fieldWrapperEl = form.querySelector(`[data-field-id="${key}"]`);
+          if (fieldWrapperEl && fieldWrapperEl.dataset.type === 'radio-group' && Array.isArray(payload[key])) {
+            if (BASE_ATTENDEE_DATA_FILTER[key]?.type === 'array') return;
+            payload[key] = payload[key].length > 0 ? payload[key][0] : undefined;
+          }
+        });
+      }
+
+      it('collapses a checked radio group (single choice) to a plain string, not an array', () => {
+        // Radio inputs sharing a name are mutually exclusive by native browser
+        // semantics, so exactly one is checked here — mirrors real rendering.
+        const form = document.createElement('form');
+        const fieldWrapper = document.createElement('div');
+        fieldWrapper.setAttribute('data-field-id', 'industry');
+        fieldWrapper.setAttribute('data-type', 'radio-group');
+
+        const radio1 = document.createElement('input');
+        radio1.type = 'radio';
+        radio1.name = 'industry';
+        radio1.value = 'Technology';
+        radio1.checked = true;
+
+        const radio2 = document.createElement('input');
+        radio2.type = 'radio';
+        radio2.name = 'industry';
+        radio2.value = 'Retail';
+        radio2.checked = false;
+
+        fieldWrapper.append(radio1, radio2);
+        form.appendChild(fieldWrapper);
+
+        const payload = {};
+        [radio1, radio2].forEach((r) => {
+          if (r.checked) {
+            payload[r.name] = payload[r.name] ? [...payload[r.name], r.value] : [r.value];
+          } else {
+            payload[r.name] = payload[r.name] || [];
+          }
+        });
+
+        simulateRadioGroupPostProcess(form, payload);
+
+        expect(payload.industry).to.equal('Technology');
+        expect(typeof payload.industry).to.equal('string');
+      });
+
+      it('collapses an unchecked radio group to undefined', () => {
+        const form = document.createElement('form');
+        const fieldWrapper = document.createElement('div');
+        fieldWrapper.setAttribute('data-field-id', 'industry');
+        fieldWrapper.setAttribute('data-type', 'radio-group');
+
+        const radio1 = document.createElement('input');
+        radio1.type = 'radio';
+        radio1.name = 'industry';
+        radio1.value = 'Technology';
+        radio1.checked = false;
+
+        fieldWrapper.append(radio1);
+        form.appendChild(fieldWrapper);
+
+        const payload = { industry: [] };
+        simulateRadioGroupPostProcess(form, payload);
+
+        expect(payload.industry).to.equal(undefined);
+      });
+    });
   });
 
   describe('inviteOnly + campaign gate', () => {
@@ -855,6 +940,146 @@ describe('Events Form', () => {
       const errorEl = form.querySelector('.error');
       expect(errorEl).to.not.be.null;
       expect(errorEl.textContent).to.equal('event-full-no-waitlist-error-msg');
+    });
+  });
+
+  describe('getRsvpConfigFromMeta', () => {
+    let metaEl;
+
+    afterEach(() => {
+      metaEl?.remove();
+      metaEl = null;
+      document.head.querySelectorAll('meta[name="rsvp-config"]').forEach((el) => el.remove());
+    });
+
+    function setRsvpConfigMeta(value) {
+      metaEl = document.createElement('meta');
+      metaEl.setAttribute('name', 'rsvp-config');
+      metaEl.content = JSON.stringify(value);
+      document.head.appendChild(metaEl);
+    }
+
+    it('returns null when rsvp-config meta is absent', async () => {
+      const { getRsvpConfigFromMeta } = await import('../../../../event-libs/v1/blocks/events-form/events-form.js');
+      expect(getRsvpConfigFromMeta()).to.equal(null);
+    });
+
+    it('returns null when rsvpFormFields is empty', async () => {
+      const { getRsvpConfigFromMeta } = await import('../../../../event-libs/v1/blocks/events-form/events-form.js');
+      setRsvpConfigMeta({ rsvpFormFields: [] });
+      expect(getRsvpConfigFromMeta()).to.equal(null);
+    });
+
+    it('appends a submit field when none exists in rsvpFormFields', async () => {
+      const { getRsvpConfigFromMeta } = await import('../../../../event-libs/v1/blocks/events-form/events-form.js');
+      setRsvpConfigMeta({
+        rsvpFormFields: [
+          { field: 'industry', label: 'Industry', type: 'select', required: true, options: [] },
+        ],
+      });
+      const result = getRsvpConfigFromMeta();
+      const submitField = result.data.find((f) => f.type === 'submit');
+      expect(submitField).to.exist;
+      expect(submitField.field).to.equal('Submit');
+      expect(submitField.label).to.equal('Submit');
+    });
+
+    it('does not append a duplicate submit field when one already exists', async () => {
+      const { getRsvpConfigFromMeta } = await import('../../../../event-libs/v1/blocks/events-form/events-form.js');
+      setRsvpConfigMeta({
+        rsvpFormFields: [
+          { field: 'industry', label: 'Industry', type: 'select', required: false, options: [] },
+          { field: 'Submit', label: 'Submit', type: 'submit', required: false, options: [] },
+        ],
+      });
+      const result = getRsvpConfigFromMeta();
+      const submitFields = result.data.filter((f) => f.type === 'submit');
+      expect(submitFields).to.have.lengthOf(1);
+    });
+
+    it('maps required boolean true to "x"', async () => {
+      const { getRsvpConfigFromMeta } = await import('../../../../event-libs/v1/blocks/events-form/events-form.js');
+      setRsvpConfigMeta({
+        rsvpFormFields: [
+          { field: 'title', label: 'Title', type: 'text', required: true, options: [] },
+        ],
+      });
+      const result = getRsvpConfigFromMeta();
+      expect(result.data[0].required).to.equal('x');
+    });
+
+    it('maps required boolean false to empty string', async () => {
+      const { getRsvpConfigFromMeta } = await import('../../../../event-libs/v1/blocks/events-form/events-form.js');
+      setRsvpConfigMeta({
+        rsvpFormFields: [
+          { field: 'title', label: 'Title', type: 'text', required: false, options: [] },
+        ],
+      });
+      const result = getRsvpConfigFromMeta();
+      expect(result.data[0].required).to.equal('');
+    });
+
+    it('remaps checkbox + displayAs "dropdown" to multi-select', async () => {
+      const { getRsvpConfigFromMeta } = await import('../../../../event-libs/v1/blocks/events-form/events-form.js');
+      setRsvpConfigMeta({
+        rsvpFormFields: [
+          {
+            field: 'interests', label: 'Interests', type: 'checkbox', displayAs: 'dropdown', required: false, options: [],
+          },
+        ],
+      });
+      const result = getRsvpConfigFromMeta();
+      expect(result.data[0].type).to.equal('multi-select');
+    });
+
+    it('leaves checkbox + displayAs "checkbox" (default) as checkbox', async () => {
+      const { getRsvpConfigFromMeta } = await import('../../../../event-libs/v1/blocks/events-form/events-form.js');
+      setRsvpConfigMeta({
+        rsvpFormFields: [
+          {
+            field: 'interests', label: 'Interests', type: 'checkbox', displayAs: 'checkbox', required: false, options: [],
+          },
+        ],
+      });
+      const result = getRsvpConfigFromMeta();
+      expect(result.data[0].type).to.equal('checkbox');
+    });
+
+    it('leaves checkbox with no displayAs as checkbox (default, backward compatible)', async () => {
+      const { getRsvpConfigFromMeta } = await import('../../../../event-libs/v1/blocks/events-form/events-form.js');
+      setRsvpConfigMeta({
+        rsvpFormFields: [
+          { field: 'interests', label: 'Interests', type: 'checkbox', required: false, options: [] },
+        ],
+      });
+      const result = getRsvpConfigFromMeta();
+      expect(result.data[0].type).to.equal('checkbox');
+    });
+
+    it('remaps select + displayAs "radio" to radio-group', async () => {
+      const { getRsvpConfigFromMeta } = await import('../../../../event-libs/v1/blocks/events-form/events-form.js');
+      setRsvpConfigMeta({
+        rsvpFormFields: [
+          {
+            field: 'industry', label: 'Industry', type: 'select', displayAs: 'radio', required: false, options: [],
+          },
+        ],
+      });
+      const result = getRsvpConfigFromMeta();
+      expect(result.data[0].type).to.equal('radio-group');
+    });
+
+    it('leaves select + displayAs "dropdown" (default) as select', async () => {
+      const { getRsvpConfigFromMeta } = await import('../../../../event-libs/v1/blocks/events-form/events-form.js');
+      setRsvpConfigMeta({
+        rsvpFormFields: [
+          {
+            field: 'industry', label: 'Industry', type: 'select', displayAs: 'dropdown', required: false, options: [],
+          },
+        ],
+      });
+      const result = getRsvpConfigFromMeta();
+      expect(result.data[0].type).to.equal('select');
     });
   });
 });
