@@ -1,4 +1,4 @@
-import { DA_ADMIN_ORIGIN } from '../constants.js';
+import { DA_ADMIN_ORIGIN, DA_ORIGIN, DA_APP_PATH } from '../constants.js';
 
 let daToken = null;
 let sdkDaFetch = null;
@@ -379,10 +379,11 @@ export async function syncSchedules(org, repo, eventFolder, scanPath = null) {
   const foundData = new Map(); // scheduleId → decoded object (for new discoveries)
   // Fetch + scan docs in parallel (bounded). Scanning happens inside the worker
   // so each doc's text can be garbage-collected before the next batch.
+  const canonicalPrefix = `${DA_ORIGIN}/app/${org}/${repo}/${DA_APP_PATH}`;
   const perDocFinds = await mapWithConcurrency(docFiles, SCAN_CONCURRENCY, async (filePath) => {
     const res = await fetchText(org, repo, filePath);
     if (!res.ok) return null;
-    if (!res.text) return [];
+    if (!res.text) return { finds: [], needsRewrite: false };
     const finds = [];
     const re = new RegExp(SCHEDULE_PARAM_RE.source, 'g');
     let m;
@@ -391,7 +392,19 @@ export async function syncSchedules(org, repo, eventFolder, scanPath = null) {
       const decoded = decodeScheduleParam(m[1]);
       if (decoded?.scheduleId) finds.push(decoded);
     }
-    return finds;
+    // Check if any schedule href uses a non-canonical URL (wrong domain/path or missing hash)
+    const hrefRe = /href=(["'])([^"']*\?schedule=[A-Za-z0-9+/=%-]{20,}[^"']*)\1/gi;
+    let needsRewrite = false;
+    let hm;
+    // eslint-disable-next-line no-cond-assign
+    while ((hm = hrefRe.exec(res.text)) !== null) {
+      const href = hm[2];
+      if (!href.startsWith(canonicalPrefix) || !href.includes('#scheduleId=')) {
+        needsRewrite = true;
+        break;
+      }
+    }
+    return { finds, needsRewrite };
   });
   // Abort rather than misclassify: a doc we couldn't read might reference a
   // schedule, so treating it as empty could wrongly demote active → draft.
@@ -403,7 +416,12 @@ export async function syncSchedules(org, repo, eventFolder, scanPath = null) {
       error: `Sync aborted: ${unreadable} document(s) could not be read (rate limited or unavailable). Please retry — lower SCAN_CONCURRENCY if this persists.`,
     };
   }
-  for (const finds of perDocFinds) {
+  // Rewrite non-canonical links in the background (source only, no publish).
+  const docsToRewrite = docFiles.filter((_, i) => perDocFinds[i]?.needsRewrite);
+  if (docsToRewrite.length > 0) {
+    await mapWithConcurrency(docsToRewrite, SCAN_CONCURRENCY, (path) => rewriteScheduleLinksInDoc(org, repo, path));
+  }
+  for (const { finds } of perDocFinds) {
     for (const decoded of finds) {
       foundIds.add(decoded.scheduleId);
       if (!foundData.has(decoded.scheduleId)) foundData.set(decoded.scheduleId, decoded);
@@ -538,6 +556,67 @@ export async function findScheduleReferences(org, repo, scheduleId, scanPath = '
 // re-read and retry — same protection as the sheet writes, so a doc edit made
 // in parallel isn't silently clobbered. Returns true on success (incl. no-op
 // cases: doc gone / link already absent), false if it couldn't be updated.
+// Rewrites non-canonical schedule hrefs in a doc to the current DA app URL
+// format (da.live/app/{org}/{repo}/tools/da-apps/schedule-maker?schedule=...
+// #scheduleId=...). Uses ETag-based conditional write with retry so concurrent
+// edits are handled safely. Source-only — no preview or publish.
+async function rewriteScheduleLinksInDoc(org, repo, filePath) {
+  const canonicalPrefix = `${DA_ORIGIN}/app/${org}/${repo}/${DA_APP_PATH}`;
+  const hrefRe = /href=(["'])([^"']*\?schedule=[A-Za-z0-9+/=%-]{20,}[^"']*)\1/gi;
+  const url = `${DA_ADMIN_ORIGIN}/source/${org}/${repo}${filePath}`;
+
+  for (let attempt = 0; attempt <= MAX_WRITE_RETRIES; attempt += 1) {
+    // eslint-disable-next-line no-await-in-loop
+    if (attempt > 0) await sleep(retryDelay(attempt - 1));
+    let resp;
+    try {
+      // eslint-disable-next-line no-await-in-loop
+      resp = await doFetch(url, getHeaders('GET'));
+    } catch {
+      return false;
+    }
+    if (!resp.ok) return resp.status === 404;
+    const etag = normalizeEtag(resp.headers.get('ETag'));
+    // eslint-disable-next-line no-await-in-loop
+    const text = await resp.text();
+    let changed = false;
+    const rewritten = text.replace(hrefRe, (match, quote, href) => {
+      try {
+        if (href.startsWith(canonicalPrefix) && href.includes('#scheduleId=')) return match;
+        const parsed = new URL(href);
+        const scheduleParam = parsed.searchParams.get('schedule');
+        if (!scheduleParam) return match;
+        const decoded = decodeScheduleParam(scheduleParam);
+        const newUrl = new URL(canonicalPrefix);
+        newUrl.searchParams.set('schedule', scheduleParam);
+        if (decoded?.scheduleId) newUrl.hash = `scheduleId=${decoded.scheduleId}`;
+        changed = true;
+        return `href=${quote}${newUrl.toString()}${quote}`;
+      } catch {
+        return match;
+      }
+    });
+    if (!changed) return true;
+
+    const formData = new FormData();
+    formData.append('data', new Blob([rewritten], { type: 'text/html' }), filePath.split('/').pop());
+    const headers = new Headers();
+    if (daToken) headers.append('Authorization', `Bearer ${daToken}`);
+    if (etag) headers.append('If-Match', etag);
+    let writeResp;
+    try {
+      // eslint-disable-next-line no-await-in-loop
+      writeResp = await doFetch(url, { method: 'POST', headers, body: formData });
+    } catch {
+      return false;
+    }
+    if (writeResp.ok) return true;
+    if (writeResp.status === 412) continue; // concurrent edit — re-read and retry
+    return false;
+  }
+  return false;
+}
+
 async function removeScheduleFromDoc(org, repo, filePath, scheduleId) {
   // Matches a full <a ...href="...?schedule=<b64>...">...</a> element
   const anchorRe = /<a\s[^>]*href=["']([^"']*)["'][^>]*>[\s\S]*?<\/a>/gi;
