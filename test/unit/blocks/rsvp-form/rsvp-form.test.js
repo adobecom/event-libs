@@ -1,10 +1,12 @@
 import { expect } from '@esm-bundle/chai';
+import { readFile } from '@web/test-runner-commands';
 import { resolveRsvpConfig } from '../../../../event-libs/v1/blocks/rsvp-form/config.js';
 import { buildField } from '../../../../event-libs/v1/blocks/rsvp-form/fields.js';
 import { constructPayload } from '../../../../event-libs/v1/blocks/rsvp-form/payload.js';
 import { applyRules } from '../../../../event-libs/v1/blocks/rsvp-form/rules.js';
 import { personalizeForm } from '../../../../event-libs/v1/blocks/rsvp-form/prefill.js';
 import { validateForm, clearForm } from '../../../../event-libs/v1/blocks/rsvp-form/submit.js';
+import { classifyRows } from '../../../../event-libs/v1/blocks/rsvp-form/rsvp-form.js';
 
 /**
  * Minimal stand-ins for the real Spectrum 2 web components, registered once
@@ -147,23 +149,29 @@ describe('rsvp-form', () => {
       const wrapper = buildField({
         field: 'jobLevel', type: 'radio-group', label: 'Level', options: 'IC;Manager',
       });
-      expect(wrapper.querySelector('.rsvp-form-radio-group')).to.exist;
+      const control = wrapper.querySelector('.rsvp-form-radio-group');
+      expect(control).to.exist;
       expect(wrapper.querySelectorAll('input[type="radio"]')).to.have.lengthOf(2);
+      // id is required for the sp-field-label's `for` to resolve to this control.
+      expect(control.id).to.equal('jobLevel');
     });
 
     it('falls back to a hand-rolled combobox when sp-combobox is unavailable', () => {
       const wrapper = buildField({
         field: 'productsOfInterest', type: 'multi-select', label: 'Products', options: 'A;B;C',
       });
-      expect(wrapper.querySelector('.rsvp-form-combobox')).to.exist;
+      const control = wrapper.querySelector('.rsvp-form-combobox');
+      expect(control).to.exist;
       expect(wrapper.querySelectorAll('.rsvp-form-combobox-listbox li')).to.have.lengthOf(3);
+      expect(control.id).to.equal('productsOfInterest');
     });
 
-    it('renders one sp-checkbox per option for checkbox-group', () => {
+    it('renders one sp-checkbox per option for checkbox-group, with an id for label association', () => {
       const wrapper = buildField({
         field: 'contactMethods', type: 'checkbox-group', label: 'Contact', options: 'email;phone',
       });
       expect(wrapper.querySelectorAll('sp-checkbox')).to.have.lengthOf(2);
+      expect(wrapper.querySelector('.rsvp-form-checkbox-group').id).to.equal('contactMethods');
     });
   });
 
@@ -228,6 +236,29 @@ describe('rsvp-form', () => {
       themeHost.append(submit, country);
       expect(constructPayload(themeHost)).to.deep.equal({});
     });
+
+    it('excludes CN legal-agreement checkboxes that have no data-field-id ancestor, reading only the real contactMethods group', () => {
+      // Mirrors consent.js's fixed DOM shape: the outer terms wrapper carries
+      // no data-field-id (it's a layout container); only the nested
+      // contactMethods checkbox group does. CN's legal "submit-blocker"
+      // checkboxes sit directly in the (untagged) terms wrapper, so they must
+      // never be swept into any payload key.
+      const termsWrapper = document.createElement('div');
+      termsWrapper.className = 'terms-and-conditions-wrapper';
+      const legalCheckbox = document.createElement('sp-checkbox');
+      legalCheckbox.className = 'submit-blocker';
+      legalCheckbox.checked = true;
+      termsWrapper.append(legalCheckbox);
+
+      const contactMethodsGroup = buildField({
+        field: 'contactMethods', type: 'checkbox-group', label: 'Contact', options: 'email;phone',
+      });
+      termsWrapper.append(contactMethodsGroup);
+      contactMethodsGroup.querySelector('sp-checkbox').checked = true;
+
+      themeHost.append(termsWrapper);
+      expect(constructPayload(themeHost)).to.deep.equal({ contactMethods: ['email'] });
+    });
   });
 
   describe('rules.js applyRules', () => {
@@ -266,6 +297,52 @@ describe('rsvp-form', () => {
       }]);
 
       expect(dependent.classList.contains('hidden')).to.equal(false);
+    });
+
+    it('applies the equal operator', () => {
+      const trigger = buildField({ field: 'plan', type: 'text', label: 'Plan' });
+      const dependent = buildField({ field: 'seats', type: 'text', label: 'Seats' });
+      themeHost.append(trigger, dependent);
+      trigger.querySelector('sp-textfield').value = 'enterprise';
+
+      applyRules(themeHost, [{
+        fieldId: 'seats',
+        rule: { type: 'required', condition: { key: 'plan', operator: '=', value: 'enterprise' } },
+      }]);
+
+      expect(dependent.classList.contains('required')).to.equal(true);
+    });
+
+    it('applies the includes operator against a multi-select array value', () => {
+      const trigger = buildField({
+        field: 'productsOfInterest', type: 'multi-select', label: 'Products', options: 'A;B',
+      });
+      const dependent = buildField({ field: 'followUp', type: 'text', label: 'Follow up' });
+      themeHost.append(trigger, dependent);
+      trigger.querySelector('.rsvp-form-combobox').values = ['A'];
+
+      applyRules(themeHost, [{
+        fieldId: 'followUp',
+        rule: { type: 'shown', condition: { key: 'productsOfInterest', operator: 'inc', value: 'A' } },
+      }]);
+
+      expect(dependent.classList.contains('shown')).to.equal(true);
+    });
+
+    it('applies the excludes operator against a multi-select array value', () => {
+      const trigger = buildField({
+        field: 'productsOfInterest', type: 'multi-select', label: 'Products', options: 'A;B',
+      });
+      const dependent = buildField({ field: 'followUp', type: 'text', label: 'Follow up' });
+      themeHost.append(trigger, dependent);
+      trigger.querySelector('.rsvp-form-combobox').values = ['B'];
+
+      applyRules(themeHost, [{
+        fieldId: 'followUp',
+        rule: { type: 'shown', condition: { key: 'productsOfInterest', operator: 'exc', value: 'A' } },
+      }]);
+
+      expect(dependent.classList.contains('shown')).to.equal(true);
     });
   });
 
@@ -347,6 +424,32 @@ describe('rsvp-form', () => {
 
       expect(wrapper.querySelector('sp-textfield').value).to.equal('Grace');
       themeHost.remove();
+    });
+  });
+
+  describe('rsvp-form.js classifyRows', () => {
+    it('classifies rows by class name from authored markup', async () => {
+      const html = await readFile({ path: './mocks/default.html' });
+      const container = document.createElement('div');
+      container.innerHTML = html;
+      const block = container.querySelector('.rsvp-form');
+
+      const { hero, terms, success, waitlist } = classifyRows(block);
+      expect(hero.classList.contains('rsvp-form-hero')).to.equal(true);
+      expect(terms.classList.contains('rsvp-form-terms')).to.equal(true);
+      expect(success.classList.contains('rsvp-form-success')).to.equal(true);
+      expect(waitlist.classList.contains('rsvp-form-waitlist-success')).to.equal(true);
+    });
+
+    it('falls back to positional order when no class-named rows are present', () => {
+      const block = document.createElement('div');
+      block.innerHTML = '<div>hero</div><div>terms</div><div>success</div><div>waitlist</div>';
+
+      const { hero, terms, success, waitlist } = classifyRows(block);
+      expect(hero.textContent).to.equal('hero');
+      expect(terms.textContent).to.equal('terms');
+      expect(success.textContent).to.equal('success');
+      expect(waitlist.textContent).to.equal('waitlist');
     });
   });
 });

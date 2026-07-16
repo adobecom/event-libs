@@ -255,7 +255,7 @@
     align-items: start;
   }
 
-  .rsvp-form-fields :is([data-action="submit"], [data-action="clear"], .rsvp-form-heading-wrapper, .rsvp-form-full-width) {
+  .rsvp-form-fields :is(.rsvp-form-submit-wrapper, .rsvp-form-clear-wrapper, .rsvp-form-heading-wrapper, .rsvp-form-full-width) {
     grid-column: 1 / 3;
     justify-self: center;
   }

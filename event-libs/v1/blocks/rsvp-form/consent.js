@@ -98,10 +98,13 @@ export async function addConsentSuite(themeHost, submitButton) {
     'data-type': 'select',
     'data-required': 'x',
   }, [label, countryPicker]);
+  // No data-field-id here: this is a layout container, not a payload field.
+  // The CN legal-agreement checkboxes append directly into it (and must NOT
+  // be swept into any payload key); the non-CN contactMethods checkbox group
+  // (createContactMethodsGroup) is the sole element that carries
+  // data-field-id="contactMethods", nested inside this wrapper.
   const termsWrapper = createTag('div', {
     class: 'field-wrapper rsvp-form-full-width terms-and-conditions-wrapper transparent',
-    'data-field-id': 'contactMethods',
-    'data-type': 'checkbox-group',
   });
 
   let rows = [];

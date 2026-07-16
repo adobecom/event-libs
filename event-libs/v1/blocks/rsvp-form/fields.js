@@ -1,7 +1,7 @@
 import { createTag } from '../../utils/utils.js';
 import { dictionaryManager } from '../../utils/dictionary-manager.js';
 import { PHONE_FIELD_RE, PHONE_PATTERN } from '../../utils/constances.js';
-import { hasNativeRadio, hasNativeCombobox } from './spectrum.js';
+import { hasNativeRadio } from './spectrum.js';
 import { createRadioGroup, createCombobox } from './handroll-fallback.js';
 
 function t(key) {
@@ -62,18 +62,11 @@ function createPickerField({ field, placeholder, options, defval, required }) {
   return picker;
 }
 
+// sp-combobox (Spectrum Web Components 1.7.0) is single-select only, so
+// there's no native replacement to feature-detect toward here — unlike
+// radio-group, this fallback isn't a stop-gap for a missing Milo build;
+// it's the only control that actually supports multi-select.
 function createMultiSelectField(fd) {
-  const { field, placeholder, options, defval, required } = fd;
-  if (hasNativeCombobox()) {
-    const attrs = { id: field, multiple: '', placeholder: placeholder ? t(placeholder) : '' };
-    if (required === 'x') attrs.required = '';
-    const combobox = createTag('sp-combobox', attrs);
-    splitOptions(options).forEach(({ label, value }) => {
-      combobox.append(createTag('sp-menu-item', { value }, t(label)));
-    });
-    if (defval) combobox.value = defval;
-    return combobox;
-  }
   return createCombobox({ ...fd, multiple: true });
 }
 
@@ -95,7 +88,7 @@ function createRadioGroupField(fd) {
 
 /** Single-option checkbox groups collapse to a boolean payload (see payload.js). */
 function createCheckboxGroupField({ field, options, defval }) {
-  const wrapper = createTag('div', { class: 'rsvp-form-checkbox-group' });
+  const wrapper = createTag('div', { id: field, class: 'rsvp-form-checkbox-group' });
   const defList = splitOptions(defval).map((o) => o.value);
   splitOptions(options).forEach(({ label, value }) => {
     const checkbox = createTag('sp-checkbox', { value, name: field }, t(label));

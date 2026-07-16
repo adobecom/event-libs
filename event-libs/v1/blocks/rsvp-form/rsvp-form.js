@@ -26,7 +26,7 @@ const ROW_SELECTORS = {
   waitlist: '.rsvp-form-waitlist-success',
 };
 
-function classifyRows(block) {
+export function classifyRows(block) {
   const named = {};
   Object.entries(ROW_SELECTORS).forEach(([key, selector]) => {
     named[key] = block.querySelector(`:scope > ${selector}`);
@@ -66,8 +66,20 @@ async function buildForm(bp) {
   const config = resolveRsvpConfig();
   if (!config) return null;
 
+  const profile = BlockMediator.get('imsProfile');
+  const showConsentForGuest = getMetadata('allow-guest-registration') === 'true' && profile?.account_type === 'guest';
+  const forceConsent = getMetadata('force-consent-collection') === 'true';
+  const needsConsent = showConsentForGuest || forceConsent;
+
+  // The consent suite renders its own sp-picker/sp-menu-item/sp-checkbox
+  // independent of the configured field list, so its modules must be
+  // requested here too — otherwise a text-only form with
+  // force-consent-collection would never load them.
+  const fieldTypes = config.fields.map((f) => f.type);
+  if (needsConsent) fieldTypes.push('select', 'checkbox');
+
   await Promise.all([
-    loadSwc(config.fields.map((f) => f.type)),
+    loadSwc(fieldTypes),
     dictionaryManager.initialize(),
   ]);
 
@@ -88,10 +100,7 @@ async function buildForm(bp) {
   appendEventTerms(themeHost, bp.terms);
 
   const submitButton = themeHost.querySelector('[data-action="submit"]');
-  const profile = BlockMediator.get('imsProfile');
-  const showConsentForGuest = getMetadata('allow-guest-registration') === 'true' && profile?.account_type === 'guest';
-  const forceConsent = getMetadata('force-consent-collection') === 'true';
-  if ((showConsentForGuest || forceConsent) && submitButton) {
+  if (needsConsent && submitButton) {
     await addConsentSuite(themeHost, submitButton);
   }
 

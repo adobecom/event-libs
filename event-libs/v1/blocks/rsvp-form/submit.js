@@ -124,7 +124,15 @@ async function buildSubmitPayload(themeHost) {
     if (item?.dataset.consentId) payload.consentStringId = item.dataset.consentId;
   }
 
-  applyImplicitContactMethodsToPayload(themeHost, payload);
+  // applyImplicitContactMethodsToPayload (shared with events-form.js) detects
+  // "no checkbox UI present" via a native `input[type="checkbox"]` query,
+  // which can't see sp-checkbox's shadow-DOM internals. Without this guard it
+  // would treat a real-but-all-unchecked contactMethods group as "no UI" and
+  // overwrite the user's deliberate empty selection with implicit defaults.
+  const contactMethodsGroup = themeHost.querySelector('[data-field-id="contactMethods"]');
+  if (!contactMethodsGroup?.querySelector('sp-checkbox')) {
+    applyImplicitContactMethodsToPayload(themeHost, payload);
+  }
 
   const textWrappers = [...themeHost.querySelectorAll('[data-type="text"], [data-type="text-area"]')];
   await Promise.all(textWrappers.map(async (wrapper) => {

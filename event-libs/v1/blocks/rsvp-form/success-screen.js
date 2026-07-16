@@ -1,6 +1,7 @@
 import { createTag, getMetadata } from '../../utils/utils.js';
 import BlockMediator from '../../deps/block-mediator.min.js';
 import { deleteAttendeeFromEvent } from '../../utils/esp-controller.js';
+import { clearForm } from './submit.js';
 
 /**
  * Decorates a success/waitlist screen row: two authored sub-screens
@@ -92,6 +93,7 @@ export function showSuccessMsgFirstScreen({
   const rsvpData = BlockMediator.get('rsvpData');
   if (!rsvpData) return false;
 
+  if (formEl) clearForm(formEl);
   formEl?.classList.add('hidden');
   eventHero?.classList.add('hidden');
 

@@ -7,7 +7,9 @@ const LIT_URL = `${miloLibs}/deps/lit-all.min.js`;
 // Core modules every rsvp-form needs regardless of which fields are configured.
 const CORE_MODULES = ['theme', 'field-label', 'help-text', 'button', 'divider'];
 
-// Field-type -> extra dist module(s) to load, beyond CORE_MODULES.
+// Field-type -> extra dist module(s) to load, beyond CORE_MODULES. multi-select
+// has no entry: sp-combobox (SWC 1.7.0) is single-select only, so multi-select
+// always uses the hand-rolled fallback — there's no native module to load.
 const FIELD_MODULE_MAP = {
   text: ['textfield'],
   email: ['textfield'],
@@ -15,7 +17,6 @@ const FIELD_MODULE_MAP = {
   phone: ['textfield'],
   'text-area': ['textfield'],
   select: ['picker', 'menu'],
-  'multi-select': ['combobox'],
   'radio-group': ['radio'],
   checkbox: ['checkbox'],
   'checkbox-group': ['checkbox'],
@@ -28,14 +29,13 @@ function importOnce(url) {
 }
 
 let nativeRadioAvailable = false;
-let nativeComboboxAvailable = false;
 
 /**
- * Milo's spectrum-web-components build has no radio/combobox entry points yet
- * (a follow-up milo PR adds them). Attempt the import; if it 404s or the
- * custom element never registers, the caller falls back to
- * `handroll-fallback.js`. Non-throwing by design — a missing module must not
- * break the rest of the form.
+ * Milo's spectrum-web-components build has no radio entry point yet (a
+ * follow-up milo PR adds it). Attempt the import; if it 404s or the custom
+ * element never registers, the caller falls back to `handroll-fallback.js`.
+ * Non-throwing by design — a missing module must not break the rest of the
+ * form.
  */
 async function tryImportControl(moduleName, tagName) {
   try {
@@ -51,7 +51,9 @@ async function tryImportControl(moduleName, tagName) {
  * Loads Lit + the theme + whichever Spectrum 2 dist modules the resolved
  * field set needs, deduping/caching imports so repeat calls are free. Must be
  * awaited before building any sp-* control.
- * @param {string[]} fieldTypes - resolved field `type` values from config.js
+ * @param {string[]} fieldTypes - resolved field `type` values from config.js,
+ *   plus 'select'/'checkbox' when the consent suite will render (it needs
+ *   sp-picker/sp-menu-item/sp-checkbox independent of the configured fields)
  */
 export async function loadSwc(fieldTypes = []) {
   await importOnce(LIT_URL);
@@ -60,20 +62,14 @@ export async function loadSwc(fieldTypes = []) {
   fieldTypes.forEach((type) => (FIELD_MODULE_MAP[type] || []).forEach((m) => modules.add(m)));
 
   const needsRadio = modules.delete('radio');
-  const needsCombobox = modules.delete('combobox');
 
   await Promise.all([...modules].map((m) => importOnce(`${SWC_DIST}/${m}.js`)));
 
   if (needsRadio) nativeRadioAvailable = await tryImportControl('radio', 'sp-radio-group');
-  if (needsCombobox) nativeComboboxAvailable = await tryImportControl('combobox', 'sp-combobox');
 }
 
 export function hasNativeRadio() {
   return nativeRadioAvailable;
-}
-
-export function hasNativeCombobox() {
-  return nativeComboboxAvailable;
 }
 
 /**
