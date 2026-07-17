@@ -533,18 +533,6 @@
 
 /* ── Placeholders ────────────────────────────────────────── */
 
-.sg-sessions-placeholder {
-  padding: var(--s2a-spacing-lg);
-  color: var(--s2a-color-content-subtle);
-  font-size: var(--s2a-font-size-sm);
-}
-
-.sg-full-page-placeholder {
-  padding: var(--s2a-spacing-lg);
-  color: var(--s2a-color-content-subtle);
-  font-size: var(--s2a-font-size-sm);
-}
-
 .sg-error {
   padding: var(--s2a-spacing-md);
   color: var(--s2a-color-content-utility-error);
@@ -808,14 +796,6 @@
   gap: var(--s2a-spacing-xs);
 }
 
-.sg-live-card__track-icon {
-  width: 24px;
-  height: 24px;
-  border-radius: 3px;
-  object-fit: contain;
-  flex-shrink: 0;
-}
-
 .sg-live-card__body {
   flex: 1;
   display: flex;
@@ -903,14 +883,6 @@
 
 .sg-live-card__btn-label {
   display: none;
-}
-
-.sg-live-card__play-icon,
-.sg-live-card__favorite-icon {
-  display: inline-block;
-  width: 20px;
-  height: 20px;
-  flex-shrink: 0;
 }
 
 .sg-live-card__btn--watch {
@@ -1207,32 +1179,11 @@
   margin-bottom: var(--s2a-spacing-md);
 }
 
-/* Mobile variant shown at top */
-.sg-card__track--top {
-  display: flex;
-  align-items: center;
-  gap: var(--s2a-spacing-xs);
-  font-size: var(--s2a-font-size-xs);
-  font-weight: 500;
-  color: var(--s2a-color-gray-900);
-  line-height: 1.33;
-  margin-bottom: var(--s2a-spacing-md);
-}
-
-.sg-card__track-icon {
-  width: 20px;
-  height: 20px;
-  border-radius: 3px;
-  object-fit: contain;
-  flex-shrink: 0;
-}
-
 /* Desktop footer track and badge hidden on mobile */
 .sg-card__track--footer { display: none; }
 .sg-card__footer-badge { display: none; }
 
 .sg-card:hover .sg-card__track { color: var(--s2a-color-gray-900); }
-.sg-card:hover .sg-card__track--top { color: inherit; }
 
 .sg-card__time {
   font-size: var(--s2a-font-size-xs);
@@ -1431,28 +1382,6 @@
   gap: var(--s2a-spacing-md);
 }
 
-.sg-reg-prompt__text {
-  font-size: var(--s2a-font-size-md);
-  color: var(--s2a-color-content-default);
-  margin: 0;
-}
-
-.sg-reg-prompt__btn {
-  height: 40px;
-  padding: 0 var(--s2a-spacing-lg);
-  border-radius: 20px;
-  background: var(--s2a-color-gray-800);
-  color: #fff;
-  border: none;
-  font-family: var(--s2a-font-family-adobe-clean);
-  font-weight: var(--s2a-font-weight-adobe-clean-bold);
-  font-size: var(--s2a-font-size-sm);
-  cursor: pointer;
-  transition: opacity 0.15s;
-}
-
-.sg-reg-prompt__btn:hover { opacity: 0.85; }
-
 /* ── Tablet (min-width: 768px) ───────────────────────────────────────────── */
 
 @media (min-width: 768px) {
@@ -1633,11 +1562,6 @@
   }
 
   .sg-live-card__track-row { gap: var(--s2a-spacing-xs); }
-
-  .sg-live-card__track-icon {
-    width: 24px;
-    height: 24px;
-  }
 
   .sg-live-card__track {
     font-size: var(--s2a-font-size-sm);
@@ -1823,11 +1747,6 @@
   }
 
   .sg-live-card__track-row { gap: 6px; }
-
-  .sg-live-card__track-icon {
-    width: 24px;
-    height: 24px;
-  }
 
   .sg-live-card__track {
     font-size: var(--s2a-font-size-sm);
@@ -2135,11 +2054,6 @@
 
   .sg-live-card__track-row { gap: 6px; }
 
-  .sg-live-card__track-icon {
-    width: 24px;
-    height: 24px;
-  }
-
   .sg-live-card__track {
     font-size: var(--s2a-font-size-sm);
     font-weight: 500;
@@ -2444,12 +2358,6 @@
 
   /* Mobile variant hidden on desktop */
   .sg-card__badge-row { display: none; }
-  .sg-card__track--top { display: none; }
-
-  .sg-card__track-icon {
-    width: 16px;
-    height: 16px;
-  }
 
   /* Desktop footer: category badge replaces plain track text */
   .sg-card__track--footer { display: none; }
@@ -2636,7 +2544,6 @@
 
 /* ── Pending state — muted action buttons ────────────────────── */
 
-.sg-card__btn--loading,
 .sg-live-card__btn.is-pending {
   opacity: 0.5;
   pointer-events: none;
@@ -2670,34 +2577,6 @@
 .sg-full-page__body {
   flex: 1;
   padding: var(--s2a-spacing-lg) 0;
-}
-
-/* ── My Sessions header layout ───────────────────────────────── */
-
-.sg-sub-tabs {
-  display: flex;
-  gap: var(--s2a-spacing-lg);
-  padding: 0 var(--s2a-spacing-lg);
-  background: var(--s2a-color-background-default);
-  border-bottom: 1px solid var(--s2a-color-border-subtle);
-}
-
-.sg-sub-tab {
-  height: 44px;
-  border: none;
-  background: transparent;
-  font-family: var(--s2a-font-family-adobe-clean);
-  font-weight: var(--s2a-font-weight-adobe-clean-bold);
-  font-size: var(--s2a-font-size-sm);
-  color: var(--s2a-color-content-subtle);
-  border-bottom: 3px solid transparent;
-  cursor: pointer;
-  margin-bottom: -1px;
-}
-
-.sg-sub-tab--active {
-  color: var(--s2a-color-content-default);
-  border-bottom-color: var(--s2a-color-content-default);
 }
 
 /* ── Track section (On Demand) ───────────────────────────────── */

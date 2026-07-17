@@ -2,6 +2,9 @@
 // needs it and utils/ shouldn't reach back into this block's directory. Re-exported here
 // so existing call sites in this block don't need to change their import path.
 export { getNowMs } from '../../../utils/session-state.js';
+// Shared with features/conflict-modal/conflict-modal.js, which can't depend on a
+// block-scoped util — same re-export reasoning as getNowMs above.
+export { formatDuration } from '../../../utils/date-time-helper.js';
 
 export function detectUserTimezone() {
   try {
@@ -79,15 +82,6 @@ export function isSessionOnDemand(session, nowMs) {
 
 export function allSessionsEnded(sessions, nowMs) {
   return sessions.length > 0 && sessions.every((s) => nowMs > Date.parse(s.endTimeUtc));
-}
-
-export function formatDuration(startUtc, endUtc) {
-  const totalMin = Math.round((Date.parse(endUtc) - Date.parse(startUtc)) / 60000);
-  const h = Math.floor(totalMin / 60);
-  const m = totalMin % 60;
-  if (h === 0) return `${m} min`;
-  if (m === 0) return `${h} hr`;
-  return `${h} hr ${m} min`;
 }
 
 // Returns null for a session with no valid startTimeUtc, so callers comparing against a

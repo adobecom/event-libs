@@ -813,7 +813,7 @@ Tests mirror `test/unit/blocks/sessions-guide/`. Coverage status to be assessed 
   - (or gate behind `?sgDev=true`)
 - Wire real API calls in `event-libs/v1/services/sessions/rainfocus.js` (replace mock stubs with FEDS token + IMS userId)
 - Wire real API call in `event-libs/v1/services/sessions/mobile-rider.js`
-- Wire real API call in `event-libs/v1/services/sessions/sessions-api.js` (replace `MOCK_SESSIONS` with actual endpoint)
+- ✅ `event-libs/v1/services/sessions/sessions-api.js` wired to the real ESL/ESP catalog endpoint (`fetchEslSessions`/`mapEslPayloadToRawSessions`); `MOCK_SESSIONS` remains only as the no-`event-id` fallback
 - Confirm FEDS event name `feds.data.authToken.loaded` and attribute path `window.feds.data.authToken` against live integration
 - PR description references MWPW-194331 and includes testing notes for widget and full-page surfaces
 
@@ -880,7 +880,7 @@ event-libs/v1/features/           # SHARED, non-block reusable rendering logic �
     conflict-modal.css           # .sg-modal-backdrop / .sg-conflict-modal* rules, co-located, loaded the same way
 
 event-libs/v1/services/sessions/  # SHARED service layer (moved out of this block)
-  sessions-api.js                 # fetchSessions — mocked with MOCK_SESSIONS; includes MOCK_FEATURED_IDS
+  sessions-api.js                 # fetchSessions — real ESL/ESP endpoint, falls back to MOCK_SESSIONS with no event-id
   rainfocus.js                    # stub: fetchScheduled, fetchFavorited, addSession, removeSession, toggleSessionInterest
   mobile-rider.js                 # stub: fetchLiveStatus (returns all-inactive)
   poller.js                       # startPolling, stopPolling — takes a plain onUpdate callback, no dispatch coupling

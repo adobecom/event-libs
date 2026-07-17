@@ -14,6 +14,19 @@ export function applyLocaleFormat(hours, minutes, locale) {
   return new Intl.DateTimeFormat(locale, DEFAULT_TIME_FORMAT_OPTIONS).format(date);
 }
 
+// Shared duration formatter — `short: true` gives compact units ("1h 30m") for tight
+// UI spaces (cards, modals); the default ("1 hr 30 min") suits looser layouts.
+export function formatDuration(startUtc, endUtc, { short = false } = {}) {
+  const totalMin = Math.round((Date.parse(endUtc) - Date.parse(startUtc)) / 60000);
+  const h = Math.floor(totalMin / 60);
+  const m = totalMin % 60;
+  const hUnit = short ? 'h' : ' hr';
+  const mUnit = short ? 'm' : ' min';
+  if (h === 0) return `${m}${mUnit}`;
+  if (m === 0) return `${h}${hUnit}`;
+  return `${h}${hUnit} ${m}${mUnit}`;
+}
+
 /**
  * Converts a UTC timestamp (in milliseconds) to a user-friendly local date time string.
  * The output is DST sensitive and follows locale format without localization.

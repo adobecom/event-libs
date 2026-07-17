@@ -1,6 +1,6 @@
 import { html } from '../../../deps/htm-preact.js';
 import { useSessionGuide } from '../store/index.js';
-import { formatShortTime, getNowMs } from '../utils/time.js';
+import { formatShortTime, formatDuration, getNowMs } from '../utils/time.js';
 import { deriveSessionState } from '../../../utils/session-state.js';
 import {
   scheduled, favorited, pendingActions, liveStreamActiveIds,
@@ -10,13 +10,6 @@ import { IconPlay, IconCalendarCheck, IconCalendarPlus, IconHeartFilled, IconHea
 import { setSessionParam, safeUrl } from '../utils/url.js';
 import { CategoryBadge } from './CategoryBadge.js';
 import { getTrackIcon } from '../../../utils/track-icon-config.js';
-
-function formatDuration(ms) {
-  const h = Math.floor(ms / 3600000);
-  const m = Math.floor((ms % 3600000) / 60000);
-  if (h > 0 && m >= 0) return `${h}h ${m}m`;
-  return `${m}m`;
-}
 
 export const buildLiveCard = () => LiveCard;
 
@@ -37,7 +30,9 @@ export function LiveCard({ session, variant = 'live' }) {
   const duration = endMs - startMs;
   const elapsed = Math.min(Math.max(nowMs - startMs, 0), duration);
   const progressPct = duration > 0 ? Math.round((elapsed / duration) * 100) : 0;
-  const durationLabel = duration >= 0 ? formatDuration(duration) : '';
+  const durationLabel = duration >= 0
+    ? formatDuration(session.startTimeUtc, session.endTimeUtc, { short: true })
+    : '';
 
   const trackColor = getTrackIcon(session.track)?.color || '';
   const startTime = formatShortTime(session.startTimeUtc, userTz);

@@ -1,77 +1,29 @@
-import { html, useState, useRef, useLayoutEffect } from '../../../deps/htm-preact.js';
+import { html } from '../../../deps/htm-preact.js';
 import { useSessionGuide } from '../store/index.js';
 import {
   scheduled as scheduledSignal, favorited as favoritedSignal,
 } from '../../../utils/session-store.js';
 import { formatShortTime, formatTimezoneAbbr } from '../utils/time.js';
 import { SessionCard } from './SessionCard.js';
+import { useCarouselRow } from '../utils/use-carousel-row.js';
 
 export const buildTimeSlotRow = () => TimeSlotRow;
 
 export function TimeSlotRow({ sessions, forceOnDemand = false }) {
   const { state } = useSessionGuide();
-  const { eventConfig, dismissingIds: rawDismissing } = state;
+  const { eventConfig } = state;
   const scheduled = scheduledSignal.value;
   const favorited = favoritedSignal.value;
   const userTz = eventConfig.userTz;
-  const dismissingIds = rawDismissing || new Set();
-  const allDismissing = sessions?.every((s) => dismissingIds.has(s.id)) || false;
 
   // Encodes scheduled/favorited state of every card in this row.
   // Changes value whenever a card gains or loses a state that widens it,
   // so useLayoutEffect re-measures with the actual post-layout card widths.
   const cardStateKey = sessions?.map((s) => (scheduled.has(s.id) ? 1 : 0) + (favorited.has(s.id) ? 2 : 0)).join('') || '';
 
-  const [offset, setOffset] = useState(0);
-  const [{ tx, showNext }, setMeasure] = useState({ tx: 0, showNext: false });
-  const stripRef = useRef(null);
-  const viewportRef = useRef(null);
-  const rowRef = useRef(null);
-  const rowHeightRef = useRef(0);
-  const collapsingRef = useRef(false);
-
-  // Runs after every render. When the row is not collapsing, keep rowHeightRef
-  // current so we always have the real height ready when a collapse starts.
-  // When collapsing begins, pin max-height to that captured value then animate
-  // to 0 — this makes the transition start from the actual height instead of
-  // the 600px CSS baseline, so the vertical slide syncs with the card collapse.
-  useLayoutEffect(() => {
-    const row = rowRef.current;
-    if (!row) return;
-    if (!allDismissing) {
-      rowHeightRef.current = row.offsetHeight;
-      collapsingRef.current = false;
-      row.style.maxHeight = '';
-    } else if (!collapsingRef.current) {
-      collapsingRef.current = true;
-      const h = rowHeightRef.current || row.scrollHeight;
-      row.style.maxHeight = `${h}px`;
-      // eslint-disable-next-line no-unused-expressions
-      row.offsetHeight; // force reflow so transition starts from h, not 600px
-      row.style.maxHeight = '0px';
-    }
-  });
-
-  useLayoutEffect(() => {
-    const strip = stripRef.current;
-    const viewport = viewportRef.current;
-    if (!strip || !viewport) return;
-    const cards = [...strip.children];
-    if (!cards.length) return;
-    const gap = parseFloat(getComputedStyle(strip).columnGap) || 0;
-    let newTx = 0;
-    let totalWidth = 0;
-    cards.forEach((card, i) => {
-      const w = card.offsetWidth;
-      if (i < offset) newTx += w + gap;
-      totalWidth += w + (i < cards.length - 1 ? gap : 0);
-    });
-    // Reserve room for the last card's hover-expanded width (427px per .sg-card:hover)
-    // so its action buttons stay reachable when the viewport is tight.
-    const HOVER_CARD_WIDTH = 427;
-    const effectiveTotal = totalWidth - cards[cards.length - 1].offsetWidth + HOVER_CARD_WIDTH;
-    setMeasure({ tx: newTx, showNext: effectiveTotal - newTx > viewport.offsetWidth + 1 });
-  }, [offset, cardStateKey]);
+  const {
+    dismissingIds, allDismissing, offset, setOffset, tx, showNext, stripRef, viewportRef, rowRef,
+  } = useCarouselRow(sessions, cardStateKey);
 
   if (!sessions || !sessions.length) return null;
 

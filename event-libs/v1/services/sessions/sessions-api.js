@@ -2,19 +2,10 @@ import { constructRequestOptions } from '../../utils/esp-controller.js';
 import { getEventServiceEnv } from '../../utils/utils.js';
 import { ENV_MAP } from '../../utils/constances.js';
 
-// Swap to a real photo for visual testing of the speaker details view.
+// Fallback speaker photo — real ESL data has no photo field yet (see
+// mapEslPayloadToRawSessions(), which sets photo: null), so this fills the gap for
+// visual testing of the speaker details view without ever overwriting a real one.
 const TEST_SPEAKER_PHOTO = 'https://MWPW-199065--event-libs--adobecom.aem.live/event-libs/v1/blocks/sessions-guide/assets/Kristy-Campbell.jpg';
-
-// Adobe MAX 2026 — November 10–12, Los Angeles (PST = UTC−8)
-export const MOCK_EVENT_DAYS = ['2026-11-10', '2026-11-11', '2026-11-12'];
-
-// Featured session IDs surfaced in the live carousel when nothing is currently live.
-// Covers all three days so the right ones are shown per active day.
-export const MOCK_FEATURED_IDS = [
-  'k-001', 's-007', 's-001',    // Day 1: opening keynote, design systems, AI workflows
-  's-009', 's-010', 's-022',    // Day 2: trends keynote, Express for teams, AE expressions
-  's-012', 's-030', 's-013',    // Day 3: closing keynote, design tokens, motion graphics
-];
 
 const MOCK_SESSIONS = [
   // ─── DAY 1 (NOV 10) ──────────────────────────────────────────────────────
@@ -641,7 +632,7 @@ export function normalizeSessions(rawSessions) {
     category: coerceArray(s.category),
     contentCategory: coerceArray(s.contentCategory),
     audience: coerceArray(s.audience),
-    speakers: (s.speakers || []).map((sp) => ({ ...sp, photo: TEST_SPEAKER_PHOTO })),
+    speakers: (s.speakers || []).map((sp) => ({ ...sp, photo: sp.photo || TEST_SPEAKER_PHOTO })),
     products: s.products || [],
     resources: s.resources || [],
     mrStreamId: s.mrStreamId ?? null,
