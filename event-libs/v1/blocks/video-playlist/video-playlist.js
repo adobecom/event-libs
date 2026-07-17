@@ -378,6 +378,10 @@ class VideoPlaylist {
     this.disposers.push(() => button.removeEventListener('click', onClick));
 
     this.playlistToggleBtn = button;
+    // The player is initialized before this button exists (to catch early
+    // autoplay), so onPlay() may already have set this.hasPlayed by now —
+    // re-apply visibility immediately instead of waiting for the next event.
+    this.updateToggleVisibility();
     return button;
   }
 
