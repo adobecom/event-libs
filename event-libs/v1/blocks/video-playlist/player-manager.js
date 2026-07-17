@@ -97,6 +97,21 @@ export class PlayerManager {
     window.addEventListener('message', this.boundMessageHandler);
     this.setupYouTubeHook();
     this.watchMpcPlayingState();
+    this.scheduleOnPlayFallback();
+  }
+
+  /**
+   * Message/state-based play detection depends on postMessage/YT-state contracts
+   * we can't fully verify live, and both have already proven unreliable across
+   * refreshes. As a robust fallback, fire onPlay unconditionally shortly after
+   * the player mounts — with autoplay enabled, the video is playing well within
+   * this window in the overwhelming majority of cases. Harmless if one of the
+   * event-based paths already fired onPlay earlier (idempotent).
+   */
+  scheduleOnPlayFallback() {
+    if (typeof this.onPlay !== 'function') return;
+    const timer = setTimeout(() => this.onPlay(), 2000);
+    this.cleanupFns.push(() => clearTimeout(timer));
   }
 
   /**
