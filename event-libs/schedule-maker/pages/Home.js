@@ -84,7 +84,7 @@ export default function Home() {
                 onInput=${handleSearch} \
                 className="sm-home__schedules-search" \
               />
-              <sp-action-button onClick=${syncSchedules} title="Scan DA documents to sync active/draft status and discover new schedules">
+              <sp-action-button onClick=${syncSchedules} title="Scan DA documents to find schedule links">
                 Sync
               </sp-action-button>
             </div>
