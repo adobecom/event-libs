@@ -171,7 +171,8 @@ class VideoPlaylist {
       this.cfg = this.parseCfg();
       this.root = this.createRoot();
       this.el.appendChild(this.root);
-      this.relocateVideoWrapper();
+      this.videoWrapperPromise = this.relocateVideoWrapper();
+      this.videoWrapperPromise.then((wrapper) => { this.videoWrapper = wrapper; });
       await this.loadAndRender();
       this.initPlayerManager();
     } catch (err) {
@@ -199,25 +200,25 @@ class VideoPlaylist {
         if (child !== valueDiv) child.remove();
       });
       this.root.appendChild(wrapper);
+      return wrapper;
     };
 
     const existing = findWrapper();
-    if (existing) {
-      relocate(existing);
-      return;
-    }
+    if (existing) return Promise.resolve(relocate(existing));
 
     // Milo decorates the authored video link into .milo-video asynchronously
     // (YouTube in particular does async setup), so it may not exist yet at this
     // point. Watch for it instead of silently giving up.
-    const observer = new MutationObserver(() => {
-      const wrapper = findWrapper();
-      if (!wrapper) return;
-      observer.disconnect();
-      relocate(wrapper);
+    return new Promise((resolve) => {
+      const observer = new MutationObserver(() => {
+        const wrapper = findWrapper();
+        if (!wrapper) return;
+        observer.disconnect();
+        resolve(relocate(wrapper));
+      });
+      observer.observe(this.el, { childList: true, subtree: true });
+      this.disposers.push(() => observer.disconnect());
     });
-    observer.observe(this.el, { childList: true, subtree: true });
-    this.disposers.push(() => observer.disconnect());
   }
 
   cleanup() {
@@ -330,7 +331,12 @@ class VideoPlaylist {
     const header = await this.renderHeader();
     const sessions = this.renderSessions(cards);
     this.drawer = this.renderPlaylistDrawer(header, sessions);
-    this.root.appendChild(this.renderPlaylistToggle());
+    const toggle = this.renderPlaylistToggle();
+    // Append into .container as a fallback (so the button always exists even if
+    // there's no video on the page), then move it into the video wrapper once
+    // relocateVideoWrapper() resolves, so it's scoped/positioned to the video.
+    this.root.appendChild(toggle);
+    this.videoWrapperPromise.then((wrapper) => wrapper.appendChild(toggle));
     this.root.appendChild(this.drawer);
 
     // 3. Initialize Favorites Manager (only if enabled AND user is registered)
@@ -370,6 +376,14 @@ class VideoPlaylist {
 
     this.playlistToggleBtn = button;
     return button;
+  }
+
+  /**
+   * The toggle stays hidden until playback actually starts — before that,
+   * there's nothing playing alongside the drawer to make room for.
+   */
+  showPlaylistToggle() {
+    this.playlistToggleBtn?.classList.add('is-visible');
   }
 
   renderPlaylistDrawer(header, sessions) {
@@ -571,6 +585,7 @@ class VideoPlaylist {
       navigateTo: (href) => {
         window.location.href = href;
       },
+      onPlay: () => this.showPlaylistToggle(),
     });
     this.playerManager.bootstrap();
   }

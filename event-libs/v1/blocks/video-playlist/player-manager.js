@@ -24,11 +24,13 @@ export class PlayerManager {
     updateProgressBar,
     getCards,
     navigateTo,
+    onPlay,
   }) {
     this.highlightSession = highlightSession;
     this.updateProgressBar = updateProgressBar;
     this.getCards = getCards;
     this.navigateTo = navigateTo;
+    this.onPlay = onPlay;
 
     this.videoContainer = null;
     this.progressInterval = null;
@@ -145,6 +147,7 @@ export class PlayerManager {
         ? 0
         : current?.secondsWatched || 0;
     startVideoFromSecond(this.videoContainer, start);
+    if (typeof this.onPlay === 'function') this.onPlay();
   }
 
   handleComplete(videoId) {
@@ -313,6 +316,7 @@ export class PlayerManager {
     const { PlayerState } = window.YT;
     if (event.data === PlayerState.PLAYING) {
       this.startYT(event.target, videoId);
+      if (typeof this.onPlay === 'function') this.onPlay();
     } else if (
       event.data === PlayerState.PAUSED ||
       event.data === PlayerState.BUFFERING

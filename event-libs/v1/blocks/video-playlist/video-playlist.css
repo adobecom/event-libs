@@ -23,6 +23,14 @@
   width: 100%;
 }
 
+/* Video wrapper is a flex item that shrinks to make room for the drawer,
+   and the positioning context for the (video-scoped) playlist toggle button. */
+.video-playlist .container > div:first-child {
+  position: relative;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
 /* Full-width breakout: the whole block (video + container) escapes the Milo grid,
    leaving a fixed 24px gutter on each side regardless of viewport. */
 .video-playlist {
@@ -136,7 +144,8 @@
   color: var(--text-color);
   margin: 0;
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
+  align-items: stretch;
   position: relative;
   border-radius: 16px;
   overflow: hidden;
@@ -174,8 +183,10 @@
   background: none;
 }
 
-/* Playlist overlay: toggle button + drawer, anchored over the video */
+/* Playlist toggle: scoped to the video wrapper (its positioning context), stays
+   hidden until playback actually starts (see showPlaylistToggle() in JS). */
 .video-playlist .playlist-toggle {
+  display: none;
   position: absolute;
   top: 16px;
   right: 16px;
@@ -190,23 +201,33 @@
   cursor: pointer;
 }
 
+.video-playlist .playlist-toggle.is-visible {
+  display: inline-flex;
+  align-items: center;
+}
+
+/* Playlist drawer: a docked side panel that shares space with the video (flex
+   row in .container) instead of overlaying on top of it. Collapsed to 0 width
+   by default; expanding animates both the drawer sliding in and the video
+   shrinking to make room, since they're adjacent flex items. */
 .video-playlist .playlist-drawer {
-  display: none;
-  position: absolute;
-  top: 0;
-  right: 0;
-  z-index: 3;
-  width: 360px;
-  max-width: calc(100% - 32px);
+  position: relative;
+  z-index: 1;
+  flex: 0 0 0;
+  width: 0;
   max-height: 100%;
+  overflow: hidden;
   overflow-y: auto;
+  display: flex;
   flex-direction: column;
   background: var(--header-background-color);
   box-shadow: -2px 0 12px 0 rgb(0 0 0 / 40%);
+  transition: flex-basis 0.3s ease, width 0.3s ease;
 }
 
 .video-playlist .playlist-drawer.is-open {
-  display: flex;
+  flex: 0 0 360px;
+  width: 360px;
 }
 
 .video-playlist .playlist-drawer-close {
