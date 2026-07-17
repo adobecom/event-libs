@@ -22,29 +22,39 @@ function extractSymbols(svgText) {
   return icons;
 }
 
+async function fetchMiloIcons(miloLibs) {
+  try {
+    const { fetchIcons } = await import(`${miloLibs}/features/icons/icons.js`);
+    return await fetchIcons({ miloLibs });
+  } catch (err) {
+    window.lana?.log(`[icon-resolver] failed to load Milo icons: ${err.message}`);
+    return {};
+  }
+}
+
 function loadMiloIcons() {
   if (!miloIconsPromise) {
     const miloLibs = getEventConfig()?.miloConfig?.miloLibs || LIBS;
-    miloIconsPromise = import(`${miloLibs}/features/icons/icons.js`)
-      .then(({ fetchIcons }) => fetchIcons({ miloLibs }))
-      .catch((err) => {
-        window.lana?.log(`[icon-resolver] failed to load Milo icons: ${err.message}`);
-        return {};
-      });
+    miloIconsPromise = fetchMiloIcons(miloLibs);
   }
   return miloIconsPromise;
 }
 
+async function fetchOwnIcons() {
+  const spriteUrl = new URL('./track-icons.svg', import.meta.url).href;
+  try {
+    const resp = await fetch(spriteUrl);
+    const svgText = resp.ok ? await resp.text() : '';
+    return extractSymbols(svgText);
+  } catch (err) {
+    window.lana?.log(`[icon-resolver] failed to load track-icons.svg: ${err.message}`);
+    return {};
+  }
+}
+
 function loadOwnIcons() {
   if (!ownIconsPromise) {
-    const spriteUrl = new URL('./track-icons.svg', import.meta.url).href;
-    ownIconsPromise = fetch(spriteUrl)
-      .then((resp) => (resp.ok ? resp.text() : ''))
-      .then(extractSymbols)
-      .catch((err) => {
-        window.lana?.log(`[icon-resolver] failed to load track-icons.svg: ${err.message}`);
-        return {};
-      });
+    ownIconsPromise = fetchOwnIcons();
   }
   return ownIconsPromise;
 }

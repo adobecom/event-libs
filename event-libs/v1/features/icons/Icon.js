@@ -6,12 +6,13 @@ export function Icon({ name, size = 20, className = '' }) {
 
   useEffect(() => {
     let cancelled = false;
-    resolveIcon(name).then((svg) => {
+    (async () => {
+      const svg = await resolveIcon(name);
       if (cancelled || !svg || !ref.current) return;
       svg.setAttribute('width', size);
       svg.setAttribute('height', size);
       ref.current.replaceChildren(svg);
-    });
+    })();
     return () => { cancelled = true; };
   }, [name, size]);
 
