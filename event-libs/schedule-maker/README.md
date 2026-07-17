@@ -89,7 +89,7 @@ Sync is a **read-only scan** that discovers schedule links authored in DA docume
 1. Recursively `list` all HTML docs under the event folder.
 2. Fetch + regex-scan every doc **in parallel** (bounded at `SCAN_CONCURRENCY = 100`), collecting every `?schedule=` and `#schedule=` link found.
 3. Decode each link's base64 payload using `decodeScheduleParam`.
-4. Deduplicate by `scheduleId` (falling back to `title` for old no-id links). First occurrence per key wins.
+4. Deduplicate by `scheduleId`. First occurrence per key wins.
 5. Return `{ schedules, docRefs }` — `docRefs` maps each schedule key to the list of doc paths that reference it, shown as DA edit links in the sidebar.
 
 No sheets are written. Sync only reads.
