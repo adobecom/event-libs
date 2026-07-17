@@ -232,15 +232,29 @@
 
 .video-playlist .playlist-drawer-close {
   position: absolute;
-  top: 12px;
-  right: 12px;
-  z-index: 1;
+  top: 10px;
+  right: 10px;
+  /* Must exceed .consonant-switch-input's z-index (1) — neither .header nor
+     .consonant-switch establish their own stacking context (position:relative
+     without a z-index), so that invisible, full-size switch hit-target competes
+     directly with this button for clicks in the same effective stacking context. */
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
   border: none;
-  background: transparent;
+  border-radius: 50%;
+  background: rgb(0 0 0 / 40%);
   color: var(--text-color);
   font-size: 16px;
   line-height: 1;
   cursor: pointer;
+}
+
+.video-playlist .playlist-drawer-close:hover {
+  background: rgb(0 0 0 / 60%);
 }
 
 /* Header Styles */

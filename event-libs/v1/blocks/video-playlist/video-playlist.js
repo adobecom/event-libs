@@ -386,7 +386,18 @@ class VideoPlaylist {
    * there's nothing playing alongside the drawer to make room for.
    */
   showPlaylistToggle() {
-    this.playlistToggleBtn?.classList.add('is-visible');
+    this.hasPlayed = true;
+    this.updateToggleVisibility();
+  }
+
+  /**
+   * The toggle is only ever shown once playback has started AND the drawer
+   * itself isn't already open (no point offering to open what's already open).
+   */
+  updateToggleVisibility() {
+    if (!this.playlistToggleBtn) return;
+    const isOpen = this.drawer?.classList.contains('is-open');
+    this.playlistToggleBtn.classList.toggle('is-visible', !!this.hasPlayed && !isOpen);
   }
 
   renderPlaylistDrawer(header, sessions) {
@@ -417,6 +428,7 @@ class VideoPlaylist {
     const nextOpen = typeof forceOpen === 'boolean' ? forceOpen : !this.drawer.classList.contains('is-open');
     this.drawer.classList.toggle('is-open', nextOpen);
     this.playlistToggleBtn.setAttribute('aria-expanded', String(nextOpen));
+    this.updateToggleVisibility();
 
     if (nextOpen) {
       saveShouldAutoPlayToLocalStorage(true);
