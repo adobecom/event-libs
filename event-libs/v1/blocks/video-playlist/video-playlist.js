@@ -173,8 +173,11 @@ class VideoPlaylist {
       this.el.appendChild(this.root);
       this.videoWrapperPromise = this.relocateVideoWrapper();
       this.videoWrapperPromise.then((wrapper) => { this.videoWrapper = wrapper; });
-      await this.loadAndRender();
+      // Bootstrap the player listener before fetching playlist cards: the embedded
+      // video (autoplay: true) can start playing immediately, independent of that
+      // fetch, so waiting on it risks missing the initial load/play event entirely.
       this.initPlayerManager();
+      await this.loadAndRender();
     } catch (err) {
       logError(err, 'VideoPlaylist.init');
       this.root?.classList.remove('is-hidden');
