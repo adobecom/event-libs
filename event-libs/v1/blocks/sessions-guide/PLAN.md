@@ -305,7 +305,7 @@ The live→on-demand auto-transition (`allEnded || pastManualCutoff` while `acti
 ### 0.3 Data layer ✅ (mocked)
 All service files exist and export the correct API surface; all currently return mock data. They live in `event-libs/v1/services/sessions/` (promoted out of this block so the shared `session-store.js` — which owns fetching/polling/mutations — doesn't have to import from inside another block's folder):
 
-**`services/sessions/sessions-api.js`** — `fetchSessions(apiUrl)` returns `normalizeSessions(MOCK_SESSIONS)`. `MOCK_SESSIONS` is a 30-session catalog covering Adobe MAX 2026 Nov 10–12. TODO: replace with real API call.
+**`services/sessions/sessions-api.js`** — ✅ wired to the real ESL/ESP endpoint (`fetchEslSessions`/`mapEslPayloadToRawSessions`); `fetchSessions(eventId)` falls back to `normalizeSessions(mapEslPayloadToRawSessions(MOCK_ESL_PAYLOAD))` only when no `eventId` is given. `MOCK_ESL_PAYLOAD` is a 15-session raw-ESL-shaped catalog covering Adobe MAX 2026 Nov 10–12, piped through the same mapping pipeline as real data so it can't structurally drift.
 
 **`services/sessions/rainfocus.js`** — stub implementations returning mock data:
 - `fetchScheduled()` → `['session-1', 'session-3']`
@@ -813,7 +813,7 @@ Tests mirror `test/unit/blocks/sessions-guide/`. Coverage status to be assessed 
   - (or gate behind `?sgDev=true`)
 - Wire real API calls in `event-libs/v1/services/sessions/rainfocus.js` (replace mock stubs with FEDS token + IMS userId)
 - Wire real API call in `event-libs/v1/services/sessions/mobile-rider.js`
-- ✅ `event-libs/v1/services/sessions/sessions-api.js` wired to the real ESL/ESP catalog endpoint (`fetchEslSessions`/`mapEslPayloadToRawSessions`); `MOCK_SESSIONS` remains only as the no-`event-id` fallback
+- ✅ `event-libs/v1/services/sessions/sessions-api.js` wired to the real ESL/ESP catalog endpoint (`fetchEslSessions`/`mapEslPayloadToRawSessions`); `MOCK_ESL_PAYLOAD` remains only as the no-`event-id` fallback
 - Confirm FEDS event name `feds.data.authToken.loaded` and attribute path `window.feds.data.authToken` against live integration
 - PR description references MWPW-194331 and includes testing notes for widget and full-page surfaces
 
@@ -849,7 +849,7 @@ Phase 15 (PR Readiness) ⬜ — final gate
 | `isRegistered` source wiring | Wired via `BlockMediator.get('rsvpData').registered` inside `session-store.js`'s `syncAuth()`; dev state via `sg:dev-auth` localStorage; production wiring blocked on real Rainfocus integration |
 | Real Rainfocus API calls not wired | All RF service methods are stubs; `null` credentials passed in `services/sessions/session-actions.js`; must replace before shipping |
 | Real Mobile Rider API not wired | `fetchLiveStatus` returns all-inactive mock; polling runs but no live sessions will appear |
-| Real sessions API not wired | `MOCK_SESSIONS` used; replace `fetchSessions` with real endpoint before shipping |
+| Real sessions API | ✅ wired (`fetchEslSessions`/`mapEslPayloadToRawSessions`); `MOCK_ESL_PAYLOAD` used only when no `eventId` is present |
 | Dev scaffolding (`seedDevData()` in `session-store.js`) in production path | `TODO` comments present; must remove or gate before PR — now runs page-wide via `decorateEvent`, not just for this block, so removal affects any page with `rainfocus-api-url` metadata |
 | 30 s polling causes excessive re-renders | Preact diffing handles; `useMemo` guards in view components on filter-derived lists |
 | RF pessimistic mutations feel slow | `pendingActions` Set + `is-pending` class on buttons covers perceived latency; error toast on failure |
@@ -880,7 +880,7 @@ event-libs/v1/features/           # SHARED, non-block reusable rendering logic �
     conflict-modal.css           # .sg-modal-backdrop / .sg-conflict-modal* rules, co-located, loaded the same way
 
 event-libs/v1/services/sessions/  # SHARED service layer (moved out of this block)
-  sessions-api.js                 # fetchSessions — real ESL/ESP endpoint, falls back to MOCK_SESSIONS with no event-id
+  sessions-api.js                 # fetchSessions — real ESL/ESP endpoint, falls back to MOCK_ESL_PAYLOAD with no event-id
   rainfocus.js                    # stub: fetchScheduled, fetchFavorited, addSession, removeSession, toggleSessionInterest
   mobile-rider.js                 # stub: fetchLiveStatus (returns all-inactive)
   poller.js                       # startPolling, stopPolling — takes a plain onUpdate callback, no dispatch coupling

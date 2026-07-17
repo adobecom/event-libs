@@ -105,7 +105,7 @@ Credentials needed per call: `rfAuthToken` (from FEDS/IMS), `clientId` (IMS user
 
 `fetchSessions(eventId)` now calls the real ESL/ESP catalog endpoint
 (`GET {serviceApiEndpoints.esp}/v1/events/{eventId}/sessions`) via `fetchEslSessions()` +
-`mapEslPayloadToRawSessions()`, and only falls back to `MOCK_SESSIONS` when `eventId` is
+`mapEslPayloadToRawSessions()`, and only falls back to `MOCK_ESL_PAYLOAD` when `eventId` is
 falsy. `event-id` metadata is read in `session-store.js`'s `initSessionState()` and passed
 through — **no further code change needed here**; this activates automatically once a page
 authors real `event-id` metadata (today, per item 3's note, `event-id` is already present
