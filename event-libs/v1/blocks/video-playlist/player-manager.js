@@ -96,6 +96,35 @@ export class PlayerManager {
     window.removeEventListener('message', this.boundMessageHandler);
     window.addEventListener('message', this.boundMessageHandler);
     this.setupYouTubeHook();
+    this.watchMpcPlayingState();
+  }
+
+  /**
+   * Our own message listener has to win a race against the Adobe TV iframe's
+   * own script on every page load (worse with caching, which speeds up the
+   * iframe unpredictably relative to our JS) — so the "load" message can be
+   * missed intermittently. Milo's own adobetv.js already tracks play state
+   * independently via a data-playing attribute, set by a listener it registers
+   * at iframe-creation time (structurally earlier than ours). Watch that
+   * instead, checking the current value immediately in case it's already set.
+   */
+  watchMpcPlayingState() {
+    const iframe = qs('iframe', this.videoContainer);
+    if (!iframe || typeof this.onPlay !== 'function') return;
+
+    const checkPlaying = () => {
+      if (iframe.getAttribute('data-playing') !== 'true') return false;
+      this.onPlay();
+      return true;
+    };
+
+    if (checkPlaying()) return;
+
+    const observer = new MutationObserver(() => {
+      if (checkPlaying()) observer.disconnect();
+    });
+    observer.observe(iframe, { attributes: true, attributeFilter: ['data-playing'] });
+    this.cleanupFns.push(() => observer.disconnect());
   }
 
   highlightCurrentSession() {
