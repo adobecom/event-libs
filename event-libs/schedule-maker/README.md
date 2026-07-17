@@ -1,6 +1,6 @@
 # Schedule Maker
 
-Schedule Maker is a standalone [Document Authoring (DA)](https://da.live) app for building and managing **page schedules** — named collections of timestamped content blocks that drive the [Timing Framework](../v1/features/timing-framework/README.md) on event pages. It runs full-screen inside DA (`da.live/app/{org}/{repo}/schedule-maker`), authenticates through the DA SDK, and persists all data directly to DA sheets on the content repo. There is no build step and no backend of its own.
+Schedule Maker is a standalone [Document Authoring (DA)](https://da.live) app for building and managing **page schedules** — named collections of timestamped content blocks that drive the [Timing Framework](../v1/features/timing-framework/README.md) on event pages. It runs full-screen inside DA (`da.live/app/{org}/{repo}/tools/da-apps/schedule-maker`), authenticates through the DA SDK, and uses a **link-first** model: all schedule data lives in the shared URL — no server-side sheets are written.
 
 ## Architecture Overview
 
@@ -9,7 +9,7 @@ Schedule Maker is a standalone [Document Authoring (DA)](https://da.live) app fo
 - **Preact + HTM** via `../../v1/deps/htm-preact.js` — components are tagged-template literals (`` html`...` ``), no JSX, no bundler.
 - **Spectrum Web Components** — loaded at runtime from Milo libs (`sp-button`, `sp-textfield`, `sp-toast`, etc.).
 - **DA SDK** (`https://da.live/nx/utils/sdk.js`) — supplies the auth token and the `{ org, repo }` context that scopes every instance to one content namespace.
-- **admin.da.live API** — the only persistence/query surface: `list` (folders/files) and `source` (read/write files). There is **no search API**.
+- **admin.da.live API** — used only for `list` (folder scanning) and `source` (document read during sync). No sheets are written.
 
 ### Core Components
 
@@ -19,15 +19,15 @@ Schedule Maker is a standalone [Document Authoring (DA)](https://da.live) app fo
 
 2. **Context providers** (`context/`)
    - **[DAContext](context/DAContext.js)** — initializes the DA SDK, exposes `{ token, org, repo, isLoading, error }`, and pushes the token + authenticated `daFetch` into the controller.
-   - **[NavigationContext](context/NavigationContext.js)** — page/mode state and unsaved-changes tracking.
-   - **[SchedulesContext](context/SchedulesContext.js)** — the app's state store: schedule list, active schedule, event folder, loading/error/toast flags, and all CRUD + sync operations. Consumed via the `useSchedulesData` / `useSchedulesOperations` / `useSchedulesUI` selector hooks.
+   - **[NavigationContext](context/NavigationContext.js)** — page/mode state.
+   - **[SchedulesContext](context/SchedulesContext.js)** — the app's state store: schedule list, active schedule, event folder, loading/error/toast flags, sync operations, and all local mutations. Consumed via the `useSchedulesData` / `useSchedulesOperations` / `useSchedulesUI` selector hooks.
 
 3. **DA controller** ([scripts/da-controller.js](scripts/da-controller.js))
-   - Wraps `admin.da.live` for all reads/writes: `getSchedules`, `createSchedule`, `updateSchedule`, `deleteSchedule`, `syncSchedules`, `findScheduleReferences`, `refreshScheduleStatus`.
-   - Owns the concurrency-safety machinery (ETag optimistic locking) and the parallel document scanner. See [Concurrency & Data Integrity](#concurrency--data-integrity).
+   - Wraps `admin.da.live` for document scanning: `listEventFolders`, `listFolder`, `syncSchedules`, and the hash-link rewrite pass.
+   - Owns the concurrency machinery (bounded parallel pool, ETag-based conditional writes for the rewrite pass) and `decodeScheduleParam`. No sheet CRUD.
 
 4. **UI** ([ScheduleMaker.js](ScheduleMaker.js) → [pages/Schedules.js](pages/Schedules.js))
-   - Two-panel layout: a [Sidebar](components/Sidebar.js) (event picker, sync, schedule list with active/draft badges) and a [ScheduleEditor](components/ScheduleEditor.js) (block editing).
+   - Two-panel layout: a [Sidebar](components/Sidebar.js) (event picker, sync, schedule list with doc-reference paths) and a [ScheduleEditor](components/ScheduleEditor.js) (block editing).
    - The Home page is intentionally bypassed — the app always renders the Schedules layout.
 
 ### Data Flow
@@ -35,101 +35,73 @@ Schedule Maker is a standalone [Document Authoring (DA)](https://da.live) app fo
 ```
 DA SDK ──(token, org, repo, daFetch)──▶ DAContext ──▶ da-controller
                                                           │
-   UI ◀── SchedulesContext (state) ◀── CRUD / sync ◀──────┘
+   UI ◀── SchedulesContext (state) ◀── sync scan ◀────────┘
                                                           │
-                                            admin.da.live (list / source)
+                                            admin.da.live (list / source — read-only)
 ```
 
-## Data Model
+## Link-First Model
 
-### Folder Structure (per content repo)
-
-Each event lives in its own folder; the folder path is the **event folder** the app is scoped to (`/` is valid and scans the whole repo).
+Every schedule is fully described by its **share link**:
 
 ```
-{repo}/
-  max2025/
-    schedules-active.json    ← schedules referenced in ≥1 DA document
-    schedules-draft.json     ← schedules not referenced anywhere yet
-  max2026/
-    schedules-active.json
-    schedules-draft.json
+https://da.live/app/{org}/{repo}/tools/da-apps/schedule-maker#schedule={base64}
 ```
 
-> DA "sheets" are `.json` files served by `admin.da.live/source`. Each holds `{ ":type": "sheet", "data": [ ...rows ] }`.
+The `#schedule=` hash fragment holds the entire schedule JSON (title, blocks, timestamps) encoded as base64. No server state is required to open or edit a schedule — click the link, the editor loads the schedule from the hash, you edit, you copy the new link.
 
-### Schedule Row
-
-| Column | Type | Notes |
-|--------|------|-------|
-| `scheduleId` | string (UUID) | Client-generated on create; stable identity |
-| `title` | string | Human-readable name |
-| `blocks` | JSON string | Serialized array of Block objects (parsed on read) |
-| `createdTime` | ISO 8601 | Set once on creation |
-| `modificationTime` | ISO 8601 | Updated on every save |
-
-`status` (`active` / `draft`) is **not stored** — it is derived from which sheet the row lives in.
-
-### Block Object (inside `blocks`)
+### Schedule JSON Structure
 
 ```json
 {
-  "id": "uuid",
+  "scheduleId": "uuid",
   "title": "string",
-  "fragmentPath": "/path/to/fragment",
-  "startDateTime": 1750000000000,
-  "includeLiveStream": false,
-  "liveStream": { "provider": "MobileRider", "streamId": "string" }
+  "createdTime": "ISO 8601",
+  "modificationTime": "ISO 8601",
+  "blocks": [
+    {
+      "title": "string",
+      "fragmentPath": "/path/to/fragment",
+      "startDateTime": 1750000000000,
+      "includeLiveStream": false,
+      "liveStream": { "provider": "MobileRider", "streamId": "string" }
+    }
+  ]
 }
 ```
 
-`startDateTime` is stored as **epoch milliseconds**. A block is "complete" when it has a `title`, `fragmentPath`, and `startDateTime` (and a `streamId` if `includeLiveStream` is set) — incomplete schedules show a warning icon in the sidebar.
+`startDateTime` is stored as **epoch milliseconds**. `modificationTime` is stamped at Copy Link time. A block is "complete" when it has a `title`, `fragmentPath`, and `startDateTime` (and a `streamId` if `includeLiveStream` is set) — incomplete schedules show a warning icon in the sidebar.
 
-## Active vs Draft
+> **Hash vs query param**: `?schedule=` (old ECC format) is also supported for reading. Sync detects both. New links always use `#schedule=` because DA forwards the hash fragment to the embedded iframe app, whereas query params are not forwarded.
 
-A schedule is **active** if its base64-encoded share link (`?schedule=<b64>`) appears in at least one HTML document within the event folder; otherwise it is **draft**.
+## Deep-Link Loading
 
-Because references are created by humans pasting a link into a document — an action outside the app — the **only** way to detect them is to scan the documents. This is what **Sync** does, and it is the source of truth for the active/draft split. (A reverse index can't help here: a paste happens outside the app, so nothing would update the index until a scan runs anyway.)
+When DA opens the schedule-maker URL with a `#schedule=` fragment, the app reads and decodes the fragment on mount (`Schedules.js` `useEffect`) and opens the schedule directly in the editor. No sync or network request is needed.
+
+Old `?schedule=` links from ECC open the app but do not auto-load; the author can use Sync to find and open them from the sidebar list.
+
+## Sync
+
+Sync is a **read-only scan** that discovers schedule links authored in DA documents and builds an in-memory list.
 
 ### Sync Flow ([syncSchedules](scripts/da-controller.js))
 
 1. Recursively `list` all HTML docs under the event folder.
-2. Fetch + regex-scan every doc **in parallel** (see [Sync Performance](#sync-performance)), collecting every `scheduleId` found.
-3. Reclassify: move sheet rows between `schedules-active.json` / `schedules-draft.json` to match what the docs contain.
-4. Any `scheduleId` found in a doc but absent from both sheets is a **new discovery** and is added to active (reconstructed from the link's base64 payload).
-5. Write both sheets back under optimistic locking.
+2. Fetch + regex-scan every doc **in parallel** (bounded at `SCAN_CONCURRENCY = 100`), collecting every `?schedule=` and `#schedule=` link found.
+3. Decode each link's base64 payload using `decodeScheduleParam`.
+4. Deduplicate by `scheduleId` (falling back to `title` for old no-id links). First occurrence per key wins.
+5. Return `{ schedules, docRefs }` — `docRefs` maps each schedule key to the list of doc paths that reference it, shown as DA edit links in the sidebar.
 
-`createSchedule` always writes to the **draft** sheet; `updateSchedule` writes in place to whichever sheet the row currently lives in; `refreshScheduleStatus` re-scans a single schedule and moves it if needed.
+No sheets are written. Sync only reads.
 
-## Concurrency & Data Integrity
+### Rewrite Pass (Temporary)
 
-All writes are full-sheet read-modify-write operations. Without protection, a save racing a sync would silently clobber the other (last-write-wins). To prevent that, every write uses **ETag-based optimistic locking**.
+Until the production `decorate.js` fix ships, sync also rewrites any `#schedule=` hrefs it finds back to `?schedule=` query-param format so the production chronobox can load them. This pass uses ETag-based conditional writes with retries. It will be removed once the fix is on production.
 
-### How it works
+### Sync Performance
 
-1. `readSheet` captures the sheet's `ETag`.
-2. `writeSheet` sends it back as `If-Match`. If the sheet changed since the read, `admin.da.live` (R2) responds **412 Precondition Failed** instead of overwriting.
-3. On a 412, the operation **re-reads and retries** (up to `MAX_WRITE_RETRIES`), so the change always lands on top of the latest state. Only if retries are exhausted does a conflict surface to the user.
-
-Semantics of the conditional header:
-
-| Situation | Header sent |
-|-----------|-------------|
-| Existing sheet, ETag known | `If-Match: <etag>` |
-| Existing sheet, ETag unavailable | *(none — unconditional, degrades to last-write-wins)* |
-| Sheet does not exist yet (create) | `If-None-Match: *` |
-
-### The weak-ETag gotcha
-
-`admin.da.live` sits behind a CDN that **weakens ETags** (`W/"…"`) when it gzips a response. R2 rejects weak validators on a conditional write, so `normalizeEtag()` strips the `W/` prefix to recover the strong validator before sending `If-Match`. Without this, every conditional write returns 412.
-
-## Sync Performance
-
-The per-document `source` fetch is the sync bottleneck. Scanning is done with a **bounded parallel pool** ([mapWithConcurrency](scripts/da-controller.js)) rather than a sequential loop.
-
-- **`SCAN_CONCURRENCY`** (default `50`) — max in-flight fetches. Raise cautiously and watch for `429`s or a latency plateau; lower it if syncs start aborting.
-- **`fetchText` retries** on `429` / `5xx` / network errors with exponential backoff (0.3s → 4s), honoring `Retry-After`.
-- **Fail loud, not silent** — a document that can't be read after retries is *not* treated as empty. Sync **aborts with an error** rather than risk misclassifying an active schedule as draft. The delete-reference scan does the same, and blocks deletion until the scan succeeds (deleting on an incomplete scan could leave dangling links).
+- **`SCAN_CONCURRENCY`** (`100`) — max in-flight fetches. Watch for `429`s; `fetchText` retries with exponential backoff (0.3 s → 4 s), honoring `Retry-After`.
+- **Fail loud, not silent** — a document that can't be read after retries causes sync to **abort with an error** rather than silently omit potential schedules.
 
 ## Key Features
 
@@ -138,9 +110,10 @@ The per-document `source` fetch is the sync bottleneck. Scanning is done with a 
 | **Event folder picker** | [EventPicker](components/EventPicker.js) | Lists folders via `admin.da.live/list`; last folder remembered in `localStorage`. `/` = whole repo. |
 | **Fragment path browser** | [FragmentPathBrowser](components/editor/FragmentPathBrowser.js) | Column navigation over folders/HTML; defaults to `/events/events-shared/fragments`, or pre-navigates to the current path. |
 | **Epoch datetime input** | [BlockEditor](components/editor/BlockEditor.js) | Local-time picker synced with an epoch-ms field. |
-| **Excel import** | [SheetImporter](components/SheetImporter.js) | Imports schedules as drafts into the current event folder. Uses SheetJS (`v1/deps/xlsx.mjs`), vendored from `cdn.sheetjs.com/xlsx-0.20.3`. |
-| **URL share** | [utils.js](utils.js) | Copies a base64-encoded schedule link for embedding in DA docs. |
-| **Delete flow** | [DeleteConfirmationModal](components/DeleteConfirmationModal.js) | Scans for referencing docs, warns that deletion strips links and publishes staged changes, then hard-deletes the row. |
+| **Excel import** | [SheetImporter](components/SheetImporter.js) | Imports schedules from an Excel/CSV file and creates them locally. Uses SheetJS (`v1/deps/xlsx.mjs`), vendored from `cdn.sheetjs.com/xlsx-0.20.3`. |
+| **Copy Link** | [ScheduleHeader](components/editor/ScheduleHeader.js) | Copies a rich anchor (title + modification timestamp as link text, full `#schedule=` URL as href) to the clipboard for pasting into DA docs. |
+| **Sync** | [da-controller.js](scripts/da-controller.js) | Scans all docs in the event folder and builds the sidebar schedule list with doc-reference paths. |
+| **Discard** | [SchedulesContext](context/SchedulesContext.js) | Reverts the active schedule to the state it was in when last opened. |
 
 ## Access Control
 
@@ -165,15 +138,14 @@ npx serve . --listen 3000
 ```
 
 - DA requests `/tools/da-apps/schedule-maker` → `serve` returns [tools/da-apps/schedule-maker.html](../tools/da-apps/schedule-maker.html), the local-dev entry.
-- That entry loads assets via absolute paths (`/schedule-maker/...`), so its own location and the request's trailing slash don't matter. It loads the **local** code — distinct from the da-events entry, which loads deployed code from aem.live.
+- That entry loads assets via absolute paths (`/schedule-maker/...`), so its own location and the request's trailing slash don't matter.
 - Milo/Spectrum is loaded from `https://www.adobe.com/libs`. To test against a different Milo build, edit the `LIBS` constant in `schedule-maker.js` directly — `?milolibs=` params on the parent DA page are not visible to the iframe.
 
 ## Deployment
 
 - The app **code** is distributed from `adobecom/event-libs` under `schedule-maker/`.
 - On aem.live it is served at `https://main--event-libs--adobecom.aem.live/event-libs/schedule-maker/…` (the repo nests content under an `event-libs/` prefix).
-- Each content repo (`da-events`, `da-events-fg-pink`, …) registers its **own** entry point (e.g. `tools/da-apps/schedule-maker.html`) that loads the code from event-libs via absolute aem.live URLs and lets the DA SDK scope it to that repo. The entry can read `context.ref` (and an `?eventlibs=<branch>` override) to load the matching event-libs branch. Adding a new repo requires only a new entry point — no app code changes.
-- Floodgate content spaces (e.g. `da-events-fg-pink`) share the parent repo's code, so the same entry serves them automatically — no separate file.
+- Each content repo (`da-events`, `da-events-fg-pink`, …) registers its **own** entry point (e.g. `tools/da-apps/schedule-maker.html`) that loads the code from event-libs via absolute aem.live URLs and lets the DA SDK scope it to that repo. Adding a new repo requires only a new entry point — no app code changes.
 
 ## File Structure
 
@@ -189,16 +161,16 @@ event-libs/ (inner repo root — served locally)
     ├── htm-wrapper.js          # re-exports html/h from v1 deps
     ├── context/
     │   ├── DAContext.js        # DA SDK init → token + org/repo
-    │   ├── NavigationContext.js  # page/mode + unsaved-changes state
-    │   └── SchedulesContext.js   # central state store + CRUD/sync operations
+    │   ├── NavigationContext.js  # page/mode state
+    │   └── SchedulesContext.js   # central state store + local mutations + sync
     ├── scripts/
-    │   └── da-controller.js    # admin.da.live wrapper: CRUD, sync, ETag locking, scanner
+    │   └── da-controller.js    # admin.da.live wrapper: list/scan, ETag rewrite, decoder
     ├── pages/
     │   ├── Home.js             # bypassed
-    │   └── Schedules.js        # two-panel layout (Sidebar + Editor)
+    │   └── Schedules.js        # two-panel layout (Sidebar + Editor); hash deep-link on mount
     └── components/
-        ├── Sidebar.js  EventPicker.js  SearchInput.js  SheetImporter.js
-        ├── ScheduleEditor.js  Modal.js  *Modal.js
+        ├── Sidebar.js  EventPicker.js  SearchInput.js  SheetImporter.js  AddScheduleModal.js
+        ├── ScheduleEditor.js  Modal.js
         └── editor/
             ├── ScheduleHeader.js  BlockEditor.js  FragmentPathBrowser.js
 ```
@@ -207,4 +179,4 @@ event-libs/ (inner repo root — served locally)
 
 - Network / API failures are logged via `window.lana` and returned as `{ ok: false, status, error }` from the controller.
 - The UI surfaces errors as Spectrum toasts (`toastError` / `toastSuccess`) or, for repo-level access failures, an inline access-error panel.
-- Conflict (412) after exhausted retries and unreadable-document aborts both surface actionable "please retry" messages rather than failing silently or corrupting the active/draft split.
+- Unreadable-document aborts during sync surface actionable "please retry" messages rather than failing silently.

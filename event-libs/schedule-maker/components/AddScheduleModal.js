@@ -16,20 +16,11 @@ export default function AddScheduleModal({ isOpen, onClose }) {
     onClose();
   };
 
-  const handleCreateManuallySchedule = async () => {
-    const newSchedule = { title: scheduleName, isComplete: false, blocks: [] };
-    const newScheduleResponse = await createAndAddSchedule(newSchedule);
-    if (newScheduleResponse.error) return;
-    setActiveSchedule(newScheduleResponse);
+  const handleCreate = () => {
+    const created = createAndAddSchedule({ title: scheduleName, blocks: [] });
+    setActiveSchedule(created);
     setScheduleName('');
     goToEditSchedule();
-    onClose();
-  };
-
-  const handleCreateFromSheet = () => {
-    if (!scheduleName.trim()) return;
-    goToSheetImport(scheduleName);
-    setScheduleName('');
     onClose();
   };
 
@@ -47,10 +38,10 @@ export default function AddScheduleModal({ isOpen, onClose }) {
           onInput=${(e) => setScheduleName(e.target.value)} \
         ></sp-textfield>
         <div class="add-schedule-form-buttons">
-          <sp-button size="l" static-color="black" treatment="outline" onClick=${handleCreateManuallySchedule} disabled=${!scheduleName.trim()}>
-            Create Manually
+          <sp-button size="l" static-color="black" treatment="outline" onClick=${handleCreate} disabled=${!scheduleName.trim()}>
+            Create
           </sp-button>
-          <sp-button size="l" static-color="black" treatment="outline" onClick=${handleCreateFromSheet} disabled=${!scheduleName.trim()}>
+          <sp-button size="l" static-color="black" treatment="outline" onClick=${() => { goToSheetImport(scheduleName); onClose(); }} disabled=${!scheduleName.trim()}>
             Create from Sheet
           </sp-button>
         </div>

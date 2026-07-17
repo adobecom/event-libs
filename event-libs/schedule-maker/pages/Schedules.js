@@ -1,50 +1,35 @@
-import { useState, useEffect, useRef } from '../../v1/deps/htm-preact.js';
+import { useState, useEffect } from '../../v1/deps/htm-preact.js';
 import { html } from '../htm-wrapper.js';
 import Sidebar from '../components/Sidebar.js';
 import ScheduleEditor from '../components/ScheduleEditor.js';
 import SheetImporter from '../components/SheetImporter.js';
 import AddScheduleModal from '../components/AddScheduleModal.js';
 import { useNavigation } from '../context/NavigationContext.js';
-import { useSchedulesData, useSchedulesUI } from '../context/SchedulesContext.js';
-import { ScheduleURLUtility } from '../utils.js';
+import { useSchedulesData } from '../context/SchedulesContext.js';
+import { decodeScheduleParam } from '../scripts/da-controller.js';
+import { prepareScheduleForClient } from '../utils.js';
 
 export default function Schedules() {
-  const { activePage, goToEditSchedule } = useNavigation();
-  const { schedules, activeSchedule, setActiveSchedule } = useSchedulesData();
-  const { isInitialLoading } = useSchedulesUI();
+  const { goToEditSchedule, activePage } = useNavigation();
+  const { setActiveSchedule } = useSchedulesData();
   const [isAddScheduleModalOpen, setIsAddScheduleModalOpen] = useState(false);
-  const deepLinkHandled = useRef(false);
 
+  // On mount, check if the URL hash carries schedule data (#schedule={b64}).
+  // DA forwards the parent page hash to the iframe, enabling deep-link open.
   useEffect(() => {
-    if (isInitialLoading || !schedules.length || deepLinkHandled.current) return;
-    deepLinkHandled.current = true;
-
-    const tryDeepLink = async () => {
-      // Primary: hash fragment (#scheduleId=) — may be forwarded by DA to iframe
-      const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ''));
-      let targetId = hashParams.get('scheduleId');
-
-      // Fallback: ?schedule= query param — works for direct iframe URL access
-      if (!targetId) {
-        const qp = new URLSearchParams(window.location.search);
-        if (qp.get('schedule')) {
-          try {
-            const decoded = await ScheduleURLUtility.extractScheduleFromURL(window.location.href);
-            targetId = decoded?.scheduleId;
-          } catch { /* ignore malformed param */ }
-        }
-      }
-
-      if (!targetId || activeSchedule) return;
-      const match = schedules.find((s) => s.scheduleId === targetId);
-      if (match) {
-        setActiveSchedule(match);
+    const hash = window.location.hash;
+    if (!hash) return;
+    const m = hash.match(/[#&]schedule=([A-Za-z0-9+/=%-]{20,})/);
+    if (!m) return;
+    try {
+      const decoded = decodeScheduleParam(m[1]);
+      if (decoded?.blocks?.length) {
+        const prepared = prepareScheduleForClient(decoded);
+        setActiveSchedule(prepared);
         goToEditSchedule();
       }
-    };
-
-    tryDeepLink();
-  }, [schedules, isInitialLoading]);
+    } catch { /* ignore malformed hash */ }
+  }, []);
 
   return html`
     <div class="sm-page">
@@ -54,7 +39,7 @@ export default function Schedules() {
           <${Sidebar} setIsAddScheduleModalOpen=${setIsAddScheduleModalOpen} />
         </div>
         <div class="sm-schedules__content">
-          ${activePage.mode === 'import' ? html`<${SheetImporter} />` : html`<${ScheduleEditor} />`}
+          ${activePage?.mode === 'import' ? html`<${SheetImporter} />` : html`<${ScheduleEditor} />`}
         </div>
       </div>
       <${AddScheduleModal} isOpen=${isAddScheduleModalOpen} onClose=${() => setIsAddScheduleModalOpen(false)} />

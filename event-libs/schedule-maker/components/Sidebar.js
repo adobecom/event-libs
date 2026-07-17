@@ -1,41 +1,16 @@
 import { useState } from '../../v1/deps/htm-preact.js';
 import { html } from '../htm-wrapper.js';
-import { useSchedulesData, useSchedulesOperations } from '../context/SchedulesContext.js';
+import { useSchedulesData } from '../context/SchedulesContext.js';
 import { useNavigation } from '../context/NavigationContext.js';
-import Modal from './Modal.js';
-import UnsavedChangesModal from './UnsavedChangesModal.js';
 import SearchInput from './SearchInput.js';
 import EventPicker from './EventPicker.js';
 
-function StatusBadge({ status }) {
-  if (status === 'active') {
-    return html`<span class="sm-status-badge sm-status-badge--active">Active</span>`;
-  }
-  return html`<span class="sm-status-badge sm-status-badge--draft">Draft</span>`;
-}
-
 function Sidebar({ setIsAddScheduleModalOpen }) {
   const [search, setSearch] = useState('');
-  const [isNoFolderModalOpen, setIsNoFolderModalOpen] = useState(false);
-  const [isUnsavedChangesModalOpen, setIsUnsavedChangesModalOpen] = useState(false);
-  const [pendingAction, setPendingAction] = useState(null);
-  const [pendingSchedule, setPendingSchedule] = useState(null);
   const { goToEditSchedule } = useNavigation();
-  const { schedules, activeSchedule, setActiveSchedule, hasUnsavedChanges, eventFolder } = useSchedulesData();
-  const { discardChangesToActiveSchedule } = useSchedulesOperations();
+  const { schedules, activeSchedule, setActiveSchedule, hasSynced } = useSchedulesData();
 
-  const handleAddSchedule = () => {
-    if (!eventFolder) {
-      setIsNoFolderModalOpen(true);
-      return;
-    }
-    if (hasUnsavedChanges) {
-      setPendingAction('add');
-      setIsUnsavedChangesModalOpen(true);
-      return;
-    }
-    setIsAddScheduleModalOpen(true);
-  };
+  const handleAddSchedule = () => setIsAddScheduleModalOpen(true);
 
   const handleSearch = (e) => {
     e.preventDefault();
@@ -43,34 +18,11 @@ function Sidebar({ setIsAddScheduleModalOpen }) {
   };
 
   const handleSelectSchedule = (schedule) => {
-    if (hasUnsavedChanges) {
-      setPendingAction('switch');
-      setPendingSchedule(schedule);
-      setIsUnsavedChangesModalOpen(true);
-      return;
-    }
     setActiveSchedule(schedule);
     goToEditSchedule();
   };
 
-  const handleProceedWithAction = () => {
-    discardChangesToActiveSchedule();
-    if (pendingAction === 'add') {
-      setIsAddScheduleModalOpen(true);
-    } else if (pendingAction === 'switch' && pendingSchedule) {
-      setActiveSchedule(pendingSchedule);
-      goToEditSchedule();
-    }
-    setPendingAction(null);
-    setPendingSchedule(null);
-  };
-
-  const handleCloseUnsavedChangesModal = () => {
-    setIsUnsavedChangesModalOpen(false);
-    setPendingAction(null);
-    setPendingSchedule(null);
-  };
-
+  const showFilter = hasSynced && schedules.length > 0;
   const filteredSchedules = schedules?.filter((s) => (s.title || '').toLowerCase().includes(search.toLowerCase()));
 
   return html`
@@ -93,16 +45,18 @@ function Sidebar({ setIsAddScheduleModalOpen }) {
           </sp-icon>
           Add Schedule
         </sp-button>
-        <${SearchInput} \
-          placeholder="Search schedules" \
-          value="${search}" \
-          onInput="${handleSearch}" \
-          className="sm-sidebar__search" \
-        />
+        ${showFilter && html`
+          <${SearchInput} \
+            placeholder="Filter schedules" \
+            value="${search}" \
+            onInput="${handleSearch}" \
+            className="sm-sidebar__search" \
+          />
+        `}
       </div>
       <div class="sm-sidebar__schedules">
         ${filteredSchedules?.length === 0 && !search && html`
-          <p class="sm-sidebar__empty">No schedules yet. Click Add Schedule to create one.</p>
+          <p class="sm-sidebar__empty">No schedules yet. Add a schedule or sync an event folder.</p>
         `}
         ${filteredSchedules?.length === 0 && search && html`
           <p class="sm-sidebar__empty">No schedules match "${search}".</p>
@@ -121,28 +75,10 @@ function Sidebar({ setIsAddScheduleModalOpen }) {
                 <path d="M16.7334 18H3.2666C2.46631 18 1.74365 17.5898 1.33398 16.9023C0.924314 16.2148 0.906734 15.3838 1.28759 14.6797L8.021 2.23242C8.41455 1.50488 9.17286 1.05273 10 1.05273C10.8271 1.05273 11.5855 1.50488 11.979 2.23242L18.7124 14.6797C19.0933 15.3838 19.0757 16.2148 18.666 16.9023C18.2563 17.5898 17.5337 18 16.7334 18ZM10 2.55273C9.86572 2.55273 9.53223 2.59082 9.34033 2.94531L2.60693 15.3926C2.42382 15.7314 2.55664 16.0244 2.62255 16.1338C2.68798 16.2441 2.88183 16.5 3.26659 16.5H16.7334C17.1182 16.5 17.312 16.2441 17.3774 16.1338C17.4434 16.0244 17.5762 15.7314 17.3931 15.3926L10.6597 2.94531C10.4678 2.59082 10.1343 2.55273 10 2.55273Z" fill="#F03823"/>
               </svg>
             `}
-            <${StatusBadge} status=${schedule.status} />
           </button>
         `)}
       </div>
 
-      <${Modal} \
-        isOpen=${isNoFolderModalOpen} \
-        onClose=${() => setIsNoFolderModalOpen(false)} \
-        title="Select a folder first" \
-        showActions=${false} \
-        size="small" \
-      >
-        <p>Please select an event folder before creating a schedule.</p>
-        <div class="modal-actions">
-          <sp-button size="l" static-color="black" onClick=${() => setIsNoFolderModalOpen(false)}>OK</sp-button>
-        </div>
-      </${Modal}>
-      <${UnsavedChangesModal} \
-        isOpen=${isUnsavedChangesModalOpen} \
-        onClose=${handleCloseUnsavedChangesModal} \
-        onProceed=${handleProceedWithAction} \
-      />
     </div>
   `;
 }

@@ -64,6 +64,7 @@ function assignIdToBlocks(schedule) {
 function prepareScheduleForServer(schedule) {
   if (!schedule) return null;
   const deepCopy = JSON.parse(JSON.stringify(schedule));
+  deepCopy.modificationTime = new Date().toISOString();
   deepCopy.blocks.forEach((block) => {
     delete block.id;
     delete block.isEditingBlockTitle;
@@ -82,6 +83,8 @@ function prepareScheduleForServer(schedule) {
 function prepareScheduleForClient(schedule) {
   if (!schedule) return null;
   const s = JSON.parse(JSON.stringify(schedule));
+  if (!s.scheduleId) s.scheduleId = crypto.randomUUID();
+  if (!s.createdTime) s.createdTime = new Date().toISOString();
   s.blocks.forEach((block) => {
     block.id = `block-${crypto.randomUUID()}`;
     block.isEditingBlockTitle = false;
@@ -107,8 +110,8 @@ class ScheduleURLUtility {
       const jsonString = JSON.stringify(serverSchedule);
       const base64JsonString = btoa(unescape(encodeURIComponent(jsonString)));
       const url = new URL(`${DA_ORIGIN}/app/${org}/${repo}/${DA_APP_PATH}`);
-      url.searchParams.set('schedule', base64JsonString);
-      url.hash = `scheduleId=${scheduleObject.scheduleId}`;
+      // Hash fragment is used — DA forwards the parent hash to the iframe.
+      url.hash = `schedule=${base64JsonString}`;
       return url.toString();
     } catch (error) {
       window.lana?.log(`Error creating schedule URL: ${error}`);
@@ -119,11 +122,13 @@ class ScheduleURLUtility {
   static async extractScheduleFromURL(urlString) {
     try {
       const url = new URL(urlString);
-      const encodedBase64JsonString = url.searchParams.get('schedule');
-      if (!encodedBase64JsonString) {
+      // Try query param first (old ECC/SM format), then hash fragment (new SM format).
+      const encodedParam = url.searchParams.get('schedule')
+        || (() => { const m = url.hash.match(/[#&]schedule=([A-Za-z0-9+/=%-]{20,})/); return m?.[1]; })();
+      if (!encodedParam) {
         throw new Error('No schedule parameter found in URL');
       }
-      const decodedJsonString = atob(decodeURIComponent(encodedBase64JsonString));
+      const decodedJsonString = atob(decodeURIComponent(encodedParam));
       return JSON.parse(decodedJsonString);
     } catch (error) {
       window.lana?.log(`Error extracting schedule from URL: ${error}`);
@@ -133,8 +138,13 @@ class ScheduleURLUtility {
 
   static async copyScheduleToClipboard(scheduleObject, org, repo) {
     try {
-      const scheduleURL = this.createScheduleURL(scheduleObject, org, repo);
-      const { title, modificationTime } = scheduleObject;
+      const serverSchedule = prepareScheduleForServer(scheduleObject);
+      const jsonString = JSON.stringify(serverSchedule);
+      const base64JsonString = btoa(unescape(encodeURIComponent(jsonString)));
+      const urlObj = new URL(`${DA_ORIGIN}/app/${org}/${repo}/${DA_APP_PATH}`);
+      urlObj.hash = `schedule=${base64JsonString}`;
+      const scheduleURL = urlObj.toString();
+      const { title, modificationTime } = serverSchedule;
       const formattedDate = modificationTime
         ? new Date(modificationTime).toLocaleString('en-US', {
           weekday: 'long',

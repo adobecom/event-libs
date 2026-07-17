@@ -1,42 +1,29 @@
-/* eslint-disable max-len */
 import { createContext, useState, useContext, useCallback, useEffect, useMemo } from '../../v1/deps/htm-preact.js';
 import { html } from '../htm-wrapper.js';
+import { syncSchedules as syncSchedulesController } from '../scripts/da-controller.js';
 import {
-  getSchedules as getSchedulesController,
-  createSchedule as createScheduleController,
-  updateSchedule as updateScheduleController,
-  deleteSchedule as deleteScheduleController,
-  syncSchedules as syncSchedulesController,
-  findScheduleReferences as findScheduleReferencesImpl,
-} from '../scripts/da-controller.js';
-import {
-  processSchedules,
   assignIdToBlocks,
   isBlockComplete,
   isScheduleComplete,
   prepareScheduleForServer,
   prepareScheduleForClient,
-  validateSchedule,
 } from '../utils.js';
 import { useDA } from './DAContext.js';
-import { useNavigation } from './NavigationContext.js';
 
 const SchedulesContext = createContext();
 
 const SchedulesProvider = ({ children }) => {
   const { org, repo } = useDA();
-  const { setHasUnsavedChanges } = useNavigation();
 
   const [eventFolder, setEventFolder] = useState(() => localStorage.getItem('sm-last-event-folder') || null);
   const [schedules, setSchedules] = useState([]);
+  const [docRefs, setDocRefs] = useState({});
+  const [hasSynced, setHasSynced] = useState(false);
   const [originalActiveSchedule, setOriginalActiveSchedule] = useState(null);
   const [activeSchedule, setActiveScheduleState] = useState(null);
   const [toastSuccess, setToastSuccess] = useState(null);
 
   const [isInitialLoading, setIsInitialLoading] = useState(false);
-  const [isCreating, setIsCreating] = useState(false);
-  const [isUpdating, setIsUpdating] = useState(false);
-  const [isDeleting, setIsDeleting] = useState(false);
   const [error, setError] = useState(null);
   const [toastError, setToastError] = useState(null);
 
@@ -45,29 +32,6 @@ const SchedulesProvider = ({ children }) => {
     const current = JSON.stringify(prepareScheduleForServer(activeSchedule));
     return original !== current;
   }, [originalActiveSchedule, activeSchedule]);
-
-  useEffect(() => {
-    setHasUnsavedChanges(hasUnsavedChanges);
-  }, [hasUnsavedChanges, setHasUnsavedChanges]);
-
-  const getSchedules = useCallback(async () => {
-    if (!org || !repo || !eventFolder) return;
-    setIsInitialLoading(true);
-    setError(null);
-    try {
-      const result = await getSchedulesController(org, repo, eventFolder);
-      if (!result.ok) {
-        setError(result.status === 403 ? 'You do not have access to this repo.' : (result.error || 'Failed to load schedules'));
-        return;
-      }
-      const sorted = processSchedules(result.data || []);
-      setSchedules(sorted);
-    } catch (err) {
-      setError(err.message || 'Failed to get schedules');
-    } finally {
-      setIsInitialLoading(false);
-    }
-  }, [org, repo, eventFolder]);
 
   const setActiveScheduleWithOriginal = useCallback((schedule) => {
     if (schedule) {
@@ -83,106 +47,36 @@ const SchedulesProvider = ({ children }) => {
     }
   }, []);
 
-  const createAndAddSchedule = useCallback(async (schedule) => {
-    setIsCreating(true);
-    setToastError(null);
-    try {
-      const validationErrors = validateSchedule(schedule);
-      if (validationErrors.length > 0) {
-        const errorMessage = validationErrors.join('\n');
-        setToastError(errorMessage);
-        setIsCreating(false);
-        return { error: errorMessage };
-      }
-      const serverSchedule = prepareScheduleForServer(schedule);
-      const result = await createScheduleController(org, repo, eventFolder, serverSchedule);
-      if (!result.ok) {
-        const msg = result.status === 403 ? 'You do not have access to this repo.' : (result.error || 'Failed to create schedule');
-        setToastError(msg);
-        return { error: msg };
-      }
-      const decorated = prepareScheduleForClient(result.data);
-      setSchedules((prev) => [decorated, ...prev]);
-      setToastSuccess('Schedule created successfully');
-      return decorated;
-    } catch (err) {
-      const msg = err.message || 'Failed to create schedule';
-      setToastError(msg);
-      return { error: msg };
-    } finally {
-      setIsCreating(false);
-    }
-  }, [org, repo, eventFolder]);
+  // Creates a schedule in memory only — no server write. Returns the decorated
+  // client-side schedule so the caller can set it as active and open the editor.
+  const createAndAddSchedule = useCallback((schedule) => {
+    const newSchedule = prepareScheduleForClient({
+      ...schedule,
+      scheduleId: crypto.randomUUID(),
+      createdTime: new Date().toISOString(),
+      modificationTime: new Date().toISOString(),
+      blocks: schedule.blocks || [],
+    });
+    setSchedules((prev) => [newSchedule, ...prev]);
+    return newSchedule;
+  }, []);
 
-  const updateSchedule = useCallback(async (scheduleId, schedule) => {
-    setIsUpdating(true);
-    setToastError(null);
-    try {
-      const serverSchedule = prepareScheduleForServer(schedule);
-      const result = await updateScheduleController(org, repo, eventFolder, scheduleId, serverSchedule);
-      if (!result.ok) {
-        const msg = result.status === 403 ? 'You do not have access to this repo.' : (result.error || 'Failed to update schedule');
-        setToastError(msg);
-        return { error: msg };
-      }
-      const decorated = prepareScheduleForClient(result.data);
-      setSchedules((prev) => prev.map((s) => (s.scheduleId === scheduleId ? decorated : s)));
-      setActiveScheduleWithOriginal(decorated);
-      setToastSuccess('Schedule updated successfully');
-      return decorated;
-    } catch (err) {
-      const msg = err.message || 'Failed to update schedule';
-      setToastError(msg);
-      return { error: msg };
-    } finally {
-      setIsUpdating(false);
-    }
-  }, [org, repo, eventFolder, setActiveScheduleWithOriginal]);
-
-  const deleteSchedule = useCallback(async (scheduleId, affectedPaths = []) => {
-    setIsDeleting(true);
-    setToastError(null);
-    try {
-      const result = await deleteScheduleController(org, repo, eventFolder, scheduleId, affectedPaths);
-      if (!result.ok) {
-        const msg = result.status === 403 ? 'You do not have access to this repo.' : (result.error || 'Failed to delete schedule');
-        setToastError(msg);
-        return { error: msg };
-      }
-      setSchedules((prev) => prev.filter((s) => s.scheduleId !== scheduleId));
-      setActiveScheduleWithOriginal(null);
-      setToastSuccess('Schedule deleted successfully');
-      return true;
-    } catch (err) {
-      const msg = err.message || 'Failed to delete schedule';
-      setToastError(msg);
-      return { error: msg };
-    } finally {
-      setIsDeleting(false);
-    }
-  }, [org, repo, eventFolder, setActiveScheduleWithOriginal]);
-
-  const syncSchedules = useCallback(async (scanPath = null) => {
+  const syncSchedules = useCallback(async () => {
     if (!org || !repo || !eventFolder) return;
     setIsInitialLoading(true);
+    setError(null);
     setToastError(null);
     try {
-      const result = await syncSchedulesController(org, repo, eventFolder, scanPath);
+      const result = await syncSchedulesController(org, repo, eventFolder);
       if (!result.ok) {
         setToastError(result.error || 'Sync failed');
         return;
       }
-      const { active, draft, newlyDiscovered, movedToActive, movedToDraft } = result.data;
-      const allRows = [
-        ...active.map((r) => ({ ...r, status: 'active' })),
-        ...draft.map((r) => ({ ...r, status: 'draft' })),
-      ];
-      setSchedules(processSchedules(allRows));
-      const parts = [];
-      if (newlyDiscovered.length) parts.push(`${newlyDiscovered.length} new`);
-      if (movedToActive) parts.push(`${movedToActive} moved to active`);
-      if (movedToDraft) parts.push(`${movedToDraft} moved to draft`);
-      setToastSuccess(parts.length ? `Sync complete — ${parts.join(', ')}` : 'Sync complete — no changes');
+      const { schedules: found, docRefs: refs } = result.data;
+      setSchedules(found.map((s) => prepareScheduleForClient(s)));
+      setDocRefs(refs);
+      setHasSynced(true);
+      setToastSuccess(`Sync complete — ${found.length} schedule(s) found`);
     } catch (err) {
       setToastError(err.message || 'Sync failed');
     } finally {
@@ -237,18 +131,9 @@ const SchedulesProvider = ({ children }) => {
   const clearToastError = useCallback(() => setToastError(null), []);
   const clearToastSuccess = useCallback(() => setToastSuccess(null), []);
 
-  const findScheduleReferencesStable = useCallback(
-    (sid, scanPath) => findScheduleReferencesImpl(org, repo, sid, scanPath),
-    [org, repo],
-  );
-
   useEffect(() => {
-    if (eventFolder) {
-      localStorage.setItem('sm-last-event-folder', eventFolder);
-      setActiveScheduleWithOriginal(null);
-      getSchedules();
-    }
-  }, [eventFolder, getSchedules]);
+    if (eventFolder) localStorage.setItem('sm-last-event-folder', eventFolder);
+  }, [eventFolder]);
 
   const value = {
     schedules,
@@ -257,10 +142,9 @@ const SchedulesProvider = ({ children }) => {
     setActiveSchedule: setActiveScheduleWithOriginal,
     eventFolder,
     setEventFolder,
+    hasSynced,
+    docRefs,
     isInitialLoading,
-    isCreating,
-    isUpdating,
-    isDeleting,
     error,
     toastError,
     clearToastError,
@@ -270,14 +154,11 @@ const SchedulesProvider = ({ children }) => {
     setToastSuccess,
     hasUnsavedChanges,
     createAndAddSchedule,
-    updateSchedule,
-    deleteSchedule,
     updateScheduleLocally,
     addBlockLocally,
     updateBlockLocally,
     deleteBlockLocally,
     discardChangesToActiveSchedule,
-    findScheduleReferences: findScheduleReferencesStable,
     syncSchedules,
   };
 
@@ -300,6 +181,8 @@ export const useSchedulesData = () => {
     hasUnsavedChanges: ctx.hasUnsavedChanges,
     eventFolder: ctx.eventFolder,
     setEventFolder: ctx.setEventFolder,
+    hasSynced: ctx.hasSynced,
+    docRefs: ctx.docRefs,
   };
 };
 
@@ -307,14 +190,11 @@ export const useSchedulesOperations = () => {
   const ctx = useContext(SchedulesContext);
   return {
     createAndAddSchedule: ctx.createAndAddSchedule,
-    updateSchedule: ctx.updateSchedule,
-    deleteSchedule: ctx.deleteSchedule,
     updateScheduleLocally: ctx.updateScheduleLocally,
     addBlockLocally: ctx.addBlockLocally,
     updateBlockLocally: ctx.updateBlockLocally,
     deleteBlockLocally: ctx.deleteBlockLocally,
     discardChangesToActiveSchedule: ctx.discardChangesToActiveSchedule,
-    findScheduleReferences: ctx.findScheduleReferences,
     syncSchedules: ctx.syncSchedules,
   };
 };
@@ -323,9 +203,6 @@ export const useSchedulesUI = () => {
   const ctx = useContext(SchedulesContext);
   return {
     isInitialLoading: ctx.isInitialLoading,
-    isCreating: ctx.isCreating,
-    isUpdating: ctx.isUpdating,
-    isDeleting: ctx.isDeleting,
     error: ctx.error,
     toastError: ctx.toastError,
     toastSuccess: ctx.toastSuccess,

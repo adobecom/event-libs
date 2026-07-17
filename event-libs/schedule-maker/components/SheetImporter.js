@@ -121,15 +121,14 @@ export default function SheetImporter() {
     }).filter((block) => block.title && block.startDateTime);
   };
 
-  const handleAddSchedule = async () => {
+  const handleAddSchedule = () => {
     const blocks = convertToBlocks();
     if (blocks.length === 0) {
       // eslint-disable-next-line no-alert
       alert('No valid blocks found. Please check your column mapping.');
       return;
     }
-    const newSchedule = await createAndAddSchedule({ title: importSheetScheduleName, blocks });
-    if (newSchedule.error) return;
+    const newSchedule = createAndAddSchedule({ title: importSheetScheduleName, blocks });
     setUploadedFile(null);
     setWorkbook(null);
     setSelectedSheet('');

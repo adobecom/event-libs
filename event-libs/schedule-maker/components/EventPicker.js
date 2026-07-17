@@ -247,7 +247,7 @@ export default function EventPicker() {
 
   return html`
     <div class="sm-event-picker">
-      <sp-field-label size="l"><strong>Events Folder</strong></sp-field-label>
+      <sp-field-label size="l"><strong>Folder to fetch schedule links</strong></sp-field-label>
       <div class="sm-event-picker__row">
         <sp-textfield
           type="text"
