@@ -21,22 +21,40 @@ function waitForSessionsReady() {
   });
 }
 
+// Seeded directly into sessions.value for every test — this block just renders whatever's
+// there, and tests shouldn't depend on the real sessions-catalog fetch (which needs a real
+// event-id to return anything, and isn't something to exercise here).
+const TEST_SESSION = {
+  id: 'demo-session-1',
+  rfCode: 'DEMO001',
+  startTimeUtc: new Date(Date.now() - 60_000).toISOString(),
+  endTimeUtc: new Date(Date.now() + 3_600_000).toISOString(),
+};
+
 describe('session-state-demo block', () => {
   let el;
 
   // initSessionState() is idempotent and only needs the rainfocus-api-url gate to run
-  // once — this populates the real apiConfig that favoriteSession()'s RF call needs,
-  // same as decorateEvent() would on a real page, instead of leaving it null.
+  // once — this populates the real apiConfig that favoriteSession()'s RF call needs, same
+  // as decorateEvent() would on a real page. Its internal loadSessions() also fetches the
+  // sessions catalog, which needs a real event-id to return anything meaningful — stub
+  // fetch for that one call so it resolves immediately with no sessions, then every test
+  // seeds sessions.value with TEST_SESSION itself instead of depending on what that fetch
+  // returns.
   before(async () => {
+    const realFetch = window.fetch;
+    window.fetch = async () => new Response(JSON.stringify({ sessions: [], sessionTimes: [], speakers: [] }));
     setMetadata('rainfocus-api-url', 'https://mock.example/api');
     initSessionState();
     await waitForSessionsReady();
+    window.fetch = realFetch;
   });
 
   beforeEach(() => {
     document.body.innerHTML = body;
     el = document.querySelector('.session-state-demo');
 
+    sessions.value = [TEST_SESSION];
     favorited.value = new Set();
     scheduled.value = new Set();
     pendingActions.value = new Set();
@@ -52,7 +70,7 @@ describe('session-state-demo block', () => {
   it('renders the current signal values on init', async () => {
     await init(el);
     expect(rowValue('Sessions status')).to.equal('ready');
-    expect(Number(rowValue('Sessions loaded'))).to.be.greaterThan(0);
+    expect(Number(rowValue('Sessions loaded'))).to.equal(1);
     expect(rowValue('Favorited')).to.equal('0');
     expect(rowValue('Scheduled')).to.equal('0');
     expect(rowValue('Logged in')).to.equal('true');
