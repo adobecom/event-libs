@@ -56,7 +56,7 @@ function Sidebar({ setIsAddScheduleModalOpen }) {
       </div>
       <div class="sm-sidebar__schedules">
         ${filteredSchedules?.length === 0 && !search && html`
-          <p class="sm-sidebar__empty">No schedules yet. Add a schedule or sync an event folder.</p>
+          <p class="sm-sidebar__empty">No schedules yet. Add a schedule or scan an event folder to find existing schedule links.</p>
         `}
         ${filteredSchedules?.length === 0 && search && html`
           <p class="sm-sidebar__empty">No schedules match "${search}".</p>
