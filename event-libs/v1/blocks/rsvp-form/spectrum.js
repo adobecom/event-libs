@@ -5,7 +5,10 @@ const SWC_DIST = `${miloLibs}/features/spectrum-web-components/dist`;
 const LIT_URL = `${miloLibs}/deps/lit-all.min.js`;
 
 // Core modules every rsvp-form needs regardless of which fields are configured.
-const CORE_MODULES = ['theme', 'field-label', 'help-text', 'button', 'divider'];
+// 'themes/spectrum-two' (rather than plain 'theme') registers sp-theme AND the
+// spectrum-two system/color/scale token fragments the theme host below requests
+// — Milo's plain theme.js only registers the classic spectrum system.
+const CORE_MODULES = ['themes/spectrum-two', 'field-label', 'help-text', 'button', 'divider'];
 
 // Field-type -> extra dist module(s) to load, beyond CORE_MODULES. multi-select
 // has no entry: sp-combobox (SWC 1.7.0) is single-select only, so multi-select
