@@ -19,6 +19,10 @@ const { default: loadFragment } = await import(`${miloLibs}/blocks/fragment/frag
 
 const VALID_REGISTRATION_STATUS = ['registered', 'waitlisted'];
 
+/** Valid `displayAs` flavors for the `text` substrate; each is also a valid
+ * native `<input type>` (or `text-area`, handled by its own dispatch entry). */
+const TEXT_DISPLAY_AS = new Set(['text', 'email', 'phone', 'number', 'date', 'url', 'text-area']);
+
 const RULE_OPERATORS = {
   equal: '=',
   notEqual: '!=',
@@ -885,17 +889,33 @@ export function getRsvpConfigFromMeta() {
     const data = config.rsvpFormFields.map((f) => {
       const field = lowercaseKeys(f);
       if (typeof field.field === 'string') field.field = field.field.trim();
+      field.type = field.type || 'text';
       field.required = field.required === true ? 'x' : '';
       if (Array.isArray(field.options)) {
         field.options = field.options.map((o) => (typeof o === 'object' ? o.value : o)).join(';');
       }
-      // ESP's field type enum has no dedicated multi-select value — `select` is
-      // single-choice and `checkbox` is multi-choice. `displayas` (EMC's
-      // displayAs, already stored by ESP) carries the render-style hint; remap
-      // to the widget types this file already implements for the legacy
-      // per-cloud JSON path so scope-config-driven fields get the same options.
-      if (field.type === 'select' && field.displayas === 'radio') field.type = 'radio-group';
-      if (field.type === 'checkbox' && field.displayas === 'dropdown') field.type = 'multi-select';
+      // ESP's field `type` names only the substrate (text/select/multi-select);
+      // `displayas` (EMC's displayAs, already stored by ESP) picks the concrete
+      // widget within it. Remap to the internal dispatch types this file already
+      // implements for the legacy per-cloud JSON path, so scope-config-driven
+      // fields render identically. `checkbox` is a legacy wire value from before
+      // this taxonomy, remapped to its own pre-existing default rather than
+      // passed through, so old data keeps rendering exactly as it did. Any other
+      // `type` (heading/legal/divider/submit/clear, or a legacy direct value
+      // like `email`/`text-area`) passes through untouched.
+      const da = field.displayas;
+      if (field.type === 'text') {
+        field.type = TEXT_DISPLAY_AS.has(da) ? da : 'text';
+      }
+      else if (field.type === 'select') {
+        field.type = da === 'radio' ? 'radio-group' : 'select';
+      }
+      else if (field.type === 'multi-select') {
+        field.type = da === 'combobox' ? 'multi-select' : 'checkbox-group';
+      }
+      else if (field.type === 'checkbox') {
+        field.type = da === 'dropdown' ? 'multi-select' : 'checkbox';
+      }
       return field;
     });
 
