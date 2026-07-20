@@ -233,20 +233,29 @@ class VideoPlaylist {
    * (header + all sessions) is taller than the video, the video-wrapper gets
    * stretched past the actual 16:9 video, leaving blank space below it. Pin
    * .container's height to the video's own rendered height instead, so the
-   * drawer is capped to match it and scrolls internally beyond that. A
-   * ResizeObserver keeps this in sync — the video's height itself changes
-   * whenever its width does (viewport resize, or the drawer opening/closing
-   * and narrowing it).
+   * drawer is capped to match it and scrolls internally beyond that.
+   *
+   * Measure .milo-video itself, not the wrapper: the wrapper is a direct flex
+   * child of .container, so align-items:stretch forces ITS height to match
+   * whatever we set on .container — measuring the wrapper would just echo back
+   * that same (possibly stale) value instead of the video's true aspect-ratio
+   * height. .milo-video is nested deeper and never stretched, so its height is
+   * always genuinely derived from its own current width.
+   *
+   * A ResizeObserver keeps this in sync — the video's width (and so its
+   * aspect-ratio height) changes on viewport resize, and whenever the drawer
+   * opens/closes and narrows or widens it.
    */
   syncContainerHeightToVideo(wrapper) {
+    const video = wrapper.querySelector('.milo-video') || wrapper;
     const sync = () => {
-      const height = wrapper.getBoundingClientRect().height;
+      const height = video.getBoundingClientRect().height;
       if (height > 0 && this.root) this.root.style.height = `${height}px`;
     };
 
     sync();
     const ro = new ResizeObserver(sync);
-    ro.observe(wrapper);
+    ro.observe(video);
     this.disposers.push(() => ro.disconnect());
   }
 
