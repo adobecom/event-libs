@@ -14,15 +14,17 @@ export default function Schedules() {
   const { setActiveSchedule } = useSchedulesData();
   const [isAddScheduleModalOpen, setIsAddScheduleModalOpen] = useState(false);
 
-  // On mount, check if the URL hash carries schedule data (#schedule={b64}).
-  // DA forwards the parent page hash to the iframe, enabling deep-link open.
+  // On mount, check if the URL carries schedule data, either as a query param
+  // (?schedule={b64}, TEMPORARY current format) or hash fragment (#schedule={b64},
+  // DA forwards the parent page hash to the iframe, enabling deep-link open).
   useEffect(() => {
-    const hash = window.location.hash;
-    if (!hash) return;
-    const m = hash.match(/[#&]schedule=([A-Za-z0-9+/=%-]{20,})/);
-    if (!m) return;
+    const url = new URL(window.location.href);
+    const queryParam = url.searchParams.get('schedule');
+    const hashMatch = url.hash.match(/[#&]schedule=([A-Za-z0-9+/=%-]{20,})/);
+    const encodedParam = queryParam || hashMatch?.[1];
+    if (!encodedParam) return;
     try {
-      const decoded = decodeScheduleParam(m[1]);
+      const decoded = decodeScheduleParam(encodedParam);
       if (decoded?.blocks?.length) {
         const prepared = prepareScheduleForClient(decoded);
         setActiveSchedule(prepared);

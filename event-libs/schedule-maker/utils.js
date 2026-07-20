@@ -110,8 +110,9 @@ class ScheduleURLUtility {
       const jsonString = JSON.stringify(serverSchedule);
       const base64JsonString = btoa(unescape(encodeURIComponent(jsonString)));
       const url = new URL(`${DA_ORIGIN}/app/${org}/${repo}/${DA_APP_PATH}`);
-      // Hash fragment is used — DA forwards the parent hash to the iframe.
-      url.hash = `schedule=${base64JsonString}`;
+      // TEMPORARY: reverted to query-param format (?schedule=) until the
+      // decorate.js hash-format fix is deployed to production. See da-controller.js.
+      url.searchParams.set('schedule', base64JsonString);
       return url.toString();
     } catch (error) {
       window.lana?.log(`Error creating schedule URL: ${error}`);
@@ -142,7 +143,9 @@ class ScheduleURLUtility {
       const jsonString = JSON.stringify(serverSchedule);
       const base64JsonString = btoa(unescape(encodeURIComponent(jsonString)));
       const urlObj = new URL(`${DA_ORIGIN}/app/${org}/${repo}/${DA_APP_PATH}`);
-      urlObj.hash = `schedule=${base64JsonString}`;
+      // TEMPORARY: reverted to query-param format (?schedule=) until the
+      // decorate.js hash-format fix is deployed to production. See da-controller.js.
+      urlObj.searchParams.set('schedule', base64JsonString);
       const scheduleURL = urlObj.toString();
       const { title, modificationTime } = serverSchedule;
       const formattedDate = modificationTime
