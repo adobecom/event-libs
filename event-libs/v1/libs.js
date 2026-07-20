@@ -25,6 +25,7 @@ const EVENT_BLOCKS = [
 ];
 
 const EVENT_BLOCKS_C2 = [
+  'upcoming-sessions',
 ];
 
 // Import only the most essential utilities that are always needed
