@@ -172,7 +172,10 @@ class VideoPlaylist {
       this.root = this.createRoot();
       this.el.appendChild(this.root);
       this.videoWrapperPromise = this.relocateVideoWrapper();
-      this.videoWrapperPromise.then((wrapper) => { this.videoWrapper = wrapper; });
+      this.videoWrapperPromise.then((wrapper) => {
+        this.videoWrapper = wrapper;
+        this.syncContainerHeightToVideo(wrapper);
+      });
       // Bootstrap the player listener before fetching playlist cards: the embedded
       // video (autoplay: true) can start playing immediately, independent of that
       // fetch, so waiting on it risks missing the initial load/play event entirely.
@@ -222,6 +225,29 @@ class VideoPlaylist {
       observer.observe(this.el, { childList: true, subtree: true });
       this.disposers.push(() => observer.disconnect());
     });
+  }
+
+  /**
+   * .container's height is otherwise auto, so align-items:stretch would size
+   * the row off whichever item's content is tallest — if the drawer's content
+   * (header + all sessions) is taller than the video, the video-wrapper gets
+   * stretched past the actual 16:9 video, leaving blank space below it. Pin
+   * .container's height to the video's own rendered height instead, so the
+   * drawer is capped to match it and scrolls internally beyond that. A
+   * ResizeObserver keeps this in sync — the video's height itself changes
+   * whenever its width does (viewport resize, or the drawer opening/closing
+   * and narrowing it).
+   */
+  syncContainerHeightToVideo(wrapper) {
+    const sync = () => {
+      const height = wrapper.getBoundingClientRect().height;
+      if (height > 0 && this.root) this.root.style.height = `${height}px`;
+    };
+
+    sync();
+    const ro = new ResizeObserver(sync);
+    ro.observe(wrapper);
+    this.disposers.push(() => ro.disconnect());
   }
 
   cleanup() {
