@@ -53,8 +53,16 @@
 
 .upcoming-sessions-heading {
   margin: 0;
-  font-size: var(--s2a-font-size-xl, 20px);
-  font-weight: var(--s2a-font-weight-adobe-clean-extrabold, 800);
+  font-size: var(--s2a-font-size-lg, 18px);
+  letter-spacing: var(--s2a-font-letter-spacing-5xl, -0.2px);
+  hanging-punctuation: first last;
+
+  /* Light (default) = dark text; .dark variant flips it below. */
+  color: var(--s2a-color-gray-1000, #000);
+}
+
+.upcoming-sessions.dark .upcoming-sessions-heading {
+  color: var(--s2a-color-gray-25, #fff);
 }
 
 .upcoming-sessions-track {

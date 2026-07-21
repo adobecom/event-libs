@@ -106,8 +106,9 @@ function formatTimeRange(session) {
   }
 }
 
+/** `track` matches sessions-guide.js's own field name/shape (flat string, not a delimited list). */
 function primaryCategory(session) {
-  return (session.tags || '').split(',').map((t) => t.trim()).filter(Boolean)[0] || '';
+  return session.track || '';
 }
 
 /** session-store/session-actions expect `.id`/`.rfCode`/`.startTimeUtc`/`.endTimeUtc`. */
@@ -484,7 +485,7 @@ async function decorate(el) {
   renderTrack(track, sessions);
 
   const header = createTag('div', { class: 'upcoming-sessions-header' }, '', { parent: el });
-  if (heading) createTag('h2', { class: 'upcoming-sessions-heading' }, heading, { parent: header });
+  if (heading) createTag('h6', { class: 'upcoming-sessions-heading' }, heading, { parent: header });
   header.append(buildCarouselControls(track));
 
   el.append(track);
