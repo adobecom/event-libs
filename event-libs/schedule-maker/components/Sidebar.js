@@ -5,8 +5,30 @@ import { useNavigation } from '../context/NavigationContext.js';
 import SearchInput from './SearchInput.js';
 import EventPicker from './EventPicker.js';
 
+function AccordionSection({ iconClass, icon, title, isOpen, onToggle, children }) {
+  return html`
+    <div class="sm-sidebar__section">
+      <button \
+        type="button" \
+        class="sm-sidebar__section-header" \
+        aria-expanded=${isOpen} \
+        onclick=${onToggle} \
+      >
+        <span class="sm-sidebar__section-icon ${iconClass}">${icon}</span>
+        <span class="sm-sidebar__section-title">${title}</span>
+        <svg class="sm-sidebar__section-chevron ${isOpen ? 'sm-sidebar__section-chevron--open' : ''}" width="14" height="14" viewBox="0 0 14 14" fill="none">
+          <path d="M3 8.5L7 4.5L11 8.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </button>
+      ${isOpen && html`<div class="sm-sidebar__section-body">${children}</div>`}
+    </div>
+  `;
+}
+
 function Sidebar({ setIsAddScheduleModalOpen }) {
   const [search, setSearch] = useState('');
+  const [isNewSectionOpen, setIsNewSectionOpen] = useState(true);
+  const [isFindSectionOpen, setIsFindSectionOpen] = useState(false);
   const { goToEditSchedule } = useNavigation();
   const { schedules, activeSchedule, setActiveSchedule, hasSynced } = useSchedulesData();
 
@@ -27,36 +49,59 @@ function Sidebar({ setIsAddScheduleModalOpen }) {
 
   return html`
     <div class="sm-sidebar">
-      <div class="sm-sidebar__folder">
-        <${EventPicker} />
-      </div>
-      <div class="sm-sidebar__header">
-        <sp-button class="sm-sidebar__button" size="l" static-color="black" onclick=${handleAddSchedule}>
-          <sp-icon slot="icon">
-            <svg width="22" height="22" viewBox="0 0 22 22" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <mask id="mask0_2489_9865" style="mask-type:alpha" maskUnits="userSpaceOnUse" x="0" y="0" width="22" height="22">
-                <path d="M11 20.6572C5.69228 20.6572 1.375 16.3399 1.375 11.0322C1.375 5.72451 5.69228 1.40723 11 1.40723C16.3077 1.40723 20.625 5.72451 20.625 11.0322C20.625 16.3399 16.3077 20.6572 11 20.6572ZM11 3.05723C6.60215 3.05723 3.025 6.63437 3.025 11.0322C3.025 15.4301 6.60215 19.0072 11 19.0072C15.3979 19.0072 18.975 15.4301 18.975 11.0322C18.975 6.63437 15.3979 3.05723 11 3.05723Z" fill="#292929"/>
-                <path d="M14.5751 10.1751H11.8251V7.4251C11.8251 6.96963 11.4556 6.6001 11.0001 6.6001C10.5446 6.6001 10.1751 6.96963 10.1751 7.4251V10.1751H7.4251C6.96963 10.1751 6.6001 10.5446 6.6001 11.0001C6.6001 11.4556 6.96963 11.8251 7.4251 11.8251H10.1751V14.5751C10.1751 15.0306 10.5446 15.4001 11.0001 15.4001C11.4556 15.4001 11.8251 15.0306 11.8251 14.5751V11.8251H14.5751C15.0306 11.8251 15.4001 11.4556 15.4001 11.0001C15.4001 10.5446 15.0306 10.1751 14.5751 10.1751Z" fill="#292929"/>
-              </mask>
-              <g mask="url(#mask0_2489_9865)">
-                <rect width="22" height="22" fill="white"/>
-              </g>
+      <div class="sm-sidebar__accordion">
+        <${AccordionSection} \
+          iconClass="sm-sidebar__section-icon--new" \
+          icon=${html`
+            <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+              <path d="M9 3.5V14.5M3.5 9H14.5" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/>
             </svg>
-          </sp-icon>
-          Add Schedule
-        </sp-button>
-        ${showFilter && html`
-          <${SearchInput} \
-            placeholder="Filter schedules" \
-            value="${search}" \
-            onInput="${handleSearch}" \
-            className="sm-sidebar__search" \
-          />
-        `}
+          `} \
+          title="New schedule" \
+          isOpen=${isNewSectionOpen} \
+          onToggle=${() => setIsNewSectionOpen((prev) => !prev)} \
+        >
+          <p class="sm-sidebar__section-description">Create a schedule from scratch.</p>
+          <sp-button class="sm-sidebar__button" static-color="black" onclick=${handleAddSchedule}>
+            <sp-icon slot="icon">
+              <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+                <path d="M9 3.5V14.5M3.5 9H14.5" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/>
+              </svg>
+            </sp-icon>
+            Create new schedule
+          </sp-button>
+        </${AccordionSection}>
+
+        <${AccordionSection} \
+          iconClass="sm-sidebar__section-icon--find" \
+          icon=${html`
+            <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+              <circle cx="8" cy="8" r="5.25" stroke="currentColor" stroke-width="1.5"/>
+              <path d="M15 15L12 12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+            </svg>
+          `} \
+          title="Find existing schedules" \
+          isOpen=${isFindSectionOpen} \
+          onToggle=${() => setIsFindSectionOpen((prev) => !prev)} \
+        >
+          <p class="sm-sidebar__section-description">Scan a DA folder for docs with schedule links.</p>
+          <${EventPicker} />
+        </${AccordionSection}>
       </div>
+
+      <div class="sm-sidebar__divider"></div>
+
+      ${showFilter && html`
+        <${SearchInput} \
+          placeholder="Filter schedules" \
+          value="${search}" \
+          onInput="${handleSearch}" \
+          className="sm-sidebar__search" \
+        />
+      `}
       <div class="sm-sidebar__schedules">
         ${filteredSchedules?.length === 0 && !search && html`
-          <p class="sm-sidebar__empty">No schedules yet. Add a schedule or scan an event folder to find existing schedule links.</p>
+          <p class="sm-sidebar__empty">No schedules yet. Create one above, or scan a folder to find existing links.</p>
         `}
         ${filteredSchedules?.length === 0 && search && html`
           <p class="sm-sidebar__empty">No schedules match "${search}".</p>

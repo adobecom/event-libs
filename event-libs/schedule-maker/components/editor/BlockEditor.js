@@ -259,7 +259,7 @@ export default function BlockEditor({
             oninput=${(event) => handleFragmentPathChange(block.id, event)} \
             placeholder="Enter fragment path" \
           />
-          <sp-action-button quiet size="l" onClick=${() => setIsBrowserOpen(true)} aria-label="Browse fragment path" title="Browse DA fragments">
+          <sp-action-button quiet onClick=${() => setIsBrowserOpen(true)} aria-label="Browse fragment path" title="Browse DA fragments">
             <sp-icon slot="icon">
               <svg xmlns="http://www.w3.org/2000/svg" height="18" viewBox="0 0 18 18" width="18">
                 <path fill="currentColor" d="M1,4.5v10A1.5,1.5,0,0,0,2.5,16h13A1.5,1.5,0,0,0,17,14.5V6.5A1.5,1.5,0,0,0,15.5,5H9.664a.5.5,0,0,1-.39-.188L7.546,2.688A1.5,1.5,0,0,0,6.378,2.1H2.5A1.5,1.5,0,0,0,1,3.6Z"/>

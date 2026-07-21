@@ -247,7 +247,6 @@ export default function EventPicker() {
 
   return html`
     <div class="sm-event-picker">
-      <sp-field-label size="l"><strong>Folder to fetch schedule links</strong></sp-field-label>
       <div class="sm-event-picker__row">
         <sp-textfield
           type="text"
@@ -257,21 +256,22 @@ export default function EventPicker() {
           onblur=${handleInputBlur}
           onkeydown=${handleInputKeyDown}
         />
-        <sp-action-button quiet size="l" onClick=${() => setIsBrowserOpen(true)} aria-label="Browse for event folder" title="Browse for event folder">
+        <sp-action-button quiet onClick=${() => setIsBrowserOpen(true)} aria-label="Browse for event folder" title="Browse for event folder">
           <sp-icon slot="icon">
             <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 18 18">
               <path fill="currentColor" d="M1,4.5v10A1.5,1.5,0,0,0,2.5,16h13A1.5,1.5,0,0,0,17,14.5V6.5A1.5,1.5,0,0,0,15.5,5H9.664a.5.5,0,0,1-.39-.188L7.546,2.688A1.5,1.5,0,0,0,6.378,2.1H2.5A1.5,1.5,0,0,0,1,3.6Z"/>
             </svg>
           </sp-icon>
         </sp-action-button>
-        <sp-action-button quiet size="l" onClick=${() => syncSchedules()} aria-label="Sync schedules" title="Scan event folder to find schedule links in documents">
+        <sp-button treatment="outline" static-color="black" onClick=${() => syncSchedules()} title="Scan event folder to find schedule links in documents">
           <sp-icon slot="icon">
             <svg xmlns="http://www.w3.org/2000/svg" height="18" viewBox="0 0 18 18" width="18">
               <path fill="currentColor" d="M16.337,10H15.39a.6075.6075,0,0,0-.581.469A5.7235,5.7235,0,0,1,5.25,13.006l-.346-.3465L6.8815,10.682A.392.392,0,0,0,7,10.4a.4.4,0,0,0-.377-.4H1.25a.25.25,0,0,0-.25.25v5.375A.4.4,0,0,0,1.4,16a.3905.3905,0,0,0,.28-.118l1.8085-1.8085.178.1785a8.09048,8.09048,0,0,0,3.642,2.1655,7.715,7.715,0,0,0,9.4379-5.47434q.04733-.178.0861-.35816A.5.5,0,0,0,16.337,10Z"/>
               <path fill="currentColor" d="M16.6,2a.3905.3905,0,0,0-.28.118L14.5095,3.9265l-.178-.1765a8.09048,8.09048,0,0,0-3.642-2.1655A7.715,7.715,0,0,0,1.25269,7.06072q-.04677.17612-.08519.35428A.5.5,0,0,0,1.663,8H2.61a.6075.6075,0,0,0,.581-.469A5.7235,5.7235,0,0,1,12.75,4.994l.346.3465L11.1185,7.318A.392.392,0,0,0,11,7.6a.4.4,0,0,0,.377.4H16.75A.25.25,0,0,0,17,7.75V2.377A.4.4,0,0,0,16.6,2Z"/>
             </svg>
           </sp-icon>
-        </sp-action-button>
+          Scan
+        </sp-button>
       </div>
       <${FolderBrowser}
         isOpen=${isBrowserOpen}
