@@ -14,6 +14,26 @@ import MobileRiderController from '../../../services/sessions/mobile-rider-contr
 const ROTATE_OUT_MS = 350;
 const MR_POLL_INTERVAL_MS = 30_000;
 
+/**
+ * Testing-only clock override: `?timing=<epoch-ms>` in the page URL lets QA
+ * simulate "now" as any instant (e.g. right before a session starts, or
+ * mid-live) without waiting for real time to pass. Read once at module load
+ * (not per-call) as an *offset* from the real clock, not a frozen value —
+ * `now()` still advances in real time from that point, so setTimeout-based
+ * timers and the MR poll keep firing correctly relative to it. Absent or
+ * invalid `timing` falls back to the real `Date.now()` exactly as before.
+ */
+const TIMING_OVERRIDE_OFFSET_MS = (() => {
+  const raw = new URLSearchParams(window.location.search).get('timing');
+  if (!raw) return null;
+  const parsed = Number(raw);
+  return Number.isFinite(parsed) ? parsed - Date.now() : null;
+})();
+
+function now() {
+  return TIMING_OVERRIDE_OFFSET_MS === null ? Date.now() : Date.now() + TIMING_OVERRIDE_OFFSET_MS;
+}
+
 // session-store.js's own liveStreamActiveIds is currently backed by a mocked
 // fetchLiveStatus() (services/sessions/mobile-rider.js — always returns
 // everything inactive), so it can never report a session live yet. Poll the
@@ -66,7 +86,7 @@ function liveActiveIds() {
  * once MR genuinely reports active (-> 'live', watch/broadcast routing).
  */
 function currentState(session) {
-  const state = deriveSessionState(toDerivedInput(session), liveActiveIds(), Date.now());
+  const state = deriveSessionState(toDerivedInput(session), liveActiveIds(), now());
   if (session.mrStreamId && state === 'on-demand') return 'upcoming';
   return state;
 }
@@ -311,7 +331,7 @@ function scheduleStateTimers(el, track, sessions) {
     if (!sessionTime) return;
 
     // upcoming -> live: simple scheduled timer against the baked-in start time.
-    const untilStart = sessionTime.startTimeMillis - Date.now();
+    const untilStart = sessionTime.startTimeMillis - now();
     if (untilStart > 0) {
       timers.push(setTimeout(() => renderTrack(track, sessions), untilStart));
     }
@@ -322,7 +342,7 @@ function scheduleStateTimers(el, track, sessions) {
     // fallback safety net; the real end signal is startMobileRiderPolling's
     // active -> inactive transition (onMobileRiderEnded), which fires
     // independently of this timer and usually removes the card first.
-    const untilEnd = sessionTime.endTimeMillis - Date.now();
+    const untilEnd = sessionTime.endTimeMillis - now();
     if (untilEnd > 0) {
       timers.push(setTimeout(() => removeCard(el, session.sessionId), untilEnd));
     } else if (currentState(session) === 'on-demand') {
@@ -388,7 +408,7 @@ function startMobileRiderPolling(sessions, onEnded) {
   }
 
   async function tick() {
-    const ids = dueIds(Date.now());
+    const ids = dueIds(now());
     if (!ids.length) return;
     try {
       const { active } = await mobileRiderController.getMediaStatus(ids);
@@ -408,7 +428,7 @@ function startMobileRiderPolling(sessions, onEnded) {
   // instant the session starts rather than waiting for the next 30s interval
   // boundary — plus the immediate tick() below for sessions already underway.
   const startTimers = mrSessions
-    .map((s) => (s.sessionTime?.startTimeMillis ?? 0) - Date.now())
+    .map((s) => (s.sessionTime?.startTimeMillis ?? 0) - now())
     .filter((untilStart) => untilStart > 0)
     .map((untilStart) => setTimeout(tick, untilStart));
 
