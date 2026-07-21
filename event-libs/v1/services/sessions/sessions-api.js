@@ -7,7 +7,7 @@ import { ENV_MAP } from '../../utils/constances.js';
 // visual testing of the speaker details view without ever overwriting a real one.
 const TEST_SPEAKER_PHOTO = 'https://MWPW-199065--event-libs--adobecom.aem.live/event-libs/v1/blocks/sessions-guide/assets/Kristy-Campbell.jpg';
 
-// Realistic raw ESL/ESP catalog payload — same shape as the real `GET /v1/events/:id/sessions`
+// Realistic raw ESL/ESP catalog payload — same shape as the real `GET /v1/events/:id/session-catalog`
 // response (payload.sessions[] / payload.sessionTimes[] / payload.speakers[], joined by id,
 // customAttributes carrying track/audience/etc.) rather than the app's post-mapped session
 // shape. Piped through the same mapEslPayloadToRawSessions()/normalizeSessions() pipeline the
@@ -461,7 +461,7 @@ export function mapEslPayloadToRawSessions(payload) {
 async function fetchEslSessions(eventId) {
   const { serviceApiEndpoints } = ENV_MAP[getEventServiceEnv().name];
   const options = await constructRequestOptions('GET');
-  const res = await fetch(`${serviceApiEndpoints.esp}/v1/events/${eventId}/sessions`, options);
+  const res = await fetch(`${serviceApiEndpoints.esp}/v1/events/${eventId}/session-catalog`, options);
   if (!res.ok) {
     throw new Error(`ESL sessions fetch failed for event ${eventId}: ${res.status}`);
   }
