@@ -14,17 +14,18 @@ export default function Schedules() {
   const { setActiveSchedule } = useSchedulesData();
   const [isAddScheduleModalOpen, setIsAddScheduleModalOpen] = useState(false);
 
-  // On mount, check if the URL carries schedule data, either as a query param
-  // (?schedule={b64}, TEMPORARY current format) or hash fragment (#schedule={b64},
-  // DA forwards the parent page hash to the iframe, enabling deep-link open).
+  // On mount, check if the URL hash carries schedule data (#schedule={b64}).
+  // DA forwards only the parent page's hash to this iframe app — not query
+  // params — so a ?schedule= link (old ECC format, or a freshly-copied link
+  // while Copy Link temporarily emits ?schedule=) will not auto-open here;
+  // it can still be found via Sync from the sidebar list.
   useEffect(() => {
-    const url = new URL(window.location.href);
-    const queryParam = url.searchParams.get('schedule');
-    const hashMatch = url.hash.match(/[#&]schedule=([A-Za-z0-9+/=%-]{20,})/);
-    const encodedParam = queryParam || hashMatch?.[1];
-    if (!encodedParam) return;
+    const hash = window.location.hash;
+    if (!hash) return;
+    const m = hash.match(/[#&]schedule=([A-Za-z0-9+/=%-]{20,})/);
+    if (!m) return;
     try {
-      const decoded = decodeScheduleParam(encodedParam);
+      const decoded = decodeScheduleParam(m[1]);
       if (decoded?.blocks?.length) {
         const prepared = prepareScheduleForClient(decoded);
         setActiveSchedule(prepared);

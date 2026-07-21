@@ -27,7 +27,8 @@ Schedule Maker is a standalone [Document Authoring (DA)](https://da.live) app fo
    - Owns the concurrency machinery (bounded parallel pool, ETag-based conditional writes for the rewrite pass) and `decodeScheduleParam`. No sheet CRUD.
 
 4. **UI** ([ScheduleMaker.js](ScheduleMaker.js) → [pages/Schedules.js](pages/Schedules.js))
-   - Two-panel layout: a [Sidebar](components/Sidebar.js) (event picker, sync, schedule list with doc-reference paths) and a [ScheduleEditor](components/ScheduleEditor.js) (block editing).
+   - Two-panel layout: a [Sidebar](components/Sidebar.js) and a [ScheduleEditor](components/ScheduleEditor.js) (block editing, with drag-to-reorder).
+   - The sidebar is two collapsible accordion cards — **New schedule** and **Find existing schedules** (event picker + sync, collapsed by default) — above the schedule list.
    - The Home page is intentionally bypassed — the app always renders the Schedules layout.
 
 ### Data Flow
@@ -42,13 +43,21 @@ DA SDK ──(token, org, repo, daFetch)──▶ DAContext ──▶ da-control
 
 ## Link-First Model
 
-Every schedule is fully described by its **share link**:
+Every schedule is fully described by its **share link**, either as a hash fragment or a query param:
 
 ```
 https://da.live/app/{org}/{repo}/tools/da-apps/schedule-maker#schedule={base64}
+https://da.live/app/{org}/{repo}/tools/da-apps/schedule-maker?schedule={base64}
 ```
 
-The `#schedule=` hash fragment holds the entire schedule JSON (title, blocks, timestamps) encoded as base64. No server state is required to open or edit a schedule — click the link, the editor loads the schedule from the hash, you edit, you copy the new link.
+Both forms hold the entire schedule JSON (title, blocks, timestamps) encoded as base64. No server state is required to open or edit a schedule — click the link, the editor loads the schedule, you edit, you copy the new link.
+
+These two formats are **not interchangeable in practice** — each one only auto-decodes in one specific consumer:
+
+- **`#schedule=` — the schedule-maker app itself.** DA forwards only the parent page's hash into this app's iframe, not the query string, so `Schedules.js`'s deep-link-on-mount only ever reads `window.location.hash`. A `?schedule=` link will not auto-open here at all.
+- **`?schedule=` — the published page's `chrono-box` block.** `decorate.js` parses the authored `<a>` href directly (no iframe involved), and the *production* build of `decorate.js` only reads the query param today, not the hash.
+
+> **Copy Link currently emits `?schedule=` (temporary),** to keep freshly-copied links rendering correctly on published pages. The tradeoff: a freshly-copied link will **not** auto-open back in the schedule-maker editor if you paste/click it — use Sync to find and reopen it from the sidebar list instead, or manually swap `?schedule=` → `#schedule=` in the URL (adding `?ref=<branch>` too, if you're pointed at a feature-branch build) to open it directly in the app for local testing. Once the hash-aware `decorate.js` ships to production, flip `ScheduleURLUtility` in [utils.js](utils.js) back to `#schedule=` and both consumers line up on the same format again. `decodeScheduleParam` itself (used by sync's doc-text scan) is format-agnostic — it decodes a raw base64 string regardless of where it came from — so only the *URL-reading* call sites are format-sensitive.
 
 ### Schedule JSON Structure
 
@@ -72,13 +81,11 @@ The `#schedule=` hash fragment holds the entire schedule JSON (title, blocks, ti
 
 `startDateTime` is stored as **epoch milliseconds**. `modificationTime` is stamped at Copy Link time. A block is "complete" when it has a `title`, `fragmentPath`, and `startDateTime` (and a `streamId` if `includeLiveStream` is set) — incomplete schedules show a warning icon in the sidebar.
 
-> **Hash vs query param**: `?schedule=` (old ECC format) is also supported for reading. Sync detects both. New links always use `#schedule=` because DA forwards the hash fragment to the embedded iframe app, whereas query params are not forwarded.
-
 ## Deep-Link Loading
 
 When DA opens the schedule-maker URL with a `#schedule=` fragment, the app reads and decodes the fragment on mount (`Schedules.js` `useEffect`) and opens the schedule directly in the editor. No sync or network request is needed.
 
-Old `?schedule=` links from ECC open the app but do not auto-load; the author can use Sync to find and open them from the sidebar list.
+`?schedule=` links (old ECC format, or a freshly-copied link while Copy Link temporarily emits `?schedule=` — see Link-First Model above) do **not** auto-open here, since DA never forwards the query string into this app's iframe. Use Sync to find and open them from the sidebar list instead.
 
 ## Sync
 
@@ -96,23 +103,25 @@ No sheets are written. Sync only reads.
 
 ### Rewrite Pass (Temporary)
 
-Until the production `decorate.js` fix ships, sync also rewrites any `#schedule=` hrefs it finds back to `?schedule=` query-param format so the production chronobox can load them. This pass uses ETag-based conditional writes with retries. It will be removed once the fix is on production.
+Sync also rewrites any `#schedule=` hrefs it finds in scanned docs back to `?schedule=` query-param format, so the production chronobox can load them. This is a second, belt-and-suspenders instance of the same temporary measure as the Copy Link format above (catching hash-format links from other sources, e.g. authored before this revert). This pass uses ETag-based conditional writes with retries. Once `decorate.js`'s hash support ships to production, both this rewrite pass and the Copy Link format should flip from `?schedule=`-favoring back to `#schedule=`-favoring together.
 
-### Sync Performance
+### Sync Performance & Reliability
 
 - **`SCAN_CONCURRENCY`** (`100`) — max in-flight fetches. Watch for `429`s; `fetchText` retries with exponential backoff (0.3 s → 4 s), honoring `Retry-After`.
-- **Fail loud, not silent** — a document that can't be read after retries causes sync to **abort with an error** rather than silently omit potential schedules.
+- **Fail loud, not silent** — a document that can't be read after retries causes sync to **abort with an error** rather than silently omit potential schedules. Likewise, if the initial folder `list` call itself fails with a `401` or a network error, sync reports that as an error instead of reporting a false "0 schedules found" success — a plain empty folder still succeeds normally.
+- The **Scan** button is disabled until a folder path is entered.
 
 ## Key Features
 
 | Feature | Component | Notes |
 |---------|-----------|-------|
-| **Event folder picker** | [EventPicker](components/EventPicker.js) | Lists folders via `admin.da.live/list`; last folder remembered in `localStorage`. `/` = whole repo. |
+| **Event folder picker** | [EventPicker](components/EventPicker.js) | Lists folders via `admin.da.live/list` in a "Select DA Folder" browser modal; last folder remembered in `localStorage`. `/` = whole repo. |
 | **Fragment path browser** | [FragmentPathBrowser](components/editor/FragmentPathBrowser.js) | Column navigation over folders/HTML; defaults to `/events/events-shared/fragments`, or pre-navigates to the current path. |
 | **Epoch datetime input** | [BlockEditor](components/editor/BlockEditor.js) | Local-time picker synced with an epoch-ms field. |
+| **Drag-to-reorder blocks** | [BlockEditor](components/editor/BlockEditor.js), [ScheduleEditor](components/ScheduleEditor.js) | Native HTML5 drag-and-drop via a grip handle; works for existing and newly-added blocks. Manual order persists through editing and save (only the initial load re-sorts by `startDateTime`). |
 | **Excel import** | [SheetImporter](components/SheetImporter.js) | Imports schedules from an Excel/CSV file and creates them locally. Uses SheetJS (`v1/deps/xlsx.mjs`), vendored from `cdn.sheetjs.com/xlsx-0.20.3`. |
-| **Copy Link** | [ScheduleHeader](components/editor/ScheduleHeader.js) | Copies a rich anchor (title + modification timestamp as link text, full `#schedule=` URL as href) to the clipboard for pasting into DA docs. |
-| **Sync** | [da-controller.js](scripts/da-controller.js) | Scans all docs in the event folder and builds the sidebar schedule list with doc-reference paths. |
+| **Copy Link** | [ScheduleHeader](components/editor/ScheduleHeader.js) | Copies a rich anchor (title + modification timestamp as link text, `?schedule=` URL as href — see Link-First Model above) to the clipboard for pasting into DA docs. |
+| **Sync** | [da-controller.js](scripts/da-controller.js) | Scans all docs in the event folder and builds the sidebar schedule list with doc-reference paths. Disabled until a folder path is set; surfaces auth failures as errors. |
 | **Discard** | [SchedulesContext](context/SchedulesContext.js) | Reverts the active schedule to the state it was in when last opened. |
 
 ## Access Control
@@ -167,7 +176,7 @@ event-libs/ (inner repo root — served locally)
     │   └── da-controller.js    # admin.da.live wrapper: list/scan, ETag rewrite, decoder
     ├── pages/
     │   ├── Home.js             # bypassed
-    │   └── Schedules.js        # two-panel layout (Sidebar + Editor); hash deep-link on mount
+    │   └── Schedules.js        # two-panel layout (Sidebar + Editor); deep-link on mount
     └── components/
         ├── Sidebar.js  EventPicker.js  SearchInput.js  SheetImporter.js  AddScheduleModal.js
         ├── ScheduleEditor.js  Modal.js
@@ -180,3 +189,4 @@ event-libs/ (inner repo root — served locally)
 - Network / API failures are logged via `window.lana` and returned as `{ ok: false, status, error }` from the controller.
 - The UI surfaces errors as Spectrum toasts (`toastError` / `toastSuccess`) or, for repo-level access failures, an inline access-error panel.
 - Unreadable-document aborts during sync surface actionable "please retry" messages rather than failing silently.
+- A `status: 0` result (folder browser, fragment path browser, sync) shows "Unable to reach DA — sign in at da.live first, or check your connection." DA's own SDK `daFetch` helper can swallow a genuine `401` into a thrown/generic error when its IMS sign-in bootstrap fails — common in incognito/private browsing — so `status: 0` is the realistic signal for "not signed in," not a literal `401`.
