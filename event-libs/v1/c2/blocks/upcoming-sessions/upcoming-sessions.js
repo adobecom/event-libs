@@ -126,6 +126,8 @@ function toRfSession(session) {
     rfCode: session.sessionCode,
     startTimeUtc: derived.startTimeUtc,
     endTimeUtc: derived.endTimeUtc,
+    title: session.enTitle,
+    track: session.track,
   };
 }
 

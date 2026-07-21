@@ -630,6 +630,84 @@ No JS change was needed — `decorate()`/`attachToPrecedingBlock()` don't
 need to know which surface is active, since it's purely a CSS class Milo
 already applies from the authored variant.
 
+### 14. Schedule-conflict modal (implemented)
+
+Supersedes the earlier "conflict detection is disabled" note under §2.4 —
+Add to Schedule now shows the same schedule-conflict modal Session Guide
+uses, with no new modal implementation needed here:
+
+- `EVENT_CONFIG.showConflictModal` (in `upcoming-sessions.js`) is `true`.
+- `scheduleWithFeedback()` → `runSessionAction()` →
+  `services/sessions/session-actions.js`'s `scheduleAction()` already checks
+  `findScheduleConflict()` whenever `showConflictModal` is `true` — this is
+  shared, UI-agnostic logic, not something owned by this block.
+- On conflict, `services/sessions/action-feedback.js`'s `runSessionAction()`
+  opens the same shared, page-level
+  `features/conflict-modal/conflict-modal.js` Session Guide itself uses
+  (built on Milo's own modal component — focus trap, Escape-to-close, body
+  scroll lock, etc. come for free). That module is already plain vanilla JS
+  (`createTag`, no Preact dependency), so it works unmodified from this
+  vanilla block.
+
+**Important scoping detail:** `findScheduleConflict()` checks the incoming
+session against the shared `session-store.js` `sessions` signal — the full
+catalog populated by `initSessionState()`'s `loadSessions()` (a real fetch
+against `rainfocus-api-url`) — **not** this block's own authored
+`upcoming-session-author-data.json` payload. So two overlapping cards from
+this block's own authored data will **not** conflict with each other unless
+their exact ids/times also happen to exist in that separately-fetched
+catalog. This is inherent to how conflict detection is scoped page-wide
+(matches Session Guide's own behavior exactly — a session scheduled from
+Session Guide will conflict with one scheduled from this marquee block, and
+vice versa, since both write to the same `scheduled` signal) — not a gap
+specific to this block.
+
+#### Test plan — schedule-conflict modal
+
+No automated tests yet (standing "no tests until dev complete" instruction
+applies here too). Manual steps:
+
+1. **Set up a guaranteed conflict** via the browser console, since the
+   block's own authored sessions won't reliably conflict with each other
+   (see the scoping note above). Pick one of the authored cards — e.g.
+   `S6210` (`id: 1c2f7e9a-3b4d-4e21-9a6f-6d1f1a2b3c4d`, starts
+   `1784624404633`) — and inject a fake already-scheduled session into the
+   shared catalog with an overlapping time window:
+   ```js
+   const store = await import('/event-libs/v1/utils/session-store.js');
+   store.sessions.value = [
+     ...store.sessions.value,
+     {
+       id: 'fake-conflict-1',
+       title: 'Existing Scheduled Session',
+       track: 'Design',
+       startTimeUtc: new Date(1784624404633).toISOString(),
+       endTimeUtc: new Date(1784628904633).toISOString(),
+     },
+   ];
+   store.scheduled.value = new Set([...store.scheduled.value, 'fake-conflict-1']);
+   ```
+2. **Trigger it.** Click Add to Schedule on the overlapping card (`S6210` in
+   the example above). Confirm the shared conflict modal opens — title "You
+   have conflicting sessions", a radio option per session (existing vs.
+   incoming) with title/track/duration shown correctly, incoming
+   pre-selected, and a Save button.
+3. **Keep existing.** Select the existing option and Save. Confirm the
+   incoming session is *not* added to `scheduled` and the card's schedule
+   icon stays in its unscheduled state.
+4. **Keep incoming.** Reopen the conflict (repeat step 1's seeding if
+   needed) and this time select incoming, then Save. Confirm the fake
+   existing session is removed from `scheduled`, the incoming session is
+   added, and the card's schedule icon updates immediately (via the
+   existing `scheduled.subscribe()` re-render) with no page refresh.
+5. **Auth gating still applies.** Clear `localStorage.getItem('sg:dev-auth')`
+   (or otherwise force `isLoggedIn`/`isRegistered` to not both be `true`) and
+   confirm Add to Schedule shows the login/registration toast instead of a
+   conflict modal — `assertAuthorized()` runs before the conflict check.
+6. **Non-conflicting schedule still works.** Confirm scheduling a card with
+   no time overlap against anything in `scheduled` succeeds immediately with
+   no modal, exactly as before this change.
+
 ## Open questions for implementation
 
 - **Configurator integration:** should the Upcoming Sessions Configurator be
@@ -678,3 +756,4 @@ already applies from the authored variant.
 | Calendar/chrono action | Session page only | Keeps hero rail lightweight |
 | Attach to preceding block | Check immediate preceding sibling for `.attach-upcoming`; overlay if present, normal flow otherwise | Matches Figma desktop/mobile designs; also structurally guaranteed since both blocks are authored in the same fragment |
 | Card surface (light/dark) | Light is the default (`s2a/color/background/subtle` → `#f8f8f8`); authoring the `dark` block variant switches to `#505050` via a `.dark` CSS class — no JS involvement | Design defines the card token-driven for both surfaces (§13); `dark` is opt-in since it's the less common placement (marquee hero overlay) |
+| Schedule-conflict modal | `EVENT_CONFIG.showConflictModal: true` — reuses Session Guide's own shared `session-actions.js`/`action-feedback.js`/`conflict-modal.js` as-is, no new modal built (§14) | That layer was already UI-agnostic and vanilla-JS compatible; conflicts are checked against the shared page-wide `sessions`/`scheduled` catalog, not this block's own authored subset |
