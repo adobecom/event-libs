@@ -15,6 +15,19 @@
  * cards here match Session Guide's look exactly. Copied on purpose, not
  * @import'd, so this block has no runtime dependency on sessions-guide.css
  * being loaded (per design doc: keep decoupled).
+ *
+ * IMPORTANT: sessions-guide.css defines its own (very different, light-themed)
+ * rules for these exact same class names — e.g. its own `.sg-live-card` is a
+ * white card that turns solid #000 on hover at wide breakpoints, and its
+ * `.sg-icon-btn`/`.sg-category-badge` values differ too. Session Guide's CSS
+ * can genuinely be loaded on the same page as this block (its modal opens
+ * from this component's own cards), and two same-specificity `.sg-live-card`
+ * rules from two different stylesheets is a load-order race, not a reliable
+ * override — whichever stylesheet's <link> lands later in <head> wins,
+ * regardless of which one is "correct" here. All selectors below are
+ * therefore scoped under `.upcoming-sessions` to raise their specificity
+ * above sessions-guide.css's un-scoped versions, so this block's card
+ * styling always wins deterministically.
  */
 
 .upcoming-sessions {
@@ -48,6 +61,11 @@
   display: flex;
   gap: var(--s2a-spacing-md, 16px);
   overflow-x: auto;
+  overflow-y: visible;
+
+  /* Vertical breathing room so a card's :hover scale-up (see .sg-live-card)
+     doesn't get clipped or trigger a vertical scrollbar. */
+  padding-block: var(--s2a-spacing-xs, 8px);
   scroll-snap-type: x proximity;
   scrollbar-width: none;
 }
@@ -136,8 +154,9 @@
  * the card's own row-direction flex on desktop).
  */
 
-.sg-live-card {
-  background: var(--s2a-color-gray-900, #131313);
+.upcoming-sessions .sg-live-card {
+  /* s2a/color/background/subtle, light (default) = --s2a-color-gray-50. */
+  background: var(--s2a-color-gray-50, #f8f8f8);
   border: none;
   border-radius: var(--s2a-border-radius-md, 16px);
   display: flex;
@@ -151,21 +170,37 @@
   padding: var(--s2a-spacing-md, 16px);
   gap: var(--s2a-spacing-md, 16px);
   overflow: hidden;
-  transition: background 0.2s, border-color 0.2s;
+  transition: background 0.32s cubic-bezier(0.22, 1, 0.36, 1),
+              box-shadow 0.32s cubic-bezier(0.22, 1, 0.36, 1),
+              transform 0.32s cubic-bezier(0.22, 1, 0.36, 1),
+              border-color 0.2s;
   cursor: pointer;
 }
 
-.sg-live-card:focus-visible {
-  outline: var(--s2a-border-width-md, 2px) solid var(--s2a-color-gray-25, #fff);
+.upcoming-sessions .sg-live-card:focus-visible {
+  outline: var(--s2a-border-width-md, 2px) solid var(--s2a-color-gray-1000, #000);
   outline-offset: 2px;
 }
 
-.sg-live-card:hover {
+/*
+ * Light (default) hover: inverts to s2a/color/gray/900 (#131313) and grows,
+ * matching sessions-guide.css's own `.sg-card:hover` "expand" pattern
+ * (width/min-height increase, gray-50 -> gray-900, box-shadow, z-index) — same
+ * transition curve. Growth is done via `transform: scale()` rather than
+ * literal width/height like `.sg-card` uses, since this card sits in a
+ * horizontally-scrolling track (growing width/height directly would reflow
+ * and shift sibling cards mid-scroll); scaling keeps that layout-neutral
+ * while still reading as "grows on hover".
+ */
+.upcoming-sessions .sg-live-card:hover {
   background: var(--s2a-color-gray-900, #131313);
   border-color: transparent;
+  transform: scale(1.05);
+  box-shadow: 0 6px 24px rgb(0 0 0 / 18%);
+  z-index: 2;
 }
 
-.sg-live-card__content {
+.upcoming-sessions .sg-live-card__content {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
@@ -174,7 +209,7 @@
   min-width: 0;
 }
 
-.sg-live-card__meta {
+.upcoming-sessions .sg-live-card__meta {
   display: flex;
   flex-direction: row;
   align-items: center;
@@ -184,82 +219,158 @@
   margin: 0;
 }
 
-.sg-live-card__track-row {
+.upcoming-sessions .sg-live-card__track-row {
   display: flex;
   align-items: center;
   gap: var(--s2a-spacing-xs, 8px);
 }
 
-/* #8a8a8a has no exact matching gray token (closest is --s2a-color-gray-500 #8f8f8f) — kept literal. */
-.sg-live-card__time {
+.upcoming-sessions .sg-live-card__time {
   font-family: 'Adobe Clean Spectrum VF', 'Adobe Clean', adobe-clean, 'Trebuchet MS', sans-serif;
   font-weight: var(--s2a-font-weight-adobe-clean-regular, 400);
   font-size: var(--s2a-font-size-xs, 12px);
   line-height: 1.5;
-  color: #8a8a8a;
+  color: var(--s2a-color-gray-600, #717171);
   white-space: nowrap;
   margin: 0;
   transition: color 0.2s;
 }
 
-/* #f2f2f2 has no exact matching gray token (closest is --s2a-color-gray-75 #f3f3f3) — kept literal. */
-.sg-live-card__title {
+.upcoming-sessions .sg-live-card__title {
   font-family: 'Adobe Clean Spectrum VF', 'Adobe Clean', adobe-clean, 'Trebuchet MS', sans-serif;
   font-weight: var(--s2a-font-weight-adobe-clean-extrabold, 800);
   font-size: var(--s2a-font-size-md, 16px);
   line-height: 1.25;
   margin: 0;
-  color: #f2f2f2;
+  color: var(--s2a-color-gray-1000, #000);
   transition: color 0.2s;
 }
 
-.sg-live-card__actions {
+.upcoming-sessions .sg-live-card__actions {
   display: flex;
   align-items: center;
   gap: var(--s2a-spacing-sm, 12px);
 }
 
+/*
+ * ── Dark surface variant ─────────────────────────────────────────────────
+ * Card background is bound to the semantic token `s2a/color/background/
+ * subtle`, which resolves differently per surface (light: --s2a-color-gray-50
+ * #f8f8f8 — the default above; dark: --s2a-color-gray-700 #505050). Default
+ * (no variant, or an explicit `light` variant) stays light via the unscoped
+ * rules above; authoring the `dark` variant (`upcoming-sessions (dark)`)
+ * puts a `dark` class on the block root and switches the surface here — this
+ * is the original look this card shipped with, for the dark hero/marquee
+ * overlay context (§6/§13 of the design doc).
+ */
+.upcoming-sessions.dark .sg-live-card {
+  background: var(--s2a-color-gray-700, #505050);
+}
+
+/*
+ * Per the Figma dev-mode CSS export, the dark card's :hover state is
+ * byte-identical to its default — no color inversion, no grow/shadow.
+ * Explicitly reset the light variant's hover effects here rather than
+ * relying on cascade order, since transform/box-shadow/z-index aren't
+ * otherwise overridden anywhere else for `.dark`.
+ */
+.upcoming-sessions.dark .sg-live-card:hover {
+  background: var(--s2a-color-gray-700, #505050);
+  transform: none;
+  box-shadow: none;
+  z-index: auto;
+}
+
+.upcoming-sessions.dark .sg-live-card:focus-visible {
+  outline-color: var(--s2a-color-gray-25, #fff);
+}
+
+/*
+ * No separate :hover rule needed for text/badge color here — these plain
+ * selectors are equal-specificity with (and declared after) the generic
+ * light-hover color rules above, so they already win regardless of hover
+ * state via source order, correctly keeping dark's own hover identical to
+ * its default per the Figma export.
+ */
+.upcoming-sessions.dark .sg-live-card__time {
+  color: #8a8a8a;
+}
+
+.upcoming-sessions.dark .sg-live-card__title {
+  color: #f2f2f2;
+}
+
 @media (width >= 900px) {
-  .sg-live-card {
+  .upcoming-sessions .sg-live-card {
     flex-direction: row;
     align-items: flex-start;
     width: 431px;
     height: 128px;
     padding: var(--s2a-spacing-lg, 24px);
     gap: var(--s2a-spacing-lg, 24px);
-
-    /* No exact 75% transparent-black token (closest are 72%/80%) — kept literal per spec. */
-    background: rgb(0 0 0);
+    background: var(--s2a-color-gray-50, #f8f8f8);
   }
 
-  .sg-live-card:hover {
-    background: var(--s2a-color-transparent-black-80, rgb(0 0 0 / 80%));
+  .upcoming-sessions .sg-live-card:hover {
+    background: var(--s2a-color-gray-900, #131313);
   }
 
-  .sg-live-card__content {
+  .upcoming-sessions .sg-live-card__content {
     width: 327px;
   }
 
-  .sg-live-card__time {
-    color: var(--s2a-color-transparent-white-64, rgb(255 255 255 / 64%));
+  .upcoming-sessions .sg-live-card__time {
+    color: var(--s2a-color-gray-600, #717171);
   }
 
-  .sg-live-card__title {
+  .upcoming-sessions .sg-live-card__title {
     font-size: var(--s2a-font-size-lg, 18px);
-    line-height: 1.22;
+    line-height: 22px;
+    color: var(--s2a-color-gray-1000, #000);
+  }
+
+  /*
+   * Values below match the Figma dev-mode CSS export for "Session card -
+   * no images" exactly (both its default and :hover export are identical —
+   * this card does not change appearance on hover on desktop).
+   */
+  .upcoming-sessions.dark .sg-live-card {
+    background: var(--s2a-color-gray-700, #505050);
+  }
+
+  .upcoming-sessions.dark .sg-live-card:hover {
+    background: var(--s2a-color-gray-700, #505050);
+  }
+
+  .upcoming-sessions.dark .sg-live-card__time {
     color: var(--s2a-color-gray-25, #fff);
   }
 
-  .sg-live-card__actions {
+  .upcoming-sessions.dark .sg-live-card__title {
+    color: var(--s2a-color-gray-25, #fff);
+  }
+
+  .upcoming-sessions .sg-live-card__actions {
     flex-direction: column;
     width: var(--s2a-spacing-xl, 32px);
     gap: var(--s2a-spacing-sm, 12px);
+  }
+
+  /*
+   * Icon buttons solid opaque white with a translucent white border, not the
+   * 80%-opacity "on-light" chip used elsewhere — per the Figma dev-mode
+   * export's ".IconButton/Core/Primary" values for the dark card variant.
+   * No exact --s2a-color-transparent-white-40 token confirmed — kept literal.
+   */
+  .upcoming-sessions.dark .sg-live-card .sg-icon-btn--solid.sg-icon-btn--on-light {
+    background: var(--s2a-color-gray-25, #fff);
+    border-color: rgb(255 255 255 / 40%);
   }
 }
 
 /* ── Icon Button (S2A Foundations) — copied verbatim, already has inline fallbacks ── */
 
-.sg-icon-btn {
+.upcoming-sessions .sg-icon-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -273,23 +384,23 @@
   padding: 0;
 }
 
-.sg-icon-btn:disabled {
+.upcoming-sessions .sg-icon-btn:disabled {
   opacity: 0.48;
   cursor: default;
   pointer-events: none;
 }
 
-.sg-icon-btn:focus-visible {
+.upcoming-sessions .sg-icon-btn:focus-visible {
   outline: 1px solid var(--s2a-color-focus-ring-default, #3b63fb);
   outline-offset: 1px;
 }
 
-.sg-icon-btn--md {
+.upcoming-sessions .sg-icon-btn--md {
   width: var(--s2a-spacing-xl, 32px);
   height: var(--s2a-spacing-xl, 32px);
 }
 
-.sg-icon-btn__icon {
+.upcoming-sessions .sg-icon-btn__icon {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -297,12 +408,12 @@
   pointer-events: none;
 }
 
-.sg-icon-btn--md .sg-icon-btn__icon {
+.upcoming-sessions .sg-icon-btn--md .sg-icon-btn__icon {
   width: var(--s2a-spacing-md, 16px);
   height: var(--s2a-spacing-md, 16px);
 }
 
-.sg-icon-btn__icon > svg {
+.upcoming-sessions .sg-icon-btn__icon > svg {
   width: 100%;
   height: 100%;
   display: block;
@@ -315,49 +426,89 @@
  * itself, not the card). blur(4.6875px) has no matching --s2a-blur-* token
  * (scale starts at 8px) — kept literal per the exact Figma value.
  */
-.sg-icon-btn--solid.sg-icon-btn--on-light {
+.upcoming-sessions .sg-icon-btn--solid.sg-icon-btn--on-light {
   background: var(--s2a-color-transparent-white-80, rgb(255 255 255 / 80%));
   backdrop-filter: blur(4.6875px);
   color: var(--s2a-color-gray-1000, #000);
   border: var(--s2a-border-width-sm, 1px) solid var(--s2a-color-gray-100, #e9e9e9);
 }
 
-.sg-icon-btn--solid.sg-icon-btn--on-light:hover:not(:disabled) {
+.upcoming-sessions .sg-icon-btn--solid.sg-icon-btn--on-light:hover:not(:disabled) {
   background: var(--s2a-color-transparent-white-96, rgb(255 255 255 / 96%));
   border-color: var(--s2a-color-gray-25, #fff);
 }
 
-.sg-icon-btn--solid.sg-icon-btn--on-light:active:not(:disabled) {
+.upcoming-sessions .sg-icon-btn--solid.sg-icon-btn--on-light:active:not(:disabled) {
   background: var(--s2a-color-gray-25, #fff);
   border-color: var(--s2a-color-gray-25, #fff);
 }
 
-/* #fff labels/icons here have an exact token (--s2a-color-gray-25); spacing/sizing tokenized below. */
-.sg-category-badge {
+.upcoming-sessions .sg-category-badge {
   display: inline-flex;
   align-items: center;
   gap: var(--s2a-spacing-xs, 8px);
   white-space: nowrap;
 }
 
-.sg-category-badge__icon-color {
+.upcoming-sessions .sg-category-badge__icon-color {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  color: var(--s2a-color-gray-25, #fff);
+  color: var(--s2a-color-gray-1000, #000);
 }
 
-.sg-category-badge__icon {
+.upcoming-sessions .sg-category-badge__icon {
   display: block;
   width: var(--s2a-spacing-20, 20px);
   height: var(--s2a-spacing-20, 20px);
 }
 
-.sg-category-badge__label {
+.upcoming-sessions .sg-category-badge__label {
   font-family: 'Adobe Clean Spectrum VF', 'Adobe Clean', adobe-clean, 'Trebuchet MS', sans-serif;
   font-weight: var(--s2a-font-weight-adobe-clean-medium, 500);
   font-size: var(--s2a-font-size-xs, 12px);
   line-height: var(--s2a-font-line-height-2xs, 16px);
+  color: var(--s2a-color-gray-1000, #000);
+}
+
+.upcoming-sessions.dark .sg-category-badge__icon-color,
+.upcoming-sessions.dark .sg-category-badge__label {
   color: var(--s2a-color-gray-25, #fff);
+}
+
+/*
+ * Light (default) hover text color — flips to white against the inverted
+ * dark hover background (.sg-live-card:hover, near the top of this file).
+ * Declared last/highest-specificity on purpose so it wins over every plain
+ * light/dark color rule above regardless of source order.
+ */
+.upcoming-sessions .sg-live-card:hover .sg-live-card__title,
+.upcoming-sessions .sg-live-card:hover .sg-live-card__time,
+.upcoming-sessions .sg-live-card:hover .sg-category-badge__icon-color,
+.upcoming-sessions .sg-live-card:hover .sg-category-badge__label {
+  color: var(--s2a-color-gray-25, #fff);
+}
+
+/*
+ * Dark hover must stay identical to its own default (per the Figma export —
+ * see the "Dark surface variant" section) even though the generic light
+ * hover-color rule above happens to share the same #fff value at desktop.
+ * At mobile, dark's own default text colors (#8a8a8a / #f2f2f2) are NOT
+ * white, so this higher-specificity override is required to correctly win
+ * over the generic rule above regardless of source order.
+ */
+.upcoming-sessions.dark .sg-live-card:hover .sg-live-card__time {
+  color: #8a8a8a;
+}
+
+.upcoming-sessions.dark .sg-live-card:hover .sg-live-card__title {
+  color: #f2f2f2;
+}
+
+@media (width >= 900px) {
+  .upcoming-sessions.dark .sg-live-card:hover .sg-live-card__time,
+  .upcoming-sessions.dark .sg-live-card:hover .sg-live-card__title {
+    color: var(--s2a-color-gray-25, #fff);
+  }
 }

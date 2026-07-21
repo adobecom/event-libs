@@ -9,7 +9,7 @@ import {
 } from '../../../utils/session-store.js';
 import { scheduleWithFeedback, favoriteWithFeedback } from '../../../services/sessions/action-feedback.js';
 import { setSessionParam, safeUrl } from '../../../blocks/sessions-guide/utils/url.js';
-import MobileRiderController from '../../../features/timing-framework/plugins/mobile-rider/mobile-rider-controller.js';
+import MobileRiderController from '../../../services/sessions/mobile-rider-controller.js';
 
 const ROTATE_OUT_MS = 350;
 const MR_POLL_INTERVAL_MS = 30_000;
@@ -17,8 +17,8 @@ const MR_POLL_INTERVAL_MS = 30_000;
 // session-store.js's own liveStreamActiveIds is currently backed by a mocked
 // fetchLiveStatus() (services/sessions/mobile-rider.js — always returns
 // everything inactive), so it can never report a session live yet. Poll the
-// real Mobile Rider endpoint directly instead, the same way chrono-box's own
-// mobile-rider plugin does (mobile-rider-controller.js hits
+// real Mobile Rider endpoint directly instead, via the real
+// MobileRiderController (services/sessions/mobile-rider-controller.js, hits
 // overlay-admin-integration.mobilerider.com). Kept as our own local Set,
 // merged with the shared signal below, so this starts working for free if
 // the shared mock is ever replaced with a real implementation.
@@ -40,7 +40,7 @@ const ICON_ARROW_RIGHT = '<svg width="16" height="16" viewBox="0 0 16 16" fill="
 
 /** Adapts a raw catalog session object into the shape `deriveSessionState` expects. */
 function toDerivedInput(session) {
-  const sessionTime = session.sessionTimes?.[0];
+  const { sessionTime } = session;
   return {
     startTimeUtc: sessionTime ? new Date(sessionTime.startTimeMillis).toISOString() : null,
     endTimeUtc: sessionTime ? new Date(sessionTime.endTimeMillis).toISOString() : null,
@@ -55,12 +55,24 @@ function liveActiveIds() {
   return new Set([...liveStreamActiveIds.value, ...mrActiveIds]);
 }
 
+/**
+ * Wraps deriveSessionState for this block's own needs: for an MR session,
+ * deriveSessionState reports 'on-demand' the moment the scheduled start time
+ * passes without MR confirming active (its "no real end signal yet" fallback
+ * — reasonable for Session Guide's own On Demand view, wrong here). Until MR
+ * actually confirms the stream is live, keep routing/behaving as 'upcoming'
+ * (session-guide) rather than treating the card as ended. The card only
+ * leaves the row via scheduleStateTimers's scheduled-end-time removal, or
+ * once MR genuinely reports active (-> 'live', watch/broadcast routing).
+ */
 function currentState(session) {
-  return deriveSessionState(toDerivedInput(session), liveActiveIds(), Date.now());
+  const state = deriveSessionState(toDerivedInput(session), liveActiveIds(), Date.now());
+  if (session.mrStreamId && state === 'on-demand') return 'upcoming';
+  return state;
 }
 
 function formatTimeRange(session) {
-  const sessionTime = session.sessionTimes?.[0];
+  const { sessionTime } = session;
   if (!sessionTime) return '';
   const options = { hour: 'numeric', minute: '2-digit', hour12: true };
   if (sessionTime.timezone) options.timeZone = sessionTime.timezone;
@@ -99,7 +111,10 @@ export function resolveClickAction(session) {
   const state = currentState(session);
   if (state === 'upcoming') return { type: 'session-guide', sessionId: session.sessionId };
   if (state === 'live') {
-    const url = safeUrl(session.watchUrl || session.url);
+    // Live sessions route to wherever the session is actually streaming
+    // (homepage or Session Broadcast) via the authored watchUrl — never the
+    // session's own detail-page `url`, which isn't a stream destination.
+    const url = safeUrl(session.watchUrl);
     return url ? { type: 'watch', url } : { type: 'none' };
   }
   // 'on-demand' is unreachable by click — the card has already rotated out.
@@ -277,16 +292,22 @@ function removeCard(el, sessionId) {
   setTimeout(() => card.remove(), ROTATE_OUT_MS);
 }
 
+// Live/favorite/schedule updates rebuild every card from scratch (state is
+// derived fresh per render, not diffed) — preserve scroll position across
+// that rebuild so a background update (e.g. a session going live) doesn't
+// yank a mid-browse user back to the start of the carousel.
 function renderTrack(track, sessions) {
+  const { scrollLeft } = track;
   track.innerHTML = '';
   sessions.forEach((session) => track.append(buildCard(session)));
+  track.scrollLeft = scrollLeft;
 }
 
 function scheduleStateTimers(el, track, sessions) {
   const timers = [];
 
   sessions.forEach((session) => {
-    const sessionTime = session.sessionTimes?.[0];
+    const { sessionTime } = session;
     if (!sessionTime) return;
 
     // upcoming -> live: simple scheduled timer against the baked-in start time.
@@ -296,12 +317,11 @@ function scheduleStateTimers(el, track, sessions) {
     }
 
     // live/upcoming -> on-demand: rotate out once the scheduled end passes.
-    // NOTE: this is a scheduled-time fallback only. Per the design doc, true
-    // end confirmation for a `live` session should come from the shared
-    // liveStreamActiveIds poll (session under/post-run), which requires
-    // `mrStreamId` on the authored session object — not present in the
-    // current catalog payload. Until that field is added, this timer is the
-    // only end-of-session signal available.
+    // For a non-MR (e.g. YouTube) session this is the only end signal there
+    // is — start/end time is authoritative. For an MR session this is just a
+    // fallback safety net; the real end signal is startMobileRiderPolling's
+    // active -> inactive transition (onMobileRiderEnded), which fires
+    // independently of this timer and usually removes the card first.
     const untilEnd = sessionTime.endTimeMillis - Date.now();
     if (untilEnd > 0) {
       timers.push(setTimeout(() => removeCard(el, session.sessionId), untilEnd));
@@ -342,33 +362,63 @@ function readSectionMetadata(el, key) {
 }
 
 /**
- * Polls the real Mobile Rider endpoint for any authored session that has an
- * mrStreamId, mirroring chrono-box's own plugin (mobile-rider-controller.js)
- * rather than relying on session-store.js's currently-mocked poller. Calls
- * `onChange` only when the active-id set actually changes.
+ * Polls the real Mobile Rider endpoint (services/sessions/mobile-rider-
+ * controller.js) for any authored session that has an mrStreamId, rather
+ * than relying on session-store.js's currently-mocked poller. Keeps
+ * polling every MR_POLL_INTERVAL_MS once a session's own scheduled start time
+ * arrives — never before — since MR has nothing to report on a session that
+ * hasn't started yet, and polls continue afterward (a session can go
+ * active/inactive more than once: under-run before the real start, post-run
+ * lingering after).
+ *
+ * `onEnded(endedIds)` fires with the mrStreamIds that just flipped from
+ * active -> inactive — MR's only real "this session is actually done"
+ * signal, independent of the scheduled-end-time fallback timer.
  */
-function startMobileRiderPolling(sessions, onChange) {
-  const mrIds = [...new Set(sessions.map((s) => s.mrStreamId).filter(Boolean))];
-  if (!mrIds.length) return null;
+function startMobileRiderPolling(sessions, onEnded) {
+  const mrSessions = sessions.filter((s) => s.mrStreamId);
+  if (!mrSessions.length) return null;
+
+  function dueIds(nowMs) {
+    return [...new Set(
+      mrSessions
+        .filter((s) => (s.sessionTime?.startTimeMillis ?? 0) <= nowMs)
+        .map((s) => s.mrStreamId),
+    )];
+  }
 
   async function tick() {
+    const ids = dueIds(Date.now());
+    if (!ids.length) return;
     try {
-      const { active } = await mobileRiderController.getMediaStatus(mrIds);
+      const { active } = await mobileRiderController.getMediaStatus(ids);
       const nextActive = new Set(active);
-      const changed = nextActive.size !== mrActiveIds.size
-        || [...nextActive].some((id) => !mrActiveIds.has(id));
-      if (changed) {
-        mrActiveIds.clear();
-        nextActive.forEach((id) => mrActiveIds.add(id));
-        onChange();
-      }
+      const endedIds = ids.filter((id) => mrActiveIds.has(id) && !nextActive.has(id));
+      const gainedIds = ids.some((id) => nextActive.has(id) && !mrActiveIds.has(id));
+      if (!endedIds.length && !gainedIds) return;
+      ids.forEach((id) => mrActiveIds.delete(id));
+      nextActive.forEach((id) => mrActiveIds.add(id));
+      onEnded(endedIds);
     } catch (error) {
       window.lana?.log(`upcoming-sessions: mobile rider poll failed: ${error.message}`);
     }
   }
 
+  // A per-session kick exactly at its own start time, so polling begins the
+  // instant the session starts rather than waiting for the next 30s interval
+  // boundary — plus the immediate tick() below for sessions already underway.
+  const startTimers = mrSessions
+    .map((s) => (s.sessionTime?.startTimeMillis ?? 0) - Date.now())
+    .filter((untilStart) => untilStart > 0)
+    .map((untilStart) => setTimeout(tick, untilStart));
+
   tick();
-  return setInterval(tick, MR_POLL_INTERVAL_MS);
+  const intervalId = setInterval(tick, MR_POLL_INTERVAL_MS);
+
+  return () => {
+    startTimers.forEach(clearTimeout);
+    clearInterval(intervalId);
+  };
 }
 
 export default async function init(el) {
@@ -421,15 +471,27 @@ async function decorate(el) {
 
   let timers = scheduleStateTimers(el, track, sessions);
 
+  // session-store.js's shared liveStreamActiveIds is currently backed by a
+  // mocked fetchLiveStatus() that never reports anything active/ended — kept
+  // subscribed so this starts reacting for free once that mock is replaced.
   function onLiveSignalChange() {
-    sessions.forEach((session) => {
-      if (currentState(session) === 'on-demand') removeCard(el, session.sessionId);
-    });
+    renderTrack(track, sessions);
+  }
+
+  // Real MR end signal: a session that was active and just flipped inactive
+  // (post-run) is genuinely over — remove it immediately rather than waiting
+  // on the scheduled-end-time fallback timer.
+  function onMobileRiderEnded(endedIds) {
+    if (endedIds.length) {
+      sessions
+        .filter((session) => endedIds.includes(session.mrStreamId))
+        .forEach((session) => removeCard(el, session.sessionId));
+    }
     renderTrack(track, sessions);
   }
 
   const unsubscribeLive = liveStreamActiveIds.subscribe(onLiveSignalChange);
-  const mrPollTimer = startMobileRiderPolling(sessions, onLiveSignalChange);
+  const stopMobileRiderPolling = startMobileRiderPolling(sessions, onMobileRiderEnded);
   const unsubscribeFavorited = favorited.subscribe(() => renderTrack(track, sessions));
   const unsubscribeScheduled = scheduled.subscribe(() => renderTrack(track, sessions));
   const unsubscribePending = pendingActions.subscribe(() => renderTrack(track, sessions));
@@ -444,7 +506,7 @@ async function decorate(el) {
 
   el._upcomingSessionsCleanup = () => {
     timers.forEach(clearTimeout);
-    if (mrPollTimer) clearInterval(mrPollTimer);
+    if (stopMobileRiderPolling) stopMobileRiderPolling();
     unsubscribeLive();
     unsubscribeFavorited();
     unsubscribeScheduled();
