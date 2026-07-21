@@ -246,6 +246,8 @@ export default function EventPicker() {
     if (e.key === 'Enter') e.target.blur();
   };
 
+  const hasFolder = inputValue.trim().length > 0;
+
   return html`
     <div class="sm-event-picker">
       <div class="sm-event-picker__row">
@@ -264,7 +266,7 @@ export default function EventPicker() {
             </svg>
           </sp-icon>
         </sp-action-button>
-        <sp-button treatment="outline" static-color="black" onClick=${() => syncSchedules()} title="Scan event folder to find schedule links in documents">
+        <sp-button treatment="outline" static-color="black" disabled=${!hasFolder} onClick=${() => syncSchedules()} title="Scan event folder to find schedule links in documents">
           <sp-icon slot="icon">
             <svg xmlns="http://www.w3.org/2000/svg" height="18" viewBox="0 0 18 18" width="18">
               <path fill="currentColor" d="M16.337,10H15.39a.6075.6075,0,0,0-.581.469A5.7235,5.7235,0,0,1,5.25,13.006l-.346-.3465L6.8815,10.682A.392.392,0,0,0,7,10.4a.4.4,0,0,0-.377-.4H1.25a.25.25,0,0,0-.25.25v5.375A.4.4,0,0,0,1.4,16a.3905.3905,0,0,0,.28-.118l1.8085-1.8085.178.1785a8.09048,8.09048,0,0,0,3.642,2.1655,7.715,7.715,0,0,0,9.4379-5.47434q.04733-.178.0861-.35816A.5.5,0,0,0,16.337,10Z"/>

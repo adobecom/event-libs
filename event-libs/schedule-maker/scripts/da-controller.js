@@ -151,12 +151,19 @@ async function fetchText(org, repo, path) {
 async function listAllFiles(org, repo, path) {
   const files = [];
   let frontier = [path];
+  let authError = false;
 
   while (frontier.length > 0) {
     // eslint-disable-next-line no-await-in-loop
     const levelResults = await mapWithConcurrency(frontier, SCAN_CONCURRENCY, async (folderPath) => {
       const result = await daFetch(`/list/${org}/${repo}${folderPath}`, getHeaders('GET'));
-      if (!result.ok) return { files: [], folders: [] };
+      if (!result.ok) {
+        // 401/0 means every listing call is failing the same way (auth, not a
+        // one-off missing subfolder), so surface it rather than reporting an
+        // empty scan as if the folder legitimately had nothing in it.
+        if (result.status === 401 || result.status === 0) authError = true;
+        return { files: [], folders: [] };
+      }
       const items = Array.isArray(result.data) ? result.data : [];
       const levelFiles = [];
       const levelFolders = [];
@@ -176,7 +183,7 @@ async function listAllFiles(org, repo, path) {
     frontier = nextFrontier;
   }
 
-  return files;
+  return { files, authError };
 }
 
 // Matches ?schedule= (old ECC/SM query-param format) and #schedule= (new SM hash format).
@@ -254,7 +261,14 @@ export function decodeScheduleParam(raw) {
 export async function syncSchedules(org, repo, eventFolder) {
   const basePath = eventFolder.startsWith('/') ? eventFolder : `/${eventFolder}`;
 
-  const allFiles = await listAllFiles(org, repo, basePath);
+  const { files: allFiles, authError } = await listAllFiles(org, repo, basePath);
+  if (authError) {
+    return {
+      ok: false,
+      status: 401,
+      error: 'Unable to reach DA — sign in at da.live first, then try syncing again.',
+    };
+  }
   const docFiles = allFiles.filter((f) => f.endsWith('.html'));
 
   const foundData = new Map(); // scheduleId → decoded object (first occurrence wins)
