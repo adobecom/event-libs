@@ -24,6 +24,9 @@ const EVENT_BLOCKS = [
   'session-state-demo',
 ];
 
+const EVENT_BLOCKS_C2 = [
+];
+
 // Import only the most essential utilities that are always needed
 // These are the functions that the importer's scripts.js actually uses
 import {
@@ -59,6 +62,7 @@ export {
   validatePageAndRedirect,
   processAutoBlockLinks,
   EVENT_BLOCKS,
+  EVENT_BLOCKS_C2,
 };
 
 // Lazy-loaded delayed actions for event pages

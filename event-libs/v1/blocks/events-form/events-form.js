@@ -19,6 +19,10 @@ const { default: loadFragment } = await import(`${miloLibs}/blocks/fragment/frag
 
 const VALID_REGISTRATION_STATUS = ['registered', 'waitlisted'];
 
+/** Valid `displayAs` flavors for the `text` substrate; each is also a valid
+ * native `<input type>` (or `text-area`, handled by its own dispatch entry). */
+const TEXT_DISPLAY_AS = new Set(['text', 'email', 'phone', 'number', 'date', 'url', 'text-area']);
+
 const RULE_OPERATORS = {
   equal: '=',
   notEqual: '!=',
@@ -175,14 +179,25 @@ function constructPayload(form) {
     if (fe.value) payload[fe.id] = fe.value;
   });
 
-  // Post-process checkbox groups to convert single-option groups to booleans
+  // Post-process checkbox/radio groups. Single-option checkbox groups convert to
+  // booleans. Radio groups are mutually exclusive by native radio semantics (shared
+  // `name`), so their payload array always has 0 or 1 entries — collapse it to a
+  // plain string, since string-typed attendee fields (e.g. industry, jobTitle) have
+  // no array-to-string coercion downstream.
   Object.keys(payload).forEach((key) => {
     const fieldWrapper = form.querySelector(`[data-field-id="${key}"]`);
-    if (fieldWrapper && (fieldWrapper.dataset.type === 'checkbox' || fieldWrapper.dataset.type === 'checkbox-group')) {
+    if (!fieldWrapper || !Array.isArray(payload[key])) return;
+    // Base attendee array fields (e.g. contactMethods) must stay arrays for the API
+    if (BASE_ATTENDEE_DATA_FILTER[key]?.type === 'array') return;
+
+    if (fieldWrapper.dataset.type === 'radio-group') {
+      payload[key] = payload[key].length > 0 ? payload[key][0] : undefined;
+      return;
+    }
+
+    if (fieldWrapper.dataset.type === 'checkbox' || fieldWrapper.dataset.type === 'checkbox-group') {
       const checkboxes = fieldWrapper.querySelectorAll('input[type="checkbox"]');
-      if (checkboxes.length === 1 && Array.isArray(payload[key]) && payload[key].length <= 1) {
-        // Base attendee array fields (e.g. contactMethods) must stay arrays for the API
-        if (BASE_ATTENDEE_DATA_FILTER[key]?.type === 'array') return;
+      if (checkboxes.length === 1 && payload[key].length <= 1) {
         // Single option checkbox with at most one value - convert to boolean
         payload[key] = payload[key].length > 0;
       }
@@ -874,9 +889,32 @@ export function getRsvpConfigFromMeta() {
     const data = config.rsvpFormFields.map((f) => {
       const field = lowercaseKeys(f);
       if (typeof field.field === 'string') field.field = field.field.trim();
+      field.type = field.type || 'text';
       field.required = field.required === true ? 'x' : '';
       if (Array.isArray(field.options)) {
         field.options = field.options.map((o) => (typeof o === 'object' ? o.value : o)).join(';');
+      }
+      // ESP's field `type` names only the substrate (text/select/multi-select);
+      // `displayas` (EMC's displayAs, already stored by ESP) picks the concrete
+      // widget within it. Remap to the internal dispatch types this file already
+      // implements for the legacy per-cloud JSON path, so scope-config-driven
+      // fields render identically. `checkbox` is a legacy wire value from before
+      // this taxonomy, remapped to its own pre-existing default rather than
+      // passed through, so old data keeps rendering exactly as it did. Any other
+      // `type` (heading/legal/divider/submit/clear, or a legacy direct value
+      // like `email`/`text-area`) passes through untouched.
+      const da = field.displayas;
+      if (field.type === 'text') {
+        field.type = TEXT_DISPLAY_AS.has(da) ? da : 'text';
+      }
+      else if (field.type === 'select') {
+        field.type = da === 'radio' ? 'radio-group' : 'select';
+      }
+      else if (field.type === 'multi-select') {
+        field.type = da === 'combobox' ? 'multi-select' : 'checkbox-group';
+      }
+      else if (field.type === 'checkbox') {
+        field.type = da === 'dropdown' ? 'multi-select' : 'checkbox';
       }
       return field;
     });

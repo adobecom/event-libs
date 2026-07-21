@@ -1012,6 +1012,58 @@ function addStylesToEventPage() {
   document.head.appendChild(link);
 }
 
+export function applyAreaTheme(area = document) {
+  try {
+    const customAttributes = JSON.parse(getMetadata('custom-attributes'));
+    const theme = customAttributes.find((attr) => attr.attribute.toLowerCase().trim() === 'theme');
+    if (!theme) return;
+
+    const themeValue = theme.values?.[0]?.value?.toLowerCase().trim();
+    if (themeValue !== 'dark' && themeValue !== 'light') return;
+
+    const isDocument = area === document;
+    const blocks = isDocument
+      ? area.body.querySelectorAll('main > div > div[class]')
+      : area.querySelectorAll('div[class]');
+    blocks.forEach((block) => {
+      const isSectionMetadata = block.classList.contains('section-metadata');
+      if (isSectionMetadata) {
+        const blockRows = block.querySelectorAll(':scope > div');
+        if (blockRows.length > 0) {
+          const styleRow = Array.from(blockRows).find((row) => {
+            const cols = row.querySelectorAll(':scope > div');
+            return cols[0]?.textContent.trim().toLowerCase() === 'style';
+          });
+
+          if (styleRow) {
+            const cols = styleRow.querySelectorAll(':scope > div');
+            if (cols.length > 1) {
+              const valueCol = cols[1];
+              const values = valueCol.textContent.split(',').map((v) => v.trim().toLowerCase());
+              if (!values.includes(themeValue)) {
+                valueCol.textContent = `${valueCol.textContent}, ${themeValue}`;
+              }
+            }
+          } else {
+            const newRow = createTag('div');
+            const labelCol = createTag('div');
+            labelCol.textContent = 'style';
+            const valueCol = createTag('div');
+            valueCol.textContent = themeValue;
+            newRow.append(labelCol);
+            newRow.append(valueCol);
+            block.append(newRow);
+          }
+        }
+      }
+      block.classList.remove('dark', 'light');
+      block.classList.add(themeValue);
+    });
+  } catch {
+    // no-op: custom-attributes absent or not valid JSON
+  }
+}
+
 export function decorateEvent(parent) {
   setHydrationPromise(hydrateBlocks(parent));
 
@@ -1048,7 +1100,7 @@ export function decorateEvent(parent) {
 
   processTemplateInAllNodes(parent, { ...photosData, ...massagedMetadata });
   decorateProfileCardsZPattern(parent);
-
+  applyAreaTheme(parent);
   flagEventState(parent);
   
   // Process template links synchronously first (no dictionary needed)
@@ -1086,3 +1138,5 @@ export default function decorateArea(area = document) {
     eagerLoad(marquee, 'div:last-child > div:last-child img');
   }());
 }
+
+
