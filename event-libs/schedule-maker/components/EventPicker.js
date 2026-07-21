@@ -9,6 +9,7 @@ async function fetchFolders(org, repo, path) {
   const result = await listFolder(org, repo, path);
   if (!result.ok) {
     if (result.status === 401) throw new Error('Unauthorized — sign in at da.live first.');
+    if (result.status === 0) throw new Error('Unable to reach DA — sign in at da.live first, or check your connection.');
     throw new Error(`Failed to load (${result.status})`);
   }
   return (result.data || []).filter((item) => !item.ext);
@@ -144,7 +145,7 @@ function FolderBrowser({ isOpen, onClose, onSelect, initialPath }) {
     <${Modal}
       isOpen=${isOpen}
       onClose=${onClose}
-      title="Select Event Folder"
+      title="Select DA Folder"
       confirmText="Select"
       cancelText="Cancel"
       onConfirm=${handleConfirm}

@@ -13,6 +13,7 @@ async function fetchDAItems(org, repo, contentPath) {
   const result = await listFolder(org, repo, contentPath);
   if (!result.ok) {
     if (result.status === 401) throw new Error('Unauthorized — you may need DA access. Try signing in at da.live first.');
+    if (result.status === 0) throw new Error('Unable to reach DA — sign in at da.live first, or check your connection.');
     throw new Error(`Failed to load (${result.status})`);
   }
   return (result.data || []).filter((item) => !item.ext || item.ext === 'html');
