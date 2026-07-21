@@ -42,6 +42,12 @@ describe('Adobe Event Service API', () => {
       expect(options).to.have.property('method', 'GET');
       expect(options.headers.get('Authorization')).to.equal('Bearer fake-token');
     });
+
+    it('should omit the Authorization header when skipAuth is true, even with a signed-in session', async () => {
+      window.adobeIMS = { getAccessToken: () => ({ token: 'fake-token' }) };
+      const options = await api.constructRequestOptions('GET', null, false, true);
+      expect(options.headers.has('Authorization')).to.be.false;
+    });
   });
 
   describe('getEvent', () => {
@@ -219,6 +225,90 @@ describe('Adobe Event Service API', () => {
       sandbox.stub(window, 'fetch').rejects(new Error('Network failure'));
 
       const result = await api.getCampaign('event-1', 'camp-1');
+      expect(result.ok).to.be.false;
+      expect(result.status).to.equal('Network Error');
+    });
+  });
+
+  describe('getGuestRsvpLink', () => {
+    it('should resolve a valid guest RSVP link', async () => {
+      sandbox.stub(window, 'fetch').resolves({ json: () => ({ eventId: 'event-123', status: 'unused' }), ok: true });
+      const result = await api.getGuestRsvpLink('tok-1');
+      expect(result.ok).to.be.true;
+      expect(result.data).to.have.property('eventId', 'event-123');
+    });
+
+    it('should not wait for adobeIMS before fetching', async () => {
+      delete window.adobeIMS;
+      const fetchStub = sandbox.stub(window, 'fetch').resolves({ json: () => ({ eventId: 'event-123' }), ok: true });
+      const result = await api.getGuestRsvpLink('tok-1');
+      expect(result.ok).to.be.true;
+      expect(fetchStub.calledOnce).to.be.true;
+    });
+
+    it('should return an error for a consumed/expired/revoked link', async () => {
+      sandbox.stub(window, 'fetch').resolves({ json: () => ({ message: 'Gone' }), ok: false, status: 410 });
+      const result = await api.getGuestRsvpLink('tok-1');
+      expect(result.ok).to.be.false;
+      expect(result.status).to.equal(410);
+    });
+
+    it('should handle network errors', async () => {
+      sandbox.stub(window, 'fetch').rejects(new Error('Network failure'));
+      const result = await api.getGuestRsvpLink('tok-1');
+      expect(result.ok).to.be.false;
+      expect(result.status).to.equal('Network Error');
+    });
+
+    it('should never attach the caller\'s own Authorization header, even when already signed in', async () => {
+      window.adobeIMS = { getAccessToken: () => ({ token: 'assistants-own-token' }) };
+      const fetchStub = sandbox.stub(window, 'fetch').resolves({ json: () => ({ eventId: 'event-123' }), ok: true });
+      await api.getGuestRsvpLink('tok-1');
+      const [, options] = fetchStub.firstCall.args;
+      expect(options.headers.has('Authorization')).to.be.false;
+    });
+  });
+
+  describe('redeemGuestRsvpLink', () => {
+    it('should redeem a guest RSVP link and return attendee data', async () => {
+      const fetchStub = sandbox.stub(window, 'fetch').resolves({
+        json: () => ({ attendeeId: 'att-1', registrationStatus: 'registered' }),
+        ok: true,
+      });
+
+      const result = await api.redeemGuestRsvpLink('tok-1', { firstName: 'John', lastName: 'Doe', email: 'john@test.com' });
+      expect(result.ok).to.be.true;
+      expect(result.data).to.have.property('registrationStatus', 'registered');
+
+      const [url] = fetchStub.firstCall.args;
+      expect(url).to.include('/v1/guestRsvpLinks/tok-1/redeem');
+    });
+
+    it('should return an error without making a request when token or data is missing', async () => {
+      const fetchStub = sandbox.stub(window, 'fetch');
+      const result = await api.redeemGuestRsvpLink(null, { firstName: 'John' });
+      expect(result.ok).to.be.false;
+      expect(fetchStub.called).to.be.false;
+    });
+
+    it('should return an error if the link is already consumed', async () => {
+      sandbox.stub(window, 'fetch').resolves({ json: () => ({ message: 'Conflict' }), ok: false, status: 409 });
+      const result = await api.redeemGuestRsvpLink('tok-1', { firstName: 'John' });
+      expect(result.ok).to.be.false;
+      expect(result.status).to.equal(409);
+    });
+
+    it('should never attach the caller\'s own Authorization header, even when already signed in', async () => {
+      window.adobeIMS = { getAccessToken: () => ({ token: 'assistants-own-token' }) };
+      const fetchStub = sandbox.stub(window, 'fetch').resolves({ json: () => ({ attendeeId: 'att-1' }), ok: true });
+      await api.redeemGuestRsvpLink('tok-1', { firstName: 'John' });
+      const [, options] = fetchStub.firstCall.args;
+      expect(options.headers.has('Authorization')).to.be.false;
+    });
+
+    it('should handle network errors', async () => {
+      sandbox.stub(window, 'fetch').rejects(new Error('Network failure'));
+      const result = await api.redeemGuestRsvpLink('tok-1', { firstName: 'John' });
       expect(result.ok).to.be.false;
       expect(result.status).to.equal('Network Error');
     });

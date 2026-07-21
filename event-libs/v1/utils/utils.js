@@ -1,4 +1,4 @@
-import { SUSI_OPTIONS, CONDITIONAL_REG, ENV_MAP, CAMPAIGN_ID_PATTERN } from './constances.js';
+import { SUSI_OPTIONS, CONDITIONAL_REG, ENV_MAP, CAMPAIGN_ID_PATTERN, GUEST_RSVP_TOKEN_PATTERN } from './constances.js';
 import BlockMediator from '../deps/block-mediator.min.js';
 
 const ICONS_BASE_URL = new URL('../icons/', import.meta.url).href;
@@ -333,6 +333,36 @@ export function getValidCampaignIdFromUrl(searchParams) {
   const search = searchParams != null ? searchParams.toString() : window.location.search;
   const campaignId = new URLSearchParams(search).get('campaign');
   return campaignId && CAMPAIGN_ID_PATTERN.test(campaignId) ? campaignId : null;
+}
+
+/**
+ * Returns the guest RSVP link token from the current URL search params if present and
+ * well-formed. Presence of a valid token here does not mean the link is still usable
+ * (unused/unexpired) — that is resolved server-side via getGuestRsvpLink().
+ * @param {URLSearchParams} [searchParams] - Optional search params (defaults to window.location.search).
+ * @returns {string|null} Well-formed guest RSVP token or null.
+ */
+export function getGuestRsvpToken(searchParams) {
+  const search = searchParams != null ? searchParams.toString() : window.location.search;
+  const token = new URLSearchParams(search).get('guestRsvpToken');
+  return token && GUEST_RSVP_TOKEN_PATTERN.test(token) ? token : null;
+}
+
+/**
+ * Single source of truth for whether a guest/no-profile visitor must be forced
+ * through Adobe ID sign-in. Shared by the RSVP button click-interceptor
+ * (decorate.js) and the RSVP form (events-form.js) so the two never drift out
+ * of sync. A guest RSVP link token — valid or not — always bypasses sign-in;
+ * an invalid link surfaces its own error once the form loads and never falls
+ * back to SUSI.
+ * @param {Object} profile - BlockMediator 'imsProfile' value.
+ * @param {boolean} allowGuestReg - Whether allow-guest-registration metadata is 'true'.
+ * @returns {boolean} True if sign-in must be forced.
+ */
+export function shouldForceGuestSignIn(profile, allowGuestReg) {
+  return Boolean(profile?.noProfile || profile?.account_type === 'guest')
+    && !allowGuestReg
+    && !profile?.guestRsvpToken;
 }
 
 /**

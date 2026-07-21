@@ -181,6 +181,20 @@ export function getInviteOnlyNoCampaignMessage(manager) {
     : text;
 }
 
+export const GUEST_RSVP_LINK_INVALID_MESSAGE_KEY = 'rsvp-guest-link-invalid-cta-text';
+
+/**
+ * Localized message when a guest RSVP link has already been redeemed, expired, or revoked.
+ * @param {DictionaryManager} manager - Initialized dictionary manager instance
+ * @returns {string}
+ */
+export function getGuestRsvpLinkInvalidMessage(manager) {
+  const text = manager.getValue(GUEST_RSVP_LINK_INVALID_MESSAGE_KEY);
+  return text === GUEST_RSVP_LINK_INVALID_MESSAGE_KEY
+    ? 'This registration link is no longer valid. It may have already been used or expired.'
+    : text;
+}
+
 export const EVENT_WAITLIST_BANNER_MESSAGE_KEY = 'event-waitlist-banner-msg';
 
 /**

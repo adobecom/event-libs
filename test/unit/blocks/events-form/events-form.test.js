@@ -1,8 +1,9 @@
 import { expect } from '@esm-bundle/chai';
 import sinon from 'sinon';
-import { getValidCampaignIdFromUrl } from '../../../../event-libs/v1/utils/utils.js';
+import { getValidCampaignIdFromUrl, resetCampaignMapCache } from '../../../../event-libs/v1/utils/utils.js';
 import { BASE_ATTENDEE_DATA_FILTER } from '../../../../event-libs/v1/utils/data-utils.js';
 import { stripTags } from '../../../../event-libs/v1/utils/sanitize-utils.js';
+import BlockMediator from '../../../../event-libs/v1/deps/block-mediator.min.js';
 
 describe('Events Form', () => {
   let block;
@@ -801,6 +802,92 @@ describe('Events Form', () => {
     });
   });
 
+  describe('submitForm guest RSVP redeem routing', () => {
+    let sandbox;
+    let submitForm;
+
+    before(async () => {
+      const module = await import('../../../../event-libs/v1/blocks/events-form/events-form.js');
+      submitForm = module.submitForm;
+    });
+
+    beforeEach(() => {
+      sandbox = sinon.createSandbox();
+    });
+
+    afterEach(() => {
+      sandbox.restore();
+      BlockMediator.set('imsProfile', undefined);
+    });
+
+    function buildForm() {
+      const form = document.createElement('form');
+      [['firstName', 'Guest'], ['lastName', 'User'], ['email', 'guest@test.com']].forEach(([id, value]) => {
+        const input = document.createElement('input');
+        input.id = id;
+        input.name = id;
+        input.type = 'text';
+        input.value = value;
+        form.appendChild(input);
+      });
+      return form;
+    }
+
+    it('redeems the guest RSVP link instead of calling getAndCreateAndAddAttendee', async () => {
+      BlockMediator.set('imsProfile', { account_type: 'guest', guestRsvpToken: 'valid-guest-token-1234567890' });
+      const fetchStub = sandbox.stub(window, 'fetch').resolves({
+        json: () => ({ attendeeId: 'att-1', registrationStatus: 'registered' }),
+        ok: true,
+      });
+
+      const result = await submitForm({ form: buildForm(), sanitizeList: [] });
+
+      expect(result.ok).to.be.true;
+      expect(result.data).to.have.property('registrationStatus', 'registered');
+      expect(fetchStub.calledOnce).to.be.true;
+      const [url] = fetchStub.firstCall.args;
+      expect(url).to.include('/v1/guestRsvpLinks/valid-guest-token-1234567890/redeem');
+    });
+
+    it('retains campaignId in the guest redeem payload (redeem is a single combined create+register call)', async () => {
+      resetCampaignMapCache();
+      window.history.replaceState({}, '', `${window.location.pathname}?campaign=camp-1`);
+      BlockMediator.set('imsProfile', { account_type: 'guest', guestRsvpToken: 'valid-guest-token-1234567890' });
+      const fetchStub = sandbox.stub(window, 'fetch').callsFake((url) => {
+        if (typeof url === 'string' && url.includes('campaign-map.json')) {
+          return Promise.resolve({ ok: false, status: 404 });
+        }
+        return Promise.resolve({ json: () => ({ attendeeId: 'att-1', registrationStatus: 'registered' }), ok: true });
+      });
+
+      try {
+        await submitForm({ form: buildForm(), sanitizeList: [] });
+
+        const redeemCall = fetchStub.getCalls().find((call) => String(call.args[0]).includes('/redeem'));
+        const body = JSON.parse(redeemCall.args[1].body);
+        expect(body.campaignId).to.equal('camp-1');
+      } finally {
+        window.history.replaceState({}, '', window.location.pathname);
+        resetCampaignMapCache();
+      }
+    });
+
+    it('falls back to getAndCreateAndAddAttendee when no guest RSVP token is present', async () => {
+      BlockMediator.set('imsProfile', { account_type: 'type1' });
+      const fetchStub = sandbox.stub(window, 'fetch');
+      fetchStub.onCall(0).resolves({ json: () => ({ eventId: 'test-event-id', isFull: false }), ok: true });
+      fetchStub.onCall(1).resolves({ json: () => ({ message: 'Not found' }), ok: false, status: 404 });
+      fetchStub.onCall(2).resolves({ json: () => ({ attendeeId: 'att-2' }), ok: true });
+      fetchStub.onCall(3).resolves({ json: () => ({ registrationStatus: 'registered' }), ok: true });
+
+      const result = await submitForm({ form: buildForm(), sanitizeList: [] });
+
+      expect(result.ok).to.be.true;
+      const urls = fetchStub.getCalls().map((call) => call.args[0]);
+      expect(urls.some((url) => url.includes('/guestRsvpLinks/'))).to.be.false;
+    });
+  });
+
   describe('getFullState and buildErrorMsg (campaign-aware 400)', () => {
     let sandbox;
     let originalHref;
@@ -822,6 +909,7 @@ describe('Events Form', () => {
     afterEach(() => {
       sandbox.restore();
       window.history.replaceState({}, '', originalHref);
+      BlockMediator.set('imsProfile', undefined);
     });
 
     function stubFetchByUrl(eventResponse, campaignResponse = null) {
@@ -940,6 +1028,27 @@ describe('Events Form', () => {
       const errorEl = form.querySelector('.error');
       expect(errorEl).to.not.be.null;
       expect(errorEl.textContent).to.equal('event-full-no-waitlist-error-msg');
+    });
+
+    it('buildErrorMsg shows the guest-link-invalid message for a non-400 failure when a guest RSVP token is active', async () => {
+      // Models the two-tab race: the link was valid at page load but got redeemed
+      // elsewhere before this submit, so the redeem call fails with a non-400 status.
+      BlockMediator.set('imsProfile', { account_type: 'guest', guestRsvpToken: 'tok-1234567890abcdef' });
+      stubFetchByUrl({ json: () => ({}), ok: true });
+      const form = document.createElement('form');
+      await buildErrorMsg(form, 409);
+      const errorEl = form.querySelector('.error');
+      expect(errorEl).to.not.be.null;
+      expect(errorEl.textContent).to.equal('This registration link is no longer valid. It may have already been used or expired.');
+    });
+
+    it('buildErrorMsg falls back to the generic message for a non-400 failure with no guest RSVP token', async () => {
+      stubFetchByUrl({ json: () => ({}), ok: true });
+      const form = document.createElement('form');
+      await buildErrorMsg(form, 500);
+      const errorEl = form.querySelector('.error');
+      expect(errorEl).to.not.be.null;
+      expect(errorEl.textContent).to.equal('rsvp-error-msg');
     });
   });
 

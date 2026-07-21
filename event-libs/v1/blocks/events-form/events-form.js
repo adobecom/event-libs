@@ -1,10 +1,10 @@
-import { deleteAttendeeFromEvent, getAndCreateAndAddAttendee, getAttendee, getEvent, getCampaign, registerForSessionTime } from '../../utils/esp-controller.js';
+import { deleteAttendeeFromEvent, getAndCreateAndAddAttendee, getAttendee, getEvent, getCampaign, registerForSessionTime, redeemGuestRsvpLink } from '../../utils/esp-controller.js';
 import BlockMediator from '../../deps/block-mediator.min.js';
 import { signIn, decorateEvent } from '../../utils/decorate.js';
-import { dictionaryManager, getInviteOnlyNoCampaignMessage } from '../../utils/dictionary-manager.js';
-import { getEventConfig, LIBS, getMetadata, getSusiOptions, getValidCampaignIdFromUrl, resolveRoutedCampaignId } from '../../utils/utils.js';
+import { dictionaryManager, getInviteOnlyNoCampaignMessage, getGuestRsvpLinkInvalidMessage } from '../../utils/dictionary-manager.js';
+import { getEventConfig, LIBS, getMetadata, getSusiOptions, getValidCampaignIdFromUrl, resolveRoutedCampaignId, shouldForceGuestSignIn } from '../../utils/utils.js';
 import { FALLBACK_LOCALES, CAMPAIGN_ID_PATTERN, PHONE_FIELD_RE, PHONE_PATTERN  } from '../../utils/constances.js';
-import { BASE_ATTENDEE_DATA_FILTER } from '../../utils/data-utils.js';
+import { BASE_ATTENDEE_DATA_FILTER, getBaseAttendeePayload } from '../../utils/data-utils.js';
 import { parseRsvpFieldLimit, stripTags } from '../../utils/sanitize-utils.js';
 import { applyImplicitContactMethodsToPayload, getImplicitConsentRaw } from '../../utils/rsvp-consent.js';
 
@@ -207,7 +207,7 @@ function constructPayload(form) {
   return payload;
 }
 
-async function submitForm(bp) {
+export async function submitForm(bp) {
   const { form, sanitizeList } = bp;
   const payload = constructPayload(form);
 
@@ -255,6 +255,19 @@ async function submitForm(bp) {
   const campaignId = await resolveRoutedCampaignId();
   if (campaignId) {
     payload.campaignId = campaignId;
+  }
+
+  // A valid guest RSVP link never reaches submitForm unless it's still usable (an
+  // invalid link short-circuits before the form is built, see onProfile). Redeeming
+  // consumes the link server-side in the same call that records the registration.
+  // The redeem endpoint combines create-attendee + add-to-event into one call, so
+  // it needs campaignId too — getBaseAttendeePayload alone only covers attendee
+  // fields (campaignId lives in EVENT_ATTENDEE_DATA_FILTER), so re-attach it here.
+  const guestRsvpToken = BlockMediator.get('imsProfile')?.guestRsvpToken;
+  if (guestRsvpToken) {
+    const guestPayload = getBaseAttendeePayload(payload);
+    if (payload.campaignId) guestPayload.campaignId = payload.campaignId;
+    return redeemGuestRsvpLink(guestRsvpToken, guestPayload);
   }
 
   return getAndCreateAndAddAttendee(getMetadata('event-id'), payload);
@@ -309,8 +322,9 @@ export async function buildErrorMsg(parent, status) {
 
   if (!eventObj.ok) return;
 
-  let errorKey = 'rsvp-error-msg';
+  let errorMsg;
   if (status === 400) {
+    let errorKey = 'rsvp-error-msg';
     const { full, waitlistEnabled, usedCampaign } = await getFullState(eventId);
     if (full && usedCampaign) {
       errorKey = waitlistEnabled ? 'campaign-full-error-msg' : 'campaign-full-no-waitlist-error-msg';
@@ -318,6 +332,15 @@ export async function buildErrorMsg(parent, status) {
       const eventInfo = eventObj.data;
       errorKey = eventInfo?.allowWaitlisting === 'true' ? 'event-full-error-msg' : 'event-full-no-waitlist-error-msg';
     }
+    errorMsg = dictionaryManager.getValue(errorKey);
+  } else if (BlockMediator.get('imsProfile')?.guestRsvpToken) {
+    // A guest RSVP link is consumed on redeem; a non-400 submit failure here almost
+    // always means the link became invalid between page load and submit (e.g. the
+    // same link redeemed in another tab), not a generic transient error.
+    await dictionaryManager.initialize();
+    errorMsg = getGuestRsvpLinkInvalidMessage(dictionaryManager);
+  } else {
+    errorMsg = dictionaryManager.getValue('rsvp-error-msg');
   }
 
   const existingErrors = parent.querySelectorAll('.error');
@@ -325,7 +348,6 @@ export async function buildErrorMsg(parent, status) {
     existingErrors.forEach((err) => err.remove());
   }
 
-  const errorMsg = dictionaryManager.getValue(errorKey);
   const error = createTag('p', { class: 'error' }, errorMsg);
   parent.append(error);
   setTimeout(() => {
@@ -730,6 +752,12 @@ function decorateSuccessScreen(screen) {
             const profile = BlockMediator.get('imsProfile');
             const rsvpData = BlockMediator.get('rsvpData');
 
+            if (profile.account_type === 'guest' && !rsvpData?.attendeeId) {
+              cta.classList.remove('loading');
+              buildErrorMsg(screen, 500);
+              return;
+            }
+
             const rsvpResp = profile.account_type === 'guest'
               ? await deleteAttendeeFromEvent(getMetadata('event-id'), rsvpData.attendeeId)
               : await deleteAttendeeFromEvent(getMetadata('event-id'));
@@ -1029,7 +1057,8 @@ async function createForm(bp, formData) {
   addTerms(formEl, terms);
 
   const profile = BlockMediator.get('imsProfile');
-  const showConsentForGuest = getMetadata('allow-guest-registration') === 'true' && profile?.account_type === 'guest';
+  const showConsentForGuest = profile?.account_type === 'guest'
+    && (getMetadata('allow-guest-registration') === 'true' || Boolean(profile?.guestRsvpToken));
   const forceConsent = getMetadata('force-consent-collection') === 'true';
   if (showConsentForGuest || forceConsent) await addConsentSuite(formEl);
 
@@ -1175,11 +1204,23 @@ async function onProfile(bp, formData) {
     if (!resolvedProfile || hasHandledProfile) return;
     hasHandledProfile = true;
 
-    if ((resolvedProfile.noProfile || resolvedProfile.account_type === 'guest')
-      && /#rsvp-form.*/.test(window.location.hash)
-      && !allowGuestReg) {
+    if (shouldForceGuestSignIn(resolvedProfile, allowGuestReg)
+      && /#rsvp-form.*/.test(window.location.hash)) {
       // TODO: also check for guestCheckout enablement for future iterations
       signIn(getSusiOptions(getConfig()));
+    } else if (resolvedProfile.guestLinkInvalid) {
+      // Guest RSVP link has already been redeemed, expired, or was revoked. Show a
+      // general error and never build the form — the link is not reusable.
+      eventHero.classList.remove('loading');
+      decorateHero(bp.eventHero);
+      (async () => {
+        await dictionaryManager.initialize();
+        const msg = getGuestRsvpLinkInvalidMessage(dictionaryManager);
+        const error = createTag('p', { class: 'error' }, msg);
+        bp.formContainer.append(error);
+      })().finally(() => {
+        block.classList.remove('loading');
+      });
     } else {
       eventHero.classList.remove('loading');
       decorateHero(bp.eventHero);

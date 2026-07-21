@@ -124,4 +124,115 @@ describe('Profile Functions', () => {
 
     expect(BlockMediator.get('rsvpData')).to.equal(null);
   });
+
+  describe('guest RSVP link bypass', () => {
+    beforeEach(() => {
+      // A prior test may have left an accessor (get/set) descriptor on window.adobeIMS
+      // via lazyCaptureProfile's polling fallback; delete it so our plain assignment
+      // below creates a fresh data property instead of re-triggering a stale closure.
+      delete window.adobeIMS;
+      // captureProfile's guest branch triggers a real, unstubbed dynamic import
+      // (constructRequestOptions -> getUuid.js) that 404s in this test env — genuine
+      // network I/O the outer fake clock can't accelerate. Use real timers here so
+      // waitForImsProfile below can reliably poll for the real async work to settle.
+      clock.restore();
+    });
+
+    afterEach(() => {
+      window.history.replaceState({}, '', window.location.pathname);
+    });
+
+    async function waitForImsProfile({ timeout = 3000, interval = 20 } = {}) {
+      const start = Date.now();
+      while (BlockMediator.get('imsProfile') === undefined) {
+        if (Date.now() - start > timeout) throw new Error('Timed out waiting for imsProfile to be set');
+        await new Promise((resolve) => { setTimeout(resolve, interval); });
+      }
+    }
+
+    it('should bypass Adobe ID and set a synthetic guest profile for a valid guest RSVP token', async () => {
+      const token = 'valid-guest-rsvp-token-1234567890';
+      window.history.replaceState({}, '', `${window.location.pathname}?guestRsvpToken=${token}`);
+      // A real IMS profile must never be consulted once a guest token is present.
+      window.adobeIMS = { getProfile: () => Promise.resolve({ name: 'Should not be used' }), getAccessToken: () => null };
+      // metaEventId (outer beforeEach) is 'test-event-id' — the link must resolve to
+      // the SAME event as the current page for the guard added below to accept it.
+      sinon.stub(window, 'fetch').resolves({ json: () => ({ eventId: 'test-event-id', status: 'unused' }), ok: true });
+
+      lazyCaptureProfile();
+      await waitForImsProfile();
+
+      expect(BlockMediator.get('imsProfile')).to.deep.equal({
+        account_type: 'guest',
+        guestRsvpToken: token,
+        guestRsvpEventId: 'test-event-id',
+      });
+      expect(BlockMediator.get('rsvpData')).to.equal(null);
+      expect(window.fetch.calledOnce).to.be.true;
+    });
+
+    it('should mark the profile guestLinkInvalid when the link resolves to a different event than the current page', async () => {
+      const token = 'wrong-event-guest-rsvp-token-12345';
+      window.history.replaceState({}, '', `${window.location.pathname}?guestRsvpToken=${token}`);
+      window.adobeIMS = { getProfile: () => Promise.resolve({ name: 'Should not be used' }), getAccessToken: () => null };
+      // metaEventId (outer beforeEach) is 'test-event-id' — this link is for a different event.
+      sinon.stub(window, 'fetch').resolves({ json: () => ({ eventId: 'some-other-event-id', status: 'unused' }), ok: true });
+
+      lazyCaptureProfile();
+      await waitForImsProfile();
+
+      expect(BlockMediator.get('imsProfile')).to.deep.equal({
+        account_type: 'guest',
+        guestRsvpToken: token,
+        guestLinkInvalid: true,
+      });
+      expect(BlockMediator.get('rsvpData')).to.equal(null);
+    });
+
+    it('should mark the profile guestLinkInvalid when the link resolve responds 200 OK but reports a non-unused status', async () => {
+      const token = 'already-redeemed-guest-token-1234567';
+      window.history.replaceState({}, '', `${window.location.pathname}?guestRsvpToken=${token}`);
+      window.adobeIMS = { getProfile: () => Promise.resolve({ name: 'Should not be used' }), getAccessToken: () => null };
+      // Backend reports "redeemed" via a 200 OK body rather than a non-2xx status.
+      sinon.stub(window, 'fetch').resolves({ json: () => ({ eventId: 'test-event-id', status: 'redeemed' }), ok: true });
+
+      lazyCaptureProfile();
+      await waitForImsProfile();
+
+      expect(BlockMediator.get('imsProfile')).to.deep.equal({
+        account_type: 'guest',
+        guestRsvpToken: token,
+        guestLinkInvalid: true,
+      });
+      expect(BlockMediator.get('rsvpData')).to.equal(null);
+    });
+
+    it('should mark the profile guestLinkInvalid when the link cannot be resolved (consumed/expired/revoked)', async () => {
+      const token = 'consumed-guest-rsvp-token-987654321';
+      window.history.replaceState({}, '', `${window.location.pathname}?guestRsvpToken=${token}`);
+      window.adobeIMS = { getProfile: () => Promise.resolve({ name: 'Should not be used' }), getAccessToken: () => null };
+      sinon.stub(window, 'fetch').resolves({ json: () => ({ message: 'Gone' }), ok: false, status: 410 });
+
+      lazyCaptureProfile();
+      await waitForImsProfile();
+
+      expect(BlockMediator.get('imsProfile')).to.deep.equal({
+        account_type: 'guest',
+        guestRsvpToken: token,
+        guestLinkInvalid: true,
+      });
+      expect(BlockMediator.get('rsvpData')).to.equal(null);
+    });
+
+    it('should ignore a malformed guestRsvpToken and fall through to the normal profile flow', async () => {
+      window.history.replaceState({}, '', `${window.location.pathname}?guestRsvpToken=too-short`);
+      window.adobeIMS = { getProfile: () => Promise.resolve({ name: 'IMS User', account_type: 'type1' }), getAccessToken: () => null };
+      sinon.stub(window, 'fetch').resolves({ text: () => 'not found', ok: false });
+
+      lazyCaptureProfile();
+      await waitForImsProfile();
+
+      expect(BlockMediator.get('imsProfile')).to.deep.equal({ name: 'IMS User', account_type: 'type1' });
+    });
+  });
 });
