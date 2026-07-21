@@ -47,8 +47,15 @@ const mrActiveIds = new Set();
 
 // scheduleWithFeedback/favoriteWithFeedback need an eventConfig for registration-required
 // copy and conflict-modal gating. This block has no authored config surface for those yet
-// (see the design doc's open questions) — falls back to sensible defaults.
-const EVENT_CONFIG = { title: '', showConflictModal: false, registerUrl: '/register' };
+// (see the design doc's open questions) — falls back to sensible defaults. Conflict-modal
+// behavior matches sessions-guide.js exactly: scheduleAction() (services/sessions/
+// session-actions.js) checks findScheduleConflict() against the shared session-store's
+// full `sessions` catalog (populated by initSessionState()'s loadSessions(), not just
+// this block's own small authored subset) and, on conflict, runSessionAction()
+// (services/sessions/action-feedback.js) opens the same shared, page-level
+// features/conflict-modal/conflict-modal.js Session Guide itself uses — no separate
+// modal implementation needed here.
+const EVENT_CONFIG = { title: '', showConflictModal: true, registerUrl: '/register' };
 
 // Same SVGs as event-libs/v1/blocks/sessions-guide/components/icons.js, inlined —
 // that file exports Preact components (htm-preact), not usable from vanilla JS.
