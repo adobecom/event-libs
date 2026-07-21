@@ -472,18 +472,34 @@
 
 .sm-editor__block--incomplete { border-color: var(--sm-color-error); }
 .sm-editor__block--editing { border-color: var(--sm-color-border-dark); }
+.sm-editor__block--dragging { opacity: 0.5; }
+.sm-editor__block--drag-over { box-shadow: inset 0 2px 0 var(--sm-color-border-dark); }
 
 .sm-editor__block-header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: var(--sm-spacing-sm);
 }
+
+.sm-editor__block-drag-handle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  padding: var(--sm-spacing-xs);
+  border: none;
+  background: none;
+  color: var(--sm-color-text-secondary);
+  cursor: grab;
+}
+
+.sm-editor__block-drag-handle:active { cursor: grabbing; }
 
 .sm-editor__block-header-actions {
   display: flex;
   align-items: center;
   gap: var(--sm-spacing-xl);
+  margin-left: auto;
 }
 
 .sm-editor__block-datetime {

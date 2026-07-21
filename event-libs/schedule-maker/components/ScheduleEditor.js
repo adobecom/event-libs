@@ -6,8 +6,29 @@ import BlockEditor from './editor/BlockEditor.js';
 
 export default function ScheduleEditor() {
   const { activeSchedule } = useSchedulesData();
-  const { addBlockLocally } = useSchedulesOperations();
+  const { addBlockLocally, reorderBlocksLocally } = useSchedulesOperations();
   const [editingBlockId, setEditingBlockId] = useState(null);
+  const [draggedBlockId, setDraggedBlockId] = useState(null);
+  const [dragOverBlockId, setDragOverBlockId] = useState(null);
+
+  const handleBlockDragStart = (blockId) => setDraggedBlockId(blockId);
+
+  const handleBlockDragOver = (blockId) => {
+    if (blockId !== draggedBlockId) setDragOverBlockId(blockId);
+  };
+
+  const handleBlockDrop = (targetBlockId) => {
+    if (draggedBlockId && draggedBlockId !== targetBlockId) {
+      reorderBlocksLocally(draggedBlockId, targetBlockId);
+    }
+    setDraggedBlockId(null);
+    setDragOverBlockId(null);
+  };
+
+  const handleBlockDragEnd = () => {
+    setDraggedBlockId(null);
+    setDragOverBlockId(null);
+  };
 
   const handleAddBlock = () => {
     if (!activeSchedule) return;
@@ -49,6 +70,12 @@ export default function ScheduleEditor() {
               block=${block} \
               editingBlockId=${editingBlockId} \
               setEditingBlockId=${setEditingBlockId} \
+              isDragging=${draggedBlockId === block.id} \
+              isDragOver=${dragOverBlockId === block.id && draggedBlockId !== block.id} \
+              onBlockDragStart=${handleBlockDragStart} \
+              onBlockDragOver=${handleBlockDragOver} \
+              onBlockDrop=${handleBlockDrop} \
+              onBlockDragEnd=${handleBlockDragEnd} \
             />
           `) || ''}
         </section>

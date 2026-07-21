@@ -128,6 +128,22 @@ const SchedulesProvider = ({ children }) => {
     });
   }, []);
 
+  // Moves draggedBlockId to sit just before targetBlockId. Order is otherwise
+  // untouched by add/update/delete, so this manual order survives until the
+  // next prepareScheduleForClient re-sort by startDateTime.
+  const reorderBlocksLocally = useCallback((draggedBlockId, targetBlockId) => {
+    setActiveScheduleState((prev) => {
+      if (!prev || draggedBlockId === targetBlockId) return prev;
+      const blocks = [...prev.blocks];
+      const fromIndex = blocks.findIndex((b) => b.id === draggedBlockId);
+      const toIndex = blocks.findIndex((b) => b.id === targetBlockId);
+      if (fromIndex === -1 || toIndex === -1) return prev;
+      const [moved] = blocks.splice(fromIndex, 1);
+      blocks.splice(toIndex, 0, moved);
+      return { ...prev, blocks };
+    });
+  }, []);
+
   const clearToastError = useCallback(() => setToastError(null), []);
   const clearToastSuccess = useCallback(() => setToastSuccess(null), []);
 
@@ -158,6 +174,7 @@ const SchedulesProvider = ({ children }) => {
     addBlockLocally,
     updateBlockLocally,
     deleteBlockLocally,
+    reorderBlocksLocally,
     discardChangesToActiveSchedule,
     syncSchedules,
   };
@@ -194,6 +211,7 @@ export const useSchedulesOperations = () => {
     addBlockLocally: ctx.addBlockLocally,
     updateBlockLocally: ctx.updateBlockLocally,
     deleteBlockLocally: ctx.deleteBlockLocally,
+    reorderBlocksLocally: ctx.reorderBlocksLocally,
     discardChangesToActiveSchedule: ctx.discardChangesToActiveSchedule,
     syncSchedules: ctx.syncSchedules,
   };

@@ -54,10 +54,42 @@ function localInputToEpoch(localIsoString) {
   return naiveUtc.getTime() - (tzMs - wantedMs);
 }
 
-export default function BlockEditor({ block, editingBlockId, setEditingBlockId }) {
+export default function BlockEditor({
+  block,
+  editingBlockId,
+  setEditingBlockId,
+  isDragging,
+  isDragOver,
+  onBlockDragStart,
+  onBlockDragOver,
+  onBlockDrop,
+  onBlockDragEnd,
+}) {
   const { updateBlockLocally, deleteBlockLocally } = useSchedulesOperations();
   const { org, repo } = useDAContext();
   const [isBrowserOpen, setIsBrowserOpen] = useState(false);
+  const [isDragHandleActive, setIsDragHandleActive] = useState(false);
+
+  const handleDragStart = (event) => {
+    event.dataTransfer.effectAllowed = 'move';
+    event.dataTransfer.setData('text/plain', block.id);
+    onBlockDragStart?.(block.id);
+  };
+
+  const handleDragOver = (event) => {
+    event.preventDefault();
+    onBlockDragOver?.(block.id);
+  };
+
+  const handleDrop = (event) => {
+    event.preventDefault();
+    onBlockDrop?.(block.id);
+  };
+
+  const handleDragEnd = () => {
+    setIsDragHandleActive(false);
+    onBlockDragEnd?.();
+  };
 
   const handleEditBlockTitle = (blockId) => {
     updateBlockLocally(blockId, { isEditingBlockTitle: true });
@@ -100,11 +132,34 @@ export default function BlockEditor({ block, editingBlockId, setEditingBlockId }
 
   return html`
     <div \
-      class="sm-editor__block ${editingBlockId === block.id ? 'sm-editor__block--editing' : ''} ${!block.isComplete ? 'sm-editor__block--incomplete' : ''}" \
+      class="sm-editor__block ${editingBlockId === block.id ? 'sm-editor__block--editing' : ''} ${!block.isComplete ? 'sm-editor__block--incomplete' : ''} ${isDragging ? 'sm-editor__block--dragging' : ''} ${isDragOver ? 'sm-editor__block--drag-over' : ''}" \
       onFocusIn=${() => setEditingBlockId(block.id)} \
       onFocusOut=${() => setEditingBlockId(null)} \
+      draggable=${isDragHandleActive} \
+      ondragstart=${handleDragStart} \
+      ondragover=${handleDragOver} \
+      ondrop=${handleDrop} \
+      ondragend=${handleDragEnd} \
     >
       <div class="sm-editor__block-header">
+        <button \
+          type="button" \
+          class="sm-editor__block-drag-handle" \
+          aria-label="Drag to reorder block" \
+          title="Drag to reorder" \
+          onMouseDown=${() => setIsDragHandleActive(true)} \
+          onMouseUp=${() => setIsDragHandleActive(false)} \
+          onMouseLeave=${() => setIsDragHandleActive(false)} \
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" width="10" height="16" viewBox="0 0 10 16">
+            <circle cx="2" cy="2" r="1.5" fill="currentColor"/>
+            <circle cx="8" cy="2" r="1.5" fill="currentColor"/>
+            <circle cx="2" cy="8" r="1.5" fill="currentColor"/>
+            <circle cx="8" cy="8" r="1.5" fill="currentColor"/>
+            <circle cx="2" cy="14" r="1.5" fill="currentColor"/>
+            <circle cx="8" cy="14" r="1.5" fill="currentColor"/>
+          </svg>
+        </button>
         <sp-textfield \
           aria-label="Block title" \
           label="Block title" \
