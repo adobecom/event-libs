@@ -1014,7 +1014,9 @@ function addStylesToEventPage() {
 export function applyAreaTheme(area = document) {
   try {
     const customAttributes = JSON.parse(getMetadata('custom-attributes'));
-    const theme = customAttributes.find((attr) => attr.attribute.toLowerCase().trim() === 'theme');
+    const theme = customAttributes.find(
+      (attr) => (attr.name ?? attr.attribute)?.toLowerCase().trim() === 'theme',
+    );
     if (!theme) return;
 
     const themeValue = theme.values?.[0]?.value?.toLowerCase().trim();
