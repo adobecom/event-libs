@@ -340,4 +340,93 @@ describe('Adobe Event Service API', () => {
       expect(result.data.registrationStatus).to.equal('registered');
     });
   });
+
+  describe('listEvents', () => {
+    it('should fetch a page of events', async () => {
+      sandbox.stub(window, 'fetch').resolves({
+        json: () => ({ events: [{ eventId: '1' }], nextPageToken: 'tok-2' }),
+        ok: true,
+      });
+      const result = await api.listEvents({});
+      expect(result.ok).to.be.true;
+      expect(result.data.events).to.deep.equal([{ eventId: '1' }]);
+      expect(result.data.nextPageToken).to.equal('tok-2');
+    });
+
+    it('should call the ESP host, not ESL', async () => {
+      const fetchStub = sandbox.stub(window, 'fetch').resolves({
+        json: () => ({ events: [] }),
+        ok: true,
+      });
+      await api.listEvents({});
+      const [url] = fetchStub.firstCall.args;
+      expect(url).to.include('/v1/events');
+      expect(url).to.not.include('events-service-layer');
+    });
+
+    it('should return an error on a failed request', async () => {
+      sandbox.stub(window, 'fetch').resolves({ json: () => ({ message: 'nope' }), ok: false, status: 500 });
+      const result = await api.listEvents({});
+      expect(result.ok).to.be.false;
+      expect(result.status).to.equal(500);
+    });
+  });
+
+  describe('listAllEvents', () => {
+    it('should walk every page until nextPageToken is exhausted', async () => {
+      const fetchStub = sandbox.stub(window, 'fetch');
+      fetchStub.onCall(0).resolves({
+        json: () => ({ events: [{ eventId: '1' }], nextPageToken: 'tok-2' }),
+        ok: true,
+      });
+      fetchStub.onCall(1).resolves({
+        json: () => ({ events: [{ eventId: '2' }], nextPageToken: null }),
+        ok: true,
+      });
+      const result = await api.listAllEvents({ fromDate: 1 });
+      expect(result.ok).to.be.true;
+      expect(result.data).to.deep.equal([{ eventId: '1' }, { eventId: '2' }]);
+      expect(fetchStub.callCount).to.equal(2);
+    });
+
+    it('should cache the result for repeat calls with the same fromDate', async () => {
+      const fetchStub = sandbox.stub(window, 'fetch').resolves({
+        json: () => ({ events: [{ eventId: '1' }], nextPageToken: null }),
+        ok: true,
+      });
+      await api.listAllEvents({ fromDate: 42 });
+      await api.listAllEvents({ fromDate: 42 });
+      expect(fetchStub.callCount).to.equal(1);
+    });
+
+    it('should not cache a failed fetch', async () => {
+      const fetchStub = sandbox.stub(window, 'fetch');
+      fetchStub.onCall(0).resolves({ json: () => ({ message: 'nope' }), ok: false, status: 500 });
+      fetchStub.onCall(1).resolves({ json: () => ({ events: [], nextPageToken: null }), ok: true });
+      const first = await api.listAllEvents({ fromDate: 99 });
+      expect(first.ok).to.be.false;
+      const second = await api.listAllEvents({ fromDate: 99 });
+      expect(second.ok).to.be.true;
+      expect(fetchStub.callCount).to.equal(2);
+    });
+  });
+
+  describe('getEventSessionCatalog', () => {
+    it('should fetch the raw session catalog for an event', async () => {
+      sandbox.stub(window, 'fetch').resolves({
+        json: () => ({ sessions: [{ sessionId: 's-1' }] }),
+        ok: true,
+      });
+      const result = await api.getEventSessionCatalog('event-1');
+      expect(result.ok).to.be.true;
+      expect(result.data).to.deep.equal([{ sessionId: 's-1' }]);
+    });
+
+    it('should return an error on a failed request', async () => {
+      sandbox.stub(window, 'fetch').resolves({ json: () => ({ message: 'nope' }), ok: false, status: 404 });
+      const result = await api.getEventSessionCatalog('event-1');
+      expect(result.ok).to.be.false;
+      expect(result.status).to.equal(404);
+    });
+  });
 });

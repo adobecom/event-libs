@@ -104,6 +104,126 @@ export async function getEvent(eventId) {
   }
 }
 
+// Single-page ESP events list call, mirroring ESP's own query params
+// (`page-size`, `next-page-token`, `from-date` — epoch ms). Public endpoint,
+// gateway API key only — no IMS token required, so this skips the IMS-wait
+// other constructRequestOptions callers rely on (this app runs outside the
+// Milo/event-libs page runtime, where window.adobeIMS never appears).
+export async function listEvents({ pageSize, nextPageToken, fromDate } = {}) {
+  const eventServiceEnv = getEventServiceEnv();
+  const { serviceApiEndpoints } = ENV_MAP[eventServiceEnv.name];
+  const options = await constructRequestOptions('GET', null, false);
+
+  const params = new URLSearchParams();
+  if (pageSize) params.set('page-size', pageSize);
+  if (nextPageToken) params.set('next-page-token', nextPageToken);
+  if (fromDate) params.set('from-date', fromDate);
+  const query = params.toString();
+
+  try {
+    // GET /v1/events lives on the ESP base URL, not ESL — getEvent's .esl
+    // call above is a different endpoint and an easy precedent to copy by
+    // mistake here.
+    const response = await fetch(`${serviceApiEndpoints.esp}/v1/events${query ? `?${query}` : ''}`, options);
+    const data = await response.json();
+
+    if (!response.ok) {
+      window.lana?.log(`Error: Failed to list events. Status:${JSON.stringify(response)}`);
+      return { ok: false, status: response.status, error: data };
+    }
+
+    return { ok: true, data: { events: data.events || [], nextPageToken: data.nextPageToken || null } };
+  } catch (error) {
+    window.lana?.log(`Error: Failed to list events. Error:${JSON.stringify(error)}`);
+    return { ok: false, status: 'Network Error', error: error.message };
+  }
+}
+
+const LIST_ALL_EVENTS_MAX_PAGES = 100;
+// ~6 months, in ms — the picker's job is configuring current/upcoming Tier 1
+// events, not an event's entire multi-year history (unlike EMC's
+// fetchAllPages precedent, which walks everything since it's a general admin
+// console — see tier-1-event-configurator/PLAN.md §5).
+const LIST_ALL_EVENTS_DEFAULT_LOOKBACK_MS = 1000 * 60 * 60 * 24 * 30 * 6;
+// Longer than EMC's ~10s cache — this picker doesn't need near-real-time
+// freshness, so avoid re-walking the full paginated history on every open.
+const LIST_ALL_EVENTS_CACHE_TTL_MS = 5 * 60 * 1000;
+
+let listAllEventsCache = null; // { fromDate, expiresAt, promise }
+
+// Walks every page of GET /v1/events within the fromDate floor, concatenating
+// into one array — ports EMC's fetchAllPages() pattern so the picker can
+// search/filter client-side across the whole catalog instead of one page at
+// a time. Cached briefly so reopening the picker doesn't re-walk the full
+// history each time; a failed fetch is never cached, so the next call retries.
+export async function listAllEvents({ fromDate } = {}) {
+  const resolvedFromDate = fromDate ?? (Date.now() - LIST_ALL_EVENTS_DEFAULT_LOOKBACK_MS);
+  const now = Date.now();
+
+  if (
+    listAllEventsCache
+    && listAllEventsCache.fromDate === resolvedFromDate
+    && listAllEventsCache.expiresAt > now
+  ) {
+    return listAllEventsCache.promise;
+  }
+
+  const promise = (async () => {
+    const events = [];
+    let nextPageToken;
+    let pageCount = 0;
+
+    while (pageCount < LIST_ALL_EVENTS_MAX_PAGES) {
+      // eslint-disable-next-line no-await-in-loop
+      const page = await listEvents({ nextPageToken, fromDate: resolvedFromDate });
+      if (!page.ok) {
+        listAllEventsCache = null;
+        return page;
+      }
+
+      events.push(...page.data.events);
+      nextPageToken = page.data.nextPageToken;
+      pageCount += 1;
+      if (!nextPageToken) break;
+    }
+
+    return { ok: true, data: events };
+  })();
+
+  listAllEventsCache = { fromDate: resolvedFromDate, expiresAt: now + LIST_ALL_EVENTS_CACHE_TTL_MS, promise };
+  return promise;
+}
+
+// Raw ESP session-catalog fetch, for callers that need the unmapped session
+// objects (e.g. reading customAttributes directly) rather than sessions-api.js's
+// fully-normalized shape. Public endpoint, same as listEvents above.
+//
+// NOTE: sessions-api.js's fetchSessions()/mapEslPayloadToRawSessions() (MWPW-200314,
+// not yet merged to dev as of this writing) hits this same /session-catalog
+// endpoint and normalizes it into the app's session shape. Once that lands,
+// prefer importing fetchSessions(eventId) over this raw fetch where a caller
+// only needs the same data fetchSessions already provides.
+export async function getEventSessionCatalog(eventId) {
+  const eventServiceEnv = getEventServiceEnv();
+  const { serviceApiEndpoints } = ENV_MAP[eventServiceEnv.name];
+  const options = await constructRequestOptions('GET', null, false);
+
+  try {
+    const response = await fetch(`${serviceApiEndpoints.esp}/v1/events/${eventId}/session-catalog`, options);
+    const data = await response.json();
+
+    if (!response.ok) {
+      window.lana?.log(`Error: Failed to get session catalog for event ${eventId}. Status:${JSON.stringify(response)}`);
+      return { ok: false, status: response.status, error: data };
+    }
+
+    return { ok: true, data: data.sessions || [] };
+  } catch (error) {
+    window.lana?.log(`Error: Failed to get session catalog for event ${eventId}. Error:${JSON.stringify(error)}`);
+    return { ok: false, status: 'Network Error', error: error.message };
+  }
+}
+
 export async function getEventAttendee(eventId) {
   const eventServiceEnv = getEventServiceEnv();
   const { serviceApiEndpoints } = ENV_MAP[eventServiceEnv.name];

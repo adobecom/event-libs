@@ -1,0 +1,157 @@
+import { createContext, useState, useContext, useCallback, useEffect } from '../../v1/deps/htm-preact.js';
+import { html } from '../htm-wrapper.js';
+import {
+  getConfigs,
+  upsertConfig as upsertConfigController,
+  deleteConfig as deleteConfigController,
+} from '../scripts/da-controller.js';
+import { useDA } from './DAContext.js';
+
+const ConfigsContext = createContext();
+
+function emptyConfig() {
+  return {
+    trackIcons: {},
+    allowDoubleBooking: false,
+    featuredSessions: [],
+  };
+}
+
+const ConfigsProvider = ({ children }) => {
+  const { org, repo } = useDA();
+
+  const [configs, setConfigs] = useState([]);
+  const [isInitialLoading, setIsInitialLoading] = useState(false);
+  const [hasLoaded, setHasLoaded] = useState(false);
+  const [error, setError] = useState(null);
+  const [toastSuccess, setToastSuccess] = useState(null);
+  const [toastError, setToastError] = useState(null);
+
+  // The row currently open in the editor — always a full row shape
+  // ({ eventId, eventTitle, config }), whether freshly created (New/Duplicate)
+  // or loaded from the library (Edit).
+  const [activeConfig, setActiveConfig] = useState(null);
+
+  const loadConfigs = useCallback(async () => {
+    if (!org || !repo) return;
+    setIsInitialLoading(true);
+    setError(null);
+    try {
+      const result = await getConfigs(org, repo);
+      if (!result.ok) {
+        setError(result.error || 'Failed to load the config library');
+        return;
+      }
+      setConfigs(result.data);
+      setHasLoaded(true);
+    } finally {
+      setIsInitialLoading(false);
+    }
+  }, [org, repo]);
+
+  useEffect(() => {
+    if (org && repo && !hasLoaded) loadConfigs();
+  }, [org, repo, hasLoaded, loadConfigs]);
+
+  const findConfigByEventId = useCallback(
+    (eventId) => configs.find((c) => c.eventId === eventId) || null,
+    [configs],
+  );
+
+  // Starts a fresh row for a newly picked event. Dedup (routing to Edit when a
+  // row already exists for the picked event) is the picker's responsibility —
+  // see PLAN.md Phase 4 — so this always assumes no prior row.
+  const startNewConfig = useCallback((event) => {
+    setActiveConfig({
+      eventId: event.eventId,
+      eventTitle: event.enTitle || event.eventId,
+      config: emptyConfig(),
+    });
+  }, []);
+
+  // Clones an existing row's config onto a newly picked Event ID. The
+  // app-stamped identity fields (eventId/eventTitle/updated) are dropped from
+  // the clone rather than carried over stale — upsertConfig re-stamps them
+  // from the picker's selection at save time regardless.
+  const startDuplicateConfig = useCallback((sourceRow, event) => {
+    const clonedConfig = { ...sourceRow.config };
+    delete clonedConfig.eventId;
+    delete clonedConfig.eventTitle;
+    delete clonedConfig.updated;
+    setActiveConfig({
+      eventId: event.eventId,
+      eventTitle: event.enTitle || event.eventId,
+      config: clonedConfig,
+    });
+  }, []);
+
+  const startEditConfig = useCallback((row) => {
+    setActiveConfig(row);
+  }, []);
+
+  const clearActiveConfig = useCallback(() => setActiveConfig(null), []);
+
+  const saveActiveConfig = useCallback(async () => {
+    if (!activeConfig || !org || !repo) return { ok: false };
+    const result = await upsertConfigController(org, repo, activeConfig);
+    if (!result.ok) {
+      setToastError(result.error || 'Failed to save — please retry');
+      return result;
+    }
+    setConfigs((prev) => {
+      const idx = prev.findIndex((r) => r.eventId === result.data.eventId);
+      if (idx === -1) return [result.data, ...prev];
+      const next = [...prev];
+      next[idx] = result.data;
+      return next;
+    });
+    setActiveConfig(result.data);
+    setToastSuccess(`Saved config for ${result.data.eventTitle}`);
+    return result;
+  }, [activeConfig, org, repo]);
+
+  const removeConfig = useCallback(async (eventId) => {
+    if (!org || !repo) return { ok: false };
+    const result = await deleteConfigController(org, repo, eventId);
+    if (!result.ok) {
+      setToastError(result.error || 'Failed to delete — please retry');
+      return result;
+    }
+    setConfigs((prev) => prev.filter((r) => r.eventId !== eventId));
+    setToastSuccess('Config deleted');
+    return result;
+  }, [org, repo]);
+
+  const clearToastError = useCallback(() => setToastError(null), []);
+  const clearToastSuccess = useCallback(() => setToastSuccess(null), []);
+
+  const value = {
+    configs,
+    isInitialLoading,
+    error,
+    toastSuccess,
+    toastError,
+    clearToastError,
+    clearToastSuccess,
+    setToastError,
+    setToastSuccess,
+    activeConfig,
+    findConfigByEventId,
+    startNewConfig,
+    startDuplicateConfig,
+    startEditConfig,
+    clearActiveConfig,
+    saveActiveConfig,
+    removeConfig,
+  };
+
+  return html`
+    <${ConfigsContext.Provider} value=${value}>
+      ${children}
+    </${ConfigsContext.Provider}>
+  `;
+};
+
+const useConfigs = () => useContext(ConfigsContext);
+
+export { ConfigsContext, ConfigsProvider, useConfigs };
