@@ -49,10 +49,20 @@ export function waitForAdobeIMS() {
   });
 }
 
+// Override for callers with no window.adobeIMS at all (e.g. the standalone
+// tier-1-event-configurator DA app, which has no Milo/IMS bootstrap) — set
+// once a token is available from whatever auth flow that caller has, and
+// every constructRequestOptions() call picks it up automatically.
+let espAuthTokenOverride = null;
+
+export function setEspAuthToken(token) {
+  espAuthTokenOverride = token;
+}
+
 export async function constructRequestOptions(method, body = null, waitForIMS = true) {
   const { miloConfig } = getEventConfig();
   const miloLibs = miloConfig?.miloLibs || LIBS;
-  
+
   let getUuid;
   try {
     const [{ default: importedGetUuid }] = await Promise.all([import(`${miloLibs}/utils/getUuid.js`), waitForIMS ? waitForAdobeIMS() : Promise.resolve()]);
@@ -63,7 +73,7 @@ export async function constructRequestOptions(method, body = null, waitForIMS = 
   }
 
   const headers = new Headers();
-  const authToken = window.adobeIMS?.getAccessToken()?.token;
+  const authToken = espAuthTokenOverride || window.adobeIMS?.getAccessToken()?.token;
 
   if (authToken) headers.append('Authorization', `Bearer ${authToken}`);
   headers.append('x-api-key', 'acom_event_service');

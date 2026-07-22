@@ -42,6 +42,25 @@ describe('Adobe Event Service API', () => {
       expect(options).to.have.property('method', 'GET');
       expect(options.headers.get('Authorization')).to.equal('Bearer fake-token');
     });
+
+    it('should prefer the setEspAuthToken override over window.adobeIMS', async () => {
+      window.adobeIMS = { getAccessToken: () => ({ token: 'ims-token' }) };
+      api.setEspAuthToken('override-token');
+      try {
+        const options = await api.constructRequestOptions('GET');
+        expect(options.headers.get('Authorization')).to.equal('Bearer override-token');
+      } finally {
+        api.setEspAuthToken(null);
+      }
+    });
+
+    it('should fall back to window.adobeIMS once the override is cleared', async () => {
+      window.adobeIMS = { getAccessToken: () => ({ token: 'ims-token' }) };
+      api.setEspAuthToken('override-token');
+      api.setEspAuthToken(null);
+      const options = await api.constructRequestOptions('GET');
+      expect(options.headers.get('Authorization')).to.equal('Bearer ims-token');
+    });
   });
 
   describe('getEvent', () => {

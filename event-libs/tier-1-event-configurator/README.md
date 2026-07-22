@@ -25,6 +25,21 @@ the in-progress MWPW-200314 branch). Once that rewrite merges to `dev`,
 by importing the shared `fetchSessions(eventId)` instead of hitting ESP
 directly a second time.
 
+**Known auth gap — blocking, unresolved:** ESP's API Gateway requires a real
+IMS Bearer token on `/v1/events` and `/v1/events/:id/session-catalog` (the
+route code itself has no auth check, but the gateway in front of it does).
+This app has no IMS token source of its own (no Milo/IMS bootstrap, no
+`window.adobeIMS`). `esp-controller.js`'s `setEspAuthToken()` exists to let
+a caller like this app inject a token, and `DAContext.js` currently feeds it
+the DA SDK's own token as a best-effort attempt — **confirmed by live
+testing (2026-07-22) that this does NOT work**: the gateway returns
+`401 ErrInvalidOauthToken`, meaning the header reaches it but a DA-issued
+token isn't a valid IMS OAuth token from ESP's perspective. This app needs
+its own real IMS login flow (mirroring EMC's client-side IMS SDK
+integration) — blocked on choosing an IMS `client_id` to authenticate as.
+The ESP event picker (Phase 1d) cannot fetch real events until this is
+resolved. See PLAN.md §5 for the full writeup.
+
 ## Architecture
 
 Same shape as the [Schedule Maker](../schedule-maker/README.md) precedent:
