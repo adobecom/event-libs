@@ -9,6 +9,14 @@
   font-family: var(--s2a-font-family-default);
 }
 
+/* The authored content row (text col | media col) has no class of its own — collapse
+   it out of the box tree so event-marquee-text/event-marquee-media become direct grid
+   /flex items of .event-marquee itself, not grandchildren. Without this, grid-area/
+   order/flex below are silently no-ops and the two columns just stack in normal flow. */
+.event-marquee > div:first-child {
+  display: contents;
+}
+
 .event-marquee .event-marquee-text,
 .event-marquee .event-marquee-media {
   box-sizing: border-box;
