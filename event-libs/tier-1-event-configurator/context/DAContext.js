@@ -1,7 +1,7 @@
 import { createContext, useState, useContext, useEffect } from '../../v1/deps/htm-preact.js';
 import { html } from '../htm-wrapper.js';
 import { setDaToken, setDaFetch } from '../scripts/da-controller.js';
-import { setEspAuthToken } from '../../v1/utils/esp-controller.js';
+import { initIms } from '../scripts/ims-controller.js';
 
 const DAContext = createContext();
 
@@ -22,13 +22,12 @@ const DAProvider = ({ children }) => {
         setRepo(context?.repo);
         setDaToken(sdkToken);
         if (actions?.daFetch) setDaFetch(actions.daFetch);
-        // No Milo/IMS bootstrap in this standalone app (no window.adobeIMS),
-        // so ESP calls (listEvents/listAllEvents/getEventSessionCatalog) have
-        // no token at all otherwise. Reuse DA's own token as a best-effort
-        // Authorization Bearer — unverified whether ESP's gateway accepts a
-        // DA-issued token (vs. one from an allow-listed IMS client like
-        // EMC's); needs live verification. See PLAN.md.
-        setEspAuthToken(sdkToken);
+        // DA's own token is scoped to DA's IMS client, not one ESP's gateway
+        // allow-lists (confirmed rejected with ErrInvalidOauthToken — see
+        // PLAN.md), so ESP calls need their own real IMS session instead.
+        // Bounded at 5s and never rejects — a slow/blocked IMS load degrades
+        // to "no Authorization header" rather than blocking the app.
+        await initIms();
       } catch (err) {
         window.lana?.log(`DA SDK init error: ${err}`);
         setError('Failed to initialize DA SDK. Please reload the page.');

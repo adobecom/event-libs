@@ -25,20 +25,23 @@ the in-progress MWPW-200314 branch). Once that rewrite merges to `dev`,
 by importing the shared `fetchSessions(eventId)` instead of hitting ESP
 directly a second time.
 
-**Known auth gap — blocking, unresolved:** ESP's API Gateway requires a real
-IMS Bearer token on `/v1/events` and `/v1/events/:id/session-catalog` (the
-route code itself has no auth check, but the gateway in front of it does).
-This app has no IMS token source of its own (no Milo/IMS bootstrap, no
-`window.adobeIMS`). `esp-controller.js`'s `setEspAuthToken()` exists to let
-a caller like this app inject a token, and `DAContext.js` currently feeds it
-the DA SDK's own token as a best-effort attempt — **confirmed by live
-testing (2026-07-22) that this does NOT work**: the gateway returns
-`401 ErrInvalidOauthToken`, meaning the header reaches it but a DA-issued
-token isn't a valid IMS OAuth token from ESP's perspective. This app needs
-its own real IMS login flow (mirroring EMC's client-side IMS SDK
-integration) — blocked on choosing an IMS `client_id` to authenticate as.
-The ESP event picker (Phase 1d) cannot fetch real events until this is
-resolved. See PLAN.md §5 for the full writeup.
+**ESP auth:** ESP's API Gateway requires a real IMS Bearer token on
+`/v1/events` and `/v1/events/:id/session-catalog` (the route code itself
+has no auth check, but the gateway in front of it does). This app has no
+Milo bootstrap, so reusing DA's own token was tried first and confirmed
+(live test) to fail with `401 ErrInvalidOauthToken` — DA's token is a real
+IMS token, just scoped to DA's own `client_id`, which ESP's gateway doesn't
+accept. `scripts/ims-controller.js` now bootstraps this app's **own** IMS
+session client-side instead, using `client_id: 'events-milo'` (the same
+client real production event-libs pages already use successfully against
+ESP) — riding the same underlying Adobe IMS SSO session a DA login already
+established, so a signed-in user shouldn't see a second login prompt.
+**Verified so far:** graceful degradation with no real Adobe session (IMS
+resolves anonymous, ESP calls go out with no `Authorization` header rather
+than a broken one). **Not yet verified:** that a real signed-in session
+silently mints an `events-milo`-scoped token and that ESP's gateway accepts
+it — needs a live test through the real `?ref=local` DA flow. See PLAN.md
+§5 for the full writeup.
 
 ## Architecture
 
