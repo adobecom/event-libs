@@ -1,5 +1,3 @@
-import { getEventServiceEnv } from '../../v1/utils/utils.js';
-
 // Same client_id already used by production event-libs Milo pages for real
 // ESP calls (event-libs/scripts/scripts.js) — allow-listed by ESP's gateway,
 // unlike DA's own token (confirmed rejected with ErrInvalidOauthToken, see
@@ -12,14 +10,15 @@ const IMS_SCOPE = 'AdobeID,openid,gnav';
 const IMS_URL = 'https://auth.services.adobe.com/imslib/imslib.min.js';
 const IMS_TIMEOUT = 5000;
 
-const IMS_ENVIRONMENT = {
-  dev: 'stg1',
-  dev02: 'stg1',
-  stage: 'stg1',
-  stage02: 'stg1',
-  local: 'stg1',
-  prod: 'prod',
-};
+// IMS environment is about where the *user's* real SSO session lives, not
+// which ESP backend (dev/stage/prod) this app happens to be querying data
+// from — those are independent axes. A real Adobe SSO session lives on prod
+// IMS regardless of which ESP env the picker is pointed at (confirmed live:
+// coupling this to getEventServiceEnv() checked stg1 for a real prod-only
+// session and got `invalid_credentials`). Matches Milo's own loadIms(),
+// where `environment: env.ims` is the Milo site's own env, never derived
+// from a page's backend API config.
+const IMS_ENVIRONMENT = 'prod';
 
 function loadScript(src) {
   return new Promise((resolve, reject) => {
@@ -48,7 +47,7 @@ export function initIms() {
     window.adobeid = {
       client_id: IMS_CLIENT_ID,
       scope: IMS_SCOPE,
-      environment: IMS_ENVIRONMENT[getEventServiceEnv().name] || 'prod',
+      environment: IMS_ENVIRONMENT,
       autoValidateToken: true,
       useLocalStorage: true,
       onReady: () => {

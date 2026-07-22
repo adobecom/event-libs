@@ -38,10 +38,25 @@ ESP) — riding the same underlying Adobe IMS SSO session a DA login already
 established, so a signed-in user shouldn't see a second login prompt.
 **Verified so far:** graceful degradation with no real Adobe session (IMS
 resolves anonymous, ESP calls go out with no `Authorization` header rather
-than a broken one). **Not yet verified:** that a real signed-in session
-silently mints an `events-milo`-scoped token and that ESP's gateway accepts
-it — needs a live test through the real `?ref=local` DA flow. See PLAN.md
-§5 for the full writeup.
+than a broken one).
+
+**Bug found and fixed via live testing:** the first real test (real
+signed-in session, via `?ref=local`) came back with no `Authorization`
+header at all, and IMS's own token-check hit `stg1` with
+`invalid_credentials`. Cause: `environment` was wrongly derived from
+`getEventServiceEnv()` (the ESP *backend* env) instead of being a fixed
+`'prod'` — a real Adobe SSO session lives on prod IMS regardless of which
+ESP backend the picker happens to be querying data from. Fixed by hardcoding
+`IMS_ENVIRONMENT = 'prod'` in `ims-controller.js`, decoupled from ESP env
+entirely. **Not yet re-verified live after this fix.**
+
+**Known open risk if the above fix isn't enough:** `events-milo` is
+registered for real production domains (`*.aem.live` etc.); testing via
+`?ref=local` runs this app on `http://localhost:3000` instead, which IMS
+client origin validation may not allow-list. If a live retest still fails,
+try a real deployed feature-branch URL instead of `?ref=local` to isolate
+"wrong IMS env" from "disallowed local origin." See PLAN.md §5 for the full
+writeup.
 
 ## Architecture
 
