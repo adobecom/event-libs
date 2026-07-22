@@ -150,26 +150,29 @@
   .event-marquee-media > video {
     height: 100%;
     object-fit: cover;
-    max-height: 360px;
   }
 
   /* Row-split only applies when there's a bleeding asset (Video variant) — gated the
      same way marquee.css gates its own row switch on the `.split` modifier class, so
-     Text/CTA (no asset) keeps its column layout with text pinned to the bottom. */
+     Text/CTA (no asset) keeps its column layout with text pinned to the bottom.
+     Unlike Milo's own `.asset.bleed` (which escapes a narrower, centered content
+     container via `position: absolute; width: 50vw`), event-marquee is already
+     full-bleed with no narrower container to escape — so the asset just stays a
+     normal flex item and fills the remaining row width/height on its own. Forcing
+     the Milo technique here left the text centered mid-row instead of anchored left
+     (`justify-content: center` had nothing else to center once the asset was pulled
+     out of flow) and needlessly overrode the height. */
   .event-marquee-video .event-marquee-foreground {
     flex-direction: row;
-    justify-content: center;
   }
 
   .event-marquee-video .event-marquee-text {
+    flex: 0 0 auto;
     max-width: calc(50% - var(--s2a-layout-guide-gap));
   }
 
   .event-marquee-bleed {
-    position: absolute;
-    width: 50vw;
-    right: 0;
-    height: 100%;
+    flex: 1 1 auto;
   }
 
   .event-marquee-bleed picture,
