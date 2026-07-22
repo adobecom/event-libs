@@ -28,6 +28,7 @@ const prodDomains = ['milo.adobe.com', 'business.adobe.com', 'www.adobe.com', 'n
 const STYLES = '';
 
 const EVENT_LIBS_BASE = '/event-libs/v1';
+// testing: const EVENT_LIBS_BASE = '/event-libs/v1-test';
 const IS_C2 = getMetadata('foundation') === 'c2';
 const EVENT_BLOCKS_LIB = IS_C2
   ? { base: `${EVENT_LIBS_BASE}/c2`, blocks: EVENT_BLOCKS_C2 }

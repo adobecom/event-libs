@@ -37,6 +37,7 @@ export default {
       'events/blocks/': '/event-libs/v1/blocks/',
       'events/scripts/': '/event-libs/v1/utils/',
       'events/features/': '/event-libs/v1/features/',
+      'events/c2/': '/event-libs/v1/c2/',
     }
   })],
   reporters: [

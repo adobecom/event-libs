@@ -1,0 +1,142 @@
+@import '../../styles/tokens.css';
+
+.event-marquee {
+  position: relative;
+  box-sizing: border-box;
+  overflow: hidden;
+  width: 100%;
+  color: var(--s2a-color-content-knockout);
+  font-family: var(--s2a-font-family-default);
+}
+
+.event-marquee .event-marquee-text,
+.event-marquee .event-marquee-media {
+  box-sizing: border-box;
+}
+
+.event-marquee .event-marquee-text h1,
+.event-marquee .event-marquee-text h2,
+.event-marquee .event-marquee-text h3 {
+  font-family: var(--s2a-font-family-heading);
+  font-weight: var(--s2a-font-weight-heading);
+  letter-spacing: var(--s2a-typography-letter-spacing-heading-2);
+  line-height: var(--s2a-typography-line-height-heading-2);
+  font-size: var(--s2a-typography-font-size-heading-2);
+  margin: 0 0 var(--s2a-spacing-sm);
+}
+
+.event-marquee .event-marquee-text p {
+  font-size: var(--s2a-typography-font-size-body-md);
+  line-height: var(--s2a-typography-line-height-body-md);
+  margin: 0 0 var(--s2a-spacing-lg);
+}
+
+.event-marquee .event-marquee-text .con-button {
+  margin: 0 var(--s2a-spacing-sm) var(--s2a-spacing-sm) 0;
+}
+
+.event-marquee .event-marquee-media picture,
+.event-marquee .event-marquee-media img,
+.event-marquee .event-marquee-media video {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.event-marquee .event-marquee-actions {
+  position: absolute;
+  z-index: 2;
+  top: var(--s2a-spacing-md);
+  right: var(--s2a-spacing-md);
+  display: flex;
+  gap: var(--s2a-spacing-xs);
+}
+
+.event-marquee .event-marquee-action {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: none;
+  border-radius: var(--s2a-border-radius-round);
+  background: var(--s2a-color-transparent-black-48);
+  color: var(--s2a-color-content-knockout);
+  cursor: pointer;
+}
+
+.event-marquee .event-marquee-action:hover {
+  background: var(--s2a-color-transparent-black-64);
+}
+
+.event-marquee .event-marquee-favorite.is-favorited {
+  color: var(--s2a-color-brand-adobe-red);
+}
+
+/* Text/CTA variant — full-bleed background, text overlaid on top */
+.event-marquee.event-marquee-text-cta {
+  display: grid;
+  min-height: 420px;
+}
+
+.event-marquee.event-marquee-text-cta .event-marquee-media {
+  grid-area: 1 / 1;
+  width: 100%;
+  height: 100%;
+}
+
+.event-marquee.event-marquee-text-cta .event-marquee-media::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(0deg, var(--s2a-color-transparent-black-64), var(--s2a-color-transparent-black-00) 60%);
+}
+
+.event-marquee.event-marquee-text-cta .event-marquee-text {
+  grid-area: 1 / 1;
+  position: relative;
+  z-index: 1;
+  align-self: end;
+  padding: var(--s2a-viewport-vertical-padding-lg) var(--s2a-layout-guide-gap);
+  max-width: var(--s2a-layout-rich-media-content-measure-wide);
+}
+
+/* Video variant — side-by-side split ("Split Marquee" in Figma) */
+.event-marquee.event-marquee-video {
+  display: flex;
+  flex-direction: column;
+}
+
+.event-marquee.event-marquee-video .event-marquee-text {
+  order: 1;
+  padding: var(--s2a-viewport-vertical-padding-md) var(--s2a-layout-guide-gap);
+}
+
+.event-marquee.event-marquee-video .event-marquee-media {
+  order: 2;
+  position: relative;
+  min-height: 240px;
+}
+
+@media (min-width: 1024px) {
+  .event-marquee.event-marquee-video {
+    flex-direction: row;
+    align-items: stretch;
+  }
+
+  .event-marquee.event-marquee-video .event-marquee-text {
+    order: 0;
+    flex: 0 0 auto;
+    width: 40%;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+  }
+
+  .event-marquee.event-marquee-video .event-marquee-media {
+    flex: 1 1 auto;
+    min-height: 0;
+  }
+}
