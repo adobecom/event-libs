@@ -184,6 +184,9 @@ export default async function init(el) {
   if (mediaCol) mediaCol.classList.add('event-marquee-media');
   const player = detectPlayer(mediaCol);
   el.classList.add(player ? 'event-marquee-video' : 'event-marquee-text-cta');
+  // Matches classic marquee.js#decorateSplit's `media.classList.add('bleed')` — the
+  // asset bleeds to the trailing edge instead of sitting inline with the text.
+  if (player) mediaCol.classList.add('event-marquee-bleed');
 
   if (player?.type === 'mobile-rider' && !player.processed) processAutoBlockLinks(mediaCol);
   if (player) decorateActions(mediaCol, config);

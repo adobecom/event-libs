@@ -1,20 +1,39 @@
 @import '../../styles/tokens.css';
 
+/* Ported from Milo's classic marquee.css, split + always-dark subset only (we don't
+   need the light/quiet/center/inline/one-third modifiers marquee.css also supports).
+   Milo's spacing/color custom properties are swapped for our own s2a C2 tokens, and
+   the breakpoints are swapped too — marquee.css switches to split's row layout at
+   600px/1200px, its own (non-C2) --spacing-* breakpoint system, but this is a C2
+   block built entirely on the s2a token system, which defines 1024px (tablet)/1280px
+   (desktop)/1441px (HD) instead. Using 600/1200 here would mix two unrelated
+   breakpoint systems, so the *technique* is kept identical, the numbers aren't. */
+
 .event-marquee {
   position: relative;
   box-sizing: border-box;
   overflow: hidden;
   width: 100%;
-  min-height: 420px;
   color: var(--s2a-color-content-knockout);
   font-family: var(--s2a-font-family-default);
+  display: flex;
 }
 
-/* Background row (optional, row 1 of 2) — decorated by Milo's own decorateBlockBg,
-   same technique as classic marquee.js's `.background`: absolutely positioned,
-   full-bleed, sits behind the foreground. Kept as its own layer, separate from any
-   foreground asset/player — matches the Figma "Live Promo" reference, which has a
-   dim ambient background *and* a separate inset video player. */
+@media (min-width: 1024px) {
+  .event-marquee {
+    min-height: 360px;
+  }
+}
+
+@media (min-width: 1280px) {
+  .event-marquee {
+    min-height: 560px;
+  }
+}
+
+/* Background (optional, row 1) — decorated by Milo's own decorateBlockBg; absolutely
+   positioned full-bleed, same as marquee.css's `.background picture { position:
+   absolute; inset: 0; }`. Kept as its own layer, separate from any foreground asset. */
 .event-marquee-background {
   position: absolute;
   inset: 0;
@@ -37,17 +56,20 @@
   background: linear-gradient(0deg, var(--s2a-color-transparent-black-64), var(--s2a-color-transparent-black-00) 60%);
 }
 
-/* Foreground row (always present, last row) — text, plus an optional asset (side
-   image or interactive player) that bleeds to one edge rather than covering the
-   whole marquee. Classed directly by event-marquee.js, so flex/order below apply to
-   real direct children — no grandchild-vs-direct-child ambiguity. */
+/* Foreground (always present, last row) — ports marquee.css's `.foreground`. */
 .event-marquee-foreground {
   position: relative;
   z-index: 1;
   display: flex;
   flex-direction: column;
-  gap: var(--s2a-spacing-lg);
-  min-height: inherit;
+  gap: var(--s2a-spacing-xl);
+  padding: var(--s2a-spacing-4xl) 0;
+}
+
+@media (min-width: 1024px) {
+  .event-marquee-foreground {
+    padding: var(--s2a-spacing-xl) 0;
+  }
 }
 
 .event-marquee-text,
@@ -72,20 +94,75 @@
   margin: 0 0 var(--s2a-spacing-lg);
 }
 
-.event-marquee-text .con-button {
-  margin: 0 var(--s2a-spacing-sm) var(--s2a-spacing-sm) 0;
+/* Ports marquee.css's `.action-area` (the CTA row's own wrapper — real Milo
+   decorateButtons adds this class to it automatically, so it's already present). */
+.event-marquee-text .action-area {
+  display: flex;
+  margin: 0;
+  gap: var(--s2a-spacing-sm);
+  flex-flow: column wrap;
+  align-items: stretch;
 }
 
-/* Only size plain images/video directly — an interactive player (.milo-video,
-   .mobile-rider) brings its own sizing/aspect-ratio CSS and must not be force-cropped
-   the way a decorative asset image can be. */
+@media (min-width: 1024px) {
+  .event-marquee-text .action-area {
+    flex-direction: row;
+    align-items: center;
+  }
+}
+
+/* Asset (optional, in the foreground) — ports marquee.css's `.asset`/`.asset.bleed`.
+   Only sizes plain images/video directly — an interactive player (.milo-video,
+   .mobile-rider) brings its own sizing/aspect-ratio CSS and must not be
+   force-cropped the way a decorative asset image can be. */
+.event-marquee-media {
+  width: 100%;
+  margin: 0 auto;
+}
+
 .event-marquee-media picture,
 .event-marquee-media > img,
 .event-marquee-media > video {
   display: block;
   width: 100%;
-  height: 100%;
-  object-fit: cover;
+  height: auto;
+}
+
+@media (min-width: 1024px) {
+  .event-marquee-media > img,
+  .event-marquee-media > video {
+    height: 100%;
+    object-fit: cover;
+    max-height: 360px;
+  }
+
+  /* Row-split only applies when there's a bleeding asset (Video variant) — gated the
+     same way marquee.css gates its own row switch on the `.split` modifier class, so
+     Text/CTA (no asset) keeps its column layout with text pinned to the bottom. */
+  .event-marquee-video .event-marquee-foreground {
+    flex-direction: row;
+    justify-content: center;
+  }
+
+  .event-marquee-video .event-marquee-text {
+    max-width: calc(50% - var(--s2a-layout-guide-gap));
+  }
+
+  .event-marquee-bleed {
+    position: absolute;
+    width: 50vw;
+    right: 0;
+    height: 100%;
+  }
+
+  .event-marquee-bleed picture,
+  .event-marquee-bleed > video {
+    height: 100%;
+  }
+
+  .event-marquee-bleed > video {
+    object-fit: cover;
+  }
 }
 
 .event-marquee-actions {
@@ -119,48 +196,8 @@
   color: var(--s2a-color-brand-adobe-red);
 }
 
-/* Text/CTA variant — no asset (or a non-player asset), text sits at the bottom of
-   the full-bleed background. */
+/* Text/CTA variant — no asset (or a non-player asset): text sits at the bottom of
+   the full-bleed background, matching the Figma "Upcoming" state. */
 .event-marquee-text-cta .event-marquee-foreground {
   justify-content: flex-end;
-}
-
-.event-marquee-text-cta .event-marquee-text {
-  padding: var(--s2a-viewport-vertical-padding-lg) var(--s2a-layout-guide-gap);
-  max-width: var(--s2a-layout-rich-media-content-measure-wide);
-}
-
-/* Video variant — text + a bleeding side asset ("Split Marquee" in Figma). Mobile:
-   stacked. Desktop: side by side, asset bleeding to the trailing edge, same idea as
-   classic marquee.split's `.asset.bleed`. */
-.event-marquee-video .event-marquee-text {
-  order: 1;
-  padding: var(--s2a-viewport-vertical-padding-md) var(--s2a-layout-guide-gap);
-}
-
-.event-marquee-video .event-marquee-media {
-  order: 2;
-  position: relative;
-  min-height: 240px;
-}
-
-@media (min-width: 1024px) {
-  .event-marquee-video .event-marquee-foreground {
-    flex-direction: row;
-    align-items: stretch;
-  }
-
-  .event-marquee-video .event-marquee-text {
-    order: 0;
-    flex: 0 0 auto;
-    width: 45%;
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-  }
-
-  .event-marquee-video .event-marquee-media {
-    flex: 1 1 auto;
-    min-height: 0;
-  }
 }
