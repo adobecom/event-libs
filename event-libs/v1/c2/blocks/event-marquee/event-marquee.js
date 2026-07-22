@@ -10,36 +10,39 @@ const ICON_HEART_OUTLINE = '<svg width="20" height="20" viewBox="0 0 20 20" fill
 const ICON_HEART_FILLED = '<svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false"><path d="M8.61426 17.5195C9.02246 17.8398 9.51123 18 10 18C10.4888 18 10.9781 17.8398 11.3858 17.5195C12.9732 16.2734 16.5908 13.0039 17.7603 11.0908C18.6929 9.56543 19.0132 7.67773 18.6172 6.04199C18.2774 4.63769 17.4551 3.50488 16.2393 2.76367C14.9116 1.95409 13.2705 1.79003 11.959 2.34179C11.2647 2.63183 10.5698 3.1416 9.99171 3.77148C9.42628 3.17773 8.72316 2.65234 8.063 2.35058C6.78419 1.7666 5.13526 1.9248 3.76124 2.76367C2.54493 3.50488 1.72266 4.63769 1.38282 6.04199C0.98682 7.67773 1.30713 9.56543 2.23975 11.0908C3.41162 13.0078 7.02832 16.2754 8.61426 17.5195Z" fill="currentColor"/></svg>';
 const ICON_SHARE = '<svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false"><path d="M14.5 6.5C15.8807 6.5 17 5.38071 17 4C17 2.61929 15.8807 1.5 14.5 1.5C13.1193 1.5 12 2.61929 12 4C12 4.16249 12.0154 4.32158 12.0447 4.4759L6.68625 7.62766C6.21886 7.09565 5.5387 6.76 4.78125 6.76C3.39871 6.76 2.28125 7.87746 2.28125 9.26C2.28125 10.6425 3.39871 11.76 4.78125 11.76C5.53927 11.76 6.21996 11.4239 6.68738 10.8912L12.0447 14.0416C12.0154 14.1959 12 14.355 12 14.5175C12 15.8982 13.1193 17.0175 14.5 17.0175C15.8807 17.0175 17 15.8982 17 14.5175C17 13.1368 15.8807 12.0175 14.5 12.0175C13.7412 12.0175 13.0603 12.3546 12.5928 12.8879L7.23752 9.73838C7.26721 9.58281 7.28125 9.42246 7.28125 9.26C7.28125 9.09708 7.26714 8.93627 7.23731 8.78028L12.5936 5.6289C13.0611 6.16257 13.7417 6.5 14.5 6.5Z" fill="currentColor"/></svg>';
 
-function parseConfig(el) {
-  const rows = [...el.querySelectorAll(':scope > div')];
-  const [contentRow, ...metaRows] = rows;
-  const [textCol, mediaCol] = contentRow
-    ? [...contentRow.querySelectorAll(':scope > div')]
-    : [];
+// event-marquee has no inline metadata rows of its own — same convention as Milo's
+// C2 Router Marquee, which reads its one extra field (`starting-marquee`) from a
+// sibling Section Metadata block rather than a row inside the marquee itself (see
+// router-marquee.js#reorderSlidesMaybe). The block table is pure content: one row,
+// two columns (text | media) — same shape as router-marquee's own `decorateSlide`.
+function parseContent(el) {
+  const contentRow = el.querySelector(':scope > div');
+  const [textCol, mediaCol] = contentRow ? contentRow.querySelectorAll(':scope > div') : [];
+  return { textCol, mediaCol };
+}
 
+// Mirrors router-marquee.js#reorderSlidesMaybe's own lookup of a sibling
+// `.section-metadata` block, using Milo's real `getMetadata` helper (dynamically
+// imported, since we're an external consumer, not Milo itself).
+async function getSectionConfig(el, miloLibs) {
   const config = {
-    title: '',
-    sessionId: '',
-    favoriteEnabled: null,
-    shareEnabled: null,
+    title: '', sessionId: '', favoriteEnabled: null, shareEnabled: null,
   };
 
-  metaRows.forEach((row) => {
-    const cells = row.querySelectorAll(':scope > div');
-    const key = cells[0]?.textContent?.trim().toLowerCase();
-    const val = cells[1]?.textContent?.trim();
-    if (!key || val === undefined) return;
-    switch (key) {
-      case 'event-title': config.title = val; break;
-      case 'session-id': config.sessionId = val; break;
-      case 'favorite-enabled': config.favoriteEnabled = val.toLowerCase() === 'true'; break;
-      case 'share-enabled': config.shareEnabled = val.toLowerCase() === 'true'; break;
-      default: break;
-    }
-  });
-  metaRows.forEach((row) => row.remove());
+  const sectionMeta = el.parentElement?.querySelector('.section-metadata');
+  if (!sectionMeta) return config;
 
-  return { textCol, mediaCol, config };
+  const { getMetadata: getSectionMetadata } = await import(`${miloLibs}/c2/blocks/section-metadata/section-metadata.js`);
+  const metadata = getSectionMetadata(sectionMeta);
+
+  // `.text` values are lowercased by Milo's helper (fine for the true/false flags);
+  // title/session-id need their original casing, so read `.content` instead.
+  if (metadata['event-title']) config.title = metadata['event-title'].content[0]?.textContent.trim() || '';
+  if (metadata['session-id']) config.sessionId = metadata['session-id'].content[0]?.textContent.trim() || '';
+  if (metadata['favorite-enabled']) config.favoriteEnabled = metadata['favorite-enabled'].text[0] === 'true';
+  if (metadata['share-enabled']) config.shareEnabled = metadata['share-enabled'].text[0] === 'true';
+
+  return config;
 }
 
 // Video variant is auto-detected the same way Milo's own C2 router-marquee detects
@@ -144,9 +147,12 @@ function decorateActions(mediaCol, config) {
 
 export default async function init(el) {
   const miloLibs = getEventConfig()?.miloConfig?.miloLibs || LIBS;
-  const { decorateButtons } = await import(`${miloLibs}/utils/decorate.js`);
+  const [{ decorateButtons }, config] = await Promise.all([
+    import(`${miloLibs}/utils/decorate.js`),
+    getSectionConfig(el, miloLibs),
+  ]);
 
-  const { textCol, mediaCol, config } = parseConfig(el);
+  const { textCol, mediaCol } = parseContent(el);
   if (!textCol || !mediaCol) {
     window.lana?.log('[event-marquee] expected a text column and a media column, got none');
     return;

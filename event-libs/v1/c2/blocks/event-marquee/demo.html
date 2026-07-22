@@ -5,7 +5,8 @@
     npx serve .   → http://localhost:3000/event-libs/v1/c2/blocks/event-marquee/demo.html
 
   Runs standalone (no Milo/AEM, no real RainFocus backend):
-    - decorateButtons is a local stub (see the inline <script type="module"> below)
+    - decorateButtons and Section Metadata's getMetadata are local stubs (reused from
+      the unit test fixtures) so config parsing works without a real Milo/AEM env
     - session-store signals are seeded directly with mock data instead of a real fetch
     - YouTube/MPC variants are faked as already-decorated `.milo-video` markup, since
       the real decoration only happens inside Milo's own AUTO_BLOCKS pipeline
@@ -36,6 +37,7 @@
     .event-marquee { border: 1px dashed rgba(255,255,255,.2); margin-bottom: 48px; }
     .event-marquee .event-marquee-media picture, .event-marquee .event-marquee-media img { background: #333; min-height: 240px; }
     .event-marquee .event-marquee-media .milo-video, .event-marquee .event-marquee-media .mobile-rider { min-height: 240px; background: #222; display: flex; align-items: center; justify-content: center; color: #666; font-size: 13px; }
+    .section-metadata { display: none; }
   </style>
 </head>
 <body>
@@ -103,10 +105,9 @@
         <a href="https://www.mobilerider.com/embed?videoId=demo-live-123&skinId=default&autoplay=true">Watch live</a>
       </div>
     </div>
-    <div>
-      <div>session-id</div>
-      <div>s-100</div>
-    </div>
+  </div>
+  <div class="section-metadata">
+    <div><div>session-id</div><div>s-100</div></div>
   </div>
 </section>
 
@@ -124,10 +125,9 @@
         <div class="milo-video">(stand-in for Milo's real YouTube embed)</div>
       </div>
     </div>
-    <div>
-      <div>session-id</div>
-      <div>s-201</div>
-    </div>
+  </div>
+  <div class="section-metadata">
+    <div><div>session-id</div><div>s-201</div></div>
   </div>
 </section>
 
@@ -144,10 +144,9 @@
         <div class="milo-video">(stand-in for Milo's real MPC embed)</div>
       </div>
     </div>
-    <div>
-      <div>session-id</div>
-      <div>s-202</div>
-    </div>
+  </div>
+  <div class="section-metadata">
+    <div><div>session-id</div><div>s-202</div></div>
   </div>
 </section>
 
@@ -159,6 +158,8 @@
       <div><h2>Sponsor spotlight</h2><p>No favoriting on sponsor content.</p></div>
       <div><div class="milo-video">(stand-in player)</div></div>
     </div>
+  </div>
+  <div class="section-metadata">
     <div><div>session-id</div><div>s-100</div></div>
     <div><div>favorite-enabled</div><div>false</div></div>
   </div>
@@ -172,6 +173,8 @@
       <div><h2>Internal preview</h2><p>Not meant to be shared externally.</p></div>
       <div><div class="milo-video">(stand-in player)</div></div>
     </div>
+  </div>
+  <div class="section-metadata">
     <div><div>session-id</div><div>s-100</div></div>
     <div><div>share-enabled</div><div>false</div></div>
   </div>
@@ -198,6 +201,8 @@
       <div><h2>Unknown session</h2><p>Demonstrates the "waiting to resolve" case.</p></div>
       <div><div class="milo-video">(stand-in player)</div></div>
     </div>
+  </div>
+  <div class="section-metadata">
     <div><div>session-id</div><div>s-999</div></div>
   </div>
 </section>

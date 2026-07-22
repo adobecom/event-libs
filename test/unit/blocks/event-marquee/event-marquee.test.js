@@ -9,25 +9,38 @@ const body = await readFile({ path: './mocks/default.html' });
 const localMiloLibs = 'http://localhost:2000/test/unit/blocks/event-marquee/mocks/libs';
 setEventConfig({}, { miloLibs: localMiloLibs });
 
+// Metadata lives in a sibling Section Metadata block, same convention as Milo's own
+// C2 Router Marquee (`starting-marquee`) — never as rows inside the marquee itself.
+function sectionMetadataHtml(rows = {}) {
+  const entries = Object.entries(rows);
+  if (!entries.length) return '';
+  return `
+    <div class="section-metadata">
+      ${entries.map(([key, val]) => `<div><div>${key}</div><div>${val}</div></div>`).join('')}
+    </div>
+  `;
+}
+
 function videoVariantHtml({ sessionId = 's-100', favoriteEnabled, shareEnabled } = {}) {
-  const metaRows = [
-    `<div><div>session-id</div><div>${sessionId}</div></div>`,
-    favoriteEnabled !== undefined ? `<div><div>favorite-enabled</div><div>${favoriteEnabled}</div></div>` : '',
-    shareEnabled !== undefined ? `<div><div>share-enabled</div><div>${shareEnabled}</div></div>` : '',
-  ].join('');
+  const metaRows = {};
+  if (sessionId) metaRows['session-id'] = sessionId;
+  if (favoriteEnabled !== undefined) metaRows['favorite-enabled'] = favoriteEnabled;
+  if (shareEnabled !== undefined) metaRows['share-enabled'] = shareEnabled;
 
   return `
-    <div class="event-marquee">
-      <div>
+    <div class="section">
+      <div class="event-marquee">
         <div>
-          <h2>Live now</h2>
-          <p>Join the mainstage keynote.</p>
-        </div>
-        <div>
-          <div class="milo-video"><iframe title="video"></iframe></div>
+          <div>
+            <h2>Live now</h2>
+            <p>Join the mainstage keynote.</p>
+          </div>
+          <div>
+            <div class="milo-video"><iframe title="video"></iframe></div>
+          </div>
         </div>
       </div>
-      ${metaRows}
+      ${sectionMetadataHtml(metaRows)}
     </div>
   `;
 }
@@ -73,6 +86,13 @@ describe('event-marquee', () => {
       expect(el.querySelector('.event-marquee-text')).to.exist;
       expect(el.querySelector('.event-marquee-media')).to.exist;
     });
+
+    it('does not require a sibling Section Metadata block', async () => {
+      const el = document.querySelector('.event-marquee');
+      expect(el.parentElement.querySelector('.section-metadata')).to.not.exist;
+      await init(el);
+      expect(el.querySelector('.event-marquee-actions')).to.not.exist;
+    });
   });
 
   describe('Video variant', () => {
@@ -84,7 +104,7 @@ describe('event-marquee', () => {
       expect(el.classList.contains('event-marquee-text-cta')).to.be.false;
     });
 
-    it('strips authoring metadata rows before rendering', async () => {
+    it('leaves the block\'s own rows untouched (no metadata rows to strip)', async () => {
       document.body.innerHTML = videoVariantHtml();
       const el = document.querySelector('.event-marquee');
       await init(el);
@@ -142,6 +162,27 @@ describe('event-marquee', () => {
       const el = document.querySelector('.event-marquee');
       await init(el);
       expect(el.querySelector('.event-marquee-share')).to.not.exist;
+    });
+
+    it('preserves the original casing of session-id and event-title from Section Metadata', async () => {
+      document.body.innerHTML = `
+        <div class="section">
+          <div class="event-marquee">
+            <div>
+              <div><h2>Live now</h2></div>
+              <div><div class="milo-video"><iframe title="video"></iframe></div></div>
+            </div>
+          </div>
+          <div class="section-metadata">
+            <div><div>event-title</div><div>MAX2026</div></div>
+            <div><div>session-id</div><div>S-AbC123</div></div>
+          </div>
+        </div>
+      `;
+      sessions.value = [{ id: 'S-AbC123', rfCode: 'rf-1' }];
+      const el = document.querySelector('.event-marquee');
+      await init(el);
+      expect(el.querySelector('.event-marquee-favorite')).to.exist;
     });
   });
 });

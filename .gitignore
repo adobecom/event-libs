@@ -6,6 +6,8 @@ node_modules/*
 .DS_Store
 .idea
 *.pem
+.env
+.env.*
 
 # PIM local state
 .pim/

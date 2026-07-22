@@ -16,6 +16,30 @@ the bottom of the doc):
 | foundation | c2 |
 ```
 
+## Authoring convention
+
+Same convention as Milo's own C2 blocks (Router Marquee, Rich Content): the block
+itself is **pure content** — no config rows inside it. Any config that isn't itself
+content (Router Marquee's `starting-marquee`, this block's `session-id` etc.) lives in
+a **Section Metadata** block placed as a sibling of the marquee, inside the same
+section:
+
+```
+| Event Marquee |  |
+| --- | --- |
+| ## Headline<br>Body copy<br>**_[Register now](https://...)_** | ![](./background.jpg) |
+
+| Section Metadata |  |
+| --- | --- |
+| session-id | s-100 |
+```
+
+At runtime, `event-marquee.js` looks up `el.parentElement.querySelector('.section-metadata')`
+and reads it with Milo's own `getMetadata` helper (`c2/blocks/section-metadata/section-metadata.js`)
+— the exact same lookup Router Marquee uses for `starting-marquee`. If there's no
+Section Metadata block in the section, event-marquee just uses defaults (no Favorite
+button, share button shown).
+
 ## Variants
 
 There is no explicit "variant" field to author. The variant is auto-detected from
@@ -27,14 +51,10 @@ C2 Router Marquee uses:
 - **Video variant** — media column contains an interactive player (Mobile Rider,
   YouTube, or MPC/Adobe TV). Adds a Favorite button and a share icon.
 
-## How the table maps to the block
+## The Event Marquee block itself
 
-```
-Row 1  →  [ text column  |  media column ]     ← the content, 2 cells side by side
-Row 2+ →  [ property     |  value        ]     ← metadata, one property per row
-```
-
-### Row 1 — content row (always required)
+One row, two cells — same shape as Router Marquee's own `decorateSlide` (text column |
+media column).
 
 **Left cell (text column):**
 
@@ -45,7 +65,7 @@ Row 2+ →  [ property     |  value        ]     ← metadata, one property per 
 | Primary CTA | Bold *and* italic the link text: `**_[Register now](https://...)_**` |
 | Secondary CTA | Italic the link text: `_[Learn more](https://...)_` |
 
-Up to 2 CTAs, same convention Milo uses everywhere else.
+Up to 2 CTAs, same `<em>`/`<em><strong>` convention Milo uses everywhere else.
 
 **Right cell (media column)** — this is what auto-detects the variant:
 
@@ -60,7 +80,10 @@ Up to 2 CTAs, same convention Milo uses everywhere else.
 A background image/video and a player link can both be pasted into the same cell —
 that gives a background treatment plus the embedded player.
 
-### Row 2+ — properties reference
+## Section Metadata — properties reference
+
+Add a `Section Metadata` block below the marquee, in the same section, to set any of
+these. All are optional.
 
 | Property | Values | Required | Default | Notes |
 |---|---|---|---|---|
@@ -70,11 +93,16 @@ that gives a background treatment plus the embedded player.
 | `share-enabled` | `true` / `false` | No | `true` (Video variant only) | Explicit override — set `false` to hide the share icon |
 
 Favorite/share only ever appear in the Video variant — they don't render at all in
-Text/CTA.
+Text/CTA, regardless of what's in Section Metadata.
 
-## Sample tables
+Note: Milo's `getMetadata` helper lowercases its `.text` values, which is why
+`event-title`/`session-id` are read from `.content` instead (preserving the original
+casing) — `favorite-enabled`/`share-enabled` are read from `.text` since `true`/`false`
+comparisons are case-insensitive anyway.
 
-**1. Text/CTA — background image, 2 CTAs**
+## Sample sections
+
+**1. Text/CTA — background image, 2 CTAs (no Section Metadata needed)**
 ```
 | Event Marquee |  |
 | --- | --- |
@@ -93,6 +121,9 @@ Text/CTA.
 | Event Marquee |  |
 | --- | --- |
 | ## Live now: Mainstage<br>Join the keynote as it happens. | [Watch live](https://www.mobilerider.com/embed?videoId=demo-live-123&skinId=default&autoplay=true) |
+
+| Section Metadata |  |
+| --- | --- |
 | session-id | s-100 |
 ```
 
@@ -101,6 +132,9 @@ Text/CTA.
 | Event Marquee |  |
 | --- | --- |
 | ## Replay: Design Systems at Scale<br>Missed it live? Watch the full session now. | [Watch replay](https://www.youtube.com/watch?v=abc123XYZ) |
+
+| Section Metadata |  |
+| --- | --- |
 | session-id | s-201 |
 ```
 
@@ -109,6 +143,9 @@ Text/CTA.
 | Event Marquee |  |
 | --- | --- |
 | ## Replay: What's New in Creative Cloud<br>The full session, on demand. | [Watch replay](https://tv.adobe.com/watch/abc-123) |
+
+| Section Metadata |  |
+| --- | --- |
 | session-id | s-202 |
 ```
 
@@ -117,6 +154,9 @@ Text/CTA.
 | Event Marquee |  |
 | --- | --- |
 | ## Sponsor spotlight<br>No favoriting on sponsor content. | [Watch](https://tv.adobe.com/watch/sponsor-1) |
+
+| Section Metadata |  |
+| --- | --- |
 | session-id | s-100 |
 | favorite-enabled | false |
 ```
@@ -126,6 +166,9 @@ Text/CTA.
 | Event Marquee |  |
 | --- | --- |
 | ## Internal preview<br>Not meant to be shared externally. | [Watch](https://tv.adobe.com/watch/preview-1) |
+
+| Section Metadata |  |
+| --- | --- |
 | session-id | s-100 |
 | share-enabled | false |
 ```
@@ -135,6 +178,9 @@ Text/CTA.
 | Event Marquee |  |
 | --- | --- |
 | ## Live now: Mainstage | ![](./background.jpg)<br>[Watch live](https://www.mobilerider.com/embed?videoId=demo-live-123&skinId=default&autoplay=true) |
+
+| Section Metadata |  |
+| --- | --- |
 | session-id | s-100 |
 ```
 
