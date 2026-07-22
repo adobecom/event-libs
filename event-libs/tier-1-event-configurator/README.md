@@ -103,3 +103,25 @@ npx serve . --listen 3000
   against a real `admin.da.live` sheet — a mocked DA SDK can validate the UI
   wiring and real ESP calls, but not real DA auth/writes.
 - Requires being signed in to da.live in the browser you open that URL in.
+
+### Switching ESP env locally
+
+`?espenv=`/`?eccEnv=` query params **don't work** through the DA-proxied
+route above — DA's SDK only forwards `context.ref` through the iframe
+handshake, so a query param on the parent `da.live/app/...` URL never
+reaches this app (same limitation Schedule Maker documents for
+`?milolibs=`). Instead, uncomment and edit the `event-service-env` `<meta>`
+tag already present in
+[tools/da-apps/tier-1-event-configurator.html](../tools/da-apps/tier-1-event-configurator.html):
+
+```html
+<meta name="event-service-env" content="stage" />
+```
+
+`getEventServiceEnv()` (`event-libs/v1/utils/utils.js`) reads this tag
+directly from the iframe's own `document.head`, independent of the parent
+page — verified locally: with `content="stage"` set, `listEvents()`'s
+fetch resolved to `events-service-platform-stage.adobe.io` instead of the
+`prod` default. Valid values are the `ENV_MAP` keys in
+`event-libs/v1/utils/constances.js`: `dev`, `dev02`, `stage`, `stage02`,
+`prod`, `local`.
