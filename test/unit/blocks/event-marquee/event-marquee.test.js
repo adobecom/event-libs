@@ -136,6 +136,34 @@ describe('event-marquee', () => {
       expect(el.classList.contains('event-marquee-text-cta')).to.be.false;
     });
 
+    it('renders the video variant for an already-processed .mobile-rider div (the consuming site\'s own decorateArea() runs processAutoBlockLinks globally before this block\'s init())', async () => {
+      document.body.innerHTML = `
+        <div class="event-marquee">
+          <div>
+            <div><h2>Live now</h2></div>
+            <div><div class="mobile-rider" data-extracted-video-id="abc123"></div></div>
+          </div>
+        </div>
+      `;
+      const el = document.querySelector('.event-marquee');
+      await init(el);
+      expect(el.classList.contains('event-marquee-video')).to.be.true;
+    });
+
+    it('renders the video variant for a raw, unprocessed mobilerider.com link', async () => {
+      document.body.innerHTML = `
+        <div class="event-marquee">
+          <div>
+            <div><h2>Live now</h2></div>
+            <div><a href="https://www.mobilerider.com/embed?videoId=abc123">Watch</a></div>
+          </div>
+        </div>
+      `;
+      const el = document.querySelector('.event-marquee');
+      await init(el);
+      expect(el.classList.contains('event-marquee-video')).to.be.true;
+    });
+
     it('decorates both the background row and the foreground asset', async () => {
       document.body.innerHTML = videoVariantHtml();
       const el = document.querySelector('.event-marquee');

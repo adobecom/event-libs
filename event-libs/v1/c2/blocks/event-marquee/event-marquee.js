@@ -51,13 +51,17 @@ async function getSectionConfig(el, miloLibs) {
 
 // Video variant is auto-detected the same way Milo's own C2 router-marquee detects
 // it — from content already decorated into place, not an authored field. `.milo-video`
-// covers MPC/tv.adobe.com and YouTube (both use that class); a `mobilerider.com` link
-// is event-libs' own equivalent, self-initialized below via processAutoBlockLinks —
-// see event-libs/v1/utils/decorate.js#processAutoBlockLinks.
+// covers MPC/tv.adobe.com and YouTube (both use that class). A `mobilerider.com` link
+// is event-libs' own equivalent — but the *consuming site's* own decorateArea() calls
+// processAutoBlockLinks(document) globally, before any block's init() runs, so by the
+// time we get here the anchor is usually already converted into a `.mobile-rider` div.
+// Check for both: the already-processed div (the common real-world case) and the raw,
+// unprocessed anchor (our own demo/tests, where nothing has processed it yet).
 function detectPlayer(mediaCol) {
   if (!mediaCol) return null;
+  if (mediaCol.querySelector('.mobile-rider')) return { type: 'mobile-rider', processed: true };
   const mrLink = mediaCol.querySelector('a[href*="mobilerider.com"]');
-  if (mrLink) return { type: 'mobile-rider' };
+  if (mrLink) return { type: 'mobile-rider', processed: false };
   const miloVideo = mediaCol.querySelector('.milo-video');
   if (miloVideo) return { type: 'milo-video' };
   return null;
@@ -181,6 +185,6 @@ export default async function init(el) {
   const player = detectPlayer(mediaCol);
   el.classList.add(player ? 'event-marquee-video' : 'event-marquee-text-cta');
 
-  if (player?.type === 'mobile-rider') processAutoBlockLinks(mediaCol);
+  if (player?.type === 'mobile-rider' && !player.processed) processAutoBlockLinks(mediaCol);
   if (player) decorateActions(mediaCol, config);
 }
