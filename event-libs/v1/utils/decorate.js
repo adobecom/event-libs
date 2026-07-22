@@ -511,19 +511,24 @@ function prebuildAutoBlock(blockName, link) {
   const autoBlockBuilders = {
     'chrono-box': (link) => {
       const url = new URL(link.href);
-      const scheduleBase64 = url.searchParams.get('schedule');
+      const hashMatch = url.hash.match(/[#&]schedule=([A-Za-z0-9+/=%-]{20,})/);
+      const scheduleBase64 = url.searchParams.get('schedule') || hashMatch?.[1];
       const schedule = parseEncodedConfig(scheduleBase64);
-      
+
       if (!schedule || !schedule.blocks || !Array.isArray(schedule.blocks)) {
         return null;
       }
 
+      // url.pathname looks like "/app/{org}/{repo}/tools/da-apps/schedule-maker"
+      const pathParts = url.pathname.split('/').filter(Boolean);
+      const [org, repo] = pathParts[0] === 'app' ? [pathParts[1], pathParts[2]] : [];
 
       // Transform schedule blocks into chrono-box format
       const chronoBoxData = schedule.blocks.map(block => {
         const item = {
           pathToFragment: block.fragmentPath,
-          toggleTime: block.startDateTime
+          title: block.title,
+          toggleTime: block.startDateTime,
         };
 
         // Add mobileRider sessionId if the block includes a live stream
@@ -544,7 +549,7 @@ function prebuildAutoBlock(blockName, link) {
         class: 'chrono-box',
         'data-schedule-id': schedule.scheduleId,
         'data-schedule-title': schedule.title,
-        'data-schedule-maker-url': `${url.origin}${url.pathname}?scheduleId=${schedule.scheduleId}`,
+        ...(org && repo ? { 'data-schedule-repo': `${org}/${repo}` } : {}),
       }, innerDiv);
 
       return chronoBoxEl;

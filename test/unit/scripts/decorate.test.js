@@ -1820,5 +1820,48 @@ describe('decorateEvent - Array Iteration', () => {
       expect(() => processAutoBlockLinks(parent)).to.not.throw();
       await new Promise((resolve) => { setTimeout(resolve, 50); });
     });
+
+    function encodeSchedule(schedule) {
+      return window.btoa(unescape(encodeURIComponent(JSON.stringify(schedule))));
+    }
+
+    function buildScheduleMakerLink(org, repo) {
+      const schedule = {
+        scheduleId: 'test-schedule-id',
+        title: 'Test Schedule',
+        blocks: [{ fragmentPath: '/fragments/one', title: 'Block One', startDateTime: 1750000000000 }],
+      };
+      const link = document.createElement('a');
+      link.href = `https://da.live/app/${org}/${repo}/tools/da-apps/schedule-maker#schedule=${encodeSchedule(schedule)}`;
+      return link;
+    }
+
+    it('should stamp data-schedule-repo from the authored org/repo (da-events)', async () => {
+      const parent = document.createElement('div');
+      const p = document.createElement('p');
+      p.appendChild(buildScheduleMakerLink('adobecom', 'da-events'));
+      parent.appendChild(p);
+
+      processAutoBlockLinks(parent);
+      await new Promise((resolve) => { setTimeout(resolve, 50); });
+
+      const chronoBox = parent.querySelector('.chrono-box');
+      expect(chronoBox).to.not.be.null;
+      expect(chronoBox.getAttribute('data-schedule-repo')).to.equal('adobecom/da-events');
+    });
+
+    it('should stamp data-schedule-repo from the authored org/repo (da-events-fg-pink)', async () => {
+      const parent = document.createElement('div');
+      const p = document.createElement('p');
+      p.appendChild(buildScheduleMakerLink('adobecom', 'da-events-fg-pink'));
+      parent.appendChild(p);
+
+      processAutoBlockLinks(parent);
+      await new Promise((resolve) => { setTimeout(resolve, 50); });
+
+      const chronoBox = parent.querySelector('.chrono-box');
+      expect(chronoBox).to.not.be.null;
+      expect(chronoBox.getAttribute('data-schedule-repo')).to.equal('adobecom/da-events-fg-pink');
+    });
   });
 });
