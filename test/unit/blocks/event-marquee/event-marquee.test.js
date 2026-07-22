@@ -150,6 +150,28 @@ describe('event-marquee', () => {
       expect(el.classList.contains('event-marquee-video')).to.be.true;
     });
 
+    it('renders the split layout for an ambient/decorative video asset, without Favorite/share (no player, no session)', async () => {
+      document.body.innerHTML = `
+        <div class="event-marquee">
+          <div>
+            <div><h2>Behind the scenes</h2></div>
+            <div>
+              <div class="video-container video-holder">
+                <video playsinline muted loop data-video-source="./loop.mp4"><source src="./loop.mp4" type="video/mp4"></video>
+                <button class="play-pause-button">Pause</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
+      const el = document.querySelector('.event-marquee');
+      await init(el);
+      expect(el.classList.contains('event-marquee-video')).to.be.true;
+      expect(el.querySelector('.event-marquee-media').classList.contains('event-marquee-bleed')).to.be.true;
+      expect(el.querySelector('.event-marquee-favorite')).to.not.exist;
+      expect(el.querySelector('.event-marquee-share')).to.not.exist;
+    });
+
     it('renders the video variant for a raw, unprocessed mobilerider.com link', async () => {
       document.body.innerHTML = `
         <div class="event-marquee">

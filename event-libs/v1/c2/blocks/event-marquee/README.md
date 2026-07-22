@@ -55,16 +55,20 @@ fallback all work for free, no new code.
 
 ## Variants
 
-There is no explicit "variant" field to author. The variant is auto-detected from
-what's in the foreground's asset cell — the same content-presence approach Milo's own
-marquee blocks use for their own auto-detection:
+There is no explicit "variant" field to author. Two things are auto-detected
+independently from what's in the foreground's asset cell — the same content-presence
+approach Milo's own marquee blocks use:
 
-- **Text/CTA variant** — no asset cell, or an asset that isn't a recognized
-  interactive player. Headline, body copy, up to 2 CTAs, over the background.
-- **Video variant** — asset cell contains an interactive player (Mobile Rider,
-  YouTube, or MPC/Adobe TV). Adds a Favorite button and a share icon. The player
-  bleeds to one edge on desktop rather than covering the whole marquee ("Split
-  Marquee" in Figma) — it sits *in front of* the background, not instead of it.
+- **Layout** — no asset cell at all → **Text/CTA**: headline, body copy, up to 2
+  CTAs, text pinned to the bottom of the full-bleed background. Any asset cell at
+  all (a decorative image, an ambient video, *or* an interactive player) →
+  **split layout**: the asset bleeds to one edge on desktop instead of covering the
+  whole marquee ("Split Marquee" in Figma) — it sits *in front of* the background,
+  not instead of it.
+- **Favorite/share** — shown only when the asset is specifically a recognized
+  interactive player (Mobile Rider, YouTube, or MPC/Adobe TV). A decorative image or
+  an ambient video gets the split layout but no Favorite/share, since there's no
+  session to favorite.
 
 ## The Event Marquee block itself
 
@@ -88,15 +92,17 @@ Text cell:
 
 Up to 2 CTAs, same `<em>`/`<em><strong>` convention Milo uses everywhere else.
 
-Asset cell (optional) — presence/type of a real player here is what flips the
-variant to Video:
+Asset cell (optional) — presence of anything here switches to the split layout;
+only a recognized player also gets Favorite/share:
 
 | Want | Paste this |
 |---|---|
-| No asset — text over the background only (Text/CTA variant) | Leave the cell out entirely |
-| Mobile Rider live/on-demand player (→ Video variant) | A `mobilerider.com` embed link, e.g. `https://www.mobilerider.com/embed?videoId=abc123&skinId=default&autoplay=true` |
-| YouTube player (→ Video variant) | A normal `youtube.com/watch?v=...` or `youtu.be/...` link |
-| MPC / Adobe TV player (→ Video variant) | A `tv.adobe.com/...` link |
+| No asset — text over the background only, no split | Leave the cell out entirely |
+| Decorative image, split layout, no Favorite/share | A normal image |
+| Ambient/decorative looping video, split layout, no Favorite/share | A link to an `.mp4` ending in `#autoplay` — Milo's generic AUTO_BLOCK decorates it, including the play/pause button (already C2-tokenized on `foundation:c2` pages, for free) |
+| Mobile Rider live/on-demand player — split layout + Favorite/share | A `mobilerider.com` embed link, e.g. `https://www.mobilerider.com/embed?videoId=abc123&skinId=default&autoplay=true` |
+| YouTube player — split layout + Favorite/share | A normal `youtube.com/watch?v=...` or `youtu.be/...` link |
+| MPC / Adobe TV player — split layout + Favorite/share | A `tv.adobe.com/...` link |
 
 ## Section Metadata — properties reference
 
@@ -110,8 +116,9 @@ these. All are optional.
 | `favorite-enabled` | `true` / `false` | No | shows automatically when Video variant + `session-id` is set | Explicit override — set `false` to force-hide it |
 | `share-enabled` | `true` / `false` | No | `true` (Video variant only) | Explicit override — set `false` to hide the share icon |
 
-Favorite/share only ever appear in the Video variant — they don't render at all in
-Text/CTA, regardless of what's in Section Metadata.
+Favorite/share only ever appear when the asset is a recognized interactive player —
+they don't render for the no-asset Text/CTA layout, or for a decorative image/ambient
+video asset, regardless of what's in Section Metadata.
 
 Note: Milo's `getMetadata` helper lowercases its `.text` values, which is why
 `event-title`/`session-id` are read from `.content` instead (preserving the original

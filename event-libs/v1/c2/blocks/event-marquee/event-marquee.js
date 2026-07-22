@@ -67,6 +67,17 @@ function detectPlayer(mediaCol) {
   return null;
 }
 
+// Split/bleed layout is triggered by *any* foreground asset — an interactive player,
+// or a plain decorative image/ambient video (Milo's own generic `.mp4` AUTO_BLOCK,
+// which also covers this: decorateAnchorVideo wraps it in `.video-container`, and
+// addAccessibilityControl even emits the already-C2-tokenized play/pause button for
+// free on `foundation:c2` pages — video.css handles all of that, no new code here).
+// Favorite/share, however, are gated on `detectPlayer` specifically — a decorative
+// asset has no associated session to favorite.
+function hasAsset(mediaCol) {
+  return !!mediaCol && (mediaCol.children.length > 0 || !!mediaCol.textContent.trim());
+}
+
 function buildFavoriteButton(session, feedbackConfig) {
   const btn = createTag('button', {
     type: 'button',
@@ -183,10 +194,11 @@ export default async function init(el) {
 
   if (mediaCol) mediaCol.classList.add('event-marquee-media');
   const player = detectPlayer(mediaCol);
-  el.classList.add(player ? 'event-marquee-video' : 'event-marquee-text-cta');
+  const showsAsset = hasAsset(mediaCol);
+  el.classList.add(showsAsset ? 'event-marquee-video' : 'event-marquee-text-cta');
   // Matches classic marquee.js#decorateSplit's `media.classList.add('bleed')` — the
   // asset bleeds to the trailing edge instead of sitting inline with the text.
-  if (player) mediaCol.classList.add('event-marquee-bleed');
+  if (showsAsset) mediaCol.classList.add('event-marquee-bleed');
 
   if (player?.type === 'mobile-rider' && !player.processed) processAutoBlockLinks(mediaCol);
   if (player) decorateActions(mediaCol, config);

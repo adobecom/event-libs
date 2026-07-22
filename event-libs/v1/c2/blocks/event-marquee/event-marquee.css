@@ -128,6 +128,23 @@
   height: auto;
 }
 
+/* Ambient/decorative video (Milo's generic `.mp4` AUTO_BLOCK) wraps the actual
+   <video> one level deeper, in `.video-container` — Milo's own video.css only
+   overrides that wrapper's default `width: fit-content` for `.marquee`/`.aside`/
+   `.quiz-marquee`, not `.event-marquee`, so without this it wouldn't fill the asset
+   box. Higher specificity than video.css's own rules, so this wins regardless of
+   stylesheet load order. */
+.event-marquee .event-marquee-media .video-container {
+  width: 100%;
+  height: 100%;
+}
+
+.event-marquee .event-marquee-media .video-container video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
 @media (min-width: 1024px) {
   .event-marquee-media > img,
   .event-marquee-media > video {
