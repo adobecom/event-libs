@@ -79,8 +79,27 @@ mounts this app via ES module import, branch-driven by the DA SDK's
 
 ## Local development
 
-Point the loader's `context.ref` at your branch (push the same branch name
-to both `da-events` and `event-libs`), or serve this directory directly and
-open it in a browser with `#app` present — DA SDK auth will fail outside a
-real da.live iframe, so full end-to-end testing requires the da-events
-loader route.
+DA proxies the app to `localhost:3000` when you append `?ref=local` to the
+production tool URL — same pattern as Schedule Maker:
+
+```
+https://da.live/app/adobecom/da-events/tools/da-apps/tier-1-event-configurator?ref=local
+```
+
+Serve from the **inner repo root** (the directory that holds
+`tier-1-event-configurator/`, `tools/`, and `v1/`):
+
+```bash
+cd event-libs   # the inner event-libs/ folder, not the git repo root
+npx serve . --listen 3000
+```
+
+- DA requests `/tools/da-apps/tier-1-event-configurator` → `serve` returns
+  [tools/da-apps/tier-1-event-configurator.html](../tools/da-apps/tier-1-event-configurator.html),
+  the local-dev entry (root-relative asset paths, so it's independent of the
+  request's trailing slash).
+- This route gets a real DA SDK handshake (real `org`/`repo`/`token`), so
+  it's the only way to test the sheet CRUD (readSheet/writeSheet/mutateSheet)
+  against a real `admin.da.live` sheet — a mocked DA SDK can validate the UI
+  wiring and real ESP calls, but not real DA auth/writes.
+- Requires being signed in to da.live in the browser you open that URL in.
