@@ -1,6 +1,6 @@
 import { expect } from '@esm-bundle/chai';
 
-import { getEventAttendeePayload } from '../../../event-libs/v1/utils/data-utils.js';
+import { getEventAttendeePayload, getGuestAttendeePayload } from '../../../event-libs/v1/utils/data-utils.js';
 
 describe('data-utils', () => {
   describe('getEventAttendeePayload', () => {
@@ -48,6 +48,49 @@ describe('data-utils', () => {
     it('returns argument unchanged when falsy', () => {
       expect(getEventAttendeePayload(null)).to.equal(null);
       expect(getEventAttendeePayload(undefined)).to.equal(undefined);
+    });
+  });
+
+  describe('getGuestAttendeePayload', () => {
+    it('includes base attendee fields plus consent fields the guest submit endpoint accepts', () => {
+      const out = getGuestAttendeePayload({
+        firstName: 'Ada',
+        lastName: 'Lovelace',
+        email: 'ada@example.com',
+        consentStringId: 'cs3G;ve1;en',
+        shareInfoWithPartners: true,
+        ccSentiment: 'opt-in',
+        requiresTicket: false,
+      });
+      expect(out).to.deep.equal({
+        firstName: 'Ada',
+        lastName: 'Lovelace',
+        email: 'ada@example.com',
+        consentStringId: 'cs3G;ve1;en',
+        shareInfoWithPartners: true,
+        ccSentiment: 'opt-in',
+        requiresTicket: false,
+      });
+    });
+
+    it('coerces shareInfoWithPartners/requiresTicket from radio-group array (Yes/No)', () => {
+      expect(getGuestAttendeePayload({ shareInfoWithPartners: ['Yes'] }).shareInfoWithPartners).to.be.true;
+      expect(getGuestAttendeePayload({ requiresTicket: ['No'] }).requiresTicket).to.be.false;
+    });
+
+    it('never includes campaignId (server sources it from the token, never the client)', () => {
+      const out = getGuestAttendeePayload({ firstName: 'Ada', campaignId: 'camp-1' });
+      expect(out).to.not.have.property('campaignId');
+    });
+
+    it('drops unknown keys', () => {
+      const out = getGuestAttendeePayload({ firstName: 'Ada', totallyMadeUpField: 'x' });
+      expect(out).to.not.have.property('totallyMadeUpField');
+    });
+
+    it('returns argument unchanged when falsy', () => {
+      expect(getGuestAttendeePayload(null)).to.equal(null);
+      expect(getGuestAttendeePayload(undefined)).to.equal(undefined);
     });
   });
 });

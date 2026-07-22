@@ -802,7 +802,7 @@ describe('Events Form', () => {
     });
   });
 
-  describe('submitForm guest RSVP redeem routing', () => {
+  describe('submitForm guest RSVP submit routing', () => {
     let sandbox;
     let submitForm;
 
@@ -833,7 +833,7 @@ describe('Events Form', () => {
       return form;
     }
 
-    it('redeems the guest RSVP link instead of calling getAndCreateAndAddAttendee', async () => {
+    it('submits the guest RSVP instead of calling getAndCreateAndAddAttendee', async () => {
       BlockMediator.set('imsProfile', { account_type: 'guest', guestRsvpToken: 'valid-guest-token-1234567890' });
       const fetchStub = sandbox.stub(window, 'fetch').resolves({
         json: () => ({ attendeeId: 'att-1', registrationStatus: 'registered' }),
@@ -845,11 +845,12 @@ describe('Events Form', () => {
       expect(result.ok).to.be.true;
       expect(result.data).to.have.property('registrationStatus', 'registered');
       expect(fetchStub.calledOnce).to.be.true;
-      const [url] = fetchStub.firstCall.args;
-      expect(url).to.include('/v1/guestRsvpLinks/valid-guest-token-1234567890/redeem');
+      const [url, options] = fetchStub.firstCall.args;
+      expect(url).to.include('/v1/events/test-event-id/guestRsvpAttendees');
+      expect(options.headers.get('x-adobe-esp-guest-token')).to.equal('valid-guest-token-1234567890');
     });
 
-    it('retains campaignId in the guest redeem payload (redeem is a single combined create+register call)', async () => {
+    it('never sends campaignId in the guest submit payload (server sources it from the token)', async () => {
       resetCampaignMapCache();
       window.history.replaceState({}, '', `${window.location.pathname}?campaign=camp-1`);
       BlockMediator.set('imsProfile', { account_type: 'guest', guestRsvpToken: 'valid-guest-token-1234567890' });
@@ -863,9 +864,10 @@ describe('Events Form', () => {
       try {
         await submitForm({ form: buildForm(), sanitizeList: [] });
 
-        const redeemCall = fetchStub.getCalls().find((call) => String(call.args[0]).includes('/redeem'));
-        const body = JSON.parse(redeemCall.args[1].body);
-        expect(body.campaignId).to.equal('camp-1');
+        const submitCall = fetchStub.getCalls().find((call) => String(call.args[0]).includes('/guestRsvpAttendees'));
+        const body = JSON.parse(submitCall.args[1].body);
+        expect(body.campaignId).to.equal(undefined);
+        expect(body.firstName).to.equal('Guest');
       } finally {
         window.history.replaceState({}, '', window.location.pathname);
         resetCampaignMapCache();
@@ -884,7 +886,7 @@ describe('Events Form', () => {
 
       expect(result.ok).to.be.true;
       const urls = fetchStub.getCalls().map((call) => call.args[0]);
-      expect(urls.some((url) => url.includes('/guestRsvpLinks/'))).to.be.false;
+      expect(urls.some((url) => url.includes('/guestRsvpAttendees'))).to.be.false;
     });
   });
 
@@ -1030,16 +1032,45 @@ describe('Events Form', () => {
       expect(errorEl.textContent).to.equal('event-full-no-waitlist-error-msg');
     });
 
-    it('buildErrorMsg shows the guest-link-invalid message for a non-400 failure when a guest RSVP token is active', async () => {
-      // Models the two-tab race: the link was valid at page load but got redeemed
-      // elsewhere before this submit, so the redeem call fails with a non-400 status.
+    it('buildErrorMsg shows the already-registered message on a 409 when a guest RSVP token is active', async () => {
+      // AttendeeAlreadyRegistered — this email is already registered for the event.
+      // The token itself is NOT consumed on this error, so the copy must not imply
+      // the link is dead.
       BlockMediator.set('imsProfile', { account_type: 'guest', guestRsvpToken: 'tok-1234567890abcdef' });
       stubFetchByUrl({ json: () => ({}), ok: true });
       const form = document.createElement('form');
       await buildErrorMsg(form, 409);
       const errorEl = form.querySelector('.error');
       expect(errorEl).to.not.be.null;
-      expect(errorEl.textContent).to.equal('This registration link is no longer valid. It may have already been used or expired.');
+      expect(errorEl.textContent).to.equal('This email is already registered for this event.');
+    });
+
+    it('buildErrorMsg shows the guest-link-invalid message on a 401/404/410 when a guest RSVP token is active', async () => {
+      // Models the two-tab race: the token was valid at page load but got used
+      // elsewhere before this submit, so the submit call fails as gone/not-found,
+      // or the guest-token header failed to reach the server (401) — same class
+      // of "not usable here" outcome as the validate call in profile.js.
+      BlockMediator.set('imsProfile', { account_type: 'guest', guestRsvpToken: 'tok-1234567890abcdef' });
+      stubFetchByUrl({ json: () => ({}), ok: true });
+      for (const status of [401, 404, 410]) {
+        const form = document.createElement('form');
+        await buildErrorMsg(form, status);
+        const errorEl = form.querySelector('.error');
+        expect(errorEl).to.not.be.null;
+        expect(errorEl.textContent).to.equal('This registration link is no longer valid. It may have already been used or expired.');
+      }
+    });
+
+    it('buildErrorMsg falls back to the generic message for a 403/500 failure with a guest RSVP token active', async () => {
+      // 403 (waitlisting not allowed / invite-only) and 500 don't mean the token
+      // became unusable, so they must not surface the invalid-link copy.
+      BlockMediator.set('imsProfile', { account_type: 'guest', guestRsvpToken: 'tok-1234567890abcdef' });
+      stubFetchByUrl({ json: () => ({}), ok: true });
+      const form = document.createElement('form');
+      await buildErrorMsg(form, 403);
+      const errorEl = form.querySelector('.error');
+      expect(errorEl).to.not.be.null;
+      expect(errorEl.textContent).to.equal('rsvp-error-msg');
     });
 
     it('buildErrorMsg falls back to the generic message for a non-400 failure with no guest RSVP token', async () => {

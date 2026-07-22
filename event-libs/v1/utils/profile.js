@@ -1,5 +1,5 @@
 import BlockMediator from '../deps/block-mediator.min.js';
-import { getEventAttendee, getGuestRsvpLink } from './esp-controller.js';
+import { getEventAttendee, validateGuestRsvpToken } from './esp-controller.js';
 import { getMetadata, getGuestRsvpToken } from './utils.js';
 
 export async function getProfile() {
@@ -51,23 +51,20 @@ export function lazyCaptureProfile() {
   }
 
   async function captureProfile() {
-    // A guest RSVP link always bypasses Adobe ID login, regardless of whether the
+    // A guest RSVP token always bypasses Adobe ID login, regardless of whether the
     // browser happens to have a signed-in IMS session (e.g. an assistant using their
-    // own account to RSVP on a VIP's behalf). Resolve the link itself server-side and
-    // short-circuit the normal profile/attendee lookup.
+    // own account to RSVP on a VIP's behalf). Validate the token itself server-side
+    // and short-circuit the normal profile/attendee lookup.
     const guestRsvpToken = getGuestRsvpToken();
     if (guestRsvpToken) {
-      const linkResp = await getGuestRsvpLink(guestRsvpToken);
-      // A link minted for a different event must never register against this page's
-      // event (e.g. a copy-pasted/reused URL) — treat that the same as an invalid link.
-      // Also honor an explicit non-'unused' status if the backend reports one on an
-      // otherwise-ok response, rather than relying solely on the HTTP status code.
-      const isForThisEvent = linkResp.ok
-        && linkResp.data?.eventId === getMetadata('event-id')
-        && (linkResp.data?.status == null || linkResp.data.status === 'unused');
+      const eventId = getMetadata('event-id');
+      const validateResp = await validateGuestRsvpToken(eventId, guestRsvpToken);
+      // The validate call is event-scoped, so the backend already 404s a token
+      // minted for a different event (e.g. a copy-pasted/reused URL) — a plain
+      // ok/not-ok check is enough; 401/404/409/410 all mean "not usable here".
       BlockMediator.set('rsvpData', null);
-      BlockMediator.set('imsProfile', isForThisEvent
-        ? { account_type: 'guest', guestRsvpToken, guestRsvpEventId: linkResp.data.eventId }
+      BlockMediator.set('imsProfile', validateResp.ok
+        ? { account_type: 'guest', guestRsvpToken, guestRsvpEventId: validateResp.data?.eventId ?? eventId }
         : { account_type: 'guest', guestRsvpToken, guestLinkInvalid: true });
       return;
     }

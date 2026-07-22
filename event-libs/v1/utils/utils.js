@@ -336,15 +336,15 @@ export function getValidCampaignIdFromUrl(searchParams) {
 }
 
 /**
- * Returns the guest RSVP link token from the current URL search params if present and
- * well-formed. Presence of a valid token here does not mean the link is still usable
- * (unused/unexpired) — that is resolved server-side via getGuestRsvpLink().
+ * Returns the guest RSVP token from the current URL search params if present and
+ * well-formed. Presence of a valid token here does not mean it is still usable
+ * (unused/unexpired) — that is resolved server-side via validateGuestRsvpToken().
  * @param {URLSearchParams} [searchParams] - Optional search params (defaults to window.location.search).
  * @returns {string|null} Well-formed guest RSVP token or null.
  */
 export function getGuestRsvpToken(searchParams) {
   const search = searchParams != null ? searchParams.toString() : window.location.search;
-  const token = new URLSearchParams(search).get('guestRsvpToken');
+  const token = new URLSearchParams(search).get('guestToken');
   return token && GUEST_RSVP_TOKEN_PATTERN.test(token) ? token : null;
 }
 

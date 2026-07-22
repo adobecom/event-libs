@@ -31,23 +31,23 @@ describe('getValidCampaignIdFromUrl', () => {
 
 describe('getGuestRsvpToken', () => {
   it('returns a well-formed guest RSVP token from the URL', () => {
-    expect(getGuestRsvpToken(new URLSearchParams('?guestRsvpToken=abc123-DEF456_ghi789'))).to.equal('abc123-DEF456_ghi789');
+    expect(getGuestRsvpToken(new URLSearchParams('?guestToken=abc123-DEF456_ghi789'))).to.equal('abc123-DEF456_ghi789');
   });
 
-  it('returns null when the guestRsvpToken param is absent', () => {
+  it('returns null when the guestToken param is absent', () => {
     expect(getGuestRsvpToken(new URLSearchParams(''))).to.be.null;
   });
 
   it('returns null when the token is shorter than 16 characters', () => {
-    expect(getGuestRsvpToken(new URLSearchParams('?guestRsvpToken=too-short'))).to.be.null;
+    expect(getGuestRsvpToken(new URLSearchParams('?guestToken=too-short'))).to.be.null;
   });
 
   it('returns null when the token fails pattern validation', () => {
-    expect(getGuestRsvpToken(new URLSearchParams('?guestRsvpToken=bad/token!with spaces'))).to.be.null;
+    expect(getGuestRsvpToken(new URLSearchParams('?guestToken=bad/token!with spaces'))).to.be.null;
   });
 
   it('returns null when the token exceeds 256 chars', () => {
-    expect(getGuestRsvpToken(new URLSearchParams(`?guestRsvpToken=${'a'.repeat(257)}`))).to.be.null;
+    expect(getGuestRsvpToken(new URLSearchParams(`?guestToken=${'a'.repeat(257)}`))).to.be.null;
   });
 });
 

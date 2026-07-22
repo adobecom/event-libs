@@ -49,7 +49,7 @@ export function waitForAdobeIMS() {
   });
 }
 
-export async function constructRequestOptions(method, body = null, waitForIMS = true, skipAuth = false) {
+export async function constructRequestOptions(method, body = null, waitForIMS = true, skipAuth = false, guestToken = null) {
   const { miloConfig } = getEventConfig();
   const miloLibs = miloConfig?.miloLibs || LIBS;
 
@@ -63,12 +63,15 @@ export async function constructRequestOptions(method, body = null, waitForIMS = 
   }
 
   const headers = new Headers();
-  // skipAuth is for genuinely public endpoints (e.g. guest RSVP link resolve/redeem):
-  // never attach the caller's own IMS identity, even if one happens to be signed in
-  // (an assistant registering on a VIP's behalf must stay anonymous to the backend).
+  // skipAuth is for genuinely public/guest-token-authenticated endpoints: never attach
+  // the caller's own IMS identity, even if one happens to be signed in (an assistant
+  // registering on a VIP's behalf must stay anonymous to the backend).
   const authToken = skipAuth ? null : window.adobeIMS?.getAccessToken()?.token;
 
   if (authToken) headers.append('Authorization', `Bearer ${authToken}`);
+  // Guest RSVP endpoints authenticate solely via this header — the token never
+  // travels in the URL path or query string, to keep it out of access logs.
+  if (guestToken) headers.append('x-adobe-esp-guest-token', guestToken);
   headers.append('x-api-key', 'acom_event_service');
   headers.append('x-request-id', await getUuid(new Date().getTime()));
   headers.append('content-type', 'application/json');
@@ -304,52 +307,53 @@ export async function getCampaign(eventId, campaignId) {
   }
 }
 
-// Guest RSVP link endpoints — public, no Authorization header, so both calls
-// skip waiting for adobeIMS and skip attaching any signed-in caller's own IMS
-// token (constructRequestOptions(..., waitForIMS=false, skipAuth=true)) to
-// avoid stalling for a guest with no IMS session and to keep the redemption
-// anonymous even when the caller (e.g. an assistant) happens to be signed in.
-export async function getGuestRsvpLink(token) {
+// Guest RSVP token endpoints — authenticated solely by the x-adobe-esp-guest-token
+// header (constructRequestOptions(..., waitForIMS=false, skipAuth=true, token)), so
+// both calls skip waiting for adobeIMS (avoids stalling for a guest with no IMS
+// session) and skip attaching any signed-in caller's own IMS token (keeps the
+// submission anonymous even when the caller, e.g. an assistant, happens to be
+// signed in).
+export async function validateGuestRsvpToken(eventId, token) {
   const eventServiceEnv = getEventServiceEnv();
   const { serviceApiEndpoints } = ENV_MAP[eventServiceEnv.name];
-  const options = await constructRequestOptions('GET', null, false, true);
+  const options = await constructRequestOptions('GET', null, false, true, token);
 
   try {
-    const response = await fetch(`${serviceApiEndpoints.esl}/v1/guestRsvpLinks/${token}`, options);
+    const response = await fetch(`${serviceApiEndpoints.esl}/v1/events/${eventId}/guestRsvpAttendees`, options);
     const data = await response.json();
 
     if (!response.ok) {
-      window.lana?.log(`Error: Failed to resolve guest RSVP link. Status:${JSON.stringify(response)}`);
+      window.lana?.log(`Error: Failed to validate guest RSVP token. Status:${JSON.stringify(response)}`);
       return { ok: false, status: response.status, error: data };
     }
 
     return { ok: true, data };
   } catch (error) {
-    window.lana?.log(`Error: Failed to resolve guest RSVP link:${JSON.stringify(error)}`);
+    window.lana?.log(`Error: Failed to validate guest RSVP token:${JSON.stringify(error)}`);
     return { ok: false, status: 'Network Error', error: error.message };
   }
 }
 
-export async function redeemGuestRsvpLink(token, attendeeData) {
-  if (!token || !attendeeData) return { ok: false, error: 'Missing token or attendee data' };
+export async function submitGuestRsvp(eventId, token, attendeeData) {
+  if (!eventId || !token || !attendeeData) return { ok: false, error: 'Missing eventId, token, or attendee data' };
 
   const eventServiceEnv = getEventServiceEnv();
   const { serviceApiEndpoints } = ENV_MAP[eventServiceEnv.name];
   const raw = JSON.stringify(attendeeData);
-  const options = await constructRequestOptions('POST', raw, false, true);
+  const options = await constructRequestOptions('POST', raw, false, true, token);
 
   try {
-    const response = await fetch(`${serviceApiEndpoints.esl}/v1/guestRsvpLinks/${token}/redeem`, options);
+    const response = await fetch(`${serviceApiEndpoints.esl}/v1/events/${eventId}/guestRsvpAttendees`, options);
     const data = await response.json();
 
     if (!response.ok) {
-      window.lana?.log(`Error: Failed to redeem guest RSVP link. Status:${JSON.stringify(response)}`);
+      window.lana?.log(`Error: Failed to submit guest RSVP. Status:${JSON.stringify(response)}`);
       return { ok: false, status: response.status, error: data };
     }
 
     return { ok: true, data };
   } catch (error) {
-    window.lana?.log(`Error: Failed to redeem guest RSVP link:${JSON.stringify(error)}`);
+    window.lana?.log(`Error: Failed to submit guest RSVP:${JSON.stringify(error)}`);
     return { ok: false, status: 'Network Error', error: error.message };
   }
 }
