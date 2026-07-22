@@ -58,6 +58,8 @@ export const BASE_ATTENDEE_DATA_FILTER = {
   isGuest: { type: 'boolean', submittable: true },
   consentStringId: { type: 'string', submittable: true },
   modificationTime: { type: 'string', submittable: true },
+  phoneticFirstName: { type: 'string', submittable: true },
+  phoneticLastName: { type: 'string', submittable: true },
 };
 
 export function isValidAttribute(attr) {
