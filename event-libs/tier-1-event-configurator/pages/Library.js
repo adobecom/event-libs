@@ -100,6 +100,7 @@ export default function Library() {
       </div>
 
       <${SearchInput} \
+        id="tec-library-search" \
         placeholder="Search by event title or Event ID" \
         value=${search} \
         onInput=${handleSearch} \

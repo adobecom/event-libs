@@ -54,6 +54,7 @@ export default function EventPicker({
       <div class="tec-event-picker">
         <div class="tec-event-picker__controls">
           <${SearchInput} \
+            id="tec-event-picker-search" \
             placeholder="Search by title or Event ID" \
             value=${search} \
             onInput=${handleSearch} \

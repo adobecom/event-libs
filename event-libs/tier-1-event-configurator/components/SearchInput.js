@@ -1,7 +1,7 @@
 import { html } from '../htm-wrapper.js';
 
 export default function SearchInput({
-  placeholder = 'Search', value = '', onInput, className = '',
+  id, placeholder = 'Search', value = '', onInput, className = '',
 }) {
   const handleInput = (e) => {
     if (onInput) onInput(e);
@@ -16,6 +16,8 @@ export default function SearchInput({
       </div>
       <input \
         type="text" \
+        id="${id}" \
+        name="${id}" \
         class="tec-search-input__field" \
         placeholder="${placeholder}" \
         value="${value}" \
