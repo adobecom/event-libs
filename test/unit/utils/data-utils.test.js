@@ -52,6 +52,19 @@ describe('data-utils', () => {
       expect(getEventAttendeePayload(null)).to.equal(null);
       expect(getEventAttendeePayload(undefined)).to.equal(undefined);
     });
+
+    it('includes phoneticFirstName and phoneticLastName when present', () => {
+      const out = getEventAttendeePayload({
+        firstName: 'Sharmee',
+        lastName: 'Biswas',
+        email: 'sharmeeb@adobe.com',
+        registrationStatus: 'registered',
+        phoneticFirstName: 'Shar-me',
+        phoneticLastName: 'Bis-wass',
+      });
+      expect(out.phoneticFirstName).to.equal('Shar-me');
+      expect(out.phoneticLastName).to.equal('Bis-wass');
+    });
   });
 
   describe('getBaseAttendeePayload', () => {
