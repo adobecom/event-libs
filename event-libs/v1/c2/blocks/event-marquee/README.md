@@ -18,16 +18,26 @@ the bottom of the doc):
 
 ## Authoring convention
 
-Same convention as Milo's own C2 blocks (Router Marquee, Rich Content): the block
-itself is **pure content** — no config rows inside it. Any config that isn't itself
-content (Router Marquee's `starting-marquee`, this block's `session-id` etc.) lives in
-a **Section Metadata** block placed as a sibling of the marquee, inside the same
-section:
+Same row shape as Milo's own **classic marquee** (`libs/blocks/marquee/marquee.js`),
+not Router Marquee — that's the block that actually has background image/video +
+foreground text + a "side" video asset, matching the Figma "Live Promo" reference:
+
+- **Row 1 (optional) — background.** A single cell with a full-bleed image or an
+  ambient looping video. Sits behind everything, dimmed with a gradient for legibility.
+  Omit this row entirely if you don't want a background.
+- **Last row (required) — foreground.** Two cells: text | asset. The asset cell is
+  optional — leave it out for a plain background-only Text/CTA marquee, or put an
+  interactive player in it for the Video variant (see below).
+
+Config that isn't content (favorite/share toggles, session ID) lives in a separate
+**Section Metadata** block placed as a sibling of the marquee, inside the same
+section — same convention Router Marquee uses for its own `starting-marquee` field:
 
 ```
 | Event Marquee |  |
 | --- | --- |
-| ## Headline<br>Body copy<br>**_[Register now](https://...)_** | ![](./background.jpg) |
+| ![](./background.jpg) |  |
+| ## Headline<br>Body copy<br>**_[Register now](https://...)_** | [Watch live](https://...) |
 
 | Section Metadata |  |
 | --- | --- |
@@ -38,25 +48,36 @@ At runtime, `event-marquee.js` looks up `el.parentElement.querySelector('.sectio
 and reads it with Milo's own `getMetadata` helper (`c2/blocks/section-metadata/section-metadata.js`)
 — the exact same lookup Router Marquee uses for `starting-marquee`. If there's no
 Section Metadata block in the section, event-marquee just uses defaults (no Favorite
-button, share button shown).
+button, share button shown). The background row is decorated with Milo's own
+`decorateBlockBg` (`utils/decorate.js`) — the same function classic marquee.js itself
+calls — so responsive per-viewport backgrounds, focal point, and solid-color
+fallback all work for free, no new code.
 
 ## Variants
 
 There is no explicit "variant" field to author. The variant is auto-detected from
-what's authored in the media column — the same content-presence approach Milo's own
-C2 Router Marquee uses:
+what's in the foreground's asset cell — the same content-presence approach Milo's own
+marquee blocks use for their own auto-detection:
 
-- **Text/CTA variant** — media column has a background image and/or an ambient
-  looping video, but no interactive player. Headline, body copy, up to 2 CTAs.
-- **Video variant** — media column contains an interactive player (Mobile Rider,
-  YouTube, or MPC/Adobe TV). Adds a Favorite button and a share icon.
+- **Text/CTA variant** — no asset cell, or an asset that isn't a recognized
+  interactive player. Headline, body copy, up to 2 CTAs, over the background.
+- **Video variant** — asset cell contains an interactive player (Mobile Rider,
+  YouTube, or MPC/Adobe TV). Adds a Favorite button and a share icon. The player
+  bleeds to one edge on desktop rather than covering the whole marquee ("Split
+  Marquee" in Figma) — it sits *in front of* the background, not instead of it.
 
 ## The Event Marquee block itself
 
-One row, two cells — same shape as Router Marquee's own `decorateSlide` (text column |
-media column).
+**Background row (optional, first row)** — one cell:
 
-**Left cell (text column):**
+| Want | Paste this |
+|---|---|
+| Static background image | A normal image |
+| Ambient looping background video | A link to an `.mp4` ending in `#autoplay`, e.g. `https://.../loop.mp4#autoplay` |
+
+**Foreground row (required, last row)** — text cell, then an optional asset cell:
+
+Text cell:
 
 | Content | How to author it |
 |---|---|
@@ -67,18 +88,15 @@ media column).
 
 Up to 2 CTAs, same `<em>`/`<em><strong>` convention Milo uses everywhere else.
 
-**Right cell (media column)** — this is what auto-detects the variant:
+Asset cell (optional) — presence/type of a real player here is what flips the
+variant to Video:
 
 | Want | Paste this |
 |---|---|
-| Background image only (→ Text/CTA variant) | A normal image |
-| Ambient looping background video (→ still Text/CTA — this alone doesn't add a player) | A link to an `.mp4` ending in `#autoplay`, e.g. `https://.../loop.mp4#autoplay` |
+| No asset — text over the background only (Text/CTA variant) | Leave the cell out entirely |
 | Mobile Rider live/on-demand player (→ Video variant) | A `mobilerider.com` embed link, e.g. `https://www.mobilerider.com/embed?videoId=abc123&skinId=default&autoplay=true` |
 | YouTube player (→ Video variant) | A normal `youtube.com/watch?v=...` or `youtu.be/...` link |
 | MPC / Adobe TV player (→ Video variant) | A `tv.adobe.com/...` link |
-
-A background image/video and a player link can both be pasted into the same cell —
-that gives a background treatment plus the embedded player.
 
 ## Section Metadata — properties reference
 
@@ -102,24 +120,34 @@ comparisons are case-insensitive anyway.
 
 ## Sample sections
 
-**1. Text/CTA — background image, 2 CTAs (no Section Metadata needed)**
+**1. Text/CTA — background image, 2 CTAs, no asset (no Section Metadata needed)**
 ```
 | Event Marquee |  |
 | --- | --- |
-| ## Upcoming: Keynote Replay<br>Catch the highlights from today's mainstage session.<br>**_[Register now](https://www.adobe.com/register)_**<br>_[Learn more](https://www.adobe.com/learn-more)_ | ![](./background.jpg) |
+| ![](./background.jpg) |  |
+| ## Upcoming: Keynote Replay<br>Catch the highlights from today's mainstage session.<br>**_[Register now](https://www.adobe.com/register)_**<br>_[Learn more](https://www.adobe.com/learn-more)_ |  |
 ```
 
 **2. Text/CTA — 1 CTA, ambient looping background video**
 ```
 | Event Marquee |  |
 | --- | --- |
-| ## Day 2 starts tomorrow<br>Set a reminder so you don't miss the opening session.<br>**_[Remind me](https://www.adobe.com/remind-me)_** | [background loop](./background-loop.mp4#autoplay) |
+| [background loop](./background-loop.mp4#autoplay) |  |
+| ## Day 2 starts tomorrow<br>Set a reminder so you don't miss the opening session.<br>**_[Remind me](https://www.adobe.com/remind-me)_** |  |
 ```
 
-**3. Video — Mobile Rider, with Favorite CTA**
+**3. Text/CTA — no background row at all**
 ```
 | Event Marquee |  |
 | --- | --- |
+| ## Plain announcement<br>No background authored — just text on the block's own default color. |  |
+```
+
+**4. Video — Mobile Rider, with background + Favorite CTA**
+```
+| Event Marquee |  |
+| --- | --- |
+| ![](./background.jpg) |  |
 | ## Live now: Mainstage<br>Join the keynote as it happens. | [Watch live](https://www.mobilerider.com/embed?videoId=demo-live-123&skinId=default&autoplay=true) |
 
 | Section Metadata |  |
@@ -127,10 +155,11 @@ comparisons are case-insensitive anyway.
 | session-id | s-100 |
 ```
 
-**4. Video — YouTube replay**
+**5. Video — YouTube replay**
 ```
 | Event Marquee |  |
 | --- | --- |
+| ![](./background.jpg) |  |
 | ## Replay: Design Systems at Scale<br>Missed it live? Watch the full session now. | [Watch replay](https://www.youtube.com/watch?v=abc123XYZ) |
 
 | Section Metadata |  |
@@ -138,10 +167,11 @@ comparisons are case-insensitive anyway.
 | session-id | s-201 |
 ```
 
-**5. Video — MPC / Adobe TV replay**
+**6. Video — MPC / Adobe TV replay**
 ```
 | Event Marquee |  |
 | --- | --- |
+| ![](./background.jpg) |  |
 | ## Replay: What's New in Creative Cloud<br>The full session, on demand. | [Watch replay](https://tv.adobe.com/watch/abc-123) |
 
 | Section Metadata |  |
@@ -149,10 +179,11 @@ comparisons are case-insensitive anyway.
 | session-id | s-202 |
 ```
 
-**6. Video — Favorite explicitly disabled (e.g. sponsor content)**
+**7. Video — Favorite explicitly disabled (e.g. sponsor content)**
 ```
 | Event Marquee |  |
 | --- | --- |
+| ![](./background.jpg) |  |
 | ## Sponsor spotlight<br>No favoriting on sponsor content. | [Watch](https://tv.adobe.com/watch/sponsor-1) |
 
 | Section Metadata |  |
@@ -161,27 +192,17 @@ comparisons are case-insensitive anyway.
 | favorite-enabled | false |
 ```
 
-**7. Video — share explicitly disabled (internal preview)**
+**8. Video — share explicitly disabled (internal preview)**
 ```
 | Event Marquee |  |
 | --- | --- |
+| ![](./background.jpg) |  |
 | ## Internal preview<br>Not meant to be shared externally. | [Watch](https://tv.adobe.com/watch/preview-1) |
 
 | Section Metadata |  |
 | --- | --- |
 | session-id | s-100 |
 | share-enabled | false |
-```
-
-**8. Video with a background image *and* the player together**
-```
-| Event Marquee |  |
-| --- | --- |
-| ## Live now: Mainstage | ![](./background.jpg)<br>[Watch live](https://www.mobilerider.com/embed?videoId=demo-live-123&skinId=default&autoplay=true) |
-
-| Section Metadata |  |
-| --- | --- |
-| session-id | s-100 |
 ```
 
 ## Dev preview

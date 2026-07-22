@@ -5,26 +5,58 @@
   box-sizing: border-box;
   overflow: hidden;
   width: 100%;
+  min-height: 420px;
   color: var(--s2a-color-content-knockout);
   font-family: var(--s2a-font-family-default);
 }
 
-/* The authored content row (text col | media col) has no class of its own — collapse
-   it out of the box tree so event-marquee-text/event-marquee-media become direct grid
-   /flex items of .event-marquee itself, not grandchildren. Without this, grid-area/
-   order/flex below are silently no-ops and the two columns just stack in normal flow. */
-.event-marquee > div:first-child {
-  display: contents;
+/* Background row (optional, row 1 of 2) — decorated by Milo's own decorateBlockBg,
+   same technique as classic marquee.js's `.background`: absolutely positioned,
+   full-bleed, sits behind the foreground. Kept as its own layer, separate from any
+   foreground asset/player — matches the Figma "Live Promo" reference, which has a
+   dim ambient background *and* a separate inset video player. */
+.event-marquee-background {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
 }
 
-.event-marquee .event-marquee-text,
-.event-marquee .event-marquee-media {
+.event-marquee-background picture,
+.event-marquee-background img,
+.event-marquee-background video {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.event-marquee-background::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(0deg, var(--s2a-color-transparent-black-64), var(--s2a-color-transparent-black-00) 60%);
+}
+
+/* Foreground row (always present, last row) — text, plus an optional asset (side
+   image or interactive player) that bleeds to one edge rather than covering the
+   whole marquee. Classed directly by event-marquee.js, so flex/order below apply to
+   real direct children — no grandchild-vs-direct-child ambiguity. */
+.event-marquee-foreground {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: inherit;
+}
+
+.event-marquee-text,
+.event-marquee-media {
   box-sizing: border-box;
 }
 
-.event-marquee .event-marquee-text h1,
-.event-marquee .event-marquee-text h2,
-.event-marquee .event-marquee-text h3 {
+.event-marquee-text h1,
+.event-marquee-text h2,
+.event-marquee-text h3 {
   font-family: var(--s2a-font-family-heading);
   font-weight: var(--s2a-font-weight-heading);
   letter-spacing: var(--s2a-typography-letter-spacing-heading-2);
@@ -33,26 +65,29 @@
   margin: 0 0 var(--s2a-spacing-sm);
 }
 
-.event-marquee .event-marquee-text p {
+.event-marquee-text p {
   font-size: var(--s2a-typography-font-size-body-md);
   line-height: var(--s2a-typography-line-height-body-md);
   margin: 0 0 var(--s2a-spacing-lg);
 }
 
-.event-marquee .event-marquee-text .con-button {
+.event-marquee-text .con-button {
   margin: 0 var(--s2a-spacing-sm) var(--s2a-spacing-sm) 0;
 }
 
-.event-marquee .event-marquee-media picture,
-.event-marquee .event-marquee-media img,
-.event-marquee .event-marquee-media video {
+/* Only size plain images/video directly — an interactive player (.milo-video,
+   .mobile-rider) brings its own sizing/aspect-ratio CSS and must not be force-cropped
+   the way a decorative asset image can be. */
+.event-marquee-media picture,
+.event-marquee-media > img,
+.event-marquee-media > video {
   display: block;
   width: 100%;
   height: 100%;
   object-fit: cover;
 }
 
-.event-marquee .event-marquee-actions {
+.event-marquee-actions {
   position: absolute;
   z-index: 2;
   top: var(--s2a-spacing-md);
@@ -61,7 +96,7 @@
   gap: var(--s2a-spacing-xs);
 }
 
-.event-marquee .event-marquee-action {
+.event-marquee-action {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -75,75 +110,55 @@
   cursor: pointer;
 }
 
-.event-marquee .event-marquee-action:hover {
+.event-marquee-action:hover {
   background: var(--s2a-color-transparent-black-64);
 }
 
-.event-marquee .event-marquee-favorite.is-favorited {
+.event-marquee-favorite.is-favorited {
   color: var(--s2a-color-brand-adobe-red);
 }
 
-/* Text/CTA variant — full-bleed background, text overlaid on top */
-.event-marquee.event-marquee-text-cta {
-  display: grid;
-  min-height: 420px;
+/* Text/CTA variant — no asset (or a non-player asset), text sits at the bottom of
+   the full-bleed background. */
+.event-marquee-text-cta .event-marquee-foreground {
+  justify-content: flex-end;
 }
 
-.event-marquee.event-marquee-text-cta .event-marquee-media {
-  grid-area: 1 / 1;
-  width: 100%;
-  height: 100%;
-}
-
-.event-marquee.event-marquee-text-cta .event-marquee-media::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(0deg, var(--s2a-color-transparent-black-64), var(--s2a-color-transparent-black-00) 60%);
-}
-
-.event-marquee.event-marquee-text-cta .event-marquee-text {
-  grid-area: 1 / 1;
-  position: relative;
-  z-index: 1;
-  align-self: end;
+.event-marquee-text-cta .event-marquee-text {
   padding: var(--s2a-viewport-vertical-padding-lg) var(--s2a-layout-guide-gap);
   max-width: var(--s2a-layout-rich-media-content-measure-wide);
 }
 
-/* Video variant — side-by-side split ("Split Marquee" in Figma) */
-.event-marquee.event-marquee-video {
-  display: flex;
-  flex-direction: column;
-}
-
-.event-marquee.event-marquee-video .event-marquee-text {
+/* Video variant — text + a bleeding side asset ("Split Marquee" in Figma). Mobile:
+   stacked. Desktop: side by side, asset bleeding to the trailing edge, same idea as
+   classic marquee.split's `.asset.bleed`. */
+.event-marquee-video .event-marquee-text {
   order: 1;
   padding: var(--s2a-viewport-vertical-padding-md) var(--s2a-layout-guide-gap);
 }
 
-.event-marquee.event-marquee-video .event-marquee-media {
+.event-marquee-video .event-marquee-media {
   order: 2;
   position: relative;
   min-height: 240px;
 }
 
 @media (min-width: 1024px) {
-  .event-marquee.event-marquee-video {
+  .event-marquee-video .event-marquee-foreground {
     flex-direction: row;
     align-items: stretch;
   }
 
-  .event-marquee.event-marquee-video .event-marquee-text {
+  .event-marquee-video .event-marquee-text {
     order: 0;
     flex: 0 0 auto;
-    width: 40%;
+    width: 45%;
     display: flex;
     flex-direction: column;
     justify-content: center;
   }
 
-  .event-marquee.event-marquee-video .event-marquee-media {
+  .event-marquee-video .event-marquee-media {
     flex: 1 1 auto;
     min-height: 0;
   }

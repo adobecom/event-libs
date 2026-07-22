@@ -21,15 +21,24 @@ function sectionMetadataHtml(rows = {}) {
   `;
 }
 
-function videoVariantHtml({ sessionId = 's-100', favoriteEnabled, shareEnabled } = {}) {
+// Same row shape as Milo's classic marquee.js: an optional first row is the
+// full-bleed background; the last row is the foreground (text + optional asset).
+function videoVariantHtml({
+  sessionId = 's-100', favoriteEnabled, shareEnabled, withBackground = true,
+} = {}) {
   const metaRows = {};
   if (sessionId) metaRows['session-id'] = sessionId;
   if (favoriteEnabled !== undefined) metaRows['favorite-enabled'] = favoriteEnabled;
   if (shareEnabled !== undefined) metaRows['share-enabled'] = shareEnabled;
 
+  const backgroundRow = withBackground
+    ? '<div><div><picture><img src="./bg.jpg" alt=""></picture></div></div>'
+    : '';
+
   return `
     <div class="section">
       <div class="event-marquee">
+        ${backgroundRow}
         <div>
           <div>
             <h2>Live now</h2>
@@ -80,11 +89,20 @@ describe('event-marquee', () => {
       expect(el.querySelector('.event-marquee-actions')).to.not.exist;
     });
 
-    it('tags the text and media columns', async () => {
+    it('decorates the background row via Milo\'s decorateBlockBg', async () => {
       const el = document.querySelector('.event-marquee');
       await init(el);
+      const background = el.querySelector('.event-marquee-background');
+      expect(background).to.exist;
+      expect(background.querySelector('picture')).to.exist;
+    });
+
+    it('tags the foreground row and text column, with no asset', async () => {
+      const el = document.querySelector('.event-marquee');
+      await init(el);
+      expect(el.querySelector('.event-marquee-foreground')).to.exist;
       expect(el.querySelector('.event-marquee-text')).to.exist;
-      expect(el.querySelector('.event-marquee-media')).to.exist;
+      expect(el.querySelector('.event-marquee-media')).to.not.exist;
     });
 
     it('does not require a sibling Section Metadata block', async () => {
@@ -92,6 +110,20 @@ describe('event-marquee', () => {
       expect(el.parentElement.querySelector('.section-metadata')).to.not.exist;
       await init(el);
       expect(el.querySelector('.event-marquee-actions')).to.not.exist;
+    });
+
+    it('works with no background row at all (foreground-only marquee)', async () => {
+      document.body.innerHTML = `
+        <div class="event-marquee">
+          <div>
+            <div><h2>Just text</h2></div>
+          </div>
+        </div>
+      `;
+      const el = document.querySelector('.event-marquee');
+      await init(el);
+      expect(el.classList.contains('event-marquee-text-cta')).to.be.true;
+      expect(el.querySelector('.event-marquee-background')).to.not.exist;
     });
   });
 
@@ -104,11 +136,12 @@ describe('event-marquee', () => {
       expect(el.classList.contains('event-marquee-text-cta')).to.be.false;
     });
 
-    it('leaves the block\'s own rows untouched (no metadata rows to strip)', async () => {
+    it('decorates both the background row and the foreground asset', async () => {
       document.body.innerHTML = videoVariantHtml();
       const el = document.querySelector('.event-marquee');
       await init(el);
-      expect(el.querySelectorAll(':scope > div').length).to.equal(1);
+      expect(el.querySelector('.event-marquee-background')).to.exist;
+      expect(el.querySelector('.event-marquee-media .milo-video')).to.exist;
     });
 
     it('renders a Favorite button when the authored session-id matches a known session', async () => {
@@ -162,6 +195,14 @@ describe('event-marquee', () => {
       const el = document.querySelector('.event-marquee');
       await init(el);
       expect(el.querySelector('.event-marquee-share')).to.not.exist;
+    });
+
+    it('works with no background row (video variant with an asset only)', async () => {
+      document.body.innerHTML = videoVariantHtml({ sessionId: '', withBackground: false });
+      const el = document.querySelector('.event-marquee');
+      await init(el);
+      expect(el.classList.contains('event-marquee-video')).to.be.true;
+      expect(el.querySelector('.event-marquee-background')).to.not.exist;
     });
 
     it('preserves the original casing of session-id and event-title from Section Metadata', async () => {

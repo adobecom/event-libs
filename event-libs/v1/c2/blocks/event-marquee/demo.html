@@ -5,8 +5,9 @@
     npx serve .   → http://localhost:3000/event-libs/v1/c2/blocks/event-marquee/demo.html
 
   Runs standalone (no Milo/AEM, no real RainFocus backend):
-    - decorateButtons and Section Metadata's getMetadata are local stubs (reused from
-      the unit test fixtures) so config parsing works without a real Milo/AEM env
+    - decorateButtons and decorateBlockBg (background handling) and Section Metadata's
+      getMetadata are local stubs (reused from the unit test fixtures) so config
+      parsing/background decoration work without a real Milo/AEM env
     - session-store signals are seeded directly with mock data instead of a real fetch
     - YouTube/MPC variants are faked as already-decorated `.milo-video` markup, since
       the real decoration only happens inside Milo's own AUTO_BLOCKS pipeline
@@ -46,6 +47,7 @@
   <strong>Event Marquee · Dev Preview</strong>
   <a href="#text-cta-2cta">Text/CTA (2 CTAs)</a>
   <a href="#text-cta-1cta">Text/CTA (1 CTA)</a>
+  <a href="#text-cta-no-bg">Text/CTA (no background row)</a>
   <a href="#video-mr">Video: Mobile Rider</a>
   <a href="#video-yt">Video: YouTube</a>
   <a href="#video-mpc">Video: MPC</a>
@@ -58,17 +60,19 @@
 <!-- ══ TEXT/CTA — background image, primary + secondary CTA ══════════════ -->
 <section class="demo-surface" id="text-cta-2cta">
   <h2>Text/CTA variant — 2 CTAs</h2>
-  <p class="demo-note">No player content in the media column → auto-detected as Text/CTA.</p>
+  <p class="demo-note">Row 1 = background (image), row 2 (foreground) = text only, no asset → auto-detected as Text/CTA.</p>
   <div class="event-marquee">
+    <div>
+      <div>
+        <picture><img src="https://picsum.photos/seed/marquee1/1600/900" alt=""></picture>
+      </div>
+    </div>
     <div>
       <div>
         <h2>Upcoming: Keynote Replay</h2>
         <p>Catch the highlights from today's mainstage session, available on demand.</p>
         <p><em><strong><a href="#register">Register now</a></strong></em></p>
         <p><em><a href="#learn-more">Learn more</a></em></p>
-      </div>
-      <div>
-        <picture><img src="https://picsum.photos/seed/marquee1/1600/900" alt=""></picture>
       </div>
     </div>
   </div>
@@ -80,12 +84,28 @@
   <div class="event-marquee">
     <div>
       <div>
+        <picture><img src="https://picsum.photos/seed/marquee2/1600/900" alt=""></picture>
+      </div>
+    </div>
+    <div>
+      <div>
         <h2>Day 2 starts tomorrow</h2>
         <p>Set a reminder so you don't miss the opening session.</p>
         <p><em><strong><a href="#remind-me">Remind me</a></strong></em></p>
       </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══ TEXT/CTA — single row, no background at all ═════════════════════ -->
+<section class="demo-surface" id="text-cta-no-bg">
+  <h2>Text/CTA variant — no background row</h2>
+  <p class="demo-note">Only one row authored → treated entirely as the foreground, no `.event-marquee-background` element at all.</p>
+  <div class="event-marquee">
+    <div>
       <div>
-        <picture><img src="https://picsum.photos/seed/marquee2/1600/900" alt=""></picture>
+        <h2>Plain announcement</h2>
+        <p>No background authored — just text on the block's own default color.</p>
       </div>
     </div>
   </div>
@@ -96,6 +116,11 @@
   <h2>Video variant — Mobile Rider</h2>
   <p class="demo-note">Real mobilerider.com link → really self-inits via processAutoBlockLinks. Won't play (no real video ID/backend), but the surrounding scaffolding + actions bar are real.</p>
   <div class="event-marquee">
+    <div>
+      <div>
+        <picture><img src="https://picsum.photos/seed/marquee-mr/1600/900" alt=""></picture>
+      </div>
+    </div>
     <div>
       <div>
         <h2>Live now: Mainstage</h2>
@@ -118,6 +143,11 @@
   <div class="event-marquee">
     <div>
       <div>
+        <picture><img src="https://picsum.photos/seed/marquee-yt/1600/900" alt=""></picture>
+      </div>
+    </div>
+    <div>
+      <div>
         <h2>Replay: Design Systems at Scale</h2>
         <p>Missed it live? Watch the full session now.</p>
       </div>
@@ -135,6 +165,11 @@
 <section class="demo-surface" id="video-mpc">
   <h2>Video variant — MPC (tv.adobe.com)</h2>
   <div class="event-marquee">
+    <div>
+      <div>
+        <picture><img src="https://picsum.photos/seed/marquee-mpc/1600/900" alt=""></picture>
+      </div>
+    </div>
     <div>
       <div>
         <h2>Replay: What's New in Creative Cloud</h2>
@@ -155,6 +190,11 @@
   <h2>Video variant — favorite-enabled: false</h2>
   <div class="event-marquee">
     <div>
+      <div>
+        <picture><img src="https://picsum.photos/seed/marquee-nofav/1600/900" alt=""></picture>
+      </div>
+    </div>
+    <div>
       <div><h2>Sponsor spotlight</h2><p>No favoriting on sponsor content.</p></div>
       <div><div class="milo-video">(stand-in player)</div></div>
     </div>
@@ -169,6 +209,11 @@
 <section class="demo-surface" id="video-no-share">
   <h2>Video variant — share-enabled: false</h2>
   <div class="event-marquee">
+    <div>
+      <div>
+        <picture><img src="https://picsum.photos/seed/marquee-noshare/1600/900" alt=""></picture>
+      </div>
+    </div>
     <div>
       <div><h2>Internal preview</h2><p>Not meant to be shared externally.</p></div>
       <div><div class="milo-video">(stand-in player)</div></div>
@@ -186,6 +231,11 @@
   <p class="demo-note">No session-id row at all → Favorite button never renders (share still does).</p>
   <div class="event-marquee">
     <div>
+      <div>
+        <picture><img src="https://picsum.photos/seed/marquee-nosession/1600/900" alt=""></picture>
+      </div>
+    </div>
+    <div>
       <div><h2>Ambient loop</h2><p>Just a background video, no associated session.</p></div>
       <div><div class="milo-video">(stand-in player)</div></div>
     </div>
@@ -197,6 +247,11 @@
   <h2>Video variant — session-id doesn't match any known session</h2>
   <p class="demo-note">Authored session-id is "s-999", which isn't in the seeded mock session list below → the Favorite slot stays empty (it's waiting on a session that will never resolve here).</p>
   <div class="event-marquee">
+    <div>
+      <div>
+        <picture><img src="https://picsum.photos/seed/marquee-unmatched/1600/900" alt=""></picture>
+      </div>
+    </div>
     <div>
       <div><h2>Unknown session</h2><p>Demonstrates the "waiting to resolve" case.</p></div>
       <div><div class="milo-video">(stand-in player)</div></div>
@@ -212,8 +267,9 @@
   import { sessions, auth, favorited } from '/event-libs/v1/utils/session-store.js';
   import init from '/event-libs/v1/c2/blocks/event-marquee/event-marquee.js';
 
-  // Point miloLibs at a tiny local decorateButtons stub (reused from the unit test
-  // fixtures) so CTA decoration works without a real Milo/AEM environment.
+  // Point miloLibs at tiny local stubs (reused from the unit test fixtures) so CTA
+  // decoration, background decoration, and Section Metadata parsing all work without
+  // a real Milo/AEM environment.
   const miloLibs = `${window.location.origin}/test/unit/blocks/event-marquee/mocks/libs`;
   setEventConfig({ miloConfig: { miloLibs } }, { miloLibs });
 
