@@ -1,6 +1,6 @@
 import { expect } from '@esm-bundle/chai';
 
-import { getEventAttendeePayload, getGuestAttendeePayload } from '../../../event-libs/v1/utils/data-utils.js';
+import { getEventAttendeePayload, getRsvpTokenAttendeePayload } from '../../../event-libs/v1/utils/data-utils.js';
 
 describe('data-utils', () => {
   describe('getEventAttendeePayload', () => {
@@ -51,9 +51,9 @@ describe('data-utils', () => {
     });
   });
 
-  describe('getGuestAttendeePayload', () => {
+  describe('getRsvpTokenAttendeePayload', () => {
     it('includes base attendee fields plus consent fields the guest submit endpoint accepts', () => {
-      const out = getGuestAttendeePayload({
+      const out = getRsvpTokenAttendeePayload({
         firstName: 'Ada',
         lastName: 'Lovelace',
         email: 'ada@example.com',
@@ -74,23 +74,23 @@ describe('data-utils', () => {
     });
 
     it('coerces shareInfoWithPartners/requiresTicket from radio-group array (Yes/No)', () => {
-      expect(getGuestAttendeePayload({ shareInfoWithPartners: ['Yes'] }).shareInfoWithPartners).to.be.true;
-      expect(getGuestAttendeePayload({ requiresTicket: ['No'] }).requiresTicket).to.be.false;
+      expect(getRsvpTokenAttendeePayload({ shareInfoWithPartners: ['Yes'] }).shareInfoWithPartners).to.be.true;
+      expect(getRsvpTokenAttendeePayload({ requiresTicket: ['No'] }).requiresTicket).to.be.false;
     });
 
     it('never includes campaignId (server sources it from the token, never the client)', () => {
-      const out = getGuestAttendeePayload({ firstName: 'Ada', campaignId: 'camp-1' });
+      const out = getRsvpTokenAttendeePayload({ firstName: 'Ada', campaignId: 'camp-1' });
       expect(out).to.not.have.property('campaignId');
     });
 
     it('drops unknown keys', () => {
-      const out = getGuestAttendeePayload({ firstName: 'Ada', totallyMadeUpField: 'x' });
+      const out = getRsvpTokenAttendeePayload({ firstName: 'Ada', totallyMadeUpField: 'x' });
       expect(out).to.not.have.property('totallyMadeUpField');
     });
 
     it('returns argument unchanged when falsy', () => {
-      expect(getGuestAttendeePayload(null)).to.equal(null);
-      expect(getGuestAttendeePayload(undefined)).to.equal(undefined);
+      expect(getRsvpTokenAttendeePayload(null)).to.equal(null);
+      expect(getRsvpTokenAttendeePayload(undefined)).to.equal(undefined);
     });
   });
 });

@@ -108,26 +108,27 @@ export function getBaseAttendeePayload(attendeeData) {
 }
 
 /**
- * Fields the guest RSVP submission endpoint (POST .../guestRsvpAttendees) accepts
- * beyond the base attendee identity fields: identity-level consent (consentStringId,
- * already in BASE_ATTENDEE_DATA_FILTER) plus event-level consent/ticket flags that
- * only live in EVENT_ATTENDEE_DATA_FILTER for the normal create-attendee flow. The
- * guest endpoint combines create+add-to-event in one call, so it needs both.
+ * Fields the RSVP token registration endpoint (POST .../rsvpTokenRegistrations)
+ * accepts beyond the base attendee identity fields: identity-level consent
+ * (consentStringId, already in BASE_ATTENDEE_DATA_FILTER) plus event-level
+ * consent/ticket flags that only live in EVENT_ATTENDEE_DATA_FILTER for the
+ * normal create-attendee flow. The RSVP token endpoint combines create+add-to-event
+ * in one call, so it needs both.
  */
-export const GUEST_ATTENDEE_DATA_FILTER = {
+export const RSVP_TOKEN_ATTENDEE_DATA_FILTER = {
   ...BASE_ATTENDEE_DATA_FILTER,
   shareInfoWithPartners: { type: 'boolean', submittable: true },
   ccSentiment: { type: 'string', submittable: true },
   requiresTicket: { type: 'boolean', submittable: true },
 };
 
-export function getGuestAttendeePayload(attendeeData) {
+export function getRsvpTokenAttendeePayload(attendeeData) {
   if (!attendeeData) return attendeeData;
   return Object.entries(attendeeData).reduce((acc, [key, value]) => {
-    const nextValue = GUEST_ATTENDEE_DATA_FILTER[key]?.type === 'boolean'
+    const nextValue = RSVP_TOKEN_ATTENDEE_DATA_FILTER[key]?.type === 'boolean'
       ? coerceBoolean(key, value)
       : value;
-    if (GUEST_ATTENDEE_DATA_FILTER[key]?.submittable && isValidAttribute(nextValue)) {
+    if (RSVP_TOKEN_ATTENDEE_DATA_FILTER[key]?.submittable && isValidAttribute(nextValue)) {
       acc[key] = nextValue;
     }
     return acc;

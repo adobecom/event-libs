@@ -1,5 +1,5 @@
 import { expect } from '@esm-bundle/chai';
-import { DictionaryManager, dictionaryManager, getInviteOnlyNoCampaignMessage, getGuestRsvpLinkInvalidMessage, getGuestAlreadyRegisteredMessage } from '../../../event-libs/v1/utils/dictionary-manager.js';
+import { DictionaryManager, dictionaryManager, getInviteOnlyNoCampaignMessage, getRsvpTokenInvalidMessage, getRsvpTokenAlreadyRegisteredMessage } from '../../../event-libs/v1/utils/dictionary-manager.js';
 import { setEventConfig } from '../../../event-libs/v1/utils/utils.js';
 
 describe('DictionaryManager', () => {
@@ -179,7 +179,7 @@ describe('getInviteOnlyNoCampaignMessage', () => {
   });
 });
 
-describe('getGuestRsvpLinkInvalidMessage', () => {
+describe('getRsvpTokenInvalidMessage', () => {
   let originalFetch;
 
   beforeEach(() => {
@@ -198,7 +198,7 @@ describe('getGuestRsvpLinkInvalidMessage', () => {
 
   it('returns fallback English copy when key is not in dictionary', () => {
     const manager = new DictionaryManager();
-    expect(getGuestRsvpLinkInvalidMessage(manager)).to.equal(
+    expect(getRsvpTokenInvalidMessage(manager)).to.equal(
       'This registration link is no longer valid. It may have already been used or expired.',
     );
   });
@@ -212,7 +212,7 @@ describe('getGuestRsvpLinkInvalidMessage', () => {
           total: 1,
           offset: 0,
           limit: 1,
-          data: [{ key: 'rsvp-guest-link-invalid-cta-text', value: 'This link has already been used.' }],
+          data: [{ key: 'rsvp-token-invalid-cta-text', value: 'This link has already been used.' }],
         },
         ':version': 3,
         ':names': ['data'],
@@ -221,11 +221,11 @@ describe('getGuestRsvpLinkInvalidMessage', () => {
     };
     globalThis.fetch = () => Promise.resolve(mockResponse);
     await manager.initialize();
-    expect(getGuestRsvpLinkInvalidMessage(manager)).to.equal('This link has already been used.');
+    expect(getRsvpTokenInvalidMessage(manager)).to.equal('This link has already been used.');
   });
 });
 
-describe('getGuestAlreadyRegisteredMessage', () => {
+describe('getRsvpTokenAlreadyRegisteredMessage', () => {
   let originalFetch;
 
   beforeEach(() => {
@@ -244,7 +244,7 @@ describe('getGuestAlreadyRegisteredMessage', () => {
 
   it('returns fallback English copy when key is not in dictionary', () => {
     const manager = new DictionaryManager();
-    expect(getGuestAlreadyRegisteredMessage(manager)).to.equal(
+    expect(getRsvpTokenAlreadyRegisteredMessage(manager)).to.equal(
       'This email is already registered for this event.',
     );
   });
@@ -258,7 +258,7 @@ describe('getGuestAlreadyRegisteredMessage', () => {
           total: 1,
           offset: 0,
           limit: 1,
-          data: [{ key: 'rsvp-guest-already-registered-cta-text', value: 'You are already on the list.' }],
+          data: [{ key: 'rsvp-token-already-registered-cta-text', value: 'You are already on the list.' }],
         },
         ':version': 3,
         ':names': ['data'],
@@ -267,6 +267,6 @@ describe('getGuestAlreadyRegisteredMessage', () => {
     };
     globalThis.fetch = () => Promise.resolve(mockResponse);
     await manager.initialize();
-    expect(getGuestAlreadyRegisteredMessage(manager)).to.equal('You are already on the list.');
+    expect(getRsvpTokenAlreadyRegisteredMessage(manager)).to.equal('You are already on the list.');
   });
 });

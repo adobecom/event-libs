@@ -1,6 +1,6 @@
 import { expect } from '@esm-bundle/chai';
 
-import { getValidCampaignIdFromUrl, resolveRoutedCampaignId, resetCampaignMapCache, getGuestRsvpToken, shouldForceGuestSignIn } from '../../../event-libs/v1/utils/utils.js';
+import { getValidCampaignIdFromUrl, resolveRoutedCampaignId, resetCampaignMapCache, getRsvpToken, shouldForceGuestSignIn } from '../../../event-libs/v1/utils/utils.js';
 
 function mockCampaignMap(rules) {
   window.fetch = async (url) => {
@@ -29,25 +29,25 @@ describe('getValidCampaignIdFromUrl', () => {
   });
 });
 
-describe('getGuestRsvpToken', () => {
-  it('returns a well-formed guest RSVP token from the URL', () => {
-    expect(getGuestRsvpToken(new URLSearchParams('?guestToken=abc123-DEF456_ghi789'))).to.equal('abc123-DEF456_ghi789');
+describe('getRsvpToken', () => {
+  it('returns a well-formed RSVP token from the URL', () => {
+    expect(getRsvpToken(new URLSearchParams('?rsvpToken=abc123-DEF456_ghi789'))).to.equal('abc123-DEF456_ghi789');
   });
 
-  it('returns null when the guestToken param is absent', () => {
-    expect(getGuestRsvpToken(new URLSearchParams(''))).to.be.null;
+  it('returns null when the rsvpToken param is absent', () => {
+    expect(getRsvpToken(new URLSearchParams(''))).to.be.null;
   });
 
   it('returns null when the token is shorter than 16 characters', () => {
-    expect(getGuestRsvpToken(new URLSearchParams('?guestToken=too-short'))).to.be.null;
+    expect(getRsvpToken(new URLSearchParams('?rsvpToken=too-short'))).to.be.null;
   });
 
   it('returns null when the token fails pattern validation', () => {
-    expect(getGuestRsvpToken(new URLSearchParams('?guestToken=bad/token!with spaces'))).to.be.null;
+    expect(getRsvpToken(new URLSearchParams('?rsvpToken=bad/token!with spaces'))).to.be.null;
   });
 
   it('returns null when the token exceeds 256 chars', () => {
-    expect(getGuestRsvpToken(new URLSearchParams(`?guestToken=${'a'.repeat(257)}`))).to.be.null;
+    expect(getRsvpToken(new URLSearchParams(`?rsvpToken=${'a'.repeat(257)}`))).to.be.null;
   });
 });
 
@@ -55,7 +55,7 @@ describe('shouldForceGuestSignIn', () => {
   // Single source of truth shared by decorate.js's handleRSVPBtnBasedOnProfile
   // and events-form.js's onProfile — both call this instead of maintaining
   // their own copy of the gate condition.
-  it('forces sign-in for a guest with no allow-guest-registration and no RSVP link token', () => {
+  it('forces sign-in for a guest with no allow-guest-registration and no RSVP token', () => {
     expect(shouldForceGuestSignIn({ account_type: 'guest' }, false)).to.equal(true);
   });
 
@@ -67,12 +67,12 @@ describe('shouldForceGuestSignIn', () => {
     expect(shouldForceGuestSignIn({ account_type: 'guest' }, true)).to.equal(false);
   });
 
-  it('does not force sign-in when a valid guest RSVP link token is present', () => {
-    expect(shouldForceGuestSignIn({ account_type: 'guest', guestRsvpToken: 'tok-1234567890abcdef' }, false)).to.equal(false);
+  it('does not force sign-in when a valid RSVP token is present', () => {
+    expect(shouldForceGuestSignIn({ account_type: 'guest', rsvpToken: 'tok-1234567890abcdef' }, false)).to.equal(false);
   });
 
-  it('does not force sign-in when an invalid guest RSVP link token is present', () => {
-    expect(shouldForceGuestSignIn({ account_type: 'guest', guestRsvpToken: 'tok-1234567890abcdef', guestLinkInvalid: true }, false)).to.equal(false);
+  it('does not force sign-in when an invalid RSVP token is present', () => {
+    expect(shouldForceGuestSignIn({ account_type: 'guest', rsvpToken: 'tok-1234567890abcdef', rsvpTokenInvalid: true }, false)).to.equal(false);
   });
 
   it('does not force sign-in for a real logged-in (non-guest) profile', () => {

@@ -181,32 +181,32 @@ export function getInviteOnlyNoCampaignMessage(manager) {
     : text;
 }
 
-export const GUEST_RSVP_LINK_INVALID_MESSAGE_KEY = 'rsvp-guest-link-invalid-cta-text';
+export const RSVP_TOKEN_INVALID_MESSAGE_KEY = 'rsvp-token-invalid-cta-text';
 
 /**
- * Localized message when a guest RSVP token has already been used, expired, or revoked.
+ * Localized message when an RSVP token has already been used, expired, or revoked.
  * @param {DictionaryManager} manager - Initialized dictionary manager instance
  * @returns {string}
  */
-export function getGuestRsvpLinkInvalidMessage(manager) {
-  const text = manager.getValue(GUEST_RSVP_LINK_INVALID_MESSAGE_KEY);
-  return text === GUEST_RSVP_LINK_INVALID_MESSAGE_KEY
+export function getRsvpTokenInvalidMessage(manager) {
+  const text = manager.getValue(RSVP_TOKEN_INVALID_MESSAGE_KEY);
+  return text === RSVP_TOKEN_INVALID_MESSAGE_KEY
     ? 'This registration link is no longer valid. It may have already been used or expired.'
     : text;
 }
 
-export const GUEST_RSVP_ALREADY_REGISTERED_MESSAGE_KEY = 'rsvp-guest-already-registered-cta-text';
+export const RSVP_TOKEN_ALREADY_REGISTERED_MESSAGE_KEY = 'rsvp-token-already-registered-cta-text';
 
 /**
- * Localized message when a guest RSVP submission fails because the email is already
- * registered for the event. Unlike an invalid/used token, the token itself is NOT
- * consumed by this error and stays usable for a different guest.
+ * Localized message when an RSVP token registration fails because the email is
+ * already registered for the event. Unlike an invalid/used token, the token itself
+ * is NOT consumed by this error and stays usable for a different guest.
  * @param {DictionaryManager} manager - Initialized dictionary manager instance
  * @returns {string}
  */
-export function getGuestAlreadyRegisteredMessage(manager) {
-  const text = manager.getValue(GUEST_RSVP_ALREADY_REGISTERED_MESSAGE_KEY);
-  return text === GUEST_RSVP_ALREADY_REGISTERED_MESSAGE_KEY
+export function getRsvpTokenAlreadyRegisteredMessage(manager) {
+  const text = manager.getValue(RSVP_TOKEN_ALREADY_REGISTERED_MESSAGE_KEY);
+  return text === RSVP_TOKEN_ALREADY_REGISTERED_MESSAGE_KEY
     ? 'This email is already registered for this event.'
     : text;
 }

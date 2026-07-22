@@ -49,14 +49,14 @@ describe('Adobe Event Service API', () => {
       expect(options.headers.has('Authorization')).to.be.false;
     });
 
-    it('should attach the x-adobe-esp-guest-token header when a guest token is passed', async () => {
+    it('should attach the x-adobe-esp-rsvp-token header when an RSVP token is passed', async () => {
       const options = await api.constructRequestOptions('GET', null, false, true, 'tok-1');
-      expect(options.headers.get('x-adobe-esp-guest-token')).to.equal('tok-1');
+      expect(options.headers.get('x-adobe-esp-rsvp-token')).to.equal('tok-1');
     });
 
-    it('should omit the guest token header when no guest token is passed', async () => {
+    it('should omit the RSVP token header when no RSVP token is passed', async () => {
       const options = await api.constructRequestOptions('GET');
-      expect(options.headers.has('x-adobe-esp-guest-token')).to.be.false;
+      expect(options.headers.has('x-adobe-esp-rsvp-token')).to.be.false;
     });
   });
 
@@ -240,35 +240,35 @@ describe('Adobe Event Service API', () => {
     });
   });
 
-  describe('validateGuestRsvpToken', () => {
-    it('should validate a usable guest RSVP token', async () => {
+  describe('validateRsvpToken', () => {
+    it('should validate a usable RSVP token', async () => {
       sandbox.stub(window, 'fetch').resolves({ json: () => ({ eventId: 'event-123', campaignId: 'camp-1' }), ok: true });
-      const result = await api.validateGuestRsvpToken('event-123', 'tok-1');
+      const result = await api.validateRsvpToken('event-123', 'tok-1');
       expect(result.ok).to.be.true;
       expect(result.data).to.have.property('eventId', 'event-123');
     });
 
-    it('should call the event-scoped guestRsvpAttendees endpoint with the token header', async () => {
+    it('should call the event-scoped rsvpTokenRegistrations endpoint with the token header', async () => {
       delete window.adobeIMS;
       const fetchStub = sandbox.stub(window, 'fetch').resolves({ json: () => ({ eventId: 'event-123' }), ok: true });
-      const result = await api.validateGuestRsvpToken('event-123', 'tok-1');
+      const result = await api.validateRsvpToken('event-123', 'tok-1');
       expect(result.ok).to.be.true;
       expect(fetchStub.calledOnce).to.be.true;
       const [url, options] = fetchStub.firstCall.args;
-      expect(url).to.include('/v1/events/event-123/guestRsvpAttendees');
-      expect(options.headers.get('x-adobe-esp-guest-token')).to.equal('tok-1');
+      expect(url).to.include('/v1/events/event-123/rsvpTokenRegistrations');
+      expect(options.headers.get('x-adobe-esp-rsvp-token')).to.equal('tok-1');
     });
 
     it('should return an error for a used/expired/revoked/unknown token', async () => {
       sandbox.stub(window, 'fetch').resolves({ json: () => ({ message: 'Gone' }), ok: false, status: 410 });
-      const result = await api.validateGuestRsvpToken('event-123', 'tok-1');
+      const result = await api.validateRsvpToken('event-123', 'tok-1');
       expect(result.ok).to.be.false;
       expect(result.status).to.equal(410);
     });
 
     it('should handle network errors', async () => {
       sandbox.stub(window, 'fetch').rejects(new Error('Network failure'));
-      const result = await api.validateGuestRsvpToken('event-123', 'tok-1');
+      const result = await api.validateRsvpToken('event-123', 'tok-1');
       expect(result.ok).to.be.false;
       expect(result.status).to.equal('Network Error');
     });
@@ -276,38 +276,38 @@ describe('Adobe Event Service API', () => {
     it('should never attach the caller\'s own Authorization header, even when already signed in', async () => {
       window.adobeIMS = { getAccessToken: () => ({ token: 'assistants-own-token' }) };
       const fetchStub = sandbox.stub(window, 'fetch').resolves({ json: () => ({ eventId: 'event-123' }), ok: true });
-      await api.validateGuestRsvpToken('event-123', 'tok-1');
+      await api.validateRsvpToken('event-123', 'tok-1');
       const [, options] = fetchStub.firstCall.args;
       expect(options.headers.has('Authorization')).to.be.false;
     });
   });
 
-  describe('submitGuestRsvp', () => {
-    it('should submit a guest RSVP and return the attendee data', async () => {
+  describe('submitRsvpTokenRegistration', () => {
+    it('should submit an RSVP token registration and return the attendee data', async () => {
       const fetchStub = sandbox.stub(window, 'fetch').resolves({
         json: () => ({ attendeeId: 'att-1', registrationStatus: 'registered' }),
         ok: true,
       });
 
-      const result = await api.submitGuestRsvp('event-123', 'tok-1', { firstName: 'John', lastName: 'Doe', email: 'john@test.com' });
+      const result = await api.submitRsvpTokenRegistration('event-123', 'tok-1', { firstName: 'John', lastName: 'Doe', email: 'john@test.com' });
       expect(result.ok).to.be.true;
       expect(result.data).to.have.property('registrationStatus', 'registered');
 
       const [url, options] = fetchStub.firstCall.args;
-      expect(url).to.include('/v1/events/event-123/guestRsvpAttendees');
-      expect(options.headers.get('x-adobe-esp-guest-token')).to.equal('tok-1');
+      expect(url).to.include('/v1/events/event-123/rsvpTokenRegistrations');
+      expect(options.headers.get('x-adobe-esp-rsvp-token')).to.equal('tok-1');
     });
 
     it('should return an error without making a request when eventId, token, or data is missing', async () => {
       const fetchStub = sandbox.stub(window, 'fetch');
-      const result = await api.submitGuestRsvp('event-123', null, { firstName: 'John' });
+      const result = await api.submitRsvpTokenRegistration('event-123', null, { firstName: 'John' });
       expect(result.ok).to.be.false;
       expect(fetchStub.called).to.be.false;
     });
 
     it('should return an error if the email is already registered', async () => {
       sandbox.stub(window, 'fetch').resolves({ json: () => ({ message: 'Conflict' }), ok: false, status: 409 });
-      const result = await api.submitGuestRsvp('event-123', 'tok-1', { firstName: 'John' });
+      const result = await api.submitRsvpTokenRegistration('event-123', 'tok-1', { firstName: 'John' });
       expect(result.ok).to.be.false;
       expect(result.status).to.equal(409);
     });
@@ -315,14 +315,14 @@ describe('Adobe Event Service API', () => {
     it('should never attach the caller\'s own Authorization header, even when already signed in', async () => {
       window.adobeIMS = { getAccessToken: () => ({ token: 'assistants-own-token' }) };
       const fetchStub = sandbox.stub(window, 'fetch').resolves({ json: () => ({ attendeeId: 'att-1' }), ok: true });
-      await api.submitGuestRsvp('event-123', 'tok-1', { firstName: 'John' });
+      await api.submitRsvpTokenRegistration('event-123', 'tok-1', { firstName: 'John' });
       const [, options] = fetchStub.firstCall.args;
       expect(options.headers.has('Authorization')).to.be.false;
     });
 
     it('should handle network errors', async () => {
       sandbox.stub(window, 'fetch').rejects(new Error('Network failure'));
-      const result = await api.submitGuestRsvp('event-123', 'tok-1', { firstName: 'John' });
+      const result = await api.submitRsvpTokenRegistration('event-123', 'tok-1', { firstName: 'John' });
       expect(result.ok).to.be.false;
       expect(result.status).to.equal('Network Error');
     });
