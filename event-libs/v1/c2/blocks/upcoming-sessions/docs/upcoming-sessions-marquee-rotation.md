@@ -113,9 +113,10 @@ Session Guide counterparts:
   `scheduleSession()`).
 - A logged-out user clicking either icon must follow the **same sign-in
   prompt flow** Session Guide uses.
-- Per-state icon availability differs (see §5): in `live` state, Add to
-  Schedule is **hidden/disabled** (a live session can't be scheduled) while
-  Favorite **remains active**. In `upcoming` state, both are active.
+- **Both icons are always active** — per §12 (design update), this
+  component never renders a `live` card state (a session's card is removed
+  the instant it starts), so there's no "hide Add to Schedule while live"
+  case to handle here.
 - This is the one piece of card interaction that is inherently per-user and
   therefore can never be baked in by the Configurator — it's always hydrated
   client-side regardless of how the base card list was populated.
@@ -126,23 +127,27 @@ Each card displays:
 
 - Session title
 - Category/topic (channel badge)
-- Time range, **or** a "Live Now" badge when the session is confirmed `live`
-  (badge copy/styling pending design — see Open Questions)
+- Time range
 - Speaker avatar(s)
-- Add to Schedule icon (state-gated per §2.4/§5)
+- Add to Schedule icon (always active — see §2.4/§12)
 - Favorite icon
 
-All of the above **except the state itself and the favorite/schedule
-toggle state** are baked in by the Configurator at authoring time (title,
-category, time range, speaker avatar, session ID, canonical URLs). State
-(`upcoming`/`live`/`on-demand`) and favorite/schedule toggle state are
+All of the above **except the favorite/schedule toggle state** are baked in
+by the Configurator at authoring time (title, category, time range, speaker
+avatar, session ID, canonical URLs). Favorite/schedule toggle state is
 always computed/read client-side, never authored.
+
+**Design update (§12):** this component only ever renders one card state —
+"upcoming" (clickable, opens the Session Guide detail). There is no `live`
+or `on-demand` card state — the instant a session starts (confirmed via
+scheduled start time for non-MR sessions, or via Mobile Rider poll
+confirmation for MR sessions), its card is removed from the row entirely
+rather than switching to a different visual/interactive state.
 
 | Session state | Click target | Add to Schedule | Favorite |
 |---|---|---|---|
-| `upcoming` | Session Guide modal, opened directly to this session's detail view (not the default Session Guide view) | active | active |
-| `live` | Resolved Watch URL (Homepage or Session Broadcast) — **not** the Session Guide modal | hidden/disabled | active |
-| `on-demand` | n/a — card has already rotated out (§4); this component never renders an on-demand card state, unlike Session Guide's On Demand view | n/a | n/a |
+| `upcoming` (the only rendered state) | Session Guide modal, opened directly to this session's detail view (not the default Session Guide view) | active | active |
+| removed (session has started) | n/a — card is gone from the row (§12) | n/a | n/a |
 
 ## Architecture
 
@@ -268,40 +273,24 @@ be handled differently:
   show/hide/reorder among existing cards — there is no buffer to refill,
   no sliding window, no network dependency at the moment of the swap.
 
-### 5. Card click routing — state recomputed before routing
+### 5. Card click routing (implemented — simplified by §12's design update)
 
-Each card, on click, routes to a **different destination depending on
-session state** — two genuinely different targets, not two modes of one
-modal:
+**Design update:** this section originally described state-dependent
+routing (`upcoming` → Session Guide modal, `live` → Watch URL, `on-demand`
+→ unreachable), recomputed fresh at click time to guard against a session
+crossing a state boundary between paint and click. That's no longer
+necessary: per §12, this component never renders a `live` or `on-demand`
+card at all — a session's card is removed the instant it starts (via
+scheduled start time for non-MR sessions, or Mobile Rider poll confirmation
+for MR sessions), rather than switching to a different clickable state.
 
-- **`upcoming`** → opens the **Session Guide modal**, directly to that
-  session's detail view (not the default Session Guide view).
-- **`live`** → navigates the user to the resolved **Watch URL** (Homepage or
-  Session Broadcast, per whatever ESP/ESL resolves for that session) — this
-  does **not** open the Session Guide modal at all.
-- **`on-demand`** → not reachable by click; the card has already rotated out
-  of the row by the time a session reaches this state (§4).
-
-Because routing branches on state, **state must be resolved before the
-click is routed**, and — per §4 — resolving `live` correctly requires the
-live-poll signal, not just the baked-in times:
-
-1. User clicks a card.
-2. The click handler recomputes `deriveSessionState(session,
-   liveStreamActiveIds, Date.now())` **at click time**, using the current
-   live-poll snapshot — not the state value the card was last
-   rendered/bucketed with, and not a `live`/`on-demand` guess based on
-   scheduled `endTimeUtc` alone (per §4's under-run/post-run concern).
-3. Route per the table above, using that fresh result.
-
-**Don't reuse the render-time state.** A session can cross a state boundary
-while the card is sitting on screen (main thread busy, timer coalescing,
-the user hovering, or a real-world under/post-run). If the click handler
-trusted stale state, it could send the user to the Session Guide modal for
-a session that's actually gone live, or already ended — wrong destination,
-not just wrong copy. Recomputing at the moment of the click is cheap (no
-fetch — it's a pure function over baked-in data plus the already-subscribed
-live-poll snapshot).
+The only state a rendered card can ever be in is "upcoming", so every card
+click has exactly one possible destination: it opens the **Session Guide
+modal**, directly to that session's detail view (not the default Session
+Guide view) — implemented as `resolveClickAction()` in `upcoming-sessions.js`,
+kept as its own function (rather than inlined) purely for parity/testability
+with sessions-guide's own click-decision pattern, not because there's a
+decision to make anymore.
 
 ### 6. Attaching to a preceding block via `.attach-upcoming`
 
@@ -480,127 +469,106 @@ END:VCALENDAR
   multiple exports from the same event don't collide/overwrite in the
   browser's downloads folder.
 
-### 12. Mobile Rider live-status polling (implemented)
+### 12. Mobile Rider live-status polling — no live state, remove on start (implemented)
 
-Supersedes parts of §4/§5 now that implementation has landed: this block
-does **not** subscribe to a shared/external live-poll signal owned by
-another block. It runs its own direct poll against the real Mobile Rider
-endpoint (`MobileRiderController.getMediaStatus`, the same client
-`chrono-box`'s own MR plugin uses), merged into `deriveSessionState`'s
-active-id set alongside the (currently mocked, always-empty)
-`session-store.js` `liveStreamActiveIds` signal — so this starts working
-for free if that shared mock is ever replaced with a real implementation.
+**Design update, superseding the previous version of this section
+entirely:** this component does not support showing a "live" state at all.
+As soon as a session starts, its card is removed from the row — there is no
+`live` badge, no watch/broadcast click-routing, no "Add to Schedule hidden
+while live" special case. The only two states a session ever occupies here
+are "upcoming" (rendered, clickable, opens the Session Guide detail) and
+"gone" (removed). §5's live-state click-routing table and §2.4's "Add to
+Schedule hidden/disabled in `live` state" note are no longer accurate —
+there's no `live` card state left for either of those to apply to.
 
-- **Only sessions with an authored `mrStreamId` are polled.** A session
-  without one is a non-MR / YouTube-style session and is handled purely by
-  its baked-in `startTimeUtc`/`endTimeUtc` — "blindly" time-based, no
-  network call, matching §4's original `upcoming`→`live` design as-is.
+- **Only sessions with an authored `mrStreamId` are polled** against the
+  real Mobile Rider endpoint (`MobileRiderController.getMediaStatus`).
+  Sessions without one are non-MR / YouTube-style and are handled purely by
+  their baked-in `startTimeUtc` — "blindly" time-based, no network call.
+- **Non-MR sessions**: the card is removed the instant the scheduled start
+  time passes. This relies solely on the authored start time — there is no
+  live-status confirmation step for these, by design (nothing to poll).
+- **MR sessions**: removal relies solely on the Mobile Rider poll
+  confirming the session has actually started — **not** on the scheduled
+  start time. A session past its scheduled start but not yet MR-confirmed
+  stays on screen as a normal "upcoming" card (clickable, opens Session
+  Guide) rather than being removed or shown as live.
 - **Polling for a given MR session does not start until that session's own
-  scheduled start time arrives** — there is nothing for MR to report before
-  a session has started, so no request is made early. A per-session
-  `setTimeout` fires a poll tick at exactly that session's start time (not
-  the next arbitrary interval boundary), and every **30 seconds**
-  thereafter for the lifetime of the block, for every MR session whose
-  start time has passed.
-- **One batched request per poll tick**, not one per session — all due
-  `mrStreamId`s are deduplicated into a single `getMediaStatus(ids)` call.
-- **Polling continues indefinitely** while any MR session is due — a
-  session can flip active/inactive more than once (under-run before the
-  official start, post-run lingering after), so polling never stops after
-  the first "seen active" tick.
-- **Until MR confirms a session is actually active, the card stays in
-  `upcoming` state** — even after its scheduled start time has passed.
-  Card click continues to open the Session Guide modal in this window; the
-  card is never prematurely treated as `on-demand`/ended just because the
-  schedule says it should have started.
-- **The instant MR confirms a session is active**, the card flips to `live`:
-  badge becomes "Live Now", the Add to Schedule icon is removed (Favorite
-  stays active per §2.4/§5), and click now routes to the session's
-  authored `watchUrl` — **never** the session's own detail-page `url`,
-  which is not a stream destination. If `watchUrl` isn't authored for a
-  live session, the click resolves to no action rather than sending the
-  user to the wrong page.
-- **The instant MR reports a previously-active session as no longer
-  active**, the card is removed from the row immediately (rotates out) —
-  this is the real, authoritative end signal for an MR session. The
-  scheduled-`endTimeUtc` timer from §4 still exists as a fallback safety
-  net only (in case a poll is ever missed), not the primary mechanism for
-  MR sessions.
-- **All of the above happens live, without a page refresh.** Every poll
-  tick that changes anything (a session going active or a session ending)
-  triggers a full re-render of the card track — recomputing state,
-  badge, buttons, and click routing for every card from scratch. The same
-  re-render also fires on any Favorite/Add to Schedule/pending-action
-  signal change, from this component or elsewhere on the page sharing the
-  same `session-store.js` signals. Because the whole track is rebuilt from
-  scratch on every such update, **scroll position is explicitly preserved**
-  across the rebuild (`track.scrollLeft` saved/restored) so a background
-  state change never yanks a mid-browse user back to the start of the
-  carousel.
+  scheduled start time arrives** — there is nothing for MR to report
+  before a session has started. A per-session `setTimeout` fires a poll
+  tick at exactly that session's start time (not the next arbitrary
+  interval boundary), then every **30 seconds** thereafter, for every MR
+  session whose start time has passed and hasn't yet been confirmed
+  started.
+- **One batched request per poll tick**, not one per session — all due,
+  unresolved `mrStreamId`s are deduplicated into a single
+  `getMediaStatus(ids)` call.
+- **The instant MR confirms a session has started, its card is removed
+  immediately (no live state ever rendered in between), and that
+  session's `mrStreamId` is permanently excluded from all future polling**
+  — there's nothing further to check for it once it's gone. Once every MR
+  session in the row has been resolved this way, the poll interval itself
+  is cleared automatically (nothing left to check).
+- **Removed sessions cannot be resurrected.** Favorite/Add to
+  Schedule/pending-action changes elsewhere on the page still trigger a
+  full re-render of the remaining cards, but the removed session's data is
+  dropped from the block's own working list at the moment it's removed
+  (not just removed from the DOM) — so a later re-render can't
+  accidentally re-add a card for a session that's already started.
+- Scroll position is still explicitly preserved across every re-render
+  (`track.scrollLeft` saved/restored), so removals/favorite/schedule
+  updates never yank a mid-browse user back to the start of the carousel.
 
-#### Test plan — MR live-status & real-time UI
+#### Test plan — start-time/MR-based removal
 
 Manual/exploratory (no automated tests yet — standing "no tests until dev
 complete" instruction still applies to this block):
 
-1. **No polling before start.** Author a session with an `mrStreamId` and a
-   `startTimeUtc` several minutes in the future. Confirm (via network
-   panel) that no `getMediaStatus` request fires for that id until the
-   scheduled start time is reached.
+1. **No polling before start.** Author an MR session (`mrStreamId` set)
+   with a `startTimeUtc` several minutes in the future. Confirm (via
+   network panel) that no `getMediaStatus` request fires for that id until
+   the scheduled start time is reached.
 2. **Poll starts exactly at session start.** Confirm a `getMediaStatus`
-   request fires at (not meaningfully after) the session's `startTimeUtc`,
-   and every ~30s afterward.
+   request fires at (not meaningfully after) the MR session's
+   `startTimeUtc`, and every ~30s afterward until resolved.
 3. **Batching.** With 2+ MR sessions due simultaneously, confirm exactly
-   one `getMediaStatus` request per tick containing all due ids, not one
-   request per session.
-4. **Stays `upcoming` until MR confirms active.** Mock `getMediaStatus` to
-   keep returning a due session as inactive past its scheduled start.
-   Confirm: card still shows the time range (not "Live Now"), Add to
-   Schedule is still visible, and clicking still opens the Session Guide
-   modal — the card is never silently dropped or marked ended just because
+   one `getMediaStatus` request per tick containing all due, unresolved
+   ids — not one request per session.
+4. **MR session stays visible past its scheduled start until confirmed.**
+   Mock `getMediaStatus` to keep returning a due MR session as inactive
+   past its scheduled start. Confirm the card is still rendered, still
+   shows its normal time range, and clicking it still opens the Session
+   Guide detail — it is not removed or shown as live just because
    scheduled time has passed.
-5. **Transition to live.** Mock `getMediaStatus` to flip a due session to
-   active. Confirm, without reloading the page: badge changes to "Live
-   Now", Add to Schedule button disappears, Favorite button remains and
-   remains functional, and clicking the card navigates to that session's
-   authored `watchUrl`.
-6. **Missing `watchUrl` on a live session.** Same as above but the session
-   has no `watchUrl` authored. Confirm clicking the live card does nothing
-   (no navigation, no error) rather than falling back to the session's
-   detail-page URL.
-7. **Transition to ended.** With a session already `live`, mock
-   `getMediaStatus` to report it inactive again. Confirm the card
-   immediately rotates out of the row (no page refresh, no waiting for the
-   scheduled-`endTimeUtc` fallback timer) as soon as the next poll tick
-   observes the change.
-8. **Under-run.** A session's scheduled window hasn't ended yet, but MR
-   reports it inactive (ended early). Confirm the card is removed
-   immediately on the next poll tick, not held on screen until the
-   scheduled end time.
-9. **Post-run.** A session's scheduled end time passes while MR still
-   reports it active. Confirm the card is **not** removed by the
-   scheduled-end fallback timer while MR still says active — it should
-   only rotate out once a poll tick actually observes the transition to
-   inactive.
-10. **Non-MR (YouTube-style) session.** A session with no `mrStreamId`
-    should never trigger any `getMediaStatus` request, and should
-    transition `upcoming`→`live`→(removed) purely on its baked-in
-    `startTimeUtc`/`endTimeUtc`, matching §4's original design exactly.
-11. **Scroll position preserved.** Scroll the carousel partway, then
-    trigger any state-changing update (favorite another session in another
-    tab/component sharing the signals, or let an MR poll tick fire).
-    Confirm the carousel's scroll position is unchanged after the
-    re-render — the user is not yanked back to the start.
-12. **Multiple MR sessions, mixed states.** Author 3+ MR sessions with
-    staggered start times and independently mock each one active/inactive
-    at different times. Confirm each card's state, badge, and click target
-    update independently and correctly as its own `mrStreamId` changes,
-    without affecting unrelated cards' rendered state.
-13. **Cleanup.** Navigate away from / remove the block from the DOM (or
-    trigger its `_upcomingSessionsCleanup`) while a poll interval and
-    pending per-session start timers are active. Confirm no further
-    `getMediaStatus` requests fire afterward (interval and timers are
-    actually cleared, not just the reference dropped).
+5. **MR session removed the instant it's confirmed started.** Mock
+   `getMediaStatus` to flip a due MR session to active. Confirm, without
+   reloading the page: the card is removed immediately (no live badge
+   ever appears), and no further `getMediaStatus` request is made for that
+   session's `mrStreamId` afterward.
+6. **Non-MR session removed purely by start time.** Author a session with
+   no `mrStreamId`. Confirm it never triggers any `getMediaStatus`
+   request, and its card is removed the instant its scheduled start time
+   passes (check both the live `setTimeout` case and the
+   `visibilitychange` recompute case — background the tab past the start
+   time, then refocus and confirm the card is gone).
+7. **All MR sessions resolved stops the interval.** With every MR session
+   in the row confirmed started, confirm no further `getMediaStatus`
+   requests fire at all (the poll interval is cleared automatically).
+8. **Removed sessions don't come back.** After a session is removed
+   (either path), trigger an unrelated re-render (favorite/schedule a
+   different session). Confirm the removed session's card does not
+   reappear.
+9. **Scroll position preserved.** Scroll the carousel partway, then let a
+   removal or an unrelated favorite/schedule update fire. Confirm scroll
+   position is unchanged afterward.
+10. **Multiple MR sessions, independent resolution.** Author 3+ MR
+    sessions with staggered start times and independently mock each one
+    active at different times. Confirm each is removed independently, at
+    the correct time, without affecting unrelated cards.
+11. **Cleanup.** Remove the block from the DOM (or trigger its
+    `_upcomingSessionsCleanup`) while a poll interval and pending
+    per-session start timers are active. Confirm no further
+    `getMediaStatus` requests fire afterward.
 
 ### 13. Card surface color — token-driven, supports both light and dark (implemented)
 
@@ -727,7 +695,6 @@ applies here too). Manual steps:
 - Does the channel/tag filter concept from earlier drafts still matter now
   that selection happens via the Configurator's own search/pick UI, or is
   it fully superseded by "author searches and picks directly"?
-- **"Live Now" badge copy and styling** — pending design (per ticket).
 - **Analytics attribution** — should favorite/schedule/watch actions
   originating from this component be distinguished from the same actions
   taken within Session Guide, or tracked as the same event regardless of
@@ -744,10 +711,9 @@ applies here too). Manual steps:
 | Card limit | Soft authoring guideline `N` (default 9), not runtime-enforced | No runtime fetch exists to size a request against; it's just how many the author put in the array |
 | LCP handling | No special handling needed | Decoration has no fetch — nothing to defer or sequence against hero LCP |
 | `upcoming`→`live` transition | Local per-card timer keyed to baked-in `startTimeUtc` | Simple, no fetch to protect, background-tab safeguard via `visibilitychange` recompute |
-| `live`→`on-demand` transition | Driven by shared live-poll signal, not baked-in `endTimeUtc` | Sessions under-run/post-run; scheduled end time alone is unreliable for the true end |
-| New poll ownership | None — subscribe to an existing shared live-poll (e.g. from `sessions-guide`) | Avoid duplicating live-poll infrastructure that already exists elsewhere on the page |
-| Click destination by state | `upcoming` → Session Guide modal (session detail); `live` → resolved Watch URL, not Session Guide; `on-demand` → unreachable | Per ticket: live sessions route to the watch experience, not back into Session Guide |
-| Click-time state recompute | Always recompute via `deriveSessionState` + current live-poll snapshot at click, never reuse render-time state | Session can cross a state boundary (including under/post-run) between paint and click |
+| `upcoming`→removed transition (§12) | Non-MR: removed at scheduled start time. MR: removed only on Mobile Rider poll confirmation, never by scheduled time | Design update — this component never shows a `live` state; a session's card disappears the instant it starts instead of switching state |
+| MR poll ownership | This block's own direct poll (`MobileRiderController`), not the shared/mocked `session-store.js` signal | The shared signal is permanently mocked/empty; a direct poll is the only way to get real MR confirmation today |
+| Click destination | Always the Session Guide modal (session detail) — the only card state that ever renders | Per §12's design update: there's no `live`/`on-demand` state left to route differently for |
 | Component scope | Single instance per page, marquee-only | Standalone blade placement is an explicit future enhancement, out of scope now |
 | Show/hide behavior | Manual authoring/ops toggle only; component renders gracefully with fewer than `N` cards, never auto-hides | Per ticket: not intended for a thin session pool, but the system must not decide that |
 | Favorite/Schedule contract | Match Session Guide's persisted state and sign-in prompt flow exactly; `live` state hides/disables Add to Schedule, keeps Favorite active | Per ticket: consistent behavior with Session Guide; a live session can't be scheduled |

@@ -1,14 +1,12 @@
 import { createTag } from '../../../utils/utils.js';
-import { deriveSessionState } from '../../../utils/session-state.js';
 import {
   favorited,
   scheduled,
   pendingActions,
-  liveStreamActiveIds,
   initSessionState,
 } from '../../../utils/session-store.js';
 import { scheduleWithFeedback, favoriteWithFeedback } from '../../../services/sessions/action-feedback.js';
-import { setSessionParam, safeUrl } from '../../../blocks/sessions-guide/utils/url.js';
+import { setSessionParam } from '../../../blocks/sessions-guide/utils/url.js';
 import MobileRiderController from '../../../services/sessions/mobile-rider-controller.js';
 
 const ROTATE_OUT_MS = 350;
@@ -34,16 +32,15 @@ function now() {
   return TIMING_OVERRIDE_OFFSET_MS === null ? Date.now() : Date.now() + TIMING_OVERRIDE_OFFSET_MS;
 }
 
-// session-store.js's own liveStreamActiveIds is currently backed by a mocked
-// fetchLiveStatus() (services/sessions/mobile-rider.js — always returns
-// everything inactive), so it can never report a session live yet. Poll the
-// real Mobile Rider endpoint directly instead, via the real
-// MobileRiderController (services/sessions/mobile-rider-controller.js, hits
-// overlay-admin-integration.mobilerider.com). Kept as our own local Set,
-// merged with the shared signal below, so this starts working for free if
-// the shared mock is ever replaced with a real implementation.
+// This block never displays a "live" state — the instant a session starts,
+// its card is removed (see scheduleStateTimers for non-MR sessions,
+// startMobileRiderPolling for MR sessions) rather than switching to a live
+// badge/routing. session-store.js's own shared liveStreamActiveIds signal is
+// irrelevant here for the same reason — polls the real Mobile Rider endpoint
+// directly instead, via the real MobileRiderController
+// (services/sessions/mobile-rider-controller.js, hits
+// overlay-admin-integration.mobilerider.com).
 const mobileRiderController = new MobileRiderController();
-const mrActiveIds = new Set();
 
 // scheduleWithFeedback/favoriteWithFeedback need an eventConfig for registration-required
 // copy and conflict-modal gating. This block has no authored config surface for those yet
@@ -65,37 +62,13 @@ const ICON_HEART_FILLED = '<svg width="20" height="20" viewBox="0 0 20 20" fill=
 const ICON_HEART_OUTLINE = '<svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false"><path d="M10 18C9.51124 18 9.02247 17.8398 8.61427 17.5195C7.02833 16.2754 3.41163 13.0078 2.23976 11.0908C1.30714 9.56542 0.986826 7.67772 1.38283 6.04198C1.72267 4.63768 2.54494 3.50487 3.76125 2.76366C5.13527 1.92479 6.7842 1.76659 8.06301 2.35057C8.72317 2.65233 9.42629 3.17772 9.99172 3.77147C10.5698 3.14159 11.2647 2.63182 11.959 2.34178C13.2705 1.79002 14.9116 1.95408 16.2393 2.76366C17.4551 3.50487 18.2774 4.63768 18.6172 6.04198C19.0132 7.67772 18.6929 9.56542 17.7603 11.0908C16.5908 13.0039 12.9732 16.2734 11.3858 17.5195C10.9781 17.8398 10.4888 18 10 18ZM6.38722 3.49901C5.78077 3.49901 5.13185 3.68456 4.54201 4.04491C3.67287 4.57421 3.08498 5.38671 2.84084 6.39452C2.53615 7.65233 2.79006 9.11522 3.51906 10.3076C4.47218 11.8662 7.66847 14.8711 9.54006 16.3398C9.81057 16.5527 10.189 16.5527 10.4595 16.3398C12.333 14.8691 15.5298 11.8633 16.4805 10.3076C17.21 9.11523 17.4639 7.65234 17.1592 6.39452C16.9151 5.38671 16.3272 4.57421 15.4585 4.04491C14.5327 3.48046 13.4136 3.35839 12.5386 3.7246C11.8565 4.01073 11.1055 4.6621 10.6245 5.38476C10.3462 5.80273 9.65385 5.80273 9.37553 5.38476C8.94047 4.73144 8.12651 4.02929 7.43998 3.71581C7.12162 3.5703 6.7627 3.49901 6.38722 3.49901Z" fill="currentColor"/></svg>';
 const ICON_ARROW_RIGHT = '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false"><path d="M3.5 8H12.5M12.5 8L8.5 4M12.5 8L8.5 12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 
-/** Adapts a raw catalog session object into the shape `deriveSessionState` expects. */
-function toDerivedInput(session) {
+/** ISO start/end for session-actions.js/session-store.js, which expect UTC strings, not millis. */
+function toIsoTimes(session) {
   const { sessionTime } = session;
   return {
     startTimeUtc: sessionTime ? new Date(sessionTime.startTimeMillis).toISOString() : null,
     endTimeUtc: sessionTime ? new Date(sessionTime.endTimeMillis).toISOString() : null,
-    // If the authored session has a Mobile Rider id, deriveSessionState's
-    // MR branch kicks in and checks the merged active-ids set below instead
-    // of the pure time-window fallback.
-    mrStreamId: session.mrStreamId,
   };
-}
-
-function liveActiveIds() {
-  return new Set([...liveStreamActiveIds.value, ...mrActiveIds]);
-}
-
-/**
- * Wraps deriveSessionState for this block's own needs: for an MR session,
- * deriveSessionState reports 'on-demand' the moment the scheduled start time
- * passes without MR confirming active (its "no real end signal yet" fallback
- * — reasonable for Session Guide's own On Demand view, wrong here). Until MR
- * actually confirms the stream is live, keep routing/behaving as 'upcoming'
- * (session-guide) rather than treating the card as ended. The card only
- * leaves the row via scheduleStateTimers's scheduled-end-time removal, or
- * once MR genuinely reports active (-> 'live', watch/broadcast routing).
- */
-function currentState(session) {
-  const state = deriveSessionState(toDerivedInput(session), liveActiveIds(), now());
-  if (session.mrStreamId && state === 'on-demand') return 'upcoming';
-  return state;
 }
 
 function formatTimeRange(session) {
@@ -120,35 +93,28 @@ function primaryCategory(session) {
 
 /** session-store/session-actions expect `.id`/`.rfCode`/`.startTimeUtc`/`.endTimeUtc`. */
 function toRfSession(session) {
-  const derived = toDerivedInput(session);
+  const { startTimeUtc, endTimeUtc } = toIsoTimes(session);
   return {
     id: session.sessionId,
     rfCode: session.sessionCode,
-    startTimeUtc: derived.startTimeUtc,
-    endTimeUtc: derived.endTimeUtc,
+    startTimeUtc,
+    endTimeUtc,
     title: session.enTitle,
     track: session.track,
   };
 }
 
 /**
- * Pure decision for what a card click should do, given the session's current
- * state. Kept separate from the actual navigation effect so it's testable
- * without touching browser navigation APIs.
- * @returns {{ type: 'session-guide', sessionId: string } | { type: 'watch', url: string } | { type: 'none' }}
+ * Every rendered card is always in the "upcoming" state — this block never
+ * displays a live session; the instant one starts, its card is removed
+ * instead (scheduleStateTimers for non-MR sessions, startMobileRiderPolling
+ * for MR sessions), so a click can only ever mean "open the Session Guide
+ * detail view". Kept as its own function, mirroring sessions-guide's own
+ * click-decision pattern, so it stays independently testable.
+ * @returns {{ type: 'session-guide', sessionId: string }}
  */
 export function resolveClickAction(session) {
-  const state = currentState(session);
-  if (state === 'upcoming') return { type: 'session-guide', sessionId: session.sessionId };
-  if (state === 'live') {
-    // Live sessions route to wherever the session is actually streaming
-    // (homepage or Session Broadcast) via the authored watchUrl — never the
-    // session's own detail-page `url`, which isn't a stream destination.
-    const url = safeUrl(session.watchUrl);
-    return url ? { type: 'watch', url } : { type: 'none' };
-  }
-  // 'on-demand' is unreachable by click — the card has already rotated out.
-  return { type: 'none' };
+  return { type: 'session-guide', sessionId: session.sessionId };
 }
 
 /** Mirrors SessionCard/LiveCard's own `?session=` deep-link mechanism in sessions-guide. */
@@ -159,8 +125,7 @@ function openSessionGuideDetail(sessionId) {
 
 function routeCardClick(session) {
   const action = resolveClickAction(session);
-  if (action.type === 'session-guide') openSessionGuideDetail(action.sessionId);
-  else if (action.type === 'watch') window.location.assign(action.url);
+  openSessionGuideDetail(action.sessionId);
 }
 
 /** Builds an sg-icon-btn (same classes/markup shape as sessions-guide's IconButton.js). */
@@ -201,7 +166,6 @@ async function handleFavorite(e, session, isFavorited, btn) {
 
 /** Mirrors sessions-guide's LiveCard/SessionCard markup and classes (sg-live-card family). */
 export function buildCard(session) {
-  const state = currentState(session);
   const isScheduled = scheduled.value.has(session.sessionId);
   const isFavorited = favorited.value.has(session.sessionId);
   const isPending = pendingActions.value.has(session.sessionId);
@@ -217,10 +181,9 @@ export function buildCard(session) {
   const card = createTag('div', {
     class: cardClass,
     'data-session-id': session.sessionId,
-    'data-state': state,
     role: 'button',
     tabindex: '0',
-    'aria-label': `${session.enTitle}, ${state === 'live' ? 'Live Now' : formatTimeRange(session)}`,
+    'aria-label': `${session.enTitle}, ${formatTimeRange(session)}`,
   });
 
   const content = createTag('div', { class: 'sg-live-card__content' }, '', { parent: card });
@@ -238,7 +201,7 @@ export function buildCard(session) {
     createTag('span', { class: 'sg-category-badge__label' }, category, { parent: badge });
   }
 
-  createTag('p', { class: 'sg-live-card__time' }, state === 'live' ? 'Live Now' : formatTimeRange(session), { parent: meta });
+  createTag('p', { class: 'sg-live-card__time' }, formatTimeRange(session), { parent: meta });
 
   // Sibling of .sg-live-card__content, not nested inside it — matches the Figma
   // structure (Frame 2147229141 text block + Frame 2147228840 icon column as
@@ -246,17 +209,15 @@ export function buildCard(session) {
   const actions = createTag('div', { class: 'sg-live-card__actions' }, '', { parent: card });
   actions.addEventListener('click', (e) => e.stopPropagation());
 
-  if (state !== 'live') {
-    const scheduleBtn = buildIconButton({
-      iconSvg: isScheduled ? ICON_CALENDAR_CHECK : ICON_CALENDAR_PLUS,
-      label: isScheduled ? 'Remove from schedule' : 'Add to schedule',
-      pressed: isScheduled,
-      disabled: isPending,
-      extraClass: 'sg-live-card__btn--schedule',
-      onClick: (e) => handleSchedule(e, session, isScheduled, scheduleBtn),
-    });
-    actions.append(scheduleBtn);
-  }
+  const scheduleBtn = buildIconButton({
+    iconSvg: isScheduled ? ICON_CALENDAR_CHECK : ICON_CALENDAR_PLUS,
+    label: isScheduled ? 'Remove from schedule' : 'Add to schedule',
+    pressed: isScheduled,
+    disabled: isPending,
+    extraClass: 'sg-live-card__btn--schedule',
+    onClick: (e) => handleSchedule(e, session, isScheduled, scheduleBtn),
+  });
+  actions.append(scheduleBtn);
 
   const favoriteBtn = buildIconButton({
     iconSvg: isFavorited ? ICON_HEART_FILLED : ICON_HEART_OUTLINE,
@@ -333,30 +294,29 @@ function renderTrack(track, sessions) {
   track.scrollLeft = scrollLeft;
 }
 
-function scheduleStateTimers(el, track, sessions) {
+/**
+ * Non-MR (e.g. YouTube) sessions rely purely on the baked-in scheduled start
+ * time — the instant it passes, the card is dropped entirely (this block
+ * never shows a live state). MR sessions are explicitly excluded here: their
+ * removal is owned solely by startMobileRiderPolling's poll confirmation,
+ * not by scheduled time, since MR is the authoritative "has this session
+ * actually started" signal for them.
+ */
+function scheduleStateTimers(sessions, dropSession) {
   const timers = [];
 
   sessions.forEach((session) => {
+    if (session.mrStreamId) return;
     const { sessionTime } = session;
     if (!sessionTime) return;
 
-    // upcoming -> live: simple scheduled timer against the baked-in start time.
     const untilStart = sessionTime.startTimeMillis - now();
     if (untilStart > 0) {
-      timers.push(setTimeout(() => renderTrack(track, sessions), untilStart));
-    }
-
-    // live/upcoming -> on-demand: rotate out once the scheduled end passes.
-    // For a non-MR (e.g. YouTube) session this is the only end signal there
-    // is — start/end time is authoritative. For an MR session this is just a
-    // fallback safety net; the real end signal is startMobileRiderPolling's
-    // active -> inactive transition (onMobileRiderEnded), which fires
-    // independently of this timer and usually removes the card first.
-    const untilEnd = sessionTime.endTimeMillis - now();
-    if (untilEnd > 0) {
-      timers.push(setTimeout(() => removeCard(el, session.sessionId), untilEnd));
-    } else if (currentState(session) === 'on-demand') {
-      removeCard(el, session.sessionId);
+      timers.push(setTimeout(() => dropSession(session.sessionId), untilStart));
+    } else {
+      // Already past its start (e.g. a long-backgrounded tab recomputing on
+      // visibilitychange) — drop immediately rather than missing the window.
+      dropSession(session.sessionId);
     }
   });
 
@@ -394,25 +354,30 @@ function readSectionMetadata(el, key) {
 /**
  * Polls the real Mobile Rider endpoint (services/sessions/mobile-rider-
  * controller.js) for any authored session that has an mrStreamId, rather
- * than relying on session-store.js's currently-mocked poller. Keeps
- * polling every MR_POLL_INTERVAL_MS once a session's own scheduled start time
- * arrives — never before — since MR has nothing to report on a session that
- * hasn't started yet, and polls continue afterward (a session can go
- * active/inactive more than once: under-run before the real start, post-run
- * lingering after).
+ * than relying on session-store.js's currently-mocked poller. Starts polling
+ * a given session only once its own scheduled start time arrives — never
+ * before — since MR has nothing to report on a session that hasn't started
+ * yet.
  *
- * `onEnded(endedIds)` fires with the mrStreamIds that just flipped from
- * active -> inactive — MR's only real "this session is actually done"
- * signal, independent of the scheduled-end-time fallback timer.
+ * This block never shows a "live" state: the first time MR confirms a
+ * session has actually started, `onStarted(startedIds)` fires with the
+ * mrStreamIds that just went active, the card is removed, and that
+ * session's mrStreamId is permanently excluded from all future polling —
+ * there's nothing further to check for it once it's been dropped. Once
+ * every MR session has been resolved this way, the interval itself is
+ * cleared automatically.
  */
-function startMobileRiderPolling(sessions, onEnded) {
+function startMobileRiderPolling(sessions, onStarted) {
   const mrSessions = sessions.filter((s) => s.mrStreamId);
   if (!mrSessions.length) return null;
+
+  const resolvedIds = new Set();
+  let intervalId = null;
 
   function dueIds(nowMs) {
     return [...new Set(
       mrSessions
-        .filter((s) => (s.sessionTime?.startTimeMillis ?? 0) <= nowMs)
+        .filter((s) => !resolvedIds.has(s.mrStreamId) && (s.sessionTime?.startTimeMillis ?? 0) <= nowMs)
         .map((s) => s.mrStreamId),
     )];
   }
@@ -422,13 +387,14 @@ function startMobileRiderPolling(sessions, onEnded) {
     if (!ids.length) return;
     try {
       const { active } = await mobileRiderController.getMediaStatus(ids);
-      const nextActive = new Set(active);
-      const endedIds = ids.filter((id) => mrActiveIds.has(id) && !nextActive.has(id));
-      const gainedIds = ids.some((id) => nextActive.has(id) && !mrActiveIds.has(id));
-      if (!endedIds.length && !gainedIds) return;
-      ids.forEach((id) => mrActiveIds.delete(id));
-      nextActive.forEach((id) => mrActiveIds.add(id));
-      onEnded(endedIds);
+      const startedIds = ids.filter((id) => active.includes(id));
+      if (!startedIds.length) return;
+      startedIds.forEach((id) => resolvedIds.add(id));
+      onStarted(startedIds);
+      if (intervalId && mrSessions.every((s) => resolvedIds.has(s.mrStreamId))) {
+        clearInterval(intervalId);
+        intervalId = null;
+      }
     } catch (error) {
       window.lana?.log(`upcoming-sessions: mobile rider poll failed: ${error.message}`);
     }
@@ -443,11 +409,11 @@ function startMobileRiderPolling(sessions, onEnded) {
     .map((untilStart) => setTimeout(tick, untilStart));
 
   tick();
-  const intervalId = setInterval(tick, MR_POLL_INTERVAL_MS);
+  intervalId = setInterval(tick, MR_POLL_INTERVAL_MS);
 
   return () => {
     startTimers.forEach(clearTimeout);
-    clearInterval(intervalId);
+    if (intervalId) clearInterval(intervalId);
   };
 }
 
@@ -499,29 +465,26 @@ async function decorate(el) {
 
   el.append(track);
 
-  let timers = scheduleStateTimers(el, track, sessions);
-
-  // session-store.js's shared liveStreamActiveIds is currently backed by a
-  // mocked fetchLiveStatus() that never reports anything active/ended — kept
-  // subscribed so this starts reacting for free once that mock is replaced.
-  function onLiveSignalChange() {
-    renderTrack(track, sessions);
+  // Cards are removed permanently as sessions start (never shown live) — drop
+  // a session from both the DOM and this list together so a later full
+  // re-render (favorited/scheduled/pending changes) can't resurrect it.
+  function dropSession(sessionId) {
+    removeCard(el, sessionId);
+    sessions = sessions.filter((session) => session.sessionId !== sessionId);
   }
 
-  // Real MR end signal: a session that was active and just flipped inactive
-  // (post-run) is genuinely over — remove it immediately rather than waiting
-  // on the scheduled-end-time fallback timer.
-  function onMobileRiderEnded(endedIds) {
-    if (endedIds.length) {
-      sessions
-        .filter((session) => endedIds.includes(session.mrStreamId))
-        .forEach((session) => removeCard(el, session.sessionId));
-    }
-    renderTrack(track, sessions);
+  let timers = scheduleStateTimers(sessions, dropSession);
+
+  // MR confirms a session has actually started -> remove its card and stop
+  // polling it (startMobileRiderPolling already excludes resolved ids from
+  // future polls); this block never shows a live state in between.
+  function onSessionsStarted(startedIds) {
+    sessions
+      .filter((session) => startedIds.includes(session.mrStreamId))
+      .forEach((session) => dropSession(session.sessionId));
   }
 
-  const unsubscribeLive = liveStreamActiveIds.subscribe(onLiveSignalChange);
-  const stopMobileRiderPolling = startMobileRiderPolling(sessions, onMobileRiderEnded);
+  const stopMobileRiderPolling = startMobileRiderPolling(sessions, onSessionsStarted);
   const unsubscribeFavorited = favorited.subscribe(() => renderTrack(track, sessions));
   const unsubscribeScheduled = scheduled.subscribe(() => renderTrack(track, sessions));
   const unsubscribePending = pendingActions.subscribe(() => renderTrack(track, sessions));
@@ -529,7 +492,7 @@ async function decorate(el) {
   function onVisibilityChange() {
     if (document.visibilityState !== 'visible') return;
     timers.forEach(clearTimeout);
-    timers = scheduleStateTimers(el, track, sessions);
+    timers = scheduleStateTimers(sessions, dropSession);
     renderTrack(track, sessions);
   }
   document.addEventListener('visibilitychange', onVisibilityChange);
@@ -537,7 +500,6 @@ async function decorate(el) {
   el._upcomingSessionsCleanup = () => {
     timers.forEach(clearTimeout);
     if (stopMobileRiderPolling) stopMobileRiderPolling();
-    unsubscribeLive();
     unsubscribeFavorited();
     unsubscribeScheduled();
     unsubscribePending();
