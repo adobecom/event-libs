@@ -110,6 +110,15 @@ const ConfigsProvider = ({ children }) => {
     });
   }, []);
 
+  // Sets a single top-level config field (e.g. allowDoubleBooking,
+  // featuredSessions) immutably, so the Config JSON preview stays in sync.
+  const updateConfigField = useCallback((key, value) => {
+    setActiveConfig((prev) => {
+      if (!prev) return prev;
+      return { ...prev, config: { ...prev.config, [key]: value } };
+    });
+  }, []);
+
   const saveActiveConfig = useCallback(async () => {
     if (!activeConfig || !org || !repo) return { ok: false };
     const result = await upsertConfigController(org, repo, activeConfig);
@@ -161,6 +170,7 @@ const ConfigsProvider = ({ children }) => {
     startEditConfig,
     clearActiveConfig,
     updateTrackIcon,
+    updateConfigField,
     saveActiveConfig,
     removeConfig,
   };

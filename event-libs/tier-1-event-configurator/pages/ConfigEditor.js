@@ -9,7 +9,8 @@ import TrackIconEditor from '../components/TrackIconEditor.js';
 export default function ConfigEditor() {
   const { goToLibrary } = useNavigation();
   const {
-    activeConfig, saveActiveConfig, clearActiveConfig, updateTrackIcon, setToastSuccess, setToastError,
+    activeConfig, saveActiveConfig, clearActiveConfig, updateTrackIcon, updateConfigField,
+    setToastSuccess, setToastError,
   } = useConfigs();
 
   const [sessions, setSessions] = useState([]);
@@ -96,7 +97,15 @@ export default function ConfigEditor() {
 
       <section class="tec-editor__section">
         <h2>Allow double booking</h2>
-        <p class="tec-editor__placeholder">Coming soon (PLAN.md Phase 2).</p>
+        <p>Lets an attendee schedule sessions that overlap in time on this event's Tier 1 surfaces.</p>
+        <label class="tec-editor__checkbox">
+          <input
+            type="checkbox"
+            checked=${!!activeConfig.config.allowDoubleBooking}
+            onChange=${(e) => updateConfigField('allowDoubleBooking', e.target.checked)}
+          />
+          Allow double booking
+        </label>
       </section>
 
       <section class="tec-editor__section">

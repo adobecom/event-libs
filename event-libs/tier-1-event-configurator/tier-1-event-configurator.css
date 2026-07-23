@@ -273,6 +273,14 @@
   font-style: italic;
 }
 
+.tec-editor__checkbox {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
 .tec-editor__error {
   color: var(--tec-color-error);
 }

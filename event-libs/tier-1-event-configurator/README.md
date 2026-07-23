@@ -10,11 +10,20 @@ See [PLAN.md](./PLAN.md) for the full design, decisions, and phase breakdown
 
 ## Status
 
-Phases 1a–1e are implemented: DA SDK auth, config-library sheet CRUD, the
-library list view (search/Edit/Duplicate/Delete/Copy config), the ESP event
-picker + session fetch, and the track icon/color editor. Phase 2
-(allow-double-booking) and Phase 3 (featured sessions) are still open —
-their sections in the editor currently show a "coming soon" placeholder.
+Phases 1a–1e and Phase 2 are implemented: DA SDK auth, config-library sheet
+CRUD, the library list view (search/Edit/Duplicate/Delete/Copy config), the
+ESP event picker + session fetch (currently gated off in favor of a manual
+Event ID entry fallback — see the CORS status below), the track icon/color
+editor, and the allow-double-booking toggle. Phase 3 (featured sessions) is
+still open — its section in the editor currently shows a "coming soon"
+placeholder.
+
+**Phase 2 scope note:** this app only adds the `allowDoubleBooking` boolean
+to the form/Config JSON. The consuming-side wiring (renaming
+`track-icon-config.js` to a broader singleton, wiring `scheduleAction`'s
+`showConflictModal` param, retiring sessions-guide's per-block
+`show-conflict-modal` table row) is explicitly MWPW-200314's territory, per
+PLAN.md §6 — not built here.
 
 **Track icon editor implementation note:** `event-libs/v1/utils/track-icon-config.js`
 (the real `DEFAULT_TRACK_ICON_CONFIG`/`getTrackIcon()`) and
