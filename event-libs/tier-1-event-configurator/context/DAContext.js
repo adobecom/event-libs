@@ -1,7 +1,7 @@
 import { createContext, useState, useContext, useEffect } from '../../v1/deps/htm-preact.js';
 import { html } from '../htm-wrapper.js';
 import { setDaToken, setDaFetch } from '../scripts/da-controller.js';
-// import { setEspAuthToken } from '../../v1/utils/esp-controller.js';
+import { setEspAuthToken } from '../../v1/utils/esp-controller.js';
 
 const DAContext = createContext();
 
@@ -22,13 +22,14 @@ const DAProvider = ({ children }) => {
         setRepo(context?.repo);
         setDaToken(sdkToken);
         if (actions?.daFetch) setDaFetch(actions.daFetch);
-        // TEMP DIAGNOSTIC (2026-07-22): setEspAuthToken(sdkToken) disabled to
-        // test whether ESP calls going out with NO Authorization header (a
-        // "simple" CORS request, no preflight) behave differently than with
-        // one (which forces a preflight). DA-token reuse is otherwise
-        // confirmed working against prod ESP — see PLAN.md — so re-enable
-        // this once the CORS gap is closed, don't leave it off long-term.
-        // setEspAuthToken(sdkToken);
+        // No Milo/IMS bootstrap in this standalone app (no window.adobeIMS),
+        // so ESP calls (listEvents/listAllEvents/getEventSessionCatalog) have
+        // no token at all otherwise. Reuse DA's own token as the Authorization
+        // Bearer — confirmed working against prod ESP via curl (see PLAN.md);
+        // blocked only on a CORS gap on ESP's side (also confirmed via a
+        // no-Authorization diagnostic: CORS fails identically either way, so
+        // it's unconditional, not a preflight-specific issue), not auth.
+        setEspAuthToken(sdkToken);
       } catch (err) {
         window.lana?.log(`DA SDK init error: ${err}`);
         setError('Failed to initialize DA SDK. Please reload the page.');
