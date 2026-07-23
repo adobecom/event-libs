@@ -25,37 +25,15 @@ the in-progress MWPW-200314 branch). Once that rewrite merges to `dev`,
 by importing the shared `fetchSessions(eventId)` instead of hitting ESP
 directly a second time.
 
-**ESP auth — RESOLVED as a CORS gap, not an auth problem.** Early testing
-suggested `/v1/events` needed real IMS auth that this app couldn't provide
-(DA's own token got `401 ErrInvalidOauthToken`; a client-side IMS bootstrap
-via `client_id: 'events-milo'` got CORS-rejected from inside DA's iframe).
-Deeper investigation (internal CGW docs + the actual gateway route config)
-overturned that: `allowedClientIDs` (CGW's client-id allow-list) only
-applies to *service* tokens, never *user* tokens — so no client-id
-mismatch was ever really in play. The decisive test: the same request that
-failed with CORS in the browser **worked fine as a plain `curl`** — proof
-the server-side request (with real auth) succeeds; the browser is just
-being blocked from *reading* the response because ESP doesn't send
-`Access-Control-Allow-Origin` for this route. **Auth already works. The
-actual gap is CORS on `/v1/events` specifically** — likely because no
-auth-requiring ESP route has ever been called directly from a browser
-before (every existing browser call goes through ESL, or hits ESP's fully
-public routes like `session-catalog`).
+**ESP auth is confirmed working — the real gap is CORS, and it's already tracked.** `setEspAuthToken()` (wired from `DAContext.js`, reusing DA's own token) is proven correct: a `curl` replaying the app's exact request, including its `Authorization` header, against **prod** ESP returned real data. The only reason this doesn't yet work end-to-end from the browser is CORS — confirmed unrelated to auth or request shape (fails identically with or without the `Authorization` header).
 
-**DA-token reuse (`setEspAuthToken()`, wired from `DAContext.js`) is
-confirmed working, not just a best-effort guess.** The `curl` that proved
-CORS was the blocker replayed the exact request the app sends — including
-its `Authorization` header, i.e. DA's own token — against **prod** ESP,
-and got real data back. That's direct evidence DA's token is genuinely
-accepted there. (The earlier `401 ErrInvalidOauthToken` was against the
-**Dev** CGW tier specifically, which behaves differently — not proof DA's
-token is fundamentally wrong for ESP.) No further auth changes needed here
-— once CORS is enabled on `/v1/events`, this should work end-to-end as-is.
-**The ESP event picker (Phase 1d) still cannot fetch real events from the
-browser** until
-ESP's `/v1/events` route gets CORS enabled for this app's origin(s) — a
-scoped ask to the ESP/platform team, not a client-side fix. See PLAN.md §5
-for the full investigation trail.
+This isn't a new problem needing a fresh ask: [MWPW-200897](https://jira.corp.adobe.com/browse/MWPW-200897) already tracks it, assigned to Daniel. Confirmed directly from the actual deploy repo (`events-service-platform-deploy`'s `main`):
+- **Prod already whitelists `main--da-events--adobecom.aem.page`/`.live`** (pre-existing) — so once this app's `da-events` loader (PR #41) merges to `main`, CORS should already work with no further platform-team action.
+- **Dev also whitelists `main--da-events--...`** (added by this ticket) alongside its own `dev--da-events--...`.
+- **Stage does not** — an earlier addition was reverted, scoped to Dev only.
+- **No feature branch is whitelisted anywhere** (all entries are exact-string origins, no wildcards) — that's the one real gap, and only for pre-merge testing: needs a single line added to `k8s/helm/Dev/values.yaml` for `worktree-tier-1-event-configurator--da-events--adobecom.aem.page`/`.live`, mirroring the exact pattern already used for `main`.
+
+See PLAN.md §5 for the full investigation trail and sourcing.
 
 ## Architecture
 
