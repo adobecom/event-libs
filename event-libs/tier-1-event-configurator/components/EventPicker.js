@@ -8,7 +8,7 @@ const PUBLISH_FILTERS = ['all', 'published', 'draft'];
 const PUBLISH_FILTER_LABELS = { all: 'All', published: 'Published', draft: 'Draft' };
 
 export default function EventPicker({
-  isOpen, onClose, onSelect, title = 'Select an event',
+  isOpen, onClose, onSelect, onError, title = 'Select an event',
 }) {
   const [events, setEvents] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -25,7 +25,14 @@ export default function EventPicker({
       .then((result) => {
         if (cancelled) return;
         if (!result.ok) {
-          setError(result.error || 'Failed to load events');
+          const message = result.error || 'Failed to load events';
+          setError(message);
+          // Caller (Library.js) treats this as the signal to fail over to
+          // ManualEventLookup for the rest of the session — see its
+          // handleBrowseError. Firing on any failure, not just CORS/auth
+          // ones, keeps that fallback authoritative rather than duplicating
+          // failure-classification logic here.
+          onError?.(message);
           return;
         }
         setEvents(result.data);
@@ -34,7 +41,7 @@ export default function EventPicker({
         if (!cancelled) setIsLoading(false);
       });
     return () => { cancelled = true; };
-  }, [isOpen]);
+  }, [isOpen, onError]);
 
   const filteredEvents = useMemo(() => {
     const term = search.trim().toLowerCase();

@@ -27,6 +27,13 @@ export default function Library() {
   const [pickerMode, setPickerMode] = useState('new'); // 'new' | 'duplicate'
   const [duplicateSource, setDuplicateSource] = useState(null);
   const [rowPendingDelete, setRowPendingDelete] = useState(null);
+  // Official fallback: if the full EventPicker's listAllEvents() call fails
+  // for any reason (CORS, the prod-vs-non-prod auth mismatch documented in
+  // PLAN.md §5, a real outage), fail over to ManualEventLookup for the rest
+  // of the session rather than leaving a broken picker on screen. Sticky
+  // per page load — not per open — so a transient failure doesn't force a
+  // full re-attempt (and likely re-failure) on every click.
+  const [browseFailed, setBrowseFailed] = useState(false);
 
   const filteredConfigs = useMemo(() => {
     const term = search.trim().toLowerCase();
@@ -82,6 +89,11 @@ export default function Library() {
     startDuplicateConfig, startNewConfig, goToEditor, setToastSuccess,
   ]);
 
+  const handleBrowseError = useCallback((message) => {
+    setBrowseFailed(true);
+    window.lana?.log(`tier-1-event-configurator: EventPicker failed, falling back to ManualEventLookup. ${message}`);
+  }, []);
+
   const handleCopyConfig = useCallback(async (row) => {
     const ok = await copyTextToClipboard(JSON.stringify(row.config, null, 2));
     if (ok) setToastSuccess(`Copied config for ${row.eventTitle}`);
@@ -136,12 +148,13 @@ export default function Library() {
         </ul>
       `}
 
-      ${EVENT_BROWSE_ENABLED
+      ${EVENT_BROWSE_ENABLED && !browseFailed
         ? html`
           <${EventPicker} \
             isOpen=${pickerOpen} \
             onClose=${() => setPickerOpen(false)} \
             onSelect=${handlePickEvent} \
+            onError=${handleBrowseError} \
             title=${pickerMode === 'duplicate' ? 'Duplicate config — pick the target event' : 'New config — pick an event'} \
           />
         `
