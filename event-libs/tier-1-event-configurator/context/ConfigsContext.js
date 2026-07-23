@@ -91,6 +91,25 @@ const ConfigsProvider = ({ children }) => {
 
   const clearActiveConfig = useCallback(() => setActiveConfig(null), []);
 
+  // Merges { icon, color } updates into config.trackIcons[track] for the
+  // active config, immutably, so the Config JSON preview (reading
+  // activeConfig.config directly) stays in sync automatically.
+  const updateTrackIcon = useCallback((track, updates) => {
+    setActiveConfig((prev) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        config: {
+          ...prev.config,
+          trackIcons: {
+            ...prev.config.trackIcons,
+            [track]: { ...prev.config.trackIcons?.[track], ...updates },
+          },
+        },
+      };
+    });
+  }, []);
+
   const saveActiveConfig = useCallback(async () => {
     if (!activeConfig || !org || !repo) return { ok: false };
     const result = await upsertConfigController(org, repo, activeConfig);
@@ -141,6 +160,7 @@ const ConfigsProvider = ({ children }) => {
     startDuplicateConfig,
     startEditConfig,
     clearActiveConfig,
+    updateTrackIcon,
     saveActiveConfig,
     removeConfig,
   };

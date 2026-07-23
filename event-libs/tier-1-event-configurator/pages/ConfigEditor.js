@@ -4,11 +4,12 @@ import { getEventSessionCatalog } from '../../v1/utils/esp-controller.js';
 import { useNavigation } from '../context/NavigationContext.js';
 import { useConfigs } from '../context/ConfigsContext.js';
 import { copyTextToClipboard, extractDistinctTracks } from '../utils.js';
+import TrackIconEditor from '../components/TrackIconEditor.js';
 
 export default function ConfigEditor() {
   const { goToLibrary } = useNavigation();
   const {
-    activeConfig, saveActiveConfig, clearActiveConfig, setToastSuccess, setToastError,
+    activeConfig, saveActiveConfig, clearActiveConfig, updateTrackIcon, setToastSuccess, setToastError,
   } = useConfigs();
 
   const [sessions, setSessions] = useState([]);
@@ -80,18 +81,17 @@ export default function ConfigEditor() {
         ${sessionsError && html`<p class="tec-editor__error">${sessionsError}</p>`}
         ${!isLoadingSessions && !sessionsError && html`
           <p>${sessions.length} session(s) found — ${tracks.length} distinct track(s).</p>
-          <div class="tec-editor__tracks">
-            ${tracks.map((track) => html`<span class="tec-editor__track-chip" key=${track}>${track}</span>`)}
-          </div>
         `}
       </section>
 
       <section class="tec-editor__section">
-        <h2>Track icons &amp; colors</h2>
-        <p class="tec-editor__placeholder">
-          Coming soon (PLAN.md Phase 1e) — icon/color assignment per track listed above,
-          falling back to the built-in defaults for tracks with no authored icon yet.
-        </p>
+        <h2>Track icons & colors</h2>
+        <p>Unauthored tracks fall back to the built-in defaults shown here.</p>
+        <${TrackIconEditor}
+          tracks=${tracks}
+          trackIcons=${activeConfig.config.trackIcons}
+          onChange=${updateTrackIcon}
+        />
       </section>
 
       <section class="tec-editor__section">

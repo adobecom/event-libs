@@ -233,18 +233,55 @@
   color: var(--tec-color-error);
 }
 
-.tec-editor__tracks {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
+.tec-track-editor__empty {
+  color: var(--tec-color-text-secondary);
+  font-style: italic;
 }
 
-.tec-editor__track-chip {
-  background: var(--tec-color-background);
+.tec-track-editor__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--tec-spacing-sm);
+}
+
+.tec-track-editor__row {
+  display: flex;
+  align-items: center;
+  gap: var(--tec-spacing-sm);
+}
+
+.tec-track-editor__preview {
+  flex-shrink: 0;
+}
+
+.tec-track-editor__name {
+  flex: 1;
+  min-width: 0;
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tec-track-editor__icon-select {
+  min-width: 220px;
+  padding: 6px 8px;
   border: 1px solid var(--tec-color-border);
-  border-radius: 999px;
-  padding: 4px 12px;
+  border-radius: var(--tec-border-radius);
   font-size: 13px;
+}
+
+.tec-track-editor__color-input {
+  width: 36px;
+  height: 32px;
+  padding: 0;
+  border: 1px solid var(--tec-color-border);
+  border-radius: var(--tec-border-radius);
+  background: none;
+  cursor: pointer;
 }
 
 .tec-editor__config-preview {

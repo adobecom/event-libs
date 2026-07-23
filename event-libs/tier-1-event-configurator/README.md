@@ -10,11 +10,24 @@ See [PLAN.md](./PLAN.md) for the full design, decisions, and phase breakdown
 
 ## Status
 
-Phases 1a–1d are implemented: DA SDK auth, config-library sheet CRUD, the
-library list view (search/Edit/Duplicate/Delete/Copy config), and the ESP
-event picker + session fetch. Phase 1e (track icon/color editor), Phase 2
-(allow-double-booking), and Phase 3 (featured sessions) are still open —
+Phases 1a–1e are implemented: DA SDK auth, config-library sheet CRUD, the
+library list view (search/Edit/Duplicate/Delete/Copy config), the ESP event
+picker + session fetch, and the track icon/color editor. Phase 2
+(allow-double-booking) and Phase 3 (featured sessions) are still open —
 their sections in the editor currently show a "coming soon" placeholder.
+
+**Track icon editor implementation note:** `event-libs/v1/utils/track-icon-config.js`
+(the real `DEFAULT_TRACK_ICON_CONFIG`/`getTrackIcon()`) and
+`event-libs/v1/features/icons/` (`Icon.js`/`icon-resolver.js`/`track-icons.svg`)
+don't exist on `dev` — like `fetchSessions()`, they're part of the
+in-progress MWPW-200314 branch. `default-track-icons.js` and
+`track-icon-sprite.js` here are temporary, self-contained copies of that
+data/sprite (not the shared utility itself, to avoid duplicating the actual
+resolution logic) — consolidate back onto the real ones once that branch
+merges. Also note: Chrome doesn't support cross-document
+`<use href="external.svg#id">` (only Firefox does) — `track-icon-sprite.js`
+fetches and inlines the sprite's `<symbol>` markup instead, same technique
+the real `icon-resolver.js` uses, for the same reason.
 
 **Known interim gap:** the track list shown in the editor comes from a raw
 `getEventSessionCatalog()` call in `event-libs/v1/utils/esp-controller.js`,
