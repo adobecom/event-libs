@@ -42,11 +42,17 @@ auth-requiring ESP route has ever been called directly from a browser
 before (every existing browser call goes through ESL, or hits ESP's fully
 public routes like `session-catalog`).
 
-`esp-controller.js` still uses DA-token reuse (`setEspAuthToken()`, wired
-from `DAContext.js`) for now — harmless to leave in place, since the token
-itself is valid, real auth (confirmed via curl); it just needs the CORS
-gap closed on ESP's side to start working end-to-end. **The ESP event
-picker (Phase 1d) still cannot fetch real events from the browser** until
+**DA-token reuse (`setEspAuthToken()`, wired from `DAContext.js`) is
+confirmed working, not just a best-effort guess.** The `curl` that proved
+CORS was the blocker replayed the exact request the app sends — including
+its `Authorization` header, i.e. DA's own token — against **prod** ESP,
+and got real data back. That's direct evidence DA's token is genuinely
+accepted there. (The earlier `401 ErrInvalidOauthToken` was against the
+**Dev** CGW tier specifically, which behaves differently — not proof DA's
+token is fundamentally wrong for ESP.) No further auth changes needed here
+— once CORS is enabled on `/v1/events`, this should work end-to-end as-is.
+**The ESP event picker (Phase 1d) still cannot fetch real events from the
+browser** until
 ESP's `/v1/events` route gets CORS enabled for this app's origin(s) — a
 scoped ask to the ESP/platform team, not a client-side fix. See PLAN.md §5
 for the full investigation trail.
