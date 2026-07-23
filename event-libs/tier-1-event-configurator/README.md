@@ -25,38 +25,39 @@ the in-progress MWPW-200314 branch). Once that rewrite merges to `dev`,
 by importing the shared `fetchSessions(eventId)` instead of hitting ESP
 directly a second time.
 
-**ESP auth:** ESP's API Gateway requires a real IMS Bearer token on
-`/v1/events` and `/v1/events/:id/session-catalog` (the route code itself
-has no auth check, but the gateway in front of it does). This app has no
-Milo bootstrap, so reusing DA's own token was tried first and confirmed
-(live test) to fail with `401 ErrInvalidOauthToken` — DA's token is a real
-IMS token, just scoped to DA's own `client_id`, which ESP's gateway doesn't
-accept. `scripts/ims-controller.js` now bootstraps this app's **own** IMS
-session client-side instead, using `client_id: 'events-milo'` (the same
-client real production event-libs pages already use successfully against
-ESP) — riding the same underlying Adobe IMS SSO session a DA login already
-established, so a signed-in user shouldn't see a second login prompt.
-**Verified so far:** graceful degradation with no real Adobe session (IMS
-resolves anonymous, ESP calls go out with no `Authorization` header rather
-than a broken one).
+**ESP auth — blocking, unresolved:** ESP's API Gateway requires a real IMS
+Bearer token on `/v1/events` and `/v1/events/:id/session-catalog` (the
+route code itself has no auth check, but the gateway in front of it does).
+This app has no Milo bootstrap, so it currently reuses DA's own token
+(`esp-controller.js`'s `setEspAuthToken()`, wired from `DAContext.js`) as a
+best-effort `Authorization` header. **Confirmed by live testing this fails**
+with `401 ErrInvalidOauthToken` — DA's token is a real IMS token, just
+scoped to DA's own `client_id`, which ESP's gateway doesn't accept.
 
-**Bug found and fixed via live testing:** the first real test (real
-signed-in session, via `?ref=local`) came back with no `Authorization`
-header at all, and IMS's own token-check hit `stg1` with
-`invalid_credentials`. Cause: `environment` was wrongly derived from
-`getEventServiceEnv()` (the ESP *backend* env) instead of being a fixed
-`'prod'` — a real Adobe SSO session lives on prod IMS regardless of which
-ESP backend the picker happens to be querying data from. Fixed by hardcoding
-`IMS_ENVIRONMENT = 'prod'` in `ims-controller.js`, decoupled from ESP env
-entirely. **Not yet re-verified live after this fix.**
+An alternative was tried and reverted: bootstrapping this app's own IMS
+session client-side via `client_id: 'events-milo'` (the same client real
+production event-libs pages use successfully against ESP), mirroring
+Milo/DA's own `imslib.min.js` mechanism. Live-tested from both `localhost`
+(via `?ref=local`) and a real deployed `*.aem.live` branch — **identical
+CORS rejection from IMS itself in both cases**, ruling out an origin
+allow-list problem. The common factor across every failed attempt: this
+app always runs inside an iframe (DA embeds it), while every known-working
+use of `events-milo` is a top-level page navigation. Working theory: IMS
+rejects the session check when framed, independent of origin (a common
+anti-clickjacking restriction) — DA's own IMS client is presumably
+configured to permit iframe embedding; `events-milo` almost certainly
+isn't. This needs a properly-configured IMS client for iframe-embedded
+apps (existing or newly registered), not a client-side code fix.
 
-**Known open risk if the above fix isn't enough:** `events-milo` is
-registered for real production domains (`*.aem.live` etc.); testing via
-`?ref=local` runs this app on `http://localhost:3000` instead, which IMS
-client origin validation may not allow-list. If a live retest still fails,
-try a real deployed feature-branch URL instead of `?ref=local` to isolate
-"wrong IMS env" from "disallowed local origin." See PLAN.md §5 for the full
-writeup.
+**Current state:** reverted to DA-token reuse rather than the `events-milo`
+bootstrap, since it at least sidesteps the iframe/CORS problem (no extra
+IMS network call — it just forwards the token DA's own handshake already
+provided) and its failure mode (gateway rejects the token outright) is more
+tractable than fighting IMS's iframe restrictions client-side. **The ESP
+event picker (Phase 1d) still cannot fetch real events** until either
+ESP's gateway is configured to accept a DA-issued token, or a suitable IMS
+client is found/registered for this iframe-embedded context. See PLAN.md
+§5 for the full writeup.
 
 ## Architecture
 

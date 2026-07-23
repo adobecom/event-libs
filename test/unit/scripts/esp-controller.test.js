@@ -42,6 +42,25 @@ describe('Adobe Event Service API', () => {
       expect(options).to.have.property('method', 'GET');
       expect(options.headers.get('Authorization')).to.equal('Bearer fake-token');
     });
+
+    it('should prefer the setEspAuthToken override over window.adobeIMS', async () => {
+      window.adobeIMS = { getAccessToken: () => ({ token: 'ims-token' }) };
+      api.setEspAuthToken('override-token');
+      try {
+        const options = await api.constructRequestOptions('GET');
+        expect(options.headers.get('Authorization')).to.equal('Bearer override-token');
+      } finally {
+        api.setEspAuthToken(null);
+      }
+    });
+
+    it('should fall back to window.adobeIMS once the override is cleared', async () => {
+      window.adobeIMS = { getAccessToken: () => ({ token: 'ims-token' }) };
+      api.setEspAuthToken('override-token');
+      api.setEspAuthToken(null);
+      const options = await api.constructRequestOptions('GET');
+      expect(options.headers.get('Authorization')).to.equal('Bearer ims-token');
+    });
   });
 
   describe('getEvent', () => {
@@ -342,10 +361,6 @@ describe('Adobe Event Service API', () => {
   });
 
   describe('listEvents', () => {
-    beforeEach(() => {
-      window.adobeIMS = { getAccessToken: () => ({ token: 'fake-token' }) };
-    });
-
     it('should fetch a page of events', async () => {
       sandbox.stub(window, 'fetch').resolves({
         json: () => ({ events: [{ eventId: '1' }], nextPageToken: 'tok-2' }),
@@ -377,10 +392,6 @@ describe('Adobe Event Service API', () => {
   });
 
   describe('listAllEvents', () => {
-    beforeEach(() => {
-      window.adobeIMS = { getAccessToken: () => ({ token: 'fake-token' }) };
-    });
-
     it('should walk every page until nextPageToken is exhausted', async () => {
       const fetchStub = sandbox.stub(window, 'fetch');
       fetchStub.onCall(0).resolves({
@@ -420,10 +431,6 @@ describe('Adobe Event Service API', () => {
   });
 
   describe('getEventSessionCatalog', () => {
-    beforeEach(() => {
-      window.adobeIMS = { getAccessToken: () => ({ token: 'fake-token' }) };
-    });
-
     it('should fetch the raw session catalog for an event', async () => {
       sandbox.stub(window, 'fetch').resolves({
         json: () => ({ sessions: [{ sessionId: 's-1' }] }),

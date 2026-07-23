@@ -49,6 +49,16 @@ export function waitForAdobeIMS() {
   });
 }
 
+// Override for callers with no window.adobeIMS at all (e.g. the standalone
+// tier-1-event-configurator DA app, which has no Milo/IMS bootstrap) — set
+// once a token is available from whatever auth flow that caller has, and
+// every constructRequestOptions() call picks it up automatically.
+let espAuthTokenOverride = null;
+
+export function setEspAuthToken(token) {
+  espAuthTokenOverride = token;
+}
+
 export async function constructRequestOptions(method, body = null, waitForIMS = true) {
   const { miloConfig } = getEventConfig();
   const miloLibs = miloConfig?.miloLibs || LIBS;
@@ -63,7 +73,7 @@ export async function constructRequestOptions(method, body = null, waitForIMS = 
   }
 
   const headers = new Headers();
-  const authToken = window.adobeIMS?.getAccessToken()?.token;
+  const authToken = espAuthTokenOverride || window.adobeIMS?.getAccessToken()?.token;
 
   if (authToken) headers.append('Authorization', `Bearer ${authToken}`);
   headers.append('x-api-key', 'acom_event_service');
@@ -107,13 +117,14 @@ export async function getEvent(eventId) {
 // Single-page ESP events list call, mirroring ESP's own query params
 // (`page-size`, `next-page-token`, `from-date` — epoch ms). The route itself
 // has no auth check, but ESP's API Gateway requires a real IMS Bearer token
-// regardless (confirmed live) — same as every other call in this file, so
-// this waits for window.adobeIMS like the rest (tier-1-event-configurator
-// bootstraps its own IMS session for this; see its ims-controller.js).
+// regardless. tier-1-event-configurator has no window.adobeIMS at all
+// (standalone DA app, no Milo bootstrap) — it feeds setEspAuthToken() the
+// DA SDK's own token instead, so this skips the window.adobeIMS wait other
+// constructRequestOptions callers rely on (it would hang forever here).
 export async function listEvents({ pageSize, nextPageToken, fromDate } = {}) {
   const eventServiceEnv = getEventServiceEnv();
   const { serviceApiEndpoints } = ENV_MAP[eventServiceEnv.name];
-  const options = await constructRequestOptions('GET');
+  const options = await constructRequestOptions('GET', null, false);
 
   const params = new URLSearchParams();
   if (pageSize) params.set('page-size', pageSize);
@@ -197,7 +208,7 @@ export async function listAllEvents({ fromDate } = {}) {
 
 // Raw ESP session-catalog fetch, for callers that need the unmapped session
 // objects (e.g. reading customAttributes directly) rather than sessions-api.js's
-// fully-normalized shape. Same real-IMS-token requirement as listEvents above.
+// fully-normalized shape. Same auth handling as listEvents above.
 //
 // NOTE: sessions-api.js's fetchSessions()/mapEslPayloadToRawSessions() (MWPW-200314,
 // not yet merged to dev as of this writing) hits this same /session-catalog
@@ -207,7 +218,7 @@ export async function listAllEvents({ fromDate } = {}) {
 export async function getEventSessionCatalog(eventId) {
   const eventServiceEnv = getEventServiceEnv();
   const { serviceApiEndpoints } = ENV_MAP[eventServiceEnv.name];
-  const options = await constructRequestOptions('GET');
+  const options = await constructRequestOptions('GET', null, false);
 
   try {
     const response = await fetch(`${serviceApiEndpoints.esp}/v1/events/${eventId}/session-catalog`, options);
