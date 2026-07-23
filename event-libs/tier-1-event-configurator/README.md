@@ -25,39 +25,31 @@ the in-progress MWPW-200314 branch). Once that rewrite merges to `dev`,
 by importing the shared `fetchSessions(eventId)` instead of hitting ESP
 directly a second time.
 
-**ESP auth — blocking, unresolved:** ESP's API Gateway requires a real IMS
-Bearer token on `/v1/events` and `/v1/events/:id/session-catalog` (the
-route code itself has no auth check, but the gateway in front of it does).
-This app has no Milo bootstrap, so it currently reuses DA's own token
-(`esp-controller.js`'s `setEspAuthToken()`, wired from `DAContext.js`) as a
-best-effort `Authorization` header. **Confirmed by live testing this fails**
-with `401 ErrInvalidOauthToken` — DA's token is a real IMS token, just
-scoped to DA's own `client_id`, which ESP's gateway doesn't accept.
+**ESP auth — RESOLVED as a CORS gap, not an auth problem.** Early testing
+suggested `/v1/events` needed real IMS auth that this app couldn't provide
+(DA's own token got `401 ErrInvalidOauthToken`; a client-side IMS bootstrap
+via `client_id: 'events-milo'` got CORS-rejected from inside DA's iframe).
+Deeper investigation (internal CGW docs + the actual gateway route config)
+overturned that: `allowedClientIDs` (CGW's client-id allow-list) only
+applies to *service* tokens, never *user* tokens — so no client-id
+mismatch was ever really in play. The decisive test: the same request that
+failed with CORS in the browser **worked fine as a plain `curl`** — proof
+the server-side request (with real auth) succeeds; the browser is just
+being blocked from *reading* the response because ESP doesn't send
+`Access-Control-Allow-Origin` for this route. **Auth already works. The
+actual gap is CORS on `/v1/events` specifically** — likely because no
+auth-requiring ESP route has ever been called directly from a browser
+before (every existing browser call goes through ESL, or hits ESP's fully
+public routes like `session-catalog`).
 
-An alternative was tried and reverted: bootstrapping this app's own IMS
-session client-side via `client_id: 'events-milo'` (the same client real
-production event-libs pages use successfully against ESP), mirroring
-Milo/DA's own `imslib.min.js` mechanism. Live-tested from both `localhost`
-(via `?ref=local`) and a real deployed `*.aem.live` branch — **identical
-CORS rejection from IMS itself in both cases**, ruling out an origin
-allow-list problem. The common factor across every failed attempt: this
-app always runs inside an iframe (DA embeds it), while every known-working
-use of `events-milo` is a top-level page navigation. Working theory: IMS
-rejects the session check when framed, independent of origin (a common
-anti-clickjacking restriction) — DA's own IMS client is presumably
-configured to permit iframe embedding; `events-milo` almost certainly
-isn't. This needs a properly-configured IMS client for iframe-embedded
-apps (existing or newly registered), not a client-side code fix.
-
-**Current state:** reverted to DA-token reuse rather than the `events-milo`
-bootstrap, since it at least sidesteps the iframe/CORS problem (no extra
-IMS network call — it just forwards the token DA's own handshake already
-provided) and its failure mode (gateway rejects the token outright) is more
-tractable than fighting IMS's iframe restrictions client-side. **The ESP
-event picker (Phase 1d) still cannot fetch real events** until either
-ESP's gateway is configured to accept a DA-issued token, or a suitable IMS
-client is found/registered for this iframe-embedded context. See PLAN.md
-§5 for the full writeup.
+`esp-controller.js` still uses DA-token reuse (`setEspAuthToken()`, wired
+from `DAContext.js`) for now — harmless to leave in place, since the token
+itself is valid, real auth (confirmed via curl); it just needs the CORS
+gap closed on ESP's side to start working end-to-end. **The ESP event
+picker (Phase 1d) still cannot fetch real events from the browser** until
+ESP's `/v1/events` route gets CORS enabled for this app's origin(s) — a
+scoped ask to the ESP/platform team, not a client-side fix. See PLAN.md §5
+for the full investigation trail.
 
 ## Architecture
 
