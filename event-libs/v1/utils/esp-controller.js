@@ -59,7 +59,7 @@ export function setEspAuthToken(token) {
   espAuthTokenOverride = token;
 }
 
-export async function constructRequestOptions(method, body = null, waitForIMS = true) {
+export async function constructRequestOptions(method, body = null, waitForIMS = true, includeAuth = true) {
   const { miloConfig } = getEventConfig();
   const miloLibs = miloConfig?.miloLibs || LIBS;
 
@@ -73,7 +73,7 @@ export async function constructRequestOptions(method, body = null, waitForIMS = 
   }
 
   const headers = new Headers();
-  const authToken = espAuthTokenOverride || window.adobeIMS?.getAccessToken()?.token;
+  const authToken = includeAuth && (espAuthTokenOverride || window.adobeIMS?.getAccessToken()?.token);
 
   if (authToken) headers.append('Authorization', `Bearer ${authToken}`);
   headers.append('x-api-key', 'acom_event_service');
@@ -119,11 +119,15 @@ export async function getEvent(eventId) {
 // browser + curl testing, unlike listEvents() below (blocked by a CORS gap,
 // see tier-1-event-configurator/PLAN.md). Used by that app's manual
 // Event-ID-entry fallback for New Config/Duplicate, since browsing the full
-// catalog via listEvents() isn't available yet.
+// catalog via listEvents() isn't available yet. Deliberately skips
+// Authorization (includeAuth=false): this route doesn't need it, and the
+// DA app's espAuthTokenOverride is a prod-IMS token — sending it against a
+// non-prod ESP tier gets rejected as ErrInvalidOauthToken by that
+// environment's gateway instead of being silently ignored.
 export async function getEspEvent(eventId) {
   const eventServiceEnv = getEventServiceEnv();
   const { serviceApiEndpoints } = ENV_MAP[eventServiceEnv.name];
-  const options = await constructRequestOptions('GET', null, false);
+  const options = await constructRequestOptions('GET', null, false, false);
 
   try {
     const response = await fetch(`${serviceApiEndpoints.esp}/v1/events/${eventId}`, options);
@@ -235,7 +239,9 @@ export async function listAllEvents({ fromDate } = {}) {
 
 // Raw ESP session-catalog fetch, for callers that need the unmapped session
 // objects (e.g. reading customAttributes directly) rather than sessions-api.js's
-// fully-normalized shape. Same auth handling as listEvents above.
+// fully-normalized shape. Confirmed public, same reasoning as getEspEvent()
+// above — skips Authorization (includeAuth=false) so a non-prod-scoped
+// override token can't get rejected by a non-prod ESP tier's gateway.
 //
 // NOTE: sessions-api.js's fetchSessions()/mapEslPayloadToRawSessions() (MWPW-200314,
 // not yet merged to dev as of this writing) hits this same /session-catalog
@@ -245,7 +251,7 @@ export async function listAllEvents({ fromDate } = {}) {
 export async function getEventSessionCatalog(eventId) {
   const eventServiceEnv = getEventServiceEnv();
   const { serviceApiEndpoints } = ENV_MAP[eventServiceEnv.name];
-  const options = await constructRequestOptions('GET', null, false);
+  const options = await constructRequestOptions('GET', null, false, false);
 
   try {
     const response = await fetch(`${serviceApiEndpoints.esp}/v1/events/${eventId}/session-catalog`, options);

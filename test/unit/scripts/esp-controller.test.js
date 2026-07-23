@@ -61,6 +61,17 @@ describe('Adobe Event Service API', () => {
       const options = await api.constructRequestOptions('GET');
       expect(options.headers.get('Authorization')).to.equal('Bearer ims-token');
     });
+
+    it('should omit Authorization entirely when includeAuth is false, even with an override set', async () => {
+      window.adobeIMS = { getAccessToken: () => ({ token: 'ims-token' }) };
+      api.setEspAuthToken('override-token');
+      try {
+        const options = await api.constructRequestOptions('GET', null, true, false);
+        expect(options.headers.has('Authorization')).to.be.false;
+      } finally {
+        api.setEspAuthToken(null);
+      }
+    });
   });
 
   describe('getEvent', () => {
@@ -450,6 +461,21 @@ describe('Adobe Event Service API', () => {
       expect(result.ok).to.be.false;
       expect(result.status).to.equal(404);
     });
+
+    it('should not send an Authorization header even with an override token set', async () => {
+      api.setEspAuthToken('da-token');
+      try {
+        const fetchStub = sandbox.stub(window, 'fetch').resolves({
+          json: () => ({ eventId: 'event-1' }),
+          ok: true,
+        });
+        await api.getEspEvent('event-1');
+        const [, options] = fetchStub.firstCall.args;
+        expect(options.headers.has('Authorization')).to.be.false;
+      } finally {
+        api.setEspAuthToken(null);
+      }
+    });
   });
 
   describe('getEventSessionCatalog', () => {
@@ -468,6 +494,21 @@ describe('Adobe Event Service API', () => {
       const result = await api.getEventSessionCatalog('event-1');
       expect(result.ok).to.be.false;
       expect(result.status).to.equal(404);
+    });
+
+    it('should not send an Authorization header even with an override token set', async () => {
+      api.setEspAuthToken('da-token');
+      try {
+        const fetchStub = sandbox.stub(window, 'fetch').resolves({
+          json: () => ({ sessions: [] }),
+          ok: true,
+        });
+        await api.getEventSessionCatalog('event-1');
+        const [, options] = fetchStub.firstCall.args;
+        expect(options.headers.has('Authorization')).to.be.false;
+      } finally {
+        api.setEspAuthToken(null);
+      }
     });
   });
 });
