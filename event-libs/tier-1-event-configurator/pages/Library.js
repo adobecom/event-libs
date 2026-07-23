@@ -2,10 +2,12 @@ import { useState, useMemo, useCallback } from '../../v1/deps/htm-preact.js';
 import { html } from '../htm-wrapper.js';
 import SearchInput from '../components/SearchInput.js';
 import EventPicker from '../components/EventPicker.js';
+import ManualEventLookup from '../components/ManualEventLookup.js';
 import Modal from '../components/Modal.js';
 import { useNavigation } from '../context/NavigationContext.js';
 import { useConfigs } from '../context/ConfigsContext.js';
 import { copyTextToClipboard, formatUpdatedTime } from '../utils.js';
+import { EVENT_BROWSE_ENABLED } from '../constants.js';
 
 export default function Library() {
   const { goToEditor } = useNavigation();
@@ -134,12 +136,23 @@ export default function Library() {
         </ul>
       `}
 
-      <${EventPicker} \
-        isOpen=${pickerOpen} \
-        onClose=${() => setPickerOpen(false)} \
-        onSelect=${handlePickEvent} \
-        title=${pickerMode === 'duplicate' ? 'Duplicate config — pick the target event' : 'New config — pick an event'} \
-      />
+      ${EVENT_BROWSE_ENABLED
+        ? html`
+          <${EventPicker} \
+            isOpen=${pickerOpen} \
+            onClose=${() => setPickerOpen(false)} \
+            onSelect=${handlePickEvent} \
+            title=${pickerMode === 'duplicate' ? 'Duplicate config — pick the target event' : 'New config — pick an event'} \
+          />
+        `
+        : html`
+          <${ManualEventLookup} \
+            isOpen=${pickerOpen} \
+            onClose=${() => setPickerOpen(false)} \
+            onSelect=${handlePickEvent} \
+            title=${pickerMode === 'duplicate' ? 'Duplicate config — enter the target Event ID' : 'New config — enter an Event ID'} \
+          />
+        `}
 
       <${Modal} \
         isOpen=${!!rowPendingDelete} \

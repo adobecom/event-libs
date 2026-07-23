@@ -199,6 +199,50 @@
   padding: var(--tec-spacing-md) 0;
 }
 
+/* Manual event lookup */
+
+.tec-manual-lookup__hint {
+  color: var(--tec-color-text-secondary);
+  font-size: 13px;
+  margin-top: 0;
+}
+
+.tec-manual-lookup__row {
+  display: flex;
+  gap: var(--tec-spacing-sm);
+}
+
+.tec-manual-lookup__input {
+  flex: 1;
+  padding: 8px 12px;
+  border: 1px solid var(--tec-color-border);
+  border-radius: var(--tec-border-radius);
+  font-size: 14px;
+}
+
+.tec-manual-lookup__error {
+  color: var(--tec-color-error);
+}
+
+.tec-manual-lookup__result {
+  margin-top: var(--tec-spacing-md);
+  padding: var(--tec-spacing-md);
+  background: var(--tec-color-background);
+  border: 1px solid var(--tec-color-border);
+  border-radius: var(--tec-border-radius);
+}
+
+.tec-manual-lookup__result-title {
+  font-weight: 700;
+  margin: 0 0 4px;
+}
+
+.tec-manual-lookup__result-meta {
+  color: var(--tec-color-text-secondary);
+  font-size: 13px;
+  margin: 0 0 var(--tec-spacing-sm);
+}
+
 /* Editor */
 
 .tec-editor__header {

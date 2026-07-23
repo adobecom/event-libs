@@ -114,6 +114,33 @@ export async function getEvent(eventId) {
   }
 }
 
+// Singular event lookup directly on ESP (not ESL, unlike getEvent() above) —
+// confirmed public (200, real data, no Authorization header needed) via live
+// browser + curl testing, unlike listEvents() below (blocked by a CORS gap,
+// see tier-1-event-configurator/PLAN.md). Used by that app's manual
+// Event-ID-entry fallback for New Config/Duplicate, since browsing the full
+// catalog via listEvents() isn't available yet.
+export async function getEspEvent(eventId) {
+  const eventServiceEnv = getEventServiceEnv();
+  const { serviceApiEndpoints } = ENV_MAP[eventServiceEnv.name];
+  const options = await constructRequestOptions('GET', null, false);
+
+  try {
+    const response = await fetch(`${serviceApiEndpoints.esp}/v1/events/${eventId}`, options);
+    const data = await response.json();
+
+    if (!response.ok) {
+      window.lana?.log(`Error: Failed to get ESP event ${eventId}. Status:${JSON.stringify(response)}`);
+      return { ok: false, status: response.status, error: data };
+    }
+
+    return { ok: true, data };
+  } catch (error) {
+    window.lana?.log(`Error: Failed to get ESP event ${eventId}. Error:${JSON.stringify(error)}`);
+    return { ok: false, status: 'Network Error', error: error.message };
+  }
+}
+
 // Single-page ESP events list call, mirroring ESP's own query params
 // (`page-size`, `next-page-token`, `from-date` — epoch ms). The route itself
 // has no auth check, but ESP's API Gateway requires a real IMS Bearer token

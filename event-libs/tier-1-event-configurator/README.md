@@ -48,6 +48,8 @@ This isn't a new problem needing a fresh ask: [MWPW-200897](https://jira.corp.ad
 
 See PLAN.md §5 for the full investigation trail and sourcing.
 
+**Manual Event ID entry (active fallback) vs. the full catalog picker (built, but disabled).** New Config/Duplicate currently use `ManualEventLookup.js` (author types a known Event ID, `getEspEvent()` looks it up for real — confirmed CORS-free, unlike `listEvents()`) rather than `EventPicker.js`'s full browse/search UI, gated by `constants.js`'s `EVENT_BROWSE_ENABLED = false`. `EventPicker`/`listEvents`/`listAllEvents` are kept fully intact, not deleted — flipping that one flag re-enables the full picker once the CORS gap above closes.
+
 ## Architecture
 
 Same shape as the [Schedule Maker](../schedule-maker/README.md) precedent:

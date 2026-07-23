@@ -430,6 +430,28 @@ describe('Adobe Event Service API', () => {
     });
   });
 
+  describe('getEspEvent', () => {
+    it('should fetch a single event directly from ESP', async () => {
+      const fetchStub = sandbox.stub(window, 'fetch').resolves({
+        json: () => ({ eventId: 'event-1', enTitle: 'Test Event', published: true }),
+        ok: true,
+      });
+      const result = await api.getEspEvent('event-1');
+      expect(result.ok).to.be.true;
+      expect(result.data).to.deep.equal({ eventId: 'event-1', enTitle: 'Test Event', published: true });
+      const [url] = fetchStub.firstCall.args;
+      expect(url).to.include('/v1/events/event-1');
+      expect(url).to.not.include('events-service-layer');
+    });
+
+    it('should return an error for an unknown event id', async () => {
+      sandbox.stub(window, 'fetch').resolves({ json: () => ({ message: 'not found' }), ok: false, status: 404 });
+      const result = await api.getEspEvent('missing-id');
+      expect(result.ok).to.be.false;
+      expect(result.status).to.equal(404);
+    });
+  });
+
   describe('getEventSessionCatalog', () => {
     it('should fetch the raw session catalog for an event', async () => {
       sandbox.stub(window, 'fetch').resolves({
