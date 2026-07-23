@@ -9,12 +9,12 @@ const PAGES = {
   editor: 'editor',
 };
 
-// listEvents()/listAllEvents() (the "browse all events" picker) are blocked
+// listEvents()/listAllEvents() (the "browse all events" picker) were blocked
 // by a CORS gap on ESP's /v1/events route (tracked in MWPW-200897 — see
-// PLAN.md §5). The picker code is kept intact, not deleted, so it's a
-// one-line flip once that's resolved — ManualEventLookup is the active
-// fallback in the meantime (getEspEvent(), confirmed CORS-free).
-const EVENT_BROWSE_ENABLED = false;
+// PLAN.md §5). MWPW-201634 whitelisted this branch's da-events origin on Dev
+// (events-service-platform-deploy@52b2631) — temporarily flipped to true to
+// verify the fix live from this branch's DA preview.
+const EVENT_BROWSE_ENABLED = true;
 
 export {
   DA_ADMIN_ORIGIN,
