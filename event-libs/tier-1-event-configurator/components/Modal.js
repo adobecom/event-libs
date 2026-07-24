@@ -69,12 +69,12 @@ export default function Modal({
     if (!showActions) return null;
     return html`
       <div class="modal-actions">
-        <sp-button treatment="outline" static-color="black" size="l" onClick=${onClose}>
+        <button type="button" class="tec-btn tec-btn--outline tec-btn--l" onClick=${onClose}>
           ${cancelText}
-        </sp-button>
-        <sp-button size="l" static-color="black" onClick=${onConfirm} disabled=${confirmDisabled || undefined}>
+        </button>
+        <button type="button" class="tec-btn tec-btn--primary tec-btn--l" onClick=${onConfirm} disabled=${confirmDisabled}>
           ${confirmText}
-        </sp-button>
+        </button>
       </div>
     `;
   };
@@ -84,11 +84,11 @@ export default function Modal({
       <div class="modal ${sizeClass}" ref=${modalRef} tabindex="-1" onKeyDown=${handleKeyDown} role="document">
         <div class="modal-header">
           ${title && html`<h2 id="modal-title" class="modal-title">${title}</h2>`}
-          <sp-action-button quiet size="s" onClick=${onClose} aria-label="Close modal" class="modal-close">
-            <svg xmlns="http://www.w3.org/2000/svg" height="18" viewBox="0 0 18 18" width="18" slot="icon">
+          <button type="button" class="tec-btn tec-btn--icon modal-close" onClick=${onClose} aria-label="Close modal">
+            <svg xmlns="http://www.w3.org/2000/svg" height="18" viewBox="0 0 18 18" width="18">
               <path fill="currentColor" fill-rule="evenodd" d="M13.243,3.343,9,7.586,4.757,3.343a.5.5,0,0,0-.707,0l-.707.707a.5.5,0,0,0,0,.707L7.586,9,3.343,13.243a.5.5,0,0,0,0,.707l.707.707a.5.5,0,0,0,.707,0L9,10.414l4.243,4.243a.5.5,0,0,0,.707,0l.707-.707a.5.5,0,0,0,0-.707L10.414,9l4.243-4.243a.5.5,0,0,0,0-.707l-.707-.707A.5.5,0,0,0,13.243,3.343Z"/>
             </svg>
-          </sp-action-button>
+          </button>
         </div>
         <div class="modal-content">
           ${children}

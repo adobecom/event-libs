@@ -45,10 +45,12 @@ export default function TrackIconEditor({ tracks, trackIcons, onChange }) {
 
         return html`
           <li class="tec-track-editor__row ${complete ? '' : 'is-incomplete'}" key=${track}>
-            <${IconPreview} icon=${icon} color=${color} />
+            <div class="tec-track-editor__preview-wrap">
+              <${IconPreview} icon=${icon} color=${color} />
+            </div>
             <span class="tec-track-editor__name">${track}</span>
             <select
-              class="tec-track-editor__icon-select"
+              class="tec-field tec-track-editor__icon-select"
               value=${icon}
               onChange=${(e) => onChange(track, { icon: e.target.value })}
             >

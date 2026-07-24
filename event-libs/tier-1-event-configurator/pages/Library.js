@@ -109,8 +109,11 @@ export default function Library() {
   return html`
     <div class="tec-page">
       <div class="tec-library__header">
-        <h1 class="tec-page__title">Tier 1 Event Configurator</h1>
-        <sp-button size="l" static-color="black" onClick=${openNewPicker}>New config</sp-button>
+        <div>
+          <h1 class="tec-page__title">Tier 1 Event Configurator</h1>
+          <p class="tec-page__subtitle">Per-event Tier 1 config, authored once and pasted into the event page's metadata.</p>
+        </div>
+        <button type="button" class="tec-btn tec-btn--primary tec-btn--l" onClick=${openNewPicker}>New config</button>
       </div>
 
       <${SearchInput} \
@@ -138,10 +141,10 @@ export default function Library() {
                 </span>
               </div>
               <div class="tec-library__item-actions">
-                <sp-action-button quiet size="m" onClick=${() => openEdit(row)}>Edit</sp-action-button>
-                <sp-action-button quiet size="m" onClick=${() => openDuplicatePicker(row)}>Duplicate</sp-action-button>
-                <sp-action-button quiet size="m" onClick=${() => handleCopyConfig(row)}>Copy config</sp-action-button>
-                <sp-action-button quiet size="m" onClick=${() => setRowPendingDelete(row)}>Delete</sp-action-button>
+                <button type="button" class="tec-btn tec-btn--quiet" onClick=${() => openEdit(row)}>Edit</button>
+                <button type="button" class="tec-btn tec-btn--quiet" onClick=${() => openDuplicatePicker(row)}>Duplicate</button>
+                <button type="button" class="tec-btn tec-btn--quiet" onClick=${() => handleCopyConfig(row)}>Copy config</button>
+                <button type="button" class="tec-btn tec-btn--quiet tec-btn--danger" onClick=${() => setRowPendingDelete(row)}>Delete</button>
               </div>
             </li>
           `)}

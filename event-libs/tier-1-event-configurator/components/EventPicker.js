@@ -80,16 +80,16 @@ export default function EventPicker({
             `)}
           </div>
         </div>
-        ${isLoading && html`<p class="tec-event-picker__status">Loading events…</p>`}
+        ${isLoading && html`<p class="tec-loading-inline"><span class="tec-spinner tec-spinner--s"></span> Loading events…</p>`}
         ${error && html`<p class="tec-event-picker__status tec-event-picker__status--error">${error}</p>`}
         ${!isLoading && !error && html`
           <ul class="tec-event-picker__list">
             ${filteredEvents.map((event) => html`
-              <li class="tec-event-picker__item" key=${event.eventId}>
-                <sp-action-button quiet size="l" onClick=${() => onSelect(event)}>
+              <li key=${event.eventId}>
+                <button type="button" class="tec-event-picker__item-btn" onClick=${() => onSelect(event)}>
                   <span class="tec-event-picker__item-title">${event.enTitle || event.eventId}</span>
                   <span class="tec-event-picker__item-meta">${event.eventId} · ${event.published ? 'Published' : 'Draft'}</span>
-                </sp-action-button>
+                </button>
               </li>
             `)}
             ${filteredEvents.length === 0 && html`<li class="tec-event-picker__empty">No events match.</li>`}

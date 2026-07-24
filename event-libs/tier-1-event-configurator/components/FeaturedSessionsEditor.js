@@ -101,7 +101,7 @@ export default function FeaturedSessionsEditor({
                   <span class="tec-featured-editor__title">${session?.enTitle || sessionId}</span>
                   <span class="tec-featured-editor__track">${session ? getSessionMeta(session) : 'Not found in current session catalog'}</span>
                 </div>
-                <sp-action-button quiet size="s" onClick=${() => handleRemove(sessionId)}>Remove</sp-action-button>
+                <button type="button" class="tec-btn tec-btn--quiet tec-btn--s tec-btn--danger" onClick=${() => handleRemove(sessionId)}>Remove</button>
               </li>
             `;
           })}
@@ -119,7 +119,7 @@ export default function FeaturedSessionsEditor({
             className="tec-featured-editor__search" \
           />
           <select
-            class="tec-featured-editor__track-filter"
+            class="tec-field tec-featured-editor__track-filter"
             value=${trackFilter}
             onChange=${(e) => setTrackFilter(e.target.value)}
           >
@@ -134,7 +134,7 @@ export default function FeaturedSessionsEditor({
                 <span class="tec-featured-editor__title">${session.enTitle || session.sessionId}</span>
                 <span class="tec-featured-editor__track">${getSessionMeta(session)}</span>
               </div>
-              <sp-action-button quiet size="s" onClick=${() => handleAdd(session.sessionId)}>Add</sp-action-button>
+              <button type="button" class="tec-btn tec-btn--quiet tec-btn--s" onClick=${() => handleAdd(session.sessionId)}>Add</button>
             </li>
           `)}
           ${availableSessions.length === 0 && html`<li class="tec-featured-editor__empty">No sessions match.</li>`}

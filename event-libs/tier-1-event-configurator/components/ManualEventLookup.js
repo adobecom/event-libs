@@ -58,20 +58,20 @@ export default function ManualEventLookup({
         <div class="tec-manual-lookup__row">
           <input
             type="text"
-            class="tec-manual-lookup__input"
+            class="tec-field tec-manual-lookup__input"
             placeholder="Event ID"
             value=${eventId}
             onInput=${(e) => setEventId(e.target.value)}
             onKeyDown=${(e) => { if (e.key === 'Enter') handleLookup(); }}
           />
-          <sp-button
-            size="m"
-            static-color="black"
+          <button
+            type="button"
+            class="tec-btn tec-btn--primary"
             onClick=${handleLookup}
-            disabled=${isLoading || !eventId.trim() || undefined}
+            disabled=${isLoading || !eventId.trim()}
           >
             ${isLoading ? 'Looking up…' : 'Look up'}
-          </sp-button>
+          </button>
         </div>
         ${error && html`<p class="tec-manual-lookup__error">${error}</p>`}
         ${foundEvent && html`
@@ -80,7 +80,7 @@ export default function ManualEventLookup({
             <p class="tec-manual-lookup__result-meta">
               ${foundEvent.eventId} · ${foundEvent.published ? 'Published' : 'Draft'}
             </p>
-            <sp-button size="m" static-color="black" onClick=${handleUse}>Use this event</sp-button>
+            <button type="button" class="tec-btn tec-btn--primary" onClick=${handleUse}>Use this event</button>
           </div>
         `}
       </div>

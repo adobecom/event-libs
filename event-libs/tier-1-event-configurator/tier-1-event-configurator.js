@@ -5,24 +5,11 @@ import { NavigationProvider } from './context/NavigationContext.js';
 import { ConfigsProvider } from './context/ConfigsContext.js';
 import TierOneEventConfigurator from './TierOneEventConfigurator.js';
 
-const LIBS = 'https://www.adobe.com/libs';
-
-async function loadSpectrumComponents() {
-  await Promise.all([
-    import(`${LIBS}/deps/lit-all.min.js`),
-    import(`${LIBS}/features/spectrum-web-components/dist/theme.js`),
-    import(`${LIBS}/features/spectrum-web-components/dist/button.js`),
-    import(`${LIBS}/features/spectrum-web-components/dist/action-button.js`),
-    import(`${LIBS}/features/spectrum-web-components/dist/progress-circle.js`),
-    import(`${LIBS}/features/spectrum-web-components/dist/icon.js`),
-    import(`${LIBS}/features/spectrum-web-components/dist/textfield.js`),
-    import(`${LIBS}/features/spectrum-web-components/dist/toast.js`),
-  ]);
-}
-
+// No Spectrum Web Components — plain HTML/CSS (tier-1-event-configurator.css)
+// instead. This app fought SWC's shadow-DOM styling model more than it
+// benefited from it (static-color="black" overrides, etc.), and skipping 8
+// remote script loads is a real win for a small internal tool.
 async function init() {
-  await loadSpectrumComponents();
-
   render(
     html`
       <${DAProvider}>

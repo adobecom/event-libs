@@ -84,24 +84,26 @@ export default function ConfigEditor() {
   return html`
     <div class="tec-page tec-editor">
       <div class="tec-editor__header">
-        <sp-action-button quiet size="m" onClick=${handleCancel}>← Back to library</sp-action-button>
-        <h1 class="tec-page__title">${activeConfig.eventTitle}</h1>
-        <p class="tec-editor__event-id">${activeConfig.eventId}</p>
+        <button type="button" class="tec-btn tec-btn--icon" onClick=${handleCancel} aria-label="Back to library">←</button>
+        <div class="tec-editor__header-text">
+          <h1 class="tec-editor__title">${activeConfig.eventTitle}</h1>
+          <p class="tec-editor__event-id">${activeConfig.eventId}</p>
+        </div>
       </div>
 
       <section class="tec-editor__section">
         <h2>Sessions</h2>
-        ${isLoadingSessions && html`<p>Loading sessions…</p>`}
+        ${isLoadingSessions && html`<p class="tec-loading-inline"><span class="tec-spinner tec-spinner--s"></span> Loading sessions…</p>`}
         ${sessionsError && html`<p class="tec-editor__error">${sessionsError}</p>`}
         ${!isLoadingSessions && !sessionsError && html`
-          <p>${sessions.length} session(s) found — ${tracks.length} distinct track(s).</p>
+          <p class="tec-editor__section-hint">${sessions.length} session(s) found — ${tracks.length} distinct track(s).</p>
         `}
       </section>
 
       <section class="tec-editor__section">
         <h2>Track icons & colors</h2>
-        <p>Icons pre-fill from the built-in defaults where known. Color always starts black — pick a color per track, or leave both icon and color unset to use the page's own built-in default at render time.</p>
-        ${isLoadingSessions && html`<p>Loading tracks…</p>`}
+        <p class="tec-editor__section-hint">Icons pre-fill from the built-in defaults where known. Color always starts black — pick a color per track, or leave both icon and color unset to use the page's own built-in default at render time.</p>
+        ${isLoadingSessions && html`<p class="tec-loading-inline"><span class="tec-spinner tec-spinner--s"></span> Loading tracks…</p>`}
         ${sessionsError && html`<p class="tec-editor__error">${sessionsError}</p>`}
         ${incompleteTracks.length > 0 && html`
           <p class="tec-editor__error">
@@ -119,7 +121,7 @@ export default function ConfigEditor() {
 
       <section class="tec-editor__section">
         <h2>Allow double booking</h2>
-        <p>Lets an attendee schedule sessions that overlap in time on this event's Tier 1 surfaces.</p>
+        <p class="tec-editor__section-hint">Lets an attendee schedule sessions that overlap in time on this event's Tier 1 surfaces.</p>
         <label class="tec-editor__checkbox">
           <input
             type="checkbox"
@@ -132,8 +134,8 @@ export default function ConfigEditor() {
 
       <section class="tec-editor__section">
         <h2>Featured sessions</h2>
-        <p>Pick which sessions appear in the featured carousel, and set their display order.</p>
-        ${isLoadingSessions && html`<p>Loading sessions…</p>`}
+        <p class="tec-editor__section-hint">Pick which sessions appear in the featured carousel, and set their display order.</p>
+        ${isLoadingSessions && html`<p class="tec-loading-inline"><span class="tec-spinner tec-spinner--s"></span> Loading sessions…</p>`}
         ${sessionsError && html`<p class="tec-editor__error">${sessionsError}</p>`}
         ${!isLoadingSessions && !sessionsError && html`
           <${FeaturedSessionsEditor} \
@@ -148,16 +150,16 @@ export default function ConfigEditor() {
 
       <section class="tec-editor__section">
         <h2>Config JSON</h2>
-        <p>This is what gets saved to the row, and what you'll paste into the page's <code>tier-1-event-config</code> metadata after saving.</p>
+        <p class="tec-editor__section-hint">This is what gets saved to the row, and what you'll paste into the page's <code>tier-1-event-config</code> metadata after saving.</p>
         <pre class="tec-editor__config-preview">${configPreview}</pre>
-        <sp-action-button size="m" onClick=${handleCopy}>Copy config</sp-action-button>
+        <button type="button" class="tec-btn tec-btn--outline" onClick=${handleCopy}>Copy config</button>
       </section>
 
       <div class="tec-editor__actions">
-        <sp-button treatment="outline" static-color="black" size="l" onClick=${handleCancel}>Cancel</sp-button>
-        <sp-button size="l" static-color="black" onClick=${handleSave} disabled=${isSaving || incompleteTracks.length > 0 || undefined}>
+        <button type="button" class="tec-btn tec-btn--outline tec-btn--l" onClick=${handleCancel}>Cancel</button>
+        <button type="button" class="tec-btn tec-btn--primary tec-btn--l" onClick=${handleSave} disabled=${isSaving || incompleteTracks.length > 0}>
           ${isSaving ? 'Saving…' : 'Save'}
-        </sp-button>
+        </button>
       </div>
     </div>
   `;
