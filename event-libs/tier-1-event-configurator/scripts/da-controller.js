@@ -29,7 +29,13 @@ function getHeaders(method = 'GET', body = null) {
   const headers = new Headers();
   if (daToken) headers.append('Authorization', `Bearer ${daToken}`);
   if (body) headers.append('content-type', 'application/json');
-  return { method, headers, body: body ? JSON.stringify(body) : undefined };
+  // no-store bypasses the browser cache — otherwise a cached GET can return a
+  // stale ETag, so the very next conditional write's If-Match fails against
+  // the CDN's actual current ETag and surfaces as a false-positive Conflict
+  // (same issue Schedule Maker's da-controller.js hit and fixed the same way).
+  return {
+    method, headers, body: body ? JSON.stringify(body) : undefined, cache: 'no-store',
+  };
 }
 
 async function daFetch(path, options = {}) {
@@ -75,6 +81,18 @@ function migrateLegacyTitle(row) {
   };
 }
 
+// A malformed config string (bad manual edit, truncated write) shouldn't take
+// down the whole library load — log and default that one row to {} instead.
+function parseRowConfig(row) {
+  if (typeof row.config !== 'string') return row.config ?? {};
+  try {
+    return JSON.parse(row.config);
+  } catch (error) {
+    window.lana?.log(`tier-1-event-configurator: malformed config JSON for row ${row.eventId}, defaulting to {}. ${error}`);
+    return {};
+  }
+}
+
 // Reads a sheet and returns its rows plus the ETag, so callers can perform
 // conditional (optimistic-locking) writes with writeSheet. `config` is stored
 // on the sheet as a stringified JSON blob and parsed back into an object here.
@@ -86,10 +104,7 @@ async function readSheet(org, repo, path) {
 
   const rows = raw
     .filter((row) => row && row.eventId)
-    .map((row) => migrateLegacyTitle({
-      ...row,
-      config: typeof row.config === 'string' ? JSON.parse(row.config) : (row.config ?? {}),
-    }));
+    .map((row) => migrateLegacyTitle({ ...row, config: parseRowConfig(row) }));
   return { ok: true, data: rows, etag: result.etag };
 }
 
