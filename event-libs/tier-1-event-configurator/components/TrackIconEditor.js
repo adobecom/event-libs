@@ -29,6 +29,15 @@ function IconPreview({ icon, color }) {
   `;
 }
 
+// Color is deliberately never defaulted from DEFAULT_TRACK_ICON_CONFIG's
+// per-track brand color — that made every known track look "already
+// configured" with a real color on first load, when nothing had actually
+// been authored yet. Color is purely an author decision; unauthored tracks
+// always start black until the author explicitly picks one. The icon slug
+// still auto-populates from the known-track default, since that's just a
+// sensible starting icon, not a color choice.
+const DEFAULT_ICON_COLOR = '#000000';
+
 export default function TrackIconEditor({ tracks, trackIcons, onChange }) {
   if (!tracks || tracks.length === 0) {
     return html`<p class="tec-track-editor__empty">No tracks found in this event's sessions yet.</p>`;
@@ -40,7 +49,7 @@ export default function TrackIconEditor({ tracks, trackIcons, onChange }) {
         const authored = trackIcons?.[track];
         const fallback = getDefaultTrackIcon(track);
         const icon = authored?.icon ?? fallback?.icon ?? '';
-        const color = authored?.color ?? fallback?.color ?? '#292929';
+        const color = authored?.color ?? DEFAULT_ICON_COLOR;
         const complete = isTrackIconEntryComplete(authored);
 
         return html`

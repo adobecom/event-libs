@@ -99,7 +99,7 @@ export default function ConfigEditor() {
 
       <section class="tec-editor__section">
         <h2>Track icons & colors</h2>
-        <p>Unauthored tracks fall back to the built-in defaults shown here.</p>
+        <p>Icons pre-fill from the built-in defaults where known. Color always starts black — pick a color per track, or leave both icon and color unset to use the page's own built-in default at render time.</p>
         ${incompleteTracks.length > 0 && html`
           <p class="tec-editor__error">
             ${incompleteTracks.length} track${incompleteTracks.length === 1 ? '' : 's'} ${incompleteTracks.length === 1 ? 'has' : 'have'} only an icon or only a color set — set both, or clear both to use the default, before saving: ${incompleteTracks.join(', ')}
