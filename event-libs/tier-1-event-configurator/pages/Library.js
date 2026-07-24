@@ -5,6 +5,7 @@ import ManualEventLookup from '../components/ManualEventLookup.js';
 import Modal from '../components/Modal.js';
 import { useNavigation } from '../context/NavigationContext.js';
 import { useConfigs } from '../context/ConfigsContext.js';
+import { useEventEnv } from '../context/EventEnvContext.js';
 import {
   copyTextToClipboard, formatUpdatedTime, getDisplayTitle, stringifyConfig,
 } from '../utils.js';
@@ -22,6 +23,7 @@ export default function Library() {
     setToastSuccess,
     setToastError,
   } = useConfigs();
+  const { envName, setEnv } = useEventEnv();
 
   const [search, setSearch] = useState('');
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -60,10 +62,15 @@ export default function Library() {
     setPickerOpen(true);
   }, []);
 
+  // Restores the ESP env this row was created against before opening it —
+  // a full page reload resets EventEnvContext's override to its default
+  // (prod), so without this an edit of a non-prod-authored row would
+  // silently refetch its session catalog from the wrong tier.
   const openEdit = useCallback((row) => {
+    setEnv(row.eventServiceEnv || 'prod');
     startEditConfig(row);
     goToEditor();
-  }, [startEditConfig, goToEditor]);
+  }, [setEnv, startEditConfig, goToEditor]);
 
   // Event-ID collision guard: picking an event that already has a row routes
   // to Edit for that row instead of creating a second row with the same
@@ -78,13 +85,13 @@ export default function Library() {
       return;
     }
     if (pickerMode === 'duplicate' && duplicateSource) {
-      startDuplicateConfig(duplicateSource, event);
+      startDuplicateConfig(duplicateSource, event, envName);
     } else {
-      startNewConfig(event);
+      startNewConfig(event, envName);
     }
     goToEditor();
   }, [
-    findConfigByEventId, openEdit, pickerMode, duplicateSource,
+    findConfigByEventId, openEdit, pickerMode, duplicateSource, envName,
     startDuplicateConfig, startNewConfig, goToEditor, setToastSuccess,
   ]);
 

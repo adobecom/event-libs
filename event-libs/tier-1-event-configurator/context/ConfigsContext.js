@@ -32,8 +32,8 @@ const ConfigsProvider = ({ children }) => {
   const [toastError, setToastError] = useState(null);
 
   // The row currently open in the editor — always a full row shape
-  // ({ eventId, backendEventTitle, config }), whether freshly created
-  // (New/Duplicate) or loaded from the library (Edit).
+  // ({ eventId, backendEventTitle, eventServiceEnv, config }), whether
+  // freshly created (New/Duplicate) or loaded from the library (Edit).
   const [activeConfig, setActiveConfig] = useState(null);
 
   const loadConfigs = useCallback(async () => {
@@ -64,11 +64,18 @@ const ConfigsProvider = ({ children }) => {
 
   // Starts a fresh row for a newly picked event. Dedup (routing to Edit when a
   // row already exists for the picked event) is the picker's responsibility —
-  // see PLAN.md Phase 4 — so this always assumes no prior row.
-  const startNewConfig = useCallback((event) => {
+  // see PLAN.md Phase 4 — so this always assumes no prior row. `eventServiceEnv`
+  // is whatever ESP tier was active when the event was picked (Library.js
+  // reads it from EventEnvContext) — row-level only, never pasted into the
+  // page's Config, since it's purely an authoring-time detail of where this
+  // event's data came from, re-applied automatically when the row is edited
+  // later (see Library.js's openEdit) so a session-catalog refetch doesn't
+  // silently default back to prod after a page reload resets the override.
+  const startNewConfig = useCallback((event, eventServiceEnv) => {
     setActiveConfig({
       eventId: event.eventId,
       backendEventTitle: event.enTitle || event.eventId,
+      eventServiceEnv,
       config: emptyConfig(),
     });
   }, []);
@@ -79,7 +86,9 @@ const ConfigsProvider = ({ children }) => {
   // eventTitle (the author's alternative title) is also reset — it names the
   // source event specifically, not a generic style setting like trackIcons,
   // so carrying it over would silently mislabel the new event.
-  const startDuplicateConfig = useCallback((sourceRow, event) => {
+  // `eventServiceEnv` is the *new* pick's env, not the source row's —
+  // Duplicate can legitimately target a different tier than its source.
+  const startDuplicateConfig = useCallback((sourceRow, event, eventServiceEnv) => {
     const clonedConfig = { ...sourceRow.config };
     delete clonedConfig.eventId;
     delete clonedConfig.backendEventTitle;
@@ -87,6 +96,7 @@ const ConfigsProvider = ({ children }) => {
     setActiveConfig({
       eventId: event.eventId,
       backendEventTitle: event.enTitle || event.eventId,
+      eventServiceEnv,
       config: { ...clonedConfig, eventTitle: '' },
     });
   }, []);

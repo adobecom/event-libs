@@ -112,6 +112,7 @@ One shared DA sheet per content-repo at
 {
   "eventId": "...",
   "backendEventTitle": "...",
+  "eventServiceEnv": "dev",
   "config": {
     "eventId": "...",
     "backendEventTitle": "...",
@@ -126,6 +127,8 @@ One shared DA sheet per content-repo at
 ```
 
 **Two different kinds of title, added 2026-07-24 (per Daniel).** `backendEventTitle` is the real ESP/backend title (`event.enTitle`) — app-stamped at both the row and `config` level, exactly like `eventId`/`updated`, never author-editable. `config.eventTitle` is the opposite: an optional author-set alternative display name, authored only inside `config` (no row-level column), defaulting to blank. `getDisplayTitle(row)` (`utils.js`) resolves which one to actually show: the authored `eventTitle` if set, else `backendEventTitle`, else the raw Event ID — used everywhere a row's title is shown (library list, toasts, the editor header). Rows saved under the old single-`eventTitle` schema are migrated on read (`da-controller.js`'s `migrateLegacyTitle`), not rewritten in place — the old value becomes `backendEventTitle`, and the new `eventTitle` starts blank rather than inheriting it.
+
+**`eventServiceEnv`, added 2026-07-24 (bug fix, per Daniel).** Row-level only — never stamped into `config`, since it's an authoring-time detail (which ESP tier this event's data came from), irrelevant to the live page that eventually reads `config`. Captured from the active environment picker selection when a row is created (`Library.js` reads it off `EventEnvContext`), and restored via `setEnv()` whenever that row is reopened for Edit. Fixes a real bug: without this, a full page reload reset the env override to its default (prod), so editing a Dev-authored row after a reload silently refetched its session catalog from Prod instead.
 
 `config` is the exact value an author copies into their event page's own
 `tier-1-event-config` metadata row — this app never touches the page itself.

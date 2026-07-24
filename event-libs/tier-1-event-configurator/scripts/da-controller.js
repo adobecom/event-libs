@@ -174,7 +174,9 @@ export async function getConfigs(org, repo) {
 // Upsert-by-Event-ID: replaces the existing row for this event, or appends a
 // new one — a single write path rather than separate create/update calls, so
 // re-picking an already-configured event can never create a duplicate row.
-export async function upsertConfig(org, repo, { eventId, backendEventTitle, config }) {
+export async function upsertConfig(org, repo, {
+  eventId, backendEventTitle, eventServiceEnv, config,
+}) {
   const updated = new Date().toISOString();
   const stampedConfig = {
     ...config,
@@ -182,7 +184,12 @@ export async function upsertConfig(org, repo, { eventId, backendEventTitle, conf
     backendEventTitle,
     updated,
   };
-  const newRow = { eventId, backendEventTitle, config: stampedConfig, updated };
+  // eventServiceEnv is row-level only, not stamped into config — it's an
+  // authoring-time detail (which ESP tier this event came from), irrelevant
+  // to the page that eventually consumes the pasted Config.
+  const newRow = {
+    eventId, backendEventTitle, eventServiceEnv, config: stampedConfig, updated,
+  };
 
   const result = await mutateSheet(org, repo, CONFIGS_SHEET_PATH, (rows) => {
     const idx = rows.findIndex((r) => r.eventId === eventId);
