@@ -9,15 +9,22 @@ const PAGES = {
   editor: 'editor',
 };
 
-// listEvents()/listAllEvents() (the "browse all events" picker) were blocked
-// by a CORS gap on ESP's /v1/events route (tracked in MWPW-200897 — see
-// PLAN.md §5). MWPW-201634 whitelisted this branch's da-events origin on Dev
-// (events-service-platform-deploy@52b2631), confirming the CORS gap is
-// closed — but listEvents() now returns a real 401 on Dev even with the
-// Authorization header attached, a separate auth issue from CORS. Back to
-// false until that's root-caused; ManualEventLookup (getEspEvent(), the
-// singular lookup) remains the confirmed-working path.
-const EVENT_BROWSE_ENABLED = false;
+// listEvents()/listAllEvents() (the "browse all events" picker) is the
+// default flow again (2026-07-24, per Daniel), now that the CORS gap
+// (MWPW-201634) is confirmed closed and DA's token is confirmed accepted
+// against prod ESP (curl-replay, see PLAN.md §5) — prod is where this app
+// actually runs once merged. The known remaining wrinkle is Dev/Stage-tier
+// testing specifically: listEvents() genuinely requires a valid token there
+// (unlike getEspEvent()/getEventSessionCatalog(), which are optional-auth),
+// and DA's token is prod-IMS-scoped, so it won't authenticate against a
+// non-prod tier. That's exactly what the automatic fallback below is for —
+// EventPicker's onError (Library.js's browseFailed) swaps to
+// ManualEventLookup (with its own env picker) the moment listAllEvents()
+// fails at runtime, so pre-merge non-prod testing still works without
+// hardcoding anything. Flip back to false only if browse itself needs to be
+// disabled outright, not for env-specific auth issues — the fallback
+// already handles those.
+const EVENT_BROWSE_ENABLED = true;
 
 // Selectable in ManualEventLookup.js's env picker (context/EventEnvContext.js).
 // Excludes 'local' — that's specifically for the localhost-serving dev

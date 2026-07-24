@@ -14,8 +14,9 @@ Phases 1a–1e, Phase 2, Phase 3 (app side), and Phase 4 are all implemented:
 DA SDK auth, config-library sheet CRUD, the library list view (search/Edit/
 Duplicate/Delete/Copy config, with an Event ID collision guard routing to
 Edit instead of duplicating a row), the ESP event picker + session fetch
-(currently gated off in favor of a manual Event ID entry fallback — see the
-CORS status below), the track icon/color editor (with save-blocking
+(the default flow again as of 2026-07-24 — see the CORS status below for
+why, and the automatic fallback to manual entry if it fails), the track
+icon/color editor (with save-blocking
 validation — a track can't be saved with only an icon or only a color set),
 the allow-double-booking toggle, and the featured-sessions picker
 (`FeaturedSessionsEditor.js` — search + track filter, each session's date/
@@ -61,17 +62,16 @@ directly a second time.
 
 See PLAN.md §5 for the full investigation trail and sourcing.
 
-**Manual Event ID entry (active fallback) vs. the full catalog picker (built, but disabled by default).** New Config/Duplicate currently use `ManualEventLookup.js` (author types a known Event ID, `getEspEvent()` looks it up for real) rather than `EventPicker.js`'s full browse/search UI, gated by `constants.js`'s `EVENT_BROWSE_ENABLED = false`. `EventPicker`/`listEvents`/`listAllEvents` are kept fully intact, not deleted — flipping that flag re-enables the full picker.
-
-**The fallback is now automatic, not just a static flag (2026-07-24).** Even with `EVENT_BROWSE_ENABLED` set to `true`, if `EventPicker`'s `listAllEvents()` call fails at runtime for any reason, it fires an `onError` callback; `Library.js` catches it and swaps to `ManualEventLookup` for the rest of the page session (sticky per load, not per open, to avoid a doomed re-attempt on every click). This is the app's permanent safety net for any full-picker failure, not just a pre-CORS-fix stopgap.
+**Full catalog picker is the default flow again (2026-07-24, per Daniel), with manual entry as the automatic fallback.** New Config/Duplicate use `EventPicker.js` (browse/search the full ESP catalog, `constants.js`'s `EVENT_BROWSE_ENABLED = true`) by default. If `listAllEvents()` fails at runtime for any reason — CORS, an env-specific auth issue (see below), a real outage — `EventPicker` fires an `onError` callback; `Library.js` catches it and swaps to `ManualEventLookup.js` (manual Event ID entry, `getEspEvent()`, plus its own environment picker) for the rest of the page session, sticky per load rather than per open so a persistent failure doesn't force a doomed re-attempt on every click. `EventPicker`/`ManualEventLookup` are both kept fully intact either way — flipping `EVENT_BROWSE_ENABLED` back to `false` disables browse outright if ever needed, but the fallback already handles ordinary runtime failures without that.
 
 ## Architecture
 
 Same shape as the [Schedule Maker](../schedule-maker/README.md) precedent:
-Preact + HTM + Spectrum Web Components, no build step, DA SDK auth via
-`context/DAContext.js` (ported unchanged).
+Preact + HTM, no build step (no Spectrum Web Components — see PLAN.md's
+app-shape section for why), DA SDK auth via `context/DAContext.js` (ported
+unchanged).
 
-- `tier-1-event-configurator.js` — entry point; loads Spectrum components, mounts the app.
+- `tier-1-event-configurator.js` — entry point; mounts the app.
 - `TierOneEventConfigurator.js` — root shell (loading/error/toast states, page routing).
 - `context/DAContext.js` — DA SDK auth (org/repo/token).
 - `context/NavigationContext.js` — library ↔ editor page state.
@@ -87,11 +87,12 @@ Preact + HTM + Spectrum Web Components, no build step, DA SDK auth via
 - `pages/ConfigEditor.js` — per-event editor; fetches that event's session catalog on
   open, shows the resulting `Config` JSON and a copy-to-clipboard action.
 - `components/EventPicker.js` — ESP event picker (search + published/draft filter),
-  used by both New config and Duplicate; fails over to `ManualEventLookup` via
-  an `onError` callback if `listAllEvents()` fails at runtime (see the CORS
-  status below).
-- `components/ManualEventLookup.js` — manual Event ID entry + lookup, the
-  active default for New config/Duplicate and the automatic fallback above.
+  the default flow for New config and Duplicate; fails over to
+  `ManualEventLookup` via an `onError` callback if `listAllEvents()` fails
+  at runtime (see the CORS status below).
+- `components/ManualEventLookup.js` — manual Event ID entry + lookup, with
+  its own environment picker; the automatic fallback above, and how you'd
+  target a non-prod tier for testing.
 - `components/TrackIconEditor.js` — per-track icon/color pickers.
 - `components/FeaturedSessionsEditor.js` — featured-sessions picker: search +
   track filter over the already-fetched session catalog, add/remove, ↑/↓
@@ -167,9 +168,13 @@ reaches this app (same limitation Schedule Maker documents for
 `?milolibs=`).
 
 **Use the app's own environment picker instead (2026-07-24, per Daniel) —**
-open New config/Duplicate's manual Event ID lookup (`ManualEventLookup.js`)
-and pick a tier from the **Environment** dropdown next to the Event ID
-field. Backed by `setEventServiceEnvOverride()`
+its home is `ManualEventLookup.js`'s **Environment** dropdown, next to the
+Event ID field. Since `EventPicker` (the full browse/search catalog) is the
+default flow for New config/Duplicate, reach it via the automatic
+fallback — `EventPicker`'s `listAllEvents()` call needs to fail first
+(e.g. testing against a non-prod tier where that call doesn't
+authenticate, see the CORS/auth section below), which swaps the picker to
+`ManualEventLookup` for the rest of the session. Backed by `setEventServiceEnvOverride()`
 (`event-libs/v1/utils/utils.js`) — a module-level override
 `getEventServiceEnv()` checks first, ahead of the query-param/meta-tag/prod
 chain — this persists for the rest of the session (every later ESP call,
