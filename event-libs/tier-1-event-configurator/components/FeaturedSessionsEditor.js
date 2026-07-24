@@ -1,6 +1,6 @@
 import { useState, useMemo, useCallback } from '../../v1/deps/htm-preact.js';
 import { html } from '../htm-wrapper.js';
-import { getSessionTrack } from '../utils.js';
+import { getSessionTrack, formatSessionTime } from '../utils.js';
 import SearchInput from './SearchInput.js';
 
 // Simple up/down reordering rather than drag-and-drop (PLAN.md Phase 3) —
@@ -8,7 +8,7 @@ import SearchInput from './SearchInput.js';
 // DnD adds real implementation/testing surface for a benefit authors get
 // just as well from two buttons. Revisit only if authors actually complain.
 export default function FeaturedSessionsEditor({
-  sessions, tracks, featuredSessions, onChange,
+  sessions, sessionTimes, tracks, featuredSessions, onChange,
 }) {
   const [search, setSearch] = useState('');
   const [trackFilter, setTrackFilter] = useState('');
@@ -18,6 +18,26 @@ export default function FeaturedSessionsEditor({
     (sessions || []).forEach((s) => map.set(s.sessionId, s));
     return map;
   }, [sessions]);
+
+  // A session can have more than one sessionTime (e.g. a live slot plus an
+  // on-demand replay, see ESP-SESSION-ENDPOINTS.md) — show the earliest for
+  // "when is this" picker context.
+  const earliestTimeBySessionId = useMemo(() => {
+    const map = new Map();
+    (sessionTimes || []).forEach((time) => {
+      const existing = map.get(time.sessionId);
+      if (!existing || time.startTimeMillis < existing.startTimeMillis) {
+        map.set(time.sessionId, time);
+      }
+    });
+    return map;
+  }, [sessionTimes]);
+
+  const getSessionMeta = useCallback((session) => {
+    const track = getSessionTrack(session) || '—';
+    const time = formatSessionTime(earliestTimeBySessionId.get(session.sessionId));
+    return time ? `${track} · ${time}` : track;
+  }, [earliestTimeBySessionId]);
 
   const featuredIds = featuredSessions || [];
   const featuredSet = useMemo(() => new Set(featuredIds), [featuredIds]);
@@ -61,7 +81,6 @@ export default function FeaturedSessionsEditor({
         <ul class="tec-featured-editor__list">
           ${featuredIds.map((sessionId, index) => {
             const session = sessionsById.get(sessionId);
-            const track = session && getSessionTrack(session);
             return html`
               <li class="tec-featured-editor__row" key=${sessionId}>
                 <div class="tec-featured-editor__reorder">
@@ -80,7 +99,7 @@ export default function FeaturedSessionsEditor({
                 </div>
                 <div class="tec-featured-editor__info">
                   <span class="tec-featured-editor__title">${session?.enTitle || sessionId}</span>
-                  <span class="tec-featured-editor__track">${track || (session ? '—' : 'Not found in current session catalog')}</span>
+                  <span class="tec-featured-editor__track">${session ? getSessionMeta(session) : 'Not found in current session catalog'}</span>
                 </div>
                 <sp-action-button quiet size="s" onClick=${() => handleRemove(sessionId)}>Remove</sp-action-button>
               </li>
@@ -113,7 +132,7 @@ export default function FeaturedSessionsEditor({
             <li class="tec-featured-editor__row" key=${session.sessionId}>
               <div class="tec-featured-editor__info">
                 <span class="tec-featured-editor__title">${session.enTitle || session.sessionId}</span>
-                <span class="tec-featured-editor__track">${getSessionTrack(session) || '—'}</span>
+                <span class="tec-featured-editor__track">${getSessionMeta(session)}</span>
               </div>
               <sp-action-button quiet size="s" onClick=${() => handleAdd(session.sessionId)}>Add</sp-action-button>
             </li>

@@ -15,6 +15,7 @@ export default function ConfigEditor() {
   } = useConfigs();
 
   const [sessions, setSessions] = useState([]);
+  const [sessionTimes, setSessionTimes] = useState([]);
   const [isLoadingSessions, setIsLoadingSessions] = useState(false);
   const [sessionsError, setSessionsError] = useState(null);
   const [isSaving, setIsSaving] = useState(false);
@@ -32,7 +33,8 @@ export default function ConfigEditor() {
         setSessionsError(result.error || 'Failed to load sessions for this event');
         return;
       }
-      setSessions(result.data);
+      setSessions(result.data.sessions);
+      setSessionTimes(result.data.sessionTimes);
     }).finally(() => {
       if (!cancelled) setIsLoadingSessions(false);
     });
@@ -115,6 +117,7 @@ export default function ConfigEditor() {
         ${!isLoadingSessions && !sessionsError && html`
           <${FeaturedSessionsEditor} \
             sessions=${sessions} \
+            sessionTimes=${sessionTimes} \
             tracks=${tracks} \
             featuredSessions=${activeConfig.config.featuredSessions} \
             onChange=${(next) => updateConfigField('featuredSessions', next)} \

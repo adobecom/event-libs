@@ -479,14 +479,25 @@ describe('Adobe Event Service API', () => {
   });
 
   describe('getEventSessionCatalog', () => {
-    it('should fetch the raw session catalog for an event', async () => {
+    it('should fetch the raw session catalog for an event, including sessionTimes', async () => {
       sandbox.stub(window, 'fetch').resolves({
-        json: () => ({ sessions: [{ sessionId: 's-1' }] }),
+        json: () => ({
+          sessions: [{ sessionId: 's-1' }],
+          sessionTimes: [{ sessionId: 's-1', sessionTimeId: 't-1', startTimeMillis: 1700000000000 }],
+        }),
         ok: true,
       });
       const result = await api.getEventSessionCatalog('event-1');
       expect(result.ok).to.be.true;
-      expect(result.data).to.deep.equal([{ sessionId: 's-1' }]);
+      expect(result.data.sessions).to.deep.equal([{ sessionId: 's-1' }]);
+      expect(result.data.sessionTimes).to.deep.equal([{ sessionId: 's-1', sessionTimeId: 't-1', startTimeMillis: 1700000000000 }]);
+    });
+
+    it('should default sessions and sessionTimes to empty arrays when absent', async () => {
+      sandbox.stub(window, 'fetch').resolves({ json: () => ({}), ok: true });
+      const result = await api.getEventSessionCatalog('event-1');
+      expect(result.ok).to.be.true;
+      expect(result.data).to.deep.equal({ sessions: [], sessionTimes: [] });
     });
 
     it('should return an error on a failed request', async () => {

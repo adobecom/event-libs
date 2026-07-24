@@ -42,6 +42,29 @@ export function extractDistinctTracks(sessions) {
   return [...tracks].sort();
 }
 
+// A session can have more than one sessionTime (e.g. a live slot plus an
+// on-demand replay) — callers pass the one they want formatted (typically
+// the earliest, for a picker's "when is this" context). Formats in the
+// sessionTime's own venue timezone, not the viewer's local one — this is an
+// authoring tool describing when a session is scheduled at the event, not a
+// viewer-facing display.
+export function formatSessionTime(sessionTime) {
+  if (!sessionTime?.startTimeMillis) return '';
+  try {
+    return new Date(sessionTime.startTimeMillis).toLocaleString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+      timeZone: sessionTime.timezone || undefined,
+      timeZoneName: 'short',
+    });
+  } catch {
+    return '';
+  }
+}
+
 export function formatUpdatedTime(isoString) {
   if (!isoString) return '';
   try {

@@ -243,6 +243,11 @@ export async function listAllEvents({ fromDate } = {}) {
 // above — skips Authorization (includeAuth=false) so a non-prod-scoped
 // override token can't get rejected by a non-prod ESP tier's gateway.
 //
+// Returns both `sessions` and `sessionTimes` — ESP keeps start/end times in a
+// separate top-level array cross-referenced by sessionId (a session can have
+// more than one time, e.g. a live slot plus an on-demand replay), not embedded
+// on the session object itself (see tier-1-event-configurator/ESP-SESSION-ENDPOINTS.md).
+//
 // NOTE: sessions-api.js's fetchSessions()/mapEslPayloadToRawSessions() (MWPW-200314,
 // not yet merged to dev as of this writing) hits this same /session-catalog
 // endpoint and normalizes it into the app's session shape. Once that lands,
@@ -262,7 +267,7 @@ export async function getEventSessionCatalog(eventId) {
       return { ok: false, status: response.status, error: data };
     }
 
-    return { ok: true, data: data.sessions || [] };
+    return { ok: true, data: { sessions: data.sessions || [], sessionTimes: data.sessionTimes || [] } };
   } catch (error) {
     window.lana?.log(`Error: Failed to get session catalog for event ${eventId}. Error:${JSON.stringify(error)}`);
     return { ok: false, status: 'Network Error', error: error.message };
