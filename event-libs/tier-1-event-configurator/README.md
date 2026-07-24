@@ -6,7 +6,10 @@ config per Event ID, authored once and pasted by hand into that event's page
 metadata (`tier-1-event-config`).
 
 See [PLAN.md](./PLAN.md) for the full design, decisions, and phase breakdown
-([MWPW-201380](https://jira.corp.adobe.com/browse/MWPW-201380)).
+([MWPW-201380](https://jira.corp.adobe.com/browse/MWPW-201380)). See
+[MWPW-200314-HANDOFF.md](./MWPW-200314-HANDOFF.md) for the consolidated
+consuming-side task list this app's output requires — separate ticket,
+separate branch.
 
 ## Status
 
@@ -20,10 +23,11 @@ icon/color editor (with save-blocking
 validation — a track can't be saved with only an icon or only a color set),
 the allow-double-booking toggle, and the featured-sessions picker
 (`FeaturedSessionsEditor.js` — search + track filter, each session's date/
-start time in its own venue timezone, add/remove, ↑/↓ reorder, writing a
-flat ordered `featuredSessions` array). Phase 3's consuming-side wiring
-(MWPW-200314, separate PR) is still open — see PLAN.md's Phase 3 section
-for what's left there.
+start time in its own venue timezone, add/remove, drag-and-drop reorder
+with a keyboard-operable fallback, writing a flat ordered `featuredSessions`
+array). All consuming-side wiring (MWPW-200314, separate branch/PR) is
+still open — see [MWPW-200314-HANDOFF.md](./MWPW-200314-HANDOFF.md) for the
+consolidated task list.
 
 **Phase 2 scope note:** this app only adds the `allowDoubleBooking` boolean
 to the form/Config JSON. The consuming-side wiring (renaming
