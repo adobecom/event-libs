@@ -131,9 +131,9 @@ describe('data-utils', () => {
       expect(getRsvpTokenAttendeePayload({ requiresTicket: ['No'] }).requiresTicket).to.be.false;
     });
 
-    it('never includes campaignId (server sources it from the token, never the client)', () => {
+    it('includes campaignId — the endpoint shares the same payload schema as the normal attendee flow', () => {
       const out = getRsvpTokenAttendeePayload({ firstName: 'Ada', campaignId: 'camp-1' });
-      expect(out).to.not.have.property('campaignId');
+      expect(out).to.have.property('campaignId', 'camp-1');
     });
 
     it('drops unknown keys', () => {

@@ -850,7 +850,7 @@ describe('Events Form', () => {
       expect(options.headers.get('x-adobe-esp-rsvp-token')).to.equal('valid-rsvp-token-1234567890');
     });
 
-    it('never forwards campaignId on the RSVP token submit call, even when a campaign is routed (server sources it from the token)', async () => {
+    it('forwards a routed campaign in the body of the RSVP token submit call — same payload schema as the normal attendee flow', async () => {
       resetCampaignMapCache();
       window.history.replaceState({}, '', `${window.location.pathname}?campaign=camp-1`);
       BlockMediator.set('imsProfile', { account_type: 'guest', rsvpToken: 'valid-rsvp-token-1234567890' });
@@ -867,7 +867,7 @@ describe('Events Form', () => {
         const submitCall = fetchStub.getCalls().find((call) => String(call.args[0]).includes('/rsvpTokenRegistrations'));
         expect(submitCall.args[0]).to.not.include('campaignId');
         const body = JSON.parse(submitCall.args[1].body);
-        expect(body).to.not.have.property('campaignId');
+        expect(body).to.have.property('campaignId', 'camp-1');
         expect(body.firstName).to.equal('Guest');
       } finally {
         window.history.replaceState({}, '', window.location.pathname);

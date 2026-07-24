@@ -113,17 +113,20 @@ export function getBaseAttendeePayload(attendeeData) {
 
 /**
  * Fields the RSVP token registration endpoint (POST .../rsvpTokenRegistrations)
- * accepts beyond the base attendee identity fields: identity-level consent
- * (consentStringId, already in BASE_ATTENDEE_DATA_FILTER) plus event-level
- * consent/ticket flags that only live in EVENT_ATTENDEE_DATA_FILTER for the
- * normal create-attendee flow. The RSVP token endpoint combines create+add-to-event
- * in one call, so it needs both.
+ * accepts. Per the backend team, this endpoint is a full replacement for the
+ * normal create-attendee + add-to-event calls (same payload schema), just
+ * gated by a looser auth mechanism (x-adobe-esp-rsvp-token header instead of
+ * IMS bearer auth) so a guest without an Adobe ID can hit it. This filter is
+ * BASE_ATTENDEE_DATA_FILTER plus the event-level fields that only live in
+ * EVENT_ATTENDEE_DATA_FILTER for the normal flow — consent/ticket flags and
+ * campaignId — since the RSVP token endpoint combines both calls into one.
  */
 export const RSVP_TOKEN_ATTENDEE_DATA_FILTER = {
   ...BASE_ATTENDEE_DATA_FILTER,
   shareInfoWithPartners: { type: 'boolean', submittable: true },
   ccSentiment: { type: 'string', submittable: true },
   requiresTicket: { type: 'boolean', submittable: true },
+  campaignId: { type: 'string', submittable: true },
 };
 
 export function getRsvpTokenAttendeePayload(attendeeData) {

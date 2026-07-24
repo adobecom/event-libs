@@ -260,9 +260,9 @@ export async function submitForm(bp) {
   // A valid RSVP token never reaches submitForm unless it's still usable (an
   // invalid token short-circuits before the form is built, see onProfile). Submitting
   // consumes the token server-side in the same call that records the registration.
-  // The endpoint combines create-attendee + add-to-event into one call, and sources
-  // campaignId from the token itself — getRsvpTokenAttendeePayload's filter doesn't
-  // include campaignId, so it's dropped here even though it's on payload above.
+  // The endpoint combines create-attendee + add-to-event into one call, using the
+  // same payload schema as that normal flow (per the backend team) — so campaignId
+  // (set on payload above) is included here too via getRsvpTokenAttendeePayload.
   const rsvpToken = BlockMediator.get('imsProfile')?.rsvpToken;
   if (rsvpToken) {
     return submitRsvpTokenRegistration(getMetadata('event-id'), rsvpToken, getRsvpTokenAttendeePayload(payload));
