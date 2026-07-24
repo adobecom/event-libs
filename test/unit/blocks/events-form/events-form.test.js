@@ -850,7 +850,7 @@ describe('Events Form', () => {
       expect(options.headers.get('x-adobe-esp-rsvp-token')).to.equal('valid-rsvp-token-1234567890');
     });
 
-    it('never sends campaignId in the RSVP token submit payload (server sources it from the token)', async () => {
+    it('never forwards campaignId on the RSVP token submit call, even when a campaign is routed (server sources it from the token)', async () => {
       resetCampaignMapCache();
       window.history.replaceState({}, '', `${window.location.pathname}?campaign=camp-1`);
       BlockMediator.set('imsProfile', { account_type: 'guest', rsvpToken: 'valid-rsvp-token-1234567890' });
@@ -865,33 +865,10 @@ describe('Events Form', () => {
         await submitForm({ form: buildForm(), sanitizeList: [] });
 
         const submitCall = fetchStub.getCalls().find((call) => String(call.args[0]).includes('/rsvpTokenRegistrations'));
-        const body = JSON.parse(submitCall.args[1].body);
-        expect(body.campaignId).to.equal(undefined);
-        expect(body.firstName).to.equal('Guest');
-      } finally {
-        window.history.replaceState({}, '', window.location.pathname);
-        resetCampaignMapCache();
-      }
-    });
-
-    it('forwards a routed campaign as a query param on the RSVP token submit call, still never in the body', async () => {
-      resetCampaignMapCache();
-      window.history.replaceState({}, '', `${window.location.pathname}?campaign=camp-1`);
-      BlockMediator.set('imsProfile', { account_type: 'guest', rsvpToken: 'valid-rsvp-token-1234567890' });
-      const fetchStub = sandbox.stub(window, 'fetch').callsFake((url) => {
-        if (typeof url === 'string' && url.includes('campaign-map.json')) {
-          return Promise.resolve({ ok: false, status: 404 });
-        }
-        return Promise.resolve({ json: () => ({ attendeeId: 'att-1', registrationStatus: 'registered' }), ok: true });
-      });
-
-      try {
-        await submitForm({ form: buildForm(), sanitizeList: [] });
-
-        const submitCall = fetchStub.getCalls().find((call) => String(call.args[0]).includes('/rsvpTokenRegistrations'));
-        expect(submitCall.args[0]).to.include('campaignId=camp-1');
+        expect(submitCall.args[0]).to.not.include('campaignId');
         const body = JSON.parse(submitCall.args[1].body);
         expect(body).to.not.have.property('campaignId');
+        expect(body.firstName).to.equal('Guest');
       } finally {
         window.history.replaceState({}, '', window.location.pathname);
         resetCampaignMapCache();

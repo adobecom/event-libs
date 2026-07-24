@@ -477,21 +477,16 @@ export async function validateRsvpToken(eventId, token) {
   }
 }
 
-export async function submitRsvpTokenRegistration(eventId, token, attendeeData, campaignId = null) {
+export async function submitRsvpTokenRegistration(eventId, token, attendeeData) {
   if (!eventId || !token || !attendeeData) return { ok: false, error: 'Missing eventId, token, or attendee data' };
 
   const eventServiceEnv = getEventServiceEnv();
   const { serviceApiEndpoints } = ENV_MAP[eventServiceEnv.name];
   const raw = JSON.stringify(attendeeData);
   const options = await constructRequestOptions('POST', raw, false, true, token);
-  const url = new URL(`${serviceApiEndpoints.esl}/v1/events/${eventId}/rsvpTokenRegistrations`);
-  // Tokens never carry a bound campaign (EMC no longer sets one at generation),
-  // so this query-param fallback is the sole campaign-attribution path for
-  // rsvp-token registrations — campaignId is never sent in the request body.
-  if (campaignId) url.searchParams.set('campaignId', campaignId);
 
   try {
-    const response = await fetch(url.toString(), options);
+    const response = await fetch(`${serviceApiEndpoints.esl}/v1/events/${eventId}/rsvpTokenRegistrations`, options);
     const data = await response.json();
 
     if (!response.ok) {
