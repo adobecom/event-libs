@@ -10,13 +10,15 @@ See [PLAN.md](./PLAN.md) for the full design, decisions, and phase breakdown
 
 ## Status
 
-Phases 1a–1e and Phase 2 are implemented: DA SDK auth, config-library sheet
-CRUD, the library list view (search/Edit/Duplicate/Delete/Copy config), the
-ESP event picker + session fetch (currently gated off in favor of a manual
-Event ID entry fallback — see the CORS status below), the track icon/color
-editor, and the allow-double-booking toggle. Phase 3 (featured sessions) is
-still open — its section in the editor currently shows a "coming soon"
-placeholder.
+Phases 1a–1e, Phase 2, and Phase 3 (app side) are implemented: DA SDK auth,
+config-library sheet CRUD, the library list view (search/Edit/Duplicate/
+Delete/Copy config), the ESP event picker + session fetch (currently gated
+off in favor of a manual Event ID entry fallback — see the CORS status
+below), the track icon/color editor, the allow-double-booking toggle, and
+the featured-sessions picker (`FeaturedSessionsEditor.js` — search + track
+filter, add/remove, ↑/↓ reorder, writing a flat ordered `featuredSessions`
+array). Phase 3's consuming-side wiring (MWPW-200314, separate PR) is still
+open — see PLAN.md's Phase 3 section for what's left there.
 
 **Phase 2 scope note:** this app only adds the `allowDoubleBooking` boolean
 to the form/Config JSON. The consuming-side wiring (renaming
@@ -78,7 +80,15 @@ Preact + HTM + Spectrum Web Components, no build step, DA SDK auth via
 - `pages/ConfigEditor.js` — per-event editor; fetches that event's session catalog on
   open, shows the resulting `Config` JSON and a copy-to-clipboard action.
 - `components/EventPicker.js` — ESP event picker (search + published/draft filter),
-  used by both New config and Duplicate.
+  used by both New config and Duplicate; fails over to `ManualEventLookup` via
+  an `onError` callback if `listAllEvents()` fails at runtime (see the CORS
+  status below).
+- `components/ManualEventLookup.js` — manual Event ID entry + lookup, the
+  active default for New config/Duplicate and the automatic fallback above.
+- `components/TrackIconEditor.js` — per-track icon/color pickers.
+- `components/FeaturedSessionsEditor.js` — featured-sessions picker: search +
+  track filter over the already-fetched session catalog, add/remove, ↑/↓
+  reorder into a flat ordered `featuredSessions` array.
 - `components/Modal.js`, `components/SearchInput.js` — generic, ported from Schedule Maker.
 
 ## Data model

@@ -28,11 +28,15 @@ export async function copyTextToClipboard(text) {
 // duplicated here rather than imported; consolidate once it lands).
 const TRACK_ATTRIBUTE_NAME = 'Primary Track for Agenda (Digital Agenda)';
 
+export function getSessionTrack(session) {
+  const attr = (session?.customAttributes || []).find((a) => a?.name === TRACK_ATTRIBUTE_NAME);
+  return attr?.values?.[0]?.label ?? attr?.values?.[0]?.value ?? null;
+}
+
 export function extractDistinctTracks(sessions) {
   const tracks = new Set();
   (sessions || []).forEach((session) => {
-    const attr = (session.customAttributes || []).find((a) => a?.name === TRACK_ATTRIBUTE_NAME);
-    const value = attr?.values?.[0]?.label ?? attr?.values?.[0]?.value;
+    const value = getSessionTrack(session);
     if (value) tracks.add(value);
   });
   return [...tracks].sort();

@@ -5,6 +5,7 @@ import { useNavigation } from '../context/NavigationContext.js';
 import { useConfigs } from '../context/ConfigsContext.js';
 import { copyTextToClipboard, extractDistinctTracks } from '../utils.js';
 import TrackIconEditor from '../components/TrackIconEditor.js';
+import FeaturedSessionsEditor from '../components/FeaturedSessionsEditor.js';
 
 export default function ConfigEditor() {
   const { goToLibrary } = useNavigation();
@@ -110,7 +111,15 @@ export default function ConfigEditor() {
 
       <section class="tec-editor__section">
         <h2>Featured sessions</h2>
-        <p class="tec-editor__placeholder">Coming soon (PLAN.md Phase 3).</p>
+        <p>Pick which sessions appear in the featured carousel, and set their display order.</p>
+        ${!isLoadingSessions && !sessionsError && html`
+          <${FeaturedSessionsEditor} \
+            sessions=${sessions} \
+            tracks=${tracks} \
+            featuredSessions=${activeConfig.config.featuredSessions} \
+            onChange=${(next) => updateConfigField('featuredSessions', next)} \
+          />
+        `}
       </section>
 
       <section class="tec-editor__section">

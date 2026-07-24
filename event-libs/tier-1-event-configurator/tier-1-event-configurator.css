@@ -336,6 +336,109 @@
   cursor: pointer;
 }
 
+.tec-featured-editor {
+  display: flex;
+  gap: var(--tec-spacing-lg);
+}
+
+.tec-featured-editor__column {
+  flex: 1;
+  min-width: 0;
+}
+
+.tec-featured-editor__column h3 {
+  font-size: 14px;
+  margin: 0 0 var(--tec-spacing-sm);
+}
+
+.tec-featured-editor__controls {
+  display: flex;
+  gap: var(--tec-spacing-sm);
+  margin-bottom: var(--tec-spacing-sm);
+}
+
+.tec-featured-editor__search {
+  flex: 1;
+}
+
+.tec-featured-editor__track-filter {
+  padding: 6px 8px;
+  border: 1px solid var(--tec-color-border);
+  border-radius: var(--tec-border-radius);
+  font-size: 13px;
+}
+
+.tec-featured-editor__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 360px;
+  overflow-y: auto;
+}
+
+.tec-featured-editor__row {
+  display: flex;
+  align-items: center;
+  gap: var(--tec-spacing-sm);
+  padding: 8px;
+  background: var(--tec-color-background);
+  border: 1px solid var(--tec-color-border);
+  border-radius: var(--tec-border-radius);
+}
+
+.tec-featured-editor__reorder {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.tec-featured-editor__reorder button {
+  border: 1px solid var(--tec-color-border);
+  background: var(--tec-color-surface);
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 11px;
+  line-height: 1;
+  padding: 2px 4px;
+}
+
+.tec-featured-editor__reorder button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.tec-featured-editor__info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.tec-featured-editor__title {
+  font-weight: 700;
+  font-size: 13px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tec-featured-editor__track {
+  font-size: 12px;
+  color: var(--tec-color-text-secondary);
+}
+
+.tec-featured-editor__empty {
+  color: var(--tec-color-text-secondary);
+  font-style: italic;
+  font-size: 13px;
+  list-style: none;
+}
+
 .tec-editor__config-preview {
   background: var(--tec-color-background);
   border: 1px solid var(--tec-color-border);
