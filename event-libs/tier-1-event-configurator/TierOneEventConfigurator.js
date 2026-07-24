@@ -5,16 +5,20 @@ import ConfigEditor from './pages/ConfigEditor.js';
 import { useNavigation } from './context/NavigationContext.js';
 import { useConfigs } from './context/ConfigsContext.js';
 import { useDA } from './context/DAContext.js';
-import { PAGES } from './constants.js';
+import { useEventEnv } from './context/EventEnvContext.js';
+import { PAGES, EVENT_SERVICE_ENV_OPTIONS } from './constants.js';
 
 const TOAST_TIMEOUT_MS = 6000;
 
 export default function TierOneEventConfigurator() {
   const { isLoading: isDaLoading, error: daError } = useDA();
   const { activePage } = useNavigation();
+  const { envName } = useEventEnv();
   const {
     toastError, clearToastError, toastSuccess, clearToastSuccess, isInitialLoading, error,
   } = useConfigs();
+
+  const envLabel = EVENT_SERVICE_ENV_OPTIONS.find((opt) => opt.value === envName)?.label || envName;
 
   // sp-toast owned its own auto-dismiss timeout; a plain div needs its own.
   useEffect(() => {
@@ -51,6 +55,13 @@ export default function TierOneEventConfigurator() {
 
   return html`
     <div class="tec-app">
+      ${envName !== 'prod' && html`
+        <div class="tec-env-banner" role="status">
+          <strong>Non-production environment: ${envLabel}.</strong>
+          ESP/ESL calls are targeting ${envName}, not prod — set via the manual Event ID lookup's environment picker.
+        </div>
+      `}
+
       ${isInitialLoading && html`
         <div class="tec-loading">
           <div class="tec-spinner" role="status" aria-label="Loading config library…"></div>

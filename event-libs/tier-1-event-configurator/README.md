@@ -76,6 +76,9 @@ Preact + HTM + Spectrum Web Components, no build step, DA SDK auth via
 - `context/DAContext.js` — DA SDK auth (org/repo/token).
 - `context/NavigationContext.js` — library ↔ editor page state.
 - `context/ConfigsContext.js` — config-library list state, CRUD actions, toasts.
+- `context/EventEnvContext.js` — reactive wrapper around
+  `setEventServiceEnvOverride()`; backs `ManualEventLookup.js`'s environment
+  picker and the app-wide non-prod banner.
 - `scripts/da-controller.js` — `readSheet`/`writeSheet`/`mutateSheet` (ETag optimistic
   locking, ported from Schedule Maker's pre-link-first-pivot implementation) plus
   `getConfigs`/`upsertConfig`/`deleteConfig` on top.
@@ -155,24 +158,33 @@ npx serve . --listen 3000
   wiring and real ESP calls, but not real DA auth/writes.
 - Requires being signed in to da.live in the browser you open that URL in.
 
-### Switching ESP env locally
+### Switching ESP env
 
 `?espenv=`/`?eccEnv=` query params **don't work** through the DA-proxied
 route above — DA's SDK only forwards `context.ref` through the iframe
 handshake, so a query param on the parent `da.live/app/...` URL never
 reaches this app (same limitation Schedule Maker documents for
-`?milolibs=`). Instead, uncomment and edit the `event-service-env` `<meta>`
-tag already present in
-[tools/da-apps/tier-1-event-configurator.html](../tools/da-apps/tier-1-event-configurator.html):
+`?milolibs=`).
 
-```html
-<meta name="event-service-env" content="stage" />
-```
+**Use the app's own environment picker instead (2026-07-24, per Daniel) —**
+open New config/Duplicate's manual Event ID lookup (`ManualEventLookup.js`)
+and pick a tier from the **Environment** dropdown next to the Event ID
+field. Backed by `setEventServiceEnvOverride()`
+(`event-libs/v1/utils/utils.js`) — a module-level override
+`getEventServiceEnv()` checks first, ahead of the query-param/meta-tag/prod
+chain — this persists for the rest of the session (every later ESP call,
+not just that one lookup), and the app shows a loud banner across the top
+of every page any time it's not targeting prod, so there's no ambiguity
+about which tier is live. Valid values are the `ENV_MAP` keys in
+`event-libs/v1/utils/constances.js`: `prod`, `stage`, `stage02`, `dev`,
+`dev02` (the picker excludes `local` — that's specifically for the
+localhost-serving dev harness below, and targets the same endpoints as
+`dev` anyway).
 
-`getEventServiceEnv()` (`event-libs/v1/utils/utils.js`) reads this tag
-directly from the iframe's own `document.head`, independent of the parent
-page — verified locally: with `content="stage"` set, `listEvents()`'s
-fetch resolved to `events-service-platform-stage.adobe.io` instead of the
-`prod` default. Valid values are the `ENV_MAP` keys in
-`event-libs/v1/utils/constances.js`: `dev`, `dev02`, `stage`, `stage02`,
-`prod`, `local`.
+This supersedes hardcoding the `event-service-env` `<meta>` tag in
+[tools/da-apps/tier-1-event-configurator.html](../tools/da-apps/tier-1-event-configurator.html)
+— that tag forced the same env for everyone with no visible indication it
+was active, and is now commented out by default. It's still supported as a
+lower-priority fallback in `getEventServiceEnv()` for a scenario the in-app
+picker can't reach (e.g. before the app itself has mounted), but shouldn't
+be needed in normal use.

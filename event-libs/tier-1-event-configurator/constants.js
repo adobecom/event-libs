@@ -19,9 +19,23 @@ const PAGES = {
 // singular lookup) remains the confirmed-working path.
 const EVENT_BROWSE_ENABLED = false;
 
+// Selectable in ManualEventLookup.js's env picker (context/EventEnvContext.js).
+// Excludes 'local' — that's specifically for the localhost-serving dev
+// harness (README's "Local development" section), not something an author
+// picking a real ESP tier from the UI would want; it targets the exact same
+// endpoints as 'dev' anyway (see v1/utils/constances.js's ENV_MAP).
+const EVENT_SERVICE_ENV_OPTIONS = [
+  { value: 'prod', label: 'Prod' },
+  { value: 'stage', label: 'Stage' },
+  { value: 'stage02', label: 'Stage02' },
+  { value: 'dev', label: 'Dev' },
+  { value: 'dev02', label: 'Dev02' },
+];
+
 export {
   DA_ADMIN_ORIGIN,
   CONFIGS_SHEET_PATH,
   PAGES,
   EVENT_BROWSE_ENABLED,
+  EVENT_SERVICE_ENV_OPTIONS,
 };

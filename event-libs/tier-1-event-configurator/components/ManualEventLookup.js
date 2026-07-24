@@ -2,15 +2,26 @@ import { useState } from '../../v1/deps/htm-preact.js';
 import { html } from '../htm-wrapper.js';
 import { getEspEvent } from '../../v1/utils/esp-controller.js';
 import Modal from './Modal.js';
+import { useEventEnv } from '../context/EventEnvContext.js';
+import { EVENT_SERVICE_ENV_OPTIONS } from '../constants.js';
 
 // Fallback for New Config/Duplicate while listEvents()'s CORS gap is open
 // (see constants.js's EVENT_BROWSE_ENABLED) — author enters a known Event ID
 // directly rather than browsing/searching the full catalog. getEspEvent()
 // looks it up for real (confirmed CORS-free, unlike the list endpoint) so
 // the author can confirm the title/published state before proceeding.
+//
+// Also the one place an author can target a non-prod ESP tier (per Daniel —
+// replaces hardcoding a <meta name="event-service-env"> tag in the loader
+// HTML, which forced the same env for everyone with no visible indication
+// it was active). Persists for the rest of the session via
+// EventEnvContext/setEventServiceEnvOverride — the same choice applies to
+// every later ESP call (session catalog fetch, etc.), not just this lookup
+// — and TierOneEventConfigurator.js shows a loud banner any time it's not prod.
 export default function ManualEventLookup({
   isOpen, onClose, onSelect, title = 'Enter an Event ID',
 }) {
+  const { envName, setEnv } = useEventEnv();
   const [eventId, setEventId] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -19,6 +30,14 @@ export default function ManualEventLookup({
   const reset = () => {
     setEventId('');
     setIsLoading(false);
+    setError(null);
+    setFoundEvent(null);
+  };
+
+  const handleEnvChange = (e) => {
+    setEnv(e.target.value);
+    // A result already shown was fetched under the previous env — clear it
+    // rather than leave a stale lookup displayed against the new choice.
     setError(null);
     setFoundEvent(null);
   };
@@ -55,6 +74,12 @@ export default function ManualEventLookup({
         <p class="tec-manual-lookup__hint">
           Enter the Event ID exactly as it appears in ESP or the event page's own metadata.
         </p>
+        <label class="tec-manual-lookup__env-row">
+          <span class="tec-manual-lookup__env-label">Environment</span>
+          <select class="tec-field tec-manual-lookup__env-select" value=${envName} onChange=${handleEnvChange}>
+            ${EVENT_SERVICE_ENV_OPTIONS.map((opt) => html`<option value=${opt.value} key=${opt.value}>${opt.label}</option>`)}
+          </select>
+        </label>
         <div class="tec-manual-lookup__row">
           <input
             type="text"

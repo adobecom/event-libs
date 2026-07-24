@@ -3,6 +3,7 @@ import { html } from './htm-wrapper.js';
 import { DAProvider } from './context/DAContext.js';
 import { NavigationProvider } from './context/NavigationContext.js';
 import { ConfigsProvider } from './context/ConfigsContext.js';
+import { EventEnvProvider } from './context/EventEnvContext.js';
 import TierOneEventConfigurator from './TierOneEventConfigurator.js';
 
 // No Spectrum Web Components — plain HTML/CSS (tier-1-event-configurator.css)
@@ -13,11 +14,13 @@ async function init() {
   render(
     html`
       <${DAProvider}>
-        <${NavigationProvider}>
-          <${ConfigsProvider}>
-            <${TierOneEventConfigurator} />
-          </${ConfigsProvider}>
-        </${NavigationProvider}>
+        <${EventEnvProvider}>
+          <${NavigationProvider}>
+            <${ConfigsProvider}>
+              <${TierOneEventConfigurator} />
+            </${ConfigsProvider}>
+          </${NavigationProvider}>
+        </${EventEnvProvider}>
       </${DAProvider}>
     `,
     document.getElementById('app'),

@@ -104,6 +104,19 @@
   margin: 4px 0 0;
 }
 
+/* Non-prod environment banner — deliberately loud (unlike everything else
+   in this app) so it's impossible to miss that ESP/ESL calls aren't
+   hitting prod. Never rendered at all when targeting prod, so there's no
+   visual noise in the common case. */
+.tec-env-banner {
+  background: #fdf0e0;
+  color: #7a4a00;
+  border-bottom: 1px solid #f0c987;
+  padding: 10px var(--tec-spacing-lg);
+  font-size: 13px;
+  text-align: center;
+}
+
 /* Spinner */
 
 .tec-spinner {
@@ -543,6 +556,23 @@ select.tec-field {
   color: var(--tec-color-text-secondary);
   font-size: 13px;
   margin-top: 0;
+}
+
+.tec-manual-lookup__env-row {
+  display: flex;
+  align-items: center;
+  gap: var(--tec-spacing-sm);
+  margin-bottom: var(--tec-spacing-md);
+}
+
+.tec-manual-lookup__env-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--tec-color-text-secondary);
+}
+
+.tec-manual-lookup__env-select {
+  min-width: 120px;
 }
 
 .tec-manual-lookup__row {
