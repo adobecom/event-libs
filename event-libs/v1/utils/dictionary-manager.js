@@ -181,6 +181,36 @@ export function getInviteOnlyNoCampaignMessage(manager) {
     : text;
 }
 
+export const RSVP_TOKEN_INVALID_MESSAGE_KEY = 'rsvp-token-invalid-cta-text';
+
+/**
+ * Localized message when an RSVP token has already been used, expired, or revoked.
+ * @param {DictionaryManager} manager - Initialized dictionary manager instance
+ * @returns {string}
+ */
+export function getRsvpTokenInvalidMessage(manager) {
+  const text = manager.getValue(RSVP_TOKEN_INVALID_MESSAGE_KEY);
+  return text === RSVP_TOKEN_INVALID_MESSAGE_KEY
+    ? 'This registration link is no longer valid. It may have already been used or expired.'
+    : text;
+}
+
+export const RSVP_TOKEN_ALREADY_REGISTERED_MESSAGE_KEY = 'rsvp-token-already-registered-cta-text';
+
+/**
+ * Localized message when an RSVP token registration fails because the email is
+ * already registered for the event. Unlike an invalid/used token, the token itself
+ * is NOT consumed by this error and stays usable for a different guest.
+ * @param {DictionaryManager} manager - Initialized dictionary manager instance
+ * @returns {string}
+ */
+export function getRsvpTokenAlreadyRegisteredMessage(manager) {
+  const text = manager.getValue(RSVP_TOKEN_ALREADY_REGISTERED_MESSAGE_KEY);
+  return text === RSVP_TOKEN_ALREADY_REGISTERED_MESSAGE_KEY
+    ? 'This email is already registered for this event.'
+    : text;
+}
+
 export const EVENT_WAITLIST_BANNER_MESSAGE_KEY = 'event-waitlist-banner-msg';
 
 /**

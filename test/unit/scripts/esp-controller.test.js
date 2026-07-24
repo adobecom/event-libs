@@ -42,6 +42,52 @@ describe('Adobe Event Service API', () => {
       expect(options).to.have.property('method', 'GET');
       expect(options.headers.get('Authorization')).to.equal('Bearer fake-token');
     });
+
+    it('should prefer the setEspAuthToken override over window.adobeIMS', async () => {
+      window.adobeIMS = { getAccessToken: () => ({ token: 'ims-token' }) };
+      api.setEspAuthToken('override-token');
+      try {
+        const options = await api.constructRequestOptions('GET');
+        expect(options.headers.get('Authorization')).to.equal('Bearer override-token');
+      } finally {
+        api.setEspAuthToken(null);
+      }
+    });
+
+    it('should fall back to window.adobeIMS once the override is cleared', async () => {
+      window.adobeIMS = { getAccessToken: () => ({ token: 'ims-token' }) };
+      api.setEspAuthToken('override-token');
+      api.setEspAuthToken(null);
+      const options = await api.constructRequestOptions('GET');
+      expect(options.headers.get('Authorization')).to.equal('Bearer ims-token');
+    });
+
+    it('should omit Authorization entirely when skipAuth is true, even with an override set', async () => {
+      window.adobeIMS = { getAccessToken: () => ({ token: 'ims-token' }) };
+      api.setEspAuthToken('override-token');
+      try {
+        const options = await api.constructRequestOptions('GET', null, true, true);
+        expect(options.headers.has('Authorization')).to.be.false;
+      } finally {
+        api.setEspAuthToken(null);
+      }
+    });
+
+    it('should omit the Authorization header when skipAuth is true, even with a signed-in session', async () => {
+      window.adobeIMS = { getAccessToken: () => ({ token: 'fake-token' }) };
+      const options = await api.constructRequestOptions('GET', null, false, true);
+      expect(options.headers.has('Authorization')).to.be.false;
+    });
+
+    it('should attach the x-adobe-esp-rsvp-token header when an RSVP token is passed', async () => {
+      const options = await api.constructRequestOptions('GET', null, false, true, 'tok-1');
+      expect(options.headers.get('x-adobe-esp-rsvp-token')).to.equal('tok-1');
+    });
+
+    it('should omit the RSVP token header when no RSVP token is passed', async () => {
+      const options = await api.constructRequestOptions('GET');
+      expect(options.headers.has('x-adobe-esp-rsvp-token')).to.be.false;
+    });
   });
 
   describe('getEvent', () => {
@@ -224,6 +270,122 @@ describe('Adobe Event Service API', () => {
     });
   });
 
+  describe('validateRsvpToken', () => {
+    it('should validate a usable RSVP token', async () => {
+      sandbox.stub(window, 'fetch').resolves({ json: () => ({ eventId: 'event-123', campaignId: 'camp-1' }), ok: true });
+      const result = await api.validateRsvpToken('event-123', 'tok-1');
+      expect(result.ok).to.be.true;
+      expect(result.data).to.have.property('eventId', 'event-123');
+    });
+
+    it('should call the event-scoped rsvpTokenRegistrations endpoint with the token header', async () => {
+      delete window.adobeIMS;
+      const fetchStub = sandbox.stub(window, 'fetch').resolves({ json: () => ({ eventId: 'event-123' }), ok: true });
+      const result = await api.validateRsvpToken('event-123', 'tok-1');
+      expect(result.ok).to.be.true;
+      expect(fetchStub.calledOnce).to.be.true;
+      const [url, options] = fetchStub.firstCall.args;
+      expect(url).to.include('/v1/events/event-123/rsvpTokenRegistrations');
+      expect(options.headers.get('x-adobe-esp-rsvp-token')).to.equal('tok-1');
+    });
+
+    it('should return an error for a used/expired/revoked/unknown token', async () => {
+      sandbox.stub(window, 'fetch').resolves({ json: () => ({ message: 'Gone' }), ok: false, status: 410 });
+      const result = await api.validateRsvpToken('event-123', 'tok-1');
+      expect(result.ok).to.be.false;
+      expect(result.status).to.equal(410);
+    });
+
+    it('should handle network errors', async () => {
+      sandbox.stub(window, 'fetch').rejects(new Error('Network failure'));
+      const result = await api.validateRsvpToken('event-123', 'tok-1');
+      expect(result.ok).to.be.false;
+      expect(result.status).to.equal('Network Error');
+    });
+
+    it('should never attach the caller\'s own Authorization header, even when already signed in', async () => {
+      window.adobeIMS = { getAccessToken: () => ({ token: 'assistants-own-token' }) };
+      const fetchStub = sandbox.stub(window, 'fetch').resolves({ json: () => ({ eventId: 'event-123' }), ok: true });
+      await api.validateRsvpToken('event-123', 'tok-1');
+      const [, options] = fetchStub.firstCall.args;
+      expect(options.headers.has('Authorization')).to.be.false;
+    });
+  });
+
+  describe('submitRsvpTokenRegistration', () => {
+    it('should submit an RSVP token registration and return the attendee data', async () => {
+      const fetchStub = sandbox.stub(window, 'fetch').resolves({
+        json: () => ({ attendeeId: 'att-1', registrationStatus: 'registered' }),
+        ok: true,
+      });
+
+      const result = await api.submitRsvpTokenRegistration('event-123', 'tok-1', { firstName: 'John', lastName: 'Doe', email: 'john@test.com' });
+      expect(result.ok).to.be.true;
+      expect(result.data).to.have.property('registrationStatus', 'registered');
+
+      const [url, options] = fetchStub.firstCall.args;
+      expect(url).to.include('/v1/events/event-123/rsvpTokenRegistrations');
+      expect(url).to.not.include('campaignId');
+      expect(options.headers.get('x-adobe-esp-rsvp-token')).to.equal('tok-1');
+    });
+
+    it('should append campaignId as a query param (never in the body) when a campaign is passed', async () => {
+      const fetchStub = sandbox.stub(window, 'fetch').resolves({
+        json: () => ({ attendeeId: 'att-1', registrationStatus: 'registered' }),
+        ok: true,
+      });
+
+      await api.submitRsvpTokenRegistration('event-123', 'tok-1', { firstName: 'John' }, 'camp-1');
+
+      const [url, options] = fetchStub.firstCall.args;
+      expect(url).to.include('/v1/events/event-123/rsvpTokenRegistrations');
+      expect(url).to.include('campaignId=camp-1');
+      const body = JSON.parse(options.body);
+      expect(body).to.not.have.property('campaignId');
+    });
+
+    it('should omit the campaignId query param when no campaign is passed', async () => {
+      const fetchStub = sandbox.stub(window, 'fetch').resolves({
+        json: () => ({ attendeeId: 'att-1' }),
+        ok: true,
+      });
+
+      await api.submitRsvpTokenRegistration('event-123', 'tok-1', { firstName: 'John' });
+
+      const [url] = fetchStub.firstCall.args;
+      expect(url).to.not.include('campaignId');
+    });
+
+    it('should return an error without making a request when eventId, token, or data is missing', async () => {
+      const fetchStub = sandbox.stub(window, 'fetch');
+      const result = await api.submitRsvpTokenRegistration('event-123', null, { firstName: 'John' });
+      expect(result.ok).to.be.false;
+      expect(fetchStub.called).to.be.false;
+    });
+
+    it('should return an error if the email is already registered', async () => {
+      sandbox.stub(window, 'fetch').resolves({ json: () => ({ message: 'Conflict' }), ok: false, status: 409 });
+      const result = await api.submitRsvpTokenRegistration('event-123', 'tok-1', { firstName: 'John' });
+      expect(result.ok).to.be.false;
+      expect(result.status).to.equal(409);
+    });
+
+    it('should never attach the caller\'s own Authorization header, even when already signed in', async () => {
+      window.adobeIMS = { getAccessToken: () => ({ token: 'assistants-own-token' }) };
+      const fetchStub = sandbox.stub(window, 'fetch').resolves({ json: () => ({ attendeeId: 'att-1' }), ok: true });
+      await api.submitRsvpTokenRegistration('event-123', 'tok-1', { firstName: 'John' });
+      const [, options] = fetchStub.firstCall.args;
+      expect(options.headers.has('Authorization')).to.be.false;
+    });
+
+    it('should handle network errors', async () => {
+      sandbox.stub(window, 'fetch').rejects(new Error('Network failure'));
+      const result = await api.submitRsvpTokenRegistration('event-123', 'tok-1', { firstName: 'John' });
+      expect(result.ok).to.be.false;
+      expect(result.status).to.equal('Network Error');
+    });
+  });
+
   describe('getAndCreateAndAddAttendee', () => {
     const eventId = 'event-123';
     const attendeeData = { firstName: 'John', lastName: 'Doe', email: 'john@test.com' };
@@ -338,6 +500,168 @@ describe('Adobe Event Service API', () => {
       const result = await api.getAndCreateAndAddAttendee(eventId, dataWithCampaign);
       expect(result.ok).to.be.true;
       expect(result.data.registrationStatus).to.equal('registered');
+    });
+  });
+
+  describe('listEvents', () => {
+    it('should fetch a page of events', async () => {
+      sandbox.stub(window, 'fetch').resolves({
+        json: () => ({ events: [{ eventId: '1' }], nextPageToken: 'tok-2' }),
+        ok: true,
+      });
+      const result = await api.listEvents({});
+      expect(result.ok).to.be.true;
+      expect(result.data.events).to.deep.equal([{ eventId: '1' }]);
+      expect(result.data.nextPageToken).to.equal('tok-2');
+    });
+
+    it('should call the ESP host, not ESL', async () => {
+      const fetchStub = sandbox.stub(window, 'fetch').resolves({
+        json: () => ({ events: [] }),
+        ok: true,
+      });
+      await api.listEvents({});
+      const [url] = fetchStub.firstCall.args;
+      expect(url).to.include('/v1/events');
+      expect(url).to.not.include('events-service-layer');
+    });
+
+    it('should return an error on a failed request', async () => {
+      sandbox.stub(window, 'fetch').resolves({ json: () => ({ message: 'nope' }), ok: false, status: 500 });
+      const result = await api.listEvents({});
+      expect(result.ok).to.be.false;
+      expect(result.status).to.equal(500);
+    });
+  });
+
+  describe('listAllEvents', () => {
+    it('should walk every page until nextPageToken is exhausted', async () => {
+      const fetchStub = sandbox.stub(window, 'fetch');
+      fetchStub.onCall(0).resolves({
+        json: () => ({ events: [{ eventId: '1' }], nextPageToken: 'tok-2' }),
+        ok: true,
+      });
+      fetchStub.onCall(1).resolves({
+        json: () => ({ events: [{ eventId: '2' }], nextPageToken: null }),
+        ok: true,
+      });
+      const result = await api.listAllEvents({ fromDate: 1 });
+      expect(result.ok).to.be.true;
+      expect(result.data).to.deep.equal([{ eventId: '1' }, { eventId: '2' }]);
+      expect(fetchStub.callCount).to.equal(2);
+    });
+
+    it('should cache the result for repeat calls with the same fromDate', async () => {
+      const fetchStub = sandbox.stub(window, 'fetch').resolves({
+        json: () => ({ events: [{ eventId: '1' }], nextPageToken: null }),
+        ok: true,
+      });
+      await api.listAllEvents({ fromDate: 42 });
+      await api.listAllEvents({ fromDate: 42 });
+      expect(fetchStub.callCount).to.equal(1);
+    });
+
+    it('should not cache a failed fetch', async () => {
+      const fetchStub = sandbox.stub(window, 'fetch');
+      fetchStub.onCall(0).resolves({ json: () => ({ message: 'nope' }), ok: false, status: 500 });
+      fetchStub.onCall(1).resolves({ json: () => ({ events: [], nextPageToken: null }), ok: true });
+      const first = await api.listAllEvents({ fromDate: 99 });
+      expect(first.ok).to.be.false;
+      const second = await api.listAllEvents({ fromDate: 99 });
+      expect(second.ok).to.be.true;
+      expect(fetchStub.callCount).to.equal(2);
+    });
+
+    it('should apply no from-date floor when called with no arguments', async () => {
+      const fetchStub = sandbox.stub(window, 'fetch').resolves({
+        json: () => ({ events: [], nextPageToken: null }),
+        ok: true,
+      });
+      await api.listAllEvents();
+      const [url] = fetchStub.firstCall.args;
+      expect(url).to.not.include('from-date');
+    });
+  });
+
+  describe('getEspEvent', () => {
+    it('should fetch a single event directly from ESP', async () => {
+      const fetchStub = sandbox.stub(window, 'fetch').resolves({
+        json: () => ({ eventId: 'event-1', enTitle: 'Test Event', published: true }),
+        ok: true,
+      });
+      const result = await api.getEspEvent('event-1');
+      expect(result.ok).to.be.true;
+      expect(result.data).to.deep.equal({ eventId: 'event-1', enTitle: 'Test Event', published: true });
+      const [url] = fetchStub.firstCall.args;
+      expect(url).to.include('/v1/events/event-1');
+      expect(url).to.not.include('events-service-layer');
+    });
+
+    it('should return an error for an unknown event id', async () => {
+      sandbox.stub(window, 'fetch').resolves({ json: () => ({ message: 'not found' }), ok: false, status: 404 });
+      const result = await api.getEspEvent('missing-id');
+      expect(result.ok).to.be.false;
+      expect(result.status).to.equal(404);
+    });
+
+    it('should not send an Authorization header even with an override token set', async () => {
+      api.setEspAuthToken('da-token');
+      try {
+        const fetchStub = sandbox.stub(window, 'fetch').resolves({
+          json: () => ({ eventId: 'event-1' }),
+          ok: true,
+        });
+        await api.getEspEvent('event-1');
+        const [, options] = fetchStub.firstCall.args;
+        expect(options.headers.has('Authorization')).to.be.false;
+      } finally {
+        api.setEspAuthToken(null);
+      }
+    });
+  });
+
+  describe('getEventSessionCatalog', () => {
+    it('should fetch the raw session catalog for an event, including sessionTimes', async () => {
+      sandbox.stub(window, 'fetch').resolves({
+        json: () => ({
+          sessions: [{ sessionId: 's-1' }],
+          sessionTimes: [{ sessionId: 's-1', sessionTimeId: 't-1', startTimeMillis: 1700000000000 }],
+        }),
+        ok: true,
+      });
+      const result = await api.getEventSessionCatalog('event-1');
+      expect(result.ok).to.be.true;
+      expect(result.data.sessions).to.deep.equal([{ sessionId: 's-1' }]);
+      expect(result.data.sessionTimes).to.deep.equal([{ sessionId: 's-1', sessionTimeId: 't-1', startTimeMillis: 1700000000000 }]);
+    });
+
+    it('should default sessions and sessionTimes to empty arrays when absent', async () => {
+      sandbox.stub(window, 'fetch').resolves({ json: () => ({}), ok: true });
+      const result = await api.getEventSessionCatalog('event-1');
+      expect(result.ok).to.be.true;
+      expect(result.data).to.deep.equal({ sessions: [], sessionTimes: [] });
+    });
+
+    it('should return an error on a failed request', async () => {
+      sandbox.stub(window, 'fetch').resolves({ json: () => ({ message: 'nope' }), ok: false, status: 404 });
+      const result = await api.getEventSessionCatalog('event-1');
+      expect(result.ok).to.be.false;
+      expect(result.status).to.equal(404);
+    });
+
+    it('should not send an Authorization header even with an override token set', async () => {
+      api.setEspAuthToken('da-token');
+      try {
+        const fetchStub = sandbox.stub(window, 'fetch').resolves({
+          json: () => ({ sessions: [] }),
+          ok: true,
+        });
+        await api.getEventSessionCatalog('event-1');
+        const [, options] = fetchStub.firstCall.args;
+        expect(options.headers.has('Authorization')).to.be.false;
+      } finally {
+        api.setEspAuthToken(null);
+      }
     });
   });
 });

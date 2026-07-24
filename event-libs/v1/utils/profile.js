@@ -1,6 +1,6 @@
 import BlockMediator from '../deps/block-mediator.min.js';
-import { getEventAttendee } from './esp-controller.js';
-import { getMetadata } from './utils.js';
+import { getEventAttendee, validateRsvpToken } from './esp-controller.js';
+import { getMetadata, getRsvpToken } from './utils.js';
 
 export async function getProfile() {
   const { feds, adobeProfile, fedsConfig, adobeIMS } = window;
@@ -51,6 +51,24 @@ export function lazyCaptureProfile() {
   }
 
   async function captureProfile() {
+    // An RSVP token always bypasses Adobe ID login, regardless of whether the
+    // browser happens to have a signed-in IMS session (e.g. an assistant using their
+    // own account to RSVP on a VIP's behalf). Validate the token itself server-side
+    // and short-circuit the normal profile/attendee lookup.
+    const rsvpToken = getRsvpToken();
+    if (rsvpToken) {
+      const eventId = getMetadata('event-id');
+      const validateResp = await validateRsvpToken(eventId, rsvpToken);
+      // The validate call is event-scoped, so the backend already 404s a token
+      // minted for a different event (e.g. a copy-pasted/reused URL) — a plain
+      // ok/not-ok check is enough; 401/404/409/410 all mean "not usable here".
+      BlockMediator.set('rsvpData', null);
+      BlockMediator.set('imsProfile', validateResp.ok
+        ? { account_type: 'guest', rsvpToken, rsvpTokenEventId: validateResp.data?.eventId ?? eventId }
+        : { account_type: 'guest', rsvpToken, rsvpTokenInvalid: true });
+      return;
+    }
+
     try {
       const profile = await getProfile();
       BlockMediator.set('imsProfile', profile);

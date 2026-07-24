@@ -16,6 +16,8 @@ export const EVENT_ATTENDEE_DATA_FILTER = {
   requiresTicket: { type: 'boolean', submittable: true },
   ccSentiment: { type: 'string', submittable: true },
   campaignId: { type: 'string', submittable: true },
+  phoneticFirstName: { type: 'string', submittable: true },
+  phoneticLastName: { type: 'string', submittable: true },
 };
 
 /**
@@ -58,6 +60,8 @@ export const BASE_ATTENDEE_DATA_FILTER = {
   isGuest: { type: 'boolean', submittable: true },
   consentStringId: { type: 'string', submittable: true },
   modificationTime: { type: 'string', submittable: true },
+  phoneticFirstName: { type: 'string', submittable: true },
+  phoneticLastName: { type: 'string', submittable: true },
 };
 
 export function isValidAttribute(attr) {
@@ -67,12 +71,12 @@ export function isValidAttribute(attr) {
 const BOOLEAN_TRUE_TOKENS = new Set(['yes', 'true', '1', 'y', 'on']);
 const BOOLEAN_FALSE_TOKENS = new Set(['no', 'false', '0', 'n', 'off']);
 
-function coerceEventAttendeeBoolean(key, value) {
+function coerceBoolean(key, value) {
   if (typeof value === 'boolean') return value;
   if (Array.isArray(value)) {
     if (value.length === 0) return undefined;
-    if (value.length === 1) return coerceEventAttendeeBoolean(key, value[0]);
-    window.lana?.log(`getEventAttendeePayload: unexpected boolean field shape for ${key}`);
+    if (value.length === 1) return coerceBoolean(key, value[0]);
+    window.lana?.log(`Unexpected boolean field shape for ${key}`);
     return undefined;
   }
   if (typeof value === 'string') {
@@ -88,7 +92,7 @@ export function getEventAttendeePayload(attendeeData) {
   if (!attendeeData) return attendeeData;
   return Object.entries(attendeeData).reduce((acc, [key, value]) => {
     const nextValue = EVENT_ATTENDEE_DATA_FILTER[key]?.type === 'boolean'
-      ? coerceEventAttendeeBoolean(key, value)
+      ? coerceBoolean(key, value)
       : value;
     if (EVENT_ATTENDEE_DATA_FILTER[key]?.submittable && isValidAttribute(nextValue)) {
       acc[key] = nextValue;
@@ -102,6 +106,34 @@ export function getBaseAttendeePayload(attendeeData) {
   return Object.entries(attendeeData).reduce((acc, [key, value]) => {
     if (BASE_ATTENDEE_DATA_FILTER[key]?.submittable && isValidAttribute(value)) {
       acc[key] = value;
+    }
+    return acc;
+  }, {});
+}
+
+/**
+ * Fields the RSVP token registration endpoint (POST .../rsvpTokenRegistrations)
+ * accepts beyond the base attendee identity fields: identity-level consent
+ * (consentStringId, already in BASE_ATTENDEE_DATA_FILTER) plus event-level
+ * consent/ticket flags that only live in EVENT_ATTENDEE_DATA_FILTER for the
+ * normal create-attendee flow. The RSVP token endpoint combines create+add-to-event
+ * in one call, so it needs both.
+ */
+export const RSVP_TOKEN_ATTENDEE_DATA_FILTER = {
+  ...BASE_ATTENDEE_DATA_FILTER,
+  shareInfoWithPartners: { type: 'boolean', submittable: true },
+  ccSentiment: { type: 'string', submittable: true },
+  requiresTicket: { type: 'boolean', submittable: true },
+};
+
+export function getRsvpTokenAttendeePayload(attendeeData) {
+  if (!attendeeData) return attendeeData;
+  return Object.entries(attendeeData).reduce((acc, [key, value]) => {
+    const nextValue = RSVP_TOKEN_ATTENDEE_DATA_FILTER[key]?.type === 'boolean'
+      ? coerceBoolean(key, value)
+      : value;
+    if (RSVP_TOKEN_ATTENDEE_DATA_FILTER[key]?.submittable && isValidAttribute(nextValue)) {
+      acc[key] = nextValue;
     }
     return acc;
   }, {});

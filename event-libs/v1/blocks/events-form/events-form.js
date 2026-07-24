@@ -1,10 +1,10 @@
-import { deleteAttendeeFromEvent, getAndCreateAndAddAttendee, getAttendee, getEvent, getCampaign, registerForSessionTime } from '../../utils/esp-controller.js';
+import { deleteAttendeeFromEvent, getAndCreateAndAddAttendee, getAttendee, getEvent, getCampaign, registerForSessionTime, submitRsvpTokenRegistration } from '../../utils/esp-controller.js';
 import BlockMediator from '../../deps/block-mediator.min.js';
 import { signIn, decorateEvent } from '../../utils/decorate.js';
-import { dictionaryManager, getInviteOnlyNoCampaignMessage } from '../../utils/dictionary-manager.js';
-import { getEventConfig, LIBS, getMetadata, getSusiOptions, getValidCampaignIdFromUrl, resolveRoutedCampaignId } from '../../utils/utils.js';
+import { dictionaryManager, getInviteOnlyNoCampaignMessage, getRsvpTokenInvalidMessage, getRsvpTokenAlreadyRegisteredMessage } from '../../utils/dictionary-manager.js';
+import { getEventConfig, LIBS, getMetadata, getSusiOptions, getValidCampaignIdFromUrl, resolveRoutedCampaignId, shouldForceGuestSignIn } from '../../utils/utils.js';
 import { FALLBACK_LOCALES, CAMPAIGN_ID_PATTERN, PHONE_FIELD_RE, PHONE_PATTERN  } from '../../utils/constances.js';
-import { BASE_ATTENDEE_DATA_FILTER } from '../../utils/data-utils.js';
+import { BASE_ATTENDEE_DATA_FILTER, getRsvpTokenAttendeePayload } from '../../utils/data-utils.js';
 import { parseRsvpFieldLimit, stripTags } from '../../utils/sanitize-utils.js';
 import { applyImplicitContactMethodsToPayload, getImplicitConsentRaw } from '../../utils/rsvp-consent.js';
 
@@ -207,7 +207,7 @@ function constructPayload(form) {
   return payload;
 }
 
-async function submitForm(bp) {
+export async function submitForm(bp) {
   const { form, sanitizeList } = bp;
   const payload = constructPayload(form);
 
@@ -255,6 +255,19 @@ async function submitForm(bp) {
   const campaignId = await resolveRoutedCampaignId();
   if (campaignId) {
     payload.campaignId = campaignId;
+  }
+
+  // A valid RSVP token never reaches submitForm unless it's still usable (an
+  // invalid token short-circuits before the form is built, see onProfile). Submitting
+  // consumes the token server-side in the same call that records the registration.
+  // The endpoint combines create-attendee + add-to-event into one call. Tokens never
+  // carry a bound campaign (EMC composes a separate ?campaign= param on the share
+  // link instead of binding one at generation), so campaignId is never sent in the
+  // body — getRsvpTokenAttendeePayload's filter drops it even though it's on payload
+  // above — and is instead forwarded as a query param on the submit call itself.
+  const rsvpToken = BlockMediator.get('imsProfile')?.rsvpToken;
+  if (rsvpToken) {
+    return submitRsvpTokenRegistration(getMetadata('event-id'), rsvpToken, getRsvpTokenAttendeePayload(payload), campaignId);
   }
 
   return getAndCreateAndAddAttendee(getMetadata('event-id'), payload);
@@ -309,8 +322,9 @@ export async function buildErrorMsg(parent, status) {
 
   if (!eventObj.ok) return;
 
-  let errorKey = 'rsvp-error-msg';
+  let errorMsg;
   if (status === 400) {
+    let errorKey = 'rsvp-error-msg';
     const { full, waitlistEnabled, usedCampaign } = await getFullState(eventId);
     if (full && usedCampaign) {
       errorKey = waitlistEnabled ? 'campaign-full-error-msg' : 'campaign-full-no-waitlist-error-msg';
@@ -318,6 +332,21 @@ export async function buildErrorMsg(parent, status) {
       const eventInfo = eventObj.data;
       errorKey = eventInfo?.allowWaitlisting === 'true' ? 'event-full-error-msg' : 'event-full-no-waitlist-error-msg';
     }
+    errorMsg = dictionaryManager.getValue(errorKey);
+  } else if (status === 409 && BlockMediator.get('imsProfile')?.rsvpToken) {
+    // AttendeeAlreadyRegistered — this email is already registered for the event.
+    // The token is NOT consumed on this error, so it stays usable for a different
+    // guest; the copy must not imply the link itself is dead.
+    await dictionaryManager.initialize();
+    errorMsg = getRsvpTokenAlreadyRegisteredMessage(dictionaryManager);
+  } else if ((status === 401 || status === 404 || status === 410) && BlockMediator.get('imsProfile')?.rsvpToken) {
+    // Token header missing (401), not found (404), or expired/revoked (410) — it
+    // became invalid between page load and submit (e.g. the same link used in
+    // another tab), or the RSVP token header failed to reach the server.
+    await dictionaryManager.initialize();
+    errorMsg = getRsvpTokenInvalidMessage(dictionaryManager);
+  } else {
+    errorMsg = dictionaryManager.getValue('rsvp-error-msg');
   }
 
   const existingErrors = parent.querySelectorAll('.error');
@@ -325,7 +354,6 @@ export async function buildErrorMsg(parent, status) {
     existingErrors.forEach((err) => err.remove());
   }
 
-  const errorMsg = dictionaryManager.getValue(errorKey);
   const error = createTag('p', { class: 'error' }, errorMsg);
   parent.append(error);
   setTimeout(() => {
@@ -363,6 +391,18 @@ function eventFormSendAnalytics(bp, view) {
   const modalId = modal.id ? ` | ${modal.id}` : '';
   const event = new Event(`${view}${name}${modalId}`);
   sendAnalytics(event);
+}
+
+/**
+ * Breakout-session auto-registration isn't supported for rsvp-token registrations
+ * (no logged-in identity for the /attendees/me call to resolve against) — this is
+ * the shared gate used by the submit handler to decide whether to fire it.
+ * @param {string} registrationStatus - `registrationStatus` from the submit response.
+ * @param {Object} profile - BlockMediator 'imsProfile' value.
+ * @returns {boolean} True if auto-registration should run.
+ */
+export function shouldAutoRegisterSessions(registrationStatus, profile) {
+  return registrationStatus === 'registered' && !profile?.rsvpToken;
 }
 
 async function autoRegisterSessions() {
@@ -411,7 +451,7 @@ function createButton({ type, label }, bp) {
         if (respJson.ok) {
           BlockMediator.set('rsvpData', respJson.data);
           eventFormSendAnalytics(bp, 'Form Submit');
-          if (respJson.data?.registrationStatus === 'registered') autoRegisterSessions();
+          if (shouldAutoRegisterSessions(respJson.data?.registrationStatus, BlockMediator.get('imsProfile'))) autoRegisterSessions();
         } else {
           const { status } = respJson;
 
@@ -730,6 +770,12 @@ function decorateSuccessScreen(screen) {
             const profile = BlockMediator.get('imsProfile');
             const rsvpData = BlockMediator.get('rsvpData');
 
+            if (profile.account_type === 'guest' && !rsvpData?.attendeeId) {
+              cta.classList.remove('loading');
+              buildErrorMsg(screen, 500);
+              return;
+            }
+
             const rsvpResp = profile.account_type === 'guest'
               ? await deleteAttendeeFromEvent(getMetadata('event-id'), rsvpData.attendeeId)
               : await deleteAttendeeFromEvent(getMetadata('event-id'));
@@ -1029,7 +1075,8 @@ async function createForm(bp, formData) {
   addTerms(formEl, terms);
 
   const profile = BlockMediator.get('imsProfile');
-  const showConsentForGuest = getMetadata('allow-guest-registration') === 'true' && profile?.account_type === 'guest';
+  const showConsentForGuest = profile?.account_type === 'guest'
+    && (getMetadata('allow-guest-registration') === 'true' || Boolean(profile?.rsvpToken));
   const forceConsent = getMetadata('force-consent-collection') === 'true';
   if (showConsentForGuest || forceConsent) await addConsentSuite(formEl);
 
@@ -1175,11 +1222,23 @@ async function onProfile(bp, formData) {
     if (!resolvedProfile || hasHandledProfile) return;
     hasHandledProfile = true;
 
-    if ((resolvedProfile.noProfile || resolvedProfile.account_type === 'guest')
-      && /#rsvp-form.*/.test(window.location.hash)
-      && !allowGuestReg) {
+    if (shouldForceGuestSignIn(resolvedProfile, allowGuestReg)
+      && /#rsvp-form.*/.test(window.location.hash)) {
       // TODO: also check for guestCheckout enablement for future iterations
       signIn(getSusiOptions(getConfig()));
+    } else if (resolvedProfile.rsvpTokenInvalid) {
+      // RSVP token has already been used, expired, or was revoked. Show a
+      // general error and never build the form — the token is not reusable.
+      eventHero.classList.remove('loading');
+      decorateHero(bp.eventHero);
+      (async () => {
+        await dictionaryManager.initialize();
+        const msg = getRsvpTokenInvalidMessage(dictionaryManager);
+        const error = createTag('p', { class: 'error' }, msg);
+        bp.formContainer.append(error);
+      })().finally(() => {
+        block.classList.remove('loading');
+      });
     } else {
       eventHero.classList.remove('loading');
       decorateHero(bp.eventHero);

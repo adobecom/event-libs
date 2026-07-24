@@ -49,10 +49,20 @@ export function waitForAdobeIMS() {
   });
 }
 
-export async function constructRequestOptions(method, body = null, waitForIMS = true) {
+// Override for callers with no window.adobeIMS at all (e.g. the standalone
+// tier-1-event-configurator DA app, which has no Milo/IMS bootstrap) — set
+// once a token is available from whatever auth flow that caller has, and
+// every constructRequestOptions() call picks it up automatically.
+let espAuthTokenOverride = null;
+
+export function setEspAuthToken(token) {
+  espAuthTokenOverride = token;
+}
+
+export async function constructRequestOptions(method, body = null, waitForIMS = true, skipAuth = false, rsvpToken = null) {
   const { miloConfig } = getEventConfig();
   const miloLibs = miloConfig?.miloLibs || LIBS;
-  
+
   let getUuid;
   try {
     const [{ default: importedGetUuid }] = await Promise.all([import(`${miloLibs}/utils/getUuid.js`), waitForIMS ? waitForAdobeIMS() : Promise.resolve()]);
@@ -63,9 +73,17 @@ export async function constructRequestOptions(method, body = null, waitForIMS = 
   }
 
   const headers = new Headers();
-  const authToken = window.adobeIMS?.getAccessToken()?.token;
+  // skipAuth is for genuinely public/guest-token-authenticated endpoints: never attach
+  // the caller's own IMS identity, even if one happens to be signed in (an assistant
+  // registering on a VIP's behalf must stay anonymous to the backend). The override
+  // takes precedence over window.adobeIMS for callers with no IMS bootstrap at all
+  // (e.g. the standalone tier-1-event-configurator DA app).
+  const authToken = skipAuth ? null : (espAuthTokenOverride || window.adobeIMS?.getAccessToken()?.token);
 
   if (authToken) headers.append('Authorization', `Bearer ${authToken}`);
+  // RSVP-token endpoints authenticate solely via this header — the token never
+  // travels in the URL path or query string, to keep it out of access logs.
+  if (rsvpToken) headers.append('x-adobe-esp-rsvp-token', rsvpToken);
   headers.append('x-api-key', 'acom_event_service');
   headers.append('x-request-id', await getUuid(new Date().getTime()));
   headers.append('content-type', 'application/json');
@@ -100,6 +118,137 @@ export async function getEvent(eventId) {
     return { ok: true, data };
   } catch (error) {
     window.lana?.log(`Error: Failed to get details for event ${eventId}:`, error);
+    return { ok: false, status: 'Network Error', error: error.message };
+  }
+}
+
+// Singular event lookup directly on ESP (not ESL, unlike getEvent() above) —
+// confirmed public. Skips Authorization (skipAuth=true): a wrong-env
+// override token gets rejected outright rather than ignored.
+export async function getEspEvent(eventId) {
+  const eventServiceEnv = getEventServiceEnv();
+  const { serviceApiEndpoints } = ENV_MAP[eventServiceEnv.name];
+  const options = await constructRequestOptions('GET', null, false, true);
+
+  try {
+    const response = await fetch(`${serviceApiEndpoints.esp}/v1/events/${eventId}`, options);
+    const data = await response.json();
+
+    if (!response.ok) {
+      window.lana?.log(`Error: Failed to get ESP event ${eventId}. Status:${JSON.stringify(response)}`);
+      return { ok: false, status: response.status, error: data };
+    }
+
+    return { ok: true, data };
+  } catch (error) {
+    window.lana?.log(`Error: Failed to get ESP event ${eventId}. Error:${JSON.stringify(error)}`);
+    return { ok: false, status: 'Network Error', error: error.message };
+  }
+}
+
+// Single-page ESP events list call (page-size/next-page-token/from-date,
+// epoch ms). Unlike getEspEvent(), this route requires a valid IMS Bearer
+// token. Skips the window.adobeIMS wait (waitForIMS=false) for callers
+// feeding their own token via setEspAuthToken() instead.
+export async function listEvents({ pageSize, nextPageToken, fromDate } = {}) {
+  const eventServiceEnv = getEventServiceEnv();
+  const { serviceApiEndpoints } = ENV_MAP[eventServiceEnv.name];
+  const options = await constructRequestOptions('GET', null, false);
+
+  const params = new URLSearchParams();
+  if (pageSize) params.set('page-size', pageSize);
+  if (nextPageToken) params.set('next-page-token', nextPageToken);
+  if (fromDate) params.set('from-date', fromDate);
+  const query = params.toString();
+
+  try {
+    // GET /v1/events lives on the ESP base URL, not ESL — getEvent's .esl
+    // call above is a different endpoint and an easy precedent to copy by
+    // mistake here.
+    const response = await fetch(`${serviceApiEndpoints.esp}/v1/events${query ? `?${query}` : ''}`, options);
+    const data = await response.json();
+
+    if (!response.ok) {
+      window.lana?.log(`Error: Failed to list events. Status:${JSON.stringify(response)}`);
+      return { ok: false, status: response.status, error: data };
+    }
+
+    return { ok: true, data: { events: data.events || [], nextPageToken: data.nextPageToken || null } };
+  } catch (error) {
+    window.lana?.log(`Error: Failed to list events. Error:${JSON.stringify(error)}`);
+    return { ok: false, status: 'Network Error', error: error.message };
+  }
+}
+
+const LIST_ALL_EVENTS_MAX_PAGES = 100;
+const LIST_ALL_EVENTS_CACHE_TTL_MS = 5 * 60 * 1000;
+
+let listAllEventsCache = null; // { fromDate, expiresAt, promise }
+
+// Walks every page of GET /v1/events into one array for client-side
+// search/filter. Cached briefly; a failed fetch is never cached. No
+// from-date floor for now — walks full history (bounded by MAX_PAGES);
+// consider a default lookback if that proves too slow in practice.
+export async function listAllEvents({ fromDate } = {}) {
+  const now = Date.now();
+
+  if (
+    listAllEventsCache
+    && listAllEventsCache.fromDate === fromDate
+    && listAllEventsCache.expiresAt > now
+  ) {
+    return listAllEventsCache.promise;
+  }
+
+  const promise = (async () => {
+    const events = [];
+    let nextPageToken;
+    let pageCount = 0;
+
+    while (pageCount < LIST_ALL_EVENTS_MAX_PAGES) {
+      // eslint-disable-next-line no-await-in-loop
+      const page = await listEvents({ nextPageToken, fromDate });
+      if (!page.ok) {
+        listAllEventsCache = null;
+        return page;
+      }
+
+      events.push(...page.data.events);
+      nextPageToken = page.data.nextPageToken;
+      pageCount += 1;
+      if (!nextPageToken) break;
+    }
+
+    return { ok: true, data: events };
+  })();
+
+  listAllEventsCache = { fromDate, expiresAt: now + LIST_ALL_EVENTS_CACHE_TTL_MS, promise };
+  return promise;
+}
+
+// Raw ESP session-catalog fetch (unmapped objects, e.g. for customAttributes)
+// — confirmed public, skips Authorization like getEspEvent(). Returns
+// `sessions` and `sessionTimes` separately — ESP keeps times in their own
+// sessionId-keyed array (a session can have more than one, e.g. live +
+// on-demand), not embedded on the session itself. Once MWPW-200314 merges,
+// prefer sessions-api.js's fetchSessions(), which normalizes this same data.
+export async function getEventSessionCatalog(eventId) {
+  const eventServiceEnv = getEventServiceEnv();
+  const { serviceApiEndpoints } = ENV_MAP[eventServiceEnv.name];
+  const options = await constructRequestOptions('GET', null, false, true);
+
+  try {
+    const response = await fetch(`${serviceApiEndpoints.esp}/v1/events/${eventId}/session-catalog`, options);
+    const data = await response.json();
+
+    if (!response.ok) {
+      window.lana?.log(`Error: Failed to get session catalog for event ${eventId}. Status:${JSON.stringify(response)}`);
+      return { ok: false, status: response.status, error: data };
+    }
+
+    return { ok: true, data: { sessions: data.sessions || [], sessionTimes: data.sessionTimes || [] } };
+  } catch (error) {
+    window.lana?.log(`Error: Failed to get session catalog for event ${eventId}. Error:${JSON.stringify(error)}`);
     return { ok: false, status: 'Network Error', error: error.message };
   }
 }
@@ -297,6 +446,62 @@ export async function getCampaign(eventId, campaignId) {
     return { ok: true, data };
   } catch (error) {
     window.lana?.log(`Error: Failed to get campaign ${campaignId} for event ${eventId}:${JSON.stringify(error)}`);
+    return { ok: false, status: 'Network Error', error: error.message };
+  }
+}
+
+// RSVP token endpoints — authenticated solely by the x-adobe-esp-rsvp-token
+// header (constructRequestOptions(..., waitForIMS=false, skipAuth=true, token)), so
+// both calls skip waiting for adobeIMS (avoids stalling for a guest with no IMS
+// session) and skip attaching any signed-in caller's own IMS token (keeps the
+// submission anonymous even when the caller, e.g. an assistant, happens to be
+// signed in).
+export async function validateRsvpToken(eventId, token) {
+  const eventServiceEnv = getEventServiceEnv();
+  const { serviceApiEndpoints } = ENV_MAP[eventServiceEnv.name];
+  const options = await constructRequestOptions('GET', null, false, true, token);
+
+  try {
+    const response = await fetch(`${serviceApiEndpoints.esl}/v1/events/${eventId}/rsvpTokenRegistrations`, options);
+    const data = await response.json();
+
+    if (!response.ok) {
+      window.lana?.log(`Error: Failed to validate RSVP token. Status:${JSON.stringify(response)}`);
+      return { ok: false, status: response.status, error: data };
+    }
+
+    return { ok: true, data };
+  } catch (error) {
+    window.lana?.log(`Error: Failed to validate RSVP token:${JSON.stringify(error)}`);
+    return { ok: false, status: 'Network Error', error: error.message };
+  }
+}
+
+export async function submitRsvpTokenRegistration(eventId, token, attendeeData, campaignId = null) {
+  if (!eventId || !token || !attendeeData) return { ok: false, error: 'Missing eventId, token, or attendee data' };
+
+  const eventServiceEnv = getEventServiceEnv();
+  const { serviceApiEndpoints } = ENV_MAP[eventServiceEnv.name];
+  const raw = JSON.stringify(attendeeData);
+  const options = await constructRequestOptions('POST', raw, false, true, token);
+  const url = new URL(`${serviceApiEndpoints.esl}/v1/events/${eventId}/rsvpTokenRegistrations`);
+  // Tokens never carry a bound campaign (EMC no longer sets one at generation),
+  // so this query-param fallback is the sole campaign-attribution path for
+  // rsvp-token registrations — campaignId is never sent in the request body.
+  if (campaignId) url.searchParams.set('campaignId', campaignId);
+
+  try {
+    const response = await fetch(url.toString(), options);
+    const data = await response.json();
+
+    if (!response.ok) {
+      window.lana?.log(`Error: Failed to submit RSVP token registration. Status:${JSON.stringify(response)}`);
+      return { ok: false, status: response.status, error: data };
+    }
+
+    return { ok: true, data };
+  } catch (error) {
+    window.lana?.log(`Error: Failed to submit RSVP token registration:${JSON.stringify(error)}`);
     return { ok: false, status: 'Network Error', error: error.message };
   }
 }
