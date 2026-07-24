@@ -439,6 +439,16 @@ describe('Adobe Event Service API', () => {
       expect(second.ok).to.be.true;
       expect(fetchStub.callCount).to.equal(2);
     });
+
+    it('should apply no from-date floor when called with no arguments', async () => {
+      const fetchStub = sandbox.stub(window, 'fetch').resolves({
+        json: () => ({ events: [], nextPageToken: null }),
+        ok: true,
+      });
+      await api.listAllEvents();
+      const [url] = fetchStub.firstCall.args;
+      expect(url).to.not.include('from-date');
+    });
   });
 
   describe('getEspEvent', () => {

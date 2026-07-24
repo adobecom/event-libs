@@ -176,23 +176,25 @@ export async function listEvents({ pageSize, nextPageToken, fromDate } = {}) {
 }
 
 const LIST_ALL_EVENTS_MAX_PAGES = 100;
-// ~6 months back — configuring current/upcoming events, not full history.
-const LIST_ALL_EVENTS_DEFAULT_LOOKBACK_MS = 1000 * 60 * 60 * 24 * 30 * 6;
 const LIST_ALL_EVENTS_CACHE_TTL_MS = 5 * 60 * 1000;
 
 let listAllEventsCache = null; // { fromDate, expiresAt, promise }
 
-// Walks every page of GET /v1/events within the fromDate floor into one
-// array, so the picker can search/filter client-side over the whole catalog.
-// Cached briefly so reopening the picker doesn't re-walk the full history
-// each time; a failed fetch is never cached, so the next call retries.
+// Walks every page of GET /v1/events into one array, so the picker can
+// search/filter client-side over the whole catalog. Cached briefly so
+// reopening the picker doesn't re-walk the full history each time; a failed
+// fetch is never cached, so the next call retries.
+//
+// No from-date floor for now — no default lookback is applied, so this
+// walks the event's entire history (still bounded by LIST_ALL_EVENTS_MAX_PAGES).
+// Consider reintroducing a default (e.g. ~6 months) once real usage shows
+// how far back authors actually need to search/duplicate from.
 export async function listAllEvents({ fromDate } = {}) {
-  const resolvedFromDate = fromDate ?? (Date.now() - LIST_ALL_EVENTS_DEFAULT_LOOKBACK_MS);
   const now = Date.now();
 
   if (
     listAllEventsCache
-    && listAllEventsCache.fromDate === resolvedFromDate
+    && listAllEventsCache.fromDate === fromDate
     && listAllEventsCache.expiresAt > now
   ) {
     return listAllEventsCache.promise;
@@ -205,7 +207,7 @@ export async function listAllEvents({ fromDate } = {}) {
 
     while (pageCount < LIST_ALL_EVENTS_MAX_PAGES) {
       // eslint-disable-next-line no-await-in-loop
-      const page = await listEvents({ nextPageToken, fromDate: resolvedFromDate });
+      const page = await listEvents({ nextPageToken, fromDate });
       if (!page.ok) {
         listAllEventsCache = null;
         return page;
@@ -220,7 +222,7 @@ export async function listAllEvents({ fromDate } = {}) {
     return { ok: true, data: events };
   })();
 
-  listAllEventsCache = { fromDate: resolvedFromDate, expiresAt: now + LIST_ALL_EVENTS_CACHE_TTL_MS, promise };
+  listAllEventsCache = { fromDate, expiresAt: now + LIST_ALL_EVENTS_CACHE_TTL_MS, promise };
   return promise;
 }
 
