@@ -192,22 +192,20 @@ export async function updateRSVPButtonState(rsvpBtn) {
   }
 
   const rsvpData = BlockMediator.get('rsvpData');
-  if (rsvpData?.registrationStatus === 'registered') {
-    setCtaState('registered', rsvpBtn);
-  } else if (rsvpData?.registrationStatus === 'waitlisted') {
-    setCtaState('waitlisted', rsvpBtn);
-  } else {
-    if (rsvpData) {
-      window.lana?.log(
-        `RSVP button: unhandled registrationStatus "${rsvpData.registrationStatus}" — falling back to default CTA`,
-        { tags: 'events-decorate', severity: 'warning' },
-      );
-    }
+  if (!rsvpData) {
     if (eventFull) {
-      setCtaState(waitlistEnabled ? 'toWaitlist' : 'eventClosed', rsvpBtn);
+      if (waitlistEnabled) {
+        setCtaState('toWaitlist', rsvpBtn);
+      } else {
+        setCtaState('eventClosed', rsvpBtn);
+      }
     } else {
       setCtaState('default', rsvpBtn);
     }
+  } else if (rsvpData.registrationStatus === 'registered') {
+    setCtaState('registered', rsvpBtn);
+  } else if (rsvpData.registrationStatus === 'waitlisted') {
+    setCtaState('waitlisted', rsvpBtn);
   }
 }
 
