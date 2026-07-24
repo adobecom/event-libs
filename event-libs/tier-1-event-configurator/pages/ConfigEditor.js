@@ -10,8 +10,8 @@ import FeaturedSessionsEditor from '../components/FeaturedSessionsEditor.js';
 export default function ConfigEditor() {
   const { goToLibrary } = useNavigation();
   const {
-    activeConfig, saveActiveConfig, clearActiveConfig, updateTrackIcon, updateConfigField,
-    setToastSuccess, setToastError,
+    activeConfig, saveActiveConfig, clearActiveConfig, updateTrackIcon, seedTrackIcons,
+    updateConfigField, setToastSuccess, setToastError,
   } = useConfigs();
 
   const [sessions, setSessions] = useState([]);
@@ -35,11 +35,12 @@ export default function ConfigEditor() {
       }
       setSessions(result.data.sessions);
       setSessionTimes(result.data.sessionTimes);
+      seedTrackIcons(extractDistinctTracks(result.data.sessions));
     }).finally(() => {
       if (!cancelled) setIsLoadingSessions(false);
     });
     return () => { cancelled = true; };
-  }, [eventId]);
+  }, [eventId, seedTrackIcons]);
 
   const tracks = useMemo(() => extractDistinctTracks(sessions), [sessions]);
 

@@ -6,6 +6,7 @@ import {
   deleteConfig as deleteConfigController,
 } from '../scripts/da-controller.js';
 import { useDA } from './DAContext.js';
+import { getDefaultTrackIcon, DEFAULT_ICON_COLOR } from '../default-track-icons.js';
 
 const ConfigsContext = createContext();
 
@@ -110,6 +111,35 @@ const ConfigsProvider = ({ children }) => {
     });
   }, []);
 
+  // Called once real tracks are known (session fetch resolves) — writes a
+  // real { icon, color: black } entry for any track that has a *known*
+  // default icon and isn't already present in trackIcons (never overwrites
+  // an already-authored or already-seeded entry). Tracks with no known
+  // default icon are deliberately left unseeded entirely — there's nothing
+  // sensible to auto-pick, and seeding a color with no icon would trip
+  // isTrackIconEntryComplete's own validation. This is what makes the Config
+  // JSON preview show real, complete data for known tracks as soon as
+  // sessions load, rather than staying empty until the author touches
+  // each row by hand.
+  const seedTrackIcons = useCallback((tracks) => {
+    setActiveConfig((prev) => {
+      if (!prev) return prev;
+      const existing = prev.config.trackIcons || {};
+      const additions = {};
+      (tracks || []).forEach((track) => {
+        if (existing[track]) return;
+        const fallback = getDefaultTrackIcon(track);
+        if (!fallback?.icon) return;
+        additions[track] = { icon: fallback.icon, color: DEFAULT_ICON_COLOR };
+      });
+      if (Object.keys(additions).length === 0) return prev;
+      return {
+        ...prev,
+        config: { ...prev.config, trackIcons: { ...existing, ...additions } },
+      };
+    });
+  }, []);
+
   // Sets a single top-level config field (e.g. allowDoubleBooking,
   // featuredSessions) immutably, so the Config JSON preview stays in sync.
   const updateConfigField = useCallback((key, value) => {
@@ -170,6 +200,7 @@ const ConfigsProvider = ({ children }) => {
     startEditConfig,
     clearActiveConfig,
     updateTrackIcon,
+    seedTrackIcons,
     updateConfigField,
     saveActiveConfig,
     removeConfig,

@@ -31,6 +31,14 @@ export const KNOWN_ICON_SLUGS = Object.freeze(
   [...new Set(Object.values(DEFAULT_TRACK_ICON_CONFIG).map((entry) => entry.icon))].sort(),
 );
 
+// Deliberately not DEFAULT_TRACK_ICON_CONFIG's own per-track brand colors —
+// those are real production page-side defaults, not what this authoring
+// app should ever show or write as *its* default. Both the seeded/authored
+// default and the editor's display default are always plain black. Shared
+// so ConfigsContext's auto-seeding (on session load) and TrackIconEditor's
+// display logic can't drift apart.
+export const DEFAULT_ICON_COLOR = '#000000';
+
 export function slugifyTrackName(name) {
   return name ? name.toLowerCase().replace(/[\s_]+/g, '-').replace(/[^a-z0-9-]/g, '') : '';
 }

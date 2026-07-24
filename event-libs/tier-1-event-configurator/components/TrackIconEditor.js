@@ -1,6 +1,6 @@
 import { useState, useEffect } from '../../v1/deps/htm-preact.js';
 import { html } from '../htm-wrapper.js';
-import { KNOWN_ICON_SLUGS, getDefaultTrackIcon } from '../default-track-icons.js';
+import { KNOWN_ICON_SLUGS, getDefaultTrackIcon, DEFAULT_ICON_COLOR } from '../default-track-icons.js';
 import { loadTrackIconSprite } from '../track-icon-sprite.js';
 import { isTrackIconEntryComplete } from '../utils.js';
 
@@ -28,15 +28,6 @@ function IconPreview({ icon, color }) {
     ></svg>
   `;
 }
-
-// Color is deliberately never defaulted from DEFAULT_TRACK_ICON_CONFIG's
-// per-track brand color — that made every known track look "already
-// configured" with a real color on first load, when nothing had actually
-// been authored yet. Color is purely an author decision; unauthored tracks
-// always start black until the author explicitly picks one. The icon slug
-// still auto-populates from the known-track default, since that's just a
-// sensible starting icon, not a color choice.
-const DEFAULT_ICON_COLOR = '#000000';
 
 export default function TrackIconEditor({ tracks, trackIcons, onChange }) {
   if (!tracks || tracks.length === 0) {
