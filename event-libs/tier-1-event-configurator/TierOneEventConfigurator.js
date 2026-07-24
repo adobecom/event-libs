@@ -1,5 +1,4 @@
-import { useEffect } from '../v1/deps/htm-preact.js';
-import { html } from './htm-wrapper.js';
+import { useEffect, html } from '../v1/deps/htm-preact.js';
 import Library from './pages/Library.js';
 import ConfigEditor from './pages/ConfigEditor.js';
 import { useNavigation } from './context/NavigationContext.js';

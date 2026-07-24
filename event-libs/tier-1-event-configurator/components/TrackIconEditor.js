@@ -1,5 +1,4 @@
-import { useState, useEffect } from '../../v1/deps/htm-preact.js';
-import { html } from '../htm-wrapper.js';
+import { useState, useEffect, html } from '../../v1/deps/htm-preact.js';
 import { KNOWN_ICON_SLUGS, getDefaultTrackIcon, DEFAULT_ICON_COLOR } from '../default-track-icons.js';
 import { loadTrackIconSprite } from '../track-icon-sprite.js';
 import { isTrackIconEntryComplete } from '../utils.js';

@@ -1,4 +1,4 @@
-import { html } from '../htm-wrapper.js';
+import { html } from '../../v1/deps/htm-preact.js';
 
 export default function SearchInput({
   id, placeholder = 'Search', value = '', onInput, className = '',

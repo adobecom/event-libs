@@ -1,5 +1,4 @@
-import { useState, useRef } from '../../v1/deps/htm-preact.js';
-import { html } from '../htm-wrapper.js';
+import { useState, useRef, html } from '../../v1/deps/htm-preact.js';
 import { getEspEvent } from '../../v1/utils/esp-controller.js';
 import Modal from './Modal.js';
 import { useEventEnv } from '../context/EventEnvContext.js';

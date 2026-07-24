@@ -1,7 +1,6 @@
 import {
-  useState, useMemo, useCallback, useRef, useLayoutEffect, useEffect,
+  useState, useMemo, useCallback, useRef, useLayoutEffect, useEffect, html,
 } from '../../v1/deps/htm-preact.js';
-import { html } from '../htm-wrapper.js';
 import { getSessionTrack, formatSessionTime } from '../utils.js';
 import SearchInput from './SearchInput.js';
 

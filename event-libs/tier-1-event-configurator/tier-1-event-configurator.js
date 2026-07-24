@@ -1,5 +1,4 @@
-import { render } from '../v1/deps/htm-preact.js';
-import { html } from './htm-wrapper.js';
+import { render, html } from '../v1/deps/htm-preact.js';
 import { DAProvider } from './context/DAContext.js';
 import { NavigationProvider } from './context/NavigationContext.js';
 import { ConfigsProvider } from './context/ConfigsContext.js';

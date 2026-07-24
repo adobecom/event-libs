@@ -1,7 +1,6 @@
 import {
-  createContext, useState, useContext, useCallback, useMemo,
+  createContext, useState, useContext, useCallback, useMemo, html,
 } from '../../v1/deps/htm-preact.js';
-import { html } from '../htm-wrapper.js';
 import { setEventServiceEnvOverride, getEventServiceEnv } from '../../v1/utils/utils.js';
 
 const EventEnvContext = createContext();

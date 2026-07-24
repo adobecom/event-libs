@@ -1,5 +1,4 @@
-import { useState, useEffect, useMemo } from '../../v1/deps/htm-preact.js';
-import { html } from '../htm-wrapper.js';
+import { useState, useEffect, useMemo, html } from '../../v1/deps/htm-preact.js';
 import { getEventSessionCatalog } from '../../v1/utils/esp-controller.js';
 import { useNavigation } from '../context/NavigationContext.js';
 import { useConfigs } from '../context/ConfigsContext.js';

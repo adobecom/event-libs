@@ -1,5 +1,6 @@
-import { createContext, useState, useContext, useCallback, useEffect } from '../../v1/deps/htm-preact.js';
-import { html } from '../htm-wrapper.js';
+import {
+  createContext, useState, useContext, useCallback, useEffect, html,
+} from '../../v1/deps/htm-preact.js';
 import {
   getConfigs,
   upsertConfig as upsertConfigController,

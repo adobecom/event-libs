@@ -1,5 +1,6 @@
-import { useState, useContext, useCallback, createContext } from '../../v1/deps/htm-preact.js';
-import { html } from '../htm-wrapper.js';
+import {
+  useState, useContext, useCallback, createContext, html,
+} from '../../v1/deps/htm-preact.js';
 import { PAGES } from '../constants.js';
 
 const NavigationContext = createContext();

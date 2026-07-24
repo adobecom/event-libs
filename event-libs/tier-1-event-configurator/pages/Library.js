@@ -1,5 +1,4 @@
-import { useState, useMemo, useCallback } from '../../v1/deps/htm-preact.js';
-import { html } from '../htm-wrapper.js';
+import { useState, useMemo, useCallback, html } from '../../v1/deps/htm-preact.js';
 import SearchInput from '../components/SearchInput.js';
 import EventPicker from '../components/EventPicker.js';
 import ManualEventLookup from '../components/ManualEventLookup.js';

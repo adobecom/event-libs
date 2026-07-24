@@ -1,5 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from '../../v1/deps/htm-preact.js';
-import { html } from '../htm-wrapper.js';
+import { useState, useEffect, useMemo, useCallback, html } from '../../v1/deps/htm-preact.js';
 import { listAllEvents } from '../../v1/utils/esp-controller.js';
 import Modal from './Modal.js';
 import SearchInput from './SearchInput.js';
