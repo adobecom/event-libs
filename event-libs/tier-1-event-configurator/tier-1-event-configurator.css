@@ -392,11 +392,33 @@ select.tec-field {
   min-width: 0;
 }
 
+.tec-library__item-title-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
 .tec-library__item-title {
   font-weight: 700;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  min-width: 0;
+}
+
+/* Same warning palette as .tec-env-banner — only rendered for a non-prod
+   row, so it stays quiet in the common (prod) case. */
+.tec-library__item-env {
+  flex-shrink: 0;
+  background: #fdf0e0;
+  color: #7a4a00;
+  border: 1px solid #f0c987;
+  border-radius: 999px;
+  padding: 1px 8px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
 }
 
 .tec-library__item-meta {

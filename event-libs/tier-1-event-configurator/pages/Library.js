@@ -141,7 +141,12 @@ export default function Library() {
           ${filteredConfigs.map((row) => html`
             <li class="tec-library__item" key=${row.eventId}>
               <div class="tec-library__item-info">
-                <span class="tec-library__item-title">${getDisplayTitle(row)}</span>
+                <span class="tec-library__item-title-row">
+                  <span class="tec-library__item-title">${getDisplayTitle(row)}</span>
+                  ${row.eventServiceEnv && row.eventServiceEnv !== 'prod' && html`
+                    <span class="tec-library__item-env">${row.eventServiceEnv}</span>
+                  `}
+                </span>
                 <span class="tec-library__item-meta">
                   ${row.config?.eventTitle ? `${row.backendEventTitle} · ` : ''}${row.eventId} · updated ${formatUpdatedTime(row.updated)}
                 </span>
