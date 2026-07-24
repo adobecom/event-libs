@@ -72,24 +72,21 @@ const ConfigsProvider = ({ children }) => {
     });
   }, []);
 
-  // Clones an existing row's config onto a newly picked Event ID. The
-  // app-stamped identity fields (eventId/backendEventTitle/updated) are
-  // dropped from the clone rather than carried over stale — upsertConfig
-  // re-stamps them from the picker's selection at save time regardless.
-  // config.eventTitle (the author's alternative title) is also cleared, not
-  // carried over — it's specific to the source event's own identity, not a
-  // generic style setting like trackIcons, so inheriting it onto a
-  // different event would silently mislabel the new one.
+  // Clones an existing row's config onto a newly picked Event ID. App-stamped
+  // identity fields (eventId/backendEventTitle/updated) are dropped rather
+  // than carried over stale — upsertConfig re-stamps them at save time.
+  // eventTitle (the author's alternative title) is also reset — it names the
+  // source event specifically, not a generic style setting like trackIcons,
+  // so carrying it over would silently mislabel the new event.
   const startDuplicateConfig = useCallback((sourceRow, event) => {
     const clonedConfig = { ...sourceRow.config };
     delete clonedConfig.eventId;
     delete clonedConfig.backendEventTitle;
     delete clonedConfig.updated;
-    clonedConfig.eventTitle = '';
     setActiveConfig({
       eventId: event.eventId,
       backendEventTitle: event.enTitle || event.eventId,
-      config: clonedConfig,
+      config: { ...clonedConfig, eventTitle: '' },
     });
   }, []);
 
@@ -119,15 +116,10 @@ const ConfigsProvider = ({ children }) => {
   }, []);
 
   // Called once real tracks are known (session fetch resolves) — writes a
-  // real { icon, color: black } entry for any track that has a *known*
-  // default icon and isn't already present in trackIcons (never overwrites
-  // an already-authored or already-seeded entry). Tracks with no known
-  // default icon are deliberately left unseeded entirely — there's nothing
-  // sensible to auto-pick, and seeding a color with no icon would trip
-  // isTrackIconEntryComplete's own validation. This is what makes the Config
-  // JSON preview show real, complete data for known tracks as soon as
-  // sessions load, rather than staying empty until the author touches
-  // each row by hand.
+  // { icon, color: black } entry for any track with a *known* default icon
+  // that isn't already in trackIcons (never overwrites an authored/seeded
+  // entry). Tracks with no known icon are left unseeded — nothing sensible
+  // to auto-pick, and seeding a color alone would trip isTrackIconEntryComplete.
   const seedTrackIcons = useCallback((tracks) => {
     setActiveConfig((prev) => {
       if (!prev) return prev;

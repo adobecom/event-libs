@@ -6,14 +6,11 @@ import { setEventServiceEnvOverride, getEventServiceEnv } from '../../v1/utils/u
 
 const EventEnvContext = createContext();
 
-// Reactive wrapper around v1/utils/utils.js's plain module-level env
-// override — that override is the real source of truth esp-controller.js
-// reads from (so it works for non-React call sites too), but a bare module
-// variable can't drive a re-rendered UI on its own. This context is the one
-// place both directions meet: ManualEventLookup.js's env picker calls
-// setEnv(), and the app-wide env badge (TierOneEventConfigurator.js) reads
-// envName — both backed by the same setEventServiceEnvOverride() call, so
-// they can never drift apart.
+// Reactive wrapper around v1/utils/utils.js's module-level env override
+// (the real source of truth esp-controller.js reads from, so it also works
+// for non-React call sites) — a bare module variable can't drive a
+// re-rendered UI on its own. Both the env picker's setEnv() and the app-wide
+// banner's envName read go through the same setEventServiceEnvOverride().
 const EventEnvProvider = ({ children }) => {
   const [envName, setEnvName] = useState(() => getEventServiceEnv().name);
 

@@ -8,6 +8,7 @@ import {
 } from '../utils.js';
 import TrackIconEditor from '../components/TrackIconEditor.js';
 import FeaturedSessionsEditor from '../components/FeaturedSessionsEditor.js';
+import LoadingInline from '../components/LoadingInline.js';
 
 export default function ConfigEditor() {
   const { goToLibrary } = useNavigation();
@@ -107,7 +108,7 @@ export default function ConfigEditor() {
 
       <section class="tec-editor__section">
         <h2>Sessions</h2>
-        ${isLoadingSessions && html`<p class="tec-loading-inline"><span class="tec-spinner tec-spinner--s"></span> Loading sessions…</p>`}
+        ${isLoadingSessions && html`<${LoadingInline} label="Loading sessions…" />`}
         ${sessionsError && html`<p class="tec-editor__error">${sessionsError}</p>`}
         ${!isLoadingSessions && !sessionsError && html`
           <p class="tec-editor__section-hint">${sessions.length} session(s) found — ${tracks.length} distinct track(s).</p>
@@ -117,7 +118,7 @@ export default function ConfigEditor() {
       <section class="tec-editor__section">
         <h2>Track icons & colors</h2>
         <p class="tec-editor__section-hint">Icons pre-fill from the built-in defaults where known. Color always starts black — pick a color per track, or leave both icon and color unset to use the page's own built-in default at render time.</p>
-        ${isLoadingSessions && html`<p class="tec-loading-inline"><span class="tec-spinner tec-spinner--s"></span> Loading tracks…</p>`}
+        ${isLoadingSessions && html`<${LoadingInline} label="Loading tracks…" />`}
         ${sessionsError && html`<p class="tec-editor__error">${sessionsError}</p>`}
         ${incompleteTracks.length > 0 && html`
           <p class="tec-editor__error">
@@ -149,7 +150,7 @@ export default function ConfigEditor() {
       <section class="tec-editor__section">
         <h2>Featured sessions</h2>
         <p class="tec-editor__section-hint">Pick which sessions appear in the featured carousel, and set their display order.</p>
-        ${isLoadingSessions && html`<p class="tec-loading-inline"><span class="tec-spinner tec-spinner--s"></span> Loading sessions…</p>`}
+        ${isLoadingSessions && html`<${LoadingInline} label="Loading sessions…" />`}
         ${sessionsError && html`<p class="tec-editor__error">${sessionsError}</p>`}
         ${!isLoadingSessions && !sessionsError && html`
           <${FeaturedSessionsEditor} \

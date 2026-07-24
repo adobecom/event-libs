@@ -1,10 +1,8 @@
 // Temporary copy of event-libs/v1/utils/track-icon-config.js's
-// DEFAULT_TRACK_ICON_CONFIG + slugify, which lives on the in-progress
-// MWPW-200314 branch (not yet merged to dev, so unavailable from this
-// worktree — see PLAN.md). Ported 1:1, including the icon slugs, which
-// match track-icons.svg's own <symbol> ids (also copied locally into
-// ./assets/track-icons.svg for the same reason). Consolidate back onto the
-// real utility once that branch merges — don't let this drift independently.
+// DEFAULT_TRACK_ICON_CONFIG + slugify, which lives on the not-yet-merged
+// MWPW-200314 branch. Icon slugs match track-icons.svg's <symbol> ids
+// (also copied locally into ./assets/track-icons.svg). Consolidate back
+// onto the real utility once that branch merges.
 
 export const DEFAULT_TRACK_ICON_CONFIG = {
   'social-media': { icon: 'social-media', color: '#FF6B35' },
@@ -31,12 +29,10 @@ export const KNOWN_ICON_SLUGS = Object.freeze(
   [...new Set(Object.values(DEFAULT_TRACK_ICON_CONFIG).map((entry) => entry.icon))].sort(),
 );
 
-// Deliberately not DEFAULT_TRACK_ICON_CONFIG's own per-track brand colors —
-// those are real production page-side defaults, not what this authoring
-// app should ever show or write as *its* default. Both the seeded/authored
-// default and the editor's display default are always plain black. Shared
-// so ConfigsContext's auto-seeding (on session load) and TrackIconEditor's
-// display logic can't drift apart.
+// Deliberately not DEFAULT_TRACK_ICON_CONFIG's per-track brand colors —
+// this authoring app's own default (seeded and displayed) is always plain
+// black. Shared so ConfigsContext's seeding and TrackIconEditor's display
+// can't drift apart.
 export const DEFAULT_ICON_COLOR = '#000000';
 
 export function slugifyTrackName(name) {

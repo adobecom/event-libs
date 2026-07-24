@@ -55,14 +55,12 @@ async function daFetch(path, options = {}) {
   return { ok: true, status: resp.status, etag };
 }
 
-// One-time migration-on-read for rows saved under the old schema (a single
-// `eventTitle` meaning "the backend/ESP title", both on the row and inside
-// `config`) to the current one (`backendEventTitle` app-stamped at both
-// levels; `eventTitle` now means an author-set alternative display name,
-// authored only inside `config`, never on the row). A row already has
-// `backendEventTitle` once it's been saved under the new schema at least
-// once — nothing to migrate then. Never rewrites the sheet itself; the next
-// real save naturally persists the new shape.
+// One-time migration-on-read: old rows had a single `eventTitle` meaning
+// the backend title, at both the row and config level. Now `backendEventTitle`
+// holds that (app-stamped both places) and `eventTitle` means an author-set
+// alternative, authored only inside `config`. A row with `backendEventTitle`
+// already is new-schema — nothing to migrate. Never rewrites the sheet; the
+// next real save persists the new shape.
 function migrateLegacyTitle(row) {
   const needsRowMigration = row.backendEventTitle === undefined && row.eventTitle !== undefined;
   const { eventTitle: legacyRowTitle, ...rowRest } = row;
@@ -76,9 +74,6 @@ function migrateLegacyTitle(row) {
   const { eventTitle: legacyConfigTitle, ...configRest } = config;
   return {
     ...migratedRow,
-    // Old config.eventTitle held the backend title, not an authored alt
-    // title — move it, and start the new eventTitle blank rather than
-    // carrying the old value into a field that now means something else.
     config: { ...configRest, backendEventTitle: legacyConfigTitle, eventTitle: '' },
   };
 }

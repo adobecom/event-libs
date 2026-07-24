@@ -18,29 +18,21 @@ function DragHandleIcon() {
   `;
 }
 
-// Pointer-based drag reorder (replaces the earlier up/down-buttons-only
-// design, PLAN.md Phase 3, per Daniel's request for a more delightful/
-// best-practice sort UX). One handle per row does double duty: pointerdown
+// Pointer-based drag reorder. Each row's handle does double duty: pointerdown
 // drags it (mouse/touch, via Pointer Events), and ArrowUp/ArrowDown while
-// it's focused reorders it via the same code path — native drag alone
-// isn't keyboard- or screen-reader-operable, so the handle has to carry
-// both, not just look like it does.
+// it's focused reorders it through the same path — native drag alone isn't
+// keyboard- or screen-reader-operable.
 //
-// Move/up tracking is done via window-level listeners, not
-// setPointerCapture on the handle itself — capture doesn't reliably survive
-// the handle's own DOM node being *moved* mid-gesture (exactly what happens
-// on every live-reorder swap below, for the FLIP animation), and losing
-// capture mid-drag was firing a premature lostpointercapture — ending the
-// drag after the very first swap. window never moves, so this is immune to
-// that.
+// Move/up tracking uses window-level listeners rather than
+// setPointerCapture on the handle: capture doesn't survive the handle's own
+// DOM node being moved mid-gesture (which happens on every reorder swap,
+// for the FLIP animation below), so it was ending drags after one swap.
 //
-// Dragging uses a uniform-row-height assumption (every row here renders
-// identically) to do simple arithmetic instead of continuous DOM
-// measurement: the dragged row's target slot is derived directly from the
-// cumulative pointer delta since drag start, and everyone else gets a
-// lightweight FLIP-style animation (instant inverse transform, forced
-// reflow, then transition to 0) whenever the order changes underneath them
-// — including from a keyboard move, not just a drag.
+// Assumes every row is the same height, so the dragged row's target slot is
+// arithmetic on the cumulative pointer delta rather than continuous DOM
+// measurement, and other rows get a FLIP-style settle animation (instant
+// inverse transform, one shared reflow, then transition to 0) whenever the
+// order changes underneath them.
 export default function FeaturedSessionsEditor({
   sessions, sessionTimes, tracks, featuredSessions, onChange,
 }) {
@@ -80,7 +72,10 @@ export default function FeaturedSessionsEditor({
     [sessionsById],
   );
 
-  const featuredIds = featuredSessions || [];
+  // Memoized so the FLIP effect's reference-equality check below (prevOrder
+  // !== featuredIds) reflects a genuine order change, not a fresh []
+  // literal recreated on every render whenever featuredSessions is falsy.
+  const featuredIds = useMemo(() => featuredSessions || [], [featuredSessions]);
   const featuredSet = useMemo(() => new Set(featuredIds), [featuredIds]);
 
   // Full client-side filter over the already-fetched catalog — no second
@@ -147,11 +142,10 @@ export default function FeaturedSessionsEditor({
     return rect.height + gap;
   }, []);
 
-  // Latest-ref pattern: the actual handlers close over current props/state
-  // and are free to change identity every render, but the functions handed
-  // to addEventListener/removeEventListener never change — so a listener
-  // added at drag-start is always removable later with the exact same
-  // reference, regardless of how many re-renders happened in between.
+  // Latest-ref pattern: handlers can change identity every render, but the
+  // stable*/addEventListener/removeEventListener references never do — so a
+  // listener added at drag-start stays removable later, regardless of
+  // re-renders in between.
   const handlePointerMoveRef = useRef(() => {});
   const endDragRef = useRef(() => {});
   const stableMove = useRef((e) => handlePointerMoveRef.current(e)).current;
@@ -238,6 +232,10 @@ export default function FeaturedSessionsEditor({
     if (prevOrder !== featuredIds) {
       const rowHeight = measureRowHeight();
       if (rowHeight) {
+        // Two passes, not interleaved per-node: write every "from" transform
+        // first, force one shared reflow, then write every "to" transform —
+        // avoids layout thrashing from alternating reads/writes per row.
+        const movedNodes = [];
         prevOrder.forEach((sessionId) => {
           if (sessionId === dragInfo.current?.sessionId) return;
           const oldIndex = prevOrder.indexOf(sessionId);
@@ -247,11 +245,17 @@ export default function FeaturedSessionsEditor({
           if (!node) return;
           node.style.transition = 'none';
           node.style.transform = `translateY(${(oldIndex - newIndex) * rowHeight}px)`;
-          // eslint-disable-next-line no-unused-expressions
-          node.offsetHeight; // force reflow so the browser commits the instant transform before we animate away from it
-          node.style.transition = 'transform 0.2s ease';
-          node.style.transform = '';
+          movedNodes.push(node);
         });
+
+        if (movedNodes.length > 0) {
+          // eslint-disable-next-line no-unused-expressions
+          document.body.offsetHeight; // one shared reflow for the whole batch
+          movedNodes.forEach((node) => {
+            node.style.transition = 'transform 0.2s ease';
+            node.style.transform = '';
+          });
+        }
       }
     }
     prevOrderRef.current = featuredIds;

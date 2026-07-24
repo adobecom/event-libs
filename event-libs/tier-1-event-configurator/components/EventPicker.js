@@ -3,6 +3,7 @@ import { html } from '../htm-wrapper.js';
 import { listAllEvents } from '../../v1/utils/esp-controller.js';
 import Modal from './Modal.js';
 import SearchInput from './SearchInput.js';
+import LoadingInline from './LoadingInline.js';
 
 const PUBLISH_FILTERS = ['all', 'published', 'draft'];
 const PUBLISH_FILTER_LABELS = { all: 'All', published: 'Published', draft: 'Draft' };
@@ -27,11 +28,8 @@ export default function EventPicker({
         if (!result.ok) {
           const message = result.error || 'Failed to load events';
           setError(message);
-          // Caller (Library.js) treats this as the signal to fail over to
-          // ManualEventLookup for the rest of the session — see its
-          // handleBrowseError. Firing on any failure, not just CORS/auth
-          // ones, keeps that fallback authoritative rather than duplicating
-          // failure-classification logic here.
+          // Caller (Library.js) fails over to ManualEventLookup on any
+          // failure — no need to classify the error here too.
           onError?.(message);
           return;
         }
@@ -80,7 +78,7 @@ export default function EventPicker({
             `)}
           </div>
         </div>
-        ${isLoading && html`<p class="tec-loading-inline"><span class="tec-spinner tec-spinner--s"></span> Loading events…</p>`}
+        ${isLoading && html`<${LoadingInline} label="Loading events…" />`}
         ${error && html`<p class="tec-event-picker__status tec-event-picker__status--error">${error}</p>`}
         ${!isLoading && !error && html`
           <ul class="tec-event-picker__list">

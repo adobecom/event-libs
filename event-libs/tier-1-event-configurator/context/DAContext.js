@@ -22,13 +22,8 @@ const DAProvider = ({ children }) => {
         setRepo(context?.repo);
         setDaToken(sdkToken);
         if (actions?.daFetch) setDaFetch(actions.daFetch);
-        // No Milo/IMS bootstrap in this standalone app (no window.adobeIMS),
-        // so ESP calls (listEvents/listAllEvents/getEventSessionCatalog) have
-        // no token at all otherwise. Reuse DA's own token as the Authorization
-        // Bearer — confirmed working against prod ESP via curl (see PLAN.md);
-        // blocked only on a CORS gap on ESP's side (also confirmed via a
-        // no-Authorization diagnostic: CORS fails identically either way, so
-        // it's unconditional, not a preflight-specific issue), not auth.
+        // No Milo/IMS bootstrap here (no window.adobeIMS), so ESP calls have
+        // no token otherwise — reuse DA's own as the Authorization Bearer.
         setEspAuthToken(sdkToken);
       } catch (err) {
         window.lana?.log(`DA SDK init error: ${err}`);

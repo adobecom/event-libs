@@ -27,12 +27,9 @@ export default function Library() {
   const [pickerMode, setPickerMode] = useState('new'); // 'new' | 'duplicate'
   const [duplicateSource, setDuplicateSource] = useState(null);
   const [rowPendingDelete, setRowPendingDelete] = useState(null);
-  // Official fallback: if the full EventPicker's listAllEvents() call fails
-  // for any reason (CORS, the prod-vs-non-prod auth mismatch documented in
-  // PLAN.md §5, a real outage), fail over to ManualEventLookup for the rest
-  // of the session rather than leaving a broken picker on screen. Sticky
-  // per page load — not per open — so a transient failure doesn't force a
-  // full re-attempt (and likely re-failure) on every click.
+  // If EventPicker's listAllEvents() fails for any reason, fail over to
+  // ManualEventLookup for the rest of the session (sticky per page load, not
+  // per open, so a transient failure doesn't force a doomed re-attempt).
   const [browseFailed, setBrowseFailed] = useState(false);
 
   const filteredConfigs = useMemo(() => {

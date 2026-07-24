@@ -115,15 +115,9 @@ export async function getEvent(eventId) {
 }
 
 // Singular event lookup directly on ESP (not ESL, unlike getEvent() above) —
-// confirmed public (200, real data, no Authorization header needed) via live
-// browser + curl testing, unlike listEvents() below (blocked by a CORS gap,
-// see tier-1-event-configurator/PLAN.md). Used by that app's manual
-// Event-ID-entry fallback for New Config/Duplicate, since browsing the full
-// catalog via listEvents() isn't available yet. Deliberately skips
-// Authorization (includeAuth=false): this route doesn't need it, and the
-// DA app's espAuthTokenOverride is a prod-IMS token — sending it against a
-// non-prod ESP tier gets rejected as ErrInvalidOauthToken by that
-// environment's gateway instead of being silently ignored.
+// confirmed public, no Authorization needed. Skips it deliberately
+// (includeAuth=false): an override token scoped to the wrong environment
+// gets rejected outright by a non-prod tier's gateway rather than ignored.
 export async function getEspEvent(eventId) {
   const eventServiceEnv = getEventServiceEnv();
   const { serviceApiEndpoints } = ENV_MAP[eventServiceEnv.name];
@@ -146,12 +140,11 @@ export async function getEspEvent(eventId) {
 }
 
 // Single-page ESP events list call, mirroring ESP's own query params
-// (`page-size`, `next-page-token`, `from-date` — epoch ms). The route itself
-// has no auth check, but ESP's API Gateway requires a real IMS Bearer token
-// regardless. tier-1-event-configurator has no window.adobeIMS at all
-// (standalone DA app, no Milo bootstrap) — it feeds setEspAuthToken() the
-// DA SDK's own token instead, so this skips the window.adobeIMS wait other
-// constructRequestOptions callers rely on (it would hang forever here).
+// (page-size, next-page-token, from-date — epoch ms). Unlike getEspEvent()
+// above, this route genuinely requires a valid IMS Bearer token. Skips the
+// window.adobeIMS wait (waitForIMS=false) for callers with no Milo/IMS
+// bootstrap that feed their own token via setEspAuthToken() instead — it
+// would otherwise hang forever waiting for a window.adobeIMS that never appears.
 export async function listEvents({ pageSize, nextPageToken, fromDate } = {}) {
   const eventServiceEnv = getEventServiceEnv();
   const { serviceApiEndpoints } = ENV_MAP[eventServiceEnv.name];
@@ -183,22 +176,16 @@ export async function listEvents({ pageSize, nextPageToken, fromDate } = {}) {
 }
 
 const LIST_ALL_EVENTS_MAX_PAGES = 100;
-// ~6 months, in ms — the picker's job is configuring current/upcoming Tier 1
-// events, not an event's entire multi-year history (unlike EMC's
-// fetchAllPages precedent, which walks everything since it's a general admin
-// console — see tier-1-event-configurator/PLAN.md §5).
+// ~6 months back — configuring current/upcoming events, not full history.
 const LIST_ALL_EVENTS_DEFAULT_LOOKBACK_MS = 1000 * 60 * 60 * 24 * 30 * 6;
-// Longer than EMC's ~10s cache — this picker doesn't need near-real-time
-// freshness, so avoid re-walking the full paginated history on every open.
 const LIST_ALL_EVENTS_CACHE_TTL_MS = 5 * 60 * 1000;
 
 let listAllEventsCache = null; // { fromDate, expiresAt, promise }
 
-// Walks every page of GET /v1/events within the fromDate floor, concatenating
-// into one array — ports EMC's fetchAllPages() pattern so the picker can
-// search/filter client-side across the whole catalog instead of one page at
-// a time. Cached briefly so reopening the picker doesn't re-walk the full
-// history each time; a failed fetch is never cached, so the next call retries.
+// Walks every page of GET /v1/events within the fromDate floor into one
+// array, so the picker can search/filter client-side over the whole catalog.
+// Cached briefly so reopening the picker doesn't re-walk the full history
+// each time; a failed fetch is never cached, so the next call retries.
 export async function listAllEvents({ fromDate } = {}) {
   const resolvedFromDate = fromDate ?? (Date.now() - LIST_ALL_EVENTS_DEFAULT_LOOKBACK_MS);
   const now = Date.now();
@@ -238,21 +225,19 @@ export async function listAllEvents({ fromDate } = {}) {
 }
 
 // Raw ESP session-catalog fetch, for callers that need the unmapped session
-// objects (e.g. reading customAttributes directly) rather than sessions-api.js's
-// fully-normalized shape. Confirmed public, same reasoning as getEspEvent()
-// above — skips Authorization (includeAuth=false) so a non-prod-scoped
-// override token can't get rejected by a non-prod ESP tier's gateway.
+// objects (e.g. reading customAttributes directly) rather than
+// sessions-api.js's fully-normalized shape. Confirmed public, same reasoning
+// as getEspEvent() above (skips Authorization).
 //
 // Returns both `sessions` and `sessionTimes` — ESP keeps start/end times in a
 // separate top-level array cross-referenced by sessionId (a session can have
-// more than one time, e.g. a live slot plus an on-demand replay), not embedded
-// on the session object itself (see tier-1-event-configurator/ESP-SESSION-ENDPOINTS.md).
+// more than one, e.g. a live slot plus an on-demand replay), not embedded on
+// the session object itself (see tier-1-event-configurator/ESP-SESSION-ENDPOINTS.md).
 //
-// NOTE: sessions-api.js's fetchSessions()/mapEslPayloadToRawSessions() (MWPW-200314,
-// not yet merged to dev as of this writing) hits this same /session-catalog
-// endpoint and normalizes it into the app's session shape. Once that lands,
-// prefer importing fetchSessions(eventId) over this raw fetch where a caller
-// only needs the same data fetchSessions already provides.
+// NOTE: sessions-api.js's fetchSessions() (MWPW-200314, not yet merged) hits
+// this same endpoint and normalizes it into the app's session shape — prefer
+// that over this raw fetch once merged, where a caller only needs what it
+// already provides.
 export async function getEventSessionCatalog(eventId) {
   const eventServiceEnv = getEventServiceEnv();
   const { serviceApiEndpoints } = ENV_MAP[eventServiceEnv.name];

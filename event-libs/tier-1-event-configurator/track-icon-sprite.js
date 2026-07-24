@@ -1,10 +1,9 @@
 // Loads and parses ./assets/track-icons.svg into per-icon { viewBox, innerHTML }
 // entries, fetched and cached once. Chrome doesn't support cross-document
-// <use href="external.svg#id">  — only Firefox does — so icons must be resolved
-// to inline markup rather than referenced externally (same reason
-// event-libs/v1/features/icons/icon-resolver.js does its own fetch+parse
-// instead of a bare external <use>; see default-track-icons.js for why that
-// real utility isn't imported directly here).
+// <use href="external.svg#id"> (only Firefox does), so icons are resolved
+// to inline markup instead — same reason icon-resolver.js does its own
+// fetch+parse (see default-track-icons.js for why that real utility isn't
+// imported directly here).
 const SPRITE_URL = new URL('./assets/track-icons.svg', import.meta.url).href;
 
 let spritePromise;
@@ -26,7 +25,10 @@ export function loadTrackIconSprite() {
     spritePromise = fetch(SPRITE_URL)
       .then((resp) => (resp.ok ? resp.text() : ''))
       .then(parseSymbols)
-      .catch(() => ({}));
+      .catch((error) => {
+        window.lana?.log(`Failed to load track icon sprite: ${error}`);
+        return {};
+      });
   }
   return spritePromise;
 }
