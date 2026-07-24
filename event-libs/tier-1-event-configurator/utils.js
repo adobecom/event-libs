@@ -77,6 +77,15 @@ export function isTrackIconEntryComplete(entry) {
   return !entry.color || !!entry.icon;
 }
 
+// The library-list/toast-facing title for a row: the author's own
+// alternative title (config.eventTitle) if they've set one, else the real
+// backend/ESP title (backendEventTitle), else the raw Event ID as a last
+// resort. backendEventTitle is app-stamped (never author-editable);
+// config.eventTitle is the opposite — author-set only, never auto-filled.
+export function getDisplayTitle(row) {
+  return row?.config?.eventTitle || row?.backendEventTitle || row?.eventId || '';
+}
+
 export function formatUpdatedTime(isoString) {
   if (!isoString) return '';
   try {

@@ -3,7 +3,9 @@ import { html } from '../htm-wrapper.js';
 import { getEventSessionCatalog } from '../../v1/utils/esp-controller.js';
 import { useNavigation } from '../context/NavigationContext.js';
 import { useConfigs } from '../context/ConfigsContext.js';
-import { copyTextToClipboard, extractDistinctTracks, isTrackIconEntryComplete } from '../utils.js';
+import {
+  copyTextToClipboard, extractDistinctTracks, isTrackIconEntryComplete, getDisplayTitle,
+} from '../utils.js';
 import TrackIconEditor from '../components/TrackIconEditor.js';
 import FeaturedSessionsEditor from '../components/FeaturedSessionsEditor.js';
 
@@ -86,10 +88,22 @@ export default function ConfigEditor() {
       <div class="tec-editor__header">
         <button type="button" class="tec-btn tec-btn--icon" onClick=${handleCancel} aria-label="Back to library">←</button>
         <div class="tec-editor__header-text">
-          <h1 class="tec-editor__title">${activeConfig.eventTitle}</h1>
-          <p class="tec-editor__event-id">${activeConfig.eventId}</p>
+          <h1 class="tec-editor__title">${getDisplayTitle(activeConfig)}</h1>
+          <p class="tec-editor__event-id">${activeConfig.eventId} · Backend title: ${activeConfig.backendEventTitle}</p>
         </div>
       </div>
+
+      <section class="tec-editor__section">
+        <h2>Event title</h2>
+        <p class="tec-editor__section-hint">Optional alternative display name for this event. Leave blank to use the backend title ("${activeConfig.backendEventTitle}") everywhere this is shown.</p>
+        <input
+          type="text"
+          class="tec-field tec-editor__title-input"
+          placeholder=${activeConfig.backendEventTitle}
+          value=${activeConfig.config.eventTitle || ''}
+          onInput=${(e) => updateConfigField('eventTitle', e.target.value)}
+        />
+      </section>
 
       <section class="tec-editor__section">
         <h2>Sessions</h2>

@@ -631,6 +631,11 @@ select.tec-field {
   font-style: italic;
 }
 
+.tec-editor__title-input {
+  width: 100%;
+  max-width: 480px;
+}
+
 .tec-editor__checkbox {
   display: flex;
   align-items: center;

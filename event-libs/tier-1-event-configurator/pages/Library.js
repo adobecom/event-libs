@@ -6,7 +6,7 @@ import ManualEventLookup from '../components/ManualEventLookup.js';
 import Modal from '../components/Modal.js';
 import { useNavigation } from '../context/NavigationContext.js';
 import { useConfigs } from '../context/ConfigsContext.js';
-import { copyTextToClipboard, formatUpdatedTime } from '../utils.js';
+import { copyTextToClipboard, formatUpdatedTime, getDisplayTitle } from '../utils.js';
 import { EVENT_BROWSE_ENABLED } from '../constants.js';
 
 export default function Library() {
@@ -42,7 +42,8 @@ export default function Library() {
     );
     if (!term) return sorted;
     return sorted.filter(
-      (row) => (row.eventTitle || '').toLowerCase().includes(term)
+      (row) => (row.backendEventTitle || '').toLowerCase().includes(term)
+        || (row.config?.eventTitle || '').toLowerCase().includes(term)
         || (row.eventId || '').toLowerCase().includes(term),
     );
   }, [configs, search]);
@@ -96,7 +97,7 @@ export default function Library() {
 
   const handleCopyConfig = useCallback(async (row) => {
     const ok = await copyTextToClipboard(JSON.stringify(row.config, null, 2));
-    if (ok) setToastSuccess(`Copied config for ${row.eventTitle}`);
+    if (ok) setToastSuccess(`Copied config for ${getDisplayTitle(row)}`);
     else setToastError('Could not copy config — copy it manually from the editor instead');
   }, [setToastSuccess, setToastError]);
 
@@ -135,9 +136,9 @@ export default function Library() {
           ${filteredConfigs.map((row) => html`
             <li class="tec-library__item" key=${row.eventId}>
               <div class="tec-library__item-info">
-                <span class="tec-library__item-title">${row.eventTitle}</span>
+                <span class="tec-library__item-title">${getDisplayTitle(row)}</span>
                 <span class="tec-library__item-meta">
-                  ${row.eventId} · updated ${formatUpdatedTime(row.updated)}
+                  ${row.config?.eventTitle ? `${row.backendEventTitle} · ` : ''}${row.eventId} · updated ${formatUpdatedTime(row.updated)}
                 </span>
               </div>
               <div class="tec-library__item-actions">
@@ -180,7 +181,7 @@ export default function Library() {
       >
         <p>
           This removes the config for
-          ${' '}<strong>${rowPendingDelete?.eventTitle}</strong> from the library.
+          ${' '}<strong>${rowPendingDelete && getDisplayTitle(rowPendingDelete)}</strong> from the library.
           The sheet has no version history, so this can't be undone.
         </p>
       </${Modal}>

@@ -7,11 +7,13 @@ import {
 } from '../scripts/da-controller.js';
 import { useDA } from './DAContext.js';
 import { getDefaultTrackIcon, DEFAULT_ICON_COLOR } from '../default-track-icons.js';
+import { getDisplayTitle } from '../utils.js';
 
 const ConfigsContext = createContext();
 
 function emptyConfig() {
   return {
+    eventTitle: '',
     trackIcons: {},
     allowDoubleBooking: false,
     featuredSessions: [],
@@ -29,8 +31,8 @@ const ConfigsProvider = ({ children }) => {
   const [toastError, setToastError] = useState(null);
 
   // The row currently open in the editor — always a full row shape
-  // ({ eventId, eventTitle, config }), whether freshly created (New/Duplicate)
-  // or loaded from the library (Edit).
+  // ({ eventId, backendEventTitle, config }), whether freshly created
+  // (New/Duplicate) or loaded from the library (Edit).
   const [activeConfig, setActiveConfig] = useState(null);
 
   const loadConfigs = useCallback(async () => {
@@ -65,23 +67,28 @@ const ConfigsProvider = ({ children }) => {
   const startNewConfig = useCallback((event) => {
     setActiveConfig({
       eventId: event.eventId,
-      eventTitle: event.enTitle || event.eventId,
+      backendEventTitle: event.enTitle || event.eventId,
       config: emptyConfig(),
     });
   }, []);
 
   // Clones an existing row's config onto a newly picked Event ID. The
-  // app-stamped identity fields (eventId/eventTitle/updated) are dropped from
-  // the clone rather than carried over stale — upsertConfig re-stamps them
-  // from the picker's selection at save time regardless.
+  // app-stamped identity fields (eventId/backendEventTitle/updated) are
+  // dropped from the clone rather than carried over stale — upsertConfig
+  // re-stamps them from the picker's selection at save time regardless.
+  // config.eventTitle (the author's alternative title) is also cleared, not
+  // carried over — it's specific to the source event's own identity, not a
+  // generic style setting like trackIcons, so inheriting it onto a
+  // different event would silently mislabel the new one.
   const startDuplicateConfig = useCallback((sourceRow, event) => {
     const clonedConfig = { ...sourceRow.config };
     delete clonedConfig.eventId;
-    delete clonedConfig.eventTitle;
+    delete clonedConfig.backendEventTitle;
     delete clonedConfig.updated;
+    clonedConfig.eventTitle = '';
     setActiveConfig({
       eventId: event.eventId,
-      eventTitle: event.enTitle || event.eventId,
+      backendEventTitle: event.enTitle || event.eventId,
       config: clonedConfig,
     });
   }, []);
@@ -164,7 +171,7 @@ const ConfigsProvider = ({ children }) => {
       return next;
     });
     setActiveConfig(result.data);
-    setToastSuccess(`Saved config for ${result.data.eventTitle}`);
+    setToastSuccess(`Saved config for ${getDisplayTitle(result.data)}`);
     return result;
   }, [activeConfig, org, repo]);
 

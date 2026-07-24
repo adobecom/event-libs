@@ -55,6 +55,34 @@ async function daFetch(path, options = {}) {
   return { ok: true, status: resp.status, etag };
 }
 
+// One-time migration-on-read for rows saved under the old schema (a single
+// `eventTitle` meaning "the backend/ESP title", both on the row and inside
+// `config`) to the current one (`backendEventTitle` app-stamped at both
+// levels; `eventTitle` now means an author-set alternative display name,
+// authored only inside `config`, never on the row). A row already has
+// `backendEventTitle` once it's been saved under the new schema at least
+// once — nothing to migrate then. Never rewrites the sheet itself; the next
+// real save naturally persists the new shape.
+function migrateLegacyTitle(row) {
+  const needsRowMigration = row.backendEventTitle === undefined && row.eventTitle !== undefined;
+  const { eventTitle: legacyRowTitle, ...rowRest } = row;
+  const migratedRow = needsRowMigration
+    ? { ...rowRest, backendEventTitle: legacyRowTitle }
+    : row;
+
+  const config = migratedRow.config || {};
+  const needsConfigMigration = config.backendEventTitle === undefined && config.eventTitle !== undefined;
+  if (!needsConfigMigration) return migratedRow;
+  const { eventTitle: legacyConfigTitle, ...configRest } = config;
+  return {
+    ...migratedRow,
+    // Old config.eventTitle held the backend title, not an authored alt
+    // title — move it, and start the new eventTitle blank rather than
+    // carrying the old value into a field that now means something else.
+    config: { ...configRest, backendEventTitle: legacyConfigTitle, eventTitle: '' },
+  };
+}
+
 // Reads a sheet and returns its rows plus the ETag, so callers can perform
 // conditional (optimistic-locking) writes with writeSheet. `config` is stored
 // on the sheet as a stringified JSON blob and parsed back into an object here.
@@ -66,7 +94,7 @@ async function readSheet(org, repo, path) {
 
   const rows = raw
     .filter((row) => row && row.eventId)
-    .map((row) => ({
+    .map((row) => migrateLegacyTitle({
       ...row,
       config: typeof row.config === 'string' ? JSON.parse(row.config) : (row.config ?? {}),
     }));
@@ -162,15 +190,15 @@ export async function getConfigs(org, repo) {
 // Upsert-by-Event-ID: replaces the existing row for this event, or appends a
 // new one — a single write path rather than separate create/update calls, so
 // re-picking an already-configured event can never create a duplicate row.
-export async function upsertConfig(org, repo, { eventId, eventTitle, config }) {
+export async function upsertConfig(org, repo, { eventId, backendEventTitle, config }) {
   const updated = new Date().toISOString();
   const stampedConfig = {
     ...config,
     eventId,
-    eventTitle,
+    backendEventTitle,
     updated,
   };
-  const newRow = { eventId, eventTitle, config: stampedConfig, updated };
+  const newRow = { eventId, backendEventTitle, config: stampedConfig, updated };
 
   const result = await mutateSheet(org, repo, CONFIGS_SHEET_PATH, (rows) => {
     const idx = rows.findIndex((r) => r.eventId === eventId);

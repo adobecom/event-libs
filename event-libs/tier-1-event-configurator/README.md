@@ -103,9 +103,10 @@ One shared DA sheet per content-repo at
 ```json
 {
   "eventId": "...",
-  "eventTitle": "...",
+  "backendEventTitle": "...",
   "config": {
     "eventId": "...",
+    "backendEventTitle": "...",
     "eventTitle": "...",
     "updated": "2026-07-22T21:30:00.000Z",
     "trackIcons": { "Track Name": { "icon": "icon-slug", "color": "#RRGGBB" } },
@@ -115,6 +116,8 @@ One shared DA sheet per content-repo at
   "updated": "2026-07-22T21:30:00.000Z"
 }
 ```
+
+**Two different kinds of title, added 2026-07-24 (per Daniel).** `backendEventTitle` is the real ESP/backend title (`event.enTitle`) — app-stamped at both the row and `config` level, exactly like `eventId`/`updated`, never author-editable. `config.eventTitle` is the opposite: an optional author-set alternative display name, authored only inside `config` (no row-level column), defaulting to blank. `getDisplayTitle(row)` (`utils.js`) resolves which one to actually show: the authored `eventTitle` if set, else `backendEventTitle`, else the raw Event ID — used everywhere a row's title is shown (library list, toasts, the editor header). Rows saved under the old single-`eventTitle` schema are migrated on read (`da-controller.js`'s `migrateLegacyTitle`), not rewritten in place — the old value becomes `backendEventTitle`, and the new `eventTitle` starts blank rather than inheriting it.
 
 `config` is the exact value an author copies into their event page's own
 `tier-1-event-config` metadata row — this app never touches the page itself.
