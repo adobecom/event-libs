@@ -115,9 +115,8 @@ export async function getEvent(eventId) {
 }
 
 // Singular event lookup directly on ESP (not ESL, unlike getEvent() above) —
-// confirmed public, no Authorization needed. Skips it deliberately
-// (includeAuth=false): an override token scoped to the wrong environment
-// gets rejected outright by a non-prod tier's gateway rather than ignored.
+// confirmed public. Skips Authorization (includeAuth=false): a wrong-env
+// override token gets rejected outright rather than ignored.
 export async function getEspEvent(eventId) {
   const eventServiceEnv = getEventServiceEnv();
   const { serviceApiEndpoints } = ENV_MAP[eventServiceEnv.name];
@@ -139,12 +138,10 @@ export async function getEspEvent(eventId) {
   }
 }
 
-// Single-page ESP events list call, mirroring ESP's own query params
-// (page-size, next-page-token, from-date — epoch ms). Unlike getEspEvent()
-// above, this route genuinely requires a valid IMS Bearer token. Skips the
-// window.adobeIMS wait (waitForIMS=false) for callers with no Milo/IMS
-// bootstrap that feed their own token via setEspAuthToken() instead — it
-// would otherwise hang forever waiting for a window.adobeIMS that never appears.
+// Single-page ESP events list call (page-size/next-page-token/from-date,
+// epoch ms). Unlike getEspEvent(), this route requires a valid IMS Bearer
+// token. Skips the window.adobeIMS wait (waitForIMS=false) for callers
+// feeding their own token via setEspAuthToken() instead.
 export async function listEvents({ pageSize, nextPageToken, fromDate } = {}) {
   const eventServiceEnv = getEventServiceEnv();
   const { serviceApiEndpoints } = ENV_MAP[eventServiceEnv.name];
@@ -180,15 +177,10 @@ const LIST_ALL_EVENTS_CACHE_TTL_MS = 5 * 60 * 1000;
 
 let listAllEventsCache = null; // { fromDate, expiresAt, promise }
 
-// Walks every page of GET /v1/events into one array, so the picker can
-// search/filter client-side over the whole catalog. Cached briefly so
-// reopening the picker doesn't re-walk the full history each time; a failed
-// fetch is never cached, so the next call retries.
-//
-// No from-date floor for now — no default lookback is applied, so this
-// walks the event's entire history (still bounded by LIST_ALL_EVENTS_MAX_PAGES).
-// Consider reintroducing a default (e.g. ~6 months) once real usage shows
-// how far back authors actually need to search/duplicate from.
+// Walks every page of GET /v1/events into one array for client-side
+// search/filter. Cached briefly; a failed fetch is never cached. No
+// from-date floor for now — walks full history (bounded by MAX_PAGES);
+// consider a default lookback if that proves too slow in practice.
 export async function listAllEvents({ fromDate } = {}) {
   const now = Date.now();
 
@@ -226,20 +218,12 @@ export async function listAllEvents({ fromDate } = {}) {
   return promise;
 }
 
-// Raw ESP session-catalog fetch, for callers that need the unmapped session
-// objects (e.g. reading customAttributes directly) rather than
-// sessions-api.js's fully-normalized shape. Confirmed public, same reasoning
-// as getEspEvent() above (skips Authorization).
-//
-// Returns both `sessions` and `sessionTimes` — ESP keeps start/end times in a
-// separate top-level array cross-referenced by sessionId (a session can have
-// more than one, e.g. a live slot plus an on-demand replay), not embedded on
-// the session object itself (see tier-1-event-configurator/ESP-SESSION-ENDPOINTS.md).
-//
-// NOTE: sessions-api.js's fetchSessions() (MWPW-200314, not yet merged) hits
-// this same endpoint and normalizes it into the app's session shape — prefer
-// that over this raw fetch once merged, where a caller only needs what it
-// already provides.
+// Raw ESP session-catalog fetch (unmapped objects, e.g. for customAttributes)
+// — confirmed public, skips Authorization like getEspEvent(). Returns
+// `sessions` and `sessionTimes` separately — ESP keeps times in their own
+// sessionId-keyed array (a session can have more than one, e.g. live +
+// on-demand), not embedded on the session itself. Once MWPW-200314 merges,
+// prefer sessions-api.js's fetchSessions(), which normalizes this same data.
 export async function getEventSessionCatalog(eventId) {
   const eventServiceEnv = getEventServiceEnv();
   const { serviceApiEndpoints } = ENV_MAP[eventServiceEnv.name];

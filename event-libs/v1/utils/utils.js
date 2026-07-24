@@ -48,12 +48,9 @@ export const [setEventConfig, updateEventConfig, getEventConfig] = (() => {
   ];
 })();
 
-// Override for callers that pick an ESP/ESL environment at runtime rather
-// than via a <meta> tag or query param (e.g. tier-1-event-configurator's
-// env picker — query params don't reliably reach a DA-embedded iframe).
-// Opt-in only — defaults to null/inactive, so every other consumer of
-// getEventServiceEnv() is unaffected. Checked first, ahead of the
-// query-param/meta-tag/prod chain.
+// Runtime env override (e.g. tier-1-event-configurator's env picker).
+// Opt-in — defaults to null, so other getEventServiceEnv() callers are
+// unaffected. Checked first, ahead of the query-param/meta-tag/prod chain.
 let eventServiceEnvOverride = null;
 
 export function setEventServiceEnvOverride(envName) {

@@ -1,9 +1,6 @@
-// Loads and parses ./assets/track-icons.svg into per-icon { viewBox, innerHTML }
-// entries, fetched and cached once. Chrome doesn't support cross-document
-// <use href="external.svg#id"> (only Firefox does), so icons are resolved
-// to inline markup instead — same reason icon-resolver.js does its own
-// fetch+parse (see default-track-icons.js for why that real utility isn't
-// imported directly here).
+// Fetches+parses track-icons.svg into per-icon { viewBox, innerHTML }, cached
+// once. Chrome doesn't support cross-document <use href="external.svg#id">,
+// so icons are inlined instead of referenced.
 const SPRITE_URL = new URL('./assets/track-icons.svg', import.meta.url).href;
 
 let spritePromise;

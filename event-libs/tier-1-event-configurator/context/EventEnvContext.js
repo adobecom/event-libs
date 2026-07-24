@@ -6,11 +6,8 @@ import { setEventServiceEnvOverride, getEventServiceEnv } from '../../v1/utils/u
 
 const EventEnvContext = createContext();
 
-// Reactive wrapper around v1/utils/utils.js's module-level env override
-// (the real source of truth esp-controller.js reads from, so it also works
-// for non-React call sites) — a bare module variable can't drive a
-// re-rendered UI on its own. Both the env picker's setEnv() and the app-wide
-// banner's envName read go through the same setEventServiceEnvOverride().
+// Reactive wrapper around utils.js's module-level env override, so a plain
+// variable (needed for non-React callers too) can still drive a re-render.
 const EventEnvProvider = ({ children }) => {
   const [envName, setEnvName] = useState(() => getEventServiceEnv().name);
 

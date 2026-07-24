@@ -1,8 +1,5 @@
-// Temporary copy of event-libs/v1/utils/track-icon-config.js's
-// DEFAULT_TRACK_ICON_CONFIG + slugify, which lives on the not-yet-merged
-// MWPW-200314 branch. Icon slugs match track-icons.svg's <symbol> ids
-// (also copied locally into ./assets/track-icons.svg). Consolidate back
-// onto the real utility once that branch merges.
+// Temporary copy of v1/utils/track-icon-config.js's DEFAULT_TRACK_ICON_CONFIG
+// (lives on the not-yet-merged MWPW-200314 branch). Consolidate once it merges.
 
 export const DEFAULT_TRACK_ICON_CONFIG = {
   'social-media': { icon: 'social-media', color: '#FF6B35' },
@@ -29,10 +26,8 @@ export const KNOWN_ICON_SLUGS = Object.freeze(
   [...new Set(Object.values(DEFAULT_TRACK_ICON_CONFIG).map((entry) => entry.icon))].sort(),
 );
 
-// Deliberately not DEFAULT_TRACK_ICON_CONFIG's per-track brand colors —
-// this authoring app's own default (seeded and displayed) is always plain
-// black. Shared so ConfigsContext's seeding and TrackIconEditor's display
-// can't drift apart.
+// Not DEFAULT_TRACK_ICON_CONFIG's per-track brand colors — this app's own
+// default is always plain black (seeding and display share this constant).
 export const DEFAULT_ICON_COLOR = '#000000';
 
 export function slugifyTrackName(name) {

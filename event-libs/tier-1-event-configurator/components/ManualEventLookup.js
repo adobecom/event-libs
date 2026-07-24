@@ -5,15 +5,9 @@ import Modal from './Modal.js';
 import { useEventEnv } from '../context/EventEnvContext.js';
 import { EVENT_SERVICE_ENV_OPTIONS } from '../constants.js';
 
-// New Config/Duplicate's fallback when EventPicker's full catalog browse
-// fails at runtime (see Library.js's browseFailed) — author enters a known
-// Event ID directly. getEspEvent() looks it up for real so they can confirm
-// the title/published state before proceeding.
-//
-// Also the one place an author can target a non-prod ESP tier. The choice
-// persists for the rest of the session (via EventEnvContext), applying to
-// every later ESP call, not just this lookup — TierOneEventConfigurator.js
-// shows a banner any time it's not prod.
+// New Config/Duplicate's fallback when EventPicker's browse fails at
+// runtime (Library.js's browseFailed). Also the one place to target a
+// non-prod ESP tier — the choice persists for the rest of the session.
 export default function ManualEventLookup({
   isOpen, onClose, onSelect, title = 'Enter an Event ID',
 }) {
@@ -22,10 +16,7 @@ export default function ManualEventLookup({
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
   const [foundEvent, setFoundEvent] = useState(null);
-  // Bumped on every new lookup and on every env change, so a response that
-  // lands after either has happened (e.g. Enter pressed twice, or the env
-  // switched while a request was in flight) is recognized as stale and
-  // discarded instead of silently overwriting newer state.
+  // Bumped on every lookup/env change so a stale response can't overwrite newer state.
   const requestIdRef = useRef(0);
 
   const reset = () => {

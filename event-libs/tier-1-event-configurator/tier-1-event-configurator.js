@@ -6,10 +6,7 @@ import { ConfigsProvider } from './context/ConfigsContext.js';
 import { EventEnvProvider } from './context/EventEnvContext.js';
 import TierOneEventConfigurator from './TierOneEventConfigurator.js';
 
-// No Spectrum Web Components — plain HTML/CSS (tier-1-event-configurator.css)
-// instead. This app fought SWC's shadow-DOM styling model more than it
-// benefited from it (static-color="black" overrides, etc.), and skipping 8
-// remote script loads is a real win for a small internal tool.
+// No Spectrum Web Components — plain HTML/CSS (tier-1-event-configurator.css).
 async function init() {
   render(
     html`

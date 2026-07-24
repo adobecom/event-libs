@@ -55,12 +55,9 @@ async function daFetch(path, options = {}) {
   return { ok: true, status: resp.status, etag };
 }
 
-// One-time migration-on-read: old rows had a single `eventTitle` meaning
-// the backend title, at both the row and config level. Now `backendEventTitle`
-// holds that (app-stamped both places) and `eventTitle` means an author-set
-// alternative, authored only inside `config`. A row with `backendEventTitle`
-// already is new-schema — nothing to migrate. Never rewrites the sheet; the
-// next real save persists the new shape.
+// One-time migration-on-read: old rows had a single `eventTitle` meaning the
+// backend title. Now that's `backendEventTitle`, and `eventTitle` means an
+// author-set alternative. Doesn't rewrite the sheet; the next save does.
 function migrateLegacyTitle(row) {
   const needsRowMigration = row.backendEventTitle === undefined && row.eventTitle !== undefined;
   const { eventTitle: legacyRowTitle, ...rowRest } = row;
@@ -96,13 +93,10 @@ async function readSheet(org, repo, path) {
   return { ok: true, data: rows, etag: result.etag };
 }
 
-// Writes the full sheet. Concurrency control via conditional headers:
-//   - { etag }          → If-Match: <etag>   (write only if unchanged since read)
-//   - { create: true }  → If-None-Match: *   (write only if the sheet doesn't exist yet)
-//   - neither           → unconditional      (last-write-wins; e.g. etag unavailable)
-// `create` is ignored when an etag is given. A precondition failure returns
-// { ok:false, status:412, conflict:true } so callers can re-read and retry
-// rather than silently clobber a concurrent write.
+// Writes the full sheet. { etag } → If-Match (write only if unchanged);
+// { create: true } → If-None-Match: * (only if the sheet doesn't exist yet);
+// neither → unconditional. A precondition failure returns status:412 so
+// callers can re-read and retry instead of clobbering a concurrent write.
 async function writeSheet(org, repo, path, rows, { etag, create } = {}) {
   const serialized = rows.map((row) => ({
     ...row,
@@ -148,14 +142,9 @@ async function writeSheet(org, repo, path, rows, { etag, create } = {}) {
 const MAX_WRITE_RETRIES = 4;
 const CONFLICT_ERROR = 'Conflict: the config library sheet was changed by someone else. Please retry.';
 
-// Optimistic-locking read-modify-write for a single sheet. Reads the sheet with
-// its ETag, applies `mutate(rows)`, then writes conditionally. On a 412 conflict
-// (a concurrent write landed in between) it re-reads and retries, so the mutation
-// is always applied on top of the latest state instead of clobbering it.
-//
-// `mutate(rows)` must return { rows, result, skip? }. When skip is true the write
-// is not performed (e.g. deleting a row that's already gone), avoiding a
-// needless version bump.
+// Optimistic-locking read-modify-write: reads the sheet + ETag, applies
+// mutate(rows), writes conditionally, and retries on a 412 conflict.
+// mutate(rows) returns { rows, result, skip? } — skip avoids a needless write.
 async function mutateSheet(org, repo, path, mutate) {
   for (let attempt = 0; attempt <= MAX_WRITE_RETRIES; attempt += 1) {
     // eslint-disable-next-line no-await-in-loop

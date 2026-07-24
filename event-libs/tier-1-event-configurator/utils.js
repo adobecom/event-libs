@@ -1,6 +1,6 @@
-// Copies a plain-text payload to the clipboard. Detects navigator.clipboard
-// availability first (not guaranteed inside the DA iframe) and falls back to
-// a hidden textarea + document.execCommand('copy') when unavailable.
+// Copies text to the clipboard, falling back to a hidden textarea +
+// execCommand('copy') when navigator.clipboard isn't available (not
+// guaranteed inside the DA iframe).
 export async function copyTextToClipboard(text) {
   try {
     if (navigator.clipboard && navigator.clipboard.writeText) {
@@ -22,10 +22,8 @@ export async function copyTextToClipboard(text) {
   }
 }
 
-// Same custom attribute ESP's real session-catalog payload carries the
-// "Primary Digital Agenda Track" under (matches sessions-api.js's
-// extractCustomAttributeValue, MWPW-200314 — not yet merged to dev, so
-// duplicated here rather than imported; consolidate once it lands).
+// Matches sessions-api.js's extractCustomAttributeValue (MWPW-200314, not
+// yet merged) — duplicated here rather than imported; consolidate once it lands.
 const TRACK_ATTRIBUTE_NAME = 'Primary Track for Agenda (Digital Agenda)';
 
 export function getSessionTrack(session) {
@@ -42,12 +40,8 @@ export function extractDistinctTracks(sessions) {
   return [...tracks].sort();
 }
 
-// A session can have more than one sessionTime (e.g. a live slot plus an
-// on-demand replay) — callers pass the one they want formatted (typically
-// the earliest, for a picker's "when is this" context). Formats in the
-// sessionTime's own venue timezone, not the viewer's local one — this is an
-// authoring tool describing when a session is scheduled at the event, not a
-// viewer-facing display.
+// Formats in the sessionTime's own venue timezone, not the viewer's local
+// one — this is authoring, describing when a session happens at the event.
 export function formatSessionTime(sessionTime) {
   if (!sessionTime?.startTimeMillis) return '';
   try {
@@ -65,23 +59,15 @@ export function formatSessionTime(sessionTime) {
   }
 }
 
-// An untouched track (no entry at all) is fine — it cleanly falls back to
-// the built-in default icon (TrackIconEditor). An icon with no explicit
-// color is *also* fine now — color implicitly defaults to black, so that's
-// a normal, complete state, not a half-set one. The only state that doesn't
-// make sense is a color authored with no icon to apply it to. Mirrors
-// Schedule Maker's isBlockComplete pattern: a pure predicate, not validation
-// logic baked into the editor component.
+// Icon-only is fine (color defaults to black) — only color-with-no-icon
+// doesn't make sense. Mirrors Schedule Maker's isBlockComplete pattern.
 export function isTrackIconEntryComplete(entry) {
   if (!entry) return true;
   return !entry.color || !!entry.icon;
 }
 
-// The library-list/toast-facing title for a row: the author's own
-// alternative title (config.eventTitle) if they've set one, else the real
-// backend/ESP title (backendEventTitle), else the raw Event ID as a last
-// resort. backendEventTitle is app-stamped (never author-editable);
-// config.eventTitle is the opposite — author-set only, never auto-filled.
+// Display title for a row: the author's alternative title if set, else the
+// real backend/ESP title, else the raw Event ID.
 export function getDisplayTitle(row) {
   return row?.config?.eventTitle || row?.backendEventTitle || row?.eventId || '';
 }

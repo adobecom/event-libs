@@ -18,21 +18,15 @@ function DragHandleIcon() {
   `;
 }
 
-// Pointer-based drag reorder. Each row's handle does double duty: pointerdown
-// drags it (mouse/touch, via Pointer Events), and ArrowUp/ArrowDown while
-// it's focused reorders it through the same path — native drag alone isn't
-// keyboard- or screen-reader-operable.
+// Pointer-based drag reorder. Each handle also responds to ArrowUp/ArrowDown
+// when focused, since native drag isn't keyboard-operable.
 //
-// Move/up tracking uses window-level listeners rather than
-// setPointerCapture on the handle: capture doesn't survive the handle's own
-// DOM node being moved mid-gesture (which happens on every reorder swap,
-// for the FLIP animation below), so it was ending drags after one swap.
+// Tracks pointermove/up on window, not via setPointerCapture on the handle —
+// capture doesn't survive the handle's DOM node moving mid-drag (which
+// happens every reorder swap), so it was ending drags after one swap.
 //
-// Assumes every row is the same height, so the dragged row's target slot is
-// arithmetic on the cumulative pointer delta rather than continuous DOM
-// measurement, and other rows get a FLIP-style settle animation (instant
-// inverse transform, one shared reflow, then transition to 0) whenever the
-// order changes underneath them.
+// Assumes every row is the same height: the dragged row's target slot is
+// arithmetic on the pointer delta, and other rows FLIP-animate into place.
 export default function FeaturedSessionsEditor({
   sessions, sessionTimes, tracks, featuredSessions, onChange,
 }) {
@@ -47,9 +41,7 @@ export default function FeaturedSessionsEditor({
     return map;
   }, [sessions]);
 
-  // A session can have more than one sessionTime (e.g. a live slot plus an
-  // on-demand replay, see ESP-SESSION-ENDPOINTS.md) — show the earliest for
-  // "when is this" picker context.
+  // A session can have more than one sessionTime (e.g. live + on-demand) — use the earliest.
   const earliestTimeBySessionId = useMemo(() => {
     const map = new Map();
     (sessionTimes || []).forEach((time) => {
@@ -72,16 +64,13 @@ export default function FeaturedSessionsEditor({
     [sessionsById],
   );
 
-  // Memoized so the FLIP effect's reference-equality check below (prevOrder
-  // !== featuredIds) reflects a genuine order change, not a fresh []
-  // literal recreated on every render whenever featuredSessions is falsy.
+  // Memoized so the FLIP effect's prevOrder !== featuredIds check reflects a
+  // real order change, not a fresh [] recreated whenever featuredSessions is falsy.
   const featuredIds = useMemo(() => featuredSessions || [], [featuredSessions]);
   const featuredSet = useMemo(() => new Set(featuredIds), [featuredIds]);
 
   // Full client-side filter over the already-fetched catalog — no second
-  // /session-facets call and no pagination/virtualization, matching the
-  // event size this picker actually needs to handle (see
-  // ESP-SESSION-ENDPOINTS.md's open questions, resolved here).
+  // /session-facets call, no pagination.
   const availableSessions = useMemo(() => {
     const term = search.trim().toLowerCase();
     return (sessions || []).filter((session) => {
@@ -120,8 +109,7 @@ export default function FeaturedSessionsEditor({
     }
   }, [handleMove]);
 
-  // --- Drag state (refs, not state, so pointermove can read/write them on
-  // every event without forcing a re-render per pixel of movement) ---
+  // Refs, not state — pointermove reads/writes these without re-rendering per pixel.
   const listRef = useRef(null);
   const itemRefs = useRef(new Map());
   const dragInfo = useRef(null); // { sessionId, startClientY, startIndex, rowHeight }
@@ -142,10 +130,8 @@ export default function FeaturedSessionsEditor({
     return rect.height + gap;
   }, []);
 
-  // Latest-ref pattern: handlers can change identity every render, but the
-  // stable*/addEventListener/removeEventListener references never do — so a
-  // listener added at drag-start stays removable later, regardless of
-  // re-renders in between.
+  // Latest-ref pattern: stableMove/stableEnd never change identity, so a
+  // listener added at drag-start stays removable later even if the handlers do.
   const handlePointerMoveRef = useRef(() => {});
   const endDragRef = useRef(() => {});
   const stableMove = useRef((e) => handlePointerMoveRef.current(e)).current;
@@ -185,10 +171,8 @@ export default function FeaturedSessionsEditor({
 
     const draggedNode = itemRefs.current.get(info.sessionId);
     if (draggedNode) {
-      // The layout itself already accounts for whole-slot shifts once the
-      // array reorders (above) — this transform only needs to supply the
-      // remaining sub-slot distance so the row keeps tracking the pointer
-      // smoothly instead of jumping at each swap.
+      // Layout already covers whole-slot shifts from the reorder above; this
+      // only supplies the remaining sub-slot distance.
       const visualOffset = deltaY - (targetIndex - info.startIndex) * info.rowHeight;
       draggedNode.style.transform = `translateY(${visualOffset}px)`;
     }
@@ -214,27 +198,23 @@ export default function FeaturedSessionsEditor({
     setDraggedId(null);
   };
 
-  // Safety net: if this component unmounts mid-drag (e.g. navigating away),
-  // don't leave the window listeners registered.
+  // Safety net: don't leave window listeners registered if unmounted mid-drag.
   useEffect(() => () => {
     window.removeEventListener('pointermove', stableMove);
     window.removeEventListener('pointerup', stableEnd);
     window.removeEventListener('pointercancel', stableEnd);
   }, [stableMove, stableEnd]);
 
-  // FLIP-lite: whenever the order changes (drag, keyboard move, or an
-  // add/remove shifting everyone after it), animate every row other than
-  // the one actively being dragged (that one's already being positioned by
-  // the pointer handler above) from its old slot to its new one.
+  // FLIP-lite: when the order changes, animate every row except the one
+  // being dragged (already positioned above) from its old slot to its new one.
   const prevOrderRef = useRef(featuredIds);
   useLayoutEffect(() => {
     const prevOrder = prevOrderRef.current;
     if (prevOrder !== featuredIds) {
       const rowHeight = measureRowHeight();
       if (rowHeight) {
-        // Two passes, not interleaved per-node: write every "from" transform
-        // first, force one shared reflow, then write every "to" transform —
-        // avoids layout thrashing from alternating reads/writes per row.
+        // Two passes (write all "from", one reflow, write all "to") to avoid
+        // layout thrashing from interleaving reads/writes per row.
         const movedNodes = [];
         prevOrder.forEach((sessionId) => {
           if (sessionId === dragInfo.current?.sessionId) return;
