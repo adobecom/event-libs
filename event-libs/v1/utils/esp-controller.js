@@ -49,10 +49,10 @@ export function waitForAdobeIMS() {
   });
 }
 
-export async function constructRequestOptions(method, body = null, waitForIMS = true) {
+export async function constructRequestOptions(method, body = null, waitForIMS = true, skipAuth = false, rsvpToken = null) {
   const { miloConfig } = getEventConfig();
   const miloLibs = miloConfig?.miloLibs || LIBS;
-  
+
   let getUuid;
   try {
     const [{ default: importedGetUuid }] = await Promise.all([import(`${miloLibs}/utils/getUuid.js`), waitForIMS ? waitForAdobeIMS() : Promise.resolve()]);
@@ -63,9 +63,15 @@ export async function constructRequestOptions(method, body = null, waitForIMS = 
   }
 
   const headers = new Headers();
-  const authToken = window.adobeIMS?.getAccessToken()?.token;
+  // skipAuth is for genuinely public/guest-token-authenticated endpoints: never attach
+  // the caller's own IMS identity, even if one happens to be signed in (an assistant
+  // registering on a VIP's behalf must stay anonymous to the backend).
+  const authToken = skipAuth ? null : window.adobeIMS?.getAccessToken()?.token;
 
   if (authToken) headers.append('Authorization', `Bearer ${authToken}`);
+  // RSVP-token endpoints authenticate solely via this header — the token never
+  // travels in the URL path or query string, to keep it out of access logs.
+  if (rsvpToken) headers.append('x-adobe-esp-rsvp-token', rsvpToken);
   headers.append('x-api-key', 'acom_event_service');
   headers.append('x-request-id', await getUuid(new Date().getTime()));
   headers.append('content-type', 'application/json');
@@ -297,6 +303,62 @@ export async function getCampaign(eventId, campaignId) {
     return { ok: true, data };
   } catch (error) {
     window.lana?.log(`Error: Failed to get campaign ${campaignId} for event ${eventId}:${JSON.stringify(error)}`);
+    return { ok: false, status: 'Network Error', error: error.message };
+  }
+}
+
+// RSVP token endpoints — authenticated solely by the x-adobe-esp-rsvp-token
+// header (constructRequestOptions(..., waitForIMS=false, skipAuth=true, token)), so
+// both calls skip waiting for adobeIMS (avoids stalling for a guest with no IMS
+// session) and skip attaching any signed-in caller's own IMS token (keeps the
+// submission anonymous even when the caller, e.g. an assistant, happens to be
+// signed in).
+export async function validateRsvpToken(eventId, token) {
+  const eventServiceEnv = getEventServiceEnv();
+  const { serviceApiEndpoints } = ENV_MAP[eventServiceEnv.name];
+  const options = await constructRequestOptions('GET', null, false, true, token);
+
+  try {
+    const response = await fetch(`${serviceApiEndpoints.esl}/v1/events/${eventId}/rsvpTokenRegistrations`, options);
+    const data = await response.json();
+
+    if (!response.ok) {
+      window.lana?.log(`Error: Failed to validate RSVP token. Status:${JSON.stringify(response)}`);
+      return { ok: false, status: response.status, error: data };
+    }
+
+    return { ok: true, data };
+  } catch (error) {
+    window.lana?.log(`Error: Failed to validate RSVP token:${JSON.stringify(error)}`);
+    return { ok: false, status: 'Network Error', error: error.message };
+  }
+}
+
+export async function submitRsvpTokenRegistration(eventId, token, attendeeData, campaignId = null) {
+  if (!eventId || !token || !attendeeData) return { ok: false, error: 'Missing eventId, token, or attendee data' };
+
+  const eventServiceEnv = getEventServiceEnv();
+  const { serviceApiEndpoints } = ENV_MAP[eventServiceEnv.name];
+  const raw = JSON.stringify(attendeeData);
+  const options = await constructRequestOptions('POST', raw, false, true, token);
+  const url = new URL(`${serviceApiEndpoints.esl}/v1/events/${eventId}/rsvpTokenRegistrations`);
+  // Tokens never carry a bound campaign (EMC no longer sets one at generation),
+  // so this query-param fallback is the sole campaign-attribution path for
+  // rsvp-token registrations — campaignId is never sent in the request body.
+  if (campaignId) url.searchParams.set('campaignId', campaignId);
+
+  try {
+    const response = await fetch(url.toString(), options);
+    const data = await response.json();
+
+    if (!response.ok) {
+      window.lana?.log(`Error: Failed to submit RSVP token registration. Status:${JSON.stringify(response)}`);
+      return { ok: false, status: response.status, error: data };
+    }
+
+    return { ok: true, data };
+  } catch (error) {
+    window.lana?.log(`Error: Failed to submit RSVP token registration:${JSON.stringify(error)}`);
     return { ok: false, status: 'Network Error', error: error.message };
   }
 }

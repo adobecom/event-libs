@@ -1,5 +1,5 @@
 import { expect } from '@esm-bundle/chai';
-import { DictionaryManager, dictionaryManager, getInviteOnlyNoCampaignMessage } from '../../../event-libs/v1/utils/dictionary-manager.js';
+import { DictionaryManager, dictionaryManager, getInviteOnlyNoCampaignMessage, getRsvpTokenInvalidMessage, getRsvpTokenAlreadyRegisteredMessage } from '../../../event-libs/v1/utils/dictionary-manager.js';
 import { setEventConfig } from '../../../event-libs/v1/utils/utils.js';
 
 describe('DictionaryManager', () => {
@@ -176,5 +176,97 @@ describe('getInviteOnlyNoCampaignMessage', () => {
     globalThis.fetch = () => Promise.resolve(mockResponse);
     await manager.initialize();
     expect(getInviteOnlyNoCampaignMessage(manager)).to.equal('Invitation-only copy from sheet.');
+  });
+});
+
+describe('getRsvpTokenInvalidMessage', () => {
+  let originalFetch;
+
+  beforeEach(() => {
+    originalFetch = globalThis.fetch;
+    DictionaryManager._clearCache();
+    setEventConfig({}, {
+      miloLibs: 'http://localhost:2000/test/unit/blocks/promotional-content/mocks/libs',
+      locales: { '': { ietf: 'en-US', tk: 'hah7vzn.css' } },
+    });
+  });
+
+  afterEach(() => {
+    globalThis.fetch = originalFetch;
+    DictionaryManager._clearCache();
+  });
+
+  it('returns fallback English copy when key is not in dictionary', () => {
+    const manager = new DictionaryManager();
+    expect(getRsvpTokenInvalidMessage(manager)).to.equal(
+      'This registration link is no longer valid. It may have already been used or expired.',
+    );
+  });
+
+  it('returns configured dictionary value when present', async () => {
+    const manager = new DictionaryManager();
+    const mockResponse = {
+      ok: true,
+      json: () => Promise.resolve({
+        data: {
+          total: 1,
+          offset: 0,
+          limit: 1,
+          data: [{ key: 'rsvp-token-invalid-cta-text', value: 'This link has already been used.' }],
+        },
+        ':version': 3,
+        ':names': ['data'],
+        ':type': 'multi-sheet',
+      }),
+    };
+    globalThis.fetch = () => Promise.resolve(mockResponse);
+    await manager.initialize();
+    expect(getRsvpTokenInvalidMessage(manager)).to.equal('This link has already been used.');
+  });
+});
+
+describe('getRsvpTokenAlreadyRegisteredMessage', () => {
+  let originalFetch;
+
+  beforeEach(() => {
+    originalFetch = globalThis.fetch;
+    DictionaryManager._clearCache();
+    setEventConfig({}, {
+      miloLibs: 'http://localhost:2000/test/unit/blocks/promotional-content/mocks/libs',
+      locales: { '': { ietf: 'en-US', tk: 'hah7vzn.css' } },
+    });
+  });
+
+  afterEach(() => {
+    globalThis.fetch = originalFetch;
+    DictionaryManager._clearCache();
+  });
+
+  it('returns fallback English copy when key is not in dictionary', () => {
+    const manager = new DictionaryManager();
+    expect(getRsvpTokenAlreadyRegisteredMessage(manager)).to.equal(
+      'This email is already registered for this event.',
+    );
+  });
+
+  it('returns configured dictionary value when present', async () => {
+    const manager = new DictionaryManager();
+    const mockResponse = {
+      ok: true,
+      json: () => Promise.resolve({
+        data: {
+          total: 1,
+          offset: 0,
+          limit: 1,
+          data: [{ key: 'rsvp-token-already-registered-cta-text', value: 'You are already on the list.' }],
+        },
+        ':version': 3,
+        ':names': ['data'],
+        ':type': 'multi-sheet',
+      }),
+    };
+    globalThis.fetch = () => Promise.resolve(mockResponse);
+    await manager.initialize();
+    expect(getRsvpTokenAlreadyRegisteredMessage(manager)).to.equal('You are already on the list.');
   });
 });

@@ -25,6 +25,7 @@ import {
   parseEncodedConfig,
   createTag,
   getValidCampaignIdFromUrl,
+  shouldForceGuestSignIn,
 } from './utils.js';
 import { massageMetadata } from './date-time-helper.js';
 import { hydrateBlocks, setHydrationPromise } from '../hydrate/hydrate.js';
@@ -224,15 +225,12 @@ async function handleRSVPBtnBasedOnProfile(rsvpBtn, profile) {
     updateRSVPButtonState(rsvpBtn);
   });
 
-  if (profile?.noProfile || profile.account_type === 'guest') {
-    const allowGuestReg = getMetadata('allow-guest-registration') === 'true';
-
-    if (!allowGuestReg) {
-      rsvpBtn.el.addEventListener('click', (e) => {
-        e.preventDefault();
-        signIn({ ...getSusiOptions(), redirect_uri: `${e.target.href}` });
-      });
-    }
+  const allowGuestReg = getMetadata('allow-guest-registration') === 'true';
+  if (shouldForceGuestSignIn(profile, allowGuestReg)) {
+    rsvpBtn.el.addEventListener('click', (e) => {
+      e.preventDefault();
+      signIn({ ...getSusiOptions(), redirect_uri: `${e.target.href}` });
+    });
   }
 }
 
@@ -332,10 +330,10 @@ const regHashCallbacks = {
     if (a.dataset.rsvpInitialized === 'true') {
       return;
     }
-    
+
     // Store the original text BEFORE any modifications
     const originalText = a.textContent.includes('|') ? a.textContent.split('|')[0] : a.textContent;
-    
+
     // Mark as initialized and store original text in dataset
     a.dataset.rsvpInitialized = 'true';
     a.dataset.rsvpOriginalText = originalText;
