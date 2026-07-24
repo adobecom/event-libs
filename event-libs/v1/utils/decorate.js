@@ -9,7 +9,7 @@ import {
 } from './constances.js';
 import BlockMediator from '../deps/block-mediator.min.js';
 import { getEvent, getCampaign } from './esp-controller.js';
-import { dictionaryManager, getInviteOnlyNoCampaignMessage } from './dictionary-manager.js';
+import { dictionaryManager, getInviteOnlyNoCampaignMessage, getRsvpTokenInvalidMessage } from './dictionary-manager.js';
 import {
   getMetadata,
   setMetadata,
@@ -144,6 +144,12 @@ function setCtaState(targetState, rsvpBtn) { // eslint-disable-line no-unused-va
       updateAnalyticTag(rsvpBtn.el, text);
       checkRed.remove();
     },
+    rsvpTokenInvalid: () => {
+      const text = getRsvpTokenInvalidMessage(dictionaryManager);
+      hideBtn(text);
+      updateAnalyticTag(rsvpBtn.el, text);
+      checkRed.remove();
+    },
     default: () => {
       // Use stored original text as fallback if current originalText is the loading text
       const loadingText = dictionaryManager.getValue('rsvp-loading-cta-text');
@@ -161,6 +167,16 @@ function setCtaState(targetState, rsvpBtn) { // eslint-disable-line no-unused-va
 }
 
 export async function updateRSVPButtonState(rsvpBtn) {
+  const profile = BlockMediator.get('imsProfile');
+  if (profile?.rsvpTokenInvalid) {
+    // Token was already used, expired, or revoked (validated on load, see
+    // profile.js's captureProfile) — reflect it on the CTA itself rather than
+    // letting the guest click through to a form that will just reject them,
+    // and skip the event fetch below since it's moot for a dead token.
+    setCtaState('rsvpTokenInvalid', rsvpBtn);
+    return;
+  }
+
   const eventInfo = await getEvent(getMetadata('event-id'));
   let eventFull = false;
   let waitlistEnabled = getMetadata('allow-wait-listing') === 'true';
@@ -179,7 +195,6 @@ export async function updateRSVPButtonState(rsvpBtn) {
   }
 
   const campaignId = new URLSearchParams(window.location.search).get('campaign');
-  const profile = BlockMediator.get('imsProfile');
   const isLoggedInNonGuest = profile && !profile.noProfile && profile.account_type !== 'guest';
   if (campaignId && CAMPAIGN_ID_PATTERN.test(campaignId) && isLoggedInNonGuest) {
     const campaignInfo = await getCampaign(getMetadata('event-id'), campaignId);

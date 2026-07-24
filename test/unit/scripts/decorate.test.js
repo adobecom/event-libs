@@ -117,6 +117,7 @@ describe('updateRSVPButtonState', () => {
     setMetadata('event-id', 'test-event-id');
     BlockMediator.set('rsvpData', null);
     BlockMediator.set('eventData', null);
+    BlockMediator.set('imsProfile', null);
     originalLocationSearch = window.location.search;
   });
 
@@ -177,6 +178,32 @@ describe('updateRSVPButtonState', () => {
     expect(anchor.getAttribute('href')).to.equal('#rsvp-form');
     expect(anchor.textContent).to.equal('Register');
     expect(wrapper.querySelector('.rsvp-btn-message')).to.be.null;
+
+    wrapper.remove();
+  });
+
+  it('hides RSVP button and shows message when the RSVP token is invalid, without fetching the event', async () => {
+    fetchStub = sinon.stub(window, 'fetch');
+    BlockMediator.set('imsProfile', { account_type: 'guest', rsvpToken: 'tok-1', rsvpTokenInvalid: true });
+
+    const wrapper = document.createElement('p');
+    const anchor = document.createElement('a');
+    anchor.href = '#rsvp-form';
+    anchor.textContent = 'Register';
+    anchor.dataset.modalHash = '#rsvp-form';
+    wrapper.appendChild(anchor);
+    document.body.appendChild(wrapper);
+    const rsvpBtn = { el: anchor, originalText: 'Register' };
+
+    await updateRSVPButtonState(rsvpBtn);
+
+    expect(fetchStub.called).to.be.false;
+    expect(anchor.style.display).to.equal('none');
+    expect(anchor.getAttribute('aria-hidden')).to.equal('true');
+    expect(anchor.getAttribute('tabindex')).to.equal('-1');
+    const msgEl = wrapper.querySelector('.rsvp-btn-message');
+    expect(msgEl).to.not.be.null;
+    expect(msgEl.textContent).to.include('valid');
 
     wrapper.remove();
   });
