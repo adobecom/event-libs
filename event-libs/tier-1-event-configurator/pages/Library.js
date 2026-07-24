@@ -5,7 +5,9 @@ import ManualEventLookup from '../components/ManualEventLookup.js';
 import Modal from '../components/Modal.js';
 import { useNavigation } from '../context/NavigationContext.js';
 import { useConfigs } from '../context/ConfigsContext.js';
-import { copyTextToClipboard, formatUpdatedTime, getDisplayTitle } from '../utils.js';
+import {
+  copyTextToClipboard, formatUpdatedTime, getDisplayTitle, stringifyConfig,
+} from '../utils.js';
 import { EVENT_BROWSE_ENABLED } from '../constants.js';
 
 export default function Library() {
@@ -92,7 +94,7 @@ export default function Library() {
   }, []);
 
   const handleCopyConfig = useCallback(async (row) => {
-    const ok = await copyTextToClipboard(JSON.stringify(row.config, null, 2));
+    const ok = await copyTextToClipboard(stringifyConfig(row.config));
     if (ok) setToastSuccess(`Copied config for ${getDisplayTitle(row)}`);
     else setToastError('Could not copy config — copy it manually from the editor instead');
   }, [setToastSuccess, setToastError]);

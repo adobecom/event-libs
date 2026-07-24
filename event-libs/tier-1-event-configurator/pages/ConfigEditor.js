@@ -3,7 +3,7 @@ import { getEventSessionCatalog } from '../../v1/utils/esp-controller.js';
 import { useNavigation } from '../context/NavigationContext.js';
 import { useConfigs } from '../context/ConfigsContext.js';
 import {
-  copyTextToClipboard, extractDistinctTracks, isTrackIconEntryComplete, getDisplayTitle,
+  copyTextToClipboard, extractDistinctTracks, isTrackIconEntryComplete, getDisplayTitle, stringifyConfig,
 } from '../utils.js';
 import TrackIconEditor from '../components/TrackIconEditor.js';
 import FeaturedSessionsEditor from '../components/FeaturedSessionsEditor.js';
@@ -48,7 +48,7 @@ export default function ConfigEditor() {
 
   const configPreview = useMemo(() => {
     if (!activeConfig) return '';
-    return JSON.stringify(activeConfig.config, null, 2);
+    return stringifyConfig(activeConfig.config);
   }, [activeConfig]);
 
   // A color authored with no icon to apply it to doesn't make sense (icon

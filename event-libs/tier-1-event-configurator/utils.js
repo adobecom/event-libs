@@ -72,6 +72,49 @@ export function getDisplayTitle(row) {
   return row?.config?.eventTitle || row?.backendEventTitle || row?.eventId || '';
 }
 
+function isPlainObject(value) {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+// A plain object whose own values are all primitives (e.g. a trackIcons
+// entry, { icon, color }) — safe to render on one line rather than expanding.
+function isCompactObject(value) {
+  return isPlainObject(value) && Object.values(value).every((v) => typeof v !== 'object' || v === null);
+}
+
+// JSON.stringify(value) alone gives cramped {"icon":"3d"} with no spaces,
+// and any truthy `space` arg forces it multi-line — so build the spacing by hand.
+function stringifyCompact(value) {
+  const entries = Object.entries(value);
+  if (entries.length === 0) return '{}';
+  const parts = entries.map(([k, v]) => `${JSON.stringify(k)}: ${JSON.stringify(v)}`);
+  return `{ ${parts.join(', ')} }`;
+}
+
+// Like JSON.stringify(value, null, 2), except a "compact" object (see above)
+// renders on one line instead of expanding one property per line — used for
+// the Config JSON preview/copy so e.g. trackIcons reads as
+// "3D": { "icon": "3d", "color": "#000000" } instead of three lines per track.
+export function stringifyConfig(value, indent = '') {
+  if (Array.isArray(value)) {
+    if (value.length === 0) return '[]';
+    const childIndent = `${indent}  `;
+    const items = value.map((item) => `${childIndent}${stringifyConfig(item, childIndent)}`);
+    return `[\n${items.join(',\n')}\n${indent}]`;
+  }
+  if (isPlainObject(value)) {
+    const entries = Object.entries(value);
+    if (entries.length === 0) return '{}';
+    const childIndent = `${indent}  `;
+    const lines = entries.map(([key, val]) => {
+      const serialized = isCompactObject(val) ? stringifyCompact(val) : stringifyConfig(val, childIndent);
+      return `${childIndent}${JSON.stringify(key)}: ${serialized}`;
+    });
+    return `{\n${lines.join(',\n')}\n${indent}}`;
+  }
+  return JSON.stringify(value);
+}
+
 export function formatUpdatedTime(isoString) {
   if (!isoString) return '';
   try {
