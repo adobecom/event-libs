@@ -90,7 +90,7 @@ export default function Modal({
             </svg>
           </button>
         </div>
-        <div class="modal-content">
+        <div class="modal-content ${showActions ? '' : 'modal-content--standalone'}">
           ${children}
         </div>
         ${renderActions()}

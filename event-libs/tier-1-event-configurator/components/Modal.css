@@ -74,6 +74,13 @@
   overflow-y: auto;
 }
 
+/* showActions=false means .modal-actions (which otherwise supplies the
+   bottom gap) never renders -- without this, content sits flush against
+   the modal's bottom edge (e.g. ManualEventLookup.js's size="small" modal). */
+.modal-content--standalone {
+  padding-bottom: 1.5rem;
+}
+
 .modal-actions {
   display: flex;
   gap: var(--tec-spacing-md, 1rem);
