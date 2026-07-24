@@ -72,9 +72,7 @@ export default function TrackIconEditor({ tracks, trackIcons, onChange }) {
               aria-label="${track} color"
             />
             ${!complete && html`
-              <span class="tec-track-editor__warning">
-                ${authored.icon ? 'Missing color' : 'Missing icon'}
-              </span>
+              <span class="tec-track-editor__warning">Color set with no icon — pick one, or clear the color</span>
             `}
           </li>
         `;

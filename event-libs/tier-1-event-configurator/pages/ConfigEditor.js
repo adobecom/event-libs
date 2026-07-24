@@ -48,9 +48,9 @@ export default function ConfigEditor() {
     return JSON.stringify(activeConfig.config, null, 2);
   }, [activeConfig]);
 
-  // A track with only an icon or only a color set can't cleanly resolve to
-  // either the authored value or the built-in default at read time — flagged
-  // here rather than silently saved half-set (PLAN.md Phase 4).
+  // A color authored with no icon to apply it to doesn't make sense (icon
+  // alone is fine — color implicitly defaults to black) — flagged here
+  // rather than silently saved in a state that can't render (PLAN.md Phase 4).
   const incompleteTracks = useMemo(() => {
     if (!activeConfig) return [];
     return tracks.filter((track) => !isTrackIconEntryComplete(activeConfig.config.trackIcons?.[track]));
@@ -100,16 +100,20 @@ export default function ConfigEditor() {
       <section class="tec-editor__section">
         <h2>Track icons & colors</h2>
         <p>Icons pre-fill from the built-in defaults where known. Color always starts black — pick a color per track, or leave both icon and color unset to use the page's own built-in default at render time.</p>
+        ${isLoadingSessions && html`<p>Loading tracks…</p>`}
+        ${sessionsError && html`<p class="tec-editor__error">${sessionsError}</p>`}
         ${incompleteTracks.length > 0 && html`
           <p class="tec-editor__error">
-            ${incompleteTracks.length} track${incompleteTracks.length === 1 ? '' : 's'} ${incompleteTracks.length === 1 ? 'has' : 'have'} only an icon or only a color set — set both, or clear both to use the default, before saving: ${incompleteTracks.join(', ')}
+            ${incompleteTracks.length} track${incompleteTracks.length === 1 ? '' : 's'} ${incompleteTracks.length === 1 ? 'has' : 'have'} a color set with no icon — pick one, or clear the color, before saving: ${incompleteTracks.join(', ')}
           </p>
         `}
-        <${TrackIconEditor}
-          tracks=${tracks}
-          trackIcons=${activeConfig.config.trackIcons}
-          onChange=${updateTrackIcon}
-        />
+        ${!isLoadingSessions && !sessionsError && html`
+          <${TrackIconEditor}
+            tracks=${tracks}
+            trackIcons=${activeConfig.config.trackIcons}
+            onChange=${updateTrackIcon}
+          />
+        `}
       </section>
 
       <section class="tec-editor__section">
@@ -128,6 +132,8 @@ export default function ConfigEditor() {
       <section class="tec-editor__section">
         <h2>Featured sessions</h2>
         <p>Pick which sessions appear in the featured carousel, and set their display order.</p>
+        ${isLoadingSessions && html`<p>Loading sessions…</p>`}
+        ${sessionsError && html`<p class="tec-editor__error">${sessionsError}</p>`}
         ${!isLoadingSessions && !sessionsError && html`
           <${FeaturedSessionsEditor} \
             sessions=${sessions} \

@@ -66,14 +66,15 @@ export function formatSessionTime(sessionTime) {
 }
 
 // An untouched track (no entry at all) is fine — it cleanly falls back to
-// the built-in default icon/color (TrackIconEditor). Only a *partial*
-// authored entry (icon picked but color left default-empty, or vice versa)
-// is invalid — it can't cleanly resolve to either the authored value or the
-// default at read time. Mirrors Schedule Maker's isBlockComplete pattern:
-// a pure predicate, not validation logic baked into the editor component.
+// the built-in default icon (TrackIconEditor). An icon with no explicit
+// color is *also* fine now — color implicitly defaults to black, so that's
+// a normal, complete state, not a half-set one. The only state that doesn't
+// make sense is a color authored with no icon to apply it to. Mirrors
+// Schedule Maker's isBlockComplete pattern: a pure predicate, not validation
+// logic baked into the editor component.
 export function isTrackIconEntryComplete(entry) {
   if (!entry) return true;
-  return !!entry.icon === !!entry.color;
+  return !entry.color || !!entry.icon;
 }
 
 export function formatUpdatedTime(isoString) {
