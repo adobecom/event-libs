@@ -260,12 +260,14 @@ export async function submitForm(bp) {
   // A valid RSVP token never reaches submitForm unless it's still usable (an
   // invalid token short-circuits before the form is built, see onProfile). Submitting
   // consumes the token server-side in the same call that records the registration.
-  // The endpoint combines create-attendee + add-to-event into one call, and sources
-  // campaignId from the token itself — getRsvpTokenAttendeePayload's filter doesn't
-  // include campaignId, so it's dropped here even though it's on payload above.
+  // The endpoint combines create-attendee + add-to-event into one call. Tokens never
+  // carry a bound campaign (EMC composes a separate ?campaign= param on the share
+  // link instead of binding one at generation), so campaignId is never sent in the
+  // body — getRsvpTokenAttendeePayload's filter drops it even though it's on payload
+  // above — and is instead forwarded as a query param on the submit call itself.
   const rsvpToken = BlockMediator.get('imsProfile')?.rsvpToken;
   if (rsvpToken) {
-    return submitRsvpTokenRegistration(getMetadata('event-id'), rsvpToken, getRsvpTokenAttendeePayload(payload));
+    return submitRsvpTokenRegistration(getMetadata('event-id'), rsvpToken, getRsvpTokenAttendeePayload(payload), campaignId);
   }
 
   return getAndCreateAndAddAttendee(getMetadata('event-id'), payload);
@@ -391,6 +393,18 @@ function eventFormSendAnalytics(bp, view) {
   sendAnalytics(event);
 }
 
+/**
+ * Breakout-session auto-registration isn't supported for rsvp-token registrations
+ * (no logged-in identity for the /attendees/me call to resolve against) — this is
+ * the shared gate used by the submit handler to decide whether to fire it.
+ * @param {string} registrationStatus - `registrationStatus` from the submit response.
+ * @param {Object} profile - BlockMediator 'imsProfile' value.
+ * @returns {boolean} True if auto-registration should run.
+ */
+export function shouldAutoRegisterSessions(registrationStatus, profile) {
+  return registrationStatus === 'registered' && !profile?.rsvpToken;
+}
+
 async function autoRegisterSessions() {
   let sessions;
   try {
@@ -437,7 +451,7 @@ function createButton({ type, label }, bp) {
         if (respJson.ok) {
           BlockMediator.set('rsvpData', respJson.data);
           eventFormSendAnalytics(bp, 'Form Submit');
-          if (respJson.data?.registrationStatus === 'registered') autoRegisterSessions();
+          if (shouldAutoRegisterSessions(respJson.data?.registrationStatus, BlockMediator.get('imsProfile'))) autoRegisterSessions();
         } else {
           const { status } = respJson;
 

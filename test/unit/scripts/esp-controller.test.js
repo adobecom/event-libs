@@ -295,7 +295,35 @@ describe('Adobe Event Service API', () => {
 
       const [url, options] = fetchStub.firstCall.args;
       expect(url).to.include('/v1/events/event-123/rsvpTokenRegistrations');
+      expect(url).to.not.include('campaignId');
       expect(options.headers.get('x-adobe-esp-rsvp-token')).to.equal('tok-1');
+    });
+
+    it('should append campaignId as a query param (never in the body) when a campaign is passed', async () => {
+      const fetchStub = sandbox.stub(window, 'fetch').resolves({
+        json: () => ({ attendeeId: 'att-1', registrationStatus: 'registered' }),
+        ok: true,
+      });
+
+      await api.submitRsvpTokenRegistration('event-123', 'tok-1', { firstName: 'John' }, 'camp-1');
+
+      const [url, options] = fetchStub.firstCall.args;
+      expect(url).to.include('/v1/events/event-123/rsvpTokenRegistrations');
+      expect(url).to.include('campaignId=camp-1');
+      const body = JSON.parse(options.body);
+      expect(body).to.not.have.property('campaignId');
+    });
+
+    it('should omit the campaignId query param when no campaign is passed', async () => {
+      const fetchStub = sandbox.stub(window, 'fetch').resolves({
+        json: () => ({ attendeeId: 'att-1' }),
+        ok: true,
+      });
+
+      await api.submitRsvpTokenRegistration('event-123', 'tok-1', { firstName: 'John' });
+
+      const [url] = fetchStub.firstCall.args;
+      expect(url).to.not.include('campaignId');
     });
 
     it('should return an error without making a request when eventId, token, or data is missing', async () => {

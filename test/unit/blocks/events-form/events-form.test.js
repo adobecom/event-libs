@@ -874,6 +874,30 @@ describe('Events Form', () => {
       }
     });
 
+    it('forwards a routed campaign as a query param on the RSVP token submit call, still never in the body', async () => {
+      resetCampaignMapCache();
+      window.history.replaceState({}, '', `${window.location.pathname}?campaign=camp-1`);
+      BlockMediator.set('imsProfile', { account_type: 'guest', rsvpToken: 'valid-rsvp-token-1234567890' });
+      const fetchStub = sandbox.stub(window, 'fetch').callsFake((url) => {
+        if (typeof url === 'string' && url.includes('campaign-map.json')) {
+          return Promise.resolve({ ok: false, status: 404 });
+        }
+        return Promise.resolve({ json: () => ({ attendeeId: 'att-1', registrationStatus: 'registered' }), ok: true });
+      });
+
+      try {
+        await submitForm({ form: buildForm(), sanitizeList: [] });
+
+        const submitCall = fetchStub.getCalls().find((call) => String(call.args[0]).includes('/rsvpTokenRegistrations'));
+        expect(submitCall.args[0]).to.include('campaignId=camp-1');
+        const body = JSON.parse(submitCall.args[1].body);
+        expect(body).to.not.have.property('campaignId');
+      } finally {
+        window.history.replaceState({}, '', window.location.pathname);
+        resetCampaignMapCache();
+      }
+    });
+
     it('falls back to getAndCreateAndAddAttendee when no RSVP token is present', async () => {
       BlockMediator.set('imsProfile', { account_type: 'type1' });
       const fetchStub = sandbox.stub(window, 'fetch');
@@ -887,6 +911,33 @@ describe('Events Form', () => {
       expect(result.ok).to.be.true;
       const urls = fetchStub.getCalls().map((call) => call.args[0]);
       expect(urls.some((url) => url.includes('/rsvpTokenRegistrations'))).to.be.false;
+    });
+  });
+
+  describe('shouldAutoRegisterSessions', () => {
+    let shouldAutoRegisterSessions;
+
+    before(async () => {
+      const module = await import('../../../../event-libs/v1/blocks/events-form/events-form.js');
+      shouldAutoRegisterSessions = module.shouldAutoRegisterSessions;
+    });
+
+    it('returns true for a registered, non-rsvp-token profile', () => {
+      expect(shouldAutoRegisterSessions('registered', { account_type: 'type1' })).to.be.true;
+    });
+
+    it('returns false for a registered rsvp-token (guest) profile', () => {
+      expect(shouldAutoRegisterSessions('registered', { account_type: 'guest', rsvpToken: 'tok-1234567890abcdef' })).to.be.false;
+    });
+
+    it('returns false for a waitlisted registration regardless of profile', () => {
+      expect(shouldAutoRegisterSessions('waitlisted', { account_type: 'type1' })).to.be.false;
+      expect(shouldAutoRegisterSessions('waitlisted', { account_type: 'guest', rsvpToken: 'tok-1234567890abcdef' })).to.be.false;
+    });
+
+    it('returns true for a registered response when profile is null/undefined (no rsvp token present)', () => {
+      expect(shouldAutoRegisterSessions('registered', null)).to.be.true;
+      expect(shouldAutoRegisterSessions('registered', undefined)).to.be.true;
     });
   });
 
