@@ -48,7 +48,22 @@ export const [setEventConfig, updateEventConfig, getEventConfig] = (() => {
   ];
 })();
 
+// Runtime env override (e.g. tier-1-event-configurator's env picker).
+// Opt-in — defaults to null, so other getEventServiceEnv() callers are
+// unaffected. Checked first, ahead of the query-param/meta-tag/prod chain.
+let eventServiceEnvOverride = null;
+
+export function setEventServiceEnvOverride(envName) {
+  eventServiceEnvOverride = envName && ENV_MAP[envName] ? envName : null;
+}
+
+export function getEventServiceEnvOverride() {
+  return eventServiceEnvOverride;
+}
+
 export function getEventServiceEnv() {
+  if (eventServiceEnvOverride && ENV_MAP[eventServiceEnvOverride]) return ENV_MAP[eventServiceEnvOverride];
+
   const { search } = window.location;
   const usp = new URLSearchParams(search);
   const espEnv = usp.get('espenv') || usp.get('eccEnv');
@@ -57,7 +72,7 @@ export function getEventServiceEnv() {
 
   const metadataEnv = getMetadata('event-service-env');
   if (metadataEnv && ENV_MAP[metadataEnv]) return ENV_MAP[metadataEnv];
-  
+
   return ENV_MAP.prod;
 }
 

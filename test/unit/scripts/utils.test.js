@@ -10,6 +10,9 @@ import {
   createOptimizedPicture,
   getIcon,
   getValidCampaignIdFromUrl,
+  getEventServiceEnv,
+  setEventServiceEnvOverride,
+  getEventServiceEnvOverride,
 } from '../../../event-libs/v1/utils/utils.js';
 
 describe('Utility Functions', () => {
@@ -97,6 +100,55 @@ describe('Utility Functions', () => {
     it('should convert string to handle format', () => {
       expect(handlize('  Test String  ')).to.equal('test-string');
       expect(handlize('Another Test')).to.equal('another-test');
+    });
+  });
+
+  describe('getEventServiceEnv / setEventServiceEnvOverride', () => {
+    afterEach(() => {
+      // The override is a module-level singleton shared with every other
+      // consumer of getEventServiceEnv() (esp-controller.js, etc.) — never
+      // leave it set past the test that set it.
+      setEventServiceEnvOverride(null);
+      const meta = document.head.querySelector('meta[name="event-service-env"]');
+      if (meta) document.head.removeChild(meta);
+    });
+
+    it('should default to prod with no override, query param, or meta tag', () => {
+      expect(getEventServiceEnv().name).to.equal('prod');
+      expect(getEventServiceEnvOverride()).to.be.null;
+    });
+
+    it('should use the override once set, and report it back', () => {
+      setEventServiceEnvOverride('dev');
+      expect(getEventServiceEnvOverride()).to.equal('dev');
+      expect(getEventServiceEnv().name).to.equal('dev');
+      expect(getEventServiceEnv().serviceApiEndpoints).to.have.property('esp');
+    });
+
+    it('should ignore an unknown env name rather than throw', () => {
+      setEventServiceEnvOverride('not-a-real-env');
+      expect(getEventServiceEnvOverride()).to.be.null;
+      expect(getEventServiceEnv().name).to.equal('prod');
+    });
+
+    it('should clear back to the default chain when set to null', () => {
+      setEventServiceEnvOverride('stage');
+      setEventServiceEnvOverride(null);
+      expect(getEventServiceEnvOverride()).to.be.null;
+      expect(getEventServiceEnv().name).to.equal('prod');
+    });
+
+    it('should take priority over a <meta name="event-service-env"> tag', () => {
+      setMetadata('event-service-env', 'stage');
+      setEventServiceEnvOverride('dev');
+      expect(getEventServiceEnv().name).to.equal('dev');
+    });
+
+    it('should fall back to the meta tag once the override is cleared', () => {
+      setMetadata('event-service-env', 'stage');
+      setEventServiceEnvOverride('dev');
+      setEventServiceEnvOverride(null);
+      expect(getEventServiceEnv().name).to.equal('stage');
     });
   });
 
