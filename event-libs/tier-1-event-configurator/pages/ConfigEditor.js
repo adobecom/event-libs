@@ -3,7 +3,7 @@ import { html } from '../htm-wrapper.js';
 import { getEventSessionCatalog } from '../../v1/utils/esp-controller.js';
 import { useNavigation } from '../context/NavigationContext.js';
 import { useConfigs } from '../context/ConfigsContext.js';
-import { copyTextToClipboard, extractDistinctTracks } from '../utils.js';
+import { copyTextToClipboard, extractDistinctTracks, isTrackIconEntryComplete } from '../utils.js';
 import TrackIconEditor from '../components/TrackIconEditor.js';
 import FeaturedSessionsEditor from '../components/FeaturedSessionsEditor.js';
 
@@ -48,12 +48,21 @@ export default function ConfigEditor() {
     return JSON.stringify(activeConfig.config, null, 2);
   }, [activeConfig]);
 
+  // A track with only an icon or only a color set can't cleanly resolve to
+  // either the authored value or the built-in default at read time — flagged
+  // here rather than silently saved half-set (PLAN.md Phase 4).
+  const incompleteTracks = useMemo(() => {
+    if (!activeConfig) return [];
+    return tracks.filter((track) => !isTrackIconEntryComplete(activeConfig.config.trackIcons?.[track]));
+  }, [tracks, activeConfig]);
+
   const handleCancel = () => {
     clearActiveConfig();
     goToLibrary();
   };
 
   const handleSave = async () => {
+    if (incompleteTracks.length > 0) return;
     setIsSaving(true);
     try {
       const result = await saveActiveConfig();
@@ -91,6 +100,11 @@ export default function ConfigEditor() {
       <section class="tec-editor__section">
         <h2>Track icons & colors</h2>
         <p>Unauthored tracks fall back to the built-in defaults shown here.</p>
+        ${incompleteTracks.length > 0 && html`
+          <p class="tec-editor__error">
+            ${incompleteTracks.length} track${incompleteTracks.length === 1 ? '' : 's'} ${incompleteTracks.length === 1 ? 'has' : 'have'} only an icon or only a color set — set both, or clear both to use the default, before saving: ${incompleteTracks.join(', ')}
+          </p>
+        `}
         <${TrackIconEditor}
           tracks=${tracks}
           trackIcons=${activeConfig.config.trackIcons}
@@ -134,7 +148,7 @@ export default function ConfigEditor() {
 
       <div class="tec-editor__actions">
         <sp-button treatment="outline" static-color="black" size="l" onClick=${handleCancel}>Cancel</sp-button>
-        <sp-button size="l" static-color="black" onClick=${handleSave} disabled=${isSaving || undefined}>
+        <sp-button size="l" static-color="black" onClick=${handleSave} disabled=${isSaving || incompleteTracks.length > 0 || undefined}>
           ${isSaving ? 'Saving…' : 'Save'}
         </sp-button>
       </div>

@@ -2,6 +2,7 @@ import { useState, useEffect } from '../../v1/deps/htm-preact.js';
 import { html } from '../htm-wrapper.js';
 import { KNOWN_ICON_SLUGS, getDefaultTrackIcon } from '../default-track-icons.js';
 import { loadTrackIconSprite } from '../track-icon-sprite.js';
+import { isTrackIconEntryComplete } from '../utils.js';
 
 function IconPreview({ icon, color }) {
   const [symbols, setSymbols] = useState(null);
@@ -40,9 +41,10 @@ export default function TrackIconEditor({ tracks, trackIcons, onChange }) {
         const fallback = getDefaultTrackIcon(track);
         const icon = authored?.icon ?? fallback?.icon ?? '';
         const color = authored?.color ?? fallback?.color ?? '#292929';
+        const complete = isTrackIconEntryComplete(authored);
 
         return html`
-          <li class="tec-track-editor__row" key=${track}>
+          <li class="tec-track-editor__row ${complete ? '' : 'is-incomplete'}" key=${track}>
             <${IconPreview} icon=${icon} color=${color} />
             <span class="tec-track-editor__name">${track}</span>
             <select
@@ -60,6 +62,11 @@ export default function TrackIconEditor({ tracks, trackIcons, onChange }) {
               onInput=${(e) => onChange(track, { color: e.target.value })}
               aria-label="${track} color"
             />
+            ${!complete && html`
+              <span class="tec-track-editor__warning">
+                ${authored.icon ? 'Missing color' : 'Missing icon'}
+              </span>
+            `}
           </li>
         `;
       })}

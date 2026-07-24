@@ -10,15 +10,19 @@ See [PLAN.md](./PLAN.md) for the full design, decisions, and phase breakdown
 
 ## Status
 
-Phases 1a–1e, Phase 2, and Phase 3 (app side) are implemented: DA SDK auth,
-config-library sheet CRUD, the library list view (search/Edit/Duplicate/
-Delete/Copy config), the ESP event picker + session fetch (currently gated
-off in favor of a manual Event ID entry fallback — see the CORS status
-below), the track icon/color editor, the allow-double-booking toggle, and
-the featured-sessions picker (`FeaturedSessionsEditor.js` — search + track
-filter, add/remove, ↑/↓ reorder, writing a flat ordered `featuredSessions`
-array). Phase 3's consuming-side wiring (MWPW-200314, separate PR) is still
-open — see PLAN.md's Phase 3 section for what's left there.
+Phases 1a–1e, Phase 2, Phase 3 (app side), and Phase 4 are all implemented:
+DA SDK auth, config-library sheet CRUD, the library list view (search/Edit/
+Duplicate/Delete/Copy config, with an Event ID collision guard routing to
+Edit instead of duplicating a row), the ESP event picker + session fetch
+(currently gated off in favor of a manual Event ID entry fallback — see the
+CORS status below), the track icon/color editor (with save-blocking
+validation — a track can't be saved with only an icon or only a color set),
+the allow-double-booking toggle, and the featured-sessions picker
+(`FeaturedSessionsEditor.js` — search + track filter, each session's date/
+start time in its own venue timezone, add/remove, ↑/↓ reorder, writing a
+flat ordered `featuredSessions` array). Phase 3's consuming-side wiring
+(MWPW-200314, separate PR) is still open — see PLAN.md's Phase 3 section
+for what's left there.
 
 **Phase 2 scope note:** this app only adds the `allowDoubleBooking` boolean
 to the form/Config JSON. The consuming-side wiring (renaming

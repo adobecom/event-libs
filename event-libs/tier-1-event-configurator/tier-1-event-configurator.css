@@ -336,6 +336,18 @@
   cursor: pointer;
 }
 
+.tec-track-editor__row.is-incomplete {
+  outline: 1px solid var(--tec-color-error);
+  outline-offset: 4px;
+  border-radius: var(--tec-border-radius);
+}
+
+.tec-track-editor__warning {
+  color: var(--tec-color-error);
+  font-size: 12px;
+  flex-shrink: 0;
+}
+
 .tec-featured-editor {
   display: flex;
   gap: var(--tec-spacing-lg);
