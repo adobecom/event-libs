@@ -1,5 +1,5 @@
 import {
-  useState, useMemo, useCallback, useRef, useLayoutEffect,
+  useState, useMemo, useCallback, useRef, useLayoutEffect, useEffect,
 } from '../../v1/deps/htm-preact.js';
 import { html } from '../htm-wrapper.js';
 import { getSessionTrack, formatSessionTime } from '../utils.js';
@@ -21,11 +21,18 @@ function DragHandleIcon() {
 // Pointer-based drag reorder (replaces the earlier up/down-buttons-only
 // design, PLAN.md Phase 3, per Daniel's request for a more delightful/
 // best-practice sort UX). One handle per row does double duty: pointerdown
-// drags it (mouse/touch, via Pointer Events + setPointerCapture so tracking
-// keeps working even once the pointer leaves the handle's bounds), and
-// ArrowUp/ArrowDown while it's focused reorders it via the same code path —
-// native drag alone isn't keyboard- or screen-reader-operable, so the
-// handle has to carry both, not just look like it does.
+// drags it (mouse/touch, via Pointer Events), and ArrowUp/ArrowDown while
+// it's focused reorders it via the same code path — native drag alone
+// isn't keyboard- or screen-reader-operable, so the handle has to carry
+// both, not just look like it does.
+//
+// Move/up tracking is done via window-level listeners, not
+// setPointerCapture on the handle itself — capture doesn't reliably survive
+// the handle's own DOM node being *moved* mid-gesture (exactly what happens
+// on every live-reorder swap below, for the FLIP animation), and losing
+// capture mid-drag was firing a premature lostpointercapture — ending the
+// drag after the very first swap. window never moves, so this is immune to
+// that.
 //
 // Dragging uses a uniform-row-height assumption (every row here renders
 // identically) to do simple arithmetic instead of continuous DOM
@@ -140,6 +147,16 @@ export default function FeaturedSessionsEditor({
     return rect.height + gap;
   }, []);
 
+  // Latest-ref pattern: the actual handlers close over current props/state
+  // and are free to change identity every render, but the functions handed
+  // to addEventListener/removeEventListener never change — so a listener
+  // added at drag-start is always removable later with the exact same
+  // reference, regardless of how many re-renders happened in between.
+  const handlePointerMoveRef = useRef(() => {});
+  const endDragRef = useRef(() => {});
+  const stableMove = useRef((e) => handlePointerMoveRef.current(e)).current;
+  const stableEnd = useRef((e) => endDragRef.current(e)).current;
+
   const handlePointerDown = useCallback((e, sessionId) => {
     if (e.button !== undefined && e.button !== 0) return;
     const rowHeight = measureRowHeight();
@@ -149,10 +166,12 @@ export default function FeaturedSessionsEditor({
       sessionId, startClientY: e.clientY, startIndex, rowHeight,
     };
     setDraggedId(sessionId);
-    e.currentTarget.setPointerCapture?.(e.pointerId);
-  }, [measureRowHeight]);
+    window.addEventListener('pointermove', stableMove);
+    window.addEventListener('pointerup', stableEnd);
+    window.addEventListener('pointercancel', stableEnd);
+  }, [measureRowHeight, stableMove, stableEnd]);
 
-  const handlePointerMove = useCallback((e) => {
+  handlePointerMoveRef.current = (e) => {
     const info = dragInfo.current;
     if (!info) return;
     const deltaY = e.clientY - info.startClientY;
@@ -179,12 +198,14 @@ export default function FeaturedSessionsEditor({
       const visualOffset = deltaY - (targetIndex - info.startIndex) * info.rowHeight;
       draggedNode.style.transform = `translateY(${visualOffset}px)`;
     }
-  }, [onChange]);
+  };
 
-  const endDrag = useCallback((e) => {
+  endDragRef.current = () => {
     const info = dragInfo.current;
     if (!info) return;
-    e?.currentTarget?.releasePointerCapture?.(e.pointerId);
+    window.removeEventListener('pointermove', stableMove);
+    window.removeEventListener('pointerup', stableEnd);
+    window.removeEventListener('pointercancel', stableEnd);
     const node = itemRefs.current.get(info.sessionId);
     if (node) {
       node.style.transition = 'transform 0.15s ease';
@@ -197,7 +218,15 @@ export default function FeaturedSessionsEditor({
     }
     dragInfo.current = null;
     setDraggedId(null);
-  }, [getTitleFor]);
+  };
+
+  // Safety net: if this component unmounts mid-drag (e.g. navigating away),
+  // don't leave the window listeners registered.
+  useEffect(() => () => {
+    window.removeEventListener('pointermove', stableMove);
+    window.removeEventListener('pointerup', stableEnd);
+    window.removeEventListener('pointercancel', stableEnd);
+  }, [stableMove, stableEnd]);
 
   // FLIP-lite: whenever the order changes (drag, keyboard move, or an
   // add/remove shifting everyone after it), animate every row other than
@@ -249,10 +278,6 @@ export default function FeaturedSessionsEditor({
                   class="tec-featured-editor__handle" \
                   aria-label="Reorder ${title}. Position ${index + 1} of ${featuredIds.length}. Drag, or press arrow up/down." \
                   onPointerDown=${(e) => handlePointerDown(e, sessionId)} \
-                  onPointerMove=${handlePointerMove} \
-                  onPointerUp=${endDrag} \
-                  onPointerCancel=${endDrag} \
-                  onLostPointerCapture=${endDrag} \
                   onKeyDown=${(e) => handleKeyDown(e, index)} \
                 >
                   <${DragHandleIcon} />
