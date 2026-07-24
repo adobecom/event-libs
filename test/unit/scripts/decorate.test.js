@@ -492,9 +492,9 @@ describe('applyAreaTheme', () => {
     document.head.innerHTML = head;
   });
 
-  function setThemeAttribute(attribute, value) {
+  function setThemeAttribute(name, value) {
     setMetadata('custom-attributes', JSON.stringify([
-      { attribute, values: [{ value }] },
+      { name, values: [{ value }] },
     ]));
   }
 
@@ -517,7 +517,7 @@ describe('applyAreaTheme', () => {
 
   it('does nothing when there is no theme attribute', () => {
     setMetadata('custom-attributes', JSON.stringify([
-      { attribute: 'other', values: [{ value: 'dark' }] },
+      { name: 'other', values: [{ value: 'dark' }] },
     ]));
     document.body.innerHTML = '<main><div><div class="foo"></div></div></main>';
     applyAreaTheme();
@@ -617,6 +617,45 @@ describe('applyAreaTheme', () => {
 
   it('resolves the theme attribute and value regardless of case or whitespace', () => {
     setThemeAttribute(' Theme ', ' DARK ');
+    document.body.innerHTML = '<main><div><div class="foo"></div></div></main>';
+    applyAreaTheme();
+    const block = document.querySelector('.foo');
+    expect(block.classList.contains('dark')).to.be.true;
+  });
+
+  it('applies the theme from a real EMC-shaped custom-attributes payload', () => {
+    setMetadata('custom-attributes', JSON.stringify([
+      {
+        name: 'promotionalItems',
+        attributeId: '0d433aa1-0a5a-4836-9146-c6a97bdf08bc',
+        inputType: 'multi-select',
+        label: 'Promotional Items',
+        enabled: true,
+        values: [
+          { valueId: '25506162-aaaa', label: 'Adobe Firefly', value: '/fragments/firefly', ordinal: 0 },
+        ],
+      },
+      {
+        name: 'theme',
+        attributeId: 'e47464c8-33f8-4e35-bbc8-08b97da80958',
+        inputType: 'single-select',
+        label: 'Theme',
+        enabled: true,
+        values: [
+          { valueId: '827c5fd5-96e7-4b34-8400-04b9d6e3e5a4', label: 'Light', value: 'light', ordinal: 0 },
+        ],
+      },
+    ]));
+    document.body.innerHTML = '<main><div><div class="foo"></div></div></main>';
+    applyAreaTheme();
+    const block = document.querySelector('.foo');
+    expect(block.classList.contains('light')).to.be.true;
+  });
+
+  it('still resolves the theme via the legacy `attribute` key', () => {
+    setMetadata('custom-attributes', JSON.stringify([
+      { attribute: 'theme', values: [{ value: 'dark' }] },
+    ]));
     document.body.innerHTML = '<main><div><div class="foo"></div></div></main>';
     applyAreaTheme();
     const block = document.querySelector('.foo');
@@ -1780,6 +1819,49 @@ describe('decorateEvent - Array Iteration', () => {
       // processAutoBlockLinks should not throw even if the dynamic import fails
       expect(() => processAutoBlockLinks(parent)).to.not.throw();
       await new Promise((resolve) => { setTimeout(resolve, 50); });
+    });
+
+    function encodeSchedule(schedule) {
+      return window.btoa(unescape(encodeURIComponent(JSON.stringify(schedule))));
+    }
+
+    function buildScheduleMakerLink(org, repo) {
+      const schedule = {
+        scheduleId: 'test-schedule-id',
+        title: 'Test Schedule',
+        blocks: [{ fragmentPath: '/fragments/one', title: 'Block One', startDateTime: 1750000000000 }],
+      };
+      const link = document.createElement('a');
+      link.href = `https://da.live/app/${org}/${repo}/tools/da-apps/schedule-maker#schedule=${encodeSchedule(schedule)}`;
+      return link;
+    }
+
+    it('should stamp data-schedule-repo from the authored org/repo (da-events)', async () => {
+      const parent = document.createElement('div');
+      const p = document.createElement('p');
+      p.appendChild(buildScheduleMakerLink('adobecom', 'da-events'));
+      parent.appendChild(p);
+
+      processAutoBlockLinks(parent);
+      await new Promise((resolve) => { setTimeout(resolve, 50); });
+
+      const chronoBox = parent.querySelector('.chrono-box');
+      expect(chronoBox).to.not.be.null;
+      expect(chronoBox.getAttribute('data-schedule-repo')).to.equal('adobecom/da-events');
+    });
+
+    it('should stamp data-schedule-repo from the authored org/repo (da-events-fg-pink)', async () => {
+      const parent = document.createElement('div');
+      const p = document.createElement('p');
+      p.appendChild(buildScheduleMakerLink('adobecom', 'da-events-fg-pink'));
+      parent.appendChild(p);
+
+      processAutoBlockLinks(parent);
+      await new Promise((resolve) => { setTimeout(resolve, 50); });
+
+      const chronoBox = parent.querySelector('.chrono-box');
+      expect(chronoBox).to.not.be.null;
+      expect(chronoBox.getAttribute('data-schedule-repo')).to.equal('adobecom/da-events-fg-pink');
     });
   });
 });
