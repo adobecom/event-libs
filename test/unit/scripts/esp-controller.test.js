@@ -289,6 +289,14 @@ describe('Adobe Event Service API', () => {
       expect(options.headers.get('x-adobe-esp-rsvp-token')).to.equal('tok-1');
     });
 
+    it('should route the GET through ESP, not ESL', async () => {
+      const fetchStub = sandbox.stub(window, 'fetch').resolves({ json: () => ({ eventId: 'event-123' }), ok: true });
+      await api.validateRsvpToken('event-123', 'tok-1');
+      const [url] = fetchStub.firstCall.args;
+      expect(url).to.include('service-platform');
+      expect(url).to.not.include('service-layer');
+    });
+
     it('should return an error for a used/expired/revoked/unknown token', async () => {
       sandbox.stub(window, 'fetch').resolves({ json: () => ({ message: 'Gone' }), ok: false, status: 410 });
       const result = await api.validateRsvpToken('event-123', 'tok-1');
@@ -327,6 +335,17 @@ describe('Adobe Event Service API', () => {
       expect(url).to.include('/v1/events/event-123/rsvpTokenRegistrations');
       expect(url).to.not.include('campaignId');
       expect(options.headers.get('x-adobe-esp-rsvp-token')).to.equal('tok-1');
+    });
+
+    it('should route the POST through ESL, not ESP', async () => {
+      const fetchStub = sandbox.stub(window, 'fetch').resolves({
+        json: () => ({ attendeeId: 'att-1', registrationStatus: 'registered' }),
+        ok: true,
+      });
+      await api.submitRsvpTokenRegistration('event-123', 'tok-1', { firstName: 'John' });
+      const [url] = fetchStub.firstCall.args;
+      expect(url).to.include('service-layer');
+      expect(url).to.not.include('service-platform');
     });
 
     it('should append campaignId as a query param (never in the body) when a campaign is passed', async () => {

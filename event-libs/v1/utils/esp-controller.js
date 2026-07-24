@@ -462,7 +462,7 @@ export async function validateRsvpToken(eventId, token) {
   const options = await constructRequestOptions('GET', null, false, true, token);
 
   try {
-    const response = await fetch(`${serviceApiEndpoints.esl}/v1/events/${eventId}/rsvpTokenRegistrations`, options);
+    const response = await fetch(`${serviceApiEndpoints.esp}/v1/events/${eventId}/rsvpTokenRegistrations`, options);
     const data = await response.json();
 
     if (!response.ok) {
