@@ -50,6 +50,20 @@
   box-sizing: border-box;
 }
 
+/* Visually hidden but still announced by screen readers — used for
+   aria-live reorder announcements that shouldn't take up layout space. */
+.tec-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 .tec-app {
   background-color: var(--tec-color-background);
   min-height: 100vh;
@@ -770,32 +784,43 @@ select.tec-field {
   border-radius: var(--tec-border-radius-sm);
 }
 
-.tec-featured-editor__reorder {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  flex-shrink: 0;
-}
-
-.tec-featured-editor__reorder button {
-  border: 1px solid var(--tec-color-border);
+.tec-featured-editor__row.is-dragging {
+  position: relative;
+  z-index: 5;
   background: var(--tec-color-surface);
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 11px;
-  line-height: 1;
-  padding: 2px 5px;
-  color: var(--tec-color-text-secondary);
-}
-
-.tec-featured-editor__reorder button:disabled {
-  opacity: 0.35;
-  cursor: not-allowed;
-}
-
-.tec-featured-editor__reorder button:hover:not(:disabled) {
   border-color: var(--tec-color-border-hover);
+  box-shadow: var(--tec-shadow-md);
+  cursor: grabbing;
+}
+
+.tec-featured-editor__handle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: none;
+  border-radius: var(--tec-border-radius-sm);
+  background: transparent;
+  color: var(--tec-color-text-secondary);
+  cursor: grab;
+  touch-action: none;
+}
+
+.tec-featured-editor__handle:hover {
+  background: var(--tec-color-surface-hover);
   color: var(--tec-color-text-primary);
+}
+
+.tec-featured-editor__handle:active {
+  cursor: grabbing;
+}
+
+.tec-featured-editor__handle:focus-visible {
+  outline: 2px solid var(--tec-color-primary);
+  outline-offset: 2px;
 }
 
 .tec-featured-editor__info {

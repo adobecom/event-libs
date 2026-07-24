@@ -1,17 +1,46 @@
-import { useState, useMemo, useCallback } from '../../v1/deps/htm-preact.js';
+import {
+  useState, useMemo, useCallback, useRef, useLayoutEffect,
+} from '../../v1/deps/htm-preact.js';
 import { html } from '../htm-wrapper.js';
 import { getSessionTrack, formatSessionTime } from '../utils.js';
 import SearchInput from './SearchInput.js';
 
-// Simple up/down reordering rather than drag-and-drop (PLAN.md Phase 3) —
-// this is an internal authoring tool with small featured lists, and native
-// DnD adds real implementation/testing surface for a benefit authors get
-// just as well from two buttons. Revisit only if authors actually complain.
+function DragHandleIcon() {
+  return html`
+    <svg width="10" height="16" viewBox="0 0 10 16" aria-hidden="true" focusable="false">
+      <circle cx="2" cy="2" r="1.5" fill="currentColor" />
+      <circle cx="8" cy="2" r="1.5" fill="currentColor" />
+      <circle cx="2" cy="8" r="1.5" fill="currentColor" />
+      <circle cx="8" cy="8" r="1.5" fill="currentColor" />
+      <circle cx="2" cy="14" r="1.5" fill="currentColor" />
+      <circle cx="8" cy="14" r="1.5" fill="currentColor" />
+    </svg>
+  `;
+}
+
+// Pointer-based drag reorder (replaces the earlier up/down-buttons-only
+// design, PLAN.md Phase 3, per Daniel's request for a more delightful/
+// best-practice sort UX). One handle per row does double duty: pointerdown
+// drags it (mouse/touch, via Pointer Events + setPointerCapture so tracking
+// keeps working even once the pointer leaves the handle's bounds), and
+// ArrowUp/ArrowDown while it's focused reorders it via the same code path —
+// native drag alone isn't keyboard- or screen-reader-operable, so the
+// handle has to carry both, not just look like it does.
+//
+// Dragging uses a uniform-row-height assumption (every row here renders
+// identically) to do simple arithmetic instead of continuous DOM
+// measurement: the dragged row's target slot is derived directly from the
+// cumulative pointer delta since drag start, and everyone else gets a
+// lightweight FLIP-style animation (instant inverse transform, forced
+// reflow, then transition to 0) whenever the order changes underneath them
+// — including from a keyboard move, not just a drag.
 export default function FeaturedSessionsEditor({
   sessions, sessionTimes, tracks, featuredSessions, onChange,
 }) {
   const [search, setSearch] = useState('');
   const [trackFilter, setTrackFilter] = useState('');
+  const [draggedId, setDraggedId] = useState(null);
+  const [announcement, setAnnouncement] = useState('');
 
   const sessionsById = useMemo(() => {
     const map = new Map();
@@ -38,6 +67,11 @@ export default function FeaturedSessionsEditor({
     const time = formatSessionTime(earliestTimeBySessionId.get(session.sessionId));
     return time ? `${track} · ${time}` : track;
   }, [earliestTimeBySessionId]);
+
+  const getTitleFor = useCallback(
+    (sessionId) => sessionsById.get(sessionId)?.enTitle || sessionId,
+    [sessionsById],
+  );
 
   const featuredIds = featuredSessions || [];
   const featuredSet = useMemo(() => new Set(featuredIds), [featuredIds]);
@@ -71,34 +105,160 @@ export default function FeaturedSessionsEditor({
     const next = [...featuredIds];
     [next[index], next[target]] = [next[target], next[index]];
     onChange(next);
-  }, [featuredIds, onChange]);
+    setAnnouncement(`Moved "${getTitleFor(next[target])}" to position ${target + 1} of ${next.length}`);
+  }, [featuredIds, onChange, getTitleFor]);
+
+  const handleKeyDown = useCallback((e, index) => {
+    if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      handleMove(index, -1);
+    } else if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      handleMove(index, 1);
+    }
+  }, [handleMove]);
+
+  // --- Drag state (refs, not state, so pointermove can read/write them on
+  // every event without forcing a re-render per pixel of movement) ---
+  const listRef = useRef(null);
+  const itemRefs = useRef(new Map());
+  const dragInfo = useRef(null); // { sessionId, startClientY, startIndex, rowHeight }
+  const orderRef = useRef(featuredIds);
+  orderRef.current = featuredIds;
+
+  const setItemRef = useCallback((sessionId, node) => {
+    if (node) itemRefs.current.set(sessionId, node);
+    else itemRefs.current.delete(sessionId);
+  }, []);
+
+  const measureRowHeight = useCallback(() => {
+    const [firstNode] = itemRefs.current.values();
+    if (!firstNode || !listRef.current) return 0;
+    const rect = firstNode.getBoundingClientRect();
+    const styles = window.getComputedStyle(listRef.current);
+    const gap = parseFloat(styles.rowGap || styles.gap || '0') || 0;
+    return rect.height + gap;
+  }, []);
+
+  const handlePointerDown = useCallback((e, sessionId) => {
+    if (e.button !== undefined && e.button !== 0) return;
+    const rowHeight = measureRowHeight();
+    const startIndex = orderRef.current.indexOf(sessionId);
+    if (!rowHeight || startIndex === -1) return;
+    dragInfo.current = {
+      sessionId, startClientY: e.clientY, startIndex, rowHeight,
+    };
+    setDraggedId(sessionId);
+    e.currentTarget.setPointerCapture?.(e.pointerId);
+  }, [measureRowHeight]);
+
+  const handlePointerMove = useCallback((e) => {
+    const info = dragInfo.current;
+    if (!info) return;
+    const deltaY = e.clientY - info.startClientY;
+    const order = orderRef.current;
+    const currentIndex = order.indexOf(info.sessionId);
+    if (currentIndex === -1) return;
+    const rawTarget = info.startIndex + Math.round(deltaY / info.rowHeight);
+    const targetIndex = Math.min(Math.max(rawTarget, 0), order.length - 1);
+
+    if (targetIndex !== currentIndex) {
+      const next = [...order];
+      next.splice(currentIndex, 1);
+      next.splice(targetIndex, 0, info.sessionId);
+      orderRef.current = next;
+      onChange(next);
+    }
+
+    const draggedNode = itemRefs.current.get(info.sessionId);
+    if (draggedNode) {
+      // The layout itself already accounts for whole-slot shifts once the
+      // array reorders (above) — this transform only needs to supply the
+      // remaining sub-slot distance so the row keeps tracking the pointer
+      // smoothly instead of jumping at each swap.
+      const visualOffset = deltaY - (targetIndex - info.startIndex) * info.rowHeight;
+      draggedNode.style.transform = `translateY(${visualOffset}px)`;
+    }
+  }, [onChange]);
+
+  const endDrag = useCallback((e) => {
+    const info = dragInfo.current;
+    if (!info) return;
+    e?.currentTarget?.releasePointerCapture?.(e.pointerId);
+    const node = itemRefs.current.get(info.sessionId);
+    if (node) {
+      node.style.transition = 'transform 0.15s ease';
+      node.style.transform = '';
+      setTimeout(() => { if (node) node.style.transition = ''; }, 160);
+    }
+    const finalIndex = orderRef.current.indexOf(info.sessionId);
+    if (finalIndex !== info.startIndex) {
+      setAnnouncement(`Moved "${getTitleFor(info.sessionId)}" to position ${finalIndex + 1} of ${orderRef.current.length}`);
+    }
+    dragInfo.current = null;
+    setDraggedId(null);
+  }, [getTitleFor]);
+
+  // FLIP-lite: whenever the order changes (drag, keyboard move, or an
+  // add/remove shifting everyone after it), animate every row other than
+  // the one actively being dragged (that one's already being positioned by
+  // the pointer handler above) from its old slot to its new one.
+  const prevOrderRef = useRef(featuredIds);
+  useLayoutEffect(() => {
+    const prevOrder = prevOrderRef.current;
+    if (prevOrder !== featuredIds) {
+      const rowHeight = measureRowHeight();
+      if (rowHeight) {
+        prevOrder.forEach((sessionId) => {
+          if (sessionId === dragInfo.current?.sessionId) return;
+          const oldIndex = prevOrder.indexOf(sessionId);
+          const newIndex = featuredIds.indexOf(sessionId);
+          if (oldIndex === -1 || newIndex === -1 || oldIndex === newIndex) return;
+          const node = itemRefs.current.get(sessionId);
+          if (!node) return;
+          node.style.transition = 'none';
+          node.style.transform = `translateY(${(oldIndex - newIndex) * rowHeight}px)`;
+          // eslint-disable-next-line no-unused-expressions
+          node.offsetHeight; // force reflow so the browser commits the instant transform before we animate away from it
+          node.style.transition = 'transform 0.2s ease';
+          node.style.transform = '';
+        });
+      }
+    }
+    prevOrderRef.current = featuredIds;
+  }, [featuredIds, measureRowHeight]);
 
   return html`
     <div class="tec-featured-editor">
       <div class="tec-featured-editor__column">
         <h3>Featured (display order)</h3>
         ${featuredIds.length === 0 && html`<p class="tec-featured-editor__empty">No sessions featured yet — add some from the list on the right.</p>`}
-        <ul class="tec-featured-editor__list">
+        <div aria-live="polite" class="tec-sr-only">${announcement}</div>
+        <ul class="tec-featured-editor__list" ref=${listRef}>
           ${featuredIds.map((sessionId, index) => {
             const session = sessionsById.get(sessionId);
+            const title = session?.enTitle || sessionId;
             return html`
-              <li class="tec-featured-editor__row" key=${sessionId}>
-                <div class="tec-featured-editor__reorder">
-                  <button \
-                    type="button" \
-                    onClick=${() => handleMove(index, -1)} \
-                    disabled=${index === 0 || undefined} \
-                    aria-label="Move up" \
-                  >↑</button>
-                  <button \
-                    type="button" \
-                    onClick=${() => handleMove(index, 1)} \
-                    disabled=${index === featuredIds.length - 1 || undefined} \
-                    aria-label="Move down" \
-                  >↓</button>
-                </div>
+              <li \
+                class="tec-featured-editor__row ${sessionId === draggedId ? 'is-dragging' : ''}" \
+                key=${sessionId} \
+                ref=${(node) => setItemRef(sessionId, node)} \
+              >
+                <button \
+                  type="button" \
+                  class="tec-featured-editor__handle" \
+                  aria-label="Reorder ${title}. Position ${index + 1} of ${featuredIds.length}. Drag, or press arrow up/down." \
+                  onPointerDown=${(e) => handlePointerDown(e, sessionId)} \
+                  onPointerMove=${handlePointerMove} \
+                  onPointerUp=${endDrag} \
+                  onPointerCancel=${endDrag} \
+                  onLostPointerCapture=${endDrag} \
+                  onKeyDown=${(e) => handleKeyDown(e, index)} \
+                >
+                  <${DragHandleIcon} />
+                </button>
                 <div class="tec-featured-editor__info">
-                  <span class="tec-featured-editor__title">${session?.enTitle || sessionId}</span>
+                  <span class="tec-featured-editor__title">${title}</span>
                   <span class="tec-featured-editor__track">${session ? getSessionMeta(session) : 'Not found in current session catalog'}</span>
                 </div>
                 <button type="button" class="tec-btn tec-btn--quiet tec-btn--s tec-btn--danger" onClick=${() => handleRemove(sessionId)}>Remove</button>
