@@ -315,13 +315,16 @@ export async function getAttendee() {
   }
 }
 
-export async function createAttendee(attendeeData) {
+export async function createAttendee(attendeeData, rsvpToken = null) {
   if (!attendeeData) return false;
 
   const eventServiceEnv = getEventServiceEnv();
   const { serviceApiEndpoints } = ENV_MAP[eventServiceEnv.name];
   const raw = JSON.stringify(attendeeData);
-  const options = await constructRequestOptions('POST', raw);
+  // A guest registering via an rsvp token has no IMS session — skip waiting for
+  // one and never attach a signed-in caller's own token, so the request stays
+  // anonymous and authenticates solely via the rsvp-token header instead.
+  const options = await constructRequestOptions('POST', raw, !rsvpToken, !!rsvpToken, rsvpToken);
 
   try {
     const response = await fetch(`${serviceApiEndpoints.esl}/v1/attendees`, options);
@@ -339,13 +342,15 @@ export async function createAttendee(attendeeData) {
   }
 }
 
-export async function addAttendeeToEvent(eventId, attendee) {
+export async function addAttendeeToEvent(eventId, attendee, rsvpToken = null) {
   if (!eventId || !attendee) return false;
 
   const eventServiceEnv = getEventServiceEnv();
   const { serviceApiEndpoints } = ENV_MAP[eventServiceEnv.name];
   const raw = JSON.stringify(attendee);
-  const options = await constructRequestOptions('POST', raw);
+  // Same anonymous-guest handling as createAttendee above. This call also
+  // consumes the rsvp token server-side once the registration succeeds.
+  const options = await constructRequestOptions('POST', raw, !rsvpToken, !!rsvpToken, rsvpToken);
 
   try {
     const response = await fetch(`${serviceApiEndpoints.esl}/v1/events/${eventId}/attendees/${attendee.attendeeId}`, options);
@@ -450,12 +455,11 @@ export async function getCampaign(eventId, campaignId) {
   }
 }
 
-// RSVP token endpoints — authenticated solely by the x-adobe-esp-rsvp-token
-// header (constructRequestOptions(..., waitForIMS=false, skipAuth=true, token)), so
-// both calls skip waiting for adobeIMS (avoids stalling for a guest with no IMS
-// session) and skip attaching any signed-in caller's own IMS token (keeps the
-// submission anonymous even when the caller, e.g. an assistant, happens to be
-// signed in).
+// Validate-on-load for a guest rsvp token — authenticated solely by the
+// x-adobe-esp-rsvp-token header. This call never consumes the token; actual
+// registration (and consumption) happens via the normal attendee endpoints
+// (createAttendee / addAttendeeToEvent above), with the token threaded through
+// as auth instead of a separate submission endpoint.
 export async function validateRsvpToken(eventId, token) {
   const eventServiceEnv = getEventServiceEnv();
   const { serviceApiEndpoints } = ENV_MAP[eventServiceEnv.name];
@@ -473,30 +477,6 @@ export async function validateRsvpToken(eventId, token) {
     return { ok: true, data };
   } catch (error) {
     window.lana?.log(`Error: Failed to validate RSVP token:${JSON.stringify(error)}`);
-    return { ok: false, status: 'Network Error', error: error.message };
-  }
-}
-
-export async function submitRsvpTokenRegistration(eventId, token, attendeeData) {
-  if (!eventId || !token || !attendeeData) return { ok: false, error: 'Missing eventId, token, or attendee data' };
-
-  const eventServiceEnv = getEventServiceEnv();
-  const { serviceApiEndpoints } = ENV_MAP[eventServiceEnv.name];
-  const raw = JSON.stringify(attendeeData);
-  const options = await constructRequestOptions('POST', raw, false, true, token);
-
-  try {
-    const response = await fetch(`${serviceApiEndpoints.esl}/v1/events/${eventId}/rsvpTokenRegistrations`, options);
-    const data = await response.json();
-
-    if (!response.ok) {
-      window.lana?.log(`Error: Failed to submit RSVP token registration. Status:${JSON.stringify(response)}`);
-      return { ok: false, status: response.status, error: data };
-    }
-
-    return { ok: true, data };
-  } catch (error) {
-    window.lana?.log(`Error: Failed to submit RSVP token registration:${JSON.stringify(error)}`);
     return { ok: false, status: 'Network Error', error: error.message };
   }
 }
@@ -713,7 +693,7 @@ export async function unregisterFromSessionTime(sessionTimeId) {
 }
 
 // compound helper functions
-export async function getAndCreateAndAddAttendee(eventId, attendeeData) {
+export async function getAndCreateAndAddAttendee(eventId, attendeeData, rsvpToken = null) {
   const profile = BlockMediator.get('imsProfile');
   const eventObj = await getEvent(eventId);
 
@@ -723,9 +703,10 @@ export async function getAndCreateAndAddAttendee(eventId, attendeeData) {
   let registrationStatus = 'registered';
 
   if (profile.account_type === 'guest') {
-    // Use BaseAttendee filter for creating new attendee
+    // Use BaseAttendee filter for creating new attendee. A guest arriving via
+    // an rsvp token authenticates this call with the token instead of IMS.
     const filteredPayload = getBaseAttendeePayload(attendeeData);
-    attendee = await createAttendee(filteredPayload);
+    attendee = await createAttendee(filteredPayload, rsvpToken);
   } else {
     const attendeeResp = await getAttendee();
 
@@ -765,7 +746,9 @@ export async function getAndCreateAndAddAttendee(eventId, attendeeData) {
     registrationStatus,
   });
 
-  return addAttendeeToEvent(eventId, eventAttendeePayload);
+  // For a guest, this call both registers and consumes the rsvp token
+  // server-side in one step.
+  return addAttendeeToEvent(eventId, eventAttendeePayload, rsvpToken);
 }
 
 export async function indexPathToSchedule(scheduleId, pagePath) {

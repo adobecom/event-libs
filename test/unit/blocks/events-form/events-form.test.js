@@ -833,24 +833,30 @@ describe('Events Form', () => {
       return form;
     }
 
-    it('submits the RSVP token registration instead of calling getAndCreateAndAddAttendee', async () => {
+    it('registers a guest via the normal attendee flow, authenticating with the rsvp-token header', async () => {
       BlockMediator.set('imsProfile', { account_type: 'guest', rsvpToken: 'valid-rsvp-token-1234567890' });
-      const fetchStub = sandbox.stub(window, 'fetch').resolves({
-        json: () => ({ attendeeId: 'att-1', registrationStatus: 'registered' }),
-        ok: true,
-      });
+      const fetchStub = sandbox.stub(window, 'fetch');
+      fetchStub.onCall(0).resolves({ json: () => ({ eventId: 'test-event-id', isFull: false }), ok: true });
+      fetchStub.onCall(1).resolves({ json: () => ({ attendeeId: 'att-1' }), ok: true });
+      fetchStub.onCall(2).resolves({ json: () => ({ attendeeId: 'att-1', registrationStatus: 'registered' }), ok: true });
 
       const result = await submitForm({ form: buildForm(), sanitizeList: [] });
 
       expect(result.ok).to.be.true;
       expect(result.data).to.have.property('registrationStatus', 'registered');
-      expect(fetchStub.calledOnce).to.be.true;
-      const [url, options] = fetchStub.firstCall.args;
-      expect(url).to.include('/v1/events/test-event-id/rsvpTokenRegistrations');
-      expect(options.headers.get('x-adobe-esp-rsvp-token')).to.equal('valid-rsvp-token-1234567890');
+      const urls = fetchStub.getCalls().map((call) => call.args[0]);
+      expect(urls.some((url) => url.includes('/rsvpTokenRegistrations'))).to.be.false;
+      expect(urls[1]).to.include('/v1/attendees');
+      expect(urls[2]).to.include('/v1/events/test-event-id/attendees/att-1');
+      const createOptions = fetchStub.getCall(1).args[1];
+      const addToEventOptions = fetchStub.getCall(2).args[1];
+      expect(createOptions.headers.get('x-adobe-esp-rsvp-token')).to.equal('valid-rsvp-token-1234567890');
+      expect(createOptions.headers.has('Authorization')).to.be.false;
+      expect(addToEventOptions.headers.get('x-adobe-esp-rsvp-token')).to.equal('valid-rsvp-token-1234567890');
+      expect(addToEventOptions.headers.has('Authorization')).to.be.false;
     });
 
-    it('forwards a routed campaign in the body of the RSVP token submit call — same payload schema as the normal attendee flow', async () => {
+    it('forwards a routed campaign in the body of the add-to-event call — same body schema as the normal attendee flow', async () => {
       resetCampaignMapCache();
       window.history.replaceState({}, '', `${window.location.pathname}?campaign=camp-1`);
       BlockMediator.set('imsProfile', { account_type: 'guest', rsvpToken: 'valid-rsvp-token-1234567890' });
@@ -858,15 +864,18 @@ describe('Events Form', () => {
         if (typeof url === 'string' && url.includes('campaign-map.json')) {
           return Promise.resolve({ ok: false, status: 404 });
         }
+        if (typeof url === 'string' && url.includes('/v1/attendees') && !url.includes('/events/')) {
+          return Promise.resolve({ json: () => ({ attendeeId: 'att-1' }), ok: true });
+        }
         return Promise.resolve({ json: () => ({ attendeeId: 'att-1', registrationStatus: 'registered' }), ok: true });
       });
 
       try {
         await submitForm({ form: buildForm(), sanitizeList: [] });
 
-        const submitCall = fetchStub.getCalls().find((call) => String(call.args[0]).includes('/rsvpTokenRegistrations'));
-        expect(submitCall.args[0]).to.not.include('campaignId');
-        const body = JSON.parse(submitCall.args[1].body);
+        const addToEventCall = fetchStub.getCalls().find((call) => String(call.args[0]).includes('/attendees/att-1'));
+        expect(addToEventCall.args[0]).to.not.include('campaignId');
+        const body = JSON.parse(addToEventCall.args[1].body);
         expect(body).to.have.property('campaignId', 'camp-1');
         expect(body.firstName).to.equal('Guest');
       } finally {
@@ -875,7 +884,7 @@ describe('Events Form', () => {
       }
     });
 
-    it('falls back to getAndCreateAndAddAttendee when no RSVP token is present', async () => {
+    it('registers a non-guest via IMS auth with no rsvp-token header', async () => {
       BlockMediator.set('imsProfile', { account_type: 'type1' });
       const fetchStub = sandbox.stub(window, 'fetch');
       fetchStub.onCall(0).resolves({ json: () => ({ eventId: 'test-event-id', isFull: false }), ok: true });
@@ -888,6 +897,8 @@ describe('Events Form', () => {
       expect(result.ok).to.be.true;
       const urls = fetchStub.getCalls().map((call) => call.args[0]);
       expect(urls.some((url) => url.includes('/rsvpTokenRegistrations'))).to.be.false;
+      const createOptions = fetchStub.getCall(2).args[1];
+      expect(createOptions.headers.has('x-adobe-esp-rsvp-token')).to.be.false;
     });
   });
 

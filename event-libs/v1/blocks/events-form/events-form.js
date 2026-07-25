@@ -1,10 +1,10 @@
-import { deleteAttendeeFromEvent, getAndCreateAndAddAttendee, getAttendee, getEvent, getCampaign, registerForSessionTime, submitRsvpTokenRegistration } from '../../utils/esp-controller.js';
+import { deleteAttendeeFromEvent, getAndCreateAndAddAttendee, getAttendee, getEvent, getCampaign, registerForSessionTime } from '../../utils/esp-controller.js';
 import BlockMediator from '../../deps/block-mediator.min.js';
 import { signIn, decorateEvent } from '../../utils/decorate.js';
 import { dictionaryManager, getInviteOnlyNoCampaignMessage, getRsvpTokenInvalidMessage, getRsvpTokenAlreadyRegisteredMessage } from '../../utils/dictionary-manager.js';
 import { getEventConfig, LIBS, getMetadata, getSusiOptions, getValidCampaignIdFromUrl, resolveRoutedCampaignId, shouldForceGuestSignIn } from '../../utils/utils.js';
 import { FALLBACK_LOCALES, CAMPAIGN_ID_PATTERN, PHONE_FIELD_RE, PHONE_PATTERN  } from '../../utils/constances.js';
-import { BASE_ATTENDEE_DATA_FILTER, getRsvpTokenAttendeePayload } from '../../utils/data-utils.js';
+import { BASE_ATTENDEE_DATA_FILTER } from '../../utils/data-utils.js';
 import { parseRsvpFieldLimit, stripTags } from '../../utils/sanitize-utils.js';
 import { applyImplicitContactMethodsToPayload, getImplicitConsentRaw } from '../../utils/rsvp-consent.js';
 
@@ -258,17 +258,13 @@ export async function submitForm(bp) {
   }
 
   // A valid RSVP token never reaches submitForm unless it's still usable (an
-  // invalid token short-circuits before the form is built, see onProfile). Submitting
-  // consumes the token server-side in the same call that records the registration.
-  // The endpoint combines create-attendee + add-to-event into one call, using the
-  // same payload schema as that normal flow (per the backend team) — so campaignId
-  // (set on payload above) is included here too via getRsvpTokenAttendeePayload.
+  // invalid token short-circuits before the form is built, see onProfile). A guest
+  // registers via the same normal attendee flow as an IMS user — the rsvp token
+  // is just threaded through as auth instead of a bearer token, and the final
+  // add-to-event call consumes it server-side once the registration succeeds.
+  // campaignId (set on payload above) rides along in that call like any other flow.
   const rsvpToken = BlockMediator.get('imsProfile')?.rsvpToken;
-  if (rsvpToken) {
-    return submitRsvpTokenRegistration(getMetadata('event-id'), rsvpToken, getRsvpTokenAttendeePayload(payload));
-  }
-
-  return getAndCreateAndAddAttendee(getMetadata('event-id'), payload);
+  return getAndCreateAndAddAttendee(getMetadata('event-id'), payload, rsvpToken);
 }
 
 function clearForm(form) {
