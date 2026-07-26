@@ -722,7 +722,10 @@ export async function getAndCreateAndAddAttendee(eventId, attendeeData, rsvpToke
     }
   }
 
-  if (!attendee?.ok) return { ok: false, error: 'Failed to create or update attendee' };
+  // Preserve the upstream status (e.g. 401/404/409/410 for a guest whose rsvp
+  // token went stale between page load and submit) so callers can show the
+  // specific error copy instead of a generic failure message.
+  if (!attendee?.ok) return { ok: false, status: attendee?.status, error: attendee?.error || 'Failed to create or update attendee' };
 
   const newAttendeeData = attendee.data;
 

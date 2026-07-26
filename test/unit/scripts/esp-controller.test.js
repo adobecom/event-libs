@@ -400,6 +400,18 @@ describe('Adobe Event Service API', () => {
       expect(addToEventOptions.headers.get('x-adobe-esp-rsvp-token')).to.equal('tok-1');
     });
 
+    it('should preserve the upstream status when create-attendee fails (e.g. an rsvp token that went stale between page load and submit)', async () => {
+      BlockMediator.set('imsProfile', { account_type: 'guest', rsvpToken: 'tok-1' });
+      const fetchStub = sandbox.stub(window, 'fetch');
+      fetchStub.onCall(0).resolves({ json: () => ({ eventId, isFull: false }), ok: true });
+      fetchStub.onCall(1).resolves({ json: () => ({ message: 'Gone' }), ok: false, status: 410 });
+
+      const result = await api.getAndCreateAndAddAttendee(eventId, attendeeData, 'tok-1');
+      expect(result.ok).to.be.false;
+      expect(result.status).to.equal(410);
+      expect(fetchStub.callCount).to.equal(2);
+    });
+
     it('should waitlist when event is full regardless of campaign', async () => {
       BlockMediator.set('imsProfile', { account_type: 'guest' });
       const fetchStub = sandbox.stub(window, 'fetch');
