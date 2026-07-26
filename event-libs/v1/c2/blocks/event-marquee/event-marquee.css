@@ -216,8 +216,12 @@
   color: var(--s2a-color-brand-adobe-red);
 }
 
-/* Text/CTA variant — no asset (or a non-player asset): text sits at the bottom of
-   the full-bleed background, matching the Figma "Upcoming" state. */
+/* Text/CTA variant — no asset (or a non-player asset): text is vertically centered
+   over the full-bleed background, matching real Milo's own default (non-split)
+   marquee, which vertically centers its foreground via `align-items: center` on a
+   row-direction container. Ours stays column-direction here (no asset to sit
+   beside), so the equivalent is `justify-content: center` on the main (vertical)
+   axis — same visual result without forcing an unnecessary row layout. */
 .event-marquee-text-cta .event-marquee-foreground {
-  justify-content: flex-end;
+  justify-content: center;
 }
