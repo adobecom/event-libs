@@ -225,3 +225,10 @@
 .event-marquee-text-cta .event-marquee-foreground {
   justify-content: center;
 }
+
+/* Text stays constrained even with no asset present — per Figma, it never spans the
+   full width of the marquee, split or not. This was in an earlier version of this
+   file and got dropped by mistake during the marquee.css port; restoring it here. */
+.event-marquee-text-cta .event-marquee-text {
+  max-width: var(--s2a-layout-rich-media-content-measure-wide);
+}
