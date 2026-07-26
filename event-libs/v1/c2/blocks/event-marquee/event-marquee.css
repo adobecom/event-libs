@@ -67,8 +67,15 @@
 }
 
 @media (min-width: 1024px) {
+  /* Matches marquee.css's own `.marquee .foreground { flex-direction: row; ... }` —
+     that rule is NOT scoped to `.split`, it applies to every marquee at the large
+     breakpoint regardless of whether there's an asset. Same here: row applies
+     unconditionally, not just to the Video variant. With a single child (Text/CTA,
+     no asset), row vs. column has no visual effect on its own — see the
+     Text/CTA-specific override below for how vertical centering carries over. */
   .event-marquee-foreground {
     padding: var(--s2a-spacing-xl) 0;
+    flex-direction: row;
   }
 }
 
@@ -152,20 +159,12 @@
     object-fit: cover;
   }
 
-  /* Row-split only applies when there's a bleeding asset (Video variant) — gated the
-     same way marquee.css gates its own row switch on the `.split` modifier class, so
-     Text/CTA (no asset) keeps its column layout with text pinned to the bottom.
-     Unlike Milo's own `.asset.bleed` (which escapes a narrower, centered content
+  /* Unlike Milo's own `.asset.bleed` (which escapes a narrower, centered content
      container via `position: absolute; width: 50vw`), event-marquee is already
      full-bleed with no narrower container to escape — so the asset just stays a
      normal flex item and fills the remaining row width/height on its own. Forcing
      the Milo technique here left the text centered mid-row instead of anchored left
-     (`justify-content: center` had nothing else to center once the asset was pulled
-     out of flow) and needlessly overrode the height. */
-  .event-marquee-video .event-marquee-foreground {
-    flex-direction: row;
-  }
-
+     and needlessly overrode the height. */
   .event-marquee-video .event-marquee-text {
     flex: 0 0 auto;
     max-width: calc(50% - var(--s2a-layout-guide-gap));
@@ -218,12 +217,21 @@
 
 /* Text/CTA variant — no asset (or a non-player asset): text is vertically centered
    over the full-bleed background, matching real Milo's own default (non-split)
-   marquee, which vertically centers its foreground via `align-items: center` on a
-   row-direction container. Ours stays column-direction here (no asset to sit
-   beside), so the equivalent is `justify-content: center` on the main (vertical)
-   axis — same visual result without forcing an unnecessary row layout. */
+   marquee. On mobile, .event-marquee-foreground is still column-direction, so
+   `justify-content: center` (the main/vertical axis) centers it. At 1024px+, the
+   shared rule above switches to row-direction for every variant — centering there
+   has to move to `align-items` (now the cross/vertical axis) instead, and
+   `justify-content` needs resetting so a lone text item doesn't get horizontally
+   centered too (it should stay left-anchored, per Figma). */
 .event-marquee-text-cta .event-marquee-foreground {
   justify-content: center;
+}
+
+@media (min-width: 1024px) {
+  .event-marquee-text-cta .event-marquee-foreground {
+    justify-content: flex-start;
+    align-items: center;
+  }
 }
 
 /* Text stays constrained even with no asset present — per Figma, it never spans the
