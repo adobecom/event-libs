@@ -159,6 +159,18 @@
     object-fit: cover;
   }
 
+  /* .milo-video (MPC + YouTube) is a fixed 16:9 box (Milo's own iframe.css:
+     `height: 0; padding-bottom: 56.25%`, sized from width, not stretchable) — same
+     for Mobile Rider's own aspect-ratio-based player sizing. Neither actually
+     stretches to the row's full height, so left at the default `align-items:
+     stretch` they just sit pinned to the top with dead space below. Centering them
+     specifically (not the whole row) leaves the plain-image/ambient-video case
+     above untouched, which still needs `stretch` for its own height: 100% fill. */
+  .event-marquee-foreground:has(.milo-video),
+  .event-marquee-foreground:has(.mobile-rider) {
+    align-items: center;
+  }
+
   /* Unlike Milo's own `.asset.bleed` (which escapes a narrower, centered content
      container via `position: absolute; width: 50vw`), event-marquee is already
      full-bleed with no narrower container to escape — so the asset just stays a
