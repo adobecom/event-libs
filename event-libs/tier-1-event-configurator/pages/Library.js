@@ -7,7 +7,7 @@ import { useNavigation } from '../context/NavigationContext.js';
 import { useConfigs } from '../context/ConfigsContext.js';
 import { useEventEnv } from '../context/EventEnvContext.js';
 import {
-  copyTextToClipboard, formatUpdatedTime, getDisplayTitle, stringifyConfig,
+  copyTextToClipboard, formatUpdatedTime, getDisplayTitle,
 } from '../utils.js';
 import { EVENT_BROWSE_ENABLED } from '../constants.js';
 
@@ -101,7 +101,9 @@ export default function Library() {
   }, []);
 
   const handleCopyConfig = useCallback(async (row) => {
-    const ok = await copyTextToClipboard(stringifyConfig(row.config));
+    // Minified, not stringifyConfig's pretty-printed form: DA joins a metadata cell's
+    // multi-line content back with ", ", corrupting multi-line JSON with stray commas.
+    const ok = await copyTextToClipboard(JSON.stringify(row.config));
     if (ok) setToastSuccess(`Copied config for ${getDisplayTitle(row)}`);
     else setToastError('Could not copy config — copy it manually from the editor instead');
   }, [setToastSuccess, setToastError]);

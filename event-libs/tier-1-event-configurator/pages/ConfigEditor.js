@@ -76,7 +76,9 @@ export default function ConfigEditor() {
   };
 
   const handleCopy = async () => {
-    const ok = await copyTextToClipboard(configPreview);
+    // Minified, not configPreview's pretty-printed form: DA joins a metadata cell's
+    // multi-line content back with ", ", corrupting multi-line JSON with stray commas.
+    const ok = await copyTextToClipboard(JSON.stringify(activeConfig.config));
     if (ok) setToastSuccess('Config copied — paste it into the page\'s tier-1-event-config metadata');
     else setToastError('Could not copy config — select and copy the JSON block manually');
   };
