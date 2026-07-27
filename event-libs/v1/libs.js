@@ -27,6 +27,7 @@ const EVENT_BLOCKS = [
 const EVENT_BLOCKS_C2 = [
   'mobile-rider',
   'event-marquee',
+  'upcoming-sessions',
 ];
 
 // Import only the most essential utilities that are always needed
