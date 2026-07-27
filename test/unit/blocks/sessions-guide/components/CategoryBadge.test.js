@@ -1,16 +1,16 @@
 import { expect } from '@esm-bundle/chai';
 import { CategoryBadge } from '../../../../../event-libs/v1/blocks/sessions-guide/components/CategoryBadge.js';
-import { initTrackIconConfig } from '../../../../../event-libs/v1/utils/track-icon-config.js';
+import { initTierOneEventConfig } from '../../../../../event-libs/v1/utils/tier-1-event-config.js';
 
 describe('CategoryBadge', () => {
   before(() => {
     const meta = document.createElement('meta');
-    meta.name = 'track-icon-config';
+    meta.name = 'tier-1-event-config';
     meta.content = JSON.stringify({
-      'Social Media': { icon: 'social-media', color: '#FF6B35' },
+      trackIcons: { 'Social Media': { icon: 'social-media', color: '#FF6B35' } },
     });
     document.head.appendChild(meta);
-    initTrackIconConfig();
+    initTierOneEventConfig();
   });
 
   it('renders without throwing', () => {
@@ -30,7 +30,7 @@ describe('CategoryBadge', () => {
   it('falls back to the default mainstage icon/color when the category has no config entry', () => {
     const html = CategoryBadge({ category: 'Unmapped Track' });
     expect(html).to.include('Unmapped Track');
-    // #E91E63 is the built-in default mainstage color (see track-icon-config.js).
+    // #E91E63 is the built-in default mainstage color (see tier-1-event-config.js).
     expect(html).to.include('color:#E91E63');
   });
 

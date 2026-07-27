@@ -1,6 +1,6 @@
 import { html } from '../../../deps/htm-preact.js';
 import { Icon } from '../../../features/icons/Icon.js';
-import { getTrackIcon } from '../../../utils/track-icon-config.js';
+import { getTrackIcon } from '../../../utils/tier-1-event-config.js';
 
 export function CategoryBadge({ category, size }) {
   const entry = getTrackIcon(category) || getTrackIcon('mainstage');

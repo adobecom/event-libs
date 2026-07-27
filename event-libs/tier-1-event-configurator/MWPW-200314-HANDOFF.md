@@ -10,26 +10,28 @@ MWPW-200314. See `PLAN.md` for the full narrative/sourcing behind each item
 consolidated checklist so it doesn't have to be reconstructed from PLAN.md's
 chronological log every time.
 
-## 1. Rename `track-icon-config.js` into a broader `tier-1-event-config.js`-style singleton
+## 1. Rename `track-icon-config.js` into a broader `tier-1-event-config.js`-style singleton — done 2026-07-27
 
-Currently one `getMetadata('track-icon-config')` read, one getter
-(`getTrackIcon()`). Needs to become one `getMetadata('tier-1-event-config')`
-read exposing multiple getters — `getTrackIcon()`, `getAllowDoubleBooking()`,
-and (once Phase 3 lands) a featured-sessions getter — off the same parsed
-object, rather than three separate ad-hoc reads.
+`event-libs/v1/utils/track-icon-config.js` → `event-libs/v1/utils/tier-1-event-config.js`.
+One `getMetadata('tier-1-event-config')` read exposing `getTrackIcon()` and
+`getAllowDoubleBooking()` off the same parsed object (a featured-sessions
+getter lands once Phase 3/item 3 does), rather than three separate ad-hoc
+reads. `getTrackIcon()` now unwraps `parsedConfig.trackIcons[trackName]`
+(the new key nests track icons under `.trackIcons`, unlike the old key which
+*was* the track map directly).
 
-**Legacy-key fallback still needed:** some da-events pages already have a
-real, authored standalone `track-icon-config` key (shipped and live-verified
-before this app existed — see the `track-icon-config-system` project memory
-if you have access to it). `initTrackIconConfig()`-equivalent should check
-`tier-1-event-config.trackIcons` first, fall back to the legacy standalone
-`track-icon-config` key if the new key is absent, then fall back to
-`DEFAULT_TRACK_ICON_CONFIG` as today. Drop the legacy fallback only once no
-live pages depend on it.
+**Resolved 2026-07-27, per Daniel: no legacy-key fallback needed.** The
+pages this whole config system targets — both the old standalone
+`track-icon-config` key and the new `tier-1-event-config` key — are not yet
+published, so there's no live content to regress. Dropped the fallback
+chain entirely: new key or nothing, no legacy-key check. The built-in
+`DEFAULT_TRACK_ICON_CONFIG` gap-fill for known tracks with no authored
+entry is unrelated to that fallback and still applies as before.
 
-Consumers to update (imports of the renamed file): `parse-config.js`,
-`LiveCard.js`, `CategoryBadge.js`, `SessionDetailOverlay.js`,
-`LiveUpcomingView.js`, `SessionCard.js`, `decorate.js`.
+Consumers updated (imports of the renamed file): `CategoryBadge.js`,
+`LiveCard.js`, `SessionDetailOverlay.js`, `SessionCard.js`, `decorate.js`
+— the actual current importers (`parse-config.js` and `LiveUpcomingView.js`
+were listed above but don't import this module).
 
 ## 2. Wire `allowDoubleBooking`
 

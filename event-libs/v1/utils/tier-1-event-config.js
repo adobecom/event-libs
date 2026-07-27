@@ -1,15 +1,17 @@
 import { getMetadata } from './utils.js';
 
-// Page-level, one-shot bootstrap for the track -> { icon, color } config, mirroring
+// Page-level, one-shot bootstrap for the Tier 1 Event Configurator app's authored output
+// (Config JSON pasted into the `tier-1-event-config` metadata row), mirroring
 // session-store.js's initSessionState() pattern. Read once during decorateEvent, before
-// any block's own init() runs, so any block on the page can call getTrackIcon().
+// any block's own init() runs, so any block on the page can call getTrackIcon()/
+// getAllowDoubleBooking().
 let initialized = false;
-let trackIconConfig = {};
+let tierOneEventConfig = {};
 
 // Built-in fallback so real, known Track values render a curated icon/color out of the
-// box even before a page authors track-icon-config — authored metadata always takes
-// priority (checked first in getTrackIcon), this only fills gaps. Ported 1:1 from the
-// old CategoryBadge.js BADGE_MAP + sessions-guide.js MOCK_CATEGORY_COLORS.
+// box even before a page authors trackIcons — authored config always takes priority
+// (checked first in getTrackIcon), this only fills gaps. Ported 1:1 from the old
+// CategoryBadge.js BADGE_MAP + sessions-guide.js MOCK_CATEGORY_COLORS.
 const DEFAULT_TRACK_ICON_CONFIG = {
   'social-media': { icon: 'social-media', color: '#FF6B35' },
   'design-and-illustration': { icon: 'design-and-illustration', color: '#9D50BB' },
@@ -33,24 +35,29 @@ function slugify(name) {
   return name ? name.toLowerCase().replace(/[\s_]+/g, '-').replace(/[^a-z0-9-]/g, '') : '';
 }
 
-export function initTrackIconConfig() {
+export function initTierOneEventConfig() {
   if (initialized) return;
   initialized = true;
-  const raw = getMetadata('track-icon-config');
+  const raw = getMetadata('tier-1-event-config');
   if (!raw) return;
   try {
-    trackIconConfig = JSON.parse(raw);
+    tierOneEventConfig = JSON.parse(raw);
   } catch (err) {
-    window.lana?.log(`[track-icon-config] invalid track-icon-config JSON: ${err.message}`);
+    window.lana?.log(`[tier-1-event-config] invalid tier-1-event-config JSON: ${err.message}`);
   }
 }
 
 export function getTrackIcon(trackName) {
   if (!trackName) return null;
   const slug = slugify(trackName);
-  return trackIconConfig[trackName]
-    || trackIconConfig[slug]
+  const trackIcons = tierOneEventConfig.trackIcons || {};
+  return trackIcons[trackName]
+    || trackIcons[slug]
     || DEFAULT_TRACK_ICON_CONFIG[trackName]
     || DEFAULT_TRACK_ICON_CONFIG[slug]
     || null;
+}
+
+export function getAllowDoubleBooking() {
+  return !!tierOneEventConfig.allowDoubleBooking;
 }

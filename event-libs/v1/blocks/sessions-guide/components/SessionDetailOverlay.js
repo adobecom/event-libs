@@ -11,7 +11,7 @@ import { deriveSessionState } from '../../../utils/session-state.js';
 import { setSessionParam, safeUrl } from '../utils/url.js';
 import { IconHeartFilled, IconHeartOutline } from './icons.js';
 import { Icon } from '../../../features/icons/Icon.js';
-import { getTrackIcon } from '../../../utils/track-icon-config.js';
+import { getTrackIcon } from '../../../utils/tier-1-event-config.js';
 
 export function SessionDetailOverlay({ onBack }) {
   const { state } = useSessionGuide();

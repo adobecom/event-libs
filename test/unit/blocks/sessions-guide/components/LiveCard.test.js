@@ -5,7 +5,7 @@ import { buildLiveCard } from '../../../../../event-libs/v1/blocks/sessions-guid
 import {
   scheduled, favorited, pendingActions, liveStreamActiveIds,
 } from '../../../../../event-libs/v1/utils/session-store.js';
-import { initTrackIconConfig } from '../../../../../event-libs/v1/utils/track-icon-config.js';
+import { initTierOneEventConfig } from '../../../../../event-libs/v1/utils/tier-1-event-config.js';
 
 const BASE_CONFIG = {
   title: 'Adobe MAX 2026',
@@ -44,10 +44,10 @@ function makeStore() {
 describe('LiveCard', () => {
   before(() => {
     const meta = document.createElement('meta');
-    meta.name = 'track-icon-config';
-    meta.content = JSON.stringify({ Featured: { icon: 'mainstage', color: '#ff0000' } });
+    meta.name = 'tier-1-event-config';
+    meta.content = JSON.stringify({ trackIcons: { Featured: { icon: 'mainstage', color: '#ff0000' } } });
     document.head.appendChild(meta);
-    initTrackIconConfig();
+    initTierOneEventConfig();
   });
 
   beforeEach(() => {

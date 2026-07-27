@@ -1,26 +1,34 @@
 import { expect } from '@esm-bundle/chai';
-import { initTrackIconConfig, getTrackIcon } from '../../../event-libs/v1/utils/track-icon-config.js';
+import {
+  initTierOneEventConfig,
+  getTrackIcon,
+  getAllowDoubleBooking,
+} from '../../../event-libs/v1/utils/tier-1-event-config.js';
 
-describe('track-icon-config (malformed JSON)', () => {
+describe('tier-1-event-config (malformed JSON)', () => {
   let loggedMessages;
 
   before(() => {
     const meta = document.createElement('meta');
-    meta.name = 'track-icon-config';
+    meta.name = 'tier-1-event-config';
     meta.content = '{not valid json';
     document.head.appendChild(meta);
 
     loggedMessages = [];
     window.lana = { log: (msg) => loggedMessages.push(msg) };
-    initTrackIconConfig();
+    initTierOneEventConfig();
   });
 
   it('logs via window.lana.log without throwing', () => {
     expect(loggedMessages.length).to.equal(1);
-    expect(loggedMessages[0]).to.include('invalid track-icon-config JSON');
+    expect(loggedMessages[0]).to.include('invalid tier-1-event-config JSON');
   });
 
   it('leaves the authored config empty (falling back only to built-in defaults)', () => {
     expect(getTrackIcon('Some Totally Unmapped Track')).to.equal(null);
+  });
+
+  it('defaults allowDoubleBooking to false when config failed to parse', () => {
+    expect(getAllowDoubleBooking()).to.equal(false);
   });
 });

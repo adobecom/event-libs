@@ -5,7 +5,7 @@ import { buildSessionCard } from '../../../../../event-libs/v1/blocks/sessions-g
 import {
   scheduled, favorited, pendingActions, auth,
 } from '../../../../../event-libs/v1/utils/session-store.js';
-import { initTrackIconConfig } from '../../../../../event-libs/v1/utils/track-icon-config.js';
+import { initTierOneEventConfig } from '../../../../../event-libs/v1/utils/tier-1-event-config.js';
 
 const BASE_CONFIG = {
   title: 'Adobe MAX 2026',
@@ -62,10 +62,10 @@ function renderCard(session, ctxOverrides = {}) {
 describe('SessionCard', () => {
   before(() => {
     const meta = document.createElement('meta');
-    meta.name = 'track-icon-config';
-    meta.content = JSON.stringify({ Design: { icon: 'design-and-illustration', color: '#0066cc' } });
+    meta.name = 'tier-1-event-config';
+    meta.content = JSON.stringify({ trackIcons: { Design: { icon: 'design-and-illustration', color: '#0066cc' } } });
     document.head.appendChild(meta);
-    initTrackIconConfig();
+    initTierOneEventConfig();
   });
 
   beforeEach(() => {
@@ -75,7 +75,7 @@ describe('SessionCard', () => {
     auth.value = { isLoggedIn: true, isRegistered: true, userFirstName: null };
   });
 
-  it('applies the track color from the page-wide track-icon-config', () => {
+  it('applies the track color from the page-wide tier-1-event-config', () => {
     const html = renderCard(UPCOMING_SESSION);
     expect(html).to.include('color:#0066cc');
   });

@@ -30,7 +30,7 @@ import {
 import { massageMetadata } from './date-time-helper.js';
 import { hydrateBlocks, setHydrationPromise } from '../hydrate/hydrate.js';
 import { initSessionState } from './session-store.js';
-import { initTrackIconConfig } from './track-icon-config.js';
+import { initTierOneEventConfig } from './tier-1-event-config.js';
 
 const ICONS_BASE_URL = new URL('../icons/', import.meta.url).href;
 
@@ -1083,10 +1083,11 @@ export function decorateEvent(parent) {
 
   if (!getMetadata('event-id')) return;
 
-  // Bootstraps the page-wide track -> { icon, color } config ahead of any block's own
-  // init(), so any block can call getTrackIcon() regardless of tier. Cheap parse, no
-  // network cost, so unlike initSessionState() below it isn't gated further.
-  initTrackIconConfig();
+  // Bootstraps the page-wide Tier 1 Event Configurator app output (track icons/colors,
+  // allowDoubleBooking, ...) ahead of any block's own init(), so any block can call
+  // getTrackIcon()/getAllowDoubleBooking() regardless of tier. Cheap parse, no network
+  // cost, so unlike initSessionState() below it isn't gated further.
+  initTierOneEventConfig();
 
   // Bootstraps shared, page-level session state (sessions, favorites, scheduled,
   // auth) ahead of any block's own init() — no-ops when rainfocus-api-url isn't authored.

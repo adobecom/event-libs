@@ -9,7 +9,7 @@ import { scheduleWithFeedback, favoriteWithFeedback } from '../../../services/se
 import { IconPlay, IconCalendarCheck, IconCalendarPlus, IconHeartFilled, IconHeartOutline } from './icons.js';
 import { setSessionParam, safeUrl } from '../utils/url.js';
 import { CategoryBadge } from './CategoryBadge.js';
-import { getTrackIcon } from '../../../utils/track-icon-config.js';
+import { getTrackIcon } from '../../../utils/tier-1-event-config.js';
 
 export const buildLiveCard = () => LiveCard;
 

@@ -1,21 +1,28 @@
 import { expect } from '@esm-bundle/chai';
-import { initTrackIconConfig, getTrackIcon } from '../../../event-libs/v1/utils/track-icon-config.js';
+import {
+  initTierOneEventConfig,
+  getTrackIcon,
+  getAllowDoubleBooking,
+} from '../../../event-libs/v1/utils/tier-1-event-config.js';
 
 // video-audio-and-motion's color deliberately differs from its built-in default
-// (#E53935, see track-icon-config.js) so the override test below proves authored
+// (#E53935, see tier-1-event-config.js) so the override test below proves authored
 // config actually takes precedence, rather than merely matching by coincidence.
 const CONFIG = {
-  'Social Media': { icon: 'social-media', color: '#FF6B35' },
-  'video-audio-and-motion': { icon: 'video-audio-and-motion', color: '#000000' },
+  trackIcons: {
+    'Social Media': { icon: 'social-media', color: '#FF6B35' },
+    'video-audio-and-motion': { icon: 'video-audio-and-motion', color: '#000000' },
+  },
+  allowDoubleBooking: true,
 };
 
-describe('track-icon-config', () => {
+describe('tier-1-event-config', () => {
   before(() => {
     const meta = document.createElement('meta');
-    meta.name = 'track-icon-config';
+    meta.name = 'tier-1-event-config';
     meta.content = JSON.stringify(CONFIG);
     document.head.appendChild(meta);
-    initTrackIconConfig();
+    initTierOneEventConfig();
   });
 
   it('resolves an exact Track-name key', () => {
@@ -49,8 +56,13 @@ describe('track-icon-config', () => {
     expect(getTrackIcon(undefined)).to.equal(null);
   });
 
+  it('reads allowDoubleBooking off the same parsed config', () => {
+    expect(getAllowDoubleBooking()).to.equal(true);
+  });
+
   it('is idempotent — a second init() call does not re-parse or clear the config', () => {
-    initTrackIconConfig();
+    initTierOneEventConfig();
     expect(getTrackIcon('Social Media')).to.deep.equal({ icon: 'social-media', color: '#FF6B35' });
+    expect(getAllowDoubleBooking()).to.equal(true);
   });
 });
