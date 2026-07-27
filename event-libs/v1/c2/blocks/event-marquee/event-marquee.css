@@ -25,9 +25,18 @@
   }
 }
 
+/* 913px, confirmed directly from Figma at the 1440px reference width — the
+   "Marquee" frame is 913px tall in *every* state checked, including State B
+   (Text/CTA, no Upcoming Sessions row at all in that frame's own children) and
+   State B.2 (Video, with the Upcoming Sessions row included). Since the height
+   is identical whether or not sessions are attached, this is a fixed height for
+   the block itself, not something to compute conditionally — keeps the page from
+   reflowing when Schedule Maker rotates between states. Post-event (State D) uses
+   a visibly different design per Figma — revisit this value if/when that state is
+   implemented, rather than assuming it also needs 913px. */
 @media (min-width: 1280px) {
   .event-marquee {
-    min-height: 560px;
+    min-height: 913px;
   }
 }
 
