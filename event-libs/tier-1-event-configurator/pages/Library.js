@@ -101,11 +101,8 @@ export default function Library() {
   }, []);
 
   const handleCopyConfig = useCallback(async (row) => {
-    // Minified, not stringifyConfig's pretty-printed multi-line form: DA's metadata
-    // table turns each line of a pasted multi-line value into its own paragraph,
-    // then joins a cell's paragraphs back together with ", " when building the
-    // <meta> tag — silently corrupting multi-line JSON with stray commas at every
-    // line break. A single-line copy avoids the corruption entirely.
+    // Minified, not stringifyConfig's pretty-printed form: DA joins a metadata cell's
+    // multi-line content back with ", ", corrupting multi-line JSON with stray commas.
     const ok = await copyTextToClipboard(JSON.stringify(row.config));
     if (ok) setToastSuccess(`Copied config for ${getDisplayTitle(row)}`);
     else setToastError('Could not copy config — copy it manually from the editor instead');
