@@ -833,7 +833,7 @@ describe('Events Form', () => {
       return form;
     }
 
-    it('registers a guest via the normal attendee flow, authenticating with the rsvp-token header', async () => {
+    it('registers a guest via the normal attendee flow, sending both the IMS token and the rsvp-token header', async () => {
       BlockMediator.set('imsProfile', { account_type: 'guest', rsvpToken: 'valid-rsvp-token-1234567890' });
       const fetchStub = sandbox.stub(window, 'fetch');
       fetchStub.onCall(0).resolves({ json: () => ({ eventId: 'test-event-id', isFull: false }), ok: true });
@@ -851,9 +851,9 @@ describe('Events Form', () => {
       const createOptions = fetchStub.getCall(1).args[1];
       const addToEventOptions = fetchStub.getCall(2).args[1];
       expect(createOptions.headers.get('x-adobe-esp-rsvp-token')).to.equal('valid-rsvp-token-1234567890');
-      expect(createOptions.headers.has('Authorization')).to.be.false;
+      expect(createOptions.headers.get('Authorization')).to.equal('Bearer fake-token');
       expect(addToEventOptions.headers.get('x-adobe-esp-rsvp-token')).to.equal('valid-rsvp-token-1234567890');
-      expect(addToEventOptions.headers.has('Authorization')).to.be.false;
+      expect(addToEventOptions.headers.get('Authorization')).to.equal('Bearer fake-token');
     });
 
     it('forwards a routed campaign in the body of the add-to-event call — same body schema as the normal attendee flow', async () => {

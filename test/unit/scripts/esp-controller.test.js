@@ -147,7 +147,7 @@ describe('Adobe Event Service API', () => {
       expect(error.ok).to.be.false;
     });
 
-    it('should authenticate via the rsvp-token header (and omit Authorization) when a token is passed', async () => {
+    it('should send both the IMS token and the rsvp-token header when a token is passed', async () => {
       window.adobeIMS = { getAccessToken: () => ({ token: 'fake-token' }) };
       const fetchStub = sandbox.stub(window, 'fetch').resolves({ json: () => ({}), ok: true });
 
@@ -155,10 +155,10 @@ describe('Adobe Event Service API', () => {
 
       const options = fetchStub.firstCall.args[1];
       expect(options.headers.get('x-adobe-esp-rsvp-token')).to.equal('tok-1');
-      expect(options.headers.has('Authorization')).to.be.false;
+      expect(options.headers.get('Authorization')).to.equal('Bearer fake-token');
     });
 
-    it('should authenticate via IMS (and omit the rsvp-token header) when no token is passed', async () => {
+    it('should omit the rsvp-token header when no token is passed, and still authenticate via IMS', async () => {
       window.adobeIMS = { getAccessToken: () => ({ token: 'fake-token' }) };
       const fetchStub = sandbox.stub(window, 'fetch').resolves({ json: () => ({}), ok: true });
 
@@ -167,6 +167,17 @@ describe('Adobe Event Service API', () => {
       const options = fetchStub.firstCall.args[1];
       expect(options.headers.get('Authorization')).to.equal('Bearer fake-token');
       expect(options.headers.has('x-adobe-esp-rsvp-token')).to.be.false;
+    });
+
+    it('should degrade gracefully (no throw, no Authorization) when a token is passed with no IMS session', async () => {
+      delete window.adobeIMS;
+      const fetchStub = sandbox.stub(window, 'fetch').resolves({ json: () => ({}), ok: true });
+
+      await api.createAttendee({ name: 'John Doe' }, 'tok-1');
+
+      const options = fetchStub.firstCall.args[1];
+      expect(options.headers.get('x-adobe-esp-rsvp-token')).to.equal('tok-1');
+      expect(options.headers.has('Authorization')).to.be.false;
     });
   });
 
@@ -186,7 +197,7 @@ describe('Adobe Event Service API', () => {
       expect(error.ok).to.be.false;
     });
 
-    it('should authenticate via the rsvp-token header (and omit Authorization) when a token is passed', async () => {
+    it('should send both the IMS token and the rsvp-token header when a token is passed', async () => {
       window.adobeIMS = { getAccessToken: () => ({ token: 'fake-token' }) };
       const fetchStub = sandbox.stub(window, 'fetch').resolves({ json: () => ({}), ok: true });
 
@@ -194,10 +205,10 @@ describe('Adobe Event Service API', () => {
 
       const options = fetchStub.firstCall.args[1];
       expect(options.headers.get('x-adobe-esp-rsvp-token')).to.equal('tok-1');
-      expect(options.headers.has('Authorization')).to.be.false;
+      expect(options.headers.get('Authorization')).to.equal('Bearer fake-token');
     });
 
-    it('should authenticate via IMS (and omit the rsvp-token header) when no token is passed', async () => {
+    it('should omit the rsvp-token header when no token is passed, and still authenticate via IMS', async () => {
       window.adobeIMS = { getAccessToken: () => ({ token: 'fake-token' }) };
       const fetchStub = sandbox.stub(window, 'fetch').resolves({ json: () => ({}), ok: true });
 
@@ -206,6 +217,17 @@ describe('Adobe Event Service API', () => {
       const options = fetchStub.firstCall.args[1];
       expect(options.headers.get('Authorization')).to.equal('Bearer fake-token');
       expect(options.headers.has('x-adobe-esp-rsvp-token')).to.be.false;
+    });
+
+    it('should degrade gracefully (no throw, no Authorization) when a token is passed with no IMS session', async () => {
+      delete window.adobeIMS;
+      const fetchStub = sandbox.stub(window, 'fetch').resolves({ json: () => ({}), ok: true });
+
+      await api.addAttendeeToEvent('123', { name: 'John Doe' }, 'tok-1');
+
+      const options = fetchStub.firstCall.args[1];
+      expect(options.headers.get('x-adobe-esp-rsvp-token')).to.equal('tok-1');
+      expect(options.headers.has('Authorization')).to.be.false;
     });
   });
 

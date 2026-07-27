@@ -73,11 +73,11 @@ export async function constructRequestOptions(method, body = null, waitForIMS = 
   }
 
   const headers = new Headers();
-  // skipAuth is for genuinely public/guest-token-authenticated endpoints: never attach
-  // the caller's own IMS identity, even if one happens to be signed in (an assistant
-  // registering on a VIP's behalf must stay anonymous to the backend). The override
-  // takes precedence over window.adobeIMS for callers with no IMS bootstrap at all
-  // (e.g. the standalone tier-1-event-configurator DA app).
+  // skipAuth suppresses the caller's IMS identity entirely — used only by
+  // validateRsvpToken's load-time check, which authenticates solely via the
+  // rsvp-token header and runs before there's necessarily any IMS session to read.
+  // The override takes precedence over window.adobeIMS for callers with no IMS
+  // bootstrap at all (e.g. the standalone tier-1-event-configurator DA app).
   const authToken = skipAuth ? null : (espAuthTokenOverride || window.adobeIMS?.getAccessToken()?.token);
 
   if (authToken) headers.append('Authorization', `Bearer ${authToken}`);
@@ -321,10 +321,14 @@ export async function createAttendee(attendeeData, rsvpToken = null) {
   const eventServiceEnv = getEventServiceEnv();
   const { serviceApiEndpoints } = ENV_MAP[eventServiceEnv.name];
   const raw = JSON.stringify(attendeeData);
-  // A guest registering via an rsvp token has no IMS session — skip waiting for
-  // one and never attach a signed-in caller's own token, so the request stays
-  // anonymous and authenticates solely via the rsvp-token header instead.
-  const options = await constructRequestOptions('POST', raw, !rsvpToken, !!rsvpToken, rsvpToken);
+  // The backend derives the attendee identity from the IMS token itself (a guest
+  // token maps to attendeeId = the email in the body, with isGuest set), so this
+  // still needs the IMS access token even when an rsvp token is also present —
+  // the rsvp-token header alone isn't enough to authenticate this endpoint.
+  if (rsvpToken && !window.adobeIMS?.getAccessToken()?.token) {
+    window.lana?.log('createAttendee: rsvp-token registration submitted with no IMS access token — the backend will reject this request', { tags: 'events-esp-controller', severity: 'warning' });
+  }
+  const options = await constructRequestOptions('POST', raw, true, false, rsvpToken);
 
   try {
     const response = await fetch(`${serviceApiEndpoints.esl}/v1/attendees`, options);
@@ -348,9 +352,10 @@ export async function addAttendeeToEvent(eventId, attendee, rsvpToken = null) {
   const eventServiceEnv = getEventServiceEnv();
   const { serviceApiEndpoints } = ENV_MAP[eventServiceEnv.name];
   const raw = JSON.stringify(attendee);
-  // Same anonymous-guest handling as createAttendee above. This call also
-  // consumes the rsvp token server-side once the registration succeeds.
-  const options = await constructRequestOptions('POST', raw, !rsvpToken, !!rsvpToken, rsvpToken);
+  // Same identity handling as createAttendee above — the IMS token is required
+  // for the backend to resolve who this is. This call also consumes the rsvp
+  // token server-side once the registration succeeds.
+  const options = await constructRequestOptions('POST', raw, true, false, rsvpToken);
 
   try {
     const response = await fetch(`${serviceApiEndpoints.esl}/v1/events/${eventId}/attendees/${attendee.attendeeId}`, options);
