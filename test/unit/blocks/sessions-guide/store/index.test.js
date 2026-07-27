@@ -5,7 +5,6 @@ import { auth } from '../../../../../event-libs/v1/utils/session-store.js';
 const MOCK_CONFIG = {
   title: 'Adobe MAX 2026',
   userTz: 'America/Los_Angeles',
-  showConflictModal: true,
   filterCategories: [],
   theme: 'dark',
 };

@@ -9,7 +9,7 @@ import { deriveSessionState, getNowMs } from '../../utils/session-state.js';
 // Reference implementation for SHARED-STATE-USAGE.md's vanilla-JS pattern — reads the
 // page-level session-store signals and mutates them through action-feedback.js, with
 // no Preact dependency. Not authored on any real event page.
-const DEMO_EVENT_CONFIG = { registerUrl: '/register', showConflictModal: false };
+const DEMO_EVENT_CONFIG = { registerUrl: '/register' };
 
 function renderRow(parent, label) {
   const row = createTag('p', { class: 'session-state-demo__row' }, '', { parent });

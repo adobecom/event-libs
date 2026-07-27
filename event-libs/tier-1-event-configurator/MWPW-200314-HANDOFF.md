@@ -33,12 +33,13 @@ Consumers updated (imports of the renamed file): `CategoryBadge.js`,
 — the actual current importers (`parse-config.js` and `LiveUpcomingView.js`
 were listed above but don't import this module).
 
-## 2. Wire `allowDoubleBooking`
+## 2. Wire `allowDoubleBooking` — done 2026-07-27
 
-Read `tier-1-event-config.allowDoubleBooking` (via the new singleton's
-`getAllowDoubleBooking()`) and drive `session-actions.js`'s `scheduleAction`
-`showConflictModal` param from it — one shared, page-level, event-wide read,
-not a per-block setting.
+`action-feedback.js`'s `scheduleWithFeedback` now derives `scheduleAction`'s
+`showConflictModal` param from `getAllowDoubleBooking()` (the item 1
+singleton) instead of `eventConfig.showConflictModal` — one shared,
+page-level, event-wide read, not a per-block setting. Inverted, since
+allowing double booking means suppressing the conflict modal.
 
 **Retire sessions-guide's per-block `show-conflict-modal` table row**
 (`parse-config.js:27`) as part of this — it's superseded, not kept as a
@@ -51,7 +52,10 @@ authoring `show-conflict-modal: true` to worry about migrating. **What
 actually matters instead: make sure the new/updated logic reads from
 `tier-1-event-config` (this app's output), not the old per-block
 `show-conflict-modal` config shape.** That's the real migration here, not a
-legacy-flag cleanup.
+legacy-flag cleanup. Removed `parse-config.js`'s `show-conflict-modal` case
+and default entirely, plus the row from `sessions-guide`'s demo/mock
+authoring fixtures and the now-meaningless `showConflictModal` filler field
+from unrelated component test mocks.
 
 **`sessions-hub.js` is explicitly OUT of scope, by design, not a gap.** It
 has its own entirely independent scheduling/conflict flow
@@ -107,9 +111,12 @@ just flagged as a cheap addition once the field exists.
 - [ ] A page with only the legacy standalone `track-icon-config` key still
       renders correct icons/colors (fallback verified independently of this
       app).
-- [ ] Allow double booking shows the conflict modal consistently across
+- [x] Allow double booking shows the conflict modal consistently across
       Tier 1 scheduling surfaces (today: sessions-guide only —
-      `sessions-hub` intentionally not wired).
+      `sessions-hub` intentionally not wired). Covered by
+      `action-feedback.test.js`/`action-feedback-allow-double-booking.test.js`;
+      real DA-page verification still pending (needs a page with
+      `tier-1-event-config.allowDoubleBooking` authored via the app).
 - [ ] A featured session shows on whichever day it actually falls on in
       `LiveUpcomingView` for each viewer; reordering the authored
       `featuredSessions` array actually changes carousel order (verifies

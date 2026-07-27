@@ -12,7 +12,6 @@ const DEFAULT_FILTER_CATEGORIES = [
 export function parseSessionsGuideConfig(el, { logPrefix, forcedSurface } = {}) {
   const config = {
     title: '',
-    showConflictModal: false,
     filterCategories: DEFAULT_FILTER_CATEGORIES,
     featuredSessionIds: [],
     theme: null,
@@ -24,7 +23,6 @@ export function parseSessionsGuideConfig(el, { logPrefix, forcedSurface } = {}) 
     if (!key || val === undefined) return;
     switch (key) {
       case 'event-title': config.title = val; break;
-      case 'show-conflict-modal': config.showConflictModal = val.toLowerCase() === 'true'; break;
       case 'theme': if (val) config.theme = val; break;
       case 'filter-categories':
         try { config.filterCategories = JSON.parse(val); } catch {

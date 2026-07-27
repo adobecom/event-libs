@@ -8,7 +8,6 @@ const BASE_CONFIG = {
   surface: 'page',
   rfApiUrl: '',
   rfApiProfileId: '',
-  showConflictModal: false,
   filterCategories: [],
   mrEnv: 'dev',
   theme: 'dark',

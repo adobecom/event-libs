@@ -41,7 +41,7 @@ const PAST_SESSION = {
 
 const BASE_CONFIG = {
   userTz: 'America/Los_Angeles', surface: 'page',
-  title: '', showConflictModal: false, filterCategories: [], theme: 'dark',
+  title: '', filterCategories: [], theme: 'dark',
 };
 
 function makeStore({

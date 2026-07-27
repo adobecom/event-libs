@@ -11,7 +11,6 @@ const BASE_CONFIG = {
   title: 'Adobe MAX 2026',
   userTz: 'America/Los_Angeles',
   surface: 'page',
-  showConflictModal: false,
   filterCategories: [],
   theme: 'dark',
 };

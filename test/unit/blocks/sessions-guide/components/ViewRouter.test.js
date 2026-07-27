@@ -9,7 +9,7 @@ import {
 const BASE_CONFIG = {
   userTz: 'America/Los_Angeles', surface: 'page',
   title: '',
-  showConflictModal: false, filterCategories: [], theme: 'dark',
+  filterCategories: [], theme: 'dark',
 };
 
 function makeStore(activeView, extraState = {}) {
