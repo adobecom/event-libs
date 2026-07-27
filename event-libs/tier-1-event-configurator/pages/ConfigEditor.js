@@ -76,7 +76,12 @@ export default function ConfigEditor() {
   };
 
   const handleCopy = async () => {
-    const ok = await copyTextToClipboard(configPreview);
+    // Minified, not configPreview's pretty-printed multi-line form: DA's metadata
+    // table turns each line of a pasted multi-line value into its own paragraph,
+    // then joins a cell's paragraphs back together with ", " when building the
+    // <meta> tag — silently corrupting multi-line JSON with stray commas at every
+    // line break. A single-line copy avoids the corruption entirely.
+    const ok = await copyTextToClipboard(JSON.stringify(activeConfig.config));
     if (ok) setToastSuccess('Config copied — paste it into the page\'s tier-1-event-config metadata');
     else setToastError('Could not copy config — select and copy the JSON block manually');
   };

@@ -7,7 +7,7 @@ import { useNavigation } from '../context/NavigationContext.js';
 import { useConfigs } from '../context/ConfigsContext.js';
 import { useEventEnv } from '../context/EventEnvContext.js';
 import {
-  copyTextToClipboard, formatUpdatedTime, getDisplayTitle, stringifyConfig,
+  copyTextToClipboard, formatUpdatedTime, getDisplayTitle,
 } from '../utils.js';
 import { EVENT_BROWSE_ENABLED } from '../constants.js';
 
@@ -101,7 +101,12 @@ export default function Library() {
   }, []);
 
   const handleCopyConfig = useCallback(async (row) => {
-    const ok = await copyTextToClipboard(stringifyConfig(row.config));
+    // Minified, not stringifyConfig's pretty-printed multi-line form: DA's metadata
+    // table turns each line of a pasted multi-line value into its own paragraph,
+    // then joins a cell's paragraphs back together with ", " when building the
+    // <meta> tag — silently corrupting multi-line JSON with stray commas at every
+    // line break. A single-line copy avoids the corruption entirely.
+    const ok = await copyTextToClipboard(JSON.stringify(row.config));
     if (ok) setToastSuccess(`Copied config for ${getDisplayTitle(row)}`);
     else setToastError('Could not copy config — copy it manually from the editor instead');
   }, [setToastSuccess, setToastError]);
