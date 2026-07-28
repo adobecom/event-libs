@@ -67,28 +67,33 @@ whole config system (and MWPW-200314) is specifically Tier 1 (MAX,
 Summit-scale events). Don't wire it in as a side effect of this work without
 a separate, deliberate decision to do so.
 
-## 3. Featured sessions — bigger than "wire an existing read"
+## 3. Featured sessions — done 2026-07-27
 
-- **Fix `getFeaturedSessions` to iterate `featuredSessions` in *authored*
-  order, not filter the day's catalog order.** As it stands today it does
-  something like `sessionsForDay(...).filter((s) => idSet.has(s.id))` —
-  that's the catalog's order, not the author's. This app's
-  `FeaturedSessionsEditor.js` reorder UI (drag-and-drop + keyboard) has no
-  visible effect on real display order until this is fixed.
-- **Add a new function reading the *same* `featuredSessions` array for
-  `OnDemandView.js`** — ID-membership only, authored order, **no
-  day-scoping** (`getFeaturedSessions`'s `activeDay` requirement doesn't
-  apply to on-demand content at all).
-- **Build a new featured-carousel section in `OnDemandView.js`** — doesn't
-  exist there today. Mirror `LiveUpcomingView.js`'s
-  `<Carousel variant="featured">` pattern.
-- `featuredSessions` is a single flat array of session IDs — no day-keying,
-  no `duringEvent`/`postEvent` split. `LiveUpcomingView` filters it down to
-  whatever's relevant for the active day (existing `sessionsForDay`
-  day-intersection logic, once the order fix above lands);
-  `OnDemandView`'s new function filters it with no day-scoping. Same
-  authored list, two views, each applying its own natural filter — a
-  session is never authored twice to be featured in both places.
+- **Fixed `getFeaturedSessions` to iterate `featuredSessions` in *authored*
+  order.** It used to do `sessionsForDay(...).filter((s) => idSet.has(s.id))`
+  — the catalog's order, not the author's. Now builds a `Map` keyed by day
+  session id and maps `featuredIds` through it, so `FeaturedSessionsEditor.js`'s
+  reorder UI actually affects real display order.
+- **Added `getOnDemandFeaturedSessions(sessions, featuredIds)`** to
+  `session-filters.js` — same authored array, same order, but ID-membership
+  only, **no day-scoping**, and (unlike the live view) no deterministic-shuffle
+  fallback: nothing authored means nothing shown, since on-demand content
+  isn't tied to a single event day the way the live carousel needs to fill
+  dead space.
+- **Built a new featured-carousel section in `OnDemandView.js`**, mirroring
+  `LiveUpcomingView.js`'s `<Carousel variant="featured">` pattern. Reads from
+  `onDemandRaw` (all on-demand sessions), not the viewer's filtered
+  `available` list — featured is a curated highlight reel, not something the
+  viewer's search/filter selections should be able to hide.
+- **Both `getFeaturedSessions`/`getOnDemandFeaturedSessions` now read
+  `getFeaturedSessionIds()`** — a new getter added to the `tier-1-event-config.js`
+  singleton (`tierOneEventConfig.featuredSessions || []`), per item 1's own
+  anticipated Phase 3 addition.
+- **Retired sessions-guide's old per-block `featured-sessions` authoring
+  row** (`parse-config.js`) in favor of the page-level source, same call as
+  item 2 made for `show-conflict-modal` — confirmed with Daniel rather than
+  assumed, since this handoff's original text didn't say so explicitly.
+  `LiveUpcomingView.js` no longer reads `eventConfig.featuredSessionIds`.
 
 ## 4. Optional, cheap, high-value: self-verification against a mispasted config
 
@@ -117,11 +122,16 @@ just flagged as a cheap addition once the field exists.
       `action-feedback.test.js`/`action-feedback-allow-double-booking.test.js`;
       real DA-page verification still pending (needs a page with
       `tier-1-event-config.allowDoubleBooking` authored via the app).
-- [ ] A featured session shows on whichever day it actually falls on in
+- [x] A featured session shows on whichever day it actually falls on in
       `LiveUpcomingView` for each viewer; reordering the authored
       `featuredSessions` array actually changes carousel order (verifies
       the `getFeaturedSessions` order fix); `OnDemandView.js` renders a
       featured carousel reading the same array where none exists today.
+      Order-correctness covered directly in `session-filters.test.js`;
+      component-level wiring covered in
+      `LiveUpcomingView-featured.test.js`/`OnDemandView-featured.test.js`.
+      Real DA-page verification still pending (needs a page with
+      `tier-1-event-config.featuredSessions` authored via the app).
 - [ ] Pasting a `Config` whose `eventId` doesn't match the page's own
       `event-id` metadata is at least visible/detectable in the data (full
       warning logic is item 4 above, optional).

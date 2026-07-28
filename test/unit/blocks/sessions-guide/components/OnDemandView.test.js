@@ -82,4 +82,10 @@ describe('OnDemandView', () => {
     const html = View({});
     expect(html).to.include('sg-time-row__cards');
   });
+
+  it('does not show a featured carousel when no featuredSessions are authored', () => {
+    const store = makeStore([PAST_DESIGN, PAST_VIDEO]);
+    const View = buildOnDemandView(preact, store);
+    expect(View({})).to.not.include('sg-carousel-section--featured');
+  });
 });

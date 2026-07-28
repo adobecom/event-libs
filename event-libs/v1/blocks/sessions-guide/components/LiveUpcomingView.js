@@ -10,6 +10,7 @@ import {
   sessionsForDay,
 } from '../utils/session-filters.js';
 import { getNowMs, formatShortTime, formatTimezoneAbbr } from '../utils/time.js';
+import { getFeaturedSessionIds } from '../../../utils/tier-1-event-config.js';
 
 export const buildLiveUpcomingView = () => LiveUpcomingView;
 
@@ -20,7 +21,7 @@ export function LiveUpcomingView() {
   const liveStreamActiveIds = liveStreamActiveIdsSignal.value;
   const activeFilters = state.activeFilters || {};
   const searchQuery = state.searchQuery || '';
-  const { userTz, featuredSessionIds } = eventConfig;
+  const { userTz } = eventConfig;
   // Read purely to establish a re-render dependency on time-driven session-state
   // transitions (see sessionStateVersion in session-store.js) — value itself is unused.
   // eslint-disable-next-line no-unused-expressions
@@ -33,7 +34,7 @@ export function LiveUpcomingView() {
 
   // Featured sessions fill the live carousel when nothing is currently live
   const featured = live.length === 0
-    ? getFeaturedSessions(sessions, featuredSessionIds || [], activeDay, userTz)
+    ? getFeaturedSessions(sessions, getFeaturedSessionIds(), activeDay, userTz)
     : [];
 
   // Upcoming sessions have filters + search applied

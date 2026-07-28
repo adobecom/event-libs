@@ -81,4 +81,12 @@ describe('LiveUpcomingView', () => {
     const View = buildLiveUpcomingView(preact, store);
     expect(View({})).to.include('sg-time-row');
   });
+
+  it('does not show a featured carousel when no featuredSessions are authored and nothing to fall back to', () => {
+    // No sessions at all — unlike the authored case, there's nothing for the
+    // deterministic-shuffle fallback (see getFeaturedSessions) to fill dead space with.
+    const store = makeStore([]);
+    const View = buildLiveUpcomingView(preact, store);
+    expect(View({})).to.not.include('sg-carousel-section--featured');
+  });
 });

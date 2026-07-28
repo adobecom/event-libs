@@ -1,9 +1,8 @@
 import { detectUserTimezone } from './time.js';
 
 // Shared by sessions-guide.js and sessions-guide-full-page.js so authoring-table keys
-// only need to be handled in one place — previously duplicated per-file, which let
-// sessions-guide-full-page.js's copy silently drift out of sync (missing the
-// 'featured-sessions' case sessions-guide.js already supported).
+// only need to be handled in one place — previously duplicated per-file, which let the
+// two copies silently drift out of sync.
 const DEFAULT_FILTER_CATEGORIES = [
   { id: 'track', label: 'Channel' },
   { id: 'type', label: 'Session Type' },
@@ -13,7 +12,6 @@ export function parseSessionsGuideConfig(el, { logPrefix, forcedSurface } = {}) 
   const config = {
     title: '',
     filterCategories: DEFAULT_FILTER_CATEGORIES,
-    featuredSessionIds: [],
     theme: null,
   };
   [...el.querySelectorAll(':scope > div')].forEach((row) => {
@@ -27,11 +25,6 @@ export function parseSessionsGuideConfig(el, { logPrefix, forcedSurface } = {}) 
       case 'filter-categories':
         try { config.filterCategories = JSON.parse(val); } catch {
           window.lana?.log(`[${logPrefix}] invalid filter-categories JSON`);
-        }
-        break;
-      case 'featured-sessions':
-        try { config.featuredSessionIds = JSON.parse(val); } catch {
-          window.lana?.log(`[${logPrefix}] invalid featured-sessions JSON`);
         }
         break;
       default: break;

@@ -3,6 +3,7 @@ import {
   initTierOneEventConfig,
   getTrackIcon,
   getAllowDoubleBooking,
+  getFeaturedSessionIds,
 } from '../../../event-libs/v1/utils/tier-1-event-config.js';
 
 describe('tier-1-event-config (malformed JSON)', () => {
@@ -30,5 +31,9 @@ describe('tier-1-event-config (malformed JSON)', () => {
 
   it('defaults allowDoubleBooking to false when config failed to parse', () => {
     expect(getAllowDoubleBooking()).to.equal(false);
+  });
+
+  it('defaults featuredSessions to an empty array when config failed to parse', () => {
+    expect(getFeaturedSessionIds()).to.deep.equal([]);
   });
 });

@@ -61,3 +61,7 @@ export function getTrackIcon(trackName) {
 export function getAllowDoubleBooking() {
   return !!tierOneEventConfig.allowDoubleBooking;
 }
+
+export function getFeaturedSessionIds() {
+  return tierOneEventConfig.featuredSessions || [];
+}
