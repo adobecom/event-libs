@@ -109,12 +109,15 @@ with no page `event-id` at all).
 
 (mirrors `PLAN.md`'s own test-plan section, consuming-side subset only)
 
-- [ ] `tier-1-event-config.trackIcons`/`getAllowDoubleBooking()`/featured-
+- [x] `tier-1-event-config.trackIcons`/`getAllowDoubleBooking()`/featured-
       sessions all read correctly off one shared `getMetadata('tier-1-event-config')`
-      parse, not three separate reads.
-- [ ] A page with only the legacy standalone `track-icon-config` key still
+      parse, not three separate reads. Covered by
+      `tier-1-event-config.test.js`/`-invalid.test.js`/`-retry.test.js`.
+- [x] ~~A page with only the legacy standalone `track-icon-config` key still
       renders correct icons/colors (fallback verified independently of this
-      app).
+      app).~~ **N/A — resolved 2026-07-27, per Daniel: no legacy-key fallback
+      implemented at all** (see item 1). No live pages author either key, so
+      there's nothing to verify here.
 - [x] Allow double booking shows the conflict modal consistently across
       Tier 1 scheduling surfaces (today: sessions-guide only —
       `sessions-hub` intentionally not wired). Covered by
