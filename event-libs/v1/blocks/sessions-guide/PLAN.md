@@ -91,7 +91,7 @@ The block's own components (and any other block) read `auth.value` directly — 
 Real FEDS token (`getFedsToken()`) and RF credential wiring are implemented but not yet activated — Rainfocus service methods currently return mock data.
 
 ### Timezone
-All session times come from the event API in UTC. `detectUserTimezone()` detects the user's timezone via `Intl.DateTimeFormat().resolvedOptions().timeZone` at init and stores it as `eventConfig.userTz`. Cards and overlays read `userTz` from context. A `?serverTime=<ms>` URL parameter lets `getNowMs()` simulate landing on the page at a specific instant — time then keeps advancing from there at the real clock's rate, rather than freezing forever, matching the same-named parameter's semantics in `features/timing-framework`.
+All session times come from the event API in UTC. `detectUserTimezone()` detects the user's timezone via `Intl.DateTimeFormat().resolvedOptions().timeZone` at init and stores it as `guideConfig.userTz`. Cards and overlays read `userTz` from context. A `?serverTime=<ms>` URL parameter lets `getNowMs()` simulate landing on the page at a specific instant — time then keeps advancing from there at the real clock's rate, rather than freezing forever, matching the same-named parameter's semantics in `features/timing-framework`.
 
 ### User registration states
 Three distinct states drive the UI:
@@ -149,7 +149,9 @@ SessionsGuideBlock (init entry point — sessions-guide.js)
 Toast and the schedule-conflict modal are **not** part of this tree anymore — they're page-level singletons mounted directly to `document.body` by `event-libs/v1/features/toast/toast.js`/`features/conflict-modal/conflict-modal.js` (via `initSessionState()`), independent of whether this block is on the page at all.
 
 ### Shared utility components
-- `CategoryBadge` — renders category icon + label; color driven by `eventConfig.categoryColors`
+- `CategoryBadge` — renders category icon + label; color driven by `getTrackIcon()`
+  (`event-libs/v1/utils/tier-1-event-config.js`, the Tier 1 Event Configurator app's
+  page-level output — see `MWPW-200314-HANDOFF.md`)
 - `IconButton` — S2A icon-only button (solid/outlined/transparent variants, on-light/on-dark contexts)
 - `icons.js` — SVG icon functions: `IconPlay`, `IconCalendarCheck`, `IconCalendarPlus`, `IconHeartFilled`, `IconHeartOutline`
 
@@ -194,7 +196,7 @@ State is split across two modules — shared signals (readable by any block) and
   searchQuery: string,
   mySessionsTab: 'upcoming' | 'on-demand',
   myFavoritesTab: 'upcoming' | 'on-demand',
-  eventConfig: EventConfig,
+  guideConfig: GuideConfig,
   activeSessionId: string | null,    // id of session shown in detail overlay (widget only)
   dismissingIds: Set<string>,        // session IDs currently animating out of My Sessions/My Favorites
   regPromptOpen: boolean,            // drives modal RegistrationPrompt (from App-level gating)
@@ -231,15 +233,21 @@ interface Session {
   copyrightDisclaimer?: string;
 }
 
-interface EventConfig {
+// This block's own per-instance authoring config, parsed by parse-config.js's
+// parseSessionsGuideConfig(). Named GuideConfig (not EventConfig) to stay distinct
+// from utils.js's page-wide getEventConfig() and the Tier 1 Event Configurator's
+// tier-1-event-config.js singleton — see MWPW-200314-HANDOFF.md item 1.
+//
+// showConflictModal, trackIcons/trackColors/categoryColors, and featuredSessionIds
+// used to live here but were retired (MWPW-200314 items 2/3): allow-double-booking,
+// track icons/colors, and featured sessions are now page-level settings authored
+// once via the Tier 1 Event Configurator app and read through
+// event-libs/v1/utils/tier-1-event-config.js's getAllowDoubleBooking()/
+// getTrackIcon()/getFeaturedSessionIds() — not block-instance config.
+interface GuideConfig {
   title: string;                 // event display name; authored as 'event-title'
   registerUrl: string;           // registration CTA URL; sourced from session-store's apiConfig (page metadata), default '/register'
-  showConflictModal: boolean;
   filterCategories: FilterCategory[];  // [{ id, label }]; id maps to session property
-  trackIcons: Record<string, string>;  // track label → icon URL
-  trackColors: Record<string, string>; // track label → CSS color
-  categoryColors: Record<string, string>; // category key → CSS color (for CategoryBadge)
-  featuredSessionIds: string[];  // session IDs for featured carousel; falls back to deterministic random
   theme: 'light' | 'dark';      // default: widget='dark', page='light'
   surface: 'widget' | 'page';   // set from el.classList.contains('page')
   userTz: string;               // detected at init via detectUserTimezone()
@@ -290,17 +298,25 @@ The live→on-demand auto-transition (`allEnded || pastManualCutoff` while `acti
 - Dev seeding (`sg:dev-auth`, `sessions:scheduled`, `sessions:favorited` in localStorage) now lives inside `session-store.js`'s `initSessionState()`, not in this block's `init()` — see Phase 0.3 (TODO: remove once real IMS/Rainfocus auth is wired up)
 
 ### 0.2 Config parsing ✅
-`parseConfig(el)` reads the authoring table (standard Milo block format) into `eventConfig` — presentational/per-instance config only:
-- `event-title`, `show-conflict-modal` (boolean)
+`parseSessionsGuideConfig(el)` (in `utils/parse-config.js`) reads the authoring table
+(standard Milo block format) into `guideConfig` — presentational/per-instance config
+only:
+- `event-title`
 - `filter-categories` (JSON: `[{ id, label }]`)
-- `track-icons` (JSON map), `track-colors` (JSON map), `category-colors` (JSON map)
 - `theme` (`light` | `dark`; defaults: widget=`'dark'`, page=`'light'`)
-- `featured-sessions` (JSON array of session IDs)
 - `surface` derived from `el.classList.contains('page')`
 - `userTz` set via `detectUserTimezone()`
-- `registerUrl` is **not** authored here — it's merged in from `getApiConfig()` (see below) after `parseConfig()` runs
+- `registerUrl` is **not** authored here — it's merged in from `getApiConfig()` (see below) after `parseSessionsGuideConfig()` runs
 
 `rainfocus-api-url`, `rainfocus-api-profile-id`, `register-url`, and `manual-on-demand-transition-time` moved to **page metadata** (read by `session-store.js`, not this block) since they gate data other blocks need too, not just this widget's presentation. See `REAL-API-CHECKLIST.md` for the current metadata keys.
+
+**`show-conflict-modal`, `track-icons`/`track-colors`/`category-colors`, and
+`featured-sessions` used to be per-block authoring rows here — retired
+(`MWPW-200314` items 2/3).** Allow-double-booking, track icons/colors, and featured
+sessions are now page-level settings authored once via the Tier 1 Event Configurator
+app and read through `event-libs/v1/utils/tier-1-event-config.js`'s
+`getAllowDoubleBooking()`/`getTrackIcon()`/`getFeaturedSessionIds()` — see
+`MWPW-200314-HANDOFF.md` for the full history.
 
 ### 0.3 Data layer ✅ (mocked)
 All service files exist and export the correct API surface; all currently return mock data. They live in `event-libs/v1/services/sessions/` (promoted out of this block so the shared `session-store.js` — which owns fetching/polling/mutations — doesn't have to import from inside another block's folder):
@@ -326,7 +342,7 @@ All service files exist and export the correct API surface; all currently return
 - `scheduleSession(session)` / `favoriteSession(session)` — mutators that call the RF API and update the signals + localStorage
 
 **`store/index.js`** (block-local) exports:
-- `buildInitialState(eventConfig)` — initializes this block's UI-only state; reads `auth.value.isRegistered` for the initial `activeView`
+- `buildInitialState(guideConfig)` — initializes this block's UI-only state; reads `auth.value.isRegistered` for the initial `activeView`
 - `reducer(state, action)` — handles the UI-only action types listed above
 - `SessionGuideContext` — the Preact context object (also exposed as `SessionGuideContext._current` for direct useContext compatibility workaround)
 - `SessionGuideProvider` — wraps the app; watches the shared signals via `useEffect` to derive `eventDays` and the on-demand auto-transition, but no longer owns fetching, polling, auth sync, or persistence
@@ -376,7 +392,7 @@ Real FEDS token (`getFedsToken()`) and RF credential wiring: `services/sessions/
 ```javascript
 const surface = el.classList.contains('page') ? 'page' : 'widget';
 ```
-`surface` is stored in `eventConfig` and drives the `App` branch between `<DrawerShell>` and `<FullPageShell>`.
+`surface` is stored in `guideConfig` and drives the `App` branch between `<DrawerShell>` and `<FullPageShell>`.
 
 ### 1.2 Portal architecture (widget only) ✅
 The widget mounts into `<div class="sg-portal">` appended to `document.body`. The `.sessions-guide.widget` block element is cleared (`el.innerHTML = ''`) and serves as an invisible mount point.
@@ -450,7 +466,7 @@ Breakpoint at 1280 px: CTA goes to `peek` on wide, directly to `expanded` on nar
 
 **Context over props:** cards read all shared state from `useSessionGuide()`. Only `session` (and sometimes `forceOnDemand`) is passed as a prop.
 
-**`userTz` source:** read from `eventConfig.userTz` via context.
+**`userTz` source:** read from `guideConfig.userTz` via context.
 
 ### 2.1 SessionCard component ✅
 - `session` prop required; `forceOnDemand` prop (boolean, default false) forces on-demand display for previously-aired sessions
@@ -585,7 +601,7 @@ No longer a Preact component — `mountToast()` builds the toast element once vi
 
 ### 4.6 RegistrationPrompt component ✅
 - `isLoggedIn === false` → "Sign in and register" + `window.adobeIMS?.signIn()` button
-- Else (logged in, not registered) → "Register for the event" + `<a href="/register">` (register URL from eventConfig)
+- Else (logged in, not registered) → "Register for the event" + `<a href="/register">` (hardcoded `/register`, not currently sourced from `guideConfig.registerUrl`)
 - Rendered inline inside each view (My Sessions, My Favorites) for the full-view gate
 - Also rendered as a modal from `App` when `regPromptOpen === true` (triggered by `SHOW_REG_PROMPT`)
 
@@ -924,7 +940,7 @@ event-libs/v1/blocks/sessions-guide/
     FilterPanel.js                # sidebar category list + checkbox options
     RegistrationPrompt.js        # inline/modal auth gate: login vs register variant
     DownloadButton.js             # ICS download trigger (My Sessions only)
-    CategoryBadge.js              # category icon + label + color from eventConfig.categoryColors
+    CategoryBadge.js              # category icon + label + color from getTrackIcon() (tier-1-event-config.js)
     IconButton.js                 # S2A icon-only button (solid/outlined/transparent)
     icons.js                      # IconPlay, IconCalendarCheck, IconCalendarPlus, IconHeartFilled, IconHeartOutline
 

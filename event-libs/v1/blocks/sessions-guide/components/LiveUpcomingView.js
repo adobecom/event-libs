@@ -16,12 +16,12 @@ export const buildLiveUpcomingView = () => LiveUpcomingView;
 
 export function LiveUpcomingView() {
   const { state } = useSessionGuide();
-  const { activeDay, eventConfig } = state;
+  const { activeDay, guideConfig } = state;
   const sessions = sessionsSignal.value;
   const liveStreamActiveIds = liveStreamActiveIdsSignal.value;
   const activeFilters = state.activeFilters || {};
   const searchQuery = state.searchQuery || '';
-  const { userTz } = eventConfig;
+  const { userTz } = guideConfig;
   // Read purely to establish a re-render dependency on time-driven session-state
   // transitions (see sessionStateVersion in session-store.js) — value itself is unused.
   // eslint-disable-next-line no-unused-expressions

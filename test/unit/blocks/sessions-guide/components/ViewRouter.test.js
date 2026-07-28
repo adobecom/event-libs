@@ -26,7 +26,7 @@ function makeStore(activeView, extraState = {}) {
       mySessionsTab: 'upcoming',
       myFavoritesTab: 'upcoming',
       activeDay: new Date().toLocaleDateString('en-CA'),
-      eventConfig: { ...BASE_CONFIG },
+      guideConfig: { ...BASE_CONFIG },
       ...extraState,
     },
     dispatch: () => {},

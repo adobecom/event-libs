@@ -1,10 +1,9 @@
 import { getMetadata } from './utils.js';
 
-// Page-level, one-shot bootstrap for the Tier 1 Event Configurator app's authored output
-// (Config JSON pasted into the `tier-1-event-config` metadata row), mirroring
-// session-store.js's initSessionState() pattern. Read once during decorateEvent, before
-// any block's own init() runs, so any block on the page can call getTrackIcon()/
-// getAllowDoubleBooking().
+// Page-level bootstrap for the Tier 1 Event Configurator app's authored output (Config
+// JSON pasted into the `tier-1-event-config` metadata row). Read once during
+// decorateEvent, before any block's own init() runs, so any block on the page can call
+// getTrackIcon()/getAllowDoubleBooking()/getFeaturedSessionIds().
 let initialized = false;
 let tierOneEventConfig = {};
 
@@ -35,15 +34,26 @@ function slugify(name) {
   return name ? name.toLowerCase().replace(/[\s_]+/g, '-').replace(/[^a-z0-9-]/g, '') : '';
 }
 
+// Idempotent — safe to call multiple times; no-ops after the first successful init
+// and when the essential tier-1-event-config metadata is absent (mirrors
+// session-store.js's initSessionState() gate on rainfocus-api-url).
 export function initTierOneEventConfig() {
   if (initialized) return;
-  initialized = true;
   const raw = getMetadata('tier-1-event-config');
   if (!raw) return;
+  initialized = true;
   try {
     tierOneEventConfig = JSON.parse(raw);
   } catch (err) {
     window.lana?.log(`[tier-1-event-config] invalid tier-1-event-config JSON: ${err.message}`);
+    return;
+  }
+  // Catches the real failure mode this manual copy/paste hand-off invites: an author
+  // pastes the wrong event's Config onto a page. Only warn on an actual mismatch —
+  // skip silently if either side is missing (e.g. an older Config with no eventId).
+  const pageEventId = getMetadata('event-id');
+  if (tierOneEventConfig.eventId && pageEventId && tierOneEventConfig.eventId !== pageEventId) {
+    window.lana?.log(`[tier-1-event-config] eventId mismatch: config authored for ${tierOneEventConfig.eventId}, page is ${pageEventId}`);
   }
 }
 

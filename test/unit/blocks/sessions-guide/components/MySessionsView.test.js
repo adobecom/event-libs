@@ -60,7 +60,7 @@ function makeStore({
 
   const store = buildStore(preact);
   store.SessionGuideContext._current = {
-    state: { mySessionsTab, activeDay, eventConfig: { ...BASE_CONFIG } },
+    state: { mySessionsTab, activeDay, guideConfig: { ...BASE_CONFIG } },
     dispatch: () => {},
   };
   return store;

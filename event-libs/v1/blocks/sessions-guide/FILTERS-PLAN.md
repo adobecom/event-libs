@@ -73,7 +73,7 @@ drives the card icon/topic tag, not a filter facet. Good, no conflict there.
   **This already covers "add/remove/rename/reorder filter sections"** — it's just JSON
   array editing. `id` must currently map 1:1 to an existing session property name.
 - **`event-libs/v1/blocks/sessions-guide/components/FilterPanel.js`**: renders the panel
-  UI from `eventConfig.filterCategories`. Options per category are **not** authored —
+  UI from `guideConfig.filterCategories`. Options per category are **not** authored —
   they're derived live via `useComputed` by scanning `sessions.value` and collecting
   every distinct value found at `s[id]` (array-tolerant: handles both string and array
   session fields already, see lines 26-39). Selections are per-category `Set`s

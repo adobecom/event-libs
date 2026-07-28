@@ -15,8 +15,8 @@ export const buildLiveCard = () => LiveCard;
 
 export function LiveCard({ session, variant = 'live' }) {
   const { state, dispatch } = useSessionGuide();
-  const { eventConfig } = state;
-  const { userTz, surface } = eventConfig;
+  const { guideConfig } = state;
+  const { userTz, surface } = guideConfig;
 
   const isScheduled = scheduled.value.has(session.id);
   const isFavorited = favorited.value.has(session.id);
@@ -48,12 +48,12 @@ export function LiveCard({ session, variant = 'live' }) {
 
   async function handleSchedule(e) {
     e.stopPropagation();
-    await scheduleWithFeedback(session, { eventConfig, isScheduled });
+    await scheduleWithFeedback(session, { eventConfig: guideConfig, isScheduled });
   }
 
   async function handleFavorite(e) {
     e.stopPropagation();
-    await favoriteWithFeedback(session, { eventConfig, isFavorited });
+    await favoriteWithFeedback(session, { eventConfig: guideConfig, isFavorited });
   }
 
   const watchHref = safeUrl(session.watchUrl || session.sessionPageUrl);

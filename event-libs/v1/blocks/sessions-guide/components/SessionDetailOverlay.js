@@ -15,8 +15,8 @@ import { getTrackIcon } from '../../../utils/tier-1-event-config.js';
 
 export function SessionDetailOverlay({ onBack }) {
   const { state } = useSessionGuide();
-  const { activeSessionId, eventConfig } = state;
-  const { userTz } = eventConfig;
+  const { activeSessionId, guideConfig } = state;
+  const { userTz } = guideConfig;
 
   const [descExpanded, setDescExpanded] = useState(false);
 
@@ -47,12 +47,12 @@ export function SessionDetailOverlay({ onBack }) {
 
   async function handleSchedule(e) {
     e.stopPropagation();
-    await scheduleWithFeedback(session, { eventConfig, isScheduled });
+    await scheduleWithFeedback(session, { eventConfig: guideConfig, isScheduled });
   }
 
   async function handleFavorite(e) {
     e.stopPropagation();
-    await favoriteWithFeedback(session, { eventConfig, isFavorited });
+    await favoriteWithFeedback(session, { eventConfig: guideConfig, isFavorited });
   }
 
   async function handleShare(e) {

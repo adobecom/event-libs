@@ -95,16 +95,15 @@ a separate, deliberate decision to do so.
   assumed, since this handoff's original text didn't say so explicitly.
   `LiveUpcomingView.js` no longer reads `eventConfig.featuredSessionIds`.
 
-## 4. Optional, cheap, high-value: self-verification against a mispasted config
+## 4. Optional, cheap, high-value: self-verification against a mispasted config — done 2026-07-27
 
-`Config` now carries its own `eventId`/`backendEventTitle`/`updated`,
-duplicated deliberately (not redundant) so the pasted JSON is self-
-describing once it lands in a page's metadata. The consuming side can
-cross-check `tier-1-event-config.eventId` against the page's own `event-id`
-metadata at read time and `window.lana?.log()` a warning on mismatch —
-catches the real failure mode this manual copy/paste hand-off invites (an
-author pastes the wrong event's config onto the wrong page). Not required,
-just flagged as a cheap addition once the field exists.
+`initTierOneEventConfig()` now cross-checks `tierOneEventConfig.eventId`
+against the page's own `getMetadata('event-id')` immediately after a
+successful parse — the same one-shot bootstrap, not a separate call site
+callers would need to remember to invoke. Warns via `window.lana?.log()`
+only on an actual mismatch; skips silently if either side is missing (e.g.
+an older Config authored before the `eventId` field existed, or a context
+with no page `event-id` at all).
 
 ## Test-plan items relevant to the consuming side
 
@@ -132,6 +131,8 @@ just flagged as a cheap addition once the field exists.
       `LiveUpcomingView-featured.test.js`/`OnDemandView-featured.test.js`.
       Real DA-page verification still pending (needs a page with
       `tier-1-event-config.featuredSessions` authored via the app).
-- [ ] Pasting a `Config` whose `eventId` doesn't match the page's own
+- [x] Pasting a `Config` whose `eventId` doesn't match the page's own
       `event-id` metadata is at least visible/detectable in the data (full
-      warning logic is item 4 above, optional).
+      warning logic is item 4 above, optional). Covered by
+      `tier-1-event-config-eventid-mismatch.test.js`/`-match.test.js`/
+      `-no-config-id.test.js`. Real DA-page verification still pending.

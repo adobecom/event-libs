@@ -37,9 +37,9 @@ describe('store/buildInitialState', () => {
     expect(state.drawerState).to.equal('hidden');
   });
 
-  it('carries eventConfig through', () => {
+  it('carries guideConfig through', () => {
     const state = buildInitialState(MOCK_CONFIG);
-    expect(state.eventConfig).to.deep.equal(MOCK_CONFIG);
+    expect(state.guideConfig).to.deep.equal(MOCK_CONFIG);
   });
 });
 

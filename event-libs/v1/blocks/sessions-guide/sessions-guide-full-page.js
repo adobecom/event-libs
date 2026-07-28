@@ -11,8 +11,8 @@ async function loadPreact() {
 }
 
 export default async function init(el) {
-  const eventConfig = parseSessionsGuideConfig(el, { logPrefix: 'sessions-guide-full-page', forcedSurface: 'page' });
-  eventConfig.registerUrl = getApiConfig()?.registerUrl || '/register';
+  const guideConfig = parseSessionsGuideConfig(el, { logPrefix: 'sessions-guide-full-page', forcedSurface: 'page' });
+  guideConfig.registerUrl = getApiConfig()?.registerUrl || '/register';
 
   const preact = await loadPreact();
   const { render } = preact;
@@ -21,10 +21,10 @@ export default async function init(el) {
   const { App } = await import('./components/App.js');
 
   el.innerHTML = '';
-  el.dataset.theme = eventConfig.theme;
+  el.dataset.theme = guideConfig.theme;
 
   render(
-    preact.h(SessionGuideProvider, { eventConfig }, preact.h(App, null)),
+    preact.h(SessionGuideProvider, { guideConfig }, preact.h(App, null)),
     el,
   );
 }

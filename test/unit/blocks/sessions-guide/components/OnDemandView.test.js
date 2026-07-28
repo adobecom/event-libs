@@ -39,7 +39,7 @@ function makeStore(sessionList) {
   store.SessionGuideContext._current = {
     state: {
       activeView: 'on-demand', activeFilters: {}, searchQuery: '',
-      eventConfig: { ...BASE_CONFIG },
+      guideConfig: { ...BASE_CONFIG },
     },
     dispatch: () => {},
   };

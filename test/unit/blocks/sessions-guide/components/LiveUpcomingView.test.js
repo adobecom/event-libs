@@ -38,7 +38,7 @@ function makeStore(sessionList, activeDay = TODAY) {
   liveStreamActiveIds.value = new Set();
   const store = buildStore(preact);
   store.SessionGuideContext._current = {
-    state: { activeDay, eventConfig: { ...BASE_CONFIG } },
+    state: { activeDay, guideConfig: { ...BASE_CONFIG } },
     dispatch: () => {},
   };
   return store;

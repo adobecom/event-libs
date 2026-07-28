@@ -24,7 +24,7 @@ export function MySessionsView() {
   const liveStreamActiveIds = liveStreamActiveIdsSignal.value;
   const activeFilters = state.activeFilters || {};
   const searchQuery = state.searchQuery || '';
-  const userTz = state.eventConfig?.userTz;
+  const userTz = state.guideConfig?.userTz;
   // Read purely to establish a re-render dependency on time-driven session-state
   // transitions (see sessionStateVersion in session-store.js) — value itself is unused.
   // eslint-disable-next-line no-unused-expressions

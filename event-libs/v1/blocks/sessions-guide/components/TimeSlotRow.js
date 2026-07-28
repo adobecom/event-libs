@@ -11,10 +11,10 @@ export const buildTimeSlotRow = () => TimeSlotRow;
 
 export function TimeSlotRow({ sessions, forceOnDemand = false }) {
   const { state } = useSessionGuide();
-  const { eventConfig } = state;
+  const { guideConfig } = state;
   const scheduled = scheduledSignal.value;
   const favorited = favoritedSignal.value;
-  const userTz = eventConfig.userTz;
+  const userTz = guideConfig.userTz;
 
   // Encodes scheduled/favorited state of every card in this row.
   // Changes value whenever a card gains or loses a state that widens it,

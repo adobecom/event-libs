@@ -119,8 +119,9 @@ Known gaps in the real mapping (not blockers, just incomplete real-data coverage
   fetch once that's designed.
 - Sessions with multiple `sessionTimes` (recurring/repeated) only surface their earliest
   occurrence.
-- `CategoryBadge`'s icon set (`BADGE_MAP`) and `eventConfig.trackIcons` were built for mock
-  vocabulary and don't cover all real `Track`/`Primary Track for Agenda` label values yet —
+- `CategoryBadge`'s icon set — `getTrackIcon()`'s built-in `DEFAULT_TRACK_ICON_CONFIG`
+  map in `event-libs/v1/utils/tier-1-event-config.js` — was built for mock vocabulary
+  and doesn't cover all real `Track`/`Primary Track for Agenda` label values yet —
   a content/design task, not a code gap.
 
 ---

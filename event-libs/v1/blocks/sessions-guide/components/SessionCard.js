@@ -13,9 +13,9 @@ export const buildSessionCard = () => SessionCard;
 
 export function SessionCard({ session, forceOnDemand = false, timeDisplay = 'duration' }) {
   const { state, dispatch } = useSessionGuide();
-  const { eventConfig, activeView } = state;
+  const { guideConfig, activeView } = state;
   const dismissingIds = state.dismissingIds || new Set();
-  const { userTz, surface } = eventConfig;
+  const { userTz, surface } = guideConfig;
 
   const isScheduled = scheduled.value.has(session.id);
   const isFavorited = favorited.value.has(session.id);
@@ -83,7 +83,7 @@ export function SessionCard({ session, forceOnDemand = false, timeDisplay = 'dur
     await withDismissAnimation(
       e,
       activeView === 'my-sessions' && isScheduled,
-      () => scheduleWithFeedback(session, { eventConfig, isScheduled }),
+      () => scheduleWithFeedback(session, { eventConfig: guideConfig, isScheduled }),
     );
   }
 
@@ -92,7 +92,7 @@ export function SessionCard({ session, forceOnDemand = false, timeDisplay = 'dur
     await withDismissAnimation(
       e,
       activeView === 'my-favorites' && isFavorited,
-      () => favoriteWithFeedback(session, { eventConfig, isFavorited }),
+      () => favoriteWithFeedback(session, { eventConfig: guideConfig, isFavorited }),
     );
   }
 

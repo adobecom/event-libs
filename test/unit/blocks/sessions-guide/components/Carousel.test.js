@@ -35,7 +35,7 @@ function makeStore() {
       scheduled: new Set(),
       favorited: new Set(),
       isRegistered: true,
-      eventConfig: { ...BASE_CONFIG },
+      guideConfig: { ...BASE_CONFIG },
     },
     dispatch: () => {},
   };

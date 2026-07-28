@@ -34,7 +34,7 @@ const NO_THUMB_SESSION = { ...LIVE_SESSION, id: 'session-no-thumb', thumbnailUrl
 function makeStore() {
   const store = buildStore(preact);
   store.SessionGuideContext._current = {
-    state: { eventConfig: { ...BASE_CONFIG } },
+    state: { guideConfig: { ...BASE_CONFIG } },
     dispatch: () => {},
   };
   return store;

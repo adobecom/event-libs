@@ -45,7 +45,7 @@ const ONDEMAND_SESSION = {
 
 function makeCtx(overrides = {}) {
   const state = {
-    eventConfig: { ...BASE_CONFIG },
+    guideConfig: { ...BASE_CONFIG },
     ...overrides,
   };
   return { state, dispatch: () => {} };

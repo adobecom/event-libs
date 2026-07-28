@@ -27,7 +27,11 @@ function getDefaultDay(eventDays, userTz) {
 
 // UI-only state for this block's own widget chrome — cross-block data (sessions,
 // favorited, scheduled, auth) lives in event-libs/v1/utils/session-store.js instead.
-export function buildInitialState(eventConfig) {
+// Named guideConfig (not eventConfig) to stay distinct from utils.js's page-wide
+// getEventConfig() and the Tier 1 Event Configurator's tier-1-event-config.js —
+// this is sessions-guide's own block-level authoring config (parse-config.js's
+// output: title, filterCategories, theme, surface, userTz, registerUrl).
+export function buildInitialState(guideConfig) {
   return {
     drawerState: 'hidden',
     activeView: auth.value.isRegistered ? 'my-sessions' : 'live-upcoming',
@@ -37,7 +41,7 @@ export function buildInitialState(eventConfig) {
     searchQuery: '',
     mySessionsTab: 'upcoming',
     myFavoritesTab: 'upcoming',
-    eventConfig: eventConfig || {},
+    guideConfig: guideConfig || {},
     activeSessionId: null,
     dismissingIds: new Set(),
     regPromptOpen: false,
@@ -49,7 +53,7 @@ export function reducer(state, action) {
     case 'SET_EVENT_DAYS': {
       const activeDay = action.eventDays.includes(state.activeDay)
         ? state.activeDay
-        : getDefaultDay(action.eventDays, state.eventConfig.userTz);
+        : getDefaultDay(action.eventDays, state.guideConfig.userTz);
       return { ...state, eventDays: action.eventDays, activeDay };
     }
 
@@ -106,13 +110,13 @@ export function reducer(state, action) {
 
 export const SessionGuideContext = createContext(null);
 
-export function SessionGuideProvider({ eventConfig, children }) {
-  const [state, dispatch] = useReducer(reducer, buildInitialState(eventConfig));
+export function SessionGuideProvider({ guideConfig, children }) {
+  const [state, dispatch] = useReducer(reducer, buildInitialState(guideConfig));
 
   // Recompute the day-tab list whenever the shared sessions data changes.
   useEffect(() => {
     function recomputeDays() {
-      dispatch({ type: 'SET_EVENT_DAYS', eventDays: deriveEventDays(sessions.value, eventConfig.userTz) });
+      dispatch({ type: 'SET_EVENT_DAYS', eventDays: deriveEventDays(sessions.value, guideConfig.userTz) });
     }
     recomputeDays();
     return sessions.subscribe(recomputeDays);
