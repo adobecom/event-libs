@@ -320,17 +320,14 @@ export async function createAttendee(attendeeData, rsvpToken = null) {
   const eventServiceEnv = getEventServiceEnv();
   const { serviceApiEndpoints } = ENV_MAP[eventServiceEnv.name];
   const raw = JSON.stringify(attendeeData);
-  // The backend gives the rsvp-token header precedence over any IMS credential, so an
-  // assistant registering a VIP via the link stays correctly scoped to the VIP rather than
-  // themselves — but only once it actually sees the header, and some backend environments
-  // still require *some* Authorization to be present at all. A guest IMS token (auto-issued
-  // to any anonymous visitor) is safe to forward: it carries no identity of its own for the
-  // backend to prefer over the rsvp token. A real signed-in user's token is not forwarded
-  // here, since backends without that precedence yet would resolve identity from it instead
-  // of the rsvp token, registering the assistant rather than the VIP.
-  const imsToken = window.adobeIMS?.getAccessToken();
-  const skipAuth = !!rsvpToken && !imsToken?.isGuestToken;
-  const options = await constructRequestOptions('POST', raw, true, skipAuth, rsvpToken);
+  // Cluster Gateway requires a valid IMS credential on every request regardless of the
+  // rsvp-token header, so this always forwards whatever IMS token exists (guest or a real
+  // signed-in session) rather than suppressing it — omitting it would get the request
+  // rejected at the gateway before it ever reaches ESP. Which identity actually gets
+  // registered is the backend's call, not ours: ESP's attendee routes give the rsvp-token
+  // header precedence over any IMS identity, so an assistant registering a VIP via the link
+  // while signed into their own Adobe ID still registers the VIP, not themselves.
+  const options = await constructRequestOptions('POST', raw, true, false, rsvpToken);
 
   try {
     const response = await fetch(`${serviceApiEndpoints.esl}/v1/attendees`, options);
@@ -356,9 +353,7 @@ export async function addAttendeeToEvent(eventId, attendee, rsvpToken = null) {
   const raw = JSON.stringify(attendee);
   // Same identity handling as createAttendee above. This call also consumes
   // the rsvp token server-side once the registration succeeds.
-  const imsToken = window.adobeIMS?.getAccessToken();
-  const skipAuth = !!rsvpToken && !imsToken?.isGuestToken;
-  const options = await constructRequestOptions('POST', raw, true, skipAuth, rsvpToken);
+  const options = await constructRequestOptions('POST', raw, true, false, rsvpToken);
 
   try {
     const response = await fetch(`${serviceApiEndpoints.esl}/v1/events/${eventId}/attendees/${attendee.attendeeId}`, options);
@@ -712,7 +707,9 @@ export async function getAndCreateAndAddAttendee(eventId, attendeeData, rsvpToke
 
   if (profile.account_type === 'guest') {
     // Use BaseAttendee filter for creating new attendee. A guest arriving via an rsvp
-    // token authenticates primarily with the rsvp-token header, not a signed-in identity.
+    // token still forwards whatever IMS token exists alongside it — see createAttendee
+    // for why (Cluster Gateway requires one either way; the backend, not us, decides
+    // which credential's identity the registration actually uses).
     const filteredPayload = getBaseAttendeePayload(attendeeData);
     attendee = await createAttendee(filteredPayload, rsvpToken);
   } else {

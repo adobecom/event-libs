@@ -859,7 +859,7 @@ describe('Events Form', () => {
       expect(addToEventOptions.headers.get('Authorization')).to.equal('Bearer fake-token');
     });
 
-    it('omits Authorization (but keeps the rsvp-token header) when the rsvp link is opened in a real signed-in session', async () => {
+    it('still forwards a real signed-in session\'s IMS token when the rsvp link is opened while signed in — Cluster Gateway requires one either way', async () => {
       const originalAdobeIMS = window.adobeIMS;
       window.adobeIMS = { getAccessToken: () => ({ token: 'assistants-own-token', isGuestToken: false }) };
       BlockMediator.set('imsProfile', { account_type: 'guest', rsvpToken: 'valid-rsvp-token-1234567890' });
@@ -874,9 +874,9 @@ describe('Events Form', () => {
       const createOptions = fetchStub.getCall(1).args[1];
       const addToEventOptions = fetchStub.getCall(2).args[1];
       expect(createOptions.headers.get('x-adobe-esp-rsvp-token')).to.equal('valid-rsvp-token-1234567890');
-      expect(createOptions.headers.has('Authorization')).to.be.false;
+      expect(createOptions.headers.get('Authorization')).to.equal('Bearer assistants-own-token');
       expect(addToEventOptions.headers.get('x-adobe-esp-rsvp-token')).to.equal('valid-rsvp-token-1234567890');
-      expect(addToEventOptions.headers.has('Authorization')).to.be.false;
+      expect(addToEventOptions.headers.get('Authorization')).to.equal('Bearer assistants-own-token');
     });
 
     it('forwards a routed campaign in the body of the add-to-event call — same body schema as the normal attendee flow', async () => {

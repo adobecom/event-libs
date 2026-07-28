@@ -158,7 +158,7 @@ describe('Adobe Event Service API', () => {
       expect(options.headers.get('Authorization')).to.equal('Bearer fake-token');
     });
 
-    it('should omit the Authorization header (but keep the rsvp-token header) when the caller has a real signed-in session', async () => {
+    it('should still forward a real signed-in session\'s IMS token alongside the rsvp-token header — Cluster Gateway requires one either way', async () => {
       window.adobeIMS = { getAccessToken: () => ({ token: 'assistants-own-token', isGuestToken: false }) };
       const fetchStub = sandbox.stub(window, 'fetch').resolves({ json: () => ({}), ok: true });
 
@@ -166,7 +166,7 @@ describe('Adobe Event Service API', () => {
 
       const options = fetchStub.firstCall.args[1];
       expect(options.headers.get('x-adobe-esp-rsvp-token')).to.equal('tok-1');
-      expect(options.headers.has('Authorization')).to.be.false;
+      expect(options.headers.get('Authorization')).to.equal('Bearer assistants-own-token');
     });
 
     it('should omit the rsvp-token header when no token is passed, and still authenticate via IMS', async () => {
@@ -219,7 +219,7 @@ describe('Adobe Event Service API', () => {
       expect(options.headers.get('Authorization')).to.equal('Bearer fake-token');
     });
 
-    it('should omit the Authorization header (but keep the rsvp-token header) when the caller has a real signed-in session', async () => {
+    it('should still forward a real signed-in session\'s IMS token alongside the rsvp-token header — Cluster Gateway requires one either way', async () => {
       window.adobeIMS = { getAccessToken: () => ({ token: 'assistants-own-token', isGuestToken: false }) };
       const fetchStub = sandbox.stub(window, 'fetch').resolves({ json: () => ({}), ok: true });
 
@@ -227,7 +227,7 @@ describe('Adobe Event Service API', () => {
 
       const options = fetchStub.firstCall.args[1];
       expect(options.headers.get('x-adobe-esp-rsvp-token')).to.equal('tok-1');
-      expect(options.headers.has('Authorization')).to.be.false;
+      expect(options.headers.get('Authorization')).to.equal('Bearer assistants-own-token');
     });
 
     it('should omit the rsvp-token header when no token is passed, and still authenticate via IMS', async () => {
