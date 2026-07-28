@@ -147,8 +147,8 @@ describe('Adobe Event Service API', () => {
       expect(error.ok).to.be.false;
     });
 
-    it('should send both the IMS token and the rsvp-token header when a token is passed', async () => {
-      window.adobeIMS = { getAccessToken: () => ({ token: 'fake-token' }) };
+    it('should send both the guest IMS token and the rsvp-token header when a token is passed', async () => {
+      window.adobeIMS = { getAccessToken: () => ({ token: 'fake-token', isGuestToken: true }) };
       const fetchStub = sandbox.stub(window, 'fetch').resolves({ json: () => ({}), ok: true });
 
       await api.createAttendee({ name: 'John Doe' }, 'tok-1');
@@ -156,6 +156,17 @@ describe('Adobe Event Service API', () => {
       const options = fetchStub.firstCall.args[1];
       expect(options.headers.get('x-adobe-esp-rsvp-token')).to.equal('tok-1');
       expect(options.headers.get('Authorization')).to.equal('Bearer fake-token');
+    });
+
+    it('should omit the Authorization header (but keep the rsvp-token header) when the caller has a real signed-in session', async () => {
+      window.adobeIMS = { getAccessToken: () => ({ token: 'assistants-own-token', isGuestToken: false }) };
+      const fetchStub = sandbox.stub(window, 'fetch').resolves({ json: () => ({}), ok: true });
+
+      await api.createAttendee({ name: 'John Doe' }, 'tok-1');
+
+      const options = fetchStub.firstCall.args[1];
+      expect(options.headers.get('x-adobe-esp-rsvp-token')).to.equal('tok-1');
+      expect(options.headers.has('Authorization')).to.be.false;
     });
 
     it('should omit the rsvp-token header when no token is passed, and still authenticate via IMS', async () => {
@@ -197,8 +208,8 @@ describe('Adobe Event Service API', () => {
       expect(error.ok).to.be.false;
     });
 
-    it('should send both the IMS token and the rsvp-token header when a token is passed', async () => {
-      window.adobeIMS = { getAccessToken: () => ({ token: 'fake-token' }) };
+    it('should send both the guest IMS token and the rsvp-token header when a token is passed', async () => {
+      window.adobeIMS = { getAccessToken: () => ({ token: 'fake-token', isGuestToken: true }) };
       const fetchStub = sandbox.stub(window, 'fetch').resolves({ json: () => ({}), ok: true });
 
       await api.addAttendeeToEvent('123', { name: 'John Doe' }, 'tok-1');
@@ -206,6 +217,17 @@ describe('Adobe Event Service API', () => {
       const options = fetchStub.firstCall.args[1];
       expect(options.headers.get('x-adobe-esp-rsvp-token')).to.equal('tok-1');
       expect(options.headers.get('Authorization')).to.equal('Bearer fake-token');
+    });
+
+    it('should omit the Authorization header (but keep the rsvp-token header) when the caller has a real signed-in session', async () => {
+      window.adobeIMS = { getAccessToken: () => ({ token: 'assistants-own-token', isGuestToken: false }) };
+      const fetchStub = sandbox.stub(window, 'fetch').resolves({ json: () => ({}), ok: true });
+
+      await api.addAttendeeToEvent('123', { name: 'John Doe' }, 'tok-1');
+
+      const options = fetchStub.firstCall.args[1];
+      expect(options.headers.get('x-adobe-esp-rsvp-token')).to.equal('tok-1');
+      expect(options.headers.has('Authorization')).to.be.false;
     });
 
     it('should omit the rsvp-token header when no token is passed, and still authenticate via IMS', async () => {

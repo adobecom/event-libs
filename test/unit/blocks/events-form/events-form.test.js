@@ -833,7 +833,9 @@ describe('Events Form', () => {
       return form;
     }
 
-    it('registers a guest via the normal attendee flow, sending both the IMS token and the rsvp-token header', async () => {
+    it('registers a guest via the normal attendee flow, sending both the guest IMS token and the rsvp-token header', async () => {
+      const originalAdobeIMS = window.adobeIMS;
+      window.adobeIMS = { getAccessToken: () => ({ token: 'fake-token', isGuestToken: true }) };
       BlockMediator.set('imsProfile', { account_type: 'guest', rsvpToken: 'valid-rsvp-token-1234567890' });
       const fetchStub = sandbox.stub(window, 'fetch');
       fetchStub.onCall(0).resolves({ json: () => ({ eventId: 'test-event-id', isFull: false }), ok: true });
@@ -841,6 +843,7 @@ describe('Events Form', () => {
       fetchStub.onCall(2).resolves({ json: () => ({ attendeeId: 'att-1', registrationStatus: 'registered' }), ok: true });
 
       const result = await submitForm({ form: buildForm(), sanitizeList: [] });
+      window.adobeIMS = originalAdobeIMS;
 
       expect(result.ok).to.be.true;
       expect(result.data).to.have.property('registrationStatus', 'registered');
@@ -854,6 +857,26 @@ describe('Events Form', () => {
       expect(createOptions.headers.get('Authorization')).to.equal('Bearer fake-token');
       expect(addToEventOptions.headers.get('x-adobe-esp-rsvp-token')).to.equal('valid-rsvp-token-1234567890');
       expect(addToEventOptions.headers.get('Authorization')).to.equal('Bearer fake-token');
+    });
+
+    it('omits Authorization (but keeps the rsvp-token header) when the rsvp link is opened in a real signed-in session', async () => {
+      const originalAdobeIMS = window.adobeIMS;
+      window.adobeIMS = { getAccessToken: () => ({ token: 'assistants-own-token', isGuestToken: false }) };
+      BlockMediator.set('imsProfile', { account_type: 'guest', rsvpToken: 'valid-rsvp-token-1234567890' });
+      const fetchStub = sandbox.stub(window, 'fetch');
+      fetchStub.onCall(0).resolves({ json: () => ({ eventId: 'test-event-id', isFull: false }), ok: true });
+      fetchStub.onCall(1).resolves({ json: () => ({ attendeeId: 'att-1' }), ok: true });
+      fetchStub.onCall(2).resolves({ json: () => ({ attendeeId: 'att-1', registrationStatus: 'registered' }), ok: true });
+
+      await submitForm({ form: buildForm(), sanitizeList: [] });
+      window.adobeIMS = originalAdobeIMS;
+
+      const createOptions = fetchStub.getCall(1).args[1];
+      const addToEventOptions = fetchStub.getCall(2).args[1];
+      expect(createOptions.headers.get('x-adobe-esp-rsvp-token')).to.equal('valid-rsvp-token-1234567890');
+      expect(createOptions.headers.has('Authorization')).to.be.false;
+      expect(addToEventOptions.headers.get('x-adobe-esp-rsvp-token')).to.equal('valid-rsvp-token-1234567890');
+      expect(addToEventOptions.headers.has('Authorization')).to.be.false;
     });
 
     it('forwards a routed campaign in the body of the add-to-event call — same body schema as the normal attendee flow', async () => {

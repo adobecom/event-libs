@@ -81,8 +81,7 @@ export async function constructRequestOptions(method, body = null, waitForIMS = 
   const authToken = skipAuth ? null : (espAuthTokenOverride || window.adobeIMS?.getAccessToken()?.token);
 
   if (authToken) headers.append('Authorization', `Bearer ${authToken}`);
-  // RSVP-token endpoints authenticate solely via this header — the token never
-  // travels in the URL path or query string, to keep it out of access logs.
+  // The rsvp-token never travels in the URL path or query string, to keep it out of access logs.
   if (rsvpToken) headers.append('x-adobe-esp-rsvp-token', rsvpToken);
   headers.append('x-api-key', 'acom_event_service');
   headers.append('x-request-id', await getUuid(new Date().getTime()));
@@ -321,14 +320,17 @@ export async function createAttendee(attendeeData, rsvpToken = null) {
   const eventServiceEnv = getEventServiceEnv();
   const { serviceApiEndpoints } = ENV_MAP[eventServiceEnv.name];
   const raw = JSON.stringify(attendeeData);
-  // The backend derives the attendee identity from the IMS token itself (a guest
-  // token maps to attendeeId = the email in the body, with isGuest set), so this
-  // still needs the IMS access token even when an rsvp token is also present —
-  // the rsvp-token header alone isn't enough to authenticate this endpoint.
-  if (rsvpToken && !window.adobeIMS?.getAccessToken()?.token) {
-    window.lana?.log('createAttendee: rsvp-token registration submitted with no IMS access token — the backend will reject this request', { tags: 'events-esp-controller', severity: 'warning' });
-  }
-  const options = await constructRequestOptions('POST', raw, true, false, rsvpToken);
+  // The backend gives the rsvp-token header precedence over any IMS credential, so an
+  // assistant registering a VIP via the link stays correctly scoped to the VIP rather than
+  // themselves — but only once it actually sees the header, and some backend environments
+  // still require *some* Authorization to be present at all. A guest IMS token (auto-issued
+  // to any anonymous visitor) is safe to forward: it carries no identity of its own for the
+  // backend to prefer over the rsvp token. A real signed-in user's token is not forwarded
+  // here, since backends without that precedence yet would resolve identity from it instead
+  // of the rsvp token, registering the assistant rather than the VIP.
+  const imsToken = window.adobeIMS?.getAccessToken();
+  const skipAuth = !!rsvpToken && !imsToken?.isGuestToken;
+  const options = await constructRequestOptions('POST', raw, true, skipAuth, rsvpToken);
 
   try {
     const response = await fetch(`${serviceApiEndpoints.esl}/v1/attendees`, options);
@@ -352,10 +354,11 @@ export async function addAttendeeToEvent(eventId, attendee, rsvpToken = null) {
   const eventServiceEnv = getEventServiceEnv();
   const { serviceApiEndpoints } = ENV_MAP[eventServiceEnv.name];
   const raw = JSON.stringify(attendee);
-  // Same identity handling as createAttendee above — the IMS token is required
-  // for the backend to resolve who this is. This call also consumes the rsvp
-  // token server-side once the registration succeeds.
-  const options = await constructRequestOptions('POST', raw, true, false, rsvpToken);
+  // Same identity handling as createAttendee above. This call also consumes
+  // the rsvp token server-side once the registration succeeds.
+  const imsToken = window.adobeIMS?.getAccessToken();
+  const skipAuth = !!rsvpToken && !imsToken?.isGuestToken;
+  const options = await constructRequestOptions('POST', raw, true, skipAuth, rsvpToken);
 
   try {
     const response = await fetch(`${serviceApiEndpoints.esl}/v1/events/${eventId}/attendees/${attendee.attendeeId}`, options);
@@ -708,8 +711,8 @@ export async function getAndCreateAndAddAttendee(eventId, attendeeData, rsvpToke
   let registrationStatus = 'registered';
 
   if (profile.account_type === 'guest') {
-    // Use BaseAttendee filter for creating new attendee. A guest arriving via
-    // an rsvp token authenticates this call with the token instead of IMS.
+    // Use BaseAttendee filter for creating new attendee. A guest arriving via an rsvp
+    // token authenticates primarily with the rsvp-token header, not a signed-in identity.
     const filteredPayload = getBaseAttendeePayload(attendeeData);
     attendee = await createAttendee(filteredPayload, rsvpToken);
   } else {
