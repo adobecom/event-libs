@@ -32,6 +32,7 @@ export const ANALYTICS = Object.freeze({
   UNFAVORITE: 'Unfavorite',
   CLOSE_FAVORITE_NOTIFICATION: 'Close Favorite Notification',
   VIEW_SCHEDULE: 'View Schedule',
+  CHAT_OPEN: 'Session Chat_Open',
 });
 
 /* ---------- Social Icons (inline SVG) ---------- */
@@ -62,4 +63,9 @@ export const CHIMERA_COLLECTION_DEFAULT_PARAMS = Object.freeze({
 export const TAG_COLLECTION_URL = '/chimera-api/collection';
 export const FEATURED_COLLECTION_URL = '/chimera-api/collection';
 export const ENTITY_LOOKUP_URL = 'https://14257-chidlookupservice.adobeio-static.net/api/v1/web/chidlookupservice-0.0.1/__id-lookup';
+
+/* ---------- AI Week demo: persona video chat ---------- */
+// Local backend from tools/ai-week-video-chat/ (see its README) - not a real
+// production endpoint, this is the AI Week hackathon demo only.
+export const AI_CHAT_API_BASE = 'http://localhost:8787';
 

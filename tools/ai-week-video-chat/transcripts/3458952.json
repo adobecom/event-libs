@@ -1,0 +1,17 @@
+{
+  "videoId": "3458952",
+  "title": "Design Powerhouse Super Session: Maximizing Your Creativity",
+  "durationSeconds": 2901,
+  "synthetic": true,
+  "note": "Placeholder transcript for the AI Week demo, not a real transcription. Replace via generate_transcripts.py once ffmpeg + an OpenAI/Whisper key are available.",
+  "segments": [
+    { "start": 0, "text": "Panel of designers introduces the idea of a 'combined toolkit' - moving concepting, editing, and prototyping across Photoshop, Illustrator, and Firefly instead of staying siloed in one app." },
+    { "start": 360, "text": "Live demo of using Generative Fill to explore concept directions quickly, then refining the chosen direction by hand rather than shipping the generated output directly." },
+    { "start": 720, "text": "Automating repetitive production work - batch resizing, asset export presets, and actions - to protect time for the actual creative decisions." },
+    { "start": 1080, "text": "Building a reusable color and typography system so a campaign stays consistent across social, web, and print without redoing decisions for every asset." },
+    { "start": 1440, "text": "Cross-team collaboration: handing off editable source files to motion and web teams, and the naming/versioning conventions that keep handoffs from breaking." },
+    { "start": 1800, "text": "How to present concepts to clients or stakeholders - framing 2-3 directions with a clear rationale each, instead of one polished option with no context." },
+    { "start": 2160, "text": "A segment on staying current: how the panelists each budget a couple of hours a week to try new features before a deadline forces them to." },
+    { "start": 2520, "text": "Closing Q&A: attendees ask about burnout from tool-switching, and the panel's shared advice to standardize a personal 'default stack' instead of adopting every new tool." }
+  ]
+}

@@ -1,0 +1,18 @@
+{
+  "videoId": "3458860",
+  "title": "What They Never Taught You: Real Talk about Your Creative Career",
+  "durationSeconds": 4029,
+  "synthetic": true,
+  "note": "Placeholder transcript for the AI Week demo, not a real transcription. Replace via generate_transcripts.py once ffmpeg + an OpenAI/Whisper key are available.",
+  "segments": [
+    { "start": 0, "text": "Yuko Shimizu opens by describing the jump from art school to freelance illustration, and why nobody teaches you how to actually run a creative career as a business." },
+    { "start": 420, "text": "She walks through building an early portfolio: picking a consistent visual voice over chasing trends, and why a scattered portfolio confuses art directors more than a narrow one." },
+    { "start": 900, "text": "A section on rejection: pitching book covers and editorial work that never got picked, and reframing a 'no' as information about fit rather than a verdict on the work itself." },
+    { "start": 1380, "text": "Deep dive into her materials and technique - ink, brush pens, and how a hybrid analog-then-digital workflow keeps linework expressive instead of overly polished." },
+    { "start": 1860, "text": "Working with publishers and art directors: negotiating scope, revisions, and usage rights on editorial and book-cover commissions without underselling the work." },
+    { "start": 2340, "text": "Talks candidly about imposter syndrome persisting even after awards and major clients, and the daily habits she uses to keep working through it." },
+    { "start": 2820, "text": "On teaching: what she tells illustration students at SVA that she wishes someone had told her - namely that technical skill matters less than a distinct point of view." },
+    { "start": 3300, "text": "Turning personal, non-commissioned projects into new client relationships, and using social platforms to build an audience independent of any single publisher." },
+    { "start": 3780, "text": "Closing thoughts on AI image tools: her take on where generative tools help an illustrator's process versus where a distinct hand-drawn voice is what clients are actually paying for." }
+  ]
+}

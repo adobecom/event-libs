@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>video-playlist + AI Week chat demo</title>
+  <link rel="stylesheet" href="./video-playlist.css">
+  <style>
+    body { margin: 0; padding: 40px; background: #0a0a0a; font-family: sans-serif; }
+    h1 { color: #fff; font-size: 16px; }
+    p { color: #aaa; font-size: 13px; max-width: 640px; }
+  </style>
+</head>
+<body>
+  <h1>video-playlist - AI Week persona chat demo</h1>
+  <p>
+    Uses the block's own mock adapter (5 real MAX 2025 sessions, no network/IMS
+    needed). Start the chat backend first: <code>cd tools/ai-week-video-chat &amp;&amp;
+    npm start</code>. Click "View playlist", then the chat icon on any session
+    card.
+  </p>
+
+  <div class="video-playlist">
+    <div><div>playlistTitle</div><div>MAX 2025 Sessions</div></div>
+    <div><div>topicEyebrow</div><div>On demand</div></div>
+    <div><div>minimumSessions</div><div>4</div></div>
+    <div><div>isTagbased</div><div>true</div></div>
+    <div><div>socialSharing</div><div>false</div></div>
+    <div><div>favoritesEnabled</div><div>false</div></div>
+    <div><div>theme</div><div>dark</div></div>
+  </div>
+
+  <script type="module">
+    import init from './video-playlist.js';
+
+    init(document.querySelector('.video-playlist'));
+  </script>
+</body>
+</html>

@@ -1,0 +1,17 @@
+{
+  "videoId": "3424768",
+  "title": "Super Session: Future-Proofing Your Design Career in the Age of AI",
+  "durationSeconds": 3292,
+  "synthetic": true,
+  "note": "Placeholder transcript for the AI Week demo, not a real transcription. Replace via generate_transcripts.py once ffmpeg + an OpenAI/Whisper key are available.",
+  "segments": [
+    { "start": 0, "text": "Panel frames AI as a collaborator that removes production grunt work, not a replacement for creative judgment, and sets up the rest of the session around that distinction." },
+    { "start": 480, "text": "Discussion of uniquely human skills that stay valuable regardless of tooling: taste, storytelling, empathy for a user or audience, and knowing which idea is worth pursuing." },
+    { "start": 960, "text": "Reskilling and portfolio strategy - what to add to a portfolio now (process, rationale, iteration) versus polished final shots alone, since AI makes final shots cheap to produce." },
+    { "start": 1440, "text": "Side-by-side case studies comparing fully AI-generated work against AI-assisted work where a human directed every key decision, and why clients still pay differently for each." },
+    { "start": 1920, "text": "Ethical considerations: attribution, training-data provenance, and how the panelists vet which AI tools they'll actually use on client work." },
+    { "start": 2400, "text": "Staying adaptable: treating new AI features as just another material to learn, the same way past generations learned new software, rather than a threat to specialize away from." },
+    { "start": 2880, "text": "The value of community and mentorship during this shift - pairing junior designers with seniors specifically to transfer judgment, not just tool proficiency." },
+    { "start": 3120, "text": "Closing call to action: pick one workflow this month to augment with AI, keep the creative decisions your own, and measure whether it actually gave time back for better work." }
+  ]
+}

@@ -1,0 +1,17 @@
+{
+  "videoId": "5-bUvwi2L-E",
+  "title": "The Heart and Mind of Editing Award-Winning Music Videos",
+  "durationSeconds": 2059,
+  "synthetic": true,
+  "note": "Placeholder transcript for the AI Week demo, not a real transcription. Replace via generate_transcripts.py once ffmpeg + an OpenAI/Whisper key are available.",
+  "segments": [
+    { "start": 0, "text": "The editor opens on 'cutting to intention' - starting every music video edit from the emotional beat of the track rather than the raw footage, and letting pacing follow the music's own rhythm." },
+    { "start": 300, "text": "A breakdown of beat-matching cuts: finding the musical accents in a track first, then building the edit's rhythm around them before touching performance footage." },
+    { "start": 600, "text": "Color grading for mood - how a warmer, lower-contrast grade versus a cold, high-contrast one changes the emotional read of the exact same performance footage." },
+    { "start": 900, "text": "Working with a director's vision: translating a director's reference boards and mood language into actual timeline decisions without losing their intent." },
+    { "start": 1200, "text": "Project organization in Premiere for music video work - bin structure, multicam syncing to the master audio track, and labeling conventions that scale to hundreds of takes." },
+    { "start": 1500, "text": "Sound design tricks beyond the master track: layering subtle whooshes and impacts under cuts to make edits feel more physical, even in a purely visual medium." },
+    { "start": 1800, "text": "On burnout: the editor describes hitting a wall mid-career, and the specific changes to workload and feedback loops with artists/labels that helped them recover." },
+    { "start": 1980, "text": "Closing thoughts on redefining success as an editor - moving away from view counts as the only measure, toward whether the edit served the song and the artist's intent." }
+  ]
+}

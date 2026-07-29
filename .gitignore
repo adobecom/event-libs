@@ -2,10 +2,17 @@
 .aem/*
 coverage/*
 logs/*
-node_modules/*
+node_modules/
 .DS_Store
 .idea
 *.pem
+
+# Python (tools/*)
+__pycache__/
+*.pyc
+
+# Runtime-generated API response cache (tools/ai-week-video-chat)
+tools/ai-week-video-chat/.cache/
 
 # PIM local state
 .pim/

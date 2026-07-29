@@ -162,6 +162,7 @@ class VideoPlaylist {
     this.disposers = [];
     this.favoritesManager = null;
     this.playerManager = null;
+    this.videoChatManager = null;
     this.init();
   }
 
@@ -262,6 +263,7 @@ class VideoPlaylist {
   cleanup() {
     this.playerManager?.cleanup();
     this.favoritesManager?.cleanup();
+    this.videoChatManager?.cleanup();
     this.disposers.forEach((fn) => {
       try {
         fn();
@@ -376,6 +378,22 @@ class VideoPlaylist {
     this.root.appendChild(toggle);
     this.videoWrapperPromise.then((wrapper) => wrapper.appendChild(toggle));
     this.root.appendChild(this.drawer);
+
+    // AI Week demo: persona-aware chat per session, independent of registration
+    // status - it's a content-discovery feature, not gated on RF like Favorites.
+    try {
+      this.videoChatManager?.cleanup();
+      const { VideoChatManager } = await import('./video-chat-manager.js');
+      this.videoChatManager = new VideoChatManager({
+        getCards: () => this.cards,
+        getSessionsWrapper: () => this.sessionsWrapper,
+        getPlayerManager: () => this.playerManager,
+        navigateTo: (href) => { window.location.href = href; },
+      });
+      this.videoChatManager.setup();
+    } catch (error) {
+      logError(error, 'VideoPlaylist.render.videoChatManager');
+    }
 
     // 3. Initialize Favorites Manager (only if enabled AND user is registered)
     if (this.cfg.favoritesEnabled) {

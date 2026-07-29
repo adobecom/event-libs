@@ -1,0 +1,17 @@
+{
+  "videoId": "3424767",
+  "title": "Sunshine and Storms: Weathering a Creative Life",
+  "durationSeconds": 3538,
+  "synthetic": true,
+  "note": "Placeholder transcript for the AI Week demo, not a real transcription. Replace via generate_transcripts.py once ffmpeg + an OpenAI/Whisper key are available.",
+  "segments": [
+    { "start": 0, "text": "Tad Carpenter opens by tracing the founding of Carpenter Collective, and why he frames a creative career as alternating 'sunshine and storms' rather than a steady upward line." },
+    { "start": 420, "text": "How the studio built its first award-winning brand identity system on a shoestring budget, and the specific client trust-building that made that first big win possible." },
+    { "start": 900, "text": "Weathering the 'storms' - a slow year with almost no new business, and the concrete changes to outreach and pricing that pulled the studio out of it." },
+    { "start": 1380, "text": "Building a distinctive brand system: how Carpenter Collective develops a visual language (color, illustration, type) that stays consistent across packaging, signage, and digital." },
+    { "start": 1860, "text": "Balancing the studio's own creative point of view against client asks - when to hold firm on a design decision and when a client's business context should override taste." },
+    { "start": 2340, "text": "Growing from a solo freelancer into a small studio: hiring the first designer, and the specific mentoring habits that kept the studio's visual voice consistent as the team grew." },
+    { "start": 2820, "text": "Maintaining creative energy over a long career - Tad's own routines (sketching outside of client work, side projects) that keep the work from feeling purely commercial." },
+    { "start": 3120, "text": "Closing thoughts: treating both the wins and the slow periods as data about the business, not just morale swings, and using that to make steadier long-term decisions." }
+  ]
+}
