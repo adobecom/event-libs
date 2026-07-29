@@ -73,16 +73,15 @@ export async function constructRequestOptions(method, body = null, waitForIMS = 
   }
 
   const headers = new Headers();
-  // skipAuth is for genuinely public/guest-token-authenticated endpoints: never attach
-  // the caller's own IMS identity, even if one happens to be signed in (an assistant
-  // registering on a VIP's behalf must stay anonymous to the backend). The override
-  // takes precedence over window.adobeIMS for callers with no IMS bootstrap at all
-  // (e.g. the standalone tier-1-event-configurator DA app).
+  // skipAuth suppresses the caller's IMS identity entirely — used only by
+  // validateRsvpToken's load-time check, which authenticates solely via the
+  // rsvp-token header and runs before there's necessarily any IMS session to read.
+  // The override takes precedence over window.adobeIMS for callers with no IMS
+  // bootstrap at all (e.g. the standalone tier-1-event-configurator DA app).
   const authToken = skipAuth ? null : (espAuthTokenOverride || window.adobeIMS?.getAccessToken()?.token);
 
   if (authToken) headers.append('Authorization', `Bearer ${authToken}`);
-  // RSVP-token endpoints authenticate solely via this header — the token never
-  // travels in the URL path or query string, to keep it out of access logs.
+  // The rsvp-token never travels in the URL path or query string, to keep it out of access logs.
   if (rsvpToken) headers.append('x-adobe-esp-rsvp-token', rsvpToken);
   headers.append('x-api-key', 'acom_event_service');
   headers.append('x-request-id', await getUuid(new Date().getTime()));
@@ -315,13 +314,20 @@ export async function getAttendee() {
   }
 }
 
-export async function createAttendee(attendeeData) {
+export async function createAttendee(attendeeData, rsvpToken = null) {
   if (!attendeeData) return false;
 
   const eventServiceEnv = getEventServiceEnv();
   const { serviceApiEndpoints } = ENV_MAP[eventServiceEnv.name];
   const raw = JSON.stringify(attendeeData);
-  const options = await constructRequestOptions('POST', raw);
+  // Cluster Gateway requires a valid IMS credential on every request regardless of the
+  // rsvp-token header, so this always forwards whatever IMS token exists (guest or a real
+  // signed-in session) rather than suppressing it — omitting it would get the request
+  // rejected at the gateway before it ever reaches ESP. Which identity actually gets
+  // registered is the backend's call, not ours: ESP's attendee routes give the rsvp-token
+  // header precedence over any IMS identity, so an assistant registering a VIP via the link
+  // while signed into their own Adobe ID still registers the VIP, not themselves.
+  const options = await constructRequestOptions('POST', raw, true, false, rsvpToken);
 
   try {
     const response = await fetch(`${serviceApiEndpoints.esl}/v1/attendees`, options);
@@ -339,13 +345,15 @@ export async function createAttendee(attendeeData) {
   }
 }
 
-export async function addAttendeeToEvent(eventId, attendee) {
+export async function addAttendeeToEvent(eventId, attendee, rsvpToken = null) {
   if (!eventId || !attendee) return false;
 
   const eventServiceEnv = getEventServiceEnv();
   const { serviceApiEndpoints } = ENV_MAP[eventServiceEnv.name];
   const raw = JSON.stringify(attendee);
-  const options = await constructRequestOptions('POST', raw);
+  // Same identity handling as createAttendee above. This call also consumes
+  // the rsvp token server-side once the registration succeeds.
+  const options = await constructRequestOptions('POST', raw, true, false, rsvpToken);
 
   try {
     const response = await fetch(`${serviceApiEndpoints.esl}/v1/events/${eventId}/attendees/${attendee.attendeeId}`, options);
@@ -450,19 +458,18 @@ export async function getCampaign(eventId, campaignId) {
   }
 }
 
-// RSVP token endpoints — authenticated solely by the x-adobe-esp-rsvp-token
-// header (constructRequestOptions(..., waitForIMS=false, skipAuth=true, token)), so
-// both calls skip waiting for adobeIMS (avoids stalling for a guest with no IMS
-// session) and skip attaching any signed-in caller's own IMS token (keeps the
-// submission anonymous even when the caller, e.g. an assistant, happens to be
-// signed in).
+// Validate-on-load for a guest rsvp token — authenticated solely by the
+// x-adobe-esp-rsvp-token header. This call never consumes the token; actual
+// registration (and consumption) happens via the normal attendee endpoints
+// (createAttendee / addAttendeeToEvent above), with the token threaded through
+// as auth instead of a separate submission endpoint.
 export async function validateRsvpToken(eventId, token) {
   const eventServiceEnv = getEventServiceEnv();
   const { serviceApiEndpoints } = ENV_MAP[eventServiceEnv.name];
   const options = await constructRequestOptions('GET', null, false, true, token);
 
   try {
-    const response = await fetch(`${serviceApiEndpoints.esl}/v1/events/${eventId}/rsvpTokenRegistrations`, options);
+    const response = await fetch(`${serviceApiEndpoints.esp}/v1/events/${eventId}/rsvpTokenRegistrations`, options);
     const data = await response.json();
 
     if (!response.ok) {
@@ -473,35 +480,6 @@ export async function validateRsvpToken(eventId, token) {
     return { ok: true, data };
   } catch (error) {
     window.lana?.log(`Error: Failed to validate RSVP token:${JSON.stringify(error)}`);
-    return { ok: false, status: 'Network Error', error: error.message };
-  }
-}
-
-export async function submitRsvpTokenRegistration(eventId, token, attendeeData, campaignId = null) {
-  if (!eventId || !token || !attendeeData) return { ok: false, error: 'Missing eventId, token, or attendee data' };
-
-  const eventServiceEnv = getEventServiceEnv();
-  const { serviceApiEndpoints } = ENV_MAP[eventServiceEnv.name];
-  const raw = JSON.stringify(attendeeData);
-  const options = await constructRequestOptions('POST', raw, false, true, token);
-  const url = new URL(`${serviceApiEndpoints.esl}/v1/events/${eventId}/rsvpTokenRegistrations`);
-  // Tokens never carry a bound campaign (EMC no longer sets one at generation),
-  // so this query-param fallback is the sole campaign-attribution path for
-  // rsvp-token registrations — campaignId is never sent in the request body.
-  if (campaignId) url.searchParams.set('campaignId', campaignId);
-
-  try {
-    const response = await fetch(url.toString(), options);
-    const data = await response.json();
-
-    if (!response.ok) {
-      window.lana?.log(`Error: Failed to submit RSVP token registration. Status:${JSON.stringify(response)}`);
-      return { ok: false, status: response.status, error: data };
-    }
-
-    return { ok: true, data };
-  } catch (error) {
-    window.lana?.log(`Error: Failed to submit RSVP token registration:${JSON.stringify(error)}`);
     return { ok: false, status: 'Network Error', error: error.message };
   }
 }
@@ -718,7 +696,7 @@ export async function unregisterFromSessionTime(sessionTimeId) {
 }
 
 // compound helper functions
-export async function getAndCreateAndAddAttendee(eventId, attendeeData) {
+export async function getAndCreateAndAddAttendee(eventId, attendeeData, rsvpToken = null) {
   const profile = BlockMediator.get('imsProfile');
   const eventObj = await getEvent(eventId);
 
@@ -728,9 +706,12 @@ export async function getAndCreateAndAddAttendee(eventId, attendeeData) {
   let registrationStatus = 'registered';
 
   if (profile.account_type === 'guest') {
-    // Use BaseAttendee filter for creating new attendee
+    // Use BaseAttendee filter for creating new attendee. A guest arriving via an rsvp
+    // token still forwards whatever IMS token exists alongside it — see createAttendee
+    // for why (Cluster Gateway requires one either way; the backend, not us, decides
+    // which credential's identity the registration actually uses).
     const filteredPayload = getBaseAttendeePayload(attendeeData);
-    attendee = await createAttendee(filteredPayload);
+    attendee = await createAttendee(filteredPayload, rsvpToken);
   } else {
     const attendeeResp = await getAttendee();
 
@@ -746,7 +727,10 @@ export async function getAndCreateAndAddAttendee(eventId, attendeeData) {
     }
   }
 
-  if (!attendee?.ok) return { ok: false, error: 'Failed to create or update attendee' };
+  // Preserve the upstream status (e.g. 401/404/409/410 for a guest whose rsvp
+  // token went stale between page load and submit) so callers can show the
+  // specific error copy instead of a generic failure message.
+  if (!attendee?.ok) return { ok: false, status: attendee?.status, error: attendee?.error || 'Failed to create or update attendee' };
 
   const newAttendeeData = attendee.data;
 
@@ -770,7 +754,9 @@ export async function getAndCreateAndAddAttendee(eventId, attendeeData) {
     registrationStatus,
   });
 
-  return addAttendeeToEvent(eventId, eventAttendeePayload);
+  // For a guest, this call both registers and consumes the rsvp token
+  // server-side in one step.
+  return addAttendeeToEvent(eventId, eventAttendeePayload, rsvpToken);
 }
 
 export async function indexPathToSchedule(scheduleId, pagePath) {
