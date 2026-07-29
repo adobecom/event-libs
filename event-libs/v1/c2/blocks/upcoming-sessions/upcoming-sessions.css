@@ -54,6 +54,15 @@
   .upcoming-sessions--attached {
     padding-left: var(--s2a-layout-lg, 124px);
     padding-right: 0;
+
+    /* Not flush with the marquee's bottom edge — confirmed from Figma's own
+       node geometry: this section's top offset (654) + its content height
+       (192) leaves exactly 67px of empty space below it before the
+       marquee's own bottom edge (654 + 192 + 67 = 913). Literal value, not
+       a token: 67 doesn't cleanly match any tokens.css spacing step (the
+       nearest, 64/--s2a-spacing-4xl, is a 3px rounding-level difference,
+       not the same number). */
+    bottom: 67px;
   }
 }
 
