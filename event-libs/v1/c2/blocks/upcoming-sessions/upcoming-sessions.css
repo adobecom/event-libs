@@ -35,11 +35,15 @@
   padding: var(--s2a-spacing-md, 16px);
 }
 
+/* Below 1280px, this stacks normally after the marquee's own foreground
+   content instead of overlaying it — confirmed from Figma's actual mobile
+   frame (375 wide): the marquee's content there doesn't come anywhere near
+   913px tall, and the *next* section already starts within that same
+   reference frame. The event-marquee itself only gets a fixed min-height
+   at 1280px+ (see event-marquee.css) — below that, an absolutely positioned
+   overlay here would just overlap the foreground content instead of
+   reserving its own space, which is exactly the overlap bug this fixes. */
 .upcoming-sessions--attached {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
   padding: var(--s2a-spacing-lg, 24px) var(--s2a-spacing-md, 16px);
 }
 
@@ -49,9 +53,17 @@
    node geometry: the peeking card is authored to sit mostly off-frame (only
    ~31px of it visible at 1440px), hard-cut flush against the marquee's true
    right edge with no margin at all. A symmetric right gutter here would
-   under-reveal the peek versus the design. */
+   under-reveal the peek versus the design.
+
+   Only becomes an absolutely positioned overlay here, at 1280px+ — this is
+   the one breakpoint where event-marquee reserves a fixed, generous height
+   (913px) with real room to spare underneath its own content for this to
+   overlay into. */
 @media (min-width: 1280px) {
   .upcoming-sessions--attached {
+    position: absolute;
+    left: 0;
+    right: 0;
     padding-left: var(--s2a-layout-lg, 124px);
     padding-right: 0;
 

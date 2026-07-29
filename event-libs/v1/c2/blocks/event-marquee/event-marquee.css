@@ -17,6 +17,12 @@
   color: var(--s2a-color-content-knockout);
   font-family: var(--s2a-font-family-default);
   display: flex;
+
+  /* Stacks the foreground and (below 1280px, in-flow) upcoming-sessions
+     attachment vertically. Was invisible before: upcoming-sessions was
+     always position:absolute (out of flow), so this container's own
+     flex-direction never mattered until it became a real in-flow sibling. */
+  flex-direction: column;
 }
 
 @media (min-width: 1024px) {
@@ -79,6 +85,13 @@
   flex-direction: column;
   gap: var(--s2a-spacing-xl);
   padding: var(--s2a-spacing-4xl) var(--s2a-spacing-md);
+
+  /* .event-marquee is now flex-direction:column (to stack the in-flow,
+     below-1280px upcoming-sessions attachment underneath this instead of
+     beside it) — without this, foreground has no explicit height in that
+     column layout, so the video-bleed asset's own height:100% (further
+     down this file) has nothing real to resolve against and collapses. */
+  flex: 1 1 auto;
 }
 
 @media (min-width: 1024px) {
