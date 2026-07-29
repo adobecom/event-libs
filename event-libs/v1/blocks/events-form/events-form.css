@@ -485,7 +485,7 @@
     width: 100%;
   }
   
-  .events-form :is(.events-form-submit-wrapper:last-child, .events-form-heading-wrapper, .thank-you, .events-form-full-width) {
+  .events-form :is(.events-form-submit-wrapper:last-child, .events-form-submit-wrapper, .events-form-heading-wrapper, .thank-you, .events-form-full-width) {
     grid-column: 1 / 3;
     justify-self: center;
   }
