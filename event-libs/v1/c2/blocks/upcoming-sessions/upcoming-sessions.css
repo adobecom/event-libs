@@ -43,6 +43,17 @@
   padding: var(--s2a-spacing-lg, 24px) var(--s2a-spacing-md, 16px);
 }
 
+/* Matches event-marquee's own 1280px+ horizontal gutter (event-marquee.css,
+   .event-marquee-foreground) so the headline, the first card, and the
+   peeking last card's cut edge all line up consistently instead of the
+   marquee's own content and this attached fragment using two different,
+   unrelated horizontal insets. */
+@media (min-width: 1280px) {
+  .upcoming-sessions--attached {
+    padding-inline: var(--s2a-layout-lg, 124px);
+  }
+}
+
 .upcoming-sessions-header {
   display: flex;
   align-items: center;

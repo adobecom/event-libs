@@ -65,14 +65,20 @@
   background: linear-gradient(0deg, var(--s2a-color-transparent-black-64), var(--s2a-color-transparent-black-00) 60%);
 }
 
-/* Foreground (always present, last row) — ports marquee.css's `.foreground`. */
+/* Foreground (always present, last row) — ports marquee.css's `.foreground`.
+   Horizontal padding was missing entirely here (0 on both sides) — confirmed
+   via a real rendered screenshot that the headline sat flush against the
+   viewport edge, partially clipped. var(--s2a-spacing-md) is a reasonable
+   mobile/tablet gutter; the 1280px+ tier below bumps this to the exact value
+   Figma's dev-mode redline calls out (124px, which is also a real named
+   primitive in tokens.css: --s2a-spacing-124 / --s2a-layout-lg). */
 .event-marquee-foreground {
   position: relative;
   z-index: 1;
   display: flex;
   flex-direction: column;
   gap: var(--s2a-spacing-xl);
-  padding: var(--s2a-spacing-4xl) 0;
+  padding: var(--s2a-spacing-4xl) var(--s2a-spacing-md);
 }
 
 @media (min-width: 1024px) {
@@ -83,8 +89,17 @@
      no asset), row vs. column has no visual effect on its own — see the
      Text/CTA-specific override below for how vertical centering carries over. */
   .event-marquee-foreground {
-    padding: var(--s2a-spacing-xl) 0;
+    padding: var(--s2a-spacing-xl) var(--s2a-spacing-md);
     flex-direction: row;
+  }
+}
+
+/* Must come after the 1024px+ block above: same selector/property, equal
+   specificity — an earlier position here would lose the cascade to that
+   broader rule regardless of this media query being narrower. */
+@media (min-width: 1280px) {
+  .event-marquee-foreground {
+    padding-inline: var(--s2a-layout-lg);
   }
 }
 
