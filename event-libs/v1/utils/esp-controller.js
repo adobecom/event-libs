@@ -441,7 +441,7 @@ export async function getCampaign(eventId, campaignId) {
 
   try {
     const response = await fetch(
-      `${serviceApiEndpoints.esl}/v1/events/${eventId}/campaigns/${campaignId}`,
+      `${serviceApiEndpoints.esp}/v1/events/${eventId}/campaigns/${campaignId}`,
       options,
     );
     const data = await response.json();
