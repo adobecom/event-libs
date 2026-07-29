@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Schedule Maker</title>
+  <link rel="stylesheet" href="/schedule-maker/schedule-maker.css" />
+</head>
+<body>
+  <!--
+    LOCAL-DEV entry point. Mirrors the da-events app path
+    (tools/da-apps/schedule-maker) so `?ref=local` against the production
+    da.live URL proxies here. It loads the app from the LOCAL server via
+    root-relative paths (/schedule-maker/...), so serve from the event-libs
+    inner root. This file is not used on aem.live — the da-events entry loads
+    the deployed code there.
+  -->
+  <div id="app"></div>
+  <script type="module" src="/schedule-maker/schedule-maker.js"></script>
+</body>
+</html>

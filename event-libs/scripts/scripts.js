@@ -10,9 +10,9 @@
  * governing permissions and limitations under the License.
  */
 
-import { LIBS } from '../v1/utils/utils.js';
+import { LIBS, getMetadata } from '../v1/utils/utils.js';
 import decorateArea from '../v1/utils/decorate.js';
-import { EVENT_BLOCKS } from '../v1/libs.js';
+import { EVENT_BLOCKS, EVENT_BLOCKS_C2 } from '../v1/libs.js';
 
 const {
   loadArea,
@@ -27,6 +27,12 @@ const prodDomains = ['milo.adobe.com', 'business.adobe.com', 'www.adobe.com', 'n
 // Add project-wide style path here.
 const STYLES = '';
 
+const EVENT_LIBS_BASE = '/event-libs/v1';
+const IS_C2 = getMetadata('foundation') === 'c2';
+const EVENT_BLOCKS_LIB = IS_C2
+  ? { base: `${EVENT_LIBS_BASE}/c2`, blocks: EVENT_BLOCKS_C2 }
+  : { base: EVENT_LIBS_BASE, blocks: EVENT_BLOCKS };
+
 // Add any config options.
 const CONFIG = {
   codeRoot: '/event-libs',
@@ -35,7 +41,7 @@ const CONFIG = {
   miloLibs: LIBS,
   prodDomains,
   externalLibs: [
-    { base: '/event-libs/v1', blocks: EVENT_BLOCKS },
+    EVENT_BLOCKS_LIB,
   ],
   htmlExclude: [
     /www\.adobe\.com\/(\w\w(_\w\w)?\/)?express(\/.*)?/,
