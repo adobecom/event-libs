@@ -24,6 +24,9 @@ const EVENT_BLOCKS = [
   'session-state-demo',
 ];
 
+const EVENT_BLOCKS_C2 = [
+];
+
 // Import only the most essential utilities that are always needed
 // These are the functions that the importer's scripts.js actually uses
 import {
@@ -59,21 +62,13 @@ export {
   validatePageAndRedirect,
   processAutoBlockLinks,
   EVENT_BLOCKS,
+  EVENT_BLOCKS_C2,
 };
 
 // Lazy-loaded delayed actions for event pages
 export const eventsDelayedActions = async () => {
   const { lazyCaptureProfile } = await import('./utils/profile.js');
   lazyCaptureProfile();
-
-  const chronoBoxesWithSchedule = document.querySelectorAll('.chrono-box[data-schedule-id]');
-  const hasSchedulableChronoBoxes = chronoBoxesWithSchedule.length > 0;
-  const envName = getEventConfig()?.miloConfig?.env?.name;
-  const isProd = envName === 'prod';
-  if (hasSchedulableChronoBoxes && !isProd) {
-    const { default: autoIndexPageSchedules } = await import('./features/indexer-widget/page-schedule-indexer.js');
-    await autoIndexPageSchedules();
-  }
 
   if (getMetadata('meta-pixel')) {
     const { default: initMetaPixel } = await import('../scripts/meta-pixel.js');

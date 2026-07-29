@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Tier 1 Event Configurator</title>
+  <!--
+    ESP env override for local testing — superseded 2026-07-24 by the app's
+    own in-UI environment picker (ManualEventLookup.js, backed by
+    setEventServiceEnvOverride() in event-libs/v1/utils/utils.js). That
+    picker persists for the whole session, unlike this tag which silently
+    forces the same env for everyone with no visible indication it's active.
+    Leave commented out; only uncomment for a scenario the in-app picker
+    can't reach (e.g. before the app itself has mounted). Valid values:
+    dev, dev02, stage, stage02, prod, local (see ENV_MAP in
+    event-libs/v1/utils/constances.js). Defaults to prod when absent/commented.
+  -->
+  <!-- <meta name="event-service-env" content="local" /> -->
+  <link rel="stylesheet" href="/tier-1-event-configurator/tier-1-event-configurator.css" />
+</head>
+<body>
+  <!--
+    LOCAL-DEV entry point. Mirrors the da-events app path
+    (tools/da-apps/tier-1-event-configurator) so `?ref=local` against the
+    production da.live URL proxies here. It loads the app from the LOCAL
+    server via root-relative paths (/tier-1-event-configurator/...), so serve
+    from the event-libs inner root. This file is not used on aem.live — the
+    da-events entry loads the deployed code there.
+  -->
+  <div id="app"></div>
+  <script type="module" src="/tier-1-event-configurator/tier-1-event-configurator.js"></script>
+</body>
+</html>

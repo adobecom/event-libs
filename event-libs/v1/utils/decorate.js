@@ -9,7 +9,7 @@ import {
 } from './constances.js';
 import BlockMediator from '../deps/block-mediator.min.js';
 import { getEvent, getCampaign } from './esp-controller.js';
-import { dictionaryManager, getInviteOnlyNoCampaignMessage } from './dictionary-manager.js';
+import { dictionaryManager, getInviteOnlyNoCampaignMessage, getRsvpTokenInvalidMessage } from './dictionary-manager.js';
 import {
   getMetadata,
   setMetadata,
@@ -25,6 +25,7 @@ import {
   parseEncodedConfig,
   createTag,
   getValidCampaignIdFromUrl,
+  shouldForceGuestSignIn,
 } from './utils.js';
 import { massageMetadata } from './date-time-helper.js';
 import { hydrateBlocks, setHydrationPromise } from '../hydrate/hydrate.js';
@@ -123,6 +124,12 @@ function setCtaState(targetState, rsvpBtn) { // eslint-disable-line no-unused-va
       rsvpBtn.el.textContent = waitlistedText;
       rsvpBtn.el.prepend(checkRed);
     },
+    declined: () => {
+      const declinedText = dictionaryManager.getValue('declined-cta-text');
+      disableBtn();
+      updateAnalyticTag(rsvpBtn.el, declinedText);
+      rsvpBtn.el.textContent = declinedText;
+    },
     toWaitlist: () => {
       const waitlistText = dictionaryManager.getValue('waitlist-cta-text');
       enableBtn();
@@ -139,6 +146,12 @@ function setCtaState(targetState, rsvpBtn) { // eslint-disable-line no-unused-va
     },
     inviteOnlyNoCampaign: () => {
       const text = getInviteOnlyNoCampaignMessage(dictionaryManager);
+      hideBtn(text);
+      updateAnalyticTag(rsvpBtn.el, text);
+      checkRed.remove();
+    },
+    rsvpTokenInvalid: () => {
+      const text = getRsvpTokenInvalidMessage(dictionaryManager);
       hideBtn(text);
       updateAnalyticTag(rsvpBtn.el, text);
       checkRed.remove();
@@ -160,6 +173,16 @@ function setCtaState(targetState, rsvpBtn) { // eslint-disable-line no-unused-va
 }
 
 export async function updateRSVPButtonState(rsvpBtn) {
+  const profile = BlockMediator.get('imsProfile');
+  if (profile?.rsvpTokenInvalid) {
+    // Token was already used, expired, or revoked (validated on load, see
+    // profile.js's captureProfile) — reflect it on the CTA itself rather than
+    // letting the guest click through to a form that will just reject them,
+    // and skip the event fetch below since it's moot for a dead token.
+    setCtaState('rsvpTokenInvalid', rsvpBtn);
+    return;
+  }
+
   const eventInfo = await getEvent(getMetadata('event-id'));
   let eventFull = false;
   let waitlistEnabled = getMetadata('allow-wait-listing') === 'true';
@@ -178,7 +201,6 @@ export async function updateRSVPButtonState(rsvpBtn) {
   }
 
   const campaignId = new URLSearchParams(window.location.search).get('campaign');
-  const profile = BlockMediator.get('imsProfile');
   const isLoggedInNonGuest = profile && !profile.noProfile && profile.account_type !== 'guest';
   if (campaignId && CAMPAIGN_ID_PATTERN.test(campaignId) && isLoggedInNonGuest) {
     const campaignInfo = await getCampaign(getMetadata('event-id'), campaignId);
@@ -205,6 +227,8 @@ export async function updateRSVPButtonState(rsvpBtn) {
     setCtaState('registered', rsvpBtn);
   } else if (rsvpData.registrationStatus === 'waitlisted') {
     setCtaState('waitlisted', rsvpBtn);
+  } else if (rsvpData.registrationStatus === 'declined') {
+    setCtaState('declined', rsvpBtn);
   }
 }
 
@@ -224,15 +248,12 @@ async function handleRSVPBtnBasedOnProfile(rsvpBtn, profile) {
     updateRSVPButtonState(rsvpBtn);
   });
 
-  if (profile?.noProfile || profile.account_type === 'guest') {
-    const allowGuestReg = getMetadata('allow-guest-registration') === 'true';
-
-    if (!allowGuestReg) {
-      rsvpBtn.el.addEventListener('click', (e) => {
-        e.preventDefault();
-        signIn({ ...getSusiOptions(), redirect_uri: `${e.target.href}` });
-      });
-    }
+  const allowGuestReg = getMetadata('allow-guest-registration') === 'true';
+  if (shouldForceGuestSignIn(profile, allowGuestReg)) {
+    rsvpBtn.el.addEventListener('click', (e) => {
+      e.preventDefault();
+      signIn({ ...getSusiOptions(), redirect_uri: `${e.target.href}` });
+    });
   }
 }
 
@@ -332,10 +353,10 @@ const regHashCallbacks = {
     if (a.dataset.rsvpInitialized === 'true') {
       return;
     }
-    
+
     // Store the original text BEFORE any modifications
     const originalText = a.textContent.includes('|') ? a.textContent.split('|')[0] : a.textContent;
-    
+
     // Mark as initialized and store original text in dataset
     a.dataset.rsvpInitialized = 'true';
     a.dataset.rsvpOriginalText = originalText;
@@ -511,19 +532,24 @@ function prebuildAutoBlock(blockName, link) {
   const autoBlockBuilders = {
     'chrono-box': (link) => {
       const url = new URL(link.href);
-      const scheduleBase64 = url.searchParams.get('schedule');
+      const hashMatch = url.hash.match(/[#&]schedule=([A-Za-z0-9+/=%-]{20,})/);
+      const scheduleBase64 = url.searchParams.get('schedule') || hashMatch?.[1];
       const schedule = parseEncodedConfig(scheduleBase64);
-      
+
       if (!schedule || !schedule.blocks || !Array.isArray(schedule.blocks)) {
         return null;
       }
 
+      // url.pathname looks like "/app/{org}/{repo}/tools/da-apps/schedule-maker"
+      const pathParts = url.pathname.split('/').filter(Boolean);
+      const [org, repo] = pathParts[0] === 'app' ? [pathParts[1], pathParts[2]] : [];
 
       // Transform schedule blocks into chrono-box format
       const chronoBoxData = schedule.blocks.map(block => {
         const item = {
           pathToFragment: block.fragmentPath,
-          toggleTime: block.startDateTime
+          title: block.title,
+          toggleTime: block.startDateTime,
         };
 
         // Add mobileRider sessionId if the block includes a live stream
@@ -544,7 +570,7 @@ function prebuildAutoBlock(blockName, link) {
         class: 'chrono-box',
         'data-schedule-id': schedule.scheduleId,
         'data-schedule-title': schedule.title,
-        'data-schedule-maker-url': `${url.origin}${url.pathname}?scheduleId=${schedule.scheduleId}`,
+        ...(org && repo ? { 'data-schedule-repo': `${org}/${repo}` } : {}),
       }, innerDiv);
 
       return chronoBoxEl;
@@ -1011,6 +1037,60 @@ function addStylesToEventPage() {
   document.head.appendChild(link);
 }
 
+export function applyAreaTheme(area = document) {
+  try {
+    const customAttributes = JSON.parse(getMetadata('custom-attributes'));
+    const theme = customAttributes.find(
+      (attr) => (attr.name ?? attr.attribute)?.toLowerCase().trim() === 'theme',
+    );
+    if (!theme) return;
+
+    const themeValue = theme.values?.[0]?.value?.toLowerCase().trim();
+    if (themeValue !== 'dark' && themeValue !== 'light') return;
+
+    const isDocument = area === document;
+    const blocks = isDocument
+      ? area.body.querySelectorAll('main > div > div[class]')
+      : area.querySelectorAll('div[class]');
+    blocks.forEach((block) => {
+      const isSectionMetadata = block.classList.contains('section-metadata');
+      if (isSectionMetadata) {
+        const blockRows = block.querySelectorAll(':scope > div');
+        if (blockRows.length > 0) {
+          const styleRow = Array.from(blockRows).find((row) => {
+            const cols = row.querySelectorAll(':scope > div');
+            return cols[0]?.textContent.trim().toLowerCase() === 'style';
+          });
+
+          if (styleRow) {
+            const cols = styleRow.querySelectorAll(':scope > div');
+            if (cols.length > 1) {
+              const valueCol = cols[1];
+              const values = valueCol.textContent.split(',').map((v) => v.trim().toLowerCase());
+              if (!values.includes(themeValue)) {
+                valueCol.textContent = `${valueCol.textContent}, ${themeValue}`;
+              }
+            }
+          } else {
+            const newRow = createTag('div');
+            const labelCol = createTag('div');
+            labelCol.textContent = 'style';
+            const valueCol = createTag('div');
+            valueCol.textContent = themeValue;
+            newRow.append(labelCol);
+            newRow.append(valueCol);
+            block.append(newRow);
+          }
+        }
+      }
+      block.classList.remove('dark', 'light');
+      block.classList.add(themeValue);
+    });
+  } catch {
+    // no-op: custom-attributes absent or not valid JSON
+  }
+}
+
 export function decorateEvent(parent) {
   setHydrationPromise(hydrateBlocks(parent));
 
@@ -1042,7 +1122,7 @@ export function decorateEvent(parent) {
 
   processTemplateInAllNodes(parent, { ...photosData, ...massagedMetadata });
   decorateProfileCardsZPattern(parent);
-
+  applyAreaTheme(parent);
   flagEventState(parent);
   
   // Process template links synchronously first (no dictionary needed)
@@ -1080,3 +1160,5 @@ export default function decorateArea(area = document) {
     eagerLoad(marquee, 'div:last-child > div:last-child img');
   }());
 }
+
+
