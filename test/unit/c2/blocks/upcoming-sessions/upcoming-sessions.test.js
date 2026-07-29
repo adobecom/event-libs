@@ -178,6 +178,40 @@ describe('upcoming-sessions', () => {
       expect(section.contains(extraContent), 'unrelated content stays a section child').to.equal(true);
     });
 
+    it('next/prev arrow clicks still scroll the track after attaching to a preceding block', async () => {
+      const sessions = Array.from(
+        { length: 5 },
+        (_, i) => session({ sessionId: `session-${i}`, sessionCode: `S-00${i}`, enTitle: `Session ${i}` }),
+      );
+      const section = document.createElement('div');
+      section.className = 'section';
+      const hero = document.createElement('div');
+      hero.className = 'hero attach-upcoming';
+      const el = document.createElement('div');
+      el.className = 'upcoming-sessions carousel clip-end';
+      const headingRow = document.createElement('div');
+      headingRow.append(document.createElement('div'));
+      headingRow.firstChild.textContent = 'Upcoming';
+      el.append(headingRow);
+      const metadata = buildSectionMetadata({ 'upcoming-sessions': JSON.stringify(sessions) });
+      section.append(hero, el, metadata);
+      document.body.append(section);
+
+      await init(el);
+
+      expect(el.dataset.fewSessions).to.equal('false');
+      const track = el.querySelector('.upcoming-sessions-track');
+      let calls = [];
+      track.scrollBy = (opts) => { calls.push(opts.left); };
+
+      el.querySelector('.upcoming-sessions-arrow--next').click();
+      el.querySelector('.upcoming-sessions-arrow--prev').click();
+
+      expect(calls.length).to.equal(2);
+      expect(calls[0]).to.be.greaterThan(0);
+      expect(calls[1]).to.be.lessThan(0);
+    });
+
     it('routes an upcoming-session card click to the session-guide deep link', async () => {
       const el = buildBlock([session()]);
       await init(el);
