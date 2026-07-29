@@ -259,22 +259,26 @@
   color: var(--s2a-color-brand-adobe-red);
 }
 
-/* Text/CTA variant — no asset (or a non-player asset): text is vertically centered
-   over the full-bleed background, matching real Milo's own default (non-split)
-   marquee. On mobile, .event-marquee-foreground is still column-direction, so
-   `justify-content: center` (the main/vertical axis) centers it. At 1024px+, the
-   shared rule above switches to row-direction for every variant — centering there
-   has to move to `align-items` (now the cross/vertical axis) instead, and
-   `justify-content` needs resetting so a lone text item doesn't get horizontally
-   centered too (it should stay left-anchored, per Figma). */
+/* Text/CTA variant — no asset (or a non-player asset). On mobile,
+   .event-marquee-foreground is still column-direction, so `justify-content:
+   center` (the main/vertical axis) centers it. At 1024px+, the shared rule
+   above switches to row-direction for every variant, and `justify-content`
+   needs resetting so a lone text item doesn't get horizontally centered too
+   (it should stay left-anchored, per Figma). */
 .event-marquee-text-cta .event-marquee-foreground {
   justify-content: center;
 }
 
 @media (min-width: 1024px) {
+  /* Fixed top offset instead of vertical centering (align-items: center) —
+     per Figma's dev-mode redline for this variant, the headline sits at a
+     specific 167px from the top of the marquee, not centered in the row.
+     167px is a literal value, not a token: it doesn't map to any step in
+     tokens.css's spacing scale (96 / 124 / 160 / 240), so forcing a nearby
+     token would drift from the measured design rather than match it. */
   .event-marquee-text-cta .event-marquee-foreground {
     justify-content: flex-start;
-    align-items: center;
+    padding-top: 167px;
   }
 }
 
