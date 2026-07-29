@@ -328,6 +328,15 @@ naturally always co-located as siblings in the same section.
   the overlay — the overlay positioning logic should read from CSS
   breakpoints (per the C2 convention in §3), not duplicate layout logic in
   JS.
+- **Hard authoring rule: nothing else may be authored in that same section**,
+  beyond the preceding `attach-upcoming` block and this one. The overlay's
+  `position: absolute` anchors to the section (the nearest positioned
+  ancestor, since these are siblings, not nested) — that only lines up with
+  the preceding block's actual edges because that block is the section's
+  *only* in-flow content. A third block or extra text sharing the section
+  would grow the section past the preceding block's own size and detach the
+  overlay from it. See event-marquee's README ("Attaching Upcoming Sessions")
+  for the full explanation from that side.
 
 ### 7. Shared carousel mechanics
 

@@ -369,6 +369,18 @@ function attachToPrecedingBlock(el) {
   if (previous?.classList.contains('attach-upcoming')) {
     el.classList.add('upcoming-sessions--attached');
     previous.classList.add('attach-upcoming--has-overlay');
+
+    // Wraps just these two elements so the overlay's position:absolute
+    // anchors to a box that always exactly matches the preceding block's own
+    // size, regardless of anything else authored in the same section. Without
+    // this, the absolute positioning falls back to the section itself (the
+    // nearest positioned ancestor for two siblings) - correct only as long as
+    // the preceding block is the section's sole in-flow content. Runs
+    // synchronously here, before any of this block's own async work, so it
+    // carries no LCP/CLS risk.
+    const wrapper = createTag('div', { class: 'event-marquee-upcoming-wrapper' });
+    previous.parentNode.insertBefore(wrapper, previous);
+    wrapper.append(previous, el);
   }
 }
 

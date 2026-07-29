@@ -35,6 +35,16 @@
   padding: var(--s2a-spacing-md, 16px);
 }
 
+/* Created by upcoming-sessions.js (attachToPrecedingBlock) to wrap only the
+   attach-upcoming block and this one. Gives .upcoming-sessions--attached's
+   absolute positioning (below) a dedicated positioned ancestor that always
+   exactly matches the preceding block's own size, instead of falling back to
+   the whole section - so it stays correct regardless of anything else
+   authored alongside them in that section. */
+.event-marquee-upcoming-wrapper {
+  position: relative;
+}
+
 /* Below 1280px, this stacks normally after the marquee's own foreground
    content instead of overlaying it — confirmed from Figma's actual mobile
    frame (375 wide): the marquee's content there doesn't come anywhere near

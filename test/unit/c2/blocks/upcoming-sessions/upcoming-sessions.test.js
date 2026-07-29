@@ -147,6 +147,37 @@ describe('upcoming-sessions', () => {
       expect(hero.classList.contains('attach-upcoming--has-overlay')).to.equal(true);
     });
 
+    it('wraps only the preceding block and itself, leaving other section content (e.g. section-metadata) outside the wrapper', async () => {
+      const section = document.createElement('div');
+      section.className = 'section';
+      const hero = document.createElement('div');
+      hero.className = 'hero attach-upcoming';
+      const block = document.createElement('div');
+      block.className = 'upcoming-sessions carousel clip-end';
+      const headingRow = document.createElement('div');
+      headingRow.append(document.createElement('div'));
+      headingRow.firstChild.textContent = 'Upcoming';
+      block.append(headingRow);
+      const metadata = buildSectionMetadata({ 'upcoming-sessions': JSON.stringify([session()]) });
+      // Extra content sharing the section - exactly the scenario the wrapper
+      // exists to protect against (would otherwise grow the section past the
+      // hero's own size and detach the overlay from it).
+      const extraContent = document.createElement('div');
+      extraContent.className = 'unrelated-block';
+      section.append(hero, block, metadata, extraContent);
+      document.body.append(section);
+
+      await init(block);
+
+      const wrapper = section.querySelector(':scope > .event-marquee-upcoming-wrapper');
+      expect(wrapper, 'wrapper must exist as a direct child of the section').to.not.be.null;
+      expect([...wrapper.children]).to.deep.equal([hero, block]);
+      expect(wrapper.contains(metadata)).to.equal(false);
+      expect(wrapper.contains(extraContent)).to.equal(false);
+      expect(section.contains(metadata), 'section-metadata stays a section child').to.equal(true);
+      expect(section.contains(extraContent), 'unrelated content stays a section child').to.equal(true);
+    });
+
     it('routes an upcoming-session card click to the session-guide deep link', async () => {
       const el = buildBlock([session()]);
       await init(el);

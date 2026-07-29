@@ -53,6 +53,40 @@ button, share button shown). The background row is decorated with Milo's own
 calls — so responsive per-viewport backgrounds, focal point, and solid-color
 fallback all work for free, no new code.
 
+## Attaching Upcoming Sessions
+
+To show the "Upcoming" sessions carousel overlaid on the bottom of the marquee,
+author `event-marquee` with an `attach-upcoming` modifier, followed immediately
+by an `upcoming-sessions` block **in the same section**:
+
+```
+| Event Marquee (attach-upcoming) |  |
+| --- | --- |
+| ![](./background.jpg) |  |
+| ## Headline<br>Body copy | [Watch live](https://...) |
+
+| Upcoming Sessions |  |
+| --- | --- |
+```
+
+**Do not author anything else in that section** — no extra text, no additional
+blocks, nothing besides these two. This isn't just a style preference:
+
+- `upcoming-sessions.js`'s own attach-detection (`attachToPrecedingBlock`) checks
+  `el.previousElementSibling` for the `attach-upcoming` class — this only works
+  if `event-marquee` is the *immediately preceding* element in the same section.
+- The overlay positioning (`.upcoming-sessions--attached`, in
+  `upcoming-sessions.css`) is `position: absolute` anchored to the section itself
+  (the nearest positioned ancestor, since the two blocks are siblings, not
+  nested). That only lines up correctly with the marquee because the marquee is
+  the section's *only* in-flow child — `event-marquee` is `width: 100%` and the
+  only sibling contributing to layout, so the section's box always exactly
+  matches the marquee's box. Adding any other content to the section breaks
+  that match, and the overlay will detach from the marquee's actual edges.
+
+If you need other content near the marquee, put it in a **separate section**
+below this one — not in the same section as the marquee/upcoming-sessions pair.
+
 ## Variants
 
 There is no explicit "variant" field to author. Two things are auto-detected
