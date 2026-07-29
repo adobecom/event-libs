@@ -50,7 +50,10 @@ function session(overrides = {}) {
     sessionLengthInMinutes: 60,
     url: 'https://example.com/sessions/s-001',
     tags: 'Design,Illustration',
-    sessionTimes: [{
+    // Singular object, matching what the block actually reads (session.sessionTime)
+    // and the authored-data example (docs/upcoming-session-author-data.json) — NOT
+    // a `sessionTimes` array, which the code never looks at.
+    sessionTime: {
       sessionTimeId: 'time-1',
       sessionId: 'session-1',
       eventId: 'event-1',
@@ -61,7 +64,7 @@ function session(overrides = {}) {
       attendeeCount: 42,
       isFull: false,
       locationId: 'loc-1',
-    }],
+    },
     ...overrides,
   };
 }
@@ -236,11 +239,11 @@ describe('upcoming-sessions', () => {
 
     it('shows a Live Now badge and hides the schedule button for a live session', () => {
       const live = session({
-        sessionTimes: [{
+        sessionTime: {
           startTimeMillis: Date.now() - 60_000,
           endTimeMillis: Date.now() + 3_600_000,
           timezone: 'America/Los_Angeles',
-        }],
+        },
       });
       const card = buildCard(live);
       expect(card.querySelector('.sg-live-card__time').textContent).to.equal('Live Now');
@@ -256,11 +259,11 @@ describe('upcoming-sessions', () => {
     it('routes a live-session card click to its Watch URL, not session-guide', () => {
       const live = session({
         watchUrl: 'https://example.com/watch/s-001',
-        sessionTimes: [{
+        sessionTime: {
           startTimeMillis: Date.now() - 60_000,
           endTimeMillis: Date.now() + 3_600_000,
           timezone: 'America/Los_Angeles',
-        }],
+        },
       });
       document.body.append(buildCard(live));
 
@@ -288,13 +291,16 @@ describe('upcoming-sessions', () => {
 
   describe('resolveClickAction', () => {
     it('resolves a live session to a watch-url click action, not session-guide', () => {
+      // A live session routes to its authored `watchUrl` (the stream destination) —
+      // never its detail-page `url`. See resolveClickAction: `url` is deliberately
+      // ignored for live sessions.
       const live = session({
-        url: 'https://example.com/watch/s-001',
-        sessionTimes: [{
+        watchUrl: 'https://example.com/watch/s-001',
+        sessionTime: {
           startTimeMillis: Date.now() - 60_000,
           endTimeMillis: Date.now() + 3_600_000,
           timezone: 'America/Los_Angeles',
-        }],
+        },
       });
       expect(resolveClickAction(live)).to.deep.equal({ type: 'watch', url: 'https://example.com/watch/s-001' });
     });
@@ -303,11 +309,11 @@ describe('upcoming-sessions', () => {
       const live = session({
         url: 'https://example.com/sessions/s-001',
         watchUrl: 'https://example.com/watch/s-001',
-        sessionTimes: [{
+        sessionTime: {
           startTimeMillis: Date.now() - 60_000,
           endTimeMillis: Date.now() + 3_600_000,
           timezone: 'America/Los_Angeles',
-        }],
+        },
       });
       expect(resolveClickAction(live)).to.deep.equal({ type: 'watch', url: 'https://example.com/watch/s-001' });
     });
@@ -319,11 +325,11 @@ describe('upcoming-sessions', () => {
     it('resolves a javascript: URL on a live session to no action (safeUrl guard)', () => {
       const live = session({
         url: 'javascript:alert(1)',
-        sessionTimes: [{
+        sessionTime: {
           startTimeMillis: Date.now() - 60_000,
           endTimeMillis: Date.now() + 3_600_000,
           timezone: 'America/Los_Angeles',
-        }],
+        },
       });
       expect(resolveClickAction(live)).to.deep.equal({ type: 'none' });
     });
