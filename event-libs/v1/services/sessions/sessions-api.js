@@ -360,6 +360,12 @@ export function normalizeSessions(rawSessions) {
 // yet) — fetchSessions() falls back to MOCK_ESL_PAYLOAD whenever it's absent, and only
 // attempts the real ESL/ESP call once one is provided.
 
+// Single source of truth so the name only has to change in one place — ESP is expected
+// to rename this custom attribute for the MAX 2026 event; swap the string here when the
+// new name lands. Exported so tier-1-event-configurator/utils.js (which needs the same
+// attribute for its own track editor) doesn't carry a second, independently-drifting copy.
+export const TRACK_ATTRIBUTE_NAME = 'Primary Track for Agenda (Digital Agenda)';
+
 // customAttributes carry things like track/audience/technical-level as name+values pairs
 // rather than plain session fields. `values[]` holds the value(s) actually selected for
 // that session (see events-service-platform's resolveCustomAttributes), not the full
@@ -435,7 +441,7 @@ export function mapEslPayloadToRawSessions(payload) {
       duration: session.sessionLengthInMinutes || 0,
       // "Track" is topic-like (drives the card icon); "Primary Track for Agenda" is the
       // single value shown as the card/detail track name — two distinct real attributes.
-      track: extractCustomAttributeValue(session, 'Primary Track for Agenda (Digital Agenda)'),
+      track: extractCustomAttributeValue(session, TRACK_ATTRIBUTE_NAME),
       category: extractCustomAttributeValues(session, 'Track'),
       contentCategory: extractCustomAttributeValues(session, 'Programming Category'),
       type,
