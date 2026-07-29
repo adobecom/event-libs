@@ -1178,7 +1178,7 @@ export async function initFormBasedOnRSVPData(bp) {
     const attendeeResp = await getAttendee();
     if (attendeeResp.ok) existingAttendeeData = attendeeResp.data;
     if (syncUIWithRSVPStatus()) return;
-    personalizeForm(block, { profile, existingAttendeeData });
+    personalizeForm(block, { existingAttendeeData, profile });
   }
 
   const countryInput = block.querySelector('select#consentStringId');
