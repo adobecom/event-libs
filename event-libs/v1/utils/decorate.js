@@ -124,6 +124,12 @@ function setCtaState(targetState, rsvpBtn) { // eslint-disable-line no-unused-va
       rsvpBtn.el.textContent = waitlistedText;
       rsvpBtn.el.prepend(checkRed);
     },
+    declined: () => {
+      const declinedText = dictionaryManager.getValue('declined-cta-text');
+      disableBtn();
+      updateAnalyticTag(rsvpBtn.el, declinedText);
+      rsvpBtn.el.textContent = declinedText;
+    },
     toWaitlist: () => {
       const waitlistText = dictionaryManager.getValue('waitlist-cta-text');
       enableBtn();
@@ -221,6 +227,8 @@ export async function updateRSVPButtonState(rsvpBtn) {
     setCtaState('registered', rsvpBtn);
   } else if (rsvpData.registrationStatus === 'waitlisted') {
     setCtaState('waitlisted', rsvpBtn);
+  } else if (rsvpData.registrationStatus === 'declined') {
+    setCtaState('declined', rsvpBtn);
   }
 }
 
