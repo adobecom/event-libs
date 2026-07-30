@@ -1,8 +1,14 @@
 # Block Hydration
 
-Hydration fills a block's authored rows with event data from page metadata before the
-block initializes. The hydrator does not render final UI — it fabricates the same DOM an
-author would have written by hand, then the block's own `init()` decorates it as usual.
+Hydration repeats an authored template row once per item in an event-data collection,
+before the block initializes.
+
+**No content originates in code.** The author writes one row containing
+`[[collection.field]]` placeholders plus any static text the block needs; the hydrator
+only clones that row per item and rewrites each clone's placeholders to point at a
+specific item. `decorateEvent`'s existing placeholder resolution then fills in the values,
+exactly as it does for the rest of the page. A hydrator never reads a field value, and
+never invents a label.
 
 This works for blocks event-libs owns *and* for consumer blocks it doesn't, such as
 da-bacom's `event-speakers`.
@@ -31,10 +37,25 @@ which produces `class="event-speakers hydrate speaker"`. Supported type variants
 `speaker`, `judge`, `host`, and `keynote`; omit the type variant to render every
 speaker in the metadata.
 
-Authored rows in a hydrated block are placeholders. `event-speakers` replaces them
-entirely, so there is no need to author a row per speaker — an empty block is fine. It
-also clears them when there is nothing to render, because the block throws on a row with
-fewer than two cells but initializes cleanly with no rows at all.
+Then author **exactly one template row** — the shape of a single item, with
+`[[collection.field]]` placeholders where the data goes:
+
+| event-speakers (hydrate, speaker) | | | |
+| --- | --- | --- | --- |
+| *(image with alt* `[[speakers.photo]]`*)* | `[[speakers.firstName]] [[speakers.lastName]]`<br>`[[speakers.title]]`<br>`[[speakers.company]]` | `[[speakers.bio]]` | Read more |
+
+Notes on authoring the template:
+
+- **Write the placeholder without an index.** `[[speakers.firstName]]`, not
+  `[[speakers:0.firstName]]`. The hydrator adds the index per clone.
+- **The collection name comes from the placeholders.** `speakers` in the example above
+  maps to `<meta name="speakers">`. No config row is needed.
+- **Images bind through the `alt` attribute**, as elsewhere in event decoration: drop a
+  placeholder image into the cell and set its alt text to `[[speakers.photo]]`.
+- **Static text stays static.** The "Read more" label above is authored, so changing it to
+  "Open me" just works. Anything not in `[[...]]` is copied verbatim to every row.
+- **The block must not be empty.** With no template row there is nothing to repeat, and
+  the hydrator leaves the block alone.
 
 ## How it works
 
@@ -48,6 +69,25 @@ Lookup order:
 
 A block with no hydrator is left untouched and logged. A hydrator that throws is logged
 separately, and the remaining blocks still hydrate.
+
+The shared `repeatTemplate` helper does the structural work:
+
+1. Find the row containing `[[...]]` placeholders — the template.
+2. Derive the collection name from the first placeholder, and parse that metadata.
+3. Let the hydrator filter and sort the items (its only job).
+4. Clone the template per item, rewriting `[[speakers.x]]` to `[[speakers:i.x]]` where
+   `i` is the item's index in the original metadata array.
+5. Remove the template row.
+
+Ordering matters and is load-bearing: `hydrateBlocks` runs at the top of `decorateEvent`,
+and `processTemplateInAllNodes` — which resolves `[[...]]` — runs later in the same
+function. So the placeholders the hydrator writes are resolved in the same pass, before
+any block `init()`.
+
+If the collection is missing, unparseable, or selects no items, the hydrator removes the
+template row rather than leaving it: an unresolved row would render literal `[[tokens]]`
+to the user, and for `event-speakers` a leftover single-cell row makes the block throw on
+`name.parentNode`. A block with no rows at all initializes cleanly.
 
 Consumers need no special call: hydration runs to completion inside `decorateEvent`,
 which projects already invoke before `loadArea()`.
@@ -112,43 +152,40 @@ statically mapped hydrators ship in every event page's critical path, so prefer
 
 ## Writing a hydrator
 
-A hydrator is a module with a default export taking the block element and mutating it
-in place. It must be synchronous — see
-[Why hydration is synchronous](#why-hydration-is-synchronous).
+Delegate the structure to `repeatTemplate` and supply only the selection rule — which
+items appear, in what order. That is usually the whole hydrator:
 
 ```js
-import { createTag, getMetadata, getImageSource } from '../../utils/utils.js';
+import repeatTemplate from '../repeat-template.js';
+
+function selectItems(items, block) {
+  // Filter by a variant class, sort however the block needs, and return items
+  // from the original array so their indexes can be recovered.
+  return items.filter((item) => block.classList.contains(item.kind));
+}
 
 export default function hydrateMyBlock(block) {
-  const raw = getMetadata('speakers');
-  if (!raw) return;
-
-  let data;
-  try {
-    data = JSON.parse(raw);
-  } catch (error) {
-    window.lana?.log(`Hydrator: Failed to parse metadata "speakers": ${error.message}`);
-    return;
-  }
-  // build rows and append to block
+  repeatTemplate(block, { selectItems });
 }
 ```
 
 Guidelines:
 
-- Stay synchronous. No `async`, `await`, `fetch`, or dynamic `import()`.
-- Parse metadata in `try/catch` and log via `logHydration` from `hydrate/log.js` — not
-  `window.lana?.log` directly, which drops the message because hydration runs before
-  Milo's `loadLana`. Never throw for missing or malformed data.
-- Leave the block in a state its `init()` tolerates, even on the bail-out paths. That may
-  mean clearing authored placeholders rather than leaving them.
-- Set plain values with `textContent`. `createTag`'s third argument is parsed as HTML.
-- Resolve images through `getImageSource(photo)`. Photo values are objects, not URLs,
-  and the SharePoint vs DA source differs by CMS.
-- Match the target block's authored contract exactly, including cell count and order.
+- **Never produce content.** No labels, no field values, no generated markup. If you find
+  yourself writing a user-visible string, it belongs in the authored template instead.
+- `selectItems` must return items **from the original array** — `repeatTemplate` recovers
+  each item's index with `indexOf` to build its placeholder. Returning copies breaks that.
+- Stay synchronous. No `async`, `await`, `fetch`, or dynamic `import()`. See
+  [Why hydration is synchronous](#why-hydration-is-synchronous).
+- Log via `logHydration` from `hydrate/log.js`, not `window.lana?.log` directly — the
+  latter drops the message, since hydration runs before Milo's `loadLana`.
+- Tolerate field-name variants in event data: `speakerType`/`type`, and `title`/`bio` at
+  the top level or nested under `localizations['en-US']`.
 - Don't remove the block. The hydrator doesn't own its lifecycle.
-- Tolerate both field-name variants in event data: `speakerType`/`type`, and
-  `title`/`bio` at the top level or nested under `localizations['en-US']`.
+
+If a block genuinely needs structure the template model can't express, a hydrator may
+still mutate the block directly — but then the content question applies with full force,
+and the values must come from placeholders the decoration pass resolves.
 
 ## Available hydrators
 
@@ -157,19 +194,24 @@ Guidelines:
 | `image-links` | `sponsors` | `sponsors` + tier (`platinum`, `diamond`, `gold`, `silver`, `bronze`, `engagement`) | event-libs |
 | `event-speakers` | `speakers` | `speaker`, `judge`, `host`, `keynote` | da-bacom |
 
+`image-links` predates the template model and still builds its rows in code; it is the
+one exception, kept as-is to avoid changing authored sponsor pages.
+
 ### `event-speakers`
 
-Builds one row per speaker in the four-cell shape the block expects:
+Repeats the authored template row once per speaker, sorted by `ordinal` — speakers with
+no ordinal go last. Its selection rule is the entire hydrator; the four-cell shape, the
+heading level, and the "Read more" label all come from the template.
 
-```html
-<div>
-  <div><picture><img src="…" alt="…"></picture></div>
-  <div><h3>First Last</h3><p>Title</p><p>Company</p></div>
-  <div><p>Bio…</p></div>
-  <div>Read more</div>
-</div>
-```
+The block reads cells positionally, so the authored template must keep this order:
 
-Speakers are sorted by `ordinal`. `company` is omitted when absent. Bios are passed
-through at full length — the block truncates to a 75-character preview itself and
-captures the full text for its "Read more" expansion.
+| Cell | Contents |
+| --- | --- |
+| 1 | image, with `[[speakers.photo]]` as its alt text |
+| 2 | name, and optionally title/company — the block styles the first heading here |
+| 3 | bio |
+| 4 | the expand label (removed by the block, reused as its button text) |
+
+Cell 2 must not be empty: the block throws on `name.parentNode` for a row with fewer than
+two cells. Bio placeholders resolve to the full text — the block truncates to a
+75-character preview itself and keeps the rest for its "Read more" expansion.

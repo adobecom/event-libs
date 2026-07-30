@@ -57,6 +57,42 @@ describe('Content Update Script', () => {
     expect(checkForDoubleSquareBrackets()).to.be.false;
   });
 
+  // End-to-end proof of the hydration contract: hydrateBlocks repeats the authored
+  // template row and rewrites its token indexes, then processTemplateInAllNodes resolves
+  // them — so no hydrated content originates in code.
+  it('hydrates a consumer block template and resolves its placeholders', () => {
+    document.body.innerHTML = `
+      <div>
+        <div class="event-speakers hydrate host">
+          <div>
+            <div></div>
+            <div><h3>[[speakers.firstName]] [[speakers.lastName]]</h3></div>
+            <div><p>[[speakers.bio]]</p></div>
+            <div>Read more</div>
+          </div>
+        </div>
+      </div>
+    `;
+    const miloDeps = {
+      getConfig: () => ({
+        locale: { ietf: 'en-US' },
+        miloConfig: { locale: { ietf: 'en-US' } },
+      }),
+      miloLibs: LIBS,
+    };
+
+    decorateEvent(document, miloDeps);
+
+    const block = document.querySelector('.event-speakers');
+    const rows = block.querySelectorAll(':scope > div');
+    expect(rows).to.have.lengthOf(1);
+    expect(checkForDoubleSquareBrackets()).to.be.false;
+    expect(block.querySelector('h3').textContent).to.equal('Hallease Narvaez');
+    expect(block.querySelector(':scope > div > div:nth-child(3)').textContent).to.include('Hallease');
+    // The label is authored, never produced by the hydrator
+    expect(block.querySelector(':scope > div > div:nth-child(4)').textContent.trim()).to.equal('Read more');
+  });
+
   it('handles #event-template special case', () => {
     document.body.innerHTML = defaultDoc;
     const miloDeps = {

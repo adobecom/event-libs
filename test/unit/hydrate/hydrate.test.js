@@ -432,23 +432,23 @@ describe('hydration is synchronous', () => {
   // Guards against reintroducing a dynamic import or async hydrator, either of which
   // would race block init on the fragment/personalization paths.
   it('completes before hydrateBlocks returns', () => {
-    setMetadata('speakers', JSON.stringify([{
-      ordinal: 0,
-      speakerType: 'Speaker',
-      firstName: 'Sync',
-      lastName: 'Speaker',
-      bio: 'Bio.',
-      photo: { imageUrl: 'https://example.com/sync.jpg' },
-    }]));
+    setMetadata('speakers', JSON.stringify([
+      { ordinal: 0, speakerType: 'Speaker', firstName: 'Sync', lastName: 'One' },
+      { ordinal: 1, speakerType: 'Speaker', firstName: 'Sync', lastName: 'Two' },
+    ]));
 
-    document.body.innerHTML = '<div class="event-speakers hydrate speaker"></div>';
+    document.body.innerHTML = `
+      <div class="event-speakers hydrate speaker">
+        <div><div></div><div>[[speakers.firstName]]</div><div></div><div>Read more</div></div>
+      </div>
+    `;
 
     hydrateBlocks(document);
 
     // Asserted on the very next statement, with no await in between
     const block = document.querySelector('.event-speakers');
-    expect(block.querySelectorAll('img')).to.have.lengthOf(1);
-    expect(block.querySelector('h3').textContent).to.equal('Sync Speaker');
+    expect(block.querySelectorAll(':scope > div')).to.have.lengthOf(2);
+    expect(block.innerHTML).to.include('[[speakers:0.firstName]]');
   });
 
   it('returns undefined rather than a promise', () => {
@@ -508,7 +508,11 @@ describe('hydration runs once per block', () => {
       photo: { imageUrl: 'https://example.com/re.jpg' },
     }]));
 
-    document.body.innerHTML = '<div class="event-speakers hydrate speaker"><div><div></div></div></div>';
+    document.body.innerHTML = `
+      <div class="event-speakers hydrate speaker">
+        <div><div></div><div>[[speakers.firstName]]</div><div></div><div>Read more</div></div>
+      </div>
+    `;
 
     hydrateBlocks(document);
     const block = document.querySelector('.event-speakers');

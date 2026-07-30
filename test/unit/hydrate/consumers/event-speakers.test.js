@@ -23,7 +23,7 @@ const SPEAKERS = [
     lastName: 'Swopes',
     title: 'Sr. Community Relationship Manager and Evangelist',
     company: 'Adobe',
-    bio: 'Elise Swopes is a self taught photographer and graphic designer known for unique cityscapes.',
+    bio: 'Elise Swopes is a self taught photographer and graphic designer.',
     photo: { imageUrl: 'https://example.com/elise.jpg', altText: 'Speaker photo for: Elise Swopes' },
   },
   {
@@ -39,50 +39,17 @@ const SPEAKERS = [
 ];
 
 /**
- * Verbatim copy of da-bacom/blocks/event-speakers/event-speakers.js so the
- * integration test can prove the hydrated DOM survives the real block's init.
- * Keep in sync with that file.
+ * The authored template row. Everything the block renders — including the "Read more"
+ * label — comes from here, never from hydrator code.
  */
-const PREVIEW_LENGTH = 75;
-const READ_MORE = 'Read more';
-
-const initEventSpeakersBlock = (el) => {
-  const rows = el?.querySelectorAll(':scope > div');
-
-  rows?.forEach((row) => {
-    row?.classList.add('speaker');
-
-    const columns = row?.querySelectorAll(':scope > div');
-    const name = columns?.[1];
-    const desc = columns?.[2];
-    const descHtml = desc?.innerHTML;
-    const readMore = columns?.[3];
-    const readMoreText = readMore?.innerText || READ_MORE;
-
-    name?.classList.add('name');
-    name?.querySelector('h1, h2, h3, h4, h5, h6')?.classList.add('body-s');
-    desc?.classList.add('desc');
-    readMore?.remove();
-
-    if (descHtml?.length > PREVIEW_LENGTH) {
-      const preview = descHtml.slice(0, PREVIEW_LENGTH);
-      const button = document.createElement('button');
-
-      button.innerText = readMoreText;
-      button.addEventListener('click', (event) => {
-        event.target.parentElement.innerHTML = descHtml;
-      });
-      desc.innerHTML = `${preview}<span class="ellipsis">...</span>`;
-      desc.appendChild(button);
-    }
-
-    const section = document.createElement('section');
-
-    section.classList.add('text', 'body-xs');
-    name.parentNode.insertBefore(section, name);
-    section.append(name, desc);
-  });
-};
+const TEMPLATE_ROW = `
+  <div>
+    <div><picture><img src="./media_1.jpg?width=750" alt="[[speakers.photo]]"></picture></div>
+    <div><h3>[[speakers.firstName]] [[speakers.lastName]]</h3><p>[[speakers.title]]</p></div>
+    <div><p>[[speakers.bio]]</p></div>
+    <div>Read more</div>
+  </div>
+`;
 
 describe('event-speakers hydrator', () => {
   beforeEach(() => {
@@ -90,17 +57,17 @@ describe('event-speakers hydrator', () => {
     document.head.innerHTML = '';
   });
 
-  const authorBlock = (variants = '') => {
+  const authorBlock = (variants = '', row = TEMPLATE_ROW) => {
     document.body.innerHTML = `
-      <div class="event-speakers hydrate${variants ? ` ${variants}` : ''}">
-        <div><div></div></div>
-      </div>
+      <div class="event-speakers hydrate${variants ? ` ${variants}` : ''}">${row}</div>
     `;
     return document.querySelector('.event-speakers');
   };
 
-  describe('block contract', () => {
-    it('produces exactly four cells per row in the documented order', () => {
+  const tokensIn = (block) => [...block.innerHTML.matchAll(/\[\[(.*?)\]\]/g)].map((m) => m[1]);
+
+  describe('template repetition', () => {
+    it('clones the authored row once per speaker', () => {
       setMetadata('speakers', JSON.stringify(SPEAKERS));
       const block = authorBlock('speaker');
 
@@ -108,47 +75,75 @@ describe('event-speakers hydrator', () => {
 
       const rows = block.querySelectorAll(':scope > div');
       expect(rows).to.have.lengthOf(2);
-
       rows.forEach((row) => {
-        const cells = row.querySelectorAll(':scope > div');
-        expect(cells).to.have.lengthOf(4);
-        // cell 1 must be non-empty or the block throws on name.parentNode
-        expect(cells[1].textContent.trim()).to.not.equal('');
-        expect(cells[0].querySelector('picture > img')).to.not.be.null;
-        expect(cells[2].querySelector('p')).to.not.be.null;
-        expect(cells[3].textContent).to.equal('Read more');
+        expect(row.querySelectorAll(':scope > div')).to.have.lengthOf(4);
       });
     });
 
-    it('removes authored placeholder rows', () => {
-      setMetadata('speakers', JSON.stringify(SPEAKERS));
-      document.body.innerHTML = `
-        <div class="event-speakers hydrate speaker">
-          <div><div>placeholder</div></div>
-          <div><div>another placeholder</div></div>
-        </div>
-      `;
-      const block = document.querySelector('.event-speakers');
-
-      hydrateEventSpeakers(block);
-
-      expect(block.textContent).to.not.include('placeholder');
-      expect(block.querySelectorAll(':scope > div')).to.have.lengthOf(2);
-    });
-
-    it('renders the name as a heading the block can style', () => {
+    it('removes the template row so it cannot render raw tokens', () => {
       setMetadata('speakers', JSON.stringify(SPEAKERS));
       const block = authorBlock('speaker');
 
       hydrateEventSpeakers(block);
 
-      const heading = block.querySelector(':scope > div > div:nth-child(2) > h3');
-      expect(heading).to.not.be.null;
-      expect(heading.textContent).to.equal('Elise Swopes');
+      expect(tokensIn(block).every((t) => t.includes(':'))).to.be.true;
+    });
+
+    it('indexes each clone to its speaker, ordinal order', () => {
+      setMetadata('speakers', JSON.stringify(SPEAKERS));
+      const block = authorBlock('speaker');
+
+      hydrateEventSpeakers(block);
+
+      const [first, second] = block.querySelectorAll(':scope > div');
+      // Elise has ordinal 0 but is index 1 in the metadata; Katie is ordinal 1, index 0
+      expect(first.innerHTML).to.include('[[speakers:1.firstName]]');
+      expect(second.innerHTML).to.include('[[speakers:0.firstName]]');
+    });
+
+    it('rewrites image tokens in the alt attribute', () => {
+      setMetadata('speakers', JSON.stringify(SPEAKERS));
+      const block = authorBlock('speaker');
+
+      hydrateEventSpeakers(block);
+
+      const alts = [...block.querySelectorAll('img')].map((img) => img.alt);
+      expect(alts).to.deep.equal(['[[speakers:1.photo]]', '[[speakers:0.photo]]']);
+    });
+
+    it('preserves authored content that is not a token', () => {
+      setMetadata('speakers', JSON.stringify(SPEAKERS));
+      const block = authorBlock('speaker');
+
+      hydrateEventSpeakers(block);
+
+      const labels = [...block.querySelectorAll(':scope > div > div:nth-child(4)')]
+        .map((cell) => cell.textContent.trim());
+      expect(labels).to.deep.equal(['Read more', 'Read more']);
+    });
+
+    it('honours a different authored read-more label', () => {
+      setMetadata('speakers', JSON.stringify(SPEAKERS));
+      const block = authorBlock('speaker', TEMPLATE_ROW.replace('Read more', 'Open me'));
+
+      hydrateEventSpeakers(block);
+
+      expect(block.querySelector(':scope > div > div:nth-child(4)').textContent.trim()).to.equal('Open me');
+    });
+
+    it('preserves the authored picture markup for the image pipeline', () => {
+      setMetadata('speakers', JSON.stringify(SPEAKERS));
+      const block = authorBlock('speaker');
+
+      hydrateEventSpeakers(block);
+
+      const picture = block.querySelector('picture');
+      expect(picture).to.not.be.null;
+      expect(picture.querySelector('img').getAttribute('src')).to.equal('./media_1.jpg?width=750');
     });
   });
 
-  describe('data handling', () => {
+  describe('selection', () => {
     it('filters speakers by variant class', () => {
       setMetadata('speakers', JSON.stringify(SPEAKERS));
       const block = authorBlock('judge');
@@ -157,7 +152,7 @@ describe('event-speakers hydrator', () => {
 
       const rows = block.querySelectorAll(':scope > div');
       expect(rows).to.have.lengthOf(1);
-      expect(rows[0].textContent).to.include('Sam Rivera');
+      expect(rows[0].innerHTML).to.include('[[speakers:2.firstName]]');
     });
 
     it('renders every speaker when no type variant is present', () => {
@@ -169,149 +164,42 @@ describe('event-speakers hydrator', () => {
       expect(block.querySelectorAll(':scope > div')).to.have.lengthOf(3);
     });
 
-    it('sorts speakers by ordinal', () => {
-      setMetadata('speakers', JSON.stringify(SPEAKERS));
-      const block = authorBlock('speaker');
-
-      hydrateEventSpeakers(block);
-
-      const names = [...block.querySelectorAll('h3')].map((h) => h.textContent);
-      expect(names).to.deep.equal(['Elise Swopes', 'Katie Johnson']);
-    });
-
-    it('includes company only when present', () => {
-      setMetadata('speakers', JSON.stringify(SPEAKERS));
-      const block = authorBlock('speaker');
-
-      hydrateEventSpeakers(block);
-
-      const [elise, katie] = block.querySelectorAll(':scope > div');
-      const eliseParas = [...elise.querySelectorAll(':scope > div:nth-child(2) > p')];
-      const katieParas = [...katie.querySelectorAll(':scope > div:nth-child(2) > p')];
-
-      expect(eliseParas.map((p) => p.textContent)).to.deep.equal([
-        'Sr. Community Relationship Manager and Evangelist',
-        'Adobe',
-      ]);
-      expect(katieParas.map((p) => p.textContent)).to.deep.equal(['Co-Owner, goodtype']);
-    });
-
-    it('reads title and bio from localizations when not top level', () => {
-      setMetadata('speakers', JSON.stringify([{
-        speakerId: 'spk-loc',
-        ordinal: 0,
-        speakerType: 'Speaker',
-        firstName: 'Yuko',
-        lastName: 'Shimizu',
-        localizations: { 'en-US': { title: 'Illustrator and Educator', bio: 'Localized bio.' } },
-        photo: { imageUrl: 'https://example.com/yuko.jpg' },
-      }]));
-      const block = authorBlock('speaker');
-
-      hydrateEventSpeakers(block);
-
-      const row = block.querySelector(':scope > div');
-      expect(row.querySelector(':scope > div:nth-child(2) > p').textContent).to.equal('Illustrator and Educator');
-      expect(row.querySelector(':scope > div:nth-child(3) > p').textContent).to.equal('Localized bio.');
-    });
-
     it('tolerates type as an alias for speakerType', () => {
-      setMetadata('speakers', JSON.stringify([{
-        ordinal: 0,
-        type: 'Host',
-        firstName: 'Alex',
-        lastName: 'Chen',
-        bio: 'Hosting.',
-        photo: { imageUrl: 'https://example.com/alex.jpg' },
-      }]));
+      setMetadata('speakers', JSON.stringify([
+        { ordinal: 0, type: 'Host', firstName: 'Alex', lastName: 'Chen' },
+      ]));
       const block = authorBlock('host');
 
       hydrateEventSpeakers(block);
 
-      expect(block.querySelector('h3').textContent).to.equal('Alex Chen');
+      expect(block.querySelectorAll(':scope > div')).to.have.lengthOf(1);
     });
 
-    it('falls back to the full name for alt text when photo has none', () => {
-      setMetadata('speakers', JSON.stringify([{
-        ordinal: 0,
-        speakerType: 'Speaker',
-        firstName: 'No',
-        lastName: 'Alt',
-        bio: 'Bio.',
-        photo: { imageUrl: 'https://example.com/noalt.jpg' },
-      }]));
+    it('places speakers without an ordinal after those with one', () => {
+      setMetadata('speakers', JSON.stringify([
+        { speakerType: 'Speaker', firstName: 'No', lastName: 'Ordinal' },
+        { ordinal: 5, speakerType: 'Speaker', firstName: 'Five', lastName: 'X' },
+      ]));
       const block = authorBlock('speaker');
 
       hydrateEventSpeakers(block);
 
-      expect(block.querySelector('img').alt).to.equal('No Alt');
-    });
-
-    it('still renders a row when a speaker has no photo', () => {
-      setMetadata('speakers', JSON.stringify([{
-        ordinal: 0,
-        speakerType: 'Speaker',
-        firstName: 'Photoless',
-        lastName: 'Person',
-        bio: 'Bio.',
-      }]));
-      const block = authorBlock('speaker');
-
-      hydrateEventSpeakers(block);
-
-      const cells = block.querySelectorAll(':scope > div > div');
-      expect(cells).to.have.lengthOf(4);
-      expect(block.querySelector('img')).to.be.null;
-      expect(cells[1].textContent).to.include('Photoless Person');
-    });
-
-    it('renders name and title as text, not markup', () => {
-      setMetadata('speakers', JSON.stringify([{
-        ordinal: 0,
-        speakerType: 'Speaker',
-        firstName: '<img src=x onerror="window.__xss=1">',
-        lastName: 'Tag',
-        title: '<script>window.__xss=1</script>CEO',
-        bio: 'Bio.',
-      }]));
-      const block = authorBlock('speaker');
-
-      hydrateEventSpeakers(block);
-
-      const nameCell = block.querySelector(':scope > div > div:nth-child(2)');
-      expect(nameCell.querySelector('img')).to.be.null;
-      expect(nameCell.querySelector('script')).to.be.null;
-      expect(nameCell.querySelector('h3').textContent).to.include('<img');
-    });
-
-    it('does not pre-truncate the bio', () => {
-      const longBio = 'A'.repeat(400);
-      setMetadata('speakers', JSON.stringify([{
-        ordinal: 0,
-        speakerType: 'Speaker',
-        firstName: 'Long',
-        lastName: 'Bio',
-        bio: longBio,
-        photo: { imageUrl: 'https://example.com/long.jpg' },
-      }]));
-      const block = authorBlock('speaker');
-
-      hydrateEventSpeakers(block);
-
-      expect(block.querySelector(':scope > div > div:nth-child(3) > p').textContent).to.equal(longBio);
+      const [first, second] = block.querySelectorAll(':scope > div');
+      expect(first.innerHTML).to.include('[[speakers:1.firstName]]');
+      expect(second.innerHTML).to.include('[[speakers:0.firstName]]');
     });
   });
 
-  // A surviving placeholder row is worse than an empty block: the block throws on
-  // `name.parentNode` for a row with fewer than two cells, but tolerates no rows.
+  // A surviving template row would render literal [[tokens]] to the user, and a row with
+  // fewer than two cells makes the block throw on `name.parentNode`.
   describe('graceful degradation', () => {
     const expectSafelyEmpty = (block) => {
       expect(block.querySelectorAll(':scope > div')).to.have.lengthOf(0);
+      expect(tokensIn(block)).to.have.lengthOf(0);
       expect(document.querySelector('.event-speakers')).to.not.be.null;
-      expect(() => initEventSpeakersBlock(block)).to.not.throw();
     };
 
-    it('clears placeholder rows when no speakers metadata exists', () => {
+    it('clears the template when no speakers metadata exists', () => {
       const block = authorBlock('speaker');
 
       hydrateEventSpeakers(block);
@@ -319,7 +207,7 @@ describe('event-speakers hydrator', () => {
       expectSafelyEmpty(block);
     });
 
-    it('clears placeholder rows when metadata is invalid JSON', () => {
+    it('clears the template when metadata is invalid JSON', () => {
       setMetadata('speakers', 'not json');
       const block = authorBlock('speaker');
 
@@ -328,7 +216,7 @@ describe('event-speakers hydrator', () => {
       expectSafelyEmpty(block);
     });
 
-    it('clears placeholder rows when no speaker matches the variant', () => {
+    it('clears the template when no speaker matches the variant', () => {
       setMetadata('speakers', JSON.stringify(SPEAKERS));
       const block = authorBlock('keynote');
 
@@ -337,7 +225,7 @@ describe('event-speakers hydrator', () => {
       expectSafelyEmpty(block);
     });
 
-    it('clears placeholder rows for an empty speakers array', () => {
+    it('clears the template for an empty speakers array', () => {
       setMetadata('speakers', JSON.stringify([]));
       const block = authorBlock('speaker');
 
@@ -345,59 +233,28 @@ describe('event-speakers hydrator', () => {
 
       expectSafelyEmpty(block);
     });
+
+    it('leaves an un-templated block alone', () => {
+      setMetadata('speakers', JSON.stringify(SPEAKERS));
+      const block = authorBlock('speaker', '<div><div>Static</div><div>Author content</div></div>');
+
+      hydrateEventSpeakers(block);
+
+      expect(block.querySelectorAll(':scope > div')).to.have.lengthOf(1);
+      expect(block.textContent).to.include('Static');
+    });
   });
 
-  describe('integration with the consumer block', () => {
-    it('is resolved by hydrateBlocks via the built-in hydrator map', () => {
+  describe('integration', () => {
+    it('is dispatched by hydrateBlocks', () => {
       setMetadata('speakers', JSON.stringify(SPEAKERS));
       authorBlock('speaker');
 
       hydrateBlocks(document);
 
       const block = document.querySelector('.event-speakers');
-      expect(block.querySelectorAll('img')).to.have.lengthOf(2);
-    });
-
-    it('survives the real block init and produces its expected DOM', () => {
-      setMetadata('speakers', JSON.stringify(SPEAKERS));
-      authorBlock('speaker');
-
-      hydrateBlocks(document);
-      const block = document.querySelector('.event-speakers');
-
-      // Must not throw — a row missing its name cell would abort here
-      initEventSpeakersBlock(block);
-
-      const speakers = block.querySelectorAll('.speaker');
-      expect(speakers).to.have.lengthOf(2);
-
-      speakers.forEach((speaker) => {
-        expect(speaker.querySelector(':scope > div > picture > img')).to.not.be.null;
-        expect(speaker.querySelector(':scope > section.text')).to.not.be.null;
-        expect(speaker.querySelector(':scope > section > div.name')).to.not.be.null;
-        expect(speaker.querySelector(':scope > section > div.name > h3.body-s')).to.not.be.null;
-        expect(speaker.querySelector(':scope > section > div.desc')).to.not.be.null;
-      });
-    });
-
-    it('yields a working read more expansion after init', () => {
-      setMetadata('speakers', JSON.stringify(SPEAKERS));
-      authorBlock('speaker');
-
-      hydrateBlocks(document);
-      const block = document.querySelector('.event-speakers');
-      initEventSpeakersBlock(block);
-
-      const desc = block.querySelector('.desc');
-      const button = desc.querySelector('button');
-      expect(button).to.not.be.null;
-      expect(button.innerText).to.equal('Read more');
-      expect(desc.querySelector('.ellipsis')).to.not.be.null;
-
-      button.click();
-
-      expect(desc.querySelector('.ellipsis')).to.be.null;
-      expect(desc.textContent).to.include('unique cityscapes');
+      expect(block.querySelectorAll(':scope > div')).to.have.lengthOf(2);
+      expect(block.getAttribute('data-hydrated')).to.equal('true');
     });
   });
 });
