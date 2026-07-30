@@ -1,6 +1,6 @@
 import { expect } from '@esm-bundle/chai';
 import { readFile } from '@web/test-runner-commands';
-import init from '../../../../event-libs/v1/blocks/video-playlist/video-playlist.js';
+import init, { computeDrawerCapPx } from '../../../../event-libs/v1/blocks/video-playlist/video-playlist.js';
 
 const defaultBody = await readFile({ path: './mocks/default.html' });
 
@@ -214,5 +214,68 @@ describe('video-playlist block', () => {
     const bar = matchingSession.querySelector('.session-thumb-progress-bar');
     expect(bar, 'progress bar element must exist').to.not.be.null;
     expect(bar.style.width).to.equal('50%');
+  });
+
+  // ------------------------------------------------------------------ //
+  // Mobile drawer — cap math (pure)
+  // ------------------------------------------------------------------ //
+  describe('computeDrawerCapPx', () => {
+    it('caps the drawer just below the reference bottom (viewport − reference − gap)', () => {
+      // 800 tall viewport, title bottom at 200, 16px gap → 800 − 200 − 16 = 584
+      expect(computeDrawerCapPx(800, 200, { floor: 320, gap: 16 })).to.equal(584);
+    });
+
+    it('never shrinks below the floor when the reference sits low (long title / short device)', () => {
+      // Only 800 − 700 − 16 = 84 would remain, but the floor of 320 wins.
+      expect(computeDrawerCapPx(800, 700, { floor: 320, gap: 16 })).to.equal(320);
+    });
+
+    it('falls back to 70% of the viewport when no reference element is found', () => {
+      expect(computeDrawerCapPx(800, null, { floor: 320, gap: 16 })).to.equal(560);
+    });
+  });
+
+  // ------------------------------------------------------------------ //
+  // Mobile drawer — collapse/expand toggle + cap wiring
+  // ------------------------------------------------------------------ //
+  describe('mobile drawer', () => {
+    it('renders a collapse/expand chevron that toggles is-collapsed and aria-expanded', async () => {
+      const el = document.querySelector('.video-playlist');
+      init(el);
+      await waitFor(() => !!el.querySelector('.header-collapse-toggle'));
+
+      const container = el.querySelector('.container');
+      const toggle = el.querySelector('.header-collapse-toggle');
+
+      // Default = expanded.
+      expect(container.classList.contains('is-collapsed')).to.be.false;
+      expect(toggle.getAttribute('aria-expanded')).to.equal('true');
+
+      toggle.click();
+      expect(container.classList.contains('is-collapsed'), 'collapses on first click').to.be.true;
+      expect(toggle.getAttribute('aria-expanded')).to.equal('false');
+      expect(toggle.getAttribute('aria-label')).to.equal('Expand playlist');
+
+      toggle.click();
+      expect(container.classList.contains('is-collapsed'), 'expands on second click').to.be.false;
+      expect(toggle.getAttribute('aria-expanded')).to.equal('true');
+      expect(toggle.getAttribute('aria-label')).to.equal('Collapse playlist');
+    });
+
+    it('writes the --playlist-drawer-cap custom property, capping below the title anchor when present', async () => {
+      // Author a session title in a sibling .playlist-drawer-anchor block, as on a real page.
+      const anchor = document.createElement('div');
+      anchor.className = 'playlist-drawer-anchor';
+      anchor.innerHTML = '<h2>Session title</h2>';
+      document.body.insertBefore(anchor, document.body.firstChild);
+
+      const el = document.querySelector('.video-playlist');
+      init(el);
+      await waitFor(() => !!el.querySelector('.container')
+        && el.querySelector('.container').style.getPropertyValue('--playlist-drawer-cap') !== '');
+
+      const cap = el.querySelector('.container').style.getPropertyValue('--playlist-drawer-cap');
+      expect(cap, 'cap is set as a px value').to.match(/^\d+px$/);
+    });
   });
 });

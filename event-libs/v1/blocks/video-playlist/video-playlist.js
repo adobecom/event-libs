@@ -13,6 +13,11 @@ import {
   ANALYTICS,
   PLAYLIST_SKIP_TO_ID,
   MAX_PERCENTAGE,
+  DRAWER_ANCHOR_SELECTOR,
+  DRAWER_TITLE_SELECTOR,
+  DRAWER_MIN_HEIGHT_RATIO,
+  DRAWER_TITLE_GAP_PX,
+  DRAWER_CAP_CSS_VAR,
 } from './constants.js';
 import {
   getSessions,
@@ -58,8 +63,27 @@ const DEFAULT_CFG = {
   copyLinkAltText: 'Share with link',
   copyNotificationText: 'Link copied to clipboard!',
   sessionPath: '',
+  expandPlaylistText: 'Expand playlist',
+  collapsePlaylistText: 'Collapse playlist',
+  // Author override: which element's heading the mobile drawer caps below.
+  // Defaults to the shared `.playlist-drawer-anchor` convention.
+  drawerAnchor: DRAWER_ANCHOR_SELECTOR,
 };
 
+
+/**
+ * Pure math for the expanded drawer's max-height, split out so it's testable
+ * without a live layout. Given the viewport height and the document-relative
+ * bottom of the reference element (the session title, or the player as a
+ * fallback), returns the capped height in px: viewport minus the reference's
+ * bottom minus a gap, but never below the floor. Returns a plain 70% fraction
+ * when no reference element is available at all.
+ * @returns {number} cap in pixels
+ */
+export function computeDrawerCapPx(viewportH, referenceBottom, { floor, gap }) {
+  if (referenceBottom == null) return Math.round(viewportH * 0.7);
+  return Math.max(floor, viewportH - referenceBottom - gap);
+}
 
 const getMeta = (root) =>
   Object.fromEntries(
@@ -87,6 +111,9 @@ const coerceValue = (key, value, defaults) => {
 const prepareCards = (cards = []) => cards.filter((card) => card.search?.thumbnailUrl);
 
 const PLAY_ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" height="40" viewBox="0 0 18 18" width="40"><rect opacity="0" width="18" height="18"/><path fill="#e5e5e5" d="M9,1a8,8,0,1,0,8,8A8,8,0,0,0,9,1Zm4.2685,8.43L7.255,12.93A.50009.50009,0,0,1,7,13H6.5a.5.5,0,0,1-.5-.5v-7A.5.5,0,0,1,6.5,5H7a.50009.50009,0,0,1,.255.07l6.0135,3.5a.5.5,0,0,1,0,.86Z"/></svg>';
+
+// Chevron (points down); rotated 180deg via CSS in the collapsed state.
+const CHEVRON_ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true" focusable="false"><path d="M4 6.5L9 11.5L14 6.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 
 const buildSessionCard = (card) => {
   const videoId = normalizeVideoId(card.search.mpcVideoId || card.search.videoId);
@@ -202,7 +229,7 @@ class VideoPlaylist {
   }
 
   createRoot() {
-    const container = createTag('div', { class: 'container is-hidden' });
+    const container = createTag('div', { class: 'container is-hidden', id: 'video-playlist-drawer' });
     if (this.cfg.theme) container.classList.add(`consonant--${this.cfg.theme}`);
     return container;
   }
@@ -298,6 +325,9 @@ class VideoPlaylist {
     this.root.appendChild(
       createTag('div', { id: PLAYLIST_SKIP_TO_ID, class: 'playlist-skip-to' }),
     );
+
+    // Mobile sticky drawer: dynamic height cap below the session title.
+    this.setupDrawer();
   }
 
   async renderHeader() {
@@ -331,6 +361,19 @@ class VideoPlaylist {
     createTag('p', { class: 'header-topic' }, this.cfg.topicEyebrow, { parent: left });
     createTag('h3', { class: 'header-title' }, this.cfg.playlistTitle, { parent: left });
     const right = createTag('div', { class: 'header-right' }, '', { parent: content });
+
+    // Collapse/expand chevron — only visible on mobile via CSS. Wired
+    // unconditionally (harmless on desktop, where the drawer styling doesn't apply).
+    this.collapseToggleBtn = createTag('button', {
+      type: 'button',
+      class: 'header-collapse-toggle',
+      'aria-expanded': 'true',
+      'aria-controls': this.root.id,
+      'aria-label': this.cfg.collapsePlaylistText,
+    }, CHEVRON_ICON_SVG, { parent: content });
+    const onCollapseToggle = () => this.toggleDrawer();
+    this.collapseToggleBtn.addEventListener('click', onCollapseToggle);
+    this.disposers.push(() => this.collapseToggleBtn.removeEventListener('click', onCollapseToggle));
 
     let socialModule = null;
     if (this.cfg.socialSharing) {
@@ -370,6 +413,101 @@ class VideoPlaylist {
     }
 
     return header;
+  }
+
+  /* --- Mobile sticky drawer --- */
+
+  /**
+   * Wires the drawer's dynamic height cap to stay correct across viewport /
+   * orientation changes and late layout shifts (fonts, images) that move the
+   * session title. Only the cap math runs here; the fixed-bottom drawer styling
+   * itself is CSS, gated to mobile.
+   */
+  setupDrawer() {
+    this.computeDrawerCap();
+
+    const onResize = () => this.computeDrawerCap();
+    window.addEventListener('resize', onResize);
+    window.addEventListener('orientationchange', onResize);
+    this.disposers.push(() => {
+      window.removeEventListener('resize', onResize);
+      window.removeEventListener('orientationchange', onResize);
+    });
+
+    // The title is in a sibling block that may still be decorating when we first
+    // measure — recompute after load and once web fonts settle, since both change
+    // the title's rendered height and therefore the cap.
+    window.addEventListener('load', onResize, { once: true });
+    this.disposers.push(() => window.removeEventListener('load', onResize));
+    this.disposers.push(() => { document.body.style.paddingBottom = ''; });
+    document.fonts?.ready?.then(() => this.computeDrawerCap()).catch(() => {});
+  }
+
+  /**
+   * Caps the expanded drawer so it sits just below the session title (keeping
+   * the title visible), falling back to below the player when no title anchor is
+   * present, and to a plain viewport fraction if neither is found. Never shrinks
+   * below DRAWER_MIN_HEIGHT_RATIO of the viewport. Writes the result into a CSS
+   * custom property the mobile drawer CSS consumes — harmless on desktop.
+   */
+  computeDrawerCap() {
+    const viewportH = window.innerHeight;
+    const floor = Math.round(viewportH * DRAWER_MIN_HEIGHT_RATIO);
+
+    // Document-top-relative bottom of an element. Adding scrollY makes it
+    // scroll-stable (getBoundingClientRect is viewport-relative), representing
+    // the element's position as seen with the page scrolled to the top.
+    const docBottomOf = (el) => (el ? el.getBoundingClientRect().bottom + window.scrollY : null);
+
+    const anchor = document.querySelector(this.cfg.drawerAnchor);
+    const title = anchor?.querySelector(DRAWER_TITLE_SELECTOR);
+    const player = [...this.el.children].find((child) => child.querySelector?.('.milo-video'));
+
+    const referenceBottom = docBottomOf(title) ?? docBottomOf(player);
+    const cap = computeDrawerCapPx(viewportH, referenceBottom, {
+      floor,
+      gap: DRAWER_TITLE_GAP_PX,
+    });
+
+    this.root.style.setProperty(DRAWER_CAP_CSS_VAR, `${cap}px`);
+
+    // Collapsed height = the header's own height, so the collapsed drawer shows
+    // exactly the header (title + chevron) and clips the sessions below it.
+    const header = this.root.querySelector('.header');
+    if (header) {
+      this.root.style.setProperty('--playlist-drawer-collapsed-height', `${header.offsetHeight}px`);
+      // Reserve space at the bottom of the page so the fixed collapsed bar never
+      // covers the last of the page's own content. Only meaningful on mobile
+      // (where the drawer is fixed); the media query below makes it a no-op on
+      // desktop by not reading the property, but we still guard with matchMedia
+      // so we don't pad the body on desktop.
+      const isMobile = window.matchMedia('(max-width: 768px)').matches;
+      document.body.style.paddingBottom = isMobile ? `${header.offsetHeight}px` : '';
+    }
+  }
+
+  /**
+   * Toggles the mobile drawer between expanded (default) and collapsed
+   * (header-only). No-op visually on desktop, where the drawer CSS doesn't apply.
+   */
+  toggleDrawer(forceExpanded) {
+    const willExpand = typeof forceExpanded === 'boolean'
+      ? forceExpanded
+      : this.root.classList.contains('is-collapsed');
+
+    this.root.classList.toggle('is-collapsed', !willExpand);
+    if (this.collapseToggleBtn) {
+      this.collapseToggleBtn.setAttribute('aria-expanded', String(willExpand));
+      this.collapseToggleBtn.setAttribute(
+        'aria-label',
+        willExpand ? this.cfg.collapsePlaylistText : this.cfg.expandPlaylistText,
+      );
+      this.collapseToggleBtn.setAttribute(
+        'daa-ll',
+        willExpand ? ANALYTICS.DRAWER_EXPAND : ANALYTICS.DRAWER_COLLAPSE,
+      );
+    }
+    if (willExpand) this.computeDrawerCap();
   }
 
   renderSessions(cards) {

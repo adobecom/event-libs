@@ -244,7 +244,33 @@
 .video-playlist .header-content {
   display: flex;
   justify-content: space-between;
+  align-items: flex-start;
 }
+
+/* Collapse/expand chevron — hidden by default (desktop side-by-side layout has
+   no drawer to collapse); shown only in the mobile drawer media query below. */
+.video-playlist .header-collapse-toggle {
+  display: none;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--text-color);
+  cursor: pointer;
+}
+
+.video-playlist .header-collapse-toggle svg {
+  transition: transform 0.3s ease;
+}
+
+/* The collapsed-state rotation override lives at the very end of this file
+   (search "header-collapse-toggle[aria-expanded") — placed there so its higher
+   specificity comes after the lower-specificity icon rules, satisfying
+   stylelint's no-descending-specificity ordering. */
 
 .video-playlist .header-topic {
   font-size: 12px;
@@ -920,28 +946,64 @@
   }
 }
 
-/* Mobile Responsive */
+/* Mobile Responsive — playlist becomes a fixed, collapsible bottom drawer */
 @media (max-width: 768px) {
-  /* Stack video and playlist vertically on mobile */
+  /* Stack the player on top; the playlist is pulled out of flow into a drawer. */
   .video-playlist {
     flex-direction: column;
   }
 
+  .video-playlist .header-collapse-toggle {
+    display: flex;
+  }
+
+  /*
+   * Fixed drawer pinned to the viewport bottom.
+   * Expanded (default): capped just below the session title by JS
+   * (--playlist-drawer-cap, a px value), so the title stays visible. The 70vh
+   * here is only a pre-JS fallback; JS recomputes the cap from
+   * window.innerHeight on load/resize/orientation, which already reflects the
+   * mobile address-bar show/hide, so the real cap tracks the visual viewport.
+   * Collapsed: shrinks to the header height.
+   */
   .video-playlist .container {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 10;
+    width: 100%;
     max-width: 100%;
     height: auto;
-    max-height: none;
+    max-height: var(--playlist-drawer-cap, 70vh);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    border-radius: 12px 12px 0 0;
+    box-shadow: 0 -4px 16px rgb(0 0 0 / 25%);
+    transition: max-height 0.3s ease;
+  }
+
+  .video-playlist .container.is-collapsed {
+    max-height: var(--playlist-drawer-collapsed-height, 64px);
+  }
+
+  /* Header stays fixed at the drawer top; the session list scrolls beneath it. */
+  .video-playlist .header {
+    flex: 0 0 auto;
   }
 
   .video-playlist .sessions {
-    flex-direction: row;
-    overflow-x: auto;
-    padding: 8px;
+    flex: 1 1 auto;
+    flex-direction: column;
+    overflow-x: hidden;
+    overflow-y: auto;
+    padding: 8px 12px;
   }
 
   .video-playlist .session {
-    min-width: 280px;
-    width: 280px;
+    width: 100%;
+    min-width: 0;
   }
 
   .video-playlist .session-thumb {
@@ -1123,4 +1185,13 @@
   text-decoration: underline;
   color: #333;
   text-decoration-color: #333;
+}
+
+/* Chevron points up when the drawer is collapsed (tap to expand), down when
+   expanded. Keyed off the button's own aria-expanded state (set in JS). Placed
+   at end-of-file on purpose: its specificity is higher than the icon rules
+   above, so source order here keeps stylelint's no-descending-specificity
+   happy without contorting the selector. */
+.video-playlist .header-collapse-toggle[aria-expanded="false"] svg {
+  transform: rotate(180deg);
 }

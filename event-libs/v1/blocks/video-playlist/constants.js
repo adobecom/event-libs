@@ -14,6 +14,23 @@ export const PROGRESS_SAVE_INTERVAL = 5;
 export const VIDEO_ORIGIN = 'https://video.tv.adobe.com';
 export const MAX_PERCENTAGE = 100;
 
+/* ---------- Mobile sticky drawer ---------- */
+// The drawer caps its expanded height below the session title so the title
+// stays visible. The title lives OUTSIDE this block (a sibling `.text` block),
+// so it's marked with this class by the author; we then target the heading
+// inside it. If absent, the drawer falls back to sitting below the player.
+export const DRAWER_ANCHOR_SELECTOR = '.playlist-drawer-anchor';
+export const DRAWER_TITLE_SELECTOR = 'h1, h2, h3';
+// Floor: the expanded drawer never shrinks below this fraction of the viewport,
+// even when a long title on a short device would otherwise leave no room. Below
+// the floor the drawer wins and covers the lower part of the title.
+export const DRAWER_MIN_HEIGHT_RATIO = 0.4;
+// Breathing room between the title's bottom and the expanded drawer's top edge.
+export const DRAWER_TITLE_GAP_PX = 16;
+// CSS custom property the JS writes the computed cap into; the mobile drawer CSS
+// reads it for the expanded max-height.
+export const DRAWER_CAP_CSS_VAR = '--playlist-drawer-cap';
+
 /* ---------- Event States ---------- */
 export const EVENT_STATES = Object.freeze({
   LOAD: 'load',
@@ -32,6 +49,8 @@ export const ANALYTICS = Object.freeze({
   UNFAVORITE: 'Unfavorite',
   CLOSE_FAVORITE_NOTIFICATION: 'Close Favorite Notification',
   VIEW_SCHEDULE: 'View Schedule',
+  DRAWER_EXPAND: 'Playlist_Expand',
+  DRAWER_COLLAPSE: 'Playlist_Collapse',
 });
 
 /* ---------- Social Icons (inline SVG) ---------- */
