@@ -21,10 +21,10 @@ export const MAX_PERCENTAGE = 100;
 // inside it. If absent, the drawer falls back to sitting below the player.
 export const DRAWER_ANCHOR_SELECTOR = '.playlist-drawer-anchor';
 export const DRAWER_TITLE_SELECTOR = 'h1, h2, h3';
-// Floor: the expanded drawer never shrinks below this fraction of the viewport,
-// even when a long title on a short device would otherwise leave no room. Below
-// the floor the drawer wins and covers the lower part of the title.
-export const DRAWER_MIN_HEIGHT_RATIO = 0.4;
+// Floor fallback (px) used only if the drawer header can't be measured. The real
+// floor is the header's own rendered height — title visibility wins, so the
+// drawer shrinks to keep the whole title above it but never below its header.
+export const DEFAULT_DRAWER_HEADER_HEIGHT = 64;
 // Breathing room between the title's bottom and the expanded drawer's top edge.
 export const DRAWER_TITLE_GAP_PX = 16;
 // CSS custom property the JS writes the computed cap into; the mobile drawer CSS

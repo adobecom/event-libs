@@ -15,7 +15,7 @@ import {
   MAX_PERCENTAGE,
   DRAWER_ANCHOR_SELECTOR,
   DRAWER_TITLE_SELECTOR,
-  DRAWER_MIN_HEIGHT_RATIO,
+  DEFAULT_DRAWER_HEADER_HEIGHT,
   DRAWER_TITLE_GAP_PX,
   DRAWER_CAP_CSS_VAR,
 } from './constants.js';
@@ -446,13 +446,22 @@ class VideoPlaylist {
   /**
    * Caps the expanded drawer so it sits just below the session title (keeping
    * the title visible), falling back to below the player when no title anchor is
-   * present, and to a plain viewport fraction if neither is found. Never shrinks
-   * below DRAWER_MIN_HEIGHT_RATIO of the viewport. Writes the result into a CSS
-   * custom property the mobile drawer CSS consumes — harmless on desktop.
+   * present, and to a plain viewport fraction if neither is found. Title
+   * visibility wins: the floor is the drawer's own header height, so it shrinks
+   * to keep the whole title above it but never below its header. Writes the
+   * result into a CSS custom property the mobile drawer CSS consumes.
    */
   computeDrawerCap() {
     const viewportH = window.innerHeight;
-    const floor = Math.round(viewportH * DRAWER_MIN_HEIGHT_RATIO);
+
+    // Floor = the drawer's own header height. Title visibility wins: the drawer
+    // shrinks to keep the whole title above it, but never below its header
+    // (title + chevron), so it always stays usable/expandable. (Previously the
+    // floor was a fixed % of the viewport, which could win over a tall title and
+    // cover it — reversed here, per design direction: title always wins.)
+    const header = this.root.querySelector('.header');
+    const headerH = header ? header.offsetHeight : DEFAULT_DRAWER_HEADER_HEIGHT;
+    const floor = headerH;
 
     // Document-top-relative bottom of an element. Adding scrollY makes it
     // scroll-stable (getBoundingClientRect is viewport-relative), representing
@@ -473,16 +482,13 @@ class VideoPlaylist {
 
     // Collapsed height = the header's own height, so the collapsed drawer shows
     // exactly the header (title + chevron) and clips the sessions below it.
-    const header = this.root.querySelector('.header');
     if (header) {
-      this.root.style.setProperty('--playlist-drawer-collapsed-height', `${header.offsetHeight}px`);
+      this.root.style.setProperty('--playlist-drawer-collapsed-height', `${headerH}px`);
       // Reserve space at the bottom of the page so the fixed collapsed bar never
-      // covers the last of the page's own content. Only meaningful on mobile
-      // (where the drawer is fixed); the media query below makes it a no-op on
-      // desktop by not reading the property, but we still guard with matchMedia
-      // so we don't pad the body on desktop.
+      // covers the last of the page's own content. Only on mobile, where the
+      // drawer is fixed; reset in cleanup.
       const isMobile = window.matchMedia('(max-width: 768px)').matches;
-      document.body.style.paddingBottom = isMobile ? `${header.offsetHeight}px` : '';
+      document.body.style.paddingBottom = isMobile ? `${headerH}px` : '';
     }
   }
 
