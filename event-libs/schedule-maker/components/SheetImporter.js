@@ -2,6 +2,7 @@ import { html } from '../htm-wrapper.js';
 import { useState, useEffect } from '../../v1/deps/htm-preact.js';
 import { useSchedulesOperations, useSchedulesData } from '../context/SchedulesContext.js';
 import { useNavigation } from '../context/NavigationContext.js';
+import { convertSheetRowsToBlocks } from '../utils.js';
 
 export default function SheetImporter() {
   const { importSheetScheduleName } = useNavigation();
@@ -90,36 +91,7 @@ export default function SheetImporter() {
     setColumnMapping((prev) => ({ ...prev, [property]: columnName }));
   };
 
-  const convertToBlocks = () => {
-    if (sheetData.length < 2) return [];
-    const headers = sheetData[0];
-    const colIndexMap = {};
-    Object.values(columnMapping).forEach((col) => { if (col) colIndexMap[col] = headers.indexOf(col); });
-    const rows = sheetData.slice(1);
-    return rows.map((row) => {
-      const block = {};
-      Object.entries(columnMapping).forEach(([property, columnName]) => {
-        if (columnName && colIndexMap[columnName] >= 0) {
-          const value = row[colIndexMap[columnName]] || '';
-          if (property === 'streamId') {
-            block.liveStream = { provider: 'MobileRider', streamId: value };
-            block.includeLiveStream = Boolean(value);
-          } else {
-            block[property] = value;
-          }
-        }
-      });
-      block.id = `block-${crypto.randomUUID()}`;
-      if (!block.liveStream) {
-        block.liveStream = { provider: 'MobileRider', streamId: '' };
-        block.includeLiveStream = false;
-      }
-      block.startDateTime = new Date(block.startDateTime).getTime() || 0;
-      block.isComplete = false;
-      block.isEditingBlockTitle = false;
-      return block;
-    }).filter((block) => block.title && block.startDateTime);
-  };
+  const convertToBlocks = () => convertSheetRowsToBlocks(sheetData, columnMapping);
 
   const handleAddSchedule = () => {
     const blocks = convertToBlocks();

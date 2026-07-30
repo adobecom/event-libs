@@ -103,6 +103,82 @@ function processSchedules(schedules) {
   return sorted.map((schedule) => prepareScheduleForClient(schedule));
 }
 
+function setScheduleTitle(schedule, title) {
+  if (!schedule) return schedule;
+  const updated = { ...schedule, title };
+  return { ...updated, isComplete: isScheduleComplete(updated) };
+}
+
+function addBlockToSchedule(schedule, block) {
+  if (!schedule) return schedule;
+  const updatedBlocks = [...schedule.blocks, block];
+  return { ...schedule, blocks: updatedBlocks, isComplete: isScheduleComplete({ ...schedule, blocks: updatedBlocks }) };
+}
+
+function updateBlockInSchedule(schedule, blockId, updates) {
+  if (!schedule) return schedule;
+  const blockToUpdate = schedule.blocks.find((b) => b.id === blockId);
+  if (!blockToUpdate) return schedule;
+  const updatedBlock = { ...blockToUpdate, ...updates };
+  updatedBlock.isComplete = isBlockComplete(updatedBlock);
+  const updatedBlocks = schedule.blocks.map((b) => (b.id === blockId ? updatedBlock : b));
+  return { ...schedule, blocks: updatedBlocks, isComplete: isScheduleComplete({ ...schedule, blocks: updatedBlocks }) };
+}
+
+function deleteBlockFromSchedule(schedule, blockId) {
+  if (!schedule) return schedule;
+  const updatedBlocks = schedule.blocks.filter((b) => b.id !== blockId);
+  return { ...schedule, blocks: updatedBlocks, isComplete: isScheduleComplete({ ...schedule, blocks: updatedBlocks }) };
+}
+
+// Moves draggedBlockId to sit just before targetBlockId. Order is otherwise
+// untouched by add/update/delete, so this manual order survives until the
+// next prepareScheduleForClient re-sort by startDateTime.
+function reorderBlocksInSchedule(schedule, draggedBlockId, targetBlockId) {
+  if (!schedule || draggedBlockId === targetBlockId) return schedule;
+  const blocks = [...schedule.blocks];
+  const fromIndex = blocks.findIndex((b) => b.id === draggedBlockId);
+  const toIndex = blocks.findIndex((b) => b.id === targetBlockId);
+  if (fromIndex === -1 || toIndex === -1) return schedule;
+  const [moved] = blocks.splice(fromIndex, 1);
+  blocks.splice(toIndex, 0, moved);
+  return { ...schedule, blocks };
+}
+
+// Converts raw sheet rows (a header row followed by data rows) into schedule
+// blocks using a property→column-name mapping. Pure counterpart to the sheet
+// importer UI so the transform can be unit-tested independently of the DOM.
+function convertSheetRowsToBlocks(sheetData, columnMapping) {
+  if (sheetData.length < 2) return [];
+  const headers = sheetData[0];
+  const colIndexMap = {};
+  Object.values(columnMapping).forEach((col) => { if (col) colIndexMap[col] = headers.indexOf(col); });
+  const rows = sheetData.slice(1);
+  return rows.map((row) => {
+    const block = {};
+    Object.entries(columnMapping).forEach(([property, columnName]) => {
+      if (columnName && colIndexMap[columnName] >= 0) {
+        const value = row[colIndexMap[columnName]] || '';
+        if (property === 'streamId') {
+          block.liveStream = { provider: 'MobileRider', streamId: value };
+          block.includeLiveStream = Boolean(value);
+        } else {
+          block[property] = value;
+        }
+      }
+    });
+    block.id = `block-${crypto.randomUUID()}`;
+    if (!block.liveStream) {
+      block.liveStream = { provider: 'MobileRider', streamId: '' };
+      block.includeLiveStream = false;
+    }
+    block.startDateTime = new Date(block.startDateTime).getTime() || 0;
+    block.isComplete = false;
+    block.isEditingBlockTitle = false;
+    return block;
+  }).filter((block) => block.title && block.startDateTime);
+}
+
 class ScheduleURLUtility {
   static createScheduleURL(scheduleObject, org, repo) {
     try {
@@ -195,4 +271,10 @@ export {
   prepareScheduleForServer,
   ScheduleURLUtility,
   validateSchedule,
+  setScheduleTitle,
+  addBlockToSchedule,
+  updateBlockInSchedule,
+  deleteBlockFromSchedule,
+  reorderBlocksInSchedule,
+  convertSheetRowsToBlocks,
 };
