@@ -26,6 +26,7 @@ const EVENT_BLOCKS = [
 ];
 
 const EVENT_BLOCKS_C2 = [
+  'video-playlist',
 ];
 
 // Import only the most essential utilities that are always needed
