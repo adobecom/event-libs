@@ -5,7 +5,7 @@
   --video-playlist-switch-spacing-top-to-control: 9px;
 }
 
-.video-playlist > div:not(.container):not(:has(.milo-video)) {
+.video-playlist > div:not(.video-playlist-container):not(:has(.milo-video)) {
   display: none !important;
 }
 
@@ -31,7 +31,7 @@
     flex-direction: row; /* Side-by-side layout */
   }
   
-  .video-playlist .container {
+  .video-playlist .video-playlist-container {
     height: 675px; /* Fixed height for large screens */
     min-height: 675px;
     max-width: 360px;
@@ -56,7 +56,7 @@
     max-width: 83.4%;
   }
   
-  .video-playlist .container {
+  .video-playlist .video-playlist-container {
     max-width: 1200px; /* Max width constraint */
     width: 100%;
   }
@@ -91,7 +91,7 @@
 /* Fallback for older browsers (including Edge Legacy) */
 @supports not selector(:has(*)) {
   /* Hide all direct child divs except video-playlist-container */
-  .video-playlist > div:not(.container) {
+  .video-playlist > div:not(.video-playlist-container) {
     display: none !important;
   }
   
@@ -128,13 +128,13 @@
   }
   
   /* Make video container take remaining space */
-  .video-playlist > div:not(.container) {
+  .video-playlist > div:not(.video-playlist-container) {
     flex: 1;
     width: 100%;
   }
 }
 
-.video-playlist .container.is-hidden {
+.video-playlist .video-playlist-container.is-hidden {
   display: none;
 }
 
@@ -142,7 +142,7 @@
   height: 1px;
 }
 
-.video-playlist .container {
+.video-playlist .video-playlist-container {
   /* Color Variables */
   --container-background-color: #000;
   --text-color: #fff;
@@ -154,7 +154,7 @@
   --scrollbar-thumb-color: var(--progress-track-color);
   --sessions-session-vertical-padding: 9px;
   --sessions-session-horizontal-padding: 10px;
-  --sessions-session-thumb-progress-color: #1473e6;
+  --sessions-session-thumb-progress-color: var(--color-accent, #1473e6);
   --sessions-session-desc-color: #d5d5d5;
   --sessions-session-info-favorite-color: #fff;
   --footer-background-color: #1d1d1d;
@@ -176,7 +176,7 @@
   position: relative;
 }
 
-.video-playlist .container.consonant--light {
+.video-playlist .video-playlist-container.consonant--light {
   --container-background-color: #f8f6f6;
   --text-color: #000;
   --header-background-color: #fff;
@@ -188,7 +188,7 @@
   --sessions-session-info-favorite-color: #000;
   --footer-background-color: #d9d9d9;
   --highlighted-background-color: #fff;
-  --hover-title-color: #1473e6;
+  --hover-title-color: var(--color-accent, #1473e6);
   --related-playlist-separator-color: #adaaaa;
   --header-toggle-text-color: #222222;
   --switch-background-color: #D5D5D5;
@@ -198,13 +198,13 @@
 }
 
 /* Light theme social share button */
-.video-playlist .container.consonant--light .social-share {
+.video-playlist .video-playlist-container.consonant--light .social-share {
   background: none;
   color: #4b4b4b;
   border: none;
 }
 
-.video-playlist .container.consonant--light .social-share:hover {
+.video-playlist .video-playlist-container.consonant--light .social-share:hover {
   background: none;
 }
 
@@ -723,7 +723,7 @@
 }
 
 .video-playlist .toast--info {
-  background-color: #1473e6;
+  background-color: var(--color-accent, #1473e6);
 }
 
 .video-playlist .toast--error {
@@ -872,7 +872,7 @@
   bottom: 0;
   left: -130px;
   margin-bottom: 8px;
-  background: #1473e6;
+  background: var(--color-accent, #1473e6);
   color: white;
   padding: 12px 12px;
   border-radius: 6px;
@@ -905,7 +905,7 @@
   left: -23px;
   margin-bottom: 0;
   border: 4px solid transparent;
-  border-left-color: #1473e6;
+  border-left-color: var(--color-accent, #1473e6);
   z-index: 1000;
   pointer-events: none;
   opacity: 0;
@@ -966,7 +966,7 @@
    * mobile address-bar show/hide, so the real cap tracks the visual viewport.
    * Collapsed: shrinks to the header height.
    */
-  .video-playlist .container {
+  .video-playlist .video-playlist-container {
     position: fixed;
     left: 0;
     right: 0;
@@ -984,7 +984,7 @@
     transition: max-height 0.3s ease;
   }
 
-  .video-playlist .container.is-collapsed {
+  .video-playlist .video-playlist-container.is-collapsed {
     max-height: var(--playlist-drawer-collapsed-height, 64px);
   }
 
@@ -1034,15 +1034,18 @@
 
 /* Small Mobile Responsive */
 @media (max-width: 600px) {
+  /* Overrides the (max-width: 1575px) rule's max-width: 83.4% — same selector,
+     later in source, and this query is the narrower match, so it already wins
+     by source order (no !important needed). */
   .video-playlist {
-    width: 100% !important;
-    max-width: 100% !important;
+    width: 100%;
+    max-width: 100%;
   }
 }
 
 /* High Contrast Mode */
 @media (prefers-contrast: high) {
-  .video-playlist .container {
+  .video-playlist .video-playlist-container {
     --container-background-color: #000;
     --text-color: #fff;
     --header-background-color: #000;
@@ -1054,7 +1057,7 @@
 }
 
 /* Override Consonant Icon Styles */
-.video-playlist .container .consonant-icon:nth-last-child(1) {
+.video-playlist .video-playlist-container .consonant-icon:nth-last-child(1) {
   margin-right: 0;
 }
 

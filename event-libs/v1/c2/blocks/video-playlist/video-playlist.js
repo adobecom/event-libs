@@ -229,7 +229,7 @@ class VideoPlaylist {
   }
 
   createRoot() {
-    const container = createTag('div', { class: 'container is-hidden', id: 'video-playlist-drawer' });
+    const container = createTag('div', { class: 'video-playlist-container is-hidden', id: 'video-playlist-drawer' });
     if (this.cfg.theme) container.classList.add(`consonant--${this.cfg.theme}`);
     return container;
   }
