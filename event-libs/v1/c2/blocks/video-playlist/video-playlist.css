@@ -408,6 +408,11 @@
   position: relative;
   flex: 1;
   overflow-y: auto;
+
+  /* Keep scroll inside the list in every layout (desktop side-panel and the
+     mobile fixed drawer) — without this, hitting the top/bottom of the list
+     chains the scroll through to the page behind it. */
+  overscroll-behavior: contain;
   margin-bottom: 8px;
   scrollbar-width: thin;
   scrollbar-color: var(--scrollbar-thumb-color) transparent;
