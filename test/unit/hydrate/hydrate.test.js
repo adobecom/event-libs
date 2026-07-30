@@ -1,6 +1,10 @@
 import { expect } from '@esm-bundle/chai';
 
-import { hydrateBlocks } from '../../../event-libs/v1/hydrate/hydrate.js';
+import {
+  hydrateBlocks,
+  registerHydrator,
+} from '../../../event-libs/v1/hydrate/hydrate.js';
+import hydrateEventSpeakers from '../../../event-libs/v1/hydrate/consumers/event-speakers.js';
 import { setMetadata } from '../../../event-libs/v1/utils/utils.js';
 
 describe('hydrateBlocks', () => {
@@ -31,7 +35,7 @@ describe('hydrateBlocks', () => {
       </div>
     `;
 
-    await hydrateBlocks(document);
+    hydrateBlocks(document);
 
     const block = document.querySelector('.image-links');
     const rows = block.querySelectorAll(':scope > div');
@@ -64,7 +68,7 @@ describe('hydrateBlocks', () => {
       </div>
     `;
 
-    await hydrateBlocks(document);
+    hydrateBlocks(document);
 
     const block = document.querySelector('.image-links');
     const images = block.querySelectorAll('img');
@@ -87,7 +91,7 @@ describe('hydrateBlocks', () => {
       </div>
     `;
 
-    await hydrateBlocks(document);
+    hydrateBlocks(document);
 
     const block = document.querySelector('.image-links');
     const images = block.querySelectorAll('img');
@@ -108,7 +112,7 @@ describe('hydrateBlocks', () => {
       </div>
     `;
 
-    await hydrateBlocks(document);
+    hydrateBlocks(document);
 
     const block = document.querySelector('.image-links');
     const images = block.querySelectorAll('img');
@@ -131,7 +135,7 @@ describe('hydrateBlocks', () => {
       </div>
     `;
 
-    await hydrateBlocks(document);
+    hydrateBlocks(document);
 
     const block = document.querySelector('.image-links');
     const link = block.querySelector('a');
@@ -157,7 +161,7 @@ describe('hydrateBlocks', () => {
       </div>
     `;
 
-    await hydrateBlocks(document);
+    hydrateBlocks(document);
 
     const block = document.querySelector('.image-links');
     const links = block.querySelectorAll('a');
@@ -177,7 +181,7 @@ describe('hydrateBlocks', () => {
     `;
 
     // Should not throw
-    await hydrateBlocks(document);
+    hydrateBlocks(document);
 
     const block = document.querySelector('.image-links');
     const images = block.querySelectorAll('img');
@@ -193,7 +197,7 @@ describe('hydrateBlocks', () => {
       </div>
     `;
 
-    await hydrateBlocks(document);
+    hydrateBlocks(document);
 
     const block = document.querySelector('.image-links');
     const images = block.querySelectorAll('img');
@@ -220,7 +224,7 @@ describe('hydrateBlocks', () => {
       </div>
     `;
 
-    await hydrateBlocks(document);
+    hydrateBlocks(document);
 
     const block = document.querySelector('.image-links');
     const images = block.querySelectorAll('img');
@@ -242,7 +246,7 @@ describe('hydrateBlocks', () => {
       </div>
     `;
 
-    await hydrateBlocks(document);
+    hydrateBlocks(document);
 
     const block = document.querySelector('.image-links');
     const img = block.querySelector('img');
@@ -257,7 +261,7 @@ describe('hydrateBlocks', () => {
     `;
 
     // Should not throw even when hydrator doesn't exist
-    await hydrateBlocks(document);
+    hydrateBlocks(document);
 
     const block = document.querySelector('.nonexistent-block');
     expect(block).to.not.be.null;
@@ -286,7 +290,7 @@ describe('hydrateBlocks', () => {
       </div>
     `;
 
-    await hydrateBlocks(document);
+    hydrateBlocks(document);
 
     const blocks = document.querySelectorAll('.image-links');
     expect(blocks).to.have.lengthOf(2);
@@ -296,5 +300,241 @@ describe('hydrateBlocks', () => {
 
     expect(goldBlock.querySelectorAll('img')).to.have.lengthOf(1);
     expect(silverBlock.querySelectorAll('img')).to.have.lengthOf(1);
+  });
+});
+
+describe('consumer hydrator registration', () => {
+  let lanaLogs;
+  let originalLog;
+
+  beforeEach(() => {
+    document.body.innerHTML = '';
+    document.head.innerHTML = '';
+    lanaLogs = [];
+    originalLog = window.lana?.log;
+    window.lana = { ...window.lana, log: (msg) => lanaLogs.push(msg) };
+  });
+
+  afterEach(() => {
+    if (originalLog) window.lana.log = originalLog;
+    // The registry is module-global; restore the built-in so later tests are unaffected
+    // even if an assertion above threw.
+    registerHydrator('event-speakers', hydrateEventSpeakers);
+  });
+
+  it('calls a hydrator registered as a function', () => {
+    let received = null;
+    registerHydrator('custom-consumer-block', (block) => {
+      received = block;
+      block.dataset.hydrated = 'true';
+    });
+
+    document.body.innerHTML = '<div class="custom-consumer-block hydrate"></div>';
+
+    hydrateBlocks(document);
+
+    const block = document.querySelector('.custom-consumer-block');
+    expect(received).to.equal(block);
+    expect(block.dataset.hydrated).to.equal('true');
+  });
+
+  it('prefers a registered hydrator over the built-in one', () => {
+    registerHydrator('event-speakers', (block) => {
+      block.dataset.hydratedBy = 'override';
+    });
+
+    document.body.innerHTML = '<div class="event-speakers hydrate speaker"></div>';
+
+    hydrateBlocks(document);
+
+    expect(document.querySelector('.event-speakers').dataset.hydratedBy).to.equal('override');
+  });
+
+  it('rejects a registration that is not a function', () => {
+    expect(registerHydrator('incomplete-block', './some/module.js')).to.be.false;
+
+    document.body.innerHTML = '<div class="incomplete-block hydrate"></div>';
+
+    hydrateBlocks(document);
+
+    expect(lanaLogs.some((msg) => msg.includes('needs a function'))).to.be.true;
+    expect(lanaLogs.some((msg) => msg.includes('Hydrator not found for block: incomplete-block'))).to.be.true;
+  });
+
+  it('rejects an async hydrator, which would hydrate too late', () => {
+    expect(registerHydrator('async-block', async (block) => {
+      block.dataset.hydrated = 'late';
+    })).to.be.false;
+
+    document.body.innerHTML = '<div class="async-block hydrate"></div>';
+
+    hydrateBlocks(document);
+
+    expect(lanaLogs.some((msg) => msg.includes('rejected an async function'))).to.be.true;
+    expect(document.querySelector('.async-block').dataset.hydrated).to.equal(undefined);
+  });
+
+  it('returns true and warns when replacing an existing registration', () => {
+    expect(registerHydrator('replaceable-block', () => {})).to.be.true;
+    expect(registerHydrator('replaceable-block', (block) => {
+      block.dataset.hydratedBy = 'second';
+    })).to.be.true;
+
+    document.body.innerHTML = '<div class="replaceable-block hydrate"></div>';
+
+    hydrateBlocks(document);
+
+    expect(lanaLogs.some((msg) => msg.includes('replaced an existing registration'))).to.be.true;
+    expect(document.querySelector('.replaceable-block').dataset.hydratedBy).to.equal('second');
+  });
+
+  it('distinguishes a throwing hydrator from a missing one', () => {
+    registerHydrator('throwing-block', () => {
+      throw new Error('boom');
+    });
+
+    document.body.innerHTML = `
+      <div class="throwing-block hydrate"></div>
+      <div class="missing-hydrator-block hydrate"></div>
+    `;
+
+    hydrateBlocks(document);
+
+    expect(lanaLogs).to.include('Hydrator failed for block throwing-block: boom');
+    expect(lanaLogs).to.include('Hydrator not found for block: missing-hydrator-block');
+  });
+
+  it('continues hydrating later blocks after one throws', () => {
+    registerHydrator('bad-block', () => {
+      throw new Error('boom');
+    });
+    registerHydrator('good-block', (block) => {
+      block.dataset.hydrated = 'true';
+    });
+
+    document.body.innerHTML = `
+      <div class="bad-block hydrate"></div>
+      <div class="good-block hydrate"></div>
+    `;
+
+    hydrateBlocks(document);
+
+    expect(document.querySelector('.good-block').dataset.hydrated).to.equal('true');
+  });
+});
+
+describe('hydration is synchronous', () => {
+  beforeEach(() => {
+    document.body.innerHTML = '';
+    document.head.innerHTML = '';
+  });
+
+  // Guards against reintroducing a dynamic import or async hydrator, either of which
+  // would race block init on the fragment/personalization paths.
+  it('completes before hydrateBlocks returns', () => {
+    setMetadata('speakers', JSON.stringify([{
+      ordinal: 0,
+      speakerType: 'Speaker',
+      firstName: 'Sync',
+      lastName: 'Speaker',
+      bio: 'Bio.',
+      photo: { imageUrl: 'https://example.com/sync.jpg' },
+    }]));
+
+    document.body.innerHTML = '<div class="event-speakers hydrate speaker"></div>';
+
+    hydrateBlocks(document);
+
+    // Asserted on the very next statement, with no await in between
+    const block = document.querySelector('.event-speakers');
+    expect(block.querySelectorAll('img')).to.have.lengthOf(1);
+    expect(block.querySelector('h3').textContent).to.equal('Sync Speaker');
+  });
+
+  it('returns undefined rather than a promise', () => {
+    document.body.innerHTML = '<div class="image-links hydrate sponsors gold"></div>';
+    expect(hydrateBlocks(document)).to.equal(undefined);
+  });
+});
+
+describe('hydration logging', () => {
+  // Hydration runs before consumers call loadLana, so window.lana does not exist yet.
+  it('buffers a message until lana is available instead of dropping it', async () => {
+    const originalLana = window.lana;
+    delete window.lana;
+
+    document.body.innerHTML = '<div class="no-hydrator-block hydrate"></div>';
+
+    hydrateBlocks(document);
+
+    const logs = [];
+    window.lana = { log: (msg) => logs.push(msg) };
+    window.dispatchEvent(new Event('load'));
+    await Promise.resolve();
+
+    expect(logs).to.include('Hydrator not found for block: no-hydrator-block');
+    window.lana = originalLana;
+  });
+});
+
+describe('hydration runs once per block', () => {
+  beforeEach(() => {
+    document.body.innerHTML = '';
+    document.head.innerHTML = '';
+  });
+
+  // decorateEvent runs again for nested areas (fragments, personalization). Without a
+  // guard, a second pass would wipe the DOM the block's init() already built.
+  it('skips a block that has already been hydrated', () => {
+    let calls = 0;
+    registerHydrator('once-block', () => { calls += 1; });
+
+    document.body.innerHTML = '<div class="once-block hydrate"></div>';
+
+    hydrateBlocks(document);
+    hydrateBlocks(document);
+
+    expect(calls).to.equal(1);
+    expect(document.querySelector('.once-block').getAttribute('data-hydrated')).to.equal('true');
+  });
+
+  it('preserves initialized DOM when a later pass covers the block again', () => {
+    setMetadata('speakers', JSON.stringify([{
+      ordinal: 0,
+      speakerType: 'Speaker',
+      firstName: 'Re',
+      lastName: 'Entrant',
+      bio: 'Bio.',
+      photo: { imageUrl: 'https://example.com/re.jpg' },
+    }]));
+
+    document.body.innerHTML = '<div class="event-speakers hydrate speaker"><div><div></div></div></div>';
+
+    hydrateBlocks(document);
+    const block = document.querySelector('.event-speakers');
+
+    // Stand in for the block's init(), which relocates cells into a <section>
+    const section = document.createElement('section');
+    block.querySelector(':scope > div').append(section);
+
+    hydrateBlocks(document);
+
+    expect(block.querySelectorAll('section')).to.have.lengthOf(1);
+  });
+
+  it('retries a block whose hydrator threw', () => {
+    let calls = 0;
+    registerHydrator('retry-block', () => {
+      calls += 1;
+      throw new Error('boom');
+    });
+
+    document.body.innerHTML = '<div class="retry-block hydrate"></div>';
+
+    hydrateBlocks(document);
+    hydrateBlocks(document);
+
+    expect(calls).to.equal(2);
+    expect(document.querySelector('.retry-block').hasAttribute('data-hydrated')).to.be.false;
   });
 });

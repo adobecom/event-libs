@@ -1,42 +1,71 @@
-/**
- * Promise for the current hydration run. Set when decorateEvent calls hydrateBlocks
- * so that blocks that depend on hydrated content can await it before initializing.
- */
-let currentHydrationPromise = null;
+import logHydration from './log.js';
+import hydrateImageLinks from './image-links.js';
+import hydrateEventSpeakers from './consumers/event-speakers.js';
+
+// Statically imported, never lazily: Milo calls decorateArea for fragments and
+// personalization without awaiting it, so any asynchrony here — a dynamic import()
+// included — races the block's own init(). See docs/block-hydration.md.
+const HYDRATORS = {
+  'image-links': hydrateImageLinks,
+  // Blocks event-libs does not own
+  'event-speakers': hydrateEventSpeakers,
+};
+
+// Marks a block as hydrated so a later decorateEvent pass over a nested area
+// (fragments, personalization) can't re-run a hydrator over initialized DOM.
+const HYDRATED_ATTR = 'data-hydrated';
+
+// Consumer-supplied hydrators, keyed by block name. Takes precedence over HYDRATORS.
+const [registerHydrator, getRegisteredHydrator] = (() => {
+  const registry = new Map();
+  return [
+    (blockName, hydrator) => {
+      if (!blockName || typeof hydrator !== 'function') {
+        logHydration(`Hydrator: registerHydrator("${blockName}") needs a function. Import your module first and register its default export.`);
+        return false;
+      }
+      // An async hydrator would return an unobserved promise and hydrate too late.
+      if (hydrator.constructor?.name === 'AsyncFunction') {
+        logHydration(`Hydrator: registerHydrator("${blockName}") rejected an async function. Hydration must be synchronous.`);
+        return false;
+      }
+      if (registry.has(blockName)) {
+        logHydration(`Hydrator: registerHydrator("${blockName}") replaced an existing registration.`);
+      }
+      registry.set(blockName, hydrator);
+      return true;
+    },
+    (blockName) => registry.get(blockName) ?? null,
+  ];
+})();
+
+export { registerHydrator };
 
 /**
- * Returns the promise for the current page's hydration, if any.
- * Blocks that need hydrated DOM (e.g. image-links) should await this before init.
- * @returns {Promise<void>|null} Resolves when hydration is done, or null if no hydration was started
+ * Hydrates blocks in the area that need dynamic content from metadata. Runs to
+ * completion synchronously, so there is nothing to await.
+ * @param {HTMLElement|Document} area
  */
-export function getHydrationPromise() {
-  return currentHydrationPromise ?? null;
-}
+export function hydrateBlocks(area = document) {
+  if (!area) return;
 
-/**
- * Stores the hydration promise. Used by decorateEvent so it can stay sync.
- * @param {Promise<void>} p
- */
-export function setHydrationPromise(p) {
-  currentHydrationPromise = p;
-}
-
-/**
- * Hydrates blocks in the document that need dynamic content from metadata.
- * Call this before blocks are initialized.
- */
-export async function hydrateBlocks(area = document) {
-  const blocks = area.querySelectorAll('.hydrate');
+  const blocks = area.querySelectorAll(`.hydrate:not([${HYDRATED_ATTR}])`);
 
   for (const block of blocks) {
     // Extract block name from class list (first class is typically the block name)
     const blockName = block.classList[0];
+    const hydrate = getRegisteredHydrator(blockName) ?? HYDRATORS[blockName];
+
+    if (!hydrate) {
+      logHydration(`Hydrator not found for block: ${blockName}`);
+      continue;
+    }
 
     try {
-      const { default: hydrate } = await import(`./${blockName}.js`);
       hydrate(block);
+      block.setAttribute(HYDRATED_ATTR, 'true');
     } catch (e) {
-      window.lana?.log(`Hydrator not found for block: ${blockName}`);
+      logHydration(`Hydrator failed for block ${blockName}: ${e.message}`);
     }
   }
 }

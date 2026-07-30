@@ -48,6 +48,9 @@ import {
   processAutoBlockLinks,
 } from './utils/decorate.js';
 
+// Hydration API for consumers that author hydrated blocks they own themselves
+import { registerHydrator } from './hydrate/hydrate.js';
+
 // Core exports - always available (synchronous)
 export {
   getEventServiceEnv,
@@ -61,6 +64,7 @@ export {
   getNonProdData,
   validatePageAndRedirect,
   processAutoBlockLinks,
+  registerHydrator,
   EVENT_BLOCKS,
   EVENT_BLOCKS_C2,
 };

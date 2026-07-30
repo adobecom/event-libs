@@ -28,7 +28,7 @@ import {
   shouldForceGuestSignIn,
 } from './utils.js';
 import { massageMetadata } from './date-time-helper.js';
-import { hydrateBlocks, setHydrationPromise } from '../hydrate/hydrate.js';
+import { hydrateBlocks } from '../hydrate/hydrate.js';
 import { initSessionState } from './session-store.js';
 
 const ICONS_BASE_URL = new URL('../icons/', import.meta.url).href;
@@ -1092,7 +1092,9 @@ export function applyAreaTheme(area = document) {
 }
 
 export function decorateEvent(parent) {
-  setHydrationPromise(hydrateBlocks(parent));
+  // Must stay sync: Milo doesn't await decorateArea for fragments or personalization,
+  // so hydration has to finish here or it races each block's init().
+  hydrateBlocks(parent);
 
   // handle photos data parsing
   const photosData = parsePhotosData(parent);

@@ -1,4 +1,5 @@
 import { createTag, getMetadata, getImageSource } from '../utils/utils.js';
+import logHydration from './log.js';
 
 const CONFIG = {
   // Mapping of class names to metadata keys
@@ -59,7 +60,7 @@ export default function hydrateImageLinks(block) {
     if (!metadataValue) return;
     data = JSON.parse(metadataValue);
   } catch (error) {
-    window.lana?.log(`Hydrator: Failed to parse metadata "${metadataKey}": ${error.message}`);
+    logHydration(`Hydrator: Failed to parse metadata "${metadataKey}": ${error.message}`);
     return;
   }
 
