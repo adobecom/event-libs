@@ -1,5 +1,6 @@
 import { html, useEffect, useRef, useState } from '../../../deps/htm-preact.js';
 import { useSessionGuide } from '../store/index.js';
+import { sessions, sessionsStatus, auth } from '../../../utils/session-store.js';
 import { DrawerHeader } from './DrawerHeader.js';
 import { ViewRouter } from './ViewRouter.js';
 import { SessionDetailOverlay } from './SessionDetailOverlay.js';
@@ -42,8 +43,8 @@ export function DrawerShell() {
     if (drawerState === 'peek') {
       expandedRef.current = false;
       document.body.style.overflow = 'hidden';
-      // ≤1440px viewport width → ~500px peek; >1440px (e.g. 1920px) → ~890px peek
-      const peekHeight = window.innerWidth > 1440 ? 890 : 500;
+      // ≤1440px viewport width → 55% of viewport height; >1440px → 65%
+      const peekHeight = Math.round(window.innerHeight * (window.innerWidth > 1440 ? 0.65 : 0.55));
       const peekTop = Math.max(getTopMargin(), window.innerHeight - peekHeight);
       el.style.transition = 'none';
       el.style.top = '100vh';
@@ -126,26 +127,30 @@ export function DrawerShell() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     if (params.has('sessions') || params.has('session')) {
-      dispatch({ type: 'SET_DRAWER', drawer: 'expanded' });
+      dispatch({
+        type: 'SET_DRAWER',
+        drawer: 'expanded',
+        defaultView: auth.value.isRegistered ? 'my-sessions' : 'live-upcoming',
+      });
     }
   }, []);
 
   // URL deep-linking: resolve ?session=slug once sessions are loaded
   useEffect(() => {
-    if (state.sessionsStatus !== 'ready') return;
+    if (sessionsStatus.value !== 'ready') return;
     const params = new URLSearchParams(window.location.search);
     const sessionParam = params.get('session');
     if (!sessionParam) return;
     // URL format: slug-rfCode (rfCode is after the last dash)
     const lastDash = sessionParam.lastIndexOf('-');
     const rfCode = lastDash >= 0 ? sessionParam.slice(lastDash + 1) : sessionParam;
-    const found = state.sessions.find((s) => s.rfCode === rfCode || s.id === sessionParam);
+    const found = sessions.value.find((s) => s.rfCode === rfCode || s.id === sessionParam);
     if (found) dispatch({ type: 'SET_ACTIVE_SESSION', sessionId: found.id });
-  }, [state.sessionsStatus]);
+  }, [sessionsStatus.value]);
 
   // Keep sessionsRef current so the popstate handler always sees the latest list
-  const sessionsRef = useRef(state.sessions);
-  useEffect(() => { sessionsRef.current = state.sessions; }, [state.sessions]);
+  const sessionsRef = useRef(sessions.value);
+  useEffect(() => sessions.subscribe((v) => { sessionsRef.current = v; }), []);
 
   // popstate listener — restores state from URL without pushing new history entries
   // Registered once (stable []); reads sessions via ref to avoid re-registering on every poll.
@@ -157,34 +162,38 @@ export function DrawerShell() {
         const lastDash = sessionParam.lastIndexOf('-');
         const rfCode = lastDash >= 0 ? sessionParam.slice(lastDash + 1) : sessionParam;
         const found = sessionsRef.current.find((s) => s.rfCode === rfCode || s.id === sessionParam);
-        dispatch({ type: 'SET_DRAWER', drawer: 'expanded' });
+        const defaultView = auth.value.isRegistered ? 'my-sessions' : 'live-upcoming';
+        dispatch({ type: 'SET_DRAWER', drawer: 'expanded', defaultView });
         dispatch({ type: 'SET_ACTIVE_SESSION', sessionId: found ? found.id : null });
       } else if (params.has('sessions')) {
-        dispatch({ type: 'SET_DRAWER', drawer: 'expanded' });
+        const defaultView = auth.value.isRegistered ? 'my-sessions' : 'live-upcoming';
+        dispatch({ type: 'SET_DRAWER', drawer: 'expanded', defaultView });
         dispatch({ type: 'SET_ACTIVE_SESSION', sessionId: null });
       } else {
-        dispatch({ type: 'SET_DRAWER', drawer: 'hidden' });
-        dispatch({ type: 'SET_ACTIVE_SESSION', sessionId: null });
+        dispatch({ type: 'CLOSE_DRAWER' });
       }
     }
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
   }, []);
 
-  const { drawerState, sessionsStatus, activeSessionId } = state;
+  const { drawerState, activeSessionId } = state;
   const isOpen = drawerState !== 'hidden';
   const isExpanded = drawerState === 'expanded';
   const hasDetail = !!activeSessionId;
 
   function closeDrawer() {
-    dispatch({ type: 'SET_DRAWER', drawer: 'hidden' });
-    dispatch({ type: 'SET_ACTIVE_SESSION', sessionId: null });
+    dispatch({ type: 'CLOSE_DRAWER' });
     history.pushState({}, '', clearSessionParams());
   }
 
   function openDrawer() {
-    const isMobile = window.matchMedia('(max-width: 767px)').matches;
-    dispatch({ type: 'SET_DRAWER', drawer: isMobile ? 'expanded' : 'peek' });
+    const isNarrow = window.matchMedia('(max-width: 1279px)').matches;
+    dispatch({
+      type: 'SET_DRAWER',
+      drawer: isNarrow ? 'expanded' : 'peek',
+      defaultView: auth.value.isRegistered ? 'my-sessions' : 'live-upcoming',
+    });
     history.pushState({}, '', setSessionsParam());
   }
 
@@ -219,9 +228,9 @@ export function DrawerShell() {
         />
         <div class="sg-drawer__body">
           <div class=${`sg-body-scroll${isExpanded ? ' sg-body-scroll--scrollable' : ''}`}>
-            ${sessionsStatus === 'loading' && html`<div class="sg-loading">Loading sessions…</div>`}
-            ${sessionsStatus === 'error' && html`<div class="sg-error">Failed to load sessions.</div>`}
-            ${sessionsStatus === 'ready' && html`<${ViewRouter} />`}
+            ${sessionsStatus.value === 'loading' && html`<div class="sg-loading">Loading sessions…</div>`}
+            ${sessionsStatus.value === 'error' && html`<div class="sg-error">Failed to load sessions.</div>`}
+            ${sessionsStatus.value === 'ready' && html`<${ViewRouter} />`}
           </div>
           <div class=${'sg-detail-panel' + (hasDetail ? ' sg-detail-panel--open' : '')}>
             ${hasDetail && html`<${SessionDetailOverlay} onBack=${handleDetailBack} />`}
@@ -229,7 +238,18 @@ export function DrawerShell() {
         </div>
         ${filterOpen && html`<${FilterPanel} onClose=${handleFilterClose} />`}
       </div>
-      ${!isOpen && html`<button class="sg-cta-btn" onclick=${openDrawer} type="button">Browse Sessions</button>`}
+      ${!isOpen && html`<button class="sg-cta-btn" onclick=${openDrawer} type="button">
+        View all sessions
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false">
+          <path d="M15.75 3H13.75V2C13.75 1.58594 13.4141 1.25 13 1.25C12.5859 1.25 12.25 1.58594 12.25 2V3H7.75V2C7.75 1.58594 7.41406 1.25 7 1.25C6.58594 1.25 6.25 1.58594 6.25 2V3H4.25C3.00928 3 2 4.00977 2 5.25V15.75C2 16.9902 3.00928 18 4.25 18H15.75C16.9907 18 18 16.9902 18 15.75V5.25C18 4.00977 16.9907 3 15.75 3ZM4.25 4.5H6.25V5C6.25 5.41406 6.58594 5.75 7 5.75C7.41406 5.75 7.75 5.41406 7.75 5V4.5H12.25V5C12.25 5.41406 12.5859 5.75 13 5.75C13.4141 5.75 13.75 5.41406 13.75 5V4.5H15.75C16.1636 4.5 16.5 4.83691 16.5 5.25V7H3.5V5.25C3.5 4.83691 3.83643 4.5 4.25 4.5ZM15.75 16.5H4.25C3.83643 16.5 3.5 16.1631 3.5 15.75V8.5H16.5V15.75C16.5 16.1631 16.1636 16.5 15.75 16.5Z" fill="currentColor"/>
+          <path d="M7 11C7 10.4477 6.55228 10 6 10C5.44772 10 5 10.4477 5 11C5 11.5523 5.44772 12 6 12C6.55228 12 7 11.5523 7 11Z" fill="currentColor"/>
+          <path d="M11 11C11 10.4477 10.5523 10 10 10C9.44772 10 9 10.4477 9 11C9 11.5523 9.44772 12 10 12C10.5523 12 11 11.5523 11 11Z" fill="currentColor"/>
+          <path d="M15 11C15 10.4477 14.5523 10 14 10C13.4477 10 13 10.4477 13 11C13 11.5523 13.4477 12 14 12C14.5523 12 15 11.5523 15 11Z" fill="currentColor"/>
+          <path d="M7 14C7 13.4477 6.55228 13 6 13C5.44772 13 5 13.4477 5 14C5 14.5523 5.44772 15 6 15C6.55228 15 7 14.5523 7 14Z" fill="currentColor"/>
+          <path d="M11 14C11 13.4477 10.5523 13 10 13C9.44772 13 9 13.4477 9 14C9 14.5523 9.44772 15 10 15C10.5523 15 11 14.5523 11 14Z" fill="currentColor"/>
+          <path d="M15 14C15 13.4477 14.5523 13 14 13C13.4477 13 13 13.4477 13 14C13 14.5523 13.4477 15 14 15C14.5523 15 15 14.5523 15 14Z" fill="currentColor"/>
+        </svg>
+      </button>`}
     </div>
   `;
 }

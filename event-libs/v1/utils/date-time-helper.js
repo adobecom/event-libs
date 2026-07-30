@@ -1,5 +1,19 @@
 import { getMetadata } from "./utils.js";
 
+export const LOCALE_FORMATTERS = {
+  'fr-FR': (h, m) => (m === 0 ? `${h}h` : `${h}h${String(m).padStart(2, '0')}`),
+};
+
+const DEFAULT_TIME_FORMAT_OPTIONS = { hour: 'numeric', minute: 'numeric', hour12: true };
+
+export function applyLocaleFormat(hours, minutes, locale) {
+  const formatter = LOCALE_FORMATTERS[locale];
+  if (formatter) return formatter(hours, minutes);
+  const date = new Date();
+  date.setHours(hours, minutes, 0, 0);
+  return new Intl.DateTimeFormat(locale, DEFAULT_TIME_FORMAT_OPTIONS).format(date);
+}
+
 /**
  * Converts a UTC timestamp (in milliseconds) to a user-friendly local date time string.
  * The output is DST sensitive and follows locale format without localization.
@@ -288,14 +302,20 @@ function getTimeOnly(timestamp, locale, { includeTimeZone = false, timezone = nu
     const date = new Date(timestampNum);
     if (Number.isNaN(date.getTime())) return '';
 
-    const options = {
-      hour: 'numeric',
-      minute: '2-digit',
-      hour12: true,
-    };
+    if (LOCALE_FORMATTERS[locale]) {
+      const tzOpts = timezone ? { timeZone: timezone } : {};
+      const parts = new Intl.DateTimeFormat('en-US', { hour: 'numeric', minute: 'numeric', hour12: false, ...tzOpts }).formatToParts(date);
+      const h = Number(parts.find((p) => p.type === 'hour').value);
+      const m = Number(parts.find((p) => p.type === 'minute').value);
+      const timeStr = applyLocaleFormat(h, m, locale);
+      if (!includeTimeZone) return timeStr;
+      const tzAbbr = date.toLocaleTimeString('en-US', { timeZoneName: 'short', ...tzOpts }).split(' ').pop();
+      return `${timeStr} ${tzAbbr}`;
+    }
+
+    const options = { hour: 'numeric', minute: '2-digit', hour12: true };
     if (includeTimeZone) options.timeZoneName = 'short';
     if (timezone) options.timeZone = timezone;
-
     return date.toLocaleTimeString(locale, options);
   } catch (error) {
     window.lana?.log(`Error getting time only: ${JSON.stringify(error)}`);

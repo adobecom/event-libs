@@ -2,7 +2,11 @@
 
 **Ticket:** MWPW-194331 · **Epic:** MWPW-192677  
 **Assignee:** Daniel Oliva  
-**Stack:** Preact · ES Modules · BlockMediator (IMS only) · Milo/IMS · FEDS
+**Stack:** Preact · Preact Signals (shared session state) · ES Modules · BlockMediator (IMS + RSVP) · Milo/IMS · FEDS
+
+> **Architecture update (MWPW-199065):** Sessions, favorites, scheduled sessions, and auth were promoted out of this block's Preact Context into a page-level shared module (`event-libs/v1/utils/session-store.js`) so other blocks on the same page can read the same state. See "State layers" and "Why signals, not just BlockMediator" below for the rationale, `REAL-API-CHECKLIST.md` for the current mock/real-API status, and `../../utils/SHARED-STATE-USAGE.md` (co-located with `session-store.js` itself) for a how-to guide aimed at other blocks (Preact and vanilla JS) consuming this state. Sections below that still describe the old single-reducer design have been updated in place; historical phase descriptions (UI behavior, gestures, breakpoints) are unaffected and still accurate.
+>
+> **Follow-up (same ticket):** The toast and schedule-conflict modal were promoted the same way — out of this block's Preact tree into framework-agnostic, page-level modules (`event-libs/v1/features/toast/toast.js`, `event-libs/v1/features/conflict-modal/conflict-modal.js`), mounted once by `session-store.js`'s `initSessionState()`. They live under `features/`, not `utils/` or a new block, since blocks require author-placed content and `utils/` is otherwise pure logic with no DOM/CSS of its own — `features/` is this codebase's existing home for reusable, non-block rendering logic (see `features/carousel/`). Any block — Preact or vanilla — that calls `scheduleAction`/`favoriteAction` now gets the same feedback UI for free. `action-feedback.js` (the error → toast/conflict translator) moved with them to `event-libs/v1/services/sessions/` and no longer takes a `dispatch` argument at all. See Phase 4 below for the updated component/module descriptions.
 
 ---
 
@@ -13,130 +17,184 @@ The Session Guide is a complex, stateful event browser that ships in two surface
 1. **Widget** — a peek-to-expand bottom drawer embedded on the event homepage
 2. **Full Page** — a standalone page at `/max/2026/sessions.html`
 
-Both surfaces share the same component architecture and must always reflect identical session state. Sessions are fetched from the event API on initial load; scheduled and favorited sessions are fetched from Rainfocus on load (registration-gated). Live stream status for Mobile Rider sessions is polled every 30 s from the MR API. Non-MR sessions use time-window logic to determine live state. The block handles time-based state transitions, auth-aware views, and a rich set of user interactions across multiple responsive breakpoints.
+Both surfaces share the same component architecture and must always reflect identical session state. Sessions are fetched from the event API on initial load (currently mocked). Scheduled and favorited sessions are fetched from Rainfocus on load (registration-gated; currently mocked). Live stream status for Mobile Rider sessions is polled every 30 s from the MR API (currently mocked). Non-MR sessions use time-window logic to determine live state. The block handles time-based state transitions, auth-aware views, and a rich set of user interactions across multiple responsive breakpoints.
 
 ---
 
 ## Architecture Decisions
 
 ### Preact over vanilla JS
-The prototype (`prototype/index.js`) already exposes the complexity: ~2000 lines of imperative DOM manipulation to manage ~15 distinct pieces of state. Preact gives us reactive rendering, collocated component state, and a natural model for the time-driven update loop without a build step. Preact is confirmed available at `${miloLibs}/deps/htm-preact.js`.
+The prototype (`prototype/index.js`) already exposed the complexity: ~2000 lines of imperative DOM manipulation to manage ~15 distinct pieces of state. Preact gives us reactive rendering, collocated component state, and a natural model for the time-driven update loop without a build step. Preact is confirmed available at `${miloLibs}/deps/htm-preact.js` (imported as `htm-preact.js` from the local `deps/` directory in this project).
+
+### Component pattern — named exports, not factories
+All components are **plain named exports** using htm tagged template literals. The factory pattern (`buildXxx(preact, store)`) described in the original plan was abandoned. Components import dependencies directly at the module level.
+
+```javascript
+// Actual pattern used throughout:
+import { html, useState } from '../../../deps/htm-preact.js';
+import { useSessionGuide } from '../store/index.js';
+
+export function SessionCard({ session, forceOnDemand = false }) {
+  const { state, dispatch } = useSessionGuide();
+  // ...
+  return html`<div class="sg-card">...</div>`;
+}
+
+// Some components also export a factory shim for test compatibility:
+export const buildSessionCard = () => SessionCard;
+```
+
+### htm tagged template literals, not JSX
+All template output uses `` html`...` `` from `htm-preact.js`. File extensions are `.js`, not `.jsx`. There is no JSX transform or build step.
 
 ### State layers
 | Layer | Tool | Purpose |
 |---|---|---|
-| App-wide state | Preact Context + `useReducer` | Sessions, scheduled, favorited, active view, filters, search — single source of truth |
-| Local UI state | `useState` | Drawer open/closed, carousel index, panel open/closed |
-| Scheduled / favorited persistence | Rainfocus API | Source of truth for registered users — fetched on load, mutated via RF API calls |
-| IMS profile | `BlockMediator` | Read `imsProfile` — existing project pattern |
-| Inter-block (same page) | `BlockMediator` | Publish `scheduledCount` etc. to other blocks on the homepage |
-| URL state | `history.pushState` | Widget: `?sessions` / `?session=<slug>`. Full page: `?view=` / `?filter=` / `?search=` |
+| Shared, page-level state | Preact `signal()` (`event-libs/v1/utils/session-store.js`) | Sessions, favorited, scheduled, auth, live-stream status, pending actions — single source of truth, readable by **any** block on the page, not just this one |
+| Shared, page-level feedback UI | Preact `signal()` + vanilla DOM (`event-libs/v1/features/toast/toast.js`, `event-libs/v1/features/conflict-modal/conflict-modal.js`) | Toast and schedule-conflict modal — mounted once by `initSessionState()`, rendered with plain DOM so any block (Preact or vanilla) can trigger them via `showToast()`/`showConflictModal()`, not just this one |
+| Block-local UI state | Preact Context + `useReducer` (`store/index.js`) | Drawer state, active view, active day, filters, search — this widget's own chrome, not needed elsewhere |
+| Local component state | `useState` | Carousel index, filter panel open/closed, mobile search open |
+| Scheduled / favorited persistence | Rainfocus API (mocked) + localStorage (`sessions:scheduled` / `sessions:favorited`) | Source of truth for registered users — fetched on load, mutated via RF API calls, persisted locally by `session-store.js` |
+| Auth/registration dev state | `localStorage` (`sg:dev-auth`) | Dev-only override so Milo's guest IMS cannot overwrite dev user state — now seeded and read entirely inside `session-store.js` |
+| IMS profile | `BlockMediator` | Read `imsProfile` — existing project pattern; bridged into the shared `auth` signal by `session-store.js` |
+| RSVP / registration | `BlockMediator` | Read `rsvpData.registered` — existing project pattern; bridged into the shared `auth` signal |
+| Inter-block (same page) | `BlockMediator` (legacy keys) + `session-store.js` signals (new shared keys) | `BlockMediator` keeps owning `imsProfile`/`rsvpData`/`espData` as before; new cross-block session data goes through signals instead of adding more `BlockMediator` keys |
+| URL state | `history.pushState` | Widget: `?sessions` / `?session=<slug>-<rfCode>`. Full page: `?view=` / `?filter=` / `?search=` |
 
-### Why not BlockMediator as primary state
-The widget (`/max.html`) and full-page (`/max/2026/sessions.html`) are on different pages — BlockMediator is in-memory and cannot survive a page navigation. Within a single page, Preact Context is cleaner and more testable than a global pub/sub store. Rainfocus is the authoritative persistence layer for scheduled and favorited sessions: mutations call the RF API, and each surface rehydrates from RF on init.
+### Why signals, not just BlockMediator
+The original design kept all session state in this block's own Preact Context, on the theory that the widget and full-page surfaces are on different pages and in-memory state can't survive navigation anyway. That held until a cross-block requirement came in: other blocks on the *same* page (favorites badges, registration-aware CTAs, etc.) need to read sessions/favorites/scheduled/auth too — state scoped to one block's Context isn't reachable from outside it.
+
+`BlockMediator` (a plain keyed pub/sub, no reactivity of its own) already solves the "shared across blocks" half of that problem and is used elsewhere in this codebase, but bridging it into Preact requires hand-rolled `useEffect` + `subscribe` + `dispatch` boilerplate per key — exactly what the original `syncAuth()` effect below used to do. Preact Signals are already vendored in `deps/htm-preact.js` (this repo's Preact build has the signal-integration hooks patched in) and give both properties for free: a plain module-level value usable from **any** JS (Preact or vanilla), and automatic fine-grained re-rendering for any Preact component that reads `.value` during render — no Context/Provider plumbing needed across block boundaries.
+
+So the split is: `BlockMediator` still owns what it already owned (`imsProfile`, `rsvpData`, `espData`), and `session-store.js` owns everything new that other blocks need, bridging the two BlockMediator keys it cares about into its own `auth` signal. This block's own Context/reducer only holds state that is genuinely private to this widget's UI (drawer position, active tab, toast, etc.).
+
+`initSessionState()` bootstraps the shared store from `decorateEvent()` — before any block's own `init()` runs — gated on the `rainfocus-api-url` page metadata (mirroring the `event-id` gate `decorateEvent` already uses). That decouples "is the shared session data available" from "is the sessions-guide block specifically authored on this page."
+
+`decorateEvent()` additionally requires `tier-1-event-state-enabled` metadata to be `'true'` before it even calls `initSessionState()`. `event-id` alone is already authored broadly across prod event pages for unrelated purposes, so gating on it alone would seed sessions-guide's mock data (`sg:dev-auth`, mock scheduled/favorited) on pages that never intend to use it. `tier-1-event-state-enabled` is an explicit opt-in, separate from — and checked before — the `rainfocus-api-url` gate inside `initSessionState()` itself.
 
 ### Polling architecture
-A single `setInterval` (30 s) starts after sessions are loaded — it is not started on component mount. Because `init()` awaits the session fetch before mounting Preact, sessions are available as a prop when the component mounts, and polling starts immediately in the `useEffect`. It calls the Mobile Rider batch API for all sessions that have an `mrStreamId`.
+A single `setInterval` (30 s) starts inside `session-store.js` after sessions are loaded (when `sessionsStatus.value === 'ready'`). It calls the Mobile Rider batch API for all sessions that have an `mrStreamId`. The polling engine self-stops when all MR sessions report inactive (stream day over). `poller.js`'s `startPolling(mrSessions, env, onUpdate, intervalMs)` takes a plain callback instead of a dispatch function — decoupling it from ever being tied to a specific reducer.
 
-```javascript
-// poller.js
-let _dispatch = null;
-export const injectDispatch = (dispatch) => { _dispatch = dispatch; };
+### Auth architecture
+Auth state is synced entirely inside `session-store.js`'s `syncAuth()`, from two sources:
+1. `localStorage` (`sg:dev-auth`) — checked first; dev-mode override that prevents Milo's guest IMS from overwriting the dev user. Seeded by `session-store.js` itself (see Phase 0.3).
+2. `BlockMediator` — subscribes to both `imsProfile` and `rsvpData`. `isRegistered` is derived from `rsvpData.registered === true`. Both subscriptions call the same `syncAuth()` function, which writes the shared `auth` signal.
 
-async function tick(mrSessions, env) {
-  const ids = mrSessions.map(s => s.mrStreamId).join(',');
-  const base = env === 'prod'
-    ? 'https://overlay-admin.mobilerider.com'
-    : 'https://overlay-admin-dev.mobilerider.com';
-  const { active, inactive } = await fetch(`${base}/api/media-status?ids=${ids}`)
-    .then(r => r.json());
-  _dispatch?.({ type: 'LIVE_STATUS_UPDATE', active: new Set(active), inactive: new Set(inactive), now: Date.now() });
-}
+The block's own components (and any other block) read `auth.value` directly — no dispatch or Context involved.
 
-export function startPolling(mrSessions, env, intervalMs = 30_000) {
-  if (!mrSessions.length) return; // nothing to poll
-  tick(mrSessions, env);          // immediate first run
-  return setInterval(() => tick(mrSessions, env), intervalMs);
-}
-```
+Real FEDS token (`getFedsToken()`) and RF credential wiring are implemented but not yet activated — Rainfocus service methods currently return mock data.
 
 ### Timezone
-All session times come from the event API in UTC. A `formatSessionTime(utcIso, userTz)` utility converts on render. `Intl.DateTimeFormat().resolvedOptions().timeZone` handles detection with a fallback to `eventConfig.baseTimezone`.
+All session times come from the event API in UTC. `detectUserTimezone()` detects the user's timezone via `Intl.DateTimeFormat().resolvedOptions().timeZone` at init and stores it as `eventConfig.userTz`. Cards and overlays read `userTz` from context. A `?serverTime=<ms>` URL parameter overrides `Date.now()` for testing via `getNowMs()`.
 
 ### User registration states
 Three distinct states drive the UI:
 
-| State | `isLoggedIn` | `isRegistered` | RF data |
+| State | `isLoggedIn` | `isRegistered` | Scheduled / favorited |
 |---|---|---|---|
-| Loading | `null` | `undefined` | — |
-| Logged out | `false` | `false` | absent |
-| Logged in, not registered | `true` | `false` | absent |
-| Logged in + registered | `true` | `true` | available |
+| Loading | `null` | `undefined` | from localStorage |
+| Logged out | `false` | `false` | localStorage only |
+| Logged in, not registered | `true` | `false` | localStorage only |
+| Logged in + registered | `true` | `true` | Rainfocus (mocked) |
 
-All users see session cards, schedule/favorite buttons, and the My Sessions tab. The action gate is `isRegistered === true` — unregistered users clicking a gated action receive a `<RegistrationPrompt />`. The `isLoggedIn` flag is still held in state for display purposes (e.g. showing the user's first name) but does not gate any actions.
-
-`isRegistered` source is deferred — it will be wired to either a BlockMediator key or `window.feds.utilities.getEventData()` in a follow-up. For Phase 0, mock it.
+All users can schedule and favorite sessions (stored in localStorage). The registration gate for My Sessions / My Favorites views shows `<RegistrationPrompt />` when `isRegistered !== true`. Toast messages prompt login or registration on action if not authenticated. Action buttons call the RF API when `isRegistered === true` (currently mocked).
 
 ---
 
-## Component Tree (High Level)
+## Component Tree (Actual)
 
 ```
-SessionsGuideBlock (init entry point)
-  ├── SessionsGuideApp (Preact root)
-  │     ├── DrawerShell  (widget only)
-  │     │     ├── DrawerHeader
-  │     │     │     ├── HeaderTitle
-  │     │     │     ├── DateTabs
-  │     │     │     └── RightControls
-  │     │     │           ├── ViewDropdown
-  │     │     │           ├── FilterButton → FilterPanel
-  │     │     │           ├── SearchButton → SearchField
-  │     │     │           └── DownloadButton (My Sessions only)
-  │     │     ├── DrawerBody (scrollable)
-  │     │     │     ├── LiveNowSection → LiveCardCarousel
-  │     │     │     ├── FeaturedSection → FeaturedCarousel (future days)
-  │     │     │     ├── BrandConciergeRibbon
-  │     │     │     ├── UpcomingSessions → TimeSlotRow[] → SessionCard[]
-  │     │     │     └── OnDemandSessions → TrackSection[] → SessionCard[]
-  │     │     └── SessionDetailOverlay
-  │     └── FullPageShell  (full page only)
-  │           ├── FullPageHeader (same controls as DrawerHeader)
-  │           ├── FullPageBody
-  │           │     └── [same sections as DrawerBody]
-  │           └── (no SessionDetailOverlay — cards link directly to session pages)
-  ├── ConflictModal
-  ├── RegistrationPrompt
-  └── Toast
+SessionsGuideBlock (init entry point — sessions-guide.js)
+  └── SessionGuideProvider (store/index.js — Preact context + useReducer)
+        └── App (components/App.js)
+              ├── DrawerShell  (widget surface)
+              │     ├── DrawerHeader
+              │     │     ├── DateTabs
+              │     │     ├── ViewDropdown
+              │     │     ├── DownloadButton (My Sessions view only)
+              │     │     └── inline mobile search field (no separate SearchField component)
+              │     ├── FilterPanel (rendered inside DrawerShell when filterOpen)
+              │     ├── ViewRouter
+              │     │     ├── LiveUpcomingView  (activeView === 'live-upcoming')
+              │     │     │     ├── Carousel (live sessions, variant="live") → LiveCard[]
+              │     │     │     ├── Carousel (featured sessions, variant="featured") → LiveCard[]
+              │     │     │     ├── TimeSlotRow[] (upcoming) → SessionCard[]
+              │     │     │     └── TimeSlotRow[] (previously aired, forceOnDemand) → SessionCard[]
+              │     │     ├── MySessionsView    (activeView === 'my-sessions')
+              │     │     │     ├── Carousel (live scheduled, variant="live") → LiveCard[]
+              │     │     │     ├── tab bar: Upcoming | On Demand (smart: hidden tab when empty)
+              │     │     │     ├── TimeSlotRow[] (upcoming scheduled)
+              │     │     │     └── TrackRow[] (on-demand scheduled, grouped by track)
+              │     │     ├── MyFavoritesView   (activeView === 'my-favorites')
+              │     │     │     ├── Carousel (live favorited, variant="live") → LiveCard[]
+              │     │     │     ├── tab bar: Upcoming | On Demand (smart: hidden tab when empty)
+              │     │     │     ├── TimeSlotRow[] (upcoming favorited)
+              │     │     │     └── TrackRow[] (on-demand favorited, grouped by track)
+              │     │     └── OnDemandView      (activeView === 'on-demand')
+              │     │           └── track sections (h3 + SessionCard[] per track)
+              │     └── SessionDetailOverlay (inside .sg-detail-panel, widget only)
+              ├── FullPageShell (page surface)
+              │     ├── DrawerHeader (reused; hideClose=true)
+              │     ├── FilterPanel (when filterOpen)
+              │     └── ViewRouter (same as widget)
+              └── RegistrationPrompt (modal wrapper in App, content from RegistrationPrompt component)
 ```
+
+Toast and the schedule-conflict modal are **not** part of this tree anymore — they're page-level singletons mounted directly to `document.body` by `event-libs/v1/features/toast/toast.js`/`features/conflict-modal/conflict-modal.js` (via `initSessionState()`), independent of whether this block is on the page at all.
+
+### Shared utility components
+- `CategoryBadge` — renders category icon + label; color driven by `eventConfig.categoryColors`
+- `IconButton` — S2A icon-only button (solid/outlined/transparent variants, on-light/on-dark contexts)
+- `icons.js` — SVG icon functions: `IconPlay`, `IconCalendarCheck`, `IconCalendarPlus`, `IconHeartFilled`, `IconHeartOutline`
 
 ---
 
 ## State Shape
 
+State is split across two modules — shared signals (readable by any block) and this block's own UI-only reducer.
+
 ```javascript
-// Held in Preact Context via useReducer — this is the shape of the reducer state
+// event-libs/v1/utils/session-store.js — module-level Preact signal()s, page-scoped.
+// Preact components read `.value` directly during render for fine-grained reactivity;
+// non-Preact code uses `.subscribe()` / `.peek()`. Not tied to this block in any way.
 {
-  sessions: Session[],              // fetched from event API on init, static after load
-  scheduled: Set<string>,           // session IDs — source of truth is Rainfocus
-  favorited: Set<string>,           // session IDs — source of truth is Rainfocus
-  liveStreamActiveIds: Set<string>, // mrStreamIds currently active per MR poll
+  sessions: Session[],              // fetched from event API on init; mocked currently
+  sessionsStatus: 'idle' | 'loading' | 'ready' | 'error',
+  liveStreamActiveIds: Set<string>, // mrStreamIds currently active per MR poll (mocked = empty Set)
+  favorited: Set<string>,           // session IDs — persisted to localStorage; source of truth is Rainfocus (mocked)
+  scheduled: Set<string>,           // session IDs — persisted to localStorage; source of truth is Rainfocus (mocked)
+  auth: {                           // bridged from BlockMediator (imsProfile/rsvpData) or sg:dev-auth
+    isLoggedIn: null | boolean,        // null = IMS still loading
+    isRegistered: undefined | boolean, // undefined = registration status loading
+    userFirstName: string | null,
+  },
+  pendingActions: Set<string>,       // session IDs with in-flight RF API calls
+}
+```
+
+```javascript
+// store/index.js — held in this block's own Preact Context via useReducer.
+// Everything here is genuinely private to this widget's UI; nothing here is
+// needed by any other block. Actual shape from buildInitialState().
+{
+  drawerState: 'hidden' | 'peek' | 'expanded',
   activeView: 'live-upcoming' | 'my-sessions' | 'my-favorites' | 'on-demand',
-  activeDay: string,                // ISO date string, e.g. '2026-10-28'
-  activeFilters: {                  // keyed by filter category name
-    channel: Set<string>,
-    type: Set<string>,
-    product: Set<string>,
-    // ...configurable per event
+  eventDays: string[],              // ISO date strings, derived from the shared `sessions` signal via useEffect
+  activeDay: string,                // ISO date string e.g. '2026-11-10'
+  activeFilters: {                  // keyed by filter category id (session property name)
+    [categoryId]: Set<string>,      // e.g. { track: Set<'Design','Video'>, type: Set<'Lab'> }
   },
   searchQuery: string,
   mySessionsTab: 'upcoming' | 'on-demand',
-  isLoggedIn: null | boolean,        // null = IMS still loading
-  isRegistered: undefined | boolean, // undefined = registration status loading; mocked in Phase 0
-  userFirstName: string | null,
+  myFavoritesTab: 'upcoming' | 'on-demand',
   eventConfig: EventConfig,
+  activeSessionId: string | null,    // id of session shown in detail overlay (widget only)
+  dismissingIds: Set<string>,        // session IDs currently animating out of My Sessions/My Favorites
+  regPromptOpen: boolean,            // drives modal RegistrationPrompt (from App-level gating)
 }
 ```
+
+Toast and conflict-modal state moved out of this reducer entirely — see `event-libs/v1/features/toast/toast.js` (`toast` signal) and `event-libs/v1/features/conflict-modal/conflict-modal.js` (`conflict` signal), both page-level and independent of this block.
 
 ```typescript
 interface Session {
@@ -156,910 +214,600 @@ interface Session {
   speakers: Speaker[];
   products: string[];
   resources: Resource[];
-  // Live section eligibility flags
   mrStreamId: string | null;     // Mobile Rider stream ID; non-null = MR session
-  // On-demand
-  videoAvailable: boolean;       // recording is ready; drives card click behavior
+  videoAvailable: boolean;       // recording is ready
   inPerson: boolean;             // in-person session ("Recording coming soon" until videoAvailable)
   sessionPageUrl: string;
-  watchUrl: string;              // Watch Now destination (keynote → homepage, other → channel page)
+  watchUrl: string;              // Watch Now destination
   isKeynote: boolean;
-  thumbnailUrl: string | null;   // video thumbnail for LiveCard image panel; null when unavailable
+  thumbnailUrl: string | null;   // video thumbnail; null when unavailable
   copyrightDisclaimer?: string;
 }
 
 interface EventConfig {
-  title: string;
-  days: string[];                // ISO date strings
-  baseTimezone: string;          // IANA, e.g. 'America/Los_Angeles'
-  userTz: string;                // detected at init via detectUserTimezone(baseTimezone); cards read from here
-  rfApiUrl: string;              // Rainfocus base API URL
-  rfApiProfileId: string;        // per-event Rainfocus profile ID; authored as config
-  manualOnDemandTransitionTime: string | null;
+  title: string;                 // event display name; authored as 'event-title'
+  registerUrl: string;           // registration CTA URL; sourced from session-store's apiConfig (page metadata), default '/register'
   showConflictModal: boolean;
-  filterCategories: FilterCategory[];
-  trackIcons: Record<string, string>;   // track label → Spectrum SVG path
-  trackColors: Record<string, string>;
-  mrEnv: 'dev' | 'prod';
-  surface: 'widget' | 'page';   // set in parseConfig from el.classList; drives App routing
+  filterCategories: FilterCategory[];  // [{ id, label }]; id maps to session property
+  trackIcons: Record<string, string>;  // track label → icon URL
+  trackColors: Record<string, string>; // track label → CSS color
+  categoryColors: Record<string, string>; // category key → CSS color (for CategoryBadge)
+  featuredSessionIds: string[];  // session IDs for featured carousel; falls back to deterministic random
+  theme: 'light' | 'dark';      // default: widget='dark', page='light'
+  surface: 'widget' | 'page';   // set from el.classList.contains('page')
+  userTz: string;               // detected at init via detectUserTimezone()
 }
 ```
 
-Note: `session.state` is **not** stored in the reducer — it is derived on every render via `deriveSessionState(session, liveStreamActiveIds, now)` (see Phase 5). Keeping derived state out of the store prevents stale-state bugs.
+`rfApiUrl`, `rfApiProfileId`, `mrEnv`, and `manualOnDemandTransitionTime` moved **out** of `EventConfig` (and out of this block's authoring table) and into page-level metadata read by `session-store.js`'s `getApiConfig()` — see "Config parsing" in Phase 0.2 below. They gate the shared bootstrap, not this widget's rendering, so other blocks on the page can rely on the same values without this block being authored at all.
+
+Note: `session.state` is **not** stored anywhere — it is computed on every render via `deriveSessionState(session, liveStreamActiveIds, now)` in `event-libs/v1/utils/session-state.js` (promoted out of this block since other blocks need "is this session live" too). Keeping derived state out of the store prevents stale-state bugs.
+
+Note: event days are **derived from the shared `sessions` signal**, not authored as config. `SessionGuideProvider` watches `sessions.subscribe(...)` and dispatches `SET_EVENT_DAYS` into the local reducer, which holds the derived array in `state.eventDays`.
+
+### Reducer actions (complete list)
+
+Actions that used to manage shared data (`INIT_USER_DATA`, `LIVE_STATUS_UPDATE`, `SCHEDULE_ADD`/`SCHEDULE_REMOVE`, `FAVORITE_ADD`/`FAVORITE_REMOVE`, `IMS_UPDATE`, `SESSIONS_LOADED`, `SET_SESSIONS_STATUS`, `SET_PENDING`) no longer exist — that data lives in `session-store.js` signals and is mutated directly (`scheduleSession()`, `favoriteSession()`, signal assignment), not through this reducer. The reducer now only holds UI-only state:
+
+| Action | Effect |
+|---|---|
+| `SET_EVENT_DAYS` | Set `eventDays` from the shared `sessions` signal; recompute `activeDay` if it's no longer in the new list |
+| `SET_VIEW` | Change `activeView`; persist to `sessionStorage` (`sg:last-view`) |
+| `SET_DAY` | Change `activeDay` |
+| `SET_FILTERS` | Replace `activeFilters` |
+| `SET_SEARCH` | Update `searchQuery` |
+| `SET_MY_TAB` | Switch `mySessionsTab` (`upcoming` / `on-demand`) |
+| `SET_MY_FAVORITES_TAB` | Switch `myFavoritesTab` (`upcoming` / `on-demand`) |
+| `SET_DRAWER` | Set `drawerState`; restores last view from `sessionStorage`, falling back to a caller-supplied `defaultView` (computed from the shared `auth` signal at the dispatch site, since the reducer itself must stay a pure function of its own state) |
+| `SET_ACTIVE_SESSION` | Set `activeSessionId` (opens/closes detail overlay) |
+| `SHOW_REG_PROMPT` / `HIDE_REG_PROMPT` | Set `regPromptOpen` |
+| `ADD_DISMISSING_ID` / `REMOVE_DISMISSING_ID` | Manage `dismissingIds` Set for card exit animations |
+
+`SHOW_TOAST`/`HIDE_TOAST` and `SHOW_CONFLICT`/`HIDE_CONFLICT` no longer exist as reducer actions — `showToast()`/`hideToast()` (`utils/toast.js`) and `showConflictModal()`/`hideConflictModal()` (`utils/conflict-modal.js`) write directly to their own shared signals instead, with no `dispatch` involved.
+
+The live→on-demand auto-transition (`allEnded || pastManualCutoff` while `activeView === 'live-upcoming'`) is likewise no longer a reducer case — it's a `useEffect` in `SessionGuideProvider` that watches the shared `sessions`/`liveStreamActiveIds` signals and dispatches a plain `SET_VIEW` when the condition is met.
 
 ---
 
-## Phase 0 — Foundation
+## Phase 0 — Foundation ✅ Complete
 
 **Goal:** Set up the block skeleton, Preact integration, state architecture, and shared utilities.
 
-### 0.1 Block scaffold
-- Create `sessions-guide.js` with `export default async function init(el)` entry point
-- Register `'sessions-guide'` in `event-libs/v1/libs.js` → `EVENT_BLOCKS`
-- Import Preact from `${miloLibs}/deps/htm-preact.js` (confirmed available)
-- `init()` awaits the session fetch before mounting Preact; all other async sources (FEDS token, IMS profile, Rainfocus) are non-blocking and flow in via dispatches after mount
-- Mount `<SessionsGuideApp />` into `el`, passing parsed block config and initial session data as props
+### 0.1 Block scaffold ✅
+- `sessions-guide.js` with `export default async function init(el)` entry point
+- `'sessions-guide'` registered in `event-libs/v1/libs.js` → `EVENT_BLOCKS`
+- Imports Preact from `event-libs/v1/deps/htm-preact.js` (local `deps/`, not URL-resolved)
+- `init()` no longer fetches sessions itself — the shared `session-store.js` module is bootstrapped by `decorateEvent()` before any block's `init()` runs, so sessions/auth/favorites are already loading (or loaded) by the time this block mounts
+- Widget surface: mounts into a `<div class="sg-portal">` appended to `document.body`
+- Page surface: mounts directly into `el`
+- Dev seeding (`sg:dev-auth`, `sessions:scheduled`, `sessions:favorited` in localStorage) now lives inside `session-store.js`'s `initSessionState()`, not in this block's `init()` — see Phase 0.3 (TODO: remove once real IMS/Rainfocus auth is wired up)
 
-### 0.2 Config parsing
-Parse authoring table (the standard Milo block table format) into `eventConfig`:
-- `event-title`, `event-days`, `base-timezone`
-- `show-conflict-modal` (boolean)
-- `filter-categories` (JSON or delimited list)
-- `track-icons` (JSON map)
-- `manual-on-demand-transition-time` (ISO datetime or null)
-- `theme` (`light` | `dark`)
-- `rainfocus-api-url` — Rainfocus base API endpoint
-- `rainfocus-api-profile-id` — per-event `rfApiProfileId` query param sent with every RF call
+### 0.2 Config parsing ✅
+`parseConfig(el)` reads the authoring table (standard Milo block format) into `eventConfig` — presentational/per-instance config only:
+- `event-title`, `show-conflict-modal` (boolean)
+- `filter-categories` (JSON: `[{ id, label }]`)
+- `track-icons` (JSON map), `track-colors` (JSON map), `category-colors` (JSON map)
+- `theme` (`light` | `dark`; defaults: widget=`'dark'`, page=`'light'`)
+- `featured-sessions` (JSON array of session IDs)
+- `surface` derived from `el.classList.contains('page')`
+- `userTz` set via `detectUserTimezone()`
+- `registerUrl` is **not** authored here — it's merged in from `getApiConfig()` (see below) after `parseConfig()` runs
 
-### 0.3 Data layer
-Three distinct data sources, each in its own service file:
+`rainfocus-api-url`, `rainfocus-api-profile-id`, `register-url`, and `manual-on-demand-transition-time` moved to **page metadata** (read by `session-store.js`, not this block) since they gate data other blocks need too, not just this widget's presentation. See `REAL-API-CHECKLIST.md` for the current metadata keys.
 
-**`services/sessions-api.js`** — event API (own infrastructure):
-- `fetchSessions(apiUrl)` → `Session[]`
-- Called once in `init()`, awaited before Preact mounts. Response is normalized to the `Session` interface.
-- Error handling with `window.lana?.log()`
+### 0.3 Data layer ✅ (mocked)
+All service files exist and export the correct API surface; all currently return mock data. They live in `event-libs/v1/services/sessions/` (promoted out of this block so the shared `session-store.js` — which owns fetching/polling/mutations — doesn't have to import from inside another block's folder):
 
-**`services/rainfocus.js`** — Rainfocus API (registration-gated):
-- `fetchScheduled(rfAuthToken, clientId, rfApiProfileId, rfApiUrl)` → `string[]` (session IDs)
-- `fetchFavorited(rfAuthToken, clientId, rfApiProfileId, rfApiUrl)` → `string[]` (session IDs)
-- `addSession(sessionTimeId, rfAuthToken, clientId, rfApiProfileId, rfApiUrl)` → confirmation
-- `removeSession(sessionTimeId, rfAuthToken, clientId, rfApiProfileId, rfApiUrl)` → confirmation
-- `toggleSessionInterest(sessionTimeId, sessionId, rfAuthToken, clientId, rfApiProfileId, rfApiUrl)` → confirmation
-- Only called when `isRegistered === true`. Returns lists of session IDs cross-referenced against the sessions catalog in the store.
-- All mutations are **pessimistic** — state is updated only after the RF call confirms success. The calling component shows a loading/disabled state on the action button while the call is in flight.
+**`services/sessions/sessions-api.js`** — `fetchSessions(apiUrl)` returns `normalizeSessions(MOCK_SESSIONS)`. `MOCK_SESSIONS` is a 30-session catalog covering Adobe MAX 2026 Nov 10–12. TODO: replace with real API call.
 
-**`services/mobile-rider.js`** — Mobile Rider API (no auth):
-- `fetchLiveStatus(mrStreamIds, env)` → `{ active: Set<string>, inactive: Set<string> }`
-- Called by the polling engine every 30 s. Only sessions with `mrStreamId !== null` are included.
+**`services/sessions/rainfocus.js`** — stub implementations returning mock data:
+- `fetchScheduled()` → `['session-1', 'session-3']`
+- `fetchFavorited()` → `['session-2']`
+- `addSession()`, `removeSession()`, `toggleSessionInterest()` → `{ ok: true }`
 
-**`services/feds.js`** — FEDS auth utilities:
-- `getFedsToken()` → `Promise<string>` — resolves immediately if `window.feds.data.authToken` is already set, otherwise waits for the FEDS auth token loaded event with an 8-second timeout before rejecting.
+**`services/sessions/mobile-rider.js`** — `fetchLiveStatus(mrStreamIds, env)` → `{ active: new Set(), inactive: new Set(mrStreamIds) }`. TODO: replace with real MR API call.
 
-```javascript
-export function getFedsToken() {
-  const token = window?.feds?.data?.authToken;
-  if (token) return Promise.resolve(token);
+**`services/feds.js`** (still block-local — not yet needed by any other block) — `getFedsToken()` — implemented (checks `window?.feds?.data?.authToken`, waits for `feds.data.authToken.loaded` event, 8 s timeout). Not yet called in production flow.
 
-  return new Promise((resolve, reject) => {
-    const timeout = setTimeout(
-      () => reject(new Error('[sessions-guide] FEDS auth token timed out')),
-      8000,
-    );
-    window.addEventListener('feds.data.authToken.loaded', () => {
-      clearTimeout(timeout);
-      resolve(window.feds.data.authToken);
-    }, { once: true });
-  });
-}
-```
+**Dev seeding** — folded into `event-libs/v1/utils/session-store.js`'s `seedDevData()`, called from `initSessionState()` before `loadPersisted()`/`syncAuth()` run. Sets `sg:dev-auth` and seeds `sessions:scheduled` / `sessions:favorited` in localStorage for development. (Previously a standalone `services/dev-mock.js` called from this block's own `init()` — moved because the shared bootstrap now runs *before* any block's `init()`, so seeding had to move earlier too, or the shared store would read empty localStorage on first load.)
 
-Note: the exact event name and attribute path must be confirmed against the live FEDS integration before shipping.
+### 0.4 Shared session state + Preact Context/Reducer ✅
+**`event-libs/v1/utils/session-store.js`** (shared, page-level) exports:
+- Signals: `sessions`, `sessionsStatus`, `liveStreamActiveIds`, `favorited`, `scheduled`, `auth`, `pendingActions`
+- `initSessionState()` — idempotent bootstrap, gated on `rainfocus-api-url` metadata, called from `decorateEvent()`
+- `getApiConfig()` — the parsed metadata (`apiUrl`, `profileId`, `registerUrl`, `manualCutoff`, `mrEnv`)
+- `scheduleSession(session)` / `favoriteSession(session)` — mutators that call the RF API and update the signals + localStorage
 
-### 0.4 Preact Context + Reducer (primary state)
-Create `event-libs/v1/blocks/sessions-guide/store/index.js`:
+**`store/index.js`** (block-local) exports:
+- `buildInitialState(eventConfig)` — initializes this block's UI-only state; reads `auth.value.isRegistered` for the initial `activeView`
+- `reducer(state, action)` — handles the UI-only action types listed above
+- `SessionGuideContext` — the Preact context object (also exposed as `SessionGuideContext._current` for direct useContext compatibility workaround)
+- `SessionGuideProvider` — wraps the app; watches the shared signals via `useEffect` to derive `eventDays` and the on-demand auto-transition, but no longer owns fetching, polling, auth sync, or persistence
+- `useSessionGuide()` — `useContext(SessionGuideContext)` convenience hook
+- `buildStore()` — compatibility shim for tests (returns `{ SessionGuideContext, useSessionGuide }`)
 
-```javascript
-// Action types
-// INIT_USER_DATA      — set scheduled Set, favorited Set from Rainfocus fetch after registration confirmed
-// LIVE_STATUS_UPDATE  — update liveStreamActiveIds from MR poll tick
-// SCHEDULE_ADD/REMOVE — update scheduled set after RF API confirms; dispatch only on RF success
-// FAVORITE_ADD/REMOVE — update favorited set after RF API confirms; dispatch only on RF success
-// SET_VIEW            — change activeView
-// SET_DAY             — change activeDay
-// SET_FILTERS         — update activeFilters
-// SET_SEARCH          — update searchQuery
-// SET_MY_TAB          — switch Upcoming / On Demand tab
-// IMS_UPDATE          — set isLoggedIn (null | boolean), isRegistered (undefined | boolean), userFirstName
+`SessionGuideProvider` runs two `useEffect` hooks (down from four — fetching, auth sync, and persistence moved to `session-store.js`):
+1. Recompute `eventDays`/`activeDay` whenever the shared `sessions` signal changes
+2. Auto-switch out of `'live-upcoming'` once all sessions are on-demand or the manual cutoff has passed, watching the shared `sessions`/`liveStreamActiveIds` signals
 
-export const SessionGuideContext = createContext(null);
+### 0.5 Time utilities ✅
+`utils/time.js`:
+- `getNowMs()` — `Date.now()` with `?serverTime=<ms>` URL override for testing
+- `detectUserTimezone()` — `Intl.DateTimeFormat().resolvedOptions().timeZone` with `'UTC'` fallback
+- `formatSessionTime(utcIso, userTz)` — localized with timezone abbreviation
+- `formatShortTime(utcIso, userTz)` — localized without timezone abbreviation
+- `formatSessionDate(utcIso, userTz)` — weekday + month + day
+- `isSessionLive(session, nowMs)`, `isSessionUpcoming(session, nowMs)`, `isSessionOnDemand(session, nowMs)`, `allSessionsEnded(sessions, nowMs)`
+- `getSessionDayKey(session, userTz)` — ISO date string using `en-CA` locale (YYYY-MM-DD)
 
-export function SessionGuideProvider({ children, eventConfig, initialSessions }) {
-  const [state, dispatch] = useReducer(reducer, buildInitialState(eventConfig, initialSessions));
+### 0.6 Polling engine ✅
+`services/sessions/poller.js` (promoted out of this block; called from `session-store.js`):
+- Module-level `_timerId` singleton — no more `_dispatch`/`injectDispatch`
+- `tick(mrSessions, env, onUpdate)` — calls `fetchLiveStatus`, invokes `onUpdate(active, inactive, now)` directly, self-stops polling when all MR sessions inactive
+- `startPolling(mrSessions, env, onUpdate, intervalMs = 30_000)` — no-op when `mrSessions.length === 0`; calls `stopPolling()` first to reset any prior interval; fires immediate first tick
+- `stopPolling()` — clears interval, nulls timer
 
-  // sessions are in initialSessions (fetched before mount), so polling starts immediately
-  useEffect(() => {
-    injectDispatch(dispatch);
-    const mrSessions = initialSessions.filter(s => s.mrStreamId);
-    const timerId = startPolling(mrSessions, eventConfig.mrEnv);
-    return () => clearInterval(timerId);
-  }, []); // runs once — sessions are static after init
+`session-store.js`'s `loadSessions()` calls `startPolling(mrSessions, apiConfig.mrEnv, (active) => { liveStreamActiveIds.value = active; })` — the callback writes straight to the shared signal, no reducer/dispatch involved.
 
-  return <SessionGuideContext.Provider value={{ state, dispatch }}>{children}</SessionGuideContext.Provider>;
-}
-```
+### 0.7 Auth integration ✅ (dev path only; production credentials not yet wired)
+Auth state flows from localStorage (`sg:dev-auth`) or BlockMediator (`imsProfile` + `rsvpData`) into the shared `auth` signal via `session-store.js`'s `syncAuth()`. The localStorage path takes priority to prevent Milo's guest IMS from overwriting a dev user.
 
-- `scheduled` and `favorited` start as empty Sets in `buildInitialState()` and are populated by `INIT_USER_DATA` after the Rainfocus fetch resolves
-- `initialSessions` is passed as a prop — sessions are fetched and awaited in `init()` before Preact mounts
+`isRegistered` is derived from `rsvpData.registered === true` — sourced from BlockMediator `rsvpData` key.
 
-### 0.5 Time utilities
-Create `event-libs/v1/blocks/sessions-guide/utils/time.js`:
-- `detectUserTimezone()` → IANA string with `Intl` fallback to base timezone
-- `formatSessionTime(utcIso, userTz)` → localized display string
-- `formatSessionDate(utcIso, userTz)` → localized date string
-- `isSessionLive(session, nowMs)` → boolean
-- `isSessionUpcoming(session, nowMs)` → boolean
-- `isSessionOnDemand(session, nowMs)` → boolean
-- `allSessionsEnded(sessions, nowMs)` → boolean (drives post-event auto-transition)
-- `getSessionDayKey(session, userTz)` → ISO date string for date-tab grouping
+Real FEDS token (`getFedsToken()`) and RF credential wiring: `services/sessions/session-actions.js` passes `null` for `rfAuthToken`/`clientId` to all RF service calls (TODO comments mark the integration points).
 
-### 0.6 Polling engine
-Create `event-libs/v1/blocks/sessions-guide/services/poller.js`.
-
-The engine polls only Mobile Rider sessions. Sessions without `mrStreamId` are handled purely by time-window logic in `deriveSessionState()` and never touch the network after initial load.
-
-Polling starts from `SessionGuideProvider`'s `useEffect` on mount. Because `initialSessions` is passed as a prop (fetched and awaited in `init()` before mount), `mrSessions` is never empty due to a timing issue.
-
-```javascript
-let _dispatch = null;
-export const injectDispatch = (dispatch) => { _dispatch = dispatch; };
-
-async function tick(mrSessions, env) {
-  try {
-    const { active, inactive } = await fetchLiveStatus(
-      mrSessions.map(s => s.mrStreamId),
-      env,
-    );
-    _dispatch?.({ type: 'LIVE_STATUS_UPDATE', active, inactive, now: Date.now() });
-
-    // Stop polling once all MR sessions are inactive (stream day is over)
-    if (mrSessions.every(s => inactive.has(s.mrStreamId))) stopPolling();
-  } catch (err) {
-    window.lana?.log(`[sessions-guide] MR poll failed: ${err.message}`);
-  }
-}
-
-let _timerId = null;
-export function startPolling(mrSessions, env, intervalMs = 30_000) {
-  if (!mrSessions.length) return; // no MR sessions on this event
-  tick(mrSessions, env);          // immediate first run on init
-  _timerId = setInterval(() => tick(mrSessions, env), intervalMs);
-  return _timerId;
-}
-export function stopPolling() { clearInterval(_timerId); _timerId = null; }
-```
-
-`mrSessions` is the filtered list of sessions that have `mrStreamId !== null`. This list is static — sessions don't gain or lose `mrStreamId` after load.
-
-### 0.7 Auth integration
-
-Authentication and registration state come from two independent async sources that must both resolve before Rainfocus calls can fire:
-
-- **`rfAuthToken`** — a FEDS-issued JWT. Fetched via `getFedsToken()` (see `services/feds.js`). Only present when `isRegistered === true`.
-- **`clientId`** — the user's Adobe ID from `imsProfile.userId` via BlockMediator.
-
-Coordination rules:
-1. `BlockMediator.get('imsProfile')` is checked once on init. If a profile is already present, the IMS flow is triggered immediately. `BlockMediator.subscribe('imsProfile', ...)` handles late arrivals. Only one path fires — whichever resolves first sets a flag so the second is a no-op.
-2. Once `isRegistered === true` (mocked in Phase 0; wired to FEDS/BlockMediator in a follow-up), trigger `Promise.all([getFedsToken(), getImsProfile()])`. Both must resolve before calling `fetchScheduled` / `fetchFavorited`.
-3. Dispatch `IMS_UPDATE` with `{ isLoggedIn, isRegistered, userFirstName }` whenever auth state changes. `isLoggedIn` is `null` while IMS is loading, then `true` or `false`. `isRegistered` is `undefined` while loading, then `true` or `false`.
-4. On successful Rainfocus fetch: dispatch `INIT_USER_DATA` with `{ scheduled: Set, favorited: Set }`.
-5. All registration-gated actions gate on `state.isRegistered === true`; if false, the component renders `<RegistrationPrompt />`.
-
-```javascript
-// Rough init() sequence:
-// 1. fetchSessions(apiUrl) — awaited; Preact mounts only after this resolves
-// 2. render(<SessionsGuideApp initialSessions={sessions} />)
-// 3. BlockMediator.get('imsProfile') — check immediately on init
-// 4. BlockMediator.subscribe('imsProfile', handler) — for late IMS arrival; no-op if step 3 already fired
-// 5. When isRegistered resolves to true:
-//    Promise.all([getFedsToken(), getImsProfile()])
-//      .then(([rfAuthToken, { userId }]) =>
-//        Promise.all([
-//          fetchScheduled(rfAuthToken, userId, rfApiProfileId, rfApiUrl),
-//          fetchFavorited(rfAuthToken, userId, rfApiProfileId, rfApiUrl),
-//        ]))
-//      .then(([scheduled, favorited]) =>
-//        dispatch({ type: 'INIT_USER_DATA', scheduled: new Set(scheduled), favorited: new Set(favorited) }))
-//      .catch(err => window.lana?.log(err.message))
-```
-
-### 0.8 CSS custom properties
-Port the S2A design tokens from `prototype/style.css` into `sessions-guide.css`. Keep the same token names (`--s2a-*`). No hardcoded hex values in component styles.
+### 0.8 CSS custom properties ✅
+`sessions-guide.css` contains all block styles. Theme applied via `data-theme` attribute on `sg-portal` (widget) or `el` (page).
 
 ---
 
-## Phase 1 — Drawer Shell (Widget)
+## Phase 1 — Drawer Shell (Widget) ✅ Complete
 
-**Goal:** The peek-to-expand bottom drawer renders correctly on all breakpoints with the header and skeleton content areas. Authoritative reference: `prototype/index.js` lines 1281–1368.
+**Goal:** The peek-to-expand bottom drawer renders correctly on all breakpoints with the header and view routing.
 
-### 1.1 Surface detection
-The block determines which surface to render from its second CSS class, added automatically by Milo's block decoration when the author writes `sessions-guide (page)` in the table:
-
+### 1.1 Surface detection ✅
 ```javascript
-const surface = el.classList.contains('page') ? 'page' : 'widget'; // defaults to widget
+const surface = el.classList.contains('page') ? 'page' : 'widget';
 ```
+`surface` is stored in `eventConfig` and drives the `App` branch between `<DrawerShell>` and `<FullPageShell>`.
 
-`surface` is passed into `App` as an initial state value. `App` branches once at the top — `surface === 'widget' ? <DrawerShell> : <FullPage>` — and all shared inner content (session cards, views, filters, search, store) is surface-agnostic.
+### 1.2 Portal architecture (widget only) ✅
+The widget mounts into `<div class="sg-portal">` appended to `document.body`. The `.sessions-guide.widget` block element is cleared (`el.innerHTML = ''`) and serves as an invisible mount point.
 
-### 1.2 Portal architecture (widget only)
-Both the CTA button and the drawer shell are portaled to `document.body` from the Preact tree. The `.sessions-guide.widget` block element becomes a zero-output invisible mount point — its physical position on the page is irrelevant to visual output.
+### 1.3 Sessions fetch ✅ (now owned by the shared store, not this block)
+Sessions are fetched once by `session-store.js`'s `loadSessions()`, kicked off from `initSessionState()` in `decorateEvent()` — before this (or any) block's `init()` runs. This block's `init()` no longer awaits a fetch or passes `initialSessions` into the provider; `DrawerShell`/`FullPageShell` render a loading state by reading `sessionsStatus.value` directly until it flips to `'ready'`.
 
-Rationale: any ancestor with `transform`, `filter`, or `will-change` creates a new stacking context and makes `position: fixed` relative to that ancestor instead of the viewport. Portaling to body guarantees correct viewport-relative positioning regardless of the homepage's CSS.
-
-In full-page mode, nothing is portaled — `el` is the visual surface rendered inline.
-
-### 1.3 Sessions fetch — mount-first pattern
-Sessions are fetched in a `useEffect` post-mount, not awaited before Preact mounts:
-
-```javascript
-// In SessionsGuideProvider
-useEffect(() => {
-  dispatch({ type: 'SET_SESSIONS_STATUS', status: 'loading' });
-  fetchSessions(eventConfig.rfApiUrl)
-    .then(sessions => dispatch({ type: 'SESSIONS_LOADED', sessions }))
-    .catch(err => {
-      window.lana?.log(`[sessions-guide] session fetch failed: ${err.message}`);
-      dispatch({ type: 'SET_SESSIONS_STATUS', status: 'error' });
-    });
-}, []);
-```
-
-A spinner is shown inside the drawer body while `sessionsStatus === 'loading'`. This requires two additions to the store (see Phase 0 cross-reference):
-- State field: `sessionsStatus: 'loading' | 'ready' | 'error'`
-- Action: `SESSIONS_LOADED` — sets `sessions` array and flips `sessionsStatus` to `'ready'`
-
-Polling starts in a second effect keyed on `sessionsStatus === 'ready'`:
-```javascript
-useEffect(() => {
-  if (sessionsStatus !== 'ready') return;
-  const mrSessions = sessions.filter(s => s.mrStreamId);
-  injectDispatch(dispatch);
-  const id = startPolling(mrSessions, eventConfig.mrEnv);
-  return () => clearInterval(id);
-}, [sessionsStatus]);
-```
-
-### 1.4 Drawer open/close
+### 1.4 Drawer open/close ✅
 
 **Triggers:**
-- **CTA button** — a Preact-rendered `position: fixed; bottom: 0` button portaled to `document.body`. Since the button lives in the Preact tree, it cannot be clicked before the handler exists — no window API, no `CustomEvent`, no BlockMediator key needed for this.
-- **`?sessions` URL param** — checked on mount; opens directly to **expanded** (skips peek). `new URLSearchParams(location.search).has('sessions')` → `dispatch({ type: 'SET_DRAWER', drawer: 'expanded' })`.
-- **`?session=<slug>` URL param** — opens to expanded + triggers session detail (Phase 6/10).
+- **CTA button** — Preact-rendered `position: fixed; bottom: 0` button inside `DrawerShell` (only rendered when `drawerState === 'hidden'`)
+- **`?sessions` URL param** — checked on mount in `DrawerShell`; auto-opens to `expanded`
+- **`?session=<slug>-<rfCode>` URL param** — auto-opens to `expanded` + resolves `activeSessionId` once sessions are loaded
 
 **State machine:**
 
-Mobile (≤767 px) and desktop/tablet (≥768 px) differ in how the CTA opens the drawer:
-
-| From | To | Trigger | Breakpoint |
-|---|---|---|---|
-| `hidden` | `expanded` | CTA button click | **Mobile (≤767 px)** |
-| `hidden` | `peek` | CTA button click | Desktop/tablet (≥768 px) |
-| `hidden` | `expanded` | `?sessions` or `?session=<slug>` on load | All |
-| `peek` | `expanded` | Scroll-down (wheel) or swipe-up (touch) — proportional drag | Desktop/tablet only |
-| `peek` | `hidden` | Backdrop click or close button | Desktop/tablet only |
-| `expanded` | `hidden` | Backdrop click or close button | All |
-
-On mobile the `peek` state is never entered — the CTA goes directly to `expanded` and the X button / backdrop tap goes directly to `hidden`. There is no `expanded → peek` transition on any breakpoint. Scroll-up while expanded scrolls content, never collapses the drawer.
+| From | To | Trigger |
+|---|---|---|
+| `hidden` | `expanded` | CTA click on narrow (≤1279 px) |
+| `hidden` | `peek` | CTA click on wide (≥1280 px) |
+| `hidden` | `expanded` | `?sessions` or `?session=` on load |
+| `peek` | `expanded` | Scroll-down (wheel) or swipe-up (touch) |
+| `peek` | `hidden` | Backdrop click |
+| `expanded` | `hidden` | Backdrop click or close button |
 
 **Heights:**
-- **Peek:** content-derived — `headerH + liveH + (rowH × 0.5)` — measured from the rendered DOM at open time. Falls back to header-only when the live section is not visible.
-- **Expanded:** full viewport minus `TOP_MARGIN = 20 px` (i.e. `drawer.style.top = '20px'`).
+- **Peek:** `Math.round(window.innerHeight * (window.innerWidth > 1440 ? 0.65 : 0.55))`
+- **Expanded:** `getTopMargin()` from top — 0 px on ≤1279 px, 20 px on ≥1280 px
 
-**CSS transition:** `top` property animated with `cubic-bezier(0.4, 0, 0.2, 1)` at `0.45 s` on open/close and on commit. Proportional drag uses `0.08 s linear` while gesture is in progress.
+**CSS transition:** `top` property with `cubic-bezier(0.4, 0, 0.2, 1)` at `0.45 s`. Drag uses `0.08 s linear`.
 
 **Body scroll lock:** `document.body.style.overflow = 'hidden'` on open; restored on close.
 
-**Content scroll:** `.body-scroll` is not scrollable until `drawerFullyExpanded` latches (`top ≤ TOP_MARGIN`). Before that, `overflow-y: hidden` is enforced on the scroll container, and `e.preventDefault()` on wheel/touch events prevents scroll-through to the page.
+**Scroll container:** `.sg-body-scroll--scrollable` class enables `overflow-y` scrolling only when `drawerState === 'expanded'`.
 
-### 1.5 Gesture handling
+### 1.5 Gesture handling ✅
+- **Wheel** — `deltaY > 0` (scroll down) expands from peek; multiplied 1.2×
+- **Touch** — `touchmove` delta with 1.5× multiplier; `touchstart` initializes `touchPrevYRef`
+- Both use module-level refs (`expandedRef`, `currentTopRef`, `drawerStateRef`) via `useRef` so gesture handlers don't need to be re-registered on state changes
+- `passive: false` on wheel and touchmove; `passive: true` on touchstart
 
-Gesture handling is only relevant on desktop/tablet where the drawer can be in the `peek` state. On mobile the drawer goes directly from `hidden` to `expanded`, so these handlers are effectively no-ops on mobile (the guard `drawerStateRef.current === 'peek'` is never true).
+### 1.6 Responsive variants ✅
+Breakpoint at 1280 px: CTA goes to `peek` on wide, directly to `expanded` on narrow.
 
-**Desktop — wheel (peek → expanded):**
-```javascript
-drawerEl.addEventListener('wheel', (e) => {
-  if (!open || drawerFullyExpanded) return;
-  e.preventDefault();
-  if (e.deltaY > 0) { // scroll down = expand
-    const newTop = Math.max(TOP_MARGIN, currentTop - Math.abs(e.deltaY) * 1.2);
-    if (newTop <= TOP_MARGIN) { drawerFullyExpanded = true; setDrawerTop(TOP_MARGIN, true); }
-    else { setDrawerTop(newTop, false); }
-  }
-}, { passive: false });
-```
+### 1.7 DrawerHeader component ✅
+- Renders title (personalized "FirstName, see what's happening" when logged in), date tabs, right controls
+- Mobile search: inline `<input type="search">` revealed in a separate row below controls; toggle via search icon button; Escape closes and clears
+- Filter button: shows active filter count badge
+- `hideControls` prop: collapses the entire controls area when detail overlay is open
 
-**Desktop/tablet touch — swipe-up (peek → expanded):**
-```javascript
-drawerEl.addEventListener('touchmove', (e) => {
-  if (!open || drawerFullyExpanded) return;
-  const delta = touchPrevY - e.touches[0].clientY; // positive = swipe up
-  touchPrevY = e.touches[0].clientY;
-  if (delta > 0) {
-    const newTop = Math.max(TOP_MARGIN, currentTop - delta * 1.5);
-    if (newTop <= TOP_MARGIN) { drawerFullyExpanded = true; setDrawerTop(TOP_MARGIN, true); }
-    else { setDrawerTop(newTop, false); }
-    e.preventDefault();
-  }
-}, { passive: false });
-```
+### 1.8 DateTabs component ✅
+- Renders one tab per `state.eventDays` entry (derived from sessions, not authored config)
+- Disabled (`pointer-events: none`) when `activeView === 'on-demand'`
+- Uses noon UTC offset (`T12:00:00`) to avoid DST edge cases in `formatDay()`
 
-The `drawerFullyExpanded` flag is a module-level boolean held in the `DrawerShell` component's closure (not in the Preact store — it is a UI implementation detail, not shared state).
-
-### 1.6 Responsive variants
-
-Mobile uses a simplified `hidden ↔ expanded` two-state model. Desktop/tablet uses the full `hidden → peek → expanded → hidden` model with gesture-driven expansion.
-
-| Breakpoint | Drawer width | Drawer open behavior | Session row behavior |
-|---|---|---|---|
-| ≥1024 px | Centered, `min(1400px, 100%)` | CTA → `peek` → gesture → `expanded` | Transform-based horizontal scroll |
-| 768–1023 px | Full width | CTA → `peek` → gesture → `expanded` | Transform-based horizontal scroll |
-| ≤767 px | Full width | CTA → `expanded` directly (no `peek`) | Native horizontal scroll |
-
-### 1.7 DrawerHeader component
-- `position: sticky; top: 0` inside `.body-scroll`. Sticks to the top of the scroll container — not the viewport.
-- Border-radius (`20px 20px 0 0`) matches the drawer shell's top corners.
-- Contains: `HeaderTitle`, `DateTabs`, `RightControls`
-- When a session detail overlay is open: `RightControls` collapses via `max-height: 0; opacity: 0; overflow: hidden; pointer-events: none` CSS transition (0.3 s ease). The `.drawer.detail-open` class on the shell drives this.
-
-### 1.8 DateTabs component
-- Renders one pill per `eventConfig.days` entry (ISO date strings)
-- **Default active tab on open:** today's date matched against `eventConfig.days`. Fallbacks: first day if current date is before the event starts; last day if after the event ends.
-- Active tab drives `activeDay` in store via `SET_DAY` dispatch
-- Disabled state (`opacity: 0.35; pointer-events: none`) when `activeView === 'on-demand'`
-- Tab label formatted with `Intl.DateTimeFormat` (e.g. "Oct 28")
-
-### 1.9 ViewDropdown component
-- Four options: "Live & Upcoming" / "My Sessions" / "My Favorites" / "On Demand"
-- Updates `activeView` in store via `SET_VIEW`
-- Unregistered users selecting "My Sessions" or "My Favorites" receive `<RegistrationPrompt />` instead of switching view
-- Button label reflects active view; chevron rotates 180° on open (`transition: transform 0.15s ease`)
-- Dropdown panel: `position: absolute; top: calc(100% + 6px); right: 0` — renders above body scroll, z-index above drawer content
+### 1.9 ViewDropdown component ✅
+- Four options: `'Live & upcoming'` / `'My sessions'` / `'My favorites'` / `'On demand'`
+- All views selectable by any user (no registration gate at dropdown level; gate is inside each view component)
+- Click-outside closes via `document` event listener in `useEffect`
+- `sessionStorage` (`sg:last-view`) persists last view; restored when drawer re-opens via `SET_DRAWER` action
 
 ---
 
-## Phase 2 — Session Cards
+## Phase 2 — Session Cards ✅ Complete
 
-**Goal:** The two card variants (small session card, large live card) render with all action buttons wired up.
+**Goal:** The two card variants render with all action buttons wired up.
 
 ### 2.0 Component conventions
 
-**Factory pattern:** All Phase 2 components follow the same pattern as Phase 1 — `buildXxx(preact, store)` returns the component function. No raw `React.createElement` outside the factory.
+**Direct imports, no factory:** all components import `useSessionGuide` directly. The `buildXxx = () => Xxx` factory shims are retained for test compatibility only.
 
-**Context over props:** Cards read all shared state directly from `useSessionGuide()`. The only required prop for a card is `session`. Everything else (`scheduled`, `favorited`, `isRegistered`, `userTz`, `surface`, `eventConfig`) comes from context.
+**Context over props:** cards read all shared state from `useSessionGuide()`. Only `session` (and sometimes `forceOnDemand`) is passed as a prop.
 
+**`userTz` source:** read from `eventConfig.userTz` via context.
+
+### 2.1 SessionCard component ✅
+- `session` prop required; `forceOnDemand` prop (boolean, default false) forces on-demand display for previously-aired sessions
+- Local `hoverAnim` state (`null | 'fav' | 'sched'`) drives slide-in animation class on the actions column — `sg-card--anim-fav` / `sg-card--anim-sched`
+- `dismissingIds.has(session.id)` drives `sg-card--collapsing` for exit animation
+- Time label logic:
+  - `forceOnDemand` → `'ON DEMAND'`
+  - `onDemandNatural && inPerson && !videoAvailable` → `'Recording coming soon'`
+  - `onDemandNatural` → `'ON DEMAND'`
+  - else → `formatSessionTime(startTimeUtc, userTz)` with short end time
+- Card click:
+  - Page surface → navigate to `session.sessionPageUrl`
+  - Widget + on-demand → navigate to `session.sessionPageUrl`
+  - Widget + upcoming/live → `SET_ACTIVE_SESSION` dispatch + push `?session=` URL param
+- Actions:
+  - `forceOnDemand`: Play button only (navigates to `sessionPageUrl`)
+  - Upcoming/live: Schedule button (calendar icon) + Favorite button (heart icon)
+  - On-demand: Favorite button only
+- iOS workaround: `ontouchend` handler on actions div prevents iOS synthetic click routing through `transform + overflow:hidden` ancestor
+
+### 2.2 LiveCard component ✅
+- `session` prop required; `variant` prop (`'live'` | `'featured'`, default `'live'`)
+- Progress bar: `width: ${progressPct}%` — computed at render time from `getNowMs()`
+- Duration label: `Xh Ym` format
+- Primary CTA varies by `variant` + `sessionState`:
+  - `variant='live'` + has `watchUrl` → "Watch now" button
+  - `variant='featured'` + `sessionState='upcoming'` → "Add to schedule" / "Added to schedule" toggle button
+  - `variant='featured'` + `sessionState='on-demand'` + has `watchHref` → "Watch on demand" button
+- Widget card click opens detail overlay; non-widget does nothing
+- Schedule and favorite icon buttons always present with `isPending` disabled state
+
+### 2.3 TimeSlotRow component ✅
+- Required prop: `sessions` — pre-filtered `Session[]` for this time slot; `forceOnDemand` boolean
+- Label shows `formatShortTime(sessions[0].startTimeUtc, userTz)`
+- Transform-based horizontal scroll (desktop + mobile): `translateX(-${offset * cardWidth}px)`
+- Card width DOM-computed once after first render via `useEffect` + `useRef`; includes `columnGap`
+- `allDismissing` — when all sessions in the row are in `dismissingIds`, adds `sg-time-row--collapsing`
+
+### 2.4 Carousel component ✅
+- Required: `sessions`, `title`, `formatTime`, `variant`
+- Dual-mode: **paged** (desktop: `overflowX: visible`, transform-based) vs **native scroll** (mobile/tablet: scrollLeft-based)
+- `paged` state determined by CSS `overflowX` computed style — auto-detects breakpoint via `measure()` after render
+- `visibleCountRef` — number of visible cards per page; used for `maxOffset`
+- Resize listener updates `measure()` and `refreshEdges()`
+- Nav: prev/next arrow buttons; disabled when at start/end edge
+
+---
+
+## Phase 3 — Views ✅ Complete
+
+**Goal:** All four views render with the correct content.
+
+### 3.1 Live & Upcoming view ✅ (`LiveUpcomingView`)
+- Live section: `liveSessions()` filtered to `activeDay` — uses `isInLiveNow()` for MR sessions, `isSessionLive()` for non-MR
+- Featured carousel: shown when `live.length === 0`; uses `getFeaturedSessions()` which maps `featuredSessionIds` to day sessions (falls back to deterministic random shuffle keyed on `activeDay`)
+- Upcoming section: `upcomingSessions()` filtered to `activeDay`, then `filterSessions()` applied
+- Previously aired section: shown when both `timeSlots.length === 0 && live.length === 0`; shows all sessions for the day with `forceOnDemand={true}`, grouped by start time
+- Empty state: "No sessions scheduled for this day."
+
+### 3.2 My Sessions view ✅ (`MySessionsView`)
+- Registration gate: `isRegistered !== true` → `<RegistrationPrompt />`
+- Live section: scheduled sessions currently live for activeDay
+- Smart tab bar: tabs only shown for non-empty halves; if both upcoming and on-demand have sessions, both tabs show; single-tab case hides the tab bar automatically (via `effectiveTab` clamping)
+- Upcoming tab: `TimeSlotRow[]` for scheduled upcoming sessions on activeDay
+- On Demand tab: `TrackRow[]` for scheduled on-demand sessions on activeDay (grouped by track)
+- Empty state: "You currently have no scheduled sessions." + "See Live & Upcoming" button
+- Filter + search applied to both upcoming and on-demand lists
+
+### 3.3 My Favorites view ✅ (`MyFavoritesView`)
+- Mirror of My Sessions view using `favorited` Set and `myFavoritesTab` state
+- Empty state: "You currently have no favorited sessions." + "See Live & Upcoming" button
+- Tab dispatch: `SET_MY_FAVORITES_TAB` (separate from `SET_MY_TAB`)
+
+### 3.4 On Demand view ✅ (`OnDemandView`)
+- `onDemandSessions()` across all sessions (no day filter); `filterSessions()` applied
+- Grouped by track via `groupByTrack()` → `h3 + SessionCard[]` sections (not via `TrackRow`)
+- Empty state: "Sessions will be available on demand after the event."
+- Auto-activated by a `useEffect` in `SessionGuideProvider` watching the shared `sessions`/`liveStreamActiveIds` signals, dispatching `SET_VIEW` when `allEnded || pastManualCutoff`
+
+### 3.5 View transitions ✅
+All view switches are instant — `ViewRouter` returns the active view component based on `state.activeView`.
+
+---
+
+## Phase 4 — Session Interactions ✅ Complete
+
+**Goal:** Add to Schedule, Favorite, Conflict Modal, and ICS download all work, with pessimistic updates.
+
+### 4.1 Add to Schedule / Remove ✅
+`services/sessions/session-actions.js` → `scheduleAction(session, { showConflictModal })` — promoted out of this block, UI-agnostic (no `dispatch`/reducer knowledge, so any block — Preact or vanilla — can call it):
+- Auth gate: reads the shared `auth` signal directly; `isLoggedIn !== true` throws `SessionActionError('auth-required')`; `isRegistered !== true` throws `SessionActionError('registration-required')`
+- Pending guard: no-op if `pendingActions.value.has(session.id)` (read from `session-store.js`, not a reducer field)
+- Conflict check: if not yet scheduled and `showConflictModal` (passed explicitly by the caller, since it's block-instance config), throws `SessionActionError('conflict', { conflict, incoming })` instead of dispatching a modal itself
+- Success path: calls `session-store.js`'s `scheduleSession(session)`, which mutates the shared `scheduled` signal, persists to localStorage, and calls the RF API
+- Failure: any thrown error is a discriminated `SessionActionError` (`reason: 'auth-required' | 'registration-required' | 'conflict' | 'network'`) — **this module never shows a toast, opens a modal, or touches a reducer**. `services/sessions/action-feedback.js` (`runSessionAction()`, promoted alongside it) translates the error into a call to the shared `showToast()`/`showConflictModal()` modules — usable by any block, Preact or vanilla, with no `dispatch` argument at all
+- Dismiss animation: unchanged — still `ADD_DISMISSING_ID` + 450 ms delay before the action, driven by the calling component (`SessionCard`/`LiveCard`/`SessionDetailOverlay`); `SessionCard`'s two call sites share this logic via a local `withDismissAnimation()` helper
+- Conflict resolution: `resolveScheduleConflict(conflict, incoming)` — called from `action-feedback.js`'s `onConfirm` handler; reuses `scheduleSession()`'s toggle behavior to remove the conflicting session then add the incoming one
+- Call-site convenience: `scheduleWithFeedback(session, { eventConfig, isScheduled })` / `favoriteWithFeedback(session, { eventConfig, isFavorited })` (also in `action-feedback.js`) wrap `runSessionAction()` with the shared success copy so `SessionCard`/`LiveCard`/`SessionDetailOverlay` don't each repeat it
+
+### 4.2 Favorite / Unfavorite ✅
+`services/sessions/session-actions.js` → `favoriteAction(session)` — same auth-gate/error-throwing contract as `scheduleAction`, calling `session-store.js`'s `favoriteSession(session)` on success. Toast composition and dismiss-animation timing live in the calling component via `favoriteWithFeedback()`, same as scheduling.
+
+### 4.3 Conflict modal ✅ (promoted to `event-libs/v1/features/conflict-modal/conflict-modal.js`)
+No longer a Preact component — `mountConflictModal()` builds a backdrop + modal once via plain DOM (`createTag`), mounted to `document.body` by `initSessionState()`, and subscribes to the module's own `conflict` signal:
+- Renders two radio-style `<label>` cards: "Currently scheduled" (existing) vs "New session" (incoming)
+- Save button awaits `conflict.value.onConfirm(keep)`, then calls `hideConflictModal()`
+- Cancel / backdrop click: `hideConflictModal()` directly, no `onConfirm` call
+- Local (closure, not `useState`) `saving` variable drives "Saving…" label and disabled state on Save button
+- `showConflictModal({ existing, incoming, onConfirm })` (called from `action-feedback.js`) sets the signal — `onConfirm` is a closure over the current session data, same contract as before
+- CSS is co-located at `event-libs/v1/features/conflict-modal/conflict-modal.css`, loaded via `loadStyle(new URL('./conflict-modal.css', import.meta.url).href)` — same convention as `features/carousel/milo-carousel.css`
+
+> **Why `features/`, not a block:** blocks are decorated from author-placed DOM (Milo's `loadArea()` matches a block's class name in content); toast/conflict-modal have no authored instance and must exist as soon as `initSessionState()` runs, page-wide, regardless of what's authored. `features/` is this codebase's existing home for reusable, non-block rendering logic that a caller imports and invokes directly (see `features/carousel/milo-carousel.js`, imported by `blocks/bento-cards/bento-cards.js`) — a much closer structural fit than either a block or the block-agnostic-but-pure-logic `utils/` directory.
+
+### 4.4 Toast ✅ (promoted to `event-libs/v1/features/toast/toast.js`)
+No longer a Preact component — `mountToast()` builds the toast element once via plain DOM, mounted to `document.body` by `initSessionState()`, and subscribes to the module's own `toast` signal:
+- Four variants: `neutral`, `informative`, `positive`, `negative`
+- Icons: `InfoIcon` (informative), `CheckIcon` (positive), `AlertIcon` (negative) — inlined as static SVG strings
+- Enter animation: double rAF to ensure browser paints hidden state before CSS transition
+- Auto-dismiss after `toast.duration` ms (default 1500); `duration: null` = persistent (auth prompts)
+- Manual dismiss: X button starts the exit transition; `transitionend` clears the `toast` signal and hides the element
+- Optional CTA: `ctaHref` renders as `<a>`; `ctaAction` renders as `<button>`
+- `showToast({ message, variant, ctaLabel, ctaAction, ctaHref, duration })` / `hideToast()` are the only two entry points — any block can call them directly
+- CSS is co-located at `event-libs/v1/features/toast/toast.css`, loaded the same way as the conflict modal's
+
+### 4.5 ICS download ✅
+`utils/ics.js` → `generateICS(sessions)` / `downloadICS(sessions, filename)`:
+- RFC 5545 compliant: `BEGIN:VCALENDAR`, `VEVENT` per session
+- `DTSTART`/`DTEND` in UTC (`Z` suffix)
+- `SUMMARY`, `DESCRIPTION` (includes speaker names), `URL`
+- Line folding at 75 octets per RFC 5545 §3.1
+- Triggered by `DownloadButton` in My Sessions view header (only shown when `activeView === 'my-sessions'`)
+
+### 4.6 RegistrationPrompt component ✅
+- `isLoggedIn === false` → "Sign in and register" + `window.adobeIMS?.signIn()` button
+- Else (logged in, not registered) → "Register for the event" + `<a href="/register">` (register URL from eventConfig)
+- Rendered inline inside each view (My Sessions, My Favorites) for the full-view gate
+- Also rendered as a modal from `App` when `regPromptOpen === true` (triggered by `SHOW_REG_PROMPT`)
+
+> **Note:** The current auth gate for scheduleAction/favoriteAction uses `showToast()` (not `SHOW_REG_PROMPT`). The modal RegistrationPrompt (`regPromptOpen`) is wired up in `App` but not currently triggered by schedule/favorite interactions.
+
+---
+
+## Phase 5 — Session State & Time-Based Behaviors ✅ Complete
+
+**Goal:** Live Now eligibility, on-demand derivation, and post-event auto-transition are all implemented.
+
+### 5.1 Session state derivation ✅
+`event-libs/v1/utils/session-state.js` (promoted out of this block) → `deriveSessionState(session, liveStreamActiveIds, nowMs)`:
+- MR sessions: inactive in poll API → `'on-demand'` (if past start) or `'upcoming'` (pre-start); active → `'live'` (if past start) or `'upcoming'`
+- Non-MR: pure time window — `'on-demand'` if past end, `'live'` if between start/end, `'upcoming'` if pre-start
+
+### 5.2 Live Now eligibility ✅
+`event-libs/v1/utils/session-state.js` → `isInLiveNow(session, liveStreamActiveIds, nowMs)`:
+- Only MR sessions past their start time that are active in the MR API qualify for Live Now
+
+### 5.3 Auto-transition to on-demand ✅
+No longer a reducer case (`LIVE_STATUS_UPDATE` doesn't exist). Implemented as a `useEffect` in `SessionGuideProvider` (`store/index.js`) that subscribes to the shared `sessions`/`liveStreamActiveIds` signals and dispatches a plain `SET_VIEW`. Post-event auto-transition: `allEnded || pastManualCutoff` (cutoff from `getApiConfig().manualCutoff`) and `activeView === 'live-upcoming'` → switch to `'on-demand'`.
+
+### 5.4 In-person on-demand cards ✅
+- `session.inPerson && !session.videoAvailable` → time label "Recording coming soon" in `SessionCard`; detail overlay shows "Recording coming soon" badge
+- `session.inPerson && session.videoAvailable` → navigates to `session.sessionPageUrl`
+
+---
+
+## Phase 6 — Session Detail Overlay ✅ Complete
+
+**Goal:** The session expansion panel (widget only) renders all session metadata and syncs action states.
+
+### 6.1 SessionDetailOverlay component ✅
+- Controlled by `activeSessionId` in store; reads session from `sessions.find(s => s.id === activeSessionId)`
+- Two-column layout: main col (summary + description + products + resources + copyright) + side col (speakers)
+- Actions:
+  - Upcoming sessions: Schedule / Scheduled toggle button (primary) + Favorite icon button + Share icon button
+  - Live/on-demand sessions: Watch now link (primary) + Favorite icon button + Share icon button
+  - "Recording coming soon" badge for in-person sessions without `videoAvailable`
+- Description expand/collapse: "More" / "Less" button with `is-expanded` class; local `descExpanded` state
+- Attributes list: Technical level, Track, Content category, Audience (filtered for non-empty values)
+- Share: `navigator.share()` if available; else `navigator.clipboard.writeText()` with "Link copied" toast; swallows `AbortError`
+
+### 6.2 URL param for open overlay (widget) ✅
+- `DrawerShell` handles `handleDetailBack()`: pushes `setSessionsParam()` URL
+- `DrawerShell` handles `closeDrawer()`: pushes `clearSessionParams()` URL
+- Opening detail: `SessionCard` / `LiveCard` push `setSessionParam(slug-rfCode)` URL
+- `popstate` listener in `DrawerShell` restores state from URL without pushing new entries
+
+### 6.3 State sync ✅
+Schedule/favorite actions in the overlay dispatch through the same store → both the overlay and the list card update from the same state source automatically.
+
+---
+
+## Phase 7 — Filter System ✅ Complete
+
+**Goal:** Multi-category filter panel that updates session lists with active filter count.
+
+### 7.1 FilterPanel component ✅
+- Two-panel layout: left sidebar (category buttons) + right options (checkboxes)
+- Category options derived dynamically from `sessions` via `useMemo` — no hardcoded option values
+- Local `localFilters` state (copy of `activeFilters`) — only committed to store on Apply; Reset clears both local and store
+- Active category highlighted; count badge per category in sidebar
+- Total active count badge in panel header
+
+### 7.2 Filter state ✅
+`SET_FILTERS` action replaces the entire `activeFilters` object. Filter panel initializes `localFilters` from current `activeFilters` on open.
+
+### 7.3 Filter composition with search ✅
+`utils/session-filters.js` → `filterSessions(sessions, activeFilters, searchQuery)`:
+- Each active filter category is applied as AND between categories, OR within a category
+- Array session properties (e.g. `products`) support array membership check
+- Search: title, description, speakers names, track, type (case-insensitive includes)
+- Applied together as a pipeline; neither filter nor search alone gates the other
+
+### 7.4 Filter options ✅
+Derived from `sessions[n][categoryId]` values — no authored option lists needed. Array properties are expanded.
+
+---
+
+## Phase 8 — Search ✅ Complete
+
+**Goal:** Full-text keyword search across session fields.
+
+### 8.1 Search implementation ✅
+Search is inline in `DrawerHeader` (not a separate `SearchField` component):
+- Mobile search row: hidden below controls; toggle via search icon button in the right controls area; Escape key closes + clears; clear (✕) button
+- Desktop: same mobile search row revealed (no separate desktop inline field)
+- `oninput` dispatches `SET_SEARCH` immediately
+
+### 8.2 Search logic ✅ (in `filterSessions`)
 ```javascript
-export function buildSessionCard(preact, store) {
-  const { html } = preact;
-  const { useSessionGuide } = store;
-
-  return function SessionCard({ session }) {
-    const { state, dispatch } = useSessionGuide();
-    const { scheduled, favorited, isRegistered, eventConfig } = state;
-    const userTz = eventConfig.userTz;
-    const isScheduled = scheduled.has(session.id);
-    const isFavorited = favorited.has(session.id);
-    // ...
-  };
-}
-```
-
-**`userTz` source:** Detected once in `parseConfig` via `detectUserTimezone(config.baseTimezone)` and stored as `eventConfig.userTz`. Cards read it from context — no prop threading required.
-
-**Time-based state in Phase 2:** Cards derive display state (upcoming / live / on-demand) using the time utilities from `utils/time.js`. `isSessionOnDemand(session, Date.now())` is called at render time. Full MR-poll-aware derivation via `deriveSessionState()` is wired up in Phase 5; Phase 2 cards use pure time-window logic only.
-
-**Interim mutation behavior (Phase 4 boundary):** Phase 2 wires up the schedule and favorite buttons with direct dispatch — no RF API call yet:
-- `isRegistered !== true` → no-op (button click is silently swallowed; Phase 4 adds `<RegistrationPrompt />`)
-- `isRegistered === true` → dispatch `SCHEDULE_ADD` / `SCHEDULE_REMOVE` / `FAVORITE_ADD` / `FAVORITE_REMOVE` immediately
-
-Phase 4 replaces the direct dispatch with the pessimistic RF-then-dispatch pattern.
-
-### 2.1 SessionCard component
-
-Factory: `buildSessionCard(preact, store)`  
-Only required prop: `session`
-
-Renders:
-- Track badge (Spectrum SVG icon + label + color from `eventConfig.trackIcons` / `eventConfig.trackColors`)
-- Session title
-- Session description (truncated to 2 lines via CSS `-webkit-line-clamp`)
-- Time range (localized via `formatSessionTime(session.startTimeUtc, userTz)`) or `On-demand` label when `isSessionOnDemand(session, Date.now())`
-- Schedule button (`icon-calendar`) — hidden when session is on-demand; no-op when `isRegistered !== true`
-- Favorite button (`icon-heart`) — always rendered; no-op when `isRegistered !== true`
-
-**Always-visible column (CSS-driven):**  
-Active action buttons are permanently visible via CSS class modifiers; inactive icons appear only on hover:
-
-```css
-.sg-card .sg-card__actions { opacity: 0; }
-.sg-card:hover .sg-card__actions { opacity: 1; }
-.sg-card.is-scheduled .sg-card__btn--schedule { opacity: 1; } /* always visible when active */
-.sg-card.is-favorited .sg-card__btn--favorite { opacity: 1; }
-```
-
-`.is-scheduled` and `.is-favorited` classes are applied to the card root element based on context state. No JavaScript visibility toggling.
-
-**Card click behavior by surface and session state:**
-- **Widget, upcoming/live:** opens `<SessionDetailOverlay />`
-- **Widget, on-demand (video available):** navigates to `session.sessionPageUrl`
-- **Widget, in-person on-demand (video not available):** opens `<SessionDetailOverlay />` with "Recording coming soon"
-- **Full page (`eventConfig.surface === 'page'`):** navigates to `session.sessionPageUrl` in all states
-
-### 2.2 LiveCard component (large)
-
-Factory: `buildLiveCard(preact, store)`  
-Only required prop: `session`
-
-Used in Live Now section and Featured (upcoming days) section.
-
-Renders:
-- Large image panel (560 × 316 px) — `session.thumbnailUrl` as `<img>`; falls back to track-colored placeholder when `thumbnailUrl` is `null`
-- Progress bar — `width: ((Date.now() - startMs) / (endMs - startMs) * 100)%` — snapshot at render time. Refreshes for free on every 30 s MR poll tick (the `LIVE_STATUS_UPDATE` dispatch triggers a re-render of the card tree)
-- Track badge, localized time, title, description
-- `Watch now` primary CTA → `session.watchUrl` (keynote: homepage player, other: channel page)
-- Schedule button — same interim behavior as `SessionCard` (direct dispatch when registered, no-op otherwise)
-- Favorite button — same
-- Hover: background flips black, text flips white (CSS `transition` on `.sg-live-card`)
-
-### 2.3 TimeSlotRow component
-
-Factory: `buildTimeSlotRow(preact, store)`  
-Required prop: `sessions` — pre-filtered `Session[]` for this time slot, passed in from the parent view
-
-The parent view is responsible for filtering: it groups sessions by time slot, applies `activeDay` / `activeFilters` / `searchQuery`, and passes only the visible subset to each `TimeSlotRow`. The row itself does no filtering.
-
-Renders:
-- Time label (e.g. "9:15 AM") — derived from `sessions[0].startTimeUtc` via `formatShortTime` (no timezone abbreviation — times are shown in the user's local timezone)
-- Horizontal card scroll strip containing one `<SessionCard />` per session in `sessions`
-- Left/right scroll arrow buttons
-  - **Desktop/tablet (≥768 px):** transform-based scroll — `translateX(offset)` with `offset` incremented by card width per arrow click
-  - **Mobile (< 768 px):** native CSS horizontal scroll (`overflow-x: auto; scroll-snap-type: x mandatory`)
-- Card width for desktop/tablet offset calculation is DOM-computed once on first render via `ref` on the first card element — no hardcoded pixel value
-
-Row is omitted entirely when `sessions.length === 0` (parent view never renders it with an empty array).
-
-### 2.4 Carousel component (shared)
-
-Factory: `buildCarousel(preact, store)`  
-Required prop: `sessions` — `Session[]` to display as `LiveCard`s
-
-Reusable for Live Now section and Featured (upcoming days) section. The carousel owns rendering of `<LiveCard />`s internally — callers pass session objects, not pre-rendered cards.
-
-Features:
-- Prev/Next arrow buttons
-- Dot indicators (one per session)
-- Active index tracked in local `useState` (not in the global store — carousel position is ephemeral UI state)
-- Keyboard: left/right arrows navigate when carousel is focused
-
----
-
-## Phase 3 — Views
-
-**Goal:** All four views render with the correct content and transitions between them are instant.
-
-### 3.1 Live & Upcoming view
-- Shows `<LiveNowSection />` for the current day if sessions are currently live
-- Shows `<FeaturedSection />` for future days (upcoming keynotes/featured sessions)
-- Shows `<UpcomingSessions />` grouped by time slot, filtered to `activeDay`
-- `<BrandConciergeRibbon />` injected after the 2nd visible session row
-- Heading: "Sessions" (or event title from config)
-- Date tabs are enabled and control which day's sessions are shown
-
-### 3.2 My Sessions view
-- Registration gate: unregistered users (logged out or logged in) see `<RegistrationPrompt />`
-- Sub-tabs: `Upcoming` | `On Demand`
-- Upcoming sub-tab: same `<TimeSlotRow />` layout, filtered to `scheduled` sessions
-- On Demand sub-tab: `<OnDemandSessions />` filtered to `scheduled` sessions
-- `<DownloadButton />` visible (generates `.ics` file)
-- `<BrandConciergeRibbon />` after 2nd row
-- Personalized greeting: "Hi, {firstName}" in header
-
-### 3.3 My Favorites view
-- Registration gate: unregistered users (logged out or logged in) see `<RegistrationPrompt />`
-- Same layout as My Sessions Upcoming tab, filtered to `favorited` sessions
-- `<BrandConciergeRibbon />` after 2nd row
-
-### 3.4 On Demand Sessions view
-- Organized by primary track (channel)
-- Track order controlled by `eventConfig.onDemandTrackOrder`
-- Session cards show no time
-- In-person sessions with `videoAvailable: false` show "Recording coming soon" label
-- Date tabs disabled in this view
-- `<BrandConciergeRibbon />` after 2nd row
-- Activated automatically post-event (see Phase 5)
-
-### 3.5 View transitions
-- All view switches are instant (no animation) — user chose this explicitly in the prototype
-- `applyView(instant = true)` equivalent: Preact re-render with new filter predicate
-
----
-
-## Phase 4 — Session Interactions
-
-**Goal:** Add to Schedule, Favorite, Conflict Modal, and ICS download all work correctly and sync to Rainfocus.
-
-### 4.1 Add to Schedule / Remove
-- Gate: `isRegistered === false` → `<RegistrationPrompt />` (two variants: logged-out shows login+register CTA; logged-in shows register CTA)
-- If `eventConfig.showConflictModal` is true and a time conflict exists: open `<ConflictModal />`
-- **Pessimistic update**: RF `addSession` / `removeSession` API call fires first; `SCHEDULE_ADD` / `SCHEDULE_REMOVE` is dispatched only on confirmed success. The button shows a loading/disabled state while the call is in flight.
-- On RF error: show error toast, button resets to its previous state
-- Toast: "Added to schedule" (success green) or "Removed from schedule"
-- Sync to `blockMediator` so other blocks on the same page receive the update immediately
-
-### 4.2 Favorite / Unfavorite
-- Same registration gate and pessimistic pattern as 4.1
-- RF `toggleSessionInterest` API call fires first; `FAVORITE_ADD` / `FAVORITE_REMOVE` dispatched only on success
-- Toast: "Added to favorites" (success) or "Removed from favorites"
-- Sync via BlockMediator
-
-### 4.3 ConflictModal component
-- Renders two `<ConflictOption />` cards: currently scheduled session vs new session
-- Radio-style selection (only one can be kept)
-- "Save" resolves the conflict, updating `scheduled` via the RF API (pessimistic)
-- "Cancel" / outside-click: dismiss, keep existing
-- Only shown when `eventConfig.showConflictModal === true`
-
-### 4.4 Toast component
-- Variants: default (blue), success (green), alert (red)
-- Icons: check, heart, alert
-- Auto-dismiss after 1500 ms, dismissible via X button
-- Positioned `fixed` bottom-center, above the drawer z-index
-
-### 4.5 ICS download (My Sessions)
-- `generateICS(sessions, userTz)` → produces an `.ics` string
-- Each event: `DTSTART;TZID=...`, `DTEND;TZID=...`, `SUMMARY`, `DESCRIPTION`
-- Triggered by the download icon button in My Sessions header
-- Uses `Blob` + `URL.createObjectURL` to trigger browser download
-
-### 4.6 RegistrationPrompt component
-- Shown inline (not a modal) when an unregistered user tries to access a gated view or action
-- Two variants driven by `isLoggedIn` state:
-  - **Logged out**: "Sign in and register for the event" — CTA calls `window.adobeIMS.signIn()`
-  - **Logged in, not registered**: "Register for the event" — CTA links to the event registration flow
-- Replaces the `SignInPrompt` name from earlier drafts
-
----
-
-## Phase 5 — Session State & Time-Based Behaviors
-
-**Goal:** Live Now eligibility is derived correctly from MR poll results and time windows; sessions transition to on-demand at the right moment; the post-event view transition is handled automatically.
-
-### 5.1 Session state derivation (pure function, no store)
-
-`state` is never stored — it is computed on every render from the current store snapshot:
-
-```javascript
-// utils/session-state.js
-
-/**
- * Derive the display state of a session.
- * liveStreamActiveIds — Set<mrStreamId> from the latest MR poll (store.liveStreamActiveIds)
- * nowMs              — Date.now() at render time (passed in so the function stays pure/testable)
- */
-export function deriveSessionState(session, liveStreamActiveIds, nowMs) {
-  const start = Date.parse(session.startTimeUtc);
-  const end   = Date.parse(session.endTimeUtc);
-
-  if (session.mrStreamId) {
-    // MR session: inactive in MR API = on-demand regardless of time
-    if (!liveStreamActiveIds.has(session.mrStreamId)) {
-      return nowMs < start ? 'upcoming' : 'on-demand';
-    }
-    // Active in MR API + past start time = live
-    return nowMs >= start ? 'live' : 'upcoming';
-  }
-
-  // Non-MR: pure time-based
-  if (nowMs > end)   return 'on-demand';
-  if (nowMs >= start) return 'live';
-  return 'upcoming';
-}
-```
-
-### 5.2 Live Now section eligibility (pure function)
-
-Only sessions with the right flag AND the right time/poll conditions are shown in Live Now:
-
-```javascript
-// utils/session-state.js
-
-export function isInLiveNow(session, liveStreamActiveIds, nowMs) {
-  const start = Date.parse(session.startTimeUtc);
-  const end   = Date.parse(session.endTimeUtc);
-
-  if (session.mrStreamId) {
-    // MR: must be past start time AND currently active in MR API
-    return nowMs >= start && liveStreamActiveIds.has(session.mrStreamId);
-  }
-
-  return false; // all other sessions never appear in Live Now
-}
-```
-
-`<LiveNowSection />` renders only when `sessions.some(s => isInLiveNow(s, liveStreamActiveIds, now))` for the active day. No Live Now section = the section is simply not rendered.
-
-### 5.3 Reducer — LIVE_STATUS_UPDATE action
-
-On each poll tick the reducer receives `{ active: Set, inactive: Set, now: number }`:
-
-```javascript
-case 'LIVE_STATUS_UPDATE': {
-  const next = { ...state, liveStreamActiveIds: action.active };
-
-  // Post-event auto-transition: if all sessions for the event are on-demand
-  // and the user is still on the live-upcoming view, switch to on-demand view.
-  const allEnded = state.sessions.every(s =>
-    deriveSessionState(s, action.active, action.now) === 'on-demand'
-  );
-  // Honour manual override from authoring config if provided
-  const manualCutoff = state.eventConfig.manualOnDemandTransitionTime
-    ? Date.parse(state.eventConfig.manualOnDemandTransitionTime)
-    : null;
-  const pastManualCutoff = manualCutoff ? action.now >= manualCutoff : false;
-
-  if ((allEnded || pastManualCutoff) && next.activeView === 'live-upcoming') {
-    next.activeView = 'on-demand';
-  }
-
-  return next;
-}
-```
-
-### 5.4 In-person on-demand cards
-- `session.inPerson && !session.videoAvailable`: card shows "Recording coming soon" label; click opens Session Detail modal with the same label
-- `session.inPerson && session.videoAvailable`: click navigates to `session.sessionPageUrl`
-- `videoAvailable` is part of the static sessions payload and updated on the next full session refresh (not via polling)
-
----
-
-## Phase 6 — Session Detail Overlay
-
-**Goal:** The session expansion panel (widget only) renders all session metadata and syncs its action states to the main card.
-
-### 6.1 SessionDetailOverlay component
-- Slides in from the right within the drawer (CSS: `transform: translateX(100%)` → `translateX(0)`)
-- Header controls collapse (same mechanism as Phase 1.3)
-- Back button closes overlay, returns to list
-- Main close (×) button: if overlay open → close overlay; if not → close drawer
-
-Displays (from `Session`):
-- Track badge (icon + color + label)
-- Session title
-- Type, date, premiere time (all localized)
-- Description
-- Technical level, category, channel, audience
-- Copyright disclaimer (if present)
-- Speakers list (name, title, photo)
-- Featured products (icons + names)
-- Session resources (links)
-- Add to Schedule / Scheduled CTA (sync to card state; gated on `isRegistered`)
-- Favorite / Favorited CTA (gated on `isRegistered`)
-- Watch Now button (only when `session.state === 'live'`)
-
-### 6.2 URL param for open modal (widget)
-When detail opens: `history.pushState({}, '', `?session=${session.slug}-${session.rfCode}``)`  
-When detail closes (back/X without closing drawer): `history.pushState({}, '', '?sessions')`  
-When drawer closes: `history.pushState({}, '', window.location.pathname)`  
-`popstate` listener handles browser back button.
-
-### 6.3 State sync
-Any schedule/favorite toggle inside the detail overlay dispatches through the same store action → both the overlay and the underlying card update from the same state source (no separate sync step needed with Preact's reactive model).
-
----
-
-## Phase 7 — Filter System
-
-**Goal:** A fully configurable multi-category filter panel that updates the session list with an active filter count.
-
-### 7.1 FilterPanel component
-- Positioned absolutely within the drawer (above body-scroll z-index)
-- Layout: left sidebar (filter categories) + right content grid (filter options)
-- Filter categories are driven by `eventConfig.filterCategories`; unneeded categories hidden
-- Multi-select within each category
-- Apply / Reset actions
-- Active filter count badge on the Filter button
-
-### 7.2 Filter state
-`activeFilters` in the store is an object keyed by category name, each a `Set<string>`.  
-`applyFilters()` updates the store and triggers a Preact re-render.
-
-### 7.3 Filter composition with search
-Both `activeFilters` and `searchQuery` are applied simultaneously via a single `filterSessions(sessions, activeFilters, searchQuery)` pure function. This function is memoized (via `useMemo` with the correct deps) in the component tree.
-
-### 7.4 Track icons in filter options
-Channel filter options render the corresponding Spectrum SVG icon beside the label (same icons used on session cards). Icons are injected from `eventConfig.trackIcons`.
-
----
-
-## Phase 8 — Search
-
-**Goal:** Full-text keyword search across title, description, presenter name, and tags returns results in under 200 ms.
-
-### 8.1 SearchField component
-- Desktop: collapses into an inline field in `RightControls`; search icon button toggles it open
-- Mobile: expands into a row below `RightControls`
-- Escape key closes search; clear (×) button clears query
-- `oninput` updates `searchQuery` in store
-
-### 8.2 Search logic
-```javascript
-function matchesSearch(session, query) {
-  if (!query) return true;
-  const q = query.toLowerCase();
+function matchesSearch(session, q) {
   return (
-    session.title.toLowerCase().includes(q) ||
-    session.description.toLowerCase().includes(q) ||
-    session.speakers.some(s => s.name.toLowerCase().includes(q)) ||
-    session.track.toLowerCase().includes(q) ||
-    session.type.toLowerCase().includes(q)
+    session.title?.toLowerCase().includes(q)
+    || session.description?.toLowerCase().includes(q)
+    || session.speakers?.some((sp) => sp.name?.toLowerCase().includes(q))
+    || session.track?.toLowerCase().includes(q)
+    || session.type?.toLowerCase().includes(q)
   );
 }
 ```
-Client-side only (P1). P2 features (autocomplete, semantic search) are out of scope for this ticket.
 
 ---
 
-## Phase 9 — Full Page Version
+## Phase 9 — Full Page Version ✅ Complete
 
-**Goal:** A standalone block at `/max/2026/sessions.html` that shares all components and state with the widget.
+**Goal:** A standalone block that shares all components with the widget.
 
-### 9.1 `sessions-guide-full-page.js`
-- Separate block entry — registers as `'sessions-guide-full-page'` in `EVENT_BLOCKS`
-- Mounts `<SessionsGuideApp mode="full-page" />` (no drawer shell, no peek animation)
-- Reads the same `eventConfig` from the authoring table
-- Connects to the same `BlockMediator` key so state is shared with any widget instance on the same page
+### 9.1 Full page surface ✅
+There **is** a separate block entry, `sessions-guide-full-page.js`, registered as its own `EVENT_BLOCKS` name (`'sessions-guide-full-page'`) alongside `'sessions-guide'` — this section previously claimed otherwise, which was already stale before this refactor. Authors write either `sessions-guide (page)` (surface detected from the `page` class, same block as the widget) or a dedicated `sessions-guide-full-page` block (surface forced to `'page'` in its own `parseConfig()`). Both entry points mount the same `SessionGuideProvider`/`App` tree and read `registerUrl` from the shared `session-store.js` the same way.
 
-### 9.2 Behavioral differences vs widget
+`FullPageShell` renders `DrawerHeader` (with `hideClose={true}`) + `ViewRouter` + optional `FilterPanel`.
+
+### 9.2 Behavioral differences vs widget ✅
+
 | Feature | Widget | Full Page |
 |---|---|---|
-| Shell | Peek-to-expand drawer | Full-page layout |
-| Session card click | Opens detail overlay | Navigates to session page |
-| Default view (registered) | My Sessions | Live & Upcoming |
-| Default view (unregistered) | Live & Upcoming | Live & Upcoming |
-| Session detail overlay | Yes | No (card → page navigation) |
-| URL params | `?sessions`, `?session=<slug>` | `?view=`, `?filter=`, `?search=` |
+| Shell | Peek-to-expand drawer in portal | Inline layout in block element |
+| Session card click | Opens detail overlay (upcoming/live); navigates (on-demand) | Always navigates to session page |
+| Session detail overlay | Yes (`sg-detail-panel` inside drawer) | No |
+| URL params | `?sessions`, `?session=<slug>-<rfCode>` | `?view=`, `?filter=`, `?search=` |
+| CTA button | "View all sessions" fixed button | Not rendered |
 
-### 9.3 URL param management (full page)
-- `?view=my-sessions` / `?view=my-favorites` / `?view=on-demand` → set `activeView` on load
-- `?filter=track:design,level:beginner` → populate `activeFilters` on load
-- `?search=typography` → populate `searchQuery` on load
-- All URL param writes use `history.replaceState` (no new history entry per keystroke); use `pushState` only on view switches
-- Clearing view reverts to base URL (no `?view=` param)
-
-### 9.4 Widget ↔ Full Page sync
-The widget (`/max.html`) and full page (`/max/2026/sessions.html`) are on different pages — in-memory state cannot survive navigation between them. Rainfocus is the authoritative persistence layer: scheduled and favorited sets are fetched from RF on init for each surface independently. When the user navigates from one surface to the other, the destination page re-fetches from RF on load and reflects the latest confirmed state.
-
-There is no client-side sync mechanism between the two surfaces. Any mutation (add to schedule, favorite) is written to RF immediately via the pessimistic pattern (Phase 4.1/4.2), so the next surface load will read the correct state.
+### 9.3 URL param management (full page) ✅
+`FullPageShell` uses two `useEffect` hooks:
+1. On mount: reads `?view=`, `?search=`, `?filter=cat:val,cat:val` and dispatches store actions
+2. On `activeView` / `activeFilters` / `searchQuery` change: `history.replaceState` to sync URL
 
 ---
 
-## Phase 10 — URL Deep Linking (Widget)
+## Phase 10 — URL Deep Linking (Widget) ✅ Complete
 
-**Goal:** The widget's open state and active session detail are reflected in the URL and can be restored on page load.
+**Goal:** Widget open state and active session detail reflected in URL.
 
-### 10.1 Widget open/close URL
-- Open: `history.pushState({ sessionsOpen: true }, '', '?sessions')`
-- Close: `history.pushState({}, '', window.location.pathname)`
-- On page load: if `?sessions` in URL → auto-open drawer
-- If `?session=<slug>-<rfCode>` in URL → auto-open drawer AND open the matching session detail
+### 10.1 Widget open/close URL ✅
+- Open → `history.pushState({}, '', setSessionsParam())` (sets `?sessions=`, drops `?session=`)
+- Close → `history.pushState({}, '', clearSessionParams())`
 
-### 10.2 Session detail URL
-- Open detail: replace `?sessions` with `?session=${slug}-${rfCode}`
-- Close detail (keep drawer open): revert to `?sessions`
-- Close drawer while detail open: revert to base URL
+### 10.2 Session detail URL ✅
+- Open detail → `history.pushState({}, '', setSessionParam('slug-rfCode'))` (drops `?sessions=`)
+- Close detail (keep drawer open) → `history.pushState({}, '', setSessionsParam())`
 
-### 10.3 Shareable URLs
-The URL at any point accurately encodes the visible state. No server-side routing needed — all state restoration is client-side on `DOMContentLoaded`.
+### 10.3 popstate handler ✅
+`DrawerShell` registers a single `popstate` listener using a `sessionsRef` to avoid re-registration on every session list change. Handles three URL states: `?session=`, `?sessions=`, neither.
 
 ---
 
-## Phase 11 — Brand Concierge AI Ribbon
+## Phase 11 — Brand Concierge AI Ribbon ⬜ Not Started
 
-**Goal:** The Brand Concierge entry point appears after the 2nd visible row of sessions in every view.
+**Goal:** Entry point for Brand Concierge AI after the 2nd visible session row.
 
-### 11.1 BrandConciergeRibbon component
-- Positioned as a sibling to session rows (not as a CSS overlay)
-- The session list rendering logic tracks row count and inserts the ribbon component after index 1 (zero-based)
-- Appears in all four views: Live & Upcoming, My Sessions, My Favorites, On Demand
-- If fewer than 2 rows exist, ribbon appears after the last row
-
-### 11.2 Content
-- Entry point text and CTA driven by authoring config (separate content table row in the block)
-- Clicking the CTA opens the Brand Concierge experience (external integration, not in scope of this ticket)
+No `BrandConciergeRibbon` component exists. Not yet implemented.
 
 ---
 
-## Phase 12 — Analytics
+## Phase 12 — Analytics ⬜ Not Started
 
-**Goal:** All required events fire at the correct moments.
+**Goal:** Fire analytics events at the correct moments.
 
-Create `event-libs/v1/blocks/sessions-guide/utils/analytics.js`:
-
-```javascript
-// All analytics dispatched via window.digitalData or the existing Milo analytics util
-export const track = {
-  guideOpen: ()                    => fire('sessions_guide_open'),
-  viewToggle: (view)               => fire('sessions_view_toggle', { view }),
-  filterApply: (filters)           => fire('sessions_filter_apply', { filters }),
-  scheduleAdd: (sessionId)         => fire('sessions_schedule_add', { sessionId }),
-  scheduleRemove: (sessionId)      => fire('sessions_schedule_remove', { sessionId }),
-  favoriteAdd: (sessionId)         => fire('sessions_favorite_add', { sessionId }),
-  favoriteRemove: (sessionId)      => fire('sessions_favorite_remove', { sessionId }),
-  watchNow: (sessionId, dest)      => fire('sessions_watch_now', { sessionId, dest }), // dest: 'homepage' | 'channel'
-  modalOpen: (sessionId)           => fire('sessions_modal_open', { sessionId }),
-  sessionPageClick: (sessionId)    => fire('sessions_page_click', { sessionId }),
-};
-```
+No `utils/analytics.js` exists. Not yet implemented.
 
 ---
 
-## Phase 13 — Theme & Responsive Polish
+## Phase 13 — Theme & Responsive Polish 🔄 In Progress
 
-### 13.1 Dark / Light theme
-`eventConfig.theme` adds a `data-theme="dark"` or `data-theme="light"` attribute to the drawer root. All color tokens switch via CSS attribute selectors. Dark theme is used in the prototype (parent page has `background: #1a1a2e`).
+### 13.1 Dark / Light theme 🔄
+`data-theme` attribute applied to `sg-portal` (widget) or `el` (page). CSS token switching via `[data-theme="dark"]` / `[data-theme="light"]` attribute selectors. Default: widget=dark, page=light.
 
-### 13.2 Responsive breakpoints
-| Breakpoint | Session rows | Live card width | Drawer behavior |
-|---|---|---|---|
-| ≥1280 px | 4 cards/row max | 1104 px | Drawer centered, max 1400 px |
-| 1024–1279 px | 3 cards | Scaled | Full width |
-| 768–1023 px (tablet) | 2–3 cards | Scaled | Full width, transform-based row scroll |
-| ≤767 px (mobile) | 1.2 cards (peek) | Full width | Full width, native scroll |
+### 13.2 Responsive breakpoints 🔄
+Key breakpoints in use:
+- `≤1279 px` (narrow) — CTA opens directly to `expanded`; top margin = 0
+- `≥1280 px` (wide) — CTA opens to `peek`; top margin = 20 px
 
-### 13.3 Accessibility
-- All interactive elements have `aria-label` or visible label text
-- Focus trap inside open drawer and open modals
-- `role="dialog"` + `aria-modal="true"` on drawer, detail overlay, conflict modal
-- Keyboard: Escape closes open panels/modals in order (detail → drawer; filter → closed)
-- `prefers-reduced-motion`: disable card collapse/expand animations
+Carousel: `overflowX` computed style determines paged vs native scroll mode — responsive without JS breakpoint checks.
+
+### 13.3 Accessibility 🔄
+Present: `role="dialog"` / `aria-modal` / `aria-label` on drawer, conflict modal, filter panel; `aria-label` on all icon buttons; `role="tablist"` / `role="tab"` / `aria-selected` on date tabs; `aria-haspopup` / `aria-expanded` on dropdowns; `aria-pressed` on toggle buttons; `aria-live="polite"` on toast; focus trap not yet implemented.
 
 ---
 
-## Phase 14 — Testing
+## Phase 14 — Testing 🔄 In Progress
 
-Tests mirror `test/unit/blocks/sessions-guide/`.
+Tests mirror `test/unit/blocks/sessions-guide/`. Coverage status to be assessed against actual test files.
 
-### 14.1 Unit tests
-- `store/index.js`: state init, pessimistic mutation dispatch (only on RF success)
-- `utils/time.js`: timezone conversion, DST edge case, `isSessionLive`, `allSessionsEnded`
-- `utils/analytics.js`: event firing
-- `services/rainfocus.js`: response normalization, error handling, pessimistic mutation flow
-- `services/feds.js`: `getFedsToken()` — already-present token, late arrival via event, 8s timeout
-- Filter logic: `filterSessions` pure function with various filter + search combinations
+### 14.1 Priority unit tests
+- `store/index.js`: reducer coverage for the remaining UI-only actions, `buildInitialState`
+- `event-libs/v1/utils/session-store.js`: signal mutations, localStorage persistence, `initSessionState()` gating, auth bridge from BlockMediator/dev-auth
+- `utils/time.js`: timezone conversion, `getNowMs` override, `getSessionDayKey`
+- `event-libs/v1/utils/session-state.js`: `deriveSessionState` + `isInLiveNow` — pure functions, easy to cover
+- `utils/session-filters.js`: all filter/grouping functions
+- `utils/ics.js`: RFC 5545 output, line folding, edge cases
+- `event-libs/v1/services/sessions/session-actions.js`: auth gate, pessimistic mutation flow, conflict detection, `SessionActionError` reasons
+- `event-libs/v1/services/sessions/action-feedback.js` ✅ (`test/unit/services/sessions/action-feedback.test.js`): translation of each `SessionActionError` reason into the right `showToast()`/`showConflictModal()` call
+- `event-libs/v1/features/toast/toast.js` ✅ (`test/unit/features/toast/toast.test.js`): signal mutations, mount idempotency, rendering, CTA link/button, transition-driven dismiss
+- `event-libs/v1/features/conflict-modal/conflict-modal.js` ✅ (`test/unit/features/conflict-modal/conflict-modal.test.js`): signal mutations, mount idempotency, rendering, selection gating Save, confirm/cancel/backdrop-dismiss flows
+- `services/feds.js`: already-present token, late arrival via event, 8 s timeout
 
-### 14.2 Component tests
-- `SessionCard`: renders scheduled/favorited states, fires correct callbacks, hides calendar for on-demand, shows `RegistrationPrompt` for unregistered users
-- `ConflictModal`: renders two options, resolves correctly
-- `Toast`: auto-dismisses, variant classes correct
-- `FilterPanel`: category switching, select/deselect, apply/reset
-- `RegistrationPrompt`: logged-out variant vs. logged-in-unregistered variant
+### 14.2 Component tests (priority order)
+- `SessionCard`: on-demand/upcoming rendering, `forceOnDemand` prop, `dismissingIds` class, `hoverAnim` state, iOS touch handler
+- `FilterPanel`: local filter state, apply/reset, dynamic option derivation
+- `RegistrationPrompt`: logged-out vs logged-in-unregistered variants
 
-### 14.3 Integration tests
-- Full view rendering for each of the 4 views
-- Poll-driven state update causes LiveNow section to appear/disappear
-- URL param handling: `?sessions` auto-opens, `?session=<slug>` opens detail
-- RF pessimistic mutation: state unchanged until RF resolves; updates on success; resets on error
+(Toast and the conflict modal are no longer Preact components — see the `features/toast/toast.js` / `features/conflict-modal/conflict-modal.js` entries in 14.1 above.)
+
+### 14.3 Integration tests (priority order)
+- Full view rendering for all 4 views
+- Poll-driven state update: `session-store.js`'s `liveStreamActiveIds` signal changing on a poll tick, and the on-demand auto-transition `useEffect` reacting to it
+- URL param handling: `?sessions` auto-opens, `?session=slug-rfCode` resolves detail
+- Filter + search composition
 
 ---
 
-## Phase 15 — Linting & PR Readiness
+## Phase 15 — Linting & PR Readiness ⬜ Not Started
 
 - `npm run lint:fix` passes for all new files
 - `npm test` green with ≥80 % line coverage on new code
 - No `console.error` — all errors via `window.lana?.log()`
-- No hardcoded Milo URLs — resolved from `getConfig().miloLibs`
+- No hardcoded Milo URLs — all deps resolved from local `event-libs/v1/deps/`
 - All imports use `.js` extensions
-- `EVENT_BLOCKS` updated in `libs.js`
-- FEDS event name and attribute path confirmed against live FEDS integration before shipping
-- `isRegistered` source wired (BlockMediator key or `window.feds.utilities.getEventData()`) or explicitly deferred with a `// TODO` comment
+- `EVENT_BLOCKS` confirmed updated in `libs.js`
+- Remove dev scaffolding before shipping:
+  - `seedDevData()` in `event-libs/v1/utils/session-store.js` (writes `sg:dev-auth` / `sessions:scheduled` / `sessions:favorited`)
+  - (or gate behind `?sgDev=true`)
+- Wire real API calls in `event-libs/v1/services/sessions/rainfocus.js` (replace mock stubs with FEDS token + IMS userId)
+- Wire real API call in `event-libs/v1/services/sessions/mobile-rider.js`
+- Wire real API call in `event-libs/v1/services/sessions/sessions-api.js` (replace `MOCK_SESSIONS` with actual endpoint)
+- Confirm FEDS event name `feds.data.authToken.loaded` and attribute path `window.feds.data.authToken` against live integration
 - PR description references MWPW-194331 and includes testing notes for widget and full-page surfaces
 
 ---
@@ -1067,107 +815,141 @@ Tests mirror `test/unit/blocks/sessions-guide/`.
 ## Dependency Map
 
 ```
-Phase 0 (Foundation)
-  └─► Phase 1 (Drawer Shell)
-        └─► Phase 2 (Session Cards)
-              ├─► Phase 3 (Views)
-              │     └─► Phase 4 (Interactions) ──► Phase 6 (Detail Overlay)
-              │           └─► Phase 5 (Time/Polling)
-              │                 └─► Phase 3 (feeds On Demand auto-transition)
-              ├─► Phase 7 (Filter)
-              ├─► Phase 8 (Search)
-              └─► Phase 9 (Full Page) ──► Phase 10 (URL Deep Linking)
-                    └─► Phase 11 (Brand Concierge)
-Phase 12 (Analytics) ─ can be wired in alongside Phase 3–9
-Phase 13 (Polish) ─ parallel to later phases
-Phase 14 (Tests) ─ written alongside each phase
-Phase 15 (PR Readiness) ─ final gate
+Phase 0 (Foundation) ✅
+  └─► Phase 1 (Drawer Shell) ✅
+        └─► Phase 2 (Session Cards) ✅
+              ├─► Phase 3 (Views) ✅
+              │     └─► Phase 4 (Interactions) ✅ ──► Phase 6 (Detail Overlay) ✅
+              │           └─► Phase 5 (Time/Polling) ✅
+              │                 └─► Phase 3 (feeds On Demand auto-transition) ✅
+              ├─► Phase 7 (Filter) ✅
+              ├─► Phase 8 (Search) ✅
+              └─► Phase 9 (Full Page) ✅ ──► Phase 10 (URL Deep Linking) ✅
+                    └─► Phase 11 (Brand Concierge) ⬜
+Phase 12 (Analytics) ⬜ — can be wired alongside any phase
+Phase 13 (Polish) 🔄 — parallel to later phases
+Phase 14 (Tests) 🔄 — written alongside each phase
+Phase 15 (PR Readiness) ⬜ — final gate
 ```
 
 ---
 
 ## Key Risks & Mitigations
 
-| Risk | Mitigation |
+| Risk | Mitigation / Status |
 |---|---|
-| FEDS event name / attribute path differs from what's documented | Confirm against live FEDS integration before shipping Phase 0.7; `getFedsToken()` timeout provides a clear failure signal |
-| `isRegistered` source not yet wired | Mocked in Phase 0; explicit TODO in Phase 15 gate — all gates read `isRegistered` so wiring is a single-point swap |
-| 30 s polling causes excessive re-renders | Preact's diffing handles this; ensure `useMemo` guards in list components so only changed cards re-render |
-| RF pessimistic mutations feel slow | Loading state on action buttons covers perceived latency; error toast provides clear feedback on failure |
-| Timezone DST edge case on multi-day events | Covered by `Intl.DateTimeFormat` which handles DST automatically |
-| Large session catalogs (500+ sessions) | Implement windowed rendering (virtual list) in Phase 13 if performance degrades |
-| IMS not available on page | `window.adobeIMS` check before calling; graceful no-auth fallback |
-| RF API unavailable | `fetchScheduled`/`fetchFavorited` failures caught and logged via `lana`; block renders with empty scheduled/favorited sets |
+| FEDS event name / attribute path differs from what's documented | `getFedsToken()` implemented with timeout; FEDS integration not yet activated — confirm before shipping Phase 0.7 |
+| `isRegistered` source wiring | Wired via `BlockMediator.get('rsvpData').registered` inside `session-store.js`'s `syncAuth()`; dev state via `sg:dev-auth` localStorage; production wiring blocked on real Rainfocus integration |
+| Real Rainfocus API calls not wired | All RF service methods are stubs; `null` credentials passed in `services/sessions/session-actions.js`; must replace before shipping |
+| Real Mobile Rider API not wired | `fetchLiveStatus` returns all-inactive mock; polling runs but no live sessions will appear |
+| Real sessions API not wired | `MOCK_SESSIONS` used; replace `fetchSessions` with real endpoint before shipping |
+| Dev scaffolding (`seedDevData()` in `session-store.js`) in production path | `TODO` comments present; must remove or gate before PR — now runs page-wide via `decorateEvent`, not just for this block, so removal affects any page with `rainfocus-api-url` metadata |
+| 30 s polling causes excessive re-renders | Preact diffing handles; `useMemo` guards in view components on filter-derived lists |
+| RF pessimistic mutations feel slow | `pendingActions` Set + `is-pending` class on buttons covers perceived latency; error toast on failure |
+| Timezone DST edge case on multi-day events | `Intl.DateTimeFormat` handles DST automatically; date tabs use noon UTC to avoid midnight DST edge |
+| iOS synthetic click routing through transform ancestors | Handled via `ontouchend` in `SessionCard`; `elementFromPoint` dispatch to correct action button |
+| `drawerStateRef` stale closure in gesture handlers | All gesture handler refs use `useRef` values; re-registered once on mount with stable `[]` deps |
+| `SessionGuideContext._current` direct assignment | Workaround for Preact `useContext` behavior when `App` is called directly from `children()`; documented in comment |
 
 ---
 
 ## File Structure
 
+Shared, page-level modules now live outside this block's directory — anything another block might need (data, mutations, derived-state helpers) had to move up so `v1/utils/` isn't reaching back into `v1/blocks/sessions-guide/`.
+
 ```
+event-libs/v1/utils/
+  session-store.js               # SHARED, page-level: sessions/sessionsStatus/liveStreamActiveIds/favorited/scheduled/auth/pendingActions signals; initSessionState(), getApiConfig(), scheduleSession(), favoriteSession(); also calls mountToast()/mountConflictModal()
+  session-state.js                # SHARED: deriveSessionState, isInLiveNow — pure functions (moved out of this block)
+  decorate.js                     # calls initSessionState() from decorateEvent(), before any block's init()
+
+event-libs/v1/features/           # SHARED, non-block reusable rendering logic — imported directly by whichever
+                                   # block needs it (existing convention, see features/carousel/milo-carousel.js)
+  toast/
+    toast.js                     # toast signal, showToast(), hideToast(), mountToast() — vanilla DOM, no Preact dependency
+    toast.css                    # .sg-toast* rules, co-located and loaded on demand by mountToast() via loadStyle()
+  conflict-modal/
+    conflict-modal.js            # conflict signal, showConflictModal(), hideConflictModal(), mountConflictModal() — vanilla DOM
+    conflict-modal.css           # .sg-modal-backdrop / .sg-conflict-modal* rules, co-located, loaded the same way
+
+event-libs/v1/services/sessions/  # SHARED service layer (moved out of this block)
+  sessions-api.js                 # fetchSessions — mocked with MOCK_SESSIONS; includes MOCK_FEATURED_IDS
+  rainfocus.js                    # stub: fetchScheduled, fetchFavorited, addSession, removeSession, toggleSessionInterest
+  mobile-rider.js                 # stub: fetchLiveStatus (returns all-inactive)
+  poller.js                       # startPolling, stopPolling — takes a plain onUpdate callback, no dispatch coupling
+  session-actions.js              # scheduleAction, favoriteAction, hasTimeConflict, resolveScheduleConflict, SessionActionError — UI-agnostic; throws instead of dispatching toasts
+  action-feedback.js              # runSessionAction(), scheduleWithFeedback(), favoriteWithFeedback() — translate SessionActionError into showToast()/showConflictModal() calls; no dispatch argument, usable by any block
+
 event-libs/v1/blocks/sessions-guide/
-  sessions-guide.js             # block entry (widget)
-  sessions-guide-full-page.js   # block entry (full page)
-  sessions-guide.css            # all styles
-  PLAN.md                       # this document
+  sessions-guide.js               # block entry (widget default, page via CSS class)
+  sessions-guide-full-page.js     # separate block entry, registered as 'sessions-guide-full-page' in EVENT_BLOCKS; forces surface='page'
+  sessions-guide.css              # all styles
+  PLAN.md                         # this document
+  REAL-API-CHECKLIST.md           # current mock → real API status
   store/
-    index.js                    # Preact Context + useReducer state management
+    index.js                      # block-local Preact Context + useReducer; UI-only state (drawer, view routing, filters) — toast/conflict modal moved out, see event-libs/v1/features/
   services/
-    sessions-api.js             # event API — initial session fetch + normalizer
-    rainfocus.js                # Rainfocus API — fetchScheduled, fetchFavorited, addSession, removeSession, toggleSessionInterest
-    mobile-rider.js             # MR API — fetchLiveStatus (batch, no auth)
-    poller.js                   # polling engine — startPolling, stopPolling, injectDispatch
-    feds.js                     # FEDS utilities — getFedsToken()
+    feds.js                       # getFedsToken() — implemented; not yet called in production flow (still block-local; no other block needs it yet)
   utils/
-    time.js                     # timezone formatting helpers
-    session-state.js            # deriveSessionState, isInLiveNow (pure functions)
-    analytics.js                # event tracking
-    ics.js                      # ICS calendar file generator
+    time.js                       # getNowMs, detectUserTimezone, formatSessionTime, formatShortTime, formatSessionDate, isSessionLive, isSessionUpcoming, isSessionOnDemand, allSessionsEnded, getSessionDayKey
+    session-filters.js            # sessionsForDay, groupByStartTime, groupByTrack, liveSessions, upcomingSessions, onDemandSessions, getFeaturedSessions, filterSessions
+    url.js                        # setSessionsParam, setSessionParam, clearSessionParams
+    ics.js                        # generateICS, downloadICS — RFC 5545 compliant
   components/
-    App.jsx                     # root Preact component (mode: widget | full-page)
-    DrawerShell.jsx
-    DrawerHeader.jsx
-    DateTabs.jsx
-    ViewDropdown.jsx
-    FilterPanel.jsx
-    SearchField.jsx
-    DownloadButton.jsx
-    LiveNowSection.jsx
-    FeaturedSection.jsx
-    Carousel.jsx
-    UpcomingSessions.jsx
-    TimeSlotRow.jsx
-    OnDemandSessions.jsx
-    TrackSection.jsx
-    SessionCard.jsx
-    LiveCard.jsx
-    SessionDetailOverlay.jsx
-    BrandConciergeRibbon.jsx
-    ConflictModal.jsx
-    RegistrationPrompt.jsx
-    Toast.jsx
-  prototype/                    # static reference prototype (do not edit)
-    index.html
-    index.js
-    style.css
+    App.js                       # root: branches on surface; renders RegistrationPrompt modal (Toast/ConflictModal are page-level singletons now, not rendered here)
+    DrawerShell.js                # widget shell: peek/expand drawer, gestures, URL deep-linking, FilterPanel, SessionDetailOverlay
+    FullPageShell.js             # page shell: URL params in/out, FilterPanel
+    DrawerHeader.js               # title, DateTabs, ViewDropdown, DownloadButton, inline mobile search
+    DateTabs.js                  # per-day tabs from state.eventDays
+    ViewDropdown.js               # 4-option dropdown; sentence-case labels
+    ViewRouter.js                 # routes activeView to the correct view component
+    LiveUpcomingView.js          # live carousel + featured carousel + upcoming slots + previously-aired slots
+    MySessionsView.js            # registration gate + live carousel + smart tabs + upcoming/on-demand subtabs
+    MyFavoritesView.js           # mirror of MySessionsView using favorited set
+    OnDemandView.js               # on-demand sessions grouped by track
+    Carousel.js                   # LiveCard carousel with paged/native-scroll dual mode
+    TimeSlotRow.js                # time label + horizontal SessionCard strip with transform scroll
+    TrackRow.js                   # track label + horizontal SessionCard strip (on-demand in My Sessions/My Favorites)
+    SessionCard.js                # small card: category badge, title, desc, time, action buttons
+    LiveCard.js                   # large card: thumbnail, progress bar, CTAs
+    SessionDetailOverlay.js      # full session detail: 2-col layout, share, expand description
+    FilterPanel.js                # sidebar category list + checkbox options
+    RegistrationPrompt.js        # inline/modal auth gate: login vs register variant
+    DownloadButton.js             # ICS download trigger (My Sessions only)
+    CategoryBadge.js              # category icon + label + color from eventConfig.categoryColors
+    IconButton.js                 # S2A icon-only button (solid/outlined/transparent)
+    icons.js                      # IconPlay, IconCalendarCheck, IconCalendarPlus, IconHeartFilled, IconHeartOutline
 
 test/unit/blocks/sessions-guide/
   sessions-guide.test.js
   store/index.test.js
-  services/sessions-api.test.js
-  services/rainfocus.test.js
-  services/mobile-rider.test.js
-  services/poller.test.js
   services/feds.test.js
+  services/poller.test.js       # still tests here — imports from the new event-libs/v1/services/sessions/poller.js path
   utils/time.test.js
-  utils/session-state.test.js    # deriveSessionState + isInLiveNow — pure functions, easy to cover
-  utils/analytics.test.js
+  utils/session-filters.test.js
   utils/ics.test.js
   components/SessionCard.test.js
-  components/ConflictModal.test.js
-  components/Toast.test.js
+  components/LiveCard.test.js
   components/FilterPanel.test.js
   components/RegistrationPrompt.test.js
+  components/ViewRouter.test.js
+  components/LiveUpcomingView.test.js
+  components/MySessionsView.test.js
+  components/OnDemandView.test.js
+  components/Carousel.test.js
+  components/TimeSlotRow.test.js
   mocks/
     default.html
     sessions.json               # sample sessions API response
+
+test/unit/features/toast/
+  toast.test.js                  # features/toast/toast.js — signal, mount idempotency, rendering, dismiss
+
+test/unit/features/conflict-modal/
+  conflict-modal.test.js         # features/conflict-modal/conflict-modal.js — signal, mount idempotency, rendering, confirm/cancel flows
+
+test/unit/services/sessions/
+  action-feedback.test.js        # services/sessions/action-feedback.js — SessionActionError reason → toast/conflict-modal mapping
 ```
+
+Test files for code that stayed block-local (`store/index.js`, `services/feds.js`, everything under `components/`) were **not** relocated when their imports moved to shared paths — they stayed under `test/unit/blocks/sessions-guide/` and just updated their import paths. `toast.js`, `conflict-modal.js`, and `action-feedback.js` are the first modules whose tests actually moved to sit next to the shared code they cover (`test/unit/features/`, `test/unit/services/sessions/`) rather than staying under this block's test tree — the pattern to follow for any future promotion out of this block.

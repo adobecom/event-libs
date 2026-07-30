@@ -1,8 +1,9 @@
 import { expect } from '@esm-bundle/chai';
 import sinon from 'sinon';
-import { getValidCampaignIdFromUrl } from '../../../../event-libs/v1/utils/utils.js';
+import { getValidCampaignIdFromUrl, resetCampaignMapCache } from '../../../../event-libs/v1/utils/utils.js';
 import { BASE_ATTENDEE_DATA_FILTER } from '../../../../event-libs/v1/utils/data-utils.js';
 import { stripTags } from '../../../../event-libs/v1/utils/sanitize-utils.js';
+import BlockMediator from '../../../../event-libs/v1/deps/block-mediator.min.js';
 
 describe('Events Form', () => {
   let block;
@@ -306,7 +307,7 @@ describe('Events Form', () => {
     const PHONE_PATTERN = '^\\+?[\\d\\s\\(\\)\\.\\-]{7,20}$';
 
     function simulateCreatePhoneAwareInput({ type, field, pattern, title }) {
-      const isPhoneField = type === 'tel' || type === 'phone' || (typeof field === 'string' && PHONE_FIELD_RE.test(field));
+      const isPhoneField = type === 'tel' || type === 'phone' || (type !== 'text' && typeof field === 'string' && PHONE_FIELD_RE.test(field));
       const attrs = { type: isPhoneField ? 'tel' : type, id: field };
       if (isPhoneField) {
         attrs.inputmode = 'tel';
@@ -320,8 +321,8 @@ describe('Events Form', () => {
       return input;
     }
 
-    it('applies tel type, pattern, inputmode for businessPhone field', () => {
-      const input = simulateCreatePhoneAwareInput({ type: 'text', field: 'businessPhone' });
+    it('applies tel type, pattern, inputmode for businessPhone field (legacy: no explicit type)', () => {
+      const input = simulateCreatePhoneAwareInput({ type: undefined, field: 'businessPhone' });
       expect(input.getAttribute('type')).to.equal('tel');
       expect(input.getAttribute('inputmode')).to.equal('tel');
       expect(input.getAttribute('autocomplete')).to.equal('tel');
@@ -329,14 +330,28 @@ describe('Events Form', () => {
       expect(input.hasAttribute('title')).to.be.false;
     });
 
-    it('applies same defaults for mobilePhone field', () => {
-      const input = simulateCreatePhoneAwareInput({ type: 'text', field: 'mobilePhone' });
+    it('applies same defaults for mobilePhone field (legacy: no explicit type)', () => {
+      const input = simulateCreatePhoneAwareInput({ type: undefined, field: 'mobilePhone' });
       expect(input.getAttribute('type')).to.equal('tel');
       expect(input.getAttribute('pattern')).to.equal(PHONE_PATTERN);
     });
 
+    it('does not apply phone defaults when explicit type is text, even if field name contains phone', () => {
+      const input = simulateCreatePhoneAwareInput({ type: 'text', field: 'businessPhone' });
+      expect(input.getAttribute('type')).to.equal('text');
+      expect(input.hasAttribute('pattern')).to.be.false;
+      expect(input.hasAttribute('inputmode')).to.be.false;
+    });
+
     it('does not apply phone defaults for non-phone fields', () => {
       const input = simulateCreatePhoneAwareInput({ type: 'text', field: 'firstName' });
+      expect(input.getAttribute('type')).to.equal('text');
+      expect(input.hasAttribute('pattern')).to.be.false;
+      expect(input.hasAttribute('inputmode')).to.be.false;
+    });
+
+    it('does not apply phone defaults for fields that contain "phone" as a substring (e.g. Phonetic First Name)', () => {
+      const input = simulateCreatePhoneAwareInput({ type: 'text', field: 'Phonetic First Name' });
       expect(input.getAttribute('type')).to.equal('text');
       expect(input.hasAttribute('pattern')).to.be.false;
       expect(input.hasAttribute('inputmode')).to.be.false;
@@ -611,6 +626,77 @@ describe('Events Form', () => {
         expect(payload.contactMethods).to.deep.equal([]);
       });
     });
+
+    describe('radio group string conversion', () => {
+      function simulateRadioGroupPostProcess(form, payload) {
+        Object.keys(payload).forEach((key) => {
+          const fieldWrapperEl = form.querySelector(`[data-field-id="${key}"]`);
+          if (fieldWrapperEl && fieldWrapperEl.dataset.type === 'radio-group' && Array.isArray(payload[key])) {
+            if (BASE_ATTENDEE_DATA_FILTER[key]?.type === 'array') return;
+            payload[key] = payload[key].length > 0 ? payload[key][0] : undefined;
+          }
+        });
+      }
+
+      it('collapses a checked radio group (single choice) to a plain string, not an array', () => {
+        // Radio inputs sharing a name are mutually exclusive by native browser
+        // semantics, so exactly one is checked here — mirrors real rendering.
+        const form = document.createElement('form');
+        const fieldWrapper = document.createElement('div');
+        fieldWrapper.setAttribute('data-field-id', 'industry');
+        fieldWrapper.setAttribute('data-type', 'radio-group');
+
+        const radio1 = document.createElement('input');
+        radio1.type = 'radio';
+        radio1.name = 'industry';
+        radio1.value = 'Technology';
+        radio1.checked = true;
+
+        const radio2 = document.createElement('input');
+        radio2.type = 'radio';
+        radio2.name = 'industry';
+        radio2.value = 'Retail';
+        radio2.checked = false;
+
+        fieldWrapper.append(radio1, radio2);
+        form.appendChild(fieldWrapper);
+
+        const payload = {};
+        [radio1, radio2].forEach((r) => {
+          if (r.checked) {
+            payload[r.name] = payload[r.name] ? [...payload[r.name], r.value] : [r.value];
+          } else {
+            payload[r.name] = payload[r.name] || [];
+          }
+        });
+
+        simulateRadioGroupPostProcess(form, payload);
+
+        expect(payload.industry).to.equal('Technology');
+        expect(typeof payload.industry).to.equal('string');
+      });
+
+      it('collapses an unchecked radio group to undefined', () => {
+        const form = document.createElement('form');
+        const fieldWrapper = document.createElement('div');
+        fieldWrapper.setAttribute('data-field-id', 'industry');
+        fieldWrapper.setAttribute('data-type', 'radio-group');
+
+        const radio1 = document.createElement('input');
+        radio1.type = 'radio';
+        radio1.name = 'industry';
+        radio1.value = 'Technology';
+        radio1.checked = false;
+
+        fieldWrapper.append(radio1);
+        form.appendChild(fieldWrapper);
+
+        const payload = { industry: [] };
+        simulateRadioGroupPostProcess(form, payload);
+
+        expect(payload.industry).to.equal(undefined);
+      });
+    });
   });
 
   describe('inviteOnly + campaign gate', () => {
@@ -716,6 +802,156 @@ describe('Events Form', () => {
     });
   });
 
+  describe('submitForm RSVP token submit routing', () => {
+    let sandbox;
+    let submitForm;
+
+    before(async () => {
+      const module = await import('../../../../event-libs/v1/blocks/events-form/events-form.js');
+      submitForm = module.submitForm;
+    });
+
+    beforeEach(() => {
+      sandbox = sinon.createSandbox();
+    });
+
+    afterEach(() => {
+      sandbox.restore();
+      BlockMediator.set('imsProfile', undefined);
+    });
+
+    function buildForm() {
+      const form = document.createElement('form');
+      [['firstName', 'Guest'], ['lastName', 'User'], ['email', 'guest@test.com']].forEach(([id, value]) => {
+        const input = document.createElement('input');
+        input.id = id;
+        input.name = id;
+        input.type = 'text';
+        input.value = value;
+        form.appendChild(input);
+      });
+      return form;
+    }
+
+    it('registers a guest via the normal attendee flow, sending both the guest IMS token and the rsvp-token header', async () => {
+      const originalAdobeIMS = window.adobeIMS;
+      window.adobeIMS = { getAccessToken: () => ({ token: 'fake-token', isGuestToken: true }) };
+      BlockMediator.set('imsProfile', { account_type: 'guest', rsvpToken: 'valid-rsvp-token-1234567890' });
+      const fetchStub = sandbox.stub(window, 'fetch');
+      fetchStub.onCall(0).resolves({ json: () => ({ eventId: 'test-event-id', isFull: false }), ok: true });
+      fetchStub.onCall(1).resolves({ json: () => ({ attendeeId: 'att-1' }), ok: true });
+      fetchStub.onCall(2).resolves({ json: () => ({ attendeeId: 'att-1', registrationStatus: 'registered' }), ok: true });
+
+      const result = await submitForm({ form: buildForm(), sanitizeList: [] });
+      window.adobeIMS = originalAdobeIMS;
+
+      expect(result.ok).to.be.true;
+      expect(result.data).to.have.property('registrationStatus', 'registered');
+      const urls = fetchStub.getCalls().map((call) => call.args[0]);
+      expect(urls.some((url) => url.includes('/rsvpTokenRegistrations'))).to.be.false;
+      expect(urls[1]).to.include('/v1/attendees');
+      expect(urls[2]).to.include('/v1/events/test-event-id/attendees/att-1');
+      const createOptions = fetchStub.getCall(1).args[1];
+      const addToEventOptions = fetchStub.getCall(2).args[1];
+      expect(createOptions.headers.get('x-adobe-esp-rsvp-token')).to.equal('valid-rsvp-token-1234567890');
+      expect(createOptions.headers.get('Authorization')).to.equal('Bearer fake-token');
+      expect(addToEventOptions.headers.get('x-adobe-esp-rsvp-token')).to.equal('valid-rsvp-token-1234567890');
+      expect(addToEventOptions.headers.get('Authorization')).to.equal('Bearer fake-token');
+    });
+
+    it('still forwards a real signed-in session\'s IMS token when the rsvp link is opened while signed in — Cluster Gateway requires one either way', async () => {
+      const originalAdobeIMS = window.adobeIMS;
+      window.adobeIMS = { getAccessToken: () => ({ token: 'assistants-own-token', isGuestToken: false }) };
+      BlockMediator.set('imsProfile', { account_type: 'guest', rsvpToken: 'valid-rsvp-token-1234567890' });
+      const fetchStub = sandbox.stub(window, 'fetch');
+      fetchStub.onCall(0).resolves({ json: () => ({ eventId: 'test-event-id', isFull: false }), ok: true });
+      fetchStub.onCall(1).resolves({ json: () => ({ attendeeId: 'att-1' }), ok: true });
+      fetchStub.onCall(2).resolves({ json: () => ({ attendeeId: 'att-1', registrationStatus: 'registered' }), ok: true });
+
+      await submitForm({ form: buildForm(), sanitizeList: [] });
+      window.adobeIMS = originalAdobeIMS;
+
+      const createOptions = fetchStub.getCall(1).args[1];
+      const addToEventOptions = fetchStub.getCall(2).args[1];
+      expect(createOptions.headers.get('x-adobe-esp-rsvp-token')).to.equal('valid-rsvp-token-1234567890');
+      expect(createOptions.headers.get('Authorization')).to.equal('Bearer assistants-own-token');
+      expect(addToEventOptions.headers.get('x-adobe-esp-rsvp-token')).to.equal('valid-rsvp-token-1234567890');
+      expect(addToEventOptions.headers.get('Authorization')).to.equal('Bearer assistants-own-token');
+    });
+
+    it('forwards a routed campaign in the body of the add-to-event call — same body schema as the normal attendee flow', async () => {
+      resetCampaignMapCache();
+      window.history.replaceState({}, '', `${window.location.pathname}?campaign=camp-1`);
+      BlockMediator.set('imsProfile', { account_type: 'guest', rsvpToken: 'valid-rsvp-token-1234567890' });
+      const fetchStub = sandbox.stub(window, 'fetch').callsFake((url) => {
+        if (typeof url === 'string' && url.includes('campaign-map.json')) {
+          return Promise.resolve({ ok: false, status: 404 });
+        }
+        if (typeof url === 'string' && url.includes('/v1/attendees') && !url.includes('/events/')) {
+          return Promise.resolve({ json: () => ({ attendeeId: 'att-1' }), ok: true });
+        }
+        return Promise.resolve({ json: () => ({ attendeeId: 'att-1', registrationStatus: 'registered' }), ok: true });
+      });
+
+      try {
+        await submitForm({ form: buildForm(), sanitizeList: [] });
+
+        const addToEventCall = fetchStub.getCalls().find((call) => String(call.args[0]).includes('/attendees/att-1'));
+        expect(addToEventCall.args[0]).to.not.include('campaignId');
+        const body = JSON.parse(addToEventCall.args[1].body);
+        expect(body).to.have.property('campaignId', 'camp-1');
+        expect(body.firstName).to.equal('Guest');
+      } finally {
+        window.history.replaceState({}, '', window.location.pathname);
+        resetCampaignMapCache();
+      }
+    });
+
+    it('registers a non-guest via IMS auth with no rsvp-token header', async () => {
+      BlockMediator.set('imsProfile', { account_type: 'type1' });
+      const fetchStub = sandbox.stub(window, 'fetch');
+      fetchStub.onCall(0).resolves({ json: () => ({ eventId: 'test-event-id', isFull: false }), ok: true });
+      fetchStub.onCall(1).resolves({ json: () => ({ message: 'Not found' }), ok: false, status: 404 });
+      fetchStub.onCall(2).resolves({ json: () => ({ attendeeId: 'att-2' }), ok: true });
+      fetchStub.onCall(3).resolves({ json: () => ({ registrationStatus: 'registered' }), ok: true });
+
+      const result = await submitForm({ form: buildForm(), sanitizeList: [] });
+
+      expect(result.ok).to.be.true;
+      const urls = fetchStub.getCalls().map((call) => call.args[0]);
+      expect(urls.some((url) => url.includes('/rsvpTokenRegistrations'))).to.be.false;
+      const createOptions = fetchStub.getCall(2).args[1];
+      expect(createOptions.headers.has('x-adobe-esp-rsvp-token')).to.be.false;
+    });
+  });
+
+  describe('shouldAutoRegisterSessions', () => {
+    let shouldAutoRegisterSessions;
+
+    before(async () => {
+      const module = await import('../../../../event-libs/v1/blocks/events-form/events-form.js');
+      shouldAutoRegisterSessions = module.shouldAutoRegisterSessions;
+    });
+
+    it('returns true for a registered, non-rsvp-token profile', () => {
+      expect(shouldAutoRegisterSessions('registered', { account_type: 'type1' })).to.be.true;
+    });
+
+    it('returns false for a registered rsvp-token (guest) profile', () => {
+      expect(shouldAutoRegisterSessions('registered', { account_type: 'guest', rsvpToken: 'tok-1234567890abcdef' })).to.be.false;
+    });
+
+    it('returns false for a waitlisted registration regardless of profile', () => {
+      expect(shouldAutoRegisterSessions('waitlisted', { account_type: 'type1' })).to.be.false;
+      expect(shouldAutoRegisterSessions('waitlisted', { account_type: 'guest', rsvpToken: 'tok-1234567890abcdef' })).to.be.false;
+    });
+
+    it('returns true for a registered response when profile is null/undefined (no rsvp token present)', () => {
+      expect(shouldAutoRegisterSessions('registered', null)).to.be.true;
+      expect(shouldAutoRegisterSessions('registered', undefined)).to.be.true;
+    });
+  });
+
   describe('getFullState and buildErrorMsg (campaign-aware 400)', () => {
     let sandbox;
     let originalHref;
@@ -737,6 +973,7 @@ describe('Events Form', () => {
     afterEach(() => {
       sandbox.restore();
       window.history.replaceState({}, '', originalHref);
+      BlockMediator.set('imsProfile', undefined);
     });
 
     function stubFetchByUrl(eventResponse, campaignResponse = null) {
@@ -855,6 +1092,284 @@ describe('Events Form', () => {
       const errorEl = form.querySelector('.error');
       expect(errorEl).to.not.be.null;
       expect(errorEl.textContent).to.equal('event-full-no-waitlist-error-msg');
+    });
+
+    it('buildErrorMsg shows the already-registered message on a 409 when an RSVP token is active', async () => {
+      // AttendeeAlreadyRegistered — this email is already registered for the event.
+      // The token itself is NOT consumed on this error, so the copy must not imply
+      // the link is dead.
+      BlockMediator.set('imsProfile', { account_type: 'guest', rsvpToken: 'tok-1234567890abcdef' });
+      stubFetchByUrl({ json: () => ({}), ok: true });
+      const form = document.createElement('form');
+      await buildErrorMsg(form, 409);
+      const errorEl = form.querySelector('.error');
+      expect(errorEl).to.not.be.null;
+      expect(errorEl.textContent).to.equal('This email is already registered for this event.');
+    });
+
+    it('buildErrorMsg shows the token-invalid message on a 401/404/410 when an RSVP token is active', async () => {
+      // Models the two-tab race: the token was valid at page load but got used
+      // elsewhere before this submit, so the submit call fails as gone/not-found,
+      // or the RSVP-token header failed to reach the server (401) — same class
+      // of "not usable here" outcome as the validate call in profile.js.
+      BlockMediator.set('imsProfile', { account_type: 'guest', rsvpToken: 'tok-1234567890abcdef' });
+      stubFetchByUrl({ json: () => ({}), ok: true });
+      for (const status of [401, 404, 410]) {
+        const form = document.createElement('form');
+        await buildErrorMsg(form, status);
+        const errorEl = form.querySelector('.error');
+        expect(errorEl).to.not.be.null;
+        expect(errorEl.textContent).to.equal('This registration link is no longer valid. It may have already been used or expired.');
+      }
+    });
+
+    it('buildErrorMsg falls back to the generic message for a 403/500 failure with an RSVP token active', async () => {
+      // 403 (waitlisting not allowed / invite-only) and 500 don't mean the token
+      // became unusable, so they must not surface the invalid-link copy.
+      BlockMediator.set('imsProfile', { account_type: 'guest', rsvpToken: 'tok-1234567890abcdef' });
+      stubFetchByUrl({ json: () => ({}), ok: true });
+      const form = document.createElement('form');
+      await buildErrorMsg(form, 403);
+      const errorEl = form.querySelector('.error');
+      expect(errorEl).to.not.be.null;
+      expect(errorEl.textContent).to.equal('rsvp-error-msg');
+    });
+
+    it('buildErrorMsg falls back to the generic message for a non-400 failure with no RSVP token', async () => {
+      stubFetchByUrl({ json: () => ({}), ok: true });
+      const form = document.createElement('form');
+      await buildErrorMsg(form, 500);
+      const errorEl = form.querySelector('.error');
+      expect(errorEl).to.not.be.null;
+      expect(errorEl.textContent).to.equal('rsvp-error-msg');
+    });
+  });
+
+  describe('getRsvpConfigFromMeta', () => {
+    let metaEl;
+
+    afterEach(() => {
+      metaEl?.remove();
+      metaEl = null;
+      document.head.querySelectorAll('meta[name="rsvp-config"]').forEach((el) => el.remove());
+    });
+
+    function setRsvpConfigMeta(value) {
+      metaEl = document.createElement('meta');
+      metaEl.setAttribute('name', 'rsvp-config');
+      metaEl.content = JSON.stringify(value);
+      document.head.appendChild(metaEl);
+    }
+
+    it('returns null when rsvp-config meta is absent', async () => {
+      const { getRsvpConfigFromMeta } = await import('../../../../event-libs/v1/blocks/events-form/events-form.js');
+      expect(getRsvpConfigFromMeta()).to.equal(null);
+    });
+
+    it('returns null when rsvpFormFields is empty', async () => {
+      const { getRsvpConfigFromMeta } = await import('../../../../event-libs/v1/blocks/events-form/events-form.js');
+      setRsvpConfigMeta({ rsvpFormFields: [] });
+      expect(getRsvpConfigFromMeta()).to.equal(null);
+    });
+
+    it('appends a submit field when none exists in rsvpFormFields', async () => {
+      const { getRsvpConfigFromMeta } = await import('../../../../event-libs/v1/blocks/events-form/events-form.js');
+      setRsvpConfigMeta({
+        rsvpFormFields: [
+          { field: 'industry', label: 'Industry', type: 'select', required: true, options: [] },
+        ],
+      });
+      const result = getRsvpConfigFromMeta();
+      const submitField = result.data.find((f) => f.type === 'submit');
+      expect(submitField).to.exist;
+      expect(submitField.field).to.equal('Submit');
+      expect(submitField.label).to.equal('Submit');
+    });
+
+    it('does not append a duplicate submit field when one already exists', async () => {
+      const { getRsvpConfigFromMeta } = await import('../../../../event-libs/v1/blocks/events-form/events-form.js');
+      setRsvpConfigMeta({
+        rsvpFormFields: [
+          { field: 'industry', label: 'Industry', type: 'select', required: false, options: [] },
+          { field: 'Submit', label: 'Submit', type: 'submit', required: false, options: [] },
+        ],
+      });
+      const result = getRsvpConfigFromMeta();
+      const submitFields = result.data.filter((f) => f.type === 'submit');
+      expect(submitFields).to.have.lengthOf(1);
+    });
+
+    it('maps required boolean true to "x"', async () => {
+      const { getRsvpConfigFromMeta } = await import('../../../../event-libs/v1/blocks/events-form/events-form.js');
+      setRsvpConfigMeta({
+        rsvpFormFields: [
+          { field: 'title', label: 'Title', type: 'text', required: true, options: [] },
+        ],
+      });
+      const result = getRsvpConfigFromMeta();
+      expect(result.data[0].required).to.equal('x');
+    });
+
+    it('maps required boolean false to empty string', async () => {
+      const { getRsvpConfigFromMeta } = await import('../../../../event-libs/v1/blocks/events-form/events-form.js');
+      setRsvpConfigMeta({
+        rsvpFormFields: [
+          { field: 'title', label: 'Title', type: 'text', required: false, options: [] },
+        ],
+      });
+      const result = getRsvpConfigFromMeta();
+      expect(result.data[0].required).to.equal('');
+    });
+
+    it('remaps checkbox + displayAs "dropdown" to multi-select', async () => {
+      const { getRsvpConfigFromMeta } = await import('../../../../event-libs/v1/blocks/events-form/events-form.js');
+      setRsvpConfigMeta({
+        rsvpFormFields: [
+          {
+            field: 'interests', label: 'Interests', type: 'checkbox', displayAs: 'dropdown', required: false, options: [],
+          },
+        ],
+      });
+      const result = getRsvpConfigFromMeta();
+      expect(result.data[0].type).to.equal('multi-select');
+    });
+
+    it('leaves checkbox + displayAs "checkbox" (default) as checkbox', async () => {
+      const { getRsvpConfigFromMeta } = await import('../../../../event-libs/v1/blocks/events-form/events-form.js');
+      setRsvpConfigMeta({
+        rsvpFormFields: [
+          {
+            field: 'interests', label: 'Interests', type: 'checkbox', displayAs: 'checkbox', required: false, options: [],
+          },
+        ],
+      });
+      const result = getRsvpConfigFromMeta();
+      expect(result.data[0].type).to.equal('checkbox');
+    });
+
+    it('leaves checkbox with no displayAs as checkbox (default, backward compatible)', async () => {
+      const { getRsvpConfigFromMeta } = await import('../../../../event-libs/v1/blocks/events-form/events-form.js');
+      setRsvpConfigMeta({
+        rsvpFormFields: [
+          { field: 'interests', label: 'Interests', type: 'checkbox', required: false, options: [] },
+        ],
+      });
+      const result = getRsvpConfigFromMeta();
+      expect(result.data[0].type).to.equal('checkbox');
+    });
+
+    it('remaps select + displayAs "radio" to radio-group', async () => {
+      const { getRsvpConfigFromMeta } = await import('../../../../event-libs/v1/blocks/events-form/events-form.js');
+      setRsvpConfigMeta({
+        rsvpFormFields: [
+          {
+            field: 'industry', label: 'Industry', type: 'select', displayAs: 'radio', required: false, options: [],
+          },
+        ],
+      });
+      const result = getRsvpConfigFromMeta();
+      expect(result.data[0].type).to.equal('radio-group');
+    });
+
+    it('leaves select + displayAs "dropdown" (default) as select', async () => {
+      const { getRsvpConfigFromMeta } = await import('../../../../event-libs/v1/blocks/events-form/events-form.js');
+      setRsvpConfigMeta({
+        rsvpFormFields: [
+          {
+            field: 'industry', label: 'Industry', type: 'select', displayAs: 'dropdown', required: false, options: [],
+          },
+        ],
+      });
+      const result = getRsvpConfigFromMeta();
+      expect(result.data[0].type).to.equal('select');
+    });
+
+    // Substrate/displayAs taxonomy: type names only the substrate (text/select/
+    // multi-select); displayAs picks the concrete widget within it.
+    [
+      ['text', undefined, 'text'],
+      ['text', 'text', 'text'],
+      ['text', 'email', 'email'],
+      ['text', 'phone', 'phone'],
+      ['text', 'number', 'number'],
+      ['text', 'date', 'date'],
+      ['text', 'url', 'url'],
+      ['text', 'text-area', 'text-area'],
+      ['text', 'not-a-real-flavor', 'text'],
+    ].forEach(([type, displayAs, expected]) => {
+      it(`remaps text + displayAs "${displayAs}" to "${expected}"`, async () => {
+        const { getRsvpConfigFromMeta } = await import('../../../../event-libs/v1/blocks/events-form/events-form.js');
+        setRsvpConfigMeta({
+          rsvpFormFields: [
+            { field: 'title', label: 'Title', type, displayAs, required: false, options: [] },
+          ],
+        });
+        const result = getRsvpConfigFromMeta();
+        expect(result.data[0].type).to.equal(expected);
+      });
+    });
+
+    it('remaps select + displayAs "picker" (default) to select', async () => {
+      const { getRsvpConfigFromMeta } = await import('../../../../event-libs/v1/blocks/events-form/events-form.js');
+      setRsvpConfigMeta({
+        rsvpFormFields: [
+          {
+            field: 'industry', label: 'Industry', type: 'select', displayAs: 'picker', required: false, options: [],
+          },
+        ],
+      });
+      const result = getRsvpConfigFromMeta();
+      expect(result.data[0].type).to.equal('select');
+    });
+
+    it('remaps multi-select + displayAs "checkbox" (default) to checkbox-group', async () => {
+      const { getRsvpConfigFromMeta } = await import('../../../../event-libs/v1/blocks/events-form/events-form.js');
+      setRsvpConfigMeta({
+        rsvpFormFields: [
+          {
+            field: 'interests', label: 'Interests', type: 'multi-select', displayAs: 'checkbox', required: false, options: [],
+          },
+        ],
+      });
+      const result = getRsvpConfigFromMeta();
+      expect(result.data[0].type).to.equal('checkbox-group');
+    });
+
+    it('leaves multi-select with no displayAs as checkbox-group (default)', async () => {
+      const { getRsvpConfigFromMeta } = await import('../../../../event-libs/v1/blocks/events-form/events-form.js');
+      setRsvpConfigMeta({
+        rsvpFormFields: [
+          { field: 'interests', label: 'Interests', type: 'multi-select', required: false, options: [] },
+        ],
+      });
+      const result = getRsvpConfigFromMeta();
+      expect(result.data[0].type).to.equal('checkbox-group');
+    });
+
+    it('remaps multi-select + displayAs "combobox" to the compact multi-select widget', async () => {
+      const { getRsvpConfigFromMeta } = await import('../../../../event-libs/v1/blocks/events-form/events-form.js');
+      setRsvpConfigMeta({
+        rsvpFormFields: [
+          {
+            field: 'interests', label: 'Interests', type: 'multi-select', displayAs: 'combobox', required: false, options: [],
+          },
+        ],
+      });
+      const result = getRsvpConfigFromMeta();
+      expect(result.data[0].type).to.equal('multi-select');
+    });
+
+    it('leaves non-taxonomy types (e.g. heading, divider) untouched', async () => {
+      const { getRsvpConfigFromMeta } = await import('../../../../event-libs/v1/blocks/events-form/events-form.js');
+      setRsvpConfigMeta({
+        rsvpFormFields: [
+          { field: 'intro', label: 'Welcome', type: 'heading', required: false, options: [] },
+          { field: 'sep', label: '', type: 'divider', required: false, options: [] },
+        ],
+      });
+      const result = getRsvpConfigFromMeta();
+      expect(result.data[0].type).to.equal('heading');
+      expect(result.data[1].type).to.equal('divider');
     });
   });
 });

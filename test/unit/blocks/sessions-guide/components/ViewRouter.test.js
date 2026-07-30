@@ -2,27 +2,29 @@ import { expect } from '@esm-bundle/chai';
 import * as preact from '../../../mocks/deps/htm-preact.js';
 import { buildStore } from '../../../../../event-libs/v1/blocks/sessions-guide/store/index.js';
 import { buildViewRouter } from '../../../../../event-libs/v1/blocks/sessions-guide/components/ViewRouter.js';
+import {
+  sessions, scheduled, favorited, liveStreamActiveIds, auth,
+} from '../../../../../event-libs/v1/utils/session-store.js';
 
 const BASE_CONFIG = {
   userTz: 'America/Los_Angeles', surface: 'page',
   trackColors: {}, trackIcons: {}, title: '',
-  rfApiUrl: '', rfApiProfileId: '', showConflictModal: false,
-  filterCategories: [], mrEnv: 'dev', theme: 'dark',
-  manualOnDemandTransitionTime: null,
+  showConflictModal: false, filterCategories: [], theme: 'dark',
 };
 
 function makeStore(activeView, extraState = {}) {
+  sessions.value = [];
+  scheduled.value = new Set();
+  favorited.value = new Set();
+  liveStreamActiveIds.value = new Set();
+  auth.value = { isLoggedIn: true, isRegistered: true, userFirstName: null };
+
   const store = buildStore(preact);
   store.SessionGuideContext._current = {
     state: {
       activeView,
-      sessions: [],
-      scheduled: new Set(),
-      favorited: new Set(),
-      liveStreamActiveIds: new Set(),
-      isRegistered: true,
-      isLoggedIn: true,
       mySessionsTab: 'upcoming',
+      myFavoritesTab: 'upcoming',
       activeDay: new Date().toLocaleDateString('en-CA'),
       eventConfig: { ...BASE_CONFIG },
       ...extraState,
