@@ -1,7 +1,6 @@
 import { createTag, createOptimizedPicture } from '../../../utils/utils.js';
 
 const VARIANTS = ['ratio-1-1', 'ratio-4-3', 'ratio-3-4', 'ratio-4-5'];
-const OVERLAY_VARIANTS = ['ratio-3-4', 'ratio-4-5'];
 const DEFAULT_VARIANT = 'ratio-4-3';
 
 function getVariant(el) {
@@ -43,12 +42,13 @@ function buildBody(contentWrapper) {
   return body;
 }
 
-function buildOverlay(contentWrapper) {
-  const { nodes } = buildTextNodes(contentWrapper);
-  return createTag('div', { class: 'card-overlay' }, nodes);
-}
-
 export default async function init(el) {
+  if (el.classList.contains('hydrate')) {
+    const { getHydrationPromise } = await import('../../../hydrate/hydrate.js');
+    const hydrationPromise = getHydrationPromise();
+    if (hydrationPromise) await hydrationPromise;
+  }
+
   const [mediaWrapper, contentWrapper] = [...el.querySelectorAll(':scope > div')];
   const variant = getVariant(el);
   const media = buildMedia(mediaWrapper);
@@ -58,15 +58,8 @@ export default async function init(el) {
     return;
   }
 
-  if (OVERLAY_VARIANTS.includes(variant)) {
-    media.querySelector('picture').after(buildOverlay(contentWrapper));
-    el.innerHTML = '';
-    el.append(media);
-  } else {
-    const body = buildBody(contentWrapper);
-    el.innerHTML = '';
-    el.append(media, body);
-  }
-
+  const body = buildBody(contentWrapper);
+  el.innerHTML = '';
+  el.append(media, body);
   el.dataset.cardVariant = variant;
 }

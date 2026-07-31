@@ -11,7 +11,7 @@
   display: none;
 }
 
-.carousel-track > .cards-c2 {
+.carousel-track > .card-c2 {
   scroll-snap-align: start;
 }
 
