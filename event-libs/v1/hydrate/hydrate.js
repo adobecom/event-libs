@@ -15,7 +15,7 @@ const HYDRATORS = {
 const HYDRATED_ATTR = 'data-hydrated';
 
 // Consumer-supplied hydrators, keyed by block name. Takes precedence over HYDRATORS.
-const [registerHydrator, getRegisteredHydrator] = (() => {
+const [registerHydrator, getRegisteredHydrator, clearRegistry] = (() => {
   const registry = new Map();
   return [
     (blockName, hydrator) => {
@@ -35,10 +35,16 @@ const [registerHydrator, getRegisteredHydrator] = (() => {
       return true;
     },
     (blockName) => registry.get(blockName) ?? null,
+    () => registry.clear(),
   ];
 })();
 
 export { registerHydrator };
+
+/** Clears all registrations. For tests — the registry is module state. */
+export function resetHydrators() {
+  clearRegistry();
+}
 
 /**
  * Hydrates blocks in the area that need dynamic content from metadata. Runs to
@@ -61,8 +67,9 @@ export function hydrateBlocks(area = document) {
     }
 
     try {
-      hydrate(block);
-      block.setAttribute(HYDRATED_ATTR, 'true');
+      // Only mark on success. A hydrator that returns false bailed out — often because
+      // its data wasn't there — so a later pass over a nested area should retry it.
+      if (hydrate(block) !== false) block.setAttribute(HYDRATED_ATTR, 'true');
     } catch (e) {
       logHydration(`Hydrator failed for block ${blockName}: ${e.message}`);
     }

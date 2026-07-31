@@ -3,9 +3,16 @@ import { expect } from '@esm-bundle/chai';
 import {
   hydrateBlocks,
   registerHydrator,
+  resetHydrators,
 } from '../../../event-libs/v1/hydrate/hydrate.js';
-import hydrateImageLinks from '../../../event-libs/v1/hydrate/image-links.js';
 import { setMetadata } from '../../../event-libs/v1/utils/utils.js';
+import * as libs from '../../../event-libs/v1/libs.js';
+
+// The registry is module state, so every describe that registers must clean up or it
+// leaks into later tests — including ones in other files.
+afterEach(() => {
+  resetHydrators();
+});
 
 describe('hydrateBlocks', () => {
   beforeEach(() => {
@@ -317,16 +324,15 @@ describe('consumer hydrator registration', () => {
 
   afterEach(() => {
     if (originalLog) window.lana.log = originalLog;
-    // The registry is module-global; restore the built-in so later tests are unaffected
-    // even if an assertion above threw.
-    registerHydrator('image-links', hydrateImageLinks);
   });
 
   it('calls a hydrator registered as a function', () => {
     let received = null;
     registerHydrator('custom-consumer-block', (block) => {
       received = block;
-      block.dataset.hydrated = 'true';
+      // Not `dataset.hydrated` — that is hydrateBlocks' own bookkeeping flag, so
+      // asserting on it would pass even for a hydrator that never ran.
+      block.dataset.ranHydrator = 'true';
     });
 
     document.body.innerHTML = '<div class="custom-consumer-block hydrate"></div>';
@@ -335,7 +341,7 @@ describe('consumer hydrator registration', () => {
 
     const block = document.querySelector('.custom-consumer-block');
     expect(received).to.equal(block);
-    expect(block.dataset.hydrated).to.equal('true');
+    expect(block.dataset.ranHydrator).to.equal('true');
   });
 
   it('prefers a registered hydrator over the built-in one', () => {
@@ -517,6 +523,35 @@ describe('hydration runs once per block', () => {
     expect(block.querySelectorAll(':scope > div')).to.have.lengthOf(1);
   });
 
+  it('retries a block whose hydrator returned false', () => {
+    let calls = 0;
+    registerHydrator('bailed-block', () => {
+      calls += 1;
+      return false;
+    });
+
+    document.body.innerHTML = '<div class="bailed-block hydrate"></div>';
+
+    hydrateBlocks(document);
+    hydrateBlocks(document);
+
+    // A bail-out often means the data wasn't there yet, so a later pass should retry
+    expect(calls).to.equal(2);
+    expect(document.querySelector('.bailed-block').hasAttribute('data-hydrated')).to.be.false;
+  });
+
+  it('marks a hydrator that returns nothing as done', () => {
+    let calls = 0;
+    registerHydrator('void-block', () => { calls += 1; });
+
+    document.body.innerHTML = '<div class="void-block hydrate"></div>';
+
+    hydrateBlocks(document);
+    hydrateBlocks(document);
+
+    expect(calls).to.equal(1);
+  });
+
   it('retries a block whose hydrator threw', () => {
     let calls = 0;
     registerHydrator('retry-block', () => {
@@ -531,5 +566,40 @@ describe('hydration runs once per block', () => {
 
     expect(calls).to.equal(2);
     expect(document.querySelector('.retry-block').hasAttribute('data-hydrated')).to.be.false;
+  });
+});
+
+/**
+ * libs.js is the barrel consumers import. Anything they read off it by name is public
+ * API — dropping an export breaks them silently, since their feature detection just
+ * turns the feature off. These assertions pin that surface.
+ */
+describe('libs.js hydration exports', () => {
+  beforeEach(() => {
+    document.body.innerHTML = '';
+    document.head.innerHTML = '';
+  });
+
+  ['registerHydrator', 'repeatTemplate', 'decorateEvent'].forEach((name) => {
+    it(`exports ${name} as a function`, () => {
+      expect(libs[name], `${name} is missing from libs.js`).to.be.a('function');
+    });
+  });
+
+  it('drives the consumer hydration flow through the barrel alone', () => {
+    document.body.innerHTML = '<div class="barrel-block hydrate"><div><div>[[widgets.name]]</div></div></div>';
+    libs.setMetadata('widgets', JSON.stringify([{ name: 'A' }, { name: 'B' }]));
+
+    expect(libs.registerHydrator(
+      'barrel-block',
+      (block) => libs.repeatTemplate(block, { selectItems: (items) => items }),
+    )).to.be.true;
+
+    hydrateBlocks(document);
+
+    const rows = document.querySelectorAll('.barrel-block > div');
+    expect(rows).to.have.lengthOf(2);
+    expect([...rows].map((row) => row.innerHTML.trim()))
+      .to.deep.equal(['<div>[[widgets:0.name]]</div>', '<div>[[widgets:1.name]]</div>']);
   });
 });

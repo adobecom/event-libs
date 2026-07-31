@@ -52,13 +52,18 @@ Then author **exactly one template row** — the shape of a single item, with
 Notes on authoring the template:
 
 - **Write the placeholder without an index.** `[[speakers.firstName]]`, not
-  `[[speakers:0.firstName]]`. The hydrator adds the index per clone.
+  `[[speakers:0.firstName]]`. The hydrator adds the index per clone. An explicitly
+  indexed placeholder is left alone — it resolves to that one item and does not repeat.
+- **Author exactly one template row.** If several rows carry placeholders, only the first
+  is repeated and the rest are dropped (logged).
 - **The collection name comes from the placeholders.** `speakers` in the example above
   maps to `<meta name="speakers">`. No config row is needed.
 - **Images bind through the `alt` attribute**, as elsewhere in event decoration: drop a
   placeholder image into the cell and set its alt text to `[[speakers.photo]]`.
 - **Static text stays static.** The "Read more" label above is authored, so changing it to
-  "Open me" just works. Anything not in `[[...]]` is copied verbatim to every row.
+  "Open me" just works. Anything not in `[[...]]` is copied verbatim to every row. Do
+  author that cell: `event-speakers` falls back to a hardcoded English "Read more" if it
+  is left empty, which is neither translatable nor authorable.
 - **The block must not be empty.** With no template row there is nothing to repeat, and
   the hydrator leaves the block alone.
 
@@ -100,8 +105,12 @@ which projects already invoke before `loadArea()`.
 A successfully hydrated block is marked `data-hydrated="true"` and skipped by later
 passes. This matters because `decorateEvent` runs again for nested areas — fragments,
 personalization, and `events-form` — and a second pass over an already-initialized block
-would destroy the DOM its `init()` built. A hydrator that throws is left unmarked, so a
-later pass retries it.
+would destroy the DOM its `init()` built.
+
+A hydrator that throws, or that returns `false`, is left **unmarked** so a later pass
+retries it. That is why a hydrator should return `repeatTemplate`'s result: a block whose
+data wasn't available on the first pass then still gets a second chance, instead of being
+permanently marked done.
 
 ## Why hydration is synchronous
 
@@ -145,12 +154,18 @@ da-bacom/
 if (eventMD) {
   eventUtils = await import(`${EVENT_LIBS}/libs.js`);
 
-  const { default: hydrateEventSpeakers } = await import('../blocks/event-speakers/event-speakers.hydrator.js');
-  eventUtils.registerHydrator('event-speakers', hydrateEventSpeakers);
+  const { default: createHydrator } = await import('../blocks/event-speakers/event-speakers.hydrator.js');
+  eventUtils.registerHydrator('event-speakers', createHydrator(eventUtils.repeatTemplate));
 }
 // ...
 if (eventMD && eventUtils?.decorateEvent) eventUtils.decorateEvent(document);
 ```
+
+Note the hydrator module exports a **factory** that takes `repeatTemplate`, rather than
+importing it itself. A consumer cannot `import` from `${EVENT_LIBS}/libs.js` statically —
+static import paths must be literals, and the event-libs URL is resolved at runtime — and
+it cannot `await import()` inside the hydrator, which must be synchronous. Injecting it
+here, where awaiting is already safe, is the way around that.
 
 The `await import` is fine here — page startup is outside `decorateEvent`, where awaiting
 is safe. Register a **function**, not a module path: resolving a path would need a dynamic
@@ -175,20 +190,20 @@ override event-libs' behaviour for an event-libs block.
 Delegate the structure to `repeatTemplate` and supply only the selection rule — which
 items appear, in what order. That is usually the whole hydrator:
 
-`repeatTemplate` is exported from `libs.js` as public API for exactly this:
+`repeatTemplate` is exported from `libs.js` as public API for exactly this. Take it as an
+argument rather than importing it (see [Registering a hydrator](#registering-a-hydrator)):
 
 ```js
 // In your own repo, next to your block
-import { repeatTemplate } from `${EVENT_LIBS}/libs.js`;
-
-function selectItems(items, block) {
+export function selectItems(items, block) {
   // Filter by a variant class, sort however the block needs, and return items
   // from the original array so their indexes can be recovered.
   return items.filter((item) => block.classList.contains(item.kind));
 }
 
-export default function hydrateMyBlock(block) {
-  repeatTemplate(block, { selectItems });
+export default function createMyBlockHydrator(repeatTemplate) {
+  // Return the boolean so a bail-out isn't marked hydrated
+  return (block) => repeatTemplate(block, { selectItems });
 }
 ```
 
@@ -200,8 +215,10 @@ Guidelines:
   each item's index with `indexOf` to build its placeholder. Returning copies breaks that.
 - Stay synchronous. No `async`, `await`, `fetch`, or dynamic `import()`. See
   [Why hydration is synchronous](#why-hydration-is-synchronous).
-- Tolerate field-name variants in event data: `speakerType`/`type`, and `title`/`bio` at
-  the top level or nested under `localizations['en-US']`.
+- **Return `repeatTemplate`'s result**, so a bail-out isn't marked hydrated and can be
+  retried on a later pass.
+- Tolerate field-name variants your selection reads — e.g. `speakerType`/`type`. Variants
+  in *rendered* fields aren't a hydrator concern: those resolve from placeholders.
 - Don't remove the block. The hydrator doesn't own its lifecycle.
 - Leave the block in a state its `init()` tolerates on the bail-out paths too —
   `repeatTemplate` handles this by removing the unresolved template row.
@@ -224,8 +241,9 @@ one exception, kept as-is to avoid changing authored sponsor pages.
 
 Lives in da-bacom, since da-bacom owns that block's DOM. It repeats the authored template
 row once per speaker, sorted by `ordinal` — speakers with no ordinal go last. Its selection
-rule is the entire hydrator; the four-cell shape, the heading level, and the "Read more"
-label all come from the template.
+rule is the entire hydrator; the four-cell shape, the heading level, and the expand label
+all come from the template. If the block is authored with two type variants, the first in
+`speaker`, `judge`, `host`, `keynote` order wins.
 
 The block reads cells positionally, so the authored template must keep this order:
 

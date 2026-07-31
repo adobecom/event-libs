@@ -25,17 +25,33 @@ function hasToken(el) {
   return getTokens(el).length > 0;
 }
 
+function parseCollection(name) {
+  const raw = name && getMetadata(name);
+  if (!raw) return null;
+
+  try {
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
 /**
- * Derives the collection name from the first indexless token in the row.
+ * Finds the collection to repeat: the first indexless token in the row that names a
+ * metadata array. Page-level placeholders like [[event-title]] are skipped, so their
+ * position in the row doesn't matter.
  * @param {HTMLElement} row
- * @returns {string|null}
+ * @returns {{name: string, items: any[]}|null}
  */
-function findCollectionName(row) {
+function findCollection(row) {
   for (const token of getTokens(row)) {
     // Conditionals and array helpers are not per-item collection paths
-    if (token.includes('?(') || token.startsWith('@')) continue;
+    if (token.includes('?(') || token.startsWith('@') || token.includes(':')) continue;
+
     const name = token.match(COLLECTION_REG)?.[1];
-    if (name && !token.includes(':')) return name;
+    const items = parseCollection(name);
+    if (items) return { name, items };
   }
   return null;
 }
@@ -43,21 +59,20 @@ function findCollectionName(row) {
 /**
  * Rewrites every [[collection...]] token in the row to target one item.
  * `speakers.firstName` becomes `speakers:2.firstName`, `speakers` becomes `speakers:2`.
+ * Tokens for other collections are left alone, including ones whose name merely starts
+ * with this collection's name — `speakersExtra` must not become `speakers:2Extra`.
+ *
+ * Rewriting innerHTML also covers placeholders in attributes, which is how images bind
+ * (their token lives in `alt`).
  */
 function setTokenIndex(row, collection, index) {
   row.innerHTML = row.innerHTML.replace(META_REG, (match, token) => {
-    if (!token.startsWith(collection) || token.includes(':')) return match;
+    if (token.includes(':')) return match;
     const rest = token.slice(collection.length);
+    // Only a full-segment match counts: the token is the collection itself, or the
+    // collection followed by a path separator.
+    if (!token.startsWith(collection) || (rest && !rest.startsWith('.'))) return match;
     return `[[${collection}:${index}${rest}]]`;
-  });
-
-  // Image tokens live in the alt attribute, which innerHTML round-trips correctly,
-  // but attributes on the row element itself would not be covered above.
-  row.querySelectorAll('img[alt*="[["]').forEach((img) => {
-    img.alt = img.alt.replace(META_REG, (match, token) => {
-      if (!token.startsWith(collection) || token.includes(':')) return match;
-      return `[[${collection}:${index}${token.slice(collection.length)}]]`;
-    });
   });
 }
 
@@ -71,49 +86,60 @@ function setTokenIndex(row, collection, index) {
  * @returns {boolean} Whether the block was hydrated
  */
 export default function repeatTemplate(block, { selectItems } = {}) {
+  const blockName = block.classList[0];
   const rows = [...block.querySelectorAll(':scope > div')];
-  const template = rows.find(hasToken);
+  const templates = rows.filter(hasToken);
+  const [template] = templates;
 
   if (!template) {
-    logHydration(`Hydrator: no [[token]] template row authored in ${block.classList[0]}`);
+    logHydration(`Hydrator: no [[token]] template row authored in ${blockName}`);
     return false;
   }
 
-  const collection = findCollectionName(template);
+  // Only the first templated row is repeated; say so rather than dropping the rest
+  // silently, since that reads as content vanishing for no reason.
+  if (templates.length > 1) {
+    logHydration(`Hydrator: ${blockName} has ${templates.length} rows with [[tokens]]; only the first is used as the template`);
+  }
+
+  const collection = findCollection(template);
+
   if (!collection) {
-    logHydration(`Hydrator: could not derive a collection from the template row in ${block.classList[0]}`);
-    return false;
-  }
-
-  const raw = getMetadata(collection);
-  let items;
-  try {
-    items = raw ? JSON.parse(raw) : null;
-  } catch (error) {
-    logHydration(`Hydrator: failed to parse metadata "${collection}": ${error.message}`);
-  }
-
-  if (!Array.isArray(items)) {
-    // Leave nothing behind: an unresolved template row would render raw [[tokens]].
+    // Nothing to repeat: the tokens name no metadata array. Could be a typo, or the data
+    // simply isn't on the page yet — either way strip the rows, since an unresolved
+    // template renders raw [[tokens]] to the user.
+    logHydration(`Hydrator: no metadata array matches the [[tokens]] in ${blockName}; check the collection name is spelled correctly and its metadata is present`);
     rows.forEach((row) => row.remove());
     return false;
   }
 
+  const { name, items } = collection;
   const selected = selectItems ? selectItems(items, block) : items;
 
   if (!selected.length) {
-    logHydration(`Hydrator: no "${collection}" items to render in ${block.classList[0]}`);
+    logHydration(`Hydrator: no "${name}" items to render in ${blockName}`);
     rows.forEach((row) => row.remove());
     return false;
   }
 
+  let rendered = 0;
+
   selected.forEach((item) => {
+    // The index is the item's position in the source array, so selectItems has to hand
+    // back the original objects — a copy would resolve to the wrong item or none at all.
+    const index = items.indexOf(item);
+    if (index === -1) {
+      logHydration(`Hydrator: selectItems for ${blockName} returned an item that is not in the "${name}" metadata; return the original objects, not copies`);
+      return;
+    }
+
     const clone = template.cloneNode(true);
-    setTokenIndex(clone, collection, items.indexOf(item));
+    setTokenIndex(clone, name, index);
     block.append(clone);
+    rendered += 1;
   });
 
   rows.forEach((row) => row.remove());
 
-  return true;
+  return rendered > 0;
 }
