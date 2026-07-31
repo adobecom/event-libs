@@ -4,7 +4,7 @@ import {
   hydrateBlocks,
   registerHydrator,
 } from '../../../event-libs/v1/hydrate/hydrate.js';
-import hydrateEventSpeakers from '../../../event-libs/v1/hydrate/consumers/event-speakers.js';
+import hydrateImageLinks from '../../../event-libs/v1/hydrate/image-links.js';
 import { setMetadata } from '../../../event-libs/v1/utils/utils.js';
 
 describe('hydrateBlocks', () => {
@@ -319,7 +319,7 @@ describe('consumer hydrator registration', () => {
     if (originalLog) window.lana.log = originalLog;
     // The registry is module-global; restore the built-in so later tests are unaffected
     // even if an assertion above threw.
-    registerHydrator('event-speakers', hydrateEventSpeakers);
+    registerHydrator('image-links', hydrateImageLinks);
   });
 
   it('calls a hydrator registered as a function', () => {
@@ -339,15 +339,15 @@ describe('consumer hydrator registration', () => {
   });
 
   it('prefers a registered hydrator over the built-in one', () => {
-    registerHydrator('event-speakers', (block) => {
+    registerHydrator('image-links', (block) => {
       block.dataset.hydratedBy = 'override';
     });
 
-    document.body.innerHTML = '<div class="event-speakers hydrate speaker"></div>';
+    document.body.innerHTML = '<div class="image-links hydrate sponsors gold"></div>';
 
     hydrateBlocks(document);
 
-    expect(document.querySelector('.event-speakers').dataset.hydratedBy).to.equal('override');
+    expect(document.querySelector('.image-links').dataset.hydratedBy).to.equal('override');
   });
 
   it('rejects a registration that is not a function', () => {
@@ -432,23 +432,22 @@ describe('hydration is synchronous', () => {
   // Guards against reintroducing a dynamic import or async hydrator, either of which
   // would race block init on the fragment/personalization paths.
   it('completes before hydrateBlocks returns', () => {
-    setMetadata('speakers', JSON.stringify([
-      { ordinal: 0, speakerType: 'Speaker', firstName: 'Sync', lastName: 'One' },
-      { ordinal: 1, speakerType: 'Speaker', firstName: 'Sync', lastName: 'Two' },
+    setMetadata('sponsors', JSON.stringify([
+      { name: 'Sponsor 1', image: { imageUrl: 'https://example.com/1.jpg' }, sponsorType: 'gold' },
+      { name: 'Sponsor 2', image: { imageUrl: 'https://example.com/2.jpg' }, sponsorType: 'gold' },
     ]));
 
     document.body.innerHTML = `
-      <div class="event-speakers hydrate speaker">
-        <div><div></div><div>[[speakers.firstName]]</div><div></div><div>Read more</div></div>
+      <div class="image-links hydrate sponsors gold">
+        <div><div><h2>Gold Sponsors</h2></div></div>
       </div>
     `;
 
     hydrateBlocks(document);
 
     // Asserted on the very next statement, with no await in between
-    const block = document.querySelector('.event-speakers');
-    expect(block.querySelectorAll(':scope > div')).to.have.lengthOf(2);
-    expect(block.innerHTML).to.include('[[speakers:0.firstName]]');
+    const block = document.querySelector('.image-links');
+    expect(block.querySelectorAll('img')).to.have.lengthOf(2);
   });
 
   it('returns undefined rather than a promise', () => {
@@ -499,31 +498,23 @@ describe('hydration runs once per block', () => {
   });
 
   it('preserves initialized DOM when a later pass covers the block again', () => {
-    setMetadata('speakers', JSON.stringify([{
-      ordinal: 0,
-      speakerType: 'Speaker',
-      firstName: 'Re',
-      lastName: 'Entrant',
-      bio: 'Bio.',
-      photo: { imageUrl: 'https://example.com/re.jpg' },
-    }]));
+    registerHydrator('reentrant-block', (block) => {
+      block.append(document.createElement('div'));
+    });
 
-    document.body.innerHTML = `
-      <div class="event-speakers hydrate speaker">
-        <div><div></div><div>[[speakers.firstName]]</div><div></div><div>Read more</div></div>
-      </div>
-    `;
+    document.body.innerHTML = '<div class="reentrant-block hydrate"></div>';
 
     hydrateBlocks(document);
-    const block = document.querySelector('.event-speakers');
+    const block = document.querySelector('.reentrant-block');
 
-    // Stand in for the block's init(), which relocates cells into a <section>
+    // Stand in for a block init() that relocates its rows into a wrapper
     const section = document.createElement('section');
     block.querySelector(':scope > div').append(section);
 
     hydrateBlocks(document);
 
     expect(block.querySelectorAll('section')).to.have.lengthOf(1);
+    expect(block.querySelectorAll(':scope > div')).to.have.lengthOf(1);
   });
 
   it('retries a block whose hydrator threw', () => {

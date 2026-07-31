@@ -13,6 +13,11 @@ never invents a label.
 This works for blocks event-libs owns *and* for consumer blocks it doesn't, such as
 da-bacom's `event-speakers`.
 
+**Ownership boundary:** event-libs owns the data and the mechanism; each consumer owns its
+own blocks' DOM. A hydrator for a consumer-owned block therefore lives in that consumer's
+repo, next to its block, and is registered via `registerHydrator`. event-libs' `HYDRATORS`
+map is for event-libs' own blocks only — do not add consumer blocks to it.
+
 ## Table of Contents
 
 1. [Authoring](#authoring)
@@ -125,38 +130,56 @@ has one chance, before init.
 
 ## Registering a hydrator
 
-If the hydrator lives in your own project, import it and register the function before
-calling `decorateEvent`:
+**This is the pattern for every consumer-owned block.** Keep the hydrator beside its block
+in your own repo, and register it at page startup:
 
-```js
-const eventUtils = await import(`${EVENT_LIBS}/libs.js`);
-const { default: hydrateMyBlock } = await import('/blocks/my-block/hydrate.js');
-
-eventUtils.registerHydrator('my-block', hydrateMyBlock);
+```
+da-bacom/
+├── scripts/scripts.js                          ← registers the hydrator
+└── blocks/event-speakers/
+    ├── event-speakers.js                       ← the block
+    └── event-speakers.hydrator.js              ← its hydrator
 ```
 
-Register a **function**, not a module path — resolving a path would require a dynamic
-import inside the hydration path, which is what we're avoiding. Do your own import
-up front, where awaiting is safe. `registerHydrator` returns `true` on success and
-`false` if it rejected the hydrator.
+```js
+if (eventMD) {
+  eventUtils = await import(`${EVENT_LIBS}/libs.js`);
 
-Register **before `decorateEvent` runs**, or the block keeps its authored placeholder
-rows. Both existing consumers have a window for this: they already `await import` of
-`libs.js` well before their `decorateEvent` call.
+  const { default: hydrateEventSpeakers } = await import('../blocks/event-speakers/event-speakers.hydrator.js');
+  eventUtils.registerHydrator('event-speakers', hydrateEventSpeakers);
+}
+// ...
+if (eventMD && eventUtils?.decorateEvent) eventUtils.decorateEvent(document);
+```
 
-A registered hydrator takes precedence over a built-in one, so a consumer can override
-event-libs' behaviour for its own block. If the hydrator is generally useful, add it
-under `v1/hydrate/consumers/` and map it in `HYDRATORS` instead — bearing in mind that
-statically mapped hydrators ship in every event page's critical path, so prefer
-`registerHydrator` for anything consumer-specific.
+The `await import` is fine here — page startup is outside `decorateEvent`, where awaiting
+is safe. Register a **function**, not a module path: resolving a path would need a dynamic
+import inside the hydration path, which is what the sync constraint rules out.
+`registerHydrator` returns `true` on success, `false` if it rejected the hydrator.
+
+Register **before `decorateEvent` runs**, or the block keeps its unresolved template row.
+
+**One registration covers every hydration pass.** The registry is module state on the
+event-libs instance, so it outlives the initial page load and still applies when Milo
+re-invokes `decorateArea` for [fragments](https://github.com/adobecom/milo/blob/main/libs/blocks/fragment/fragment.js)
+and [personalization](https://github.com/adobecom/milo/blob/main/libs/features/personalization/personalization.js).
+Note the fragment path passes a detached `DOMParser` document; that works because
+`getMetadata` reads the main document by default, so a hydrator sees page metadata
+regardless of which area it is handed.
+
+A registered hydrator takes precedence over a built-in one, so a consumer can also
+override event-libs' behaviour for an event-libs block.
 
 ## Writing a hydrator
 
 Delegate the structure to `repeatTemplate` and supply only the selection rule — which
 items appear, in what order. That is usually the whole hydrator:
 
+`repeatTemplate` is exported from `libs.js` as public API for exactly this:
+
 ```js
-import repeatTemplate from '../repeat-template.js';
+// In your own repo, next to your block
+import { repeatTemplate } from `${EVENT_LIBS}/libs.js`;
 
 function selectItems(items, block) {
   // Filter by a variant class, sort however the block needs, and return items
@@ -177,11 +200,11 @@ Guidelines:
   each item's index with `indexOf` to build its placeholder. Returning copies breaks that.
 - Stay synchronous. No `async`, `await`, `fetch`, or dynamic `import()`. See
   [Why hydration is synchronous](#why-hydration-is-synchronous).
-- Log via `logHydration` from `hydrate/log.js`, not `window.lana?.log` directly — the
-  latter drops the message, since hydration runs before Milo's `loadLana`.
 - Tolerate field-name variants in event data: `speakerType`/`type`, and `title`/`bio` at
   the top level or nested under `localizations['en-US']`.
 - Don't remove the block. The hydrator doesn't own its lifecycle.
+- Leave the block in a state its `init()` tolerates on the bail-out paths too —
+  `repeatTemplate` handles this by removing the unresolved template row.
 
 If a block genuinely needs structure the template model can't express, a hydrator may
 still mutate the block directly — but then the content question applies with full force,
@@ -189,19 +212,20 @@ and the values must come from placeholders the decoration pass resolves.
 
 ## Available hydrators
 
-| Block | Metadata | Variants | Owner |
-| --- | --- | --- | --- |
-| `image-links` | `sponsors` | `sponsors` + tier (`platinum`, `diamond`, `gold`, `silver`, `bronze`, `engagement`) | event-libs |
-| `event-speakers` | `speakers` | `speaker`, `judge`, `host`, `keynote` | da-bacom |
+| Block | Metadata | Variants | Owner | Where the hydrator lives |
+| --- | --- | --- | --- | --- |
+| `image-links` | `sponsors` | `sponsors` + tier (`platinum`, `diamond`, `gold`, `silver`, `bronze`, `engagement`) | event-libs | `v1/hydrate/image-links.js` (in `HYDRATORS`) |
+| `event-speakers` | `speakers` | `speaker`, `judge`, `host`, `keynote` | da-bacom | `da-bacom/blocks/event-speakers/event-speakers.hydrator.js` (registered) |
 
 `image-links` predates the template model and still builds its rows in code; it is the
 one exception, kept as-is to avoid changing authored sponsor pages.
 
-### `event-speakers`
+### `event-speakers` (da-bacom)
 
-Repeats the authored template row once per speaker, sorted by `ordinal` — speakers with
-no ordinal go last. Its selection rule is the entire hydrator; the four-cell shape, the
-heading level, and the "Read more" label all come from the template.
+Lives in da-bacom, since da-bacom owns that block's DOM. It repeats the authored template
+row once per speaker, sorted by `ordinal` — speakers with no ordinal go last. Its selection
+rule is the entire hydrator; the four-cell shape, the heading level, and the "Read more"
+label all come from the template.
 
 The block reads cells positionally, so the authored template must keep this order:
 

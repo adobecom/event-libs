@@ -50,6 +50,7 @@ import {
 
 // Hydration API for consumers that author hydrated blocks they own themselves
 import { registerHydrator } from './hydrate/hydrate.js';
+import repeatTemplate from './hydrate/repeat-template.js';
 
 // Core exports - always available (synchronous)
 export {
@@ -65,6 +66,7 @@ export {
   validatePageAndRedirect,
   processAutoBlockLinks,
   registerHydrator,
+  repeatTemplate,
   EVENT_BLOCKS,
   EVENT_BLOCKS_C2,
 };

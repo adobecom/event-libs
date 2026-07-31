@@ -1,14 +1,13 @@
 import logHydration from './log.js';
 import hydrateImageLinks from './image-links.js';
-import hydrateEventSpeakers from './consumers/event-speakers.js';
 
-// Statically imported, never lazily: Milo calls decorateArea for fragments and
-// personalization without awaiting it, so any asynchrony here — a dynamic import()
-// included — races the block's own init(). See docs/block-hydration.md.
+// Hydrators for blocks event-libs owns. Statically imported, never lazily: Milo calls
+// decorateArea for fragments and personalization without awaiting it, so any asynchrony
+// here — a dynamic import() included — races the block's own init().
+// Consumer-owned blocks belong in the consumer's repo, via registerHydrator.
+// See docs/block-hydration.md.
 const HYDRATORS = {
   'image-links': hydrateImageLinks,
-  // Blocks event-libs does not own
-  'event-speakers': hydrateEventSpeakers,
 };
 
 // Marks a block as hydrated so a later decorateEvent pass over a nested area
