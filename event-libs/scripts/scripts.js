@@ -79,6 +79,10 @@ decorateArea();
 (function loadStyles() {
   const paths = [`${LIBS}/styles/styles.css`];
   if (STYLES) { paths.push(STYLES); }
+  // Page-wide C2 styles (rounded video players, etc.) — only on foundation:c2
+  // pages. Blocks' own CSS can't host page-wide rules (it loads only when the
+  // block is present), so this stylesheet is loaded here instead.
+  if (IS_C2) { paths.push(`${EVENT_LIBS_BASE}/c2/styles/c2-global.css`); }
   paths.forEach((path) => {
     const link = document.createElement('link');
     link.setAttribute('rel', 'stylesheet');
