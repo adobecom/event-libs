@@ -5,6 +5,7 @@ import {
   registerHydrator,
   resetHydrators,
 } from '../../../event-libs/v1/hydrate/hydrate.js';
+import repeatTemplate from '../../../event-libs/v1/hydrate/repeat-template.js';
 import { setMetadata } from '../../../event-libs/v1/utils/utils.js';
 import * as libs from '../../../event-libs/v1/libs.js';
 
@@ -426,6 +427,62 @@ describe('consumer hydrator registration', () => {
     hydrateBlocks(document);
 
     expect(document.querySelector('.good-block').dataset.hydrated).to.equal('true');
+  });
+});
+
+describe('registry lifetime', () => {
+  beforeEach(() => {
+    document.body.innerHTML = '';
+    document.head.innerHTML = '';
+  });
+
+  // Consumers register once at page startup, but Milo re-invokes the configured
+  // decorateArea for fragments (blocks/fragment/fragment.js) and personalization
+  // (features/personalization/personalization.js). The registry is module state, so one
+  // registration has to serve all three passes.
+  it('serves the document, personalization and fragment passes from one registration', () => {
+    const seen = [];
+    registerHydrator('late-block', (block) => { seen.push(block.dataset.pass); });
+
+    // 1. page-startup pass over the whole document
+    document.body.innerHTML = '<div class="late-block hydrate" data-pass="document"></div>';
+    hydrateBlocks(document);
+
+    // 2. personalization: decorateArea(element) on a live in-document element
+    const element = document.createElement('div');
+    element.innerHTML = '<div class="late-block hydrate" data-pass="personalization"></div>';
+    document.body.append(element);
+    hydrateBlocks(element);
+
+    // 3. fragment: decorateArea(doc) where doc is a detached DOMParser document
+    const doc = new DOMParser().parseFromString(
+      '<html><head></head><body><div class="late-block hydrate" data-pass="fragment"></div></body></html>',
+      'text/html',
+    );
+    hydrateBlocks(doc);
+
+    expect(seen).to.deep.equal(['document', 'personalization', 'fragment']);
+  });
+
+  // The fragment document has its own empty head, so a hydrator reading page metadata
+  // only works because getMetadata defaults to the main document.
+  it('resolves page metadata inside a detached fragment document', () => {
+    setMetadata('widgets', JSON.stringify([{ name: 'A' }, { name: 'B' }]));
+    registerHydrator('frag-block', (block) => repeatTemplate(block, {
+      selectItems: (items) => items,
+    }));
+
+    const doc = new DOMParser().parseFromString(
+      '<html><head></head><body><div class="frag-block hydrate"><div><div>[[widgets.name]]</div></div></div></body></html>',
+      'text/html',
+    );
+
+    hydrateBlocks(doc);
+
+    const rows = doc.querySelectorAll('.frag-block > div');
+    expect(rows).to.have.lengthOf(2);
+    expect([...rows].map((row) => row.innerHTML.trim()))
+      .to.deep.equal(['<div>[[widgets:0.name]]</div>', '<div>[[widgets:1.name]]</div>']);
   });
 });
 
