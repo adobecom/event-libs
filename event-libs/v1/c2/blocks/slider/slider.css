@@ -5,6 +5,12 @@
   scroll-snap-type: x mandatory;
   scrollbar-width: none;
   -ms-overflow-style: none;
+
+  /* Engineering-owned intra-component offset: the track is flanked by its own
+     .carousel-controls (arrows/heading) above and below as DOM siblings. Figma spec
+     puts 32px between the controls and the cards (the card row's padding-top). Not
+     authorable spacing — it belongs to the slider component, not the section. */
+  margin-block: var(--s2a-spacing-32, 32px);
 }
 
 .carousel-track::-webkit-scrollbar {
