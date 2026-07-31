@@ -25,8 +25,8 @@ const EVENT_BLOCKS = [
 ];
 
 const EVENT_BLOCKS_C2 = [
-  'card',
-  'carousel',
+  'cards-c2',
+  'carousel-c2',
 ];
 
 // Import only the most essential utilities that are always needed
