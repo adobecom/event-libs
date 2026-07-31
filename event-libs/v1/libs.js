@@ -27,6 +27,7 @@ const EVENT_BLOCKS = [
 const EVENT_BLOCKS_C2 = [
   'card-c2',
   'slider',
+  'upcoming-sessions',
 ];
 
 // Import only the most essential utilities that are always needed
