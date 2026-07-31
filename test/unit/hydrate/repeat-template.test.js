@@ -42,6 +42,27 @@ describe('repeatTemplate', () => {
     expect(tokensIn(block)).to.deep.equal(['widgets:0.first', 'widgets:0.last']);
   });
 
+  it('indexes a token whose path contains a nested array index', () => {
+    setMetadata('widgets', JSON.stringify([
+      { links: [{ url: 'a' }] },
+      { links: [{ url: 'b' }] },
+    ]));
+    const block = author('<div><div>[[widgets.links:0.url]]</div></div>');
+
+    repeatTemplate(block);
+
+    // The nested :0 must survive while the collection gets its own index
+    expect(tokensIn(block)).to.deep.equal(['widgets:0.links:0.url', 'widgets:1.links:0.url']);
+  });
+
+  it('derives the collection from a nested-path token', () => {
+    setMetadata('widgets', JSON.stringify([{ links: [{ url: 'a' }] }, { links: [{ url: 'b' }] }]));
+    const block = author('<div><div>[[widgets.links:0.url]]</div></div>');
+
+    expect(repeatTemplate(block)).to.be.true;
+    expect(block.querySelectorAll(':scope > div')).to.have.lengthOf(2);
+  });
+
   it('rewrites a bare collection token', () => {
     setMetadata('widgets', JSON.stringify(['A', 'B']));
     const block = author('<div><div>[[widgets]]</div></div>');
@@ -218,6 +239,20 @@ describe('repeatTemplate', () => {
       expect(repeatTemplate(block)).to.be.true;
       expect(tokensIn(block)).to.deep.equal([
         'event-title', 'widgets:0.name', 'event-title', 'widgets:1.name',
+      ]);
+    });
+
+    it('warns that a per-item conditional is unsupported, and leaves it unindexed', () => {
+      setMetadata('widgets', JSON.stringify([{ name: 'A', vip: true }, { name: 'B' }]));
+      const block = author('<div><div>[[widgets.name]] [[widgets.vip?(VIP):()]]</div></div>');
+
+      repeatTemplate(block);
+
+      // Indexing it would be worse: CONDITIONAL_REG would read the condition as `0.vip`
+      expect(lanaLogs.some((m) => m.includes('per-item conditionals are not supported'))).to.be.true;
+      expect(tokensIn(block)).to.deep.equal([
+        'widgets:0.name', 'widgets.vip?(VIP):()',
+        'widgets:1.name', 'widgets.vip?(VIP):()',
       ]);
     });
 

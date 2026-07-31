@@ -59,7 +59,13 @@ Notes on authoring the template:
 - **The collection name comes from the placeholders.** `speakers` in the example above
   maps to `<meta name="speakers">`. No config row is needed.
 - **Images bind through the `alt` attribute**, as elsewhere in event decoration: drop a
-  placeholder image into the cell and set its alt text to `[[speakers.photo]]`.
+  placeholder image into the cell and set its alt text to `[[speakers.photo]]`. The image
+  must be a real authored image so the pipeline wraps it in `<picture>` — an unwrapped
+  `<img>` can never resolve, and decoration removes its parent, which for a bare
+  `<div><img></div>` deletes the whole cell and shifts the positions the block reads.
+- **Nested paths work**: `[[speakers.socialMedia:0.link]]` resolves per speaker.
+- **Per-item conditionals do not.** `[[speakers.isVip?(Yes):(No)]]` evaluates against the
+  whole collection, not the row's speaker, and is logged as unsupported.
 - **Static text stays static.** The "Read more" label above is authored, so changing it to
   "Open me" just works. Anything not in `[[...]]` is copied verbatim to every row. Do
   author that cell: `event-speakers` falls back to a hardcoded English "Read more" if it

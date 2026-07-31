@@ -46,8 +46,10 @@ function parseCollection(name) {
  */
 function findCollection(row) {
   for (const token of getTokens(row)) {
-    // Conditionals and array helpers are not per-item collection paths
-    if (token.includes('?(') || token.startsWith('@') || token.includes(':')) continue;
+    // Conditionals and array helpers are not per-item collection paths. Nor is a token
+    // the author already indexed — `speakers:0.x` names one item, not the collection.
+    const alreadyIndexed = token.match(/^[a-z0-9-]+:/i);
+    if (token.includes('?(') || token.startsWith('@') || alreadyIndexed) continue;
 
     const name = token.match(COLLECTION_REG)?.[1];
     const items = parseCollection(name);
@@ -67,11 +69,24 @@ function findCollection(row) {
  */
 function setTokenIndex(row, collection, index) {
   row.innerHTML = row.innerHTML.replace(META_REG, (match, token) => {
-    if (token.includes(':')) return match;
+    if (!token.startsWith(collection)) return match;
+
+    // Per-item conditionals aren't supported: CONDITIONAL_REG's condition path excludes
+    // ':', so an indexed `speakers:2.isVip?(..):(..)` parses its condition as `2.isVip`.
+    // Leaving it unindexed is no better — it evaluates against the whole array — so warn
+    // rather than silently rendering the same branch on every row.
+    if (token.includes('?(')) {
+      logHydration(`Hydrator: per-item conditionals are not supported in a hydrated template ("${token}"); it will evaluate against the whole "${collection}" collection`);
+      return match;
+    }
+
     const rest = token.slice(collection.length);
-    // Only a full-segment match counts: the token is the collection itself, or the
-    // collection followed by a path separator.
-    if (!token.startsWith(collection) || (rest && !rest.startsWith('.'))) return match;
+    // Only a full-segment match counts, so `speakersExtra` isn't treated as `speakers`.
+    // A `:` here means the author already indexed the collection — leave it alone.
+    // Deeper `:` (e.g. `.socialMedia:0.link`) is a nested array index and must still
+    // be indexed at the collection position.
+    if (rest && !rest.startsWith('.')) return match;
+
     return `[[${collection}:${index}${rest}]]`;
   });
 }
