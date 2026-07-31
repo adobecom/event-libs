@@ -48,7 +48,6 @@ import {
   processAutoBlockLinks,
 } from './utils/decorate.js';
 
-// Hydration API for consumers that author hydrated blocks they own themselves
 import { registerHydrator } from './hydrate/hydrate.js';
 import repeatTemplate from './hydrate/repeat-template.js';
 

@@ -5,7 +5,6 @@ function isOdd(number) {
 }
 
 export default async function init(el) {
-  // Hydration already completed synchronously in decorateEvent — nothing to await.
   const rows = [...el.querySelectorAll(':scope > div')];
 
   if (!rows.length) {

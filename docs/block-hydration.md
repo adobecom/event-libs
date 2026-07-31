@@ -118,6 +118,39 @@ retries it. That is why a hydrator should return `repeatTemplate`'s result: a bl
 data wasn't available on the first pass then still gets a second chance, instead of being
 permanently marked done.
 
+### Token rewriting rules
+
+`setTokenIndex` is small but every branch in it exists for a reason. The source carries no
+comments — nothing here is minified, so comments ship to the browser — so the invariants
+live here instead. Each is covered by a test in `test/unit/hydrate/repeat-template.test.js`.
+
+| Authored token | Becomes | Why |
+| --- | --- | --- |
+| `[[speakers.firstName]]` | `[[speakers:2.firstName]]` | the normal case |
+| `[[speakers]]` | `[[speakers:2]]` | bare collection token |
+| `[[speakers.links:0.url]]` | `[[speakers:2.links:0.url]]` | a nested array index is not the collection's own index, so it must survive |
+| `[[speakersExtra.name]]` | unchanged | only a full path segment matches; a name that merely *starts with* the collection is a different collection |
+| `[[speakers:0.name]]` | unchanged | already indexed by the author — names one item, so nothing to repeat |
+| `[[event-title]]` | unchanged | not part of this collection |
+| `[[speakers.vip?(y):(n)]]` | unchanged, logged | see below |
+
+Two further details that are easy to undo by accident:
+
+- **Rewriting happens on `innerHTML`, not on text nodes.** That is deliberate — it also
+  covers placeholders in attributes, which is how images bind (their token lives in `alt`).
+- **`META_REG` is a global regex**, so `lastIndex` is stateful. Always `match`/`matchAll`,
+  never `.test()`.
+
+**Per-item conditionals cannot work.** `CONDITIONAL_REG` excludes `:` from its condition
+path, so an indexed `[[speakers:2.isVip?(y):(n)]]` parses its condition as `2.isVip`.
+Leaving it unindexed is no better — it evaluates against the whole array and renders the
+same branch on every row. So it is left alone and logged as unsupported.
+
+**`selectItems` must return the original item objects.** Indexes are recovered with
+`indexOf`, so returning copies resolves to the wrong item or none. Returning a filtered
+and sorted view of the same objects is correct; `.map()`ing them into new objects is not.
+This is logged and skipped rather than rendering `[[speakers:-1.x]]`.
+
 ## Why hydration is synchronous
 
 Hydration must complete before any block's `init()` runs, and there is no point at which

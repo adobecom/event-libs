@@ -1092,8 +1092,6 @@ export function applyAreaTheme(area = document) {
 }
 
 export function decorateEvent(parent) {
-  // Must stay sync: Milo doesn't await decorateArea for fragments or personalization,
-  // so hydration has to finish here or it races each block's init().
   hydrateBlocks(parent);
 
   // handle photos data parsing
