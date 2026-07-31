@@ -1,0 +1,120 @@
+.carousel-track {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.carousel-track::-webkit-scrollbar {
+  display: none;
+}
+
+.carousel-track > .card {
+  scroll-snap-align: start;
+}
+
+.carousel-controls {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+
+.carousel-heading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  text-align: center;
+}
+
+.carousel-pills {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+}
+
+.carousel-pill {
+  padding: 8px 16px;
+  border-radius: 999px;
+  border: 1px solid #000;
+  background: transparent;
+  font-family: 'Adobe Clean', sans-serif;
+  font-size: 14px;
+  font-weight: 700;
+  color: #000;
+  cursor: pointer;
+}
+
+.carousel-pill.is-active {
+  background: #000;
+  color: #fff;
+}
+
+.carousel-arrows {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 16px;
+  width: 100%;
+  padding-inline: 24px;
+}
+
+.carousel-arrow {
+  box-sizing: border-box;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 48px;
+  height: 48px;
+  border-radius: 30px;
+  background: rgb(0 0 0 / 64%);
+  border: 1px solid rgb(255 255 255 / 24%);
+  backdrop-filter: blur(4px);
+  cursor: pointer;
+}
+
+.carousel-arrow:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.carousel-arrow-icon {
+  width: 16px;
+  height: 16px;
+  background-color: #fff;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M5 3l6 5-6 5' fill='none' stroke='%23fff' stroke-width='1.5'/%3E%3C/svg%3E") center / contain no-repeat;
+}
+
+.carousel-arrow-prev .carousel-arrow-icon {
+  transform: rotate(180deg);
+}
+
+.carousel-dots {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.carousel-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: rgb(0 0 0 / 24%);
+}
+
+.carousel-dot.is-active {
+  background: #000;
+}
+
+@media (width <= 767px) {
+  .carousel-arrows {
+    padding-inline: 16px;
+  }
+}
