@@ -65,3 +65,28 @@
     overflow: hidden;
   }
 }
+
+/*
+ * The MobileRider player ships its own skin (adobe-skin.min.css, loaded at
+ * runtime from mobilerider.com) that styles its overlay headings — e.g.
+ * `.overlays-wrapper .titlecontainer h1`. But Milo's C2 global typography
+ * (`h1, h2, .heading-*` in libs/c2/styles/styles.css) uses bare element
+ * selectors that ALSO match those headings and force values the skin doesn't
+ * set (letter-spacing, line-height, font-weight...), cramping the player title.
+ *
+ * Scoping this reset to `.mobile-rider :is(h1..h6)` gives it specificity
+ * (0,1,1): higher than C2's bare `h1` (0,0,1), so it wins over the C2 leak, but
+ * lower than the skin's own `.overlays-wrapper .titlecontainer h1` (0,2,1), so
+ * the skin still wins on everything it sets. `revert` rolls the leaked
+ * properties back to the browser default — i.e. renders as if C2's global
+ * heading styles weren't there — letting the player's own skin come through.
+ */
+.mobile-rider :is(h1, h2, h3, h4, h5, h6) {
+  font-size: revert;
+  font-weight: revert;
+  font-family: revert;
+  line-height: revert;
+  letter-spacing: revert;
+  margin: revert;
+  scroll-margin-top: revert;
+}
