@@ -1,5 +1,7 @@
 import { createTag } from '../../../utils/utils.js';
 
+const ICON_ARROW_RIGHT = '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false"><path d="M3.5 8H12.5M12.5 8L8.5 4M12.5 8L8.5 12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+
 let autoId = 0;
 
 function nextAutoId() {
@@ -85,10 +87,30 @@ function buildPills(pillsRow) {
   return pillsContainer;
 }
 
+// The mobile centered-peek gutter (see slider.css) is real padding on the track, so
+// `scrollLeft` never actually reaches 0 there — the first card's "resting" position
+// already sits past that leading gutter (see alignInitialScroll). 0 on desktop, where
+// there's no such padding.
+function getLeadingGutter(track) {
+  return parseFloat(getComputedStyle(track).paddingInlineStart) || 0;
+}
+
 function updateArrowState(track, prevBtn, nextBtn) {
+  const minScroll = getLeadingGutter(track);
   const maxScroll = track.scrollWidth - track.clientWidth;
-  prevBtn.disabled = track.scrollLeft <= 0;
+  prevBtn.disabled = track.scrollLeft <= minScroll;
   nextBtn.disabled = track.scrollLeft >= maxScroll - 1;
+}
+
+// scroll-snap-align only affects where the browser snaps *after* a scroll gesture —
+// it never auto-positions the initial scroll offset. Without this, the mobile
+// centered-peek gutter (padding-inline on .carousel-track) would just render as dead
+// blank space in front of the first card at scrollLeft: 0 on page load.
+function alignInitialScroll(track) {
+  if (track.dataset.scrollAligned) return;
+  const gutter = getLeadingGutter(track);
+  if (gutter > 0) track.scrollLeft = gutter;
+  track.dataset.scrollAligned = 'true';
 }
 
 function buildArrows(track) {
@@ -96,12 +118,12 @@ function buildArrows(track) {
     class: 'carousel-arrow carousel-arrow-prev',
     type: 'button',
     'aria-label': 'Previous',
-  }, '<span class="carousel-arrow-icon"></span>');
+  }, ICON_ARROW_RIGHT);
   const nextBtn = createTag('button', {
     class: 'carousel-arrow carousel-arrow-next',
     type: 'button',
     'aria-label': 'Next',
-  }, '<span class="carousel-arrow-icon"></span>');
+  }, ICON_ARROW_RIGHT);
 
   const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   const scrollByCard = (direction) => {
@@ -113,8 +135,19 @@ function buildArrows(track) {
   prevBtn.addEventListener('click', () => scrollByCard(-1));
   nextBtn.addEventListener('click', () => scrollByCard(1));
 
-  track.addEventListener('scroll', () => updateArrowState(track, prevBtn, nextBtn));
-  updateArrowState(track, prevBtn, nextBtn);
+  const refresh = () => updateArrowState(track, prevBtn, nextBtn);
+  track.addEventListener('scroll', refresh);
+  // The initial synchronous pass runs before the cards are decorated/sized, so the
+  // track's scrollWidth still equals its clientWidth and "next" would wrongly disable
+  // until the first scroll. Re-evaluate whenever the track or its cards change size
+  // (card decoration settling, images loading, viewport resize). Observing a card as
+  // well as the track catches the common case where only the track's scrollWidth
+  // grows while its own border-box stays fixed.
+  const resizeObserver = new ResizeObserver(refresh);
+  resizeObserver.observe(track);
+  const firstCard = track.querySelector('.card-c2');
+  if (firstCard) resizeObserver.observe(firstCard);
+  refresh();
 
   const arrowsContainer = createTag('div', { class: 'carousel-arrows' }, [prevBtn, nextBtn]);
   return arrowsContainer;
@@ -163,6 +196,7 @@ export default async function init(el) {
 
   const trackId = track.dataset.carouselId || el.dataset.carouselId || nextAutoId();
   track.dataset.carouselId = trackId;
+  alignInitialScroll(track);
 
   const { headingRow, pillsRow } = parseRows(el);
   const header = buildHeader(headingRow);

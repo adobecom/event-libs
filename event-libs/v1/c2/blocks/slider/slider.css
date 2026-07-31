@@ -68,13 +68,19 @@
   display: flex;
   justify-content: center;
   align-items: center;
-  width: 48px;
-  height: 48px;
-  border-radius: 30px;
-  background: rgb(0 0 0 / 64%);
-  border: 1px solid rgb(255 255 255 / 24%);
+  width: var(--s2a-spacing-2xl, 48px);
+  height: var(--s2a-spacing-2xl, 48px);
+  border-radius: var(--s2a-border-radius-round, 999px);
+  border: var(--s2a-border-width-sm, 1px) solid var(--s2a-color-transparent-white-24, rgb(255 255 255 / 24%));
+  background: var(--s2a-color-transparent-black-64, rgb(0 0 0 / 64%));
   backdrop-filter: blur(4px);
+  color: var(--s2a-color-gray-25, #fff);
   cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.carousel-arrow:hover {
+  background: var(--s2a-color-transparent-black-80, rgb(0 0 0 / 80%));
 }
 
 .carousel-arrow:disabled {
@@ -82,14 +88,8 @@
   cursor: default;
 }
 
-.carousel-arrow-icon {
-  width: 16px;
-  height: 16px;
-  background-color: #fff;
-  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M5 3l6 5-6 5' fill='none' stroke='%23fff' stroke-width='1.5'/%3E%3C/svg%3E") center / contain no-repeat;
-}
-
-.carousel-arrow-prev .carousel-arrow-icon {
+/* Same right-arrow icon, rotated — matches the Figma component (one asset, two directions). */
+.carousel-arrow-prev {
   transform: rotate(180deg);
 }
 
@@ -116,5 +116,18 @@
 @media (width <= 767px) {
   .carousel-arrows {
     padding-inline: 16px;
+  }
+
+  /* Centered-peek carousel: the focused card sits in the middle of the
+     viewport with the previous/next card peeking in on both sides — matches
+     card-c2's own 327px mobile default width (--card-min-width isn't visible
+     here since it's scoped to .card-c2, not the track). Desktop shows several
+     cards at once, so start-alignment (the base rule) still applies there. */
+  .carousel-track {
+    padding-inline: calc((100% - 327px) / 2);
+  }
+
+  .carousel-track > .card-c2 {
+    scroll-snap-align: center;
   }
 }
