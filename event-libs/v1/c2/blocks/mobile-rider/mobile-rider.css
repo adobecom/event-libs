@@ -67,12 +67,6 @@
   line-height: 1;
 }
 
-.marquee .asset .mobile-rider img,
-.marquee .asset .mobile-rider video {
-  max-width: none !important;
-  min-height: auto !important;
-}
-
 /* MAX 2026 (C2) rounds the MR player on desktop; mobile keeps squared corners
    (base rules above leave it square). This is the C2 copy of the block, so it
    only loads on C2 pages — no foundation-meta gate needed. Radius per the
