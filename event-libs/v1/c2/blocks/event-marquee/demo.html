@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<!--
+  Event Marquee — Dev Preview
+  Serve from project root, e.g.:
+    npx serve .   → http://localhost:3000/event-libs/v1/c2/blocks/event-marquee/demo.html
+
+  Runs standalone (no Milo/AEM, no real RainFocus backend):
+    - decorateButtons and decorateBlockBg (background handling) and Section Metadata's
+      getMetadata are local stubs (reused from the unit test fixtures) so config
+      parsing/background decoration work without a real Milo/AEM env
+    - session-store signals are seeded directly with mock data instead of a real fetch
+    - YouTube/MPC variants are faked as already-decorated `.milo-video` markup, since
+      the real decoration only happens inside Milo's own AUTO_BLOCKS pipeline
+    - The Mobile Rider variant uses a real mobilerider.com link and really self-inits
+      via processAutoBlockLinks — it just won't play, since there's no real video ID
+    - Ambient background video (.mp4#autoplay) is genuinely Milo's own AUTO_BLOCKS
+      decoration, so it can't be exercised here either — see the note at the bottom
+      for how to test that (and real YT/MPC/MR playback) against the real AEM dev
+      server with `foundation: c2` page metadata.
+-->
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Event Marquee — Dev Preview</title>
+  <link rel="stylesheet" href="event-marquee.css" />
+  <link rel="stylesheet" href="../../../features/toast/toast.css" />
+  <style>
+    * , *::before, *::after { box-sizing: border-box; }
+    body { margin: 0; font-family: adobe-clean, 'Source Sans Pro', sans-serif; background: #0d0d0d; color: #fff; }
+    .demo-nav { display: flex; align-items: center; gap: 20px; padding: 14px 24px; background: rgba(255,255,255,.06); border-bottom: 1px solid rgba(255,255,255,.1); position: sticky; top: 0; z-index: 10; flex-wrap: wrap; }
+    .demo-nav strong { font-size: 14px; color: #aaa; }
+    .demo-nav a { font-size: 13px; color: #58a6ff; text-decoration: none; }
+    .demo-nav a:hover { text-decoration: underline; }
+    .demo-surface { padding: 24px; max-width: 1280px; margin: 0 auto; }
+    .demo-surface h2 { font-size: 13px; letter-spacing: .08em; text-transform: uppercase; color: #888; margin: 0 0 6px; }
+    .demo-surface p.demo-note { font-size: 12px; color: #666; margin: 0 0 16px; }
+    .event-marquee { border: 1px dashed rgba(255,255,255,.2); margin-bottom: 48px; }
+    .event-marquee .event-marquee-media picture, .event-marquee .event-marquee-media img { background: #333; min-height: 240px; }
+    .event-marquee .event-marquee-media .milo-video, .event-marquee .event-marquee-media .mobile-rider { min-height: 240px; background: #222; display: flex; align-items: center; justify-content: center; color: #666; font-size: 13px; }
+    .section-metadata { display: none; }
+  </style>
+</head>
+<body>
+
+<nav class="demo-nav">
+  <strong>Event Marquee · Dev Preview</strong>
+  <a href="#text-cta-2cta">Text/CTA (2 CTAs)</a>
+  <a href="#text-cta-1cta">Text/CTA (1 CTA)</a>
+  <a href="#text-cta-no-bg">Text/CTA (no background row)</a>
+  <a href="#video-mr">Video: Mobile Rider</a>
+  <a href="#video-yt">Video: YouTube</a>
+  <a href="#video-mpc">Video: MPC</a>
+  <a href="#video-no-favorite">Video: favorite disabled</a>
+  <a href="#video-no-share">Video: share disabled</a>
+  <a href="#video-no-session">Video: no session-id</a>
+  <a href="#video-unmatched-session">Video: unmatched session-id</a>
+</nav>
+
+<!-- ══ TEXT/CTA — background image, primary + secondary CTA ══════════════ -->
+<section class="demo-surface" id="text-cta-2cta">
+  <h2>Text/CTA variant — 2 CTAs</h2>
+  <p class="demo-note">Row 1 = background (image), row 2 (foreground) = text only, no asset → auto-detected as Text/CTA.</p>
+  <div class="event-marquee">
+    <div>
+      <div>
+        <picture><img src="https://picsum.photos/seed/marquee1/1600/900" alt=""></picture>
+      </div>
+    </div>
+    <div>
+      <div>
+        <h2>Upcoming: Keynote Replay</h2>
+        <p>Catch the highlights from today's mainstage session, available on demand.</p>
+        <p><em><strong><a href="#register">Register now</a></strong></em></p>
+        <p><em><a href="#learn-more">Learn more</a></em></p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══ TEXT/CTA — single CTA ══════════════════════════════════════════════ -->
+<section class="demo-surface" id="text-cta-1cta">
+  <h2>Text/CTA variant — 1 CTA</h2>
+  <div class="event-marquee">
+    <div>
+      <div>
+        <picture><img src="https://picsum.photos/seed/marquee2/1600/900" alt=""></picture>
+      </div>
+    </div>
+    <div>
+      <div>
+        <h2>Day 2 starts tomorrow</h2>
+        <p>Set a reminder so you don't miss the opening session.</p>
+        <p><em><strong><a href="#remind-me">Remind me</a></strong></em></p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══ TEXT/CTA — single row, no background at all ═════════════════════ -->
+<section class="demo-surface" id="text-cta-no-bg">
+  <h2>Text/CTA variant — no background row</h2>
+  <p class="demo-note">Only one row authored → treated entirely as the foreground, no `.event-marquee-background` element at all.</p>
+  <div class="event-marquee">
+    <div>
+      <div>
+        <h2>Plain announcement</h2>
+        <p>No background authored — just text on the block's own default color.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══ VIDEO — Mobile Rider (real link, really self-inits, won't play) ══ -->
+<section class="demo-surface" id="video-mr">
+  <h2>Video variant — Mobile Rider</h2>
+  <p class="demo-note">Real mobilerider.com link → really self-inits via processAutoBlockLinks. Won't play (no real video ID/backend), but the surrounding scaffolding + actions bar are real.</p>
+  <div class="event-marquee">
+    <div>
+      <div>
+        <picture><img src="https://picsum.photos/seed/marquee-mr/1600/900" alt=""></picture>
+      </div>
+    </div>
+    <div>
+      <div>
+        <h2>Live now: Mainstage</h2>
+        <p>Join the keynote as it happens.</p>
+      </div>
+      <div>
+        <a href="https://www.mobilerider.com/embed?videoId=demo-live-123&skinId=default&autoplay=true">Watch live</a>
+      </div>
+    </div>
+  </div>
+  <div class="section-metadata">
+    <div><div>session-id</div><div>s-100</div></div>
+  </div>
+</section>
+
+<!-- ══ VIDEO — YouTube (faked as already-decorated, since Milo isn't running) ══ -->
+<section class="demo-surface" id="video-yt">
+  <h2>Video variant — YouTube</h2>
+  <p class="demo-note">Faked as pre-decorated `.milo-video` markup — real YouTube decoration only happens inside Milo's AUTO_BLOCKS pipeline, not available in this standalone demo.</p>
+  <div class="event-marquee">
+    <div>
+      <div>
+        <picture><img src="https://picsum.photos/seed/marquee-yt/1600/900" alt=""></picture>
+      </div>
+    </div>
+    <div>
+      <div>
+        <h2>Replay: Design Systems at Scale</h2>
+        <p>Missed it live? Watch the full session now.</p>
+      </div>
+      <div>
+        <div class="milo-video">(stand-in for Milo's real YouTube embed)</div>
+      </div>
+    </div>
+  </div>
+  <div class="section-metadata">
+    <div><div>session-id</div><div>s-201</div></div>
+  </div>
+</section>
+
+<!-- ══ VIDEO — MPC / tv.adobe.com (faked, same reason as YouTube) ══════════ -->
+<section class="demo-surface" id="video-mpc">
+  <h2>Video variant — MPC (tv.adobe.com)</h2>
+  <div class="event-marquee">
+    <div>
+      <div>
+        <picture><img src="https://picsum.photos/seed/marquee-mpc/1600/900" alt=""></picture>
+      </div>
+    </div>
+    <div>
+      <div>
+        <h2>Replay: What's New in Creative Cloud</h2>
+        <p>The full session, on demand.</p>
+      </div>
+      <div>
+        <div class="milo-video">(stand-in for Milo's real MPC embed)</div>
+      </div>
+    </div>
+  </div>
+  <div class="section-metadata">
+    <div><div>session-id</div><div>s-202</div></div>
+  </div>
+</section>
+
+<!-- ══ VIDEO — favorite explicitly disabled ═══════════════════════════════ -->
+<section class="demo-surface" id="video-no-favorite">
+  <h2>Video variant — favorite-enabled: false</h2>
+  <div class="event-marquee">
+    <div>
+      <div>
+        <picture><img src="https://picsum.photos/seed/marquee-nofav/1600/900" alt=""></picture>
+      </div>
+    </div>
+    <div>
+      <div><h2>Sponsor spotlight</h2><p>No favoriting on sponsor content.</p></div>
+      <div><div class="milo-video">(stand-in player)</div></div>
+    </div>
+  </div>
+  <div class="section-metadata">
+    <div><div>session-id</div><div>s-100</div></div>
+    <div><div>favorite-enabled</div><div>false</div></div>
+  </div>
+</section>
+
+<!-- ══ VIDEO — share explicitly disabled ══════════════════════════════════ -->
+<section class="demo-surface" id="video-no-share">
+  <h2>Video variant — share-enabled: false</h2>
+  <div class="event-marquee">
+    <div>
+      <div>
+        <picture><img src="https://picsum.photos/seed/marquee-noshare/1600/900" alt=""></picture>
+      </div>
+    </div>
+    <div>
+      <div><h2>Internal preview</h2><p>Not meant to be shared externally.</p></div>
+      <div><div class="milo-video">(stand-in player)</div></div>
+    </div>
+  </div>
+  <div class="section-metadata">
+    <div><div>session-id</div><div>s-100</div></div>
+    <div><div>share-enabled</div><div>false</div></div>
+  </div>
+</section>
+
+<!-- ══ VIDEO — no session-id authored → no Favorite button at all ═══════ -->
+<section class="demo-surface" id="video-no-session">
+  <h2>Video variant — no session-id authored</h2>
+  <p class="demo-note">No session-id row at all → Favorite button never renders (share still does).</p>
+  <div class="event-marquee">
+    <div>
+      <div>
+        <picture><img src="https://picsum.photos/seed/marquee-nosession/1600/900" alt=""></picture>
+      </div>
+    </div>
+    <div>
+      <div><h2>Ambient loop</h2><p>Just a background video, no associated session.</p></div>
+      <div><div class="milo-video">(stand-in player)</div></div>
+    </div>
+  </div>
+</section>
+
+<!-- ══ VIDEO — session-id authored but not in the mock session list ═════ -->
+<section class="demo-surface" id="video-unmatched-session">
+  <h2>Video variant — session-id doesn't match any known session</h2>
+  <p class="demo-note">Authored session-id is "s-999", which isn't in the seeded mock session list below → the Favorite slot stays empty (it's waiting on a session that will never resolve here).</p>
+  <div class="event-marquee">
+    <div>
+      <div>
+        <picture><img src="https://picsum.photos/seed/marquee-unmatched/1600/900" alt=""></picture>
+      </div>
+    </div>
+    <div>
+      <div><h2>Unknown session</h2><p>Demonstrates the "waiting to resolve" case.</p></div>
+      <div><div class="milo-video">(stand-in player)</div></div>
+    </div>
+  </div>
+  <div class="section-metadata">
+    <div><div>session-id</div><div>s-999</div></div>
+  </div>
+</section>
+
+<script type="module">
+  import { setEventConfig } from '/event-libs/v1/utils/utils.js';
+  import { sessions, auth, favorited } from '/event-libs/v1/utils/session-store.js';
+  import init from '/event-libs/v1/c2/blocks/event-marquee/event-marquee.js';
+
+  // Point miloLibs at tiny local stubs (reused from the unit test fixtures) so CTA
+  // decoration, background decoration, and Section Metadata parsing all work without
+  // a real Milo/AEM environment.
+  const miloLibs = `${window.location.origin}/test/unit/blocks/event-marquee/mocks/libs`;
+  setEventConfig({ miloConfig: { miloLibs } }, { miloLibs });
+
+  window.lana = { log: (msg) => console.warn('[lana]', msg) };
+  window.adobeIMS = { isSignedInUser: () => true };
+
+  // Seed the shared session-store directly (real fetch needs a rainfocus-api-url
+  // metadata + live backend, neither of which exist in this standalone demo).
+  sessions.value = [
+    { id: 's-100', rfCode: 'rf-100', title: 'Mainstage Keynote' },
+    { id: 's-201', rfCode: 'rf-201', title: 'Design Systems at Scale' },
+    { id: 's-202', rfCode: 'rf-202', title: "What's New in Creative Cloud" },
+  ];
+  auth.value = { isLoggedIn: true, isRegistered: true, userFirstName: 'Dev' };
+  favorited.value = new Set();
+
+  document.querySelectorAll('.event-marquee').forEach((el) => init(el));
+</script>
+</body>
+</html>
