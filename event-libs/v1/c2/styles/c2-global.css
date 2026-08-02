@@ -1,0 +1,38 @@
+/* stylelint-disable selector-class-pattern */
+
+/*
+ * Global C2 styles — loaded once per page, only when `foundation: c2`
+ * (see event-libs/scripts/scripts.js -> loadStyles, guarded by IS_C2).
+ *
+ * Unlike a block stylesheet (which loads only when its block is on the page),
+ * this file is the home for page-wide C2 concerns that can't belong to any one
+ * block. Rules here are additionally gated with
+ * `:root:has(meta[name="foundation"][content="c2"])` — Milo's own idiom (see
+ * libs/blocks/video/video.css) — so they stay inert on C1 pages even if this
+ * file is ever loaded there.
+ */
+
+/*
+ * MWPW-200847 (MR) / MPC / YouTube rounded corners.
+ *
+ * MAX 2026 (C2) rounds every embedded video player on desktop; C1 kept them
+ * squared, and mobile stays squared here too. YouTube and MPC (Adobe TV /
+ * "Media Publishing Cloud") are Milo AUTO_BLOCKS we can't copy into our c2/
+ * folder — but both render their iframe into Milo's shared `.milo-video`
+ * wrapper (libs/blocks/youtube/youtube.js, libs/blocks/adobetv/adobetv.js), so
+ * a single rule on `.milo-video` rounds both, wherever they appear on the page
+ * (marquee, split-marquee, or anywhere else) — not just inside one block.
+ *
+ * Radius per the Figma SSOT (24px, matching the MR HP_Player). `overflow:
+ * hidden` clips the iframe's square corners to the rounded wrapper. The 1024px
+ * cutoff is the C2 "not mobile" boundary; below it the player keeps square
+ * corners, per the ticket. Milo does NOT round `.milo-video` itself — its only
+ * C2 video rounding is the 4px play-pause button (video.css), not the frame —
+ * so this is additive, not an override.
+ */
+@media (min-width: 1024px) {
+  :root:has(meta[name="foundation"][content="c2"]) .milo-video {
+    border-radius: var(--s2a-border-radius-24, 24px);
+    overflow: hidden;
+  }
+}
