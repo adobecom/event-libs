@@ -1,5 +1,7 @@
 /* stylelint-disable selector-class-pattern */
 
+@import '../../styles/tokens.css';
+
 /* Mobile Rider Player Styles */
 
 .mobile-rider {
@@ -10,7 +12,10 @@
   box-sizing: border-box;
 }
 
-.mobile-rider .mobile-rider-container { position: relative; }
+.mobile-rider .mobile-rider-container {
+  position: relative;
+  width: 100%;
+}
 
 .mobile-rider .mobile-rider-container .mr-poster {
   position: absolute;
@@ -58,11 +63,21 @@
    split-marquee embed; the 375px mobile frame is squared). overflow: hidden
    clips the square video/poster to the rounded wrapper. The 1024px cutoff is
    the C2 "not mobile" boundary the marquee itself uses — adjust here if design
-   wants the mobile/desktop switch at a different width. */
+   wants the mobile/desktop switch at a different width.
+
+   max-width/margin here cover the standalone full-bleed placement (e.g. the
+   livestream "State A" homepage moment: Mobile Rider authored on its own, no
+   event-marquee involved) — edge-to-edge below 1024px per the Figma mobile
+   frame, capped and centered above it per the C2 "rich media content measure"
+   token, which steps through the same values Figma uses at each breakpoint
+   (848 / 1192 / 1480) rather than a single hardcoded width only correct at
+   exactly 1440px. */
 @media (min-width: 1024px) {
   .mobile-rider .mobile-rider-container {
     border-radius: var(--s2a-border-radius-24, 24px);
     overflow: hidden;
+    max-width: var(--s2a-layout-rich-media-content-measure-wide, 1192px);
+    margin: 0 auto;
   }
 }
 
