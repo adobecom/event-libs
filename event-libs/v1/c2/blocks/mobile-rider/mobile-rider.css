@@ -12,6 +12,23 @@
   box-sizing: border-box;
 }
 
+/*
+ * Width-capping lives here (the outer block), not on .mobile-rider-container
+ * (the inner box that has border-radius + overflow: hidden). Confirmed by
+ * testing: putting max-width on the SAME element as border-radius +
+ * overflow: hidden breaks <video> clipping at the bottom edge (the video's
+ * bottom corners render square) — moving max-width to this outer wrapper and
+ * letting the container simply be width: 100% of it avoids the bug entirely.
+ * contain: paint was tried on the container as a fix and did not resolve it,
+ * confirming this is specifically about max-width + border-radius +
+ * overflow: hidden coexisting on one element, not a general compositing fix.
+ */
+@media (min-width: 1024px) {
+  .mobile-rider {
+    max-width: var(--s2a-layout-rich-media-content-measure-wide, 1192px);
+  }
+}
+
 .mobile-rider .mobile-rider-container {
   position: relative;
   width: 100%;
@@ -65,27 +82,12 @@
    the C2 "not mobile" boundary the marquee itself uses — adjust here if design
    wants the mobile/desktop switch at a different width.
 
-   max-width/margin here cover the standalone full-bleed placement (e.g. the
-   livestream "State A" homepage moment: Mobile Rider authored on its own, no
-   event-marquee involved) — edge-to-edge below 1024px per the Figma mobile
-   frame, capped and centered above it per the C2 "rich media content measure"
-   token, which steps through the same values Figma uses at each breakpoint
-   (848 / 1192 / 1480) rather than a single hardcoded width only correct at
-   exactly 1440px.
-
-   contain: paint forces the video's compositing layer to actually respect
-   this box's rounded clip — without it, the <video> element's bottom edge
-   can render past the rounded corners once max-width narrows the container
-   after the video has already started playing (a known browser quirk with
-   border-radius + overflow: hidden on video elements that get resized after
-   first paint). */
+   No max-width here — see the .mobile-rider rule above for why the
+   width-capping deliberately lives on the outer element instead. */
 @media (min-width: 1024px) {
   .mobile-rider .mobile-rider-container {
     border-radius: var(--s2a-border-radius-24, 24px);
     overflow: hidden;
-    max-width: var(--s2a-layout-rich-media-content-measure-wide, 1192px);
-    margin: 0 auto;
-    contain: paint;
   }
 }
 
