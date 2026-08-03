@@ -1,0 +1,111 @@
+/* stylelint-disable selector-class-pattern */
+
+@import '../../styles/tokens.css';
+
+/* Mobile Rider Player Styles */
+
+.mobile-rider {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  margin: 0 auto;
+  box-sizing: border-box;
+}
+
+/*
+ * Width-capping lives here (the outer block), not on .mobile-rider-container
+ * (the inner box that has border-radius + overflow: hidden). Confirmed by
+ * testing: putting max-width on the SAME element as border-radius +
+ * overflow: hidden breaks <video> clipping at the bottom edge (the video's
+ * bottom corners render square) — moving max-width to this outer wrapper and
+ * letting the container simply be width: 100% of it avoids the bug entirely.
+ * contain: paint was tried on the container as a fix and did not resolve it,
+ * confirming this is specifically about max-width + border-radius +
+ * overflow: hidden coexisting on one element, not a general compositing fix.
+ */
+@media (min-width: 1024px) {
+  .mobile-rider {
+    max-width: var(--s2a-layout-rich-media-content-measure-wide, 1192px);
+  }
+}
+
+.mobile-rider .mobile-rider-container {
+  position: relative;
+  width: 100%;
+}
+
+.mobile-rider .mobile-rider-container .mr-poster {
+  position: absolute;
+  inset: 0;
+  object-fit: cover;
+  display: block;
+}
+
+.mobile-rider > :not(.mobile-rider-player) {
+  display: none;
+}
+
+.mobile-rider .mobile-rider-container.is-hidden {
+  display: none;
+}
+
+.mobile-rider .mobile-rider-container.isASL {
+  position: relative;
+  width: 100%;
+  padding-bottom: 56.25%;
+}
+
+.mobile-rider .mobile-rider-container video {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.mobile-rider h2#title_container {
+  line-height: 1;
+}
+
+/* MAX 2026 (C2) rounds the MR player on desktop; mobile keeps squared corners
+   (base rules above leave it square). This is the C2 copy of the block, so it
+   only loads on C2 pages — no foundation-meta gate needed. Radius per the
+   Figma SSOT (HP_Player cornerRadius = 24px, both the full-takeover and the
+   split-marquee embed; the 375px mobile frame is squared). overflow: hidden
+   clips the square video/poster to the rounded wrapper. The 1024px cutoff is
+   the C2 "not mobile" boundary the marquee itself uses — adjust here if design
+   wants the mobile/desktop switch at a different width.
+
+   No max-width here — see the .mobile-rider rule above for why the
+   width-capping deliberately lives on the outer element instead. */
+@media (min-width: 1024px) {
+  .mobile-rider .mobile-rider-container {
+    border-radius: var(--s2a-border-radius-24, 24px);
+    overflow: hidden;
+  }
+}
+
+/*
+ * The MobileRider player ships its own skin (adobe-skin.min.css, loaded at
+ * runtime from mobilerider.com) that styles its overlay headings — e.g.
+ * `.overlays-wrapper .titlecontainer h1`. But Milo's C2 global typography
+ * (`h1, h2, .heading-*` in libs/c2/styles/styles.css) uses bare element
+ * selectors that ALSO match those headings and force values the skin doesn't
+ * set (letter-spacing, line-height, font-weight...), cramping the player title.
+ *
+ * Scoping this reset to `.mobile-rider :is(h1..h6)` gives it specificity
+ * (0,1,1): higher than C2's bare `h1` (0,0,1), so it wins over the C2 leak, but
+ * lower than the skin's own `.overlays-wrapper .titlecontainer h1` (0,2,1), so
+ * the skin still wins on everything it sets. `revert` rolls the leaked
+ * properties back to the browser default — i.e. renders as if C2's global
+ * heading styles weren't there — letting the player's own skin come through.
+ */
+.mobile-rider :is(h1, h2, h3, h4, h5, h6) {
+  font-size: revert;
+  font-weight: revert;
+  font-family: revert;
+  line-height: revert;
+  letter-spacing: revert;
+  margin: revert;
+  scroll-margin-top: revert;
+}
