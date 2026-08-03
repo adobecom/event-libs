@@ -63,6 +63,31 @@
   height: 100%;
 }
 
+/*
+ * Carried over from the classic (non-C2) block — dropped by mistake in the
+ * initial C2 copy. If this block is authored inside a Milo Marquee's asset
+ * cell (e.g. the split-marquee embed), Milo's own marquee.css out-specifies
+ * the rule above: `.marquee.split .asset video` is (0,3,1) vs. this file's
+ * `.mobile-rider .mobile-rider-container video` at (0,2,1), and sets
+ * `max-height: 360px`; at >=1200px, `.marquee .asset video` (also more
+ * specific) adds `max-width: initial; min-height: 150px`. All three win on
+ * specificity alone, clamping the video instead of filling the rounded,
+ * overflow: hidden container — defeating the corner-rounding this block
+ * ships. `!important` guarantees this wins regardless of exactly how
+ * specific Milo's marquee selectors are (or become later), rather than
+ * relying on a specificity arms race. max-height is new here — the classic
+ * block's original version of this rule didn't set it, but the split
+ * variant's max-height: 360px needs neutralizing too, or the video still
+ * gets capped short of filling the container even with max-width/min-height
+ * fixed.
+ */
+.marquee .asset .mobile-rider img,
+.marquee .asset .mobile-rider video {
+  max-width: none !important;
+  min-height: auto !important;
+  max-height: none !important;
+}
+
 .mobile-rider h2#title_container {
   line-height: 1;
 }
