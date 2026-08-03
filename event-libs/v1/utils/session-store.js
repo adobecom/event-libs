@@ -18,6 +18,10 @@ export const favorited = signal(new Set());
 export const scheduled = signal(new Set());
 export const auth = signal({ isLoggedIn: null, isRegistered: undefined, userFirstName: null });
 export const pendingActions = signal(new Set());
+// Set by openSessionGuideDetail() below; sessions-guide's DrawerShell subscribes to open
+// its detail view for the given session. A new object on every call (even repeat calls
+// for the same sessionId) so the signal always notifies.
+export const sessionGuideRequest = signal(null);
 
 let initialized = false;
 let apiConfig = null;
@@ -114,6 +118,15 @@ async function loadSessions() {
 
 export function getApiConfig() {
   return apiConfig;
+}
+
+// General-purpose entry point for any block to open Session Guide directly to a
+// session's detail view (e.g. a card click in Upcoming Sessions/Featured Sessions),
+// without duplicating Session Guide's internal drawer/URL logic. No-ops if the
+// sessions-guide block isn't authored/mounted on the current page — the caller is
+// expected to know it's present, same as it must for the session data itself.
+export function openSessionGuideDetail(sessionId) {
+  sessionGuideRequest.value = { sessionId };
 }
 
 // Idempotent — safe to call multiple times; no-ops after the first successful init

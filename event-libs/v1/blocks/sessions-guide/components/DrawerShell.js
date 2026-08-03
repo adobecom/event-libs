@@ -1,14 +1,29 @@
 import { html, useEffect, useRef, useState } from '../../../deps/htm-preact.js';
 import { useSessionGuide } from '../store/index.js';
-import { sessions, sessionsStatus, auth } from '../../../utils/session-store.js';
+import {
+  sessions, sessionsStatus, auth, sessionGuideRequest,
+} from '../../../utils/session-store.js';
 import { DrawerHeader } from './DrawerHeader.js';
 import { ViewRouter } from './ViewRouter.js';
 import { SessionDetailOverlay } from './SessionDetailOverlay.js';
 import { FilterPanel } from './FilterPanel.js';
-import { setSessionsParam, clearSessionParams } from '../utils/url.js';
+import { setSessionParam, setSessionsParam, clearSessionParams } from '../utils/url.js';
 
 // No top gap on mobile/tablet (drawer covers the full screen); 20px gap on desktop.
 const getTopMargin = () => (window.matchMedia('(max-width: 1279px)').matches ? 0 : 20);
+
+// Pure decision logic for the openSessionGuideDetail(sessionId) external API, kept
+// separate from the useEffect below so it's directly unit-testable.
+export function resolveSessionGuideRequest(request, { sessionsStatusValue, sessionsValue, authValue }) {
+  if (!request || sessionsStatusValue !== 'ready') return null;
+  const found = sessionsValue.find((s) => s.id === request.sessionId);
+  if (!found) return { found: false, sessionId: request.sessionId };
+  return {
+    found: true,
+    sessionId: found.id,
+    defaultView: authValue.isRegistered ? 'my-sessions' : 'live-upcoming',
+  };
+}
 
 export function DrawerShell() {
   const { state, dispatch } = useSessionGuide();
@@ -147,6 +162,27 @@ export function DrawerShell() {
     const found = sessions.value.find((s) => s.rfCode === rfCode || s.id === sessionParam);
     if (found) dispatch({ type: 'SET_ACTIVE_SESSION', sessionId: found.id });
   }, [sessionsStatus.value]);
+
+  // External API: other blocks call openSessionGuideDetail(sessionId) (session-store.js) to
+  // open us straight to a session's detail view. sessions/sessionsStatus are the same
+  // page-level signals a caller's own session data comes from, so by the time a card is
+  // clickable, sessions are already 'ready' here too — no buffering needed for a request
+  // that arrives before load.
+  useEffect(() => sessionGuideRequest.subscribe((request) => {
+    const result = resolveSessionGuideRequest(request, {
+      sessionsStatusValue: sessionsStatus.value,
+      sessionsValue: sessions.value,
+      authValue: auth.value,
+    });
+    if (!result) return;
+    if (!result.found) {
+      window.lana?.log(`[sessions-guide] openSessionGuideDetail: session "${result.sessionId}" not found`);
+      return;
+    }
+    dispatch({ type: 'SET_DRAWER', drawer: 'expanded', defaultView: result.defaultView });
+    dispatch({ type: 'SET_ACTIVE_SESSION', sessionId: result.sessionId });
+    history.pushState({}, '', setSessionParam(result.sessionId));
+  }), []);
 
   // Keep sessionsRef current so the popstate handler always sees the latest list
   const sessionsRef = useRef(sessions.value);
