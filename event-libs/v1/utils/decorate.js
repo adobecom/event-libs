@@ -26,6 +26,8 @@ import {
   createTag,
   getValidCampaignIdFromUrl,
   shouldForceGuestSignIn,
+  LIBS,
+  loadStyle,
 } from './utils.js';
 import { massageMetadata } from './date-time-helper.js';
 import { hydrateBlocks, setHydrationPromise } from '../hydrate/hydrate.js';
@@ -401,6 +403,31 @@ const regHashCallbacks = {
         }
       });
     }
+  },
+  '#open-camera': (a) => {
+    if (a.dataset.cameraCtaInitialized === 'true') return;
+    a.dataset.cameraCtaInitialized = 'true';
+    a.classList.add('camera-cta-btn');
+
+    a.addEventListener('click', async (e) => {
+      e.preventDefault();
+      const miloLibs = getEventConfig()?.miloConfig?.miloLibs || LIBS;
+      const cameraModalCssUrl = new URL('../blocks/camera-modal/camera-modal.css', import.meta.url).href;
+
+      const [{ getModal, closeModal }, { default: initCameraModal }] = await Promise.all([
+        import(`${miloLibs}/blocks/modal/modal.js`),
+        import('../blocks/camera-modal/camera-modal.js'),
+        new Promise((resolve) => { loadStyle(cameraModalCssUrl, resolve); }),
+      ]);
+
+      const content = createTag('div', { class: 'camera-modal' });
+      await initCameraModal(content);
+
+      let dialogEl;
+      content.addEventListener('camera-modal:close', () => closeModal(dialogEl));
+
+      dialogEl = await getModal(null, { id: 'camera-modal', content, class: 'camera-modal' });
+    });
   },
 };
 

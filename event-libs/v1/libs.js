@@ -22,6 +22,7 @@ const EVENT_BLOCKS = [
   'sessions-guide',
   'sessions-guide-full-page',
   'session-state-demo',
+  'camera-modal',
 ];
 
 const EVENT_BLOCKS_C2 = [
