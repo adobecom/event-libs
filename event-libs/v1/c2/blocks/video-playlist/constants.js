@@ -21,6 +21,11 @@ export const MAX_PERCENTAGE = 100;
 // inside it. If absent, the drawer falls back to sitting below the player.
 export const DRAWER_ANCHOR_SELECTOR = '.playlist-drawer-anchor';
 export const DRAWER_TITLE_SELECTOR = 'h1, h2, h3';
+// Only this many lines of the title are guaranteed above the drawer. A title
+// that wraps further is allowed to have its extra lines covered — at least
+// this many lines still peek above the drawer, per design direction
+// (previously the whole title, however many lines, always stayed visible).
+export const DRAWER_TITLE_MAX_LINES = 2;
 // Floor fallback (px) used only if the drawer header can't be measured. The real
 // floor is the header's own rendered height — title visibility wins, so the
 // drawer shrinks to keep the whole title above it but never below its header.

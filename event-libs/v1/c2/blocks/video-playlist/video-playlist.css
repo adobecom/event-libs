@@ -952,7 +952,15 @@
 }
 
 /* Mobile Responsive — playlist becomes a fixed, collapsible bottom drawer */
-@media (max-width: 768px) {
+
+/*
+ * Portrait-only: in landscape, revert to the horizontal (row) layout above,
+ * even below 768px width — per design direction, the fixed-bottom drawer is
+ * a portrait-specific treatment, not a width-only one. The matching JS check
+ * (computeDrawerCap's isDrawerActive) uses the same two conditions so the
+ * body's reserved bottom padding and this CSS never disagree.
+ */
+@media (max-width: 768px) and (orientation: portrait) {
   /* Stack the player on top; the playlist is pulled out of flow into a drawer. */
   .video-playlist {
     flex-direction: column;

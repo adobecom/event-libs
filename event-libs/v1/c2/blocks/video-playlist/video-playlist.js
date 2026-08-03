@@ -18,6 +18,7 @@ import {
   DEFAULT_DRAWER_HEADER_HEIGHT,
   DRAWER_TITLE_GAP_PX,
   DRAWER_CAP_CSS_VAR,
+  DRAWER_TITLE_MAX_LINES,
 } from './constants.js';
 import {
   getSessions,
@@ -83,6 +84,18 @@ const DEFAULT_CFG = {
 export function computeDrawerCapPx(viewportH, referenceBottom, { floor, gap }) {
   if (referenceBottom == null) return Math.round(viewportH * 0.7);
   return Math.max(floor, viewportH - referenceBottom - gap);
+}
+
+/**
+ * Clamps a title's rendered bottom to at most `maxLines` lines, so a title
+ * that wraps further doesn't push the drawer down to keep every line visible
+ * — the extra lines are allowed to sit behind the drawer, with only the first
+ * `maxLines` guaranteed to peek above it. Never extends past the title's own
+ * real bottom, so a title with fewer lines than `maxLines` is unaffected.
+ * @returns {number} the clamped bottom, in the same coordinate space as `top`
+ */
+export function clampedTitleBottom(top, height, lineHeightPx, maxLines) {
+  return top + Math.min(height, lineHeightPx * maxLines);
 }
 
 const getMeta = (root) =>
@@ -445,20 +458,20 @@ class VideoPlaylist {
 
   /**
    * Caps the expanded drawer so it sits just below the session title (keeping
-   * the title visible), falling back to below the player when no title anchor is
-   * present, and to a plain viewport fraction if neither is found. Title
-   * visibility wins: the floor is the drawer's own header height, so it shrinks
-   * to keep the whole title above it but never below its header. Writes the
-   * result into a CSS custom property the mobile drawer CSS consumes.
+   * at most DRAWER_TITLE_MAX_LINES of it visible — a title that wraps further
+   * can have the drawer overlap the extra lines), falling back to below the
+   * player when no title anchor is present, and to a plain viewport fraction
+   * if neither is found. The floor is the drawer's own header height, so it
+   * never shrinks below its header. Writes the result into a CSS custom
+   * property the mobile drawer CSS consumes.
    */
   computeDrawerCap() {
     const viewportH = window.innerHeight;
 
-    // Floor = the drawer's own header height. Title visibility wins: the drawer
-    // shrinks to keep the whole title above it, but never below its header
-    // (title + chevron), so it always stays usable/expandable. (Previously the
-    // floor was a fixed % of the viewport, which could win over a tall title and
-    // cover it — reversed here, per design direction: title always wins.)
+    // Floor = the drawer's own header height, so it never shrinks below its
+    // header (title + chevron) and stays usable/expandable. (Previously the
+    // floor was a fixed % of the viewport, which could win over a tall title
+    // and cover it — reversed here, per design direction: title always wins.)
     const header = this.root.querySelector('.header');
     const headerH = header ? header.offsetHeight : DEFAULT_DRAWER_HEADER_HEIGHT;
     const floor = headerH;
@@ -468,11 +481,26 @@ class VideoPlaylist {
     // the element's position as seen with the page scrolled to the top.
     const docBottomOf = (el) => (el ? el.getBoundingClientRect().bottom + window.scrollY : null);
 
+    // Same idea, but clamped to at most DRAWER_TITLE_MAX_LINES — a title
+    // wrapping to more lines than that only guarantees those first lines
+    // stay above the drawer, not the whole thing.
+    const clampedTitleDocBottom = (el) => {
+      if (!el) return null;
+      const rect = el.getBoundingClientRect();
+      const { lineHeight, fontSize } = getComputedStyle(el);
+      const parsedLineHeight = parseFloat(lineHeight);
+      const lineHeightPx = Number.isNaN(parsedLineHeight)
+        ? parseFloat(fontSize) * 1.2
+        : parsedLineHeight;
+      return clampedTitleBottom(rect.top, rect.height, lineHeightPx, DRAWER_TITLE_MAX_LINES)
+        + window.scrollY;
+    };
+
     const anchor = document.querySelector(this.cfg.drawerAnchor);
     const title = anchor?.querySelector(DRAWER_TITLE_SELECTOR);
     const player = [...this.el.children].find((child) => child.querySelector?.('.milo-video'));
 
-    const referenceBottom = docBottomOf(title) ?? docBottomOf(player);
+    const referenceBottom = clampedTitleDocBottom(title) ?? docBottomOf(player);
     const cap = computeDrawerCapPx(viewportH, referenceBottom, {
       floor,
       gap: DRAWER_TITLE_GAP_PX,
@@ -485,10 +513,12 @@ class VideoPlaylist {
     if (header) {
       this.root.style.setProperty('--playlist-drawer-collapsed-height', `${headerH}px`);
       // Reserve space at the bottom of the page so the fixed collapsed bar never
-      // covers the last of the page's own content. Only on mobile, where the
-      // drawer is fixed; reset in cleanup.
-      const isMobile = window.matchMedia('(max-width: 768px)').matches;
-      document.body.style.paddingBottom = isMobile ? `${headerH}px` : '';
+      // covers the last of the page's own content. Only when the drawer CSS is
+      // actually active (mobile width AND portrait — landscape reverts to the
+      // horizontal layout, see the matching media query in the CSS); reset in
+      // cleanup.
+      const isDrawerActive = window.matchMedia('(max-width: 768px) and (orientation: portrait)').matches;
+      document.body.style.paddingBottom = isDrawerActive ? `${headerH}px` : '';
     }
   }
 
