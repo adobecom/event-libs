@@ -46,6 +46,13 @@ describe('services/sessions/rainfocus', () => {
       expect(lastRequest.startsWith(DEFAULT_RF_API_URL)).to.be.true;
     });
 
+    it('appends endpoint to rfApiUrl even when it is missing a trailing slash', async () => {
+      stubFetch({ mySchedule: [] });
+      await fetchScheduled(null, null, 'profile-1', 'https://example.com/rf');
+      const url = new URL(lastRequest);
+      expect(url.origin + url.pathname).to.equal('https://example.com/rf/mySchedule');
+    });
+
     it('returns an empty array when mySchedule is missing from the response', async () => {
       stubFetch({});
       const result = await fetchScheduled(null, null, 'profile-1', 'https://example.com/rf/');

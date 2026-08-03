@@ -10,12 +10,10 @@
 // rfAuthToken/clientId are still sourced elsewhere (see session-store.js's
 // "TODO: replace null credentials" markers) and simply passed through here.
 
-// TODO(MWPW-200311): confirm the real schedule/favorites path segment with the
-// platform/RF team before relying on this default. Only a sibling RF proxy route
-// (`rf-auth-seq-generic`, in milo's mep/addons/event.js) is confirmed live under
-// this `www.adobe.com/events/api/` family — this is a non-crashing placeholder,
-// not a verified production endpoint.
-export const DEFAULT_RF_API_URL = 'https://www.adobe.com/events/api/rainfocus/';
+// Confirmed live (MAX 2025 curl examples, MWPW-200311): www.adobe.com reverse-proxies
+// this path to RF's real backend, sidestepping CORS/RF's IP allowlist the same way the
+// legacy northstar client's `max-api` endpoint did.
+export const DEFAULT_RF_API_URL = 'https://www.adobe.com/max-api/';
 
 // TODO(MWPW-200311): placeholder only — replace with the real default event's
 // RainFocus profile id once confirmed. Per the Jira thread this isn't a secret:
@@ -31,7 +29,11 @@ const ENDPOINTS = {
 };
 
 function buildUrl(rfApiUrl, endpoint, params) {
-  const url = new URL(endpoint, rfApiUrl || DEFAULT_RF_API_URL);
+  const base = rfApiUrl || DEFAULT_RF_API_URL;
+  // An author-authored rfApiUrl missing its trailing slash (e.g. ".../max-api" instead of
+  // ".../max-api/") would otherwise have its last path segment replaced by `endpoint`
+  // rather than appended to it, per URL's normal relative-resolution rules.
+  const url = new URL(endpoint, base.endsWith('/') ? base : `${base}/`);
   Object.entries(params).forEach(([key, value]) => {
     if (value !== undefined && value !== null && value !== '') url.searchParams.set(key, value);
   });

@@ -113,7 +113,7 @@ One shared DA sheet per content-repo at
   "eventId": "...",
   "backendEventTitle": "...",
   "eventServiceEnv": "dev",
-  "rfApiUrl": "https://www.adobe.com/events/api/rainfocus/",
+  "rfApiUrl": "https://www.adobe.com/max-api/",
   "rfProfileId": "...",
   "config": {
     "eventId": "...",
@@ -132,7 +132,7 @@ One shared DA sheet per content-repo at
 
 **`eventServiceEnv`, added 2026-07-24 (bug fix, per Daniel).** Row-level only — never stamped into `config`, since it's an authoring-time detail (which ESP tier this event's data came from), irrelevant to the live page that eventually reads `config`. Captured from the active environment picker selection when a row is created (`Library.js` reads it off `EventEnvContext`), and restored via `setEnv()` whenever that row is reopened for Edit. Fixes a real bug: without this, a full page reload reset the env override to its default (prod), so editing a Dev-authored row after a reload silently refetched its session catalog from Prod instead.
 
-**`rfApiUrl`/`rfProfileId`, added for [MWPW-200311](https://jira.corp.adobe.com/browse/MWPW-200311).** Row-level, like `eventServiceEnv` — but for a different reason: the live page reads these as their own separate `rainfocus-api-url`/`rainfocus-api-profile-id` metadata rows (`event-libs/v1/utils/session-store.js`), not nested inside the `tier-1-event-config` JSON blob, so `ConfigEditor.js` gives them their own "Copy RainFocus metadata rows" action rather than folding them into "Copy config". Never carried over on Duplicate (`startDuplicateConfig` always resets them blank) — unlike a style setting such as `trackIcons`, silently reusing another event's RainFocus profile id would misroute this new event's live schedule/favorites calls at the wrong RF profile. Leaving both blank is fine: `session-store.js` falls back to a hardcoded default profile id (`DEFAULT_RF_PROFILE_ID` in `event-libs/v1/services/sessions/rainfocus.js`) so calls don't silently send `profileId: undefined` — see that file's `TODO(MWPW-200311)` markers for the placeholder values still awaiting confirmation from the platform/RainFocus team.
+**`rfApiUrl`/`rfProfileId`, added for [MWPW-200311](https://jira.corp.adobe.com/browse/MWPW-200311).** Row-level, like `eventServiceEnv` — but for a different reason: the live page reads these as their own separate `rainfocus-api-url`/`rainfocus-api-profile-id` metadata rows (`event-libs/v1/utils/session-store.js`), not nested inside the `tier-1-event-config` JSON blob, so `ConfigEditor.js` gives them their own "Copy RainFocus metadata rows" action rather than folding them into "Copy config". Never carried over on Duplicate (`startDuplicateConfig` always resets them blank) — unlike a style setting such as `trackIcons`, silently reusing another event's RainFocus profile id would misroute this new event's live schedule/favorites calls at the wrong RF profile. Leaving `rfApiUrl` blank is fine: it falls back to `DEFAULT_RF_API_URL` (`https://www.adobe.com/max-api/`, confirmed live against real MAX 2025 traffic) in `event-libs/v1/services/sessions/rainfocus.js`. Leaving `rfProfileId` blank also falls back to a hardcoded default (`DEFAULT_RF_PROFILE_ID`, same file) so calls don't silently send `profileId: undefined` — but that one's still a placeholder awaiting a real default-event value (see that file's `TODO(MWPW-200311)` marker).
 
 `config` is the exact value an author copies into their event page's own
 `tier-1-event-config` metadata row — this app never touches the page itself.

@@ -193,7 +193,7 @@ export default function ConfigEditor() {
           id="tec-rf-api-url"
           type="text"
           class="tec-field tec-editor__rf-input"
-          placeholder="https://www.adobe.com/events/api/rainfocus/"
+          placeholder="https://www.adobe.com/max-api/"
           value=${activeConfig.rfApiUrl || ''}
           onInput=${(e) => updateRfField('rfApiUrl', e.target.value)}
         />
