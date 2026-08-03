@@ -1,6 +1,8 @@
 import { expect } from '@esm-bundle/chai';
 import init, { resolveClickAction, buildCard } from '../../../../../event-libs/v1/c2/blocks/upcoming-sessions/upcoming-sessions.js';
-import { scheduled, favorited, pendingActions, liveStreamActiveIds } from '../../../../../event-libs/v1/utils/session-store.js';
+import {
+  scheduled, favorited, pendingActions, liveStreamActiveIds,
+} from '../../../../../event-libs/v1/utils/session-store.js';
 
 function buildSectionMetadata(entries) {
   const el = document.createElement('div');
@@ -50,6 +52,8 @@ function session(overrides = {}) {
     sessionLengthInMinutes: 60,
     url: 'https://example.com/sessions/s-001',
     tags: 'Design,Illustration',
+    track: 'Video',
+    category: 'video',
     sessionTimes: [{
       sessionTimeId: 'time-1',
       sessionId: 'session-1',
@@ -181,10 +185,10 @@ describe('upcoming-sessions', () => {
   });
 
   describe('buildCard', () => {
-    it('uses the sessions-guide sg-live-card classes and shows the session title', () => {
+    it('uses the sessions-guide sg-card classes and shows the session title', () => {
       const card = buildCard(session());
-      expect(card.classList.contains('sg-live-card')).to.equal(true);
-      expect(card.querySelector('.sg-live-card__title').textContent).to.equal('Intro to Adobe Express');
+      expect(card.classList.contains('sg-card')).to.equal(true);
+      expect(card.querySelector('.sg-card__title').textContent).to.equal('Intro to Adobe Express');
     });
 
     it('always renders the upcoming state, never a live badge — cards are dropped on start instead of switching to live', () => {
@@ -196,13 +200,13 @@ describe('upcoming-sessions', () => {
         }],
       });
       const card = buildCard(started);
-      expect(card.querySelector('.sg-live-card__time').textContent).to.not.equal('Live Now');
-      expect(card.querySelector('.sg-live-card__btn--schedule')).to.not.equal(null);
+      expect(card.querySelector('.sg-card__time').textContent).to.not.equal('Live Now');
+      expect(card.querySelector('.sg-card__btn--schedule')).to.not.equal(null);
     });
 
     it('shows the schedule button for an upcoming session', () => {
       const card = buildCard(session());
-      expect(card.querySelector('.sg-live-card__btn--schedule')).to.not.equal(null);
+      expect(card.querySelector('.sg-card__btn--schedule')).to.not.equal(null);
     });
 
     it('routes a card click to the session-guide deep link regardless of session start time', () => {
@@ -220,10 +224,36 @@ describe('upcoming-sessions', () => {
       let pushedUrl = null;
       window.history.pushState = (state, title, url) => { pushedUrl = url; };
 
-      document.querySelector('.sg-live-card').click();
+      document.querySelector('.sg-card').click();
       window.history.pushState = originalPushState;
 
       expect(pushedUrl).to.contain('session=session-1');
+    });
+
+    it('renders a resolved category badge in the badge-row and repeats it in the footer, alongside the plain track label and time', () => {
+      const card = buildCard(session());
+
+      const topBadge = card.querySelector('.sg-card__badge-row .sg-category-badge');
+      expect(topBadge).to.not.equal(null);
+      expect(topBadge.querySelector('.sg-category-badge__label').textContent).to.equal('Video');
+
+      const footer = card.querySelector('.sg-card__footer');
+      expect(footer.querySelector('.sg-card__track--footer').textContent).to.equal('Video');
+      expect(footer.querySelector('.sg-card__footer-badge .sg-category-badge__label').textContent).to.equal('Video');
+      expect(footer.querySelector('.sg-card__time')).to.not.equal(null);
+    });
+
+    it('omits the category badge entirely when the category has no known match', () => {
+      const card = buildCard(session({ category: 'not-a-real-category' }));
+      expect(card.querySelector('.sg-category-badge')).to.equal(null);
+      // The plain track label still renders — it doesn't depend on the category lookup.
+      expect(card.querySelector('.sg-card__track--footer').textContent).to.equal('Video');
+    });
+
+    it('renders the schedule and favorite buttons unconditionally, not only on hover/scheduled/favorited', () => {
+      const card = buildCard(session());
+      expect(card.querySelector('.sg-card__btn--schedule')).to.not.equal(null);
+      expect(card.querySelector('.sg-card__btn--favorite')).to.not.equal(null);
     });
   });
 

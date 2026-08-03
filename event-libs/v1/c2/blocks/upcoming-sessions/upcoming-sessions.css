@@ -10,19 +10,20 @@
  * blur(4.6875px)) are left as plain literals — forcing a mismatched token
  * would drift from the design, not match it.
  *
- * Card classes below (.sg-live-card, .sg-icon-btn, .sg-category-badge families)
- * are copied from event-libs/v1/blocks/sessions-guide/sessions-guide.css so
- * cards here match Session Guide's look exactly. Copied on purpose, not
- * @import'd, so this block has no runtime dependency on sessions-guide.css
- * being loaded (per design doc: keep decoupled).
+ * Card classes below (.sg-card, .sg-icon-btn, .sg-category-badge families)
+ * are copied from event-libs/v1/blocks/sessions-guide/sessions-guide.css
+ * (see SessionCard.js) so cards here match Session Guide's real session
+ * card exactly. Copied on purpose, not @import'd, so this block has no
+ * runtime dependency on sessions-guide.css being loaded (per design doc:
+ * keep decoupled).
  *
- * IMPORTANT: sessions-guide.css defines its own (very different, light-themed)
- * rules for these exact same class names — e.g. its own `.sg-live-card` is a
- * white card that turns solid #000 on hover at wide breakpoints, and its
- * `.sg-icon-btn`/`.sg-category-badge` values differ too. Session Guide's CSS
- * can genuinely be loaded on the same page as this block (its modal opens
- * from this component's own cards), and two same-specificity `.sg-live-card`
- * rules from two different stylesheets is a load-order race, not a reliable
+ * IMPORTANT: sessions-guide.css defines its own rules for these exact same
+ * class names, sized for its fixed-width grid/time-row layout rather than
+ * this block's horizontally-scrolling peeking carousel (see the sizing note
+ * in the "Card (sg-card family)" section below). Session Guide's CSS can
+ * genuinely be loaded on the same page as this block (its modal opens from
+ * this component's own cards), and two same-specificity `.sg-card` rules
+ * from two different stylesheets is a load-order race, not a reliable
  * override — whichever stylesheet's <link> lands later in <head> wins,
  * regardless of which one is "correct" here. All selectors below are
  * therefore scoped under `.upcoming-sessions` to raise their specificity
@@ -147,149 +148,214 @@
 }
 
 /*
- * ── Card (sg-live-card family) ──────────────────────────────────────────
- * Visual values below follow the actual Figma dev-mode CSS export for this
- * card ("Session card - no images"), not sessions-guide.css's own
- * light-themed card:
- *   docs/upcoming-sessions/with-event-marquee-mobile.json  (base/mobile)
- *   docs/upcoming-sessions/with-event-marquee-desktop.json (desktop, ≥900px)
- * Class names are kept as sg-live-card* since the JS already targets them —
- * only the visual values below are Figma-sourced, not sessions-guide-sourced.
+ * ── Card (sg-card family) ─────────────────────────────────────────────────
+ * Ported from sessions-guide.css's own `.sg-card` (see SessionCard.js) so
+ * this block's cards match Session Guide's real session-card component
+ * closely — badge-row above the title at mobile/tablet, a footer row
+ * (track label + repeated category badge + time) below it at desktop, with
+ * CSS swapping which of the two badges is visible per breakpoint.
  *
- * Structure: .sg-live-card > .sg-live-card__content (title + badge/time row),
- * .sg-live-card__actions (icon buttons) — siblings, not nested, matching the
- * Figma layer tree (Frame 2147229141 + Frame 2147228840 as siblings inside
- * the card's own row-direction flex on desktop).
+ * Two deliberate divergences from sessions-guide's own `.sg-card`:
+ *
+ * 1. Sizing — sessions-guide's `.sg-card` grows on hover (width
+ *    379->427px, min-height 124->150px) because it sits in a fixed
+ *    grid/time-row. This card sits in a horizontally-scrolling peeking
+ *    carousel instead, where growing the card's own box on hover would
+ *    reflow sibling cards mid-scroll (width) or the whole section's height
+ *    (height). So width/height stay fixed at their resting size always —
+ *    the same values this card used before this port: a proportional
+ *    peeking formula at mobile/tablet (1 full card + 1/3 of the next
+ *    peeking), and a literal 431x128px at desktop
+ *    (`@media (width >= 900px)` below). The "grows on hover" cue instead
+ *    comes from `transform: scale()`, exactly like this card did before
+ *    this port.
+ *
+ * 2. Action buttons — sessions-guide reveals the action-icon column only
+ *    on hover/`.is-scheduled`/`.is-favorited` (sliding out from width:0).
+ *    That leaves the buttons unreachable on touch/keyboard unless a
+ *    session is already scheduled/favorited, so this card keeps them
+ *    always visible at every breakpoint instead (matching how mobile/
+ *    tablet already behaved before this port).
  */
 
-.upcoming-sessions .sg-live-card {
-  /* s2a/color/background/subtle, light (default) = --s2a-color-gray-50. */
+.upcoming-sessions .sg-card {
   background: var(--s2a-color-gray-50, #f8f8f8);
   border: none;
   border-radius: var(--s2a-border-radius-md, 16px);
   display: flex;
   flex-direction: column;
-  align-items: stretch;
+  align-items: flex-start;
   flex-shrink: 0;
+  position: relative;
+  overflow: hidden;
 
   /* 1 full card + 1/3 of the next peeking: (4/3)*cardWidth + gap = track width. */
   width: calc((100% - var(--s2a-spacing-md, 16px)) * 0.75);
   height: 172px;
   padding: var(--s2a-spacing-md, 16px);
   gap: var(--s2a-spacing-md, 16px);
-  overflow: hidden;
+  cursor: pointer;
   transition: background 0.32s cubic-bezier(0.22, 1, 0.36, 1),
               box-shadow 0.32s cubic-bezier(0.22, 1, 0.36, 1),
-              transform 0.32s cubic-bezier(0.22, 1, 0.36, 1),
-              border-color 0.2s;
-  cursor: pointer;
+              transform 0.32s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-.upcoming-sessions .sg-live-card:focus-visible {
+.upcoming-sessions .sg-card:focus-visible {
   outline: var(--s2a-border-width-md, 2px) solid var(--s2a-color-gray-1000, #000);
   outline-offset: 2px;
 }
 
+.upcoming-sessions .sg-card:active {
+  background: var(--s2a-color-gray-75, #ececec);
+}
+
 /*
- * Light (default) hover: inverts to s2a/color/gray/900 (#131313) and grows,
- * matching sessions-guide.css's own `.sg-card:hover` "expand" pattern
- * (width/min-height increase, gray-50 -> gray-900, box-shadow, z-index) — same
- * transition curve. Growth is done via `transform: scale()` rather than
- * literal width/height like `.sg-card` uses, since this card sits in a
- * horizontally-scrolling track (growing width/height directly would reflow
- * and shift sibling cards mid-scroll); scaling keeps that layout-neutral
- * while still reading as "grows on hover".
+ * Inverts to near-black and grows via `transform: scale()` rather than the
+ * literal width/min-height growth sessions-guide's own `.sg-card:hover`
+ * uses — see the sizing note above.
  */
-.upcoming-sessions .sg-live-card:hover {
+.upcoming-sessions .sg-card:hover {
   background: var(--s2a-color-gray-900, #131313);
-  border-color: transparent;
-  transform: scale(1.05);
   box-shadow: 0 6px 24px rgb(0 0 0 / 18%);
+  transform: scale(1.05);
   z-index: 2;
 }
 
-.upcoming-sessions .sg-live-card__content {
+.upcoming-sessions .sg-card__body {
+  flex: 1 1 auto;
+  min-width: 0;
+  width: 100%;
+  align-self: stretch;
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
-  gap: var(--s2a-spacing-md, 16px);
-  flex: 1;
-  min-width: 0;
+  gap: 0;
+  overflow: hidden;
 }
 
-.upcoming-sessions .sg-live-card__meta {
+/* Category badge row — shown at top on mobile/tablet, hidden on desktop. */
+.upcoming-sessions .sg-card__badge-row {
   display: flex;
-  flex-direction: row;
   align-items: center;
-  justify-content: space-between;
-  gap: var(--s2a-spacing-xs, 8px);
+  flex-shrink: 0;
   width: 100%;
-  margin: 0;
+  margin-bottom: var(--s2a-spacing-md, 16px);
 }
 
-.upcoming-sessions .sg-live-card__track-row {
-  display: flex;
-  align-items: center;
-  gap: var(--s2a-spacing-xs, 8px);
-}
-
-.upcoming-sessions .sg-live-card__time {
-  font-family: 'Adobe Clean Spectrum VF', 'Adobe Clean', adobe-clean, 'Trebuchet MS', sans-serif;
-  font-weight: var(--s2a-font-weight-adobe-clean-regular, 400);
-  font-size: var(--s2a-font-size-xs, 12px);
-  line-height: 1.5;
-  color: var(--s2a-color-gray-600, #717171);
-  white-space: nowrap;
-  margin: 0;
-  transition: color 0.2s;
-}
-
-.upcoming-sessions .sg-live-card__title {
+.upcoming-sessions .sg-card__title {
   font-family: 'Adobe Clean Spectrum VF', 'Adobe Clean', adobe-clean, 'Trebuchet MS', sans-serif;
   font-weight: var(--s2a-font-weight-adobe-clean-extrabold, 800);
   font-size: var(--s2a-font-size-md, 16px);
   line-height: 1.25;
-  margin: 0;
   color: var(--s2a-color-gray-1000, #000);
+  margin: 0;
+  min-width: 0;
+  width: 100%;
+  overflow: hidden;
+  /* stylelint-disable-next-line value-no-vendor-prefix */
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
   transition: color 0.2s;
 }
 
-.upcoming-sessions .sg-live-card__actions {
+.upcoming-sessions .sg-card:hover .sg-card__title {
+  color: var(--s2a-color-gray-25, #fff);
+}
+
+/* Footer row (track label + repeated badge + time) — hidden on mobile/tablet, shown on desktop. */
+.upcoming-sessions .sg-card__footer {
+  display: none;
+}
+
+.upcoming-sessions .sg-card__track {
+  font-size: var(--s2a-font-size-xs, 12px);
+  font-weight: 500;
+  color: var(--s2a-color-gray-1000, #000);
   display: flex;
   align-items: center;
+  gap: var(--s2a-spacing-xs, 8px);
+  white-space: nowrap;
+  flex-shrink: 0;
+  line-height: 1.5;
+  transition: color 0.2s;
+}
+
+.upcoming-sessions .sg-card:hover .sg-card__track {
+  color: var(--s2a-color-gray-25, #fff);
+}
+
+/* Desktop-only repeated badge — hidden on mobile/tablet (badge-row is shown there instead). */
+.upcoming-sessions .sg-card__footer-badge {
+  display: none;
+}
+
+.upcoming-sessions .sg-card:hover .sg-category-badge {
+  color: var(--s2a-color-gray-25, #fff);
+}
+
+.upcoming-sessions .sg-card__time {
+  font-size: var(--s2a-font-size-xs, 12px);
+  color: var(--s2a-color-gray-600, #717171);
+  line-height: 1.5;
+  white-space: nowrap;
+  text-align: right;
+  transition: color 0.2s;
+}
+
+.upcoming-sessions .sg-card:hover .sg-card__time {
+  color: rgb(255 255 255 / 50%);
+}
+
+/* Icon action row — always visible on mobile/tablet; time rendered via ::after (data-time), since .sg-card__footer is hidden here. */
+.upcoming-sessions .sg-card__actions {
+  display: flex;
+  flex-direction: row;
   gap: var(--s2a-spacing-sm, 12px);
+  flex-shrink: 0;
+  width: 100%;
+  align-items: center;
+  justify-content: center;
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.upcoming-sessions .sg-card__actions::after {
+  content: attr(data-time);
+  font-size: var(--s2a-font-size-xs, 12px);
+  color: var(--s2a-color-gray-600, #717171);
+  margin-left: auto;
+  white-space: nowrap;
+  line-height: 1.5;
+  pointer-events: none;
+}
+
+.upcoming-sessions .sg-card:hover .sg-card__actions::after {
+  color: rgb(255 255 255 / 50%);
 }
 
 /*
  * ── Dark surface variant ─────────────────────────────────────────────────
- * Card background is bound to the semantic token `s2a/color/background/
- * subtle`, which resolves differently per surface (light: --s2a-color-gray-50
- * #f8f8f8 — the default above; dark: --s2a-color-gray-700 #505050). Default
- * (no variant, or an explicit `light` variant) stays light via the unscoped
- * rules above; authoring the `dark` variant (`upcoming-sessions (dark)`)
- * puts a `dark` class on the block root and switches the surface here — this
- * is the original look this card shipped with, for the dark hero/marquee
- * overlay context (§6/§13 of the design doc).
+ * Per the Figma dev-mode CSS export for "Session card - no images" (dark):
+ * mobile/tablet (below the 900px breakpoint) use a flat translucent black
+ * fill; desktop (see the `@media (width >= 900px)` block below) switches to
+ * a gradient + background blur instead — a heavier glass-overlay treatment
+ * for sitting on top of a hero/marquee image at that size (§6/§13 of the
+ * design doc). This overrides only the sg-card background/text colors —
+ * the sg-card structure/hover-grow/action-reveal mechanic above is
+ * unaffected. Default (no variant, or an explicit `light` variant) stays
+ * sg-card's own light-resting/dark-hover treatment via the unscoped rules
+ * above; authoring the `dark` variant (`upcoming-sessions (dark)`) puts a
+ * `dark` class on the block root and switches to this overlay treatment.
  */
-.upcoming-sessions.dark .sg-live-card {
-  background: var(--s2a-color-gray-700, #505050);
-}
-
-/*
- * Per the Figma dev-mode CSS export, the dark card's :hover state is
- * byte-identical to its default — no color inversion, no grow/shadow.
- * Explicitly reset the light variant's hover effects here rather than
- * relying on cascade order, since transform/box-shadow/z-index aren't
- * otherwise overridden anywhere else for `.dark`.
- */
-.upcoming-sessions.dark .sg-live-card:hover {
-  background: var(--s2a-color-gray-700, #505050);
-  transform: none;
+.upcoming-sessions.dark .sg-card,
+.upcoming-sessions.dark .sg-card:hover,
+.upcoming-sessions.dark .sg-card.is-scheduled,
+.upcoming-sessions.dark .sg-card.is-favorited {
+  background: rgb(0 0 0 / 64%);
   box-shadow: none;
-  z-index: auto;
 }
 
-.upcoming-sessions.dark .sg-live-card:focus-visible {
+.upcoming-sessions.dark .sg-card:focus-visible {
   outline-color: var(--s2a-color-gray-25, #fff);
 }
 
@@ -300,41 +366,100 @@
  * state via source order, correctly keeping dark's own hover identical to
  * its default per the Figma export.
  */
-.upcoming-sessions.dark .sg-live-card__time {
-  color: #8a8a8a;
+/* stylelint-disable no-descending-specificity */
+.upcoming-sessions.dark .sg-card__time,
+.upcoming-sessions.dark .sg-card__actions::after {
+  color: #afafaf;
 }
 
-.upcoming-sessions.dark .sg-live-card__title {
+.upcoming-sessions.dark .sg-card__title,
+.upcoming-sessions.dark .sg-card__track {
   color: #f2f2f2;
 }
 
+.upcoming-sessions.dark .sg-category-badge {
+  color: #f2f2f2;
+}
+/* stylelint-enable no-descending-specificity */
+
 @media (width >= 900px) {
-  .upcoming-sessions .sg-live-card {
+  .upcoming-sessions .sg-card {
     flex-direction: row;
-    align-items: flex-start;
+    align-items: stretch;
     width: 431px;
-    height: 128px;
+    height: 108px;
     padding: var(--s2a-spacing-lg, 24px);
-    gap: var(--s2a-spacing-lg, 24px);
-    background: var(--s2a-color-gray-50, #f8f8f8);
+    gap: 0;
   }
 
-  .upcoming-sessions .sg-live-card:hover {
-    background: var(--s2a-color-gray-900, #131313);
+  .upcoming-sessions .sg-card__body {
+    width: auto;
   }
 
-  .upcoming-sessions .sg-live-card__content {
-    width: 327px;
+  .upcoming-sessions .sg-card__badge-row {
+    display: none;
   }
 
-  .upcoming-sessions .sg-live-card__time {
-    color: var(--s2a-color-gray-600, #717171);
-  }
-
-  .upcoming-sessions .sg-live-card__title {
+  .upcoming-sessions .sg-card__title {
     font-size: var(--s2a-font-size-lg, 18px);
     line-height: 22px;
-    color: var(--s2a-color-gray-1000, #000);
+    -webkit-line-clamp: 2;
+  }
+
+  /*
+   * Fixed margin-top (matching the 16px gap in the Figma frame between the
+   * title and this row), not margin-top:auto — sessions-guide's own
+   * `.sg-card__footer` uses auto because its card is min-height (grows to
+   * fit content); ours is a fixed height (see the sizing note above), so
+   * auto would push this row all the way to the box's bottom edge whenever
+   * the title doesn't use its full 2-line allowance, leaving a large gap.
+   */
+  .upcoming-sessions .sg-card__footer {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: var(--s2a-spacing-xs, 8px);
+    margin-top: var(--s2a-spacing-md, 16px);
+  }
+
+  .upcoming-sessions .sg-card__track--footer {
+    display: none;
+  }
+
+  .upcoming-sessions .sg-card__footer-badge {
+    display: contents;
+  }
+
+  /*
+   * `.sg-card__footer`'s `justify-content: space-between` only pins time to
+   * the right when the badge (its sibling) actually renders. When category
+   * doesn't resolve to a known badge, `.sg-card__footer-badge` (display:
+   * contents) contributes nothing, `.sg-card__track--footer` is hidden
+   * above, and time ends up as the row's only participating flex child —
+   * which space-between collapses to the start (left) instead of the end.
+   * `margin-left: auto` pins it to the right unconditionally, regardless of
+   * whether a badge is present.
+   */
+  .upcoming-sessions .sg-card__time {
+    margin-left: auto;
+  }
+
+  /* Always visible at desktop too (not hover-revealed) — a hover-only reveal
+     left the buttons unreachable on touch/keyboard unless a session was
+     already scheduled/favorited. */
+  .upcoming-sessions .sg-card__actions {
+    flex-direction: column;
+    width: var(--s2a-spacing-2xl, 48px);
+    padding-left: var(--s2a-spacing-md, 16px);
+    margin-top: 0;
+    opacity: 1;
+    pointer-events: auto;
+    align-items: center;
+    justify-content: flex-start;
+  }
+
+  .upcoming-sessions .sg-card__actions::after {
+    display: none;
   }
 
   /*
@@ -342,38 +467,29 @@
    * no images" exactly (both its default and :hover export are identical —
    * this card does not change appearance on hover on desktop).
    */
-  .upcoming-sessions.dark .sg-live-card {
-    background: var(--s2a-color-gray-700, #505050);
+  .upcoming-sessions.dark .sg-card,
+  .upcoming-sessions.dark .sg-card:hover,
+  .upcoming-sessions.dark .sg-card.is-scheduled,
+  .upcoming-sessions.dark .sg-card.is-favorited {
+    background: linear-gradient(0deg, rgb(0 0 0 / 64%), rgb(0 0 0 / 64%)), rgb(0 0 0 / 75%);
+    backdrop-filter: blur(2px);
   }
 
-  .upcoming-sessions.dark .sg-live-card:hover {
-    background: var(--s2a-color-gray-700, #505050);
+  /* stylelint-disable no-descending-specificity */
+  .upcoming-sessions.dark .sg-card__time,
+  .upcoming-sessions.dark .sg-card__actions::after {
+    color: rgb(255 255 255 / 64%);
   }
 
-  .upcoming-sessions.dark .sg-live-card__time {
+  .upcoming-sessions.dark .sg-card__title,
+  .upcoming-sessions.dark .sg-card__track {
     color: var(--s2a-color-gray-25, #fff);
   }
 
-  .upcoming-sessions.dark .sg-live-card__title {
+  .upcoming-sessions.dark .sg-category-badge {
     color: var(--s2a-color-gray-25, #fff);
   }
-
-  .upcoming-sessions .sg-live-card__actions {
-    flex-direction: column;
-    width: var(--s2a-spacing-xl, 32px);
-    gap: var(--s2a-spacing-sm, 12px);
-  }
-
-  /*
-   * Icon buttons solid opaque white with a translucent white border, not the
-   * 80%-opacity "on-light" chip used elsewhere — per the Figma dev-mode
-   * export's ".IconButton/Core/Primary" values for the dark card variant.
-   * No exact --s2a-color-transparent-white-40 token confirmed — kept literal.
-   */
-  .upcoming-sessions.dark .sg-live-card .sg-icon-btn--solid.sg-icon-btn--on-light {
-    background: var(--s2a-color-gray-25, #fff);
-    border-color: rgb(255 255 255 / 40%);
-  }
+  /* stylelint-enable no-descending-specificity */
 }
 
 /* ── Icon Button (S2A Foundations) — copied verbatim, already has inline fallbacks ── */
@@ -428,29 +544,28 @@
 }
 
 /*
- * "Add to schedule"/"Add to favorites" buttons: ".IconButton / Primary / Solid
- * / On Light" per the Figma dev-mode CSS export — a small light/white "chip"
- * sitting on the dark card, so its icon is black (contrast against the chip
- * itself, not the card). blur(4.6875px) has no matching --s2a-blur-* token
- * (scale starts at 8px) — kept literal per the exact Figma value.
+ * "Add to schedule"/"Add to favorites" buttons use the "on-dark" context
+ * (matching SessionCard.js's real markup — always on-dark, regardless of
+ * this block's own light/dark surface variant, since the card's hover
+ * state already goes near-black either way): a solid opaque white chip.
  */
-.upcoming-sessions .sg-icon-btn--solid.sg-icon-btn--on-light {
-  background: var(--s2a-color-transparent-white-80, rgb(255 255 255 / 80%));
-  backdrop-filter: blur(4.6875px);
-  color: var(--s2a-color-gray-1000, #000);
-  border: var(--s2a-border-width-sm, 1px) solid var(--s2a-color-gray-100, #e9e9e9);
+.upcoming-sessions .sg-icon-btn--solid.sg-icon-btn--on-dark {
+  background: var(--s2a-color-background-default, #fff);
+  color: var(--s2a-color-content-default, #000);
+  border: var(--s2a-border-width-sm, 1px) solid var(--s2a-color-gray-100, #e0e0e0);
 }
 
-.upcoming-sessions .sg-icon-btn--solid.sg-icon-btn--on-light:hover:not(:disabled) {
-  background: var(--s2a-color-transparent-white-96, rgb(255 255 255 / 96%));
-  border-color: var(--s2a-color-gray-25, #fff);
+.upcoming-sessions .sg-icon-btn--solid.sg-icon-btn--on-dark:hover:not(:disabled) {
+  background: var(--s2a-color-transparent-white-64, rgb(255 255 255 / 64%));
+  border-color: var(--s2a-color-border-inverse, #fff);
 }
 
-.upcoming-sessions .sg-icon-btn--solid.sg-icon-btn--on-light:active:not(:disabled) {
-  background: var(--s2a-color-gray-25, #fff);
-  border-color: var(--s2a-color-gray-25, #fff);
+.upcoming-sessions .sg-icon-btn--solid.sg-icon-btn--on-dark:active:not(:disabled) {
+  background: var(--s2a-color-background-default, #fff);
+  border-color: transparent;
 }
 
+/* stylelint-disable-next-line no-descending-specificity */
 .upcoming-sessions .sg-category-badge {
   display: inline-flex;
   align-items: center;
@@ -472,51 +587,23 @@
   height: var(--s2a-spacing-20, 20px);
 }
 
+/*
+ * currentColor (not a hardcoded value) so this label picks up whatever
+ * color gets set on its ancestor `.sg-category-badge` by the hover/dark
+ * rules above — matching sessions-guide.css's own `.sg-category-badge__label`
+ * exactly. The icon's own tint (set via inline style in buildCategoryBadge,
+ * always higher specificity than any class rule) stays constant regardless
+ * of hover/dark state, same as sessions-guide.
+ */
 .upcoming-sessions .sg-category-badge__label {
   font-family: 'Adobe Clean Spectrum VF', 'Adobe Clean', adobe-clean, 'Trebuchet MS', sans-serif;
   font-weight: var(--s2a-font-weight-adobe-clean-medium, 500);
   font-size: var(--s2a-font-size-xs, 12px);
   line-height: var(--s2a-font-line-height-2xs, 16px);
-  color: var(--s2a-color-gray-1000, #000);
+  color: currentcolor;
 }
 
-.upcoming-sessions.dark .sg-category-badge__icon-color,
-.upcoming-sessions.dark .sg-category-badge__label {
+/* Only takes effect when a badge has no inline tint (see buildCategoryBadge) — inline style otherwise always wins. */
+.upcoming-sessions.dark .sg-category-badge__icon-color {
   color: var(--s2a-color-gray-25, #fff);
-}
-
-/*
- * Light (default) hover text color — flips to white against the inverted
- * dark hover background (.sg-live-card:hover, near the top of this file).
- * Declared last/highest-specificity on purpose so it wins over every plain
- * light/dark color rule above regardless of source order.
- */
-.upcoming-sessions .sg-live-card:hover .sg-live-card__title,
-.upcoming-sessions .sg-live-card:hover .sg-live-card__time,
-.upcoming-sessions .sg-live-card:hover .sg-category-badge__icon-color,
-.upcoming-sessions .sg-live-card:hover .sg-category-badge__label {
-  color: var(--s2a-color-gray-25, #fff);
-}
-
-/*
- * Dark hover must stay identical to its own default (per the Figma export —
- * see the "Dark surface variant" section) even though the generic light
- * hover-color rule above happens to share the same #fff value at desktop.
- * At mobile, dark's own default text colors (#8a8a8a / #f2f2f2) are NOT
- * white, so this higher-specificity override is required to correctly win
- * over the generic rule above regardless of source order.
- */
-.upcoming-sessions.dark .sg-live-card:hover .sg-live-card__time {
-  color: #8a8a8a;
-}
-
-.upcoming-sessions.dark .sg-live-card:hover .sg-live-card__title {
-  color: #f2f2f2;
-}
-
-@media (width >= 900px) {
-  .upcoming-sessions.dark .sg-live-card:hover .sg-live-card__time,
-  .upcoming-sessions.dark .sg-live-card:hover .sg-live-card__title {
-    color: var(--s2a-color-gray-25, #fff);
-  }
 }
