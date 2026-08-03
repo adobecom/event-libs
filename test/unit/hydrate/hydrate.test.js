@@ -357,6 +357,19 @@ describe('consumer hydrator registration', () => {
     expect(document.querySelector('.image-links').dataset.hydratedBy).to.equal('override');
   });
 
+  it('does not resolve a hydrator via the Object prototype chain for a "constructor"-classed block', () => {
+    document.body.innerHTML = '<div class="constructor hydrate"><div><div>[[widgets.name]]</div></div></div>';
+
+    hydrateBlocks(document);
+
+    const block = document.querySelector('.constructor');
+    // A plain-object lookup of HYDRATORS['constructor'] would inherit the global `Object`
+    // function, which is callable and not `=== false` — silently "hydrating" the block.
+    expect(block.hasAttribute('data-hydrated')).to.be.false;
+    expect(block.innerHTML).to.include('[[widgets.name]]');
+    expect(lanaLogs.some((msg) => msg.includes('Hydrator not found for block: constructor'))).to.be.true;
+  });
+
   it('rejects a registration that is not a function', () => {
     expect(registerHydrator('incomplete-block', './some/module.js')).to.be.false;
 
@@ -537,6 +550,27 @@ describe('hydration logging', () => {
     expect(logs).to.include('Hydrator not found for block: no-hydrator-block');
     window.lana = originalLana;
   });
+
+  // `load` only fires once per document. By the time a later fragment/personalization
+  // hydration pass runs, it has already fired and never will again — so a message
+  // logged then can only reach lana through the readyState==='complete' poll, not the
+  // `load` listener. No event is dispatched here on purpose.
+  it('polls for lana instead of dropping the message once the load event can no longer fire', async () => {
+    const originalLana = window.lana;
+    delete window.lana;
+
+    document.body.innerHTML = '<div class="no-hydrator-poll-block hydrate"></div>';
+
+    hydrateBlocks(document);
+
+    const logs = [];
+    window.lana = { log: (msg) => logs.push(msg) };
+
+    await new Promise((resolve) => { setTimeout(resolve, 350); });
+
+    expect(logs).to.include('Hydrator not found for block: no-hydrator-poll-block');
+    window.lana = originalLana;
+  });
 });
 
 describe('hydration runs once per block', () => {
@@ -607,6 +641,34 @@ describe('hydration runs once per block', () => {
     hydrateBlocks(document);
 
     expect(calls).to.equal(1);
+  });
+
+  // Every early-exit in the built-in image-links hydrator used to bail with a bare
+  // `return;` (undefined), which `!== false` marks the block hydrated forever — even
+  // though sponsors metadata simply wasn't ready yet on the first pass.
+  it('retries the built-in image-links hydrator after a metadata parse failure', () => {
+    setMetadata('sponsors', 'not json');
+
+    document.body.innerHTML = `
+      <div class="image-links hydrate sponsors gold">
+        <div><div><h2>Gold Sponsors</h2></div></div>
+      </div>
+    `;
+
+    hydrateBlocks(document);
+
+    const block = document.querySelector('.image-links');
+    expect(block.hasAttribute('data-hydrated')).to.be.false;
+    expect(block.querySelectorAll('img')).to.have.lengthOf(0);
+
+    setMetadata('sponsors', JSON.stringify([
+      { name: 'Sponsor 1', image: { imageUrl: 'https://example.com/1.jpg' }, sponsorType: 'gold' },
+    ]));
+
+    hydrateBlocks(document);
+
+    expect(block.querySelectorAll('img')).to.have.lengthOf(1);
+    expect(block.hasAttribute('data-hydrated')).to.be.true;
   });
 
   it('retries a block whose hydrator threw', () => {

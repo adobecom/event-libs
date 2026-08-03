@@ -51,24 +51,24 @@ export default function hydrateImageLinks(block) {
     }
   }
 
-  if (!metadataKey) return;
+  if (!metadataKey) return false;
 
   // Get metadata
   let data;
   try {
     const metadataValue = getMetadata(metadataKey);
-    if (!metadataValue) return;
+    if (!metadataValue) return false;
     data = JSON.parse(metadataValue);
   } catch (error) {
     logHydration(`Hydrator: Failed to parse metadata "${metadataKey}": ${error.message}`);
-    return;
+    return false;
   }
 
-  if (!data || !data.length) return;
+  if (!data || !data.length) return false;
 
   // Get filter config for this metadata type
   const filterConf = CONFIG.filterConfig[metadataKey];
-  if (!filterConf) return;
+  if (!filterConf) return false;
 
   // Extract tier from block class names
   const tier = extractTierFromClassList(block.classList, metadataKey);
@@ -82,9 +82,11 @@ export default function hydrateImageLinks(block) {
     });
   }
 
-  if (!filteredData.length) return;
+  if (!filteredData.length) return false;
 
   // Create image rows for each item
+  let rendered = 0;
+
   filteredData.forEach((item) => {
     const imageData = item[filterConf.imageKey];
     if (!imageData) return;
@@ -111,5 +113,8 @@ export default function hydrateImageLinks(block) {
 
     row.append(cell);
     block.append(row);
+    rendered += 1;
   });
+
+  return rendered > 0;
 }

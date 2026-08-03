@@ -9,10 +9,6 @@ function getTokens(el) {
   return [...el.innerHTML.matchAll(META_REG)].map((m) => m[1]);
 }
 
-function hasToken(el) {
-  return getTokens(el).length > 0;
-}
-
 function parseCollection(name) {
   const raw = name && getMetadata(name);
   if (!raw) return null;
@@ -25,8 +21,8 @@ function parseCollection(name) {
   }
 }
 
-function findCollection(row) {
-  for (const token of getTokens(row)) {
+function findCollection(tokens) {
+  for (const token of tokens) {
     if (!token.includes('?(') && !token.startsWith('@') && !INDEXED_REG.test(token)) {
       const name = token.match(COLLECTION_REG)?.[1];
       const items = parseCollection(name);
@@ -55,23 +51,34 @@ function setTokenIndex(row, collection, index) {
 export default function repeatTemplate(block, { selectItems } = {}) {
   const blockName = block.classList[0];
   const rows = [...block.querySelectorAll(':scope > div')];
-  const templates = rows.filter(hasToken);
-  const [template] = templates;
+  const candidates = rows
+    .map((row) => ({ row, tokens: getTokens(row) }))
+    .filter(({ tokens }) => tokens.length > 0);
 
-  if (!template) {
+  if (!candidates.length) {
     logHydration(`Hydrator: no [[token]] template row authored in ${blockName}`);
     return false;
   }
 
-  if (templates.length > 1) {
-    logHydration(`Hydrator: ${blockName} has ${templates.length} rows with [[tokens]]; only the first is used as the template`);
+  if (candidates.length > 1) {
+    logHydration(`Hydrator: ${blockName} has ${candidates.length} rows with [[tokens]]; only the first row whose tokens resolve to metadata is used as the template`);
   }
 
-  const collection = findCollection(template);
+  const templateRows = candidates.map(({ row }) => row);
+  let template = null;
+  let collection = null;
+
+  for (const candidate of candidates) {
+    collection = findCollection(candidate.tokens);
+    if (collection) {
+      template = candidate.row;
+      break;
+    }
+  }
 
   if (!collection) {
     logHydration(`Hydrator: no metadata array matches the [[tokens]] in ${blockName}; check the collection name is spelled correctly and its metadata is present`);
-    rows.forEach((row) => row.remove());
+    templateRows.forEach((row) => row.remove());
     return false;
   }
 
@@ -80,7 +87,7 @@ export default function repeatTemplate(block, { selectItems } = {}) {
 
   if (!selected.length) {
     logHydration(`Hydrator: no "${name}" items to render in ${blockName}`);
-    rows.forEach((row) => row.remove());
+    templateRows.forEach((row) => row.remove());
     return false;
   }
 
@@ -99,7 +106,7 @@ export default function repeatTemplate(block, { selectItems } = {}) {
     rendered += 1;
   });
 
-  rows.forEach((row) => row.remove());
+  templateRows.forEach((row) => row.remove());
 
   return rendered > 0;
 }

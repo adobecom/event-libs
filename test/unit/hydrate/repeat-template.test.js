@@ -93,6 +93,23 @@ describe('repeatTemplate', () => {
     expect(labels).to.deep.equal(['Read more', 'Read more']);
   });
 
+  // A static row is a sibling of the template row (e.g. an authored header), not a cell
+  // inside it. Only token-bearing rows are the template's business; a static row must
+  // survive alongside the clones rather than being swept up with the original template.
+  it('preserves a static row that has no tokens alongside the template row', () => {
+    setMetadata('widgets', JSON.stringify([{ name: 'A' }, { name: 'B' }]));
+    const block = author(`
+      <div><div>Section header</div></div>
+      <div><div>[[widgets.name]]</div></div>
+    `);
+
+    expect(repeatTemplate(block)).to.be.true;
+
+    const rowTexts = [...block.querySelectorAll(':scope > div')].map((row) => row.textContent.trim());
+    expect(rowTexts[0]).to.equal('Section header');
+    expect(tokensIn(block)).to.deep.equal(['widgets:0.name', 'widgets:1.name']);
+  });
+
   // Pins the contract consumer hydrators depend on. da-bacom's selectSpeakers reads
   // block.classList to pick a type variant, so both the argument order and the second
   // argument's presence are load-bearing across the repo boundary.
@@ -204,7 +221,7 @@ describe('repeatTemplate', () => {
 
       repeatTemplate(block);
 
-      expect(lanaLogs.some((m) => m.includes('only the first is used as the template'))).to.be.true;
+      expect(lanaLogs.some((m) => m.includes('only the first row whose tokens resolve to metadata is used as the template'))).to.be.true;
       expect(block.querySelectorAll(':scope > div')).to.have.lengthOf(2);
     });
 
@@ -264,6 +281,20 @@ describe('repeatTemplate', () => {
       expect(lanaLogs.some((m) => m.includes('spelled correctly'))).to.be.true;
       expect(tokensIn(block)).to.have.lengthOf(0);
     });
+
+    // A leading conditional/@-only row still has [[tokens]], so it used to be picked as
+    // "the" template by position alone; findCollection then failed on it and the bail-out
+    // wiped every row, including the real template right behind it.
+    it('skips a leading row whose tokens do not resolve to a collection, using the next resolvable row', () => {
+      setMetadata('widgets', JSON.stringify([{ name: 'A' }, { name: 'B' }]));
+      const block = author(`
+        <div><div>[[isFull?(Full):(Open)]]</div></div>
+        <div><div>[[widgets.name]]</div></div>
+      `);
+
+      expect(repeatTemplate(block)).to.be.true;
+      expect(tokensIn(block)).to.deep.equal(['widgets:0.name', 'widgets:1.name']);
+    });
   });
 
   describe('bail-out paths', () => {
@@ -280,6 +311,19 @@ describe('repeatTemplate', () => {
 
       expect(repeatTemplate(block)).to.be.false;
       expect(block.querySelectorAll(':scope > div')).to.have.lengthOf(0);
+    });
+
+    it('preserves a static row when the template row fails to resolve a collection', () => {
+      const block = author(`
+        <div><div>Section header</div></div>
+        <div><div>[[widgets.name]]</div></div>
+      `);
+
+      expect(repeatTemplate(block)).to.be.false;
+
+      const rows = [...block.querySelectorAll(':scope > div')];
+      expect(rows).to.have.lengthOf(1);
+      expect(rows[0].textContent.trim()).to.equal('Section header');
     });
 
     it('clears the template when the metadata is invalid JSON', () => {

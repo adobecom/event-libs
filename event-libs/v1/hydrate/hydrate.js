@@ -7,33 +7,30 @@ const HYDRATORS = {
 
 const HYDRATED_ATTR = 'data-hydrated';
 
-const [registerHydrator, getRegisteredHydrator, clearRegistry] = (() => {
-  const registry = new Map();
-  return [
-    (blockName, hydrator) => {
-      if (!blockName || typeof hydrator !== 'function') {
-        logHydration(`Hydrator: registerHydrator("${blockName}") needs a function. Import your module first and register its default export.`);
-        return false;
-      }
-      if (hydrator.constructor?.name === 'AsyncFunction') {
-        logHydration(`Hydrator: registerHydrator("${blockName}") rejected an async function. Hydration must be synchronous.`);
-        return false;
-      }
-      if (registry.has(blockName)) {
-        logHydration(`Hydrator: registerHydrator("${blockName}") replaced an existing registration.`);
-      }
-      registry.set(blockName, hydrator);
-      return true;
-    },
-    (blockName) => registry.get(blockName) ?? null,
-    () => registry.clear(),
-  ];
-})();
+const registry = new Map();
 
-export { registerHydrator };
+export function registerHydrator(blockName, hydrator) {
+  if (!blockName || typeof hydrator !== 'function') {
+    logHydration(`Hydrator: registerHydrator("${blockName}") needs a function. Import your module first and register its default export.`);
+    return false;
+  }
+  if (hydrator.constructor?.name === 'AsyncFunction') {
+    logHydration(`Hydrator: registerHydrator("${blockName}") rejected an async function. Hydration must be synchronous.`);
+    return false;
+  }
+  if (registry.has(blockName)) {
+    logHydration(`Hydrator: registerHydrator("${blockName}") replaced an existing registration.`);
+  }
+  registry.set(blockName, hydrator);
+  return true;
+}
+
+function getRegisteredHydrator(blockName) {
+  return registry.get(blockName) ?? null;
+}
 
 export function resetHydrators() {
-  clearRegistry();
+  registry.clear();
 }
 
 export function hydrateBlocks(area = document) {
@@ -43,7 +40,8 @@ export function hydrateBlocks(area = document) {
 
   for (const block of blocks) {
     const blockName = block.classList[0];
-    const hydrate = getRegisteredHydrator(blockName) ?? HYDRATORS[blockName];
+    const ownHydrator = Object.hasOwn(HYDRATORS, blockName) ? HYDRATORS[blockName] : null;
+    const hydrate = getRegisteredHydrator(blockName) ?? ownHydrator;
 
     if (!hydrate) {
       logHydration(`Hydrator not found for block: ${blockName}`);
