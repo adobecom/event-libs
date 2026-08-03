@@ -13,7 +13,7 @@ export default function ConfigEditor() {
   const { goToLibrary } = useNavigation();
   const {
     activeConfig, saveActiveConfig, clearActiveConfig, updateTrackIcon, seedTrackIcons,
-    updateConfigField, setToastSuccess, setToastError,
+    updateConfigField, updateRfField, setToastSuccess, setToastError,
   } = useConfigs();
 
   const [sessions, setSessions] = useState([]);
@@ -81,6 +81,21 @@ export default function ConfigEditor() {
     const ok = await copyTextToClipboard(JSON.stringify(activeConfig.config));
     if (ok) setToastSuccess('Config copied — paste it into the page\'s tier-1-event-config metadata');
     else setToastError('Could not copy config — select and copy the JSON block manually');
+  };
+
+  // rfApiUrl/rfProfileId (MWPW-200311) are pasted as their own two metadata rows —
+  // separate from tier-1-event-config, since session-store.js reads them as flat
+  // rainfocus-api-url/rainfocus-api-profile-id metadata, not nested JSON. Tab-separated
+  // so pasting straight into a two-column DA metadata table lands each value in its
+  // own cell instead of one cell per line.
+  const handleCopyRfMetadata = async () => {
+    const text = [
+      ['rainfocus-api-url', activeConfig.rfApiUrl || ''],
+      ['rainfocus-api-profile-id', activeConfig.rfProfileId || ''],
+    ].map(([key, value]) => `${key}\t${value}`).join('\n');
+    const ok = await copyTextToClipboard(text);
+    if (ok) setToastSuccess('RainFocus metadata copied — paste as two new rows in the page\'s metadata table');
+    else setToastError('Could not copy — add these two rows to the page\'s metadata table manually');
   };
 
   if (!activeConfig) return null;
@@ -162,6 +177,36 @@ export default function ConfigEditor() {
             onChange=${(next) => updateConfigField('featuredSessions', next)} \
           />
         `}
+      </section>
+
+      <section class="tec-editor__section">
+        <h2>RainFocus API</h2>
+        <p class="tec-editor__section-hint">
+          Lets this event's Tier 1 pages make live RainFocus schedule/favorites calls.
+          Pasted as two separate <code>rainfocus-api-url</code> / <code>rainfocus-api-profile-id</code>
+          metadata rows — not part of the Config JSON above. The profile id isn't a secret
+          (RainFocus restricts access by IP allowlist on their side), but it is specific to
+          this event — leave blank and the page falls back to the site's default event.
+        </p>
+        <label class="tec-editor__field-label" for="tec-rf-api-url">RainFocus API URL</label>
+        <input
+          id="tec-rf-api-url"
+          type="text"
+          class="tec-field tec-editor__rf-input"
+          placeholder="https://www.adobe.com/events/api/rainfocus/"
+          value=${activeConfig.rfApiUrl || ''}
+          onInput=${(e) => updateRfField('rfApiUrl', e.target.value)}
+        />
+        <label class="tec-editor__field-label" for="tec-rf-profile-id">RainFocus profile ID</label>
+        <input
+          id="tec-rf-profile-id"
+          type="text"
+          class="tec-field tec-editor__rf-input"
+          placeholder="this event's RainFocus profile id"
+          value=${activeConfig.rfProfileId || ''}
+          onInput=${(e) => updateRfField('rfProfileId', e.target.value)}
+        />
+        <button type="button" class="tec-btn tec-btn--outline" onClick=${handleCopyRfMetadata}>Copy RainFocus metadata rows</button>
       </section>
 
       <section class="tec-editor__section">

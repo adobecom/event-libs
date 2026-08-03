@@ -3,7 +3,9 @@ import BlockMediator from '../deps/block-mediator.min.js';
 import { getMetadata, getEventServiceEnv } from './utils.js';
 import { fetchSessions, probeEslPayload } from '../services/sessions/sessions-api.js';
 import { startPolling } from '../services/sessions/poller.js';
-import { addSession, removeSession, toggleSessionInterest } from '../services/sessions/rainfocus.js';
+import {
+  addSession, removeSession, toggleSessionInterest, DEFAULT_RF_PROFILE_ID,
+} from '../services/sessions/rainfocus.js';
 import { mountToast } from '../features/toast/toast.js';
 
 const LS_SCHEDULED = 'sessions:scheduled';
@@ -140,7 +142,10 @@ export function initSessionState() {
 
   apiConfig = {
     apiUrl,
-    profileId: getMetadata('rainfocus-api-profile-id'),
+    // Falls back to the RF service's own hardcoded default (MWPW-200311) when an
+    // author has authored rainfocus-api-url but not yet the per-event profile id —
+    // keeps schedule/favorite actions from silently sending profileId: undefined.
+    profileId: getMetadata('rainfocus-api-profile-id') || DEFAULT_RF_PROFILE_ID,
     registerUrl: getMetadata('register-url') || '/register',
     manualCutoff: getMetadata('manual-on-demand-transition-time') || null,
     mrEnv: deriveMrEnv(),

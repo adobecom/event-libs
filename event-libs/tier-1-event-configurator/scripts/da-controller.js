@@ -190,7 +190,7 @@ export async function getConfigs(org, repo) {
 // new one — a single write path rather than separate create/update calls, so
 // re-picking an already-configured event can never create a duplicate row.
 export async function upsertConfig(org, repo, {
-  eventId, backendEventTitle, eventServiceEnv, config,
+  eventId, backendEventTitle, eventServiceEnv, rfApiUrl, rfProfileId, config,
 }) {
   const updated = new Date().toISOString();
   const stampedConfig = {
@@ -202,8 +202,13 @@ export async function upsertConfig(org, repo, {
   // eventServiceEnv is row-level only, not stamped into config — it's an
   // authoring-time detail (which ESP tier this event came from), irrelevant
   // to the page that eventually consumes the pasted Config.
+  // rfApiUrl/rfProfileId (MWPW-200311) are row-level too, but for a different
+  // reason: the page reads them as their own separate rainfocus-api-url /
+  // rainfocus-api-profile-id metadata rows (session-store.js), not nested inside
+  // the tier-1-event-config JSON blob — so they're pasted alongside config, not
+  // stamped into it.
   const newRow = {
-    eventId, backendEventTitle, eventServiceEnv, config: stampedConfig, updated,
+    eventId, backendEventTitle, eventServiceEnv, rfApiUrl, rfProfileId, config: stampedConfig, updated,
   };
 
   const result = await mutateSheet(org, repo, CONFIGS_SHEET_PATH, (rows) => {

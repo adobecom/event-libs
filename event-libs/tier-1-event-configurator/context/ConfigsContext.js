@@ -76,6 +76,8 @@ const ConfigsProvider = ({ children }) => {
       eventId: event.eventId,
       backendEventTitle: event.enTitle || event.eventId,
       eventServiceEnv,
+      rfApiUrl: '',
+      rfProfileId: '',
       config: emptyConfig(),
     });
   }, []);
@@ -88,6 +90,10 @@ const ConfigsProvider = ({ children }) => {
   // so carrying it over would silently mislabel the new event.
   // `eventServiceEnv` is the *new* pick's env, not the source row's —
   // Duplicate can legitimately target a different tier than its source.
+  // rfApiUrl/rfProfileId (MWPW-200311) are always reset blank rather than
+  // cloned — unlike style settings such as trackIcons, silently reusing another
+  // event's RainFocus profile id would misroute this new event's live
+  // schedule/favorites calls at whatever RF profile the source event used.
   const startDuplicateConfig = useCallback((sourceRow, event, eventServiceEnv) => {
     const clonedConfig = { ...sourceRow.config };
     delete clonedConfig.eventId;
@@ -97,6 +103,8 @@ const ConfigsProvider = ({ children }) => {
       eventId: event.eventId,
       backendEventTitle: event.enTitle || event.eventId,
       eventServiceEnv,
+      rfApiUrl: '',
+      rfProfileId: '',
       config: { ...clonedConfig, eventTitle: '' },
     });
   }, []);
@@ -159,6 +167,16 @@ const ConfigsProvider = ({ children }) => {
     });
   }, []);
 
+  // Sets a row-level RainFocus field (rfApiUrl/rfProfileId, MWPW-200311) —
+  // separate from updateConfigField since these live alongside config, not
+  // nested inside it (see startDuplicateConfig's comment for why).
+  const updateRfField = useCallback((key, value) => {
+    setActiveConfig((prev) => {
+      if (!prev) return prev;
+      return { ...prev, [key]: value };
+    });
+  }, []);
+
   const saveActiveConfig = useCallback(async () => {
     if (!activeConfig || !org || !repo) return { ok: false };
     const result = await upsertConfigController(org, repo, activeConfig);
@@ -212,6 +230,7 @@ const ConfigsProvider = ({ children }) => {
     updateTrackIcon,
     seedTrackIcons,
     updateConfigField,
+    updateRfField,
     saveActiveConfig,
     removeConfig,
   };

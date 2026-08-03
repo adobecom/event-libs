@@ -21,6 +21,7 @@ function waitForSessionsReady() {
 
 describe('session-state-demo block', () => {
   let el;
+  let originalFetch;
 
   // initSessionState() is idempotent and only needs the rainfocus-api-url gate to run
   // once — this populates the real apiConfig that favoriteSession()'s RF call needs,
@@ -39,6 +40,16 @@ describe('session-state-demo block', () => {
     scheduled.value = new Set();
     pendingActions.value = new Set();
     auth.value = { isLoggedIn: true, isRegistered: true, userFirstName: null };
+
+    // rainfocus.js now makes a real fetch() for toggleSessionInterest/addSession/
+    // removeSession — stub it so the favorite/schedule button clicks below don't hit
+    // the network (unit tests disallow external fetches).
+    originalFetch = window.fetch;
+    window.fetch = async () => ({ ok: true, status: 200, json: async () => ({ responseCode: '0' }) });
+  });
+
+  afterEach(() => {
+    window.fetch = originalFetch;
   });
 
   function rowValue(label) {
