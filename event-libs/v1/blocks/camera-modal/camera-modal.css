@@ -1,12 +1,19 @@
-.camera-modal {
+.dialog-modal.camera-modal {
+  width: min(92vw, 1080px);
+  max-width: 1080px;
+  height: min(85vh, 680px);
+}
+
+.camera-modal-content {
   display: flex;
   gap: 24px;
   align-items: stretch;
+  height: 100%;
 }
 
 .camera-modal-camera {
-  flex: 1 1 60%;
-  min-height: 320px;
+  flex: 1 1 65%;
+  min-height: 480px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -28,14 +35,15 @@
 }
 
 .camera-modal-actions {
-  flex: 0 0 200px;
+  flex: 0 0 240px;
   display: flex;
   flex-direction: column;
   gap: 12px;
+  padding: 24px;
 }
 
 @media (max-width: 600px) {
-  .camera-modal {
+  .camera-modal-content {
     flex-direction: column;
   }
 

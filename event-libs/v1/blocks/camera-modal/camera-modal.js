@@ -30,8 +30,8 @@ export default async function init(el) {
   const actionsPane = createTag('div', { class: 'camera-modal-actions' }, closeBtn);
 
   el.innerHTML = '';
-  el.classList.add('camera-modal');
-  el.append(cameraPane, actionsPane);
+  el.classList.add('camera-modal-content');
+  el.append(actionsPane, cameraPane);
 
   const onModalClosed = () => {
     window.removeEventListener('milo:modal:closed', onModalClosed);

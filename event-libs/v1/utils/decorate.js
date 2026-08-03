@@ -420,7 +420,7 @@ const regHashCallbacks = {
         new Promise((resolve) => { loadStyle(cameraModalCssUrl, resolve); }),
       ]);
 
-      const content = createTag('div', { class: 'camera-modal' });
+      const content = createTag('div', {});
       await initCameraModal(content);
 
       let dialogEl;
