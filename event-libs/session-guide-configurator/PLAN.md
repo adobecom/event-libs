@@ -283,10 +283,10 @@ block), and picks `sessions-guide` vs. `sessions-guide-full-page` block class fr
 old table format, per the earlier "skip manual authoring altogether" decision (§3a).
 
 Only `surface`/`theme`/`userTz`/`registerUrl` are actually consumed by the render tree
-today. `eventId`, `headings`, `behaviorFlags`, `swimlaneOrder` are new fields carried
-straight onto `guideConfig`, present but not read by anything yet — wiring
-`DrawerHeader.js` (headings), `OnDemandView.js` (swimlaneOrder), or the behavior flags
-into their respective call sites is separate work.
+today. `eventId`, `headings`, `behaviorFlags`, `swimlaneOrder`, and
+`authoredFilterCategories` (see naming-collision note below) are new fields carried
+straight onto `guideConfig`, present but not read by anything yet. Full checklist for
+wiring each one up: `MWPW-194336-CONSUMPTION-HANDOFF.md`.
 
 **Naming-collision guard:** the incoming authored `filterCategories` shape
 (`{attributeId, displayName, enabled}`, §7) does *not* overwrite `guideConfig.filterCategories`
@@ -294,7 +294,7 @@ into their respective call sites is separate work.
 (`[{id: 'track', label: 'Channel'}, {id: 'type', label: 'Session Type'}]`), since
 `FilterPanel.js` still indexes sessions directly by `id` and would silently render empty
 option lists if handed ESP `attributeId`s instead. The new authored shape is carried
-under `guideConfig.authoredFilterCategories` until §7's consuming-side handoff item
+under `guideConfig.authoredFilterCategories` until the consuming-side handoff (item 1)
 rewires `FilterPanel.js` to read from it (and at that point the legacy key/default can
 be deleted outright, not kept as a fallback).
 
@@ -380,7 +380,7 @@ author-editable) / reorder. Saves only the decisions —
 `filterCategories: [{ attributeId, displayName, enabled, order }]` (§5) — no values, no
 counts; those are never persisted, only ever derived live.
 
-**Consuming side (the handoff item):** the sessions-guide block already fetches the
+**Consuming side (tracked in `MWPW-194336-CONSUMPTION-HANDOFF.md` item 1):** the sessions-guide block already fetches the
 full session catalog to render itself. It would run the *same*
 `deriveFacetableAttributes()`, filter/order the result through the config's saved
 `filterCategories`, substitute `displayName` for `label`, and render the panel — same
@@ -405,6 +405,7 @@ retrofitted later.
 
 - The actual promotion of shared components (§5a) into a common location both apps
   import from — the decision is made, the concrete target location isn't picked yet.
-- The sessions-guide consuming-side handoff item itself (§7's last paragraph) — the
-  data shape and aggregation logic it needs to use are fully specified, but the actual
-  `FilterPanel.js` rework isn't scheduled or designed as its own piece of work yet.
+- The sessions-guide consuming-side handoff itself — data shapes and aggregation logic
+  are fully specified, but none of `FilterPanel.js`/`DrawerHeader.js`/`OnDemandView.js`/
+  the behavior-flag gating points are scheduled or designed as their own piece of work
+  yet. Full checklist: `MWPW-194336-CONSUMPTION-HANDOFF.md`.
