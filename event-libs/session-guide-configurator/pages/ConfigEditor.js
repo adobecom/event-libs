@@ -1,15 +1,52 @@
-import { useState, html } from '../../v1/deps/htm-preact.js';
+import {
+  useState, useEffect, useMemo, html,
+} from '../../v1/deps/htm-preact.js';
+import { getEventSessionCatalog } from '../../v1/utils/esp-controller.js';
+import { extractDistinctTracks, deriveFacetableAttributes } from '../../v1/services/sessions/sessions-api.js';
 import { useNavigation } from '../context/NavigationContext.js';
 import { useConfigs } from '../context/ConfigsContext.js';
-import { getDisplayTitle } from '../utils.js';
+import { useDA } from '../context/DAContext.js';
+import { getDisplayTitle, copyTextToClipboard, createSessionGuideConfigURL } from '../utils.js';
+import SwimlaneOrderEditor from '../components/SwimlaneOrderEditor.js';
+import FiltersEditor from '../components/FiltersEditor.js';
+import LoadingInline from '../components/LoadingInline.js';
 
 export default function ConfigEditor() {
   const { goToLibrary } = useNavigation();
+  const { org, repo } = useDA();
   const {
     activeConfig, saveActiveConfig, clearActiveConfig, updateComponentName, updateConfigField,
+    updateNestedConfigField, seedSwimlaneOrder, seedFilterCategories, setToastSuccess, setToastError,
   } = useConfigs();
 
   const [isSaving, setIsSaving] = useState(false);
+  const [sessions, setSessions] = useState([]);
+  const [isLoadingSessions, setIsLoadingSessions] = useState(false);
+  const [sessionsError, setSessionsError] = useState(null);
+
+  const eventId = activeConfig?.eventId;
+
+  useEffect(() => {
+    if (!eventId) return undefined;
+    let cancelled = false;
+    setIsLoadingSessions(true);
+    setSessionsError(null);
+    getEventSessionCatalog(eventId).then((result) => {
+      if (cancelled) return;
+      if (!result.ok) {
+        setSessionsError(result.error || 'Failed to load sessions for this event');
+        return;
+      }
+      setSessions(result.data.sessions);
+      seedSwimlaneOrder(extractDistinctTracks(result.data.sessions));
+      seedFilterCategories(deriveFacetableAttributes(result.data.sessions));
+    }).finally(() => {
+      if (!cancelled) setIsLoadingSessions(false);
+    });
+    return () => { cancelled = true; };
+  }, [eventId, seedSwimlaneOrder, seedFilterCategories]);
+
+  const tracks = useMemo(() => extractDistinctTracks(sessions), [sessions]);
 
   const handleCancel = () => {
     clearActiveConfig();
@@ -29,6 +66,17 @@ export default function ConfigEditor() {
     }
   };
 
+  // Encodes whatever's currently in the editor, saved or not — same as Tier 1 Event
+  // Configurator's in-editor Copy Config, which doesn't require a prior save either.
+  // Consumed by decorate.js's prebuildAutoBlock at decoration time (PLAN.md §3a); no
+  // manual authoring-table path exists for this block.
+  const handleCopyLink = async () => {
+    const url = createSessionGuideConfigURL(activeConfig.config, org, repo);
+    const ok = await copyTextToClipboard(url);
+    if (ok) setToastSuccess('Link copied — paste it into the event page where the Session Guide should appear');
+    else setToastError('Could not copy the link — please retry');
+  };
+
   if (!activeConfig) return null;
 
   return html`
@@ -40,6 +88,15 @@ export default function ConfigEditor() {
           <p class="sgc-editor__event-id">${activeConfig.eventId} · Backend title: ${activeConfig.backendEventTitle}</p>
         </div>
       </div>
+
+      <section class="sgc-editor__section">
+        <h2>Sessions</h2>
+        ${isLoadingSessions && html`<${LoadingInline} label="Loading sessions…" />`}
+        ${sessionsError && html`<p class="sgc-editor__error">${sessionsError}</p>`}
+        ${!isLoadingSessions && !sessionsError && html`
+          <p class="sgc-editor__section-hint">${sessions.length} session(s) found — ${tracks.length} distinct track(s).</p>
+        `}
+      </section>
 
       <section class="sgc-editor__section">
         <h2>Component name</h2>
@@ -105,8 +162,120 @@ export default function ConfigEditor() {
         </label>
       </section>
 
+      <section class="sgc-editor__section">
+        <h2>Headings</h2>
+        <p class="sgc-editor__section-hint">Shown reflects the viewer's auth state, and separately their pre-/post-event state.</p>
+        <label class="sgc-editor__field-label">
+          Logged-out
+          <input
+            type="text"
+            class="sgc-field sgc-editor__heading-input"
+            value=${activeConfig.config.headings.loggedOut}
+            onInput=${(e) => updateNestedConfigField('headings', 'loggedOut', e.target.value)}
+          />
+        </label>
+        <label class="sgc-editor__field-label">
+          Logged-in
+          <input
+            type="text"
+            class="sgc-field sgc-editor__heading-input"
+            value=${activeConfig.config.headings.loggedIn}
+            onInput=${(e) => updateNestedConfigField('headings', 'loggedIn', e.target.value)}
+          />
+        </label>
+        <label class="sgc-editor__field-label">
+          Logged-out (post-event)
+          <input
+            type="text"
+            class="sgc-field sgc-editor__heading-input"
+            value=${activeConfig.config.headings.loggedOutPostEvent}
+            onInput=${(e) => updateNestedConfigField('headings', 'loggedOutPostEvent', e.target.value)}
+          />
+        </label>
+        <label class="sgc-editor__field-label">
+          Logged-in (post-event)
+          <input
+            type="text"
+            class="sgc-field sgc-editor__heading-input"
+            value=${activeConfig.config.headings.loggedInPostEvent}
+            onInput=${(e) => updateNestedConfigField('headings', 'loggedInPostEvent', e.target.value)}
+          />
+        </label>
+      </section>
+
+      <section class="sgc-editor__section">
+        <h2>Behavior flags</h2>
+        <label class="sgc-editor__checkbox">
+          <input
+            type="checkbox"
+            checked=${!!activeConfig.config.behaviorFlags.enableScheduling}
+            onChange=${(e) => updateNestedConfigField('behaviorFlags', 'enableScheduling', e.target.checked)}
+          />
+          Enable scheduling
+        </label>
+        <label class="sgc-editor__checkbox">
+          <input
+            type="checkbox"
+            checked=${!!activeConfig.config.behaviorFlags.enableFavoriting}
+            onChange=${(e) => updateNestedConfigField('behaviorFlags', 'enableFavoriting', e.target.checked)}
+          />
+          Enable favoriting
+        </label>
+        <label class="sgc-editor__checkbox">
+          <input
+            type="checkbox"
+            checked=${!!activeConfig.config.behaviorFlags.enableWatchNowCtas}
+            onChange=${(e) => updateNestedConfigField('behaviorFlags', 'enableWatchNowCtas', e.target.checked)}
+          />
+          Enable Watch Now CTAs
+        </label>
+        <label class="sgc-editor__checkbox">
+          <input
+            type="checkbox"
+            checked=${!!activeConfig.config.behaviorFlags.enableBrandConciergeRibbon}
+            onChange=${(e) => updateNestedConfigField('behaviorFlags', 'enableBrandConciergeRibbon', e.target.checked)}
+          />
+          Enable Brand Concierge Ribbon
+        </label>
+        <p class="sgc-editor__section-hint">Allowing double-booking of overlapping sessions is set at the event level via the linked Tier 1 config, not here.</p>
+      </section>
+
+      <section class="sgc-editor__section">
+        <h2>On-demand swimlane order</h2>
+        <p class="sgc-editor__section-hint">Drag to reorder, or focus a handle and press arrow up/down. Renaming/removing swimlanes isn't available here — track names/icons/colors are managed globally via the Tier 1 Event Configurator.</p>
+        ${isLoadingSessions && html`<${LoadingInline} label="Loading tracks…" />`}
+        ${sessionsError && html`<p class="sgc-editor__error">${sessionsError}</p>`}
+        ${!isLoadingSessions && !sessionsError && html`
+          <${SwimlaneOrderEditor} \
+            tracks=${activeConfig.config.swimlaneOrder} \
+            onChange=${(next) => updateConfigField('swimlaneOrder', next)} \
+          />
+        `}
+      </section>
+
+      <section class="sgc-editor__section">
+        <h2>Filters</h2>
+        <p class="sgc-editor__section-hint">Every facetable attribute from this event's sessions starts enabled — unselect, rename, or reorder the ones shown in the published Session Guide. Filter options themselves are always read live from ESP, not authored here.</p>
+        ${isLoadingSessions && html`<${LoadingInline} label="Loading filters…" />`}
+        ${sessionsError && html`<p class="sgc-editor__error">${sessionsError}</p>`}
+        ${!isLoadingSessions && !sessionsError && html`
+          <${FiltersEditor} \
+            categories=${activeConfig.config.filterCategories} \
+            onChange=${(next) => updateConfigField('filterCategories', next)} \
+          />
+        `}
+      </section>
+
       <div class="sgc-editor__actions">
         <button type="button" class="sgc-btn sgc-btn--outline sgc-btn--l" onClick=${handleCancel}>Cancel</button>
+        <button
+          type="button"
+          class="sgc-btn sgc-btn--outline sgc-btn--l"
+          onClick=${handleCopyLink}
+          disabled=${componentNameMissing}
+        >
+          Copy link
+        </button>
         <button
           type="button"
           class="sgc-btn sgc-btn--primary sgc-btn--l"

@@ -129,6 +129,50 @@ const ConfigsProvider = ({ children }) => {
     });
   }, []);
 
+  // Called once real tracks are known (session fetch resolves) — mirrors Tier 1 Event
+  // Configurator's seedTrackIcons: drops swimlaneOrder entries for tracks that no
+  // longer appear in the live catalog, and appends any newly-discovered track not yet
+  // in the authored order, without disturbing the author's existing ordering.
+  const seedSwimlaneOrder = useCallback((tracks) => {
+    setActiveConfig((prev) => {
+      if (!prev) return prev;
+      const existing = prev.config.swimlaneOrder || [];
+      const liveTracks = tracks || [];
+      const stillValid = existing.filter((t) => liveTracks.includes(t));
+      const newOnes = liveTracks.filter((t) => !existing.includes(t));
+      if (newOnes.length === 0 && stillValid.length === existing.length) return prev;
+      return {
+        ...prev,
+        config: { ...prev.config, swimlaneOrder: [...stillValid, ...newOnes] },
+      };
+    });
+  }, []);
+
+  // Same "seed once discovered, never destroy authored state" pattern as
+  // seedSwimlaneOrder above, for the Filters step (PLAN.md §7): candidateAttributes
+  // comes from deriveFacetableAttributes(sessions) — everything facetable starts
+  // enabled by default (the "starting point" requirement), author unselects/renames/
+  // reorders from there. filterCategories is a plain array in display order — no
+  // separate numeric `order` field, to avoid two sources of truth for the same thing.
+  const seedFilterCategories = useCallback((candidateAttributes) => {
+    setActiveConfig((prev) => {
+      if (!prev) return prev;
+      const existing = prev.config.filterCategories || [];
+      const candidates = candidateAttributes || [];
+      const candidateIds = new Set(candidates.map((c) => c.attributeId));
+      const stillValid = existing.filter((c) => candidateIds.has(c.attributeId));
+      const existingIds = new Set(existing.map((c) => c.attributeId));
+      const newOnes = candidates
+        .filter((c) => !existingIds.has(c.attributeId))
+        .map((c) => ({ attributeId: c.attributeId, displayName: c.label, enabled: true }));
+      if (newOnes.length === 0 && stillValid.length === existing.length) return prev;
+      return {
+        ...prev,
+        config: { ...prev.config, filterCategories: [...stillValid, ...newOnes] },
+      };
+    });
+  }, []);
+
   const saveActiveConfig = useCallback(async () => {
     if (!activeConfig || !org || !repo) return { ok: false };
     const result = await upsertConfigController(org, repo, activeConfig);
@@ -181,6 +225,8 @@ const ConfigsProvider = ({ children }) => {
     updateComponentName,
     updateConfigField,
     updateNestedConfigField,
+    seedSwimlaneOrder,
+    seedFilterCategories,
     saveActiveConfig,
     removeConfig,
   };

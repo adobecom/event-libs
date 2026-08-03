@@ -4,6 +4,12 @@
 // keyed by configId, not eventId; see PLAN.md §2/§5).
 const CONFIGS_SHEET_PATH = '/tools/da-apps/session-guide-configurator/configs.json';
 
+// Copy Link's target — the DA app's own edit-mode URL, not the admin API origin
+// (DA_ADMIN_ORIGIN lives in v1/utils/da-sheet-controller.js, a different concern).
+// Same pattern as Schedule Maker's DA_ORIGIN/DA_APP_PATH (PLAN.md §3a).
+const DA_ORIGIN = 'https://da.live';
+const DA_APP_PATH = 'tools/da-apps/session-guide-configurator';
+
 const PAGES = {
   library: 'library',
   editor: 'editor',
@@ -26,6 +32,8 @@ const EVENT_SERVICE_ENV_OPTIONS = [
 
 export {
   CONFIGS_SHEET_PATH,
+  DA_ORIGIN,
+  DA_APP_PATH,
   PAGES,
   EVENT_BROWSE_ENABLED,
   EVENT_SERVICE_ENV_OPTIONS,

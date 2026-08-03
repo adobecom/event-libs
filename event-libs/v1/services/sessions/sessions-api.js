@@ -366,6 +366,59 @@ export function normalizeSessions(rawSessions) {
 // attribute for its own track editor) doesn't carry a second, independently-drifting copy.
 export const TRACK_ATTRIBUTE_NAME = 'Primary Track for Agenda (Digital Agenda)';
 
+// Generic session/track helpers, not Tier-1-specific — moved here (2026-07-30) so both
+// tier-1-event-configurator and session-guide-configurator import the same
+// implementation instead of one DA app importing from the other's UI code.
+export function getSessionTrack(session) {
+  const attr = (session?.customAttributes || []).find((a) => a?.name === TRACK_ATTRIBUTE_NAME);
+  return attr?.values?.[0]?.label ?? attr?.values?.[0]?.value ?? null;
+}
+
+export function extractDistinctTracks(sessions) {
+  const tracks = new Set();
+  (sessions || []).forEach((session) => {
+    const value = getSessionTrack(session);
+    if (value) tracks.add(value);
+  });
+  return [...tracks].sort();
+}
+
+// Derives facetable custom attributes + their distinct values from an already-fetched
+// session catalog. Mirrors the same enabled/inputType/valueId gate ESP's own
+// /session-facets applies server-side (see events-service-platform's
+// resolveCustomAttributes/buildAttributeIndexItems), so results match it field-for-
+// field, without the extra network round-trip — both consumers (session-guide-
+// configurator's own Filters step, and sessions-guide's FilterPanel.js) already have
+// the full session catalog in memory for other reasons. See
+// session-guide-configurator/PLAN.md §7 for the full design writeup.
+export function deriveFacetableAttributes(sessions) {
+  const attributeMap = new Map(); // attributeId -> { attributeId, label, values: Map<valueId, {...}> }
+  (sessions || []).forEach((session) => {
+    (session.customAttributes || []).forEach((attr) => {
+      if (attr.enabled === false) return;
+      if (!['single-select', 'multi-select'].includes(attr.inputType)) return;
+      if (!attributeMap.has(attr.attributeId)) {
+        attributeMap.set(attr.attributeId, { attributeId: attr.attributeId, label: attr.label, values: new Map() });
+      }
+      const group = attributeMap.get(attr.attributeId);
+      (attr.values || []).forEach((v) => {
+        if (!v.valueId) return; // free-text values aren't indexable
+        if (!group.values.has(v.valueId)) {
+          group.values.set(v.valueId, {
+            valueId: v.valueId, label: v.label, ordinal: v.ordinal, count: 0,
+          });
+        }
+        group.values.get(v.valueId).count += 1;
+      });
+    });
+  });
+  return [...attributeMap.values()].map((group) => ({
+    attributeId: group.attributeId,
+    label: group.label,
+    values: [...group.values.values()].sort((a, b) => a.ordinal - b.ordinal),
+  }));
+}
+
 // customAttributes carry things like track/audience/technical-level as name+values pairs
 // rather than plain session fields. `values[]` holds the value(s) actually selected for
 // that session (see events-service-platform's resolveCustomAttributes), not the full

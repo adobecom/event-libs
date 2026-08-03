@@ -576,6 +576,36 @@ function prebuildAutoBlock(blockName, link) {
 
       return chronoBoxEl;
     },
+    'sessions-guide': (link) => {
+      const url = new URL(link.href);
+      const hashMatch = url.hash.match(/[#&]sgConfig=([A-Za-z0-9+/=%-]{20,})/);
+      const sgConfigBase64 = url.searchParams.get('sgConfig') || hashMatch?.[1];
+      const config = parseEncodedConfig(sgConfigBase64);
+
+      if (!config) {
+        return null;
+      }
+
+      // Catches the real failure mode this manual copy/paste hand-off invites: an
+      // author pastes the wrong event's link onto the wrong page (mirrors
+      // MWPW-200314 item 4's tier-1-event-config eventId cross-check).
+      const pageEventId = getMetadata('event-id');
+      if (config.eventId && pageEventId && config.eventId !== pageEventId) {
+        window.lana?.log(`[sessions-guide] eventId mismatch: config authored for ${config.eventId}, page is ${pageEventId}`);
+      }
+
+      // surface picks which already-registered block this becomes — sessions-guide
+      // (widget/drawer) or sessions-guide-full-page (dedicated page layout) — same
+      // two blocks EVENT_BLOCKS already supports for manual authoring, just reached
+      // a different way here. No manual authoring-table path exists for this block;
+      // sessions-guide.js's init() reads data-session-guide-config only.
+      const blockClass = config.surface === 'page' ? 'sessions-guide-full-page' : 'sessions-guide';
+
+      return createTag('div', {
+        class: blockClass,
+        'data-session-guide-config': JSON.stringify(config),
+      });
+    },
   }
 
   if (autoBlockBuilders[blockName]) {
@@ -591,6 +621,7 @@ export function processAutoBlockLinks(parent) {
   const autoBlockIdentifiers = {
     'chrono-box': { pattern: 'schedule-maker' },
     'mobile-rider': { pattern: 'mobilerider.com', selfInit: true },
+    'sessions-guide': { pattern: 'session-guide-configurator' },
   };
 
   Object.entries(autoBlockIdentifiers).forEach(([blockName, { pattern, selfInit }]) => {

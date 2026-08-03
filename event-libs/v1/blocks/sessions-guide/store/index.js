@@ -30,7 +30,8 @@ function getDefaultDay(eventDays, userTz) {
 // Named guideConfig (not eventConfig) to stay distinct from utils.js's page-wide
 // getEventConfig() and the Tier 1 Event Configurator's tier-1-event-config.js —
 // this is sessions-guide's own block-level authoring config (parse-config.js's
-// output: title, filterCategories, theme, surface, userTz, registerUrl).
+// output: eventId, surface, theme, userTz, filterCategories, headings, behaviorFlags,
+// swimlaneOrder, authoredFilterCategories, plus registerUrl merged in by init()).
 export function buildInitialState(guideConfig) {
   return {
     drawerState: 'hidden',
