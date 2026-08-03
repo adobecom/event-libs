@@ -12,6 +12,10 @@ import { setSessionParam, setSessionsParam, clearSessionParams } from '../utils/
 // No top gap on mobile/tablet (drawer covers the full screen); 20px gap on desktop.
 const getTopMargin = () => (window.matchMedia('(max-width: 1279px)').matches ? 0 : 20);
 
+// The view to land on when opening the drawer fresh, shared by every open path below
+// (mount deep-link, popstate, manual open, external openSessionGuideDetail request).
+const getDefaultView = (isRegistered) => (isRegistered ? 'my-sessions' : 'live-upcoming');
+
 // Pure decision logic for the openSessionGuideDetail(sessionId) external API, kept
 // separate from the useEffect below so it's directly unit-testable.
 export function resolveSessionGuideRequest(request, { sessionsStatusValue, sessionsValue, authValue }) {
@@ -21,7 +25,7 @@ export function resolveSessionGuideRequest(request, { sessionsStatusValue, sessi
   return {
     found: true,
     sessionId: found.id,
-    defaultView: authValue.isRegistered ? 'my-sessions' : 'live-upcoming',
+    defaultView: getDefaultView(authValue.isRegistered),
   };
 }
 
@@ -145,7 +149,7 @@ export function DrawerShell() {
       dispatch({
         type: 'SET_DRAWER',
         drawer: 'expanded',
-        defaultView: auth.value.isRegistered ? 'my-sessions' : 'live-upcoming',
+        defaultView: getDefaultView(auth.value.isRegistered),
       });
     }
   }, []);
@@ -198,12 +202,10 @@ export function DrawerShell() {
         const lastDash = sessionParam.lastIndexOf('-');
         const rfCode = lastDash >= 0 ? sessionParam.slice(lastDash + 1) : sessionParam;
         const found = sessionsRef.current.find((s) => s.rfCode === rfCode || s.id === sessionParam);
-        const defaultView = auth.value.isRegistered ? 'my-sessions' : 'live-upcoming';
-        dispatch({ type: 'SET_DRAWER', drawer: 'expanded', defaultView });
+        dispatch({ type: 'SET_DRAWER', drawer: 'expanded', defaultView: getDefaultView(auth.value.isRegistered) });
         dispatch({ type: 'SET_ACTIVE_SESSION', sessionId: found ? found.id : null });
       } else if (params.has('sessions')) {
-        const defaultView = auth.value.isRegistered ? 'my-sessions' : 'live-upcoming';
-        dispatch({ type: 'SET_DRAWER', drawer: 'expanded', defaultView });
+        dispatch({ type: 'SET_DRAWER', drawer: 'expanded', defaultView: getDefaultView(auth.value.isRegistered) });
         dispatch({ type: 'SET_ACTIVE_SESSION', sessionId: null });
       } else {
         dispatch({ type: 'CLOSE_DRAWER' });
@@ -228,7 +230,7 @@ export function DrawerShell() {
     dispatch({
       type: 'SET_DRAWER',
       drawer: isNarrow ? 'expanded' : 'peek',
-      defaultView: auth.value.isRegistered ? 'my-sessions' : 'live-upcoming',
+      defaultView: getDefaultView(auth.value.isRegistered),
     });
     history.pushState({}, '', setSessionsParam());
   }
