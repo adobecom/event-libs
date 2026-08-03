@@ -79,6 +79,19 @@
   }
 }
 
+/*
+ * Landscape at this same width tier: let the player go edge-to-edge instead
+ * of the 83.4% cap above — landscape should maximize the video, not center
+ * it with gaps on both sides. Everything else from the block above (column
+ * stacking, horizontal-scrolling session row) still applies; this only
+ * overrides the width.
+ */
+@media (max-width: 1575px) and (orientation: landscape) {
+  .video-playlist {
+    max-width: 100%;
+  }
+}
+
 
 
 .video-playlist .milo-video {
