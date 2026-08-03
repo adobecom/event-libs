@@ -105,12 +105,13 @@
   }
 }
 
-/* "ControlButton", size xl (48px), context on-dark — per Figma dev-mode CSS export. */
+/*
+ * "ControlButton", size xl (48px), context on-dark — per Figma dev-mode CSS
+ * export. Desktop-only: hidden below 900px, matching the slider block's own
+ * carousel-controls treatment — mobile/tablet rely on swipe instead.
+ */
 .upcoming-sessions-controls {
-  display: flex;
-  flex-shrink: 0;
-  align-items: center;
-  gap: var(--s2a-spacing-md, 16px);
+  display: none;
 }
 
 .upcoming-sessions-arrow {
@@ -133,10 +134,16 @@
   background: var(--s2a-color-transparent-black-80, rgb(0 0 0 / 80%));
 }
 
-/* Desktop shows ~3 cards at once with no need to scroll — hide the arrows
-   when there's nothing to scroll to. Mobile always peeks a partial card
-   (1.5 shown), so controls stay regardless of count. */
 @media (width >= 900px) {
+  .upcoming-sessions-controls {
+    display: flex;
+    flex-shrink: 0;
+    align-items: center;
+    gap: var(--s2a-spacing-md, 16px);
+  }
+
+  /* Desktop shows ~3 cards at once with no need to scroll — hide the arrows
+     when there's nothing to scroll to. */
   .upcoming-sessions[data-few-sessions="true"] .upcoming-sessions-controls {
     display: none;
   }

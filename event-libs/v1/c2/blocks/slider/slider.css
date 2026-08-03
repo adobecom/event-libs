@@ -21,11 +21,21 @@
   scroll-snap-align: start;
 }
 
+/* The slider block's own UI (heading/pills/arrows) is desktop-only — hidden
+   below 900px. The card track is a separate sibling element (see
+   locateTrack() in slider.js), so it keeps scrolling/swiping at mobile and
+   tablet regardless; only this block's controls disappear. */
 .carousel-controls {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 16px;
+  display: none;
+}
+
+@media (width >= 900px) {
+  .carousel-controls {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+  }
 }
 
 .carousel-heading {
@@ -102,15 +112,6 @@
 @media (width <= 767px) {
   .carousel-arrows {
     padding-inline: 16px;
-  }
-
-  /* Centered-peek carousel: the focused card sits in the middle of the
-     viewport with the previous/next card peeking in on both sides — matches
-     card-c2's own 327px mobile default width (--card-min-width isn't visible
-     here since it's scoped to .card-c2, not the track). Desktop shows several
-     cards at once, so start-alignment (the base rule) still applies there. */
-  .carousel-track {
-    padding-inline: calc((100% - 327px) / 2);
   }
 
   .carousel-track > .card-c2 {
