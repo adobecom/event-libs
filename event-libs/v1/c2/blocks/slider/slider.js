@@ -153,40 +153,6 @@ function buildArrows(track) {
   return arrowsContainer;
 }
 
-function buildDots(track) {
-  const cards = [...track.querySelectorAll(':scope > .card-c2')];
-  const cardWidth = cards[0]?.clientWidth || 0;
-  const perView = cardWidth > 0 && track.clientWidth > 0
-    ? Math.max(1, Math.round(track.clientWidth / cardWidth))
-    : cards.length;
-  if (cards.length <= perView) return null;
-
-  const pageCount = Math.ceil(cards.length / perView);
-  const dotsList = createTag('ul', { class: 'carousel-dots' });
-  const dots = [];
-  for (let i = 0; i < pageCount; i += 1) {
-    const dot = createTag('li', { class: 'carousel-dot', 'data-page': i });
-    if (i === 0) dot.classList.add('is-active');
-    dotsList.append(dot);
-    dots.push(dot);
-  }
-
-  const observer = new IntersectionObserver((entries) => {
-    entries.forEach((entry) => {
-      if (!entry.isIntersecting) return;
-      const index = cards.indexOf(entry.target);
-      const page = Math.floor(index / perView);
-      dots.forEach((dot, i) => dot.classList.toggle('is-active', i === page));
-    });
-  }, { root: track, threshold: 0.6 });
-
-  cards.forEach((card, i) => {
-    if (i % perView === 0) observer.observe(card);
-  });
-
-  return dotsList;
-}
-
 export default async function init(el) {
   const track = locateTrack(el);
   if (!track) {
@@ -202,12 +168,10 @@ export default async function init(el) {
   const header = buildHeader(headingRow);
   const pills = buildPills(pillsRow);
   const arrows = buildArrows(track);
-  const dots = buildDots(track);
 
   el.innerHTML = '';
   el.classList.add('carousel-controls');
   if (header) el.append(header);
   if (pills) el.append(pills);
   el.append(arrows);
-  if (dots) el.append(dots);
 }

@@ -99,26 +99,6 @@
   transform: rotate(180deg);
 }
 
-.carousel-dots {
-  display: flex;
-  justify-content: center;
-  gap: 8px;
-  list-style: none;
-  margin: 0;
-  padding: 0;
-}
-
-.carousel-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: rgb(0 0 0 / 24%);
-}
-
-.carousel-dot.is-active {
-  background: #000;
-}
-
 @media (width <= 767px) {
   .carousel-arrows {
     padding-inline: 16px;

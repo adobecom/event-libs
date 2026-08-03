@@ -425,6 +425,12 @@ export default async function init(el) {
 }
 
 async function decorate(el) {
+  // Mirrors sessions-hub's own defensive re-init cleanup (sessions-hub.js) —
+  // there's no framework-level teardown hook for this block, so if decorate()
+  // ever runs again on the same el (re-decoration), tear down the previous
+  // instance's timers/polling/subscriptions/listener before building new ones.
+  el._upcomingSessionsCleanup?.();
+
   attachToPrecedingBlock(el);
 
   const rows = el.querySelectorAll(':scope > div');

@@ -160,6 +160,24 @@ describe('upcoming-sessions', () => {
 
       expect(pushedUrl).to.contain('session=session-1');
     });
+
+    it('tears down the previous instance\'s cleanup when the block is re-decorated', async () => {
+      const el = buildBlock([session()]);
+      await init(el);
+
+      const firstCleanup = el._upcomingSessionsCleanup;
+      expect(firstCleanup).to.be.a('function');
+      let called = false;
+      el._upcomingSessionsCleanup = () => {
+        called = true;
+        firstCleanup();
+      };
+
+      await init(el);
+
+      expect(called).to.equal(true);
+      expect(el._upcomingSessionsCleanup).to.not.equal(firstCleanup);
+    });
   });
 
   describe('buildCard', () => {
@@ -169,18 +187,17 @@ describe('upcoming-sessions', () => {
       expect(card.querySelector('.sg-live-card__title').textContent).to.equal('Intro to Adobe Express');
     });
 
-    it('shows a Live Now badge and hides the schedule button for a live session', () => {
-      const live = session({
+    it('always renders the upcoming state, never a live badge — cards are dropped on start instead of switching to live', () => {
+      const started = session({
         sessionTimes: [{
           startTimeMillis: Date.now() - 60_000,
           endTimeMillis: Date.now() + 3_600_000,
           timezone: 'America/Los_Angeles',
         }],
       });
-      const card = buildCard(live);
-      expect(card.querySelector('.sg-live-card__time').textContent).to.equal('Live Now');
-      expect(card.querySelector('.sg-live-card__btn--schedule')).to.equal(null);
-      expect(card.querySelector('.sg-live-card__btn--favorite')).to.not.equal(null);
+      const card = buildCard(started);
+      expect(card.querySelector('.sg-live-card__time').textContent).to.not.equal('Live Now');
+      expect(card.querySelector('.sg-live-card__btn--schedule')).to.not.equal(null);
     });
 
     it('shows the schedule button for an upcoming session', () => {
@@ -188,8 +205,8 @@ describe('upcoming-sessions', () => {
       expect(card.querySelector('.sg-live-card__btn--schedule')).to.not.equal(null);
     });
 
-    it('routes a live-session card click to its Watch URL, not session-guide', () => {
-      const live = session({
+    it('routes a card click to the session-guide deep link regardless of session start time', () => {
+      const started = session({
         watchUrl: 'https://example.com/watch/s-001',
         sessionTimes: [{
           startTimeMillis: Date.now() - 60_000,
@@ -197,33 +214,26 @@ describe('upcoming-sessions', () => {
           timezone: 'America/Los_Angeles',
         }],
       });
-      document.body.append(buildCard(live));
+      document.body.append(buildCard(started));
 
-      const originalAssign = window.location.assign;
-      let assignedUrl = null;
-      try {
-        Object.defineProperty(window.location, 'assign', {
-          configurable: true,
-          value: (url) => { assignedUrl = url; },
-        });
-      } catch {
-        // Some browsers lock down Location.prototype; the resolveClickAction
-        // unit tests below cover this decision without touching window.location.
-      }
+      const originalPushState = window.history.pushState;
+      let pushedUrl = null;
+      window.history.pushState = (state, title, url) => { pushedUrl = url; };
 
       document.querySelector('.sg-live-card').click();
+      window.history.pushState = originalPushState;
 
-      try {
-        Object.defineProperty(window.location, 'assign', { configurable: true, value: originalAssign });
-      } catch { /* see above */ }
-
-      if (assignedUrl !== null) expect(assignedUrl).to.equal('https://example.com/watch/s-001');
+      expect(pushedUrl).to.contain('session=session-1');
     });
   });
 
   describe('resolveClickAction', () => {
-    it('resolves a live session to a watch-url click action, not session-guide', () => {
-      const live = session({
+    it('resolves an upcoming session to a session-guide click action', () => {
+      expect(resolveClickAction(session())).to.deep.equal({ type: 'session-guide', sessionId: 'session-1' });
+    });
+
+    it('resolves to session-guide regardless of session start time or url — cards are dropped on start rather than switching to a live/watch action', () => {
+      const started = session({
         url: 'https://example.com/watch/s-001',
         sessionTimes: [{
           startTimeMillis: Date.now() - 60_000,
@@ -231,36 +241,7 @@ describe('upcoming-sessions', () => {
           timezone: 'America/Los_Angeles',
         }],
       });
-      expect(resolveClickAction(live)).to.deep.equal({ type: 'watch', url: 'https://example.com/watch/s-001' });
-    });
-
-    it('prefers watchUrl over url for a live session, matching sessions-guide LiveCard', () => {
-      const live = session({
-        url: 'https://example.com/sessions/s-001',
-        watchUrl: 'https://example.com/watch/s-001',
-        sessionTimes: [{
-          startTimeMillis: Date.now() - 60_000,
-          endTimeMillis: Date.now() + 3_600_000,
-          timezone: 'America/Los_Angeles',
-        }],
-      });
-      expect(resolveClickAction(live)).to.deep.equal({ type: 'watch', url: 'https://example.com/watch/s-001' });
-    });
-
-    it('resolves an upcoming session to a session-guide click action', () => {
-      expect(resolveClickAction(session())).to.deep.equal({ type: 'session-guide', sessionId: 'session-1' });
-    });
-
-    it('resolves a javascript: URL on a live session to no action (safeUrl guard)', () => {
-      const live = session({
-        url: 'javascript:alert(1)',
-        sessionTimes: [{
-          startTimeMillis: Date.now() - 60_000,
-          endTimeMillis: Date.now() + 3_600_000,
-          timezone: 'America/Los_Angeles',
-        }],
-      });
-      expect(resolveClickAction(live)).to.deep.equal({ type: 'none' });
+      expect(resolveClickAction(started)).to.deep.equal({ type: 'session-guide', sessionId: 'session-1' });
     });
   });
 });

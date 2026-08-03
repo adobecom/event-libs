@@ -2,12 +2,16 @@ import { META_REG } from '../utils/constances.js';
 import { getMetadata } from '../utils/utils.js';
 
 const SESSION_CODE_PATTERN = /^s\d+$/i;
+// card-c2.js's own aspect-ratio variant classes (e.g. "ratio-3-4") can be authored
+// alongside the hydrate classes on the same block — exclude them here too, or they'd
+// get mistaken for the metadata-key class.
+const RATIO_VARIANT_PATTERN = /^ratio-\d+-\d+$/;
 
 function getMetadataKeyAndSessionCode(block) {
   let metadataKey;
   let sessionCode;
   [...block.classList].forEach((cls) => {
-    if (cls === 'card-c2' || cls === 'hydrate') return;
+    if (cls === 'card-c2' || cls === 'hydrate' || RATIO_VARIANT_PATTERN.test(cls)) return;
     if (SESSION_CODE_PATTERN.test(cls)) {
       sessionCode = cls.toLowerCase();
     } else {

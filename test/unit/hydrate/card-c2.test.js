@@ -149,6 +149,25 @@ describe('card-c2 hydrator', () => {
     expect(block.dataset.sessionId).to.be.undefined;
   });
 
+  it('ignores a ratio-variant class when detecting the metadata key', async () => {
+    document.body.innerHTML = `
+      <div class="card-c2 hydrate featured-sessions ratio-3-4 s6210">
+        <div><div><picture><img src="/media/s6210.jpg" alt=""></picture></div></div>
+        ${AUTHORED_CONTENT}
+      </div>
+    `;
+
+    await hydrateBlocks(document);
+
+    const block = document.querySelector('.card-c2');
+    expect(tokensIn(block)).to.deep.equal([
+      'featured-sessions:0.enTitle',
+      'featured-sessions:0.track',
+      'featured-sessions:0.url',
+    ]);
+    expect(block.dataset.sessionId).to.equal('1c2f7e9a-3b4d-4e21-9a6f-6d1f1a2b3c4d');
+  });
+
   it('leaves the authored picture untouched — images are never tokenized', async () => {
     document.body.innerHTML = `
       <div class="card-c2 hydrate featured-sessions s6210">
