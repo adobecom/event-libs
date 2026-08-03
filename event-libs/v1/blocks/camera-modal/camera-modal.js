@@ -31,7 +31,7 @@ export default async function init(el) {
 
   el.innerHTML = '';
   el.classList.add('camera-modal-content');
-  el.append(actionsPane, cameraPane);
+  el.append(cameraPane, actionsPane);
 
   const onModalClosed = () => {
     window.removeEventListener('milo:modal:closed', onModalClosed);
