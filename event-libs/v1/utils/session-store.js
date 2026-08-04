@@ -28,6 +28,7 @@ export const sessionGuideRequest = signal(null);
 
 let initialized = false;
 let apiConfig = null;
+let myDataAttempted = false;
 
 // getEventServiceEnv() resolves dev/dev02/stage/stage02/prod/local; the media-relay
 // backend only has dev/stage/prod environments, so the finer-grained names collapse.
@@ -88,6 +89,7 @@ function syncAuth() {
         isRegistered: devAuth.isRegistered ?? undefined,
         userFirstName: devAuth.userFirstName ?? null,
       };
+      maybeLoadMyData();
       return;
     }
   } catch { /* ignore */ }
@@ -99,6 +101,7 @@ function syncAuth() {
     isRegistered: rsvp?.registered === true,
     userFirstName: profile?.first_name ?? null,
   };
+  maybeLoadMyData();
 }
 
 // Entries are RF's session-time objects, not bare ids — match sessionTimeID against
@@ -123,6 +126,18 @@ async function loadMyData() {
   }
 }
 
+// myData is a per-attendee schedule/favorites call — pointless (and liable to error or return
+// someone else's stale-looking empty state) for a guest or unregistered visitor, unlike the
+// ESL session catalog, which loads for everyone regardless of auth. Runs once, whichever
+// resolves last between the catalog loading and auth confirming logged-in + registered.
+function maybeLoadMyData() {
+  if (myDataAttempted) return;
+  if (sessionsStatus.value !== 'ready') return;
+  if (!auth.value.isLoggedIn || !auth.value.isRegistered) return;
+  myDataAttempted = true;
+  loadMyData();
+}
+
 async function loadSessions() {
   sessionsStatus.value = 'loading';
   probeEslPayload(); // TEMP: fire-and-forget, see sessions-api.js for why
@@ -135,7 +150,7 @@ async function loadSessions() {
     });
     const mrSessions = sessions.value.filter((s) => s.mrStreamId);
     startPolling(mrSessions, apiConfig.mrEnv, (active) => { liveStreamActiveIds.value = active; });
-    loadMyData();
+    maybeLoadMyData();
   } catch (err) {
     window.lana?.log(`[session-store] sessions fetch failed: ${err.message}`);
     sessionsStatus.value = 'error';
