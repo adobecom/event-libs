@@ -4,7 +4,8 @@ import { getMetadata, getEventServiceEnv } from './utils.js';
 import { fetchSessions, probeEslPayload } from '../services/sessions/sessions-api.js';
 import { startPolling } from '../services/sessions/poller.js';
 import {
-  addSession, removeSession, toggleSessionInterest, DEFAULT_RF_API_URL, DEFAULT_RF_PROFILE_ID,
+  fetchMyData, addSession, removeSession, toggleSessionInterest,
+  DEFAULT_RF_API_URL, DEFAULT_RF_PROFILE_ID,
 } from '../services/sessions/rainfocus.js';
 import { mountToast } from '../features/toast/toast.js';
 
@@ -100,6 +101,21 @@ function syncAuth() {
   };
 }
 
+// Reconciles scheduled/favorited with the real RF call once it resolves — loadPersisted()
+// already gave the UI a synchronous fallback from localStorage/dev-seed data.
+async function loadMyData() {
+  try {
+    // TODO: replace null credentials with real rfAuthToken/clientId from auth integration
+    const data = await fetchMyData(null, null, apiConfig.profileId, apiConfig.apiUrl);
+    batch(() => {
+      scheduled.value = new Set(data.scheduled);
+      favorited.value = new Set(data.favorited);
+    });
+  } catch (err) {
+    window.lana?.log(`[session-store] myData fetch failed: ${err.message}`);
+  }
+}
+
 async function loadSessions() {
   sessionsStatus.value = 'loading';
   probeEslPayload(); // TEMP: fire-and-forget, see sessions-api.js for why
@@ -168,6 +184,7 @@ export function initSessionState() {
   BlockMediator.subscribe('rsvpData', syncAuth);
   scheduled.subscribe(persistScheduled);
   favorited.subscribe(persistFavorited);
+  loadMyData();
   loadSessions();
 }
 

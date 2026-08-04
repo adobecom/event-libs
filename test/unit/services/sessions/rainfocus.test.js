@@ -1,7 +1,7 @@
 import { expect } from '@esm-bundle/chai';
 import {
-  fetchScheduled, fetchFavorited, addSession, removeSession, toggleSessionInterest,
-  DEFAULT_RF_API_URL, DEFAULT_RF_PROFILE_ID, RF_PROFILE_IDS,
+  fetchMyData, addSession, removeSession, toggleSessionInterest,
+  DEFAULT_RF_API_URL, DEFAULT_RF_PROFILE_ID, RF_PROFILE_IDS, RF_WIDGET_ID,
 } from '../../../../event-libs/v1/services/sessions/rainfocus.js';
 
 describe('services/sessions/rainfocus', () => {
@@ -34,44 +34,36 @@ describe('services/sessions/rainfocus', () => {
     window.fetch = originalFetch;
   });
 
-  describe('fetchScheduled', () => {
-    it('builds the mySchedule request with all params and returns the array', async () => {
-      stubFetch({ mySchedule: ['session-1', 'session-3'] });
-      const result = await fetchScheduled('auth-token', 'client-1', 'profile-1', 'https://example.com/rf/');
-      expect(result).to.deep.equal(['session-1', 'session-3']);
+  describe('fetchMyData', () => {
+    it('builds the myData request with rfWidgetId and returns scheduled/favorited', async () => {
+      stubFetch({ mySchedule: ['session-1', 'session-3'], myInterests: ['session-2'] });
+      const result = await fetchMyData('auth-token', 'client-1', 'profile-1', 'https://example.com/rf/');
+      expect(result).to.deep.equal({ scheduled: ['session-1', 'session-3'], favorited: ['session-2'] });
       const url = new URL(lastRequest);
-      expect(url.origin + url.pathname).to.equal('https://example.com/rf/mySchedule');
+      expect(url.origin + url.pathname).to.equal('https://example.com/rf/myData');
       expect(url.searchParams.get('rfApiProfileId')).to.equal('profile-1');
       expect(url.searchParams.get('rfAuthToken')).to.equal('auth-token');
       expect(url.searchParams.get('clientId')).to.equal('client-1');
+      expect(url.searchParams.get('rfWidgetId')).to.equal(RF_WIDGET_ID);
     });
 
     it('falls back to DEFAULT_RF_API_URL when no rfApiUrl is provided', async () => {
-      stubFetch({ mySchedule: [] });
-      await fetchScheduled(null, null, 'profile-1', undefined);
+      stubFetch({});
+      await fetchMyData(null, null, 'profile-1', undefined);
       expect(lastRequest.startsWith(DEFAULT_RF_API_URL)).to.be.true;
     });
 
     it('appends endpoint to rfApiUrl even when it is missing a trailing slash', async () => {
-      stubFetch({ mySchedule: [] });
-      await fetchScheduled(null, null, 'profile-1', 'https://example.com/rf');
-      const url = new URL(lastRequest);
-      expect(url.origin + url.pathname).to.equal('https://example.com/rf/mySchedule');
-    });
-
-    it('returns an empty array when mySchedule is missing from the response', async () => {
       stubFetch({});
-      const result = await fetchScheduled(null, null, 'profile-1', 'https://example.com/rf/');
-      expect(result).to.deep.equal([]);
+      await fetchMyData(null, null, 'profile-1', 'https://example.com/rf');
+      const url = new URL(lastRequest);
+      expect(url.origin + url.pathname).to.equal('https://example.com/rf/myData');
     });
-  });
 
-  describe('fetchFavorited', () => {
-    it('builds the myInterests request and returns the array', async () => {
-      stubFetch({ myInterests: ['session-2'] });
-      const result = await fetchFavorited('auth-token', 'client-1', 'profile-1', 'https://example.com/rf/');
-      expect(result).to.deep.equal(['session-2']);
-      expect(lastRequest).to.include('/rf/myInterests');
+    it('defaults scheduled/favorited to empty arrays when missing from the response', async () => {
+      stubFetch({});
+      const result = await fetchMyData(null, null, 'profile-1', 'https://example.com/rf/');
+      expect(result).to.deep.equal({ scheduled: [], favorited: [] });
     });
   });
 

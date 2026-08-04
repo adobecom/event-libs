@@ -15,9 +15,12 @@ export const RF_PROFILE_IDS = {
 // Current/upcoming event — update when the next MAX supersedes it.
 export const DEFAULT_RF_PROFILE_ID = RF_PROFILE_IDS.max26;
 
+// Same value for every event seen so far (Summit and MAX alike) — the legacy northstar
+// client's per-event widget ids (e.g. a separate Summit 2021 one) are retired/unused.
+export const RF_WIDGET_ID = 'RCitHYXguvb7I6o4Ps9T5weDqIK9xRYb';
+
 const ENDPOINTS = {
-  GET_FAVORITES: 'myInterests',
-  GET_SCHEDULE: 'mySchedule',
+  MY_DATA: 'myData',
   TOGGLE_FAVORITES: 'toggleSessionInterest',
   ADD_TO_SCHEDULE: 'addSession',
   REMOVE_FROM_SCHEDULE: 'removeSession',
@@ -56,18 +59,17 @@ function handleWriteResponse(data) {
   }
 }
 
-export async function fetchScheduled(rfAuthToken, clientId, rfApiProfileId, rfApiUrl) {
-  const data = await rawFetch(rfApiUrl, ENDPOINTS.GET_SCHEDULE, {
-    rfApiProfileId, rfAuthToken, clientId,
+// The first call on landing on an event page — fetches the signed-in attendee's schedule
+// and favorites in one request. Field names assumed from mySchedule/myInterests' own
+// naming; unconfirmed against real myData traffic.
+export async function fetchMyData(rfAuthToken, clientId, rfApiProfileId, rfApiUrl) {
+  const data = await rawFetch(rfApiUrl, ENDPOINTS.MY_DATA, {
+    rfApiProfileId, rfAuthToken, clientId, rfWidgetId: RF_WIDGET_ID,
   });
-  return data?.mySchedule ?? [];
-}
-
-export async function fetchFavorited(rfAuthToken, clientId, rfApiProfileId, rfApiUrl) {
-  const data = await rawFetch(rfApiUrl, ENDPOINTS.GET_FAVORITES, {
-    rfApiProfileId, rfAuthToken, clientId,
-  });
-  return data?.myInterests ?? [];
+  return {
+    scheduled: data?.mySchedule ?? [],
+    favorited: data?.myInterests ?? [],
+  };
 }
 
 export async function addSession(sessionTimeId, rfAuthToken, clientId, rfApiProfileId, rfApiUrl) {
