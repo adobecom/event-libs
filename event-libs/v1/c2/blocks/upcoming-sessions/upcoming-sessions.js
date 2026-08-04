@@ -549,8 +549,9 @@ async function decorate(el) {
   el.innerHTML = '';
   el.setAttribute('role', 'region');
   if (heading) el.setAttribute('aria-label', heading);
-  // Desktop hides the scroll arrows entirely when there's nothing to scroll to.
-  el.dataset.fewSessions = String(sessions.length <= 3);
+  // Desktop only shows the scroll arrows when there's more than one card's
+  // worth of peeking to scroll to (i.e. more than 2 sessions).
+  el.dataset.fewSessions = String(sessions.length <= 2);
 
   const track = createTag('div', { class: 'upcoming-sessions-track' });
   renderTrack(track, sessions);

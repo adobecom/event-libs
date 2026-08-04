@@ -95,6 +95,22 @@ describe('upcoming-sessions', () => {
       expect(el.querySelector('.upcoming-sessions-heading').textContent).to.equal('Upcoming');
     });
 
+    it('marks data-few-sessions=true (arrows hidden) with 2 or fewer sessions', async () => {
+      const el = buildBlock([session(), session({ sessionId: 'session-2' })]);
+      await init(el);
+      expect(el.dataset.fewSessions).to.equal('true');
+    });
+
+    it('marks data-few-sessions=false (arrows shown) with more than 2 sessions', async () => {
+      const el = buildBlock([
+        session(),
+        session({ sessionId: 'session-2' }),
+        session({ sessionId: 'session-3' }),
+      ]);
+      await init(el);
+      expect(el.dataset.fewSessions).to.equal('false');
+    });
+
     it('removes itself entirely when the authored array is empty', async () => {
       const el = buildBlock([]);
       await init(el);
