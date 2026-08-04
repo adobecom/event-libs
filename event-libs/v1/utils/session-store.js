@@ -101,15 +101,24 @@ function syncAuth() {
   };
 }
 
+// mySchedule/sessionInterests entries are RF's own session-time objects, not bare ids —
+// match each one's sessionTimeID against session.rfCode, which scheduleSession()/
+// favoriteSession() already send as RF's sessionTimeId, to recover our internal session.id.
+function mapToSessionIds(entries) {
+  const idByRfCode = new Map(sessions.value.map((s) => [s.rfCode, s.id]));
+  return (entries || []).map((entry) => idByRfCode.get(entry.sessionTimeID)).filter(Boolean);
+}
+
 // Reconciles scheduled/favorited with the real RF call once it resolves — loadPersisted()
-// already gave the UI a synchronous fallback from localStorage/dev-seed data.
+// already gave the UI a synchronous fallback from localStorage/dev-seed data. Runs after
+// the session catalog loads, since mapToSessionIds() needs it.
 async function loadMyData() {
   try {
     // TODO: replace null with a real rfAuthToken from auth integration
     const data = await fetchMyData(null, apiConfig.profileId, apiConfig.apiUrl);
     batch(() => {
-      scheduled.value = new Set(data.scheduled);
-      favorited.value = new Set(data.favorited);
+      scheduled.value = new Set(mapToSessionIds(data.scheduled));
+      favorited.value = new Set(mapToSessionIds(data.favorited));
     });
   } catch (err) {
     window.lana?.log(`[session-store] myData fetch failed: ${err.message}`);
@@ -128,6 +137,7 @@ async function loadSessions() {
     });
     const mrSessions = sessions.value.filter((s) => s.mrStreamId);
     startPolling(mrSessions, apiConfig.mrEnv, (active) => { liveStreamActiveIds.value = active; });
+    loadMyData();
   } catch (err) {
     window.lana?.log(`[session-store] sessions fetch failed: ${err.message}`);
     sessionsStatus.value = 'error';
@@ -184,7 +194,6 @@ export function initSessionState() {
   BlockMediator.subscribe('rsvpData', syncAuth);
   scheduled.subscribe(persistScheduled);
   favorited.subscribe(persistFavorited);
-  loadMyData();
   loadSessions();
 }
 
