@@ -4,9 +4,9 @@ import {
   scheduled,
   pendingActions,
   initSessionState,
+  openSessionGuideDetail,
 } from '../../../utils/session-store.js';
 import { scheduleWithFeedback, favoriteWithFeedback } from '../../../services/sessions/action-feedback.js';
-import { setSessionParam } from '../../../blocks/sessions-guide/utils/url.js';
 import MobileRiderController from '../../../services/sessions/mobile-rider-controller.js';
 
 const ROTATE_OUT_MS = 350;
@@ -205,12 +205,6 @@ function toRfSession(session) {
  */
 export function resolveClickAction(session) {
   return { type: 'session-guide', sessionId: session.sessionId };
-}
-
-/** Mirrors SessionCard/LiveCard's own `?session=` deep-link mechanism in sessions-guide. */
-function openSessionGuideDetail(sessionId) {
-  window.history.pushState({}, '', setSessionParam(sessionId));
-  window.dispatchEvent(new PopStateEvent('popstate'));
 }
 
 function routeCardClick(session) {

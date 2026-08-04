@@ -1,5 +1,6 @@
-import { setSessionParam, safeUrl } from '../../../blocks/sessions-guide/utils/url.js';
+import { safeUrl } from '../../../blocks/sessions-guide/utils/url.js';
 import { deriveSessionState } from '../../../utils/session-state.js';
+import { openSessionGuideDetail } from '../../../utils/session-store.js';
 import MobileRiderController from '../../../services/sessions/mobile-rider-controller.js';
 
 const MR_POLL_INTERVAL_MS = 30 * 1000;
@@ -77,12 +78,6 @@ export function resolveCardAction(dataset, nowMs = now(), activeStreamIds = live
 
   const url = safeUrl(state === 'live' ? (watchUrl || sessionUrl) : sessionUrl);
   return url ? { type: 'navigate', url } : { type: 'none' };
-}
-
-/** Mirrors sessions-guide's own `?session=` deep-link mechanism (pushState + popstate). */
-function openSessionGuideDetail(sessionId) {
-  window.history.pushState({}, '', setSessionParam(sessionId));
-  window.dispatchEvent(new PopStateEvent('popstate'));
 }
 
 function runAction(action) {

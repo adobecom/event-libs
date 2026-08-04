@@ -1,7 +1,7 @@
 import { expect } from '@esm-bundle/chai';
 import init, { resolveClickAction, buildCard } from '../../../../../event-libs/v1/c2/blocks/upcoming-sessions/upcoming-sessions.js';
 import {
-  scheduled, favorited, pendingActions, liveStreamActiveIds,
+  scheduled, favorited, pendingActions, liveStreamActiveIds, sessionGuideRequest,
 } from '../../../../../event-libs/v1/utils/session-store.js';
 
 function buildSectionMetadata(entries) {
@@ -70,6 +70,7 @@ describe('upcoming-sessions', () => {
     favorited.value = new Set();
     pendingActions.value = new Set();
     liveStreamActiveIds.value = new Set();
+    sessionGuideRequest.value = null;
   });
 
   describe('init(el)', () => {
@@ -164,14 +165,9 @@ describe('upcoming-sessions', () => {
       const el = buildBlock([session()]);
       await init(el);
 
-      const originalPushState = window.history.pushState;
-      let pushedUrl = null;
-      window.history.pushState = (state, title, url) => { pushedUrl = url; };
-
       el.querySelector('.upcoming-sessions-card').click();
-      window.history.pushState = originalPushState;
 
-      expect(pushedUrl).to.contain('session=session-1');
+      expect(sessionGuideRequest.value).to.deep.equal({ sessionId: 'session-1' });
     });
 
     it('tears down the previous instance\'s cleanup when the block is re-decorated', async () => {
@@ -254,14 +250,9 @@ describe('upcoming-sessions', () => {
       });
       document.body.append(buildCard(started));
 
-      const originalPushState = window.history.pushState;
-      let pushedUrl = null;
-      window.history.pushState = (state, title, url) => { pushedUrl = url; };
-
       document.querySelector('.sg-card').click();
-      window.history.pushState = originalPushState;
 
-      expect(pushedUrl).to.contain('session=session-1');
+      expect(sessionGuideRequest.value).to.deep.equal({ sessionId: 'session-1' });
     });
 
     it('renders a resolved category badge in the badge-row and repeats it in the footer, alongside the plain track label and time', () => {
