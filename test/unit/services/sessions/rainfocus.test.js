@@ -85,10 +85,14 @@ describe('services/sessions/rainfocus', () => {
   });
 
   describe('fetchMyData', () => {
-    it('builds the myData request with rfWidgetId and returns scheduled/favorited', async () => {
-      stubFetch({ mySchedule: ['session-1', 'session-3'], sessionInterests: ['session-2'] });
+    it('builds the myData request with rfWidgetId and returns scheduled/favorited/loggedInUser', async () => {
+      stubFetch({
+        mySchedule: ['session-1', 'session-3'], sessionInterests: ['session-2'], loggedInUser: { firstName: 'Test' },
+      });
       const result = await fetchMyData('auth-token', 'profile-1', 'https://example.com/rf/');
-      expect(result).to.deep.equal({ scheduled: ['session-1', 'session-3'], favorited: ['session-2'] });
+      expect(result).to.deep.equal({
+        scheduled: ['session-1', 'session-3'], favorited: ['session-2'], loggedInUser: { firstName: 'Test' },
+      });
       const url = new URL(lastRequest);
       expect(url.origin + url.pathname).to.equal('https://example.com/rf/myData');
       expect(url.searchParams.get('rfApiProfileId')).to.equal('profile-1');
@@ -110,10 +114,10 @@ describe('services/sessions/rainfocus', () => {
       expect(url.origin + url.pathname).to.equal('https://example.com/rf/myData');
     });
 
-    it('defaults scheduled/favorited to empty arrays when missing from the response', async () => {
+    it('defaults scheduled/favorited/loggedInUser when missing from the response', async () => {
       stubFetch({});
       const result = await fetchMyData(null, 'profile-1', 'https://example.com/rf/');
-      expect(result).to.deep.equal({ scheduled: [], favorited: [] });
+      expect(result).to.deep.equal({ scheduled: [], favorited: [], loggedInUser: null });
     });
   });
 

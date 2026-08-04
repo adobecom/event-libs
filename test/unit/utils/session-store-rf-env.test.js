@@ -1,6 +1,6 @@
 import { expect } from '@esm-bundle/chai';
-import { setMetadata } from '../../../event-libs/v1/utils/utils.js';
-import { STAGE_RF_API_URL, DEFAULT_RF_PROFILE_ID } from '../../../event-libs/v1/services/sessions/rainfocus.js';
+import { setMetadata, getEventConfig, updateEventConfig } from '../../../event-libs/v1/utils/utils.js';
+import { DEFAULT_RF_API_URL, STAGE_RF_API_URL } from '../../../event-libs/v1/services/sessions/rainfocus.js';
 
 // session-store.js holds module-level singleton state (initialized, apiConfig, etc.) that
 // @web/test-runner does not reliably reset between test files sharing a worker session —
@@ -20,24 +20,28 @@ function waitForSessionsReady() {
   });
 }
 
-describe('session-store: RF defaults when tier-1-event-config omits them', () => {
+describe('session-store: RF endpoint default matches milo\'s real page env', () => {
+  let originalConfig;
+
   before(async () => {
+    // getEventConfig() is a real, shared singleton (like BlockMediator) — the global mock sets
+    // miloConfig.env.name: 'local' for every test; override to 'prod' just for this one.
+    originalConfig = getEventConfig();
+    updateEventConfig(originalConfig, { ...originalConfig.miloConfig, env: { name: 'prod' } });
+
     setMetadata('tier-1-event-config', JSON.stringify({ allowDoubleBooking: true }));
     initSessionState();
     await waitForSessionsReady();
   });
 
   after(() => {
+    updateEventConfig(originalConfig, originalConfig.miloConfig);
     document.head.querySelector('meta[name="tier-1-event-config"]')?.remove();
   });
 
-  // The test harness's global miloConfig mock (test/unit/scripts/mocks/event-config.js) sets
-  // env.name: 'local' — the same non-prod IMS environment a real local dev session would have
-  // — so the env-aware default correctly resolves to the stage RF endpoint here, not the prod
-  // one (see session-store-rf-env.test.js for the 'prod' branch).
-  it('falls back to STAGE_RF_API_URL/DEFAULT_RF_PROFILE_ID', () => {
+  it('uses DEFAULT_RF_API_URL (not STAGE_RF_API_URL) when miloConfig.env.name is prod', () => {
     const apiConfig = getApiConfig();
-    expect(apiConfig.apiUrl).to.equal(STAGE_RF_API_URL);
-    expect(apiConfig.profileId).to.equal(DEFAULT_RF_PROFILE_ID);
+    expect(apiConfig.apiUrl).to.equal(DEFAULT_RF_API_URL);
+    expect(apiConfig.apiUrl).to.not.equal(STAGE_RF_API_URL);
   });
 });

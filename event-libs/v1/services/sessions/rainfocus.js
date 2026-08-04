@@ -10,6 +10,13 @@
 // Confirmed live via real MAX 2025 traffic — reverse-proxies to RF, avoiding CORS/IP allowlist.
 export const DEFAULT_RF_API_URL = 'https://www.adobe.com/max-api/';
 
+// Non-prod counterpart — mirrors milo's own env-switching convention for RF calls
+// (libs/features/mep/addons/event.js proxies its own RF route the same way: prod uses
+// www.adobe.com, everything else uses www.stage.adobe.com). A stage-IMS profile's clientId
+// won't resolve against prod RF, so this needs to match whichever IMS environment is active.
+// Not confirmed via real max-api traffic specifically, only inferred from that precedent.
+export const STAGE_RF_API_URL = 'https://www.stage.adobe.com/max-api/';
+
 // Not secrets — RainFocus restricts access by IP allowlist, not by this value.
 export const RF_PROFILE_IDS = {
   max25: 'MAX25ggj84gt2s0u73vzzzSESSIONHUB',
@@ -73,8 +80,9 @@ export async function fetchAuthToken(clientId, rfApiProfileId, rfApiUrl) {
 }
 
 // The first call on landing on an event page — schedule + favorites in one request. Real
-// response also includes exhibitorInterests/exhibitorLeadSetting/exhibitorLeads/loggedInUser,
-// not needed here.
+// response also includes exhibitorInterests/exhibitorLeadSetting/exhibitorLeads — not needed
+// here. loggedInUser is: a populated attendee record confirms the caller is registered for
+// this event in RF, which session-store.js uses as the registration signal.
 export async function fetchMyData(rfAuthToken, rfApiProfileId, rfApiUrl) {
   const data = await rawFetch(rfApiUrl, ENDPOINTS.MY_DATA, {
     rfApiProfileId, rfAuthToken, rfWidgetId: RF_WIDGET_ID,
@@ -82,6 +90,7 @@ export async function fetchMyData(rfAuthToken, rfApiProfileId, rfApiUrl) {
   return {
     scheduled: data?.mySchedule ?? [],
     favorited: data?.sessionInterests ?? [],
+    loggedInUser: data?.loggedInUser ?? null,
   };
 }
 

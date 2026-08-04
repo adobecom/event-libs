@@ -1,16 +1,13 @@
 import { signal, batch } from '../deps/htm-preact.js';
 import BlockMediator from '../deps/block-mediator.min.js';
-import { getMetadata, getEventServiceEnv } from './utils.js';
+import { getMetadata, getEventServiceEnv, getEventConfig } from './utils.js';
 import { fetchSessions, probeEslPayload } from '../services/sessions/sessions-api.js';
 import { startPolling } from '../services/sessions/poller.js';
 import {
-  fetchMyData, addSession, removeSession, toggleSessionInterest,
-  DEFAULT_RF_API_URL, DEFAULT_RF_PROFILE_ID,
+  fetchAuthToken, fetchMyData, addSession, removeSession, toggleSessionInterest,
+  DEFAULT_RF_API_URL, STAGE_RF_API_URL, DEFAULT_RF_PROFILE_ID,
 } from '../services/sessions/rainfocus.js';
 import { mountToast } from '../features/toast/toast.js';
-
-const LS_SCHEDULED = 'sessions:scheduled';
-const LS_FAVORITED = 'sessions:favorited';
 
 // Shared, page-level state. Preact components read `.value` directly during
 // render for fine-grained reactivity; non-Preact code uses `.subscribe()`/`.peek()`.
@@ -31,6 +28,9 @@ let apiConfig = null;
 let myDataAttempted = false;
 let hasLoggedImsStatus = false;
 let realAuthConfirmed = false;
+let rfAuthToken = null;
+let rfAuthTokenStarted = false;
+let rfAuthTokenSettled = false;
 
 // getEventServiceEnv() resolves dev/dev02/stage/stage02/prod/local; the media-relay
 // backend only has dev/stage/prod environments, so the finer-grained names collapse.
@@ -41,42 +41,14 @@ function deriveMrEnv() {
   return 'dev';
 }
 
-// TODO: remove once real IMS/Rainfocus auth is wired up — simulates a logged-in,
-// registered user with a pre-seeded schedule/favorites across all environments.
-const SEED_SCHEDULED = ['k-001', 's-001', 's-002', 's-006'];
-const SEED_FAVORITED = ['k-001', 's-001', 's-003', 's-007'];
-
-function seedDevData() {
-  try {
-    if (!localStorage.getItem('sg:dev-auth')) {
-      localStorage.setItem('sg:dev-auth', JSON.stringify({
-        isLoggedIn: true,
-        isRegistered: true,
-        userFirstName: 'Dev',
-      }));
-    }
-    if (!localStorage.getItem(LS_SCHEDULED)) {
-      localStorage.setItem(LS_SCHEDULED, JSON.stringify(SEED_SCHEDULED));
-    }
-    if (!localStorage.getItem(LS_FAVORITED)) {
-      localStorage.setItem(LS_FAVORITED, JSON.stringify(SEED_FAVORITED));
-    }
-  } catch { /* ignore */ }
-}
-
-function loadPersisted() {
-  try {
-    scheduled.value = new Set(JSON.parse(localStorage.getItem(LS_SCHEDULED) || '[]'));
-    favorited.value = new Set(JSON.parse(localStorage.getItem(LS_FAVORITED) || '[]'));
-  } catch { /* localStorage unavailable */ }
-}
-
-function persistScheduled() {
-  try { localStorage.setItem(LS_SCHEDULED, JSON.stringify([...scheduled.value])); } catch { /* unavailable */ }
-}
-
-function persistFavorited() {
-  try { localStorage.setItem(LS_FAVORITED, JSON.stringify([...favorited.value])); } catch { /* unavailable */ }
+// Milo's own page env (local/stage/prod, from getConfig() — see mobile-rider.js for the same
+// pattern), not the ESP-specific event-service-env: RF availability depends on which IMS
+// environment produced profile.userId (a stage-IMS clientId won't resolve against prod RF),
+// and milo's local env mirrors stage's IMS (ENVS.local = { ...ENVS.stage }), so only prod is
+// truly prod here.
+function defaultRfApiUrlForEnv() {
+  const isProd = getEventConfig()?.miloConfig?.env?.name === 'prod';
+  return isProd ? DEFAULT_RF_API_URL : STAGE_RF_API_URL;
 }
 
 // One-off diagnostic for live testing — rsvpData doesn't apply to T1 events, so
@@ -88,34 +60,47 @@ function logImsLoginOnce() {
   console.log('[session-store] IMS login confirmed:', auth.value);
 }
 
-function syncAuth() {
-  // Real IMS profile (event-libs/v1/utils/profile.js's lazyCaptureProfile()) takes priority
-  // whenever it's actually been captured — sg:dev-auth is a fallback for a bare local harness
-  // with no Milo/IMS bootstrap at all, and never drives the one-time myData/log triggers below,
-  // since it isn't a real signal that a real attendee is signed in.
-  const profile = BlockMediator.get('imsProfile');
-  if (profile !== undefined) {
-    realAuthConfirmed = true;
-    const rsvp = BlockMediator.get('rsvpData');
-    auth.value = {
-      isLoggedIn: !!(profile && !profile.noProfile && profile.account_type !== 'guest'),
-      isRegistered: rsvp?.registered === true,
-      userFirstName: profile?.first_name ?? null,
-    };
-    logImsLoginOnce();
-    maybeLoadMyData();
-    return;
-  }
+// Exchanges the real IMS profile's userId for an rfAuthToken (RF's jwt endpoint) — needed to
+// attribute myData/schedule/favorite calls to the real signed-in attendee rather than sending
+// no credentials at all. The real response field is unconfirmed (northstar never called this
+// endpoint either, so there's no traffic to check against) — tries the most likely candidates.
+// Runs once; maybeLoadMyData() waits for rfAuthTokenSettled (set only once this actually
+// finishes) rather than rfAuthTokenStarted, so it can't fire mid-exchange with a still-null token.
+async function exchangeRfAuthToken(clientId) {
+  if (rfAuthTokenStarted) return;
+  rfAuthTokenStarted = true;
   try {
-    const devAuth = JSON.parse(localStorage.getItem('sg:dev-auth') || 'null');
-    if (devAuth) {
-      auth.value = {
-        isLoggedIn: devAuth.isLoggedIn ?? null,
-        isRegistered: devAuth.isRegistered ?? undefined,
-        userFirstName: devAuth.userFirstName ?? null,
-      };
-    }
-  } catch { /* ignore */ }
+    const data = await fetchAuthToken(clientId, apiConfig.profileId, apiConfig.apiUrl);
+    rfAuthToken = data?.rfAuthToken ?? data?.token ?? data?.jwt ?? data?.authToken ?? null;
+    if (!rfAuthToken) window.lana?.log('[session-store] jwt exchange returned no recognizable token field');
+  } catch (err) {
+    window.lana?.log(`[session-store] jwt exchange failed: ${err.message}`);
+  }
+  rfAuthTokenSettled = true;
+  maybeLoadMyData();
+}
+
+// isRegistered isn't set here at all — rsvpData doesn't apply to T1 events; loadMyData()
+// derives it from RF's own loggedInUser field instead, once the jwt exchange and myData call
+// complete.
+function syncAuth() {
+  const profile = BlockMediator.get('imsProfile');
+  if (profile === undefined) return;
+  realAuthConfirmed = true;
+  auth.value = {
+    ...auth.value,
+    isLoggedIn: !!(profile && !profile.noProfile && profile.account_type !== 'guest'),
+    userFirstName: profile?.first_name ?? null,
+  };
+  logImsLoginOnce();
+  if (auth.value.isLoggedIn && profile.userId) {
+    exchangeRfAuthToken(profile.userId);
+  } else {
+    // Not logged in, or logged in with no userId to exchange — either way, mark the
+    // exchange as settled so maybeLoadMyData() isn't blocked on it forever.
+    rfAuthTokenSettled = true;
+    maybeLoadMyData();
+  }
 }
 
 // Entries are RF's session-time objects, not bare ids — match sessionTimeID against
@@ -125,15 +110,18 @@ function mapToSessionIds(entries) {
   return (entries || []).map((entry) => idByRfCode.get(entry.sessionTimeID)).filter(Boolean);
 }
 
-// Reconciles scheduled/favorited with the real RF response, once the session catalog
-// (needed for mapToSessionIds()) has loaded; loadPersisted() covers the UI until then.
+// Populates scheduled/favorited from the real RF response, once the session catalog (needed
+// for mapToSessionIds()) has loaded. Also derives isRegistered from loggedInUser — a populated
+// record is the only registration signal myData's response gives us, since rsvpData doesn't
+// apply to T1 events (unconfirmed mapping, verify once we can test against a real unregistered
+// attendee).
 async function loadMyData() {
   try {
-    // TODO: replace null with a real rfAuthToken from auth integration
-    const data = await fetchMyData(null, apiConfig.profileId, apiConfig.apiUrl);
+    const data = await fetchMyData(rfAuthToken, apiConfig.profileId, apiConfig.apiUrl);
     batch(() => {
       scheduled.value = new Set(mapToSessionIds(data.scheduled));
       favorited.value = new Set(mapToSessionIds(data.favorited));
+      auth.value = { ...auth.value, isRegistered: !!(data.loggedInUser && Object.keys(data.loggedInUser).length > 0) };
     });
   } catch (err) {
     window.lana?.log(`[session-store] myData fetch failed: ${err.message}`);
@@ -142,14 +130,14 @@ async function loadMyData() {
 
 // myData is a per-attendee schedule/favorites call — pointless (and liable to error or return
 // someone else's stale-looking empty state) for a logged-out visitor, unlike the ESL session
-// catalog, which loads for everyone regardless of auth. rsvpData/isRegistered doesn't apply to
-// T1 events, so isLoggedIn is the only gate — but only once a real IMS profile has actually
-// confirmed it, not sg:dev-auth's local fallback. Runs once, whichever resolves last between
-// the catalog loading and real auth confirming logged-in.
+// catalog, which loads for everyone regardless of auth. Waits for the jwt exchange to have
+// settled too, so it doesn't fire with a still-null rfAuthToken while that's in flight. Runs
+// once, whichever of catalog/auth/token resolves last.
 function maybeLoadMyData() {
   if (myDataAttempted) return;
   if (sessionsStatus.value !== 'ready') return;
   if (!realAuthConfirmed || !auth.value.isLoggedIn) return;
+  if (!rfAuthTokenSettled) return;
   myDataAttempted = true;
   loadMyData();
 }
@@ -208,7 +196,7 @@ export function initSessionState() {
   initialized = true;
 
   apiConfig = {
-    apiUrl: tierOneConfig.rfApiUrl || DEFAULT_RF_API_URL,
+    apiUrl: tierOneConfig.rfApiUrl || defaultRfApiUrlForEnv(),
     profileId: tierOneConfig.rfProfileId || DEFAULT_RF_PROFILE_ID,
     registerUrl: getMetadata('register-url') || '/register',
     manualCutoff: getMetadata('manual-on-demand-transition-time') || null,
@@ -216,13 +204,8 @@ export function initSessionState() {
   };
 
   mountToast();
-  seedDevData();
-  loadPersisted();
   syncAuth();
   BlockMediator.subscribe('imsProfile', syncAuth);
-  BlockMediator.subscribe('rsvpData', syncAuth);
-  scheduled.subscribe(persistScheduled);
-  favorited.subscribe(persistFavorited);
   loadSessions();
 }
 
@@ -245,11 +228,10 @@ export async function scheduleSession(session) {
   const isScheduled = scheduled.value.has(session.id);
   setPending(session.id, true);
   try {
-    // TODO: replace null with a real rfAuthToken from auth integration
     if (isScheduled) {
-      await removeSession(session.rfCode, null, apiConfig.profileId, apiConfig.apiUrl);
+      await removeSession(session.rfCode, rfAuthToken, apiConfig.profileId, apiConfig.apiUrl);
     } else {
-      await addSession(session.rfCode, null, apiConfig.profileId, apiConfig.apiUrl);
+      await addSession(session.rfCode, rfAuthToken, apiConfig.profileId, apiConfig.apiUrl);
     }
   } catch (err) {
     setPending(session.id, false);
@@ -267,8 +249,7 @@ export async function favoriteSession(session) {
   const isFavorited = favorited.value.has(session.id);
   setPending(session.id, true);
   try {
-    // TODO: replace null with a real rfAuthToken from auth integration
-    await toggleSessionInterest(session.rfCode, session.id, null, apiConfig.profileId, apiConfig.apiUrl);
+    await toggleSessionInterest(session.rfCode, session.id, rfAuthToken, apiConfig.profileId, apiConfig.apiUrl);
   } catch (err) {
     setPending(session.id, false);
     throw err;

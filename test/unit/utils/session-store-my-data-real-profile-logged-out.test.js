@@ -22,7 +22,6 @@ function waitForSessionsReady() {
 
 describe('session-store: myData is skipped when a real IMS profile confirms logged-out', () => {
   let originalFetch;
-  let originalLocalStorage;
   let myDataCalled;
 
   before(async () => {
@@ -31,25 +30,6 @@ describe('session-store: myData is skipped when a real IMS profile confirms logg
     // absent BlockMediator key. Also resets rsvpData in case another test file left one.
     BlockMediator.set('imsProfile', { noProfile: true });
     BlockMediator.set('rsvpData', undefined);
-
-    // localStorage is real, shared, browser-wide state — seedDevData()/loadPersisted() would
-    // otherwise read whatever another test file's run happened to leave behind. Swap in an
-    // in-memory stub scoped to this page with known values, so myData not firing can be
-    // verified precisely (an empty store isn't "untouched" — seedDevData() unconditionally
-    // seeds a mock schedule/favorites into any store that doesn't already have one).
-    originalLocalStorage = window.localStorage;
-    const store = new Map([
-      ['sessions:scheduled', JSON.stringify(['k-001'])],
-      ['sessions:favorited', JSON.stringify(['s-001'])],
-    ]);
-    Object.defineProperty(window, 'localStorage', {
-      configurable: true,
-      value: {
-        getItem: (key) => store.get(key) ?? null,
-        setItem: (key, value) => store.set(key, String(value)),
-        removeItem: (key) => store.delete(key),
-      },
-    });
 
     originalFetch = window.fetch;
     myDataCalled = false;
@@ -66,8 +46,10 @@ describe('session-store: myData is skipped when a real IMS profile confirms logg
 
   after(() => {
     window.fetch = originalFetch;
-    Object.defineProperty(window, 'localStorage', { configurable: true, value: originalLocalStorage });
     document.head.querySelector('meta[name="tier-1-event-config"]')?.remove();
+    // BlockMediator is a real, shared singleton across test files (unlike session-store.js's
+    // cache-busted copy) — reset so this profile doesn't leak into whichever test runs next.
+    BlockMediator.set('imsProfile', undefined);
   });
 
   it('still loads the ESL session catalog', () => {
@@ -75,9 +57,9 @@ describe('session-store: myData is skipped when a real IMS profile confirms logg
     expect(sessionsStatus.value).to.equal('ready');
   });
 
-  it('never calls myData, leaving persisted scheduled/favorited untouched', () => {
+  it('never calls myData, leaving scheduled/favorited empty', () => {
     expect(myDataCalled).to.be.false;
-    expect(scheduled.value).to.deep.equal(new Set(['k-001']));
-    expect(favorited.value).to.deep.equal(new Set(['s-001']));
+    expect(scheduled.value).to.deep.equal(new Set());
+    expect(favorited.value).to.deep.equal(new Set());
   });
 });
