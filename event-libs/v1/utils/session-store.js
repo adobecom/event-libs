@@ -29,6 +29,7 @@ export const sessionGuideRequest = signal(null);
 let initialized = false;
 let apiConfig = null;
 let myDataAttempted = false;
+let hasLoggedImsStatus = false;
 
 // getEventServiceEnv() resolves dev/dev02/stage/stage02/prod/local; the media-relay
 // backend only has dev/stage/prod environments, so the finer-grained names collapse.
@@ -77,6 +78,15 @@ function persistFavorited() {
   try { localStorage.setItem(LS_FAVORITED, JSON.stringify([...favorited.value])); } catch { /* unavailable */ }
 }
 
+// One-off diagnostic for live testing — rsvpData doesn't apply to T1 events, so
+// isLoggedIn plus a resolved IMS profile is the whole signal worth watching for.
+function logImsLoginOnce() {
+  if (hasLoggedImsStatus || !auth.value.isLoggedIn) return;
+  hasLoggedImsStatus = true;
+  // eslint-disable-next-line no-console
+  console.log('[session-store] IMS login confirmed:', auth.value);
+}
+
 function syncAuth() {
   // sg:dev-auth in localStorage takes priority — prevents Milo's guest IMS from
   // overwriting a dev-mode user after a block renders (TODO: remove once real IMS
@@ -89,6 +99,7 @@ function syncAuth() {
         isRegistered: devAuth.isRegistered ?? undefined,
         userFirstName: devAuth.userFirstName ?? null,
       };
+      logImsLoginOnce();
       maybeLoadMyData();
       return;
     }
@@ -101,6 +112,7 @@ function syncAuth() {
     isRegistered: rsvp?.registered === true,
     userFirstName: profile?.first_name ?? null,
   };
+  logImsLoginOnce();
   maybeLoadMyData();
 }
 
@@ -127,13 +139,14 @@ async function loadMyData() {
 }
 
 // myData is a per-attendee schedule/favorites call — pointless (and liable to error or return
-// someone else's stale-looking empty state) for a guest or unregistered visitor, unlike the
-// ESL session catalog, which loads for everyone regardless of auth. Runs once, whichever
-// resolves last between the catalog loading and auth confirming logged-in + registered.
+// someone else's stale-looking empty state) for a logged-out visitor, unlike the ESL session
+// catalog, which loads for everyone regardless of auth. rsvpData/isRegistered doesn't apply to
+// T1 events, so isLoggedIn is the only gate. Runs once, whichever resolves last between the
+// catalog loading and auth confirming logged-in.
 function maybeLoadMyData() {
   if (myDataAttempted) return;
   if (sessionsStatus.value !== 'ready') return;
-  if (!auth.value.isLoggedIn || !auth.value.isRegistered) return;
+  if (!auth.value.isLoggedIn) return;
   myDataAttempted = true;
   loadMyData();
 }
