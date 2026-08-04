@@ -10,6 +10,8 @@ import { setSessionParam } from '../../../blocks/sessions-guide/utils/url.js';
 import MobileRiderController from '../../../services/sessions/mobile-rider-controller.js';
 
 const ROTATE_OUT_MS = 350;
+const SLIDE_MS = 350;
+const SLIDE_EASING = 'cubic-bezier(0.22, 1, 0.36, 1)';
 const MR_POLL_INTERVAL_MS = 30_000;
 
 /**
@@ -361,6 +363,40 @@ function buildCarouselControls(track) {
   return controls;
 }
 
+/**
+ * FLIP technique (First-Last-Invert-Play): `movers` have already reflowed
+ * into their post-removal positions by the time this runs (called right
+ * after `card.remove()`). For each one, jump it back to where it *was*
+ * (`beforeLefts`) with transitions disabled, then release that on the next
+ * frame with a transition enabled — it animates smoothly from the old
+ * position to the new one instead of snapping, reading as "later cards
+ * slide left to fill the gap" rather than an abrupt reflow.
+ */
+function slideIntoPlace(movers, beforeLefts) {
+  movers.forEach((mover, i) => {
+    const afterLeft = mover.getBoundingClientRect().left;
+    const delta = beforeLefts[i] - afterLeft;
+    mover.style.transition = 'none';
+    mover.style.transform = delta ? `translateX(${delta}px)` : '';
+  });
+
+  // Force layout so the jump above is committed before it's released on the
+  // next frame — otherwise the browser can coalesce both style writes into
+  // one paint and skip straight to the end state, with no visible slide.
+  movers[0]?.getBoundingClientRect();
+
+  requestAnimationFrame(() => {
+    movers.forEach((mover) => {
+      mover.style.transition = `transform ${SLIDE_MS}ms ${SLIDE_EASING}`;
+      mover.style.transform = '';
+    });
+  });
+
+  setTimeout(() => {
+    movers.forEach((mover) => { mover.style.transition = ''; });
+  }, SLIDE_MS);
+}
+
 function removeCard(el, sessionId) {
   const card = el.querySelector(`[data-session-id="${sessionId}"]`);
   if (!card) return;
@@ -369,8 +405,18 @@ function removeCard(el, sessionId) {
     card.remove();
     return;
   }
+
+  // Cards after this one will shift left once it's actually removed — snapshot
+  // their pre-removal positions now, while this card still occupies its slot.
+  const siblings = [...card.parentElement.querySelectorAll(':scope > .upcoming-sessions-card')];
+  const movers = siblings.slice(siblings.indexOf(card) + 1);
+  const beforeLefts = movers.map((mover) => mover.getBoundingClientRect().left);
+
   card.classList.add('upcoming-sessions-card--rotating-out');
-  setTimeout(() => card.remove(), ROTATE_OUT_MS);
+  setTimeout(() => {
+    card.remove();
+    if (movers.length) slideIntoPlace(movers, beforeLefts);
+  }, ROTATE_OUT_MS);
 }
 
 // Live/favorite/schedule updates rebuild every card from scratch (state is

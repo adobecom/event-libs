@@ -54,18 +54,11 @@ function session(overrides = {}) {
     tags: 'Design,Illustration',
     track: 'Video',
     category: 'video',
-    sessionTimes: [{
-      sessionTimeId: 'time-1',
-      sessionId: 'session-1',
-      eventId: 'event-1',
+    sessionTime: {
       startTimeMillis: now + 60_000,
       endTimeMillis: now + 3_660_000,
       timezone: 'America/Los_Angeles',
-      attendeeLimit: 100,
-      attendeeCount: 42,
-      isFull: false,
-      locationId: 'loc-1',
-    }],
+    },
     ...overrides,
   };
 }
@@ -198,6 +191,31 @@ describe('upcoming-sessions', () => {
       expect(called).to.equal(true);
       expect(el._upcomingSessionsCleanup).to.not.equal(firstCleanup);
     });
+
+    it('drops an already-started session\'s card and slides the remaining card into place, leaving no lingering inline style', async () => {
+      const started = session({
+        sessionId: 'session-1',
+        sessionTime: {
+          startTimeMillis: Date.now() - 60_000,
+          endTimeMillis: Date.now() + 3_600_000,
+          timezone: 'America/Los_Angeles',
+        },
+      });
+      const upcoming = session({ sessionId: 'session-2' });
+      const el = buildBlock([started, upcoming]);
+      await init(el);
+
+      // scheduleStateTimers drops an already-started session immediately, then
+      // removeCard fades it out (ROTATE_OUT_MS) before sliding the remaining
+      // card into place (SLIDE_MS) — wait past both.
+      await new Promise((resolve) => setTimeout(resolve, 800));
+
+      expect(el.querySelector('[data-session-id="session-1"]')).to.equal(null);
+      const remaining = el.querySelector('[data-session-id="session-2"]');
+      expect(remaining).to.not.equal(null);
+      expect(remaining.style.transform).to.equal('');
+      expect(remaining.style.transition).to.equal('');
+    });
   });
 
   describe('buildCard', () => {
@@ -209,11 +227,11 @@ describe('upcoming-sessions', () => {
 
     it('always renders the upcoming state, never a live badge — cards are dropped on start instead of switching to live', () => {
       const started = session({
-        sessionTimes: [{
+        sessionTime: {
           startTimeMillis: Date.now() - 60_000,
           endTimeMillis: Date.now() + 3_600_000,
           timezone: 'America/Los_Angeles',
-        }],
+        },
       });
       const card = buildCard(started);
       expect(card.querySelector('.sg-card__time').textContent).to.not.equal('Live Now');
@@ -228,11 +246,11 @@ describe('upcoming-sessions', () => {
     it('routes a card click to the session-guide deep link regardless of session start time', () => {
       const started = session({
         watchUrl: 'https://example.com/watch/s-001',
-        sessionTimes: [{
+        sessionTime: {
           startTimeMillis: Date.now() - 60_000,
           endTimeMillis: Date.now() + 3_600_000,
           timezone: 'America/Los_Angeles',
-        }],
+        },
       });
       document.body.append(buildCard(started));
 
@@ -281,11 +299,11 @@ describe('upcoming-sessions', () => {
     it('resolves to session-guide regardless of session start time or url — cards are dropped on start rather than switching to a live/watch action', () => {
       const started = session({
         url: 'https://example.com/watch/s-001',
-        sessionTimes: [{
+        sessionTime: {
           startTimeMillis: Date.now() - 60_000,
           endTimeMillis: Date.now() + 3_600_000,
           timezone: 'America/Los_Angeles',
-        }],
+        },
       });
       expect(resolveClickAction(started)).to.deep.equal({ type: 'session-guide', sessionId: 'session-1' });
     });
