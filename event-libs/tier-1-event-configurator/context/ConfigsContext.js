@@ -18,6 +18,8 @@ function emptyConfig() {
     trackIcons: {},
     allowDoubleBooking: false,
     featuredSessions: [],
+    rfApiUrl: '',
+    rfProfileId: '',
   };
 }
 
@@ -76,8 +78,6 @@ const ConfigsProvider = ({ children }) => {
       eventId: event.eventId,
       backendEventTitle: event.enTitle || event.eventId,
       eventServiceEnv,
-      rfApiUrl: '',
-      rfProfileId: '',
       config: emptyConfig(),
     });
   }, []);
@@ -91,7 +91,7 @@ const ConfigsProvider = ({ children }) => {
   // `eventServiceEnv` is the *new* pick's env, not the source row's —
   // Duplicate can legitimately target a different tier than its source.
   // rfApiUrl/rfProfileId (MWPW-200311) are always reset blank rather than
-  // cloned — unlike style settings such as trackIcons, silently reusing another
+  // cloned — unlike a style setting such as trackIcons, silently reusing another
   // event's RainFocus profile id would misroute this new event's live
   // schedule/favorites calls at whatever RF profile the source event used.
   const startDuplicateConfig = useCallback((sourceRow, event, eventServiceEnv) => {
@@ -103,9 +103,9 @@ const ConfigsProvider = ({ children }) => {
       eventId: event.eventId,
       backendEventTitle: event.enTitle || event.eventId,
       eventServiceEnv,
-      rfApiUrl: '',
-      rfProfileId: '',
-      config: { ...clonedConfig, eventTitle: '' },
+      config: {
+        ...clonedConfig, eventTitle: '', rfApiUrl: '', rfProfileId: '',
+      },
     });
   }, []);
 
@@ -159,21 +159,12 @@ const ConfigsProvider = ({ children }) => {
   }, []);
 
   // Sets a single top-level config field (e.g. allowDoubleBooking,
-  // featuredSessions) immutably, so the Config JSON preview stays in sync.
+  // featuredSessions, rfApiUrl, rfProfileId) immutably, so the Config JSON
+  // preview stays in sync.
   const updateConfigField = useCallback((key, value) => {
     setActiveConfig((prev) => {
       if (!prev) return prev;
       return { ...prev, config: { ...prev.config, [key]: value } };
-    });
-  }, []);
-
-  // Sets a row-level RainFocus field (rfApiUrl/rfProfileId, MWPW-200311) —
-  // separate from updateConfigField since these live alongside config, not
-  // nested inside it (see startDuplicateConfig's comment for why).
-  const updateRfField = useCallback((key, value) => {
-    setActiveConfig((prev) => {
-      if (!prev) return prev;
-      return { ...prev, [key]: value };
     });
   }, []);
 
@@ -230,7 +221,6 @@ const ConfigsProvider = ({ children }) => {
     updateTrackIcon,
     seedTrackIcons,
     updateConfigField,
-    updateRfField,
     saveActiveConfig,
     removeConfig,
   };
