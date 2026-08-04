@@ -1,5 +1,7 @@
 import { expect } from '@esm-bundle/chai';
 import { readFile } from '@web/test-runner-commands';
+// This block imports session-store.js itself (statically, same URL) — the test must import
+// the same, non-cache-busted instance too, so both sides share the same signals/apiConfig.
 import init from '../../../../event-libs/v1/blocks/session-state-demo/session-state-demo.js';
 import {
   sessions, sessionsStatus, favorited, scheduled, auth, pendingActions, initSessionState,

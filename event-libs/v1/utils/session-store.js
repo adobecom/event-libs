@@ -30,6 +30,7 @@ let initialized = false;
 let apiConfig = null;
 let myDataAttempted = false;
 let hasLoggedImsStatus = false;
+let realAuthConfirmed = false;
 
 // getEventServiceEnv() resolves dev/dev02/stage/stage02/prod/local; the media-relay
 // backend only has dev/stage/prod environments, so the finer-grained names collapse.
@@ -88,9 +89,23 @@ function logImsLoginOnce() {
 }
 
 function syncAuth() {
-  // sg:dev-auth in localStorage takes priority — prevents Milo's guest IMS from
-  // overwriting a dev-mode user after a block renders (TODO: remove once real IMS
-  // auth is wired up end to end).
+  // Real IMS profile (event-libs/v1/utils/profile.js's lazyCaptureProfile()) takes priority
+  // whenever it's actually been captured — sg:dev-auth is a fallback for a bare local harness
+  // with no Milo/IMS bootstrap at all, and never drives the one-time myData/log triggers below,
+  // since it isn't a real signal that a real attendee is signed in.
+  const profile = BlockMediator.get('imsProfile');
+  if (profile !== undefined) {
+    realAuthConfirmed = true;
+    const rsvp = BlockMediator.get('rsvpData');
+    auth.value = {
+      isLoggedIn: !!(profile && !profile.noProfile && profile.account_type !== 'guest'),
+      isRegistered: rsvp?.registered === true,
+      userFirstName: profile?.first_name ?? null,
+    };
+    logImsLoginOnce();
+    maybeLoadMyData();
+    return;
+  }
   try {
     const devAuth = JSON.parse(localStorage.getItem('sg:dev-auth') || 'null');
     if (devAuth) {
@@ -99,21 +114,8 @@ function syncAuth() {
         isRegistered: devAuth.isRegistered ?? undefined,
         userFirstName: devAuth.userFirstName ?? null,
       };
-      logImsLoginOnce();
-      maybeLoadMyData();
-      return;
     }
   } catch { /* ignore */ }
-  const profile = BlockMediator.get('imsProfile');
-  if (profile === undefined) return;
-  const rsvp = BlockMediator.get('rsvpData');
-  auth.value = {
-    isLoggedIn: !!(profile && !profile.noProfile && profile.account_type !== 'guest'),
-    isRegistered: rsvp?.registered === true,
-    userFirstName: profile?.first_name ?? null,
-  };
-  logImsLoginOnce();
-  maybeLoadMyData();
 }
 
 // Entries are RF's session-time objects, not bare ids — match sessionTimeID against
@@ -141,12 +143,13 @@ async function loadMyData() {
 // myData is a per-attendee schedule/favorites call — pointless (and liable to error or return
 // someone else's stale-looking empty state) for a logged-out visitor, unlike the ESL session
 // catalog, which loads for everyone regardless of auth. rsvpData/isRegistered doesn't apply to
-// T1 events, so isLoggedIn is the only gate. Runs once, whichever resolves last between the
-// catalog loading and auth confirming logged-in.
+// T1 events, so isLoggedIn is the only gate — but only once a real IMS profile has actually
+// confirmed it, not sg:dev-auth's local fallback. Runs once, whichever resolves last between
+// the catalog loading and real auth confirming logged-in.
 function maybeLoadMyData() {
   if (myDataAttempted) return;
   if (sessionsStatus.value !== 'ready') return;
-  if (!auth.value.isLoggedIn) return;
+  if (!realAuthConfirmed || !auth.value.isLoggedIn) return;
   myDataAttempted = true;
   loadMyData();
 }

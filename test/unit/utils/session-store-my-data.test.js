@@ -1,8 +1,13 @@
 import { expect } from '@esm-bundle/chai';
-import {
-  initSessionState, getApiConfig, sessionsStatus, scheduled, favorited,
-} from '../../../event-libs/v1/utils/session-store.js';
 import { setMetadata } from '../../../event-libs/v1/utils/utils.js';
+import BlockMediator from '../../../event-libs/v1/deps/block-mediator.min.js';
+
+// session-store.js holds module-level singleton state (initialized, apiConfig, etc.) that
+// @web/test-runner does not reliably reset between test files sharing a worker session —
+// cache-bust the import so this file gets its own fresh instance regardless.
+const {
+  initSessionState, getApiConfig, sessionsStatus, scheduled, favorited,
+} = await import(`../../../event-libs/v1/utils/session-store.js?t=${Math.random()}`);
 
 function waitForSessionsReady() {
   if (sessionsStatus.value === 'ready') return Promise.resolve();
@@ -31,6 +36,9 @@ describe('session-store: myData maps RF sessionTimeID to our session ids', () =>
       }),
     });
 
+    // maybeLoadMyData() only fires off a real IMS profile (not sg:dev-auth's local fallback).
+    BlockMediator.set('imsProfile', { first_name: 'Test', account_type: 'type1' });
+
     setMetadata('tier-1-event-config', JSON.stringify({ rfApiUrl: 'https://mock.example/api' }));
     initSessionState();
     await waitForSessionsReady();
@@ -41,6 +49,12 @@ describe('session-store: myData maps RF sessionTimeID to our session ids', () =>
 
   after(() => {
     window.fetch = originalFetch;
+    document.head.querySelector('meta[name="tier-1-event-config"]')?.remove();
+    // seedDevData()/loadPersisted() read/write real, browser-wide localStorage — clean up
+    // so this run's seed data doesn't leak into another test file sharing the same storage.
+    localStorage.removeItem('sg:dev-auth');
+    localStorage.removeItem('sessions:scheduled');
+    localStorage.removeItem('sessions:favorited');
   });
 
   it('resolves the real RF response into apiConfig-backed scheduled/favorited ids', () => {

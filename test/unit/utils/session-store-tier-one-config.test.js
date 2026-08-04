@@ -1,8 +1,12 @@
 import { expect } from '@esm-bundle/chai';
-import {
-  initSessionState, getApiConfig, sessionsStatus,
-} from '../../../event-libs/v1/utils/session-store.js';
 import { setMetadata } from '../../../event-libs/v1/utils/utils.js';
+
+// session-store.js holds module-level singleton state (initialized, apiConfig, etc.) that
+// @web/test-runner does not reliably reset between test files sharing a worker session —
+// cache-bust the import so this file gets its own fresh instance regardless.
+const {
+  initSessionState, getApiConfig, sessionsStatus,
+} = await import(`../../../event-libs/v1/utils/session-store.js?t=${Math.random()}`);
 
 function waitForSessionsReady() {
   if (sessionsStatus.value === 'ready') return Promise.resolve();
@@ -23,6 +27,10 @@ describe('session-store: RF config sourced from tier-1-event-config', () => {
     }));
     initSessionState();
     await waitForSessionsReady();
+  });
+
+  after(() => {
+    document.head.querySelector('meta[name="tier-1-event-config"]')?.remove();
   });
 
   it('reads apiUrl/profileId from the tier-1-event-config payload', () => {
