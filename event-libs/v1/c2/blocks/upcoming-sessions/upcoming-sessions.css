@@ -176,10 +176,13 @@
  *    export for this card exactly — the peeking-multiple-cards effect
  *    comes for free from these fixed-size items overflowing a scrollable
  *    flex row, no proportional-to-viewport formula needed), and a literal
- *    431x128px at desktop (`@media (min-width: 1280px)` below — matching
+ *    375x108px at desktop (`@media (min-width: 1280px)` below — matching
  *    sessions-guide.css's own breakpoint, not this codebase's usual
- *    900px). The "grows on hover" cue instead comes from
- *    `transform: scale()`, exactly like this card did before this port.
+ *    900px; 375px rather than the Figma "Small session row" frame's own
+ *    431px card, since 431px doesn't actually fit 3 cards + gaps within
+ *    that frame's stated 1440px width and padding — flagged to design).
+ *    The "grows on hover" cue instead comes from `transform: scale()`,
+ *    exactly like this card did before this port.
  *
  * 2. Action buttons — sessions-guide reveals the action-icon column only
  *    on hover/`.is-scheduled`/`.is-favorited` (sliding out from width:0).
@@ -395,7 +398,7 @@
   .upcoming-sessions .sg-card {
     flex-direction: row;
     align-items: stretch;
-    width: 431px;
+    width: 375px;
     height: 108px;
     padding: var(--s2a-spacing-lg, 24px);
     gap: 0;
