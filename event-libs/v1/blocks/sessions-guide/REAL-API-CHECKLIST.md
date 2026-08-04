@@ -4,9 +4,11 @@ Remove or replace every item below once real IMS login and Rainfocus registratio
 
 > **Note (MWPW-199065):** the dev-mock scaffolding and the Rainfocus/Mobile Rider/sessions services all moved out of this block into shared, page-level modules (`event-libs/v1/utils/session-store.js` and `event-libs/v1/services/sessions/`) so other blocks on the same page can read the same session/auth state. The steps below reference the new locations.
 
+> **Status (MWPW-200311, 2026-08-04):** items 1, 2, 4, and 7 are done — real IMS profile + a real jwt-exchanged `rfAuthToken` now drive every Rainfocus call, with the dev-mock localStorage scaffolding fully removed. Item 3 is superseded: `rainfocus-api-url`/`rainfocus-api-profile-id` no longer live in separate flat metadata — they're `rfApiUrl`/`rfProfileId` fields inside the Tier 1 Event Configurator's single `tier-1-event-config` JSON payload instead (`tier-1-event-state-enabled` is still required, unchanged). Items 5–6 (Mobile Rider, sessions API) remain open.
+
 ---
 
-## 1. Delete the dev-seeding logic in the shared store
+## 1. Delete the dev-seeding logic in the shared store ✅ Done
 
 **File:** `event-libs/v1/utils/session-store.js`
 
@@ -37,7 +39,7 @@ This used to live in a standalone `services/dev-mock.js` inside this block, call
 
 ---
 
-## 2. Remove the `sg:dev-auth` priority check in `syncAuth`
+## 2. Remove the `sg:dev-auth` priority check in `syncAuth` ✅ Done
 
 **File:** `event-libs/v1/utils/session-store.js` — inside `syncAuth()`
 
@@ -60,7 +62,7 @@ After removal, `syncAuth()` falls through directly to reading `imsProfile` and `
 
 ---
 
-## 3. Move `rainfocus-api-url` / `rainfocus-api-profile-id` from mock metadata to real values
+## 3. Move `rainfocus-api-url` / `rainfocus-api-profile-id` from mock metadata to real values — superseded, see status note above
 
 **Where:** page `<meta>` tags, read by `getMetadata()` in `initSessionState()` (`event-libs/v1/utils/session-store.js`)
 
@@ -81,7 +83,7 @@ These already live in page metadata (not this block's authoring table) so the sh
 
 ---
 
-## 4. Implement real Rainfocus API calls
+## 4. Implement real Rainfocus API calls ✅ Done
 
 **File:** `event-libs/v1/services/sessions/rainfocus.js`
 
@@ -107,25 +109,16 @@ Credentials needed per call: `rfAuthToken` (from FEDS/IMS), `clientId` (IMS user
 
 ---
 
-## 7. Pass real credentials in session actions
+## 7. Pass real credentials in session actions ✅ Done
 
 **File:** `event-libs/v1/services/sessions/session-actions.js`
 
-Call sites pass `null` for `rfAuthToken` and `clientId` (via `event-libs/v1/utils/session-store.js`'s `scheduleSession()` / `favoriteSession()`, which these call):
-
-- `scheduleSession()` → `addSession(session.rfCode, null, null, apiConfig.profileId, apiConfig.apiUrl)` / `removeSession(...)`
-- `favoriteSession()` → `toggleSessionInterest(session.rfCode, session.id, null, null, apiConfig.profileId, apiConfig.apiUrl)`
-
-Replace the `null` values with the real token and user ID sourced from the IMS profile on `BlockMediator`.
+`scheduleSession()`/`favoriteSession()` (in `session-store.js`, which this file calls) now pass a real jwt-exchanged `rfAuthToken` — no more hardcoded `null`. `clientId` was dropped from the contract entirely (confirmed against real MAX26 traffic and northstar's `determineParams()`: it's only ever sent on the unused `AUTH`/`jwt` endpoint, never on `addSession`/`removeSession`/`toggleSessionInterest`).
 
 ---
 
-## localStorage keys used by the mock (safe to clear after migration)
+## localStorage keys ✅ Removed (MWPW-200311)
 
-| Key | Purpose |
-|-----|---------|
-| `sg:dev-auth` | Fake logged-in user — written by `seedDevData()` and read by `syncAuth()`, both in `session-store.js` |
-| `sessions:scheduled` | Persisted scheduled session IDs — keep this, it maps to real user data |
-| `sessions:favorited` | Persisted favorited session IDs — keep this, it maps to real user data |
+`sg:dev-auth`/`sessions:scheduled`/`sessions:favorited` and the `seedDevData()`/`loadPersisted()`/`persistScheduled()`/`persistFavorited()` functions that read/wrote them are gone — `session-store.js` no longer touches `localStorage` at all. Real IMS (`BlockMediator`'s `imsProfile`) and a real `myData` call on every load are the sole sources of truth now.
 
 `sessions:scheduled` and `sessions:favorited` are production-worthy; they provide offline persistence and should remain. Only `sg:dev-auth` is mock-only. (These keys were renamed from `sg:scheduled` / `sg:favorited` when the store became shared/page-level rather than specific to this block.)
