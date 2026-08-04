@@ -1,5 +1,7 @@
 import { expect } from '@esm-bundle/chai';
 import { readFile } from '@web/test-runner-commands';
+// This block imports session-store.js itself (statically, same URL) — the test must import
+// the same, non-cache-busted instance too, so both sides share the same signals/apiConfig.
 import init from '../../../../event-libs/v1/blocks/session-state-demo/session-state-demo.js';
 import {
   sessions, sessionsStatus, favorited, scheduled, auth, pendingActions, initSessionState,
@@ -21,12 +23,12 @@ function waitForSessionsReady() {
 
 describe('session-state-demo block', () => {
   let el;
+  let originalFetch;
 
-  // initSessionState() is idempotent and only needs the rainfocus-api-url gate to run
-  // once — this populates the real apiConfig that favoriteSession()'s RF call needs,
-  // same as decorateEvent() would on a real page, instead of leaving it null.
+  // initSessionState() is idempotent and only runs once — this populates the real
+  // apiConfig that favoriteSession()'s RF call needs, same as decorateEvent() would.
   before(async () => {
-    setMetadata('rainfocus-api-url', 'https://mock.example/api');
+    setMetadata('tier-1-event-config', JSON.stringify({ rfApiUrl: 'https://mock.example/api' }));
     initSessionState();
     await waitForSessionsReady();
   });
@@ -39,6 +41,16 @@ describe('session-state-demo block', () => {
     scheduled.value = new Set();
     pendingActions.value = new Set();
     auth.value = { isLoggedIn: true, isRegistered: true, userFirstName: null };
+
+    // rainfocus.js now makes a real fetch() for toggleSessionInterest/addSession/
+    // removeSession — stub it so the favorite/schedule button clicks below don't hit
+    // the network (unit tests disallow external fetches).
+    originalFetch = window.fetch;
+    window.fetch = async () => ({ ok: true, status: 200, json: async () => ({ responseCode: '0' }) });
+  });
+
+  afterEach(() => {
+    window.fetch = originalFetch;
   });
 
   function rowValue(label) {
