@@ -62,15 +62,15 @@ function handleWriteResponse(data) {
 }
 
 // The first call on landing on an event page — fetches the signed-in attendee's schedule
-// and favorites in one request. Field names assumed from mySchedule/myInterests' own
-// naming; unconfirmed against real myData traffic.
+// and favorites in one request. Confirmed real response also includes exhibitorInterests,
+// exhibitorLeadSetting, exhibitorLeads, and loggedInUser — not needed here, so not modeled.
 export async function fetchMyData(rfAuthToken, rfApiProfileId, rfApiUrl) {
   const data = await rawFetch(rfApiUrl, ENDPOINTS.MY_DATA, {
     rfApiProfileId, rfAuthToken, rfWidgetId: RF_WIDGET_ID,
   });
   return {
     scheduled: data?.mySchedule ?? [],
-    favorited: data?.myInterests ?? [],
+    favorited: data?.sessionInterests ?? [],
   };
 }
 

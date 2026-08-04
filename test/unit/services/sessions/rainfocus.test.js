@@ -36,7 +36,7 @@ describe('services/sessions/rainfocus', () => {
 
   describe('fetchMyData', () => {
     it('builds the myData request with rfWidgetId and returns scheduled/favorited', async () => {
-      stubFetch({ mySchedule: ['session-1', 'session-3'], myInterests: ['session-2'] });
+      stubFetch({ mySchedule: ['session-1', 'session-3'], sessionInterests: ['session-2'] });
       const result = await fetchMyData('auth-token', 'profile-1', 'https://example.com/rf/');
       expect(result).to.deep.equal({ scheduled: ['session-1', 'session-3'], favorited: ['session-2'] });
       const url = new URL(lastRequest);
