@@ -1,8 +1,9 @@
 import { signal, batch } from '../deps/htm-preact.js';
 import BlockMediator from '../deps/block-mediator.min.js';
 import { getMetadata, getEventServiceEnv, getEventConfig } from './utils.js';
-import { fetchSessions, probeEslPayload } from '../services/sessions/sessions-api.js';
+import { fetchSessions } from '../services/sessions/sessions-api.js';
 import { startPolling } from '../services/sessions/poller.js';
+import { startSessionStateTicker } from '../services/sessions/session-state-ticker.js';
 import {
   fetchAuthToken, fetchMyData, addSession, removeSession, toggleSessionInterest,
   DEFAULT_RF_API_URL, STAGE_RF_API_URL, DEFAULT_RF_PROFILE_ID,
@@ -18,6 +19,10 @@ export const favorited = signal(new Set());
 export const scheduled = signal(new Set());
 export const auth = signal({ isLoggedIn: null, isRegistered: undefined, userFirstName: null });
 export const pendingActions = signal(new Set());
+// Bumped only when a session's derived state (upcoming/live/on-demand) actually changes —
+// see session-state-ticker.js. Components read this purely to establish a re-render
+// dependency; the value itself carries no meaning beyond "something transitioned."
+export const sessionStateVersion = signal(0);
 // Set by openSessionGuideDetail() below; sessions-guide's DrawerShell subscribes to open
 // its detail view for the given session. A new object on every call (even repeat calls
 // for the same sessionId) so the signal always notifies.
@@ -138,9 +143,8 @@ function maybeLoadMyData() {
 
 async function loadSessions() {
   sessionsStatus.value = 'loading';
-  probeEslPayload(); // TEMP: fire-and-forget, see sessions-api.js for why
   try {
-    const fetched = await fetchSessions(apiConfig.apiUrl);
+    const fetched = await fetchSessions(apiConfig.eventId);
     // Batched so components reading both `sessions` and `sessionsStatus` re-render once.
     batch(() => {
       sessions.value = fetched;
@@ -148,6 +152,13 @@ async function loadSessions() {
     });
     const mrSessions = sessions.value.filter((s) => s.mrStreamId);
     startPolling(mrSessions, apiConfig.mrEnv, (active) => { liveStreamActiveIds.value = active; });
+    // Unlike MR polling, this always runs — a page with only non-MR sessions still needs
+    // upcoming/live/on-demand transitions to happen without waiting for a user interaction.
+    startSessionStateTicker(
+      () => sessions.value,
+      () => liveStreamActiveIds.value,
+      () => { sessionStateVersion.value += 1; },
+    );
     maybeLoadMyData();
   } catch (err) {
     window.lana?.log(`[session-store] sessions fetch failed: ${err.message}`);
@@ -191,6 +202,7 @@ export function initSessionState() {
 
   apiConfig = {
     apiUrl: tierOneConfig.rfApiUrl || defaultRfApiUrlForEnv(),
+    eventId: getMetadata('event-id'),
     profileId: tierOneConfig.rfProfileId || DEFAULT_RF_PROFILE_ID,
     registerUrl: getMetadata('register-url') || '/register',
     manualCutoff: getMetadata('manual-on-demand-transition-time') || null,

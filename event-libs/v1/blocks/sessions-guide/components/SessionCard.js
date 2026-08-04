@@ -7,14 +7,15 @@ import { setSessionParam, safeUrl } from '../utils/url.js';
 import { CategoryBadge } from './CategoryBadge.js';
 import { IconButton } from './IconButton.js';
 import { IconPlay, IconCalendarCheck, IconCalendarPlus, IconHeartFilled, IconHeartOutline } from './icons.js';
+import { getTrackIcon } from '../../../utils/tier-1-event-config.js';
 
 export const buildSessionCard = () => SessionCard;
 
 export function SessionCard({ session, forceOnDemand = false, timeDisplay = 'duration' }) {
   const { state, dispatch } = useSessionGuide();
-  const { eventConfig, activeView } = state;
+  const { guideConfig, activeView } = state;
   const dismissingIds = state.dismissingIds || new Set();
-  const { userTz, surface, trackColors } = eventConfig;
+  const { userTz, surface } = guideConfig;
 
   const isScheduled = scheduled.value.has(session.id);
   const isFavorited = favorited.value.has(session.id);
@@ -22,7 +23,7 @@ export function SessionCard({ session, forceOnDemand = false, timeDisplay = 'dur
   const [hoverAnim, setHoverAnim] = useState(null);
   const onDemandNatural = isSessionOnDemand(session, getNowMs());
   const onDemand = forceOnDemand || onDemandNatural;
-  const trackColor = (trackColors && trackColors[session.track]) || '';
+  const trackColor = getTrackIcon(session.track)?.color || '';
 
   const upcomingTimeLabel = (timeDisplay === 'duration' && session.endTimeUtc)
     ? formatDuration(session.startTimeUtc, session.endTimeUtc)
@@ -82,7 +83,7 @@ export function SessionCard({ session, forceOnDemand = false, timeDisplay = 'dur
     await withDismissAnimation(
       e,
       activeView === 'my-sessions' && isScheduled,
-      () => scheduleWithFeedback(session, { eventConfig, isScheduled }),
+      () => scheduleWithFeedback(session, { eventConfig: guideConfig, isScheduled }),
     );
   }
 
@@ -91,7 +92,7 @@ export function SessionCard({ session, forceOnDemand = false, timeDisplay = 'dur
     await withDismissAnimation(
       e,
       activeView === 'my-favorites' && isFavorited,
-      () => favoriteWithFeedback(session, { eventConfig, isFavorited }),
+      () => favoriteWithFeedback(session, { eventConfig: guideConfig, isFavorited }),
     );
   }
 
@@ -138,13 +139,13 @@ export function SessionCard({ session, forceOnDemand = false, timeDisplay = 'dur
       onmouseenter=${onMouseEnter} onmouseleave=${onMouseLeave}>
       <div class="sg-card__body">
         <div class="sg-card__badge-row">
-          <${CategoryBadge} category=${session.category} size="sm" />
+          <${CategoryBadge} category=${session.category?.[0]} size="sm" />
         </div>
         <p class="sg-card__title">${session.title}</p>
         <p class="sg-card__desc">${session.description}</p>
         <div class="sg-card__footer">
           <span class="sg-card__track sg-card__track--footer" style=${'color:' + trackColor}>${session.track}</span>
-          <span class="sg-card__footer-badge"><${CategoryBadge} category=${session.category} size="sm" /></span>
+          <span class="sg-card__footer-badge"><${CategoryBadge} category=${session.category?.[0]} size="sm" /></span>
           <span class="sg-card__time">${timeLabel}</span>
         </div>
       </div>

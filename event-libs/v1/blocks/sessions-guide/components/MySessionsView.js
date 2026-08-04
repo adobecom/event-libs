@@ -2,7 +2,7 @@ import { html, useMemo } from '../../../deps/htm-preact.js';
 import { useSessionGuide } from '../store/index.js';
 import {
   sessions as sessionsSignal, scheduled as scheduledSignal,
-  liveStreamActiveIds as liveStreamActiveIdsSignal, auth,
+  liveStreamActiveIds as liveStreamActiveIdsSignal, auth, sessionStateVersion,
 } from '../../../utils/session-store.js';
 import { RegistrationPrompt } from './RegistrationPrompt.js';
 import { TimeSlotRow } from './TimeSlotRow.js';
@@ -11,7 +11,7 @@ import { Carousel } from './Carousel.js';
 import {
   groupByStartTime, groupByTrack, onDemandSessions, filterSessions, sessionsForDay, liveSessions,
 } from '../utils/session-filters.js';
-import { getNowMs, formatShortTime } from '../utils/time.js';
+import { getNowMs, formatShortTime, formatTimezoneAbbr } from '../utils/time.js';
 import { deriveSessionState } from '../../../utils/session-state.js';
 
 export const buildMySessionsView = () => MySessionsView;
@@ -24,7 +24,11 @@ export function MySessionsView() {
   const liveStreamActiveIds = liveStreamActiveIdsSignal.value;
   const activeFilters = state.activeFilters || {};
   const searchQuery = state.searchQuery || '';
-  const userTz = state.eventConfig?.userTz;
+  const userTz = state.guideConfig?.userTz;
+  // Read purely to establish a re-render dependency on time-driven session-state
+  // transitions (see sessionStateVersion in session-store.js) — value itself is unused.
+  // eslint-disable-next-line no-unused-expressions
+  sessionStateVersion.value;
   const nowMs = getNowMs();
 
   if (auth.value.isRegistered !== true) return html`<${RegistrationPrompt} />`;
@@ -72,6 +76,7 @@ export function MySessionsView() {
             sessions=${live}
             title="Live now"
             formatTime=${(s) => formatShortTime(s.startTimeUtc, userTz)}
+            formatTimezone=${(s) => formatTimezoneAbbr(s.startTimeUtc, userTz)}
           />
         </div>
       `}

@@ -27,12 +27,26 @@ describe('session-store: myData maps RF sessionTimeID to our session ids', () =>
 
   before(async () => {
     originalFetch = window.fetch;
-    // rfCode 'S001'/'K001' match the mock catalog's session ids 's-001'/'k-001'
-    // (event-libs/v1/services/sessions/sessions-api.js) — 'UNKNOWN' has no match.
+    // rfCode 'S001'/'K001' come from the stubbed ESL session-catalog response below, mapped
+    // to session ids 's-001'/'k-001' by mapEslPayloadToRawSessions() — 'UNKNOWN' has no match.
     window.fetch = async (url) => {
       if (url.includes('/jwt')) {
         jwtRequestUrl = url;
         return { ok: true, status: 200, json: async () => ({ rfAuthToken: 'exchanged-token' }) };
+      }
+      if (url.includes('session-catalog')) {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            sessions: [
+              { sessionId: 's-001', sessionCode: 'S001' },
+              { sessionId: 'k-001', sessionCode: 'K001' },
+            ],
+            sessionTimes: [],
+            speakers: [],
+          }),
+        };
       }
       myDataRequestUrl = url;
       return {

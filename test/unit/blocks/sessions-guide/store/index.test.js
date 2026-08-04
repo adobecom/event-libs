@@ -5,10 +5,7 @@ import { auth } from '../../../../../event-libs/v1/utils/session-store.js';
 const MOCK_CONFIG = {
   title: 'Adobe MAX 2026',
   userTz: 'America/Los_Angeles',
-  showConflictModal: true,
   filterCategories: [],
-  trackIcons: {},
-  trackColors: {},
   theme: 'dark',
 };
 
@@ -40,9 +37,9 @@ describe('store/buildInitialState', () => {
     expect(state.drawerState).to.equal('hidden');
   });
 
-  it('carries eventConfig through', () => {
+  it('carries guideConfig through', () => {
     const state = buildInitialState(MOCK_CONFIG);
-    expect(state.eventConfig).to.deep.equal(MOCK_CONFIG);
+    expect(state.guideConfig).to.deep.equal(MOCK_CONFIG);
   });
 });
 
