@@ -15,10 +15,15 @@
 // legacy northstar client's `max-api` endpoint did.
 export const DEFAULT_RF_API_URL = 'https://www.adobe.com/max-api/';
 
-// TODO(MWPW-200311): placeholder only — replace with the real default event's
-// RainFocus profile id once confirmed. Per the Jira thread this isn't a secret:
-// RainFocus restricts access by IP allowlisting on their side, not by this value.
-export const DEFAULT_RF_PROFILE_ID = 'REPLACE_WITH_DEFAULT_RF_PROFILE_ID';
+// Per the Jira thread (MWPW-200311) these aren't secrets: RainFocus restricts access
+// by IP allowlisting on their side, not by this value — safe to hardcode/expose client-side.
+export const RF_PROFILE_IDS = {
+  max25: 'MAX25ggj84gt2s0u73vzzzSESSIONHUB',
+  max26: 'MAX26sss1mIiY19qLgszzzSESSIONHUB',
+};
+
+// Current/upcoming event as of MWPW-200311 — update when the next MAX supersedes it.
+export const DEFAULT_RF_PROFILE_ID = RF_PROFILE_IDS.max26;
 
 const ENDPOINTS = {
   GET_FAVORITES: 'myInterests',

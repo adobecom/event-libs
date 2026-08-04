@@ -1,12 +1,18 @@
 import { expect } from '@esm-bundle/chai';
 import {
   fetchScheduled, fetchFavorited, addSession, removeSession, toggleSessionInterest,
-  DEFAULT_RF_API_URL,
+  DEFAULT_RF_API_URL, DEFAULT_RF_PROFILE_ID, RF_PROFILE_IDS,
 } from '../../../../event-libs/v1/services/sessions/rainfocus.js';
 
 describe('services/sessions/rainfocus', () => {
   let originalFetch;
   let lastRequest;
+
+  it('defaults to the current MAX26 profile id', () => {
+    expect(RF_PROFILE_IDS.max25).to.equal('MAX25ggj84gt2s0u73vzzzSESSIONHUB');
+    expect(RF_PROFILE_IDS.max26).to.equal('MAX26sss1mIiY19qLgszzzSESSIONHUB');
+    expect(DEFAULT_RF_PROFILE_ID).to.equal(RF_PROFILE_IDS.max26);
+  });
 
   const stubFetch = (body, { ok = true, status = 200 } = {}) => {
     window.fetch = async (url) => {
