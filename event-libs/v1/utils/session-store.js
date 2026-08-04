@@ -101,17 +101,15 @@ function syncAuth() {
   };
 }
 
-// mySchedule/sessionInterests entries are RF's own session-time objects, not bare ids —
-// match each one's sessionTimeID against session.rfCode, which scheduleSession()/
-// favoriteSession() already send as RF's sessionTimeId, to recover our internal session.id.
+// Entries are RF's session-time objects, not bare ids — match sessionTimeID against
+// session.rfCode (the id scheduleSession()/favoriteSession() already send as sessionTimeId).
 function mapToSessionIds(entries) {
   const idByRfCode = new Map(sessions.value.map((s) => [s.rfCode, s.id]));
   return (entries || []).map((entry) => idByRfCode.get(entry.sessionTimeID)).filter(Boolean);
 }
 
-// Reconciles scheduled/favorited with the real RF call once it resolves — loadPersisted()
-// already gave the UI a synchronous fallback from localStorage/dev-seed data. Runs after
-// the session catalog loads, since mapToSessionIds() needs it.
+// Reconciles scheduled/favorited with the real RF response, once the session catalog
+// (needed for mapToSessionIds()) has loaded; loadPersisted() covers the UI until then.
 async function loadMyData() {
   try {
     // TODO: replace null with a real rfAuthToken from auth integration
