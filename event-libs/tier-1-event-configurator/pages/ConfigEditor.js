@@ -76,7 +76,9 @@ export default function ConfigEditor() {
   };
 
   const handleCopy = async () => {
-    const ok = await copyTextToClipboard(configPreview);
+    // Minified, not configPreview's pretty-printed form: DA joins a metadata cell's
+    // multi-line content back with ", ", corrupting multi-line JSON with stray commas.
+    const ok = await copyTextToClipboard(JSON.stringify(activeConfig.config));
     if (ok) setToastSuccess('Config copied — paste it into the page\'s tier-1-event-config metadata');
     else setToastError('Could not copy config — select and copy the JSON block manually');
   };
@@ -160,6 +162,35 @@ export default function ConfigEditor() {
             onChange=${(next) => updateConfigField('featuredSessions', next)} \
           />
         `}
+      </section>
+
+      <section class="tec-editor__section">
+        <h2>RainFocus API</h2>
+        <p class="tec-editor__section-hint">
+          Lets this event's Tier 1 pages make live RainFocus schedule/favorites calls.
+          Part of the Config JSON below — one payload, pasted once into the page's
+          <code>tier-1-event-config</code> metadata. The profile id isn't a secret
+          (RainFocus restricts access by IP allowlist on their side), but it is specific to
+          this event — leave blank and the page falls back to the site's default event.
+        </p>
+        <label class="tec-editor__field-label" for="tec-rf-api-url">RainFocus API URL</label>
+        <input
+          id="tec-rf-api-url"
+          type="text"
+          class="tec-field tec-editor__rf-input"
+          placeholder="https://www.adobe.com/max-api/"
+          value=${activeConfig.config.rfApiUrl || ''}
+          onInput=${(e) => updateConfigField('rfApiUrl', e.target.value)}
+        />
+        <label class="tec-editor__field-label" for="tec-rf-profile-id">RainFocus profile ID</label>
+        <input
+          id="tec-rf-profile-id"
+          type="text"
+          class="tec-field tec-editor__rf-input"
+          placeholder="this event's RainFocus profile id"
+          value=${activeConfig.config.rfProfileId || ''}
+          onInput=${(e) => updateConfigField('rfProfileId', e.target.value)}
+        />
       </section>
 
       <section class="tec-editor__section">
