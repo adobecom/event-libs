@@ -143,12 +143,21 @@ const ConfigsProvider = ({ children }) => {
       const existing = prev.config.swimlaneOrder || [];
       const liveTracks = tracks || [];
       const liveTrackSet = new Set(liveTracks);
-      const stillValid = existing.filter((r) => liveTrackSet.has(r.track));
+      // Backfills `displayName` on entries seeded before that field existed (rather
+      // than leaving it undefined forever) — `stillValid` isn't otherwise touched.
+      let backfilled = false;
+      const stillValid = existing
+        .filter((r) => liveTrackSet.has(r.track))
+        .map((r) => {
+          if (r.displayName) return r;
+          backfilled = true;
+          return { ...r, displayName: r.track };
+        });
       const existingTrackSet = new Set(existing.map((r) => r.track));
       const newOnes = liveTracks
         .filter((t) => !existingTrackSet.has(t))
         .map((t) => ({ track: t, displayName: t, enabled: true }));
-      if (newOnes.length === 0 && stillValid.length === existing.length) return prev;
+      if (newOnes.length === 0 && stillValid.length === existing.length && !backfilled) return prev;
       return {
         ...prev,
         config: { ...prev.config, swimlaneOrder: [...stillValid, ...newOnes] },
@@ -169,15 +178,24 @@ const ConfigsProvider = ({ children }) => {
       if (!prev) return prev;
       const existing = prev.config.filterCategories || [];
       const candidates = candidateAttributes || [];
-      const candidateIds = new Set(candidates.map((c) => c.attributeId));
-      const stillValid = existing.filter((c) => candidateIds.has(c.attributeId));
+      const candidatesById = new Map(candidates.map((c) => [c.attributeId, c]));
+      // Backfills `label` on entries seeded before that field existed (rather than
+      // leaving it undefined forever) — `stillValid` isn't otherwise touched.
+      let backfilled = false;
+      const stillValid = existing
+        .filter((c) => candidatesById.has(c.attributeId))
+        .map((c) => {
+          if (c.label) return c;
+          backfilled = true;
+          return { ...c, label: candidatesById.get(c.attributeId).label ?? c.displayName };
+        });
       const existingIds = new Set(existing.map((c) => c.attributeId));
       const newOnes = candidates
         .filter((c) => !existingIds.has(c.attributeId))
         .map((c) => ({
           attributeId: c.attributeId, label: c.label, displayName: c.label, enabled: true,
         }));
-      if (newOnes.length === 0 && stillValid.length === existing.length) return prev;
+      if (newOnes.length === 0 && stillValid.length === existing.length && !backfilled) return prev;
       return {
         ...prev,
         config: { ...prev.config, filterCategories: [...stillValid, ...newOnes] },
