@@ -134,7 +134,9 @@ const ConfigsProvider = ({ children }) => {
   // longer appear in the live catalog, and appends any newly-discovered track not yet
   // in the authored order (enabled by default — the "starting point" requirement,
   // same as seedFilterCategories below), without disturbing the author's existing
-  // ordering/enabled state.
+  // ordering/enabled/displayName state. `track` itself is the immutable original
+  // value (used to match sessions to swimlanes); `displayName` defaults to it and is
+  // author-editable, same rename pattern as filterCategories below.
   const seedSwimlaneOrder = useCallback((tracks) => {
     setActiveConfig((prev) => {
       if (!prev) return prev;
@@ -145,7 +147,7 @@ const ConfigsProvider = ({ children }) => {
       const existingTrackSet = new Set(existing.map((r) => r.track));
       const newOnes = liveTracks
         .filter((t) => !existingTrackSet.has(t))
-        .map((t) => ({ track: t, enabled: true }));
+        .map((t) => ({ track: t, displayName: t, enabled: true }));
       if (newOnes.length === 0 && stillValid.length === existing.length) return prev;
       return {
         ...prev,
@@ -160,6 +162,8 @@ const ConfigsProvider = ({ children }) => {
   // enabled by default (the "starting point" requirement), author unselects/renames/
   // reorders from there. filterCategories is a plain array in display order — no
   // separate numeric `order` field, to avoid two sources of truth for the same thing.
+  // `label` is the immutable original ESP label (kept alongside `displayName` so the
+  // editor can always show what's being overridden, even after a rename).
   const seedFilterCategories = useCallback((candidateAttributes) => {
     setActiveConfig((prev) => {
       if (!prev) return prev;
@@ -170,7 +174,9 @@ const ConfigsProvider = ({ children }) => {
       const existingIds = new Set(existing.map((c) => c.attributeId));
       const newOnes = candidates
         .filter((c) => !existingIds.has(c.attributeId))
-        .map((c) => ({ attributeId: c.attributeId, displayName: c.label, enabled: true }));
+        .map((c) => ({
+          attributeId: c.attributeId, label: c.label, displayName: c.label, enabled: true,
+        }));
       if (newOnes.length === 0 && stillValid.length === existing.length) return prev;
       return {
         ...prev,

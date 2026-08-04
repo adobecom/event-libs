@@ -205,11 +205,17 @@ authoring library, full fidelity):
   behaviorFlags: {
     enableScheduling, enableFavoriting, enableWatchNowCtas, enableBrandConciergeRibbon,
   },
-  filterCategories,  // [{ attributeId, displayName, enabled, order }] — see §7, no values/counts persisted
-  swimlaneOrder,     // [{ track, enabled }] — author-chosen order + per-track show/hide
+  filterCategories,  // [{ attributeId, label, displayName, enabled, order }] — see §7, no
+                      // values/counts persisted. `label` is the immutable original ESP
+                      // label (2026-08-04: kept alongside `displayName` so the editor can
+                      // always show what's being overridden, even after a rename).
+  swimlaneOrder,     // [{ track, displayName, enabled }] — author-chosen order + per-track
+                      // show/hide/rename. `track` is the immutable original value (also
+                      // used to match sessions to swimlanes); `displayName` defaults to it
+                      // and is author-editable, same rename pattern as filterCategories
                       // (2026-08-04: added `enabled` so authors can drop a track from the
-                      // guide entirely, not just reorder it — same shape/reasoning as
-                      // filterCategories above, minus displayName since tracks aren't renamed here)
+                      // guide entirely, not just reorder it, then added `displayName` for
+                      // the same rename capability filterCategories already had).
 }
 ```
 
@@ -292,7 +298,7 @@ straight onto `guideConfig`, present but not read by anything yet. Full checklis
 wiring each one up: `MWPW-194336-CONSUMPTION-HANDOFF.md`.
 
 **Naming-collision guard:** the incoming authored `filterCategories` shape
-(`{attributeId, displayName, enabled}`, §7) does *not* overwrite `guideConfig.filterCategories`
+(`{attributeId, label, displayName, enabled}`, §7) does *not* overwrite `guideConfig.filterCategories`
 — that key is left as `FilterPanel.js`'s existing legacy default
 (`[{id: 'track', label: 'Channel'}, {id: 'type', label: 'Session Type'}]`), since
 `FilterPanel.js` still indexes sessions directly by `id` and would silently render empty
@@ -380,8 +386,11 @@ export function deriveFacetableAttributes(sessions) {
 fetched in Phase 2, shows every result as a pre-enabled candidate (the "starting
 point"), lets the author unselect / set a **display name** (defaulting to `label`,
 author-editable) / reorder. Saves only the decisions —
-`filterCategories: [{ attributeId, displayName, enabled, order }]` (§5) — no values, no
-counts; those are never persisted, only ever derived live.
+`filterCategories: [{ attributeId, label, displayName, enabled, order }]` (§5, `label`
+added 2026-08-04 so the editor UI can always show the original name next to the
+editable one) — no values, no counts; those are never persisted, only ever derived
+live. Same rename + "show the original alongside it" treatment was extended to
+`swimlaneOrder` the same day, so both editors behave consistently (§5a).
 
 **Consuming side (tracked in `MWPW-194336-CONSUMPTION-HANDOFF.md` item 1):** the sessions-guide block already fetches the
 full session catalog to render itself. It would run the *same*

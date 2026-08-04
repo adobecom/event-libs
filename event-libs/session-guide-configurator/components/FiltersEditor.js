@@ -7,7 +7,9 @@ import {
 // the "starting point" requirement). No per-value CRUD — filter *options* are always
 // live-derived from ESP, never authored (PLAN.md §7). Same reorder mechanics as
 // SwimlaneOrderEditor.js/Tier 1's FeaturedSessionsEditor.js, plus a per-row enable
-// checkbox and editable display-name input.
+// checkbox and editable display-name input. The original ESP `label` (kept alongside
+// `displayName` by seedFilterCategories) is always shown next to the editable field so
+// authors know what they're overriding.
 function DragHandleIcon() {
   return html`
     <svg width="10" height="16" viewBox="0 0 10 16" aria-hidden="true" focusable="false">
@@ -197,7 +199,7 @@ export default function FiltersEditor({ categories, onChange }) {
     <ul class="sgc-filters-editor__list" ref=${listRef}>
       ${rows.map((row, index) => html`
         <li \
-          class="sgc-filters-editor__row ${row.attributeId === draggedId ? 'is-dragging' : ''}" \
+          class="sgc-filters-editor__row ${row.attributeId === draggedId ? 'is-dragging' : ''} ${!row.enabled ? 'is-disabled' : ''}" \
           key=${row.attributeId} \
           ref=${(node) => setItemRef(row.attributeId, node)} \
         >
@@ -217,6 +219,7 @@ export default function FiltersEditor({ categories, onChange }) {
               onChange=${(e) => updateRow(row.attributeId, { enabled: e.target.checked })}
             />
           </label>
+          <span class="sgc-filters-editor__original" title="Original name">${row.label}</span>
           <input
             type="text"
             class="sgc-field sgc-filters-editor__name-input"

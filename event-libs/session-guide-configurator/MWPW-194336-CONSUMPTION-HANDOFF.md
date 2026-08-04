@@ -27,9 +27,10 @@ That mechanism needs replacing, not extending:
   `v1/services/sessions/sessions-api.js`) over the block's own already-fetched
   session catalog.
 - Filter/order the result through `guideConfig.authoredFilterCategories`
-  (shape `{attributeId, displayName, enabled}[]`) — keep only `enabled`
-  entries, in authored order.
-- Substitute `displayName` for `label` when rendering category tabs.
+  (shape `{attributeId, label, displayName, enabled}[]` — `label` is the
+  original ESP label, unused at render time but kept so the configurator's
+  own editor can show it) — keep only `enabled` entries, in authored order.
+- Render `displayName` (not `label`) as the category tab text.
 - Look up each session's value for a category by `attributeId` against its
   `customAttributes[]` (same shape `getSessionTrack()` already reads for
   swimlanes — see item 3), not `s[id]` — sessions don't have flat
@@ -64,15 +65,19 @@ Needs:
 ## 3. Swimlane order + visibility — wire `swimlaneOrder` into `OnDemandView.js` (not started)
 
 `OnDemandView.js`'s `groupByTrack(available)` (in `utils/session-filters.js`)
-currently returns tracks in whatever order it derives them in — there's no
-authored ordering or hiding applied today. `guideConfig.swimlaneOrder` is
-`[{ track, enabled }]` (2026-08-04 — was a plain track-name array before
-disable support was added in the configurator). Needs:
+currently returns tracks in whatever order it derives them in, labeled with
+the raw track value — there's no authored ordering, hiding, or renaming
+applied today. `guideConfig.swimlaneOrder` is `[{ track, displayName, enabled }]`
+(2026-08-04 — was a plain track-name array before disable/rename support was
+added in the configurator; `track` is the immutable original value used to
+match sessions, `displayName` is the author's editable override). Needs:
 - `groupByTrack` (or a new wrapper) to accept `guideConfig.swimlaneOrder`,
   **drop any track whose entry has `enabled: false` entirely** (not just push
   it to the end — those sessions shouldn't render in this guide at all, same
   as an author fully deselecting a filter category), and sort the remaining
   tracks to match the enabled entries' order.
+- Render each swimlane's header using `displayName`, not the raw `track`
+  value.
 - Decide the fallback for any track present in the session data but *not*
   in `swimlaneOrder` at all (e.g. a new track added at ESP after this config
   was last authored/seeded) — likely append at the end in whatever order
@@ -108,7 +113,8 @@ inspection:
 - [ ] Each of the four `headings` strings renders in the right
       auth-state/post-event combination; a blank authored string falls back
       to the existing hardcoded copy.
-- [ ] `OnDemandView.js` renders track swimlanes in `swimlaneOrder`'s order; a
+- [ ] `OnDemandView.js` renders track swimlanes in `swimlaneOrder`'s order,
+      headed by each entry's `displayName` (not the raw `track` value); a
       disabled track (`enabled: false`) doesn't render at all; a track missing
       from `swimlaneOrder` entirely still renders (doesn't silently disappear).
 - [ ] Each `behaviorFlags` toggle set to `false` actually removes/disables

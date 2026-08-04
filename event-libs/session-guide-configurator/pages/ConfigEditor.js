@@ -242,7 +242,7 @@ export default function ConfigEditor() {
 
       <section class="sgc-editor__section">
         <h2>On-demand swimlane order</h2>
-        <p class="sgc-editor__section-hint">Drag to reorder, or focus a handle and press arrow up/down. Unselect a track to hide it from the session guide entirely. Renaming swimlanes isn't available here — track names/icons/colors are managed globally via the Tier 1 Event Configurator.</p>
+        <p class="sgc-editor__section-hint">Drag to reorder, or focus a handle and press arrow up/down. Unselect a track to hide it from the session guide entirely, or edit its name to change how it's labeled here — the original value stays shown alongside for reference. Track icons/colors are still managed globally via the Tier 1 Event Configurator.</p>
         ${isLoadingSessions && html`<${LoadingInline} label="Loading tracks…" />`}
         ${sessionsError && html`<p class="sgc-editor__error">${sessionsError}</p>`}
         ${!isLoadingSessions && !sessionsError && html`
@@ -255,7 +255,7 @@ export default function ConfigEditor() {
 
       <section class="sgc-editor__section">
         <h2>Filters</h2>
-        <p class="sgc-editor__section-hint">Every facetable attribute from this event's sessions starts enabled — unselect, rename, or reorder the ones shown in the published Session Guide. Filter options themselves are always read live from ESP, not authored here.</p>
+        <p class="sgc-editor__section-hint">Every facetable attribute from this event's sessions starts enabled — unselect, rename, or reorder the ones shown in the published Session Guide. The original name stays shown alongside the editable one for reference. Filter options themselves are always read live from ESP, not authored here.</p>
         ${isLoadingSessions && html`<${LoadingInline} label="Loading filters…" />`}
         ${sessionsError && html`<p class="sgc-editor__error">${sessionsError}</p>`}
         ${!isLoadingSessions && !sessionsError && html`
