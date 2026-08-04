@@ -1,6 +1,7 @@
 import { expect } from '@esm-bundle/chai';
 import {
-  fetchMyData, addSession, removeSession, toggleSessionInterest,
+  fetchAuthToken, fetchMyData, fetchScheduled, fetchFavorited,
+  addSession, removeSession, dropAndSwapSession, toggleSessionInterest, fetchAttendeeAccess,
   DEFAULT_RF_API_URL, DEFAULT_RF_PROFILE_ID, RF_PROFILE_IDS, RF_WIDGET_ID,
 } from '../../../../event-libs/v1/services/sessions/rainfocus.js';
 
@@ -32,6 +33,55 @@ describe('services/sessions/rainfocus', () => {
 
   afterEach(() => {
     window.fetch = originalFetch;
+  });
+
+  describe('fetchAuthToken', () => {
+    it('builds the jwt request with clientId (the only endpoint that sends it)', async () => {
+      stubFetch({ token: 'abc' });
+      await fetchAuthToken('client-1', 'profile-1', 'https://example.com/rf/');
+      const url = new URL(lastRequest);
+      expect(url.pathname).to.equal('/rf/jwt');
+      expect(url.searchParams.get('rfApiProfileId')).to.equal('profile-1');
+      expect(url.searchParams.get('clientId')).to.equal('client-1');
+    });
+  });
+
+  describe('fetchScheduled / fetchFavorited', () => {
+    it('fetchScheduled hits mySchedule and returns the array', async () => {
+      stubFetch({ mySchedule: ['session-1'] });
+      const result = await fetchScheduled('auth-token', 'profile-1', 'https://example.com/rf/');
+      expect(result).to.deep.equal(['session-1']);
+      expect(lastRequest).to.include('/rf/mySchedule');
+    });
+
+    it('fetchFavorited hits myInterests and returns the array', async () => {
+      stubFetch({ myInterests: ['session-2'] });
+      const result = await fetchFavorited('auth-token', 'profile-1', 'https://example.com/rf/');
+      expect(result).to.deep.equal(['session-2']);
+      expect(lastRequest).to.include('/rf/myInterests');
+    });
+  });
+
+  describe('fetchAttendeeAccess', () => {
+    it('hits attendeeAccess with sessionTimeId', async () => {
+      stubFetch({ access: true });
+      const result = await fetchAttendeeAccess('st-1', 'auth-token', 'profile-1', 'https://example.com/rf/');
+      expect(result).to.deep.equal({ access: true });
+      const url = new URL(lastRequest);
+      expect(url.pathname).to.equal('/rf/attendeeAccess');
+      expect(url.searchParams.get('sessionTimeId')).to.equal('st-1');
+    });
+  });
+
+  describe('dropAndSwapSession', () => {
+    it('hits dropSwapSession with sessionTimeId and dropSessionItems', async () => {
+      stubFetch({ responseCode: '0' });
+      await dropAndSwapSession('st-new', 'st-old-1;st-old-2', 'auth-token', 'profile-1', 'https://example.com/rf/');
+      const url = new URL(lastRequest);
+      expect(url.pathname).to.equal('/rf/dropSwapSession');
+      expect(url.searchParams.get('sessionTimeId')).to.equal('st-new');
+      expect(url.searchParams.get('dropSessionItems')).to.equal('st-old-1;st-old-2');
+    });
   });
 
   describe('fetchMyData', () => {
