@@ -4,7 +4,7 @@ import { getMetadata, getEventServiceEnv } from './utils.js';
 import { fetchSessions, probeEslPayload } from '../services/sessions/sessions-api.js';
 import { startPolling } from '../services/sessions/poller.js';
 import {
-  addSession, removeSession, toggleSessionInterest, DEFAULT_RF_PROFILE_ID,
+  addSession, removeSession, toggleSessionInterest, DEFAULT_RF_API_URL, DEFAULT_RF_PROFILE_ID,
 } from '../services/sessions/rainfocus.js';
 import { mountToast } from '../features/toast/toast.js';
 
@@ -131,38 +131,30 @@ export function openSessionGuideDetail(sessionId) {
   sessionGuideRequest.value = { sessionId };
 }
 
-// The Tier 1 Event Configurator (MWPW-200311) consolidates rfApiUrl/rfProfileId into the
-// same JSON payload as trackIcons/allowDoubleBooking/featuredSessions, pasted once into
-// tier-1-event-config metadata — rather than requiring authors to also hand-author separate
-// rainfocus-api-url/rainfocus-api-profile-id metadata rows. A malformed/absent value here
-// just means those two fields fall through to the flat-metadata/hardcoded-default chain below.
+// Parses the Tier 1 Event Configurator's payload (MWPW-200311); null if absent/invalid.
 function parseTierOneEventConfig() {
+  const raw = getMetadata('tier-1-event-config');
+  if (!raw) return null;
   try {
-    return JSON.parse(getMetadata('tier-1-event-config') || '{}');
+    return JSON.parse(raw);
   } catch (err) {
     window.lana?.log(`[session-store] invalid tier-1-event-config JSON: ${err.message}`);
-    return {};
+    return null;
   }
 }
 
-// Idempotent — safe to call multiple times; no-ops after the first successful init
-// and when there's no RF API URL from either source (mirrors the `event-id` gate that
-// decorateEvent already uses for page-wide setup).
+// Idempotent — safe to call multiple times; no-ops after the first successful init and
+// when tier-1-event-config metadata is absent (mirrors the `event-id` gate decorateEvent
+// already uses for page-wide setup).
 export function initSessionState() {
   if (initialized) return;
   const tierOneConfig = parseTierOneEventConfig();
-  // rainfocus-api-url flat metadata remains a fallback for pages authored without the
-  // Configurator (or for quick manual/local testing) — the Configurator's JSON takes priority.
-  const apiUrl = tierOneConfig.rfApiUrl || getMetadata('rainfocus-api-url');
-  if (!apiUrl) return;
+  if (!tierOneConfig) return;
   initialized = true;
 
   apiConfig = {
-    apiUrl,
-    // Falls back to the RF service's own hardcoded default (MWPW-200311) when neither the
-    // Configurator's JSON nor the flat metadata has a per-event profile id yet — keeps
-    // schedule/favorite actions from silently sending profileId: undefined.
-    profileId: tierOneConfig.rfProfileId || getMetadata('rainfocus-api-profile-id') || DEFAULT_RF_PROFILE_ID,
+    apiUrl: tierOneConfig.rfApiUrl || DEFAULT_RF_API_URL,
+    profileId: tierOneConfig.rfProfileId || DEFAULT_RF_PROFILE_ID,
     registerUrl: getMetadata('register-url') || '/register',
     manualCutoff: getMetadata('manual-on-demand-transition-time') || null,
     mrEnv: deriveMrEnv(),

@@ -90,10 +90,8 @@ const ConfigsProvider = ({ children }) => {
   // so carrying it over would silently mislabel the new event.
   // `eventServiceEnv` is the *new* pick's env, not the source row's —
   // Duplicate can legitimately target a different tier than its source.
-  // rfApiUrl/rfProfileId (MWPW-200311) are always reset blank rather than
-  // cloned — unlike a style setting such as trackIcons, silently reusing another
-  // event's RainFocus profile id would misroute this new event's live
-  // schedule/favorites calls at whatever RF profile the source event used.
+  // rfApiUrl/rfProfileId always reset blank — reusing another event's RF
+  // profile id would misroute this event's live schedule/favorites calls.
   const startDuplicateConfig = useCallback((sourceRow, event, eventServiceEnv) => {
     const clonedConfig = { ...sourceRow.config };
     delete clonedConfig.eventId;

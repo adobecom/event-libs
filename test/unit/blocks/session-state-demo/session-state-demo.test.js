@@ -23,11 +23,10 @@ describe('session-state-demo block', () => {
   let el;
   let originalFetch;
 
-  // initSessionState() is idempotent and only needs the rainfocus-api-url gate to run
-  // once — this populates the real apiConfig that favoriteSession()'s RF call needs,
-  // same as decorateEvent() would on a real page, instead of leaving it null.
+  // initSessionState() is idempotent and only runs once — this populates the real
+  // apiConfig that favoriteSession()'s RF call needs, same as decorateEvent() would.
   before(async () => {
-    setMetadata('rainfocus-api-url', 'https://mock.example/api');
+    setMetadata('tier-1-event-config', JSON.stringify({ rfApiUrl: 'https://mock.example/api' }));
     initSessionState();
     await waitForSessionsReady();
   });

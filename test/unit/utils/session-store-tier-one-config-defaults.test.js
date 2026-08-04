@@ -3,6 +3,7 @@ import {
   initSessionState, getApiConfig, sessionsStatus,
 } from '../../../event-libs/v1/utils/session-store.js';
 import { setMetadata } from '../../../event-libs/v1/utils/utils.js';
+import { DEFAULT_RF_API_URL, DEFAULT_RF_PROFILE_ID } from '../../../event-libs/v1/services/sessions/rainfocus.js';
 
 function waitForSessionsReady() {
   if (sessionsStatus.value === 'ready') return Promise.resolve();
@@ -15,19 +16,16 @@ function waitForSessionsReady() {
   });
 }
 
-describe('session-store: RF config sourced from tier-1-event-config', () => {
+describe('session-store: RF defaults when tier-1-event-config omits them', () => {
   before(async () => {
-    setMetadata('tier-1-event-config', JSON.stringify({
-      rfApiUrl: 'https://example.com/from-tier-1-config/',
-      rfProfileId: 'profile-from-tier-1-config',
-    }));
+    setMetadata('tier-1-event-config', JSON.stringify({ allowDoubleBooking: true }));
     initSessionState();
     await waitForSessionsReady();
   });
 
-  it('reads apiUrl/profileId from the tier-1-event-config payload', () => {
+  it('falls back to DEFAULT_RF_API_URL/DEFAULT_RF_PROFILE_ID', () => {
     const apiConfig = getApiConfig();
-    expect(apiConfig.apiUrl).to.equal('https://example.com/from-tier-1-config/');
-    expect(apiConfig.profileId).to.equal('profile-from-tier-1-config');
+    expect(apiConfig.apiUrl).to.equal(DEFAULT_RF_API_URL);
+    expect(apiConfig.profileId).to.equal(DEFAULT_RF_PROFILE_ID);
   });
 });

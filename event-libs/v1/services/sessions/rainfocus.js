@@ -1,28 +1,18 @@
-// RainFocus (RF) live schedule/favorites API — the endpoint + profile id are per-event
-// values, authored via the Tier 1 Event Configurator into the `rainfocus-api-url` /
-// `rainfocus-api-profile-id` page metadata (MWPW-200311). session-store.js reads that
-// metadata and falls back to DEFAULT_RF_PROFILE_ID below when an author hasn't set
-// rainfocus-api-profile-id yet, so add/remove/toggle calls don't silently send
-// profileId: undefined.
-//
-// Ported from the legacy northstar rainFocus.js client's ENDPOINTS/query-param
-// contract (same RF backend), minus its AEM/FEDS-specific auth plumbing —
-// rfAuthToken/clientId are still sourced elsewhere (see session-store.js's
-// "TODO: replace null credentials" markers) and simply passed through here.
+// RainFocus (RF) live schedule/favorites API. Endpoint + profile id normally come from the
+// Tier 1 Event Configurator's tier-1-event-config payload (see session-store.js), falling
+// back to the defaults below. Ported from northstar's rainFocus.js ENDPOINTS/query-param
+// contract; rfAuthToken/clientId are sourced elsewhere and just passed through here.
 
-// Confirmed live (MAX 2025 curl examples, MWPW-200311): www.adobe.com reverse-proxies
-// this path to RF's real backend, sidestepping CORS/RF's IP allowlist the same way the
-// legacy northstar client's `max-api` endpoint did.
+// Confirmed live via real MAX 2025 traffic — reverse-proxies to RF, avoiding CORS/IP allowlist.
 export const DEFAULT_RF_API_URL = 'https://www.adobe.com/max-api/';
 
-// Per the Jira thread (MWPW-200311) these aren't secrets: RainFocus restricts access
-// by IP allowlisting on their side, not by this value — safe to hardcode/expose client-side.
+// Not secrets — RainFocus restricts access by IP allowlist, not by this value.
 export const RF_PROFILE_IDS = {
   max25: 'MAX25ggj84gt2s0u73vzzzSESSIONHUB',
   max26: 'MAX26sss1mIiY19qLgszzzSESSIONHUB',
 };
 
-// Current/upcoming event as of MWPW-200311 — update when the next MAX supersedes it.
+// Current/upcoming event — update when the next MAX supersedes it.
 export const DEFAULT_RF_PROFILE_ID = RF_PROFILE_IDS.max26;
 
 const ENDPOINTS = {
@@ -35,9 +25,7 @@ const ENDPOINTS = {
 
 function buildUrl(rfApiUrl, endpoint, params) {
   const base = rfApiUrl || DEFAULT_RF_API_URL;
-  // An author-authored rfApiUrl missing its trailing slash (e.g. ".../max-api" instead of
-  // ".../max-api/") would otherwise have its last path segment replaced by `endpoint`
-  // rather than appended to it, per URL's normal relative-resolution rules.
+  // Ensure a trailing slash so endpoint appends rather than replacing the last path segment.
   const url = new URL(endpoint, base.endsWith('/') ? base : `${base}/`);
   Object.entries(params).forEach(([key, value]) => {
     if (value !== undefined && value !== null && value !== '') url.searchParams.set(key, value);
@@ -52,10 +40,7 @@ async function rawFetch(rfApiUrl, endpoint, params) {
   return resp.json();
 }
 
-// Write-call envelope only: RF returns a numeric-string `responseCode` (0 or 15 = success,
-// no actual failure) — ported from northstar's handleResponse. The two read calls
-// (mySchedule/myInterests) never include a responseCode at all, so they skip this
-// entirely and just default a missing array to empty (see below).
+// Only write calls carry a responseCode (0/15 = success); reads never do.
 function handleWriteResponse(data) {
   const responseCode = data?.responseCode;
   switch (responseCode) {
