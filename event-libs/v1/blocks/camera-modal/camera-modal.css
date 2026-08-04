@@ -17,15 +17,34 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  padding: 12px;
   background: #000;
   border-radius: 8px;
   overflow: hidden;
+  position: relative;
 }
 
 .camera-modal-feed {
+  display: none;
+}
+
+.camera-modal-output {
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  object-fit: contain;
+}
+
+.camera-modal-loading {
+  position: absolute;
+  bottom: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgb(0 0 0 / 60%);
+  color: #fff;
+  padding: 6px 16px;
+  border-radius: 20px;
+  font-size: 13px;
+  pointer-events: none;
 }
 
 .camera-modal-error {
@@ -40,6 +59,47 @@
   flex-direction: column;
   gap: 12px;
   padding: 24px;
+}
+
+.camera-modal-bg-label {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.camera-modal-swatches {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.camera-modal-swatch {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 3px solid transparent;
+  cursor: pointer;
+  transition: border-color 0.15s;
+  padding: 0;
+}
+
+.camera-modal-swatch:hover {
+  border-color: rgb(0 0 0 / 30%);
+}
+
+.camera-modal-swatch.active {
+  border-color: #1473e6;
+  box-shadow: 0 0 0 2px #1473e6;
+}
+
+.camera-modal-swatch-none {
+  background:
+    linear-gradient(45deg, #ccc 25%, transparent 25%),
+    linear-gradient(-45deg, #ccc 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, #ccc 75%),
+    linear-gradient(-45deg, transparent 75%, #ccc 75%);
+  background-size: 12px 12px;
+  background-position: 0 0, 0 6px, 6px -6px, -6px 0;
 }
 
 @media (max-width: 600px) {
