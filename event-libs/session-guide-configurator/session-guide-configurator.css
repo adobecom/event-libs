@@ -584,6 +584,12 @@
   cursor: grabbing;
 }
 
+.sgc-swimlane-editor__enable {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
 .sgc-swimlane-editor__handle {
   display: flex;
   align-items: center;
@@ -618,4 +624,9 @@
   flex: 1;
   min-width: 0;
   font-size: 14px;
+}
+
+.sgc-swimlane-editor__row.is-disabled .sgc-swimlane-editor__title {
+  color: var(--sgc-color-text-secondary);
+  text-decoration: line-through;
 }

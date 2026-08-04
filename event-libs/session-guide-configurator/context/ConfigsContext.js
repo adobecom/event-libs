@@ -132,14 +132,20 @@ const ConfigsProvider = ({ children }) => {
   // Called once real tracks are known (session fetch resolves) — mirrors Tier 1 Event
   // Configurator's seedTrackIcons: drops swimlaneOrder entries for tracks that no
   // longer appear in the live catalog, and appends any newly-discovered track not yet
-  // in the authored order, without disturbing the author's existing ordering.
+  // in the authored order (enabled by default — the "starting point" requirement,
+  // same as seedFilterCategories below), without disturbing the author's existing
+  // ordering/enabled state.
   const seedSwimlaneOrder = useCallback((tracks) => {
     setActiveConfig((prev) => {
       if (!prev) return prev;
       const existing = prev.config.swimlaneOrder || [];
       const liveTracks = tracks || [];
-      const stillValid = existing.filter((t) => liveTracks.includes(t));
-      const newOnes = liveTracks.filter((t) => !existing.includes(t));
+      const liveTrackSet = new Set(liveTracks);
+      const stillValid = existing.filter((r) => liveTrackSet.has(r.track));
+      const existingTrackSet = new Set(existing.map((r) => r.track));
+      const newOnes = liveTracks
+        .filter((t) => !existingTrackSet.has(t))
+        .map((t) => ({ track: t, enabled: true }));
       if (newOnes.length === 0 && stillValid.length === existing.length) return prev;
       return {
         ...prev,

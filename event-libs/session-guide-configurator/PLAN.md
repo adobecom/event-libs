@@ -206,7 +206,10 @@ authoring library, full fidelity):
     enableScheduling, enableFavoriting, enableWatchNowCtas, enableBrandConciergeRibbon,
   },
   filterCategories,  // [{ attributeId, displayName, enabled, order }] — see §7, no values/counts persisted
-  swimlaneOrder,     // array of track/channel identifiers, author-chosen order
+  swimlaneOrder,     // [{ track, enabled }] — author-chosen order + per-track show/hide
+                      // (2026-08-04: added `enabled` so authors can drop a track from the
+                      // guide entirely, not just reorder it — same shape/reasoning as
+                      // filterCategories above, minus displayName since tracks aren't renamed here)
 }
 ```
 

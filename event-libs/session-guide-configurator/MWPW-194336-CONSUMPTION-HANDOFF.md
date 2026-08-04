@@ -61,17 +61,23 @@ Needs:
   falling back to the current hardcoded copy only if the authored string for
   that combination is blank.
 
-## 3. Swimlane order — wire `swimlaneOrder` into `OnDemandView.js` (not started)
+## 3. Swimlane order + visibility — wire `swimlaneOrder` into `OnDemandView.js` (not started)
 
 `OnDemandView.js`'s `groupByTrack(available)` (in `utils/session-filters.js`)
 currently returns tracks in whatever order it derives them in — there's no
-authored ordering applied today. Needs:
-- `groupByTrack` (or a new wrapper) to accept `guideConfig.swimlaneOrder`
-  (an array of track-name strings) and sort its output to match it.
+authored ordering or hiding applied today. `guideConfig.swimlaneOrder` is
+`[{ track, enabled }]` (2026-08-04 — was a plain track-name array before
+disable support was added in the configurator). Needs:
+- `groupByTrack` (or a new wrapper) to accept `guideConfig.swimlaneOrder`,
+  **drop any track whose entry has `enabled: false` entirely** (not just push
+  it to the end — those sessions shouldn't render in this guide at all, same
+  as an author fully deselecting a filter category), and sort the remaining
+  tracks to match the enabled entries' order.
 - Decide the fallback for any track present in the session data but *not*
-  in `swimlaneOrder` (e.g. a new track added at ESP after this config was
-  last authored/seeded) — likely append at the end in whatever order
-  `groupByTrack` would otherwise produce, rather than dropping the track.
+  in `swimlaneOrder` at all (e.g. a new track added at ESP after this config
+  was last authored/seeded) — likely append at the end in whatever order
+  `groupByTrack` would otherwise produce, rather than dropping it (dropping
+  is only correct for a track the author explicitly disabled).
 
 ## 4. Behavior flags — wire into their respective gating points (not started)
 
@@ -103,8 +109,8 @@ inspection:
       auth-state/post-event combination; a blank authored string falls back
       to the existing hardcoded copy.
 - [ ] `OnDemandView.js` renders track swimlanes in `swimlaneOrder`'s order; a
-      track missing from `swimlaneOrder` still renders (doesn't silently
-      disappear).
+      disabled track (`enabled: false`) doesn't render at all; a track missing
+      from `swimlaneOrder` entirely still renders (doesn't silently disappear).
 - [ ] Each `behaviorFlags` toggle set to `false` actually removes/disables
       the corresponding affordance across all three card/detail surfaces
       consistently (not just one of them).

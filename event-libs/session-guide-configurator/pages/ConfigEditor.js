@@ -242,7 +242,7 @@ export default function ConfigEditor() {
 
       <section class="sgc-editor__section">
         <h2>On-demand swimlane order</h2>
-        <p class="sgc-editor__section-hint">Drag to reorder, or focus a handle and press arrow up/down. Renaming/removing swimlanes isn't available here — track names/icons/colors are managed globally via the Tier 1 Event Configurator.</p>
+        <p class="sgc-editor__section-hint">Drag to reorder, or focus a handle and press arrow up/down. Unselect a track to hide it from the session guide entirely. Renaming swimlanes isn't available here — track names/icons/colors are managed globally via the Tier 1 Event Configurator.</p>
         ${isLoadingSessions && html`<${LoadingInline} label="Loading tracks…" />`}
         ${sessionsError && html`<p class="sgc-editor__error">${sessionsError}</p>`}
         ${!isLoadingSessions && !sessionsError && html`

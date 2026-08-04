@@ -1,13 +1,17 @@
 import {
-  useState, useCallback, useRef, useLayoutEffect, useEffect, html,
+  useState, useMemo, useCallback, useRef, useLayoutEffect, useEffect, html,
 } from '../../v1/deps/htm-preact.js';
 
-// Reorder only — no rename/remove. Channel names/icons/colors are managed globally
-// via the Tier 1 Event Configurator, outside this tool (PLAN.md §4.6). `tracks` is
-// always already seeded/valid by ConfigsContext.js's seedSwimlaneOrder before this
-// renders, so there's no add/remove-from-catalog concern here, unlike Tier 1's
-// FeaturedSessionsEditor.js (whose core pointer-drag + keyboard-reorder mechanics this
-// mirrors, simplified to a single column of plain track-name strings).
+// Reorder + enable/disable — no rename/remove of the track itself. Channel names/
+// icons/colors are managed globally via the Tier 1 Event Configurator, outside this
+// tool (PLAN.md §4.6). `tracks` is always already seeded/valid by ConfigsContext.js's
+// seedSwimlaneOrder before this renders, so there's no add/remove-from-catalog concern
+// here, unlike Tier 1's FeaturedSessionsEditor.js (whose core pointer-drag +
+// keyboard-reorder mechanics this mirrors) — same reorder mechanics as
+// FiltersEditor.js, minus the display-name rename input, since a track's display name
+// isn't authored here at all. A disabled track is dropped entirely from the rendered
+// guide by the consuming side (MWPW-194336-CONSUMPTION-HANDOFF.md item 3), not just
+// hidden from ordering.
 function DragHandleIcon() {
   return html`
     <svg width="10" height="16" viewBox="0 0 10 16" aria-hidden="true" focusable="false">
@@ -25,16 +29,31 @@ export default function SwimlaneOrderEditor({ tracks, onChange }) {
   const [draggedTrack, setDraggedTrack] = useState(null);
   const [announcement, setAnnouncement] = useState('');
 
-  const order = tracks || [];
+  const rows = tracks || [];
+  // Memoized so the FLIP effect's prevOrder !== order check reflects a real order
+  // change, not a fresh array recreated every render (same reasoning as Tier 1's
+  // FeaturedSessionsEditor.js's featuredIds memo / FiltersEditor.js's rowIds memo).
+  // Depends on the tracks prop itself, not the locally-rebound `rows`, since `rows`
+  // is a fresh [] literal on every render whenever tracks is falsy.
+  const order = useMemo(() => rows.map((r) => r.track), [tracks]);
+
+  const updateRow = useCallback((track, updates) => {
+    onChange(rows.map((r) => (r.track === track ? { ...r, ...updates } : r)));
+  }, [rows, onChange]);
+
+  const reorder = useCallback((nextOrder) => {
+    const byTrack = new Map(rows.map((r) => [r.track, r]));
+    onChange(nextOrder.map((track) => byTrack.get(track)));
+  }, [rows, onChange]);
 
   const handleMove = useCallback((index, direction) => {
     const target = index + direction;
     if (target < 0 || target >= order.length) return;
     const next = [...order];
     [next[index], next[target]] = [next[target], next[index]];
-    onChange(next);
+    reorder(next);
     setAnnouncement(`Moved "${next[target]}" to position ${target + 1} of ${next.length}`);
-  }, [order, onChange]);
+  }, [order, reorder]);
 
   const handleKeyDown = useCallback((e, index) => {
     if (e.key === 'ArrowUp') {
@@ -100,7 +119,7 @@ export default function SwimlaneOrderEditor({ tracks, onChange }) {
       next.splice(currentIndex, 1);
       next.splice(targetIndex, 0, info.track);
       orderRef.current = next;
-      onChange(next);
+      reorder(next);
     }
 
     const draggedNode = itemRefs.current.get(info.track);
@@ -168,29 +187,37 @@ export default function SwimlaneOrderEditor({ tracks, onChange }) {
     prevOrderRef.current = order;
   }, [order, measureRowHeight]);
 
-  if (order.length === 0) {
+  if (rows.length === 0) {
     return html`<p class="sgc-swimlane-editor__empty">No tracks found in this event's session catalog yet.</p>`;
   }
 
   return html`
     <div aria-live="polite" class="sgc-sr-only">${announcement}</div>
     <ul class="sgc-swimlane-editor__list" ref=${listRef}>
-      ${order.map((track, index) => html`
+      ${rows.map((row, index) => html`
         <li \
-          class="sgc-swimlane-editor__row ${track === draggedTrack ? 'is-dragging' : ''}" \
-          key=${track} \
-          ref=${(node) => setItemRef(track, node)} \
+          class="sgc-swimlane-editor__row ${row.track === draggedTrack ? 'is-dragging' : ''} ${!row.enabled ? 'is-disabled' : ''}" \
+          key=${row.track} \
+          ref=${(node) => setItemRef(row.track, node)} \
         >
           <button \
             type="button" \
             class="sgc-swimlane-editor__handle" \
-            aria-label="Reorder ${track}. Position ${index + 1} of ${order.length}. Drag, or press arrow up/down." \
-            onPointerDown=${(e) => handlePointerDown(e, track)} \
+            aria-label="Reorder ${row.track}. Position ${index + 1} of ${rows.length}. Drag, or press arrow up/down." \
+            onPointerDown=${(e) => handlePointerDown(e, row.track)} \
             onKeyDown=${(e) => handleKeyDown(e, index)} \
           >
             <${DragHandleIcon} />
           </button>
-          <span class="sgc-swimlane-editor__title">${track}</span>
+          <label class="sgc-swimlane-editor__enable">
+            <input
+              type="checkbox"
+              checked=${row.enabled}
+              aria-label="Show ${row.track} in the session guide"
+              onChange=${(e) => updateRow(row.track, { enabled: e.target.checked })}
+            />
+          </label>
+          <span class="sgc-swimlane-editor__title">${row.track}</span>
         </li>
       `)}
     </ul>
