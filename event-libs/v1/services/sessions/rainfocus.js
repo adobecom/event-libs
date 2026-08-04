@@ -10,11 +10,10 @@
 // Confirmed live via real MAX 2025 traffic — reverse-proxies to RF, avoiding CORS/IP allowlist.
 export const DEFAULT_RF_API_URL = 'https://www.adobe.com/max-api/';
 
-// Non-prod counterpart — mirrors milo's own env-switching convention for RF calls
-// (libs/features/mep/addons/event.js proxies its own RF route the same way: prod uses
-// www.adobe.com, everything else uses www.stage.adobe.com). A stage-IMS profile's clientId
-// won't resolve against prod RF, so this needs to match whichever IMS environment is active.
-// Not confirmed via real max-api traffic specifically, only inferred from that precedent.
+// Non-prod counterpart, needed because a stage-IMS clientId won't resolve against prod RF —
+// and milo's local env mirrors stage IMS, so this covers local too. Inferred from milo's own
+// prod/stage RF proxy split (libs/features/mep/addons/event.js), not confirmed via real
+// max-api traffic.
 export const STAGE_RF_API_URL = 'https://www.stage.adobe.com/max-api/';
 
 // Not secrets — RainFocus restricts access by IP allowlist, not by this value.
@@ -74,15 +73,13 @@ function handleWriteResponse(data) {
   }
 }
 
-// Exchanges an IMS clientId for an rfAuthToken.
 export async function fetchAuthToken(clientId, rfApiProfileId, rfApiUrl) {
   return rawFetch(rfApiUrl, ENDPOINTS.AUTH, { rfApiProfileId, clientId });
 }
 
 // The first call on landing on an event page — schedule + favorites in one request. Real
 // response also includes exhibitorInterests/exhibitorLeadSetting/exhibitorLeads — not needed
-// here. loggedInUser is: a populated attendee record confirms the caller is registered for
-// this event in RF, which session-store.js uses as the registration signal.
+// here. loggedInUser: a populated attendee record is session-store.js's registration signal.
 export async function fetchMyData(rfAuthToken, rfApiProfileId, rfApiUrl) {
   const data = await rawFetch(rfApiUrl, ENDPOINTS.MY_DATA, {
     rfApiProfileId, rfAuthToken, rfWidgetId: RF_WIDGET_ID,
@@ -136,7 +133,6 @@ export async function toggleSessionInterest(sessionTimeId, sessionId, rfAuthToke
   return handleWriteResponse(data);
 }
 
-// Attendee access info for a given session time.
 export async function fetchAttendeeAccess(sessionTimeId, rfAuthToken, rfApiProfileId, rfApiUrl) {
   return rawFetch(rfApiUrl, ENDPOINTS.ATTENDEE, { rfApiProfileId, rfAuthToken, sessionTimeId });
 }

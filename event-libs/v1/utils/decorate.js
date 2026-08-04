@@ -1106,10 +1106,9 @@ export function decorateEvent(parent) {
   if (!getMetadata('event-id')) return;
 
   // Bootstraps shared, page-level session state (sessions, favorites, scheduled, auth)
-  // ahead of any block's own init() — also no-ops when tier-1-event-config isn't
-  // authored. Gated on tier-1-event-state-enabled too, since event-id alone is already
-  // authored broadly in prod; we don't want to seed sessions-guide's mock data on every
-  // event page that happens to have it.
+  // ahead of any block's own init() — no-ops when tier-1-event-config isn't authored.
+  // Also gated on tier-1-event-state-enabled since event-id alone is already authored
+  // broadly in prod; we don't want to bootstrap this on every page that happens to have it.
   if (getMetadata('tier-1-event-state-enabled') === 'true') {
     initSessionState();
   }

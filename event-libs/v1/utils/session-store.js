@@ -41,18 +41,14 @@ function deriveMrEnv() {
   return 'dev';
 }
 
-// Milo's own page env (local/stage/prod, from getConfig() — see mobile-rider.js for the same
-// pattern), not the ESP-specific event-service-env: RF availability depends on which IMS
-// environment produced profile.userId (a stage-IMS clientId won't resolve against prod RF),
-// and milo's local env mirrors stage's IMS (ENVS.local = { ...ENVS.stage }), so only prod is
-// truly prod here.
+// Milo's own page env (see mobile-rider.js's getEnv() for the same pattern), not the
+// ESP-specific event-service-env — see STAGE_RF_API_URL in rainfocus.js for why this matters.
 function defaultRfApiUrlForEnv() {
   const isProd = getEventConfig()?.miloConfig?.env?.name === 'prod';
   return isProd ? DEFAULT_RF_API_URL : STAGE_RF_API_URL;
 }
 
-// One-off diagnostic for live testing — rsvpData doesn't apply to T1 events, so
-// isLoggedIn plus a resolved IMS profile is the whole signal worth watching for.
+// One-off diagnostic for live testing.
 function logImsLoginOnce() {
   if (hasLoggedImsStatus || !auth.value.isLoggedIn) return;
   hasLoggedImsStatus = true;
@@ -60,12 +56,11 @@ function logImsLoginOnce() {
   console.log('[session-store] IMS login confirmed:', auth.value);
 }
 
-// Exchanges the real IMS profile's userId for an rfAuthToken (RF's jwt endpoint) — needed to
-// attribute myData/schedule/favorite calls to the real signed-in attendee rather than sending
-// no credentials at all. The real response field is unconfirmed (northstar never called this
-// endpoint either, so there's no traffic to check against) — tries the most likely candidates.
-// Runs once; maybeLoadMyData() waits for rfAuthTokenSettled (set only once this actually
-// finishes) rather than rfAuthTokenStarted, so it can't fire mid-exchange with a still-null token.
+// Exchanges the real IMS profile's userId for an rfAuthToken (RF's jwt endpoint), so
+// myData/schedule/favorite calls are attributed to the real signed-in attendee. The real
+// response field is unconfirmed (northstar never called this endpoint) — tries the likely
+// candidates. Runs once; rfAuthTokenSettled (not rfAuthTokenStarted) gates maybeLoadMyData()
+// so it can't fire mid-exchange with a still-null token.
 async function exchangeRfAuthToken(clientId) {
   if (rfAuthTokenStarted) return;
   rfAuthTokenStarted = true;
@@ -111,9 +106,8 @@ function mapToSessionIds(entries) {
 }
 
 // Populates scheduled/favorited from the real RF response, once the session catalog (needed
-// for mapToSessionIds()) has loaded. Also derives isRegistered from loggedInUser — a populated
-// record is the only registration signal myData's response gives us, since rsvpData doesn't
-// apply to T1 events (unconfirmed mapping, verify once we can test against a real unregistered
+// for mapToSessionIds()) has loaded. Also derives isRegistered from loggedInUser — the only
+// registration signal myData gives us (unconfirmed mapping, verify against a real unregistered
 // attendee).
 async function loadMyData() {
   try {
