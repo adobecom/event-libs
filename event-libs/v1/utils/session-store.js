@@ -105,8 +105,8 @@ function syncAuth() {
 // already gave the UI a synchronous fallback from localStorage/dev-seed data.
 async function loadMyData() {
   try {
-    // TODO: replace null credentials with real rfAuthToken/clientId from auth integration
-    const data = await fetchMyData(null, null, apiConfig.profileId, apiConfig.apiUrl);
+    // TODO: replace null with a real rfAuthToken from auth integration
+    const data = await fetchMyData(null, apiConfig.profileId, apiConfig.apiUrl);
     batch(() => {
       scheduled.value = new Set(data.scheduled);
       favorited.value = new Set(data.favorited);
@@ -207,11 +207,11 @@ export async function scheduleSession(session) {
   const isScheduled = scheduled.value.has(session.id);
   setPending(session.id, true);
   try {
-    // TODO: replace null credentials with real rfAuthToken/clientId from auth integration
+    // TODO: replace null with a real rfAuthToken from auth integration
     if (isScheduled) {
-      await removeSession(session.rfCode, null, null, apiConfig.profileId, apiConfig.apiUrl);
+      await removeSession(session.rfCode, null, apiConfig.profileId, apiConfig.apiUrl);
     } else {
-      await addSession(session.rfCode, null, null, apiConfig.profileId, apiConfig.apiUrl);
+      await addSession(session.rfCode, null, apiConfig.profileId, apiConfig.apiUrl);
     }
   } catch (err) {
     setPending(session.id, false);
@@ -229,8 +229,8 @@ export async function favoriteSession(session) {
   const isFavorited = favorited.value.has(session.id);
   setPending(session.id, true);
   try {
-    // TODO: replace null credentials with real rfAuthToken/clientId from auth integration
-    await toggleSessionInterest(session.rfCode, session.id, null, null, apiConfig.profileId, apiConfig.apiUrl);
+    // TODO: replace null with a real rfAuthToken from auth integration
+    await toggleSessionInterest(session.rfCode, session.id, null, apiConfig.profileId, apiConfig.apiUrl);
   } catch (err) {
     setPending(session.id, false);
     throw err;

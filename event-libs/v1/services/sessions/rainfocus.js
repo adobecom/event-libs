@@ -1,7 +1,9 @@
 // RainFocus (RF) live schedule/favorites API. Endpoint + profile id normally come from the
 // Tier 1 Event Configurator's tier-1-event-config payload (see session-store.js), falling
 // back to the defaults below. Ported from northstar's rainFocus.js ENDPOINTS/query-param
-// contract; rfAuthToken/clientId are sourced elsewhere and just passed through here.
+// contract; rfAuthToken is sourced elsewhere and just passed through here. clientId isn't
+// part of this contract — northstar's determineParams() only ever sent it on the unused
+// AUTH/jwt endpoint, confirmed absent from real myData/toggleSessionInterest traffic.
 
 // Confirmed live via real MAX 2025 traffic — reverse-proxies to RF, avoiding CORS/IP allowlist.
 export const DEFAULT_RF_API_URL = 'https://www.adobe.com/max-api/';
@@ -62,9 +64,9 @@ function handleWriteResponse(data) {
 // The first call on landing on an event page — fetches the signed-in attendee's schedule
 // and favorites in one request. Field names assumed from mySchedule/myInterests' own
 // naming; unconfirmed against real myData traffic.
-export async function fetchMyData(rfAuthToken, clientId, rfApiProfileId, rfApiUrl) {
+export async function fetchMyData(rfAuthToken, rfApiProfileId, rfApiUrl) {
   const data = await rawFetch(rfApiUrl, ENDPOINTS.MY_DATA, {
-    rfApiProfileId, rfAuthToken, clientId, rfWidgetId: RF_WIDGET_ID,
+    rfApiProfileId, rfAuthToken, rfWidgetId: RF_WIDGET_ID,
   });
   return {
     scheduled: data?.mySchedule ?? [],
@@ -72,25 +74,23 @@ export async function fetchMyData(rfAuthToken, clientId, rfApiProfileId, rfApiUr
   };
 }
 
-export async function addSession(sessionTimeId, rfAuthToken, clientId, rfApiProfileId, rfApiUrl) {
+export async function addSession(sessionTimeId, rfAuthToken, rfApiProfileId, rfApiUrl) {
   const data = await rawFetch(rfApiUrl, ENDPOINTS.ADD_TO_SCHEDULE, {
-    rfApiProfileId, rfAuthToken, clientId, sessionTimeId,
+    rfApiProfileId, rfAuthToken, sessionTimeId,
   });
   return handleWriteResponse(data);
 }
 
-export async function removeSession(sessionTimeId, rfAuthToken, clientId, rfApiProfileId, rfApiUrl) {
+export async function removeSession(sessionTimeId, rfAuthToken, rfApiProfileId, rfApiUrl) {
   const data = await rawFetch(rfApiUrl, ENDPOINTS.REMOVE_FROM_SCHEDULE, {
-    rfApiProfileId, rfAuthToken, clientId, sessionTimeId,
+    rfApiProfileId, rfAuthToken, sessionTimeId,
   });
   return handleWriteResponse(data);
 }
 
-export async function toggleSessionInterest(
-  sessionTimeId, sessionId, rfAuthToken, clientId, rfApiProfileId, rfApiUrl,
-) {
+export async function toggleSessionInterest(sessionTimeId, sessionId, rfAuthToken, rfApiProfileId, rfApiUrl) {
   const data = await rawFetch(rfApiUrl, ENDPOINTS.TOGGLE_FAVORITES, {
-    rfApiProfileId, rfAuthToken, clientId, sessionTimeId, sessionId,
+    rfApiProfileId, rfAuthToken, sessionTimeId, sessionId,
   });
   return handleWriteResponse(data);
 }

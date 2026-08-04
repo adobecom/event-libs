@@ -37,32 +37,32 @@ describe('services/sessions/rainfocus', () => {
   describe('fetchMyData', () => {
     it('builds the myData request with rfWidgetId and returns scheduled/favorited', async () => {
       stubFetch({ mySchedule: ['session-1', 'session-3'], myInterests: ['session-2'] });
-      const result = await fetchMyData('auth-token', 'client-1', 'profile-1', 'https://example.com/rf/');
+      const result = await fetchMyData('auth-token', 'profile-1', 'https://example.com/rf/');
       expect(result).to.deep.equal({ scheduled: ['session-1', 'session-3'], favorited: ['session-2'] });
       const url = new URL(lastRequest);
       expect(url.origin + url.pathname).to.equal('https://example.com/rf/myData');
       expect(url.searchParams.get('rfApiProfileId')).to.equal('profile-1');
       expect(url.searchParams.get('rfAuthToken')).to.equal('auth-token');
-      expect(url.searchParams.get('clientId')).to.equal('client-1');
       expect(url.searchParams.get('rfWidgetId')).to.equal(RF_WIDGET_ID);
+      expect(url.searchParams.has('clientId')).to.be.false;
     });
 
     it('falls back to DEFAULT_RF_API_URL when no rfApiUrl is provided', async () => {
       stubFetch({});
-      await fetchMyData(null, null, 'profile-1', undefined);
+      await fetchMyData(null, 'profile-1', undefined);
       expect(lastRequest.startsWith(DEFAULT_RF_API_URL)).to.be.true;
     });
 
     it('appends endpoint to rfApiUrl even when it is missing a trailing slash', async () => {
       stubFetch({});
-      await fetchMyData(null, null, 'profile-1', 'https://example.com/rf');
+      await fetchMyData(null, 'profile-1', 'https://example.com/rf');
       const url = new URL(lastRequest);
       expect(url.origin + url.pathname).to.equal('https://example.com/rf/myData');
     });
 
     it('defaults scheduled/favorited to empty arrays when missing from the response', async () => {
       stubFetch({});
-      const result = await fetchMyData(null, null, 'profile-1', 'https://example.com/rf/');
+      const result = await fetchMyData(null, 'profile-1', 'https://example.com/rf/');
       expect(result).to.deep.equal({ scheduled: [], favorited: [] });
     });
   });
@@ -70,23 +70,24 @@ describe('services/sessions/rainfocus', () => {
   describe('write actions', () => {
     it('addSession posts to addSession with sessionTimeId and resolves on responseCode 0', async () => {
       stubFetch({ responseCode: '0' });
-      const result = await addSession('st-1', 'auth-token', 'client-1', 'profile-1', 'https://example.com/rf/');
+      const result = await addSession('st-1', 'auth-token', 'profile-1', 'https://example.com/rf/');
       expect(result).to.deep.equal({ responseCode: '0' });
       const url = new URL(lastRequest);
       expect(url.pathname).to.include('addSession');
       expect(url.searchParams.get('sessionTimeId')).to.equal('st-1');
+      expect(url.searchParams.has('clientId')).to.be.false;
     });
 
     it('removeSession hits removeSession with sessionTimeId', async () => {
       stubFetch({ responseCode: '0' });
-      await removeSession('st-2', null, null, 'profile-1', 'https://example.com/rf/');
+      await removeSession('st-2', null, 'profile-1', 'https://example.com/rf/');
       expect(lastRequest).to.include('removeSession');
       expect(lastRequest).to.include('sessionTimeId=st-2');
     });
 
     it('toggleSessionInterest hits toggleSessionInterest with both sessionTimeId and sessionId', async () => {
       stubFetch({ responseCode: '0' });
-      await toggleSessionInterest('st-3', 'sess-3', null, null, 'profile-1', 'https://example.com/rf/');
+      await toggleSessionInterest('st-3', 'sess-3', null, 'profile-1', 'https://example.com/rf/');
       const url = new URL(lastRequest);
       expect(url.pathname).to.include('toggleSessionInterest');
       expect(url.searchParams.get('sessionTimeId')).to.equal('st-3');
@@ -97,7 +98,7 @@ describe('services/sessions/rainfocus', () => {
       stubFetch({ responseCode: '13' });
       let error;
       try {
-        await addSession('st-1', null, null, 'profile-1', 'https://example.com/rf/');
+        await addSession('st-1', null, 'profile-1', 'https://example.com/rf/');
       } catch (err) {
         error = err;
       }
@@ -108,7 +109,7 @@ describe('services/sessions/rainfocus', () => {
       stubFetch({ responseCode: '27' });
       let error;
       try {
-        await addSession('st-1', null, null, 'profile-1', 'https://example.com/rf/');
+        await addSession('st-1', null, 'profile-1', 'https://example.com/rf/');
       } catch (err) {
         error = err;
       }
@@ -119,7 +120,7 @@ describe('services/sessions/rainfocus', () => {
       stubFetch({}, { ok: false, status: 500 });
       let error;
       try {
-        await addSession('st-1', null, null, 'profile-1', 'https://example.com/rf/');
+        await addSession('st-1', null, 'profile-1', 'https://example.com/rf/');
       } catch (err) {
         error = err;
       }
