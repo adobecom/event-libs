@@ -12,17 +12,6 @@
   box-sizing: border-box;
 }
 
-/*
- * Width-capping lives here (the outer block), not on .mobile-rider-container
- * (the inner box that has border-radius + overflow: hidden). Confirmed by
- * testing: putting max-width on the SAME element as border-radius +
- * overflow: hidden breaks <video> clipping at the bottom edge (the video's
- * bottom corners render square) — moving max-width to this outer wrapper and
- * letting the container simply be width: 100% of it avoids the bug entirely.
- * contain: paint was tried on the container as a fix and did not resolve it,
- * confirming this is specifically about max-width + border-radius +
- * overflow: hidden coexisting on one element, not a general compositing fix.
- */
 @media (min-width: 1024px) {
   .mobile-rider {
     max-width: var(--s2a-layout-rich-media-content-measure-wide, 1192px);
@@ -63,24 +52,6 @@
   height: 100%;
 }
 
-/*
- * Carried over from the classic (non-C2) block — dropped by mistake in the
- * initial C2 copy. If this block is authored inside a Milo Marquee's asset
- * cell (e.g. the split-marquee embed), Milo's own marquee.css out-specifies
- * the rule above: `.marquee.split .asset video` is (0,3,1) vs. this file's
- * `.mobile-rider .mobile-rider-container video` at (0,2,1), and sets
- * `max-height: 360px`; at >=1200px, `.marquee .asset video` (also more
- * specific) adds `max-width: initial; min-height: 150px`. All three win on
- * specificity alone, clamping the video instead of filling the rounded,
- * overflow: hidden container — defeating the corner-rounding this block
- * ships. `!important` guarantees this wins regardless of exactly how
- * specific Milo's marquee selectors are (or become later), rather than
- * relying on a specificity arms race. max-height is new here — the classic
- * block's original version of this rule didn't set it, but the split
- * variant's max-height: 360px needs neutralizing too, or the video still
- * gets capped short of filling the container even with max-width/min-height
- * fixed.
- */
 .marquee .asset .mobile-rider img,
 .marquee .asset .mobile-rider video {
   max-width: none !important;
@@ -92,17 +63,6 @@
   line-height: 1;
 }
 
-/* MAX 2026 (C2) rounds the MR player on desktop; mobile keeps squared corners
-   (base rules above leave it square). This is the C2 copy of the block, so it
-   only loads on C2 pages — no foundation-meta gate needed. Radius per the
-   Figma SSOT (HP_Player cornerRadius = 24px, both the full-takeover and the
-   split-marquee embed; the 375px mobile frame is squared). overflow: hidden
-   clips the square video/poster to the rounded wrapper. The 1024px cutoff is
-   the C2 "not mobile" boundary the marquee itself uses — adjust here if design
-   wants the mobile/desktop switch at a different width.
-
-   No max-width here — see the .mobile-rider rule above for why the
-   width-capping deliberately lives on the outer element instead. */
 @media (min-width: 1024px) {
   .mobile-rider .mobile-rider-container {
     border-radius: var(--s2a-border-radius-24, 24px);
@@ -110,21 +70,6 @@
   }
 }
 
-/*
- * The MobileRider player ships its own skin (adobe-skin.min.css, loaded at
- * runtime from mobilerider.com) that styles its overlay headings — e.g.
- * `.overlays-wrapper .titlecontainer h1`. But Milo's C2 global typography
- * (`h1, h2, .heading-*` in libs/c2/styles/styles.css) uses bare element
- * selectors that ALSO match those headings and force values the skin doesn't
- * set (letter-spacing, line-height, font-weight...), cramping the player title.
- *
- * Scoping this reset to `.mobile-rider :is(h1..h6)` gives it specificity
- * (0,1,1): higher than C2's bare `h1` (0,0,1), so it wins over the C2 leak, but
- * lower than the skin's own `.overlays-wrapper .titlecontainer h1` (0,2,1), so
- * the skin still wins on everything it sets. `revert` rolls the leaked
- * properties back to the browser default — i.e. renders as if C2's global
- * heading styles weren't there — letting the player's own skin come through.
- */
 .mobile-rider :is(h1, h2, h3, h4, h5, h6) {
   font-size: revert;
   font-weight: revert;
