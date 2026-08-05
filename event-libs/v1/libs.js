@@ -25,6 +25,7 @@ const EVENT_BLOCKS = [
 ];
 
 const EVENT_BLOCKS_C2 = [
+  'chrono-box',
   'mobile-rider',
 ];
 
