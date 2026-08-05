@@ -9,6 +9,8 @@ import {
 
 let modalLoader;
 
+const BLADE_BIO_PREVIEW_LENGTH = 144;
+
 function decorateImage(card, photo) {
   if (!photo) return;
 
@@ -212,8 +214,6 @@ function getProfileName(data) {
 function getSocialLinks(data) {
   return data?.socialLinks || data?.socialMedia || [];
 }
-
-const BLADE_BIO_PREVIEW_LENGTH = 144;
 
 function getBioPlainText(bio) {
   const trimmedBio = typeof bio === 'string' ? bio.trim() : '';
