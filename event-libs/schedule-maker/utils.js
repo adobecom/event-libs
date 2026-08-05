@@ -142,9 +142,10 @@ function deleteBlockFromSchedule(schedule, blockId) {
   return { ...schedule, blocks: updatedBlocks, isComplete: isScheduleComplete({ ...schedule, blocks: updatedBlocks }) };
 }
 
-// Moves draggedBlockId to sit just before targetBlockId. Order is otherwise
-// untouched by add/update/delete, so this manual order survives until the
-// next prepareScheduleForClient re-sort by startDateTime.
+// Moves draggedBlockId to sit just before targetBlockId. This is a preview-only
+// reorder within the current editing session: prepareScheduleForServer (Copy
+// Link) always re-sorts blocks by startDateTime, so a drag that lands on a
+// non-chronological order will not survive into the exported link.
 function reorderBlocksInSchedule(schedule, draggedBlockId, targetBlockId) {
   if (!schedule || draggedBlockId === targetBlockId) return schedule;
   const blocks = [...schedule.blocks];
