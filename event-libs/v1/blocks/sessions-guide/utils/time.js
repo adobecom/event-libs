@@ -1,17 +1,10 @@
-// Read once at module load — frozen for the lifetime of the page.
-const SERVER_TIME = (() => {
-  try {
-    const raw = new URLSearchParams(window.location.search).get('serverTime');
-    const ms = raw ? parseInt(raw, 10) : NaN;
-    return Number.isFinite(ms) ? ms : null;
-  } catch {
-    return null;
-  }
-})();
-
-export function getNowMs() {
-  return SERVER_TIME ?? Date.now();
-}
+// Promoted to ../../../utils/session-state.js since the shared session-state-ticker
+// needs it and utils/ shouldn't reach back into this block's directory. Re-exported here
+// so existing call sites in this block don't need to change their import path.
+export { getNowMs } from '../../../utils/session-state.js';
+// Shared with features/conflict-modal/conflict-modal.js, which can't depend on a
+// block-scoped util — same re-export reasoning as getNowMs above.
+export { formatDuration } from '../../../utils/date-time-helper.js';
 
 export function detectUserTimezone() {
   try {
@@ -21,30 +14,56 @@ export function detectUserTimezone() {
   }
 }
 
+// Some real sessions (canceled, TBD, overflow-room placeholders) have no scheduled
+// sessionTime yet, so startTimeUtc/endTimeUtc can be ''. Intl.DateTimeFormat.format()
+// throws RangeError on an Invalid Date rather than degrading gracefully like
+// Date.parse() (used by isSessionLive() etc. below) — this keeps every formatter here
+// call-site-safe without requiring every caller to guard first.
+function safeDate(value) {
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
 export function formatSessionTime(utcIso, userTz) {
+  const date = safeDate(utcIso);
+  if (!date) return '';
   return new Intl.DateTimeFormat('en-US', {
     hour: 'numeric',
     minute: '2-digit',
     timeZone: userTz,
     timeZoneName: 'short',
-  }).format(new Date(utcIso));
+  }).format(date);
 }
 
 export function formatShortTime(utcIso, userTz) {
+  const date = safeDate(utcIso);
+  if (!date) return '';
   return new Intl.DateTimeFormat('en-US', {
     hour: 'numeric',
     minute: '2-digit',
     timeZone: userTz,
-  }).format(new Date(utcIso));
+  }).format(date);
+}
+
+export function formatTimezoneAbbr(utcIso, userTz) {
+  const date = safeDate(utcIso);
+  if (!date) return '';
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: userTz,
+    timeZoneName: 'short',
+  }).formatToParts(date);
+  return parts.find((p) => p.type === 'timeZoneName')?.value || '';
 }
 
 export function formatSessionDate(utcIso, userTz) {
+  const date = safeDate(utcIso);
+  if (!date) return '';
   return new Intl.DateTimeFormat('en-US', {
     weekday: 'short',
     month: 'short',
     day: 'numeric',
     timeZone: userTz,
-  }).format(new Date(utcIso));
+  }).format(date);
 }
 
 export function isSessionLive(session, nowMs) {
@@ -65,20 +84,15 @@ export function allSessionsEnded(sessions, nowMs) {
   return sessions.length > 0 && sessions.every((s) => nowMs > Date.parse(s.endTimeUtc));
 }
 
-export function formatDuration(startUtc, endUtc) {
-  const totalMin = Math.round((Date.parse(endUtc) - Date.parse(startUtc)) / 60000);
-  const h = Math.floor(totalMin / 60);
-  const m = totalMin % 60;
-  if (h === 0) return `${m} min`;
-  if (m === 0) return `${h} hr`;
-  return `${h} hr ${m} min`;
-}
-
+// Returns null for a session with no valid startTimeUtc, so callers comparing against a
+// real day key (e.g. sessionsForDay()) naturally exclude it instead of crashing.
 export function getSessionDayKey(session, userTz) {
+  const date = safeDate(session.startTimeUtc);
+  if (!date) return null;
   return new Intl.DateTimeFormat('en-CA', {
     year: 'numeric',
     month: '2-digit',
     day: '2-digit',
     timeZone: userTz,
-  }).format(new Date(session.startTimeUtc));
+  }).format(date);
 }

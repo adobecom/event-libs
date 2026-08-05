@@ -5,14 +5,12 @@ import { buildSessionCard } from '../../../../../event-libs/v1/blocks/sessions-g
 import {
   scheduled, favorited, pendingActions, auth,
 } from '../../../../../event-libs/v1/utils/session-store.js';
+import { initTierOneEventConfig } from '../../../../../event-libs/v1/utils/tier-1-event-config.js';
 
 const BASE_CONFIG = {
   title: 'Adobe MAX 2026',
   userTz: 'America/Los_Angeles',
   surface: 'page',
-  trackColors: { Design: '#0066cc' },
-  trackIcons: {},
-  showConflictModal: false,
   filterCategories: [],
   theme: 'dark',
 };
@@ -47,7 +45,7 @@ const ONDEMAND_SESSION = {
 
 function makeCtx(overrides = {}) {
   const state = {
-    eventConfig: { ...BASE_CONFIG },
+    guideConfig: { ...BASE_CONFIG },
     ...overrides,
   };
   return { state, dispatch: () => {} };
@@ -61,11 +59,24 @@ function renderCard(session, ctxOverrides = {}) {
 }
 
 describe('SessionCard', () => {
+  before(() => {
+    const meta = document.createElement('meta');
+    meta.name = 'tier-1-event-config';
+    meta.content = JSON.stringify({ trackIcons: { Design: { icon: 'design-and-illustration', color: '#0066cc' } } });
+    document.head.appendChild(meta);
+    initTierOneEventConfig();
+  });
+
   beforeEach(() => {
     scheduled.value = new Set();
     favorited.value = new Set();
     pendingActions.value = new Set();
     auth.value = { isLoggedIn: true, isRegistered: true, userFirstName: null };
+  });
+
+  it('applies the track color from the page-wide tier-1-event-config', () => {
+    const html = renderCard(UPCOMING_SESSION);
+    expect(html).to.include('color:#0066cc');
   });
 
   it('renders without throwing', () => {

@@ -10,33 +10,36 @@ MWPW-200314. See `PLAN.md` for the full narrative/sourcing behind each item
 consolidated checklist so it doesn't have to be reconstructed from PLAN.md's
 chronological log every time.
 
-## 1. Rename `track-icon-config.js` into a broader `tier-1-event-config.js`-style singleton
+## 1. Rename `track-icon-config.js` into a broader `tier-1-event-config.js`-style singleton — done 2026-07-27
 
-Currently one `getMetadata('track-icon-config')` read, one getter
-(`getTrackIcon()`). Needs to become one `getMetadata('tier-1-event-config')`
-read exposing multiple getters — `getTrackIcon()`, `getAllowDoubleBooking()`,
-and (once Phase 3 lands) a featured-sessions getter — off the same parsed
-object, rather than three separate ad-hoc reads.
+`event-libs/v1/utils/track-icon-config.js` → `event-libs/v1/utils/tier-1-event-config.js`.
+One `getMetadata('tier-1-event-config')` read exposing `getTrackIcon()` and
+`getAllowDoubleBooking()` off the same parsed object (a featured-sessions
+getter lands once Phase 3/item 3 does), rather than three separate ad-hoc
+reads. `getTrackIcon()` now unwraps `parsedConfig.trackIcons[trackName]`
+(the new key nests track icons under `.trackIcons`, unlike the old key which
+*was* the track map directly).
 
-**Legacy-key fallback still needed:** some da-events pages already have a
-real, authored standalone `track-icon-config` key (shipped and live-verified
-before this app existed — see the `track-icon-config-system` project memory
-if you have access to it). `initTrackIconConfig()`-equivalent should check
-`tier-1-event-config.trackIcons` first, fall back to the legacy standalone
-`track-icon-config` key if the new key is absent, then fall back to
-`DEFAULT_TRACK_ICON_CONFIG` as today. Drop the legacy fallback only once no
-live pages depend on it.
+**Resolved 2026-07-27, per Daniel: no legacy-key fallback needed.** The
+pages this whole config system targets — both the old standalone
+`track-icon-config` key and the new `tier-1-event-config` key — are not yet
+published, so there's no live content to regress. Dropped the fallback
+chain entirely: new key or nothing, no legacy-key check. The built-in
+`DEFAULT_TRACK_ICON_CONFIG` gap-fill for known tracks with no authored
+entry is unrelated to that fallback and still applies as before.
 
-Consumers to update (imports of the renamed file): `parse-config.js`,
-`LiveCard.js`, `CategoryBadge.js`, `SessionDetailOverlay.js`,
-`LiveUpcomingView.js`, `SessionCard.js`, `decorate.js`.
+Consumers updated (imports of the renamed file): `CategoryBadge.js`,
+`LiveCard.js`, `SessionDetailOverlay.js`, `SessionCard.js`, `decorate.js`
+— the actual current importers (`parse-config.js` and `LiveUpcomingView.js`
+were listed above but don't import this module).
 
-## 2. Wire `allowDoubleBooking`
+## 2. Wire `allowDoubleBooking` — done 2026-07-27
 
-Read `tier-1-event-config.allowDoubleBooking` (via the new singleton's
-`getAllowDoubleBooking()`) and drive `session-actions.js`'s `scheduleAction`
-`showConflictModal` param from it — one shared, page-level, event-wide read,
-not a per-block setting.
+`action-feedback.js`'s `scheduleWithFeedback` now derives `scheduleAction`'s
+`showConflictModal` param from `getAllowDoubleBooking()` (the item 1
+singleton) instead of `eventConfig.showConflictModal` — one shared,
+page-level, event-wide read, not a per-block setting. Inverted, since
+allowing double booking means suppressing the conflict modal.
 
 **Retire sessions-guide's per-block `show-conflict-modal` table row**
 (`parse-config.js:27`) as part of this — it's superseded, not kept as a
@@ -49,7 +52,10 @@ authoring `show-conflict-modal: true` to worry about migrating. **What
 actually matters instead: make sure the new/updated logic reads from
 `tier-1-event-config` (this app's output), not the old per-block
 `show-conflict-modal` config shape.** That's the real migration here, not a
-legacy-flag cleanup.
+legacy-flag cleanup. Removed `parse-config.js`'s `show-conflict-modal` case
+and default entirely, plus the row from `sessions-guide`'s demo/mock
+authoring fixtures and the now-meaningless `showConflictModal` filler field
+from unrelated component test mocks.
 
 **`sessions-hub.js` is explicitly OUT of scope, by design, not a gap.** It
 has its own entirely independent scheduling/conflict flow
@@ -61,58 +67,75 @@ whole config system (and MWPW-200314) is specifically Tier 1 (MAX,
 Summit-scale events). Don't wire it in as a side effect of this work without
 a separate, deliberate decision to do so.
 
-## 3. Featured sessions — bigger than "wire an existing read"
+## 3. Featured sessions — done 2026-07-27
 
-- **Fix `getFeaturedSessions` to iterate `featuredSessions` in *authored*
-  order, not filter the day's catalog order.** As it stands today it does
-  something like `sessionsForDay(...).filter((s) => idSet.has(s.id))` —
-  that's the catalog's order, not the author's. This app's
-  `FeaturedSessionsEditor.js` reorder UI (drag-and-drop + keyboard) has no
-  visible effect on real display order until this is fixed.
-- **Add a new function reading the *same* `featuredSessions` array for
-  `OnDemandView.js`** — ID-membership only, authored order, **no
-  day-scoping** (`getFeaturedSessions`'s `activeDay` requirement doesn't
-  apply to on-demand content at all).
-- **Build a new featured-carousel section in `OnDemandView.js`** — doesn't
-  exist there today. Mirror `LiveUpcomingView.js`'s
-  `<Carousel variant="featured">` pattern.
-- `featuredSessions` is a single flat array of session IDs — no day-keying,
-  no `duringEvent`/`postEvent` split. `LiveUpcomingView` filters it down to
-  whatever's relevant for the active day (existing `sessionsForDay`
-  day-intersection logic, once the order fix above lands);
-  `OnDemandView`'s new function filters it with no day-scoping. Same
-  authored list, two views, each applying its own natural filter — a
-  session is never authored twice to be featured in both places.
+- **Fixed `getFeaturedSessions` to iterate `featuredSessions` in *authored*
+  order.** It used to do `sessionsForDay(...).filter((s) => idSet.has(s.id))`
+  — the catalog's order, not the author's. Now builds a `Map` keyed by day
+  session id and maps `featuredIds` through it, so `FeaturedSessionsEditor.js`'s
+  reorder UI actually affects real display order.
+- **Added `getOnDemandFeaturedSessions(sessions, featuredIds)`** to
+  `session-filters.js` — same authored array, same order, but ID-membership
+  only, **no day-scoping**, and (unlike the live view) no deterministic-shuffle
+  fallback: nothing authored means nothing shown, since on-demand content
+  isn't tied to a single event day the way the live carousel needs to fill
+  dead space.
+- **Built a new featured-carousel section in `OnDemandView.js`**, mirroring
+  `LiveUpcomingView.js`'s `<Carousel variant="featured">` pattern. Reads from
+  `onDemandRaw` (all on-demand sessions), not the viewer's filtered
+  `available` list — featured is a curated highlight reel, not something the
+  viewer's search/filter selections should be able to hide.
+- **Both `getFeaturedSessions`/`getOnDemandFeaturedSessions` now read
+  `getFeaturedSessionIds()`** — a new getter added to the `tier-1-event-config.js`
+  singleton (`tierOneEventConfig.featuredSessions || []`), per item 1's own
+  anticipated Phase 3 addition.
+- **Retired sessions-guide's old per-block `featured-sessions` authoring
+  row** (`parse-config.js`) in favor of the page-level source, same call as
+  item 2 made for `show-conflict-modal` — confirmed with Daniel rather than
+  assumed, since this handoff's original text didn't say so explicitly.
+  `LiveUpcomingView.js` no longer reads `eventConfig.featuredSessionIds`.
 
-## 4. Optional, cheap, high-value: self-verification against a mispasted config
+## 4. Optional, cheap, high-value: self-verification against a mispasted config — done 2026-07-27
 
-`Config` now carries its own `eventId`/`backendEventTitle`/`updated`,
-duplicated deliberately (not redundant) so the pasted JSON is self-
-describing once it lands in a page's metadata. The consuming side can
-cross-check `tier-1-event-config.eventId` against the page's own `event-id`
-metadata at read time and `window.lana?.log()` a warning on mismatch —
-catches the real failure mode this manual copy/paste hand-off invites (an
-author pastes the wrong event's config onto the wrong page). Not required,
-just flagged as a cheap addition once the field exists.
+`initTierOneEventConfig()` now cross-checks `tierOneEventConfig.eventId`
+against the page's own `getMetadata('event-id')` immediately after a
+successful parse — the same one-shot bootstrap, not a separate call site
+callers would need to remember to invoke. Warns via `window.lana?.log()`
+only on an actual mismatch; skips silently if either side is missing (e.g.
+an older Config authored before the `eventId` field existed, or a context
+with no page `event-id` at all).
 
 ## Test-plan items relevant to the consuming side
 
 (mirrors `PLAN.md`'s own test-plan section, consuming-side subset only)
 
-- [ ] `tier-1-event-config.trackIcons`/`getAllowDoubleBooking()`/featured-
+- [x] `tier-1-event-config.trackIcons`/`getAllowDoubleBooking()`/featured-
       sessions all read correctly off one shared `getMetadata('tier-1-event-config')`
-      parse, not three separate reads.
-- [ ] A page with only the legacy standalone `track-icon-config` key still
+      parse, not three separate reads. Covered by
+      `tier-1-event-config.test.js`/`-invalid.test.js`/`-retry.test.js`.
+- [x] ~~A page with only the legacy standalone `track-icon-config` key still
       renders correct icons/colors (fallback verified independently of this
-      app).
-- [ ] Allow double booking shows the conflict modal consistently across
+      app).~~ **N/A — resolved 2026-07-27, per Daniel: no legacy-key fallback
+      implemented at all** (see item 1). No live pages author either key, so
+      there's nothing to verify here.
+- [x] Allow double booking shows the conflict modal consistently across
       Tier 1 scheduling surfaces (today: sessions-guide only —
-      `sessions-hub` intentionally not wired).
-- [ ] A featured session shows on whichever day it actually falls on in
+      `sessions-hub` intentionally not wired). Covered by
+      `action-feedback.test.js`/`action-feedback-allow-double-booking.test.js`;
+      real DA-page verification still pending (needs a page with
+      `tier-1-event-config.allowDoubleBooking` authored via the app).
+- [x] A featured session shows on whichever day it actually falls on in
       `LiveUpcomingView` for each viewer; reordering the authored
       `featuredSessions` array actually changes carousel order (verifies
       the `getFeaturedSessions` order fix); `OnDemandView.js` renders a
       featured carousel reading the same array where none exists today.
-- [ ] Pasting a `Config` whose `eventId` doesn't match the page's own
+      Order-correctness covered directly in `session-filters.test.js`;
+      component-level wiring covered in
+      `LiveUpcomingView-featured.test.js`/`OnDemandView-featured.test.js`.
+      Real DA-page verification still pending (needs a page with
+      `tier-1-event-config.featuredSessions` authored via the app).
+- [x] Pasting a `Config` whose `eventId` doesn't match the page's own
       `event-id` metadata is at least visible/detectable in the data (full
-      warning logic is item 4 above, optional).
+      warning logic is item 4 above, optional). Covered by
+      `tier-1-event-config-eventid-mismatch.test.js`/`-match.test.js`/
+      `-no-config-id.test.js`. Real DA-page verification still pending.

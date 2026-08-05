@@ -20,7 +20,14 @@ function waitForSessionsReady() {
 }
 
 describe('session-store: RF config sourced from tier-1-event-config', () => {
+  let originalFetch;
+
   before(async () => {
+    // Only apiConfig is under test here, not the session catalog — stub the real ESL
+    // fetch (event-id is unset, so it'd otherwise hit the network) with an empty payload.
+    originalFetch = window.fetch;
+    window.fetch = async () => new Response(JSON.stringify({ sessions: [], sessionTimes: [], speakers: [] }));
+
     setMetadata('tier-1-event-config', JSON.stringify({
       rfApiUrl: 'https://example.com/from-tier-1-config/',
       rfProfileId: 'profile-from-tier-1-config',
@@ -30,6 +37,7 @@ describe('session-store: RF config sourced from tier-1-event-config', () => {
   });
 
   after(() => {
+    window.fetch = originalFetch;
     document.head.querySelector('meta[name="tier-1-event-config"]')?.remove();
   });
 

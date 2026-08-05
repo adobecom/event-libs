@@ -22,12 +22,18 @@ function waitForSessionsReady() {
 
 describe('session-store: RF endpoint default matches milo\'s real page env', () => {
   let originalConfig;
+  let originalFetch;
 
   before(async () => {
     // getEventConfig() is a real, shared singleton (like BlockMediator) — the global mock sets
     // miloConfig.env.name: 'local' for every test; override to 'prod' just for this one.
     originalConfig = getEventConfig();
     updateEventConfig(originalConfig, { ...originalConfig.miloConfig, env: { name: 'prod' } });
+
+    // Only apiConfig is under test here, not the session catalog — stub the real ESL
+    // fetch (event-id is unset, so it'd otherwise hit the network) with an empty payload.
+    originalFetch = window.fetch;
+    window.fetch = async () => new Response(JSON.stringify({ sessions: [], sessionTimes: [], speakers: [] }));
 
     setMetadata('tier-1-event-config', JSON.stringify({ allowDoubleBooking: true }));
     initSessionState();
@@ -36,6 +42,7 @@ describe('session-store: RF endpoint default matches milo\'s real page env', () 
 
   after(() => {
     updateEventConfig(originalConfig, originalConfig.miloConfig);
+    window.fetch = originalFetch;
     document.head.querySelector('meta[name="tier-1-event-config"]')?.remove();
   });
 

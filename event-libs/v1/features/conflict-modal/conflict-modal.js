@@ -2,6 +2,7 @@ import { signal } from '../../deps/htm-preact.js';
 import {
   createTag, loadStyle, LIBS, getEventConfig,
 } from '../../utils/utils.js';
+import { formatDuration } from '../../utils/date-time-helper.js';
 
 // Page-level, framework-agnostic schedule-conflict modal — built on Milo's shared
 // modal component (the same one sessions-hub.js already uses for its own conflict
@@ -17,15 +18,6 @@ async function getMiloModal() {
   return import(`${miloLibs}/blocks/modal/modal.js`);
 }
 
-function formatDuration(startUtc, endUtc) {
-  const totalMin = Math.round((Date.parse(endUtc) - Date.parse(startUtc)) / 60000);
-  const h = Math.floor(totalMin / 60);
-  const m = totalMin % 60;
-  if (h === 0) return `${m}m`;
-  if (m === 0) return `${h}h`;
-  return `${h}h ${m}m`;
-}
-
 function buildOption(name, value, session, onSelect) {
   const option = createTag('label', { class: 'sg-conflict-option' });
   const input = createTag('input', { class: 'sg-conflict-option__radio', type: 'radio', name, value });
@@ -38,7 +30,9 @@ function buildOption(name, value, session, onSelect) {
   const track = createTag('span', { class: 'sg-conflict-option__track' });
   track.textContent = session.track || '';
   const duration = createTag('span', { class: 'sg-conflict-option__duration' });
-  if (session.startTimeUtc && session.endTimeUtc) duration.textContent = formatDuration(session.startTimeUtc, session.endTimeUtc);
+  if (session.startTimeUtc && session.endTimeUtc) {
+    duration.textContent = formatDuration(session.startTimeUtc, session.endTimeUtc, { short: true });
+  }
   meta.append(track, duration);
 
   option.append(input, titleEl, meta);
