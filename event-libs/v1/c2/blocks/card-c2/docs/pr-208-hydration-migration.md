@@ -1,6 +1,6 @@
 # Migration plan: PR #208 (block hydration rewrite) → card-c2 / Featured Sessions
 
-PR: https://github.com/adobecom/event-libs/pull/208 (open, not yet merged)
+PR: https://github.com/adobecom/event-libs/pull/208 (merged, migration below completed)
 
 ## What PR #208 changes
 

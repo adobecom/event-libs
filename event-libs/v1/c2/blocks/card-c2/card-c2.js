@@ -43,12 +43,6 @@ function buildBody(contentWrapper) {
 }
 
 export default async function init(el) {
-  if (el.classList.contains('hydrate')) {
-    const { getHydrationPromise } = await import('../../../hydrate/hydrate.js');
-    const hydrationPromise = getHydrationPromise();
-    if (hydrationPromise) await hydrationPromise;
-  }
-
   const [mediaWrapper, contentWrapper] = [...el.querySelectorAll(':scope > div')];
   const variant = getVariant(el);
   const media = buildMedia(mediaWrapper);

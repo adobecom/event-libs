@@ -77,13 +77,13 @@ function applySessionData(block, session) {
 
 export default function hydrateCardC2(block) {
   const { metadataKey, sessionCode } = getMetadataKeyAndSessionCode(block);
-  if (!metadataKey || !sessionCode) return;
+  if (!metadataKey || !sessionCode) return false;
 
   const sessions = getSessions(metadataKey);
-  if (!sessions) return;
+  if (!sessions) return false;
 
   const index = sessions.findIndex((s) => (s.sessionCode || '').toLowerCase() === sessionCode);
-  if (index === -1) return;
+  if (index === -1) return false;
 
   rewriteTokensToIndex(block, metadataKey, index);
   applySessionData(block, sessions[index]);
