@@ -55,6 +55,16 @@ function sortBlocks(blocks) {
   return blocks ? [...blocks].sort((a, b) => a.startDateTime - b.startDateTime) : blocks;
 }
 
+// True if sorting blocks by startDateTime would change their order. Used to tell
+// authors their manual (or incidental) ordering is being auto-corrected on export,
+// since the timing worker that drives chrono-box assumes ascending startDateTime
+// and silently picks the wrong "current" block otherwise.
+function blocksNeedSorting(blocks) {
+  if (!blocks || blocks.length < 2) return false;
+  const sorted = sortBlocks(blocks);
+  return blocks.some((block, index) => block !== sorted[index]);
+}
+
 function assignIdToBlocks(schedule) {
   schedule.blocks.forEach((block) => {
     block.id = `block-${crypto.randomUUID()}`;
@@ -65,6 +75,7 @@ function prepareScheduleForServer(schedule) {
   if (!schedule) return null;
   const deepCopy = JSON.parse(JSON.stringify(schedule));
   deepCopy.modificationTime = new Date().toISOString();
+  deepCopy.blocks = sortBlocks(deepCopy.blocks);
   deepCopy.blocks.forEach((block) => {
     delete block.id;
     delete block.isEditingBlockTitle;
@@ -103,6 +114,82 @@ function processSchedules(schedules) {
   return sorted.map((schedule) => prepareScheduleForClient(schedule));
 }
 
+function setScheduleTitle(schedule, title) {
+  if (!schedule) return schedule;
+  const updated = { ...schedule, title };
+  return { ...updated, isComplete: isScheduleComplete(updated) };
+}
+
+function addBlockToSchedule(schedule, block) {
+  if (!schedule) return schedule;
+  const updatedBlocks = [...schedule.blocks, block];
+  return { ...schedule, blocks: updatedBlocks, isComplete: isScheduleComplete({ ...schedule, blocks: updatedBlocks }) };
+}
+
+function updateBlockInSchedule(schedule, blockId, updates) {
+  if (!schedule) return schedule;
+  const blockToUpdate = schedule.blocks.find((b) => b.id === blockId);
+  if (!blockToUpdate) return schedule;
+  const updatedBlock = { ...blockToUpdate, ...updates };
+  updatedBlock.isComplete = isBlockComplete(updatedBlock);
+  const updatedBlocks = schedule.blocks.map((b) => (b.id === blockId ? updatedBlock : b));
+  return { ...schedule, blocks: updatedBlocks, isComplete: isScheduleComplete({ ...schedule, blocks: updatedBlocks }) };
+}
+
+function deleteBlockFromSchedule(schedule, blockId) {
+  if (!schedule) return schedule;
+  const updatedBlocks = schedule.blocks.filter((b) => b.id !== blockId);
+  return { ...schedule, blocks: updatedBlocks, isComplete: isScheduleComplete({ ...schedule, blocks: updatedBlocks }) };
+}
+
+// Moves draggedBlockId to sit just before targetBlockId. Order is otherwise
+// untouched by add/update/delete, so this manual order survives until the
+// next prepareScheduleForClient re-sort by startDateTime.
+function reorderBlocksInSchedule(schedule, draggedBlockId, targetBlockId) {
+  if (!schedule || draggedBlockId === targetBlockId) return schedule;
+  const blocks = [...schedule.blocks];
+  const fromIndex = blocks.findIndex((b) => b.id === draggedBlockId);
+  const toIndex = blocks.findIndex((b) => b.id === targetBlockId);
+  if (fromIndex === -1 || toIndex === -1) return schedule;
+  const [moved] = blocks.splice(fromIndex, 1);
+  blocks.splice(toIndex, 0, moved);
+  return { ...schedule, blocks };
+}
+
+// Converts raw sheet rows (a header row followed by data rows) into schedule
+// blocks using a property→column-name mapping. Pure counterpart to the sheet
+// importer UI so the transform can be unit-tested independently of the DOM.
+function convertSheetRowsToBlocks(sheetData, columnMapping) {
+  if (sheetData.length < 2) return [];
+  const headers = sheetData[0];
+  const colIndexMap = {};
+  Object.values(columnMapping).forEach((col) => { if (col) colIndexMap[col] = headers.indexOf(col); });
+  const rows = sheetData.slice(1);
+  return rows.map((row) => {
+    const block = {};
+    Object.entries(columnMapping).forEach(([property, columnName]) => {
+      if (columnName && colIndexMap[columnName] >= 0) {
+        const value = row[colIndexMap[columnName]] || '';
+        if (property === 'streamId') {
+          block.liveStream = { provider: 'MobileRider', streamId: value };
+          block.includeLiveStream = Boolean(value);
+        } else {
+          block[property] = value;
+        }
+      }
+    });
+    block.id = `block-${crypto.randomUUID()}`;
+    if (!block.liveStream) {
+      block.liveStream = { provider: 'MobileRider', streamId: '' };
+      block.includeLiveStream = false;
+    }
+    block.startDateTime = new Date(block.startDateTime).getTime() || 0;
+    block.isComplete = false;
+    block.isEditingBlockTitle = false;
+    return block;
+  }).filter((block) => block.title && block.startDateTime);
+}
+
 class ScheduleURLUtility {
   static createScheduleURL(scheduleObject, org, repo) {
     try {
@@ -138,6 +225,7 @@ class ScheduleURLUtility {
   }
 
   static async copyScheduleToClipboard(scheduleObject, org, repo) {
+    const wasReordered = blocksNeedSorting(scheduleObject?.blocks);
     try {
       const serverSchedule = prepareScheduleForServer(scheduleObject);
       const jsonString = JSON.stringify(serverSchedule);
@@ -167,7 +255,7 @@ class ScheduleURLUtility {
       const data = [new ClipboardItem({ [blob.type]: blob })];
       if (navigator.clipboard && navigator.clipboard.write) {
         await navigator.clipboard.write(data);
-        return true;
+        return { copied: true, wasReordered };
       }
       const textArea = document.createElement('textarea');
       textArea.value = scheduleURL;
@@ -177,10 +265,10 @@ class ScheduleURLUtility {
       textArea.select();
       const successful = document.execCommand('copy');
       document.body.removeChild(textArea);
-      return successful;
+      return { copied: successful, wasReordered };
     } catch (error) {
       window.lana?.log(`Error copying schedule to clipboard: ${error}`);
-      return false;
+      return { copied: false, wasReordered: false };
     }
   }
 }
@@ -189,10 +277,17 @@ export {
   isBlockComplete,
   isScheduleComplete,
   sortBlocks,
+  blocksNeedSorting,
   processSchedules,
   prepareScheduleForClient,
   assignIdToBlocks,
   prepareScheduleForServer,
   ScheduleURLUtility,
   validateSchedule,
+  setScheduleTitle,
+  addBlockToSchedule,
+  updateBlockInSchedule,
+  deleteBlockFromSchedule,
+  reorderBlocksInSchedule,
+  convertSheetRowsToBlocks,
 };

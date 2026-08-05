@@ -3,10 +3,14 @@ import { html } from '../htm-wrapper.js';
 import { syncSchedules as syncSchedulesController } from '../scripts/da-controller.js';
 import {
   assignIdToBlocks,
-  isBlockComplete,
-  isScheduleComplete,
   prepareScheduleForServer,
   prepareScheduleForClient,
+  setScheduleTitle,
+  addBlockToSchedule,
+  updateBlockInSchedule,
+  deleteBlockFromSchedule,
+  reorderBlocksInSchedule,
+  sortBlocks,
 } from '../utils.js';
 import { useDA } from './DAContext.js';
 
@@ -86,11 +90,7 @@ const SchedulesProvider = ({ children }) => {
 
   const updateScheduleLocally = useCallback((title) => {
     setToastError(null);
-    setActiveScheduleState((prev) => {
-      if (!prev) return prev;
-      const updated = { ...prev, title };
-      return { ...updated, isComplete: isScheduleComplete(updated) };
-    });
+    setActiveScheduleState((prev) => setScheduleTitle(prev, title));
   }, []);
 
   const discardChangesToActiveSchedule = useCallback(() => {
@@ -99,49 +99,28 @@ const SchedulesProvider = ({ children }) => {
   }, [originalActiveSchedule]);
 
   const addBlockLocally = useCallback((block) => {
-    setActiveScheduleState((prev) => {
-      if (!prev) return prev;
-      const updatedBlocks = [...prev.blocks, block];
-      return { ...prev, blocks: updatedBlocks, isComplete: isScheduleComplete({ ...prev, blocks: updatedBlocks }) };
-    });
+    setActiveScheduleState((prev) => addBlockToSchedule(prev, block));
     setToastError(null);
   }, []);
 
   const updateBlockLocally = useCallback((blockId, updates) => {
-    setActiveScheduleState((prev) => {
-      if (!prev) return prev;
-      const blockToUpdate = prev.blocks.find((b) => b.id === blockId);
-      if (!blockToUpdate) return prev;
-      const updatedBlock = { ...blockToUpdate, ...updates };
-      updatedBlock.isComplete = isBlockComplete(updatedBlock);
-      const updatedBlocks = prev.blocks.map((b) => (b.id === blockId ? updatedBlock : b));
-      return { ...prev, blocks: updatedBlocks, isComplete: isScheduleComplete({ ...prev, blocks: updatedBlocks }) };
-    });
+    setActiveScheduleState((prev) => updateBlockInSchedule(prev, blockId, updates));
     setToastError(null);
   }, []);
 
   const deleteBlockLocally = useCallback((blockId) => {
-    setActiveScheduleState((prev) => {
-      if (!prev) return prev;
-      const updatedBlocks = prev.blocks.filter((b) => b.id !== blockId);
-      return { ...prev, blocks: updatedBlocks, isComplete: isScheduleComplete({ ...prev, blocks: updatedBlocks }) };
-    });
+    setActiveScheduleState((prev) => deleteBlockFromSchedule(prev, blockId));
   }, []);
 
-  // Moves draggedBlockId to sit just before targetBlockId. Order is otherwise
-  // untouched by add/update/delete, so this manual order survives until the
-  // next prepareScheduleForClient re-sort by startDateTime.
   const reorderBlocksLocally = useCallback((draggedBlockId, targetBlockId) => {
-    setActiveScheduleState((prev) => {
-      if (!prev || draggedBlockId === targetBlockId) return prev;
-      const blocks = [...prev.blocks];
-      const fromIndex = blocks.findIndex((b) => b.id === draggedBlockId);
-      const toIndex = blocks.findIndex((b) => b.id === targetBlockId);
-      if (fromIndex === -1 || toIndex === -1) return prev;
-      const [moved] = blocks.splice(fromIndex, 1);
-      blocks.splice(toIndex, 0, moved);
-      return { ...prev, blocks };
-    });
+    setActiveScheduleState((prev) => reorderBlocksInSchedule(prev, draggedBlockId, targetBlockId));
+  }, []);
+
+  // Mirrors the auto-sort applied to the exported link (see prepareScheduleForServer)
+  // so the editor's visible block order matches what was just copied, rather than
+  // leaving the on-screen list looking out of order after a "blocks were sorted" toast.
+  const sortBlocksLocally = useCallback(() => {
+    setActiveScheduleState((prev) => (prev ? { ...prev, blocks: sortBlocks(prev.blocks) } : prev));
   }, []);
 
   const clearToastError = useCallback(() => setToastError(null), []);
@@ -175,6 +154,7 @@ const SchedulesProvider = ({ children }) => {
     updateBlockLocally,
     deleteBlockLocally,
     reorderBlocksLocally,
+    sortBlocksLocally,
     discardChangesToActiveSchedule,
     syncSchedules,
   };
@@ -212,6 +192,7 @@ export const useSchedulesOperations = () => {
     updateBlockLocally: ctx.updateBlockLocally,
     deleteBlockLocally: ctx.deleteBlockLocally,
     reorderBlocksLocally: ctx.reorderBlocksLocally,
+    sortBlocksLocally: ctx.sortBlocksLocally,
     discardChangesToActiveSchedule: ctx.discardChangesToActiveSchedule,
     syncSchedules: ctx.syncSchedules,
   };
