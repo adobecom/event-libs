@@ -9,7 +9,10 @@ import Modal from '../components/Modal.js';
 import { useNavigation } from '../context/NavigationContext.js';
 import { useConfigs } from '../context/ConfigsContext.js';
 import { useEventEnv } from '../context/EventEnvContext.js';
-import { getDisplayTitle, formatUpdatedTime } from '../utils.js';
+import { useDA } from '../context/DAContext.js';
+import {
+  getDisplayTitle, formatUpdatedTime, createSessionGuideConfigURL, copySessionGuideConfigLink,
+} from '../utils.js';
 import { EVENT_BROWSE_ENABLED } from '../constants.js';
 
 export default function Library() {
@@ -20,8 +23,11 @@ export default function Library() {
     startDuplicateConfig,
     startEditConfig,
     removeConfig,
+    setToastSuccess,
+    setToastError,
   } = useConfigs();
   const { envName, setEnv } = useEventEnv();
+  const { org, repo } = useDA();
 
   const [search, setSearch] = useState('');
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -76,6 +82,20 @@ export default function Library() {
     startDuplicateConfig(row);
     goToEditor();
   }, [setEnv, startDuplicateConfig, goToEditor]);
+
+  // Same rich-hyperlink copy as ConfigEditor.js's Copy Link — lets an author grab a
+  // saved config's link straight from the library, without opening it in the editor
+  // first (PLAN.md §3a).
+  const handleCopyLink = useCallback(async (row) => {
+    const url = createSessionGuideConfigURL(row.config, org, repo);
+    const formattedDate = formatUpdatedTime(row.updated);
+    const linkText = formattedDate
+      ? `Session Guide: ${getDisplayTitle(row)} – ${formattedDate}`
+      : `Session Guide: ${getDisplayTitle(row)}`;
+    const ok = await copySessionGuideConfigLink(url, linkText);
+    if (ok) setToastSuccess('Link copied — paste it into the event page where the Session Guide should appear');
+    else setToastError('Could not copy the link — please retry');
+  }, [org, repo, setToastSuccess, setToastError]);
 
   // eventServiceEnv is only ever supplied by Tier1ConfigPicker (the picked event's
   // config's own authored env) — EventPicker/ManualEventLookup don't supply one, so
@@ -142,6 +162,7 @@ export default function Library() {
               </div>
               <div class="sgc-library__item-actions">
                 <button type="button" class="sgc-btn sgc-btn--quiet" onClick=${() => openEdit(row)}>Edit</button>
+                <button type="button" class="sgc-btn sgc-btn--quiet" onClick=${() => handleCopyLink(row)}>Copy link</button>
                 <button type="button" class="sgc-btn sgc-btn--quiet" onClick=${() => handleDuplicate(row)}>Duplicate</button>
                 <button type="button" class="sgc-btn sgc-btn--quiet sgc-btn--danger" onClick=${() => setRowPendingDelete(row)}>Delete</button>
               </div>

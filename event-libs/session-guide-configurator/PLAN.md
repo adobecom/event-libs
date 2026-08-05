@@ -80,7 +80,10 @@ there:**
   URL copy when that API isn't available). Link text is `Session Guide: {display
   title} – {updated date}` (date omitted for an unsaved config). Pasting into DA's
   rich-text editor drops in a working link with readable text instead of a wall of
-  base64 — `utils.js`'s `copySessionGuideConfigLink()`.
+  base64 — `utils.js`'s `copySessionGuideConfigLink()`. Available from two call
+  sites sharing the same logic: `ConfigEditor.js`'s action bar (the config currently
+  open, saved or not) and `Library.js`'s per-row actions (any already-saved config,
+  no need to open it in the editor first).
 
 **The manual authoring-table experience is retired entirely, not kept as a fallback —
 this was the one real design fork, and it's resolved.** `chrono-box`'s builder doesn't
