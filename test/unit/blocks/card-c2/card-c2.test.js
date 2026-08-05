@@ -32,6 +32,18 @@ describe('card-c2', () => {
     expect(el.querySelector('.card-cta').textContent).to.equal('Learn more');
   });
 
+  it('renders a body-layout card for ratio-16-9 too', async () => {
+    document.body.innerHTML = await readFile({ path: './mocks/ratio-16-9.html' });
+    const el = document.querySelector('.card-c2');
+    await init(el);
+
+    expect(el.dataset.cardVariant).to.equal('ratio-16-9');
+    expect(el.querySelector('.card-media picture')).to.exist;
+    expect(el.querySelector('.card-title').textContent).to.equal('Featured Session Title');
+    expect(el.querySelector('.card-description').textContent).to.equal('Featured session description goes here.');
+    expect(el.querySelector('.card-cta').textContent).to.equal('Watch now');
+  });
+
   it('defaults to ratio-4-3 when no variant class is authored', async () => {
     document.body.innerHTML = await readFile({ path: './mocks/ratio-4-3.html' });
     const el = document.querySelector('.card-c2');

@@ -1,6 +1,6 @@
 import { createTag, createOptimizedPicture } from '../../../utils/utils.js';
 
-const VARIANTS = ['ratio-1-1', 'ratio-4-3', 'ratio-3-4', 'ratio-4-5'];
+const VARIANTS = ['ratio-1-1', 'ratio-4-3', 'ratio-3-4', 'ratio-4-5', 'ratio-16-9'];
 const DEFAULT_VARIANT = 'ratio-4-3';
 
 function getVariant(el) {

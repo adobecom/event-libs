@@ -64,7 +64,7 @@
   margin: 0;
 }
 
-/* Aspect-ratio variants, authored as `ratio-1-1`, `ratio-4-3`, `ratio-3-4`, `ratio-4-5` */
+/* Aspect-ratio variants, authored as `ratio-1-1`, `ratio-4-3`, `ratio-3-4`, `ratio-4-5`, `ratio-16-9` */
 
 .card-c2[data-card-variant="ratio-1-1"] .card-media {
   aspect-ratio: 1 / 1;
@@ -82,6 +82,10 @@
 .card-c2[data-card-variant="ratio-4-5"] .card-media {
   aspect-ratio: 4 / 5;
   border-radius: 16px;
+}
+
+.card-c2[data-card-variant="ratio-16-9"] .card-media {
+  aspect-ratio: 16 / 9;
 }
 
 /* Body layout: content below the media, shared by every variant */
