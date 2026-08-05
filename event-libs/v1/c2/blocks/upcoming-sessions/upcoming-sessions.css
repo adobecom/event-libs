@@ -58,11 +58,11 @@
   letter-spacing: var(--s2a-font-letter-spacing-5xl, -0.2px);
   hanging-punctuation: first last;
 
-  /* Light (default) = dark text; .dark variant flips it below. */
+  /* Light (default) = dark text; .dark-theme variant flips it below. */
   color: var(--s2a-color-gray-1000, #000);
 }
 
-.upcoming-sessions.dark .upcoming-sessions-heading {
+.upcoming-sessions.dark-theme .upcoming-sessions-heading {
   color: var(--s2a-color-gray-25, #fff);
 }
 
@@ -356,18 +356,27 @@
  * the sg-card structure/hover-grow/action-reveal mechanic above is
  * unaffected. Default (no variant, or an explicit `light` variant) stays
  * sg-card's own light-resting/dark-hover treatment via the unscoped rules
- * above; authoring the `dark` variant (`upcoming-sessions (dark)`) puts a
- * `dark` class on the block root and switches to this overlay treatment.
+ * above; authoring the `dark-theme` variant (`upcoming-sessions
+ * (dark-theme)`) puts a `dark-theme` class on the block root and switches
+ * to this overlay treatment. Deliberately not named `dark` — that's a
+ * reserved, global Milo class (any element with it gets Milo's own
+ * `.dark { background-color: ...; color: ...; }` rule, painting a solid
+ * dark background site-wide), which collided with this block's own local
+ * "dark card surface" meaning of the same name.
  */
-.upcoming-sessions.dark .sg-card,
-.upcoming-sessions.dark .sg-card:hover,
-.upcoming-sessions.dark .sg-card.is-scheduled,
-.upcoming-sessions.dark .sg-card.is-favorited {
+.upcoming-sessions.dark-theme .sg-card,
+.upcoming-sessions.dark-theme .sg-card.is-scheduled,
+.upcoming-sessions.dark-theme .sg-card.is-favorited {
   background: rgb(0 0 0 / 64%);
   box-shadow: none;
 }
 
-.upcoming-sessions.dark .sg-card:focus-visible {
+.upcoming-sessions.dark-theme .sg-card:hover {
+  background: #292929;
+  box-shadow: none;
+}
+
+.upcoming-sessions.dark-theme .sg-card:focus-visible {
   outline-color: var(--s2a-color-gray-25, #fff);
 }
 
@@ -379,17 +388,17 @@
  * its default per the Figma export.
  */
 /* stylelint-disable no-descending-specificity */
-.upcoming-sessions.dark .sg-card__time,
-.upcoming-sessions.dark .sg-card__actions::after {
+.upcoming-sessions.dark-theme .sg-card__time,
+.upcoming-sessions.dark-theme .sg-card__actions::after {
   color: #afafaf;
 }
 
-.upcoming-sessions.dark .sg-card__title,
-.upcoming-sessions.dark .sg-card__track {
+.upcoming-sessions.dark-theme .sg-card__title,
+.upcoming-sessions.dark-theme .sg-card__track {
   color: #f2f2f2;
 }
 
-.upcoming-sessions.dark .sg-category-badge {
+.upcoming-sessions.dark-theme .sg-category-badge {
   color: #f2f2f2;
 }
 /* stylelint-enable no-descending-specificity */
@@ -476,29 +485,33 @@
 
   /*
    * Values below match the Figma dev-mode CSS export for "Session card -
-   * no images" exactly (both its default and :hover export are identical —
-   * this card does not change appearance on hover on desktop).
+   * no images" exactly, except :hover — the card's background changes to
+   * a flat #292929 on hover instead of staying the same gradient/blur.
    */
-  .upcoming-sessions.dark .sg-card,
-  .upcoming-sessions.dark .sg-card:hover,
-  .upcoming-sessions.dark .sg-card.is-scheduled,
-  .upcoming-sessions.dark .sg-card.is-favorited {
+  .upcoming-sessions.dark-theme .sg-card,
+  .upcoming-sessions.dark-theme .sg-card.is-scheduled,
+  .upcoming-sessions.dark-theme .sg-card.is-favorited {
     background: linear-gradient(0deg, rgb(0 0 0 / 64%), rgb(0 0 0 / 64%)), rgb(0 0 0 / 75%);
     backdrop-filter: blur(2px);
   }
 
+  .upcoming-sessions.dark-theme .sg-card:hover {
+    background: #292929;
+    backdrop-filter: none;
+  }
+
   /* stylelint-disable no-descending-specificity */
-  .upcoming-sessions.dark .sg-card__time,
-  .upcoming-sessions.dark .sg-card__actions::after {
+  .upcoming-sessions.dark-theme .sg-card__time,
+  .upcoming-sessions.dark-theme .sg-card__actions::after {
     color: rgb(255 255 255 / 64%);
   }
 
-  .upcoming-sessions.dark .sg-card__title,
-  .upcoming-sessions.dark .sg-card__track {
+  .upcoming-sessions.dark-theme .sg-card__title,
+  .upcoming-sessions.dark-theme .sg-card__track {
     color: var(--s2a-color-gray-25, #fff);
   }
 
-  .upcoming-sessions.dark .sg-category-badge {
+  .upcoming-sessions.dark-theme .sg-category-badge {
     color: var(--s2a-color-gray-25, #fff);
   }
   /* stylelint-enable no-descending-specificity */
@@ -616,6 +629,6 @@
 }
 
 /* Only takes effect when a badge has no inline tint (see buildCategoryBadge) — inline style otherwise always wins. */
-.upcoming-sessions.dark .sg-category-badge__icon-color {
+.upcoming-sessions.dark-theme .sg-category-badge__icon-color {
   color: var(--s2a-color-gray-25, #fff);
 }
