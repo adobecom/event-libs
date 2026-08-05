@@ -198,6 +198,69 @@ describe('da-controller', () => {
       expect(result.data.docRefs.old).to.deep.equal(['/events/e/a.html']);
     });
 
+    it('prefers the most-recently-modified occurrence when the same scheduleId appears twice with different content', async () => {
+      const stale = encodeSchedule({
+        scheduleId: 'dup', title: 'Original Title', modificationTime: '2026-01-01T00:00:00.000Z', blocks: [{ title: 'a' }],
+      });
+      const fresh = encodeSchedule({
+        scheduleId: 'dup', title: 'Edited Title', modificationTime: '2026-06-01T00:00:00.000Z', blocks: [{ title: 'a' }, { title: 'b' }],
+      });
+      // Stale copy appears first in the doc, freshly-edited copy pasted after it.
+      const docHtml = `<a href="?schedule=${stale}">old</a><a href="?schedule=${fresh}">new</a>`;
+
+      setDaFetch(routeFetch([
+        ['/list/org/repo/events/e', makeResponse({
+          json: [{ path: '/org/repo/events/e/index.html', ext: 'html' }],
+        })],
+        ['/source/org/repo/events/e/index.html', makeResponse({ text: docHtml })],
+      ]));
+
+      const result = await syncSchedules('org', 'repo', '/events/e');
+      expect(result.ok).to.be.true;
+      expect(result.data.schedules).to.have.lengthOf(1);
+      expect(result.data.schedules[0].title).to.equal('Edited Title');
+      expect(result.data.schedules[0].blocks).to.have.lengthOf(2);
+      // The doc only appears once in docRefs even though it contains two links for the same schedule.
+      expect(result.data.docRefs.dup).to.deep.equal(['/events/e/index.html']);
+    });
+
+    it('prefers the most-recently-modified occurrence regardless of which one is scanned first', async () => {
+      const stale = encodeSchedule({ scheduleId: 'dup2', title: 'Stale', modificationTime: '2026-01-01T00:00:00.000Z', blocks: [] });
+      const fresh = encodeSchedule({ scheduleId: 'dup2', title: 'Fresh', modificationTime: '2026-06-01T00:00:00.000Z', blocks: [] });
+      // Fresh copy happens to be listed/scanned before the stale one this time.
+      const docHtml = `<a href="?schedule=${fresh}">new</a><a href="?schedule=${stale}">old</a>`;
+
+      setDaFetch(routeFetch([
+        ['/list/org/repo/events/e', makeResponse({
+          json: [{ path: '/org/repo/events/e/index.html', ext: 'html' }],
+        })],
+        ['/source/org/repo/events/e/index.html', makeResponse({ text: docHtml })],
+      ]));
+
+      const result = await syncSchedules('org', 'repo', '/events/e');
+      expect(result.data.schedules[0].title).to.equal('Fresh');
+    });
+
+    it('prefers the freshest occurrence across two different docs', async () => {
+      const stale = encodeSchedule({ scheduleId: 'dup3', title: 'Stale', modificationTime: '2026-01-01T00:00:00.000Z', blocks: [] });
+      const fresh = encodeSchedule({ scheduleId: 'dup3', title: 'Fresh', modificationTime: '2026-06-01T00:00:00.000Z', blocks: [] });
+
+      setDaFetch(routeFetch([
+        ['/list/org/repo/events/e', makeResponse({
+          json: [
+            { path: '/org/repo/events/e/a.html', ext: 'html' },
+            { path: '/org/repo/events/e/b.html', ext: 'html' },
+          ],
+        })],
+        ['/source/org/repo/events/e/a.html', makeResponse({ text: `<a href="?schedule=${stale}">old</a>` })],
+        ['/source/org/repo/events/e/b.html', makeResponse({ text: `<a href="?schedule=${fresh}">new</a>` })],
+      ]));
+
+      const result = await syncSchedules('org', 'repo', '/events/e');
+      expect(result.data.schedules[0].title).to.equal('Fresh');
+      expect(result.data.docRefs.dup3).to.have.lengthOf(2);
+    });
+
     it('recurses into subfolders when listing files', async () => {
       const encoded = encodeSchedule({ scheduleId: 'deep', title: 'Deep', modificationTime: '2026-06-01T00:00:00.000Z', blocks: [] });
       setDaFetch(routeFetch([

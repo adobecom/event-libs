@@ -244,6 +244,7 @@ async function rewriteNonCanonicalScheduleLinks(org, repo, filePath) {
     // eslint-disable-next-line no-await-in-loop
     const text = await resp.text();
     let changed = false;
+    const conversions = [];
     const rewritten = text.replace(SCHEDULE_HREF_RE, (match, quote, href) => {
       if (isCanonicalScheduleHref(href, canonicalPrefix)) return match;
       const scheduleParam = extractScheduleParamFromHref(href);
@@ -251,6 +252,7 @@ async function rewriteNonCanonicalScheduleLinks(org, repo, filePath) {
       const newUrl = new URL(canonicalPrefix);
       newUrl.hash = `schedule=${scheduleParam}`;
       changed = true;
+      conversions.push({ from: href, to: newUrl.toString() });
       return `href=${quote}${newUrl.toString()}${quote}`;
     });
     if (!changed) return true;
@@ -265,7 +267,12 @@ async function rewriteNonCanonicalScheduleLinks(org, repo, filePath) {
       // eslint-disable-next-line no-await-in-loop
       writeResp = await doFetch(url, { method: 'POST', headers, body: formData });
     } catch { return false; }
-    if (writeResp.ok) return true;
+    if (writeResp.ok) {
+      conversions.forEach(({ from, to }) => {
+        console.log(`[schedule-maker sync] migrated link in ${filePath}\n  from: ${from}\n  to:   ${to}`);
+      });
+      return true;
+    }
     if (writeResp.status === 412) continue; // concurrent edit — re-read and retry
     return false;
   }
@@ -351,7 +358,14 @@ export async function syncSchedules(org, repo, eventFolder) {
     const seenInDoc = new Set();
     finds.forEach((decoded) => {
       const key = decoded.scheduleId || decoded.title;
-      if (!foundData.has(key)) foundData.set(key, decoded);
+      const existing = foundData.get(key);
+      // Same scheduleId can appear more than once (e.g. a stale copy of a link
+      // left in a doc alongside a freshly-copied one after editing) — keep
+      // whichever occurrence has the most recent modificationTime, not just
+      // whichever was scanned first.
+      if (!existing || new Date(decoded.modificationTime || 0) > new Date(existing.modificationTime || 0)) {
+        foundData.set(key, decoded);
+      }
       if (!seenInDoc.has(key)) {
         seenInDoc.add(key);
         if (!docRefs[key]) docRefs[key] = [];
