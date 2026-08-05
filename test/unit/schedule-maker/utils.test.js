@@ -3,6 +3,7 @@ import {
   isBlockComplete,
   isScheduleComplete,
   sortBlocks,
+  blocksNeedSorting,
   processSchedules,
   prepareScheduleForClient,
   assignIdToBlocks,
@@ -101,6 +102,31 @@ describe('schedule-maker utils', () => {
     });
   });
 
+  describe('blocksNeedSorting', () => {
+    it('is false for fewer than two blocks', () => {
+      expect(blocksNeedSorting(undefined)).to.be.false;
+      expect(blocksNeedSorting([])).to.be.false;
+      expect(blocksNeedSorting([makeBlock()])).to.be.false;
+    });
+
+    it('is false when blocks are already in ascending startDateTime order', () => {
+      const blocks = [
+        makeBlock({ id: 'a', startDateTime: 100 }),
+        makeBlock({ id: 'b', startDateTime: 200 }),
+      ];
+      expect(blocksNeedSorting(blocks)).to.be.false;
+    });
+
+    it('is true when a later block has an earlier startDateTime', () => {
+      const blocks = [
+        makeBlock({ id: 'a', startDateTime: 100 }),
+        makeBlock({ id: 'b', startDateTime: 200 }),
+        makeBlock({ id: 'c', startDateTime: 50 }),
+      ];
+      expect(blocksNeedSorting(blocks)).to.be.true;
+    });
+  });
+
   describe('validateSchedule', () => {
     it('returns no errors for a valid schedule', () => {
       const schedule = makeSchedule({ blocks: [makeBlock()] });
@@ -175,6 +201,20 @@ describe('schedule-maker utils', () => {
       const schedule = makeSchedule({ blocks: [makeBlock()] });
       prepareScheduleForServer(schedule);
       expect(schedule.blocks[0]).to.have.property('id', 'block-1');
+    });
+
+    it('sorts blocks by startDateTime before serializing', () => {
+      const schedule = makeSchedule({
+        blocks: [
+          makeBlock({ id: 'a', startDateTime: 300 }),
+          makeBlock({ id: 'b', startDateTime: 100 }),
+          makeBlock({ id: 'c', startDateTime: 200 }),
+        ],
+      });
+      const result = prepareScheduleForServer(schedule);
+      expect(result.blocks.map((b) => b.startDateTime)).to.deep.equal([100, 200, 300]);
+      // Original (client-side) order is untouched, e.g. for the editor's own display.
+      expect(schedule.blocks.map((b) => b.id)).to.deep.equal(['a', 'b', 'c']);
     });
   });
 
@@ -260,6 +300,19 @@ describe('schedule-maker utils', () => {
         threw = true;
       }
       expect(threw).to.be.true;
+    });
+
+    it('sorts out-of-order blocks by startDateTime in the exported URL', async () => {
+      const schedule = makeSchedule({
+        blocks: [
+          makeBlock({ id: 'a', startDateTime: 300 }),
+          makeBlock({ id: 'b', startDateTime: 100 }),
+          makeBlock({ id: 'c', startDateTime: 200 }),
+        ],
+      });
+      const url = ScheduleURLUtility.createScheduleURL(schedule, 'myorg', 'myrepo');
+      const extracted = await ScheduleURLUtility.extractScheduleFromURL(url);
+      expect(extracted.blocks.map((b) => b.startDateTime)).to.deep.equal([100, 200, 300]);
     });
   });
 

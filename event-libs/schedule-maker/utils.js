@@ -55,6 +55,16 @@ function sortBlocks(blocks) {
   return blocks ? [...blocks].sort((a, b) => a.startDateTime - b.startDateTime) : blocks;
 }
 
+// True if sorting blocks by startDateTime would change their order. Used to tell
+// authors their manual (or incidental) ordering is being auto-corrected on export,
+// since the timing worker that drives chrono-box assumes ascending startDateTime
+// and silently picks the wrong "current" block otherwise.
+function blocksNeedSorting(blocks) {
+  if (!blocks || blocks.length < 2) return false;
+  const sorted = sortBlocks(blocks);
+  return blocks.some((block, index) => block !== sorted[index]);
+}
+
 function assignIdToBlocks(schedule) {
   schedule.blocks.forEach((block) => {
     block.id = `block-${crypto.randomUUID()}`;
@@ -65,6 +75,7 @@ function prepareScheduleForServer(schedule) {
   if (!schedule) return null;
   const deepCopy = JSON.parse(JSON.stringify(schedule));
   deepCopy.modificationTime = new Date().toISOString();
+  deepCopy.blocks = sortBlocks(deepCopy.blocks);
   deepCopy.blocks.forEach((block) => {
     delete block.id;
     delete block.isEditingBlockTitle;
@@ -214,6 +225,7 @@ class ScheduleURLUtility {
   }
 
   static async copyScheduleToClipboard(scheduleObject, org, repo) {
+    const wasReordered = blocksNeedSorting(scheduleObject?.blocks);
     try {
       const serverSchedule = prepareScheduleForServer(scheduleObject);
       const jsonString = JSON.stringify(serverSchedule);
@@ -243,7 +255,7 @@ class ScheduleURLUtility {
       const data = [new ClipboardItem({ [blob.type]: blob })];
       if (navigator.clipboard && navigator.clipboard.write) {
         await navigator.clipboard.write(data);
-        return true;
+        return { copied: true, wasReordered };
       }
       const textArea = document.createElement('textarea');
       textArea.value = scheduleURL;
@@ -253,10 +265,10 @@ class ScheduleURLUtility {
       textArea.select();
       const successful = document.execCommand('copy');
       document.body.removeChild(textArea);
-      return successful;
+      return { copied: successful, wasReordered };
     } catch (error) {
       window.lana?.log(`Error copying schedule to clipboard: ${error}`);
-      return false;
+      return { copied: false, wasReordered: false };
     }
   }
 }
@@ -265,6 +277,7 @@ export {
   isBlockComplete,
   isScheduleComplete,
   sortBlocks,
+  blocksNeedSorting,
   processSchedules,
   prepareScheduleForClient,
   assignIdToBlocks,

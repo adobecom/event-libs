@@ -8,7 +8,7 @@ import { DA_ORIGIN } from '../../constants.js';
 export default function ScheduleHeader() {
   const { org, repo } = useDA();
   const { activeSchedule, hasUnsavedChanges, docRefs } = useSchedulesData();
-  const { updateScheduleLocally, discardChangesToActiveSchedule } = useSchedulesOperations();
+  const { updateScheduleLocally, discardChangesToActiveSchedule, sortBlocksLocally } = useSchedulesOperations();
   const { setToastSuccess, setToastError } = useSchedulesUI();
 
   const [isEditingScheduleTitle, setIsEditingScheduleTitle] = useState(false);
@@ -16,9 +16,14 @@ export default function ScheduleHeader() {
   const handleCopyLink = async () => {
     if (!activeSchedule) return;
     try {
-      const didCopy = await ScheduleURLUtility.copyScheduleToClipboard(activeSchedule, org, repo);
-      if (didCopy) {
-        setToastSuccess('Link copied to clipboard');
+      const { copied, wasReordered } = await ScheduleURLUtility.copyScheduleToClipboard(activeSchedule, org, repo);
+      if (copied) {
+        if (wasReordered) {
+          sortBlocksLocally();
+          setToastSuccess('Blocks were out of order and have been sorted by start time. Link copied to clipboard.');
+        } else {
+          setToastSuccess('Link copied to clipboard');
+        }
       } else {
         setToastError('Failed to copy link to clipboard');
       }

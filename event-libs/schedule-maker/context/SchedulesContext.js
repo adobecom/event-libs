@@ -10,6 +10,7 @@ import {
   updateBlockInSchedule,
   deleteBlockFromSchedule,
   reorderBlocksInSchedule,
+  sortBlocks,
 } from '../utils.js';
 import { useDA } from './DAContext.js';
 
@@ -115,6 +116,13 @@ const SchedulesProvider = ({ children }) => {
     setActiveScheduleState((prev) => reorderBlocksInSchedule(prev, draggedBlockId, targetBlockId));
   }, []);
 
+  // Mirrors the auto-sort applied to the exported link (see prepareScheduleForServer)
+  // so the editor's visible block order matches what was just copied, rather than
+  // leaving the on-screen list looking out of order after a "blocks were sorted" toast.
+  const sortBlocksLocally = useCallback(() => {
+    setActiveScheduleState((prev) => (prev ? { ...prev, blocks: sortBlocks(prev.blocks) } : prev));
+  }, []);
+
   const clearToastError = useCallback(() => setToastError(null), []);
   const clearToastSuccess = useCallback(() => setToastSuccess(null), []);
 
@@ -146,6 +154,7 @@ const SchedulesProvider = ({ children }) => {
     updateBlockLocally,
     deleteBlockLocally,
     reorderBlocksLocally,
+    sortBlocksLocally,
     discardChangesToActiveSchedule,
     syncSchedules,
   };
@@ -183,6 +192,7 @@ export const useSchedulesOperations = () => {
     updateBlockLocally: ctx.updateBlockLocally,
     deleteBlockLocally: ctx.deleteBlockLocally,
     reorderBlocksLocally: ctx.reorderBlocksLocally,
+    sortBlocksLocally: ctx.sortBlocksLocally,
     discardChangesToActiveSchedule: ctx.discardChangesToActiveSchedule,
     syncSchedules: ctx.syncSchedules,
   };
