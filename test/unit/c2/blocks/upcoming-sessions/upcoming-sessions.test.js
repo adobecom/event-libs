@@ -3,6 +3,7 @@ import init, { resolveClickAction, buildCard } from '../../../../../event-libs/v
 import {
   scheduled, favorited, pendingActions, liveStreamActiveIds, sessionGuideRequest,
 } from '../../../../../event-libs/v1/utils/session-store.js';
+import { setEventConfig } from '../../../../../event-libs/v1/utils/utils.js';
 
 function buildSectionMetadata(entries) {
   const el = document.createElement('div');
@@ -53,7 +54,6 @@ function session(overrides = {}) {
     url: 'https://example.com/sessions/s-001',
     tags: 'Design,Illustration',
     track: 'Video',
-    category: 'video',
     sessionTime: {
       startTimeMillis: now + 60_000,
       endTimeMillis: now + 3_660_000,
@@ -64,6 +64,10 @@ function session(overrides = {}) {
 }
 
 describe('upcoming-sessions', () => {
+  before(() => {
+    setEventConfig({}, { miloLibs: '/test/unit/features/icons/mocks/libs' });
+  });
+
   beforeEach(() => {
     document.body.innerHTML = '';
     scheduled.value = new Set();
@@ -268,11 +272,18 @@ describe('upcoming-sessions', () => {
       expect(footer.querySelector('.sg-card__time')).to.not.equal(null);
     });
 
-    it('omits the category badge entirely when the category has no known match', () => {
-      const card = buildCard(session({ category: 'not-a-real-category' }));
+    it('falls back to the mainstage badge (not no badge) when the track has no icon config match', () => {
+      const card = buildCard(session({ track: 'Not A Real Track' }));
+      const badge = card.querySelector('.sg-category-badge');
+      expect(badge).to.not.equal(null);
+      // The label is the raw track string itself, not a curated one.
+      expect(badge.querySelector('.sg-category-badge__label').textContent).to.equal('Not A Real Track');
+      expect(card.querySelector('.sg-card__track--footer').textContent).to.equal('Not A Real Track');
+    });
+
+    it('omits the badge entirely when there is no track at all', () => {
+      const card = buildCard(session({ track: '' }));
       expect(card.querySelector('.sg-category-badge')).to.equal(null);
-      // The plain track label still renders — it doesn't depend on the category lookup.
-      expect(card.querySelector('.sg-card__track--footer').textContent).to.equal('Video');
     });
 
     it('renders the schedule and favorite buttons unconditionally, not only on hover/scheduled/favorited', () => {

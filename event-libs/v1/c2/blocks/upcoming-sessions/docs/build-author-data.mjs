@@ -79,44 +79,10 @@ function getCustomAttributeValue(session, name) {
   return attr?.values?.[0]?.label ?? attr?.values?.[0]?.value ?? null;
 }
 
-function getCustomAttributeRawValue(session, name) {
-  const attr = session.customAttributes?.find((ca) => ca.name.trim().toLowerCase() === name.toLowerCase());
-  return attr?.values?.[0]?.value ?? null;
-}
-
 function getTrack(session) {
   return getCustomAttributeValue(session, 'Primary Track for Agenda (Digital Agenda)')
     || getCustomAttributeValue(session, 'Track')
     || '';
-}
-
-/**
- * ESP's "Primary Track for Agenda" raw machine values don't line up 1:1 with
- * sessions-guide's CategoryBadge.js BADGE_MAP keys (e.g. ESP's
- * "graphic-design-and-illustration" vs BADGE_MAP's "design-and-illustration").
- * Maps the ones with a reasonable match; anything absent here (e.g. ESP's
- * "adobe-live-max", which has no BADGE_MAP equivalent) is left unmapped —
- * `category` stays unset and the card simply renders without a badge,
- * mirroring CategoryBadge.js's own graceful `if (!config) return null`.
- */
-const TRACK_VALUE_TO_CATEGORY = {
-  '3d': '3d',
-  branding: 'branding',
-  'creativity-and-marketing-in-business': 'business',
-  creator: 'content-creator',
-  education: 'education',
-  'generative-ai': 'generative-ai',
-  'graphic-design-and-illustration': 'design-and-illustration',
-  'mainstage-broadcast': 'mainstage',
-  photography: 'photography',
-  'social-media-and-marketing': 'social-media',
-  'video-audio-and-motion': 'video',
-};
-
-function getCategory(session) {
-  const rawValue = getCustomAttributeRawValue(session, 'Primary Track for Agenda (Digital Agenda)')
-    || getCustomAttributeRawValue(session, 'Track');
-  return rawValue ? TRACK_VALUE_TO_CATEGORY[rawValue] : undefined;
 }
 
 function getSessionTime(session, sessionTimes) {
@@ -137,9 +103,6 @@ function toAuthorEntry(session, sessionTimes) {
     track: getTrack(session),
     url: session.url,
   };
-
-  const category = getCategory(session);
-  if (category) entry.category = category;
 
   const sessionTime = getSessionTime(session, sessionTimes);
   if (sessionTime) entry.sessionTime = sessionTime;
