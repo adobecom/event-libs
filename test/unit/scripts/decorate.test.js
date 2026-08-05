@@ -3,6 +3,8 @@ import { expect } from '@esm-bundle/chai';
 import sinon from 'sinon';
 import { LIBS, setMetadata, setEventConfig } from '../../../event-libs/v1/utils/utils.js';
 import BlockMediator from '../../../event-libs/v1/deps/block-mediator.min.js';
+import { registerHydrator, resetHydrators } from '../../../event-libs/v1/hydrate/hydrate.js';
+import repeatTemplate from '../../../event-libs/v1/hydrate/repeat-template.js';
 import {
   convertUtcTimestampToLocalDateTime,
   massageMetadata,
@@ -55,6 +57,48 @@ describe('Content Update Script', () => {
 
     decorateEvent(document, miloDeps);
     expect(checkForDoubleSquareBrackets()).to.be.false;
+  });
+
+  // End-to-end proof of the whole consumer contract, as a consumer repo would use it:
+  // register a hydrator that only selects items, let repeatTemplate clone the authored
+  // template row and rewrite its placeholder indexes, then let processTemplateInAllNodes
+  // resolve them. No hydrated content originates in code.
+  it('hydrates a registered consumer block template and resolves its placeholders', () => {
+    registerHydrator('consumer-speakers', (block) => repeatTemplate(block, {
+      selectItems: (speakers) => speakers.filter((s) => s.speakerType === 'Host'),
+    }));
+
+    document.body.innerHTML = `
+      <div>
+        <div class="consumer-speakers hydrate">
+          <div>
+            <div></div>
+            <div><h3>[[speakers.firstName]] [[speakers.lastName]]</h3></div>
+            <div><p>[[speakers.bio]]</p></div>
+            <div>Read more</div>
+          </div>
+        </div>
+      </div>
+    `;
+    const miloDeps = {
+      getConfig: () => ({
+        locale: { ietf: 'en-US' },
+        miloConfig: { locale: { ietf: 'en-US' } },
+      }),
+      miloLibs: LIBS,
+    };
+
+    decorateEvent(document, miloDeps);
+
+    const block = document.querySelector('.consumer-speakers');
+    expect(block.querySelectorAll(':scope > div')).to.have.lengthOf(1);
+    expect(checkForDoubleSquareBrackets()).to.be.false;
+    expect(block.querySelector('h3').textContent).to.equal('Hallease Narvaez');
+    expect(block.querySelector(':scope > div > div:nth-child(3)').textContent).to.include('Hallease');
+    // The label is authored, never produced by the hydrator
+    expect(block.querySelector(':scope > div > div:nth-child(4)').textContent.trim()).to.equal('Read more');
+
+    resetHydrators();
   });
 
   it('handles #event-template special case', () => {

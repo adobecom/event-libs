@@ -28,7 +28,7 @@ import {
   shouldForceGuestSignIn,
 } from './utils.js';
 import { massageMetadata } from './date-time-helper.js';
-import { hydrateBlocks, setHydrationPromise } from '../hydrate/hydrate.js';
+import { hydrateBlocks } from '../hydrate/hydrate.js';
 import { initSessionState } from './session-store.js';
 import { initTierOneEventConfig } from './tier-1-event-config.js';
 
@@ -1093,7 +1093,7 @@ export function applyAreaTheme(area = document) {
 }
 
 export function decorateEvent(parent) {
-  setHydrationPromise(hydrateBlocks(parent));
+  hydrateBlocks(parent);
 
   // handle photos data parsing
   const photosData = parsePhotosData(parent);
