@@ -189,10 +189,10 @@ async function listAllFiles(org, repo, path) {
 // Matches ?schedule= (old ECC/SM query-param format) and #schedule= (new SM hash format).
 const SCHEDULE_PARAM_RE = /[?#]schedule=([A-Za-z0-9+/=%-]{20,})/g;
 
-// Temporary: rewrites new #schedule= hash-format hrefs back to ?schedule= query-param format
-// so the production chronobox (which only reads searchParams) can load them.
-async function rewriteHashLinksToQueryParam(org, repo, filePath) {
-  const hrefRe = /href=(["'])([^"']*#schedule=[A-Za-z0-9+/=%-]{20,}[^"']*)\1/gi;
+// Upgrades old ECC ?schedule= query-param hrefs to the canonical #schedule= hash
+// format, now that production chronobox (decorate.js) reads the hash directly.
+async function rewriteQueryLinksToHash(org, repo, filePath) {
+  const hrefRe = /href=(["'])([^"']*[?&]schedule=[A-Za-z0-9+/=%-]{20,}[^"']*)\1/gi;
   const url = `${DA_ADMIN_ORIGIN}/source/${org}/${repo}${filePath}`;
 
   for (let attempt = 0; attempt <= MAX_WRITE_RETRIES; attempt += 1) {
@@ -211,10 +211,10 @@ async function rewriteHashLinksToQueryParam(org, repo, filePath) {
     const rewritten = text.replace(hrefRe, (match, quote, href) => {
       try {
         const parsed = new URL(href);
-        const hashMatch = parsed.hash.match(/[#&]schedule=([A-Za-z0-9+/=%-]{20,})/);
-        if (!hashMatch) return match;
-        parsed.hash = '';
-        parsed.searchParams.set('schedule', hashMatch[1]);
+        const scheduleParam = parsed.searchParams.get('schedule');
+        if (!scheduleParam) return match;
+        parsed.searchParams.delete('schedule');
+        parsed.hash = `schedule=${scheduleParam}`;
         changed = true;
         return `href=${quote}${parsed.toString()}${quote}`;
       } catch { return match; }
@@ -286,7 +286,7 @@ export async function syncSchedules(org, repo, eventFolder) {
       const decoded = decodeScheduleParam(m[1]);
       if (decoded?.scheduleId || decoded?.title) finds.push(decoded);
     }
-    const needsRewrite = /href=["'][^"']*#schedule=[A-Za-z0-9+/=%-]{20,}/.test(res.text);
+    const needsRewrite = /href=["'][^"']*[?&]schedule=[A-Za-z0-9+/=%-]{20,}/.test(res.text);
     return { finds, needsRewrite };
   });
 
@@ -301,11 +301,12 @@ export async function syncSchedules(org, repo, eventFolder) {
     };
   }
 
-  // Temporary: rewrite #schedule= hash-format links back to ?schedule= query-param
-  // so the production chronobox can read them until the decorate.js fix is deployed.
+  // Upgrade old ECC ?schedule= links found during scan to the canonical #schedule=
+  // hash format, so authors never need to manually adjust a URL for it to load
+  // correctly in the DA app.
   const docsToRewrite = docFiles.filter((_, i) => perDocFinds[i]?.needsRewrite);
   if (docsToRewrite.length > 0) {
-    await mapWithConcurrency(docsToRewrite, SCAN_CONCURRENCY, (path) => rewriteHashLinksToQueryParam(org, repo, path));
+    await mapWithConcurrency(docsToRewrite, SCAN_CONCURRENCY, (path) => rewriteQueryLinksToHash(org, repo, path));
   }
 
   perDocFinds.forEach(({ finds }, i) => {

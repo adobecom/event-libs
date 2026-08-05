@@ -52,6 +52,12 @@ function encodeSchedule(schedule) {
   return btoa(JSON.stringify(schedule));
 }
 
+// Reads the HTML body a rewrite POST would have written (FormData -> Blob -> text).
+async function writtenBody(options) {
+  const blob = options.body.get('data');
+  return blob.text();
+}
+
 describe('da-controller', () => {
   beforeEach(() => {
     setDaToken('test-token');
@@ -265,6 +271,101 @@ describe('da-controller', () => {
       const result = await syncSchedules('org', 'repo', '/events/e');
       expect(result.ok).to.be.true;
       expect(result.data.schedules).to.deep.equal([]);
+    });
+  });
+
+  describe('rewrite pass (?schedule= → #schedule=)', () => {
+    it('upgrades an old ECC ?schedule= link to the canonical #schedule= hash format', async () => {
+      const encoded = encodeSchedule({ scheduleId: 's1', title: 'T', modificationTime: '2026-06-01T00:00:00.000Z', blocks: [] });
+      const docHtml = `<a href="https://da.live/app/o/r/tools/da-apps/schedule-maker?schedule=${encoded}">link</a>`;
+
+      const fetchMock = routeFetch([
+        ['/list/org/repo/events/e', makeResponse({
+          json: [{ path: '/org/repo/events/e/index.html', ext: 'html' }],
+        })],
+        ['/source/org/repo/events/e/index.html', (url, options) => (options?.method === 'POST'
+          ? makeResponse({ ok: true })
+          : makeResponse({ text: docHtml, headers: { ETag: '"abc123"' } })),
+        ],
+      ]);
+      setDaFetch(fetchMock);
+
+      const result = await syncSchedules('org', 'repo', '/events/e');
+      expect(result.ok).to.be.true;
+
+      const write = fetchMock.calls.find((c) => c.options?.method === 'POST');
+      expect(write, 'expected a rewrite POST').to.exist;
+      const body = await writtenBody(write.options);
+      expect(body).to.include(`#schedule=${encoded}`);
+      expect(body).to.not.include('?schedule=');
+      expect(write.options.headers.get('If-Match')).to.equal('"abc123"');
+    });
+
+    it('does not rewrite a doc whose link is already in #schedule= format', async () => {
+      const encoded = encodeSchedule({ scheduleId: 's2', title: 'T', modificationTime: '2026-06-01T00:00:00.000Z', blocks: [] });
+      const docHtml = `<a href="https://da.live/app/o/r/tools/da-apps/schedule-maker#schedule=${encoded}">link</a>`;
+
+      const fetchMock = routeFetch([
+        ['/list/org/repo/events/e', makeResponse({
+          json: [{ path: '/org/repo/events/e/index.html', ext: 'html' }],
+        })],
+        ['/source/org/repo/events/e/index.html', makeResponse({ text: docHtml })],
+      ]);
+      setDaFetch(fetchMock);
+
+      const result = await syncSchedules('org', 'repo', '/events/e');
+      expect(result.ok).to.be.true;
+      expect(fetchMock.calls.some((c) => c.options?.method === 'POST')).to.be.false;
+    });
+
+    it('preserves other query params on the href when upgrading to #schedule=', async () => {
+      const encoded = encodeSchedule({ scheduleId: 's3', title: 'T', modificationTime: '2026-06-01T00:00:00.000Z', blocks: [] });
+      const docHtml = `<a href="https://da.live/app/o/r/tools/da-apps/schedule-maker?ref=my-branch&schedule=${encoded}">link</a>`;
+
+      const fetchMock = routeFetch([
+        ['/list/org/repo/events/e', makeResponse({
+          json: [{ path: '/org/repo/events/e/index.html', ext: 'html' }],
+        })],
+        ['/source/org/repo/events/e/index.html', (url, options) => (options?.method === 'POST'
+          ? makeResponse({ ok: true })
+          : makeResponse({ text: docHtml })),
+        ],
+      ]);
+      setDaFetch(fetchMock);
+
+      await syncSchedules('org', 'repo', '/events/e');
+
+      const write = fetchMock.calls.find((c) => c.options?.method === 'POST');
+      const body = await writtenBody(write.options);
+      expect(body).to.include('ref=my-branch');
+      expect(body).to.include(`#schedule=${encoded}`);
+      expect(body).to.not.include('?schedule=');
+    });
+
+    it('retries the write after a 412 conflict, re-reading before writing again', async () => {
+      const encoded = encodeSchedule({ scheduleId: 's4', title: 'T', modificationTime: '2026-06-01T00:00:00.000Z', blocks: [] });
+      const docHtml = `<a href="https://da.live/app/o/r/tools/da-apps/schedule-maker?schedule=${encoded}">link</a>`;
+      let postAttempts = 0;
+
+      const fetchMock = routeFetch([
+        ['/list/org/repo/events/e', makeResponse({
+          json: [{ path: '/org/repo/events/e/index.html', ext: 'html' }],
+        })],
+        ['/source/org/repo/events/e/index.html', (url, options) => {
+          if (options?.method === 'POST') {
+            postAttempts += 1;
+            return postAttempts === 1
+              ? makeResponse({ ok: false, status: 412, text: 'conflict' })
+              : makeResponse({ ok: true });
+          }
+          return makeResponse({ text: docHtml, headers: { ETag: '"etag"' } });
+        }],
+      ]);
+      setDaFetch(fetchMock);
+
+      const result = await syncSchedules('org', 'repo', '/events/e');
+      expect(result.ok).to.be.true;
+      expect(postAttempts).to.equal(2);
     });
   });
 });

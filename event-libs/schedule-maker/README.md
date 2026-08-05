@@ -52,12 +52,12 @@ https://da.live/app/{org}/{repo}/tools/da-apps/schedule-maker?schedule={base64}
 
 Both forms hold the entire schedule JSON (title, blocks, timestamps) encoded as base64. No server state is required to open or edit a schedule — click the link, the editor loads the schedule, you edit, you copy the new link.
 
-These two formats are **not interchangeable in practice** — each one only auto-decodes in one specific consumer:
+`#schedule=` is the **canonical format**, read by both consumers:
 
-- **`#schedule=` — the schedule-maker app itself.** DA forwards only the parent page's hash into this app's iframe, not the query string, so `Schedules.js`'s deep-link-on-mount only ever reads `window.location.hash`. A `?schedule=` link will not auto-open here at all.
-- **`?schedule=` — the published page's `chrono-box` block.** `decorate.js` parses the authored `<a>` href directly (no iframe involved), and the *production* build of `decorate.js` only reads the query param today, not the hash.
+- **The schedule-maker app itself.** DA forwards only the parent page's hash into this app's iframe, not the query string, so `Schedules.js`'s deep-link-on-mount only ever reads `window.location.hash`. A `?schedule=` link will not auto-open here at all.
+- **The published page's `chrono-box` block.** `decorate.js` parses the authored `<a>` href directly (no iframe involved) and reads `#schedule=` (falling back to `?schedule=` for old ECC links) — see the `chrono-box` block builder in `decorate.js`.
 
-> **Copy Link currently emits `?schedule=` (temporary),** to keep freshly-copied links rendering correctly on published pages. The tradeoff: a freshly-copied link will **not** auto-open back in the schedule-maker editor if you paste/click it — use Sync to find and reopen it from the sidebar list instead, or manually swap `?schedule=` → `#schedule=` in the URL (adding `?ref=<branch>` too, if you're pointed at a feature-branch build) to open it directly in the app for local testing. Once the hash-aware `decorate.js` ships to production, flip `ScheduleURLUtility` in [utils.js](utils.js) back to `#schedule=` and both consumers line up on the same format again. `decodeScheduleParam` itself (used by sync's doc-text scan) is format-agnostic — it decodes a raw base64 string regardless of where it came from — so only the *URL-reading* call sites are format-sensitive.
+`?schedule=` (the old ECC/SM query-param format) still decodes fine wherever it's found — `decodeScheduleParam` and `extractScheduleFromURL` are format-agnostic — but Copy Link now emits `#schedule=`, and Sync upgrades any `?schedule=` links it finds to `#schedule=` (see Rewrite Pass below), so authored content converges on the canonical format without manual URL edits.
 
 ### Schedule JSON Structure
 
@@ -85,7 +85,7 @@ These two formats are **not interchangeable in practice** — each one only auto
 
 When DA opens the schedule-maker URL with a `#schedule=` fragment, the app reads and decodes the fragment on mount (`Schedules.js` `useEffect`) and opens the schedule directly in the editor. No sync or network request is needed.
 
-`?schedule=` links (old ECC format, or a freshly-copied link while Copy Link temporarily emits `?schedule=` — see Link-First Model above) do **not** auto-open here, since DA never forwards the query string into this app's iframe. Use Sync to find and open them from the sidebar list instead.
+Old ECC `?schedule=` links do **not** auto-open here, since DA never forwards the query string into this app's iframe. Use Sync to find and open them from the sidebar list instead — Sync also upgrades them to `#schedule=` (see Rewrite Pass below), so reopening the doc's link afterward works directly.
 
 ## Sync
 
@@ -101,9 +101,9 @@ Sync is a **read-only scan** that discovers schedule links authored in DA docume
 
 No sheets are written. Sync only reads.
 
-### Rewrite Pass (Temporary)
+### Rewrite Pass
 
-Sync also rewrites any `#schedule=` hrefs it finds in scanned docs back to `?schedule=` query-param format, so the production chronobox can load them. This is a second, belt-and-suspenders instance of the same temporary measure as the Copy Link format above (catching hash-format links from other sources, e.g. authored before this revert). This pass uses ETag-based conditional writes with retries. Once `decorate.js`'s hash support ships to production, both this rewrite pass and the Copy Link format should flip from `?schedule=`-favoring back to `#schedule=`-favoring together.
+Sync also upgrades any `?schedule=` hrefs it finds in scanned docs to the canonical `#schedule=` hash format (`rewriteQueryLinksToHash`), so authors never need to manually adjust an old ECC link for it to load correctly in the DA app. This pass uses ETag-based conditional writes with retries.
 
 ### Sync Performance & Reliability
 
@@ -120,7 +120,7 @@ Sync also rewrites any `#schedule=` hrefs it finds in scanned docs back to `?sch
 | **Epoch datetime input** | [BlockEditor](components/editor/BlockEditor.js) | Local-time picker synced with an epoch-ms field. |
 | **Drag-to-reorder blocks** | [BlockEditor](components/editor/BlockEditor.js), [ScheduleEditor](components/ScheduleEditor.js) | Native HTML5 drag-and-drop via a grip handle; works for existing and newly-added blocks. Manual order persists through editing and save (only the initial load re-sorts by `startDateTime`). |
 | **Excel import** | [SheetImporter](components/SheetImporter.js) | Imports schedules from an Excel/CSV file and creates them locally. Uses SheetJS (`v1/deps/xlsx.mjs`), vendored from `cdn.sheetjs.com/xlsx-0.20.3`. |
-| **Copy Link** | [ScheduleHeader](components/editor/ScheduleHeader.js) | Copies a rich anchor (title + modification timestamp as link text, `?schedule=` URL as href — see Link-First Model above) to the clipboard for pasting into DA docs. |
+| **Copy Link** | [ScheduleHeader](components/editor/ScheduleHeader.js) | Copies a rich anchor (title + modification timestamp as link text, `#schedule=` URL as href — see Link-First Model above) to the clipboard for pasting into DA docs. |
 | **Sync** | [da-controller.js](scripts/da-controller.js) | Scans all docs in the event folder and builds the sidebar schedule list with doc-reference paths. Disabled until a folder path is set; surfaces auth failures as errors. |
 | **Discard** | [SchedulesContext](context/SchedulesContext.js) | Reverts the active schedule to the state it was in when last opened. |
 

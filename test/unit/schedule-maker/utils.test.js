@@ -283,12 +283,20 @@ describe('schedule-maker utils', () => {
       expect(extracted.blocks).to.have.lengthOf(1);
     });
 
-    it('extracts a schedule from a hash-fragment URL', async () => {
+    it('emits the canonical #schedule= hash format, not ?schedule=', () => {
       const schedule = makeSchedule({ blocks: [makeBlock()] });
-      const queryUrl = ScheduleURLUtility.createScheduleURL(schedule, 'o', 'r');
-      const encoded = new URL(queryUrl).searchParams.get('schedule');
-      const hashUrl = `https://da.live/app/o/r/tools#schedule=${encoded}`;
-      const extracted = await ScheduleURLUtility.extractScheduleFromURL(hashUrl);
+      const url = ScheduleURLUtility.createScheduleURL(schedule, 'o', 'r');
+      const parsed = new URL(url);
+      expect(parsed.hash).to.match(/^#schedule=/);
+      expect(parsed.searchParams.get('schedule')).to.equal(null);
+    });
+
+    it('still extracts a schedule from an old ECC ?schedule= query-param URL', async () => {
+      const schedule = makeSchedule({ blocks: [makeBlock()] });
+      const hashUrl = ScheduleURLUtility.createScheduleURL(schedule, 'o', 'r');
+      const encoded = new URL(hashUrl).hash.replace(/^#schedule=/, '');
+      const queryUrl = `https://da.live/app/o/r/tools?schedule=${encoded}`;
+      const extracted = await ScheduleURLUtility.extractScheduleFromURL(queryUrl);
       expect(extracted.title).to.equal('My Schedule');
     });
 
