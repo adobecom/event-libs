@@ -317,6 +317,157 @@ describe('Profile Cards Module', () => {
     });
   });
 
+  describe('blade variant', () => {
+    const LOREM = 'Lorem ipsum dolor sit amet consectetur adipiscing elit sed do eiusmod tempor incididunt ut labore et dolore magna aliqua ut enim ad minim veniam quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat duis aute irure dolor';
+    const SHORT_BIO = LOREM.slice(0, 100);
+    const LONG_BIO = LOREM.slice(0, 250);
+    const VERY_LONG_BIO = `${LOREM} ${LOREM}`;
+
+    function makeBladeBlock(speakers, { classes = 'blade', configRows = '<div><div>type</div><div>speaker</div></div>' } = {}) {
+      setMetadata('speakers', JSON.stringify(speakers));
+      const el = document.createElement('div');
+      el.className = `profile-cards ${classes}`;
+      el.innerHTML = `<div><div><h2>Heading</h2></div></div>${configRows}`;
+      document.body.appendChild(el);
+      return el;
+    }
+
+    beforeEach(() => {
+      document.body.innerHTML = body;
+      document.head.innerHTML = head;
+    });
+
+    it('renders name and title but no company field, social icons, or modal trigger', () => {
+      const el = document.querySelector('#blade-cards');
+      init(el);
+
+      const cards = el.querySelectorAll('.card-container');
+      expect(cards).to.have.lengthOf(3);
+
+      cards.forEach((card) => {
+        expect(card.querySelector('.card-name')).to.not.be.null;
+        expect(card.querySelector('.card-title')).to.not.be.null;
+        expect(card.querySelector('.card-company')).to.be.null;
+        expect(card.querySelector('.card-social-icons')).to.be.null;
+        expect(card.getAttribute('role')).to.not.equal('button');
+        expect(card.hasAttribute('aria-haspopup')).to.be.false;
+      });
+    });
+
+    it('does not add the single class or center a 3-card blade block', () => {
+      const el = document.querySelector('#blade-cards');
+      init(el);
+
+      expect(el.classList.contains('single')).to.be.false;
+    });
+
+    it('does not enable modal even when the modal class is also authored', () => {
+      const el = makeBladeBlock([
+        { firstName: 'Ada', lastName: 'Lovelace', speakerType: 'Speaker', title: 'Mathematician', bio: SHORT_BIO },
+      ], { classes: 'blade modal' });
+      init(el);
+
+      const card = el.querySelector('.card-container');
+      expect(card.getAttribute('role')).to.not.equal('button');
+      expect(card.hasAttribute('aria-haspopup')).to.be.false;
+      expect(card.classList.contains('modal-trigger')).to.be.false;
+    });
+
+    it('does not enable the carousel even with more than 3 speakers', () => {
+      const el = makeBladeBlock([
+        { firstName: 'A', lastName: 'One', speakerType: 'Speaker', title: 't', bio: SHORT_BIO },
+        { firstName: 'B', lastName: 'Two', speakerType: 'Speaker', title: 't', bio: SHORT_BIO },
+        { firstName: 'C', lastName: 'Three', speakerType: 'Speaker', title: 't', bio: SHORT_BIO },
+        { firstName: 'D', lastName: 'Four', speakerType: 'Speaker', title: 't', bio: SHORT_BIO },
+      ]);
+      init(el);
+
+      expect(el.querySelectorAll('.card-container')).to.have.lengthOf(4);
+      expect(el.classList.contains('with-carousel')).to.be.false;
+      expect(el.querySelector('.carousel-plugin')).to.be.null;
+    });
+
+    it('does not add the single class for a lone blade speaker', () => {
+      const el = makeBladeBlock([
+        { firstName: 'Solo', lastName: 'Speaker', speakerType: 'Speaker', title: 't', bio: SHORT_BIO },
+      ]);
+      init(el);
+
+      expect(el.querySelectorAll('.card-container')).to.have.lengthOf(1);
+      expect(el.classList.contains('single')).to.be.false;
+    });
+
+    it('renders the full bio with no Read more button when it is 144 characters or fewer', () => {
+      const el = makeBladeBlock([
+        { firstName: 'Short', lastName: 'Bio', speakerType: 'Speaker', title: 't', bio: SHORT_BIO },
+      ]);
+      init(el);
+
+      const desc = el.querySelector('.blade-desc');
+      expect(desc.querySelector('.blade-desc-text').textContent).to.equal(SHORT_BIO);
+      expect(desc.querySelector('.blade-read-more')).to.be.null;
+    });
+
+    it('truncates a long bio with a working Read more / Collapse toggle', () => {
+      const el = makeBladeBlock([
+        { firstName: 'Long', lastName: 'Bio', speakerType: 'Speaker', title: 't', bio: LONG_BIO },
+      ]);
+      init(el);
+
+      const textEl = el.querySelector('.blade-desc-text');
+      const btn = el.querySelector('.blade-read-more');
+
+      expect(btn).to.not.be.null;
+      expect(btn.textContent).to.equal('Read more');
+      expect(btn.getAttribute('aria-expanded')).to.equal('false');
+      expect(textEl.textContent.endsWith('…')).to.be.true;
+      expect(textEl.textContent.length).to.be.at.most(145);
+      const collapsedText = textEl.textContent;
+
+      btn.click();
+      expect(btn.textContent).to.equal('Collapse');
+      expect(btn.getAttribute('aria-expanded')).to.equal('true');
+      expect(textEl.textContent.length).to.be.greaterThan(collapsedText.length);
+
+      btn.click();
+      expect(btn.textContent).to.equal('Read more');
+      expect(btn.getAttribute('aria-expanded')).to.equal('false');
+      expect(textEl.textContent).to.equal(collapsedText);
+    });
+
+    it('shows the full bio with no dangling ellipsis once expanded, even past 292 characters', () => {
+      const el = makeBladeBlock([
+        { firstName: 'Very', lastName: 'Long', speakerType: 'Speaker', title: 't', bio: VERY_LONG_BIO },
+      ]);
+      init(el);
+
+      const textEl = el.querySelector('.blade-desc-text');
+      const btn = el.querySelector('.blade-read-more');
+
+      btn.click();
+      expect(textEl.textContent).to.equal(VERY_LONG_BIO);
+      expect(textEl.textContent.endsWith('…')).to.be.false;
+    });
+
+    it('renders a static-authored blade card with a working Read more toggle', () => {
+      const el = document.querySelector('#blade-static-cards');
+      init(el);
+
+      const card = el.querySelector('.card-container');
+      expect(card.querySelector('.card-name').textContent.trim()).to.equal('Static Blade Speaker');
+      expect(card.querySelector('.card-title').textContent.trim()).to.equal('VP of Marketing, Adobe');
+      expect(card.querySelector('.card-social-icons')).to.be.null;
+
+      const btn = card.querySelector('.blade-read-more');
+      expect(btn).to.not.be.null;
+
+      const textEl = card.querySelector('.blade-desc-text');
+      const collapsedText = textEl.textContent;
+      btn.click();
+      expect(textEl.textContent.length).to.be.greaterThan(collapsedText.length);
+    });
+  });
+
   describe('createSocialIcon', () => {
     it('should return a social icon element', () => {
       const icon = createSocialIcon(document.createElement('svg'), 'facebook');

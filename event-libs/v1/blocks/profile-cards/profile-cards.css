@@ -48,6 +48,50 @@
   flex-direction: column;
 }
 
+/* Blade variant - Mobile first */
+.profile-cards.blade {
+  max-width: 1200px;
+  margin: auto;
+}
+
+.profile-cards.blade .cards-wrapper {
+  display: grid;
+  grid-template-columns: 1fr;
+  row-gap: 24px;
+  column-gap: 24px;
+  padding: 32px 16px;
+}
+
+.profile-cards.blade .card-container {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 16px;
+  margin: 0;
+  border: none;
+  border-radius: 0;
+  background-color: transparent;
+}
+
+.profile-cards.blade .card-content {
+  padding: 0;
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.profile-cards.blade .blade-read-more {
+  background: none;
+  border: 0;
+  padding: 0;
+  margin-left: 4px;
+  font: inherit;
+  font-weight: 700;
+  text-decoration: underline;
+  cursor: pointer;
+  color: inherit;
+  display: inline;
+}
+
 .profile-cards.single .card-container {
   display: flex;
   align-items: flex-start;
@@ -136,6 +180,28 @@
   font-weight: 400;
   line-height: var(--type-body-l-lh);
   margin-top: 0;
+}
+
+.profile-cards.blade .card-name {
+  font-size: 16px;
+  font-weight: 700;
+  margin: 0 0 4px;
+  color: #2c2c2c;
+}
+
+.profile-cards.blade .card-title {
+  font-size: var(--type-body-xs-size);
+  line-height: var(--type-body-xs-lh);
+  font-weight: 400;
+  margin: 0 0 8px;
+}
+
+.profile-cards.blade .card-desc {
+  font-size: var(--type-body-xs-size);
+  line-height: var(--type-body-xs-lh);
+  font-weight: 400;
+  margin: 0;
+  color: #2c2c2c;
 }
 
 .profile-cards .card-social-icons {
@@ -231,8 +297,24 @@
   display: block;
 }
 
+.profile-cards.blade .card-container .card-image-container {
+  flex: 0 0 98px;
+  width: 98px;
+  height: 98px;
+  border-radius: 50%;
+}
+
+.profile-cards.blade .cards-wrapper .card-container:only-child {
+  grid-column: 1 / -1;
+  justify-self: center;
+}
+
 /* Tablet and up */
 @media screen and (min-width: 600px) {
+  .profile-cards.blade .cards-wrapper {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
   /* Grid variants: Tablet - all variants get 2 columns */
   .profile-cards.grid.two-up .cards-wrapper,
   .profile-cards.grid.three-up .cards-wrapper,
@@ -307,6 +389,12 @@
 
   .profile-cards.single .cards-wrapper .card-social-icons {
     margin-left: 15px;
+  }
+
+  .profile-cards.blade .cards-wrapper {
+    column-gap: 48px;
+    row-gap: 40px;
+    padding: 56px 16px;
   }
 
   /* Grid variants: Desktop */

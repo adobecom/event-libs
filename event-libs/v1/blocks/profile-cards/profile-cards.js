@@ -213,6 +213,90 @@ function getSocialLinks(data) {
   return data?.socialLinks || data?.socialMedia || [];
 }
 
+const BLADE_BIO_PREVIEW_LENGTH = 144;
+
+function getBioPlainText(bio) {
+  const trimmedBio = typeof bio === 'string' ? bio.trim() : '';
+  if (!trimmedBio) return '';
+  if (!trimmedBio.includes('<')) return trimmedBio;
+
+  const container = createTag('div');
+  container.innerHTML = trimmedBio;
+  return container.textContent.trim();
+}
+
+function truncateBioText(text, limit) {
+  if (text.length <= limit) return { text, truncated: false };
+
+  let cut = text.lastIndexOf(' ', limit);
+  if (cut <= 0) cut = limit;
+
+  return { text: text.slice(0, cut).trimEnd(), truncated: true };
+}
+
+function appendBioBlade(container, bio, fullName) {
+  const plainBio = getBioPlainText(bio);
+  if (!plainBio) return;
+
+  const desc = createTag('div', { class: 'card-desc blade-desc' });
+  const textEl = createTag('span', { class: 'blade-desc-text' });
+  desc.append(textEl);
+  container.append(desc);
+
+  const short = truncateBioText(plainBio, BLADE_BIO_PREVIEW_LENGTH);
+  if (!short.truncated) {
+    textEl.textContent = plainBio;
+    return;
+  }
+
+  let expanded = false;
+
+  const renderState = () => {
+    if (expanded) {
+      textEl.textContent = plainBio;
+      return;
+    }
+    textEl.textContent = `${short.text}…`;
+  };
+
+  renderState();
+
+  const btn = createTag('button', {
+    type: 'button',
+    class: 'blade-read-more',
+    'aria-expanded': 'false',
+    'aria-label': `Read more about ${fullName}'s bio`,
+  }, 'Read more');
+
+  btn.addEventListener('click', () => {
+    expanded = !expanded;
+    renderState();
+    btn.textContent = expanded ? 'Collapse' : 'Read more';
+    btn.setAttribute('aria-expanded', String(expanded));
+    btn.setAttribute('aria-label', expanded
+      ? `Collapse ${fullName}'s bio`
+      : `Read more about ${fullName}'s bio`);
+  });
+
+  desc.append(btn);
+}
+
+function decorateContentBlade(cardContainer, data) {
+  const contentContainer = createTag('div', { class: 'card-content' });
+  const textContainer = createTag('div', { class: 'card-text-container' });
+  const fullName = getProfileName(data);
+  const name = createTag('h2', { class: 'card-name' }, fullName);
+
+  textContainer.append(name);
+  if (data.title) {
+    textContainer.append(createTag('p', { class: 'card-title' }, data.title));
+  }
+  appendBioBlade(textContainer, data.bio, fullName);
+
+  contentContainer.append(textContainer);
+  cardContainer.append(contentContainer);
+}
+
 function appendBio(contentContainer, bio) {
   const trimmedBio = typeof bio === 'string' ? bio.trim() : '';
   if (!trimmedBio) return;
@@ -441,10 +525,10 @@ function parseStaticCard(row) {
   };
 }
 
-function decorateStaticCards(el, { modal } = {}) {
+function decorateStaticCards(el, { modal, blade } = {}) {
   const cardsWrapper = el.querySelector('.cards-wrapper');
   const rows = Array.from(el.querySelectorAll(':scope > div:not(.cards-wrapper)'));
-  
+
   // First row is the heading, skip it
   const cardRows = rows.slice(1);
 
@@ -459,29 +543,33 @@ function decorateStaticCards(el, { modal } = {}) {
 
     const cardContainer = createTag('div', { class: 'card-container' });
     decorateImage(cardContainer, cardData.photo);
-    decorateContent(cardContainer, cardData);
-    if (modal) {
+    if (blade) {
+      decorateContentBlade(cardContainer, cardData);
+    } else {
+      decorateContent(cardContainer, cardData);
+    }
+    if (modal && !blade) {
       decorateModalTrigger(cardContainer, cardData, index);
     }
     cardsWrapper.append(cardContainer);
-    
+
     // Remove the original row
     row.remove();
   });
 
   const cardCount = cardsWrapper.querySelectorAll('.card-container').length;
   const isGrid = el.classList.contains('grid');
-  
-  if (cardCount === 1) {
+
+  if (cardCount === 1 && !blade) {
     el.classList.add('single');
-  } else if (cardCount > 3 && !isGrid) {
+  } else if (cardCount > 3 && !isGrid && !blade) {
     cardsWrapper.classList.add('carousel-plugin', 'show-3');
     el.classList.add('with-carousel');
     buildMiloCarousel(cardsWrapper, Array.from(cardsWrapper.querySelectorAll('.card-container')));
   }
 }
 
-function decorateCards(el, data, { simple, modal, speakerType } = {}) {
+function decorateCards(el, data, { simple, modal, blade, speakerType } = {}) {
   const cardsWrapper = el.querySelector('.cards-wrapper');
   const filteredData = speakerType
     ? data.filter((speaker) => speaker.speakerType?.toLowerCase() === speakerType)
@@ -496,12 +584,14 @@ function decorateCards(el, data, { simple, modal, speakerType } = {}) {
     const cardContainer = createTag('div', { class: 'card-container' });
 
     decorateImage(cardContainer, speaker.photo);
-    if (simple) {
+    if (blade) {
+      decorateContentBlade(cardContainer, speaker);
+    } else if (simple) {
       decorateContentSimple(cardContainer, speaker);
     } else {
       decorateContent(cardContainer, speaker);
     }
-    if (modal) {
+    if (modal && !blade) {
       decorateModalTrigger(cardContainer, speaker, index);
     }
 
@@ -510,9 +600,9 @@ function decorateCards(el, data, { simple, modal, speakerType } = {}) {
 
   const isGrid = el.classList.contains('grid');
 
-  if (filteredData.length === 1) {
+  if (filteredData.length === 1 && !blade) {
     el.classList.add('single');
-  } else if (filteredData.length > 3 && !isGrid) {
+  } else if (filteredData.length > 3 && !isGrid && !blade) {
     cardsWrapper.classList.add('carousel-plugin', 'show-3');
     el.classList.add('with-carousel');
 
@@ -561,9 +651,10 @@ function parseConfigRows(el) {
 
 export default function init(el) {
   const isModal = el.classList.contains('modal');
+  const isBlade = el.classList.contains('blade');
 
   // Handle grid variant: add default three-up if no *-up class is present
-  if (el.classList.contains('grid')) {
+  if (el.classList.contains('grid') && !isBlade) {
     const hasUpVariant = Array.from(el.classList).some((cls) => cls.endsWith('-up'));
     if (!hasUpVariant) {
       el.classList.add('three-up');
@@ -607,8 +698,10 @@ export default function init(el) {
       sortedData = sortDataByOrdinals(data);
     }
 
-    decorateCards(el, sortedData, { simple: isSimple, modal: isModal, speakerType });
+    decorateCards(el, sortedData, {
+      simple: isSimple, modal: isModal, blade: isBlade, speakerType,
+    });
   } else {
-    decorateStaticCards(el, { modal: isModal });
+    decorateStaticCards(el, { modal: isModal, blade: isBlade });
   }
 }
