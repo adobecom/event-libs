@@ -4,6 +4,7 @@ import { useNavigation } from '../context/NavigationContext.js';
 import { useConfigs } from '../context/ConfigsContext.js';
 import {
   copyTextToClipboard, extractDistinctTracks, isTrackIconEntryComplete, getDisplayTitle, stringifyConfig,
+  buildUpcomingSessionEntry,
 } from '../utils.js';
 import TrackIconEditor from '../components/TrackIconEditor.js';
 import FeaturedSessionsEditor from '../components/FeaturedSessionsEditor.js';
@@ -73,6 +74,16 @@ export default function ConfigEditor() {
     } finally {
       setIsSaving(false);
     }
+  };
+
+  const handleCopyUpcomingSessions = async () => {
+    const sessionsById = new Map(sessions.map((s) => [s.sessionId, s]));
+    const entries = (activeConfig.config.upcomingSessions || [])
+      .filter((id) => sessionsById.has(id))
+      .map((id) => buildUpcomingSessionEntry(sessionsById.get(id), sessionTimes));
+    const ok = await copyTextToClipboard(JSON.stringify(entries));
+    if (ok) setToastSuccess('Upcoming Sessions JSON copied — paste it into the upcoming-sessions block\'s section-metadata row');
+    else setToastError('Could not copy — select and copy the JSON block manually');
   };
 
   const handleCopy = async () => {
@@ -161,6 +172,32 @@ export default function ConfigEditor() {
             featuredSessions=${activeConfig.config.featuredSessions} \
             onChange=${(next) => updateConfigField('featuredSessions', next)} \
           />
+        `}
+      </section>
+
+      <section class="tec-editor__section">
+        <h2>Upcoming sessions</h2>
+        <p class="tec-editor__section-hint">
+          Pick which sessions appear in the Homepage marquee's Upcoming Sessions row, and set
+          their order. Your picks are saved with this row so you can come back and edit them,
+          but the <code>upcoming-sessions</code> block itself doesn't read the Config JSON
+          below — it reads its own section-metadata. Use "Copy Upcoming Sessions JSON" and paste
+          the result into that block's own section-metadata row (key
+          <code>upcoming-sessions</code>) instead.
+        </p>
+        ${isLoadingSessions && html`<${LoadingInline} label="Loading sessions…" />`}
+        ${sessionsError && html`<p class="tec-editor__error">${sessionsError}</p>`}
+        ${!isLoadingSessions && !sessionsError && html`
+          <${FeaturedSessionsEditor} \
+            sessions=${sessions} \
+            sessionTimes=${sessionTimes} \
+            tracks=${tracks} \
+            featuredSessions=${activeConfig.config.upcomingSessions} \
+            onChange=${(next) => updateConfigField('upcomingSessions', next)} \
+            heading="Upcoming (display order)" \
+            emptyHint="No sessions added yet — add some from the list on the right." \
+          />
+          <button type="button" class="tec-btn tec-btn--outline" onClick=${handleCopyUpcomingSessions}>Copy Upcoming Sessions JSON</button>
         `}
       </section>
 

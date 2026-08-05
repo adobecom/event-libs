@@ -28,6 +28,7 @@ function DragHandleIcon() {
 // arithmetic on the pointer delta, and other rows FLIP-animate into place.
 export default function FeaturedSessionsEditor({
   sessions, sessionTimes, tracks, featuredSessions, onChange,
+  heading = 'Featured (display order)', emptyHint = 'No sessions featured yet — add some from the list on the right.',
 }) {
   const [search, setSearch] = useState('');
   const [trackFilter, setTrackFilter] = useState('');
@@ -243,8 +244,8 @@ export default function FeaturedSessionsEditor({
   return html`
     <div class="tec-featured-editor">
       <div class="tec-featured-editor__column">
-        <h3>Featured (display order)</h3>
-        ${featuredIds.length === 0 && html`<p class="tec-featured-editor__empty">No sessions featured yet — add some from the list on the right.</p>`}
+        <h3>${heading}</h3>
+        ${featuredIds.length === 0 && html`<p class="tec-featured-editor__empty">${emptyHint}</p>`}
         <div aria-live="polite" class="tec-sr-only">${announcement}</div>
         <ul class="tec-featured-editor__list" ref=${listRef}>
           ${featuredIds.map((sessionId, index) => {

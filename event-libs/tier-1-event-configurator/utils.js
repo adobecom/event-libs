@@ -113,6 +113,29 @@ export function stringifyConfig(value, indent = '') {
   return JSON.stringify(value);
 }
 
+// Mirrors upcoming-sessions/docs/build-author-data.mjs's toAuthorEntry() shape —
+// the small per-session object upcoming-sessions.js reads directly from its own
+// authored section-metadata (not the tier-1-event-config metadata this app
+// otherwise writes to), so it's built here rather than looked up at render time.
+export function buildUpcomingSessionEntry(session, sessionTimes) {
+  const match = (sessionTimes || []).find((st) => st.sessionId === session.sessionId);
+  const entry = {
+    sessionId: session.sessionId,
+    sessionCode: session.sessionCode,
+    enTitle: session.enTitle,
+    track: getSessionTrack(session) || '',
+    url: session.url,
+  };
+  if (match) {
+    entry.sessionTime = {
+      startTimeMillis: match.startTimeMillis,
+      endTimeMillis: match.endTimeMillis,
+      timezone: match.timezone,
+    };
+  }
+  return entry;
+}
+
 export function formatUpdatedTime(isoString) {
   if (!isoString) return '';
   try {
