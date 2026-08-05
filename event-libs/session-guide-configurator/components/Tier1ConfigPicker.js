@@ -4,19 +4,15 @@ import {
 import Modal from './Modal.js';
 import SearchInput from './SearchInput.js';
 import LoadingInline from './LoadingInline.js';
-// Deliberate cross-app dependency, not a duplication risk like TRACK_ATTRIBUTE_NAME was
-// (PLAN.md §4.6) — Session Guide Configurator is explicitly designed to hook into an
-// existing Tier 1 Event Configurator config as its event source (PLAN.md §2), so
-// reusing Tier 1's own sheet-read and title-resolution logic directly is the correct
-// call, not a copy to keep in sync.
+// Deliberate cross-app import: this app uses Tier 1 configs as its event source, so
+// it reuses Tier 1's sheet-read and title-resolution logic directly rather than
+// duplicating it.
 import { getConfigs as getTier1Configs } from '../../tier-1-event-configurator/scripts/da-controller.js';
 import { getDisplayTitle as getTier1DisplayTitle } from '../../tier-1-event-configurator/utils.js';
 import { useDA } from '../context/DAContext.js';
 
-// Default event-source picker for New config: lists events that already have a Tier 1
-// Event Configurator config, since that's this app's real source of truth for event
-// data (PLAN.md §2). onSwitchToAlternative lets an author fall back to ESP browse /
-// manual Event ID entry for an event that doesn't have a Tier 1 config yet.
+// Lists events that already have a Tier 1 Event Configurator config — this app's
+// real source of truth for event data.
 export default function Tier1ConfigPicker({
   isOpen, onClose, onSelect, onSwitchToAlternative,
 }) {

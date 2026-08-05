@@ -6,8 +6,6 @@ import Modal from './Modal.js';
 import SearchInput from './SearchInput.js';
 import LoadingInline from './LoadingInline.js';
 
-// Candidate for promotion to a shared location (identical to Tier 1 Event
-// Configurator's own EventPicker.js aside from the class prefix) — see PLAN.md §8.
 const PUBLISH_FILTERS = ['all', 'published', 'draft'];
 const PUBLISH_FILTER_LABELS = { all: 'All', published: 'Published', draft: 'Draft' };
 
@@ -31,8 +29,7 @@ export default function EventPicker({
         if (!result.ok) {
           const message = result.error || 'Failed to load events';
           setError(message);
-          // Caller (Library.js) fails over to ManualEventLookup on any
-          // failure — no need to classify the error here too.
+          // Caller handles fallback for any failure; no need to classify the error here.
           onError?.(message);
           return;
         }

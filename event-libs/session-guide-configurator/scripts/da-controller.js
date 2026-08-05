@@ -5,9 +5,7 @@ import { CONFIGS_SHEET_PATH } from '../constants.js';
 
 export { setDaToken, setDaFetch };
 
-// Rows are keyed by their own configId, not eventId — an event can have many configs
-// (widget + page variants, testing variants; see PLAN.md §2/§5), so there's no
-// event-based dedup/migration logic to mirror from Tier 1 Event Configurator here.
+// Rows are keyed by configId, not eventId — an event can have many configs.
 function parseRows(rawRows) {
   return rawRows
     .filter((row) => row && row.configId)
@@ -21,7 +19,6 @@ export async function getConfigs(org, repo) {
   return { ok: true, data: parseRows(result.data) };
 }
 
-// Upsert-by-configId: replaces the existing row for this config, or appends a new one.
 export async function upsertConfig(org, repo, {
   configId, componentName, eventId, backendEventTitle, eventServiceEnv, config,
 }) {

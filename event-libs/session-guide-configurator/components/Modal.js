@@ -1,7 +1,5 @@
 import { useEffect, useRef, html } from '../../v1/deps/htm-preact.js';
 
-// Candidate for promotion to a shared location (identical to Tier 1 Event
-// Configurator's own Modal.js aside from the class prefix) — see PLAN.md §8.
 export default function Modal({
   isOpen,
   onClose,

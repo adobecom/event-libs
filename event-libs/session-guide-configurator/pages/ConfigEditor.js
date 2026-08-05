@@ -6,9 +6,7 @@ import { extractDistinctTracks, deriveFacetableAttributes } from '../../v1/servi
 import { useNavigation } from '../context/NavigationContext.js';
 import { useConfigs } from '../context/ConfigsContext.js';
 import { useDA } from '../context/DAContext.js';
-import {
-  getDisplayTitle, createSessionGuideConfigURL, copySessionGuideConfigLink, formatUpdatedTime,
-} from '../utils.js';
+import { getDisplayTitle, copyRowLinkWithToast } from '../utils.js';
 import SwimlaneOrderEditor from '../components/SwimlaneOrderEditor.js';
 import FiltersEditor from '../components/FiltersEditor.js';
 import LoadingInline from '../components/LoadingInline.js';
@@ -68,22 +66,8 @@ export default function ConfigEditor() {
     }
   };
 
-  // Encodes whatever's currently in the editor, saved or not — same as Tier 1 Event
-  // Configurator's in-editor Copy Config, which doesn't require a prior save either.
-  // Consumed by decorate.js's prebuildAutoBlock at decoration time (PLAN.md §3a); no
-  // manual authoring-table path exists for this block. Copies a real hyperlink (with
-  // display text), not just the bare URL, same as Schedule Maker's own Copy Link —
-  // pasting into a DA doc drops in a working link, not a wall of base64.
-  const handleCopyLink = async () => {
-    const url = createSessionGuideConfigURL(activeConfig.config, org, repo);
-    const formattedDate = formatUpdatedTime(activeConfig.updated);
-    const linkText = formattedDate
-      ? `Session Guide: ${getDisplayTitle(activeConfig)} – ${formattedDate}`
-      : `Session Guide: ${getDisplayTitle(activeConfig)}`;
-    const ok = await copySessionGuideConfigLink(url, linkText);
-    if (ok) setToastSuccess('Link copied — paste it into the event page where the Session Guide should appear');
-    else setToastError('Could not copy the link — please retry');
-  };
+  // Encodes activeConfig.config directly — works on unsaved changes too, no save required.
+  const handleCopyLink = () => copyRowLinkWithToast(activeConfig, org, repo, setToastSuccess, setToastError);
 
   if (!activeConfig) return null;
 

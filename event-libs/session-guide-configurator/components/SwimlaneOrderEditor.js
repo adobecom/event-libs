@@ -2,18 +2,11 @@ import {
   useState, useMemo, useCallback, useRef, useLayoutEffect, useEffect, html,
 } from '../../v1/deps/htm-preact.js';
 
-// Reorder + enable/disable + rename — no removing a track from the catalog itself.
-// Channel names/icons/colors used elsewhere on the page are still managed globally
-// via the Tier 1 Event Configurator, outside this tool (PLAN.md §4.6) — `displayName`
-// here only affects this session guide's own swimlane header. `tracks` is always
-// already seeded/valid by ConfigsContext.js's seedSwimlaneOrder before this renders,
-// so there's no add/remove-from-catalog concern here, unlike Tier 1's
-// FeaturedSessionsEditor.js (whose core pointer-drag + keyboard-reorder mechanics this
-// mirrors) — same reorder + rename mechanics as FiltersEditor.js. The original track
-// value is always shown alongside the editable name so authors know what they're
-// overriding. A disabled track is dropped entirely from the rendered guide by the
-// consuming side (MWPW-194336-CONSUMPTION-HANDOFF.md item 3), not just hidden from
-// ordering.
+// Reorder + enable/disable + rename only — tracks aren't added or removed here.
+// `displayName` only affects this session guide's swimlane header; the underlying
+// track's name/icon/color elsewhere on the page are managed separately. A disabled
+// track is dropped entirely from the rendered guide by the consuming side, not just
+// hidden from ordering.
 function DragHandleIcon() {
   return html`
     <svg width="10" height="16" viewBox="0 0 10 16" aria-hidden="true" focusable="false">
@@ -32,11 +25,8 @@ export default function SwimlaneOrderEditor({ tracks, onChange }) {
   const [announcement, setAnnouncement] = useState('');
 
   const rows = tracks || [];
-  // Memoized so the FLIP effect's prevOrder !== order check reflects a real order
-  // change, not a fresh array recreated every render (same reasoning as Tier 1's
-  // FeaturedSessionsEditor.js's featuredIds memo / FiltersEditor.js's rowIds memo).
-  // Depends on the tracks prop itself, not the locally-rebound `rows`, since `rows`
-  // is a fresh [] literal on every render whenever tracks is falsy.
+  // Depends on `tracks`, not `rows` — `rows` is a fresh [] literal on every render
+  // when tracks is falsy, which would defeat the FLIP effect's identity check below.
   const order = useMemo(() => rows.map((r) => r.track), [tracks]);
 
   const getTitleFor = useCallback(

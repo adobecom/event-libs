@@ -23,8 +23,7 @@ const DAProvider = ({ children }) => {
         setRepo(context?.repo);
         setDaToken(sdkToken);
         if (actions?.daFetch) setDaFetch(actions.daFetch);
-        // No Milo/IMS bootstrap here (no window.adobeIMS), so ESP calls have
-        // no token otherwise — reuse DA's own as the Authorization Bearer.
+        // No Milo/IMS bootstrap here, so reuse DA's token as the ESP auth bearer.
         setEspAuthToken(sdkToken);
       } catch (err) {
         window.lana?.log(`DA SDK init error: ${err}`);

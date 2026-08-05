@@ -39,9 +39,7 @@ const ConfigsProvider = ({ children }) => {
   const [toastSuccess, setToastSuccess] = useState(null);
   const [toastError, setToastError] = useState(null);
 
-  // The row currently open in the editor — always a full row shape
-  // ({ configId, componentName, eventId, backendEventTitle, eventServiceEnv, config }),
-  // whether freshly created (New/Duplicate) or loaded from the library (Edit).
+  // Always a full row shape, whether freshly created or loaded from the library.
   const [activeConfig, setActiveConfig] = useState(null);
 
   const loadConfigs = useCallback(async () => {
@@ -65,10 +63,8 @@ const ConfigsProvider = ({ children }) => {
     if (org && repo && !hasLoaded) loadConfigs();
   }, [org, repo, hasLoaded, loadConfigs]);
 
-  // Starts a fresh row for a newly picked event. Unlike Tier 1 Event Configurator,
-  // there's no dedup-by-event check here — an event can have many configs (widget +
-  // page variants, testing variants; see PLAN.md §2/§5), so picking an event that
-  // already has other rows is expected, not an error.
+  // An event can have many configs, so picking an event that already has rows is
+  // expected, not an error — there's no dedup-by-event check.
   const startNewConfig = useCallback((event, eventServiceEnv) => {
     setActiveConfig({
       configId: crypto.randomUUID(),
@@ -80,11 +76,8 @@ const ConfigsProvider = ({ children }) => {
     });
   }, []);
 
-  // Clones a row's settings as-is onto the *same* event — no event re-picking, unlike
-  // Tier 1 Event Configurator's cross-event Duplicate (which exists only because that
-  // tool is one-row-per-event; this one isn't). Component name is pre-filled with a
-  // "(copy)" suggestion rather than left blank, since everything else about the clone
-  // is deliberately unchanged (PLAN.md §4.1: "Duplicates should copy everything over").
+  // Clones a row's settings as-is onto the same event; only componentName gets a
+  // "(copy)" suggestion.
   const startDuplicateConfig = useCallback((sourceRow) => {
     setActiveConfig({
       configId: crypto.randomUUID(),
@@ -102,14 +95,11 @@ const ConfigsProvider = ({ children }) => {
 
   const clearActiveConfig = useCallback(() => setActiveConfig(null), []);
 
-  // componentName lives at the row level, not inside config (see PLAN.md §5) — its
-  // own setter, distinct from updateConfigField below.
+  // componentName lives at the row level, not inside config, hence a separate setter.
   const updateComponentName = useCallback((componentName) => {
     setActiveConfig((prev) => (prev ? { ...prev, componentName } : prev));
   }, []);
 
-  // Sets a single top-level config field (e.g. surface, theme) immutably, so the
-  // editor UI (reading activeConfig.config directly) stays in sync automatically.
   const updateConfigField = useCallback((key, value) => {
     setActiveConfig((prev) => {
       if (!prev) return prev;
@@ -117,8 +107,6 @@ const ConfigsProvider = ({ children }) => {
     });
   }, []);
 
-  // Sets a single field within a nested config object (headings.*, behaviorFlags.*),
-  // immutably, same reasoning as updateConfigField above.
   const updateNestedConfigField = useCallback((group, key, value) => {
     setActiveConfig((prev) => {
       if (!prev) return prev;
@@ -129,22 +117,16 @@ const ConfigsProvider = ({ children }) => {
     });
   }, []);
 
-  // Called once real tracks are known (session fetch resolves) — mirrors Tier 1 Event
-  // Configurator's seedTrackIcons: drops swimlaneOrder entries for tracks that no
-  // longer appear in the live catalog, and appends any newly-discovered track not yet
-  // in the authored order (enabled by default — the "starting point" requirement,
-  // same as seedFilterCategories below), without disturbing the author's existing
-  // ordering/enabled/displayName state. `track` itself is the immutable original
-  // value (used to match sessions to swimlanes); `displayName` defaults to it and is
-  // author-editable, same rename pattern as filterCategories below.
+  // Seeds tracks from the live catalog on top of swimlaneOrder: drops entries for
+  // tracks no longer live, appends new ones (enabled by default), and otherwise
+  // leaves the author's existing order/enabled/displayName state untouched.
   const seedSwimlaneOrder = useCallback((tracks) => {
     setActiveConfig((prev) => {
       if (!prev) return prev;
       const existing = prev.config.swimlaneOrder || [];
       const liveTracks = tracks || [];
       const liveTrackSet = new Set(liveTracks);
-      // Backfills `displayName` on entries seeded before that field existed (rather
-      // than leaving it undefined forever) — `stillValid` isn't otherwise touched.
+      // Backfills displayName on entries seeded before that field existed.
       let backfilled = false;
       const stillValid = existing
         .filter((r) => liveTrackSet.has(r.track))
@@ -165,22 +147,17 @@ const ConfigsProvider = ({ children }) => {
     });
   }, []);
 
-  // Same "seed once discovered, never destroy authored state" pattern as
-  // seedSwimlaneOrder above, for the Filters step (PLAN.md §7): candidateAttributes
-  // comes from deriveFacetableAttributes(sessions) — everything facetable starts
-  // enabled by default (the "starting point" requirement), author unselects/renames/
-  // reorders from there. filterCategories is a plain array in display order — no
-  // separate numeric `order` field, to avoid two sources of truth for the same thing.
-  // `label` is the immutable original ESP label (kept alongside `displayName` so the
-  // editor can always show what's being overridden, even after a rename).
+  // Seeds newly-discovered facetable attributes on top of filterCategories (enabled
+  // by default), without disturbing existing order/state. Display order is the array
+  // order — there's no separate `order` field. `label` keeps the original ESP label
+  // alongside the editable `displayName`.
   const seedFilterCategories = useCallback((candidateAttributes) => {
     setActiveConfig((prev) => {
       if (!prev) return prev;
       const existing = prev.config.filterCategories || [];
       const candidates = candidateAttributes || [];
       const candidatesById = new Map(candidates.map((c) => [c.attributeId, c]));
-      // Backfills `label` on entries seeded before that field existed (rather than
-      // leaving it undefined forever) — `stillValid` isn't otherwise touched.
+      // Backfills label on entries seeded before that field existed.
       let backfilled = false;
       const stillValid = existing
         .filter((c) => candidatesById.has(c.attributeId))

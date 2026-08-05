@@ -586,19 +586,15 @@ function prebuildAutoBlock(blockName, link) {
         return null;
       }
 
-      // Catches the real failure mode this manual copy/paste hand-off invites: an
-      // author pastes the wrong event's link onto the wrong page (mirrors
-      // MWPW-200314 item 4's tier-1-event-config eventId cross-check).
+      // Guards against the real risk of this manual copy/paste hand-off: an author
+      // pasting the wrong event's link onto the wrong page.
       const pageEventId = getMetadata('event-id');
       if (config.eventId && pageEventId && config.eventId !== pageEventId) {
         window.lana?.log(`[sessions-guide] eventId mismatch: config authored for ${config.eventId}, page is ${pageEventId}`);
       }
 
-      // surface picks which already-registered block this becomes — sessions-guide
-      // (widget/drawer) or sessions-guide-full-page (dedicated page layout) — same
-      // two blocks EVENT_BLOCKS already supports for manual authoring, just reached
-      // a different way here. No manual authoring-table path exists for this block;
-      // sessions-guide.js's init() reads data-session-guide-config only.
+      // No authoring-table path exists for this block — sessions-guide.js's init()
+      // reads data-session-guide-config only.
       const blockClass = config.surface === 'page' ? 'sessions-guide-full-page' : 'sessions-guide';
 
       return createTag('div', {

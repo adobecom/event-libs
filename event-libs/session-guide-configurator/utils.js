@@ -1,16 +1,13 @@
 import { DA_ORIGIN, DA_APP_PATH } from './constants.js';
 
-// Display title for a row: componentName is the deliberate identifying label here
-// (not a fallback) — an event can have multiple configs (widget/page variants, test
-// copies; see PLAN.md §2/§5), so unlike Tier 1 Event Configurator, the linked event's
-// own title alone isn't unique per row.
+// componentName is the primary label, not just a fallback — an event can have
+// multiple configs, so its title alone isn't unique per row.
 export function getDisplayTitle(row) {
   return row?.componentName || row?.backendEventTitle || row?.eventId || '';
 }
 
-// Copies text to the clipboard, falling back to a hidden textarea +
-// execCommand('copy') when navigator.clipboard isn't available (not
-// guaranteed inside the DA iframe) — same as Tier 1 Event Configurator's own helper.
+// Falls back to a hidden textarea + execCommand('copy') when navigator.clipboard
+// isn't available (not guaranteed inside the DA iframe).
 export async function copyTextToClipboard(text) {
   try {
     if (navigator.clipboard && navigator.clipboard.writeText) {
@@ -32,10 +29,9 @@ export async function copyTextToClipboard(text) {
   }
 }
 
-// Encodes a config blob into a URL pointing at this app, same base64 technique as
-// Schedule Maker's ScheduleURLUtility.createScheduleURL (PLAN.md §3a). decorate.js's
-// prebuildAutoBlock reverses this via the shared parseEncodedConfig() (v1/utils/
-// utils.js) at decoration time — no manual authoring-table path exists for this block.
+// Encodes a config blob into a URL pointing at this app. decorate.js's
+// prebuildAutoBlock decodes it via the shared parseEncodedConfig() (v1/utils/utils.js)
+// at decoration time — there is no manual authoring-table path for this block.
 export function createSessionGuideConfigURL(configBlob, org, repo) {
   const jsonString = JSON.stringify(configBlob);
   const base64JsonString = btoa(unescape(encodeURIComponent(jsonString)));
@@ -44,11 +40,9 @@ export function createSessionGuideConfigURL(configBlob, org, repo) {
   return url.toString();
 }
 
-// Copies a rich hyperlink (an <a> element, not just the bare URL string) to the
-// clipboard, so pasting into DA's rich-text editor drops in a real link with display
-// text — same technique as Schedule Maker's ScheduleURLUtility.copyScheduleToClipboard.
-// Falls back to a plain-text URL copy (via copyTextToClipboard above) when the
-// rich-clipboard write API isn't available.
+// Copies a rich hyperlink (an <a> element, not just the bare URL string) so pasting
+// into DA's rich-text editor drops in a real link with display text. Falls back to a
+// plain-text URL copy when the rich-clipboard write API isn't available.
 export async function copySessionGuideConfigLink(url, linkText) {
   try {
     if (navigator.clipboard && navigator.clipboard.write) {
@@ -81,4 +75,17 @@ export function formatUpdatedTime(isoString) {
   } catch {
     return '';
   }
+}
+
+// Shared by ConfigEditor.js (the open config, saved or not) and Library.js (any saved
+// row) — builds the link, copies it, and reports the result via the given toast setters.
+export async function copyRowLinkWithToast(row, org, repo, setToastSuccess, setToastError) {
+  const url = createSessionGuideConfigURL(row.config, org, repo);
+  const formattedDate = formatUpdatedTime(row.updated);
+  const linkText = formattedDate
+    ? `Session Guide: ${getDisplayTitle(row)} – ${formattedDate}`
+    : `Session Guide: ${getDisplayTitle(row)}`;
+  const ok = await copySessionGuideConfigLink(url, linkText);
+  if (ok) setToastSuccess('Link copied — paste it into the event page where the Session Guide should appear');
+  else setToastError('Could not copy the link — please retry');
 }

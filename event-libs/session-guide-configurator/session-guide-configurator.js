@@ -5,8 +5,7 @@ import { ConfigsProvider } from './context/ConfigsContext.js';
 import { EventEnvProvider } from './context/EventEnvContext.js';
 import SessionGuideConfigurator from './SessionGuideConfigurator.js';
 
-// No Spectrum Web Components — plain HTML/CSS (session-guide-configurator.css),
-// same precedent as tier-1-event-configurator.
+// Plain HTML/CSS — no Spectrum Web Components (session-guide-configurator.css).
 async function init() {
   render(
     html`

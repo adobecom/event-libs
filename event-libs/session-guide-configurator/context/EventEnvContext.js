@@ -5,8 +5,8 @@ import { setEventServiceEnvOverride, getEventServiceEnv } from '../../v1/utils/u
 
 const EventEnvContext = createContext();
 
-// Reactive wrapper around utils.js's module-level env override, so a plain
-// variable (needed for non-React callers too) can still drive a re-render.
+// Reactive wrapper around utils.js's module-level env override, so non-React callers
+// can still trigger a re-render.
 const EventEnvProvider = ({ children }) => {
   const [envName, setEnvName] = useState(() => getEventServiceEnv().name);
 

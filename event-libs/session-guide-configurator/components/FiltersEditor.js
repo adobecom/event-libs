@@ -2,14 +2,8 @@ import {
   useState, useMemo, useCallback, useRef, useLayoutEffect, useEffect, html,
 } from '../../v1/deps/htm-preact.js';
 
-// Select/unselect + rename + reorder over deriveFacetableAttributes(sessions)'s output
-// (ConfigsContext.js's seedFilterCategories seeds `categories`, enabled by default —
-// the "starting point" requirement). No per-value CRUD — filter *options* are always
-// live-derived from ESP, never authored (PLAN.md §7). Same reorder mechanics as
-// SwimlaneOrderEditor.js/Tier 1's FeaturedSessionsEditor.js, plus a per-row enable
-// checkbox and editable display-name input. The original ESP `label` (kept alongside
-// `displayName` by seedFilterCategories) is always shown next to the editable field so
-// authors know what they're overriding.
+// Filter options themselves are always derived from ESP data, not authored here —
+// this only supports enabling/disabling, renaming, and reordering.
 function DragHandleIcon() {
   return html`
     <svg width="10" height="16" viewBox="0 0 10 16" aria-hidden="true" focusable="false">
@@ -28,11 +22,8 @@ export default function FiltersEditor({ categories, onChange }) {
   const [announcement, setAnnouncement] = useState('');
 
   const rows = categories || [];
-  // Memoized so the FLIP effect's prevOrder !== rowIds check reflects a real order
-  // change, not a fresh array recreated every render (same reasoning as Tier 1's
-  // FeaturedSessionsEditor.js's featuredIds memo). Depends on the categories prop
-  // itself, not the locally-rebound `rows`, since `rows` is a fresh [] literal on
-  // every render whenever categories is falsy.
+  // Depends on `categories`, not `rows` — `rows` is a fresh [] literal on every render
+  // when categories is falsy, which would defeat the FLIP effect's identity check below.
   const rowIds = useMemo(() => rows.map((r) => r.attributeId), [categories]);
 
   const getTitleFor = useCallback(

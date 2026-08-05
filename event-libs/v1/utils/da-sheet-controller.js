@@ -1,8 +1,7 @@
 // Generic DA admin-API sheet CRUD, shared by every DA app that stores a config library
-// as a single sheet (tier-1-event-configurator, session-guide-configurator, ...) —
-// extracted 2026-07-30 rather than left as a third independently-drifting copy.
-// App-specific concerns (row key, upsert/delete semantics, schema migration) stay in
-// each app's own scripts/da-controller.js, built on top of these primitives.
+// as a single sheet (tier-1-event-configurator, session-guide-configurator). App-specific
+// concerns (row key, upsert/delete semantics, schema migration) stay in each app's own
+// scripts/da-controller.js, built on top of these primitives.
 
 const DA_ADMIN_ORIGIN = 'https://admin.da.live';
 

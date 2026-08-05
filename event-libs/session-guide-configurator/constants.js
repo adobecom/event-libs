@@ -1,12 +1,7 @@
-// One config-library sheet per content-repo (da-events, each floodgate space, etc.) —
-// resolved against whichever org/repo the DA SDK handshake reports. Sibling to Tier 1
-// Event Configurator's own sheet, not merged into it — row shapes differ (this one is
-// keyed by configId, not eventId; see PLAN.md §2/§5).
+// Keyed by configId, not eventId — an event can have multiple configs.
 const CONFIGS_SHEET_PATH = '/tools/da-apps/session-guide-configurator/configs.json';
 
-// Copy Link's target — the DA app's own edit-mode URL, not the admin API origin
-// (DA_ADMIN_ORIGIN lives in v1/utils/da-sheet-controller.js, a different concern).
-// Same pattern as Schedule Maker's DA_ORIGIN/DA_APP_PATH (PLAN.md §3a).
+// This app's own edit-mode URL, not the admin API origin.
 const DA_ORIGIN = 'https://da.live';
 const DA_APP_PATH = 'tools/da-apps/session-guide-configurator';
 
@@ -15,13 +10,12 @@ const PAGES = {
   editor: 'editor',
 };
 
-// Default flow for New Config is browsing the full ESP catalog (EventPicker);
-// Library.js auto-falls-back to ManualEventLookup if that fails at runtime. Flip to
-// false to disable browse outright — mirrors Tier 1 Event Configurator's own flag.
+// Library.js falls back to ManualEventLookup if EventPicker's browse fails; set to
+// false to disable browse outright.
 const EVENT_BROWSE_ENABLED = true;
 
-// Selectable in ManualEventLookup.js's env picker. Excludes 'local' — that's
-// for the localhost dev harness, and targets the same endpoints as 'dev'.
+// Excludes 'local' — that targets the same endpoints as 'dev' and is only relevant
+// to the localhost dev harness.
 const EVENT_SERVICE_ENV_OPTIONS = [
   { value: 'prod', label: 'Prod' },
   { value: 'stage', label: 'Stage' },

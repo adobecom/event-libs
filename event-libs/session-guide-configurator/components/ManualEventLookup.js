@@ -4,13 +4,6 @@ import Modal from './Modal.js';
 import { useEventEnv } from '../context/EventEnvContext.js';
 import { EVENT_SERVICE_ENV_OPTIONS } from '../constants.js';
 
-// Candidate for promotion to a shared location (identical to Tier 1 Event
-// Configurator's own ManualEventLookup.js aside from the class prefix) — see
-// PLAN.md §8.
-//
-// New Config/Duplicate's fallback when EventPicker's browse fails at
-// runtime (Library.js's browseFailed). Also the one place to target a
-// non-prod ESP tier — the choice persists for the rest of the session.
 export default function ManualEventLookup({
   isOpen, onClose, onSelect, title = 'Enter an Event ID',
 }) {

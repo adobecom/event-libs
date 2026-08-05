@@ -10,9 +10,7 @@ import { useNavigation } from '../context/NavigationContext.js';
 import { useConfigs } from '../context/ConfigsContext.js';
 import { useEventEnv } from '../context/EventEnvContext.js';
 import { useDA } from '../context/DAContext.js';
-import {
-  getDisplayTitle, formatUpdatedTime, createSessionGuideConfigURL, copySessionGuideConfigLink,
-} from '../utils.js';
+import { getDisplayTitle, formatUpdatedTime, copyRowLinkWithToast } from '../utils.js';
 import { EVENT_BROWSE_ENABLED } from '../constants.js';
 
 export default function Library() {
@@ -31,15 +29,10 @@ export default function Library() {
 
   const [search, setSearch] = useState('');
   const [pickerOpen, setPickerOpen] = useState(false);
-  // 'tier1' (default — pick an event that already has a Tier 1 Event Configurator
-  // config, this app's real source of truth, PLAN.md §2) | 'browse' (ESP catalog) |
-  // 'manual' (Event ID entry) — the latter two are explicit fallbacks for an event
-  // that doesn't have a Tier 1 config yet, reached via Tier1ConfigPicker's own link.
+  // 'tier1' is the default; 'browse' and 'manual' are fallbacks for events without a Tier 1 config yet.
   const [pickerMode, setPickerMode] = useState('tier1');
   const [rowPendingDelete, setRowPendingDelete] = useState(null);
-  // If EventPicker's listAllEvents() fails for any reason, fail over to
-  // ManualEventLookup for the rest of the session (sticky per page load, not
-  // per open, so a transient failure doesn't force a doomed re-attempt).
+  // Sticky for the page load once EventPicker fails, so a transient failure doesn't retry every reopen.
   const [browseFailed, setBrowseFailed] = useState(false);
 
   const filteredConfigs = useMemo(() => {
@@ -67,40 +60,24 @@ export default function Library() {
   }, [browseFailed]);
 
   const openEdit = useCallback((row) => {
-    // Restores the ESP env this row was created against before opening it — a full
-    // page reload resets EventEnvContext's override to its default (prod), same
-    // reasoning as Tier 1 Event Configurator's own openEdit.
+    // A page reload resets the env override to its default, so restore the row's env before opening it.
     setEnv(row.eventServiceEnv || 'prod');
     startEditConfig(row);
     goToEditor();
   }, [setEnv, startEditConfig, goToEditor]);
 
-  // No event re-picking, unlike Tier 1 Event Configurator's cross-event Duplicate —
-  // clones the row onto the same event (see ConfigsContext.js/PLAN.md §4.1).
   const handleDuplicate = useCallback((row) => {
     setEnv(row.eventServiceEnv || 'prod');
     startDuplicateConfig(row);
     goToEditor();
   }, [setEnv, startDuplicateConfig, goToEditor]);
 
-  // Same rich-hyperlink copy as ConfigEditor.js's Copy Link — lets an author grab a
-  // saved config's link straight from the library, without opening it in the editor
-  // first (PLAN.md §3a).
-  const handleCopyLink = useCallback(async (row) => {
-    const url = createSessionGuideConfigURL(row.config, org, repo);
-    const formattedDate = formatUpdatedTime(row.updated);
-    const linkText = formattedDate
-      ? `Session Guide: ${getDisplayTitle(row)} – ${formattedDate}`
-      : `Session Guide: ${getDisplayTitle(row)}`;
-    const ok = await copySessionGuideConfigLink(url, linkText);
-    if (ok) setToastSuccess('Link copied — paste it into the event page where the Session Guide should appear');
-    else setToastError('Could not copy the link — please retry');
-  }, [org, repo, setToastSuccess, setToastError]);
+  const handleCopyLink = useCallback(
+    (row) => copyRowLinkWithToast(row, org, repo, setToastSuccess, setToastError),
+    [org, repo, setToastSuccess, setToastError],
+  );
 
-  // eventServiceEnv is only ever supplied by Tier1ConfigPicker (the picked event's
-  // config's own authored env) — EventPicker/ManualEventLookup don't supply one, so
-  // this falls back to whatever the global env picker is currently set to, same as
-  // before this picker gained a third mode.
+  // eventServiceEnv is only supplied by Tier1ConfigPicker; other pickers omit it, so fall back to the global env.
   const handlePickEvent = useCallback((event, eventServiceEnv) => {
     setPickerOpen(false);
     const env = eventServiceEnv || envName;
