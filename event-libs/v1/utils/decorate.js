@@ -1043,13 +1043,14 @@ function addStylesToEventPage() {
   document.head.appendChild(link);
 }
 
-// Parses "dark", "light", or a block-scoped form like "dark(blocks:hero-marquee,profile-cards)".
-// A scoped value themes only the listed blocks instead of the whole page.
+// e.g. "dark" or "dark(blocks:hero-marquee,profile-cards)"
 function parseThemeValue(raw) {
   const value = raw?.toLowerCase().trim();
   const match = value?.match(/^(dark|light)(?:\(\s*blocks\s*:\s*([^)]*)\)\s*)?$/);
   if (!match) return null;
   const [, theme, blocksParam] = match;
+  // undefined (no parens) means whole-page; '' (empty blocks: list) must stay
+  // distinct from that so it scopes to zero blocks instead of falling back.
   const blockNames = blocksParam !== undefined
     ? blocksParam.split(',').map((b) => b.trim()).filter(Boolean)
     : null;

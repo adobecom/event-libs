@@ -762,6 +762,40 @@ describe('applyAreaTheme', () => {
     expect(document.querySelector('.event-agenda').classList.contains('dark')).to.be.false;
   });
 
+  it('matches block names as exact tokens, not prefixes', () => {
+    setThemeAttribute('theme', 'dark(blocks:hero)');
+    document.body.innerHTML = `
+      <main><div>
+        <div class="hero"></div>
+        <div class="hero-marquee"></div>
+      </div></main>
+    `;
+    applyAreaTheme();
+    expect(document.querySelector('.hero').classList.contains('dark')).to.be.true;
+    expect(document.querySelector('.hero-marquee').classList.contains('dark')).to.be.false;
+  });
+
+  it('matches block names case-insensitively', () => {
+    setThemeAttribute('theme', 'dark(blocks:Hero-Marquee)');
+    document.body.innerHTML = '<main><div><div class="hero-marquee"></div></div></main>';
+    applyAreaTheme();
+    expect(document.querySelector('.hero-marquee').classList.contains('dark')).to.be.true;
+  });
+
+  it('applies a block-scoped theme when area is a specific element', () => {
+    setThemeAttribute('theme', 'dark(blocks:hero-marquee)');
+    document.body.innerHTML = `
+      <div id="area">
+        <div class="hero-marquee"></div>
+        <div class="profile-cards"></div>
+      </div>
+    `;
+    const area = document.getElementById('area');
+    applyAreaTheme(area);
+    expect(area.querySelector('.hero-marquee').classList.contains('dark')).to.be.true;
+    expect(area.querySelector('.profile-cards').classList.contains('dark')).to.be.false;
+  });
+
   it('tolerates whitespace inside the block-scoped syntax', () => {
     setThemeAttribute('theme', ' dark( blocks: hero-marquee , profile-cards ) ');
     document.body.innerHTML = `
