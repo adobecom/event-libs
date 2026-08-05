@@ -588,17 +588,22 @@ function prebuildAutoBlock(blockName, link) {
 export function processAutoBlockLinks(parent) {
   // selfInit: true — block lives inside an already-loaded parent (e.g. marquee);
   // Milo won't re-scan it, so we import and call init() directly with the anchor.
+  // c2: true — this block has a C2 copy under v1/c2/blocks/, so on a
+  // `foundation: c2` page load it from there instead of the classic v1/blocks/.
+  const isC2 = getMetadata('foundation') === 'c2';
   const autoBlockIdentifiers = {
     'chrono-box': { pattern: 'schedule-maker' },
-    'mobile-rider': { pattern: 'mobilerider.com', selfInit: true },
+    'mobile-rider': { pattern: 'mobilerider.com', selfInit: true, c2: true },
   };
 
-  Object.entries(autoBlockIdentifiers).forEach(([blockName, { pattern, selfInit }]) => {
+  Object.entries(autoBlockIdentifiers).forEach(([blockName, { pattern, selfInit, c2 }]) => {
     const links = parent.querySelectorAll(`a[href*="${pattern}"]`);
     Promise.all([...links].map(async (link) => {
       if (selfInit) {
         link.classList.add(blockName, 'link-block');
-        const { default: initBlock } = await import(`../blocks/${blockName}/${blockName}.js`);
+        // Route to the C2 copy only when the page is C2 *and* the block has one;
+        const blocksDir = (isC2 && c2) ? '../c2/blocks' : '../blocks';
+        const { default: initBlock } = await import(`${blocksDir}/${blockName}/${blockName}.js`);
         await initBlock(link);
         return;
       }

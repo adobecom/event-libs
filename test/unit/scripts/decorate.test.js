@@ -1892,6 +1892,29 @@ describe('decorateEvent - Array Iteration', () => {
       await new Promise((resolve) => { setTimeout(resolve, 50); });
     });
 
+    it('routes the MR auto-block to the C2 copy on a foundation:c2 page', async () => {
+      // The block injects its own CSS from its module path, so the injected
+      // link's href reveals which copy (classic vs c2/) actually loaded.
+      document.getElementById('mobile-rider-css')?.remove();
+      setMetadata('foundation', 'c2');
+      try {
+        const parent = document.createElement('div');
+        const link = document.createElement('a');
+        link.href = 'https://assets.mobilerider.com/embed?videoId=c2test';
+        parent.appendChild(link);
+
+        processAutoBlockLinks(parent);
+        await new Promise((resolve) => { setTimeout(resolve, 50); });
+
+        const cssLink = document.getElementById('mobile-rider-css');
+        expect(cssLink, 'block CSS injected — the module ran').to.not.be.null;
+        expect(cssLink.href, 'loaded from the c2/ path').to.contain('/c2/blocks/mobile-rider/');
+      } finally {
+        setMetadata('foundation', '');
+        document.getElementById('mobile-rider-css')?.remove();
+      }
+    });
+
     function encodeSchedule(schedule) {
       return window.btoa(unescape(encodeURIComponent(JSON.stringify(schedule))));
     }

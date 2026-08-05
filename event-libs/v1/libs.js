@@ -25,6 +25,7 @@ const EVENT_BLOCKS = [
 ];
 
 const EVENT_BLOCKS_C2 = [
+  'mobile-rider',
 ];
 
 // Import only the most essential utilities that are always needed
