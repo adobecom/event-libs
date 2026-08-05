@@ -1,7 +1,6 @@
 /* eslint-disable no-underscore-dangle */
 import { expect } from '@esm-bundle/chai';
 import sinon from 'sinon';
-import init from '../../../../event-libs/v1/blocks/mobile-rider/mobile-rider.js';
 
 const defaultHtml = `
 <div class="mobile-rider">
@@ -36,11 +35,21 @@ const defaultHtml = `
 </div>
 `;
 
-describe('Mobile Rider Module', () => {
-  let mockLana;
-  let riderInstance = null;
+// Runs the full behavior suite against a given mobile-rider.js implementation
+// - the classic block and the C2 copy - so a regression in either (a broken
+// drawer import, a broken ASL listener, etc.) is caught directly instead of
+// relying on the other variant's coverage or an indirect routing test.
+function runMobileRiderSuite(modulePath, variantLabel) {
+  describe(`Mobile Rider Module (${variantLabel})`, () => {
+    let init;
+    let mockLana;
+    let riderInstance = null;
 
-  beforeEach(() => {
+    before(async () => {
+      ({ default: init } = await import(modulePath));
+    });
+
+    beforeEach(() => {
     mockLana = { log: sinon.stub() };
     globalThis.lana = mockLana;
 
@@ -873,4 +882,8 @@ describe('Mobile Rider Module', () => {
       expect(instance).to.not.be.null;
     });
   });
-});
+  });
+}
+
+runMobileRiderSuite('../../../../event-libs/v1/blocks/mobile-rider/mobile-rider.js', 'classic');
+runMobileRiderSuite('../../../../event-libs/v1/c2/blocks/mobile-rider/mobile-rider.js', 'C2');
