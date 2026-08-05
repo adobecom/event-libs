@@ -274,10 +274,71 @@ describe('da-controller', () => {
     });
   });
 
-  describe('rewrite pass (?schedule= → #schedule=)', () => {
-    it('upgrades an old ECC ?schedule= link to the canonical #schedule= hash format', async () => {
-      const encoded = encodeSchedule({ scheduleId: 's1', title: 'T', modificationTime: '2026-06-01T00:00:00.000Z', blocks: [] });
-      const docHtml = `<a href="https://da.live/app/o/r/tools/da-apps/schedule-maker?schedule=${encoded}">link</a>`;
+  describe('rewrite pass (non-canonical schedule links → canonical DA app #schedule=)', () => {
+    const canonical = (encoded) => `https://da.live/app/org/repo/tools/da-apps/schedule-maker#schedule=${encoded}`;
+
+    // Old ECC tool was hosted on several different domains across environments —
+    // the rewrite must recognize all of them (and anything else non-canonical),
+    // not just one hardcoded prod domain.
+    const oldEccDomains = [
+      'https://www.adobe.com/ecc/system/tools/schedule-maker',
+      'https://main--ecc-milo--adobecom.aem.page/ecc/system/tools/schedule-maker',
+      'https://dev--ecc-milo--adobecom.aem.live/ecc/system/tools/schedule-maker',
+      'https://stage--ecc-milo--adobecom.aem.live/ecc/system/tools/schedule-maker',
+    ];
+
+    oldEccDomains.forEach((base) => {
+      it(`migrates an old ECC link on ${new URL(base).hostname} (hash format) to the canonical DA app URL`, async () => {
+        const encoded = encodeSchedule({ scheduleId: 's1', title: 'T', modificationTime: '2026-06-01T00:00:00.000Z', blocks: [] });
+        const docHtml = `<a href="${base}#schedule=${encoded}">link</a>`;
+
+        const fetchMock = routeFetch([
+          ['/list/org/repo/events/e', makeResponse({
+            json: [{ path: '/org/repo/events/e/index.html', ext: 'html' }],
+          })],
+          ['/source/org/repo/events/e/index.html', (url, options) => (options?.method === 'POST'
+            ? makeResponse({ ok: true })
+            : makeResponse({ text: docHtml, headers: { ETag: '"abc123"' } })),
+          ],
+        ]);
+        setDaFetch(fetchMock);
+
+        const result = await syncSchedules('org', 'repo', '/events/e');
+        expect(result.ok).to.be.true;
+
+        const write = fetchMock.calls.find((c) => c.options?.method === 'POST');
+        expect(write, 'expected a rewrite POST').to.exist;
+        const body = await writtenBody(write.options);
+        expect(body).to.include(`href="${canonical(encoded)}"`);
+      });
+    });
+
+    it('migrates an old ECC link using the old ?schedule= query format', async () => {
+      const encoded = encodeSchedule({ scheduleId: 's2', title: 'T', modificationTime: '2026-06-01T00:00:00.000Z', blocks: [] });
+      const docHtml = `<a href="https://www.adobe.com/ecc/system/tools/schedule-maker?schedule=${encoded}">link</a>`;
+
+      const fetchMock = routeFetch([
+        ['/list/org/repo/events/e', makeResponse({
+          json: [{ path: '/org/repo/events/e/index.html', ext: 'html' }],
+        })],
+        ['/source/org/repo/events/e/index.html', (url, options) => (options?.method === 'POST'
+          ? makeResponse({ ok: true })
+          : makeResponse({ text: docHtml })),
+        ],
+      ]);
+      setDaFetch(fetchMock);
+
+      await syncSchedules('org', 'repo', '/events/e');
+
+      const write = fetchMock.calls.find((c) => c.options?.method === 'POST');
+      expect(write, 'expected a rewrite POST').to.exist;
+      const body = await writtenBody(write.options);
+      expect(body).to.include(`href="${canonical(encoded)}"`);
+    });
+
+    it('upgrades a DA-app link still using the old ?schedule= query format', async () => {
+      const encoded = encodeSchedule({ scheduleId: 's3', title: 'T', modificationTime: '2026-06-01T00:00:00.000Z', blocks: [] });
+      const docHtml = `<a href="https://da.live/app/org/repo/tools/da-apps/schedule-maker?schedule=${encoded}">link</a>`;
 
       const fetchMock = routeFetch([
         ['/list/org/repo/events/e', makeResponse({
@@ -296,31 +357,36 @@ describe('da-controller', () => {
       const write = fetchMock.calls.find((c) => c.options?.method === 'POST');
       expect(write, 'expected a rewrite POST').to.exist;
       const body = await writtenBody(write.options);
-      expect(body).to.include(`#schedule=${encoded}`);
-      expect(body).to.not.include('?schedule=');
+      expect(body).to.include(`href="${canonical(encoded)}"`);
       expect(write.options.headers.get('If-Match')).to.equal('"abc123"');
     });
 
-    it('does not rewrite a doc whose link is already in #schedule= format', async () => {
-      const encoded = encodeSchedule({ scheduleId: 's2', title: 'T', modificationTime: '2026-06-01T00:00:00.000Z', blocks: [] });
-      const docHtml = `<a href="https://da.live/app/o/r/tools/da-apps/schedule-maker#schedule=${encoded}">link</a>`;
+    it('migrates a DA-app link pointing at a different org/repo to the currently-synced org/repo', async () => {
+      const encoded = encodeSchedule({ scheduleId: 's4', title: 'T', modificationTime: '2026-06-01T00:00:00.000Z', blocks: [] });
+      const docHtml = `<a href="https://da.live/app/other-org/other-repo/tools/da-apps/schedule-maker#schedule=${encoded}">link</a>`;
 
       const fetchMock = routeFetch([
         ['/list/org/repo/events/e', makeResponse({
           json: [{ path: '/org/repo/events/e/index.html', ext: 'html' }],
         })],
-        ['/source/org/repo/events/e/index.html', makeResponse({ text: docHtml })],
+        ['/source/org/repo/events/e/index.html', (url, options) => (options?.method === 'POST'
+          ? makeResponse({ ok: true })
+          : makeResponse({ text: docHtml })),
+        ],
       ]);
       setDaFetch(fetchMock);
 
-      const result = await syncSchedules('org', 'repo', '/events/e');
-      expect(result.ok).to.be.true;
-      expect(fetchMock.calls.some((c) => c.options?.method === 'POST')).to.be.false;
+      await syncSchedules('org', 'repo', '/events/e');
+
+      const write = fetchMock.calls.find((c) => c.options?.method === 'POST');
+      expect(write, 'expected a rewrite POST').to.exist;
+      const body = await writtenBody(write.options);
+      expect(body).to.include(`href="${canonical(encoded)}"`);
     });
 
-    it('preserves other query params on the href when upgrading to #schedule=', async () => {
-      const encoded = encodeSchedule({ scheduleId: 's3', title: 'T', modificationTime: '2026-06-01T00:00:00.000Z', blocks: [] });
-      const docHtml = `<a href="https://da.live/app/o/r/tools/da-apps/schedule-maker?ref=my-branch&schedule=${encoded}">link</a>`;
+    it('drops extraneous params (e.g. ?ref=) when rebuilding a non-canonical link', async () => {
+      const encoded = encodeSchedule({ scheduleId: 's5', title: 'T', modificationTime: '2026-06-01T00:00:00.000Z', blocks: [] });
+      const docHtml = `<a href="https://da.live/app/org/repo/tools/da-apps/schedule-maker?ref=my-branch&schedule=${encoded}">link</a>`;
 
       const fetchMock = routeFetch([
         ['/list/org/repo/events/e', makeResponse({
@@ -337,14 +403,58 @@ describe('da-controller', () => {
 
       const write = fetchMock.calls.find((c) => c.options?.method === 'POST');
       const body = await writtenBody(write.options);
-      expect(body).to.include('ref=my-branch');
-      expect(body).to.include(`#schedule=${encoded}`);
-      expect(body).to.not.include('?schedule=');
+      expect(body).to.include(`href="${canonical(encoded)}"`);
+      expect(body).to.not.include('ref=my-branch');
+    });
+
+    it('does not rewrite a link that is already exactly canonical', async () => {
+      const encoded = encodeSchedule({ scheduleId: 's6', title: 'T', modificationTime: '2026-06-01T00:00:00.000Z', blocks: [] });
+      const docHtml = `<a href="${canonical(encoded)}">link</a>`;
+
+      const fetchMock = routeFetch([
+        ['/list/org/repo/events/e', makeResponse({
+          json: [{ path: '/org/repo/events/e/index.html', ext: 'html' }],
+        })],
+        ['/source/org/repo/events/e/index.html', makeResponse({ text: docHtml })],
+      ]);
+      setDaFetch(fetchMock);
+
+      const result = await syncSchedules('org', 'repo', '/events/e');
+      expect(result.ok).to.be.true;
+      expect(fetchMock.calls.some((c) => c.options?.method === 'POST')).to.be.false;
+    });
+
+    it('rewrites only the non-canonical link when a doc has both canonical and non-canonical links', async () => {
+      const encodedOld = encodeSchedule({ scheduleId: 'old', title: 'Old', modificationTime: '2026-06-01T00:00:00.000Z', blocks: [] });
+      const encodedNew = encodeSchedule({ scheduleId: 'new', title: 'New', modificationTime: '2026-06-01T00:00:00.000Z', blocks: [] });
+      const docHtml = `
+        <a href="https://www.adobe.com/ecc/system/tools/schedule-maker?schedule=${encodedOld}">old</a>
+        <a href="${canonical(encodedNew)}">new</a>
+      `;
+
+      const fetchMock = routeFetch([
+        ['/list/org/repo/events/e', makeResponse({
+          json: [{ path: '/org/repo/events/e/index.html', ext: 'html' }],
+        })],
+        ['/source/org/repo/events/e/index.html', (url, options) => (options?.method === 'POST'
+          ? makeResponse({ ok: true })
+          : makeResponse({ text: docHtml })),
+        ],
+      ]);
+      setDaFetch(fetchMock);
+
+      await syncSchedules('org', 'repo', '/events/e');
+
+      const write = fetchMock.calls.find((c) => c.options?.method === 'POST');
+      expect(write, 'expected a rewrite POST').to.exist;
+      const body = await writtenBody(write.options);
+      expect(body).to.include(`href="${canonical(encodedOld)}"`);
+      expect(body).to.include(`href="${canonical(encodedNew)}"`);
     });
 
     it('retries the write after a 412 conflict, re-reading before writing again', async () => {
-      const encoded = encodeSchedule({ scheduleId: 's4', title: 'T', modificationTime: '2026-06-01T00:00:00.000Z', blocks: [] });
-      const docHtml = `<a href="https://da.live/app/o/r/tools/da-apps/schedule-maker?schedule=${encoded}">link</a>`;
+      const encoded = encodeSchedule({ scheduleId: 's7', title: 'T', modificationTime: '2026-06-01T00:00:00.000Z', blocks: [] });
+      const docHtml = `<a href="https://www.adobe.com/ecc/system/tools/schedule-maker?schedule=${encoded}">link</a>`;
       let postAttempts = 0;
 
       const fetchMock = routeFetch([
@@ -366,6 +476,29 @@ describe('da-controller', () => {
       const result = await syncSchedules('org', 'repo', '/events/e');
       expect(result.ok).to.be.true;
       expect(postAttempts).to.equal(2);
+    });
+
+    it('leaves the doc untouched if the write never succeeds after retries', async () => {
+      const encoded = encodeSchedule({ scheduleId: 's8', title: 'T', modificationTime: '2026-06-01T00:00:00.000Z', blocks: [] });
+      const docHtml = `<a href="https://www.adobe.com/ecc/system/tools/schedule-maker?schedule=${encoded}">link</a>`;
+
+      const fetchMock = routeFetch([
+        ['/list/org/repo/events/e', makeResponse({
+          json: [{ path: '/org/repo/events/e/index.html', ext: 'html' }],
+        })],
+        ['/source/org/repo/events/e/index.html', (url, options) => (options?.method === 'POST'
+          ? makeResponse({ ok: false, status: 500, text: 'server error' })
+          : makeResponse({ text: docHtml, headers: { ETag: '"etag"' } })),
+        ],
+      ]);
+      setDaFetch(fetchMock);
+
+      // Sync itself should still succeed (the rewrite is best-effort/background) —
+      // it must not abort the whole sync just because a write-back failed.
+      const result = await syncSchedules('org', 'repo', '/events/e');
+      expect(result.ok).to.be.true;
+      expect(result.data.schedules).to.have.lengthOf(1);
+      expect(result.data.schedules[0].scheduleId).to.equal('s8');
     });
   });
 });

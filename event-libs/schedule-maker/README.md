@@ -23,7 +23,7 @@ Schedule Maker is a standalone [Document Authoring (DA)](https://da.live) app fo
    - **[SchedulesContext](context/SchedulesContext.js)** — the app's state store: schedule list, active schedule, event folder, loading/error/toast flags, sync operations, and all local mutations. Consumed via the `useSchedulesData` / `useSchedulesOperations` / `useSchedulesUI` selector hooks.
 
 3. **DA controller** ([scripts/da-controller.js](scripts/da-controller.js))
-   - Wraps `admin.da.live` for document scanning: `listEventFolders`, `listFolder`, `syncSchedules`, and the hash-link rewrite pass.
+   - Wraps `admin.da.live` for document scanning: `listEventFolders`, `listFolder`, `syncSchedules`, and the non-canonical-link rewrite pass.
    - Owns the concurrency machinery (bounded parallel pool, ETag-based conditional writes for the rewrite pass) and `decodeScheduleParam`. No sheet CRUD.
 
 4. **UI** ([ScheduleMaker.js](ScheduleMaker.js) → [pages/Schedules.js](pages/Schedules.js))
@@ -57,7 +57,7 @@ Both forms hold the entire schedule JSON (title, blocks, timestamps) encoded as 
 - **The schedule-maker app itself.** DA forwards only the parent page's hash into this app's iframe, not the query string, so `Schedules.js`'s deep-link-on-mount only ever reads `window.location.hash`. A `?schedule=` link will not auto-open here at all.
 - **The published page's `chrono-box` block.** `decorate.js` parses the authored `<a>` href directly (no iframe involved) and reads `#schedule=` (falling back to `?schedule=` for old ECC links) — see the `chrono-box` block builder in `decorate.js`.
 
-`?schedule=` (the old ECC/SM query-param format) still decodes fine wherever it's found — `decodeScheduleParam` and `extractScheduleFromURL` are format-agnostic — but Copy Link now emits `#schedule=`, and Sync upgrades any `?schedule=` links it finds to `#schedule=` (see Rewrite Pass below), so authored content converges on the canonical format without manual URL edits.
+`?schedule=` (the old ECC/SM query-param format) still decodes fine wherever it's found — `decodeScheduleParam` and `extractScheduleFromURL` are format-agnostic — but Copy Link now emits `#schedule=`, and Sync upgrades any non-canonical link it finds (old ECC-hosted links on any domain, or old `?schedule=` links already on the DA app) to the canonical DA app URL in `#schedule=` format (see Rewrite Pass below), so authored content converges without manual URL edits.
 
 ### Schedule JSON Structure
 
@@ -85,7 +85,7 @@ Both forms hold the entire schedule JSON (title, blocks, timestamps) encoded as 
 
 When DA opens the schedule-maker URL with a `#schedule=` fragment, the app reads and decodes the fragment on mount (`Schedules.js` `useEffect`) and opens the schedule directly in the editor. No sync or network request is needed.
 
-Old ECC `?schedule=` links do **not** auto-open here, since DA never forwards the query string into this app's iframe. Use Sync to find and open them from the sidebar list instead — Sync also upgrades them to `#schedule=` (see Rewrite Pass below), so reopening the doc's link afterward works directly.
+Old ECC links (any domain/format) do **not** auto-open here, since DA never forwards the query string into this app's iframe and the domain isn't this app's. Use Sync to find and open them from the sidebar list instead — Sync also migrates them to the canonical DA app `#schedule=` link (see Rewrite Pass below), so reopening the doc's link afterward works directly.
 
 ## Sync
 
@@ -103,7 +103,7 @@ No sheets are written. Sync only reads.
 
 ### Rewrite Pass
 
-Sync also upgrades any `?schedule=` hrefs it finds in scanned docs to the canonical `#schedule=` hash format (`rewriteQueryLinksToHash`), so authors never need to manually adjust an old ECC link for it to load correctly in the DA app. This pass uses ETag-based conditional writes with retries.
+Sync also migrates any non-canonical schedule href it finds in scanned docs to the canonical DA app URL in `#schedule=` hash format (`rewriteNonCanonicalScheduleLinks`), so authors never need to manually adjust a link for it to load correctly in the DA app. "Non-canonical" covers old ECC-hosted links on any domain (production `www.adobe.com`, or a feature-branch/dev/stage `*-ecc-milo-*` domain — detection is domain-agnostic, it just checks whether the href already matches `da.live/app/{org}/{repo}/tools/da-apps/schedule-maker#schedule=`), a DA-app link still using the old `?schedule=` query format, and a DA-app link that points at a different org/repo than the one currently being synced. The rewrite always rebuilds the full canonical URL from scratch (dropping any other params the old href had, e.g. a manually-added `?ref=`) rather than patching the existing one in place. This pass uses ETag-based conditional writes with retries, and a write that never succeeds doesn't fail the sync — the link is just left as-is for the next sync to retry.
 
 ### Sync Performance & Reliability
 
