@@ -73,6 +73,14 @@ there:**
   `prebuildAutoBlock` that decodes the URL, cross-checks `config.eventId` against the
   page's own `event-id` metadata and warns on mismatch (same pattern as
   `MWPW-200314` item 4), then builds the block element.
+- Copy Link (2026-08-04): copies a rich hyperlink, not the bare URL string — same
+  technique as Schedule Maker's `ScheduleURLUtility.copyScheduleToClipboard()` (build a
+  real `<a>` element, wrap its `outerHTML` in a `text/html` `Blob`, write via
+  `navigator.clipboard.write([new ClipboardItem(...)])`, falling back to a plain-text
+  URL copy when that API isn't available). Link text is `Session Guide: {display
+  title} – {updated date}` (date omitted for an unsaved config). Pasting into DA's
+  rich-text editor drops in a working link with readable text instead of a wall of
+  base64 — `utils.js`'s `copySessionGuideConfigLink()`.
 
 **The manual authoring-table experience is retired entirely, not kept as a fallback —
 this was the one real design fork, and it's resolved.** `chrono-box`'s builder doesn't

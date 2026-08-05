@@ -44,6 +44,30 @@ export function createSessionGuideConfigURL(configBlob, org, repo) {
   return url.toString();
 }
 
+// Copies a rich hyperlink (an <a> element, not just the bare URL string) to the
+// clipboard, so pasting into DA's rich-text editor drops in a real link with display
+// text — same technique as Schedule Maker's ScheduleURLUtility.copyScheduleToClipboard.
+// Falls back to a plain-text URL copy (via copyTextToClipboard above) when the
+// rich-clipboard write API isn't available.
+export async function copySessionGuideConfigLink(url, linkText) {
+  try {
+    if (navigator.clipboard && navigator.clipboard.write) {
+      const linkElement = document.createElement('a');
+      linkElement.href = url;
+      linkElement.textContent = linkText;
+      const blob = new Blob([linkElement.outerHTML], { type: 'text/html' });
+      // eslint-disable-next-line no-undef
+      const data = [new ClipboardItem({ [blob.type]: blob })];
+      await navigator.clipboard.write(data);
+      return true;
+    }
+    return await copyTextToClipboard(url);
+  } catch (error) {
+    window.lana?.log(`Error copying session guide link to clipboard: ${error}`);
+    return false;
+  }
+}
+
 export function formatUpdatedTime(isoString) {
   if (!isoString) return '';
   try {
