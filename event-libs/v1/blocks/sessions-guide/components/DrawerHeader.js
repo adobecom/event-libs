@@ -12,7 +12,7 @@ export function DrawerHeader({ onClose, onFilterToggle, filterOpen, hideClose, h
   const { activeFilters, activeView } = state;
   const title = (auth.value.isLoggedIn && auth.value.userFirstName)
     ? `${auth.value.userFirstName}, see what's happening`
-    : (state.eventConfig.title || "See what's happening at MAX");
+    : (state.guideConfig.title || "See what's happening at MAX");
 
   const activeFilterCount = Object.values(activeFilters).reduce(
     (sum, set) => sum + (set instanceof Set ? set.size : 0),

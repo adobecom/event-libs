@@ -1,7 +1,19 @@
 import { expect } from '@esm-bundle/chai';
 
-import { hydrateBlocks } from '../../../event-libs/v1/hydrate/hydrate.js';
+import {
+  hydrateBlocks,
+  registerHydrator,
+  resetHydrators,
+} from '../../../event-libs/v1/hydrate/hydrate.js';
+import repeatTemplate from '../../../event-libs/v1/hydrate/repeat-template.js';
 import { setMetadata } from '../../../event-libs/v1/utils/utils.js';
+import * as libs from '../../../event-libs/v1/libs.js';
+
+// The registry is module state, so every describe that registers must clean up or it
+// leaks into later tests — including ones in other files.
+afterEach(() => {
+  resetHydrators();
+});
 
 describe('hydrateBlocks', () => {
   beforeEach(() => {
@@ -31,7 +43,7 @@ describe('hydrateBlocks', () => {
       </div>
     `;
 
-    await hydrateBlocks(document);
+    hydrateBlocks(document);
 
     const block = document.querySelector('.image-links');
     const rows = block.querySelectorAll(':scope > div');
@@ -64,7 +76,7 @@ describe('hydrateBlocks', () => {
       </div>
     `;
 
-    await hydrateBlocks(document);
+    hydrateBlocks(document);
 
     const block = document.querySelector('.image-links');
     const images = block.querySelectorAll('img');
@@ -87,7 +99,7 @@ describe('hydrateBlocks', () => {
       </div>
     `;
 
-    await hydrateBlocks(document);
+    hydrateBlocks(document);
 
     const block = document.querySelector('.image-links');
     const images = block.querySelectorAll('img');
@@ -108,7 +120,7 @@ describe('hydrateBlocks', () => {
       </div>
     `;
 
-    await hydrateBlocks(document);
+    hydrateBlocks(document);
 
     const block = document.querySelector('.image-links');
     const images = block.querySelectorAll('img');
@@ -131,7 +143,7 @@ describe('hydrateBlocks', () => {
       </div>
     `;
 
-    await hydrateBlocks(document);
+    hydrateBlocks(document);
 
     const block = document.querySelector('.image-links');
     const link = block.querySelector('a');
@@ -157,7 +169,7 @@ describe('hydrateBlocks', () => {
       </div>
     `;
 
-    await hydrateBlocks(document);
+    hydrateBlocks(document);
 
     const block = document.querySelector('.image-links');
     const links = block.querySelectorAll('a');
@@ -177,7 +189,7 @@ describe('hydrateBlocks', () => {
     `;
 
     // Should not throw
-    await hydrateBlocks(document);
+    hydrateBlocks(document);
 
     const block = document.querySelector('.image-links');
     const images = block.querySelectorAll('img');
@@ -193,7 +205,7 @@ describe('hydrateBlocks', () => {
       </div>
     `;
 
-    await hydrateBlocks(document);
+    hydrateBlocks(document);
 
     const block = document.querySelector('.image-links');
     const images = block.querySelectorAll('img');
@@ -220,7 +232,7 @@ describe('hydrateBlocks', () => {
       </div>
     `;
 
-    await hydrateBlocks(document);
+    hydrateBlocks(document);
 
     const block = document.querySelector('.image-links');
     const images = block.querySelectorAll('img');
@@ -242,7 +254,7 @@ describe('hydrateBlocks', () => {
       </div>
     `;
 
-    await hydrateBlocks(document);
+    hydrateBlocks(document);
 
     const block = document.querySelector('.image-links');
     const img = block.querySelector('img');
@@ -257,7 +269,7 @@ describe('hydrateBlocks', () => {
     `;
 
     // Should not throw even when hydrator doesn't exist
-    await hydrateBlocks(document);
+    hydrateBlocks(document);
 
     const block = document.querySelector('.nonexistent-block');
     expect(block).to.not.be.null;
@@ -286,7 +298,7 @@ describe('hydrateBlocks', () => {
       </div>
     `;
 
-    await hydrateBlocks(document);
+    hydrateBlocks(document);
 
     const blocks = document.querySelectorAll('.image-links');
     expect(blocks).to.have.lengthOf(2);
@@ -296,5 +308,417 @@ describe('hydrateBlocks', () => {
 
     expect(goldBlock.querySelectorAll('img')).to.have.lengthOf(1);
     expect(silverBlock.querySelectorAll('img')).to.have.lengthOf(1);
+  });
+});
+
+describe('consumer hydrator registration', () => {
+  let lanaLogs;
+  let originalLog;
+
+  beforeEach(() => {
+    document.body.innerHTML = '';
+    document.head.innerHTML = '';
+    lanaLogs = [];
+    originalLog = window.lana?.log;
+    window.lana = { ...window.lana, log: (msg) => lanaLogs.push(msg) };
+  });
+
+  afterEach(() => {
+    if (originalLog) window.lana.log = originalLog;
+  });
+
+  it('calls a hydrator registered as a function', () => {
+    let received = null;
+    registerHydrator('custom-consumer-block', (block) => {
+      received = block;
+      // Not `dataset.hydrated` — that is hydrateBlocks' own bookkeeping flag, so
+      // asserting on it would pass even for a hydrator that never ran.
+      block.dataset.ranHydrator = 'true';
+    });
+
+    document.body.innerHTML = '<div class="custom-consumer-block hydrate"></div>';
+
+    hydrateBlocks(document);
+
+    const block = document.querySelector('.custom-consumer-block');
+    expect(received).to.equal(block);
+    expect(block.dataset.ranHydrator).to.equal('true');
+  });
+
+  it('prefers a registered hydrator over the built-in one', () => {
+    registerHydrator('image-links', (block) => {
+      block.dataset.hydratedBy = 'override';
+    });
+
+    document.body.innerHTML = '<div class="image-links hydrate sponsors gold"></div>';
+
+    hydrateBlocks(document);
+
+    expect(document.querySelector('.image-links').dataset.hydratedBy).to.equal('override');
+  });
+
+  it('does not resolve a hydrator via the Object prototype chain for a "constructor"-classed block', () => {
+    document.body.innerHTML = '<div class="constructor hydrate"><div><div>[[widgets.name]]</div></div></div>';
+
+    hydrateBlocks(document);
+
+    const block = document.querySelector('.constructor');
+    // A plain-object lookup of HYDRATORS['constructor'] would inherit the global `Object`
+    // function, which is callable and not `=== false` — silently "hydrating" the block.
+    expect(block.hasAttribute('data-hydrated')).to.be.false;
+    expect(block.innerHTML).to.include('[[widgets.name]]');
+    expect(lanaLogs.some((msg) => msg.includes('Hydrator not found for block: constructor'))).to.be.true;
+  });
+
+  it('rejects a registration that is not a function', () => {
+    expect(registerHydrator('incomplete-block', './some/module.js')).to.be.false;
+
+    document.body.innerHTML = '<div class="incomplete-block hydrate"></div>';
+
+    hydrateBlocks(document);
+
+    expect(lanaLogs.some((msg) => msg.includes('needs a function'))).to.be.true;
+    expect(lanaLogs.some((msg) => msg.includes('Hydrator not found for block: incomplete-block'))).to.be.true;
+  });
+
+  it('rejects an async hydrator, which would hydrate too late', () => {
+    expect(registerHydrator('async-block', async (block) => {
+      block.dataset.hydrated = 'late';
+    })).to.be.false;
+
+    document.body.innerHTML = '<div class="async-block hydrate"></div>';
+
+    hydrateBlocks(document);
+
+    expect(lanaLogs.some((msg) => msg.includes('rejected an async function'))).to.be.true;
+    expect(document.querySelector('.async-block').dataset.hydrated).to.equal(undefined);
+  });
+
+  it('returns true and warns when replacing an existing registration', () => {
+    expect(registerHydrator('replaceable-block', () => {})).to.be.true;
+    expect(registerHydrator('replaceable-block', (block) => {
+      block.dataset.hydratedBy = 'second';
+    })).to.be.true;
+
+    document.body.innerHTML = '<div class="replaceable-block hydrate"></div>';
+
+    hydrateBlocks(document);
+
+    expect(lanaLogs.some((msg) => msg.includes('replaced an existing registration'))).to.be.true;
+    expect(document.querySelector('.replaceable-block').dataset.hydratedBy).to.equal('second');
+  });
+
+  it('distinguishes a throwing hydrator from a missing one', () => {
+    registerHydrator('throwing-block', () => {
+      throw new Error('boom');
+    });
+
+    document.body.innerHTML = `
+      <div class="throwing-block hydrate"></div>
+      <div class="missing-hydrator-block hydrate"></div>
+    `;
+
+    hydrateBlocks(document);
+
+    expect(lanaLogs).to.include('Hydrator failed for block throwing-block: boom');
+    expect(lanaLogs).to.include('Hydrator not found for block: missing-hydrator-block');
+  });
+
+  it('continues hydrating later blocks after one throws', () => {
+    registerHydrator('bad-block', () => {
+      throw new Error('boom');
+    });
+    registerHydrator('good-block', (block) => {
+      block.dataset.hydrated = 'true';
+    });
+
+    document.body.innerHTML = `
+      <div class="bad-block hydrate"></div>
+      <div class="good-block hydrate"></div>
+    `;
+
+    hydrateBlocks(document);
+
+    expect(document.querySelector('.good-block').dataset.hydrated).to.equal('true');
+  });
+});
+
+describe('registry lifetime', () => {
+  beforeEach(() => {
+    document.body.innerHTML = '';
+    document.head.innerHTML = '';
+  });
+
+  // Consumers register once at page startup, but Milo re-invokes the configured
+  // decorateArea for fragments (blocks/fragment/fragment.js) and personalization
+  // (features/personalization/personalization.js). The registry is module state, so one
+  // registration has to serve all three passes.
+  it('serves the document, personalization and fragment passes from one registration', () => {
+    const seen = [];
+    registerHydrator('late-block', (block) => { seen.push(block.dataset.pass); });
+
+    // 1. page-startup pass over the whole document
+    document.body.innerHTML = '<div class="late-block hydrate" data-pass="document"></div>';
+    hydrateBlocks(document);
+
+    // 2. personalization: decorateArea(element) on a live in-document element
+    const element = document.createElement('div');
+    element.innerHTML = '<div class="late-block hydrate" data-pass="personalization"></div>';
+    document.body.append(element);
+    hydrateBlocks(element);
+
+    // 3. fragment: decorateArea(doc) where doc is a detached DOMParser document
+    const doc = new DOMParser().parseFromString(
+      '<html><head></head><body><div class="late-block hydrate" data-pass="fragment"></div></body></html>',
+      'text/html',
+    );
+    hydrateBlocks(doc);
+
+    expect(seen).to.deep.equal(['document', 'personalization', 'fragment']);
+  });
+
+  // The fragment document has its own empty head, so a hydrator reading page metadata
+  // only works because getMetadata defaults to the main document.
+  it('resolves page metadata inside a detached fragment document', () => {
+    setMetadata('widgets', JSON.stringify([{ name: 'A' }, { name: 'B' }]));
+    registerHydrator('frag-block', (block) => repeatTemplate(block, {
+      selectItems: (items) => items,
+    }));
+
+    const doc = new DOMParser().parseFromString(
+      '<html><head></head><body><div class="frag-block hydrate"><div><div>[[widgets.name]]</div></div></div></body></html>',
+      'text/html',
+    );
+
+    hydrateBlocks(doc);
+
+    const rows = doc.querySelectorAll('.frag-block > div');
+    expect(rows).to.have.lengthOf(2);
+    expect([...rows].map((row) => row.innerHTML.trim()))
+      .to.deep.equal(['<div>[[widgets:0.name]]</div>', '<div>[[widgets:1.name]]</div>']);
+  });
+});
+
+describe('hydration is synchronous', () => {
+  beforeEach(() => {
+    document.body.innerHTML = '';
+    document.head.innerHTML = '';
+  });
+
+  // Guards against reintroducing a dynamic import or async hydrator, either of which
+  // would race block init on the fragment/personalization paths.
+  it('completes before hydrateBlocks returns', () => {
+    setMetadata('sponsors', JSON.stringify([
+      { name: 'Sponsor 1', image: { imageUrl: 'https://example.com/1.jpg' }, sponsorType: 'gold' },
+      { name: 'Sponsor 2', image: { imageUrl: 'https://example.com/2.jpg' }, sponsorType: 'gold' },
+    ]));
+
+    document.body.innerHTML = `
+      <div class="image-links hydrate sponsors gold">
+        <div><div><h2>Gold Sponsors</h2></div></div>
+      </div>
+    `;
+
+    hydrateBlocks(document);
+
+    // Asserted on the very next statement, with no await in between
+    const block = document.querySelector('.image-links');
+    expect(block.querySelectorAll('img')).to.have.lengthOf(2);
+  });
+
+  it('returns undefined rather than a promise', () => {
+    document.body.innerHTML = '<div class="image-links hydrate sponsors gold"></div>';
+    expect(hydrateBlocks(document)).to.equal(undefined);
+  });
+});
+
+describe('hydration logging', () => {
+  // Hydration runs before consumers call loadLana, so window.lana does not exist yet.
+  it('buffers a message until lana is available instead of dropping it', async () => {
+    const originalLana = window.lana;
+    delete window.lana;
+
+    document.body.innerHTML = '<div class="no-hydrator-block hydrate"></div>';
+
+    hydrateBlocks(document);
+
+    const logs = [];
+    window.lana = { log: (msg) => logs.push(msg) };
+    window.dispatchEvent(new Event('load'));
+    await Promise.resolve();
+
+    expect(logs).to.include('Hydrator not found for block: no-hydrator-block');
+    window.lana = originalLana;
+  });
+
+  // `load` only fires once per document. By the time a later fragment/personalization
+  // hydration pass runs, it has already fired and never will again — so a message
+  // logged then can only reach lana through the readyState==='complete' poll, not the
+  // `load` listener. No event is dispatched here on purpose.
+  it('polls for lana instead of dropping the message once the load event can no longer fire', async () => {
+    const originalLana = window.lana;
+    delete window.lana;
+
+    document.body.innerHTML = '<div class="no-hydrator-poll-block hydrate"></div>';
+
+    hydrateBlocks(document);
+
+    const logs = [];
+    window.lana = { log: (msg) => logs.push(msg) };
+
+    await new Promise((resolve) => { setTimeout(resolve, 350); });
+
+    expect(logs).to.include('Hydrator not found for block: no-hydrator-poll-block');
+    window.lana = originalLana;
+  });
+});
+
+describe('hydration runs once per block', () => {
+  beforeEach(() => {
+    document.body.innerHTML = '';
+    document.head.innerHTML = '';
+  });
+
+  // decorateEvent runs again for nested areas (fragments, personalization). Without a
+  // guard, a second pass would wipe the DOM the block's init() already built.
+  it('skips a block that has already been hydrated', () => {
+    let calls = 0;
+    registerHydrator('once-block', () => { calls += 1; });
+
+    document.body.innerHTML = '<div class="once-block hydrate"></div>';
+
+    hydrateBlocks(document);
+    hydrateBlocks(document);
+
+    expect(calls).to.equal(1);
+    expect(document.querySelector('.once-block').getAttribute('data-hydrated')).to.equal('true');
+  });
+
+  it('preserves initialized DOM when a later pass covers the block again', () => {
+    registerHydrator('reentrant-block', (block) => {
+      block.append(document.createElement('div'));
+    });
+
+    document.body.innerHTML = '<div class="reentrant-block hydrate"></div>';
+
+    hydrateBlocks(document);
+    const block = document.querySelector('.reentrant-block');
+
+    // Stand in for a block init() that relocates its rows into a wrapper
+    const section = document.createElement('section');
+    block.querySelector(':scope > div').append(section);
+
+    hydrateBlocks(document);
+
+    expect(block.querySelectorAll('section')).to.have.lengthOf(1);
+    expect(block.querySelectorAll(':scope > div')).to.have.lengthOf(1);
+  });
+
+  it('retries a block whose hydrator returned false', () => {
+    let calls = 0;
+    registerHydrator('bailed-block', () => {
+      calls += 1;
+      return false;
+    });
+
+    document.body.innerHTML = '<div class="bailed-block hydrate"></div>';
+
+    hydrateBlocks(document);
+    hydrateBlocks(document);
+
+    // A bail-out often means the data wasn't there yet, so a later pass should retry
+    expect(calls).to.equal(2);
+    expect(document.querySelector('.bailed-block').hasAttribute('data-hydrated')).to.be.false;
+  });
+
+  it('marks a hydrator that returns nothing as done', () => {
+    let calls = 0;
+    registerHydrator('void-block', () => { calls += 1; });
+
+    document.body.innerHTML = '<div class="void-block hydrate"></div>';
+
+    hydrateBlocks(document);
+    hydrateBlocks(document);
+
+    expect(calls).to.equal(1);
+  });
+
+  // Every early-exit in the built-in image-links hydrator used to bail with a bare
+  // `return;` (undefined), which `!== false` marks the block hydrated forever — even
+  // though sponsors metadata simply wasn't ready yet on the first pass.
+  it('retries the built-in image-links hydrator after a metadata parse failure', () => {
+    setMetadata('sponsors', 'not json');
+
+    document.body.innerHTML = `
+      <div class="image-links hydrate sponsors gold">
+        <div><div><h2>Gold Sponsors</h2></div></div>
+      </div>
+    `;
+
+    hydrateBlocks(document);
+
+    const block = document.querySelector('.image-links');
+    expect(block.hasAttribute('data-hydrated')).to.be.false;
+    expect(block.querySelectorAll('img')).to.have.lengthOf(0);
+
+    setMetadata('sponsors', JSON.stringify([
+      { name: 'Sponsor 1', image: { imageUrl: 'https://example.com/1.jpg' }, sponsorType: 'gold' },
+    ]));
+
+    hydrateBlocks(document);
+
+    expect(block.querySelectorAll('img')).to.have.lengthOf(1);
+    expect(block.hasAttribute('data-hydrated')).to.be.true;
+  });
+
+  it('retries a block whose hydrator threw', () => {
+    let calls = 0;
+    registerHydrator('retry-block', () => {
+      calls += 1;
+      throw new Error('boom');
+    });
+
+    document.body.innerHTML = '<div class="retry-block hydrate"></div>';
+
+    hydrateBlocks(document);
+    hydrateBlocks(document);
+
+    expect(calls).to.equal(2);
+    expect(document.querySelector('.retry-block').hasAttribute('data-hydrated')).to.be.false;
+  });
+});
+
+/**
+ * libs.js is the barrel consumers import. Anything they read off it by name is public
+ * API — dropping an export breaks them silently, since their feature detection just
+ * turns the feature off. These assertions pin that surface.
+ */
+describe('libs.js hydration exports', () => {
+  beforeEach(() => {
+    document.body.innerHTML = '';
+    document.head.innerHTML = '';
+  });
+
+  ['registerHydrator', 'repeatTemplate', 'decorateEvent'].forEach((name) => {
+    it(`exports ${name} as a function`, () => {
+      expect(libs[name], `${name} is missing from libs.js`).to.be.a('function');
+    });
+  });
+
+  it('drives the consumer hydration flow through the barrel alone', () => {
+    document.body.innerHTML = '<div class="barrel-block hydrate"><div><div>[[widgets.name]]</div></div></div>';
+    libs.setMetadata('widgets', JSON.stringify([{ name: 'A' }, { name: 'B' }]));
+
+    expect(libs.registerHydrator(
+      'barrel-block',
+      (block) => libs.repeatTemplate(block, { selectItems: (items) => items }),
+    )).to.be.true;
+
+    hydrateBlocks(document);
+
+    const rows = document.querySelectorAll('.barrel-block > div');
+    expect(rows).to.have.lengthOf(2);
+    expect([...rows].map((row) => row.innerHTML.trim()))
+      .to.deep.equal(['<div>[[widgets:0.name]]</div>', '<div>[[widgets:1.name]]</div>']);
   });
 });

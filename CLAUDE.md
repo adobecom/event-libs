@@ -74,6 +74,20 @@ Environments are resolved from hostname or `?eccEnv` query param: `dev`, `dev02`
 - Metadata keys are `kebab-case`; parse JSON values in `try/catch`
 - Module-level singletons use the closure-based getter/setter pattern in `utils.js`
 
+### Vertical Spacing
+
+Per [MWPW-201396](https://jira.corp.adobe.com/browse/MWPW-201396), vertical page
+spacing is a design/authoring concern, not an engineering one:
+
+- **Do not hard-code vertical spacing** (top/bottom `padding` or `margin`) into a
+  block's CSS or JS. Spacing guidance lives in the Figma components.
+- Authors must **retain flexibility** to adjust spacing — never lock a block into
+  fixed vertical spacing values.
+- If a block genuinely requires baked-in spacing, it **must be well documented**:
+  why it is needed, the exact values, and the viewport(s) it applies to.
+- Intentional, engineering-owned offsets (e.g. Hero top spacing that accounts for
+  the global navigation) are the documented exception, not the rule.
+
 ## Testing
 
 Tests mirror the source tree under `test/unit/`. HTML fixtures live in `mocks/` subdirectories.

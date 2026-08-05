@@ -3,6 +3,8 @@ import { expect } from '@esm-bundle/chai';
 import sinon from 'sinon';
 import { LIBS, setMetadata, setEventConfig } from '../../../event-libs/v1/utils/utils.js';
 import BlockMediator from '../../../event-libs/v1/deps/block-mediator.min.js';
+import { registerHydrator, resetHydrators } from '../../../event-libs/v1/hydrate/hydrate.js';
+import repeatTemplate from '../../../event-libs/v1/hydrate/repeat-template.js';
 import {
   convertUtcTimestampToLocalDateTime,
   massageMetadata,
@@ -55,6 +57,48 @@ describe('Content Update Script', () => {
 
     decorateEvent(document, miloDeps);
     expect(checkForDoubleSquareBrackets()).to.be.false;
+  });
+
+  // End-to-end proof of the whole consumer contract, as a consumer repo would use it:
+  // register a hydrator that only selects items, let repeatTemplate clone the authored
+  // template row and rewrite its placeholder indexes, then let processTemplateInAllNodes
+  // resolve them. No hydrated content originates in code.
+  it('hydrates a registered consumer block template and resolves its placeholders', () => {
+    registerHydrator('consumer-speakers', (block) => repeatTemplate(block, {
+      selectItems: (speakers) => speakers.filter((s) => s.speakerType === 'Host'),
+    }));
+
+    document.body.innerHTML = `
+      <div>
+        <div class="consumer-speakers hydrate">
+          <div>
+            <div></div>
+            <div><h3>[[speakers.firstName]] [[speakers.lastName]]</h3></div>
+            <div><p>[[speakers.bio]]</p></div>
+            <div>Read more</div>
+          </div>
+        </div>
+      </div>
+    `;
+    const miloDeps = {
+      getConfig: () => ({
+        locale: { ietf: 'en-US' },
+        miloConfig: { locale: { ietf: 'en-US' } },
+      }),
+      miloLibs: LIBS,
+    };
+
+    decorateEvent(document, miloDeps);
+
+    const block = document.querySelector('.consumer-speakers');
+    expect(block.querySelectorAll(':scope > div')).to.have.lengthOf(1);
+    expect(checkForDoubleSquareBrackets()).to.be.false;
+    expect(block.querySelector('h3').textContent).to.equal('Hallease Narvaez');
+    expect(block.querySelector(':scope > div > div:nth-child(3)').textContent).to.include('Hallease');
+    // The label is authored, never produced by the hydrator
+    expect(block.querySelector(':scope > div > div:nth-child(4)').textContent.trim()).to.equal('Read more');
+
+    resetHydrators();
   });
 
   it('handles #event-template special case', () => {
@@ -117,6 +161,7 @@ describe('updateRSVPButtonState', () => {
     setMetadata('event-id', 'test-event-id');
     BlockMediator.set('rsvpData', null);
     BlockMediator.set('eventData', null);
+    BlockMediator.set('imsProfile', null);
     originalLocationSearch = window.location.search;
   });
 
@@ -177,6 +222,32 @@ describe('updateRSVPButtonState', () => {
     expect(anchor.getAttribute('href')).to.equal('#rsvp-form');
     expect(anchor.textContent).to.equal('Register');
     expect(wrapper.querySelector('.rsvp-btn-message')).to.be.null;
+
+    wrapper.remove();
+  });
+
+  it('hides RSVP button and shows message when the RSVP token is invalid, without fetching the event', async () => {
+    fetchStub = sinon.stub(window, 'fetch');
+    BlockMediator.set('imsProfile', { account_type: 'guest', rsvpToken: 'tok-1', rsvpTokenInvalid: true });
+
+    const wrapper = document.createElement('p');
+    const anchor = document.createElement('a');
+    anchor.href = '#rsvp-form';
+    anchor.textContent = 'Register';
+    anchor.dataset.modalHash = '#rsvp-form';
+    wrapper.appendChild(anchor);
+    document.body.appendChild(wrapper);
+    const rsvpBtn = { el: anchor, originalText: 'Register' };
+
+    await updateRSVPButtonState(rsvpBtn);
+
+    expect(fetchStub.called).to.be.false;
+    expect(anchor.style.display).to.equal('none');
+    expect(anchor.getAttribute('aria-hidden')).to.equal('true');
+    expect(anchor.getAttribute('tabindex')).to.equal('-1');
+    const msgEl = wrapper.querySelector('.rsvp-btn-message');
+    expect(msgEl).to.not.be.null;
+    expect(msgEl.textContent).to.include('valid');
 
     wrapper.remove();
   });
@@ -492,9 +563,9 @@ describe('applyAreaTheme', () => {
     document.head.innerHTML = head;
   });
 
-  function setThemeAttribute(attribute, value) {
+  function setThemeAttribute(name, value) {
     setMetadata('custom-attributes', JSON.stringify([
-      { attribute, values: [{ value }] },
+      { name, values: [{ value }] },
     ]));
   }
 
@@ -517,7 +588,7 @@ describe('applyAreaTheme', () => {
 
   it('does nothing when there is no theme attribute', () => {
     setMetadata('custom-attributes', JSON.stringify([
-      { attribute: 'other', values: [{ value: 'dark' }] },
+      { name: 'other', values: [{ value: 'dark' }] },
     ]));
     document.body.innerHTML = '<main><div><div class="foo"></div></div></main>';
     applyAreaTheme();
@@ -617,6 +688,45 @@ describe('applyAreaTheme', () => {
 
   it('resolves the theme attribute and value regardless of case or whitespace', () => {
     setThemeAttribute(' Theme ', ' DARK ');
+    document.body.innerHTML = '<main><div><div class="foo"></div></div></main>';
+    applyAreaTheme();
+    const block = document.querySelector('.foo');
+    expect(block.classList.contains('dark')).to.be.true;
+  });
+
+  it('applies the theme from a real EMC-shaped custom-attributes payload', () => {
+    setMetadata('custom-attributes', JSON.stringify([
+      {
+        name: 'promotionalItems',
+        attributeId: '0d433aa1-0a5a-4836-9146-c6a97bdf08bc',
+        inputType: 'multi-select',
+        label: 'Promotional Items',
+        enabled: true,
+        values: [
+          { valueId: '25506162-aaaa', label: 'Adobe Firefly', value: '/fragments/firefly', ordinal: 0 },
+        ],
+      },
+      {
+        name: 'theme',
+        attributeId: 'e47464c8-33f8-4e35-bbc8-08b97da80958',
+        inputType: 'single-select',
+        label: 'Theme',
+        enabled: true,
+        values: [
+          { valueId: '827c5fd5-96e7-4b34-8400-04b9d6e3e5a4', label: 'Light', value: 'light', ordinal: 0 },
+        ],
+      },
+    ]));
+    document.body.innerHTML = '<main><div><div class="foo"></div></div></main>';
+    applyAreaTheme();
+    const block = document.querySelector('.foo');
+    expect(block.classList.contains('light')).to.be.true;
+  });
+
+  it('still resolves the theme via the legacy `attribute` key', () => {
+    setMetadata('custom-attributes', JSON.stringify([
+      { attribute: 'theme', values: [{ value: 'dark' }] },
+    ]));
     document.body.innerHTML = '<main><div><div class="foo"></div></div></main>';
     applyAreaTheme();
     const block = document.querySelector('.foo');
@@ -1780,6 +1890,72 @@ describe('decorateEvent - Array Iteration', () => {
       // processAutoBlockLinks should not throw even if the dynamic import fails
       expect(() => processAutoBlockLinks(parent)).to.not.throw();
       await new Promise((resolve) => { setTimeout(resolve, 50); });
+    });
+
+    it('routes the MR auto-block to the C2 copy on a foundation:c2 page', async () => {
+      // The block injects its own CSS from its module path, so the injected
+      // link's href reveals which copy (classic vs c2/) actually loaded.
+      document.getElementById('mobile-rider-css')?.remove();
+      setMetadata('foundation', 'c2');
+      try {
+        const parent = document.createElement('div');
+        const link = document.createElement('a');
+        link.href = 'https://assets.mobilerider.com/embed?videoId=c2test';
+        parent.appendChild(link);
+
+        processAutoBlockLinks(parent);
+        await new Promise((resolve) => { setTimeout(resolve, 50); });
+
+        const cssLink = document.getElementById('mobile-rider-css');
+        expect(cssLink, 'block CSS injected — the module ran').to.not.be.null;
+        expect(cssLink.href, 'loaded from the c2/ path').to.contain('/c2/blocks/mobile-rider/');
+      } finally {
+        setMetadata('foundation', '');
+        document.getElementById('mobile-rider-css')?.remove();
+      }
+    });
+
+    function encodeSchedule(schedule) {
+      return window.btoa(unescape(encodeURIComponent(JSON.stringify(schedule))));
+    }
+
+    function buildScheduleMakerLink(org, repo) {
+      const schedule = {
+        scheduleId: 'test-schedule-id',
+        title: 'Test Schedule',
+        blocks: [{ fragmentPath: '/fragments/one', title: 'Block One', startDateTime: 1750000000000 }],
+      };
+      const link = document.createElement('a');
+      link.href = `https://da.live/app/${org}/${repo}/tools/da-apps/schedule-maker#schedule=${encodeSchedule(schedule)}`;
+      return link;
+    }
+
+    it('should stamp data-schedule-repo from the authored org/repo (da-events)', async () => {
+      const parent = document.createElement('div');
+      const p = document.createElement('p');
+      p.appendChild(buildScheduleMakerLink('adobecom', 'da-events'));
+      parent.appendChild(p);
+
+      processAutoBlockLinks(parent);
+      await new Promise((resolve) => { setTimeout(resolve, 50); });
+
+      const chronoBox = parent.querySelector('.chrono-box');
+      expect(chronoBox).to.not.be.null;
+      expect(chronoBox.getAttribute('data-schedule-repo')).to.equal('adobecom/da-events');
+    });
+
+    it('should stamp data-schedule-repo from the authored org/repo (da-events-fg-pink)', async () => {
+      const parent = document.createElement('div');
+      const p = document.createElement('p');
+      p.appendChild(buildScheduleMakerLink('adobecom', 'da-events-fg-pink'));
+      parent.appendChild(p);
+
+      processAutoBlockLinks(parent);
+      await new Promise((resolve) => { setTimeout(resolve, 50); });
+
+      const chronoBox = parent.querySelector('.chrono-box');
+      expect(chronoBox).to.not.be.null;
+      expect(chronoBox.getAttribute('data-schedule-repo')).to.equal('adobecom/da-events-fg-pink');
     });
   });
 });

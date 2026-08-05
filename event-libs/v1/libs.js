@@ -25,7 +25,8 @@ const EVENT_BLOCKS = [
 ];
 
 const EVENT_BLOCKS_C2 = [
-   'chrono-box',
+  'chrono-box',
+  'mobile-rider',
 ];
 
 // Import only the most essential utilities that are always needed
@@ -49,6 +50,9 @@ import {
   processAutoBlockLinks,
 } from './utils/decorate.js';
 
+import { registerHydrator } from './hydrate/hydrate.js';
+import repeatTemplate from './hydrate/repeat-template.js';
+
 // Core exports - always available (synchronous)
 export {
   getEventServiceEnv,
@@ -62,6 +66,8 @@ export {
   getNonProdData,
   validatePageAndRedirect,
   processAutoBlockLinks,
+  registerHydrator,
+  repeatTemplate,
   EVENT_BLOCKS,
   EVENT_BLOCKS_C2,
 };
@@ -70,15 +76,6 @@ export {
 export const eventsDelayedActions = async () => {
   const { lazyCaptureProfile } = await import('./utils/profile.js');
   lazyCaptureProfile();
-
-  const chronoBoxesWithSchedule = document.querySelectorAll('.chrono-box[data-schedule-id]');
-  const hasSchedulableChronoBoxes = chronoBoxesWithSchedule.length > 0;
-  const envName = getEventConfig()?.miloConfig?.env?.name;
-  const isProd = envName === 'prod';
-  if (hasSchedulableChronoBoxes && !isProd) {
-    const { default: autoIndexPageSchedules } = await import('./features/indexer-widget/page-schedule-indexer.js');
-    await autoIndexPageSchedules();
-  }
 
   if (getMetadata('meta-pixel')) {
     const { default: initMetaPixel } = await import('../scripts/meta-pixel.js');

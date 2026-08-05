@@ -1,8 +1,8 @@
 import { deleteAttendeeFromEvent, getAndCreateAndAddAttendee, getAttendee, getEvent, getCampaign, registerForSessionTime } from '../../utils/esp-controller.js';
 import BlockMediator from '../../deps/block-mediator.min.js';
 import { signIn, decorateEvent } from '../../utils/decorate.js';
-import { dictionaryManager, getInviteOnlyNoCampaignMessage } from '../../utils/dictionary-manager.js';
-import { getEventConfig, LIBS, getMetadata, getSusiOptions, getValidCampaignIdFromUrl, resolveRoutedCampaignId } from '../../utils/utils.js';
+import { dictionaryManager, getInviteOnlyNoCampaignMessage, getRsvpTokenInvalidMessage, getRsvpTokenAlreadyRegisteredMessage } from '../../utils/dictionary-manager.js';
+import { getEventConfig, LIBS, getMetadata, getSusiOptions, getValidCampaignIdFromUrl, resolveRoutedCampaignId, shouldForceGuestSignIn } from '../../utils/utils.js';
 import { FALLBACK_LOCALES, CAMPAIGN_ID_PATTERN, PHONE_FIELD_RE, PHONE_PATTERN  } from '../../utils/constances.js';
 import { BASE_ATTENDEE_DATA_FILTER } from '../../utils/data-utils.js';
 import { parseRsvpFieldLimit, stripTags } from '../../utils/sanitize-utils.js';
@@ -18,6 +18,10 @@ const { decorateDefaultLinkAnalytics } = await import(`${miloLibs}/martech/attri
 const { default: loadFragment } = await import(`${miloLibs}/blocks/fragment/fragment.js`);
 
 const VALID_REGISTRATION_STATUS = ['registered', 'waitlisted'];
+
+/** Valid `displayAs` flavors for the `text` substrate; each is also a valid
+ * native `<input type>` (or `text-area`, handled by its own dispatch entry). */
+const TEXT_DISPLAY_AS = new Set(['text', 'email', 'phone', 'number', 'date', 'url', 'text-area']);
 
 const RULE_OPERATORS = {
   equal: '=',
@@ -203,7 +207,7 @@ function constructPayload(form) {
   return payload;
 }
 
-async function submitForm(bp) {
+export async function submitForm(bp) {
   const { form, sanitizeList } = bp;
   const payload = constructPayload(form);
 
@@ -253,7 +257,14 @@ async function submitForm(bp) {
     payload.campaignId = campaignId;
   }
 
-  return getAndCreateAndAddAttendee(getMetadata('event-id'), payload);
+  // A valid RSVP token never reaches submitForm unless it's still usable (an
+  // invalid token short-circuits before the form is built, see onProfile). A guest
+  // registers via the same normal attendee flow as an IMS user — the rsvp token
+  // is just threaded through as auth instead of a bearer token, and the final
+  // add-to-event call consumes it server-side once the registration succeeds.
+  // campaignId (set on payload above) rides along in that call like any other flow.
+  const rsvpToken = BlockMediator.get('imsProfile')?.rsvpToken;
+  return getAndCreateAndAddAttendee(getMetadata('event-id'), payload, rsvpToken);
 }
 
 function clearForm(form) {
@@ -305,8 +316,9 @@ export async function buildErrorMsg(parent, status) {
 
   if (!eventObj.ok) return;
 
-  let errorKey = 'rsvp-error-msg';
+  let errorMsg;
   if (status === 400) {
+    let errorKey = 'rsvp-error-msg';
     const { full, waitlistEnabled, usedCampaign } = await getFullState(eventId);
     if (full && usedCampaign) {
       errorKey = waitlistEnabled ? 'campaign-full-error-msg' : 'campaign-full-no-waitlist-error-msg';
@@ -314,6 +326,21 @@ export async function buildErrorMsg(parent, status) {
       const eventInfo = eventObj.data;
       errorKey = eventInfo?.allowWaitlisting === 'true' ? 'event-full-error-msg' : 'event-full-no-waitlist-error-msg';
     }
+    errorMsg = dictionaryManager.getValue(errorKey);
+  } else if (status === 409 && BlockMediator.get('imsProfile')?.rsvpToken) {
+    // AttendeeAlreadyRegistered — this email is already registered for the event.
+    // The token is NOT consumed on this error, so it stays usable for a different
+    // guest; the copy must not imply the link itself is dead.
+    await dictionaryManager.initialize();
+    errorMsg = getRsvpTokenAlreadyRegisteredMessage(dictionaryManager);
+  } else if ((status === 401 || status === 404 || status === 410) && BlockMediator.get('imsProfile')?.rsvpToken) {
+    // Token header missing (401), not found (404), or expired/revoked (410) — it
+    // became invalid between page load and submit (e.g. the same link used in
+    // another tab), or the RSVP token header failed to reach the server.
+    await dictionaryManager.initialize();
+    errorMsg = getRsvpTokenInvalidMessage(dictionaryManager);
+  } else {
+    errorMsg = dictionaryManager.getValue('rsvp-error-msg');
   }
 
   const existingErrors = parent.querySelectorAll('.error');
@@ -321,7 +348,6 @@ export async function buildErrorMsg(parent, status) {
     existingErrors.forEach((err) => err.remove());
   }
 
-  const errorMsg = dictionaryManager.getValue(errorKey);
   const error = createTag('p', { class: 'error' }, errorMsg);
   parent.append(error);
   setTimeout(() => {
@@ -359,6 +385,18 @@ function eventFormSendAnalytics(bp, view) {
   const modalId = modal.id ? ` | ${modal.id}` : '';
   const event = new Event(`${view}${name}${modalId}`);
   sendAnalytics(event);
+}
+
+/**
+ * Breakout-session auto-registration isn't supported for rsvp-token registrations
+ * (no logged-in identity for the /attendees/me call to resolve against) — this is
+ * the shared gate used by the submit handler to decide whether to fire it.
+ * @param {string} registrationStatus - `registrationStatus` from the submit response.
+ * @param {Object} profile - BlockMediator 'imsProfile' value.
+ * @returns {boolean} True if auto-registration should run.
+ */
+export function shouldAutoRegisterSessions(registrationStatus, profile) {
+  return registrationStatus === 'registered' && !profile?.rsvpToken;
 }
 
 async function autoRegisterSessions() {
@@ -407,7 +445,7 @@ function createButton({ type, label }, bp) {
         if (respJson.ok) {
           BlockMediator.set('rsvpData', respJson.data);
           eventFormSendAnalytics(bp, 'Form Submit');
-          if (respJson.data?.registrationStatus === 'registered') autoRegisterSessions();
+          if (shouldAutoRegisterSessions(respJson.data?.registrationStatus, BlockMediator.get('imsProfile'))) autoRegisterSessions();
         } else {
           const { status } = respJson;
 
@@ -726,6 +764,12 @@ function decorateSuccessScreen(screen) {
             const profile = BlockMediator.get('imsProfile');
             const rsvpData = BlockMediator.get('rsvpData');
 
+            if (profile.account_type === 'guest' && !rsvpData?.attendeeId) {
+              cta.classList.remove('loading');
+              buildErrorMsg(screen, 500);
+              return;
+            }
+
             const rsvpResp = profile.account_type === 'guest'
               ? await deleteAttendeeFromEvent(getMetadata('event-id'), rsvpData.attendeeId)
               : await deleteAttendeeFromEvent(getMetadata('event-id'));
@@ -885,17 +929,33 @@ export function getRsvpConfigFromMeta() {
     const data = config.rsvpFormFields.map((f) => {
       const field = lowercaseKeys(f);
       if (typeof field.field === 'string') field.field = field.field.trim();
+      field.type = field.type || 'text';
       field.required = field.required === true ? 'x' : '';
       if (Array.isArray(field.options)) {
         field.options = field.options.map((o) => (typeof o === 'object' ? o.value : o)).join(';');
       }
-      // ESP's field type enum has no dedicated multi-select value — `select` is
-      // single-choice and `checkbox` is multi-choice. `displayas` (EMC's
-      // displayAs, already stored by ESP) carries the render-style hint; remap
-      // to the widget types this file already implements for the legacy
-      // per-cloud JSON path so scope-config-driven fields get the same options.
-      if (field.type === 'select' && field.displayas === 'radio') field.type = 'radio-group';
-      if (field.type === 'checkbox' && field.displayas === 'dropdown') field.type = 'multi-select';
+      // ESP's field `type` names only the substrate (text/select/multi-select);
+      // `displayas` (EMC's displayAs, already stored by ESP) picks the concrete
+      // widget within it. Remap to the internal dispatch types this file already
+      // implements for the legacy per-cloud JSON path, so scope-config-driven
+      // fields render identically. `checkbox` is a legacy wire value from before
+      // this taxonomy, remapped to its own pre-existing default rather than
+      // passed through, so old data keeps rendering exactly as it did. Any other
+      // `type` (heading/legal/divider/submit/clear, or a legacy direct value
+      // like `email`/`text-area`) passes through untouched.
+      const da = field.displayas;
+      if (field.type === 'text') {
+        field.type = TEXT_DISPLAY_AS.has(da) ? da : 'text';
+      }
+      else if (field.type === 'select') {
+        field.type = da === 'radio' ? 'radio-group' : 'select';
+      }
+      else if (field.type === 'multi-select') {
+        field.type = da === 'combobox' ? 'multi-select' : 'checkbox-group';
+      }
+      else if (field.type === 'checkbox') {
+        field.type = da === 'dropdown' ? 'multi-select' : 'checkbox';
+      }
       return field;
     });
 
@@ -1009,7 +1069,8 @@ async function createForm(bp, formData) {
   addTerms(formEl, terms);
 
   const profile = BlockMediator.get('imsProfile');
-  const showConsentForGuest = getMetadata('allow-guest-registration') === 'true' && profile?.account_type === 'guest';
+  const showConsentForGuest = profile?.account_type === 'guest'
+    && (getMetadata('allow-guest-registration') === 'true' || Boolean(profile?.rsvpToken));
   const forceConsent = getMetadata('force-consent-collection') === 'true';
   if (showConsentForGuest || forceConsent) await addConsentSuite(formEl);
 
@@ -1117,7 +1178,7 @@ export async function initFormBasedOnRSVPData(bp) {
     const attendeeResp = await getAttendee();
     if (attendeeResp.ok) existingAttendeeData = attendeeResp.data;
     if (syncUIWithRSVPStatus()) return;
-    personalizeForm(block, { profile, existingAttendeeData });
+    personalizeForm(block, { existingAttendeeData, profile });
   }
 
   const countryInput = block.querySelector('select#consentStringId');
@@ -1155,11 +1216,23 @@ async function onProfile(bp, formData) {
     if (!resolvedProfile || hasHandledProfile) return;
     hasHandledProfile = true;
 
-    if ((resolvedProfile.noProfile || resolvedProfile.account_type === 'guest')
-      && /#rsvp-form.*/.test(window.location.hash)
-      && !allowGuestReg) {
+    if (shouldForceGuestSignIn(resolvedProfile, allowGuestReg)
+      && /#rsvp-form.*/.test(window.location.hash)) {
       // TODO: also check for guestCheckout enablement for future iterations
       signIn(getSusiOptions(getConfig()));
+    } else if (resolvedProfile.rsvpTokenInvalid) {
+      // RSVP token has already been used, expired, or was revoked. Show a
+      // general error and never build the form — the token is not reusable.
+      eventHero.classList.remove('loading');
+      decorateHero(bp.eventHero);
+      (async () => {
+        await dictionaryManager.initialize();
+        const msg = getRsvpTokenInvalidMessage(dictionaryManager);
+        const error = createTag('p', { class: 'error' }, msg);
+        bp.formContainer.append(error);
+      })().finally(() => {
+        block.classList.remove('loading');
+      });
     } else {
       eventHero.classList.remove('loading');
       decorateHero(bp.eventHero);

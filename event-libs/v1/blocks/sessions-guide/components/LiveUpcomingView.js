@@ -1,7 +1,7 @@
 import { html } from '../../../deps/htm-preact.js';
 import { useSessionGuide } from '../store/index.js';
 import {
-  sessions as sessionsSignal, liveStreamActiveIds as liveStreamActiveIdsSignal,
+  sessions as sessionsSignal, liveStreamActiveIds as liveStreamActiveIdsSignal, sessionStateVersion,
 } from '../../../utils/session-store.js';
 import { Carousel } from './Carousel.js';
 import { TimeSlotRow } from './TimeSlotRow.js';
@@ -9,18 +9,23 @@ import {
   liveSessions, upcomingSessions, groupByStartTime, filterSessions, getFeaturedSessions,
   sessionsForDay,
 } from '../utils/session-filters.js';
-import { getNowMs, formatShortTime } from '../utils/time.js';
+import { getNowMs, formatShortTime, formatTimezoneAbbr } from '../utils/time.js';
+import { getFeaturedSessionIds } from '../../../utils/tier-1-event-config.js';
 
 export const buildLiveUpcomingView = () => LiveUpcomingView;
 
 export function LiveUpcomingView() {
   const { state } = useSessionGuide();
-  const { activeDay, eventConfig } = state;
+  const { activeDay, guideConfig } = state;
   const sessions = sessionsSignal.value;
   const liveStreamActiveIds = liveStreamActiveIdsSignal.value;
   const activeFilters = state.activeFilters || {};
   const searchQuery = state.searchQuery || '';
-  const { userTz, featuredSessionIds } = eventConfig;
+  const { userTz } = guideConfig;
+  // Read purely to establish a re-render dependency on time-driven session-state
+  // transitions (see sessionStateVersion in session-store.js) — value itself is unused.
+  // eslint-disable-next-line no-unused-expressions
+  sessionStateVersion.value;
   const nowMs = getNowMs();
 
   // Live section shows regardless of active filters
@@ -29,7 +34,7 @@ export function LiveUpcomingView() {
 
   // Featured sessions fill the live carousel when nothing is currently live
   const featured = live.length === 0
-    ? getFeaturedSessions(sessions, featuredSessionIds || [], activeDay, userTz)
+    ? getFeaturedSessions(sessions, getFeaturedSessionIds(), activeDay, userTz)
     : [];
 
   // Upcoming sessions have filters + search applied
@@ -50,6 +55,7 @@ export function LiveUpcomingView() {
             sessions=${live}
             title="Live now"
             formatTime=${(s) => formatShortTime(s.startTimeUtc, userTz)}
+            formatTimezone=${(s) => formatTimezoneAbbr(s.startTimeUtc, userTz)}
             variant="live"
           />
         </div>

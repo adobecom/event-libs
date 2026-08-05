@@ -29,8 +29,8 @@ const TODAY = fmt(Date.parse(LIVE_SESSION.startTimeUtc));
 const UPCOMING_DAY = fmt(Date.parse(UPCOMING_SESSION.startTimeUtc));
 
 const BASE_CONFIG = {
-  userTz: TZ, surface: 'page', trackColors: {}, trackIcons: {},
-  title: '', showConflictModal: false, filterCategories: [], theme: 'dark',
+  userTz: TZ, surface: 'page',
+  title: '', filterCategories: [], theme: 'dark',
 };
 
 function makeStore(sessionList, activeDay = TODAY) {
@@ -38,7 +38,7 @@ function makeStore(sessionList, activeDay = TODAY) {
   liveStreamActiveIds.value = new Set();
   const store = buildStore(preact);
   store.SessionGuideContext._current = {
-    state: { activeDay, eventConfig: { ...BASE_CONFIG } },
+    state: { activeDay, guideConfig: { ...BASE_CONFIG } },
     dispatch: () => {},
   };
   return store;
@@ -80,5 +80,13 @@ describe('LiveUpcomingView', () => {
     const store = makeStore([UPCOMING_SESSION], UPCOMING_DAY);
     const View = buildLiveUpcomingView(preact, store);
     expect(View({})).to.include('sg-time-row');
+  });
+
+  it('does not show a featured carousel when no featuredSessions are authored and nothing to fall back to', () => {
+    // No sessions at all — unlike the authored case, there's nothing for the
+    // deterministic-shuffle fallback (see getFeaturedSessions) to fill dead space with.
+    const store = makeStore([]);
+    const View = buildLiveUpcomingView(preact, store);
+    expect(View({})).to.not.include('sg-carousel-section--featured');
   });
 });

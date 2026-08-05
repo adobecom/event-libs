@@ -1,8 +1,9 @@
 import { expect } from '@esm-bundle/chai';
 import sinon from 'sinon';
-import { getValidCampaignIdFromUrl } from '../../../../event-libs/v1/utils/utils.js';
+import { getValidCampaignIdFromUrl, resetCampaignMapCache } from '../../../../event-libs/v1/utils/utils.js';
 import { BASE_ATTENDEE_DATA_FILTER } from '../../../../event-libs/v1/utils/data-utils.js';
 import { stripTags } from '../../../../event-libs/v1/utils/sanitize-utils.js';
+import BlockMediator from '../../../../event-libs/v1/deps/block-mediator.min.js';
 
 describe('Events Form', () => {
   let block;
@@ -801,6 +802,156 @@ describe('Events Form', () => {
     });
   });
 
+  describe('submitForm RSVP token submit routing', () => {
+    let sandbox;
+    let submitForm;
+
+    before(async () => {
+      const module = await import('../../../../event-libs/v1/blocks/events-form/events-form.js');
+      submitForm = module.submitForm;
+    });
+
+    beforeEach(() => {
+      sandbox = sinon.createSandbox();
+    });
+
+    afterEach(() => {
+      sandbox.restore();
+      BlockMediator.set('imsProfile', undefined);
+    });
+
+    function buildForm() {
+      const form = document.createElement('form');
+      [['firstName', 'Guest'], ['lastName', 'User'], ['email', 'guest@test.com']].forEach(([id, value]) => {
+        const input = document.createElement('input');
+        input.id = id;
+        input.name = id;
+        input.type = 'text';
+        input.value = value;
+        form.appendChild(input);
+      });
+      return form;
+    }
+
+    it('registers a guest via the normal attendee flow, sending both the guest IMS token and the rsvp-token header', async () => {
+      const originalAdobeIMS = window.adobeIMS;
+      window.adobeIMS = { getAccessToken: () => ({ token: 'fake-token', isGuestToken: true }) };
+      BlockMediator.set('imsProfile', { account_type: 'guest', rsvpToken: 'valid-rsvp-token-1234567890' });
+      const fetchStub = sandbox.stub(window, 'fetch');
+      fetchStub.onCall(0).resolves({ json: () => ({ eventId: 'test-event-id', isFull: false }), ok: true });
+      fetchStub.onCall(1).resolves({ json: () => ({ attendeeId: 'att-1' }), ok: true });
+      fetchStub.onCall(2).resolves({ json: () => ({ attendeeId: 'att-1', registrationStatus: 'registered' }), ok: true });
+
+      const result = await submitForm({ form: buildForm(), sanitizeList: [] });
+      window.adobeIMS = originalAdobeIMS;
+
+      expect(result.ok).to.be.true;
+      expect(result.data).to.have.property('registrationStatus', 'registered');
+      const urls = fetchStub.getCalls().map((call) => call.args[0]);
+      expect(urls.some((url) => url.includes('/rsvpTokenRegistrations'))).to.be.false;
+      expect(urls[1]).to.include('/v1/attendees');
+      expect(urls[2]).to.include('/v1/events/test-event-id/attendees/att-1');
+      const createOptions = fetchStub.getCall(1).args[1];
+      const addToEventOptions = fetchStub.getCall(2).args[1];
+      expect(createOptions.headers.get('x-adobe-esp-rsvp-token')).to.equal('valid-rsvp-token-1234567890');
+      expect(createOptions.headers.get('Authorization')).to.equal('Bearer fake-token');
+      expect(addToEventOptions.headers.get('x-adobe-esp-rsvp-token')).to.equal('valid-rsvp-token-1234567890');
+      expect(addToEventOptions.headers.get('Authorization')).to.equal('Bearer fake-token');
+    });
+
+    it('still forwards a real signed-in session\'s IMS token when the rsvp link is opened while signed in — Cluster Gateway requires one either way', async () => {
+      const originalAdobeIMS = window.adobeIMS;
+      window.adobeIMS = { getAccessToken: () => ({ token: 'assistants-own-token', isGuestToken: false }) };
+      BlockMediator.set('imsProfile', { account_type: 'guest', rsvpToken: 'valid-rsvp-token-1234567890' });
+      const fetchStub = sandbox.stub(window, 'fetch');
+      fetchStub.onCall(0).resolves({ json: () => ({ eventId: 'test-event-id', isFull: false }), ok: true });
+      fetchStub.onCall(1).resolves({ json: () => ({ attendeeId: 'att-1' }), ok: true });
+      fetchStub.onCall(2).resolves({ json: () => ({ attendeeId: 'att-1', registrationStatus: 'registered' }), ok: true });
+
+      await submitForm({ form: buildForm(), sanitizeList: [] });
+      window.adobeIMS = originalAdobeIMS;
+
+      const createOptions = fetchStub.getCall(1).args[1];
+      const addToEventOptions = fetchStub.getCall(2).args[1];
+      expect(createOptions.headers.get('x-adobe-esp-rsvp-token')).to.equal('valid-rsvp-token-1234567890');
+      expect(createOptions.headers.get('Authorization')).to.equal('Bearer assistants-own-token');
+      expect(addToEventOptions.headers.get('x-adobe-esp-rsvp-token')).to.equal('valid-rsvp-token-1234567890');
+      expect(addToEventOptions.headers.get('Authorization')).to.equal('Bearer assistants-own-token');
+    });
+
+    it('forwards a routed campaign in the body of the add-to-event call — same body schema as the normal attendee flow', async () => {
+      resetCampaignMapCache();
+      window.history.replaceState({}, '', `${window.location.pathname}?campaign=camp-1`);
+      BlockMediator.set('imsProfile', { account_type: 'guest', rsvpToken: 'valid-rsvp-token-1234567890' });
+      const fetchStub = sandbox.stub(window, 'fetch').callsFake((url) => {
+        if (typeof url === 'string' && url.includes('campaign-map.json')) {
+          return Promise.resolve({ ok: false, status: 404 });
+        }
+        if (typeof url === 'string' && url.includes('/v1/attendees') && !url.includes('/events/')) {
+          return Promise.resolve({ json: () => ({ attendeeId: 'att-1' }), ok: true });
+        }
+        return Promise.resolve({ json: () => ({ attendeeId: 'att-1', registrationStatus: 'registered' }), ok: true });
+      });
+
+      try {
+        await submitForm({ form: buildForm(), sanitizeList: [] });
+
+        const addToEventCall = fetchStub.getCalls().find((call) => String(call.args[0]).includes('/attendees/att-1'));
+        expect(addToEventCall.args[0]).to.not.include('campaignId');
+        const body = JSON.parse(addToEventCall.args[1].body);
+        expect(body).to.have.property('campaignId', 'camp-1');
+        expect(body.firstName).to.equal('Guest');
+      } finally {
+        window.history.replaceState({}, '', window.location.pathname);
+        resetCampaignMapCache();
+      }
+    });
+
+    it('registers a non-guest via IMS auth with no rsvp-token header', async () => {
+      BlockMediator.set('imsProfile', { account_type: 'type1' });
+      const fetchStub = sandbox.stub(window, 'fetch');
+      fetchStub.onCall(0).resolves({ json: () => ({ eventId: 'test-event-id', isFull: false }), ok: true });
+      fetchStub.onCall(1).resolves({ json: () => ({ message: 'Not found' }), ok: false, status: 404 });
+      fetchStub.onCall(2).resolves({ json: () => ({ attendeeId: 'att-2' }), ok: true });
+      fetchStub.onCall(3).resolves({ json: () => ({ registrationStatus: 'registered' }), ok: true });
+
+      const result = await submitForm({ form: buildForm(), sanitizeList: [] });
+
+      expect(result.ok).to.be.true;
+      const urls = fetchStub.getCalls().map((call) => call.args[0]);
+      expect(urls.some((url) => url.includes('/rsvpTokenRegistrations'))).to.be.false;
+      const createOptions = fetchStub.getCall(2).args[1];
+      expect(createOptions.headers.has('x-adobe-esp-rsvp-token')).to.be.false;
+    });
+  });
+
+  describe('shouldAutoRegisterSessions', () => {
+    let shouldAutoRegisterSessions;
+
+    before(async () => {
+      const module = await import('../../../../event-libs/v1/blocks/events-form/events-form.js');
+      shouldAutoRegisterSessions = module.shouldAutoRegisterSessions;
+    });
+
+    it('returns true for a registered, non-rsvp-token profile', () => {
+      expect(shouldAutoRegisterSessions('registered', { account_type: 'type1' })).to.be.true;
+    });
+
+    it('returns false for a registered rsvp-token (guest) profile', () => {
+      expect(shouldAutoRegisterSessions('registered', { account_type: 'guest', rsvpToken: 'tok-1234567890abcdef' })).to.be.false;
+    });
+
+    it('returns false for a waitlisted registration regardless of profile', () => {
+      expect(shouldAutoRegisterSessions('waitlisted', { account_type: 'type1' })).to.be.false;
+      expect(shouldAutoRegisterSessions('waitlisted', { account_type: 'guest', rsvpToken: 'tok-1234567890abcdef' })).to.be.false;
+    });
+
+    it('returns true for a registered response when profile is null/undefined (no rsvp token present)', () => {
+      expect(shouldAutoRegisterSessions('registered', null)).to.be.true;
+      expect(shouldAutoRegisterSessions('registered', undefined)).to.be.true;
+    });
+  });
+
   describe('getFullState and buildErrorMsg (campaign-aware 400)', () => {
     let sandbox;
     let originalHref;
@@ -822,6 +973,7 @@ describe('Events Form', () => {
     afterEach(() => {
       sandbox.restore();
       window.history.replaceState({}, '', originalHref);
+      BlockMediator.set('imsProfile', undefined);
     });
 
     function stubFetchByUrl(eventResponse, campaignResponse = null) {
@@ -940,6 +1092,56 @@ describe('Events Form', () => {
       const errorEl = form.querySelector('.error');
       expect(errorEl).to.not.be.null;
       expect(errorEl.textContent).to.equal('event-full-no-waitlist-error-msg');
+    });
+
+    it('buildErrorMsg shows the already-registered message on a 409 when an RSVP token is active', async () => {
+      // AttendeeAlreadyRegistered — this email is already registered for the event.
+      // The token itself is NOT consumed on this error, so the copy must not imply
+      // the link is dead.
+      BlockMediator.set('imsProfile', { account_type: 'guest', rsvpToken: 'tok-1234567890abcdef' });
+      stubFetchByUrl({ json: () => ({}), ok: true });
+      const form = document.createElement('form');
+      await buildErrorMsg(form, 409);
+      const errorEl = form.querySelector('.error');
+      expect(errorEl).to.not.be.null;
+      expect(errorEl.textContent).to.equal('This email is already registered for this event.');
+    });
+
+    it('buildErrorMsg shows the token-invalid message on a 401/404/410 when an RSVP token is active', async () => {
+      // Models the two-tab race: the token was valid at page load but got used
+      // elsewhere before this submit, so the submit call fails as gone/not-found,
+      // or the RSVP-token header failed to reach the server (401) — same class
+      // of "not usable here" outcome as the validate call in profile.js.
+      BlockMediator.set('imsProfile', { account_type: 'guest', rsvpToken: 'tok-1234567890abcdef' });
+      stubFetchByUrl({ json: () => ({}), ok: true });
+      for (const status of [401, 404, 410]) {
+        const form = document.createElement('form');
+        await buildErrorMsg(form, status);
+        const errorEl = form.querySelector('.error');
+        expect(errorEl).to.not.be.null;
+        expect(errorEl.textContent).to.equal('This registration link is no longer valid. It may have already been used or expired.');
+      }
+    });
+
+    it('buildErrorMsg falls back to the generic message for a 403/500 failure with an RSVP token active', async () => {
+      // 403 (waitlisting not allowed / invite-only) and 500 don't mean the token
+      // became unusable, so they must not surface the invalid-link copy.
+      BlockMediator.set('imsProfile', { account_type: 'guest', rsvpToken: 'tok-1234567890abcdef' });
+      stubFetchByUrl({ json: () => ({}), ok: true });
+      const form = document.createElement('form');
+      await buildErrorMsg(form, 403);
+      const errorEl = form.querySelector('.error');
+      expect(errorEl).to.not.be.null;
+      expect(errorEl.textContent).to.equal('rsvp-error-msg');
+    });
+
+    it('buildErrorMsg falls back to the generic message for a non-400 failure with no RSVP token', async () => {
+      stubFetchByUrl({ json: () => ({}), ok: true });
+      const form = document.createElement('form');
+      await buildErrorMsg(form, 500);
+      const errorEl = form.querySelector('.error');
+      expect(errorEl).to.not.be.null;
+      expect(errorEl.textContent).to.equal('rsvp-error-msg');
     });
   });
 
@@ -1080,6 +1282,94 @@ describe('Events Form', () => {
       });
       const result = getRsvpConfigFromMeta();
       expect(result.data[0].type).to.equal('select');
+    });
+
+    // Substrate/displayAs taxonomy: type names only the substrate (text/select/
+    // multi-select); displayAs picks the concrete widget within it.
+    [
+      ['text', undefined, 'text'],
+      ['text', 'text', 'text'],
+      ['text', 'email', 'email'],
+      ['text', 'phone', 'phone'],
+      ['text', 'number', 'number'],
+      ['text', 'date', 'date'],
+      ['text', 'url', 'url'],
+      ['text', 'text-area', 'text-area'],
+      ['text', 'not-a-real-flavor', 'text'],
+    ].forEach(([type, displayAs, expected]) => {
+      it(`remaps text + displayAs "${displayAs}" to "${expected}"`, async () => {
+        const { getRsvpConfigFromMeta } = await import('../../../../event-libs/v1/blocks/events-form/events-form.js');
+        setRsvpConfigMeta({
+          rsvpFormFields: [
+            { field: 'title', label: 'Title', type, displayAs, required: false, options: [] },
+          ],
+        });
+        const result = getRsvpConfigFromMeta();
+        expect(result.data[0].type).to.equal(expected);
+      });
+    });
+
+    it('remaps select + displayAs "picker" (default) to select', async () => {
+      const { getRsvpConfigFromMeta } = await import('../../../../event-libs/v1/blocks/events-form/events-form.js');
+      setRsvpConfigMeta({
+        rsvpFormFields: [
+          {
+            field: 'industry', label: 'Industry', type: 'select', displayAs: 'picker', required: false, options: [],
+          },
+        ],
+      });
+      const result = getRsvpConfigFromMeta();
+      expect(result.data[0].type).to.equal('select');
+    });
+
+    it('remaps multi-select + displayAs "checkbox" (default) to checkbox-group', async () => {
+      const { getRsvpConfigFromMeta } = await import('../../../../event-libs/v1/blocks/events-form/events-form.js');
+      setRsvpConfigMeta({
+        rsvpFormFields: [
+          {
+            field: 'interests', label: 'Interests', type: 'multi-select', displayAs: 'checkbox', required: false, options: [],
+          },
+        ],
+      });
+      const result = getRsvpConfigFromMeta();
+      expect(result.data[0].type).to.equal('checkbox-group');
+    });
+
+    it('leaves multi-select with no displayAs as checkbox-group (default)', async () => {
+      const { getRsvpConfigFromMeta } = await import('../../../../event-libs/v1/blocks/events-form/events-form.js');
+      setRsvpConfigMeta({
+        rsvpFormFields: [
+          { field: 'interests', label: 'Interests', type: 'multi-select', required: false, options: [] },
+        ],
+      });
+      const result = getRsvpConfigFromMeta();
+      expect(result.data[0].type).to.equal('checkbox-group');
+    });
+
+    it('remaps multi-select + displayAs "combobox" to the compact multi-select widget', async () => {
+      const { getRsvpConfigFromMeta } = await import('../../../../event-libs/v1/blocks/events-form/events-form.js');
+      setRsvpConfigMeta({
+        rsvpFormFields: [
+          {
+            field: 'interests', label: 'Interests', type: 'multi-select', displayAs: 'combobox', required: false, options: [],
+          },
+        ],
+      });
+      const result = getRsvpConfigFromMeta();
+      expect(result.data[0].type).to.equal('multi-select');
+    });
+
+    it('leaves non-taxonomy types (e.g. heading, divider) untouched', async () => {
+      const { getRsvpConfigFromMeta } = await import('../../../../event-libs/v1/blocks/events-form/events-form.js');
+      setRsvpConfigMeta({
+        rsvpFormFields: [
+          { field: 'intro', label: 'Welcome', type: 'heading', required: false, options: [] },
+          { field: 'sep', label: '', type: 'divider', required: false, options: [] },
+        ],
+      });
+      const result = getRsvpConfigFromMeta();
+      expect(result.data[0].type).to.equal('heading');
+      expect(result.data[1].type).to.equal('divider');
     });
   });
 });

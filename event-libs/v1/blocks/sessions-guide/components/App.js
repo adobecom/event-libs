@@ -8,8 +8,8 @@ export function App() {
   const ctx = useSessionGuide();
   if (!ctx) return html`<section class="sg-app sg-app--page"><div class="sg-loading">Loading sessions…</div></section>`;
   const { state, dispatch } = ctx;
-  const { eventConfig, regPromptOpen } = state;
-  const surface = eventConfig.surface;
+  const { guideConfig, regPromptOpen } = state;
+  const surface = guideConfig.surface;
 
   // Each component must be invoked via html`<${Comp} />` so the test stub
   // evaluates the component call before interpolating the string result.

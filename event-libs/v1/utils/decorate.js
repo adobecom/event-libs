@@ -9,7 +9,7 @@ import {
 } from './constances.js';
 import BlockMediator from '../deps/block-mediator.min.js';
 import { getEvent, getCampaign } from './esp-controller.js';
-import { dictionaryManager, getInviteOnlyNoCampaignMessage } from './dictionary-manager.js';
+import { dictionaryManager, getInviteOnlyNoCampaignMessage, getRsvpTokenInvalidMessage } from './dictionary-manager.js';
 import {
   getMetadata,
   setMetadata,
@@ -25,10 +25,12 @@ import {
   parseEncodedConfig,
   createTag,
   getValidCampaignIdFromUrl,
+  shouldForceGuestSignIn,
 } from './utils.js';
 import { massageMetadata } from './date-time-helper.js';
-import { hydrateBlocks, setHydrationPromise } from '../hydrate/hydrate.js';
+import { hydrateBlocks } from '../hydrate/hydrate.js';
 import { initSessionState } from './session-store.js';
+import { initTierOneEventConfig } from './tier-1-event-config.js';
 
 const ICONS_BASE_URL = new URL('../icons/', import.meta.url).href;
 
@@ -123,6 +125,12 @@ function setCtaState(targetState, rsvpBtn) { // eslint-disable-line no-unused-va
       rsvpBtn.el.textContent = waitlistedText;
       rsvpBtn.el.prepend(checkRed);
     },
+    declined: () => {
+      const declinedText = dictionaryManager.getValue('declined-cta-text');
+      disableBtn();
+      updateAnalyticTag(rsvpBtn.el, declinedText);
+      rsvpBtn.el.textContent = declinedText;
+    },
     toWaitlist: () => {
       const waitlistText = dictionaryManager.getValue('waitlist-cta-text');
       enableBtn();
@@ -139,6 +147,12 @@ function setCtaState(targetState, rsvpBtn) { // eslint-disable-line no-unused-va
     },
     inviteOnlyNoCampaign: () => {
       const text = getInviteOnlyNoCampaignMessage(dictionaryManager);
+      hideBtn(text);
+      updateAnalyticTag(rsvpBtn.el, text);
+      checkRed.remove();
+    },
+    rsvpTokenInvalid: () => {
+      const text = getRsvpTokenInvalidMessage(dictionaryManager);
       hideBtn(text);
       updateAnalyticTag(rsvpBtn.el, text);
       checkRed.remove();
@@ -160,6 +174,16 @@ function setCtaState(targetState, rsvpBtn) { // eslint-disable-line no-unused-va
 }
 
 export async function updateRSVPButtonState(rsvpBtn) {
+  const profile = BlockMediator.get('imsProfile');
+  if (profile?.rsvpTokenInvalid) {
+    // Token was already used, expired, or revoked (validated on load, see
+    // profile.js's captureProfile) — reflect it on the CTA itself rather than
+    // letting the guest click through to a form that will just reject them,
+    // and skip the event fetch below since it's moot for a dead token.
+    setCtaState('rsvpTokenInvalid', rsvpBtn);
+    return;
+  }
+
   const eventInfo = await getEvent(getMetadata('event-id'));
   let eventFull = false;
   let waitlistEnabled = getMetadata('allow-wait-listing') === 'true';
@@ -178,7 +202,6 @@ export async function updateRSVPButtonState(rsvpBtn) {
   }
 
   const campaignId = new URLSearchParams(window.location.search).get('campaign');
-  const profile = BlockMediator.get('imsProfile');
   const isLoggedInNonGuest = profile && !profile.noProfile && profile.account_type !== 'guest';
   if (campaignId && CAMPAIGN_ID_PATTERN.test(campaignId) && isLoggedInNonGuest) {
     const campaignInfo = await getCampaign(getMetadata('event-id'), campaignId);
@@ -205,6 +228,8 @@ export async function updateRSVPButtonState(rsvpBtn) {
     setCtaState('registered', rsvpBtn);
   } else if (rsvpData.registrationStatus === 'waitlisted') {
     setCtaState('waitlisted', rsvpBtn);
+  } else if (rsvpData.registrationStatus === 'declined') {
+    setCtaState('declined', rsvpBtn);
   }
 }
 
@@ -224,15 +249,12 @@ async function handleRSVPBtnBasedOnProfile(rsvpBtn, profile) {
     updateRSVPButtonState(rsvpBtn);
   });
 
-  if (profile?.noProfile || profile.account_type === 'guest') {
-    const allowGuestReg = getMetadata('allow-guest-registration') === 'true';
-
-    if (!allowGuestReg) {
-      rsvpBtn.el.addEventListener('click', (e) => {
-        e.preventDefault();
-        signIn({ ...getSusiOptions(), redirect_uri: `${e.target.href}` });
-      });
-    }
+  const allowGuestReg = getMetadata('allow-guest-registration') === 'true';
+  if (shouldForceGuestSignIn(profile, allowGuestReg)) {
+    rsvpBtn.el.addEventListener('click', (e) => {
+      e.preventDefault();
+      signIn({ ...getSusiOptions(), redirect_uri: `${e.target.href}` });
+    });
   }
 }
 
@@ -332,10 +354,10 @@ const regHashCallbacks = {
     if (a.dataset.rsvpInitialized === 'true') {
       return;
     }
-    
+
     // Store the original text BEFORE any modifications
     const originalText = a.textContent.includes('|') ? a.textContent.split('|')[0] : a.textContent;
-    
+
     // Mark as initialized and store original text in dataset
     a.dataset.rsvpInitialized = 'true';
     a.dataset.rsvpOriginalText = originalText;
@@ -511,19 +533,24 @@ function prebuildAutoBlock(blockName, link) {
   const autoBlockBuilders = {
     'chrono-box': (link) => {
       const url = new URL(link.href);
-      const scheduleBase64 = url.searchParams.get('schedule');
+      const hashMatch = url.hash.match(/[#&]schedule=([A-Za-z0-9+/=%-]{20,})/);
+      const scheduleBase64 = url.searchParams.get('schedule') || hashMatch?.[1];
       const schedule = parseEncodedConfig(scheduleBase64);
-      
+
       if (!schedule || !schedule.blocks || !Array.isArray(schedule.blocks)) {
         return null;
       }
 
+      // url.pathname looks like "/app/{org}/{repo}/tools/da-apps/schedule-maker"
+      const pathParts = url.pathname.split('/').filter(Boolean);
+      const [org, repo] = pathParts[0] === 'app' ? [pathParts[1], pathParts[2]] : [];
 
       // Transform schedule blocks into chrono-box format
       const chronoBoxData = schedule.blocks.map(block => {
         const item = {
           pathToFragment: block.fragmentPath,
-          toggleTime: block.startDateTime
+          title: block.title,
+          toggleTime: block.startDateTime,
         };
 
         // Add mobileRider sessionId if the block includes a live stream
@@ -544,7 +571,7 @@ function prebuildAutoBlock(blockName, link) {
         class: 'chrono-box',
         'data-schedule-id': schedule.scheduleId,
         'data-schedule-title': schedule.title,
-        'data-schedule-maker-url': `${url.origin}${url.pathname}?scheduleId=${schedule.scheduleId}`,
+        ...(org && repo ? { 'data-schedule-repo': `${org}/${repo}` } : {}),
       }, innerDiv);
 
       return chronoBoxEl;
@@ -561,17 +588,22 @@ function prebuildAutoBlock(blockName, link) {
 export function processAutoBlockLinks(parent) {
   // selfInit: true — block lives inside an already-loaded parent (e.g. marquee);
   // Milo won't re-scan it, so we import and call init() directly with the anchor.
+  // c2: true — this block has a C2 copy under v1/c2/blocks/, so on a
+  // `foundation: c2` page load it from there instead of the classic v1/blocks/.
+  const isC2 = getMetadata('foundation') === 'c2';
   const autoBlockIdentifiers = {
     'chrono-box': { pattern: 'schedule-maker' },
-    'mobile-rider': { pattern: 'mobilerider.com', selfInit: true },
+    'mobile-rider': { pattern: 'mobilerider.com', selfInit: true, c2: true },
   };
 
-  Object.entries(autoBlockIdentifiers).forEach(([blockName, { pattern, selfInit }]) => {
+  Object.entries(autoBlockIdentifiers).forEach(([blockName, { pattern, selfInit, c2 }]) => {
     const links = parent.querySelectorAll(`a[href*="${pattern}"]`);
     Promise.all([...links].map(async (link) => {
       if (selfInit) {
         link.classList.add(blockName, 'link-block');
-        const { default: initBlock } = await import(`../blocks/${blockName}/${blockName}.js`);
+        // Route to the C2 copy only when the page is C2 *and* the block has one;
+        const blocksDir = (isC2 && c2) ? '../c2/blocks' : '../blocks';
+        const { default: initBlock } = await import(`${blocksDir}/${blockName}/${blockName}.js`);
         await initBlock(link);
         return;
       }
@@ -1014,7 +1046,9 @@ function addStylesToEventPage() {
 export function applyAreaTheme(area = document) {
   try {
     const customAttributes = JSON.parse(getMetadata('custom-attributes'));
-    const theme = customAttributes.find((attr) => attr.attribute.toLowerCase().trim() === 'theme');
+    const theme = customAttributes.find(
+      (attr) => (attr.name ?? attr.attribute)?.toLowerCase().trim() === 'theme',
+    );
     if (!theme) return;
 
     const themeValue = theme.values?.[0]?.value?.toLowerCase().trim();
@@ -1064,7 +1098,7 @@ export function applyAreaTheme(area = document) {
 }
 
 export function decorateEvent(parent) {
-  setHydrationPromise(hydrateBlocks(parent));
+  hydrateBlocks(parent);
 
   // handle photos data parsing
   const photosData = parsePhotosData(parent);
@@ -1077,11 +1111,16 @@ export function decorateEvent(parent) {
 
   if (!getMetadata('event-id')) return;
 
-  // Bootstraps shared, page-level session state (sessions, favorites, scheduled,
-  // auth) ahead of any block's own init() — no-ops when rainfocus-api-url isn't authored.
-  // Additionally gated on tier-1-event-state-enabled since event-id alone is already
-  // authored broadly in prod; we don't want to seed sessions-guide's mock data on every
-  // event page that happens to have it.
+  // Bootstraps the page-wide Tier 1 Event Configurator app output (track icons/colors,
+  // allowDoubleBooking, rfApiUrl/rfProfileId, ...) ahead of any block's own init(), so
+  // any block can call getTrackIcon()/getAllowDoubleBooking() regardless of tier. Cheap
+  // parse, no network cost, so unlike initSessionState() below it isn't gated further.
+  initTierOneEventConfig();
+
+  // Bootstraps shared, page-level session state (sessions, favorites, scheduled, auth)
+  // ahead of any block's own init() — no-ops when tier-1-event-config isn't authored.
+  // Also gated on tier-1-event-state-enabled since event-id alone is already authored
+  // broadly in prod; we don't want to bootstrap this on every page that happens to have it.
   if (getMetadata('tier-1-event-state-enabled') === 'true') {
     initSessionState();
   }

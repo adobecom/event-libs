@@ -1,6 +1,6 @@
 import { html } from '../../../deps/htm-preact.js';
 import { useSessionGuide } from '../store/index.js';
-import { formatShortTime, getNowMs } from '../utils/time.js';
+import { formatShortTime, formatDuration, getNowMs } from '../utils/time.js';
 import { deriveSessionState } from '../../../utils/session-state.js';
 import {
   scheduled, favorited, pendingActions, liveStreamActiveIds,
@@ -9,20 +9,14 @@ import { scheduleWithFeedback, favoriteWithFeedback } from '../../../services/se
 import { IconPlay, IconCalendarCheck, IconCalendarPlus, IconHeartFilled, IconHeartOutline } from './icons.js';
 import { setSessionParam, safeUrl } from '../utils/url.js';
 import { CategoryBadge } from './CategoryBadge.js';
-
-function formatDuration(ms) {
-  const h = Math.floor(ms / 3600000);
-  const m = Math.floor((ms % 3600000) / 60000);
-  if (h > 0 && m >= 0) return `${h}h ${m}m`;
-  return `${m}m`;
-}
+import { getTrackIcon } from '../../../utils/tier-1-event-config.js';
 
 export const buildLiveCard = () => LiveCard;
 
 export function LiveCard({ session, variant = 'live' }) {
   const { state, dispatch } = useSessionGuide();
-  const { eventConfig } = state;
-  const { userTz, trackColors, surface } = eventConfig;
+  const { guideConfig } = state;
+  const { userTz, surface } = guideConfig;
 
   const isScheduled = scheduled.value.has(session.id);
   const isFavorited = favorited.value.has(session.id);
@@ -36,9 +30,11 @@ export function LiveCard({ session, variant = 'live' }) {
   const duration = endMs - startMs;
   const elapsed = Math.min(Math.max(nowMs - startMs, 0), duration);
   const progressPct = duration > 0 ? Math.round((elapsed / duration) * 100) : 0;
-  const durationLabel = duration >= 0 ? formatDuration(duration) : '';
+  const durationLabel = duration >= 0
+    ? formatDuration(session.startTimeUtc, session.endTimeUtc, { short: true })
+    : '';
 
-  const trackColor = (trackColors && trackColors[session.track]) || '';
+  const trackColor = getTrackIcon(session.track)?.color || '';
   const startTime = formatShortTime(session.startTimeUtc, userTz);
   const endTime = session.endTimeUtc ? formatShortTime(session.endTimeUtc, userTz) : '';
   const timeRange = endTime ? `${startTime} – ${endTime}` : startTime;
@@ -52,12 +48,12 @@ export function LiveCard({ session, variant = 'live' }) {
 
   async function handleSchedule(e) {
     e.stopPropagation();
-    await scheduleWithFeedback(session, { eventConfig, isScheduled });
+    await scheduleWithFeedback(session, { eventConfig: guideConfig, isScheduled });
   }
 
   async function handleFavorite(e) {
     e.stopPropagation();
-    await favoriteWithFeedback(session, { eventConfig, isFavorited });
+    await favoriteWithFeedback(session, { eventConfig: guideConfig, isFavorited });
   }
 
   const watchHref = safeUrl(session.watchUrl || session.sessionPageUrl);
@@ -114,7 +110,7 @@ export function LiveCard({ session, variant = 'live' }) {
       <div class="sg-live-card__body">
         <div class="sg-live-card__meta">
           <div class="sg-live-card__track-row">
-            ${html`<${CategoryBadge} category=${session.category} />`}
+            ${html`<${CategoryBadge} category=${session.category?.[0]} />`}
           </div>
           <p class="sg-live-card__time">${timeRange}</p>
         </div>
