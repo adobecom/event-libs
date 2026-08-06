@@ -9,8 +9,6 @@ import {
 
 let modalLoader;
 
-const BLADE_BIO_PREVIEW_LENGTH = 144;
-
 function decorateImage(card, photo) {
   if (!photo) return;
 
@@ -215,62 +213,29 @@ function getSocialLinks(data) {
   return data?.socialLinks || data?.socialMedia || [];
 }
 
-function getBioPlainText(bio) {
-  const trimmedBio = typeof bio === 'string' ? bio.trim() : '';
-  if (!trimmedBio) return '';
-  if (!trimmedBio.includes('<')) return trimmedBio;
-
-  const container = createTag('div');
-  container.innerHTML = trimmedBio;
-  return container.textContent.trim();
-}
-
-function truncateBioText(text, limit) {
-  if (text.length <= limit) return { text, truncated: false };
-
-  let cut = text.lastIndexOf(' ', limit);
-  if (cut <= 0) cut = limit;
-
-  return { text: text.slice(0, cut).trimEnd(), truncated: true };
-}
-
 function appendBioBlade(container, bio, fullName) {
-  const plainBio = getBioPlainText(bio);
-  if (!plainBio) return;
+  const trimmedBio = typeof bio === 'string' ? bio.trim() : '';
+  if (!trimmedBio) return;
 
   const desc = createTag('div', { class: 'card-desc blade-desc' });
-  const textEl = createTag('span', { class: 'blade-desc-text' });
-  desc.append(textEl);
-  container.append(desc);
-
-  const short = truncateBioText(plainBio, BLADE_BIO_PREVIEW_LENGTH);
-  if (!short.truncated) {
-    textEl.textContent = plainBio;
-    return;
+  if (trimmedBio.includes('<')) {
+    desc.innerHTML = trimmedBio;
+  } else {
+    desc.textContent = trimmedBio;
   }
-
-  let expanded = false;
-
-  const renderState = () => {
-    if (expanded) {
-      textEl.textContent = plainBio;
-      return;
-    }
-    textEl.textContent = `${short.text}…`;
-  };
-
-  renderState();
+  container.append(desc);
 
   const btn = createTag('button', {
     type: 'button',
     class: 'blade-read-more',
+    hidden: '',
     'aria-expanded': 'false',
     'aria-label': `Read more about ${fullName}'s bio`,
   }, 'Read more');
 
   btn.addEventListener('click', () => {
-    expanded = !expanded;
-    renderState();
+    const cardContainer = btn.closest('.card-container');
+    const expanded = cardContainer.classList.toggle('expanded');
     btn.textContent = expanded ? 'Collapse' : 'Read more';
     btn.setAttribute('aria-expanded', String(expanded));
     btn.setAttribute('aria-label', expanded
@@ -278,7 +243,37 @@ function appendBioBlade(container, bio, fullName) {
       : `Read more about ${fullName}'s bio`);
   });
 
-  desc.append(btn);
+  container.append(btn);
+}
+
+function syncBladeBioOverflow(cardContainer) {
+  const desc = cardContainer.querySelector('.blade-desc');
+  const btn = cardContainer.querySelector('.blade-read-more');
+  if (!desc || !btn) return;
+
+  if (cardContainer.classList.contains('expanded')) {
+    btn.hidden = false;
+    return;
+  }
+
+  btn.hidden = desc.scrollHeight <= desc.clientHeight;
+}
+
+/**
+ * Reveals the Read more toggle only for blade cards whose 2-line-clamped
+ * bio actually overflows. Exported so tests can call it directly after
+ * stubbing scrollHeight/clientHeight, matching the sessions-hub pattern.
+ */
+export function syncBladeBiosOverflow(el) {
+  el.querySelectorAll('.card-container').forEach(syncBladeBioOverflow);
+}
+
+function scheduleBladeBiosOverflowSync(el) {
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      syncBladeBiosOverflow(el);
+    });
+  });
 }
 
 function decorateContentBlade(cardContainer, data) {
@@ -567,6 +562,8 @@ function decorateStaticCards(el, { modal, blade } = {}) {
     el.classList.add('with-carousel');
     buildMiloCarousel(cardsWrapper, Array.from(cardsWrapper.querySelectorAll('.card-container')));
   }
+
+  if (blade) scheduleBladeBiosOverflowSync(el);
 }
 
 function decorateCards(el, data, { simple, modal, blade, speakerType } = {}) {
@@ -608,6 +605,8 @@ function decorateCards(el, data, { simple, modal, blade, speakerType } = {}) {
 
     buildMiloCarousel(cardsWrapper, Array.from(cardsWrapper.querySelectorAll('.card-container')));
   }
+
+  if (blade) scheduleBladeBiosOverflowSync(el);
 }
 
 function sortDataByOrdinals(data) {

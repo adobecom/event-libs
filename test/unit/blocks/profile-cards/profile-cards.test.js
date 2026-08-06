@@ -1,6 +1,8 @@
 import { expect } from '@esm-bundle/chai';
 import { readFile } from '@web/test-runner-commands';
-import init, { createSocialIcon, buildModalContent } from '../../../../event-libs/v1/blocks/profile-cards/profile-cards.js';
+import init, {
+  createSocialIcon, buildModalContent, syncBladeBiosOverflow,
+} from '../../../../event-libs/v1/blocks/profile-cards/profile-cards.js';
 import { setMetadata } from '../../../../event-libs/v1/utils/utils.js';
 
 /** Mirrors Milo modal.js FOCUSABLES selector for initial-focus assertions */
@@ -318,10 +320,7 @@ describe('Profile Cards Module', () => {
   });
 
   describe('blade variant', () => {
-    const LOREM = 'Lorem ipsum dolor sit amet consectetur adipiscing elit sed do eiusmod tempor incididunt ut labore et dolore magna aliqua ut enim ad minim veniam quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat duis aute irure dolor';
-    const SHORT_BIO = LOREM.slice(0, 100);
-    const LONG_BIO = LOREM.slice(0, 250);
-    const VERY_LONG_BIO = `${LOREM} ${LOREM}`;
+    const BIO = 'A short bio used across blade variant tests.';
 
     function makeBladeBlock(speakers, { classes = 'blade', configRows = '<div><div>type</div><div>speaker</div></div>' } = {}) {
       setMetadata('speakers', JSON.stringify(speakers));
@@ -330,6 +329,13 @@ describe('Profile Cards Module', () => {
       el.innerHTML = `<div><div><h2>Heading</h2></div></div>${configRows}`;
       document.body.appendChild(el);
       return el;
+    }
+
+    // Mirrors the sessions-hub line-clamp overflow pattern: stub scrollHeight/
+    // clientHeight rather than relying on real layout, then sync directly.
+    function stubOverflow(desc, isOverflowing) {
+      Object.defineProperty(desc, 'scrollHeight', { configurable: true, get: () => (isOverflowing ? 200 : 100) });
+      Object.defineProperty(desc, 'clientHeight', { configurable: true, get: () => 100 });
     }
 
     beforeEach(() => {
@@ -363,7 +369,7 @@ describe('Profile Cards Module', () => {
 
     it('does not enable modal even when the modal class is also authored', () => {
       const el = makeBladeBlock([
-        { firstName: 'Ada', lastName: 'Lovelace', speakerType: 'Speaker', title: 'Mathematician', bio: SHORT_BIO },
+        { firstName: 'Ada', lastName: 'Lovelace', speakerType: 'Speaker', title: 'Mathematician', bio: BIO },
       ], { classes: 'blade modal' });
       init(el);
 
@@ -375,10 +381,10 @@ describe('Profile Cards Module', () => {
 
     it('does not enable the carousel even with more than 3 speakers', () => {
       const el = makeBladeBlock([
-        { firstName: 'A', lastName: 'One', speakerType: 'Speaker', title: 't', bio: SHORT_BIO },
-        { firstName: 'B', lastName: 'Two', speakerType: 'Speaker', title: 't', bio: SHORT_BIO },
-        { firstName: 'C', lastName: 'Three', speakerType: 'Speaker', title: 't', bio: SHORT_BIO },
-        { firstName: 'D', lastName: 'Four', speakerType: 'Speaker', title: 't', bio: SHORT_BIO },
+        { firstName: 'A', lastName: 'One', speakerType: 'Speaker', title: 't', bio: BIO },
+        { firstName: 'B', lastName: 'Two', speakerType: 'Speaker', title: 't', bio: BIO },
+        { firstName: 'C', lastName: 'Three', speakerType: 'Speaker', title: 't', bio: BIO },
+        { firstName: 'D', lastName: 'Four', speakerType: 'Speaker', title: 't', bio: BIO },
       ]);
       init(el);
 
@@ -389,7 +395,7 @@ describe('Profile Cards Module', () => {
 
     it('does not add the single class for a lone blade speaker', () => {
       const el = makeBladeBlock([
-        { firstName: 'Solo', lastName: 'Speaker', speakerType: 'Speaker', title: 't', bio: SHORT_BIO },
+        { firstName: 'Solo', lastName: 'Speaker', speakerType: 'Speaker', title: 't', bio: BIO },
       ]);
       init(el);
 
@@ -397,59 +403,78 @@ describe('Profile Cards Module', () => {
       expect(el.classList.contains('single')).to.be.false;
     });
 
-    it('renders the full bio with no Read more button when it is 144 characters or fewer', () => {
+    it('always renders the full bio text (no character-based truncation)', () => {
       const el = makeBladeBlock([
-        { firstName: 'Short', lastName: 'Bio', speakerType: 'Speaker', title: 't', bio: SHORT_BIO },
+        { firstName: 'Full', lastName: 'Bio', speakerType: 'Speaker', title: 't', bio: BIO },
+      ]);
+      init(el);
+
+      expect(el.querySelector('.blade-desc').textContent).to.equal(BIO);
+    });
+
+    it('keeps the Read more button hidden when the 2-line-clamped bio does not overflow', () => {
+      const el = makeBladeBlock([
+        { firstName: 'Fits', lastName: 'Bio', speakerType: 'Speaker', title: 't', bio: BIO },
       ]);
       init(el);
 
       const desc = el.querySelector('.blade-desc');
-      expect(desc.querySelector('.blade-desc-text').textContent).to.equal(SHORT_BIO);
-      expect(desc.querySelector('.blade-read-more')).to.be.null;
+      stubOverflow(desc, false);
+      syncBladeBiosOverflow(el);
+
+      expect(el.querySelector('.blade-read-more').hidden).to.be.true;
     });
 
-    it('truncates a long bio with a working Read more / Collapse toggle', () => {
+    it('reveals the Read more button when the 2-line-clamped bio overflows, and toggles Collapse on click', () => {
       const el = makeBladeBlock([
-        { firstName: 'Long', lastName: 'Bio', speakerType: 'Speaker', title: 't', bio: LONG_BIO },
+        { firstName: 'Overflow', lastName: 'Bio', speakerType: 'Speaker', title: 't', bio: BIO },
       ]);
       init(el);
 
-      const textEl = el.querySelector('.blade-desc-text');
-      const btn = el.querySelector('.blade-read-more');
+      const card = el.querySelector('.card-container');
+      const desc = el.querySelector('.blade-desc');
+      stubOverflow(desc, true);
+      syncBladeBiosOverflow(el);
 
-      expect(btn).to.not.be.null;
+      const btn = el.querySelector('.blade-read-more');
+      expect(btn.hidden).to.be.false;
       expect(btn.textContent).to.equal('Read more');
       expect(btn.getAttribute('aria-expanded')).to.equal('false');
-      expect(textEl.textContent.endsWith('…')).to.be.true;
-      expect(textEl.textContent.length).to.be.at.most(145);
-      const collapsedText = textEl.textContent;
+      expect(card.classList.contains('expanded')).to.be.false;
 
       btn.click();
+      expect(card.classList.contains('expanded')).to.be.true;
       expect(btn.textContent).to.equal('Collapse');
       expect(btn.getAttribute('aria-expanded')).to.equal('true');
-      expect(textEl.textContent.length).to.be.greaterThan(collapsedText.length);
+      // the bio text itself never changes - CSS line-clamp handles the visual truncation
+      expect(desc.textContent).to.equal(BIO);
 
       btn.click();
+      expect(card.classList.contains('expanded')).to.be.false;
       expect(btn.textContent).to.equal('Read more');
       expect(btn.getAttribute('aria-expanded')).to.equal('false');
-      expect(textEl.textContent).to.equal(collapsedText);
     });
 
-    it('shows the full bio with no dangling ellipsis once expanded, even past 292 characters', () => {
+    it('keeps the Read more button visible once expanded even if a later sync re-runs', () => {
       const el = makeBladeBlock([
-        { firstName: 'Very', lastName: 'Long', speakerType: 'Speaker', title: 't', bio: VERY_LONG_BIO },
+        { firstName: 'Overflow', lastName: 'Bio', speakerType: 'Speaker', title: 't', bio: BIO },
       ]);
       init(el);
 
-      const textEl = el.querySelector('.blade-desc-text');
-      const btn = el.querySelector('.blade-read-more');
+      const card = el.querySelector('.card-container');
+      const desc = el.querySelector('.blade-desc');
+      stubOverflow(desc, true);
+      syncBladeBiosOverflow(el);
+      el.querySelector('.blade-read-more').click();
 
-      btn.click();
-      expect(textEl.textContent).to.equal(VERY_LONG_BIO);
-      expect(textEl.textContent.endsWith('…')).to.be.false;
+      // simulate re-running the overflow sync (e.g. from a resize) while expanded
+      syncBladeBiosOverflow(el);
+
+      expect(card.classList.contains('expanded')).to.be.true;
+      expect(el.querySelector('.blade-read-more').hidden).to.be.false;
     });
 
-    it('renders a static-authored blade card with a working Read more toggle', () => {
+    it('renders a static-authored blade card whose Read more toggle expands without changing the bio text', () => {
       const el = document.querySelector('#blade-static-cards');
       init(el);
 
@@ -458,13 +483,17 @@ describe('Profile Cards Module', () => {
       expect(card.querySelector('.card-title').textContent.trim()).to.equal('VP of Marketing, Adobe');
       expect(card.querySelector('.card-social-icons')).to.be.null;
 
-      const btn = card.querySelector('.blade-read-more');
-      expect(btn).to.not.be.null;
+      const desc = card.querySelector('.blade-desc');
+      const originalText = desc.textContent;
+      stubOverflow(desc, true);
+      syncBladeBiosOverflow(el);
 
-      const textEl = card.querySelector('.blade-desc-text');
-      const collapsedText = textEl.textContent;
+      const btn = card.querySelector('.blade-read-more');
+      expect(btn.hidden).to.be.false;
+
       btn.click();
-      expect(textEl.textContent.length).to.be.greaterThan(collapsedText.length);
+      expect(card.classList.contains('expanded')).to.be.true;
+      expect(desc.textContent).to.equal(originalText);
     });
   });
 
