@@ -6,6 +6,13 @@ import FragmentPathBrowser from './FragmentPathBrowser.js';
 
 const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
 
+// The native datetime-local input renders using the browser's own default
+// locale/hour-cycle (12- vs 24-hour), which we can't control directly. Detect
+// that same preference here so the PT hint next to it matches instead of
+// always showing 12-hour AM/PM regardless of what the field itself displays.
+const userHourCycle = new Intl.DateTimeFormat(undefined, { hour: 'numeric' }).resolvedOptions().hourCycle;
+const prefersHour12 = userHourCycle === 'h11' || userHourCycle === 'h12';
+
 const localFormatter = new Intl.DateTimeFormat('en-US', {
   timeZone: userTimezone,
   year: 'numeric',
@@ -16,14 +23,14 @@ const localFormatter = new Intl.DateTimeFormat('en-US', {
   hour12: false,
 });
 
-const ptFormatter = new Intl.DateTimeFormat('en-US', {
+const ptFormatter = new Intl.DateTimeFormat(undefined, {
   timeZone: 'America/Los_Angeles',
   month: '2-digit',
   day: '2-digit',
   year: 'numeric',
   hour: '2-digit',
   minute: '2-digit',
-  hour12: true,
+  hour12: prefersHour12,
 });
 
 function getFragmentPreviewUrl(org, repo, fragmentPath) {
