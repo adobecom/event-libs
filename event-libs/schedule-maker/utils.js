@@ -88,6 +88,15 @@ function prepareScheduleForServer(schedule) {
     }
   });
   delete deepCopy.isComplete;
+  // Sync attaches these to schedules it returns (see da-controller.js
+  // syncSchedules) so the sidebar/editor can show them — they're a snapshot
+  // of scan-time bookkeeping, not authored schedule content, and must never
+  // leave the app. Without stripping them, a schedule opened from the sidebar
+  // would carry stale conflict/reference data forward into every future
+  // Copy Link, growing indefinitely even after the real conflict resolves.
+  delete deepCopy.referencedInDocs;
+  delete deepCopy.hasConflictingVersions;
+  delete deepCopy.conflictingVersions;
   return deepCopy;
 }
 

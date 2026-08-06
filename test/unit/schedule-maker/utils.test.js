@@ -180,6 +180,19 @@ describe('schedule-maker utils', () => {
       expect(result.modificationTime).to.be.a('string');
     });
 
+    it('strips sync-derived bookkeeping fields so they never leak into an exported link', () => {
+      const schedule = makeSchedule({
+        blocks: [makeBlock()],
+        referencedInDocs: ['/events/a.html'],
+        hasConflictingVersions: true,
+        conflictingVersions: [{ title: 'Other version', referencedInDocs: ['/events/b.html'] }],
+      });
+      const result = prepareScheduleForServer(schedule);
+      expect(result).to.not.have.property('referencedInDocs');
+      expect(result).to.not.have.property('hasConflictingVersions');
+      expect(result).to.not.have.property('conflictingVersions');
+    });
+
     it('drops liveStream when not included and fragmentPath when empty', () => {
       const schedule = makeSchedule({
         blocks: [makeBlock({ includeLiveStream: false, liveStream: { streamId: 'x' }, fragmentPath: '' })],
