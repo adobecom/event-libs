@@ -2,6 +2,7 @@ import { expect } from '@esm-bundle/chai';
 import {
   setDaToken,
   setDaFetch,
+  setLegacyLinkMigrationEnabled,
   listEventFolders,
   listFolder,
   syncSchedules,
@@ -66,6 +67,7 @@ describe('da-controller', () => {
   afterEach(() => {
     setDaFetch(null);
     setDaToken(null);
+    setLegacyLinkMigrationEnabled(false);
   });
 
   describe('decodeScheduleParam', () => {
@@ -398,6 +400,13 @@ describe('da-controller', () => {
   });
 
   describe('rewrite pass (non-canonical schedule links → canonical DA app #schedule=)', () => {
+    // This whole pass is gated by ENABLE_LEGACY_LINK_MIGRATION (constants.js),
+    // off by default now that a live migration scan has run. Enable it for
+    // these tests specifically; the "disabled by default" describe block
+    // below covers the off state.
+    beforeEach(() => setLegacyLinkMigrationEnabled(true));
+    afterEach(() => setLegacyLinkMigrationEnabled(false));
+
     const canonical = (encoded) => `https://da.live/app/org/repo/tools/da-apps/schedule-maker#schedule=${encoded}`;
 
     // Old ECC tool was hosted on several different domains across environments —
@@ -622,6 +631,29 @@ describe('da-controller', () => {
       expect(result.ok).to.be.true;
       expect(result.data.schedules).to.have.lengthOf(1);
       expect(result.data.schedules[0].scheduleId).to.equal('s8');
+    });
+  });
+
+  describe('rewrite pass disabled by default (ENABLE_LEGACY_LINK_MIGRATION off)', () => {
+    it('leaves a non-canonical link untouched and still finds/decodes the schedule', async () => {
+      const encoded = encodeSchedule({ scheduleId: 's9', title: 'T', modificationTime: '2026-06-01T00:00:00.000Z', blocks: [] });
+      const docHtml = `<a href="https://www.adobe.com/ecc/system/tools/schedule-maker?schedule=${encoded}">link</a>`;
+
+      const fetchMock = routeFetch([
+        ['/list/org/repo/events/e', makeResponse({
+          json: [{ path: '/org/repo/events/e/index.html', ext: 'html' }],
+        })],
+        ['/source/org/repo/events/e/index.html', makeResponse({ text: docHtml })],
+      ]);
+      setDaFetch(fetchMock);
+
+      const result = await syncSchedules('org', 'repo', '/events/e');
+      expect(result.ok).to.be.true;
+      // The schedule is still found/decoded — only the rewrite (write-back) is skipped.
+      expect(result.data.schedules).to.have.lengthOf(1);
+      expect(result.data.schedules[0].scheduleId).to.equal('s9');
+      // No write attempted at all.
+      expect(fetchMock.calls.some((c) => c.options?.method === 'POST')).to.be.false;
     });
   });
 });

@@ -1,7 +1,8 @@
-import { DA_ADMIN_ORIGIN, DA_ORIGIN, DA_APP_PATH } from '../constants.js';
+import { DA_ADMIN_ORIGIN, DA_ORIGIN, DA_APP_PATH, ENABLE_LEGACY_LINK_MIGRATION } from '../constants.js';
 
 let daToken = null;
 let sdkDaFetch = null;
+let legacyLinkMigrationEnabled = ENABLE_LEGACY_LINK_MIGRATION;
 
 export function setDaToken(token) {
   daToken = token;
@@ -9,6 +10,13 @@ export function setDaToken(token) {
 
 export function setDaFetch(fn) {
   sdkDaFetch = fn;
+}
+
+// Test-only override for ENABLE_LEGACY_LINK_MIGRATION (constants.js) — flip
+// the constant there for the real on/off switch; this just lets tests
+// exercise both states without touching module-level config.
+export function setLegacyLinkMigrationEnabled(enabled) {
+  legacyLinkMigrationEnabled = enabled;
 }
 
 // Prefer the DA SDK's authenticated fetch when it has been provided; otherwise
@@ -352,8 +360,10 @@ export async function syncSchedules(org, repo, eventFolder) {
       const decoded = decodeScheduleParam(m[1]);
       if (decoded?.scheduleId || decoded?.title) finds.push(decoded);
     }
-    const needsRewrite = [...res.text.matchAll(SCHEDULE_HREF_RE)]
-      .some(([, , href]) => !isCanonicalScheduleHref(href, canonicalPrefix));
+    // Skip when the legacy-migration feature is switched off — no old-domain
+    // or old-format links left to find once a full scan has migrated them.
+    const needsRewrite = legacyLinkMigrationEnabled
+      && [...res.text.matchAll(SCHEDULE_HREF_RE)].some(([, , href]) => !isCanonicalScheduleHref(href, canonicalPrefix));
     return { finds, needsRewrite };
   });
 
@@ -372,9 +382,13 @@ export async function syncSchedules(org, repo, eventFolder) {
   // links on any domain, and old ?schedule= query-param links on the DA app —
   // to the canonical DA app URL in #schedule= hash format, so authors never
   // need to manually adjust a URL for it to load correctly in the DA app.
-  const docsToRewrite = docFiles.filter((_, i) => perDocFinds[i]?.needsRewrite);
-  if (docsToRewrite.length > 0) {
-    await mapWithConcurrency(docsToRewrite, SCAN_CONCURRENCY, (path) => rewriteNonCanonicalScheduleLinks(org, repo, path));
+  // Gated by ENABLE_LEGACY_LINK_MIGRATION (see constants.js) — switch back on
+  // if legacy links resurface after a full migration scan.
+  if (legacyLinkMigrationEnabled) {
+    const docsToRewrite = docFiles.filter((_, i) => perDocFinds[i]?.needsRewrite);
+    if (docsToRewrite.length > 0) {
+      await mapWithConcurrency(docsToRewrite, SCAN_CONCURRENCY, (path) => rewriteNonCanonicalScheduleLinks(org, repo, path));
+    }
   }
 
   perDocFinds.forEach(({ finds }, i) => {
