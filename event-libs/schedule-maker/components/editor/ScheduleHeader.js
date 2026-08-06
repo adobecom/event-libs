@@ -7,8 +7,10 @@ import { DA_ORIGIN } from '../../constants.js';
 
 export default function ScheduleHeader() {
   const { org, repo } = useDA();
-  const { activeSchedule, hasUnsavedChanges, docRefs } = useSchedulesData();
-  const { updateScheduleLocally, discardChangesToActiveSchedule, sortBlocksLocally } = useSchedulesOperations();
+  const { activeSchedule, hasUnsavedChanges, docRefs, setActiveSchedule } = useSchedulesData();
+  const {
+    updateScheduleLocally, discardChangesToActiveSchedule, sortBlocksLocally, createAndAddSchedule,
+  } = useSchedulesOperations();
   const { setToastSuccess, setToastError } = useSchedulesUI();
 
   const [isEditingScheduleTitle, setIsEditingScheduleTitle] = useState(false);
@@ -30,6 +32,21 @@ export default function ScheduleHeader() {
     } catch (error) {
       window.lana?.log(`Error copying link: ${error}`);
     }
+  };
+
+  // Starts an independent schedule seeded from the current one's content, with
+  // a fresh scheduleId/createdTime/modificationTime — for authors building a
+  // variant, not updating this schedule in place. Copy Link never does this:
+  // it always keeps the same scheduleId, since placing/replacing links for the
+  // same logical schedule is its own, more common job.
+  const handleDuplicate = () => {
+    if (!activeSchedule) return;
+    const duplicated = createAndAddSchedule({
+      ...activeSchedule,
+      title: `${activeSchedule.title} (Copy)`,
+    });
+    setActiveSchedule(duplicated);
+    setToastSuccess('Duplicated as a new, independent schedule');
   };
 
   if (!activeSchedule) {
@@ -75,6 +92,15 @@ export default function ScheduleHeader() {
             Discard
           </sp-action-button>
         `}
+        <sp-action-button size="m" onclick=${handleDuplicate} title="Start a new, independent schedule from this one's current content">
+          <sp-icon slot="icon">
+            <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <rect x="2.5" y="4.5" width="9" height="9" rx="1" stroke="currentColor" stroke-width="1.3"/>
+              <path d="M6.5 4.5V3.5C6.5 2.94772 6.94772 2.5 7.5 2.5H14.5C15.0523 2.5 15.5 2.94772 15.5 3.5V10.5C15.5 11.0523 15.0523 11.5 14.5 11.5H13.5" stroke="currentColor" stroke-width="1.3" fill="none"/>
+            </svg>
+          </sp-icon>
+          Duplicate
+        </sp-action-button>
         <sp-action-button size="m" onclick=${handleCopyLink}>
           <sp-icon slot="icon">
             <svg width="20" height="21" viewBox="0 0 20 21" fill="currentColor">
