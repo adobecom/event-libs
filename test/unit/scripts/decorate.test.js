@@ -853,6 +853,105 @@ describe('applyAreaTheme', () => {
     const cols = document.querySelectorAll('.section-metadata > div > div');
     expect(cols[1].textContent).to.equal('xxl-spacing');
   });
+
+  it('applies a positional theme only to the first matching block', () => {
+    setThemeAttribute('theme', 'dark(blocks:text[first])');
+    document.body.innerHTML = `
+      <main><div>
+        <div class="text" id="t1"></div>
+        <div class="text" id="t2"></div>
+      </div></main>
+    `;
+    applyAreaTheme();
+    expect(document.getElementById('t1').classList.contains('dark')).to.be.true;
+    expect(document.getElementById('t2').classList.contains('dark')).to.be.false;
+  });
+
+  it('applies a positional theme only to the last matching block', () => {
+    setThemeAttribute('theme', 'dark(blocks:text[last])');
+    document.body.innerHTML = `
+      <main><div>
+        <div class="text" id="t1"></div>
+        <div class="text" id="t2"></div>
+      </div></main>
+    `;
+    applyAreaTheme();
+    expect(document.getElementById('t1').classList.contains('dark')).to.be.false;
+    expect(document.getElementById('t2').classList.contains('dark')).to.be.true;
+  });
+
+  it('applies a positional theme to the block at a 1-based numeric index', () => {
+    setThemeAttribute('theme', 'dark(blocks:text[2])');
+    document.body.innerHTML = `
+      <main><div>
+        <div class="text" id="t1"></div>
+        <div class="text" id="t2"></div>
+        <div class="text" id="t3"></div>
+      </div></main>
+    `;
+    applyAreaTheme();
+    expect(document.getElementById('t1').classList.contains('dark')).to.be.false;
+    expect(document.getElementById('t2').classList.contains('dark')).to.be.true;
+    expect(document.getElementById('t3').classList.contains('dark')).to.be.false;
+  });
+
+  it('combines a positional selector with a plain block name', () => {
+    setThemeAttribute('theme', 'dark(blocks:text[first],agenda)');
+    document.body.innerHTML = `
+      <main><div>
+        <div class="text" id="t1"></div>
+        <div class="text" id="t2"></div>
+        <div class="agenda"></div>
+      </div></main>
+    `;
+    applyAreaTheme();
+    expect(document.getElementById('t1').classList.contains('dark')).to.be.true;
+    expect(document.getElementById('t2').classList.contains('dark')).to.be.false;
+    expect(document.querySelector('.agenda').classList.contains('dark')).to.be.true;
+  });
+
+  it('silently skips an out-of-range positional selector while applying the rest of the list', () => {
+    setThemeAttribute('theme', 'dark(blocks:text[5],agenda)');
+    document.body.innerHTML = `
+      <main><div>
+        <div class="text" id="t1"></div>
+        <div class="text" id="t2"></div>
+        <div class="agenda"></div>
+      </div></main>
+    `;
+    applyAreaTheme();
+    expect(document.getElementById('t1').classList.contains('dark')).to.be.false;
+    expect(document.getElementById('t2').classList.contains('dark')).to.be.false;
+    expect(document.querySelector('.agenda').classList.contains('dark')).to.be.true;
+  });
+
+  it('does nothing when a positional selector keyword is malformed', () => {
+    setThemeAttribute('theme', 'dark(blocks:text[foo],agenda)');
+    document.body.innerHTML = `
+      <main><div>
+        <div class="text"></div>
+        <div class="agenda"></div>
+      </div></main>
+    `;
+    applyAreaTheme();
+    expect(document.querySelector('.text').classList.contains('dark')).to.be.false;
+    expect(document.querySelector('.agenda').classList.contains('dark')).to.be.false;
+  });
+
+  it('does not sync the section-metadata style row when using a positional selector', () => {
+    setThemeAttribute('theme', 'dark(blocks:text[first])');
+    document.body.innerHTML = `
+      <main><div>
+        <div class="text"></div>
+        <div class="section-metadata">
+          <div><div>style</div><div>xxl-spacing</div></div>
+        </div>
+      </div></main>
+    `;
+    applyAreaTheme();
+    const cols = document.querySelectorAll('.section-metadata > div > div');
+    expect(cols[1].textContent).to.equal('xxl-spacing');
+  });
 });
 
 describe('getNonProdData', () => {
