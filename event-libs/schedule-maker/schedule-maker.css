@@ -507,6 +507,17 @@
   text-decoration: underline;
 }
 
+.sm-editor__conflict-warning {
+  width: 100%;
+  font-size: 0.75rem;
+  color: var(--sm-color-warning-text, #7a4d00);
+  background: var(--sm-color-warning-bg, #fff3e0);
+  border: 1px solid var(--sm-color-warning-border, #f0c674);
+  border-radius: var(--sm-radius-sm, 4px);
+  padding: var(--sm-spacing-xs, 4px) var(--sm-spacing-sm);
+  margin-bottom: var(--sm-spacing-sm);
+}
+
 .sm-editor__header-title {
   display: flex;
   align-items: center;

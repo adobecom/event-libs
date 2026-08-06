@@ -173,10 +173,10 @@ describe('da-controller', () => {
       expect(result.ok).to.be.true;
       expect(result.data.schedules).to.have.lengthOf(1);
       expect(result.data.schedules[0].scheduleId).to.equal('s1');
-      expect(result.data.docRefs.s1).to.deep.equal(['/events/my-event/index.html']);
+      expect(result.data.schedules[0].referencedInDocs).to.deep.equal(['/events/my-event/index.html']);
     });
 
-    it('deduplicates a schedule referenced by multiple docs and sorts by recency', async () => {
+    it('lists a schedule referenced by multiple docs and sorts by recency', async () => {
       const older = encodeSchedule({ scheduleId: 'old', title: 'Old', modificationTime: '2026-01-01T00:00:00.000Z', blocks: [] });
       const newer = encodeSchedule({ scheduleId: 'new', title: 'New', modificationTime: '2026-06-01T00:00:00.000Z', blocks: [] });
 
@@ -194,19 +194,18 @@ describe('da-controller', () => {
       const result = await syncSchedules('org', 'repo', '/events/e');
       expect(result.ok).to.be.true;
       expect(result.data.schedules.map((s) => s.scheduleId)).to.deep.equal(['new', 'old']);
-      expect(result.data.docRefs.new).to.have.lengthOf(2);
-      expect(result.data.docRefs.old).to.deep.equal(['/events/e/a.html']);
+      expect(result.data.schedules.find((s) => s.scheduleId === 'new').referencedInDocs).to.have.lengthOf(2);
+      expect(result.data.schedules.find((s) => s.scheduleId === 'old').referencedInDocs).to.deep.equal(['/events/e/a.html']);
     });
 
-    it('prefers the most-recently-modified occurrence when the same scheduleId appears twice with different content', async () => {
-      const stale = encodeSchedule({
-        scheduleId: 'dup', title: 'Original Title', modificationTime: '2026-01-01T00:00:00.000Z', blocks: [{ title: 'a' }],
+    it('collapses identical content re-placed under the same scheduleId to one entry, keeping the most recent modificationTime', async () => {
+      const first = encodeSchedule({
+        scheduleId: 'dup', title: 'Keynote', modificationTime: '2026-01-01T00:00:00.000Z', blocks: [{ title: 'a' }],
       });
-      const fresh = encodeSchedule({
-        scheduleId: 'dup', title: 'Edited Title', modificationTime: '2026-06-01T00:00:00.000Z', blocks: [{ title: 'a' }, { title: 'b' }],
+      const second = encodeSchedule({
+        scheduleId: 'dup', title: 'Keynote', modificationTime: '2026-06-01T00:00:00.000Z', blocks: [{ title: 'a' }],
       });
-      // Stale copy appears first in the doc, freshly-edited copy pasted after it.
-      const docHtml = `<a href="?schedule=${stale}">old</a><a href="?schedule=${fresh}">new</a>`;
+      const docHtml = `<a href="?schedule=${first}">old</a><a href="?schedule=${second}">new</a>`;
 
       setDaFetch(routeFetch([
         ['/list/org/repo/events/e', makeResponse({
@@ -218,17 +217,20 @@ describe('da-controller', () => {
       const result = await syncSchedules('org', 'repo', '/events/e');
       expect(result.ok).to.be.true;
       expect(result.data.schedules).to.have.lengthOf(1);
-      expect(result.data.schedules[0].title).to.equal('Edited Title');
-      expect(result.data.schedules[0].blocks).to.have.lengthOf(2);
-      // The doc only appears once in docRefs even though it contains two links for the same schedule.
-      expect(result.data.docRefs.dup).to.deep.equal(['/events/e/index.html']);
+      expect(result.data.schedules[0].modificationTime).to.equal('2026-06-01T00:00:00.000Z');
+      expect(result.data.schedules[0].hasConflictingVersions).to.be.false;
+      // The doc only appears once, even though it contains two links for the identical schedule.
+      expect(result.data.schedules[0].referencedInDocs).to.deep.equal(['/events/e/index.html']);
     });
 
-    it('prefers the most-recently-modified occurrence regardless of which one is scanned first', async () => {
-      const stale = encodeSchedule({ scheduleId: 'dup2', title: 'Stale', modificationTime: '2026-01-01T00:00:00.000Z', blocks: [] });
-      const fresh = encodeSchedule({ scheduleId: 'dup2', title: 'Fresh', modificationTime: '2026-06-01T00:00:00.000Z', blocks: [] });
-      // Fresh copy happens to be listed/scanned before the stale one this time.
-      const docHtml = `<a href="?schedule=${fresh}">new</a><a href="?schedule=${stale}">old</a>`;
+    it('shows genuinely different content under the same scheduleId as separate entries, each flagged as conflicting', async () => {
+      const original = encodeSchedule({
+        scheduleId: 'dup', title: 'Original Title', modificationTime: '2026-01-01T00:00:00.000Z', blocks: [{ title: 'a' }],
+      });
+      const variant = encodeSchedule({
+        scheduleId: 'dup', title: 'Edited Title', modificationTime: '2026-06-01T00:00:00.000Z', blocks: [{ title: 'a' }, { title: 'b' }],
+      });
+      const docHtml = `<a href="?schedule=${original}">old</a><a href="?schedule=${variant}">new</a>`;
 
       setDaFetch(routeFetch([
         ['/list/org/repo/events/e', makeResponse({
@@ -238,10 +240,16 @@ describe('da-controller', () => {
       ]));
 
       const result = await syncSchedules('org', 'repo', '/events/e');
-      expect(result.data.schedules[0].title).to.equal('Fresh');
+      expect(result.ok).to.be.true;
+      expect(result.data.schedules).to.have.lengthOf(2);
+      expect(result.data.schedules.every((s) => s.hasConflictingVersions)).to.be.true;
+      // Most recently modified sorts first, but both versions are present.
+      expect(result.data.schedules.map((s) => s.title)).to.deep.equal(['Edited Title', 'Original Title']);
+      // Both versions live in the same doc, so both list it.
+      expect(result.data.schedules.every((s) => s.referencedInDocs.includes('/events/e/index.html'))).to.be.true;
     });
 
-    it('prefers the freshest occurrence across two different docs', async () => {
+    it('scopes referencedInDocs to only the docs that actually contain that exact version', async () => {
       const stale = encodeSchedule({ scheduleId: 'dup3', title: 'Stale', modificationTime: '2026-01-01T00:00:00.000Z', blocks: [] });
       const fresh = encodeSchedule({ scheduleId: 'dup3', title: 'Fresh', modificationTime: '2026-06-01T00:00:00.000Z', blocks: [] });
 
@@ -257,53 +265,11 @@ describe('da-controller', () => {
       ]));
 
       const result = await syncSchedules('org', 'repo', '/events/e');
-      expect(result.data.schedules[0].title).to.equal('Fresh');
-      expect(result.data.docRefs.dup3).to.have.lengthOf(2);
-    });
-
-    it('flags hasConflictingVersions when the same scheduleId has genuinely different content', async () => {
-      const stale = encodeSchedule({
-        scheduleId: 'conflict1', title: 'Original', modificationTime: '2026-01-01T00:00:00.000Z', blocks: [{ title: 'a' }],
-      });
-      const fresh = encodeSchedule({
-        scheduleId: 'conflict1', title: 'Variant', modificationTime: '2026-06-01T00:00:00.000Z', blocks: [{ title: 'a' }, { title: 'b' }],
-      });
-      const docHtml = `<a href="?schedule=${stale}">old</a><a href="?schedule=${fresh}">new</a>`;
-
-      setDaFetch(routeFetch([
-        ['/list/org/repo/events/e', makeResponse({
-          json: [{ path: '/org/repo/events/e/index.html', ext: 'html' }],
-        })],
-        ['/source/org/repo/events/e/index.html', makeResponse({ text: docHtml })],
-      ]));
-
-      const result = await syncSchedules('org', 'repo', '/events/e');
-      expect(result.data.schedules).to.have.lengthOf(1);
-      expect(result.data.schedules[0].hasConflictingVersions).to.be.true;
-      // Still shows the freshest content even while flagging the conflict.
-      expect(result.data.schedules[0].title).to.equal('Variant');
-    });
-
-    it('does not flag a conflict when duplicate occurrences have identical content', async () => {
-      const identical = encodeSchedule({
-        scheduleId: 'same1', title: 'Keynote', modificationTime: '2026-01-01T00:00:00.000Z', blocks: [{ title: 'a' }],
-      });
-      // Same schedule, unedited, pasted into two docs — the ordinary reuse case.
-      setDaFetch(routeFetch([
-        ['/list/org/repo/events/e', makeResponse({
-          json: [
-            { path: '/org/repo/events/e/a.html', ext: 'html' },
-            { path: '/org/repo/events/e/b.html', ext: 'html' },
-          ],
-        })],
-        ['/source/org/repo/events/e/a.html', makeResponse({ text: `<a href="?schedule=${identical}">a</a>` })],
-        ['/source/org/repo/events/e/b.html', makeResponse({ text: `<a href="?schedule=${identical}">b</a>` })],
-      ]));
-
-      const result = await syncSchedules('org', 'repo', '/events/e');
-      expect(result.data.schedules).to.have.lengthOf(1);
-      expect(result.data.schedules[0].hasConflictingVersions).to.be.false;
-      expect(result.data.docRefs.same1).to.have.lengthOf(2);
+      expect(result.data.schedules).to.have.lengthOf(2);
+      const freshEntry = result.data.schedules.find((s) => s.title === 'Fresh');
+      const staleEntry = result.data.schedules.find((s) => s.title === 'Stale');
+      expect(freshEntry.referencedInDocs).to.deep.equal(['/events/e/b.html']);
+      expect(staleEntry.referencedInDocs).to.deep.equal(['/events/e/a.html']);
     });
 
     it('does not flag unrelated schedules (different scheduleIds) as conflicting with each other', async () => {
@@ -323,6 +289,33 @@ describe('da-controller', () => {
       expect(result.data.schedules.every((s) => !s.hasConflictingVersions)).to.be.true;
     });
 
+    it('fingerprints blocks order-independently, so re-sorted-but-identical content still collapses to one entry', async () => {
+      const forward = encodeSchedule({
+        scheduleId: 'order1',
+        title: 'T',
+        modificationTime: '2026-01-01T00:00:00.000Z',
+        blocks: [{ title: 'a', startDateTime: 100 }, { title: 'b', startDateTime: 200 }],
+      });
+      const reversed = encodeSchedule({
+        scheduleId: 'order1',
+        title: 'T',
+        modificationTime: '2026-06-01T00:00:00.000Z',
+        blocks: [{ title: 'b', startDateTime: 200 }, { title: 'a', startDateTime: 100 }],
+      });
+      const docHtml = `<a href="?schedule=${forward}">a</a><a href="?schedule=${reversed}">b</a>`;
+
+      setDaFetch(routeFetch([
+        ['/list/org/repo/events/e', makeResponse({
+          json: [{ path: '/org/repo/events/e/index.html', ext: 'html' }],
+        })],
+        ['/source/org/repo/events/e/index.html', makeResponse({ text: docHtml })],
+      ]));
+
+      const result = await syncSchedules('org', 'repo', '/events/e');
+      expect(result.data.schedules).to.have.lengthOf(1);
+      expect(result.data.schedules[0].hasConflictingVersions).to.be.false;
+    });
+
     it('recurses into subfolders when listing files', async () => {
       const encoded = encodeSchedule({ scheduleId: 'deep', title: 'Deep', modificationTime: '2026-06-01T00:00:00.000Z', blocks: [] });
       setDaFetch(routeFetch([
@@ -338,7 +331,7 @@ describe('da-controller', () => {
       const result = await syncSchedules('org', 'repo', '/events/e');
       expect(result.ok).to.be.true;
       expect(result.data.schedules[0].scheduleId).to.equal('deep');
-      expect(result.data.docRefs.deep).to.deep.equal(['/events/e/sub/page.html']);
+      expect(result.data.schedules[0].referencedInDocs).to.deep.equal(['/events/e/sub/page.html']);
     });
 
     it('normalizes an event folder given without a leading slash', async () => {

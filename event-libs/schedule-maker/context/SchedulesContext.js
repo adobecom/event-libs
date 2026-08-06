@@ -21,7 +21,6 @@ const SchedulesProvider = ({ children }) => {
 
   const [eventFolder, setEventFolder] = useState(() => localStorage.getItem('sm-last-event-folder') || null);
   const [schedules, setSchedules] = useState([]);
-  const [docRefs, setDocRefs] = useState({});
   const [hasSynced, setHasSynced] = useState(false);
   const [originalActiveSchedule, setOriginalActiveSchedule] = useState(null);
   const [activeSchedule, setActiveScheduleState] = useState(null);
@@ -76,18 +75,16 @@ const SchedulesProvider = ({ children }) => {
         setToastError(result.error || 'Sync failed');
         return;
       }
-      const { schedules: found, docRefs: refs } = result.data;
+      const { schedules: found } = result.data;
       setSchedules(found.map((s) => prepareScheduleForClient(s)));
-      setDocRefs(refs);
       setHasSynced(true);
 
       const conflicted = found.filter((s) => s.hasConflictingVersions);
       if (conflicted.length > 0) {
         conflicted.forEach((s) => {
-          const key = s.scheduleId || s.title;
           console.warn(
-            `[schedule-maker sync] "${s.title}" has conflicting versions across its referenced docs — `
-            + `showing the most recently modified one. Referenced in: ${(refs[key] || []).join(', ')}`,
+            `[schedule-maker sync] "${s.title}" shares a scheduleId with other version(s) that have different `
+            + `content — this version is referenced in: ${s.referencedInDocs.join(', ')}`,
           );
         });
         setToastSuccess(
@@ -153,7 +150,6 @@ const SchedulesProvider = ({ children }) => {
     eventFolder,
     setEventFolder,
     hasSynced,
-    docRefs,
     isInitialLoading,
     error,
     toastError,
@@ -194,7 +190,6 @@ export const useSchedulesData = () => {
     eventFolder: ctx.eventFolder,
     setEventFolder: ctx.setEventFolder,
     hasSynced: ctx.hasSynced,
-    docRefs: ctx.docRefs,
   };
 };
 

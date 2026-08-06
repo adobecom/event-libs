@@ -7,7 +7,7 @@ import { DA_ORIGIN } from '../../constants.js';
 
 export default function ScheduleHeader() {
   const { org, repo } = useDA();
-  const { activeSchedule, hasUnsavedChanges, docRefs, setActiveSchedule } = useSchedulesData();
+  const { activeSchedule, hasUnsavedChanges, setActiveSchedule } = useSchedulesData();
   const {
     updateScheduleLocally, discardChangesToActiveSchedule, sortBlocksLocally, createAndAddSchedule,
   } = useSchedulesOperations();
@@ -110,10 +110,16 @@ export default function ScheduleHeader() {
           Copy link
         </sp-action-button>
       </div>
-      ${docRefs[activeSchedule.scheduleId]?.length > 0 && html`
+      ${activeSchedule.hasConflictingVersions && html`
+        <div class="sm-editor__conflict-warning">
+          ⚠ This schedule shares an ID with other version(s) that have different content elsewhere.
+          Use Duplicate if this is meant to be an independent schedule.
+        </div>
+      `}
+      ${activeSchedule.referencedInDocs?.length > 0 && html`
         <div class="sm-editor__doc-refs">
           <span class="sm-editor__doc-refs-label">Referenced in:</span>
-          ${docRefs[activeSchedule.scheduleId].map((path) => html`
+          ${activeSchedule.referencedInDocs.map((path) => html`
             <a
               class="sm-editor__doc-ref"
               href="${DA_ORIGIN}/edit#/${org}/${repo}${path.replace(/\.html$/, '')}"

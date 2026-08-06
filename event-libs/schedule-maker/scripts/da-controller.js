@@ -282,13 +282,16 @@ async function rewriteNonCanonicalScheduleLinks(org, repo, filePath) {
 // Fingerprints a decoded schedule's authored content only — title and blocks —
 // excluding volatile fields (modificationTime changes on every Copy Link even
 // with zero real edits; scheduleId is the grouping key itself; createdTime
-// never changes but isn't meaningful content). Two occurrences of the same
-// scheduleId with matching fingerprints are truly the same schedule placed in
-// multiple docs (safe to collapse); differing fingerprints mean genuine
-// content divergence — staleness or an intentional fork, either way a
-// conflict worth surfacing rather than silently discarding.
+// never changes but isn't meaningful content). Blocks are sorted by
+// startDateTime first so the same content in a different array order still
+// fingerprints identically. Two occurrences of the same scheduleId with
+// matching fingerprints are truly the same schedule placed in multiple docs
+// (safe to collapse); differing fingerprints mean genuine content divergence —
+// staleness or an intentional fork, either way worth showing as its own entry
+// rather than silently discarding one.
 function scheduleContentFingerprint(decoded) {
-  return JSON.stringify({ title: decoded?.title, blocks: decoded?.blocks });
+  const blocks = [...(decoded?.blocks || [])].sort((a, b) => (a.startDateTime || 0) - (b.startDateTime || 0));
+  return JSON.stringify({ title: decoded?.title, blocks });
 }
 
 // Handles both correctly-encoded links (single decodeURIComponent) and legacy
@@ -324,9 +327,16 @@ export async function syncSchedules(org, repo, eventFolder) {
   }
   const docFiles = allFiles.filter((f) => f.endsWith('.html'));
 
-  const foundData = new Map(); // scheduleId → decoded object (most recently modified wins)
-  const docRefs = {}; // scheduleId → [filePath, ...]
-  const conflicts = new Set(); // scheduleId → same id, genuinely different content found
+  // Keyed by scheduleId + content fingerprint, not scheduleId alone: identical
+  // content re-placed in multiple docs collapses to one entry (the ordinary
+  // case), but genuinely different content under the same scheduleId — a
+  // different title, different blocks, whatever — is shown as its own entry
+  // rather than merged away. A shared scheduleId with different content is
+  // still worth flagging (see versionsPerId below), since two versions can
+  // otherwise look identical at a glance if their titles happen to match.
+  const foundData = new Map(); // `${scheduleId}::${fingerprint}` → decoded object
+  const docRefsByKey = {}; // same composite key → [filePath, ...] (internal only — folded onto each schedule below)
+  const versionsPerId = new Map(); // scheduleId → Set of fingerprints seen
   const canonicalPrefix = `${DA_ORIGIN}/app/${org}/${repo}/${DA_APP_PATH}`;
 
   const perDocFinds = await mapWithConcurrency(docFiles, SCAN_CONCURRENCY, async (filePath) => {
@@ -370,38 +380,47 @@ export async function syncSchedules(org, repo, eventFolder) {
     const filePath = docFiles[i];
     const seenInDoc = new Set();
     finds.forEach((decoded) => {
-      const key = decoded.scheduleId || decoded.title;
+      const id = decoded.scheduleId || decoded.title;
+      const fingerprint = scheduleContentFingerprint(decoded);
+      const key = `${id}::${fingerprint}`;
+
+      if (!versionsPerId.has(id)) versionsPerId.set(id, new Set());
+      versionsPerId.get(id).add(fingerprint);
+
       const existing = foundData.get(key);
-      if (existing && scheduleContentFingerprint(existing) !== scheduleContentFingerprint(decoded)) {
-        // Same scheduleId, genuinely different content — a stale copy left
-        // behind after an edit, or an intentional variant that never got its
-        // own identity. Either way, flag it rather than silently discarding
-        // one version: chrono-box and ChronoLens both render/inspect each
-        // occurrence independently and would show both, so Sync shouldn't be
-        // the only place that looks like there's just one.
-        conflicts.add(key);
-      }
-      // Same scheduleId can appear more than once (e.g. a stale copy of a link
-      // left in a doc alongside a freshly-copied one after editing) — keep
+      // Identical content under this key can still show up more than once
+      // (e.g. the same unedited schedule pasted into two docs) — keep
       // whichever occurrence has the most recent modificationTime, not just
-      // whichever was scanned first.
+      // whichever was scanned first. Since the key already includes the
+      // fingerprint, this never merges two occurrences with different content.
       if (!existing || new Date(decoded.modificationTime || 0) > new Date(existing.modificationTime || 0)) {
         foundData.set(key, decoded);
       }
       if (!seenInDoc.has(key)) {
         seenInDoc.add(key);
-        if (!docRefs[key]) docRefs[key] = [];
-        docRefs[key].push(filePath);
+        if (!docRefsByKey[key]) docRefsByKey[key] = [];
+        docRefsByKey[key].push(filePath);
       }
     });
   });
 
   const schedules = [...foundData.values()]
-    .map((schedule) => ({
-      ...schedule,
-      hasConflictingVersions: conflicts.has(schedule.scheduleId || schedule.title),
-    }))
+    .map((schedule) => {
+      const id = schedule.scheduleId || schedule.title;
+      const key = `${id}::${scheduleContentFingerprint(schedule)}`;
+      return {
+        ...schedule,
+        // True when this scheduleId has other versions with different
+        // content elsewhere — worth a heads-up even though each version now
+        // shows as its own entry, since two versions can still look identical
+        // at a glance if their titles happen to match (only their blocks differ).
+        hasConflictingVersions: (versionsPerId.get(id)?.size || 0) > 1,
+        // Only the docs that actually contain THIS version's exact content —
+        // not every doc that shares this scheduleId regardless of content.
+        referencedInDocs: docRefsByKey[key] || [],
+      };
+    })
     .sort((a, b) => new Date(b.modificationTime || 0) - new Date(a.modificationTime || 0));
 
-  return { ok: true, data: { schedules, docRefs } };
+  return { ok: true, data: { schedules } };
 }
