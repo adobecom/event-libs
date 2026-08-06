@@ -18,12 +18,14 @@ import LoadingInline from '../components/LoadingInline.js';
 const HOMEPAGE_FIELD_BY_TYPE = {
   [CONFIG_TYPES.HOMEPAGE_UPCOMING_SESSIONS]: {
     field: 'upcomingSessions',
+    metaField: 'upcomingSessionsMeta',
     label: 'Upcoming Sessions',
     metadataKey: 'upcoming-sessions',
     blockHint: 'the upcoming-sessions block',
   },
   [CONFIG_TYPES.HOMEPAGE_FEATURED_SESSIONS]: {
     field: 'featuredSessions',
+    metaField: 'featuredSessionsMeta',
     label: 'Featured Sessions',
     metadataKey: 'featured-sessions',
     blockHint: 'each card-c2 Featured Sessions card',
@@ -100,11 +102,20 @@ export default function ConfigEditor() {
     }
   };
 
+  const handleMetaChange = (sessionId, patch) => {
+    const current = activeConfig.config[homepageMeta.metaField] || {};
+    updateConfigField(homepageMeta.metaField, {
+      ...current,
+      [sessionId]: { ...current[sessionId], ...patch },
+    });
+  };
+
   const handleCopyHomepageJson = async () => {
     const sessionsById = new Map(sessions.map((s) => [s.sessionId, s]));
+    const metaById = activeConfig.config[homepageMeta.metaField] || {};
     const entries = (activeConfig.config[homepageMeta.field] || [])
       .filter((id) => sessionsById.has(id))
-      .map((id) => buildSessionAuthorEntry(sessionsById.get(id), sessionTimes));
+      .map((id) => buildSessionAuthorEntry(sessionsById.get(id), sessionTimes, metaById[id]));
     const ok = await copyTextToClipboard(JSON.stringify(entries));
     if (ok) setToastSuccess(`${homepageMeta.label} JSON copied — paste it into ${homepageMeta.blockHint}'s section-metadata row`);
     else setToastError('Could not copy — select and copy the JSON block manually');
@@ -245,7 +256,9 @@ export default function ConfigEditor() {
             row so you can come back and edit them, but ${homepageMeta.blockHint} doesn't read
             this row directly — it reads its own section-metadata. Use "Copy ${homepageMeta.label} JSON"
             and paste the result into that block's own section-metadata row (key
-            <code>${homepageMeta.metadataKey}</code>) instead.
+            <code>${homepageMeta.metadataKey}</code>) instead. Watch URL / Mobile Rider stream ID
+            are optional per-session overrides — neither has a source in the session catalog, so
+            fill them in only for sessions that actually need one.
           </p>
           ${isLoadingSessions && html`<${LoadingInline} label="Loading sessions…" />`}
           ${sessionsError && html`<p class="tec-editor__error">${sessionsError}</p>`}
@@ -258,6 +271,8 @@ export default function ConfigEditor() {
               onChange=${(next) => updateConfigField(homepageMeta.field, next)} \
               heading="${homepageMeta.label} (display order)" \
               emptyHint="No sessions added yet — add some from the list on the right." \
+              meta=${activeConfig.config[homepageMeta.metaField]} \
+              onMetaChange=${handleMetaChange} \
             />
             <button type="button" class="tec-btn tec-btn--outline" onClick=${handleCopyHomepageJson}>Copy ${homepageMeta.label} JSON</button>
           `}

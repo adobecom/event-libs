@@ -29,6 +29,11 @@ function DragHandleIcon() {
 export default function FeaturedSessionsEditor({
   sessions, sessionTimes, tracks, featuredSessions, onChange,
   heading = 'Featured (display order)', emptyHint = 'No sessions featured yet — add some from the list on the right.',
+  // Optional per-session overrides (watchUrl, mrStreamId) — neither field has
+  // a source in the ESP session catalog (see MOBILE-RIDER-STREAM-ID-GAP.md),
+  // so when a caller needs them in its output JSON, they're authored here by
+  // hand instead. Omitted entirely for callers that don't pass onMetaChange.
+  meta, onMetaChange,
 }) {
   const [search, setSearch] = useState('');
   const [trackFilter, setTrackFilter] = useState('');
@@ -269,6 +274,26 @@ export default function FeaturedSessionsEditor({
                 <div class="tec-featured-editor__info">
                   <span class="tec-featured-editor__title">${title}</span>
                   <span class="tec-featured-editor__track">${session ? getSessionMeta(session) : 'Not found in current session catalog'}</span>
+                  ${onMetaChange && html`
+                    <div class="tec-featured-editor__meta-fields">
+                      <input \
+                        type="text" \
+                        class="tec-field tec-field--s" \
+                        placeholder="Watch URL (optional)" \
+                        aria-label="Watch URL for ${title}" \
+                        value=${meta?.[sessionId]?.watchUrl || ''} \
+                        onInput=${(e) => onMetaChange(sessionId, { watchUrl: e.target.value })} \
+                      />
+                      <input \
+                        type="text" \
+                        class="tec-field tec-field--s" \
+                        placeholder="Mobile Rider stream ID (optional)" \
+                        aria-label="Mobile Rider stream ID for ${title}" \
+                        value=${meta?.[sessionId]?.mrStreamId || ''} \
+                        onInput=${(e) => onMetaChange(sessionId, { mrStreamId: e.target.value })} \
+                      />
+                    </div>
+                  `}
                 </div>
                 <button type="button" class="tec-btn tec-btn--quiet tec-btn--s tec-btn--danger" onClick=${() => handleRemove(sessionId)}>Remove</button>
               </li>

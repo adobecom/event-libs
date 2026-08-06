@@ -1071,3 +1071,20 @@ select.tec-field {
   color: var(--tec-color-text-secondary);
   font-size: 13px;
 }
+
+/* Per-session Watch URL / Mobile Rider stream ID overrides — see
+   MOBILE-RIDER-STREAM-ID-GAP.md for why these are hand-authored here rather
+   than sourced from the ESP session catalog. */
+
+.tec-featured-editor__meta-fields {
+  display: flex;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.tec-field--s {
+  flex: 1;
+  min-width: 0;
+  padding: 4px 8px;
+  font-size: 12px;
+}

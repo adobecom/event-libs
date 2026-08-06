@@ -120,7 +120,11 @@ export function stringifyConfig(value, indent = '') {
 // section-metadata (not the tier-1-event-config metadata this app otherwise
 // writes to), so it's built here rather than looked up at render time. Shared
 // by both Homepage config types — they need the identical shape.
-export function buildSessionAuthorEntry(session, sessionTimes) {
+// `meta` is an optional { watchUrl, mrStreamId } hand-authored override (see
+// MOBILE-RIDER-STREAM-ID-GAP.md) — both omitted entirely from the entry when
+// blank, matching upcoming-sessions.js's own authored-data shape, where an
+// absent key (not an empty string) means "not applicable to this session".
+export function buildSessionAuthorEntry(session, sessionTimes, meta) {
   const match = (sessionTimes || []).find((st) => st.sessionId === session.sessionId);
   const entry = {
     sessionId: session.sessionId,
@@ -129,6 +133,8 @@ export function buildSessionAuthorEntry(session, sessionTimes) {
     track: getSessionTrack(session) || '',
     url: session.url,
   };
+  if (meta?.watchUrl) entry.watchUrl = meta.watchUrl;
+  if (meta?.mrStreamId) entry.mrStreamId = meta.mrStreamId;
   if (match) {
     entry.sessionTime = {
       startTimeMillis: match.startTimeMillis,

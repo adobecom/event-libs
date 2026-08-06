@@ -20,7 +20,9 @@ function emptyConfig() {
     trackIcons: {},
     allowDoubleBooking: false,
     featuredSessions: [],
+    featuredSessionsMeta: {},
     upcomingSessions: [],
+    upcomingSessionsMeta: {},
     rfApiUrl: '',
     rfProfileId: '',
   };
