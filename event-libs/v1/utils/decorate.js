@@ -1043,6 +1043,20 @@ function addStylesToEventPage() {
   document.head.appendChild(link);
 }
 
+// e.g. "dark" or "dark(blocks:hero-marquee,profile-cards)"
+function parseThemeValue(raw) {
+  const value = raw?.toLowerCase().trim();
+  const match = value?.match(/^(dark|light)(?:\(\s*blocks\s*:\s*([^)]*)\)\s*)?$/);
+  if (!match) return null;
+  const [, theme, blocksParam] = match;
+  // undefined (no parens) means whole-page; '' (empty blocks: list) must stay
+  // distinct from that so it scopes to zero blocks instead of falling back.
+  const blockNames = blocksParam !== undefined
+    ? blocksParam.split(',').map((b) => b.trim()).filter(Boolean)
+    : null;
+  return { theme, blockNames };
+}
+
 export function applyAreaTheme(area = document) {
   try {
     const customAttributes = JSON.parse(getMetadata('custom-attributes'));
@@ -1051,14 +1065,22 @@ export function applyAreaTheme(area = document) {
     );
     if (!theme) return;
 
-    const themeValue = theme.values?.[0]?.value?.toLowerCase().trim();
-    if (themeValue !== 'dark' && themeValue !== 'light') return;
+    const parsed = parseThemeValue(theme.values?.[0]?.value);
+    if (!parsed) return;
+    const { theme: themeValue, blockNames } = parsed;
 
     const isDocument = area === document;
     const blocks = isDocument
       ? area.body.querySelectorAll('main > div > div[class]')
       : area.querySelectorAll('div[class]');
     blocks.forEach((block) => {
+      if (blockNames) {
+        if (!blockNames.some((name) => block.classList.contains(name))) return;
+        block.classList.remove('dark', 'light');
+        block.classList.add(themeValue);
+        return;
+      }
+
       const isSectionMetadata = block.classList.contains('section-metadata');
       if (isSectionMetadata) {
         const blockRows = block.querySelectorAll(':scope > div');
