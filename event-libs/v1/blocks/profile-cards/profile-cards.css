@@ -85,6 +85,8 @@
   padding: 0;
   margin: 0;
   font: inherit;
+  font-size: var(--type-body-xs-size);
+  line-height: var(--type-body-xs-lh);
   font-weight: 400;
   text-decoration: underline;
   cursor: pointer;
