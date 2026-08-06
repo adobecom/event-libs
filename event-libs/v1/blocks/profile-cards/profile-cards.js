@@ -268,12 +268,50 @@ export function syncBladeBiosOverflow(el) {
   el.querySelectorAll('.card-container').forEach(syncBladeBioOverflow);
 }
 
-function scheduleBladeBiosOverflowSync(el) {
+function debounce(fn, delay) {
+  let timer;
+  return (...args) => {
+    clearTimeout(timer);
+    timer = setTimeout(() => fn(...args), delay);
+  };
+}
+
+const bladeOverflowObservers = new WeakMap();
+
+function disconnectBladeBiosOverflowObserver(el) {
+  const disconnect = bladeOverflowObservers.get(el);
+  if (disconnect) {
+    disconnect();
+    bladeOverflowObservers.delete(el);
+  }
+}
+
+function connectBladeBiosOverflowObserver(el) {
+  if (typeof ResizeObserver === 'undefined') return;
+  disconnectBladeBiosOverflowObserver(el);
+
+  const cardsWrapper = el.querySelector('.cards-wrapper');
+  if (!cardsWrapper) return;
+
+  const debouncedSync = debounce(() => syncBladeBiosOverflow(el), 100);
+  const ro = new ResizeObserver(() => debouncedSync());
+  ro.observe(cardsWrapper);
+  bladeOverflowObservers.set(el, () => ro.disconnect());
+}
+
+/** Waits for fonts.ready first - otherwise the ResizeObserver's unconditional initial observe() callback would measure against fallback-font metrics. */
+async function initBladeBiosOverflowSync(el) {
+  try {
+    await document.fonts?.ready;
+  } catch {
+    // ignore font loading errors
+  }
   requestAnimationFrame(() => {
     requestAnimationFrame(() => {
       syncBladeBiosOverflow(el);
     });
   });
+  connectBladeBiosOverflowObserver(el);
 }
 
 function decorateContentBlade(cardContainer, data) {
@@ -563,7 +601,7 @@ function decorateStaticCards(el, { modal, blade } = {}) {
     buildMiloCarousel(cardsWrapper, Array.from(cardsWrapper.querySelectorAll('.card-container')));
   }
 
-  if (blade) scheduleBladeBiosOverflowSync(el);
+  if (blade) initBladeBiosOverflowSync(el);
 }
 
 function decorateCards(el, data, { simple, modal, blade, speakerType } = {}) {
@@ -606,7 +644,7 @@ function decorateCards(el, data, { simple, modal, blade, speakerType } = {}) {
     buildMiloCarousel(cardsWrapper, Array.from(cardsWrapper.querySelectorAll('.card-container')));
   }
 
-  if (blade) scheduleBladeBiosOverflowSync(el);
+  if (blade) initBladeBiosOverflowSync(el);
 }
 
 function sortDataByOrdinals(data) {
