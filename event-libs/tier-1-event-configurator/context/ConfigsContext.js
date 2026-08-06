@@ -9,11 +9,13 @@ import {
 import { useDA } from './DAContext.js';
 import { getDefaultTrackIcon, DEFAULT_ICON_COLOR } from '../default-track-icons.js';
 import { getDisplayTitle } from '../utils.js';
+import { CONFIG_TYPES } from '../constants.js';
 
 const ConfigsContext = createContext();
 
 function emptyConfig() {
   return {
+    configName: '',
     eventTitle: '',
     trackIcons: {},
     allowDoubleBooking: false,
@@ -60,35 +62,45 @@ const ConfigsProvider = ({ children }) => {
     if (org && repo && !hasLoaded) loadConfigs();
   }, [org, repo, hasLoaded, loadConfigs]);
 
+  // Rows are keyed on (eventId, configType) together — the same event can
+  // carry a Global row plus separate Homepage rows (Upcoming Sessions,
+  // Featured Sessions) side by side. Absent configType means Global, for
+  // rows saved before this field existed.
   const findConfigByEventId = useCallback(
-    (eventId) => configs.find((c) => c.eventId === eventId) || null,
+    (eventId, configType = CONFIG_TYPES.GLOBAL) => configs.find(
+      (c) => c.eventId === eventId && (c.configType || CONFIG_TYPES.GLOBAL) === configType,
+    ) || null,
     [configs],
   );
 
-  // Starts a fresh row for a newly picked event. Dedup (routing to Edit when a
-  // row already exists for the picked event) is the picker's responsibility —
-  // see PLAN.md Phase 4 — so this always assumes no prior row. `eventServiceEnv`
-  // is whatever ESP tier was active when the event was picked (Library.js
-  // reads it from EventEnvContext) — row-level only, never pasted into the
-  // page's Config, since it's purely an authoring-time detail of where this
-  // event's data came from, re-applied automatically when the row is edited
-  // later (see Library.js's openEdit) so a session-catalog refetch doesn't
-  // silently default back to prod after a page reload resets the override.
-  const startNewConfig = useCallback((event, eventServiceEnv) => {
+  // Starts a fresh row for a newly picked event + config type. Dedup (routing
+  // to Edit when a row already exists for the picked event+type) is the
+  // picker's responsibility — see PLAN.md Phase 4 — so this always assumes no
+  // prior row. `eventServiceEnv` is whatever ESP tier was active when the
+  // event was picked (Library.js reads it from EventEnvContext) — row-level
+  // only, never pasted into the page's Config, since it's purely an
+  // authoring-time detail of where this event's data came from, re-applied
+  // automatically when the row is edited later (see Library.js's openEdit) so
+  // a session-catalog refetch doesn't silently default back to prod after a
+  // page reload resets the override.
+  const startNewConfig = useCallback((event, eventServiceEnv, configType = CONFIG_TYPES.GLOBAL) => {
     setActiveConfig({
       eventId: event.eventId,
       backendEventTitle: event.enTitle || event.eventId,
       eventServiceEnv,
+      configType,
       config: emptyConfig(),
     });
   }, []);
 
-  // Clones an existing row's config onto a newly picked Event ID. App-stamped
-  // identity fields (eventId/backendEventTitle/updated) are dropped rather
-  // than carried over stale — upsertConfig re-stamps them at save time.
-  // eventTitle (the author's alternative title) is also reset — it names the
-  // source event specifically, not a generic style setting like trackIcons,
-  // so carrying it over would silently mislabel the new event.
+  // Clones an existing row's config onto a newly picked Event ID, keeping the
+  // source row's configType — Duplicate always stays within the same config
+  // surface, it just retargets which event it's for. App-stamped identity
+  // fields (eventId/backendEventTitle/updated) are dropped rather than
+  // carried over stale — upsertConfig re-stamps them at save time.
+  // eventTitle/configName (the author-set names) are also reset — they name
+  // the source specifically, not a generic style setting like trackIcons, so
+  // carrying them over would silently mislabel the new event.
   // `eventServiceEnv` is the *new* pick's env, not the source row's —
   // Duplicate can legitimately target a different tier than its source.
   // rfApiUrl/rfProfileId always reset blank — reusing another event's RF
@@ -102,8 +114,9 @@ const ConfigsProvider = ({ children }) => {
       eventId: event.eventId,
       backendEventTitle: event.enTitle || event.eventId,
       eventServiceEnv,
+      configType: sourceRow.configType || CONFIG_TYPES.GLOBAL,
       config: {
-        ...clonedConfig, eventTitle: '', rfApiUrl: '', rfProfileId: '',
+        ...clonedConfig, configName: '', eventTitle: '', rfApiUrl: '', rfProfileId: '',
       },
     });
   }, []);
@@ -175,7 +188,10 @@ const ConfigsProvider = ({ children }) => {
       return result;
     }
     setConfigs((prev) => {
-      const idx = prev.findIndex((r) => r.eventId === result.data.eventId);
+      const savedType = result.data.configType || CONFIG_TYPES.GLOBAL;
+      const idx = prev.findIndex(
+        (r) => r.eventId === result.data.eventId && (r.configType || CONFIG_TYPES.GLOBAL) === savedType,
+      );
       if (idx === -1) return [result.data, ...prev];
       const next = [...prev];
       next[idx] = result.data;
@@ -186,14 +202,16 @@ const ConfigsProvider = ({ children }) => {
     return result;
   }, [activeConfig, org, repo]);
 
-  const removeConfig = useCallback(async (eventId) => {
+  const removeConfig = useCallback(async (eventId, configType = CONFIG_TYPES.GLOBAL) => {
     if (!org || !repo) return { ok: false };
-    const result = await deleteConfigController(org, repo, eventId);
+    const result = await deleteConfigController(org, repo, eventId, configType);
     if (!result.ok) {
       setToastError(result.error || 'Failed to delete — please retry');
       return result;
     }
-    setConfigs((prev) => prev.filter((r) => r.eventId !== eventId));
+    setConfigs((prev) => prev.filter(
+      (r) => !(r.eventId === eventId && (r.configType || CONFIG_TYPES.GLOBAL) === configType),
+    ));
     setToastSuccess('Config deleted');
     return result;
   }, [org, repo]);

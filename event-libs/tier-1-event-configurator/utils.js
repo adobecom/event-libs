@@ -64,10 +64,11 @@ export function isTrackIconEntryComplete(entry) {
   return !entry.color || !!entry.icon;
 }
 
-// Display title for a row: the author's alternative title if set, else the
-// real backend/ESP title, else the raw Event ID.
+// Display title for a row: the author-set config name if set, else the
+// author's alternative event title (Global rows only), else the real
+// backend/ESP title, else the raw Event ID.
 export function getDisplayTitle(row) {
-  return row?.config?.eventTitle || row?.backendEventTitle || row?.eventId || '';
+  return row?.config?.configName || row?.config?.eventTitle || row?.backendEventTitle || row?.eventId || '';
 }
 
 function isPlainObject(value) {
@@ -114,10 +115,12 @@ export function stringifyConfig(value, indent = '') {
 }
 
 // Mirrors upcoming-sessions/docs/build-author-data.mjs's toAuthorEntry() shape —
-// the small per-session object upcoming-sessions.js reads directly from its own
-// authored section-metadata (not the tier-1-event-config metadata this app
-// otherwise writes to), so it's built here rather than looked up at render time.
-export function buildUpcomingSessionEntry(session, sessionTimes) {
+// the small per-session object a homepage block (upcoming-sessions.js, or
+// card-c2's Featured Sessions hydrator) reads directly from its own authored
+// section-metadata (not the tier-1-event-config metadata this app otherwise
+// writes to), so it's built here rather than looked up at render time. Shared
+// by both Homepage config types — they need the identical shape.
+export function buildSessionAuthorEntry(session, sessionTimes) {
   const match = (sessionTimes || []).find((st) => st.sessionId === session.sessionId);
   const entry = {
     sessionId: session.sessionId,

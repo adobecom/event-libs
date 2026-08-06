@@ -9,6 +9,26 @@ const PAGES = {
   editor: 'editor',
 };
 
+// Two config surfaces: Global (pasted into an event page's tier-1-event-config
+// metadata, consumed across the event experience — Session Guide, Event App, etc.)
+// and Homepage (pasted into a single homepage block's own section-metadata —
+// upcoming-sessions or card-c2/Featured Sessions — nothing else reads it).
+const CONFIG_TYPES = {
+  GLOBAL: 'global',
+  HOMEPAGE_UPCOMING_SESSIONS: 'homepage-upcoming-sessions',
+  HOMEPAGE_FEATURED_SESSIONS: 'homepage-featured-sessions',
+};
+
+const HOMEPAGE_CONFIG_TYPE_OPTIONS = [
+  { value: CONFIG_TYPES.HOMEPAGE_UPCOMING_SESSIONS, label: 'Upcoming Sessions' },
+  { value: CONFIG_TYPES.HOMEPAGE_FEATURED_SESSIONS, label: 'Featured Sessions' },
+];
+
+function isHomepageConfigType(configType) {
+  return configType === CONFIG_TYPES.HOMEPAGE_UPCOMING_SESSIONS
+    || configType === CONFIG_TYPES.HOMEPAGE_FEATURED_SESSIONS;
+}
+
 // Default flow for New Config/Duplicate is browsing the full ESP catalog
 // (EventPicker); Library.js auto-falls-back to ManualEventLookup if that
 // fails at runtime. Flip to false to disable browse outright.
@@ -30,4 +50,7 @@ export {
   PAGES,
   EVENT_BROWSE_ENABLED,
   EVENT_SERVICE_ENV_OPTIONS,
+  CONFIG_TYPES,
+  HOMEPAGE_CONFIG_TYPE_OPTIONS,
+  isHomepageConfigType,
 };

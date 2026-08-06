@@ -949,3 +949,125 @@ select.tec-field {
   backdrop-filter: blur(6px);
   border-top: 1px solid var(--tec-color-border);
 }
+
+/* Library — grouped by config type (Global / Homepage) */
+
+.tec-library__group {
+  margin-bottom: var(--tec-spacing-xl);
+  padding-bottom: var(--tec-spacing-lg);
+  border-bottom: 1px solid var(--tec-color-border);
+}
+
+.tec-library__group:last-of-type {
+  border-bottom: none;
+}
+
+.tec-library__group-header {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--tec-spacing-md);
+  margin-bottom: var(--tec-spacing-md);
+}
+
+.tec-library__group-icon {
+  font-size: 20px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.tec-library__group-heading {
+  flex: 1;
+  min-width: 0;
+}
+
+.tec-library__group-heading h2 {
+  display: flex;
+  align-items: center;
+  gap: var(--tec-spacing-sm);
+  margin: 0 0 4px;
+  font-size: 17px;
+}
+
+.tec-library__group-desc {
+  margin: 0;
+  color: var(--tec-color-text-secondary);
+  font-size: 13px;
+}
+
+.tec-library__group-badge {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  padding: 2px 10px;
+  border-radius: 999px;
+}
+
+.tec-library__group-badge--global {
+  background: #e5f1fd;
+  color: var(--tec-color-primary);
+}
+
+.tec-library__group-badge--homepage {
+  background: var(--tec-color-success-bg);
+  color: var(--tec-color-success);
+}
+
+.tec-library__item-type {
+  flex-shrink: 0;
+  background: var(--tec-color-surface-hover);
+  color: var(--tec-color-text-secondary);
+  border: 1px solid var(--tec-color-border);
+  border-radius: 999px;
+  padding: 1px 8px;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.tec-library__new-menu {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.tec-library__new-menu-list {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 4px);
+  z-index: 10;
+  background: var(--tec-color-surface);
+  border: 1px solid var(--tec-color-border);
+  border-radius: var(--tec-border-radius);
+  box-shadow: var(--tec-shadow-sm);
+  min-width: 180px;
+  overflow: hidden;
+}
+
+.tec-library__new-menu-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: var(--tec-spacing-sm) var(--tec-spacing-md);
+  background: none;
+  border: none;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.tec-library__new-menu-item:hover {
+  background: var(--tec-color-surface-hover);
+}
+
+.tec-library__how-differ {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--tec-spacing-md);
+  padding: var(--tec-spacing-md);
+  background: var(--tec-color-surface-hover);
+  border: 1px solid var(--tec-color-border);
+  border-radius: var(--tec-border-radius);
+}
+
+.tec-library__how-differ p {
+  margin: 4px 0 0;
+  color: var(--tec-color-text-secondary);
+  font-size: 13px;
+}

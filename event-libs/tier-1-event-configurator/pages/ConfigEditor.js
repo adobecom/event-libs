@@ -4,11 +4,31 @@ import { useNavigation } from '../context/NavigationContext.js';
 import { useConfigs } from '../context/ConfigsContext.js';
 import {
   copyTextToClipboard, extractDistinctTracks, isTrackIconEntryComplete, getDisplayTitle, stringifyConfig,
-  buildUpcomingSessionEntry,
+  buildSessionAuthorEntry,
 } from '../utils.js';
+import { CONFIG_TYPES, isHomepageConfigType } from '../constants.js';
 import TrackIconEditor from '../components/TrackIconEditor.js';
 import FeaturedSessionsEditor from '../components/FeaturedSessionsEditor.js';
 import LoadingInline from '../components/LoadingInline.js';
+
+// Which config field + block/metadata key a Homepage config type feeds —
+// both homepage config types share the exact same picker UI, they only
+// differ in which config field they write to and which block ultimately
+// reads the generated JSON.
+const HOMEPAGE_FIELD_BY_TYPE = {
+  [CONFIG_TYPES.HOMEPAGE_UPCOMING_SESSIONS]: {
+    field: 'upcomingSessions',
+    label: 'Upcoming Sessions',
+    metadataKey: 'upcoming-sessions',
+    blockHint: 'the upcoming-sessions block',
+  },
+  [CONFIG_TYPES.HOMEPAGE_FEATURED_SESSIONS]: {
+    field: 'featuredSessions',
+    label: 'Featured Sessions',
+    metadataKey: 'featured-sessions',
+    blockHint: 'each card-c2 Featured Sessions card',
+  },
+};
 
 export default function ConfigEditor() {
   const { goToLibrary } = useNavigation();
@@ -24,6 +44,9 @@ export default function ConfigEditor() {
   const [isSaving, setIsSaving] = useState(false);
 
   const eventId = activeConfig?.eventId;
+  const configType = activeConfig?.configType || CONFIG_TYPES.GLOBAL;
+  const isHomepage = isHomepageConfigType(configType);
+  const homepageMeta = HOMEPAGE_FIELD_BY_TYPE[configType];
 
   useEffect(() => {
     if (!eventId) return undefined;
@@ -38,12 +61,12 @@ export default function ConfigEditor() {
       }
       setSessions(result.data.sessions);
       setSessionTimes(result.data.sessionTimes);
-      seedTrackIcons(extractDistinctTracks(result.data.sessions));
+      if (!isHomepage) seedTrackIcons(extractDistinctTracks(result.data.sessions));
     }).finally(() => {
       if (!cancelled) setIsLoadingSessions(false);
     });
     return () => { cancelled = true; };
-  }, [eventId, seedTrackIcons]);
+  }, [eventId, isHomepage, seedTrackIcons]);
 
   const tracks = useMemo(() => extractDistinctTracks(sessions), [sessions]);
 
@@ -55,10 +78,11 @@ export default function ConfigEditor() {
   // A color authored with no icon to apply it to doesn't make sense (icon
   // alone is fine — color implicitly defaults to black) — flagged here
   // rather than silently saved in a state that can't render (PLAN.md Phase 4).
+  // Global-only: Homepage configs don't author track icons at all.
   const incompleteTracks = useMemo(() => {
-    if (!activeConfig) return [];
+    if (!activeConfig || isHomepage) return [];
     return tracks.filter((track) => !isTrackIconEntryComplete(activeConfig.config.trackIcons?.[track]));
-  }, [tracks, activeConfig]);
+  }, [tracks, activeConfig, isHomepage]);
 
   const handleCancel = () => {
     clearActiveConfig();
@@ -76,13 +100,13 @@ export default function ConfigEditor() {
     }
   };
 
-  const handleCopyUpcomingSessions = async () => {
+  const handleCopyHomepageJson = async () => {
     const sessionsById = new Map(sessions.map((s) => [s.sessionId, s]));
-    const entries = (activeConfig.config.upcomingSessions || [])
+    const entries = (activeConfig.config[homepageMeta.field] || [])
       .filter((id) => sessionsById.has(id))
-      .map((id) => buildUpcomingSessionEntry(sessionsById.get(id), sessionTimes));
+      .map((id) => buildSessionAuthorEntry(sessionsById.get(id), sessionTimes));
     const ok = await copyTextToClipboard(JSON.stringify(entries));
-    if (ok) setToastSuccess('Upcoming Sessions JSON copied — paste it into the upcoming-sessions block\'s section-metadata row');
+    if (ok) setToastSuccess(`${homepageMeta.label} JSON copied — paste it into ${homepageMeta.blockHint}'s section-metadata row`);
     else setToastError('Could not copy — select and copy the JSON block manually');
   };
 
@@ -106,17 +130,33 @@ export default function ConfigEditor() {
         </div>
       </div>
 
-      <section class="tec-editor__section">
-        <h2>Event title</h2>
-        <p class="tec-editor__section-hint">Optional alternative display name for this event. Leave blank to use the backend title ("${activeConfig.backendEventTitle}") everywhere this is shown.</p>
-        <input
-          type="text"
-          class="tec-field tec-editor__title-input"
-          placeholder=${activeConfig.backendEventTitle}
-          value=${activeConfig.config.eventTitle || ''}
-          onInput=${(e) => updateConfigField('eventTitle', e.target.value)}
-        />
-      </section>
+      ${isHomepage && html`
+        <section class="tec-editor__section">
+          <h2>Config name</h2>
+          <p class="tec-editor__section-hint">Name this config so it's easy to find in the library later. Purely a label — never pasted anywhere.</p>
+          <input
+            type="text"
+            class="tec-field tec-editor__title-input"
+            placeholder=${`e.g. "${activeConfig.backendEventTitle} homepage config"`}
+            value=${activeConfig.config.configName || ''}
+            onInput=${(e) => updateConfigField('configName', e.target.value)}
+          />
+        </section>
+      `}
+
+      ${!isHomepage && html`
+        <section class="tec-editor__section">
+          <h2>Event title</h2>
+          <p class="tec-editor__section-hint">Optional alternative display name for this event. Leave blank to use the backend title ("${activeConfig.backendEventTitle}") everywhere this is shown.</p>
+          <input
+            type="text"
+            class="tec-field tec-editor__title-input"
+            placeholder=${activeConfig.backendEventTitle}
+            value=${activeConfig.config.eventTitle || ''}
+            onInput=${(e) => updateConfigField('eventTitle', e.target.value)}
+          />
+        </section>
+      `}
 
       <section class="tec-editor__section">
         <h2>Sessions</h2>
@@ -127,115 +167,102 @@ export default function ConfigEditor() {
         `}
       </section>
 
-      <section class="tec-editor__section">
-        <h2>Track icons & colors</h2>
-        <p class="tec-editor__section-hint">Icons pre-fill from the built-in defaults where known. Color always starts black — pick a color per track, or leave both icon and color unset to use the page's own built-in default at render time.</p>
-        ${isLoadingSessions && html`<${LoadingInline} label="Loading tracks…" />`}
-        ${sessionsError && html`<p class="tec-editor__error">${sessionsError}</p>`}
-        ${incompleteTracks.length > 0 && html`
-          <p class="tec-editor__error">
-            ${incompleteTracks.length} track${incompleteTracks.length === 1 ? '' : 's'} ${incompleteTracks.length === 1 ? 'has' : 'have'} a color set with no icon — pick one, or clear the color, before saving: ${incompleteTracks.join(', ')}
+      ${!isHomepage && html`
+        <section class="tec-editor__section">
+          <h2>Track icons & colors</h2>
+          <p class="tec-editor__section-hint">Icons pre-fill from the built-in defaults where known. Color always starts black — pick a color per track, or leave both icon and color unset to use the page's own built-in default at render time.</p>
+          ${isLoadingSessions && html`<${LoadingInline} label="Loading tracks…" />`}
+          ${sessionsError && html`<p class="tec-editor__error">${sessionsError}</p>`}
+          ${incompleteTracks.length > 0 && html`
+            <p class="tec-editor__error">
+              ${incompleteTracks.length} track${incompleteTracks.length === 1 ? '' : 's'} ${incompleteTracks.length === 1 ? 'has' : 'have'} a color set with no icon — pick one, or clear the color, before saving: ${incompleteTracks.join(', ')}
+            </p>
+          `}
+          ${!isLoadingSessions && !sessionsError && html`
+            <${TrackIconEditor}
+              tracks=${tracks}
+              trackIcons=${activeConfig.config.trackIcons}
+              onChange=${updateTrackIcon}
+            />
+          `}
+        </section>
+
+        <section class="tec-editor__section">
+          <h2>Allow double booking</h2>
+          <p class="tec-editor__section-hint">Lets an attendee schedule sessions that overlap in time on this event's Tier 1 surfaces.</p>
+          <label class="tec-editor__checkbox">
+            <input
+              type="checkbox"
+              checked=${!!activeConfig.config.allowDoubleBooking}
+              onChange=${(e) => updateConfigField('allowDoubleBooking', e.target.checked)}
+            />
+            Allow double booking
+          </label>
+        </section>
+
+        <section class="tec-editor__section">
+          <h2>RainFocus API</h2>
+          <p class="tec-editor__section-hint">
+            Lets this event's Tier 1 pages make live RainFocus schedule/favorites calls.
+            Part of the Config JSON below — one payload, pasted once into the page's
+            <code>tier-1-event-config</code> metadata. The profile id isn't a secret
+            (RainFocus restricts access by IP allowlist on their side), but it is specific to
+            this event — leave blank and the page falls back to the site's default event.
           </p>
-        `}
-        ${!isLoadingSessions && !sessionsError && html`
-          <${TrackIconEditor}
-            tracks=${tracks}
-            trackIcons=${activeConfig.config.trackIcons}
-            onChange=${updateTrackIcon}
-          />
-        `}
-      </section>
-
-      <section class="tec-editor__section">
-        <h2>Allow double booking</h2>
-        <p class="tec-editor__section-hint">Lets an attendee schedule sessions that overlap in time on this event's Tier 1 surfaces.</p>
-        <label class="tec-editor__checkbox">
+          <label class="tec-editor__field-label" for="tec-rf-api-url">RainFocus API URL</label>
           <input
-            type="checkbox"
-            checked=${!!activeConfig.config.allowDoubleBooking}
-            onChange=${(e) => updateConfigField('allowDoubleBooking', e.target.checked)}
+            id="tec-rf-api-url"
+            type="text"
+            class="tec-field tec-editor__rf-input"
+            placeholder="https://www.adobe.com/max-api/"
+            value=${activeConfig.config.rfApiUrl || ''}
+            onInput=${(e) => updateConfigField('rfApiUrl', e.target.value)}
           />
-          Allow double booking
-        </label>
-      </section>
-
-      <section class="tec-editor__section">
-        <h2>Featured sessions</h2>
-        <p class="tec-editor__section-hint">Pick which sessions appear in the featured carousel, and set their display order.</p>
-        ${isLoadingSessions && html`<${LoadingInline} label="Loading sessions…" />`}
-        ${sessionsError && html`<p class="tec-editor__error">${sessionsError}</p>`}
-        ${!isLoadingSessions && !sessionsError && html`
-          <${FeaturedSessionsEditor} \
-            sessions=${sessions} \
-            sessionTimes=${sessionTimes} \
-            tracks=${tracks} \
-            featuredSessions=${activeConfig.config.featuredSessions} \
-            onChange=${(next) => updateConfigField('featuredSessions', next)} \
+          <label class="tec-editor__field-label" for="tec-rf-profile-id">RainFocus profile ID</label>
+          <input
+            id="tec-rf-profile-id"
+            type="text"
+            class="tec-field tec-editor__rf-input"
+            placeholder="this event's RainFocus profile id"
+            value=${activeConfig.config.rfProfileId || ''}
+            onInput=${(e) => updateConfigField('rfProfileId', e.target.value)}
           />
-        `}
-      </section>
+        </section>
 
-      <section class="tec-editor__section">
-        <h2>Upcoming sessions</h2>
-        <p class="tec-editor__section-hint">
-          Pick which sessions appear in the Homepage marquee's Upcoming Sessions row, and set
-          their order. Your picks are saved with this row so you can come back and edit them,
-          but the <code>upcoming-sessions</code> block itself doesn't read the Config JSON
-          below — it reads its own section-metadata. Use "Copy Upcoming Sessions JSON" and paste
-          the result into that block's own section-metadata row (key
-          <code>upcoming-sessions</code>) instead.
-        </p>
-        ${isLoadingSessions && html`<${LoadingInline} label="Loading sessions…" />`}
-        ${sessionsError && html`<p class="tec-editor__error">${sessionsError}</p>`}
-        ${!isLoadingSessions && !sessionsError && html`
-          <${FeaturedSessionsEditor} \
-            sessions=${sessions} \
-            sessionTimes=${sessionTimes} \
-            tracks=${tracks} \
-            featuredSessions=${activeConfig.config.upcomingSessions} \
-            onChange=${(next) => updateConfigField('upcomingSessions', next)} \
-            heading="Upcoming (display order)" \
-            emptyHint="No sessions added yet — add some from the list on the right." \
-          />
-          <button type="button" class="tec-btn tec-btn--outline" onClick=${handleCopyUpcomingSessions}>Copy Upcoming Sessions JSON</button>
-        `}
-      </section>
+        <section class="tec-editor__section">
+          <h2>Config JSON</h2>
+          <p class="tec-editor__section-hint">This is what gets saved to the row, and what you'll paste into the page's <code>tier-1-event-config</code> metadata after saving.</p>
+          <pre class="tec-editor__config-preview">${configPreview}</pre>
+          <button type="button" class="tec-btn tec-btn--outline" onClick=${handleCopy}>Copy config</button>
+        </section>
+      `}
 
-      <section class="tec-editor__section">
-        <h2>RainFocus API</h2>
-        <p class="tec-editor__section-hint">
-          Lets this event's Tier 1 pages make live RainFocus schedule/favorites calls.
-          Part of the Config JSON below — one payload, pasted once into the page's
-          <code>tier-1-event-config</code> metadata. The profile id isn't a secret
-          (RainFocus restricts access by IP allowlist on their side), but it is specific to
-          this event — leave blank and the page falls back to the site's default event.
-        </p>
-        <label class="tec-editor__field-label" for="tec-rf-api-url">RainFocus API URL</label>
-        <input
-          id="tec-rf-api-url"
-          type="text"
-          class="tec-field tec-editor__rf-input"
-          placeholder="https://www.adobe.com/max-api/"
-          value=${activeConfig.config.rfApiUrl || ''}
-          onInput=${(e) => updateConfigField('rfApiUrl', e.target.value)}
-        />
-        <label class="tec-editor__field-label" for="tec-rf-profile-id">RainFocus profile ID</label>
-        <input
-          id="tec-rf-profile-id"
-          type="text"
-          class="tec-field tec-editor__rf-input"
-          placeholder="this event's RainFocus profile id"
-          value=${activeConfig.config.rfProfileId || ''}
-          onInput=${(e) => updateConfigField('rfProfileId', e.target.value)}
-        />
-      </section>
-
-      <section class="tec-editor__section">
-        <h2>Config JSON</h2>
-        <p class="tec-editor__section-hint">This is what gets saved to the row, and what you'll paste into the page's <code>tier-1-event-config</code> metadata after saving.</p>
-        <pre class="tec-editor__config-preview">${configPreview}</pre>
-        <button type="button" class="tec-btn tec-btn--outline" onClick=${handleCopy}>Copy config</button>
-      </section>
+      ${isHomepage && html`
+        <section class="tec-editor__section">
+          <h2>${homepageMeta.label}</h2>
+          <p class="tec-editor__section-hint">
+            Pick which sessions appear, and set their order. Your picks are saved with this
+            row so you can come back and edit them, but ${homepageMeta.blockHint} doesn't read
+            this row directly — it reads its own section-metadata. Use "Copy ${homepageMeta.label} JSON"
+            and paste the result into that block's own section-metadata row (key
+            <code>${homepageMeta.metadataKey}</code>) instead.
+          </p>
+          ${isLoadingSessions && html`<${LoadingInline} label="Loading sessions…" />`}
+          ${sessionsError && html`<p class="tec-editor__error">${sessionsError}</p>`}
+          ${!isLoadingSessions && !sessionsError && html`
+            <${FeaturedSessionsEditor} \
+              sessions=${sessions} \
+              sessionTimes=${sessionTimes} \
+              tracks=${tracks} \
+              featuredSessions=${activeConfig.config[homepageMeta.field]} \
+              onChange=${(next) => updateConfigField(homepageMeta.field, next)} \
+              heading="${homepageMeta.label} (display order)" \
+              emptyHint="No sessions added yet — add some from the list on the right." \
+            />
+            <button type="button" class="tec-btn tec-btn--outline" onClick=${handleCopyHomepageJson}>Copy ${homepageMeta.label} JSON</button>
+          `}
+        </section>
+      `}
 
       <div class="tec-editor__actions">
         <button type="button" class="tec-btn tec-btn--outline tec-btn--l" onClick=${handleCancel}>Cancel</button>
