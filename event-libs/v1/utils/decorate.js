@@ -1037,7 +1037,9 @@ function addStylesToEventPage() {
   document.head.appendChild(link);
 }
 
-// e.g. "dark" or "dark(blocks:hero-marquee,profile-cards)"
+// e.g. "dark", "dark(blocks:hero-marquee,profile-cards)", or "dark(blocks:text[first],agenda)"
+const BLOCK_TOKEN_RE = /^([^[\]]+?)(?:\[\s*(first|last|[1-9]\d*)\s*\])?$/;
+
 function parseThemeValue(raw) {
   const value = raw?.toLowerCase().trim();
   const match = value?.match(/^(dark|light)(?:\(\s*blocks\s*:\s*([^)]*)\)\s*)?$/);
@@ -1045,10 +1047,17 @@ function parseThemeValue(raw) {
   const [, theme, blocksParam] = match;
   // undefined (no parens) means whole-page; '' (empty blocks: list) must stay
   // distinct from that so it scopes to zero blocks instead of falling back.
-  const blockNames = blocksParam !== undefined
-    ? blocksParam.split(',').map((b) => b.trim()).filter(Boolean)
-    : null;
-  return { theme, blockNames };
+  if (blocksParam === undefined) return { theme, blockTokens: null };
+
+  const rawTokens = blocksParam.split(',').map((b) => b.trim()).filter(Boolean);
+  const blockTokens = [];
+  for (const token of rawTokens) {
+    const tokenMatch = token.match(BLOCK_TOKEN_RE);
+    if (!tokenMatch) return null;
+    const [, name, selector] = tokenMatch;
+    blockTokens.push({ name: name.trim(), selector: selector ?? null });
+  }
+  return { theme, blockTokens };
 }
 
 export function applyAreaTheme(area = document) {
@@ -1061,20 +1070,36 @@ export function applyAreaTheme(area = document) {
 
     const parsed = parseThemeValue(theme.values?.[0]?.value);
     if (!parsed) return;
-    const { theme: themeValue, blockNames } = parsed;
+    const { theme: themeValue, blockTokens } = parsed;
 
     const isDocument = area === document;
     const blocks = isDocument
       ? area.body.querySelectorAll('main > div > div[class]')
       : area.querySelectorAll('div[class]');
-    blocks.forEach((block) => {
-      if (blockNames) {
-        if (!blockNames.some((name) => block.classList.contains(name))) return;
+
+    if (blockTokens) {
+      const blockList = Array.from(blocks);
+      const plainNames = blockTokens.filter((t) => !t.selector).map((t) => t.name);
+      const positionalTargets = new Set();
+      blockTokens.filter((t) => t.selector).forEach(({ name, selector }) => {
+        const group = blockList.filter((b) => b.classList.contains(name));
+        const index = selector === 'first' ? 0
+          : selector === 'last' ? group.length - 1
+            : Number(selector) - 1;
+        if (group[index]) positionalTargets.add(group[index]);
+      });
+
+      blockList.forEach((block) => {
+        const matches = plainNames.some((name) => block.classList.contains(name))
+          || positionalTargets.has(block);
+        if (!matches) return;
         block.classList.remove('dark', 'light');
         block.classList.add(themeValue);
-        return;
-      }
+      });
+      return;
+    }
 
+    blocks.forEach((block) => {
       const isSectionMetadata = block.classList.contains('section-metadata');
       if (isSectionMetadata) {
         const blockRows = block.querySelectorAll(':scope > div');
