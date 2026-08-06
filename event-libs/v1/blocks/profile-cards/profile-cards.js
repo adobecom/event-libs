@@ -213,6 +213,85 @@ function getSocialLinks(data) {
   return data?.socialLinks || data?.socialMedia || [];
 }
 
+function appendBioBlade(container, bio, fullName) {
+  const trimmedBio = typeof bio === 'string' ? bio.trim() : '';
+  if (!trimmedBio) return;
+
+  const desc = createTag('div', { class: 'card-desc blade-desc' });
+  if (trimmedBio.includes('<')) {
+    desc.innerHTML = trimmedBio;
+  } else {
+    desc.textContent = trimmedBio;
+  }
+  container.append(desc);
+
+  const btn = createTag('button', {
+    type: 'button',
+    class: 'blade-read-more',
+    hidden: '',
+    'aria-expanded': 'false',
+    'aria-label': `Read more about ${fullName}'s bio`,
+  }, 'Read more');
+
+  btn.addEventListener('click', () => {
+    const cardContainer = btn.closest('.card-container');
+    const expanded = cardContainer.classList.toggle('expanded');
+    btn.textContent = expanded ? 'Collapse' : 'Read more';
+    btn.setAttribute('aria-expanded', String(expanded));
+    btn.setAttribute('aria-label', expanded
+      ? `Collapse ${fullName}'s bio`
+      : `Read more about ${fullName}'s bio`);
+  });
+
+  container.append(btn);
+}
+
+function syncBladeBioOverflow(cardContainer) {
+  const desc = cardContainer.querySelector('.blade-desc');
+  const btn = cardContainer.querySelector('.blade-read-more');
+  if (!desc || !btn) return;
+
+  if (cardContainer.classList.contains('expanded')) {
+    btn.hidden = false;
+    return;
+  }
+
+  btn.hidden = desc.scrollHeight <= desc.clientHeight;
+}
+
+/**
+ * Reveals the Read more toggle only for blade cards whose 2-line-clamped
+ * bio actually overflows. Exported so tests can call it directly after
+ * stubbing scrollHeight/clientHeight, matching the sessions-hub pattern.
+ */
+export function syncBladeBiosOverflow(el) {
+  el.querySelectorAll('.card-container').forEach(syncBladeBioOverflow);
+}
+
+function scheduleBladeBiosOverflowSync(el) {
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      syncBladeBiosOverflow(el);
+    });
+  });
+}
+
+function decorateContentBlade(cardContainer, data) {
+  const contentContainer = createTag('div', { class: 'card-content' });
+  const textContainer = createTag('div', { class: 'card-text-container' });
+  const fullName = getProfileName(data);
+  const name = createTag('h2', { class: 'card-name' }, fullName);
+
+  textContainer.append(name);
+  if (data.title) {
+    textContainer.append(createTag('p', { class: 'card-title' }, data.title));
+  }
+  appendBioBlade(textContainer, data.bio, fullName);
+
+  contentContainer.append(textContainer);
+  cardContainer.append(contentContainer);
+}
+
 function appendBio(contentContainer, bio) {
   const trimmedBio = typeof bio === 'string' ? bio.trim() : '';
   if (!trimmedBio) return;
@@ -441,10 +520,10 @@ function parseStaticCard(row) {
   };
 }
 
-function decorateStaticCards(el, { modal } = {}) {
+function decorateStaticCards(el, { modal, blade } = {}) {
   const cardsWrapper = el.querySelector('.cards-wrapper');
   const rows = Array.from(el.querySelectorAll(':scope > div:not(.cards-wrapper)'));
-  
+
   // First row is the heading, skip it
   const cardRows = rows.slice(1);
 
@@ -459,29 +538,35 @@ function decorateStaticCards(el, { modal } = {}) {
 
     const cardContainer = createTag('div', { class: 'card-container' });
     decorateImage(cardContainer, cardData.photo);
-    decorateContent(cardContainer, cardData);
-    if (modal) {
+    if (blade) {
+      decorateContentBlade(cardContainer, cardData);
+    } else {
+      decorateContent(cardContainer, cardData);
+    }
+    if (modal && !blade) {
       decorateModalTrigger(cardContainer, cardData, index);
     }
     cardsWrapper.append(cardContainer);
-    
+
     // Remove the original row
     row.remove();
   });
 
   const cardCount = cardsWrapper.querySelectorAll('.card-container').length;
   const isGrid = el.classList.contains('grid');
-  
-  if (cardCount === 1) {
+
+  if (cardCount === 1 && !blade) {
     el.classList.add('single');
-  } else if (cardCount > 3 && !isGrid) {
+  } else if (cardCount > 3 && !isGrid && !blade) {
     cardsWrapper.classList.add('carousel-plugin', 'show-3');
     el.classList.add('with-carousel');
     buildMiloCarousel(cardsWrapper, Array.from(cardsWrapper.querySelectorAll('.card-container')));
   }
+
+  if (blade) scheduleBladeBiosOverflowSync(el);
 }
 
-function decorateCards(el, data, { simple, modal, speakerType } = {}) {
+function decorateCards(el, data, { simple, modal, blade, speakerType } = {}) {
   const cardsWrapper = el.querySelector('.cards-wrapper');
   const filteredData = speakerType
     ? data.filter((speaker) => speaker.speakerType?.toLowerCase() === speakerType)
@@ -496,12 +581,14 @@ function decorateCards(el, data, { simple, modal, speakerType } = {}) {
     const cardContainer = createTag('div', { class: 'card-container' });
 
     decorateImage(cardContainer, speaker.photo);
-    if (simple) {
+    if (blade) {
+      decorateContentBlade(cardContainer, speaker);
+    } else if (simple) {
       decorateContentSimple(cardContainer, speaker);
     } else {
       decorateContent(cardContainer, speaker);
     }
-    if (modal) {
+    if (modal && !blade) {
       decorateModalTrigger(cardContainer, speaker, index);
     }
 
@@ -510,14 +597,16 @@ function decorateCards(el, data, { simple, modal, speakerType } = {}) {
 
   const isGrid = el.classList.contains('grid');
 
-  if (filteredData.length === 1) {
+  if (filteredData.length === 1 && !blade) {
     el.classList.add('single');
-  } else if (filteredData.length > 3 && !isGrid) {
+  } else if (filteredData.length > 3 && !isGrid && !blade) {
     cardsWrapper.classList.add('carousel-plugin', 'show-3');
     el.classList.add('with-carousel');
 
     buildMiloCarousel(cardsWrapper, Array.from(cardsWrapper.querySelectorAll('.card-container')));
   }
+
+  if (blade) scheduleBladeBiosOverflowSync(el);
 }
 
 function sortDataByOrdinals(data) {
@@ -561,9 +650,10 @@ function parseConfigRows(el) {
 
 export default function init(el) {
   const isModal = el.classList.contains('modal');
+  const isBlade = el.classList.contains('blade');
 
   // Handle grid variant: add default three-up if no *-up class is present
-  if (el.classList.contains('grid')) {
+  if (el.classList.contains('grid') && !isBlade) {
     const hasUpVariant = Array.from(el.classList).some((cls) => cls.endsWith('-up'));
     if (!hasUpVariant) {
       el.classList.add('three-up');
@@ -607,8 +697,10 @@ export default function init(el) {
       sortedData = sortDataByOrdinals(data);
     }
 
-    decorateCards(el, sortedData, { simple: isSimple, modal: isModal, speakerType });
+    decorateCards(el, sortedData, {
+      simple: isSimple, modal: isModal, blade: isBlade, speakerType,
+    });
   } else {
-    decorateStaticCards(el, { modal: isModal });
+    decorateStaticCards(el, { modal: isModal, blade: isBlade });
   }
 }
