@@ -1,12 +1,20 @@
 /* eslint-disable no-unused-vars */
 import { expect } from '@esm-bundle/chai';
 import sinon from 'sinon';
-import createDrawer from '../../../../event-libs/v1/blocks/mobile-rider/drawer.js';
 
-describe('Mobile Rider Drawer', () => {
-  let mockLana;
+// Runs the full drawer suite against a given drawer.js implementation - the
+// classic block and the C2 copy - so a regression in either is caught
+// directly instead of relying on the other variant's coverage.
+function runDrawerSuite(modulePath, variantLabel) {
+  describe(`Mobile Rider Drawer (${variantLabel})`, () => {
+    let createDrawer;
+    let mockLana;
 
-  beforeEach(() => {
+    before(async () => {
+      ({ default: createDrawer } = await import(modulePath));
+    });
+
+    beforeEach(() => {
     // Mock lana
     mockLana = { log: sinon.stub() };
     globalThis.lana = mockLana;
@@ -428,4 +436,8 @@ describe('Mobile Rider Drawer', () => {
       expect(() => drawer.remove()).to.not.throw();
     });
   });
-});
+  });
+}
+
+runDrawerSuite('../../../../event-libs/v1/blocks/mobile-rider/drawer.js', 'classic');
+runDrawerSuite('../../../../event-libs/v1/c2/blocks/mobile-rider/drawer.js', 'C2');

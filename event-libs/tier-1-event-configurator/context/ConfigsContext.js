@@ -18,6 +18,8 @@ function emptyConfig() {
     trackIcons: {},
     allowDoubleBooking: false,
     featuredSessions: [],
+    rfApiUrl: '',
+    rfProfileId: '',
   };
 }
 
@@ -88,6 +90,8 @@ const ConfigsProvider = ({ children }) => {
   // so carrying it over would silently mislabel the new event.
   // `eventServiceEnv` is the *new* pick's env, not the source row's —
   // Duplicate can legitimately target a different tier than its source.
+  // rfApiUrl/rfProfileId always reset blank — reusing another event's RF
+  // profile id would misroute this event's live schedule/favorites calls.
   const startDuplicateConfig = useCallback((sourceRow, event, eventServiceEnv) => {
     const clonedConfig = { ...sourceRow.config };
     delete clonedConfig.eventId;
@@ -97,7 +101,9 @@ const ConfigsProvider = ({ children }) => {
       eventId: event.eventId,
       backendEventTitle: event.enTitle || event.eventId,
       eventServiceEnv,
-      config: { ...clonedConfig, eventTitle: '' },
+      config: {
+        ...clonedConfig, eventTitle: '', rfApiUrl: '', rfProfileId: '',
+      },
     });
   }, []);
 
@@ -151,7 +157,8 @@ const ConfigsProvider = ({ children }) => {
   }, []);
 
   // Sets a single top-level config field (e.g. allowDoubleBooking,
-  // featuredSessions) immutably, so the Config JSON preview stays in sync.
+  // featuredSessions, rfApiUrl, rfProfileId) immutably, so the Config JSON
+  // preview stays in sync.
   const updateConfigField = useCallback((key, value) => {
     setActiveConfig((prev) => {
       if (!prev) return prev;

@@ -53,18 +53,33 @@ export function onDemandSessions(sessions, liveStreamActiveIds, nowMs) {
 
 /**
  * Featured sessions for the active day, shown in the live carousel when nothing is live.
- * When featuredIds is non-empty, maps them to sessions on the active day (max 3).
+ * When featuredIds is non-empty, maps them to sessions on the active day in authored
+ * order (max 3) — not the catalog's order, so FeaturedSessionsEditor.js's reorder UI
+ * actually affects display order.
  * Falls back to a deterministic random selection of up to 3 day sessions when no ids configured.
  */
 export function getFeaturedSessions(sessions, featuredIds, activeDay, userTz) {
   const daySessions = sessionsForDay(sessions, activeDay, userTz);
 
   if (featuredIds && featuredIds.length > 0) {
-    const idSet = new Set(featuredIds);
-    return daySessions.filter((s) => idSet.has(s.id)).slice(0, 3);
+    const daySessionsById = new Map(daySessions.map((s) => [s.id, s]));
+    return featuredIds.map((id) => daySessionsById.get(id)).filter(Boolean).slice(0, 3);
   }
 
   return deterministicShuffle(daySessions, activeDay).slice(0, 3);
+}
+
+/**
+ * Featured sessions for the on-demand view: same authored featuredIds array as
+ * getFeaturedSessions, in the same authored order, but ID-membership only — no
+ * day-scoping (on-demand content isn't tied to a single event day) and no shuffle
+ * fallback (nothing to show when nothing's authored, unlike the live carousel's need
+ * to fill dead space when nothing's live).
+ */
+export function getOnDemandFeaturedSessions(sessions, featuredIds) {
+  if (!featuredIds || featuredIds.length === 0) return [];
+  const sessionsById = new Map(sessions.map((s) => [s.id, s]));
+  return featuredIds.map((id) => sessionsById.get(id)).filter(Boolean).slice(0, 3);
 }
 
 function deterministicShuffle(arr, seed) {

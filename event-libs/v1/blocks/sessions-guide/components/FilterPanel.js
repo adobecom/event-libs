@@ -4,8 +4,8 @@ import { sessions } from '../../../utils/session-store.js';
 
 export function FilterPanel({ onClose }) {
   const { state, dispatch } = useSessionGuide();
-  const { activeFilters, eventConfig } = state;
-  const { filterCategories } = eventConfig;
+  const { activeFilters, guideConfig } = state;
+  const { filterCategories } = guideConfig;
 
   const [localFilters, setLocalFilters] = useState(() => {
     const init = {};

@@ -22,7 +22,7 @@ This doc shows how.
 
 ```html
 <meta name="tier-1-event-state-enabled" content="true">
-<meta name="rainfocus-api-url" content="...">
+<meta name="tier-1-event-config" content='{"rfApiUrl":"...","rfProfileId":"..."}'>
 ```
 
 Without those, every signal stays at its default (`sessions.value` is `[]`, `auth.value.isLoggedIn`

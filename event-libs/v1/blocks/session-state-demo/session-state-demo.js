@@ -1,13 +1,15 @@
 import { createTag } from '../../utils/utils.js';
 import {
   sessions, sessionsStatus, favorited, scheduled, auth, pendingActions,
+  liveStreamActiveIds, sessionStateVersion,
 } from '../../utils/session-store.js';
 import { favoriteWithFeedback } from '../../services/sessions/action-feedback.js';
+import { deriveSessionState, getNowMs } from '../../utils/session-state.js';
 
 // Reference implementation for SHARED-STATE-USAGE.md's vanilla-JS pattern — reads the
 // page-level session-store signals and mutates them through action-feedback.js, with
 // no Preact dependency. Not authored on any real event page.
-const DEMO_EVENT_CONFIG = { registerUrl: '/register', showConflictModal: false };
+const DEMO_EVENT_CONFIG = { registerUrl: '/register' };
 
 function renderRow(parent, label) {
   const row = createTag('p', { class: 'session-state-demo__row' }, '', { parent });
@@ -25,6 +27,7 @@ export default async function init(el) {
   const scheduledValue = renderRow(el, 'Scheduled');
   const loggedInValue = renderRow(el, 'Logged in');
   const registeredValue = renderRow(el, 'Registered');
+  const firstSessionStateValue = renderRow(el, 'First session state');
 
   sessionsStatus.subscribe((status) => { statusValue.textContent = status; });
   sessions.subscribe((list) => { countValue.textContent = String(list.length); });
@@ -33,6 +36,17 @@ export default async function init(el) {
   auth.subscribe(({ isLoggedIn, isRegistered }) => {
     loggedInValue.textContent = String(isLoggedIn);
     registeredValue.textContent = String(isRegistered);
+  });
+
+  // sessionStateVersion only fires when a session's upcoming/live/on-demand bucket
+  // actually changes (see session-state-ticker.js) — not on every tick — so this is the
+  // only subscription needed to keep this row live as the event progresses, instead of
+  // also subscribing to `sessions`/`liveStreamActiveIds` directly.
+  sessionStateVersion.subscribe(() => {
+    const [firstSession] = sessions.value;
+    firstSessionStateValue.textContent = firstSession
+      ? deriveSessionState(firstSession, liveStreamActiveIds.value, getNowMs())
+      : 'n/a';
   });
 
   const favoriteBtn = createTag(

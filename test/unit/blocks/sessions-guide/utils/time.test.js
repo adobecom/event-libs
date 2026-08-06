@@ -2,6 +2,7 @@ import { expect } from '@esm-bundle/chai';
 import {
   detectUserTimezone,
   formatSessionTime,
+  formatShortTime,
   formatSessionDate,
   formatDuration,
   isSessionLive,
@@ -37,12 +38,32 @@ describe('utils/time', () => {
       const result = formatSessionTime(SESSION.startTimeUtc, TZ);
       expect(result).to.be.a('string').and.not.empty;
     });
+
+    it('returns an empty string instead of throwing for a session with no scheduled time', () => {
+      expect(formatSessionTime('', TZ)).to.equal('');
+      expect(formatSessionTime(undefined, TZ)).to.equal('');
+    });
+  });
+
+  describe('formatShortTime', () => {
+    it('returns a non-empty string for valid input', () => {
+      const result = formatShortTime(SESSION.startTimeUtc, TZ);
+      expect(result).to.be.a('string').and.not.empty;
+    });
+
+    it('returns an empty string instead of throwing for a session with no scheduled time', () => {
+      expect(formatShortTime('', TZ)).to.equal('');
+    });
   });
 
   describe('formatSessionDate', () => {
     it('returns a non-empty string for valid input', () => {
       const result = formatSessionDate(SESSION.startTimeUtc, TZ);
       expect(result).to.be.a('string').and.not.empty;
+    });
+
+    it('returns an empty string instead of throwing for a session with no scheduled time', () => {
+      expect(formatSessionDate('', TZ)).to.equal('');
     });
   });
 
@@ -111,6 +132,10 @@ describe('utils/time', () => {
       // 2026-10-28T17:00:00Z = 2026-10-28T10:00:00-07:00 in LA
       const key = getSessionDayKey(SESSION, TZ);
       expect(key).to.equal('2026-10-28');
+    });
+
+    it('returns null instead of throwing for a session with no scheduled time', () => {
+      expect(getSessionDayKey({ startTimeUtc: '' }, TZ)).to.be.null;
     });
   });
 
