@@ -112,8 +112,30 @@ export default function ScheduleHeader() {
       </div>
       ${activeSchedule.hasConflictingVersions && html`
         <div class="sm-editor__conflict-warning">
-          ⚠ This schedule shares an ID with other version(s) that have different content elsewhere.
-          Use Duplicate if this is meant to be an independent schedule.
+          <p class="sm-editor__conflict-warning-summary">
+            ⚠ This schedule shares an ID with ${activeSchedule.conflictingVersions.length} other version(s) that have different content:
+          </p>
+          <ul class="sm-editor__conflict-warning-list">
+            ${activeSchedule.conflictingVersions.map((sib) => html`
+              <li>
+                “${sib.title}” —
+                ${sib.referencedInDocs.length > 0
+                  ? sib.referencedInDocs.map((path, i) => html`
+                    ${i > 0 && ', '}<a
+                      class="sm-editor__doc-ref"
+                      href="${DA_ORIGIN}/edit#/${org}/${repo}${path.replace(/\.html$/, '')}"
+                      target="_blank"
+                      rel="noreferrer"
+                    >${path.replace(/\.html$/, '')}</a>
+                  `)
+                  : 'no doc currently found'}
+              </li>
+            `)}
+          </ul>
+          <p class="sm-editor__conflict-warning-hint">
+            If these are meant to be independent schedules, open the other version and click Duplicate.
+            If this is really the same schedule, edit and Copy Link, then replace the link(s) above with the new one.
+          </p>
         </div>
       `}
       ${activeSchedule.referencedInDocs?.length > 0 && html`

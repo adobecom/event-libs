@@ -514,8 +514,23 @@
   background: var(--sm-color-warning-bg, #fff3e0);
   border: 1px solid var(--sm-color-warning-border, #f0c674);
   border-radius: var(--sm-radius-sm, 4px);
-  padding: var(--sm-spacing-xs, 4px) var(--sm-spacing-sm);
+  padding: var(--sm-spacing-sm);
   margin-bottom: var(--sm-spacing-sm);
+}
+
+.sm-editor__conflict-warning-summary {
+  margin: 0 0 var(--sm-spacing-xs, 4px);
+  font-weight: 600;
+}
+
+.sm-editor__conflict-warning-list {
+  margin: 0 0 var(--sm-spacing-xs, 4px);
+  padding-left: 1.25em;
+}
+
+.sm-editor__conflict-warning-hint {
+  margin: 0;
+  color: var(--sm-color-text-secondary, #6e6e6e);
 }
 
 .sm-editor__header-title {

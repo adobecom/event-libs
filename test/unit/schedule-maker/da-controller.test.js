@@ -219,6 +219,7 @@ describe('da-controller', () => {
       expect(result.data.schedules).to.have.lengthOf(1);
       expect(result.data.schedules[0].modificationTime).to.equal('2026-06-01T00:00:00.000Z');
       expect(result.data.schedules[0].hasConflictingVersions).to.be.false;
+      expect(result.data.schedules[0].conflictingVersions).to.deep.equal([]);
       // The doc only appears once, even though it contains two links for the identical schedule.
       expect(result.data.schedules[0].referencedInDocs).to.deep.equal(['/events/e/index.html']);
     });
@@ -247,6 +248,10 @@ describe('da-controller', () => {
       expect(result.data.schedules.map((s) => s.title)).to.deep.equal(['Edited Title', 'Original Title']);
       // Both versions live in the same doc, so both list it.
       expect(result.data.schedules.every((s) => s.referencedInDocs.includes('/events/e/index.html'))).to.be.true;
+      // Each version points directly at its sibling, not just a bare flag.
+      const [fresh, stale] = result.data.schedules;
+      expect(fresh.conflictingVersions).to.deep.equal([{ title: 'Original Title', referencedInDocs: ['/events/e/index.html'] }]);
+      expect(stale.conflictingVersions).to.deep.equal([{ title: 'Edited Title', referencedInDocs: ['/events/e/index.html'] }]);
     });
 
     it('scopes referencedInDocs to only the docs that actually contain that exact version', async () => {

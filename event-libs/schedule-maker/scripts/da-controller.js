@@ -332,11 +332,12 @@ export async function syncSchedules(org, repo, eventFolder) {
   // case), but genuinely different content under the same scheduleId — a
   // different title, different blocks, whatever — is shown as its own entry
   // rather than merged away. A shared scheduleId with different content is
-  // still worth flagging (see versionsPerId below), since two versions can
-  // otherwise look identical at a glance if their titles happen to match.
+  // still worth flagging, since two versions can otherwise look identical at a
+  // glance if their titles happen to match (only their blocks differ) — see
+  // conflictingVersions below, attached per schedule so the UI can point
+  // directly at the sibling(s) and their docs instead of just a bare flag.
   const foundData = new Map(); // `${scheduleId}::${fingerprint}` → decoded object
   const docRefsByKey = {}; // same composite key → [filePath, ...] (internal only — folded onto each schedule below)
-  const versionsPerId = new Map(); // scheduleId → Set of fingerprints seen
   const canonicalPrefix = `${DA_ORIGIN}/app/${org}/${repo}/${DA_APP_PATH}`;
 
   const perDocFinds = await mapWithConcurrency(docFiles, SCAN_CONCURRENCY, async (filePath) => {
@@ -384,9 +385,6 @@ export async function syncSchedules(org, repo, eventFolder) {
       const fingerprint = scheduleContentFingerprint(decoded);
       const key = `${id}::${fingerprint}`;
 
-      if (!versionsPerId.has(id)) versionsPerId.set(id, new Set());
-      versionsPerId.get(id).add(fingerprint);
-
       const existing = foundData.get(key);
       // Identical content under this key can still show up more than once
       // (e.g. the same unedited schedule pasted into two docs) — keep
@@ -404,20 +402,32 @@ export async function syncSchedules(org, repo, eventFolder) {
     });
   });
 
-  const schedules = [...foundData.values()]
+  const withDocRefs = [...foundData.values()].map((schedule) => {
+    const id = schedule.scheduleId || schedule.title;
+    const key = `${id}::${scheduleContentFingerprint(schedule)}`;
+    // Only the docs that actually contain THIS version's exact content — not
+    // every doc that shares this scheduleId regardless of content.
+    return { ...schedule, referencedInDocs: docRefsByKey[key] || [] };
+  });
+
+  // Group by scheduleId so each version can point directly at its sibling(s)
+  // — the actual title(s) and doc(s) — instead of just flagging "conflict"
+  // and leaving the author to hunt for what it means and where to look.
+  const byId = new Map();
+  withDocRefs.forEach((schedule) => {
+    const id = schedule.scheduleId || schedule.title;
+    if (!byId.has(id)) byId.set(id, []);
+    byId.get(id).push(schedule);
+  });
+
+  const schedules = withDocRefs
     .map((schedule) => {
       const id = schedule.scheduleId || schedule.title;
-      const key = `${id}::${scheduleContentFingerprint(schedule)}`;
+      const siblings = byId.get(id).filter((other) => other !== schedule);
       return {
         ...schedule,
-        // True when this scheduleId has other versions with different
-        // content elsewhere — worth a heads-up even though each version now
-        // shows as its own entry, since two versions can still look identical
-        // at a glance if their titles happen to match (only their blocks differ).
-        hasConflictingVersions: (versionsPerId.get(id)?.size || 0) > 1,
-        // Only the docs that actually contain THIS version's exact content —
-        // not every doc that shares this scheduleId regardless of content.
-        referencedInDocs: docRefsByKey[key] || [],
+        hasConflictingVersions: siblings.length > 0,
+        conflictingVersions: siblings.map((sib) => ({ title: sib.title, referencedInDocs: sib.referencedInDocs })),
       };
     })
     .sort((a, b) => new Date(b.modificationTime || 0) - new Date(a.modificationTime || 0));

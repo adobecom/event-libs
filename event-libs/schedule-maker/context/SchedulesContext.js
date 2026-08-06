@@ -82,9 +82,12 @@ const SchedulesProvider = ({ children }) => {
       const conflicted = found.filter((s) => s.hasConflictingVersions);
       if (conflicted.length > 0) {
         conflicted.forEach((s) => {
+          const siblingLines = s.conflictingVersions
+            .map((sib) => `    - "${sib.title}" — ${sib.referencedInDocs.join(', ') || 'no doc found'}`)
+            .join('\n');
           console.warn(
-            `[schedule-maker sync] "${s.title}" shares a scheduleId with other version(s) that have different `
-            + `content — this version is referenced in: ${s.referencedInDocs.join(', ')}`,
+            `[schedule-maker sync] "${s.title}" (${s.referencedInDocs.join(', ') || 'no doc found'}) shares a `
+            + `scheduleId with ${s.conflictingVersions.length} other version(s):\n${siblingLines}`,
           );
         });
         setToastSuccess(
