@@ -29,8 +29,7 @@ function getDefaultDay(eventDays, userTz) {
 // favorited, scheduled, auth) lives in event-libs/v1/utils/session-store.js instead.
 // Named guideConfig (not eventConfig) to stay distinct from utils.js's page-wide
 // getEventConfig() and the Tier 1 Event Configurator's tier-1-event-config.js —
-// this is sessions-guide's own block-level authoring config (parse-config.js's
-// output: title, filterCategories, theme, surface, userTz, registerUrl).
+// this is sessions-guide's own block-level authoring config (see parse-config.js).
 export function buildInitialState(guideConfig) {
   return {
     drawerState: 'hidden',
