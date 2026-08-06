@@ -87,10 +87,6 @@ function buildPills(pillsRow) {
   return pillsContainer;
 }
 
-// The mobile centered-peek gutter (see slider.css) is real padding on the track, so
-// `scrollLeft` never actually reaches 0 there — the first card's "resting" position
-// already sits past that leading gutter (see alignInitialScroll). 0 on desktop, where
-// there's no such padding.
 function getLeadingGutter(track) {
   return parseFloat(getComputedStyle(track).paddingInlineStart) || 0;
 }
@@ -102,10 +98,6 @@ function updateArrowState(track, prevBtn, nextBtn) {
   nextBtn.disabled = track.scrollLeft >= maxScroll - 1;
 }
 
-// scroll-snap-align only affects where the browser snaps *after* a scroll gesture —
-// it never auto-positions the initial scroll offset. Without this, the mobile
-// centered-peek gutter (padding-inline on .carousel-track) would just render as dead
-// blank space in front of the first card at scrollLeft: 0 on page load.
 function alignInitialScroll(track) {
   if (track.dataset.scrollAligned) return;
   const gutter = getLeadingGutter(track);
@@ -137,12 +129,6 @@ function buildArrows(track) {
 
   const refresh = () => updateArrowState(track, prevBtn, nextBtn);
   track.addEventListener('scroll', refresh);
-  // The initial synchronous pass runs before the cards are decorated/sized, so the
-  // track's scrollWidth still equals its clientWidth and "next" would wrongly disable
-  // until the first scroll. Re-evaluate whenever the track or its cards change size
-  // (card decoration settling, images loading, viewport resize). Observing a card as
-  // well as the track catches the common case where only the track's scrollWidth
-  // grows while its own border-box stays fixed.
   const resizeObserver = new ResizeObserver(refresh);
   resizeObserver.observe(track);
   const firstCard = track.querySelector('.card-c2');

@@ -43,7 +43,6 @@
   object-fit: cover;
 }
 
-/* Shared typography */
 
 .card-c2 .card-title {
   font-family: 'Adobe Clean Display', serif;
@@ -64,7 +63,6 @@
   margin: 0;
 }
 
-/* Aspect-ratio variants, authored as `ratio-1-1`, `ratio-4-3`, `ratio-3-4`, `ratio-4-5`, `ratio-16-9` */
 
 .card-c2[data-card-variant="ratio-1-1"] .card-media {
   aspect-ratio: 1 / 1;
@@ -88,7 +86,6 @@
   aspect-ratio: 16 / 9;
 }
 
-/* Body layout: content below the media, shared by every variant */
 
 .card-c2 .card-body {
   display: flex;

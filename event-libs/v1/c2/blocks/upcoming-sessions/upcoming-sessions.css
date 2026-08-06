@@ -1,36 +1,3 @@
-/*
- * Design tokens below come from milo/libs/c2/styles/styles.css, the actual C2
- * foundation stylesheet — guaranteed loaded on any page with `foundation: c2`
- * metadata (which this block already requires), unlike
- * event-libs/v1/blocks/sessions-guide/sessions-guide-tokens.css, which isn't
- * guaranteed present on a page that doesn't load the sessions-guide block.
- * Every var() below has a literal fallback matching the Figma dev-mode export,
- * so this still renders correctly even if the token isn't defined for some
- * reason. Values with no exact matching token (e.g. #8a8a8a, #f2f2f2,
- * blur(4.6875px)) are left as plain literals — forcing a mismatched token
- * would drift from the design, not match it.
- *
- * Card classes below (.sg-card, .sg-icon-btn, .sg-category-badge families)
- * are copied from event-libs/v1/blocks/sessions-guide/sessions-guide.css
- * (see SessionCard.js) so cards here match Session Guide's real session
- * card exactly. Copied on purpose, not @import'd, so this block has no
- * runtime dependency on sessions-guide.css being loaded (per design doc:
- * keep decoupled).
- *
- * IMPORTANT: sessions-guide.css defines its own rules for these exact same
- * class names, sized for its fixed-width grid/time-row layout rather than
- * this block's horizontally-scrolling peeking carousel (see the sizing note
- * in the "Card (sg-card family)" section below). Session Guide's CSS can
- * genuinely be loaded on the same page as this block (its modal opens from
- * this component's own cards), and two same-specificity `.sg-card` rules
- * from two different stylesheets is a load-order race, not a reliable
- * override — whichever stylesheet's <link> lands later in <head> wins,
- * regardless of which one is "correct" here. All selectors below are
- * therefore scoped under `.upcoming-sessions` to raise their specificity
- * above sessions-guide.css's un-scoped versions, so this block's card
- * styling always wins deterministically.
- */
-
 .upcoming-sessions {
   position: relative;
   padding: var(--s2a-spacing-md, 16px);
@@ -57,8 +24,6 @@
   font-size: var(--s2a-font-size-lg, 18px);
   letter-spacing: var(--s2a-font-letter-spacing-5xl, -0.2px);
   hanging-punctuation: first last;
-
-  /* Light (default) = dark text; .dark-theme variant flips it below. */
   color: var(--s2a-color-gray-1000, #000);
 }
 
@@ -71,9 +36,6 @@
   gap: var(--s2a-spacing-md, 16px);
   overflow-x: auto;
   overflow-y: visible;
-
-  /* Vertical breathing room so a card's :hover scale-up (see .sg-live-card)
-     doesn't get clipped or trigger a vertical scrollbar. */
   padding-block: var(--s2a-spacing-xs, 8px);
   scroll-snap-type: x proximity;
   scrollbar-width: none;
@@ -84,7 +46,6 @@
   display: none;
 }
 
-/* No edge fade per the Figma reference — peeking cards are hard-cut, not gradiented. */
 .upcoming-sessions.clip-end .upcoming-sessions-track {
   padding-inline-start: 0;
 }
@@ -106,12 +67,6 @@
   }
 }
 
-/*
- * "ControlButton", size xl (48px), context on-dark — per Figma dev-mode CSS
- * export. Desktop-only: hidden below 1280px (matching sessions-guide.css's
- * own breakpoint system — see the sizing note in the "Card" section below)
- * — mobile/tablet rely on swipe instead.
- */
 .upcoming-sessions-controls {
   display: none;
 }
@@ -144,53 +99,14 @@
     gap: var(--s2a-spacing-md, 16px);
   }
 
-  /* Desktop shows ~3 cards at once with no need to scroll — hide the arrows
-     when there's nothing to scroll to. */
   .upcoming-sessions[data-few-sessions="true"] .upcoming-sessions-controls {
     display: none;
   }
 }
 
-/* Same right-arrow icon, rotated — matches the Figma component (one asset, two directions). */
 .upcoming-sessions-arrow--prev {
   transform: rotate(180deg);
 }
-
-/*
- * ── Card (sg-card family) ─────────────────────────────────────────────────
- * Ported from sessions-guide.css's own `.sg-card` (see SessionCard.js) so
- * this block's cards match Session Guide's real session-card component
- * closely — badge-row above the title at mobile/tablet, a footer row
- * (track label + repeated category badge + time) below it at desktop, with
- * CSS swapping which of the two badges is visible per breakpoint.
- *
- * Two deliberate divergences from sessions-guide's own `.sg-card`:
- *
- * 1. Sizing — sessions-guide's `.sg-card` grows on hover (width
- *    379->427px, min-height 124->150px) because it sits in a fixed
- *    grid/time-row. This card sits in a horizontally-scrolling peeking
- *    carousel instead, where growing the card's own box on hover would
- *    reflow sibling cards mid-scroll (width) or the whole section's height
- *    (height). So width/height stay fixed at their resting size always —
- *    a literal 255x152px at mobile/tablet (matching the Figma dev-mode
- *    export for this card exactly — the peeking-multiple-cards effect
- *    comes for free from these fixed-size items overflowing a scrollable
- *    flex row, no proportional-to-viewport formula needed), and a literal
- *    375x108px at desktop (`@media (min-width: 1280px)` below — matching
- *    sessions-guide.css's own breakpoint, not this codebase's usual
- *    900px; 375px rather than the Figma "Small session row" frame's own
- *    431px card, since 431px doesn't actually fit 3 cards + gaps within
- *    that frame's stated 1440px width and padding — flagged to design).
- *    The "grows on hover" cue instead comes from `transform: scale()`,
- *    exactly like this card did before this port.
- *
- * 2. Action buttons — sessions-guide reveals the action-icon column only
- *    on hover/`.is-scheduled`/`.is-favorited` (sliding out from width:0).
- *    That leaves the buttons unreachable on touch/keyboard unless a
- *    session is already scheduled/favorited, so this card keeps them
- *    always visible at every breakpoint instead (matching how mobile/
- *    tablet already behaved before this port).
- */
 
 .upcoming-sessions .sg-card {
   background: var(--s2a-color-gray-50, #f8f8f8);
@@ -221,11 +137,6 @@
   background: var(--s2a-color-gray-75, #ececec);
 }
 
-/*
- * Inverts to near-black and grows via `transform: scale()` rather than the
- * literal width/min-height growth sessions-guide's own `.sg-card:hover`
- * uses — see the sizing note above.
- */
 .upcoming-sessions .sg-card:hover {
   background: var(--s2a-color-gray-900, #131313);
   box-shadow: 0 6px 24px rgb(0 0 0 / 18%);
@@ -244,7 +155,6 @@
   overflow: hidden;
 }
 
-/* Category badge row — shown at top on mobile/tablet, hidden on desktop. */
 .upcoming-sessions .sg-card__badge-row {
   display: flex;
   align-items: center;
@@ -274,7 +184,6 @@
   color: var(--s2a-color-gray-25, #fff);
 }
 
-/* Footer row (track label + repeated badge + time) — hidden on mobile/tablet, shown on desktop. */
 .upcoming-sessions .sg-card__footer {
   display: none;
 }
@@ -296,7 +205,6 @@
   color: var(--s2a-color-gray-25, #fff);
 }
 
-/* Desktop-only repeated badge — hidden on mobile/tablet (badge-row is shown there instead). */
 .upcoming-sessions .sg-card__footer-badge {
   display: none;
 }
@@ -318,7 +226,6 @@
   color: rgb(255 255 255 / 50%);
 }
 
-/* Icon action row — always visible on mobile/tablet; time rendered via ::after (data-time), since .sg-card__footer is hidden here. */
 .upcoming-sessions .sg-card__actions {
   display: flex;
   flex-direction: row;
@@ -345,25 +252,6 @@
   color: rgb(255 255 255 / 50%);
 }
 
-/*
- * ── Dark surface variant ─────────────────────────────────────────────────
- * Per the Figma dev-mode CSS export for "Session card - no images" (dark):
- * mobile/tablet (below the 1280px breakpoint) use a flat translucent black
- * fill; desktop (see the `@media (min-width: 1280px)` block below) switches
- * to a gradient + background blur instead — a heavier glass-overlay treatment
- * for sitting on top of a hero/marquee image at that size (§6/§13 of the
- * design doc). This overrides only the sg-card background/text colors —
- * the sg-card structure/hover-grow/action-reveal mechanic above is
- * unaffected. Default (no variant, or an explicit `light` variant) stays
- * sg-card's own light-resting/dark-hover treatment via the unscoped rules
- * above; authoring the `dark-theme` variant (`upcoming-sessions
- * (dark-theme)`) puts a `dark-theme` class on the block root and switches
- * to this overlay treatment. Deliberately not named `dark` — that's a
- * reserved, global Milo class (any element with it gets Milo's own
- * `.dark { background-color: ...; color: ...; }` rule, painting a solid
- * dark background site-wide), which collided with this block's own local
- * "dark card surface" meaning of the same name.
- */
 .upcoming-sessions.dark-theme .sg-card,
 .upcoming-sessions.dark-theme .sg-card.is-scheduled,
 .upcoming-sessions.dark-theme .sg-card.is-favorited {
@@ -380,13 +268,6 @@
   outline-color: var(--s2a-color-gray-25, #fff);
 }
 
-/*
- * No separate :hover rule needed for text/badge color here — these plain
- * selectors are equal-specificity with (and declared after) the generic
- * light-hover color rules above, so they already win regardless of hover
- * state via source order, correctly keeping dark's own hover identical to
- * its default per the Figma export.
- */
 /* stylelint-disable no-descending-specificity */
 .upcoming-sessions.dark-theme .sg-card__time,
 .upcoming-sessions.dark-theme .sg-card__actions::after {
@@ -427,14 +308,6 @@
     -webkit-line-clamp: 2;
   }
 
-  /*
-   * Fixed margin-top (matching the 16px gap in the Figma frame between the
-   * title and this row), not margin-top:auto — sessions-guide's own
-   * `.sg-card__footer` uses auto because its card is min-height (grows to
-   * fit content); ours is a fixed height (see the sizing note above), so
-   * auto would push this row all the way to the box's bottom edge whenever
-   * the title doesn't use its full 2-line allowance, leaving a large gap.
-   */
   .upcoming-sessions .sg-card__footer {
     display: flex;
     align-items: flex-end;
@@ -451,23 +324,10 @@
     display: contents;
   }
 
-  /*
-   * `.sg-card__footer`'s `justify-content: space-between` only pins time to
-   * the right when the badge (its sibling) actually renders. When category
-   * doesn't resolve to a known badge, `.sg-card__footer-badge` (display:
-   * contents) contributes nothing, `.sg-card__track--footer` is hidden
-   * above, and time ends up as the row's only participating flex child —
-   * which space-between collapses to the start (left) instead of the end.
-   * `margin-left: auto` pins it to the right unconditionally, regardless of
-   * whether a badge is present.
-   */
   .upcoming-sessions .sg-card__time {
     margin-left: auto;
   }
 
-  /* Always visible at desktop too (not hover-revealed) — a hover-only reveal
-     left the buttons unreachable on touch/keyboard unless a session was
-     already scheduled/favorited. */
   .upcoming-sessions .sg-card__actions {
     flex-direction: column;
     width: var(--s2a-spacing-2xl, 48px);
@@ -483,11 +343,6 @@
     display: none;
   }
 
-  /*
-   * Values below match the Figma dev-mode CSS export for "Session card -
-   * no images" exactly, except :hover — the card's background changes to
-   * a flat #292929 on hover instead of staying the same gradient/blur.
-   */
   .upcoming-sessions.dark-theme .sg-card,
   .upcoming-sessions.dark-theme .sg-card.is-scheduled,
   .upcoming-sessions.dark-theme .sg-card.is-favorited {
@@ -516,8 +371,6 @@
   }
   /* stylelint-enable no-descending-specificity */
 }
-
-/* ── Icon Button (S2A Foundations) — copied verbatim, already has inline fallbacks ── */
 
 .upcoming-sessions .sg-icon-btn {
   display: inline-flex;
@@ -568,12 +421,6 @@
   display: block;
 }
 
-/*
- * "Add to schedule"/"Add to favorites" buttons use the "on-dark" context
- * (matching SessionCard.js's real markup — always on-dark, regardless of
- * this block's own light/dark surface variant, since the card's hover
- * state already goes near-black either way): a solid opaque white chip.
- */
 .upcoming-sessions .sg-icon-btn--solid.sg-icon-btn--on-dark {
   background: var(--s2a-color-background-default, #fff);
   color: var(--s2a-color-content-default, #000);
@@ -612,14 +459,6 @@
   height: var(--s2a-spacing-20, 20px);
 }
 
-/*
- * currentColor (not a hardcoded value) so this label picks up whatever
- * color gets set on its ancestor `.sg-category-badge` by the hover/dark
- * rules above — matching sessions-guide.css's own `.sg-category-badge__label`
- * exactly. The icon's own tint (set via inline style in buildCategoryBadge,
- * always higher specificity than any class rule) stays constant regardless
- * of hover/dark state, same as sessions-guide.
- */
 .upcoming-sessions .sg-category-badge__label {
   font-family: 'Adobe Clean Spectrum VF', 'Adobe Clean', adobe-clean, 'Trebuchet MS', sans-serif;
   font-weight: var(--s2a-font-weight-adobe-clean-medium, 500);
@@ -628,7 +467,6 @@
   color: currentcolor;
 }
 
-/* Only takes effect when a badge has no inline tint (see buildCategoryBadge) — inline style otherwise always wins. */
 .upcoming-sessions.dark-theme .sg-category-badge__icon-color {
   color: var(--s2a-color-gray-25, #fff);
 }

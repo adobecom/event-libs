@@ -57,8 +57,6 @@ export default async function init(el) {
   el.append(media, body);
   el.dataset.cardVariant = variant;
 
-  // Session-hydrated cards carry routing data (data-session-id etc.); make them
-  // clickable, routing by derived state. No-op for plain authored cards.
   if (el.dataset.sessionId) {
     const { default: attachSessionRouting } = await import('./session-routing.js');
     attachSessionRouting(el);

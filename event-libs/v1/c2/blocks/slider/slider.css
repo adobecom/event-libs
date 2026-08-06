@@ -6,10 +6,6 @@
   scrollbar-width: none;
   -ms-overflow-style: none;
 
-  /* Engineering-owned intra-component offset: the track is flanked by its own
-     .carousel-controls (arrows/heading) above and below as DOM siblings. Figma spec
-     puts 32px between the controls and the cards (the card row's padding-top). Not
-     authorable spacing — it belongs to the slider component, not the section. */
   margin-block: var(--s2a-spacing-32, 32px);
 }
 
@@ -21,10 +17,6 @@
   scroll-snap-align: start;
 }
 
-/* The slider block's own UI (heading/pills/arrows) is desktop-only — hidden
-   below 900px. The card track is a separate sibling element (see
-   locateTrack() in slider.js), so it keeps scrolling/swiping at mobile and
-   tablet regardless; only this block's controls disappear. */
 .carousel-controls {
   display: none;
 }
@@ -104,7 +96,6 @@
   cursor: default;
 }
 
-/* Same right-arrow icon, rotated — matches the Figma component (one asset, two directions). */
 .carousel-arrow-prev {
   transform: rotate(180deg);
 }
