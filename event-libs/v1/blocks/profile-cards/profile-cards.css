@@ -59,7 +59,7 @@
   grid-template-columns: 1fr;
   row-gap: 24px;
   column-gap: 24px;
-  padding: 32px 16px;
+  padding: 32px var(--grid-margins-width);
 }
 
 .profile-cards.blade .card-container {
@@ -406,7 +406,7 @@
   .profile-cards.blade .cards-wrapper {
     column-gap: 48px;
     row-gap: 40px;
-    padding: 56px 16px;
+    padding: 56px var(--grid-margins-width);
   }
 
   /* Grid variants: Desktop */
