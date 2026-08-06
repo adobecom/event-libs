@@ -416,7 +416,11 @@ async function decorate(el) {
   el.innerHTML = '';
   el.setAttribute('role', 'region');
   if (heading) el.setAttribute('aria-label', heading);
-  el.dataset.fewSessions = String(sessions.length <= 2);
+
+  function updateFewSessions() {
+    el.dataset.fewSessions = String(sessions.length <= 3);
+  }
+  updateFewSessions();
 
   const track = createTag('div', { class: 'upcoming-sessions-track' });
   renderTrack(track, sessions);
@@ -430,6 +434,7 @@ async function decorate(el) {
   function dropSession(sessionId) {
     removeCard(el, sessionId);
     sessions = sessions.filter((session) => session.sessionId !== sessionId);
+    updateFewSessions();
   }
 
   let timers = scheduleStateTimers(sessions, dropSession);

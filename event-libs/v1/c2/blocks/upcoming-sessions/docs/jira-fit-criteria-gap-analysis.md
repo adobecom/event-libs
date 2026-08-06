@@ -35,7 +35,8 @@ skipped — the block correctly never implements them.
   (single section-metadata-fed block), not a runtime constraint, which matches the
   story's scope.
 - **Desktop scroll controls, mobile swipe** — `buildCarouselControls()` renders
-  prev/next arrows; `data-few-sessions` hides them when ≤2 cards; CSS scrolls the
+  prev/next arrows; `data-few-sessions` hides them when ≤3 cards (recomputed as
+  sessions are dropped, not just at initial decoration); CSS scrolls the
   `.upcoming-sessions-track` natively on touch (swipeable) with arrows desktop-only
   (`@media (min-width: 1280px)`).
 - **Row bleeds past right edge of container** — existing `carousel clip-end` block

@@ -93,20 +93,48 @@ describe('upcoming-sessions', () => {
       expect(el.querySelector('.upcoming-sessions-heading').textContent).to.equal('Upcoming');
     });
 
-    it('marks data-few-sessions=true (arrows hidden) with 2 or fewer sessions', async () => {
-      const el = buildBlock([session(), session({ sessionId: 'session-2' })]);
-      await init(el);
-      expect(el.dataset.fewSessions).to.equal('true');
-    });
-
-    it('marks data-few-sessions=false (arrows shown) with more than 2 sessions', async () => {
+    it('marks data-few-sessions=true (arrows hidden) with 3 or fewer sessions', async () => {
       const el = buildBlock([
         session(),
         session({ sessionId: 'session-2' }),
         session({ sessionId: 'session-3' }),
       ]);
       await init(el);
+      expect(el.dataset.fewSessions).to.equal('true');
+    });
+
+    it('marks data-few-sessions=false (arrows shown) with more than 3 sessions', async () => {
+      const el = buildBlock([
+        session(),
+        session({ sessionId: 'session-2' }),
+        session({ sessionId: 'session-3' }),
+        session({ sessionId: 'session-4' }),
+      ]);
+      await init(el);
       expect(el.dataset.fewSessions).to.equal('false');
+    });
+
+    it('flips data-few-sessions to true once a dropped session brings the visible count to 3', async () => {
+      const started = session({
+        sessionId: 'session-1',
+        sessionTime: {
+          startTimeMillis: Date.now() - 60_000,
+          endTimeMillis: Date.now() + 3_600_000,
+          timezone: 'America/Los_Angeles',
+        },
+      });
+      const el = buildBlock([
+        started,
+        session({ sessionId: 'session-2' }),
+        session({ sessionId: 'session-3' }),
+        session({ sessionId: 'session-4' }),
+      ]);
+
+      // The already-started session is dropped synchronously during init(), before this
+      // resolves, bringing the visible count from 4 down to 3.
+      await init(el);
+
+      expect(el.dataset.fewSessions).to.equal('true');
     });
 
     it('removes itself entirely when the authored array is empty', async () => {
