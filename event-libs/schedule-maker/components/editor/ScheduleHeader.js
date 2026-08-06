@@ -134,7 +134,8 @@ export default function ScheduleHeader() {
           </ul>
           <p class="sm-editor__conflict-warning-hint">
             If these are meant to be independent schedules, open the other version and click Duplicate.
-            If this is really the same schedule, edit and Copy Link, then replace the link(s) above with the new one.
+            If this is really the same schedule, decide which content is correct (editing first if needed), then Copy Link
+            and replace every doc reference for this schedule — both listed above and in "Referenced in" below — with the new link.
           </p>
         </div>
       `}
