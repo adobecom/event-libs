@@ -4,6 +4,7 @@ import {
   isScheduleComplete,
   sortBlocks,
   blocksNeedSorting,
+  sortSchedulesAlphabetically,
   processSchedules,
   prepareScheduleForClient,
   assignIdToBlocks,
@@ -99,6 +100,33 @@ describe('schedule-maker utils', () => {
     it('returns falsy input unchanged', () => {
       expect(sortBlocks(undefined)).to.equal(undefined);
       expect(sortBlocks(null)).to.equal(null);
+    });
+  });
+
+  describe('sortSchedulesAlphabetically', () => {
+    it('sorts by title, case-insensitively, without mutating the input', () => {
+      const input = [
+        makeSchedule({ scheduleId: 'a', title: 'zebra' }),
+        makeSchedule({ scheduleId: 'b', title: 'Apple' }),
+        makeSchedule({ scheduleId: 'c', title: 'banana' }),
+      ];
+      const sorted = sortSchedulesAlphabetically(input);
+      expect(sorted.map((s) => s.scheduleId)).to.deep.equal(['b', 'c', 'a']);
+      expect(input.map((s) => s.scheduleId)).to.deep.equal(['a', 'b', 'c']);
+    });
+
+    it('treats a missing title as sorting first', () => {
+      const input = [
+        makeSchedule({ scheduleId: 'a', title: 'anything' }),
+        makeSchedule({ scheduleId: 'b', title: undefined }),
+      ];
+      const sorted = sortSchedulesAlphabetically(input);
+      expect(sorted.map((s) => s.scheduleId)).to.deep.equal(['b', 'a']);
+    });
+
+    it('returns falsy input unchanged', () => {
+      expect(sortSchedulesAlphabetically(undefined)).to.equal(undefined);
+      expect(sortSchedulesAlphabetically(null)).to.equal(null);
     });
   });
 

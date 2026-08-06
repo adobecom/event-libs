@@ -65,6 +65,16 @@ function blocksNeedSorting(blocks) {
   return blocks.some((block, index) => block !== sorted[index]);
 }
 
+// Case-insensitive, locale-aware alphabetical sort for the sidebar list. Kept
+// separate from processSchedules (which sorts by modificationTime and isn't
+// currently used) since the sidebar's order needs to stay stable and
+// self-evident from the title alone, not shift around on every edit/sync.
+function sortSchedulesAlphabetically(schedules) {
+  return schedules
+    ? [...schedules].sort((a, b) => (a.title || '').localeCompare(b.title || '', undefined, { sensitivity: 'base' }))
+    : schedules;
+}
+
 function assignIdToBlocks(schedule) {
   schedule.blocks.forEach((block) => {
     block.id = `block-${crypto.randomUUID()}`;
@@ -284,6 +294,7 @@ export {
   isScheduleComplete,
   sortBlocks,
   blocksNeedSorting,
+  sortSchedulesAlphabetically,
   processSchedules,
   prepareScheduleForClient,
   assignIdToBlocks,
