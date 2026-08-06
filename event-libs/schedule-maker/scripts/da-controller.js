@@ -279,6 +279,18 @@ async function rewriteNonCanonicalScheduleLinks(org, repo, filePath) {
   return false;
 }
 
+// Fingerprints a decoded schedule's authored content only — title and blocks —
+// excluding volatile fields (modificationTime changes on every Copy Link even
+// with zero real edits; scheduleId is the grouping key itself; createdTime
+// never changes but isn't meaningful content). Two occurrences of the same
+// scheduleId with matching fingerprints are truly the same schedule placed in
+// multiple docs (safe to collapse); differing fingerprints mean genuine
+// content divergence — staleness or an intentional fork, either way a
+// conflict worth surfacing rather than silently discarding.
+function scheduleContentFingerprint(decoded) {
+  return JSON.stringify({ title: decoded?.title, blocks: decoded?.blocks });
+}
+
 // Handles both correctly-encoded links (single decodeURIComponent) and legacy
 // double-encoded links where encodeURIComponent was applied before searchParams.set.
 export function decodeScheduleParam(raw) {
@@ -312,8 +324,9 @@ export async function syncSchedules(org, repo, eventFolder) {
   }
   const docFiles = allFiles.filter((f) => f.endsWith('.html'));
 
-  const foundData = new Map(); // scheduleId → decoded object (first occurrence wins)
+  const foundData = new Map(); // scheduleId → decoded object (most recently modified wins)
   const docRefs = {}; // scheduleId → [filePath, ...]
+  const conflicts = new Set(); // scheduleId → same id, genuinely different content found
   const canonicalPrefix = `${DA_ORIGIN}/app/${org}/${repo}/${DA_APP_PATH}`;
 
   const perDocFinds = await mapWithConcurrency(docFiles, SCAN_CONCURRENCY, async (filePath) => {
@@ -359,6 +372,15 @@ export async function syncSchedules(org, repo, eventFolder) {
     finds.forEach((decoded) => {
       const key = decoded.scheduleId || decoded.title;
       const existing = foundData.get(key);
+      if (existing && scheduleContentFingerprint(existing) !== scheduleContentFingerprint(decoded)) {
+        // Same scheduleId, genuinely different content — a stale copy left
+        // behind after an edit, or an intentional variant that never got its
+        // own identity. Either way, flag it rather than silently discarding
+        // one version: chrono-box and ChronoLens both render/inspect each
+        // occurrence independently and would show both, so Sync shouldn't be
+        // the only place that looks like there's just one.
+        conflicts.add(key);
+      }
       // Same scheduleId can appear more than once (e.g. a stale copy of a link
       // left in a doc alongside a freshly-copied one after editing) — keep
       // whichever occurrence has the most recent modificationTime, not just
@@ -374,9 +396,12 @@ export async function syncSchedules(org, repo, eventFolder) {
     });
   });
 
-  const schedules = [...foundData.values()].sort(
-    (a, b) => new Date(b.modificationTime || 0) - new Date(a.modificationTime || 0),
-  );
+  const schedules = [...foundData.values()]
+    .map((schedule) => ({
+      ...schedule,
+      hasConflictingVersions: conflicts.has(schedule.scheduleId || schedule.title),
+    }))
+    .sort((a, b) => new Date(b.modificationTime || 0) - new Date(a.modificationTime || 0));
 
   return { ok: true, data: { schedules, docRefs } };
 }

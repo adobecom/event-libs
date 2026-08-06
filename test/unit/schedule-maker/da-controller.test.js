@@ -261,6 +261,68 @@ describe('da-controller', () => {
       expect(result.data.docRefs.dup3).to.have.lengthOf(2);
     });
 
+    it('flags hasConflictingVersions when the same scheduleId has genuinely different content', async () => {
+      const stale = encodeSchedule({
+        scheduleId: 'conflict1', title: 'Original', modificationTime: '2026-01-01T00:00:00.000Z', blocks: [{ title: 'a' }],
+      });
+      const fresh = encodeSchedule({
+        scheduleId: 'conflict1', title: 'Variant', modificationTime: '2026-06-01T00:00:00.000Z', blocks: [{ title: 'a' }, { title: 'b' }],
+      });
+      const docHtml = `<a href="?schedule=${stale}">old</a><a href="?schedule=${fresh}">new</a>`;
+
+      setDaFetch(routeFetch([
+        ['/list/org/repo/events/e', makeResponse({
+          json: [{ path: '/org/repo/events/e/index.html', ext: 'html' }],
+        })],
+        ['/source/org/repo/events/e/index.html', makeResponse({ text: docHtml })],
+      ]));
+
+      const result = await syncSchedules('org', 'repo', '/events/e');
+      expect(result.data.schedules).to.have.lengthOf(1);
+      expect(result.data.schedules[0].hasConflictingVersions).to.be.true;
+      // Still shows the freshest content even while flagging the conflict.
+      expect(result.data.schedules[0].title).to.equal('Variant');
+    });
+
+    it('does not flag a conflict when duplicate occurrences have identical content', async () => {
+      const identical = encodeSchedule({
+        scheduleId: 'same1', title: 'Keynote', modificationTime: '2026-01-01T00:00:00.000Z', blocks: [{ title: 'a' }],
+      });
+      // Same schedule, unedited, pasted into two docs — the ordinary reuse case.
+      setDaFetch(routeFetch([
+        ['/list/org/repo/events/e', makeResponse({
+          json: [
+            { path: '/org/repo/events/e/a.html', ext: 'html' },
+            { path: '/org/repo/events/e/b.html', ext: 'html' },
+          ],
+        })],
+        ['/source/org/repo/events/e/a.html', makeResponse({ text: `<a href="?schedule=${identical}">a</a>` })],
+        ['/source/org/repo/events/e/b.html', makeResponse({ text: `<a href="?schedule=${identical}">b</a>` })],
+      ]));
+
+      const result = await syncSchedules('org', 'repo', '/events/e');
+      expect(result.data.schedules).to.have.lengthOf(1);
+      expect(result.data.schedules[0].hasConflictingVersions).to.be.false;
+      expect(result.data.docRefs.same1).to.have.lengthOf(2);
+    });
+
+    it('does not flag unrelated schedules (different scheduleIds) as conflicting with each other', async () => {
+      const a = encodeSchedule({ scheduleId: 'x', title: 'A', modificationTime: '2026-01-01T00:00:00.000Z', blocks: [] });
+      const b = encodeSchedule({ scheduleId: 'y', title: 'B', modificationTime: '2026-01-01T00:00:00.000Z', blocks: [] });
+      const docHtml = `<a href="?schedule=${a}">a</a><a href="?schedule=${b}">b</a>`;
+
+      setDaFetch(routeFetch([
+        ['/list/org/repo/events/e', makeResponse({
+          json: [{ path: '/org/repo/events/e/index.html', ext: 'html' }],
+        })],
+        ['/source/org/repo/events/e/index.html', makeResponse({ text: docHtml })],
+      ]));
+
+      const result = await syncSchedules('org', 'repo', '/events/e');
+      expect(result.data.schedules).to.have.lengthOf(2);
+      expect(result.data.schedules.every((s) => !s.hasConflictingVersions)).to.be.true;
+    });
+
     it('recurses into subfolders when listing files', async () => {
       const encoded = encodeSchedule({ scheduleId: 'deep', title: 'Deep', modificationTime: '2026-06-01T00:00:00.000Z', blocks: [] });
       setDaFetch(routeFetch([

@@ -80,7 +80,22 @@ const SchedulesProvider = ({ children }) => {
       setSchedules(found.map((s) => prepareScheduleForClient(s)));
       setDocRefs(refs);
       setHasSynced(true);
-      setToastSuccess(`Sync complete — ${found.length} schedule(s) found`);
+
+      const conflicted = found.filter((s) => s.hasConflictingVersions);
+      if (conflicted.length > 0) {
+        conflicted.forEach((s) => {
+          const key = s.scheduleId || s.title;
+          console.warn(
+            `[schedule-maker sync] "${s.title}" has conflicting versions across its referenced docs — `
+            + `showing the most recently modified one. Referenced in: ${(refs[key] || []).join(', ')}`,
+          );
+        });
+        setToastSuccess(
+          `Sync complete — ${found.length} schedule(s) found, ${conflicted.length} with conflicting versions (see console)`,
+        );
+      } else {
+        setToastSuccess(`Sync complete — ${found.length} schedule(s) found`);
+      }
     } catch (err) {
       setToastError(err.message || 'Sync failed');
     } finally {
