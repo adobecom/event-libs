@@ -1,6 +1,8 @@
 import { expect } from '@esm-bundle/chai';
 import { readFile } from '@web/test-runner-commands';
-import init, { createSocialIcon, buildModalContent } from '../../../../event-libs/v1/blocks/profile-cards/profile-cards.js';
+import init, {
+  createSocialIcon, buildModalContent, syncBladeBiosOverflow,
+} from '../../../../event-libs/v1/blocks/profile-cards/profile-cards.js';
 import { setMetadata } from '../../../../event-libs/v1/utils/utils.js';
 
 /** Mirrors Milo modal.js FOCUSABLES selector for initial-focus assertions */
@@ -314,6 +316,184 @@ describe('Profile Cards Module', () => {
       init(el);
       const configRows = Array.from(el.querySelectorAll(':scope > div:not(.cards-wrapper)')).slice(1);
       expect(configRows).to.have.lengthOf(0);
+    });
+  });
+
+  describe('blade variant', () => {
+    const BIO = 'A short bio used across blade variant tests.';
+
+    function makeBladeBlock(speakers, { classes = 'blade', configRows = '<div><div>type</div><div>speaker</div></div>' } = {}) {
+      setMetadata('speakers', JSON.stringify(speakers));
+      const el = document.createElement('div');
+      el.className = `profile-cards ${classes}`;
+      el.innerHTML = `<div><div><h2>Heading</h2></div></div>${configRows}`;
+      document.body.appendChild(el);
+      return el;
+    }
+
+    // Mirrors the sessions-hub line-clamp overflow pattern: stub scrollHeight/
+    // clientHeight rather than relying on real layout, then sync directly.
+    function stubOverflow(desc, isOverflowing) {
+      Object.defineProperty(desc, 'scrollHeight', { configurable: true, get: () => (isOverflowing ? 200 : 100) });
+      Object.defineProperty(desc, 'clientHeight', { configurable: true, get: () => 100 });
+    }
+
+    beforeEach(() => {
+      document.body.innerHTML = body;
+      document.head.innerHTML = head;
+    });
+
+    it('renders name and title but no company field, social icons, or modal trigger', () => {
+      const el = document.querySelector('#blade-cards');
+      init(el);
+
+      const cards = el.querySelectorAll('.card-container');
+      expect(cards).to.have.lengthOf(3);
+
+      cards.forEach((card) => {
+        expect(card.querySelector('.card-name')).to.not.be.null;
+        expect(card.querySelector('.card-title')).to.not.be.null;
+        expect(card.querySelector('.card-company')).to.be.null;
+        expect(card.querySelector('.card-social-icons')).to.be.null;
+        expect(card.getAttribute('role')).to.not.equal('button');
+        expect(card.hasAttribute('aria-haspopup')).to.be.false;
+      });
+    });
+
+    it('does not add the single class or center a 3-card blade block', () => {
+      const el = document.querySelector('#blade-cards');
+      init(el);
+
+      expect(el.classList.contains('single')).to.be.false;
+    });
+
+    it('does not enable modal even when the modal class is also authored', () => {
+      const el = makeBladeBlock([
+        { firstName: 'Ada', lastName: 'Lovelace', speakerType: 'Speaker', title: 'Mathematician', bio: BIO },
+      ], { classes: 'blade modal' });
+      init(el);
+
+      const card = el.querySelector('.card-container');
+      expect(card.getAttribute('role')).to.not.equal('button');
+      expect(card.hasAttribute('aria-haspopup')).to.be.false;
+      expect(card.classList.contains('modal-trigger')).to.be.false;
+    });
+
+    it('does not enable the carousel even with more than 3 speakers', () => {
+      const el = makeBladeBlock([
+        { firstName: 'A', lastName: 'One', speakerType: 'Speaker', title: 't', bio: BIO },
+        { firstName: 'B', lastName: 'Two', speakerType: 'Speaker', title: 't', bio: BIO },
+        { firstName: 'C', lastName: 'Three', speakerType: 'Speaker', title: 't', bio: BIO },
+        { firstName: 'D', lastName: 'Four', speakerType: 'Speaker', title: 't', bio: BIO },
+      ]);
+      init(el);
+
+      expect(el.querySelectorAll('.card-container')).to.have.lengthOf(4);
+      expect(el.classList.contains('with-carousel')).to.be.false;
+      expect(el.querySelector('.carousel-plugin')).to.be.null;
+    });
+
+    it('does not add the single class for a lone blade speaker', () => {
+      const el = makeBladeBlock([
+        { firstName: 'Solo', lastName: 'Speaker', speakerType: 'Speaker', title: 't', bio: BIO },
+      ]);
+      init(el);
+
+      expect(el.querySelectorAll('.card-container')).to.have.lengthOf(1);
+      expect(el.classList.contains('single')).to.be.false;
+    });
+
+    it('always renders the full bio text (no character-based truncation)', () => {
+      const el = makeBladeBlock([
+        { firstName: 'Full', lastName: 'Bio', speakerType: 'Speaker', title: 't', bio: BIO },
+      ]);
+      init(el);
+
+      expect(el.querySelector('.blade-desc').textContent).to.equal(BIO);
+    });
+
+    it('keeps the Read more button hidden when the 2-line-clamped bio does not overflow', () => {
+      const el = makeBladeBlock([
+        { firstName: 'Fits', lastName: 'Bio', speakerType: 'Speaker', title: 't', bio: BIO },
+      ]);
+      init(el);
+
+      const desc = el.querySelector('.blade-desc');
+      stubOverflow(desc, false);
+      syncBladeBiosOverflow(el);
+
+      expect(el.querySelector('.blade-read-more').hidden).to.be.true;
+    });
+
+    it('reveals the Read more button when the 2-line-clamped bio overflows, and toggles Collapse on click', () => {
+      const el = makeBladeBlock([
+        { firstName: 'Overflow', lastName: 'Bio', speakerType: 'Speaker', title: 't', bio: BIO },
+      ]);
+      init(el);
+
+      const card = el.querySelector('.card-container');
+      const desc = el.querySelector('.blade-desc');
+      stubOverflow(desc, true);
+      syncBladeBiosOverflow(el);
+
+      const btn = el.querySelector('.blade-read-more');
+      expect(btn.hidden).to.be.false;
+      expect(btn.textContent).to.equal('Read more');
+      expect(btn.getAttribute('aria-expanded')).to.equal('false');
+      expect(card.classList.contains('expanded')).to.be.false;
+
+      btn.click();
+      expect(card.classList.contains('expanded')).to.be.true;
+      expect(btn.textContent).to.equal('Collapse');
+      expect(btn.getAttribute('aria-expanded')).to.equal('true');
+      // the bio text itself never changes - CSS line-clamp handles the visual truncation
+      expect(desc.textContent).to.equal(BIO);
+
+      btn.click();
+      expect(card.classList.contains('expanded')).to.be.false;
+      expect(btn.textContent).to.equal('Read more');
+      expect(btn.getAttribute('aria-expanded')).to.equal('false');
+    });
+
+    it('keeps the Read more button visible once expanded even if a later sync re-runs', () => {
+      const el = makeBladeBlock([
+        { firstName: 'Overflow', lastName: 'Bio', speakerType: 'Speaker', title: 't', bio: BIO },
+      ]);
+      init(el);
+
+      const card = el.querySelector('.card-container');
+      const desc = el.querySelector('.blade-desc');
+      stubOverflow(desc, true);
+      syncBladeBiosOverflow(el);
+      el.querySelector('.blade-read-more').click();
+
+      // simulate re-running the overflow sync (e.g. from a resize) while expanded
+      syncBladeBiosOverflow(el);
+
+      expect(card.classList.contains('expanded')).to.be.true;
+      expect(el.querySelector('.blade-read-more').hidden).to.be.false;
+    });
+
+    it('renders a static-authored blade card whose Read more toggle expands without changing the bio text', () => {
+      const el = document.querySelector('#blade-static-cards');
+      init(el);
+
+      const card = el.querySelector('.card-container');
+      expect(card.querySelector('.card-name').textContent.trim()).to.equal('Static Blade Speaker');
+      expect(card.querySelector('.card-title').textContent.trim()).to.equal('VP of Marketing, Adobe');
+      expect(card.querySelector('.card-social-icons')).to.be.null;
+
+      const desc = card.querySelector('.blade-desc');
+      const originalText = desc.textContent;
+      stubOverflow(desc, true);
+      syncBladeBiosOverflow(el);
+
+      const btn = card.querySelector('.blade-read-more');
+      expect(btn.hidden).to.be.false;
+
+      btn.click();
+      expect(card.classList.contains('expanded')).to.be.true;
+      expect(desc.textContent).to.equal(originalText);
     });
   });
 
