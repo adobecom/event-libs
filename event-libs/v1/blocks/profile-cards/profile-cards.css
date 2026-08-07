@@ -94,6 +94,10 @@
   display: block;
 }
 
+.profile-cards.blade .blade-read-more[hidden] {
+  display: none;
+}
+
 .profile-cards.single .card-container {
   display: flex;
   align-items: flex-start;
