@@ -40,8 +40,8 @@ const PAST_SESSION = {
 };
 
 const BASE_CONFIG = {
-  userTz: 'America/Los_Angeles', surface: 'page', trackColors: {}, trackIcons: {},
-  title: '', showConflictModal: false, filterCategories: [], theme: 'dark',
+  userTz: 'America/Los_Angeles', surface: 'page',
+  title: '', filterCategories: [], theme: 'dark',
 };
 
 function makeStore({
@@ -60,7 +60,7 @@ function makeStore({
 
   const store = buildStore(preact);
   store.SessionGuideContext._current = {
-    state: { mySessionsTab, activeDay, eventConfig: { ...BASE_CONFIG } },
+    state: { mySessionsTab, activeDay, guideConfig: { ...BASE_CONFIG } },
     dispatch: () => {},
   };
   return store;

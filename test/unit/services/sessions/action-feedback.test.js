@@ -1,9 +1,12 @@
 import { expect } from '@esm-bundle/chai';
 
-import { runSessionAction } from '../../../../event-libs/v1/services/sessions/action-feedback.js';
+import { runSessionAction, scheduleWithFeedback } from '../../../../event-libs/v1/services/sessions/action-feedback.js';
 import { SessionActionError } from '../../../../event-libs/v1/services/sessions/session-actions.js';
 import { toast } from '../../../../event-libs/v1/features/toast/toast.js';
 import { conflict } from '../../../../event-libs/v1/features/conflict-modal/conflict-modal.js';
+import {
+  auth, sessions, scheduled, pendingActions,
+} from '../../../../event-libs/v1/utils/session-store.js';
 
 describe('services/sessions/action-feedback', () => {
   const eventConfig = { title: 'Adobe MAX 2026', registerUrl: '/register' };
@@ -70,5 +73,26 @@ describe('services/sessions/action-feedback', () => {
     expect(toast.value.message).to.equal('Something went wrong. Please try again.');
     expect(toast.value.variant).to.equal('negative');
     expect(loggedMessages[0]).to.include('add to schedule failed');
+  });
+
+  // No tier-1-event-config metadata authored anywhere in this file, so
+  // getAllowDoubleBooking() defaults to false — mirrors a page that hasn't set the
+  // flag, where a genuine time conflict must still block scheduling.
+  it('scheduleWithFeedback surfaces the conflict modal for a real time conflict when allowDoubleBooking is unset', async () => {
+    auth.value = { isLoggedIn: true, isRegistered: true, userFirstName: null };
+    pendingActions.value = new Set();
+    const existingSession = {
+      id: 'existing', startTimeUtc: '2026-10-28T16:00:00Z', endTimeUtc: '2026-10-28T17:00:00Z',
+    };
+    const incoming = {
+      id: 'incoming', startTimeUtc: '2026-10-28T16:30:00Z', endTimeUtc: '2026-10-28T17:30:00Z',
+    };
+    sessions.value = [existingSession, incoming];
+    scheduled.value = new Set(['existing']);
+
+    await scheduleWithFeedback(incoming, { eventConfig, isScheduled: false });
+
+    expect(conflict.value.existing).to.equal(existingSession);
+    expect(conflict.value.incoming).to.equal(incoming);
   });
 });

@@ -4,6 +4,7 @@ import { sessionsStatus } from '../../../utils/session-store.js';
 import { DrawerHeader } from './DrawerHeader.js';
 import { ViewRouter } from './ViewRouter.js';
 import { FilterPanel } from './FilterPanel.js';
+import { LoadingState } from './LoadingState.js';
 
 export function FullPageShell() {
   const { state, dispatch } = useSessionGuide();
@@ -76,7 +77,7 @@ export function FullPageShell() {
         <${DrawerHeader} onClose=${noop} onFilterToggle=${() => setFilterOpen((o) => !o)} filterOpen=${filterOpen} hideClose=${true} />
       </div>
       <div class="sg-full-page__body">
-        ${sessionsStatus.value === 'loading' && html`<div class="sg-loading">Loading sessions…</div>`}
+        ${sessionsStatus.value === 'loading' && html`<${LoadingState} />`}
         ${sessionsStatus.value === 'error' && html`<div class="sg-error">Failed to load sessions.</div>`}
         ${sessionsStatus.value === 'ready' && html`<${ViewRouter} />`}
       </div>

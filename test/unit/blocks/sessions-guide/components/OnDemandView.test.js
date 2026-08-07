@@ -28,8 +28,8 @@ const UPCOMING = {
 };
 
 const BASE_CONFIG = {
-  userTz: 'America/Los_Angeles', surface: 'page', trackColors: {}, trackIcons: {},
-  title: '', showConflictModal: false, filterCategories: [], theme: 'dark',
+  userTz: 'America/Los_Angeles', surface: 'page',
+  title: '', filterCategories: [], theme: 'dark',
 };
 
 function makeStore(sessionList) {
@@ -39,7 +39,7 @@ function makeStore(sessionList) {
   store.SessionGuideContext._current = {
     state: {
       activeView: 'on-demand', activeFilters: {}, searchQuery: '',
-      eventConfig: { ...BASE_CONFIG },
+      guideConfig: { ...BASE_CONFIG },
     },
     dispatch: () => {},
   };
@@ -81,5 +81,11 @@ describe('OnDemandView', () => {
     const View = buildOnDemandView(preact, store);
     const html = View({});
     expect(html).to.include('sg-time-row__cards');
+  });
+
+  it('does not show a featured carousel when no featuredSessions are authored', () => {
+    const store = makeStore([PAST_DESIGN, PAST_VIDEO]);
+    const View = buildOnDemandView(preact, store);
+    expect(View({})).to.not.include('sg-carousel-section--featured');
   });
 });

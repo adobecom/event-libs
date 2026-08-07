@@ -1,6 +1,7 @@
 import { resolveScheduleConflict, scheduleAction, favoriteAction } from './session-actions.js';
 import { showToast } from '../../features/toast/toast.js';
 import { showConflictModal } from '../../features/conflict-modal/conflict-modal.js';
+import { getAllowDoubleBooking } from '../../utils/tier-1-event-config.js';
 
 // Translates a SessionActionError (thrown by the shared, UI-agnostic session-actions
 // layer) into a toast or conflict modal via the shared, page-level modules — usable by
@@ -53,8 +54,10 @@ export async function runSessionAction(actionFn, {
 // Thin, pre-labeled wrappers around runSessionAction so every schedule/favorite call
 // site shares the same success copy instead of repeating it at each call site.
 export function scheduleWithFeedback(session, { eventConfig, isScheduled }) {
+  // One shared, page-level read (not eventConfig, which is per-block) — inverted,
+  // since allowing double booking means suppressing the conflict modal.
   return runSessionAction(
-    () => scheduleAction(session, { showConflictModal: eventConfig.showConflictModal }),
+    () => scheduleAction(session, { showConflictModal: !getAllowDoubleBooking() }),
     {
       eventConfig,
       actionLabel: 'add to schedule',

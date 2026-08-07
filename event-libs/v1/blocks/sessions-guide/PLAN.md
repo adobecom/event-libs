@@ -51,6 +51,7 @@ All template output uses `` html`...` `` from `htm-preact.js`. File extensions a
 | Layer | Tool | Purpose |
 |---|---|---|
 | Shared, page-level state | Preact `signal()` (`event-libs/v1/utils/session-store.js`) | Sessions, favorited, scheduled, auth, live-stream status, pending actions — single source of truth, readable by **any** block on the page, not just this one |
+| Shared, page-level re-render trigger | Preact `signal()` (`sessionStateVersion` in `event-libs/v1/utils/session-store.js`) | Bumped only when a session's derived state (upcoming/live/on-demand) actually changes due to time passing — see "Session-state ticker" below |
 | Shared, page-level feedback UI | Preact `signal()` + vanilla DOM (`event-libs/v1/features/toast/toast.js`, `event-libs/v1/features/conflict-modal/conflict-modal.js`) | Toast and schedule-conflict modal — mounted once by `initSessionState()`, rendered with plain DOM so any block (Preact or vanilla) can trigger them via `showToast()`/`showConflictModal()`, not just this one |
 | Block-local UI state | Preact Context + `useReducer` (`store/index.js`) | Drawer state, active view, active day, filters, search — this widget's own chrome, not needed elsewhere |
 | Local component state | `useState` | Carousel index, filter panel open/closed, mobile search open |
@@ -75,6 +76,11 @@ So the split is: `BlockMediator` still owns what it already owned (`imsProfile`,
 ### Polling architecture
 A single `setInterval` (30 s) starts inside `session-store.js` after sessions are loaded (when `sessionsStatus.value === 'ready'`). It calls the Mobile Rider batch API for all sessions that have an `mrStreamId`. The polling engine self-stops when all MR sessions report inactive (stream day over). `poller.js`'s `startPolling(mrSessions, env, onUpdate, intervalMs)` takes a plain callback instead of a dispatch function — decoupling it from ever being tied to a specific reducer.
 
+### Session-state ticker
+MR polling only gives components an ambient re-render on a live-status change — a page with only non-MR sessions had no mechanism to notice a session crossing its start/end time purely because the clock moved forward, short of a user interacting with something else first. `event-libs/v1/services/sessions/session-state-ticker.js`'s `startSessionStateTicker(getSessions, getLiveStreamActiveIds, onChange, { intervalMs, getNow })` runs on its own 15 s interval (also started from `session-store.js`, unconditionally — not gated on MR sessions existing), diffs `deriveSessionState()` per session against its last-known value, and only calls `onChange` when at least one session's bucket actually changed. `session-store.js` wires `onChange` to bump the shared `sessionStateVersion` signal. It self-stops once every session is on-demand, mirroring the MR poller's own self-stop.
+
+Components don't read `sessionStateVersion`'s value for anything — they read it purely to establish a Preact-signals re-render dependency (a bare `sessionStateVersion.value;` read, `eslint-disable`d for `no-unused-expressions`), then compute `nowMs`/`deriveSessionState()` fresh as normal. Currently read by `LiveUpcomingView`, `MySessionsView`, `MyFavoritesView`, `OnDemandView`, and `SessionDetailOverlay` — child components (`SessionCard`, `LiveCard`, `TimeSlotRow`, etc.) don't need it, since they re-render via the normal cascade when their parent view re-renders. The auto-transition effect in `store/index.js` also subscribes to it directly (via `.subscribe()`, since it's inside a `useEffect` rather than a render body), so the on-demand auto-switch fires from pure time passing too, not just from a `sessions`/`liveStreamActiveIds` write.
+
 ### Auth architecture
 Auth state is synced entirely inside `session-store.js`'s `syncAuth()`, from two sources:
 1. `localStorage` (`sg:dev-auth`) — checked first; dev-mode override that prevents Milo's guest IMS from overwriting the dev user. Seeded by `session-store.js` itself (see Phase 0.3).
@@ -85,7 +91,7 @@ The block's own components (and any other block) read `auth.value` directly — 
 Real FEDS token (`getFedsToken()`) and RF credential wiring are implemented but not yet activated — Rainfocus service methods currently return mock data.
 
 ### Timezone
-All session times come from the event API in UTC. `detectUserTimezone()` detects the user's timezone via `Intl.DateTimeFormat().resolvedOptions().timeZone` at init and stores it as `eventConfig.userTz`. Cards and overlays read `userTz` from context. A `?serverTime=<ms>` URL parameter overrides `Date.now()` for testing via `getNowMs()`.
+All session times come from the event API in UTC. `detectUserTimezone()` detects the user's timezone via `Intl.DateTimeFormat().resolvedOptions().timeZone` at init and stores it as `guideConfig.userTz`. Cards and overlays read `userTz` from context. A `?serverTime=<ms>` URL parameter lets `getNowMs()` simulate landing on the page at a specific instant — time then keeps advancing from there at the real clock's rate, rather than freezing forever, matching the same-named parameter's semantics in `features/timing-framework`.
 
 ### User registration states
 Three distinct states drive the UI:
@@ -143,7 +149,9 @@ SessionsGuideBlock (init entry point — sessions-guide.js)
 Toast and the schedule-conflict modal are **not** part of this tree anymore — they're page-level singletons mounted directly to `document.body` by `event-libs/v1/features/toast/toast.js`/`features/conflict-modal/conflict-modal.js` (via `initSessionState()`), independent of whether this block is on the page at all.
 
 ### Shared utility components
-- `CategoryBadge` — renders category icon + label; color driven by `eventConfig.categoryColors`
+- `CategoryBadge` — renders category icon + label; color driven by `getTrackIcon()`
+  (`event-libs/v1/utils/tier-1-event-config.js`, the Tier 1 Event Configurator app's
+  page-level output — see `MWPW-200314-HANDOFF.md`)
 - `IconButton` — S2A icon-only button (solid/outlined/transparent variants, on-light/on-dark contexts)
 - `icons.js` — SVG icon functions: `IconPlay`, `IconCalendarCheck`, `IconCalendarPlus`, `IconHeartFilled`, `IconHeartOutline`
 
@@ -169,6 +177,7 @@ State is split across two modules — shared signals (readable by any block) and
     userFirstName: string | null,
   },
   pendingActions: Set<string>,       // session IDs with in-flight RF API calls
+  sessionStateVersion: number,       // bumped only on a real upcoming/live/on-demand transition; see session-state-ticker.js
 }
 ```
 
@@ -187,7 +196,7 @@ State is split across two modules — shared signals (readable by any block) and
   searchQuery: string,
   mySessionsTab: 'upcoming' | 'on-demand',
   myFavoritesTab: 'upcoming' | 'on-demand',
-  eventConfig: EventConfig,
+  guideConfig: GuideConfig,
   activeSessionId: string | null,    // id of session shown in detail overlay (widget only)
   dismissingIds: Set<string>,        // session IDs currently animating out of My Sessions/My Favorites
   regPromptOpen: boolean,            // drives modal RegistrationPrompt (from App-level gating)
@@ -224,15 +233,21 @@ interface Session {
   copyrightDisclaimer?: string;
 }
 
-interface EventConfig {
+// This block's own per-instance authoring config, parsed by parse-config.js's
+// parseSessionsGuideConfig(). Named GuideConfig (not EventConfig) to stay distinct
+// from utils.js's page-wide getEventConfig() and the Tier 1 Event Configurator's
+// tier-1-event-config.js singleton — see MWPW-200314-HANDOFF.md item 1.
+//
+// showConflictModal, trackIcons/trackColors/categoryColors, and featuredSessionIds
+// used to live here but were retired (MWPW-200314 items 2/3): allow-double-booking,
+// track icons/colors, and featured sessions are now page-level settings authored
+// once via the Tier 1 Event Configurator app and read through
+// event-libs/v1/utils/tier-1-event-config.js's getAllowDoubleBooking()/
+// getTrackIcon()/getFeaturedSessionIds() — not block-instance config.
+interface GuideConfig {
   title: string;                 // event display name; authored as 'event-title'
   registerUrl: string;           // registration CTA URL; sourced from session-store's apiConfig (page metadata), default '/register'
-  showConflictModal: boolean;
   filterCategories: FilterCategory[];  // [{ id, label }]; id maps to session property
-  trackIcons: Record<string, string>;  // track label → icon URL
-  trackColors: Record<string, string>; // track label → CSS color
-  categoryColors: Record<string, string>; // category key → CSS color (for CategoryBadge)
-  featuredSessionIds: string[];  // session IDs for featured carousel; falls back to deterministic random
   theme: 'light' | 'dark';      // default: widget='dark', page='light'
   surface: 'widget' | 'page';   // set from el.classList.contains('page')
   userTz: string;               // detected at init via detectUserTimezone()
@@ -283,22 +298,30 @@ The live→on-demand auto-transition (`allEnded || pastManualCutoff` while `acti
 - Dev seeding (`sg:dev-auth`, `sessions:scheduled`, `sessions:favorited` in localStorage) now lives inside `session-store.js`'s `initSessionState()`, not in this block's `init()` — see Phase 0.3 (TODO: remove once real IMS/Rainfocus auth is wired up)
 
 ### 0.2 Config parsing ✅
-`parseConfig(el)` reads the authoring table (standard Milo block format) into `eventConfig` — presentational/per-instance config only:
-- `event-title`, `show-conflict-modal` (boolean)
+`parseSessionsGuideConfig(el)` (in `utils/parse-config.js`) reads the authoring table
+(standard Milo block format) into `guideConfig` — presentational/per-instance config
+only:
+- `event-title`
 - `filter-categories` (JSON: `[{ id, label }]`)
-- `track-icons` (JSON map), `track-colors` (JSON map), `category-colors` (JSON map)
 - `theme` (`light` | `dark`; defaults: widget=`'dark'`, page=`'light'`)
-- `featured-sessions` (JSON array of session IDs)
 - `surface` derived from `el.classList.contains('page')`
 - `userTz` set via `detectUserTimezone()`
-- `registerUrl` is **not** authored here — it's merged in from `getApiConfig()` (see below) after `parseConfig()` runs
+- `registerUrl` is **not** authored here — it's merged in from `getApiConfig()` (see below) after `parseSessionsGuideConfig()` runs
 
 `rainfocus-api-url`, `rainfocus-api-profile-id`, `register-url`, and `manual-on-demand-transition-time` moved to **page metadata** (read by `session-store.js`, not this block) since they gate data other blocks need too, not just this widget's presentation. See `REAL-API-CHECKLIST.md` for the current metadata keys.
+
+**`show-conflict-modal`, `track-icons`/`track-colors`/`category-colors`, and
+`featured-sessions` used to be per-block authoring rows here — retired
+(`MWPW-200314` items 2/3).** Allow-double-booking, track icons/colors, and featured
+sessions are now page-level settings authored once via the Tier 1 Event Configurator
+app and read through `event-libs/v1/utils/tier-1-event-config.js`'s
+`getAllowDoubleBooking()`/`getTrackIcon()`/`getFeaturedSessionIds()` — see
+`MWPW-200314-HANDOFF.md` for the full history.
 
 ### 0.3 Data layer ✅ (mocked)
 All service files exist and export the correct API surface; all currently return mock data. They live in `event-libs/v1/services/sessions/` (promoted out of this block so the shared `session-store.js` — which owns fetching/polling/mutations — doesn't have to import from inside another block's folder):
 
-**`services/sessions/sessions-api.js`** — `fetchSessions(apiUrl)` returns `normalizeSessions(MOCK_SESSIONS)`. `MOCK_SESSIONS` is a 30-session catalog covering Adobe MAX 2026 Nov 10–12. TODO: replace with real API call.
+**`services/sessions/sessions-api.js`** — ✅ wired to the real ESL/ESP endpoint (`fetchEslSessions`/`mapEslPayloadToRawSessions`); `fetchSessions(eventId)` falls back to `normalizeSessions(mapEslPayloadToRawSessions(MOCK_ESL_PAYLOAD))` only when no `eventId` is given. `MOCK_ESL_PAYLOAD` is a 15-session raw-ESL-shaped catalog covering Adobe MAX 2026 Nov 10–12, piped through the same mapping pipeline as real data so it can't structurally drift.
 
 **`services/sessions/rainfocus.js`** — stub implementations returning mock data:
 - `fetchScheduled()` → `['session-1', 'session-3']`
@@ -319,7 +342,7 @@ All service files exist and export the correct API surface; all currently return
 - `scheduleSession(session)` / `favoriteSession(session)` — mutators that call the RF API and update the signals + localStorage
 
 **`store/index.js`** (block-local) exports:
-- `buildInitialState(eventConfig)` — initializes this block's UI-only state; reads `auth.value.isRegistered` for the initial `activeView`
+- `buildInitialState(guideConfig)` — initializes this block's UI-only state; reads `auth.value.isRegistered` for the initial `activeView`
 - `reducer(state, action)` — handles the UI-only action types listed above
 - `SessionGuideContext` — the Preact context object (also exposed as `SessionGuideContext._current` for direct useContext compatibility workaround)
 - `SessionGuideProvider` — wraps the app; watches the shared signals via `useEffect` to derive `eventDays` and the on-demand auto-transition, but no longer owns fetching, polling, auth sync, or persistence
@@ -328,11 +351,11 @@ All service files exist and export the correct API surface; all currently return
 
 `SessionGuideProvider` runs two `useEffect` hooks (down from four — fetching, auth sync, and persistence moved to `session-store.js`):
 1. Recompute `eventDays`/`activeDay` whenever the shared `sessions` signal changes
-2. Auto-switch out of `'live-upcoming'` once all sessions are on-demand or the manual cutoff has passed, watching the shared `sessions`/`liveStreamActiveIds` signals
+2. Auto-switch out of `'live-upcoming'` once all sessions are on-demand or the manual cutoff has passed, watching the shared `sessions`/`liveStreamActiveIds`/`sessionStateVersion` signals
 
 ### 0.5 Time utilities ✅
-`utils/time.js`:
-- `getNowMs()` — `Date.now()` with `?serverTime=<ms>` URL override for testing
+`utils/time.js` (re-exports `getNowMs` from `event-libs/v1/utils/session-state.js`, promoted there since the shared session-state-ticker needs it):
+- `getNowMs()` — `Date.now()`, or a `?serverTime=<ms>` origin that keeps advancing at the real clock's rate rather than freezing
 - `detectUserTimezone()` — `Intl.DateTimeFormat().resolvedOptions().timeZone` with `'UTC'` fallback
 - `formatSessionTime(utcIso, userTz)` — localized with timezone abbreviation
 - `formatShortTime(utcIso, userTz)` — localized without timezone abbreviation
@@ -369,7 +392,7 @@ Real FEDS token (`getFedsToken()`) and RF credential wiring: `services/sessions/
 ```javascript
 const surface = el.classList.contains('page') ? 'page' : 'widget';
 ```
-`surface` is stored in `eventConfig` and drives the `App` branch between `<DrawerShell>` and `<FullPageShell>`.
+`surface` is stored in `guideConfig` and drives the `App` branch between `<DrawerShell>` and `<FullPageShell>`.
 
 ### 1.2 Portal architecture (widget only) ✅
 The widget mounts into `<div class="sg-portal">` appended to `document.body`. The `.sessions-guide.widget` block element is cleared (`el.innerHTML = ''`) and serves as an invisible mount point.
@@ -443,7 +466,7 @@ Breakpoint at 1280 px: CTA goes to `peek` on wide, directly to `expanded` on nar
 
 **Context over props:** cards read all shared state from `useSessionGuide()`. Only `session` (and sometimes `forceOnDemand`) is passed as a prop.
 
-**`userTz` source:** read from `eventConfig.userTz` via context.
+**`userTz` source:** read from `guideConfig.userTz` via context.
 
 ### 2.1 SessionCard component ✅
 - `session` prop required; `forceOnDemand` prop (boolean, default false) forces on-demand display for previously-aired sessions
@@ -578,7 +601,7 @@ No longer a Preact component — `mountToast()` builds the toast element once vi
 
 ### 4.6 RegistrationPrompt component ✅
 - `isLoggedIn === false` → "Sign in and register" + `window.adobeIMS?.signIn()` button
-- Else (logged in, not registered) → "Register for the event" + `<a href="/register">` (register URL from eventConfig)
+- Else (logged in, not registered) → "Register for the event" + `<a href="/register">` (hardcoded `/register`, not currently sourced from `guideConfig.registerUrl`)
 - Rendered inline inside each view (My Sessions, My Favorites) for the full-view gate
 - Also rendered as a modal from `App` when `regPromptOpen === true` (triggered by `SHOW_REG_PROMPT`)
 
@@ -806,7 +829,7 @@ Tests mirror `test/unit/blocks/sessions-guide/`. Coverage status to be assessed 
   - (or gate behind `?sgDev=true`)
 - Wire real API calls in `event-libs/v1/services/sessions/rainfocus.js` (replace mock stubs with FEDS token + IMS userId)
 - Wire real API call in `event-libs/v1/services/sessions/mobile-rider.js`
-- Wire real API call in `event-libs/v1/services/sessions/sessions-api.js` (replace `MOCK_SESSIONS` with actual endpoint)
+- ✅ `event-libs/v1/services/sessions/sessions-api.js` wired to the real ESL/ESP catalog endpoint (`fetchEslSessions`/`mapEslPayloadToRawSessions`); `MOCK_ESL_PAYLOAD` remains only as the no-`event-id` fallback
 - Confirm FEDS event name `feds.data.authToken.loaded` and attribute path `window.feds.data.authToken` against live integration
 - PR description references MWPW-194331 and includes testing notes for widget and full-page surfaces
 
@@ -842,7 +865,7 @@ Phase 15 (PR Readiness) ⬜ — final gate
 | `isRegistered` source wiring | Wired via `BlockMediator.get('rsvpData').registered` inside `session-store.js`'s `syncAuth()`; dev state via `sg:dev-auth` localStorage; production wiring blocked on real Rainfocus integration |
 | Real Rainfocus API calls not wired | All RF service methods are stubs; `null` credentials passed in `services/sessions/session-actions.js`; must replace before shipping |
 | Real Mobile Rider API not wired | `fetchLiveStatus` returns all-inactive mock; polling runs but no live sessions will appear |
-| Real sessions API not wired | `MOCK_SESSIONS` used; replace `fetchSessions` with real endpoint before shipping |
+| Real sessions API | ✅ wired (`fetchEslSessions`/`mapEslPayloadToRawSessions`); `MOCK_ESL_PAYLOAD` used only when no `eventId` is present |
 | Dev scaffolding (`seedDevData()` in `session-store.js`) in production path | `TODO` comments present; must remove or gate before PR — now runs page-wide via `decorateEvent`, not just for this block, so removal affects any page with `rainfocus-api-url` metadata |
 | 30 s polling causes excessive re-renders | Preact diffing handles; `useMemo` guards in view components on filter-derived lists |
 | RF pessimistic mutations feel slow | `pendingActions` Set + `is-pending` class on buttons covers perceived latency; error toast on failure |
@@ -859,8 +882,8 @@ Shared, page-level modules now live outside this block's directory — anything 
 
 ```
 event-libs/v1/utils/
-  session-store.js               # SHARED, page-level: sessions/sessionsStatus/liveStreamActiveIds/favorited/scheduled/auth/pendingActions signals; initSessionState(), getApiConfig(), scheduleSession(), favoriteSession(); also calls mountToast()/mountConflictModal()
-  session-state.js                # SHARED: deriveSessionState, isInLiveNow — pure functions (moved out of this block)
+  session-store.js               # SHARED, page-level: sessions/sessionsStatus/liveStreamActiveIds/favorited/scheduled/auth/pendingActions/sessionStateVersion signals; initSessionState(), getApiConfig(), scheduleSession(), favoriteSession(); also calls mountToast()/mountConflictModal()
+  session-state.js                # SHARED: getNowMs, deriveSessionState, isInLiveNow — pure functions (moved out of this block)
   decorate.js                     # calls initSessionState() from decorateEvent(), before any block's init()
 
 event-libs/v1/features/           # SHARED, non-block reusable rendering logic — imported directly by whichever
@@ -873,10 +896,11 @@ event-libs/v1/features/           # SHARED, non-block reusable rendering logic �
     conflict-modal.css           # .sg-modal-backdrop / .sg-conflict-modal* rules, co-located, loaded the same way
 
 event-libs/v1/services/sessions/  # SHARED service layer (moved out of this block)
-  sessions-api.js                 # fetchSessions — mocked with MOCK_SESSIONS; includes MOCK_FEATURED_IDS
+  sessions-api.js                 # fetchSessions — real ESL/ESP endpoint, falls back to MOCK_ESL_PAYLOAD with no event-id
   rainfocus.js                    # stub: fetchScheduled, fetchFavorited, addSession, removeSession, toggleSessionInterest
   mobile-rider.js                 # stub: fetchLiveStatus (returns all-inactive)
   poller.js                       # startPolling, stopPolling — takes a plain onUpdate callback, no dispatch coupling
+  session-state-ticker.js          # startSessionStateTicker, stopSessionStateTicker — diffs deriveSessionState() per session on an interval, only calls onChange on a real transition
   session-actions.js              # scheduleAction, favoriteAction, hasTimeConflict, resolveScheduleConflict, SessionActionError — UI-agnostic; throws instead of dispatching toasts
   action-feedback.js              # runSessionAction(), scheduleWithFeedback(), favoriteWithFeedback() — translate SessionActionError into showToast()/showConflictModal() calls; no dispatch argument, usable by any block
 
@@ -916,7 +940,7 @@ event-libs/v1/blocks/sessions-guide/
     FilterPanel.js                # sidebar category list + checkbox options
     RegistrationPrompt.js        # inline/modal auth gate: login vs register variant
     DownloadButton.js             # ICS download trigger (My Sessions only)
-    CategoryBadge.js              # category icon + label + color from eventConfig.categoryColors
+    CategoryBadge.js              # category icon + label + color from getTrackIcon() (tier-1-event-config.js)
     IconButton.js                 # S2A icon-only button (solid/outlined/transparent)
     icons.js                      # IconPlay, IconCalendarCheck, IconCalendarPlus, IconHeartFilled, IconHeartOutline
 
@@ -950,6 +974,7 @@ test/unit/features/conflict-modal/
 
 test/unit/services/sessions/
   action-feedback.test.js        # services/sessions/action-feedback.js — SessionActionError reason → toast/conflict-modal mapping
+  session-state-ticker.test.js   # services/sessions/session-state-ticker.js — diff-and-notify, self-stop, injectable clock
 ```
 
 Test files for code that stayed block-local (`store/index.js`, `services/feds.js`, everything under `components/`) were **not** relocated when their imports moved to shared paths — they stayed under `test/unit/blocks/sessions-guide/` and just updated their import paths. `toast.js`, `conflict-modal.js`, and `action-feedback.js` are the first modules whose tests actually moved to sit next to the shared code they cover (`test/unit/features/`, `test/unit/services/sessions/`) rather than staying under this block's test tree — the pattern to follow for any future promotion out of this block.

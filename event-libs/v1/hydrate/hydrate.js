@@ -1,42 +1,57 @@
-/**
- * Promise for the current hydration run. Set when decorateEvent calls hydrateBlocks
- * so that blocks that depend on hydrated content can await it before initializing.
- */
-let currentHydrationPromise = null;
+import logHydration from './log.js';
+import hydrateImageLinks from './image-links.js';
 
-/**
- * Returns the promise for the current page's hydration, if any.
- * Blocks that need hydrated DOM (e.g. image-links) should await this before init.
- * @returns {Promise<void>|null} Resolves when hydration is done, or null if no hydration was started
- */
-export function getHydrationPromise() {
-  return currentHydrationPromise ?? null;
+const HYDRATORS = {
+  'image-links': hydrateImageLinks,
+};
+
+const HYDRATED_ATTR = 'data-hydrated';
+
+const registry = new Map();
+
+export function registerHydrator(blockName, hydrator) {
+  if (!blockName || typeof hydrator !== 'function') {
+    logHydration(`Hydrator: registerHydrator("${blockName}") needs a function. Import your module first and register its default export.`);
+    return false;
+  }
+  if (hydrator.constructor?.name === 'AsyncFunction') {
+    logHydration(`Hydrator: registerHydrator("${blockName}") rejected an async function. Hydration must be synchronous.`);
+    return false;
+  }
+  if (registry.has(blockName)) {
+    logHydration(`Hydrator: registerHydrator("${blockName}") replaced an existing registration.`);
+  }
+  registry.set(blockName, hydrator);
+  return true;
 }
 
-/**
- * Stores the hydration promise. Used by decorateEvent so it can stay sync.
- * @param {Promise<void>} p
- */
-export function setHydrationPromise(p) {
-  currentHydrationPromise = p;
+function getRegisteredHydrator(blockName) {
+  return registry.get(blockName) ?? null;
 }
 
-/**
- * Hydrates blocks in the document that need dynamic content from metadata.
- * Call this before blocks are initialized.
- */
-export async function hydrateBlocks(area = document) {
-  const blocks = area.querySelectorAll('.hydrate');
+export function resetHydrators() {
+  registry.clear();
+}
+
+export function hydrateBlocks(area = document) {
+  if (!area) return;
+
+  const blocks = area.querySelectorAll(`.hydrate:not([${HYDRATED_ATTR}])`);
 
   for (const block of blocks) {
-    // Extract block name from class list (first class is typically the block name)
     const blockName = block.classList[0];
+    const ownHydrator = Object.hasOwn(HYDRATORS, blockName) ? HYDRATORS[blockName] : null;
+    const hydrate = getRegisteredHydrator(blockName) ?? ownHydrator;
+
+    if (!hydrate) {
+      logHydration(`Hydrator not found for block: ${blockName}`);
+      continue;
+    }
 
     try {
-      const { default: hydrate } = await import(`./${blockName}.js`);
-      hydrate(block);
+      if (hydrate(block) !== false) block.setAttribute(HYDRATED_ATTR, 'true');
     } catch (e) {
-      window.lana?.log(`Hydrator not found for block: ${blockName}`);
+      logHydration(`Hydrator failed for block ${blockName}: ${e.message}`);
     }
   }
 }

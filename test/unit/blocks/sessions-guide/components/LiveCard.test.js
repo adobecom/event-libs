@@ -5,14 +5,12 @@ import { buildLiveCard } from '../../../../../event-libs/v1/blocks/sessions-guid
 import {
   scheduled, favorited, pendingActions, liveStreamActiveIds,
 } from '../../../../../event-libs/v1/utils/session-store.js';
+import { initTierOneEventConfig } from '../../../../../event-libs/v1/utils/tier-1-event-config.js';
 
 const BASE_CONFIG = {
   title: 'Adobe MAX 2026',
   userTz: 'America/Los_Angeles',
   surface: 'widget',
-  trackColors: { Featured: '#ff0000' },
-  trackIcons: {},
-  showConflictModal: false,
   filterCategories: [],
   theme: 'dark',
 };
@@ -36,18 +34,33 @@ const NO_THUMB_SESSION = { ...LIVE_SESSION, id: 'session-no-thumb', thumbnailUrl
 function makeStore() {
   const store = buildStore(preact);
   store.SessionGuideContext._current = {
-    state: { eventConfig: { ...BASE_CONFIG } },
+    state: { guideConfig: { ...BASE_CONFIG } },
     dispatch: () => {},
   };
   return store;
 }
 
 describe('LiveCard', () => {
+  before(() => {
+    const meta = document.createElement('meta');
+    meta.name = 'tier-1-event-config';
+    meta.content = JSON.stringify({ trackIcons: { Featured: { icon: 'mainstage', color: '#ff0000' } } });
+    document.head.appendChild(meta);
+    initTierOneEventConfig();
+  });
+
   beforeEach(() => {
     scheduled.value = new Set();
     favorited.value = new Set();
     pendingActions.value = new Set();
     liveStreamActiveIds.value = new Set();
+  });
+
+  it('applies the track color to the thumbnail placeholder background', () => {
+    const store = makeStore();
+    const LiveCard = buildLiveCard(preact, store);
+    const html = LiveCard({ session: NO_THUMB_SESSION });
+    expect(html).to.include('background:#ff0000');
   });
 
   it('renders without throwing', () => {
