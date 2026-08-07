@@ -19,6 +19,16 @@ async function waitForSocialIcons(el, timeoutMs = 5000) {
   }
 }
 
+/** Polls rather than waiting a fixed number of rAFs/ms, which get throttled unpredictably when many test files run concurrently. */
+async function waitFor(conditionFn, timeoutMs = 5000) {
+  const start = Date.now();
+  while (Date.now() - start < timeoutMs) {
+    if (conditionFn()) return;
+    await new Promise((r) => setTimeout(r, 20));
+  }
+  throw new Error('waitFor: condition not met within timeout');
+}
+
 describe('Profile Cards Module', () => {
   describe('init', () => {
     beforeEach(() => {
@@ -494,6 +504,140 @@ describe('Profile Cards Module', () => {
       btn.click();
       expect(card.classList.contains('expanded')).to.be.true;
       expect(desc.textContent).to.equal(originalText);
+    });
+
+    // Real rAF/ResizeObserver can be suspended indefinitely on a backgrounded page when many WTR sessions share a browser, so stub both instead of racing that.
+    function stubRaf() {
+      const original = window.requestAnimationFrame;
+      Object.defineProperty(window, 'requestAnimationFrame', {
+        configurable: true,
+        value: (cb) => setTimeout(cb, 0),
+      });
+      return () => Object.defineProperty(window, 'requestAnimationFrame', { configurable: true, value: original });
+    }
+
+    function stubResizeObserver() {
+      const original = window.ResizeObserver;
+      const instances = [];
+      class FakeResizeObserver {
+        constructor(callback) {
+          this.callback = callback;
+          instances.push(this);
+        }
+
+        observe() {}
+
+        disconnect() {}
+      }
+      Object.defineProperty(window, 'ResizeObserver', { configurable: true, value: FakeResizeObserver });
+      return {
+        instances,
+        restore: () => Object.defineProperty(window, 'ResizeObserver', { configurable: true, value: original }),
+      };
+    }
+
+    it('waits for document.fonts.ready before performing the initial overflow sync', async function bladeFontsReadyGate() {
+      this.timeout(10000);
+      const restoreRaf = stubRaf();
+      const { restore: restoreRo } = stubResizeObserver();
+      const originalFonts = document.fonts;
+      let resolveFonts;
+      const fontsReady = new Promise((resolve) => { resolveFonts = resolve; });
+      Object.defineProperty(document, 'fonts', { configurable: true, value: { ready: fontsReady } });
+
+      try {
+        const el = makeBladeBlock([
+          { firstName: 'Wait', lastName: 'ForFonts', speakerType: 'Speaker', title: 't', bio: BIO },
+        ]);
+        init(el);
+
+        const desc = el.querySelector('.blade-desc');
+        stubOverflow(desc, true);
+
+        // fontsReady is still unresolved, so the sync can't have run yet.
+        await new Promise((resolve) => setTimeout(resolve, 50));
+        expect(el.querySelector('.blade-read-more').hidden).to.be.true;
+
+        resolveFonts();
+        await waitFor(() => el.querySelector('.blade-read-more').hidden === false);
+      } finally {
+        Object.defineProperty(document, 'fonts', { configurable: true, value: originalFonts });
+        restoreRo();
+        restoreRaf();
+      }
+    });
+
+    it('does not throw when document.fonts is unavailable', async function bladeNoFontsApi() {
+      this.timeout(10000);
+      const restoreRaf = stubRaf();
+      const { restore: restoreRo } = stubResizeObserver();
+      const originalFonts = document.fonts;
+      Object.defineProperty(document, 'fonts', { configurable: true, value: undefined });
+
+      try {
+        const el = makeBladeBlock([
+          { firstName: 'No', lastName: 'FontsApi', speakerType: 'Speaker', title: 't', bio: BIO },
+        ]);
+        expect(() => init(el)).to.not.throw();
+
+        const desc = el.querySelector('.blade-desc');
+        stubOverflow(desc, true);
+        await waitFor(() => el.querySelector('.blade-read-more').hidden === false);
+      } finally {
+        Object.defineProperty(document, 'fonts', { configurable: true, value: originalFonts });
+        restoreRo();
+        restoreRaf();
+      }
+    });
+
+    it('does not throw when ResizeObserver is unavailable', async function bladeNoResizeObserver() {
+      this.timeout(10000);
+      const restoreRaf = stubRaf();
+      const originalResizeObserver = window.ResizeObserver;
+      Object.defineProperty(window, 'ResizeObserver', { configurable: true, value: undefined });
+
+      try {
+        const el = makeBladeBlock([
+          { firstName: 'No', lastName: 'ResizeObserverApi', speakerType: 'Speaker', title: 't', bio: BIO },
+        ]);
+        expect(() => init(el)).to.not.throw();
+
+        const desc = el.querySelector('.blade-desc');
+        stubOverflow(desc, true);
+        await waitFor(() => el.querySelector('.blade-read-more').hidden === false);
+      } finally {
+        Object.defineProperty(window, 'ResizeObserver', { configurable: true, value: originalResizeObserver });
+        restoreRaf();
+      }
+    });
+
+    it('re-syncs via the ResizeObserver backstop when the cards wrapper resizes', async function bladeResizeObserverBackstop() {
+      this.timeout(10000);
+      const restoreRaf = stubRaf();
+      const { instances, restore: restoreRo } = stubResizeObserver();
+
+      try {
+        const el = makeBladeBlock([
+          { firstName: 'Resize', lastName: 'Card', speakerType: 'Speaker', title: 't', bio: BIO },
+        ]);
+        init(el);
+
+        const desc = el.querySelector('.blade-desc');
+        stubOverflow(desc, true);
+
+        // Prove the one-shot initial sync already ran, so it can't fire again.
+        await waitFor(() => el.querySelector('.blade-read-more').hidden === false);
+
+        // Only the (manually-triggered) ResizeObserver callback can flip this now.
+        stubOverflow(desc, false);
+        expect(instances).to.have.lengthOf(1);
+        instances[0].callback();
+
+        await waitFor(() => el.querySelector('.blade-read-more').hidden === true);
+      } finally {
+        restoreRo();
+        restoreRaf();
+      }
     });
   });
 
