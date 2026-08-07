@@ -41,7 +41,7 @@ const PAST_SESSION = {
 
 const BASE_CONFIG = {
   userTz: 'America/Los_Angeles', surface: 'page',
-  title: '', filterCategories: [], theme: 'dark',
+  title: '', filterCategories: [], theme: 'dark', registerUrl: '/register-test',
 };
 
 function makeStore({
@@ -67,17 +67,20 @@ function makeStore({
 }
 
 describe('MySessionsView', () => {
-  it('shows RegistrationPrompt when not registered', () => {
+  // The actual login/registration toast + redirect-to-fallback is fired by
+  // checkViewAccess() (see action-feedback.test.js and ViewDropdown.test.js) from a
+  // useEffect, which this test harness's htm-preact mock no-ops — so all that's directly
+  // observable here is that the view renders nothing while unauthorized, not the toast.
+  it('renders nothing when logged out', () => {
     const store = makeStore({ isRegistered: false, isLoggedIn: false });
     const View = buildMySessionsView(preact, store);
-    expect(View({})).to.include('sg-reg-prompt');
-    expect(View({})).to.not.include('sg-view--my-sessions');
+    expect(View({})).to.be.null;
   });
 
-  it('shows RegistrationPrompt when logged in but not registered', () => {
+  it('renders nothing when logged in but not registered', () => {
     const store = makeStore({ isRegistered: false, isLoggedIn: true });
     const View = buildMySessionsView(preact, store);
-    expect(View({})).to.include('sg-reg-prompt');
+    expect(View({})).to.be.null;
   });
 
   it('renders the my-sessions view when registered', () => {

@@ -1,5 +1,6 @@
 import { html, useState, useEffect, useRef } from '../../../deps/htm-preact.js';
 import { useSessionGuide } from '../store/index.js';
+import { checkViewAccess } from '../../../services/sessions/action-feedback.js';
 
 const VIEWS = [
   { value: 'live-upcoming', label: 'Live & upcoming' },
@@ -7,6 +8,17 @@ const VIEWS = [
   { value: 'my-favorites', label: 'My favorites' },
   { value: 'on-demand', label: 'On demand' },
 ];
+
+export const buildViewDropdown = () => ViewDropdown;
+
+// Pure decision logic for a view selection, kept separate from the click handler below so
+// it's directly unit-testable without simulating a dropdown click through the render
+// harness (same reasoning as DrawerShell.js's resolveSessionGuideRequest). checkViewAccess()
+// still has the side effect of showing a toast when blocked — this just decides where to
+// land: the requested view when allowed, or the returned fallback when not.
+export function resolveViewSelection(value, { eventConfig }) {
+  return checkViewAccess(value, { eventConfig }) || value;
+}
 
 export function ViewDropdown() {
   const { state, dispatch } = useSessionGuide();
@@ -25,7 +37,7 @@ export function ViewDropdown() {
   }, [open]);
 
   function selectView(value) {
-    dispatch({ type: 'SET_VIEW', view: value });
+    dispatch({ type: 'SET_VIEW', view: resolveViewSelection(value, { eventConfig: state.guideConfig }) });
     setOpen(false);
   }
 

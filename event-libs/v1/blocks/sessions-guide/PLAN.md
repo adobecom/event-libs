@@ -103,7 +103,7 @@ Three distinct states drive the UI:
 | Logged in, not registered | `true` | `false` | localStorage only |
 | Logged in + registered | `true` | `true` | Rainfocus (mocked) |
 
-All users can schedule and favorite sessions (stored in localStorage). The registration gate for My Sessions / My Favorites views shows `<RegistrationPrompt />` when `isRegistered !== true`. Toast messages prompt login or registration on action if not authenticated. Action buttons call the RF API when `isRegistered === true` (currently mocked).
+All users can schedule and favorite sessions (stored in localStorage). Navigating to My Sessions / My Favorites while logged out or unregistered shows a toast (not view content) and redirects to a fallback view — see 4.6. Toast messages likewise prompt login or registration on schedule/favorite actions if not authenticated. Action buttons call the RF API when `isRegistered === true` (currently mocked).
 
 ---
 
@@ -143,7 +143,6 @@ SessionsGuideBlock (init entry point — sessions-guide.js)
               │     ├── DrawerHeader (reused; hideClose=true)
               │     ├── FilterPanel (when filterOpen)
               │     └── ViewRouter (same as widget)
-              └── RegistrationPrompt (modal wrapper in App, content from RegistrationPrompt component)
 ```
 
 Toast and the schedule-conflict modal are **not** part of this tree anymore — they're page-level singletons mounted directly to `document.body` by `event-libs/v1/features/toast/toast.js`/`features/conflict-modal/conflict-modal.js` (via `initSessionState()`), independent of whether this block is on the page at all.
@@ -199,7 +198,6 @@ State is split across two modules — shared signals (readable by any block) and
   guideConfig: GuideConfig,
   activeSessionId: string | null,    // id of session shown in detail overlay (widget only)
   dismissingIds: Set<string>,        // session IDs currently animating out of My Sessions/My Favorites
-  regPromptOpen: boolean,            // drives modal RegistrationPrompt (from App-level gating)
 }
 ```
 
@@ -275,7 +273,6 @@ Actions that used to manage shared data (`INIT_USER_DATA`, `LIVE_STATUS_UPDATE`,
 | `SET_MY_FAVORITES_TAB` | Switch `myFavoritesTab` (`upcoming` / `on-demand`) |
 | `SET_DRAWER` | Set `drawerState`; restores last view from `sessionStorage`, falling back to a caller-supplied `defaultView` (computed from the shared `auth` signal at the dispatch site, since the reducer itself must stay a pure function of its own state) |
 | `SET_ACTIVE_SESSION` | Set `activeSessionId` (opens/closes detail overlay) |
-| `SHOW_REG_PROMPT` / `HIDE_REG_PROMPT` | Set `regPromptOpen` |
 | `ADD_DISMISSING_ID` / `REMOVE_DISMISSING_ID` | Manage `dismissingIds` Set for card exit animations |
 
 `SHOW_TOAST`/`HIDE_TOAST` and `SHOW_CONFLICT`/`HIDE_CONFLICT` no longer exist as reducer actions — `showToast()`/`hideToast()` (`utils/toast.js`) and `showConflictModal()`/`hideConflictModal()` (`utils/conflict-modal.js`) write directly to their own shared signals instead, with no `dispatch` involved.
@@ -527,7 +524,7 @@ Breakpoint at 1280 px: CTA goes to `peek` on wide, directly to `expanded` on nar
 - Empty state: "No sessions scheduled for this day."
 
 ### 3.2 My Sessions view ✅ (`MySessionsView`)
-- Registration gate: `isRegistered !== true` → `<RegistrationPrompt />`
+- Auth gate (see 4.6): renders `null` and never mounts its content when unauthorized — a `useEffect` fires a login/registration toast and redirects to a fallback view instead
 - Live section: scheduled sessions currently live for activeDay
 - Smart tab bar: tabs only shown for non-empty halves; if both upcoming and on-demand have sessions, both tabs show; single-tab case hides the tab bar automatically (via `effectiveTab` clamping)
 - Upcoming tab: `TimeSlotRow[]` for scheduled upcoming sessions on activeDay
@@ -599,13 +596,41 @@ No longer a Preact component — `mountToast()` builds the toast element once vi
 - Line folding at 75 octets per RFC 5545 §3.1
 - Triggered by `DownloadButton` in My Sessions view header (only shown when `activeView === 'my-sessions'`)
 
-### 4.6 RegistrationPrompt component ✅
-- `isLoggedIn === false` → "Sign in and register" + `window.adobeIMS?.signIn()` button
-- Else (logged in, not registered) → "Register for the event" + `<a href="/register">` (hardcoded `/register`, not currently sourced from `guideConfig.registerUrl`)
-- Rendered inline inside each view (My Sessions, My Favorites) for the full-view gate
-- Also rendered as a modal from `App` when `regPromptOpen === true` (triggered by `SHOW_REG_PROMPT`)
+### 4.6 My Sessions/My Favorites view-access gate ✅
+Resolved 2026-08-06 — two iterations. First removed the standalone `RegistrationPrompt`
+component (built ahead of the settled auth model — its modal path,
+`regPromptOpen`/`SHOW_REG_PROMPT`/`HIDE_REG_PROMPT`, was dead: never dispatched from
+anywhere) in favor of inline empty-state copy in the views themselves. Per PM (Kat), that
+was still the wrong shape — the intended behavior is a **toast + redirect**, not any content
+rendered in the view itself, matching the same pattern already used for the click-time
+schedule/favorite gate:
 
-> **Note:** The current auth gate for scheduleAction/favoriteAction uses `showToast()` (not `SHOW_REG_PROMPT`). The modal RegistrationPrompt (`regPromptOpen`) is wired up in `App` but not currently triggered by schedule/favorite interactions.
+- Attempting to navigate to My Sessions/My Favorites while unauthorized never shows their
+  content. `checkViewAccess(view, { eventConfig })` (`services/sessions/action-feedback.js`)
+  shows the same login/registration toast `runSessionAction()` already uses
+  (`adobeIMS.signIn()` CTA / `eventConfig.registerUrl` CTA, both persistent —
+  `duration: null`), then returns a fallback view to land on instead: `live-upcoming` while
+  the event is still on, `on-demand` once `isPostEvent()` (`utils/session-state.js`, shared
+  with session-store's own live→on-demand auto-transition) is true.
+- Checked from two places, both funneling through the same function so there's exactly one
+  definition of "blocked" and one toast fires per attempt:
+  - `ViewDropdown.js`'s click handler, via the exported pure `resolveViewSelection(value, {
+    eventConfig })` (same "extract the decision logic so it's testable without simulating a
+    click" pattern as `DrawerShell.js`'s `resolveSessionGuideRequest`) — a blocked click
+    never dispatches `SET_VIEW` to the gated view at all, so there's no flash.
+  - `MySessionsView`/`MyFavoritesView` themselves, via a `useEffect` keyed on
+    `auth.value.isLoggedIn`/`isRegistered` that dispatches the fallback if blocked, with the
+    view rendering `null` in the meantime. This is the safety net for every path that can
+    land on these views *without* a dropdown click — `FullPageShell`'s `?view=` URL param on
+    mount, and `DrawerShell`'s `SET_DRAWER` restoring a stale `my-sessions`/`my-favorites`
+    from `sessionStorage`. It also reactively bounces the user out (with the same toast) if
+    their auth state flips to unauthorized while already sitting on the view (e.g. a session
+    expiring in another tab).
+
+The click-time auth gate for scheduleAction/favoriteAction is a separate, pre-existing
+mechanism and was never the problem — `runSessionAction()`'s error-to-toast translation
+already did exactly this for schedule/favorite clicks; `checkViewAccess()` reuses its toast
+copy/CTA logic via a shared `showAuthToast()` helper rather than duplicating it.
 
 ---
 
@@ -804,7 +829,7 @@ Tests mirror `test/unit/blocks/sessions-guide/`. Coverage status to be assessed 
 ### 14.2 Component tests (priority order)
 - `SessionCard`: on-demand/upcoming rendering, `forceOnDemand` prop, `dismissingIds` class, `hoverAnim` state, iOS touch handler
 - `FilterPanel`: local filter state, apply/reset, dynamic option derivation
-- `RegistrationPrompt`: logged-out vs logged-in-unregistered variants
+- `MySessionsView` view-access gate ✅ (`MySessionsView.test.js`): renders `null` when logged-out/unregistered. `MyFavoritesView` mirrors the same logic but still has no dedicated test file (see 14.2 gap, tracked in MWPW-200314 work item 8). The actual toast/fallback-view decision is tested at its source instead — `checkViewAccess()`/`resolveViewSelection()` (`action-feedback.test.js`, `ViewDropdown.test.js`) — since this component's `useEffect` is a no-op under the test harness's htm-preact mock.
 
 (Toast and the conflict modal are no longer Preact components — see the `features/toast/toast.js` / `features/conflict-modal/conflict-modal.js` entries in 14.1 above.)
 
@@ -893,12 +918,12 @@ event-libs/v1/features/           # SHARED, non-block reusable rendering logic �
     toast.css                    # .sg-toast* rules, co-located and loaded on demand by mountToast() via loadStyle()
   conflict-modal/
     conflict-modal.js            # conflict signal, showConflictModal(), hideConflictModal(), mountConflictModal() — vanilla DOM
-    conflict-modal.css           # .sg-modal-backdrop / .sg-conflict-modal* rules, co-located, loaded the same way
+    conflict-modal.css           # .sg-conflict-modal* rules (backdrop is Milo's own dialog curtain, not a custom class), co-located, loaded the same way
 
 event-libs/v1/services/sessions/  # SHARED service layer (moved out of this block)
-  sessions-api.js                 # fetchSessions — real ESL/ESP endpoint, falls back to MOCK_ESL_PAYLOAD with no event-id
-  rainfocus.js                    # stub: fetchScheduled, fetchFavorited, addSession, removeSession, toggleSessionInterest
-  mobile-rider.js                 # stub: fetchLiveStatus (returns all-inactive)
+  sessions-api.js                 # fetchSessions — real, public ESL/ESP session-catalog endpoint (no auth/mock fallback, MWPW-200437)
+  rainfocus.js                    # real: fetchScheduled, fetchFavorited, addSession, removeSession, toggleSessionInterest (MWPW-200311)
+  mobile-rider.js                 # real: fetchLiveStatus — Mobile Rider batch media-status endpoint (dev vs prod host)
   poller.js                       # startPolling, stopPolling — takes a plain onUpdate callback, no dispatch coupling
   session-state-ticker.js          # startSessionStateTicker, stopSessionStateTicker — diffs deriveSessionState() per session on an interval, only calls onChange on a real transition
   session-actions.js              # scheduleAction, favoriteAction, hasTimeConflict, resolveScheduleConflict, SessionActionError — UI-agnostic; throws instead of dispatching toasts
@@ -920,15 +945,15 @@ event-libs/v1/blocks/sessions-guide/
     url.js                        # setSessionsParam, setSessionParam, clearSessionParams
     ics.js                        # generateICS, downloadICS — RFC 5545 compliant
   components/
-    App.js                       # root: branches on surface; renders RegistrationPrompt modal (Toast/ConflictModal are page-level singletons now, not rendered here)
+    App.js                       # root: branches on surface (Toast/ConflictModal are page-level singletons now, not rendered here)
     DrawerShell.js                # widget shell: peek/expand drawer, gestures, URL deep-linking, FilterPanel, SessionDetailOverlay
     FullPageShell.js             # page shell: URL params in/out, FilterPanel
     DrawerHeader.js               # title, DateTabs, ViewDropdown, DownloadButton, inline mobile search
     DateTabs.js                  # per-day tabs from state.eventDays
-    ViewDropdown.js               # 4-option dropdown; sentence-case labels
+    ViewDropdown.js               # 4-option dropdown; sentence-case labels; gates My Sessions/My Favorites via resolveViewSelection()
     ViewRouter.js                 # routes activeView to the correct view component
     LiveUpcomingView.js          # live carousel + featured carousel + upcoming slots + previously-aired slots
-    MySessionsView.js            # registration gate + live carousel + smart tabs + upcoming/on-demand subtabs
+    MySessionsView.js            # view-access gate (toast + redirect if unauthorized) + live carousel + smart tabs + upcoming/on-demand subtabs
     MyFavoritesView.js           # mirror of MySessionsView using favorited set
     OnDemandView.js               # on-demand sessions grouped by track
     Carousel.js                   # LiveCard carousel with paged/native-scroll dual mode
@@ -938,7 +963,6 @@ event-libs/v1/blocks/sessions-guide/
     LiveCard.js                   # large card: thumbnail, progress bar, CTAs
     SessionDetailOverlay.js      # full session detail: 2-col layout, share, expand description
     FilterPanel.js                # sidebar category list + checkbox options
-    RegistrationPrompt.js        # inline/modal auth gate: login vs register variant
     DownloadButton.js             # ICS download trigger (My Sessions only)
     CategoryBadge.js              # category icon + label + color from getTrackIcon() (tier-1-event-config.js)
     IconButton.js                 # S2A icon-only button (solid/outlined/transparent)
@@ -955,8 +979,8 @@ test/unit/blocks/sessions-guide/
   components/SessionCard.test.js
   components/LiveCard.test.js
   components/FilterPanel.test.js
-  components/RegistrationPrompt.test.js
   components/ViewRouter.test.js
+  components/ViewDropdown.test.js
   components/LiveUpcomingView.test.js
   components/MySessionsView.test.js
   components/OnDemandView.test.js

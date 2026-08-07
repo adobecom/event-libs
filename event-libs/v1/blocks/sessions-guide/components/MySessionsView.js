@@ -1,10 +1,10 @@
-import { html, useMemo } from '../../../deps/htm-preact.js';
+import { html, useMemo, useEffect } from '../../../deps/htm-preact.js';
 import { useSessionGuide } from '../store/index.js';
 import {
   sessions as sessionsSignal, scheduled as scheduledSignal,
   liveStreamActiveIds as liveStreamActiveIdsSignal, auth, sessionStateVersion,
 } from '../../../utils/session-store.js';
-import { RegistrationPrompt } from './RegistrationPrompt.js';
+import { checkViewAccess } from '../../../services/sessions/action-feedback.js';
 import { TimeSlotRow } from './TimeSlotRow.js';
 import { TrackRow } from './TrackRow.js';
 import { Carousel } from './Carousel.js';
@@ -31,7 +31,19 @@ export function MySessionsView() {
   sessionStateVersion.value;
   const nowMs = getNowMs();
 
-  if (auth.value.isRegistered !== true) return html`<${RegistrationPrompt} />`;
+  // Logged-out/unregistered visitors never see this view's content — a toast (with the
+  // right sign-in/register CTA) fires and they're bounced to a fallback view instead.
+  // Re-checked whenever auth changes, not just on mount, so a session expiring while
+  // already on this view bounces out too — not just blocked navigation into it. The
+  // ViewDropdown click handler also calls checkViewAccess() before ever dispatching here,
+  // so this effect is mainly a safety net for URL-driven navigation and drawer state
+  // restored from sessionStorage, both of which can land here without a click.
+  const { isLoggedIn, isRegistered } = auth.value;
+  useEffect(() => {
+    const fallback = checkViewAccess('my-sessions', { eventConfig: state.guideConfig });
+    if (fallback) dispatch({ type: 'SET_VIEW', view: fallback });
+  }, [isLoggedIn, isRegistered]);
+  if (!isLoggedIn || isRegistered !== true) return null;
 
   // Memoized: this component re-renders on every context dispatch (e.g. opening the
   // detail overlay), not just when the inputs below actually change.

@@ -56,3 +56,18 @@ export function isInLiveNow(session, liveStreamActiveIds, nowMs) {
   const start = Date.parse(session.startTimeUtc);
   return nowMs >= start && liveStreamActiveIds.has(session.mrStreamId);
 }
+
+/**
+ * Whether the event has functionally ended: every session has transitioned to on-demand,
+ * or the authored manual cutoff time has passed — whichever comes first. Shared by
+ * session-store.js's own live-upcoming → on-demand auto-transition and
+ * action-feedback.js's unauthorized-view fallback, so both agree on the same definition.
+ * An empty session list is never "post-event" (nothing to have ended yet).
+ */
+export function isPostEvent(sessionList, liveStreamActiveIds, nowMs, manualCutoff) {
+  const pastManualCutoff = manualCutoff ? nowMs >= Date.parse(manualCutoff) : false;
+  const allEnded = sessionList.length > 0 && sessionList.every(
+    (s) => deriveSessionState(s, liveStreamActiveIds, nowMs) === 'on-demand',
+  );
+  return allEnded || pastManualCutoff;
+}

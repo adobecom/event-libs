@@ -3,14 +3,21 @@ import { startPolling, stopPolling } from '../../../../../event-libs/v1/services
 
 describe('services/poller', () => {
   let updates;
+  let originalFetch;
 
   beforeEach(() => {
     updates = [];
     stopPolling();
+    // Each tick now makes a real fetchLiveStatus() call to Mobile Rider's batch
+    // media-status endpoint — stub it so ticks resolve deterministically without
+    // hitting the network (unit tests disallow external fetches).
+    originalFetch = window.fetch;
+    window.fetch = async () => new Response(JSON.stringify({ active: [], inactive: [] }));
   });
 
   afterEach(() => {
     stopPolling();
+    window.fetch = originalFetch;
   });
 
   it('startPolling returns null for empty mrSessions', () => {
