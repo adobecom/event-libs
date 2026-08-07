@@ -37,10 +37,17 @@
  * token). Unlike .mobile-rider-container, .milo-video has no outer wrapper
  * element we control — youtube.js/adobetv.js insert it directly into the
  * page, not inside a block div we own — so max-width has to live on the same
- * element as border-radius/overflow: hidden. That combination broke <video>
- * clipping for Mobile Rider, but YouTube/MPC render as <iframe>, not <video>,
- * so that specific bug may not apply here. Verify this empirically (same way
- * the Mobile Rider bug was originally caught) before assuming it's safe.
+ * element as border-radius/overflow: hidden.
+ *
+ * Confirmed bug: Milo's own .milo-video (libs/styles/iframe.css) gets its 16:9
+ * shape from `height: 0; padding-bottom: 56.25%` — a percentage padding, which
+ * CSS always resolves against the *containing block's* width, not this
+ * element's own max-width-constrained width. So capping max-width here alone
+ * shrinks the box's width but not its height, producing a too-tall box; the
+ * iframe fills it exactly, and YouTube/MPC letterbox their real 16:9 content
+ * inside it (visible as black bars top/bottom). Overridden below with
+ * `aspect-ratio: 16 / 9` (computed from the box's own resolved width) plus
+ * `height: auto; padding-bottom: 0` to cancel Milo's percentage hack.
  */
 @media (min-width: 1024px) {
   :root:has(meta[name="foundation"][content="c2"]) .milo-video {
@@ -48,5 +55,8 @@
     overflow: hidden;
     max-width: var(--s2a-layout-rich-media-content-measure-wide, 1192px);
     margin: 0 auto;
+    aspect-ratio: 16 / 9;
+    height: auto;
+    padding-bottom: 0;
   }
 }
