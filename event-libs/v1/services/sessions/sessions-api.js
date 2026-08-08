@@ -2,11 +2,9 @@ import { constructRequestOptions } from '../../utils/esp-controller.js';
 import { getEventServiceEnv } from '../../utils/utils.js';
 import { ENV_MAP } from '../../utils/constances.js';
 
-// TEMPORARY (2026-08-07): the `published` filter below is disabled by default. Every
-// session in the real MAX26 catalog is currently `published: false` (draft/test rows —
-// real content hasn't been authored yet), so enforcing this today would hide the entire
-// catalog. Flip to `true` once real, published content exists — see
-// project_esl-real-payload-schema-diffs.md for the full real-payload audit this came from.
+// TEMPORARY: disabled — every session in the real MAX26 catalog is currently a draft/test
+// row, so enforcing this today would hide the whole catalog. Flip to `true` once real,
+// published content exists.
 export const ENFORCE_PUBLISHED_FILTER = false;
 
 function coerceArray(value) {
@@ -14,12 +12,8 @@ function coerceArray(value) {
   return value ? [value] : [];
 }
 
-// ESP prefixes its own external*Id fields (externalSessionId, externalSessionTimeId) with
-// "rf-" as its own internal namespacing — confirmed against real RainFocus traffic that
-// RainFocus's own API always uses the bare id, with no prefix, in both directions: request
-// params (addSession/removeSession/toggleSessionInterest) and myData's own response
-// (mySchedule[]/sessionInterests[] entries). Strip it before using these ids to talk to RF
-// directly or match RF's own responses.
+// ESP prefixes its own external*Id fields with "rf-" as internal namespacing —
+// RainFocus's own API always expects the bare id, with no prefix.
 function stripRfPrefix(id) {
   return id ? id.replace(/^rf-/, '') : '';
 }
@@ -29,9 +23,8 @@ export function normalizeSessions(rawSessions) {
     id: s.id || '',
     slug: s.slug || '',
     rfCode: s.rfCode || '',
-    // RF-native SESSION id (not session-time id) — required by toggleSessionInterest's
-    // sessionId param, which real RF traffic confirms is keyed independent of any
-    // sessionTimeId (favoriting isn't time-slot-specific).
+    // RF-native session id (not session-time id) — toggleSessionInterest (favoriting)
+    // keys on this instead of rfCode.
     rfSessionId: s.rfSessionId || '',
     title: s.title || '',
     description: s.description || '',
@@ -141,12 +134,8 @@ function slugFromUrl(url) {
   return segments[segments.length - 1] || '';
 }
 
-// `published: false` marks a draft/test row (e.g. ESP's own internal test sessions,
-// confirmed present in the real MAX26 catalog) that must never reach real visitors once
-// ENFORCE_PUBLISHED_FILTER is turned back on. Missing the field entirely is treated as
-// visible (fail open) rather than hiding a real session over a field ESP might omit.
-// Exported/kept separate from ENFORCE_PUBLISHED_FILTER so the rule itself is unit-testable
-// independent of whether it's currently being enforced.
+// `published: false` marks a draft/test row that must never reach real visitors once
+// ENFORCE_PUBLISHED_FILTER is on. Missing the field is treated as visible (fail open).
 export function isSessionPublished(session) {
   return session.published !== false;
 }
@@ -191,14 +180,9 @@ export function mapEslPayloadToRawSessions(payload) {
     return {
       id: session.sessionId,
       slug,
-      // RainFocus's own schedule (addSession/removeSession) calls take a sessionTimeId —
-      // sessionTimes[].externalSessionTimeId, the per-time-slot RF identifier, with ESP's
-      // "rf-" prefix stripped (RF's own API never uses it). Sessions with no scheduled
-      // sessionTime yet (see below) have no rfCode either — nothing to schedule against.
+      // Schedule (addSession/removeSession) keys on the per-time-slot id; favoriting
+      // (toggleSessionInterest) keys on the session-level id instead — two distinct RF ids.
       rfCode: stripRfPrefix(firstTime?.externalSessionTimeId),
-      // RainFocus's toggleSessionInterest (favoriting) call takes a plain sessionId
-      // instead — a different, session-level (not time-slot-level) RF identifier, matching
-      // sessions[].externalSessionId, "rf-" prefix stripped the same way.
       rfSessionId: stripRfPrefix(session.externalSessionId),
       title: session.localizations?.['en-US']?.title || session.enTitle || '',
       description: session.localizations?.['en-US']?.description || '',
@@ -230,11 +214,8 @@ export function mapEslPayloadToRawSessions(payload) {
   });
 }
 
-// `/session-catalog` is a confirmed-public ESP endpoint (MWPW-200437) — no IMS/user
-// token or x-adobe-esp-group-id header required, only the gateway-level API key that
-// constructRequestOptions() always attaches. Skips waitForIMS too, same as
-// esp-controller.js's getEspEvent(): no reason to block on an IMS session that this
-// call never uses.
+// `/session-catalog` is a confirmed-public ESP endpoint — no auth token or group-id
+// header required (skipAuth: true), same pattern as esp-controller.js's getEspEvent().
 async function fetchEslSessions(eventId) {
   const { serviceApiEndpoints } = ENV_MAP[getEventServiceEnv().name];
   const options = await constructRequestOptions('GET', null, false, true);

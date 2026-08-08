@@ -1,7 +1,5 @@
-// Mobile Rider's batch live/inactive media-status endpoint. Only two environments exist on
-// their side (not the finer-grained ESP dev/dev02/stage/stage02/prod/local split) — a shared
-// qa/dev/stage/localhost host and a separate production host. `env` here is session-store.js's
-// already-collapsed mrEnv ('dev' | 'stage' | 'prod'), via deriveMrEnv().
+// Mobile Rider's batch media-status endpoint — only two environments on their side, not
+// ESP's finer-grained split; `env` is session-store.js's already-collapsed mrEnv.
 const MR_PROD_BASE_URL = 'https://overlay-admin.mobilerider.com';
 const MR_DEV_BASE_URL = 'https://overlay-admin-dev.mobilerider.com';
 

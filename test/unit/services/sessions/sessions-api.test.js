@@ -91,9 +91,6 @@ describe('services/sessions/sessions-api', () => {
     });
 
     it('takes rfCode from the earliest sessionTime\'s externalSessionTimeId, "rf-" prefix stripped', () => {
-      // RainFocus's schedule/remove calls key on a sessionTimeId, not the human-readable
-      // sessionCode ("S001") — must be the per-time-slot RF id, with ESP's own "rf-"
-      // namespacing prefix stripped (RF's own API never uses it).
       expect(full.rfCode).to.equal('earlier');
     });
 
@@ -102,8 +99,6 @@ describe('services/sessions/sessions-api', () => {
     });
 
     it('takes rfSessionId from the session-level externalSessionId, "rf-" prefix stripped', () => {
-      // RainFocus's toggleSessionInterest (favoriting) call keys on a plain sessionId
-      // instead — a different, session-level RF id, not the per-time-slot one above.
       expect(full.rfSessionId).to.equal('full-session');
     });
 
@@ -162,10 +157,6 @@ describe('services/sessions/sessions-api', () => {
   });
 
   describe('isSessionPublished', () => {
-    // The rule itself, independent of whether ENFORCE_PUBLISHED_FILTER currently applies
-    // it — `published: false` marks a draft/test row (confirmed present in the real
-    // MAX26 catalog); a session with no `published` field at all is treated as visible
-    // (fail open).
     it('is false when a session is explicitly published: false', () => {
       expect(isSessionPublished({ published: false })).to.be.false;
     });
@@ -192,11 +183,8 @@ describe('services/sessions/sessions-api', () => {
 
     const mapped = mapEslPayloadToRawSessions(payload);
 
-    // TEMPORARY (2026-08-07): ENFORCE_PUBLISHED_FILTER is currently off (see its own
-    // comment in sessions-api.js — real MAX26 content isn't authored yet, everything in
-    // the catalog is still published: false test rows), so nothing gets filtered out
-    // regardless of isSessionPublished()'s verdict. Once it's flipped back on, this test
-    // should change to assert 'draft' is excluded and 'live'/'no-field' are included.
+    // TEMPORARY: once ENFORCE_PUBLISHED_FILTER flips to true, this should assert 'draft'
+    // is excluded and 'live'/'no-field' are included instead.
     it('does not filter out unpublished sessions while ENFORCE_PUBLISHED_FILTER is off', () => {
       expect(ENFORCE_PUBLISHED_FILTER).to.be.false;
       expect(mapped.map((s) => s.id)).to.deep.equal(['draft', 'live', 'no-field']);

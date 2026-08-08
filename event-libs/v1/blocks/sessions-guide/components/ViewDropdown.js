@@ -11,11 +11,8 @@ const VIEWS = [
 
 export const buildViewDropdown = () => ViewDropdown;
 
-// Pure decision logic for a view selection, kept separate from the click handler below so
-// it's directly unit-testable without simulating a dropdown click through the render
-// harness (same reasoning as DrawerShell.js's resolveSessionGuideRequest). checkViewAccess()
-// still has the side effect of showing a toast when blocked — this just decides where to
-// land: the requested view when allowed, or the returned fallback when not.
+// Pure decision logic, kept separate from the click handler so it's unit-testable without
+// simulating a click (same reasoning as DrawerShell.js's resolveSessionGuideRequest).
 export function resolveViewSelection(value, { eventConfig }) {
   return checkViewAccess(value, { eventConfig }) || value;
 }

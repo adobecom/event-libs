@@ -78,28 +78,21 @@ export function parseRowConfig(row, logPrefix) {
   }
 }
 
-// Coerces a sheet's raw `data` value into an array of rows. Confirmed live 2026-08-07: a
-// single-row sheet collapses `data` to a bare object instead of a one-element array (a
-// common quirk of spreadsheet-backed JSON APIs) — `Array.isArray` guards that.
+// A single-row sheet collapses `data` to a bare object instead of a one-element array
+// (a common spreadsheet-backed-JSON-API quirk) — coerce it back into an array either way.
 function coerceRows(raw) {
   if (Array.isArray(raw)) return raw;
   return raw ? [raw] : [];
 }
 
-// Reads a sheet and returns its rows plus the ETag, so callers can perform conditional
-// (optimistic-locking) writes with writeSheet. Rows are returned raw (caller decides how to
-// parse/validate `config` and which key identifies a row).
+// Reads a sheet and returns its rows plus the ETag, for optimistic-locking writes via
+// writeSheet. Rows are raw — caller decides how to parse `config` and which key IDs a row.
 //
-// The admin API returns two different shapes depending on how many sheets the underlying
-// document has: a single-sheet file is `{ ":type":"sheet", "data":[...rows] }` (what
-// writeSheet below always produces for a brand-new file) — but once a document has more than
-// one named sheet, the whole response becomes `{ ":type":"multi-sheet", ":names":[...],
-// "data": { total, limit, offset, data:[...rows] }, "<otherName>": {...} }`, with our own
-// rows nested one level deeper under the sheet actually named "data". Confirmed live
-// 2026-08-07: a real tier-1-event-configurator configs.json already carries an unrelated
-// second "homepage" sheet nobody in this codebase writes — silently dropping it on the next
-// save would be real, hard-to-notice data loss, so it's round-tripped via `otherSheets` for
-// writeSheet/mutateSheet to preserve unchanged rather than being read here and discarded.
+// A single-sheet document is `{ ":type":"sheet", "data":[...rows] }`; once it has more than
+// one named sheet, the whole response becomes multi-sheet, with our own rows nested one
+// level deeper under a sheet actually named "data". Any other named sheet (e.g. a foreign
+// tab added by hand) is captured as `otherSheets` so writeSheet/mutateSheet can round-trip
+// it unchanged instead of silently dropping it on the next save.
 export async function readSheet(org, repo, path) {
   const result = await daFetch(`/source/${org}/${repo}${path}`, getHeaders('GET'));
   if (!result.ok) return result;
@@ -117,12 +110,10 @@ export async function readSheet(org, repo, path) {
   };
 }
 
-// Writes the full sheet. { etag } → If-Match (write only if unchanged);
-// { create: true } → If-None-Match: * (only if the sheet doesn't exist yet).
-// { otherSheets, sheetNames, version } — from a prior readSheet() call — round-trip any
-// sheet this app doesn't own (see readSheet's comment); omitted, it writes the simple
-// single-sheet shape, correct for a brand-new file. A precondition failure returns
-// status:412 so callers can re-read and retry instead of clobbering a concurrent write.
+// Writes the full sheet. { etag } → If-Match; { create: true } → If-None-Match: *.
+// { otherSheets, sheetNames, version } (from a prior readSheet()) round-trip any sheet this
+// app doesn't own; omitted, it writes the plain single-sheet shape. A 412 means a concurrent
+// write — callers should re-read and retry.
 export async function writeSheet(org, repo, path, rows, {
   etag, create, otherSheets, sheetNames, version,
 } = {}) {

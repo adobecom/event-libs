@@ -42,11 +42,6 @@ describe('utils/da-sheet-controller', () => {
       expect(result.data).to.deep.equal([{ eventId: 'only-one' }]);
     });
 
-    // Confirmed live 2026-08-07: a real tier-1-event-configurator configs.json came back as
-    // multi-sheet — `{ ":type":"multi-sheet", "data": { total, limit, offset, data:[...] },
-    // "homepage": {...} }` — with our rows nested one level deeper than the single-sheet
-    // shape. The old code (and my first, wrong fix) read `body.data` directly, getting the
-    // sheet-metadata wrapper object instead of the actual rows.
     it('reads rows from the nested "data" sheet in a multi-sheet document', async () => {
       stubFetch({
         ':type': 'multi-sheet',

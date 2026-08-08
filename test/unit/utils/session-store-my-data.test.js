@@ -27,13 +27,8 @@ describe('session-store: myData maps RF ids to our session ids', () => {
 
   before(async () => {
     originalFetch = window.fetch;
-    // rfCode ('S001TIME') comes from s-001's sessionTime.externalSessionTimeId; rfSessionId
-    // ('K001SESS') comes from k-001's session-level externalSessionId — both "rf-"-prefixed
-    // in the stubbed ESL session-catalog response below, matching the real ESP shape, and
-    // stripped by mapEslPayloadToRawSessions(). mySchedule matches by sessionTimeID (→
-    // rfCode); sessionInterests matches by sessionID (→ rfSessionId) — confirmed against
-    // real RF traffic these are two different, non-interchangeable ids. 'UNKNOWN' has no
-    // match either way.
+    // mySchedule matches by sessionTimeID (→ rfCode); sessionInterests matches by sessionID
+    // (→ rfSessionId) — two different, non-interchangeable ids. 'UNKNOWN' has no match either way.
     window.fetch = async (url) => {
       if (url.includes('/jwt')) {
         jwtRequestUrl = url;

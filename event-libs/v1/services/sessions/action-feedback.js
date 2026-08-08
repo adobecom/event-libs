@@ -96,11 +96,8 @@ export function favoriteWithFeedback(session, { eventConfig, isFavorited }) {
 
 const GATED_VIEW_LABELS = { 'my-sessions': 'My sessions', 'my-favorites': 'My favorites' };
 
-// Where an unauthorized visitor should land instead of a gated view — during the event
-// there's still something to watch (Live & upcoming); post-event there's nothing live
-// left, so On demand is the more useful default. Shares isPostEvent()'s definition with
-// session-store's own live-upcoming → on-demand auto-transition, so both agree on when
-// the event is "over".
+// Where an unauthorized visitor should land instead of a gated view — Live & upcoming
+// during the event, On demand once isPostEvent() (shared with the auto-transition below).
 function fallbackViewForUnauthorized() {
   if (sessionsStatus.value !== 'ready' || !sessions.value.length) return 'live-upcoming';
   const manualCutoff = getApiConfig()?.manualCutoff;
@@ -109,14 +106,11 @@ function fallbackViewForUnauthorized() {
     : 'live-upcoming';
 }
 
-// Gates navigation to My Sessions/My Favorites — shows the same login/registration toast
-// used by scheduleWithFeedback/favoriteWithFeedback. Returns the view to redirect to when
-// blocked (a toast has already been shown), or null when the view is accessible (or isn't
-// gated at all). Called both from ViewDropdown's click handler (so a blocked click never
-// dispatches SET_VIEW to the gated view in the first place) and reactively from
-// MySessionsView/MyFavoritesView themselves — so URL-driven navigation, a drawer restoring
-// its last view from sessionStorage, and auth changing while already on the view are all
-// covered by the same single check instead of three separate ones.
+// Gates navigation to My Sessions/My Favorites, reusing the same login/registration toast
+// as the schedule/favorite actions. Returns the fallback view when blocked (toast already
+// shown), or null when accessible/ungated. Called from ViewDropdown's click handler and
+// reactively from MySessionsView/MyFavoritesView, covering every way a visitor can land on
+// these views.
 export function checkViewAccess(view, { eventConfig }) {
   const label = GATED_VIEW_LABELS[view];
   if (!label) return null;

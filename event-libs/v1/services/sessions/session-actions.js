@@ -27,9 +27,7 @@ function findScheduleConflict(incoming, allSessions, scheduledIds) {
   ) || null;
 }
 
-// Exported so action-feedback.js's checkViewAccess() (gates navigation to My Sessions/My
-// Favorites, not just schedule/favorite mutations) can reuse the same auth check and error
-// reasons instead of duplicating them.
+// Exported so action-feedback.js's checkViewAccess() can reuse the same check.
 export function assertAuthorized() {
   const { isLoggedIn, isRegistered } = auth.value;
   if (isLoggedIn !== true) throw new SessionActionError('auth-required');

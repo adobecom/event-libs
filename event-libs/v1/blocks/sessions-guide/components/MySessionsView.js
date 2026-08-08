@@ -31,13 +31,9 @@ export function MySessionsView() {
   sessionStateVersion.value;
   const nowMs = getNowMs();
 
-  // Logged-out/unregistered visitors never see this view's content — a toast (with the
-  // right sign-in/register CTA) fires and they're bounced to a fallback view instead.
-  // Re-checked whenever auth changes, not just on mount, so a session expiring while
-  // already on this view bounces out too — not just blocked navigation into it. The
-  // ViewDropdown click handler also calls checkViewAccess() before ever dispatching here,
-  // so this effect is mainly a safety net for URL-driven navigation and drawer state
-  // restored from sessionStorage, both of which can land here without a click.
+  // Logged-out/unregistered visitors never see this view's content — a toast fires and
+  // they're bounced to a fallback view instead. Re-checked on every auth change, not just
+  // mount, so it also catches URL-driven navigation and a session expiring mid-view.
   const { isLoggedIn, isRegistered } = auth.value;
   useEffect(() => {
     const fallback = checkViewAccess('my-sessions', { eventConfig: state.guideConfig });
