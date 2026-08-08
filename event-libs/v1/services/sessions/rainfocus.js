@@ -7,13 +7,21 @@
 // unused here (ported for parity with northstar's full endpoint set) — their response shapes
 // are unconfirmed, unlike fetchMyData's.
 
-// Confirmed live via real MAX 2025 traffic — reverse-proxies to RF, avoiding CORS/IP allowlist.
+// Same-origin Adobe.com client proxy over RainFocus's real API (avoids CORS/IP allowlist) —
+// confirmed live via real MAX 2025 traffic, and documented internally: maps these operation
+// slugs to RainFocus's own /api/adobe/v2/* paths on events.rainfocus.com (prod backend).
+// See go/rainfocus-api-integration (wiki.corp.adobe.com/.../2131569308) and go/rainfocus-api-reference
+// (wiki.corp.adobe.com/.../3972304790).
 export const DEFAULT_RF_API_URL = 'https://www.adobe.com/max-api/';
 
-// Non-prod counterpart, needed because a stage-IMS clientId won't resolve against prod RF —
-// and milo's local env mirrors stage IMS, so this covers local too. Inferred from milo's own
-// prod/stage RF proxy split (libs/features/mep/addons/event.js), not confirmed via real
-// max-api traffic.
+// Non-prod counterpart — proxies to a genuinely separate RainFocus backend host
+// (events-stg.rainfocus.com, not just a different Adobe.com CDN environment fronting the
+// same RF data). Confirmed empirically 2026-08-07: swapping a stage-issued rfAuthToken onto
+// the prod URL (or vice versa) fails outright with responseCode 103 ("must provide... a
+// valid userToken") on both sides — tokens aren't portable across the two hosts. A stage-IMS
+// identity won't resolve against prod RF, and milo's local env mirrors stage IMS, so this
+// covers local dev too. See go/rainfocus-api-integration's staging examples and "FEDS - MAX
+// 2020" (wiki.corp.adobe.com/.../2162927534), which documents the raw stage RF host directly.
 export const STAGE_RF_API_URL = 'https://www.stage.adobe.com/max-api/';
 
 // Not secrets — RainFocus restricts access by IP allowlist, not by this value.
@@ -104,7 +112,14 @@ export async function fetchFavorited(rfAuthToken, rfApiProfileId, rfApiUrl) {
 
 export async function addSession(sessionTimeId, rfAuthToken, rfApiProfileId, rfApiUrl) {
   const data = await rawFetch(rfApiUrl, ENDPOINTS.ADD_TO_SCHEDULE, {
-    rfApiProfileId, rfAuthToken, sessionTimeId,
+    // northstar only sends this for hybrid events (gated on a page-level isEventHybrid
+    // flag) — MAX is always hybrid (in-person + virtual attendance both exist, see the
+    // real Format values), so it's unconditional here rather than threading through a
+    // flag for a distinction that's always true for us. Without it, RF defaults the
+    // request to in-person-only attendance and rejects with responseCode 27
+    // ("must be registered for the full conference...") even for attendees who should
+    // be allowed to schedule online/hybrid sessions.
+    rfApiProfileId, rfAuthToken, sessionTimeId, virtual: true,
   });
   return handleWriteResponse(data);
 }

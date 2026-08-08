@@ -1,6 +1,8 @@
 import { expect } from '@esm-bundle/chai';
 
-import { mapEslPayloadToRawSessions, normalizeSessions } from '../../../../event-libs/v1/services/sessions/sessions-api.js';
+import {
+  mapEslPayloadToRawSessions, normalizeSessions, isSessionPublished, ENFORCE_PUBLISHED_FILTER,
+} from '../../../../event-libs/v1/services/sessions/sessions-api.js';
 
 function customAttr(name, values) {
   return { name, values };
@@ -28,13 +30,14 @@ describe('services/sessions/sessions-api', () => {
         },
       ],
       sessionTimes: [
-        { sessionId: 's-1', startTimeMillis: 2000, endTimeMillis: 3000 },
-        { sessionId: 's-1', startTimeMillis: 1000, endTimeMillis: 1500 },
+        { sessionId: 's-1', startTimeMillis: 2000, endTimeMillis: 3000, externalSessionTimeId: 'rf-later' },
+        { sessionId: 's-1', startTimeMillis: 1000, endTimeMillis: 1500, externalSessionTimeId: 'rf-earlier' },
       ],
       sessions: [
         {
           sessionId: 's-1',
           sessionCode: 'S001',
+          externalSessionId: 'rf-full-session',
           url: 'https://www.adobe.com/drafts/esp-dev/max/2025/sessions/full-stack-session-s001',
           sessionLengthInMinutes: 60,
           localizations: { 'en-US': { title: 'Full Stack Session', description: 'A session about everything.' } },
@@ -85,7 +88,27 @@ describe('services/sessions/sessions-api', () => {
     it('derives slug and sessionPageUrl from the drafts URL, not the URL itself', () => {
       expect(full.slug).to.equal('full-stack-session-s001');
       expect(full.sessionPageUrl).to.equal('/sessions/full-stack-session-s001');
-      expect(full.rfCode).to.equal('S001');
+    });
+
+    it('takes rfCode from the earliest sessionTime\'s externalSessionTimeId, "rf-" prefix stripped', () => {
+      // RainFocus's schedule/remove calls key on a sessionTimeId, not the human-readable
+      // sessionCode ("S001") — must be the per-time-slot RF id, with ESP's own "rf-"
+      // namespacing prefix stripped (RF's own API never uses it).
+      expect(full.rfCode).to.equal('earlier');
+    });
+
+    it('leaves rfCode empty when there is no sessionTime to take it from', () => {
+      expect(bare.rfCode).to.equal('');
+    });
+
+    it('takes rfSessionId from the session-level externalSessionId, "rf-" prefix stripped', () => {
+      // RainFocus's toggleSessionInterest (favoriting) call keys on a plain sessionId
+      // instead — a different, session-level RF id, not the per-time-slot one above.
+      expect(full.rfSessionId).to.equal('full-session');
+    });
+
+    it('leaves rfSessionId empty when there is no externalSessionId at all', () => {
+      expect(bare.rfSessionId).to.equal('');
     });
 
     it('maps track (single) and category (multi, topic) from separate attributes', () => {
@@ -135,6 +158,48 @@ describe('services/sessions/sessions-api', () => {
       expect(bare.speakers).to.deep.equal([]);
       expect(bare.thumbnailUrl).to.be.null;
       expect(bare.isKeynote).to.be.false;
+    });
+  });
+
+  describe('isSessionPublished', () => {
+    // The rule itself, independent of whether ENFORCE_PUBLISHED_FILTER currently applies
+    // it — `published: false` marks a draft/test row (confirmed present in the real
+    // MAX26 catalog); a session with no `published` field at all is treated as visible
+    // (fail open).
+    it('is false when a session is explicitly published: false', () => {
+      expect(isSessionPublished({ published: false })).to.be.false;
+    });
+
+    it('is true when a session is explicitly published: true', () => {
+      expect(isSessionPublished({ published: true })).to.be.true;
+    });
+
+    it('is true when a session has no published field at all', () => {
+      expect(isSessionPublished({})).to.be.true;
+    });
+  });
+
+  describe('mapEslPayloadToRawSessions published filtering', () => {
+    const payload = {
+      speakers: [],
+      sessionTimes: [],
+      sessions: [
+        { sessionId: 'draft', sessionCode: 'D1', published: false, customAttributes: [] },
+        { sessionId: 'live', sessionCode: 'L1', published: true, customAttributes: [] },
+        { sessionId: 'no-field', sessionCode: 'N1', customAttributes: [] },
+      ],
+    };
+
+    const mapped = mapEslPayloadToRawSessions(payload);
+
+    // TEMPORARY (2026-08-07): ENFORCE_PUBLISHED_FILTER is currently off (see its own
+    // comment in sessions-api.js — real MAX26 content isn't authored yet, everything in
+    // the catalog is still published: false test rows), so nothing gets filtered out
+    // regardless of isSessionPublished()'s verdict. Once it's flipped back on, this test
+    // should change to assert 'draft' is excluded and 'live'/'no-field' are included.
+    it('does not filter out unpublished sessions while ENFORCE_PUBLISHED_FILTER is off', () => {
+      expect(ENFORCE_PUBLISHED_FILTER).to.be.false;
+      expect(mapped.map((s) => s.id)).to.deep.equal(['draft', 'live', 'no-field']);
     });
   });
 

@@ -47,7 +47,10 @@ function deriveMrEnv() {
 }
 
 // Milo's own page env (see mobile-rider.js's getEnv() for the same pattern), not the
-// ESP-specific event-service-env — see STAGE_RF_API_URL in rainfocus.js for why this matters.
+// ESP-specific event-service-env — see STAGE_RF_API_URL in rainfocus.js for why this matters:
+// a stage-IMS clientId (which is what a local dev session has, since milo's local env mirrors
+// stage IMS) won't resolve against prod RF — confirmed live 2026-08-07 (Daniel's local IMS
+// profile had no matching RainFocus record against prod).
 function defaultRfApiUrlForEnv() {
   const isProd = getEventConfig()?.miloConfig?.env?.name === 'prod';
   return isProd ? DEFAULT_RF_API_URL : STAGE_RF_API_URL;
@@ -103,11 +106,15 @@ function syncAuth() {
   }
 }
 
-// Entries are RF's session-time objects, not bare ids — match sessionTimeID against
-// session.rfCode (the id scheduleSession()/favoriteSession() already send as sessionTimeId).
-function mapToSessionIds(entries) {
-  const idByRfCode = new Map(sessions.value.map((s) => [s.rfCode, s.id]));
-  return (entries || []).map((entry) => idByRfCode.get(entry.sessionTimeID)).filter(Boolean);
+// mySchedule[]/sessionInterests[] entries are RF's own objects, not bare ids, and — confirmed
+// against real RF traffic — key on two different, non-interchangeable ids: schedule entries
+// carry a top-level sessionTimeID (matched against session.rfCode); favorite/interest entries
+// carry a top-level sessionID with no sessionTimeID at all (matched against
+// session.rfSessionId). Passing the wrong field name silently returns everything unmatched
+// rather than throwing, so getting `idField`/`matchField` backwards here fails quietly.
+function mapToSessionIds(entries, idField, matchField) {
+  const idByRf = new Map(sessions.value.map((s) => [s[matchField], s.id]));
+  return (entries || []).map((entry) => idByRf.get(entry[idField])).filter(Boolean);
 }
 
 // Populates scheduled/favorited from the real RF response, once the session catalog (needed
@@ -118,8 +125,8 @@ async function loadMyData() {
   try {
     const data = await fetchMyData(rfAuthToken, apiConfig.profileId, apiConfig.apiUrl);
     batch(() => {
-      scheduled.value = new Set(mapToSessionIds(data.scheduled));
-      favorited.value = new Set(mapToSessionIds(data.favorited));
+      scheduled.value = new Set(mapToSessionIds(data.scheduled, 'sessionTimeID', 'rfCode'));
+      favorited.value = new Set(mapToSessionIds(data.favorited, 'sessionID', 'rfSessionId'));
       auth.value = { ...auth.value, isRegistered: !!(data.loggedInUser && Object.keys(data.loggedInUser).length > 0) };
     });
   } catch (err) {
@@ -255,7 +262,10 @@ export async function favoriteSession(session) {
   const isFavorited = favorited.value.has(session.id);
   setPending(session.id, true);
   try {
-    await toggleSessionInterest(session.rfCode, session.id, rfAuthToken, apiConfig.profileId, apiConfig.apiUrl);
+    // Confirmed against real RF traffic: toggleSessionInterest (favoriting) keys on the
+    // session-level rfSessionId, not the time-slot-level rfCode — sessionTimeId is left
+    // empty (buildUrl() drops empty-string params, matching real requests that omit it).
+    await toggleSessionInterest('', session.rfSessionId, rfAuthToken, apiConfig.profileId, apiConfig.apiUrl);
   } catch (err) {
     setPending(session.id, false);
     throw err;

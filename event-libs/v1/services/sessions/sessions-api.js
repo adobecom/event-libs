@@ -2,9 +2,26 @@ import { constructRequestOptions } from '../../utils/esp-controller.js';
 import { getEventServiceEnv } from '../../utils/utils.js';
 import { ENV_MAP } from '../../utils/constances.js';
 
+// TEMPORARY (2026-08-07): the `published` filter below is disabled by default. Every
+// session in the real MAX26 catalog is currently `published: false` (draft/test rows —
+// real content hasn't been authored yet), so enforcing this today would hide the entire
+// catalog. Flip to `true` once real, published content exists — see
+// project_esl-real-payload-schema-diffs.md for the full real-payload audit this came from.
+export const ENFORCE_PUBLISHED_FILTER = false;
+
 function coerceArray(value) {
   if (Array.isArray(value)) return value;
   return value ? [value] : [];
+}
+
+// ESP prefixes its own external*Id fields (externalSessionId, externalSessionTimeId) with
+// "rf-" as its own internal namespacing — confirmed against real RainFocus traffic that
+// RainFocus's own API always uses the bare id, with no prefix, in both directions: request
+// params (addSession/removeSession/toggleSessionInterest) and myData's own response
+// (mySchedule[]/sessionInterests[] entries). Strip it before using these ids to talk to RF
+// directly or match RF's own responses.
+function stripRfPrefix(id) {
+  return id ? id.replace(/^rf-/, '') : '';
 }
 
 export function normalizeSessions(rawSessions) {
@@ -12,6 +29,10 @@ export function normalizeSessions(rawSessions) {
     id: s.id || '',
     slug: s.slug || '',
     rfCode: s.rfCode || '',
+    // RF-native SESSION id (not session-time id) — required by toggleSessionInterest's
+    // sessionId param, which real RF traffic confirms is keyed independent of any
+    // sessionTimeId (favoriting isn't time-slot-specific).
+    rfSessionId: s.rfSessionId || '',
     title: s.title || '',
     description: s.description || '',
     startTimeUtc: s.startTimeUtc || '',
@@ -120,6 +141,16 @@ function slugFromUrl(url) {
   return segments[segments.length - 1] || '';
 }
 
+// `published: false` marks a draft/test row (e.g. ESP's own internal test sessions,
+// confirmed present in the real MAX26 catalog) that must never reach real visitors once
+// ENFORCE_PUBLISHED_FILTER is turned back on. Missing the field entirely is treated as
+// visible (fail open) rather than hiding a real session over a field ESP might omit.
+// Exported/kept separate from ENFORCE_PUBLISHED_FILTER so the rule itself is unit-testable
+// independent of whether it's currently being enforced.
+export function isSessionPublished(session) {
+  return session.published !== false;
+}
+
 // Joins the ESL/ESP catalog payload's flat, relational arrays (sessions/sessionTimes/
 // speakers, related by id) into the raw-session shape normalizeSessions() expects.
 export function mapEslPayloadToRawSessions(payload) {
@@ -130,7 +161,9 @@ export function mapEslPayloadToRawSessions(payload) {
     timesBySessionId.get(t.sessionId).push(t);
   });
 
-  return (payload.sessions || []).map((session) => {
+  return (payload.sessions || [])
+    .filter((session) => !ENFORCE_PUBLISHED_FILTER || isSessionPublished(session))
+    .map((session) => {
     // Some real sessions (canceled, TBD, overflow-room placeholders) have no scheduled
     // sessionTime yet — startTimeUtc/endTimeUtc fall through to '' below, and
     // utils/time.js's formatters/getSessionDayKey() are guarded to handle that gracefully.
@@ -158,7 +191,15 @@ export function mapEslPayloadToRawSessions(payload) {
     return {
       id: session.sessionId,
       slug,
-      rfCode: session.sessionCode || '',
+      // RainFocus's own schedule (addSession/removeSession) calls take a sessionTimeId —
+      // sessionTimes[].externalSessionTimeId, the per-time-slot RF identifier, with ESP's
+      // "rf-" prefix stripped (RF's own API never uses it). Sessions with no scheduled
+      // sessionTime yet (see below) have no rfCode either — nothing to schedule against.
+      rfCode: stripRfPrefix(firstTime?.externalSessionTimeId),
+      // RainFocus's toggleSessionInterest (favoriting) call takes a plain sessionId
+      // instead — a different, session-level (not time-slot-level) RF identifier, matching
+      // sessions[].externalSessionId, "rf-" prefix stripped the same way.
+      rfSessionId: stripRfPrefix(session.externalSessionId),
       title: session.localizations?.['en-US']?.title || session.enTitle || '',
       description: session.localizations?.['en-US']?.description || '',
       startTimeUtc: firstTime ? new Date(firstTime.startTimeMillis).toISOString() : '',
