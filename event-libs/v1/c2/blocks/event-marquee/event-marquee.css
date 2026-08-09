@@ -77,6 +77,21 @@
   background: linear-gradient(0deg, var(--s2a-color-transparent-black-64), var(--s2a-color-transparent-black-00) 60%);
 }
 
+/* Foreground (always present, last row) — ports marquee.css's `.foreground`.
+   Horizontal padding was missing entirely here (0 on both sides) — confirmed
+   via a real rendered screenshot that the headline sat flush against the
+   viewport edge, partially clipped. var(--s2a-spacing-md) is a reasonable
+   mobile/tablet gutter; the 1280px+ tier below bumps this to the exact value
+   Figma's dev-mode redline calls out (124px, which is also a real named
+   primitive in tokens.css: --s2a-spacing-124 / --s2a-layout-lg). */
+.event-marquee-foreground {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--s2a-spacing-xl);
+  padding: var(--s2a-spacing-4xl) var(--s2a-spacing-md);
+}
+
 @media (min-width: 1024px) {
   /* Matches marquee.css's own `.marquee .foreground { flex-direction: row; ... }` —
      that rule is NOT scoped to `.split`, it applies to every marquee at the large
