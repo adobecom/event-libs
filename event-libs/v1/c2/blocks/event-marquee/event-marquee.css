@@ -211,7 +211,7 @@
      normal flex item and fills the remaining row width/height on its own. Forcing
      the Milo technique here left the text centered mid-row instead of anchored left
      and needlessly overrode the height. */
-  .event-marquee-video .event-marquee-text {
+  .event-marquee-text {
     display: inline-flex;
     flex-direction: column;
     align-items: flex-start;
