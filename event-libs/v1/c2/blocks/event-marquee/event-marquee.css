@@ -232,16 +232,10 @@
      the Milo technique here left the text centered mid-row instead of anchored left
      and needlessly overrode the height. */
   .event-marquee-video .event-marquee-text {
-    flex: 0 0 auto;
-    max-width: calc(50% - var(--s2a-layout-guide-gap));
-
-    /* The row stretches this to the bleeding asset's full height (needed for the
-       asset itself), but nothing centered its own content within that height —
-       it just sat at the top. Centering it internally here, rather than via
-       align-items on the shared row, keeps the asset's stretch-fill untouched. */
-    display: flex;
+    display: inline-flex;
     flex-direction: column;
-    justify-content: center;
+    align-items: flex-start;
+    gap: 24px;
   }
 
   .event-marquee-bleed {
@@ -308,13 +302,7 @@
      token would drift from the measured design rather than match it. */
   .event-marquee-text-cta .event-marquee-foreground {
     justify-content: flex-start;
-    padding-top: 167px;
+    padding-top: var(--s2a-spacing-160);
   }
 }
 
-/* Text stays constrained even with no asset present — per Figma, it never spans the
-   full width of the marquee, split or not. This was in an earlier version of this
-   file and got dropped by mistake during the marquee.css port; restoring it here. */
-.event-marquee-text-cta .event-marquee-text {
-  max-width: var(--s2a-layout-rich-media-content-measure-wide);
-}
