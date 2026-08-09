@@ -1,3 +1,24 @@
+// `?serverTime=<ms>` simulates landing on the page at a specific instant, for testing
+// time-driven transitions without waiting for a real session's start/end. It's an origin,
+// not a freeze — simulated time keeps advancing at the same rate as the real clock from
+// whatever instant the page loaded, so a tester can park just before a transition and
+// watch it happen rather than the clock staying frozen forever.
+const SERVER_TIME_ORIGIN = (() => {
+  try {
+    const raw = new URLSearchParams(window.location.search).get('serverTime');
+    const ms = raw ? parseInt(raw, 10) : NaN;
+    return Number.isFinite(ms) ? ms : null;
+  } catch {
+    return null;
+  }
+})();
+const PAGE_LOAD_MS = Date.now();
+
+export function getNowMs() {
+  if (SERVER_TIME_ORIGIN == null) return Date.now();
+  return SERVER_TIME_ORIGIN + (Date.now() - PAGE_LOAD_MS);
+}
+
 /**
  * Derives live/upcoming/on-demand state for a session.
  * Uses MR poll results for mrStreamId sessions; pure time-window for all others.

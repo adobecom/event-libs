@@ -1,6 +1,9 @@
 import { expect } from '@esm-bundle/chai';
 import init, { resolveClickAction, buildCard } from '../../../../../event-libs/v1/c2/blocks/upcoming-sessions/upcoming-sessions.js';
-import { scheduled, favorited, pendingActions, liveStreamActiveIds } from '../../../../../event-libs/v1/utils/session-store.js';
+import {
+  scheduled, favorited, pendingActions, liveStreamActiveIds, sessionGuideRequest,
+} from '../../../../../event-libs/v1/utils/session-store.js';
+import { setEventConfig } from '../../../../../event-libs/v1/utils/utils.js';
 
 function buildSectionMetadata(entries) {
   const el = document.createElement('div');
@@ -50,32 +53,28 @@ function session(overrides = {}) {
     sessionLengthInMinutes: 60,
     url: 'https://example.com/sessions/s-001',
     tags: 'Design,Illustration',
-    // Singular object, matching what the block actually reads (session.sessionTime)
-    // and the authored-data example (docs/upcoming-session-author-data.json) — NOT
-    // a `sessionTimes` array, which the code never looks at.
+    track: 'Video',
     sessionTime: {
-      sessionTimeId: 'time-1',
-      sessionId: 'session-1',
-      eventId: 'event-1',
       startTimeMillis: now + 60_000,
       endTimeMillis: now + 3_660_000,
       timezone: 'America/Los_Angeles',
-      attendeeLimit: 100,
-      attendeeCount: 42,
-      isFull: false,
-      locationId: 'loc-1',
     },
     ...overrides,
   };
 }
 
 describe('upcoming-sessions', () => {
+  before(() => {
+    setEventConfig({}, { miloLibs: '/test/unit/features/icons/mocks/libs' });
+  });
+
   beforeEach(() => {
     document.body.innerHTML = '';
     scheduled.value = new Set();
     favorited.value = new Set();
     pendingActions.value = new Set();
     liveStreamActiveIds.value = new Set();
+    sessionGuideRequest.value = null;
   });
 
   describe('init(el)', () => {
@@ -92,6 +91,50 @@ describe('upcoming-sessions', () => {
       await init(el);
       expect(el.getAttribute('aria-label')).to.equal('Upcoming');
       expect(el.querySelector('.upcoming-sessions-heading').textContent).to.equal('Upcoming');
+    });
+
+    it('marks data-few-sessions=true (arrows hidden) with 3 or fewer sessions', async () => {
+      const el = buildBlock([
+        session(),
+        session({ sessionId: 'session-2' }),
+        session({ sessionId: 'session-3' }),
+      ]);
+      await init(el);
+      expect(el.dataset.fewSessions).to.equal('true');
+    });
+
+    it('marks data-few-sessions=false (arrows shown) with more than 3 sessions', async () => {
+      const el = buildBlock([
+        session(),
+        session({ sessionId: 'session-2' }),
+        session({ sessionId: 'session-3' }),
+        session({ sessionId: 'session-4' }),
+      ]);
+      await init(el);
+      expect(el.dataset.fewSessions).to.equal('false');
+    });
+
+    it('flips data-few-sessions to true once a dropped session brings the visible count to 3', async () => {
+      const started = session({
+        sessionId: 'session-1',
+        sessionTime: {
+          startTimeMillis: Date.now() - 60_000,
+          endTimeMillis: Date.now() + 3_600_000,
+          timezone: 'America/Los_Angeles',
+        },
+      });
+      const el = buildBlock([
+        started,
+        session({ sessionId: 'session-2' }),
+        session({ sessionId: 'session-3' }),
+        session({ sessionId: 'session-4' }),
+      ]);
+
+      // The already-started session is dropped synchronously during init(), before this
+      // resolves, bringing the visible count from 4 down to 3.
+      await init(el);
+
+      expect(el.dataset.fewSessions).to.equal('true');
     });
 
     it('removes itself entirely when the authored array is empty', async () => {
@@ -150,114 +193,86 @@ describe('upcoming-sessions', () => {
       expect(hero.classList.contains('attach-upcoming--has-overlay')).to.equal(true);
     });
 
-    it('wraps only the preceding block and itself, leaving other section content (e.g. section-metadata) outside the wrapper', async () => {
-      const section = document.createElement('div');
-      section.className = 'section';
-      const hero = document.createElement('div');
-      hero.className = 'hero attach-upcoming';
-      const block = document.createElement('div');
-      block.className = 'upcoming-sessions carousel clip-end';
-      const headingRow = document.createElement('div');
-      headingRow.append(document.createElement('div'));
-      headingRow.firstChild.textContent = 'Upcoming';
-      block.append(headingRow);
-      const metadata = buildSectionMetadata({ 'upcoming-sessions': JSON.stringify([session()]) });
-      // Extra content sharing the section - exactly the scenario the wrapper
-      // exists to protect against (would otherwise grow the section past the
-      // hero's own size and detach the overlay from it).
-      const extraContent = document.createElement('div');
-      extraContent.className = 'unrelated-block';
-      section.append(hero, block, metadata, extraContent);
-      document.body.append(section);
-
-      await init(block);
-
-      const wrapper = section.querySelector(':scope > .event-marquee-upcoming-wrapper');
-      expect(wrapper, 'wrapper must exist as a direct child of the section').to.not.be.null;
-      expect([...wrapper.children]).to.deep.equal([hero, block]);
-      expect(wrapper.contains(metadata)).to.equal(false);
-      expect(wrapper.contains(extraContent)).to.equal(false);
-      expect(section.contains(metadata), 'section-metadata stays a section child').to.equal(true);
-      expect(section.contains(extraContent), 'unrelated content stays a section child').to.equal(true);
-    });
-
-    it('next/prev arrow clicks still scroll the track after attaching to a preceding block', async () => {
-      const sessions = Array.from(
-        { length: 5 },
-        (_, i) => session({ sessionId: `session-${i}`, sessionCode: `S-00${i}`, enTitle: `Session ${i}` }),
-      );
-      const section = document.createElement('div');
-      section.className = 'section';
-      const hero = document.createElement('div');
-      hero.className = 'hero attach-upcoming';
-      const el = document.createElement('div');
-      el.className = 'upcoming-sessions carousel clip-end';
-      const headingRow = document.createElement('div');
-      headingRow.append(document.createElement('div'));
-      headingRow.firstChild.textContent = 'Upcoming';
-      el.append(headingRow);
-      const metadata = buildSectionMetadata({ 'upcoming-sessions': JSON.stringify(sessions) });
-      section.append(hero, el, metadata);
-      document.body.append(section);
-
-      await init(el);
-
-      expect(el.dataset.fewSessions).to.equal('false');
-      const track = el.querySelector('.upcoming-sessions-track');
-      let calls = [];
-      track.scrollBy = (opts) => { calls.push(opts.left); };
-
-      el.querySelector('.upcoming-sessions-arrow--next').click();
-      el.querySelector('.upcoming-sessions-arrow--prev').click();
-
-      expect(calls.length).to.equal(2);
-      expect(calls[0]).to.be.greaterThan(0);
-      expect(calls[1]).to.be.lessThan(0);
-    });
-
     it('routes an upcoming-session card click to the session-guide deep link', async () => {
       const el = buildBlock([session()]);
       await init(el);
 
-      const originalPushState = window.history.pushState;
-      let pushedUrl = null;
-      window.history.pushState = (state, title, url) => { pushedUrl = url; };
-
       el.querySelector('.upcoming-sessions-card').click();
-      window.history.pushState = originalPushState;
 
-      expect(pushedUrl).to.contain('session=session-1');
+      expect(sessionGuideRequest.value).to.deep.equal({ sessionId: 'session-1' });
+    });
+
+    it('tears down the previous instance\'s cleanup when the block is re-decorated', async () => {
+      const el = buildBlock([session()]);
+      await init(el);
+
+      const firstCleanup = el._upcomingSessionsCleanup;
+      expect(firstCleanup).to.be.a('function');
+      let called = false;
+      el._upcomingSessionsCleanup = () => {
+        called = true;
+        firstCleanup();
+      };
+
+      await init(el);
+
+      expect(called).to.equal(true);
+      expect(el._upcomingSessionsCleanup).to.not.equal(firstCleanup);
+    });
+
+    it('drops an already-started session\'s card and slides the remaining card into place, leaving no lingering inline style', async () => {
+      const started = session({
+        sessionId: 'session-1',
+        sessionTime: {
+          startTimeMillis: Date.now() - 60_000,
+          endTimeMillis: Date.now() + 3_600_000,
+          timezone: 'America/Los_Angeles',
+        },
+      });
+      const upcoming = session({ sessionId: 'session-2' });
+      const el = buildBlock([started, upcoming]);
+      await init(el);
+
+      // scheduleStateTimers drops an already-started session immediately, then
+      // removeCard fades it out (ROTATE_OUT_MS) before sliding the remaining
+      // card into place (SLIDE_MS) — wait past both.
+      await new Promise((resolve) => setTimeout(resolve, 800));
+
+      expect(el.querySelector('[data-session-id="session-1"]')).to.equal(null);
+      const remaining = el.querySelector('[data-session-id="session-2"]');
+      expect(remaining).to.not.equal(null);
+      expect(remaining.style.transform).to.equal('');
+      expect(remaining.style.transition).to.equal('');
     });
   });
 
   describe('buildCard', () => {
-    it('uses the sessions-guide sg-live-card classes and shows the session title', () => {
+    it('uses the sessions-guide sg-card classes and shows the session title', () => {
       const card = buildCard(session());
-      expect(card.classList.contains('sg-live-card')).to.equal(true);
-      expect(card.querySelector('.sg-live-card__title').textContent).to.equal('Intro to Adobe Express');
+      expect(card.classList.contains('sg-card')).to.equal(true);
+      expect(card.querySelector('.sg-card__title').textContent).to.equal('Intro to Adobe Express');
     });
 
-    it('shows a Live Now badge and hides the schedule button for a live session', () => {
-      const live = session({
+    it('always renders the upcoming state, never a live badge — cards are dropped on start instead of switching to live', () => {
+      const started = session({
         sessionTime: {
           startTimeMillis: Date.now() - 60_000,
           endTimeMillis: Date.now() + 3_600_000,
           timezone: 'America/Los_Angeles',
         },
       });
-      const card = buildCard(live);
-      expect(card.querySelector('.sg-live-card__time').textContent).to.equal('Live Now');
-      expect(card.querySelector('.sg-live-card__btn--schedule')).to.equal(null);
-      expect(card.querySelector('.sg-live-card__btn--favorite')).to.not.equal(null);
+      const card = buildCard(started);
+      expect(card.querySelector('.sg-card__time').textContent).to.not.equal('Live Now');
+      expect(card.querySelector('.sg-card__btn--schedule')).to.not.equal(null);
     });
 
     it('shows the schedule button for an upcoming session', () => {
       const card = buildCard(session());
-      expect(card.querySelector('.sg-live-card__btn--schedule')).to.not.equal(null);
+      expect(card.querySelector('.sg-card__btn--schedule')).to.not.equal(null);
     });
 
-    it('routes a live-session card click to its Watch URL, not session-guide', () => {
-      const live = session({
+    it('routes a card click to the session-guide deep link regardless of session start time', () => {
+      const started = session({
         watchUrl: 'https://example.com/watch/s-001',
         sessionTime: {
           startTimeMillis: Date.now() - 60_000,
@@ -265,73 +280,62 @@ describe('upcoming-sessions', () => {
           timezone: 'America/Los_Angeles',
         },
       });
-      document.body.append(buildCard(live));
+      document.body.append(buildCard(started));
 
-      const originalAssign = window.location.assign;
-      let assignedUrl = null;
-      try {
-        Object.defineProperty(window.location, 'assign', {
-          configurable: true,
-          value: (url) => { assignedUrl = url; },
-        });
-      } catch {
-        // Some browsers lock down Location.prototype; the resolveClickAction
-        // unit tests below cover this decision without touching window.location.
-      }
+      document.querySelector('.sg-card').click();
 
-      document.querySelector('.sg-live-card').click();
+      expect(sessionGuideRequest.value).to.deep.equal({ sessionId: 'session-1' });
+    });
 
-      try {
-        Object.defineProperty(window.location, 'assign', { configurable: true, value: originalAssign });
-      } catch { /* see above */ }
+    it('renders a resolved category badge in the badge-row and repeats it in the footer, alongside the plain track label and time', () => {
+      const card = buildCard(session());
 
-      if (assignedUrl !== null) expect(assignedUrl).to.equal('https://example.com/watch/s-001');
+      const topBadge = card.querySelector('.sg-card__badge-row .sg-category-badge');
+      expect(topBadge).to.not.equal(null);
+      expect(topBadge.querySelector('.sg-category-badge__label').textContent).to.equal('Video');
+
+      const footer = card.querySelector('.sg-card__footer');
+      expect(footer.querySelector('.sg-card__track--footer').textContent).to.equal('Video');
+      expect(footer.querySelector('.sg-card__footer-badge .sg-category-badge__label').textContent).to.equal('Video');
+      expect(footer.querySelector('.sg-card__time')).to.not.equal(null);
+    });
+
+    it('falls back to the mainstage badge (not no badge) when the track has no icon config match', () => {
+      const card = buildCard(session({ track: 'Not A Real Track' }));
+      const badge = card.querySelector('.sg-category-badge');
+      expect(badge).to.not.equal(null);
+      // The label is the raw track string itself, not a curated one.
+      expect(badge.querySelector('.sg-category-badge__label').textContent).to.equal('Not A Real Track');
+      expect(card.querySelector('.sg-card__track--footer').textContent).to.equal('Not A Real Track');
+    });
+
+    it('omits the badge entirely when there is no track at all', () => {
+      const card = buildCard(session({ track: '' }));
+      expect(card.querySelector('.sg-category-badge')).to.equal(null);
+    });
+
+    it('renders the schedule and favorite buttons unconditionally, not only on hover/scheduled/favorited', () => {
+      const card = buildCard(session());
+      expect(card.querySelector('.sg-card__btn--schedule')).to.not.equal(null);
+      expect(card.querySelector('.sg-card__btn--favorite')).to.not.equal(null);
     });
   });
 
   describe('resolveClickAction', () => {
-    it('resolves a live session to a watch-url click action, not session-guide', () => {
-      // A live session routes to its authored `watchUrl` (the stream destination) —
-      // never its detail-page `url`. See resolveClickAction: `url` is deliberately
-      // ignored for live sessions.
-      const live = session({
-        watchUrl: 'https://example.com/watch/s-001',
-        sessionTime: {
-          startTimeMillis: Date.now() - 60_000,
-          endTimeMillis: Date.now() + 3_600_000,
-          timezone: 'America/Los_Angeles',
-        },
-      });
-      expect(resolveClickAction(live)).to.deep.equal({ type: 'watch', url: 'https://example.com/watch/s-001' });
-    });
-
-    it('prefers watchUrl over url for a live session, matching sessions-guide LiveCard', () => {
-      const live = session({
-        url: 'https://example.com/sessions/s-001',
-        watchUrl: 'https://example.com/watch/s-001',
-        sessionTime: {
-          startTimeMillis: Date.now() - 60_000,
-          endTimeMillis: Date.now() + 3_600_000,
-          timezone: 'America/Los_Angeles',
-        },
-      });
-      expect(resolveClickAction(live)).to.deep.equal({ type: 'watch', url: 'https://example.com/watch/s-001' });
-    });
-
     it('resolves an upcoming session to a session-guide click action', () => {
       expect(resolveClickAction(session())).to.deep.equal({ type: 'session-guide', sessionId: 'session-1' });
     });
 
-    it('resolves a javascript: URL on a live session to no action (safeUrl guard)', () => {
-      const live = session({
-        url: 'javascript:alert(1)',
+    it('resolves to session-guide regardless of session start time or url — cards are dropped on start rather than switching to a live/watch action', () => {
+      const started = session({
+        url: 'https://example.com/watch/s-001',
         sessionTime: {
           startTimeMillis: Date.now() - 60_000,
           endTimeMillis: Date.now() + 3_600_000,
           timezone: 'America/Los_Angeles',
         },
       });
-      expect(resolveClickAction(live)).to.deep.equal({ type: 'none' });
+      expect(resolveClickAction(started)).to.deep.equal({ type: 'session-guide', sessionId: 'session-1' });
     });
   });
 });

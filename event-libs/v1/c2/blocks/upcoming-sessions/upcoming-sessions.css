@@ -1,91 +1,14 @@
-/*
- * Design tokens below come from milo/libs/c2/styles/styles.css, the actual C2
- * foundation stylesheet — guaranteed loaded on any page with `foundation: c2`
- * metadata (which this block already requires), unlike
- * event-libs/v1/blocks/sessions-guide/sessions-guide-tokens.css, which isn't
- * guaranteed present on a page that doesn't load the sessions-guide block.
- * Every var() below has a literal fallback matching the Figma dev-mode export,
- * so this still renders correctly even if the token isn't defined for some
- * reason. Values with no exact matching token (e.g. #8a8a8a, #f2f2f2,
- * blur(4.6875px)) are left as plain literals — forcing a mismatched token
- * would drift from the design, not match it.
- *
- * Card classes below (.sg-live-card, .sg-icon-btn, .sg-category-badge families)
- * are copied from event-libs/v1/blocks/sessions-guide/sessions-guide.css so
- * cards here match Session Guide's look exactly. Copied on purpose, not
- * @import'd, so this block has no runtime dependency on sessions-guide.css
- * being loaded (per design doc: keep decoupled).
- *
- * IMPORTANT: sessions-guide.css defines its own (very different, light-themed)
- * rules for these exact same class names — e.g. its own `.sg-live-card` is a
- * white card that turns solid #000 on hover at wide breakpoints, and its
- * `.sg-icon-btn`/`.sg-category-badge` values differ too. Session Guide's CSS
- * can genuinely be loaded on the same page as this block (its modal opens
- * from this component's own cards), and two same-specificity `.sg-live-card`
- * rules from two different stylesheets is a load-order race, not a reliable
- * override — whichever stylesheet's <link> lands later in <head> wins,
- * regardless of which one is "correct" here. All selectors below are
- * therefore scoped under `.upcoming-sessions` to raise their specificity
- * above sessions-guide.css's un-scoped versions, so this block's card
- * styling always wins deterministically.
- */
-
 .upcoming-sessions {
   position: relative;
   padding: var(--s2a-spacing-md, 16px);
 }
 
-/* Created by upcoming-sessions.js (attachToPrecedingBlock) to wrap only the
-   attach-upcoming block and this one. Gives .upcoming-sessions--attached's
-   absolute positioning (below) a dedicated positioned ancestor that always
-   exactly matches the preceding block's own size, instead of falling back to
-   the whole section - so it stays correct regardless of anything else
-   authored alongside them in that section. */
-.event-marquee-upcoming-wrapper {
-  position: relative;
-}
-
-/* Below 1280px, this stacks normally after the marquee's own foreground
-   content instead of overlaying it — confirmed from Figma's actual mobile
-   frame (375 wide): the marquee's content there doesn't come anywhere near
-   913px tall, and the *next* section already starts within that same
-   reference frame. The event-marquee itself only gets a fixed min-height
-   at 1280px+ (see event-marquee.css) — below that, an absolutely positioned
-   overlay here would just overlap the foreground content instead of
-   reserving its own space, which is exactly the overlap bug this fixes. */
 .upcoming-sessions--attached {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
   padding: var(--s2a-spacing-lg, 24px) var(--s2a-spacing-md, 16px);
-}
-
-/* Left matches event-marquee's own 1280px+ gutter (event-marquee.css,
-   .event-marquee-foreground) so the headline and the first card line up.
-   Right is intentionally 0, not symmetric — confirmed directly from Figma's
-   node geometry: the peeking card is authored to sit mostly off-frame (only
-   ~31px of it visible at 1440px), hard-cut flush against the marquee's true
-   right edge with no margin at all. A symmetric right gutter here would
-   under-reveal the peek versus the design.
-
-   Only becomes an absolutely positioned overlay here, at 1280px+ — this is
-   the one breakpoint where event-marquee reserves a fixed, generous height
-   (913px) with real room to spare underneath its own content for this to
-   overlay into. */
-@media (min-width: 1280px) {
-  .upcoming-sessions--attached {
-    position: absolute;
-    left: 0;
-    right: 0;
-    padding-left: var(--s2a-layout-lg, 124px);
-    padding-right: 0;
-
-    /* Not flush with the marquee's bottom edge — confirmed from Figma's own
-       node geometry: this section's top offset (654) + its content height
-       (192) leaves exactly 67px of empty space below it before the
-       marquee's own bottom edge (654 + 192 + 67 = 913). Literal value, not
-       a token: 67 doesn't cleanly match any tokens.css spacing step (the
-       nearest, 64/--s2a-spacing-4xl, is a 3px rounding-level difference,
-       not the same number). */
-    bottom: 67px;
-  }
 }
 
 .upcoming-sessions-header {
@@ -101,12 +24,10 @@
   font-size: var(--s2a-font-size-lg, 18px);
   letter-spacing: var(--s2a-font-letter-spacing-5xl, -0.2px);
   hanging-punctuation: first last;
-
-  /* Light (default) = dark text; .dark variant flips it below. */
   color: var(--s2a-color-gray-1000, #000);
 }
 
-.upcoming-sessions.dark .upcoming-sessions-heading {
+.upcoming-sessions.dark-theme .upcoming-sessions-heading {
   color: var(--s2a-color-gray-25, #fff);
 }
 
@@ -115,19 +36,16 @@
   gap: var(--s2a-spacing-md, 16px);
   overflow-x: auto;
   overflow-y: visible;
-
-  /* Vertical breathing room so a card's :hover scale-up (see .sg-live-card)
-     doesn't get clipped or trigger a vertical scrollbar. */
   padding-block: var(--s2a-spacing-xs, 8px);
   scroll-snap-type: x proximity;
   scrollbar-width: none;
+  padding-inline: var(--s2a-spacing-md, 16px);
 }
 
 .upcoming-sessions-track::-webkit-scrollbar {
   display: none;
 }
 
-/* No edge fade per the Figma reference — peeking cards are hard-cut, not gradiented. */
 .upcoming-sessions.clip-end .upcoming-sessions-track {
   padding-inline-start: 0;
 }
@@ -149,12 +67,8 @@
   }
 }
 
-/* "ControlButton", size xl (48px), context on-dark — per Figma dev-mode CSS export. */
 .upcoming-sessions-controls {
-  display: flex;
-  flex-shrink: 0;
-  align-items: center;
-  gap: var(--s2a-spacing-md, 16px);
+  display: none;
 }
 
 .upcoming-sessions-arrow {
@@ -177,251 +91,317 @@
   background: var(--s2a-color-transparent-black-80, rgb(0 0 0 / 80%));
 }
 
-/* Desktop shows ~3 cards at once with no need to scroll — hide the arrows
-   when there's nothing to scroll to. Mobile always peeks a partial card
-   (1.5 shown), so controls stay regardless of count. */
-@media (width >= 900px) {
+@media (min-width: 1280px) {
+  /* Figma (State B.2/C, Desktop 1440): the attached overlay hugs its content exactly
+     — "Upcoming" heading (24px) + 16px gap + session row (152px) = 192px, with no
+     extra top/bottom padding on the overlay itself. The 24px/24px top+bottom pair
+     coded below was a guess made before this was measured directly against Figma;
+     zeroing it here (only at this breakpoint — mobile/tablet weren't re-measured) is
+     what actually closes the gap, not a cosmetic tweak. */
+  .upcoming-sessions--attached {
+    padding-top: 0;
+    padding-bottom: 0;
+  }
+
+  .upcoming-sessions-header {
+    margin-bottom: var(--s2a-spacing-md, 16px);
+  }
+
+  /* Matches Figma's "Upcoming" label exactly: 24px/900 Adobe Clean Display Black,
+     24px line-height — the same semantic heading tokens event-marquee.css uses for
+     its own H1-H3, not one-off literals. This was plain 18px/default-weight body
+     text before, which under-measured the header's real height by several pixels. */
+  .upcoming-sessions-heading {
+    font-family: var(--s2a-font-family-heading);
+    font-weight: var(--s2a-font-weight-heading);
+    font-size: var(--s2a-font-size-2xl, 24px);
+    line-height: var(--s2a-font-line-height-md, 24px);
+  }
+
+  /* Figma's "Small session row" reserves 12px top/bottom around the card row, not 8px. */
+  .upcoming-sessions-track {
+    padding-block: var(--s2a-spacing-sm, 12px);
+  }
+
+  .upcoming-sessions-controls {
+    display: flex;
+    flex-shrink: 0;
+    align-items: center;
+    gap: var(--s2a-spacing-md, 16px);
+  }
+
   .upcoming-sessions[data-few-sessions="true"] .upcoming-sessions-controls {
     display: none;
   }
 }
 
-/* Same right-arrow icon, rotated — matches the Figma component (one asset, two directions). */
 .upcoming-sessions-arrow--prev {
   transform: rotate(180deg);
 }
 
-/*
- * ── Card (sg-live-card family) ──────────────────────────────────────────
- * Visual values below follow the actual Figma dev-mode CSS export for this
- * card ("Session card - no images"), not sessions-guide.css's own
- * light-themed card:
- *   docs/upcoming-sessions/with-event-marquee-mobile.json  (base/mobile)
- *   docs/upcoming-sessions/with-event-marquee-desktop.json (desktop, ≥900px)
- * Class names are kept as sg-live-card* since the JS already targets them —
- * only the visual values below are Figma-sourced, not sessions-guide-sourced.
- *
- * Structure: .sg-live-card > .sg-live-card__content (title + badge/time row),
- * .sg-live-card__actions (icon buttons) — siblings, not nested, matching the
- * Figma layer tree (Frame 2147229141 + Frame 2147228840 as siblings inside
- * the card's own row-direction flex on desktop).
- */
-
-.upcoming-sessions .sg-live-card {
-  /* s2a/color/background/subtle, light (default) = --s2a-color-gray-50. */
+.upcoming-sessions .sg-card {
   background: var(--s2a-color-gray-50, #f8f8f8);
   border: none;
   border-radius: var(--s2a-border-radius-md, 16px);
   display: flex;
   flex-direction: column;
-  align-items: stretch;
+  align-items: flex-start;
   flex-shrink: 0;
-
-  /* 1 full card + 1/3 of the next peeking: (4/3)*cardWidth + gap = track width. */
-  width: calc((100% - var(--s2a-spacing-md, 16px)) * 0.75);
-  height: 172px;
+  position: relative;
+  overflow: hidden;
+  width: 255px;
+  height: 152px;
   padding: var(--s2a-spacing-md, 16px);
   gap: var(--s2a-spacing-md, 16px);
-  overflow: hidden;
+  cursor: pointer;
   transition: background 0.32s cubic-bezier(0.22, 1, 0.36, 1),
               box-shadow 0.32s cubic-bezier(0.22, 1, 0.36, 1),
-              transform 0.32s cubic-bezier(0.22, 1, 0.36, 1),
-              border-color 0.2s;
-  cursor: pointer;
+              transform 0.32s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-.upcoming-sessions .sg-live-card:focus-visible {
+.upcoming-sessions .sg-card:focus-visible {
   outline: var(--s2a-border-width-md, 2px) solid var(--s2a-color-gray-1000, #000);
   outline-offset: 2px;
 }
 
-/*
- * Light (default) hover: inverts to s2a/color/gray/900 (#131313) and grows,
- * matching sessions-guide.css's own `.sg-card:hover` "expand" pattern
- * (width/min-height increase, gray-50 -> gray-900, box-shadow, z-index) — same
- * transition curve. Growth is done via `transform: scale()` rather than
- * literal width/height like `.sg-card` uses, since this card sits in a
- * horizontally-scrolling track (growing width/height directly would reflow
- * and shift sibling cards mid-scroll); scaling keeps that layout-neutral
- * while still reading as "grows on hover".
- */
-.upcoming-sessions .sg-live-card:hover {
+.upcoming-sessions .sg-card:active {
+  background: var(--s2a-color-gray-75, #ececec);
+}
+
+.upcoming-sessions .sg-card:hover {
   background: var(--s2a-color-gray-900, #131313);
-  border-color: transparent;
-  transform: scale(1.05);
   box-shadow: 0 6px 24px rgb(0 0 0 / 18%);
+  transform: scale(1.05);
   z-index: 2;
 }
 
-.upcoming-sessions .sg-live-card__content {
+.upcoming-sessions .sg-card__body {
+  flex: 1 1 auto;
+  min-width: 0;
+  width: 100%;
+  align-self: stretch;
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
-  gap: var(--s2a-spacing-md, 16px);
-  flex: 1;
-  min-width: 0;
+  gap: 0;
+  overflow: hidden;
 }
 
-.upcoming-sessions .sg-live-card__meta {
+.upcoming-sessions .sg-card__badge-row {
   display: flex;
-  flex-direction: row;
   align-items: center;
-  justify-content: space-between;
-  gap: var(--s2a-spacing-xs, 8px);
+  flex-shrink: 0;
   width: 100%;
-  margin: 0;
+  margin-bottom: var(--s2a-spacing-md, 16px);
 }
 
-.upcoming-sessions .sg-live-card__track-row {
-  display: flex;
-  align-items: center;
-  gap: var(--s2a-spacing-xs, 8px);
-}
-
-.upcoming-sessions .sg-live-card__time {
-  font-family: 'Adobe Clean Spectrum VF', 'Adobe Clean', adobe-clean, 'Trebuchet MS', sans-serif;
-  font-weight: var(--s2a-font-weight-adobe-clean-regular, 400);
-  font-size: var(--s2a-font-size-xs, 12px);
-  line-height: 1.5;
-  color: var(--s2a-color-gray-600, #717171);
-  white-space: nowrap;
-  margin: 0;
-  transition: color 0.2s;
-}
-
-.upcoming-sessions .sg-live-card__title {
+.upcoming-sessions .sg-card__title {
   font-family: 'Adobe Clean Spectrum VF', 'Adobe Clean', adobe-clean, 'Trebuchet MS', sans-serif;
   font-weight: var(--s2a-font-weight-adobe-clean-extrabold, 800);
   font-size: var(--s2a-font-size-md, 16px);
   line-height: 1.25;
-  margin: 0;
   color: var(--s2a-color-gray-1000, #000);
+  margin: 0;
+  min-width: 0;
+  width: 100%;
+  overflow: hidden;
+  /* stylelint-disable-next-line value-no-vendor-prefix */
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
   transition: color 0.2s;
 }
 
-.upcoming-sessions .sg-live-card__actions {
+.upcoming-sessions .sg-card:hover .sg-card__title {
+  color: var(--s2a-color-gray-25, #fff);
+}
+
+.upcoming-sessions .sg-card__footer {
+  display: none;
+}
+
+.upcoming-sessions .sg-card__track {
+  font-size: var(--s2a-font-size-xs, 12px);
+  font-weight: 500;
+  color: var(--s2a-color-gray-1000, #000);
   display: flex;
   align-items: center;
+  gap: var(--s2a-spacing-xs, 8px);
+  white-space: nowrap;
+  flex-shrink: 0;
+  line-height: 1.5;
+  transition: color 0.2s;
+}
+
+.upcoming-sessions .sg-card:hover .sg-card__track {
+  color: var(--s2a-color-gray-25, #fff);
+}
+
+.upcoming-sessions .sg-card__footer-badge {
+  display: none;
+}
+
+.upcoming-sessions .sg-card:hover .sg-category-badge {
+  color: var(--s2a-color-gray-25, #fff);
+}
+
+.upcoming-sessions .sg-card__time {
+  font-size: var(--s2a-font-size-xs, 12px);
+  color: var(--s2a-color-gray-600, #717171);
+  line-height: 1.5;
+  white-space: nowrap;
+  text-align: right;
+  transition: color 0.2s;
+}
+
+.upcoming-sessions .sg-card:hover .sg-card__time {
+  color: rgb(255 255 255 / 50%);
+}
+
+.upcoming-sessions .sg-card__actions {
+  display: flex;
+  flex-direction: row;
   gap: var(--s2a-spacing-sm, 12px);
+  flex-shrink: 0;
+  width: 100%;
+  align-items: center;
+  justify-content: center;
+  opacity: 1;
+  pointer-events: auto;
 }
 
-/*
- * ── Dark surface variant ─────────────────────────────────────────────────
- * Card background is bound to the semantic token `s2a/color/background/
- * subtle`, which resolves differently per surface (light: --s2a-color-gray-50
- * #f8f8f8 — the default above; dark: --s2a-color-gray-700 #505050). Default
- * (no variant, or an explicit `light` variant) stays light via the unscoped
- * rules above; authoring the `dark` variant (`upcoming-sessions (dark)`)
- * puts a `dark` class on the block root and switches the surface here — this
- * is the original look this card shipped with, for the dark hero/marquee
- * overlay context (§6/§13 of the design doc).
- */
-.upcoming-sessions.dark .sg-live-card {
-  background: var(--s2a-color-gray-700, #505050);
+.upcoming-sessions .sg-card__actions::after {
+  content: attr(data-time);
+  font-size: var(--s2a-font-size-xs, 12px);
+  color: var(--s2a-color-gray-600, #717171);
+  margin-left: auto;
+  white-space: nowrap;
+  line-height: 1.5;
+  pointer-events: none;
 }
 
-/*
- * Per the Figma dev-mode CSS export, the dark card's :hover state is
- * byte-identical to its default — no color inversion, no grow/shadow.
- * Explicitly reset the light variant's hover effects here rather than
- * relying on cascade order, since transform/box-shadow/z-index aren't
- * otherwise overridden anywhere else for `.dark`.
- */
-.upcoming-sessions.dark .sg-live-card:hover {
-  background: var(--s2a-color-gray-700, #505050);
-  transform: none;
+.upcoming-sessions .sg-card:hover .sg-card__actions::after {
+  color: rgb(255 255 255 / 50%);
+}
+
+.upcoming-sessions.dark-theme .sg-card,
+.upcoming-sessions.dark-theme .sg-card.is-scheduled,
+.upcoming-sessions.dark-theme .sg-card.is-favorited {
+  background: rgb(0 0 0 / 64%);
   box-shadow: none;
-  z-index: auto;
 }
 
-.upcoming-sessions.dark .sg-live-card:focus-visible {
+.upcoming-sessions.dark-theme .sg-card:hover {
+  background: #292929;
+  box-shadow: none;
+}
+
+.upcoming-sessions.dark-theme .sg-card:focus-visible {
   outline-color: var(--s2a-color-gray-25, #fff);
 }
 
-/*
- * No separate :hover rule needed for text/badge color here — these plain
- * selectors are equal-specificity with (and declared after) the generic
- * light-hover color rules above, so they already win regardless of hover
- * state via source order, correctly keeping dark's own hover identical to
- * its default per the Figma export.
- */
-.upcoming-sessions.dark .sg-live-card__time {
-  color: #8a8a8a;
+/* stylelint-disable no-descending-specificity */
+.upcoming-sessions.dark-theme .sg-card__time,
+.upcoming-sessions.dark-theme .sg-card__actions::after {
+  color: #afafaf;
 }
 
-.upcoming-sessions.dark .sg-live-card__title {
+.upcoming-sessions.dark-theme .sg-card__title,
+.upcoming-sessions.dark-theme .sg-card__track {
   color: #f2f2f2;
 }
 
-@media (width >= 900px) {
-  .upcoming-sessions .sg-live-card {
+.upcoming-sessions.dark-theme .sg-category-badge {
+  color: #f2f2f2;
+}
+/* stylelint-enable no-descending-specificity */
+
+@media (min-width: 1280px) {
+  .upcoming-sessions .sg-card {
     flex-direction: row;
-    align-items: flex-start;
-    width: 431px;
+    align-items: stretch;
+    width: 375px;
     height: 128px;
     padding: var(--s2a-spacing-lg, 24px);
-    gap: var(--s2a-spacing-lg, 24px);
-    background: var(--s2a-color-gray-50, #f8f8f8);
+    gap: 0;
   }
 
-  .upcoming-sessions .sg-live-card:hover {
-    background: var(--s2a-color-gray-900, #131313);
+  .upcoming-sessions .sg-card__body {
+    width: auto;
   }
 
-  .upcoming-sessions .sg-live-card__content {
-    width: 327px;
+  .upcoming-sessions .sg-card__badge-row {
+    display: none;
   }
 
-  .upcoming-sessions .sg-live-card__time {
-    color: var(--s2a-color-gray-600, #717171);
-  }
-
-  .upcoming-sessions .sg-live-card__title {
+  .upcoming-sessions .sg-card__title {
     font-size: var(--s2a-font-size-lg, 18px);
     line-height: 22px;
-    color: var(--s2a-color-gray-1000, #000);
+    -webkit-line-clamp: 2;
   }
 
-  /*
-   * Values below match the Figma dev-mode CSS export for "Session card -
-   * no images" exactly (both its default and :hover export are identical —
-   * this card does not change appearance on hover on desktop).
-   */
-  .upcoming-sessions.dark .sg-live-card {
-    background: var(--s2a-color-gray-700, #505050);
+  .upcoming-sessions .sg-card__footer {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: var(--s2a-spacing-xs, 8px);
+    margin-top: var(--s2a-spacing-md, 16px);
   }
 
-  .upcoming-sessions.dark .sg-live-card:hover {
-    background: var(--s2a-color-gray-700, #505050);
+  .upcoming-sessions .sg-card__track--footer {
+    display: none;
   }
 
-  .upcoming-sessions.dark .sg-live-card__time {
-    color: var(--s2a-color-gray-25, #fff);
+  .upcoming-sessions .sg-card__footer-badge {
+    display: contents;
   }
 
-  .upcoming-sessions.dark .sg-live-card__title {
-    color: var(--s2a-color-gray-25, #fff);
+  .upcoming-sessions .sg-card__time {
+    margin-left: auto;
   }
 
-  .upcoming-sessions .sg-live-card__actions {
+  .upcoming-sessions .sg-card__actions {
     flex-direction: column;
-    width: var(--s2a-spacing-xl, 32px);
-    gap: var(--s2a-spacing-sm, 12px);
+    width: var(--s2a-spacing-2xl, 48px);
+    padding-left: var(--s2a-spacing-md, 16px);
+    margin-top: 0;
+    opacity: 1;
+    pointer-events: auto;
+    align-items: center;
+    justify-content: flex-start;
   }
 
-  /*
-   * Icon buttons solid opaque white with a translucent white border, not the
-   * 80%-opacity "on-light" chip used elsewhere — per the Figma dev-mode
-   * export's ".IconButton/Core/Primary" values for the dark card variant.
-   * No exact --s2a-color-transparent-white-40 token confirmed — kept literal.
-   */
-  .upcoming-sessions.dark .sg-live-card .sg-icon-btn--solid.sg-icon-btn--on-light {
-    background: var(--s2a-color-gray-25, #fff);
-    border-color: rgb(255 255 255 / 40%);
+  .upcoming-sessions .sg-card__actions::after {
+    display: none;
   }
+
+  .upcoming-sessions.dark-theme .sg-card,
+  .upcoming-sessions.dark-theme .sg-card.is-scheduled,
+  .upcoming-sessions.dark-theme .sg-card.is-favorited {
+    background: linear-gradient(0deg, rgb(0 0 0 / 64%), rgb(0 0 0 / 64%)), rgb(0 0 0 / 75%);
+    backdrop-filter: blur(2px);
+  }
+
+  .upcoming-sessions.dark-theme .sg-card:hover {
+    background: #292929;
+    backdrop-filter: none;
+  }
+
+  /* stylelint-disable no-descending-specificity */
+  .upcoming-sessions.dark-theme .sg-card__time,
+  .upcoming-sessions.dark-theme .sg-card__actions::after {
+    color: rgb(255 255 255 / 64%);
+  }
+
+  .upcoming-sessions.dark-theme .sg-card__title,
+  .upcoming-sessions.dark-theme .sg-card__track {
+    color: var(--s2a-color-gray-25, #fff);
+  }
+
+  .upcoming-sessions.dark-theme .sg-category-badge {
+    color: var(--s2a-color-gray-25, #fff);
+  }
+  /* stylelint-enable no-descending-specificity */
 }
-
-/* ── Icon Button (S2A Foundations) — copied verbatim, already has inline fallbacks ── */
 
 .upcoming-sessions .sg-icon-btn {
   display: inline-flex;
@@ -472,30 +452,23 @@
   display: block;
 }
 
-/*
- * "Add to schedule"/"Add to favorites" buttons: ".IconButton / Primary / Solid
- * / On Light" per the Figma dev-mode CSS export — a small light/white "chip"
- * sitting on the dark card, so its icon is black (contrast against the chip
- * itself, not the card). blur(4.6875px) has no matching --s2a-blur-* token
- * (scale starts at 8px) — kept literal per the exact Figma value.
- */
-.upcoming-sessions .sg-icon-btn--solid.sg-icon-btn--on-light {
-  background: var(--s2a-color-transparent-white-80, rgb(255 255 255 / 80%));
-  backdrop-filter: blur(4.6875px);
-  color: var(--s2a-color-gray-1000, #000);
-  border: var(--s2a-border-width-sm, 1px) solid var(--s2a-color-gray-100, #e9e9e9);
+.upcoming-sessions .sg-icon-btn--solid.sg-icon-btn--on-dark {
+  background: var(--s2a-color-background-default, #fff);
+  color: var(--s2a-color-content-default, #000);
+  border: var(--s2a-border-width-sm, 1px) solid var(--s2a-color-gray-100, #e0e0e0);
 }
 
-.upcoming-sessions .sg-icon-btn--solid.sg-icon-btn--on-light:hover:not(:disabled) {
-  background: var(--s2a-color-transparent-white-96, rgb(255 255 255 / 96%));
-  border-color: var(--s2a-color-gray-25, #fff);
+.upcoming-sessions .sg-icon-btn--solid.sg-icon-btn--on-dark:hover:not(:disabled) {
+  background: var(--s2a-color-transparent-white-64, rgb(255 255 255 / 64%));
+  border-color: var(--s2a-color-border-inverse, #fff);
 }
 
-.upcoming-sessions .sg-icon-btn--solid.sg-icon-btn--on-light:active:not(:disabled) {
-  background: var(--s2a-color-gray-25, #fff);
-  border-color: var(--s2a-color-gray-25, #fff);
+.upcoming-sessions .sg-icon-btn--solid.sg-icon-btn--on-dark:active:not(:disabled) {
+  background: var(--s2a-color-background-default, #fff);
+  border-color: transparent;
 }
 
+/* stylelint-disable-next-line no-descending-specificity */
 .upcoming-sessions .sg-category-badge {
   display: inline-flex;
   align-items: center;
@@ -522,46 +495,9 @@
   font-weight: var(--s2a-font-weight-adobe-clean-medium, 500);
   font-size: var(--s2a-font-size-xs, 12px);
   line-height: var(--s2a-font-line-height-2xs, 16px);
-  color: var(--s2a-color-gray-1000, #000);
+  color: currentcolor;
 }
 
-.upcoming-sessions.dark .sg-category-badge__icon-color,
-.upcoming-sessions.dark .sg-category-badge__label {
+.upcoming-sessions.dark-theme .sg-category-badge__icon-color {
   color: var(--s2a-color-gray-25, #fff);
-}
-
-/*
- * Light (default) hover text color — flips to white against the inverted
- * dark hover background (.sg-live-card:hover, near the top of this file).
- * Declared last/highest-specificity on purpose so it wins over every plain
- * light/dark color rule above regardless of source order.
- */
-.upcoming-sessions .sg-live-card:hover .sg-live-card__title,
-.upcoming-sessions .sg-live-card:hover .sg-live-card__time,
-.upcoming-sessions .sg-live-card:hover .sg-category-badge__icon-color,
-.upcoming-sessions .sg-live-card:hover .sg-category-badge__label {
-  color: var(--s2a-color-gray-25, #fff);
-}
-
-/*
- * Dark hover must stay identical to its own default (per the Figma export —
- * see the "Dark surface variant" section) even though the generic light
- * hover-color rule above happens to share the same #fff value at desktop.
- * At mobile, dark's own default text colors (#8a8a8a / #f2f2f2) are NOT
- * white, so this higher-specificity override is required to correctly win
- * over the generic rule above regardless of source order.
- */
-.upcoming-sessions.dark .sg-live-card:hover .sg-live-card__time {
-  color: #8a8a8a;
-}
-
-.upcoming-sessions.dark .sg-live-card:hover .sg-live-card__title {
-  color: #f2f2f2;
-}
-
-@media (width >= 900px) {
-  .upcoming-sessions.dark .sg-live-card:hover .sg-live-card__time,
-  .upcoming-sessions.dark .sg-live-card:hover .sg-live-card__title {
-    color: var(--s2a-color-gray-25, #fff);
-  }
 }
