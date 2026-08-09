@@ -135,26 +135,6 @@
   box-sizing: border-box;
 }
 
-/* Font-family/weight/size/line-height/letter-spacing are intentionally NOT set here
-   — Milo's own C2 stylesheet (libs/c2/styles/styles.css) already styles bare h1/h2/h3
-   per-tag (h1 = heading-1 tokens, h2 = heading-2, h3 = heading-3; confirmed directly
-   against Figma's dev-mode panel for this exact headline, which specifies heading-1).
-   A block-level override here previously forced every tag to the same (and briefly,
-   the wrong-tier) size, fighting that per-tag cascade — author with H1 for the
-   Figma-matching size; H2/H3 now render at their own, smaller, real heading sizes.
-   Only the bottom margin is still ours to set: Milo's own rule zeroes it by default. */
-.event-marquee-text h1,
-.event-marquee-text h2,
-.event-marquee-text h3 {
-  margin: 0 0 var(--s2a-spacing-sm);
-}
-
-.event-marquee-text p {
-  font-size: var(--s2a-typography-font-size-body-md);
-  line-height: var(--s2a-typography-line-height-body-md);
-  margin: 0 0 var(--s2a-spacing-lg);
-}
-
 /* Ports marquee.css's `.action-area` (the CTA row's own wrapper — real Milo
    decorateButtons adds this class to it automatically, so it's already present). */
 .event-marquee-text .action-area {
