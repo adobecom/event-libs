@@ -9,6 +9,16 @@
    (desktop)/1441px (HD) instead. Using 600/1200 here would mix two unrelated
    breakpoint systems, so the *technique* is kept identical, the numbers aren't. */
 
+/* Created by event-marquee.js's attachUpcomingSessionsWrapper — wraps this block and
+   a following upcoming-sessions block together so upcoming-sessions.css's
+   .upcoming-sessions--attached (position: absolute) anchors to a box we control (no
+   width/padding of its own, so it always exactly matches this block's own box)
+   instead of `.section`, whose width/centering varies per page via Milo's own
+   section-style classes (e.g. `container`/`wide`). */
+.event-marquee-upcoming-wrapper {
+  position: relative;
+}
+
 .event-marquee {
   position: relative;
   box-sizing: border-box;

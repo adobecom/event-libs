@@ -276,4 +276,89 @@ describe('event-marquee', () => {
       expect(el.querySelector('.event-marquee-favorite')).to.exist;
     });
   });
+
+  describe('Upcoming Sessions wrapper', () => {
+    it('wraps itself and a following .upcoming-sessions block when attach-upcoming is authored', async () => {
+      document.body.innerHTML = `
+        <div class="section">
+          <div class="event-marquee attach-upcoming">
+            <div>
+              <div><h2>Live now</h2></div>
+            </div>
+          </div>
+          <div class="upcoming-sessions"></div>
+        </div>
+      `;
+      const section = document.querySelector('.section');
+      const upcoming = document.querySelector('.upcoming-sessions');
+      const el = document.querySelector('.event-marquee');
+      await init(el);
+
+      const wrapper = el.parentElement;
+      expect(wrapper.classList.contains('event-marquee-upcoming-wrapper')).to.be.true;
+      expect(wrapper.parentElement).to.equal(section);
+      expect([...wrapper.children]).to.deep.equal([el, upcoming]);
+    });
+
+    it('does nothing when attach-upcoming is not authored', async () => {
+      document.body.innerHTML = `
+        <div class="section">
+          <div class="event-marquee">
+            <div>
+              <div><h2>Live now</h2></div>
+            </div>
+          </div>
+          <div class="upcoming-sessions"></div>
+        </div>
+      `;
+      const section = document.querySelector('.section');
+      const el = document.querySelector('.event-marquee');
+      await init(el);
+
+      expect(el.parentElement).to.equal(section);
+      expect(el.parentElement.classList.contains('event-marquee-upcoming-wrapper')).to.be.false;
+    });
+
+    it('does nothing when attach-upcoming is authored but no upcoming-sessions sibling follows', async () => {
+      document.body.innerHTML = `
+        <div class="section">
+          <div class="event-marquee attach-upcoming">
+            <div>
+              <div><h2>Live now</h2></div>
+            </div>
+          </div>
+        </div>
+      `;
+      const section = document.querySelector('.section');
+      const el = document.querySelector('.event-marquee');
+      await init(el);
+
+      expect(el.parentElement).to.equal(section);
+    });
+
+    it('is idempotent across re-decoration — does not nest a second wrapper', async () => {
+      document.body.innerHTML = `
+        <div class="section">
+          <div class="event-marquee attach-upcoming">
+            <div>
+              <div><h2>Live now</h2></div>
+            </div>
+          </div>
+          <div class="upcoming-sessions"></div>
+        </div>
+      `;
+      const section = document.querySelector('.section');
+      const upcoming = document.querySelector('.upcoming-sessions');
+      const el = document.querySelector('.event-marquee');
+      await init(el);
+      const wrapper = el.parentElement;
+
+      await init(el);
+
+      expect(el.parentElement).to.equal(wrapper);
+      expect(wrapper.parentElement).to.equal(section);
+      expect([...wrapper.children]).to.deep.equal([el, upcoming]);
+      expect(section.querySelectorAll('.event-marquee-upcoming-wrapper').length).to.equal(1);
+    });
+  });
 });

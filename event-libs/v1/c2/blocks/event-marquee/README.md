@@ -69,20 +69,37 @@ by an `upcoming-sessions` block **in the same section**:
 | --- | --- |
 ```
 
-**Do not author anything else in that section** — no extra text, no additional
-blocks, nothing besides these two. This isn't just a style preference:
+`event-marquee` must be the **immediately preceding** element before
+`upcoming-sessions` in the same section — `event-marquee.js`'s own
+attach-detection (`attachUpcomingSessionsWrapper`) checks `el.nextElementSibling`
+for the `upcoming-sessions` class (gated on `event-marquee` itself carrying the
+authored `attach-upcoming` modifier), so it only fires when the two blocks are
+directly adjacent.
 
-- `upcoming-sessions.js`'s own attach-detection (`attachToPrecedingBlock`) checks
-  `el.previousElementSibling` for the `attach-upcoming` class — this only works
-  if `event-marquee` is the *immediately preceding* element in the same section.
-- The overlay positioning (`.upcoming-sessions--attached`, in
-  `upcoming-sessions.css`) is `position: absolute` anchored to the section itself
-  (the nearest positioned ancestor, since the two blocks are siblings, not
-  nested). That only lines up correctly with the marquee because the marquee is
-  the section's *only* in-flow child — `event-marquee` is `width: 100%` and the
-  only sibling contributing to layout, so the section's box always exactly
-  matches the marquee's box. Adding any other content to the section breaks
-  that match, and the overlay will detach from the marquee's actual edges.
+Once detected, `attachUpcomingSessionsWrapper` wraps the two blocks together in
+a new `.event-marquee-upcoming-wrapper` div (moving both out of the section and
+into it) and makes *that* wrapper the positioned ancestor for
+`upcoming-sessions.css`'s `.upcoming-sessions--attached` `position: absolute`
+overlay — not the section itself. This was a real bug in an earlier version of
+this doc/implementation: anchoring to `.section` only lined up correctly by
+coincidence, when the section's own rendered box happened to exactly match the
+marquee's box. Real pages set section styles like `container`/`wide` directly
+on `.section` (Milo's `.container { width: var(--grid-container-width);
+margin: 0 auto; }`), narrowing and centering the section independently of the
+marquee's own 100%-width box — which visibly detached the overlay from the
+marquee's actual edges. The wrapper has no width or padding of its own, so its
+box is always exactly the marquee's box regardless of whatever styling the
+section has. You can now safely author other content in the same section
+without breaking the overlay's alignment — it no longer depends on the
+marquee being the section's only child.
+
+This wrapper is intentionally owned by `event-marquee.js`, not
+`upcoming-sessions.js` — `upcoming-sessions.js` is untouched by this and still
+just checks `el.previousElementSibling` for the `attach-upcoming` class to add
+its own `upcoming-sessions--attached`/`attach-upcoming--has-overlay` styling
+hooks, which works regardless of which of the two blocks' `init()` runs first
+or whether the wrapper exists yet at that point — wrapping two already-adjacent
+siblings preserves their relative order either way.
 
 If you need other content near the marquee, put it in a **separate section**
 below this one — not in the same section as the marquee/upcoming-sessions pair.

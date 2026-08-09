@@ -164,6 +164,29 @@ function decorateActions(mediaCol, config) {
   if (shareEnabled) actions.append(buildShareButton());
 }
 
+// Wraps this marquee + the following upcoming-sessions block together so
+// .upcoming-sessions--attached's `position: absolute` overlay anchors to a box we
+// control, not `.section` itself. Anchoring to `.section` only lined up with the
+// marquee by coincidence — it assumed the section's own rendered box exactly matched
+// the marquee's box, which held only as long as nothing else changed the section's
+// width. Real pages set section styles like `container`/`wide` directly on `.section`
+// (Milo's `.container { width: var(--grid-container-width); margin: 0 auto; }`),
+// narrowing/centering it independently of the marquee's own 100%-width box — visibly
+// detaching the overlay from the marquee's actual edges. Wrapping both blocks removes
+// the dependency on `.section`'s own styling entirely: the wrapper has no width or
+// padding of its own, so its box is always exactly the marquee's box. Guarded against
+// re-decoration: once wrapped, el's own parent already carries the wrapper class, so
+// a second init() call is a no-op instead of nesting another wrapper around it.
+function attachUpcomingSessionsWrapper(el) {
+  if (!el.classList.contains('attach-upcoming')) return;
+  if (el.parentElement?.classList.contains('event-marquee-upcoming-wrapper')) return;
+  const next = el.nextElementSibling;
+  if (!next?.classList.contains('upcoming-sessions')) return;
+  const wrapper = createTag('div', { class: 'event-marquee-upcoming-wrapper' });
+  el.parentElement.insertBefore(wrapper, el);
+  wrapper.append(el, next);
+}
+
 export default async function init(el) {
   const miloLibs = getEventConfig()?.miloConfig?.miloLibs || LIBS;
   const [{ decorateButtons, decorateBlockBg }, config] = await Promise.all([
@@ -202,4 +225,6 @@ export default async function init(el) {
 
   if (player?.type === 'mobile-rider' && !player.processed) processAutoBlockLinks(mediaCol);
   if (player) decorateActions(mediaCol, config);
+
+  attachUpcomingSessionsWrapper(el);
 }
