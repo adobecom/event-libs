@@ -23,9 +23,20 @@
   position: relative;
 }
 
+.event-marquee {
+  position: relative;
+  box-sizing: border-box;
+  overflow: hidden;
+  width: 100%;
+  color: var(--s2a-color-content-knockout);
+  font-family: var(--s2a-font-family-default);
+  display: flex;
+  flex-direction: column;
+}
+
 @media (min-width: 768px) {
   .event-marquee {
-    min-height: 360px;
+    height: 360px;
   }
 }
 
@@ -42,15 +53,23 @@
    (attachToPrecedingBlock) only once it actually attaches — not just because the
    author included the `attach-upcoming` modifier — so a mis-authored section
    (no matching sibling) correctly falls back to the shorter, no-overlay height.
+   `height`, not `min-height`: this is a fixed-size component matching an exact
+   Figma frame, not a flexible minimum. With min-height, an oversized child (e.g.
+   the row-layout video, which computes its own height from its width via
+   aspect-ratio and can exceed the marquee's intended height at wide viewports)
+   just grew the box instead of being clipped — visibly overlapping the Upcoming
+   Sessions overlay below, since the overlay's `bottom: 0` no longer lined up
+   with where the design expected content to end. `height` + the `overflow:
+   hidden` already on `.event-marquee` now actually clips that case.
    TODO: confirm 913 vs 961/963 — flagged as possibly stale, re-verify against
    Figma before relying on it further. */
 .event-marquee.attach-upcoming--has-overlay {
-  min-height: 913px;
+  height: 913px;
 }
 
 @media (min-width: 1280px) {
   .event-marquee {
-    min-height: 721px;
+    height: 721px;
   }
 
   /* Clearance above the Upcoming Sessions overlay so the media/player column
@@ -129,6 +148,7 @@
   position: relative;
   display: flex;
   flex-direction: column;
+  flex: 1 1 auto;
   gap: var(--s2a-spacing-xl);
   padding: var(--s2a-layout-sm) var(--s2a-spacing-lg);
 }
