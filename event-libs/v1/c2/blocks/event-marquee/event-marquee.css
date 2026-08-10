@@ -86,6 +86,19 @@
   z-index: 0;
 }
 
+/* decorateBlockBg (libs/utils/decorate.js) adds the `event-marquee-background`
+   class to the background row itself, but leaves its per-viewport child div(s)
+   as plain, unpositioned block boxes — so without this, the child's height comes
+   from its own content's natural rendered size, not from stretching to fill
+   .event-marquee-background's full absolutely-positioned box. No class to target
+   here (DA/decorateBlockBg don't add one), so it's selected structurally as the
+   direct child. Confirmed live in DevTools before applying here. */
+.event-marquee-background > div {
+  position: absolute;
+  inset: 0;
+  line-height: 0;
+}
+
 .event-marquee-background picture,
 .event-marquee-background img,
 .event-marquee-background video {
