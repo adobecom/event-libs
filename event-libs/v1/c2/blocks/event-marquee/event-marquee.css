@@ -134,11 +134,24 @@
   object-fit: cover;
 }
 
+/* Matches Router Marquee's own `.rm-overlay` gradient exactly (Milo's actual C2
+   marquee — libs/c2/blocks/router-marquee/router-marquee.css) rather than the
+   flat single-gradient guess this had before. Router Marquee only has two tiers
+   for this, not three: mobile+tablet share one gradient (`width < 1280px`,
+   60% black), desktop is a second (`width >= 1280px`, 56% — slightly lighter,
+   since desktop's wider text column needs less contrast help). Same 108deg
+   diagonal and 0%/98.86% stops at both tiers, only the peak opacity changes. */
 .event-marquee-background::after {
   content: '';
   position: absolute;
   inset: 0;
-  background: linear-gradient(0deg, var(--s2a-color-transparent-black-64), var(--s2a-color-transparent-black-00) 60%);
+  background: linear-gradient(108deg, rgb(0 0 0 / 60%) 0%, rgb(0 0 0 / 0%) 98.86%);
+}
+
+@media (min-width: 1280px) {
+  .event-marquee-background::after {
+    background: linear-gradient(108deg, rgb(0 0 0 / 56%) 0%, rgb(0 0 0 / 0%) 98.86%);
+  }
 }
 
 /* Foreground (always present, last row) — ports marquee.css's `.foreground`.
