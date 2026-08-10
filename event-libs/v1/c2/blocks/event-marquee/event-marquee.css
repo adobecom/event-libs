@@ -163,7 +163,16 @@
      Text/CTA-specific override below for how vertical centering carries over. */
   .event-marquee-foreground {
     flex-direction: row;
-    padding-block: var(--s2a-spacing-xl);
+
+    /* 167px, not --s2a-spacing-xl (32px) — per Figma's dev-mode redline, the
+       headline sits at a specific fixed offset from the top of the marquee at
+       desktop, for every variant, not the smaller row-layout gap. Literal, not
+       a token: 167px doesn't map to any step in tokens.css's spacing scale
+       (96/124/160/240), so forcing a nearby token would drift from the
+       measured design. padding-bottom keeps the original --s2a-spacing-xl
+       value — only the top side changes. */
+    padding-top: 167px;
+    padding-bottom: var(--s2a-spacing-xl);
     padding-inline: var(--s2a-layout-lg);
 
     /* 48px, confirmed in Figma — the base rule's --s2a-spacing-xl (32px) was the
@@ -352,23 +361,18 @@
    center` (the main/vertical axis) centers it. At 1280px+, the shared rule
    above switches to row-direction for every variant, and `justify-content`
    needs resetting so a lone text item doesn't get horizontally centered too
-   (it should stay left-anchored, per Figma). */
+   (it should stay left-anchored, per Figma). padding-top is handled by the
+   shared .event-marquee-foreground rule now (167px, every variant) — this
+   only resets justify-content for this variant specifically. */
 .event-marquee-text-cta .event-marquee-foreground {
   justify-content: center;
 }
 
 @media (min-width: 1280px) {
-  /* Fixed top offset instead of vertical centering (align-items: center) —
-     per Figma's dev-mode redline for this variant, the headline sits at a
-     specific 167px from the top of the marquee, not centered in the row.
-     167px is a literal value, not a token: it doesn't map to any step in
-     tokens.css's spacing scale (96 / 124 / 160 / 240), so forcing a nearby
-     token would drift from the measured design rather than match it. Moved
-     from 1024px to 1280px along with the row-layout flip it depends on —
-     it was previously out of sync with that flip once the flip itself moved. */
   .event-marquee-text-cta .event-marquee-foreground {
     justify-content: flex-start;
-    padding-top: 167px;
   }
 }
+
+
 
