@@ -209,17 +209,15 @@
 /* Must come after the 1200px+ block above: same selector/property, equal
    specificity — an earlier position here would lose the cascade to that
    broader rule regardless of this media query being narrower. */
-@media (min-width: 1280px) {
-  .event-marquee-foreground {
-    padding-inline: var(--s2a-layout-lg);
+.event-marquee-foreground {
+  padding-inline: var(--s2a-layout-lg);
 
-    /* 48px, confirmed in Figma — the base rule's --s2a-spacing-xl (32px) was the
-       mobile/tablet column-stacking gap; the row layout's own gap between the
-       text and media columns is wider. Unlike the 60px/473px measurements
-       elsewhere in this file, 48px lands exactly on the scale (--s2a-spacing-3xl),
-       so it's tokenized rather than kept as a literal. */
-    gap: var(--s2a-spacing-3xl);
-  }
+  /* 48px, confirmed in Figma — the base rule's --s2a-spacing-xl (32px) was the
+      mobile/tablet column-stacking gap; the row layout's own gap between the
+      text and media columns is wider. Unlike the 60px/473px measurements
+      elsewhere in this file, 48px lands exactly on the scale (--s2a-spacing-3xl),
+      so it's tokenized rather than kept as a literal. */
+  gap: var(--s2a-spacing-3xl);
 }
 
 .event-marquee-text,
