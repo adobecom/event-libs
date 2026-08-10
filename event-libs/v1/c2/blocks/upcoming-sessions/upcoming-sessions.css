@@ -9,13 +9,19 @@
    in-flow (a normal sibling below the video, not an overlay), but per direct
    product direction this now matches desktop everywhere instead: the marquee
    reserves the same 913px at every tier (see event-marquee.css's min-height),
-   and Upcoming Sessions overlays its bottom edge there too. */
+   and Upcoming Sessions overlays its bottom edge there too.
+   Padding is mobile/tablet-specific here — 24px left (--s2a-spacing-lg), 40px
+   bottom (--s2a-spacing-2xl), both exact token matches, not Figma-measured for
+   this tier. The desktop values (124px/60px, Figma-verified against the Desktop
+   1440 frame) apply as a 1280px+ override instead of being the default — see
+   the existing 1280px block below, which already holds this selector's other
+   desktop-only overrides. */
 .upcoming-sessions--attached {
   position: absolute;
   left: 0;
   right: 0;
   bottom: 0;
-  padding: 0 0 60px var(--s2a-layout-lg);
+  padding: 0 0 var(--s2a-spacing-2xl) var(--s2a-spacing-lg);
 }
 
 .upcoming-sessions-header {
@@ -109,10 +115,14 @@
      60px to the overlay's total reserved height (192px content + 60px = 252px) —
      event-marquee.css's `min-height: 913px` (721px base + 192px overlay) has not
      been reconciled against this yet.
-     position/left/right/bottom/padding now live in the base rule above (applies
-     at every breakpoint) — this block only holds what's still desktop-specific:
-     heading typography, track padding, and card sizing, none of which have been
-     verified against a mobile/tablet Figma frame yet. */
+     padding-left is 124px (--s2a-layout-lg), matching the marquee's own desktop
+     gutter — overrides the base rule's 24px/40px mobile-tablet values (see the
+     comment there), which aren't Figma-measured for this tier. position/left/
+     right/bottom live in that base rule too and apply unchanged here. */
+  .upcoming-sessions--attached {
+    padding: 0 0 60px var(--s2a-layout-lg);
+  }
+
   .upcoming-sessions-header {
     margin-bottom: var(--s2a-spacing-md, 16px);
   }
