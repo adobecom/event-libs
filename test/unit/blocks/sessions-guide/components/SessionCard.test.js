@@ -171,6 +171,39 @@ describe('SessionCard', () => {
     expect(html).to.match(/\d+(:\d+)?\s*(AM|PM)/i);
   });
 
+  it('tags the card daa-ll as Session-Card-Navigate on the page surface', () => {
+    const html = renderCard(UPCOMING_SESSION);
+    expect(html).to.include('daa-ll=Session-Card-Navigate');
+  });
+
+  it('tags the card daa-ll as Session-Card-Open on the widget surface for a live/upcoming session', () => {
+    const html = renderCard(UPCOMING_SESSION, { guideConfig: { ...BASE_CONFIG, surface: 'widget' } });
+    expect(html).to.include('daa-ll=Session-Card-Open');
+  });
+
+  it('tags the card daa-ll as On-Demand-Card-Navigate on the widget surface for an on-demand session', () => {
+    const html = renderCard(ONDEMAND_SESSION, { guideConfig: { ...BASE_CONFIG, surface: 'widget' } });
+    expect(html).to.include('daa-ll=On-Demand-Card-Navigate');
+  });
+
+  // Only the schedule button is asserted here — the favorite IconButton is embedded
+  // directly in the card's own outer template rather than its own nested html`` call,
+  // which this test mock's minimal component-tag parser can't resolve (real htm/preact
+  // renders it correctly; this is a mock limitation, not a production bug).
+  it('tags the schedule button with Add-/Remove- daa-ll labels matching its state', () => {
+    expect(renderCard(UPCOMING_SESSION)).to.include('daa-ll=Add-to-Schedule');
+    scheduled.value = new Set(['session-1']);
+    expect(renderCard(UPCOMING_SESSION)).to.include('daa-ll=Remove-from-Schedule');
+  });
+
+  it('tags the previously-aired play button with daa-ll=Watch-Now', () => {
+    const store = buildStore(preact);
+    store.SessionGuideContext._current = makeCtx();
+    const SessionCard = buildSessionCard(preact, store);
+    const html = SessionCard({ session: ONDEMAND_SESSION, forceOnDemand: true });
+    expect(html).to.include('daa-ll=Watch-Now');
+  });
+
   it('does not dispatch when isRegistered is not true (no-op guard)', () => {
     auth.value = { isLoggedIn: true, isRegistered: false, userFirstName: null };
     const dispatched = [];

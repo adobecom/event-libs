@@ -133,8 +133,14 @@ export function SessionCard({ session, forceOnDemand = false, timeDisplay = 'dur
     history.pushState({}, '', setSessionParam(`${slug}-${rfCode}`));
   }
 
+  // eslint-disable-next-line no-nested-ternary
+  const cardDaaLl = surface === 'page'
+    ? 'Session-Card-Navigate'
+    : (onDemand ? 'On-Demand-Card-Navigate' : 'Session-Card-Open');
+
   return html`
     <div class=${cardClass} onclick=${handleClick} role="button" tabindex="0"
+      daa-ll=${cardDaaLl}
       onkeydown=${(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleClick(); } }}
       onmouseenter=${onMouseEnter} onmouseleave=${onMouseLeave}>
       <div class="sg-card__body">
@@ -157,6 +163,7 @@ export function SessionCard({ session, forceOnDemand = false, timeDisplay = 'dur
           extraClass="sg-card__btn--play"
           label="Play session"
           onclick=${handlePlay}
+          daaLl=${'Watch-Now'}
         >
           <${IconPlay} />
         </${IconButton}>`}
@@ -169,6 +176,7 @@ export function SessionCard({ session, forceOnDemand = false, timeDisplay = 'dur
           onclick=${handleSchedule}
           pressed=${isScheduled}
           disabled=${isPending}
+          daaLl=${isScheduled ? 'Remove-from-Schedule' : 'Add-to-Schedule'}
         >
           ${isScheduled ? html`<${IconCalendarCheck} />` : html`<${IconCalendarPlus} />`}
         </${IconButton}>`}
@@ -181,6 +189,7 @@ export function SessionCard({ session, forceOnDemand = false, timeDisplay = 'dur
           onclick=${handleFavorite}
           pressed=${isFavorited}
           disabled=${isPending}
+          daaLl=${isFavorited ? 'Remove-from-Favorites' : 'Add-to-Favorites'}
         >
           ${isFavorited ? html`<${IconHeartFilled} />` : html`<${IconHeartOutline} />`}
         </${IconButton}>

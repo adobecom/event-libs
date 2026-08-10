@@ -129,6 +129,7 @@ export function SessionDetailOverlay({ onBack }) {
                           href=${watchHref}
                           onclick=${handleWatch}
                           aria-disabled=${watchHref ? undefined : 'true'}
+                          daa-ll="Watch-Now"
                         >
                           <span class="sg-detail__btn-icon sg-detail__btn-icon--play" aria-hidden="true"></span>
                           Watch now
@@ -140,6 +141,7 @@ export function SessionDetailOverlay({ onBack }) {
                           onclick=${handleSchedule}
                           disabled=${isPending}
                           aria-pressed=${String(isScheduled)}
+                          daa-ll=${isScheduled ? 'Remove-from-Schedule' : 'Add-to-Schedule'}
                           type="button"
                         >
                           <span class=${'sg-detail__btn-icon ' + (isScheduled ? 'sg-detail__btn-icon--check' : 'sg-detail__btn-icon--plus')} aria-hidden="true"></span>
@@ -156,6 +158,7 @@ export function SessionDetailOverlay({ onBack }) {
                     onclick=${handleFavorite}
                     pressed=${isFavorited}
                     disabled=${isPending}
+                    daaLl=${isFavorited ? 'Remove-from-Favorites' : 'Add-to-Favorites'}
                   >
                     ${isFavorited ? html`<${IconHeartFilled} />` : html`<${IconHeartOutline} />`}
                   </${IconButton}>

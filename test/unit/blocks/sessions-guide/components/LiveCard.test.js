@@ -127,4 +127,38 @@ describe('LiveCard', () => {
     expect(html).to.include('sg-live-card__btn--favorite');
     expect(html).to.include('sg-live-card__btn--schedule');
   });
+
+  it('tags the watch button with daa-ll=Watch-Now', () => {
+    const store = makeStore();
+    const LiveCard = buildLiveCard(preact, store);
+    expect(LiveCard({ session: LIVE_SESSION })).to.include('daa-ll="Watch-Now"');
+  });
+
+  it('tags the card with daa-ll=Session-Card-Open on the widget surface', () => {
+    const store = makeStore();
+    const LiveCard = buildLiveCard(preact, store);
+    expect(LiveCard({ session: LIVE_SESSION })).to.include('daa-ll=Session-Card-Open');
+  });
+
+  it('omits the card daa-ll on the page surface (card click is a no-op there)', () => {
+    const store = buildStore(preact);
+    store.SessionGuideContext._current = {
+      state: { guideConfig: { ...BASE_CONFIG, surface: 'page' } },
+      dispatch: () => {},
+    };
+    const LiveCard = buildLiveCard(preact, store);
+    expect(LiveCard({ session: LIVE_SESSION })).to.not.include('daa-ll=Session-Card-Open');
+  });
+
+  it('tags the schedule/favorite buttons with Add-/Remove- daa-ll labels matching their state', () => {
+    const store = makeStore();
+    const LiveCard = buildLiveCard(preact, store);
+    expect(LiveCard({ session: LIVE_SESSION })).to.include('daa-ll=Add-to-Schedule');
+    expect(LiveCard({ session: LIVE_SESSION })).to.include('daa-ll=Add-to-Favorites');
+    scheduled.value = new Set(['session-keynote']);
+    favorited.value = new Set(['session-keynote']);
+    const html = LiveCard({ session: LIVE_SESSION });
+    expect(html).to.include('daa-ll=Remove-from-Schedule');
+    expect(html).to.include('daa-ll=Remove-from-Favorites');
+  });
 });

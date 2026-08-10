@@ -78,6 +78,7 @@ export function LiveCard({ session, variant = 'live' }) {
         class=${'sg-live-card__btn sg-live-card__btn--watch' + (isScheduled ? ' is-scheduled' : '') + (isPending ? ' is-pending' : '')}
         onclick=${handleSchedule}
         disabled=${isPending}
+        daa-ll=${isScheduled ? 'Remove-from-Schedule' : 'Add-to-Schedule'}
         type="button"
       >${isScheduled
           ? html`<${IconCalendarCheck} />Added to schedule`
@@ -88,6 +89,7 @@ export function LiveCard({ session, variant = 'live' }) {
     primaryCta = html`<button
       class="sg-live-card__btn sg-live-card__btn--watch"
       onclick=${handleWatch}
+      daa-ll="Watch-Now"
       type="button"
     ><${IconPlay} />Watch now</button>`;
   }
@@ -102,6 +104,7 @@ export function LiveCard({ session, variant = 'live' }) {
 
   return html`
     <div class=${cardClass} onclick=${handleCardClick} role="button" tabindex="0"
+      daa-ll=${surface === 'widget' ? 'Session-Card-Open' : undefined}
       onkeydown=${(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleCardClick(); } }}>
       <div class="sg-live-card__image">
         ${session.thumbnailUrl
@@ -131,6 +134,7 @@ export function LiveCard({ session, variant = 'live' }) {
             aria-label=${isScheduled ? 'Remove from schedule' : 'Add to schedule'}
             aria-pressed=${String(isScheduled)}
             disabled=${isPending}
+            daa-ll=${isScheduled ? 'Remove-from-Schedule' : 'Add-to-Schedule'}
             type="button"
           ></button>
           <button
@@ -139,6 +143,7 @@ export function LiveCard({ session, variant = 'live' }) {
             aria-label=${isFavorited ? 'Remove from favorites' : 'Add to favorites'}
             aria-pressed=${String(isFavorited)}
             disabled=${isPending}
+            daa-ll=${isFavorited ? 'Remove-from-Favorites' : 'Add-to-Favorites'}
             type="button"
           >${isFavorited ? html`<${IconHeartFilled} />` : html`<${IconHeartOutline} />`
           }<span class="sg-live-card__btn-label">${isFavorited ? 'Favorited' : 'Favorite'}</span></button>

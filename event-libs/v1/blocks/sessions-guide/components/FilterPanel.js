@@ -112,8 +112,8 @@ export function FilterPanel({ onClose }) {
         </div>
       </div>
       <div class="sg-filter-panel__footer">
-        <button class="sg-filter-panel__reset" onclick=${reset} type="button">Reset all</button>
-        <button class="sg-filter-panel__apply" onclick=${apply} type="button">Apply</button>
+        <button class="sg-filter-panel__reset" onclick=${reset} daa-ll="Filter-Reset-All" type="button">Reset all</button>
+        <button class="sg-filter-panel__apply" onclick=${apply} daa-ll="Filter-Apply" type="button">Apply</button>
       </div>
     </div>
   `;

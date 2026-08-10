@@ -58,6 +58,7 @@ export function ViewDropdown() {
               onclick=${() => selectView(v.value)}
               role="option"
               aria-selected=${state.activeView === v.value}
+              daa-ll="View-Toggle-${v.value}"
             >${v.label}</li>
           `)}
         </ul>
