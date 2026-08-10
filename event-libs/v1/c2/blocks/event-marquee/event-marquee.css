@@ -45,25 +45,23 @@
    (upcoming-sessions.css's `.upcoming-sessions--attached`, always absolute/
    bottom:0 at every breakpoint, never in-flow) — both numbers confirmed directly
    from Figma's own auto-layout data (State B.2/State C, Desktop 1440), not
-   estimated from a screenshot. Reserving that height only when an overlay is
-   actually present avoids two problems a single fixed constant caused: an author
-   who authors event-marquee *without* attaching Upcoming Sessions got ~192px of
-   dead space at the bottom for nothing, and if a future Upcoming Sessions redesign
-   changes its own height, this 913px would silently drift out of sync with it
-   instead of being visibly wrong.
+   estimated from a screenshot. Applied unscoped (every breakpoint, not just
+   1280px+) per direct product direction: Upcoming Sessions overlays the marquee
+   the same way on mobile/tablet as it does on desktop, so the marquee needs the
+   same 913px reserved everywhere too — not just when the row layout is active.
    `attach-upcoming--has-overlay` is added by upcoming-sessions.js itself
    (attachToPrecedingBlock) only once it actually attaches — not just because the
    author included the `attach-upcoming` modifier — so a mis-authored section
    (no matching sibling) correctly falls back to the shorter, no-overlay height.
    TODO: confirm 913 vs 961/963 — flagged as possibly stale, re-verify against
    Figma before relying on it further. */
+.event-marquee.attach-upcoming--has-overlay {
+  min-height: 913px;
+}
+
 @media (min-width: 1280px) {
   .event-marquee {
     min-height: 721px;
-  }
-
-  .event-marquee.attach-upcoming--has-overlay {
-    min-height: 913px;
   }
 
   /* Clearance above the Upcoming Sessions overlay so the media/player column
