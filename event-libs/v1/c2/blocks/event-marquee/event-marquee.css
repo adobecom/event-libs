@@ -149,6 +149,15 @@
   display: flex;
   flex-direction: column;
   flex: 1 1 auto;
+
+  /* Flex items get an *initial* min-height of auto, not 0 — meaning the browser
+     refuses to shrink this below its own content's intrinsic size, even inside
+     .event-marquee's fixed height + overflow:hidden. That's the classic
+     flexbox-overflow trap: the parent's fixed height was silently not clipping
+     an oversized child (the row-layout video) because this flex item itself
+     never actually shrank to fit. Without this, the earlier height/overflow
+     fix on .event-marquee had no real effect. */
+  min-height: 0;
   gap: var(--s2a-spacing-xl);
   padding: var(--s2a-layout-sm) var(--s2a-spacing-lg);
 }
@@ -250,6 +259,14 @@
 .event-marquee-media {
   width: 100%;
   margin: 0 auto;
+
+  /* Same flexbox-overflow trap as .event-marquee-foreground's own min-height:0
+     above, one level deeper — this is itself a flex item of .event-marquee-
+     foreground (column direction below 1280px, row above it), and its default
+     min-height:auto lets an oversized child (the aspect-ratio-driven video)
+     refuse to shrink, breaking out past .event-marquee's fixed height +
+     overflow:hidden regardless of direction. */
+  min-height: 0;
 }
 
 .event-marquee-media picture,
