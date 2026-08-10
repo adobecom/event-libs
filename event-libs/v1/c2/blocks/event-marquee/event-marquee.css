@@ -196,6 +196,18 @@
   margin-bottom: var(--s2a-spacing-lg);
 }
 
+/* Desktop-specific Figma redline: at 1280px+, every gap in the text column is a
+   uniform 24px (--s2a-spacing-lg) — headline to next line, that to body copy,
+   body copy to the CTA row — not the mobile/tablet 8px from the rule above.
+   Only overrides the base 8px; the `:has(+ .action-area)` rule already sets
+   24px before the CTA row, so it's a harmless no-op at this breakpoint, not a
+   conflict. */
+@media (min-width: 1280px) {
+  .event-marquee-text > :not(.action-area) {
+    margin-bottom: var(--s2a-spacing-lg);
+  }
+}
+
 /* Ports marquee.css's `.action-area` (the CTA row's own wrapper — real Milo
    decorateButtons adds this class to it automatically, so it's already present). */
 .event-marquee-text .action-area {
@@ -356,7 +368,7 @@
      it was previously out of sync with that flip once the flip itself moved. */
   .event-marquee-text-cta .event-marquee-foreground {
     justify-content: flex-start;
-    padding-top: var(--s2a-spacing-160);
+    padding-top: 167px;
   }
 }
 
