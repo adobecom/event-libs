@@ -61,11 +61,16 @@
   .event-marquee.attach-upcoming--has-overlay {
     min-height: 913px;
   }
-  
+
+  /* Clearance above the Upcoming Sessions overlay so the media/player column
+     doesn't crowd it. No spacing token equals 60px exactly (--s2a-spacing-3xl is
+     48px, --s2a-spacing-4xl is 64px, both a real drift from the measured value),
+     so it's kept as a literal — same reasoning as the 167px Text/CTA offset
+     below and the 60px .upcoming-sessions--attached padding-bottom in
+     upcoming-sessions.css. */
   .event-marquee.attach-upcoming--has-overlay .event-marquee-foreground {
     padding-bottom: 60px;
   }
-
 }
 
 /* Background (optional, row 1) — decorated by Milo's own decorateBlockBg; absolutely
@@ -222,7 +227,7 @@
     display: inline-flex;
     flex-direction: column;
     align-items: flex-start;
-    gap: 24px;
+    gap: var(--s2a-spacing-lg);
   }
 
   .event-marquee-bleed {
@@ -252,8 +257,8 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 40px;
-  height: 40px;
+  width: var(--s2a-spacing-2xl);
+  height: var(--s2a-spacing-2xl);
   padding: 0;
   border: none;
   border-radius: var(--s2a-border-radius-round);
