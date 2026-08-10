@@ -61,26 +61,11 @@
   .event-marquee.attach-upcoming--has-overlay {
     min-height: 913px;
   }
-
-  /* Figma (State B.2, Desktop 1440): the foreground content column is a fixed
-     473px tall within the marquee when Upcoming Sessions is attached (Frame
-     2147228369, 1440x473 — the same auto-layout data the 913px min-height above
-     was confirmed against). No spacing token matches 473 — it's a component
-     height, not a step on the spacing scale — so it's kept as a literal, same
-     as the 167px Text/CTA offset further down this file. */
+  
   .event-marquee.attach-upcoming--has-overlay .event-marquee-foreground {
-    height: 473px;
+    padding-bottom: 60px;
   }
 
-  /* Figma: the media/player column (Frame 2147230939, 691x413) sits inside that
-     473px foreground with 60px clear below it before the row ends, so the
-     player doesn't crowd the Upcoming Sessions overlay beneath it. No spacing
-     token equals 60px exactly — --s2a-spacing-3xl is 48px, --s2a-spacing-4xl is
-     64px — and using either would drift 12-16% from the measured value, so 60px
-     is kept as a literal rather than forced onto a nearby token. */
-  .event-marquee.attach-upcoming--has-overlay .event-marquee-media {
-    margin-bottom: 60px;
-  }
 }
 
 /* Background (optional, row 1) — decorated by Milo's own decorateBlockBg; absolutely
