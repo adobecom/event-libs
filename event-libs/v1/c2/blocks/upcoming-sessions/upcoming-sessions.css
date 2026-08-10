@@ -3,12 +3,20 @@
   padding: var(--s2a-spacing-md, 16px);
 }
 
+/* Below 1280px, this renders in-flow — a normal stacked block after the video,
+   not an overlay. Confirmed against Figma's mobile (375) frame: Frame 2147230757
+   sits as a plain sibling after the video player, contributing real document
+   height to the marquee's total, not positioned at its bottom edge. The
+   `position: absolute` overlay treatment (and the 124px left padding matched to
+   the marquee's own desktop gutter) only applies from 1280px — see the existing
+   1280px block below (kept as one block with the padding-top/padding-bottom
+   overrides already there, rather than a second `@media (min-width: 1280px)`,
+   so this selector's full desktop behavior reads in one place). Left at
+   padding:0 here rather than guessing a mobile-specific inset: the header/
+   track's own child padding needs a closer look against Figma before adding
+   anything at this tier. */
 .upcoming-sessions--attached {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  padding: 0 0 0 var(--s2a-layout-lg);
+  padding: 0;
 }
 
 .upcoming-sessions-header {
@@ -101,10 +109,15 @@
      --s2a-spacing-4xl/64px, both a real drift from 60px, so kept literal). This adds
      60px to the overlay's total reserved height (192px content + 60px = 252px) —
      event-marquee.css's `min-height: 913px` (721px base + 192px overlay) has not
-     been reconciled against this yet. */
+     been reconciled against this yet.
+     position/left/right/bottom/padding-left only apply from here too — below
+     1280px this renders in-flow (see the base rule above). */
   .upcoming-sessions--attached {
-    padding-top: 0;
-    padding-bottom: 60px;
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    padding: 0 0 60px var(--s2a-layout-lg);
   }
 
   .upcoming-sessions-header {
