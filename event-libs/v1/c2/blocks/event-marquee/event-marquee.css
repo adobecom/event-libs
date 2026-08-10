@@ -2,16 +2,16 @@
 
 /* Ported from Milo's classic marquee.css, split + always-dark subset only (we don't
    need the light/quiet/center/inline/one-third modifiers marquee.css also supports).
-   Milo's spacing/color custom properties are swapped for our own s2a C2 tokens, and
-   the breakpoints are swapped too — marquee.css switches to split's row layout at
-   600px/1200px, its own (non-C2) --spacing-* breakpoint system, but this is a C2
-   block built on Milo's real c2 breakpoint scale instead: 768px (grid/layout
-   activation — libs/c2/styles/styles.css's own `@media (width >= 768px)` block,
-   `--grid-columns: 12`, `.two-up`/`.three-up`/etc.), 1024px and 1280px (typography
-   scaling tiers), 1441px (HD). Our own tokens.css only carries the 1024/1280/1441
-   typography tiers, not 768 — this file adds 768px directly where Milo's source
-   says layout structure should change, since there's no Figma tablet frame (only
-   375/mobile and 1440/desktop exist) to verify anything more specific against. */
+   Milo's spacing/color custom properties are swapped for our own s2a C2 tokens.
+   Breakpoints follow Router Marquee's real, confirmed C2 scale instead of classic
+   marquee.css's own 600px/1200px (non-C2) system or tokens.css's typography-only
+   1024/1280/1441 tiers: 768px is where layout structure changes (Milo's own
+   grid-activation breakpoint — libs/c2/styles/styles.css's `@media (width >=
+   768px)`, `--grid-columns: 12`), 1280px is the tablet/desktop split (Router
+   Marquee's own `@media (width >= 1280px)` — libs/c2/blocks/router-marquee/
+   router-marquee.css). Neither 768 nor this file's use of 1280 for layout is a
+   typography-tier tokens.css value; there's no Figma tablet frame (only 375/mobile
+   and 1440/desktop exist) to verify anything more specific against either. */
 
 /* Created by event-marquee.js's attachUpcomingSessionsWrapper — wraps this block and
    a following upcoming-sessions block together so upcoming-sessions.css's
@@ -34,7 +34,7 @@
   flex-direction: column;
 }
 
-@media (min-width: 1024px) {
+@media (min-width: 768px) {
   .event-marquee {
     min-height: 360px;
   }
@@ -106,11 +106,25 @@
   object-fit: cover;
 }
 
+/* Matches Router Marquee's own `.rm-overlay` gradient exactly (Milo's actual C2
+   marquee — libs/c2/blocks/router-marquee/router-marquee.css) rather than a flat
+   single-gradient guess. Router Marquee has two tiers for this, not three:
+   mobile+tablet share one gradient (`width < 1280px`, 60% black), desktop is a
+   second (`width >= 1280px`, 56% — slightly lighter, since desktop's wider text
+   column needs less contrast help). Same 108deg diagonal and 0%/98.86% stops at
+   both tiers, only the peak opacity changes — matches this file's own 1280px
+   breakpoint for everything else layout-related. */
 .event-marquee-background::after {
   content: '';
   position: absolute;
   inset: 0;
-  background: linear-gradient(0deg, var(--s2a-color-transparent-black-64), var(--s2a-color-transparent-black-00) 60%);
+  background: linear-gradient(108deg, rgb(0 0 0 / 60%) 0%, rgb(0 0 0 / 0%) 98.86%);
+}
+
+@media (min-width: 1280px) {
+  .event-marquee-background::after {
+    background: linear-gradient(108deg, rgb(0 0 0 / 56%) 0%, rgb(0 0 0 / 0%) 98.86%);
+  }
 }
 
 /* Foreground (always present, last row) — ports marquee.css's `.foreground`.
@@ -130,16 +144,17 @@
   padding: var(--s2a-layout-sm) var(--s2a-spacing-lg);
 }
 
-/* 1200px, not Milo's 768px grid-activation breakpoint or the 1024px typography
-   tier — a two-column split (text | video) needs more room than a generic
-   multi-up card grid does; holding it from 768px left the columns too cramped
-   in practice. 1200px doesn't map to any existing tokens.css tier (1024/1280/
-   1441), so it's a literal specific to this component, not a design-system
-   value. Moves the *structural* column→row flip and what depends on it — not
-   standalone pixel values like min-height:360px or the Text/CTA 167px offset
-   below, which stay at 1024px since there's no evidence they should move
-   with it. */
-@media (min-width: 1200px) {
+/* 1280px, not 1200px — consolidated to match Router Marquee's real, confirmed
+   tablet/desktop split (libs/c2/blocks/router-marquee/router-marquee.css:
+   `@media (width >= 1280px)`), and merged into one block with the other
+   1280px+ desktop refinements below (padding-inline, gap) so the column→row
+   flip and everything that depends on visually looking "finished" in that
+   layout land together, not a breakpoint apart. This used to sit at 1200px —
+   an ad-hoc value picked because 768px felt too cramped in practice — but that
+   left a 1200-1279px zone where layout had flipped to row while the other
+   desktop-specific padding/gap/centering rules hadn't kicked in yet: a broken
+   in-between state, not a real design tier. */
+@media (min-width: 1280px) {
   /* Matches marquee.css's own `.marquee .foreground { flex-direction: row; ... }` —
      that rule is NOT scoped to `.split`, it applies to every marquee at the large
      breakpoint regardless of whether there's an asset. Same here: row applies
@@ -147,16 +162,8 @@
      no asset), row vs. column has no visual effect on its own — see the
      Text/CTA-specific override below for how vertical centering carries over. */
   .event-marquee-foreground {
-    padding: var(--s2a-spacing-xl) var(--s2a-spacing-md);
     flex-direction: row;
-  }
-}
-
-/* Must come after the 768px+ block above: same selector/property, equal
-   specificity — an earlier position here would lose the cascade to that
-   broader rule regardless of this media query being narrower. */
-@media (min-width: 1280px) {
-  .event-marquee-foreground {
+    padding-block: var(--s2a-spacing-xl);
     padding-inline: var(--s2a-layout-lg);
 
     /* 48px, confirmed in Figma — the base rule's --s2a-spacing-xl (32px) was the
@@ -199,7 +206,7 @@
   align-items: stretch;
 }
 
-@media (min-width: 1200px) {
+@media (min-width: 1280px) {
   .event-marquee-text .action-area {
     flex-direction: row;
     align-items: center;
@@ -240,14 +247,14 @@
   object-fit: cover;
 }
 
-/* 1200px — see the row-layout comment above `.event-marquee-foreground`'s own
-   1200px block. Everything here only makes sense once the foreground is in row
+/* 1280px — see the row-layout comment above `.event-marquee-foreground`'s own
+   1280px block. Everything here only makes sense once the foreground is in row
    layout (the asset bleeding to fill the row's height, the text switching to
    inline-flex so it doesn't stretch full-width), so it moves with that flip
    rather than staying a breakpoint behind it — leaving row layout active but
    these companion rules not yet applied would be a visibly broken in-between
    state, not a real intermediate design. */
-@media (min-width: 1200px) {
+@media (min-width: 1280px) {
   .event-marquee-media > img,
   .event-marquee-media > video {
     height: 100%;
@@ -330,7 +337,7 @@
 
 /* Text/CTA variant — no asset (or a non-player asset). On mobile,
    .event-marquee-foreground is still column-direction, so `justify-content:
-   center` (the main/vertical axis) centers it. At 1024px+, the shared rule
+   center` (the main/vertical axis) centers it. At 1280px+, the shared rule
    above switches to row-direction for every variant, and `justify-content`
    needs resetting so a lone text item doesn't get horizontally centered too
    (it should stay left-anchored, per Figma). */
@@ -338,13 +345,15 @@
   justify-content: center;
 }
 
-@media (min-width: 1024px) {
+@media (min-width: 1280px) {
   /* Fixed top offset instead of vertical centering (align-items: center) —
      per Figma's dev-mode redline for this variant, the headline sits at a
      specific 167px from the top of the marquee, not centered in the row.
      167px is a literal value, not a token: it doesn't map to any step in
      tokens.css's spacing scale (96 / 124 / 160 / 240), so forcing a nearby
-     token would drift from the measured design rather than match it. */
+     token would drift from the measured design rather than match it. Moved
+     from 1024px to 1280px along with the row-layout flip it depends on —
+     it was previously out of sync with that flip once the flip itself moved. */
   .event-marquee-text-cta .event-marquee-foreground {
     justify-content: flex-start;
     padding-top: var(--s2a-spacing-160);
