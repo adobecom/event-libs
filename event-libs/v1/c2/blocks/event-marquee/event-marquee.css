@@ -36,6 +36,42 @@
   flex-direction: column;
 }
 
+/* Below 1280px, upcoming-sessions.css renders Upcoming Sessions in-flow — a real
+   sibling below the marquee's own box, not an overlay (see that file's own
+   comment on .upcoming-sessions--attached). But Figma's mobile frame shows both
+   sitting on ONE continuous background spanning the full height (a single
+   background Rectangle behind headline + video + Upcoming Sessions) — so the
+   marquee's own .event-marquee-background needs to visually extend behind the
+   in-flow Upcoming Sessions block too, not stop at the marquee's own (shorter)
+   box. .event-marquee-background is `position: absolute; inset: 0`, which
+   resolves against the *nearest positioned ancestor* — normally .event-marquee
+   itself (position: relative, above). Un-setting that here lets it skip up to
+   .event-marquee-upcoming-wrapper's own position: relative instead, so `inset: 0`
+   covers the wrapper's full box (marquee + Upcoming Sessions together). overflow
+   moves to the wrapper for the same reason: .event-marquee's own overflow:hidden
+   would otherwise clip the background right back down to the marquee's own
+   shorter box, defeating this entirely, since overflow:hidden clips descendants
+   regardless of what they're positioned relative to.
+   .event-marquee-actions (the favorite/share buttons, also position:absolute)
+   bubbles up the same way — harmless, since the marquee is the wrapper's first,
+   full-width child, so their top-right corners already coincide.
+   Only applies inside the wrapper: a standalone marquee (no Upcoming Sessions
+   attached) has no wrapper to bubble up to, and keeps its own position/overflow
+   from the base rule above. At 1280px+, Upcoming Sessions is absolutely
+   positioned directly against the wrapper regardless, and .event-marquee's own
+   913px min-height already reaches far enough for its own background to cover
+   the whole reserved area on its own — nothing to change there. */
+@media (max-width: 1279px) {
+  .event-marquee-upcoming-wrapper .event-marquee {
+    position: static;
+    overflow: visible;
+  }
+
+  .event-marquee-upcoming-wrapper {
+    overflow: hidden;
+  }
+}
+
 @media (min-width: 1024px) {
   .event-marquee {
     min-height: 360px;
@@ -44,10 +80,11 @@
 
 /* 913px = the base 721px marquee (Figma, 1440px reference width, no Upcoming
    Sessions row) plus the 192px Upcoming Sessions overlay reserves at the bottom
-   (upcoming-sessions.css's `.upcoming-sessions--attached`, always absolute/
-   bottom:0 at every breakpoint, never in-flow) — both numbers confirmed directly
-   from Figma's own auto-layout data (State B.2/State C, Desktop 1440), not
-   estimated from a screenshot. Reserving that height only when an overlay is
+   (upcoming-sessions.css's `.upcoming-sessions--attached`, absolute/bottom:0 only
+   at 1280px+ — below that it's in-flow, see the max-width:1279px block above) —
+   both numbers confirmed directly from Figma's own auto-layout data (State
+   B.2/State C, Desktop 1440), not estimated from a screenshot. Reserving that
+   height only when an overlay is
    actually present avoids two problems a single fixed constant caused: an author
    who authors event-marquee *without* attaching Upcoming Sessions got ~192px of
    dead space at the bottom for nothing, and if a future Upcoming Sessions redesign
