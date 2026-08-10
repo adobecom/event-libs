@@ -92,15 +92,19 @@
 }
 
 @media (min-width: 1280px) {
-  /* Figma (State B.2/C, Desktop 1440): the attached overlay hugs its content exactly
-     — "Upcoming" heading (24px) + 16px gap + session row (152px) = 192px, with no
-     extra top/bottom padding on the overlay itself. The 24px/24px top+bottom pair
-     coded below was a guess made before this was measured directly against Figma;
-     zeroing it here (only at this breakpoint — mobile/tablet weren't re-measured) is
-     what actually closes the gap, not a cosmetic tweak. */
+  /* Figma (State B.2/C, Desktop 1440): the attached overlay's own content is
+     "Upcoming" heading (24px) + 16px gap + session row (152px) = 192px, with no
+     top padding — the 24px top pair coded before was a guess made before this was
+     measured directly against Figma. padding-bottom is 60px, not 0: clearance below
+     the session row before the wrapper's bottom edge, confirmed live against the
+     rendered marquee (no exact token — nearest are --s2a-spacing-3xl/48px and
+     --s2a-spacing-4xl/64px, both a real drift from 60px, so kept literal). This adds
+     60px to the overlay's total reserved height (192px content + 60px = 252px) —
+     event-marquee.css's `min-height: 913px` (721px base + 192px overlay) has not
+     been reconciled against this yet. */
   .upcoming-sessions--attached {
     padding-top: 0;
-    padding-bottom: 0;
+    padding-bottom: 60px;
   }
 
   .upcoming-sessions-header {
