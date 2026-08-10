@@ -260,12 +260,16 @@
      full-bleed with no narrower container to escape — so the asset just stays a
      normal flex item and fills the remaining row width/height on its own. Forcing
      the Milo technique here left the text centered mid-row instead of anchored left
-     and needlessly overrode the height. */
+     and needlessly overrode the height.
+     No `gap` here on purpose — flexbox gap is one uniform value for every child,
+     but Figma wants two different gaps (8px between text pieces, 24px before the
+     CTA row). That's handled by the `:not(.action-area)`/`:has()` margin rules
+     above instead, which apply at every breakpoint, not just this one — adding
+     gap here would stack on top of those margins and double the spacing. */
   .event-marquee-text {
     display: inline-flex;
     flex-direction: column;
     align-items: flex-start;
-    gap: var(--s2a-spacing-lg);
   }
 
   .event-marquee-bleed {
