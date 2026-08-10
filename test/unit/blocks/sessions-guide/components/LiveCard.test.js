@@ -20,10 +20,12 @@ const LIVE_SESSION = {
   title: 'MAX Keynote',
   description: 'The opening keynote.',
   track: 'Featured',
-  startTimeUtc: '2026-10-28T16:00:00Z',
-  endTimeUtc: '2026-10-28T17:30:00Z',
+  // Relative to "now" (not a fixed date) so the session always lands in the
+  // 'live' sessionState regardless of when the suite runs.
+  startTimeUtc: new Date(Date.now() - 30 * 60 * 1000).toISOString(),
+  endTimeUtc: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
   thumbnailUrl: 'https://example.com/thumb.jpg',
-  watchUrl: '/max',
+  isOnline: true,
   sessionPageUrl: '/sessions/max-keynote',
   videoAvailable: false,
   inPerson: false,
@@ -91,16 +93,16 @@ describe('LiveCard', () => {
     expect(html).to.not.include('<img');
   });
 
-  it('renders Watch now button when watchUrl is set', () => {
+  it('renders Watch now button for a live session with a watch destination', () => {
     const store = makeStore();
     const LiveCard = buildLiveCard(preact, store);
     expect(LiveCard({ session: LIVE_SESSION })).to.include('Watch now');
   });
 
-  it('does not render Watch now when watchUrl is empty', () => {
+  it('does not render Watch now when the live session has no watch destination', () => {
     const store = makeStore();
     const LiveCard = buildLiveCard(preact, store);
-    const noWatch = { ...LIVE_SESSION, watchUrl: '' };
+    const noWatch = { ...LIVE_SESSION, isOnline: false, isLivestreamed: false };
     expect(LiveCard({ session: noWatch })).to.not.include('Watch now');
   });
 

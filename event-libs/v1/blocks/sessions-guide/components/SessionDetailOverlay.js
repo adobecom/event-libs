@@ -7,14 +7,14 @@ import {
 } from '../../../utils/session-store.js';
 import { scheduleWithFeedback, favoriteWithFeedback } from '../../../services/sessions/action-feedback.js';
 import { showToast } from '../../../features/toast/toast.js';
-import { deriveSessionState } from '../../../utils/session-state.js';
-import { setSessionParam, safeUrl } from '../utils/url.js';
+import { deriveSessionState, getWatchDestination } from '../../../utils/session-state.js';
+import { setSessionParam, clearSessionParams, safeUrl, isSamePage } from '../utils/url.js';
 import { IconHeartFilled, IconHeartOutline } from './icons.js';
 import { Icon } from '../../../features/icons/Icon.js';
 import { getTrackIcon } from '../../../utils/tier-1-event-config.js';
 
 export function SessionDetailOverlay({ onBack }) {
-  const { state } = useSessionGuide();
+  const { state, dispatch } = useSessionGuide();
   const { activeSessionId, guideConfig } = state;
   const { userTz } = guideConfig;
 
@@ -35,8 +35,21 @@ export function SessionDetailOverlay({ onBack }) {
   const isLive = sessionState === 'live';
   const onDemand = sessionState === 'on-demand';
   const recordingComing = onDemand && session.inPerson && !session.videoAvailable;
-  // Live / on-demand sessions surface "Watch now"; upcoming sessions surface "Add to schedule".
+  const watchHref = safeUrl(getWatchDestination(session, sessionState));
+  // Live / on-demand sessions surface "Watch now" (disabled if there's no real
+  // destination); upcoming sessions surface "Add to schedule".
   const showWatch = isLive || onDemand;
+
+  function handleWatch(e) {
+    // Already on the destination page (e.g. the widget is embedded on the homepage/broadcast
+    // page itself) — close the widget instead of reloading the page out from under the player.
+    if (isSamePage(watchHref)) {
+      e.preventDefault();
+      dispatch({ type: 'CLOSE_DRAWER' });
+      history.pushState({}, '', clearSessionParams());
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  }
 
   const trackIconName = getTrackIcon(session.track)?.icon || '';
   const startShort = session.startTimeUtc ? formatShortTime(session.startTimeUtc, userTz) : '';
@@ -112,9 +125,10 @@ export function SessionDetailOverlay({ onBack }) {
                   ${showWatch
     ? html`
                         <a
-                          class=${'sg-detail__btn sg-detail__btn--primary sg-detail__btn--watch' + (session.watchUrl ? '' : ' is-disabled')}
-                          href=${safeUrl(session.watchUrl)}
-                          aria-disabled=${session.watchUrl ? undefined : 'true'}
+                          class=${'sg-detail__btn sg-detail__btn--primary sg-detail__btn--watch' + (watchHref ? '' : ' is-disabled')}
+                          href=${watchHref}
+                          onclick=${handleWatch}
+                          aria-disabled=${watchHref ? undefined : 'true'}
                         >
                           <span class="sg-detail__btn-icon sg-detail__btn-icon--play" aria-hidden="true"></span>
                           Watch now

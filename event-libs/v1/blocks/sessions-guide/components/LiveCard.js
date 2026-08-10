@@ -1,13 +1,13 @@
 import { html } from '../../../deps/htm-preact.js';
 import { useSessionGuide } from '../store/index.js';
 import { formatShortTime, formatDuration, getNowMs } from '../utils/time.js';
-import { deriveSessionState } from '../../../utils/session-state.js';
+import { deriveSessionState, getWatchDestination } from '../../../utils/session-state.js';
 import {
   scheduled, favorited, pendingActions, liveStreamActiveIds,
 } from '../../../utils/session-store.js';
 import { scheduleWithFeedback, favoriteWithFeedback } from '../../../services/sessions/action-feedback.js';
 import { IconPlay, IconCalendarCheck, IconCalendarPlus, IconHeartFilled, IconHeartOutline } from './icons.js';
-import { setSessionParam, safeUrl } from '../utils/url.js';
+import { setSessionParam, clearSessionParams, safeUrl, isSamePage } from '../utils/url.js';
 import { CategoryBadge } from './CategoryBadge.js';
 import { getTrackIcon } from '../../../utils/tier-1-event-config.js';
 
@@ -56,11 +56,24 @@ export function LiveCard({ session, variant = 'live' }) {
     await favoriteWithFeedback(session, { eventConfig: guideConfig, isFavorited });
   }
 
-  const watchHref = safeUrl(session.watchUrl || session.sessionPageUrl);
+  const watchHref = safeUrl(getWatchDestination(session, sessionState));
+
+  function handleWatch(e) {
+    e.stopPropagation();
+    // Already on the destination page (e.g. the widget is embedded on the homepage/broadcast
+    // page itself) — close the widget instead of reloading the page out from under the player.
+    if (isSamePage(watchHref)) {
+      dispatch({ type: 'CLOSE_DRAWER' });
+      history.pushState({}, '', clearSessionParams());
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+    window.location.href = watchHref;
+  }
 
   let primaryCta;
-  if (variant === 'featured') {
-    if (sessionState === 'upcoming') {
+  if (sessionState === 'upcoming') {
+    if (variant === 'featured') {
       primaryCta = html`<button
         class=${'sg-live-card__btn sg-live-card__btn--watch' + (isScheduled ? ' is-scheduled' : '') + (isPending ? ' is-pending' : '')}
         onclick=${handleSchedule}
@@ -70,17 +83,11 @@ export function LiveCard({ session, variant = 'live' }) {
           ? html`<${IconCalendarCheck} />Added to schedule`
           : html`<${IconCalendarPlus} />Add to schedule`
         }</button>`;
-    } else if (sessionState === 'on-demand' && watchHref) {
-      primaryCta = html`<button
-        class="sg-live-card__btn sg-live-card__btn--watch"
-        onclick=${(e) => { e.stopPropagation(); window.location.href = watchHref; }}
-        type="button"
-      ><${IconPlay} />Watch on demand</button>`;
     }
-  } else if (session.watchUrl) {
+  } else if (watchHref) {
     primaryCta = html`<button
       class="sg-live-card__btn sg-live-card__btn--watch"
-      onclick=${(e) => { e.stopPropagation(); if (watchHref) window.location.href = watchHref; }}
+      onclick=${handleWatch}
       type="button"
     ><${IconPlay} />Watch now</button>`;
   }

@@ -68,3 +68,22 @@ export function isPostEvent(sessionList, liveStreamActiveIds, nowMs, manualCutof
   );
   return allEnded || pastManualCutoff;
 }
+
+/**
+ * Where "Watch now" should navigate, given a session's derived state.
+ * Live sessions go to the homepage player (Livestreamed Content = Live) or the broadcast
+ * page (Format = Online, and not already a homepage livestream); on-demand sessions go to
+ * their own page instead. Returns '' when there's nothing to watch.
+ *
+ * Root-relative so it follows whatever domain is currently serving the page (dev/stage/
+ * prod preview or production) instead of hardcoding one — the homepage/broadcast pages
+ * live in the same site as this widget.
+ */
+export function getWatchDestination(session, sessionState) {
+  if (sessionState === 'on-demand') return session.sessionPageUrl || '';
+  if (sessionState !== 'live') return '';
+  // TODO: Maybe it needs to come from configs in case of Summit or other events with different homepage/broadcast pages.
+  if (session.isLivestreamed) return '/max.html';
+  if (session.isOnline) return '/max/broadcast.html';
+  return '';
+}

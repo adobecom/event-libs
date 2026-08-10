@@ -51,7 +51,7 @@ describe('services/sessions/sessions-api', () => {
             customAttr('Audience', [selectValue('Designer'), selectValue('Developer')]),
             customAttr('Session Type', [selectValue('Keynote')]),
             customAttr('Product', [selectValue('Adobe Photoshop', 'adobe-photoshop')]),
-            customAttr('Format', [selectValue('In person', 'in-person'), selectValue('On demand, post event', 'on-demand-post-event')]),
+            customAttr('Format', [selectValue('In-Person', 'in-person'), selectValue('On demand, post event', 'on-demand-post-event')]),
             customAttr('Watch ', [textValue('<br><a href="https://example.com/watch" target="_blank">Watch</a>')]),
             customAttr('LegalDisclaimer', [textValue('<p>Copyright.</p>')]),
           ],
@@ -128,6 +128,16 @@ describe('services/sessions/sessions-api', () => {
       expect(full.videoAvailable).to.be.true;
     });
 
+    it('derives isOnline from Format specifically, not the broader videoAvailable', () => {
+      // full's Format is In-Person + On demand, post event — no 'Online' value.
+      expect(full.isOnline).to.be.false;
+    });
+
+    it('derives isLivestreamed from the Livestreamed Content customAttribute', () => {
+      expect(full.isLivestreamed).to.be.false;
+      expect(bare.isLivestreamed).to.be.false;
+    });
+
     it('extracts the watch href from the raw HTML anchor value', () => {
       expect(full.watchUrl).to.equal('https://example.com/watch');
     });
@@ -188,6 +198,37 @@ describe('services/sessions/sessions-api', () => {
     it('does not filter out unpublished sessions while ENFORCE_PUBLISHED_FILTER is off', () => {
       expect(ENFORCE_PUBLISHED_FILTER).to.be.false;
       expect(mapped.map((s) => s.id)).to.deep.equal(['draft', 'live', 'no-field']);
+    });
+  });
+
+  describe('mapEslPayloadToRawSessions Watch Now fields', () => {
+    const payload = {
+      speakers: [],
+      sessionTimes: [],
+      sessions: [
+        {
+          sessionId: 'homepage-live',
+          customAttributes: [
+            customAttr('Format', [selectValue('Online')]),
+            customAttr('Livestreamed Content', [selectValue('Live')]),
+          ],
+        },
+        {
+          sessionId: 'broadcast-only',
+          customAttributes: [customAttr('Format', [selectValue('Online')])],
+        },
+      ],
+    };
+    const [homepageLive, broadcastOnly] = mapEslPayloadToRawSessions(payload);
+
+    it('sets both isLivestreamed and isOnline for a homepage livestream', () => {
+      expect(homepageLive.isLivestreamed).to.be.true;
+      expect(homepageLive.isOnline).to.be.true;
+    });
+
+    it('sets only isOnline for a broadcast-page-only session', () => {
+      expect(broadcastOnly.isLivestreamed).to.be.false;
+      expect(broadcastOnly.isOnline).to.be.true;
     });
   });
 

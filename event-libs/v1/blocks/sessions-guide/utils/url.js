@@ -35,3 +35,14 @@ export function safeUrl(url) {
   if (!url) return undefined;
   return /^(https?:\/\/|\/)/.test(url) ? url : undefined;
 }
+
+// Whether `href` points at the page currently being viewed (ignoring query/hash) — used to
+// skip reloading a "Watch now" destination the widget is already embedded on.
+export function isSamePage(href) {
+  if (!href) return false;
+  try {
+    return new URL(href, window.location.origin).pathname === window.location.pathname;
+  } catch {
+    return false;
+  }
+}
