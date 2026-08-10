@@ -23,17 +23,6 @@
   position: relative;
 }
 
-.event-marquee {
-  position: relative;
-  box-sizing: border-box;
-  overflow: hidden;
-  width: 100%;
-  color: var(--s2a-color-content-knockout);
-  font-family: var(--s2a-font-family-default);
-  display: flex;
-  flex-direction: column;
-}
-
 @media (min-width: 768px) {
   .event-marquee {
     min-height: 360px;
