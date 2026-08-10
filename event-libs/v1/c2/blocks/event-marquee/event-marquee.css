@@ -2,16 +2,18 @@
 
 /* Ported from Milo's classic marquee.css, split + always-dark subset only (we don't
    need the light/quiet/center/inline/one-third modifiers marquee.css also supports).
-   Milo's spacing/color custom properties are swapped for our own s2a C2 tokens, and
-   the breakpoints are swapped too — marquee.css switches to split's row layout at
-   600px/1200px, its own (non-C2) --spacing-* breakpoint system, but this is a C2
-   block built on Milo's real c2 breakpoint scale instead: 768px (grid/layout
-   activation — libs/c2/styles/styles.css's own `@media (width >= 768px)` block,
-   `--grid-columns: 12`, `.two-up`/`.three-up`/etc.), 1024px and 1280px (typography
-   scaling tiers), 1441px (HD). Our own tokens.css only carries the 1024/1280/1441
-   typography tiers, not 768 — this file adds 768px directly where Milo's source
-   says layout structure should change, since there's no Figma tablet frame (only
-   375/mobile and 1440/desktop exist) to verify anything more specific against. */
+   Milo's spacing/color custom properties are swapped for our own s2a C2 tokens.
+   Breakpoints are a mix of two unrelated systems, kept deliberately separate:
+   tokens.css's real c2 typography tiers (1024px/1280px/1441px — confirmed against
+   Milo's own libs/c2/styles/styles.css) drive font-size/spacing-scale changes, but
+   the text|video column split needs its own breakpoint, since a two-column layout
+   needs more room than typography scaling does. That started at 768px (Milo's own
+   grid-activation breakpoint, `@media (width >= 768px) { --grid-columns: 12; ...}`)
+   but proved too cramped in practice, so it's 1200px instead — a literal specific to
+   this component, not a design-system value (coincidentally close to classic
+   marquee.css's own split-layout breakpoint, 1200px, but arrived at independently).
+   There's no Figma tablet frame (only 375/mobile and 1440/desktop exist) to verify
+   anything more specific against. */
 
 /* Created by event-marquee.js's attachUpcomingSessionsWrapper — wraps this block and
    a following upcoming-sessions block together so upcoming-sessions.css's
@@ -119,15 +121,16 @@
   padding: var(--s2a-layout-sm) var(--s2a-spacing-lg);
 }
 
-/* 768px, not 1024px — matches Milo's own c2 grid-activation breakpoint
-   (libs/c2/styles/styles.css: `@media (width >= 768px) { --grid-columns: 12; ...
-   .two-up/.three-up/... }`), which is the real "mobile → tablet" layout boundary
-   in this design system. There's no Figma tablet frame to verify exact spacing
-   against (only 375/mobile and 1440/desktop exist), so this only moves the
-   *structural* column→row flip and what depends on it — not standalone pixel
-   values like min-height:360px or the Text/CTA 167px offset below, which stay at
-   1024px since there's no evidence they should move with it. */
-@media (min-width: 768px) {
+/* 1200px, not Milo's 768px grid-activation breakpoint or the 1024px typography
+   tier — a two-column split (text | video) needs more room than a generic
+   multi-up card grid does; holding it from 768px left the columns too cramped
+   in practice. 1200px doesn't map to any existing tokens.css tier (1024/1280/
+   1441), so it's a literal specific to this component, not a design-system
+   value. Moves the *structural* column→row flip and what depends on it — not
+   standalone pixel values like min-height:360px or the Text/CTA 167px offset
+   below, which stay at 1024px since there's no evidence they should move
+   with it. */
+@media (min-width: 1200px) {
   /* Matches marquee.css's own `.marquee .foreground { flex-direction: row; ... }` —
      that rule is NOT scoped to `.split`, it applies to every marquee at the large
      breakpoint regardless of whether there's an asset. Same here: row applies
@@ -140,7 +143,7 @@
   }
 }
 
-/* Must come after the 768px+ block above: same selector/property, equal
+/* Must come after the 1200px+ block above: same selector/property, equal
    specificity — an earlier position here would lose the cascade to that
    broader rule regardless of this media query being narrower. */
 @media (min-width: 1280px) {
@@ -171,7 +174,7 @@
   align-items: stretch;
 }
 
-@media (min-width: 768px) {
+@media (min-width: 1200px) {
   .event-marquee-text .action-area {
     flex-direction: row;
     align-items: center;
@@ -212,14 +215,14 @@
   object-fit: cover;
 }
 
-/* 768px, not 1024px — see the row-layout comment above `.event-marquee-foreground`'s
-   own 768px block. Everything here only makes sense once the foreground is in row
+/* 1200px — see the row-layout comment above `.event-marquee-foreground`'s own
+   1200px block. Everything here only makes sense once the foreground is in row
    layout (the asset bleeding to fill the row's height, the text switching to
-   inline-flex so it doesn't stretch full-width), so it moves with that flip rather
-   than staying a breakpoint behind it — leaving 768-1023px with row layout active
-   but these companion rules not yet applied would be a visibly broken in-between
+   inline-flex so it doesn't stretch full-width), so it moves with that flip
+   rather than staying a breakpoint behind it — leaving row layout active but
+   these companion rules not yet applied would be a visibly broken in-between
    state, not a real intermediate design. */
-@media (min-width: 768px) {
+@media (min-width: 1200px) {
   .event-marquee-media > img,
   .event-marquee-media > video {
     height: 100%;
