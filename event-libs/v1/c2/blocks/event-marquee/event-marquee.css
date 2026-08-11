@@ -18,9 +18,31 @@
    .upcoming-sessions--attached (position: absolute) anchors to a box we control (no
    width/padding of its own, so it always exactly matches this block's own box)
    instead of `.section`, whose width/centering varies per page via Milo's own
-   section-style classes (e.g. `container`/`wide`). */
+   section-style classes (e.g. `container`/`wide`).
+   Ideally this section is authored with NO `style` value at all, so .section
+   stays unpadded/full-width — see the opt-in max-width/centering further
+   down. If `container` IS authored anyway (e.g. for consistency with other
+   sections on the page, or because some other content in the same section
+   needs it), the rule right below cancels just its padding-inline below
+   1200px, so mobile/tablet still get the full-bleed background/video this
+   block is built around, while `container`'s own (fixed, ~24px) gutter still
+   applies at 1200px+ same as it would anywhere else on the page. */
 .event-marquee-upcoming-wrapper {
   position: relative;
+}
+
+/* `> .event-marquee-upcoming-wrapper` covers the attach-upcoming case (the
+   wrapper replaces both original children as .section's new direct child —
+   see attachUpcomingSessionsWrapper); `> .event-marquee` covers the
+   standalone case, where the block itself is still .section's direct child.
+   Targets .section.container specifically (not .section alone), so this is
+   a no-op on any page where the section was authored per the guidance above
+   with no `style` at all — nothing to cancel there in the first place. */
+@media (max-width: 1199.98px) {
+  .section.container:has(> .event-marquee-upcoming-wrapper),
+  .section.container:has(> .event-marquee) {
+    padding-inline: 0;
+  }
 }
 
 .event-marquee {
@@ -32,6 +54,29 @@
   font-family: var(--s2a-font-family-default);
   display: flex;
   flex-direction: column;
+}
+
+/* Full-bleed by default at every breakpoint, mobile through desktop — capping
+   at Figma's own 1440px reference width is opt-in, not automatic. Matches the
+   existing `.contained` convention from other event-libs blocks (see
+   promotional-content.css/event-product-blades.css's own `.block.contained {
+   max-width: 1440px; margin: auto; }`) rather than inventing a new one: no
+   custom JS needed either, `contained` lands on .event-marquee the same way
+   any Milo block modifier does — authoring "Event Marquee (contained)" in DA.
+   `.event-marquee-upcoming-wrapper:has(.event-marquee.contained)`, not just
+   `.event-marquee.contained` alone — the wrapper only exists in the
+   attach-upcoming case, and .upcoming-sessions--attached (left: 0; right: 0,
+   anchored to *that* element) needs to cap and center along with the marquee
+   too, or its horizontal edges would stop lining up with a now-narrower,
+   centered marquee sitting behind/above it. Capping .event-marquee itself,
+   not just its content, is deliberate: .event-marquee-background's
+   `inset: 0` is relative to this element, so the background/video bleed caps
+   and centers along with everything else instead of stretching edge-to-edge
+   while only the text stays boxed. */
+.event-marquee.contained,
+.event-marquee-upcoming-wrapper:has(.event-marquee.contained) {
+  max-width: 1440px;
+  margin-inline: auto;
 }
 
 /* 273px reserves clearance for the Upcoming Sessions overlay — the exact block
