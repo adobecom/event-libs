@@ -142,11 +142,6 @@
 .event-marquee-media {
   margin: 0 auto;
   min-height: 0;
-}
-
-.event-marquee-media:has(video),
-.event-marquee-media:has(.milo-video),
-.event-marquee-media:has(.mobile-rider) {
   width: 100%;
 }
 
