@@ -34,42 +34,41 @@
   flex-direction: column;
 }
 
-@media (min-width: 768px) {
-  .event-marquee {
-    height: 360px;
-  }
-}
-
 /* 913px = the base 721px marquee (Figma, 1440px reference width, no Upcoming
    Sessions row) plus the 192px Upcoming Sessions overlay reserves at the bottom
-   (upcoming-sessions.css's `.upcoming-sessions--attached`, always absolute/
-   bottom:0 at every breakpoint, never in-flow) — both numbers confirmed directly
-   from Figma's own auto-layout data (State B.2/State C, Desktop 1440), not
-   estimated from a screenshot. Applied unscoped (every breakpoint, not just
-   1280px+) per direct product direction: Upcoming Sessions overlays the marquee
-   the same way on mobile/tablet as it does on desktop, so the marquee needs the
-   same 913px reserved everywhere too — not just when the row layout is active.
+   (upcoming-sessions.css's `.upcoming-sessions--attached`). Applied as `min-
+   height` unscoped (every breakpoint below 1280px is still column layout, where
+   video width = full viewport width) so the marquee can grow to fit its
+   stacked content instead of clipping it — a 16:9 video at full width needs
+   very different heights across the column-layout range (~211px at 375px wide,
+   ~719px at 1279px wide), so no single fixed number can serve all of it without
+   either wasting space or badly cropping the video. Upcoming Sessions' overlay
+   `bottom: 0` is anchored to .event-marquee-upcoming-wrapper, whose height is
+   just whatever .event-marquee actually renders at — so letting the marquee
+   grow here is what keeps the overlay correctly at the true bottom instead of
+   overlapping content, not a hard cap.
    `attach-upcoming--has-overlay` is added by upcoming-sessions.js itself
    (attachToPrecedingBlock) only once it actually attaches — not just because the
    author included the `attach-upcoming` modifier — so a mis-authored section
    (no matching sibling) correctly falls back to the shorter, no-overlay height.
-   `height`, not `min-height`: this is a fixed-size component matching an exact
-   Figma frame, not a flexible minimum. With min-height, an oversized child (e.g.
-   the row-layout video, which computes its own height from its width via
-   aspect-ratio and can exceed the marquee's intended height at wide viewports)
-   just grew the box instead of being clipped — visibly overlapping the Upcoming
-   Sessions overlay below, since the overlay's `bottom: 0` no longer lined up
-   with where the design expected content to end. `height` + the `overflow:
-   hidden` already on `.event-marquee` now actually clips that case.
    TODO: confirm 913 vs 961/963 — flagged as possibly stale, re-verify against
    Figma before relying on it further. */
 .event-marquee.attach-upcoming--has-overlay {
-  height: 913px;
+  min-height: 913px;
 }
 
 @media (min-width: 1280px) {
+  /* Row layout only, from here: video width is capped to roughly half the row
+     (not full viewport width), so its aspect-ratio-driven height stays within
+     a range Figma actually confirmed fits a fixed box. `height`, not `min-
+     height`, here specifically — a genuine fixed-size hero matching the exact
+     Figma frame, safe to hard-clip via .event-marquee's own overflow:hidden. */
   .event-marquee {
     height: 721px;
+  }
+
+  .event-marquee.attach-upcoming--has-overlay {
+    height: 913px;
   }
 
   /* Clearance above the Upcoming Sessions overlay so the media/player column
@@ -306,18 +305,6 @@
   .event-marquee-media > video {
     height: 100%;
     object-fit: cover;
-  }
-
-  /* .milo-video (MPC + YouTube) is a fixed 16:9 box (Milo's own iframe.css:
-     `height: 0; padding-bottom: 56.25%`, sized from width, not stretchable) — same
-     for Mobile Rider's own aspect-ratio-based player sizing. Neither actually
-     stretches to the row's full height, so left at the default `align-items:
-     stretch` they just sit pinned to the top with dead space below. Centering them
-     specifically (not the whole row) leaves the plain-image/ambient-video case
-     above untouched, which still needs `stretch` for its own height: 100% fill. */
-  .event-marquee-foreground:has(.milo-video),
-  .event-marquee-foreground:has(.mobile-rider) {
-    align-items: center;
   }
 
   /* Unlike Milo's own `.asset.bleed` (which escapes a narrower, centered content
