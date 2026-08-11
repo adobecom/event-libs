@@ -34,30 +34,38 @@
   flex-direction: column;
 }
 
-/* 913px = the base 721px marquee (Figma, 1440px reference width, no Upcoming
-   Sessions row) plus the 192px Upcoming Sessions overlay reserves at the bottom
-   (upcoming-sessions.css's `.upcoming-sessions--attached`). Applied as `min-
-   height` unscoped (every breakpoint below 1200px is still column layout, where
-   video width = full viewport width) so the marquee can grow to fit its
-   stacked content instead of clipping it — a 16:9 video at full width needs
-   very different heights across the column-layout range (~211px at 375px wide,
-   ~719px at 1199px wide), so no single fixed number can serve all of it without
-   either wasting space or badly cropping the video. Upcoming Sessions' overlay
-   `bottom: 0` is anchored to .event-marquee-upcoming-wrapper, whose height is
-   just whatever .event-marquee actually renders at — so letting the marquee
-   grow here is what keeps the overlay correctly at the true bottom instead of
-   overlapping content, not a hard cap.
+/* 913px, confirmed against Figma's own three stacked measurements (Desktop 1440
+   frame): 167px (.event-marquee-foreground's padding-top, empty space before
+   content starts) + 473px (the foreground's own content zone below that
+   padding, which already bakes in a 60px trailing gap before the Upcoming
+   Sessions block starts) + 273px (the Upcoming Sessions block itself) = 913px
+   exactly. Supersedes an earlier, less precise derivation (721px base marquee +
+   192px Upcoming Sessions content, before the 60px gap and exact 273px overlay
+   height were measured directly) — same 913px total, more accurate breakdown.
+   Applied as `min-height` unscoped (every breakpoint below 1200px is still
+   column layout, where video width = full viewport width) so the marquee can
+   grow to fit its stacked content instead of clipping it — a 16:9 video at full
+   width needs very different heights across the column-layout range (~211px at
+   375px wide, ~719px at 1199px wide), so no single fixed number can serve all
+   of it without either wasting space or badly cropping the video. Upcoming
+   Sessions' overlay `bottom: 0` is anchored to .event-marquee-upcoming-wrapper,
+   whose height is just whatever .event-marquee actually renders at — so
+   letting the marquee grow here is what keeps the overlay correctly at the
+   true bottom instead of overlapping content, not a hard cap.
    `attach-upcoming--has-overlay` is added by upcoming-sessions.js itself
    (attachToPrecedingBlock) only once it actually attaches — not just because the
    author included the `attach-upcoming` modifier — so a mis-authored section
    (no matching sibling) correctly falls back to the shorter, no-overlay height.
-   padding-bottom: 200px reserves clearance for the Upcoming Sessions overlay,
-   confirmed live in DevTools. Deliberately unscoped, not just at 1200px+: the
-   overlap was reproducible while actively resizing the browser through the
-   column-layout range, not only at a specific breakpoint, so the reservation
-   needs to hold everywhere .attach-upcoming--has-overlay applies. Because
-   .event-marquee is box-sizing:border-box, this shrinks the *content* area
-   .event-marquee-foreground actually renders into (down to ~713px) while
+   padding-bottom: 273px reserves clearance for the Upcoming Sessions overlay —
+   the exact block height from the Figma breakdown above, replacing an earlier
+   200px value that was only confirmed live in DevTools, not measured against
+   the real design. Deliberately unscoped, not just at 1200px+: the overlap was
+   reproducible while actively resizing the browser through the column-layout
+   range, not only at a specific breakpoint, so the reservation needs to hold
+   everywhere .attach-upcoming--has-overlay applies. Because .event-marquee is
+   box-sizing:border-box, this shrinks the *content* area
+   .event-marquee-foreground actually renders into (down to 913 - 273 = 640px,
+   i.e. exactly the 167px padding-top + 473px content zone from Figma) while
    .event-marquee-background's `inset:0` still covers the full 913px regardless
    (padding doesn't constrain an absolutely-positioned child) — so the
    background stays full-bleed, the video gets clipped by overflow:hidden at
@@ -65,16 +73,10 @@
    through with nothing rendering into it. This replaces an earlier, narrower
    attempt at the same clearance (padding-bottom on .event-marquee-foreground,
    1280px-only) that didn't hold up once the video could overflow at any
-   column-layout width, not just desktop.
-   200px is tuned against Upcoming Sessions' current rendered height, not
-   derived from a token or formula — if its content ever grows (e.g. a session
-   title wrapping to an extra line, another card row), this number may need
-   re-checking against the real height at that point, not just trusted as-is.
-   TODO: confirm 913 vs 961/963 — flagged as possibly stale, re-verify against
-   Figma before relying on it further. */
+   column-layout width, not just desktop. */
 .event-marquee.attach-upcoming--has-overlay {
   min-height: 913px;
-  padding-bottom: 200px;
+  padding-bottom: 273px;
 }
 
 @media (min-width: 1200px) {
