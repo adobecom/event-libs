@@ -51,10 +51,30 @@
    (attachToPrecedingBlock) only once it actually attaches — not just because the
    author included the `attach-upcoming` modifier — so a mis-authored section
    (no matching sibling) correctly falls back to the shorter, no-overlay height.
+   padding-bottom: 200px reserves clearance for the Upcoming Sessions overlay,
+   confirmed live in DevTools. Deliberately unscoped, not just at 1280px+: the
+   overlap was reproducible while actively resizing the browser through the
+   column-layout range, not only at a specific breakpoint, so the reservation
+   needs to hold everywhere .attach-upcoming--has-overlay applies. Because
+   .event-marquee is box-sizing:border-box, this shrinks the *content* area
+   .event-marquee-foreground actually renders into (down to ~713px) while
+   .event-marquee-background's `inset:0` still covers the full 913px regardless
+   (padding doesn't constrain an absolutely-positioned child) — so the
+   background stays full-bleed, the video gets clipped by overflow:hidden at
+   the smaller boundary, and the leftover band is just background showing
+   through with nothing rendering into it. This replaces an earlier, narrower
+   attempt at the same clearance (padding-bottom on .event-marquee-foreground,
+   1280px-only) that didn't hold up once the video could overflow at any
+   column-layout width, not just desktop.
+   200px is tuned against Upcoming Sessions' current rendered height, not
+   derived from a token or formula — if its content ever grows (e.g. a session
+   title wrapping to an extra line, another card row), this number may need
+   re-checking against the real height at that point, not just trusted as-is.
    TODO: confirm 913 vs 961/963 — flagged as possibly stale, re-verify against
    Figma before relying on it further. */
 .event-marquee.attach-upcoming--has-overlay {
   min-height: 913px;
+  padding-bottom: 200px;
 }
 
 @media (min-width: 1280px) {
@@ -69,16 +89,6 @@
 
   .event-marquee.attach-upcoming--has-overlay {
     height: 913px;
-  }
-
-  /* Clearance above the Upcoming Sessions overlay so the media/player column
-     doesn't crowd it. No spacing token equals 60px exactly (--s2a-spacing-3xl is
-     48px, --s2a-spacing-4xl is 64px, both a real drift from the measured value),
-     so it's kept as a literal — same reasoning as the 167px Text/CTA offset
-     below and the 60px .upcoming-sessions--attached padding-bottom in
-     upcoming-sessions.css. */
-  .event-marquee.attach-upcoming--has-overlay .event-marquee-foreground {
-    padding-bottom: 60px;
   }
 }
 
