@@ -364,17 +364,8 @@
     align-items: flex-start;
   }
 
-  /* flex-shrink: 0, not the default 1 — this is the shrink-prevention Milo's own
-     `.marquee .foreground .asset` is missing (confirmed live: that rule only sets
-     a `max-width: 600px` ceiling, no floor, so it collapses well below that cap
-     whenever the row is tight — e.g. rendering at ~405px instead of 600px on
-     Milo's own kitchen-sink docs page). Porting the fix rather than the bug:
-     .event-marquee-text's own `max-width: 500px` already caps the text side (same
-     role as Milo split's `.text { max-width: calc(50% - var(--grid-column-width)) }`),
-     so the asset holds its grown size and the text wraps/shrinks instead if the
-     row gets tight — text reflowing is harmless, a squeezed image/video isn't. */
   .event-marquee-bleed {
-    flex: 1 0 auto;
+    flex: 1 1 auto;
   }
 
   .event-marquee-bleed picture,
