@@ -145,6 +145,12 @@
   width: 100%;
 }
 
+@media (min-width: 768px) and (max-width: 1199.98px) {
+  .event-marquee-media {
+    width: 83.4%;
+  }
+}
+
 .event-marquee-media picture,
 .event-marquee-media img,
 .event-marquee-media video {
