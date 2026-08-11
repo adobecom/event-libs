@@ -278,9 +278,16 @@
   min-height: 0;
 }
 
+/* `> img` (direct-child only) never matched a real authored image: DA/decorate.js
+   always wraps it in a <picture>, so the actual <img> is a grandchild
+   (.event-marquee-media > picture > img), not a direct child. That left the real
+   <img> with no CSS sizing at all — it fell back to its own HTML width/height
+   attributes (whatever the source image's natural size happens to be) inside a
+   full-width <picture> wrapper, instead of filling the container. Plain
+   descendant selectors here (no `>`) catch the image at any nesting depth. */
 .event-marquee-media picture,
-.event-marquee-media > img,
-.event-marquee-media > video {
+.event-marquee-media img,
+.event-marquee-media video {
   display: block;
   width: 100%;
   height: auto;
@@ -311,8 +318,11 @@
    these companion rules not yet applied would be a visibly broken in-between
    state, not a real intermediate design. */
 @media (min-width: 1280px) {
-  .event-marquee-media > img,
-  .event-marquee-media > video {
+  /* Same `>` (direct-child) gap as the base rule above — broadened to a plain
+     descendant selector so a real authored image (always wrapped in <picture>
+     by DA/decorate.js) is actually reached here too. */
+  .event-marquee-media img,
+  .event-marquee-media video {
     height: 100%;
     object-fit: cover;
   }
