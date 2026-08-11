@@ -152,6 +152,36 @@
   object-fit: cover;
 }
 
+/* Milo's own generic `.mp4` AUTO_BLOCK (libs/blocks/video/video.js) adds this
+   play/pause control automatically for the ambient background video — its
+   own c2 styling (video.css, scoped under `:root:has(meta[name="foundation"]
+   [content="c2"])`) anchors it bottom-right by default. Figma puts it
+   top-right instead, and bottom-right is also where Upcoming Sessions'
+   overlay sits (upcoming-sessions.css's `.upcoming-sessions--attached`,
+   position: absolute; bottom: 0) — confirmed live, the button was rendering
+   underneath/behind that overlay, unreachable to click.
+   Selector deliberately mirrors Milo's own `:root:has(...)` prefix rather
+   than just `.event-marquee-background button.play-pause-button` alone —
+   :has() adds real specificity (roughly as if its argument were the
+   selector itself), so a plain class-based override here wouldn't actually
+   beat Milo's rule regardless of load order; repeating the same prefix (a
+   condition that's always true on our own pages anyway, since event-marquee
+   only ever loads on `foundation: c2` pages) is what wins the tie instead of
+   reaching for `!important`. `right`/size are left exactly as Milo's own
+   rule sets them (including its own 1280px/1440px growth tiers) — only
+   `top`/`bottom` flip, since that's the only thing Figma actually changes. */
+:root:has(meta[name="foundation"][content="c2"]) .event-marquee-background button.play-pause-button {
+  top: var(--s2a-spacing-lg);
+  bottom: auto;
+}
+
+@media (width >= 1280px) {
+  :root:has(meta[name="foundation"][content="c2"]) .event-marquee-background button.play-pause-button {
+    top: var(--s2a-spacing-xl);
+    bottom: auto;
+  }
+}
+
 /* Matches Router Marquee's own `.rm-overlay` gradient exactly (Milo's actual C2
    marquee — libs/c2/blocks/router-marquee/router-marquee.css) rather than a flat
    single-gradient guess. Router Marquee has two tiers for this, not three:
