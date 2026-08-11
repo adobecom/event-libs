@@ -286,6 +286,24 @@
   .event-marquee-text {
     padding-inline: var(--s2a-spacing-lg);
   }
+
+  /* Extra clearance on the right only when there's an ambient background
+     video (and therefore its play-pause button, repositioned top-right
+     above) — confirmed live: the headline was wide/tall enough at this
+     column-layout tier to reach into the same top-right corner the button
+     now sits in, since .event-marquee-text otherwise has no reason to stop
+     short of the button's spot. Scoped via :has() so text-only/image-
+     background variants (no button in the DOM at all) keep the full column
+     width instead of losing space to a clearance nothing there needs.
+     64px is a rough placeholder for the button's own footprint (32-48px
+     wide, video.css) plus its offset from the edge — not Figma-confirmed,
+     since there's no tablet/mobile frame for the ambient-video variant with
+     a headline this long to measure against. This only reserves horizontal
+     space; a headline tall enough to wrap into the button's own vertical
+     band could still collide, which this alone doesn't prevent. */
+  .event-marquee:has(.play-pause-button) .event-marquee-text {
+    padding-right: calc(var(--s2a-spacing-lg) + 64px);
+  }
 }
 
 /* 1200px, per direct product direction — not Router Marquee's own confirmed
