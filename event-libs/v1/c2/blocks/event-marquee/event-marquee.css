@@ -126,7 +126,15 @@
    was a placeholder guess made before this was measured directly; the real values
    are --s2a-layout-sm (80px) and --s2a-spacing-lg (24px). The 1200px+ tier below
    bumps horizontal padding again to the desktop-specific value Figma's dev-mode
-   redline calls out separately (124px / --s2a-layout-lg). */
+   redline calls out separately (124px / --s2a-layout-lg).
+   padding-block only here, not the full padding shorthand — the horizontal
+   24px moved to .event-marquee-text below (see the max-width:1199.98px rule
+   further down) so it only insets the text, not the asset too. Below 1200px
+   this container has no separate row/column split for text vs. asset (both
+   just stack via flex-direction:column), so any horizontal padding set here
+   applies to both children equally, insetting the asset instead of letting
+   it bleed to the full width of .event-marquee — per direct request, the
+   asset (video especially) should span 100% width on mobile and tablet. */
 .event-marquee-foreground {
   position: relative;
   display: flex;
@@ -142,7 +150,24 @@
      fix on .event-marquee had no real effect. */
   min-height: 0;
   gap: var(--s2a-spacing-xl);
-  padding: var(--s2a-layout-sm) var(--s2a-spacing-lg);
+  padding-block: var(--s2a-layout-sm);
+}
+
+/* Carries the 24px horizontal inset that used to live on .event-marquee-
+   foreground itself (see the comment above), scoped to end just before
+   1200px so it hands off cleanly to that breakpoint's own row-layout
+   padding-inline (back on .event-marquee-foreground there, since at that
+   point text and asset are separate flex columns, not stacked, and both
+   need to sit inside the same shared 124px gutter). box-sizing: border-box
+   (set on .event-marquee-text elsewhere in this file) means adding this
+   doesn't change the text's outer width — only its content shifts in — so
+   this is a visual no-op for the text compared to before; the only real
+   change is the asset next to it no longer inheriting an inset it never
+   needed. */
+@media (max-width: 1199.98px) {
+  .event-marquee-text {
+    padding-inline: var(--s2a-spacing-lg);
+  }
 }
 
 /* 1200px, per direct product direction — not Router Marquee's own confirmed
@@ -266,35 +291,6 @@
 .event-marquee-media:has(.milo-video),
 .event-marquee-media:has(.mobile-rider) {
   width: 100%;
-}
-
-/* 1024px+ (below the 1200px row-layout flip, where the asset gets its own
-   full-bleed treatment via flex instead — see .event-marquee-bleed's 1200px
-   rule further down): moves .event-marquee-foreground's own horizontal
-   padding (24px, --s2a-spacing-lg) onto .event-marquee-text instead of
-   leaving it on the shared foreground container. That padding was previously
-   applied to *both* children (text and asset) since it lives on their common
-   parent — fine for the text, but it insets the asset too, so it renders
-   inside a 24px margin instead of edge-to-edge. Moving it to .event-marquee-
-   text directly keeps the text's own inset exactly as before (box-sizing:
-   border-box, so its outer width is unaffected — only its content shifts in),
-   while the asset, no longer constrained by any parent padding, naturally
-   spans .event-marquee-foreground's full width with no extra sizing rules
-   needed on the asset side at all.
-   Scoped to end just before 1200px so it hands off cleanly to that
-   breakpoint's own row-layout padding-inline (back on .event-marquee-
-   foreground there, since row layout uses a completely different sizing
-   model for the asset). 1024px specifically, not 768px (this file's other
-   column-layout tier) or 1200px — a separate, one-off breakpoint per direct
-   request, not tied to any other tier in this file. */
-@media (min-width: 1024px) and (max-width: 1199.98px) {
-  .event-marquee-foreground {
-    padding-inline: 0;
-  }
-
-  .event-marquee-text {
-    padding-inline: var(--s2a-spacing-lg);
-  }
 }
 
 /* `> img` (direct-child only) never matched a real authored image: DA/decorate.js
