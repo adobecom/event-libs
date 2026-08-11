@@ -169,15 +169,24 @@
    only ever loads on `foundation: c2` pages) is what wins the tie instead of
    reaching for `!important`. `right`/size are left exactly as Milo's own
    rule sets them (including its own 1280px/1440px growth tiers) — only
-   `top`/`bottom` flip, since that's the only thing Figma actually changes. */
+   `top`/`bottom` flip, since that's the only thing Figma actually changes.
+   80px added on top of the usual spacing: Milo's global navigation renders
+   as a sticky/overlaying header on top of page content (confirmed live —
+   `header.global-navigation` measured 1728x80), and since the marquee is
+   normally the very first block on the page, that header was covering this
+   corner too, right where the button had just been moved to. Not using
+   Milo's own --global-height-nav token here — its defined defaults (56px/
+   64px, libs/navigation/navigation.css and libs/styles/styles.css) don't
+   match the 80px actually measured on this page, so referencing it would
+   likely under-clear the header rather than reliably match it. */
 :root:has(meta[name="foundation"][content="c2"]) .event-marquee-background button.play-pause-button {
-  top: var(--s2a-spacing-lg);
+  top: calc(80px + var(--s2a-spacing-lg));
   bottom: auto;
 }
 
 @media (width >= 1280px) {
   :root:has(meta[name="foundation"][content="c2"]) .event-marquee-background button.play-pause-button {
-    top: var(--s2a-spacing-xl);
+    top: calc(80px + var(--s2a-spacing-xl));
     bottom: auto;
   }
 }
