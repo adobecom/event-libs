@@ -6,7 +6,9 @@
 
 @media (max-width: 1199.98px) {
   .section.container:has(> .event-marquee-upcoming-wrapper),
-  .section.container:has(> .event-marquee) {
+  .section.container:has(> .event-marquee),
+  .event-marquee.container,
+  .event-marquee-upcoming-wrapper:has(.event-marquee.container) {
     padding-inline: 0;
   }
 }
