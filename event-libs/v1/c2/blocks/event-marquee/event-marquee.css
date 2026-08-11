@@ -203,12 +203,14 @@
     padding-bottom: var(--s2a-spacing-xl);
     padding-inline: var(--s2a-layout-lg);
 
-    /* 48px, confirmed in Figma — the base rule's --s2a-spacing-xl (32px) was the
-       mobile/tablet column-stacking gap; the row layout's own gap between the
-       text and media columns is wider. Unlike the 60px/473px measurements
-       elsewhere in this file, 48px lands exactly on the scale (--s2a-spacing-3xl),
-       so it's tokenized rather than kept as a literal. */
-    gap: var(--s2a-spacing-3xl);
+    /* 28px, measured directly off Figma's 1440px desktop frame (dev-mode: 124px
+       padding each side + 473px text + 28px gap + 691px asset = 1440px exactly).
+       Not a token — 28px doesn't land on any step in tokens.css's spacing scale
+       (24/32/48/...), so keeping it as a literal rather than rounding to the
+       nearest token avoids drifting from the measured design. Previously used
+       --s2a-spacing-3xl (48px), which was a guess made before this was measured
+       directly against the real frame. */
+    gap: 28px;
   }
 }
 
@@ -362,10 +364,32 @@
     display: inline-flex;
     flex-direction: column;
     align-items: flex-start;
+
+    /* flex-grow/flex-basis (not just max-width) so the text and asset columns
+       hold Figma's actual 473:691 ratio at every width from 1200px up, not
+       just exactly at 1440px — flex-basis: 0% means the 952px (at 1200px) or
+       1164px (at 1440px) of remaining row space (after padding-inline/gap) is
+       split 473:691 between the two, same proportion either way. Replaces an
+       earlier guess (an even 50/50 split over a separate 1200-1439px media
+       query) made before these exact Figma numbers were available. max-width
+       still caps it at the true 473px so it doesn't keep growing past that on
+       ultra-wide screens beyond 1440px — see .event-marquee-bleed below for
+       why the asset is left uncapped instead. */
+    flex: 473 1 0%;
+    min-width: 0;
+    max-width: 473px;
   }
 
+  /* No max-width cap here on purpose, unlike .event-marquee-text — this block
+     is already full-bleed with no narrower content container of its own (see
+     the comment above about not using Milo's position:absolute .asset.bleed
+     technique), so once .event-marquee-text hits its 473px cap, any extra row
+     width past 1440px is meant to keep flowing to the asset instead of going
+     unused. flex-basis: 0% + flex-grow: 691 gives it the same proportional
+     share as the text column (691 parts vs. text's 473) up to that point. */
   .event-marquee-bleed {
-    flex: 1 1 auto;
+    flex: 691 1 0%;
+    min-width: 0;
   }
 
   .event-marquee-bleed picture,
@@ -426,13 +450,5 @@
     justify-content: flex-start;
   }
 }
-
-
-@media (min-width: 1200px) and (max-width: 1280px) {
-  .event-marquee-text {
-    max-width: calc(50% - (var(--s2a-spacing-3xl) / 2));
-  }
-}
-
 
 
