@@ -266,7 +266,6 @@
    .mobile-rider) brings its own sizing/aspect-ratio CSS and must not be
    force-cropped the way a decorative asset image can be. */
 .event-marquee-media {
-  width: 100%;
   margin: 0 auto;
 
   /* Same flexbox-overflow trap as .event-marquee-foreground's own min-height:0
@@ -276,6 +275,20 @@
      refuse to shrink, breaking out past .event-marquee's fixed height +
      overflow:hidden regardless of direction. */
   min-height: 0;
+}
+
+/* width:100% only when there's an actual player inside — confirmed live: a real
+   video/interactive player needs this (Milo's own .milo-video/lite-youtube
+   sizing depends on having a defined parent width to size against; without it
+   the player doesn't render at all), but the same width:100% is what stops a
+   plain decorative image from shrinking to its own natural size and centering
+   via the margin:0 auto above — it was forcing images to stretch to fill the
+   full column instead. `:has()` distinguishes the two cases sharing this same
+   class, same technique as .event-marquee-foreground:has(.milo-video) below. */
+.event-marquee-media:has(video),
+.event-marquee-media:has(.milo-video),
+.event-marquee-media:has(.mobile-rider) {
+  width: 100%;
 }
 
 /* `> img` (direct-child only) never matched a real authored image: DA/decorate.js
