@@ -238,6 +238,28 @@
   min-height: 0;
   gap: var(--s2a-spacing-xl);
   padding-block: var(--s2a-layout-sm);
+
+  /* .event-marquee-foreground is the sole in-flow child of .event-marquee
+     (the background is position:absolute, taken out of flow entirely), so
+     via flex it stretches to cover the *entire* marquee box — including the
+     top-right corner where the ambient background video's play-pause button
+     sits. That corner is otherwise empty (no text/CTA content renders there),
+     but the foreground element's own box is still there and still
+     hit-testable by default, so it was silently swallowing clicks meant for
+     the button underneath — confirmed live, moving the button didn't help
+     until this was added. z-index/stacking isn't the right fix here: the
+     button's z-index only applies *within* .event-marquee-background's own
+     stacking context (it has its own via z-index:0), so no z-index on the
+     button alone can lift it above a later-painted, full-covering sibling
+     stacking context. pointer-events: none removes the empty foreground box
+     from hit-testing entirely, and the rule below restores it specifically
+     on the two elements that actually need to stay clickable (text/CTAs,
+     the asset and its own Favorite/share actions). */
+  pointer-events: none;
+}
+
+.event-marquee-foreground > * {
+  pointer-events: auto;
 }
 
 /* Carries the 24px horizontal inset that used to live on .event-marquee-
