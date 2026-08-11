@@ -270,27 +270,30 @@
 
 /* 1024px+ (below the 1200px row-layout flip, where the asset gets its own
    full-bleed treatment via flex instead — see .event-marquee-bleed's 1200px
-   rule further down): the asset still sits inside .event-marquee-foreground's
-   own padding-inline (24px, --s2a-spacing-lg) in column layout, same as the
-   text above it, so it renders inset instead of edge-to-edge. This pulls it
-   back out to the full width of .event-marquee itself, negative-margin bleed
-   style — margin-inline cancels the parent's padding, width grows by the same
-   amount to reclaim the space the negative margin freed up. Scoped to end
-   just before 1200px so it hands off cleanly to that breakpoint's own
-   flex-based sizing, rather than leaving a stale negative margin active once
-   the layout switches to row.
-   1024px specifically, not 768px (this file's other column-layout tier) or
-   1200px — a separate, one-off breakpoint per direct request, not tied to any
-   other tier in this file.
-   .event-marquee-media.event-marquee-bleed (both classes), not just
-   .event-marquee-bleed alone — needed to match the specificity of the
-   `:has(video)` rule above (a class + pseudo-class also counts as two
-   selectors), so this reliably wins for the video/player case instead of
-   depending on source order alone. */
+   rule further down): moves .event-marquee-foreground's own horizontal
+   padding (24px, --s2a-spacing-lg) onto .event-marquee-text instead of
+   leaving it on the shared foreground container. That padding was previously
+   applied to *both* children (text and asset) since it lives on their common
+   parent — fine for the text, but it insets the asset too, so it renders
+   inside a 24px margin instead of edge-to-edge. Moving it to .event-marquee-
+   text directly keeps the text's own inset exactly as before (box-sizing:
+   border-box, so its outer width is unaffected — only its content shifts in),
+   while the asset, no longer constrained by any parent padding, naturally
+   spans .event-marquee-foreground's full width with no extra sizing rules
+   needed on the asset side at all.
+   Scoped to end just before 1200px so it hands off cleanly to that
+   breakpoint's own row-layout padding-inline (back on .event-marquee-
+   foreground there, since row layout uses a completely different sizing
+   model for the asset). 1024px specifically, not 768px (this file's other
+   column-layout tier) or 1200px — a separate, one-off breakpoint per direct
+   request, not tied to any other tier in this file. */
 @media (min-width: 1024px) and (max-width: 1199.98px) {
-  .event-marquee-media.event-marquee-bleed {
-    margin-inline: calc(-1 * var(--s2a-spacing-lg));
-    width: calc(100% + (2 * var(--s2a-spacing-lg)));
+  .event-marquee-foreground {
+    padding-inline: 0;
+  }
+
+  .event-marquee-text {
+    padding-inline: var(--s2a-spacing-lg);
   }
 }
 
