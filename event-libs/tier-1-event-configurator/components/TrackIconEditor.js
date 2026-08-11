@@ -3,7 +3,7 @@ import { KNOWN_ICON_SLUGS, getDefaultTrackIcon, DEFAULT_ICON_COLOR } from '../de
 import { loadTrackIconSprite } from '../track-icon-sprite.js';
 import { isTrackIconEntryComplete } from '../utils.js';
 
-function IconPreview({ icon, color }) {
+export function IconPreview({ icon, color }) {
   const [symbols, setSymbols] = useState(null);
 
   useEffect(() => {

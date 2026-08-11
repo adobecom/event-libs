@@ -37,6 +37,11 @@ export function normalizeSessions(rawSessions) {
     category: coerceArray(s.category),
     contentCategory: coerceArray(s.contentCategory),
     audience: coerceArray(s.audience),
+    // Additional Event Site Tracks / Override Primary Event Site Track: MAX26-only
+    // fields, absent from MAX25 sessions — naturally empty/'' for those, which is exactly
+    // the single-track fallback behavior we want for them.
+    additionalTracks: coerceArray(s.additionalTracks),
+    trackOverride: s.trackOverride || '',
     speakers: s.speakers || [],
     products: s.products || [],
     resources: s.resources || [],
@@ -53,17 +58,17 @@ export function normalizeSessions(rawSessions) {
   }));
 }
 
-// Single source of truth so the name only has to change in one place — ESP is expected
-// to rename this custom attribute for the MAX 2026 event; swap the string here when the
-// new name lands. Exported so tier-1-event-configurator/utils.js (which needs the same
+// ESP renamed this (and a few other) custom attributes for MAX26 — try the current name
+// first, fall back to the MAX25 name so events authored under either schema still
+// resolve. Exported so tier-1-event-configurator/utils.js (which needs the same
 // attribute for its own track editor) doesn't carry a second, independently-drifting copy.
-export const TRACK_ATTRIBUTE_NAME = 'Primary Track for Agenda (Digital Agenda)';
+export const TRACK_ATTRIBUTE_NAMES = ['Primary Event Site Track', 'Primary Track for Agenda (Digital Agenda)'];
 
 // Generic session/track helpers, not Tier-1-specific — shared here so
 // tier-1-event-configurator and session-guide-configurator use the same implementation
 // instead of one importing from the other's UI code.
 export function getSessionTrack(session) {
-  const attr = (session?.customAttributes || []).find((a) => a?.name === TRACK_ATTRIBUTE_NAME);
+  const attr = (session?.customAttributes || []).find((a) => TRACK_ATTRIBUTE_NAMES.includes(a?.name));
   return attr?.values?.[0]?.label ?? attr?.values?.[0]?.value ?? null;
 }
 
@@ -74,6 +79,25 @@ export function extractDistinctTracks(sessions) {
     if (value) tracks.add(value);
   });
   return [...tracks].sort();
+}
+
+const OVERRIDE_ATTRIBUTE_NAME = 'Override Primary Event Site Track';
+
+// Override Primary Event Site Track is free text, not a select — each distinct value an
+// author has typed becomes its own swimlane, so the configurator needs to know the full
+// set of distinct texts in use to offer a per-value icon mapping (mirrors getSessionTrack).
+export function getSessionOverrideText(session) {
+  const attr = (session?.customAttributes || []).find((a) => a?.name === OVERRIDE_ATTRIBUTE_NAME);
+  return attr?.values?.[0]?.label ?? attr?.values?.[0]?.value ?? null;
+}
+
+export function extractDistinctOverrideTexts(sessions) {
+  const texts = new Set();
+  (sessions || []).forEach((session) => {
+    const value = getSessionOverrideText(session);
+    if (value) texts.add(value);
+  });
+  return [...texts].sort();
 }
 
 // Derives facetable custom attributes + their distinct values from an already-fetched
@@ -112,8 +136,13 @@ export function deriveFacetableAttributes(sessions) {
 // rather than plain session fields. `values[]` holds the value(s) actually selected for
 // that session (see events-service-platform's resolveCustomAttributes), not the full
 // option list.
+//
+// `name` may be a single string or an array of candidate names, tried in order — used for
+// attributes ESP renamed between MAX25 and MAX26 (a given session only ever carries one of
+// the two, so "first found" is unambiguous in practice).
 function extractCustomAttributeValues(session, name) {
-  const attr = (session.customAttributes || []).find((a) => a?.name === name);
+  const candidates = Array.isArray(name) ? name : [name];
+  const attr = (session.customAttributes || []).find((a) => candidates.includes(a?.name));
   return (attr?.values || []).map((v) => v?.label ?? v?.value).filter(Boolean);
 }
 
@@ -175,7 +204,7 @@ export function mapEslPayloadToRawSessions(payload) {
       }));
 
     const formatValues = extractCustomAttributeValues(session, 'Format');
-    const type = extractCustomAttributeValue(session, 'Session Type');
+    const type = extractCustomAttributeValue(session, ['Type', 'Session Type']);
     const slug = slugFromUrl(session.url);
     const thumbnail = (session.images || []).find((img) => img.imageKind === 'session-card-image');
 
@@ -191,11 +220,14 @@ export function mapEslPayloadToRawSessions(payload) {
       startTimeUtc: firstTime ? new Date(firstTime.startTimeMillis).toISOString() : '',
       endTimeUtc: firstTime ? new Date(firstTime.endTimeMillis).toISOString() : '',
       duration: session.sessionLengthInMinutes || 0,
-      // "Track" is topic-like (drives the card icon); "Primary Track for Agenda" is the
+      // "Track" is topic-like (drives the card icon); "Primary Event Site Track" is the
       // single value shown as the card/detail track name — two distinct real attributes.
-      track: extractCustomAttributeValue(session, TRACK_ATTRIBUTE_NAME),
+      track: extractCustomAttributeValue(session, TRACK_ATTRIBUTE_NAMES),
       category: extractCustomAttributeValues(session, 'Track'),
-      contentCategory: extractCustomAttributeValues(session, 'Programming Category'),
+      contentCategory: extractCustomAttributeValues(session, ['Category', 'Programming Category']),
+      // MAX26-only — see normalizeSessions() for why no MAX25 fallback is needed here.
+      additionalTracks: extractCustomAttributeValues(session, 'Additional Event Site Tracks'),
+      trackOverride: extractCustomAttributeValue(session, 'Override Primary Event Site Track'),
       type,
       technicalLevel: extractCustomAttributeValue(session, 'Technical Level'),
       audience: extractCustomAttributeValues(session, 'Audience'),
@@ -209,7 +241,7 @@ export function mapEslPayloadToRawSessions(payload) {
       watchUrl: extractWatchUrl(session),
       isKeynote: type === 'Keynote',
       thumbnailUrl: thumbnail?.imageUrl ?? null,
-      copyrightDisclaimer: extractCustomAttributeValue(session, 'LegalDisclaimer') || undefined,
+      copyrightDisclaimer: extractCustomAttributeValue(session, ['Legal Disclaimer', 'LegalDisclaimer']) || undefined,
       // resources[]/mrStreamId intentionally omitted — no source in this payload yet
       // (resources still in development backend-side; video/stream data is deliberately
       // withheld from this public endpoint until the session goes live). normalizeSessions()

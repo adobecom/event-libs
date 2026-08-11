@@ -2652,6 +2652,15 @@
   font-size: 12px;
 }
 
+/* "+N" indicator for a session's additionalTracks (MWPW-200314 item 10) */
+.sg-category-badge__count {
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 16px;
+  color: currentcolor;
+  opacity: 0.72;
+}
+
 /* ── Icon Button (S2A Foundations) ──────────────────────────────────── */
 
 .sg-icon-btn {

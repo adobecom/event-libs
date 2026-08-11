@@ -119,7 +119,7 @@ export function MyFavoritesView() {
         `}
         ${effectiveTab === 'on-demand' && html`
           <div class="sg-my-favorites__on-demand">
-            ${groupByTrack(filteredOnDemand).map(([track, trackSessions]) => html`
+            ${groupByTrack(filteredOnDemand, state.guideConfig?.swimlaneOrder).map(([track, trackSessions]) => html`
               <${TrackRow} track=${track} sessions=${trackSessions} />
             `)}
           </div>

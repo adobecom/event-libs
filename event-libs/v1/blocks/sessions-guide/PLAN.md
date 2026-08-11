@@ -860,6 +860,125 @@ Tests mirror `test/unit/blocks/sessions-guide/`. Coverage status to be assessed 
 
 ---
 
+## Phase 16 — Digital Agenda Track Badges & Swimlanes ✅ Complete (MWPW-200314 item 10, merged with item 12's swimlaneOrder consumption)
+
+MAX26's real session-catalog data (verified against a live response, not assumed) renamed
+several custom attributes from their MAX25 names and introduced two genuinely new ones.
+MAX26 is the source of truth going forward; MAX25 support is secondary and handled via a
+name-fallback, not a year-detection branch.
+
+### 16.1 MAX26 field-name migration ✅
+
+`sessions-api.js`'s `extractCustomAttributeValue(s)`/`Values(s)` now accept either a name
+or an array of candidate names, tried in order (current name first, MAX25 fallback second —
+a session only ever carries one of the two, so this is unambiguous in practice):
+
+| Field | MAX26 name | MAX25 fallback |
+|---|---|---|
+| Primary track | `Primary Event Site Track` | `Primary Track for Agenda (Digital Agenda)` |
+| Content category | `Category` | `Programming Category` |
+| Session type | `Type` | `Session Type` |
+| Copyright | `Legal Disclaimer` | `LegalDisclaimer` |
+
+`TRACK_ATTRIBUTE_NAME` → `TRACK_ATTRIBUTE_NAMES` (array). New MAX26-only fields
+(`Additional Event Site Tracks`, `Override Primary Event Site Track`) have no fallback —
+they're simply absent/empty on MAX25 sessions, which naturally produces the single-track
+behavior below without any extra branching. Also added `getSessionOverrideText(session)`/
+`extractDistinctOverrideTexts(sessions)` (mirror `getSessionTrack`/`extractDistinctTracks`),
+re-exported via `tier-1-event-configurator/utils.js` for the new per-override-text editor
+(16.5) to know which distinct texts exist in a live event's real sessions.
+
+### 16.2 Track/badge model — `resolveTrackBadge(session)` (`utils/session-filters.js`) ✅
+
+Confirmed with Daniel (2026-08-11) as 6 concrete cases, dropping the earlier "no Other
+bucket, otherwise fall through to primary+additional" catch-all:
+
+| # | Primary | Additional | Override | Swimlane(s) | Badge |
+|---|---|---|---|---|---|
+| 1 | ✓ | – | – | primary | primary icon |
+| 2 | ✓ | ✓ | – | primary + additional | primary icon + "+1" |
+| 3/6 | – | – | ✓ | **override text itself** | override icon (per-text, or default) |
+| 4 | ✓ | – | ✓ | override text (not primary!) | override icon |
+| 5 | – | ✓ | ✓ | override text + additional | override icon + "+1" |
+| 7 | ✓ | ✓ | ✓ | override text + additional | override icon + "+1" (PM-confirmed 2026-08-11) |
+| — | – | – | – | *(excluded — no badge, no lane, no "Other")* | |
+
+Key rules, not obvious from the table alone:
+- **Override always wins swimlane placement outright**, whether or not a primary track
+  also exists (case 4) — the primary track never appears in swimlanes once an override is
+  set, it's completely superseded.
+- The override lane is keyed by **the override text itself**, not a generic "Override"
+  bucket — every session sharing the exact same free-text value lands in the same lane;
+  different text values get separate lanes.
+- **Additional Event Site Tracks only ever supports one value** (confirmed with Daniel) —
+  `resolveTrackBadge` defensively caps it at 1 (`.slice(0, 1)`) even though the ESP field
+  is multi-select, so the badge is always a plain "+1", never "+N".
+- Icon/color for an override lane come from `getOverrideTrackIcon(overrideText)`
+  (`tier-1-event-config.js`) — a **per-override-text map** (`overrideTrackIcons`) checked
+  first, falling back to a single event-wide default (`overrideTrackIcon`), falling back to
+  the built-in default (`{ icon: 'star', color: '#6E6E6E' }`).
+- `stackedTracks` (for the detail/session-page stacked-badge display) is the *additional*
+  track(s) only when an override applies (the override text isn't a real track, so it isn't
+  itself "stacked", and the primary track — if any — is also dropped from the stack once
+  overridden), or `[primary, ...additional]` when there's no override. Confirmed with
+  Daniel (2026-08-11): this is the intended behavior.
+
+### 16.3 Swimlane placement + ordering — `groupByTrack(sessions, swimlaneOrder)` ✅
+
+Rewritten from single-track-keyed grouping to placing a session into one swimlane per
+`resolveTrackBadge().swimlanes` entry, skipping sessions `resolveTrackBadge()` excludes.
+Second param is the Session Guide Configurator's authored `swimlaneOrder` (item 12) —
+listed tracks sort first in authored order, unlisted tracks follow in first-seen order.
+Wired into `OnDemandView.js`/`MySessionsView.js`/`MyFavoritesView.js` via
+`state.guideConfig?.swimlaneOrder` (already parsed by `parse-config.js`, previously unused
+by the component tree).
+
+### 16.4 Badge rendering ✅
+
+- `CategoryBadge.js` now takes a `session` prop and renders `resolveTrackBadge()`'s result
+  (label/icon/color/`+N` count), replacing its old, mismatched `category` prop — the
+  component was actually reading the `Track` topic-tag attribute, not `Primary Event Site
+  Track`, before this pass. Renders nothing (not a fallback badge) for an excluded session.
+- `SessionDetailOverlay.js`'s channel line uses the same `resolveTrackBadge()` result
+  instead of raw `session.track`/`getTrackIcon(session.track)`, and renders a stacked row
+  of chips (`.sg-detail__track-stack`) for `stackedTracks` when present.
+- `LiveCard.js`/`SessionCard.js` updated to pass `session=${session}` instead of
+  `category=${session.category?.[0]}`.
+
+### 16.5 Override icon authoring — Tier 1 Event Configurator ✅
+
+Since each distinct override text is its own swimlane (16.2), the configurator needs a
+per-text icon mapping, not a single field — `OverrideTrackIconEditor.js` was rebuilt from
+a single icon+color row into a `TrackIconEditor.js`-style list, one row per distinct
+override text found in the event's real sessions (`extractDistinctOverrideTexts`), plus a
+separate "default" row for `overrideTrackIcon` (the event-wide fallback shown for any text
+not yet mapped). New config fields: `overrideTrackIcons: { [text]: {icon, color} }`
+(per-text map) and `overrideTrackIcon: {icon, color} | null` (single default, unchanged
+from the first pass). `ConfigsContext.js` got a new `updateOverrideTrackIcon(text, updates)`
+mirroring `updateTrackIcon(track, updates)`. Added a `star` `<symbol>` to both
+`v1/features/icons/track-icons.svg` and the configurator's own copy of that sprite (the
+only icon slug not tied to a real track name) — used as the built-in override default.
+
+No auto-seeding for override texts (unlike `seedTrackIcons()` for real tracks) — there's no
+sensible icon to guess for arbitrary free text, so every mapping is authored manually.
+
+### 16.6 Known gaps / not done in this pass
+
+- No Figma reference was available for the badge/`+1`/stacked-chip visuals — implemented a
+  functional default (`.sg-category-badge__count`, `.sg-detail__track-chip`); may need
+  design review.
+- No test coverage exists for `SessionDetailOverlay.js` at all (pre-existing gap, tracked
+  under Phase 14/item 8, not fixed here).
+- No test infrastructure exists for the Tier 1 Event Configurator app itself — the new
+  `OverrideTrackIconEditor.js`/config plumbing has no automated coverage.
+- The Session Guide Configurator's `swimlaneOrder` field still only seeds from real track
+  names (`extractDistinctTracks`) — it doesn't yet know about override-text lanes, so an
+  author can't explicitly reorder those. They fall through to `groupByTrack`'s "unlisted,
+  first-seen order, appended after" behavior. Not requested yet; flagging as a likely
+  follow-on once override lanes see real use.
+
+---
+
 ## Dependency Map
 
 ```

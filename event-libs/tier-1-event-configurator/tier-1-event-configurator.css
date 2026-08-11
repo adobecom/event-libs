@@ -755,6 +755,10 @@ select.tec-field {
   background: var(--tec-color-error-bg);
 }
 
+.tec-override-editor .tec-track-editor__row {
+  margin-bottom: 12px;
+}
+
 .tec-track-editor__preview-wrap {
   flex-shrink: 0;
   width: 32px;

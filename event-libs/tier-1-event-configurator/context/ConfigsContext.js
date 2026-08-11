@@ -16,6 +16,8 @@ function emptyConfig() {
   return {
     eventTitle: '',
     trackIcons: {},
+    overrideTrackIcon: null,
+    overrideTrackIcons: {},
     allowDoubleBooking: false,
     featuredSessions: [],
     rfApiUrl: '',
@@ -156,6 +158,24 @@ const ConfigsProvider = ({ children }) => {
     });
   }, []);
 
+  // Same merge pattern as updateTrackIcon, keyed by override text instead of track name —
+  // each distinct text an author has typed is its own swimlane, with its own entry.
+  const updateOverrideTrackIcon = useCallback((overrideText, updates) => {
+    setActiveConfig((prev) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        config: {
+          ...prev.config,
+          overrideTrackIcons: {
+            ...prev.config.overrideTrackIcons,
+            [overrideText]: { ...prev.config.overrideTrackIcons?.[overrideText], ...updates },
+          },
+        },
+      };
+    });
+  }, []);
+
   // Sets a single top-level config field (e.g. allowDoubleBooking,
   // featuredSessions, rfApiUrl, rfProfileId) immutably, so the Config JSON
   // preview stays in sync.
@@ -218,6 +238,7 @@ const ConfigsProvider = ({ children }) => {
     clearActiveConfig,
     updateTrackIcon,
     seedTrackIcons,
+    updateOverrideTrackIcon,
     updateConfigField,
     saveActiveConfig,
     removeConfig,

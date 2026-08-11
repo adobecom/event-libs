@@ -1,4 +1,6 @@
-export { getSessionTrack, extractDistinctTracks } from '../v1/services/sessions/sessions-api.js';
+export {
+  getSessionTrack, extractDistinctTracks, getSessionOverrideText, extractDistinctOverrideTexts,
+} from '../v1/services/sessions/sessions-api.js';
 
 // Copies text to the clipboard, falling back to a hidden textarea +
 // execCommand('copy') when navigator.clipboard isn't available (not

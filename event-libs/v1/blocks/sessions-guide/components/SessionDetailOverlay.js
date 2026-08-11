@@ -12,6 +12,7 @@ import { setSessionParam, clearSessionParams, safeUrl, isSamePage } from '../uti
 import { IconHeartFilled, IconHeartOutline } from './icons.js';
 import { Icon } from '../../../features/icons/Icon.js';
 import { getTrackIcon } from '../../../utils/tier-1-event-config.js';
+import { resolveTrackBadge } from '../utils/session-filters.js';
 
 export function SessionDetailOverlay({ onBack }) {
   const { state, dispatch } = useSessionGuide();
@@ -51,7 +52,9 @@ export function SessionDetailOverlay({ onBack }) {
     }
   }
 
-  const trackIconName = getTrackIcon(session.track)?.icon || '';
+  // Digital Agenda Track badge (MWPW-200314 item 10) — null for a session with neither a
+  // primary track nor an override (no "Other" badge shown, matching swimlane placement).
+  const trackBadge = resolveTrackBadge(session);
   const startShort = session.startTimeUtc ? formatShortTime(session.startTimeUtc, userTz) : '';
   const endShort = session.endTimeUtc ? formatShortTime(session.endTimeUtc, userTz) : '';
   const timeRange = showWatch && !endShort
@@ -110,10 +113,25 @@ export function SessionDetailOverlay({ onBack }) {
             <div class="sg-detail__group sg-detail__group--summary">
               <div class="sg-detail__summary">
                 <div class="sg-detail__summary-top">
-                  <div class="sg-detail__channel">
-                    ${trackIconName && html`<${Icon} name=${trackIconName} size=${20} className="sg-detail__channel-icon" />`}
-                    <span class="sg-detail__channel-name">${session.track}</span>
-                  </div>
+                  ${trackBadge && html`
+                    <div class="sg-detail__channel">
+                      <${Icon} name=${trackBadge.icon} size=${20} className="sg-detail__channel-icon" />
+                      <span class="sg-detail__channel-name">${trackBadge.label}</span>
+                    </div>
+                  `}
+                  ${trackBadge?.stackedTracks && html`
+                    <div class="sg-detail__track-stack">
+                      ${trackBadge.stackedTracks.map((track) => {
+    const icon = getTrackIcon(track);
+    return html`
+                          <span class="sg-detail__track-chip" key=${track}>
+                            <${Icon} name=${icon?.icon} size=${16} className="sg-detail__track-chip-icon" />
+                            ${track}
+                          </span>
+                        `;
+  })}
+                    </div>
+                  `}
                   ${timeRange && html`<span class="sg-detail__time">${timeRange}</span>`}
                 </div>
 
@@ -246,7 +264,7 @@ export function SessionDetailOverlay({ onBack }) {
                   ${session.speakers.map((sp) => html`
                     <div class="sg-detail__speaker">
                       ${sp.photo
-    ? html`<img class="sg-detail__speaker-photo" src=${sp.photo} alt=${sp.name} />`
+    ? html`<img class="sg-detail__speaker-photo" src=${sp.photo} alt=${sp.name} width="56" height="56" loading="lazy" decoding="async" />`
     : html`<span class="sg-detail__speaker-photo sg-detail__speaker-photo--placeholder" aria-hidden="true"></span>`}
                       <div class="sg-detail__speaker-info">
                         <span class="sg-detail__speaker-name">${sp.name}</span>

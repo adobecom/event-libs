@@ -30,7 +30,7 @@ export function OnDemandView() {
   // featured carousel — it's a curated highlight reel, not a filtered result set.
   const featured = getOnDemandFeaturedSessions(onDemandRaw, getFeaturedSessionIds());
   const available = filterSessions(onDemandRaw, activeFilters, searchQuery);
-  const byTrack = groupByTrack(available);
+  const byTrack = groupByTrack(available, state.guideConfig?.swimlaneOrder);
 
   return html`
     <div class="sg-view sg-view--on-demand">

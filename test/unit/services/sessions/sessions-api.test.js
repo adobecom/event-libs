@@ -232,6 +232,57 @@ describe('services/sessions/sessions-api', () => {
     });
   });
 
+  describe('mapEslPayloadToRawSessions MAX26 field names (with MAX25 fallback)', () => {
+    const max26Payload = {
+      speakers: [],
+      sessionTimes: [],
+      sessions: [
+        {
+          sessionId: 'max26-session',
+          customAttributes: [
+            customAttr('Primary Event Site Track', [selectValue('Branding')]),
+            customAttr('Category', [selectValue('Thought Leadership')]),
+            customAttr('Type', [selectValue('Session')]),
+            customAttr('Legal Disclaimer', [textValue('<p>MAX26 copyright.</p>')]),
+            customAttr('Additional Event Site Tracks', [selectValue('Video, Audio & Motion', 'video-audio-and-motion'), selectValue('Branding')]),
+            customAttr('Override Primary Event Site Track', [textValue('this is a test')]),
+          ],
+        },
+        {
+          // MAX25-shaped: old attribute names, no MAX26-only fields at all.
+          sessionId: 'max25-session',
+          customAttributes: [
+            customAttr('Primary Track for Agenda (Digital Agenda)', [selectValue('Branding')]),
+            customAttr('Programming Category', [selectValue('How To')]),
+          ],
+        },
+      ],
+    };
+    const [max26, max25] = mapEslPayloadToRawSessions(max26Payload);
+
+    it('resolves the MAX26 track/category/type/disclaimer attribute names', () => {
+      expect(max26.track).to.equal('Branding');
+      expect(max26.contentCategory).to.deep.equal(['Thought Leadership']);
+      expect(max26.type).to.equal('Session');
+      expect(max26.copyrightDisclaimer).to.equal('<p>MAX26 copyright.</p>');
+    });
+
+    it('extracts additionalTracks (multi-select) and trackOverride (free text)', () => {
+      expect(max26.additionalTracks).to.deep.equal(['Video, Audio & Motion', 'Branding']);
+      expect(max26.trackOverride).to.equal('this is a test');
+    });
+
+    it('still resolves track/category via the MAX25 attribute names as a fallback', () => {
+      expect(max25.track).to.equal('Branding');
+      expect(max25.contentCategory).to.deep.equal(['How To']);
+    });
+
+    it('leaves additionalTracks/trackOverride empty for a MAX25-shaped session with neither field', () => {
+      expect(max25.additionalTracks).to.deep.equal([]);
+      expect(max25.trackOverride).to.equal('');
+    });
+  });
+
   describe('normalizeSessions', () => {
     it('defaults resources/mrStreamId even when the real-data mapper omits them', () => {
       const [normalized] = normalizeSessions([{ id: 's-1', category: ['3D'], audience: ['Designer'] }]);

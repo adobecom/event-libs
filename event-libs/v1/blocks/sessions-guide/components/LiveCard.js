@@ -106,7 +106,7 @@ export function LiveCard({ session, variant = 'live' }) {
     <div class=${cardClass} onclick=${handleCardClick}>
       <div class="sg-live-card__image">
         ${session.thumbnailUrl
-    ? html`<img src=${session.thumbnailUrl} alt=${session.title} loading="lazy" />`
+    ? html`<img src=${session.thumbnailUrl} alt=${session.title} loading="lazy" decoding="async" />`
     : html`<div class="sg-live-card__thumb-placeholder" style=${'background:' + trackColor}></div>`}
         <div class="sg-live-card__progress-row">
           <div class="sg-live-card__progress">
@@ -118,7 +118,7 @@ export function LiveCard({ session, variant = 'live' }) {
       <div class="sg-live-card__body">
         <div class="sg-live-card__meta">
           <div class="sg-live-card__track-row">
-            ${html`<${CategoryBadge} category=${session.category?.[0]} />`}
+            ${html`<${CategoryBadge} session=${session} />`}
           </div>
           <p class="sg-live-card__time">${timeRange}</p>
         </div>

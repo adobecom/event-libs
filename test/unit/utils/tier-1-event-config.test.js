@@ -2,6 +2,7 @@ import { expect } from '@esm-bundle/chai';
 import {
   initTierOneEventConfig,
   getTrackIcon,
+  getOverrideTrackIcon,
   getAllowDoubleBooking,
   getFeaturedSessionIds,
 } from '../../../event-libs/v1/utils/tier-1-event-config.js';
@@ -14,6 +15,10 @@ const CONFIG = {
     'Social Media': { icon: 'social-media', color: '#FF6B35' },
     'video-audio-and-motion': { icon: 'video-audio-and-motion', color: '#000000' },
   },
+  overrideTrackIcons: {
+    'custom label': { icon: 'video', color: '#123456' },
+  },
+  overrideTrackIcon: { icon: 'business', color: '#111111' },
   allowDoubleBooking: true,
   featuredSessions: ['session-b', 'session-a'],
 };
@@ -56,6 +61,14 @@ describe('tier-1-event-config', () => {
   it('returns null for an empty/undefined track name', () => {
     expect(getTrackIcon('')).to.equal(null);
     expect(getTrackIcon(undefined)).to.equal(null);
+  });
+
+  it('resolves an override icon from the per-override-text map first', () => {
+    expect(getOverrideTrackIcon('custom label')).to.deep.equal({ icon: 'video', color: '#123456' });
+  });
+
+  it('falls back to the event-wide overrideTrackIcon for an unmapped override text', () => {
+    expect(getOverrideTrackIcon('some other text')).to.deep.equal({ icon: 'business', color: '#111111' });
   });
 
   it('reads allowDoubleBooking off the same parsed config', () => {

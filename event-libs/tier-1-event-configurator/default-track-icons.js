@@ -20,10 +20,15 @@ export const DEFAULT_TRACK_ICON_CONFIG = {
   'creativity-and-marketing-in-business': { icon: 'creativity-and-marketing-in-business', color: '#42A5F5' },
 };
 
-// Every known icon slug — the full set of <symbol> ids in track-icons.svg,
-// same list as DEFAULT_TRACK_ICON_CONFIG's own icon values.
+// Shown for the Override Primary Event Site Track case (free-text, not a real track — no
+// per-track icon/color to look up). Not one of DEFAULT_TRACK_ICON_CONFIG's entries since
+// it isn't keyed by a track name.
+export const DEFAULT_OVERRIDE_TRACK_ICON = { icon: 'star', color: '#6E6E6E' };
+
+// Every known icon slug — the full set of <symbol> ids in track-icons.svg, plus 'star'
+// (the override icon, not tied to any single track).
 export const KNOWN_ICON_SLUGS = Object.freeze(
-  [...new Set(Object.values(DEFAULT_TRACK_ICON_CONFIG).map((entry) => entry.icon))].sort(),
+  [...new Set([...Object.values(DEFAULT_TRACK_ICON_CONFIG).map((entry) => entry.icon), 'star'])].sort(),
 );
 
 // Not DEFAULT_TRACK_ICON_CONFIG's per-track brand colors — this app's own

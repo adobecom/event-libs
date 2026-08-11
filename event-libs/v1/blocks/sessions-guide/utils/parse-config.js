@@ -9,8 +9,8 @@ const DEFAULT_FILTER_CATEGORIES = [
 
 // Config comes solely from the data-session-guide-config attribute decorate.js sets
 // (decoded via parseEncodedConfig); there is no authoring-table path.
-// headings/behaviorFlags/swimlaneOrder/authoredFilterCategories aren't consumed by the
-// component tree yet — keep returning them for callers not yet wired up to read them.
+// headings/behaviorFlags/authoredFilterCategories aren't consumed yet — returned for
+// callers not yet wired up (swimlaneOrder now is, via groupByTrack()'s callers).
 export function parseSessionsGuideConfig(el, { logPrefix, forcedSurface } = {}) {
   let authored = {};
   try {
