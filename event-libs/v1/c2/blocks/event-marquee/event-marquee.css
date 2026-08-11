@@ -3,15 +3,15 @@
 /* Ported from Milo's classic marquee.css, split + always-dark subset only (we don't
    need the light/quiet/center/inline/one-third modifiers marquee.css also supports).
    Milo's spacing/color custom properties are swapped for our own s2a C2 tokens.
-   Breakpoints follow Router Marquee's real, confirmed C2 scale instead of classic
-   marquee.css's own 600px/1200px (non-C2) system or tokens.css's typography-only
-   1024/1280/1441 tiers: 768px is where layout structure changes (Milo's own
-   grid-activation breakpoint — libs/c2/styles/styles.css's `@media (width >=
-   768px)`, `--grid-columns: 12`), 1280px is the tablet/desktop split (Router
-   Marquee's own `@media (width >= 1280px)` — libs/c2/blocks/router-marquee/
-   router-marquee.css). Neither 768 nor this file's use of 1280 for layout is a
-   typography-tier tokens.css value; there's no Figma tablet frame (only 375/mobile
-   and 1440/desktop exist) to verify anything more specific against either. */
+   Breakpoints: 768px is where layout structure changes (Milo's own grid-activation
+   breakpoint — libs/c2/styles/styles.css's `@media (width >= 768px)`,
+   `--grid-columns: 12`). The column→row split itself is 1200px, per direct product
+   direction — not Router Marquee's own confirmed tablet/desktop split (1280px,
+   libs/c2/blocks/router-marquee/router-marquee.css) or tokens.css's typography-only
+   1024/1280/1441 tiers, and not classic marquee.css's own 600px/1200px (non-C2)
+   system either, even though the number happens to coincide with that last one —
+   arrived at independently. There's no Figma tablet frame (only 375/mobile and
+   1440/desktop exist) to verify anything more specific against either breakpoint. */
 
 /* Created by event-marquee.js's attachUpcomingSessionsWrapper — wraps this block and
    a following upcoming-sessions block together so upcoming-sessions.css's
@@ -37,11 +37,11 @@
 /* 913px = the base 721px marquee (Figma, 1440px reference width, no Upcoming
    Sessions row) plus the 192px Upcoming Sessions overlay reserves at the bottom
    (upcoming-sessions.css's `.upcoming-sessions--attached`). Applied as `min-
-   height` unscoped (every breakpoint below 1280px is still column layout, where
+   height` unscoped (every breakpoint below 1200px is still column layout, where
    video width = full viewport width) so the marquee can grow to fit its
    stacked content instead of clipping it — a 16:9 video at full width needs
    very different heights across the column-layout range (~211px at 375px wide,
-   ~719px at 1279px wide), so no single fixed number can serve all of it without
+   ~719px at 1199px wide), so no single fixed number can serve all of it without
    either wasting space or badly cropping the video. Upcoming Sessions' overlay
    `bottom: 0` is anchored to .event-marquee-upcoming-wrapper, whose height is
    just whatever .event-marquee actually renders at — so letting the marquee
@@ -52,7 +52,7 @@
    author included the `attach-upcoming` modifier — so a mis-authored section
    (no matching sibling) correctly falls back to the shorter, no-overlay height.
    padding-bottom: 200px reserves clearance for the Upcoming Sessions overlay,
-   confirmed live in DevTools. Deliberately unscoped, not just at 1280px+: the
+   confirmed live in DevTools. Deliberately unscoped, not just at 1200px+: the
    overlap was reproducible while actively resizing the browser through the
    column-layout range, not only at a specific breakpoint, so the reservation
    needs to hold everywhere .attach-upcoming--has-overlay applies. Because
@@ -77,7 +77,7 @@
   padding-bottom: 200px;
 }
 
-@media (min-width: 1280px) {
+@media (min-width: 1200px) {
   /* Row layout only, from here: video width is capped to roughly half the row
      (not full viewport width), so its aspect-ratio-driven height stays within
      a range Figma actually confirmed fits a fixed box. `height`, not `min-
@@ -126,11 +126,13 @@
 /* Matches Router Marquee's own `.rm-overlay` gradient exactly (Milo's actual C2
    marquee — libs/c2/blocks/router-marquee/router-marquee.css) rather than a flat
    single-gradient guess. Router Marquee has two tiers for this, not three:
-   mobile+tablet share one gradient (`width < 1280px`, 60% black), desktop is a
-   second (`width >= 1280px`, 56% — slightly lighter, since desktop's wider text
-   column needs less contrast help). Same 108deg diagonal and 0%/98.86% stops at
-   both tiers, only the peak opacity changes — matches this file's own 1280px
-   breakpoint for everything else layout-related. */
+   mobile+tablet share one gradient (60% black), desktop is a second (56% —
+   slightly lighter, since desktop's wider text column needs less contrast help).
+   Router Marquee itself switches these at its own 1280px breakpoint (`width <
+   1280px` / `width >= 1280px`); the switch here uses this file's own 1200px
+   layout breakpoint instead, so it changes at the same point everything else
+   layout-related does, not a breakpoint apart from it. Same 108deg diagonal and
+   0%/98.86% stops at both tiers, only the peak opacity changes. */
 .event-marquee-background::after {
   content: '';
   position: absolute;
@@ -138,7 +140,7 @@
   background: linear-gradient(108deg, rgb(0 0 0 / 60%) 0%, rgb(0 0 0 / 0%) 98.86%);
 }
 
-@media (min-width: 1280px) {
+@media (min-width: 1200px) {
   .event-marquee-background::after {
     background: linear-gradient(108deg, rgb(0 0 0 / 56%) 0%, rgb(0 0 0 / 0%) 98.86%);
   }
@@ -150,7 +152,7 @@
    content box (327+24+24=375, 212+80+80=372 — checks out exactly against the
    component's own 372px height). --s2a-spacing-4xl/--s2a-spacing-md (64px/16px)
    was a placeholder guess made before this was measured directly; the real values
-   are --s2a-layout-sm (80px) and --s2a-spacing-lg (24px). The 1280px+ tier below
+   are --s2a-layout-sm (80px) and --s2a-spacing-lg (24px). The 1200px+ tier below
    bumps horizontal padding again to the desktop-specific value Figma's dev-mode
    redline calls out separately (124px / --s2a-layout-lg). */
 .event-marquee-foreground {
@@ -171,17 +173,16 @@
   padding: var(--s2a-layout-sm) var(--s2a-spacing-lg);
 }
 
-/* 1280px, not 1200px — consolidated to match Router Marquee's real, confirmed
-   tablet/desktop split (libs/c2/blocks/router-marquee/router-marquee.css:
-   `@media (width >= 1280px)`), and merged into one block with the other
-   1280px+ desktop refinements below (padding-inline, gap) so the column→row
+/* 1200px, per direct product direction — not Router Marquee's own confirmed
+   tablet/desktop split (1280px, libs/c2/blocks/router-marquee/router-marquee.css:
+   `@media (width >= 1280px)`). This was briefly moved to 1280px to match that
+   value and keep every desktop-tier rule in this file on one consistent
+   breakpoint, but moved back to 1200px afterward — still kept as one block with
+   the other desktop refinements below (padding-inline, gap) so the column→row
    flip and everything that depends on visually looking "finished" in that
-   layout land together, not a breakpoint apart. This used to sit at 1200px —
-   an ad-hoc value picked because 768px felt too cramped in practice — but that
-   left a 1200-1279px zone where layout had flipped to row while the other
-   desktop-specific padding/gap/centering rules hadn't kicked in yet: a broken
-   in-between state, not a real design tier. */
-@media (min-width: 1280px) {
+   layout land together at whichever single breakpoint this file uses, rather
+   than splitting across two. */
+@media (min-width: 1200px) {
   /* Matches marquee.css's own `.marquee .foreground { flex-direction: row; ... }` —
      that rule is NOT scoped to `.split`, it applies to every marquee at the large
      breakpoint regardless of whether there's an asset. Same here: row applies
@@ -232,13 +233,13 @@
   margin-bottom: var(--s2a-spacing-lg);
 }
 
-/* Desktop-specific Figma redline: at 1280px+, every gap in the text column is a
+/* Desktop-specific Figma redline: at 1200px+, every gap in the text column is a
    uniform 24px (--s2a-spacing-lg) — headline to next line, that to body copy,
    body copy to the CTA row — not the mobile/tablet 8px from the rule above.
    Only overrides the base 8px; the `:has(+ .action-area)` rule already sets
    24px before the CTA row, so it's a harmless no-op at this breakpoint, not a
    conflict. */
-@media (min-width: 1280px) {
+@media (min-width: 1200px) {
   .event-marquee-text > :not(.action-area) {
     margin-bottom: var(--s2a-spacing-lg);
   }
@@ -254,7 +255,7 @@
   align-items: stretch;
 }
 
-@media (min-width: 1280px) {
+@media (min-width: 1200px) {
   .event-marquee-text .action-area {
     flex-direction: row;
     align-items: center;
@@ -270,7 +271,7 @@
 
   /* Same flexbox-overflow trap as .event-marquee-foreground's own min-height:0
      above, one level deeper — this is itself a flex item of .event-marquee-
-     foreground (column direction below 1280px, row above it), and its default
+     foreground (column direction below 1200px, row above it), and its default
      min-height:auto lets an oversized child (the aspect-ratio-driven video)
      refuse to shrink, breaking out past .event-marquee's fixed height +
      overflow:hidden regardless of direction. */
@@ -323,14 +324,14 @@
   object-fit: cover;
 }
 
-/* 1280px — see the row-layout comment above `.event-marquee-foreground`'s own
-   1280px block. Everything here only makes sense once the foreground is in row
+/* 1200px — see the row-layout comment above `.event-marquee-foreground`'s own
+   1200px block. Everything here only makes sense once the foreground is in row
    layout (the asset bleeding to fill the row's height, the text switching to
    inline-flex so it doesn't stretch full-width), so it moves with that flip
    rather than staying a breakpoint behind it — leaving row layout active but
    these companion rules not yet applied would be a visibly broken in-between
    state, not a real intermediate design. */
-@media (min-width: 1280px) {
+@media (min-width: 1200px) {
   /* video only, not img — a plain decorative image keeps its own aspect ratio
      (height:auto, from the base rule) at every breakpoint, it doesn't get
      force-cropped to fill the row's full height the way an interactive player
@@ -410,7 +411,7 @@
 
 /* Text/CTA variant — no asset (or a non-player asset). On mobile,
    .event-marquee-foreground is still column-direction, so `justify-content:
-   center` (the main/vertical axis) centers it. At 1280px+, the shared rule
+   center` (the main/vertical axis) centers it. At 1200px+, the shared rule
    above switches to row-direction for every variant, and `justify-content`
    needs resetting so a lone text item doesn't get horizontally centered too
    (it should stay left-anchored, per Figma). padding-top is handled by the
@@ -420,10 +421,20 @@
   justify-content: center;
 }
 
-@media (min-width: 1280px) {
+@media (min-width: 1200px) {
   .event-marquee-text-cta .event-marquee-foreground {
     justify-content: flex-start;
   }
+}
+
+/* Fixed max-width per direct request — keeps the text column from stretching
+   too wide once row layout puts it side-by-side with a narrower asset column,
+   or when there's no asset at all and it would otherwise be the row's only
+   content. Not a token: 500px doesn't map to any step in tokens.css's spacing
+   scale, and there's no Figma redline confirming this exact figure — treat it
+   as a literal placeholder until measured against a real frame. */
+.event-marquee-text {
+  max-width: 500px;
 }
 
 
