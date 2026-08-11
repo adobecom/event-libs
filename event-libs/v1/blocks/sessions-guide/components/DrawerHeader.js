@@ -79,6 +79,7 @@ export function DrawerHeader({ onClose, onFilterToggle, filterOpen, hideClose, h
                 class=${`sg-search-btn${mobileSearchOpen ? ' active' : ''}`}
                 onclick=${openMobileSearch}
                 aria-label="Search sessions"
+                aria-expanded=${String(mobileSearchOpen)}
                 type="button"
               >
                 <span class="sg-search-icon" aria-hidden="true"></span>

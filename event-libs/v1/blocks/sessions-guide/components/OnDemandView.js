@@ -46,7 +46,7 @@ export function OnDemandView() {
       `}
       ${byTrack.map(([track, trackSessions]) => html`<${TrackRow} key=${track} track=${track} sessions=${trackSessions} />`)}
       ${byTrack.length === 0 && html`
-        <div class="sg-empty">Sessions will be available on demand after the event.</div>
+        <div class="sg-empty" role="status" aria-live="polite">Sessions will be available on demand after the event.</div>
       `}
     </div>
   `;

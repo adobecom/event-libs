@@ -246,7 +246,7 @@ export function SessionDetailOverlay({ onBack }) {
                   ${session.speakers.map((sp) => html`
                     <div class="sg-detail__speaker">
                       ${sp.photo
-    ? html`<img class="sg-detail__speaker-photo" src=${sp.photo} alt="" />`
+    ? html`<img class="sg-detail__speaker-photo" src=${sp.photo} alt=${sp.name} />`
     : html`<span class="sg-detail__speaker-photo sg-detail__speaker-photo--placeholder" aria-hidden="true"></span>`}
                       <div class="sg-detail__speaker-info">
                         <span class="sg-detail__speaker-name">${sp.name}</span>

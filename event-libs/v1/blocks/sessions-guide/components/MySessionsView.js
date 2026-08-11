@@ -89,7 +89,7 @@ export function MySessionsView() {
         </div>
       `}
       ${bothEmpty ? html`
-        <div class="sg-my-sessions__empty">
+        <div class="sg-my-sessions__empty" role="status" aria-live="polite">
           <p>You currently have no scheduled sessions.</p>
           <button
             class="sg-my-sessions__see-live-btn"
@@ -102,11 +102,13 @@ export function MySessionsView() {
           ${hasUpcoming && html`<button
             class=${'sg-my-sessions-tab' + (effectiveTab === 'upcoming' ? ' sg-my-sessions-tab--active' : '')}
             onclick=${() => setTab('upcoming')}
+            aria-pressed=${String(effectiveTab === 'upcoming')}
             type="button"
           >Upcoming</button>`}
           ${hasOnDemand && html`<button
             class=${'sg-my-sessions-tab' + (effectiveTab === 'on-demand' ? ' sg-my-sessions-tab--active' : '')}
             onclick=${() => setTab('on-demand')}
+            aria-pressed=${String(effectiveTab === 'on-demand')}
             type="button"
           >On demand</button>`}
         </div>

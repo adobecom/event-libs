@@ -78,7 +78,7 @@ export function FullPageShell() {
       </div>
       <div class="sg-full-page__body">
         ${sessionsStatus.value === 'loading' && html`<${LoadingState} />`}
-        ${sessionsStatus.value === 'error' && html`<div class="sg-error">Failed to load sessions.</div>`}
+        ${sessionsStatus.value === 'error' && html`<div class="sg-error" role="alert">Failed to load sessions.</div>`}
         ${sessionsStatus.value === 'ready' && html`<${ViewRouter} />`}
       </div>
       ${filterOpen && html`<${FilterPanel} onClose=${() => setFilterOpen(false)} />`}

@@ -5,7 +5,7 @@ import { FullPageShell } from './FullPageShell.js';
 
 export function App() {
   const ctx = useSessionGuide();
-  if (!ctx) return html`<section class="sg-app sg-app--page"><div class="sg-loading">Loading sessions…</div></section>`;
+  if (!ctx) return html`<section class="sg-app sg-app--page"><div class="sg-loading" role="status" aria-live="polite">Loading sessions…</div></section>`;
   const { state } = ctx;
   const { guideConfig } = state;
   const surface = guideConfig.surface;

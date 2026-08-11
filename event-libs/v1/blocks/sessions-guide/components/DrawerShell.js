@@ -9,6 +9,7 @@ import { SessionDetailOverlay } from './SessionDetailOverlay.js';
 import { FilterPanel } from './FilterPanel.js';
 import { LoadingState } from './LoadingState.js';
 import { setSessionParam, setSessionsParam, clearSessionParams } from '../utils/url.js';
+import { trapFocus } from '../utils/focus-trap.js';
 
 // No top gap on mobile/tablet (drawer covers the full screen); 20px gap on desktop.
 const getTopMargin = () => (window.matchMedia('(max-width: 1279px)').matches ? 0 : 20);
@@ -226,6 +227,10 @@ export function DrawerShell() {
     history.pushState({}, '', clearSessionParams());
   }
 
+  // Traps Tab focus within the drawer while open and closes it on Escape, mirroring
+  // Milo's shared modal (which this hand-rolled, gesture-driven drawer can't use directly).
+  useEffect(() => (isOpen ? trapFocus(drawerRef.current, closeDrawer) : undefined), [isOpen]);
+
   function openDrawer() {
     const isNarrow = window.matchMedia('(max-width: 1279px)').matches;
     dispatch({
@@ -268,7 +273,7 @@ export function DrawerShell() {
         <div class="sg-drawer__body">
           <div class=${`sg-body-scroll${isExpanded ? ' sg-body-scroll--scrollable' : ''}`}>
             ${sessionsStatus.value === 'loading' && html`<${LoadingState} />`}
-            ${sessionsStatus.value === 'error' && html`<div class="sg-error">Failed to load sessions.</div>`}
+            ${sessionsStatus.value === 'error' && html`<div class="sg-error" role="alert">Failed to load sessions.</div>`}
             ${sessionsStatus.value === 'ready' && html`<${ViewRouter} />`}
           </div>
           <div class=${'sg-detail-panel' + (hasDetail ? ' sg-detail-panel--open' : '')}>

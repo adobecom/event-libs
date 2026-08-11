@@ -103,9 +103,7 @@ export function LiveCard({ session, variant = 'live' }) {
   }
 
   return html`
-    <div class=${cardClass} onclick=${handleCardClick} role="button" tabindex="0"
-      daa-ll=${surface === 'widget' ? 'Session-Card-Open' : undefined}
-      onkeydown=${(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleCardClick(); } }}>
+    <div class=${cardClass} onclick=${handleCardClick}>
       <div class="sg-live-card__image">
         ${session.thumbnailUrl
     ? html`<img src=${session.thumbnailUrl} alt=${session.title} loading="lazy" />`
@@ -124,7 +122,14 @@ export function LiveCard({ session, variant = 'live' }) {
           </div>
           <p class="sg-live-card__time">${timeRange}</p>
         </div>
-        <p class="sg-live-card__title">${session.title}</p>
+        ${surface === 'widget'
+    ? html`<button
+              class="sg-live-card__title sg-live-card__title-btn"
+              type="button"
+              onclick=${(e) => { e.stopPropagation(); handleCardClick(); }}
+              daa-ll="Session-Card-Open"
+            >${session.title}</button>`
+    : html`<p class="sg-live-card__title">${session.title}</p>`}
         <p class="sg-live-card__desc">${session.description}</p>
         <div class="sg-live-card__actions">
           ${primaryCta}

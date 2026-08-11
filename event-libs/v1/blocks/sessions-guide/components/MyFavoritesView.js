@@ -89,7 +89,7 @@ export function MyFavoritesView() {
         </div>
       `}
       ${bothEmpty ? html`
-        <div class="sg-my-favorites__empty">
+        <div class="sg-my-favorites__empty" role="status" aria-live="polite">
           <p>You currently have no favorited sessions.</p>
           <button
             class="sg-my-favorites__see-live-btn"
@@ -102,11 +102,13 @@ export function MyFavoritesView() {
           ${hasUpcoming && html`<button
             class=${'sg-my-sessions-tab' + (effectiveTab === 'upcoming' ? ' sg-my-sessions-tab--active' : '')}
             onclick=${() => setTab('upcoming')}
+            aria-pressed=${String(effectiveTab === 'upcoming')}
             type="button"
           >Upcoming</button>`}
           ${hasOnDemand && html`<button
             class=${'sg-my-sessions-tab' + (effectiveTab === 'on-demand' ? ' sg-my-sessions-tab--active' : '')}
             onclick=${() => setTab('on-demand')}
+            aria-pressed=${String(effectiveTab === 'on-demand')}
             type="button"
           >On demand</button>`}
         </div>

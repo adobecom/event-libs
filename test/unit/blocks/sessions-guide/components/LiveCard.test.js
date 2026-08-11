@@ -134,20 +134,22 @@ describe('LiveCard', () => {
     expect(LiveCard({ session: LIVE_SESSION })).to.include('daa-ll="Watch-Now"');
   });
 
-  it('tags the card with daa-ll=Session-Card-Open on the widget surface', () => {
+  it('tags the card title button with daa-ll=Session-Card-Open on the widget surface', () => {
     const store = makeStore();
     const LiveCard = buildLiveCard(preact, store);
-    expect(LiveCard({ session: LIVE_SESSION })).to.include('daa-ll=Session-Card-Open');
+    expect(LiveCard({ session: LIVE_SESSION })).to.include('daa-ll="Session-Card-Open"');
   });
 
-  it('omits the card daa-ll on the page surface (card click is a no-op there)', () => {
+  it('renders the title as plain text (not an interactive control) on the page surface', () => {
     const store = buildStore(preact);
     store.SessionGuideContext._current = {
       state: { guideConfig: { ...BASE_CONFIG, surface: 'page' } },
       dispatch: () => {},
     };
     const LiveCard = buildLiveCard(preact, store);
-    expect(LiveCard({ session: LIVE_SESSION })).to.not.include('daa-ll=Session-Card-Open');
+    const html = LiveCard({ session: LIVE_SESSION });
+    expect(html).to.not.include('daa-ll="Session-Card-Open"');
+    expect(html).to.include('<p class="sg-live-card__title">MAX Keynote</p>');
   });
 
   it('tags the schedule/favorite buttons with Add-/Remove- daa-ll labels matching their state', () => {

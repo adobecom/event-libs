@@ -78,7 +78,7 @@ export function LiveUpcomingView() {
           ${previouslyAiredSlots.map((slot) => html`<${TimeSlotRow} key=${slot[0].startTimeUtc} sessions=${slot} forceOnDemand=${true} />`)}
         `}
         ${timeSlots.length === 0 && !live.length && !featured.length && !previouslyAiredSlots.length && html`
-          <div class="sg-empty">No sessions scheduled for this day.</div>
+          <div class="sg-empty" role="status" aria-live="polite">No sessions scheduled for this day.</div>
         `}
       </div>
     </div>
