@@ -268,6 +268,32 @@
   width: 100%;
 }
 
+/* 1024px+ (below the 1200px row-layout flip, where the asset gets its own
+   full-bleed treatment via flex instead — see .event-marquee-bleed's 1200px
+   rule further down): the asset still sits inside .event-marquee-foreground's
+   own padding-inline (24px, --s2a-spacing-lg) in column layout, same as the
+   text above it, so it renders inset instead of edge-to-edge. This pulls it
+   back out to the full width of .event-marquee itself, negative-margin bleed
+   style — margin-inline cancels the parent's padding, width grows by the same
+   amount to reclaim the space the negative margin freed up. Scoped to end
+   just before 1200px so it hands off cleanly to that breakpoint's own
+   flex-based sizing, rather than leaving a stale negative margin active once
+   the layout switches to row.
+   1024px specifically, not 768px (this file's other column-layout tier) or
+   1200px — a separate, one-off breakpoint per direct request, not tied to any
+   other tier in this file.
+   .event-marquee-media.event-marquee-bleed (both classes), not just
+   .event-marquee-bleed alone — needed to match the specificity of the
+   `:has(video)` rule above (a class + pseudo-class also counts as two
+   selectors), so this reliably wins for the video/player case instead of
+   depending on source order alone. */
+@media (min-width: 1024px) and (max-width: 1199.98px) {
+  .event-marquee-media.event-marquee-bleed {
+    margin-inline: calc(-1 * var(--s2a-spacing-lg));
+    width: calc(100% + (2 * var(--s2a-spacing-lg)));
+  }
+}
+
 /* `> img` (direct-child only) never matched a real authored image: DA/decorate.js
    always wraps it in a <picture>, so the actual <img> is a grandchild
    (.event-marquee-media > picture > img), not a direct child. That left the real
