@@ -977,6 +977,20 @@ sensible icon to guess for arbitrary free text, so every mapping is authored man
   first-seen order, appended after" behavior. Not requested yet; flagging as a likely
   follow-on once override lanes see real use.
 
+### 16.7 Cleanup pass ✅
+
+Went through everything above once more for dead code before moving on to further
+configurator work:
+- Removed `session.category` (the `Track` topic-tag attribute) — dead since `CategoryBadge.js`
+  moved to `resolveTrackBadge()`; nothing else ever read it.
+- Removed `session.watchUrl`/`extractWatchUrl()` (the old `Watch ` custom-attribute
+  extraction) — dead since item 5's `getWatchDestination()` replaced its only consumer.
+- Consolidated `DEFAULT_TRACK_ICON_CONFIG`/`DEFAULT_OVERRIDE_TRACK_ICON`, previously
+  hand-duplicated between `tier-1-event-config.js` and the configurator's
+  `default-track-icons.js` (the latter's own header comment had called this out as
+  temporary since before this ticket — never done). Now defined once in
+  `tier-1-event-config.js`, exported, and imported by `default-track-icons.js`.
+
 ---
 
 ## Dependency Map

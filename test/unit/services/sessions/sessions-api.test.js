@@ -44,7 +44,6 @@ describe('services/sessions/sessions-api', () => {
           speakers: [{ speakerId: 'sp-2', ordinal: 1 }, { speakerId: 'sp-1', ordinal: 0 }],
           images: [{ imageKind: 'session-hero-image', imageUrl: 'hero.jpg' }, { imageKind: 'session-card-image', imageUrl: 'card.jpg' }],
           customAttributes: [
-            customAttr('Track', [selectValue('3D'), selectValue('Photography')]),
             customAttr('Primary Track for Agenda (Digital Agenda)', [selectValue('Photography')]),
             customAttr('Programming Category', [selectValue('How To')]),
             customAttr('Technical Level', [selectValue('Intermediate')]),
@@ -52,7 +51,6 @@ describe('services/sessions/sessions-api', () => {
             customAttr('Session Type', [selectValue('Keynote')]),
             customAttr('Product', [selectValue('Adobe Photoshop', 'adobe-photoshop')]),
             customAttr('Format', [selectValue('In-Person', 'in-person'), selectValue('On demand, post event', 'on-demand-post-event')]),
-            customAttr('Watch ', [textValue('<br><a href="https://example.com/watch" target="_blank">Watch</a>')]),
             customAttr('LegalDisclaimer', [textValue('<p>Copyright.</p>')]),
           ],
         },
@@ -106,9 +104,8 @@ describe('services/sessions/sessions-api', () => {
       expect(bare.rfSessionId).to.equal('');
     });
 
-    it('maps track (single) and category (multi, topic) from separate attributes', () => {
+    it('maps track and contentCategory from separate attributes', () => {
       expect(full.track).to.equal('Photography');
-      expect(full.category).to.deep.equal(['3D', 'Photography']);
       expect(full.contentCategory).to.deep.equal(['How To']);
     });
 
@@ -138,10 +135,6 @@ describe('services/sessions/sessions-api', () => {
       expect(bare.isLivestreamed).to.be.false;
     });
 
-    it('extracts the watch href from the raw HTML anchor value', () => {
-      expect(full.watchUrl).to.equal('https://example.com/watch');
-    });
-
     it('picks the session-card-image thumbnail, not the hero image', () => {
       expect(full.thumbnailUrl).to.equal('card.jpg');
     });
@@ -159,7 +152,6 @@ describe('services/sessions/sessions-api', () => {
     it('leaves fields with no source in the payload unset on a bare session', () => {
       expect(bare.startTimeUtc).to.equal('');
       expect(bare.track).to.equal('');
-      expect(bare.category).to.deep.equal([]);
       expect(bare.speakers).to.deep.equal([]);
       expect(bare.thumbnailUrl).to.be.null;
       expect(bare.isKeynote).to.be.false;
@@ -285,28 +277,26 @@ describe('services/sessions/sessions-api', () => {
 
   describe('normalizeSessions', () => {
     it('defaults resources/mrStreamId even when the real-data mapper omits them', () => {
-      const [normalized] = normalizeSessions([{ id: 's-1', category: ['3D'], audience: ['Designer'] }]);
+      const [normalized] = normalizeSessions([{ id: 's-1', audience: ['Designer'] }]);
       expect(normalized.resources).to.deep.equal([]);
       expect(normalized.mrStreamId).to.be.null;
     });
 
-    it('coerces mock-style plain-string category/audience into arrays', () => {
-      const [normalized] = normalizeSessions([{ id: 's-1', category: 'mainstage', audience: 'All' }]);
-      expect(normalized.category).to.deep.equal(['mainstage']);
+    it('coerces mock-style plain-string audience into an array', () => {
+      const [normalized] = normalizeSessions([{ id: 's-1', audience: 'All' }]);
       expect(normalized.audience).to.deep.equal(['All']);
     });
 
-    it('passes already-array-shaped category/audience/contentCategory through unchanged', () => {
+    it('passes already-array-shaped audience/contentCategory through unchanged', () => {
       const [normalized] = normalizeSessions([{
-        id: 's-1', category: ['3D', 'Photography'], contentCategory: ['How To'], audience: ['Designer', 'Developer'],
+        id: 's-1', contentCategory: ['How To'], audience: ['Designer', 'Developer'],
       }]);
-      expect(normalized.category).to.deep.equal(['3D', 'Photography']);
       expect(normalized.contentCategory).to.deep.equal(['How To']);
       expect(normalized.audience).to.deep.equal(['Designer', 'Developer']);
     });
 
     it('defaults contentCategory to an empty array when absent (mock fixtures)', () => {
-      const [normalized] = normalizeSessions([{ id: 's-1', category: 'mainstage', audience: 'All' }]);
+      const [normalized] = normalizeSessions([{ id: 's-1', audience: 'All' }]);
       expect(normalized.contentCategory).to.deep.equal([]);
     });
   });

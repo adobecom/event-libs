@@ -34,7 +34,6 @@ export function normalizeSessions(rawSessions) {
     track: s.track || '',
     type: s.type || '',
     technicalLevel: s.technicalLevel || '',
-    category: coerceArray(s.category),
     contentCategory: coerceArray(s.contentCategory),
     audience: coerceArray(s.audience),
     // Additional Event Site Tracks / Override Primary Event Site Track: MAX26-only
@@ -51,7 +50,6 @@ export function normalizeSessions(rawSessions) {
     isLivestreamed: Boolean(s.isLivestreamed),
     isOnline: Boolean(s.isOnline),
     sessionPageUrl: s.sessionPageUrl || '',
-    watchUrl: s.watchUrl || '',
     isKeynote: Boolean(s.isKeynote),
     thumbnailUrl: s.thumbnailUrl ?? null,
     ...(s.copyrightDisclaimer ? { copyrightDisclaimer: s.copyrightDisclaimer } : {}),
@@ -150,13 +148,6 @@ function extractCustomAttributeValue(session, name) {
   return extractCustomAttributeValues(session, name)[0] || '';
 }
 
-// The `Watch ` customAttribute's value is a raw HTML anchor (e.g.
-// `<a href="...">Watch</a>`) rather than a bare URL — pull the href out of it.
-function extractWatchUrl(session) {
-  const html = extractCustomAttributeValue(session, 'Watch ');
-  return /href="([^"]+)"/.exec(html)?.[1] || '';
-}
-
 // `sessions[].url` is an internal drafts/staging link, not usable as a production page
 // URL — but its last path segment is exactly the slug we want.
 function slugFromUrl(url) {
@@ -220,10 +211,7 @@ export function mapEslPayloadToRawSessions(payload) {
       startTimeUtc: firstTime ? new Date(firstTime.startTimeMillis).toISOString() : '',
       endTimeUtc: firstTime ? new Date(firstTime.endTimeMillis).toISOString() : '',
       duration: session.sessionLengthInMinutes || 0,
-      // "Track" is topic-like (drives the card icon); "Primary Event Site Track" is the
-      // single value shown as the card/detail track name — two distinct real attributes.
       track: extractCustomAttributeValue(session, TRACK_ATTRIBUTE_NAMES),
-      category: extractCustomAttributeValues(session, 'Track'),
       contentCategory: extractCustomAttributeValues(session, ['Category', 'Programming Category']),
       // MAX26-only — see normalizeSessions() for why no MAX25 fallback is needed here.
       additionalTracks: extractCustomAttributeValues(session, 'Additional Event Site Tracks'),
@@ -238,7 +226,6 @@ export function mapEslPayloadToRawSessions(payload) {
       videoAvailable: formatValues.includes('Online') || formatValues.includes('On demand, post event'),
       isLivestreamed: extractCustomAttributeValues(session, 'Livestreamed Content').includes('Live'),
       sessionPageUrl: slug ? `/sessions/${slug}` : '',
-      watchUrl: extractWatchUrl(session),
       isKeynote: type === 'Keynote',
       thumbnailUrl: thumbnail?.imageUrl ?? null,
       copyrightDisclaimer: extractCustomAttributeValue(session, ['Legal Disclaimer', 'LegalDisclaimer']) || undefined,

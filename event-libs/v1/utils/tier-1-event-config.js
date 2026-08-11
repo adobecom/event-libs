@@ -9,9 +9,10 @@ let tierOneEventConfig = {};
 
 // Built-in fallback so real, known Track values render a curated icon/color out of the
 // box even before a page authors trackIcons — authored config always takes priority
-// (checked first in getTrackIcon), this only fills gaps. Ported 1:1 from the old
-// CategoryBadge.js BADGE_MAP + sessions-guide.js MOCK_CATEGORY_COLORS.
-const DEFAULT_TRACK_ICON_CONFIG = {
+// (checked first in getTrackIcon), this only fills gaps. Exported so
+// tier-1-event-configurator/default-track-icons.js (which needs the same defaults for
+// its own icon pickers) doesn't carry a second, independently-drifting copy.
+export const DEFAULT_TRACK_ICON_CONFIG = {
   'social-media': { icon: 'social-media', color: '#FF6B35' },
   'design-and-illustration': { icon: 'design-and-illustration', color: '#9D50BB' },
   mainstage: { icon: 'mainstage', color: '#E91E63' },
@@ -32,8 +33,9 @@ const DEFAULT_TRACK_ICON_CONFIG = {
 
 // Shown for the Override Primary Event Site Track case (free-text, not a real track — no
 // per-track icon/color to look up) — authored config always takes priority, this only
-// fills the gap before an event configures its own.
-const DEFAULT_OVERRIDE_TRACK_ICON = { icon: 'star', color: '#6E6E6E' };
+// fills the gap before an event configures its own. Exported for the same reason as
+// DEFAULT_TRACK_ICON_CONFIG above.
+export const DEFAULT_OVERRIDE_TRACK_ICON = { icon: 'star', color: '#6E6E6E' };
 
 function slugify(name) {
   return name ? name.toLowerCase().replace(/[\s_]+/g, '-').replace(/[^a-z0-9-]/g, '') : '';

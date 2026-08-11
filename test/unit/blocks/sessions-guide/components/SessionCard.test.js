@@ -26,7 +26,6 @@ const UPCOMING_SESSION = {
   videoAvailable: false,
   inPerson: false,
   sessionPageUrl: '/sessions/building-with-ai',
-  watchUrl: '',
 };
 
 // A past session (on-demand)
@@ -40,7 +39,6 @@ const ONDEMAND_SESSION = {
   videoAvailable: true,
   inPerson: false,
   sessionPageUrl: '/sessions/past',
-  watchUrl: '',
 };
 
 function makeCtx(overrides = {}) {
