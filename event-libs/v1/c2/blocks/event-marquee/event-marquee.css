@@ -318,10 +318,16 @@
    these companion rules not yet applied would be a visibly broken in-between
    state, not a real intermediate design. */
 @media (min-width: 1280px) {
-  /* Same `>` (direct-child) gap as the base rule above — broadened to a plain
-     descendant selector so a real authored image (always wrapped in <picture>
-     by DA/decorate.js) is actually reached here too. */
-  .event-marquee-media img,
+  /* video only, not img — a plain decorative image keeps its own aspect ratio
+     (height:auto, from the base rule) at every breakpoint, it doesn't get
+     force-cropped to fill the row's full height the way an interactive player
+     does. Was briefly broadened to include img too when fixing the `>`
+     (direct-child) selector gap below — that fixed the sizing bug but also
+     made images stretch/crop to fill the row for the first time, which was
+     never actually intended, just previously masked by the same bug. Same
+     `>` gap as the base rule above — a real authored image is always wrapped
+     in <picture> by DA/decorate.js, so a direct-child selector never reaches
+     it; still using a plain descendant selector here for video specifically. */
   .event-marquee-media video {
     height: 100%;
     object-fit: cover;
