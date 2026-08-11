@@ -365,6 +365,16 @@
     flex-direction: column;
     align-items: flex-start;
 
+    /* .event-marquee-foreground never sets align-items, so its default (stretch)
+       otherwise forces every row child to the row's full cross-axis height —
+       matching .event-marquee-bleed's own explicit height: 100% (needed for the
+       video). Without this, .event-marquee-text stretched to that same full
+       height too, even though its actual content (headline/body/CTAs) is much
+       shorter — confirmed live in DevTools, the box extended well past the
+       visible text. align-self here opts this one item out of stretch without
+       touching .event-marquee-bleed, which still needs the default. */
+    align-self: flex-start;
+
     /* flex-grow/flex-basis (not just max-width) so the text and asset columns
        hold Figma's actual 473:691 ratio at every width from 1200px up, not
        just exactly at 1440px — flex-basis: 0% means the 952px (at 1200px) or
