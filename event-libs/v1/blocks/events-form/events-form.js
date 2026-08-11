@@ -1,7 +1,7 @@
 import { deleteAttendeeFromEvent, getAndCreateAndAddAttendee, getAttendee, getEvent, getCampaign, registerForSessionTime } from '../../utils/esp-controller.js';
 import BlockMediator from '../../deps/block-mediator.min.js';
 import { signIn, decorateEvent } from '../../utils/decorate.js';
-import { dictionaryManager, getInviteOnlyNoCampaignMessage, getRsvpTokenInvalidMessage, getRsvpTokenAlreadyRegisteredMessage } from '../../utils/dictionary-manager.js';
+import { dictionaryManager, getInviteOnlyNoCampaignMessage, getRsvpTokenInvalidMessage, getRsvpTokenAlreadyRegisteredMessage, getMultiSelectMoreSuffixMessage } from '../../utils/dictionary-manager.js';
 import { getEventConfig, LIBS, getMetadata, getSusiOptions, getValidCampaignIdFromUrl, resolveRoutedCampaignId, shouldForceGuestSignIn } from '../../utils/utils.js';
 import { FALLBACK_LOCALES, CAMPAIGN_ID_PATTERN, PHONE_FIELD_RE, PHONE_PATTERN  } from '../../utils/constances.js';
 import { BASE_ATTENDEE_DATA_FILTER } from '../../utils/data-utils.js';
@@ -54,15 +54,18 @@ function applyConsentCountrySelectValue(selectEl, stored) {
   if (byConsentId) selectEl.value = byConsentId.value;
 }
 
-function createSelect(fd) {
+const MULTI_SELECT_CONDENSED_VISIBLE_COUNT = 2;
+
+export function createSelect(fd) {
   const {
     field, placeholder, options, defval, required, type,
   } = fd;
 
+  const optionValues = options.split(';').map((o) => o.trim());
+
   const select = createTag('select', { id: field });
   if (placeholder) select.append(createTag('option', { class: 'placeholder-option', selected: '', disabled: '', value: '' }, dictionaryManager.getValue(placeholder, 'rsvp-fields')));
-  options.split(';').forEach(async (o) => {
-    const text = o.trim();
+  optionValues.forEach((text) => {
     const optionText = dictionaryManager.getValue(text, 'rsvp-fields');
     const option = createTag('option', { value: text }, optionText);
     select.append(option);
@@ -86,12 +89,35 @@ function createSelect(fd) {
 
     const selectedValues = new Set();
 
+    optionValues.forEach((text) => {
+      const label = createTag('label', {}, dictionaryManager.getValue(text, 'rsvp-fields'), { parent: customDropdown });
+      createTag('input', { type: 'checkbox', value: text, class: 'no-submit' }, '', { parent: label });
+    });
+
+    // Immutable snapshot of authoring order: re-sorting is always derived from this
+    // fixed reference rather than the (possibly already-reordered) live DOM, so a
+    // deselected option reliably returns to its original position.
+    const originalLabels = Array.from(customDropdown.children);
+
+    const sortDropdownOptions = () => {
+      const sorted = [...originalLabels].sort((a, b) => {
+        const aSelected = selectedValues.has(a.querySelector('input').value);
+        const bSelected = selectedValues.has(b.querySelector('input').value);
+        return Number(bSelected) - Number(aSelected);
+      });
+      sorted.forEach((label) => customDropdown.append(label));
+    };
+
     const updateSelectUI = () => {
       if (selectedValues.size === 0) {
         selectedOptions.textContent = placeholder || '-';
       } else {
-        const valuesArr = Array.from(selectedValues);
-        selectedOptions.textContent = valuesArr.join(', ');
+        const orderedSelected = optionValues.filter((v) => selectedValues.has(v));
+        const visible = orderedSelected.slice(0, MULTI_SELECT_CONDENSED_VISIBLE_COUNT);
+        const remaining = orderedSelected.length - visible.length;
+        selectedOptions.textContent = remaining > 0
+          ? `${visible.join(', ')} ${getMultiSelectMoreSuffixMessage(dictionaryManager, { count: remaining })}`
+          : visible.join(', ');
       }
 
       Array.from(select.options).forEach((opt) => {
@@ -102,13 +128,9 @@ function createSelect(fd) {
       customSelectBoxes.forEach((cb) => {
         cb.checked = selectedValues.has(cb.value);
       });
-    };
 
-    options.split(';').forEach((o) => {
-      const text = o.trim();
-      const label = createTag('label', {}, dictionaryManager.getValue(text, 'rsvp-fields'), { parent: customDropdown });
-      createTag('input', { type: 'checkbox', value: text, class: 'no-submit' }, '', { parent: label });
-    });
+      sortDropdownOptions();
+    };
 
     customSelect.addEventListener('click', () => {
       customDropdown.classList.toggle('hidden');

@@ -1374,6 +1374,93 @@ describe('Events Form', () => {
   });
 });
 
+describe('createSelect - multi-select combobox condensed view', () => {
+  let createSelect;
+  let sandbox;
+
+  before(async () => {
+    const module = await import('../../../../event-libs/v1/blocks/events-form/events-form.js');
+    createSelect = module.createSelect;
+  });
+
+  beforeEach(async () => {
+    const { dictionaryManager } = await import('../../../../event-libs/v1/utils/dictionary-manager.js');
+    sandbox = sinon.createSandbox();
+    sandbox.stub(dictionaryManager, 'getValue').callsFake((key) => key);
+  });
+
+  afterEach(() => {
+    sandbox.restore();
+  });
+
+  function buildField(overrides = {}) {
+    return {
+      field: 'productsOfInterest',
+      placeholder: 'Select products',
+      options: 'Acrobat;Illustrator;InDesign;Lightroom;Photoshop',
+      defval: '',
+      required: '',
+      type: 'multi-select',
+      ...overrides,
+    };
+  }
+
+  function check(wrapper, value, checked) {
+    const checkbox = wrapper.querySelector(`.custom-dropdown input[value="${value}"]`);
+    checkbox.checked = checked;
+    checkbox.dispatchEvent(new Event('change', { bubbles: true }));
+  }
+
+  function dropdownOrder(wrapper) {
+    return Array.from(wrapper.querySelectorAll('.custom-dropdown input'))
+      .map((cb) => cb.value);
+  }
+
+  it('shows the plain comma list when 2 or fewer options are selected', () => {
+    const wrapper = createSelect(buildField());
+    check(wrapper, 'Acrobat', true);
+    check(wrapper, 'Illustrator', true);
+    expect(wrapper.querySelector('.selected-options').textContent).to.equal('Acrobat, Illustrator');
+  });
+
+  it('condenses to "+N more" once selection exceeds the visible count', () => {
+    const wrapper = createSelect(buildField());
+    check(wrapper, 'Acrobat', true);
+    check(wrapper, 'Illustrator', true);
+    check(wrapper, 'Photoshop', true);
+    expect(wrapper.querySelector('.selected-options').textContent).to.equal('Acrobat, Illustrator +1 more');
+  });
+
+  it('drops the "+N more" suffix again once deselecting back under the threshold', () => {
+    const wrapper = createSelect(buildField());
+    check(wrapper, 'Acrobat', true);
+    check(wrapper, 'Illustrator', true);
+    check(wrapper, 'Photoshop', true);
+    check(wrapper, 'Photoshop', false);
+    expect(wrapper.querySelector('.selected-options').textContent).to.equal('Acrobat, Illustrator');
+  });
+
+  it('orders the condensed summary by the original option order, not selection order', () => {
+    const wrapper = createSelect(buildField());
+    check(wrapper, 'Photoshop', true);
+    check(wrapper, 'Acrobat', true);
+    expect(wrapper.querySelector('.selected-options').textContent).to.equal('Acrobat, Photoshop');
+  });
+
+  it('sorts a selected option to the top of the dropdown, preserving original relative order otherwise', () => {
+    const wrapper = createSelect(buildField());
+    check(wrapper, 'Lightroom', true);
+    expect(dropdownOrder(wrapper)).to.deep.equal(['Lightroom', 'Acrobat', 'Illustrator', 'InDesign', 'Photoshop']);
+  });
+
+  it('returns a deselected option to its original position in the dropdown', () => {
+    const wrapper = createSelect(buildField());
+    check(wrapper, 'Lightroom', true);
+    check(wrapper, 'Lightroom', false);
+    expect(dropdownOrder(wrapper)).to.deep.equal(['Acrobat', 'Illustrator', 'InDesign', 'Lightroom', 'Photoshop']);
+  });
+});
+
 describe('stripTags', () => {
   it('removes script tags and keeps inner text', () => {
     expect(stripTags('<script>alert()</script>')).to.equal('alert()');
