@@ -427,34 +427,8 @@
   }
 }
 
-/* Fixed max-width per direct request — keeps the text column from stretching
-   too wide once row layout puts it side-by-side with a narrower asset column,
-   or when there's no asset at all and it would otherwise be the row's only
-   content. Not a token: 500px doesn't map to any step in tokens.css's spacing
-   scale, and there's no Figma redline confirming this exact figure — treat it
-   as a literal placeholder until measured against a real frame. Only really
-   applies at 1440px+ in practice — see the 1200-1439px override right below,
-   which takes over for the narrower end of the row-layout range. */
-.event-marquee-text {
-  max-width: 500px;
-}
 
-/* At 1440px (Figma's own desktop reference width), 500px leaves the asset
-   plenty of room: 1440 - padding-inline(124px*2) - gap(48px) - 500px = 644px.
-   Reusing that same fixed 500px right down at the 1200px row-layout edge
-   doesn't scale down with it, though — at 1200px it only leaves the asset
-   ~404px (1200 - 248 - 48 - 500), which is why the asset was visibly
-   over-shrinking right after the column-to-row flip. Fix is on the text side,
-   not padding or the asset itself (per direct request): between 1200 and
-   1440px, cap text at half of whatever room the row actually has (minus half
-   the gap), so text and asset shrink together proportionally instead of text
-   holding a fixed 500px and eating whatever's left for the asset. The % is
-   relative to .event-marquee-foreground's own content-box width, so this
-   naturally scales with the real padding/gap in place, without hardcoding
-   those numbers into this calc too. Above 1440px the range query stops
-   applying and the base rule's fixed 500px (the Figma-confirmed value) takes
-   back over, since there's enough room there for it not to matter. */
-@media (min-width: 1200px) and (max-width: 1439.98px) {
+@media (min-width: 1200px) and (max-width: 1280px) {
   .event-marquee-text {
     max-width: calc(50% - (var(--s2a-spacing-3xl) / 2));
   }
