@@ -991,6 +991,19 @@ configurator work:
   temporary since before this ticket — never done). Now defined once in
   `tier-1-event-config.js`, exported, and imported by `default-track-icons.js`.
 
+### 16.8 Registration URL moved into the Tier 1 Event Configurator ✅
+
+`registerUrl` (the toast CTA target for logged-in-but-unregistered users, used by
+`action-feedback.js`) used to come solely from a separate page metadata field
+(`register-url`), independent of the Tier 1 Event Configurator's own config. Added
+`registerUrl` as an authored field there instead (`ConfigEditor.js`'s new "Registration"
+section, `ConfigsContext.js`), read via `session-store.js`'s `initSessionState()` —
+`tierOneConfig.registerUrl || '/register'`. The old `getMetadata('register-url')` fallback
+was removed outright, not kept for backward compatibility — this is now the only source.
+`startDuplicateConfig` resets it blank for the same reason it already resets
+`rfApiUrl`/`rfProfileId`: reusing another event's registration page would send attendees
+to register for the wrong event.
+
 ---
 
 ## Dependency Map

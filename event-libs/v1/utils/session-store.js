@@ -210,7 +210,7 @@ export function initSessionState() {
     apiUrl: tierOneConfig.rfApiUrl || defaultRfApiUrlForEnv(),
     eventId: getMetadata('event-id'),
     profileId: tierOneConfig.rfProfileId || DEFAULT_RF_PROFILE_ID,
-    registerUrl: getMetadata('register-url') || '/register',
+    registerUrl: tierOneConfig.registerUrl || '/register',
     manualCutoff: getMetadata('manual-on-demand-transition-time') || null,
     mrEnv: deriveMrEnv(),
   };

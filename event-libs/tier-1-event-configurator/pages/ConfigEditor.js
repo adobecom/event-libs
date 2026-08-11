@@ -212,6 +212,20 @@ export default function ConfigEditor() {
       </section>
 
       <section class="tec-editor__section">
+        <h2>Registration</h2>
+        <p class="tec-editor__section-hint">Where attendees are sent to register when a logged-in but unregistered user tries to schedule/favorite a session or view My Sessions/My Favorites. Leave blank and the page falls back to its own default.</p>
+        <label class="tec-editor__field-label" for="tec-register-url">Registration URL</label>
+        <input
+          id="tec-register-url"
+          type="text"
+          class="tec-field tec-editor__rf-input"
+          placeholder="/register"
+          value=${activeConfig.config.registerUrl || ''}
+          onInput=${(e) => updateConfigField('registerUrl', e.target.value)}
+        />
+      </section>
+
+      <section class="tec-editor__section">
         <h2>Config JSON</h2>
         <p class="tec-editor__section-hint">This is what gets saved to the row, and what you'll paste into the page's <code>tier-1-event-config</code> metadata after saving.</p>
         <pre class="tec-editor__config-preview">${configPreview}</pre>

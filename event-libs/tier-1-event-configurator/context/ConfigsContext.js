@@ -22,6 +22,7 @@ function emptyConfig() {
     featuredSessions: [],
     rfApiUrl: '',
     rfProfileId: '',
+    registerUrl: '',
   };
 }
 
@@ -92,8 +93,9 @@ const ConfigsProvider = ({ children }) => {
   // so carrying it over would silently mislabel the new event.
   // `eventServiceEnv` is the *new* pick's env, not the source row's —
   // Duplicate can legitimately target a different tier than its source.
-  // rfApiUrl/rfProfileId always reset blank — reusing another event's RF
-  // profile id would misroute this event's live schedule/favorites calls.
+  // rfApiUrl/rfProfileId/registerUrl always reset blank — reusing another event's RF
+  // profile id or registration page would misroute this event's live schedule/favorites
+  // calls or send attendees to register for the wrong event.
   const startDuplicateConfig = useCallback((sourceRow, event, eventServiceEnv) => {
     const clonedConfig = { ...sourceRow.config };
     delete clonedConfig.eventId;
@@ -104,7 +106,7 @@ const ConfigsProvider = ({ children }) => {
       backendEventTitle: event.enTitle || event.eventId,
       eventServiceEnv,
       config: {
-        ...clonedConfig, eventTitle: '', rfApiUrl: '', rfProfileId: '',
+        ...clonedConfig, eventTitle: '', rfApiUrl: '', rfProfileId: '', registerUrl: '',
       },
     });
   }, []);
