@@ -180,7 +180,7 @@
    match the 80px actually measured on this page, so referencing it would
    likely under-clear the header rather than reliably match it. */
 :root:has(meta[name="foundation"][content="c2"]) .event-marquee-background button.play-pause-button {
-  top: calc(80px + var(--s2a-spacing-lg));
+  top: calc(55px + var(--s2a-spacing-lg));
   bottom: auto;
 }
 
