@@ -1,7 +1,19 @@
 @import '../../styles/tokens.css';
 
-/* Ported from Milo's classic marquee.css, split + always-dark subset only (we don't
-   need the light/quiet/center/inline/one-third modifiers marquee.css also supports).
+/* Ported from Milo's classic marquee.css, split subset only (we don't need the
+   quiet/center/inline/one-third modifiers marquee.css also supports).
+   Color comes from Milo's own `.dark` class (libs/c2/styles/styles.css), not
+   a value hardcoded here — confirmed live: Milo's c2 stylesheet is already
+   loaded globally on any c2-foundation page, and its `.dark` class redefines
+   the semantic --s2a-color-content-* tokens (including --content-default) to
+   their light-on-dark values for whatever element carries it. Same mechanism
+   Rich Content relies on (rich-content.css never sets `color` itself either).
+   So: author the block as `Event Marquee (dark)` (plain Milo block-modifier
+   syntax — no custom code needed, same as `.contained`) to get the dark
+   treatment this block is currently built for; there's no light-mode Figma
+   frame yet, so `dark` should be included on every real instance for now,
+   same as before, just via the standard modifier convention instead of a
+   value baked into this file.
    Milo's spacing/color custom properties are swapped for our own s2a C2 tokens.
    Breakpoints: 768px is where layout structure changes (Milo's own grid-activation
    breakpoint — libs/c2/styles/styles.css's `@media (width >= 768px)`,
@@ -50,7 +62,7 @@
   box-sizing: border-box;
   overflow: hidden;
   width: 100%;
-  color: var(--s2a-color-content-knockout);
+  color: var(--s2a-color-content-default);
   font-family: var(--s2a-font-family-default);
   display: flex;
   flex-direction: column;
@@ -292,20 +304,17 @@
 }
 
 /* Ports marquee.css's `.action-area` (the CTA row's own wrapper — real Milo
-   decorateButtons adds this class to it automatically, so it's already present). */
+   decorateButtons adds this class to it automatically, so it's already present).
+   Row at every breakpoint, not just 1200px+ — per direct request, the CTAs
+   shouldn't stack into a column on mobile/tablet either. `wrap` still lets
+   them drop to a second line if both CTAs' text is too long to fit one row
+   at narrow widths, rather than forcing an overflow. */
 .event-marquee-text .action-area {
   display: flex;
   margin: 0;
   gap: var(--s2a-spacing-sm);
-  flex-flow: column wrap;
-  align-items: stretch;
-}
-
-@media (min-width: 1200px) {
-  .event-marquee-text .action-area {
-    flex-direction: row;
-    align-items: center;
-  }
+  flex-flow: row wrap;
+  align-items: center;
 }
 
 /* Asset (optional, in the foreground) — ports marquee.css's `.asset`/`.asset.bleed`.
@@ -475,7 +484,7 @@
   border: none;
   border-radius: var(--s2a-border-radius-round);
   background: var(--s2a-color-transparent-black-48);
-  color: var(--s2a-color-content-knockout);
+  color: var(--s2a-color-content-default);
   cursor: pointer;
 }
 
