@@ -13,8 +13,8 @@
    Padding is mobile/tablet-specific here — 24px left (--s2a-spacing-lg), 40px
    bottom (--s2a-spacing-2xl), both exact token matches, not Figma-measured for
    this tier. The desktop values (124px/60px, Figma-verified against the Desktop
-   1440 frame) apply as a 1280px+ override instead of being the default — see
-   the existing 1280px block below, which already holds this selector's other
+   1440 frame) apply as a 1200px+ override instead of being the default — see
+   the existing 1200px block below, which already holds this selector's other
    desktop-only overrides. */
 .upcoming-sessions--attached {
   position: absolute;
@@ -104,7 +104,7 @@
   background: var(--s2a-color-transparent-black-80, rgb(0 0 0 / 80%));
 }
 
-@media (min-width: 1280px) {
+@media (min-width: 1200px) {
   /* Figma (State B.2/C, Desktop 1440): the attached overlay's own content is
      "Upcoming" heading (24px) + 16px gap + session row (152px) = 192px, with no
      top padding — the 24px top pair coded before was a guess made before this was
