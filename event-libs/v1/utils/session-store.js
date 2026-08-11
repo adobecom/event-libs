@@ -138,6 +138,12 @@ function maybeLoadMyData() {
   if (!realAuthConfirmed || !auth.value.isLoggedIn) return;
   if (!rfAuthTokenSettled) return;
   myDataAttempted = true;
+  if (!rfAuthToken) {
+    // myData can't succeed without a token — skip it rather than firing a call that's
+    // guaranteed to fail. isRegistered stays undefined (unknown), not asserted false.
+    window.lana?.log('[session-store] no RF auth token — skipping myData, registration status unknown');
+    return;
+  }
   loadMyData();
 }
 
