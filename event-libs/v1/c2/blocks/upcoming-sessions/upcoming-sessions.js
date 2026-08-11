@@ -311,49 +311,12 @@ function scheduleStateTimers(sessions, dropSession) {
   return timers;
 }
 
-const ATTACHED_OVERLAY_GAP = 60;
-
-/* .upcoming-sessions--attached is position:absolute, anchored via CSS's own
-   `bottom: 0` fallback — fine as long as the marquee's foreground content
-   matches Figma's reference copy length, but real authored content (extra
-   headline lines, longer body copy) can render taller than that budget, and
-   `bottom: 0` doesn't move to compensate: the overlay just stays pinned to a
-   fixed spot and the foreground's overflow crowds into it, collapsing the
-   intended 60px gap. This measures the actual rendered gap live and sets an
-   inline `top` (relative to .event-marquee-upcoming-wrapper, the nearest
-   positioned ancestor) so the 60px gap holds regardless of content length. */
-function syncAttachedOverlayTop(el, marquee, wrapper) {
-  const foreground = marquee.querySelector('.event-marquee-foreground');
-  if (!foreground) return;
-  const top = foreground.getBoundingClientRect().bottom
-    - wrapper.getBoundingClientRect().top
-    + ATTACHED_OVERLAY_GAP;
-  el.style.top = `${Math.round(top)}px`;
-  el.style.bottom = 'auto';
-}
-
 function attachToPrecedingBlock(el) {
   const previous = el.previousElementSibling;
-  if (!previous?.classList.contains('attach-upcoming')) return undefined;
-
-  el.classList.add('upcoming-sessions--attached');
-  previous.classList.add('attach-upcoming--has-overlay');
-
-  const wrapper = previous.closest('.event-marquee-upcoming-wrapper');
-  const foreground = previous.querySelector('.event-marquee-foreground');
-  if (!wrapper || !foreground) return undefined;
-
-  const sync = () => syncAttachedOverlayTop(el, previous, wrapper);
-  sync();
-
-  /* ResizeObserver, not just a load/resize listener — the foreground's height
-     also changes from causes a plain resize listener would miss: web fonts
-     swapping in after first paint, a lazy-loaded background image/video
-     changing the row-layout asset's height, or the column<->row breakpoint
-     flip itself. */
-  const observer = new ResizeObserver(sync);
-  observer.observe(foreground);
-  return () => observer.disconnect();
+  if (previous?.classList.contains('attach-upcoming')) {
+    el.classList.add('upcoming-sessions--attached');
+    previous.classList.add('attach-upcoming--has-overlay');
+  }
 }
 
 function readSectionMetadata(el, key) {
@@ -428,7 +391,7 @@ export default async function init(el) {
 async function decorate(el) {
   el._upcomingSessionsCleanup?.();
 
-  const stopOverlaySync = attachToPrecedingBlock(el);
+  attachToPrecedingBlock(el);
 
   const rows = el.querySelectorAll(':scope > div');
   const heading = rows[0]?.textContent?.trim();
@@ -439,13 +402,11 @@ async function decorate(el) {
     sessions = payload ? JSON.parse(payload) : [];
   } catch (error) {
     window.lana?.log(`upcoming-sessions: failed to parse session payload: ${error.message}`);
-    stopOverlaySync?.();
     el.remove();
     return;
   }
 
   if (!sessions.length) {
-    stopOverlaySync?.();
     el.remove();
     return;
   }
@@ -498,7 +459,6 @@ async function decorate(el) {
   document.addEventListener('visibilitychange', onVisibilityChange);
 
   el._upcomingSessionsCleanup = () => {
-    stopOverlaySync?.();
     timers.forEach(clearTimeout);
     if (stopMobileRiderPolling) stopMobileRiderPolling();
     unsubscribeFavorited();

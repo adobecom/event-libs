@@ -10,15 +10,6 @@
    product direction this now matches desktop everywhere instead: the marquee
    reserves the same 913px at every tier (see event-marquee.css's min-height),
    and Upcoming Sessions overlays its bottom edge there too.
-   `bottom: 0` here is only a pre-JS fallback (avoids a collapsed/unpositioned
-   flash before script runs) — upcoming-sessions.js's syncAttachedOverlayTop
-   measures .event-marquee-foreground's actual rendered bottom edge live (via
-   ResizeObserver, not just once on load) and sets an inline `top` + `bottom:
-   auto` that overrides this. `bottom: 0` alone assumed the foreground's
-   content always fit Figma's reference copy length exactly — real authored
-   content (an extra headline line, longer body copy) can render taller than
-   that budget, and a static `bottom: 0` doesn't move to compensate, so the
-   60px gap this padding/JS is meant to guarantee would silently collapse.
    Padding is mobile/tablet-specific here — 24px left (--s2a-spacing-lg), 40px
    bottom (--s2a-spacing-2xl), both exact token matches, not Figma-measured for
    this tier. The desktop values (124px/60px, Figma-verified against the Desktop
