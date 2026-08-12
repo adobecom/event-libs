@@ -2652,7 +2652,7 @@
   font-size: 12px;
 }
 
-/* "+N" indicator for a session's additionalTracks (MWPW-200314 item 10) */
+/* "+N" indicator for a session's additionalTracks */
 .sg-category-badge__count {
   font-size: 12px;
   font-weight: 700;

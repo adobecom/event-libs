@@ -5,10 +5,9 @@ import { DEFAULT_TRACK_ICON_CONFIG, DEFAULT_OVERRIDE_TRACK_ICON } from '../v1/ut
 
 export { DEFAULT_TRACK_ICON_CONFIG, DEFAULT_OVERRIDE_TRACK_ICON };
 
-// Every known icon slug — the full set of <symbol> ids in track-icons.svg, plus 'star'
-// (the override icon, not tied to any single track). Passed as IconPicker.js's
-// useIconSlugOptions() base list — the synchronous initial state before federal's live
-// inventory resolves, and the fallback if that fetch fails.
+// Every known icon slug, plus 'star' (the override icon). Used as useIconSlugOptions()'s
+// base list — the synchronous initial state before federal's live inventory resolves,
+// and the fallback if that fetch fails.
 export const KNOWN_ICON_SLUGS = Object.freeze(
   [...new Set([...Object.values(DEFAULT_TRACK_ICON_CONFIG).map((entry) => entry.icon), 'star'])].sort(),
 );

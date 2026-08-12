@@ -85,14 +85,9 @@ function coerceRows(raw) {
   return raw ? [raw] : [];
 }
 
-// Reads a sheet and returns its rows plus the ETag, for optimistic-locking writes via
-// writeSheet. Rows are raw — caller decides how to parse `config` and which key IDs a row.
-//
-// A single-sheet document is `{ ":type":"sheet", "data":[...rows] }`; once it has more than
-// one named sheet, the whole response becomes multi-sheet, with our own rows nested one
-// level deeper under a sheet actually named "data". Any other named sheet (e.g. a foreign
-// tab added by hand) is captured as `otherSheets` so writeSheet/mutateSheet can round-trip
-// it unchanged instead of silently dropping it on the next save.
+// Reads a sheet and returns its rows + ETag, for optimistic-locking writes via writeSheet.
+// Handles both single-sheet and multi-sheet documents (our rows live under the "data" sheet
+// in the latter); any other named sheet is captured as `otherSheets` so writes round-trip it.
 export async function readSheet(org, repo, path) {
   const result = await daFetch(`/source/${org}/${repo}${path}`, getHeaders('GET'));
   if (!result.ok) return result;

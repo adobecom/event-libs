@@ -2,11 +2,9 @@ import { html, useState, useRef, useEffect, useMemo } from '../../v1/deps/htm-pr
 import { Icon } from '../../v1/features/icons/Icon.js';
 import { fetchFederalIconList } from '../../v1/features/icons/federal-icons.js';
 
-// Live-merges an optional curated base list with federal's actual inventory (fetched
-// once, cached in federal-icons.js) — feeds IconPicker's `options` prop. Newly-uploaded
-// federal icons show up with no event-libs code change, while already-curated slugs (if
-// any) stay selectable even before they land there. Pass no base list for a picker with
-// nothing curated yet (e.g. products, until federal has any).
+// Live-merges an optional curated base list with federal's actual icon inventory
+// (cached in federal-icons.js), so newly-uploaded federal icons appear with no code
+// change. Pass no base list when nothing's curated yet (e.g. products).
 export function useIconSlugOptions(baseSlugs = []) {
   const [slugs, setSlugs] = useState(baseSlugs);
 
@@ -22,11 +20,9 @@ export function useIconSlugOptions(baseSlugs = []) {
   return slugs;
 }
 
-// Custom combobox replacing a plain <select> — a native <select> can't render rich
-// per-option content (icon + name) across browsers, so this renders its own toggleable
-// panel: a search input plus a [icon][name] row per option, filtered as you type.
-// `color` is optional — omit it for icons that carry their own color (e.g. product
-// icons), so the trigger renders them unmodified instead of tinting with currentColor.
+// Custom combobox replacing a plain <select>, which can't render an icon + name per
+// option. `color` is optional — omit it for icons that carry their own color (e.g.
+// products) so the trigger doesn't tint them with currentColor.
 export default function IconPicker({ value, color, options, onChange, ariaLabel }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');

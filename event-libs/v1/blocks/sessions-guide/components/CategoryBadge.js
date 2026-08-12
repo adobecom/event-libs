@@ -2,9 +2,8 @@ import { html } from '../../../deps/htm-preact.js';
 import { Icon } from '../../../features/icons/Icon.js';
 import { resolveTrackBadge } from '../utils/session-filters.js';
 
-// Renders resolveTrackBadge()'s result, not the "Track" topic-tag attribute this
-// component used to read directly. Renders nothing for an excluded session — no "Other"
-// badge.
+// Renders resolveTrackBadge()'s badge; returns null (no "Other" fallback) for an
+// excluded session.
 export function CategoryBadge({ session, size }) {
   const badge = resolveTrackBadge(session);
   if (!badge) return null;

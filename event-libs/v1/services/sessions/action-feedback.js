@@ -106,11 +106,9 @@ function fallbackViewForUnauthorized() {
     : 'live-upcoming';
 }
 
-// Gates navigation to My Sessions/My Favorites, reusing the same login/registration toast
-// as the schedule/favorite actions. Returns the fallback view when blocked (toast already
-// shown), or null when accessible/ungated. Called from ViewDropdown's click handler and
-// reactively from MySessionsView/MyFavoritesView, covering every way a visitor can land on
-// these views.
+// Gates navigation to My Sessions/My Favorites, reusing the schedule/favorite actions'
+// login/registration toast. Returns the fallback view when blocked (toast already shown),
+// or null when accessible.
 export function checkViewAccess(view, { eventConfig }) {
   const label = GATED_VIEW_LABELS[view];
   if (!label) return null;

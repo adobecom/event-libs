@@ -30,11 +30,9 @@ export default function Library() {
   const [pickerMode, setPickerMode] = useState('new'); // 'new' | 'duplicate'
   const [duplicateSource, setDuplicateSource] = useState(null);
   const [rowPendingDelete, setRowPendingDelete] = useState(null);
-  // If EventPicker's listAllEvents() fails for any reason, fail over to
-  // ManualEventLookup (sticky per open, not per keystroke, so a transient
-  // failure doesn't force a doomed re-attempt). Scoped to the env that
-  // failed — switching env (from either picker) clears it, since a failure
-  // on one tier says nothing about another.
+  // If EventPicker's listAllEvents() fails, fail over to ManualEventLookup (sticky per
+  // open, not per keystroke). Scoped to the env that failed — switching env clears it,
+  // since failure on one tier says nothing about another.
   const [browseFailed, setBrowseFailed] = useState(false);
 
   useEffect(() => setBrowseFailed(false), [envName]);

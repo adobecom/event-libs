@@ -31,10 +31,9 @@ export const DEFAULT_TRACK_ICON_CONFIG = {
   'creativity-and-marketing-in-business': { icon: 'creativity-and-marketing-in-business', color: '#42A5F5' },
 };
 
-// Shown for the Override Primary Event Site Track case (free-text, not a real track — no
-// per-track icon/color to look up) — authored config always takes priority, this only
-// fills the gap before an event configures its own. Exported for the same reason as
-// DEFAULT_TRACK_ICON_CONFIG above.
+// Fallback icon/color for the free-text Override Primary Event Site Track (no per-track
+// lookup possible) — authored config always wins, this only fills the gap. Exported for
+// the same reason as DEFAULT_TRACK_ICON_CONFIG.
 export const DEFAULT_OVERRIDE_TRACK_ICON = { icon: 'star', color: '#6E6E6E' };
 
 function slugify(name) {

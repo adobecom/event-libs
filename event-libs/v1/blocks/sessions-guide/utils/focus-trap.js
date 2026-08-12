@@ -1,8 +1,6 @@
-// Milo's own focus trap (blocks/modal/modal.js) is baked into its own imperative,
-// append-to-body dialog construction and can't be pointed at an already-mounted,
-// Preact-managed container — so the drawer/filter panel need their own, lighter version
-// of the same technique: cycle Tab/Shift+Tab within the container, close on Escape,
-// and restore focus to whatever was focused before the trap activated.
+// Milo's shared focus trap (blocks/modal/modal.js) is baked into its own imperative,
+// append-to-body dialog and can't target an already-mounted, Preact-managed container —
+// hence this lighter, standalone version (see trapFocus() below).
 
 const FOCUSABLE_SELECTOR = 'a[href], button:not([disabled]), input:not([disabled]), '
   + 'select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';

@@ -27,11 +27,9 @@ function extractSymbols(svgText) {
 async function fetchMiloIcons(miloLibs) {
   try {
     const { fetchIcons } = await import(`${miloLibs}/features/icons/icons.js`);
-    // Milo's real fetchIcons() resolves to `null` (not a thrown error) on a failed/404
-    // sprite fetch (see milo/libs/features/icons/icons.js's getSVGsfromFile) — normalize
-    // to {} so a `miloIcons[iconName]` lookup below never throws. loadMiloIcons() below
-    // memoizes this promise forever, so an unguarded null here would break icon
-    // resolution permanently after one transient failure, not just for this call.
+    // fetchIcons() resolves to `null` (not a throw) on a failed sprite fetch — normalize
+    // to {} so lookups below never throw, and so one transient failure doesn't permanently
+    // break icon resolution via loadMiloIcons()'s promise memoization.
     const icons = await fetchIcons({ miloLibs });
     return icons || {};
   } catch (err) {

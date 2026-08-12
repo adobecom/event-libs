@@ -52,16 +52,9 @@ export function resolveTrackBadge(session) {
   };
 }
 
-// Places each session into every one of resolveTrackBadge().swimlanes, skipping excluded
-// sessions. swimlaneOrder is the Session Guide Configurator's authored
-// [{ track, displayName, enabled }] — `track` here is the original swimlane key, a real
-// track name or an override's exact text (the two are indistinguishable to this
-// function, matching resolveTrackBadge()'s uniform swimlanes[] output, so override lanes
-// work identically to track lanes with no special-casing). Disabled entries are dropped
-// entirely; displayName renames the label (returned as each result's 3rd tuple element)
-// without changing the key sessions are grouped/matched on. A swimlane with no
-// swimlaneOrder entry at all stays enabled under its own raw name, appended after the
-// ordered ones in first-seen order.
+// Places each session into every lane from resolveTrackBadge().swimlanes. swimlaneOrder
+// (authored [{ track, displayName, enabled }]) controls a lane's enabled state, display
+// name, and order; unlisted swimlanes stay enabled under their raw name, appended last.
 export function groupByTrack(sessions, swimlaneOrder) {
   const map = new Map();
   for (const s of sessions) {

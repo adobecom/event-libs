@@ -70,14 +70,9 @@ export function isPostEvent(sessionList, liveStreamActiveIds, nowMs, manualCutof
 }
 
 /**
- * Where "Watch now" should navigate, given a session's derived state.
- * Live sessions go to the homepage player (Livestreamed Content = Live) or the broadcast
- * page (Format = Online, and not already a homepage livestream); on-demand sessions go to
- * their own page instead. Returns '' when there's nothing to watch.
- *
- * Root-relative so it follows whatever domain is currently serving the page (dev/stage/
- * prod preview or production) instead of hardcoding one — the homepage/broadcast pages
- * live in the same site as this widget.
+ * Where "Watch now" navigates: homepage player if isLivestreamed, broadcast page if
+ * isOnline, own session page if on-demand, '' otherwise. Root-relative since the
+ * destination pages live on whatever domain is currently serving this page.
  */
 export function getWatchDestination(session, sessionState) {
   if (sessionState === 'on-demand') return session.sessionPageUrl || '';

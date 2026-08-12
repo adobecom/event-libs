@@ -152,7 +152,7 @@
   color: var(--s2a-color-content-default);
 }
 
-/* Additional Event Site Tracks stacked alongside the primary badge (MWPW-200314 item 10) */
+/* Additional Event Site Tracks stacked alongside the primary badge */
 .sg-detail__track-stack {
   display: flex;
   align-items: center;

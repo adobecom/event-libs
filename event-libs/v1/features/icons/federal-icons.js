@@ -1,10 +1,7 @@
-// Adobe's shared, cross-site icon CDN ("federal") — the centralized SVG repo Milo, DA,
-// and other adobe.com properties fetch at runtime. Reimplemented here (rather than
-// dynamically importing Milo's own getIcon()/fetchFederalIcon()) because the Tier 1
-// Event Configurator app runs standalone in a DA-hosted iframe with no Milo loaded at
-// all — this module works identically from both that app and a real Milo-decorated page.
-// Federal serves one standalone <svg> file per icon name, not a <symbol> sprite, so
-// parsing here is a plain DOMParser lookup for the <svg> root (no symbol extraction).
+// Adobe's shared, cross-site icon CDN ("federal"). Reimplemented here (instead of
+// importing Milo's getIcon()) because this module also runs standalone with no Milo
+// loaded. Federal serves one <svg> file per icon (not a <symbol> sprite), so parsing is a
+// plain DOMParser lookup.
 const PROD_ROOT = 'https://www.adobe.com';
 
 let federalRootOverride = null;
@@ -27,11 +24,9 @@ function resolveFederalRoot() {
   return PROD_ROOT;
 }
 
-// Map<name, SVGElement|null> — caches misses too, not just hits. Federal is one HTTP
-// request per icon name (no manifest), unlike the sprite-based tiers where a miss is a
-// free in-memory lookup — without this, every render of an icon not yet uploaded to
-// federal (e.g. any of the Digital Agenda track icons today) would re-fetch a 404 every
-// time.
+// Map<name, SVGElement|null> — caches misses too, not just hits, since federal is one
+// HTTP request per icon name (no manifest); without this, rendering an icon not yet
+// uploaded to federal would re-fetch a 404 on every render.
 const federalIconCache = new Map();
 
 export async function fetchFederalIcon(iconName) {
@@ -59,11 +54,9 @@ export async function fetchFederalIcon(iconName) {
   return svg ? svg.cloneNode(true) : null;
 }
 
-// icons.json is federal's own manifest of every icon it hosts — a standard Helix sheet
-// export ({ data: [{ key, icon, notation }] }), the same convention DA's library plugin
-// reads for its per-org icon config sheets. Used to populate icon pickers (e.g. the Tier
-// 1 Event Configurator's track icon dropdown) with federal's live inventory, rather than
-// a hardcoded list that drifts as icons are added there.
+// icons.json is federal's own manifest of every icon it hosts (a standard Helix sheet
+// export). Used to populate icon pickers with federal's live inventory instead of a
+// hardcoded list that would drift as icons are added there.
 let federalIconListPromise = null;
 
 export function fetchFederalIconList() {

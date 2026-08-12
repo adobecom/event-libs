@@ -40,10 +40,9 @@ export default function ConfigEditor() {
         return;
       }
       setSessions(result.data.sessions);
-      // Swimlanes include both real tracks and override-lane names (each distinct
-      // Override Primary Event Site Track value is its own swimlane, same as the live
-      // page's groupByTrack()) — deduped in case a track name and an override text
-      // happen to collide, so seedSwimlaneOrder never sees a duplicate key.
+      // Swimlanes include real tracks and override-lane names (each distinct Override
+      // Primary Event Site Track value is its own swimlane, matching groupByTrack()) —
+      // deduped in case a track name and override text collide.
       const swimlaneCandidates = [...new Set([
         ...extractDistinctTracks(result.data.sessions),
         ...extractDistinctOverrideTexts(result.data.sessions),

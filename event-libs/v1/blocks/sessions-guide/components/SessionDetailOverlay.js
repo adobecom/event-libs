@@ -52,8 +52,8 @@ export function SessionDetailOverlay({ onBack }) {
     }
   }
 
-  // Digital Agenda Track badge (MWPW-200314 item 10) — null for a session with neither a
-  // primary track nor an override (no "Other" badge shown, matching swimlane placement).
+  // null for a session with neither a primary track nor an override — no "Other" badge,
+  // matching swimlane placement.
   const trackBadge = resolveTrackBadge(session);
   const startShort = session.startTimeUtc ? formatShortTime(session.startTimeUtc, userTz) : '';
   const endShort = session.endTimeUtc ? formatShortTime(session.endTimeUtc, userTz) : '';
