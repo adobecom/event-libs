@@ -8,7 +8,7 @@ import {
 } from '../../../utils/session-store.js';
 import { getTrackIcon } from '../../../utils/tier-1-event-config.js';
 import { resolveIcon } from '../../../features/icons/icon-resolver.js';
-import { scheduleWithFeedback, favoriteWithFeedback } from '../../../services/sessions/action-feedback.js';
+import { toggleScheduleWithFeedback, toggleFavoriteWithFeedback } from '../../../services/sessions/action-feedback.js';
 import MobileRiderController from '../../../services/sessions/mobile-rider-controller.js';
 
 const ROTATE_OUT_MS = 350;
@@ -129,7 +129,7 @@ async function handleSchedule(e, session, isScheduled, btn) {
   e.stopPropagation();
   btn.disabled = true;
   try {
-    await scheduleWithFeedback(toRfSession(session), { eventConfig: EVENT_CONFIG, isScheduled });
+    await toggleScheduleWithFeedback(toRfSession(session), { eventConfig: EVENT_CONFIG, isScheduled });
   } finally {
     btn.disabled = false;
   }
@@ -139,7 +139,7 @@ async function handleFavorite(e, session, isFavorited, btn) {
   e.stopPropagation();
   btn.disabled = true;
   try {
-    await favoriteWithFeedback(toRfSession(session), { eventConfig: EVENT_CONFIG, isFavorited });
+    await toggleFavoriteWithFeedback(toRfSession(session), { eventConfig: EVENT_CONFIG, isFavorited });
   } finally {
     btn.disabled = false;
   }
