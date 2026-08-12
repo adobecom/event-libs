@@ -79,7 +79,8 @@
   flex: 1 1 auto;
   min-height: 0;
   gap: var(--s2a-spacing-lg);
-  padding-block: 128px;
+  padding-top: 128px;
+  padding-bottom: var(--s2a-spacing-2xl);
   padding-inline: var(--s2a-spacing-lg);
 }
 
@@ -130,7 +131,7 @@
 }
 
 .event-marquee-video-title {
-  margin: var(--s2a-spacing-xs) 0 0;
+  margin: var(--s2a-spacing-md) 0 0;
   font-family: var(--s2a-font-family-label);
   font-size: var(--s2a-typography-font-size-label);
   font-style: normal;
@@ -178,7 +179,6 @@
   .event-marquee-foreground {
     flex-direction: row;
     padding-top: var(--s2a-layout-md);
-    padding-bottom: var(--s2a-layout-sm);
     padding-inline: 86px;
     gap: 27px;
   }
@@ -224,7 +224,6 @@
 @media (min-width: 1440px) {
   .event-marquee-foreground {
     padding-top: 128px;
-    padding-bottom: var(--s2a-layout-md);
     padding-inline: var(--s2a-layout-lg);
     gap: var(--s2a-spacing-2xl);
   }
@@ -242,7 +241,6 @@
 @media (min-width: 1920px) {
   .event-marquee-foreground {
     padding-top: var(--s2a-layout-xl);
-    padding-bottom: 128px;
     padding-inline: 220px;
     gap: var(--s2a-layout-sm);
   }

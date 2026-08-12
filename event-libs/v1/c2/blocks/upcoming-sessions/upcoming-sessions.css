@@ -10,18 +10,18 @@
    product direction this now matches desktop everywhere instead: the marquee
    reserves the same 913px at every tier (see event-marquee.css's min-height),
    and Upcoming Sessions overlays its bottom edge there too.
-   Padding is mobile/tablet-specific here — 24px left (--s2a-spacing-lg), 40px
-   bottom (--s2a-spacing-2xl), both exact token matches, not Figma-measured for
-   this tier. The desktop values (124px/60px, Figma-verified against the Desktop
-   1440 frame) apply as a 1200px+ override instead of being the default — see
-   the existing 1200px block below, which already holds this selector's other
-   desktop-only overrides. */
+   Padding is mobile/tablet-specific here — 24px left (--s2a-spacing-lg, exact
+   token match), 56px bottom (no exact token match, literal px). The desktop
+   values (124px/60px, Figma-verified against the Desktop 1440 frame) apply as
+   a 1200px+ override instead of being the default — see the existing 1200px
+   block below, which already holds this selector's other desktop-only
+   overrides. */
 .upcoming-sessions--attached {
   position: absolute;
   left: 0;
   right: 0;
   bottom: 0;
-  padding: 0 0 var(--s2a-spacing-2xl) var(--s2a-spacing-lg);
+  padding: 0 0 56px var(--s2a-spacing-lg);
 }
 
 .upcoming-sessions-header {
