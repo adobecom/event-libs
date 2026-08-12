@@ -25,6 +25,9 @@ const EVENT_BLOCKS = [
 ];
 
 const EVENT_BLOCKS_C2 = [
+  'card-c2',
+  'slider',
+  'upcoming-sessions',
   'chrono-box',
   'mobile-rider',
 ];
