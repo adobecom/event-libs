@@ -24,12 +24,13 @@ function sectionMetadataHtml(rows = {}) {
 // Same row shape as Milo's classic marquee.js: an optional first row is the
 // full-bleed background; the last row is the foreground (text + optional asset).
 function videoVariantHtml({
-  sessionId = 's-100', favoriteEnabled, shareEnabled, withBackground = true,
+  sessionId = 's-100', favoriteEnabled, shareEnabled, videoTitle, withBackground = true,
 } = {}) {
   const metaRows = {};
   if (sessionId) metaRows['session-id'] = sessionId;
   if (favoriteEnabled !== undefined) metaRows['favorite-enabled'] = favoriteEnabled;
   if (shareEnabled !== undefined) metaRows['share-enabled'] = shareEnabled;
+  if (videoTitle !== undefined) metaRows['video-title'] = videoTitle;
 
   const backgroundRow = withBackground
     ? '<div><div><picture><img src="./bg.jpg" alt=""></picture></div></div>'
@@ -253,6 +254,40 @@ describe('event-marquee', () => {
       await init(el);
       expect(el.classList.contains('event-marquee-video')).to.be.true;
       expect(el.querySelector('.event-marquee-background')).to.not.exist;
+    });
+
+    it('renders a video title under the player when video-title is authored', async () => {
+      document.body.innerHTML = videoVariantHtml({ sessionId: '', videoTitle: 'Keynote replay title' });
+      const el = document.querySelector('.event-marquee');
+      await init(el);
+      const title = el.querySelector('.event-marquee-media .event-marquee-video-title');
+      expect(title).to.exist;
+      expect(title.textContent).to.equal('Keynote replay title');
+    });
+
+    it('does not render a video title when video-title is not authored', async () => {
+      document.body.innerHTML = videoVariantHtml({ sessionId: '' });
+      const el = document.querySelector('.event-marquee');
+      await init(el);
+      expect(el.querySelector('.event-marquee-video-title')).to.not.exist;
+    });
+
+    it('does not render a video title for an ambient/decorative video asset (no player)', async () => {
+      document.body.innerHTML = `
+        <div class="event-marquee">
+          <div>
+            <div><h2>Behind the scenes</h2></div>
+            <div>
+              <div class="video-container video-holder">
+                <video playsinline muted loop data-video-source="./loop.mp4"><source src="./loop.mp4" type="video/mp4"></video>
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
+      const el = document.querySelector('.event-marquee');
+      await init(el);
+      expect(el.querySelector('.event-marquee-video-title')).to.not.exist;
     });
 
     it('preserves the original casing of session-id and event-title from Section Metadata', async () => {
