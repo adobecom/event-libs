@@ -10,11 +10,6 @@ const ICON_HEART_OUTLINE = '<svg width="20" height="20" viewBox="0 0 20 20" fill
 const ICON_HEART_FILLED = '<svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false"><path d="M8.61426 17.5195C9.02246 17.8398 9.51123 18 10 18C10.4888 18 10.9781 17.8398 11.3858 17.5195C12.9732 16.2734 16.5908 13.0039 17.7603 11.0908C18.6929 9.56543 19.0132 7.67773 18.6172 6.04199C18.2774 4.63769 17.4551 3.50488 16.2393 2.76367C14.9116 1.95409 13.2705 1.79003 11.959 2.34179C11.2647 2.63183 10.5698 3.1416 9.99171 3.77148C9.42628 3.17773 8.72316 2.65234 8.063 2.35058C6.78419 1.7666 5.13526 1.9248 3.76124 2.76367C2.54493 3.50488 1.72266 4.63769 1.38282 6.04199C0.98682 7.67773 1.30713 9.56543 2.23975 11.0908C3.41162 13.0078 7.02832 16.2754 8.61426 17.5195Z" fill="currentColor"/></svg>';
 const ICON_SHARE = '<svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false"><path d="M14.5 6.5C15.8807 6.5 17 5.38071 17 4C17 2.61929 15.8807 1.5 14.5 1.5C13.1193 1.5 12 2.61929 12 4C12 4.16249 12.0154 4.32158 12.0447 4.4759L6.68625 7.62766C6.21886 7.09565 5.5387 6.76 4.78125 6.76C3.39871 6.76 2.28125 7.87746 2.28125 9.26C2.28125 10.6425 3.39871 11.76 4.78125 11.76C5.53927 11.76 6.21996 11.4239 6.68738 10.8912L12.0447 14.0416C12.0154 14.1959 12 14.355 12 14.5175C12 15.8982 13.1193 17.0175 14.5 17.0175C15.8807 17.0175 17 15.8982 17 14.5175C17 13.1368 15.8807 12.0175 14.5 12.0175C13.7412 12.0175 13.0603 12.3546 12.5928 12.8879L7.23752 9.73838C7.26721 9.58281 7.28125 9.42246 7.28125 9.26C7.28125 9.09708 7.26714 8.93627 7.23731 8.78028L12.5936 5.6289C13.0611 6.16257 13.7417 6.5 14.5 6.5Z" fill="currentColor"/></svg>';
 
-// Same row shape as Milo's classic marquee.js: an optional first row is the full-bleed
-// BACKGROUND (image/ambient video, behind everything); the last row is the FOREGROUND
-// (text, plus an optional "asset" cell — a side image or, for us, an interactive
-// player — that bleeds to one edge rather than covering the whole marquee). A
-// single-row marquee has no separate background, only a foreground.
 function parseContent(el) {
   const rows = [...el.querySelectorAll(':scope > div')];
   const foregroundRow = rows[rows.length - 1];
@@ -25,9 +20,6 @@ function parseContent(el) {
   };
 }
 
-// Mirrors router-marquee.js#reorderSlidesMaybe's own lookup of a sibling
-// `.section-metadata` block, using Milo's real `getMetadata` helper (dynamically
-// imported, since we're an external consumer, not Milo itself).
 async function getSectionConfig(el, miloLibs) {
   const config = {
     title: '', sessionId: '', favoriteEnabled: null, shareEnabled: null,
@@ -39,8 +31,6 @@ async function getSectionConfig(el, miloLibs) {
   const { getMetadata: getSectionMetadata } = await import(`${miloLibs}/c2/blocks/section-metadata/section-metadata.js`);
   const metadata = getSectionMetadata(sectionMeta);
 
-  // `.text` values are lowercased by Milo's helper (fine for the true/false flags);
-  // title/session-id need their original casing, so read `.content` instead.
   if (metadata['event-title']) config.title = metadata['event-title'].content[0]?.textContent.trim() || '';
   if (metadata['session-id']) config.sessionId = metadata['session-id'].content[0]?.textContent.trim() || '';
   if (metadata['favorite-enabled']) config.favoriteEnabled = metadata['favorite-enabled'].text[0] === 'true';
@@ -49,14 +39,6 @@ async function getSectionConfig(el, miloLibs) {
   return config;
 }
 
-// Video variant is auto-detected the same way Milo's own C2 router-marquee detects
-// it — from content already decorated into place, not an authored field. `.milo-video`
-// covers MPC/tv.adobe.com and YouTube (both use that class). A `mobilerider.com` link
-// is event-libs' own equivalent — but the *consuming site's* own decorateArea() calls
-// processAutoBlockLinks(document) globally, before any block's init() runs, so by the
-// time we get here the anchor is usually already converted into a `.mobile-rider` div.
-// Check for both: the already-processed div (the common real-world case) and the raw,
-// unprocessed anchor (our own demo/tests, where nothing has processed it yet).
 function detectPlayer(mediaCol) {
   if (!mediaCol) return null;
   if (mediaCol.querySelector('.mobile-rider')) return { type: 'mobile-rider', processed: true };
@@ -67,13 +49,6 @@ function detectPlayer(mediaCol) {
   return null;
 }
 
-// Split/bleed layout is triggered by *any* foreground asset — an interactive player,
-// or a plain decorative image/ambient video (Milo's own generic `.mp4` AUTO_BLOCK,
-// which also covers this: decorateAnchorVideo wraps it in `.video-container`, and
-// addAccessibilityControl even emits the already-C2-tokenized play/pause button for
-// free on `foundation:c2` pages — video.css handles all of that, no new code here).
-// Favorite/share, however, are gated on `detectPlayer` specifically — a decorative
-// asset has no associated session to favorite.
 function hasAsset(mediaCol) {
   return !!mediaCol && (mediaCol.children.length > 0 || !!mediaCol.textContent.trim());
 }
@@ -143,12 +118,15 @@ function resolveSession(sessionId, render) {
   });
 }
 
-function decorateActions(mediaCol, config) {
+function decorateActions(textCol, config) {
   const shareEnabled = config.shareEnabled ?? true;
   const favoriteEnabled = (config.favoriteEnabled ?? true) && !!config.sessionId;
   if (!shareEnabled && !favoriteEnabled) return;
 
-  const actions = createTag('div', { class: 'event-marquee-actions' }, '', { parent: mediaCol });
+  let actionArea = textCol.querySelector('.action-area');
+  if (!actionArea) actionArea = createTag('p', { class: 'action-area' }, '', { parent: textCol });
+
+  const actions = createTag('div', { class: 'event-marquee-actions' }, '', { parent: actionArea });
 
   if (favoriteEnabled) {
     initSessionState();
@@ -164,19 +142,6 @@ function decorateActions(mediaCol, config) {
   if (shareEnabled) actions.append(buildShareButton());
 }
 
-// Wraps this marquee + the following upcoming-sessions block together so
-// .upcoming-sessions--attached's `position: absolute` overlay anchors to a box we
-// control, not `.section` itself. Anchoring to `.section` only lined up with the
-// marquee by coincidence — it assumed the section's own rendered box exactly matched
-// the marquee's box, which held only as long as nothing else changed the section's
-// width. Real pages set section styles like `container`/`wide` directly on `.section`
-// (Milo's `.container { width: var(--grid-container-width); margin: 0 auto; }`),
-// narrowing/centering it independently of the marquee's own 100%-width box — visibly
-// detaching the overlay from the marquee's actual edges. Wrapping both blocks removes
-// the dependency on `.section`'s own styling entirely: the wrapper has no width or
-// padding of its own, so its box is always exactly the marquee's box. Guarded against
-// re-decoration: once wrapped, el's own parent already carries the wrapper class, so
-// a second init() call is a no-op instead of nesting another wrapper around it.
 function attachUpcomingSessionsWrapper(el) {
   if (!el.classList.contains('attach-upcoming')) return;
   if (el.parentElement?.classList.contains('event-marquee-upcoming-wrapper')) return;
@@ -224,7 +189,7 @@ export default async function init(el) {
   if (showsAsset) mediaCol.classList.add('event-marquee-bleed');
 
   if (player?.type === 'mobile-rider' && !player.processed) processAutoBlockLinks(mediaCol);
-  if (player) decorateActions(mediaCol, config);
+  if (player) decorateActions(textCol, config);
 
   attachUpcomingSessionsWrapper(el);
 }

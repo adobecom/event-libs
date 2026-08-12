@@ -4,12 +4,20 @@
   position: relative;
 }
 
-@media (max-width: 1199.98px) {
+@media (max-width: 1199px) {
   .section.container:has(> .event-marquee-upcoming-wrapper),
   .section.container:has(> .event-marquee),
   .event-marquee.container,
   .event-marquee-upcoming-wrapper:has(.event-marquee.container) {
     padding-inline: 0;
+  }
+
+  .event-marquee-text {
+    padding-inline: var(--s2a-spacing-lg);
+  }
+
+  .event-marquee:has(.play-pause-button) .event-marquee-text {
+    padding-right: calc(var(--s2a-spacing-lg) + var(--s2a-spacing-4xl));
   }
 }
 
@@ -60,7 +68,7 @@
   bottom: auto;
 }
 
-@media (width >= 1280px) {
+@media (min-width: 1280px) {
   :root:has(meta[name="foundation"][content="c2"]) .event-marquee-background button.play-pause-button {
     top: calc(var(--s2a-spacing-3xl) + var(--s2a-spacing-xl));
     bottom: auto;
@@ -74,12 +82,6 @@
   background: linear-gradient(108deg, rgb(0 0 0 / 60%) 0%, rgb(0 0 0 / 0%) 98.86%);
 }
 
-@media (min-width: 1200px) {
-  .event-marquee-background::after {
-    background: linear-gradient(108deg, rgb(0 0 0 / 56%) 0%, rgb(0 0 0 / 0%) 98.86%);
-  }
-}
-
 .event-marquee-foreground {
   position: relative;
   display: flex;
@@ -88,30 +90,6 @@
   min-height: 0;
   gap: var(--s2a-spacing-xl);
   padding-block: var(--s2a-layout-sm);
-  pointer-events: none;
-}
-
-.event-marquee-foreground > * {
-  pointer-events: auto;
-}
-
-@media (max-width: 1199.98px) {
-  .event-marquee-text {
-    padding-inline: var(--s2a-spacing-lg);
-  }
-
-  .event-marquee:has(.play-pause-button) .event-marquee-text {
-    padding-right: calc(var(--s2a-spacing-lg) + var(--s2a-spacing-4xl));
-  }
-}
-
-@media (min-width: 1200px) {
-  .event-marquee-foreground {
-    flex-direction: row;
-    padding-top: var(--s2a-layout-xl);
-    padding-inline: var(--s2a-layout-lg);
-    gap: 28px;
-  }
 }
 
 .event-marquee-text,
@@ -125,12 +103,6 @@
 
 .event-marquee-text > :not(.action-area):has(+ .action-area) {
   margin-bottom: var(--s2a-spacing-lg);
-}
-
-@media (min-width: 1200px) {
-  .event-marquee-text > :not(.action-area) {
-    margin-bottom: var(--s2a-spacing-lg);
-  }
 }
 
 .event-marquee-text .action-area {
@@ -147,7 +119,7 @@
   width: 100%;
 }
 
-@media (min-width: 768px) and (max-width: 1199.98px) {
+@media (min-width: 768px) and (max-width: 1199px) {
   .event-marquee-media {
     width: 83.4%;
   }
@@ -172,42 +144,7 @@
   object-fit: cover;
 }
 
-@media (min-width: 1200px) {
-  .event-marquee-media video {
-    height: 100%;
-    object-fit: cover;
-  }
-
-  .event-marquee-text {
-    display: inline-flex;
-    flex-direction: column;
-    align-items: flex-start;
-    align-self: flex-start;
-    flex: 473 1 0%;
-    min-width: 0;
-    max-width: 473px;
-  }
-
-  .event-marquee-bleed {
-    flex: 691 1 0%;
-    min-width: 0;
-  }
-
-  .event-marquee-bleed picture,
-  .event-marquee-bleed > video {
-    height: 100%;
-  }
-
-  .event-marquee-bleed > video {
-    object-fit: cover;
-  }
-}
-
 .event-marquee-actions {
-  position: absolute;
-  z-index: 2;
-  top: var(--s2a-spacing-md);
-  right: var(--s2a-spacing-md);
   display: flex;
   gap: var(--s2a-spacing-xs);
 }
@@ -239,6 +176,50 @@
 }
 
 @media (min-width: 1200px) {
+  .event-marquee-background::after {
+    background: linear-gradient(108deg, rgb(0 0 0 / 56%) 0%, rgb(0 0 0 / 0%) 98.86%);
+  }
+
+  .event-marquee-foreground {
+    flex-direction: row;
+    padding-top: var(--s2a-layout-xl);
+    padding-inline: var(--s2a-layout-lg);
+    gap: 28px;
+  }
+
+  .event-marquee-text > :not(.action-area) {
+    margin-bottom: var(--s2a-spacing-lg);
+  }
+
+  .event-marquee-media video {
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .event-marquee-text {
+    display: inline-flex;
+    flex-direction: column;
+    align-items: flex-start;
+    align-self: flex-start;
+    flex: 473 1 0%;
+    min-width: 0;
+    max-width: 473px;
+  }
+
+  .event-marquee-bleed {
+    flex: 691 1 0%;
+    min-width: 0;
+  }
+
+  .event-marquee-bleed picture,
+  .event-marquee-bleed > video {
+    height: 100%;
+  }
+
+  .event-marquee-bleed > video {
+    object-fit: cover;
+  }
+
   .event-marquee-text-cta .event-marquee-foreground {
     justify-content: flex-start;
   }
