@@ -3,11 +3,12 @@ import { getEventSessionCatalog } from '../../v1/utils/esp-controller.js';
 import { useNavigation } from '../context/NavigationContext.js';
 import { useConfigs } from '../context/ConfigsContext.js';
 import {
-  copyTextToClipboard, extractDistinctTracks, extractDistinctOverrideTexts, isTrackIconEntryComplete,
-  getDisplayTitle, stringifyConfig,
+  copyTextToClipboard, extractDistinctTracks, extractDistinctOverrideTexts, extractDistinctProducts,
+  isTrackIconEntryComplete, getDisplayTitle, stringifyConfig,
 } from '../utils.js';
 import TrackIconEditor from '../components/TrackIconEditor.js';
 import OverrideTrackIconEditor from '../components/OverrideTrackIconEditor.js';
+import ProductIconEditor from '../components/ProductIconEditor.js';
 import FeaturedSessionsEditor from '../components/FeaturedSessionsEditor.js';
 import LoadingInline from '../components/LoadingInline.js';
 
@@ -15,7 +16,7 @@ export default function ConfigEditor() {
   const { goToLibrary } = useNavigation();
   const {
     activeConfig, saveActiveConfig, clearActiveConfig, updateTrackIcon, seedTrackIcons,
-    updateOverrideTrackIcon, updateConfigField, setToastSuccess, setToastError,
+    updateOverrideTrackIcon, updateProductIcon, updateConfigField, setToastSuccess, setToastError,
   } = useConfigs();
 
   const [sessions, setSessions] = useState([]);
@@ -48,6 +49,7 @@ export default function ConfigEditor() {
 
   const tracks = useMemo(() => extractDistinctTracks(sessions), [sessions]);
   const overrideTexts = useMemo(() => extractDistinctOverrideTexts(sessions), [sessions]);
+  const products = useMemo(() => extractDistinctProducts(sessions), [sessions]);
 
   const configPreview = useMemo(() => {
     if (!activeConfig) return '';
@@ -115,7 +117,7 @@ export default function ConfigEditor() {
         ${isLoadingSessions && html`<${LoadingInline} label="Loading sessions…" />`}
         ${sessionsError && html`<p class="tec-editor__error">${sessionsError}</p>`}
         ${!isLoadingSessions && !sessionsError && html`
-          <p class="tec-editor__section-hint">${sessions.length} session(s) found — ${tracks.length} distinct track(s).</p>
+          <p class="tec-editor__section-hint">${sessions.length} session(s) found — ${tracks.length} distinct track(s), ${products.length} distinct product(s).</p>
         `}
       </section>
 
@@ -149,6 +151,19 @@ export default function ConfigEditor() {
             defaultOverrideIcon=${activeConfig.config.overrideTrackIcon}
             onChangeMapped=${updateOverrideTrackIcon}
             onChangeDefault=${(value) => updateConfigField('overrideTrackIcon', value)}
+          />
+        `}
+      </section>
+
+      <section class="tec-editor__section">
+        <h2>Product icons</h2>
+        <p class="tec-editor__section-hint">Products already have their own colored icons — no color to set here, just an icon per product. Not all product icons are available yet; unset ones fall back to the page's own default at render time.</p>
+        ${isLoadingSessions && html`<${LoadingInline} label="Loading products…" />`}
+        ${!isLoadingSessions && !sessionsError && html`
+          <${ProductIconEditor}
+            products=${products}
+            productIcons=${activeConfig.config.productIcons}
+            onChange=${updateProductIcon}
           />
         `}
       </section>

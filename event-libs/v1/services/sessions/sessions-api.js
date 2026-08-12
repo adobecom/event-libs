@@ -98,6 +98,23 @@ export function extractDistinctOverrideTexts(sessions) {
   return [...texts].sort();
 }
 
+const PRODUCT_ATTRIBUTE_NAME = 'Product';
+
+// Product is multi-select (a session can tag several products), unlike track/override —
+// so this returns every value on the session, not just the first.
+export function getSessionProducts(session) {
+  const attr = (session?.customAttributes || []).find((a) => a?.name === PRODUCT_ATTRIBUTE_NAME);
+  return (attr?.values || []).map((v) => v?.label ?? v?.value).filter(Boolean);
+}
+
+export function extractDistinctProducts(sessions) {
+  const products = new Set();
+  (sessions || []).forEach((session) => {
+    getSessionProducts(session).forEach((value) => products.add(value));
+  });
+  return [...products].sort();
+}
+
 // Derives facetable custom attributes + their distinct values from an already-fetched
 // session catalog, mirroring the enabled/inputType/valueId filtering ESP's own
 // /session-facets endpoint applies server-side, so results match it without an extra

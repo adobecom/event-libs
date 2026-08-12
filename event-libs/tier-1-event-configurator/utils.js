@@ -1,5 +1,6 @@
 export {
   getSessionTrack, extractDistinctTracks, getSessionOverrideText, extractDistinctOverrideTexts,
+  getSessionProducts, extractDistinctProducts,
 } from '../v1/services/sessions/sessions-api.js';
 
 // Copies text to the clipboard, falling back to a hidden textarea +

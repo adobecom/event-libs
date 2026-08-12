@@ -18,6 +18,7 @@ function emptyConfig() {
     trackIcons: {},
     overrideTrackIcon: null,
     overrideTrackIcons: {},
+    productIcons: {},
     allowDoubleBooking: false,
     featuredSessions: [],
     rfApiUrl: '',
@@ -178,6 +179,20 @@ const ConfigsProvider = ({ children }) => {
     });
   }, []);
 
+  // Simpler than updateTrackIcon — a single icon slug per product, no color to merge.
+  const updateProductIcon = useCallback((product, icon) => {
+    setActiveConfig((prev) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        config: {
+          ...prev.config,
+          productIcons: { ...prev.config.productIcons, [product]: icon },
+        },
+      };
+    });
+  }, []);
+
   // Sets a single top-level config field (e.g. allowDoubleBooking,
   // featuredSessions, rfApiUrl, rfProfileId) immutably, so the Config JSON
   // preview stays in sync.
@@ -241,6 +256,7 @@ const ConfigsProvider = ({ children }) => {
     updateTrackIcon,
     seedTrackIcons,
     updateOverrideTrackIcon,
+    updateProductIcon,
     updateConfigField,
     saveActiveConfig,
     removeConfig,

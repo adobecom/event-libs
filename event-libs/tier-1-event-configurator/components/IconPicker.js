@@ -1,9 +1,32 @@
 import { html, useState, useRef, useEffect, useMemo } from '../../v1/deps/htm-preact.js';
 import { Icon } from '../../v1/features/icons/Icon.js';
+import { fetchFederalIconList } from '../../v1/features/icons/federal-icons.js';
+
+// Live-merges an optional curated base list with federal's actual inventory (fetched
+// once, cached in federal-icons.js) — feeds IconPicker's `options` prop. Newly-uploaded
+// federal icons show up with no event-libs code change, while already-curated slugs (if
+// any) stay selectable even before they land there. Pass no base list for a picker with
+// nothing curated yet (e.g. products, until federal has any).
+export function useIconSlugOptions(baseSlugs = []) {
+  const [slugs, setSlugs] = useState(baseSlugs);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchFederalIconList().then((federalSlugs) => {
+      if (cancelled || federalSlugs.length === 0) return;
+      setSlugs([...new Set([...baseSlugs, ...federalSlugs])].sort());
+    });
+    return () => { cancelled = true; };
+  }, []);
+
+  return slugs;
+}
 
 // Custom combobox replacing a plain <select> — a native <select> can't render rich
 // per-option content (icon + name) across browsers, so this renders its own toggleable
 // panel: a search input plus a [icon][name] row per option, filtered as you type.
+// `color` is optional — omit it for icons that carry their own color (e.g. product
+// icons), so the trigger renders them unmodified instead of tinting with currentColor.
 export default function IconPicker({ value, color, options, onChange, ariaLabel }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
@@ -62,7 +85,7 @@ export default function IconPicker({ value, color, options, onChange, ariaLabel 
         onClick=${() => setOpen((prev) => !prev)}
       >
         ${value ? html`
-          <span class="tec-icon-picker__trigger-icon" style=${`color:${color}`}>
+          <span class="tec-icon-picker__trigger-icon" style=${color ? `color:${color}` : ''}>
             <${Icon} name=${value} size=${18} />
           </span>
           <span class="tec-icon-picker__trigger-label">${value}</span>

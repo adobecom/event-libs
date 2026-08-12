@@ -100,6 +100,12 @@ unchanged).
   its own environment picker; the automatic fallback above, and how you'd
   target a non-prod tier for testing.
 - `components/TrackIconEditor.js` — per-track icon/color pickers.
+- `components/ProductIconEditor.js` — per-product icon picker (no color — products
+  already have their own colored SVGs).
+- `components/IconPicker.js` — the shared searchable icon combobox both editors above
+  render per row (a native `<select>` can't show an icon + name per option); also hosts
+  `useIconSlugOptions()`, which merges an optional curated base list with federal's live
+  `icons.json` inventory.
 - `components/FeaturedSessionsEditor.js` — featured-sessions picker: search +
   track filter over the already-fetched session catalog, add/remove, ↑/↓
   reorder into a flat ordered `featuredSessions` array.
@@ -121,6 +127,7 @@ One shared DA sheet per content-repo at
     "eventTitle": "...",
     "updated": "2026-07-22T21:30:00.000Z",
     "trackIcons": { "Track Name": { "icon": "icon-slug", "color": "#RRGGBB" } },
+    "productIcons": { "Product Name": "icon-slug" },
     "allowDoubleBooking": true,
     "featuredSessions": ["sessionId1", "sessionId2"],
     "rfApiUrl": "https://www.adobe.com/max-api/",

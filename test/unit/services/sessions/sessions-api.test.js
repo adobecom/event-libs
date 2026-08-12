@@ -2,6 +2,7 @@ import { expect } from '@esm-bundle/chai';
 
 import {
   mapEslPayloadToRawSessions, normalizeSessions, isSessionPublished, ENFORCE_PUBLISHED_FILTER,
+  getSessionProducts, extractDistinctProducts,
 } from '../../../../event-libs/v1/services/sessions/sessions-api.js';
 
 function customAttr(name, values) {
@@ -298,6 +299,28 @@ describe('services/sessions/sessions-api', () => {
     it('defaults contentCategory to an empty array when absent (mock fixtures)', () => {
       const [normalized] = normalizeSessions([{ id: 's-1', audience: 'All' }]);
       expect(normalized.contentCategory).to.deep.equal([]);
+    });
+  });
+
+  describe('getSessionProducts / extractDistinctProducts', () => {
+    it('returns every product on a session (multi-select), not just the first', () => {
+      const session = {
+        customAttributes: [customAttr('Product', [selectValue('Photoshop'), selectValue('Illustrator')])],
+      };
+      expect(getSessionProducts(session)).to.deep.equal(['Photoshop', 'Illustrator']);
+    });
+
+    it('returns an empty array for a session with no Product attribute', () => {
+      expect(getSessionProducts({ customAttributes: [] })).to.deep.equal([]);
+    });
+
+    it('collects the sorted union of distinct products across sessions', () => {
+      const sessions = [
+        { customAttributes: [customAttr('Product', [selectValue('Photoshop')])] },
+        { customAttributes: [customAttr('Product', [selectValue('Illustrator'), selectValue('Photoshop')])] },
+        { customAttributes: [] },
+      ];
+      expect(extractDistinctProducts(sessions)).to.deep.equal(['Illustrator', 'Photoshop']);
     });
   });
 });

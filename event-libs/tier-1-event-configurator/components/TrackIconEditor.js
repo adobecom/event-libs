@@ -1,12 +1,12 @@
 import { html } from '../../v1/deps/htm-preact.js';
-import IconPicker from './IconPicker.js';
-import { getDefaultTrackIcon, DEFAULT_ICON_COLOR, useIconSlugOptions } from '../default-track-icons.js';
+import IconPicker, { useIconSlugOptions } from './IconPicker.js';
+import { getDefaultTrackIcon, DEFAULT_ICON_COLOR, KNOWN_ICON_SLUGS } from '../default-track-icons.js';
 import { isTrackIconEntryComplete } from '../utils.js';
 
 export default function TrackIconEditor({ tracks, trackIcons, onChange }) {
   // Called unconditionally, before the early return below — Preact hooks must run in
   // the same order on every render.
-  const iconSlugs = useIconSlugOptions();
+  const iconSlugs = useIconSlugOptions(KNOWN_ICON_SLUGS);
 
   if (!tracks || tracks.length === 0) {
     return html`<p class="tec-track-editor__empty">No tracks found in this event's sessions yet.</p>`;
