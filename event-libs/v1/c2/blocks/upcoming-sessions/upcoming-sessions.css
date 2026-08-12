@@ -3,19 +3,6 @@
   padding: var(--s2a-spacing-md, 16px);
 }
 
-/* Absolute overlay at every breakpoint, not just desktop — anchored to
-   .event-marquee-upcoming-wrapper (event-marquee.css), whose box always exactly
-   matches the marquee's own box. Figma's mobile frame actually showed this
-   in-flow (a normal sibling below the video, not an overlay), but per direct
-   product direction this now matches desktop everywhere instead: the marquee
-   reserves the same 913px at every tier (see event-marquee.css's min-height),
-   and Upcoming Sessions overlays its bottom edge there too.
-   padding-bottom is 56px at every breakpoint (no exact token match, literal
-   px). padding-left starts at 24px (--s2a-spacing-lg, exact token match) and
-   is overridden below to track event-marquee.css's own padding-inline tiers
-   (86px / --s2a-layout-lg / 220px at 1024 / 1440 / 1920) — the marquee's
-   desktop gutter used to be a single 124px value at a single 1200px
-   breakpoint, back when the marquee itself only had one desktop tier. */
 .upcoming-sessions--attached {
   position: absolute;
   left: 0;
@@ -122,40 +109,7 @@
   background: var(--s2a-color-transparent-black-80, rgb(0 0 0 / 80%));
 }
 
-@media (min-width: 1200px) {
-  /* Figma (State B.2/C, Desktop 1440): the attached overlay's own content is
-     "Upcoming" heading (24px) + header margin-bottom (16px) + track's own
-     12px/12px vertical padding (24px) + the session card itself (128px,
-     Figma-confirmed — see the .sg-card 1200px block below) = 192px, with no
-     top padding on the wrapper itself — the 24px top pair coded before was a
-     guess made before this was measured directly against Figma. (Previously
-     this comment attributed all 168px below the heading+margin to a single
-     "session row (152px)" figure, conflating the card's own height with the
-     track's vertical padding — same 192px total, corrected attribution now
-     that the card's real desktop height, 128px, is confirmed separately.)
-     This overlay's own padding-bottom/padding-left now live in dedicated
-     1024/1440/1920 blocks right after `.upcoming-sessions--attached`'s base
-     rule above, tracking event-marquee.css's own tiers — not here. */
-  .upcoming-sessions-header {
-    margin-bottom: var(--s2a-spacing-md, 16px);
-  }
-
-  /* Matches Figma's "Upcoming" label exactly: 24px/900 Adobe Clean Display Black,
-     24px line-height — the same semantic heading tokens event-marquee.css uses for
-     its own H1-H3, not one-off literals. This was plain 18px/default-weight body
-     text before, which under-measured the header's real height by several pixels. */
-  .upcoming-sessions-heading {
-    font-family: var(--s2a-font-family-heading);
-    font-weight: var(--s2a-font-weight-heading);
-    font-size: var(--s2a-font-size-2xl, 24px);
-    line-height: var(--s2a-font-line-height-md, 24px);
-  }
-
-  /* Figma's "Small session row" reserves 12px top/bottom around the card row, not 8px. */
-  .upcoming-sessions-track {
-    padding-block: var(--s2a-spacing-sm, 12px);
-  }
-
+@media (min-width: 1280px) {
   .upcoming-sessions-controls {
     display: flex;
     flex-shrink: 0;
@@ -281,7 +235,7 @@
   font-size: var(--s2a-font-size-xs, 12px);
   color: var(--s2a-color-gray-600, #717171);
   line-height: 1.5;
-  white-space: nowrap;
+  white-space: normal;
   text-align: right;
   transition: color 0.2s;
 }
@@ -307,7 +261,8 @@
   font-size: var(--s2a-font-size-xs, 12px);
   color: var(--s2a-color-gray-600, #717171);
   margin-left: auto;
-  white-space: nowrap;
+  white-space: normal;
+  text-align: right;
   line-height: 1.5;
   pointer-events: none;
 }
@@ -348,20 +303,12 @@
 }
 /* stylelint-enable no-descending-specificity */
 
-/* 1200px, matching this file's own .upcoming-sessions--attached desktop tier
-   above and event-marquee.css's row-layout breakpoint — this used to be a
-   separate, un-migrated 1280px block, which left a 1200-1279px gap where the
-   card would still render at its base (152px) mobile/tablet height while
-   .upcoming-sessions--attached had already switched to its desktop padding,
-   throwing off the reserved-space math for that range. Card height here
-   (128px) is Figma-confirmed (Session card - no images component, Desktop
-   frame: 24px padding around a 383x80 content box = 431x128 total). */
-@media (min-width: 1200px) {
+@media (min-width: 1280px) {
   .upcoming-sessions .sg-card {
     flex-direction: row;
     align-items: stretch;
     width: 375px;
-    height: 128px;
+    height: 108px;
     padding: var(--s2a-spacing-lg, 24px);
     gap: 0;
   }
