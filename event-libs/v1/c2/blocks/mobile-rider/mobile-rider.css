@@ -221,6 +221,18 @@
     border-radius: var(--s2a-border-radius-24, 24px);
     overflow: hidden;
   }
+
+  /* The info bar sits flush below the video — square the video's bottom corners so it
+     doesn't clash with the bar's own square top, and round the bar's bottom corners
+     instead, so the two read as one continuous rounded card. */
+  .mobile-rider-player:has(.mobile-rider-info-bar) .mobile-rider-container {
+    border-radius: var(--s2a-border-radius-24, 24px) var(--s2a-border-radius-24, 24px) 0 0;
+  }
+
+  .mobile-rider-info-bar {
+    border-radius: 0 0 var(--s2a-border-radius-24, 24px) var(--s2a-border-radius-24, 24px);
+    overflow: hidden;
+  }
 }
 
 .mobile-rider :is(h1, h2, h3, h4, h5, h6) {
