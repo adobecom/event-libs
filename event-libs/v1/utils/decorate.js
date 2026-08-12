@@ -1073,13 +1073,13 @@ function addStylesToEventPage() {
 // decorateEvent runs once per top-level page load, but also re-enters for every
 // fragment/personalization/events-form pass (see docs/block-hydration.md), each
 // time with a different, non-<main> `parent`. So this always resolves the real
-// page <main> directly (ignoring its own caller) and guards against re-applying.
+// page <main> directly (ignoring its own caller) rather than relying on `parent`.
+// Re-reading metadata on every call (instead of caching a "checked" flag) lets a
+// later personalization pass that updates `section-layout` still take effect.
 export function applySectionColumnsLayout() {
   const main = document.querySelector('main');
-  if (!main || main.dataset.sectionColumns) return;
-  main.dataset.sectionColumns = 'checked';
-  if (getMetadata('section-layout') !== 'columns') return;
-  main.classList.add('section-columns');
+  if (!main) return;
+  main.classList.toggle('section-columns', getMetadata('section-layout') === 'columns');
 }
 
 // e.g. "dark", "dark(blocks:hero-marquee,profile-cards)", or "dark(blocks:text[first],agenda)"

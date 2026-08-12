@@ -48,7 +48,7 @@ main.section-columns {
     min-width: 0;
   }
 
-  main.section-columns > .section.column-span-1 { flex: 1 1 0; }
+  /* column-span-1 is the default above; only 2/3 need an explicit override */
   main.section-columns > .section.column-span-2 { flex: 2 1 0; }
   main.section-columns > .section.column-span-3 { flex: 3 1 0; }
 }

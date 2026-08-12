@@ -981,10 +981,20 @@ describe('applySectionColumnsLayout', () => {
     expect(document.querySelector('main').classList.contains('section-columns')).to.be.true;
   });
 
-  it('is idempotent across repeated calls (simulating fragment/personalization re-entry)', () => {
+  it('is idempotent across repeated calls with unchanged metadata', () => {
     setMetadata('section-layout', 'columns');
     document.body.innerHTML = '<main><div class="section"></div></main>';
     applySectionColumnsLayout();
+    applySectionColumnsLayout();
+    expect(document.querySelector('main').classList.contains('section-columns')).to.be.true;
+  });
+
+  it('picks up metadata changed by a later pass (e.g. personalization updating metadata)', () => {
+    document.body.innerHTML = '<main><div class="section"></div></main>';
+    applySectionColumnsLayout();
+    expect(document.querySelector('main').classList.contains('section-columns')).to.be.false;
+
+    setMetadata('section-layout', 'columns');
     applySectionColumnsLayout();
     expect(document.querySelector('main').classList.contains('section-columns')).to.be.true;
   });
