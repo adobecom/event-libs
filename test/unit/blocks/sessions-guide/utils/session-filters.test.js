@@ -2,6 +2,7 @@ import { expect } from '@esm-bundle/chai';
 import {
   sessionsForDay, groupByStartTime, groupByTrack,
   liveSessions, upcomingSessions, onDemandSessions, getFeaturedSessions,
+  getOnDemandFeaturedSessions,
 } from '../../../../../event-libs/v1/blocks/sessions-guide/utils/session-filters.js';
 import { getSessionDayKey } from '../../../../../event-libs/v1/blocks/sessions-guide/utils/time.js';
 
@@ -143,5 +144,43 @@ describe('session-filters/getFeaturedSessions', () => {
     const r1 = getFeaturedSessions(sessions, [], LIVE_DAY, TZ).map((s) => s.id);
     const r2 = getFeaturedSessions(sessions, [], LIVE_DAY, TZ).map((s) => s.id);
     expect(r1).to.deep.equal(r2);
+  });
+
+  it('returns featured sessions in authored order, not catalog order', () => {
+    // Catalog order here is [LIVE, UPCOMING_2] (as passed in); featuredIds authors
+    // the opposite order, which the result must follow.
+    const upcoming2SameDay = { ...UPCOMING_2, startTimeUtc: LIVE.startTimeUtc, endTimeUtc: LIVE.endTimeUtc };
+    const result = getFeaturedSessions([LIVE, upcoming2SameDay], ['upcoming-2', 'live'], LIVE_DAY, TZ);
+    expect(result.map((s) => s.id)).to.deep.equal(['upcoming-2', 'live']);
+  });
+});
+
+describe('session-filters/getOnDemandFeaturedSessions', () => {
+  it('returns sessions matching featuredIds in authored order', () => {
+    const result = getOnDemandFeaturedSessions([LIVE, UPCOMING, PAST], ['past', 'live']);
+    expect(result.map((s) => s.id)).to.deep.equal(['past', 'live']);
+  });
+
+  it('is not scoped to any single day', () => {
+    // LIVE and PAST are on different days by construction (h(-0.5) vs h(-4)); both
+    // must still appear since this function has no day filter at all.
+    const result = getOnDemandFeaturedSessions([LIVE, PAST], ['live', 'past']);
+    expect(result.map((s) => s.id)).to.have.members(['live', 'past']);
+  });
+
+  it('ignores featuredIds with no matching session', () => {
+    const result = getOnDemandFeaturedSessions([LIVE], ['nonexistent', 'live']);
+    expect(result.map((s) => s.id)).to.deep.equal(['live']);
+  });
+
+  it('caps results at 3', () => {
+    const many = [LIVE, UPCOMING, PAST, UPCOMING_2];
+    const ids = many.map((s) => s.id);
+    const result = getOnDemandFeaturedSessions(many, ids);
+    expect(result.length).to.equal(3);
+  });
+
+  it('returns an empty array when no featuredIds are provided', () => {
+    expect(getOnDemandFeaturedSessions([LIVE, UPCOMING], [])).to.deep.equal([]);
   });
 });

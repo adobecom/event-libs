@@ -8,8 +8,8 @@ import {
 
 const BASE_CONFIG = {
   userTz: 'America/Los_Angeles', surface: 'page',
-  trackColors: {}, trackIcons: {}, title: '',
-  showConflictModal: false, filterCategories: [], theme: 'dark',
+  title: '',
+  filterCategories: [], theme: 'dark',
 };
 
 function makeStore(activeView, extraState = {}) {
@@ -26,7 +26,7 @@ function makeStore(activeView, extraState = {}) {
       mySessionsTab: 'upcoming',
       myFavoritesTab: 'upcoming',
       activeDay: new Date().toLocaleDateString('en-CA'),
-      eventConfig: { ...BASE_CONFIG },
+      guideConfig: { ...BASE_CONFIG },
       ...extraState,
     },
     dispatch: () => {},

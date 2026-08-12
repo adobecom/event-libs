@@ -3,7 +3,9 @@ import { LiveCard } from './LiveCard.js';
 
 export const buildCarousel = () => Carousel;
 
-export function Carousel({ sessions, title, formatTime, variant = 'live' }) {
+export function Carousel({
+  sessions, title, formatTime, formatTimezone, variant = 'live',
+}) {
   if (!sessions || !sessions.length) return null;
 
   const [offset, setOffset] = useState(0);
@@ -66,6 +68,7 @@ export function Carousel({ sessions, title, formatTime, variant = 'live' }) {
   // stays 0 with native scroll) shows the first session's time inline.
   const focused = sessions[Math.min(offset, sessions.length - 1)];
   const timeLabel = formatTime ? formatTime(focused) : '';
+  const tzLabel = formatTimezone ? formatTimezone(focused) : '';
 
   return html`
     <div class="sg-carousel">
@@ -76,7 +79,12 @@ export function Carousel({ sessions, title, formatTime, variant = 'live' }) {
         </h3>
       </div>
       <div class="sg-carousel__body">
-        ${timeLabel && html`<div class="sg-carousel__time">${timeLabel}</div>`}
+        ${timeLabel && html`
+          <div class="sg-carousel__time">
+            <span class="sg-carousel__time-value">${timeLabel}</span>
+            ${tzLabel && html`<span class="sg-carousel__time-tz">${tzLabel}</span>`}
+          </div>
+        `}
         <div class="sg-carousel__track">
           <div class="sg-carousel__cards" ref=${stripRef} onscroll=${refreshEdges} style=${'transform:translateX(-' + translateX + 'px)'}>
             ${sessions.map((s) => html`<div class="sg-carousel__card-wrap" key=${s.id}><${LiveCard} session=${s} variant=${variant} /></div>`)}

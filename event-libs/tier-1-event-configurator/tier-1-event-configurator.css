@@ -688,6 +688,23 @@ select.tec-field {
   max-width: 480px;
 }
 
+.tec-editor__field-label {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  margin: 0 0 4px;
+}
+
+.tec-editor__field-label:not(:first-child) {
+  margin-top: var(--tec-spacing-md);
+}
+
+.tec-editor__rf-input {
+  width: 100%;
+  max-width: 480px;
+  margin-bottom: var(--tec-spacing-sm);
+}
+
 .tec-editor__checkbox {
   display: flex;
   align-items: center;

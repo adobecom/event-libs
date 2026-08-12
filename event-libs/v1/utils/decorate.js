@@ -28,8 +28,9 @@ import {
   shouldForceGuestSignIn,
 } from './utils.js';
 import { massageMetadata } from './date-time-helper.js';
-import { hydrateBlocks, setHydrationPromise } from '../hydrate/hydrate.js';
+import { hydrateBlocks } from '../hydrate/hydrate.js';
 import { initSessionState } from './session-store.js';
+import { initTierOneEventConfig } from './tier-1-event-config.js';
 
 const ICONS_BASE_URL = new URL('../icons/', import.meta.url).href;
 
@@ -575,6 +576,32 @@ function prebuildAutoBlock(blockName, link) {
 
       return chronoBoxEl;
     },
+    'sessions-guide': (link) => {
+      const url = new URL(link.href);
+      const hashMatch = url.hash.match(/[#&]sgConfig=([A-Za-z0-9+/=%-]{20,})/);
+      const sgConfigBase64 = url.searchParams.get('sgConfig') || hashMatch?.[1];
+      const config = parseEncodedConfig(sgConfigBase64);
+
+      if (!config) {
+        return null;
+      }
+
+      // Guards against the real risk of this manual copy/paste hand-off: an author
+      // pasting the wrong event's link onto the wrong page.
+      const pageEventId = getMetadata('event-id');
+      if (config.eventId && pageEventId && config.eventId !== pageEventId) {
+        window.lana?.log(`[sessions-guide] eventId mismatch: config authored for ${config.eventId}, page is ${pageEventId}`);
+      }
+
+      // No authoring-table path exists for this block — sessions-guide.js's init()
+      // reads data-session-guide-config only.
+      const blockClass = config.surface === 'page' ? 'sessions-guide-full-page' : 'sessions-guide';
+
+      return createTag('div', {
+        class: blockClass,
+        'data-session-guide-config': JSON.stringify(config),
+      });
+    },
   }
 
   if (autoBlockBuilders[blockName]) {
@@ -587,17 +614,23 @@ function prebuildAutoBlock(blockName, link) {
 export function processAutoBlockLinks(parent) {
   // selfInit: true — block lives inside an already-loaded parent (e.g. marquee);
   // Milo won't re-scan it, so we import and call init() directly with the anchor.
+  // c2: true — this block has a C2 copy under v1/c2/blocks/, so on a
+  // `foundation: c2` page load it from there instead of the classic v1/blocks/.
+  const isC2 = getMetadata('foundation') === 'c2';
   const autoBlockIdentifiers = {
     'chrono-box': { pattern: 'schedule-maker' },
-    'mobile-rider': { pattern: 'mobilerider.com', selfInit: true },
+    'mobile-rider': { pattern: 'mobilerider.com', selfInit: true, c2: true },
+    'sessions-guide': { pattern: 'session-guide-configurator' },
   };
 
-  Object.entries(autoBlockIdentifiers).forEach(([blockName, { pattern, selfInit }]) => {
+  Object.entries(autoBlockIdentifiers).forEach(([blockName, { pattern, selfInit, c2 }]) => {
     const links = parent.querySelectorAll(`a[href*="${pattern}"]`);
     Promise.all([...links].map(async (link) => {
       if (selfInit) {
         link.classList.add(blockName, 'link-block');
-        const { default: initBlock } = await import(`../blocks/${blockName}/${blockName}.js`);
+        // Route to the C2 copy only when the page is C2 *and* the block has one;
+        const blocksDir = (isC2 && c2) ? '../c2/blocks' : '../blocks';
+        const { default: initBlock } = await import(`${blocksDir}/${blockName}/${blockName}.js`);
         await initBlock(link);
         return;
       }
@@ -1139,7 +1172,7 @@ export function applyAreaTheme(area = document) {
 }
 
 export function decorateEvent(parent) {
-  setHydrationPromise(hydrateBlocks(parent));
+  hydrateBlocks(parent);
 
   // handle photos data parsing
   const photosData = parsePhotosData(parent);
@@ -1152,11 +1185,16 @@ export function decorateEvent(parent) {
 
   if (!getMetadata('event-id')) return;
 
-  // Bootstraps shared, page-level session state (sessions, favorites, scheduled,
-  // auth) ahead of any block's own init() — no-ops when rainfocus-api-url isn't authored.
-  // Additionally gated on tier-1-event-state-enabled since event-id alone is already
-  // authored broadly in prod; we don't want to seed sessions-guide's mock data on every
-  // event page that happens to have it.
+  // Bootstraps the page-wide Tier 1 Event Configurator app output (track icons/colors,
+  // allowDoubleBooking, rfApiUrl/rfProfileId, ...) ahead of any block's own init(), so
+  // any block can call getTrackIcon()/getAllowDoubleBooking() regardless of tier. Cheap
+  // parse, no network cost, so unlike initSessionState() below it isn't gated further.
+  initTierOneEventConfig();
+
+  // Bootstraps shared, page-level session state (sessions, favorites, scheduled, auth)
+  // ahead of any block's own init() — no-ops when tier-1-event-config isn't authored.
+  // Also gated on tier-1-event-state-enabled since event-id alone is already authored
+  // broadly in prod; we don't want to bootstrap this on every page that happens to have it.
   if (getMetadata('tier-1-event-state-enabled') === 'true') {
     initSessionState();
   }
