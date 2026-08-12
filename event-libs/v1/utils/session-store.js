@@ -103,11 +103,11 @@ function syncAuth() {
   }
 }
 
-// Entries are RF's session-time objects, not bare ids — match sessionTimeID against
-// session.rfCode (the id scheduleSession()/favoriteSession() already send as sessionTimeId).
-function mapToSessionIds(entries) {
-  const idByRfCode = new Map(sessions.value.map((s) => [s.rfCode, s.id]));
-  return (entries || []).map((entry) => idByRfCode.get(entry.sessionTimeID)).filter(Boolean);
+// mySchedule[]/sessionInterests[] entries are RF's own objects, not bare ids — schedule
+// entries key on sessionTimeID (→ rfCode), favorite entries key on sessionID (→ rfSessionId).
+function mapToSessionIds(entries, idField, matchField) {
+  const idByRf = new Map(sessions.value.map((s) => [s[matchField], s.id]));
+  return (entries || []).map((entry) => idByRf.get(entry[idField])).filter(Boolean);
 }
 
 // Populates scheduled/favorited from the real RF response, once the session catalog (needed
@@ -118,8 +118,8 @@ async function loadMyData() {
   try {
     const data = await fetchMyData(rfAuthToken, apiConfig.profileId, apiConfig.apiUrl);
     batch(() => {
-      scheduled.value = new Set(mapToSessionIds(data.scheduled));
-      favorited.value = new Set(mapToSessionIds(data.favorited));
+      scheduled.value = new Set(mapToSessionIds(data.scheduled, 'sessionTimeID', 'rfCode'));
+      favorited.value = new Set(mapToSessionIds(data.favorited, 'sessionID', 'rfSessionId'));
       auth.value = { ...auth.value, isRegistered: !!(data.loggedInUser && Object.keys(data.loggedInUser).length > 0) };
     });
   } catch (err) {
@@ -138,6 +138,12 @@ function maybeLoadMyData() {
   if (!realAuthConfirmed || !auth.value.isLoggedIn) return;
   if (!rfAuthTokenSettled) return;
   myDataAttempted = true;
+  if (!rfAuthToken) {
+    // myData can't succeed without a token — skip it rather than firing a call that's
+    // guaranteed to fail. isRegistered stays undefined (unknown), not asserted false.
+    window.lana?.log('[session-store] no RF auth token — skipping myData, registration status unknown');
+    return;
+  }
   loadMyData();
 }
 
@@ -204,7 +210,7 @@ export function initSessionState() {
     apiUrl: tierOneConfig.rfApiUrl || defaultRfApiUrlForEnv(),
     eventId: getMetadata('event-id'),
     profileId: tierOneConfig.rfProfileId || DEFAULT_RF_PROFILE_ID,
-    registerUrl: getMetadata('register-url') || '/register',
+    registerUrl: tierOneConfig.registerUrl || '/register',
     manualCutoff: getMetadata('manual-on-demand-transition-time') || null,
     mrEnv: deriveMrEnv(),
   };
@@ -255,7 +261,8 @@ export async function favoriteSession(session) {
   const isFavorited = favorited.value.has(session.id);
   setPending(session.id, true);
   try {
-    await toggleSessionInterest(session.rfCode, session.id, rfAuthToken, apiConfig.profileId, apiConfig.apiUrl);
+    // Favoriting keys on rfSessionId, not rfCode — sessionTimeId is left empty.
+    await toggleSessionInterest('', session.rfSessionId, rfAuthToken, apiConfig.profileId, apiConfig.apiUrl);
   } catch (err) {
     setPending(session.id, false);
     throw err;

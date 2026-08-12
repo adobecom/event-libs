@@ -1,5 +1,6 @@
 import { getSessionDayKey, isSessionLive, isSessionUpcoming } from './time.js';
 import { deriveSessionState, isInLiveNow } from '../../../utils/session-state.js';
+import { getTrackIcon, getOverrideTrackIcon } from '../../../utils/tier-1-event-config.js';
 
 export function sessionsForDay(sessions, activeDay, userTz) {
   return sessions.filter((s) => getSessionDayKey(s, userTz) === activeDay);
@@ -15,14 +16,66 @@ export function groupByStartTime(sessions) {
   return [...map.entries()].sort(([a], [b]) => (a < b ? -1 : 1)).map(([, v]) => v);
 }
 
-export function groupByTrack(sessions) {
+// Digital Agenda Track badge/swimlane model — full case table in PLAN.md §16.2. In short:
+// an override, when present, always wins the lane and badge over the primary track; a
+// session with neither is excluded entirely (no "Other" bucket).
+export function resolveTrackBadge(session) {
+  const hasPrimary = !!session.track;
+  const hasOverride = !!session.trackOverride;
+  // Only one additional track is supported even though the ESP field is multi-select.
+  const additional = (session.additionalTracks || []).slice(0, 1);
+
+  if (!hasPrimary && !hasOverride) return null;
+
+  if (hasOverride) {
+    const overrideIcon = getOverrideTrackIcon(session.trackOverride);
+    return {
+      label: session.trackOverride,
+      icon: overrideIcon.icon,
+      color: overrideIcon.color,
+      count: additional.length,
+      isOverride: true,
+      swimlanes: [session.trackOverride, ...additional],
+      stackedTracks: additional.length > 0 ? additional : null,
+    };
+  }
+
+  const trackIcon = getTrackIcon(session.track);
+  return {
+    label: session.track,
+    icon: trackIcon?.icon || null,
+    color: trackIcon?.color || null,
+    count: additional.length,
+    isOverride: false,
+    swimlanes: [session.track, ...additional],
+    stackedTracks: additional.length > 0 ? [session.track, ...additional] : null,
+  };
+}
+
+// Places each session into every lane from resolveTrackBadge().swimlanes. swimlaneOrder
+// (authored [{ track, displayName, enabled }]) controls a lane's enabled state, display
+// name, and order; unlisted swimlanes stay enabled under their raw name, appended last.
+export function groupByTrack(sessions, swimlaneOrder) {
   const map = new Map();
   for (const s of sessions) {
-    const track = s.track || 'Other';
-    if (!map.has(track)) map.set(track, []);
-    map.get(track).push(s);
+    const badge = resolveTrackBadge(s);
+    if (!badge) continue;
+    badge.swimlanes.forEach((track) => {
+      if (!map.has(track)) map.set(track, []);
+      map.get(track).push(s);
+    });
   }
-  return [...map.entries()];
+
+  const configByTrack = new Map((swimlaneOrder || []).map((entry) => [entry.track, entry]));
+  const entries = [...map.entries()]
+    .filter(([track]) => configByTrack.get(track)?.enabled !== false)
+    .map(([track, trackSessions]) => [track, trackSessions, configByTrack.get(track)?.displayName || track]);
+
+  if (!swimlaneOrder || swimlaneOrder.length === 0) return entries;
+  const orderIndex = new Map(swimlaneOrder.map((entry, i) => [entry.track, i]));
+  return entries.sort(
+    ([a], [b]) => (orderIndex.get(a) ?? swimlaneOrder.length) - (orderIndex.get(b) ?? swimlaneOrder.length),
+  );
 }
 
 // Live Now section: MR sessions use poll status; non-MR sessions use time window.

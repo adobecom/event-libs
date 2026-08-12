@@ -48,7 +48,7 @@ export function DrawerHeader({ onClose, onFilterToggle, filterOpen, hideClose, h
   return html`
     <header class="sg-header">
       ${!hideClose && html`
-        <button class="sg-close-btn" onclick=${onClose} aria-label="Close sessions" type="button"></button>
+        <button class="sg-close-btn" onclick=${onClose} aria-label="Close sessions" daa-ll="Session-Guide-Close" type="button"></button>
       `}
 
       <div class="sg-header-title-row">
@@ -68,6 +68,7 @@ export function DrawerHeader({ onClose, onFilterToggle, filterOpen, hideClose, h
                 aria-label="Filter sessions"
                 aria-haspopup="true"
                 aria-expanded=${String(!!filterOpen)}
+                daa-ll="Filter-Open"
                 type="button"
               >
                 <span class="sg-filter-icon" aria-hidden="true"></span>
@@ -78,6 +79,7 @@ export function DrawerHeader({ onClose, onFilterToggle, filterOpen, hideClose, h
                 class=${`sg-search-btn${mobileSearchOpen ? ' active' : ''}`}
                 onclick=${openMobileSearch}
                 aria-label="Search sessions"
+                aria-expanded=${String(mobileSearchOpen)}
                 type="button"
               >
                 <span class="sg-search-icon" aria-hidden="true"></span>

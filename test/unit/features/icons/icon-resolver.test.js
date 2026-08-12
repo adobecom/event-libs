@@ -1,19 +1,27 @@
 import { expect } from '@esm-bundle/chai';
 import { setEventConfig } from '../../../../event-libs/v1/utils/utils.js';
+import { setFederalRootOverride } from '../../../../event-libs/v1/features/icons/federal-icons.js';
 import { resolveIcon } from '../../../../event-libs/v1/features/icons/icon-resolver.js';
 
 describe('icon-resolver', () => {
   before(() => {
     setEventConfig({}, { miloLibs: '/test/unit/features/icons/mocks/libs' });
+    setFederalRootOverride('/test/unit/features/icons/mocks/federal');
   });
 
-  it('resolves an icon from Milo first when Milo has it', async () => {
+  it('resolves an icon from federal first, even when Milo also has it', async () => {
     const svg = await resolveIcon('chevron-right');
     expect(svg).to.not.equal(null);
-    expect(svg.classList.contains('icon-milo-chevron-right')).to.equal(true);
+    expect(svg.classList.contains('icon-federal-chevron-right')).to.equal(true);
   });
 
-  it('falls back to the event-libs track-icons.svg sprite when Milo does not have it', async () => {
+  it('resolves an icon from Milo when federal does not have it', async () => {
+    const svg = await resolveIcon('search');
+    expect(svg).to.not.equal(null);
+    expect(svg.classList.contains('icon-milo-search')).to.equal(true);
+  });
+
+  it('falls back to the event-libs track-icons.svg sprite when neither federal nor Milo has it', async () => {
     const svg = await resolveIcon('mainstage');
     expect(svg).to.not.equal(null);
     expect(svg.classList.contains('icon-track-mainstage')).to.equal(true);

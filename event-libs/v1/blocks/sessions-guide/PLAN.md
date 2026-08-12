@@ -103,7 +103,7 @@ Three distinct states drive the UI:
 | Logged in, not registered | `true` | `false` | localStorage only |
 | Logged in + registered | `true` | `true` | Rainfocus (mocked) |
 
-All users can schedule and favorite sessions (stored in localStorage). The registration gate for My Sessions / My Favorites views shows `<RegistrationPrompt />` when `isRegistered !== true`. Toast messages prompt login or registration on action if not authenticated. Action buttons call the RF API when `isRegistered === true` (currently mocked).
+All users can schedule and favorite sessions (stored in localStorage). Navigating to My Sessions / My Favorites while logged out or unregistered shows a toast (not view content) and redirects to a fallback view — see 4.6. Toast messages likewise prompt login or registration on schedule/favorite actions if not authenticated. Action buttons call the RF API when `isRegistered === true` (currently mocked).
 
 ---
 
@@ -143,7 +143,6 @@ SessionsGuideBlock (init entry point — sessions-guide.js)
               │     ├── DrawerHeader (reused; hideClose=true)
               │     ├── FilterPanel (when filterOpen)
               │     └── ViewRouter (same as widget)
-              └── RegistrationPrompt (modal wrapper in App, content from RegistrationPrompt component)
 ```
 
 Toast and the schedule-conflict modal are **not** part of this tree anymore — they're page-level singletons mounted directly to `document.body` by `event-libs/v1/features/toast/toast.js`/`features/conflict-modal/conflict-modal.js` (via `initSessionState()`), independent of whether this block is on the page at all.
@@ -199,7 +198,6 @@ State is split across two modules — shared signals (readable by any block) and
   guideConfig: GuideConfig,
   activeSessionId: string | null,    // id of session shown in detail overlay (widget only)
   dismissingIds: Set<string>,        // session IDs currently animating out of My Sessions/My Favorites
-  regPromptOpen: boolean,            // drives modal RegistrationPrompt (from App-level gating)
 }
 ```
 
@@ -275,7 +273,6 @@ Actions that used to manage shared data (`INIT_USER_DATA`, `LIVE_STATUS_UPDATE`,
 | `SET_MY_FAVORITES_TAB` | Switch `myFavoritesTab` (`upcoming` / `on-demand`) |
 | `SET_DRAWER` | Set `drawerState`; restores last view from `sessionStorage`, falling back to a caller-supplied `defaultView` (computed from the shared `auth` signal at the dispatch site, since the reducer itself must stay a pure function of its own state) |
 | `SET_ACTIVE_SESSION` | Set `activeSessionId` (opens/closes detail overlay) |
-| `SHOW_REG_PROMPT` / `HIDE_REG_PROMPT` | Set `regPromptOpen` |
 | `ADD_DISMISSING_ID` / `REMOVE_DISMISSING_ID` | Manage `dismissingIds` Set for card exit animations |
 
 `SHOW_TOAST`/`HIDE_TOAST` and `SHOW_CONFLICT`/`HIDE_CONFLICT` no longer exist as reducer actions — `showToast()`/`hideToast()` (`utils/toast.js`) and `showConflictModal()`/`hideConflictModal()` (`utils/conflict-modal.js`) write directly to their own shared signals instead, with no `dispatch` involved.
@@ -527,7 +524,7 @@ Breakpoint at 1280 px: CTA goes to `peek` on wide, directly to `expanded` on nar
 - Empty state: "No sessions scheduled for this day."
 
 ### 3.2 My Sessions view ✅ (`MySessionsView`)
-- Registration gate: `isRegistered !== true` → `<RegistrationPrompt />`
+- Auth gate (see 4.6): renders `null` and never mounts its content when unauthorized — a `useEffect` fires a login/registration toast and redirects to a fallback view instead
 - Live section: scheduled sessions currently live for activeDay
 - Smart tab bar: tabs only shown for non-empty halves; if both upcoming and on-demand have sessions, both tabs show; single-tab case hides the tab bar automatically (via `effectiveTab` clamping)
 - Upcoming tab: `TimeSlotRow[]` for scheduled upcoming sessions on activeDay
@@ -599,13 +596,41 @@ No longer a Preact component — `mountToast()` builds the toast element once vi
 - Line folding at 75 octets per RFC 5545 §3.1
 - Triggered by `DownloadButton` in My Sessions view header (only shown when `activeView === 'my-sessions'`)
 
-### 4.6 RegistrationPrompt component ✅
-- `isLoggedIn === false` → "Sign in and register" + `window.adobeIMS?.signIn()` button
-- Else (logged in, not registered) → "Register for the event" + `<a href="/register">` (hardcoded `/register`, not currently sourced from `guideConfig.registerUrl`)
-- Rendered inline inside each view (My Sessions, My Favorites) for the full-view gate
-- Also rendered as a modal from `App` when `regPromptOpen === true` (triggered by `SHOW_REG_PROMPT`)
+### 4.6 My Sessions/My Favorites view-access gate ✅
+Resolved 2026-08-06 — two iterations. First removed the standalone `RegistrationPrompt`
+component (built ahead of the settled auth model — its modal path,
+`regPromptOpen`/`SHOW_REG_PROMPT`/`HIDE_REG_PROMPT`, was dead: never dispatched from
+anywhere) in favor of inline empty-state copy in the views themselves. Per PM (Kat), that
+was still the wrong shape — the intended behavior is a **toast + redirect**, not any content
+rendered in the view itself, matching the same pattern already used for the click-time
+schedule/favorite gate:
 
-> **Note:** The current auth gate for scheduleAction/favoriteAction uses `showToast()` (not `SHOW_REG_PROMPT`). The modal RegistrationPrompt (`regPromptOpen`) is wired up in `App` but not currently triggered by schedule/favorite interactions.
+- Attempting to navigate to My Sessions/My Favorites while unauthorized never shows their
+  content. `checkViewAccess(view, { eventConfig })` (`services/sessions/action-feedback.js`)
+  shows the same login/registration toast `runSessionAction()` already uses
+  (`adobeIMS.signIn()` CTA / `eventConfig.registerUrl` CTA, both persistent —
+  `duration: null`), then returns a fallback view to land on instead: `live-upcoming` while
+  the event is still on, `on-demand` once `isPostEvent()` (`utils/session-state.js`, shared
+  with session-store's own live→on-demand auto-transition) is true.
+- Checked from two places, both funneling through the same function so there's exactly one
+  definition of "blocked" and one toast fires per attempt:
+  - `ViewDropdown.js`'s click handler, via the exported pure `resolveViewSelection(value, {
+    eventConfig })` (same "extract the decision logic so it's testable without simulating a
+    click" pattern as `DrawerShell.js`'s `resolveSessionGuideRequest`) — a blocked click
+    never dispatches `SET_VIEW` to the gated view at all, so there's no flash.
+  - `MySessionsView`/`MyFavoritesView` themselves, via a `useEffect` keyed on
+    `auth.value.isLoggedIn`/`isRegistered` that dispatches the fallback if blocked, with the
+    view rendering `null` in the meantime. This is the safety net for every path that can
+    land on these views *without* a dropdown click — `FullPageShell`'s `?view=` URL param on
+    mount, and `DrawerShell`'s `SET_DRAWER` restoring a stale `my-sessions`/`my-favorites`
+    from `sessionStorage`. It also reactively bounces the user out (with the same toast) if
+    their auth state flips to unauthorized while already sitting on the view (e.g. a session
+    expiring in another tab).
+
+The click-time auth gate for scheduleAction/favoriteAction is a separate, pre-existing
+mechanism and was never the problem — `runSessionAction()`'s error-to-toast translation
+already did exactly this for schedule/favorite clicks; `checkViewAccess()` reuses its toast
+copy/CTA logic via a shared `showAuthToast()` helper rather than duplicating it.
 
 ---
 
@@ -804,7 +829,7 @@ Tests mirror `test/unit/blocks/sessions-guide/`. Coverage status to be assessed 
 ### 14.2 Component tests (priority order)
 - `SessionCard`: on-demand/upcoming rendering, `forceOnDemand` prop, `dismissingIds` class, `hoverAnim` state, iOS touch handler
 - `FilterPanel`: local filter state, apply/reset, dynamic option derivation
-- `RegistrationPrompt`: logged-out vs logged-in-unregistered variants
+- `MySessionsView` view-access gate ✅ (`MySessionsView.test.js`): renders `null` when logged-out/unregistered. `MyFavoritesView` mirrors the same logic but still has no dedicated test file (see 14.2 gap, tracked in MWPW-200314 work item 8). The actual toast/fallback-view decision is tested at its source instead — `checkViewAccess()`/`resolveViewSelection()` (`action-feedback.test.js`, `ViewDropdown.test.js`) — since this component's `useEffect` is a no-op under the test harness's htm-preact mock.
 
 (Toast and the conflict modal are no longer Preact components — see the `features/toast/toast.js` / `features/conflict-modal/conflict-modal.js` entries in 14.1 above.)
 
@@ -832,6 +857,167 @@ Tests mirror `test/unit/blocks/sessions-guide/`. Coverage status to be assessed 
 - ✅ `event-libs/v1/services/sessions/sessions-api.js` wired to the real ESL/ESP catalog endpoint (`fetchEslSessions`/`mapEslPayloadToRawSessions`); `MOCK_ESL_PAYLOAD` remains only as the no-`event-id` fallback
 - Confirm FEDS event name `feds.data.authToken.loaded` and attribute path `window.feds.data.authToken` against live integration
 - PR description references MWPW-194331 and includes testing notes for widget and full-page surfaces
+
+---
+
+## Phase 16 — Digital Agenda Track Badges & Swimlanes ✅ Complete (MWPW-200314 item 10, merged with item 12's swimlaneOrder consumption)
+
+MAX26's real session-catalog data (verified against a live response, not assumed) renamed
+several custom attributes from their MAX25 names and introduced two genuinely new ones.
+MAX26 is the source of truth going forward; MAX25 support is secondary and handled via a
+name-fallback, not a year-detection branch.
+
+### 16.1 MAX26 field-name migration ✅
+
+`sessions-api.js`'s `extractCustomAttributeValue(s)`/`Values(s)` now accept either a name
+or an array of candidate names, tried in order (current name first, MAX25 fallback second —
+a session only ever carries one of the two, so this is unambiguous in practice):
+
+| Field | MAX26 name | MAX25 fallback |
+|---|---|---|
+| Primary track | `Primary Event Site Track` | `Primary Track for Agenda (Digital Agenda)` |
+| Content category | `Category` | `Programming Category` |
+| Session type | `Type` | `Session Type` |
+| Copyright | `Legal Disclaimer` | `LegalDisclaimer` |
+
+`TRACK_ATTRIBUTE_NAME` → `TRACK_ATTRIBUTE_NAMES` (array). New MAX26-only fields
+(`Additional Event Site Tracks`, `Override Primary Event Site Track`) have no fallback —
+they're simply absent/empty on MAX25 sessions, which naturally produces the single-track
+behavior below without any extra branching. Also added `getSessionOverrideText(session)`/
+`extractDistinctOverrideTexts(sessions)` (mirror `getSessionTrack`/`extractDistinctTracks`),
+re-exported via `tier-1-event-configurator/utils.js` for the new per-override-text editor
+(16.5) to know which distinct texts exist in a live event's real sessions.
+
+### 16.2 Track/badge model — `resolveTrackBadge(session)` (`utils/session-filters.js`) ✅
+
+Confirmed with Daniel (2026-08-11) as 6 concrete cases, dropping the earlier "no Other
+bucket, otherwise fall through to primary+additional" catch-all:
+
+| # | Primary | Additional | Override | Swimlane(s) | Badge |
+|---|---|---|---|---|---|
+| 1 | ✓ | – | – | primary | primary icon |
+| 2 | ✓ | ✓ | – | primary + additional | primary icon + "+1" |
+| 3/6 | – | – | ✓ | **override text itself** | override icon (per-text, or default) |
+| 4 | ✓ | – | ✓ | override text (not primary!) | override icon |
+| 5 | – | ✓ | ✓ | override text + additional | override icon + "+1" |
+| 7 | ✓ | ✓ | ✓ | override text + additional | override icon + "+1" (PM-confirmed 2026-08-11) |
+| — | – | – | – | *(excluded — no badge, no lane, no "Other")* | |
+
+Key rules, not obvious from the table alone:
+- **Override always wins swimlane placement outright**, whether or not a primary track
+  also exists (case 4) — the primary track never appears in swimlanes once an override is
+  set, it's completely superseded.
+- The override lane is keyed by **the override text itself**, not a generic "Override"
+  bucket — every session sharing the exact same free-text value lands in the same lane;
+  different text values get separate lanes.
+- **Additional Event Site Tracks only ever supports one value** (confirmed with Daniel) —
+  `resolveTrackBadge` defensively caps it at 1 (`.slice(0, 1)`) even though the ESP field
+  is multi-select, so the badge is always a plain "+1", never "+N".
+- Icon/color for an override lane come from `getOverrideTrackIcon(overrideText)`
+  (`tier-1-event-config.js`) — a **per-override-text map** (`overrideTrackIcons`) checked
+  first, falling back to a single event-wide default (`overrideTrackIcon`), falling back to
+  the built-in default (`{ icon: 'star', color: '#6E6E6E' }`).
+- `stackedTracks` (for the detail/session-page stacked-badge display) is the *additional*
+  track(s) only when an override applies (the override text isn't a real track, so it isn't
+  itself "stacked", and the primary track — if any — is also dropped from the stack once
+  overridden), or `[primary, ...additional]` when there's no override. Confirmed with
+  Daniel (2026-08-11): this is the intended behavior.
+
+### 16.3 Swimlane placement + ordering — `groupByTrack(sessions, swimlaneOrder)` ✅
+
+Rewritten from single-track-keyed grouping to placing a session into one swimlane per
+`resolveTrackBadge().swimlanes` entry, skipping sessions `resolveTrackBadge()` excludes.
+Second param is the Session Guide Configurator's authored `swimlaneOrder` (item 12) —
+listed tracks sort first in authored order, unlisted tracks follow in first-seen order.
+Wired into `OnDemandView.js`/`MySessionsView.js`/`MyFavoritesView.js` via
+`state.guideConfig?.swimlaneOrder` (already parsed by `parse-config.js`, previously unused
+by the component tree).
+
+**Correction (2026-08-11):** the wiring above was passing `swimlaneOrder` through, but
+`groupByTrack`'s own sort logic was still written for the field's original flat
+string-array shape (`swimlaneOrder.map((t, i) => [t, i])`) from before the Session Guide
+Configurator added enable/rename support — the real authored shape is
+`[{ track, displayName, enabled }]`. Using the whole object as a Map key meant it never
+matched a real track-name string, so **ordering silently had zero effect**; `enabled`
+was never applied (a disabled track wasn't dropped); `displayName` was never applied
+either (`TrackRow`'s header rendered the raw grouping key). The only existing test for
+this (`session-filters.test.js`) fed the old flat-string shape, masking the bug. Fixed:
+`groupByTrack` now keys off `entry.track`, filters out `enabled === false` entries, and
+returns each result as `[key, sessions, displayName || key]` — callers now destructure a
+3rd element for the label instead of reusing the grouping key. Also fixes 16.6's flagged
+gap below in the same pass: `session-guide-configurator`'s `SwimlaneOrderEditor` now
+seeds from both `extractDistinctTracks` and `extractDistinctOverrideTexts` (deduped), one
+single mixed reorderable list — override-lane names work identically to track names
+throughout, since `groupByTrack` was already name-agnostic between the two.
+
+### 16.4 Badge rendering ✅
+
+- `CategoryBadge.js` now takes a `session` prop and renders `resolveTrackBadge()`'s result
+  (label/icon/color/`+N` count), replacing its old, mismatched `category` prop — the
+  component was actually reading the `Track` topic-tag attribute, not `Primary Event Site
+  Track`, before this pass. Renders nothing (not a fallback badge) for an excluded session.
+- `SessionDetailOverlay.js`'s channel line uses the same `resolveTrackBadge()` result
+  instead of raw `session.track`/`getTrackIcon(session.track)`, and renders a stacked row
+  of chips (`.sg-detail__track-stack`) for `stackedTracks` when present.
+- `LiveCard.js`/`SessionCard.js` updated to pass `session=${session}` instead of
+  `category=${session.category?.[0]}`.
+
+### 16.5 Override icon authoring — Tier 1 Event Configurator ✅
+
+Since each distinct override text is its own swimlane (16.2), the configurator needs a
+per-text icon mapping, not a single field — `OverrideTrackIconEditor.js` was rebuilt from
+a single icon+color row into a `TrackIconEditor.js`-style list, one row per distinct
+override text found in the event's real sessions (`extractDistinctOverrideTexts`), plus a
+separate "default" row for `overrideTrackIcon` (the event-wide fallback shown for any text
+not yet mapped). New config fields: `overrideTrackIcons: { [text]: {icon, color} }`
+(per-text map) and `overrideTrackIcon: {icon, color} | null` (single default, unchanged
+from the first pass). `ConfigsContext.js` got a new `updateOverrideTrackIcon(text, updates)`
+mirroring `updateTrackIcon(track, updates)`. Added a `star` `<symbol>` to both
+`v1/features/icons/track-icons.svg` and the configurator's own copy of that sprite (the
+only icon slug not tied to a real track name) — used as the built-in override default.
+
+No auto-seeding for override texts (unlike `seedTrackIcons()` for real tracks) — there's no
+sensible icon to guess for arbitrary free text, so every mapping is authored manually.
+
+### 16.6 Known gaps / not done in this pass
+
+- No Figma reference was available for the badge/`+1`/stacked-chip visuals — implemented a
+  functional default (`.sg-category-badge__count`, `.sg-detail__track-chip`); may need
+  design review.
+- No test coverage exists for `SessionDetailOverlay.js` at all (pre-existing gap, tracked
+  under Phase 14/item 8, not fixed here).
+- No test infrastructure exists for the Tier 1 Event Configurator app itself — the new
+  `OverrideTrackIconEditor.js`/config plumbing has no automated coverage.
+- ~~The Session Guide Configurator's `swimlaneOrder` field still only seeds from real track
+  names...~~ **Resolved 2026-08-11**, see 16.3's correction note — `swimlaneOrder` now
+  seeds from override-text lanes too, in the same mixed list as real tracks.
+
+### 16.7 Cleanup pass ✅
+
+Went through everything above once more for dead code before moving on to further
+configurator work:
+- Removed `session.category` (the `Track` topic-tag attribute) — dead since `CategoryBadge.js`
+  moved to `resolveTrackBadge()`; nothing else ever read it.
+- Removed `session.watchUrl`/`extractWatchUrl()` (the old `Watch ` custom-attribute
+  extraction) — dead since item 5's `getWatchDestination()` replaced its only consumer.
+- Consolidated `DEFAULT_TRACK_ICON_CONFIG`/`DEFAULT_OVERRIDE_TRACK_ICON`, previously
+  hand-duplicated between `tier-1-event-config.js` and the configurator's
+  `default-track-icons.js` (the latter's own header comment had called this out as
+  temporary since before this ticket — never done). Now defined once in
+  `tier-1-event-config.js`, exported, and imported by `default-track-icons.js`.
+
+### 16.8 Registration URL moved into the Tier 1 Event Configurator ✅
+
+`registerUrl` (the toast CTA target for logged-in-but-unregistered users, used by
+`action-feedback.js`) used to come solely from a separate page metadata field
+(`register-url`), independent of the Tier 1 Event Configurator's own config. Added
+`registerUrl` as an authored field there instead (`ConfigEditor.js`'s new "Registration"
+section, `ConfigsContext.js`), read via `session-store.js`'s `initSessionState()` —
+`tierOneConfig.registerUrl || '/register'`. The old `getMetadata('register-url')` fallback
+was removed outright, not kept for backward compatibility — this is now the only source.
+`startDuplicateConfig` resets it blank for the same reason it already resets
+`rfApiUrl`/`rfProfileId`: reusing another event's registration page would send attendees
+to register for the wrong event.
 
 ---
 
@@ -893,12 +1079,12 @@ event-libs/v1/features/           # SHARED, non-block reusable rendering logic �
     toast.css                    # .sg-toast* rules, co-located and loaded on demand by mountToast() via loadStyle()
   conflict-modal/
     conflict-modal.js            # conflict signal, showConflictModal(), hideConflictModal(), mountConflictModal() — vanilla DOM
-    conflict-modal.css           # .sg-modal-backdrop / .sg-conflict-modal* rules, co-located, loaded the same way
+    conflict-modal.css           # .sg-conflict-modal* rules (backdrop is Milo's own dialog curtain, not a custom class), co-located, loaded the same way
 
 event-libs/v1/services/sessions/  # SHARED service layer (moved out of this block)
-  sessions-api.js                 # fetchSessions — real ESL/ESP endpoint, falls back to MOCK_ESL_PAYLOAD with no event-id
-  rainfocus.js                    # stub: fetchScheduled, fetchFavorited, addSession, removeSession, toggleSessionInterest
-  mobile-rider.js                 # stub: fetchLiveStatus (returns all-inactive)
+  sessions-api.js                 # fetchSessions — real, public ESL/ESP session-catalog endpoint (no auth/mock fallback, MWPW-200437)
+  rainfocus.js                    # real: fetchScheduled, fetchFavorited, addSession, removeSession, toggleSessionInterest (MWPW-200311)
+  mobile-rider.js                 # real: fetchLiveStatus — Mobile Rider batch media-status endpoint (dev vs prod host)
   poller.js                       # startPolling, stopPolling — takes a plain onUpdate callback, no dispatch coupling
   session-state-ticker.js          # startSessionStateTicker, stopSessionStateTicker — diffs deriveSessionState() per session on an interval, only calls onChange on a real transition
   session-actions.js              # scheduleAction, favoriteAction, hasTimeConflict, resolveScheduleConflict, SessionActionError — UI-agnostic; throws instead of dispatching toasts
@@ -920,15 +1106,15 @@ event-libs/v1/blocks/sessions-guide/
     url.js                        # setSessionsParam, setSessionParam, clearSessionParams
     ics.js                        # generateICS, downloadICS — RFC 5545 compliant
   components/
-    App.js                       # root: branches on surface; renders RegistrationPrompt modal (Toast/ConflictModal are page-level singletons now, not rendered here)
+    App.js                       # root: branches on surface (Toast/ConflictModal are page-level singletons now, not rendered here)
     DrawerShell.js                # widget shell: peek/expand drawer, gestures, URL deep-linking, FilterPanel, SessionDetailOverlay
     FullPageShell.js             # page shell: URL params in/out, FilterPanel
     DrawerHeader.js               # title, DateTabs, ViewDropdown, DownloadButton, inline mobile search
     DateTabs.js                  # per-day tabs from state.eventDays
-    ViewDropdown.js               # 4-option dropdown; sentence-case labels
+    ViewDropdown.js               # 4-option dropdown; sentence-case labels; gates My Sessions/My Favorites via resolveViewSelection()
     ViewRouter.js                 # routes activeView to the correct view component
     LiveUpcomingView.js          # live carousel + featured carousel + upcoming slots + previously-aired slots
-    MySessionsView.js            # registration gate + live carousel + smart tabs + upcoming/on-demand subtabs
+    MySessionsView.js            # view-access gate (toast + redirect if unauthorized) + live carousel + smart tabs + upcoming/on-demand subtabs
     MyFavoritesView.js           # mirror of MySessionsView using favorited set
     OnDemandView.js               # on-demand sessions grouped by track
     Carousel.js                   # LiveCard carousel with paged/native-scroll dual mode
@@ -938,7 +1124,6 @@ event-libs/v1/blocks/sessions-guide/
     LiveCard.js                   # large card: thumbnail, progress bar, CTAs
     SessionDetailOverlay.js      # full session detail: 2-col layout, share, expand description
     FilterPanel.js                # sidebar category list + checkbox options
-    RegistrationPrompt.js        # inline/modal auth gate: login vs register variant
     DownloadButton.js             # ICS download trigger (My Sessions only)
     CategoryBadge.js              # category icon + label + color from getTrackIcon() (tier-1-event-config.js)
     IconButton.js                 # S2A icon-only button (solid/outlined/transparent)
@@ -955,8 +1140,8 @@ test/unit/blocks/sessions-guide/
   components/SessionCard.test.js
   components/LiveCard.test.js
   components/FilterPanel.test.js
-  components/RegistrationPrompt.test.js
   components/ViewRouter.test.js
+  components/ViewDropdown.test.js
   components/LiveUpcomingView.test.js
   components/MySessionsView.test.js
   components/OnDemandView.test.js

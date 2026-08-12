@@ -31,6 +31,7 @@ describe('session-store: RF config sourced from tier-1-event-config', () => {
     setMetadata('tier-1-event-config', JSON.stringify({
       rfApiUrl: 'https://example.com/from-tier-1-config/',
       rfProfileId: 'profile-from-tier-1-config',
+      registerUrl: '/from-tier-1-config/register',
     }));
     initSessionState();
     await waitForSessionsReady();
@@ -41,9 +42,10 @@ describe('session-store: RF config sourced from tier-1-event-config', () => {
     document.head.querySelector('meta[name="tier-1-event-config"]')?.remove();
   });
 
-  it('reads apiUrl/profileId from the tier-1-event-config payload', () => {
+  it('reads apiUrl/profileId/registerUrl from the tier-1-event-config payload', () => {
     const apiConfig = getApiConfig();
     expect(apiConfig.apiUrl).to.equal('https://example.com/from-tier-1-config/');
     expect(apiConfig.profileId).to.equal('profile-from-tier-1-config');
+    expect(apiConfig.registerUrl).to.equal('/from-tier-1-config/register');
   });
 });

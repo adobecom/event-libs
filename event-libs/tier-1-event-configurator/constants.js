@@ -9,11 +9,13 @@ const PAGES = {
 
 // Default flow for New Config/Duplicate is browsing the full ESP catalog
 // (EventPicker); Library.js auto-falls-back to ManualEventLookup if that
-// fails at runtime. Flip to false to disable browse outright.
+// fails at runtime for the currently selected env. Flip to false to disable
+// browse outright.
 const EVENT_BROWSE_ENABLED = true;
 
-// Selectable in ManualEventLookup.js's env picker. Excludes 'local' — that's
-// for the localhost dev harness, and targets the same endpoints as 'dev'.
+// Selectable in both EventPicker's and ManualEventLookup's env pickers.
+// Excludes 'local' — that's for the localhost dev harness, and targets the
+// same endpoints as 'dev'.
 const EVENT_SERVICE_ENV_OPTIONS = [
   { value: 'prod', label: 'Prod' },
   { value: 'stage', label: 'Stage' },

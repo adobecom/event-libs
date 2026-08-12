@@ -1,10 +1,10 @@
-import { html, useMemo } from '../../../deps/htm-preact.js';
+import { html, useMemo, useEffect } from '../../../deps/htm-preact.js';
 import { useSessionGuide } from '../store/index.js';
 import {
   sessions as sessionsSignal, favorited as favoritedSignal,
   liveStreamActiveIds as liveStreamActiveIdsSignal, auth, sessionStateVersion,
 } from '../../../utils/session-store.js';
-import { RegistrationPrompt } from './RegistrationPrompt.js';
+import { checkViewAccess } from '../../../services/sessions/action-feedback.js';
 import { TimeSlotRow } from './TimeSlotRow.js';
 import { TrackRow } from './TrackRow.js';
 import { Carousel } from './Carousel.js';
@@ -31,7 +31,15 @@ export function MyFavoritesView() {
   sessionStateVersion.value;
   const nowMs = getNowMs();
 
-  if (auth.value.isRegistered !== true) return html`<${RegistrationPrompt} />`;
+  // Logged-out/unregistered visitors never see this view's content — a toast fires and
+  // they're bounced to a fallback view instead. Re-checked on every auth change, not just
+  // mount, so it also catches URL-driven navigation and a session expiring mid-view.
+  const { isLoggedIn, isRegistered } = auth.value;
+  useEffect(() => {
+    const fallback = checkViewAccess('my-favorites', { eventConfig: state.guideConfig });
+    if (fallback) dispatch({ type: 'SET_VIEW', view: fallback });
+  }, [isLoggedIn, isRegistered]);
+  if (!isLoggedIn || isRegistered !== true) return null;
 
   // Memoized: this component re-renders on every context dispatch (e.g. opening the
   // detail overlay), not just when the inputs below actually change.
@@ -81,7 +89,7 @@ export function MyFavoritesView() {
         </div>
       `}
       ${bothEmpty ? html`
-        <div class="sg-my-favorites__empty">
+        <div class="sg-my-favorites__empty" role="status" aria-live="polite">
           <p>You currently have no favorited sessions.</p>
           <button
             class="sg-my-favorites__see-live-btn"
@@ -94,11 +102,13 @@ export function MyFavoritesView() {
           ${hasUpcoming && html`<button
             class=${'sg-my-sessions-tab' + (effectiveTab === 'upcoming' ? ' sg-my-sessions-tab--active' : '')}
             onclick=${() => setTab('upcoming')}
+            aria-pressed=${String(effectiveTab === 'upcoming')}
             type="button"
           >Upcoming</button>`}
           ${hasOnDemand && html`<button
             class=${'sg-my-sessions-tab' + (effectiveTab === 'on-demand' ? ' sg-my-sessions-tab--active' : '')}
             onclick=${() => setTab('on-demand')}
+            aria-pressed=${String(effectiveTab === 'on-demand')}
             type="button"
           >On demand</button>`}
         </div>
@@ -109,8 +119,8 @@ export function MyFavoritesView() {
         `}
         ${effectiveTab === 'on-demand' && html`
           <div class="sg-my-favorites__on-demand">
-            ${groupByTrack(filteredOnDemand).map(([track, trackSessions]) => html`
-              <${TrackRow} track=${track} sessions=${trackSessions} />
+            ${groupByTrack(filteredOnDemand, state.guideConfig?.swimlaneOrder).map(([track, trackSessions, label]) => html`
+              <${TrackRow} key=${track} track=${label} sessions=${trackSessions} />
             `)}
           </div>
         `}

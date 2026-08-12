@@ -27,7 +27,8 @@ function findScheduleConflict(incoming, allSessions, scheduledIds) {
   ) || null;
 }
 
-function assertAuthorized() {
+// Exported so action-feedback.js's checkViewAccess() can reuse the same check.
+export function assertAuthorized() {
   const { isLoggedIn, isRegistered } = auth.value;
   if (isLoggedIn !== true) throw new SessionActionError('auth-required');
   if (isRegistered !== true) throw new SessionActionError('registration-required');

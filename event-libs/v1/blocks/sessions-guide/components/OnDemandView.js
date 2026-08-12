@@ -30,7 +30,7 @@ export function OnDemandView() {
   // featured carousel — it's a curated highlight reel, not a filtered result set.
   const featured = getOnDemandFeaturedSessions(onDemandRaw, getFeaturedSessionIds());
   const available = filterSessions(onDemandRaw, activeFilters, searchQuery);
-  const byTrack = groupByTrack(available);
+  const byTrack = groupByTrack(available, state.guideConfig?.swimlaneOrder);
 
   return html`
     <div class="sg-view sg-view--on-demand">
@@ -44,9 +44,9 @@ export function OnDemandView() {
           />
         </div>
       `}
-      ${byTrack.map(([track, trackSessions]) => html`<${TrackRow} key=${track} track=${track} sessions=${trackSessions} />`)}
+      ${byTrack.map(([track, trackSessions, label]) => html`<${TrackRow} key=${track} track=${label} sessions=${trackSessions} />`)}
       ${byTrack.length === 0 && html`
-        <div class="sg-empty">Sessions will be available on demand after the event.</div>
+        <div class="sg-empty" role="status" aria-live="polite">Sessions will be available on demand after the event.</div>
       `}
     </div>
   `;

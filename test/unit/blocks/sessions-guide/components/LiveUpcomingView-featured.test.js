@@ -21,7 +21,7 @@ function h(offsetHours) {
 const UPCOMING_SESSION = {
   id: 'upcoming-1', title: 'Upcoming Session', description: 'Starts soon',
   track: 'Video', startTimeUtc: h(1), endTimeUtc: h(2),
-  mrStreamId: null, thumbnailUrl: null, watchUrl: '',
+  mrStreamId: null, thumbnailUrl: null,
   videoAvailable: false, inPerson: false, sessionPageUrl: '/upcoming-1',
 };
 

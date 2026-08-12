@@ -9,9 +9,10 @@ let tierOneEventConfig = {};
 
 // Built-in fallback so real, known Track values render a curated icon/color out of the
 // box even before a page authors trackIcons — authored config always takes priority
-// (checked first in getTrackIcon), this only fills gaps. Ported 1:1 from the old
-// CategoryBadge.js BADGE_MAP + sessions-guide.js MOCK_CATEGORY_COLORS.
-const DEFAULT_TRACK_ICON_CONFIG = {
+// (checked first in getTrackIcon), this only fills gaps. Exported so
+// tier-1-event-configurator/default-track-icons.js (which needs the same defaults for
+// its own icon pickers) doesn't carry a second, independently-drifting copy.
+export const DEFAULT_TRACK_ICON_CONFIG = {
   'social-media': { icon: 'social-media', color: '#FF6B35' },
   'design-and-illustration': { icon: 'design-and-illustration', color: '#9D50BB' },
   mainstage: { icon: 'mainstage', color: '#E91E63' },
@@ -29,6 +30,11 @@ const DEFAULT_TRACK_ICON_CONFIG = {
   creator: { icon: 'creator', color: '#FFB300' },
   'creativity-and-marketing-in-business': { icon: 'creativity-and-marketing-in-business', color: '#42A5F5' },
 };
+
+// Fallback icon/color for the free-text Override Primary Event Site Track (no per-track
+// lookup possible) — authored config always wins, this only fills the gap. Exported for
+// the same reason as DEFAULT_TRACK_ICON_CONFIG.
+export const DEFAULT_OVERRIDE_TRACK_ICON = { icon: 'star', color: '#6E6E6E' };
 
 function slugify(name) {
   return name ? name.toLowerCase().replace(/[\s_]+/g, '-').replace(/[^a-z0-9-]/g, '') : '';
@@ -66,6 +72,25 @@ export function getTrackIcon(trackName) {
     || DEFAULT_TRACK_ICON_CONFIG[trackName]
     || DEFAULT_TRACK_ICON_CONFIG[slug]
     || null;
+}
+
+// Each distinct override text is its own swimlane — overrideTrackIcons maps a specific
+// text to its own icon/color, overrideTrackIcon (singular) is the event-wide default for
+// any text not yet mapped.
+export function getOverrideTrackIcon(overrideText) {
+  const perTextIcons = tierOneEventConfig.overrideTrackIcons || {};
+  return perTextIcons[overrideText]
+    || tierOneEventConfig.overrideTrackIcon
+    || DEFAULT_OVERRIDE_TRACK_ICON;
+}
+
+// Products have no built-in default map (unlike tracks) — no product icons exist
+// anywhere yet (not federal, not event-libs' own sprite), so there's nothing sensible to
+// fall back to; this is purely the authored map, keyed by the exact product name.
+export function getProductIcon(productName) {
+  if (!productName) return null;
+  const productIcons = tierOneEventConfig.productIcons || {};
+  return productIcons[productName] || null;
 }
 
 export function getAllowDoubleBooking() {

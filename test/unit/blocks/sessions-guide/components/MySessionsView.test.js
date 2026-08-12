@@ -29,19 +29,19 @@ function h(offsetHours) {
 const UPCOMING_SESSION = {
   id: 'u-1', title: 'Upcoming', description: '', track: 'Design',
   startTimeUtc: h(2), endTimeUtc: h(3),
-  videoAvailable: false, inPerson: false, sessionPageUrl: '/u-1', watchUrl: '',
+  videoAvailable: false, inPerson: false, sessionPageUrl: '/u-1',
   mrStreamId: null, thumbnailUrl: null,
 };
 const PAST_SESSION = {
   id: 'p-1', title: 'Past', description: '', track: 'Video',
   startTimeUtc: h(-4), endTimeUtc: h(-3),
-  videoAvailable: true, inPerson: false, sessionPageUrl: '/p-1', watchUrl: '/p-1',
+  videoAvailable: true, inPerson: false, sessionPageUrl: '/p-1',
   mrStreamId: null, thumbnailUrl: null,
 };
 
 const BASE_CONFIG = {
   userTz: 'America/Los_Angeles', surface: 'page',
-  title: '', filterCategories: [], theme: 'dark',
+  title: '', filterCategories: [], theme: 'dark', registerUrl: '/register-test',
 };
 
 function makeStore({
@@ -67,17 +67,20 @@ function makeStore({
 }
 
 describe('MySessionsView', () => {
-  it('shows RegistrationPrompt when not registered', () => {
+  // The actual login/registration toast + redirect-to-fallback is fired by
+  // checkViewAccess() (see action-feedback.test.js and ViewDropdown.test.js) from a
+  // useEffect, which this test harness's htm-preact mock no-ops — so all that's directly
+  // observable here is that the view renders nothing while unauthorized, not the toast.
+  it('renders nothing when logged out', () => {
     const store = makeStore({ isRegistered: false, isLoggedIn: false });
     const View = buildMySessionsView(preact, store);
-    expect(View({})).to.include('sg-reg-prompt');
-    expect(View({})).to.not.include('sg-view--my-sessions');
+    expect(View({})).to.be.null;
   });
 
-  it('shows RegistrationPrompt when logged in but not registered', () => {
+  it('renders nothing when logged in but not registered', () => {
     const store = makeStore({ isRegistered: false, isLoggedIn: true });
     const View = buildMySessionsView(preact, store);
-    expect(View({})).to.include('sg-reg-prompt');
+    expect(View({})).to.be.null;
   });
 
   it('renders the my-sessions view when registered', () => {

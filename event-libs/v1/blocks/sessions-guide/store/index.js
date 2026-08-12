@@ -4,7 +4,7 @@ import {
 import {
   sessions, sessionsStatus, liveStreamActiveIds, auth, getApiConfig, sessionStateVersion,
 } from '../../../utils/session-store.js';
-import { deriveSessionState } from '../../../utils/session-state.js';
+import { isPostEvent } from '../../../utils/session-state.js';
 import { getNowMs, getSessionDayKey } from '../utils/time.js';
 
 const SS_LAST_VIEW = 'sg:last-view';
@@ -43,7 +43,6 @@ export function buildInitialState(guideConfig) {
     guideConfig: guideConfig || {},
     activeSessionId: null,
     dismissingIds: new Set(),
-    regPromptOpen: false,
   };
 }
 
@@ -89,11 +88,6 @@ export function reducer(state, action) {
     case 'SET_ACTIVE_SESSION':
       return { ...state, activeSessionId: action.sessionId };
 
-    case 'SHOW_REG_PROMPT':
-      return { ...state, regPromptOpen: true };
-    case 'HIDE_REG_PROMPT':
-      return { ...state, regPromptOpen: false };
-
     case 'ADD_DISMISSING_ID':
       return { ...state, dismissingIds: new Set([...state.dismissingIds, action.id]) };
     case 'REMOVE_DISMISSING_ID': {
@@ -127,13 +121,10 @@ export function SessionGuideProvider({ guideConfig, children }) {
     function checkAutoTransition() {
       if (state.activeView !== 'live-upcoming') return;
       if (sessionsStatus.value !== 'ready' || !sessions.value.length) return;
-      const now = getNowMs();
       const manualCutoff = getApiConfig()?.manualCutoff;
-      const pastManualCutoff = manualCutoff ? now >= Date.parse(manualCutoff) : false;
-      const allEnded = sessions.value.every(
-        (s) => deriveSessionState(s, liveStreamActiveIds.value, now) === 'on-demand',
-      );
-      if (allEnded || pastManualCutoff) dispatch({ type: 'SET_VIEW', view: 'on-demand' });
+      if (isPostEvent(sessions.value, liveStreamActiveIds.value, getNowMs(), manualCutoff)) {
+        dispatch({ type: 'SET_VIEW', view: 'on-demand' });
+      }
     }
     checkAutoTransition();
     const unsubSessions = sessions.subscribe(checkAutoTransition);

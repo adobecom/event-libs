@@ -18,12 +18,12 @@ const BASE_CONFIG = {
 const SESSION_A = {
   id: 'a', title: 'Session A', description: 'Desc A', track: 'Design',
   startTimeUtc: '2099-10-28T17:00:00Z', endTimeUtc: '2099-10-28T18:00:00Z',
-  videoAvailable: false, inPerson: false, sessionPageUrl: '/a', watchUrl: '',
+  videoAvailable: false, inPerson: false, sessionPageUrl: '/a',
 };
 const SESSION_B = {
   id: 'b', title: 'Session B', description: 'Desc B', track: 'Video',
   startTimeUtc: '2099-10-28T17:00:00Z', endTimeUtc: '2099-10-28T18:00:00Z',
-  videoAvailable: false, inPerson: false, sessionPageUrl: '/b', watchUrl: '',
+  videoAvailable: false, inPerson: false, sessionPageUrl: '/b',
 };
 
 function makeStore() {

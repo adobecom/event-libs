@@ -20,10 +20,12 @@ const LIVE_SESSION = {
   title: 'MAX Keynote',
   description: 'The opening keynote.',
   track: 'Featured',
-  startTimeUtc: '2026-10-28T16:00:00Z',
-  endTimeUtc: '2026-10-28T17:30:00Z',
+  // Relative to "now" (not a fixed date) so the session always lands in the
+  // 'live' sessionState regardless of when the suite runs.
+  startTimeUtc: new Date(Date.now() - 30 * 60 * 1000).toISOString(),
+  endTimeUtc: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
   thumbnailUrl: 'https://example.com/thumb.jpg',
-  watchUrl: '/max',
+  isOnline: true,
   sessionPageUrl: '/sessions/max-keynote',
   videoAvailable: false,
   inPerson: false,
@@ -91,16 +93,16 @@ describe('LiveCard', () => {
     expect(html).to.not.include('<img');
   });
 
-  it('renders Watch now button when watchUrl is set', () => {
+  it('renders Watch now button for a live session with a watch destination', () => {
     const store = makeStore();
     const LiveCard = buildLiveCard(preact, store);
     expect(LiveCard({ session: LIVE_SESSION })).to.include('Watch now');
   });
 
-  it('does not render Watch now when watchUrl is empty', () => {
+  it('does not render Watch now when the live session has no watch destination', () => {
     const store = makeStore();
     const LiveCard = buildLiveCard(preact, store);
-    const noWatch = { ...LIVE_SESSION, watchUrl: '' };
+    const noWatch = { ...LIVE_SESSION, isOnline: false, isLivestreamed: false };
     expect(LiveCard({ session: noWatch })).to.not.include('Watch now');
   });
 
@@ -124,5 +126,41 @@ describe('LiveCard', () => {
     expect(html).to.include('sg-live-card__btn--watch');
     expect(html).to.include('sg-live-card__btn--favorite');
     expect(html).to.include('sg-live-card__btn--schedule');
+  });
+
+  it('tags the watch button with daa-ll=Watch-Now', () => {
+    const store = makeStore();
+    const LiveCard = buildLiveCard(preact, store);
+    expect(LiveCard({ session: LIVE_SESSION })).to.include('daa-ll="Watch-Now"');
+  });
+
+  it('tags the card title button with daa-ll=Session-Card-Open on the widget surface', () => {
+    const store = makeStore();
+    const LiveCard = buildLiveCard(preact, store);
+    expect(LiveCard({ session: LIVE_SESSION })).to.include('daa-ll="Session-Card-Open"');
+  });
+
+  it('renders the title as plain text (not an interactive control) on the page surface', () => {
+    const store = buildStore(preact);
+    store.SessionGuideContext._current = {
+      state: { guideConfig: { ...BASE_CONFIG, surface: 'page' } },
+      dispatch: () => {},
+    };
+    const LiveCard = buildLiveCard(preact, store);
+    const html = LiveCard({ session: LIVE_SESSION });
+    expect(html).to.not.include('daa-ll="Session-Card-Open"');
+    expect(html).to.include('<p class="sg-live-card__title">MAX Keynote</p>');
+  });
+
+  it('tags the schedule/favorite buttons with Add-/Remove- daa-ll labels matching their state', () => {
+    const store = makeStore();
+    const LiveCard = buildLiveCard(preact, store);
+    expect(LiveCard({ session: LIVE_SESSION })).to.include('daa-ll=Add-to-Schedule');
+    expect(LiveCard({ session: LIVE_SESSION })).to.include('daa-ll=Add-to-Favorites');
+    scheduled.value = new Set(['session-keynote']);
+    favorited.value = new Set(['session-keynote']);
+    const html = LiveCard({ session: LIVE_SESSION });
+    expect(html).to.include('daa-ll=Remove-from-Schedule');
+    expect(html).to.include('daa-ll=Remove-from-Favorites');
   });
 });

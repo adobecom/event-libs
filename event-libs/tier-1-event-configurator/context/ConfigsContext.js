@@ -16,10 +16,14 @@ function emptyConfig() {
   return {
     eventTitle: '',
     trackIcons: {},
+    overrideTrackIcon: null,
+    overrideTrackIcons: {},
+    productIcons: {},
     allowDoubleBooking: false,
     featuredSessions: [],
     rfApiUrl: '',
     rfProfileId: '',
+    registerUrl: '',
   };
 }
 
@@ -90,8 +94,9 @@ const ConfigsProvider = ({ children }) => {
   // so carrying it over would silently mislabel the new event.
   // `eventServiceEnv` is the *new* pick's env, not the source row's —
   // Duplicate can legitimately target a different tier than its source.
-  // rfApiUrl/rfProfileId always reset blank — reusing another event's RF
-  // profile id would misroute this event's live schedule/favorites calls.
+  // rfApiUrl/rfProfileId/registerUrl always reset blank — reusing another event's RF
+  // profile id or registration page would misroute this event's live schedule/favorites
+  // calls or send attendees to register for the wrong event.
   const startDuplicateConfig = useCallback((sourceRow, event, eventServiceEnv) => {
     const clonedConfig = { ...sourceRow.config };
     delete clonedConfig.eventId;
@@ -102,7 +107,7 @@ const ConfigsProvider = ({ children }) => {
       backendEventTitle: event.enTitle || event.eventId,
       eventServiceEnv,
       config: {
-        ...clonedConfig, eventTitle: '', rfApiUrl: '', rfProfileId: '',
+        ...clonedConfig, eventTitle: '', rfApiUrl: '', rfProfileId: '', registerUrl: '',
       },
     });
   }, []);
@@ -152,6 +157,38 @@ const ConfigsProvider = ({ children }) => {
       return {
         ...prev,
         config: { ...prev.config, trackIcons: { ...existing, ...additions } },
+      };
+    });
+  }, []);
+
+  // Same merge pattern as updateTrackIcon, keyed by override text instead of track name —
+  // each distinct text an author has typed is its own swimlane, with its own entry.
+  const updateOverrideTrackIcon = useCallback((overrideText, updates) => {
+    setActiveConfig((prev) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        config: {
+          ...prev.config,
+          overrideTrackIcons: {
+            ...prev.config.overrideTrackIcons,
+            [overrideText]: { ...prev.config.overrideTrackIcons?.[overrideText], ...updates },
+          },
+        },
+      };
+    });
+  }, []);
+
+  // Simpler than updateTrackIcon — a single icon slug per product, no color to merge.
+  const updateProductIcon = useCallback((product, icon) => {
+    setActiveConfig((prev) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        config: {
+          ...prev.config,
+          productIcons: { ...prev.config.productIcons, [product]: icon },
+        },
       };
     });
   }, []);
@@ -218,6 +255,8 @@ const ConfigsProvider = ({ children }) => {
     clearActiveConfig,
     updateTrackIcon,
     seedTrackIcons,
+    updateOverrideTrackIcon,
+    updateProductIcon,
     updateConfigField,
     saveActiveConfig,
     removeConfig,

@@ -133,19 +133,28 @@ export function SessionCard({ session, forceOnDemand = false, timeDisplay = 'dur
     history.pushState({}, '', setSessionParam(`${slug}-${rfCode}`));
   }
 
+  // eslint-disable-next-line no-nested-ternary
+  const cardDaaLl = surface === 'page'
+    ? 'Session-Card-Navigate'
+    : (onDemand ? 'On-Demand-Card-Navigate' : 'Session-Card-Open');
+
   return html`
-    <div class=${cardClass} onclick=${handleClick} role="button" tabindex="0"
-      onkeydown=${(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleClick(); } }}
+    <div class=${cardClass} onclick=${handleClick}
       onmouseenter=${onMouseEnter} onmouseleave=${onMouseLeave}>
       <div class="sg-card__body">
         <div class="sg-card__badge-row">
-          <${CategoryBadge} category=${session.category?.[0]} size="sm" />
+          <${CategoryBadge} session=${session} size="sm" />
         </div>
-        <p class="sg-card__title">${session.title}</p>
+        <button
+          class="sg-card__title sg-card__title-btn"
+          type="button"
+          onclick=${(e) => { e.stopPropagation(); handleClick(); }}
+          daa-ll=${cardDaaLl}
+        >${session.title}</button>
         <p class="sg-card__desc">${session.description}</p>
         <div class="sg-card__footer">
           <span class="sg-card__track sg-card__track--footer" style=${'color:' + trackColor}>${session.track}</span>
-          <span class="sg-card__footer-badge"><${CategoryBadge} category=${session.category?.[0]} size="sm" /></span>
+          <span class="sg-card__footer-badge"><${CategoryBadge} session=${session} size="sm" /></span>
           <span class="sg-card__time">${timeLabel}</span>
         </div>
       </div>
@@ -157,6 +166,7 @@ export function SessionCard({ session, forceOnDemand = false, timeDisplay = 'dur
           extraClass="sg-card__btn--play"
           label="Play session"
           onclick=${handlePlay}
+          daaLl=${'Watch-Now'}
         >
           <${IconPlay} />
         </${IconButton}>`}
@@ -169,6 +179,7 @@ export function SessionCard({ session, forceOnDemand = false, timeDisplay = 'dur
           onclick=${handleSchedule}
           pressed=${isScheduled}
           disabled=${isPending}
+          daaLl=${isScheduled ? 'Remove-from-Schedule' : 'Add-to-Schedule'}
         >
           ${isScheduled ? html`<${IconCalendarCheck} />` : html`<${IconCalendarPlus} />`}
         </${IconButton}>`}
@@ -181,6 +192,7 @@ export function SessionCard({ session, forceOnDemand = false, timeDisplay = 'dur
           onclick=${handleFavorite}
           pressed=${isFavorited}
           disabled=${isPending}
+          daaLl=${isFavorited ? 'Remove-from-Favorites' : 'Add-to-Favorites'}
         >
           ${isFavorited ? html`<${IconHeartFilled} />` : html`<${IconHeartOutline} />`}
         </${IconButton}>

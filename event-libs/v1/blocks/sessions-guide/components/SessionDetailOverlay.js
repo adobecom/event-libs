@@ -7,14 +7,15 @@ import {
 } from '../../../utils/session-store.js';
 import { scheduleWithFeedback, favoriteWithFeedback } from '../../../services/sessions/action-feedback.js';
 import { showToast } from '../../../features/toast/toast.js';
-import { deriveSessionState } from '../../../utils/session-state.js';
-import { setSessionParam, safeUrl } from '../utils/url.js';
+import { deriveSessionState, getWatchDestination } from '../../../utils/session-state.js';
+import { setSessionParam, clearSessionParams, safeUrl, isSamePage } from '../utils/url.js';
 import { IconHeartFilled, IconHeartOutline } from './icons.js';
 import { Icon } from '../../../features/icons/Icon.js';
 import { getTrackIcon } from '../../../utils/tier-1-event-config.js';
+import { resolveTrackBadge } from '../utils/session-filters.js';
 
 export function SessionDetailOverlay({ onBack }) {
-  const { state } = useSessionGuide();
+  const { state, dispatch } = useSessionGuide();
   const { activeSessionId, guideConfig } = state;
   const { userTz } = guideConfig;
 
@@ -35,10 +36,25 @@ export function SessionDetailOverlay({ onBack }) {
   const isLive = sessionState === 'live';
   const onDemand = sessionState === 'on-demand';
   const recordingComing = onDemand && session.inPerson && !session.videoAvailable;
-  // Live / on-demand sessions surface "Watch now"; upcoming sessions surface "Add to schedule".
+  const watchHref = safeUrl(getWatchDestination(session, sessionState));
+  // Live / on-demand sessions surface "Watch now" (disabled if there's no real
+  // destination); upcoming sessions surface "Add to schedule".
   const showWatch = isLive || onDemand;
 
-  const trackIconName = getTrackIcon(session.track)?.icon || '';
+  function handleWatch(e) {
+    // Already on the destination page (e.g. the widget is embedded on the homepage/broadcast
+    // page itself) — close the widget instead of reloading the page out from under the player.
+    if (isSamePage(watchHref)) {
+      e.preventDefault();
+      dispatch({ type: 'CLOSE_DRAWER' });
+      history.pushState({}, '', clearSessionParams());
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  }
+
+  // null for a session with neither a primary track nor an override — no "Other" badge,
+  // matching swimlane placement.
+  const trackBadge = resolveTrackBadge(session);
   const startShort = session.startTimeUtc ? formatShortTime(session.startTimeUtc, userTz) : '';
   const endShort = session.endTimeUtc ? formatShortTime(session.endTimeUtc, userTz) : '';
   const timeRange = showWatch && !endShort
@@ -97,10 +113,25 @@ export function SessionDetailOverlay({ onBack }) {
             <div class="sg-detail__group sg-detail__group--summary">
               <div class="sg-detail__summary">
                 <div class="sg-detail__summary-top">
-                  <div class="sg-detail__channel">
-                    ${trackIconName && html`<${Icon} name=${trackIconName} size=${20} className="sg-detail__channel-icon" />`}
-                    <span class="sg-detail__channel-name">${session.track}</span>
-                  </div>
+                  ${trackBadge && html`
+                    <div class="sg-detail__channel">
+                      <${Icon} name=${trackBadge.icon} size=${20} className="sg-detail__channel-icon" />
+                      <span class="sg-detail__channel-name">${trackBadge.label}</span>
+                    </div>
+                  `}
+                  ${trackBadge?.stackedTracks && html`
+                    <div class="sg-detail__track-stack">
+                      ${trackBadge.stackedTracks.map((track) => {
+    const icon = getTrackIcon(track);
+    return html`
+                          <span class="sg-detail__track-chip" key=${track}>
+                            <${Icon} name=${icon?.icon} size=${16} className="sg-detail__track-chip-icon" />
+                            ${track}
+                          </span>
+                        `;
+  })}
+                    </div>
+                  `}
                   ${timeRange && html`<span class="sg-detail__time">${timeRange}</span>`}
                 </div>
 
@@ -112,9 +143,11 @@ export function SessionDetailOverlay({ onBack }) {
                   ${showWatch
     ? html`
                         <a
-                          class=${'sg-detail__btn sg-detail__btn--primary sg-detail__btn--watch' + (session.watchUrl ? '' : ' is-disabled')}
-                          href=${safeUrl(session.watchUrl)}
-                          aria-disabled=${session.watchUrl ? undefined : 'true'}
+                          class=${'sg-detail__btn sg-detail__btn--primary sg-detail__btn--watch' + (watchHref ? '' : ' is-disabled')}
+                          href=${watchHref}
+                          onclick=${handleWatch}
+                          aria-disabled=${watchHref ? undefined : 'true'}
+                          daa-ll="Watch-Now"
                         >
                           <span class="sg-detail__btn-icon sg-detail__btn-icon--play" aria-hidden="true"></span>
                           Watch now
@@ -126,6 +159,7 @@ export function SessionDetailOverlay({ onBack }) {
                           onclick=${handleSchedule}
                           disabled=${isPending}
                           aria-pressed=${String(isScheduled)}
+                          daa-ll=${isScheduled ? 'Remove-from-Schedule' : 'Add-to-Schedule'}
                           type="button"
                         >
                           <span class=${'sg-detail__btn-icon ' + (isScheduled ? 'sg-detail__btn-icon--check' : 'sg-detail__btn-icon--plus')} aria-hidden="true"></span>
@@ -142,6 +176,7 @@ export function SessionDetailOverlay({ onBack }) {
                     onclick=${handleFavorite}
                     pressed=${isFavorited}
                     disabled=${isPending}
+                    daaLl=${isFavorited ? 'Remove-from-Favorites' : 'Add-to-Favorites'}
                   >
                     ${isFavorited ? html`<${IconHeartFilled} />` : html`<${IconHeartOutline} />`}
                   </${IconButton}>
@@ -229,7 +264,7 @@ export function SessionDetailOverlay({ onBack }) {
                   ${session.speakers.map((sp) => html`
                     <div class="sg-detail__speaker">
                       ${sp.photo
-    ? html`<img class="sg-detail__speaker-photo" src=${sp.photo} alt="" />`
+    ? html`<img class="sg-detail__speaker-photo" src=${sp.photo} alt=${sp.name} width="56" height="56" loading="lazy" decoding="async" />`
     : html`<span class="sg-detail__speaker-photo sg-detail__speaker-photo--placeholder" aria-hidden="true"></span>`}
                       <div class="sg-detail__speaker-info">
                         <span class="sg-detail__speaker-name">${sp.name}</span>

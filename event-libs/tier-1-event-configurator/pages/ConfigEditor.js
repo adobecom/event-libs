@@ -3,9 +3,12 @@ import { getEventSessionCatalog } from '../../v1/utils/esp-controller.js';
 import { useNavigation } from '../context/NavigationContext.js';
 import { useConfigs } from '../context/ConfigsContext.js';
 import {
-  copyTextToClipboard, extractDistinctTracks, isTrackIconEntryComplete, getDisplayTitle, stringifyConfig,
+  copyTextToClipboard, extractDistinctTracks, extractDistinctOverrideTexts, extractDistinctProducts,
+  isTrackIconEntryComplete, getDisplayTitle, stringifyConfig,
 } from '../utils.js';
 import TrackIconEditor from '../components/TrackIconEditor.js';
+import OverrideTrackIconEditor from '../components/OverrideTrackIconEditor.js';
+import ProductIconEditor from '../components/ProductIconEditor.js';
 import FeaturedSessionsEditor from '../components/FeaturedSessionsEditor.js';
 import LoadingInline from '../components/LoadingInline.js';
 
@@ -13,7 +16,7 @@ export default function ConfigEditor() {
   const { goToLibrary } = useNavigation();
   const {
     activeConfig, saveActiveConfig, clearActiveConfig, updateTrackIcon, seedTrackIcons,
-    updateConfigField, setToastSuccess, setToastError,
+    updateOverrideTrackIcon, updateProductIcon, updateConfigField, setToastSuccess, setToastError,
   } = useConfigs();
 
   const [sessions, setSessions] = useState([]);
@@ -45,6 +48,8 @@ export default function ConfigEditor() {
   }, [eventId, seedTrackIcons]);
 
   const tracks = useMemo(() => extractDistinctTracks(sessions), [sessions]);
+  const overrideTexts = useMemo(() => extractDistinctOverrideTexts(sessions), [sessions]);
+  const products = useMemo(() => extractDistinctProducts(sessions), [sessions]);
 
   const configPreview = useMemo(() => {
     if (!activeConfig) return '';
@@ -112,7 +117,7 @@ export default function ConfigEditor() {
         ${isLoadingSessions && html`<${LoadingInline} label="Loading sessions…" />`}
         ${sessionsError && html`<p class="tec-editor__error">${sessionsError}</p>`}
         ${!isLoadingSessions && !sessionsError && html`
-          <p class="tec-editor__section-hint">${sessions.length} session(s) found — ${tracks.length} distinct track(s).</p>
+          <p class="tec-editor__section-hint">${sessions.length} session(s) found — ${tracks.length} distinct track(s), ${products.length} distinct product(s).</p>
         `}
       </section>
 
@@ -131,6 +136,34 @@ export default function ConfigEditor() {
             tracks=${tracks}
             trackIcons=${activeConfig.config.trackIcons}
             onChange=${updateTrackIcon}
+          />
+        `}
+      </section>
+
+      <section class="tec-editor__section">
+        <h2>Override icons</h2>
+        <p class="tec-editor__section-hint">Override Primary Event Site Track always wins swimlane placement and the badge — each distinct override text is its own lane. Map an icon per text below, or leave it on the default for texts you haven't configured yet.</p>
+        ${isLoadingSessions && html`<${LoadingInline} label="Loading override text…" />`}
+        ${!isLoadingSessions && !sessionsError && html`
+          <${OverrideTrackIconEditor}
+            overrideTexts=${overrideTexts}
+            overrideTrackIcons=${activeConfig.config.overrideTrackIcons}
+            defaultOverrideIcon=${activeConfig.config.overrideTrackIcon}
+            onChangeMapped=${updateOverrideTrackIcon}
+            onChangeDefault=${(value) => updateConfigField('overrideTrackIcon', value)}
+          />
+        `}
+      </section>
+
+      <section class="tec-editor__section">
+        <h2>Product icons</h2>
+        <p class="tec-editor__section-hint">Products already have their own colored icons — no color to set here, just an icon per product. Not all product icons are available yet; unset ones fall back to the page's own default at render time.</p>
+        ${isLoadingSessions && html`<${LoadingInline} label="Loading products…" />`}
+        ${!isLoadingSessions && !sessionsError && html`
+          <${ProductIconEditor}
+            products=${products}
+            productIcons=${activeConfig.config.productIcons}
+            onChange=${updateProductIcon}
           />
         `}
       </section>
@@ -190,6 +223,20 @@ export default function ConfigEditor() {
           placeholder="this event's RainFocus profile id"
           value=${activeConfig.config.rfProfileId || ''}
           onInput=${(e) => updateConfigField('rfProfileId', e.target.value)}
+        />
+      </section>
+
+      <section class="tec-editor__section">
+        <h2>Registration</h2>
+        <p class="tec-editor__section-hint">Where attendees are sent to register when a logged-in but unregistered user tries to schedule/favorite a session or view My Sessions/My Favorites. Leave blank and the page falls back to its own default.</p>
+        <label class="tec-editor__field-label" for="tec-register-url">Registration URL</label>
+        <input
+          id="tec-register-url"
+          type="text"
+          class="tec-field tec-editor__rf-input"
+          placeholder="/register"
+          value=${activeConfig.config.registerUrl || ''}
+          onInput=${(e) => updateConfigField('registerUrl', e.target.value)}
         />
       </section>
 
