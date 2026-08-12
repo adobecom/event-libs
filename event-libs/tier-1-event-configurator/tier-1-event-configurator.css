@@ -759,21 +759,6 @@ select.tec-field {
   margin-bottom: 12px;
 }
 
-.tec-track-editor__preview-wrap {
-  flex-shrink: 0;
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  background: var(--tec-color-background);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.tec-track-editor__preview {
-  flex-shrink: 0;
-}
-
 .tec-track-editor__name {
   flex: 1;
   min-width: 0;
@@ -784,8 +769,103 @@ select.tec-field {
   white-space: nowrap;
 }
 
-.tec-track-editor__icon-select {
-  min-width: 200px;
+.tec-icon-picker {
+  position: relative;
+  flex-shrink: 0;
+  width: 200px;
+}
+
+.tec-icon-picker__trigger {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  cursor: pointer;
+  text-align: left;
+}
+
+.tec-icon-picker__trigger-icon {
+  display: inline-flex;
+  flex-shrink: 0;
+}
+
+.tec-icon-picker__trigger-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tec-icon-picker__trigger-label--empty,
+.tec-icon-picker__option-label--empty {
+  color: var(--tec-color-text-secondary);
+  font-style: italic;
+}
+
+.tec-icon-picker__panel {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  z-index: 10;
+  width: 280px;
+  max-width: 90vw;
+  background: var(--tec-color-surface);
+  border: 1px solid var(--tec-color-border);
+  border-radius: var(--tec-border-radius-sm);
+  box-shadow: var(--tec-shadow-lg);
+  overflow: hidden;
+}
+
+.tec-icon-picker__search {
+  width: 100%;
+  border: none;
+  border-bottom: 1px solid var(--tec-color-border);
+  border-radius: 0;
+}
+
+.tec-icon-picker__list {
+  list-style: none;
+  margin: 0;
+  padding: 4px;
+  max-height: 260px;
+  overflow-y: auto;
+}
+
+.tec-icon-picker__option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 8px;
+  border: none;
+  border-radius: var(--tec-border-radius-sm);
+  background: none;
+  font-family: inherit;
+  font-size: 13px;
+  color: var(--tec-color-text-primary);
+  text-align: left;
+  cursor: pointer;
+}
+
+.tec-icon-picker__option:hover,
+.tec-icon-picker__option.is-highlighted {
+  background: var(--tec-color-surface-hover);
+}
+
+.tec-icon-picker__option.is-selected {
+  font-weight: 600;
+}
+
+.tec-icon-picker__option-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tec-icon-picker__empty {
+  padding: var(--tec-spacing-sm);
+  color: var(--tec-color-text-secondary);
+  font-size: 13px;
+  text-align: center;
 }
 
 .tec-track-editor__color-input {

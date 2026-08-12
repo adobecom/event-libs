@@ -1,20 +1,7 @@
 import { html } from '../../v1/deps/htm-preact.js';
-import { Icon } from '../../v1/features/icons/Icon.js';
+import IconPicker from './IconPicker.js';
 import { getDefaultTrackIcon, DEFAULT_ICON_COLOR, useIconSlugOptions } from '../default-track-icons.js';
 import { isTrackIconEntryComplete } from '../utils.js';
-
-// Renders through the same resolveIcon() chain (federal → Milo → event-libs' own
-// track-icons.svg) session-guide's live badges use — see CategoryBadge.js's identical
-// wrapping-span color convention — so the picker preview and the live page never drift.
-export function IconPreview({ icon, color }) {
-  if (!icon) return html`<span class="tec-track-editor__preview" aria-hidden="true"></span>`;
-
-  return html`
-    <span class="tec-track-editor__preview" style=${`color:${color}`}>
-      <${Icon} name=${icon} size=${24} />
-    </span>
-  `;
-}
 
 export default function TrackIconEditor({ tracks, trackIcons, onChange }) {
   // Called unconditionally, before the early return below — Preact hooks must run in
@@ -36,18 +23,14 @@ export default function TrackIconEditor({ tracks, trackIcons, onChange }) {
 
         return html`
           <li class="tec-track-editor__row ${complete ? '' : 'is-incomplete'}" key=${track}>
-            <div class="tec-track-editor__preview-wrap">
-              <${IconPreview} icon=${icon} color=${color} />
-            </div>
             <span class="tec-track-editor__name">${track}</span>
-            <select
-              class="tec-field tec-track-editor__icon-select"
+            <${IconPicker}
               value=${icon}
-              onChange=${(e) => onChange(track, { icon: e.target.value })}
-            >
-              <option value="">— no icon —</option>
-              ${iconSlugs.map((slug) => html`<option value=${slug} key=${slug}>${slug}</option>`)}
-            </select>
+              color=${color}
+              options=${iconSlugs}
+              onChange=${(newIcon) => onChange(track, { icon: newIcon })}
+              ariaLabel="Icon for ${track}"
+            />
             <input
               type="color"
               class="tec-track-editor__color-input"

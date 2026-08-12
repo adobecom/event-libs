@@ -39,12 +39,16 @@ PLAN.md §6 — not built here.
 **Track icon editor implementation note:** `default-track-icons.js` re-exports
 `DEFAULT_TRACK_ICON_CONFIG`/`DEFAULT_OVERRIDE_TRACK_ICON` from the real
 `event-libs/v1/utils/tier-1-event-config.js` rather than carrying its own copy.
-`TrackIconEditor.js`'s `IconPreview` renders through the real, shared
+`IconPicker.js` (a searchable combobox, since a native `<select>` can't render
+an icon + name per option) renders each option through the real, shared
 `event-libs/v1/features/icons/Icon.js`/`icon-resolver.js` — the same
 federal-CDN-first, then-Milo, then-event-libs'-own-`track-icons.svg` chain
-session-guide's live badges use — so the picker preview and the live page never
-drift. (The app previously carried its own duplicate sprite-fetch module,
-`track-icon-sprite.js`, for the period before this branch existed on `dev`;
+session-guide's live badges use — so the picker and the live page never
+drift. Its option list itself comes from `useIconSlugOptions()`
+(`default-track-icons.js`), which merges the curated `KNOWN_ICON_SLUGS` with
+federal's live `icons.json` inventory, so newly-uploaded federal icons appear
+with no code change. (The app previously carried its own duplicate sprite-fetch
+module, `track-icon-sprite.js`, for the period before this branch existed on `dev`;
 it's been retired now that the real shared resolver is available.)
 
 **Known interim gap:** the track list shown in the editor comes from a raw

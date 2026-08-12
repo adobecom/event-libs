@@ -1,6 +1,6 @@
 import { html } from '../../v1/deps/htm-preact.js';
 import { DEFAULT_OVERRIDE_TRACK_ICON, useIconSlugOptions } from '../default-track-icons.js';
-import { IconPreview } from './TrackIconEditor.js';
+import IconPicker from './IconPicker.js';
 
 // Override text is free text, not a real track, and each distinct value is its own
 // swimlane — mirrors TrackIconEditor's per-value list instead of a single icon/color pair.
@@ -15,17 +15,14 @@ export default function OverrideTrackIconEditor({
   return html`
     <div class="tec-override-editor">
       <div class="tec-track-editor__row">
-        <div class="tec-track-editor__preview-wrap">
-          <${IconPreview} icon=${defaultIcon} color=${defaultColor} />
-        </div>
         <span class="tec-track-editor__name">Default (unmapped override text)</span>
-        <select
-          class="tec-field tec-track-editor__icon-select"
+        <${IconPicker}
           value=${defaultIcon}
-          onChange=${(e) => onChangeDefault({ icon: e.target.value, color: defaultColor })}
-        >
-          ${iconSlugs.map((slug) => html`<option value=${slug} key=${slug}>${slug}</option>`)}
-        </select>
+          color=${defaultColor}
+          options=${iconSlugs}
+          onChange=${(newIcon) => onChangeDefault({ icon: newIcon, color: defaultColor })}
+          ariaLabel="Default override icon"
+        />
         <input
           type="color"
           class="tec-track-editor__color-input"
@@ -45,17 +42,14 @@ export default function OverrideTrackIconEditor({
     const color = authored?.color ?? defaultColor;
     return html`
                 <li class="tec-track-editor__row" key=${text}>
-                  <div class="tec-track-editor__preview-wrap">
-                    <${IconPreview} icon=${icon} color=${color} />
-                  </div>
                   <span class="tec-track-editor__name">${text}</span>
-                  <select
-                    class="tec-field tec-track-editor__icon-select"
+                  <${IconPicker}
                     value=${icon}
-                    onChange=${(e) => onChangeMapped(text, { icon: e.target.value, color })}
-                  >
-                    ${iconSlugs.map((slug) => html`<option value=${slug} key=${slug}>${slug}</option>`)}
-                  </select>
+                    color=${color}
+                    options=${iconSlugs}
+                    onChange=${(newIcon) => onChangeMapped(text, { icon: newIcon, color })}
+                    ariaLabel="Icon for ${text}"
+                  />
                   <input
                     type="color"
                     class="tec-track-editor__color-input"
