@@ -5,7 +5,7 @@ import { formatSessionTime, formatShortTime, getNowMs } from '../utils/time.js';
 import {
   sessions, scheduled, favorited, pendingActions, liveStreamActiveIds, sessionStateVersion,
 } from '../../../utils/session-store.js';
-import { scheduleWithFeedback, favoriteWithFeedback } from '../../../services/sessions/action-feedback.js';
+import { toggleScheduleWithFeedback, toggleFavoriteWithFeedback } from '../../../services/sessions/action-feedback.js';
 import { showToast } from '../../../features/toast/toast.js';
 import { deriveSessionState, getWatchDestination } from '../../../utils/session-state.js';
 import { setSessionParam, clearSessionParams, safeUrl, isSamePage } from '../utils/url.js';
@@ -63,12 +63,12 @@ export function SessionDetailOverlay({ onBack }) {
 
   async function handleSchedule(e) {
     e.stopPropagation();
-    await scheduleWithFeedback(session, { eventConfig: guideConfig, isScheduled });
+    await toggleScheduleWithFeedback(session, { eventConfig: guideConfig, isScheduled });
   }
 
   async function handleFavorite(e) {
     e.stopPropagation();
-    await favoriteWithFeedback(session, { eventConfig: guideConfig, isFavorited });
+    await toggleFavoriteWithFeedback(session, { eventConfig: guideConfig, isFavorited });
   }
 
   async function handleShare(e) {

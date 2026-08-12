@@ -236,7 +236,7 @@ function setPending(id, isPending) {
   else removeFromSet(pendingActions, id);
 }
 
-export async function scheduleSession(session) {
+export async function toggleSchedule(session) {
   const isScheduled = scheduled.value.has(session.id);
   setPending(session.id, true);
   try {
@@ -257,7 +257,7 @@ export async function scheduleSession(session) {
   });
 }
 
-export async function favoriteSession(session) {
+export async function toggleFavorite(session) {
   const isFavorited = favorited.value.has(session.id);
   setPending(session.id, true);
   try {

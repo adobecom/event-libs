@@ -132,7 +132,7 @@ Known gaps in the real mapping (not blockers, just incomplete real-data coverage
 
 **File:** `event-libs/v1/services/sessions/session-actions.js`
 
-`scheduleSession()`/`favoriteSession()` (in `session-store.js`, which this file calls) now pass a real jwt-exchanged `rfAuthToken` — no more hardcoded `null`. `clientId` was dropped from the contract entirely (confirmed against real MAX26 traffic and northstar's `determineParams()`: it's only ever sent on the unused `AUTH`/`jwt` endpoint, never on `addSession`/`removeSession`/`toggleSessionInterest`).
+`toggleSchedule()`/`toggleFavorite()` (in `session-store.js`, which this file calls) now pass a real jwt-exchanged `rfAuthToken` — no more hardcoded `null`. `clientId` was dropped from the contract entirely (confirmed against real MAX26 traffic and northstar's `determineParams()`: it's only ever sent on the unused `AUTH`/`jwt` endpoint, never on `addSession`/`removeSession`/`toggleSessionInterest`).
 
 ---
 

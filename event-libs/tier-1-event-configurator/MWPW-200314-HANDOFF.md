@@ -35,7 +35,7 @@ were listed above but don't import this module).
 
 ## 2. Wire `allowDoubleBooking` — done 2026-07-27
 
-`action-feedback.js`'s `scheduleWithFeedback` now derives `scheduleAction`'s
+`action-feedback.js`'s `toggleScheduleWithFeedback` now derives `toggleScheduleAction`'s
 `showConflictModal` param from `getAllowDoubleBooking()` (the item 1
 singleton) instead of `eventConfig.showConflictModal` — one shared,
 page-level, event-wide read, not a per-block setting. Inverted, since
