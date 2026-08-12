@@ -1,6 +1,7 @@
 /* eslint-disable no-underscore-dangle */
 import { expect } from '@esm-bundle/chai';
 import sinon from 'sinon';
+import { sessions, favorited } from '../../../../event-libs/v1/utils/session-store.js';
 
 const defaultHtml = `
 <div class="mobile-rider">
@@ -70,6 +71,8 @@ function runMobileRiderSuite(modulePath, variantLabel) {
     delete globalThis.mobilerider;
     delete globalThis.__mr_player;
     riderInstance = null;
+    sessions.value = [];
+    favorited.value = new Set();
   });
 
   describe('init', () => {
@@ -247,7 +250,9 @@ function runMobileRiderSuite(modulePath, variantLabel) {
     });
 
     describe('setStatus', () => {
-      it('should use mainID when it exists in store', () => {
+      // mainID preference only exists in the classic drawer copy's concurrent-video
+      // tracking; C2 dropped concurrent-video support and always keys off the id passed in.
+      (variantLabel === 'classic' ? it : it.skip)('should use mainID when it exists in store', () => {
         riderInstance.mainID = 'main-video';
         const mockStore = { get: sinon.stub().returns(false), set: sinon.stub() };
         riderInstance.store = mockStore;
@@ -294,7 +299,8 @@ function runMobileRiderSuite(modulePath, variantLabel) {
         expect(mockStore.set.called).to.be.false;
       });
 
-      it('should update store when status changes from true to false', () => {
+      // Same mainID-preference caveat as the test above — classic-only.
+      (variantLabel === 'classic' ? it : it.skip)('should update store when status changes from true to false', () => {
         riderInstance.mainID = 'main-video';
         const mockStore = { get: sinon.stub().returns(true), set: sinon.stub() };
         riderInstance.store = mockStore;
@@ -333,11 +339,11 @@ function runMobileRiderSuite(modulePath, variantLabel) {
         globalThis.mobilerider.embed = sinon.stub();
       });
 
-      it('should remove drawer, update status, and dispose player on streamend', async () => {
-        riderInstance.mainID = 'main-video';
+      it('should update status and dispose player on streamend', async () => {
         const mockStore = { get: sinon.stub().returns(true), set: sinon.stub() };
         riderInstance.store = mockStore;
-        riderInstance.drawer = { remove: sinon.stub() };
+        // Only the classic drawer copy still supports this; C2 dropped concurrent-video support.
+        if (variantLabel === 'classic') riderInstance.drawer = { remove: sinon.stub() };
 
         const videoWrapper = document.createElement('div');
         videoWrapper.className = 'video-wrapper';
@@ -360,7 +366,7 @@ function runMobileRiderSuite(modulePath, variantLabel) {
         expect(onCall).to.not.be.undefined;
         onCall.args[1]();
 
-        expect(riderInstance.drawer).to.be.null;
+        if (variantLabel === 'classic') expect(riderInstance.drawer).to.be.null;
         expect(mockStore.set.called).to.be.true;
         expect(player.dispose.called).to.be.true;
         expect(globalThis.__mr_player).to.be.null;
@@ -487,7 +493,9 @@ function runMobileRiderSuite(modulePath, variantLabel) {
     });
 
     describe('#selectInitialVideo', () => {
-      it('should select video by ?video= query param', async () => {
+      // Concurrent-video selection (and #selectInitialVideo itself) only exists in the
+      // classic drawer copy now — C2 dropped concurrent-video support entirely.
+      (variantLabel === 'classic' ? it : it.skip)('should select video by ?video= query param', async () => {
         const concurrentHtml = `
           <div class="mobile-rider">
             <div><div>concurrentenabled</div><div>true</div></div>
@@ -514,7 +522,7 @@ function runMobileRiderSuite(modulePath, variantLabel) {
         expect(instance.allVideos).to.have.lengthOf(2);
       });
 
-      it('should select video by sessionStorage concurrentVideoTitle', async () => {
+      (variantLabel === 'classic' ? it : it.skip)('should select video by sessionStorage concurrentVideoTitle', async () => {
         sessionStorage.setItem('concurrentVideoTitle', 'Title 2');
 
         const concurrentHtml = `
@@ -585,7 +593,8 @@ function runMobileRiderSuite(modulePath, variantLabel) {
       expect(meta.autoplay).to.equal('true');
     });
 
-    it('should parse concurrent configuration and set concurrentenabled', async () => {
+    // Concurrent-video parsing/selection only exists in the classic drawer copy now.
+    (variantLabel === 'classic' ? it : it.skip)('should parse concurrent configuration and set concurrentenabled', async () => {
       const concurrentHtml = `
         <div class="mobile-rider">
           <div><div>concurrentenabled</div><div>true</div></div>
@@ -846,7 +855,8 @@ function runMobileRiderSuite(modulePath, variantLabel) {
     });
   });
 
-  describe('concurrent drawer interactions', () => {
+  // C2 dropped concurrent-video/drawer support entirely — classic-only.
+  (variantLabel === 'classic' ? describe : describe.skip)('concurrent drawer interactions', () => {
     it('should render drawer items with thumbnails and handle activation', async () => {
       const concurrentHtml = `
         <div class="mobile-rider">
@@ -880,6 +890,117 @@ function runMobileRiderSuite(modulePath, variantLabel) {
       }
 
       expect(instance).to.not.be.null;
+    });
+  });
+
+  // MVP-scoped to the C2 copy only — classic mobile-rider doesn't get this bar.
+  (variantLabel === 'C2' ? describe : describe.skip)('Live Stream Session Info Bar', () => {
+    const sessionInfoBarHtml = `
+      <div class="mobile-rider">
+        <div><div>video-id</div><div>test-video-123</div></div>
+        <div><div>session-id</div><div>s-100</div></div>
+      </div>
+    `;
+
+    it('does not render an info bar when no session-id is authored', async () => {
+      document.body.innerHTML = defaultHtml;
+      const el = document.querySelector('.mobile-rider');
+      riderInstance = init(el);
+      await new Promise((resolve) => { setTimeout(resolve, 50); });
+
+      expect(el.querySelector('.mobile-rider-info-bar')).to.not.exist;
+    });
+
+    it('renders title, category, and description immediately when session data is already loaded', async () => {
+      sessions.value = [{
+        id: 's-100', title: 'Watch Day 1 Keynote', track: 'Education', description: 'Lorem ipsum',
+      }];
+
+      document.body.innerHTML = sessionInfoBarHtml;
+      const el = document.querySelector('.mobile-rider');
+      riderInstance = init(el);
+      await new Promise((resolve) => { setTimeout(resolve, 50); });
+
+      expect(el.querySelector('.mobile-rider-info-bar-title').textContent).to.equal('Watch Day 1 Keynote');
+      expect(el.querySelector('.mobile-rider-info-bar-description').textContent).to.equal('Lorem ipsum');
+      expect(el.querySelector('.mobile-rider-info-bar-category-label').textContent).to.equal('Education');
+    });
+
+    it('resolves the session reactively when it loads after init', async () => {
+      document.body.innerHTML = sessionInfoBarHtml;
+      const el = document.querySelector('.mobile-rider');
+      riderInstance = init(el);
+      await new Promise((resolve) => { setTimeout(resolve, 50); });
+
+      expect(el.querySelector('.mobile-rider-info-bar-title').textContent).to.equal('');
+
+      sessions.value = [{ id: 's-100', title: 'Watch Day 1 Keynote' }];
+      expect(el.querySelector('.mobile-rider-info-bar-title').textContent).to.equal('Watch Day 1 Keynote');
+    });
+
+    it('toggles aria-expanded and the is-expanded class on click', async () => {
+      sessions.value = [{ id: 's-100', title: 'Watch Day 1 Keynote' }];
+      document.body.innerHTML = sessionInfoBarHtml;
+      const el = document.querySelector('.mobile-rider');
+      riderInstance = init(el);
+      await new Promise((resolve) => { setTimeout(resolve, 50); });
+
+      const bar = el.querySelector('.mobile-rider-info-bar');
+      const toggle = el.querySelector('.mobile-rider-info-bar-toggle');
+      expect(toggle.getAttribute('aria-expanded')).to.equal('false');
+
+      toggle.click();
+      expect(toggle.getAttribute('aria-expanded')).to.equal('true');
+      expect(bar.classList.contains('is-expanded')).to.be.true;
+
+      toggle.click();
+      expect(toggle.getAttribute('aria-expanded')).to.equal('false');
+      expect(bar.classList.contains('is-expanded')).to.be.false;
+    });
+
+    it('opens the Session Guide detail view for this session when View all details is clicked', async () => {
+      sessions.value = [{ id: 's-100', title: 'Watch Day 1 Keynote' }];
+      document.body.innerHTML = sessionInfoBarHtml;
+      const el = document.querySelector('.mobile-rider');
+      riderInstance = init(el);
+      await new Promise((resolve) => { setTimeout(resolve, 50); });
+
+      const { sessionGuideRequest } = await import('../../../../event-libs/v1/utils/session-store.js');
+      el.querySelector('.mobile-rider-info-bar-more').click();
+      expect(sessionGuideRequest.value).to.deep.equal({ sessionId: 's-100' });
+    });
+
+    it('renders a Favorite button reflecting the favorited signal', async () => {
+      sessions.value = [{ id: 's-100', title: 'Watch Day 1 Keynote', rfCode: 'rf-100' }];
+      document.body.innerHTML = sessionInfoBarHtml;
+      const el = document.querySelector('.mobile-rider');
+      riderInstance = init(el);
+      await new Promise((resolve) => { setTimeout(resolve, 50); });
+
+      const favoriteBtn = el.querySelector('.mobile-rider-info-bar-favorite');
+      expect(favoriteBtn).to.exist;
+      expect(favoriteBtn.getAttribute('aria-label')).to.equal('Add to favorites');
+
+      favorited.value = new Set(['s-100']);
+      expect(favoriteBtn.classList.contains('is-favorited')).to.be.true;
+      expect(favoriteBtn.getAttribute('aria-label')).to.equal('Remove from favorites');
+    });
+
+    it('copies a session detail link to the clipboard when Share is clicked', async () => {
+      sessions.value = [{ id: 's-100', title: 'Watch Day 1 Keynote' }];
+      document.body.innerHTML = sessionInfoBarHtml;
+      const el = document.querySelector('.mobile-rider');
+      riderInstance = init(el);
+      await new Promise((resolve) => { setTimeout(resolve, 50); });
+
+      if (navigator.share) sinon.stub(navigator, 'share').value(undefined);
+      sinon.stub(navigator.clipboard, 'writeText').resolves();
+
+      el.querySelector('.mobile-rider-info-bar-share').click();
+      await new Promise((resolve) => { setTimeout(resolve, 50); });
+
+      expect(navigator.clipboard.writeText.calledOnce).to.be.true;
+      expect(navigator.clipboard.writeText.firstCall.args[0]).to.include('session=s-100');
     });
   });
   });
