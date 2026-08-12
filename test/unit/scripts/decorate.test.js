@@ -981,6 +981,13 @@ describe('applySectionColumnsLayout', () => {
     expect(document.querySelector('main').classList.contains('section-columns')).to.be.true;
   });
 
+  it('tolerates authored capitalization and whitespace, e.g. " Columns "', () => {
+    setMetadata('section-layout', ' Columns ');
+    document.body.innerHTML = '<main><div class="section"></div></main>';
+    applySectionColumnsLayout();
+    expect(document.querySelector('main').classList.contains('section-columns')).to.be.true;
+  });
+
   it('loads the required CSS itself, so callers only need to call this one function', () => {
     setMetadata('section-layout', 'columns');
     document.body.innerHTML = '<main><div class="section"></div></main>';

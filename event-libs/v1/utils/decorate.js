@@ -1082,7 +1082,7 @@ function addStylesToEventPage() {
 export function applySectionColumnsLayout() {
   const main = document.querySelector('main');
   if (!main) return;
-  const enabled = getMetadata('section-layout') === 'columns';
+  const enabled = getMetadata('section-layout')?.trim().toLowerCase() === 'columns';
   if (enabled) addStylesToEventPage();
   main.classList.toggle('section-columns', enabled);
 }
