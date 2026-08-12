@@ -16,6 +16,17 @@ the bottom of the doc):
 | foundation | c2 |
 ```
 
+## Theme
+
+Author the block as `Event Marquee (dark)` — plain Milo block-modifier syntax,
+no custom code involved. Color comes from Milo's own `.dark` class
+(`libs/c2/styles/styles.css`, already loaded globally on any c2-foundation
+page), which redefines the semantic `--s2a-color-content-*` tokens this
+block's CSS references — same mechanism Rich Content relies on for its own
+theming. There's no light-mode Figma frame yet, so `dark` should be included
+on every real instance for now; omitting it renders dark text against this
+block's own dark background/gradient.
+
 ## Authoring convention
 
 Same row shape as Milo's own **classic marquee** (`libs/blocks/marquee/marquee.js`),
@@ -104,6 +115,17 @@ siblings preserves their relative order either way.
 If you need other content near the marquee, put it in a **separate section**
 below this one — not in the same section as the marquee/upcoming-sessions pair.
 
+## Full-bleed
+
+The marquee is full-bleed at every breakpoint — mobile, tablet, and desktop —
+and manages its own responsive inset (padding-inline on
+`.event-marquee-foreground`) instead of relying on an ambient `.container`.
+
+Don't add `container`/`wide` styling to the section's own **Section
+Metadata** for a section holding this block — that pads/narrows `.section`
+itself (Milo's own grid classes) independently of the marquee's own padding,
+and fights with it. Leave the section's `style` field unset.
+
 ## Variants
 
 There is no explicit "variant" field to author. Two things are auto-detected
@@ -136,7 +158,7 @@ Text cell:
 
 | Content | How to author it |
 |---|---|
-| Headline | Any heading (H1–H3) |
+| Headline | **H1** for the Figma-specified size (heading-1). H2/H3 also work but render smaller — Milo's own C2 stylesheet sizes headings per-tag (h1/h2/h3 → heading-1/2/3), this block doesn't override that. |
 | Body copy | Plain paragraph(s) |
 | Primary CTA | Bold *and* italic the link text: `**_[Register now](https://...)_**` |
 | Secondary CTA | Italic the link text: `_[Learn more](https://...)_` |
@@ -166,10 +188,12 @@ these. All are optional.
 | `session-id` | a real session ID, e.g. `s-100` | Only if you want a Favorite button | `''` (no Favorite button) | Must match an ID from the fetched session list. **Independent** of whatever ID is inside the player link (MR's `videoId`, etc.) — no inference between them, on purpose |
 | `favorite-enabled` | `true` / `false` | No | shows automatically when Video variant + `session-id` is set | Explicit override — set `false` to force-hide it |
 | `share-enabled` | `true` / `false` | No | `true` (Video variant only) | Explicit override — set `false` to hide the share icon |
+| `video-title` | free text | No | `''` (no title shown) | Rendered directly under the player, bold label-style text. Only shown when the asset is a recognized interactive player — same gating as Favorite/share |
 
 Favorite/share only ever appear when the asset is a recognized interactive player —
 they don't render for the no-asset Text/CTA layout, or for a decorative image/ambient
-video asset, regardless of what's in Section Metadata.
+video asset, regardless of what's in Section Metadata. `video-title` follows the same
+gating.
 
 Note: Milo's `getMetadata` helper lowercases its `.text` values, which is why
 `event-title`/`session-id` are read from `.content` instead (preserving the original
