@@ -262,8 +262,16 @@ describe('upcoming-sessions', () => {
           timezone: 'America/Los_Angeles',
         },
       }));
-      const expected = `${new Date(startMillis).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })} - ${new Date(startMillis + 60 * 60_000).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true, timeZoneName: 'short' })}`;
-      expect(card.querySelector('.sg-card__time').textContent).to.equal(expected);
+      const timeOptions = { hour: 'numeric', minute: '2-digit', hour12: true };
+      const endMillis = startMillis + 60 * 60_000;
+      const timezoneAbbrOverrides = { 'Asia/Kolkata': 'IST', 'Asia/Calcutta': 'IST' };
+      const resolvedTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      const override = timezoneAbbrOverrides[resolvedTz];
+      const start = new Date(startMillis).toLocaleTimeString('en-US', timeOptions);
+      const end = override
+        ? `${new Date(endMillis).toLocaleTimeString('en-US', timeOptions)} ${override}`
+        : new Date(endMillis).toLocaleTimeString('en-US', { ...timeOptions, timeZoneName: 'short' });
+      expect(card.querySelector('.sg-card__time').textContent).to.equal(`${start} - ${end}`);
     });
 
     it('always renders the upcoming state, never a live badge — cards are dropped on start instead of switching to live', () => {
