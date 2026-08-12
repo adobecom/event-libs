@@ -157,7 +157,7 @@ export default function ConfigEditor() {
 
       <section class="tec-editor__section">
         <h2>Product icons & page URLs</h2>
-        <p class="tec-editor__section-hint">Products already have their own colored icons — no color to set here, just an icon and a page URL per product. Not all product icons are available yet; unset ones fall back to the page's own default at render time.</p>
+        <p class="tec-editor__section-hint">Products already have their own colored icons — no color to set here, just an icon and a page URL per product.</p>
         ${isLoadingSessions && html`<${LoadingInline} label="Loading products…" />`}
         ${!isLoadingSessions && !sessionsError && html`
           <${ProductIconEditor}
