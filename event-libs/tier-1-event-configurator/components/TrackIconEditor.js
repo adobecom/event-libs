@@ -1,6 +1,6 @@
 import { html } from '../../v1/deps/htm-preact.js';
 import { Icon } from '../../v1/features/icons/Icon.js';
-import { KNOWN_ICON_SLUGS, getDefaultTrackIcon, DEFAULT_ICON_COLOR } from '../default-track-icons.js';
+import { getDefaultTrackIcon, DEFAULT_ICON_COLOR, useIconSlugOptions } from '../default-track-icons.js';
 import { isTrackIconEntryComplete } from '../utils.js';
 
 // Renders through the same resolveIcon() chain (federal → Milo → event-libs' own
@@ -17,6 +17,10 @@ export function IconPreview({ icon, color }) {
 }
 
 export default function TrackIconEditor({ tracks, trackIcons, onChange }) {
+  // Called unconditionally, before the early return below — Preact hooks must run in
+  // the same order on every render.
+  const iconSlugs = useIconSlugOptions();
+
   if (!tracks || tracks.length === 0) {
     return html`<p class="tec-track-editor__empty">No tracks found in this event's sessions yet.</p>`;
   }
@@ -42,7 +46,7 @@ export default function TrackIconEditor({ tracks, trackIcons, onChange }) {
               onChange=${(e) => onChange(track, { icon: e.target.value })}
             >
               <option value="">— no icon —</option>
-              ${KNOWN_ICON_SLUGS.map((slug) => html`<option value=${slug} key=${slug}>${slug}</option>`)}
+              ${iconSlugs.map((slug) => html`<option value=${slug} key=${slug}>${slug}</option>`)}
             </select>
             <input
               type="color"

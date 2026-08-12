@@ -58,3 +58,27 @@ export async function fetchFederalIcon(iconName) {
   federalIconCache.set(iconName, svg);
   return svg ? svg.cloneNode(true) : null;
 }
+
+// icons.json is federal's own manifest of every icon it hosts — a standard Helix sheet
+// export ({ data: [{ key, icon, notation }] }), the same convention DA's library plugin
+// reads for its per-org icon config sheets. Used to populate icon pickers (e.g. the Tier
+// 1 Event Configurator's track icon dropdown) with federal's live inventory, rather than
+// a hardcoded list that drifts as icons are added there.
+let federalIconListPromise = null;
+
+export function fetchFederalIconList() {
+  if (!federalIconListPromise) {
+    federalIconListPromise = (async () => {
+      try {
+        const resp = await fetch(`${resolveFederalRoot()}/federal/assets/icons/icons.json`);
+        if (!resp.ok) return [];
+        const { data = [] } = await resp.json();
+        return data.map((entry) => entry.key).filter(Boolean);
+      } catch (err) {
+        window.lana?.log(`[federal-icons] failed to fetch icons.json: ${err.message}`);
+        return [];
+      }
+    })();
+  }
+  return federalIconListPromise;
+}

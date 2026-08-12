@@ -2,6 +2,7 @@ import { expect } from '@esm-bundle/chai';
 import {
   setFederalRootOverride,
   fetchFederalIcon,
+  fetchFederalIconList,
 } from '../../../../event-libs/v1/features/icons/federal-icons.js';
 
 describe('federal-icons', () => {
@@ -36,5 +37,11 @@ describe('federal-icons', () => {
     const second = await fetchFederalIcon('another-missing-icon');
     expect(first).to.equal(null);
     expect(second).to.equal(null);
+  });
+
+  it('lists the icon names federal has available, for icon pickers', async () => {
+    const names = await fetchFederalIconList();
+    expect(names).to.include('checkmark');
+    expect(names).to.include('chevron-right');
   });
 });

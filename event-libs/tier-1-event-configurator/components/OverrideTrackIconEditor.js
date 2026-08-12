@@ -1,5 +1,5 @@
 import { html } from '../../v1/deps/htm-preact.js';
-import { KNOWN_ICON_SLUGS, DEFAULT_OVERRIDE_TRACK_ICON } from '../default-track-icons.js';
+import { DEFAULT_OVERRIDE_TRACK_ICON, useIconSlugOptions } from '../default-track-icons.js';
 import { IconPreview } from './TrackIconEditor.js';
 
 // Override text is free text, not a real track, and each distinct value is its own
@@ -8,6 +8,7 @@ import { IconPreview } from './TrackIconEditor.js';
 export default function OverrideTrackIconEditor({
   overrideTexts, overrideTrackIcons, defaultOverrideIcon, onChangeMapped, onChangeDefault,
 }) {
+  const iconSlugs = useIconSlugOptions();
   const defaultIcon = defaultOverrideIcon?.icon ?? DEFAULT_OVERRIDE_TRACK_ICON.icon;
   const defaultColor = defaultOverrideIcon?.color ?? DEFAULT_OVERRIDE_TRACK_ICON.color;
 
@@ -23,7 +24,7 @@ export default function OverrideTrackIconEditor({
           value=${defaultIcon}
           onChange=${(e) => onChangeDefault({ icon: e.target.value, color: defaultColor })}
         >
-          ${KNOWN_ICON_SLUGS.map((slug) => html`<option value=${slug} key=${slug}>${slug}</option>`)}
+          ${iconSlugs.map((slug) => html`<option value=${slug} key=${slug}>${slug}</option>`)}
         </select>
         <input
           type="color"
@@ -53,7 +54,7 @@ export default function OverrideTrackIconEditor({
                     value=${icon}
                     onChange=${(e) => onChangeMapped(text, { icon: e.target.value, color })}
                   >
-                    ${KNOWN_ICON_SLUGS.map((slug) => html`<option value=${slug} key=${slug}>${slug}</option>`)}
+                    ${iconSlugs.map((slug) => html`<option value=${slug} key=${slug}>${slug}</option>`)}
                   </select>
                   <input
                     type="color"
