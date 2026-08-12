@@ -1,30 +1,18 @@
-import { useState, useEffect, html } from '../../v1/deps/htm-preact.js';
+import { html } from '../../v1/deps/htm-preact.js';
+import { Icon } from '../../v1/features/icons/Icon.js';
 import { KNOWN_ICON_SLUGS, getDefaultTrackIcon, DEFAULT_ICON_COLOR } from '../default-track-icons.js';
-import { loadTrackIconSprite } from '../track-icon-sprite.js';
 import { isTrackIconEntryComplete } from '../utils.js';
 
+// Renders through the same resolveIcon() chain (federal → Milo → event-libs' own
+// track-icons.svg) session-guide's live badges use — see CategoryBadge.js's identical
+// wrapping-span color convention — so the picker preview and the live page never drift.
 export function IconPreview({ icon, color }) {
-  const [symbols, setSymbols] = useState(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    loadTrackIconSprite().then((result) => { if (!cancelled) setSymbols(result); });
-    return () => { cancelled = true; };
-  }, []);
-
-  const symbol = icon && symbols?.[icon];
-  if (!symbol) return html`<svg class="tec-track-editor__preview" width="24" height="24" aria-hidden="true"></svg>`;
+  if (!icon) return html`<span class="tec-track-editor__preview" aria-hidden="true"></span>`;
 
   return html`
-    <svg
-      class="tec-track-editor__preview"
-      width="24"
-      height="24"
-      viewBox=${symbol.viewBox}
-      style=${`color:${color}`}
-      aria-hidden="true"
-      dangerouslySetInnerHTML=${{ __html: symbol.innerHTML }}
-    ></svg>
+    <span class="tec-track-editor__preview" style=${`color:${color}`}>
+      <${Icon} name=${icon} size=${24} />
+    </span>
   `;
 }
 

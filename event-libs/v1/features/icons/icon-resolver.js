@@ -1,9 +1,11 @@
 import { LIBS, getEventConfig } from '../../utils/utils.js';
+import { fetchFederalIcon } from './federal-icons.js';
 
 // Page-level, framework-agnostic icon resolver: any block (Preact or vanilla) can resolve
-// an icon name to an SVG element. Delegates to Milo's own icon set first (reusing its
-// cache/sprite so we don't duplicate icons Milo already maintains), falling back to
-// event-libs' own track-icons.svg sprite for track/event-specific icons Milo doesn't have.
+// an icon name to an SVG element. Tries Adobe's shared federal icon CDN first, then
+// Milo's own icon set (reusing its cache/sprite so we don't duplicate icons Milo already
+// maintains), falling back to event-libs' own track-icons.svg sprite for track/event-
+// specific icons neither of those has.
 const resolvedIconCache = new Map();
 let miloIconsPromise = null;
 let ownIconsPromise = null;
@@ -63,8 +65,11 @@ export async function resolveIcon(iconName) {
   if (!iconName) return null;
   if (resolvedIconCache.has(iconName)) return resolvedIconCache.get(iconName).cloneNode(true);
 
-  const miloIcons = await loadMiloIcons();
-  let svg = miloIcons[iconName];
+  let svg = await fetchFederalIcon(iconName);
+  if (!svg) {
+    const miloIcons = await loadMiloIcons();
+    svg = miloIcons[iconName];
+  }
   if (!svg) {
     const ownIcons = await loadOwnIcons();
     svg = ownIcons[iconName];

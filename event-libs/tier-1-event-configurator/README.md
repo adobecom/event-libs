@@ -36,18 +36,16 @@ to the form/Config JSON. The consuming-side wiring (renaming
 `show-conflict-modal` table row) is explicitly MWPW-200314's territory, per
 PLAN.md §6 — not built here.
 
-**Track icon editor implementation note:** `event-libs/v1/utils/track-icon-config.js`
-(the real `DEFAULT_TRACK_ICON_CONFIG`/`getTrackIcon()`) and
-`event-libs/v1/features/icons/` (`Icon.js`/`icon-resolver.js`/`track-icons.svg`)
-don't exist on `dev` — like `fetchSessions()`, they're part of the
-in-progress MWPW-200314 branch. `default-track-icons.js` and
-`track-icon-sprite.js` here are temporary, self-contained copies of that
-data/sprite (not the shared utility itself, to avoid duplicating the actual
-resolution logic) — consolidate back onto the real ones once that branch
-merges. Also note: Chrome doesn't support cross-document
-`<use href="external.svg#id">` (only Firefox does) — `track-icon-sprite.js`
-fetches and inlines the sprite's `<symbol>` markup instead, same technique
-the real `icon-resolver.js` uses, for the same reason.
+**Track icon editor implementation note:** `default-track-icons.js` re-exports
+`DEFAULT_TRACK_ICON_CONFIG`/`DEFAULT_OVERRIDE_TRACK_ICON` from the real
+`event-libs/v1/utils/tier-1-event-config.js` rather than carrying its own copy.
+`TrackIconEditor.js`'s `IconPreview` renders through the real, shared
+`event-libs/v1/features/icons/Icon.js`/`icon-resolver.js` — the same
+federal-CDN-first, then-Milo, then-event-libs'-own-`track-icons.svg` chain
+session-guide's live badges use — so the picker preview and the live page never
+drift. (The app previously carried its own duplicate sprite-fetch module,
+`track-icon-sprite.js`, for the period before this branch existed on `dev`;
+it's been retired now that the real shared resolver is available.)
 
 **Known interim gap:** the track list shown in the editor comes from a raw
 `getEventSessionCatalog()` call in `event-libs/v1/utils/esp-controller.js`,
