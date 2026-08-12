@@ -42,14 +42,14 @@ async function fetchSvgFrom(url) {
   }
 }
 
-// Federal has two separate SVG namespaces: /assets/icons/svgs/ for generic UI/track
-// icons (has its own icons.json manifest, see fetchFederalIconList below); /assets/svgs/
-// for product logos (curated per-product by the product team, no manifest). The live
-// frontend resolver (below) checks both, since by render time we just want to find
-// whatever was authored, regardless of which namespace it lives in. The configurator's
-// own product-icon preview is scoped to the product path only, via
-// fetchFederalProductIcon — it shouldn't resolve a typed product slug against the
-// unrelated generic namespace.
+// Federal has two separate SVG namespaces: /assets/icons/svgs/ here, for generic
+// UI/track icons (has its own icons.json manifest, see fetchFederalIconList below);
+// /assets/svgs/ (fetchFederalProductIcon below) for product logos, curated per-product
+// by the product team, no manifest. Deliberately not merged into one fallback chain —
+// nothing today ever needs to resolve a name against both namespaces (tracks/overrides
+// only ever live in this one; products only ever live in the other, via a separate,
+// not-yet-built consumer), so checking both here would just double the 404s for every
+// track/override name federal doesn't have yet.
 export async function fetchFederalIcon(iconName) {
   if (!iconName) return null;
   if (federalIconCache.has(iconName)) {
@@ -57,9 +57,7 @@ export async function fetchFederalIcon(iconName) {
     return cached ? cached.cloneNode(true) : null;
   }
 
-  const root = resolveFederalRoot();
-  const svg = await fetchSvgFrom(`${root}/federal/assets/icons/svgs/${iconName}.svg`)
-    || await fetchSvgFrom(`${root}/federal/assets/svgs/${iconName}.svg`);
+  const svg = await fetchSvgFrom(`${resolveFederalRoot()}/federal/assets/icons/svgs/${iconName}.svg`);
   if (svg) svg.classList.add('icon-federal', `icon-federal-${iconName}`);
 
   federalIconCache.set(iconName, svg);
@@ -68,9 +66,9 @@ export async function fetchFederalIcon(iconName) {
 
 const federalProductIconCache = new Map();
 
-// Product-logo namespace only, no fallback to the generic /assets/icons/svgs/ path —
-// used by the Tier 1 Event Configurator's product-icon preview specifically, not by the
-// live frontend resolver above.
+// Product-logo namespace only — used by the Tier 1 Event Configurator's product-icon
+// preview today; whatever eventually renders products on the live page (a separate,
+// not-yet-built ticket) should call this directly too, rather than fetchFederalIcon above.
 export async function fetchFederalProductIcon(iconName) {
   if (!iconName) return null;
   if (federalProductIconCache.has(iconName)) {

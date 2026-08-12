@@ -46,10 +46,11 @@ describe('federal-icons', () => {
     expect(names).to.include('chevron-right');
   });
 
-  it('falls back to the product-logo namespace when the generic one misses', async () => {
+  it('does not fall back to the product-logo namespace', async () => {
+    // 'photoshop-64' exists under /assets/svgs/ (see fetchFederalProductIcon below), not
+    // under the generic /assets/icons/svgs/ path — fetchFederalIcon must not find it there.
     const svg = await fetchFederalIcon('photoshop-64');
-    expect(svg).to.not.equal(null);
-    expect(svg.classList.contains('icon-federal-photoshop-64')).to.equal(true);
+    expect(svg).to.equal(null);
   });
 });
 
