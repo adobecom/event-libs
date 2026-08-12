@@ -39,10 +39,14 @@ a.con-button.no-event {
    next to anything else, so it always forces a line break before and after itself
    — grouping is only ever contiguous, by construction, with no validation needed. */
 @media (min-width: 900px) {
+  /* align-items: stretch (the default) is intentional: it equalizes section
+     height within a shared row (backgrounds/borders line up cleanly), but since
+     .section lays out its own children as normal block flow, not flex/grid,
+     the content inside isn't forced to stretch along with it. */
   main.section-columns {
     display: flex;
     flex-wrap: wrap;
-    align-items: flex-start;
+    align-items: stretch;
   }
 
   main.section-columns > .section {
