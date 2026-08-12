@@ -84,13 +84,14 @@ export function getOverrideTrackIcon(overrideText) {
     || DEFAULT_OVERRIDE_TRACK_ICON;
 }
 
-// Products have no built-in default map (unlike tracks) — no product icons exist
-// anywhere yet (not federal, not event-libs' own sprite), so there's nothing sensible to
-// fall back to; this is purely the authored map, keyed by the exact product name.
-export function getProductIcon(productName) {
+// Returns { icon, pageUrl } for a product, or null. No built-in default map (unlike
+// tracks) — no product icons exist anywhere yet (not federal, not event-libs' own
+// sprite), so there's nothing sensible to fall back to; this is purely the authored map,
+// keyed by the exact product name.
+export function getProduct(productName) {
   if (!productName) return null;
-  const productIcons = tierOneEventConfig.productIcons || {};
-  return productIcons[productName] || null;
+  const products = tierOneEventConfig.products || {};
+  return products[productName] || null;
 }
 
 export function getAllowDoubleBooking() {

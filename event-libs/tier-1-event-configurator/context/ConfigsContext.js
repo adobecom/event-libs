@@ -18,7 +18,7 @@ function emptyConfig() {
     trackIcons: {},
     overrideTrackIcon: null,
     overrideTrackIcons: {},
-    productIcons: {},
+    products: {},
     allowDoubleBooking: false,
     featuredSessions: [],
     rfApiUrl: '',
@@ -179,15 +179,18 @@ const ConfigsProvider = ({ children }) => {
     });
   }, []);
 
-  // Simpler than updateTrackIcon — a single icon slug per product, no color to merge.
-  const updateProductIcon = useCallback((product, icon) => {
+  // Same merge pattern as updateTrackIcon — { icon, pageUrl } per product, no color.
+  const updateProduct = useCallback((product, updates) => {
     setActiveConfig((prev) => {
       if (!prev) return prev;
       return {
         ...prev,
         config: {
           ...prev.config,
-          productIcons: { ...prev.config.productIcons, [product]: icon },
+          products: {
+            ...prev.config.products,
+            [product]: { ...prev.config.products?.[product], ...updates },
+          },
         },
       };
     });
@@ -256,7 +259,7 @@ const ConfigsProvider = ({ children }) => {
     updateTrackIcon,
     seedTrackIcons,
     updateOverrideTrackIcon,
-    updateProductIcon,
+    updateProduct,
     updateConfigField,
     saveActiveConfig,
     removeConfig,
