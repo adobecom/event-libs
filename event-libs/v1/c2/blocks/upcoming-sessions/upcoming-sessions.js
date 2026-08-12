@@ -68,29 +68,16 @@ function toIsoTimes(session) {
   };
 }
 
-const TIMEZONE_ABBR_OVERRIDES = {
-  'Asia/Kolkata': 'IST',
-  'Asia/Calcutta': 'IST',
-};
-
-function getTimezoneAbbr() {
-  const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
-  return TIMEZONE_ABBR_OVERRIDES[tz] || null;
-}
-
 function formatTimeRange(session) {
   const { sessionTime } = session;
   if (!sessionTime) return '';
   const timeOptions = { hour: 'numeric', minute: '2-digit', hour12: true };
   try {
     const start = new Date(sessionTime.startTimeMillis).toLocaleTimeString('en-US', timeOptions);
-    const abbrOverride = getTimezoneAbbr();
-    const end = abbrOverride
-      ? `${new Date(sessionTime.endTimeMillis).toLocaleTimeString('en-US', timeOptions)} ${abbrOverride}`
-      : new Date(sessionTime.endTimeMillis).toLocaleTimeString('en-US', {
-        ...timeOptions,
-        timeZoneName: 'short',
-      });
+    const end = new Date(sessionTime.endTimeMillis).toLocaleTimeString('en-US', {
+      ...timeOptions,
+      timeZoneName: 'short',
+    });
     return `${start} - ${end}`;
   } catch (error) {
     window.lana?.log(`upcoming-sessions: time format failed: ${error.message}`);
@@ -171,12 +158,14 @@ export function buildCard(session) {
     isPending ? 'is-pending' : '',
   ].filter(Boolean).join(' ');
 
+  const timeRange = formatTimeRange(session);
+
   const card = createTag('div', {
     class: cardClass,
     'data-session-id': session.sessionId,
     role: 'button',
     tabindex: '0',
-    'aria-label': `${session.enTitle}, ${formatTimeRange(session)}`,
+    'aria-label': `${session.enTitle}, ${timeRange}`,
   });
 
   const body = createTag('div', { class: 'sg-card__body' }, '', { parent: card });
@@ -192,9 +181,8 @@ export function buildCard(session) {
   const footerBadgeWrap = createTag('span', { class: 'sg-card__footer-badge' }, '', { parent: footer });
   const footerBadge = buildCategoryBadge(session.track);
   if (footerBadge) footerBadgeWrap.append(footerBadge);
-  createTag('span', { class: 'sg-card__time' }, formatTimeRange(session), { parent: footer });
+  createTag('span', { class: 'sg-card__time' }, timeRange, { parent: footer });
 
-  const timeRange = formatTimeRange(session);
   const actions = createTag('div', { class: 'sg-card__actions', 'data-time': timeRange }, '', { parent: card });
   actions.addEventListener('click', (e) => e.stopPropagation());
 

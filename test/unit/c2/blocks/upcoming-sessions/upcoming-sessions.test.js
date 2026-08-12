@@ -264,13 +264,8 @@ describe('upcoming-sessions', () => {
       }));
       const timeOptions = { hour: 'numeric', minute: '2-digit', hour12: true };
       const endMillis = startMillis + 60 * 60_000;
-      const timezoneAbbrOverrides = { 'Asia/Kolkata': 'IST', 'Asia/Calcutta': 'IST' };
-      const resolvedTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
-      const override = timezoneAbbrOverrides[resolvedTz];
       const start = new Date(startMillis).toLocaleTimeString('en-US', timeOptions);
-      const end = override
-        ? `${new Date(endMillis).toLocaleTimeString('en-US', timeOptions)} ${override}`
-        : new Date(endMillis).toLocaleTimeString('en-US', { ...timeOptions, timeZoneName: 'short' });
+      const end = new Date(endMillis).toLocaleTimeString('en-US', { ...timeOptions, timeZoneName: 'short' });
       expect(card.querySelector('.sg-card__time').textContent).to.equal(`${start} - ${end}`);
     });
 

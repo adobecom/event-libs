@@ -217,7 +217,7 @@
   font-size: var(--s2a-font-size-xs, 12px);
   color: var(--s2a-color-gray-600, #717171);
   line-height: 1.5;
-  white-space: nowrap;
+  white-space: normal;
   text-align: right;
   transition: color 0.2s;
 }
@@ -243,7 +243,8 @@
   font-size: var(--s2a-font-size-xs, 12px);
   color: var(--s2a-color-gray-600, #717171);
   margin-left: auto;
-  white-space: nowrap;
+  white-space: normal;
+  text-align: right;
   line-height: 1.5;
   pointer-events: none;
 }
