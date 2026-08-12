@@ -537,6 +537,26 @@ describe('Adobe Event Service API', () => {
       expect(result.data.registrationStatus).to.equal('waitlisted');
     });
 
+    it('should forward custom fields unrecognized by either filter into the add-to-event payload, but not fields recognized only by the base attendee filter', async () => {
+      const fetchStub = sandbox.stub(window, 'fetch');
+      fetchStub.onCall(0).resolves({ json: () => ({ eventId, isFull: false }), ok: true });
+      fetchStub.onCall(1).resolves({ json: () => (attendeeResp), ok: true, status: 200 });
+      fetchStub.onCall(2).resolves({ json: () => (attendeeResp), ok: true });
+      fetchStub.onCall(3).resolves({ json: () => ({ registrationStatus: 'registered' }), ok: true });
+
+      const dataWithCustomField = {
+        ...attendeeData,
+        jobTitle: 'Engineer',
+        customEventQuestion: 'Yes, I will attend the workshop',
+      };
+      await api.getAndCreateAndAddAttendee(eventId, dataWithCustomField);
+
+      const addToEventOptions = fetchStub.getCall(3).args[1];
+      const addToEventBody = JSON.parse(addToEventOptions.body);
+      expect(addToEventBody.customEventQuestion).to.equal('Yes, I will attend the workshop');
+      expect(addToEventBody).to.not.have.property('jobTitle');
+    });
+
     it('should fall back to event-level status when campaign lookup fails', async () => {
       BlockMediator.set('imsProfile', { account_type: 'guest' });
       const fetchStub = sandbox.stub(window, 'fetch');
