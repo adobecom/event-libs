@@ -62,7 +62,15 @@ Needs:
   falling back to the current hardcoded copy only if the authored string for
   that combination is blank.
 
-## 3. Swimlane order + visibility — wire `swimlaneOrder` into `OnDemandView.js` (not started)
+## 3. Swimlane order + visibility — wire `swimlaneOrder` into `OnDemandView.js` (resolved 2026-08-11)
+
+`OnDemandView.js` was already passing `guideConfig?.swimlaneOrder` into `groupByTrack`
+by the time this was revisited — but `groupByTrack`'s sort logic hadn't been updated for
+the `[{track,displayName,enabled}]` shape described below, so ordering silently had zero
+effect, `enabled` was never applied, and `displayName` never reached the rendered label.
+Also extended to cover override-lane names, not just tracks. Full fix + root cause in
+`event-libs/v1/blocks/sessions-guide/PLAN.md` §16.3's correction note. Original spec
+below, kept for context:
 
 `OnDemandView.js`'s `groupByTrack(available)` (in `utils/session-filters.js`)
 currently returns tracks in whatever order it derives them in, labeled with

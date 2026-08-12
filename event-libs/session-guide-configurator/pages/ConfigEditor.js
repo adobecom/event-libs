@@ -2,7 +2,9 @@ import {
   useState, useEffect, useMemo, html,
 } from '../../v1/deps/htm-preact.js';
 import { getEventSessionCatalog } from '../../v1/utils/esp-controller.js';
-import { extractDistinctTracks, deriveFacetableAttributes } from '../../v1/services/sessions/sessions-api.js';
+import {
+  extractDistinctTracks, extractDistinctOverrideTexts, deriveFacetableAttributes,
+} from '../../v1/services/sessions/sessions-api.js';
 import { useNavigation } from '../context/NavigationContext.js';
 import { useConfigs } from '../context/ConfigsContext.js';
 import { useDA } from '../context/DAContext.js';
@@ -38,7 +40,15 @@ export default function ConfigEditor() {
         return;
       }
       setSessions(result.data.sessions);
-      seedSwimlaneOrder(extractDistinctTracks(result.data.sessions));
+      // Swimlanes include both real tracks and override-lane names (each distinct
+      // Override Primary Event Site Track value is its own swimlane, same as the live
+      // page's groupByTrack()) — deduped in case a track name and an override text
+      // happen to collide, so seedSwimlaneOrder never sees a duplicate key.
+      const swimlaneCandidates = [...new Set([
+        ...extractDistinctTracks(result.data.sessions),
+        ...extractDistinctOverrideTexts(result.data.sessions),
+      ])];
+      seedSwimlaneOrder(swimlaneCandidates);
       seedFilterCategories(deriveFacetableAttributes(result.data.sessions));
     }).finally(() => {
       if (!cancelled) setIsLoadingSessions(false);
@@ -47,6 +57,7 @@ export default function ConfigEditor() {
   }, [eventId, seedSwimlaneOrder, seedFilterCategories]);
 
   const tracks = useMemo(() => extractDistinctTracks(sessions), [sessions]);
+  const overrideTexts = useMemo(() => extractDistinctOverrideTexts(sessions), [sessions]);
 
   const handleCancel = () => {
     clearActiveConfig();
@@ -86,7 +97,7 @@ export default function ConfigEditor() {
         ${isLoadingSessions && html`<${LoadingInline} label="Loading sessions…" />`}
         ${sessionsError && html`<p class="sgc-editor__error">${sessionsError}</p>`}
         ${!isLoadingSessions && !sessionsError && html`
-          <p class="sgc-editor__section-hint">${sessions.length} session(s) found — ${tracks.length} distinct track(s).</p>
+          <p class="sgc-editor__section-hint">${sessions.length} session(s) found — ${tracks.length} distinct track(s), ${overrideTexts.length} distinct override lane(s).</p>
         `}
       </section>
 
@@ -234,7 +245,7 @@ export default function ConfigEditor() {
 
       <section class="sgc-editor__section">
         <h2>On-demand swimlane order</h2>
-        <p class="sgc-editor__section-hint">Drag to reorder, or focus a handle and press arrow up/down. Unselect a track to hide it from the session guide entirely, or edit its name to change how it's labeled here — the original value stays shown alongside for reference. Track icons/colors are still managed globally via the Tier 1 Event Configurator.</p>
+        <p class="sgc-editor__section-hint">Includes both real tracks and Override Primary Event Site Track lanes — each distinct override text is its own swimlane, same as on the live page. Drag to reorder, or focus a handle and press arrow up/down. Unselect an entry to hide it from the session guide entirely, or edit its name to change how it's labeled here — the original value stays shown alongside for reference. Icons/colors are still managed globally via the Tier 1 Event Configurator.</p>
         ${isLoadingSessions && html`<${LoadingInline} label="Loading tracks…" />`}
         ${sessionsError && html`<p class="sgc-editor__error">${sessionsError}</p>`}
         ${!isLoadingSessions && !sessionsError && html`

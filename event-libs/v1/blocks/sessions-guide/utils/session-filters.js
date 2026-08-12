@@ -53,8 +53,15 @@ export function resolveTrackBadge(session) {
 }
 
 // Places each session into every one of resolveTrackBadge().swimlanes, skipping excluded
-// sessions. Ordered by the Session Guide Configurator's authored swimlaneOrder, unlisted
-// tracks appended after in first-seen order.
+// sessions. swimlaneOrder is the Session Guide Configurator's authored
+// [{ track, displayName, enabled }] — `track` here is the original swimlane key, a real
+// track name or an override's exact text (the two are indistinguishable to this
+// function, matching resolveTrackBadge()'s uniform swimlanes[] output, so override lanes
+// work identically to track lanes with no special-casing). Disabled entries are dropped
+// entirely; displayName renames the label (returned as each result's 3rd tuple element)
+// without changing the key sessions are grouped/matched on. A swimlane with no
+// swimlaneOrder entry at all stays enabled under its own raw name, appended after the
+// ordered ones in first-seen order.
 export function groupByTrack(sessions, swimlaneOrder) {
   const map = new Map();
   for (const s of sessions) {
@@ -65,9 +72,14 @@ export function groupByTrack(sessions, swimlaneOrder) {
       map.get(track).push(s);
     });
   }
-  const entries = [...map.entries()];
+
+  const configByTrack = new Map((swimlaneOrder || []).map((entry) => [entry.track, entry]));
+  const entries = [...map.entries()]
+    .filter(([track]) => configByTrack.get(track)?.enabled !== false)
+    .map(([track, trackSessions]) => [track, trackSessions, configByTrack.get(track)?.displayName || track]);
+
   if (!swimlaneOrder || swimlaneOrder.length === 0) return entries;
-  const orderIndex = new Map(swimlaneOrder.map((t, i) => [t, i]));
+  const orderIndex = new Map(swimlaneOrder.map((entry, i) => [entry.track, i]));
   return entries.sort(
     ([a], [b]) => (orderIndex.get(a) ?? swimlaneOrder.length) - (orderIndex.get(b) ?? swimlaneOrder.length),
   );

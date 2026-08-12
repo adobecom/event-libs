@@ -117,9 +117,10 @@ const ConfigsProvider = ({ children }) => {
     });
   }, []);
 
-  // Seeds tracks from the live catalog on top of swimlaneOrder: drops entries for
-  // tracks no longer live, appends new ones (enabled by default), and otherwise
-  // leaves the author's existing order/enabled/displayName state untouched.
+  // Seeds swimlane candidates (real tracks + override-lane texts, already deduped by
+  // the caller) from the live catalog on top of swimlaneOrder: drops entries no longer
+  // live, appends new ones (enabled by default), and otherwise leaves the author's
+  // existing order/enabled/displayName state untouched.
   const seedSwimlaneOrder = useCallback((tracks) => {
     setActiveConfig((prev) => {
       if (!prev) return prev;

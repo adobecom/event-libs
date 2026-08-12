@@ -291,11 +291,15 @@ describe('session-filters/groupByTrack — Digital Agenda track badge model', ()
     result.forEach(([, sessions]) => expect(sessions.map((x) => x.id)).to.deep.equal(['s-1']));
   });
 
-  it('orders swimlanes per the authored swimlaneOrder, unlisted tracks appended after', () => {
+  it('orders swimlanes per the authored swimlaneOrder ([{track,displayName,enabled}], not a plain string array), unlisted tracks appended after', () => {
     const a = { id: 'a', track: 'Design', trackOverride: '', additionalTracks: [] };
     const b = { id: 'b', track: 'Video', trackOverride: '', additionalTracks: [] };
     const c = { id: 'c', track: 'Business', trackOverride: '', additionalTracks: [] };
-    const result = groupByTrack([a, b, c], ['Video', 'Business']);
+    const swimlaneOrder = [
+      { track: 'Video', displayName: 'Video', enabled: true },
+      { track: 'Business', displayName: 'Business', enabled: true },
+    ];
+    const result = groupByTrack([a, b, c], swimlaneOrder);
     expect(result.map(([track]) => track)).to.deep.equal(['Video', 'Business', 'Design']);
   });
 
@@ -304,5 +308,38 @@ describe('session-filters/groupByTrack — Digital Agenda track badge model', ()
     const b = { id: 'b', track: 'Video', trackOverride: '', additionalTracks: [] };
     const result = groupByTrack([a, b]);
     expect(result.map(([track]) => track)).to.deep.equal(['Design', 'Video']);
+  });
+
+  it('drops a swimlane entirely when its swimlaneOrder entry is disabled', () => {
+    const a = { id: 'a', track: 'Design', trackOverride: '', additionalTracks: [] };
+    const b = { id: 'b', track: 'Video', trackOverride: '', additionalTracks: [] };
+    const swimlaneOrder = [{ track: 'Video', displayName: 'Video', enabled: false }];
+    const result = groupByTrack([a, b], swimlaneOrder);
+    expect(result.map(([track]) => track)).to.deep.equal(['Design']);
+  });
+
+  it('returns the authored displayName as the 3rd tuple element, without changing the grouping key', () => {
+    const a = { id: 'a', track: 'Design', trackOverride: '', additionalTracks: [] };
+    const swimlaneOrder = [{ track: 'Design', displayName: 'Creativity', enabled: true }];
+    const result = groupByTrack([a], swimlaneOrder);
+    expect(result[0][0]).to.equal('Design');
+    expect(result[0][2]).to.equal('Creativity');
+  });
+
+  it('defaults the label to the raw swimlane name when no swimlaneOrder entry exists for it', () => {
+    const a = { id: 'a', track: 'Design', trackOverride: '', additionalTracks: [] };
+    expect(groupByTrack([a])[0][2]).to.equal('Design');
+  });
+
+  it('treats an override-lane name identically to a track name in swimlaneOrder', () => {
+    const overridden = { id: 'o', track: '', trackOverride: 'Community Spotlight', additionalTracks: [] };
+    const tracked = { id: 't', track: 'Design', trackOverride: '', additionalTracks: [] };
+    const swimlaneOrder = [
+      { track: 'Community Spotlight', displayName: 'Community', enabled: true },
+      { track: 'Design', displayName: 'Design', enabled: true },
+    ];
+    const result = groupByTrack([overridden, tracked], swimlaneOrder);
+    expect(result.map(([track]) => track)).to.deep.equal(['Community Spotlight', 'Design']);
+    expect(result[0][2]).to.equal('Community');
   });
 });

@@ -933,6 +933,23 @@ Wired into `OnDemandView.js`/`MySessionsView.js`/`MyFavoritesView.js` via
 `state.guideConfig?.swimlaneOrder` (already parsed by `parse-config.js`, previously unused
 by the component tree).
 
+**Correction (2026-08-11):** the wiring above was passing `swimlaneOrder` through, but
+`groupByTrack`'s own sort logic was still written for the field's original flat
+string-array shape (`swimlaneOrder.map((t, i) => [t, i])`) from before the Session Guide
+Configurator added enable/rename support — the real authored shape is
+`[{ track, displayName, enabled }]`. Using the whole object as a Map key meant it never
+matched a real track-name string, so **ordering silently had zero effect**; `enabled`
+was never applied (a disabled track wasn't dropped); `displayName` was never applied
+either (`TrackRow`'s header rendered the raw grouping key). The only existing test for
+this (`session-filters.test.js`) fed the old flat-string shape, masking the bug. Fixed:
+`groupByTrack` now keys off `entry.track`, filters out `enabled === false` entries, and
+returns each result as `[key, sessions, displayName || key]` — callers now destructure a
+3rd element for the label instead of reusing the grouping key. Also fixes 16.6's flagged
+gap below in the same pass: `session-guide-configurator`'s `SwimlaneOrderEditor` now
+seeds from both `extractDistinctTracks` and `extractDistinctOverrideTexts` (deduped), one
+single mixed reorderable list — override-lane names work identically to track names
+throughout, since `groupByTrack` was already name-agnostic between the two.
+
 ### 16.4 Badge rendering ✅
 
 - `CategoryBadge.js` now takes a `session` prop and renders `resolveTrackBadge()`'s result
@@ -971,11 +988,9 @@ sensible icon to guess for arbitrary free text, so every mapping is authored man
   under Phase 14/item 8, not fixed here).
 - No test infrastructure exists for the Tier 1 Event Configurator app itself — the new
   `OverrideTrackIconEditor.js`/config plumbing has no automated coverage.
-- The Session Guide Configurator's `swimlaneOrder` field still only seeds from real track
-  names (`extractDistinctTracks`) — it doesn't yet know about override-text lanes, so an
-  author can't explicitly reorder those. They fall through to `groupByTrack`'s "unlisted,
-  first-seen order, appended after" behavior. Not requested yet; flagging as a likely
-  follow-on once override lanes see real use.
+- ~~The Session Guide Configurator's `swimlaneOrder` field still only seeds from real track
+  names...~~ **Resolved 2026-08-11**, see 16.3's correction note — `swimlaneOrder` now
+  seeds from override-text lanes too, in the same mixed list as real tracks.
 
 ### 16.7 Cleanup pass ✅
 
