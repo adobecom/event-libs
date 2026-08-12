@@ -42,6 +42,7 @@ a.con-button.no-event {
   main.section-columns {
     display: flex;
     flex-wrap: wrap;
+    align-items: flex-start;
   }
 
   main.section-columns > .section {

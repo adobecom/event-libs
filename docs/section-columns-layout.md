@@ -119,3 +119,8 @@ Renders (above 900px) as: Section 1 full-width, Sections 2+3 side-by-side split
   than Milo's own `section-metadata` intra-section grid breakpoint (1200px),
   since a full-page column is much wider than a sub-section grid column at the
   same viewport.
+- `main.section-columns` sets `align-items: flex-start` explicitly, overriding
+  flexbox's (and CSS Grid's) default `stretch`. Without it, every section sharing
+  a row would stretch to match the height of the tallest one — instead, each
+  section sizes to its own content, the same way it does when just a normal
+  direct child of `<main>` outside this feature entirely.
