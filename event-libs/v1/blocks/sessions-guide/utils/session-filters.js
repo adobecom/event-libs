@@ -1,6 +1,6 @@
 import { getSessionDayKey, isSessionLive, isSessionUpcoming } from './time.js';
 import { deriveSessionState, isInLiveNow } from '../../../utils/session-state.js';
-import { getTrackIcon, getOverrideTrackIcon } from '../../../utils/tier-1-event-config.js';
+import { getTrackIcon, getOverrideTrackIcon, DEFAULT_ICON_COLOR } from '../../../utils/tier-1-event-config.js';
 
 export function sessionsForDay(sessions, activeDay, userTz) {
   return sessions.filter((s) => getSessionDayKey(s, userTz) === activeDay);
@@ -31,8 +31,8 @@ export function resolveTrackBadge(session) {
     const overrideIcon = getOverrideTrackIcon(session.trackOverride);
     return {
       label: session.trackOverride,
-      icon: overrideIcon.icon,
-      color: overrideIcon.color,
+      icon: overrideIcon?.icon || null,
+      color: overrideIcon?.color || DEFAULT_ICON_COLOR,
       count: additional.length,
       isOverride: true,
       swimlanes: [session.trackOverride, ...additional],
@@ -44,7 +44,7 @@ export function resolveTrackBadge(session) {
   return {
     label: session.track,
     icon: trackIcon?.icon || null,
-    color: trackIcon?.color || null,
+    color: trackIcon?.color || DEFAULT_ICON_COLOR,
     count: additional.length,
     isOverride: false,
     swimlanes: [session.track, ...additional],

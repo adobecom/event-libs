@@ -15,7 +15,7 @@ import LoadingInline from '../components/LoadingInline.js';
 export default function ConfigEditor() {
   const { goToLibrary } = useNavigation();
   const {
-    activeConfig, saveActiveConfig, clearActiveConfig, updateTrackIcon, seedTrackIcons,
+    activeConfig, saveActiveConfig, clearActiveConfig, updateTrackIcon,
     updateOverrideTrackIcon, updateProduct, updateConfigField, setToastSuccess, setToastError,
   } = useConfigs();
 
@@ -40,12 +40,11 @@ export default function ConfigEditor() {
       }
       setSessions(result.data.sessions);
       setSessionTimes(result.data.sessionTimes);
-      seedTrackIcons(extractDistinctTracks(result.data.sessions));
     }).finally(() => {
       if (!cancelled) setIsLoadingSessions(false);
     });
     return () => { cancelled = true; };
-  }, [eventId, seedTrackIcons]);
+  }, [eventId]);
 
   const tracks = useMemo(() => extractDistinctTracks(sessions), [sessions]);
   const overrideTexts = useMemo(() => extractDistinctOverrideTexts(sessions), [sessions]);

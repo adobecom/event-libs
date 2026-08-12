@@ -31,11 +31,10 @@ describe('CategoryBadge', () => {
     expect(html).to.include('Social Media');
   });
 
-  it('falls back to the built-in default icon/color when the track has no authored config entry', () => {
+  it('falls back to the universal black color (no icon) when the track has no authored config entry', () => {
     const html = CategoryBadge({ session: session({ track: 'Mainstage' }) });
     expect(html).to.include('Mainstage');
-    // #E91E63 is the built-in default mainstage color (see tier-1-event-config.js).
-    expect(html).to.include('color:#E91E63');
+    expect(html).to.include('color:#000000');
   });
 
   it('renders nothing when there is no primary track and no override (no "Other" badge)', () => {
@@ -52,9 +51,9 @@ describe('CategoryBadge', () => {
     expect(html).to.include('+1');
   });
 
-  it('shows the override text and generic icon when a trackOverride is set', () => {
+  it('shows the override text and the universal black default color when unconfigured', () => {
     const html = CategoryBadge({ session: session({ trackOverride: 'custom label', additionalTracks: ['Video'] }) });
     expect(html).to.include('custom label');
-    expect(html).to.include('color:#6E6E6E');
+    expect(html).to.include('color:#000000');
   });
 });
