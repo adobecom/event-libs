@@ -922,15 +922,13 @@ function runMobileRiderSuite(modulePath, variantLabel) {
       expect(el.querySelector('.mobile-rider-info-bar')).to.not.exist;
     });
 
-    it('renders the authored title immediately, with no toggle when about-session-enabled is not set', async () => {
+    it('renders nothing at all when about-session-enabled is not set — it gates the whole bar, not just the panel', async () => {
       document.body.innerHTML = sessionInfoBarHtml();
       const el = document.querySelector('.mobile-rider');
       riderInstance = init(el);
       await new Promise((resolve) => { setTimeout(resolve, 50); });
 
-      expect(el.querySelector('.mobile-rider-info-bar-title').textContent).to.equal('Watch Day 1 Keynote');
-      expect(el.querySelector('.mobile-rider-info-bar-toggle')).to.not.exist;
-      expect(el.querySelector('.mobile-rider-info-bar-panel-wrap')).to.not.exist;
+      expect(el.querySelector('.mobile-rider-info-bar')).to.not.exist;
     });
 
     it('renders the toggle, category, and description when about-session-enabled is true', async () => {
@@ -946,7 +944,7 @@ function runMobileRiderSuite(modulePath, variantLabel) {
       expect(el.querySelector('.mobile-rider-info-bar-category-label').textContent).to.equal('Education');
     });
 
-    it('does not render the toggle when about-session-enabled is false, even with category/description authored', async () => {
+    it('renders nothing when about-session-enabled is false, even with category/description authored', async () => {
       document.body.innerHTML = sessionInfoBarHtml({
         aboutEnabled: 'false', category: 'Education', description: 'Lorem ipsum',
       });
@@ -954,7 +952,7 @@ function runMobileRiderSuite(modulePath, variantLabel) {
       riderInstance = init(el);
       await new Promise((resolve) => { setTimeout(resolve, 50); });
 
-      expect(el.querySelector('.mobile-rider-info-bar-toggle')).to.not.exist;
+      expect(el.querySelector('.mobile-rider-info-bar')).to.not.exist;
     });
 
     it('toggles aria-expanded and the is-expanded class on click', async () => {
@@ -988,7 +986,7 @@ function runMobileRiderSuite(modulePath, variantLabel) {
     });
 
     it('renders the Share button immediately, without waiting on the sessions store', async () => {
-      document.body.innerHTML = sessionInfoBarHtml();
+      document.body.innerHTML = sessionInfoBarHtml({ aboutEnabled: 'true' });
       const el = document.querySelector('.mobile-rider');
       riderInstance = init(el);
       await new Promise((resolve) => { setTimeout(resolve, 50); });
@@ -998,7 +996,7 @@ function runMobileRiderSuite(modulePath, variantLabel) {
     });
 
     it('copies a session detail link to the clipboard when Share is clicked', async () => {
-      document.body.innerHTML = sessionInfoBarHtml();
+      document.body.innerHTML = sessionInfoBarHtml({ aboutEnabled: 'true' });
       const el = document.querySelector('.mobile-rider');
       riderInstance = init(el);
       await new Promise((resolve) => { setTimeout(resolve, 50); });
@@ -1014,7 +1012,7 @@ function runMobileRiderSuite(modulePath, variantLabel) {
     });
 
     it('does not render a Favorite button until the session resolves from the store', async () => {
-      document.body.innerHTML = sessionInfoBarHtml();
+      document.body.innerHTML = sessionInfoBarHtml({ aboutEnabled: 'true' });
       const el = document.querySelector('.mobile-rider');
       riderInstance = init(el);
       await new Promise((resolve) => { setTimeout(resolve, 50); });
@@ -1027,7 +1025,7 @@ function runMobileRiderSuite(modulePath, variantLabel) {
 
     it('renders a Favorite button immediately when the session is already resolved, reflecting the favorited signal', async () => {
       sessions.value = [{ id: 's-100', rfCode: 'rf-100' }];
-      document.body.innerHTML = sessionInfoBarHtml();
+      document.body.innerHTML = sessionInfoBarHtml({ aboutEnabled: 'true' });
       const el = document.querySelector('.mobile-rider');
       riderInstance = init(el);
       await new Promise((resolve) => { setTimeout(resolve, 50); });

@@ -204,43 +204,44 @@ class MobileRider {
   // the bar render empty whenever that hadn't loaded (or never would). Favorite is the one
   // exception: favoriteAction() needs the real session object's rfCode (a RainFocus id that
   // can't be authored), so it alone still waits on the sessions store to resolve session-id.
+  // about-session-enabled gates the whole bar, not just the toggle/panel — per direct
+  // product direction, title/Share/Favorite shouldn't render either when it's false.
   #initInfoBar(cfg) {
-    const sessionId = cfg['session-id'];
     const aboutEnabled = cfg['about-session-enabled'] === true;
+    if (!aboutEnabled) return;
 
+    const sessionId = cfg['session-id'];
     const bar = createTag('div', { class: 'mobile-rider-info-bar' }, '', { parent: this.root });
     const header = createTag('div', { class: 'mobile-rider-info-bar-header' }, '', { parent: bar });
     createTag('h3', { class: 'mobile-rider-info-bar-title' }, cfg['session-title'] || '', { parent: header });
 
-    if (aboutEnabled) {
-      const toggle = createTag('button', {
-        type: 'button',
-        class: 'mobile-rider-info-bar-toggle',
-        'aria-expanded': 'false',
-      }, '', { parent: header });
-      createTag('span', { class: 'mobile-rider-info-bar-toggle-label' }, 'About this session', { parent: toggle });
-      createTag('span', { class: 'mobile-rider-info-bar-chevron' }, ICON_CHEVRON_DOWN, { parent: toggle });
+    const toggle = createTag('button', {
+      type: 'button',
+      class: 'mobile-rider-info-bar-toggle',
+      'aria-expanded': 'false',
+    }, '', { parent: header });
+    createTag('span', { class: 'mobile-rider-info-bar-toggle-label' }, 'About this session', { parent: toggle });
+    createTag('span', { class: 'mobile-rider-info-bar-chevron' }, ICON_CHEVRON_DOWN, { parent: toggle });
 
-      toggle.addEventListener('click', () => {
-        const expanded = toggle.getAttribute('aria-expanded') === 'true';
-        toggle.setAttribute('aria-expanded', String(!expanded));
-        bar.classList.toggle('is-expanded', !expanded);
-      });
+    toggle.addEventListener('click', () => {
+      const expanded = toggle.getAttribute('aria-expanded') === 'true';
+      toggle.setAttribute('aria-expanded', String(!expanded));
+      bar.classList.toggle('is-expanded', !expanded);
+    });
 
-      const panelWrap = createTag('div', { class: 'mobile-rider-info-bar-panel-wrap' }, '', { parent: bar });
-      const panel = createTag('div', { class: 'mobile-rider-info-bar-panel' }, '', { parent: panelWrap });
+    const panelWrap = createTag('div', { class: 'mobile-rider-info-bar-panel-wrap' }, '', { parent: bar });
+    const panel = createTag('div', { class: 'mobile-rider-info-bar-panel' }, '', { parent: panelWrap });
 
-      const badge = buildCategoryBadge(cfg['session-category']);
-      if (badge) panel.append(badge);
-      if (cfg['session-description']) {
-        createTag('p', { class: 'mobile-rider-info-bar-description' }, cfg['session-description'], { parent: panel });
-      }
-      const more = createTag('button', {
-        type: 'button',
-        class: 'mobile-rider-info-bar-more',
-      }, 'View all details', { parent: panel });
-      more.addEventListener('click', () => openSessionGuideDetail(sessionId));
+    const badge = buildCategoryBadge(cfg['session-category']);
+    if (badge) panel.append(badge);
+    if (cfg['session-description']) {
+      createTag('p', { class: 'mobile-rider-info-bar-description' }, cfg['session-description'], { parent: panel });
     }
+    const more = createTag('button', {
+      type: 'button',
+      class: 'mobile-rider-info-bar-more',
+    }, 'View all details', { parent: panel });
+    more.addEventListener('click', () => openSessionGuideDetail(sessionId));
 
     const actions = createTag('div', { class: 'mobile-rider-info-bar-actions' }, '', { parent: header });
     actions.append(buildShareButton({ id: sessionId, title: cfg['session-title'] || '' }));
