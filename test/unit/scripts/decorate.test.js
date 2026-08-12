@@ -981,6 +981,19 @@ describe('applySectionColumnsLayout', () => {
     expect(document.querySelector('main').classList.contains('section-columns')).to.be.true;
   });
 
+  it('loads the required CSS itself, so callers only need to call this one function', () => {
+    setMetadata('section-layout', 'columns');
+    document.body.innerHTML = '<main><div class="section"></div></main>';
+    applySectionColumnsLayout();
+    expect(document.getElementById('event-libs-styles')).to.not.be.null;
+  });
+
+  it('does not load the CSS when the layout is not enabled', () => {
+    document.body.innerHTML = '<main><div class="section"></div></main>';
+    applySectionColumnsLayout();
+    expect(document.getElementById('event-libs-styles')).to.be.null;
+  });
+
   it('is idempotent across repeated calls with unchanged metadata', () => {
     setMetadata('section-layout', 'columns');
     document.body.innerHTML = '<main><div class="section"></div></main>';
@@ -1002,6 +1015,14 @@ describe('applySectionColumnsLayout', () => {
   it('does nothing when there is no main element', () => {
     document.body.innerHTML = '<div class="not-main"></div>';
     expect(() => applySectionColumnsLayout()).to.not.throw();
+  });
+
+  it('is not applied automatically by decorateEvent, since consuming sites must call it directly to support non-event pages', () => {
+    setMetadata('section-layout', 'columns');
+    setMetadata('event-id', 'test-event');
+    document.body.innerHTML = '<main><div class="section"></div></main>';
+    decorateEvent(document.querySelector('main'));
+    expect(document.querySelector('main').classList.contains('section-columns')).to.be.false;
   });
 });
 

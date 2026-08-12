@@ -1070,16 +1070,21 @@ function addStylesToEventPage() {
   document.head.appendChild(link);
 }
 
-// decorateEvent runs once per top-level page load, but also re-enters for every
-// fragment/personalization/events-form pass (see docs/block-hydration.md), each
-// time with a different, non-<main> `parent`. So this always resolves the real
-// page <main> directly (ignoring its own caller) rather than relying on `parent`.
-// Re-reading metadata on every call (instead of caching a "checked" flag) lets a
-// later personalization pass that updates `section-layout` still take effect.
+// Not called from decorateEvent: decorateEvent only runs on pages with an
+// event-id, but this layout is meant for static/non-event pages too. The
+// consuming site's own decorateArea should call this directly, unconditionally.
+// Always resolves the real page <main> directly rather than relying on a
+// `parent`/`area` argument, since callers may re-enter with fragment/MEP
+// elements. Re-reads metadata on every call (no cached "checked" flag) so a
+// later personalization pass that updates `section-layout` still takes effect.
+// Calls addStylesToEventPage() itself so callers only need this one function
+// to get both the CSS and the class toggle.
 export function applySectionColumnsLayout() {
   const main = document.querySelector('main');
   if (!main) return;
-  main.classList.toggle('section-columns', getMetadata('section-layout') === 'columns');
+  const enabled = getMetadata('section-layout') === 'columns';
+  if (enabled) addStylesToEventPage();
+  main.classList.toggle('section-columns', enabled);
 }
 
 // e.g. "dark", "dark(blocks:hero-marquee,profile-cards)", or "dark(blocks:text[first],agenda)"
@@ -1213,7 +1218,6 @@ export function decorateEvent(parent) {
 
   // Hydrate metadata with user-friendly transformations
   addStylesToEventPage();
-  applySectionColumnsLayout();
   const miloConfig = getEventConfig().miloConfig;
   const locale = miloConfig ? miloConfig.locale?.ietf : getFallbackLocale(FALLBACK_LOCALES);
   const massagedMetadata = massageMetadata(locale);
