@@ -1,9 +1,7 @@
 import { safeUrl } from '../../../blocks/sessions-guide/utils/url.js';
 import { deriveSessionState } from '../../../utils/session-state.js';
 import { openSessionGuideDetail } from '../../../utils/session-store.js';
-import MobileRiderController from '../../../services/sessions/mobile-rider-controller.js';
-
-const MR_POLL_INTERVAL_MS = 30 * 1000;
+import { registerStreamIds, subscribe } from '../../../services/sessions/mobile-rider-poller.js';
 
 const liveStreamActiveIds = new Set();
 let mrPollStarted = false;
@@ -16,19 +14,12 @@ function startMobileRiderPolling() {
     .map((card) => card.dataset.mrStreamId);
   if (!streamIds.length) return;
 
-  const controller = new MobileRiderController();
-  const poll = async () => {
-    try {
-      const { active = [] } = await controller.getMediaStatus(streamIds);
-      liveStreamActiveIds.clear();
-      active.forEach((id) => liveStreamActiveIds.add(id));
-    } catch (e) {
-      window.lana?.log(`card-c2 routing: MR poll failed: ${e.message}`);
-    }
-  };
-
-  poll();
-  setInterval(poll, MR_POLL_INTERVAL_MS);
+  const streamIdSet = new Set(streamIds);
+  subscribe(({ active }) => {
+    liveStreamActiveIds.clear();
+    active.filter((id) => streamIdSet.has(id)).forEach((id) => liveStreamActiveIds.add(id));
+  });
+  registerStreamIds(streamIds);
 }
 
 const TIMING_OVERRIDE_OFFSET_MS = (() => {

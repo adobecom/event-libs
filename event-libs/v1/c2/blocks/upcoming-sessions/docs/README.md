@@ -32,20 +32,27 @@ render.
 - **MR (Mobile Rider) sessions**: excluded from the time-based timers above. Their
   removal is owned solely by `startMobileRiderPolling()`'s poll confirmation — MR is the
   authoritative "has this session actually started" signal for them, not the scheduled
-  time. Polling for a given session only begins once its own scheduled start time
-  arrives (plus a per-session `setTimeout` kick exactly at that instant, so polling
-  starts immediately rather than waiting for the next 30s interval boundary). The first
-  time MR confirms a session started, `onStarted(startedIds)` fires, the card is
-  removed, and that session's `mrStreamId` is permanently excluded from further polling.
-  Once every MR session is resolved, the interval clears itself automatically.
+  time. A given session's `mrStreamId` is only registered with the shared poller (see
+  below) once its own scheduled start time arrives (plus a per-session `setTimeout` kick
+  exactly at that instant, so registration happens immediately rather than waiting for
+  the next 30s poll boundary). The first time MR confirms a session started, that id is
+  unregistered and `onStarted(startedIds)` fires, dropping the card — this block never
+  cares about a session's "stop time," so once confirmed, that id is gone from every
+  future poll for good.
 - `dropSession()` removes a session from both the DOM and the in-memory `sessions` list
   together, so a later full re-render (favorited/scheduled/pending state changes)
   can't resurrect a card that already started.
 
-This block owns its own Mobile Rider polling (via the real `MobileRiderController`,
-hitting `overlay-admin-integration.mobilerider.com`) rather than relying on
-`session-store.js`'s shared/mocked poller — `session-store.js`'s `liveStreamActiveIds`
-signal is irrelevant here for the same reason this block has no live state at all.
+MR polling itself goes through the shared registry at
+`event-libs/v1/services/sessions/mobile-rider-poller.js`
+(`registerStreamIds`/`unregisterStreamIds`/`subscribe`), not a poller local to this
+block — if `card-c2`'s Featured Sessions cards are also on the page tracking
+overlapping `mrStreamId`s, both blocks' ids get batched into the same underlying
+`getMediaStatus()` call instead of two independent 30s loops hitting
+`overlay-admin-integration.mobilerider.com`. `session-store.js`'s own
+`liveStreamActiveIds` signal is still irrelevant here — it's backed by a mocked
+`fetchLiveStatus()`, not real MR data, and this block has no live state to feed it
+anyway.
 
 ## Removal animation (FLIP)
 

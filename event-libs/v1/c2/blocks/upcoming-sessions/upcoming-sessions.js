@@ -9,12 +9,11 @@ import {
 import { getTrackIcon } from '../../../utils/tier-1-event-config.js';
 import { resolveIcon } from '../../../features/icons/icon-resolver.js';
 import { scheduleWithFeedback, favoriteWithFeedback } from '../../../services/sessions/action-feedback.js';
-import MobileRiderController from '../../../services/sessions/mobile-rider-controller.js';
+import { registerStreamIds, unregisterStreamIds, subscribe } from '../../../services/sessions/mobile-rider-poller.js';
 
 const ROTATE_OUT_MS = 350;
 const SLIDE_MS = 350;
 const SLIDE_EASING = 'cubic-bezier(0.22, 1, 0.36, 1)';
-const MR_POLL_INTERVAL_MS = 30_000;
 
 const TIMING_OVERRIDE_OFFSET_MS = (() => {
   const raw = new URLSearchParams(window.location.search).get('timing');
@@ -26,8 +25,6 @@ const TIMING_OVERRIDE_OFFSET_MS = (() => {
 function now() {
   return TIMING_OVERRIDE_OFFSET_MS === null ? Date.now() : Date.now() + TIMING_OVERRIDE_OFFSET_MS;
 }
-
-const mobileRiderController = new MobileRiderController();
 
 const EVENT_CONFIG = { title: '', showConflictModal: false, registerUrl: '/register' };
 
@@ -338,46 +335,38 @@ function startMobileRiderPolling(sessions, onStarted) {
   const mrSessions = sessions.filter((s) => s.mrStreamId);
   if (!mrSessions.length) return null;
 
+  const mrStreamIds = new Set(mrSessions.map((s) => s.mrStreamId));
   const resolvedIds = new Set();
-  let intervalId = null;
+  const registeredIds = new Set();
 
-  function dueIds(nowMs) {
-    return [...new Set(
-      mrSessions
-        .filter((s) => !resolvedIds.has(s.mrStreamId) && (s.sessionTime?.startTimeMillis ?? 0) <= nowMs)
-        .map((s) => s.mrStreamId),
-    )];
+  function onDue(mrStreamId) {
+    if (registeredIds.has(mrStreamId)) return;
+    registeredIds.add(mrStreamId);
+    registerStreamIds([mrStreamId]);
   }
 
-  async function tick() {
-    const ids = dueIds(now());
-    if (!ids.length) return;
-    try {
-      const { active } = await mobileRiderController.getMediaStatus(ids);
-      const startedIds = ids.filter((id) => active.includes(id));
-      if (!startedIds.length) return;
-      startedIds.forEach((id) => resolvedIds.add(id));
-      onStarted(startedIds);
-      if (intervalId && mrSessions.every((s) => resolvedIds.has(s.mrStreamId))) {
-        clearInterval(intervalId);
-        intervalId = null;
-      }
-    } catch (error) {
-      window.lana?.log(`upcoming-sessions: mobile rider poll failed: ${error.message}`);
+  const startTimers = [];
+  mrSessions.forEach((s) => {
+    const untilStart = (s.sessionTime?.startTimeMillis ?? 0) - now();
+    if (untilStart > 0) {
+      startTimers.push(setTimeout(() => onDue(s.mrStreamId), untilStart));
+    } else {
+      onDue(s.mrStreamId);
     }
-  }
+  });
 
-  const startTimers = mrSessions
-    .map((s) => (s.sessionTime?.startTimeMillis ?? 0) - now())
-    .filter((untilStart) => untilStart > 0)
-    .map((untilStart) => setTimeout(tick, untilStart));
-
-  tick();
-  intervalId = setInterval(tick, MR_POLL_INTERVAL_MS);
+  const unsubscribe = subscribe(({ active }) => {
+    const startedIds = active.filter((id) => mrStreamIds.has(id) && !resolvedIds.has(id));
+    if (!startedIds.length) return;
+    startedIds.forEach((id) => resolvedIds.add(id));
+    unregisterStreamIds(startedIds);
+    onStarted(startedIds);
+  });
 
   return () => {
     startTimers.forEach(clearTimeout);
-    if (intervalId) clearInterval(intervalId);
+    unsubscribe();
+    unregisterStreamIds([...registeredIds].filter((id) => !resolvedIds.has(id)));
   };
 }
 

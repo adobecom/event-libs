@@ -20,25 +20,33 @@ used.
 **Fix:** delete the newer duplicate and import the existing controller from
 `features/timing-framework/plugins/mobile-rider/`.
 
-## 2. Two independent MobileRider poll loops instead of the shared poller
+## 2. Two independent MobileRider poll loops — fixed
 
-**Files:** `card-c2/session-routing.js` and `upcoming-sessions/upcoming-sessions.js`
-each still run their own `setInterval`-based MR poll loop and `?timing=` clock
-override, instead of reusing `event-libs/v1/services/sessions/poller.js` (already
-consumed by `session-store.js`).
+**Was:** `card-c2/session-routing.js` and `upcoming-sessions/upcoming-sessions.js`
+each ran their own `setInterval`-based MR poll loop, hitting
+`overlay-admin-integration.mobilerider.com` independently even when both blocks
+were on the same page tracking overlapping `mrStreamId`s.
 
-**Impact:** every block showing an MR-backed card adds another independent 30s
-poller hitting the MobileRider endpoint — redundant network calls, and a risk of
-the per-block `liveStreamActiveIds`-equivalent sets drifting out of sync with each
-other and with `session-store.js`.
+**Fix:** both now go through a shared registry,
+`event-libs/v1/services/sessions/mobile-rider-poller.js`
+(`registerStreamIds`/`unregisterStreamIds`/`subscribe`), which holds a single
+`setInterval` and batches the *union* of every currently-registered id across
+every caller into one `getMediaStatus()` call per tick, fanning the result out
+to all subscribers. Each block's own per-session gating is unchanged — this
+only replaces *where the actual fetch/interval lives*, not each block's
+business logic for deciding which ids it cares about and when:
 
-**Fix:** consolidate on the shared poller / `session-store.js`'s live-signal
-instead of each block polling independently. Note this is a deliberate,
-documented divergence in `upcoming-sessions` (its own poll is scoped to
-sessions that have an authored `mrStreamId` and only starts once each session's
-own scheduled start time arrives — see `upcoming-sessions/docs/README.md`), so
-consolidating needs to preserve that per-session gating, not just merge the two
-loops naively.
+- `upcoming-sessions.js` still gates each session's registration on its own
+  scheduled start time (per-session `setTimeout`, unchanged), and still
+  unregisters an id the moment MR confirms it active (still doesn't care about
+  "stop time" — registration is dropped, not kept around for an eventual
+  on-demand transition, since this block never shows one).
+- `card-c2/session-routing.js` still registers its full `.card-c2[data-mr-
+  stream-id]` snapshot once and never unregisters — it still needs ongoing
+  live→on-demand tracking for its own cards, unchanged.
+
+Covered by `test/unit/services/sessions/mobile-rider-poller.test.js`
+(batching, refcounted registration, subscribe/unsubscribe).
 
 ## 3. `card-c2` hydrator eagerly imported on every page — confirmed on the LCP path, fix is cross-repo
 
