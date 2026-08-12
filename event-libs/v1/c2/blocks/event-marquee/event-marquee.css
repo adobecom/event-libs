@@ -129,6 +129,16 @@
   object-fit: cover;
 }
 
+.event-marquee-video-title {
+  margin: var(--s2a-spacing-xs) 0 0;
+  font-family: var(--s2a-font-family-label);
+  font-size: var(--s2a-typography-font-size-label);
+  font-style: normal;
+  font-weight: 700;
+  line-height: var(--s2a-typography-line-height-label);
+  letter-spacing: var(--s2a-typography-letter-spacing-label);
+}
+
 .event-marquee-actions {
   display: flex;
   gap: var(--s2a-spacing-xs);

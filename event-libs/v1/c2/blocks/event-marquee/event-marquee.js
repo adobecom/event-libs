@@ -22,7 +22,7 @@ function parseContent(el) {
 
 async function getSectionConfig(el, miloLibs) {
   const config = {
-    title: '', sessionId: '', favoriteEnabled: null, shareEnabled: null,
+    title: '', sessionId: '', favoriteEnabled: null, shareEnabled: null, videoTitle: '',
   };
 
   const sectionMeta = el.parentElement?.querySelector('.section-metadata');
@@ -35,6 +35,7 @@ async function getSectionConfig(el, miloLibs) {
   if (metadata['session-id']) config.sessionId = metadata['session-id'].content[0]?.textContent.trim() || '';
   if (metadata['favorite-enabled']) config.favoriteEnabled = metadata['favorite-enabled'].text[0] === 'true';
   if (metadata['share-enabled']) config.shareEnabled = metadata['share-enabled'].text[0] === 'true';
+  if (metadata['video-title']) config.videoTitle = metadata['video-title'].content[0]?.textContent.trim() || '';
 
   return config;
 }
@@ -77,6 +78,10 @@ function buildFavoriteButton(session, feedbackConfig) {
   });
 
   return btn;
+}
+
+function buildVideoTitle(title) {
+  return createTag('p', { class: 'event-marquee-video-title' }, title);
 }
 
 function buildShareButton() {
@@ -196,6 +201,7 @@ export default async function init(el) {
 
   if (player?.type === 'mobile-rider' && !player.processed) processAutoBlockLinks(mediaCol);
   if (player) decorateActions(textCol, config);
+  if (player && config.videoTitle) mediaCol.append(buildVideoTitle(config.videoTitle));
 
   attachUpcomingSessionsWrapper(el);
 }
