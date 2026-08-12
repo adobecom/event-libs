@@ -895,12 +895,23 @@ function runMobileRiderSuite(modulePath, variantLabel) {
 
   // MVP-scoped to the C2 copy only — classic mobile-rider doesn't get this bar.
   (variantLabel === 'C2' ? describe : describe.skip)('Live Stream Session Info Bar', () => {
-    const sessionInfoBarHtml = `
-      <div class="mobile-rider">
-        <div><div>video-id</div><div>test-video-123</div></div>
-        <div><div>session-id</div><div>s-100</div></div>
-      </div>
-    `;
+    // Title/category/description are authored fields now, not pulled from the sessions
+    // store — only Favorite (via rfCode) still needs the store to resolve session-id.
+    function sessionInfoBarHtml({
+      title = 'Watch Day 1 Keynote', aboutEnabled, category, description,
+    } = {}) {
+      const row = (key, val) => (val === undefined ? '' : `<div><div>${key}</div><div>${val}</div></div>`);
+      return `
+        <div class="mobile-rider">
+          <div><div>video-id</div><div>test-video-123</div></div>
+          <div><div>session-id</div><div>s-100</div></div>
+          ${row('session-title', title)}
+          ${row('about-session-enabled', aboutEnabled)}
+          ${row('session-category', category)}
+          ${row('session-description', description)}
+        </div>
+      `;
+    }
 
     it('does not render an info bar when no session-id is authored', async () => {
       document.body.innerHTML = defaultHtml;
@@ -911,36 +922,43 @@ function runMobileRiderSuite(modulePath, variantLabel) {
       expect(el.querySelector('.mobile-rider-info-bar')).to.not.exist;
     });
 
-    it('renders title, category, and description immediately when session data is already loaded', async () => {
-      sessions.value = [{
-        id: 's-100', title: 'Watch Day 1 Keynote', track: 'Education', description: 'Lorem ipsum',
-      }];
-
-      document.body.innerHTML = sessionInfoBarHtml;
+    it('renders the authored title immediately, with no toggle when about-session-enabled is not set', async () => {
+      document.body.innerHTML = sessionInfoBarHtml();
       const el = document.querySelector('.mobile-rider');
       riderInstance = init(el);
       await new Promise((resolve) => { setTimeout(resolve, 50); });
 
       expect(el.querySelector('.mobile-rider-info-bar-title').textContent).to.equal('Watch Day 1 Keynote');
+      expect(el.querySelector('.mobile-rider-info-bar-toggle')).to.not.exist;
+      expect(el.querySelector('.mobile-rider-info-bar-panel-wrap')).to.not.exist;
+    });
+
+    it('renders the toggle, category, and description when about-session-enabled is true', async () => {
+      document.body.innerHTML = sessionInfoBarHtml({
+        aboutEnabled: 'true', category: 'Education', description: 'Lorem ipsum',
+      });
+      const el = document.querySelector('.mobile-rider');
+      riderInstance = init(el);
+      await new Promise((resolve) => { setTimeout(resolve, 50); });
+
+      expect(el.querySelector('.mobile-rider-info-bar-toggle')).to.exist;
       expect(el.querySelector('.mobile-rider-info-bar-description').textContent).to.equal('Lorem ipsum');
       expect(el.querySelector('.mobile-rider-info-bar-category-label').textContent).to.equal('Education');
     });
 
-    it('resolves the session reactively when it loads after init', async () => {
-      document.body.innerHTML = sessionInfoBarHtml;
+    it('does not render the toggle when about-session-enabled is false, even with category/description authored', async () => {
+      document.body.innerHTML = sessionInfoBarHtml({
+        aboutEnabled: 'false', category: 'Education', description: 'Lorem ipsum',
+      });
       const el = document.querySelector('.mobile-rider');
       riderInstance = init(el);
       await new Promise((resolve) => { setTimeout(resolve, 50); });
 
-      expect(el.querySelector('.mobile-rider-info-bar-title').textContent).to.equal('');
-
-      sessions.value = [{ id: 's-100', title: 'Watch Day 1 Keynote' }];
-      expect(el.querySelector('.mobile-rider-info-bar-title').textContent).to.equal('Watch Day 1 Keynote');
+      expect(el.querySelector('.mobile-rider-info-bar-toggle')).to.not.exist;
     });
 
     it('toggles aria-expanded and the is-expanded class on click', async () => {
-      sessions.value = [{ id: 's-100', title: 'Watch Day 1 Keynote' }];
-      document.body.innerHTML = sessionInfoBarHtml;
+      document.body.innerHTML = sessionInfoBarHtml({ aboutEnabled: 'true', description: 'Lorem ipsum' });
       const el = document.querySelector('.mobile-rider');
       riderInstance = init(el);
       await new Promise((resolve) => { setTimeout(resolve, 50); });
@@ -959,8 +977,7 @@ function runMobileRiderSuite(modulePath, variantLabel) {
     });
 
     it('opens the Session Guide detail view for this session when View all details is clicked', async () => {
-      sessions.value = [{ id: 's-100', title: 'Watch Day 1 Keynote' }];
-      document.body.innerHTML = sessionInfoBarHtml;
+      document.body.innerHTML = sessionInfoBarHtml({ aboutEnabled: 'true', description: 'Lorem ipsum' });
       const el = document.querySelector('.mobile-rider');
       riderInstance = init(el);
       await new Promise((resolve) => { setTimeout(resolve, 50); });
@@ -970,25 +987,18 @@ function runMobileRiderSuite(modulePath, variantLabel) {
       expect(sessionGuideRequest.value).to.deep.equal({ sessionId: 's-100' });
     });
 
-    it('renders a Favorite button reflecting the favorited signal', async () => {
-      sessions.value = [{ id: 's-100', title: 'Watch Day 1 Keynote', rfCode: 'rf-100' }];
-      document.body.innerHTML = sessionInfoBarHtml;
+    it('renders the Share button immediately, without waiting on the sessions store', async () => {
+      document.body.innerHTML = sessionInfoBarHtml();
       const el = document.querySelector('.mobile-rider');
       riderInstance = init(el);
       await new Promise((resolve) => { setTimeout(resolve, 50); });
 
-      const favoriteBtn = el.querySelector('.mobile-rider-info-bar-favorite');
-      expect(favoriteBtn).to.exist;
-      expect(favoriteBtn.getAttribute('aria-label')).to.equal('Add to favorites');
-
-      favorited.value = new Set(['s-100']);
-      expect(favoriteBtn.classList.contains('is-favorited')).to.be.true;
-      expect(favoriteBtn.getAttribute('aria-label')).to.equal('Remove from favorites');
+      // sessions.value is left at [] for this test — Share must not depend on it resolving.
+      expect(el.querySelector('.mobile-rider-info-bar-share')).to.exist;
     });
 
     it('copies a session detail link to the clipboard when Share is clicked', async () => {
-      sessions.value = [{ id: 's-100', title: 'Watch Day 1 Keynote' }];
-      document.body.innerHTML = sessionInfoBarHtml;
+      document.body.innerHTML = sessionInfoBarHtml();
       const el = document.querySelector('.mobile-rider');
       riderInstance = init(el);
       await new Promise((resolve) => { setTimeout(resolve, 50); });
@@ -1001,6 +1011,34 @@ function runMobileRiderSuite(modulePath, variantLabel) {
 
       expect(navigator.clipboard.writeText.calledOnce).to.be.true;
       expect(navigator.clipboard.writeText.firstCall.args[0]).to.include('session=s-100');
+    });
+
+    it('does not render a Favorite button until the session resolves from the store', async () => {
+      document.body.innerHTML = sessionInfoBarHtml();
+      const el = document.querySelector('.mobile-rider');
+      riderInstance = init(el);
+      await new Promise((resolve) => { setTimeout(resolve, 50); });
+
+      expect(el.querySelector('.mobile-rider-info-bar-favorite')).to.not.exist;
+
+      sessions.value = [{ id: 's-100', rfCode: 'rf-100' }];
+      expect(el.querySelector('.mobile-rider-info-bar-favorite')).to.exist;
+    });
+
+    it('renders a Favorite button immediately when the session is already resolved, reflecting the favorited signal', async () => {
+      sessions.value = [{ id: 's-100', rfCode: 'rf-100' }];
+      document.body.innerHTML = sessionInfoBarHtml();
+      const el = document.querySelector('.mobile-rider');
+      riderInstance = init(el);
+      await new Promise((resolve) => { setTimeout(resolve, 50); });
+
+      const favoriteBtn = el.querySelector('.mobile-rider-info-bar-favorite');
+      expect(favoriteBtn).to.exist;
+      expect(favoriteBtn.getAttribute('aria-label')).to.equal('Add to favorites');
+
+      favorited.value = new Set(['s-100']);
+      expect(favoriteBtn.classList.contains('is-favorited')).to.be.true;
+      expect(favoriteBtn.getAttribute('aria-label')).to.equal('Remove from favorites');
     });
   });
   });

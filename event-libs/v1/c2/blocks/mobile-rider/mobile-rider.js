@@ -185,8 +185,7 @@ class MobileRider {
 
       await this.injectPlayer(videoId, this.cfg.skinid, this.cfg.aslid);
 
-      const sessionId = this.cfg['session-id'];
-      if (sessionId) this.#initInfoBar(sessionId);
+      if (this.cfg['session-id']) this.#initInfoBar(this.cfg);
     } catch (e) { this.log(e.message); }
   }
 
@@ -200,58 +199,63 @@ class MobileRider {
 
   // Renders as a sibling of .video-wrapper, not inside it — untouched by injectPlayer's
   // wrap.innerHTML resets (ASL toggles, re-embeds) once built.
-  #initInfoBar(sessionId) {
-    initSessionState();
+  // Title/category/description are authored directly (cfg), not pulled from the sessions
+  // store — that fetch is async and gated on tier-1-event-config being present, which made
+  // the bar render empty whenever that hadn't loaded (or never would). Favorite is the one
+  // exception: favoriteAction() needs the real session object's rfCode (a RainFocus id that
+  // can't be authored), so it alone still waits on the sessions store to resolve session-id.
+  #initInfoBar(cfg) {
+    const sessionId = cfg['session-id'];
+    const aboutEnabled = cfg['about-session-enabled'] === true;
 
     const bar = createTag('div', { class: 'mobile-rider-info-bar' }, '', { parent: this.root });
     const header = createTag('div', { class: 'mobile-rider-info-bar-header' }, '', { parent: bar });
-    const titleEl = createTag('h3', { class: 'mobile-rider-info-bar-title' }, '', { parent: header });
+    createTag('h3', { class: 'mobile-rider-info-bar-title' }, cfg['session-title'] || '', { parent: header });
 
-    const toggle = createTag('button', {
-      type: 'button',
-      class: 'mobile-rider-info-bar-toggle',
-      'aria-expanded': 'false',
-    }, '', { parent: header });
-    createTag('span', { class: 'mobile-rider-info-bar-toggle-label' }, 'About this session', { parent: toggle });
-    createTag('span', { class: 'mobile-rider-info-bar-chevron' }, ICON_CHEVRON_DOWN, { parent: toggle });
+    if (aboutEnabled) {
+      const toggle = createTag('button', {
+        type: 'button',
+        class: 'mobile-rider-info-bar-toggle',
+        'aria-expanded': 'false',
+      }, '', { parent: header });
+      createTag('span', { class: 'mobile-rider-info-bar-toggle-label' }, 'About this session', { parent: toggle });
+      createTag('span', { class: 'mobile-rider-info-bar-chevron' }, ICON_CHEVRON_DOWN, { parent: toggle });
 
-    const actions = createTag('div', { class: 'mobile-rider-info-bar-actions' }, '', { parent: header });
+      toggle.addEventListener('click', () => {
+        const expanded = toggle.getAttribute('aria-expanded') === 'true';
+        toggle.setAttribute('aria-expanded', String(!expanded));
+        bar.classList.toggle('is-expanded', !expanded);
+      });
 
-    const panelWrap = createTag('div', { class: 'mobile-rider-info-bar-panel-wrap' }, '', { parent: bar });
-    const panel = createTag('div', { class: 'mobile-rider-info-bar-panel' }, '', { parent: panelWrap });
+      const panelWrap = createTag('div', { class: 'mobile-rider-info-bar-panel-wrap' }, '', { parent: bar });
+      const panel = createTag('div', { class: 'mobile-rider-info-bar-panel' }, '', { parent: panelWrap });
 
-    toggle.addEventListener('click', () => {
-      const expanded = toggle.getAttribute('aria-expanded') === 'true';
-      toggle.setAttribute('aria-expanded', String(!expanded));
-      bar.classList.toggle('is-expanded', !expanded);
-    });
-
-    const render = (session) => {
-      titleEl.textContent = session.title || '';
-      actions.replaceChildren(buildShareButton(session), buildFavoriteButton(session));
-
-      panel.replaceChildren();
-      const badge = buildCategoryBadge(session.track);
+      const badge = buildCategoryBadge(cfg['session-category']);
       if (badge) panel.append(badge);
-      if (session.description) {
-        createTag('p', { class: 'mobile-rider-info-bar-description' }, session.description, { parent: panel });
+      if (cfg['session-description']) {
+        createTag('p', { class: 'mobile-rider-info-bar-description' }, cfg['session-description'], { parent: panel });
       }
       const more = createTag('button', {
         type: 'button',
         class: 'mobile-rider-info-bar-more',
       }, 'View all details', { parent: panel });
       more.addEventListener('click', () => openSessionGuideDetail(sessionId));
-    };
+    }
 
+    const actions = createTag('div', { class: 'mobile-rider-info-bar-actions' }, '', { parent: header });
+    actions.append(buildShareButton({ id: sessionId, title: cfg['session-title'] || '' }));
+
+    initSessionState();
+    const addFavorite = (session) => actions.append(buildFavoriteButton(session));
     const existing = sessions.value.find((s) => s.id === sessionId);
     if (existing) {
-      render(existing);
+      addFavorite(existing);
       return;
     }
     const unsubscribe = sessions.subscribe((list) => {
       const found = list.find((s) => s.id === sessionId);
       if (found) {
-        render(found);
+        addFavorite(found);
         unsubscribe();
       }
     });
