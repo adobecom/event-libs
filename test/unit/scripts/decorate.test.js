@@ -23,6 +23,7 @@ const {
   getNonProdData,
   processAutoBlockLinks,
   applyAreaTheme,
+  applySectionColumnsLayout,
 } = await import('../../../event-libs/v1/utils/decorate.js');
 const head = await readFile({ path: './mocks/head.html' });
 const body = await readFile({ path: './mocks/full-event.html' });
@@ -951,6 +952,46 @@ describe('applyAreaTheme', () => {
     applyAreaTheme();
     const cols = document.querySelectorAll('.section-metadata > div > div');
     expect(cols[1].textContent).to.equal('xxl-spacing');
+  });
+});
+
+describe('applySectionColumnsLayout', () => {
+  beforeEach(() => {
+    document.body.innerHTML = '';
+    document.head.innerHTML = head;
+  });
+
+  it('does nothing when section-layout metadata is absent', () => {
+    document.body.innerHTML = '<main><div class="section"></div></main>';
+    applySectionColumnsLayout();
+    expect(document.querySelector('main').classList.contains('section-columns')).to.be.false;
+  });
+
+  it('does nothing when section-layout is not "columns"', () => {
+    setMetadata('section-layout', 'grid');
+    document.body.innerHTML = '<main><div class="section"></div></main>';
+    applySectionColumnsLayout();
+    expect(document.querySelector('main').classList.contains('section-columns')).to.be.false;
+  });
+
+  it('adds section-columns to main when section-layout is "columns"', () => {
+    setMetadata('section-layout', 'columns');
+    document.body.innerHTML = '<main><div class="section"></div></main>';
+    applySectionColumnsLayout();
+    expect(document.querySelector('main').classList.contains('section-columns')).to.be.true;
+  });
+
+  it('is idempotent across repeated calls (simulating fragment/personalization re-entry)', () => {
+    setMetadata('section-layout', 'columns');
+    document.body.innerHTML = '<main><div class="section"></div></main>';
+    applySectionColumnsLayout();
+    applySectionColumnsLayout();
+    expect(document.querySelector('main').classList.contains('section-columns')).to.be.true;
+  });
+
+  it('does nothing when there is no main element', () => {
+    document.body.innerHTML = '<div class="not-main"></div>';
+    expect(() => applySectionColumnsLayout()).to.not.throw();
   });
 });
 

@@ -30,3 +30,25 @@ a.con-button.no-event {
   pointer-events: none;
   opacity: 0.5;
 }
+
+/* Opt-in flex-column section layout (page metadata: section-layout: columns) */
+main.section-columns {
+  display: flex;
+  flex-direction: column;
+}
+
+@media (min-width: 900px) {
+  main.section-columns {
+    flex-direction: row;
+    column-gap: var(--section-columns-gap, var(--spacing-l, 32px));
+  }
+
+  main.section-columns > .section {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+
+  main.section-columns > .section.column-span-1 { flex: 1 1 0; }
+  main.section-columns > .section.column-span-2 { flex: 2 1 0; }
+  main.section-columns > .section.column-span-3 { flex: 3 1 0; }
+}

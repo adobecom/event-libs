@@ -1058,16 +1058,28 @@ function processTemplateInAllNodes(parent, extraData) {
 
 function addStylesToEventPage() {
   const styleId = 'event-libs-styles';
-  
+
   // Check if styles are already loaded
   if (document.getElementById(styleId)) return;
-  
+
   // Create and append the stylesheet link
   const link = document.createElement('link');
   link.id = styleId;
   link.rel = 'stylesheet';
   link.href = new URL('../libs-styles.css', import.meta.url).href;
   document.head.appendChild(link);
+}
+
+// decorateEvent runs once per top-level page load, but also re-enters for every
+// fragment/personalization/events-form pass (see docs/block-hydration.md), each
+// time with a different, non-<main> `parent`. So this always resolves the real
+// page <main> directly (ignoring its own caller) and guards against re-applying.
+export function applySectionColumnsLayout() {
+  const main = document.querySelector('main');
+  if (!main || main.dataset.sectionColumns) return;
+  main.dataset.sectionColumns = 'checked';
+  if (getMetadata('section-layout') !== 'columns') return;
+  main.classList.add('section-columns');
 }
 
 // e.g. "dark", "dark(blocks:hero-marquee,profile-cards)", or "dark(blocks:text[first],agenda)"
@@ -1201,6 +1213,7 @@ export function decorateEvent(parent) {
 
   // Hydrate metadata with user-friendly transformations
   addStylesToEventPage();
+  applySectionColumnsLayout();
   const miloConfig = getEventConfig().miloConfig;
   const locale = miloConfig ? miloConfig.locale?.ietf : getFallbackLocale(FALLBACK_LOCALES);
   const massagedMetadata = massageMetadata(locale);
