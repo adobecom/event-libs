@@ -16,10 +16,9 @@ describe('icon-resolver — Milo fetchIcons() resolving to null', () => {
     setEventConfig({}, { miloLibs: '/test/unit/features/icons/mocks/libs-milo-null' });
   });
 
-  it('does not throw, and still falls back to the own-sprite tier', async () => {
+  it('does not throw, and returns null (no third tier to fall back to)', async () => {
     const svg = await resolveIcon('mainstage');
-    expect(svg).to.not.equal(null);
-    expect(svg.classList.contains('icon-track-mainstage')).to.equal(true);
+    expect(svg).to.equal(null);
   });
 
   it('returns null, not a throw, for a name in no tier at all', async () => {

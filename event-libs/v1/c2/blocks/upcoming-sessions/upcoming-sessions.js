@@ -39,7 +39,9 @@ const ICON_ARROW_RIGHT = '<svg width="16" height="16" viewBox="0 0 16 16" fill="
 
 function buildCategoryBadge(track) {
   if (!track) return null;
-  const entry = getTrackIcon(track) || getTrackIcon('mainstage');
+  // No built-in default map anymore (see tier-1-event-config.js) — 'mainstage' isn't a
+  // special guaranteed-to-exist fallback, just another track name. No config, no badge.
+  const entry = getTrackIcon(track);
   if (!entry) return null;
 
   const badge = createTag('span', { class: 'sg-category-badge sg-category-badge--sm' });

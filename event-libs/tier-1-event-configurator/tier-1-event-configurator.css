@@ -895,6 +895,27 @@ select.tec-field {
   cursor: pointer;
 }
 
+.tec-track-editor__icon-input {
+  flex: 1;
+  min-width: 160px;
+}
+
+.tec-track-editor__url-input {
+  flex: 1;
+  min-width: 200px;
+}
+
+.tec-track-editor__preview-wrap {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--tec-color-background);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
 .tec-track-editor__color-input:hover {
   border-color: var(--tec-color-border-hover);
 }

@@ -17,7 +17,8 @@ describe('tier-1-event-config (retry when metadata is absent)', () => {
   it('no-ops without locking in when the metadata is absent on the first call', () => {
     initTierOneEventConfig();
     expect(getAllowDoubleBooking()).to.equal(false);
-    expect(getTrackIcon('Photography')).to.deep.equal({ icon: 'photography', color: '#4CAF50' });
+    // No built-in default map — no metadata parsed yet means no config at all.
+    expect(getTrackIcon('Photography')).to.equal(null);
   });
 
   it('picks up the config on a later call, once the metadata exists', () => {

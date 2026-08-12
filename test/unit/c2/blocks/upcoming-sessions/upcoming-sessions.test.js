@@ -4,6 +4,7 @@ import {
   scheduled, favorited, pendingActions, liveStreamActiveIds, sessionGuideRequest,
 } from '../../../../../event-libs/v1/utils/session-store.js';
 import { setEventConfig } from '../../../../../event-libs/v1/utils/utils.js';
+import { initTierOneEventConfig } from '../../../../../event-libs/v1/utils/tier-1-event-config.js';
 
 function buildSectionMetadata(entries) {
   const el = document.createElement('div');
@@ -66,6 +67,13 @@ function session(overrides = {}) {
 describe('upcoming-sessions', () => {
   before(() => {
     setEventConfig({}, { miloLibs: '/test/unit/features/icons/mocks/libs' });
+    // No built-in track defaults (see tier-1-event-config.js) — author the one track
+    // these tests actually need a badge for.
+    const meta = document.createElement('meta');
+    meta.name = 'tier-1-event-config';
+    meta.content = JSON.stringify({ trackIcons: { Video: { icon: 'video', color: '#F44336' } } });
+    document.head.appendChild(meta);
+    initTierOneEventConfig();
   });
 
   beforeEach(() => {
@@ -316,12 +324,11 @@ describe('upcoming-sessions', () => {
       expect(footer.querySelector('.sg-card__time')).to.not.equal(null);
     });
 
-    it('falls back to the mainstage badge (not no badge) when the track has no icon config match', () => {
+    it('renders no badge (not a mainstage fallback) when the track has no icon config match', () => {
+      // No built-in defaults, and 'mainstage' isn't specially guaranteed to exist either
+      // (see tier-1-event-config.js/upcoming-sessions.js) — no config, no badge.
       const card = buildCard(session({ track: 'Not A Real Track' }));
-      const badge = card.querySelector('.sg-category-badge');
-      expect(badge).to.not.equal(null);
-      // The label is the raw track string itself, not a curated one.
-      expect(badge.querySelector('.sg-category-badge__label').textContent).to.equal('Not A Real Track');
+      expect(card.querySelector('.sg-category-badge')).to.equal(null);
       expect(card.querySelector('.sg-card__track--footer').textContent).to.equal('Not A Real Track');
     });
 
