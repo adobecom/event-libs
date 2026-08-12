@@ -1,67 +1,65 @@
 /**
  * @typedef {Object} EventAttendeeDataFilter
  * @property {string} type - The type of the attribute.
- * @property {boolean} submittable - Whether the attribute can be submitted.
  */
 
 export const EVENT_ATTENDEE_DATA_FILTER = {
-  attendeeId: { type: 'string', submittable: true },
-  externalAttendeeId: { type: 'string', submittable: true },
-  firstName: { type: 'string', submittable: true },
-  lastName: { type: 'string', submittable: true },
-  email: { type: 'string', submittable: true },
-  registrationStatus: { type: 'string', submittable: true },
-  invitedBy: { type: 'string', submittable: true },
-  shareInfoWithPartners: { type: 'boolean', submittable: true },
-  requiresTicket: { type: 'boolean', submittable: true },
-  ccSentiment: { type: 'string', submittable: true },
-  campaignId: { type: 'string', submittable: true },
-  phoneticFirstName: { type: 'string', submittable: true },
-  phoneticLastName: { type: 'string', submittable: true },
+  attendeeId: { type: 'string' },
+  externalAttendeeId: { type: 'string' },
+  firstName: { type: 'string' },
+  lastName: { type: 'string' },
+  email: { type: 'string' },
+  registrationStatus: { type: 'string' },
+  invitedBy: { type: 'string' },
+  shareInfoWithPartners: { type: 'boolean' },
+  requiresTicket: { type: 'boolean' },
+  ccSentiment: { type: 'string' },
+  campaignId: { type: 'string' },
+  phoneticFirstName: { type: 'string' },
+  phoneticLastName: { type: 'string' },
 };
 
 /**
  * @typedef {Object} BaseAttendeeDataFilter
  * @property {string} type - The type of the attribute.
- * @property {boolean} submittable - Whether the attribute can be submitted.
  */
 
 export const BASE_ATTENDEE_DATA_FILTER = {
-  attendeeId: { type: 'string', submittable: true },
-  firstName: { type: 'string', submittable: true },
-  lastName: { type: 'string', submittable: true },
-  email: { type: 'string', submittable: true },
-  companyName: { type: 'string', submittable: true },
-  jobTitle: { type: 'string', submittable: true },
-  jobRole: { type: 'string', submittable: true },
-  mobilePhone: { type: 'string', submittable: true },
-  businessPhone: { type: 'string', submittable: true },
-  organizationName: { type: 'string', submittable: true },
-  countryRegion: { type: 'string', submittable: true },
-  zipPostalCode: { type: 'string', submittable: true },
-  industry: { type: 'string', submittable: true },
-  productsOfInterest: { type: 'array', submittable: true },
-  primaryProductOfInterest: { type: 'string', submittable: true },
-  companySize: { type: 'string', submittable: true },
-  specialRequirements: { type: 'string', submittable: true },
-  primarySocialMediaAccount: { type: 'string', submittable: true },
-  approximateFollowerCount: { type: 'string', submittable: true },
-  dietaryRestrictions: { type: 'string', submittable: true },
-  executiveAssistantName: { type: 'string', submittable: true },
-  executiveAssistantEmail: { type: 'string', submittable: true },
-  website: { type: 'string', submittable: true },
-  employeesInOrganization: { type: 'string', submittable: true },
-  department: { type: 'string', submittable: true },
-  dxDepartment: { type: 'string', submittable: true },
-  title: { type: 'string', submittable: true },
-  age: { type: 'string', submittable: true },
-  jobLevel: { type: 'string', submittable: true },
-  contactMethods: { type: 'array', submittable: true },
-  isGuest: { type: 'boolean', submittable: true },
-  consentStringId: { type: 'string', submittable: true },
-  modificationTime: { type: 'string', submittable: true },
-  phoneticFirstName: { type: 'string', submittable: true },
-  phoneticLastName: { type: 'string', submittable: true },
+  attendeeId: { type: 'string' },
+  firstName: { type: 'string' },
+  lastName: { type: 'string' },
+  email: { type: 'string' },
+  companyName: { type: 'string' },
+  jobTitle: { type: 'string' },
+  jobRole: { type: 'string' },
+  mobilePhone: { type: 'string' },
+  businessPhone: { type: 'string' },
+  organizationName: { type: 'string' },
+  countryRegion: { type: 'string' },
+  zipPostalCode: { type: 'string' },
+  industry: { type: 'string' },
+  productsOfInterest: { type: 'array' },
+  primaryProductOfInterest: { type: 'string' },
+  companySize: { type: 'string' },
+  specialRequirements: { type: 'string' },
+  primarySocialMediaAccount: { type: 'string' },
+  approximateFollowerCount: { type: 'string' },
+  dietaryRestrictions: { type: 'string' },
+  executiveAssistantName: { type: 'string' },
+  executiveAssistantEmail: { type: 'string' },
+  website: { type: 'string' },
+  employeesInOrganization: { type: 'string' },
+  department: { type: 'string' },
+  dxDepartment: { type: 'string' },
+  title: { type: 'string' },
+  age: { type: 'string' },
+  jobLevel: { type: 'string' },
+  contactMethods: { type: 'array' },
+  isGuest: { type: 'boolean' },
+  consentStringId: { type: 'string' },
+  modificationTime: { type: 'string' },
+  phoneticFirstName: { type: 'string' },
+  phoneticLastName: { type: 'string' },
 };
 
 export function isValidAttribute(attr) {
@@ -91,10 +89,11 @@ function coerceBoolean(key, value) {
 export function getEventAttendeePayload(attendeeData) {
   if (!attendeeData) return attendeeData;
   return Object.entries(attendeeData).reduce((acc, [key, value]) => {
-    const nextValue = EVENT_ATTENDEE_DATA_FILTER[key]?.type === 'boolean'
+    if (!EVENT_ATTENDEE_DATA_FILTER[key]) return acc;
+    const nextValue = EVENT_ATTENDEE_DATA_FILTER[key].type === 'boolean'
       ? coerceBoolean(key, value)
       : value;
-    if (EVENT_ATTENDEE_DATA_FILTER[key]?.submittable && isValidAttribute(nextValue)) {
+    if (isValidAttribute(nextValue)) {
       acc[key] = nextValue;
     }
     return acc;
@@ -104,7 +103,25 @@ export function getEventAttendeePayload(attendeeData) {
 export function getBaseAttendeePayload(attendeeData) {
   if (!attendeeData) return attendeeData;
   return Object.entries(attendeeData).reduce((acc, [key, value]) => {
-    if (BASE_ATTENDEE_DATA_FILTER[key]?.submittable && isValidAttribute(value)) {
+    if (BASE_ATTENDEE_DATA_FILTER[key] && isValidAttribute(value)) {
+      acc[key] = value;
+    }
+    return acc;
+  }, {});
+}
+
+// Unlike the two allowlists above, this key-space isn't fixed, so explicitly
+// reject prototype-chain property names rather than relying on the filter
+// lookups incidentally treating them as "recognized".
+const UNSAFE_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
+
+export function getUnrecognizedAttendeeFields(attendeeData) {
+  if (!attendeeData) return {};
+  return Object.entries(attendeeData).reduce((acc, [key, value]) => {
+    if (!UNSAFE_KEYS.has(key)
+      && !EVENT_ATTENDEE_DATA_FILTER[key]
+      && !BASE_ATTENDEE_DATA_FILTER[key]
+      && isValidAttribute(value)) {
       acc[key] = value;
     }
     return acc;
