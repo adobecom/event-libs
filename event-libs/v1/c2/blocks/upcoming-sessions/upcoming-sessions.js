@@ -68,14 +68,21 @@ function toIsoTimes(session) {
   };
 }
 
+// Cards display in the viewer's own local timezone, not the authored sessionTime.timezone
+// (which describes what timezone startTimeMillis/endTimeMillis were authored against, not
+// how they should render) — startTimeMillis/endTimeMillis are real UTC instants, so omitting
+// `timeZone` lets Intl default to the browser's local zone. `timeZoneName: 'short'` on the end
+// time surfaces the abbreviation so the displayed time is unambiguous across viewer timezones.
 function formatTimeRange(session) {
   const { sessionTime } = session;
   if (!sessionTime) return '';
-  const options = { hour: 'numeric', minute: '2-digit', hour12: true };
-  if (sessionTime.timezone) options.timeZone = sessionTime.timezone;
+  const timeOptions = { hour: 'numeric', minute: '2-digit', hour12: true };
   try {
-    const start = new Date(sessionTime.startTimeMillis).toLocaleTimeString('en-US', options);
-    const end = new Date(sessionTime.endTimeMillis).toLocaleTimeString('en-US', options);
+    const start = new Date(sessionTime.startTimeMillis).toLocaleTimeString('en-US', timeOptions);
+    const end = new Date(sessionTime.endTimeMillis).toLocaleTimeString('en-US', {
+      ...timeOptions,
+      timeZoneName: 'short',
+    });
     return `${start} - ${end}`;
   } catch (error) {
     window.lana?.log(`upcoming-sessions: time format failed: ${error.message}`);

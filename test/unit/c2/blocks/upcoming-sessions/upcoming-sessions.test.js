@@ -253,6 +253,19 @@ describe('upcoming-sessions', () => {
       expect(card.querySelector('.sg-card__title').textContent).to.equal('Intro to Adobe Express');
     });
 
+    it('renders the time in the viewer\'s local timezone with an abbreviation, not the authored sessionTime.timezone', () => {
+      const startMillis = Date.parse('2026-08-12T17:00:00.000Z');
+      const card = buildCard(session({
+        sessionTime: {
+          startTimeMillis: startMillis,
+          endTimeMillis: startMillis + 60 * 60_000,
+          timezone: 'America/Los_Angeles',
+        },
+      }));
+      const expected = `${new Date(startMillis).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })} - ${new Date(startMillis + 60 * 60_000).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true, timeZoneName: 'short' })}`;
+      expect(card.querySelector('.sg-card__time').textContent).to.equal(expected);
+    });
+
     it('always renders the upcoming state, never a live badge — cards are dropped on start instead of switching to live', () => {
       const started = session({
         sessionTime: {

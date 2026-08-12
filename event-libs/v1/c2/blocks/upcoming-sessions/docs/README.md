@@ -11,6 +11,18 @@ removed entirely rather than switching to a live badge/routing — every visible
 always in the "upcoming" state, so a click can only ever mean "open the Session Guide
 detail view" (`resolveClickAction`).
 
+## Time display
+
+`formatTimeRange()` always renders in the *viewer's* local timezone, not the authored
+`sessionTime.timezone` — `startTimeMillis`/`endTimeMillis` are real UTC instants, so
+`timeZone` is intentionally omitted from the `Intl`/`toLocaleTimeString` options, letting
+it default to the browser's own zone. The end time also carries `timeZoneName: 'short'`
+so the displayed range is self-labeling (e.g. `9:00 AM - 10:00 AM PDT`) regardless of
+which timezone the viewer or the session happens to be in. `sessionTime.timezone` itself
+is still authored/present on the session shape but is no longer read by this function —
+it describes what zone the millis were originally authored against, not how they should
+render.
+
 ## Card removal / state timers
 
 - **Non-MR (e.g. YouTube) sessions**: rely purely on the authored scheduled start time.
