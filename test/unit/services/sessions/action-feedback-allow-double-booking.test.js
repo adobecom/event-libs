@@ -1,6 +1,6 @@
 import { expect } from '@esm-bundle/chai';
 
-import { scheduleWithFeedback } from '../../../../event-libs/v1/services/sessions/action-feedback.js';
+import { toggleScheduleWithFeedback } from '../../../../event-libs/v1/services/sessions/action-feedback.js';
 import { conflict } from '../../../../event-libs/v1/features/conflict-modal/conflict-modal.js';
 import { initTierOneEventConfig } from '../../../../event-libs/v1/utils/tier-1-event-config.js';
 import {
@@ -32,10 +32,10 @@ describe('services/sessions/action-feedback (allowDoubleBooking: true)', () => {
     sessions.value = [existingSession, incoming];
     scheduled.value = new Set(['existing']);
 
-    // scheduleSession's underlying ESP call isn't mocked here and will reject in this
+    // toggleSchedule's underlying ESP call isn't mocked here and will reject in this
     // harness — irrelevant to what's under test (the conflict gate is skipped before
     // that call happens at all), so only conflict.value is asserted.
-    await scheduleWithFeedback(incoming, {
+    await toggleScheduleWithFeedback(incoming, {
       eventConfig: { title: 'Adobe MAX 2026' }, isScheduled: false,
     });
 

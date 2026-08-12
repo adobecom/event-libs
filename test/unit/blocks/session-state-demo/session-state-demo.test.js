@@ -38,7 +38,7 @@ describe('session-state-demo block', () => {
   let originalFetch;
 
   // initSessionState() is idempotent and only runs once — this populates the real apiConfig
-  // that favoriteSession()'s RF call needs, same as decorateEvent() would on a real page. Its
+  // that toggleFavorite()'s RF call needs, same as decorateEvent() would on a real page. Its
   // internal loadSessions() also fetches the real ESL sessions catalog, which needs a real
   // event-id to return anything meaningful — stub fetch for that one call so it resolves
   // immediately with no sessions, then every test seeds sessions.value with TEST_SESSION

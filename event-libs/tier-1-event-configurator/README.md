@@ -31,7 +31,7 @@ consolidated task list.
 
 **Phase 2 scope note:** this app only adds the `allowDoubleBooking` boolean
 to the form/Config JSON. The consuming-side wiring (renaming
-`track-icon-config.js` to a broader singleton, wiring `scheduleAction`'s
+`track-icon-config.js` to a broader singleton, wiring `toggleScheduleAction`'s
 `showConflictModal` param, retiring sessions-guide's per-block
 `show-conflict-modal` table row) is explicitly MWPW-200314's territory, per
 PLAN.md §6 — not built here.

@@ -10,8 +10,8 @@ This doc shows how.
 | Module | Exports | Use for |
 |---|---|---|
 | `event-libs/v1/utils/session-store.js` | Signals: `sessions`, `sessionsStatus`, `liveStreamActiveIds`, `favorited`, `scheduled`, `auth`, `pendingActions`. Function: `getApiConfig()` | Reading state |
-| `event-libs/v1/services/sessions/action-feedback.js` | `scheduleWithFeedback(session, opts)`, `favoriteWithFeedback(session, opts)` | Mutating state (recommended — includes the auth gate, conflict detection, and toast feedback) |
-| `event-libs/v1/services/sessions/session-actions.js` | `scheduleAction(session, opts)`, `favoriteAction(session)`, `SessionActionError` | Lower-level mutations, only if you need custom feedback UI instead of the shared toast/modal |
+| `event-libs/v1/services/sessions/action-feedback.js` | `toggleScheduleWithFeedback(session, opts)`, `toggleFavoriteWithFeedback(session, opts)` | Mutating state (recommended — includes the auth gate, conflict detection, and toast feedback) |
+| `event-libs/v1/services/sessions/session-actions.js` | `toggleScheduleAction(session, opts)`, `toggleFavoriteAction(session)`, `SessionActionError` | Lower-level mutations, only if you need custom feedback UI instead of the shared toast/modal |
 | `event-libs/v1/features/toast/toast.js` | `showToast(opts)`, `hideToast()` | Any ad-hoc feedback message |
 | `event-libs/v1/features/conflict-modal/conflict-modal.js` | `showConflictModal(opts)`, `hideConflictModal()` | Custom conflict flows outside schedule/favorite |
 
@@ -70,16 +70,16 @@ initial render — no separate "read once" step needed.
 
 ## Mutating state — schedule / favorite
 
-Call `scheduleWithFeedback()` / `favoriteWithFeedback()` from `services/sessions/action-feedback.js`.
+Call `toggleScheduleWithFeedback()` / `toggleFavoriteWithFeedback()` from `services/sessions/action-feedback.js`.
 They're plain async functions with no Preact or DOM assumptions, so the call site looks
 identical in a vanilla block and a Preact component:
 
 ```javascript
-import { scheduleWithFeedback } from '../../services/sessions/action-feedback.js';
+import { toggleScheduleWithFeedback } from '../../services/sessions/action-feedback.js';
 import { scheduled } from '../../utils/session-store.js';
 
 async function onScheduleClick(session, eventConfig) {
-  await scheduleWithFeedback(session, {
+  await toggleScheduleWithFeedback(session, {
     eventConfig,
     isScheduled: scheduled.value.has(session.id),
   });
@@ -95,17 +95,17 @@ This one call handles:
 - the mutation itself, persistence, and the RF API call
 - a success/failure toast
 
-`favoriteWithFeedback(session, { eventConfig, isFavorited })` is the equivalent for favoriting —
+`toggleFavoriteWithFeedback(session, { eventConfig, isFavorited })` is the equivalent for favoriting —
 same shape, no conflict detection.
 
 ### When to drop to a lower layer
 
-Only reach for `scheduleAction()` / `favoriteAction()` (`services/sessions/session-actions.js`)
+Only reach for `toggleScheduleAction()` / `toggleFavoriteAction()` (`services/sessions/session-actions.js`)
 directly if you need custom feedback UI instead of the shared toast/modal — they throw a
 `SessionActionError` with a `reason` (`'auth-required' | 'registration-required' | 'conflict' |
 'network'`) instead of showing anything themselves, so you own the UI.
 
-Don't call `session-store.js`'s `scheduleSession()` / `favoriteSession()` directly — those are
+Don't call `session-store.js`'s `toggleSchedule()` / `toggleFavorite()` directly — those are
 raw mutators with no auth gate at all. `session-actions.js` is what checks `auth.value` before
 calling them.
 

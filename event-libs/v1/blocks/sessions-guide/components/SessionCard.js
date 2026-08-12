@@ -2,7 +2,7 @@ import { html, useState } from '../../../deps/htm-preact.js';
 import { useSessionGuide } from '../store/index.js';
 import { isSessionOnDemand, formatSessionTime, formatShortTime, formatDuration, getNowMs } from '../utils/time.js';
 import { scheduled, favorited, pendingActions } from '../../../utils/session-store.js';
-import { scheduleWithFeedback, favoriteWithFeedback } from '../../../services/sessions/action-feedback.js';
+import { toggleScheduleWithFeedback, toggleFavoriteWithFeedback } from '../../../services/sessions/action-feedback.js';
 import { setSessionParam, safeUrl } from '../utils/url.js';
 import { CategoryBadge } from './CategoryBadge.js';
 import { IconButton } from './IconButton.js';
@@ -83,7 +83,7 @@ export function SessionCard({ session, forceOnDemand = false, timeDisplay = 'dur
     await withDismissAnimation(
       e,
       activeView === 'my-sessions' && isScheduled,
-      () => scheduleWithFeedback(session, { eventConfig: guideConfig, isScheduled }),
+      () => toggleScheduleWithFeedback(session, { eventConfig: guideConfig, isScheduled }),
     );
   }
 
@@ -92,7 +92,7 @@ export function SessionCard({ session, forceOnDemand = false, timeDisplay = 'dur
     await withDismissAnimation(
       e,
       activeView === 'my-favorites' && isFavorited,
-      () => favoriteWithFeedback(session, { eventConfig: guideConfig, isFavorited }),
+      () => toggleFavoriteWithFeedback(session, { eventConfig: guideConfig, isFavorited }),
     );
   }
 
