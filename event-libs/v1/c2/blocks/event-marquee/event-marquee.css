@@ -72,6 +72,17 @@
   background: linear-gradient(108deg, rgb(0 0 0 / 60%) 0%, rgb(0 0 0 / 0%) 98.86%);
 }
 
+/* .event-marquee-foreground is the sole in-flow child of .event-marquee (the
+   background is position:absolute, taken out of flow entirely), so via flex
+   it stretches to cover the *entire* marquee box — including the top-right
+   corner where the ambient background video's play-pause button sits. That
+   corner is otherwise empty (no text/CTA content renders there), but the
+   foreground element's own box is still hit-testable by default, so it
+   silently swallows clicks meant for the button underneath. pointer-events:
+   none removes the empty foreground box from hit-testing entirely, and the
+   rule below restores it specifically on foreground's own direct children
+   (text/CTAs, the media asset and its own controls/Favorite/share actions),
+   which still need to stay clickable. */
 .event-marquee-foreground {
   position: relative;
   display: flex;
@@ -82,6 +93,11 @@
   padding-top: 128px;
   padding-bottom: var(--s2a-spacing-2xl);
   padding-inline: var(--s2a-spacing-lg);
+  pointer-events: none;
+}
+
+.event-marquee-foreground > * {
+  pointer-events: auto;
 }
 
 .event-marquee-text,
