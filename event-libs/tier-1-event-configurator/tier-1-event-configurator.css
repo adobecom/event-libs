@@ -472,6 +472,23 @@ select.tec-field {
 
 /* Event picker */
 
+.tec-event-picker__env-row {
+  display: flex;
+  align-items: center;
+  gap: var(--tec-spacing-sm);
+  margin-bottom: var(--tec-spacing-md);
+}
+
+.tec-event-picker__env-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--tec-color-text-secondary);
+}
+
+.tec-event-picker__env-select {
+  min-width: 120px;
+}
+
 .tec-event-picker__controls {
   display: flex;
   gap: var(--tec-spacing-md);

@@ -3,6 +3,8 @@ import { listAllEvents } from '../../v1/utils/esp-controller.js';
 import Modal from './Modal.js';
 import SearchInput from './SearchInput.js';
 import LoadingInline from './LoadingInline.js';
+import { useEventEnv } from '../context/EventEnvContext.js';
+import { EVENT_SERVICE_ENV_OPTIONS } from '../constants.js';
 
 const PUBLISH_FILTERS = ['all', 'published', 'draft'];
 const PUBLISH_FILTER_LABELS = { all: 'All', published: 'Published', draft: 'Draft' };
@@ -10,12 +12,15 @@ const PUBLISH_FILTER_LABELS = { all: 'All', published: 'Published', draft: 'Draf
 export default function EventPicker({
   isOpen, onClose, onSelect, onError, title = 'Select an event',
 }) {
+  const { envName, setEnv } = useEventEnv();
   const [events, setEvents] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
   const [search, setSearch] = useState('');
   const [publishFilter, setPublishFilter] = useState('all');
 
+  // Refetches whenever the author switches env, so browse targets whichever
+  // tier they picked instead of only ever hitting the default/override env.
   useEffect(() => {
     if (!isOpen) return undefined;
     let cancelled = false;
@@ -38,7 +43,9 @@ export default function EventPicker({
         if (!cancelled) setIsLoading(false);
       });
     return () => { cancelled = true; };
-  }, [isOpen, onError]);
+  }, [isOpen, envName, onError]);
+
+  const handleEnvChange = useCallback((e) => setEnv(e.target.value), [setEnv]);
 
   const filteredEvents = useMemo(() => {
     const term = search.trim().toLowerCase();
@@ -56,6 +63,12 @@ export default function EventPicker({
   return html`
     <${Modal} isOpen=${isOpen} onClose=${onClose} title=${title} showActions=${false} size="large">
       <div class="tec-event-picker">
+        <label class="tec-event-picker__env-row">
+          <span class="tec-event-picker__env-label">Environment</span>
+          <select class="tec-field tec-event-picker__env-select" value=${envName} onChange=${handleEnvChange}>
+            ${EVENT_SERVICE_ENV_OPTIONS.map((opt) => html`<option value=${opt.value} key=${opt.value}>${opt.label}</option>`)}
+          </select>
+        </label>
         <div class="tec-event-picker__controls">
           <${SearchInput} \
             id="tec-event-picker-search" \
