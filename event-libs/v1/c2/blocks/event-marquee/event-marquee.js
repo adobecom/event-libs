@@ -103,6 +103,9 @@ function buildShareButton() {
   return btn;
 }
 
+// TEMP: unused while decorateActions renders a fallback session directly instead of
+// calling this; restore the call when reverting.
+// eslint-disable-next-line no-unused-vars
 function resolveSession(sessionId, render) {
   const existing = sessions.value.find((s) => s.id === sessionId);
   if (existing) {
@@ -134,9 +137,12 @@ function decorateActions(textCol, config) {
     // { title, registerUrl } — not Milo's unrelated global getEventConfig().
     const feedbackConfig = { title: config.title, registerUrl: getApiConfig()?.registerUrl || '/register' };
     const favoriteSlot = createTag('span', { class: 'event-marquee-favorite-slot' }, '', { parent: actions });
-    resolveSession(config.sessionId, (session) => {
-      favoriteSlot.replaceChildren(buildFavoriteButton(session, feedbackConfig));
-    });
+    // TEMP: render immediately with a fallback session object so the button is
+    // visible for visual/DOM review even without real session data — favorite
+    // functionality itself isn't being implemented yet. Revert to
+    // resolveSession(config.sessionId, ...) once real data is in place.
+    const session = sessions.value.find((s) => s.id === config.sessionId) || { id: config.sessionId };
+    favoriteSlot.replaceChildren(buildFavoriteButton(session, feedbackConfig));
   }
 
   if (shareEnabled) actions.append(buildShareButton());
