@@ -289,16 +289,6 @@ comparisons are case-insensitive anyway.
 
 ## Dev preview
 
-`demo.html` in this folder is a standalone, no-Milo/no-AEM preview covering all of the
-variations above (plus edge cases like an unmatched `session-id`). Serve it via:
-
-```
-npx serve .
-```
-
-then open `http://localhost:3000/event-libs/v1/c2/blocks/event-marquee/demo.html`.
-
-True YouTube/MPC/ambient-video decoration and real Mobile Rider playback can't be
-exercised in that standalone demo (they depend on Milo's real `AUTO_BLOCKS`
-pipeline) — test those against the real AEM dev server (`npm run event-libs`) with a
-page authored with `foundation: c2` metadata.
+Preview against the real AEM dev server (`npm run event-libs`) with a page authored
+with `foundation: c2` metadata — YouTube/MPC/ambient-video decoration and real Mobile
+Rider playback depend on Milo's real `AUTO_BLOCKS` pipeline, so they only work there.
