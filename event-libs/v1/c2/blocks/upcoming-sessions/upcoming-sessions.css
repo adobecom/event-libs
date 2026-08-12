@@ -10,18 +10,36 @@
    product direction this now matches desktop everywhere instead: the marquee
    reserves the same 913px at every tier (see event-marquee.css's min-height),
    and Upcoming Sessions overlays its bottom edge there too.
-   Padding is mobile/tablet-specific here — 24px left (--s2a-spacing-lg, exact
-   token match), 56px bottom (no exact token match, literal px). The desktop
-   values (124px/60px, Figma-verified against the Desktop 1440 frame) apply as
-   a 1200px+ override instead of being the default — see the existing 1200px
-   block below, which already holds this selector's other desktop-only
-   overrides. */
+   padding-bottom is 56px at every breakpoint (no exact token match, literal
+   px). padding-left starts at 24px (--s2a-spacing-lg, exact token match) and
+   is overridden below to track event-marquee.css's own padding-inline tiers
+   (86px / --s2a-layout-lg / 220px at 1024 / 1440 / 1920) — the marquee's
+   desktop gutter used to be a single 124px value at a single 1200px
+   breakpoint, back when the marquee itself only had one desktop tier. */
 .upcoming-sessions--attached {
   position: absolute;
   left: 0;
   right: 0;
   bottom: 0;
   padding: 0 0 56px var(--s2a-spacing-lg);
+}
+
+@media (min-width: 1024px) {
+  .upcoming-sessions--attached {
+    padding-left: 86px;
+  }
+}
+
+@media (min-width: 1440px) {
+  .upcoming-sessions--attached {
+    padding-left: var(--s2a-layout-lg);
+  }
+}
+
+@media (min-width: 1920px) {
+  .upcoming-sessions--attached {
+    padding-left: 220px;
+  }
 }
 
 .upcoming-sessions-header {
@@ -115,23 +133,9 @@
      "session row (152px)" figure, conflating the card's own height with the
      track's vertical padding — same 192px total, corrected attribution now
      that the card's real desktop height, 128px, is confirmed separately.)
-     padding-bottom is 60px, not 0: clearance below the session row before the
-     wrapper's bottom edge, confirmed live against the rendered marquee (no
-     exact token — nearest are --s2a-spacing-3xl/48px and --s2a-spacing-4xl/64px,
-     both a real drift from 60px, so kept literal). This adds 60px to the
-     overlay's total reserved height (192px content + 60px = 252px) —
-     event-marquee.css's own Figma-measured Upcoming Sessions block height is
-     273px (see its `.attach-upcoming--has-overlay` comment); the 21px gap
-     between that and this file's own 252px is still unreconciled, flagged
-     here rather than guessed at.
-     padding-left is 124px (--s2a-layout-lg), matching the marquee's own desktop
-     gutter — overrides the base rule's 24px/40px mobile-tablet values (see the
-     comment there), which aren't Figma-measured for this tier. position/left/
-     right/bottom live in that base rule too and apply unchanged here. */
-  .upcoming-sessions--attached {
-    padding: 0 0 60px var(--s2a-layout-lg);
-  }
-
+     This overlay's own padding-bottom/padding-left now live in dedicated
+     1024/1440/1920 blocks right after `.upcoming-sessions--attached`'s base
+     rule above, tracking event-marquee.css's own tiers — not here. */
   .upcoming-sessions-header {
     margin-bottom: var(--s2a-spacing-md, 16px);
   }
