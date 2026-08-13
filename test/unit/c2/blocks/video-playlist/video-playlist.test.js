@@ -288,70 +288,39 @@ describe('video-playlist (C2)', () => {
       expect(firstRow.dataset.href).to.equal('/sessions/match-1');
     });
 
-    it('swaps an mpc-provider row into the already-mounted player in place, no navigation', async () => {
-      const current = session({ id: 'current', playlistOnSessionPage: ['3d'] });
-      const mpcVideos = [{ provider: 'mpc', url: 'https://video.tv.adobe.com/v/3458940?autoplay=true&quality=9&end=nothing&learn=on', kind: 'onDemand' }];
-      const matches = [1, 2, 3, 4].map((i) => session({
-        id: `match-${i}`, playlistAssignment: ['3d'], sessionPageUrl: `/sessions/match-${i}`, videos: i === 1 ? mpcVideos : [],
-      }));
-      sessions.value = [current, ...matches];
+    it('loads the current session\'s own video from session-times page metadata into an already-mounted player', async () => {
+      sessions.value = [session({ id: 'current', playlistOnSessionPage: ['3d'] })];
+      document.head.innerHTML = `
+        <meta name="session-id" content="current">
+        <meta name="session-times" content='[{"videos":[{"provider":"mpc","url":"https://video.tv.adobe.com/v/3458940?autoplay=true&amp;quality=9&amp;end=nothing&amp;learn=on","kind":"onDemand"}]}]'>
+      `;
 
       document.body.innerHTML = `
         <div class="section">
           <div class="milo-video"><a href="/old">old player</a></div>
-          ${playlistHtml()}
+          <div class="video-playlist"></div>
         </div>
       `;
       el = document.querySelector('.video-playlist');
       await init(el);
 
-      const firstRow = document.body.querySelector('.video-playlist-row');
-      expect(firstRow.dataset.videoUrl).to.equal('https://video.tv.adobe.com/v/3458940?autoplay=true&quality=9&end=nothing&learn=on');
-
-      firstRow.click();
-
-      const iframe = document.querySelector('.milo-video iframe');
+      const iframe = document.querySelector('.milo-video iframe.adobetv');
       expect(iframe).to.exist;
       expect(iframe.src).to.equal('https://video.tv.adobe.com/v/3458940?autoplay=true&quality=9&end=nothing&learn=on');
-      expect(firstRow.classList.contains('is-playing')).to.be.true;
-    });
-
-    it('falls back to data-href navigation for rows with no mpc entry in videos[], even inside a .section', async () => {
-      const current = session({ id: 'current', playlistOnSessionPage: ['3d'] });
-      const matches = [1, 2, 3, 4].map((i) => session({
-        id: `match-${i}`, playlistAssignment: ['3d'], sessionPageUrl: `/sessions/match-${i}`,
-      }));
-      sessions.value = [current, ...matches];
-
-      document.body.innerHTML = `
-        <div class="section">
-          <div class="milo-video"><a href="/old">old player</a></div>
-          ${playlistHtml()}
-        </div>
-      `;
-      el = document.querySelector('.video-playlist');
-      await init(el);
-
-      const firstRow = document.body.querySelector('.video-playlist-row');
-      expect(firstRow.dataset.videoUrl).to.be.undefined;
-      expect(document.querySelector('.milo-video iframe')).to.not.exist;
     });
 
     it('builds a fresh .milo-video, mirroring Milo\'s adobetv autoblock markup, when no player is authored in the section at all', async () => {
-      const current = session({ id: 'current', playlistOnSessionPage: ['3d'] });
-      const mpcVideos = [{ provider: 'mpc', url: 'https://video.tv.adobe.com/v/3458940?autoplay=true&quality=9&end=nothing&learn=on', kind: 'onDemand' }];
-      const matches = [1, 2, 3, 4].map((i) => session({
-        id: `match-${i}`, playlistAssignment: ['3d'], sessionPageUrl: `/sessions/match-${i}`, videos: i === 1 ? mpcVideos : [],
-      }));
-      sessions.value = [current, ...matches];
+      sessions.value = [session({ id: 'current', playlistOnSessionPage: ['3d'] })];
+      document.head.innerHTML = `
+        <meta name="session-id" content="current">
+        <meta name="session-times" content='[{"videos":[{"provider":"mpc","url":"https://video.tv.adobe.com/v/3458940?autoplay=true&amp;quality=9&amp;end=nothing&amp;learn=on","kind":"onDemand"}]}]'>
+      `;
 
       // No .milo-video/.mobile-rider anywhere — the block is the section's only child,
       // a real DOM shape seen on a live page.
-      document.body.innerHTML = `<div class="section">${playlistHtml()}</div>`;
+      document.body.innerHTML = '<div class="section"><div class="video-playlist"></div></div>';
       el = document.querySelector('.video-playlist');
       await init(el);
-
-      document.body.querySelector('.video-playlist-row').click();
 
       const built = document.querySelector('.section > .milo-video');
       expect(built).to.exist;
@@ -360,28 +329,37 @@ describe('video-playlist (C2)', () => {
       expect(iframe.getAttribute('allowfullscreen')).to.equal('');
     });
 
-    it('removes an existing .mobile-rider and builds a fresh .milo-video when an mpc row is selected', async () => {
-      const current = session({ id: 'current', playlistOnSessionPage: ['3d'] });
-      const mpcVideos = [{ provider: 'mpc', url: 'https://video.tv.adobe.com/v/3458940?autoplay=true&quality=9&end=nothing&learn=on', kind: 'onDemand' }];
-      const matches = [1, 2, 3, 4].map((i) => session({
-        id: `match-${i}`, playlistAssignment: ['3d'], sessionPageUrl: `/sessions/match-${i}`, videos: i === 1 ? mpcVideos : [],
-      }));
-      sessions.value = [current, ...matches];
+    it('removes an existing .mobile-rider and builds a fresh .milo-video for the current session\'s own mpc video', async () => {
+      sessions.value = [session({ id: 'current', playlistOnSessionPage: ['3d'] })];
+      document.head.innerHTML = `
+        <meta name="session-id" content="current">
+        <meta name="session-times" content='[{"videos":[{"provider":"mpc","url":"https://video.tv.adobe.com/v/3458940?autoplay=true&amp;quality=9&amp;end=nothing&amp;learn=on","kind":"onDemand"}]}]'>
+      `;
+
+      document.body.innerHTML = '<div class="section"><div class="mobile-rider"></div><div class="video-playlist"></div></div>';
+      el = document.querySelector('.video-playlist');
+      await init(el);
+
+      expect(document.querySelector('.mobile-rider')).to.not.exist;
+      expect(document.querySelector('.section > .milo-video iframe.adobetv').src)
+        .to.equal('https://video.tv.adobe.com/v/3458940?autoplay=true&quality=9&end=nothing&learn=on');
+    });
+
+    it('does not touch the player when session-times metadata has no mpc video', async () => {
+      sessions.value = [session({ id: 'current', playlistOnSessionPage: ['3d'] })];
+      document.head.innerHTML = '<meta name="session-id" content="current">';
 
       document.body.innerHTML = `
         <div class="section">
-          <div class="mobile-rider"></div>
-          ${playlistHtml()}
+          <div class="milo-video"><a href="/old">old player</a></div>
+          <div class="video-playlist"></div>
         </div>
       `;
       el = document.querySelector('.video-playlist');
       await init(el);
 
-      document.body.querySelector('.video-playlist-row').click();
-
-      expect(document.querySelector('.mobile-rider')).to.not.exist;
-      expect(document.querySelector('.section > .milo-video iframe.adobetv').src)
-        .to.equal('https://video.tv.adobe.com/v/3458940?autoplay=true&quality=9&end=nothing&learn=on');
+      expect(document.querySelector('.milo-video iframe')).to.not.exist;
+      expect(document.querySelector('.milo-video a')).to.exist;
     });
 
     it('toggles aria-expanded and the is-expanded class when the drawer toggle is clicked', async () => {

@@ -45,10 +45,6 @@ export function normalizeSessions(rawSessions) {
     products: s.products || [],
     resources: s.resources || [],
     mrStreamId: s.mrStreamId ?? null,
-    // video-playlist's in-place row swap: ready-to-embed { provider, url, kind } entries
-    // from the matched session-time, same shape the Individual Session Page's own
-    // `session-times` page metadata carries for the current session.
-    videos: Array.isArray(s.videos) ? s.videos : [],
     playlistAssignment: coerceArray(s.playlistAssignment),
     playlistOnSessionPage: coerceArray(s.playlistOnSessionPage),
     videoAvailable: Boolean(s.videoAvailable),
@@ -267,9 +263,6 @@ export function mapEslPayloadToRawSessions(payload) {
       // table between the two needed, both draw from the same slug vocabulary.
       playlistAssignment: extractCustomAttributeSlugs(session, 'Playlist assignment/name'),
       playlistOnSessionPage: extractCustomAttributeSlugs(session, 'Playlist on session page'),
-      // video-playlist's in-place row swap: ready-to-embed videos[] from the session's
-      // own matched sessionTime (not a custom attribute) — see normalizeSessions().
-      videos: firstTime?.videos || [],
       sessionPageUrl: slug ? `/sessions/${slug}` : '',
       isKeynote: type === 'Keynote',
       thumbnailUrl: thumbnail?.imageUrl ?? null,

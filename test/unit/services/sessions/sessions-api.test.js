@@ -32,10 +32,7 @@ describe('services/sessions/sessions-api', () => {
       ],
       sessionTimes: [
         { sessionId: 's-1', startTimeMillis: 2000, endTimeMillis: 3000, externalSessionTimeId: 'rf-later' },
-        {
-          sessionId: 's-1', startTimeMillis: 1000, endTimeMillis: 1500, externalSessionTimeId: 'rf-earlier',
-          videos: [{ provider: 'mpc', url: 'https://video.tv.adobe.com/v/3458940?autoplay=true&quality=9&end=nothing&learn=on', kind: 'onDemand' }],
-        },
+        { sessionId: 's-1', startTimeMillis: 1000, endTimeMillis: 1500, externalSessionTimeId: 'rf-earlier' },
       ],
       sessions: [
         {
@@ -171,13 +168,6 @@ describe('services/sessions/sessions-api', () => {
     it('leaves playlist fields empty on a bare session', () => {
       expect(bare.playlistAssignment).to.deep.equal([]);
       expect(bare.playlistOnSessionPage).to.deep.equal([]);
-    });
-
-    it('maps the matched sessionTime\'s videos[] through, not from a custom attribute', () => {
-      expect(full.videos).to.deep.equal([
-        { provider: 'mpc', url: 'https://video.tv.adobe.com/v/3458940?autoplay=true&quality=9&end=nothing&learn=on', kind: 'onDemand' },
-      ]);
-      expect(bare.videos).to.deep.equal([]);
     });
   });
 
@@ -333,15 +323,6 @@ describe('services/sessions/sessions-api', () => {
       const [bare] = normalizeSessions([{ id: 's-2' }]);
       expect(bare.playlistAssignment).to.deep.equal([]);
       expect(bare.playlistOnSessionPage).to.deep.equal([]);
-    });
-
-    it('passes videos through, defaulting to an empty array', () => {
-      const videos = [{ provider: 'mpc', url: 'https://video.tv.adobe.com/v/3458940', kind: 'onDemand' }];
-      const [withVideos] = normalizeSessions([{ id: 's-1', videos }]);
-      expect(withVideos.videos).to.deep.equal(videos);
-
-      const [bare] = normalizeSessions([{ id: 's-2' }]);
-      expect(bare.videos).to.deep.equal([]);
     });
   });
 

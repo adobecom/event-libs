@@ -11,6 +11,19 @@ const DRAWER_GAP_PX = 16;
 const DRAWER_FLOOR_PX = 75;
 const TITLE_LINE_CAP = 2;
 
+// Individual Session Pages carry several JSON blobs as page metadata (custom-attributes,
+// session-times) — same parse-with-guard shape each time.
+function parseJsonMetadata(name) {
+  const raw = getMetadata(name);
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw);
+  } catch (e) {
+    window.lana?.log(`[video-playlist] invalid ${name} page metadata: ${e.message}`);
+    return null;
+  }
+}
+
 /**
  * Drawer expand cap ("Option B"): the drawer's open height may never push its top edge
  * above titleBottom + gap, i.e. it can never fully cover the session title. Falls back to
@@ -122,20 +135,17 @@ function analyticsAttrs(linkName) {
   return { 'daa-ll': linkName };
 }
 
-// Confirmed against real data: each session-time carries a `videos[]` array — entries
-// shaped like { provider: 'mpc', url: 'https://video.tv.adobe.com/v/3458940?autoplay=
-// true&quality=9&end=nothing&learn=on', kind: 'onDemand' } — the same shape the
-// Individual Session Page's own `session-times` page metadata carries for the current
-// session. sessions-api.js surfaces this as `session.videos`, sourced from the matched
-// sessionTime entry, not from a custom attribute — the URL is already fully-formed with
-// the right query params, nothing to construct.
+// The Individual Session Page's own `session-times` metadata carries this session's own
+// videos[] — entries shaped like { provider: 'mpc', url: 'https://video.tv.adobe.com/v/
+// 3458940?autoplay=true&quality=9&end=nothing&learn=on', kind: 'onDemand' } — confirmed
+// against real data. Only 'mpc' URLs are confirmed directly iframe-embeddable as-is;
+// other providers (youtube, mobile-rider) likely need their own embed conventions, not
+// yet confirmed.
 const EMBEDDABLE_PROVIDER = 'mpc';
 
-// Only 'mpc' URLs are confirmed directly iframe-embeddable as-is. Other providers
-// (youtube, mobile-rider) likely need their own embed conventions — not yet confirmed
-// against real data, so those rows fall back to navigation (see buildTopicView).
-function pickEmbeddableVideoUrl(videos) {
-  return (videos || []).find((v) => v.provider === EMBEDDABLE_PROVIDER)?.url || null;
+function pickEmbeddableVideoUrl(sessionTimes) {
+  const videos = (sessionTimes || []).flatMap((t) => t?.videos || []);
+  return videos.find((v) => v.provider === EMBEDDABLE_PROVIDER)?.url || null;
 }
 
 // Mirrors Milo's own adobetv.js autoblock output exactly (class names, iframe attrs) —
@@ -158,13 +168,12 @@ function buildMiloVideo(url) {
   return container;
 }
 
-// Swaps a row's video into the player already mounted alongside this block (the
-// Individual Session Page's own `.milo-video` container, in the same .section) — in
-// place, no full page reload. Real pages have been seen with no video block authored in
-// the section at all (just this block) — in that case (or when only a `.mobile-rider`
-// container is present, which can't host an AdobeTV iframe as-is), builds a fresh
-// `.milo-video` container and inserts it as a sibling, same markup a real Milo-decorated
-// embed would have.
+// Loads the current session's own video into the player mounted alongside this block
+// (the Individual Session Page's own `.milo-video` container, in the same .section).
+// Real pages have been seen with no video block authored in the section at all (just
+// this block) — in that case (or when only a `.mobile-rider` container is present, which
+// can't host an AdobeTV iframe as-is), builds a fresh `.milo-video` container and inserts
+// it as a sibling, same markup a real Milo-decorated embed would have.
 function loadVideoPlayer(el, url) {
   const section = el.closest('.section');
   if (!section) return false;
@@ -233,7 +242,6 @@ function buildRow(item, { onSelect }) {
     role: 'listitem',
     'data-item-id': item.id,
     ...(item.href ? { 'data-href': item.href } : {}),
-    ...(item.videoUrl ? { 'data-video-url': item.videoUrl } : {}),
     ...analyticsAttrs('playlist-item-select'),
   });
 
@@ -287,19 +295,13 @@ function buildTopicView(el, rows) {
         thumbnailUrl: session.thumbnailUrl,
         durationLabel: formatDuration(session.duration),
         href: session.sessionPageUrl,
-        videoUrl: pickEmbeddableVideoUrl(session.videos),
       },
       {
-        // Rows with a confirmed-embeddable video URL swap into the already-mounted
-        // player in place (see loadVideoPlayer). Everything else (no video, or a
-        // provider whose embed convention isn't confirmed yet) falls back to navigating
-        // to that session's own page — always correct, since every session already has
-        // a working page.
+        // Navigates to the selected session's own page — always correct, since every
+        // session already has a working page, and that page loads its own video from
+        // its own `session-times` metadata the same way this one does (see
+        // pickEmbeddableVideoUrl/loadVideoPlayer in init()).
         onSelect: (item) => {
-          if (item.videoUrl && loadVideoPlayer(el, item.videoUrl)) {
-            highlightRow(list, item.id);
-            return;
-          }
           if (item.href) window.location.assign(item.href);
         },
       },
@@ -329,16 +331,14 @@ export default async function init(el) {
     return;
   }
 
-  let pageCustomAttributes = null;
-  const rawCustomAttributes = getMetadata('custom-attributes');
-  if (rawCustomAttributes) {
-    try {
-      pageCustomAttributes = JSON.parse(rawCustomAttributes);
-    } catch (e) {
-      window.lana?.log(`[video-playlist] invalid custom-attributes page metadata: ${e.message}`);
-    }
-  }
+  const pageCustomAttributes = parseJsonMetadata('custom-attributes');
   const isKeynoteFromMetadata = (getMetadata('session-type') || '').toLowerCase() === 'keynote';
+
+  // The page's own video, loaded from its own `session-times` metadata — independent of
+  // whether the topic-playlist/chapters list below ends up rendering at all, and of
+  // whether a video block was separately authored in this section.
+  const currentVideoUrl = pickEmbeddableVideoUrl(parseJsonMetadata('session-times'));
+  if (currentVideoUrl) loadVideoPlayer(el, currentVideoUrl);
 
   initSessionState();
 

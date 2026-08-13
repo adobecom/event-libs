@@ -69,34 +69,39 @@ Chapters seek within the **same, already-loaded** player — `window.__mr_player
 the real player's seek API differs from the `seek(seconds)`/`currentTime`
 attempt in `video-playlist.js`, that needs correcting against a real embed.
 
-## Player switching
+## Loading the current session's own video
 
-Each session's matched sessionTime carries a ready-to-embed `videos[]`
-array — entries shaped like `{ provider: 'mpc', url:
-'https://video.tv.adobe.com/v/3458940?autoplay=true&quality=9&end=nothing&
-learn=on', kind: 'onDemand' }` — the same shape the Individual Session
-Page's own `session-times` page metadata carries for the current session.
-`sessions-api.js` surfaces this as `session.videos` (not a custom
-attribute) for every session in the fetched catalog.
+The Individual Session Page's own `session-times` metadata carries this
+session's ready-to-embed `videos[]` — entries shaped like `{ provider:
+'mpc', url: 'https://video.tv.adobe.com/v/3458940?autoplay=true&quality=9&
+end=nothing&learn=on', kind: 'onDemand' }` — confirmed against real data.
+On init, this block reads that metadata (independent of whether the
+topic-playlist/chapters list ends up rendering at all) and loads the
+`provider: 'mpc'` entry's URL — already fully-formed; nothing is
+constructed client-side — into the player mounted alongside it in the same
+`.section`.
 
-Selecting a row with a `provider: 'mpc'` entry swaps the player in place —
-no full page reload — pointed straight at that already-fully-formed URL
-(nothing is constructed client-side). If a `.milo-video` is already
-mounted alongside this block in the same `.section`, its iframe is
-replaced. **Real pages have been seen with no video block authored in the
-section at all** — in that case (or if only a `.mobile-rider` is present,
-which can't host an AdobeTV iframe as-is), a fresh `.milo-video` container
-is built and inserted as a sibling, mirroring Milo's own `adobetv.js`
-autoblock markup exactly (same classes/attrs), so it picks up the same
-global sizing (`libs/styles/iframe.css`) a real Milo-decorated embed would.
+If a `.milo-video` is already mounted there, its iframe is replaced.
+**Real pages have been seen with no video block authored in the section at
+all** — in that case (or if only a `.mobile-rider` is present, which can't
+host an AdobeTV iframe as-is), a fresh `.milo-video` container is built and
+inserted as a sibling, mirroring Milo's own `adobetv.js` autoblock markup
+exactly (same classes/attrs), so it picks up the same global sizing
+(`libs/styles/iframe.css`) a real Milo-decorated embed would.
 
-**Still out of scope**: rows with no `mpc` entry in `videos[]` (Mobile-
-Rider-hosted sessions, or any other provider) fall back to navigating to
-that session's own page (`sessionPageUrl`). No `youtube` provider has been
-confirmed in real session data yet — if/when one is, its embed convention
-(is `url` already an embeddable iframe src, or does it need conversion
-like a watch URL?) needs confirming against a real sample before wiring it
-the same way `mpc` is wired today, rather than guessed at.
+**Out of scope**: no `youtube` provider has been confirmed in real session
+data yet — if/when one is, its embed convention (is `url` already an
+embeddable iframe src, or does it need conversion like a watch URL?) needs
+confirming before wiring it the same way `mpc` is wired today.
+
+## Row selection
+
+Selecting a topic-playlist row **navigates to that session's own page**
+(`sessionPageUrl`) rather than swapping the player in place — real
+session-catalog data has no per-row video source (only the current
+session's own page carries `session-times`), so there's nothing to swap
+to. Navigating is always correct regardless: the destination page loads
+its own video the exact same way, via its own `session-times` metadata.
 
 ## Responsive layout
 
