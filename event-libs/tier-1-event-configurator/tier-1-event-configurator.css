@@ -722,6 +722,10 @@ select.tec-field {
   margin-bottom: var(--tec-spacing-sm);
 }
 
+.tec-editor__datetime-group + .tec-editor__datetime-group {
+  margin-top: var(--tec-spacing-md);
+}
+
 .tec-editor__checkbox {
   display: flex;
   align-items: center;

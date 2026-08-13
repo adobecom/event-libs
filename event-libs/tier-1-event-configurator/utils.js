@@ -102,6 +102,63 @@ export function stringifyConfig(value, indent = '') {
   return JSON.stringify(value);
 }
 
+// Editors authoring events are spread across timezones (and some events run outside LA
+// entirely — Miami, London), but most events are LA-based, so the picker shows LA time by
+// convention while the value stored/consumed is always a timezone-agnostic UTC epoch.
+export const EVENT_AUTHORING_TIMEZONE = 'America/Los_Angeles';
+
+// Offset (minutes) of `timeZone` at the instant `utcDate` represents. Used to correct a
+// UTC-epoch guess built from wall-clock parts back to the real UTC instant those parts
+// mean in `timeZone` (see zonedDateTimeToEpochMs).
+function getTimezoneOffsetMinutes(timeZone, utcDate) {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone,
+    hourCycle: 'h23',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+  }).formatToParts(utcDate).reduce((acc, p) => ({ ...acc, [p.type]: p.value }), {});
+  const asUtc = Date.UTC(
+    Number(parts.year), Number(parts.month) - 1, Number(parts.day),
+    Number(parts.hour), Number(parts.minute), Number(parts.second),
+  );
+  return (asUtc - utcDate.getTime()) / 60000;
+}
+
+// Converts a "YYYY-MM-DDTHH:mm" <input type="datetime-local"> value, interpreted as wall-clock
+// time in `timeZone`, to a UTC epoch in milliseconds. Two-pass: the first pass's offset is
+// itself computed from a UTC guess, so a DST boundary right at the entered instant could be
+// off by the DST delta — acceptable for an authoring tool, not worth a correction loop.
+export function zonedDateTimeToEpochMs(localDateTimeStr, timeZone = EVENT_AUTHORING_TIMEZONE) {
+  if (!localDateTimeStr) return null;
+  const [datePart, timePart] = localDateTimeStr.split('T');
+  const [year, month, day] = datePart.split('-').map(Number);
+  const [hour, minute] = (timePart || '00:00').split(':').map(Number);
+  const guessUtcMs = Date.UTC(year, month - 1, day, hour, minute);
+  const offsetMinutes = getTimezoneOffsetMinutes(timeZone, new Date(guessUtcMs));
+  return guessUtcMs - offsetMinutes * 60000;
+}
+
+// Converts a UTC epoch (ms) to a "YYYY-MM-DDTHH:mm" wall-clock string in `timeZone`, for
+// populating an <input type="datetime-local">. 'en-CA' gives YYYY-MM-DD parts directly
+// (same trick sessions-guide's getSessionDayKey uses).
+export function epochMsToZonedDateTimeLocal(epochMs, timeZone = EVENT_AUTHORING_TIMEZONE) {
+  if (epochMs == null || Number.isNaN(epochMs)) return '';
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone,
+    hourCycle: 'h23',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).formatToParts(new Date(epochMs)).reduce((acc, p) => ({ ...acc, [p.type]: p.value }), {});
+  return `${parts.year}-${parts.month}-${parts.day}T${parts.hour}:${parts.minute}`;
+}
+
 export function formatUpdatedTime(isoString) {
   if (!isoString) return '';
   try {
