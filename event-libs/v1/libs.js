@@ -52,6 +52,7 @@ import {
   getNonProdData,
   validatePageAndRedirect,
   processAutoBlockLinks,
+  applySectionColumnsLayout,
 } from './utils/decorate.js';
 
 import { registerHydrator } from './hydrate/hydrate.js';
@@ -70,6 +71,7 @@ export {
   getNonProdData,
   validatePageAndRedirect,
   processAutoBlockLinks,
+  applySectionColumnsLayout,
   registerHydrator,
   repeatTemplate,
   EVENT_BLOCKS,

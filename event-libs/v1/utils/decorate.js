@@ -1058,16 +1058,33 @@ function processTemplateInAllNodes(parent, extraData) {
 
 function addStylesToEventPage() {
   const styleId = 'event-libs-styles';
-  
+
   // Check if styles are already loaded
   if (document.getElementById(styleId)) return;
-  
+
   // Create and append the stylesheet link
   const link = document.createElement('link');
   link.id = styleId;
   link.rel = 'stylesheet';
   link.href = new URL('../libs-styles.css', import.meta.url).href;
   document.head.appendChild(link);
+}
+
+// Not called from decorateEvent: decorateEvent only runs on pages with an
+// event-id, but this layout is meant for static/non-event pages too. The
+// consuming site's own decorateArea should call this directly, unconditionally.
+// Always resolves the real page <main> directly rather than relying on a
+// `parent`/`area` argument, since callers may re-enter with fragment/MEP
+// elements. Re-reads metadata on every call (no cached "checked" flag) so a
+// later personalization pass that updates `section-layout` still takes effect.
+// Calls addStylesToEventPage() itself so callers only need this one function
+// to get both the CSS and the class toggle.
+export function applySectionColumnsLayout() {
+  const main = document.querySelector('main');
+  if (!main) return;
+  const enabled = getMetadata('section-layout')?.trim().toLowerCase() === 'columns';
+  if (enabled) addStylesToEventPage();
+  main.classList.toggle('section-columns', enabled);
 }
 
 // e.g. "dark", "dark(blocks:hero-marquee,profile-cards)", or "dark(blocks:text[first],agenda)"
