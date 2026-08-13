@@ -3,6 +3,7 @@ import {
 } from '../../v1/deps/htm-preact.js';
 import { setDaToken, setDaFetch } from '../scripts/da-controller.js';
 import { setEspAuthToken } from '../../v1/utils/esp-controller.js';
+import { setDaToken as setMediaDaToken, setDaFetch as setMediaDaFetch } from '../../v1/utils/da-media-controller.js';
 
 const DAContext = createContext();
 
@@ -23,6 +24,8 @@ const DAProvider = ({ children }) => {
         setRepo(context?.repo);
         setDaToken(sdkToken);
         if (actions?.daFetch) setDaFetch(actions.daFetch);
+        setMediaDaToken(sdkToken);
+        if (actions?.daFetch) setMediaDaFetch(actions.daFetch);
         // No Milo/IMS bootstrap here (no window.adobeIMS), so ESP calls have
         // no token otherwise — reuse DA's own as the Authorization Bearer.
         setEspAuthToken(sdkToken);

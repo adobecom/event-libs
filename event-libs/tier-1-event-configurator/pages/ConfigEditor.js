@@ -25,8 +25,10 @@ const HOMEPAGE_FIELD_BY_TYPE = {
     metaField: 'upcomingSessionsMeta',
     // upcoming-sessions.js reads mrStreamId (drives its Mobile Rider live-drop
     // polling) but never reads watchUrl anywhere — leave that field out.
-    metaFields: ['mrStreamId'],
-    metaHint: 'Mobile Rider stream ID is an optional per-session override',
+    // imageUrl has no reader yet either, but authors need to attach one now so
+    // it's captured in the JSON ahead of the consuming-side wiring.
+    metaFields: ['mrStreamId', 'imageUrl'],
+    metaHint: 'Mobile Rider stream ID and image are optional per-session overrides',
     label: 'Upcoming Sessions',
     metadataKey: 'upcoming-sessions',
     blockHint: 'the upcoming-sessions block',
@@ -36,9 +38,11 @@ const HOMEPAGE_FIELD_BY_TYPE = {
     metaField: 'featuredSessionsMeta',
     // card-c2's session-routing.js reads both — watchUrl is where a click
     // routes once the session goes live, mrStreamId is what tells it a
-    // session is Mobile-Rider-backed at all.
-    metaFields: ['watchUrl', 'mrStreamId'],
-    metaHint: 'Watch URL / Mobile Rider stream ID are optional per-session overrides',
+    // session is Mobile-Rider-backed at all. imageUrl has no reader yet
+    // either, but authors need to attach one now so it's captured in the
+    // JSON ahead of the consuming-side wiring.
+    metaFields: ['watchUrl', 'mrStreamId', 'imageUrl'],
+    metaHint: 'Watch URL / Mobile Rider stream ID / image are optional per-session overrides',
     label: 'Featured Sessions',
     metadataKey: 'featured-sessions',
     blockHint: 'each card-c2 Featured Sessions card',

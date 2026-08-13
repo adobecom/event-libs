@@ -3,6 +3,7 @@ import {
 } from '../../v1/deps/htm-preact.js';
 import { getSessionTrack, formatSessionTime } from '../utils.js';
 import SearchInput from './SearchInput.js';
+import ImagePickerModal from './ImagePickerModal.js';
 
 function DragHandleIcon() {
   return html`
@@ -32,6 +33,10 @@ function DragHandleIcon() {
 const META_FIELD_DEFS = {
   watchUrl: { label: 'Watch URL', placeholder: 'Watch URL (optional)' },
   mrStreamId: { label: 'Mobile Rider stream ID', placeholder: 'Mobile Rider stream ID (optional)' },
+  // type: 'image' additionally gets a thumbnail + "Upload…" button (see the meta-fields
+  // render below) — the text input still works standalone for pasting an already-uploaded
+  // or externally hosted URL directly, no upload required.
+  imageUrl: { label: 'Image', placeholder: 'Image URL (optional)', type: 'image' },
 };
 
 export default function FeaturedSessionsEditor({
@@ -49,6 +54,9 @@ export default function FeaturedSessionsEditor({
   const [trackFilter, setTrackFilter] = useState('');
   const [draggedId, setDraggedId] = useState(null);
   const [announcement, setAnnouncement] = useState('');
+  // Which row's image-upload modal is open — one shared modal instance rather than one per
+  // row, since at most one can be open at a time.
+  const [imagePickerFor, setImagePickerFor] = useState(null);
 
   const sessionsById = useMemo(() => {
     const map = new Map();
@@ -286,17 +294,30 @@ export default function FeaturedSessionsEditor({
                   <span class="tec-featured-editor__track">${session ? getSessionMeta(session) : 'Not found in current session catalog'}</span>
                   ${onMetaChange && metaFields.length > 0 && html`
                     <div class="tec-featured-editor__meta-fields">
-                      ${metaFields.map((field) => html`
-                        <input \
-                          key=${field} \
-                          type="text" \
-                          class="tec-field tec-field--s" \
-                          placeholder=${META_FIELD_DEFS[field].placeholder} \
-                          aria-label="${META_FIELD_DEFS[field].label} for ${title}" \
-                          value=${meta?.[sessionId]?.[field] || ''} \
-                          onInput=${(e) => onMetaChange(sessionId, { [field]: e.target.value })} \
-                        />
-                      `)}
+                      ${metaFields.map((field) => {
+                        const value = meta?.[sessionId]?.[field] || '';
+                        const isImage = META_FIELD_DEFS[field].type === 'image';
+                        return html`
+                          <div key=${field} class="tec-featured-editor__meta-field">
+                            ${isImage && value && html`<img class="tec-featured-editor__thumb" src=${value} alt="" />`}
+                            <input \
+                              type="text" \
+                              class="tec-field tec-field--s" \
+                              placeholder=${META_FIELD_DEFS[field].placeholder} \
+                              aria-label="${META_FIELD_DEFS[field].label} for ${title}" \
+                              value=${value} \
+                              onInput=${(e) => onMetaChange(sessionId, { [field]: e.target.value })} \
+                            />
+                            ${isImage && html`
+                              <button \
+                                type="button" \
+                                class="tec-btn tec-btn--outline tec-btn--s" \
+                                onClick=${() => setImagePickerFor(sessionId)} \
+                              >Upload…</button>
+                            `}
+                          </div>
+                        `;
+                      })}
                     </div>
                   `}
                 </div>
@@ -339,6 +360,12 @@ export default function FeaturedSessionsEditor({
           ${availableSessions.length === 0 && html`<li class="tec-featured-editor__empty">No sessions match.</li>`}
         </ul>
       </div>
+
+      <${ImagePickerModal} \
+        isOpen=${!!imagePickerFor} \
+        onClose=${() => setImagePickerFor(null)} \
+        onUploaded=${(url) => { onMetaChange(imagePickerFor, { imageUrl: url }); setImagePickerFor(null); }} \
+      />
     </div>
   `;
 }
