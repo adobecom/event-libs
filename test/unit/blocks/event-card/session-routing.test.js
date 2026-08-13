@@ -1,12 +1,12 @@
 import { expect } from '@esm-bundle/chai';
-import { resolveCardAction } from '../../../../event-libs/v1/c2/blocks/card-c2/session-routing.js';
+import { resolveCardAction } from '../../../../event-libs/v1/c2/blocks/event-card/session-routing.js';
 
 const HOUR = 60 * 60 * 1000;
 const NOW = Date.parse('2026-07-21T10:00:00.000Z');
 
 const iso = (ms) => new Date(ms).toISOString();
 
-describe('card-c2 session routing', () => {
+describe('event-card session routing', () => {
   describe('resolveCardAction', () => {
     it('routes an upcoming session to the Session Guide modal', () => {
       const action = resolveCardAction({

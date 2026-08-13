@@ -1,4 +1,4 @@
-# Migration plan: PR #208 (block hydration rewrite) → card-c2 / Featured Sessions
+# Migration plan: PR #208 (block hydration rewrite) → event-card / Featured Sessions
 
 PR: https://github.com/adobecom/event-libs/pull/208 (merged, migration below completed)
 
@@ -20,9 +20,9 @@ PR: https://github.com/adobecom/event-libs/pull/208 (merged, migration below com
 - Already-hydrated elements are marked `data-hydrated="true"` and skipped on
   re-runs.
 
-## Blocker: our card-c2 hydrator will break as-is
+## Blocker: our event-card hydrator will break as-is
 
-`card-c2.js`'s `init()` currently does:
+`event-card.js`'s `init()` currently does:
 
 ```js
 if (el.classList.contains('hydrate')) {
@@ -37,7 +37,7 @@ throw. **Must remove this block** once #208 lands. This isn't a downgrade:
 hydration is now guaranteed synchronous and complete before any block's
 `init()` runs at all, so there's nothing to await anymore.
 
-`hydrate/card-c2.js` currently lives under `STATIC_HYDRATORS` in
+`hydrate/event-card.js` currently lives under `STATIC_HYDRATORS` in
 `hydrate.js` — needs to move to the new `HYDRATORS` map (same map, new
 name, still event-libs-owned).
 
@@ -48,10 +48,10 @@ times**, with every field (including the image) pulled from metadata via
 placeholder tokens. That's a hard requirement — it's how the clone gets its
 image at all.
 
-Featured Sessions' actual authoring requirement is the opposite: **card-c2
+Featured Sessions' actual authoring requirement is the opposite: **event-card
 is authored multiple times**, once per card, because **the author hand-picks
 a different image per card** (not something derivable from session
-metadata — sessions don't carry a promotional image field). Each card-c2
+metadata — sessions don't carry a promotional image field). Each event-card
 instance is its own independently-authored block with its own image,
 title/CTA copy, and a session-code class (e.g. `s6210`) that our hydrator
 uses to look up *that one* session's data and rewrite *that card's own*
@@ -60,7 +60,7 @@ already-authored tokens to point at it.
 There is no single template row to repeat — there are N authored rows, each
 needing a different, non-metadata-derived image. `repeatTemplate` cannot
 produce that; adopting it would mean giving up per-card manual images,
-which is the whole point of this block. **Do not migrate card-c2 to
+which is the whole point of this block. **Do not migrate event-card to
 `repeatTemplate`.**
 
 This isn't a novel exception — PR #208 itself keeps `image-links` on its
@@ -71,21 +71,21 @@ own bespoke (non-`repeatTemplate`) hydrator for the same class of reason
 
 1. Rebase/merge `dev` into this branch (pulls in the new `hydrate.js`,
    `HYDRATORS`, `log.js`, `repeat-template.js`).
-2. In `event-libs/v1/hydrate/hydrate.js`, move the `card-c2` entry from the
+2. In `event-libs/v1/hydrate/hydrate.js`, move the `event-card` entry from the
    old `STATIC_HYDRATORS` map into the new `HYDRATORS` map. No change to
-   `hydrateCardC2` itself needed — it keeps its current per-card,
+   `hydrateEventCard` itself needed — it keeps its current per-card,
    session-code-lookup logic; it just isn't a `repeatTemplate` consumer.
-3. In `card-c2.js`'s `init()`, delete the `getHydrationPromise` block
+3. In `event-card.js`'s `init()`, delete the `getHydrationPromise` block
    entirely (dead code — see Blocker above). No replacement needed.
-4. Optionally have `hydrateCardC2` return `false` when it bails out early
+4. Optionally have `hydrateEventCard` return `false` when it bails out early
    (missing `metadataKey`/`sessionCode`/no match) instead of implicitly
    returning `undefined` — the new `hydrateBlocks` treats `hydrate(block)
    !== false` as success and sets `data-hydrated`; returning `false`
    correctly leaves it eligible for a future rerun and matches the new
    convention other hydrators follow.
-5. Run `npm test` — no card-c2/hydrate test assertions depend on
+5. Run `npm test` — no event-card/hydrate test assertions depend on
    `getHydrationPromise`/`STATIC_HYDRATORS` directly, but re-verify
-   `test/unit/hydrate/card-c2.test.js` and `test/unit/blocks/card-c2/
-   card-c2.test.js` pass against the new `hydrate.js`.
+   `test/unit/hydrate/event-card.test.js` and `test/unit/blocks/event-card/
+   event-card.test.js` pass against the new `hydrate.js`.
 6. No CSS/markup changes required — this is purely a hydration-pipeline
    wiring change, not a visual or content-model change.

@@ -2,7 +2,7 @@ import { META_REG } from '../utils/constances.js';
 import { getMetadata } from '../utils/utils.js';
 
 const SESSION_CODE_PATTERN = /^[a-z]{1,4}\d+$/i;
-// card-c2.js's own aspect-ratio variant classes (e.g. "ratio-3-4") can be authored
+// event-card.js's own aspect-ratio variant classes (e.g. "ratio-3-4") can be authored
 // alongside the hydrate classes on the same block — exclude them here too, or they'd
 // get mistaken for the metadata-key class.
 const RATIO_VARIANT_PATTERN = /^ratio-\d+-\d+$/;
@@ -11,7 +11,7 @@ function getMetadataKeyAndSessionCode(block) {
   let metadataKey;
   let sessionCode;
   [...block.classList].forEach((cls) => {
-    if (cls === 'card-c2' || cls === 'hydrate' || RATIO_VARIANT_PATTERN.test(cls)) return;
+    if (cls === 'event-card' || cls === 'hydrate' || RATIO_VARIANT_PATTERN.test(cls)) return;
     if (SESSION_CODE_PATTERN.test(cls)) {
       sessionCode = cls.toLowerCase();
     } else {
@@ -28,7 +28,7 @@ function getSessions(metadataKey) {
     const parsed = JSON.parse(raw);
     return Array.isArray(parsed) ? parsed : null;
   } catch (e) {
-    window.lana?.log(`card-c2 hydrator: failed to parse page metadata "${metadataKey}": ${e.message}`);
+    window.lana?.log(`event-card hydrator: failed to parse page metadata "${metadataKey}": ${e.message}`);
     return null;
   }
 }
@@ -81,7 +81,7 @@ function applySessionData(block, session) {
   if (endTimeMillis) block.dataset.endTimeUtc = new Date(endTimeMillis).toISOString();
 }
 
-export default function hydrateCardC2(block) {
+export default function hydrateEventCard(block) {
   const { metadataKey, sessionCode } = getMetadataKeyAndSessionCode(block);
   if (!metadataKey || !sessionCode) return false;
 

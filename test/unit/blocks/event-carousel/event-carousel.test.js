@@ -1,27 +1,27 @@
 import { expect } from '@esm-bundle/chai';
 import { readFile } from '@web/test-runner-commands';
-import init from '../../../../event-libs/v1/c2/blocks/slider/slider.js';
+import init from '../../../../event-libs/v1/c2/blocks/event-carousel/event-carousel.js';
 
-describe('slider', () => {
+describe('event-carousel', () => {
   beforeEach(async () => {
     document.body.innerHTML = await readFile({ path: './mocks/default.html' });
     document.head.innerHTML = '';
   });
 
   it('wraps the sibling cards in a single shared track', async () => {
-    const [headerCarousel, footerCarousel] = [...document.querySelectorAll('.slider')];
+    const [headerCarousel, footerCarousel] = [...document.querySelectorAll('.event-carousel')];
 
     await init(headerCarousel);
     await init(footerCarousel);
 
     const tracks = document.querySelectorAll('.carousel-track');
     expect(tracks).to.have.lengthOf(1);
-    expect(tracks[0].querySelectorAll(':scope > .card-c2')).to.have.lengthOf(2);
+    expect(tracks[0].querySelectorAll(':scope > .event-card')).to.have.lengthOf(2);
     expect(tracks[0].dataset.carouselId).to.be.a('string').that.is.not.empty;
   });
 
   it('renders heading and pills for the header instance', async () => {
-    const [headerCarousel, footerCarousel] = [...document.querySelectorAll('.slider')];
+    const [headerCarousel, footerCarousel] = [...document.querySelectorAll('.event-carousel')];
     await init(headerCarousel);
     await init(footerCarousel);
 
@@ -31,7 +31,7 @@ describe('slider', () => {
   });
 
   it('renders arrows-only for the footer instance', async () => {
-    const [headerCarousel, footerCarousel] = [...document.querySelectorAll('.slider')];
+    const [headerCarousel, footerCarousel] = [...document.querySelectorAll('.event-carousel')];
     await init(headerCarousel);
     await init(footerCarousel);
 
@@ -41,7 +41,7 @@ describe('slider', () => {
   });
 
   it('scrolls the shared track when an arrow is clicked', async () => {
-    const [headerCarousel, footerCarousel] = [...document.querySelectorAll('.slider')];
+    const [headerCarousel, footerCarousel] = [...document.querySelectorAll('.event-carousel')];
     await init(headerCarousel);
     await init(footerCarousel);
 
@@ -59,10 +59,10 @@ describe('slider', () => {
   });
 
   it('removes the block when no adjacent cards are found', async () => {
-    document.body.innerHTML = '<div class="slider"><div><div></div></div></div>';
-    const el = document.querySelector('.slider');
+    document.body.innerHTML = '<div class="event-carousel"><div><div></div></div></div>';
+    const el = document.querySelector('.event-carousel');
     await init(el);
 
-    expect(document.querySelector('.slider')).to.not.exist;
+    expect(document.querySelector('.event-carousel')).to.not.exist;
   });
 });

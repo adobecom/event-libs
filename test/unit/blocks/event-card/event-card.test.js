@@ -1,8 +1,8 @@
 import { expect } from '@esm-bundle/chai';
 import { readFile } from '@web/test-runner-commands';
-import init from '../../../../event-libs/v1/c2/blocks/card-c2/card-c2.js';
+import init from '../../../../event-libs/v1/c2/blocks/event-card/event-card.js';
 
-describe('card-c2', () => {
+describe('event-card', () => {
   beforeEach(() => {
     document.body.innerHTML = '';
     document.head.innerHTML = '';
@@ -10,7 +10,7 @@ describe('card-c2', () => {
 
   it('renders a body-layout card for ratio-4-3', async () => {
     document.body.innerHTML = await readFile({ path: './mocks/ratio-4-3.html' });
-    const el = document.querySelector('.card-c2');
+    const el = document.querySelector('.event-card');
     await init(el);
 
     expect(el.dataset.cardVariant).to.equal('ratio-4-3');
@@ -22,7 +22,7 @@ describe('card-c2', () => {
 
   it('renders a body-layout card for ratio-3-4 too', async () => {
     document.body.innerHTML = await readFile({ path: './mocks/ratio-3-4.html' });
-    const el = document.querySelector('.card-c2');
+    const el = document.querySelector('.event-card');
     await init(el);
 
     expect(el.dataset.cardVariant).to.equal('ratio-3-4');
@@ -34,7 +34,7 @@ describe('card-c2', () => {
 
   it('renders a body-layout card for ratio-16-9 too', async () => {
     document.body.innerHTML = await readFile({ path: './mocks/ratio-16-9.html' });
-    const el = document.querySelector('.card-c2');
+    const el = document.querySelector('.event-card');
     await init(el);
 
     expect(el.dataset.cardVariant).to.equal('ratio-16-9');
@@ -46,7 +46,7 @@ describe('card-c2', () => {
 
   it('defaults to ratio-4-3 when no variant class is authored', async () => {
     document.body.innerHTML = await readFile({ path: './mocks/ratio-4-3.html' });
-    const el = document.querySelector('.card-c2');
+    const el = document.querySelector('.event-card');
     el.classList.remove('ratio-4-3');
     await init(el);
 
@@ -54,10 +54,10 @@ describe('card-c2', () => {
   });
 
   it('removes the block when no media is authored', async () => {
-    document.body.innerHTML = '<div class="card-c2 ratio-4-3"><div></div><div></div></div>';
-    const el = document.querySelector('.card-c2');
+    document.body.innerHTML = '<div class="event-card ratio-4-3"><div></div><div></div></div>';
+    const el = document.querySelector('.event-card');
     await init(el);
 
-    expect(document.querySelector('.card-c2')).to.not.exist;
+    expect(document.querySelector('.event-card')).to.not.exist;
   });
 });

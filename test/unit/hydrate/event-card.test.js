@@ -45,7 +45,7 @@ const AUTHORED_CONTENT = `
 
 const tokensIn = (el) => [...el.innerHTML.matchAll(/\[\[(.*?)\]\]/g)].map((m) => m[1]);
 
-describe('card-c2 hydrator', () => {
+describe('event-card hydrator', () => {
   beforeEach(() => {
     document.body.innerHTML = '';
     document.head.innerHTML = '';
@@ -54,7 +54,7 @@ describe('card-c2 hydrator', () => {
 
   it('rewrites this card\'s authored tokens (including the percent-encoded href) to the matched session\'s index, and sets session data-attributes', async () => {
     document.body.innerHTML = `
-      <div class="card-c2 hydrate featured-sessions s6210">
+      <div class="event-card hydrate featured-sessions s6210">
         <div><div><picture><img src="/media/s6210.jpg" alt=""></picture></div></div>
         ${AUTHORED_CONTENT}
       </div>
@@ -62,7 +62,7 @@ describe('card-c2 hydrator', () => {
 
     await hydrateBlocks(document);
 
-    const block = document.querySelector('.card-c2');
+    const block = document.querySelector('.event-card');
     // Every token is now indexed to item 0 (S6210's position in the metadata array)
     expect(tokensIn(block)).to.deep.equal([
       'featured-sessions:0.enTitle',
@@ -83,7 +83,7 @@ describe('card-c2 hydrator', () => {
 
   it('indexes tokens to the second item and sets mrStreamId when the session is broadcast-capable', async () => {
     document.body.innerHTML = `
-      <div class="card-c2 hydrate featured-sessions s6522">
+      <div class="event-card hydrate featured-sessions s6522">
         <div><div><picture><img src="/media/s6522.jpg" alt=""></picture></div></div>
         ${AUTHORED_CONTENT}
       </div>
@@ -91,7 +91,7 @@ describe('card-c2 hydrator', () => {
 
     await hydrateBlocks(document);
 
-    const block = document.querySelector('.card-c2');
+    const block = document.querySelector('.event-card');
     expect(tokensIn(block)).to.deep.equal([
       'featured-sessions:1.enTitle',
       'featured-sessions:1.track',
@@ -104,7 +104,7 @@ describe('card-c2 hydrator', () => {
 
   it('matches a multi-letter session-code prefix (e.g. OS565), not just S####', async () => {
     document.body.innerHTML = `
-      <div class="card-c2 hydrate featured-sessions os565">
+      <div class="event-card hydrate featured-sessions os565">
         <div><div><picture><img src="/media/os565.jpg" alt=""></picture></div></div>
         ${AUTHORED_CONTENT}
       </div>
@@ -112,7 +112,7 @@ describe('card-c2 hydrator', () => {
 
     await hydrateBlocks(document);
 
-    const block = document.querySelector('.card-c2');
+    const block = document.querySelector('.event-card');
     expect(tokensIn(block)).to.deep.equal([
       'featured-sessions:2.enTitle',
       'featured-sessions:2.track',
@@ -123,7 +123,7 @@ describe('card-c2 hydrator', () => {
 
   it('rewrites bare, prefix-less tokens (e.g. [[enTitle]]) using the card\'s own metadata key', async () => {
     document.body.innerHTML = `
-      <div class="card-c2 hydrate featured-sessions s6210">
+      <div class="event-card hydrate featured-sessions s6210">
         <div><div><picture><img src="/media/s6210.jpg" alt=""></picture></div></div>
         <div><div>
           <p>[[enTitle]]</p>
@@ -135,7 +135,7 @@ describe('card-c2 hydrator', () => {
 
     await hydrateBlocks(document);
 
-    const block = document.querySelector('.card-c2');
+    const block = document.querySelector('.event-card');
     expect(tokensIn(block)).to.deep.equal([
       'featured-sessions:0.enTitle',
       'featured-sessions:0.track',
@@ -147,7 +147,7 @@ describe('card-c2 hydrator', () => {
 
   it('leaves a dotted token referencing a different metadata key untouched', async () => {
     document.body.innerHTML = `
-      <div class="card-c2 hydrate featured-sessions s6210">
+      <div class="event-card hydrate featured-sessions s6210">
         <div><div><picture><img src="/media/s6210.jpg" alt=""></picture></div></div>
         <div><div>
           <p>[[some-other-key.title]]</p>
@@ -157,13 +157,13 @@ describe('card-c2 hydrator', () => {
 
     await hydrateBlocks(document);
 
-    const block = document.querySelector('.card-c2');
+    const block = document.querySelector('.event-card');
     expect(tokensIn(block)).to.deep.equal(['some-other-key.title']);
   });
 
   it('leaves the authored tokens un-rewritten when the session code has no match', async () => {
     document.body.innerHTML = `
-      <div class="card-c2 hydrate featured-sessions s9999">
+      <div class="event-card hydrate featured-sessions s9999">
         <div><div><picture><img src="/media/s9999.jpg" alt=""></picture></div></div>
         ${AUTHORED_CONTENT}
       </div>
@@ -171,7 +171,7 @@ describe('card-c2 hydrator', () => {
 
     await hydrateBlocks(document);
 
-    const block = document.querySelector('.card-c2');
+    const block = document.querySelector('.event-card');
     expect(tokensIn(block)).to.deep.equal([
       'featured-sessions.enTitle',
       'featured-sessions.track',
@@ -182,7 +182,7 @@ describe('card-c2 hydrator', () => {
 
   it('does nothing when there is no session-code class', async () => {
     document.body.innerHTML = `
-      <div class="card-c2 hydrate featured-sessions">
+      <div class="event-card hydrate featured-sessions">
         <div><div><picture><img src="/media/none.jpg" alt=""></picture></div></div>
         ${AUTHORED_CONTENT}
       </div>
@@ -190,7 +190,7 @@ describe('card-c2 hydrator', () => {
 
     await hydrateBlocks(document);
 
-    const block = document.querySelector('.card-c2');
+    const block = document.querySelector('.event-card');
     expect(tokensIn(block)).to.deep.equal([
       'featured-sessions.enTitle',
       'featured-sessions.track',
@@ -200,7 +200,7 @@ describe('card-c2 hydrator', () => {
   it('does nothing when the featured-sessions page metadata is missing', async () => {
     document.head.innerHTML = '';
     document.body.innerHTML = `
-      <div class="card-c2 hydrate featured-sessions s6210">
+      <div class="event-card hydrate featured-sessions s6210">
         <div><div><picture><img src="/media/s6210.jpg" alt=""></picture></div></div>
         ${AUTHORED_CONTENT}
       </div>
@@ -208,7 +208,7 @@ describe('card-c2 hydrator', () => {
 
     await hydrateBlocks(document);
 
-    const block = document.querySelector('.card-c2');
+    const block = document.querySelector('.event-card');
     expect(tokensIn(block)).to.deep.equal([
       'featured-sessions.enTitle',
       'featured-sessions.track',
@@ -218,7 +218,7 @@ describe('card-c2 hydrator', () => {
 
   it('ignores a ratio-variant class when detecting the metadata key', async () => {
     document.body.innerHTML = `
-      <div class="card-c2 hydrate featured-sessions ratio-3-4 s6210">
+      <div class="event-card hydrate featured-sessions ratio-3-4 s6210">
         <div><div><picture><img src="/media/s6210.jpg" alt=""></picture></div></div>
         ${AUTHORED_CONTENT}
       </div>
@@ -226,7 +226,7 @@ describe('card-c2 hydrator', () => {
 
     await hydrateBlocks(document);
 
-    const block = document.querySelector('.card-c2');
+    const block = document.querySelector('.event-card');
     expect(tokensIn(block)).to.deep.equal([
       'featured-sessions:0.enTitle',
       'featured-sessions:0.track',
@@ -237,7 +237,7 @@ describe('card-c2 hydrator', () => {
 
   it('leaves the authored picture untouched — images are never tokenized', async () => {
     document.body.innerHTML = `
-      <div class="card-c2 hydrate featured-sessions s6210">
+      <div class="event-card hydrate featured-sessions s6210">
         <div><div><picture><img src="/media/s6210.jpg" alt="A hand-picked photo"></picture></div></div>
         ${AUTHORED_CONTENT}
       </div>
@@ -245,7 +245,7 @@ describe('card-c2 hydrator', () => {
 
     await hydrateBlocks(document);
 
-    const block = document.querySelector('.card-c2');
+    const block = document.querySelector('.event-card');
     const img = block.querySelector('img');
     expect(img.src).to.include('/media/s6210.jpg');
     expect(img.alt).to.equal('A hand-picked photo');
