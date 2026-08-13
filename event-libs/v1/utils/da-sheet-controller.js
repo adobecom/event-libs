@@ -226,14 +226,29 @@ export async function listFolder(org, repo, path) {
 // compute the exact, already-sanitized target path; this function doesn't derive one from
 // file.name). As multipart form data, matching the upload convention documented in
 // .claude/skills/build-content-from-figma/SKILL.md (POST .../source/... with a `data` field
-// carrying the file blob). Returns the public content.da.live URL the file is served from —
-// raw DA storage, not a real site asset; see uploadAndPublishMedia for a servable aem.live URL.
+// carrying the file blob).
+//
+// `file` is re-read into an already-loaded Blob before appending it, rather than handing the
+// FormData a raw File reference directly — observed in practice: appending a File straight
+// from an <input type="file"> change event reaches DA as a 201 with a *zero-byte* stored
+// object (the DA SDK's wrapped fetch, actions.daFetch, appears to lose a lazily-read File's
+// bytes in transit). writeSheet's own multipart body never hit this because it's always
+// already a materialized Blob (`new Blob([payload], ...)`), never a raw File — matching that
+// here avoids the same failure mode.
+//
+// Returns the canonical stored path/URLs from DA's own response body, not ones re-derived
+// from the input `path` — DA silently lowercases at least the filename segment on write, so
+// the canonical path can differ from what was asked for; treating DA's response as the source
+// of truth (rather than assuming the request path is what got stored) is what
+// uploadAndPublishMedia needs to target the *actual* file with its preview/live calls.
 export async function uploadMedia(org, repo, path, file) {
   if (hasUnsafePathSegment(path)) return { ok: false, status: 400, error: 'Invalid path' };
   if (!file) return { ok: false, status: 400, error: 'Invalid file' };
+  const bytes = await file.arrayBuffer();
+  const blob = new Blob([bytes], { type: file.type || 'application/octet-stream' });
   const url = `${DA_ADMIN_ORIGIN}/source/${org}/${repo}${path}`;
   const formData = new FormData();
-  formData.append('data', file, file.name || 'upload');
+  formData.append('data', blob, file.name || 'upload');
 
   const headers = new Headers();
   if (daToken) headers.append('Authorization', `Bearer ${daToken}`);
@@ -250,7 +265,18 @@ export async function uploadMedia(org, repo, path, file) {
     window.lana?.log(`DA uploadMedia error ${resp.status}: ${url} — ${error}`);
     return { ok: false, status: resp.status, error };
   }
-  return { ok: true, status: resp.status, url: `${CONTENT_DA_ORIGIN}/${org}/${repo}${path}` };
+  const body = await resp.json().catch(() => null);
+  const contentUrl = body?.source?.contentUrl;
+  const canonicalPath = contentUrl
+    ? contentUrl.replace(`${CONTENT_DA_ORIGIN}/${org}/${repo}`, '')
+    : path;
+  return {
+    ok: true,
+    status: resp.status,
+    path: canonicalPath,
+    url: contentUrl || `${CONTENT_DA_ORIGIN}/${org}/${repo}${path}`,
+    liveUrl: body?.aem?.liveUrl,
+  };
 }
 
 // Shared POST-with-no-body primitive for admin.hlx.page's preview/live actions (see
@@ -288,14 +314,19 @@ export function publishAsset(org, repo, path, branch = 'main') {
 }
 
 // Uploads, previews, then publishes a single file in one call — the entry point callers need
-// for "make this a real, live site asset." Short-circuits on the first failing step; on success
-// returns the public aem.live URL the file is now servable from.
+// for "make this a real, live site asset." Short-circuits on the first failing step. Previews
+// and publishes uploaded.path — DA's own canonical stored path (see uploadMedia) — not the
+// input `path`, since those can differ (e.g. DA lowercases the filename on write); using the
+// wrong one here is exactly what previously made preview/publish 404 against a file that was
+// actually stored one path over. On success, prefers DA's own returned liveUrl over
+// re-deriving one, for the same reason.
 export async function uploadAndPublishMedia(org, repo, path, file, branch = 'main') {
   const uploaded = await uploadMedia(org, repo, path, file);
   if (!uploaded.ok) return uploaded;
-  const previewed = await previewAsset(org, repo, path, branch);
+  const canonicalPath = uploaded.path;
+  const previewed = await previewAsset(org, repo, canonicalPath, branch);
   if (!previewed.ok) return previewed;
-  const published = await publishAsset(org, repo, path, branch);
+  const published = await publishAsset(org, repo, canonicalPath, branch);
   if (!published.ok) return published;
-  return { ok: true, url: `https://${branch}--${repo}--${org}.aem.live${path}` };
+  return { ok: true, url: uploaded.liveUrl || `https://${branch}--${repo}--${org}.aem.live${canonicalPath}` };
 }
