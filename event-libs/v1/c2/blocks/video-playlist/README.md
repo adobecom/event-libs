@@ -71,20 +71,27 @@ attempt in `video-playlist.js`, that needs correcting against a real embed.
 
 ## Player switching
 
-Rows carry an `mpcId` when the target session's `MPC ID` custom attribute
-is present (extracted by `sessions-api.js`, same pattern as
-`playlistAssignment`/`playlistOnSessionPage`). Selecting such a row swaps
-the player already mounted alongside this block (`.milo-video` or
-`.mobile-rider`, in the same `.section`) for a freshly built AdobeTV
-iframe — `video.tv.adobe.com/v/{mpcId}?autoplay=true&quality=9&end=nothing&
-learn=on` — in place, no full page reload.
+Each session's matched sessionTime carries a ready-to-embed `videos[]`
+array — entries shaped like `{ provider: 'mpc', url:
+'https://video.tv.adobe.com/v/3458940?autoplay=true&quality=9&end=nothing&
+learn=on', kind: 'onDemand' }` — the same shape the Individual Session
+Page's own `session-times` page metadata carries for the current session.
+`sessions-api.js` surfaces this as `session.videos` (not a custom
+attribute) for every session in the fetched catalog.
 
-**Still out of scope**: rows without an `mpcId` (Mobile-Rider-hosted
-sessions) fall back to navigating to that session's own page
-(`sessionPageUrl`). No YouTube-specific custom attribute has been confirmed
-in real session data yet, so YouTube rows also fall back to navigation
-today — if/when that attribute name is confirmed, it should extract into
-its own field the same way `mpcId` does, rather than guessed at.
+Selecting a row with a `provider: 'mpc'` entry swaps the player already
+mounted alongside this block (`.milo-video` or `.mobile-rider`, in the same
+`.section`) for a freshly built iframe pointed straight at that URL — in
+place, no full page reload. The URL is already fully-formed by the
+backend; nothing is constructed client-side.
+
+**Still out of scope**: rows with no `mpc` entry in `videos[]` (Mobile-
+Rider-hosted sessions, or any other provider) fall back to navigating to
+that session's own page (`sessionPageUrl`). No `youtube` provider has been
+confirmed in real session data yet — if/when one is, its embed convention
+(is `url` already an embeddable iframe src, or does it need conversion
+like a watch URL?) needs confirming against a real sample before wiring it
+the same way `mpc` is wired today, rather than guessed at.
 
 ## Responsive layout
 

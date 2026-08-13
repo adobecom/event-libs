@@ -122,25 +122,30 @@ function analyticsAttrs(linkName) {
   return { 'daa-ll': linkName };
 }
 
-const ADOBE_TV_ORIGIN = 'https://video.tv.adobe.com';
+// Confirmed against real data: each session-time carries a `videos[]` array — entries
+// shaped like { provider: 'mpc', url: 'https://video.tv.adobe.com/v/3458940?autoplay=
+// true&quality=9&end=nothing&learn=on', kind: 'onDemand' } — the same shape the
+// Individual Session Page's own `session-times` page metadata carries for the current
+// session. sessions-api.js surfaces this as `session.videos`, sourced from the matched
+// sessionTime entry, not from a custom attribute — the URL is already fully-formed with
+// the right query params, nothing to construct.
+const EMBEDDABLE_PROVIDER = 'mpc';
 
-// URL shape confirmed against a real MPC ID: video.tv.adobe.com/v/{id}?autoplay=true&
-// quality=9&end=nothing&learn=on.
-function buildAdobeTvSrc(mpcId) {
-  return `${ADOBE_TV_ORIGIN}/v/${mpcId}?autoplay=true&quality=9&end=nothing&learn=on`;
+// Only 'mpc' URLs are confirmed directly iframe-embeddable as-is. Other providers
+// (youtube, mobile-rider) likely need their own embed conventions — not yet confirmed
+// against real data, so those rows fall back to navigation (see buildTopicView).
+function pickEmbeddableVideoUrl(videos) {
+  return (videos || []).find((v) => v.provider === EMBEDDABLE_PROVIDER)?.url || null;
 }
 
 // Swaps a row's video into the player already mounted alongside this block (the
 // Individual Session Page's own `.milo-video`/`.mobile-rider` container, in the same
-// .section) — in place, no full page reload. Only MPC-hosted rows carry an mpcId today;
-// Mobile-Rider-hosted rows fall back to navigating to that session's own page (see
-// buildTopicView's onSelect), since swapping to a Mobile Rider stream in place is a
-// separate, unverified mechanism.
-function loadAdobeTvPlayer(el, mpcId) {
+// .section) — in place, no full page reload.
+function loadVideoPlayer(el, url) {
   const container = el.closest('.section')?.querySelector('.milo-video, .mobile-rider');
   if (!container) return false;
   const iframe = createTag('iframe', {
-    src: buildAdobeTvSrc(mpcId),
+    src: url,
     allow: 'autoplay; fullscreen; encrypted-media',
     allowfullscreen: '',
     loading: 'lazy',
@@ -203,7 +208,7 @@ function buildRow(item, { onSelect }) {
     role: 'listitem',
     'data-item-id': item.id,
     ...(item.href ? { 'data-href': item.href } : {}),
-    ...(item.mpcId ? { 'data-mpc-id': item.mpcId } : {}),
+    ...(item.videoUrl ? { 'data-video-url': item.videoUrl } : {}),
     ...analyticsAttrs('playlist-item-select'),
   });
 
@@ -257,15 +262,16 @@ function buildTopicView(el, rows) {
         thumbnailUrl: session.thumbnailUrl,
         durationLabel: formatDuration(session.duration),
         href: session.sessionPageUrl,
-        mpcId: session.mpcId,
+        videoUrl: pickEmbeddableVideoUrl(session.videos),
       },
       {
-        // MPC-hosted rows swap into the already-mounted player in place (see
-        // loadAdobeTvPlayer). Rows without an mpcId (Mobile-Rider-hosted, or any other
-        // player type) fall back to navigating to that session's own page — always
-        // correct, since every session already has a working page.
+        // Rows with a confirmed-embeddable video URL swap into the already-mounted
+        // player in place (see loadVideoPlayer). Everything else (no video, or a
+        // provider whose embed convention isn't confirmed yet) falls back to navigating
+        // to that session's own page — always correct, since every session already has
+        // a working page.
         onSelect: (item) => {
-          if (item.mpcId && loadAdobeTvPlayer(el, item.mpcId)) {
+          if (item.videoUrl && loadVideoPlayer(el, item.videoUrl)) {
             highlightRow(list, item.id);
             return;
           }

@@ -32,7 +32,10 @@ describe('services/sessions/sessions-api', () => {
       ],
       sessionTimes: [
         { sessionId: 's-1', startTimeMillis: 2000, endTimeMillis: 3000, externalSessionTimeId: 'rf-later' },
-        { sessionId: 's-1', startTimeMillis: 1000, endTimeMillis: 1500, externalSessionTimeId: 'rf-earlier' },
+        {
+          sessionId: 's-1', startTimeMillis: 1000, endTimeMillis: 1500, externalSessionTimeId: 'rf-earlier',
+          videos: [{ provider: 'mpc', url: 'https://video.tv.adobe.com/v/3458940?autoplay=true&quality=9&end=nothing&learn=on', kind: 'onDemand' }],
+        },
       ],
       sessions: [
         {
@@ -55,7 +58,6 @@ describe('services/sessions/sessions-api', () => {
             customAttr('LegalDisclaimer', [textValue('<p>Copyright.</p>')]),
             customAttr('Playlist assignment/name', [selectValue('Photography', 'photography'), selectValue('3D', '3d')]),
             customAttr('Playlist on session page', [selectValue('Photography', 'photography')]),
-            customAttr('MPC ID', [textValue('3458940')]),
           ],
         },
         {
@@ -171,9 +173,11 @@ describe('services/sessions/sessions-api', () => {
       expect(bare.playlistOnSessionPage).to.deep.equal([]);
     });
 
-    it('maps MPC ID to mpcId', () => {
-      expect(full.mpcId).to.equal('3458940');
-      expect(bare.mpcId).to.equal('');
+    it('maps the matched sessionTime\'s videos[] through, not from a custom attribute', () => {
+      expect(full.videos).to.deep.equal([
+        { provider: 'mpc', url: 'https://video.tv.adobe.com/v/3458940?autoplay=true&quality=9&end=nothing&learn=on', kind: 'onDemand' },
+      ]);
+      expect(bare.videos).to.deep.equal([]);
     });
   });
 
@@ -331,12 +335,13 @@ describe('services/sessions/sessions-api', () => {
       expect(bare.playlistOnSessionPage).to.deep.equal([]);
     });
 
-    it('passes mpcId through, defaulting to an empty string', () => {
-      const [withMpc] = normalizeSessions([{ id: 's-1', mpcId: '3458940' }]);
-      expect(withMpc.mpcId).to.equal('3458940');
+    it('passes videos through, defaulting to an empty array', () => {
+      const videos = [{ provider: 'mpc', url: 'https://video.tv.adobe.com/v/3458940', kind: 'onDemand' }];
+      const [withVideos] = normalizeSessions([{ id: 's-1', videos }]);
+      expect(withVideos.videos).to.deep.equal(videos);
 
       const [bare] = normalizeSessions([{ id: 's-2' }]);
-      expect(bare.mpcId).to.equal('');
+      expect(bare.videos).to.deep.equal([]);
     });
   });
 

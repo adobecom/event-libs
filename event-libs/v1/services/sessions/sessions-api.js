@@ -45,9 +45,10 @@ export function normalizeSessions(rawSessions) {
     products: s.products || [],
     resources: s.resources || [],
     mrStreamId: s.mrStreamId ?? null,
-    // Player identifiers for video-playlist's in-place row swap — a session carries at
-    // most one of these depending on how it's hosted (MPC vs. Mobile Rider).
-    mpcId: s.mpcId || '',
+    // video-playlist's in-place row swap: ready-to-embed { provider, url, kind } entries
+    // from the matched session-time, same shape the Individual Session Page's own
+    // `session-times` page metadata carries for the current session.
+    videos: Array.isArray(s.videos) ? s.videos : [],
     playlistAssignment: coerceArray(s.playlistAssignment),
     playlistOnSessionPage: coerceArray(s.playlistOnSessionPage),
     videoAvailable: Boolean(s.videoAvailable),
@@ -266,9 +267,9 @@ export function mapEslPayloadToRawSessions(payload) {
       // table between the two needed, both draw from the same slug vocabulary.
       playlistAssignment: extractCustomAttributeSlugs(session, 'Playlist assignment/name'),
       playlistOnSessionPage: extractCustomAttributeSlugs(session, 'Playlist on session page'),
-      // video-playlist's in-place row swap: video.tv.adobe.com/v/{mpcId} — confirmed
-      // against real session data (the "MPC ID" custom attribute).
-      mpcId: extractCustomAttributeValue(session, 'MPC ID'),
+      // video-playlist's in-place row swap: ready-to-embed videos[] from the session's
+      // own matched sessionTime (not a custom attribute) — see normalizeSessions().
+      videos: firstTime?.videos || [],
       sessionPageUrl: slug ? `/sessions/${slug}` : '',
       isKeynote: type === 'Keynote',
       thumbnailUrl: thumbnail?.imageUrl ?? null,
