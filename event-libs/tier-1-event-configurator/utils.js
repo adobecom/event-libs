@@ -2,11 +2,21 @@ import {
   getSessionTrack, extractDistinctTracks, getSessionOverrideText, extractDistinctOverrideTexts,
   getSessionProducts, extractDistinctProducts,
 } from '../v1/services/sessions/sessions-api.js';
+import { MEDIA_FOLDER_PATH, DA_ORIGIN, DA_APP_PATH, HOMEPAGE_LINK_HASH_KEY } from './constants.js';
 
 export {
   getSessionTrack, extractDistinctTracks, getSessionOverrideText, extractDistinctOverrideTexts,
   getSessionProducts, extractDistinctProducts,
 };
+
+// Builds the full, already-safe upload path for a session image — namespaced by event and
+// timestamped so concurrent uploads (same or different sessions/events, even the same original
+// filename) never collide. Authors never see or choose this path (see MEDIA_FOLDER_PATH).
+export function buildMediaAssetPath(eventId, fileName) {
+  const safeName = (fileName || 'image').replace(/[^A-Za-z0-9._-]/g, '-');
+  const safeEventId = (eventId || 'unknown-event').replace(/[^A-Za-z0-9._-]/g, '-');
+  return `${MEDIA_FOLDER_PATH}/${safeEventId}/${Date.now()}-${safeName}`;
+}
 
 // Copies text to the clipboard, falling back to a hidden textarea +
 // execCommand('copy') when navigator.clipboard isn't available (not
@@ -138,6 +148,63 @@ export function buildSessionAuthorEntry(session, sessionTimes, meta) {
     };
   }
   return entry;
+}
+
+// Mirrors Schedule Maker's ScheduleURLUtility.createScheduleURL (schedule-maker/utils.js) —
+// the full entries payload, base64-encoded, lives entirely in the URL hash rather than a
+// server-side sheet, so a future consuming block (upcoming-sessions.js / card-c2) can decode
+// and render it directly from the link with no extra lookup. `unescape(encodeURIComponent(...))`
+// keeps btoa from choking on non-Latin1 characters (e.g. accented session titles).
+export function buildHomepageConfigURL(org, repo, configType, eventId, entries) {
+  const payload = {
+    eventId, configType, generatedTime: new Date().toISOString(), entries,
+  };
+  const base64 = btoa(unescape(encodeURIComponent(JSON.stringify(payload))));
+  const url = new URL(`${DA_ORIGIN}/app/${org}/${repo}/${DA_APP_PATH}`);
+  url.hash = `${HOMEPAGE_LINK_HASH_KEY}=${base64}`;
+  return url.toString();
+}
+
+// Reverse of buildHomepageConfigURL. Tries a few decode variants (mirroring Schedule Maker's
+// decodeScheduleParam) so a link that's been through an extra layer of URL-encoding (e.g.
+// pasted somewhere that percent-encodes hash fragments) still decodes.
+export function decodeHomepageConfigParam(raw) {
+  const attempts = [
+    () => atob(decodeURIComponent(raw)),
+    () => atob(decodeURIComponent(decodeURIComponent(raw))),
+    () => atob(raw),
+  ];
+  for (let i = 0; i < attempts.length; i += 1) {
+    try {
+      const obj = JSON.parse(attempts[i]());
+      if (obj && obj.eventId && obj.configType) return obj;
+    } catch {
+      // try next decode variant
+    }
+  }
+  return null;
+}
+
+// Copies a link to the clipboard as a real HTML hyperlink (mirroring Schedule Maker's
+// copyScheduleToClipboard) — a ClipboardItem carrying the anchor's outerHTML, so pasting into
+// a rich-text field (DA's doc editor) yields an actual `<a>`, not the raw URL string. Falls
+// back to copyTextToClipboard's plain-text path (`text (url)`) when the rich Clipboard API
+// isn't available.
+export async function copyLinkToClipboard(url, text) {
+  try {
+    if (navigator.clipboard && navigator.clipboard.write && window.ClipboardItem) {
+      const linkElement = document.createElement('a');
+      linkElement.href = url;
+      linkElement.textContent = text;
+      const blob = new Blob([linkElement.outerHTML], { type: 'text/html' });
+      await navigator.clipboard.write([new window.ClipboardItem({ [blob.type]: blob })]);
+      return true;
+    }
+    return await copyTextToClipboard(`${text} (${url})`);
+  } catch (error) {
+    window.lana?.log(`Error copying link to clipboard: ${error}`);
+    return false;
+  }
 }
 
 export function formatUpdatedTime(isoString) {

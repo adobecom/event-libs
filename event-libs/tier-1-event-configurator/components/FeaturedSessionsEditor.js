@@ -40,7 +40,7 @@ const META_FIELD_DEFS = {
 };
 
 export default function FeaturedSessionsEditor({
-  sessions, sessionTimes, tracks, featuredSessions, onChange,
+  sessions, sessionTimes, tracks, featuredSessions, onChange, eventId,
   heading = 'Featured (display order)', emptyHint = 'No sessions featured yet — add some from the list on the right.',
   // Optional per-session overrides — neither field has a source in the ESP
   // session catalog (see MOBILE-RIDER-STREAM-ID-GAP.md), so when a caller
@@ -292,34 +292,42 @@ export default function FeaturedSessionsEditor({
                 <div class="tec-featured-editor__info">
                   <span class="tec-featured-editor__title">${title}</span>
                   <span class="tec-featured-editor__track">${session ? getSessionMeta(session) : 'Not found in current session catalog'}</span>
-                  ${onMetaChange && metaFields.length > 0 && html`
+                  ${onMetaChange && metaFields.some((field) => META_FIELD_DEFS[field].type !== 'image') && html`
                     <div class="tec-featured-editor__meta-fields">
-                      ${metaFields.map((field) => {
-                        const value = meta?.[sessionId]?.[field] || '';
-                        const isImage = META_FIELD_DEFS[field].type === 'image';
-                        return html`
-                          <div key=${field} class="tec-featured-editor__meta-field">
-                            ${isImage && value && html`<img class="tec-featured-editor__thumb" src=${value} alt="" />`}
-                            <input \
-                              type="text" \
-                              class="tec-field tec-field--s" \
-                              placeholder=${META_FIELD_DEFS[field].placeholder} \
-                              aria-label="${META_FIELD_DEFS[field].label} for ${title}" \
-                              value=${value} \
-                              onInput=${(e) => onMetaChange(sessionId, { [field]: e.target.value })} \
-                            />
-                            ${isImage && html`
-                              <button \
-                                type="button" \
-                                class="tec-btn tec-btn--outline tec-btn--s" \
-                                onClick=${() => setImagePickerFor(sessionId)} \
-                              >Upload…</button>
-                            `}
-                          </div>
-                        `;
-                      })}
+                      ${metaFields.filter((field) => META_FIELD_DEFS[field].type !== 'image').map((field) => html`
+                        <input \
+                          key=${field} \
+                          type="text" \
+                          class="tec-field tec-field--s" \
+                          placeholder=${META_FIELD_DEFS[field].placeholder} \
+                          aria-label="${META_FIELD_DEFS[field].label} for ${title}" \
+                          value=${meta?.[sessionId]?.[field] || ''} \
+                          onInput=${(e) => onMetaChange(sessionId, { [field]: e.target.value })} \
+                        />
+                      `)}
                     </div>
                   `}
+                  ${onMetaChange && metaFields.filter((field) => META_FIELD_DEFS[field].type === 'image').map((field) => {
+                    const value = meta?.[sessionId]?.[field] || '';
+                    return html`
+                      <div key=${field} class="tec-featured-editor__image-field">
+                        ${value && html`<img class="tec-featured-editor__thumb" src=${value} alt="" />`}
+                        <input \
+                          type="text" \
+                          class="tec-field tec-field--s" \
+                          placeholder=${META_FIELD_DEFS[field].placeholder} \
+                          aria-label="${META_FIELD_DEFS[field].label} for ${title}" \
+                          value=${value} \
+                          onInput=${(e) => onMetaChange(sessionId, { [field]: e.target.value })} \
+                        />
+                        <button \
+                          type="button" \
+                          class="tec-btn tec-btn--outline tec-btn--s" \
+                          onClick=${() => setImagePickerFor(sessionId)} \
+                        >Upload…</button>
+                      </div>
+                    `;
+                  })}
                 </div>
                 <button type="button" class="tec-btn tec-btn--quiet tec-btn--s tec-btn--danger" onClick=${() => handleRemove(sessionId)}>Remove</button>
               </li>
@@ -363,6 +371,7 @@ export default function FeaturedSessionsEditor({
 
       <${ImagePickerModal} \
         isOpen=${!!imagePickerFor} \
+        eventId=${eventId} \
         onClose=${() => setImagePickerFor(null)} \
         onUploaded=${(url) => { onMetaChange(imagePickerFor, { imageUrl: url }); setImagePickerFor(null); }} \
       />

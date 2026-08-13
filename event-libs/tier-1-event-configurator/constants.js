@@ -2,6 +2,22 @@
 // resolved against whichever org/repo the DA SDK handshake reports.
 const CONFIGS_SHEET_PATH = '/tools/da-apps/tier-1-event-configurator/configs.json';
 
+// Fixed, app-owned upload target for session images — authors never pick or see this path.
+// Dot-prefixed to match the shadow-folder convention documented in
+// .claude/skills/build-content-from-figma/SKILL.md for co-locating media out of an author's
+// normal DA browsing.
+const MEDIA_FOLDER_PATH = '/tools/da-apps/tier-1-event-configurator/.media';
+
+// Used to build the "Copy Link" URL authors paste into a block's section-metadata — same
+// shape as Schedule Maker's DA_ORIGIN/DA_APP_PATH (event-libs/schedule-maker/constants.js).
+const DA_ORIGIN = 'https://da.live';
+const DA_APP_PATH = 'tools/da-apps/tier-1-event-configurator';
+
+// Hash param key the app looks for on mount to deep-link straight into a Homepage config's
+// editor (see TierOneEventConfigurator.js) — distinct from Schedule Maker's own `schedule=`
+// key since both could in principle appear in the same browser session.
+const HOMEPAGE_LINK_HASH_KEY = 'tecHomepage';
+
 const PAGES = {
   library: 'library',
   editor: 'editor',
@@ -46,6 +62,10 @@ const EVENT_SERVICE_ENV_OPTIONS = [
 
 export {
   CONFIGS_SHEET_PATH,
+  MEDIA_FOLDER_PATH,
+  DA_ORIGIN,
+  DA_APP_PATH,
+  HOMEPAGE_LINK_HASH_KEY,
   PAGES,
   EVENT_BROWSE_ENABLED,
   EVENT_SERVICE_ENV_OPTIONS,

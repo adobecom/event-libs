@@ -2,10 +2,11 @@ import { useState, useEffect, useMemo, html } from '../../v1/deps/htm-preact.js'
 import { getEventSessionCatalog } from '../../v1/utils/esp-controller.js';
 import { useNavigation } from '../context/NavigationContext.js';
 import { useConfigs } from '../context/ConfigsContext.js';
+import { useDA } from '../context/DAContext.js';
 import {
   copyTextToClipboard, extractDistinctTracks, extractDistinctOverrideTexts, extractDistinctProducts,
   isTrackIconEntryComplete, getDisplayTitle, stringifyConfig,
-  buildSessionAuthorEntry,
+  buildSessionAuthorEntry, buildHomepageConfigURL, copyLinkToClipboard,
 } from '../utils.js';
 import { CONFIG_TYPES, isHomepageConfigType } from '../constants.js';
 import TrackIconEditor from '../components/TrackIconEditor.js';
@@ -31,6 +32,7 @@ const HOMEPAGE_FIELD_BY_TYPE = {
     label: 'Upcoming Sessions',
     metadataKey: 'upcoming-sessions',
     blockHint: 'the upcoming-sessions block',
+    linkPrefix: 'event-upcoming-sessions',
   },
   [CONFIG_TYPES.HOMEPAGE_FEATURED_SESSIONS]: {
     field: 'featuredSessions',
@@ -45,11 +47,13 @@ const HOMEPAGE_FIELD_BY_TYPE = {
     label: 'Featured Sessions',
     metadataKey: 'featured-sessions',
     blockHint: 'each card-c2 Featured Sessions card',
+    linkPrefix: 'event-featured-sessions',
   },
 };
 
 export default function ConfigEditor() {
   const { goToLibrary } = useNavigation();
+  const { org, repo } = useDA();
   const {
     activeConfig, saveActiveConfig, clearActiveConfig, updateTrackIcon,
     updateOverrideTrackIcon, updateProduct, updateConfigField, setToastSuccess, setToastError,
@@ -127,15 +131,20 @@ export default function ConfigEditor() {
     });
   };
 
-  const handleCopyHomepageJson = async () => {
+  const handleCopyHomepageLink = async () => {
     const sessionsById = new Map(sessions.map((s) => [s.sessionId, s]));
     const metaById = activeConfig.config[homepageMeta.metaField] || {};
     const entries = (activeConfig.config[homepageMeta.field] || [])
       .filter((id) => sessionsById.has(id))
       .map((id) => buildSessionAuthorEntry(sessionsById.get(id), sessionTimes, metaById[id]));
-    const ok = await copyTextToClipboard(JSON.stringify(entries));
-    if (ok) setToastSuccess(`${homepageMeta.label} JSON copied — paste it into ${homepageMeta.blockHint}'s section-metadata row`);
-    else setToastError('Could not copy — select and copy the JSON block manually');
+    const url = buildHomepageConfigURL(org, repo, configType, eventId, entries);
+    const formattedDate = new Date().toLocaleString('en-US', {
+      weekday: 'long', month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit',
+    });
+    const linkText = `${homepageMeta.linkPrefix}: ${getDisplayTitle(activeConfig)} – ${formattedDate}`;
+    const ok = await copyLinkToClipboard(url, linkText);
+    if (ok) setToastSuccess(`Link copied — paste it into ${homepageMeta.blockHint}'s section-metadata row`);
+    else setToastError('Could not copy the link — please retry');
   };
 
   const handleCopy = async () => {
@@ -313,9 +322,10 @@ export default function ConfigEditor() {
           <p class="tec-editor__section-hint">
             Pick which sessions appear, and set their order. Your picks are saved with this
             row so you can come back and edit them, but ${homepageMeta.blockHint} doesn't read
-            this row directly — it reads its own section-metadata. Use "Copy ${homepageMeta.label} JSON"
-            and paste the result into that block's own section-metadata row (key
-            <code>${homepageMeta.metadataKey}</code>) instead. ${homepageMeta.metaHint} — none of
+            this row directly — it reads its own section-metadata. Use "Copy Link" and paste
+            the result into that block's own section-metadata row (key
+            <code>${homepageMeta.metadataKey}</code>) instead — the link itself opens straight
+            back to this config when clicked. ${homepageMeta.metaHint} — none of
             them has a source in the session catalog, so fill them in only for sessions that
             actually need one.
           </p>
@@ -326,6 +336,7 @@ export default function ConfigEditor() {
               sessions=${sessions} \
               sessionTimes=${sessionTimes} \
               tracks=${tracks} \
+              eventId=${eventId} \
               featuredSessions=${activeConfig.config[homepageMeta.field]} \
               onChange=${(next) => updateConfigField(homepageMeta.field, next)} \
               heading="${homepageMeta.label} (display order)" \
@@ -334,7 +345,7 @@ export default function ConfigEditor() {
               onMetaChange=${handleMetaChange} \
               metaFields=${homepageMeta.metaFields} \
             />
-            <button type="button" class="tec-btn tec-btn--outline" onClick=${handleCopyHomepageJson}>Copy ${homepageMeta.label} JSON</button>
+            <button type="button" class="tec-btn tec-btn--outline" onClick=${handleCopyHomepageLink}>Copy Link</button>
           `}
         </section>
       `}
