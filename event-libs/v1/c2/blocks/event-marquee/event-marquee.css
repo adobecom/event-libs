@@ -98,6 +98,13 @@
 }
 
 .event-marquee-media {
+  /* No asset authored (text-cta variant) means this div is empty, but width:100% still
+     resolves as its flex-basis (flex-basis:auto falls back to width when set) — without
+     an explicit zero basis here, it claims the full row width and forces
+     .event-marquee-text into shrink mode instead of growing to its own max-width.
+     .event-marquee-bleed (added only when there IS an asset) overrides this per
+     breakpoint with the real 427/592/736px basis. */
+  flex: 0 1 0%;
   margin: 0 auto;
   min-height: 0;
   width: 100%;
