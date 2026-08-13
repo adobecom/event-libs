@@ -53,6 +53,8 @@ describe('services/sessions/sessions-api', () => {
             customAttr('Product', [selectValue('Adobe Photoshop', 'adobe-photoshop')]),
             customAttr('Format', [selectValue('In-Person', 'in-person'), selectValue('On demand, post event', 'on-demand-post-event')]),
             customAttr('LegalDisclaimer', [textValue('<p>Copyright.</p>')]),
+            customAttr('Playlist assignment/name', [selectValue('Photography', 'photography'), selectValue('3D', '3d')]),
+            customAttr('Playlist on session page', [selectValue('Photography', 'photography')]),
           ],
         },
         {
@@ -156,6 +158,16 @@ describe('services/sessions/sessions-api', () => {
       expect(bare.speakers).to.deep.equal([]);
       expect(bare.thumbnailUrl).to.be.null;
       expect(bare.isKeynote).to.be.false;
+    });
+
+    it('maps playlistAssignment/playlistOnSessionPage as slugs, not labels', () => {
+      expect(full.playlistAssignment).to.deep.equal(['photography', '3d']);
+      expect(full.playlistOnSessionPage).to.deep.equal(['photography']);
+    });
+
+    it('leaves playlist fields empty on a bare session', () => {
+      expect(bare.playlistAssignment).to.deep.equal([]);
+      expect(bare.playlistOnSessionPage).to.deep.equal([]);
     });
   });
 
@@ -299,6 +311,18 @@ describe('services/sessions/sessions-api', () => {
     it('defaults contentCategory to an empty array when absent (mock fixtures)', () => {
       const [normalized] = normalizeSessions([{ id: 's-1', audience: 'All' }]);
       expect(normalized.contentCategory).to.deep.equal([]);
+    });
+
+    it('passes playlistAssignment/playlistOnSessionPage through, defaulting to empty arrays', () => {
+      const [withPlaylist] = normalizeSessions([{
+        id: 's-1', playlistAssignment: ['photography', '3d'], playlistOnSessionPage: ['photography'],
+      }]);
+      expect(withPlaylist.playlistAssignment).to.deep.equal(['photography', '3d']);
+      expect(withPlaylist.playlistOnSessionPage).to.deep.equal(['photography']);
+
+      const [bare] = normalizeSessions([{ id: 's-2' }]);
+      expect(bare.playlistAssignment).to.deep.equal([]);
+      expect(bare.playlistOnSessionPage).to.deep.equal([]);
     });
   });
 

@@ -30,6 +30,7 @@ const EVENT_BLOCKS_C2 = [
   'upcoming-sessions',
   'chrono-box',
   'mobile-rider',
+  'video-playlist',
 ];
 
 // Import only the most essential utilities that are always needed

@@ -45,6 +45,8 @@ export function normalizeSessions(rawSessions) {
     products: s.products || [],
     resources: s.resources || [],
     mrStreamId: s.mrStreamId ?? null,
+    playlistAssignment: coerceArray(s.playlistAssignment),
+    playlistOnSessionPage: coerceArray(s.playlistOnSessionPage),
     videoAvailable: Boolean(s.videoAvailable),
     inPerson: Boolean(s.inPerson),
     isLivestreamed: Boolean(s.isLivestreamed),
@@ -165,6 +167,16 @@ function extractCustomAttributeValue(session, name) {
   return extractCustomAttributeValues(session, name)[0] || '';
 }
 
+// Same lookup as extractCustomAttributeValues, but returns the machine-readable slug
+// (`v.value`) instead of preferring the display label — needed for matching against
+// another session's attribute values (e.g. video-playlist's topic filter), where the
+// human-readable label would never match the slug the page actually filters on.
+function extractCustomAttributeSlugs(session, name) {
+  const candidates = Array.isArray(name) ? name : [name];
+  const attr = (session.customAttributes || []).find((a) => candidates.includes(a?.name));
+  return (attr?.values || []).map((v) => v?.value).filter(Boolean);
+}
+
 // `sessions[].url` is an internal drafts/staging link, not usable as a production page
 // URL — but its last path segment is exactly the slug we want.
 function slugFromUrl(url) {
@@ -242,6 +254,11 @@ export function mapEslPayloadToRawSessions(payload) {
       isOnline: formatValues.includes('Online'),
       videoAvailable: formatValues.includes('Online') || formatValues.includes('On demand, post event'),
       isLivestreamed: extractCustomAttributeValues(session, 'Livestreamed Content').includes('Live'),
+      // video-playlist's topic filter: read the CURRENT session's own playlistOnSessionPage
+      // value(s), then match each against OTHER sessions' playlistAssignment — no mapping
+      // table between the two needed, both draw from the same slug vocabulary.
+      playlistAssignment: extractCustomAttributeSlugs(session, 'Playlist assignment/name'),
+      playlistOnSessionPage: extractCustomAttributeSlugs(session, 'Playlist on session page'),
       sessionPageUrl: slug ? `/sessions/${slug}` : '',
       isKeynote: type === 'Keynote',
       thumbnailUrl: thumbnail?.imageUrl ?? null,

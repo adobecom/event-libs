@@ -1,0 +1,142 @@
+@import '../../styles/tokens.css';
+
+/* Desktop right-rail: the section holding a player block immediately followed by
+   video-playlist becomes a row flex container, with the player taking the remaining
+   space and this block becoming a fixed-width rail beside it — same ":has()" pattern
+   event-marquee.css already uses, no JS DOM-wrapping needed. */
+@media (min-width: 1024px) {
+  .section:has(> .video-playlist) {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--s2a-spacing-md);
+  }
+
+  .section:has(> .video-playlist) > :not(.video-playlist) {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  .video-playlist {
+    flex: 0 0 360px;
+    max-height: 100%;
+    overflow-y: auto;
+  }
+
+  .video-playlist.is-expanded {
+    flex-basis: 630px; /* 175% of the 360px rail width */
+  }
+}
+
+.video-playlist {
+  box-sizing: border-box;
+  background: var(--s2a-color-gray-900);
+  color: var(--s2a-color-gray-25);
+  font-family: var(--s2a-font-family-default);
+  border-radius: var(--s2a-border-radius-24, 24px);
+  padding: var(--s2a-spacing-lg);
+}
+
+.video-playlist-title {
+  margin: 0 0 var(--s2a-spacing-md);
+  font-size: var(--s2a-font-size-lg);
+  font-weight: var(--s2a-font-weight-adobe-clean-extrabold, 800);
+}
+
+.video-playlist-toggle {
+  display: none;
+}
+
+.video-playlist-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s2a-spacing-sm);
+}
+
+.video-playlist-row {
+  display: flex;
+  align-items: center;
+  gap: var(--s2a-spacing-sm);
+  width: 100%;
+  border: none;
+  border-radius: var(--s2a-border-radius-md, 16px);
+  background: none;
+  padding: var(--s2a-spacing-xs);
+  color: inherit;
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.video-playlist-row:hover {
+  background: var(--s2a-color-transparent-white-16, rgb(255 255 255 / 16%));
+}
+
+.video-playlist-row.is-playing {
+  background: var(--s2a-color-transparent-white-24, rgb(255 255 255 / 24%));
+}
+
+.video-playlist-row:focus-visible {
+  outline: 1px solid var(--s2a-color-focus-ring-default, #3b63fb);
+  outline-offset: 2px;
+}
+
+.video-playlist-row-thumb {
+  flex-shrink: 0;
+  width: 96px;
+  height: 54px;
+  border-radius: var(--s2a-border-radius-sm, 4px);
+  object-fit: cover;
+}
+
+.video-playlist-row-meta {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s2a-spacing-3xs);
+  min-width: 0;
+}
+
+.video-playlist-row-title {
+  font-size: var(--s2a-font-size-sm);
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.video-playlist-row-duration {
+  font-size: var(--s2a-font-size-xs);
+  color: var(--s2a-color-transparent-white-64, rgb(255 255 255 / 64%));
+}
+
+/* Mobile bottom sheet: fixed to the viewport, independent of the section's own flow —
+   "peek" height by default (DRAWER_FLOOR_PX in JS), expands up to the Option-B cap
+   (computeDrawerCapPx/clampedTitleBottom in video-playlist.js) without ever fully
+   covering the session title. */
+@media (max-width: 1023px) {
+  .video-playlist {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 2;
+    border-radius: var(--s2a-border-radius-24, 24px) var(--s2a-border-radius-24, 24px) 0 0;
+    overflow-y: auto;
+    transition: max-height 0.3s ease;
+  }
+
+  .video-playlist-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    margin-bottom: var(--s2a-spacing-sm);
+    border: none;
+    border-radius: var(--s2a-border-radius-round);
+    background: var(--s2a-color-transparent-white-16, rgb(255 255 255 / 16%));
+    color: inherit;
+    font-family: inherit;
+    font-size: var(--s2a-font-size-sm);
+    padding: var(--s2a-spacing-xs) var(--s2a-spacing-md);
+    cursor: pointer;
+  }
+}
