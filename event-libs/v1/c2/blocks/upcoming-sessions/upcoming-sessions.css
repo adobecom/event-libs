@@ -8,7 +8,25 @@
   left: 0;
   right: 0;
   bottom: 0;
-  padding: var(--s2a-spacing-lg, 24px) var(--s2a-spacing-md, 16px);
+  padding: 0 0 56px var(--s2a-spacing-lg);
+}
+
+@media (min-width: 1024px) {
+  .upcoming-sessions--attached {
+    padding-left: 86px;
+  }
+}
+
+@media (min-width: 1440px) {
+  .upcoming-sessions--attached {
+    padding-left: var(--s2a-layout-lg);
+  }
+}
+
+@media (min-width: 1920px) {
+  .upcoming-sessions--attached {
+    padding-left: 220px;
+  }
 }
 
 .upcoming-sessions-header {
