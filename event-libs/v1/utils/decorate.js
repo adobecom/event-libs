@@ -1074,11 +1074,16 @@ function addStylesToEventPage() {
 const BLOCK_TOKEN_RE = /^([^[\]]+?)(?:\[\s*(first|last|[1-9]\d*)\s*\])?$/;
 
 // Matches top-level authored blocks (main > section > block) AND blocks loaded into a
-// Milo fragment (chrono-box, promotional-content, or a plain `fragment` block all insert
-// their content as `div.fragment > div (section) > div[class] (block)`, nested inside the
-// block that triggered the load). Without the second half, a block that only exists inside
-// a dynamically-swapped fragment is structurally invisible to this selector.
-const PAGE_BLOCK_SELECTOR = 'main > div > div[class], main .fragment > div > div[class]';
+// fragment nested inside chrono-box or promotional-content — both insert their fragment's
+// content as `div.fragment > div (section) > div[class] (block)`, several levels below the
+// block that triggered the load. Scoped to these two known container types (rather than any
+// `.fragment` anywhere on the page, e.g. events-form's terms-and-conditions fragment) so this
+// doesn't reach into content nobody intends a page-wide theme rule to match.
+const PAGE_BLOCK_SELECTOR = [
+  'main > div > div[class]',
+  'main .chrono-box .fragment > div > div[class]',
+  'main .promotional-content .fragment > div > div[class]',
+].join(', ');
 
 function parseThemeValue(raw) {
   const value = raw?.toLowerCase().trim();

@@ -1050,6 +1050,56 @@ describe('applyAreaTheme', () => {
     expect(document.getElementById('t-nested').classList.contains('dark')).to.be.true;
     expect(document.getElementById('t-top-level').classList.contains('dark')).to.be.false;
   });
+
+  it('resolves a positional selector against a block nested inside a promotional-content fragment wrapper', () => {
+    setThemeAttribute('theme', 'dark(blocks:text[first])');
+    document.body.innerHTML = `
+      <main>
+        <div>
+          <div class="promotional-content">
+            <div class="fragment" data-path="/fragments/product-blade">
+              <div>
+                <div class="text" id="t-nested"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div>
+          <div class="text" id="t-top-level"></div>
+        </div>
+      </main>
+    `;
+
+    applyAreaTheme();
+
+    expect(document.getElementById('t-nested').classList.contains('dark')).to.be.true;
+    expect(document.getElementById('t-top-level').classList.contains('dark')).to.be.false;
+  });
+
+  it('does not reach into an unrelated fragment outside chrono-box/promotional-content (e.g. events-form consent)', () => {
+    setThemeAttribute('theme', 'dark(blocks:text[first])');
+    document.body.innerHTML = `
+      <main>
+        <div>
+          <div class="events-form">
+            <div class="fragment" data-path="/fragments/terms-and-conditions">
+              <div>
+                <div class="text" id="t-unrelated-fragment"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div>
+          <div class="text" id="t-top-level"></div>
+        </div>
+      </main>
+    `;
+
+    applyAreaTheme();
+
+    expect(document.getElementById('t-top-level').classList.contains('dark')).to.be.true;
+    expect(document.getElementById('t-unrelated-fragment').classList.contains('dark')).to.be.false;
+  });
 });
 
 describe('getNonProdData', () => {
