@@ -299,13 +299,6 @@ function dispatchModalOpenOnceForHash(hash) {
   window.dispatchEvent(new CustomEvent('modal:open', { bubbles: true, detail: { hash } }));
 }
 
-/**
- * Milo decorates a chrono-box's incoming fragment on a detached, pre-insertion document
- * (see fragment.js), so page-wide theme rules like `dark(blocks:text[first])` can't be
- * resolved correctly at that point — the fragment's blocks aren't part of `document` yet.
- * Call this after every schedule transition settles (loaded, empty, or failed), since each
- * one can add or remove a block a positional rule targets.
- */
 export function revalidatePageTheme() {
   applyAreaTheme();
 }

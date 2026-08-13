@@ -1073,12 +1073,6 @@ function addStylesToEventPage() {
 // e.g. "dark", "dark(blocks:hero-marquee,profile-cards)", or "dark(blocks:text[first],agenda)"
 const BLOCK_TOKEN_RE = /^([^[\]]+?)(?:\[\s*(first|last|[1-9]\d*)\s*\])?$/;
 
-// Matches top-level authored blocks (main > section > block) AND blocks loaded into a
-// fragment nested inside chrono-box or promotional-content — both insert their fragment's
-// content as `div.fragment > div (section) > div[class] (block)`, several levels below the
-// block that triggered the load. Scoped to these two known container types (rather than any
-// `.fragment` anywhere on the page, e.g. events-form's terms-and-conditions fragment) so this
-// doesn't reach into content nobody intends a page-wide theme rule to match.
 const PAGE_BLOCK_SELECTOR = [
   'main > div > div[class]',
   'main .chrono-box .fragment > div > div[class]',
@@ -1127,11 +1121,6 @@ export function applyAreaTheme(area = document) {
       const positionalTokens = blockTokens.filter((t) => t.selector);
       const plainNames = blockTokens.filter((t) => !t.selector).map((t) => t.name);
 
-      // "first"/"last"/[N] are page-wide concepts, not scoped to whatever `area` this
-      // particular call covers (decorateEvent re-runs per fragment/personalization/
-      // events-form area). Always resolve against the full page and re-sync the whole
-      // named group so a stale mark from an earlier or now-superseded call is cleaned
-      // up instead of accumulating across repeated invocations.
       if (positionalTokens.length) {
         const pageBlockList = isDocument
           ? localList
