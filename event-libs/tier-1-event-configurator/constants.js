@@ -3,10 +3,10 @@
 const CONFIGS_SHEET_PATH = '/tools/da-apps/tier-1-event-configurator/configs.json';
 
 // Fixed, app-owned upload target for session images — authors never pick or see this path.
-// Dot-prefixed to match the shadow-folder convention documented in
-// .claude/skills/build-content-from-figma/SKILL.md for co-locating media out of an author's
-// normal DA browsing.
-const MEDIA_FOLDER_PATH = '/tools/da-apps/tier-1-event-configurator/.media';
+// Must live under the site's actual published content tree (events/...), not under
+// tools/da-apps/... — that's just where this app's own loader HTML lives, and isn't part of
+// the site's Helix content mount, so preview/publish never resolves it to a servable URL.
+const MEDIA_FOLDER_PATH = '/events/homepage-assets';
 
 // Used to build the "Copy Link" URL authors paste into a block's section-metadata — same
 // shape as Schedule Maker's DA_ORIGIN/DA_APP_PATH (event-libs/schedule-maker/constants.js).

@@ -4,9 +4,9 @@ import { useDA } from '../context/DAContext.js';
 import { uploadAndPublishMedia } from '../scripts/da-controller.js';
 import { buildMediaAssetPath } from '../utils.js';
 
-// Uploads a local image straight into the app's own fixed, hidden DA folder — authors never
-// pick or see a destination — then previews and publishes it so the field ends up with a real,
-// live aem.live URL instead of a raw content.da.live storage link.
+// Uploads a local image straight into the app's own fixed DA folder — authors never pick or
+// see a destination — then previews and publishes it so the field ends up with a real, live
+// aem.live URL instead of a raw content.da.live storage link.
 export default function ImagePickerModal({
   isOpen, onClose, onUploaded, eventId,
 }) {
