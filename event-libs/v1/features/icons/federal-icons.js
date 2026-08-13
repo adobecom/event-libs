@@ -29,6 +29,27 @@ function resolveFederalRoot() {
 // uploaded to federal would re-fetch a 404 on every render.
 const federalIconCache = new Map();
 
+async function fetchSvgFrom(url) {
+  try {
+    const resp = await fetch(url);
+    if (!resp.ok) return null;
+    const svgText = await resp.text();
+    const doc = new DOMParser().parseFromString(svgText, 'image/svg+xml');
+    return doc.querySelector('svg');
+  } catch (err) {
+    window.lana?.log(`[federal-icons] failed to fetch ${url}: ${err.message}`);
+    return null;
+  }
+}
+
+// Federal has two separate SVG namespaces: /assets/icons/svgs/ here, for generic
+// UI/track icons (has its own icons.json manifest, see fetchFederalIconList below);
+// /assets/svgs/ (fetchFederalProductIcon below) for product logos, curated per-product
+// by the product team, no manifest. Deliberately not merged into one fallback chain —
+// nothing today ever needs to resolve a name against both namespaces (tracks/overrides
+// only ever live in this one; products only ever live in the other, via a separate,
+// not-yet-built consumer), so checking both here would just double the 404s for every
+// track/override name federal doesn't have yet.
 export async function fetchFederalIcon(iconName) {
   if (!iconName) return null;
   if (federalIconCache.has(iconName)) {
@@ -36,21 +57,29 @@ export async function fetchFederalIcon(iconName) {
     return cached ? cached.cloneNode(true) : null;
   }
 
-  const url = `${resolveFederalRoot()}/federal/assets/icons/svgs/${iconName}.svg`;
-  let svg = null;
-  try {
-    const resp = await fetch(url);
-    if (resp.ok) {
-      const svgText = await resp.text();
-      const doc = new DOMParser().parseFromString(svgText, 'image/svg+xml');
-      svg = doc.querySelector('svg');
-      if (svg) svg.classList.add('icon-federal', `icon-federal-${iconName}`);
-    }
-  } catch (err) {
-    window.lana?.log(`[federal-icons] failed to fetch ${iconName}: ${err.message}`);
-  }
+  const svg = await fetchSvgFrom(`${resolveFederalRoot()}/federal/assets/icons/svgs/${iconName}.svg`);
+  if (svg) svg.classList.add('icon-federal', `icon-federal-${iconName}`);
 
   federalIconCache.set(iconName, svg);
+  return svg ? svg.cloneNode(true) : null;
+}
+
+const federalProductIconCache = new Map();
+
+// Product-logo namespace only — used by the Tier 1 Event Configurator's product-icon
+// preview today; whatever eventually renders products on the live page (a separate,
+// not-yet-built ticket) should call this directly too, rather than fetchFederalIcon above.
+export async function fetchFederalProductIcon(iconName) {
+  if (!iconName) return null;
+  if (federalProductIconCache.has(iconName)) {
+    const cached = federalProductIconCache.get(iconName);
+    return cached ? cached.cloneNode(true) : null;
+  }
+
+  const svg = await fetchSvgFrom(`${resolveFederalRoot()}/federal/assets/svgs/${iconName}.svg`);
+  if (svg) svg.classList.add('icon-federal', `icon-federal-${iconName}`);
+
+  federalProductIconCache.set(iconName, svg);
   return svg ? svg.cloneNode(true) : null;
 }
 

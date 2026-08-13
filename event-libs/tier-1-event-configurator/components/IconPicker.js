@@ -2,17 +2,15 @@ import { html, useState, useRef, useEffect, useMemo } from '../../v1/deps/htm-pr
 import { Icon } from '../../v1/features/icons/Icon.js';
 import { fetchFederalIconList } from '../../v1/features/icons/federal-icons.js';
 
-// Live-merges an optional curated base list with federal's actual icon inventory
-// (cached in federal-icons.js), so newly-uploaded federal icons appear with no code
-// change. Pass no base list when nothing's curated yet (e.g. products).
-export function useIconSlugOptions(baseSlugs = []) {
-  const [slugs, setSlugs] = useState(baseSlugs);
+// Feeds IconPicker's `options` prop with federal's live icon inventory only — nothing
+// else is offered, so a picked icon is always guaranteed to actually render.
+export function useIconSlugOptions() {
+  const [slugs, setSlugs] = useState([]);
 
   useEffect(() => {
     let cancelled = false;
     fetchFederalIconList().then((federalSlugs) => {
-      if (cancelled || federalSlugs.length === 0) return;
-      setSlugs([...new Set([...baseSlugs, ...federalSlugs])].sort());
+      if (!cancelled) setSlugs([...federalSlugs].sort());
     });
     return () => { cancelled = true; };
   }, []);

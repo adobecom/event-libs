@@ -100,11 +100,11 @@ inspection:
 
 - **`enableScheduling`** → the "Add to schedule"/"Scheduled" buttons in
   `LiveCard.js`, `SessionCard.js`, and `SessionDetailOverlay.js` (all call
-  `handleSchedule`/`scheduleWithFeedback`). When disabled, hide the button
+  `handleSchedule`/`toggleScheduleWithFeedback`). When disabled, hide the button
   (or the whole schedule affordance) rather than disabling it — TBD with
   design.
 - **`enableFavoriting`** → the favorite/heart buttons in the same three
-  files (`handleFavorite`/`favoriteWithFeedback`).
+  files (`handleFavorite`/`toggleFavoriteWithFeedback`).
 - **`enableWatchNowCtas`** → the "Watch now" button in `LiveCard.js` (and
   `SessionDetailOverlay.js`'s live/on-demand variant of the same CTA).
 - **`enableBrandConciergeRibbon`** → **no such component exists in the

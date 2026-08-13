@@ -1,6 +1,10 @@
 import { LIBS } from './utils.js';
 import BlockMediator from '../deps/block-mediator.min.js';
-import { getBaseAttendeePayload, getEventAttendeePayload } from './data-utils.js';
+import {
+  getBaseAttendeePayload,
+  getEventAttendeePayload,
+  getUnrecognizedAttendeeFields,
+} from './data-utils.js';
 import { ENV_MAP } from './constances.js';
 import { getEventConfig, getEventServiceEnv } from './utils.js';
 
@@ -752,12 +756,16 @@ export async function getAndCreateAndAddAttendee(eventId, attendeeData, rsvpToke
     }
   }
 
-  // Use EventAttendee filter for adding attendee to event
-  const eventAttendeePayload = getEventAttendeePayload({
-    ...newAttendeeData,
-    ...attendeeData,
-    registrationStatus,
-  });
+  // Use EventAttendee filter for adding attendee to event; forward any
+  // custom fields the RSVP form submitted that neither filter recognizes.
+  const eventAttendeePayload = {
+    ...getEventAttendeePayload({
+      ...newAttendeeData,
+      ...attendeeData,
+      registrationStatus,
+    }),
+    ...getUnrecognizedAttendeeFields(attendeeData),
+  };
 
   // For a guest, this call both registers and consumes the rsvp token
   // server-side in one step.

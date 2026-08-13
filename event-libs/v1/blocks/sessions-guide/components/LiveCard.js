@@ -5,7 +5,7 @@ import { deriveSessionState, getWatchDestination } from '../../../utils/session-
 import {
   scheduled, favorited, pendingActions, liveStreamActiveIds,
 } from '../../../utils/session-store.js';
-import { scheduleWithFeedback, favoriteWithFeedback } from '../../../services/sessions/action-feedback.js';
+import { toggleScheduleWithFeedback, toggleFavoriteWithFeedback } from '../../../services/sessions/action-feedback.js';
 import { IconPlay, IconCalendarCheck, IconCalendarPlus, IconHeartFilled, IconHeartOutline } from './icons.js';
 import { setSessionParam, clearSessionParams, safeUrl, isSamePage } from '../utils/url.js';
 import { CategoryBadge } from './CategoryBadge.js';
@@ -48,12 +48,12 @@ export function LiveCard({ session, variant = 'live' }) {
 
   async function handleSchedule(e) {
     e.stopPropagation();
-    await scheduleWithFeedback(session, { eventConfig: guideConfig, isScheduled });
+    await toggleScheduleWithFeedback(session, { eventConfig: guideConfig, isScheduled });
   }
 
   async function handleFavorite(e) {
     e.stopPropagation();
-    await favoriteWithFeedback(session, { eventConfig: guideConfig, isFavorited });
+    await toggleFavoriteWithFeedback(session, { eventConfig: guideConfig, isFavorited });
   }
 
   const watchHref = safeUrl(getWatchDestination(session, sessionState));

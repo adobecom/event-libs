@@ -192,8 +192,10 @@ describe('session-filters/resolveTrackBadge', () => {
   it('1. Primary, no additional, no override — primary lane, primary badge icon', () => {
     const badge = resolveTrackBadge({ id: 's-1', track: 'Mainstage', trackOverride: '', additionalTracks: [] });
     expect(badge.label).to.equal('Mainstage');
-    expect(badge.icon).to.equal('mainstage');
-    expect(badge.color).to.equal('#E91E63');
+    // No built-in defaults — an unconfigured track gets no icon and the universal
+    // black fallback color, not any curated slug/color.
+    expect(badge.icon).to.equal(null);
+    expect(badge.color).to.equal('#000000');
     expect(badge.isOverride).to.be.false;
     expect(badge.swimlanes).to.deep.equal(['Mainstage']);
     expect(badge.stackedTracks).to.be.null;
@@ -216,8 +218,10 @@ describe('session-filters/resolveTrackBadge', () => {
     });
     expect(badge.isOverride).to.be.true;
     expect(badge.label).to.equal('custom label');
-    expect(badge.icon).to.equal('star');
-    expect(badge.color).to.equal('#6E6E6E');
+    // No built-in defaults — an unconfigured override also gets no icon and the
+    // universal black fallback color.
+    expect(badge.icon).to.equal(null);
+    expect(badge.color).to.equal('#000000');
     expect(badge.swimlanes).to.deep.equal(['custom label']);
     expect(badge.stackedTracks).to.be.null;
     expect(badge.count).to.equal(0);

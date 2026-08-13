@@ -6,7 +6,7 @@
 
 > **Architecture update (MWPW-199065):** Sessions, favorites, scheduled sessions, and auth were promoted out of this block's Preact Context into a page-level shared module (`event-libs/v1/utils/session-store.js`) so other blocks on the same page can read the same state. See "State layers" and "Why signals, not just BlockMediator" below for the rationale, `REAL-API-CHECKLIST.md` for the current mock/real-API status, and `../../utils/SHARED-STATE-USAGE.md` (co-located with `session-store.js` itself) for a how-to guide aimed at other blocks (Preact and vanilla JS) consuming this state. Sections below that still describe the old single-reducer design have been updated in place; historical phase descriptions (UI behavior, gestures, breakpoints) are unaffected and still accurate.
 >
-> **Follow-up (same ticket):** The toast and schedule-conflict modal were promoted the same way — out of this block's Preact tree into framework-agnostic, page-level modules (`event-libs/v1/features/toast/toast.js`, `event-libs/v1/features/conflict-modal/conflict-modal.js`), mounted once by `session-store.js`'s `initSessionState()`. They live under `features/`, not `utils/` or a new block, since blocks require author-placed content and `utils/` is otherwise pure logic with no DOM/CSS of its own — `features/` is this codebase's existing home for reusable, non-block rendering logic (see `features/carousel/`). Any block — Preact or vanilla — that calls `scheduleAction`/`favoriteAction` now gets the same feedback UI for free. `action-feedback.js` (the error → toast/conflict translator) moved with them to `event-libs/v1/services/sessions/` and no longer takes a `dispatch` argument at all. See Phase 4 below for the updated component/module descriptions.
+> **Follow-up (same ticket):** The toast and schedule-conflict modal were promoted the same way — out of this block's Preact tree into framework-agnostic, page-level modules (`event-libs/v1/features/toast/toast.js`, `event-libs/v1/features/conflict-modal/conflict-modal.js`), mounted once by `session-store.js`'s `initSessionState()`. They live under `features/`, not `utils/` or a new block, since blocks require author-placed content and `utils/` is otherwise pure logic with no DOM/CSS of its own — `features/` is this codebase's existing home for reusable, non-block rendering logic (see `features/carousel/`). Any block — Preact or vanilla — that calls `toggleScheduleAction`/`toggleFavoriteAction` now gets the same feedback UI for free. `action-feedback.js` (the error → toast/conflict translator) moved with them to `event-libs/v1/services/sessions/` and no longer takes a `dispatch` argument at all. See Phase 4 below for the updated component/module descriptions.
 
 ---
 
@@ -260,7 +260,7 @@ Note: event days are **derived from the shared `sessions` signal**, not authored
 
 ### Reducer actions (complete list)
 
-Actions that used to manage shared data (`INIT_USER_DATA`, `LIVE_STATUS_UPDATE`, `SCHEDULE_ADD`/`SCHEDULE_REMOVE`, `FAVORITE_ADD`/`FAVORITE_REMOVE`, `IMS_UPDATE`, `SESSIONS_LOADED`, `SET_SESSIONS_STATUS`, `SET_PENDING`) no longer exist — that data lives in `session-store.js` signals and is mutated directly (`scheduleSession()`, `favoriteSession()`, signal assignment), not through this reducer. The reducer now only holds UI-only state:
+Actions that used to manage shared data (`INIT_USER_DATA`, `LIVE_STATUS_UPDATE`, `SCHEDULE_ADD`/`SCHEDULE_REMOVE`, `FAVORITE_ADD`/`FAVORITE_REMOVE`, `IMS_UPDATE`, `SESSIONS_LOADED`, `SET_SESSIONS_STATUS`, `SET_PENDING`) no longer exist — that data lives in `session-store.js` signals and is mutated directly (`toggleSchedule()`, `toggleFavorite()`, signal assignment), not through this reducer. The reducer now only holds UI-only state:
 
 | Action | Effect |
 |---|---|
@@ -336,7 +336,7 @@ All service files exist and export the correct API surface; all currently return
 - Signals: `sessions`, `sessionsStatus`, `liveStreamActiveIds`, `favorited`, `scheduled`, `auth`, `pendingActions`
 - `initSessionState()` — idempotent bootstrap, gated on `rainfocus-api-url` metadata, called from `decorateEvent()`
 - `getApiConfig()` — the parsed metadata (`apiUrl`, `profileId`, `registerUrl`, `manualCutoff`, `mrEnv`)
-- `scheduleSession(session)` / `favoriteSession(session)` — mutators that call the RF API and update the signals + localStorage
+- `toggleSchedule(session)` / `toggleFavorite(session)` — mutators that call the RF API and update the signals + localStorage
 
 **`store/index.js`** (block-local) exports:
 - `buildInitialState(guideConfig)` — initializes this block's UI-only state; reads `auth.value.isRegistered` for the initial `activeView`
@@ -553,18 +553,18 @@ All view switches are instant — `ViewRouter` returns the active view component
 **Goal:** Add to Schedule, Favorite, Conflict Modal, and ICS download all work, with pessimistic updates.
 
 ### 4.1 Add to Schedule / Remove ✅
-`services/sessions/session-actions.js` → `scheduleAction(session, { showConflictModal })` — promoted out of this block, UI-agnostic (no `dispatch`/reducer knowledge, so any block — Preact or vanilla — can call it):
+`services/sessions/session-actions.js` → `toggleScheduleAction(session, { showConflictModal })` — promoted out of this block, UI-agnostic (no `dispatch`/reducer knowledge, so any block — Preact or vanilla — can call it):
 - Auth gate: reads the shared `auth` signal directly; `isLoggedIn !== true` throws `SessionActionError('auth-required')`; `isRegistered !== true` throws `SessionActionError('registration-required')`
 - Pending guard: no-op if `pendingActions.value.has(session.id)` (read from `session-store.js`, not a reducer field)
 - Conflict check: if not yet scheduled and `showConflictModal` (passed explicitly by the caller, since it's block-instance config), throws `SessionActionError('conflict', { conflict, incoming })` instead of dispatching a modal itself
-- Success path: calls `session-store.js`'s `scheduleSession(session)`, which mutates the shared `scheduled` signal, persists to localStorage, and calls the RF API
+- Success path: calls `session-store.js`'s `toggleSchedule(session)`, which mutates the shared `scheduled` signal, persists to localStorage, and calls the RF API
 - Failure: any thrown error is a discriminated `SessionActionError` (`reason: 'auth-required' | 'registration-required' | 'conflict' | 'network'`) — **this module never shows a toast, opens a modal, or touches a reducer**. `services/sessions/action-feedback.js` (`runSessionAction()`, promoted alongside it) translates the error into a call to the shared `showToast()`/`showConflictModal()` modules — usable by any block, Preact or vanilla, with no `dispatch` argument at all
 - Dismiss animation: unchanged — still `ADD_DISMISSING_ID` + 450 ms delay before the action, driven by the calling component (`SessionCard`/`LiveCard`/`SessionDetailOverlay`); `SessionCard`'s two call sites share this logic via a local `withDismissAnimation()` helper
-- Conflict resolution: `resolveScheduleConflict(conflict, incoming)` — called from `action-feedback.js`'s `onConfirm` handler; reuses `scheduleSession()`'s toggle behavior to remove the conflicting session then add the incoming one
-- Call-site convenience: `scheduleWithFeedback(session, { eventConfig, isScheduled })` / `favoriteWithFeedback(session, { eventConfig, isFavorited })` (also in `action-feedback.js`) wrap `runSessionAction()` with the shared success copy so `SessionCard`/`LiveCard`/`SessionDetailOverlay` don't each repeat it
+- Conflict resolution: `resolveScheduleConflict(conflict, incoming)` — called from `action-feedback.js`'s `onConfirm` handler; reuses `toggleSchedule()`'s toggle behavior to remove the conflicting session then add the incoming one
+- Call-site convenience: `toggleScheduleWithFeedback(session, { eventConfig, isScheduled })` / `toggleFavoriteWithFeedback(session, { eventConfig, isFavorited })` (also in `action-feedback.js`) wrap `runSessionAction()` with the shared success copy so `SessionCard`/`LiveCard`/`SessionDetailOverlay` don't each repeat it
 
 ### 4.2 Favorite / Unfavorite ✅
-`services/sessions/session-actions.js` → `favoriteAction(session)` — same auth-gate/error-throwing contract as `scheduleAction`, calling `session-store.js`'s `favoriteSession(session)` on success. Toast composition and dismiss-animation timing live in the calling component via `favoriteWithFeedback()`, same as scheduling.
+`services/sessions/session-actions.js` → `toggleFavoriteAction(session)` — same auth-gate/error-throwing contract as `toggleScheduleAction`, calling `session-store.js`'s `toggleFavorite(session)` on success. Toast composition and dismiss-animation timing live in the calling component via `toggleFavoriteWithFeedback()`, same as scheduling.
 
 ### 4.3 Conflict modal ✅ (promoted to `event-libs/v1/features/conflict-modal/conflict-modal.js`)
 No longer a Preact component — `mountConflictModal()` builds a backdrop + modal once via plain DOM (`createTag`), mounted to `document.body` by `initSessionState()`, and subscribes to the module's own `conflict` signal:
@@ -627,7 +627,7 @@ schedule/favorite gate:
     their auth state flips to unauthorized while already sitting on the view (e.g. a session
     expiring in another tab).
 
-The click-time auth gate for scheduleAction/favoriteAction is a separate, pre-existing
+The click-time auth gate for toggleScheduleAction/toggleFavoriteAction is a separate, pre-existing
 mechanism and was never the problem — `runSessionAction()`'s error-to-toast translation
 already did exactly this for schedule/favorite clicks; `checkViewAccess()` reuses its toast
 copy/CTA logic via a shared `showAuthToast()` helper rather than duplicating it.
@@ -1068,7 +1068,7 @@ Shared, page-level modules now live outside this block's directory — anything 
 
 ```
 event-libs/v1/utils/
-  session-store.js               # SHARED, page-level: sessions/sessionsStatus/liveStreamActiveIds/favorited/scheduled/auth/pendingActions/sessionStateVersion signals; initSessionState(), getApiConfig(), scheduleSession(), favoriteSession(); also calls mountToast()/mountConflictModal()
+  session-store.js               # SHARED, page-level: sessions/sessionsStatus/liveStreamActiveIds/favorited/scheduled/auth/pendingActions/sessionStateVersion signals; initSessionState(), getApiConfig(), toggleSchedule(), toggleFavorite(); also calls mountToast()/mountConflictModal()
   session-state.js                # SHARED: getNowMs, deriveSessionState, isInLiveNow — pure functions (moved out of this block)
   decorate.js                     # calls initSessionState() from decorateEvent(), before any block's init()
 
@@ -1087,8 +1087,8 @@ event-libs/v1/services/sessions/  # SHARED service layer (moved out of this bloc
   mobile-rider.js                 # real: fetchLiveStatus — Mobile Rider batch media-status endpoint (dev vs prod host)
   poller.js                       # startPolling, stopPolling — takes a plain onUpdate callback, no dispatch coupling
   session-state-ticker.js          # startSessionStateTicker, stopSessionStateTicker — diffs deriveSessionState() per session on an interval, only calls onChange on a real transition
-  session-actions.js              # scheduleAction, favoriteAction, hasTimeConflict, resolveScheduleConflict, SessionActionError — UI-agnostic; throws instead of dispatching toasts
-  action-feedback.js              # runSessionAction(), scheduleWithFeedback(), favoriteWithFeedback() — translate SessionActionError into showToast()/showConflictModal() calls; no dispatch argument, usable by any block
+  session-actions.js              # toggleScheduleAction, toggleFavoriteAction, hasTimeConflict, resolveScheduleConflict, SessionActionError — UI-agnostic; throws instead of dispatching toasts
+  action-feedback.js              # runSessionAction(), toggleScheduleWithFeedback(), toggleFavoriteWithFeedback() — translate SessionActionError into showToast()/showConflictModal() calls; no dispatch argument, usable by any block
 
 event-libs/v1/blocks/sessions-guide/
   sessions-guide.js               # block entry (widget default, page via CSS class)

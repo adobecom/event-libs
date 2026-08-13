@@ -7,7 +7,6 @@ import {
   deleteConfig as deleteConfigController,
 } from '../scripts/da-controller.js';
 import { useDA } from './DAContext.js';
-import { getDefaultTrackIcon, DEFAULT_ICON_COLOR } from '../default-track-icons.js';
 import { getDisplayTitle } from '../utils.js';
 
 const ConfigsContext = createContext();
@@ -18,7 +17,7 @@ function emptyConfig() {
     trackIcons: {},
     overrideTrackIcon: null,
     overrideTrackIcons: {},
-    productIcons: {},
+    products: {},
     allowDoubleBooking: false,
     featuredSessions: [],
     rfApiUrl: '',
@@ -137,30 +136,6 @@ const ConfigsProvider = ({ children }) => {
     });
   }, []);
 
-  // Called once real tracks are known (session fetch resolves) — writes a
-  // { icon, color: black } entry for any track with a *known* default icon
-  // that isn't already in trackIcons (never overwrites an authored/seeded
-  // entry). Tracks with no known icon are left unseeded — nothing sensible
-  // to auto-pick, and seeding a color alone would trip isTrackIconEntryComplete.
-  const seedTrackIcons = useCallback((tracks) => {
-    setActiveConfig((prev) => {
-      if (!prev) return prev;
-      const existing = prev.config.trackIcons || {};
-      const additions = {};
-      (tracks || []).forEach((track) => {
-        if (existing[track]) return;
-        const fallback = getDefaultTrackIcon(track);
-        if (!fallback?.icon) return;
-        additions[track] = { icon: fallback.icon, color: DEFAULT_ICON_COLOR };
-      });
-      if (Object.keys(additions).length === 0) return prev;
-      return {
-        ...prev,
-        config: { ...prev.config, trackIcons: { ...existing, ...additions } },
-      };
-    });
-  }, []);
-
   // Same merge pattern as updateTrackIcon, keyed by override text instead of track name —
   // each distinct text an author has typed is its own swimlane, with its own entry.
   const updateOverrideTrackIcon = useCallback((overrideText, updates) => {
@@ -179,15 +154,18 @@ const ConfigsProvider = ({ children }) => {
     });
   }, []);
 
-  // Simpler than updateTrackIcon — a single icon slug per product, no color to merge.
-  const updateProductIcon = useCallback((product, icon) => {
+  // Same merge pattern as updateTrackIcon — { icon, pageUrl } per product, no color.
+  const updateProduct = useCallback((product, updates) => {
     setActiveConfig((prev) => {
       if (!prev) return prev;
       return {
         ...prev,
         config: {
           ...prev.config,
-          productIcons: { ...prev.config.productIcons, [product]: icon },
+          products: {
+            ...prev.config.products,
+            [product]: { ...prev.config.products?.[product], ...updates },
+          },
         },
       };
     });
@@ -254,9 +232,8 @@ const ConfigsProvider = ({ children }) => {
     startEditConfig,
     clearActiveConfig,
     updateTrackIcon,
-    seedTrackIcons,
     updateOverrideTrackIcon,
-    updateProductIcon,
+    updateProduct,
     updateConfigField,
     saveActiveConfig,
     removeConfig,

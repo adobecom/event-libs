@@ -8,7 +8,7 @@ import {
 } from '../../../utils/session-store.js';
 import { getTrackIcon } from '../../../utils/tier-1-event-config.js';
 import { resolveIcon } from '../../../features/icons/icon-resolver.js';
-import { scheduleWithFeedback, favoriteWithFeedback } from '../../../services/sessions/action-feedback.js';
+import { toggleScheduleWithFeedback, toggleFavoriteWithFeedback } from '../../../services/sessions/action-feedback.js';
 import { registerStreamIds, unregisterStreamIds, subscribe } from '../../../services/sessions/mobile-rider-poller.js';
 
 const ROTATE_OUT_MS = 350;
@@ -36,7 +36,7 @@ const ICON_ARROW_RIGHT = '<svg width="16" height="16" viewBox="0 0 16 16" fill="
 
 function buildCategoryBadge(track) {
   if (!track) return null;
-  const entry = getTrackIcon(track) || getTrackIcon('mainstage');
+  const entry = getTrackIcon(track);
   if (!entry) return null;
 
   const badge = createTag('span', { class: 'sg-category-badge sg-category-badge--sm' });
@@ -126,7 +126,7 @@ async function handleSchedule(e, session, isScheduled, btn) {
   e.stopPropagation();
   btn.disabled = true;
   try {
-    await scheduleWithFeedback(toRfSession(session), { eventConfig: EVENT_CONFIG, isScheduled });
+    await toggleScheduleWithFeedback(toRfSession(session), { eventConfig: EVENT_CONFIG, isScheduled });
   } finally {
     btn.disabled = false;
   }
@@ -136,7 +136,7 @@ async function handleFavorite(e, session, isFavorited, btn) {
   e.stopPropagation();
   btn.disabled = true;
   try {
-    await favoriteWithFeedback(toRfSession(session), { eventConfig: EVENT_CONFIG, isFavorited });
+    await toggleFavoriteWithFeedback(toRfSession(session), { eventConfig: EVENT_CONFIG, isFavorited });
   } finally {
     btn.disabled = false;
   }

@@ -1,5 +1,5 @@
 import {
-  resolveScheduleConflict, scheduleAction, favoriteAction, assertAuthorized,
+  resolveScheduleConflict, toggleScheduleAction, toggleFavoriteAction, assertAuthorized,
 } from './session-actions.js';
 import { showToast } from '../../features/toast/toast.js';
 import { showConflictModal } from '../../features/conflict-modal/conflict-modal.js';
@@ -68,11 +68,11 @@ export async function runSessionAction(actionFn, {
 
 // Thin, pre-labeled wrappers around runSessionAction so every schedule/favorite call
 // site shares the same success copy instead of repeating it at each call site.
-export function scheduleWithFeedback(session, { eventConfig, isScheduled }) {
+export function toggleScheduleWithFeedback(session, { eventConfig, isScheduled }) {
   // One shared, page-level read (not eventConfig, which is per-block) — inverted,
   // since allowing double booking means suppressing the conflict modal.
   return runSessionAction(
-    () => scheduleAction(session, { showConflictModal: !getAllowDoubleBooking() }),
+    () => toggleScheduleAction(session, { showConflictModal: !getAllowDoubleBooking() }),
     {
       eventConfig,
       actionLabel: 'add to schedule',
@@ -82,9 +82,9 @@ export function scheduleWithFeedback(session, { eventConfig, isScheduled }) {
   );
 }
 
-export function favoriteWithFeedback(session, { eventConfig, isFavorited }) {
+export function toggleFavoriteWithFeedback(session, { eventConfig, isFavorited }) {
   return runSessionAction(
-    () => favoriteAction(session),
+    () => toggleFavoriteAction(session),
     {
       eventConfig,
       actionLabel: 'add to favorites',

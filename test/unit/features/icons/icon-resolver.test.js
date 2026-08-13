@@ -21,10 +21,9 @@ describe('icon-resolver', () => {
     expect(svg.classList.contains('icon-milo-search')).to.equal(true);
   });
 
-  it('falls back to the event-libs track-icons.svg sprite when neither federal nor Milo has it', async () => {
+  it('returns null for a track icon not in federal or Milo — no sprite fallback', async () => {
     const svg = await resolveIcon('mainstage');
-    expect(svg).to.not.equal(null);
-    expect(svg.classList.contains('icon-track-mainstage')).to.equal(true);
+    expect(svg).to.equal(null);
   });
 
   it('returns null when no source has the icon', async () => {

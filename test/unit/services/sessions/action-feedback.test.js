@@ -1,6 +1,6 @@
 import { expect } from '@esm-bundle/chai';
 
-import { runSessionAction, scheduleWithFeedback, checkViewAccess } from '../../../../event-libs/v1/services/sessions/action-feedback.js';
+import { runSessionAction, toggleScheduleWithFeedback, checkViewAccess } from '../../../../event-libs/v1/services/sessions/action-feedback.js';
 import { SessionActionError } from '../../../../event-libs/v1/services/sessions/session-actions.js';
 import { toast } from '../../../../event-libs/v1/features/toast/toast.js';
 import { conflict } from '../../../../event-libs/v1/features/conflict-modal/conflict-modal.js';
@@ -78,7 +78,7 @@ describe('services/sessions/action-feedback', () => {
   // No tier-1-event-config metadata authored anywhere in this file, so
   // getAllowDoubleBooking() defaults to false — mirrors a page that hasn't set the
   // flag, where a genuine time conflict must still block scheduling.
-  it('scheduleWithFeedback surfaces the conflict modal for a real time conflict when allowDoubleBooking is unset', async () => {
+  it('toggleScheduleWithFeedback surfaces the conflict modal for a real time conflict when allowDoubleBooking is unset', async () => {
     auth.value = { isLoggedIn: true, isRegistered: true, userFirstName: null };
     pendingActions.value = new Set();
     const existingSession = {
@@ -90,7 +90,7 @@ describe('services/sessions/action-feedback', () => {
     sessions.value = [existingSession, incoming];
     scheduled.value = new Set(['existing']);
 
-    await scheduleWithFeedback(incoming, { eventConfig, isScheduled: false });
+    await toggleScheduleWithFeedback(incoming, { eventConfig, isScheduled: false });
 
     expect(conflict.value.existing).to.equal(existingSession);
     expect(conflict.value.incoming).to.equal(incoming);

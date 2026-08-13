@@ -15,11 +15,11 @@ skipped — the block correctly never implements them.
   `openSessionGuideDetail(sessionId)` (`session-store.js`), matching PR #211's shared
   mechanism.
 - **Add to Schedule / Favorite, three-state auth model** — `handleSchedule`/
-  `handleFavorite` → `scheduleWithFeedback`/`favoriteWithFeedback`
+  `handleFavorite` → `toggleScheduleWithFeedback`/`toggleFavoriteWithFeedback`
   (`services/sessions/action-feedback.js`) already implement all three states:
   logged-in+registered completes the action, logged-out shows a sign-in toast,
   logged-in-not-registered shows a register toast. Reused as-is, no changes needed.
-- **No conflict modal** — `scheduleWithFeedback` passes `showConflictModal:
+- **No conflict modal** — `toggleScheduleWithFeedback` passes `showConflictModal:
   !getAllowDoubleBooking()`; this event's tier-1 config has double-booking allowed, so
   the conflict path never triggers. Correct per the resolved requirement.
 - **Category/track badge** — `buildCategoryBadge()` now uses the self-serve
