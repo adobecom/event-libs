@@ -46,22 +46,35 @@ export default function ImagePickerModal({ isOpen, onClose, onUploaded }) {
   const [uploadError, setUploadError] = useState(null);
 
   const columnsRef = useRef(null);
+  // Guards against out-of-order responses — e.g. two folders clicked in quick succession
+  // targeting the same column index. Only the reply matching the latest request actually
+  // gets applied; an earlier, slower one is dropped instead of overwriting newer state.
+  const requestSeqRef = useRef(0);
 
   useEffect(() => {
     if (columnsRef.current) columnsRef.current.scrollLeft = columnsRef.current.scrollWidth;
   }, [columnItems.length]);
 
   const loadColumn = useCallback(async (colIndex, path) => {
+    const seq = requestSeqRef.current + 1;
+    requestSeqRef.current = seq;
     setLoadingColIndex(colIndex);
     setBrowseError(null);
     try {
       const items = await fetchFolders(org, repo, path);
+      if (requestSeqRef.current !== seq) return;
       setColumnItems((prev) => { const next = prev.slice(0, colIndex); next[colIndex] = items; return next; });
       setColumnPaths((prev) => { const next = prev.slice(0, colIndex); next[colIndex] = path; return next; });
     } catch (err) {
+      if (requestSeqRef.current !== seq) return;
       setBrowseError(err.message);
+      // Drop any columns past the one that failed to load — they described the branch this
+      // navigation was leaving, not the (failed) target, and would otherwise sit stale next
+      // to the error banner.
+      setColumnItems((prev) => prev.slice(0, colIndex));
+      setColumnPaths((prev) => prev.slice(0, colIndex));
     } finally {
-      setLoadingColIndex(null);
+      if (requestSeqRef.current === seq) setLoadingColIndex(null);
     }
   }, [org, repo]);
 
@@ -98,7 +111,9 @@ export default function ImagePickerModal({ isOpen, onClose, onUploaded }) {
 
   const handleAddFolder = () => {
     const name = newFolderName.trim();
-    if (!name || name.includes('/')) return;
+    // '.'/'..' get collapsed by URL dot-segment normalization before a request is sent, so an
+    // unguarded one here could silently retarget list/upload calls outside this org/repo.
+    if (!name || name.includes('/') || name === '.' || name === '..') return;
     // colIndex is the currently deepest loaded column (columnItems.length - 1) — the new
     // virtual folder is appended as the *next* column, one level below it, not overwritten
     // into it (that would wipe out the folder list currently on screen at this depth).
@@ -126,8 +141,9 @@ export default function ImagePickerModal({ isOpen, onClose, onUploaded }) {
 
   const handleBreadcrumbClick = (path) => {
     if (!path) {
+      // Root's items are already loaded (they're the always-fetched first column) —
+      // resetToRoot restores them from state, no need to refetch.
       resetToRoot();
-      loadColumn(0, '/');
       return;
     }
     const colIndex = columnPaths.indexOf(path);
@@ -152,6 +168,7 @@ export default function ImagePickerModal({ isOpen, onClose, onUploaded }) {
       const result = await uploadMedia(org, repo, selectedFolderPath, file);
       if (!result.ok) {
         if (result.status === 401) setUploadError('Unauthorized — sign in at da.live first.');
+        else if (result.status === 0) setUploadError('Unable to reach DA — sign in at da.live first, or check your connection.');
         else setUploadError(result.error || `Upload failed (${result.status})`);
         return;
       }
@@ -161,13 +178,21 @@ export default function ImagePickerModal({ isOpen, onClose, onUploaded }) {
     }
   };
 
+  // Every close path (header ×, Escape, backdrop, and both phases' Cancel buttons) routes
+  // through this rather than the raw onClose prop — closing mid-upload would leave the
+  // upload running against a modal a caller may reopen for a different row before it
+  // settles, and its completion callback would then wrongly close *that* row's picker.
+  const handleClose = () => {
+    if (isUploading) return;
+    onClose();
+  };
+
   if (!isOpen) return null;
 
   const breadcrumb = buildBreadcrumb();
-  const deepestColIndex = columnItems.length - 1;
 
   return html`
-    <${Modal} isOpen=${isOpen} onClose=${onClose} title="Add image" size="large" showActions=${false}>
+    <${Modal} isOpen=${isOpen} onClose=${handleClose} title="Add image" size="large" showActions=${false}>
       ${phase === PHASES.FOLDER && html`
         <div class="tec-fb-wrapper">
           <p class="tec-editor__section-hint">Choose a DA folder to upload the image into, or type a new folder name below.</p>
@@ -236,7 +261,7 @@ export default function ImagePickerModal({ isOpen, onClose, onUploaded }) {
               type="button"
               class="tec-btn tec-btn--outline tec-btn--s"
               onClick=${handleAddFolder}
-              disabled=${!newFolderName.trim() || newFolderName.includes('/') || loadingColIndex === deepestColIndex}
+              disabled=${!newFolderName.trim() || newFolderName.includes('/') || newFolderName.trim() === '.' || newFolderName.trim() === '..' || loadingColIndex !== null}
             >Add folder</button>
           </div>
           <p class="tec-editor__section-hint">New folders appear in DA once you upload the first image into them.</p>
@@ -245,7 +270,7 @@ export default function ImagePickerModal({ isOpen, onClose, onUploaded }) {
             <code class="tec-fb-selected-value">${selectedFolderPath}</code>
           </div>
           <div class="tec-fb-actions">
-            <button type="button" class="tec-btn tec-btn--outline tec-btn--l" onClick=${onClose}>Cancel</button>
+            <button type="button" class="tec-btn tec-btn--outline tec-btn--l" onClick=${handleClose}>Cancel</button>
             <button type="button" class="tec-btn tec-btn--primary tec-btn--l" onClick=${() => setPhase(PHASES.UPLOAD)}>Next</button>
           </div>
         </div>
@@ -261,7 +286,7 @@ export default function ImagePickerModal({ isOpen, onClose, onUploaded }) {
           ${file && html`<p class="tec-editor__section-hint">Selected: ${file.name} (${Math.round(file.size / 1024)} KB)</p>`}
           ${uploadError && html`<p class="tec-editor__error">${uploadError}</p>`}
           <div class="tec-fb-actions">
-            <button type="button" class="tec-btn tec-btn--outline tec-btn--l" onClick=${onClose} disabled=${isUploading}>Cancel</button>
+            <button type="button" class="tec-btn tec-btn--outline tec-btn--l" onClick=${handleClose} disabled=${isUploading}>Cancel</button>
             <button type="button" class="tec-btn tec-btn--primary tec-btn--l" onClick=${handleUpload} disabled=${!file || isUploading}>
               ${isUploading ? 'Uploading…' : 'Upload'}
             </button>
