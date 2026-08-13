@@ -1073,6 +1073,13 @@ function addStylesToEventPage() {
 // e.g. "dark", "dark(blocks:hero-marquee,profile-cards)", or "dark(blocks:text[first],agenda)"
 const BLOCK_TOKEN_RE = /^([^[\]]+?)(?:\[\s*(first|last|[1-9]\d*)\s*\])?$/;
 
+// Matches top-level authored blocks (main > section > block) AND blocks loaded into a
+// Milo fragment (chrono-box, promotional-content, or a plain `fragment` block all insert
+// their content as `div.fragment > div (section) > div[class] (block)`, nested inside the
+// block that triggered the load). Without the second half, a block that only exists inside
+// a dynamically-swapped fragment is structurally invisible to this selector.
+const PAGE_BLOCK_SELECTOR = 'main > div > div[class], main .fragment > div > div[class]';
+
 function parseThemeValue(raw) {
   const value = raw?.toLowerCase().trim();
   const match = value?.match(/^(dark|light)(?:\(\s*blocks\s*:\s*([^)]*)\)\s*)?$/);
@@ -1095,26 +1102,20 @@ function parseThemeValue(raw) {
 
 export function applyAreaTheme(area = document) {
   try {
-    const rawCustomAttributes = getMetadata('custom-attributes');
-    console.log('[theme-debug] applyAreaTheme() called', { area, isDocumentArea: area === document, rawCustomAttributes });
-
-    const customAttributes = JSON.parse(rawCustomAttributes);
+    const customAttributes = JSON.parse(getMetadata('custom-attributes'));
     const theme = customAttributes.find(
       (attr) => (attr.name ?? attr.attribute)?.toLowerCase().trim() === 'theme',
     );
-    console.log('[theme-debug] resolved theme attribute', theme);
     if (!theme) return;
 
     const parsed = parseThemeValue(theme.values?.[0]?.value);
-    console.log('[theme-debug] parseThemeValue() ->', parsed);
     if (!parsed) return;
     const { theme: themeValue, blockTokens } = parsed;
 
     const isDocument = area === document;
     const blocks = isDocument
-      ? area.body.querySelectorAll('main > div > div[class]')
+      ? area.body.querySelectorAll(PAGE_BLOCK_SELECTOR)
       : area.querySelectorAll('div[class]');
-    console.log('[theme-debug] candidate blocks', Array.from(blocks).map((b) => b.className));
 
     if (blockTokens) {
       const localList = Array.from(blocks);
@@ -1129,15 +1130,13 @@ export function applyAreaTheme(area = document) {
       if (positionalTokens.length) {
         const pageBlockList = isDocument
           ? localList
-          : Array.from(document.body.querySelectorAll('main > div > div[class]'));
-        console.log('[theme-debug] pageBlockList for positional resolution', pageBlockList.map((b) => b.className));
+          : Array.from(document.body.querySelectorAll(PAGE_BLOCK_SELECTOR));
         positionalTokens.forEach(({ name, selector }) => {
           const group = pageBlockList.filter((b) => b.classList.contains(name));
           const index = selector === 'first' ? 0
             : selector === 'last' ? group.length - 1
               : Number(selector) - 1;
           const target = group[index];
-          console.log('[theme-debug] positional token', { name, selector, groupSize: group.length, foundTarget: !!target });
           group.forEach((block) => {
             block.classList.remove('dark', 'light');
             if (block === target) block.classList.add(themeValue);
@@ -1187,8 +1186,8 @@ export function applyAreaTheme(area = document) {
       block.classList.remove('dark', 'light');
       block.classList.add(themeValue);
     });
-  } catch (e) {
-    console.log('[theme-debug] applyAreaTheme() threw and was silently caught', e);
+  } catch {
+    // no-op: custom-attributes absent or not valid JSON
   }
 }
 
