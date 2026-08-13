@@ -311,7 +311,7 @@
 
   .upcoming-sessions .sg-card__footer {
     display: flex;
-    align-items: flex-end;
+    align-items: flex-start;
     justify-content: space-between;
     gap: var(--s2a-spacing-xs, 8px);
     margin-top: var(--s2a-spacing-md, 16px);

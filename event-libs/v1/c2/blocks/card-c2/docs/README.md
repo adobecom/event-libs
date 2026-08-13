@@ -28,9 +28,16 @@ for Upcoming Sessions / Session Guide:
 
 Cards with `data-mr-stream-id` need to know which MR streams are currently
 broadcasting to distinguish "live" from "upcoming"/"on-demand" (non-MR cards ignore
-this and use pure time-window checks). A single shared poll (every 30s) is started
-lazily the first time an MR-backed card is wired up, and keeps a shared
-`liveStreamActiveIds` set that `deriveSessionState` reads from.
+this and use pure time-window checks). The first MR-backed card wired up registers
+every `.card-c2[data-mr-stream-id]` on the page with the shared registry at
+`event-libs/v1/services/sessions/mobile-rider-poller.js`
+(`registerStreamIds`/`subscribe`) and never unregisters — this block needs ongoing
+live→on-demand tracking, unlike `upcoming-sessions`, which drops an id the moment
+it's confirmed started. The registry itself batches ids from every registered
+caller into a single `getMediaStatus()` call per 30s tick, so if `upcoming-sessions`
+is also polling overlapping ids on the same page, both blocks share one underlying
+request instead of two independent loops. Results feed a local `liveStreamActiveIds`
+set that `deriveSessionState` reads from.
 
 ### `?timing=<epoch-ms>` override
 

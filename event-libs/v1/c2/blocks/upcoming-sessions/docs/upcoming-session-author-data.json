@@ -3,7 +3,7 @@
     "sessionId": "1c2f7e9a-3b4d-4e21-9a6f-6d1f1a2b3c4d",
     "sessionCode": "S6210",
     "enTitle": "Generative Fill Deep Dive: Photoshop's Newest AI Tools",
-    "track": "AI",
+    "track": "Generative Ai",
     "url": "https://www.adobe.com/max/2026/sessions/generative-fill-deep-dive-s6210",
     "watchUrl": "https://www.adobe.com/max/2026/live/homepage-stage",
     "sessionTime": {
@@ -16,7 +16,7 @@
     "sessionId": "5f7a0b1c-5d8f-4a54-9d9c-0a5b5e6f7a8b",
     "sessionCode": "S6522",
     "enTitle": "Premiere Pro Roundtable: Editing at Broadcast Scale",
-    "track": "Video",
+    "track": "Video, Audio, and Motion",
     "url": "https://www.adobe.com/max/2026/sessions/premiere-pro-roundtable-s6522",
     "watchUrl": "https://www.adobe.com/max/2026/live/session-broadcast/s6522",
     "mrStreamId": "mr-stream-s6522",
@@ -30,7 +30,7 @@
     "sessionId": "7b9c2d3e-7f0b-4c76-9f1e-2c7d7a8b9c0d",
     "sessionCode": "S6608",
     "enTitle": "Firefly & Express: A Faster Path from Idea to Asset",
-    "track": "AI",
+    "track": "Generative Ai",
     "url": "https://www.adobe.com/max/2026/sessions/firefly-express-idea-to-asset-s6608",
     "sessionTime": {
       "startTimeMillis": 1784626504633,
