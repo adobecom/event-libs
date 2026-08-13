@@ -30,3 +30,36 @@ a.con-button.no-event {
   pointer-events: none;
   opacity: 0.5;
 }
+
+/* Opt-in selective section-row grouping (page metadata: section-layout: columns).
+   Sections default to full width (flex: 1 1 100% forces each onto its own line,
+   identical to normal stacking). Only sections tagged column-span-1/2/3 (via the
+   Section Metadata "style" key) shrink from 100% and pack onto a shared line with
+   their contiguous column-span-tagged neighbors. An untagged section can never fit
+   next to anything else, so it always forces a line break before and after itself
+   — grouping is only ever contiguous, by construction, with no validation needed. */
+@media (min-width: 900px) {
+  /* align-items: stretch (the default) is intentional: it equalizes section
+     height within a shared row (backgrounds/borders line up cleanly), but since
+     .section lays out its own children as normal block flow, not flex/grid,
+     the content inside isn't forced to stretch along with it. */
+  main.section-columns {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: stretch;
+  }
+
+  main.section-columns > .section {
+    flex: 1 1 100%;
+  }
+
+  main.section-columns > .section.column-span-1,
+  main.section-columns > .section.column-span-2,
+  main.section-columns > .section.column-span-3 {
+    min-width: 0;
+  }
+
+  main.section-columns > .section.column-span-1 { flex: 1 1 0; }
+  main.section-columns > .section.column-span-2 { flex: 2 1 0; }
+  main.section-columns > .section.column-span-3 { flex: 3 1 0; }
+}
