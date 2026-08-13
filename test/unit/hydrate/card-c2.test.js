@@ -22,6 +22,14 @@ const SESSIONS = [
     mrStreamId: 'mr-stream-s6522',
     sessionTime: { startTimeMillis: 1784624404633, endTimeMillis: 1784628904633, timezone: 'America/Los_Angeles' },
   },
+  {
+    sessionId: '0d646e37-b0e9-4d86-9dab-927ccb37f04e',
+    sessionCode: 'OS565',
+    enTitle: 'One Voice, Many Platforms',
+    track: 'Creator',
+    url: 'https://www.adobe.com/max/2026/sessions/os565',
+    sessionTime: { startTimeMillis: 1784624404633, endTimeMillis: 1784628904633, timezone: 'America/Los_Angeles' },
+  },
 ];
 
 // DA percent-encodes `[[`/`]]` inside attribute values on save.
@@ -92,6 +100,25 @@ describe('card-c2 hydrator', () => {
     expect(block.querySelector('a').getAttribute('href')).to.equal('[[featured-sessions:1.url]]');
     expect(block.dataset.mrStreamId).to.equal('mr-stream-s6522');
     expect(block.dataset.watchUrl).to.equal('https://www.adobe.com/max/2026/live/session-broadcast/s6522');
+  });
+
+  it('matches a multi-letter session-code prefix (e.g. OS565), not just S####', async () => {
+    document.body.innerHTML = `
+      <div class="card-c2 hydrate featured-sessions os565">
+        <div><div><picture><img src="/media/os565.jpg" alt=""></picture></div></div>
+        ${AUTHORED_CONTENT}
+      </div>
+    `;
+
+    await hydrateBlocks(document);
+
+    const block = document.querySelector('.card-c2');
+    expect(tokensIn(block)).to.deep.equal([
+      'featured-sessions:2.enTitle',
+      'featured-sessions:2.track',
+      'featured-sessions:2.url',
+    ]);
+    expect(block.dataset.sessionId).to.equal('0d646e37-b0e9-4d86-9dab-927ccb37f04e');
   });
 
   it('leaves the authored tokens un-rewritten when the session code has no match', async () => {
