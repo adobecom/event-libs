@@ -121,6 +121,46 @@ describe('card-c2 hydrator', () => {
     expect(block.dataset.sessionId).to.equal('0d646e37-b0e9-4d86-9dab-927ccb37f04e');
   });
 
+  it('rewrites bare, prefix-less tokens (e.g. [[enTitle]]) using the card\'s own metadata key', async () => {
+    document.body.innerHTML = `
+      <div class="card-c2 hydrate featured-sessions s6210">
+        <div><div><picture><img src="/media/s6210.jpg" alt=""></picture></div></div>
+        <div><div>
+          <p>[[enTitle]]</p>
+          <p>[[track]]</p>
+          <p><a href="${encodeURIComponent('[[url]]')}">Learn more</a></p>
+        </div></div>
+      </div>
+    `;
+
+    await hydrateBlocks(document);
+
+    const block = document.querySelector('.card-c2');
+    expect(tokensIn(block)).to.deep.equal([
+      'featured-sessions:0.enTitle',
+      'featured-sessions:0.track',
+      'featured-sessions:0.url',
+    ]);
+    expect(block.querySelector('a').getAttribute('href')).to.equal('[[featured-sessions:0.url]]');
+    expect(block.dataset.sessionId).to.equal('1c2f7e9a-3b4d-4e21-9a6f-6d1f1a2b3c4d');
+  });
+
+  it('leaves a dotted token referencing a different metadata key untouched', async () => {
+    document.body.innerHTML = `
+      <div class="card-c2 hydrate featured-sessions s6210">
+        <div><div><picture><img src="/media/s6210.jpg" alt=""></picture></div></div>
+        <div><div>
+          <p>[[some-other-key.title]]</p>
+        </div></div>
+      </div>
+    `;
+
+    await hydrateBlocks(document);
+
+    const block = document.querySelector('.card-c2');
+    expect(tokensIn(block)).to.deep.equal(['some-other-key.title']);
+  });
+
   it('leaves the authored tokens un-rewritten when the session code has no match', async () => {
     document.body.innerHTML = `
       <div class="card-c2 hydrate featured-sessions s9999">

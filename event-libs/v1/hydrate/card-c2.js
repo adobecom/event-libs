@@ -35,8 +35,14 @@ function getSessions(metadataKey) {
 
 function rewriteToken(str, metadataKey, index) {
   return str.replace(META_REG, (match, token) => {
-    if (!token.startsWith(metadataKey) || token.includes(':')) return match;
-    return `[[${metadataKey}:${index}${token.slice(metadataKey.length)}]]`;
+    if (token.includes(':')) return match;
+    if (token.startsWith(metadataKey)) {
+      return `[[${metadataKey}:${index}${token.slice(metadataKey.length)}]]`;
+    }
+    if (!token.includes('.')) {
+      return `[[${metadataKey}:${index}.${token}]]`;
+    }
+    return match;
   });
 }
 
