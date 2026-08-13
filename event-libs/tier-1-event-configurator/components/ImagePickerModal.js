@@ -4,6 +4,15 @@ import { useDA } from '../context/DAContext.js';
 import { uploadAndPublishMedia } from '../scripts/da-controller.js';
 import { buildMediaAssetPath } from '../utils.js';
 
+// `accept` on the file input is only a picker hint, not enforcement — the browser still lets
+// a user drag/select a non-JPEG file (or one just misnamed .jpg), so isJpeg re-checks the
+// actual file. Falls back to the extension when `type` is blank, since some OS file pickers
+// don't always set a MIME type.
+function isJpeg(file) {
+  if (file.type) return file.type === 'image/jpeg';
+  return /\.jpe?g$/i.test(file.name || '');
+}
+
 // Uploads a local image straight into the app's own fixed DA folder — authors never pick or
 // see a destination — then previews and publishes it so the field ends up with a real, live
 // aem.live URL instead of a raw content.da.live storage link.
@@ -23,7 +32,14 @@ export default function ImagePickerModal({
   }, [isOpen]);
 
   const handleFileChange = (e) => {
-    setFile(e.target.files?.[0] || null);
+    const selected = e.target.files?.[0] || null;
+    if (selected && !isJpeg(selected)) {
+      setFile(null);
+      setUploadError('Only JPG images are supported.');
+      e.target.value = '';
+      return;
+    }
+    setFile(selected);
     setUploadError(null);
   };
 
@@ -60,8 +76,8 @@ export default function ImagePickerModal({
   return html`
     <${Modal} isOpen=${isOpen} onClose=${handleClose} title="Add image" size="small" showActions=${false}>
       <div class="tec-fb-wrapper">
-        <p class="tec-editor__section-hint">Choose an image to upload. It's stored, previewed, and published automatically.</p>
-        <input type="file" accept="image/*" onChange=${handleFileChange} aria-label="Choose image file" />
+        <p class="tec-editor__section-hint">Choose a JPG image to upload. It's stored, previewed, and published automatically.</p>
+        <input type="file" accept="image/jpeg" onChange=${handleFileChange} aria-label="Choose JPG image file" />
         ${file && html`<p class="tec-editor__section-hint">Selected: ${file.name} (${Math.round(file.size / 1024)} KB)</p>`}
         ${uploadError && html`<p class="tec-editor__error">${uploadError}</p>`}
         <div class="tec-fb-actions">
