@@ -1,6 +1,7 @@
-import { createTag } from '../../../utils/utils.js';
+import { createTag, getMetadata } from '../../../utils/utils.js';
 import { sessions, initSessionState, liveStreamActiveIds } from '../../../utils/session-store.js';
 import { deriveSessionState, getNowMs } from '../../../utils/session-state.js';
+import { extractCustomAttributeSlugs } from '../../../services/sessions/sessions-api.js';
 
 const BLOCK_CSS_URL = new URL('./video-playlist.css', import.meta.url).href;
 
@@ -35,15 +36,16 @@ function isOnDemand(session, nowMs) {
   return deriveSessionState(session, liveStreamActiveIds.value, nowMs) === 'on-demand';
 }
 
-// Reads the CURRENT session's own "Playlist on session page" value(s) as the search key,
-// then matches OTHER sessions whose "Playlist assignment/name" includes that value — no
-// mapping table between the two needed, both draw from the same slug vocabulary (validated
-// against real session-catalog data: see sessions-api.js's playlistAssignment/
-// playlistOnSessionPage fields). Only on-demand rows qualify; a topic with fewer than
-// minSessions qualifying rows renders nothing at all (page just doesn't show a playlist).
-export function resolveTopicPlaylist(currentSessionId, allSessions, minSessions = DEFAULT_MIN_SESSIONS) {
-  const current = allSessions.find((s) => s.id === currentSessionId);
-  const topics = current?.playlistOnSessionPage || [];
+// Matches OTHER sessions whose "Playlist assignment/name" includes any of the given
+// topic value(s) — no mapping table between PISP/PAN needed, both draw from the same
+// slug vocabulary (validated against real session-catalog data: see sessions-api.js's
+// playlistAssignment/playlistOnSessionPage fields). Only on-demand rows qualify; fewer
+// than minSessions qualifying rows renders nothing at all (page just doesn't show a
+// playlist). `topics` is resolved by the caller — see resolveCurrentSessionTopics below —
+// deliberately not looked up from allSessions here, since the current session's own topic
+// value should come from the page's own metadata when available, not require that session
+// to already be present in the fetched catalog.
+export function resolveTopicPlaylist(currentSessionId, topics, allSessions, minSessions = DEFAULT_MIN_SESSIONS) {
   if (!topics.length) return [];
 
   const nowMs = getNowMs();
@@ -52,6 +54,19 @@ export function resolveTopicPlaylist(currentSessionId, allSessions, minSessions 
     && isOnDemand(s, nowMs));
 
   return rows.length >= minSessions ? rows : [];
+}
+
+// Individual Session Pages carry the current session's own identity as page metadata —
+// `session-id` (its real catalog id) and `custom-attributes` (its full raw customAttributes
+// blob, same shape sessions-api.js reads from the live catalog). Preferring these over the
+// fetched catalog means the current session's own topic value (and Keynote-ness) is known
+// synchronously, without depending on that session actually being present in the fetched
+// list — falls back to the catalog entry only if page metadata is missing.
+export function resolveCurrentSessionTopics(pageCustomAttributes, catalogSession) {
+  if (pageCustomAttributes) {
+    return extractCustomAttributeSlugs({ customAttributes: pageCustomAttributes }, 'Playlist on session page');
+  }
+  return catalogSession?.playlistOnSessionPage || [];
 }
 
 // Chapters have no backend data model (confirmed — nothing in session-catalog represents
@@ -240,12 +255,26 @@ export default async function init(el) {
     return acc;
   }, {});
 
-  const sessionId = cfg['session-id'];
+  // Page-level metadata (the Individual Session Page's own identity) takes precedence
+  // over anything authored on the block itself — session-id no longer needs authoring at
+  // all when the page already carries it.
+  const sessionId = getMetadata('session-id') || cfg['session-id'];
   if (!sessionId) {
-    window.lana?.log('[video-playlist] no session-id authored — nothing to render');
+    window.lana?.log('[video-playlist] no session-id (page metadata or authored) — nothing to render');
     el.remove();
     return;
   }
+
+  let pageCustomAttributes = null;
+  const rawCustomAttributes = getMetadata('custom-attributes');
+  if (rawCustomAttributes) {
+    try {
+      pageCustomAttributes = JSON.parse(rawCustomAttributes);
+    } catch (e) {
+      window.lana?.log(`[video-playlist] invalid custom-attributes page metadata: ${e.message}`);
+    }
+  }
+  const isKeynoteFromMetadata = (getMetadata('session-type') || '').toLowerCase() === 'keynote';
 
   initSessionState();
 
@@ -254,9 +283,10 @@ export default async function init(el) {
 
   const render = (sessionList) => {
     const current = sessionList.find((s) => s.id === sessionId);
-    const isChapterVariant = chapters.length > 0 || current?.isKeynote;
+    const isChapterVariant = chapters.length > 0 || isKeynoteFromMetadata || (!pageCustomAttributes && current?.isKeynote);
 
-    const rows = isChapterVariant ? chapters : resolveTopicPlaylist(sessionId, sessionList, minSessions);
+    const topics = resolveCurrentSessionTopics(pageCustomAttributes, current);
+    const rows = isChapterVariant ? chapters : resolveTopicPlaylist(sessionId, topics, sessionList, minSessions);
     if (!rows.length) {
       el.remove();
       return;

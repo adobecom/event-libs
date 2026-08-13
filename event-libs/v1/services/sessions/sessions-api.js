@@ -170,8 +170,12 @@ function extractCustomAttributeValue(session, name) {
 // Same lookup as extractCustomAttributeValues, but returns the machine-readable slug
 // (`v.value`) instead of preferring the display label — needed for matching against
 // another session's attribute values (e.g. video-playlist's topic filter), where the
-// human-readable label would never match the slug the page actually filters on.
-function extractCustomAttributeSlugs(session, name) {
+// human-readable label would never match the slug the page actually filters on. Exported
+// so video-playlist.js can run the same extraction directly on an Individual Session
+// Page's own `custom-attributes` metadata (the current session's raw customAttributes
+// blob, embedded page-side) without waiting on that session to appear in the fetched
+// session-catalog at all.
+export function extractCustomAttributeSlugs(session, name) {
   const candidates = Array.isArray(name) ? name : [name];
   const attr = (session.customAttributes || []).find((a) => candidates.includes(a?.name));
   return (attr?.values || []).map((v) => v?.value).filter(Boolean);

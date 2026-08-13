@@ -4,8 +4,9 @@ Authored on an Individual Session Page, alongside a video player block
 (Mobile Rider, or a `.milo-video` MPC/YouTube embed) in the **same section**.
 Renders one of two variants automatically — no explicit variant to author:
 
-- **Chapters** — when the current session's `isKeynote` field is true (long-form
-  Keynotes/Sneaks content), or when a `chapters` row is authored (see below).
+- **Chapters** — when the page's own `session-type` metadata is `Keynote`
+  (long-form Keynotes/Sneaks content), or when a `chapters` row is authored
+  (see below).
 - **Topic playlist** — otherwise: a list of other on-demand sessions sharing a
   topic with the current session, auto-resolved from real session-catalog data.
 
@@ -15,28 +16,44 @@ variant — the block removes itself. There's no empty state.
 
 ## Authoring
 
+The Individual Session Page template already carries the current session's
+own identity as **page metadata** — `session-id` and `custom-attributes`
+(that session's own raw customAttributes blob) — so nothing needs to be
+authored on the block itself for the topic playlist to work:
+
 ```
 | Video Playlist |  |
 | --- | --- |
-| session-id | s-100 |
 ```
+
+Block-level rows are only for the optional overrides below, and for
+authoring environments where that page metadata isn't present (a fallback,
+not the primary path):
 
 | Field | Required | Default | Notes |
 |---|---|---|---|
-| `session-id` | Yes | — | The *current* page's own session. Drives which topic values (`Playlist on session page`) get matched against other sessions' `Playlist assignment/name`. |
+| `session-id` | No | page's own `session-id` metadata | Only needed as a fallback if that metadata is missing. |
 | `playlist-title` | No | `More like this` | Heading shown above the topic playlist. Ignored in the Chapters variant (always titled "Chapters"). |
 | `minimum-sessions` | No | `4` | Minimum number of matching on-demand sessions required before the topic playlist renders at all. |
 | `chapters` | No | — | JSON array authored for the Chapters variant: `[{"label": "Intro", "timestampSeconds": 0}, ...]`. No backend field exists for this — it's hand-authored per session. |
 
 ## How the topic playlist is resolved
 
-Reads the **current session's own** `Playlist on session page` custom
-attribute value(s), then filters the full session-catalog (`sessions.value`
+Reads the **current session's own** `Playlist on session page` value(s) —
+preferring the page's own `custom-attributes` metadata (parsed with
+`sessions-api.js`'s exported `extractCustomAttributeSlugs`, the same
+extractor the real catalog fetch uses), falling back to the session's entry
+in the fetched catalog only if that metadata is missing. This means the
+current session's own topic value is known **synchronously**, without
+depending on that session having already loaded into the catalog.
+
+That topic value then filters the full session-catalog (`sessions.value`
 from `utils/session-store.js`) for **other** sessions whose `Playlist
-assignment/name` includes any of those same values. No mapping table
-between the two attributes is needed or maintained — both draw from the
-same slug vocabulary. Only sessions in the `'on-demand'` state
-(`utils/session-state.js`'s `deriveSessionState`) qualify.
+assignment/name` includes it. No mapping table between the two attributes
+is needed or maintained — both draw from the same slug vocabulary. Only
+sessions in the `'on-demand'` state (`utils/session-state.js`'s
+`deriveSessionState`) qualify. `isKeynote`/Chapters detection follows the
+same page-metadata-first pattern, via the page's own `session-type` value.
 
 **Known limitation, not solved by this block**: there's no signal in the
 session-catalog data for "recording has actually finished processing" —

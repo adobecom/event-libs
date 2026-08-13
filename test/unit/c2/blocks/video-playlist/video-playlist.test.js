@@ -4,6 +4,7 @@ import init, {
   computeDrawerCapPx,
   clampedTitleBottom,
   resolveTopicPlaylist,
+  resolveCurrentSessionTopics,
 } from '../../../../../event-libs/v1/c2/blocks/video-playlist/video-playlist.js';
 import { sessions } from '../../../../../event-libs/v1/utils/session-store.js';
 
@@ -48,24 +49,41 @@ describe('video-playlist (C2)', () => {
     expect(clampedTitleBottom(100, 72, 24, 2)).to.equal(148);
   });
 
-  describe('resolveTopicPlaylist', () => {
-    it('matches other sessions whose playlistAssignment includes the current session\'s playlistOnSessionPage value', () => {
-      const current = session({ id: 'current', playlistOnSessionPage: ['3d'] });
-      const matches = [1, 2, 3, 4].map((i) => session({ id: `match-${i}`, playlistAssignment: ['3d'] }));
-      const all = [current, ...matches];
+  describe('resolveCurrentSessionTopics', () => {
+    it('prefers the page\'s own custom-attributes metadata over the fetched catalog entry', () => {
+      const pageAttrs = [{
+        name: 'Playlist on session page',
+        values: [{ label: '3D', value: '3d' }],
+      }];
+      const catalogSession = { playlistOnSessionPage: ['video-audio-and-motion'] };
 
-      expect(resolveTopicPlaylist('current', all, 4)).to.deep.equal(matches);
+      expect(resolveCurrentSessionTopics(pageAttrs, catalogSession)).to.deep.equal(['3d']);
     });
 
-    it('returns nothing when the current session has no playlistOnSessionPage value', () => {
-      const current = session({ id: 'current', playlistOnSessionPage: [] });
-      const all = [current, session({ id: 'other', playlistAssignment: ['3d'] })];
+    it('falls back to the catalog entry\'s playlistOnSessionPage when page metadata is absent', () => {
+      const catalogSession = { playlistOnSessionPage: ['3d'] };
+      expect(resolveCurrentSessionTopics(null, catalogSession)).to.deep.equal(['3d']);
+    });
 
-      expect(resolveTopicPlaylist('current', all, 1)).to.deep.equal([]);
+    it('returns an empty array when neither page metadata nor a catalog entry exists', () => {
+      expect(resolveCurrentSessionTopics(null, undefined)).to.deep.equal([]);
+    });
+  });
+
+  describe('resolveTopicPlaylist', () => {
+    it('matches other sessions whose playlistAssignment includes a given topic value', () => {
+      const matches = [1, 2, 3, 4].map((i) => session({ id: `match-${i}`, playlistAssignment: ['3d'] }));
+      const all = [session({ id: 'current' }), ...matches];
+
+      expect(resolveTopicPlaylist('current', ['3d'], all, 4)).to.deep.equal(matches);
+    });
+
+    it('returns nothing when there are no topic values to match against', () => {
+      const all = [session({ id: 'current' }), session({ id: 'other', playlistAssignment: ['3d'] })];
+      expect(resolveTopicPlaylist('current', [], all, 1)).to.deep.equal([]);
     });
 
     it('excludes non-on-demand sessions (upcoming or live) even if the topic matches', () => {
-      const current = session({ id: 'current', playlistOnSessionPage: ['3d'] });
       const upcoming = session({
         id: 'upcoming', playlistAssignment: ['3d'],
         startTimeUtc: new Date(Date.now() + 3600000).toISOString(),
@@ -73,22 +91,18 @@ describe('video-playlist (C2)', () => {
       });
       const onDemand = session({ id: 'on-demand', playlistAssignment: ['3d'] });
 
-      expect(resolveTopicPlaylist('current', [current, upcoming, onDemand], 1)).to.deep.equal([onDemand]);
+      expect(resolveTopicPlaylist('current', ['3d'], [session({ id: 'current' }), upcoming, onDemand], 1))
+        .to.deep.equal([onDemand]);
     });
 
     it('excludes the current session itself from its own playlist', () => {
-      const current = session({
-        id: 'current', playlistOnSessionPage: ['3d'], playlistAssignment: ['3d'],
-      });
-
-      expect(resolveTopicPlaylist('current', [current], 1)).to.deep.equal([]);
+      const current = session({ id: 'current', playlistAssignment: ['3d'] });
+      expect(resolveTopicPlaylist('current', ['3d'], [current], 1)).to.deep.equal([]);
     });
 
     it('renders nothing when fewer than minSessions on-demand matches exist', () => {
-      const current = session({ id: 'current', playlistOnSessionPage: ['3d'] });
       const matches = [1, 2, 3].map((i) => session({ id: `match-${i}`, playlistAssignment: ['3d'] }));
-
-      expect(resolveTopicPlaylist('current', [current, ...matches], 4)).to.deep.equal([]);
+      expect(resolveTopicPlaylist('current', ['3d'], [session({ id: 'current' }), ...matches], 4)).to.deep.equal([]);
     });
   });
 
@@ -120,11 +134,56 @@ describe('video-playlist (C2)', () => {
       `;
     }
 
-    it('removes itself when no session-id is authored', async () => {
+    it('removes itself when no session-id is available, from metadata or authoring', async () => {
       document.body.innerHTML = '<div class="video-playlist"></div>';
       el = document.querySelector('.video-playlist');
       await init(el);
       expect(document.querySelector('.video-playlist')).to.not.exist;
+    });
+
+    it('resolves session-id from page metadata with no block authoring at all', async () => {
+      document.head.innerHTML = '<meta name="session-id" content="current">';
+      const current = session({ id: 'current', playlistOnSessionPage: ['3d'] });
+      const matches = [1, 2, 3, 4].map((i) => session({ id: `match-${i}`, playlistAssignment: ['3d'] }));
+      sessions.value = [current, ...matches];
+
+      document.body.innerHTML = '<div class="video-playlist"></div>';
+      el = document.querySelector('.video-playlist');
+      await init(el);
+
+      expect(document.body.querySelectorAll('.video-playlist-row')).to.have.lengthOf(4);
+    });
+
+    it('prefers the page\'s own custom-attributes metadata over the fetched catalog for the topic value', async () => {
+      document.head.innerHTML = `
+        <meta name="session-id" content="current">
+        <meta name="custom-attributes" content='[{"name":"Playlist on session page","values":[{"label":"3D","value":"3d"}]}]'>
+      `;
+      // The catalog entry for "current" claims a DIFFERENT topic — page metadata should win.
+      const current = session({ id: 'current', playlistOnSessionPage: ['video-audio-and-motion'] });
+      const matches = [1, 2, 3, 4].map((i) => session({ id: `match-${i}`, playlistAssignment: ['3d'] }));
+      sessions.value = [current, ...matches];
+
+      document.body.innerHTML = '<div class="video-playlist"></div>';
+      el = document.querySelector('.video-playlist');
+      await init(el);
+
+      expect(document.body.querySelectorAll('.video-playlist-row')).to.have.lengthOf(4);
+    });
+
+    it('renders the Chapters variant from session-type page metadata, even when the catalog entry says otherwise', async () => {
+      document.head.innerHTML = '<meta name="session-id" content="current"><meta name="session-type" content="Keynote">';
+      sessions.value = [session({ id: 'current', isKeynote: false })];
+
+      document.body.innerHTML = `
+        <div class="video-playlist">
+          <div><div>chapters</div><div>${JSON.stringify([{ label: 'Intro', timestampSeconds: 0 }])}</div></div>
+        </div>
+      `;
+      el = document.querySelector('.video-playlist');
+      await init(el);
+
+      expect(document.body.querySelector('.video-playlist-title').textContent).to.equal('Chapters');
     });
 
     it('removes itself when the topic playlist has fewer than the minimum matches', async () => {
