@@ -69,13 +69,22 @@ Chapters seek within the **same, already-loaded** player — `window.__mr_player
 the real player's seek API differs from the `seek(seconds)`/`currentTime`
 attempt in `video-playlist.js`, that needs correcting against a real embed.
 
-## Player switching — explicitly out of scope for this pass
+## Player switching
 
-Selecting a topic-playlist row currently **navigates to that session's own
-page** (`sessionPageUrl`) rather than swapping the player in place. Real
-session pages embed either Mobile Rider or MPC/YouTube depending on the
-session — an in-place swap between differently-typed players is a real,
-unsolved problem, not attempted here rather than guessed at.
+Rows carry an `mpcId` when the target session's `MPC ID` custom attribute
+is present (extracted by `sessions-api.js`, same pattern as
+`playlistAssignment`/`playlistOnSessionPage`). Selecting such a row swaps
+the player already mounted alongside this block (`.milo-video` or
+`.mobile-rider`, in the same `.section`) for a freshly built AdobeTV
+iframe — `video.tv.adobe.com/v/{mpcId}?autoplay=true&quality=9&end=nothing&
+learn=on` — in place, no full page reload.
+
+**Still out of scope**: rows without an `mpcId` (Mobile-Rider-hosted
+sessions) fall back to navigating to that session's own page
+(`sessionPageUrl`). No YouTube-specific custom attribute has been confirmed
+in real session data yet, so YouTube rows also fall back to navigation
+today — if/when that attribute name is confirmed, it should extract into
+its own field the same way `mpcId` does, rather than guessed at.
 
 ## Responsive layout
 

@@ -288,6 +288,54 @@ describe('video-playlist (C2)', () => {
       expect(firstRow.dataset.href).to.equal('/sessions/match-1');
     });
 
+    it('swaps an MPC-hosted row into the already-mounted player in place, no navigation', async () => {
+      const current = session({ id: 'current', playlistOnSessionPage: ['3d'] });
+      const matches = [1, 2, 3, 4].map((i) => session({
+        id: `match-${i}`, playlistAssignment: ['3d'], sessionPageUrl: `/sessions/match-${i}`, mpcId: i === 1 ? '3458940' : '',
+      }));
+      sessions.value = [current, ...matches];
+
+      document.body.innerHTML = `
+        <div class="section">
+          <div class="milo-video"><a href="/old">old player</a></div>
+          ${playlistHtml()}
+        </div>
+      `;
+      el = document.querySelector('.video-playlist');
+      await init(el);
+
+      const firstRow = document.body.querySelector('.video-playlist-row');
+      expect(firstRow.dataset.mpcId).to.equal('3458940');
+
+      firstRow.click();
+
+      const iframe = document.querySelector('.milo-video iframe');
+      expect(iframe).to.exist;
+      expect(iframe.src).to.equal('https://video.tv.adobe.com/v/3458940?autoplay=true&quality=9&end=nothing&learn=on');
+      expect(firstRow.classList.contains('is-playing')).to.be.true;
+    });
+
+    it('falls back to data-href navigation for rows without an mpcId, even inside a .section', async () => {
+      const current = session({ id: 'current', playlistOnSessionPage: ['3d'] });
+      const matches = [1, 2, 3, 4].map((i) => session({
+        id: `match-${i}`, playlistAssignment: ['3d'], sessionPageUrl: `/sessions/match-${i}`,
+      }));
+      sessions.value = [current, ...matches];
+
+      document.body.innerHTML = `
+        <div class="section">
+          <div class="milo-video"><a href="/old">old player</a></div>
+          ${playlistHtml()}
+        </div>
+      `;
+      el = document.querySelector('.video-playlist');
+      await init(el);
+
+      const firstRow = document.body.querySelector('.video-playlist-row');
+      expect(firstRow.dataset.mpcId).to.be.undefined;
+      expect(document.querySelector('.milo-video iframe')).to.not.exist;
+    });
+
     it('toggles aria-expanded and the is-expanded class when the drawer toggle is clicked', async () => {
       const current = session({ id: 'current', playlistOnSessionPage: ['3d'] });
       const matches = [1, 2, 3, 4].map((i) => session({ id: `match-${i}`, playlistAssignment: ['3d'] }));

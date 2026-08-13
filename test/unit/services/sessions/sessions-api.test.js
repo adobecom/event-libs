@@ -55,6 +55,7 @@ describe('services/sessions/sessions-api', () => {
             customAttr('LegalDisclaimer', [textValue('<p>Copyright.</p>')]),
             customAttr('Playlist assignment/name', [selectValue('Photography', 'photography'), selectValue('3D', '3d')]),
             customAttr('Playlist on session page', [selectValue('Photography', 'photography')]),
+            customAttr('MPC ID', [textValue('3458940')]),
           ],
         },
         {
@@ -168,6 +169,11 @@ describe('services/sessions/sessions-api', () => {
     it('leaves playlist fields empty on a bare session', () => {
       expect(bare.playlistAssignment).to.deep.equal([]);
       expect(bare.playlistOnSessionPage).to.deep.equal([]);
+    });
+
+    it('maps MPC ID to mpcId', () => {
+      expect(full.mpcId).to.equal('3458940');
+      expect(bare.mpcId).to.equal('');
     });
   });
 
@@ -323,6 +329,14 @@ describe('services/sessions/sessions-api', () => {
       const [bare] = normalizeSessions([{ id: 's-2' }]);
       expect(bare.playlistAssignment).to.deep.equal([]);
       expect(bare.playlistOnSessionPage).to.deep.equal([]);
+    });
+
+    it('passes mpcId through, defaulting to an empty string', () => {
+      const [withMpc] = normalizeSessions([{ id: 's-1', mpcId: '3458940' }]);
+      expect(withMpc.mpcId).to.equal('3458940');
+
+      const [bare] = normalizeSessions([{ id: 's-2' }]);
+      expect(bare.mpcId).to.equal('');
     });
   });
 

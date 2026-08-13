@@ -122,6 +122,34 @@ function analyticsAttrs(linkName) {
   return { 'daa-ll': linkName };
 }
 
+const ADOBE_TV_ORIGIN = 'https://video.tv.adobe.com';
+
+// URL shape confirmed against a real MPC ID: video.tv.adobe.com/v/{id}?autoplay=true&
+// quality=9&end=nothing&learn=on.
+function buildAdobeTvSrc(mpcId) {
+  return `${ADOBE_TV_ORIGIN}/v/${mpcId}?autoplay=true&quality=9&end=nothing&learn=on`;
+}
+
+// Swaps a row's video into the player already mounted alongside this block (the
+// Individual Session Page's own `.milo-video`/`.mobile-rider` container, in the same
+// .section) — in place, no full page reload. Only MPC-hosted rows carry an mpcId today;
+// Mobile-Rider-hosted rows fall back to navigating to that session's own page (see
+// buildTopicView's onSelect), since swapping to a Mobile Rider stream in place is a
+// separate, unverified mechanism.
+function loadAdobeTvPlayer(el, mpcId) {
+  const container = el.closest('.section')?.querySelector('.milo-video, .mobile-rider');
+  if (!container) return false;
+  const iframe = createTag('iframe', {
+    src: buildAdobeTvSrc(mpcId),
+    allow: 'autoplay; fullscreen; encrypted-media',
+    allowfullscreen: '',
+    loading: 'lazy',
+    title: 'Video player',
+  });
+  container.replaceChildren(iframe);
+  return true;
+}
+
 class Drawer {
   constructor(el, { titleEl, toggleEl }) {
     this.el = el;
@@ -175,6 +203,7 @@ function buildRow(item, { onSelect }) {
     role: 'listitem',
     'data-item-id': item.id,
     ...(item.href ? { 'data-href': item.href } : {}),
+    ...(item.mpcId ? { 'data-mpc-id': item.mpcId } : {}),
     ...analyticsAttrs('playlist-item-select'),
   });
 
@@ -228,14 +257,18 @@ function buildTopicView(el, rows) {
         thumbnailUrl: session.thumbnailUrl,
         durationLabel: formatDuration(session.duration),
         href: session.sessionPageUrl,
+        mpcId: session.mpcId,
       },
       {
-        // Phase 1: navigate to the selected session's own page — always correct, since
-        // every session already has a working page. In-place player swap (no reload) is
-        // flagged as a fast-follow: real session pages embed either Mobile Rider or
-        // MPC/YouTube depending on the session, and swapping TO a differently-typed
-        // player in place needs a mechanism not yet verified against a live page.
+        // MPC-hosted rows swap into the already-mounted player in place (see
+        // loadAdobeTvPlayer). Rows without an mpcId (Mobile-Rider-hosted, or any other
+        // player type) fall back to navigating to that session's own page — always
+        // correct, since every session already has a working page.
         onSelect: (item) => {
+          if (item.mpcId && loadAdobeTvPlayer(el, item.mpcId)) {
+            highlightRow(list, item.id);
+            return;
+          }
           if (item.href) window.location.assign(item.href);
         },
       },
