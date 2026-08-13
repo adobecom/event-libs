@@ -1,4 +1,5 @@
 import { getMetadata, getEventConfig, LIBS } from '../../utils/utils.js';
+import { applyAreaTheme } from '../../utils/decorate.js';
 
 /** @param {HTMLElement} host */
 function ensureReparentSet(host) {
@@ -299,6 +300,17 @@ function dispatchModalOpenOnceForHash(hash) {
 }
 
 /**
+ * Milo decorates a chrono-box's incoming fragment on a detached, pre-insertion document
+ * (see fragment.js), so page-wide theme rules like `dark(blocks:text[first])` can't be
+ * resolved correctly at that point — the fragment's blocks aren't part of `document` yet.
+ * Call this after every schedule transition settles (loaded, empty, or failed), since each
+ * one can add or remove a block a positional rule targets.
+ */
+export function revalidatePageTheme() {
+  applyAreaTheme();
+}
+
+/**
  * Re-run Milo modal opening for the current URL hash after scheduled fragment content is in the DOM.
  * Milo listens on `window` for `modal:open` (see utils initModalEventListener). Optional rAF deferral
  * and bounded polling give RSVP / async blocks time to expose `a[data-modal-hash]`.
@@ -424,6 +436,7 @@ export default async function init(el) {
       // document (including nested chrono-box blocks), causing unbounded recursion.
       if (!fragmentPath) {
         el.removeAttribute('style');
+        revalidatePageTheme();
         if (worker._blobUrl) {
           URL.revokeObjectURL(worker._blobUrl);
           worker._blobUrl = null;
@@ -444,6 +457,7 @@ export default async function init(el) {
       loadFragment(a)
         .then(async () => {
           el.removeAttribute('style');
+          revalidatePageTheme();
           try {
             await openModalFromPageHashAfterFragment();
           } catch (error) {
@@ -456,6 +470,7 @@ export default async function init(el) {
           el.removeAttribute('style');
           el.innerHTML = '<div class="error-message">Unable to load content. Please refresh the page.</div>';
           el.classList.add('error');
+          revalidatePageTheme();
           resolve();
         });
     };

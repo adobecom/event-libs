@@ -953,6 +953,74 @@ describe('applyAreaTheme', () => {
     const cols = document.querySelectorAll('.section-metadata > div > div');
     expect(cols[1].textContent).to.equal('xxl-spacing');
   });
+
+  it('self-heals a stale positional mark when the page-wide first block changes between invocations', () => {
+    setThemeAttribute('theme', 'dark(blocks:text[first])');
+    document.body.innerHTML = `
+      <main><div>
+        <div class="text" id="t1"></div>
+        <div class="text" id="t2"></div>
+      </div></main>
+    `;
+    applyAreaTheme();
+    expect(document.getElementById('t1').classList.contains('dark')).to.be.true;
+
+    const t0 = document.createElement('div');
+    t0.className = 'text';
+    t0.id = 't0';
+    document.querySelector('main > div').prepend(t0);
+
+    applyAreaTheme();
+
+    expect(document.getElementById('t0').classList.contains('dark')).to.be.true;
+    expect(document.getElementById('t1').classList.contains('dark')).to.be.false;
+    expect(document.getElementById('t2').classList.contains('dark')).to.be.false;
+  });
+
+  it('resolves a positional selector against the page-wide block list, ignoring a narrower area boundary', () => {
+    setThemeAttribute('theme', 'dark(blocks:text[last])');
+    document.body.innerHTML = `
+      <main>
+        <div id="area"><div class="text" id="t1"></div></div>
+        <div><div class="text" id="t2"></div></div>
+      </main>
+    `;
+    const area = document.getElementById('area');
+    applyAreaTheme(area);
+
+    expect(document.getElementById('t2').classList.contains('dark')).to.be.true;
+    expect(document.getElementById('t1').classList.contains('dark')).to.be.false;
+  });
+
+  it("does not let a detached, pre-insertion decoration pass (Milo's fragment.js DOMParser document) leave a stale mark that survives the page-wide revalidation call once the fragment lands live", () => {
+    setThemeAttribute('theme', 'dark(blocks:text[first])');
+    document.body.innerHTML = `
+      <main><div>
+        <div class="text" id="t1"></div>
+      </div></main>
+    `;
+    // An earlier page-wide pass (e.g. initial decorateEvent) already marked the real first block.
+    applyAreaTheme();
+    expect(document.getElementById('t1').classList.contains('dark')).to.be.true;
+
+    // Milo decorates the incoming chrono-box fragment on a detached div, never attached to
+    // document, before it's swapped in (see fragment.js).
+    const fragmentArea = document.createElement('div');
+    const tFrag = document.createElement('div');
+    tFrag.className = 'text';
+    tFrag.id = 't-frag';
+    fragmentArea.append(tFrag);
+    applyAreaTheme(fragmentArea);
+
+    // The fragment now lands in the live DOM, after t1.
+    document.querySelector('main > div').append(tFrag);
+
+    // chrono-box calls revalidatePageTheme() -> applyAreaTheme() (default/document) once live.
+    applyAreaTheme();
+
+    expect(document.getElementById('t1').classList.contains('dark')).to.be.true;
+    expect(document.getElementById('t-frag').classList.contains('dark')).to.be.false;
+  });
 });
 
 describe('applySectionColumnsLayout', () => {

@@ -1128,21 +1128,34 @@ export function applyAreaTheme(area = document) {
       : area.querySelectorAll('div[class]');
 
     if (blockTokens) {
-      const blockList = Array.from(blocks);
+      const localList = Array.from(blocks);
+      const positionalTokens = blockTokens.filter((t) => t.selector);
       const plainNames = blockTokens.filter((t) => !t.selector).map((t) => t.name);
-      const positionalTargets = new Set();
-      blockTokens.filter((t) => t.selector).forEach(({ name, selector }) => {
-        const group = blockList.filter((b) => b.classList.contains(name));
-        const index = selector === 'first' ? 0
-          : selector === 'last' ? group.length - 1
-            : Number(selector) - 1;
-        if (group[index]) positionalTargets.add(group[index]);
-      });
 
-      blockList.forEach((block) => {
-        const matches = plainNames.some((name) => block.classList.contains(name))
-          || positionalTargets.has(block);
-        if (!matches) return;
+      // "first"/"last"/[N] are page-wide concepts, not scoped to whatever `area` this
+      // particular call covers (decorateEvent re-runs per fragment/personalization/
+      // events-form area). Always resolve against the full page and re-sync the whole
+      // named group so a stale mark from an earlier or now-superseded call is cleaned
+      // up instead of accumulating across repeated invocations.
+      if (positionalTokens.length) {
+        const pageBlockList = isDocument
+          ? localList
+          : Array.from(document.body.querySelectorAll('main > div > div[class]'));
+        positionalTokens.forEach(({ name, selector }) => {
+          const group = pageBlockList.filter((b) => b.classList.contains(name));
+          const index = selector === 'first' ? 0
+            : selector === 'last' ? group.length - 1
+              : Number(selector) - 1;
+          const target = group[index];
+          group.forEach((block) => {
+            block.classList.remove('dark', 'light');
+            if (block === target) block.classList.add(themeValue);
+          });
+        });
+      }
+
+      localList.forEach((block) => {
+        if (!plainNames.some((name) => block.classList.contains(name))) return;
         block.classList.remove('dark', 'light');
         block.classList.add(themeValue);
       });
