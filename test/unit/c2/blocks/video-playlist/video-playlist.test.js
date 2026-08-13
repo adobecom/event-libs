@@ -337,6 +337,53 @@ describe('video-playlist (C2)', () => {
       expect(document.querySelector('.milo-video iframe')).to.not.exist;
     });
 
+    it('builds a fresh .milo-video, mirroring Milo\'s adobetv autoblock markup, when no player is authored in the section at all', async () => {
+      const current = session({ id: 'current', playlistOnSessionPage: ['3d'] });
+      const mpcVideos = [{ provider: 'mpc', url: 'https://video.tv.adobe.com/v/3458940?autoplay=true&quality=9&end=nothing&learn=on', kind: 'onDemand' }];
+      const matches = [1, 2, 3, 4].map((i) => session({
+        id: `match-${i}`, playlistAssignment: ['3d'], sessionPageUrl: `/sessions/match-${i}`, videos: i === 1 ? mpcVideos : [],
+      }));
+      sessions.value = [current, ...matches];
+
+      // No .milo-video/.mobile-rider anywhere — the block is the section's only child,
+      // a real DOM shape seen on a live page.
+      document.body.innerHTML = `<div class="section">${playlistHtml()}</div>`;
+      el = document.querySelector('.video-playlist');
+      await init(el);
+
+      document.body.querySelector('.video-playlist-row').click();
+
+      const built = document.querySelector('.section > .milo-video');
+      expect(built).to.exist;
+      const iframe = built.querySelector('iframe.adobetv');
+      expect(iframe.src).to.equal('https://video.tv.adobe.com/v/3458940?autoplay=true&quality=9&end=nothing&learn=on');
+      expect(iframe.getAttribute('allowfullscreen')).to.equal('');
+    });
+
+    it('removes an existing .mobile-rider and builds a fresh .milo-video when an mpc row is selected', async () => {
+      const current = session({ id: 'current', playlistOnSessionPage: ['3d'] });
+      const mpcVideos = [{ provider: 'mpc', url: 'https://video.tv.adobe.com/v/3458940?autoplay=true&quality=9&end=nothing&learn=on', kind: 'onDemand' }];
+      const matches = [1, 2, 3, 4].map((i) => session({
+        id: `match-${i}`, playlistAssignment: ['3d'], sessionPageUrl: `/sessions/match-${i}`, videos: i === 1 ? mpcVideos : [],
+      }));
+      sessions.value = [current, ...matches];
+
+      document.body.innerHTML = `
+        <div class="section">
+          <div class="mobile-rider"></div>
+          ${playlistHtml()}
+        </div>
+      `;
+      el = document.querySelector('.video-playlist');
+      await init(el);
+
+      document.body.querySelector('.video-playlist-row').click();
+
+      expect(document.querySelector('.mobile-rider')).to.not.exist;
+      expect(document.querySelector('.section > .milo-video iframe.adobetv').src)
+        .to.equal('https://video.tv.adobe.com/v/3458940?autoplay=true&quality=9&end=nothing&learn=on');
+    });
+
     it('toggles aria-expanded and the is-expanded class when the drawer toggle is clicked', async () => {
       const current = session({ id: 'current', playlistOnSessionPage: ['3d'] });
       const matches = [1, 2, 3, 4].map((i) => session({ id: `match-${i}`, playlistAssignment: ['3d'] }));

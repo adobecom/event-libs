@@ -79,11 +79,16 @@ Page's own `session-times` page metadata carries for the current session.
 `sessions-api.js` surfaces this as `session.videos` (not a custom
 attribute) for every session in the fetched catalog.
 
-Selecting a row with a `provider: 'mpc'` entry swaps the player already
-mounted alongside this block (`.milo-video` or `.mobile-rider`, in the same
-`.section`) for a freshly built iframe pointed straight at that URL — in
-place, no full page reload. The URL is already fully-formed by the
-backend; nothing is constructed client-side.
+Selecting a row with a `provider: 'mpc'` entry swaps the player in place —
+no full page reload — pointed straight at that already-fully-formed URL
+(nothing is constructed client-side). If a `.milo-video` is already
+mounted alongside this block in the same `.section`, its iframe is
+replaced. **Real pages have been seen with no video block authored in the
+section at all** — in that case (or if only a `.mobile-rider` is present,
+which can't host an AdobeTV iframe as-is), a fresh `.milo-video` container
+is built and inserted as a sibling, mirroring Milo's own `adobetv.js`
+autoblock markup exactly (same classes/attrs), so it picks up the same
+global sizing (`libs/styles/iframe.css`) a real Milo-decorated embed would.
 
 **Still out of scope**: rows with no `mpc` entry in `videos[]` (Mobile-
 Rider-hosted sessions, or any other provider) fall back to navigating to

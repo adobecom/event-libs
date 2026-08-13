@@ -138,20 +138,45 @@ function pickEmbeddableVideoUrl(videos) {
   return (videos || []).find((v) => v.provider === EMBEDDABLE_PROVIDER)?.url || null;
 }
 
-// Swaps a row's video into the player already mounted alongside this block (the
-// Individual Session Page's own `.milo-video`/`.mobile-rider` container, in the same
-// .section) — in place, no full page reload.
-function loadVideoPlayer(el, url) {
-  const container = el.closest('.section')?.querySelector('.milo-video, .mobile-rider');
-  if (!container) return false;
-  const iframe = createTag('iframe', {
+// Mirrors Milo's own adobetv.js autoblock output exactly (class names, iframe attrs) —
+// see node_modules/@adobecom/milo/libs/blocks/adobetv/adobetv.js — so a container built
+// here picks up the same global .milo-video sizing (libs/styles/iframe.css) a real
+// Milo-decorated embed would, whether or not one was already authored on the page.
+function buildMiloVideo(url) {
+  const container = createTag('div', { class: 'milo-video' });
+  createTag('iframe', {
     src: url,
-    allow: 'autoplay; fullscreen; encrypted-media',
+    class: 'adobetv',
+    webkitallowfullscreen: '',
+    mozallowfullscreen: '',
     allowfullscreen: '',
+    scrolling: 'no',
+    allow: 'encrypted-media',
+    title: 'Adobe Video Publishing Cloud Player',
     loading: 'lazy',
-    title: 'Video player',
-  });
-  container.replaceChildren(iframe);
+  }, '', { parent: container });
+  return container;
+}
+
+// Swaps a row's video into the player already mounted alongside this block (the
+// Individual Session Page's own `.milo-video` container, in the same .section) — in
+// place, no full page reload. Real pages have been seen with no video block authored in
+// the section at all (just this block) — in that case (or when only a `.mobile-rider`
+// container is present, which can't host an AdobeTV iframe as-is), builds a fresh
+// `.milo-video` container and inserts it as a sibling, same markup a real Milo-decorated
+// embed would have.
+function loadVideoPlayer(el, url) {
+  const section = el.closest('.section');
+  if (!section) return false;
+
+  const existingMiloVideo = section.querySelector('.milo-video');
+  if (existingMiloVideo) {
+    existingMiloVideo.replaceChildren(buildMiloVideo(url).firstElementChild);
+    return true;
+  }
+
+  section.querySelector('.mobile-rider')?.remove();
+  section.insertBefore(buildMiloVideo(url), el);
   return true;
 }
 
