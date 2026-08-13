@@ -1,0 +1,196 @@
+// Generic DA admin-API sheet CRUD, shared by every DA app that stores a config library
+// as a single sheet (tier-1-event-configurator, session-guide-configurator). App-specific
+// concerns (row key, upsert/delete semantics, schema migration) stay in each app's own
+// scripts/da-controller.js, built on top of these primitives.
+
+const DA_ADMIN_ORIGIN = 'https://admin.da.live';
+const OWNED_SHEET_NAME = 'data'; // the only sheet name any app built on this ever writes.
+
+let daToken = null;
+let sdkDaFetch = null;
+
+export function setDaToken(token) {
+  daToken = token;
+}
+
+export function setDaFetch(fn) {
+  sdkDaFetch = fn;
+}
+
+// Prefer the DA SDK's authenticated fetch when it has been provided; otherwise
+// fall back to the global fetch (auth is then supplied via the Bearer token).
+function doFetch(url, options) {
+  return (sdkDaFetch || fetch)(url, options);
+}
+
+// admin.da.live sits behind a CDN that weakens ETags (W/"...") when it gzips a
+// response. R2/S3 reject weak validators on a conditional write, so strip the
+// W/ prefix to recover the strong ETag that If-Match compares against.
+function normalizeEtag(etag) {
+  if (!etag) return undefined;
+  return etag.replace(/^W\//, '');
+}
+
+function getHeaders(method = 'GET', body = null) {
+  const headers = new Headers();
+  if (daToken) headers.append('Authorization', `Bearer ${daToken}`);
+  if (body) headers.append('content-type', 'application/json');
+  // no-store bypasses the browser cache — otherwise a cached GET can return a
+  // stale ETag, so the very next conditional write's If-Match fails against
+  // the CDN's actual current ETag and surfaces as a false-positive Conflict.
+  return {
+    method, headers, body: body ? JSON.stringify(body) : undefined, cache: 'no-store',
+  };
+}
+
+async function daFetch(path, options = {}) {
+  const url = `${DA_ADMIN_ORIGIN}${path}`;
+  let resp;
+  try {
+    resp = await doFetch(url, options);
+  } catch (err) {
+    window.lana?.log(`DA fetch network error: ${err} — ${url}`);
+    return { ok: false, status: 0, error: 'Network error' };
+  }
+  if (!resp.ok) {
+    const error = await resp.text().catch(() => resp.statusText);
+    window.lana?.log(`DA fetch error ${resp.status}: ${url} — ${error}`);
+    return { ok: false, status: resp.status, error };
+  }
+  const etag = resp.headers.get('ETag');
+  const contentType = resp.headers.get('content-type') || '';
+  if (contentType.includes('application/json')) {
+    const data = await resp.json();
+    return { ok: true, status: resp.status, data, etag };
+  }
+  return { ok: true, status: resp.status, etag };
+}
+
+// A malformed config string (bad manual edit, truncated write) shouldn't take
+// down the whole library load — log and default that one row to {} instead.
+export function parseRowConfig(row, logPrefix) {
+  if (typeof row.config !== 'string') return row.config ?? {};
+  try {
+    return JSON.parse(row.config);
+  } catch (error) {
+    window.lana?.log(`${logPrefix}: malformed config JSON for row, defaulting to {}. ${error}`);
+    return {};
+  }
+}
+
+// A single-row sheet collapses `data` to a bare object instead of a one-element array
+// (a common spreadsheet-backed-JSON-API quirk) — coerce it back into an array either way.
+function coerceRows(raw) {
+  if (Array.isArray(raw)) return raw;
+  return raw ? [raw] : [];
+}
+
+// Reads a sheet and returns its rows + ETag, for optimistic-locking writes via writeSheet.
+// Handles both single-sheet and multi-sheet documents (our rows live under the owned sheet
+// name — 'data' by default, or `sheetName` when a caller manages more than one named sheet
+// in the same file); any other named sheet is captured as `otherSheets` so writes round-trip
+// it untouched.
+export async function readSheet(org, repo, path, sheetName = OWNED_SHEET_NAME) {
+  const result = await daFetch(`/source/${org}/${repo}${path}`, getHeaders('GET'));
+  if (!result.ok) return result;
+  const body = result.data;
+  const isMultiSheet = body?.[':type'] === 'multi-sheet';
+  const rows = coerceRows(isMultiSheet ? body?.[sheetName]?.data : body?.data);
+  const otherSheets = isMultiSheet
+    ? Object.fromEntries(
+      Object.entries(body).filter(([key]) => key !== sheetName && !key.startsWith(':')),
+    )
+    : {};
+  const sheetNames = isMultiSheet ? (body[':names'] || [sheetName]) : [sheetName];
+  return {
+    ok: true, data: rows, etag: result.etag, otherSheets, sheetNames, version: body?.[':version'],
+  };
+}
+
+// Writes the full sheet. { etag } → If-Match; { create: true } → If-None-Match: *.
+// { otherSheets, sheetNames, version } (from a prior readSheet()) round-trip any sheet this
+// call doesn't own; omitted, it writes the plain single-sheet shape. A 412 means a concurrent
+// write — callers should re-read and retry.
+export async function writeSheet(org, repo, path, rows, {
+  etag, create, otherSheets, sheetNames, version, sheetName = OWNED_SHEET_NAME,
+} = {}) {
+  const serialized = rows.map((row) => ({
+    ...row,
+    config: typeof row.config === 'string' ? row.config : JSON.stringify(row.config ?? {}),
+  }));
+  const ownedSheet = {
+    total: serialized.length, limit: serialized.length, offset: 0, data: serialized,
+  };
+
+  // DA admin API accepts the same object format it returns on GET.
+  const hasOtherSheets = otherSheets && Object.keys(otherSheets).length > 0;
+  const payload = JSON.stringify(hasOtherSheets ? {
+    ':names': sheetNames || [sheetName, ...Object.keys(otherSheets)],
+    ':version': version ?? 3,
+    ':type': 'multi-sheet',
+    [sheetName]: ownedSheet,
+    ...otherSheets,
+  } : {
+    ':type': 'sheet',
+    ':sheetname': sheetName,
+    ...ownedSheet,
+  });
+
+  const url = `${DA_ADMIN_ORIGIN}/source/${org}/${repo}${path}`;
+  const formData = new FormData();
+  formData.append('data', new Blob([payload], { type: 'application/json' }), 'blob');
+
+  const headers = new Headers();
+  if (daToken) headers.append('Authorization', `Bearer ${daToken}`);
+  if (etag) headers.append('If-Match', etag);
+  else if (create) headers.append('If-None-Match', '*');
+
+  let resp;
+  try {
+    resp = await doFetch(url, { method: 'POST', headers, body: formData });
+  } catch (err) {
+    window.lana?.log(`DA writeSheet network error: ${err} — ${url}`);
+    return { ok: false, status: 0, error: 'Network error' };
+  }
+  if (resp.status === 412) {
+    return { ok: false, status: 412, conflict: true, error: 'Sheet changed concurrently' };
+  }
+  if (!resp.ok) {
+    const error = await resp.text().catch(() => resp.statusText);
+    return { ok: false, status: resp.status, error };
+  }
+  return { ok: true, status: resp.status, etag: resp.headers.get('ETag') };
+}
+
+const MAX_WRITE_RETRIES = 4;
+const CONFLICT_ERROR = 'Conflict: the config library sheet was changed by someone else. Please retry.';
+
+// Optimistic-locking read-modify-write: reads the sheet + ETag, applies
+// mutate(rows), writes conditionally, and retries on a 412 conflict.
+// mutate(rows) returns { rows, result, skip? } — skip avoids a needless write.
+// `sheetName` (default 'data') lets a caller manage more than one named sheet
+// in the same file — each sheet's own mutateSheet call automatically
+// preserves every other sheet untouched via otherSheets/sheetNames/version.
+export async function mutateSheet(org, repo, path, mutate, sheetName = OWNED_SHEET_NAME) {
+  for (let attempt = 0; attempt <= MAX_WRITE_RETRIES; attempt += 1) {
+    // eslint-disable-next-line no-await-in-loop
+    const read = await readSheet(org, repo, path, sheetName);
+    if (!read.ok && read.status !== 404) return read;
+    const rows = read.ok ? (read.data || []) : [];
+    // Existing sheet → If-Match its etag (or unconditional if etag unavailable), and
+    // preserve whatever other sheets it had. Missing sheet (404) → If-None-Match:* to
+    // guard concurrent first creation; nothing else to preserve.
+    const opts = read.ok
+      ? {
+        etag: normalizeEtag(read.etag), otherSheets: read.otherSheets, sheetNames: read.sheetNames, version: read.version, sheetName,
+      }
+      : { create: true, sheetName };
+    const { rows: newRows, result, skip } = mutate(rows);
+    if (skip) return { ok: true, data: result, skipped: true };
+    // eslint-disable-next-line no-await-in-loop
+    const write = await writeSheet(org, repo, path, newRows, opts);
+    if (write.ok) return { ok: true, data: result };
+    if (write.status !== 412) return write;
+  }
+  return { ok: false, status: 412, error: CONFLICT_ERROR };
+}

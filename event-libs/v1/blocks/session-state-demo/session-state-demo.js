@@ -3,7 +3,7 @@ import {
   sessions, sessionsStatus, favorited, scheduled, auth, pendingActions,
   liveStreamActiveIds, sessionStateVersion,
 } from '../../utils/session-store.js';
-import { favoriteWithFeedback } from '../../services/sessions/action-feedback.js';
+import { toggleFavoriteWithFeedback } from '../../services/sessions/action-feedback.js';
 import { deriveSessionState, getNowMs } from '../../utils/session-state.js';
 
 // Reference implementation for SHARED-STATE-USAGE.md's vanilla-JS pattern — reads the
@@ -58,7 +58,7 @@ export default async function init(el) {
   favoriteBtn.addEventListener('click', () => {
     const [firstSession] = sessions.value;
     if (!firstSession || pendingActions.value.has(firstSession.id)) return;
-    favoriteWithFeedback(firstSession, {
+    toggleFavoriteWithFeedback(firstSession, {
       eventConfig: DEMO_EVENT_CONFIG,
       isFavorited: favorited.value.has(firstSession.id),
     });

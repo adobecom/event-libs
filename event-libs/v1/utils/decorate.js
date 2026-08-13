@@ -576,6 +576,32 @@ function prebuildAutoBlock(blockName, link) {
 
       return chronoBoxEl;
     },
+    'sessions-guide': (link) => {
+      const url = new URL(link.href);
+      const hashMatch = url.hash.match(/[#&]sgConfig=([A-Za-z0-9+/=%-]{20,})/);
+      const sgConfigBase64 = url.searchParams.get('sgConfig') || hashMatch?.[1];
+      const config = parseEncodedConfig(sgConfigBase64);
+
+      if (!config) {
+        return null;
+      }
+
+      // Guards against the real risk of this manual copy/paste hand-off: an author
+      // pasting the wrong event's link onto the wrong page.
+      const pageEventId = getMetadata('event-id');
+      if (config.eventId && pageEventId && config.eventId !== pageEventId) {
+        window.lana?.log(`[sessions-guide] eventId mismatch: config authored for ${config.eventId}, page is ${pageEventId}`);
+      }
+
+      // No authoring-table path exists for this block — sessions-guide.js's init()
+      // reads data-session-guide-config only.
+      const blockClass = config.surface === 'page' ? 'sessions-guide-full-page' : 'sessions-guide';
+
+      return createTag('div', {
+        class: blockClass,
+        'data-session-guide-config': JSON.stringify(config),
+      });
+    },
   }
 
   if (autoBlockBuilders[blockName]) {
@@ -594,6 +620,7 @@ export function processAutoBlockLinks(parent) {
   const autoBlockIdentifiers = {
     'chrono-box': { pattern: 'schedule-maker' },
     'mobile-rider': { pattern: 'mobilerider.com', selfInit: true, c2: true },
+    'sessions-guide': { pattern: 'session-guide-configurator' },
   };
 
   Object.entries(autoBlockIdentifiers).forEach(([blockName, { pattern, selfInit, c2 }]) => {
@@ -1043,6 +1070,29 @@ function addStylesToEventPage() {
   document.head.appendChild(link);
 }
 
+// e.g. "dark", "dark(blocks:hero-marquee,profile-cards)", or "dark(blocks:text[first],agenda)"
+const BLOCK_TOKEN_RE = /^([^[\]]+?)(?:\[\s*(first|last|[1-9]\d*)\s*\])?$/;
+
+function parseThemeValue(raw) {
+  const value = raw?.toLowerCase().trim();
+  const match = value?.match(/^(dark|light)(?:\(\s*blocks\s*:\s*([^)]*)\)\s*)?$/);
+  if (!match) return null;
+  const [, theme, blocksParam] = match;
+  // undefined (no parens) means whole-page; '' (empty blocks: list) must stay
+  // distinct from that so it scopes to zero blocks instead of falling back.
+  if (blocksParam === undefined) return { theme, blockTokens: null };
+
+  const rawTokens = blocksParam.split(',').map((b) => b.trim()).filter(Boolean);
+  const blockTokens = [];
+  for (const token of rawTokens) {
+    const tokenMatch = token.match(BLOCK_TOKEN_RE);
+    if (!tokenMatch) return null;
+    const [, name, selector] = tokenMatch;
+    blockTokens.push({ name: name.trim(), selector: selector ?? null });
+  }
+  return { theme, blockTokens };
+}
+
 export function applyAreaTheme(area = document) {
   try {
     const customAttributes = JSON.parse(getMetadata('custom-attributes'));
@@ -1051,13 +1101,37 @@ export function applyAreaTheme(area = document) {
     );
     if (!theme) return;
 
-    const themeValue = theme.values?.[0]?.value?.toLowerCase().trim();
-    if (themeValue !== 'dark' && themeValue !== 'light') return;
+    const parsed = parseThemeValue(theme.values?.[0]?.value);
+    if (!parsed) return;
+    const { theme: themeValue, blockTokens } = parsed;
 
     const isDocument = area === document;
     const blocks = isDocument
       ? area.body.querySelectorAll('main > div > div[class]')
       : area.querySelectorAll('div[class]');
+
+    if (blockTokens) {
+      const blockList = Array.from(blocks);
+      const plainNames = blockTokens.filter((t) => !t.selector).map((t) => t.name);
+      const positionalTargets = new Set();
+      blockTokens.filter((t) => t.selector).forEach(({ name, selector }) => {
+        const group = blockList.filter((b) => b.classList.contains(name));
+        const index = selector === 'first' ? 0
+          : selector === 'last' ? group.length - 1
+            : Number(selector) - 1;
+        if (group[index]) positionalTargets.add(group[index]);
+      });
+
+      blockList.forEach((block) => {
+        const matches = plainNames.some((name) => block.classList.contains(name))
+          || positionalTargets.has(block);
+        if (!matches) return;
+        block.classList.remove('dark', 'light');
+        block.classList.add(themeValue);
+      });
+      return;
+    }
+
     blocks.forEach((block) => {
       const isSectionMetadata = block.classList.contains('section-metadata');
       if (isSectionMetadata) {

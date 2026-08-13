@@ -7,7 +7,6 @@ import {
   deleteConfig as deleteConfigController,
 } from '../scripts/da-controller.js';
 import { useDA } from './DAContext.js';
-import { getDefaultTrackIcon, DEFAULT_ICON_COLOR } from '../default-track-icons.js';
 import { getDisplayTitle } from '../utils.js';
 import { CONFIG_TYPES } from '../constants.js';
 
@@ -18,6 +17,9 @@ function emptyConfig() {
     configName: '',
     eventTitle: '',
     trackIcons: {},
+    overrideTrackIcon: null,
+    overrideTrackIcons: {},
+    products: {},
     allowDoubleBooking: false,
     featuredSessions: [],
     featuredSessionsMeta: {},
@@ -25,6 +27,7 @@ function emptyConfig() {
     upcomingSessionsMeta: {},
     rfApiUrl: '',
     rfProfileId: '',
+    registerUrl: '',
   };
 }
 
@@ -105,8 +108,9 @@ const ConfigsProvider = ({ children }) => {
   // carrying them over would silently mislabel the new event.
   // `eventServiceEnv` is the *new* pick's env, not the source row's —
   // Duplicate can legitimately target a different tier than its source.
-  // rfApiUrl/rfProfileId always reset blank — reusing another event's RF
-  // profile id would misroute this event's live schedule/favorites calls.
+  // rfApiUrl/rfProfileId/registerUrl always reset blank — reusing another event's RF
+  // profile id or registration page would misroute this event's live schedule/favorites
+  // calls or send attendees to register for the wrong event.
   const startDuplicateConfig = useCallback((sourceRow, event, eventServiceEnv) => {
     const clonedConfig = { ...sourceRow.config };
     delete clonedConfig.eventId;
@@ -118,7 +122,7 @@ const ConfigsProvider = ({ children }) => {
       eventServiceEnv,
       configType: sourceRow.configType || CONFIG_TYPES.GLOBAL,
       config: {
-        ...clonedConfig, configName: '', eventTitle: '', rfApiUrl: '', rfProfileId: '',
+        ...clonedConfig, configName: '', eventTitle: '', rfApiUrl: '', rfProfileId: '', registerUrl: '',
       },
     });
   }, []);
@@ -148,26 +152,37 @@ const ConfigsProvider = ({ children }) => {
     });
   }, []);
 
-  // Called once real tracks are known (session fetch resolves) — writes a
-  // { icon, color: black } entry for any track with a *known* default icon
-  // that isn't already in trackIcons (never overwrites an authored/seeded
-  // entry). Tracks with no known icon are left unseeded — nothing sensible
-  // to auto-pick, and seeding a color alone would trip isTrackIconEntryComplete.
-  const seedTrackIcons = useCallback((tracks) => {
+  // Same merge pattern as updateTrackIcon, keyed by override text instead of track name —
+  // each distinct text an author has typed is its own swimlane, with its own entry.
+  const updateOverrideTrackIcon = useCallback((overrideText, updates) => {
     setActiveConfig((prev) => {
       if (!prev) return prev;
-      const existing = prev.config.trackIcons || {};
-      const additions = {};
-      (tracks || []).forEach((track) => {
-        if (existing[track]) return;
-        const fallback = getDefaultTrackIcon(track);
-        if (!fallback?.icon) return;
-        additions[track] = { icon: fallback.icon, color: DEFAULT_ICON_COLOR };
-      });
-      if (Object.keys(additions).length === 0) return prev;
       return {
         ...prev,
-        config: { ...prev.config, trackIcons: { ...existing, ...additions } },
+        config: {
+          ...prev.config,
+          overrideTrackIcons: {
+            ...prev.config.overrideTrackIcons,
+            [overrideText]: { ...prev.config.overrideTrackIcons?.[overrideText], ...updates },
+          },
+        },
+      };
+    });
+  }, []);
+
+  // Same merge pattern as updateTrackIcon — { icon, pageUrl } per product, no color.
+  const updateProduct = useCallback((product, updates) => {
+    setActiveConfig((prev) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        config: {
+          ...prev.config,
+          products: {
+            ...prev.config.products,
+            [product]: { ...prev.config.products?.[product], ...updates },
+          },
+        },
       };
     });
   }, []);
@@ -238,7 +253,8 @@ const ConfigsProvider = ({ children }) => {
     startEditConfig,
     clearActiveConfig,
     updateTrackIcon,
-    seedTrackIcons,
+    updateOverrideTrackIcon,
+    updateProduct,
     updateConfigField,
     saveActiveConfig,
     removeConfig,

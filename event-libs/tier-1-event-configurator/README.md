@@ -31,23 +31,23 @@ consolidated task list.
 
 **Phase 2 scope note:** this app only adds the `allowDoubleBooking` boolean
 to the form/Config JSON. The consuming-side wiring (renaming
-`track-icon-config.js` to a broader singleton, wiring `scheduleAction`'s
+`track-icon-config.js` to a broader singleton, wiring `toggleScheduleAction`'s
 `showConflictModal` param, retiring sessions-guide's per-block
 `show-conflict-modal` table row) is explicitly MWPW-200314's territory, per
 PLAN.md §6 — not built here.
 
-**Track icon editor implementation note:** `event-libs/v1/utils/track-icon-config.js`
-(the real `DEFAULT_TRACK_ICON_CONFIG`/`getTrackIcon()`) and
-`event-libs/v1/features/icons/` (`Icon.js`/`icon-resolver.js`/`track-icons.svg`)
-don't exist on `dev` — like `fetchSessions()`, they're part of the
-in-progress MWPW-200314 branch. `default-track-icons.js` and
-`track-icon-sprite.js` here are temporary, self-contained copies of that
-data/sprite (not the shared utility itself, to avoid duplicating the actual
-resolution logic) — consolidate back onto the real ones once that branch
-merges. Also note: Chrome doesn't support cross-document
-`<use href="external.svg#id">` (only Firefox does) — `track-icon-sprite.js`
-fetches and inlines the sprite's `<symbol>` markup instead, same technique
-the real `icon-resolver.js` uses, for the same reason.
+**Track icon editor implementation note:** no built-in default icon/color map —
+authors pick both explicitly for every track (`default-track-icons.js` re-exports
+`DEFAULT_ICON_COLOR`, the one universal fallback color, from the real
+`event-libs/v1/utils/tier-1-event-config.js` rather than carrying its own copy).
+`IconPicker.js` (a searchable combobox, since a native `<select>` can't render
+an icon + name per option) renders each option through the real, shared
+`event-libs/v1/features/icons/Icon.js`/`icon-resolver.js` — the same
+federal-CDN-first, then-Milo-as-backup chain session-guide's live badges use
+(no other fallback — an icon in neither source doesn't render) — so the
+picker and the live page never drift. Its option list itself comes from
+`useIconSlugOptions()` (`IconPicker.js`), sourced entirely from federal's live
+`icons.json` inventory, so newly-uploaded federal icons appear with no code change.
 
 **Known interim gap:** the track list shown in the editor comes from a raw
 `getEventSessionCatalog()` call in `event-libs/v1/utils/esp-controller.js`,
@@ -98,6 +98,12 @@ unchanged).
   its own environment picker; the automatic fallback above, and how you'd
   target a non-prod tier for testing.
 - `components/TrackIconEditor.js` — per-track icon/color pickers.
+- `components/ProductIconEditor.js` — per-product icon picker (no color — products
+  already have their own colored SVGs) plus a product page URL field.
+- `components/IconPicker.js` — the shared searchable icon combobox TrackIconEditor and
+  OverrideTrackIconEditor render per row (a native `<select>` can't show an icon + name
+  per option); also hosts `useIconSlugOptions()`, sourced entirely from federal's live
+  `icons.json` inventory.
 - `components/FeaturedSessionsEditor.js` — featured-sessions picker: search +
   track filter over the already-fetched session catalog, add/remove, ↑/↓
   reorder into a flat ordered `featuredSessions` array.
@@ -119,6 +125,7 @@ One shared DA sheet per content-repo at
     "eventTitle": "...",
     "updated": "2026-07-22T21:30:00.000Z",
     "trackIcons": { "Track Name": { "icon": "icon-slug", "color": "#RRGGBB" } },
+    "products": { "Product Name": { "icon": "icon-slug", "pageUrl": "https://..." } },
     "allowDoubleBooking": true,
     "featuredSessions": ["sessionId1", "sessionId2"],
     "rfApiUrl": "https://www.adobe.com/max-api/",

@@ -9,6 +9,7 @@ import { SessionDetailOverlay } from './SessionDetailOverlay.js';
 import { FilterPanel } from './FilterPanel.js';
 import { LoadingState } from './LoadingState.js';
 import { setSessionParam, setSessionsParam, clearSessionParams } from '../utils/url.js';
+import { trapFocus } from '../utils/focus-trap.js';
 
 // No top gap on mobile/tablet (drawer covers the full screen); 20px gap on desktop.
 const getTopMargin = () => (window.matchMedia('(max-width: 1279px)').matches ? 0 : 20);
@@ -226,6 +227,10 @@ export function DrawerShell() {
     history.pushState({}, '', clearSessionParams());
   }
 
+  // Traps Tab focus within the drawer while open and closes it on Escape, mirroring
+  // Milo's shared modal (which this hand-rolled, gesture-driven drawer can't use directly).
+  useEffect(() => (isOpen ? trapFocus(drawerRef.current, closeDrawer) : undefined), [isOpen]);
+
   function openDrawer() {
     const isNarrow = window.matchMedia('(max-width: 1279px)').matches;
     dispatch({
@@ -268,7 +273,7 @@ export function DrawerShell() {
         <div class="sg-drawer__body">
           <div class=${`sg-body-scroll${isExpanded ? ' sg-body-scroll--scrollable' : ''}`}>
             ${sessionsStatus.value === 'loading' && html`<${LoadingState} />`}
-            ${sessionsStatus.value === 'error' && html`<div class="sg-error">Failed to load sessions.</div>`}
+            ${sessionsStatus.value === 'error' && html`<div class="sg-error" role="alert">Failed to load sessions.</div>`}
             ${sessionsStatus.value === 'ready' && html`<${ViewRouter} />`}
           </div>
           <div class=${'sg-detail-panel' + (hasDetail ? ' sg-detail-panel--open' : '')}>
@@ -277,7 +282,7 @@ export function DrawerShell() {
         </div>
         ${filterOpen && html`<${FilterPanel} onClose=${handleFilterClose} />`}
       </div>
-      ${!isOpen && html`<button class="sg-cta-btn" onclick=${openDrawer} type="button">
+      ${!isOpen && html`<button class="sg-cta-btn" onclick=${openDrawer} daa-ll="Session-Guide-Open" type="button">
         View all sessions
         <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false">
           <path d="M15.75 3H13.75V2C13.75 1.58594 13.4141 1.25 13 1.25C12.5859 1.25 12.25 1.58594 12.25 2V3H7.75V2C7.75 1.58594 7.41406 1.25 7 1.25C6.58594 1.25 6.25 1.58594 6.25 2V3H4.25C3.00928 3 2 4.00977 2 5.25V15.75C2 16.9902 3.00928 18 4.25 18H15.75C16.9907 18 18 16.9902 18 15.75V5.25C18 4.00977 16.9907 3 15.75 3ZM4.25 4.5H6.25V5C6.25 5.41406 6.58594 5.75 7 5.75C7.41406 5.75 7.75 5.41406 7.75 5V4.5H12.25V5C12.25 5.41406 12.5859 5.75 13 5.75C13.4141 5.75 13.75 5.41406 13.75 5V4.5H15.75C16.1636 4.5 16.5 4.83691 16.5 5.25V7H3.5V5.25C3.5 4.83691 3.83643 4.5 4.25 4.5ZM15.75 16.5H4.25C3.83643 16.5 3.5 16.1631 3.5 15.75V8.5H16.5V15.75C16.5 16.1631 16.1636 16.5 15.75 16.5Z" fill="currentColor"/>

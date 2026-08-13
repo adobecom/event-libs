@@ -1,9 +1,13 @@
-import { html, useState, useComputed } from '../../../deps/htm-preact.js';
+import { html, useState, useComputed, useEffect, useRef } from '../../../deps/htm-preact.js';
 import { useSessionGuide } from '../store/index.js';
 import { sessions } from '../../../utils/session-store.js';
+import { trapFocus } from '../utils/focus-trap.js';
 
 export function FilterPanel({ onClose }) {
   const { state, dispatch } = useSessionGuide();
+  const panelRef = useRef(null);
+
+  useEffect(() => trapFocus(panelRef.current, onClose), []);
   const { activeFilters, guideConfig } = state;
   const { filterCategories } = guideConfig;
 
@@ -71,7 +75,7 @@ export function FilterPanel({ onClose }) {
   const currentSet = localFilters[activeCategory] instanceof Set ? localFilters[activeCategory] : new Set();
 
   return html`
-    <div class="sg-filter-panel" role="dialog" aria-modal="true" aria-label="Filter sessions">
+    <div class="sg-filter-panel" ref=${panelRef} role="dialog" aria-modal="true" aria-label="Filter sessions">
       <div class="sg-filter-panel__header">
         <span class="sg-filter-panel__title">
           Filter${totalActiveCount > 0 ? html` <span class="sg-filter-panel__active-count">${totalActiveCount}</span>` : ''}
@@ -87,6 +91,7 @@ export function FilterPanel({ onClose }) {
                 <button
                   class=${'sg-filter-panel__cat' + (activeCategory === id ? ' sg-filter-panel__cat--active' : '')}
                   onclick=${() => setActiveCategory(id)}
+                  aria-pressed=${String(activeCategory === id)}
                   type="button"
                 >
                   ${label}
@@ -112,8 +117,8 @@ export function FilterPanel({ onClose }) {
         </div>
       </div>
       <div class="sg-filter-panel__footer">
-        <button class="sg-filter-panel__reset" onclick=${reset} type="button">Reset all</button>
-        <button class="sg-filter-panel__apply" onclick=${apply} type="button">Apply</button>
+        <button class="sg-filter-panel__reset" onclick=${reset} daa-ll="Filter-Reset-All" type="button">Reset all</button>
+        <button class="sg-filter-panel__apply" onclick=${apply} daa-ll="Filter-Apply" type="button">Apply</button>
       </div>
     </div>
   `;

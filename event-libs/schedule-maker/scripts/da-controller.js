@@ -1,7 +1,8 @@
-import { DA_ADMIN_ORIGIN } from '../constants.js';
+import { DA_ADMIN_ORIGIN, DA_ORIGIN, DA_APP_PATH, ENABLE_LEGACY_LINK_MIGRATION } from '../constants.js';
 
 let daToken = null;
 let sdkDaFetch = null;
+let legacyLinkMigrationEnabled = ENABLE_LEGACY_LINK_MIGRATION;
 
 export function setDaToken(token) {
   daToken = token;
@@ -9,6 +10,13 @@ export function setDaToken(token) {
 
 export function setDaFetch(fn) {
   sdkDaFetch = fn;
+}
+
+// Test-only override for ENABLE_LEGACY_LINK_MIGRATION (constants.js) — flip
+// the constant there for the real on/off switch; this just lets tests
+// exercise both states without touching module-level config.
+export function setLegacyLinkMigrationEnabled(enabled) {
+  legacyLinkMigrationEnabled = enabled;
 }
 
 // Prefer the DA SDK's authenticated fetch when it has been provided; otherwise
@@ -186,13 +194,49 @@ async function listAllFiles(org, repo, path) {
   return { files, authError };
 }
 
-// Matches ?schedule= (old ECC/SM query-param format) and #schedule= (new SM hash format).
-const SCHEDULE_PARAM_RE = /[?#]schedule=([A-Za-z0-9+/=%-]{20,})/g;
+// Matches ?schedule=, &schedule=, and #schedule= — the schedule param regardless
+// of connector char or whether it's in the query string or the hash fragment.
+const SCHEDULE_PARAM_RE = /[?#&]schedule=([A-Za-z0-9+/=%-]{20,})/g;
 
-// Temporary: rewrites new #schedule= hash-format hrefs back to ?schedule= query-param format
-// so the production chronobox (which only reads searchParams) can load them.
-async function rewriteHashLinksToQueryParam(org, repo, filePath) {
-  const hrefRe = /href=(["'])([^"']*#schedule=[A-Za-z0-9+/=%-]{20,}[^"']*)\1/gi;
+// Matches any anchor href carrying a schedule param, on any domain/path.
+const SCHEDULE_HREF_RE = /href=(["'])([^"']*[?#&]schedule=[A-Za-z0-9+/=%-]{20,}[^"']*)\1/gi;
+
+// True if href is already exactly the canonical DA app URL in hash format —
+// i.e. nothing for rewriteNonCanonicalScheduleLinks to do.
+function isCanonicalScheduleHref(href, canonicalPrefix) {
+  if (!href.startsWith(canonicalPrefix)) return false;
+  try {
+    const parsed = new URL(href);
+    if (parsed.searchParams.get('schedule')) return false;
+    return /^#schedule=[A-Za-z0-9+/=%-]{20,}$/.test(parsed.hash);
+  } catch {
+    return false;
+  }
+}
+
+// Extracts the schedule param's raw value from a href, whether it's in the
+// query string or the hash fragment.
+function extractScheduleParamFromHref(href) {
+  try {
+    const parsed = new URL(href);
+    const fromQuery = parsed.searchParams.get('schedule');
+    if (fromQuery) return fromQuery;
+    const hashMatch = parsed.hash.match(/[#&]schedule=([A-Za-z0-9+/=%-]{20,})/);
+    return hashMatch?.[1] || null;
+  } catch {
+    return null;
+  }
+}
+
+// Rewrites any schedule href that isn't already the canonical DA app URL
+// (da.live/app/{org}/{repo}/tools/da-apps/schedule-maker#schedule=...) to that
+// form. Covers both old ECC-hosted links (any environment/domain — e.g.
+// www.adobe.com, main--ecc-milo--adobecom.aem.page, dev/stage variants — the
+// check is domain-agnostic, it just looks for anything that isn't the current
+// canonical prefix) and links already on the DA app but still in the old
+// ?schedule= query-param format.
+async function rewriteNonCanonicalScheduleLinks(org, repo, filePath) {
+  const canonicalPrefix = `${DA_ORIGIN}/app/${org}/${repo}/${DA_APP_PATH}`;
   const url = `${DA_ADMIN_ORIGIN}/source/${org}/${repo}${filePath}`;
 
   for (let attempt = 0; attempt <= MAX_WRITE_RETRIES; attempt += 1) {
@@ -208,16 +252,16 @@ async function rewriteHashLinksToQueryParam(org, repo, filePath) {
     // eslint-disable-next-line no-await-in-loop
     const text = await resp.text();
     let changed = false;
-    const rewritten = text.replace(hrefRe, (match, quote, href) => {
-      try {
-        const parsed = new URL(href);
-        const hashMatch = parsed.hash.match(/[#&]schedule=([A-Za-z0-9+/=%-]{20,})/);
-        if (!hashMatch) return match;
-        parsed.hash = '';
-        parsed.searchParams.set('schedule', hashMatch[1]);
-        changed = true;
-        return `href=${quote}${parsed.toString()}${quote}`;
-      } catch { return match; }
+    const conversions = [];
+    const rewritten = text.replace(SCHEDULE_HREF_RE, (match, quote, href) => {
+      if (isCanonicalScheduleHref(href, canonicalPrefix)) return match;
+      const scheduleParam = extractScheduleParamFromHref(href);
+      if (!scheduleParam) return match;
+      const newUrl = new URL(canonicalPrefix);
+      newUrl.hash = `schedule=${scheduleParam}`;
+      changed = true;
+      conversions.push({ from: href, to: newUrl.toString() });
+      return `href=${quote}${newUrl.toString()}${quote}`;
     });
     if (!changed) return true;
 
@@ -231,11 +275,31 @@ async function rewriteHashLinksToQueryParam(org, repo, filePath) {
       // eslint-disable-next-line no-await-in-loop
       writeResp = await doFetch(url, { method: 'POST', headers, body: formData });
     } catch { return false; }
-    if (writeResp.ok) return true;
+    if (writeResp.ok) {
+      conversions.forEach(({ from, to }) => {
+        console.log(`[schedule-maker sync] migrated link in ${filePath}\n  from: ${from}\n  to:   ${to}`);
+      });
+      return true;
+    }
     if (writeResp.status === 412) continue; // concurrent edit — re-read and retry
     return false;
   }
   return false;
+}
+
+// Fingerprints a decoded schedule's authored content only — title and blocks —
+// excluding volatile fields (modificationTime changes on every Copy Link even
+// with zero real edits; scheduleId is the grouping key itself; createdTime
+// never changes but isn't meaningful content). Blocks are sorted by
+// startDateTime first so the same content in a different array order still
+// fingerprints identically. Two occurrences of the same scheduleId with
+// matching fingerprints are truly the same schedule placed in multiple docs
+// (safe to collapse); differing fingerprints mean genuine content divergence —
+// staleness or an intentional fork, either way worth showing as its own entry
+// rather than silently discarding one.
+function scheduleContentFingerprint(decoded) {
+  const blocks = [...(decoded?.blocks || [])].sort((a, b) => (a.startDateTime || 0) - (b.startDateTime || 0));
+  return JSON.stringify({ title: decoded?.title, blocks });
 }
 
 // Handles both correctly-encoded links (single decodeURIComponent) and legacy
@@ -271,8 +335,18 @@ export async function syncSchedules(org, repo, eventFolder) {
   }
   const docFiles = allFiles.filter((f) => f.endsWith('.html'));
 
-  const foundData = new Map(); // scheduleId → decoded object (first occurrence wins)
-  const docRefs = {}; // scheduleId → [filePath, ...]
+  // Keyed by scheduleId + content fingerprint, not scheduleId alone: identical
+  // content re-placed in multiple docs collapses to one entry (the ordinary
+  // case), but genuinely different content under the same scheduleId — a
+  // different title, different blocks, whatever — is shown as its own entry
+  // rather than merged away. A shared scheduleId with different content is
+  // still worth flagging, since two versions can otherwise look identical at a
+  // glance if their titles happen to match (only their blocks differ) — see
+  // conflictingVersions below, attached per schedule so the UI can point
+  // directly at the sibling(s) and their docs instead of just a bare flag.
+  const foundData = new Map(); // `${scheduleId}::${fingerprint}` → decoded object
+  const docRefsByKey = {}; // same composite key → [filePath, ...] (internal only — folded onto each schedule below)
+  const canonicalPrefix = `${DA_ORIGIN}/app/${org}/${repo}/${DA_APP_PATH}`;
 
   const perDocFinds = await mapWithConcurrency(docFiles, SCAN_CONCURRENCY, async (filePath) => {
     const res = await fetchText(org, repo, filePath);
@@ -286,7 +360,10 @@ export async function syncSchedules(org, repo, eventFolder) {
       const decoded = decodeScheduleParam(m[1]);
       if (decoded?.scheduleId || decoded?.title) finds.push(decoded);
     }
-    const needsRewrite = /href=["'][^"']*#schedule=[A-Za-z0-9+/=%-]{20,}/.test(res.text);
+    // Skip when the legacy-migration feature is switched off — no old-domain
+    // or old-format links left to find once a full scan has migrated them.
+    const needsRewrite = legacyLinkMigrationEnabled
+      && [...res.text.matchAll(SCHEDULE_HREF_RE)].some(([, , href]) => !isCanonicalScheduleHref(href, canonicalPrefix));
     return { finds, needsRewrite };
   });
 
@@ -301,30 +378,73 @@ export async function syncSchedules(org, repo, eventFolder) {
     };
   }
 
-  // Temporary: rewrite #schedule= hash-format links back to ?schedule= query-param
-  // so the production chronobox can read them until the decorate.js fix is deployed.
-  const docsToRewrite = docFiles.filter((_, i) => perDocFinds[i]?.needsRewrite);
-  if (docsToRewrite.length > 0) {
-    await mapWithConcurrency(docsToRewrite, SCAN_CONCURRENCY, (path) => rewriteHashLinksToQueryParam(org, repo, path));
+  // Upgrade non-canonical schedule links found during scan — old ECC-hosted
+  // links on any domain, and old ?schedule= query-param links on the DA app —
+  // to the canonical DA app URL in #schedule= hash format, so authors never
+  // need to manually adjust a URL for it to load correctly in the DA app.
+  // Gated by ENABLE_LEGACY_LINK_MIGRATION (see constants.js) — switch back on
+  // if legacy links resurface after a full migration scan.
+  if (legacyLinkMigrationEnabled) {
+    const docsToRewrite = docFiles.filter((_, i) => perDocFinds[i]?.needsRewrite);
+    if (docsToRewrite.length > 0) {
+      await mapWithConcurrency(docsToRewrite, SCAN_CONCURRENCY, (path) => rewriteNonCanonicalScheduleLinks(org, repo, path));
+    }
   }
 
   perDocFinds.forEach(({ finds }, i) => {
     const filePath = docFiles[i];
     const seenInDoc = new Set();
     finds.forEach((decoded) => {
-      const key = decoded.scheduleId || decoded.title;
-      if (!foundData.has(key)) foundData.set(key, decoded);
+      const id = decoded.scheduleId || decoded.title;
+      const fingerprint = scheduleContentFingerprint(decoded);
+      const key = `${id}::${fingerprint}`;
+
+      const existing = foundData.get(key);
+      // Identical content under this key can still show up more than once
+      // (e.g. the same unedited schedule pasted into two docs) — keep
+      // whichever occurrence has the most recent modificationTime, not just
+      // whichever was scanned first. Since the key already includes the
+      // fingerprint, this never merges two occurrences with different content.
+      if (!existing || new Date(decoded.modificationTime || 0) > new Date(existing.modificationTime || 0)) {
+        foundData.set(key, decoded);
+      }
       if (!seenInDoc.has(key)) {
         seenInDoc.add(key);
-        if (!docRefs[key]) docRefs[key] = [];
-        docRefs[key].push(filePath);
+        if (!docRefsByKey[key]) docRefsByKey[key] = [];
+        docRefsByKey[key].push(filePath);
       }
     });
   });
 
-  const schedules = [...foundData.values()].sort(
-    (a, b) => new Date(b.modificationTime || 0) - new Date(a.modificationTime || 0),
-  );
+  const withDocRefs = [...foundData.values()].map((schedule) => {
+    const id = schedule.scheduleId || schedule.title;
+    const key = `${id}::${scheduleContentFingerprint(schedule)}`;
+    // Only the docs that actually contain THIS version's exact content — not
+    // every doc that shares this scheduleId regardless of content.
+    return { ...schedule, referencedInDocs: docRefsByKey[key] || [] };
+  });
 
-  return { ok: true, data: { schedules, docRefs } };
+  // Group by scheduleId so each version can point directly at its sibling(s)
+  // — the actual title(s) and doc(s) — instead of just flagging "conflict"
+  // and leaving the author to hunt for what it means and where to look.
+  const byId = new Map();
+  withDocRefs.forEach((schedule) => {
+    const id = schedule.scheduleId || schedule.title;
+    if (!byId.has(id)) byId.set(id, []);
+    byId.get(id).push(schedule);
+  });
+
+  const schedules = withDocRefs
+    .map((schedule) => {
+      const id = schedule.scheduleId || schedule.title;
+      const siblings = byId.get(id).filter((other) => other !== schedule);
+      return {
+        ...schedule,
+        hasConflictingVersions: siblings.length > 0,
+        conflictingVersions: siblings.map((sib) => ({ title: sib.title, referencedInDocs: sib.referencedInDocs })),
+      };
+    })
+    .sort((a, b) => new Date(b.modificationTime || 0) - new Date(a.modificationTime || 0));
+
+  return { ok: true, data: { schedules } };
 }

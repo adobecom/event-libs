@@ -12,6 +12,7 @@ import { html } from '../../../deps/htm-preact.js';
  * @param {'solid'|'outlined'|'transparent'} [props.variant='solid']
  * @param {'on-light'|'on-dark'}             [props.context='on-light']
  * @param {'xs'|'md'|'lg'}                   [props.size='md']
+ * @param {string}   [props.daaLl]    - Analytics click label (daa-ll)
  */
 export function IconButton({
   children,
@@ -23,6 +24,7 @@ export function IconButton({
   context = 'on-light',
   size = 'md',
   extraClass,
+  daaLl,
 }) {
   const cls = [
     'sg-icon-btn',
@@ -39,6 +41,7 @@ export function IconButton({
       aria-label=${label}
       aria-pressed=${pressed !== undefined ? String(pressed) : undefined}
       disabled=${disabled || undefined}
+      daa-ll=${daaLl}
       type="button"
     >
       <span class="sg-icon-btn__icon" aria-hidden="true">${children}</span>

@@ -1,13 +1,13 @@
 import { html } from '../../../deps/htm-preact.js';
 import { useSessionGuide } from '../store/index.js';
 import { formatShortTime, formatDuration, getNowMs } from '../utils/time.js';
-import { deriveSessionState } from '../../../utils/session-state.js';
+import { deriveSessionState, getWatchDestination } from '../../../utils/session-state.js';
 import {
   scheduled, favorited, pendingActions, liveStreamActiveIds,
 } from '../../../utils/session-store.js';
-import { scheduleWithFeedback, favoriteWithFeedback } from '../../../services/sessions/action-feedback.js';
+import { toggleScheduleWithFeedback, toggleFavoriteWithFeedback } from '../../../services/sessions/action-feedback.js';
 import { IconPlay, IconCalendarCheck, IconCalendarPlus, IconHeartFilled, IconHeartOutline } from './icons.js';
-import { setSessionParam, safeUrl } from '../utils/url.js';
+import { setSessionParam, clearSessionParams, safeUrl, isSamePage } from '../utils/url.js';
 import { CategoryBadge } from './CategoryBadge.js';
 import { getTrackIcon } from '../../../utils/tier-1-event-config.js';
 
@@ -48,39 +48,48 @@ export function LiveCard({ session, variant = 'live' }) {
 
   async function handleSchedule(e) {
     e.stopPropagation();
-    await scheduleWithFeedback(session, { eventConfig: guideConfig, isScheduled });
+    await toggleScheduleWithFeedback(session, { eventConfig: guideConfig, isScheduled });
   }
 
   async function handleFavorite(e) {
     e.stopPropagation();
-    await favoriteWithFeedback(session, { eventConfig: guideConfig, isFavorited });
+    await toggleFavoriteWithFeedback(session, { eventConfig: guideConfig, isFavorited });
   }
 
-  const watchHref = safeUrl(session.watchUrl || session.sessionPageUrl);
+  const watchHref = safeUrl(getWatchDestination(session, sessionState));
+
+  function handleWatch(e) {
+    e.stopPropagation();
+    // Already on the destination page (e.g. the widget is embedded on the homepage/broadcast
+    // page itself) — close the widget instead of reloading the page out from under the player.
+    if (isSamePage(watchHref)) {
+      dispatch({ type: 'CLOSE_DRAWER' });
+      history.pushState({}, '', clearSessionParams());
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+    window.location.href = watchHref;
+  }
 
   let primaryCta;
-  if (variant === 'featured') {
-    if (sessionState === 'upcoming') {
+  if (sessionState === 'upcoming') {
+    if (variant === 'featured') {
       primaryCta = html`<button
         class=${'sg-live-card__btn sg-live-card__btn--watch' + (isScheduled ? ' is-scheduled' : '') + (isPending ? ' is-pending' : '')}
         onclick=${handleSchedule}
         disabled=${isPending}
+        daa-ll=${isScheduled ? 'Remove-from-Schedule' : 'Add-to-Schedule'}
         type="button"
       >${isScheduled
           ? html`<${IconCalendarCheck} />Added to schedule`
           : html`<${IconCalendarPlus} />Add to schedule`
         }</button>`;
-    } else if (sessionState === 'on-demand' && watchHref) {
-      primaryCta = html`<button
-        class="sg-live-card__btn sg-live-card__btn--watch"
-        onclick=${(e) => { e.stopPropagation(); window.location.href = watchHref; }}
-        type="button"
-      ><${IconPlay} />Watch on demand</button>`;
     }
-  } else if (session.watchUrl) {
+  } else if (watchHref) {
     primaryCta = html`<button
       class="sg-live-card__btn sg-live-card__btn--watch"
-      onclick=${(e) => { e.stopPropagation(); if (watchHref) window.location.href = watchHref; }}
+      onclick=${handleWatch}
+      daa-ll="Watch-Now"
       type="button"
     ><${IconPlay} />Watch now</button>`;
   }
@@ -94,11 +103,10 @@ export function LiveCard({ session, variant = 'live' }) {
   }
 
   return html`
-    <div class=${cardClass} onclick=${handleCardClick} role="button" tabindex="0"
-      onkeydown=${(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleCardClick(); } }}>
+    <div class=${cardClass} onclick=${handleCardClick}>
       <div class="sg-live-card__image">
         ${session.thumbnailUrl
-    ? html`<img src=${session.thumbnailUrl} alt=${session.title} loading="lazy" />`
+    ? html`<img src=${session.thumbnailUrl} alt=${session.title} loading="lazy" decoding="async" />`
     : html`<div class="sg-live-card__thumb-placeholder" style=${'background:' + trackColor}></div>`}
         <div class="sg-live-card__progress-row">
           <div class="sg-live-card__progress">
@@ -110,11 +118,18 @@ export function LiveCard({ session, variant = 'live' }) {
       <div class="sg-live-card__body">
         <div class="sg-live-card__meta">
           <div class="sg-live-card__track-row">
-            ${html`<${CategoryBadge} category=${session.category?.[0]} />`}
+            ${html`<${CategoryBadge} session=${session} />`}
           </div>
           <p class="sg-live-card__time">${timeRange}</p>
         </div>
-        <p class="sg-live-card__title">${session.title}</p>
+        ${surface === 'widget'
+    ? html`<button
+              class="sg-live-card__title sg-live-card__title-btn"
+              type="button"
+              onclick=${(e) => { e.stopPropagation(); handleCardClick(); }}
+              daa-ll="Session-Card-Open"
+            >${session.title}</button>`
+    : html`<p class="sg-live-card__title">${session.title}</p>`}
         <p class="sg-live-card__desc">${session.description}</p>
         <div class="sg-live-card__actions">
           ${primaryCta}
@@ -124,6 +139,7 @@ export function LiveCard({ session, variant = 'live' }) {
             aria-label=${isScheduled ? 'Remove from schedule' : 'Add to schedule'}
             aria-pressed=${String(isScheduled)}
             disabled=${isPending}
+            daa-ll=${isScheduled ? 'Remove-from-Schedule' : 'Add-to-Schedule'}
             type="button"
           ></button>
           <button
@@ -132,6 +148,7 @@ export function LiveCard({ session, variant = 'live' }) {
             aria-label=${isFavorited ? 'Remove from favorites' : 'Add to favorites'}
             aria-pressed=${String(isFavorited)}
             disabled=${isPending}
+            daa-ll=${isFavorited ? 'Remove-from-Favorites' : 'Add-to-Favorites'}
             type="button"
           >${isFavorited ? html`<${IconHeartFilled} />` : html`<${IconHeartOutline} />`
           }<span class="sg-live-card__btn-label">${isFavorited ? 'Favorited' : 'Favorite'}</span></button>

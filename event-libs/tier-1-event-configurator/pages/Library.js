@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, html } from '../../v1/deps/htm-preact.js';
+import { useState, useEffect, useMemo, useCallback, html } from '../../v1/deps/htm-preact.js';
 import SearchInput from '../components/SearchInput.js';
 import EventPicker from '../components/EventPicker.js';
 import ManualEventLookup from '../components/ManualEventLookup.js';
@@ -84,10 +84,12 @@ export default function Library() {
   const [duplicateSource, setDuplicateSource] = useState(null);
   const [rowPendingDelete, setRowPendingDelete] = useState(null);
   const [newHomepageMenuOpen, setNewHomepageMenuOpen] = useState(false);
-  // If EventPicker's listAllEvents() fails for any reason, fail over to
-  // ManualEventLookup for the rest of the session (sticky per page load, not
-  // per open, so a transient failure doesn't force a doomed re-attempt).
+  // If EventPicker's listAllEvents() fails, fail over to ManualEventLookup (sticky per
+  // open, not per keystroke). Scoped to the env that failed — switching env clears it,
+  // since failure on one tier says nothing about another.
   const [browseFailed, setBrowseFailed] = useState(false);
+
+  useEffect(() => setBrowseFailed(false), [envName]);
 
   const globalRows = useMemo(() => {
     const term = globalSearch.trim().toLowerCase();

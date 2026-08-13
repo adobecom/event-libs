@@ -6,8 +6,8 @@ import { parseSessionsGuideConfig } from './utils/parse-config.js';
 
 export default async function init(el) {
   const guideConfig = parseSessionsGuideConfig(el, { logPrefix: 'sessions-guide' });
-  // registerUrl is sourced from page metadata (shared across blocks) via session-store,
-  // already bootstrapped by decorateEvent before this block's init() runs.
+  // registerUrl comes from session-store (shared across blocks), already bootstrapped
+  // by decorateEvent before this block's init() runs.
   guideConfig.registerUrl = getApiConfig()?.registerUrl || '/register';
 
   el.innerHTML = '';

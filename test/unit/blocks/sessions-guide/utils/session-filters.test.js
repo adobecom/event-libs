@@ -1,6 +1,6 @@
 import { expect } from '@esm-bundle/chai';
 import {
-  sessionsForDay, groupByStartTime, groupByTrack,
+  sessionsForDay, groupByStartTime, groupByTrack, resolveTrackBadge,
   liveSessions, upcomingSessions, onDemandSessions, getFeaturedSessions,
   getOnDemandFeaturedSessions,
 } from '../../../../../event-libs/v1/blocks/sessions-guide/utils/session-filters.js';
@@ -182,5 +182,168 @@ describe('session-filters/getOnDemandFeaturedSessions', () => {
 
   it('returns an empty array when no featuredIds are provided', () => {
     expect(getOnDemandFeaturedSessions([LIVE, UPCOMING], [])).to.deep.equal([]);
+  });
+});
+
+// Override, when present, always wins swimlane placement and the badge regardless of
+// whether a primary track also exists; Additional Event Site Tracks only ever supports
+// one value.
+describe('session-filters/resolveTrackBadge', () => {
+  it('1. Primary, no additional, no override — primary lane, primary badge icon', () => {
+    const badge = resolveTrackBadge({ id: 's-1', track: 'Mainstage', trackOverride: '', additionalTracks: [] });
+    expect(badge.label).to.equal('Mainstage');
+    // No built-in defaults — an unconfigured track gets no icon and the universal
+    // black fallback color, not any curated slug/color.
+    expect(badge.icon).to.equal(null);
+    expect(badge.color).to.equal('#000000');
+    expect(badge.isOverride).to.be.false;
+    expect(badge.swimlanes).to.deep.equal(['Mainstage']);
+    expect(badge.stackedTracks).to.be.null;
+    expect(badge.count).to.equal(0);
+  });
+
+  it('2. Primary, additional, no override — primary + additional lane, primary badge + "+1"', () => {
+    const badge = resolveTrackBadge({
+      id: 's-1', track: 'Design', trackOverride: '', additionalTracks: ['Video'],
+    });
+    expect(badge.isOverride).to.be.false;
+    expect(badge.swimlanes).to.deep.equal(['Design', 'Video']);
+    expect(badge.stackedTracks).to.deep.equal(['Design', 'Video']);
+    expect(badge.count).to.equal(1);
+  });
+
+  it('3/6. No primary, no additional, override only — override-text lane, override badge icon', () => {
+    const badge = resolveTrackBadge({
+      id: 's-1', track: '', trackOverride: 'custom label', additionalTracks: [],
+    });
+    expect(badge.isOverride).to.be.true;
+    expect(badge.label).to.equal('custom label');
+    // No built-in defaults — an unconfigured override also gets no icon and the
+    // universal black fallback color.
+    expect(badge.icon).to.equal(null);
+    expect(badge.color).to.equal('#000000');
+    expect(badge.swimlanes).to.deep.equal(['custom label']);
+    expect(badge.stackedTracks).to.be.null;
+    expect(badge.count).to.equal(0);
+  });
+
+  it('4. Primary, no additional, override — override lane (not primary lane), override badge icon', () => {
+    const badge = resolveTrackBadge({
+      id: 's-1', track: 'Design', trackOverride: 'custom label', additionalTracks: [],
+    });
+    expect(badge.isOverride).to.be.true;
+    expect(badge.label).to.equal('custom label');
+    // Override wins placement outright — the primary track never appears in swimlanes.
+    expect(badge.swimlanes).to.deep.equal(['custom label']);
+  });
+
+  it('5. No primary, additional, override — override lane + additional lane, override icon + "+1"', () => {
+    const badge = resolveTrackBadge({
+      id: 's-1', track: '', trackOverride: 'custom label', additionalTracks: ['Video'],
+    });
+    expect(badge.isOverride).to.be.true;
+    expect(badge.swimlanes).to.deep.equal(['custom label', 'Video']);
+    expect(badge.count).to.equal(1);
+  });
+
+  it('Primary, additional, and override all present — override lane + additional lane, override badge icon', () => {
+    const badge = resolveTrackBadge({
+      id: 's-1', track: 'Design', trackOverride: 'custom label', additionalTracks: ['Video'],
+    });
+    expect(badge.isOverride).to.be.true;
+    expect(badge.label).to.equal('custom label');
+    // Override wins placement outright even with both a primary track and an additional
+    // one present — the primary track still never appears in swimlanes.
+    expect(badge.swimlanes).to.deep.equal(['custom label', 'Video']);
+    expect(badge.count).to.equal(1);
+  });
+
+  it('only ever applies one additional track even if more are somehow present', () => {
+    const badge = resolveTrackBadge({
+      id: 's-1', track: 'Design', trackOverride: '', additionalTracks: ['Video', 'Business', 'Photography'],
+    });
+    expect(badge.swimlanes).to.deep.equal(['Design', 'Video']);
+    expect(badge.count).to.equal(1);
+  });
+
+  it('returns null when there is no primary track and no override', () => {
+    expect(resolveTrackBadge({ id: 's-1', track: '', trackOverride: '', additionalTracks: [] })).to.be.null;
+  });
+});
+
+describe('session-filters/groupByTrack — Digital Agenda track badge model', () => {
+  it('groups sessions by their primary track', () => {
+    const a = { id: 'a', track: 'Design', trackOverride: '', additionalTracks: [] };
+    const b = { id: 'b', track: 'Video', trackOverride: '', additionalTracks: [] };
+    const c = { id: 'c', track: 'Design', trackOverride: '', additionalTracks: [] };
+    const result = groupByTrack([a, b, c]);
+    expect(result.map(([track]) => track)).to.have.members(['Design', 'Video']);
+    expect(result.find(([track]) => track === 'Design')[1].map((s) => s.id)).to.deep.equal(['a', 'c']);
+  });
+
+  it('excludes sessions with no primary track and no override — no "Other" bucket', () => {
+    const noTrack = { id: 'no-track', track: '', trackOverride: '', additionalTracks: [] };
+    const withTrack = { id: 'with-track', track: 'Design', trackOverride: '', additionalTracks: [] };
+    const result = groupByTrack([noTrack, withTrack]);
+    expect(result.map(([track]) => track)).to.deep.equal(['Design']);
+  });
+
+  it('places a session with additional tracks into every one of its swimlanes', () => {
+    const s = { id: 's-1', track: 'Design', trackOverride: '', additionalTracks: ['Video'] };
+    const result = groupByTrack([s]);
+    expect(result.map(([track]) => track)).to.have.members(['Design', 'Video']);
+    result.forEach(([, sessions]) => expect(sessions.map((x) => x.id)).to.deep.equal(['s-1']));
+  });
+
+  it('orders swimlanes per the authored swimlaneOrder ([{track,displayName,enabled}], not a plain string array), unlisted tracks appended after', () => {
+    const a = { id: 'a', track: 'Design', trackOverride: '', additionalTracks: [] };
+    const b = { id: 'b', track: 'Video', trackOverride: '', additionalTracks: [] };
+    const c = { id: 'c', track: 'Business', trackOverride: '', additionalTracks: [] };
+    const swimlaneOrder = [
+      { track: 'Video', displayName: 'Video', enabled: true },
+      { track: 'Business', displayName: 'Business', enabled: true },
+    ];
+    const result = groupByTrack([a, b, c], swimlaneOrder);
+    expect(result.map(([track]) => track)).to.deep.equal(['Video', 'Business', 'Design']);
+  });
+
+  it('falls back to first-seen order when no swimlaneOrder is authored', () => {
+    const a = { id: 'a', track: 'Design', trackOverride: '', additionalTracks: [] };
+    const b = { id: 'b', track: 'Video', trackOverride: '', additionalTracks: [] };
+    const result = groupByTrack([a, b]);
+    expect(result.map(([track]) => track)).to.deep.equal(['Design', 'Video']);
+  });
+
+  it('drops a swimlane entirely when its swimlaneOrder entry is disabled', () => {
+    const a = { id: 'a', track: 'Design', trackOverride: '', additionalTracks: [] };
+    const b = { id: 'b', track: 'Video', trackOverride: '', additionalTracks: [] };
+    const swimlaneOrder = [{ track: 'Video', displayName: 'Video', enabled: false }];
+    const result = groupByTrack([a, b], swimlaneOrder);
+    expect(result.map(([track]) => track)).to.deep.equal(['Design']);
+  });
+
+  it('returns the authored displayName as the 3rd tuple element, without changing the grouping key', () => {
+    const a = { id: 'a', track: 'Design', trackOverride: '', additionalTracks: [] };
+    const swimlaneOrder = [{ track: 'Design', displayName: 'Creativity', enabled: true }];
+    const result = groupByTrack([a], swimlaneOrder);
+    expect(result[0][0]).to.equal('Design');
+    expect(result[0][2]).to.equal('Creativity');
+  });
+
+  it('defaults the label to the raw swimlane name when no swimlaneOrder entry exists for it', () => {
+    const a = { id: 'a', track: 'Design', trackOverride: '', additionalTracks: [] };
+    expect(groupByTrack([a])[0][2]).to.equal('Design');
+  });
+
+  it('treats an override-lane name identically to a track name in swimlaneOrder', () => {
+    const overridden = { id: 'o', track: '', trackOverride: 'Community Spotlight', additionalTracks: [] };
+    const tracked = { id: 't', track: 'Design', trackOverride: '', additionalTracks: [] };
+    const swimlaneOrder = [
+      { track: 'Community Spotlight', displayName: 'Community', enabled: true },
+      { track: 'Design', displayName: 'Design', enabled: true },
+    ];
+    const result = groupByTrack([overridden, tracked], swimlaneOrder);
+    expect(result.map(([track]) => track)).to.deep.equal(['Community Spotlight', 'Design']);
+    expect(result[0][2]).to.equal('Community');
   });
 });

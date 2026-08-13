@@ -1,6 +1,10 @@
 import { LIBS } from './utils.js';
 import BlockMediator from '../deps/block-mediator.min.js';
-import { getBaseAttendeePayload, getEventAttendeePayload } from './data-utils.js';
+import {
+  getBaseAttendeePayload,
+  getEventAttendeePayload,
+  getUnrecognizedAttendeeFields,
+} from './data-utils.js';
 import { ENV_MAP } from './constances.js';
 import { getEventConfig, getEventServiceEnv } from './utils.js';
 
@@ -182,7 +186,7 @@ export async function listEvents({ pageSize, nextPageToken, fromDate } = {}) {
 const LIST_ALL_EVENTS_MAX_PAGES = 100;
 const LIST_ALL_EVENTS_CACHE_TTL_MS = 5 * 60 * 1000;
 
-let listAllEventsCache = null; // { fromDate, expiresAt, promise }
+let listAllEventsCache = null; // { fromDate, envName, expiresAt, promise }
 
 // Walks every page of GET /v1/events into one array for client-side
 // search/filter. Cached briefly; a failed fetch is never cached. No
@@ -190,10 +194,15 @@ let listAllEventsCache = null; // { fromDate, expiresAt, promise }
 // consider a default lookback if that proves too slow in practice.
 export async function listAllEvents({ fromDate } = {}) {
   const now = Date.now();
+  // Keyed on env too — callers (e.g. EventPicker) can switch getEventServiceEnv()'s
+  // override mid-session, and a cache hit here must not serve one tier's
+  // results for another.
+  const envName = getEventServiceEnv().name;
 
   if (
     listAllEventsCache
     && listAllEventsCache.fromDate === fromDate
+    && listAllEventsCache.envName === envName
     && listAllEventsCache.expiresAt > now
   ) {
     return listAllEventsCache.promise;
@@ -221,7 +230,7 @@ export async function listAllEvents({ fromDate } = {}) {
     return { ok: true, data: events };
   })();
 
-  listAllEventsCache = { fromDate, expiresAt: now + LIST_ALL_EVENTS_CACHE_TTL_MS, promise };
+  listAllEventsCache = { fromDate, envName, expiresAt: now + LIST_ALL_EVENTS_CACHE_TTL_MS, promise };
   return promise;
 }
 
@@ -747,12 +756,16 @@ export async function getAndCreateAndAddAttendee(eventId, attendeeData, rsvpToke
     }
   }
 
-  // Use EventAttendee filter for adding attendee to event
-  const eventAttendeePayload = getEventAttendeePayload({
-    ...newAttendeeData,
-    ...attendeeData,
-    registrationStatus,
-  });
+  // Use EventAttendee filter for adding attendee to event; forward any
+  // custom fields the RSVP form submitted that neither filter recognizes.
+  const eventAttendeePayload = {
+    ...getEventAttendeePayload({
+      ...newAttendeeData,
+      ...attendeeData,
+      registrationStatus,
+    }),
+    ...getUnrecognizedAttendeeFields(attendeeData),
+  };
 
   // For a guest, this call both registers and consumes the rsvp token
   // server-side in one step.

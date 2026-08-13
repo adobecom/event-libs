@@ -20,15 +20,15 @@ function waitForSessionsReady() {
   });
 }
 
-describe('session-store: myData maps RF sessionTimeID to our session ids', () => {
+describe('session-store: myData maps RF ids to our session ids', () => {
   let originalFetch;
   let jwtRequestUrl;
   let myDataRequestUrl;
 
   before(async () => {
     originalFetch = window.fetch;
-    // rfCode 'S001'/'K001' come from the stubbed ESL session-catalog response below, mapped
-    // to session ids 's-001'/'k-001' by mapEslPayloadToRawSessions() — 'UNKNOWN' has no match.
+    // mySchedule matches by sessionTimeID (→ rfCode); sessionInterests matches by sessionID
+    // (→ rfSessionId) — two different, non-interchangeable ids. 'UNKNOWN' has no match either way.
     window.fetch = async (url) => {
       if (url.includes('/jwt')) {
         jwtRequestUrl = url;
@@ -40,10 +40,17 @@ describe('session-store: myData maps RF sessionTimeID to our session ids', () =>
           status: 200,
           json: async () => ({
             sessions: [
-              { sessionId: 's-001', sessionCode: 'S001' },
-              { sessionId: 'k-001', sessionCode: 'K001' },
+              { sessionId: 's-001', sessionCode: 'S001', externalSessionId: 'rf-S001SESS' },
+              { sessionId: 'k-001', sessionCode: 'K001', externalSessionId: 'rf-K001SESS' },
             ],
-            sessionTimes: [],
+            sessionTimes: [
+              {
+                sessionId: 's-001', externalSessionTimeId: 'rf-S001TIME', startTimeMillis: 1000, endTimeMillis: 2000,
+              },
+              {
+                sessionId: 'k-001', externalSessionTimeId: 'rf-K001TIME', startTimeMillis: 1000, endTimeMillis: 2000,
+              },
+            ],
             speakers: [],
           }),
         };
@@ -53,8 +60,8 @@ describe('session-store: myData maps RF sessionTimeID to our session ids', () =>
         ok: true,
         status: 200,
         json: async () => ({
-          mySchedule: [{ sessionTimeID: 'S001' }],
-          sessionInterests: [{ sessionTimeID: 'K001' }, { sessionTimeID: 'UNKNOWN' }],
+          mySchedule: [{ sessionTimeID: 'S001TIME' }],
+          sessionInterests: [{ sessionID: 'K001SESS' }, { sessionID: 'UNKNOWN' }],
           loggedInUser: { firstName: 'Test' },
         }),
       };

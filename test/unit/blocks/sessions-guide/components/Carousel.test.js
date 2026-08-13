@@ -18,13 +18,13 @@ const BASE_CONFIG = {
 const SESSION_A = {
   id: 'a', title: 'Keynote A', description: 'Desc A', track: 'Featured',
   startTimeUtc: '2026-10-28T16:00:00Z', endTimeUtc: '2026-10-28T17:30:00Z',
-  thumbnailUrl: null, watchUrl: '/max', sessionPageUrl: '/sessions/a',
+  thumbnailUrl: null, sessionPageUrl: '/sessions/a',
   videoAvailable: false, inPerson: false,
 };
 const SESSION_B = {
   id: 'b', title: 'Keynote B', description: 'Desc B', track: 'Featured',
   startTimeUtc: '2026-10-28T18:00:00Z', endTimeUtc: '2026-10-28T19:00:00Z',
-  thumbnailUrl: 'https://example.com/b.jpg', watchUrl: '/max-2', sessionPageUrl: '/sessions/b',
+  thumbnailUrl: 'https://example.com/b.jpg', sessionPageUrl: '/sessions/b',
   videoAvailable: false, inPerson: false,
 };
 

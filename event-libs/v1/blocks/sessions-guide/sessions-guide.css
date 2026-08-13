@@ -829,6 +829,27 @@
 
 .sg-live-card:hover .sg-live-card__time { color: inherit; }
 
+/* Same reasoning as .sg-card__title-btn above — a real <button>, not the whole card. */
+.sg-live-card__title-btn {
+  display: block;
+  width: 100%;
+  text-align: left;
+  appearance: none;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  font-family: inherit;
+  font-weight: inherit;
+  font-size: inherit;
+  line-height: inherit;
+}
+
+.sg-live-card__title-btn:focus-visible {
+  outline: 1px solid var(--s2a-color-focus-ring-default, #3b63fb);
+  outline-offset: 2px;
+}
+
 .sg-live-card__title {
   font-family: var(--s2a-font-family-adobe-clean-display);
   font-weight: var(--s2a-font-weight-adobe-clean-display-black);
@@ -964,6 +985,7 @@
   width: auto;
   flex-shrink: 0;
   padding: 0;
+  margin: 0;
 }
 
 .sg-time-row__time-value {
@@ -1107,6 +1129,28 @@
   flex-direction: column;
   gap: 0;
   overflow: hidden;
+}
+
+/* Card titles are real <button>s (not the whole card) so keyboard/screen-reader users get
+   one unambiguous control instead of a button nested inside a button — reset browser button
+   chrome here, before .sg-card__title's own rule so its explicit type/color values win. */
+.sg-card__title-btn {
+  display: block;
+  text-align: left;
+  appearance: none;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  font-family: inherit;
+  font-weight: inherit;
+  font-size: inherit;
+  line-height: inherit;
+}
+
+.sg-card__title-btn:focus-visible {
+  outline: 1px solid var(--s2a-color-focus-ring-default, #3b63fb);
+  outline-offset: 2px;
 }
 
 .sg-card__title {
@@ -1370,16 +1414,6 @@
 
 .sg-my-favorites__see-live-btn:hover {
   background: rgb(0 0 0 / 5%);
-}
-
-/* ── Registration Prompt ─────────────────────────────────── */
-
-.sg-reg-prompt {
-  padding: var(--s2a-spacing-2xl) var(--s2a-spacing-lg);
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: var(--s2a-spacing-md);
 }
 
 /* ── Tablet (min-width: 768px) ───────────────────────────────────────────── */
@@ -2616,6 +2650,15 @@
 
 .sg-category-badge--sm .sg-category-badge__label {
   font-size: 12px;
+}
+
+/* "+N" indicator for a session's additionalTracks */
+.sg-category-badge__count {
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 16px;
+  color: currentcolor;
+  opacity: 0.72;
 }
 
 /* ── Icon Button (S2A Foundations) ──────────────────────────────────── */

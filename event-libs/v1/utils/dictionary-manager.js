@@ -229,3 +229,21 @@ export function getEventWaitlistBannerMessage(manager, { eventTitle = '' } = {})
     : raw;
   return text.replace(/\{eventTitle\}/g, eventTitle);
 }
+
+export const MULTI_SELECT_MORE_SUFFIX_KEY = 'multi-select-more-suffix';
+
+/**
+ * "+N more" suffix appended to a multi-select combobox's condensed summary
+ * (events-form's `createSelect`) once more options are selected than fit inline.
+ * Looked up from the `rsvp-fields` sheet, same as every other string rendered by
+ * that widget. Supports `{count}` token substitution.
+ * @param {DictionaryManager} manager - Initialized dictionary manager instance
+ * @param {Object} [tokens] - Tokens to interpolate into the dictionary value
+ * @param {number} [tokens.count] - Number of additional selected options to substitute for `{count}`
+ * @returns {string}
+ */
+export function getMultiSelectMoreSuffixMessage(manager, { count = 0 } = {}) {
+  const raw = manager.getValue(MULTI_SELECT_MORE_SUFFIX_KEY, 'rsvp-fields');
+  const text = raw === MULTI_SELECT_MORE_SUFFIX_KEY ? '+{count} more' : raw;
+  return text.replace(/\{count\}/g, count);
+}
