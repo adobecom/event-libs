@@ -30,7 +30,6 @@ const HOMEPAGE_FIELD_BY_TYPE = {
     metaFields: ['mrStreamId', 'imageUrl'],
     metaHint: 'Mobile Rider stream ID and image are optional per-session overrides',
     label: 'Upcoming Sessions',
-    metadataKey: 'upcoming-sessions',
     blockHint: 'the upcoming-sessions block',
     linkPrefix: 'event-upcoming-sessions',
   },
@@ -45,7 +44,6 @@ const HOMEPAGE_FIELD_BY_TYPE = {
     metaFields: ['watchUrl', 'mrStreamId', 'imageUrl'],
     metaHint: 'Watch URL / Mobile Rider stream ID / image are optional per-session overrides',
     label: 'Featured Sessions',
-    metadataKey: 'featured-sessions',
     blockHint: 'each card-c2 Featured Sessions card',
     linkPrefix: 'event-featured-sessions',
   },
@@ -143,7 +141,7 @@ export default function ConfigEditor() {
     });
     const linkText = `${homepageMeta.linkPrefix}: ${getDisplayTitle(activeConfig)} – ${formattedDate}`;
     const ok = await copyLinkToClipboard(url, linkText);
-    if (ok) setToastSuccess(`Link copied — paste it into ${homepageMeta.blockHint}'s section-metadata row`);
+    if (ok) setToastSuccess(`Link copied — paste it directly into ${homepageMeta.blockHint}'s doc body`);
     else setToastError('Could not copy the link — please retry');
   };
 
@@ -322,9 +320,8 @@ export default function ConfigEditor() {
           <p class="tec-editor__section-hint">
             Pick which sessions appear, and set their order. Your picks are saved with this
             row so you can come back and edit them, but ${homepageMeta.blockHint} doesn't read
-            this row directly — it reads its own section-metadata. Use "Copy Link" and paste
-            the result into that block's own section-metadata row (key
-            <code>${homepageMeta.metadataKey}</code>) instead — the link itself opens straight
+            this row directly — it reads a link authored straight in its own doc body. Use
+            "Copy Link" and paste the result there — the link itself opens straight
             back to this config when clicked. ${homepageMeta.metaHint} — none of
             them has a source in the session catalog, so fill them in only for sessions that
             actually need one.
