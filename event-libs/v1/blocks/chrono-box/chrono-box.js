@@ -307,6 +307,7 @@ function dispatchModalOpenOnceForHash(hash) {
  * one can add or remove a block a positional rule targets.
  */
 export function revalidatePageTheme() {
+  console.log('[theme-debug] chrono-box revalidatePageTheme() called');
   applyAreaTheme();
 }
 
@@ -424,6 +425,7 @@ export default async function init(el) {
 
       const rawPath = event.data?.pathToFragment;
       const fragmentPath = typeof rawPath === 'string' ? rawPath.trim() : '';
+      console.log('[theme-debug] chrono-box worker.onmessage', { el, fragmentPath, eventData: event.data });
 
       const { prefix } = getLocale(getConfig().locales);
       el.style.height = `${el.clientHeight}px`;

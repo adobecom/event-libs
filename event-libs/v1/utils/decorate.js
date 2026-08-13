@@ -1112,13 +1112,18 @@ function parseThemeValue(raw) {
 
 export function applyAreaTheme(area = document) {
   try {
-    const customAttributes = JSON.parse(getMetadata('custom-attributes'));
+    const rawCustomAttributes = getMetadata('custom-attributes');
+    console.log('[theme-debug] applyAreaTheme() called', { area, isDocumentArea: area === document, rawCustomAttributes });
+
+    const customAttributes = JSON.parse(rawCustomAttributes);
     const theme = customAttributes.find(
       (attr) => (attr.name ?? attr.attribute)?.toLowerCase().trim() === 'theme',
     );
+    console.log('[theme-debug] resolved theme attribute', theme);
     if (!theme) return;
 
     const parsed = parseThemeValue(theme.values?.[0]?.value);
+    console.log('[theme-debug] parseThemeValue() ->', parsed);
     if (!parsed) return;
     const { theme: themeValue, blockTokens } = parsed;
 
@@ -1126,6 +1131,7 @@ export function applyAreaTheme(area = document) {
     const blocks = isDocument
       ? area.body.querySelectorAll('main > div > div[class]')
       : area.querySelectorAll('div[class]');
+    console.log('[theme-debug] candidate blocks', Array.from(blocks).map((b) => b.className));
 
     if (blockTokens) {
       const localList = Array.from(blocks);
@@ -1141,12 +1147,14 @@ export function applyAreaTheme(area = document) {
         const pageBlockList = isDocument
           ? localList
           : Array.from(document.body.querySelectorAll('main > div > div[class]'));
+        console.log('[theme-debug] pageBlockList for positional resolution', pageBlockList.map((b) => b.className));
         positionalTokens.forEach(({ name, selector }) => {
           const group = pageBlockList.filter((b) => b.classList.contains(name));
           const index = selector === 'first' ? 0
             : selector === 'last' ? group.length - 1
               : Number(selector) - 1;
           const target = group[index];
+          console.log('[theme-debug] positional token', { name, selector, groupSize: group.length, foundTarget: !!target });
           group.forEach((block) => {
             block.classList.remove('dark', 'light');
             if (block === target) block.classList.add(themeValue);
@@ -1196,8 +1204,8 @@ export function applyAreaTheme(area = document) {
       block.classList.remove('dark', 'light');
       block.classList.add(themeValue);
     });
-  } catch {
-    // no-op: custom-attributes absent or not valid JSON
+  } catch (e) {
+    console.log('[theme-debug] applyAreaTheme() threw and was silently caught', e);
   }
 }
 
