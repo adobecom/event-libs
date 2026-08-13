@@ -1,7 +1,7 @@
 import { META_REG } from '../utils/constances.js';
 import { getMetadata } from '../utils/utils.js';
 
-const SESSION_CODE_PATTERN = /^s\d+$/i;
+const SESSION_CODE_PATTERN = /^[a-z]{1,4}\d+$/i;
 // card-c2.js's own aspect-ratio variant classes (e.g. "ratio-3-4") can be authored
 // alongside the hydrate classes on the same block — exclude them here too, or they'd
 // get mistaken for the metadata-key class.
