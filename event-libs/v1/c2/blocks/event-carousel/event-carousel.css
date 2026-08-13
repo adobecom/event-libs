@@ -13,7 +13,7 @@
   display: none;
 }
 
-.carousel-track > .card-c2 {
+.carousel-track > .event-card {
   scroll-snap-align: start;
 }
 
@@ -105,7 +105,7 @@
     padding-inline: 16px;
   }
 
-  .carousel-track > .card-c2 {
+  .carousel-track > .event-card {
     scroll-snap-align: center;
   }
 }

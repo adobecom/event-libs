@@ -10,7 +10,7 @@ function startMobileRiderPolling() {
   if (mrPollStarted) return;
   mrPollStarted = true;
 
-  const streamIds = [...document.querySelectorAll('.card-c2[data-mr-stream-id]')]
+  const streamIds = [...document.querySelectorAll('.event-card[data-mr-stream-id]')]
     .map((card) => card.dataset.mrStreamId);
   if (!streamIds.length) return;
 

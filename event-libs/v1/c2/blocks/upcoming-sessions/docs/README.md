@@ -46,7 +46,7 @@ render.
 MR polling itself goes through the shared registry at
 `event-libs/v1/services/sessions/mobile-rider-poller.js`
 (`registerStreamIds`/`unregisterStreamIds`/`subscribe`), not a poller local to this
-block — if `card-c2`'s Featured Sessions cards are also on the page tracking
+block — if `event-card`'s Featured Sessions cards are also on the page tracking
 overlapping `mrStreamId`s, both blocks' ids get batched into the same underlying
 `getMediaStatus()` call instead of two independent 30s loops hitting
 `overlay-admin-integration.mobilerider.com`. `session-store.js`'s own
@@ -79,7 +79,7 @@ without waiting for real time to pass. Read once at module load as an *offset* f
 real clock (not a frozen value) — `now()` still advances in real time from that point,
 so `setTimeout`-based timers and the MR poll keep firing correctly relative to it.
 Absent/invalid `timing` falls back to the real `Date.now()`. The identical override
-exists in `card-c2/session-routing.js`.
+exists in `event-card/session-routing.js`.
 
 ## Re-decoration cleanup
 

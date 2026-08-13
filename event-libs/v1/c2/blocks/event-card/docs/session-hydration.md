@@ -1,8 +1,8 @@
-# `card-c2` session hydration
+# `event-card` session hydration
 
 ## 1. Summary
 
-`card-c2` cards used for Featured Sessions are authored **one card per session**,
+`event-card` cards used for Featured Sessions are authored **one card per session**,
 each with its own hand-picked image already in place. The text content (title,
 track, CTA link) instead comes from a `featured-sessions` collection authored once
 in **page-level metadata** (DA's Metadata block, which becomes a real
@@ -19,8 +19,8 @@ PR #208's `repeatTemplate` model (used by `event-speakers`) assumes **one
 authored template row, cloned once per metadata item**. That fits blocks where
 the author writes the shape once and the data drives repetition.
 
-`card-c2`'s case is the opposite: the author already authors **N separate
-`card-c2` divs**, one per session, each with a real `<picture>` already placed by
+`event-card`'s case is the opposite: the author already authors **N separate
+`event-card` divs**, one per session, each with a real `<picture>` already placed by
 hand. There is nothing to clone — every card's row already exists. Forcing this
 through `repeatTemplate` would mean either cloning from one template and losing
 the author's per-card image control, or authoring the metadata's `photo` field
@@ -37,7 +37,7 @@ with **indexless placeholder tokens**, exactly like a `repeatTemplate` template
 row would be — just without the cloning step:
 
 ```html
-<div class="card-c2 hydrate featured-sessions s6210">
+<div class="event-card hydrate featured-sessions s6210">
   <div><div><picture>...</picture></div></div>  <!-- authored image, untouched -->
   <div><div>
     <p>[[featured-sessions.enTitle]]</p>
@@ -51,7 +51,7 @@ The hydrator's only job is to find which `featured-sessions` item this specific
 card corresponds to (by session-code class), and rewrite the indexless tokens in
 that card's content to point at that item's index —
 `[[featured-sessions.enTitle]]` → `[[featured-sessions:3.enTitle]]` — via the
-local `rewriteTokensToIndex` helper in `event-libs/v1/hydrate/card-c2.js`
+local `rewriteTokensToIndex` helper in `event-libs/v1/hydrate/event-card.js`
 (mirrors `repeat-template.js`'s `setTokenIndex`). `decorateEvent`'s existing
 `processTemplateInAllNodes` pass resolves the indexed tokens afterward, same as
 everywhere else on the page. The hydrator never reads `enTitle`/`track`/`url`
@@ -73,10 +73,10 @@ not a typo.
 Per the authored markup:
 
 ```html
-<div class="card-c2 hydrate featured-sessions s6210">
+<div class="event-card hydrate featured-sessions s6210">
 ```
 
-- `card-c2` — block name (used by `hydrateBlocks` to route to this hydrator)
+- `event-card` — block name (used by `hydrateBlocks` to route to this hydrator)
 - `hydrate` — opt-in marker
 - `featured-sessions` — the page metadata key to read (an array of session
   records)
@@ -131,10 +131,10 @@ don't need this — they round-trip through `innerHTML` unencoded.
 ## 5. Session-routing data-attributes
 
 Separate from the visible content, this hydrator hands off routing data for the
-card's click behavior (see `card-c2/docs/README.md` — `session-routing.js`).
+card's click behavior (see `event-card/docs/README.md` — `session-routing.js`).
 Since that data (`sessionId`, `mrStreamId`, times, `watchUrl`) is never rendered
 as visible text, it doesn't go through the token/placeholder system — it's set
-directly as `data-*` attributes on the card element itself, which `card-c2.js`
+directly as `data-*` attributes on the card element itself, which `event-card.js`
 never touches (it only clears/rebuilds `el`'s children, not `el`'s own
 attributes):
 
@@ -154,10 +154,10 @@ representation to hand back to authoring.
 
 ## 6. Registration
 
-Following PR #208's convention, `card-c2` is registered in
+Following PR #208's convention, `event-card` is registered in
 `event-libs/v1/hydrate/hydrate.js`'s static `HYDRATORS` map:
-`'card-c2': hydrateCardC2`. The hydrator itself lives at
-`event-libs/v1/hydrate/card-c2.js`.
+`'event-card': hydrateEventCard`. The hydrator itself lives at
+`event-libs/v1/hydrate/event-card.js`.
 
 ## 7. Open questions
 
@@ -165,7 +165,7 @@ Following PR #208's convention, `card-c2` is registered in
    with unresolved tokens for `decorate.js`'s existing fallback to clean up?
    Current behavior assumes the latter (§4, step 3) to avoid duplicating
    removal logic that already exists elsewhere in the decoration pipeline.
-2. `hydrate.js` still statically/eagerly imports `hydrateCardC2` (not lazy
+2. `hydrate.js` still statically/eagerly imports `hydrateEventCard` (not lazy
    `import()`), so every page pays the parse/eval cost of this hydrator's
-   module even on pages with zero `card-c2` blocks. See
-   `card-c2/docs/known-issues.md` for the tracked follow-up.
+   module even on pages with zero `event-card` blocks. See
+   `event-card/docs/known-issues.md` for the tracked follow-up.

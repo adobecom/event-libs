@@ -1,4 +1,4 @@
-# card-c2
+# event-card
 
 Generic content card. Renders a media (image) + body (title/description/CTA), with
 five aspect-ratio variants authored via class name: `ratio-1-1`, `ratio-4-3` (default),
@@ -29,7 +29,7 @@ for Upcoming Sessions / Session Guide:
 Cards with `data-mr-stream-id` need to know which MR streams are currently
 broadcasting to distinguish "live" from "upcoming"/"on-demand" (non-MR cards ignore
 this and use pure time-window checks). The first MR-backed card wired up registers
-every `.card-c2[data-mr-stream-id]` on the page with the shared registry at
+every `.event-card[data-mr-stream-id]` on the page with the shared registry at
 `event-libs/v1/services/sessions/mobile-rider-poller.js`
 (`registerStreamIds`/`subscribe`) and never unregisters — this block needs ongoing
 live→on-demand tracking, unlike `upcoming-sessions`, which drops an id the moment

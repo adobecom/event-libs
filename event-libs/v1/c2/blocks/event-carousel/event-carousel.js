@@ -18,7 +18,7 @@ function locateTrack(el) {
 
   const forward = [];
   sib = el.nextElementSibling;
-  while (sib?.classList.contains('card-c2')) {
+  while (sib?.classList.contains('event-card')) {
     forward.push(sib);
     sib = sib.nextElementSibling;
   }
@@ -31,7 +31,7 @@ function locateTrack(el) {
 
   const backward = [];
   sib = el.previousElementSibling;
-  while (sib?.classList.contains('card-c2')) {
+  while (sib?.classList.contains('event-card')) {
     backward.unshift(sib);
     sib = sib.previousElementSibling;
   }
@@ -119,7 +119,7 @@ function buildArrows(track) {
 
   const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   const scrollByCard = (direction) => {
-    const card = track.querySelector('.card-c2');
+    const card = track.querySelector('.event-card');
     const distance = card ? card.getBoundingClientRect().width + 8 : track.clientWidth;
     track.scrollBy({ left: direction * distance, behavior: reduceMotion ? 'auto' : 'smooth' });
   };
@@ -131,7 +131,7 @@ function buildArrows(track) {
   track.addEventListener('scroll', refresh);
   const resizeObserver = new ResizeObserver(refresh);
   resizeObserver.observe(track);
-  const firstCard = track.querySelector('.card-c2');
+  const firstCard = track.querySelector('.event-card');
   if (firstCard) resizeObserver.observe(firstCard);
   refresh();
 

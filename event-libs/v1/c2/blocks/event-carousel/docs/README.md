@@ -1,21 +1,21 @@
-# slider
+# event-carousel
 
-Carousel controls (heading, filter pills, prev/next arrows) for a track of `card-c2`
+Carousel controls (heading, filter pills, prev/next arrows) for a track of `event-card`
 cards. This block only builds the *controls* — the scrollable track itself is a
 separate sibling element in the DOM.
 
 ## Locating the track
 
 `locateTrack(el)` looks for an existing `.carousel-track` as a previous/next sibling.
-If none exists yet, it scans for a run of adjacent `.card-c2` siblings (forward, then
+If none exists yet, it scans for a run of adjacent `.event-card` siblings (forward, then
 backward) and wraps them in a new `.carousel-track` div. This lets the block work
 whether the track markup is authored explicitly or the cards are just placed next to
-the slider block.
+the event-carousel block.
 
 ## Layout notes
 
 - The mobile centered-peek gutter (`padding-inline-start` on `.carousel-track`, see
-  `slider.css`) is real padding, so `scrollLeft` never reaches `0` at that breakpoint —
+  `event-carousel.css`) is real padding, so `scrollLeft` never reaches `0` at that breakpoint —
   the first card's resting position already sits past the gutter. `getLeadingGutter()`
   reads that padding so arrow-disabled-state math (`updateArrowState`) accounts for it;
   it's `0` on desktop where there's no such padding.
