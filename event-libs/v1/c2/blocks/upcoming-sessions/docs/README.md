@@ -124,7 +124,7 @@ the same section, but only if that block opts in via an `attach-upcoming` class
   2. **Action buttons** — sessions-guide reveals the action-icon column only on
      hover/`.is-scheduled`/`.is-favorited`, which leaves buttons unreachable on
      touch/keyboard otherwise. This card keeps them always visible at every breakpoint.
-- The dark surface variant is authored as `dark-theme` (not `dark`) deliberately —
+- The dark surface variant is authored as `dark-card` (not `dark`) deliberately —
   `dark` is a reserved global Milo class that paints a solid dark background site-wide,
   which would collide with this block's own local "dark card surface" meaning.
 - Desktop (`@media (min-width: 1280px)`) uses a fixed `margin-top` on `.sg-card__footer`
