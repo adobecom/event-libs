@@ -57,6 +57,17 @@ local `rewriteTokensToIndex` helper in `event-libs/v1/hydrate/card-c2.js`
 everywhere else on the page. The hydrator never reads `enTitle`/`track`/`url`
 values and never builds `<p>`/`<a>` elements.
 
+### 3.1 Bare-token shorthand
+
+Since the card already authors its own metadata key as a class (`featured-sessions`
+above), repeating that key in every token is redundant. `rewriteToken()` also
+accepts a bare, prefix-less token — `[[enTitle]]` rewrites to the same
+`[[featured-sessions:3.enTitle]]` as `[[featured-sessions.enTitle]]` would. Both
+forms can be mixed freely on the same card. A token containing a `.` that
+doesn't start with this card's own metadata key (e.g. `[[some-other-key.title]]`)
+is left untouched — it's assumed to reference an unrelated metadata collection,
+not a typo.
+
 ## 4. Matching a card to its session
 
 Per the authored markup:
