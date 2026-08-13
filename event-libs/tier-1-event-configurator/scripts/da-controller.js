@@ -1,7 +1,6 @@
 import {
-  setDaToken, setDaFetch, readSheet, mutateSheet, parseRowConfig,
+  setDaToken, setDaFetch, readSheet, mutateSheet, parseRowConfig, listFolder, uploadMedia,
 } from '../../v1/utils/da-sheet-controller.js';
-import { listFolder, uploadMedia } from '../../v1/utils/da-media-controller.js';
 import { CONFIGS_SHEET_PATH, CONFIG_TYPES } from '../constants.js';
 
 export { setDaToken, setDaFetch, listFolder, uploadMedia };
