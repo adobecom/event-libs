@@ -1,0 +1,21 @@
+/* Session Details / Overview (MWPW-203474). Mobile-first, stacked. */
+@import './track-tags.css';
+@import './description-clamp.css';
+@import './quick-facts.css';
+@import './disclaimer-cc-legal.css';
+@import './share.css';
+
+.session-details {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s2a-spacing-16, 16px);
+  margin-bottom: var(--s2a-spacing-8, 8px);
+}
+
+.session-details .session-title {
+  margin: 0;
+  color: var(--s2a-color-gray-900, #131313);
+  font-size: var(--s2a-font-size-32, 2rem);
+  font-weight: 700;
+  line-height: 1.15;
+}

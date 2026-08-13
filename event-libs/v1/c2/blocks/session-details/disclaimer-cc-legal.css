@@ -1,0 +1,31 @@
+/*
+ * Disclaimer / CC / Legal Info Slots (MWPW-203467). Mobile-first.
+ * Small, muted supporting text under the title / at the abstract end.
+ */
+
+.session-gdpr-copy,
+.session-closed-caption,
+.session-legal-disclaimer {
+  margin: 0;
+  color: var(--s2a-color-gray-700, #505050);
+  font-size: var(--s2a-font-size-14, 0.875rem);
+  line-height: 1.4;
+}
+
+.session-closed-caption {
+  display: flex;
+  align-items: center;
+  gap: var(--s2a-spacing-8, 8px);
+}
+
+.session-cc-icon {
+  display: inline-flex;
+  flex: 0 0 auto;
+  width: var(--s2a-spacing-16, 16px);
+  height: var(--s2a-spacing-16, 16px);
+}
+
+.session-cc-icon svg {
+  width: 100%;
+  height: 100%;
+}

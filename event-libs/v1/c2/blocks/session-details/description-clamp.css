@@ -1,0 +1,39 @@
+/*
+ * Description "More" Clamp (MWPW-203470). Mobile-first.
+ * Line-clamp with a Show more/less toggle. Desktop unclamp is added later.
+ */
+
+.session-description {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--s2a-spacing-4, 4px);
+}
+
+.session-description-text {
+  margin: 0;
+  color: var(--s2a-color-gray-800, #292929);
+  font-size: var(--s2a-font-size-16, 1rem);
+  line-height: 1.5;
+
+  /* stylelint-disable-next-line value-no-vendor-prefix -- required for -webkit-line-clamp */
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.session-description.is-expanded .session-description-text {
+  -webkit-line-clamp: unset;
+  overflow: visible;
+}
+
+.session-description-toggle {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--s2a-color-gray-900, #131313);
+  font-size: var(--s2a-font-size-14, 0.875rem);
+  font-weight: 700;
+  cursor: pointer;
+}

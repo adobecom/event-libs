@@ -30,6 +30,10 @@ const EVENT_BLOCKS_C2 = [
   'upcoming-sessions',
   'chrono-box',
   'mobile-rider',
+  'session-details',
+  'featured-products',
+  'speakers',
+  'session-resources',
 ];
 
 // Import only the most essential utilities that are always needed

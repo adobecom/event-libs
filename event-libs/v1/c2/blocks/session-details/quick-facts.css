@@ -1,0 +1,29 @@
+/*
+ * Quick Facts (MWPW-203468). Mobile-first.
+ * Inline "Label: value, value" rows.
+ */
+
+.session-quick-facts {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s2a-spacing-4, 4px);
+  margin: 0;
+}
+
+.session-quick-fact {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s2a-spacing-4, 4px);
+  color: var(--s2a-color-gray-800, #292929);
+  font-size: var(--s2a-font-size-14, 0.875rem);
+  line-height: 1.4;
+}
+
+.session-quick-fact-label {
+  margin: 0;
+  font-weight: 700;
+}
+
+.session-quick-fact-value {
+  margin: 0;
+}
