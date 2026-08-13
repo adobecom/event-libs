@@ -1,0 +1,81 @@
+name: List changed code files
+
+on:
+  pull_request_target:
+    types: [opened, synchronize, reopened]
+    branches: [main]
+
+permissions:
+  pull-requests: write
+
+jobs:
+  list-changed-files:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/github-script@v6
+        with:
+          script: |
+            const MARKER = '<!-- pr-changed-files-comment -->';
+
+            const DOC_EXTENSIONS = new Set([
+              '.md', '.mdx', '.markdown', '.txt', '.rst', '.adoc',
+              '.doc', '.docx', '.pdf', '.rtf',
+            ]);
+            const DOC_BASENAMES = new Set([
+              'license', 'changelog', 'contributing', 'notice', 'authors', 'readme',
+            ]);
+
+            function isDocFile(path) {
+              const base = path.split('/').pop();
+              const dotIndex = base.lastIndexOf('.');
+              if (dotIndex === -1) {
+                return DOC_BASENAMES.has(base.toLowerCase());
+              }
+              const ext = base.slice(dotIndex).toLowerCase();
+              return DOC_EXTENSIONS.has(ext);
+            }
+
+            const files = await github.paginate(github.rest.pulls.listFiles, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.payload.pull_request.number,
+            });
+
+            const codeFiles = files
+              .filter((file) => !isDocFile(file.filename))
+              .map((file) => file.filename)
+              .sort();
+
+            let body;
+            if (codeFiles.length === 0) {
+              body = `${MARKER}\n### Changed files for cache purging\n\nNo purge-relevant files changed in this PR.`;
+            } else {
+              const list = codeFiles.map((path) => `<domain>/${path}`).join('\n');
+              body = `${MARKER}\n### Changed files for cache purging\n\n`
+                + 'Replace `<domain>` with the target host (e.g. `main--event-libs--adobecom.aem.live`) '
+                + "before purging — files must be purged individually, wildcards aren't supported.\n\n"
+                + `\`\`\`\n${list}\n\`\`\``;
+            }
+
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.payload.pull_request.number,
+            });
+            const existing = comments.find((comment) => comment.body.includes(MARKER));
+
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existing.id,
+                body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.payload.pull_request.number,
+                body,
+              });
+            }
