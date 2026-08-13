@@ -27,23 +27,29 @@ export default function EpochDateTimeField({
 
   return html`
     <div class="tec-editor__datetime-group">
-      <label class="tec-editor__field-label" for="${idPrefix}-local">${label} (${EVENT_AUTHORING_TIMEZONE})</label>
-      <input
-        id="${idPrefix}-local"
-        type="datetime-local"
-        class="tec-field tec-editor__rf-input"
-        value=${localValue}
-        onInput=${handleLocalChange}
-      />
-      <label class="tec-editor__field-label" for="${idPrefix}-epoch">${label} (epoch ms)</label>
-      <input
-        id="${idPrefix}-epoch"
-        type="number"
-        class="tec-field tec-editor__rf-input"
-        placeholder="e.g. 1792713600000"
-        value=${epochValue}
-        onInput=${handleEpochChange}
-      />
+      <div class="tec-editor__datetime-row">
+        <div class="tec-editor__datetime-col">
+          <label class="tec-editor__field-label" for="${idPrefix}-local">${label} (${EVENT_AUTHORING_TIMEZONE})</label>
+          <input
+            id="${idPrefix}-local"
+            type="datetime-local"
+            class="tec-field tec-editor__rf-input"
+            value=${localValue}
+            onInput=${handleLocalChange}
+          />
+        </div>
+        <div class="tec-editor__datetime-col">
+          <label class="tec-editor__field-label" for="${idPrefix}-epoch">${label} (epoch ms)</label>
+          <input
+            id="${idPrefix}-epoch"
+            type="number"
+            class="tec-field tec-editor__rf-input"
+            placeholder="e.g. 1792713600000"
+            value=${epochValue}
+            onInput=${handleEpochChange}
+          />
+        </div>
+      </div>
     </div>
   `;
 }
