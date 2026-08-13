@@ -602,6 +602,35 @@ function prebuildAutoBlock(blockName, link) {
         'data-session-guide-config': JSON.stringify(config),
       });
     },
+    'tec-homepage': (link) => {
+      const url = new URL(link.href);
+      const hashMatch = url.hash.match(/[#&]tecHomepage=([A-Za-z0-9+/=%-]{20,})/);
+      const config = parseEncodedConfig(hashMatch?.[1]);
+
+      if (!config || !Array.isArray(config.entries)) {
+        return null;
+      }
+
+      // Same manual copy/paste guard as sessions-guide above.
+      const pageEventId = getMetadata('event-id');
+      if (config.eventId && pageEventId && config.eventId !== pageEventId) {
+        window.lana?.log(`[tec-homepage] eventId mismatch: config authored for ${config.eventId}, page is ${pageEventId}`);
+      }
+
+      // Both Homepage config types share one link format/pattern — configType picks
+      // which block (and which data attribute its own init() reads) gets built.
+      if (config.configType === 'homepage-featured-sessions') {
+        return createTag('div', {
+          class: 'featured-sessions',
+          'data-featured-sessions-config': JSON.stringify(config),
+        });
+      }
+
+      return createTag('div', {
+        class: 'upcoming-sessions',
+        'data-upcoming-sessions-config': JSON.stringify(config),
+      });
+    },
   }
 
   if (autoBlockBuilders[blockName]) {
@@ -621,6 +650,7 @@ export function processAutoBlockLinks(parent) {
     'chrono-box': { pattern: 'schedule-maker' },
     'mobile-rider': { pattern: 'mobilerider.com', selfInit: true, c2: true },
     'sessions-guide': { pattern: 'session-guide-configurator' },
+    'tec-homepage': { pattern: 'tools/da-apps/tier-1-event-configurator' },
   };
 
   Object.entries(autoBlockIdentifiers).forEach(([blockName, { pattern, selfInit, c2 }]) => {

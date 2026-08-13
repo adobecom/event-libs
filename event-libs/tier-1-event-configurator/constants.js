@@ -25,8 +25,9 @@ const PAGES = {
 
 // Two config surfaces: Global (pasted into an event page's tier-1-event-config
 // metadata, consumed across the event experience — Session Guide, Event App, etc.)
-// and Homepage (pasted into a single homepage block's own section-metadata —
-// upcoming-sessions or card-c2/Featured Sessions — nothing else reads it).
+// and Homepage (authored as a single link pasted into a homepage page's doc body,
+// decoded and rendered by upcoming-sessions.js or featured-sessions.js — nothing
+// else reads it).
 const CONFIG_TYPES = {
   GLOBAL: 'global',
   HOMEPAGE_UPCOMING_SESSIONS: 'homepage-upcoming-sessions',

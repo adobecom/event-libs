@@ -123,11 +123,10 @@ export function stringifyConfig(value, indent = '') {
 }
 
 // Mirrors upcoming-sessions/docs/build-author-data.mjs's toAuthorEntry() shape —
-// the small per-session object a homepage block (upcoming-sessions.js, or
-// card-c2's Featured Sessions hydrator) reads directly from its own authored
-// section-metadata (not the tier-1-event-config metadata this app otherwise
-// writes to), so it's built here rather than looked up at render time. Shared
-// by both Homepage config types — they need the identical shape.
+// the small per-session object a homepage block (upcoming-sessions.js or
+// featured-sessions.js) decodes directly from the authored link's hash payload
+// (see buildHomepageConfigURL below), so it's built here rather than looked up at
+// render time. Shared by both Homepage config types — they need the identical shape.
 // `meta` is an optional { watchUrl, mrStreamId, imageUrl } hand-authored override (see
 // MOBILE-RIDER-STREAM-ID-GAP.md) — all three omitted entirely from the entry when
 // blank, matching upcoming-sessions.js's own authored-data shape, where an
@@ -156,12 +155,13 @@ export function buildSessionAuthorEntry(session, sessionTimes, meta) {
 
 // Mirrors Schedule Maker's ScheduleURLUtility.createScheduleURL (schedule-maker/utils.js) —
 // the full entries payload, base64-encoded, lives entirely in the URL hash rather than a
-// server-side sheet, so a future consuming block (upcoming-sessions.js / card-c2) can decode
-// and render it directly from the link with no extra lookup. `unescape(encodeURIComponent(...))`
-// keeps btoa from choking on non-Latin1 characters (e.g. accented session titles).
-export function buildHomepageConfigURL(org, repo, configType, eventId, entries) {
+// server-side sheet, so decorate.js's tec-homepage auto-block builder can decode it straight
+// off the authored link and render upcoming-sessions.js / featured-sessions.js with no extra
+// lookup. `unescape(encodeURIComponent(...))` keeps btoa from choking on non-Latin1 characters
+// (e.g. accented session titles).
+export function buildHomepageConfigURL(org, repo, configType, eventId, heading, entries) {
   const payload = {
-    eventId, configType, generatedTime: new Date().toISOString(), entries,
+    eventId, configType, heading, generatedTime: new Date().toISOString(), entries,
   };
   const base64 = btoa(unescape(encodeURIComponent(JSON.stringify(payload))));
   const url = new URL(`${DA_ORIGIN}/app/${org}/${repo}/${DA_APP_PATH}`);

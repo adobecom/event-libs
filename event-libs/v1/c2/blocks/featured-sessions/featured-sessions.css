@@ -1,0 +1,10 @@
+.featured-sessions-heading {
+  font-size: var(--s2a-font-size-lg, 18px);
+  margin: 0 0 var(--s2a-spacing-md, 16px);
+}
+
+.featured-sessions-track {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s2a-spacing-md, 16px);
+}

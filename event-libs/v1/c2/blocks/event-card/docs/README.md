@@ -7,13 +7,14 @@ five aspect-ratio variants authored via class name: `ratio-1-1`, `ratio-4-3` (de
 If no media image is found, the card removes itself — a card with no image is not a
 valid authored card.
 
-## Session-hydrated cards
+## Session-driven cards
 
-Cards rendered by other flows (e.g. Featured Sessions) can carry `data-session-id` and
-related `data-*` attributes (`data-start-time-utc`, `data-end-time-utc`, `data-mr-stream-id`,
-`data-watch-url`, `data-session-url`). When present, `session-routing.js` is lazy-loaded
-to make the card clickable and route it based on derived session state. Plain authored
-cards (no `data-session-id`) are unaffected — this is a no-op for them.
+Cards built by other flows (e.g. `event-libs/v1/c2/blocks/featured-sessions/`) can carry
+`data-session-id` and related `data-*` attributes (`data-start-time-utc`,
+`data-end-time-utc`, `data-mr-stream-id`, `data-watch-url`, `data-session-url`) before
+calling this block's own `init()` on the generated card. When present, `session-routing.js`
+is lazy-loaded to make the card clickable and route it based on derived session state.
+Plain authored cards (no `data-session-id`) are unaffected — this is a no-op for them.
 
 ## session-routing.js
 

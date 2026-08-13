@@ -28,6 +28,7 @@ const EVENT_BLOCKS_C2 = [
   'event-card',
   'event-carousel',
   'upcoming-sessions',
+  'featured-sessions',
   'chrono-box',
   'mobile-rider',
   'event-marquee',

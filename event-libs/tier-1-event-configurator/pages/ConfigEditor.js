@@ -23,10 +23,10 @@ const HOMEPAGE_FIELD_BY_TYPE = {
   [CONFIG_TYPES.HOMEPAGE_UPCOMING_SESSIONS]: {
     field: 'upcomingSessions',
     metaField: 'upcomingSessionsMeta',
+    headingField: 'upcomingSessionsHeading',
     // upcoming-sessions.js reads mrStreamId (drives its Mobile Rider live-drop
     // polling) but never reads watchUrl anywhere — leave that field out.
-    // imageUrl has no reader yet either, but authors need to attach one now so
-    // it's captured in the JSON ahead of the consuming-side wiring.
+    // imageUrl is read directly by upcoming-sessions.js's buildCard() now.
     metaFields: ['mrStreamId', 'imageUrl'],
     metaHint: 'Mobile Rider stream ID and image are optional per-session overrides',
     label: 'Upcoming Sessions',
@@ -36,15 +36,16 @@ const HOMEPAGE_FIELD_BY_TYPE = {
   [CONFIG_TYPES.HOMEPAGE_FEATURED_SESSIONS]: {
     field: 'featuredSessions',
     metaField: 'featuredSessionsMeta',
-    // card-c2's session-routing.js reads both — watchUrl is where a click
-    // routes once the session goes live, mrStreamId is what tells it a
-    // session is Mobile-Rider-backed at all. imageUrl has no reader yet
-    // either, but authors need to attach one now so it's captured in the
-    // JSON ahead of the consuming-side wiring.
+    headingField: 'featuredSessionsHeading',
+    // The featured-sessions block's generated event-card markup + session-routing.js
+    // read all three — watchUrl is where a click routes once the session goes live,
+    // mrStreamId is what tells it a session is Mobile-Rider-backed at all, and
+    // imageUrl is required for a session to render as a card at all (event-card.js
+    // removes any card with no resolvable image).
     metaFields: ['watchUrl', 'mrStreamId', 'imageUrl'],
-    metaHint: 'Watch URL / Mobile Rider stream ID / image are optional per-session overrides',
+    metaHint: 'Watch URL / Mobile Rider stream ID are optional per-session overrides — image is required for a session to appear',
     label: 'Featured Sessions',
-    blockHint: 'each card-c2 Featured Sessions card',
+    blockHint: 'the featured-sessions block',
     linkPrefix: 'event-featured-sessions',
   },
 };
@@ -135,7 +136,8 @@ export default function ConfigEditor() {
     const entries = (activeConfig.config[homepageMeta.field] || [])
       .filter((id) => sessionsById.has(id))
       .map((id) => buildSessionAuthorEntry(sessionsById.get(id), sessionTimes, metaById[id]));
-    const url = buildHomepageConfigURL(org, repo, configType, eventId, entries);
+    const heading = activeConfig.config[homepageMeta.headingField] || homepageMeta.label;
+    const url = buildHomepageConfigURL(org, repo, configType, eventId, heading, entries);
     const formattedDate = new Date().toLocaleString('en-US', {
       weekday: 'long', month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit',
     });
@@ -326,6 +328,15 @@ export default function ConfigEditor() {
             them has a source in the session catalog, so fill them in only for sessions that
             actually need one.
           </p>
+          <label class="tec-editor__field-label" for="tec-homepage-heading">Section heading</label>
+          <input
+            id="tec-homepage-heading"
+            type="text"
+            class="tec-field"
+            placeholder=${homepageMeta.label}
+            value=${activeConfig.config[homepageMeta.headingField] || ''}
+            onInput=${(e) => updateConfigField(homepageMeta.headingField, e.target.value)}
+          />
           ${isLoadingSessions && html`<${LoadingInline} label="Loading sessions…" />`}
           ${sessionsError && html`<p class="tec-editor__error">${sessionsError}</p>`}
           ${!isLoadingSessions && !sessionsError && html`
