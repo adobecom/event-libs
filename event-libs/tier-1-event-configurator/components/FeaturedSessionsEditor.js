@@ -26,14 +26,24 @@ function DragHandleIcon() {
 //
 // Assumes every row is the same height: the dragged row's target slot is
 // arithmetic on the pointer delta, and other rows FLIP-animate into place.
+// Every possible per-session override field this editor knows how to render —
+// callers pick a subset via `metaFields` (below) to match what their own
+// consuming block actually reads, rather than always showing both.
+const META_FIELD_DEFS = {
+  watchUrl: { label: 'Watch URL', placeholder: 'Watch URL (optional)' },
+  mrStreamId: { label: 'Mobile Rider stream ID', placeholder: 'Mobile Rider stream ID (optional)' },
+};
+
 export default function FeaturedSessionsEditor({
   sessions, sessionTimes, tracks, featuredSessions, onChange,
   heading = 'Featured (display order)', emptyHint = 'No sessions featured yet — add some from the list on the right.',
-  // Optional per-session overrides (watchUrl, mrStreamId) — neither field has
-  // a source in the ESP session catalog (see MOBILE-RIDER-STREAM-ID-GAP.md),
-  // so when a caller needs them in its output JSON, they're authored here by
-  // hand instead. Omitted entirely for callers that don't pass onMetaChange.
-  meta, onMetaChange,
+  // Optional per-session overrides — neither field has a source in the ESP
+  // session catalog (see MOBILE-RIDER-STREAM-ID-GAP.md), so when a caller
+  // needs one in its output JSON, it's authored here by hand instead.
+  // `metaFields` (e.g. ['mrStreamId']) picks which of META_FIELD_DEFS to
+  // show — only the ones the caller's own block actually reads. Omitted
+  // entirely (along with onMetaChange) for callers that don't need any.
+  meta, onMetaChange, metaFields = [],
 }) {
   const [search, setSearch] = useState('');
   const [trackFilter, setTrackFilter] = useState('');
@@ -274,24 +284,19 @@ export default function FeaturedSessionsEditor({
                 <div class="tec-featured-editor__info">
                   <span class="tec-featured-editor__title">${title}</span>
                   <span class="tec-featured-editor__track">${session ? getSessionMeta(session) : 'Not found in current session catalog'}</span>
-                  ${onMetaChange && html`
+                  ${onMetaChange && metaFields.length > 0 && html`
                     <div class="tec-featured-editor__meta-fields">
-                      <input \
-                        type="text" \
-                        class="tec-field tec-field--s" \
-                        placeholder="Watch URL (optional)" \
-                        aria-label="Watch URL for ${title}" \
-                        value=${meta?.[sessionId]?.watchUrl || ''} \
-                        onInput=${(e) => onMetaChange(sessionId, { watchUrl: e.target.value })} \
-                      />
-                      <input \
-                        type="text" \
-                        class="tec-field tec-field--s" \
-                        placeholder="Mobile Rider stream ID (optional)" \
-                        aria-label="Mobile Rider stream ID for ${title}" \
-                        value=${meta?.[sessionId]?.mrStreamId || ''} \
-                        onInput=${(e) => onMetaChange(sessionId, { mrStreamId: e.target.value })} \
-                      />
+                      ${metaFields.map((field) => html`
+                        <input \
+                          key=${field} \
+                          type="text" \
+                          class="tec-field tec-field--s" \
+                          placeholder=${META_FIELD_DEFS[field].placeholder} \
+                          aria-label="${META_FIELD_DEFS[field].label} for ${title}" \
+                          value=${meta?.[sessionId]?.[field] || ''} \
+                          onInput=${(e) => onMetaChange(sessionId, { [field]: e.target.value })} \
+                        />
+                      `)}
                     </div>
                   `}
                 </div>

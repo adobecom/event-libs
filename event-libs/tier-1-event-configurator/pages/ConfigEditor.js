@@ -22,6 +22,10 @@ const HOMEPAGE_FIELD_BY_TYPE = {
   [CONFIG_TYPES.HOMEPAGE_UPCOMING_SESSIONS]: {
     field: 'upcomingSessions',
     metaField: 'upcomingSessionsMeta',
+    // upcoming-sessions.js reads mrStreamId (drives its Mobile Rider live-drop
+    // polling) but never reads watchUrl anywhere — leave that field out.
+    metaFields: ['mrStreamId'],
+    metaHint: 'Mobile Rider stream ID is an optional per-session override',
     label: 'Upcoming Sessions',
     metadataKey: 'upcoming-sessions',
     blockHint: 'the upcoming-sessions block',
@@ -29,6 +33,11 @@ const HOMEPAGE_FIELD_BY_TYPE = {
   [CONFIG_TYPES.HOMEPAGE_FEATURED_SESSIONS]: {
     field: 'featuredSessions',
     metaField: 'featuredSessionsMeta',
+    // card-c2's session-routing.js reads both — watchUrl is where a click
+    // routes once the session goes live, mrStreamId is what tells it a
+    // session is Mobile-Rider-backed at all.
+    metaFields: ['watchUrl', 'mrStreamId'],
+    metaHint: 'Watch URL / Mobile Rider stream ID are optional per-session overrides',
     label: 'Featured Sessions',
     metadataKey: 'featured-sessions',
     blockHint: 'each card-c2 Featured Sessions card',
@@ -302,9 +311,9 @@ export default function ConfigEditor() {
             row so you can come back and edit them, but ${homepageMeta.blockHint} doesn't read
             this row directly — it reads its own section-metadata. Use "Copy ${homepageMeta.label} JSON"
             and paste the result into that block's own section-metadata row (key
-            <code>${homepageMeta.metadataKey}</code>) instead. Watch URL / Mobile Rider stream ID
-            are optional per-session overrides — neither has a source in the session catalog, so
-            fill them in only for sessions that actually need one.
+            <code>${homepageMeta.metadataKey}</code>) instead. ${homepageMeta.metaHint} — none of
+            them has a source in the session catalog, so fill them in only for sessions that
+            actually need one.
           </p>
           ${isLoadingSessions && html`<${LoadingInline} label="Loading sessions…" />`}
           ${sessionsError && html`<p class="tec-editor__error">${sessionsError}</p>`}
@@ -319,6 +328,7 @@ export default function ConfigEditor() {
               emptyHint="No sessions added yet — add some from the list on the right." \
               meta=${activeConfig.config[homepageMeta.metaField]} \
               onMetaChange=${handleMetaChange} \
+              metaFields=${homepageMeta.metaFields} \
             />
             <button type="button" class="tec-btn tec-btn--outline" onClick=${handleCopyHomepageJson}>Copy ${homepageMeta.label} JSON</button>
           `}
