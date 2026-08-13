@@ -125,7 +125,6 @@ export default async function init(el) {
   // Milo decorates each fetched fragment on a detached, pre-insertion document (see
   // fragment.js), so a page-wide positional theme rule like `dark(blocks:text[first])`
   // can't be resolved correctly until these fragments are actually attached, above.
-  console.log('[theme-debug] promotional-content revalidating after fragments attached', el);
   applyAreaTheme();
 
   addMediaReversedClass(el);

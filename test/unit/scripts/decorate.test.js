@@ -1021,6 +1021,36 @@ describe('applyAreaTheme', () => {
     expect(document.getElementById('t1').classList.contains('dark')).to.be.true;
     expect(document.getElementById('t-frag').classList.contains('dark')).to.be.false;
   });
+
+  it('resolves a positional selector against a block nested inside a chrono-box/fragment wrapper', () => {
+    // Mirrors the real DOM Milo produces for a loaded fragment: the anchor that triggered
+    // loadFragment gets replaced by div.fragment, whose own top-level "section" divs (from
+    // the fragment's `body > div` sections) become its direct children — nesting the block
+    // several levels below `main > div`, where the plain `main > div > div[class]` selector
+    // alone would never reach it.
+    setThemeAttribute('theme', 'dark(blocks:text[first])');
+    document.body.innerHTML = `
+      <main>
+        <div>
+          <div class="chrono-box">
+            <div class="fragment" data-path="/fragments/hero-pre">
+              <div>
+                <div class="text" id="t-nested"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div>
+          <div class="text" id="t-top-level"></div>
+        </div>
+      </main>
+    `;
+
+    applyAreaTheme();
+
+    expect(document.getElementById('t-nested').classList.contains('dark')).to.be.true;
+    expect(document.getElementById('t-top-level').classList.contains('dark')).to.be.false;
+  });
 });
 
 describe('applySectionColumnsLayout', () => {
