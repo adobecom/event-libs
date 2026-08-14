@@ -14,7 +14,7 @@ not-applicable; these three are still open and span shared infrastructure that
 **Impact:** a future fix or endpoint change (auth header, base URL, error-shape
 handling) applied to one copy silently fails to apply to the other.
 `isMediaActive`/`getMediaStatusMap` are duplicated in the older file but never
-called by `session-routing.js`/`upcoming-sessions.js` — only `getMediaStatus` is
+called by `utils/session-routing.js`/`upcoming-sessions.js` — only `getMediaStatus` is
 used.
 
 **Fix:** delete the newer duplicate and import the existing controller from
@@ -22,7 +22,7 @@ used.
 
 ## 2. Two independent MobileRider poll loops — fixed
 
-**Was:** `event-card/session-routing.js` and `upcoming-sessions/upcoming-sessions.js`
+**Was:** `utils/session-routing.js` and `upcoming-sessions/upcoming-sessions.js`
 each ran their own `setInterval`-based MR poll loop, hitting
 `overlay-admin-integration.mobilerider.com` independently even when both blocks
 were on the same page tracking overlapping `mrStreamId`s.
@@ -41,7 +41,7 @@ business logic for deciding which ids it cares about and when:
   unregisters an id the moment MR confirms it active (still doesn't care about
   "stop time" — registration is dropped, not kept around for an eventual
   on-demand transition, since this block never shows one).
-- `event-card/session-routing.js` still registers its full `.event-card[data-mr-
+- `utils/session-routing.js` still registers its full `.event-card[data-mr-
   stream-id]` snapshot once and never unregisters — it still needs ongoing
   live→on-demand tracking for its own cards, unchanged.
 

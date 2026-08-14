@@ -9,8 +9,14 @@ function getVariant(el) {
 
 function buildMedia(mediaWrapper) {
   const img = mediaWrapper?.querySelector('img');
-  if (!img) return null;
-  const picture = createOptimizedPicture(img.src, img.alt || '', true, false);
+  if (img) {
+    const picture = createOptimizedPicture(img.src, img.alt || '', true, false);
+    return createTag('div', { class: 'card-media' }, picture);
+  }
+
+  const url = mediaWrapper?.querySelector(':scope > div')?.textContent.trim();
+  if (!url) return null;
+  const picture = createTag('picture', {}, createTag('img', { src: url, loading: 'lazy', alt: '' }));
   return createTag('div', { class: 'card-media' }, picture);
 }
 
@@ -58,7 +64,7 @@ export default async function init(el) {
   el.dataset.cardVariant = variant;
 
   if (el.dataset.sessionId) {
-    const { default: attachSessionRouting } = await import('./session-routing.js');
+    const { default: attachSessionRouting } = await import('../../../utils/session-routing.js');
     attachSessionRouting(el);
   }
 }

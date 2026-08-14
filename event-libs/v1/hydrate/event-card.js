@@ -46,10 +46,11 @@ function rewriteToken(str, metadataKey, index) {
   });
 }
 
-// Rewrites this card's own authored, indexless `[[metadataKey.field]]` tokens to point
-// at one item — `featured-sessions.enTitle` becomes `featured-sessions:2.enTitle`.
-// Mirrors repeat-template.js's setTokenIndex, but applied to an already-authored card
-// instead of a cloned template row: content stays in authoring, never built here.
+// Rewrites this card's own authored, indexless `[[metadataKey.field]]` (or bare
+// `[[field]]`) tokens to point at one item — `featured-sessions.enTitle` (or `enTitle`)
+// becomes `featured-sessions:2.enTitle`. Mirrors repeat-template.js's setTokenIndex, but
+// applied to an already-authored card instead of a cloned template row: content stays
+// in authoring, never built here.
 function rewriteTokensToIndex(block, metadataKey, index) {
   // Plain-text tokens (title, description, ...) round-trip through innerHTML fine.
   block.innerHTML = rewriteToken(block.innerHTML, metadataKey, index);
@@ -81,16 +82,40 @@ function applySessionData(block, session) {
   if (endTimeMillis) block.dataset.endTimeUtc = new Date(endTimeMillis).toISOString();
 }
 
+// One authored card per session, matched to its data by an explicit session-code class
+// (e.g. "s6304").
+function hydrateSingle(block, metadataKey, sessionCode, sessions) {
+  const index = sessions.findIndex((s) => (s.sessionCode || '').toLowerCase() === sessionCode);
+  if (index === -1) return false;
+  rewriteTokensToIndex(block, metadataKey, index);
+  applySessionData(block, sessions[index]);
+  return true;
+}
+
+// One authored template card with no session-code class — cloned once per item in the
+// metadata collection instead, each clone indexed by its own array position rather than
+// matched by identifier. Lets an author write a single event-card row for e.g. a
+// Featured Sessions rail instead of one hand-duplicated card per session.
+function hydrateRepeated(block, metadataKey, sessions) {
+  if (!sessions.length) return false;
+  sessions.forEach((session, index) => {
+    const clone = block.cloneNode(true);
+    rewriteTokensToIndex(clone, metadataKey, index);
+    applySessionData(clone, session);
+    block.before(clone);
+  });
+  block.remove();
+  return true;
+}
+
 export default function hydrateEventCard(block) {
   const { metadataKey, sessionCode } = getMetadataKeyAndSessionCode(block);
-  if (!metadataKey || !sessionCode) return false;
+  if (!metadataKey) return false;
 
   const sessions = getSessions(metadataKey);
   if (!sessions) return false;
 
-  const index = sessions.findIndex((s) => (s.sessionCode || '').toLowerCase() === sessionCode);
-  if (index === -1) return false;
-
-  rewriteTokensToIndex(block, metadataKey, index);
-  applySessionData(block, sessions[index]);
+  return sessionCode
+    ? hydrateSingle(block, metadataKey, sessionCode, sessions)
+    : hydrateRepeated(block, metadataKey, sessions);
 }

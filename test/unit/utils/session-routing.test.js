@@ -1,5 +1,5 @@
 import { expect } from '@esm-bundle/chai';
-import { resolveCardAction } from '../../../../event-libs/v1/c2/blocks/event-card/session-routing.js';
+import { resolveCardAction } from '../../../event-libs/v1/utils/session-routing.js';
 
 const HOUR = 60 * 60 * 1000;
 const NOW = Date.parse('2026-07-21T10:00:00.000Z');

@@ -128,6 +128,55 @@ so it would silently fail to rewrite the CTA's token. The hydrator handles
 back with `setAttribute('href', ...)`. Plain-text tokens (title, description)
 don't need this — they round-trip through `innerHTML` unencoded.
 
+## 4.3 Repeat mode: one template card, no session-code class
+
+Not every collection is authored as N hand-duplicated cards. If a card has no
+session-code class at all — just the metadata key (and optionally a ratio
+variant) — the hydrator treats it as a **single template row** instead, and
+clones it once per item in the collection:
+
+```html
+<div class="event-card hydrate featured-sessions ratio-16-9">
+  <div><div>[[imageUrl]]</div></div>
+  <div><div>
+    <p>[[enTitle]]</p>
+    <p>[[track]]</p>
+    <p><a href="[[url]]">CTA</a></p>
+  </div></div>
+</div>
+```
+
+`getMetadataKeyAndSessionCode` already separates the session-code class from
+the metadata-key class; when no class matches `SESSION_CODE_PATTERN`,
+`hydrateEventCard` routes to `hydrateRepeated` instead of `hydrateSingle`.
+Each session in the collection gets its own clone of the authored block,
+indexed by **array position** (not matched by identifier) via the same
+`rewriteTokensToIndex` helper used for the single-card case, with the clone
+inserted as a sibling (`block.before(clone)`) and the original template
+removed afterward. An empty collection leaves the template card in place,
+untouched (no clones, no crash) — content stays in authoring even when there's
+nothing to render.
+
+Because there's no hand-placed `<picture>` in this mode, the image itself must
+come from data too: the collection is expected to carry an `imageUrl` field,
+authored here as `[[imageUrl]]` inside the media wrapper. `event-card.js`'s
+`buildMedia()` accepts this — if the media wrapper's inner `:scope > div` has
+no `<img>`, it falls back to reading the wrapper's resolved text content as an
+image URL. This only works once `processTemplateInAllNodes` has resolved the
+token to a real URL string; the hydrator itself never touches images, same as
+the single-card case.
+
+This fallback renders a plain `<picture><img></picture>` at that exact URL,
+**not** a Milo-optimized picture via `createOptimizedPicture`. A data-sourced
+`imageUrl` (e.g. a DA `content.da.live` upload) is typically cross-origin from
+the page itself, while `createOptimizedPicture`'s `relative=true` mode (used
+everywhere else in this file, including the hand-authored `<picture>` branch
+above) deliberately keeps only the URL's pathname — correct for same-origin,
+Helix-optimized authored images, but it would silently request the wrong host
+for a cross-origin data URL. Skipping `createOptimizedPicture` for this branch
+trades away responsive width variants in exchange for the image actually
+loading regardless of where it's hosted.
+
 ## 5. Session-routing data-attributes
 
 Separate from the visible content, this hydrator hands off routing data for the
