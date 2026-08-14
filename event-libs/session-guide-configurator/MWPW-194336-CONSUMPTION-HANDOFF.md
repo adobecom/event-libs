@@ -94,7 +94,7 @@ match sessions, `displayName` is the author's editable override). Needs:
 
 ## 4. Behavior flags — wire into their respective gating points (not started)
 
-`behaviorFlags: { enableScheduling, enableFavoriting, enableWatchNowCtas, enableBrandConciergeRibbon }`
+`behaviorFlags: { enableScheduling, enableFavoriting, enableWatchNowCtas }`
 — none of these are read anywhere yet. Concrete gating points found by
 inspection:
 
@@ -107,11 +107,10 @@ inspection:
   files (`handleFavorite`/`toggleFavoriteWithFeedback`).
 - **`enableWatchNowCtas`** → the "Watch now" button in `LiveCard.js` (and
   `SessionDetailOverlay.js`'s live/on-demand variant of the same CTA).
-- **`enableBrandConciergeRibbon`** → **no such component exists in the
-  codebase yet.** This flag is forward-looking — whoever picks this item up
-  needs to confirm with product/design whether the ribbon is being built as
-  part of this same handoff or is a separate, not-yet-scoped feature before
-  wiring the flag to anything.
+
+`enableBrandConciergeRibbon` was removed (2026-08-13) — the ribbon is out of
+scope for the next event and never had a corresponding component in the
+codebase.
 
 ## Test-plan items relevant to the consuming side
 
