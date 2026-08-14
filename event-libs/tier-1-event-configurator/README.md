@@ -141,6 +141,10 @@ One shared DA sheet per content-repo at
 
 **`config.rfApiUrl`/`config.rfProfileId`, added for [MWPW-200311](https://jira.corp.adobe.com/browse/MWPW-200311).** Nested in `config` like `trackIcons`/`allowDoubleBooking` — one JSON payload, not extra metadata rows. `event-libs/v1/utils/session-store.js` reads both straight off the parsed `tier-1-event-config` metadata, falling back to `DEFAULT_RF_API_URL`/`DEFAULT_RF_PROFILE_ID` (`event-libs/v1/services/sessions/rainfocus.js`) when either is blank. Never carried over on Duplicate — reusing another event's RF profile id would misroute this event's live schedule/favorites calls.
 
+**`config.overrideTrackIcons` is one field, not two.** Shape: `{ default: {icon,color} | null, byText: { "override text": {icon,color} } }` — `byText` maps a specific Override Primary Event Site Track text to its own icon/color, `default` is the event-wide fallback for any text not mapped there. `getOverrideTrackIcon()` (`v1/utils/tier-1-event-config.js`) checks `byText` first, then `default`. Previously two separate top-level fields (`overrideTrackIcon`/`overrideTrackIcons`); merged so there's nowhere for the two to drift apart, without using a reserved sentinel key inside the map (which could collide with real author-typed override text).
+
+**`config.featuredSessions` (Global) vs `config.homepageFeaturedSessions` (Homepage-Featured-Sessions type) are unrelated fields, not a naming accident.** Global's `featuredSessions` is a pre-existing, Session-Guide-only concern — a flat ordered array of sessionIds, read via `getFeaturedSessionIds()` to drive Session Guide's own featured carousel (`LiveUpcomingView.js`/`OnDemandView.js`). `homepageFeaturedSessions`/`homepageFeaturedSessionsMeta` only exist on a Homepage-Featured-Sessions row, feed the card-c2 Featured Sessions homepage block instead, and are never read from `tier-1-event-config` metadata directly — only copy-pasted out via "Copy Featured Sessions JSON" into that block's own section-metadata.
+
 `config` is the exact value an author copies into their event page's own
 `tier-1-event-config` metadata row — this app never touches the page itself.
 

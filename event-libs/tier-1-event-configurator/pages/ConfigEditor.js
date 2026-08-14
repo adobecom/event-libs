@@ -7,7 +7,7 @@ import {
   isTrackIconEntryComplete, getDisplayTitle, stringifyConfig,
   buildSessionAuthorEntry,
 } from '../utils.js';
-import { CONFIG_TYPES, isHomepageConfigType } from '../constants.js';
+import { CONFIG_TYPES, HOMEPAGE_SESSION_FIELDS, isHomepageConfigType } from '../constants.js';
 import TrackIconEditor from '../components/TrackIconEditor.js';
 import OverrideTrackIconEditor from '../components/OverrideTrackIconEditor.js';
 import ProductIconEditor from '../components/ProductIconEditor.js';
@@ -15,14 +15,12 @@ import FeaturedSessionsEditor from '../components/FeaturedSessionsEditor.js';
 import EpochDateTimeField from '../components/EpochDateTimeField.js';
 import LoadingInline from '../components/LoadingInline.js';
 
-// Which config field + block/metadata key a Homepage config type feeds —
-// both homepage config types share the exact same picker UI, they only
-// differ in which config field they write to and which block ultimately
-// reads the generated JSON.
+// UI-only labels/hints per Homepage config type, layered onto the shared field/metaField
+// names from constants.js (the single source of truth ConfigsContext.js's emptyConfig()/
+// startDuplicateConfig() also key off) rather than redeclaring them here.
 const HOMEPAGE_FIELD_BY_TYPE = {
   [CONFIG_TYPES.HOMEPAGE_UPCOMING_SESSIONS]: {
-    field: 'upcomingSessions',
-    metaField: 'upcomingSessionsMeta',
+    ...HOMEPAGE_SESSION_FIELDS[CONFIG_TYPES.HOMEPAGE_UPCOMING_SESSIONS],
     // upcoming-sessions.js reads mrStreamId (drives its Mobile Rider live-drop
     // polling) but never reads watchUrl anywhere — leave that field out.
     // imageUrl has no reader yet either, but authors need to attach one now so
@@ -34,8 +32,7 @@ const HOMEPAGE_FIELD_BY_TYPE = {
     blockHint: 'the upcoming-sessions block',
   },
   [CONFIG_TYPES.HOMEPAGE_FEATURED_SESSIONS]: {
-    field: 'featuredSessions',
-    metaField: 'featuredSessionsMeta',
+    ...HOMEPAGE_SESSION_FIELDS[CONFIG_TYPES.HOMEPAGE_FEATURED_SESSIONS],
     // utils/session-routing.js reads both — watchUrl is where a click
     // routes once the session goes live, mrStreamId is what tells it a
     // session is Mobile-Rider-backed at all. imageUrl has no reader yet
@@ -53,7 +50,8 @@ export default function ConfigEditor() {
   const { goToLibrary } = useNavigation();
   const {
     activeConfig, saveActiveConfig, clearActiveConfig, updateTrackIcon,
-    updateOverrideTrackIcon, updateProduct, updateConfigField, setToastSuccess, setToastError,
+    updateOverrideTrackIcon, updateOverrideDefaultIcon, updateProduct, updateConfigField,
+    setToastSuccess, setToastError,
   } = useConfigs();
 
   const [sessions, setSessions] = useState([]);
@@ -217,6 +215,25 @@ export default function ConfigEditor() {
 
       ${!isHomepage && html`
         <section class="tec-editor__section">
+          <h2>Featured Sessions</h2>
+          <p class="tec-editor__section-hint">Sessions Session Guide's own featured carousel highlights. Part of the Config JSON below — saved with the rest of this event's config, not copied separately.</p>
+          ${isLoadingSessions && html`<${LoadingInline} label="Loading sessions…" />`}
+          ${!isLoadingSessions && !sessionsError && html`
+            <${FeaturedSessionsEditor}
+              sessions=${sessions}
+              sessionTimes=${sessionTimes}
+              tracks=${tracks}
+              featuredSessions=${activeConfig.config.featuredSessions}
+              onChange=${(next) => updateConfigField('featuredSessions', next)}
+              heading="Featured Sessions (display order)"
+              emptyHint="No sessions added yet — add some from the list on the right."
+            />
+          `}
+        </section>
+      `}
+
+      ${!isHomepage && html`
+        <section class="tec-editor__section">
           <h2>Track icons & colors</h2>
           <p class="tec-editor__section-hint">Icons pre-fill from the built-in defaults where known. Color always starts black — pick a color per track, or leave both icon and color unset to use the page's own built-in default at render time.</p>
           ${isLoadingSessions && html`<${LoadingInline} label="Loading tracks…" />`}
@@ -242,10 +259,10 @@ export default function ConfigEditor() {
           ${!isLoadingSessions && !sessionsError && html`
             <${OverrideTrackIconEditor}
               overrideTexts=${overrideTexts}
-              overrideTrackIcons=${activeConfig.config.overrideTrackIcons}
-              defaultOverrideIcon=${activeConfig.config.overrideTrackIcon}
+              overrideTrackIcons=${activeConfig.config.overrideTrackIcons?.byText}
+              defaultOverrideIcon=${activeConfig.config.overrideTrackIcons?.default}
               onChangeMapped=${updateOverrideTrackIcon}
-              onChangeDefault=${(value) => updateConfigField('overrideTrackIcon', value)}
+              onChangeDefault=${updateOverrideDefaultIcon}
             />
           `}
         </section>

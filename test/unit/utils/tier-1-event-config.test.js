@@ -13,9 +13,11 @@ const CONFIG = {
     'video-audio-and-motion': { icon: 'video-audio-and-motion', color: '#000000' },
   },
   overrideTrackIcons: {
-    'custom label': { icon: 'video', color: '#123456' },
+    default: { icon: 'business', color: '#111111' },
+    byText: {
+      'custom label': { icon: 'video', color: '#123456' },
+    },
   },
-  overrideTrackIcon: { icon: 'business', color: '#111111' },
   allowDoubleBooking: true,
   featuredSessions: ['session-b', 'session-a'],
 };
@@ -54,7 +56,7 @@ describe('tier-1-event-config', () => {
     expect(getOverrideTrackIcon('custom label')).to.deep.equal({ icon: 'video', color: '#123456' });
   });
 
-  it('falls back to the event-wide overrideTrackIcon for an unmapped override text', () => {
+  it('falls back to the event-wide default for an unmapped override text', () => {
     expect(getOverrideTrackIcon('some other text')).to.deep.equal({ icon: 'business', color: '#111111' });
   });
 

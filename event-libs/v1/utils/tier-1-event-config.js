@@ -45,13 +45,14 @@ export function getTrackIcon(trackName) {
   return trackIcons[trackName] || trackIcons[slug] || null;
 }
 
-// Each distinct override text is its own swimlane — overrideTrackIcons maps a specific
-// text to its own icon/color, overrideTrackIcon (singular) is the event-wide default for
-// any text not yet mapped. Returns null, not a guaranteed object, when neither is
-// authored — callers apply DEFAULT_ICON_COLOR themselves (see resolveTrackBadge).
+// Each distinct override text is its own swimlane — overrideTrackIcons.byText maps a
+// specific text to its own icon/color, overrideTrackIcons.default is the event-wide
+// fallback for any text not yet mapped. Returns null, not a guaranteed object, when
+// neither is authored — callers apply DEFAULT_ICON_COLOR themselves (see resolveTrackBadge).
 export function getOverrideTrackIcon(overrideText) {
-  const perTextIcons = tierOneEventConfig.overrideTrackIcons || {};
-  return perTextIcons[overrideText] || tierOneEventConfig.overrideTrackIcon || null;
+  const override = tierOneEventConfig.overrideTrackIcons || {};
+  const byText = override.byText || {};
+  return byText[overrideText] || override.default || null;
 }
 
 // Returns { icon, pageUrl } for a product, or null. No built-in default map (unlike
