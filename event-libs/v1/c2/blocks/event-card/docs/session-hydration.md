@@ -128,6 +128,44 @@ so it would silently fail to rewrite the CTA's token. The hydrator handles
 back with `setAttribute('href', ...)`. Plain-text tokens (title, description)
 don't need this — they round-trip through `innerHTML` unencoded.
 
+## 4.3 Repeat mode: one template card, no session-code class
+
+Not every collection is authored as N hand-duplicated cards. If a card has no
+session-code class at all — just the metadata key (and optionally a ratio
+variant) — the hydrator treats it as a **single template row** instead, and
+clones it once per item in the collection:
+
+```html
+<div class="event-card hydrate featured-sessions ratio-16-9">
+  <div><div>[[imageUrl]]</div></div>
+  <div><div>
+    <p>[[enTitle]]</p>
+    <p>[[track]]</p>
+    <p><a href="[[url]]">CTA</a></p>
+  </div></div>
+</div>
+```
+
+`getMetadataKeyAndSessionCode` already separates the session-code class from
+the metadata-key class; when no class matches `SESSION_CODE_PATTERN`,
+`hydrateEventCard` routes to `hydrateRepeated` instead of `hydrateSingle`.
+Each session in the collection gets its own clone of the authored block,
+indexed by **array position** (not matched by identifier) via the same
+`rewriteTokensToIndex` helper used for the single-card case, with the clone
+inserted as a sibling (`block.before(clone)`) and the original template
+removed afterward. An empty collection leaves the template card in place,
+untouched (no clones, no crash) — content stays in authoring even when there's
+nothing to render.
+
+Because there's no hand-placed `<picture>` in this mode, the image itself must
+come from data too: the collection is expected to carry an `imageUrl` field,
+authored here as `[[imageUrl]]` inside the media wrapper. `event-card.js`'s
+`buildMedia()` accepts this — if the media wrapper's inner `:scope > div` has
+no `<img>`, it falls back to reading the wrapper's resolved text content as an
+image URL and builds the `<picture>` from that instead. This only works once
+`processTemplateInAllNodes` has resolved the token to a real URL string; the
+hydrator itself never touches images, same as the single-card case.
+
 ## 5. Session-routing data-attributes
 
 Separate from the visible content, this hydrator hands off routing data for the

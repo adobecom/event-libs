@@ -60,4 +60,23 @@ describe('event-card', () => {
 
     expect(document.querySelector('.event-card')).to.not.exist;
   });
+
+  it('builds media from a resolved image URL when no img is authored', async () => {
+    document.body.innerHTML = `
+      <div class="event-card ratio-16-9">
+        <div><div>https://example.com/media/session.jpg</div></div>
+        <div><div>
+          <p>Session Title</p>
+          <p>Session description goes here.</p>
+          <p><a href="https://example.com">Register</a></p>
+        </div></div>
+      </div>
+    `;
+    const el = document.querySelector('.event-card');
+    await init(el);
+
+    const img = el.querySelector('.card-media picture img');
+    expect(img).to.exist;
+    expect(img.src).to.include('/media/session.jpg');
+  });
 });

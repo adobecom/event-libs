@@ -9,8 +9,14 @@ function getVariant(el) {
 
 function buildMedia(mediaWrapper) {
   const img = mediaWrapper?.querySelector('img');
-  if (!img) return null;
-  const picture = createOptimizedPicture(img.src, img.alt || '', true, false);
+  if (img) {
+    const picture = createOptimizedPicture(img.src, img.alt || '', true, false);
+    return createTag('div', { class: 'card-media' }, picture);
+  }
+
+  const url = mediaWrapper?.querySelector(':scope > div')?.textContent.trim();
+  if (!url) return null;
+  const picture = createOptimizedPicture(url, '', true, false);
   return createTag('div', { class: 'card-media' }, picture);
 }
 
