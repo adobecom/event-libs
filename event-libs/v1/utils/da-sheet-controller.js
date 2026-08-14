@@ -175,7 +175,18 @@ const CONFLICT_ERROR = 'Conflict: the config library sheet was changed by someon
 // `sheetName` (default 'data') lets a caller manage more than one named sheet
 // in the same file — each sheet's own mutateSheet call automatically
 // preserves every other sheet untouched via otherSheets/sheetNames/version.
-export async function mutateSheet(org, repo, path, mutate, sheetName = OWNED_SHEET_NAME) {
+//
+// `knownSheetNames` (e.g. ['data', 'homepage']) is required for any caller that manages
+// more than one named sheet, from the very first write onward. readSheet only detects a
+// file as multi-sheet from an ALREADY multi-sheet-shaped body — so without this, the
+// first-ever write to a second sheet name (while the file is still single-sheet-shaped,
+// or doesn't exist yet) would write a plain single-sheet document instead, permanently
+// collapsing every sheet into one shared, ambiguous pool that a later read can no longer
+// tell apart (every sheetName would return the same merged rows, forever — the file
+// never becomes properly multi-sheet on its own). Passing every known sheet name up
+// front forces a real multi-sheet write from the start, with an empty placeholder for
+// any sheet that doesn't have data yet.
+export async function mutateSheet(org, repo, path, mutate, sheetName = OWNED_SHEET_NAME, knownSheetNames = null) {
   for (let attempt = 0; attempt <= MAX_WRITE_RETRIES; attempt += 1) {
     // eslint-disable-next-line no-await-in-loop
     const read = await readSheet(org, repo, path, sheetName);
@@ -184,11 +195,18 @@ export async function mutateSheet(org, repo, path, mutate, sheetName = OWNED_SHE
     // Existing sheet → If-Match its etag (or unconditional if etag unavailable), and
     // preserve whatever other sheets it had. Missing sheet (404) → If-None-Match:* to
     // guard concurrent first creation; nothing else to preserve.
-    const opts = read.ok
+    let opts = read.ok
       ? {
         etag: normalizeEtag(read.etag), otherSheets: read.otherSheets, sheetNames: read.sheetNames, version: read.version, sheetName,
       }
       : { create: true, sheetName };
+    if (knownSheetNames) {
+      const otherSheets = { ...opts.otherSheets };
+      knownSheetNames.filter((name) => name !== sheetName).forEach((name) => {
+        if (!otherSheets[name]) otherSheets[name] = { total: 0, limit: 0, offset: 0, data: [] };
+      });
+      opts = { ...opts, otherSheets, sheetNames: knownSheetNames };
+    }
     const { rows: newRows, result, skip } = mutate(rows);
     if (skip) return { ok: true, data: result, skipped: true };
     // eslint-disable-next-line no-await-in-loop

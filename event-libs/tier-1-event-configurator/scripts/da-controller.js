@@ -15,6 +15,7 @@ export { setDaToken, setDaFetch, listFolder, uploadMedia, getContentUrl };
 // other byte-for-byte untouched.
 const GLOBAL_SHEET_NAME = 'data';
 const HOMEPAGE_SHEET_NAME = 'homepage';
+const ALL_SHEET_NAMES = [GLOBAL_SHEET_NAME, HOMEPAGE_SHEET_NAME];
 
 // Rows within the homepage sheet are keyed on (eventId, configType) together,
 // not eventId alone — the same event can carry both an Upcoming Sessions row
@@ -102,7 +103,7 @@ export async function upsertConfig(org, repo, {
     const next = [...rows];
     next[idx] = newRow;
     return { rows: next, result: newRow };
-  }, targetSheet);
+  }, targetSheet, ALL_SHEET_NAMES);
   if (!result.ok) return result;
   return { ok: true, data: result.data };
 }
@@ -116,7 +117,7 @@ export async function deleteConfig(org, repo, eventId, configType) {
     if (next.length === rows.length) return { rows, result: null, skip: true };
     found = true;
     return { rows: next, result: null };
-  }, targetSheet);
+  }, targetSheet, ALL_SHEET_NAMES);
   if (!result.ok) return result;
   if (!found) return { ok: false, status: 404, error: 'Config not found' };
   return { ok: true };
