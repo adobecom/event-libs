@@ -114,6 +114,10 @@ const ConfigsProvider = ({ children }) => {
   // profile id or registration page would misroute this event's live schedule/favorites
   // calls or send attendees to register for the wrong event. eventStartDateTime/
   // eventEndDateTime reset the same way — a new event has its own dates.
+  // featuredSessions/featuredSessionsMeta/upcomingSessions/upcomingSessionsMeta are the
+  // Homepage-type equivalent of that same identity concern — they're specific ESP
+  // sessionIds from the source event's own catalog, not a style setting, so carrying
+  // them over would leave a Homepage duplicate pointing at another event's sessions.
   const startDuplicateConfig = useCallback((sourceRow, event, eventServiceEnv) => {
     const clonedConfig = { ...sourceRow.config };
     delete clonedConfig.eventId;
@@ -133,6 +137,10 @@ const ConfigsProvider = ({ children }) => {
         rfApiUrl: '',
         rfProfileId: '',
         registerUrl: '',
+        featuredSessions: [],
+        featuredSessionsMeta: {},
+        upcomingSessions: [],
+        upcomingSessionsMeta: {},
       },
     });
   }, []);
