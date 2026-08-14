@@ -528,6 +528,16 @@ function processHashtagLinks(parent) {
   
 }
 
+// Guards against the real risk of this manual copy/paste hand-off: an author pasting the
+// wrong event's link onto the wrong page. Log-only — not a security control, just authoring
+// hygiene, so it never blocks the block from building.
+function warnIfEventIdMismatch(label, config) {
+  const pageEventId = getMetadata('event-id');
+  if (config.eventId && pageEventId && config.eventId !== pageEventId) {
+    window.lana?.log(`[${label}] eventId mismatch: config authored for ${config.eventId}, page is ${pageEventId}`);
+  }
+}
+
 function prebuildAutoBlock(blockName, link) {
   let blockEl;
   const autoBlockBuilders = {
@@ -586,12 +596,7 @@ function prebuildAutoBlock(blockName, link) {
         return null;
       }
 
-      // Guards against the real risk of this manual copy/paste hand-off: an author
-      // pasting the wrong event's link onto the wrong page.
-      const pageEventId = getMetadata('event-id');
-      if (config.eventId && pageEventId && config.eventId !== pageEventId) {
-        window.lana?.log(`[sessions-guide] eventId mismatch: config authored for ${config.eventId}, page is ${pageEventId}`);
-      }
+      warnIfEventIdMismatch('sessions-guide', config);
 
       // No authoring-table path exists for this block — sessions-guide.js's init()
       // reads data-session-guide-config only.
@@ -611,11 +616,7 @@ function prebuildAutoBlock(blockName, link) {
         return null;
       }
 
-      // Same manual copy/paste guard as sessions-guide above.
-      const pageEventId = getMetadata('event-id');
-      if (config.eventId && pageEventId && config.eventId !== pageEventId) {
-        window.lana?.log(`[tec-homepage] eventId mismatch: config authored for ${config.eventId}, page is ${pageEventId}`);
-      }
+      warnIfEventIdMismatch('tec-homepage', config);
 
       // Both Homepage config types share one link format/pattern — configType picks
       // which block (and which data attribute its own init() reads) gets built. Theme

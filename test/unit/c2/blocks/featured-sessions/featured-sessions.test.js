@@ -1,5 +1,5 @@
 import { expect } from '@esm-bundle/chai';
-import init from '../../../../event-libs/v1/c2/blocks/featured-sessions/featured-sessions.js';
+import init from '../../../../../event-libs/v1/c2/blocks/featured-sessions/featured-sessions.js';
 
 function entry(overrides = {}) {
   return {

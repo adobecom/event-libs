@@ -175,10 +175,14 @@ export function buildCard(session) {
   const topBadge = buildCategoryBadge(session.track);
   if (topBadge) badgeRow.append(topBadge);
 
-  createTag('p', { class: 'sg-card__title' }, session.enTitle, { parent: body });
+  // session.enTitle/primaryCategory(session) below are attacker-influenced (decoded from
+  // the link's hash payload, not hand-authored in DA) — createTag's string `html` argument
+  // runs through insertAdjacentHTML, so these are set via .textContent to keep them as
+  // inert text rather than parsed markup.
+  createTag('p', { class: 'sg-card__title' }, '', { parent: body }).textContent = session.enTitle || '';
 
   const footer = createTag('div', { class: 'sg-card__footer' }, '', { parent: body });
-  createTag('span', { class: 'sg-card__track sg-card__track--footer' }, primaryCategory(session), { parent: footer });
+  createTag('span', { class: 'sg-card__track sg-card__track--footer' }, '', { parent: footer }).textContent = primaryCategory(session);
   const footerBadgeWrap = createTag('span', { class: 'sg-card__footer-badge' }, '', { parent: footer });
   const footerBadge = buildCategoryBadge(session.track);
   if (footerBadge) footerBadgeWrap.append(footerBadge);
@@ -409,7 +413,10 @@ async function decorate(el) {
   renderTrack(track, sessions);
 
   const header = createTag('div', { class: 'upcoming-sessions-header' }, '', { parent: el });
-  if (heading) createTag('h6', { class: 'upcoming-sessions-heading' }, heading, { parent: header });
+  // heading is attacker-influenced (decoded from the link's hash payload) — see the
+  // .textContent note on session.enTitle in buildCard() above for why this isn't passed
+  // as createTag's html argument.
+  if (heading) createTag('h6', { class: 'upcoming-sessions-heading' }, '', { parent: header }).textContent = heading;
   header.append(buildCarouselControls(track));
 
   el.append(track);

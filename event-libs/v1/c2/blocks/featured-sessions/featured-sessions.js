@@ -1,4 +1,5 @@
 import { createTag } from '../../../utils/utils.js';
+import { safeUrl } from '../../../blocks/sessions-guide/utils/url.js';
 import initEventCard from '../event-card/event-card.js';
 import initEventCarousel from '../event-carousel/event-carousel.js';
 
@@ -23,6 +24,15 @@ function setRoutingData(card, entry) {
 // plus wiring session-routing.js off the data-session-id we set below) instead of
 // duplicating any of that here. A session with no image is left for event-card.js's own
 // existing rule ("a card with no image is not a valid authored card") to drop.
+//
+// entry.enTitle/entry.track are attacker-influenced (decoded straight from the link's
+// hash payload, not hand-authored in DA) — createTag's string `html` argument runs
+// through insertAdjacentHTML, so these are set via .textContent instead to keep them
+// as inert text rather than parsed markup. Same reasoning applies to entry.url below:
+// it's set as an href only after passing safeUrl's http(s)/relative allowlist, since a
+// card with no sessionId never gets session-routing.js's click interception (and thus
+// never gets safeUrl's own re-check) and would otherwise navigate a raw click straight
+// off the unsanitized href.
 function buildAuthoredCard(entry) {
   const card = createTag('div', { class: 'event-card' });
   const mediaWrapper = createTag('div', {}, '', { parent: card });
@@ -32,10 +42,11 @@ function buildAuthoredCard(entry) {
 
   const contentWrapper = createTag('div', {}, '', { parent: card });
   const textRoot = createTag('div', {}, '', { parent: contentWrapper });
-  createTag('p', {}, entry.enTitle || '', { parent: textRoot });
-  createTag('p', {}, entry.track || '', { parent: textRoot });
+  createTag('p', {}, '', { parent: textRoot }).textContent = entry.enTitle || '';
+  createTag('p', {}, '', { parent: textRoot }).textContent = entry.track || '';
   const ctaP = createTag('p', {}, '', { parent: textRoot });
-  if (entry.url) createTag('a', { href: entry.url }, 'Learn more', { parent: ctaP });
+  const ctaHref = safeUrl(entry.url);
+  if (ctaHref) createTag('a', { href: ctaHref }, 'Learn more', { parent: ctaP });
 
   setRoutingData(card, entry);
   return card;
