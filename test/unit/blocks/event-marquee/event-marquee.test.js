@@ -56,9 +56,9 @@ function videoVariantHtml({
   `;
 }
 
-function countdownVariantHtml({ countdownEndTime, countdownLabel } = {}) {
+function countdownVariantHtml({ countdownEndTimeMillis, countdownLabel } = {}) {
   const metaRows = {};
-  if (countdownEndTime !== undefined) metaRows['countdown-end-time'] = countdownEndTime;
+  if (countdownEndTimeMillis !== undefined) metaRows['countdown-end-time-millis'] = countdownEndTimeMillis;
   if (countdownLabel !== undefined) metaRows['countdown-label'] = countdownLabel;
 
   return `
@@ -428,9 +428,9 @@ describe('event-marquee', () => {
       sinon.restore();
     });
 
-    it('renders a label and clock when countdown-end-time is valid', async () => {
-      const target = new Date(Date.now() + 60_000).toISOString();
-      document.body.innerHTML = countdownVariantHtml({ countdownEndTime: target });
+    it('renders a label and clock when countdown-end-time-millis is valid', async () => {
+      const target = Date.now() + 60_000;
+      document.body.innerHTML = countdownVariantHtml({ countdownEndTimeMillis: target });
       el = document.querySelector('.event-marquee');
       await init(el);
 
@@ -441,8 +441,8 @@ describe('event-marquee', () => {
     });
 
     it('uses an authored countdown-label instead of the default', async () => {
-      const target = new Date(Date.now() + 60_000).toISOString();
-      document.body.innerHTML = countdownVariantHtml({ countdownEndTime: target, countdownLabel: 'Doors open in:' });
+      const target = Date.now() + 60_000;
+      document.body.innerHTML = countdownVariantHtml({ countdownEndTimeMillis: target, countdownLabel: 'Doors open in:' });
       el = document.querySelector('.event-marquee');
       await init(el);
 
@@ -453,8 +453,8 @@ describe('event-marquee', () => {
       fakeClock = sinon.useFakeTimers({
         now: Date.now(), shouldAdvanceTime: false, shouldClearNativeTimers: true,
       });
-      const target = new Date(fakeClock.now + 5000).toISOString();
-      document.body.innerHTML = countdownVariantHtml({ countdownEndTime: target });
+      const target = fakeClock.now + 5000;
+      document.body.innerHTML = countdownVariantHtml({ countdownEndTimeMillis: target });
       el = document.querySelector('.event-marquee');
       await init(el);
 
@@ -468,8 +468,8 @@ describe('event-marquee', () => {
       fakeClock = sinon.useFakeTimers({
         now: Date.now(), shouldAdvanceTime: false, shouldClearNativeTimers: true,
       });
-      const target = new Date(fakeClock.now + 2000).toISOString();
-      document.body.innerHTML = countdownVariantHtml({ countdownEndTime: target });
+      const target = fakeClock.now + 2000;
+      document.body.innerHTML = countdownVariantHtml({ countdownEndTimeMillis: target });
       el = document.querySelector('.event-marquee');
       await init(el);
 
@@ -486,8 +486,8 @@ describe('event-marquee', () => {
     });
 
     it('freezes at 00:00:00 and never starts an interval when the target has already passed', async () => {
-      const target = new Date(Date.now() - 5000).toISOString();
-      document.body.innerHTML = countdownVariantHtml({ countdownEndTime: target });
+      const target = Date.now() - 5000;
+      document.body.innerHTML = countdownVariantHtml({ countdownEndTimeMillis: target });
       el = document.querySelector('.event-marquee');
       const setIntervalSpy = sinon.spy(window, 'setInterval');
       await init(el);
@@ -496,30 +496,23 @@ describe('event-marquee', () => {
       expect(setIntervalSpy.called).to.be.false;
     });
 
-    it('does not render when countdown-end-time is not authored', async () => {
+    it('does not render when countdown-end-time-millis is not authored', async () => {
       document.body.innerHTML = countdownVariantHtml();
       el = document.querySelector('.event-marquee');
       await init(el);
       expect(el.querySelector('.event-marquee-countdown')).to.not.exist;
     });
 
-    it('does not render when countdown-end-time is unparseable', async () => {
-      document.body.innerHTML = countdownVariantHtml({ countdownEndTime: 'not-a-date' });
-      el = document.querySelector('.event-marquee');
-      await init(el);
-      expect(el.querySelector('.event-marquee-countdown')).to.not.exist;
-    });
-
-    it('does not render when countdown-end-time omits a UTC/offset designator', async () => {
-      document.body.innerHTML = countdownVariantHtml({ countdownEndTime: '2026-08-20T18:00:00' });
+    it('does not render when countdown-end-time-millis is unparseable', async () => {
+      document.body.innerHTML = countdownVariantHtml({ countdownEndTimeMillis: 'not-a-number' });
       el = document.querySelector('.event-marquee');
       await init(el);
       expect(el.querySelector('.event-marquee-countdown')).to.not.exist;
     });
 
     it('is idempotent across re-decoration with the same countdown — clears the prior interval, no duplicate nodes', async () => {
-      const target = new Date(Date.now() + 60_000).toISOString();
-      document.body.innerHTML = countdownVariantHtml({ countdownEndTime: target });
+      const target = Date.now() + 60_000;
+      document.body.innerHTML = countdownVariantHtml({ countdownEndTimeMillis: target });
       el = document.querySelector('.event-marquee');
       await init(el);
 
@@ -530,9 +523,9 @@ describe('event-marquee', () => {
       expect(el.querySelectorAll('.event-marquee-countdown').length).to.equal(1);
     });
 
-    it('tears down the countdown when re-decoration removes the countdown-end-time metadata', async () => {
-      const target = new Date(Date.now() + 60_000).toISOString();
-      document.body.innerHTML = countdownVariantHtml({ countdownEndTime: target });
+    it('tears down the countdown when re-decoration removes the countdown-end-time-millis metadata', async () => {
+      const target = Date.now() + 60_000;
+      document.body.innerHTML = countdownVariantHtml({ countdownEndTimeMillis: target });
       el = document.querySelector('.event-marquee');
       await init(el);
       expect(el.querySelector('.event-marquee-countdown')).to.exist;
