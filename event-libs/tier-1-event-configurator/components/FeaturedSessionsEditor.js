@@ -264,6 +264,31 @@ export default function FeaturedSessionsEditor({
     prevOrderRef.current = featuredIds;
   }, [featuredIds, measureRowHeight]);
 
+  const renderMetaField = (field, sessionId, title) => {
+    const value = meta?.[sessionId]?.[field] || '';
+    const isImage = META_FIELD_DEFS[field].type === 'image';
+    return html`
+      <div key=${field} class="tec-featured-editor__meta-field">
+        ${isImage && value && html`<img class="tec-featured-editor__thumb" src=${value} alt="" />`}
+        <input \
+          type="text" \
+          class="tec-field tec-field--s" \
+          placeholder=${META_FIELD_DEFS[field].placeholder} \
+          aria-label="${META_FIELD_DEFS[field].label} for ${title}" \
+          value=${value} \
+          onInput=${(e) => onMetaChange(sessionId, { [field]: e.target.value })} \
+        />
+        ${isImage && html`
+          <button \
+            type="button" \
+            class="tec-btn tec-btn--outline tec-btn--s" \
+            onClick=${() => setImagePickerFor(sessionId)} \
+          >Upload…</button>
+        `}
+      </div>
+    `;
+  };
+
   return html`
     <div class="tec-featured-editor">
       <div class="tec-featured-editor__column">
@@ -294,31 +319,17 @@ export default function FeaturedSessionsEditor({
                   <span class="tec-featured-editor__track">${session ? getSessionMeta(session) : 'Not found in current session catalog'}</span>
                   ${onMetaChange && metaFields.length > 0 && html`
                     <div class="tec-featured-editor__meta-fields">
-                      ${metaFields.map((field) => {
-                        const value = meta?.[sessionId]?.[field] || '';
-                        const isImage = META_FIELD_DEFS[field].type === 'image';
-                        return html`
-                          <div key=${field} class="tec-featured-editor__meta-field">
-                            ${isImage && value && html`<img class="tec-featured-editor__thumb" src=${value} alt="" />`}
-                            <input \
-                              type="text" \
-                              class="tec-field tec-field--s" \
-                              placeholder=${META_FIELD_DEFS[field].placeholder} \
-                              aria-label="${META_FIELD_DEFS[field].label} for ${title}" \
-                              value=${value} \
-                              onInput=${(e) => onMetaChange(sessionId, { [field]: e.target.value })} \
-                            />
-                            ${isImage && html`
-                              <button \
-                                type="button" \
-                                class="tec-btn tec-btn--outline tec-btn--s" \
-                                onClick=${() => setImagePickerFor(sessionId)} \
-                              >Upload…</button>
-                            `}
-                          </div>
-                        `;
-                      })}
+                      ${metaFields.filter((field) => META_FIELD_DEFS[field].type !== 'image').map(
+                        (field) => renderMetaField(field, sessionId, title),
+                      )}
                     </div>
+                    ${metaFields.some((field) => META_FIELD_DEFS[field].type === 'image') && html`
+                      <div class="tec-featured-editor__meta-fields">
+                        ${metaFields.filter((field) => META_FIELD_DEFS[field].type === 'image').map(
+                          (field) => renderMetaField(field, sessionId, title),
+                        )}
+                      </div>
+                    `}
                   `}
                 </div>
                 <button type="button" class="tec-btn tec-btn--quiet tec-btn--s tec-btn--danger" onClick=${() => handleRemove(sessionId)}>Remove</button>
