@@ -38,8 +38,9 @@ const HOMEPAGE_FIELD_BY_TYPE = {
   [CONFIG_TYPES.HOMEPAGE_FEATURED_SESSIONS]: {
     field: 'featuredSessions',
     metaField: 'featuredSessionsMeta',
-    headingField: 'featuredSessionsHeading',
-    themeField: 'featuredSessionsTheme',
+    // No headingField/themeField — featured-sessions.js doesn't author a heading or
+    // support a theme; unlike Upcoming Sessions, this surface is always ratio-16-9
+    // cards, no config-driven visual variation.
     // The featured-sessions block's generated event-card markup + session-routing.js
     // read all three — watchUrl is where a click routes once the session goes live,
     // mrStreamId is what tells it a session is Mobile-Rider-backed at all, and
@@ -139,8 +140,12 @@ export default function ConfigEditor() {
     const entries = (activeConfig.config[homepageMeta.field] || [])
       .filter((id) => sessionsById.has(id))
       .map((id) => buildSessionAuthorEntry(sessionsById.get(id), sessionTimes, metaById[id]));
-    const heading = activeConfig.config[homepageMeta.headingField] || homepageMeta.label;
-    const theme = activeConfig.config[homepageMeta.themeField] || 'light';
+    const heading = homepageMeta.headingField
+      ? (activeConfig.config[homepageMeta.headingField] || homepageMeta.label)
+      : undefined;
+    const theme = homepageMeta.themeField
+      ? (activeConfig.config[homepageMeta.themeField] || 'light')
+      : undefined;
     const url = buildHomepageConfigURL(org, repo, configType, eventId, heading, theme, entries);
     const formattedDate = new Date().toLocaleString('en-US', {
       weekday: 'long', month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit',
@@ -348,24 +353,28 @@ export default function ConfigEditor() {
             them has a source in the session catalog, so fill them in only for sessions that
             actually need one.
           </p>
-          <label class="tec-editor__field-label" for="tec-homepage-heading">Section heading</label>
-          <input
-            id="tec-homepage-heading"
-            type="text"
-            class="tec-field"
-            placeholder=${homepageMeta.label}
-            value=${activeConfig.config[homepageMeta.headingField] || ''}
-            onInput=${(e) => updateConfigField(homepageMeta.headingField, e.target.value)}
-          />
-          <label class="tec-editor__field-label" for="tec-homepage-theme">Card theme</label>
-          <select
-            id="tec-homepage-theme"
-            class="tec-field"
-            value=${activeConfig.config[homepageMeta.themeField] || 'light'}
-            onChange=${(e) => updateConfigField(homepageMeta.themeField, e.target.value)}
-          >
-            ${HOMEPAGE_THEME_OPTIONS.map((opt) => html`<option value=${opt.value} key=${opt.value}>${opt.label}</option>`)}
-          </select>
+          ${homepageMeta.headingField && html`
+            <label class="tec-editor__field-label" for="tec-homepage-heading">Section heading</label>
+            <input
+              id="tec-homepage-heading"
+              type="text"
+              class="tec-field"
+              placeholder=${homepageMeta.label}
+              value=${activeConfig.config[homepageMeta.headingField] || ''}
+              onInput=${(e) => updateConfigField(homepageMeta.headingField, e.target.value)}
+            />
+          `}
+          ${homepageMeta.themeField && html`
+            <label class="tec-editor__field-label" for="tec-homepage-theme">Card theme</label>
+            <select
+              id="tec-homepage-theme"
+              class="tec-field"
+              value=${activeConfig.config[homepageMeta.themeField] || 'light'}
+              onChange=${(e) => updateConfigField(homepageMeta.themeField, e.target.value)}
+            >
+              ${HOMEPAGE_THEME_OPTIONS.map((opt) => html`<option value=${opt.value} key=${opt.value}>${opt.label}</option>`)}
+            </select>
+          `}
           ${isLoadingSessions && html`<${LoadingInline} label="Loading sessions…" />`}
           ${sessionsError && html`<p class="tec-editor__error">${sessionsError}</p>`}
           ${!isLoadingSessions && !sessionsError && html`

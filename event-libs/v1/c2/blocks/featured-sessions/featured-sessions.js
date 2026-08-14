@@ -34,7 +34,7 @@ function setRoutingData(card, entry) {
 // never gets safeUrl's own re-check) and would otherwise navigate a raw click straight
 // off the unsanitized href.
 function buildAuthoredCard(entry) {
-  const card = createTag('div', { class: 'event-card' });
+  const card = createTag('div', { class: 'event-card ratio-16-9' });
   const mediaWrapper = createTag('div', {}, '', { parent: card });
   if (entry.imageUrl) {
     createTag('img', { src: entry.imageUrl, alt: '' }, '', { parent: mediaWrapper });
@@ -68,11 +68,9 @@ export default async function init(el) {
     return;
   }
 
-  const heading = config?.heading || 'Featured Sessions';
-
   el.innerHTML = '';
   el.setAttribute('role', 'region');
-  el.setAttribute('aria-label', heading);
+  el.setAttribute('aria-label', 'Featured Sessions');
 
   const track = createTag('div', { class: 'carousel-track' });
   const cards = entries.map(buildAuthoredCard);
@@ -89,9 +87,4 @@ export default async function init(el) {
   }
 
   await initEventCarousel(marker);
-
-  const header = createTag('div', { class: 'featured-sessions-header' });
-  createTag('h6', { class: 'featured-sessions-heading' }, '', { parent: header }).textContent = heading;
-  header.append(marker);
-  el.prepend(header);
 }

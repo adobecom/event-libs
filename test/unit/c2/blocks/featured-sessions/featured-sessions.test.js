@@ -25,12 +25,13 @@ describe('featured-sessions', () => {
     document.body.innerHTML = '';
   });
 
-  it('renders a card per entry with an image', async () => {
-    const el = buildBlock({ heading: 'Featured', entries: [entry()] });
+  it('renders a card per entry with an image, ratio-16-9', async () => {
+    const el = buildBlock({ entries: [entry()] });
     await init(el);
 
     const cards = el.querySelectorAll('.event-card');
     expect(cards.length).to.equal(1);
+    expect(cards[0].classList.contains('ratio-16-9')).to.equal(true);
     expect(cards[0].querySelector('.card-title').textContent).to.equal('Intro to Adobe Express');
     expect(cards[0].querySelector('.card-description').textContent).to.equal('Video');
     expect(cards[0].querySelector('.card-cta').textContent).to.equal('Learn more');
@@ -39,7 +40,6 @@ describe('featured-sessions', () => {
 
   it('drops an entry with no imageUrl instead of rendering an imageless card', async () => {
     const el = buildBlock({
-      heading: 'Featured',
       entries: [entry(), entry({ sessionId: 'session-2', enTitle: 'No Image Session', imageUrl: '' })],
     });
     await init(el);
@@ -51,7 +51,6 @@ describe('featured-sessions', () => {
 
   it('sets session-routing data attributes from the entry before hydrating the card', async () => {
     const el = buildBlock({
-      heading: 'Featured',
       entries: [entry({
         mrStreamId: 'mr-1',
         watchUrl: 'https://example.com/watch',
@@ -69,24 +68,16 @@ describe('featured-sessions', () => {
     expect(card.dataset.endTimeUtc).to.equal(new Date(1750003600000).toISOString());
   });
 
-  it('renders the authored heading as its own always-visible element', async () => {
-    const el = buildBlock({ heading: 'Featured Sessions Custom', entries: [entry()] });
-    await init(el);
-
-    expect(el.getAttribute('aria-label')).to.equal('Featured Sessions Custom');
-    expect(el.querySelector('.featured-sessions-heading').textContent).to.equal('Featured Sessions Custom');
-  });
-
-  it('falls back to a default heading when none is authored', async () => {
-    const el = buildBlock({ heading: '', entries: [entry()] });
+  it('does not author a heading — aria-label is a fixed label regardless of config', async () => {
+    const el = buildBlock({ heading: 'Ignored Custom Heading', entries: [entry()] });
     await init(el);
 
     expect(el.getAttribute('aria-label')).to.equal('Featured Sessions');
-    expect(el.querySelector('.featured-sessions-heading').textContent).to.equal('Featured Sessions');
+    expect(el.querySelector('.featured-sessions-heading')).to.not.exist;
   });
 
-  it('does not render the heading through event-carousel\'s own hideable controls', async () => {
-    const el = buildBlock({ heading: 'Featured', entries: [entry()] });
+  it('does not render a heading through event-carousel\'s own hideable controls either', async () => {
+    const el = buildBlock({ entries: [entry()] });
     await init(el);
 
     expect(el.querySelector('.carousel-heading')).to.not.exist;
@@ -94,7 +85,6 @@ describe('featured-sessions', () => {
 
   it('wraps the cards in a shared carousel-track and builds arrow controls', async () => {
     const el = buildBlock({
-      heading: 'Featured',
       entries: [entry(), entry({ sessionId: 'session-2' })],
     });
     await init(el);
@@ -109,13 +99,13 @@ describe('featured-sessions', () => {
   });
 
   it('removes itself entirely when the entries array is empty', async () => {
-    const el = buildBlock({ heading: 'Featured', entries: [] });
+    const el = buildBlock({ entries: [] });
     await init(el);
     expect(el.isConnected).to.equal(false);
   });
 
   it('removes itself entirely when every entry lacks an image', async () => {
-    const el = buildBlock({ heading: 'Featured', entries: [entry({ imageUrl: '' })] });
+    const el = buildBlock({ entries: [entry({ imageUrl: '' })] });
     await init(el);
     expect(el.isConnected).to.equal(false);
   });

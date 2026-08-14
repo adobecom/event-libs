@@ -123,19 +123,3 @@
     line-height: 20px;
   }
 }
-
-.dark-card .event-card .card-title {
-  color: #fff;
-}
-
-.dark-card .event-card .card-description {
-  color: rgb(255 255 255 / 64%);
-}
-
-.dark-card .event-card .card-cta {
-  color: #fff;
-}
-
-.dark-card .event-card .card-cta::after {
-  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M4 2l4 4-4 4' fill='none' stroke='%23fff' stroke-width='1.5'/%3E%3C/svg%3E");
-}
