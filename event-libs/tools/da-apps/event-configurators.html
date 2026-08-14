@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Event Configurators</title>
+  <link rel="stylesheet" href="/event-configurators-shell/event-configurators-shell.css" />
+  <link rel="stylesheet" href="/tier-1-event-configurator/tier-1-event-configurator.css" />
+  <link rel="stylesheet" href="/session-guide-configurator/session-guide-configurator.css" />
+</head>
+<body>
+  <!--
+    LOCAL-DEV entry point. Mirrors the da-events app path
+    (tools/da-apps/event-configurators) so `?ref=local` against the
+    production da.live URL proxies here. It loads the app from the LOCAL
+    server via root-relative paths, so serve from the event-libs inner root.
+    This file is not used on aem.live — the da-events entry loads the
+    deployed code there.
+  -->
+  <div id="app"></div>
+  <script type="module" src="/event-configurators-shell/event-configurators-shell.js"></script>
+</body>
+</html>
