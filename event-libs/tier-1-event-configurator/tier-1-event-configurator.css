@@ -72,6 +72,42 @@
   -webkit-font-smoothing: antialiased;
 }
 
+.tec-app-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 0 var(--tec-spacing-lg);
+  background: var(--tec-color-surface);
+  border-bottom: 1px solid var(--tec-color-border);
+}
+
+.tec-app-tab {
+  appearance: none;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  padding: 14px 4px;
+  margin: 0 var(--tec-spacing-sm);
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--tec-color-text-secondary);
+  cursor: pointer;
+}
+
+.tec-app-tab:hover {
+  color: var(--tec-color-text-primary);
+}
+
+.tec-app-tab:focus-visible {
+  outline: 2px solid var(--tec-color-primary);
+  outline-offset: 2px;
+}
+
+.tec-app-tab--active {
+  color: var(--tec-color-text-primary);
+  border-bottom-color: var(--tec-color-primary);
+}
+
 .tec-loading,
 .tec-error {
   display: flex;
