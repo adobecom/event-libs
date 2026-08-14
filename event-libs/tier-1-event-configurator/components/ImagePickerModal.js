@@ -26,12 +26,17 @@ function stripOrgRepo(fullPath, org, repo) {
 
 const PHASES = { FOLDER: 'folder', UPLOAD: 'upload' };
 
+// Images are always uploaded into the floodgate space, regardless of which repo the tool's
+// own loader page happens to live in — the DA SDK handshake has no way to know that, so it
+// can't just be read off useDA()'s repo.
+const UPLOAD_REPO = 'da-events-fg-pink';
+
 // Two-phase modal: pick (or name) a DA folder, then pick a local image file and upload it
 // there. DA has no folder-creation endpoint — "Add folder" below is purely client-side
 // navigation into a not-yet-fetched, empty path; that path only becomes a real DA folder once
 // uploadMedia's POST lands the first file in it.
 export default function ImagePickerModal({ isOpen, onClose, onUploaded }) {
-  const { org, repo } = useDA();
+  const { org } = useDA();
 
   const [phase, setPhase] = useState(PHASES.FOLDER);
   const [columnPaths, setColumnPaths] = useState([]);
@@ -61,7 +66,7 @@ export default function ImagePickerModal({ isOpen, onClose, onUploaded }) {
     setLoadingColIndex(colIndex);
     setBrowseError(null);
     try {
-      const items = await fetchFolders(org, repo, path);
+      const items = await fetchFolders(org, UPLOAD_REPO, path);
       if (requestSeqRef.current !== seq) return;
       setColumnItems((prev) => { const next = prev.slice(0, colIndex); next[colIndex] = items; return next; });
       setColumnPaths((prev) => { const next = prev.slice(0, colIndex); next[colIndex] = path; return next; });
@@ -76,11 +81,11 @@ export default function ImagePickerModal({ isOpen, onClose, onUploaded }) {
     } finally {
       if (requestSeqRef.current === seq) setLoadingColIndex(null);
     }
-  }, [org, repo]);
+  }, [org]);
 
   // Fresh repo-root browse every time the modal opens.
   useEffect(() => {
-    if (!isOpen || !org || !repo) return;
+    if (!isOpen || !org) return;
     setPhase(PHASES.FOLDER);
     setColumnItems([]);
     setColumnPaths([]);
@@ -91,7 +96,7 @@ export default function ImagePickerModal({ isOpen, onClose, onUploaded }) {
     setUploadError(null);
     setBrowseError(null);
     loadColumn(0, '/');
-  }, [isOpen, org, repo]);
+  }, [isOpen, org]);
 
   const resetToRoot = () => {
     setActiveFolderPaths([]);
@@ -102,7 +107,7 @@ export default function ImagePickerModal({ isOpen, onClose, onUploaded }) {
   };
 
   const handleFolderClick = (colIndex, item) => {
-    const path = stripOrgRepo(item.path, org, repo);
+    const path = stripOrgRepo(item.path, org, UPLOAD_REPO);
     setActiveFolderPaths((prev) => { const next = prev.slice(0, colIndex + 1); next[colIndex] = path; return next; });
     setSelectedFolderPath(path);
     setNewFolderName('');
@@ -128,7 +133,7 @@ export default function ImagePickerModal({ isOpen, onClose, onUploaded }) {
   };
 
   const buildBreadcrumb = () => {
-    const parts = [{ label: repo, path: null }];
+    const parts = [{ label: UPLOAD_REPO, path: null }];
     const deepest = activeFolderPaths[activeFolderPaths.length - 1];
     if (deepest) {
       const segments = deepest.split('/').filter(Boolean);
@@ -165,7 +170,7 @@ export default function ImagePickerModal({ isOpen, onClose, onUploaded }) {
     setIsUploading(true);
     setUploadError(null);
     try {
-      const result = await uploadMedia(org, repo, selectedFolderPath, file);
+      const result = await uploadMedia(org, UPLOAD_REPO, selectedFolderPath, file);
       if (!result.ok) {
         if (result.status === 401) setUploadError('Unauthorized — sign in at da.live first.');
         else if (result.status === 0) setUploadError('Unable to reach DA — sign in at da.live first, or check your connection.');
@@ -196,6 +201,16 @@ export default function ImagePickerModal({ isOpen, onClose, onUploaded }) {
       ${phase === PHASES.FOLDER && html`
         <div class="tec-fb-wrapper">
           <p class="tec-editor__section-hint">Choose a DA folder to upload the image into, or type a new folder name below.</p>
+          <div class="tec-fb-repo">
+            <label class="tec-fb-repo-label" for="tec-fb-repo-input">Repo</label>
+            <input
+              id="tec-fb-repo-input"
+              type="text"
+              class="tec-field tec-field--s"
+              value=${UPLOAD_REPO}
+              disabled
+            />
+          </div>
           ${browseError && html`<div class="tec-fb-error">${browseError}</div>`}
           <div class="tec-fb-columns" ref=${columnsRef}>
             <div class="tec-fb-column">
@@ -213,7 +228,7 @@ export default function ImagePickerModal({ isOpen, onClose, onUploaded }) {
             ${columnItems.map((items, i) => html`
               <div class="tec-fb-column" key=${i}>
                 ${items.map((item) => {
-                  const path = stripOrgRepo(item.path, org, repo);
+                  const path = stripOrgRepo(item.path, org, UPLOAD_REPO);
                   const isActive = activeFolderPaths[i] === path;
                   return html`
                     <div

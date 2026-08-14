@@ -1257,6 +1257,17 @@ select.tec-field {
   gap: var(--tec-spacing-sm);
 }
 
+.tec-fb-repo {
+  display: flex;
+  align-items: center;
+  gap: var(--tec-spacing-sm);
+}
+
+.tec-fb-repo-label {
+  font-size: 14px;
+  color: var(--tec-color-text-secondary);
+}
+
 .tec-fb-error {
   background-color: var(--tec-color-error-bg);
   color: var(--tec-color-error);
