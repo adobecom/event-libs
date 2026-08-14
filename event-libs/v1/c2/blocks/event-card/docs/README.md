@@ -11,11 +11,14 @@ valid authored card.
 
 Cards rendered by other flows (e.g. Featured Sessions) can carry `data-session-id` and
 related `data-*` attributes (`data-start-time-utc`, `data-end-time-utc`, `data-mr-stream-id`,
-`data-watch-url`, `data-session-url`). When present, `session-routing.js` is lazy-loaded
-to make the card clickable and route it based on derived session state. Plain authored
-cards (no `data-session-id`) are unaffected — this is a no-op for them.
+`data-watch-url`, `data-session-url`). When present, `utils/session-routing.js` is
+lazy-loaded to make the card clickable and route it based on derived session state.
+Plain authored cards (no `data-session-id`) are unaffected — this is a no-op for them.
 
 ## session-routing.js
+
+Lives at `event-libs/v1/utils/session-routing.js` — a shared utility, not scoped to
+this block, since other consumers may lazy-load it the same way in future.
 
 Resolves where a hydrated card should navigate, mirroring the click rules established
 for Upcoming Sessions / Session Guide:

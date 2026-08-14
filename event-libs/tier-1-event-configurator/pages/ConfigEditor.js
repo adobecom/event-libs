@@ -36,7 +36,7 @@ const HOMEPAGE_FIELD_BY_TYPE = {
   [CONFIG_TYPES.HOMEPAGE_FEATURED_SESSIONS]: {
     field: 'featuredSessions',
     metaField: 'featuredSessionsMeta',
-    // card-c2's session-routing.js reads both — watchUrl is where a click
+    // utils/session-routing.js reads both — watchUrl is where a click
     // routes once the session goes live, mrStreamId is what tells it a
     // session is Mobile-Rider-backed at all. imageUrl has no reader yet
     // either, but authors need to attach one now so it's captured in the

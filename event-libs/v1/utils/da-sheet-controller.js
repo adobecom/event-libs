@@ -208,9 +208,6 @@ function hasUnsafePathSegment(path) {
   return (path || '').split('/').some((segment) => segment === '.' || segment === '..');
 }
 
-// DA admin's `path` for a listed item is already org/repo-qualified (e.g.
-// "/adobecom/da-events-fg-pink/homepage-assets/img.jpg") — the public content.da.live URL for
-// it is just that path appended to the content origin, no further lookup needed.
 export function getContentUrl(itemPath) {
   return `${CONTENT_DA_ORIGIN}${itemPath}`;
 }

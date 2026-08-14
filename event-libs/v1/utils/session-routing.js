@@ -1,7 +1,7 @@
-import { safeUrl } from '../../../blocks/sessions-guide/utils/url.js';
-import { deriveSessionState } from '../../../utils/session-state.js';
-import { openSessionGuideDetail } from '../../../utils/session-store.js';
-import { registerStreamIds, subscribe } from '../../../services/sessions/mobile-rider-poller.js';
+import { safeUrl } from '../blocks/sessions-guide/utils/url.js';
+import { deriveSessionState } from './session-state.js';
+import { openSessionGuideDetail } from './session-store.js';
+import { registerStreamIds, subscribe } from '../services/sessions/mobile-rider-poller.js';
 
 const liveStreamActiveIds = new Set();
 let mrPollStarted = false;

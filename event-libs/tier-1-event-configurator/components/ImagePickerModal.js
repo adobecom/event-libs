@@ -38,10 +38,6 @@ function stripOrgRepo(fullPath, org, repo) {
 
 const PHASES = { FOLDER: 'folder', UPLOAD: 'upload' };
 
-// Two-phase modal: pick (or name) a DA folder, then pick a local image file and upload it
-// there. DA has no folder-creation endpoint — "Add folder" below is purely client-side
-// navigation into a not-yet-fetched, empty path; that path only becomes a real DA folder once
-// uploadMedia's POST lands the first file in it.
 export default function ImagePickerModal({ isOpen, onClose, onUploaded }) {
   const { org, repo } = useDA();
 
@@ -61,12 +57,7 @@ export default function ImagePickerModal({ isOpen, onClose, onUploaded }) {
   const [imagesError, setImagesError] = useState(null);
 
   const columnsRef = useRef(null);
-  // Guards against out-of-order responses — e.g. two folders clicked in quick succession
-  // targeting the same column index. Only the reply matching the latest request actually
-  // gets applied; an earlier, slower one is dropped instead of overwriting newer state.
   const requestSeqRef = useRef(0);
-  // Same purpose as requestSeqRef, but for the existing-images fetch, which runs on its own
-  // schedule (keyed by selectedFolderPath) rather than the folder-column navigation.
   const imagesSeqRef = useRef(0);
 
   useEffect(() => {
@@ -86,9 +77,6 @@ export default function ImagePickerModal({ isOpen, onClose, onUploaded }) {
     } catch (err) {
       if (requestSeqRef.current !== seq) return;
       setBrowseError(err.message);
-      // Drop any columns past the one that failed to load — they described the branch this
-      // navigation was leaving, not the (failed) target, and would otherwise sit stale next
-      // to the error banner.
       setColumnItems((prev) => prev.slice(0, colIndex));
       setColumnPaths((prev) => prev.slice(0, colIndex));
     } finally {
@@ -96,7 +84,6 @@ export default function ImagePickerModal({ isOpen, onClose, onUploaded }) {
     }
   }, [org, repo]);
 
-  // Fresh repo-root browse every time the modal opens.
   useEffect(() => {
     if (!isOpen || !org || !repo) return;
     setPhase(PHASES.FOLDER);
@@ -111,8 +98,6 @@ export default function ImagePickerModal({ isOpen, onClose, onUploaded }) {
     loadColumn(0, '/');
   }, [isOpen, org, repo]);
 
-  // Existing images in the currently selected folder — re-fetched every time the author
-  // navigates, so "select an existing image" always reflects where they're actually standing.
   useEffect(() => {
     if (!isOpen || !org || !repo || phase !== PHASES.FOLDER) return;
     const seq = imagesSeqRef.current + 1;
@@ -156,12 +141,7 @@ export default function ImagePickerModal({ isOpen, onClose, onUploaded }) {
 
   const handleAddFolder = () => {
     const name = newFolderName.trim();
-    // '.'/'..' get collapsed by URL dot-segment normalization before a request is sent, so an
-    // unguarded one here could silently retarget list/upload calls outside this org/repo.
     if (!name || name.includes('/') || name === '.' || name === '..') return;
-    // colIndex is the currently deepest loaded column (columnItems.length - 1) — the new
-    // virtual folder is appended as the *next* column, one level below it, not overwritten
-    // into it (that would wipe out the folder list currently on screen at this depth).
     const colIndex = activeFolderPaths.length;
     const parentPath = activeFolderPaths[colIndex - 1] || '/';
     const path = parentPath === '/' ? `/${name}` : `${parentPath}/${name}`;
@@ -186,8 +166,6 @@ export default function ImagePickerModal({ isOpen, onClose, onUploaded }) {
 
   const handleBreadcrumbClick = (path) => {
     if (!path) {
-      // Root's items are already loaded (they're the always-fetched first column) —
-      // resetToRoot restores them from state, no need to refetch.
       resetToRoot();
       return;
     }
@@ -223,10 +201,6 @@ export default function ImagePickerModal({ isOpen, onClose, onUploaded }) {
     }
   };
 
-  // Every close path (header ×, Escape, backdrop, and both phases' Cancel buttons) routes
-  // through this rather than the raw onClose prop — closing mid-upload would leave the
-  // upload running against a modal a caller may reopen for a different row before it
-  // settles, and its completion callback would then wrongly close *that* row's picker.
   const handleClose = () => {
     if (isUploading) return;
     onClose();
