@@ -77,6 +77,7 @@ describe('event-card', () => {
 
     const img = el.querySelector('.card-media picture img');
     expect(img).to.exist;
-    expect(img.src).to.include('/media/session.jpg');
+    // The real absolute (possibly cross-origin) URL, not rewritten to a same-origin path.
+    expect(img.src).to.equal('https://example.com/media/session.jpg');
   });
 });

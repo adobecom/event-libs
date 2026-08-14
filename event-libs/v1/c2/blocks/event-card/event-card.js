@@ -16,7 +16,11 @@ function buildMedia(mediaWrapper) {
 
   const url = mediaWrapper?.querySelector(':scope > div')?.textContent.trim();
   if (!url) return null;
-  const picture = createOptimizedPicture(url, '', true, false);
+  // A data-sourced URL (e.g. a DA content.da.live upload) is cross-origin from the page
+  // itself. createOptimizedPicture's relative=true mode drops everything but the pathname
+  // — correct for same-origin, Helix-optimized authored images, but it would silently
+  // request the wrong host here. Render a plain <img> at the real absolute URL instead.
+  const picture = createTag('picture', {}, createTag('img', { src: url, loading: 'lazy', alt: '' }));
   return createTag('div', { class: 'card-media' }, picture);
 }
 

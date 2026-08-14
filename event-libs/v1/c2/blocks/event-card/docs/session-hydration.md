@@ -162,9 +162,20 @@ come from data too: the collection is expected to carry an `imageUrl` field,
 authored here as `[[imageUrl]]` inside the media wrapper. `event-card.js`'s
 `buildMedia()` accepts this — if the media wrapper's inner `:scope > div` has
 no `<img>`, it falls back to reading the wrapper's resolved text content as an
-image URL and builds the `<picture>` from that instead. This only works once
-`processTemplateInAllNodes` has resolved the token to a real URL string; the
-hydrator itself never touches images, same as the single-card case.
+image URL. This only works once `processTemplateInAllNodes` has resolved the
+token to a real URL string; the hydrator itself never touches images, same as
+the single-card case.
+
+This fallback renders a plain `<picture><img></picture>` at that exact URL,
+**not** a Milo-optimized picture via `createOptimizedPicture`. A data-sourced
+`imageUrl` (e.g. a DA `content.da.live` upload) is typically cross-origin from
+the page itself, while `createOptimizedPicture`'s `relative=true` mode (used
+everywhere else in this file, including the hand-authored `<picture>` branch
+above) deliberately keeps only the URL's pathname — correct for same-origin,
+Helix-optimized authored images, but it would silently request the wrong host
+for a cross-origin data URL. Skipping `createOptimizedPicture` for this branch
+trades away responsive width variants in exchange for the image actually
+loading regardless of where it's hosted.
 
 ## 5. Session-routing data-attributes
 

@@ -1257,17 +1257,6 @@ select.tec-field {
   gap: var(--tec-spacing-sm);
 }
 
-.tec-fb-repo {
-  display: flex;
-  align-items: center;
-  gap: var(--tec-spacing-sm);
-}
-
-.tec-fb-repo-label {
-  font-size: 14px;
-  color: var(--tec-color-text-secondary);
-}
-
 .tec-fb-error {
   background-color: var(--tec-color-error-bg);
   color: var(--tec-color-error);
@@ -1397,4 +1386,42 @@ select.tec-field {
   gap: var(--tec-spacing-md);
   justify-content: flex-end;
   padding-top: var(--tec-spacing-sm);
+}
+
+.tec-fb-image-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+  gap: var(--tec-spacing-sm);
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.tec-fb-image-thumb {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: var(--tec-spacing-xs);
+  border: 1px solid var(--tec-color-border);
+  border-radius: var(--tec-border-radius-sm);
+  background: none;
+  cursor: pointer;
+}
+
+.tec-fb-image-thumb:hover { background-color: var(--tec-color-surface-hover); }
+
+.tec-fb-image-thumb img {
+  width: 100%;
+  height: 70px;
+  object-fit: cover;
+  border-radius: var(--tec-border-radius-sm);
+}
+
+.tec-fb-image-thumb-name {
+  font-size: 12px;
+  color: var(--tec-color-text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
 }

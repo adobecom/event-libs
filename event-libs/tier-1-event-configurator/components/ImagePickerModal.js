@@ -4,16 +4,28 @@ import {
 import Modal from './Modal.js';
 import LoadingInline from './LoadingInline.js';
 import { useDA } from '../context/DAContext.js';
-import { listFolder, uploadMedia } from '../scripts/da-controller.js';
+import { listFolder, uploadMedia, getContentUrl } from '../scripts/da-controller.js';
 
-async function fetchFolders(org, repo, path) {
+const IMAGE_EXT_PATTERN = /^(jpe?g|png|gif|webp|svg)$/i;
+
+async function fetchFolderContents(org, repo, path) {
   const result = await listFolder(org, repo, path);
   if (!result.ok) {
     if (result.status === 401) throw new Error('Unauthorized — sign in at da.live first.');
     if (result.status === 0) throw new Error('Unable to reach DA — sign in at da.live first, or check your connection.');
     throw new Error(`Failed to load (${result.status})`);
   }
-  return (result.data || []).filter((item) => !item.ext);
+  return result.data || [];
+}
+
+function fetchFolders(org, repo, path) {
+  return fetchFolderContents(org, repo, path).then((items) => items.filter((item) => !item.ext));
+}
+
+function fetchImages(org, repo, path) {
+  return fetchFolderContents(org, repo, path).then(
+    (items) => items.filter((item) => IMAGE_EXT_PATTERN.test(item.ext || '')),
+  );
 }
 
 function getItemName(fullPath) {
@@ -26,17 +38,12 @@ function stripOrgRepo(fullPath, org, repo) {
 
 const PHASES = { FOLDER: 'folder', UPLOAD: 'upload' };
 
-// Images are always uploaded into the floodgate space, regardless of which repo the tool's
-// own loader page happens to live in — the DA SDK handshake has no way to know that, so it
-// can't just be read off useDA()'s repo.
-const UPLOAD_REPO = 'da-events-fg-pink';
-
 // Two-phase modal: pick (or name) a DA folder, then pick a local image file and upload it
 // there. DA has no folder-creation endpoint — "Add folder" below is purely client-side
 // navigation into a not-yet-fetched, empty path; that path only becomes a real DA folder once
 // uploadMedia's POST lands the first file in it.
 export default function ImagePickerModal({ isOpen, onClose, onUploaded }) {
-  const { org } = useDA();
+  const { org, repo } = useDA();
 
   const [phase, setPhase] = useState(PHASES.FOLDER);
   const [columnPaths, setColumnPaths] = useState([]);
@@ -49,12 +56,18 @@ export default function ImagePickerModal({ isOpen, onClose, onUploaded }) {
   const [file, setFile] = useState(null);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadError, setUploadError] = useState(null);
+  const [existingImages, setExistingImages] = useState([]);
+  const [isLoadingImages, setIsLoadingImages] = useState(false);
+  const [imagesError, setImagesError] = useState(null);
 
   const columnsRef = useRef(null);
   // Guards against out-of-order responses — e.g. two folders clicked in quick succession
   // targeting the same column index. Only the reply matching the latest request actually
   // gets applied; an earlier, slower one is dropped instead of overwriting newer state.
   const requestSeqRef = useRef(0);
+  // Same purpose as requestSeqRef, but for the existing-images fetch, which runs on its own
+  // schedule (keyed by selectedFolderPath) rather than the folder-column navigation.
+  const imagesSeqRef = useRef(0);
 
   useEffect(() => {
     if (columnsRef.current) columnsRef.current.scrollLeft = columnsRef.current.scrollWidth;
@@ -66,7 +79,7 @@ export default function ImagePickerModal({ isOpen, onClose, onUploaded }) {
     setLoadingColIndex(colIndex);
     setBrowseError(null);
     try {
-      const items = await fetchFolders(org, UPLOAD_REPO, path);
+      const items = await fetchFolders(org, repo, path);
       if (requestSeqRef.current !== seq) return;
       setColumnItems((prev) => { const next = prev.slice(0, colIndex); next[colIndex] = items; return next; });
       setColumnPaths((prev) => { const next = prev.slice(0, colIndex); next[colIndex] = path; return next; });
@@ -81,11 +94,11 @@ export default function ImagePickerModal({ isOpen, onClose, onUploaded }) {
     } finally {
       if (requestSeqRef.current === seq) setLoadingColIndex(null);
     }
-  }, [org]);
+  }, [org, repo]);
 
   // Fresh repo-root browse every time the modal opens.
   useEffect(() => {
-    if (!isOpen || !org) return;
+    if (!isOpen || !org || !repo) return;
     setPhase(PHASES.FOLDER);
     setColumnItems([]);
     setColumnPaths([]);
@@ -96,7 +109,34 @@ export default function ImagePickerModal({ isOpen, onClose, onUploaded }) {
     setUploadError(null);
     setBrowseError(null);
     loadColumn(0, '/');
-  }, [isOpen, org]);
+  }, [isOpen, org, repo]);
+
+  // Existing images in the currently selected folder — re-fetched every time the author
+  // navigates, so "select an existing image" always reflects where they're actually standing.
+  useEffect(() => {
+    if (!isOpen || !org || !repo || phase !== PHASES.FOLDER) return;
+    const seq = imagesSeqRef.current + 1;
+    imagesSeqRef.current = seq;
+    setIsLoadingImages(true);
+    setImagesError(null);
+    fetchImages(org, repo, selectedFolderPath)
+      .then((items) => {
+        if (imagesSeqRef.current !== seq) return;
+        setExistingImages(items);
+      })
+      .catch((err) => {
+        if (imagesSeqRef.current !== seq) return;
+        setImagesError(err.message);
+        setExistingImages([]);
+      })
+      .finally(() => {
+        if (imagesSeqRef.current === seq) setIsLoadingImages(false);
+      });
+  }, [isOpen, org, repo, phase, selectedFolderPath]);
+
+  const handleSelectExisting = (item) => {
+    onUploaded(getContentUrl(item.path));
+  };
 
   const resetToRoot = () => {
     setActiveFolderPaths([]);
@@ -107,7 +147,7 @@ export default function ImagePickerModal({ isOpen, onClose, onUploaded }) {
   };
 
   const handleFolderClick = (colIndex, item) => {
-    const path = stripOrgRepo(item.path, org, UPLOAD_REPO);
+    const path = stripOrgRepo(item.path, org, repo);
     setActiveFolderPaths((prev) => { const next = prev.slice(0, colIndex + 1); next[colIndex] = path; return next; });
     setSelectedFolderPath(path);
     setNewFolderName('');
@@ -133,7 +173,7 @@ export default function ImagePickerModal({ isOpen, onClose, onUploaded }) {
   };
 
   const buildBreadcrumb = () => {
-    const parts = [{ label: UPLOAD_REPO, path: null }];
+    const parts = [{ label: repo, path: null }];
     const deepest = activeFolderPaths[activeFolderPaths.length - 1];
     if (deepest) {
       const segments = deepest.split('/').filter(Boolean);
@@ -170,7 +210,7 @@ export default function ImagePickerModal({ isOpen, onClose, onUploaded }) {
     setIsUploading(true);
     setUploadError(null);
     try {
-      const result = await uploadMedia(org, UPLOAD_REPO, selectedFolderPath, file);
+      const result = await uploadMedia(org, repo, selectedFolderPath, file);
       if (!result.ok) {
         if (result.status === 401) setUploadError('Unauthorized — sign in at da.live first.');
         else if (result.status === 0) setUploadError('Unable to reach DA — sign in at da.live first, or check your connection.');
@@ -201,16 +241,6 @@ export default function ImagePickerModal({ isOpen, onClose, onUploaded }) {
       ${phase === PHASES.FOLDER && html`
         <div class="tec-fb-wrapper">
           <p class="tec-editor__section-hint">Choose a DA folder to upload the image into, or type a new folder name below.</p>
-          <div class="tec-fb-repo">
-            <label class="tec-fb-repo-label" for="tec-fb-repo-input">Repo</label>
-            <input
-              id="tec-fb-repo-input"
-              type="text"
-              class="tec-field tec-field--s"
-              value=${UPLOAD_REPO}
-              disabled
-            />
-          </div>
           ${browseError && html`<div class="tec-fb-error">${browseError}</div>`}
           <div class="tec-fb-columns" ref=${columnsRef}>
             <div class="tec-fb-column">
@@ -228,7 +258,7 @@ export default function ImagePickerModal({ isOpen, onClose, onUploaded }) {
             ${columnItems.map((items, i) => html`
               <div class="tec-fb-column" key=${i}>
                 ${items.map((item) => {
-                  const path = stripOrgRepo(item.path, org, UPLOAD_REPO);
+                  const path = stripOrgRepo(item.path, org, repo);
                   const isActive = activeFolderPaths[i] === path;
                   return html`
                     <div
@@ -284,9 +314,33 @@ export default function ImagePickerModal({ isOpen, onClose, onUploaded }) {
             <span class="tec-fb-selected-label">Selected:</span>
             <code class="tec-fb-selected-value">${selectedFolderPath}</code>
           </div>
+
+          <p class="tec-editor__section-hint">Or pick an image already in this folder:</p>
+          ${imagesError && html`<div class="tec-fb-error">${imagesError}</div>`}
+          ${isLoadingImages && html`<${LoadingInline} label="Loading images…" />`}
+          ${!isLoadingImages && existingImages.length === 0 && !imagesError && html`
+            <p class="tec-editor__section-hint">No images in this folder yet.</p>
+          `}
+          ${existingImages.length > 0 && html`
+            <div class="tec-fb-image-grid">
+              ${existingImages.map((item) => html`
+                <button
+                  type="button"
+                  key=${item.path}
+                  class="tec-fb-image-thumb"
+                  title=${getItemName(item.path)}
+                  onClick=${() => handleSelectExisting(item)}
+                >
+                  <img src=${getContentUrl(item.path)} alt=${getItemName(item.path)} loading="lazy" />
+                  <span class="tec-fb-image-thumb-name">${getItemName(item.path)}</span>
+                </button>
+              `)}
+            </div>
+          `}
+
           <div class="tec-fb-actions">
             <button type="button" class="tec-btn tec-btn--outline tec-btn--l" onClick=${handleClose}>Cancel</button>
-            <button type="button" class="tec-btn tec-btn--primary tec-btn--l" onClick=${() => setPhase(PHASES.UPLOAD)}>Next</button>
+            <button type="button" class="tec-btn tec-btn--primary tec-btn--l" onClick=${() => setPhase(PHASES.UPLOAD)}>Upload new…</button>
           </div>
         </div>
       `}

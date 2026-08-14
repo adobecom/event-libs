@@ -283,7 +283,15 @@ export default function FeaturedSessionsEditor({
             type="button" \
             class="tec-btn tec-btn--outline tec-btn--s" \
             onClick=${() => setImagePickerFor(sessionId)} \
-          >Upload…</button>
+          >${value ? 'Change…' : 'Add image…'}</button>
+        `}
+        ${isImage && value && html`
+          <button \
+            type="button" \
+            class="tec-btn tec-btn--quiet tec-btn--s tec-btn--danger" \
+            aria-label="Remove ${META_FIELD_DEFS[field].label} for ${title}" \
+            onClick=${() => onMetaChange(sessionId, { [field]: '' })} \
+          >Remove</button>
         `}
       </div>
     `;

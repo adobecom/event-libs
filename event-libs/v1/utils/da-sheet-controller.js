@@ -208,6 +208,13 @@ function hasUnsafePathSegment(path) {
   return (path || '').split('/').some((segment) => segment === '.' || segment === '..');
 }
 
+// DA admin's `path` for a listed item is already org/repo-qualified (e.g.
+// "/adobecom/da-events-fg-pink/homepage-assets/img.jpg") — the public content.da.live URL for
+// it is just that path appended to the content origin, no further lookup needed.
+export function getContentUrl(itemPath) {
+  return `${CONTENT_DA_ORIGIN}${itemPath}`;
+}
+
 // Lists the folders and files directly inside `path` (not recursive), folders first.
 export async function listFolder(org, repo, path) {
   if (hasUnsafePathSegment(path)) return { ok: false, status: 400, error: 'Invalid path' };
@@ -255,5 +262,5 @@ export async function uploadMedia(org, repo, path, file) {
     window.lana?.log(`DA uploadMedia error ${resp.status}: ${url} — ${error}`);
     return { ok: false, status: resp.status, error };
   }
-  return { ok: true, status: resp.status, url: `${CONTENT_DA_ORIGIN}/${org}/${repo}${normalizedPath}/${encodedName}` };
+  return { ok: true, status: resp.status, url: getContentUrl(`/${org}/${repo}${normalizedPath}/${encodedName}`) };
 }
