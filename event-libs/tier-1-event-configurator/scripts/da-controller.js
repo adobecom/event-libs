@@ -1,9 +1,11 @@
 import {
-  setDaToken, setDaFetch, readSheet, mutateSheet, parseRowConfig, uploadAndPublishMedia,
+  setDaToken, setDaFetch, readSheet, mutateSheet, parseRowConfig, uploadAndPublishMedia, listFolder,
 } from '../../v1/utils/da-sheet-controller.js';
 import { CONFIGS_SHEET_PATH, CONFIG_TYPES } from '../constants.js';
 
-export { setDaToken, setDaFetch, uploadAndPublishMedia };
+export {
+  setDaToken, setDaFetch, uploadAndPublishMedia, listFolder,
+};
 
 // Global rows live in the shared utility's default-owned sheet ('data') —
 // unchanged from before Homepage configs existed, so a concurrent

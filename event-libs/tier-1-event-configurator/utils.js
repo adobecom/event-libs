@@ -9,17 +9,14 @@ export {
   getSessionProducts, extractDistinctProducts,
 };
 
-// Builds the full, already-safe upload path for a session image — namespaced by event and
-// timestamped so concurrent uploads (same or different sessions/events, even the same original
-// filename) never collide. Authors never see or choose this path (see MEDIA_FOLDER_PATH).
-// Lowercased: DA itself lowercases at least the filename segment on write, so matching that
-// up front keeps this path predictable — though uploadMedia/uploadAndPublishMedia treat DA's
-// own returned canonical path as the source of truth regardless, in case that normalization
-// ever changes or extends further.
-export function buildMediaAssetPath(eventId, fileName) {
-  const safeName = (fileName || 'image').replace(/[^A-Za-z0-9._-]/g, '-').toLowerCase();
+export function getDefaultMediaFolder(eventId) {
   const safeEventId = (eventId || 'unknown-event').replace(/[^A-Za-z0-9._-]/g, '-').toLowerCase();
-  return `${MEDIA_FOLDER_PATH}/${safeEventId}/${Date.now()}-${safeName}`;
+  return `${MEDIA_FOLDER_PATH}/${safeEventId}`;
+}
+
+export function buildMediaFileName(fileName) {
+  const safeName = (fileName || 'image').replace(/[^A-Za-z0-9._-]/g, '-').toLowerCase();
+  return `${Date.now()}-${safeName}`;
 }
 
 // Copies text to the clipboard, falling back to a hidden textarea +

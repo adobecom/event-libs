@@ -1,5 +1,7 @@
 import { expect } from '@esm-bundle/chai';
-import { readSheet, writeSheet, mutateSheet } from '../../../event-libs/v1/utils/da-sheet-controller.js';
+import {
+  readSheet, writeSheet, mutateSheet, listFolder,
+} from '../../../event-libs/v1/utils/da-sheet-controller.js';
 
 describe('utils/da-sheet-controller', () => {
   let originalFetch;
@@ -158,6 +160,39 @@ describe('utils/da-sheet-controller', () => {
       const payload = JSON.parse(await blob.text());
       expect(payload.homepage).to.deep.equal(homepageSheet);
       expect(payload.data.data).to.deep.equal([{ eventId: 'existing', config: '{}' }, { eventId: 'new', config: '{}' }]);
+    });
+  });
+
+  describe('listFolder path-traversal guard', () => {
+    it('rejects a literal .. path segment without making a request', async () => {
+      stubFetch([]);
+      const result = await listFolder('org', 'repo', '/foo/../bar');
+      expect(result.ok).to.be.false;
+      expect(result.status).to.equal(400);
+      expect(lastRequest).to.be.null;
+    });
+
+    it('rejects a percent-encoded .. path segment without making a request', async () => {
+      stubFetch([]);
+      const result = await listFolder('org', 'repo', '/foo/%2e%2e/bar');
+      expect(result.ok).to.be.false;
+      expect(result.status).to.equal(400);
+      expect(lastRequest).to.be.null;
+    });
+
+    it('rejects a malformed percent-encoded segment without making a request', async () => {
+      stubFetch([]);
+      const result = await listFolder('org', 'repo', '/foo/%/bar');
+      expect(result.ok).to.be.false;
+      expect(result.status).to.equal(400);
+      expect(lastRequest).to.be.null;
+    });
+
+    it('allows a normal path through to the request', async () => {
+      stubFetch([]);
+      const result = await listFolder('org', 'repo', '/foo/bar');
+      expect(result.ok).to.be.true;
+      expect(lastRequest).to.not.be.null;
     });
   });
 });
