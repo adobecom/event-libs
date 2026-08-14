@@ -56,9 +56,10 @@ function videoVariantHtml({
   `;
 }
 
-function countdownVariantHtml({ countdownEndTime } = {}) {
+function countdownVariantHtml({ countdownEndTime, countdownLabel } = {}) {
   const metaRows = {};
   if (countdownEndTime !== undefined) metaRows['countdown-end-time'] = countdownEndTime;
+  if (countdownLabel !== undefined) metaRows['countdown-label'] = countdownLabel;
 
   return `
     <div class="section">
@@ -437,6 +438,15 @@ describe('event-marquee', () => {
       expect(countdown).to.exist;
       expect(countdown.querySelector('.event-marquee-countdown-label').textContent).to.equal('Session starts in:');
       expect(countdown.querySelector('.event-marquee-countdown-clock').textContent).to.match(/^\d{2,}:\d{2}:\d{2}$/);
+    });
+
+    it('uses an authored countdown-label instead of the default', async () => {
+      const target = new Date(Date.now() + 60_000).toISOString();
+      document.body.innerHTML = countdownVariantHtml({ countdownEndTime: target, countdownLabel: 'Doors open in:' });
+      el = document.querySelector('.event-marquee');
+      await init(el);
+
+      expect(el.querySelector('.event-marquee-countdown-label').textContent).to.equal('Doors open in:');
     });
 
     it('ticks the clock down over time', async () => {
