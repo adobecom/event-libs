@@ -27,10 +27,10 @@ const HOMEPAGE_FIELD_BY_TYPE = {
     headingField: 'upcomingSessionsHeading',
     themeField: 'upcomingSessionsTheme',
     // upcoming-sessions.js reads mrStreamId (drives its Mobile Rider live-drop
-    // polling) but never reads watchUrl anywhere — leave that field out.
-    // imageUrl is read directly by upcoming-sessions.js's buildCard() now.
-    metaFields: ['mrStreamId', 'imageUrl'],
-    metaHint: 'Mobile Rider stream ID and image are optional per-session overrides',
+    // polling) but never reads watchUrl or imageUrl — its cards are text-only,
+    // no structural change from the pre-link-authoring version.
+    metaFields: ['mrStreamId'],
+    metaHint: 'Mobile Rider stream ID is an optional per-session override',
     label: 'Upcoming Sessions',
     blockHint: 'the upcoming-sessions block',
     linkPrefix: 'event-upcoming-sessions',

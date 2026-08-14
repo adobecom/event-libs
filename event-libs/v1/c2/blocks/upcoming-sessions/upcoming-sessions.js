@@ -165,10 +165,6 @@ export function buildCard(session) {
     'aria-label': `${session.enTitle}, ${timeRange}`,
   });
 
-  if (session.imageUrl) {
-    createTag('img', { class: 'sg-card__image', src: session.imageUrl, alt: '' }, '', { parent: card });
-  }
-
   const body = createTag('div', { class: 'sg-card__body' }, '', { parent: card });
 
   const badgeRow = createTag('div', { class: 'sg-card__badge-row' }, '', { parent: body });

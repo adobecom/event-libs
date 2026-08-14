@@ -205,7 +205,15 @@ export async function mutateSheet(org, repo, path, mutate, sheetName = OWNED_SHE
 // org/repo than the one the app resolved. Reject at the source rather than trying to sanitize
 // a full path string after the fact.
 function hasUnsafePathSegment(path) {
-  return (path || '').split('/').some((segment) => segment === '.' || segment === '..');
+  return (path || '').split('/').some((segment) => {
+    let decoded = segment;
+    try {
+      decoded = decodeURIComponent(segment);
+    } catch {
+      return true;
+    }
+    return decoded === '.' || decoded === '..';
+  });
 }
 
 export function getContentUrl(itemPath) {

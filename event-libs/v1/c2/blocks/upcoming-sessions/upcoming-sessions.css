@@ -162,14 +162,6 @@
   z-index: 2;
 }
 
-.upcoming-sessions .sg-card__image {
-  width: 100%;
-  aspect-ratio: 16 / 9;
-  object-fit: cover;
-  border-radius: var(--s2a-border-radius-sm, 8px);
-  flex-shrink: 0;
-}
-
 .upcoming-sessions .sg-card__body {
   flex: 1 1 auto;
   min-width: 0;
@@ -319,11 +311,6 @@
     min-height: 108px;
     padding: var(--s2a-spacing-lg, 24px);
     gap: var(--s2a-spacing-md, 16px);
-  }
-
-  .upcoming-sessions .sg-card__image {
-    width: 96px;
-    aspect-ratio: 1 / 1;
   }
 
   .upcoming-sessions .sg-card__body {

@@ -235,18 +235,6 @@ describe('upcoming-sessions', () => {
       expect(card.querySelector('.sg-card__title').textContent).to.equal('Intro to Adobe Express');
     });
 
-    it('renders an image when the session carries an imageUrl', () => {
-      const card = buildCard(session({ imageUrl: 'https://example.com/image.jpg' }));
-      const img = card.querySelector('.sg-card__image');
-      expect(img).to.not.equal(null);
-      expect(img.getAttribute('src')).to.equal('https://example.com/image.jpg');
-    });
-
-    it('omits the image entirely when the session has no imageUrl', () => {
-      const card = buildCard(session());
-      expect(card.querySelector('.sg-card__image')).to.equal(null);
-    });
-
     it('renders the time in the viewer\'s local timezone with an abbreviation, not the authored sessionTime.timezone', () => {
       const startMillis = Date.parse('2026-08-12T17:00:00.000Z');
       const card = buildCard(session({
