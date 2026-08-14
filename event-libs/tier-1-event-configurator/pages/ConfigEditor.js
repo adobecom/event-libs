@@ -114,7 +114,7 @@ export default function ConfigEditor() {
 
       <section class="tec-editor__section">
         <h2>Event dates</h2>
-        <p class="tec-editor__section-hint">The event's own start/end, which can fall outside the first/last session's times (e.g. a check-in period before the first session, or a wind-down after the last). Editors are spread across timezones, so the picker shows Los Angeles time (where most events are based) while the value actually saved is a timezone-agnostic epoch — use the epoch field directly if you already have one (e.g. for a Miami- or London-based event). Leave blank if not yet known.</p>
+        <p class="tec-editor__section-hint">Can fall outside the first/last session's times. Picker shows LA time; saved as a UTC epoch — use the epoch field directly for non-LA events. Leave blank if unknown.</p>
         <${EpochDateTimeField}
           idPrefix="tec-event-start"
           label="Event start"
