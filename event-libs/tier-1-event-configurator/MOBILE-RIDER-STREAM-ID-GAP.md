@@ -24,27 +24,29 @@ Homepage configurator either. Both surfaces are blocked on the same backend gap.
 
 ## Current state in the Homepage configurator
 
-`buildSessionAuthorEntry()` (`tier-1-event-configurator/utils.js`) builds the
-JSON an author copies into `upcoming-sessions`/Featured Sessions' section-metadata.
-It does **not** include `mrStreamId` (or `watchUrl`, which isn't read by
-`upcoming-sessions.js` at all yet). For any session that genuinely is
-MR-streamed, an author currently has to hand-edit `mrStreamId` into the copied
-JSON after the fact — same workaround the older `build-author-data.mjs` CLI
-script already required, for the same reason (ESP's session catalog carries no
-such field either).
+**Resolved — Option 1 below was implemented.** `FeaturedSessionsEditor.js` has an
+optional per-session "Mobile Rider stream ID" (and "Watch URL") field next to each
+picked session; `buildSessionAuthorEntry()` (`tier-1-event-configurator/utils.js`)
+folds that author-entered `meta` into each session entry. Those entries feed the
+"Copy Link" payload (`ConfigEditor.js`'s `handleCopyHomepageLink`) — not, as this doc
+originally said, a JSON blob pasted into section-metadata; that pre-link authoring
+path no longer exists. `decorate.js`'s `tec-homepage` auto-block builder decodes the
+link and passes `mrStreamId`/`watchUrl` straight through to `upcoming-sessions.js`/
+`featured-sessions.js`, so an author only needs to fill this field in for the few
+sessions that are actually MR-streamed — no hand-editing of copied output required.
 
-## Options once this needs solving for real
+## Options considered
 
 1. **Manual input field per session** in the Upcoming/Featured Sessions picker —
    an optional "Mobile Rider stream ID" text field next to each picked session,
    author fills it in only for the few sessions that are actually MR-streamed.
    Doesn't require any backend change; purely a configurator UX addition.
-2. **Leave it out of the UI** — keep relying on hand-editing the copied JSON,
-   i.e. today's status quo, no configurator change.
+   **— chosen, see above.**
+2. **Leave it out of the UI** — keep relying on hand-editing the copied JSON.
 3. **Wait on backend** — don't build anything now; once ESP/RF actually exposes
    a real stream-id field, both Session Guide and the Homepage configurator
    should consume it the same way, so building a workaround now risks being
    thrown away.
 
-No decision has been made yet — revisit this doc once there's a concrete need
-or the backend gap closes.
+Revisit if/when ESP/RF exposes a real `mrStreamId` field — the manual field could
+then be dropped in favor of reading it straight from the session catalog.

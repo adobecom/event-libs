@@ -115,8 +115,7 @@ export default function ConfigEditor() {
     if (incompleteTracks.length > 0) return;
     setIsSaving(true);
     try {
-      const result = await saveActiveConfig();
-      if (result.ok) goToLibrary();
+      await saveActiveConfig();
     } finally {
       setIsSaving(false);
     }
