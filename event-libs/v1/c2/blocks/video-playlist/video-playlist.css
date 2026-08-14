@@ -11,9 +11,19 @@
     gap: var(--s2a-spacing-md);
   }
 
+  /* The player "block" here is almost never an authored table block itself — it starts
+     as a bare link (autoblocked into .milo-video, or .mobile-rider in place), so Milo's
+     decorateContent() sweeps it into a synthetic `.section > .content` wrapper instead of
+     a direct .video-playlist sibling. That wrapper carries Milo's own base rule (`main >
+     .section > .content { max-width: var(--grid-container-width); margin: 0 auto; }`,
+     libs/styles/styles.css) — margin:auto absorbs the flex row's free space before
+     flex-grow gets a chance to use it, leaving a centered, capped-width box instead of one
+     that actually fills the remaining space. Override both explicitly. */
   .section:has(> .video-playlist) > :not(.video-playlist) {
     flex: 1 1 auto;
     min-width: 0;
+    max-width: none;
+    margin: 0;
   }
 
   .video-playlist {
@@ -264,7 +274,9 @@
 
 @media (min-width: 1024px) {
   .video-playlist-show-more {
-    display: block;
+    display: flex;
+    align-items: center;
+    gap: var(--s2a-spacing-3xs);
     margin-top: var(--s2a-spacing-sm);
     border: none;
     background: none;
@@ -273,6 +285,21 @@
     font-size: var(--s2a-font-size-sm);
     font-weight: 700;
     cursor: pointer;
+  }
+
+  .video-playlist-show-more-chevron {
+    width: 12px;
+    height: 8px;
+    transition: transform 0.2s ease;
+  }
+
+  .video-playlist-show-more-chevron svg {
+    width: 100%;
+    height: 100%;
+  }
+
+  .video-playlist-show-more[aria-expanded='true'] .video-playlist-show-more-chevron {
+    transform: rotate(180deg);
   }
 
   .video-playlist-list:not(.is-showing-more) .video-playlist-row:nth-child(n+5) {

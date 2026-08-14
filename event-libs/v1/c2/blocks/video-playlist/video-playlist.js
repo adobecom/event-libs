@@ -662,11 +662,14 @@ function buildTopicView(el, rows) {
       class: 'video-playlist-show-more',
       'aria-expanded': 'false',
       ...analyticsAttrs('playlist-show-more'),
-    }, 'Show more', { parent: el });
+    }, '', { parent: el });
+    const label = createTag('span', {}, 'Show more', { parent: showMore });
+    createTag('span', { class: 'video-playlist-show-more-chevron' }, TOGGLE_CHEVRON_SVG, { parent: showMore });
+
     showMore.addEventListener('click', () => {
       const expanded = list.classList.toggle('is-showing-more');
       showMore.setAttribute('aria-expanded', String(expanded));
-      showMore.textContent = expanded ? 'Show less' : 'Show more';
+      label.textContent = expanded ? 'Show less' : 'Show more';
     });
   }
 }
