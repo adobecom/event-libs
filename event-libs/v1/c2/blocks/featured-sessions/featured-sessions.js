@@ -1,6 +1,7 @@
 import { createTag } from '../../../utils/utils.js';
 import { safeUrl } from '../../../blocks/sessions-guide/utils/url.js';
 import initEventCard from '../event-card/event-card.js';
+import initEventCarousel from '../event-carousel/event-carousel.js';
 
 // Mirrors hydrate/event-card.js's retired applySessionData mapping — the only piece of
 // that mechanism still worth keeping, since these data-* attributes are what
@@ -72,13 +73,25 @@ export default async function init(el) {
   el.innerHTML = '';
   el.setAttribute('role', 'region');
   el.setAttribute('aria-label', heading);
-  createTag('h6', { class: 'featured-sessions-heading' }, '', { parent: el }).textContent = heading;
 
-  const track = createTag('div', { class: 'featured-sessions-track' }, '', { parent: el });
+  const track = createTag('div', { class: 'carousel-track' });
   const cards = entries.map(buildAuthoredCard);
   cards.forEach((card) => track.append(card));
 
+  const marker = createTag('div', { class: 'event-carousel' });
+  el.append(marker, track);
+
   await Promise.all(cards.map((card) => initEventCard(card)));
 
-  if (!track.children.length) el.remove();
+  if (!track.children.length) {
+    el.remove();
+    return;
+  }
+
+  await initEventCarousel(marker);
+
+  const header = createTag('div', { class: 'featured-sessions-header' });
+  createTag('h6', { class: 'featured-sessions-heading' }, '', { parent: header }).textContent = heading;
+  header.append(marker);
+  el.prepend(header);
 }

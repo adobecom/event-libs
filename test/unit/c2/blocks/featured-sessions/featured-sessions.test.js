@@ -69,7 +69,7 @@ describe('featured-sessions', () => {
     expect(card.dataset.endTimeUtc).to.equal(new Date(1750003600000).toISOString());
   });
 
-  it('renders the authored heading', async () => {
+  it('renders the authored heading as its own always-visible element', async () => {
     const el = buildBlock({ heading: 'Featured Sessions Custom', entries: [entry()] });
     await init(el);
 
@@ -83,6 +83,29 @@ describe('featured-sessions', () => {
 
     expect(el.getAttribute('aria-label')).to.equal('Featured Sessions');
     expect(el.querySelector('.featured-sessions-heading').textContent).to.equal('Featured Sessions');
+  });
+
+  it('does not render the heading through event-carousel\'s own hideable controls', async () => {
+    const el = buildBlock({ heading: 'Featured', entries: [entry()] });
+    await init(el);
+
+    expect(el.querySelector('.carousel-heading')).to.not.exist;
+  });
+
+  it('wraps the cards in a shared carousel-track and builds arrow controls', async () => {
+    const el = buildBlock({
+      heading: 'Featured',
+      entries: [entry(), entry({ sessionId: 'session-2' })],
+    });
+    await init(el);
+
+    const track = el.querySelector('.carousel-track');
+    expect(track).to.exist;
+    expect(track.querySelectorAll(':scope > .event-card')).to.have.lengthOf(2);
+    expect(track.dataset.carouselId).to.be.a('string').that.is.not.empty;
+    expect(el.querySelector('.carousel-arrows')).to.exist;
+    expect(el.querySelector('.carousel-arrow-prev')).to.exist;
+    expect(el.querySelector('.carousel-arrow-next')).to.exist;
   });
 
   it('removes itself entirely when the entries array is empty', async () => {
