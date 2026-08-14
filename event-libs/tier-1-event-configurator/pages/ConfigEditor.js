@@ -2,12 +2,13 @@ import { useState, useEffect, useMemo, html } from '../../v1/deps/htm-preact.js'
 import { getEventSessionCatalog } from '../../v1/utils/esp-controller.js';
 import { useNavigation } from '../context/NavigationContext.js';
 import { useConfigs } from '../context/ConfigsContext.js';
+import { useDA } from '../context/DAContext.js';
 import {
   copyTextToClipboard, extractDistinctTracks, extractDistinctOverrideTexts, extractDistinctProducts,
   isTrackIconEntryComplete, getDisplayTitle, stringifyConfig,
-  buildSessionAuthorEntry,
+  buildSessionAuthorEntry, buildHomepageConfigURL, copyLinkToClipboard,
 } from '../utils.js';
-import { CONFIG_TYPES, isHomepageConfigType } from '../constants.js';
+import { CONFIG_TYPES, isHomepageConfigType, HOMEPAGE_THEME_OPTIONS } from '../constants.js';
 import TrackIconEditor from '../components/TrackIconEditor.js';
 import OverrideTrackIconEditor from '../components/OverrideTrackIconEditor.js';
 import ProductIconEditor from '../components/ProductIconEditor.js';
@@ -23,29 +24,32 @@ const HOMEPAGE_FIELD_BY_TYPE = {
   [CONFIG_TYPES.HOMEPAGE_UPCOMING_SESSIONS]: {
     field: 'upcomingSessions',
     metaField: 'upcomingSessionsMeta',
+    headingField: 'upcomingSessionsHeading',
+    themeField: 'upcomingSessionsTheme',
     // upcoming-sessions.js reads mrStreamId (drives its Mobile Rider live-drop
     // polling) but never reads watchUrl anywhere — leave that field out.
-    // imageUrl has no reader yet either, but authors need to attach one now so
-    // it's captured in the JSON ahead of the consuming-side wiring.
+    // imageUrl is read directly by upcoming-sessions.js's buildCard() now.
     metaFields: ['mrStreamId', 'imageUrl'],
     metaHint: 'Mobile Rider stream ID and image are optional per-session overrides',
     label: 'Upcoming Sessions',
-    metadataKey: 'upcoming-sessions',
     blockHint: 'the upcoming-sessions block',
+    linkPrefix: 'event-upcoming-sessions',
   },
   [CONFIG_TYPES.HOMEPAGE_FEATURED_SESSIONS]: {
     field: 'featuredSessions',
     metaField: 'featuredSessionsMeta',
-    // utils/session-routing.js reads both — watchUrl is where a click
-    // routes once the session goes live, mrStreamId is what tells it a
-    // session is Mobile-Rider-backed at all. imageUrl has no reader yet
-    // either, but authors need to attach one now so it's captured in the
-    // JSON ahead of the consuming-side wiring.
+    headingField: 'featuredSessionsHeading',
+    themeField: 'featuredSessionsTheme',
+    // The featured-sessions block's generated event-card markup + session-routing.js
+    // read all three — watchUrl is where a click routes once the session goes live,
+    // mrStreamId is what tells it a session is Mobile-Rider-backed at all, and
+    // imageUrl is required for a session to render as a card at all (event-card.js
+    // removes any card with no resolvable image).
     metaFields: ['watchUrl', 'mrStreamId', 'imageUrl'],
-    metaHint: 'Watch URL / Mobile Rider stream ID / image are optional per-session overrides',
+    metaHint: 'Watch URL / Mobile Rider stream ID are optional per-session overrides — image is required for a session to appear',
     label: 'Featured Sessions',
-    metadataKey: 'featured-sessions',
-    blockHint: 'each card-c2 Featured Sessions card',
+    blockHint: 'the featured-sessions block',
+    linkPrefix: 'event-featured-sessions',
   },
 };
 
@@ -55,6 +59,7 @@ export default function ConfigEditor() {
     activeConfig, saveActiveConfig, clearActiveConfig, updateTrackIcon,
     updateOverrideTrackIcon, updateProduct, updateConfigField, setToastSuccess, setToastError,
   } = useConfigs();
+  const { org, repo } = useDA();
 
   const [sessions, setSessions] = useState([]);
   const [sessionTimes, setSessionTimes] = useState([]);
@@ -128,15 +133,22 @@ export default function ConfigEditor() {
     });
   };
 
-  const handleCopyHomepageJson = async () => {
+  const handleCopyHomepageLink = async () => {
     const sessionsById = new Map(sessions.map((s) => [s.sessionId, s]));
     const metaById = activeConfig.config[homepageMeta.metaField] || {};
     const entries = (activeConfig.config[homepageMeta.field] || [])
       .filter((id) => sessionsById.has(id))
       .map((id) => buildSessionAuthorEntry(sessionsById.get(id), sessionTimes, metaById[id]));
-    const ok = await copyTextToClipboard(JSON.stringify(entries));
-    if (ok) setToastSuccess(`${homepageMeta.label} JSON copied — paste it into ${homepageMeta.blockHint}'s section-metadata row`);
-    else setToastError('Could not copy — select and copy the JSON block manually');
+    const heading = activeConfig.config[homepageMeta.headingField] || homepageMeta.label;
+    const theme = activeConfig.config[homepageMeta.themeField] || 'light';
+    const url = buildHomepageConfigURL(org, repo, configType, eventId, heading, theme, entries);
+    const formattedDate = new Date().toLocaleString('en-US', {
+      weekday: 'long', month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit',
+    });
+    const linkText = `${homepageMeta.linkPrefix}: ${getDisplayTitle(activeConfig)} – ${formattedDate}`;
+    const ok = await copyLinkToClipboard(url, linkText);
+    if (ok) setToastSuccess(`Link copied — paste it directly into ${homepageMeta.blockHint}'s doc body`);
+    else setToastError('Could not copy the link — please retry');
   };
 
   const handleCopy = async () => {
@@ -331,12 +343,29 @@ export default function ConfigEditor() {
           <p class="tec-editor__section-hint">
             Pick which sessions appear, and set their order. Your picks are saved with this
             row so you can come back and edit them, but ${homepageMeta.blockHint} doesn't read
-            this row directly — it reads its own section-metadata. Use "Copy ${homepageMeta.label} JSON"
-            and paste the result into that block's own section-metadata row (key
-            <code>${homepageMeta.metadataKey}</code>) instead. ${homepageMeta.metaHint} — none of
+            this row directly — it reads the link generated by "Copy Link" below once that's
+            pasted into the homepage page's doc body. ${homepageMeta.metaHint} — none of
             them has a source in the session catalog, so fill them in only for sessions that
             actually need one.
           </p>
+          <label class="tec-editor__field-label" for="tec-homepage-heading">Section heading</label>
+          <input
+            id="tec-homepage-heading"
+            type="text"
+            class="tec-field"
+            placeholder=${homepageMeta.label}
+            value=${activeConfig.config[homepageMeta.headingField] || ''}
+            onInput=${(e) => updateConfigField(homepageMeta.headingField, e.target.value)}
+          />
+          <label class="tec-editor__field-label" for="tec-homepage-theme">Card theme</label>
+          <select
+            id="tec-homepage-theme"
+            class="tec-field"
+            value=${activeConfig.config[homepageMeta.themeField] || 'light'}
+            onChange=${(e) => updateConfigField(homepageMeta.themeField, e.target.value)}
+          >
+            ${HOMEPAGE_THEME_OPTIONS.map((opt) => html`<option value=${opt.value} key=${opt.value}>${opt.label}</option>`)}
+          </select>
           ${isLoadingSessions && html`<${LoadingInline} label="Loading sessions…" />`}
           ${sessionsError && html`<p class="tec-editor__error">${sessionsError}</p>`}
           ${!isLoadingSessions && !sessionsError && html`
@@ -352,7 +381,7 @@ export default function ConfigEditor() {
               onMetaChange=${handleMetaChange} \
               metaFields=${homepageMeta.metaFields} \
             />
-            <button type="button" class="tec-btn tec-btn--outline" onClick=${handleCopyHomepageJson}>Copy ${homepageMeta.label} JSON</button>
+            <button type="button" class="tec-btn tec-btn--outline" onClick=${handleCopyHomepageLink}>Copy Link</button>
           `}
         </section>
       `}

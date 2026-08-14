@@ -165,6 +165,10 @@ export function buildCard(session) {
     'aria-label': `${session.enTitle}, ${timeRange}`,
   });
 
+  if (session.imageUrl) {
+    createTag('img', { class: 'sg-card__image', src: session.imageUrl, alt: '' }, '', { parent: card });
+  }
+
   const body = createTag('div', { class: 'sg-card__body' }, '', { parent: card });
 
   const badgeRow = createTag('div', { class: 'sg-card__badge-row' }, '', { parent: body });
@@ -319,18 +323,6 @@ function attachToPrecedingBlock(el) {
   }
 }
 
-function readSectionMetadata(el, key) {
-  const metadataBlock = el.closest('.section')?.querySelector(':scope > .section-metadata');
-  if (!metadataBlock) return null;
-  const rows = metadataBlock.querySelectorAll(':scope > div');
-  for (const row of rows) {
-    const cells = row.querySelectorAll(':scope > div');
-    const rowKey = cells[0]?.textContent?.trim().toLowerCase();
-    if (rowKey === key) return cells[1]?.textContent?.trim() ?? '';
-  }
-  return null;
-}
-
 function startMobileRiderPolling(sessions, onStarted) {
   const mrSessions = sessions.filter((s) => s.mrStreamId);
   if (!mrSessions.length) return null;
@@ -385,18 +377,17 @@ async function decorate(el) {
 
   attachToPrecedingBlock(el);
 
-  const rows = el.querySelectorAll(':scope > div');
-  const heading = rows[0]?.textContent?.trim();
-  const payload = readSectionMetadata(el, 'upcoming-sessions');
-
-  let sessions = [];
+  let config = null;
   try {
-    sessions = payload ? JSON.parse(payload) : [];
+    config = el.dataset.upcomingSessionsConfig ? JSON.parse(el.dataset.upcomingSessionsConfig) : null;
   } catch (error) {
     window.lana?.log(`upcoming-sessions: failed to parse session payload: ${error.message}`);
     el.remove();
     return;
   }
+
+  const heading = config?.heading || 'Upcoming Sessions';
+  let sessions = Array.isArray(config?.entries) ? config.entries : [];
 
   if (!sessions.length) {
     el.remove();

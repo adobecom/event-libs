@@ -6,38 +6,19 @@ import {
 import { setEventConfig } from '../../../../../event-libs/v1/utils/utils.js';
 import { initTierOneEventConfig } from '../../../../../event-libs/v1/utils/tier-1-event-config.js';
 
-function buildSectionMetadata(entries) {
-  const el = document.createElement('div');
-  el.className = 'section-metadata';
-  Object.entries(entries).forEach(([key, value]) => {
-    const row = document.createElement('div');
-    const keyCell = document.createElement('div');
-    keyCell.textContent = key;
-    const valueCell = document.createElement('div');
-    valueCell.textContent = value;
-    row.append(keyCell, valueCell);
-    el.append(row);
-  });
-  return el;
-}
-
-// Mirrors the real authored shape: the block itself only has the heading row;
-// the session array lives in a sibling .section-metadata block, both inside
-// the same .section wrapper.
+// Mirrors the real auto-built shape: decorate.js's tec-homepage auto-block builder
+// replaces the authored link with a bare div carrying the decoded { heading, entries }
+// config as a data-upcoming-sessions-config attribute — no authored rows, no sibling
+// section-metadata block.
 function buildBlock(sessions, heading = 'Upcoming') {
   const section = document.createElement('div');
   section.className = 'section';
 
   const el = document.createElement('div');
   el.className = 'upcoming-sessions carousel clip-end';
-  const headingRow = document.createElement('div');
-  headingRow.append(document.createElement('div'));
-  headingRow.firstChild.textContent = heading;
-  el.append(headingRow);
+  el.dataset.upcomingSessionsConfig = JSON.stringify({ heading, entries: sessions });
 
-  const metadata = buildSectionMetadata({ 'upcoming-sessions': JSON.stringify(sessions) });
-
-  section.append(el, metadata);
+  section.append(el);
   document.body.append(section);
   return el;
 }
@@ -86,7 +67,7 @@ describe('upcoming-sessions', () => {
   });
 
   describe('init(el)', () => {
-    it('renders a card per authored session', async () => {
+    it('renders a card per session in the config', async () => {
       const el = buildBlock([session()]);
       await init(el);
       const cards = el.querySelectorAll('.upcoming-sessions-card');
@@ -94,11 +75,18 @@ describe('upcoming-sessions', () => {
       expect(cards[0].textContent).to.contain('Intro to Adobe Express');
     });
 
-    it('renders the heading as an accessible label', async () => {
+    it('renders the authored heading as an accessible label', async () => {
       const el = buildBlock([session()], 'Upcoming');
       await init(el);
       expect(el.getAttribute('aria-label')).to.equal('Upcoming');
       expect(el.querySelector('.upcoming-sessions-heading').textContent).to.equal('Upcoming');
+    });
+
+    it('falls back to a default heading when none is authored', async () => {
+      const el = buildBlock([session()], '');
+      await init(el);
+      expect(el.getAttribute('aria-label')).to.equal('Upcoming Sessions');
+      expect(el.querySelector('.upcoming-sessions-heading').textContent).to.equal('Upcoming Sessions');
     });
 
     it('marks data-few-sessions=true (arrows hidden) with 3 or fewer sessions', async () => {
@@ -145,36 +133,26 @@ describe('upcoming-sessions', () => {
       expect(el.dataset.fewSessions).to.equal('true');
     });
 
-    it('removes itself entirely when the authored array is empty', async () => {
+    it('removes itself entirely when the entries array is empty', async () => {
       const el = buildBlock([]);
       await init(el);
       expect(el.isConnected).to.equal(false);
     });
 
-    it('removes itself entirely when there is no sibling section-metadata block', async () => {
+    it('removes itself entirely when there is no config data attribute at all', async () => {
       const el = document.createElement('div');
       el.className = 'upcoming-sessions carousel clip-end';
-      const headingRow = document.createElement('div');
-      headingRow.append(document.createElement('div'));
-      headingRow.firstChild.textContent = 'Upcoming';
-      el.append(headingRow);
       document.body.append(el);
 
       await init(el);
       expect(el.isConnected).to.equal(false);
     });
 
-    it('removes itself entirely when the section-metadata payload fails to parse', async () => {
-      const section = document.createElement('div');
-      section.className = 'section';
+    it('removes itself entirely when the config payload fails to parse', async () => {
       const el = document.createElement('div');
       el.className = 'upcoming-sessions carousel clip-end';
-      const headingRow = document.createElement('div');
-      headingRow.append(document.createElement('div'));
-      el.append(headingRow);
-      const metadata = buildSectionMetadata({ 'upcoming-sessions': 'not json' });
-      section.append(el, metadata);
-      document.body.append(section);
+      el.dataset.upcomingSessionsConfig = 'not json';
+      document.body.append(el);
 
       await init(el);
       expect(el.isConnected).to.equal(false);
@@ -187,12 +165,8 @@ describe('upcoming-sessions', () => {
       hero.className = 'hero attach-upcoming';
       const block = document.createElement('div');
       block.className = 'upcoming-sessions carousel clip-end';
-      const headingRow = document.createElement('div');
-      headingRow.append(document.createElement('div'));
-      headingRow.firstChild.textContent = 'Upcoming';
-      block.append(headingRow);
-      const metadata = buildSectionMetadata({ 'upcoming-sessions': JSON.stringify([session()]) });
-      section.append(hero, block, metadata);
+      block.dataset.upcomingSessionsConfig = JSON.stringify({ heading: 'Upcoming', entries: [session()] });
+      section.append(hero, block);
       document.body.append(section);
 
       await init(block);
@@ -259,6 +233,18 @@ describe('upcoming-sessions', () => {
       const card = buildCard(session());
       expect(card.classList.contains('sg-card')).to.equal(true);
       expect(card.querySelector('.sg-card__title').textContent).to.equal('Intro to Adobe Express');
+    });
+
+    it('renders an image when the session carries an imageUrl', () => {
+      const card = buildCard(session({ imageUrl: 'https://example.com/image.jpg' }));
+      const img = card.querySelector('.sg-card__image');
+      expect(img).to.not.equal(null);
+      expect(img.getAttribute('src')).to.equal('https://example.com/image.jpg');
+    });
+
+    it('omits the image entirely when the session has no imageUrl', () => {
+      const card = buildCard(session());
+      expect(card.querySelector('.sg-card__image')).to.equal(null);
     });
 
     it('renders the time in the viewer\'s local timezone with an abbreviation, not the authored sessionTime.timezone', () => {
