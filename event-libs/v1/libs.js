@@ -25,11 +25,12 @@ const EVENT_BLOCKS = [
 ];
 
 const EVENT_BLOCKS_C2 = [
-  'card-c2',
-  'slider',
+  'event-card',
+  'event-carousel',
   'upcoming-sessions',
   'chrono-box',
   'mobile-rider',
+  'event-marquee',
   'session-details',
   'featured-products',
   'speakers',
@@ -55,6 +56,7 @@ import {
   getNonProdData,
   validatePageAndRedirect,
   processAutoBlockLinks,
+  applySectionColumnsLayout,
 } from './utils/decorate.js';
 
 import { registerHydrator } from './hydrate/hydrate.js';
@@ -73,6 +75,7 @@ export {
   getNonProdData,
   validatePageAndRedirect,
   processAutoBlockLinks,
+  applySectionColumnsLayout,
   registerHydrator,
   repeatTemplate,
   EVENT_BLOCKS,

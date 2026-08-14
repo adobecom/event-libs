@@ -1,10 +1,10 @@
 import logHydration from './log.js';
 import hydrateImageLinks from './image-links.js';
-import hydrateCardC2 from './card-c2.js';
+import hydrateEventCard from './event-card.js';
 
 const HYDRATORS = {
   'image-links': hydrateImageLinks,
-  'card-c2': hydrateCardC2,
+  'event-card': hydrateEventCard,
 };
 
 const HYDRATED_ATTR = 'data-hydrated';
