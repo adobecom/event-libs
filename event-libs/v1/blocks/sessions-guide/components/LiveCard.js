@@ -10,6 +10,7 @@ import { IconPlay, IconCalendarCheck, IconCalendarPlus, IconHeartFilled, IconHea
 import { setSessionParam, clearSessionParams, safeUrl, isSamePage } from '../utils/url.js';
 import { CategoryBadge } from './CategoryBadge.js';
 import { getTrackIcon } from '../../../utils/tier-1-event-config.js';
+import { isBehaviorEnabled } from '../utils/behavior-flags.js';
 
 export const buildLiveCard = () => LiveCard;
 
@@ -21,6 +22,9 @@ export function LiveCard({ session, variant = 'live' }) {
   const isScheduled = scheduled.value.has(session.id);
   const isFavorited = favorited.value.has(session.id);
   const isPending = pendingActions.value.has(session.id);
+  const schedulingEnabled = isBehaviorEnabled(guideConfig, 'enableScheduling');
+  const favoritingEnabled = isBehaviorEnabled(guideConfig, 'enableFavoriting');
+  const watchNowEnabled = isBehaviorEnabled(guideConfig, 'enableWatchNowCtas');
 
   const nowMs = getNowMs();
   const sessionState = deriveSessionState(session, liveStreamActiveIds.value, nowMs);
@@ -73,7 +77,7 @@ export function LiveCard({ session, variant = 'live' }) {
 
   let primaryCta;
   if (sessionState === 'upcoming') {
-    if (variant === 'recommended') {
+    if (variant === 'recommended' && schedulingEnabled) {
       primaryCta = html`<button
         class=${'sg-live-card__btn sg-live-card__btn--watch' + (isScheduled ? ' is-scheduled' : '') + (isPending ? ' is-pending' : '')}
         onclick=${handleSchedule}
@@ -85,7 +89,7 @@ export function LiveCard({ session, variant = 'live' }) {
           : html`<${IconCalendarPlus} />Add to schedule`
         }</button>`;
     }
-  } else if (watchHref) {
+  } else if (watchHref && watchNowEnabled) {
     primaryCta = html`<button
       class="sg-live-card__btn sg-live-card__btn--watch"
       onclick=${handleWatch}
@@ -133,7 +137,7 @@ export function LiveCard({ session, variant = 'live' }) {
         <p class="sg-live-card__desc">${session.description}</p>
         <div class="sg-live-card__actions">
           ${primaryCta}
-          <button
+          ${schedulingEnabled && html`<button
             class=${'sg-live-card__btn sg-live-card__btn--schedule' + (isScheduled ? ' is-scheduled' : '') + (isPending ? ' is-pending' : '')}
             onclick=${handleSchedule}
             aria-label=${isScheduled ? 'Remove from schedule' : 'Add to schedule'}
@@ -141,8 +145,8 @@ export function LiveCard({ session, variant = 'live' }) {
             disabled=${isPending}
             daa-ll=${isScheduled ? 'Remove-from-Schedule' : 'Add-to-Schedule'}
             type="button"
-          ></button>
-          <button
+          ></button>`}
+          ${favoritingEnabled && html`<button
             class=${'sg-live-card__btn sg-live-card__btn--favorite' + (isFavorited ? ' is-favorited' : '') + (isPending ? ' is-pending' : '')}
             onclick=${handleFavorite}
             aria-label=${isFavorited ? 'Remove from favorites' : 'Add to favorites'}
@@ -151,7 +155,7 @@ export function LiveCard({ session, variant = 'live' }) {
             daa-ll=${isFavorited ? 'Remove-from-Favorites' : 'Add-to-Favorites'}
             type="button"
           >${isFavorited ? html`<${IconHeartFilled} />` : html`<${IconHeartOutline} />`
-          }<span class="sg-live-card__btn-label">${isFavorited ? 'Favorited' : 'Favorite'}</span></button>
+          }<span class="sg-live-card__btn-label">${isFavorited ? 'Favorited' : 'Favorite'}</span></button>`}
         </div>
       </div>
     </div>

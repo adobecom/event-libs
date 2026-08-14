@@ -211,7 +211,7 @@ export function initSessionState() {
     eventId: getMetadata('event-id'),
     profileId: tierOneConfig.rfProfileId || DEFAULT_RF_PROFILE_ID,
     registerUrl: tierOneConfig.registerUrl || '/register',
-    manualCutoff: getMetadata('manual-on-demand-transition-time') || null,
+    eventEndMs: tierOneConfig.eventEndDateTime || null,
     mrEnv: deriveMrEnv(),
   };
 

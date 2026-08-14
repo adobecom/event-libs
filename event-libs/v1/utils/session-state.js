@@ -58,15 +58,17 @@ export function isInLiveNow(session, liveStreamActiveIds, nowMs) {
 }
 
 /**
- * Whether the event has functionally ended: every session is on-demand, or the manual
- * cutoff has passed. An empty session list is never "post-event".
+ * Whether the event has functionally ended: every session is on-demand, or the Tier 1
+ * Event Configurator's authored eventEndDateTime (a UTC epoch ms) has passed. An empty
+ * session list alone never satisfies "every session is on-demand", but eventEndMs having
+ * passed is independently sufficient regardless of session count.
  */
-export function isPostEvent(sessionList, liveStreamActiveIds, nowMs, manualCutoff) {
-  const pastManualCutoff = manualCutoff ? nowMs >= Date.parse(manualCutoff) : false;
+export function isPostEvent(sessionList, liveStreamActiveIds, nowMs, eventEndMs) {
+  const pastEventEnd = eventEndMs ? nowMs >= eventEndMs : false;
   const allEnded = sessionList.length > 0 && sessionList.every(
     (s) => deriveSessionState(s, liveStreamActiveIds, nowMs) === 'on-demand',
   );
-  return allEnded || pastManualCutoff;
+  return allEnded || pastEventEnd;
 }
 
 /**

@@ -9,9 +9,11 @@ const DEFAULT_FILTER_CATEGORIES = [
 
 // Config comes solely from the data-session-guide-config attribute decorate.js sets
 // (decoded via parseEncodedConfig); there is no authoring-table path.
-// headings/behaviorFlags/authoredFilterCategories aren't consumed yet — returned for
-// callers not yet wired up. swimlaneOrder and recommendedSessions are (via
-// groupByTrack()'s callers and LiveUpcomingView.js/OnDemandView.js respectively).
+// headings (DrawerHeader.js), behaviorFlags (behavior-flags.js's isBehaviorEnabled(),
+// read by LiveCard/SessionCard/SessionDetailOverlay), swimlaneOrder (groupByTrack()'s
+// callers), and recommendedSessions (LiveUpcomingView.js/OnDemandView.js) are all
+// consumed. authoredFilterCategories still isn't — filterCategories remains the legacy
+// id-based fallback below until FilterPanel.js is rewired onto it.
 export function parseSessionsGuideConfig(el, { logPrefix, forcedSurface } = {}) {
   let authored = {};
   try {

@@ -202,6 +202,33 @@ describe('SessionCard', () => {
     expect(html).to.include('daa-ll=Watch-Now');
   });
 
+  it('omits the schedule button when enableScheduling is false', () => {
+    const html = renderCard(UPCOMING_SESSION, {
+      guideConfig: { ...BASE_CONFIG, behaviorFlags: { enableScheduling: false } },
+    });
+    expect(html).to.not.include('sg-card__btn--schedule');
+  });
+
+  it('omits the favorite button when enableFavoriting is false', () => {
+    const html = renderCard(UPCOMING_SESSION, {
+      guideConfig: { ...BASE_CONFIG, behaviorFlags: { enableFavoriting: false } },
+    });
+    expect(html).to.not.include('sg-card__btn--favorite');
+  });
+
+  // Asserts daa-ll (an interpolated prop) rather than the extraClass literal — same mock
+  // limitation noted above for the favorite button; extraClass isn't interpolated on this
+  // element, so the mock's minimal parser never sees it.
+  it('keeps the previously-aired play button even when enableWatchNowCtas is false (out of that flag\'s scope)', () => {
+    const store = buildStore(preact);
+    store.SessionGuideContext._current = makeCtx({
+      guideConfig: { ...BASE_CONFIG, behaviorFlags: { enableWatchNowCtas: false } },
+    });
+    const SessionCard = buildSessionCard(preact, store);
+    const html = SessionCard({ session: ONDEMAND_SESSION, forceOnDemand: true });
+    expect(html).to.include('daa-ll=Watch-Now');
+  });
+
   it('does not dispatch when isRegistered is not true (no-op guard)', () => {
     auth.value = { isLoggedIn: true, isRegistered: false, userFirstName: null };
     const dispatched = [];

@@ -13,6 +13,7 @@ import { IconHeartFilled, IconHeartOutline } from './icons.js';
 import { Icon } from '../../../features/icons/Icon.js';
 import { getTrackIcon } from '../../../utils/tier-1-event-config.js';
 import { resolveTrackBadge } from '../utils/session-filters.js';
+import { isBehaviorEnabled } from '../utils/behavior-flags.js';
 
 export function SessionDetailOverlay({ onBack }) {
   const { state, dispatch } = useSessionGuide();
@@ -33,13 +34,19 @@ export function SessionDetailOverlay({ onBack }) {
   const isScheduled = scheduled.value.has(session.id);
   const isFavorited = favorited.value.has(session.id);
   const isPending = pendingActions.value.has(session.id);
+  const schedulingEnabled = isBehaviorEnabled(guideConfig, 'enableScheduling');
+  const favoritingEnabled = isBehaviorEnabled(guideConfig, 'enableFavoriting');
+  const watchNowEnabled = isBehaviorEnabled(guideConfig, 'enableWatchNowCtas');
   const isLive = sessionState === 'live';
   const onDemand = sessionState === 'on-demand';
   const recordingComing = onDemand && session.inPerson && !session.videoAvailable;
   const watchHref = safeUrl(getWatchDestination(session, sessionState));
   // Live / on-demand sessions surface "Watch now" (disabled if there's no real
-  // destination); upcoming sessions surface "Add to schedule".
+  // destination); upcoming sessions surface "Add to schedule". Either can be turned off
+  // entirely via behaviorFlags — showWatchCta/showScheduleCta below gate on that too.
   const showWatch = isLive || onDemand;
+  const showWatchCta = showWatch && watchNowEnabled;
+  const showScheduleCta = !showWatch && schedulingEnabled;
 
   function handleWatch(e) {
     // Already on the destination page (e.g. the widget is embedded on the homepage/broadcast
@@ -140,7 +147,7 @@ export function SessionDetailOverlay({ onBack }) {
                 ${recordingComing && html`<div class="sg-detail__recording-badge">Recording coming soon</div>`}
 
                 <div class="sg-detail__actions">
-                  ${showWatch
+                  ${showWatchCta
     ? html`
                         <a
                           class=${'sg-detail__btn sg-detail__btn--primary sg-detail__btn--watch' + (watchHref ? '' : ' is-disabled')}
@@ -153,7 +160,7 @@ export function SessionDetailOverlay({ onBack }) {
                           Watch now
                         </a>
                       `
-    : html`
+    : showScheduleCta && html`
                         <button
                           class=${'sg-detail__btn sg-detail__btn--primary sg-detail__btn--schedule' + (isScheduled ? ' is-active' : '') + (isPending ? ' is-loading' : '')}
                           onclick=${handleSchedule}
@@ -167,7 +174,7 @@ export function SessionDetailOverlay({ onBack }) {
                         </button>
                       `}
 
-                  <${IconButton}
+                  ${favoritingEnabled && html`<${IconButton}
                     variant="outlined"
                     context="on-light"
                     size="lg"
@@ -179,7 +186,7 @@ export function SessionDetailOverlay({ onBack }) {
                     daaLl=${isFavorited ? 'Remove-from-Favorites' : 'Add-to-Favorites'}
                   >
                     ${isFavorited ? html`<${IconHeartFilled} />` : html`<${IconHeartOutline} />`}
-                  </${IconButton}>
+                  </${IconButton}>`}
 
                   <button
                     class="sg-detail__icon-btn sg-detail__icon-btn--share"

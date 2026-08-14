@@ -33,10 +33,10 @@ const LIVE_SESSION = {
 
 const NO_THUMB_SESSION = { ...LIVE_SESSION, id: 'session-no-thumb', thumbnailUrl: null };
 
-function makeStore() {
+function makeStore(guideConfigOverrides = {}) {
   const store = buildStore(preact);
   store.SessionGuideContext._current = {
-    state: { guideConfig: { ...BASE_CONFIG } },
+    state: { guideConfig: { ...BASE_CONFIG, ...guideConfigOverrides } },
     dispatch: () => {},
   };
   return store;
@@ -162,5 +162,23 @@ describe('LiveCard', () => {
     const html = LiveCard({ session: LIVE_SESSION });
     expect(html).to.include('daa-ll=Remove-from-Schedule');
     expect(html).to.include('daa-ll=Remove-from-Favorites');
+  });
+
+  it('omits the schedule button when enableScheduling is false', () => {
+    const store = makeStore({ behaviorFlags: { enableScheduling: false } });
+    const LiveCard = buildLiveCard(preact, store);
+    expect(LiveCard({ session: LIVE_SESSION })).to.not.include('sg-live-card__btn--schedule');
+  });
+
+  it('omits the favorite button when enableFavoriting is false', () => {
+    const store = makeStore({ behaviorFlags: { enableFavoriting: false } });
+    const LiveCard = buildLiveCard(preact, store);
+    expect(LiveCard({ session: LIVE_SESSION })).to.not.include('sg-live-card__btn--favorite');
+  });
+
+  it('omits the Watch now button when enableWatchNowCtas is false, even with a valid destination', () => {
+    const store = makeStore({ behaviorFlags: { enableWatchNowCtas: false } });
+    const LiveCard = buildLiveCard(preact, store);
+    expect(LiveCard({ session: LIVE_SESSION })).to.not.include('Watch now');
   });
 });

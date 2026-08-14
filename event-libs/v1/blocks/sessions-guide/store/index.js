@@ -115,14 +115,15 @@ export function SessionGuideProvider({ guideConfig, children }) {
     return sessions.subscribe(recomputeDays);
   }, []);
 
-  // Auto-switch out of "live-upcoming" once every session has gone on-demand, or
-  // once the authored manual cutoff time has passed — whichever comes first.
+  // Auto-switch out of "live-upcoming" once every session has gone on-demand, or once
+  // the Tier 1 Event Configurator's authored eventEndDateTime has passed — whichever
+  // comes first.
   useEffect(() => {
     function checkAutoTransition() {
       if (state.activeView !== 'live-upcoming') return;
       if (sessionsStatus.value !== 'ready' || !sessions.value.length) return;
-      const manualCutoff = getApiConfig()?.manualCutoff;
-      if (isPostEvent(sessions.value, liveStreamActiveIds.value, getNowMs(), manualCutoff)) {
+      const eventEndMs = getApiConfig()?.eventEndMs;
+      if (isPostEvent(sessions.value, liveStreamActiveIds.value, getNowMs(), eventEndMs)) {
         dispatch({ type: 'SET_VIEW', view: 'on-demand' });
       }
     }

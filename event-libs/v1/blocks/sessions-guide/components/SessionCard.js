@@ -8,6 +8,7 @@ import { CategoryBadge } from './CategoryBadge.js';
 import { IconButton } from './IconButton.js';
 import { IconPlay, IconCalendarCheck, IconCalendarPlus, IconHeartFilled, IconHeartOutline } from './icons.js';
 import { getTrackIcon } from '../../../utils/tier-1-event-config.js';
+import { isBehaviorEnabled } from '../utils/behavior-flags.js';
 
 export const buildSessionCard = () => SessionCard;
 
@@ -20,6 +21,8 @@ export function SessionCard({ session, forceOnDemand = false, timeDisplay = 'dur
   const isScheduled = scheduled.value.has(session.id);
   const isFavorited = favorited.value.has(session.id);
   const isPending = pendingActions.value.has(session.id);
+  const schedulingEnabled = isBehaviorEnabled(guideConfig, 'enableScheduling');
+  const favoritingEnabled = isBehaviorEnabled(guideConfig, 'enableFavoriting');
   const [hoverAnim, setHoverAnim] = useState(null);
   const onDemandNatural = isSessionOnDemand(session, getNowMs());
   const onDemand = forceOnDemand || onDemandNatural;
@@ -96,6 +99,8 @@ export function SessionCard({ session, forceOnDemand = false, timeDisplay = 'dur
     );
   }
 
+  // Not gated by enableWatchNowCtas: that flag's identified scope is the discrete
+  // "Watch now" CTA in LiveCard.js/SessionDetailOverlay.js, not this play button.
   function handlePlay(e) {
     e.stopPropagation();
     const dest = safeUrl(session.sessionPageUrl);
@@ -170,7 +175,7 @@ export function SessionCard({ session, forceOnDemand = false, timeDisplay = 'dur
         >
           <${IconPlay} />
         </${IconButton}>`}
-        ${!forceOnDemand && !onDemand && html`<${IconButton}
+        ${!forceOnDemand && !onDemand && schedulingEnabled && html`<${IconButton}
           variant="solid"
           context="on-dark"
           size="md"
@@ -183,7 +188,7 @@ export function SessionCard({ session, forceOnDemand = false, timeDisplay = 'dur
         >
           ${isScheduled ? html`<${IconCalendarCheck} />` : html`<${IconCalendarPlus} />`}
         </${IconButton}>`}
-        <${IconButton}
+        ${favoritingEnabled && html`<${IconButton}
           variant="solid"
           context="on-dark"
           size="md"
@@ -195,7 +200,7 @@ export function SessionCard({ session, forceOnDemand = false, timeDisplay = 'dur
           daaLl=${isFavorited ? 'Remove-from-Favorites' : 'Add-to-Favorites'}
         >
           ${isFavorited ? html`<${IconHeartFilled} />` : html`<${IconHeartOutline} />`}
-        </${IconButton}>
+        </${IconButton}>`}
       </div>
     </div>
   `;

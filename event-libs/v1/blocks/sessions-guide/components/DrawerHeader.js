@@ -1,18 +1,44 @@
-import { html, useState, useEffect, useRef } from '../../../deps/htm-preact.js';
+import {
+  html, useState, useEffect, useRef, useComputed,
+} from '../../../deps/htm-preact.js';
 import { useSessionGuide } from '../store/index.js';
-import { auth } from '../../../utils/session-store.js';
+import {
+  auth, sessions, liveStreamActiveIds, sessionStateVersion, getApiConfig,
+} from '../../../utils/session-store.js';
+import { isPostEvent, getNowMs } from '../../../utils/session-state.js';
 import { DateTabs } from './DateTabs.js';
 import { ViewDropdown } from './ViewDropdown.js';
 import { DownloadButton } from './DownloadButton.js';
+
+// Authored headings are 4 literal strings keyed by auth state x event lifecycle — no
+// placeholder interpolation, unlike the hardcoded default's first-name greeting. A blank/
+// unauthored string for the relevant key falls back to that hardcoded default.
+export function resolveDrawerTitle(headings, { isLoggedIn, userFirstName, isPost }) {
+  const loggedIn = !!(isLoggedIn && userFirstName);
+  const key = `${loggedIn ? 'loggedIn' : 'loggedOut'}${isPost ? 'PostEvent' : ''}`;
+  const defaultTitle = loggedIn ? `${userFirstName}, see what's happening` : "See what's happening at MAX";
+  return (headings || {})[key] || defaultTitle;
+}
 
 export function DrawerHeader({ onClose, onFilterToggle, filterOpen, hideClose, hideControls }) {
   const { state, dispatch } = useSessionGuide();
   const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
   const mobileSearchRef = useRef(null);
   const { activeFilters, activeView } = state;
-  const title = (auth.value.isLoggedIn && auth.value.userFirstName)
-    ? `${auth.value.userFirstName}, see what's happening`
-    : (state.guideConfig.title || "See what's happening at MAX");
+
+  // sessionStateVersion has no value of its own, only read so this recomputes on a pure
+  // time-driven transition too (see store/index.js's auto-transition effect for why).
+  const isPost = useComputed(() => {
+    void sessionStateVersion.value;
+    const eventEndMs = getApiConfig()?.eventEndMs;
+    return isPostEvent(sessions.value, liveStreamActiveIds.value, getNowMs(), eventEndMs);
+  }).value;
+
+  const title = resolveDrawerTitle(state.guideConfig.headings, {
+    isLoggedIn: auth.value.isLoggedIn,
+    userFirstName: auth.value.userFirstName,
+    isPost,
+  });
 
   const activeFilterCount = Object.values(activeFilters).reduce(
     (sum, set) => sum + (set instanceof Set ? set.size : 0),
