@@ -14,8 +14,18 @@
 
 .session-details .session-title {
   margin: 0;
-  color: var(--s2a-color-gray-900, #131313);
-  font-size: var(--s2a-font-size-32, 2rem);
-  font-weight: 700;
-  line-height: 1.15;
+  color: var(--s2a-color-gray-1000, #000);
+  font-size: var(--s2a-typography-font-size-heading-3);
+  font-weight: 900;
+  line-height: var(--s2a-typography-line-height-heading-3);
+  letter-spacing: var(--s2a-typography-letter-spacing-heading-3);
+}
+
+/* Desktop: step the title down to heading-4. */
+@media (min-width: 1024px) {
+  .session-details .session-title {
+    font-size: var(--s2a-typography-font-size-heading-4);
+    line-height: var(--s2a-typography-line-height-heading-4);
+    letter-spacing: var(--s2a-typography-letter-spacing-heading-4);
+  }
 }

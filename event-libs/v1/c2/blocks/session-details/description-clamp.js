@@ -30,10 +30,20 @@ export function renderDescriptionClamp(doc = document) {
 
   el.append(body, toggle);
 
-  // Reveal the toggle only when the clamped text overflows.
-  requestAnimationFrame(() => {
-    if (body.scrollHeight > body.clientHeight + 1) toggle.hidden = false;
-  });
+  // Reveal the toggle + fade only when the collapsed text actually overflows.
+  // Line count depends on width AND the loaded font — both settle after first
+  // paint (container-width constraint + late web-font swap), so a single check
+  // misses. A ResizeObserver catches every width/layout change and the font
+  // `loadingdone` event catches the swap, so it self-corrects without a resize.
+  const measure = () => {
+    if (el.classList.contains('is-expanded')) return;
+    const overflowing = body.scrollHeight > body.clientHeight + 1;
+    el.classList.toggle('is-clamped', overflowing);
+    toggle.hidden = !overflowing;
+  };
+  requestAnimationFrame(measure);
+  new ResizeObserver(measure).observe(body);
+  document.fonts?.addEventListener?.('loadingdone', measure);
 
   return el;
 }

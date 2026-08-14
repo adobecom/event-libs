@@ -18,7 +18,9 @@ import { getProduct, initTierOneEventConfig } from '../../../utils/tier-1-event-
 import { fetchFederalProductIcon } from '../../../features/icons/federal-icons.js';
 
 const VISIBLE_LIMIT = 6;
-const ARROW_ICON = '<svg viewBox="0 0 12 12" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><path d="M3.75 8.25 8.25 3.75M8.25 3.75H4.5M8.25 3.75V7.5"/></svg>';
+// Diagonal "open in new" arrow — Figma glyph (10x10). fill: currentColor so CSS
+// drives the color (var(--s2a-color-gray-600) per the design).
+const ARROW_ICON = '<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden="true"><path d="M8.57198 0.710938H3.57198C3.17718 0.710938 2.8577 1.03042 2.8577 1.42522C2.8577 1.82003 3.17718 2.13951 3.57198 2.13951H6.84765L0.924104 8.06306C0.64509 8.34207 0.64509 8.79409 0.924104 9.0731C1.06361 9.21261 1.24637 9.28237 1.42913 9.28237C1.61188 9.28237 1.79464 9.21261 1.93415 9.0731L7.8577 3.14955V6.42522C7.8577 6.82003 8.17718 7.13951 8.57198 7.13951C8.96679 7.13951 9.28627 6.82003 9.28627 6.42522V1.42522C9.28627 1.03042 8.96679 0.710938 8.57198 0.710938Z" fill="currentColor"/></svg>';
 
 async function paintProductIcon(slot, iconName) {
   if (!iconName) return;
@@ -41,7 +43,9 @@ export default async function init(el) {
   el.replaceChildren();
   if (!products.length) return;
 
-  el.append(createTag('h2', { class: 'featured-products-title' }, `Featured products (${products.length})`));
+  const title = createTag('h2', { class: 'featured-products-title' }, 'Featured products ');
+  title.append(createTag('span', { class: 'featured-products-count' }, `(${products.length})`));
+  el.append(title);
 
   const list = createTag('ul', { class: 'featured-products-list' });
   products.forEach((name, i) => {

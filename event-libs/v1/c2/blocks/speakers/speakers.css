@@ -13,10 +13,14 @@
 .speakers-title {
   margin: 0;
   color: var(--s2a-color-gray-1000, #000);
-  font-size: var(--s2a-typography-font-size-heading-6);
+  font-size: var(--s2a-font-size-18, 1.125rem);
   font-weight: 900;
   line-height: var(--s2a-typography-line-height-heading-6, 18px);
   letter-spacing: var(--s2a-typography-letter-spacing-heading-6);
+}
+
+.speakers-count {
+  font-weight: 400;
 }
 
 .speakers-list {
@@ -52,7 +56,7 @@
   overflow: hidden;
   border-radius: var(--s2a-border-radius-999, 999px);
   background: var(--s2a-color-gray-100, #e9e9e9);
-  color: var(--s2a-color-gray-700, #505050);
+  color: var(--s2a-color-gray-1000, #000);
   font-size: var(--s2a-font-size-16, 1rem);
   font-weight: 700;
 }
@@ -69,27 +73,43 @@
 }
 
 .speaker-name {
-  color: var(--s2a-color-gray-900, #131313);
+  color: var(--s2a-color-gray-1000, #000);
   font-size: var(--s2a-font-size-16, 1rem);
   font-weight: 700;
-  line-height: 1.3;
+  line-height: 1.5;
 }
 
 .speaker-role {
-  color: var(--s2a-color-gray-700, #505050);
-  font-size: var(--s2a-font-size-14, 0.875rem);
-  line-height: 1.3;
+  color: var(--s2a-color-gray-1000, #000);
+  font-size: var(--s2a-font-size-16, 1rem);
+  line-height: 1.5;
 }
 
 .speakers-toggle {
   /* 24 above (8 + 16 container gap) and 24 below (16 + 8 block margin) */
   margin-block: var(--s2a-spacing-8, 8px) var(--s2a-spacing-16, 16px);
   align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s2a-spacing-8, 8px);
   padding: 0;
   border: 0;
   background: none;
-  color: var(--s2a-color-gray-900, #131313);
+  color: var(--s2a-color-gray-1000, #000);
   font-size: var(--s2a-font-size-14, 0.875rem);
   font-weight: 700;
   cursor: pointer;
+}
+
+.speakers-toggle::after {
+  content: '';
+  width: 6px;
+  aspect-ratio: 2 / 1;
+  background-color: currentcolor;
+  mask: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='8'%20height='5'%20viewBox='0%200%208%205'%20fill='none'%3E%3Cpath%20d='M1%201L4%204L7%201'%20stroke='black'%20stroke-width='2'%20stroke-linecap='round'%20stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat center / contain;
+  transition: transform 0.2s ease;
+}
+
+.speakers-toggle[aria-expanded="true"]::after {
+  transform: rotate(180deg);
 }

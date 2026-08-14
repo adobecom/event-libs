@@ -43,7 +43,9 @@ export default async function init(el) {
   el.replaceChildren();
   if (!Array.isArray(speakers) || !speakers.length) return;
 
-  el.append(createTag('h2', { class: 'speakers-title' }, `Speakers (${speakers.length})`));
+  const title = createTag('h2', { class: 'speakers-title' }, 'Speakers ');
+  title.append(createTag('span', { class: 'speakers-count' }, `(${speakers.length})`));
+  el.append(title);
 
   const list = createTag('ul', { class: 'speakers-list' });
   speakers.forEach((s, i) => {
