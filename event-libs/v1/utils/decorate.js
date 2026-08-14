@@ -618,16 +618,20 @@ function prebuildAutoBlock(blockName, link) {
       }
 
       // Both Homepage config types share one link format/pattern — configType picks
-      // which block (and which data attribute its own init() reads) gets built.
+      // which block (and which data attribute its own init() reads) gets built. Theme
+      // stays a plain class (same one an author would previously have hand-added) so
+      // existing dark-card CSS applies with no block-side changes.
+      const themeClass = config.theme === 'dark' ? ' dark-card' : '';
+
       if (config.configType === 'homepage-featured-sessions') {
         return createTag('div', {
-          class: 'featured-sessions',
+          class: `featured-sessions${themeClass}`,
           'data-featured-sessions-config': JSON.stringify(config),
         });
       }
 
       return createTag('div', {
-        class: 'upcoming-sessions',
+        class: `upcoming-sessions${themeClass}`,
         'data-upcoming-sessions-config': JSON.stringify(config),
       });
     },

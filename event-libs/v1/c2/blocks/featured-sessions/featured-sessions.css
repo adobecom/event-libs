@@ -1,10 +1,20 @@
-.featured-sessions-heading {
-  font-size: var(--s2a-font-size-lg, 18px);
-  margin: 0 0 var(--s2a-spacing-md, 16px);
+.featured-sessions {
+  position: relative;
 }
 
-.featured-sessions-track {
+.featured-sessions-header {
   display: flex;
-  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
   gap: var(--s2a-spacing-md, 16px);
+  margin: 0 0 var(--s2a-spacing-sm, 12px);
+}
+
+.featured-sessions-heading {
+  margin: 0;
+  font-size: var(--s2a-font-size-lg, 18px);
+}
+
+.featured-sessions.dark-card .featured-sessions-heading {
+  color: var(--s2a-color-gray-25, #fff);
 }
