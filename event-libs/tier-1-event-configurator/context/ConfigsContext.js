@@ -16,6 +16,8 @@ function emptyConfig() {
   return {
     configName: '',
     eventTitle: '',
+    eventStartDateTime: null,
+    eventEndDateTime: null,
     trackIcons: {},
     overrideTrackIcon: null,
     overrideTrackIcons: {},
@@ -110,7 +112,8 @@ const ConfigsProvider = ({ children }) => {
   // Duplicate can legitimately target a different tier than its source.
   // rfApiUrl/rfProfileId/registerUrl always reset blank — reusing another event's RF
   // profile id or registration page would misroute this event's live schedule/favorites
-  // calls or send attendees to register for the wrong event.
+  // calls or send attendees to register for the wrong event. eventStartDateTime/
+  // eventEndDateTime reset the same way — a new event has its own dates.
   const startDuplicateConfig = useCallback((sourceRow, event, eventServiceEnv) => {
     const clonedConfig = { ...sourceRow.config };
     delete clonedConfig.eventId;
@@ -122,7 +125,14 @@ const ConfigsProvider = ({ children }) => {
       eventServiceEnv,
       configType: sourceRow.configType || CONFIG_TYPES.GLOBAL,
       config: {
-        ...clonedConfig, configName: '', eventTitle: '', rfApiUrl: '', rfProfileId: '', registerUrl: '',
+        ...clonedConfig,
+        configName: '',
+        eventTitle: '',
+        eventStartDateTime: null,
+        eventEndDateTime: null,
+        rfApiUrl: '',
+        rfProfileId: '',
+        registerUrl: '',
       },
     });
   }, []);

@@ -722,6 +722,25 @@ select.tec-field {
   margin-bottom: var(--tec-spacing-sm);
 }
 
+.tec-editor__datetime-group + .tec-editor__datetime-group {
+  margin-top: var(--tec-spacing-md);
+}
+
+.tec-editor__datetime-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--tec-spacing-md);
+}
+
+.tec-editor__datetime-col {
+  flex: 1 1 220px;
+}
+
+.tec-editor__datetime-col .tec-editor__rf-input {
+  width: 100%;
+  max-width: none;
+}
+
 .tec-editor__checkbox {
   display: flex;
   align-items: center;

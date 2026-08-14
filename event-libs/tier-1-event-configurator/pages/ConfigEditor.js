@@ -12,6 +12,7 @@ import TrackIconEditor from '../components/TrackIconEditor.js';
 import OverrideTrackIconEditor from '../components/OverrideTrackIconEditor.js';
 import ProductIconEditor from '../components/ProductIconEditor.js';
 import FeaturedSessionsEditor from '../components/FeaturedSessionsEditor.js';
+import EpochDateTimeField from '../components/EpochDateTimeField.js';
 import LoadingInline from '../components/LoadingInline.js';
 
 // Which config field + block/metadata key a Homepage config type feeds —
@@ -181,6 +182,23 @@ export default function ConfigEditor() {
           />
         </section>
       `}
+
+      <section class="tec-editor__section">
+        <h2>Event dates</h2>
+        <p class="tec-editor__section-hint">Can fall outside the first/last session's times. Picker shows LA time; saved as a UTC epoch — use the epoch field directly for non-LA events. Leave blank if unknown.</p>
+        <${EpochDateTimeField}
+          idPrefix="tec-event-start"
+          label="Event start"
+          valueMs=${activeConfig.config.eventStartDateTime}
+          onChange=${(ms) => updateConfigField('eventStartDateTime', ms)}
+        />
+        <${EpochDateTimeField}
+          idPrefix="tec-event-end"
+          label="Event end"
+          valueMs=${activeConfig.config.eventEndDateTime}
+          onChange=${(ms) => updateConfigField('eventEndDateTime', ms)}
+        />
+      </section>
 
       <section class="tec-editor__section">
         <h2>Sessions</h2>
