@@ -11,19 +11,22 @@
     gap: var(--s2a-spacing-md);
   }
 
-  /* The player "block" here is almost never an authored table block itself — it starts
-     as a bare link (autoblocked into .milo-video, or .mobile-rider in place), so Milo's
-     decorateContent() sweeps it into a synthetic `.section > .content` wrapper instead of
-     a direct .video-playlist sibling. That wrapper carries Milo's own base rule (`main >
-     .section > .content { max-width: var(--grid-container-width); margin: 0 auto; }`,
-     libs/styles/styles.css) — margin:auto absorbs the flex row's free space before
-     flex-grow gets a chance to use it, leaving a centered, capped-width box instead of one
-     that actually fills the remaining space. Override both explicitly. */
   .section:has(> .video-playlist) > :not(.video-playlist) {
     flex: 1 1 auto;
     min-width: 0;
-    max-width: none;
-    margin: 0;
+  }
+
+  /* ../../styles/c2-global.css caps every .milo-video at a fixed reading-width measure
+     and centers it (`:root:has(meta[foundation=c2]) .milo-video { max-width: ...;
+     margin: 0 auto; }`) — a sensible default for a video used standalone, but it wins
+     over the flex rule above regardless of load order: that selector's specificity
+     (0,4,1) beats this file's `.section:has(> .video-playlist) > :not(...)` (0,3,0). It
+     needs to be beaten here, not edited globally — other pages rely on the standalone
+     centered default. Same "!important to defeat a shared foundation/global default in
+     one specific layout" precedent as mobile-rider.css. */
+  .section:has(> .video-playlist) > .milo-video {
+    max-width: none !important;
+    margin: 0 !important;
   }
 
   .video-playlist {
