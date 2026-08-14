@@ -47,6 +47,12 @@ export function normalizeSessions(rawSessions) {
     mrStreamId: s.mrStreamId ?? null,
     playlistAssignment: coerceArray(s.playlistAssignment),
     playlistOnSessionPage: coerceArray(s.playlistOnSessionPage),
+    // video-playlist's "has a video source at all" filter — MPC ID / YouTube ID are both
+    // confirmed real customAttributes[].name values (see ESP-SESSION-ENDPOINTS.md).
+    hasVideoSource: Boolean(s.hasVideoSource),
+    // video-playlist's IPOD premiere formula (event start + dvrTimingHours) — "DVR Timing
+    // (in hours)" custom attribute, defaults to 0 if absent/blank.
+    dvrTimingHours: Number(s.dvrTimingHours) || 0,
     videoAvailable: Boolean(s.videoAvailable),
     inPerson: Boolean(s.inPerson),
     isLivestreamed: Boolean(s.isLivestreamed),
@@ -263,6 +269,14 @@ export function mapEslPayloadToRawSessions(payload) {
       // table between the two needed, both draw from the same slug vocabulary.
       playlistAssignment: extractCustomAttributeSlugs(session, 'Playlist assignment/name'),
       playlistOnSessionPage: extractCustomAttributeSlugs(session, 'Playlist on session page'),
+      // video-playlist won't list a session with no video source at all — MPC ID or
+      // YouTube ID, both real customAttributes[].name values on this endpoint.
+      hasVideoSource: Boolean(
+        extractCustomAttributeValue(session, 'MPC ID') || extractCustomAttributeValue(session, 'YouTube ID'),
+      ),
+      // video-playlist's IPOD premiere formula — hours after the event's own start time
+      // an in-person recording (no scheduled session-times of its own) becomes available.
+      dvrTimingHours: Number(extractCustomAttributeValue(session, 'DVR Timing (in hours)')) || 0,
       sessionPageUrl: slug ? `/sessions/${slug}` : '',
       isKeynote: type === 'Keynote',
       thumbnailUrl: thumbnail?.imageUrl ?? null,

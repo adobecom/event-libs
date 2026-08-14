@@ -55,6 +55,8 @@ describe('services/sessions/sessions-api', () => {
             customAttr('LegalDisclaimer', [textValue('<p>Copyright.</p>')]),
             customAttr('Playlist assignment/name', [selectValue('Photography', 'photography'), selectValue('3D', '3d')]),
             customAttr('Playlist on session page', [selectValue('Photography', 'photography')]),
+            customAttr('MPC ID', [textValue('3458940')]),
+            customAttr('DVR Timing (in hours)', [textValue('772')]),
           ],
         },
         {
@@ -168,6 +170,26 @@ describe('services/sessions/sessions-api', () => {
     it('leaves playlist fields empty on a bare session', () => {
       expect(bare.playlistAssignment).to.deep.equal([]);
       expect(bare.playlistOnSessionPage).to.deep.equal([]);
+    });
+
+    it('hasVideoSource is true when MPC ID is present, false on a bare session', () => {
+      expect(full.hasVideoSource).to.be.true;
+      expect(bare.hasVideoSource).to.be.false;
+    });
+
+    it('hasVideoSource is true from YouTube ID alone, with no MPC ID present', () => {
+      const [youtubeOnly] = mapEslPayloadToRawSessions({
+        sessions: [{
+          sessionId: 'yt-session',
+          customAttributes: [customAttr('YouTube ID', [textValue('dQw4w9WgXcQ')])],
+        }],
+      });
+      expect(youtubeOnly.hasVideoSource).to.be.true;
+    });
+
+    it('maps "DVR Timing (in hours)" to a numeric dvrTimingHours, defaulting to 0', () => {
+      expect(full.dvrTimingHours).to.equal(772);
+      expect(bare.dvrTimingHours).to.equal(0);
     });
   });
 
@@ -323,6 +345,22 @@ describe('services/sessions/sessions-api', () => {
       const [bare] = normalizeSessions([{ id: 's-2' }]);
       expect(bare.playlistAssignment).to.deep.equal([]);
       expect(bare.playlistOnSessionPage).to.deep.equal([]);
+    });
+
+    it('coerces hasVideoSource to a boolean, defaulting to false', () => {
+      const [withVideo] = normalizeSessions([{ id: 's-1', hasVideoSource: true }]);
+      expect(withVideo.hasVideoSource).to.be.true;
+
+      const [bare] = normalizeSessions([{ id: 's-2' }]);
+      expect(bare.hasVideoSource).to.be.false;
+    });
+
+    it('coerces dvrTimingHours to a number, defaulting to 0', () => {
+      const [withDvr] = normalizeSessions([{ id: 's-1', dvrTimingHours: 772 }]);
+      expect(withDvr.dvrTimingHours).to.equal(772);
+
+      const [bare] = normalizeSessions([{ id: 's-2' }]);
+      expect(bare.dvrTimingHours).to.equal(0);
     });
   });
 

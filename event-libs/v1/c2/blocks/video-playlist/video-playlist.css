@@ -36,14 +36,81 @@
   padding: var(--s2a-spacing-lg);
 }
 
-.video-playlist-title {
+/* Decorative bottom-sheet drag affordance — mobile-only, see the max-width block below. */
+.video-playlist-handle {
+  display: none;
+}
+
+/* Title + collapse toggle (mobile) + "Play all" switch all share one flex-wrap row so
+   the same DOM order can lay out two different ways per breakpoint: desktop keeps the
+   switch on the title's own row (flex-basis:auto, pushed right via margin-left:auto);
+   mobile forces it to wrap onto its own row (flex-basis:100%, see the max-width block
+   below) below the title+toggle row. */
+.video-playlist-top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: var(--s2a-spacing-xs) var(--s2a-spacing-md);
   margin: 0 0 var(--s2a-spacing-md);
+}
+
+.video-playlist-title {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0;
   font-size: var(--s2a-font-size-lg);
   font-weight: var(--s2a-font-weight-adobe-clean-extrabold, 800);
 }
 
 .video-playlist-toggle {
   display: none;
+}
+
+.video-playlist-autoplay {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: var(--s2a-spacing-xs);
+  margin: 0 0 0 auto;
+  font-size: var(--s2a-font-size-sm);
+  cursor: pointer;
+}
+
+/* Pure-CSS switch on the existing checkbox — no markup change, so existing tests that
+   drive `.video-playlist-autoplay-toggle` directly (`.checked`/change events) are
+   unaffected. */
+.video-playlist-autoplay-toggle {
+  appearance: none;
+  position: relative;
+  width: 32px;
+  height: 18px;
+  margin: 0;
+  border-radius: var(--s2a-border-radius-round);
+  background: var(--s2a-color-transparent-white-24, rgb(255 255 255 / 24%));
+  flex-shrink: 0;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.video-playlist-autoplay-toggle::before {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 14px;
+  height: 14px;
+  border-radius: var(--s2a-border-radius-round);
+  background: var(--s2a-color-gray-25, #fff);
+  transition: transform 0.2s ease;
+}
+
+.video-playlist-autoplay-toggle:checked {
+  background: var(--s2a-color-gray-25, #fff);
+}
+
+.video-playlist-autoplay-toggle:checked::before {
+  background: var(--s2a-color-gray-900);
+  transform: translateX(14px);
 }
 
 .video-playlist-list {
@@ -57,13 +124,11 @@
   align-items: center;
   gap: var(--s2a-spacing-sm);
   width: 100%;
-  border: none;
+  box-sizing: border-box;
   border-radius: var(--s2a-border-radius-md, 16px);
-  background: none;
   padding: var(--s2a-spacing-xs);
   color: inherit;
   font-family: inherit;
-  text-align: left;
   cursor: pointer;
 }
 
@@ -71,8 +136,12 @@
   background: var(--s2a-color-transparent-white-16, rgb(255 255 255 / 16%));
 }
 
+/* Currently-playing row: a solid light card, not just a translucent overlay — needs its
+   own text-color overrides since everything below otherwise inherits the dark-theme
+   white text. */
 .video-playlist-row.is-playing {
-  background: var(--s2a-color-transparent-white-24, rgb(255 255 255 / 24%));
+  background: var(--s2a-color-gray-25, #fff);
+  color: var(--s2a-color-gray-900);
 }
 
 .video-playlist-row:focus-visible {
@@ -80,32 +149,135 @@
   outline-offset: 2px;
 }
 
-.video-playlist-row-thumb {
+.video-playlist-row-thumb-wrap {
+  position: relative;
   flex-shrink: 0;
+  line-height: 0;
+}
+
+.video-playlist-row-thumb {
   width: 96px;
   height: 54px;
   border-radius: var(--s2a-border-radius-sm, 4px);
   object-fit: cover;
 }
 
+.video-playlist-row-play-icon {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 24px;
+  height: 24px;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+
+.video-playlist-row-play-icon svg {
+  width: 100%;
+  height: 100%;
+}
+
 .video-playlist-row-meta {
   display: flex;
+  flex: 1 1 auto;
   flex-direction: column;
   gap: var(--s2a-spacing-3xs);
   min-width: 0;
 }
 
 .video-playlist-row-title {
+  overflow: hidden;
   font-size: var(--s2a-font-size-sm);
   font-weight: 700;
+  /* stylelint-disable-next-line value-no-vendor-prefix -- required for -webkit-line-clamp */
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+
+.video-playlist-row-progress {
+  display: flex;
+  align-items: center;
+  gap: var(--s2a-spacing-xs);
+}
+
+.video-playlist-row-progress-track {
+  flex: 1 1 auto;
+  height: 4px;
+  border-radius: var(--s2a-border-radius-round);
+  background: var(--s2a-color-transparent-white-24, rgb(255 255 255 / 24%));
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+}
+
+.video-playlist-row.is-playing .video-playlist-row-progress-track {
+  background: var(--s2a-color-gray-300, rgb(0 0 0 / 16%));
+}
+
+.video-playlist-row-progress-fill {
+  height: 100%;
+  background: currentcolor;
+  border-radius: inherit;
 }
 
 .video-playlist-row-duration {
+  flex-shrink: 0;
   font-size: var(--s2a-font-size-xs);
   color: var(--s2a-color-transparent-white-64, rgb(255 255 255 / 64%));
+}
+
+.video-playlist-row.is-playing .video-playlist-row-duration {
+  color: var(--s2a-color-gray-700, rgb(0 0 0 / 64%));
+}
+
+.video-playlist-row-favorite {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: var(--s2a-border-radius-round);
+  background: none;
+  color: inherit;
+  cursor: pointer;
+}
+
+.video-playlist-row-favorite svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentcolor;
+  stroke-width: 1.5;
+}
+
+.video-playlist-row-favorite.is-favorited svg {
+  fill: currentcolor;
+}
+
+/* Desktop-only "Show more": reveals rows beyond SHOW_MORE_INITIAL_ROWS via a plain
+   nth-child cap — independent of the mobile drawer's own is-expanded/Drawer state,
+   which already covers the equivalent need on mobile (the full list scrolls there). */
+.video-playlist-show-more {
+  display: none;
+}
+
+@media (min-width: 1024px) {
+  .video-playlist-show-more {
+    display: block;
+    margin-top: var(--s2a-spacing-sm);
+    border: none;
+    background: none;
+    color: inherit;
+    font-family: inherit;
+    font-size: var(--s2a-font-size-sm);
+    font-weight: 700;
+    cursor: pointer;
+  }
+
+  .video-playlist-list:not(.is-showing-more) .video-playlist-row:nth-child(n+5) {
+    display: none;
+  }
 }
 
 /* Mobile bottom sheet: fixed to the viewport, independent of the section's own flow —
@@ -124,19 +296,36 @@
     transition: max-height 0.3s ease;
   }
 
+  .video-playlist-handle {
+    display: block;
+    width: 36px;
+    height: 4px;
+    margin: 0 auto var(--s2a-spacing-sm);
+    border-radius: var(--s2a-border-radius-round);
+    background: var(--s2a-color-transparent-white-24, rgb(255 255 255 / 24%));
+  }
+
+  .video-playlist-autoplay {
+    flex-basis: 100%;
+    margin-left: 0;
+  }
+
   .video-playlist-toggle {
     display: flex;
+    flex: 0 0 auto;
     align-items: center;
     justify-content: center;
-    width: 100%;
-    margin-bottom: var(--s2a-spacing-sm);
+    width: 32px;
+    height: 32px;
     border: none;
     border-radius: var(--s2a-border-radius-round);
     background: var(--s2a-color-transparent-white-16, rgb(255 255 255 / 16%));
     color: inherit;
-    font-family: inherit;
-    font-size: var(--s2a-font-size-sm);
-    padding: var(--s2a-spacing-xs) var(--s2a-spacing-md);
     cursor: pointer;
+  }
+
+  .video-playlist-toggle svg {
+    width: 12px;
+    height: 8px;
   }
 }
