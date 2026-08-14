@@ -27,6 +27,19 @@ export function formatDuration(startUtc, endUtc, { short = false } = {}) {
   return `${h}${hUnit} ${m}${mUnit}`;
 }
 
+export function formatCountdown(targetMs, nowMs) {
+  const remainingMs = Math.max(0, targetMs - nowMs);
+  const totalSeconds = Math.floor(remainingMs / 1000);
+  const pad = (n) => String(n).padStart(2, '0');
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  return {
+    remainingMs,
+    display: `${pad(hours)}:${pad(minutes)}:${pad(seconds)}`,
+  };
+}
+
 /**
  * Converts a UTC timestamp (in milliseconds) to a user-friendly local date time string.
  * The output is DST sensitive and follows locale format without localization.

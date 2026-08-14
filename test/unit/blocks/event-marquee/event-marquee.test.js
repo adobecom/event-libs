@@ -1,4 +1,5 @@
 import { expect } from '@esm-bundle/chai';
+import sinon from 'sinon';
 import { readFile } from '@web/test-runner-commands';
 import { setEventConfig } from '../../../../event-libs/v1/utils/utils.js';
 import { sessions, favorited } from '../../../../event-libs/v1/utils/session-store.js';
@@ -47,6 +48,25 @@ function videoVariantHtml({
           </div>
           <div>
             <div class="milo-video"><iframe title="video"></iframe></div>
+          </div>
+        </div>
+      </div>
+      ${sectionMetadataHtml(metaRows)}
+    </div>
+  `;
+}
+
+function countdownVariantHtml({ countdownEndTime } = {}) {
+  const metaRows = {};
+  if (countdownEndTime !== undefined) metaRows['countdown-end-time'] = countdownEndTime;
+
+  return `
+    <div class="section">
+      <div class="event-marquee">
+        <div>
+          <div>
+            <h2>Featured content headline</h2>
+            <p>Body copy.</p>
           </div>
         </div>
       </div>
@@ -394,6 +414,125 @@ describe('event-marquee', () => {
       expect(wrapper.parentElement).to.equal(section);
       expect([...wrapper.children]).to.deep.equal([el, upcoming]);
       expect(section.querySelectorAll('.event-marquee-upcoming-wrapper').length).to.equal(1);
+    });
+  });
+
+  describe('Countdown', () => {
+    let el;
+    let fakeClock;
+
+    afterEach(() => {
+      el?._eventMarqueeCountdownStop?.();
+      fakeClock?.restore();
+      sinon.restore();
+    });
+
+    it('renders a label and clock when countdown-end-time is valid', async () => {
+      const target = new Date(Date.now() + 60_000).toISOString();
+      document.body.innerHTML = countdownVariantHtml({ countdownEndTime: target });
+      el = document.querySelector('.event-marquee');
+      await init(el);
+
+      const countdown = el.querySelector('.event-marquee-countdown');
+      expect(countdown).to.exist;
+      expect(countdown.querySelector('.event-marquee-countdown-label').textContent).to.equal('Session starts in:');
+      expect(countdown.querySelector('.event-marquee-countdown-clock').textContent).to.match(/^\d{2,}:\d{2}:\d{2}$/);
+    });
+
+    it('ticks the clock down over time', async () => {
+      fakeClock = sinon.useFakeTimers({
+        now: Date.now(), shouldAdvanceTime: false, shouldClearNativeTimers: true,
+      });
+      const target = new Date(fakeClock.now + 5000).toISOString();
+      document.body.innerHTML = countdownVariantHtml({ countdownEndTime: target });
+      el = document.querySelector('.event-marquee');
+      await init(el);
+
+      const clockEl = el.querySelector('.event-marquee-countdown-clock');
+      const initial = clockEl.textContent;
+      fakeClock.tick(1000);
+      expect(clockEl.textContent).to.not.equal(initial);
+    });
+
+    it('stops ticking once the countdown reaches zero', async () => {
+      fakeClock = sinon.useFakeTimers({
+        now: Date.now(), shouldAdvanceTime: false, shouldClearNativeTimers: true,
+      });
+      const target = new Date(fakeClock.now + 2000).toISOString();
+      document.body.innerHTML = countdownVariantHtml({ countdownEndTime: target });
+      el = document.querySelector('.event-marquee');
+      await init(el);
+
+      const clockEl = el.querySelector('.event-marquee-countdown-clock');
+      const clearIntervalSpy = sinon.spy(window, 'clearInterval');
+      fakeClock.tick(2000);
+      expect(clockEl.textContent).to.equal('00:00:00');
+      expect(clearIntervalSpy.calledOnce).to.be.true;
+
+      clearIntervalSpy.resetHistory();
+      fakeClock.tick(1000);
+      expect(clockEl.textContent).to.equal('00:00:00');
+      expect(clearIntervalSpy.called).to.be.false;
+    });
+
+    it('freezes at 00:00:00 and never starts an interval when the target has already passed', async () => {
+      const target = new Date(Date.now() - 5000).toISOString();
+      document.body.innerHTML = countdownVariantHtml({ countdownEndTime: target });
+      el = document.querySelector('.event-marquee');
+      const setIntervalSpy = sinon.spy(window, 'setInterval');
+      await init(el);
+
+      expect(el.querySelector('.event-marquee-countdown-clock').textContent).to.equal('00:00:00');
+      expect(setIntervalSpy.called).to.be.false;
+    });
+
+    it('does not render when countdown-end-time is not authored', async () => {
+      document.body.innerHTML = countdownVariantHtml();
+      el = document.querySelector('.event-marquee');
+      await init(el);
+      expect(el.querySelector('.event-marquee-countdown')).to.not.exist;
+    });
+
+    it('does not render when countdown-end-time is unparseable', async () => {
+      document.body.innerHTML = countdownVariantHtml({ countdownEndTime: 'not-a-date' });
+      el = document.querySelector('.event-marquee');
+      await init(el);
+      expect(el.querySelector('.event-marquee-countdown')).to.not.exist;
+    });
+
+    it('does not render when countdown-end-time omits a UTC/offset designator', async () => {
+      document.body.innerHTML = countdownVariantHtml({ countdownEndTime: '2026-08-20T18:00:00' });
+      el = document.querySelector('.event-marquee');
+      await init(el);
+      expect(el.querySelector('.event-marquee-countdown')).to.not.exist;
+    });
+
+    it('is idempotent across re-decoration with the same countdown — clears the prior interval, no duplicate nodes', async () => {
+      const target = new Date(Date.now() + 60_000).toISOString();
+      document.body.innerHTML = countdownVariantHtml({ countdownEndTime: target });
+      el = document.querySelector('.event-marquee');
+      await init(el);
+
+      const clearIntervalSpy = sinon.spy(window, 'clearInterval');
+      await init(el);
+
+      expect(clearIntervalSpy.calledOnce).to.be.true;
+      expect(el.querySelectorAll('.event-marquee-countdown').length).to.equal(1);
+    });
+
+    it('tears down the countdown when re-decoration removes the countdown-end-time metadata', async () => {
+      const target = new Date(Date.now() + 60_000).toISOString();
+      document.body.innerHTML = countdownVariantHtml({ countdownEndTime: target });
+      el = document.querySelector('.event-marquee');
+      await init(el);
+      expect(el.querySelector('.event-marquee-countdown')).to.exist;
+
+      const clearIntervalSpy = sinon.spy(window, 'clearInterval');
+      el.parentElement.querySelector('.section-metadata').remove();
+      await init(el);
+
+      expect(clearIntervalSpy.calledOnce).to.be.true;
+      expect(el.querySelector('.event-marquee-countdown')).to.not.exist;
     });
   });
 });

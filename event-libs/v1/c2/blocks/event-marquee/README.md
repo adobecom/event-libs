@@ -189,6 +189,7 @@ these. All are optional.
 | `favorite-enabled` | `true` / `false` | No | shows automatically when Video variant + `session-id` is set | Explicit override — set `false` to force-hide it |
 | `share-enabled` | `true` / `false` | No | `true` (Video variant only) | Explicit override — set `false` to hide the share icon |
 | `video-title` | free text | No | `''` (no title shown) | Rendered directly under the player, bold label-style text. Only shown when the asset is a recognized interactive player — same gating as Favorite/share |
+| `countdown-end-time` | an ISO 8601 datetime string, e.g. `2026-08-20T18:00:00Z` | No | none (no countdown shown) | Renders a "Session starts in:" label and a live HH:MM:SS clock counting down to this fixed instant, appended to the text column below the headline/body/CTAs. Same instant for every visitor regardless of their local timezone — no conversion applied. Freezes at `00:00:00` once passed; doesn't trigger any transition itself (Schedule Maker's own schedule handles swapping to the next fragment, independently authored) |
 
 Favorite/share only ever appear when the asset is a recognized interactive player —
 they don't render for the no-asset Text/CTA layout, or for a decorative image/ambient
@@ -285,6 +286,18 @@ comparisons are case-insensitive anyway.
 | --- | --- |
 | session-id | s-100 |
 | share-enabled | false |
+```
+
+**9. Text/CTA — countdown timer to a pre-launch moment**
+```
+| Event Marquee |  |
+| --- | --- |
+| ![](./background.jpg) |  |
+| ## Featured content headline<br>Lorem ipsum dolor sit amet consectetur. |  |
+
+| Section Metadata |  |
+| --- | --- |
+| countdown-end-time | 2026-08-20T18:00:00Z |
 ```
 
 ## Dev preview
