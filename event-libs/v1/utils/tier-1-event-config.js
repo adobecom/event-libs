@@ -16,8 +16,8 @@ function slugify(name) {
 }
 
 // Idempotent — safe to call multiple times; no-ops after the first successful init
-// and when the essential tier-1-event-config metadata is absent (mirrors
-// session-store.js's initSessionState() gate on rainfocus-api-url).
+// and when the tier-1-event-config metadata is absent (mirrors session-store.js's
+// initSessionState(), which self-gates on the same metadata).
 export function initTierOneEventConfig() {
   if (initialized) return;
   const raw = getMetadata('tier-1-event-config');

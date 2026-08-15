@@ -18,14 +18,13 @@ This doc shows how.
 ## Prerequisite: the store has to be bootstrapped
 
 `initSessionState()` is called automatically from `decorateEvent()`, before any block's own
-`init()` runs — you never call it yourself. It's a no-op unless the page has both:
+`init()` runs — you never call it yourself. It's a no-op unless the page has:
 
 ```html
-<meta name="tier-1-event-state-enabled" content="true">
 <meta name="tier-1-event-config" content='{"rfApiUrl":"...","rfProfileId":"..."}'>
 ```
 
-Without those, every signal stays at its default (`sessions.value` is `[]`, `auth.value.isLoggedIn`
+Without that, every signal stays at its default (`sessions.value` is `[]`, `auth.value.isLoggedIn`
 is `null`, etc.) — reads won't throw, but nothing populates.
 
 ## Reading state
