@@ -15,8 +15,8 @@ const ConfigsContext = createContext();
 // Scoped per config type — a Global row never carries configName or the Homepage session-
 // pick fields, and a Homepage row only ever carries the one field+meta pair its own type
 // owns (an Upcoming Sessions row has no unused homepageFeaturedSessions, and vice versa).
-// Global's own featuredSessions is unrelated to either Homepage field — see the comment
-// on HOMEPAGE_SESSION_FIELDS in constants.js.
+// There's no Global-level session-pick field at all — Session Guide's own "Recommended
+// Sessions" (session-guide-configurator's config) replaced it.
 function emptyConfig(configType = CONFIG_TYPES.GLOBAL) {
   if (isHomepageConfigType(configType)) {
     const { field, metaField } = HOMEPAGE_SESSION_FIELDS[configType];
@@ -33,7 +33,6 @@ function emptyConfig(configType = CONFIG_TYPES.GLOBAL) {
     overrideTrackIcons: { default: null, byText: {} },
     products: {},
     allowDoubleBooking: false,
-    featuredSessions: [],
     rfApiUrl: '',
     rfProfileId: '',
     registerUrl: '',

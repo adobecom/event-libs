@@ -73,7 +73,7 @@ export function LiveCard({ session, variant = 'live' }) {
 
   let primaryCta;
   if (sessionState === 'upcoming') {
-    if (variant === 'featured') {
+    if (variant === 'recommended') {
       primaryCta = html`<button
         class=${'sg-live-card__btn sg-live-card__btn--watch' + (isScheduled ? ' is-scheduled' : '') + (isPending ? ' is-pending' : '')}
         onclick=${handleSchedule}

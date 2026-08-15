@@ -4,7 +4,6 @@ import {
   getTrackIcon,
   getOverrideTrackIcon,
   getAllowDoubleBooking,
-  getFeaturedSessionIds,
 } from '../../../event-libs/v1/utils/tier-1-event-config.js';
 
 const CONFIG = {
@@ -19,7 +18,6 @@ const CONFIG = {
     },
   },
   allowDoubleBooking: true,
-  featuredSessions: ['session-b', 'session-a'],
 };
 
 describe('tier-1-event-config', () => {
@@ -64,14 +62,9 @@ describe('tier-1-event-config', () => {
     expect(getAllowDoubleBooking()).to.equal(true);
   });
 
-  it('reads featuredSessions off the same parsed config, preserving authored order', () => {
-    expect(getFeaturedSessionIds()).to.deep.equal(['session-b', 'session-a']);
-  });
-
   it('is idempotent — a second init() call does not re-parse or clear the config', () => {
     initTierOneEventConfig();
     expect(getTrackIcon('Social Media')).to.deep.equal({ icon: 'social-media', color: '#FF6B35' });
     expect(getAllowDoubleBooking()).to.equal(true);
-    expect(getFeaturedSessionIds()).to.deep.equal(['session-b', 'session-a']);
   });
 });

@@ -21,13 +21,16 @@ Edit instead of duplicating a row), the ESP event picker + session fetch
 why, and the automatic fallback to manual entry if it fails), the track
 icon/color editor (with save-blocking
 validation — a track can't be saved with only an icon or only a color set),
-the allow-double-booking toggle, and the featured-sessions picker
-(`FeaturedSessionsEditor.js` — search + track filter, each session's date/
-start time in its own venue timezone, add/remove, drag-and-drop reorder
-with a keyboard-operable fallback, writing a flat ordered `featuredSessions`
-array). All consuming-side wiring (MWPW-200314, separate branch/PR) is
-still open — see [MWPW-200314-HANDOFF.md](./MWPW-200314-HANDOFF.md) for the
-consolidated task list.
+and the allow-double-booking toggle. All consuming-side wiring (MWPW-200314,
+separate branch/PR) is still open — see
+[MWPW-200314-HANDOFF.md](./MWPW-200314-HANDOFF.md) for the consolidated task
+list.
+
+**No Global-level featured/recommended-sessions picker.** That concept moved
+to session-guide-configurator's own "Recommended Sessions" — Session Guide's
+carousel is its own app's concern, not this event-wide config's. `FeaturedSessionsEditor.js`
+(the picker/reorder component) still exists in this app, but only for the
+Homepage config types below.
 
 **Phase 2 scope note:** this app only adds the `allowDoubleBooking` boolean
 to the form/Config JSON. The consuming-side wiring (renaming
@@ -104,9 +107,9 @@ unchanged).
   OverrideTrackIconEditor render per row (a native `<select>` can't show an icon + name
   per option); also hosts `useIconSlugOptions()`, sourced entirely from federal's live
   `icons.json` inventory.
-- `components/FeaturedSessionsEditor.js` — featured-sessions picker: search +
-  track filter over the already-fetched session catalog, add/remove, ↑/↓
-  reorder into a flat ordered `featuredSessions` array.
+- `components/FeaturedSessionsEditor.js` — session picker: search + track filter
+  over the already-fetched session catalog, add/remove, ↑/↓ reorder into a flat
+  ordered array. Homepage config types only — see "Data model" below.
 - `components/Modal.js`, `components/SearchInput.js` — generic, ported from Schedule Maker.
 
 ## Data model
@@ -127,7 +130,6 @@ One shared DA sheet per content-repo at
     "trackIcons": { "Track Name": { "icon": "icon-slug", "color": "#RRGGBB" } },
     "products": { "Product Name": { "icon": "icon-slug", "pageUrl": "https://..." } },
     "allowDoubleBooking": true,
-    "featuredSessions": ["sessionId1", "sessionId2"],
     "rfApiUrl": "https://www.adobe.com/max-api/",
     "rfProfileId": "..."
   },
@@ -143,7 +145,7 @@ One shared DA sheet per content-repo at
 
 **`config.overrideTrackIcons` is one field, not two.** Shape: `{ default: {icon,color} | null, byText: { "override text": {icon,color} } }` — `byText` maps a specific Override Primary Event Site Track text to its own icon/color, `default` is the event-wide fallback for any text not mapped there. `getOverrideTrackIcon()` (`v1/utils/tier-1-event-config.js`) checks `byText` first, then `default`. Previously two separate top-level fields (`overrideTrackIcon`/`overrideTrackIcons`); merged so there's nowhere for the two to drift apart, without using a reserved sentinel key inside the map (which could collide with real author-typed override text).
 
-**`config.featuredSessions` (Global) vs `config.homepageFeaturedSessions` (Homepage-Featured-Sessions type) are unrelated fields, not a naming accident.** Global's `featuredSessions` is a pre-existing, Session-Guide-only concern — a flat ordered array of sessionIds, read via `getFeaturedSessionIds()` to drive Session Guide's own featured carousel (`LiveUpcomingView.js`/`OnDemandView.js`). `homepageFeaturedSessions`/`homepageFeaturedSessionsMeta` only exist on a Homepage-Featured-Sessions row, feed the card-c2 Featured Sessions homepage block instead, and are never read from `tier-1-event-config` metadata directly — only copy-pasted out via "Copy Featured Sessions JSON" into that block's own section-metadata.
+**`config.homepageFeaturedSessions`/`config.homepageFeaturedSessionsMeta` only exist on a Homepage-Featured-Sessions row** — feed the card-c2 Featured Sessions homepage block, and are never read from `tier-1-event-config` metadata directly, only copy-pasted out via "Copy Featured Sessions JSON" into that block's own section-metadata. There's no Global-level equivalent — Session Guide's own recommended-sessions carousel is authored in session-guide-configurator instead (see that app's README).
 
 `config` is the exact value an author copies into their event page's own
 `tier-1-event-config` metadata row — this app never touches the page itself.

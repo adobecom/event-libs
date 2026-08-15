@@ -215,25 +215,6 @@ export default function ConfigEditor() {
 
       ${!isHomepage && html`
         <section class="tec-editor__section">
-          <h2>Featured Sessions</h2>
-          <p class="tec-editor__section-hint">Sessions Session Guide's own featured carousel highlights. Part of the Config JSON below — saved with the rest of this event's config, not copied separately.</p>
-          ${isLoadingSessions && html`<${LoadingInline} label="Loading sessions…" />`}
-          ${!isLoadingSessions && !sessionsError && html`
-            <${FeaturedSessionsEditor}
-              sessions=${sessions}
-              sessionTimes=${sessionTimes}
-              tracks=${tracks}
-              featuredSessions=${activeConfig.config.featuredSessions}
-              onChange=${(next) => updateConfigField('featuredSessions', next)}
-              heading="Featured Sessions (display order)"
-              emptyHint="No sessions added yet — add some from the list on the right."
-            />
-          `}
-        </section>
-      `}
-
-      ${!isHomepage && html`
-        <section class="tec-editor__section">
           <h2>Track icons & colors</h2>
           <p class="tec-editor__section-hint">Icons pre-fill from the built-in defaults where known. Color always starts black — pick a color per track, or leave both icon and color unset to use the page's own built-in default at render time.</p>
           ${isLoadingSessions && html`<${LoadingInline} label="Loading tracks…" />`}

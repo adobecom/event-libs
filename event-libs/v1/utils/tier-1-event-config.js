@@ -3,7 +3,7 @@ import { getMetadata } from './utils.js';
 // Page-level bootstrap for the Tier 1 Event Configurator app's authored output (Config
 // JSON pasted into the `tier-1-event-config` metadata row). Read once during
 // decorateEvent, before any block's own init() runs, so any block on the page can call
-// getTrackIcon()/getAllowDoubleBooking()/getFeaturedSessionIds().
+// getTrackIcon()/getAllowDoubleBooking().
 let initialized = false;
 let tierOneEventConfig = {};
 
@@ -67,8 +67,4 @@ export function getProduct(productName) {
 
 export function getAllowDoubleBooking() {
   return !!tierOneEventConfig.allowDoubleBooking;
-}
-
-export function getFeaturedSessionIds() {
-  return tierOneEventConfig.featuredSessions || [];
 }

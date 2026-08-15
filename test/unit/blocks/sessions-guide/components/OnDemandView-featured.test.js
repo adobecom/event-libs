@@ -3,16 +3,15 @@ import * as preact from '../../../mocks/deps/htm-preact.js';
 import { buildStore } from '../../../../../event-libs/v1/blocks/sessions-guide/store/index.js';
 import { buildOnDemandView } from '../../../../../event-libs/v1/blocks/sessions-guide/components/OnDemandView.js';
 import { sessions, liveStreamActiveIds } from '../../../../../event-libs/v1/utils/session-store.js';
-import { initTierOneEventConfig } from '../../../../../event-libs/v1/utils/tier-1-event-config.js';
 
-// Separate file from OnDemandView.test.js: initTierOneEventConfig() only ever parses
-// metadata once per module instance, so featuredSessions has to be authored before any
-// other test in this file's module graph runs.
+// Separate file from OnDemandView.test.js, mirroring that file's own separation — keeps
+// the recommendedSessions-authored scenario isolated from the "nothing authored"
+// default-case tests.
 //
-// Order-preservation itself is covered directly against getOnDemandFeaturedSessions
+// Order-preservation itself is covered directly against getOnDemandRecommendedSessions
 // in session-filters.test.js — the mock htm-preact shim here only invokes a component
 // when it's the entire template (not nested inside a wrapping <div>, as Carousel is),
-// so these tests only verify the featured section is wired up and gated correctly,
+// so these tests only verify the recommended section is wired up and gated correctly,
 // not the card contents/order.
 function h(offsetHours) {
   return new Date(Date.now() + offsetHours * 3_600_000).toISOString();
@@ -33,7 +32,7 @@ const PAST_VIDEO = {
 
 const BASE_CONFIG = {
   userTz: 'America/Los_Angeles', surface: 'page',
-  title: '', filterCategories: [], theme: 'dark',
+  title: '', filterCategories: [], theme: 'dark', recommendedSessions: ['v-1', 'd-1'],
 };
 
 function makeStore(sessionList, activeFilters = {}) {
@@ -50,30 +49,22 @@ function makeStore(sessionList, activeFilters = {}) {
   return store;
 }
 
-describe('OnDemandView (featuredSessions authored)', () => {
-  before(() => {
-    const meta = document.createElement('meta');
-    meta.name = 'tier-1-event-config';
-    meta.content = JSON.stringify({ featuredSessions: ['v-1', 'd-1'] });
-    document.head.appendChild(meta);
-    initTierOneEventConfig();
-  });
-
-  it('renders a featured carousel section when a match exists', () => {
+describe('OnDemandView (recommendedSessions authored)', () => {
+  it('renders a recommended carousel section when a match exists', () => {
     const store = makeStore([PAST_DESIGN, PAST_VIDEO]);
     const View = buildOnDemandView(preact, store);
     const html = View({});
-    expect(html).to.include('sg-carousel-section--featured');
-    expect(html).to.include('Featured');
+    expect(html).to.include('sg-carousel-section--recommended');
+    expect(html).to.include('Recommended');
   });
 
-  it('ignores the viewer\'s active filters — featured is a curated list, not a filtered one', () => {
+  it('ignores the viewer\'s active filters — recommended is a curated list, not a filtered one', () => {
     // A track filter that excludes PAST_VIDEO from the byTrack grouping below must
-    // not remove the featured section above, since it's built from onDemandRaw,
+    // not remove the recommended section above, since it's built from onDemandRaw,
     // not the filtered `available` list.
     const store = makeStore([PAST_DESIGN, PAST_VIDEO], { track: new Set(['Design']) });
     const View = buildOnDemandView(preact, store);
     const html = View({});
-    expect(html).to.include('sg-carousel-section--featured');
+    expect(html).to.include('sg-carousel-section--recommended');
   });
 });

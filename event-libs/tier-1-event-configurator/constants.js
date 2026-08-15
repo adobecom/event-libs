@@ -31,11 +31,6 @@ function isHomepageConfigType(configType) {
 // truth for emptyConfig()/startDuplicateConfig()'s type-scoped shape. ConfigEditor.js's
 // own HOMEPAGE_FIELD_BY_TYPE layers UI-only labels/hints on top of these same field names,
 // rather than redeclaring them.
-//
-// Homepage Featured Sessions is deliberately named homepageFeaturedSessions, not
-// featuredSessions — Global configs already own a separate, pre-existing featuredSessions
-// field (Session Guide's own featured carousel, read via getFeaturedSessionIds() in
-// v1/utils/tier-1-event-config.js), an unrelated concern to this Homepage block's picks.
 const HOMEPAGE_SESSION_FIELDS = {
   [CONFIG_TYPES.HOMEPAGE_UPCOMING_SESSIONS]: { field: 'upcomingSessions', metaField: 'upcomingSessionsMeta' },
   [CONFIG_TYPES.HOMEPAGE_FEATURED_SESSIONS]: { field: 'homepageFeaturedSessions', metaField: 'homepageFeaturedSessionsMeta' },
