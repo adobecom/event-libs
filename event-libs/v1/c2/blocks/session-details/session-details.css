@@ -12,11 +12,39 @@
   margin-bottom: var(--s2a-spacing-8, 8px);
 }
 
+/* Eyebrow: track tags (left) + state-driven status (right). */
+.session-eyebrow {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--s2a-spacing-12, 12px);
+}
+
+.session-status {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s2a-spacing-8, 8px);
+  color: var(--s2a-color-gray-700, #505050);
+  font-size: var(--s2a-font-size-14, 0.875rem);
+  white-space: nowrap;
+}
+
+.session-status--live {
+  color: var(--s2a-color-gray-1000, #000);
+}
+
+.session-status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: var(--s2a-border-radius-999, 999px);
+  background: #e34850;
+}
+
 /* Action row: [ primary CTA (state engine) ] favorite · share. */
 .session-actions {
   display: flex;
   align-items: center;
-  gap: var(--s2a-spacing-8, 8px);
+  gap: var(--s2a-spacing-16, 16px);
 }
 
 .session-action {
@@ -26,7 +54,7 @@
   width: 40px;
   height: 40px;
   padding: 0;
-  border: 1px solid var(--s2a-color-gray-300, #cacaca);
+  border: 1px solid var(--s2a-color-gray-1000, #000);
   border-radius: var(--s2a-border-radius-999, 999px);
   background: none;
   color: var(--s2a-color-gray-1000, #000);
@@ -43,6 +71,41 @@
 }
 
 .session-action:focus-visible {
+  outline: 2px solid var(--s2a-color-gray-1000, #000);
+  outline-offset: 2px;
+}
+
+/* Leading primary CTA — dark pill (Add to schedule / Watch now). */
+.session-primary-cta:empty {
+  display: none;
+}
+
+.session-primary-cta-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s2a-spacing-8, 8px);
+  height: 40px;
+  padding-inline: var(--s2a-spacing-16, 16px);
+  border: 0;
+  border-radius: var(--s2a-border-radius-999, 999px);
+  background: var(--s2a-color-gray-1000, #000);
+  color: var(--s2a-color-gray-25, #fff);
+  font-size: var(--s2a-font-size-14, 0.875rem);
+  font-weight: 700;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.session-primary-cta-btn svg {
+  width: 18px;
+  height: 18px;
+}
+
+.session-primary-cta-btn:hover {
+  background: var(--s2a-color-gray-800, #292929);
+}
+
+.session-primary-cta-btn:focus-visible {
   outline: 2px solid var(--s2a-color-gray-1000, #000);
   outline-offset: 2px;
 }

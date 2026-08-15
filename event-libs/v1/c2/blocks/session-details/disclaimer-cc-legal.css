@@ -28,6 +28,12 @@
   color: #2c2c2c;
 }
 
+/* Closed captions show only in the On-Demand state (session-state-view toggles
+   [hidden]); the explicit display above would otherwise override [hidden]. */
+.session-closed-caption[hidden] {
+  display: none;
+}
+
 .session-cc-icon {
   display: inline-flex;
   flex: 0 0 auto;
