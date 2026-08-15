@@ -12,11 +12,8 @@ import { CONFIG_TYPES, HOMEPAGE_SESSION_FIELDS, isHomepageConfigType } from '../
 
 const ConfigsContext = createContext();
 
-// Scoped per config type — a Global row never carries configName or the Homepage session-
-// pick fields, and a Homepage row only ever carries the one field+meta pair its own type
-// owns (an Upcoming Sessions row has no unused homepageFeaturedSessions, and vice versa).
-// There's no Global-level session-pick field at all — Session Guide's own "Recommended
-// Sessions" (session-guide-configurator's config) replaced it.
+// Scoped per config type — a Global row never carries configName or Homepage session-pick
+// fields; each Homepage sub-type only carries its own field+meta pair.
 function emptyConfig(configType = CONFIG_TYPES.GLOBAL) {
   if (isHomepageConfigType(configType)) {
     const { field, metaField } = HOMEPAGE_SESSION_FIELDS[configType];
@@ -106,15 +103,10 @@ const ConfigsProvider = ({ children }) => {
     });
   }, []);
 
-  // Builds up from a fresh, type-scoped emptyConfig() rather than cloning the source
-  // config wholesale — only genuinely reusable style settings (trackIcons,
-  // overrideTrackIcons, products, allowDoubleBooking) carry forward, on the Global side
-  // only. Everything else (title, dates, RF credentials, Homepage session picks) is
-  // event-specific identity data that would silently mislabel/misroute the new event —
-  // or, for Homepage session picks, point at another event's sessions entirely — so it
-  // always starts blank. Duplicate keeps the source row's configType; it only retargets
-  // which event this is for. `eventServiceEnv` is the *new* pick's env, not the source
-  // row's — Duplicate can legitimately target a different tier than its source.
+  // Builds from a fresh, type-scoped emptyConfig() rather than cloning wholesale — only
+  // reusable style settings (trackIcons, overrideTrackIcons, products, allowDoubleBooking)
+  // carry forward, Global only. Everything else is event-specific identity data (title,
+  // dates, RF credentials, session picks) that would mislabel/misroute the new event.
   const startDuplicateConfig = useCallback((sourceRow, event, eventServiceEnv) => {
     const configType = sourceRow.configType || CONFIG_TYPES.GLOBAL;
     const sourceConfig = sourceRow.config || {};

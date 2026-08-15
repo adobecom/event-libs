@@ -18,16 +18,10 @@ function DragHandleIcon() {
   `;
 }
 
-// Pointer-based drag reorder, same implementation as the Tier 1 Event Configurator's
-// FeaturedSessionsEditor.js (no meta-field overrides here — Session Guide already has
-// full session data itself, unlike the homepage blocks this was originally built for).
-//
-// Tracks pointermove/up on window, not via setPointerCapture on the handle — capture
-// doesn't survive the handle's DOM node moving mid-drag (which happens every reorder
-// swap), so it was ending drags after one swap.
-//
-// Assumes every row is the same height: the dragged row's target slot is arithmetic on
-// the pointer delta, and other rows FLIP-animate into place.
+// Pointer-based drag reorder — same as Tier 1's FeaturedSessionsEditor.js, minus
+// meta-field overrides (Session Guide already has full session data itself). Tracks
+// pointermove/up on window rather than pointer capture, which doesn't survive the
+// handle's DOM node moving mid-drag.
 export default function RecommendedSessionsEditor({
   sessions, sessionTimes, tracks, recommendedSessions, onChange,
 }) {
