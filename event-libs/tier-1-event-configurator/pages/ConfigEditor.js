@@ -319,7 +319,7 @@ export default function ConfigEditor() {
 
         <section class="tec-editor__section">
           <h2>Config JSON</h2>
-          <p class="tec-editor__section-hint">This is what gets saved to the row, and what you'll paste into the page's <code>tier-1-event-config</code> metadata after saving.</p>
+          <p class="tec-editor__section-hint">This is what gets saved to the row, and what you'll paste into the page's <strong><code>tier-1-event-config</code></strong> metadata after saving.</p>
           <pre class="tec-editor__config-preview">${configPreview}</pre>
           <button type="button" class="tec-btn tec-btn--outline" onClick=${handleCopy}>Copy config</button>
         </section>
