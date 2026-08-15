@@ -234,14 +234,6 @@ export default function ConfigEditor() {
           />
           Enable Watch Now CTAs
         </label>
-        <label class="sgc-editor__checkbox">
-          <input
-            type="checkbox"
-            checked=${!!activeConfig.config.behaviorFlags.enableBrandConciergeRibbon}
-            onChange=${(e) => updateNestedConfigField('behaviorFlags', 'enableBrandConciergeRibbon', e.target.checked)}
-          />
-          Enable Brand Concierge Ribbon
-        </label>
         <p class="sgc-editor__section-hint">Allowing double-booking of overlapping sessions is set at the event level via the linked Tier 1 config, not here.</p>
       </section>
 

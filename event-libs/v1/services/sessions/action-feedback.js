@@ -100,8 +100,8 @@ const GATED_VIEW_LABELS = { 'my-sessions': 'My sessions', 'my-favorites': 'My fa
 // during the event, On demand once isPostEvent() (shared with the auto-transition below).
 function fallbackViewForUnauthorized() {
   if (sessionsStatus.value !== 'ready' || !sessions.value.length) return 'live-upcoming';
-  const manualCutoff = getApiConfig()?.manualCutoff;
-  return isPostEvent(sessions.value, liveStreamActiveIds.value, getNowMs(), manualCutoff)
+  const eventEndMs = getApiConfig()?.eventEndMs;
+  return isPostEvent(sessions.value, liveStreamActiveIds.value, getNowMs(), eventEndMs)
     ? 'on-demand'
     : 'live-upcoming';
 }
