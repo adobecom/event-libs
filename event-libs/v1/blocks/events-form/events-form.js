@@ -916,19 +916,15 @@ async function addConsentSuite(form) {
   }
 }
 
-function addTerms(form, terms) {
+export function addTerms(form, terms) {
   if (!terms || terms.textContent === '') return;
   const submitWrapper = form.querySelector('.events-form-submit-wrapper');
   const termsWrapper = createTag('div', { class: 'field-wrapper events-form-full-width event-terms-wrapper' });
   const termsTexts = terms.querySelectorAll('p');
   const lis = terms.querySelectorAll('li');
 
-  termsTexts.forEach((t, i) => {
+  termsTexts.forEach((t) => {
     termsWrapper.append(t);
-
-    if (i === 1) {
-      t.remove();
-    }
   });
 
   lis.forEach((li) => {
