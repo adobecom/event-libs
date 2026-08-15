@@ -54,6 +54,11 @@ describe('parse-config/filterCategories', () => {
     expect(config.filterCategories).to.deep.equal([]);
   });
 
+  it('falls back to an empty array when filterCategories is present but not an array', () => {
+    const config = parseSessionsGuideConfig(elWithConfig({ filterCategories: { attributeId: 'attr-audience' } }));
+    expect(config.filterCategories).to.deep.equal([]);
+  });
+
   it('no longer exposes a separate authoredFilterCategories field', () => {
     const config = parseSessionsGuideConfig(elWithConfig({
       filterCategories: [{ attributeId: 'attr-audience', label: 'Audience', displayName: 'Audience', enabled: true }],

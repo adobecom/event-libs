@@ -36,10 +36,11 @@ export function parseSessionsGuideConfig(el, { logPrefix, forcedSurface } = {}) 
     surface,
     theme,
     userTz: detectUserTimezone(),
-    // No authored config, or every category disabled, both naturally yield [] — which
-    // FilterPanel.js already renders as no panel at all (filters are opt-in, not
-    // defaulted).
-    filterCategories: authored.filterCategories
+    // No authored config, every category disabled, or a malformed (non-array)
+    // filterCategories value all naturally yield [] — which FilterPanel.js already
+    // renders as no panel at all (filters are opt-in, not defaulted) — rather than
+    // throwing out of the whole parse on a corrupted/hand-edited config.
+    filterCategories: Array.isArray(authored.filterCategories)
       ? mapAuthoredFilterCategories(authored.filterCategories)
       : [],
     headings: authored.headings,
