@@ -101,15 +101,12 @@
   cursor: pointer;
 }
 
-.speakers-toggle::after {
-  content: '';
-  width: 6px;
-  aspect-ratio: 2 / 1;
-  background-color: currentcolor;
-  mask: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='8'%20height='5'%20viewBox='0%200%208%205'%20fill='none'%3E%3Cpath%20d='M1%201L4%204L7%201'%20stroke='black'%20stroke-width='2'%20stroke-linecap='round'%20stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat center / contain;
+.speakers-toggle svg {
+  width: 8px;
+  height: 5px;
   transition: transform 0.2s ease;
 }
 
-.speakers-toggle[aria-expanded="true"]::after {
+.speakers-toggle[aria-expanded="true"] svg {
   transform: rotate(180deg);
 }

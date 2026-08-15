@@ -12,6 +12,41 @@
   margin-bottom: var(--s2a-spacing-8, 8px);
 }
 
+/* Action row: [ primary CTA (state engine) ] favorite · share. */
+.session-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--s2a-spacing-8, 8px);
+}
+
+.session-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: 1px solid var(--s2a-color-gray-300, #cacaca);
+  border-radius: var(--s2a-border-radius-999, 999px);
+  background: none;
+  color: var(--s2a-color-gray-1000, #000);
+  cursor: pointer;
+}
+
+.session-action svg {
+  width: 20px;
+  height: 20px;
+}
+
+.session-action:hover {
+  background: var(--s2a-color-gray-100, #e9e9e9);
+}
+
+.session-action:focus-visible {
+  outline: 2px solid var(--s2a-color-gray-1000, #000);
+  outline-offset: 2px;
+}
+
 .session-details .session-title {
   margin: 0;
   color: var(--s2a-color-gray-1000, #000);

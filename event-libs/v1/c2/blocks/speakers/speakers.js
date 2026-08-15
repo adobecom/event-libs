@@ -15,6 +15,9 @@ import { getJsonMetadata } from '../../utils/custom-attributes.js';
 
 const MOBILE_LIMIT = 5;
 
+// Chevron next to the toggle label; rotates 180° when expanded (see CSS).
+const CHEVRON_ICON = '<svg xmlns="http://www.w3.org/2000/svg" width="8" height="5" viewBox="0 0 8 5" fill="none" aria-hidden="true"><path d="M1 1L4 4L7 1" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+
 const fullName = (s) => [s.firstName, s.lastName].filter(Boolean).join(' ').trim();
 const roleLine = (s) => [s.title, s.company].filter(Boolean).join(', ');
 const photoUrl = (s) => s.photo?.imageUrl || s.photoURL || '';
@@ -63,11 +66,14 @@ export default async function init(el) {
   if (speakers.length > MOBILE_LIMIT) {
     const toggle = createTag('button', {
       class: 'speakers-toggle', type: 'button', 'aria-expanded': 'false',
-    }, 'Show more');
+    });
+    const label = createTag('span', {}, 'Show more');
+    toggle.append(label);
+    toggle.insertAdjacentHTML('beforeend', CHEVRON_ICON);
     toggle.addEventListener('click', () => {
       const expanded = el.classList.toggle('is-expanded');
       toggle.setAttribute('aria-expanded', String(expanded));
-      toggle.textContent = expanded ? 'Show less' : 'Show more';
+      label.textContent = expanded ? 'Show less' : 'Show more';
     });
     el.append(toggle);
   }

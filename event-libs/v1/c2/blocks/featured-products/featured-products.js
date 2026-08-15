@@ -17,10 +17,15 @@ import { getAttrValues } from '../../utils/custom-attributes.js';
 import { getProduct, initTierOneEventConfig } from '../../../utils/tier-1-event-config.js';
 import { fetchFederalProductIcon } from '../../../features/icons/federal-icons.js';
 
+// Shows up to 6 before truncating. NOTE: the ticket says mobile 4 / desktop 6,
+// but Figma appears to show 6 on desktop too — confirm actual behavior with Kat
+// before finalizing (and whether it's responsive). Holding at 6 for now.
 const VISIBLE_LIMIT = 6;
 // Diagonal "open in new" arrow — Figma glyph (10x10). fill: currentColor so CSS
 // drives the color (var(--s2a-color-gray-600) per the design).
 const ARROW_ICON = '<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden="true"><path d="M8.57198 0.710938H3.57198C3.17718 0.710938 2.8577 1.03042 2.8577 1.42522C2.8577 1.82003 3.17718 2.13951 3.57198 2.13951H6.84765L0.924104 8.06306C0.64509 8.34207 0.64509 8.79409 0.924104 9.0731C1.06361 9.21261 1.24637 9.28237 1.42913 9.28237C1.61188 9.28237 1.79464 9.21261 1.93415 9.0731L7.8577 3.14955V6.42522C7.8577 6.82003 8.17718 7.13951 8.57198 7.13951C8.96679 7.13951 9.28627 6.82003 9.28627 6.42522V1.42522C9.28627 1.03042 8.96679 0.710938 8.57198 0.710938Z" fill="currentColor"/></svg>';
+// Chevron next to the toggle label; rotates 180° when expanded (see CSS).
+const CHEVRON_ICON = '<svg xmlns="http://www.w3.org/2000/svg" width="8" height="5" viewBox="0 0 8 5" fill="none" aria-hidden="true"><path d="M1 1L4 4L7 1" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 
 async function paintProductIcon(slot, iconName) {
   if (!iconName) return;
@@ -76,11 +81,14 @@ export default async function init(el) {
   if (products.length > VISIBLE_LIMIT) {
     const toggle = createTag('button', {
       class: 'featured-products-toggle', type: 'button', 'aria-expanded': 'false',
-    }, 'Show more');
+    });
+    const label = createTag('span', {}, 'Show more');
+    toggle.append(label);
+    toggle.insertAdjacentHTML('beforeend', CHEVRON_ICON);
     toggle.addEventListener('click', () => {
       const expanded = el.classList.toggle('is-expanded');
       toggle.setAttribute('aria-expanded', String(expanded));
-      toggle.textContent = expanded ? 'Show less' : 'Show more';
+      label.textContent = expanded ? 'Show less' : 'Show more';
     });
     el.append(toggle);
   }

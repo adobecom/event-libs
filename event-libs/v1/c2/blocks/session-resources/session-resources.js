@@ -15,6 +15,8 @@ import { getJsonMetadata } from '../../utils/custom-attributes.js';
 
 const MOBILE_LIMIT = 2;
 const DOWNLOADABLE = /\.(pdf|zip|pptx?|docx?|xlsx?|key|psd|ai|indd|mp4|mov)(\?|$)/i;
+// Chevron next to the toggle label; rotates 180° when expanded (see CSS).
+const CHEVRON_ICON = '<svg xmlns="http://www.w3.org/2000/svg" width="8" height="5" viewBox="0 0 8 5" fill="none" aria-hidden="true"><path d="M1 1L4 4L7 1" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 
 const ctaLabel = (m) => (DOWNLOADABLE.test(m.fileURL || '') ? 'Download' : 'Open');
 
@@ -50,11 +52,14 @@ export default async function init(el) {
   if (published.length > MOBILE_LIMIT) {
     const toggle = createTag('button', {
       class: 'session-resources-toggle', type: 'button', 'aria-expanded': 'false',
-    }, 'Show more');
+    });
+    const label = createTag('span', {}, 'Show more');
+    toggle.append(label);
+    toggle.insertAdjacentHTML('beforeend', CHEVRON_ICON);
     toggle.addEventListener('click', () => {
       const expanded = el.classList.toggle('is-expanded');
       toggle.setAttribute('aria-expanded', String(expanded));
-      toggle.textContent = expanded ? 'Show less' : 'Show more';
+      label.textContent = expanded ? 'Show less' : 'Show more';
     });
     el.append(toggle);
   }

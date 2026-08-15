@@ -9,6 +9,9 @@
  */
 import { createTag, getMetadata } from '../../../utils/utils.js';
 
+// Chevron next to the toggle label; rotates 180° when expanded (see CSS).
+const CHEVRON_ICON = '<svg xmlns="http://www.w3.org/2000/svg" width="8" height="5" viewBox="0 0 8 5" fill="none" aria-hidden="true"><path d="M1 1L4 4L7 1" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+
 export function renderDescriptionClamp(doc = document) {
   const text = (getMetadata('description', doc) || '').trim();
   if (!text) return null;
@@ -20,12 +23,15 @@ export function renderDescriptionClamp(doc = document) {
     class: 'session-description-toggle',
     type: 'button',
     'aria-expanded': 'false',
-  }, 'Show more');
+  });
+  const label = createTag('span', {}, 'Show more');
+  toggle.append(label);
+  toggle.insertAdjacentHTML('beforeend', CHEVRON_ICON);
   toggle.hidden = true;
   toggle.addEventListener('click', () => {
     const expanded = el.classList.toggle('is-expanded');
     toggle.setAttribute('aria-expanded', String(expanded));
-    toggle.textContent = expanded ? 'Show less' : 'Show more';
+    label.textContent = expanded ? 'Show less' : 'Show more';
   });
 
   el.append(body, toggle);

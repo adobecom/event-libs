@@ -16,7 +16,8 @@ import { renderTrackTags } from './track-tags.js';
 import { renderGdprCopy, renderClosedCaption, renderLegalDisclaimer } from './disclaimer-cc-legal.js';
 import { renderDescriptionClamp } from './description-clamp.js';
 import { renderQuickFacts } from './quick-facts.js';
-// import { renderShare } from './share.js';
+import { renderShare } from './share.js';
+import { renderFavorite } from './favorite.js';
 
 export default async function init(el) {
   el.replaceChildren();
@@ -39,7 +40,17 @@ export default async function init(el) {
   const closedCaption = renderClosedCaption();
   if (closedCaption) el.append(closedCaption);
 
-  // [ CTA row mounts here with the state engine ]
+  // Action row: favorite + share (persistent across all states). The state
+  // engine prepends the primary CTA (Watch now / Add to schedule) here as the
+  // leading item.
+  const favorite = renderFavorite();
+  const share = renderShare();
+  if (favorite || share) {
+    const actions = createTag('div', { class: 'session-actions' });
+    if (favorite) actions.append(favorite);
+    if (share) actions.append(share);
+    el.append(actions);
+  }
 
   // Abstract: description -> quick-fact tags -> legal disclaimer.
   const description = renderDescriptionClamp();
