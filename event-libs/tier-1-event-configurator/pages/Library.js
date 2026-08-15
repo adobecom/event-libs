@@ -183,8 +183,16 @@ export default function Library() {
     // Minified, not stringifyConfig's pretty-printed form: DA joins a metadata cell's
     // multi-line content back with ", ", corrupting multi-line JSON with stray commas.
     const ok = await copyTextToClipboard(JSON.stringify(row.config));
-    if (ok) setToastSuccess(`Copied config for ${getDisplayTitle(row)}`);
-    else setToastError('Could not copy config — copy it manually from the editor instead');
+    if (!ok) {
+      setToastError('Could not copy config — copy it manually from the editor instead');
+      return;
+    }
+    // Homepage rows aren't pasted into tier-1-event-config — they're copy-pasted via the
+    // editor's own "Copy <type> JSON" button into that block's section-metadata instead.
+    const destination = isHomepageConfigType(row.configType)
+      ? ''
+      : ' — paste it into the page\'s tier-1-event-config metadata';
+    setToastSuccess(`Copied config for ${getDisplayTitle(row)}${destination}`);
   }, [setToastSuccess, setToastError]);
 
   const confirmDelete = useCallback(async () => {
