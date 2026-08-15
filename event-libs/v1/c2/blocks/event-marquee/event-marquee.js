@@ -48,8 +48,8 @@ async function getSectionConfig(el, miloLibs) {
   if (metadata['video-title']) config.videoTitle = metadata['video-title'].content[0]?.textContent.trim() || '';
   if (metadata['countdown-end-time-millis']) {
     const raw = metadata['countdown-end-time-millis'].content[0]?.textContent.trim() || '';
-    const parsed = parseInt(raw, 10);
-    if (raw && !Number.isNaN(parsed)) {
+    const parsed = Number(raw);
+    if (raw && Number.isFinite(parsed)) {
       config.countdownEndTime = parsed;
     } else if (raw) {
       window.lana?.log(`[event-marquee] invalid countdown-end-time-millis: ${raw}`);

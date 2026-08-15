@@ -510,6 +510,29 @@ describe('event-marquee', () => {
       expect(el.querySelector('.event-marquee-countdown')).to.not.exist;
     });
 
+    it('does not render when countdown-end-time-millis has trailing garbage after the number', async () => {
+      document.body.innerHTML = countdownVariantHtml({ countdownEndTimeMillis: `${Date.now() + 60_000}ms` });
+      el = document.querySelector('.event-marquee');
+      await init(el);
+      expect(el.querySelector('.event-marquee-countdown')).to.not.exist;
+    });
+
+    it('rebuilds with a new target and resumes ticking when re-decoration changes the countdown value', async () => {
+      const pastTarget = Date.now() - 5000;
+      document.body.innerHTML = countdownVariantHtml({ countdownEndTimeMillis: pastTarget });
+      el = document.querySelector('.event-marquee');
+      await init(el);
+      expect(el.querySelector('.event-marquee-countdown-clock').textContent).to.equal('00:00:00');
+
+      const futureTarget = Date.now() + 60_000;
+      el.parentElement.querySelector('.section-metadata div div').nextElementSibling.textContent = String(futureTarget);
+      const setIntervalSpy = sinon.spy(window, 'setInterval');
+      await init(el);
+
+      expect(el.querySelector('.event-marquee-countdown-clock').textContent).to.not.equal('00:00:00');
+      expect(setIntervalSpy.calledOnce).to.be.true;
+    });
+
     it('is idempotent across re-decoration with the same countdown — clears the prior interval, no duplicate nodes', async () => {
       const target = Date.now() + 60_000;
       document.body.innerHTML = countdownVariantHtml({ countdownEndTimeMillis: target });
