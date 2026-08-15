@@ -2,6 +2,7 @@ import { html, useState, useComputed, useEffect, useRef } from '../../../../deps
 import { useSessionGuide } from '../store/index.js';
 import { sessions } from '../../../../utils/session-store.js';
 import { trapFocus } from '../utils/focus-trap.js';
+import { getFilterValue } from '../utils/session-filters.js';
 
 export function FilterPanel({ onClose }) {
   const { state, dispatch } = useSessionGuide();
@@ -33,7 +34,7 @@ export function FilterPanel({ onClose }) {
     filterCategories.forEach(({ id }) => {
       const values = new Set();
       sessions.value.forEach((s) => {
-        const v = s[id];
+        const v = getFilterValue(s, id);
         if (Array.isArray(v)) v.forEach((x) => x && values.add(x));
         else if (v) values.add(v);
       });

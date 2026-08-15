@@ -2,7 +2,7 @@ import { expect } from '@esm-bundle/chai';
 import {
   sessionsForDay, groupByStartTime, groupByTrack, resolveTrackBadge,
   liveSessions, upcomingSessions, onDemandSessions, getRecommendedSessions,
-  getOnDemandRecommendedSessions,
+  getOnDemandRecommendedSessions, getFilterValue, filterSessions,
 } from '../../../../../../event-libs/v1/c2/blocks/sessions-guide/utils/session-filters.js';
 import { getSessionDayKey } from '../../../../../../event-libs/v1/c2/blocks/sessions-guide/utils/time.js';
 
@@ -182,6 +182,64 @@ describe('session-filters/getOnDemandRecommendedSessions', () => {
 
   it('returns an empty array when no recommendedIds are provided', () => {
     expect(getOnDemandRecommendedSessions([LIVE, UPCOMING], [])).to.deep.equal([]);
+  });
+});
+
+describe('session-filters/getFilterValue', () => {
+  it('reads a legacy flat field when there is no matching customAttributeValues entry', () => {
+    const s = { track: 'Design', customAttributeValues: {} };
+    expect(getFilterValue(s, 'track')).to.equal('Design');
+  });
+
+  it('prefers customAttributeValues over a same-named flat field when both exist', () => {
+    const s = { track: 'Design', customAttributeValues: { track: ['Video'] } };
+    expect(getFilterValue(s, 'track')).to.deep.equal(['Video']);
+  });
+
+  it('resolves an authored attributeId with no flat-field counterpart (e.g. Region)', () => {
+    const s = { customAttributeValues: { 'attr-region': ['AMER'] } };
+    expect(getFilterValue(s, 'attr-region')).to.deep.equal(['AMER']);
+  });
+
+  it('returns undefined when neither source has the category', () => {
+    const s = { customAttributeValues: {} };
+    expect(getFilterValue(s, 'nonexistent')).to.be.undefined;
+  });
+});
+
+describe('session-filters/filterSessions', () => {
+  const sessions = [
+    { id: 'a', track: 'Design', type: 'Keynote' },
+    { id: 'b', track: 'Video', type: 'Lab', customAttributeValues: { 'attr-audience': ['Developer'] } },
+    { id: 'c', track: 'Video', type: 'Keynote', customAttributeValues: { 'attr-audience': ['Marketer'] } },
+  ];
+
+  it('filters by a legacy flat-field category (track)', () => {
+    const result = filterSessions(sessions, { track: new Set(['Video']) });
+    expect(result.map((s) => s.id)).to.deep.equal(['b', 'c']);
+  });
+
+  it('filters by an authored attributeId category resolved via customAttributeValues', () => {
+    const result = filterSessions(sessions, { 'attr-audience': new Set(['Developer']) });
+    expect(result.map((s) => s.id)).to.deep.equal(['b']);
+  });
+
+  it('ANDs across categories, ORs within a category — mixing legacy and attributeId categories', () => {
+    const result = filterSessions(sessions, {
+      track: new Set(['Video']),
+      'attr-audience': new Set(['Marketer']),
+    });
+    expect(result.map((s) => s.id)).to.deep.equal(['c']);
+  });
+
+  it('ignores a category with an empty value Set', () => {
+    const result = filterSessions(sessions, { track: new Set() });
+    expect(result.map((s) => s.id)).to.deep.equal(['a', 'b', 'c']);
+  });
+
+  it('returns everything unfiltered when activeFilters is empty/absent', () => {
+    expect(filterSessions(sessions, {}).length).to.equal(3);
+    expect(filterSessions(sessions, null).length).to.equal(3);
   });
 });
 

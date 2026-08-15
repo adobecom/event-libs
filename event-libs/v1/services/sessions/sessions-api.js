@@ -52,6 +52,7 @@ export function normalizeSessions(rawSessions) {
     sessionPageUrl: s.sessionPageUrl || '',
     isKeynote: Boolean(s.isKeynote),
     thumbnailUrl: s.thumbnailUrl ?? null,
+    customAttributeValues: s.customAttributeValues || {},
     ...(s.copyrightDisclaimer ? { copyrightDisclaimer: s.copyrightDisclaimer } : {}),
   }));
 }
@@ -165,6 +166,22 @@ function extractCustomAttributeValue(session, name) {
   return extractCustomAttributeValues(session, name)[0] || '';
 }
 
+// Generic attributeId-keyed map of every filterable customAttribute on a session, built
+// straight from the raw payload rather than a hand-named whitelist — so any attribute the
+// Session Guide Configurator's FiltersEditor.js offers (via deriveFacetableAttributes())
+// resolves here automatically, with no per-field mapping needed as new ones get authored.
+// Same single-select/multi-select + enabled guard deriveFacetableAttributes() applies, so
+// this only ever contains attributes that could actually be authored as a filter category.
+function buildCustomAttributeValueMap(session) {
+  const map = {};
+  (session.customAttributes || []).forEach((attr) => {
+    if (attr.enabled === false) return;
+    if (!['single-select', 'multi-select'].includes(attr.inputType)) return;
+    map[attr.attributeId] = (attr.values || []).map((v) => v?.label ?? v?.value).filter(Boolean);
+  });
+  return map;
+}
+
 // `sessions[].url` is an internal drafts/staging link, not usable as a production page
 // URL — but its last path segment is exactly the slug we want.
 function slugFromUrl(url) {
@@ -250,6 +267,7 @@ export function mapEslPayloadToRawSessions(payload) {
       // (resources still in development backend-side; video/stream data is deliberately
       // withheld from this public endpoint until the session goes live). normalizeSessions()
       // defaults both to empty/null.
+      customAttributeValues: buildCustomAttributeValueMap(session),
     };
   });
 }

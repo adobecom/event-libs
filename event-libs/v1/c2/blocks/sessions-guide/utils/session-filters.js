@@ -146,6 +146,16 @@ function deterministicShuffle(arr, seed) {
   return result;
 }
 
+// Every authored filter category's id is an ESP attributeId, resolved against
+// customAttributeValues. The flat-field fallback (session[categoryId]) is kept for any
+// category id that isn't attributeId-keyed, so a plain session field still works if one's
+// ever passed directly — nothing currently does, since the old hardcoded track/type
+// defaults were retired.
+export function getFilterValue(session, categoryId) {
+  const v = session.customAttributeValues?.[categoryId];
+  return v !== undefined ? v : session[categoryId];
+}
+
 /**
  * Apply activeFilters + searchQuery to a session list.
  * activeFilters: { [categoryId]: Set<string> }
@@ -158,7 +168,7 @@ export function filterSessions(sessions, activeFilters, searchQuery) {
     Object.entries(activeFilters).forEach(([category, values]) => {
       if (!values || values.size === 0) return;
       result = result.filter((s) => {
-        const v = s[category];
+        const v = getFilterValue(s, category);
         if (Array.isArray(v)) return v.some((item) => values.has(item));
         return values.has(v);
       });

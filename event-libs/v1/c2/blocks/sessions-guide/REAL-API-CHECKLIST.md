@@ -4,7 +4,9 @@ Remove or replace every item below once real IMS login and Rainfocus registratio
 
 > **Note (MWPW-199065):** the dev-mock scaffolding and the Rainfocus/Mobile Rider/sessions services all moved out of this block into shared, page-level modules (`event-libs/v1/utils/session-store.js` and `event-libs/v1/services/sessions/`) so other blocks on the same page can read the same session/auth state. The steps below reference the new locations.
 
-> **Status (MWPW-200311, 2026-08-04):** items 1, 2, 4, and 7 are done — real IMS profile + a real jwt-exchanged `rfAuthToken` now drive every Rainfocus call, with the dev-mock localStorage scaffolding fully removed. Item 3 is superseded: `rainfocus-api-url`/`rainfocus-api-profile-id` no longer live in separate flat metadata — they're `rfApiUrl`/`rfProfileId` fields inside the Tier 1 Event Configurator's single `tier-1-event-config` JSON payload instead (`tier-1-event-state-enabled` is still required, unchanged). Items 5–6 (Mobile Rider, sessions API) remain open.
+> **Status (MWPW-200311, 2026-08-04):** items 1, 2, 4, and 7 are done — real IMS profile + a real jwt-exchanged `rfAuthToken` now drive every Rainfocus call, with the dev-mock localStorage scaffolding fully removed. Item 3 is superseded: `rainfocus-api-url`/`rainfocus-api-profile-id` no longer live in separate flat metadata — they're `rfApiUrl`/`rfProfileId` fields inside the Tier 1 Event Configurator's single `tier-1-event-config` JSON payload instead. Item 6 is done. Item 5 (Mobile Rider) remains open.
+>
+> **Update (MWPW-200314):** the standalone `tier-1-event-state-enabled` opt-in flag referenced below was retired — the shared store now gates on `tier-1-event-config` metadata being present instead (see item 3).
 
 ---
 
@@ -73,13 +75,7 @@ After removal, `syncAuth()` falls through directly to reading `imsProfile` and `
 
 These already live in page metadata (not this block's authoring table) so the shared bootstrap can start fetching before any block mounts — just point them at the real Rainfocus endpoint/profile once it exists. `register-url` now lives in the Tier 1 Event Configurator instead of flat metadata (see the status note above); `manual-on-demand-transition-time` metadata is gone entirely — post-event state is driven solely by the Tier 1 Event Configurator's `eventEndDateTime` (`getApiConfig().eventEndMs`, consumed by `isPostEvent()` in `session-state.js`).
 
-**Also required:** `tier-1-event-state-enabled` metadata, checked in `decorateEvent()` (`event-libs/v1/utils/decorate.js`) *before* `initSessionState()` is even called:
-
-```html
-<meta name="tier-1-event-state-enabled" content="true">
-```
-
-`event-id` alone is already authored on prod event pages for unrelated purposes, so gating the shared session-store bootstrap on it alone would seed mock data on pages that don't want it. Pages that actually want the sessions-guide store must opt in with both `tier-1-event-state-enabled="true"` and `rainfocus-api-url`.
+**Also required:** `tier-1-event-config` metadata — `decorateEvent()` (`event-libs/v1/utils/decorate.js`) gates both `initTierOneEventConfig()` and `initSessionState()` on it being present, so pages must author that config before the shared store bootstraps at all. (The standalone `tier-1-event-state-enabled` opt-in flag this section used to describe was retired — presence of `tier-1-event-config` is the gate now.)
 
 ---
 

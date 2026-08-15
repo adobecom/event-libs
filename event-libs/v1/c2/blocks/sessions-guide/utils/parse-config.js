@@ -1,19 +1,22 @@
 import { detectUserTimezone } from './time.js';
 
-// Legacy fallback for FilterPanel.js, which indexes sessions by category id, not by
-// ESP attributeId; the authored categories are exposed separately as authoredFilterCategories.
-const DEFAULT_FILTER_CATEGORIES = [
-  { id: 'track', label: 'Channel' },
-  { id: 'type', label: 'Session Type' },
-];
+// Session Guide Configurator's authored filterCategories entries — { attributeId, label,
+// displayName, enabled } — map to FilterPanel.js's { id, label } shape; `id` becomes the
+// attributeId, which session-filters.js's getFilterValue() resolves against each
+// session's customAttributeValues map. Disabled entries are dropped; array order is
+// preserved as display order.
+function mapAuthoredFilterCategories(authoredCategories) {
+  return authoredCategories
+    .filter((c) => c.enabled !== false)
+    .map((c) => ({ id: c.attributeId, label: c.displayName || c.label }));
+}
 
 // Config comes solely from the data-session-guide-config attribute decorate.js sets
 // (decoded via parseEncodedConfig); there is no authoring-table path.
 // headings (DrawerHeader.js), behaviorFlags (behavior-flags.js's isBehaviorEnabled(),
 // read by LiveCard/SessionCard/SessionDetailOverlay), swimlaneOrder (groupByTrack()'s
-// callers), and recommendedSessions (LiveUpcomingView.js/OnDemandView.js) are all
-// consumed. authoredFilterCategories still isn't — filterCategories remains the legacy
-// id-based fallback below until FilterPanel.js is rewired onto it.
+// callers), recommendedSessions (LiveUpcomingView.js/OnDemandView.js), and
+// filterCategories (FilterPanel.js/session-filters.js) are all consumed.
 export function parseSessionsGuideConfig(el, { logPrefix, forcedSurface } = {}) {
   let authored = {};
   try {
@@ -33,11 +36,15 @@ export function parseSessionsGuideConfig(el, { logPrefix, forcedSurface } = {}) 
     surface,
     theme,
     userTz: detectUserTimezone(),
-    filterCategories: DEFAULT_FILTER_CATEGORIES,
+    // No authored config, or every category disabled, both naturally yield [] — which
+    // FilterPanel.js already renders as no panel at all (filters are opt-in, not
+    // defaulted).
+    filterCategories: authored.filterCategories
+      ? mapAuthoredFilterCategories(authored.filterCategories)
+      : [],
     headings: authored.headings,
     behaviorFlags: authored.behaviorFlags,
     swimlaneOrder: authored.swimlaneOrder,
-    authoredFilterCategories: authored.filterCategories,
     recommendedSessions: authored.recommendedSessions,
   };
 }
