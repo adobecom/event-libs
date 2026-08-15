@@ -159,5 +159,65 @@ describe('utils/da-sheet-controller', () => {
       expect(payload.homepage).to.deep.equal(homepageSheet);
       expect(payload.data.data).to.deep.equal([{ eventId: 'existing', config: '{}' }, { eventId: 'new', config: '{}' }]);
     });
+
+    // Regression coverage for a real bug: without knownSheetNames, the very first write to
+    // a second sheet name (while the file doesn't exist yet, or is still single-sheet-shaped
+    // from an earlier first-ever write to a *different* sheet name) wrote a plain
+    // single-sheet document instead of a multi-sheet one — permanently collapsing every
+    // sheet into one shared, ambiguous pool that every later read of any sheet name
+    // returned identically, forever (the file never became properly multi-sheet on its own).
+    describe('knownSheetNames', () => {
+      it('creates a proper multi-sheet document on the very first write ever, not a plain single-sheet one', async () => {
+        window.fetch = async (url, options) => {
+          lastRequest = { url, options };
+          if ((options.method || 'GET') === 'GET') {
+            return {
+              ok: false, status: 404, headers: new Headers(), text: async () => 'not found',
+            };
+          }
+          return { ok: true, status: 200, headers: new Headers({ ETag: '"v1"' }) };
+        };
+        const result = await mutateSheet(
+          'org',
+          'repo',
+          '/path.json',
+          (rows) => ({ rows: [...rows, { eventId: 'a', configType: 'global' }], result: null }),
+          'data',
+          ['data', 'homepage'],
+        );
+        expect(result.ok).to.be.true;
+        const blob = lastRequest.options.body.get('data');
+        const payload = JSON.parse(await blob.text());
+        expect(payload[':type']).to.equal('multi-sheet');
+        expect(payload[':names']).to.deep.equal(['data', 'homepage']);
+        expect(payload.data.data).to.deep.equal([{ eventId: 'a', configType: 'global', config: '{}' }]);
+        expect(payload.homepage).to.deep.equal({
+          total: 0, limit: 0, offset: 0, data: [],
+        });
+      });
+
+      it('does not clobber an already-populated sheet when writing the first row of a different one', async () => {
+        const homepageSheet = { total: 1, limit: 1, offset: 0, data: [{ eventId: 'existing-homepage', configType: 'homepage-upcoming-sessions' }] };
+        stubFetch({
+          ':type': 'multi-sheet',
+          ':names': ['data', 'homepage'],
+          ':version': 3,
+          data: { total: 0, limit: 0, offset: 0, data: [] },
+          homepage: homepageSheet,
+        });
+        await mutateSheet(
+          'org',
+          'repo',
+          '/path.json',
+          (rows) => ({ rows: [...rows, { eventId: 'a', configType: 'global' }], result: null }),
+          'data',
+          ['data', 'homepage'],
+        );
+        const blob = lastRequest.options.body.get('data');
+        const payload = JSON.parse(await blob.text());
+        expect(payload.homepage).to.deep.equal(homepageSheet);
+        expect(payload.data.data).to.deep.equal([{ eventId: 'a', configType: 'global', config: '{}' }]);
+      });
+    });
   });
 });

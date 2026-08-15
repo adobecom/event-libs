@@ -22,10 +22,10 @@ function emptyConfig() {
       enableScheduling: true,
       enableFavoriting: true,
       enableWatchNowCtas: true,
-      enableBrandConciergeRibbon: true,
     },
     filterCategories: [],
     swimlaneOrder: [],
+    recommendedSessions: [],
   };
 }
 

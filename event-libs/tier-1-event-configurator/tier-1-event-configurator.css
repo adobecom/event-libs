@@ -72,6 +72,42 @@
   -webkit-font-smoothing: antialiased;
 }
 
+.tec-app-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 0 var(--tec-spacing-lg);
+  background: var(--tec-color-surface);
+  border-bottom: 1px solid var(--tec-color-border);
+}
+
+.tec-app-tab {
+  appearance: none;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  padding: 14px 4px;
+  margin: 0 var(--tec-spacing-sm);
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--tec-color-text-secondary);
+  cursor: pointer;
+}
+
+.tec-app-tab:hover {
+  color: var(--tec-color-text-primary);
+}
+
+.tec-app-tab:focus-visible {
+  outline: 2px solid var(--tec-color-primary);
+  outline-offset: 2px;
+}
+
+.tec-app-tab--active {
+  color: var(--tec-color-text-primary);
+  border-bottom-color: var(--tec-color-primary);
+}
+
 .tec-loading,
 .tec-error {
   display: flex;
@@ -1089,4 +1125,339 @@ select.tec-field {
   background: rgb(250 250 250 / 90%);
   backdrop-filter: blur(6px);
   border-top: 1px solid var(--tec-color-border);
+}
+
+/* Library — grouped by config type (Global / Homepage) */
+
+.tec-library__group {
+  margin-bottom: var(--tec-spacing-xl);
+  padding-bottom: var(--tec-spacing-lg);
+  border-bottom: 1px solid var(--tec-color-border);
+}
+
+.tec-library__group:last-of-type {
+  border-bottom: none;
+}
+
+.tec-library__group-header {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--tec-spacing-md);
+  margin-bottom: var(--tec-spacing-md);
+}
+
+.tec-library__group-icon {
+  font-size: 20px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.tec-library__group-heading {
+  flex: 1;
+  min-width: 0;
+}
+
+.tec-library__group-heading h2 {
+  display: flex;
+  align-items: center;
+  gap: var(--tec-spacing-sm);
+  margin: 0 0 4px;
+  font-size: 17px;
+}
+
+.tec-library__group-desc {
+  margin: 0;
+  color: var(--tec-color-text-secondary);
+  font-size: 13px;
+}
+
+.tec-library__group-badge {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  padding: 2px 10px;
+  border-radius: 999px;
+}
+
+.tec-library__group-badge--global {
+  background: #e5f1fd;
+  color: var(--tec-color-primary);
+}
+
+.tec-library__group-badge--homepage {
+  background: var(--tec-color-success-bg);
+  color: var(--tec-color-success);
+}
+
+.tec-library__item-type {
+  flex-shrink: 0;
+  background: var(--tec-color-surface-hover);
+  color: var(--tec-color-text-secondary);
+  border: 1px solid var(--tec-color-border);
+  border-radius: 999px;
+  padding: 1px 8px;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.tec-library__new-menu {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.tec-library__new-menu-list {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 4px);
+  z-index: 10;
+  background: var(--tec-color-surface);
+  border: 1px solid var(--tec-color-border);
+  border-radius: var(--tec-border-radius);
+  box-shadow: var(--tec-shadow-sm);
+  min-width: 180px;
+  overflow: hidden;
+}
+
+.tec-library__new-menu-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: var(--tec-spacing-sm) var(--tec-spacing-md);
+  background: none;
+  border: none;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.tec-library__new-menu-item:hover {
+  background: var(--tec-color-surface-hover);
+}
+
+.tec-library__how-differ {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--tec-spacing-md);
+  padding: var(--tec-spacing-md);
+  background: var(--tec-color-surface-hover);
+  border: 1px solid var(--tec-color-border);
+  border-radius: var(--tec-border-radius);
+}
+
+.tec-library__how-differ p {
+  margin: 4px 0 0;
+  color: var(--tec-color-text-secondary);
+  font-size: 13px;
+}
+
+/* Per-session Watch URL / Mobile Rider stream ID / Image overrides — see
+   MOBILE-RIDER-STREAM-ID-GAP.md for why these are hand-authored here rather
+   than sourced from the ESP session catalog. */
+
+.tec-featured-editor__meta-fields {
+  display: flex;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.tec-featured-editor__meta-field {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+}
+
+.tec-featured-editor__thumb {
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+  object-fit: cover;
+  border-radius: var(--tec-border-radius-sm);
+  border: 1px solid var(--tec-color-border);
+}
+
+.tec-field--s {
+  flex: 1;
+  min-width: 0;
+  padding: 4px 8px;
+  font-size: 12px;
+}
+
+/* ==========================================================================
+    DA Folder Browser + Image Upload (ImagePickerModal)
+   ========================================================================== */
+
+.tec-fb-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tec-spacing-sm);
+}
+
+.tec-fb-error {
+  background-color: var(--tec-color-error-bg);
+  color: var(--tec-color-error);
+  padding: var(--tec-spacing-sm) var(--tec-spacing-md);
+  border-radius: var(--tec-border-radius-sm);
+  font-size: 14px;
+}
+
+.tec-fb-columns {
+  display: flex;
+  height: 320px;
+  overflow-x: auto;
+  border: 1px solid var(--tec-color-border);
+  border-radius: var(--tec-border-radius-sm);
+  min-height: 0;
+}
+
+.tec-fb-column {
+  min-width: 200px;
+  border-right: 1px solid var(--tec-color-border);
+  overflow-y: auto;
+  flex-shrink: 0;
+}
+
+.tec-fb-column:last-child { border-right: none; }
+
+.tec-fb-column--loading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: var(--tec-spacing-lg);
+}
+
+.tec-fb-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--tec-color-text-primary);
+  user-select: none;
+}
+
+.tec-fb-item:hover { background-color: var(--tec-color-surface-hover); }
+
+.tec-fb-item--active {
+  background-color: var(--tec-color-primary);
+  color: var(--tec-color-on-primary);
+}
+
+.tec-fb-item-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tec-fb-item-chevron {
+  margin-left: auto;
+  opacity: 0.4;
+  font-size: 16px;
+}
+
+.tec-fb-breadcrumbs {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 2px;
+  padding: 6px 0;
+  font-size: 12px;
+  color: var(--tec-color-text-secondary);
+  border-top: 1px solid var(--tec-color-border);
+}
+
+.tec-fb-breadcrumb-sep {
+  color: var(--tec-color-text-placeholder);
+  padding: 0 2px;
+}
+
+.tec-fb-breadcrumb-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: 3px;
+  font-size: 12px;
+  color: var(--tec-color-primary);
+}
+
+.tec-fb-breadcrumb-btn:hover { background-color: var(--tec-color-surface-hover); }
+
+.tec-fb-breadcrumb-btn--current {
+  color: var(--tec-color-text-primary);
+  cursor: default;
+}
+
+.tec-fb-breadcrumb-btn:disabled { cursor: default; }
+
+.tec-fb-add-folder {
+  display: flex;
+  gap: var(--tec-spacing-sm);
+  align-items: center;
+}
+
+.tec-fb-selected-path {
+  display: flex;
+  align-items: center;
+  gap: var(--tec-spacing-sm);
+  padding: 6px 0;
+  font-size: 13px;
+  border-top: 1px solid var(--tec-color-border);
+}
+
+.tec-fb-selected-label {
+  font-weight: 600;
+  color: var(--tec-color-text-secondary);
+}
+
+.tec-fb-selected-value {
+  color: var(--tec-color-text-primary);
+  word-break: break-all;
+}
+
+.tec-fb-actions {
+  display: flex;
+  gap: var(--tec-spacing-md);
+  justify-content: flex-end;
+  padding-top: var(--tec-spacing-sm);
+}
+
+.tec-fb-image-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+  gap: var(--tec-spacing-sm);
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.tec-fb-image-thumb {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: var(--tec-spacing-xs);
+  border: 1px solid var(--tec-color-border);
+  border-radius: var(--tec-border-radius-sm);
+  background: none;
+  cursor: pointer;
+}
+
+.tec-fb-image-thumb:hover { background-color: var(--tec-color-surface-hover); }
+
+.tec-fb-image-thumb img {
+  width: 100%;
+  height: 70px;
+  object-fit: cover;
+  border-radius: var(--tec-border-radius-sm);
+}
+
+.tec-fb-image-thumb-name {
+  font-size: 12px;
+  color: var(--tec-color-text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
 }

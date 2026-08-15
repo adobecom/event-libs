@@ -8,20 +8,28 @@ import {
 } from '../scripts/da-controller.js';
 import { useDA } from './DAContext.js';
 import { getDisplayTitle } from '../utils.js';
+import { CONFIG_TYPES, HOMEPAGE_SESSION_FIELDS, isHomepageConfigType } from '../constants.js';
 
 const ConfigsContext = createContext();
 
-function emptyConfig() {
+// Scoped per config type — a Global row never carries configName or Homepage session-pick
+// fields; each Homepage sub-type only carries its own field+meta pair.
+function emptyConfig(configType = CONFIG_TYPES.GLOBAL) {
+  if (isHomepageConfigType(configType)) {
+    const { field, metaField } = HOMEPAGE_SESSION_FIELDS[configType];
+    return { configName: '', [field]: [], [metaField]: {} };
+  }
   return {
     eventTitle: '',
     eventStartDateTime: null,
     eventEndDateTime: null,
     trackIcons: {},
-    overrideTrackIcon: null,
-    overrideTrackIcons: {},
+    // default: the event-wide fallback for any override text not mapped in byText.
+    // One field (not two) so there's nowhere for the two to drift apart, and no
+    // author-typed override text can collide with a reserved sentinel key.
+    overrideTrackIcons: { default: null, byText: {} },
     products: {},
     allowDoubleBooking: false,
-    featuredSessions: [],
     rfApiUrl: '',
     rfProfileId: '',
     registerUrl: '',
@@ -64,59 +72,59 @@ const ConfigsProvider = ({ children }) => {
     if (org && repo && !hasLoaded) loadConfigs();
   }, [org, repo, hasLoaded, loadConfigs]);
 
+  // Rows are keyed on (eventId, configType) together — the same event can
+  // carry a Global row plus separate Homepage rows (Upcoming Sessions,
+  // Featured Sessions) side by side. Absent configType means Global, for
+  // rows saved before this field existed.
   const findConfigByEventId = useCallback(
-    (eventId) => configs.find((c) => c.eventId === eventId) || null,
+    (eventId, configType = CONFIG_TYPES.GLOBAL) => configs.find(
+      (c) => c.eventId === eventId && (c.configType || CONFIG_TYPES.GLOBAL) === configType,
+    ) || null,
     [configs],
   );
 
-  // Starts a fresh row for a newly picked event. Dedup (routing to Edit when a
-  // row already exists for the picked event) is the picker's responsibility —
-  // see PLAN.md Phase 4 — so this always assumes no prior row. `eventServiceEnv`
-  // is whatever ESP tier was active when the event was picked (Library.js
-  // reads it from EventEnvContext) — row-level only, never pasted into the
-  // page's Config, since it's purely an authoring-time detail of where this
-  // event's data came from, re-applied automatically when the row is edited
-  // later (see Library.js's openEdit) so a session-catalog refetch doesn't
-  // silently default back to prod after a page reload resets the override.
-  const startNewConfig = useCallback((event, eventServiceEnv) => {
+  // Starts a fresh row for a newly picked event + config type. Dedup (routing
+  // to Edit when a row already exists for the picked event+type) is the
+  // picker's responsibility — see PLAN.md Phase 4 — so this always assumes no
+  // prior row. `eventServiceEnv` is whatever ESP tier was active when the
+  // event was picked (Library.js reads it from EventEnvContext) — row-level
+  // only, never pasted into the page's Config, since it's purely an
+  // authoring-time detail of where this event's data came from, re-applied
+  // automatically when the row is edited later (see Library.js's openEdit) so
+  // a session-catalog refetch doesn't silently default back to prod after a
+  // page reload resets the override.
+  const startNewConfig = useCallback((event, eventServiceEnv, configType = CONFIG_TYPES.GLOBAL) => {
     setActiveConfig({
       eventId: event.eventId,
       backendEventTitle: event.enTitle || event.eventId,
       eventServiceEnv,
-      config: emptyConfig(),
+      configType,
+      config: emptyConfig(configType),
     });
   }, []);
 
-  // Clones an existing row's config onto a newly picked Event ID. App-stamped
-  // identity fields (eventId/backendEventTitle/updated) are dropped rather
-  // than carried over stale — upsertConfig re-stamps them at save time.
-  // eventTitle (the author's alternative title) is also reset — it names the
-  // source event specifically, not a generic style setting like trackIcons,
-  // so carrying it over would silently mislabel the new event.
-  // `eventServiceEnv` is the *new* pick's env, not the source row's —
-  // Duplicate can legitimately target a different tier than its source.
-  // rfApiUrl/rfProfileId/registerUrl always reset blank — reusing another event's RF
-  // profile id or registration page would misroute this event's live schedule/favorites
-  // calls or send attendees to register for the wrong event. eventStartDateTime/
-  // eventEndDateTime reset the same way — a new event has its own dates.
+  // Builds from a fresh, type-scoped emptyConfig() rather than cloning wholesale — only
+  // reusable style settings (trackIcons, overrideTrackIcons, products, allowDoubleBooking)
+  // carry forward, Global only. Everything else is event-specific identity data (title,
+  // dates, RF credentials, session picks) that would mislabel/misroute the new event.
   const startDuplicateConfig = useCallback((sourceRow, event, eventServiceEnv) => {
-    const clonedConfig = { ...sourceRow.config };
-    delete clonedConfig.eventId;
-    delete clonedConfig.backendEventTitle;
-    delete clonedConfig.updated;
+    const configType = sourceRow.configType || CONFIG_TYPES.GLOBAL;
+    const sourceConfig = sourceRow.config || {};
+    const config = isHomepageConfigType(configType)
+      ? emptyConfig(configType)
+      : {
+        ...emptyConfig(configType),
+        trackIcons: sourceConfig.trackIcons || {},
+        overrideTrackIcons: sourceConfig.overrideTrackIcons || { default: null, byText: {} },
+        products: sourceConfig.products || {},
+        allowDoubleBooking: !!sourceConfig.allowDoubleBooking,
+      };
     setActiveConfig({
       eventId: event.eventId,
       backendEventTitle: event.enTitle || event.eventId,
       eventServiceEnv,
-      config: {
-        ...clonedConfig,
-        eventTitle: '',
-        eventStartDateTime: null,
-        eventEndDateTime: null,
-        rfApiUrl: '',
-        rfProfileId: '',
-        registerUrl: '',
-      },
+      configType,
+      config,
     });
   }, []);
 
@@ -146,17 +154,41 @@ const ConfigsProvider = ({ children }) => {
   }, []);
 
   // Same merge pattern as updateTrackIcon, keyed by override text instead of track name —
-  // each distinct text an author has typed is its own swimlane, with its own entry.
+  // each distinct text an author has typed is its own swimlane, with its own entry under
+  // overrideTrackIcons.byText.
   const updateOverrideTrackIcon = useCallback((overrideText, updates) => {
     setActiveConfig((prev) => {
       if (!prev) return prev;
+      const override = prev.config.overrideTrackIcons || {};
       return {
         ...prev,
         config: {
           ...prev.config,
           overrideTrackIcons: {
-            ...prev.config.overrideTrackIcons,
-            [overrideText]: { ...prev.config.overrideTrackIcons?.[overrideText], ...updates },
+            ...override,
+            byText: {
+              ...override.byText,
+              [overrideText]: { ...override.byText?.[overrideText], ...updates },
+            },
+          },
+        },
+      };
+    });
+  }, []);
+
+  // Merges { icon, color } updates into overrideTrackIcons.default — the event-wide
+  // fallback applied to any override text not specifically mapped above.
+  const updateOverrideDefaultIcon = useCallback((updates) => {
+    setActiveConfig((prev) => {
+      if (!prev) return prev;
+      const override = prev.config.overrideTrackIcons || {};
+      return {
+        ...prev,
+        config: {
+          ...prev.config,
+          overrideTrackIcons: {
+            ...override,
+            default: { ...override.default, ...updates },
           },
         },
       };
@@ -198,7 +230,10 @@ const ConfigsProvider = ({ children }) => {
       return result;
     }
     setConfigs((prev) => {
-      const idx = prev.findIndex((r) => r.eventId === result.data.eventId);
+      const savedType = result.data.configType || CONFIG_TYPES.GLOBAL;
+      const idx = prev.findIndex(
+        (r) => r.eventId === result.data.eventId && (r.configType || CONFIG_TYPES.GLOBAL) === savedType,
+      );
       if (idx === -1) return [result.data, ...prev];
       const next = [...prev];
       next[idx] = result.data;
@@ -209,14 +244,16 @@ const ConfigsProvider = ({ children }) => {
     return result;
   }, [activeConfig, org, repo]);
 
-  const removeConfig = useCallback(async (eventId) => {
+  const removeConfig = useCallback(async (eventId, configType = CONFIG_TYPES.GLOBAL) => {
     if (!org || !repo) return { ok: false };
-    const result = await deleteConfigController(org, repo, eventId);
+    const result = await deleteConfigController(org, repo, eventId, configType);
     if (!result.ok) {
       setToastError(result.error || 'Failed to delete — please retry');
       return result;
     }
-    setConfigs((prev) => prev.filter((r) => r.eventId !== eventId));
+    setConfigs((prev) => prev.filter(
+      (r) => !(r.eventId === eventId && (r.configType || CONFIG_TYPES.GLOBAL) === configType),
+    ));
     setToastSuccess('Config deleted');
     return result;
   }, [org, repo]);
@@ -242,6 +279,7 @@ const ConfigsProvider = ({ children }) => {
     clearActiveConfig,
     updateTrackIcon,
     updateOverrideTrackIcon,
+    updateOverrideDefaultIcon,
     updateProduct,
     updateConfigField,
     saveActiveConfig,

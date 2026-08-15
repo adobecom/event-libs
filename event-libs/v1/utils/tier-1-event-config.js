@@ -3,7 +3,7 @@ import { getMetadata } from './utils.js';
 // Page-level bootstrap for the Tier 1 Event Configurator app's authored output (Config
 // JSON pasted into the `tier-1-event-config` metadata row). Read once during
 // decorateEvent, before any block's own init() runs, so any block on the page can call
-// getTrackIcon()/getAllowDoubleBooking()/getFeaturedSessionIds().
+// getTrackIcon()/getAllowDoubleBooking().
 let initialized = false;
 let tierOneEventConfig = {};
 
@@ -16,8 +16,8 @@ function slugify(name) {
 }
 
 // Idempotent — safe to call multiple times; no-ops after the first successful init
-// and when the essential tier-1-event-config metadata is absent (mirrors
-// session-store.js's initSessionState() gate on rainfocus-api-url).
+// and when the tier-1-event-config metadata is absent (mirrors session-store.js's
+// initSessionState(), which self-gates on the same metadata).
 export function initTierOneEventConfig() {
   if (initialized) return;
   const raw = getMetadata('tier-1-event-config');
@@ -45,13 +45,14 @@ export function getTrackIcon(trackName) {
   return trackIcons[trackName] || trackIcons[slug] || null;
 }
 
-// Each distinct override text is its own swimlane — overrideTrackIcons maps a specific
-// text to its own icon/color, overrideTrackIcon (singular) is the event-wide default for
-// any text not yet mapped. Returns null, not a guaranteed object, when neither is
-// authored — callers apply DEFAULT_ICON_COLOR themselves (see resolveTrackBadge).
+// Each distinct override text is its own swimlane — overrideTrackIcons.byText maps a
+// specific text to its own icon/color, overrideTrackIcons.default is the event-wide
+// fallback for any text not yet mapped. Returns null, not a guaranteed object, when
+// neither is authored — callers apply DEFAULT_ICON_COLOR themselves (see resolveTrackBadge).
 export function getOverrideTrackIcon(overrideText) {
-  const perTextIcons = tierOneEventConfig.overrideTrackIcons || {};
-  return perTextIcons[overrideText] || tierOneEventConfig.overrideTrackIcon || null;
+  const override = tierOneEventConfig.overrideTrackIcons || {};
+  const byText = override.byText || {};
+  return byText[overrideText] || override.default || null;
 }
 
 // Returns { icon, pageUrl } for a product, or null. No built-in default map (unlike
@@ -66,8 +67,4 @@ export function getProduct(productName) {
 
 export function getAllowDoubleBooking() {
   return !!tierOneEventConfig.allowDoubleBooking;
-}
-
-export function getFeaturedSessionIds() {
-  return tierOneEventConfig.featuredSessions || [];
 }

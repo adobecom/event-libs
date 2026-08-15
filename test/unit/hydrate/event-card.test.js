@@ -180,18 +180,50 @@ describe('event-card hydrator', () => {
     expect(block.dataset.sessionId).to.be.undefined;
   });
 
-  it('does nothing when there is no session-code class', async () => {
+  it('clones one card per item when no session-code class is authored, indexed by array position', async () => {
+    document.body.innerHTML = `
+      <div class="event-card hydrate featured-sessions ratio-16-9">
+        <div><div>[[imageUrl]]</div></div>
+        <div><div>
+          <p>[[enTitle]]</p>
+          <p>[[track]]</p>
+          <p><a href="${encodeURIComponent('[[url]]')}">CTA</a></p>
+        </div></div>
+      </div>
+    `;
+
+    await hydrateBlocks(document);
+
+    const cards = [...document.querySelectorAll('.event-card')];
+    expect(cards).to.have.lengthOf(3);
+    cards.forEach((card, index) => {
+      expect(tokensIn(card)).to.deep.equal([
+        `featured-sessions:${index}.imageUrl`,
+        `featured-sessions:${index}.enTitle`,
+        `featured-sessions:${index}.track`,
+        `featured-sessions:${index}.url`,
+      ]);
+      expect(card.querySelector('a').getAttribute('href')).to.equal(`[[featured-sessions:${index}.url]]`);
+    });
+    expect(cards[0].dataset.sessionId).to.equal('1c2f7e9a-3b4d-4e21-9a6f-6d1f1a2b3c4d');
+    expect(cards[1].dataset.sessionId).to.equal('5f7a0b1c-5d8f-4a54-9d9c-0a5b5e6f7a8b');
+    expect(cards[1].dataset.mrStreamId).to.equal('mr-stream-s6522');
+    expect(cards[2].dataset.sessionId).to.equal('0d646e37-b0e9-4d86-9dab-927ccb37f04e');
+  });
+
+  it('leaves the template card alone (no crash, no clones) when the metadata array is empty', async () => {
+    setMetadata('featured-sessions', JSON.stringify([]));
     document.body.innerHTML = `
       <div class="event-card hydrate featured-sessions">
-        <div><div><picture><img src="/media/none.jpg" alt=""></picture></div></div>
         ${AUTHORED_CONTENT}
       </div>
     `;
 
     await hydrateBlocks(document);
 
-    const block = document.querySelector('.event-card');
-    expect(tokensIn(block)).to.deep.equal([
+    const cards = [...document.querySelectorAll('.event-card')];
+    expect(cards).to.have.lengthOf(1);
+    expect(tokensIn(cards[0])).to.deep.equal([
       'featured-sessions.enTitle',
       'featured-sessions.track',
     ]);
