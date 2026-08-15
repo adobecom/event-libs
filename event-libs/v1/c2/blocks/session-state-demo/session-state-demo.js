@@ -1,15 +1,16 @@
-import { createTag } from '../../utils/utils.js';
+import { createTag } from '../../../utils/utils.js';
 import {
   sessions, sessionsStatus, favorited, scheduled, auth, pendingActions,
-  liveStreamActiveIds, sessionStateVersion,
-} from '../../utils/session-store.js';
-import { toggleFavoriteWithFeedback } from '../../services/sessions/action-feedback.js';
-import { deriveSessionState, getNowMs } from '../../utils/session-state.js';
+  liveStreamActiveIds, sessionStateVersion, sessionGuideRequest, getApiConfig,
+  openSessionGuideDetail,
+} from '../../../utils/session-store.js';
+import { toggleFavoriteWithFeedback, toggleScheduleWithFeedback } from '../../../services/sessions/action-feedback.js';
+import { deriveSessionState, getNowMs } from '../../../utils/session-state.js';
 
-// Reference implementation for SHARED-STATE-USAGE.md's vanilla-JS pattern — reads the
-// page-level session-store signals and mutates them through action-feedback.js, with
-// no Preact dependency. Not authored on any real event page.
-const DEMO_EVENT_CONFIG = { registerUrl: '/register' };
+// Reference implementation for SHARED-STATE-USAGE.md's patterns — reads the page-level
+// session-store signals and mutates them through action-feedback.js/openSessionGuideDetail(),
+// with no Preact dependency. Not authored on any real event page. eventConfig is
+// getApiConfig() itself, same object any other block would forward — not a demo-only shape.
 
 function renderRow(parent, label) {
   const row = createTag('p', { class: 'session-state-demo__row' }, '', { parent });
@@ -28,6 +29,7 @@ export default async function init(el) {
   const loggedInValue = renderRow(el, 'Logged in');
   const registeredValue = renderRow(el, 'Registered');
   const firstSessionStateValue = renderRow(el, 'First session state');
+  const sessionGuideRequestValue = renderRow(el, 'Session guide request');
 
   sessionsStatus.subscribe((status) => { statusValue.textContent = status; });
   sessions.subscribe((list) => { countValue.textContent = String(list.length); });
@@ -36,6 +38,12 @@ export default async function init(el) {
   auth.subscribe(({ isLoggedIn, isRegistered }) => {
     loggedInValue.textContent = String(isLoggedIn);
     registeredValue.textContent = String(isRegistered);
+  });
+  // No-ops if sessions-guide isn't also mounted on the page (see openSessionGuideDetail's
+  // own doc comment) — this row still reflects the request signal firing either way, so
+  // the demo is visibly meaningful even standalone.
+  sessionGuideRequest.subscribe((request) => {
+    sessionGuideRequestValue.textContent = request ? request.sessionId : 'none';
   });
 
   // sessionStateVersion only fires when a session's upcoming/live/on-demand bucket
@@ -51,7 +59,7 @@ export default async function init(el) {
 
   const favoriteBtn = createTag(
     'button',
-    { type: 'button', class: 'session-state-demo__favorite-btn' },
+    { type: 'button', class: 'session-state-demo__btn session-state-demo__btn--favorite' },
     'Favorite first session',
     { parent: el },
   );
@@ -59,8 +67,35 @@ export default async function init(el) {
     const [firstSession] = sessions.value;
     if (!firstSession || pendingActions.value.has(firstSession.id)) return;
     toggleFavoriteWithFeedback(firstSession, {
-      eventConfig: DEMO_EVENT_CONFIG,
+      eventConfig: getApiConfig() || {},
       isFavorited: favorited.value.has(firstSession.id),
     });
+  });
+
+  const scheduleBtn = createTag(
+    'button',
+    { type: 'button', class: 'session-state-demo__btn session-state-demo__btn--schedule' },
+    'Schedule first session',
+    { parent: el },
+  );
+  scheduleBtn.addEventListener('click', () => {
+    const [firstSession] = sessions.value;
+    if (!firstSession || pendingActions.value.has(firstSession.id)) return;
+    toggleScheduleWithFeedback(firstSession, {
+      eventConfig: getApiConfig() || {},
+      isScheduled: scheduled.value.has(firstSession.id),
+    });
+  });
+
+  const openDetailBtn = createTag(
+    'button',
+    { type: 'button', class: 'session-state-demo__btn session-state-demo__btn--open-detail' },
+    'Open first session detail',
+    { parent: el },
+  );
+  openDetailBtn.addEventListener('click', () => {
+    const [firstSession] = sessions.value;
+    if (!firstSession) return;
+    openSessionGuideDetail(firstSession.id);
   });
 }

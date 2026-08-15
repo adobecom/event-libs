@@ -44,25 +44,47 @@
   color: #3949ab;
 }
 
-.session-state-demo__favorite-btn {
+.session-state-demo__btn {
   display: block;
   width: 100%;
-  margin-top: 16px;
+  margin-top: 8px;
   padding: 10px 16px;
   font-size: 13px;
   font-weight: 600;
   color: #fff;
-  background: #eb1000;
   border: none;
   border-radius: 8px;
   cursor: pointer;
   transition: background 0.15s ease;
 }
 
-.session-state-demo__favorite-btn:hover {
+.session-state-demo__btn:first-of-type {
+  margin-top: 16px;
+}
+
+.session-state-demo__btn--favorite,
+.session-state-demo__btn--schedule {
+  background: #eb1000;
+}
+
+.session-state-demo__btn--favorite:hover,
+.session-state-demo__btn--schedule:hover {
   background: #c40d00;
 }
 
-.session-state-demo__favorite-btn:active {
+.session-state-demo__btn--favorite:active,
+.session-state-demo__btn--schedule:active {
   background: #a30b00;
+}
+
+.session-state-demo__btn--open-detail {
+  background: #3949ab;
+}
+
+.session-state-demo__btn--open-detail:hover {
+  background: #2c3a8c;
+}
+
+.session-state-demo__btn--open-detail:active {
+  background: #232e70;
 }

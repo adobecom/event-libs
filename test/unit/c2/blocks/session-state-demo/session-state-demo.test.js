@@ -2,13 +2,13 @@ import { expect } from '@esm-bundle/chai';
 import { readFile } from '@web/test-runner-commands';
 // This block imports session-store.js itself (statically, same URL) — the test must import
 // the same, non-cache-busted instance too, so both sides share the same signals/apiConfig.
-import init from '../../../../event-libs/v1/blocks/session-state-demo/session-state-demo.js';
+import init from '../../../../../event-libs/v1/c2/blocks/session-state-demo/session-state-demo.js';
 import {
   sessions, sessionsStatus, favorited, scheduled, auth, pendingActions,
-  liveStreamActiveIds, sessionStateVersion, initSessionState,
-} from '../../../../event-libs/v1/utils/session-store.js';
-import { setMetadata } from '../../../../event-libs/v1/utils/utils.js';
-import { deriveSessionState, getNowMs } from '../../../../event-libs/v1/utils/session-state.js';
+  liveStreamActiveIds, sessionStateVersion, sessionGuideRequest, initSessionState,
+} from '../../../../../event-libs/v1/utils/session-store.js';
+import { setMetadata } from '../../../../../event-libs/v1/utils/utils.js';
+import { deriveSessionState, getNowMs } from '../../../../../event-libs/v1/utils/session-state.js';
 
 const body = await readFile({ path: './mocks/default.html' });
 
@@ -60,6 +60,7 @@ describe('session-state-demo block', () => {
     favorited.value = new Set();
     scheduled.value = new Set();
     pendingActions.value = new Set();
+    sessionGuideRequest.value = null;
     auth.value = { isLoggedIn: true, isRegistered: true, userFirstName: null };
 
     // rainfocus.js now makes a real fetch() for toggleSessionInterest/addSession/
@@ -89,6 +90,7 @@ describe('session-state-demo block', () => {
     expect(rowValue('Registered')).to.equal('true');
     const expectedState = deriveSessionState(sessions.value[0], liveStreamActiveIds.value, getNowMs());
     expect(rowValue('First session state')).to.equal(expectedState);
+    expect(rowValue('Session guide request')).to.equal('none');
   });
 
   it('recomputes the first session state row when sessionStateVersion changes', async () => {
@@ -124,20 +126,41 @@ describe('session-state-demo block', () => {
   it('favorites the first session on button click', async () => {
     await init(el);
     const [firstSession] = sessions.value;
-    const btn = el.querySelector('.session-state-demo__favorite-btn');
+    const btn = el.querySelector('.session-state-demo__btn--favorite');
     btn.click();
     await new Promise((resolve) => setTimeout(resolve, 0));
     expect(favorited.value.has(firstSession.id)).to.be.true;
+  });
+
+  it('schedules the first session on button click', async () => {
+    await init(el);
+    const [firstSession] = sessions.value;
+    const btn = el.querySelector('.session-state-demo__btn--schedule');
+    btn.click();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(scheduled.value.has(firstSession.id)).to.be.true;
+  });
+
+  it('sets sessionGuideRequest and updates the row on "Open first session detail" click', async () => {
+    await init(el);
+    const [firstSession] = sessions.value;
+    const btn = el.querySelector('.session-state-demo__btn--open-detail');
+    btn.click();
+    expect(sessionGuideRequest.value).to.deep.equal({ sessionId: firstSession.id });
+    expect(rowValue('Session guide request')).to.equal(firstSession.id);
   });
 
   it('does nothing on click when there are no sessions', async () => {
     const previousSessions = sessions.value;
     sessions.value = [];
     await init(el);
-    const btn = el.querySelector('.session-state-demo__favorite-btn');
-    btn.click();
+    el.querySelector('.session-state-demo__btn--favorite').click();
+    el.querySelector('.session-state-demo__btn--schedule').click();
+    el.querySelector('.session-state-demo__btn--open-detail').click();
     await new Promise((resolve) => setTimeout(resolve, 0));
     expect(favorited.value.size).to.equal(0);
+    expect(scheduled.value.size).to.equal(0);
+    expect(sessionGuideRequest.value).to.be.null;
     sessions.value = previousSessions;
   });
 });
