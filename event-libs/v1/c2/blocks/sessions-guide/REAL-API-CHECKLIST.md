@@ -101,14 +101,12 @@ Credentials needed per call: `rfAuthToken` (from FEDS/IMS), `clientId` (IMS user
 
 **File:** `event-libs/v1/services/sessions/sessions-api.js`
 
-`fetchSessions(eventId)` now calls the real ESL/ESP catalog endpoint
+`fetchSessions(eventId)` calls the real ESL/ESP catalog endpoint
 (`GET {serviceApiEndpoints.esp}/v1/events/{eventId}/session-catalog`) via `fetchEslSessions()` +
-`mapEslPayloadToRawSessions()`, and only falls back to `MOCK_ESL_PAYLOAD` when `eventId` is
-falsy. `event-id` metadata is read in `session-store.js`'s `initSessionState()` and passed
-through — **no further code change needed here**; this activates automatically once a page
-authors real `event-id` metadata (today, per item 3's note, `event-id` is already present
-on prod pages for unrelated purposes, but hasn't been verified to resolve against the real
-ESL/ESP backend for sessions-guide specifically).
+`mapEslPayloadToRawSessions()`. `eventId` is resolved in `session-store.js`'s
+`initSessionState()` from `tier-1-event-config.eventId` (stamped in by the Tier 1 Event
+Configurator at save time), falling back to page `event-id` metadata only when the config
+has none.
 
 Known gaps in the real mapping (not blockers, just incomplete real-data coverage):
 - `resources[]` always `[]` — backend hasn't shipped this field yet.
