@@ -1202,17 +1202,11 @@ export function decorateEvent(parent) {
 
   if (!getMetadata('event-id')) return;
 
-  // Bootstraps the page-wide Tier 1 Event Configurator app output (track icons/colors,
-  // allowDoubleBooking, rfApiUrl/rfProfileId, ...) ahead of any block's own init(), so
-  // any block can call getTrackIcon()/getAllowDoubleBooking() regardless of tier. Cheap
-  // parse, no network cost, so unlike initSessionState() below it isn't gated further.
-  initTierOneEventConfig();
-
-  // Bootstraps shared, page-level session state (sessions, favorites, scheduled, auth)
-  // ahead of any block's own init() — no-ops when tier-1-event-config isn't authored.
-  // Also gated on tier-1-event-state-enabled since event-id alone is already authored
-  // broadly in prod; we don't want to bootstrap this on every page that happens to have it.
-  if (getMetadata('tier-1-event-state-enabled') === 'true') {
+  // Bootstraps Tier 1 Event Configurator output + shared session state ahead of any
+  // block's own init(). Gated on tier-1-event-config, not just event-id, since that's
+  // the real signal a page wants this.
+  if (getMetadata('tier-1-event-config')) {
+    initTierOneEventConfig();
     initSessionState();
   }
 

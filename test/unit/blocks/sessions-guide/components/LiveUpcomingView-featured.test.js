@@ -3,16 +3,15 @@ import * as preact from '../../../mocks/deps/htm-preact.js';
 import { buildStore } from '../../../../../event-libs/v1/blocks/sessions-guide/store/index.js';
 import { buildLiveUpcomingView } from '../../../../../event-libs/v1/blocks/sessions-guide/components/LiveUpcomingView.js';
 import { sessions, liveStreamActiveIds } from '../../../../../event-libs/v1/utils/session-store.js';
-import { initTierOneEventConfig } from '../../../../../event-libs/v1/utils/tier-1-event-config.js';
 
-// Separate file from LiveUpcomingView.test.js: initTierOneEventConfig() only ever
-// parses metadata once per module instance, so featuredSessions has to be authored
-// before any other test in this file's module graph runs.
+// Separate file from LiveUpcomingView.test.js, mirroring that file's own separation —
+// keeps the recommendedSessions-authored scenario isolated from the "nothing authored"
+// default-case tests.
 //
-// Order-preservation itself is covered directly against getFeaturedSessions in
+// Order-preservation itself is covered directly against getRecommendedSessions in
 // session-filters.test.js — the mock htm-preact shim here only invokes a component
 // when it's the entire template (not nested inside a wrapping <div>, as Carousel is),
-// so this test only verifies the featured section is wired up and gated correctly
+// so this test only verifies the recommended section is wired up and gated correctly
 // (shown only when nothing's live), not the card contents/order.
 function h(offsetHours) {
   return new Date(Date.now() + offsetHours * 3_600_000).toISOString();
@@ -31,7 +30,7 @@ const UPCOMING_DAY = fmt(Date.parse(UPCOMING_SESSION.startTimeUtc));
 
 const BASE_CONFIG = {
   userTz: TZ, surface: 'page',
-  title: '', filterCategories: [], theme: 'dark',
+  title: '', filterCategories: [], theme: 'dark', recommendedSessions: ['upcoming-1'],
 };
 
 function makeStore(sessionList, activeDay) {
@@ -45,18 +44,10 @@ function makeStore(sessionList, activeDay) {
   return store;
 }
 
-describe('LiveUpcomingView (featuredSessions authored)', () => {
-  before(() => {
-    const meta = document.createElement('meta');
-    meta.name = 'tier-1-event-config';
-    meta.content = JSON.stringify({ featuredSessions: ['upcoming-1'] });
-    document.head.appendChild(meta);
-    initTierOneEventConfig();
-  });
-
-  it('renders a featured carousel section when nothing is live and a match exists', () => {
+describe('LiveUpcomingView (recommendedSessions authored)', () => {
+  it('renders a recommended carousel section when nothing is live and a match exists', () => {
     const store = makeStore([UPCOMING_SESSION], UPCOMING_DAY);
     const View = buildLiveUpcomingView(preact, store);
-    expect(View({})).to.include('sg-carousel-section--featured');
+    expect(View({})).to.include('sg-carousel-section--recommended');
   });
 });

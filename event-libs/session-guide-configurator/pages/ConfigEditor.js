@@ -11,6 +11,7 @@ import { useDA } from '../context/DAContext.js';
 import { getDisplayTitle, copyRowLinkWithToast } from '../utils.js';
 import SwimlaneOrderEditor from '../components/SwimlaneOrderEditor.js';
 import FiltersEditor from '../components/FiltersEditor.js';
+import RecommendedSessionsEditor from '../components/RecommendedSessionsEditor.js';
 import LoadingInline from '../components/LoadingInline.js';
 
 export default function ConfigEditor() {
@@ -23,6 +24,7 @@ export default function ConfigEditor() {
 
   const [isSaving, setIsSaving] = useState(false);
   const [sessions, setSessions] = useState([]);
+  const [sessionTimes, setSessionTimes] = useState([]);
   const [isLoadingSessions, setIsLoadingSessions] = useState(false);
   const [sessionsError, setSessionsError] = useState(null);
 
@@ -40,6 +42,7 @@ export default function ConfigEditor() {
         return;
       }
       setSessions(result.data.sessions);
+      setSessionTimes(result.data.sessionTimes);
       // Swimlanes include real tracks and override-lane names (each distinct Override
       // Primary Event Site Track value is its own swimlane, matching groupByTrack()) —
       // deduped in case a track name and override text collide.
@@ -264,6 +267,22 @@ export default function ConfigEditor() {
           <${FiltersEditor} \
             categories=${activeConfig.config.filterCategories} \
             onChange=${(next) => updateConfigField('filterCategories', next)} \
+          />
+        `}
+      </section>
+
+      <section class="sgc-editor__section">
+        <h2>Recommended Sessions</h2>
+        <p class="sgc-editor__section-hint">Fills the live carousel when nothing is currently live, and the on-demand view's featured row. Falls back to a randomized selection of the day's sessions when nothing is picked here.</p>
+        ${isLoadingSessions && html`<${LoadingInline} label="Loading sessions…" />`}
+        ${sessionsError && html`<p class="sgc-editor__error">${sessionsError}</p>`}
+        ${!isLoadingSessions && !sessionsError && html`
+          <${RecommendedSessionsEditor} \
+            sessions=${sessions} \
+            sessionTimes=${sessionTimes} \
+            tracks=${tracks} \
+            recommendedSessions=${activeConfig.config.recommendedSessions} \
+            onChange=${(next) => updateConfigField('recommendedSessions', next)} \
           />
         `}
       </section>

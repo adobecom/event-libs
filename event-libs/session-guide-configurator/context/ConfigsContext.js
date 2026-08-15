@@ -26,6 +26,7 @@ function emptyConfig() {
     },
     filterCategories: [],
     swimlaneOrder: [],
+    recommendedSessions: [],
   };
 }
 

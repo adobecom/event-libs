@@ -6,10 +6,9 @@ import {
 import { TrackRow } from './TrackRow.js';
 import { Carousel } from './Carousel.js';
 import {
-  onDemandSessions, groupByTrack, filterSessions, getOnDemandFeaturedSessions,
+  onDemandSessions, groupByTrack, filterSessions, getOnDemandRecommendedSessions,
 } from '../utils/session-filters.js';
 import { getNowMs } from '../utils/time.js';
-import { getFeaturedSessionIds } from '../../../utils/tier-1-event-config.js';
 
 export const buildOnDemandView = () => OnDemandView;
 
@@ -26,21 +25,21 @@ export function OnDemandView() {
   const nowMs = getNowMs();
 
   const onDemandRaw = onDemandSessions(sessions, liveStreamActiveIds, nowMs);
-  // Featured ignores the viewer's active filters/search, same as LiveUpcomingView's
-  // featured carousel — it's a curated highlight reel, not a filtered result set.
-  const featured = getOnDemandFeaturedSessions(onDemandRaw, getFeaturedSessionIds());
+  // Recommended ignores the viewer's active filters/search, same as LiveUpcomingView's
+  // recommended carousel — it's a curated highlight reel, not a filtered result set.
+  const recommended = getOnDemandRecommendedSessions(onDemandRaw, state.guideConfig?.recommendedSessions);
   const available = filterSessions(onDemandRaw, activeFilters, searchQuery);
   const byTrack = groupByTrack(available, state.guideConfig?.swimlaneOrder);
 
   return html`
     <div class="sg-view sg-view--on-demand">
-      ${featured.length > 0 && html`
-        <div class="sg-carousel-section sg-carousel-section--featured">
+      ${recommended.length > 0 && html`
+        <div class="sg-carousel-section sg-carousel-section--recommended">
           <${Carousel}
-            sessions=${featured}
-            title="Featured"
+            sessions=${recommended}
+            title="Recommended"
             formatTime=${() => 'Trending'}
-            variant="featured"
+            variant="recommended"
           />
         </div>
       `}

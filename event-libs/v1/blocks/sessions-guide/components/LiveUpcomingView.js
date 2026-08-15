@@ -6,11 +6,10 @@ import {
 import { Carousel } from './Carousel.js';
 import { TimeSlotRow } from './TimeSlotRow.js';
 import {
-  liveSessions, upcomingSessions, groupByStartTime, filterSessions, getFeaturedSessions,
+  liveSessions, upcomingSessions, groupByStartTime, filterSessions, getRecommendedSessions,
   sessionsForDay,
 } from '../utils/session-filters.js';
 import { getNowMs, formatShortTime, formatTimezoneAbbr } from '../utils/time.js';
-import { getFeaturedSessionIds } from '../../../utils/tier-1-event-config.js';
 
 export const buildLiveUpcomingView = () => LiveUpcomingView;
 
@@ -32,9 +31,9 @@ export function LiveUpcomingView() {
   const live = liveSessions(sessions, liveStreamActiveIds, activeDay, userTz, nowMs)
     .sort((a, b) => (a.startTimeUtc < b.startTimeUtc ? -1 : 1));
 
-  // Featured sessions fill the live carousel when nothing is currently live
-  const featured = live.length === 0
-    ? getFeaturedSessions(sessions, getFeaturedSessionIds(), activeDay, userTz)
+  // Recommended sessions fill the live carousel when nothing is currently live
+  const recommended = live.length === 0
+    ? getRecommendedSessions(sessions, guideConfig.recommendedSessions, activeDay, userTz)
     : [];
 
   // Upcoming sessions have filters + search applied
@@ -60,13 +59,13 @@ export function LiveUpcomingView() {
           />
         </div>
       `}
-      ${featured.length > 0 && html`
-        <div class="sg-carousel-section sg-carousel-section--featured">
+      ${recommended.length > 0 && html`
+        <div class="sg-carousel-section sg-carousel-section--recommended">
           <${Carousel}
-            sessions=${featured}
-            title="Featured"
+            sessions=${recommended}
+            title="Recommended"
             formatTime=${() => 'Trending'}
-            variant="featured"
+            variant="recommended"
           />
         </div>
       `}
@@ -77,7 +76,7 @@ export function LiveUpcomingView() {
           <h3 class="sg-upcoming-title">Previously aired</h3>
           ${previouslyAiredSlots.map((slot) => html`<${TimeSlotRow} key=${slot[0].startTimeUtc} sessions=${slot} forceOnDemand=${true} />`)}
         `}
-        ${timeSlots.length === 0 && !live.length && !featured.length && !previouslyAiredSlots.length && html`
+        ${timeSlots.length === 0 && !live.length && !recommended.length && !previouslyAiredSlots.length && html`
           <div class="sg-empty" role="status" aria-live="polite">No sessions scheduled for this day.</div>
         `}
       </div>

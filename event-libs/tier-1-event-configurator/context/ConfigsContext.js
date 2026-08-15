@@ -8,25 +8,28 @@ import {
 } from '../scripts/da-controller.js';
 import { useDA } from './DAContext.js';
 import { getDisplayTitle } from '../utils.js';
-import { CONFIG_TYPES } from '../constants.js';
+import { CONFIG_TYPES, HOMEPAGE_SESSION_FIELDS, isHomepageConfigType } from '../constants.js';
 
 const ConfigsContext = createContext();
 
-function emptyConfig() {
+// Scoped per config type — a Global row never carries configName or Homepage session-pick
+// fields; each Homepage sub-type only carries its own field+meta pair.
+function emptyConfig(configType = CONFIG_TYPES.GLOBAL) {
+  if (isHomepageConfigType(configType)) {
+    const { field, metaField } = HOMEPAGE_SESSION_FIELDS[configType];
+    return { configName: '', [field]: [], [metaField]: {} };
+  }
   return {
-    configName: '',
     eventTitle: '',
     eventStartDateTime: null,
     eventEndDateTime: null,
     trackIcons: {},
-    overrideTrackIcon: null,
-    overrideTrackIcons: {},
+    // default: the event-wide fallback for any override text not mapped in byText.
+    // One field (not two) so there's nowhere for the two to drift apart, and no
+    // author-typed override text can collide with a reserved sentinel key.
+    overrideTrackIcons: { default: null, byText: {} },
     products: {},
     allowDoubleBooking: false,
-    featuredSessions: [],
-    featuredSessionsMeta: {},
-    upcomingSessions: [],
-    upcomingSessionsMeta: {},
     rfApiUrl: '',
     rfProfileId: '',
     registerUrl: '',
@@ -96,44 +99,32 @@ const ConfigsProvider = ({ children }) => {
       backendEventTitle: event.enTitle || event.eventId,
       eventServiceEnv,
       configType,
-      config: emptyConfig(),
+      config: emptyConfig(configType),
     });
   }, []);
 
-  // Clones an existing row's config onto a newly picked Event ID, keeping the
-  // source row's configType — Duplicate always stays within the same config
-  // surface, it just retargets which event it's for. App-stamped identity
-  // fields (eventId/backendEventTitle/updated) are dropped rather than
-  // carried over stale — upsertConfig re-stamps them at save time.
-  // eventTitle/configName (the author-set names) are also reset — they name
-  // the source specifically, not a generic style setting like trackIcons, so
-  // carrying them over would silently mislabel the new event.
-  // `eventServiceEnv` is the *new* pick's env, not the source row's —
-  // Duplicate can legitimately target a different tier than its source.
-  // rfApiUrl/rfProfileId/registerUrl always reset blank — reusing another event's RF
-  // profile id or registration page would misroute this event's live schedule/favorites
-  // calls or send attendees to register for the wrong event. eventStartDateTime/
-  // eventEndDateTime reset the same way — a new event has its own dates.
+  // Builds from a fresh, type-scoped emptyConfig() rather than cloning wholesale — only
+  // reusable style settings (trackIcons, overrideTrackIcons, products, allowDoubleBooking)
+  // carry forward, Global only. Everything else is event-specific identity data (title,
+  // dates, RF credentials, session picks) that would mislabel/misroute the new event.
   const startDuplicateConfig = useCallback((sourceRow, event, eventServiceEnv) => {
-    const clonedConfig = { ...sourceRow.config };
-    delete clonedConfig.eventId;
-    delete clonedConfig.backendEventTitle;
-    delete clonedConfig.updated;
+    const configType = sourceRow.configType || CONFIG_TYPES.GLOBAL;
+    const sourceConfig = sourceRow.config || {};
+    const config = isHomepageConfigType(configType)
+      ? emptyConfig(configType)
+      : {
+        ...emptyConfig(configType),
+        trackIcons: sourceConfig.trackIcons || {},
+        overrideTrackIcons: sourceConfig.overrideTrackIcons || { default: null, byText: {} },
+        products: sourceConfig.products || {},
+        allowDoubleBooking: !!sourceConfig.allowDoubleBooking,
+      };
     setActiveConfig({
       eventId: event.eventId,
       backendEventTitle: event.enTitle || event.eventId,
       eventServiceEnv,
-      configType: sourceRow.configType || CONFIG_TYPES.GLOBAL,
-      config: {
-        ...clonedConfig,
-        configName: '',
-        eventTitle: '',
-        eventStartDateTime: null,
-        eventEndDateTime: null,
-        rfApiUrl: '',
-        rfProfileId: '',
-        registerUrl: '',
-      },
+      configType,
+      config,
     });
   }, []);
 
@@ -163,17 +154,41 @@ const ConfigsProvider = ({ children }) => {
   }, []);
 
   // Same merge pattern as updateTrackIcon, keyed by override text instead of track name —
-  // each distinct text an author has typed is its own swimlane, with its own entry.
+  // each distinct text an author has typed is its own swimlane, with its own entry under
+  // overrideTrackIcons.byText.
   const updateOverrideTrackIcon = useCallback((overrideText, updates) => {
     setActiveConfig((prev) => {
       if (!prev) return prev;
+      const override = prev.config.overrideTrackIcons || {};
       return {
         ...prev,
         config: {
           ...prev.config,
           overrideTrackIcons: {
-            ...prev.config.overrideTrackIcons,
-            [overrideText]: { ...prev.config.overrideTrackIcons?.[overrideText], ...updates },
+            ...override,
+            byText: {
+              ...override.byText,
+              [overrideText]: { ...override.byText?.[overrideText], ...updates },
+            },
+          },
+        },
+      };
+    });
+  }, []);
+
+  // Merges { icon, color } updates into overrideTrackIcons.default — the event-wide
+  // fallback applied to any override text not specifically mapped above.
+  const updateOverrideDefaultIcon = useCallback((updates) => {
+    setActiveConfig((prev) => {
+      if (!prev) return prev;
+      const override = prev.config.overrideTrackIcons || {};
+      return {
+        ...prev,
+        config: {
+          ...prev.config,
+          overrideTrackIcons: {
+            ...override,
+            default: { ...override.default, ...updates },
           },
         },
       };
@@ -264,6 +279,7 @@ const ConfigsProvider = ({ children }) => {
     clearActiveConfig,
     updateTrackIcon,
     updateOverrideTrackIcon,
+    updateOverrideDefaultIcon,
     updateProduct,
     updateConfigField,
     saveActiveConfig,

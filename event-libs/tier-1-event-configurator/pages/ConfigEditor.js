@@ -7,7 +7,7 @@ import {
   isTrackIconEntryComplete, getDisplayTitle, stringifyConfig,
   buildSessionAuthorEntry,
 } from '../utils.js';
-import { CONFIG_TYPES, isHomepageConfigType } from '../constants.js';
+import { CONFIG_TYPES, HOMEPAGE_SESSION_FIELDS, isHomepageConfigType } from '../constants.js';
 import TrackIconEditor from '../components/TrackIconEditor.js';
 import OverrideTrackIconEditor from '../components/OverrideTrackIconEditor.js';
 import ProductIconEditor from '../components/ProductIconEditor.js';
@@ -15,14 +15,12 @@ import FeaturedSessionsEditor from '../components/FeaturedSessionsEditor.js';
 import EpochDateTimeField from '../components/EpochDateTimeField.js';
 import LoadingInline from '../components/LoadingInline.js';
 
-// Which config field + block/metadata key a Homepage config type feeds —
-// both homepage config types share the exact same picker UI, they only
-// differ in which config field they write to and which block ultimately
-// reads the generated JSON.
+// UI-only labels/hints per Homepage config type, layered onto the shared field/metaField
+// names from constants.js (the single source of truth ConfigsContext.js's emptyConfig()/
+// startDuplicateConfig() also key off) rather than redeclaring them here.
 const HOMEPAGE_FIELD_BY_TYPE = {
   [CONFIG_TYPES.HOMEPAGE_UPCOMING_SESSIONS]: {
-    field: 'upcomingSessions',
-    metaField: 'upcomingSessionsMeta',
+    ...HOMEPAGE_SESSION_FIELDS[CONFIG_TYPES.HOMEPAGE_UPCOMING_SESSIONS],
     // upcoming-sessions.js reads mrStreamId (drives its Mobile Rider live-drop
     // polling) but never reads watchUrl anywhere — leave that field out.
     // imageUrl has no reader yet either, but authors need to attach one now so
@@ -34,8 +32,7 @@ const HOMEPAGE_FIELD_BY_TYPE = {
     blockHint: 'the upcoming-sessions block',
   },
   [CONFIG_TYPES.HOMEPAGE_FEATURED_SESSIONS]: {
-    field: 'featuredSessions',
-    metaField: 'featuredSessionsMeta',
+    ...HOMEPAGE_SESSION_FIELDS[CONFIG_TYPES.HOMEPAGE_FEATURED_SESSIONS],
     // utils/session-routing.js reads both — watchUrl is where a click
     // routes once the session goes live, mrStreamId is what tells it a
     // session is Mobile-Rider-backed at all. imageUrl has no reader yet
@@ -53,7 +50,8 @@ export default function ConfigEditor() {
   const { goToLibrary } = useNavigation();
   const {
     activeConfig, saveActiveConfig, clearActiveConfig, updateTrackIcon,
-    updateOverrideTrackIcon, updateProduct, updateConfigField, setToastSuccess, setToastError,
+    updateOverrideTrackIcon, updateOverrideDefaultIcon, updateProduct, updateConfigField,
+    setToastSuccess, setToastError,
   } = useConfigs();
 
   const [sessions, setSessions] = useState([]);
@@ -187,22 +185,24 @@ export default function ConfigEditor() {
         </section>
       `}
 
-      <section class="tec-editor__section">
-        <h2>Event dates</h2>
-        <p class="tec-editor__section-hint">Can fall outside the first/last session's times. Picker shows LA time; saved as a UTC epoch — use the epoch field directly for non-LA events. Leave blank if unknown.</p>
-        <${EpochDateTimeField}
-          idPrefix="tec-event-start"
-          label="Event start"
-          valueMs=${activeConfig.config.eventStartDateTime}
-          onChange=${(ms) => updateConfigField('eventStartDateTime', ms)}
-        />
-        <${EpochDateTimeField}
-          idPrefix="tec-event-end"
-          label="Event end"
-          valueMs=${activeConfig.config.eventEndDateTime}
-          onChange=${(ms) => updateConfigField('eventEndDateTime', ms)}
-        />
-      </section>
+      ${!isHomepage && html`
+        <section class="tec-editor__section">
+          <h2>Event dates</h2>
+          <p class="tec-editor__section-hint">Can fall outside the first/last session's times. Picker shows LA time; saved as a UTC epoch — use the epoch field directly for non-LA events. Leave blank if unknown.</p>
+          <${EpochDateTimeField}
+            idPrefix="tec-event-start"
+            label="Event start"
+            valueMs=${activeConfig.config.eventStartDateTime}
+            onChange=${(ms) => updateConfigField('eventStartDateTime', ms)}
+          />
+          <${EpochDateTimeField}
+            idPrefix="tec-event-end"
+            label="Event end"
+            valueMs=${activeConfig.config.eventEndDateTime}
+            onChange=${(ms) => updateConfigField('eventEndDateTime', ms)}
+          />
+        </section>
+      `}
 
       <section class="tec-editor__section">
         <h2>Sessions</h2>
@@ -240,10 +240,10 @@ export default function ConfigEditor() {
           ${!isLoadingSessions && !sessionsError && html`
             <${OverrideTrackIconEditor}
               overrideTexts=${overrideTexts}
-              overrideTrackIcons=${activeConfig.config.overrideTrackIcons}
-              defaultOverrideIcon=${activeConfig.config.overrideTrackIcon}
+              overrideTrackIcons=${activeConfig.config.overrideTrackIcons?.byText}
+              defaultOverrideIcon=${activeConfig.config.overrideTrackIcons?.default}
               onChangeMapped=${updateOverrideTrackIcon}
-              onChangeDefault=${(value) => updateConfigField('overrideTrackIcon', value)}
+              onChangeDefault=${updateOverrideDefaultIcon}
             />
           `}
         </section>
@@ -319,7 +319,7 @@ export default function ConfigEditor() {
 
         <section class="tec-editor__section">
           <h2>Config JSON</h2>
-          <p class="tec-editor__section-hint">This is what gets saved to the row, and what you'll paste into the page's <code>tier-1-event-config</code> metadata after saving.</p>
+          <p class="tec-editor__section-hint">This is what gets saved to the row, and what you'll paste into the page's <strong><code>tier-1-event-config</code></strong> metadata after saving.</p>
           <pre class="tec-editor__config-preview">${configPreview}</pre>
           <button type="button" class="tec-btn tec-btn--outline" onClick=${handleCopy}>Copy config</button>
         </section>
