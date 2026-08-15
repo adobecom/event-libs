@@ -69,7 +69,7 @@ by the time this was revisited — but `groupByTrack`'s sort logic hadn't been u
 the `[{track,displayName,enabled}]` shape described below, so ordering silently had zero
 effect, `enabled` was never applied, and `displayName` never reached the rendered label.
 Also extended to cover override-lane names, not just tracks. Full fix + root cause in
-`event-libs/v1/blocks/sessions-guide/PLAN.md` §16.3's correction note. Original spec
+`event-libs/v1/c2/blocks/sessions-guide/PLAN.md` §16.3's correction note. Original spec
 below, kept for context:
 
 `OnDemandView.js`'s `groupByTrack(available)` (in `utils/session-filters.js`)
