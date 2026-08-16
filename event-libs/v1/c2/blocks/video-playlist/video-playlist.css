@@ -1,5 +1,15 @@
 @import '../../styles/tokens.css';
 
+/* Per Figma inspect (both the 1024px desktop rail and the 768px mobile drawer), the
+   video itself gets a 16px corner radius — c2-global.css's own default for .milo-video
+   is 24px (and only applies at min-width:1024px in the first place, so mobile gets none
+   at all without this). Unconditional so it covers mobile; the desktop media query below
+   additionally needs !important to beat c2-global's higher-specificity desktop rule. */
+.section:has(> .video-playlist) .milo-video {
+  border-radius: var(--s2a-border-radius-md, 16px);
+  overflow: hidden;
+}
+
 /* Desktop right-rail: the section holding a player block immediately followed by
    video-playlist becomes a row flex container, with the player taking the remaining
    space and this block becoming a fixed-width rail beside it — same ":has()" pattern
@@ -16,21 +26,39 @@
     min-width: 0;
   }
 
-  /* ../../styles/c2-global.css caps every .milo-video at a fixed reading-width measure
-     and centers it (`:root:has(meta[foundation=c2]) .milo-video { max-width: ...;
-     margin: 0 auto; }`) — a sensible default for a video used standalone, but it wins
-     over the flex rule above regardless of load order: that selector's specificity
-     (0,4,1) beats this file's `.section:has(> .video-playlist) > :not(...)` (0,3,0). It
-     needs to be beaten here, not edited globally — other pages rely on the standalone
-     centered default. Same "!important to defeat a shared foundation/global default in
-     one specific layout" precedent as mobile-rider.css. */
+  /* ../../styles/c2-global.css caps every .milo-video at a fixed reading-width measure,
+     centers it, and rounds it to 24px (`:root:has(meta[foundation=c2]) .milo-video {
+     max-width: ...; margin: 0 auto; border-radius: 24px; }`) — a sensible default for a
+     video used standalone, but it wins over the flex rule above and the 16px radius rule
+     at the top of this file regardless of load order: that selector's specificity (0,4,1)
+     beats this file's class-based selectors (0,3,0). Needs to be beaten here, not edited
+     globally — other pages rely on the standalone centered default. Same "!important to
+     defeat a shared foundation/global default in one specific layout" precedent as
+     mobile-rider.css. */
   .section:has(> .video-playlist) > .milo-video {
     max-width: none !important;
     margin: 0 !important;
+    border-radius: var(--s2a-border-radius-md, 16px) !important;
   }
 
+  /* Desktop card is light (per Figma inspect: background:#FFF) — the inverse of the
+     mobile bottom-sheet's dark theme below. Every color that needs to contrast against
+     the card is expressed as a --vp-* custom property so this is the only place the
+     theme needs to flip; the mobile block below defines the same set for its own (dark)
+     theme. */
   .video-playlist {
+    --vp-bg: var(--s2a-color-gray-25);
+    --vp-fg: var(--s2a-color-gray-900);
+    --vp-row-hover: var(--s2a-color-transparent-black-08);
+    --vp-track-bg: var(--s2a-color-transparent-black-16);
+    --vp-muted: var(--s2a-color-transparent-black-64);
+    --vp-playing-bg: var(--s2a-color-gray-900);
+    --vp-playing-fg: var(--s2a-color-gray-25);
+    --vp-playing-track-bg: var(--s2a-color-gray-700);
+    --vp-playing-muted: var(--s2a-color-transparent-white-64);
+
     flex: 0 0 360px;
+    align-self: stretch;
     max-height: 100%;
     overflow-y: auto;
   }
@@ -38,15 +66,31 @@
   .video-playlist.is-expanded {
     flex-basis: 630px; /* 175% of the 360px rail width */
   }
+
+  /* Play-icon and favorite button are hover/focus-revealed only on desktop (per the
+     Figma "Session tile states" spec: Default shows neither, Hover shows both) — mobile
+     has no hover concept, so both stay always-visible there (see the max-width block). */
+  .video-playlist-row-play-icon,
+  .video-playlist-row-favorite {
+    opacity: 0;
+    transition: opacity 0.15s ease;
+  }
+
+  .video-playlist-row:hover .video-playlist-row-play-icon,
+  .video-playlist-row:focus-within .video-playlist-row-play-icon,
+  .video-playlist-row:hover .video-playlist-row-favorite,
+  .video-playlist-row:focus-within .video-playlist-row-favorite {
+    opacity: 1;
+  }
 }
 
 .video-playlist {
   box-sizing: border-box;
-  background: var(--s2a-color-gray-900);
-  color: var(--s2a-color-gray-25);
+  background: var(--vp-bg);
+  color: var(--vp-fg);
   font-family: var(--s2a-font-family-default);
-  border-radius: var(--s2a-border-radius-24, 24px);
-  padding: var(--s2a-spacing-lg);
+  border-radius: var(--s2a-border-radius-md, 16px);
+  padding: var(--s2a-spacing-md) var(--s2a-spacing-md) var(--s2a-spacing-lg);
 }
 
 /* Decorative bottom-sheet drag affordance — mobile-only, see the max-width block below. */
@@ -64,7 +108,7 @@
   flex-wrap: wrap;
   align-items: flex-start;
   gap: var(--s2a-spacing-xs) var(--s2a-spacing-md);
-  margin: 0 0 var(--s2a-spacing-md);
+  margin: 0 0 var(--s2a-spacing-xs);
 }
 
 .video-playlist-title {
@@ -91,7 +135,9 @@
 
 /* Pure-CSS switch on the existing checkbox — no markup change, so existing tests that
    drive `.video-playlist-autoplay-toggle` directly (`.checked`/change events) are
-   unaffected. */
+   unaffected. Track/thumb colors are absolute (not --vp-* themed) — per Figma, this
+   switch keeps the same dark-track/white-thumb look on both the light desktop card and
+   the dark mobile drawer. */
 .video-playlist-autoplay-toggle {
   appearance: none;
   position: relative;
@@ -99,7 +145,7 @@
   height: 18px;
   margin: 0;
   border-radius: var(--s2a-border-radius-round);
-  background: var(--s2a-color-transparent-white-24, rgb(255 255 255 / 24%));
+  background: var(--s2a-color-gray-700);
   flex-shrink: 0;
   cursor: pointer;
   transition: background 0.2s ease;
@@ -146,15 +192,15 @@
 }
 
 .video-playlist-row:hover {
-  background: var(--s2a-color-transparent-white-16, rgb(255 255 255 / 16%));
+  background: var(--vp-row-hover);
 }
 
-/* Currently-playing row: a solid light card, not just a translucent overlay — needs its
-   own text-color overrides since everything below otherwise inherits the dark-theme
-   white text. */
+/* Currently-playing row: a solid card in the theme's inverse colors (light-on-dark
+   card gets a light highlight; dark-on-light desktop card gets a DARK highlight — see
+   the --vp-playing-* custom properties). */
 .video-playlist-row.is-playing {
-  background: var(--s2a-color-gray-25, #fff);
-  color: var(--s2a-color-gray-900);
+  background: var(--vp-playing-bg);
+  color: var(--vp-playing-fg);
 }
 
 .video-playlist-row:focus-visible {
@@ -218,12 +264,12 @@
   flex: 1 1 auto;
   height: 4px;
   border-radius: var(--s2a-border-radius-round);
-  background: var(--s2a-color-transparent-white-24, rgb(255 255 255 / 24%));
+  background: var(--vp-track-bg);
   overflow: hidden;
 }
 
 .video-playlist-row.is-playing .video-playlist-row-progress-track {
-  background: var(--s2a-color-gray-300, rgb(0 0 0 / 16%));
+  background: var(--vp-playing-track-bg);
 }
 
 .video-playlist-row-progress-fill {
@@ -235,11 +281,11 @@
 .video-playlist-row-duration {
   flex-shrink: 0;
   font-size: var(--s2a-font-size-xs);
-  color: var(--s2a-color-transparent-white-64, rgb(255 255 255 / 64%));
+  color: var(--vp-muted);
 }
 
 .video-playlist-row.is-playing .video-playlist-row-duration {
-  color: var(--s2a-color-gray-700, rgb(0 0 0 / 64%));
+  color: var(--vp-playing-muted);
 }
 
 .video-playlist-row-favorite {
@@ -280,7 +326,7 @@
     display: flex;
     align-items: center;
     gap: var(--s2a-spacing-3xs);
-    margin-top: var(--s2a-spacing-sm);
+    margin-top: var(--s2a-spacing-xs);
     border: none;
     background: none;
     color: inherit;
@@ -313,15 +359,25 @@
 /* Mobile bottom sheet: fixed to the viewport, independent of the section's own flow —
    "peek" height by default (DRAWER_FLOOR_PX in JS), expands up to the Option-B cap
    (computeDrawerCapPx/clampedTitleBottom in video-playlist.js) without ever fully
-   covering the session title. */
+   covering the session title. Dark theme — the inverse of the desktop light card above. */
 @media (max-width: 1023px) {
   .video-playlist {
+    --vp-bg: var(--s2a-color-gray-900);
+    --vp-fg: var(--s2a-color-gray-25);
+    --vp-row-hover: var(--s2a-color-transparent-white-16);
+    --vp-track-bg: var(--s2a-color-transparent-white-24);
+    --vp-muted: var(--s2a-color-transparent-white-64);
+    --vp-playing-bg: var(--s2a-color-gray-25);
+    --vp-playing-fg: var(--s2a-color-gray-900);
+    --vp-playing-track-bg: var(--s2a-color-gray-300);
+    --vp-playing-muted: var(--s2a-color-gray-700);
+
     position: fixed;
     left: 0;
     right: 0;
     bottom: 0;
     z-index: 2;
-    border-radius: var(--s2a-border-radius-24, 24px) var(--s2a-border-radius-24, 24px) 0 0;
+    border-radius: var(--s2a-border-radius-md, 16px) var(--s2a-border-radius-md, 16px) 0 0;
     overflow-y: auto;
     transition: max-height 0.3s ease;
   }
