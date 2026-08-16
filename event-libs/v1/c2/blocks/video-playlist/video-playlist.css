@@ -19,6 +19,7 @@
     display: flex;
     align-items: flex-start;
     gap: var(--s2a-spacing-md);
+    padding-inline: 86px;
   }
 
   .section:has(> .video-playlist) > :not(.video-playlist) {
@@ -81,6 +82,24 @@
   .video-playlist-row:hover .video-playlist-row-favorite,
   .video-playlist-row:focus-within .video-playlist-row-favorite {
     opacity: 1;
+  }
+}
+
+/* Same responsive side-margin scale as event-marquee.css (the only other C2 block using
+   the `:has()` full-bleed-row pattern) — not inherited from anywhere global (Milo's own
+   grid uses a percentage-based --grid-container-width, and c2-global.css doesn't touch
+   .section margins at all), so each block that bleeds a .section to the viewport edge
+   owns this scale itself. Mobile isn't included here: below 1024px the video-playlist
+   drawer is an intentionally edge-to-edge bottom sheet, not part of this row. */
+@media (min-width: 1440px) {
+  .section:has(> .video-playlist) {
+    padding-inline: var(--s2a-layout-lg);
+  }
+}
+
+@media (min-width: 1920px) {
+  .section:has(> .video-playlist) {
+    padding-inline: 220px;
   }
 }
 
