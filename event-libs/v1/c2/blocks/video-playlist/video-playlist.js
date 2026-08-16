@@ -1,9 +1,22 @@
-import { createTag, getMetadata } from '../../../utils/utils.js';
+import { createTag, getMetadata, LIBS } from '../../../utils/utils.js';
 import { sessions, initSessionState, liveStreamActiveIds } from '../../../utils/session-store.js';
 import { deriveSessionState, getNowMs } from '../../../utils/session-state.js';
 import { extractCustomAttributeSlugs } from '../../../services/sessions/sessions-api.js';
 
 const BLOCK_CSS_URL = new URL('./video-playlist.css', import.meta.url).href;
+const MILO_IFRAME_CSS_URL = `${LIBS}/styles/iframe.css`;
+
+// Real adobetv.js/youtube.js autoblocks only ever run via Milo's own block loader,
+// which auto-attaches each block's own CSS (adobetv.css itself is just `@import
+// url('../../styles/iframe.css');`) as a side effect of loading it — .milo-video's
+// aspect-ratio/sizing rules live there, not in this block's own CSS. buildMiloVideo below
+// mirrors that markup directly (bypassing the autoblock entirely, since there may be no
+// authored link for it to decorate at all), so nothing else ever triggers that load —
+// without this, a freshly-built .milo-video has no intrinsic size at all.
+function ensureMiloIframeCss() {
+  if (document.getElementById('milo-iframe-css')) return;
+  createTag('link', { rel: 'stylesheet', href: MILO_IFRAME_CSS_URL, id: 'milo-iframe-css' }, '', { parent: document.head });
+}
 
 const DEFAULT_MIN_SESSIONS = 4;
 const DESKTOP_BREAKPOINT_PX = 1024;
@@ -289,12 +302,13 @@ function extractYouTubeId(url) {
 }
 
 // Mirrors Milo's own adobetv.js/youtube.js autoblock output (class names, iframe attrs —
-// see node_modules/@adobecom/milo/libs/blocks/{adobetv,youtube}/*.js) so a container built
-// here picks up the same global .milo-video sizing (libs/styles/iframe.css) a real
-// Milo-decorated embed would, whether or not one was already authored on the page.
-// YouTube additionally gets enablejsapi=1 + an id, needed to track completion below —
-// Milo's own autoblock doesn't add these since it never needs to observe player state.
+// see node_modules/@adobecom/milo/libs/blocks/{adobetv,youtube}/*.js), and explicitly
+// loads the same CSS (see ensureMiloIframeCss above) that output would otherwise only
+// ever get via Milo's own block loader. YouTube additionally gets enablejsapi=1 + an id,
+// needed to track completion below — Milo's own autoblock doesn't add these since it
+// never needs to observe player state.
 function buildMiloVideo(video) {
+  ensureMiloIframeCss();
   const container = createTag('div', { class: 'milo-video' });
   if (video.provider === 'youtube') {
     const youtubeId = extractYouTubeId(video.url);
