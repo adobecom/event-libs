@@ -2,6 +2,7 @@ import { useState } from '../../v1/deps/htm-preact.js';
 import { html } from '../htm-wrapper.js';
 import { useSchedulesData } from '../context/SchedulesContext.js';
 import { useNavigation } from '../context/NavigationContext.js';
+import { sortSchedulesAlphabetically } from '../utils.js';
 import SearchInput from './SearchInput.js';
 import EventPicker from './EventPicker.js';
 
@@ -45,7 +46,9 @@ function Sidebar({ setIsAddScheduleModalOpen }) {
   };
 
   const showFilter = hasSynced && schedules.length > 0;
-  const filteredSchedules = schedules?.filter((s) => (s.title || '').toLowerCase().includes(search.toLowerCase()));
+  const filteredSchedules = sortSchedulesAlphabetically(
+    schedules?.filter((s) => (s.title || '').toLowerCase().includes(search.toLowerCase())),
+  );
 
   return html`
     <div class="sm-sidebar">

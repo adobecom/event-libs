@@ -1,4 +1,6 @@
-import { useEffect, html } from '../v1/deps/htm-preact.js';
+import {
+  useState, useEffect, html, Fragment,
+} from '../v1/deps/htm-preact.js';
 import Library from './pages/Library.js';
 import ConfigEditor from './pages/ConfigEditor.js';
 import { useNavigation } from './context/NavigationContext.js';
@@ -7,9 +9,39 @@ import { useDA } from './context/DAContext.js';
 import { useEventEnv } from './context/EventEnvContext.js';
 import { PAGES, EVENT_SERVICE_ENV_OPTIONS } from './constants.js';
 
+import { DAProvider as SgcDAProvider } from '../session-guide-configurator/context/DAContext.js';
+import { EventEnvProvider as SgcEventEnvProvider } from '../session-guide-configurator/context/EventEnvContext.js';
+import { NavigationProvider as SgcNavigationProvider } from '../session-guide-configurator/context/NavigationContext.js';
+import { ConfigsProvider as SgcConfigsProvider } from '../session-guide-configurator/context/ConfigsContext.js';
+import SessionGuideConfigurator from '../session-guide-configurator/SessionGuideConfigurator.js';
+
 const TOAST_TIMEOUT_MS = 6000;
 
-export default function TierOneEventConfigurator() {
+const TABS = [
+  { id: 'event', label: 'Event Config' },
+  { id: 'session-guide', label: 'Session Guide Config' },
+];
+
+// Mounts Session Guide Configurator's own, unmodified provider stack + component — same
+// nesting order its own standalone entry point uses. No data/context sharing with the
+// Tier 1 config below; this tab only co-locates the two apps under one page/URL.
+function SessionGuideTab() {
+  return html`
+    <${SgcDAProvider}>
+      <${SgcEventEnvProvider}>
+        <${SgcNavigationProvider}>
+          <${SgcConfigsProvider}>
+            <${SessionGuideConfigurator} />
+          </${SgcConfigsProvider}>
+        </${SgcNavigationProvider}>
+      </${SgcEventEnvProvider}>
+    </${SgcDAProvider}>
+  `;
+}
+
+// Everything TierOneEventConfigurator rendered before the tab bar existed — unchanged,
+// just extracted so it can live inside a tab instead of owning the whole page.
+function EventConfigTab() {
   const { isLoading: isDaLoading, error: daError } = useDA();
   const { activePage } = useNavigation();
   const { envName } = useEventEnv();
@@ -34,26 +66,22 @@ export default function TierOneEventConfigurator() {
 
   if (isDaLoading) {
     return html`
-      <div class="tec-app">
-        <div class="tec-loading">
-          <div class="tec-spinner" role="status" aria-label="Initializing…"></div>
-        </div>
+      <div class="tec-loading">
+        <div class="tec-spinner" role="status" aria-label="Initializing…"></div>
       </div>
     `;
   }
 
   if (daError) {
     return html`
-      <div class="tec-app">
-        <div class="tec-error">
-          <p>${daError}</p>
-        </div>
+      <div class="tec-error">
+        <p>${daError}</p>
       </div>
     `;
   }
 
   return html`
-    <div class="tec-app">
+    <${Fragment}>
       ${envName !== 'prod' && html`
         <div class="tec-env-banner" role="status">
           <strong>Non-production environment: ${envLabel}.</strong>
@@ -91,6 +119,29 @@ export default function TierOneEventConfigurator() {
           <button type="button" class="tec-btn tec-btn--icon" onClick=${clearToastSuccess} aria-label="Dismiss">✕</button>
         </div>
       `}
+    </${Fragment}>
+  `;
+}
+
+export default function TierOneEventConfigurator() {
+  const [activeTabId, setActiveTabId] = useState(TABS[0].id);
+
+  return html`
+    <div class="tec-app">
+      <nav class="tec-app-tabs" role="tablist" aria-label="Event configurators">
+        ${TABS.map((tab) => html`
+          <button
+            type="button"
+            role="tab"
+            class=${'tec-app-tab' + (activeTabId === tab.id ? ' tec-app-tab--active' : '')}
+            aria-selected=${String(activeTabId === tab.id)}
+            onClick=${() => setActiveTabId(tab.id)}
+            key=${tab.id}
+          >${tab.label}</button>
+        `)}
+      </nav>
+      ${activeTabId === 'event' && html`<${EventConfigTab} />`}
+      ${activeTabId === 'session-guide' && html`<${SessionGuideTab} />`}
     </div>
   `;
 }

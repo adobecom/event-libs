@@ -2,11 +2,9 @@ import {
   useState, useMemo, useCallback, useRef, useLayoutEffect, useEffect, html,
 } from '../../v1/deps/htm-preact.js';
 
-// Reorder + enable/disable + rename only — tracks aren't added or removed here.
-// `displayName` only affects this session guide's swimlane header; the underlying
-// track's name/icon/color elsewhere on the page are managed separately. A disabled
-// track is dropped entirely from the rendered guide by the consuming side, not just
-// hidden from ordering.
+// Reorder + enable/disable + rename only — rows mix real tracks and Override Primary
+// Event Site Track lanes in one list (matching how the live page's groupByTrack()
+// treats them). A disabled entry is fully dropped from the rendered guide, not just hidden here.
 function DragHandleIcon() {
   return html`
     <svg width="10" height="16" viewBox="0 0 10 16" aria-hidden="true" focusable="false">
@@ -185,7 +183,7 @@ export default function SwimlaneOrderEditor({ tracks, onChange }) {
   }, [order, measureRowHeight]);
 
   if (rows.length === 0) {
-    return html`<p class="sgc-swimlane-editor__empty">No tracks found in this event's session catalog yet.</p>`;
+    return html`<p class="sgc-swimlane-editor__empty">No tracks or override lanes found in this event's session catalog yet.</p>`;
   }
 
   return html`

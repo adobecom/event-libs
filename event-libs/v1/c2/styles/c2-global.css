@@ -8,5 +8,8 @@
     overflow: hidden;
     max-width: var(--s2a-layout-rich-media-content-measure-wide, 1192px);
     margin: 0 auto;
+    aspect-ratio: 16 / 9;
+    height: auto;
+    padding-bottom: 0;
   }
 }

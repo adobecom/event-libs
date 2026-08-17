@@ -9,10 +9,12 @@ import LoadingInline from './LoadingInline.js';
 // duplicating it.
 import { getConfigs as getTier1Configs } from '../../tier-1-event-configurator/scripts/da-controller.js';
 import { getDisplayTitle as getTier1DisplayTitle } from '../../tier-1-event-configurator/utils.js';
+import { isHomepageConfigType } from '../../tier-1-event-configurator/constants.js';
 import { useDA } from '../context/DAContext.js';
 
 // Lists events that already have a Tier 1 Event Configurator config — this app's
-// real source of truth for event data.
+// real source of truth for event data. Global rows only — Homepage configs (Upcoming/
+// Featured Sessions) target a different surface and aren't a valid Session Guide source.
 export default function Tier1ConfigPicker({
   isOpen, onClose, onSelect, onSwitchToAlternative,
 }) {
@@ -33,7 +35,7 @@ export default function Tier1ConfigPicker({
         setError(result.error || 'Failed to load Tier 1 Event Configurator configs');
         return;
       }
-      setRows(result.data);
+      setRows(result.data.filter((row) => !isHomepageConfigType(row.configType)));
     }).finally(() => {
       if (!cancelled) setIsLoading(false);
     });

@@ -1,5 +1,6 @@
 import { getMetadata, getEventConfig, LIBS } from '../../utils/utils.js';
 import { FALLBACK_LOCALES } from '../../utils/constances.js';
+import { applyAreaTheme } from '../../utils/decorate.js';
 
 async function getPromotionalContentUrl() {
   const customPromotionalContentLocation = getMetadata('promotional-content-location');
@@ -120,6 +121,8 @@ export default async function init(el) {
     const fragmentLink = createTag('a', { href: fragmentPath }, '', { parent: el });
     await loadFragment(fragmentLink);
   }));
+
+  applyAreaTheme();
 
   addMediaReversedClass(el);
 }

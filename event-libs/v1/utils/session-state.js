@@ -56,3 +56,31 @@ export function isInLiveNow(session, liveStreamActiveIds, nowMs) {
   const start = Date.parse(session.startTimeUtc);
   return nowMs >= start && liveStreamActiveIds.has(session.mrStreamId);
 }
+
+/**
+ * Whether the event has functionally ended: every session is on-demand, or the Tier 1
+ * Event Configurator's authored eventEndDateTime (a UTC epoch ms) has passed. An empty
+ * session list alone never satisfies "every session is on-demand", but eventEndMs having
+ * passed is independently sufficient regardless of session count.
+ */
+export function isPostEvent(sessionList, liveStreamActiveIds, nowMs, eventEndMs) {
+  const pastEventEnd = eventEndMs ? nowMs >= eventEndMs : false;
+  const allEnded = sessionList.length > 0 && sessionList.every(
+    (s) => deriveSessionState(s, liveStreamActiveIds, nowMs) === 'on-demand',
+  );
+  return allEnded || pastEventEnd;
+}
+
+/**
+ * Where "Watch now" navigates: homepage player if isLivestreamed, broadcast page if
+ * isOnline, own session page if on-demand, '' otherwise. Root-relative since the
+ * destination pages live on whatever domain is currently serving this page.
+ */
+export function getWatchDestination(session, sessionState) {
+  if (sessionState === 'on-demand') return session.sessionPageUrl || '';
+  if (sessionState !== 'live') return '';
+  // TODO: Maybe it needs to come from configs in case of Summit or other events with different homepage/broadcast pages.
+  if (session.isLivestreamed) return '/max.html';
+  if (session.isOnline) return '/max/broadcast.html';
+  return '';
+}
