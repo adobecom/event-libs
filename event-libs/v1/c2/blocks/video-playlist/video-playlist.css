@@ -73,9 +73,13 @@
      otherwise the reserved 32px would sit unused and the title couldn't reclaim it, per
      Figma's own Default (92-char truncation) vs Hover (65-char) row measurements.
      margin-left cancels the row's own `gap`, which would otherwise still reserve space
-     next to a zero-width column. */
+     next to a zero-width column. min-width:0 overrides flexbox's automatic minimum size
+     (which defaults to the content's — here the 32px buttons' — min-content width) that
+     would otherwise silently keep this column from ever actually shrinking below ~32px
+     despite width:0, leaving meta with nothing to reclaim. */
   .video-playlist-row-actions {
     width: 0;
+    min-width: 0;
     overflow: hidden;
     opacity: 0;
     margin-left: calc(-1 * var(--s2a-spacing-sm));
