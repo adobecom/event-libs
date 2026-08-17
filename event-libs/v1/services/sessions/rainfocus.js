@@ -7,13 +7,12 @@
 // unused here (ported for parity with northstar's full endpoint set) — their response shapes
 // are unconfirmed, unlike fetchMyData's.
 
-// Confirmed live via real MAX 2025 traffic — reverse-proxies to RF, avoiding CORS/IP allowlist.
+// Same-origin Adobe.com proxy over RainFocus's real API (avoids CORS/IP allowlist) — maps
+// these endpoint names to RainFocus's own /api/adobe/v2/* paths on events.rainfocus.com.
 export const DEFAULT_RF_API_URL = 'https://www.adobe.com/max-api/';
 
-// Non-prod counterpart, needed because a stage-IMS clientId won't resolve against prod RF —
-// and milo's local env mirrors stage IMS, so this covers local too. Inferred from milo's own
-// prod/stage RF proxy split (libs/features/mep/addons/event.js), not confirmed via real
-// max-api traffic.
+// Proxies to a separate RainFocus host (events-stg.rainfocus.com) — tokens aren't portable
+// between the two, and milo's local env mirrors stage IMS, so this covers local dev too.
 export const STAGE_RF_API_URL = 'https://www.stage.adobe.com/max-api/';
 
 // Not secrets — RainFocus restricts access by IP allowlist, not by this value.
@@ -104,7 +103,9 @@ export async function fetchFavorited(rfAuthToken, rfApiProfileId, rfApiUrl) {
 
 export async function addSession(sessionTimeId, rfAuthToken, rfApiProfileId, rfApiUrl) {
   const data = await rawFetch(rfApiUrl, ENDPOINTS.ADD_TO_SCHEDULE, {
-    rfApiProfileId, rfAuthToken, sessionTimeId,
+    // Required — without it RF defaults to in-person-only attendance and rejects with
+    // responseCode 27, even for attendees eligible for online/hybrid sessions.
+    rfApiProfileId, rfAuthToken, sessionTimeId, virtual: true,
   });
   return handleWriteResponse(data);
 }

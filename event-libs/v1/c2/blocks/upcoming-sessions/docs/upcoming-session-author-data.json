@@ -1,0 +1,79 @@
+[
+  {
+    "sessionId": "1c2f7e9a-3b4d-4e21-9a6f-6d1f1a2b3c4d",
+    "sessionCode": "S6210",
+    "enTitle": "Generative Fill Deep Dive: Photoshop's Newest AI Tools",
+    "track": "Generative Ai",
+    "url": "https://www.adobe.com/max/2026/sessions/generative-fill-deep-dive-s6210",
+    "watchUrl": "https://www.adobe.com/max/2026/live/homepage-stage",
+    "sessionTime": {
+      "startTimeMillis": 1784624404633,
+      "endTimeMillis": 1784628904633,
+      "timezone": "America/Los_Angeles"
+    }
+  },
+  {
+    "sessionId": "5f7a0b1c-5d8f-4a54-9d9c-0a5b5e6f7a8b",
+    "sessionCode": "S6522",
+    "enTitle": "Premiere Pro Roundtable: Editing at Broadcast Scale",
+    "track": "Video, Audio, and Motion",
+    "url": "https://www.adobe.com/max/2026/sessions/premiere-pro-roundtable-s6522",
+    "watchUrl": "https://www.adobe.com/max/2026/live/session-broadcast/s6522",
+    "mrStreamId": "mr-stream-s6522",
+    "sessionTime": {
+      "startTimeMillis": 1784624404633,
+      "endTimeMillis": 1784628904633,
+      "timezone": "America/Los_Angeles"
+    }
+  },
+  {
+    "sessionId": "7b9c2d3e-7f0b-4c76-9f1e-2c7d7a8b9c0d",
+    "sessionCode": "S6608",
+    "enTitle": "Firefly & Express: A Faster Path from Idea to Asset",
+    "track": "Generative Ai",
+    "url": "https://www.adobe.com/max/2026/sessions/firefly-express-idea-to-asset-s6608",
+    "sessionTime": {
+      "startTimeMillis": 1784626504633,
+      "endTimeMillis": 1784628904633,
+      "timezone": "America/Los_Angeles"
+    }
+  },
+  {
+    "sessionId": "0858af44-de91-4fb2-b0a3-a12bc104d687",
+    "sessionCode": "S6304",
+    "enTitle": "Photoshop & Lightroom: the Brand Builder's Workflow",
+    "track": "Graphic Design and Illustration",
+    "url": "https://www.adobe.com/max/2026/sessions/photoshop-lightroom-the-brand-builders-workflow-s6304",
+    "sessionTime": {
+      "startTimeMillis": 1784627404633,
+      "endTimeMillis": 1784631004633,
+      "timezone": "America/Los_Angeles"
+    }
+  },
+  {
+    "sessionId": "3d5e8f0b-4c6e-4f32-8b7a-8e3f3c4d5e6f",
+    "sessionCode": "S6415",
+    "enTitle": "Illustrator Live: Building a Brand Identity from Scratch",
+    "track": "Graphic Design and Illustration",
+    "url": "https://www.adobe.com/max/2026/sessions/illustrator-live-brand-identity-s6415",
+    "watchUrl": "https://www.adobe.com/max/2026/live/session-broadcast/s6415",
+    "mrStreamId": "mr-stream-s6415",
+    "sessionTime": {
+      "startTimeMillis": 1784628904633,
+      "endTimeMillis": 1784633404633,
+      "timezone": "America/Los_Angeles"
+    }
+  },
+  {
+    "sessionId": "9d1e4f5a-9b2c-4e98-b13f-4e9f9c0d1e2f",
+    "sessionCode": "S6701",
+    "enTitle": "Lightroom for Landscape: Field-to-Finish Editing",
+    "track": "Photography",
+    "url": "https://www.adobe.com/max/2026/sessions/lightroom-landscape-field-to-finish-s6701",
+    "sessionTime": {
+      "startTimeMillis": 1784631604633,
+      "endTimeMillis": 1784636104633,
+      "timezone": "America/Los_Angeles"
+    }
+  }
+]

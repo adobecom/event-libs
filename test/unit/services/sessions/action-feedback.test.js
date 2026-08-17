@@ -1,11 +1,11 @@
 import { expect } from '@esm-bundle/chai';
 
-import { runSessionAction, scheduleWithFeedback } from '../../../../event-libs/v1/services/sessions/action-feedback.js';
+import { runSessionAction, toggleScheduleWithFeedback, checkViewAccess } from '../../../../event-libs/v1/services/sessions/action-feedback.js';
 import { SessionActionError } from '../../../../event-libs/v1/services/sessions/session-actions.js';
 import { toast } from '../../../../event-libs/v1/features/toast/toast.js';
 import { conflict } from '../../../../event-libs/v1/features/conflict-modal/conflict-modal.js';
 import {
-  auth, sessions, scheduled, pendingActions,
+  auth, sessions, sessionsStatus, liveStreamActiveIds, scheduled, pendingActions,
 } from '../../../../event-libs/v1/utils/session-store.js';
 
 describe('services/sessions/action-feedback', () => {
@@ -78,7 +78,7 @@ describe('services/sessions/action-feedback', () => {
   // No tier-1-event-config metadata authored anywhere in this file, so
   // getAllowDoubleBooking() defaults to false — mirrors a page that hasn't set the
   // flag, where a genuine time conflict must still block scheduling.
-  it('scheduleWithFeedback surfaces the conflict modal for a real time conflict when allowDoubleBooking is unset', async () => {
+  it('toggleScheduleWithFeedback surfaces the conflict modal for a real time conflict when allowDoubleBooking is unset', async () => {
     auth.value = { isLoggedIn: true, isRegistered: true, userFirstName: null };
     pendingActions.value = new Set();
     const existingSession = {
@@ -90,9 +90,75 @@ describe('services/sessions/action-feedback', () => {
     sessions.value = [existingSession, incoming];
     scheduled.value = new Set(['existing']);
 
-    await scheduleWithFeedback(incoming, { eventConfig, isScheduled: false });
+    await toggleScheduleWithFeedback(incoming, { eventConfig, isScheduled: false });
 
     expect(conflict.value.existing).to.equal(existingSession);
     expect(conflict.value.incoming).to.equal(incoming);
+  });
+
+  describe('checkViewAccess', () => {
+    afterEach(() => {
+      sessions.value = [];
+      sessionsStatus.value = 'idle';
+      liveStreamActiveIds.value = new Set();
+    });
+
+    it('allows an ungated view regardless of auth, with no toast', () => {
+      auth.value = { isLoggedIn: false, isRegistered: false, userFirstName: null };
+      const fallback = checkViewAccess('live-upcoming', { eventConfig });
+      expect(fallback).to.be.null;
+      expect(toast.value).to.be.null;
+    });
+
+    it('allows a gated view when logged in and registered, with no toast', () => {
+      auth.value = { isLoggedIn: true, isRegistered: true, userFirstName: null };
+      const fallback = checkViewAccess('my-sessions', { eventConfig });
+      expect(fallback).to.be.null;
+      expect(toast.value).to.be.null;
+    });
+
+    it('blocks with a login toast when logged out', () => {
+      auth.value = { isLoggedIn: false, isRegistered: false, userFirstName: null };
+      const fallback = checkViewAccess('my-sessions', { eventConfig });
+      expect(fallback).to.equal('live-upcoming');
+      expect(toast.value.message).to.equal('Login required to view My sessions');
+      expect(toast.value.ctaLabel).to.equal('Login to Adobe');
+    });
+
+    it('blocks with a registration toast (including event title) when logged in but not registered', () => {
+      auth.value = { isLoggedIn: true, isRegistered: false, userFirstName: null };
+      const fallback = checkViewAccess('my-favorites', { eventConfig });
+      expect(fallback).to.equal('live-upcoming');
+      expect(toast.value.message).to.equal('Registration for Adobe MAX 2026 required to view My favorites');
+      expect(toast.value.ctaLabel).to.equal('Register');
+      expect(toast.value.ctaHref).to.equal('/register');
+    });
+
+    it('falls back to live-upcoming when sessions have not loaded yet', () => {
+      auth.value = { isLoggedIn: false, isRegistered: false, userFirstName: null };
+      sessionsStatus.value = 'loading';
+      sessions.value = [];
+      expect(checkViewAccess('my-sessions', { eventConfig })).to.equal('live-upcoming');
+    });
+
+    it('falls back to on-demand once every session has ended (post-event)', () => {
+      auth.value = { isLoggedIn: false, isRegistered: false, userFirstName: null };
+      sessionsStatus.value = 'ready';
+      sessions.value = [
+        { id: 's-1', startTimeUtc: '2020-01-01T00:00:00Z', endTimeUtc: '2020-01-01T01:00:00Z' },
+      ];
+      liveStreamActiveIds.value = new Set();
+      expect(checkViewAccess('my-sessions', { eventConfig })).to.equal('on-demand');
+    });
+
+    it('falls back to live-upcoming while any session is still live or upcoming', () => {
+      auth.value = { isLoggedIn: false, isRegistered: false, userFirstName: null };
+      sessionsStatus.value = 'ready';
+      sessions.value = [
+        { id: 's-1', startTimeUtc: '2099-01-01T00:00:00Z', endTimeUtc: '2099-01-01T01:00:00Z' },
+      ];
+      liveStreamActiveIds.value = new Set();
+      expect(checkViewAccess('my-sessions', { eventConfig })).to.equal('live-upcoming');
+    });
   });
 });

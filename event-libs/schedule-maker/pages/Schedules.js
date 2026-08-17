@@ -16,9 +16,9 @@ export default function Schedules() {
 
   // On mount, check if the URL hash carries schedule data (#schedule={b64}).
   // DA forwards only the parent page's hash to this iframe app — not query
-  // params — so a ?schedule= link (old ECC format, or a freshly-copied link
-  // while Copy Link temporarily emits ?schedule=) will not auto-open here;
-  // it can still be found via Sync from the sidebar list.
+  // params — so an old ECC ?schedule= link will not auto-open here (it can
+  // still be found via Sync from the sidebar list). Copy Link now emits
+  // #schedule=, so freshly-copied links auto-open here on paste.
   useEffect(() => {
     const hash = window.location.hash;
     if (!hash) return;

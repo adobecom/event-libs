@@ -43,9 +43,11 @@ describe('session-store: RF defaults when tier-1-event-config omits them', () =>
   // env.name: 'local' — the same non-prod IMS environment a real local dev session would have
   // — so the env-aware default correctly resolves to the stage RF endpoint here, not the prod
   // one (see session-store-rf-env.test.js for the 'prod' branch).
-  it('falls back to STAGE_RF_API_URL/DEFAULT_RF_PROFILE_ID', () => {
+  it('falls back to STAGE_RF_API_URL/DEFAULT_RF_PROFILE_ID/the hardcoded register default/null eventEndMs', () => {
     const apiConfig = getApiConfig();
     expect(apiConfig.apiUrl).to.equal(STAGE_RF_API_URL);
     expect(apiConfig.profileId).to.equal(DEFAULT_RF_PROFILE_ID);
+    expect(apiConfig.registerUrl).to.equal('/register');
+    expect(apiConfig.eventEndMs).to.equal(null);
   });
 });

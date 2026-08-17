@@ -132,6 +132,15 @@ describe('services/sessions/rainfocus', () => {
       expect(url.searchParams.has('clientId')).to.be.false;
     });
 
+    it('addSession always sends virtual=true — MAX is a hybrid event, matches northstar', async () => {
+      // Without this, RF defaults the request to in-person-only attendance and rejects
+      // with responseCode 27 even for attendees who should be allowed to schedule.
+      stubFetch({ responseCode: '0' });
+      await addSession('st-1', 'auth-token', 'profile-1', 'https://example.com/rf/');
+      const url = new URL(lastRequest);
+      expect(url.searchParams.get('virtual')).to.equal('true');
+    });
+
     it('removeSession hits removeSession with sessionTimeId', async () => {
       stubFetch({ responseCode: '0' });
       await removeSession('st-2', null, 'profile-1', 'https://example.com/rf/');
