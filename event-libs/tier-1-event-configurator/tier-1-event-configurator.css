@@ -1002,6 +1002,7 @@ select.tec-field {
 .tec-featured-editor__column {
   flex: 1;
   min-width: 0;
+  overflow-y: auto;
 }
 
 .tec-featured-editor__column h3 {
@@ -1035,7 +1036,6 @@ select.tec-field {
   flex-direction: column;
   gap: 6px;
   max-height: 360px;
-  overflow-y: auto;
 }
 
 .tec-featured-editor__row {
@@ -1046,6 +1046,24 @@ select.tec-field {
   background: var(--tec-color-background);
   border: 1px solid var(--tec-color-border);
   border-radius: var(--tec-border-radius-sm);
+}
+
+/* Selected-session rows (left column) can grow tall once meta-field inputs are
+   showing, so align to the top instead of center — puts the remove button in
+   the row's top-right corner rather than vertically centered against the
+   whole (now potentially multi-line) row. Available-session rows (right
+   column, no meta fields) keep the base center alignment untouched. */
+.tec-featured-editor__row.tec-featured-editor__row--selected {
+  align-items: flex-start;
+  cursor: grab;
+}
+
+.tec-featured-editor__remove {
+  flex-shrink: 0;
+}
+
+.tec-btn--icon.tec-btn--icon-s.tec-featured-editor__remove {
+  border: none;
 }
 
 .tec-featured-editor__row.is-dragging {

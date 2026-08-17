@@ -14,6 +14,14 @@ function ReplaceIcon() {
   `;
 }
 
+function CloseIcon() {
+  return html`
+    <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true" focusable="false">
+      <path d="M3 3l10 10M13 3 3 13" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" />
+    </svg>
+  `;
+}
+
 function TrashIcon() {
   return html`
     <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true" focusable="false">
@@ -333,7 +341,7 @@ export default function FeaturedSessionsEditor({
             const title = session?.enTitle || sessionId;
             return html`
               <li \
-                class="tec-featured-editor__row ${sessionId === draggedId ? 'is-dragging' : ''}" \
+                class="tec-featured-editor__row tec-featured-editor__row--selected ${sessionId === draggedId ? 'is-dragging' : ''}" \
                 key=${sessionId} \
                 ref=${(node) => setItemRef(sessionId, node)} \
               >
@@ -364,7 +372,12 @@ export default function FeaturedSessionsEditor({
                     `}
                   `}
                 </div>
-                <button type="button" class="tec-btn tec-btn--quiet tec-btn--s tec-btn--danger" onClick=${() => handleRemove(sessionId)}>Remove</button>
+                <button \
+                  type="button" \
+                  class="tec-btn tec-btn--icon tec-btn--icon-s tec-btn--danger tec-featured-editor__remove" \
+                  aria-label="Remove ${title}" \
+                  onClick=${() => handleRemove(sessionId)} \
+                ><${CloseIcon} /></button>
               </li>
             `;
           })}
