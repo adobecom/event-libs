@@ -287,6 +287,34 @@
   }
 }
 
+/* Mobile-only thumbnail play overlay — desktop shows play as a separate hover-revealed
+   button in .video-playlist-row-actions instead (see the min-width:1024px block below). */
+.video-playlist-row-play-icon {
+  display: flex;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  align-items: center;
+  justify-content: center;
+  padding: 7px;
+  transform: translate(-50%, -50%);
+  border-radius: 20px;
+  background: var(--s2a-color-button-background-primary-solid-on-dark-hover);
+  color: #000;
+  pointer-events: none;
+}
+
+.video-playlist-row-play-icon svg {
+  width: 13px;
+  height: 15px;
+}
+
+@media (min-width: 1024px) {
+  .video-playlist-row-play-icon {
+    display: none;
+  }
+}
+
 .video-playlist-row-meta {
   display: flex;
   flex: 1 1 auto;
@@ -385,6 +413,18 @@
    (brand red) rather than a filled-vs-outline shape swap. */
 .video-playlist-row-favorite.is-favorited {
   color: var(--s2a-color-brand-adobe-red);
+}
+
+/* Mobile shows play centered on the thumbnail (.video-playlist-row-play-icon) instead —
+   the stacked row-actions play button is desktop-only. */
+.video-playlist-row-play {
+  display: none;
+}
+
+@media (min-width: 1024px) {
+  .video-playlist-row-play {
+    display: flex;
+  }
 }
 
 /* Desktop-only "Show more": reveals rows beyond SHOW_MORE_INITIAL_ROWS via a plain
