@@ -283,6 +283,19 @@
   color: var(--tec-color-text-primary);
 }
 
+.tec-btn--icon.tec-btn--icon-s {
+  width: 28px;
+  height: 28px;
+  padding: 5px;
+  border: 1px solid var(--tec-color-border-hover);
+}
+
+.tec-btn--icon.tec-btn--danger:hover:not(:disabled) {
+  background: var(--tec-color-error-bg);
+  color: var(--tec-color-error);
+  border-color: var(--tec-color-error);
+}
+
 .tec-btn--full {
   width: 100%;
 }
