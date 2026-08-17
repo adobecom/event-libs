@@ -355,6 +355,10 @@
   gap: var(--s2a-spacing-xs);
 }
 
+/* Frosted-glass badge, per Figma's IconButton/Core/Primary spec — a fixed dark icon on a
+   semi-transparent light circle, deliberately NOT theme-relative (--vp-*): this sits on
+   top of the thumbnail/row regardless of whether the card itself is light (desktop) or
+   dark (mobile), so it needs its own self-contained contrast, not inherited row color. */
 .video-playlist-row-favorite,
 .video-playlist-row-play {
   display: flex;
@@ -363,28 +367,24 @@
   justify-content: center;
   width: 32px;
   height: 32px;
-  border: none;
+  border: var(--s2a-border-width-sm, 1px) solid var(--s2a-color-gray-100);
   border-radius: var(--s2a-border-radius-round);
-  background: none;
-  color: inherit;
+  background: rgb(255 255 255 / 80%);
+  backdrop-filter: blur(4.6875px);
+  color: var(--s2a-color-gray-900);
   cursor: pointer;
 }
 
-.video-playlist-row-favorite svg {
-  width: 16px;
-  height: 16px;
-  fill: none;
-  stroke: currentcolor;
-  stroke-width: 1.5;
-}
-
+.video-playlist-row-favorite svg,
 .video-playlist-row-play svg {
   width: 16px;
   height: 16px;
 }
 
-.video-playlist-row-favorite.is-favorited svg {
-  fill: currentcolor;
+/* No separate "solid heart" asset confirmed yet — favorited state reads via color
+   (brand red) rather than a filled-vs-outline shape swap. */
+.video-playlist-row-favorite.is-favorited {
+  color: var(--s2a-color-brand-adobe-red);
 }
 
 /* Desktop-only "Show more": reveals rows beyond SHOW_MORE_INITIAL_ROWS via a plain
