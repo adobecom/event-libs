@@ -149,12 +149,23 @@ function maybeLoadMyData() {
 
 async function loadSessions() {
   sessionsStatus.value = 'loading';
+  // eslint-disable-next-line no-console
+  console.log('[session-store] loading session catalog', {
+    eventId: apiConfig.eventId,
+    eventServiceEnv: getEventServiceEnv()?.name,
+  });
   try {
     const fetched = await fetchSessions(apiConfig.eventId);
     // Batched so components reading both `sessions` and `sessionsStatus` re-render once.
     batch(() => {
       sessions.value = fetched;
       sessionsStatus.value = 'ready';
+    });
+    // eslint-disable-next-line no-console
+    console.log('[session-store] session catalog loaded', {
+      eventId: apiConfig.eventId,
+      sessionCount: fetched.length,
+      sampleSessionIds: fetched.slice(0, 5).map((session) => session.id),
     });
     const mrSessions = sessions.value.filter((s) => s.mrStreamId);
     startPolling(mrSessions, apiConfig.mrEnv, (active) => { liveStreamActiveIds.value = active; });
@@ -167,6 +178,13 @@ async function loadSessions() {
     );
     maybeLoadMyData();
   } catch (err) {
+    // Preserve the full error in DevTools (including its stack and any fetch details).
+    // eslint-disable-next-line no-console
+    console.error('[session-store] session catalog failed to load', {
+      eventId: apiConfig.eventId,
+      eventServiceEnv: getEventServiceEnv()?.name,
+      error: err,
+    });
     window.lana?.log(`[session-store] sessions fetch failed: ${err.message}`);
     sessionsStatus.value = 'error';
   }
@@ -201,9 +219,17 @@ function parseTierOneEventConfig() {
 // when tier-1-event-config metadata is absent (mirrors the `event-id` gate decorateEvent
 // already uses for page-wide setup).
 export function initSessionState() {
-  if (initialized) return;
+  if (initialized) {
+    // eslint-disable-next-line no-console
+    console.log('[session-store] initialization skipped: store is already initialized', apiConfig);
+    return;
+  }
   const tierOneConfig = parseTierOneEventConfig();
-  if (!tierOneConfig) return;
+  if (!tierOneConfig) {
+    // eslint-disable-next-line no-console
+    console.warn('[session-store] initialization skipped: tier-1-event-config metadata is missing or invalid');
+    return;
+  }
   initialized = true;
 
   apiConfig = {
@@ -217,6 +243,19 @@ export function initSessionState() {
     eventEndMs: tierOneConfig.eventEndDateTime || null,
     mrEnv: deriveMrEnv(),
   };
+
+  // eslint-disable-next-line no-console
+  console.log('[session-store] initialized', {
+    eventId: apiConfig.eventId,
+    apiUrl: apiConfig.apiUrl,
+    profileId: apiConfig.profileId,
+    mrEnv: apiConfig.mrEnv,
+  });
+
+  if (!apiConfig.eventId) {
+    // eslint-disable-next-line no-console
+    console.warn('[session-store] no event ID found; the session catalog request will not have a valid event key');
+  }
 
   mountToast();
   syncAuth();

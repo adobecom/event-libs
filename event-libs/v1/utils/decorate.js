@@ -1202,7 +1202,15 @@ export function decorateEvent(parent) {
 
   // Bootstraps Tier 1 Event Configurator output + shared session state ahead of any
   // block's own init().
-  if (getMetadata('tier-1-event-config')) {
+  const tierOneEventConfig = getMetadata('tier-1-event-config');
+  // eslint-disable-next-line no-console
+  console.log('[decorateEvent] session bootstrap check', {
+    hasTierOneEventConfig: Boolean(tierOneEventConfig),
+    pageEventId: getMetadata('event-id') || null,
+  });
+  if (tierOneEventConfig) {
+    // eslint-disable-next-line no-console
+    console.log('[decorateEvent] initializing Tier 1 event config and session store');
     initTierOneEventConfig();
     initSessionState();
   }
@@ -1254,4 +1262,3 @@ export default function decorateArea(area = document) {
     eagerLoad(marquee, 'div:last-child > div:last-child img');
   }());
 }
-
