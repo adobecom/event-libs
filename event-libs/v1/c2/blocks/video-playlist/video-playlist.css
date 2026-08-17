@@ -58,14 +58,12 @@
     --vp-playing-track-bg: var(--s2a-color-gray-700);
     --vp-playing-muted: var(--s2a-color-transparent-white-64);
 
-    flex: 0 0 360px;
+    /* 349px = 317px content (per Figma inspect at 1024px) + 16px+16px padding-inline;
+       widens per breakpoint below (392px @1440px = 360px content + 32px). */
+    flex: 0 0 349px;
     align-self: stretch;
     max-height: 100%;
     overflow-y: auto;
-  }
-
-  .video-playlist.is-expanded {
-    flex-basis: 630px; /* 175% of the 360px rail width */
   }
 
   /* Play-icon and favorite button are hover/focus-revealed only on desktop (per the
@@ -95,11 +93,21 @@
   .section:has(> .video-playlist) {
     padding-inline: var(--s2a-layout-lg);
   }
+
+  /* 392px = 360px content (per Figma inspect at 1440px) + 16px+16px padding-inline. */
+  .video-playlist {
+    flex-basis: 392px;
+  }
 }
 
 @media (min-width: 1920px) {
   .section:has(> .video-playlist) {
     padding-inline: 220px;
+  }
+
+  /* 487px = 455px content (per Figma inspect at 1920px) + 16px+16px padding-inline. */
+  .video-playlist {
+    flex-basis: 487px;
   }
 }
 
@@ -134,8 +142,13 @@
   flex: 1 1 auto;
   min-width: 0;
   margin: 0;
+  overflow: hidden;
   font-size: var(--s2a-font-size-lg);
   font-weight: var(--s2a-font-weight-adobe-clean-extrabold, 800);
+  /* stylelint-disable-next-line value-no-vendor-prefix -- required for -webkit-line-clamp */
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
 }
 
 .video-playlist-toggle {
