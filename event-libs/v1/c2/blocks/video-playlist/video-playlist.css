@@ -18,7 +18,7 @@
   .section:has(> .video-playlist) {
     display: flex;
     align-items: flex-start;
-    gap: var(--s2a-spacing-md);
+    gap: var(--s2a-spacing-xs);
     padding-inline: 86px;
   }
 
@@ -389,7 +389,11 @@
 
 /* Desktop-only "Show more": reveals rows beyond SHOW_MORE_INITIAL_ROWS via a plain
    nth-child cap — independent of the mobile drawer's own is-expanded/Drawer state,
-   which already covers the equivalent need on mobile (the full list scrolls there). */
+   which already covers the equivalent need on mobile (the full list scrolls there).
+   Space below it is margin, not padding — padding would inflate the button's own flex
+   box, pushing align-items:center to center the text+chevron within that taller box
+   instead of just adding space after it (visible as a misaligned chevron inside an
+   oversized focus outline). */
 .video-playlist-show-more {
   display: none;
 }
@@ -400,7 +404,7 @@
     align-items: center;
     justify-content: center;
     gap: var(--s2a-spacing-xs);
-    padding-bottom: var(--s2a-spacing-lg);
+    margin-bottom: var(--s2a-spacing-lg);
     border: none;
     background: none;
     color: #000;
