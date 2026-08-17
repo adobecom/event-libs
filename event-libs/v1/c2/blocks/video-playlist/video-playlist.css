@@ -50,7 +50,7 @@
   .video-playlist {
     --vp-bg: var(--s2a-color-gray-25);
     --vp-fg: var(--s2a-color-gray-900);
-    --vp-row-hover: var(--s2a-color-transparent-black-08);
+    --vp-row-bg: var(--s2a-color-gray-50);
     --vp-track-bg: var(--s2a-color-transparent-black-16);
     --vp-muted: var(--s2a-color-transparent-black-64);
     --vp-playing-bg: var(--s2a-color-gray-900);
@@ -237,20 +237,18 @@
   gap: var(--s2a-spacing-sm);
   width: 100%;
   box-sizing: border-box;
-  border-radius: var(--s2a-border-radius-md, 16px);
+  border-radius: var(--s2a-border-radius-sm, 8px);
   padding: var(--s2a-spacing-xs);
   color: inherit;
   font-family: inherit;
+  background: var(--vp-row-bg);
   cursor: pointer;
 }
 
-.video-playlist-row:hover {
-  background: var(--vp-row-hover);
-}
-
-/* Currently-playing row: a solid card in the theme's inverse colors (light-on-dark
-   card gets a light highlight; dark-on-light desktop card gets a DARK highlight — see
-   the --vp-playing-* custom properties). */
+/* Hover and currently-playing share the exact same treatment (per Figma) — a solid card
+   in the theme's inverse colors (light-on-dark card gets a light highlight; dark-on-light
+   desktop card gets a DARK highlight — see the --vp-playing-* custom properties). */
+.video-playlist-row:hover,
 .video-playlist-row.is-playing {
   background: var(--vp-playing-bg);
   color: var(--vp-playing-fg);
@@ -323,6 +321,7 @@
   overflow: hidden;
 }
 
+.video-playlist-row:hover .video-playlist-row-progress-track,
 .video-playlist-row.is-playing .video-playlist-row-progress-track {
   background: var(--vp-playing-track-bg);
 }
@@ -343,6 +342,7 @@
   color: var(--vp-muted);
 }
 
+.video-playlist-row:hover .video-playlist-row-duration,
 .video-playlist-row.is-playing .video-playlist-row-duration {
   color: var(--vp-playing-muted);
 }
@@ -398,19 +398,24 @@
   .video-playlist-show-more {
     display: flex;
     align-items: center;
-    gap: var(--s2a-spacing-3xs);
+    justify-content: center;
+    gap: var(--s2a-spacing-xs);
+    padding-bottom: var(--s2a-spacing-lg);
     border: none;
     background: none;
-    color: inherit;
-    font-family: inherit;
+    color: #000;
+    text-align: center;
+    font-family: var(--s2a-font-family-default);
     font-size: var(--s2a-font-size-sm);
+    font-style: normal;
     font-weight: 700;
+    line-height: 120%; /* 16.8px */
     cursor: pointer;
   }
 
   .video-playlist-show-more-chevron {
-    width: 12px;
-    height: 8px;
+    width: 8px;
+    height: 5px;
     transition: transform 0.2s ease;
   }
 
@@ -436,7 +441,7 @@
   .video-playlist {
     --vp-bg: var(--s2a-color-gray-900);
     --vp-fg: var(--s2a-color-gray-25);
-    --vp-row-hover: var(--s2a-color-transparent-white-16);
+    --vp-row-bg: transparent;
     --vp-track-bg: var(--s2a-color-transparent-white-24);
     --vp-muted: var(--s2a-color-transparent-white-64);
     --vp-playing-bg: var(--s2a-color-gray-25);
