@@ -537,7 +537,9 @@ class Drawer {
 
 // Kept minimal/generic — not copied from any design system, just a plain triangle-in-a-
 // circle overlay and heart outline matching the Figma renders' shapes.
-const PLAY_ICON_SVG = '<svg viewBox="0 0 40 40" aria-hidden="true"><circle cx="20" cy="20" r="20" fill="rgb(0 0 0 / 40%)"/><path d="M16 12.5v15l13-7.5z" fill="#fff"/></svg>';
+// A plain glyph (no baked-in circle) — the row's own .video-playlist-row-play button
+// supplies the circular background via CSS, same convention as the favorite heart icon.
+const PLAY_ICON_SVG = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 2.5v11l10-5.5z" fill="currentColor"/></svg>';
 const FAVORITE_ICON_SVG = '<svg viewBox="0 0 24 22" aria-hidden="true"><path d="M12 20.5S2 14 2 7.5A5.5 5.5 0 0 1 12 4a5.5 5.5 0 0 1 10 3.5C22 14 12 20.5 12 20.5Z"/></svg>';
 const TOGGLE_CHEVRON_SVG = '<svg viewBox="0 0 16 10" aria-hidden="true"><path d="M1 1l7 7 7-7" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 
@@ -568,12 +570,30 @@ function buildFavoriteButton(item) {
   return button;
 }
 
-// `favoritable` gates every topic-playlist-only addition (play-icon overlay, progress
-// bar, favorite button) — Chapters rows call this with no third argument at all, so
-// their markup is byte-for-byte what it always was.
+// A plain, non-interactive play affordance — clicking it does exactly what clicking the
+// row itself does (see `activate` in buildRow). stopPropagation isn't strictly needed
+// for correctness here (both paths call the same `activate`), but matches the favorite
+// button's convention and avoids a redundant double-dispatch up through the row.
+function buildPlayButton(activate) {
+  const button = createTag('button', {
+    type: 'button',
+    class: 'video-playlist-row-play',
+    'aria-hidden': 'true',
+    tabindex: '-1',
+  }, PLAY_ICON_SVG);
+  button.addEventListener('click', (event) => {
+    event.stopPropagation();
+    activate();
+  });
+  return button;
+}
+
+// `favoritable` gates every topic-playlist-only addition (progress bar, favorite/play
+// buttons) — Chapters rows call this with no third argument at all, so their markup is
+// byte-for-byte what it always was.
 function buildRow(item, { onSelect, favoritable = false }) {
-  // A plain div, not a <button> — a real <button> (favorite) needs to sit alongside it
-  // as a sibling below, and a <button> can never contain another <button>. tabindex +
+  // A plain div, not a <button> — a real <button> (favorite/play) needs to sit alongside
+  // it as a sibling below, and a <button> can never contain another <button>. tabindex +
   // the keydown handler below restore the keyboard-activation a native button would
   // otherwise have given for free.
   const row = createTag('div', {
@@ -588,7 +608,6 @@ function buildRow(item, { onSelect, favoritable = false }) {
   if (item.thumbnailUrl) {
     const thumbWrap = createTag('div', { class: 'video-playlist-row-thumb-wrap' }, '', { parent: row });
     createTag('img', { class: 'video-playlist-row-thumb', src: item.thumbnailUrl, alt: '' }, '', { parent: thumbWrap });
-    if (favoritable) createTag('span', { class: 'video-playlist-row-play-icon' }, PLAY_ICON_SVG, { parent: thumbWrap });
   }
 
   const meta = createTag('div', { class: 'video-playlist-row-meta' }, '', { parent: row });
@@ -604,9 +623,16 @@ function buildRow(item, { onSelect, favoritable = false }) {
     createTag('span', { class: 'video-playlist-row-duration' }, item.durationLabel, { parent: meta });
   }
 
-  if (favoritable) row.appendChild(buildFavoriteButton(item));
-
   const activate = () => onSelect(item, row);
+
+  // Favorite + play sit stacked together as a hover/focus-revealed action column (per
+  // Figma's "Hover" row state) — not on the thumbnail as an overlay.
+  if (favoritable) {
+    const actions = createTag('div', { class: 'video-playlist-row-actions' }, '', { parent: row });
+    actions.appendChild(buildFavoriteButton(item));
+    actions.appendChild(buildPlayButton(activate));
+  }
+
   row.addEventListener('click', activate);
   row.addEventListener('keydown', (event) => {
     if (event.key !== 'Enter' && event.key !== ' ') return;

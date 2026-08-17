@@ -747,6 +747,48 @@ describe('video-playlist (C2)', () => {
       expect(document.querySelector('.video-playlist-row-favorite')).to.not.exist;
     });
 
+    it('renders a play button on topic-playlist rows, stacked with favorite, not on the thumbnail', async () => {
+      const current = session({ id: 'current', playlistOnSessionPage: ['3d'] });
+      const matches = [1, 2, 3, 4].map((i) => session({
+        id: `match-${i}`, playlistAssignment: ['3d'], sessionPageUrl: '',
+      }));
+      sessions.value = [current, ...matches];
+
+      document.body.innerHTML = playlistHtml();
+      el = document.querySelector('.video-playlist');
+      await init(el);
+
+      const row = document.body.querySelector('.video-playlist-row');
+      const actions = row.querySelector('.video-playlist-row-actions');
+      const playButton = row.querySelector('.video-playlist-row-play');
+      expect(actions).to.exist;
+      expect(playButton).to.exist;
+      expect(actions.contains(playButton)).to.be.true;
+      expect(actions.contains(row.querySelector('.video-playlist-row-favorite'))).to.be.true;
+      // Decorative — duplicates the row's own action rather than being independently
+      // reachable/announced by assistive tech.
+      expect(playButton.getAttribute('aria-hidden')).to.equal('true');
+      expect(playButton.getAttribute('tabindex')).to.equal('-1');
+      expect(row.querySelector('.video-playlist-row-thumb-wrap .video-playlist-row-play')).to.not.exist;
+
+      const rowClickSpy = sinon.spy();
+      row.addEventListener('click', rowClickSpy);
+      playButton.click();
+
+      expect(rowClickSpy.called).to.be.false;
+    });
+
+    it('does not render a play button for Chapters rows', async () => {
+      sessions.value = [session({ id: 'current', isKeynote: true })];
+      document.body.innerHTML = playlistHtml({
+        chapters: JSON.stringify([{ label: 'Intro', timestampSeconds: 0 }]),
+      });
+      el = document.querySelector('.video-playlist');
+      await init(el);
+
+      expect(document.querySelector('.video-playlist-row-play')).to.not.exist;
+    });
+
     it('saves progress to localStorage on an mpc tick message, keyed by the current session id', async () => {
       sessions.value = [session({ id: 'current', playlistOnSessionPage: ['3d'] })];
       document.head.innerHTML = `
