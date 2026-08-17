@@ -17,7 +17,11 @@ import { renderSchedule } from './schedule.js';
 // of overflowing (which would fire immediately).
 const MAX_TIMEOUT = 2 ** 31 - 1;
 
-// TODO: source the broadcast URL from the Tier 1 Configurator instead of hardcoding.
+// Interim hardcode for MAX 2026. TODO: align with Daniel Oliva's approach — he
+// owns both getWatchDestination() (session-state.js, whose own TODO says the URL
+// "needs to come from configs") and the Tier 1 Configurator. Adopt whatever he
+// standardizes on (likely a configurator broadcastUrl field) so this CTA and his
+// watch-destination logic share one source, rather than maintaining this hardcode.
 const BROADCAST_URL = 'https://www.adobe.com/max/2026/broadcast.html';
 // Figma "watch now" glyph (play). fill: currentColor so it reads white on the
 // dark CTA pill.

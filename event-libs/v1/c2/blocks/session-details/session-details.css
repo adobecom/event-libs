@@ -12,12 +12,24 @@
   margin-bottom: var(--s2a-spacing-8, 8px);
 }
 
-/* Eyebrow: track tags (left) + state-driven status (right). */
+/* Eyebrow: track tags then state-driven status, flush left, split by a pipe. */
 .session-eyebrow {
   display: flex;
+  align-items: stretch; /* status slot (the pipe) stretches to the tags' height */
+}
+
+/* "tags | status" — the pipe lives on the slot so it spans the full height of the
+   stacked tags; 12px on each side; centered status; hidden until a status exists. */
+.session-status-slot {
+  display: inline-flex;
   align-items: flex-start;
-  justify-content: space-between;
-  gap: var(--s2a-spacing-12, 12px);
+  margin-left: var(--s2a-spacing-12, 12px);
+  padding-left: var(--s2a-spacing-12, 12px);
+  border-left: 1px solid var(--s2a-color-gray-300, #cacaca);
+}
+
+.session-status-slot:empty {
+  display: none;
 }
 
 .session-status {
