@@ -1090,6 +1090,12 @@ export function applySectionColumnsLayout() {
 // e.g. "dark", "dark(blocks:hero-marquee,profile-cards)", or "dark(blocks:text[first],agenda)"
 const BLOCK_TOKEN_RE = /^([^[\]]+?)(?:\[\s*(first|last|[1-9]\d*)\s*\])?$/;
 
+const PAGE_BLOCK_SELECTOR = [
+  'main > div > div[class]',
+  'main .chrono-box .fragment > div > div[class]',
+  'main .promotional-content .fragment > div > div[class]',
+].join(', ');
+
 function parseThemeValue(raw) {
   const value = raw?.toLowerCase().trim();
   const match = value?.match(/^(dark|light)(?:\(\s*blocks\s*:\s*([^)]*)\)\s*)?$/);
@@ -1124,25 +1130,33 @@ export function applyAreaTheme(area = document) {
 
     const isDocument = area === document;
     const blocks = isDocument
-      ? area.body.querySelectorAll('main > div > div[class]')
+      ? area.body.querySelectorAll(PAGE_BLOCK_SELECTOR)
       : area.querySelectorAll('div[class]');
 
     if (blockTokens) {
-      const blockList = Array.from(blocks);
+      const localList = Array.from(blocks);
+      const positionalTokens = blockTokens.filter((t) => t.selector);
       const plainNames = blockTokens.filter((t) => !t.selector).map((t) => t.name);
-      const positionalTargets = new Set();
-      blockTokens.filter((t) => t.selector).forEach(({ name, selector }) => {
-        const group = blockList.filter((b) => b.classList.contains(name));
-        const index = selector === 'first' ? 0
-          : selector === 'last' ? group.length - 1
-            : Number(selector) - 1;
-        if (group[index]) positionalTargets.add(group[index]);
-      });
 
-      blockList.forEach((block) => {
-        const matches = plainNames.some((name) => block.classList.contains(name))
-          || positionalTargets.has(block);
-        if (!matches) return;
+      if (positionalTokens.length) {
+        const pageBlockList = isDocument
+          ? localList
+          : Array.from(document.body.querySelectorAll(PAGE_BLOCK_SELECTOR));
+        positionalTokens.forEach(({ name, selector }) => {
+          const group = pageBlockList.filter((b) => b.classList.contains(name));
+          const index = selector === 'first' ? 0
+            : selector === 'last' ? group.length - 1
+              : Number(selector) - 1;
+          const target = group[index];
+          group.forEach((block) => {
+            block.classList.remove('dark', 'light');
+            if (block === target) block.classList.add(themeValue);
+          });
+        });
+      }
+
+      localList.forEach((block) => {
+        if (!plainNames.some((name) => block.classList.contains(name))) return;
         block.classList.remove('dark', 'light');
         block.classList.add(themeValue);
       });

@@ -1089,10 +1089,10 @@
 /* ── Session Card ────────────────────────────────────────── */
 
 /* stylelint-disable no-descending-specificity */
-.sg-card,
-.sg-card:hover,
-.sg-card.is-scheduled,
-.sg-card.is-favorited {
+.sessions-guide .sg-card,
+.sessions-guide .sg-card:hover,
+.sessions-guide .sg-card.is-scheduled,
+.sessions-guide .sg-card.is-favorited {
   flex-direction: column;
   width: 255px;
   min-height: 0;
@@ -1108,7 +1108,7 @@
 /* stylelint-enable no-descending-specificity */
 
 /* stylelint-disable-next-line no-descending-specificity */
-.sg-card {
+.sessions-guide .sg-card {
   flex-shrink: 0;
   display: flex;
   cursor: pointer;
@@ -1118,7 +1118,7 @@
 }
 
 /* stylelint-disable-next-line no-descending-specificity */
-.sg-card:active { background: var(--s2a-color-gray-75); }
+.sessions-guide .sg-card:active { background: var(--s2a-color-gray-75); }
 
 .sg-card__body {
   flex: 1 1 auto;
@@ -2260,7 +2260,7 @@
 
   /* ── Session cards ─────────────────────────────────────────── */
 
-  .sg-card {
+  .sessions-guide .sg-card {
     flex-direction: row;
     width: 379px;
     min-height: 124px;
@@ -2282,7 +2282,7 @@
                 border-width 0.45s ease;
   }
 
-  .sg-card:hover {
+  .sessions-guide .sg-card:hover {
     flex-direction: row;
     width: 427px;
     min-height: 150px;
@@ -2305,8 +2305,8 @@
     z-index: 2;
   }
 
-  .sg-card.is-scheduled,
-  .sg-card.is-favorited {
+  .sessions-guide .sg-card.is-scheduled,
+  .sessions-guide .sg-card.is-favorited {
     flex-direction: row;
     width: 427px;
     min-height: 124px;
@@ -2328,8 +2328,8 @@
                 border-width 0.45s ease;
   }
 
-  .sg-card.is-scheduled:hover,
-  .sg-card.is-favorited:hover {
+  .sessions-guide .sg-card.is-scheduled:hover,
+  .sessions-guide .sg-card.is-favorited:hover {
     background: var(--s2a-color-gray-900);
     min-height: 150px;
     box-shadow: 0 6px 24px rgb(0 0 0 / 18%);
@@ -2520,11 +2520,11 @@
 
 @media (hover: none) and (min-width: 1280px) {
   /* Kill transitions so tap-triggered :hover resets are instant */
-  .sg-card { transition: none; }
+  .sessions-guide .sg-card { transition: none; }
 
-  .sg-card:hover,
-  .sg-card.is-scheduled:hover,
-  .sg-card.is-favorited:hover {
+  .sessions-guide .sg-card:hover,
+  .sessions-guide .sg-card.is-scheduled:hover,
+  .sessions-guide .sg-card.is-favorited:hover {
     width: 379px;
     min-height: 124px;
     background: var(--s2a-color-gray-50);

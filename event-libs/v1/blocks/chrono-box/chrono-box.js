@@ -1,4 +1,5 @@
 import { getMetadata, getEventConfig, LIBS } from '../../utils/utils.js';
+import { applyAreaTheme } from '../../utils/decorate.js';
 
 /** @param {HTMLElement} host */
 function ensureReparentSet(host) {
@@ -298,6 +299,10 @@ function dispatchModalOpenOnceForHash(hash) {
   window.dispatchEvent(new CustomEvent('modal:open', { bubbles: true, detail: { hash } }));
 }
 
+export function revalidatePageTheme() {
+  applyAreaTheme();
+}
+
 /**
  * Re-run Milo modal opening for the current URL hash after scheduled fragment content is in the DOM.
  * Milo listens on `window` for `modal:open` (see utils initModalEventListener). Optional rAF deferral
@@ -424,6 +429,7 @@ export default async function init(el) {
       // document (including nested chrono-box blocks), causing unbounded recursion.
       if (!fragmentPath) {
         el.removeAttribute('style');
+        revalidatePageTheme();
         if (worker._blobUrl) {
           URL.revokeObjectURL(worker._blobUrl);
           worker._blobUrl = null;
@@ -444,6 +450,7 @@ export default async function init(el) {
       loadFragment(a)
         .then(async () => {
           el.removeAttribute('style');
+          revalidatePageTheme();
           try {
             await openModalFromPageHashAfterFragment();
           } catch (error) {
@@ -456,6 +463,7 @@ export default async function init(el) {
           el.removeAttribute('style');
           el.innerHTML = '<div class="error-message">Unable to load content. Please refresh the page.</div>';
           el.classList.add('error');
+          revalidatePageTheme();
           resolve();
         });
     };
