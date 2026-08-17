@@ -1200,15 +1200,13 @@ export function decorateEvent(parent) {
     return;
   }
 
-  if (!getMetadata('event-id')) return;
-
   // Bootstraps Tier 1 Event Configurator output + shared session state ahead of any
-  // block's own init(). Gated on tier-1-event-config, not just event-id, since that's
-  // the real signal a page wants this.
+  // block's own init().
   if (getMetadata('tier-1-event-config')) {
     initTierOneEventConfig();
     initSessionState();
   }
+  if (!getMetadata('event-id')) return;
 
   // Hydrate metadata with user-friendly transformations
   addStylesToEventPage();
@@ -1256,5 +1254,4 @@ export default function decorateArea(area = document) {
     eagerLoad(marquee, 'div:last-child > div:last-child img');
   }());
 }
-
 

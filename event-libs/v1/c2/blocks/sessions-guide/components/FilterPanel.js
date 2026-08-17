@@ -3,6 +3,10 @@ import { useSessionGuide } from '../store/index.js';
 import { sessions } from '../../../../utils/session-store.js';
 import { trapFocus } from '../utils/focus-trap.js';
 import { getFilterValue } from '../utils/session-filters.js';
+import { getProduct } from '../../../../utils/tier-1-event-config.js';
+import { Icon } from '../../../../features/icons/Icon.js';
+import { fetchFederalProductIcon } from '../../../../features/icons/federal-icons.js';
+import { IconCheckmark } from './icons.js';
 
 export function FilterPanel({ onClose }) {
   const { state, dispatch } = useSessionGuide();
@@ -79,47 +83,59 @@ export function FilterPanel({ onClose }) {
     <div class="sg-filter-panel" ref=${panelRef} role="dialog" aria-modal="true" aria-label="Filter sessions">
       <div class="sg-filter-panel__header">
         <span class="sg-filter-panel__title">
-          Filter${totalActiveCount > 0 ? html` <span class="sg-filter-panel__active-count">${totalActiveCount}</span>` : ''}
+          Filters${totalActiveCount > 0 ? html` <span class="sg-filter-panel__active-count">${totalActiveCount}</span>` : ''}
         </span>
         <button class="sg-filter-panel__close" onclick=${onClose} type="button" aria-label="Close filter panel">✕</button>
       </div>
       <div class="sg-filter-panel__body">
-        <ul class="sg-filter-panel__cats" role="list">
-          ${filterCategories.map(({ id, label }) => {
+        <div class="sg-filter-panel__sidebar">
+          <ul class="sg-filter-panel__cats" role="list">
+            ${filterCategories.map(({ id, label }) => {
     const catCount = localFilters[id]?.size || 0;
     return html`
-              <li>
-                <button
-                  class=${'sg-filter-panel__cat' + (activeCategory === id ? ' sg-filter-panel__cat--active' : '')}
-                  onclick=${() => setActiveCategory(id)}
-                  aria-pressed=${String(activeCategory === id)}
-                  type="button"
-                >
-                  ${label}
-                  ${catCount > 0 && html`<span class="sg-filter-panel__cat-badge">${catCount}</span>`}
-                </button>
-              </li>
+                <li>
+                  <button
+                    class=${'sg-filter-panel__cat' + (activeCategory === id ? ' sg-filter-panel__cat--active' : '')}
+                    onclick=${() => setActiveCategory(id)}
+                    aria-pressed=${String(activeCategory === id)}
+                    type="button"
+                  >
+                    ${label}
+                    ${catCount > 0 && html`<span class="sg-filter-panel__cat-badge">${catCount}</span>`}
+                  </button>
+                </li>
+              `;
+  })}
+          </ul>
+          <div class="sg-filter-panel__actions">
+            <button class="sg-filter-panel__apply" onclick=${apply} daa-ll="Filter-Apply" type="button">Apply</button>
+            <button class="sg-filter-panel__reset" onclick=${reset} daa-ll="Filter-Reset-All" type="button">Reset all</button>
+          </div>
+        </div>
+        <div class="sg-filter-panel__options" role="group" aria-label=${activeCategory || 'Filter options'}>
+          ${currentOptions.map((opt) => {
+    // Any option value that happens to be a real configured product (regardless of
+    // which category it's in) gets its product icon — no need to special-case "is
+    // this the Product category", same graceful-fallback pattern as getTrackIcon().
+    const isSelected = currentSet.has(opt);
+    const productIcon = getProduct(opt)?.icon;
+    return html`
+              <button
+                type="button"
+                class=${'sg-filter-pill' + (isSelected ? ' sg-filter-pill--selected' : '')}
+                onclick=${() => toggleOption(activeCategory, opt)}
+                aria-pressed=${String(isSelected)}
+              >
+                <span class="sg-filter-pill__content">
+                  ${productIcon && html`<${Icon} name=${productIcon} size=${20} resolve=${fetchFederalProductIcon} className="sg-filter-pill__icon" />`}
+                  <span class="sg-filter-pill__label">${opt}</span>
+                </span>
+                ${isSelected && html`<${IconCheckmark} />`}
+              </button>
             `;
   })}
-        </ul>
-        <div class="sg-filter-panel__options" role="group" aria-label=${activeCategory || 'Filter options'}>
-          ${currentOptions.map((opt) => html`
-            <label class="sg-filter-option">
-              <input
-                type="checkbox"
-                class="sg-filter-option__input"
-                checked=${currentSet.has(opt)}
-                onchange=${() => toggleOption(activeCategory, opt)}
-              />
-              <span class="sg-filter-option__label">${opt}</span>
-            </label>
-          `)}
           ${currentOptions.length === 0 && html`<p class="sg-filter-panel__empty">No options available.</p>`}
         </div>
-      </div>
-      <div class="sg-filter-panel__footer">
-        <button class="sg-filter-panel__reset" onclick=${reset} daa-ll="Filter-Reset-All" type="button">Reset all</button>
-        <button class="sg-filter-panel__apply" onclick=${apply} daa-ll="Filter-Apply" type="button">Apply</button>
       </div>
     </div>
   `;
