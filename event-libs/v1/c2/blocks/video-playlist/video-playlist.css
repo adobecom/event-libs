@@ -144,12 +144,14 @@
      BEFORE line-clamp/wrap ever gets a chance to constrain it, blowing the title out to
      many un-clamped, un-ellipsized lines spanning far past the card. Starting from a
      zero basis and growing via flex-grow sidesteps that content-based sizing entirely. */
-  flex: 1 1 0%;
+  flex: 1 0 0%;
   min-width: 0;
   margin: 0;
   overflow: hidden;
   font-size: var(--s2a-font-size-lg);
-  font-weight: var(--s2a-font-weight-adobe-clean-extrabold, 800);
+  font-weight: var(--s2a-font-weight-adobe-clean-black, 900);
+  line-height: 98%; /* 17.64px per Figma's "Title Small Black" type style */
+  letter-spacing: -0.54px;
   /* stylelint-disable-next-line value-no-vendor-prefix -- required for -webkit-line-clamp */
   display: -webkit-box;
   -webkit-box-orient: vertical;
@@ -261,11 +263,18 @@
   object-fit: cover;
 }
 
-/* 136.89px (per Figma inspect at 1920px) — height follows from aspect-ratio (~77px).
-   1024px/1440px thumbnail sizes aren't confirmed yet, so they keep the 96px default. */
-@media (min-width: 1920px) {
+/* Per Figma inspect: 117.19px at 1024px, then 136.889px from 1440px up (1440 and 1920
+   share the same value — height follows from aspect-ratio in both cases). Below 1024px
+   the thumbnail keeps the 96px mobile default (not confirmed yet — mobile is next). */
+@media (min-width: 1024px) {
   .video-playlist-row-thumb {
-    width: 136.89px;
+    width: 117.19px;
+  }
+}
+
+@media (min-width: 1440px) {
+  .video-playlist-row-thumb {
+    width: 136.889px;
   }
 }
 
