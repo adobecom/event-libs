@@ -69,14 +69,23 @@
   /* Favorite + play (stacked in .video-playlist-row-actions) are hover/focus-revealed
      only on desktop (per the Figma "Session tile states" spec: Default shows neither,
      Hover shows both) — mobile has no hover concept, so they stay always-visible there
-     (see the max-width block). */
+     (see the max-width block). Collapsed to width:0 (not just opacity:0) when hidden —
+     otherwise the reserved 32px would sit unused and the title couldn't reclaim it, per
+     Figma's own Default (92-char truncation) vs Hover (65-char) row measurements.
+     margin-left cancels the row's own `gap`, which would otherwise still reserve space
+     next to a zero-width column. */
   .video-playlist-row-actions {
+    width: 0;
+    overflow: hidden;
     opacity: 0;
-    transition: opacity 0.15s ease;
+    margin-left: calc(-1 * var(--s2a-spacing-sm));
+    transition: opacity 0.15s ease, width 0.15s ease, margin-left 0.15s ease;
   }
 
   .video-playlist-row:hover .video-playlist-row-actions,
   .video-playlist-row:focus-within .video-playlist-row-actions {
+    width: 32px;
+    margin-left: 0;
     opacity: 1;
   }
 }
