@@ -1,4 +1,4 @@
-import { safeUrl } from '../blocks/sessions-guide/utils/url.js';
+import { safeUrl } from './utils.js';
 import { deriveSessionState } from './session-state.js';
 import { openSessionGuideDetail } from './session-store.js';
 import { registerStreamIds, subscribe } from '../services/sessions/mobile-rider-poller.js';

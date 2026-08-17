@@ -1,5 +1,5 @@
 import { createTag } from '../../../utils/utils.js';
-import { safeUrl } from '../../../blocks/sessions-guide/utils/url.js';
+import { safeUrl } from '../sessions-guide/utils/url.js';
 import initEventCard from '../event-card/event-card.js';
 import initEventCarousel from '../event-carousel/event-carousel.js';
 

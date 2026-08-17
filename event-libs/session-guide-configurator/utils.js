@@ -62,6 +62,26 @@ export async function copySessionGuideConfigLink(url, linkText) {
   }
 }
 
+// Formats in the sessionTime's own venue timezone, not the viewer's local one — this is
+// authoring, describing when a session happens at the event. Used by
+// RecommendedSessionsEditor.js.
+export function formatSessionTime(sessionTime) {
+  if (!sessionTime?.startTimeMillis) return '';
+  try {
+    return new Date(sessionTime.startTimeMillis).toLocaleString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+      timeZone: sessionTime.timezone || undefined,
+      timeZoneName: 'short',
+    });
+  } catch {
+    return '';
+  }
+}
+
 export function formatUpdatedTime(isoString) {
   if (!isoString) return '';
   try {

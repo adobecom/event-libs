@@ -846,3 +846,9 @@ export function loadLink(href, {
 export function loadStyle(href, callback) {
   return loadLink(href, { rel: 'stylesheet', callback });
 }
+
+// Returns url only if it starts with https://, http://, or / — blocks javascript: URIs.
+export function safeUrl(url) {
+  if (!url) return undefined;
+  return /^(https?:\/\/|\/)/.test(url) ? url : undefined;
+}

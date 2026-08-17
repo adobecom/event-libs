@@ -19,9 +19,6 @@ const EVENT_BLOCKS = [
   'youtube-chat',
   'image-links',
   'venue-map',
-  'sessions-guide',
-  'sessions-guide-full-page',
-  'session-state-demo',
 ];
 
 const EVENT_BLOCKS_C2 = [
@@ -32,6 +29,9 @@ const EVENT_BLOCKS_C2 = [
   'chrono-box',
   'mobile-rider',
   'event-marquee',
+  'sessions-guide',
+  'sessions-guide-full-page',
+  'session-state-demo',
 ];
 
 // Import only the most essential utilities that are always needed
