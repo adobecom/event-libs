@@ -6,7 +6,7 @@ import {
   getUnrecognizedAttendeeFields,
 } from './data-utils.js';
 import { ENV_MAP } from './constances.js';
-import { getEventConfig, getEventServiceEnv } from './utils.js';
+import { getEventConfig, getEventServiceEnv, waitForAdobeIMS } from './utils.js';
 
 export const getCaasTags = (() => {
   let cache;
@@ -39,19 +39,6 @@ export const getCaasTags = (() => {
     return promise;
   };
 })();
-
-export function waitForAdobeIMS() {
-  return new Promise((resolve) => {
-    const checkIMS = () => {
-      if (window.adobeIMS && window.adobeIMS.getAccessToken) {
-        resolve();
-      } else {
-        setTimeout(checkIMS, 100);
-      }
-    };
-    checkIMS();
-  });
-}
 
 // Override for callers with no window.adobeIMS at all (e.g. the standalone
 // tier-1-event-configurator DA app, which has no Milo/IMS bootstrap) — set
