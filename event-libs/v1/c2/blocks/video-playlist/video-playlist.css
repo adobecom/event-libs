@@ -248,7 +248,7 @@
 
 .video-playlist-row {
   display: flex;
-  align-items: center;
+  align-items: stretch;
   gap: var(--s2a-spacing-sm);
   width: 100%;
   box-sizing: border-box;
@@ -348,6 +348,8 @@
   display: -webkit-box;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 3;
+  flex: 1 0 0;
+  align-self: stretch;
 }
 
 .video-playlist-row-progress {
