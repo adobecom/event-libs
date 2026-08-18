@@ -774,7 +774,26 @@ function buildRow(item, { onSelect, favoritable = false }) {
     actions.appendChild(buildPlayButton(activate));
   }
 
-  row.addEventListener('click', activate);
+  // A real, visually-hidden <a href> stretched over the row (a "stretched link" overlay)
+  // gives native browser affordances — status-bar URL preview on hover, right-click/
+  // middle-click "open in new tab" — that the row's synthetic click/keydown handlers
+  // can't. It's a sibling, not a wrapper: an <a> can never validly contain another
+  // focusable control (the favorite/play <button>s above), the exact same constraint
+  // that already makes this row a <div> rather than a <button> (see comment above).
+  // Positioned first so the row's own descendants (thumbnail, buttons) paint above it
+  // and stay independently clickable via their own listeners/stopPropagation.
+  if (item.href) {
+    const link = createTag('a', { class: 'video-playlist-row-link', href: item.href, tabindex: '-1', 'aria-hidden': 'true' }, '', { parent: row });
+    row.insertBefore(link, row.firstChild);
+  }
+
+  // A ctrl/cmd/shift-click or middle-click on the overlay anchor means "open in a new
+  // tab/window" — the browser already handles that natively; forcing activate()'s same-
+  // tab window.location.assign on top would hijack it back into this tab.
+  row.addEventListener('click', (event) => {
+    if (event.metaKey || event.ctrlKey || event.shiftKey || event.button !== 0) return;
+    activate();
+  });
   row.addEventListener('keydown', (event) => {
     if (event.key !== 'Enter' && event.key !== ' ') return;
     event.preventDefault();

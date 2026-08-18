@@ -247,6 +247,7 @@
 }
 
 .video-playlist-row {
+  position: relative;
   display: flex;
   align-items: stretch;
   gap: var(--s2a-spacing-sm);
@@ -258,6 +259,15 @@
   font-family: inherit;
   background: var(--vp-row-bg);
   cursor: pointer;
+}
+
+/* Stretched-link overlay (see buildRow) — gives native hover/right-click link affordances
+   without nesting a <button> inside an <a>. Sits behind every other row child so the
+   thumbnail/favorite/play controls remain independently clickable above it. */
+.video-playlist-row-link {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
 }
 
 /* Hover and currently-playing share the exact same treatment (per Figma) — a solid card
@@ -276,6 +286,7 @@
 
 .video-playlist-row-thumb-wrap {
   position: relative;
+  z-index: 1;
   flex-shrink: 0;
   line-height: 0;
 }
@@ -331,6 +342,8 @@
 }
 
 .video-playlist-row-meta {
+  position: relative;
+  z-index: 1;
   display: flex;
   flex: 1 1 auto;
   flex-direction: column;
@@ -394,6 +407,8 @@
 
 /* Favorite + play stacked together, per Figma's row "Hover" state — see buildRow. */
 .video-playlist-row-actions {
+  position: relative;
+  z-index: 1;
   display: flex;
   flex-direction: column;
   flex-shrink: 0;
