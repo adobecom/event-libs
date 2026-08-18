@@ -372,6 +372,24 @@ export function resumeMpcVideo(iframe, progress) {
   }, ADOBE_TV_ORIGIN);
 }
 
+// Live-updates the current session's OWN row (pinned first in the topic playlist, per
+// its "now playing" highlight — see render()) as its video actually plays — same
+// UI-update pattern the exploratory new-video-playlist branch's PlayerManager used
+// (setSessionProgress(), writing bar.style.width straight from tick data), scoped to just
+// this one row since this page only ever embeds its own session's video (unlike that
+// branch's multi-card in-place player-swapping model, which had to look up whichever
+// card matched the currently-loaded video id). Queried fresh on every call rather than
+// cached: the player can start ticking before render() has built the row at all (it
+// depends on the async catalog fetch), so a no-op until the row exists is simpler than
+// coordinating the two.
+function updateRowProgressUI(sessionId, secondsWatched, length) {
+  const row = [...document.querySelectorAll('.video-playlist-row')]
+    .find((r) => r.dataset.itemId === sessionId);
+  const fill = row?.querySelector('.video-playlist-row-progress-fill');
+  if (!fill) return;
+  fill.style.width = `${computeProgressPercent({ secondsWatched, length })}%`;
+}
+
 // MPC posts window messages from video.tv.adobe.com — same postMessage envelope this
 // codebase's earlier video-playlist attempt already relied on: { type: 'mpcStatus',
 // state: 'load'|'pause'|'tick'|'complete', id, currentTime, length }. Progress is saved
@@ -391,12 +409,14 @@ function watchMpcPlayback(sessionId, iframe, onComplete) {
         break;
       case MPC_STATE_PAUSE:
         saveVideoProgress(sessionId, currentTime, length);
+        updateRowProgressUI(sessionId, currentTime, length);
         break;
       case MPC_STATE_TICK: {
         const tickSecond = Math.floor(currentTime);
         if (tickSecond !== lastTickSecond && tickSecond % PROGRESS_TICK_SECONDS === 0) {
           lastTickSecond = tickSecond;
           saveVideoProgress(sessionId, currentTime, length);
+          updateRowProgressUI(sessionId, currentTime, length);
         }
         break;
       }
@@ -406,7 +426,10 @@ function watchMpcPlayback(sessionId, iframe, onComplete) {
         // actually known (this event's own, or a prior tick/pause's), so this never
         // clobbers previously-saved progress with a bogus undefined secondsWatched.
         const finalLength = length ?? getVideoProgress(sessionId)?.length ?? null;
-        if (finalLength != null) saveVideoProgress(sessionId, finalLength, finalLength);
+        if (finalLength != null) {
+          saveVideoProgress(sessionId, finalLength, finalLength);
+          updateRowProgressUI(sessionId, finalLength, finalLength);
+        }
         onComplete();
         break;
       }
@@ -461,12 +484,18 @@ async function watchYouTubePlayback(sessionId, iframe, onComplete) {
           progressInterval = setInterval(() => {
             const currentTime = event.target?.getCurrentTime?.();
             const duration = event.target?.getDuration?.();
-            if (currentTime != null && duration != null) saveVideoProgress(sessionId, currentTime, duration);
+            if (currentTime != null && duration != null) {
+              saveVideoProgress(sessionId, currentTime, duration);
+              updateRowProgressUI(sessionId, currentTime, duration);
+            }
           }, PROGRESS_TICK_SECONDS * 1000);
         } else if (event.data === window.YT.PlayerState.ENDED) {
           stopProgressPolling();
           const duration = event.target?.getDuration?.();
-          if (duration) saveVideoProgress(sessionId, duration, duration);
+          if (duration) {
+            saveVideoProgress(sessionId, duration, duration);
+            updateRowProgressUI(sessionId, duration, duration);
+          }
           onComplete();
         } else {
           stopProgressPolling();
