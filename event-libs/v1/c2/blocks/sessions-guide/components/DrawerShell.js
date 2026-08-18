@@ -14,6 +14,16 @@ import { prefersReducedMotion } from '../utils/motion.js';
 // No top gap on mobile/tablet (drawer covers the full screen); 20px gap on desktop.
 const getTopMargin = () => (window.matchMedia('(max-width: 1279px)').matches ? 0 : 20);
 
+// Lock the page behind the drawer. Both html and body are set: which one is the viewport's
+// scrolling element depends on the host page (the widget is embedded on author-built
+// pages), and body's overflow doesn't propagate to the viewport when html is the scroller
+// — which is how the background kept capturing the wheel on desktop.
+function lockPageScroll(locked) {
+  const value = locked ? 'hidden' : '';
+  document.documentElement.style.overflow = value;
+  document.body.style.overflow = value;
+}
+
 // The view to land on when opening the drawer fresh, shared by every open path below
 // (mount deep-link, popstate, manual open, external openSessionGuideDetail request).
 const getDefaultView = (isRegistered) => (isRegistered ? 'my-sessions' : 'live-upcoming');
@@ -65,9 +75,13 @@ export function DrawerShell() {
     if (!el) return;
     const { drawerState } = state;
 
+    // Keyed off "is the drawer open at all" rather than living inside the branches below:
+    // the expanded branch is skipped when a gesture handler has already flipped
+    // expandedRef, which silently left the page unlocked.
+    lockPageScroll(drawerState !== 'hidden');
+
     if (drawerState === 'peek') {
       expandedRef.current = false;
-      document.body.style.overflow = 'hidden';
       // ≤1440px viewport width → 55% of viewport height; >1440px → 65%
       const peekHeight = Math.round(window.innerHeight * (window.innerWidth > 1440 ? 0.65 : 0.55));
       const peekTop = Math.max(getTopMargin(), window.innerHeight - peekHeight);
@@ -77,7 +91,6 @@ export function DrawerShell() {
         requestAnimationFrame(() => setTop(peekTop, true));
       });
     } else if (drawerState === 'expanded' && !expandedRef.current) {
-      document.body.style.overflow = 'hidden';
       expandedRef.current = true;
       el.style.transition = 'none';
       el.style.top = '100vh';
@@ -87,32 +100,46 @@ export function DrawerShell() {
     } else if (drawerState === 'hidden') {
       el.style.transition = prefersReducedMotion() ? 'none' : 'top 0.45s cubic-bezier(0.4, 0, 0.2, 1)';
       el.style.top = '100vh';
-      document.body.style.overflow = '';
       expandedRef.current = false;
       currentTopRef.current = 0;
       setFilterOpen(false);
     }
   }, [state.drawerState]);
 
-  // Gesture handlers — attached once on mount, use refs for current values
+  // Never leave the host page locked if the block unmounts while the drawer is open.
+  useEffect(() => () => lockPageScroll(false), []);
+
+  // Commit the peek -> expanded transition. Shared by the drag gestures and the
+  // focus-driven path below so they can't drift apart.
+  function commitExpanded() {
+    expandedRef.current = true;
+    setTop(getTopMargin(), true);
+    dispatch({ type: 'SET_DRAWER', drawer: 'expanded' });
+  }
+
+  // Drag the drawer up by `distance` px, committing to expanded once it reaches the top.
+  function dragUpBy(distance) {
+    const topMargin = getTopMargin();
+    const newTop = Math.max(topMargin, currentTopRef.current - distance);
+    if (newTop <= topMargin) commitExpanded();
+    else setTop(newTop, false);
+  }
+
+  // Drag-to-expand gesture. Bound to the window, because in peek the drawer covers only
+  // the bottom of the viewport and a wheel over the backdrop never reached the element.
+  //
+  // Attached ONLY in peek, and the handlers re-check for peek. These listeners are
+  // non-passive and call preventDefault, so anything wider swallows the wheel that the
+  // expanded drawer needs for its own scrolling: gating on "not hidden" plus a mutable
+  // expandedRef meant one stale ref silently froze scrolling everywhere. Peek is the only
+  // state this gesture exists in, so that is what it keys off.
   useEffect(() => {
-    const el = drawerRef.current;
-    if (!el) return undefined;
+    if (state.drawerState !== 'peek') return undefined;
 
     function onWheel(e) {
-      if (drawerStateRef.current === 'hidden' || expandedRef.current) return;
+      if (drawerStateRef.current !== 'peek') return;
       e.preventDefault();
-      if (e.deltaY > 0) {
-        const topMargin = getTopMargin();
-        const newTop = Math.max(topMargin, currentTopRef.current - Math.abs(e.deltaY) * 1.2);
-        if (newTop <= topMargin) {
-          expandedRef.current = true;
-          setTop(topMargin, true);
-          dispatch({ type: 'SET_DRAWER', drawer: 'expanded' });
-        } else {
-          setTop(newTop, false);
-        }
-      }
+      if (e.deltaY > 0) dragUpBy(Math.abs(e.deltaY) * 1.2);
     }
 
     function onTouchStart(e) {
@@ -120,33 +147,25 @@ export function DrawerShell() {
     }
 
     function onTouchMove(e) {
-      if (drawerStateRef.current === 'hidden' || expandedRef.current) return;
+      if (drawerStateRef.current !== 'peek') return;
       const delta = touchPrevYRef.current - e.touches[0].clientY;
       touchPrevYRef.current = e.touches[0].clientY;
       if (delta > 0) {
-        const topMargin = getTopMargin();
-        const newTop = Math.max(topMargin, currentTopRef.current - delta * 1.5);
-        if (newTop <= topMargin) {
-          expandedRef.current = true;
-          setTop(topMargin, true);
-          dispatch({ type: 'SET_DRAWER', drawer: 'expanded' });
-        } else {
-          setTop(newTop, false);
-        }
+        dragUpBy(delta * 1.5);
         e.preventDefault();
       }
     }
 
-    el.addEventListener('wheel', onWheel, { passive: false });
-    el.addEventListener('touchstart', onTouchStart, { passive: true });
-    el.addEventListener('touchmove', onTouchMove, { passive: false });
+    window.addEventListener('wheel', onWheel, { passive: false });
+    window.addEventListener('touchstart', onTouchStart, { passive: true });
+    window.addEventListener('touchmove', onTouchMove, { passive: false });
 
     return () => {
-      el.removeEventListener('wheel', onWheel);
-      el.removeEventListener('touchstart', onTouchStart);
-      el.removeEventListener('touchmove', onTouchMove);
+      window.removeEventListener('wheel', onWheel);
+      window.removeEventListener('touchstart', onTouchStart);
+      window.removeEventListener('touchmove', onTouchMove);
     };
-  }, []);
+  }, [state.drawerState]);
 
   // URL deep-linking on mount: open drawer for ?sessions, open detail for ?session=slug
   useEffect(() => {
@@ -284,6 +303,7 @@ export function DrawerShell() {
           <div
             class=${`sg-body-scroll${isExpanded ? ' sg-body-scroll--scrollable' : ''}`}
             aria-busy=${String(sessionsStatus.value === 'loading')}
+            onfocusin=${() => { if (!expandedRef.current && drawerStateRef.current === 'peek') commitExpanded(); }}
           >
             <div class="sg-sr-only" role="status" aria-live="polite">${sessionsStatusMessage(sessionsStatus.value)}</div>
             ${sessionsStatus.value === 'loading' && html`<${LoadingState} />`}
