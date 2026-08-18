@@ -1,53 +1,62 @@
 /* stylelint-disable selector-class-pattern */
 
+@import url('../v1/c2/styles/tokens.css');
 @import url('./components/Modal.css');
 
 :root {
   /* Brand */
-  --tec-color-primary: #1473e6;
-  --tec-color-primary-hover: #0d66d0;
-  --tec-color-primary-down: #095aba;
-  --tec-color-on-primary: #fff;
+  --tec-color-primary: var(--s2a-color-blue-900);
+  --tec-color-primary-hover: var(--s2a-color-blue-1000);
+  --tec-color-primary-down: var(--s2a-color-blue-1100);
+  --tec-color-on-primary: var(--s2a-color-content-knockout);
 
   /* Neutrals */
-  --tec-color-text-primary: #1d1d1d;
-  --tec-color-text-secondary: #6e6e6e;
-  --tec-color-text-placeholder: #959595;
-  --tec-color-border: #d5d5d5;
-  --tec-color-border-hover: #b3b3b3;
-  --tec-color-background: #fafafa;
-  --tec-color-surface: #fff;
-  --tec-color-surface-hover: #f5f5f5;
+  --tec-color-text-primary: var(--s2a-color-content-default);
+  --tec-color-text-secondary: var(--s2a-color-content-subtle);
+  --tec-color-text-placeholder: var(--s2a-color-gray-500);
+  --tec-color-border: var(--s2a-color-border-subtle);
+  --tec-color-border-hover: var(--s2a-color-border-default);
+  --tec-color-background: var(--s2a-color-background-subtle);
+  --tec-color-surface: var(--s2a-color-background-default);
+  --tec-color-surface-hover: var(--s2a-color-gray-75);
 
   /* Semantic */
-  --tec-color-error: #d7373f;
-  --tec-color-error-bg: #fdecea;
-  --tec-color-success: #268e6c;
-  --tec-color-success-bg: #e9f7f1;
+  --tec-color-error: var(--s2a-color-content-utility-error);
+  --tec-color-error-bg: var(--s2a-color-red-100);
+  --tec-color-success: var(--s2a-color-green-900);
+  --tec-color-success-bg: var(--s2a-color-green-100);
+  --tec-color-warning: var(--s2a-color-orange-900);
+  --tec-color-warning-bg: var(--s2a-color-orange-100);
+  --tec-color-warning-border: var(--s2a-color-orange-300);
+  --tec-color-focus-ring: rgb(59 99 251 / 15%);
 
   /* Shape */
-  --tec-border-radius-sm: 4px;
-  --tec-border-radius: 8px;
-  --tec-border-radius-lg: 12px;
+  --tec-border-radius-sm: var(--s2a-border-radius-xs);
+  --tec-border-radius: var(--s2a-border-radius-sm);
+  --tec-border-radius-lg: var(--s2a-border-radius-md);
 
   /* Spacing */
-  --tec-spacing-xs: 8px;
-  --tec-spacing-sm: 12px;
-  --tec-spacing-md: 16px;
-  --tec-spacing-lg: 24px;
-  --tec-spacing-xl: 32px;
+  --tec-spacing-xs: var(--s2a-spacing-xs);
+  --tec-spacing-sm: var(--s2a-spacing-sm);
+  --tec-spacing-md: var(--s2a-spacing-md);
+  --tec-spacing-lg: var(--s2a-spacing-lg);
+  --tec-spacing-xl: var(--s2a-spacing-xl);
 
   /* Elevation */
-  --tec-shadow-sm: 0 1px 2px rgb(0 0 0 / 6%);
-  --tec-shadow-md: 0 4px 12px rgb(0 0 0 / 8%);
-  --tec-shadow-lg: 0 20px 25px -5px rgb(0 0 0 / 10%), 0 10px 10px -5px rgb(0 0 0 / 4%);
+  --tec-shadow-sm: var(--s2a-shadow-level-1-x) var(--s2a-shadow-level-1-y) var(--s2a-shadow-level-1-blur) var(--s2a-shadow-level-1-color);
+  --tec-shadow-md: var(--s2a-shadow-level-2-x) var(--s2a-shadow-level-2-y) var(--s2a-shadow-level-2-blur) var(--s2a-shadow-level-2-color);
+  --tec-shadow-lg: var(--s2a-shadow-level-4-x) var(--s2a-shadow-level-4-y) var(--s2a-shadow-level-4-blur) var(--s2a-shadow-level-4-color);
 
   /* Typography */
-  --tec-font-family: var(--body-font-family, adobe-clean, adobe-clean-serif, sans-serif);
+  --tec-font-family: var(--body-font-family, var(--s2a-font-family-adobe-clean));
 }
 
 * {
   box-sizing: border-box;
+}
+
+body {
+  margin: 0;
 }
 
 /* Visually hidden but still announced by screen readers — used for
@@ -122,9 +131,9 @@
 }
 
 .tec-content {
+  padding: var(--tec-spacing-xl) var(--tec-spacing-lg) 96px;
   max-width: 960px;
   margin: 0 auto;
-  padding: var(--tec-spacing-xl) var(--tec-spacing-lg) 96px;
 }
 
 .tec-page__title {
@@ -145,9 +154,9 @@
    hitting prod. Never rendered at all when targeting prod, so there's no
    visual noise in the common case. */
 .tec-env-banner {
-  background: #fdf0e0;
-  color: #7a4a00;
-  border-bottom: 1px solid #f0c987;
+  background: var(--tec-color-warning-bg);
+  color: var(--tec-color-warning);
+  border-bottom: 1px solid var(--tec-color-warning-border);
   padding: 10px var(--tec-spacing-lg);
   font-size: 13px;
   text-align: center;
@@ -197,7 +206,7 @@
   font-family: inherit;
   font-weight: 700;
   font-size: 14px;
-  border-radius: 16px;
+  border-radius: var(--s2a-border-radius-round);
   border: 1px solid transparent;
   cursor: pointer;
   white-space: nowrap;
@@ -219,13 +228,13 @@
 .tec-btn--s {
   padding: 5px 12px;
   font-size: 13px;
-  border-radius: 13px;
+  border-radius: var(--s2a-border-radius-round);
 }
 
 .tec-btn--l {
   padding: 10px 24px;
   font-size: 16px;
-  border-radius: 18px;
+  border-radius: var(--s2a-border-radius-round);
 }
 
 .tec-btn--primary {
@@ -278,6 +287,10 @@
   height: 32px;
 }
 
+.tec-toast .tec-btn--icon {
+  color: var(--s2a-color-content-knockout);
+}
+
 .tec-btn--icon:hover:not(:disabled) {
   background: var(--tec-color-surface-hover);
   color: var(--tec-color-text-primary);
@@ -294,6 +307,11 @@
   background: var(--tec-color-error-bg);
   color: var(--tec-color-error);
   border-color: var(--tec-color-error);
+}
+
+.tec-toast .tec-btn--icon:hover:not(:disabled) {
+  background: var(--s2a-color-transparent-white-16);
+  color: var(--s2a-color-content-knockout);
 }
 
 .tec-btn--full {
@@ -321,7 +339,7 @@
 .tec-field:focus-visible {
   outline: none;
   border-color: var(--tec-color-primary);
-  box-shadow: 0 0 0 3px rgb(20 115 230 / 15%);
+  box-shadow: 0 0 0 3px var(--tec-color-focus-ring);
 }
 
 .tec-field::placeholder {
@@ -350,20 +368,19 @@ select.tec-field {
   max-width: 420px;
   padding: var(--tec-spacing-sm) var(--tec-spacing-md);
   border-radius: var(--tec-border-radius);
-  background: var(--tec-color-surface);
+  color: var(--s2a-color-content-knockout);
   box-shadow: var(--tec-shadow-md);
   font-size: 14px;
   font-weight: 600;
-  border-left: 4px solid var(--tec-color-text-secondary);
   animation: tec-toast-in 0.18s ease-out;
 }
 
 .tec-toast--success {
-  border-left-color: var(--tec-color-success);
+  background: var(--tec-color-success);
 }
 
 .tec-toast--error {
-  border-left-color: var(--tec-color-error);
+  background: var(--tec-color-error);
 }
 
 .tec-toast__message {
@@ -460,9 +477,9 @@ select.tec-field {
    row, so it stays quiet in the common (prod) case. */
 .tec-library__item-env {
   flex-shrink: 0;
-  background: #fdf0e0;
-  color: #7a4a00;
-  border: 1px solid #f0c987;
+  background: var(--tec-color-warning-bg);
+  color: var(--tec-color-warning);
+  border: 1px solid var(--tec-color-warning-border);
   border-radius: 999px;
   padding: 1px 8px;
   font-size: 11px;
@@ -496,7 +513,7 @@ select.tec-field {
 
 .tec-search-input:focus-within {
   border-color: var(--tec-color-primary);
-  box-shadow: 0 0 0 3px rgb(20 115 230 / 15%);
+  box-shadow: 0 0 0 3px var(--tec-color-focus-ring);
 }
 
 .tec-search-input__icon {
@@ -700,7 +717,7 @@ select.tec-field {
 
 .tec-editor__header {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   gap: var(--tec-spacing-sm);
   margin-bottom: var(--tec-spacing-lg);
 }
@@ -788,6 +805,14 @@ select.tec-field {
 .tec-editor__datetime-col .tec-editor__rf-input {
   width: 100%;
   max-width: none;
+}
+
+.tec-editor__heading-input {
+  width: 100%;
+  max-width: 640px;
+  padding: 10px 14px;
+  font-size: 16px;
+  margin-bottom: var(--tec-spacing-md);
 }
 
 .tec-editor__checkbox {
@@ -1134,8 +1159,8 @@ select.tec-field {
 }
 
 .tec-editor__config-preview {
-  background: #1d1d1d;
-  color: #e1e1e1;
+  background: var(--s2a-color-gray-900);
+  color: var(--s2a-color-gray-200);
   border-radius: var(--tec-border-radius);
   padding: var(--tec-spacing-md);
   overflow-x: auto;
@@ -1211,7 +1236,7 @@ select.tec-field {
 }
 
 .tec-library__group-badge--global {
-  background: #e5f1fd;
+  background: var(--s2a-color-blue-200);
   color: var(--tec-color-primary);
 }
 

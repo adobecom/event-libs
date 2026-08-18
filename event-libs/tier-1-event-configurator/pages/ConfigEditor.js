@@ -360,7 +360,7 @@ export default function ConfigEditor() {
             <input
               id="tec-homepage-heading"
               type="text"
-              class="tec-field"
+              class="tec-field tec-editor__heading-input"
               placeholder=${homepageMeta.label}
               value=${activeConfig.config[homepageMeta.headingField] || ''}
               onInput=${(e) => updateConfigField(homepageMeta.headingField, e.target.value)}
