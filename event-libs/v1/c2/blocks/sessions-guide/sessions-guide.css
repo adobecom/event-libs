@@ -2056,6 +2056,7 @@
      margin — the drawer header's own bottom padding is the gap above it. */
   .sg-upcoming-title {
     font-size: var(--s2a-font-size-2xl);
+    line-height: 110%;
     color: var(--s2a-color-content-default);
     margin: 0;
     padding: var(--s2a-spacing-lg) var(--s2a-spacing-20) var(--s2a-spacing-sm);
