@@ -8,8 +8,6 @@ import init, {
   computeProgressPercent,
   getVideoProgress,
   saveVideoProgress,
-  isFavorite,
-  toggleFavoriteLocal,
   resumeMpcVideo,
 } from '../../../../../event-libs/v1/c2/blocks/video-playlist/video-playlist.js';
 import { sessions } from '../../../../../event-libs/v1/utils/session-store.js';
@@ -203,22 +201,6 @@ describe('video-playlist (C2)', () => {
       saveVideoProgress('s-1', 10, 60);
       saveVideoProgress('s-1', 20);
       expect(getVideoProgress('s-1').length).to.equal(60);
-    });
-  });
-
-  describe('favorites persistence', () => {
-    beforeEach(() => localStorage.removeItem('video-playlist:favorites'));
-    afterEach(() => localStorage.removeItem('video-playlist:favorites'));
-
-    it('is not favorited by default', () => {
-      expect(isFavorite('s-1')).to.be.false;
-    });
-
-    it('toggleFavoriteLocal adds then removes, returning the new state each time', () => {
-      expect(toggleFavoriteLocal('s-1')).to.be.true;
-      expect(isFavorite('s-1')).to.be.true;
-      expect(toggleFavoriteLocal('s-1')).to.be.false;
-      expect(isFavorite('s-1')).to.be.false;
     });
   });
 
@@ -727,13 +709,16 @@ describe('video-playlist (C2)', () => {
       expect(favoriteButton).to.exist;
       expect(favoriteButton.getAttribute('aria-pressed')).to.equal('false');
 
+      // The actual favorite/unfavorite now goes through the shared, real RF-backed
+      // session-store.js/action-feedback.js mechanism (see buildFavoriteButton) rather
+      // than a local synchronous toggle, so it isn't asserted here without mocking auth/
+      // network state — just that the click reaches that mechanism without also
+      // triggering row selection/navigation.
       const rowClickSpy = sinon.spy();
       row.addEventListener('click', rowClickSpy);
       favoriteButton.click();
 
       expect(rowClickSpy.called).to.be.false;
-      expect(favoriteButton.getAttribute('aria-pressed')).to.equal('true');
-      expect(favoriteButton.classList.contains('is-favorited')).to.be.true;
     });
 
     it('does not render a favorite toggle for Chapters rows', async () => {

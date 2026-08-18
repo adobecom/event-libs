@@ -64,6 +64,21 @@
     align-self: stretch;
     max-height: 100%;
     overflow-y: auto;
+
+    /* Persistently visible, styled scrollbar — the OS default (an auto-hiding overlay
+       scrollbar on macOS/some browsers) otherwise only appears on hover, which reads as
+       "there's nothing more to see" when there actually is. */
+    scrollbar-width: thin;
+    scrollbar-color: var(--s2a-color-gray-300) transparent;
+  }
+
+  .video-playlist::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  .video-playlist::-webkit-scrollbar-thumb {
+    background: var(--s2a-color-gray-300);
+    border-radius: var(--s2a-border-radius-round);
   }
 
   /* Favorite + play (stacked in .video-playlist-row-actions) are hover/focus-revealed
@@ -470,22 +485,6 @@
 
   .video-playlist-list:not(.is-showing-more) .video-playlist-row:nth-child(n+5) {
     display: none;
-  }
-
-  /* Internal scroll once expanded — keeps the title/toggle/"Play all" row in view even
-     when maxSessions (author-configurable, default 7 — see buildTopicView) is large.
-     ~4 rows' worth of height (thumb height + row padding + gap, per breakpoint) — an
-     approximation, not pixel-exact per title line count, but close enough that the 5th
-     row starts partly cut off, cueing the user to scroll rather than assuming that's all. */
-  .video-playlist-list.is-showing-more {
-    max-height: 352px;
-    overflow-y: auto;
-  }
-}
-
-@media (min-width: 1440px) {
-  .video-playlist-list.is-showing-more {
-    max-height: 396px;
   }
 }
 

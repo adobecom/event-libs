@@ -1,7 +1,15 @@
 import { createTag, getMetadata, LIBS } from '../../../utils/utils.js';
-import { sessions, initSessionState, liveStreamActiveIds } from '../../../utils/session-store.js';
+import {
+  sessions, initSessionState, liveStreamActiveIds, favorited, pendingActions,
+} from '../../../utils/session-store.js';
 import { deriveSessionState, getNowMs } from '../../../utils/session-state.js';
 import { extractCustomAttributeSlugs } from '../../../services/sessions/sessions-api.js';
+import { toggleFavoriteWithFeedback } from '../../../services/sessions/action-feedback.js';
+
+// Matches the placeholder upcoming-sessions.js uses for the same call — no shared,
+// page-level "eventConfig" builder exists yet with this exact {title, registerUrl} shape
+// (see action-feedback.js's showAuthToast), so every caller currently hand-rolls one.
+const EVENT_CONFIG = { title: '', registerUrl: '/register' };
 
 const BLOCK_CSS_URL = new URL('./video-playlist.css', import.meta.url).href;
 const MILO_IFRAME_CSS_URL = `${LIBS}/styles/iframe.css`;
@@ -30,7 +38,6 @@ const DRAWER_FLOOR_PX = 75;
 const TITLE_LINE_CAP = 2;
 const AUTOPLAY_STORAGE_KEY = 'video-playlist:play-all';
 const PROGRESS_STORAGE_KEY = 'video-playlist:progress';
-const FAVORITES_STORAGE_KEY = 'video-playlist:favorites';
 const PROGRESS_TICK_SECONDS = 5;
 const RESUME_RESTART_THRESHOLD_SECONDS = 30;
 const SHOW_MORE_INITIAL_ROWS = 4;
@@ -105,26 +112,6 @@ export function computeProgressPercent(progress) {
   if (progress.completed) return 100;
   if (!progress.length) return 0;
   return Math.max(0, Math.min(100, (progress.secondsWatched / progress.length) * 100));
-}
-
-function getFavorites() {
-  return new Set(readJson(FAVORITES_STORAGE_KEY, []));
-}
-
-export function isFavorite(sessionId) {
-  return getFavorites().has(sessionId);
-}
-
-// Returns the new state (true = now favorited) — client-only persistence, same as the
-// exploratory new-video-playlist branch's own mock favorites adapter (its "real" ESP
-// adapter was never actually wired there either).
-export function toggleFavoriteLocal(sessionId) {
-  const favorites = getFavorites();
-  const next = !favorites.has(sessionId);
-  if (next) favorites.add(sessionId);
-  else favorites.delete(sessionId);
-  writeJson(FAVORITES_STORAGE_KEY, [...favorites]);
-  return next;
 }
 
 // Individual Session Pages carry several JSON blobs as page metadata (custom-attributes,
@@ -580,29 +567,38 @@ const TOGGLE_CHEVRON_SVG = '<svg viewBox="0 0 16 10" aria-hidden="true"><path d=
 // own chevron), which wasn't part of this spec.
 const SHOW_MORE_CHEVRON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="8" height="5" viewBox="0 0 8 5" fill="none" aria-hidden="true"><path d="M1 1L4 4L7 1" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 
+function setFavoriteButtonState(button, item, isFav) {
+  button.classList.toggle('is-favorited', isFav);
+  button.setAttribute('aria-pressed', String(isFav));
+  button.setAttribute('aria-label', `${isFav ? 'Remove' : 'Add'} ${item.title} ${isFav ? 'from' : 'to'} favorites`);
+  button.setAttribute('daa-ll', isFav ? 'playlist-item-unfavorite' : 'playlist-item-favorite');
+}
+
 // The favorite button is a real, separate <button> sibling — never nested inside the
 // row's own <button>-like control, which would be invalid HTML. See buildRow: the row
 // itself is a plain div (not a <button>) specifically so this can sit alongside it.
+//
+// Same shared favorite mechanism upcoming-sessions.js/sessions-guide use (real RF-backed
+// state via session-store.js's `favorited` signal + action-feedback.js's
+// toggleFavoriteWithFeedback, not a local reimplementation) — `item` must carry the same
+// `id`/`rfSessionId` fields sessions-api.js's normalized catalog objects already have
+// (see buildTopicView), which is exactly what toggleFavoriteAction/toggleFavorite read.
 function buildFavoriteButton(item) {
-  let favorited = isFavorite(item.id);
-  const button = createTag('button', {
-    type: 'button',
-    class: 'video-playlist-row-favorite',
-    'aria-pressed': String(favorited),
-    'aria-label': `${favorited ? 'Remove' : 'Add'} ${item.title} ${favorited ? 'from' : 'to'} favorites`,
-    ...analyticsAttrs(favorited ? 'playlist-item-unfavorite' : 'playlist-item-favorite'),
-  }, FAVORITE_ICON_SVG);
-  button.classList.toggle('is-favorited', favorited);
+  const button = createTag('button', { type: 'button', class: 'video-playlist-row-favorite' }, FAVORITE_ICON_SVG);
+  setFavoriteButtonState(button, item, favorited.value.has(item.id));
 
-  button.addEventListener('click', (event) => {
+  button.addEventListener('click', async (event) => {
     // Otherwise this click would bubble up to the row's own click listener and also
     // trigger row selection/navigation.
     event.stopPropagation();
-    favorited = toggleFavoriteLocal(item.id);
-    button.classList.toggle('is-favorited', favorited);
-    button.setAttribute('aria-pressed', String(favorited));
-    button.setAttribute('aria-label', `${favorited ? 'Remove' : 'Add'} ${item.title} ${favorited ? 'from' : 'to'} favorites`);
-    button.setAttribute('daa-ll', favorited ? 'playlist-item-unfavorite' : 'playlist-item-favorite');
+    if (pendingActions.value.has(item.id)) return;
+    // toggleFavoriteWithFeedback degrades gracefully on its own (login/registration
+    // toast) rather than throwing — the `favorited` signal (and so this button, via the
+    // subscription set up in buildTopicView) only actually updates once it succeeds.
+    await toggleFavoriteWithFeedback(item, {
+      eventConfig: EVENT_CONFIG,
+      isFavorited: favorited.value.has(item.id),
+    });
   });
   return button;
 }
@@ -715,6 +711,10 @@ function buildTopicView(el, allRows, { maxSessions = DEFAULT_MAX_SESSIONS, defau
     const row = buildRow(
       {
         id: session.id,
+        // toggleFavoriteAction/toggleFavorite (session-store.js) read this off the
+        // session object passed to buildFavoriteButton — sessions-api.js's normalized
+        // catalog objects already carry it, so no extra lookup/mapping is needed.
+        rfSessionId: session.rfSessionId,
         title: session.title,
         // Falls back to the author-configured default-thumbnail when this particular
         // session has none of its own — otherwise the row would render with no thumbnail
@@ -736,6 +736,20 @@ function buildTopicView(el, allRows, { maxSessions = DEFAULT_MAX_SESSIONS, defau
     );
     list.append(row);
   });
+
+  // Reflects favorite/unfavorite actions taken anywhere else on the page (or a previous
+  // page, since `favorited` is populated from the real RF backend, not per-block state) —
+  // same live-update pattern upcoming-sessions.js uses for its own favorite buttons.
+  const favoriteButtons = [...list.querySelectorAll('.video-playlist-row-favorite')];
+  if (favoriteButtons.length) {
+    favorited.subscribe(() => {
+      favoriteButtons.forEach((button) => {
+        const row = button.closest('.video-playlist-row');
+        const title = row.querySelector('.video-playlist-row-title')?.textContent || '';
+        setFavoriteButtonState(button, { id: row.dataset.itemId, title }, favorited.value.has(row.dataset.itemId));
+      });
+    });
+  }
 
   // Desktop-only affordance (hidden on mobile via CSS — the bottom-sheet already
   // scrolls its full list) — reveals rows beyond SHOW_MORE_INITIAL_ROWS (up to the
