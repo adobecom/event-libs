@@ -99,14 +99,16 @@ export function saveVideoProgress(sessionId, secondsWatched, length = null) {
   all[sessionId] = {
     secondsWatched,
     length: resolvedLength,
-    completed: previous?.completed || Boolean(resolvedLength && secondsWatched >= resolvedLength),
+    // Derived fresh from THIS secondsWatched every time, never stuck on — a rewatch
+    // (e.g. after autoplay moves on and the viewer comes back) must be able to fall
+    // back below 100% again.
+    completed: Boolean(resolvedLength && secondsWatched >= resolvedLength),
   };
   writeJson(PROGRESS_STORAGE_KEY, all);
 }
 
-// 0-100, clamped — `completed` (set once a session's video actually finishes; see
-// watchMpcPlayback/watchYouTubePlayback below) always reads back as 100 even if a later
-// partial `secondsWatched` update without a `length` would otherwise compute lower.
+// 0-100, clamped — `completed` reflects the LAST saved secondsWatched, not a permanent
+// once-true flag, so a rewatch after finishing correctly recomputes a lower percentage.
 export function computeProgressPercent(progress) {
   if (!progress) return 0;
   if (progress.completed) return 100;
