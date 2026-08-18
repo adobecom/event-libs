@@ -53,6 +53,7 @@ import {
   validatePageAndRedirect,
   processAutoBlockLinks,
   applySectionColumnsLayout,
+  applyPageBackground,
 } from './utils/decorate.js';
 
 import { registerHydrator } from './hydrate/hydrate.js';
@@ -72,6 +73,7 @@ export {
   validatePageAndRedirect,
   processAutoBlockLinks,
   applySectionColumnsLayout,
+  applyPageBackground,
   registerHydrator,
   repeatTemplate,
   EVENT_BLOCKS,

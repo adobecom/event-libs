@@ -31,6 +31,23 @@ a.con-button.no-event {
   opacity: 0.5;
 }
 
+main:has(> picture.page-background) {
+  position: relative;
+}
+
+main > picture.page-background {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+}
+
+main > picture.page-background img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
 /* Opt-in selective section-row grouping (page metadata: section-layout: columns).
    Sections default to full width (flex: 1 1 100% forces each onto its own line,
    identical to normal stacking). Only sections tagged column-span-1/2/3 (via the
@@ -38,28 +55,61 @@ a.con-button.no-event {
    their contiguous column-span-tagged neighbors. An untagged section can never fit
    next to anything else, so it always forces a line break before and after itself
    — grouping is only ever contiguous, by construction, with no validation needed. */
-@media (min-width: 900px) {
-  /* align-items: stretch (the default) is intentional: it equalizes section
-     height within a shared row (backgrounds/borders line up cleanly), but since
-     .section lays out its own children as normal block flow, not flex/grid,
-     the content inside isn't forced to stretch along with it. */
+main.section-columns {
+  --section-columns-max-width: 100%;
+  --section-columns-gap: 0;
+}
+
+@media (min-width: 600px) {
   main.section-columns {
     display: flex;
     flex-wrap: wrap;
     align-items: stretch;
+    column-gap: var(--section-columns-gap);
+    padding-inline: max(0px, (100% - var(--section-columns-max-width)) / 2);
   }
 
   main.section-columns > .section {
     flex: 1 1 100%;
   }
 
-  main.section-columns > .section.column-span-1,
-  main.section-columns > .section.column-span-2,
-  main.section-columns > .section.column-span-3 {
+  main.section-columns > .section:not([class*='column-span-']) {
+    margin-inline: calc(-1 * max(0px, (100% - var(--section-columns-max-width)) / 2));
+  }
+
+  main.section-columns > .section[class*='column-span-'] {
     min-width: 0;
   }
 
+  main.section-columns > .section[class*='column-span-'][class*='grid-width-'] {
+    padding-left: 0;
+    padding-right: 0;
+  }
+
+  main.section-columns > .section.column-span-1-tablet { flex: 1 1 0; }
+  main.section-columns > .section.column-span-2-tablet { flex: 2 1 0; }
+  main.section-columns > .section.column-span-3-tablet { flex: 3 1 0; }
+
+  main.section-columns > .section.column-stack-tablet {
+    flex: 1 1 100%;
+    min-width: auto;
+  }
+
+  main.section-columns > .section.sticky-top,
+  main.section-columns > .section.sticky-bottom {
+    flex: 1 1 100%;
+    min-width: auto;
+  }
+}
+
+@media (min-width: 900px) {
   main.section-columns > .section.column-span-1 { flex: 1 1 0; }
   main.section-columns > .section.column-span-2 { flex: 2 1 0; }
   main.section-columns > .section.column-span-3 { flex: 3 1 0; }
+}
+
+@media (min-width: 1200px) {
+  main.section-columns > .section.column-span-1-desktop { flex: 1 1 0; }
+  main.section-columns > .section.column-span-2-desktop { flex: 2 1 0; }
+  main.section-columns > .section.column-span-3-desktop { flex: 3 1 0; }
 }

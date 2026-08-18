@@ -14,6 +14,22 @@ This is a page-level layout concern, not a block — no new block, no new
 (`applySectionColumnsLayout()` in `event-libs/v1/utils/decorate.js`) plus CSS
 (`event-libs/v1/libs-styles.css`).
 
+## vs. Milo's `two up` / `three up` / `four up` / `five up`
+
+Milo's Section Metadata already has a `columns` style option (`two up`, `three
+up`, `four up`, `five up`) that lays multiple blocks out side by side. Use that
+instead of this feature when it's sufficient — it's simpler to author and needs
+no page metadata. It's built for a different, narrower case though: it groups the
+*blocks already inside one section* into a CSS grid, so each column is always
+exactly one block, and every column is forced to share that one section's
+background/spacing/theme (there's only one Section Metadata block per section).
+Columns are also always equal width.
+
+Reach for `section-layout: columns` + `column-span-*` instead when a column needs
+to be its own independently-styled section (its own background, spacing, or
+theme), needs more than one block stacked inside it, or needs a weighted
+(non-equal) width ratio — none of which `two up`/`three up` can do.
+
 ## Authoring
 
 **1. Turn on the layout** — add a **Metadata** block at the bottom of the page:
@@ -73,10 +89,55 @@ the two groups to force the break (it can be empty/purely structural if you
 don't want it to show as its own visible row).
 
 **8. Blocks inside each section** stack top-to-bottom within their column exactly
-as they do in any normal section — nothing changes there.
+as they do in any normal section — nothing changes there. Use Milo's own section
+spacing (`m-spacing`, `xl-spacing-top`, …) and, for grid sections, its `-up` gap
+classes (`s-gap`…`xxxl-gap`) for spacing between those blocks — this feature does
+not add a separate mechanism for that.
 
-**9. Below 900px viewport width**, every section collapses back to plain vertical
+**9. Below 600px viewport width**, every section collapses back to plain vertical
 stacking regardless of tagging — there's no authoring for this, it's automatic.
+
+**10. Column ratios can vary by breakpoint.** `column-span-1/2/3` (no suffix)
+applies at **900px and up**, same as before. Two more tiers are available:
+
+- `column-span-1/2/3-tablet` — applies from **600px up to 1200px**. Use it to
+  group sections into a row earlier than the 900px default, or to give a section a
+  different ratio in that band. A section with no `-tablet` class stays full-width
+  until the next tier that does tag it.
+- `column-span-1/2/3-desktop` — applies at **1200px and up**, overriding whatever
+  ratio the section had at the tier below it (own `-tablet` class, or the base
+  900px class).
+- `column-stack-tablet` — forces a section back to full-width for the 600–1199px
+  band specifically, even if it also carries a `column-span-*`/`-desktop` class
+  that groups it into a row above or below that band.
+
+A section can carry more than one of these at once (e.g.
+`column-span-1-tablet, column-span-2-desktop`) to get a different ratio at each
+tier. Same weight-ratio math applies within each tier independently.
+
+**11. Collective row max-width.** By default a row spans `<main>`'s own full
+width — untagged sections do too, so there's no visual change. Add a page
+**Metadata** `Columns Max Width` key to cap and center every row (and the
+untagged sections between them stay full-bleed, escaping back to `<main>`'s
+edge):
+
+| Metadata | |
+|---|---|
+| Section Layout | columns |
+| Columns Max Width | 1200px |
+
+Use any CSS length or percentage — reuse an existing width rather than picking an
+arbitrary number: Milo's own container resolves to `1200px` at wide desktop
+(`--grid-container-width`), and the C2 rich-media measure tokens resolve to
+`848px`/`1192px` narrow/wide. This never uses `100vw`, so it doesn't trigger the
+scrollbar-width overflow bug that viewport-width-based centering can.
+
+**12. Gap between columns.** Add a `Columns Gap` metadata key with one of Milo's
+own spacing keywords — `none`, `xxs`, `xs`, `s`, `m`, `l`, `xl`, `xxl`, `xxxl`
+(mapped to Milo's `--spacing-*` tokens, the same scale as its `-up` gap classes).
+Default is `none` (today's edge-to-edge behavior, unchanged). This only affects
+the gutter *between* columns in a row — it does not add space between separate
+rows; use each section's own Milo spacing class for that.
 
 ### Example
 
@@ -144,8 +205,9 @@ before *and* after itself, which is exactly what makes it render alone.
   called from `decorateEvent()` — `decorateEvent` only runs on pages with an
   `event-id`, but this layout is meant for static/non-event pages too. A
   consuming site's own `decorateArea` must call it directly and unconditionally
-  (see `da-events/events/scripts/scripts.js`'s `decorateArea()` for the reference
-  integration). It always resolves the real page `<main>` directly and re-reads
+  — there is no reference integration inside this repo; `applySectionColumnsLayout`
+  is exported for a consuming site to wire in, and is exercised here only by
+  `test/unit/scripts/decorate.test.js`. It always resolves the real page `<main>` directly and re-reads
   metadata on every call — safe to call repeatedly, since `decorateArea` can
   re-enter multiple times per page load (once per fragment/personalization pass).
 - **No DOM reparenting.** Sections are never moved — every `.section` stays
@@ -158,6 +220,20 @@ before *and* after itself, which is exactly what makes it render alone.
   by several blocks, `sticky-section.js`'s forced `main.prepend`/`append`, and
   personalization's post-LCP `main > div` containment check. None of that is a
   concern here since the DOM structure never changes.
+- **`sticky-top`/`sticky-bottom` sections are always forced full-width inside a
+  column layout**, regardless of any `column-span-*` class also on them.
+  `sticky-section.js` itself still moves that section to be `<main>`'s first/last
+  child (this feature doesn't and can't prevent that), which would otherwise let
+  it land next to, and silently merge into, a row it wasn't authored next to. The
+  full-width override makes that outcome impossible — a sticky section always
+  renders alone on its own line, wherever it ends up.
+- **`grid-width-6/8/10` (and their `-desktop` variants) have their padding reset
+  to `0` when combined with `column-span-*`.** Those Milo classes compute padding
+  from `calc((100vw - Npx) / 2)` — the viewport width, not the section's actual
+  box width — which overflows or collapses content once the section is shrunk to
+  a fraction of a shared row. Combining `grid-width-*` with `column-span-*` is
+  therefore effectively a no-op for the width constraint: the section just fills
+  its column's real width, same as carrying no width option at all.
 - **Grouping mechanism is pure CSS**, via `flex-wrap`, not CSS Grid. Every
   `.section` defaults to `flex: 1 1 100%` (forces it alone onto its own line —
   visually identical to normal stacking). A `column-span-*` class overrides that
@@ -177,14 +253,30 @@ before *and* after itself, which is exactly what makes it render alone.
   in the group or what span numbers they use. A fixed-track CSS Grid would
   leave a visible gap whenever a
   group's spans didn't sum to the grid's total column count.
-- The 900px breakpoint matches this repo's own existing stack→side-by-side
-  precedent (`event-agenda.css`, `event-partners.css`, `bento-cards.css`), rather
-  than Milo's own `section-metadata` intra-section grid breakpoint (1200px),
-  since a full-page column is much wider than a sub-section grid column at the
-  same viewport.
+- The base (unsuffixed `column-span-*`) breakpoint stayed at 900px — this repo's
+  own existing stack→side-by-side precedent (`event-agenda.css`,
+  `event-partners.css`, `bento-cards.css`) — for back-compat with pages authored
+  before the `-tablet`/`-desktop` tiers existed. The tiers themselves (600/900/1200)
+  match Milo's own section-metadata breakpoints (mobile ≤599px, tablet 600–1199px,
+  desktop ≥1200px) rather than inventing new ones.
 - `main.section-columns` sets `align-items: stretch` explicitly (the flex/grid
   default) so sections sharing a row equalize in height — useful for backgrounds
   or borders to line up cleanly across the row. This only stretches each
   section's own box, not its content: `.section` lays out its children as normal
   block flow, not flex/grid, so a shorter section's actual content stays at its
   natural height inside the taller box rather than being force-stretched too.
+- **Collective max-width and column gap** are read from the `Columns Max Width`
+  and `Columns Gap` page metadata keys and written as `--section-columns-max-width`
+  / `--section-columns-gap` custom properties on `<main>`, consumed by
+  `libs-styles.css`. Centering uses `padding-inline` computed from `%`, never
+  `100vw`, so it can't trigger the scrollbar-width overflow that viewport-relative
+  centering is prone to; untagged (full-width) sections escape that padding via an
+  equal-and-opposite `margin-inline`, so they stay flush with `<main>`'s real edge
+  instead of getting inset along with the columns.
+- `Columns Gap` only sets `column-gap`, not `gap` — vertical space between wrapped
+  rows is left to each section's own Milo spacing class, so the two don't stack on
+  top of each other.
+- The `[class*='column-span-']` attribute selector (rather than enumerating
+  `column-span-1/2/3` and their `-tablet`/`-desktop` variants) is what the
+  min-width reset, the `grid-width-*` padding reset, and the max-width escape
+  margin all key off — one rule per concern instead of one per span value.

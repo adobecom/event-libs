@@ -26,6 +26,7 @@ import {
   createTag,
   getValidCampaignIdFromUrl,
   shouldForceGuestSignIn,
+  createOptimizedPicture,
 } from './utils.js';
 import { massageMetadata } from './date-time-helper.js';
 import { hydrateBlocks } from '../hydrate/hydrate.js';
@@ -1079,12 +1080,86 @@ function addStylesToEventPage() {
 // later personalization pass that updates `section-layout` still takes effect.
 // Calls addStylesToEventPage() itself so callers only need this one function
 // to get both the CSS and the class toggle.
+const COLUMNS_GAP_TOKENS = {
+  none: '0',
+  xxs: 'var(--spacing-xxs, 8px)',
+  xs: 'var(--spacing-xs, 16px)',
+  s: 'var(--spacing-s, 24px)',
+  m: 'var(--spacing-m, 32px)',
+  l: 'var(--spacing-l, 40px)',
+  xl: 'var(--spacing-xl, 48px)',
+  xxl: 'var(--spacing-xxl, 56px)',
+  xxxl: 'var(--spacing-xxxl, 80px)',
+};
+
 export function applySectionColumnsLayout() {
   const main = document.querySelector('main');
   if (!main) return;
   const enabled = getMetadata('section-layout')?.trim().toLowerCase() === 'columns';
   if (enabled) addStylesToEventPage();
   main.classList.toggle('section-columns', enabled);
+
+  const maxWidth = enabled && getMetadata('columns-max-width')?.trim();
+  if (maxWidth) main.style.setProperty('--section-columns-max-width', maxWidth);
+  else main.style.removeProperty('--section-columns-max-width');
+
+  const gapKey = enabled && getMetadata('columns-gap')?.trim().toLowerCase();
+  const gap = gapKey && COLUMNS_GAP_TOKENS[gapKey];
+  if (gap) main.style.setProperty('--section-columns-gap', gap);
+  else main.style.removeProperty('--section-columns-gap');
+}
+
+const PAGE_BACKGROUND_BREAKPOINTS = {
+  mobile: '(max-width: 599px)',
+  tablet: '(min-width: 600px) and (max-width: 1199px)',
+};
+
+function isPageBackgroundImageUrl(value) {
+  try {
+    const { pathname } = new URL(value, window.location.href);
+    return /\.(png|jpe?g|webp|avif|gif|svg)$/i.test(pathname) || pathname.includes('/media_');
+  } catch {
+    return false;
+  }
+}
+
+function pickPageBackgroundValue(values) {
+  if (values.length === 1) return values[0];
+  const isMobile = window.matchMedia(PAGE_BACKGROUND_BREAKPOINTS.mobile).matches;
+  if (values.length === 2) return isMobile ? values[0] : values[1];
+  const isTablet = window.matchMedia(PAGE_BACKGROUND_BREAKPOINTS.tablet).matches;
+  if (isMobile) return values[0];
+  return isTablet ? values[1] : values[2];
+}
+
+let pageBackgroundListenersAttached = false;
+
+export function applyPageBackground() {
+  const main = document.querySelector('main');
+  if (!main) return;
+  main.querySelector(':scope > picture.page-background')?.remove();
+  main.style.removeProperty('background');
+
+  const raw = getMetadata('page-background')?.trim();
+  if (!raw) return;
+
+  addStylesToEventPage();
+
+  if (isPageBackgroundImageUrl(raw)) {
+    const picture = createOptimizedPicture(raw, '', true, false);
+    picture.classList.add('page-background');
+    main.prepend(picture);
+    return;
+  }
+
+  main.style.background = pickPageBackgroundValue(raw.split('|').map((v) => v.trim()));
+
+  if (!pageBackgroundListenersAttached) {
+    pageBackgroundListenersAttached = true;
+    Object.values(PAGE_BACKGROUND_BREAKPOINTS).forEach((query) => {
+      window.matchMedia(query).addEventListener('change', () => applyPageBackground());
+    });
+  }
 }
 
 // e.g. "dark", "dark(blocks:hero-marquee,profile-cards)", or "dark(blocks:text[first],agenda)"

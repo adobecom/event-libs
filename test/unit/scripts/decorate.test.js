@@ -24,6 +24,7 @@ const {
   processAutoBlockLinks,
   applyAreaTheme,
   applySectionColumnsLayout,
+  applyPageBackground,
 } = await import('../../../event-libs/v1/utils/decorate.js');
 const head = await readFile({ path: './mocks/head.html' });
 const body = await readFile({ path: './mocks/full-event.html' });
@@ -1178,6 +1179,166 @@ describe('applySectionColumnsLayout', () => {
     document.body.innerHTML = '<main><div class="section"></div></main>';
     decorateEvent(document.querySelector('main'));
     expect(document.querySelector('main').classList.contains('section-columns')).to.be.false;
+  });
+
+  it('sets --section-columns-max-width from the columns-max-width metadata', () => {
+    setMetadata('section-layout', 'columns');
+    setMetadata('columns-max-width', '1200px');
+    document.body.innerHTML = '<main><div class="section"></div></main>';
+    applySectionColumnsLayout();
+    const main = document.querySelector('main');
+    expect(main.style.getPropertyValue('--section-columns-max-width')).to.equal('1200px');
+  });
+
+  it('does not set --section-columns-max-width when columns-max-width is absent', () => {
+    setMetadata('section-layout', 'columns');
+    document.body.innerHTML = '<main><div class="section"></div></main>';
+    applySectionColumnsLayout();
+    const main = document.querySelector('main');
+    expect(main.style.getPropertyValue('--section-columns-max-width')).to.equal('');
+  });
+
+  it('clears --section-columns-max-width when the layout is disabled', () => {
+    setMetadata('section-layout', 'columns');
+    setMetadata('columns-max-width', '1200px');
+    document.body.innerHTML = '<main><div class="section"></div></main>';
+    applySectionColumnsLayout();
+
+    setMetadata('section-layout', '');
+    applySectionColumnsLayout();
+    const main = document.querySelector('main');
+    expect(main.style.getPropertyValue('--section-columns-max-width')).to.equal('');
+  });
+
+  it('maps a recognized columns-gap keyword to its spacing token', () => {
+    setMetadata('section-layout', 'columns');
+    setMetadata('columns-gap', 'l');
+    document.body.innerHTML = '<main><div class="section"></div></main>';
+    applySectionColumnsLayout();
+    const main = document.querySelector('main');
+    expect(main.style.getPropertyValue('--section-columns-gap')).to.equal('var(--spacing-l, 40px)');
+  });
+
+  it('tolerates authored capitalization and whitespace for columns-gap, e.g. " XL "', () => {
+    setMetadata('section-layout', 'columns');
+    setMetadata('columns-gap', ' XL ');
+    document.body.innerHTML = '<main><div class="section"></div></main>';
+    applySectionColumnsLayout();
+    const main = document.querySelector('main');
+    expect(main.style.getPropertyValue('--section-columns-gap')).to.equal('var(--spacing-xl, 48px)');
+  });
+
+  it('ignores an unrecognized columns-gap value', () => {
+    setMetadata('section-layout', 'columns');
+    setMetadata('columns-gap', 'huge');
+    document.body.innerHTML = '<main><div class="section"></div></main>';
+    applySectionColumnsLayout();
+    const main = document.querySelector('main');
+    expect(main.style.getPropertyValue('--section-columns-gap')).to.equal('');
+  });
+
+  it('maps columns-gap "none" to 0', () => {
+    setMetadata('section-layout', 'columns');
+    setMetadata('columns-gap', 'none');
+    document.body.innerHTML = '<main><div class="section"></div></main>';
+    applySectionColumnsLayout();
+    const main = document.querySelector('main');
+    expect(main.style.getPropertyValue('--section-columns-gap')).to.equal('0');
+  });
+});
+
+describe('applyPageBackground', () => {
+  beforeEach(() => {
+    document.body.innerHTML = '';
+    document.head.innerHTML = head;
+  });
+
+  it('does nothing when page-background metadata is absent', () => {
+    document.body.innerHTML = '<main><div class="section"></div></main>';
+    applyPageBackground();
+    const main = document.querySelector('main');
+    expect(main.style.background).to.equal('');
+    expect(main.querySelector('picture.page-background')).to.be.null;
+  });
+
+  it('applies a single color value to main as a background', () => {
+    setMetadata('page-background', '#1d1d1d');
+    document.body.innerHTML = '<main><div class="section"></div></main>';
+    applyPageBackground();
+    expect(document.querySelector('main').style.background).to.equal('rgb(29, 29, 29)');
+  });
+
+  it('loads the required CSS itself, so callers only need to call this one function', () => {
+    setMetadata('page-background', '#1d1d1d');
+    document.body.innerHTML = '<main><div class="section"></div></main>';
+    applyPageBackground();
+    expect(document.getElementById('event-libs-styles')).to.not.be.null;
+  });
+
+  it('does not load the CSS when there is no page-background metadata', () => {
+    document.body.innerHTML = '<main><div class="section"></div></main>';
+    applyPageBackground();
+    expect(document.getElementById('event-libs-styles')).to.be.null;
+  });
+
+  it('inserts a page-background picture as main\'s first child for an image URL', () => {
+    setMetadata('page-background', 'https://example.com/media_1234abcd.jpg');
+    document.body.innerHTML = '<main><div class="section">content</div></main>';
+    applyPageBackground();
+    const main = document.querySelector('main');
+    expect(main.firstElementChild.matches('picture.page-background')).to.be.true;
+  });
+
+  it('recognizes a plain image extension as an image URL', () => {
+    setMetadata('page-background', 'https://example.com/foo/bar.webp');
+    document.body.innerHTML = '<main><div class="section"></div></main>';
+    applyPageBackground();
+    expect(document.querySelector('main picture.page-background')).to.not.be.null;
+  });
+
+  it('treats a non-URL, non-image value as a background color/value', () => {
+    setMetadata('page-background', 'linear-gradient(#000, #fff)');
+    document.body.innerHTML = '<main><div class="section"></div></main>';
+    applyPageBackground();
+    const main = document.querySelector('main');
+    expect(main.style.background).to.equal('linear-gradient(rgb(0, 0, 0), rgb(255, 255, 255))');
+    expect(main.querySelector('picture.page-background')).to.be.null;
+  });
+
+  it('removes a previously-applied background when metadata is cleared on a later call', () => {
+    setMetadata('page-background', '#1d1d1d');
+    document.body.innerHTML = '<main><div class="section"></div></main>';
+    applyPageBackground();
+    expect(document.querySelector('main').style.background).to.equal('rgb(29, 29, 29)');
+
+    setMetadata('page-background', '');
+    applyPageBackground();
+    expect(document.querySelector('main').style.background).to.equal('');
+  });
+
+  it('removes a previously-inserted background picture when switching to a color on a later call', () => {
+    setMetadata('page-background', 'https://example.com/media_1234abcd.jpg');
+    document.body.innerHTML = '<main><div class="section"></div></main>';
+    applyPageBackground();
+    expect(document.querySelector('main picture.page-background')).to.not.be.null;
+
+    setMetadata('page-background', '#1d1d1d');
+    applyPageBackground();
+    expect(document.querySelector('main picture.page-background')).to.be.null;
+    expect(document.querySelector('main').style.background).to.equal('rgb(29, 29, 29)');
+  });
+
+  it('does nothing when there is no main element', () => {
+    document.body.innerHTML = '<div class="not-main"></div>';
+    expect(() => applyPageBackground()).to.not.throw();
+  });
+
+  it('is not applied automatically by decorateEvent, since consuming sites must call it directly to support non-event pages', () => {
+    setMetadata('page-background', '#1d1d1d');
+    setMetadata('event-id', 'test-event');
+    document.body.innerHTML = '<main><div class="section"></div></main>';
+    decorateEvent(document.querySelector('main'));
+    expect(document.querySelector('main').style.background).to.equal('');
   });
 });
 
