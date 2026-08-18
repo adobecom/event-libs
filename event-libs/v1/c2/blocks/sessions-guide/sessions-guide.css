@@ -616,6 +616,7 @@
   font-size: var(--s2a-font-size-lg);
   color: var(--s2a-color-gray-800);
   line-height: 1.1;
+  letter-spacing: normal;
   margin: 0;
   display: flex;
   align-items: center;
@@ -653,6 +654,7 @@
   font-size: var(--s2a-font-size-lg);
   color: var(--s2a-color-content-title);
   line-height: 1.1;
+  letter-spacing: normal;
   margin: var(--s2a-spacing-lg) 0 0;
   padding: 0 var(--s2a-spacing-lg);
 }
@@ -2050,9 +2052,13 @@
     height: 8px;
   }
 
+  /* Figma: 24px above the label, 12px below, on the rows' 20px gutter. No top
+     margin — the drawer header's own bottom padding is the gap above it. */
   .sg-upcoming-title {
     font-size: var(--s2a-font-size-2xl);
-    margin: var(--s2a-spacing-2xl) 0 0;
+    color: var(--s2a-color-content-default);
+    margin: 0;
+    padding: var(--s2a-spacing-lg) var(--s2a-spacing-20) var(--s2a-spacing-sm);
   }
 
   /* ── Carousel ──────────────────────────────────────────────── */
@@ -2256,7 +2262,10 @@
     flex-direction: row;
     align-items: center;
     gap: var(--s2a-spacing-3xl);
-    padding: var(--s2a-spacing-sm) 0 var(--s2a-spacing-sm) var(--s2a-spacing-lg);
+
+    /* Left gutter matches .sg-upcoming-title so the label column lines up with the
+       section heading; right side stays 0 for the carousel to run to the edge. */
+    padding: var(--s2a-spacing-sm) 0 var(--s2a-spacing-sm) var(--s2a-spacing-20);
     border-bottom: 1px solid #e8e8e8;
     max-height: 600px;
     background: #fff;
