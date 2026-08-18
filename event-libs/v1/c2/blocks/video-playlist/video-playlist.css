@@ -247,7 +247,6 @@
 }
 
 .video-playlist-row {
-  position: relative;
   display: flex;
   align-items: stretch;
   gap: var(--s2a-spacing-sm);
@@ -261,13 +260,17 @@
   cursor: pointer;
 }
 
-/* Stretched-link overlay (see buildRow) — gives native hover/right-click link affordances
-   without nesting a <button> inside an <a>. Sits behind every other row child so the
-   thumbnail/favorite/play controls remain independently clickable above it. */
-.video-playlist-row-link {
-  position: absolute;
-  inset: 0;
-  z-index: 0;
+/* The real <a> (topic rows) or plain div (Chapters rows) wrapping thumbnail + meta —
+   see buildRow. Carries the same flex layout the row itself used to apply directly, since
+   the favorite/play actions column now sits outside it as the row's own other child. */
+.video-playlist-row-content {
+  display: flex;
+  flex: 1 1 auto;
+  align-items: stretch;
+  gap: var(--s2a-spacing-sm);
+  min-width: 0;
+  color: inherit;
+  text-decoration: none;
 }
 
 /* Hover and currently-playing share the exact same treatment (per Figma) — a solid card
@@ -279,14 +282,14 @@
   color: var(--vp-playing-fg);
 }
 
-.video-playlist-row:focus-visible {
+.video-playlist-row:focus-visible,
+.video-playlist-row-content:focus-visible {
   outline: 1px solid var(--s2a-color-focus-ring-default, #3b63fb);
   outline-offset: 2px;
 }
 
 .video-playlist-row-thumb-wrap {
   position: relative;
-  z-index: 1;
   flex-shrink: 0;
   line-height: 0;
 }
@@ -342,8 +345,6 @@
 }
 
 .video-playlist-row-meta {
-  position: relative;
-  z-index: 1;
   display: flex;
   flex: 1 1 auto;
   flex-direction: column;
@@ -407,8 +408,6 @@
 
 /* Favorite + play stacked together, per Figma's row "Hover" state — see buildRow. */
 .video-playlist-row-actions {
-  position: relative;
-  z-index: 1;
   display: flex;
   flex-direction: column;
   flex-shrink: 0;

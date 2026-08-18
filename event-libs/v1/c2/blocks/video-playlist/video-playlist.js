@@ -732,26 +732,34 @@ function buildPlayButton(activate) {
 // buttons) — Chapters rows call this with no third argument at all, so their markup is
 // byte-for-byte what it always was.
 function buildRow(item, { onSelect, favoritable = false }) {
-  // A plain div, not a <button> — a real <button> (favorite/play) needs to sit alongside
-  // it as a sibling below, and a <button> can never contain another <button>. tabindex +
-  // the keydown handler below restore the keyboard-activation a native button would
-  // otherwise have given for free.
+  // The outer row stays a plain div, not a <button>/<a> itself — the favorite/play
+  // <button>s below must sit outside the anchor (an <a> can never validly contain
+  // another focusable control), so the row is the shared container for both the real
+  // <a> (thumbnail/title/progress) and the actions column, as siblings.
   const row = createTag('div', {
     class: 'video-playlist-row',
     role: 'listitem',
-    tabindex: '0',
+    ...(item.href ? {} : { tabindex: '0' }),
     'data-item-id': item.id,
     ...(item.href ? { 'data-href': item.href } : {}),
     ...analyticsAttrs('playlist-item-select'),
   });
 
+  // Real <a href> when the row navigates (topic rows) — gives native browser affordances
+  // (status-bar URL preview on hover, right-click/middle-click/ctrl-click "open in new
+  // tab") that a synthetic click handler can't. Chapters rows (seek in-place, no href)
+  // keep the plain-div + row-level click/keydown handling they always had.
+  const content = item.href
+    ? createTag('a', { class: 'video-playlist-row-content', href: item.href }, '', { parent: row })
+    : createTag('div', { class: 'video-playlist-row-content' }, '', { parent: row });
+
   if (item.thumbnailUrl) {
-    const thumbWrap = createTag('div', { class: 'video-playlist-row-thumb-wrap' }, '', { parent: row });
+    const thumbWrap = createTag('div', { class: 'video-playlist-row-thumb-wrap' }, '', { parent: content });
     createTag('img', { class: 'video-playlist-row-thumb', src: item.thumbnailUrl, alt: '' }, '', { parent: thumbWrap });
     if (favoritable) createTag('span', { class: 'video-playlist-row-play-icon' }, THUMB_PLAY_ICON_SVG, { parent: thumbWrap });
   }
 
-  const meta = createTag('div', { class: 'video-playlist-row-meta' }, '', { parent: row });
+  const meta = createTag('div', { class: 'video-playlist-row-meta' }, '', { parent: content });
   createTag('span', { class: 'video-playlist-row-title' }, item.title, { parent: meta });
 
   if (favoritable) {
@@ -767,38 +775,22 @@ function buildRow(item, { onSelect, favoritable = false }) {
   const activate = () => onSelect(item, row);
 
   // Favorite + play sit stacked together as a hover/focus-revealed action column (per
-  // Figma's "Hover" row state) — not on the thumbnail as an overlay.
+  // Figma's "Hover" row state) — outside the <a> above, as its sibling, since a <button>
+  // can never nest inside a real <a> any more than inside a real <button>.
   if (favoritable) {
     const actions = createTag('div', { class: 'video-playlist-row-actions' }, '', { parent: row });
     actions.appendChild(buildFavoriteButton(item));
     actions.appendChild(buildPlayButton(activate));
   }
 
-  // A real, visually-hidden <a href> stretched over the row (a "stretched link" overlay)
-  // gives native browser affordances — status-bar URL preview on hover, right-click/
-  // middle-click "open in new tab" — that the row's synthetic click/keydown handlers
-  // can't. It's a sibling, not a wrapper: an <a> can never validly contain another
-  // focusable control (the favorite/play <button>s above), the exact same constraint
-  // that already makes this row a <div> rather than a <button> (see comment above).
-  // Positioned first so the row's own descendants (thumbnail, buttons) paint above it
-  // and stay independently clickable via their own listeners/stopPropagation.
-  if (item.href) {
-    const link = createTag('a', { class: 'video-playlist-row-link', href: item.href, tabindex: '-1', 'aria-hidden': 'true' }, '', { parent: row });
-    row.insertBefore(link, row.firstChild);
+  if (!item.href) {
+    row.addEventListener('click', activate);
+    row.addEventListener('keydown', (event) => {
+      if (event.key !== 'Enter' && event.key !== ' ') return;
+      event.preventDefault();
+      activate();
+    });
   }
-
-  // A ctrl/cmd/shift-click or middle-click on the overlay anchor means "open in a new
-  // tab/window" — the browser already handles that natively; forcing activate()'s same-
-  // tab window.location.assign on top would hijack it back into this tab.
-  row.addEventListener('click', (event) => {
-    if (event.metaKey || event.ctrlKey || event.shiftKey || event.button !== 0) return;
-    activate();
-  });
-  row.addEventListener('keydown', (event) => {
-    if (event.key !== 'Enter' && event.key !== ' ') return;
-    event.preventDefault();
-    activate();
-  });
   return row;
 }
 
