@@ -528,6 +528,16 @@ function processHashtagLinks(parent) {
   
 }
 
+// Guards against the real risk of this manual copy/paste hand-off: an author pasting the
+// wrong event's link onto the wrong page. Log-only — not a security control, just authoring
+// hygiene, so it never blocks the block from building.
+function warnIfEventIdMismatch(label, config) {
+  const pageEventId = getMetadata('event-id');
+  if (config.eventId && pageEventId && config.eventId !== pageEventId) {
+    window.lana?.log(`[${label}] eventId mismatch: config authored for ${config.eventId}, page is ${pageEventId}`);
+  }
+}
+
 function prebuildAutoBlock(blockName, link) {
   let blockEl;
   const autoBlockBuilders = {
@@ -586,12 +596,7 @@ function prebuildAutoBlock(blockName, link) {
         return null;
       }
 
-      // Guards against the real risk of this manual copy/paste hand-off: an author
-      // pasting the wrong event's link onto the wrong page.
-      const pageEventId = getMetadata('event-id');
-      if (config.eventId && pageEventId && config.eventId !== pageEventId) {
-        window.lana?.log(`[sessions-guide] eventId mismatch: config authored for ${config.eventId}, page is ${pageEventId}`);
-      }
+      warnIfEventIdMismatch('sessions-guide', config);
 
       // No authoring-table path exists for this block — sessions-guide.js's init()
       // reads data-session-guide-config only.
@@ -600,6 +605,35 @@ function prebuildAutoBlock(blockName, link) {
       return createTag('div', {
         class: blockClass,
         'data-session-guide-config': JSON.stringify(config),
+      });
+    },
+    'tec-homepage': (link) => {
+      const url = new URL(link.href);
+      const hashMatch = url.hash.match(/[#&]tecHomepage=([A-Za-z0-9+/=%-]{20,})/);
+      const config = parseEncodedConfig(hashMatch?.[1]);
+
+      if (!config || !Array.isArray(config.entries)) {
+        return null;
+      }
+
+      warnIfEventIdMismatch('tec-homepage', config);
+
+      // Both Homepage config types share one link format/pattern — configType picks
+      // which block (and which data attribute its own init() reads) gets built. Theme
+      // stays a plain class (same one an author would previously have hand-added) so
+      // existing dark-card CSS applies with no block-side changes.
+      const themeClass = config.theme === 'dark' ? ' dark-card' : '';
+
+      if (config.configType === 'homepage-featured-sessions') {
+        return createTag('div', {
+          class: `featured-sessions${themeClass}`,
+          'data-featured-sessions-config': JSON.stringify(config),
+        });
+      }
+
+      return createTag('div', {
+        class: `upcoming-sessions${themeClass}`,
+        'data-upcoming-sessions-config': JSON.stringify(config),
       });
     },
   }
@@ -621,6 +655,7 @@ export function processAutoBlockLinks(parent) {
     'chrono-box': { pattern: 'schedule-maker' },
     'mobile-rider': { pattern: 'mobilerider.com', selfInit: true, c2: true },
     'sessions-guide': { pattern: 'session-guide-configurator' },
+    'tec-homepage': { pattern: 'tools/da-apps/tier-1-event-configurator' },
   };
 
   Object.entries(autoBlockIdentifiers).forEach(([blockName, { pattern, selfInit, c2 }]) => {
