@@ -61,9 +61,12 @@ export function DrawerShell() {
     if (!el) return;
     const { drawerState } = state;
 
+    // Scroll-lock tracks whether the drawer is open at all, independent of the
+    // expandedRef animation-dedup guard below (which gesture handlers also mutate).
+    document.body.style.overflow = drawerState === 'hidden' ? '' : 'hidden';
+
     if (drawerState === 'peek') {
       expandedRef.current = false;
-      document.body.style.overflow = 'hidden';
       // ≤1440px viewport width → 55% of viewport height; >1440px → 65%
       const peekHeight = Math.round(window.innerHeight * (window.innerWidth > 1440 ? 0.65 : 0.55));
       const peekTop = Math.max(getTopMargin(), window.innerHeight - peekHeight);
@@ -73,7 +76,6 @@ export function DrawerShell() {
         requestAnimationFrame(() => setTop(peekTop, true));
       });
     } else if (drawerState === 'expanded' && !expandedRef.current) {
-      document.body.style.overflow = 'hidden';
       expandedRef.current = true;
       el.style.transition = 'none';
       el.style.top = '100vh';
@@ -83,7 +85,6 @@ export function DrawerShell() {
     } else if (drawerState === 'hidden') {
       el.style.transition = 'top 0.45s cubic-bezier(0.4, 0, 0.2, 1)';
       el.style.top = '100vh';
-      document.body.style.overflow = '';
       expandedRef.current = false;
       currentTopRef.current = 0;
       setFilterOpen(false);
