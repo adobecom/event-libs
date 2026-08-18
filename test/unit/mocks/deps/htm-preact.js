@@ -64,7 +64,10 @@ export function createContext(defaultValue) {
   return ctx;
 }
 
-export function useState(initial) { return [initial, () => {}]; }
+// Matches real React/Preact: a function initial is treated as a lazy initializer.
+export function useState(initial) {
+  return [typeof initial === 'function' ? initial() : initial, () => {}];
+}
 export function useEffect() {}
 export function useLayoutEffect() {}
 export function useRef(val) { return { current: val }; }
