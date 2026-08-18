@@ -282,7 +282,8 @@ describe('video-playlist (C2)', () => {
       el = document.querySelector('.video-playlist');
       await init(el);
 
-      expect(document.body.querySelectorAll('.video-playlist-row')).to.have.lengthOf(4);
+      // 4 matches + the current session itself (now included, highlighted as "playing").
+      expect(document.body.querySelectorAll('.video-playlist-row')).to.have.lengthOf(5);
     });
 
     it('prefers the page\'s own custom-attributes metadata over the fetched catalog for the topic value', async () => {
@@ -299,7 +300,8 @@ describe('video-playlist (C2)', () => {
       el = document.querySelector('.video-playlist');
       await init(el);
 
-      expect(document.body.querySelectorAll('.video-playlist-row')).to.have.lengthOf(4);
+      // 4 matches + the current session itself (now included, highlighted as "playing").
+      expect(document.body.querySelectorAll('.video-playlist-row')).to.have.lengthOf(5);
     });
 
     it('renders the Chapters variant from session-type page metadata, even when the catalog entry says otherwise', async () => {
@@ -336,7 +338,8 @@ describe('video-playlist (C2)', () => {
 
       const block = document.body.querySelector('.video-playlist');
       expect(block.querySelector('.video-playlist-title').textContent).to.equal('Related sessions');
-      expect(block.querySelectorAll('.video-playlist-row')).to.have.lengthOf(4);
+      // 4 matches + the current session itself (now included, highlighted as "playing").
+      expect(block.querySelectorAll('.video-playlist-row')).to.have.lengthOf(5);
     });
 
     it('includes an IPOD row once past its event-start + DVR-hours premiere time, using the page\'s own local-start-time-millis metadata', async () => {
@@ -354,7 +357,8 @@ describe('video-playlist (C2)', () => {
       el = document.querySelector('.video-playlist');
       await init(el);
 
-      expect(document.body.querySelectorAll('.video-playlist-row')).to.have.lengthOf(4);
+      // 4 matches + the current session itself (now included, highlighted as "playing").
+      expect(document.body.querySelectorAll('.video-playlist-row')).to.have.lengthOf(5);
     });
 
     it('defaults the playlist title to "More like this" when not authored', async () => {
@@ -433,8 +437,10 @@ describe('video-playlist (C2)', () => {
       el = document.querySelector('.video-playlist');
       await init(el);
 
-      const firstRow = document.body.querySelector('.video-playlist-row');
-      expect(firstRow.dataset.href).to.equal('/sessions/match-1');
+      // Row 0 is now the current session itself (prepended, highlighted as "playing" —
+      // see the next test); the first OTHER/resolved row is row 1.
+      const rows = document.body.querySelectorAll('.video-playlist-row');
+      expect(rows[1].dataset.href).to.equal('/sessions/match-1');
     });
 
     it('loads the current session\'s own video from session-times page metadata into an already-mounted player', async () => {
@@ -733,7 +739,10 @@ describe('video-playlist (C2)', () => {
     });
 
     it('renders a play button on topic-playlist rows, stacked with favorite, not on the thumbnail', async () => {
-      const current = session({ id: 'current', playlistOnSessionPage: ['3d'] });
+      // sessionPageUrl:'' on all of these (including current) — the play button's click
+      // handler calls `activate()` directly (unlike the favorite button, which never
+      // navigates), so a real href here would attempt real navigation in this test env.
+      const current = session({ id: 'current', playlistOnSessionPage: ['3d'], sessionPageUrl: '' });
       const matches = [1, 2, 3, 4].map((i) => session({
         id: `match-${i}`, playlistAssignment: ['3d'], sessionPageUrl: '',
       }));
@@ -743,7 +752,9 @@ describe('video-playlist (C2)', () => {
       el = document.querySelector('.video-playlist');
       await init(el);
 
-      const row = document.body.querySelector('.video-playlist-row');
+      // Row 0 is the current session (prepended, highlighted as "playing"); assert
+      // against a resolved/"match" row instead.
+      const row = document.body.querySelectorAll('.video-playlist-row')[1];
       const actions = row.querySelector('.video-playlist-row-actions');
       const playButton = row.querySelector('.video-playlist-row-play');
       expect(actions).to.exist;
@@ -909,10 +920,11 @@ describe('video-playlist (C2)', () => {
 
     it('does not render Show more when rows are at or below the initial cap', async () => {
       const current = session({ id: 'current', playlistOnSessionPage: ['3d'] });
-      const matches = [1, 2, 3, 4].map((i) => session({ id: `match-${i}`, playlistAssignment: ['3d'] }));
+      // 3 matches + the now-included current session = 4, exactly at the cap.
+      const matches = [1, 2, 3].map((i) => session({ id: `match-${i}`, playlistAssignment: ['3d'] }));
       sessions.value = [current, ...matches];
 
-      document.body.innerHTML = playlistHtml();
+      document.body.innerHTML = playlistHtml({ minimumSessions: '3' });
       el = document.querySelector('.video-playlist');
       await init(el);
 

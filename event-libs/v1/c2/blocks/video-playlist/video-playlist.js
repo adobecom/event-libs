@@ -702,9 +702,12 @@ function buildChaptersView(el, chapters) {
   if (chapters.length) highlightRow(list, chapters[0].id);
 }
 
-function buildTopicView(el, allRows, { maxSessions = DEFAULT_MAX_SESSIONS, defaultThumbnail = '' } = {}) {
+function buildTopicView(el, allRows, {
+  maxSessions = DEFAULT_MAX_SESSIONS, defaultThumbnail = '', currentSessionId = null,
+} = {}) {
   // Rows beyond the configured (or default) max are never built at all — not just
-  // hidden — so "Show more" can never reveal more than this ceiling.
+  // hidden — so "Show more" can never reveal more than this ceiling. The current
+  // session (prepended by render() when present) counts toward this same cap.
   const rows = allRows.slice(0, maxSessions);
   const list = createTag('div', { class: 'video-playlist-list', role: 'list' }, '', { parent: el });
   rows.forEach((session) => {
@@ -736,6 +739,10 @@ function buildTopicView(el, allRows, { maxSessions = DEFAULT_MAX_SESSIONS, defau
     );
     list.append(row);
   });
+
+  // Marks the current session's own row as "now playing" — same highlightRow used for
+  // the Chapters variant's first chapter — so the viewer can tell which row is theirs.
+  if (currentSessionId) highlightRow(list, currentSessionId);
 
   // Reflects favorite/unfavorite actions taken anywhere else on the page (or a previous
   // page, since `favorited` is populated from the real RF backend, not per-block state) —
@@ -878,7 +885,13 @@ export default async function init(el) {
       el.remove();
       return;
     }
+    // The minSessions gate above and `nextRow` (the actual next session to autoplay to)
+    // are both about OTHER qualifying sessions only — unaffected by this. Prepending the
+    // current session is purely a display concern: the viewer sees it as the highlighted/
+    // "now playing" row (see highlightRow call in buildTopicView below), so they know
+    // which one is theirs, without it counting toward minSessions or ever being "next".
     if (!isChapterVariant) [nextRow] = rows;
+    const displayRows = !isChapterVariant && current ? [current, ...rows] : rows;
 
     el.replaceChildren();
 
@@ -902,7 +915,7 @@ export default async function init(el) {
     if (isChapterVariant) buildChaptersView(el, rows);
     else {
       buildAutoplayToggle(top);
-      buildTopicView(el, rows, { maxSessions, defaultThumbnail });
+      buildTopicView(el, displayRows, { maxSessions, defaultThumbnail, currentSessionId: sessionId });
     }
 
     const titleEl = el.closest('.section')?.querySelector('h1, h2') || null;
