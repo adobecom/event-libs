@@ -47,9 +47,9 @@ color.
 |---|---|
 | Page Background | https://.../media_1234...jpg |
 
-Paste a link to the image asset as the value. It's decoded through this repo's
-existing `createOptimizedPicture()` utility (`event-libs/v1/utils/utils.js`) —
-the same helper other blocks already use — rather than a new image pipeline.
+Paste a link to the image asset as the value — same-origin or cross-origin both
+work, since it's rendered as a plain `<picture><img src="...">`, not run through
+`createOptimizedPicture()`'s responsive rewrite (see Technical Notes for why).
 
 ## Technical Notes
 
@@ -69,6 +69,16 @@ the same helper other blocks already use — rather than a new image pipeline.
 - A value is treated as an image if it parses as a URL whose path ends in a
   known image extension, or contains `/media_` (the DA/AEM authored-asset link
   pattern) — otherwise it's treated as a `background` value and applied as-is.
+- **The image is rendered as a plain `<picture><img src="...">`, not through
+  `createOptimizedPicture()`.** That utility's `relative: true` mode (its
+  default, used for authored `<img>` tags elsewhere in this repo) keeps only
+  the URL's pathname, assuming the image is same-origin with the page — a plain
+  metadata *string* has no such guarantee, and stripping the host from a
+  cross-origin URL 404s (the exact bug already hit and fixed for the equivalent
+  "resolved text URL" case in `event-card.js`'s `buildMedia()`). Using the
+  absolute URL directly, the same way that fix does, avoids it here too, at the
+  cost of the responsive width variants `createOptimizedPicture()` would
+  otherwise generate.
 - Color values are applied via `main.style.background`, matching per-breakpoint
   color the same way Milo's own `applyBackground` does — `matchMedia` picks the
   right value now and re-applies on breakpoint change (one listener total,

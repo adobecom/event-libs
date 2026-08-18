@@ -26,7 +26,6 @@ import {
   createTag,
   getValidCampaignIdFromUrl,
   shouldForceGuestSignIn,
-  createOptimizedPicture,
 } from './utils.js';
 import { massageMetadata } from './date-time-helper.js';
 import { hydrateBlocks } from '../hydrate/hydrate.js';
@@ -1146,8 +1145,7 @@ export function applyPageBackground() {
   addStylesToEventPage();
 
   if (isPageBackgroundImageUrl(raw)) {
-    const picture = createOptimizedPicture(raw, '', true, false);
-    picture.classList.add('page-background');
+    const picture = createTag('picture', { class: 'page-background' }, createTag('img', { src: raw, alt: '', loading: 'eager' }));
     main.prepend(picture);
     return;
   }
