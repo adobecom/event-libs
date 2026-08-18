@@ -1103,7 +1103,7 @@ export function applySectionColumnsLayout() {
   else main.style.removeProperty('--section-columns-max-width');
 
   const gapKey = enabled && getMetadata('columns-gap')?.trim().toLowerCase();
-  const gap = gapKey && COLUMNS_GAP_TOKENS[gapKey];
+  const gap = gapKey && Object.hasOwn(COLUMNS_GAP_TOKENS, gapKey) && COLUMNS_GAP_TOKENS[gapKey];
   if (gap) main.style.setProperty('--section-columns-gap', gap);
   else main.style.removeProperty('--section-columns-gap');
 }
@@ -1150,9 +1150,10 @@ export function applyPageBackground() {
     return;
   }
 
-  main.style.background = pickPageBackgroundValue(raw.split('|').map((v) => v.trim()));
+  const values = raw.split('|').map((v) => v.trim());
+  main.style.background = pickPageBackgroundValue(values);
 
-  if (!pageBackgroundListenersAttached) {
+  if (values.length > 1 && !pageBackgroundListenersAttached) {
     pageBackgroundListenersAttached = true;
     Object.values(PAGE_BACKGROUND_BREAKPOINTS).forEach((query) => {
       window.matchMedia(query).addEventListener('change', () => applyPageBackground());
