@@ -228,12 +228,7 @@
   transition: transform 0.2s ease;
 }
 
-.video-playlist-autoplay-toggle:checked {
-  background: var(--s2a-color-gray-25, #fff);
-}
-
 .video-playlist-autoplay-toggle:checked::before {
-  background: var(--s2a-color-gray-900);
   transform: translateX(14px);
 }
 
