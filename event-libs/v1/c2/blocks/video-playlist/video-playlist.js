@@ -19,6 +19,11 @@ function ensureMiloIframeCss() {
 }
 
 const DEFAULT_MIN_SESSIONS = 4;
+// Temporary fallback for IPOD premiere timing (hasPremiered) until the backend actually
+// passes the event's own start time via local-start-time-millis page metadata — per
+// product, November 8 8am America/New_York (Miami/Eastern, GMT-4). Remove once that
+// metadata is reliably present; real metadata always takes precedence over this below.
+const FALLBACK_EVENT_START_MS = new Date('2026-11-08T08:00:00-04:00').getTime();
 const DESKTOP_BREAKPOINT_PX = 1024;
 const DRAWER_GAP_PX = 16;
 const DRAWER_FLOOR_PX = 75;
@@ -29,6 +34,11 @@ const FAVORITES_STORAGE_KEY = 'video-playlist:favorites';
 const PROGRESS_TICK_SECONDS = 5;
 const RESUME_RESTART_THRESHOLD_SECONDS = 30;
 const SHOW_MORE_INITIAL_ROWS = 4;
+// Authorable ceiling on total rows ever rendered (default 7 when not authored) — distinct
+// from SHOW_MORE_INITIAL_ROWS above, which only controls how many of THOSE rows are
+// visible before "Show more" is clicked. Rows beyond this cap are never built at all,
+// regardless of how many actually qualify.
+const DEFAULT_MAX_SESSIONS = 7;
 
 // "Play all" persists across the full-page navigation that advancing to the next
 // session's own page requires (see buildTopicView/init) — a plain in-memory flag
@@ -167,11 +177,29 @@ const MS_PER_HOUR = 3600000;
 // (same event for every session in the topic playlist, so valid for all of them, not
 // just the current session — see event-agenda.js for the same metadata key in use
 // elsewhere). Scheduled sessions are unaffected — they still premiere via their own
-// endTimeUtc, exactly as isOnDemand/deriveSessionState already computed.
+// endTimeUtc, exactly as isOnDemand/deriveSessionState already computed. No DVR time
+// configured at all (0/missing) means the IPOD recording has no wait — available
+// immediately (with a video source, already required separately by the caller), not
+// gated on eventStartMs at all.
 function hasPremiered(session, eventStartMs, nowMs) {
   if (session.startTimeUtc && session.endTimeUtc) return isOnDemand(session, nowMs);
+  if (!session.dvrTimingHours) return true;
   if (eventStartMs == null) return false;
-  return nowMs >= eventStartMs + (session.dvrTimingHours || 0) * MS_PER_HOUR;
+  return nowMs >= eventStartMs + session.dvrTimingHours * MS_PER_HOUR;
+}
+
+// The CURRENT session's own end time — unlike hasPremiered above (which resolves OTHER
+// candidate rows against the fetched catalog), this reads directly off the page's own
+// `session-times` metadata (confirmed real shape: an array of entries each carrying their
+// own `endTimeMillis`, epoch ms, as a sibling of `videos`), so it's known synchronously at
+// init() time — no catalog fetch to wait on. There's no point loading the player (or
+// showing "more like this") for a session that hasn't actually ended yet. Permissive when
+// the field is missing/malformed (matches this block's prior no-check behavior) rather
+// than hiding a page we can't positively evaluate.
+function currentSessionHasEnded(sessionTimes, nowMs) {
+  const entry = (sessionTimes || [])[0];
+  if (!entry || !Number.isFinite(entry.endTimeMillis)) return true;
+  return nowMs >= entry.endTimeMillis;
 }
 
 // Matches OTHER sessions whose "Playlist assignment/name" includes any of the given
@@ -678,14 +706,20 @@ function buildChaptersView(el, chapters) {
   if (chapters.length) highlightRow(list, chapters[0].id);
 }
 
-function buildTopicView(el, rows) {
+function buildTopicView(el, allRows, { maxSessions = DEFAULT_MAX_SESSIONS, defaultThumbnail = '' } = {}) {
+  // Rows beyond the configured (or default) max are never built at all — not just
+  // hidden — so "Show more" can never reveal more than this ceiling.
+  const rows = allRows.slice(0, maxSessions);
   const list = createTag('div', { class: 'video-playlist-list', role: 'list' }, '', { parent: el });
   rows.forEach((session) => {
     const row = buildRow(
       {
         id: session.id,
         title: session.title,
-        thumbnailUrl: session.thumbnailUrl,
+        // Falls back to the author-configured default-thumbnail when this particular
+        // session has none of its own — otherwise the row would render with no thumbnail
+        // (and no play-icon overlay, since that's gated on thumbnailUrl too).
+        thumbnailUrl: session.thumbnailUrl || defaultThumbnail,
         durationLabel: formatDuration(session.duration),
         href: session.sessionPageUrl,
       },
@@ -704,8 +738,11 @@ function buildTopicView(el, rows) {
   });
 
   // Desktop-only affordance (hidden on mobile via CSS — the bottom-sheet already
-  // scrolls its full list) — reveals rows beyond SHOW_MORE_INITIAL_ROWS via CSS, so it
-  // never touches the mobile drawer's own unrelated `is-expanded` state (see Drawer).
+  // scrolls its full list) — reveals rows beyond SHOW_MORE_INITIAL_ROWS (up to the
+  // maxSessions ceiling above) via CSS, so it never touches the mobile drawer's own
+  // unrelated `is-expanded` state (see Drawer). The list itself gets an internal scroll
+  // once expanded (see .video-playlist-list.is-showing-more in the CSS) so the header
+  // stays in view even when maxSessions is large.
   if (rows.length > SHOW_MORE_INITIAL_ROWS) {
     const showMore = createTag('button', {
       type: 'button',
@@ -762,6 +799,17 @@ export default async function init(el) {
     return;
   }
 
+  const sessionTimes = parseJsonMetadata('session-times');
+  // No recording to show (or "more like this" to recommend) for a session that hasn't
+  // actually ended yet — checked synchronously off the page's own session-times metadata
+  // (real shape confirmed: each entry carries its own endTimeMillis, epoch ms, as a
+  // sibling of videos), not the catalog, so this never has to wait on sessions.value.
+  if (!currentSessionHasEnded(sessionTimes, getNowMs())) {
+    window.lana?.log('[video-playlist] current session has not ended yet — nothing to render');
+    el.remove();
+    return;
+  }
+
   const pageCustomAttributes = parseJsonMetadata('custom-attributes');
   const isKeynoteFromMetadata = (getMetadata('session-type') || '').toLowerCase() === 'keynote';
   // Same page-metadata key event-agenda.js already reads for the event's own start time —
@@ -769,7 +817,8 @@ export default async function init(el) {
   // time applies to every session in the topic playlist, not just the current one.
   const eventStartMs = (() => {
     const ms = Number(getMetadata('local-start-time-millis'));
-    return Number.isFinite(ms) && ms > 0 ? ms : null;
+    if (Number.isFinite(ms) && ms > 0) return ms;
+    return FALLBACK_EVENT_START_MS;
   })();
 
   // Set by render() below once the topic playlist is resolved — read at the moment the
@@ -783,7 +832,7 @@ export default async function init(el) {
   // whether a video block was separately authored in this section. On complete, "Play
   // all" (if enabled) advances to the next resolved topic-playlist row's own page — that
   // page loads its own video the same way, continuing the chain.
-  const currentVideo = pickEmbeddableVideo(parseJsonMetadata('session-times'));
+  const currentVideo = pickEmbeddableVideo(sessionTimes);
   if (currentVideo) {
     loadVideoPlayer(el, sessionId, currentVideo, () => {
       if (!getShouldAutoPlay() || !nextRow?.sessionPageUrl) return;
@@ -799,6 +848,8 @@ export default async function init(el) {
   initSessionState();
 
   const minSessions = Number.parseInt(cfg['minimum-sessions'], 10) || DEFAULT_MIN_SESSIONS;
+  const maxSessions = Number.parseInt(cfg['maximum-sessions'], 10) || DEFAULT_MAX_SESSIONS;
+  const defaultThumbnail = cfg['default-thumbnail'] || '';
   const chapters = parseChapters(cfg.chapters);
 
   const render = (sessionList) => {
@@ -837,7 +888,7 @@ export default async function init(el) {
     if (isChapterVariant) buildChaptersView(el, rows);
     else {
       buildAutoplayToggle(top);
-      buildTopicView(el, rows);
+      buildTopicView(el, rows, { maxSessions, defaultThumbnail });
     }
 
     const titleEl = el.closest('.section')?.querySelector('h1, h2') || null;
