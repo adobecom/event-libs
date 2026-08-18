@@ -298,7 +298,7 @@
 .video-playlist-row-thumb {
   width: 96px;
   aspect-ratio: 16 / 9;
-  border-radius: var(--s2a-border-radius-sm, 4px);
+  border-radius: 6px;
   object-fit: cover;
 }
 
@@ -565,9 +565,11 @@
   }
 
   /* Figma: "s2a/typography/heading-6" — overrides the shared desktop title rule above
-     (Title Small Black) with the mobile drawer's own heading-6 tokens. */
+     (Title Small Black) with the mobile drawer's own heading-6 tokens. Deliberately no
+     explicit `color` here — --s2a-color-content-default (the Figma token) is meant for
+     light backgrounds and is invisible against the drawer's dark theme; inheriting the
+     drawer's own --vp-fg (see .video-playlist's color rule) keeps it legible instead. */
   .video-playlist-title {
-    color: var(--s2a-color-content-default);
     font-family: var(--s2a-font-family-heading);
     font-size: var(--s2a-typography-font-size-heading-6);
     font-weight: 900;
@@ -575,11 +577,11 @@
     letter-spacing: var(--s2a-typography-letter-spacing-heading-6);
   }
 
-  /* Figma inspect: fixed 136x77 (136/77 aspect-ratio), 6px border-radius — mobile keeps a
-     fixed size rather than the desktop breakpoint-scaled widths above. */
+  /* Figma inspect: fixed 136x77 (136/77 aspect-ratio) — mobile keeps a fixed size rather
+     than the desktop breakpoint-scaled widths above (border-radius: 6px is shared, see
+     the base .video-playlist-row-thumb rule). */
   .video-playlist-row-thumb {
     width: 136px;
     aspect-ratio: 136 / 77;
-    border-radius: 6px;
   }
 }
