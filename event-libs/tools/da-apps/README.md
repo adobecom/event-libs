@@ -12,7 +12,7 @@ Standalone DA (Document Authoring) apps used by authors from within `da.live`.
 From the repo root, start a static server:
 
 ```sh
-npx serve event-libs/tools/da-apps -p 3000 -c serve.json
+npm run da-apps
 ```
 
 Then open the app inside `da.live`, pointed at your local server via `?ref=local`:

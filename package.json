@@ -11,7 +11,8 @@
     "lint:fix": "npm run lint:js -- --fix && npm run lint:css -- --fix",
     "lint:js": "eslint .",
     "lint:css": "stylelint 'event-libs/v1/blocks/**/*.css' 'event-libs/v1/styles/*.css'",
-    "event-libs": "aem up --port 3868"
+    "event-libs": "aem up --port 3868",
+    "da-apps": "npx serve event-libs/tools/da-apps -p 3000 -c serve.json"
   },
   "repository": {
     "type": "git",
