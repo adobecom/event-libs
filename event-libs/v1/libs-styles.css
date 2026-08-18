@@ -63,3 +63,65 @@ a.con-button.no-event {
   main.section-columns > .section.column-span-2 { flex: 2 1 0; }
   main.section-columns > .section.column-span-3 { flex: 3 1 0; }
 }
+
+/* ─── TEMP (MWPW-200288 demo) — Session Details Page card layout ──────────────
+   The grey #f4f4f4 canvas runs full-bleed on <main>, while the columns stay capped
+   to a centered container width via the padding-inline max() trick — so we get BOTH
+   a grey page AND a "container" max-width WITHOUT a wrapper div, and without changing
+   applySectionColumnsLayout (which only toggles the class on <main>). 2:1 columns,
+   16px gaps, white 16px-radius cards (24px padding). Scoped with :has(.session-details)
+   so no other page is affected. REMOVE with the section-columns test hook before the
+   PR — see memory desktop-layout-section-columns. */
+main.section-columns:has(.session-details) {
+  gap: 16px;
+  padding-block: 16px;
+  padding-inline: 16px; /* < 768px */
+  background: #f4f4f4;
+}
+
+/* Responsive side gutters (grey stays full-bleed): 16px < 768, 40px 768–1024,
+   then a min(84%, 1470px) container ≥1024 (8% gutters until the 1470px cap). */
+@media (min-width: 768px) {
+  main.section-columns:has(.session-details) {
+    padding-inline: 40px;
+  }
+}
+
+@media (min-width: 1024px) {
+  main.section-columns:has(.session-details) {
+    padding-inline: max(8%, (100% - 1470px) / 2);
+  }
+}
+
+/* Columns side-by-side ≥900px (span-2 : span-1 = 2 : 1); stacked below. */
+@media (min-width: 900px) {
+  main.section-columns:has(.session-details) {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: stretch;
+  }
+
+  main.section-columns:has(.session-details) > .section {
+    flex: 1 1 100%;
+    min-width: 0;
+  }
+
+  main.section-columns:has(.session-details) > .section.column-span-1 { flex: 1 1 0; }
+  main.section-columns:has(.session-details) > .section.column-span-2 { flex: 2 1 0; }
+  main.section-columns:has(.session-details) > .section.column-span-3 { flex: 3 1 0; }
+}
+
+/* Each column is a flex stack so its block-cards sit tight with a 16px gap. */
+main.section-columns:has(.session-details) > .section {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* White rounded cards — every block in a column except the hidden metadata. */
+main.section-columns:has(.session-details) > .section > div:not(.section-metadata) {
+  margin: 0;
+  padding: 24px;
+  border-radius: 16px;
+  background: #fff;
+}
