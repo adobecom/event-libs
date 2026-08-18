@@ -27,8 +27,28 @@ Columns are also always equal width.
 
 Reach for `section-layout: columns` + `column-span-*` instead when a column needs
 to be its own independently-styled section (its own background, spacing, or
-theme), needs more than one block stacked inside it, or needs a weighted
-(non-equal) width ratio — none of which `two up`/`three up` can do.
+theme), or needs more than one block stacked inside it — neither of which
+`two up`/`three up` can do.
+
+## vs. Milo's `layout` key and `masonry` grid-span
+
+Weighted (non-equal) ratios specifically are *not* new — Milo's Section
+Metadata `layout` key already does this, via four fixed options:
+`grid-template-columns-1-2`/`2-1`/`1-3`/`3-1` (authored as `layout: 1 | 2`,
+etc.), active at 1200px and up. `masonry`'s `grid-span-1`…`grid-span-11` (out
+of a 12-column grid, also 1200px and up) goes further and allows any ratio,
+by giving each block inside the section an explicit column-span number. Both
+still only place *blocks inside one section* — same single background/
+spacing/theme constraint as `two up`/`three up`, and neither has a tablet or
+mobile ratio story (masonry's tablet tier is an `auto-fit` card grid, not
+span-based; `layout` has no tablet/mobile variant at all).
+
+Use one of those first if all you need is a two-way (or masonry-style
+arbitrary) ratio split of blocks that can share one section's styling and
+only needs a ratio at desktop. Reach for `column-span-*` when the split needs
+to cross section boundaries (independent background/spacing/theme per
+column, or multiple blocks stacked in a column), or needs a ratio to hold —
+or change — below 1200px.
 
 ## Authoring
 
