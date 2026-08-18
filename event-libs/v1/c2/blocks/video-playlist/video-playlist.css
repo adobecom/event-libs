@@ -563,6 +563,13 @@
   .video-playlist-toggle svg {
     width: 17px;
     height: 10px;
+    transition: transform 0.2s ease;
+  }
+
+  /* Drawer (see toggleEl.setAttribute('aria-expanded', ...)) keeps this in sync with the
+     drawer's own open/closed state — flips the chevron to point up once expanded. */
+  .video-playlist-toggle[aria-expanded='true'] svg {
+    transform: rotate(180deg);
   }
 
   /* Figma: "s2a/typography/heading-6" — overrides the shared desktop title rule above
