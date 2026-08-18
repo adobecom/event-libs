@@ -52,7 +52,7 @@ export function LiveUpcomingView() {
         <div class="sg-carousel-section sg-carousel-section--live">
           <${Carousel}
             sessions=${live}
-            title="Live now"
+            title="Live sessions"
             formatTime=${(s) => formatShortTime(s.startTimeUtc, userTz)}
             formatTimezone=${(s) => formatTimezoneAbbr(s.startTimeUtc, userTz)}
             variant="live"

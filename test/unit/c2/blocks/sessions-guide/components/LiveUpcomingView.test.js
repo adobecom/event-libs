@@ -55,13 +55,13 @@ describe('LiveUpcomingView', () => {
     const store = makeStore([LIVE_SESSION]);
     const View = buildLiveUpcomingView(preact, store);
     expect(View({})).to.include('sg-carousel-section');
-    expect(View({})).to.include('Live now');
+    expect(View({})).to.include('Live sessions');
   });
 
   it('hides live section when no live sessions', () => {
     const store = makeStore([UPCOMING_SESSION], UPCOMING_DAY);
     const View = buildLiveUpcomingView(preact, store);
-    expect(View({})).to.not.include('Live now');
+    expect(View({})).to.not.include('Live sessions');
   });
 
   it('shows upcoming section', () => {
