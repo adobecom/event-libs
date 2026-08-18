@@ -10,18 +10,18 @@
  * setTimeout scheduled at the next boundary.
  */
 import { createTag, getMetadata } from '../../../utils/utils.js';
-import { getNowMs } from '../../../utils/session-state.js';
+import { getNowMs, getWatchDestination } from '../../../utils/session-state.js';
+import { getAttrText, getAttrValues } from '../../utils/custom-attributes.js';
 import { renderSchedule } from './schedule.js';
 
 // setTimeout clamps to a 32-bit delay; for far-future sessions we re-arm instead
 // of overflowing (which would fire immediately).
 const MAX_TIMEOUT = 2 ** 31 - 1;
 
-// Interim hardcode for MAX 2026. TODO: align with Daniel Oliva's approach — he
-// owns both getWatchDestination() (session-state.js, whose own TODO says the URL
-// "needs to come from configs") and the Tier 1 Configurator. Adopt whatever he
-// standardizes on (likely a configurator broadcastUrl field) so this CTA and his
-// watch-destination logic share one source, rather than maintaining this hardcode.
+// Fallback only. getWatchDestination() (Daniel Oliva's helper, session-state.js) is
+// the source of the live watch link — driven by our pure-time state. Daniel will
+// source the real URL from config inside it; until then it returns a generic path,
+// and we fall back to this if it yields nothing (e.g. no livestream/online flags).
 const BROADCAST_URL = 'https://www.adobe.com/max/2026/broadcast.html';
 // Figma "watch now" glyph (play). fill: currentColor so it reads white on the
 // dark CTA pill.
@@ -72,8 +72,24 @@ export function renderStatus(state, times) {
   return el;
 }
 
+// The fields getWatchDestination() reads, sourced from PAGE METADATA (not the async
+// catalog) so the live watch link stays on our pure-time, no-catalog path:
+//   isLivestreamed <- "Livestreamed Content" custom attribute (= "live")
+//   isOnline       <- "Format" custom attribute (includes "online")
+//   sessionPageUrl <- the session's own url (on-demand destination)
+function getWatchSession(doc = document) {
+  return {
+    isLivestreamed: getAttrText('Livestreamed Content', doc).toLowerCase() === 'live',
+    isOnline: getAttrValues('Format', doc).some((v) => (v.value || '').toLowerCase() === 'online'),
+    sessionPageUrl: getMetadata('url', doc) || '',
+  };
+}
+
+// Watch now only renders in the live state, so resolve the destination for 'live'
+// via getWatchDestination; fall back to BROADCAST_URL until Daniel's URL source lands.
 function renderWatchNow() {
-  const a = createTag('a', { class: 'session-primary-cta-btn session-watch-now', href: BROADCAST_URL });
+  const href = getWatchDestination(getWatchSession(), 'live') || BROADCAST_URL;
+  const a = createTag('a', { class: 'session-primary-cta-btn session-watch-now', href });
   a.innerHTML = `${PLAY_ICON}<span>Watch now</span>`;
   return a;
 }
