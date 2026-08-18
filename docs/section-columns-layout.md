@@ -180,7 +180,11 @@ one used on any ordinary Milo section, via Section Metadata's `style` field —
 `--grid-container-width` directly, so it stays in sync with Milo's own
 container width instead of a copy-pasted value that can drift out of sync with
 it. A `Columns Max Width` metadata value takes precedence when both are
-present.
+present. `container`'s own `width`/`margin: 0 auto` (which would otherwise also
+apply directly to that one tagged section, on top of the row-level effect) are
+reset to `auto`/`0` on any section that's both `column-span-*` and `container`
+tagged, so the class works purely as a signal here — it doesn't also inset that
+one section relative to its siblings.
 
 **12. Gap between columns.** Add a `Columns Gap` metadata key with one of Milo's
 own spacing keywords — `none`, `xxs`, `xs`, `s`, `m`, `l`, `xl`, `xxl`, `xxxl`

@@ -97,6 +97,11 @@ main.section-columns:has(> .section[class*='column-span-'].container) {
     padding-right: 0;
   }
 
+  main.section-columns > .section[class*='column-span-'].container {
+    width: auto;
+    margin: 0;
+  }
+
   main.section-columns > .section.column-stack-tablet {
     flex: 1 1 100%;
     min-width: auto;
