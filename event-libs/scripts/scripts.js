@@ -11,7 +11,7 @@
  */
 
 import { LIBS, getMetadata } from '../v1/utils/utils.js';
-import decorateArea from '../v1/utils/decorate.js';
+import decorateArea, { applySectionColumnsLayout, applyPageBackground } from '../v1/utils/decorate.js';
 import { EVENT_BLOCKS, EVENT_BLOCKS_C2 } from '../v1/libs.js';
 
 const {
@@ -24,7 +24,6 @@ const {
 
 const prodDomains = ['milo.adobe.com', 'business.adobe.com', 'www.adobe.com', 'news.adobe.com', 'helpx.adobe.com'];
 
-// Add project-wide style path here.
 const STYLES = '';
 
 const EVENT_LIBS_BASE = '/event-libs/v1';
@@ -33,7 +32,6 @@ const EVENT_BLOCKS_LIB = IS_C2
   ? { base: `${EVENT_LIBS_BASE}/c2`, blocks: EVENT_BLOCKS_C2 }
   : { base: EVENT_LIBS_BASE, blocks: EVENT_BLOCKS };
 
-// Add any config options.
 const CONFIG = {
   codeRoot: '/event-libs',
   contentRoot: '/event-libs',
@@ -48,9 +46,6 @@ const CONFIG = {
     /www\.adobe\.com\/(\w\w(_\w\w)?\/)?go(\/.*)?/,
     /www\.adobe\.com\/(\w\w(_\w\w)?\/)?learn(\/.*)?/,
   ],
-  // imsScope: 'AdobeID,openid,gnav',
-  // geoRouting: 'off',
-  // fallbackRouting: 'off',
   decorateArea,
   locales: {
     '': { ietf: 'en-US', tk: 'hah7vzn.css' },
@@ -70,15 +65,7 @@ setConfig(CONFIG);
 
 decorateArea();
 
-/*
- * ------------------------------------------------------------
- * Edit below at your own risk
- * ------------------------------------------------------------
- */
-
 (function loadStyles() {
-  // On a `foundation: c2` page, load Milo's C2 base styles (/c2/styles/styles.css)
-  // to match the C2 blocks — otherwise the page renders in a C1 styling context.
   const stylesPrefix = IS_C2 ? '/c2' : '';
   const paths = [`${LIBS}${stylesPrefix}/styles/styles.css`];
   if (STYLES) { paths.push(STYLES); }
@@ -93,4 +80,6 @@ decorateArea();
 (async function loadPage() {
   await loadLana({ clientId: 'events-milo' });
   await loadArea();
+  applySectionColumnsLayout();
+  applyPageBackground();
 }());
