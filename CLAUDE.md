@@ -159,6 +159,8 @@ Project-specific slash commands:
 - `/simplify` — review changed code for redundancy and reuse opportunities before committing
 - `/commit` — generates a correctly formatted commit message; use instead of writing manually
 - `/build-block-from-figma` — build a new event-libs block from Figma designs; reads Figma frames, generates JS/CSS under `event-libs/v1/blocks/`, registers in `EVENT_BLOCKS`, scaffolds a WTR test, then runs Playwright visual comparison, axe-core accessibility audit, and Lighthouse performance audit. **Requires:** Figma MCP, Playwright MCP. **Prompts for:** preview URL (localhost:3868), Figma frame URLs per viewport.
+- `/event-libs-a11y` — audit, fix, or add WCAG 2.1 AA accessibility for event-libs blocks, features, and utilities, with repo-specific DOM patterns, scoped changes, targeted verification, and structured reports.
+- `/event-libs-preact-a11y` — audit, fix, or add accessibility for Preact/HTM components such as the sessions guide, including Context/Signals state, reactive ARIA, portals, focus lifecycle, and test-layer limitations.
 
 ### Linting
 

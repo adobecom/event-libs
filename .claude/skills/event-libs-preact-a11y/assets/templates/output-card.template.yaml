@@ -1,0 +1,19 @@
+request_summary: "{audit | fix | add} on {PreactComponentName}"
+scope: "{Full | Partial — root cause outside requested file(s): [list]}"
+mode: "{audit | fix | add}"
+render_boundary: "{entry point -> provider/store -> component -> DOM root/portal}"
+state_sources:
+  - "{props | Context | reducer | Signal | local hook}"
+observed:
+  - "{facts found in the rendered component and lifecycle}"
+actions_taken:
+  - "{change or finding description}"
+verification:
+  - layer: "{HTM string mock | real DOM utility | browser/integration}"
+    result: "{what this layer actually proved}"
+artifacts:
+  - "{file path or none}"
+issues_remaining:
+  - "{anything out of scope or requiring real-browser/design verification}"
+recommendations:
+  - "{next actions}"
