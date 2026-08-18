@@ -12,7 +12,7 @@
     "lint:js": "eslint .",
     "lint:css": "stylelint 'event-libs/v1/blocks/**/*.css' 'event-libs/v1/styles/*.css'",
     "event-libs": "aem up --port 3868",
-    "da-apps": "npx serve event-libs/tools/da-apps -p 3000 -c serve.json"
+    "da-apps": "npx serve event-libs -p 3000"
   },
   "repository": {
     "type": "git",
