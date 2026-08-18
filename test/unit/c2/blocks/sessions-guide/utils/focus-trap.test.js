@@ -90,4 +90,49 @@ describe('sessions-guide/utils/focus-trap', () => {
     const cleanup = trapFocus(null);
     expect(() => cleanup()).to.not.throw();
   });
+
+  // The filter panel's trap sits inside the drawer's trap. Without stopPropagation an
+  // Escape handled by the inner surface also reached the outer one, closing both.
+  describe('nested traps', () => {
+    let outer;
+    let inner;
+    let outerEscapes;
+    let innerEscapes;
+    let cleanups;
+
+    beforeEach(() => {
+      outerEscapes = 0;
+      innerEscapes = 0;
+      outer = document.createElement('div');
+      outer.innerHTML = `
+        <button id="outer-btn">Outer</button>
+        <div id="inner"><button id="inner-btn">Inner</button></div>
+      `;
+      document.body.appendChild(outer);
+      inner = outer.querySelector('#inner');
+      cleanups = [
+        trapFocus(outer, () => { outerEscapes += 1; }),
+        trapFocus(inner, () => { innerEscapes += 1; }),
+      ];
+    });
+
+    afterEach(() => {
+      cleanups.forEach((fn) => fn());
+      outer.remove();
+    });
+
+    it('routes Escape to the innermost trap only', () => {
+      outer.querySelector('#inner-btn').focus();
+      fireEscape();
+      expect(innerEscapes).to.equal(1);
+      expect(outerEscapes).to.equal(0);
+    });
+
+    it('still routes Escape to the outer trap when focus is outside the inner one', () => {
+      outer.querySelector('#outer-btn').focus();
+      fireEscape();
+      expect(outerEscapes).to.equal(1);
+      expect(innerEscapes).to.equal(0);
+    });
+  });
 });

@@ -14,6 +14,7 @@ import { Icon } from '../../../../features/icons/Icon.js';
 import { getTrackIcon } from '../../../../utils/tier-1-event-config.js';
 import { resolveTrackBadge } from '../utils/session-filters.js';
 import { isBehaviorEnabled } from '../utils/behavior-flags.js';
+import { scrollBehavior } from '../utils/motion.js';
 
 export function SessionDetailOverlay({ onBack }) {
   const { state, dispatch } = useSessionGuide();
@@ -55,7 +56,7 @@ export function SessionDetailOverlay({ onBack }) {
       e.preventDefault();
       dispatch({ type: 'CLOSE_DRAWER' });
       history.pushState({}, '', clearSessionParams());
-      window.scrollTo({ top: 0, behavior: 'smooth' });
+      window.scrollTo({ top: 0, behavior: scrollBehavior() });
     }
   }
 
@@ -202,7 +203,7 @@ export function SessionDetailOverlay({ onBack }) {
               ${session.description && html`
                 <div class="sg-detail__details">
                   <h3 class="sg-detail__section-label">Session details</h3>
-                  <div class=${'sg-detail__desc-wrap' + (descExpanded ? ' is-expanded' : '')}>
+                  <div class=${'sg-detail__desc-wrap' + (descExpanded ? ' is-expanded' : '')} id="sg-detail-desc">
                     <p class="sg-detail__desc">${session.description}</p>
                   </div>
                   <button
@@ -210,8 +211,10 @@ export function SessionDetailOverlay({ onBack }) {
                     onclick=${() => setDescExpanded((v) => !v)}
                     type="button"
                     aria-expanded=${String(descExpanded)}
+                    aria-controls="sg-detail-desc"
                   >
-                    ${descExpanded ? 'Less' : 'More'}
+                    <span class="sg-sr-only">${descExpanded ? 'Show less of the session description' : 'Show more of the session description'}</span>
+                    <span aria-hidden="true">${descExpanded ? 'Less' : 'More'}</span>
                     <span class="sg-detail__more-icon" aria-hidden="true"></span>
                   </button>
                   ${attrs.length > 0 && html`
@@ -271,7 +274,7 @@ export function SessionDetailOverlay({ onBack }) {
                   ${session.speakers.map((sp) => html`
                     <div class="sg-detail__speaker">
                       ${sp.photo
-    ? html`<img class="sg-detail__speaker-photo" src=${sp.photo} alt=${sp.name} width="56" height="56" loading="lazy" decoding="async" />`
+    ? html`<img class="sg-detail__speaker-photo" src=${sp.photo} alt="" width="56" height="56" loading="lazy" decoding="async" />`
     : html`<span class="sg-detail__speaker-photo sg-detail__speaker-photo--placeholder" aria-hidden="true"></span>`}
                       <div class="sg-detail__speaker-info">
                         <span class="sg-detail__speaker-name">${sp.name}</span>

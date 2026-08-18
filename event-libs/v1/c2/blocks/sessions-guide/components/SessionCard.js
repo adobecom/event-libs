@@ -169,7 +169,7 @@ export function SessionCard({ session, forceOnDemand = false, timeDisplay = 'dur
           context="on-dark"
           size="md"
           extraClass="sg-card__btn--play"
-          label="Play session"
+          label=${`Play ${session.title}`}
           onclick=${handlePlay}
           daaLl=${'Watch-Now'}
         >
@@ -180,7 +180,7 @@ export function SessionCard({ session, forceOnDemand = false, timeDisplay = 'dur
           context="on-dark"
           size="md"
           extraClass="sg-card__btn--schedule"
-          label=${isScheduled ? 'Remove from schedule' : 'Add to schedule'}
+          label=${isScheduled ? `Remove ${session.title} from schedule` : `Add ${session.title} to schedule`}
           onclick=${handleSchedule}
           pressed=${isScheduled}
           disabled=${isPending}
@@ -193,7 +193,7 @@ export function SessionCard({ session, forceOnDemand = false, timeDisplay = 'dur
           context="on-dark"
           size="md"
           extraClass="sg-card__btn--favorite"
-          label=${isFavorited ? 'Remove from favorites' : 'Add to favorites'}
+          label=${isFavorited ? `Remove ${session.title} from favorites` : `Add ${session.title} to favorites`}
           onclick=${handleFavorite}
           pressed=${isFavorited}
           disabled=${isPending}

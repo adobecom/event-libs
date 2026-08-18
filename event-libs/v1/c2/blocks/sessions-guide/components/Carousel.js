@@ -1,13 +1,14 @@
 import { html, useState, useRef, useEffect } from '../../../../deps/htm-preact.js';
 import { LiveCard } from './LiveCard.js';
+import { scrollBehavior } from '../utils/motion.js';
 
 export const buildCarousel = () => Carousel;
 
 export function Carousel({
   sessions, title, formatTime, formatTimezone, variant = 'live',
 }) {
-  if (!sessions || !sessions.length) return null;
-
+  // Hooks run before the empty-list bail-out — returning first would change hook order
+  // between an empty and a populated render.
   const [offset, setOffset] = useState(0);
   // Desktop pages the strip with a transform (overflow:visible); narrower
   // viewports scroll natively, so arrows must drive scrollLeft instead.
@@ -50,6 +51,8 @@ export function Carousel({
     return () => window.removeEventListener('resize', onResize);
   }, []);
 
+  if (!sessions || !sessions.length) return null;
+
   const maxOffset = Math.max(0, sessions.length - visibleCountRef.current);
   const translateX = paged ? offset * (cardWidthRef.current || 576) : 0;
   const atStart = paged ? offset <= 0 : edges.atStart;
@@ -57,11 +60,11 @@ export function Carousel({
 
   const goPrev = () => {
     if (paged) { setOffset((o) => Math.max(0, o - 1)); return; }
-    stripRef.current?.scrollBy({ left: -(cardWidthRef.current || 300), behavior: 'smooth' });
+    stripRef.current?.scrollBy({ left: -(cardWidthRef.current || 300), behavior: scrollBehavior() });
   };
   const goNext = () => {
     if (paged) { setOffset((o) => Math.min(maxOffset, o + 1)); return; }
-    stripRef.current?.scrollBy({ left: cardWidthRef.current || 300, behavior: 'smooth' });
+    stripRef.current?.scrollBy({ left: cardWidthRef.current || 300, behavior: scrollBehavior() });
   };
 
   // Desktop shows the focused card's time in the left gutter; mobile (offset
@@ -87,7 +90,11 @@ export function Carousel({
         `}
         <div class="sg-carousel__track">
           <div class="sg-carousel__cards" ref=${stripRef} onscroll=${refreshEdges} style=${'transform:translateX(-' + translateX + 'px)'}>
-            ${sessions.map((s) => html`<div class="sg-carousel__card-wrap" key=${s.id}><${LiveCard} session=${s} variant=${variant} /></div>`)}
+            ${sessions.map((s, i) => html`<div
+              class="sg-carousel__card-wrap"
+              key=${s.id}
+              inert=${paged && (i < offset || i >= offset + visibleCountRef.current) ? true : undefined}
+            ><${LiveCard} session=${s} variant=${variant} /></div>`)}
           </div>
         </div>
         ${sessions.length > 1 && html`
@@ -95,7 +102,7 @@ export function Carousel({
             <button
               class="sg-carousel__arrow sg-carousel__arrow--prev"
               onclick=${goPrev}
-              aria-label="Previous"
+              aria-label=${`Previous session, ${title}`}
               disabled=${atStart}
               type="button"
             >
@@ -106,7 +113,7 @@ export function Carousel({
             <button
               class="sg-carousel__arrow sg-carousel__arrow--next"
               onclick=${goNext}
-              aria-label="Next"
+              aria-label=${`Next session, ${title}`}
               disabled=${atEnd}
               type="button"
             >

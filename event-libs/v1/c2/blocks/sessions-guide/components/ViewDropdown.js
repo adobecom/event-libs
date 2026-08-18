@@ -57,6 +57,7 @@ export function ViewDropdown() {
   // Each option is its own tab stop (Tab cycles through them like a real list); arrow
   // keys additionally jump directly between options, matching listbox conventions.
   function handleOptionKeydown(e, idx) {
+    const focusOption = (i) => menuRef.current?.children[i]?.focus();
     if (e.key === 'Enter' || e.key === ' ') {
       e.preventDefault();
       selectView(VIEWS[idx].value);
@@ -65,10 +66,16 @@ export function ViewDropdown() {
       closeAndRefocus();
     } else if (e.key === 'ArrowDown') {
       e.preventDefault();
-      menuRef.current?.children[(idx + 1) % VIEWS.length]?.focus();
+      focusOption((idx + 1) % VIEWS.length);
     } else if (e.key === 'ArrowUp') {
       e.preventDefault();
-      menuRef.current?.children[(idx - 1 + VIEWS.length) % VIEWS.length]?.focus();
+      focusOption((idx - 1 + VIEWS.length) % VIEWS.length);
+    } else if (e.key === 'Home') {
+      e.preventDefault();
+      focusOption(0);
+    } else if (e.key === 'End') {
+      e.preventDefault();
+      focusOption(VIEWS.length - 1);
     }
   }
 
@@ -79,22 +86,24 @@ export function ViewDropdown() {
         class=${`sg-view-btn${open ? ' sg-view-btn--open' : ''}`}
         onclick=${() => setOpen(!open)}
         aria-haspopup="listbox"
-        aria-expanded=${open}
+        aria-expanded=${String(open)}
+        aria-controls=${open ? 'sg-view-menu' : undefined}
         type="button"
       >
         ${activeLabel}
         <span class="sg-view-chevron" aria-hidden="true"></span>
       </button>
       ${open && html`
-        <ul class="sg-view-menu" role="listbox" ref=${menuRef}>
+        <ul class="sg-view-menu" id="sg-view-menu" role="listbox" aria-label="Session view" ref=${menuRef}>
           ${VIEWS.map((v, idx) => html`
             <li
               class=${`sg-view-menu-item${state.activeView === v.value ? ' sg-view-menu-item--selected' : ''}`}
               onclick=${() => selectView(v.value)}
               onkeydown=${(e) => handleOptionKeydown(e, idx)}
               role="option"
+              key=${v.value}
               tabindex="0"
-              aria-selected=${state.activeView === v.value}
+              aria-selected=${String(state.activeView === v.value)}
               daa-ll="View-Toggle-${v.value}"
             >${v.label}</li>
           `)}

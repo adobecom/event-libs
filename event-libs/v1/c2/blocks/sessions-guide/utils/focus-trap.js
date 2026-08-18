@@ -21,8 +21,12 @@ export function trapFocus(containerEl, onEscape) {
   const [first] = getFocusables(containerEl);
   (first || containerEl).focus?.({ preventScroll: true });
 
+  // Traps nest (the filter panel sits inside the drawer), and both listen on their own
+  // container, so an unstopped key would bubble to the outer trap and dismiss it too.
+  // Stopping propagation once handled keeps Escape scoped to the innermost surface.
   function onKeydown(e) {
     if (e.key === 'Escape') {
+      e.stopPropagation();
       onEscape?.();
       return;
     }
@@ -33,9 +37,11 @@ export function trapFocus(containerEl, onEscape) {
     const lastItem = items[items.length - 1];
     if (e.shiftKey && document.activeElement === firstItem) {
       e.preventDefault();
+      e.stopPropagation();
       lastItem.focus();
     } else if (!e.shiftKey && document.activeElement === lastItem) {
       e.preventDefault();
+      e.stopPropagation();
       firstItem.focus();
     }
   }

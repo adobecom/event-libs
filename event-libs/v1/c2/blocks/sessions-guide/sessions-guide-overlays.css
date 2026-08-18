@@ -667,13 +667,23 @@
   background-color: var(--s2a-color-gray-800);
 }
 
+/* ── Filter panel ─────────────────────────────────────────────
+   Mobile-first, laid out with grid areas so one DOM order (categories → options
+   → actions, which is also the mobile reading order) serves every breakpoint:
+     base    full-screen takeover, stacked — title + scrolling category strip,
+             then a single-column option list, then a full-width action bar
+     768px   categories become the fixed 145px sidebar of Figma 9145:43768,
+             with Apply/Reset pinned beneath it and a 2-column option grid
+     1024px  3-column option grid
+     1280px  anchored popover card per Figma 9145:43766, 4-column grid */
 .sg-filter-panel {
-  position: absolute;
+  position: fixed;
   inset: 0;
-  background: var(--s2a-color-background-default, #fff);
-  z-index: 80;
+  z-index: 200;
   display: flex;
   flex-direction: column;
+  padding: var(--s2a-spacing-md);
+  background: var(--s2a-color-background-default, #fff);
   animation: sg-filter-in 0.2s ease;
 }
 
@@ -682,21 +692,59 @@
   to   { opacity: 1; }
 }
 
-.sg-filter-panel__header {
+@media (prefers-reduced-motion: reduce) {
+  .sg-filter-panel { animation: none; }
+}
+
+.sg-filter-panel__body {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template:
+    "sidebar" auto
+    "options" minmax(0, 1fr)
+    "actions" auto
+    / minmax(0, 1fr);
+  gap: var(--s2a-spacing-md);
+}
+
+/* Figma has no close affordance (Apply and click-away dismiss the panel), but the
+   takeover needs a visible one — park it in the top-right corner. */
+.sg-filter-panel__close {
+  position: absolute;
+  top: var(--s2a-spacing-xs);
+  right: var(--s2a-spacing-xs);
+  z-index: 1;
+  padding: var(--s2a-spacing-xs);
+  background: transparent;
+  border: none;
+  font-size: var(--s2a-font-size-lg);
+  line-height: 1;
+  color: var(--s2a-color-content-subtle);
+  cursor: pointer;
+}
+
+.sg-filter-panel__close:hover { color: var(--s2a-color-content-default); }
+
+/* Title + category switcher. The right padding keeps the title clear of the close
+   button while they share a row; from 768px the sidebar owns its own column. */
+.sg-filter-panel__sidebar {
+  grid-area: sidebar;
+  min-width: 0;
   display: flex;
-  align-items: center;
+  flex-direction: column;
   gap: var(--s2a-spacing-sm);
-  padding: var(--s2a-spacing-lg);
-  border-bottom: 1px solid var(--s2a-color-border-subtle);
-  flex-shrink: 0;
+  padding-right: var(--s2a-spacing-xl);
 }
 
 .sg-filter-panel__title {
+  margin: 0;
   font-family: var(--s2a-font-family-adobe-clean-display);
   font-weight: var(--s2a-font-weight-adobe-clean-display-black);
-  font-size: var(--s2a-font-size-xl);
+  font-size: var(--s2a-font-size-2xl);
+  line-height: 1;
+  letter-spacing: var(--s2a-font-letter-spacing-neg-0-48);
   color: var(--s2a-color-content-default);
-  flex: 1;
 }
 
 .sg-filter-panel__active-count {
@@ -714,64 +762,43 @@
   margin-left: var(--s2a-spacing-xs);
 }
 
-.sg-filter-panel__close {
-  background: transparent;
-  border: none;
-  font-size: var(--s2a-font-size-lg);
-  cursor: pointer;
-  color: var(--s2a-color-content-subtle);
-  padding: 4px;
-  line-height: 1;
-}
-
-.sg-filter-panel__close:hover { color: var(--s2a-color-content-default); }
-
-.sg-filter-panel__body {
-  flex: 1;
-  display: flex;
-  overflow: hidden;
-}
-
-/* Sidebar: category list at the top, Apply/Reset pinned to the bottom. */
-.sg-filter-panel__sidebar {
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  gap: var(--s2a-spacing-md);
-  width: 145px;
-  flex-shrink: 0;
-  padding: var(--s2a-spacing-md) 0;
-  border-right: 1px solid var(--s2a-color-border-subtle);
-  overflow-y: auto;
-}
-
+/* A horizontally scrolling strip on mobile; a vertical list from 768px up. */
 .sg-filter-panel__cats {
   list-style: none;
   margin: 0;
   padding: 0;
+  display: flex;
+  gap: var(--s2a-spacing-md);
+  overflow-x: auto;
+  scrollbar-width: none;
 }
 
-/* Active/inactive is opacity-based (no background box), per Figma. */
+.sg-filter-panel__cats::-webkit-scrollbar { display: none; }
+
+.sg-filter-panel__cats > li { flex-shrink: 0; }
+
+/* Every label is bold 16/24 in Figma, with no background box (the list gap supplies the
+   spacing). Figma dims the inactive ones to 50% opacity, which lands at 3.95:1 on light
+   and fails 1.4.3 for 16px bold — so the dim state uses content-subtle (6.6:1) instead,
+   which reads near-identically. Selection is also carried by aria-pressed. */
 .sg-filter-panel__cat {
   display: flex;
   align-items: center;
   gap: var(--s2a-spacing-xs);
-  width: 100%;
-  padding: var(--s2a-spacing-sm) var(--s2a-spacing-md);
+  padding: 0;
   background: transparent;
   border: none;
   font-family: var(--s2a-font-family-adobe-clean);
-  font-size: var(--s2a-font-size-sm);
-  color: var(--s2a-color-content-default);
-  cursor: pointer;
+  font-size: var(--s2a-font-size-md);
+  font-weight: var(--s2a-font-weight-adobe-clean-bold);
+  line-height: var(--s2a-font-line-height-24);
+  color: var(--s2a-color-content-subtle);
+  white-space: nowrap;
   text-align: left;
-  opacity: 0.5;
+  cursor: pointer;
 }
 
-.sg-filter-panel__cat--active {
-  opacity: 1;
-  font-weight: var(--s2a-font-weight-adobe-clean-bold);
-}
+.sg-filter-panel__cat--active { color: var(--s2a-color-content-default); }
 
 .sg-filter-panel__cat-badge {
   display: inline-flex;
@@ -787,61 +814,20 @@
   padding: 0 4px;
 }
 
-.sg-filter-panel__actions {
-  display: flex;
-  flex-direction: column;
-  gap: var(--s2a-spacing-md);
-  padding: 0 var(--s2a-spacing-md);
-}
-
-.sg-filter-panel__apply {
-  height: 40px;
-  padding: 0 var(--s2a-spacing-md);
-  border-radius: var(--s2a-border-radius-round);
-  background: var(--s2a-color-gray-800);
-  color: #fff;
-  border: none;
-  font-family: var(--s2a-font-family-adobe-clean);
-  font-weight: var(--s2a-font-weight-adobe-clean-bold);
-  font-size: var(--s2a-font-size-sm);
-  cursor: pointer;
-  transition: opacity 0.15s;
-}
-
-.sg-filter-panel__apply:hover { opacity: 0.85; }
-
-.sg-filter-panel__reset {
-  height: 40px;
-  padding: 0 var(--s2a-spacing-md);
-  border-radius: var(--s2a-border-radius-round);
-  background: transparent;
-  border: 1px solid var(--s2a-color-border-subtle);
-  font-family: var(--s2a-font-family-adobe-clean);
-  font-size: var(--s2a-font-size-sm);
-  font-weight: var(--s2a-font-weight-adobe-clean-bold);
-  color: var(--s2a-color-content-default);
-  cursor: pointer;
-}
-
-.sg-filter-panel__reset:hover { background: var(--s2a-color-background-subtle); }
-
-/* Options render as a responsive pill grid (2 cols mobile → 4 cols tablet+). */
+/* Options card. One column on mobile so long product names aren't truncated,
+   widening to 2/3/4 as room allows. */
 .sg-filter-panel__options {
-  flex: 1;
-  padding: var(--s2a-spacing-md);
+  grid-area: options;
+  min-width: 0;
+  min-height: 0;
   overflow-y: auto;
+  padding: var(--s2a-spacing-md);
   background: var(--s2a-color-background-subtle);
+  border-radius: var(--s2a-border-radius-16);
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--s2a-spacing-xs);
   align-content: start;
-}
-
-/* Figma 9145:43766 (Product) / 9145:43903 (Type): 4-col grid at tablet up. */
-@media (min-width: 768px) {
-  .sg-filter-panel__options {
-    grid-template-columns: repeat(4, 1fr);
-  }
 }
 
 .sg-filter-panel__empty {
@@ -851,18 +837,60 @@
   margin: 0;
 }
 
+/* A full-width action bar on mobile — 48px touch targets, Apply weighted wider.
+   Becomes Figma's stacked 116x32 pair at 768px. */
+.sg-filter-panel__actions {
+  grid-area: actions;
+  display: flex;
+  gap: var(--s2a-spacing-sm);
+}
+
+.sg-filter-panel__apply,
+.sg-filter-panel__reset {
+  flex: 1;
+  height: 48px;
+  padding: 0 var(--s2a-spacing-lg);
+  border: 1px solid rgb(0 0 0 / 10%);
+  border-radius: var(--s2a-border-radius-round);
+  font-family: var(--s2a-font-family-adobe-clean);
+  font-weight: var(--s2a-font-weight-adobe-clean-bold);
+  font-size: var(--s2a-font-size-sm);
+  line-height: 1.2;
+  cursor: pointer;
+}
+
+.sg-filter-panel__apply {
+  flex: 2;
+  background: var(--s2a-color-gray-1000);
+  color: var(--s2a-color-content-knockout);
+  transition: opacity 0.15s;
+}
+
+.sg-filter-panel__apply:hover { opacity: 0.85; }
+
+.sg-filter-panel__reset {
+  background: transparent;
+  color: var(--s2a-color-content-default);
+}
+
+.sg-filter-panel__reset:hover { background: var(--s2a-color-background-subtle); }
+
+/* Figma "Checkbox (M)": 48px tall, 12px radius, icon + label left, checkmark
+   right when selected. The border is always there but transparent until
+   selected, so selecting never nudges the grid. */
 .sg-filter-pill {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: var(--s2a-spacing-xs);
   height: 48px;
-  padding: 0 var(--s2a-spacing-md);
+  padding: var(--s2a-spacing-xs) var(--s2a-spacing-md);
   background: var(--s2a-color-background-default);
   border: 1px solid transparent;
   border-radius: var(--s2a-border-radius-12);
   font-family: var(--s2a-font-family-adobe-clean);
   font-size: var(--s2a-font-size-sm);
+  line-height: var(--s2a-font-line-height-18);
   color: var(--s2a-color-content-default);
   cursor: pointer;
   text-align: left;
@@ -871,6 +899,7 @@
 .sg-filter-pill--selected {
   border-color: var(--s2a-color-border-subtle);
   font-weight: var(--s2a-font-weight-adobe-clean-bold);
+  letter-spacing: var(--s2a-font-letter-spacing-neg-0-16);
 }
 
 .sg-filter-pill__content {
@@ -888,6 +917,96 @@
   white-space: nowrap;
 }
 
+/* ── Tablet: categories become a sidebar column, actions sit beneath it ─────── */
+@media (min-width: 768px) {
+  .sg-filter-panel__body {
+    grid-template:
+      "sidebar options" minmax(0, 1fr)
+      "actions options" auto
+      / 145px minmax(0, 1fr);
+    column-gap: var(--s2a-spacing-lg);
+    row-gap: var(--s2a-spacing-md);
+  }
+
+  /* Figma's divider runs the full column height, which spans both sidebar rows —
+     so both carry the hairline and together they read as one line. */
+  .sg-filter-panel__sidebar,
+  .sg-filter-panel__actions {
+    border-right: 1px solid var(--s2a-color-gray-75);
+  }
+
+  .sg-filter-panel__sidebar {
+    gap: var(--s2a-spacing-xl);
+    padding-right: 0;
+    overflow-y: auto;
+  }
+
+  .sg-filter-panel__cats {
+    flex-direction: column;
+    gap: var(--s2a-spacing-20);
+    overflow-x: visible;
+  }
+
+  .sg-filter-panel__cat {
+    width: 100%;
+    white-space: normal;
+  }
+
+  .sg-filter-panel__actions {
+    flex-direction: column;
+    gap: var(--s2a-spacing-md);
+  }
+
+  .sg-filter-panel__apply,
+  .sg-filter-panel__reset {
+    flex: none;
+    width: 116px;
+    height: 32px;
+  }
+
+  .sg-filter-panel__options {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (min-width: 1024px) {
+  .sg-filter-panel__options {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+/* ── Desktop: anchored popover card ─────────────────────────────
+   Dismiss-on-click-away card anchored to the filter button (.sg-filter-wrap),
+   overlaying the widget instead of taking it over — mirrors sessions-hub's
+   sh-filter-panel and this block's own ViewDropdown. Click-away is wired in
+   DrawerHeader.js. Geometry is Figma 9145:43766 — 1307x880, 24px padding, 20px
+   radius. Height is fixed rather than max-height so the sidebar column's bottom
+   row pins Apply/Reset as designed; the options grid scrolls internally. */
+@media (min-width: 1280px) {
+  .sg-filter-panel {
+    position: absolute;
+    inset: auto;
+    top: calc(100% + 12px);
+    right: 0;
+    width: min(1307px, calc(100vw - 48px));
+    height: min(880px, calc(100vh - 200px));
+    padding: var(--s2a-spacing-lg);
+    border: 1px solid rgb(0 0 0 / 10%);
+    border-radius: 20px;
+    overflow: hidden;
+    box-shadow:
+      0 14px 30px rgb(0 0 0 / 10%),
+      0 54px 54px rgb(0 0 0 / 9%),
+      0 122px 73px rgb(0 0 0 / 5%),
+      0 217px 87px rgb(0 0 0 / 1%);
+  }
+
+  .sg-filter-panel__options {
+    grid-template-columns: repeat(4, 1fr);
+    padding: var(--s2a-spacing-lg);
+  }
+}
+
 /* ── Dark theme overrides (Phases 4–9) ───────────────────────── */
 
 [data-theme="dark"] .sg-detail-panel,
@@ -896,6 +1015,7 @@
 .sg-portal[data-theme="dark"] .sg-filter-panel {
   background: var(--s2a-color-background-default);
   color: var(--s2a-color-content-default);
+  border-color: var(--s2a-color-transparent-white-16);
 }
 
 /* Figma dark frames (9145:44777/44778/44779): pills sit slightly lighter than the
@@ -909,4 +1029,24 @@
 [data-theme="dark"] .sg-filter-pill,
 .sg-portal[data-theme="dark"] .sg-filter-pill {
   background: var(--s2a-color-background-subtle);
+}
+
+/* The sidebar divider and button outlines are authored as light-mode black alphas
+   above — invert them rather than let them disappear on dark. */
+[data-theme="dark"] .sg-filter-panel__sidebar,
+.sg-portal[data-theme="dark"] .sg-filter-panel__sidebar {
+  border-right-color: var(--s2a-color-transparent-white-08);
+}
+
+[data-theme="dark"] .sg-filter-panel__reset,
+.sg-portal[data-theme="dark"] .sg-filter-panel__reset {
+  border-color: var(--s2a-color-transparent-white-16);
+}
+
+/* Dark frames (9145:44777/44778/44779) flip Apply to a white fill with black label. */
+[data-theme="dark"] .sg-filter-panel__apply,
+.sg-portal[data-theme="dark"] .sg-filter-panel__apply {
+  background: var(--s2a-color-gray-25);
+  color: var(--s2a-color-gray-1000);
+  border-color: var(--s2a-color-transparent-white-16);
 }

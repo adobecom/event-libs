@@ -9,6 +9,7 @@ import { isPostEvent, getNowMs } from '../../../../utils/session-state.js';
 import { DateTabs } from './DateTabs.js';
 import { ViewDropdown } from './ViewDropdown.js';
 import { DownloadButton } from './DownloadButton.js';
+import { FilterPanel } from './FilterPanel.js';
 
 // Authored headings are 4 literal strings keyed by auth state x event lifecycle — no
 // placeholder interpolation, unlike the hardcoded default's first-name greeting. A blank/
@@ -20,11 +21,26 @@ export function resolveDrawerTitle(headings, { isLoggedIn, userFirstName, isPost
   return (headings || {})[key] || defaultTitle;
 }
 
-export function DrawerHeader({ onClose, onFilterToggle, filterOpen, hideClose, hideControls }) {
+export function DrawerHeader({
+  onClose, onFilterToggle, onFilterClose, filterOpen, hideClose, hideControls,
+}) {
   const { state, dispatch } = useSessionGuide();
   const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
   const mobileSearchRef = useRef(null);
+  const filterWrapRef = useRef(null);
   const { activeFilters, activeView } = state;
+  const closeFilter = onFilterClose || (() => {});
+
+  // Desktop popover dismissal: close when a click lands outside the filter wrap (button +
+  // panel). Mirrors ViewDropdown; harmless on mobile where the panel is a full takeover.
+  useEffect(() => {
+    if (!filterOpen) return undefined;
+    function onClickOutside(e) {
+      if (filterWrapRef.current && !filterWrapRef.current.contains(e.target)) closeFilter();
+    }
+    document.addEventListener('click', onClickOutside);
+    return () => document.removeEventListener('click', onClickOutside);
+  }, [filterOpen]);
 
   // sessionStateVersion has no value of its own, only read so this recomputes on a pure
   // time-driven transition too (see store/index.js's auto-transition effect for why).
@@ -87,19 +103,20 @@ export function DrawerHeader({ onClose, onFilterToggle, filterOpen, hideClose, h
           <div class="sg-right-controls">
             ${activeView === 'my-sessions' && html`<${DownloadButton} />`}
             <${ViewDropdown} />
-            <div class="sg-filter-wrap">
+            <div class="sg-filter-wrap" ref=${filterWrapRef}>
               <button
                 class=${'sg-filter-btn' + (filterOpen ? ' sg-filter-btn--open' : '') + (activeFilterCount > 0 ? ' sg-filter-btn--active' : '')}
                 onclick=${onFilterToggle}
-                aria-label="Filter sessions"
-                aria-haspopup="true"
+                aria-label=${activeFilterCount > 0 ? `Filter sessions, ${activeFilterCount} active` : 'Filter sessions'}
+                aria-haspopup="dialog"
                 aria-expanded=${String(!!filterOpen)}
+                aria-controls=${filterOpen ? 'sg-filter-panel-options' : undefined}
                 daa-ll="Filter-Open"
                 type="button"
               >
                 <span class="sg-filter-icon" aria-hidden="true"></span>
                 <span class="sg-filter-btn-label">Filter</span>
-                ${activeFilterCount > 0 && html`<span class="sg-filter-count-badge" aria-label="${activeFilterCount} active filters">${activeFilterCount}</span>`}
+                ${activeFilterCount > 0 && html`<span class="sg-filter-count-badge" aria-hidden="true">${activeFilterCount}</span>`}
               </button>
               <button
                 class=${`sg-search-btn${mobileSearchOpen ? ' active' : ''}`}
@@ -110,6 +127,7 @@ export function DrawerHeader({ onClose, onFilterToggle, filterOpen, hideClose, h
               >
                 <span class="sg-search-icon" aria-hidden="true"></span>
               </button>
+              ${filterOpen && html`<${FilterPanel} onClose=${closeFilter} />`}
             </div>
           </div>
         </div>
@@ -121,6 +139,7 @@ export function DrawerHeader({ onClose, onFilterToggle, filterOpen, hideClose, h
               class="sg-mobile-search-input"
               ref=${mobileSearchRef}
               type="search"
+              aria-label="Search sessions"
               placeholder="Search sessions..."
               autocomplete="off"
               spellcheck="false"

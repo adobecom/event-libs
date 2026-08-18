@@ -77,11 +77,14 @@ describe('TimeSlotRow', () => {
     expect(count).to.equal(2);
   });
 
-  it('does not show prev arrow at initial offset 0', () => {
+  // Arrows stay mounted and disable at the ends — conditionally unmounting them
+  // destroyed focus when a keyboard user paged to either end.
+  it('renders the prev arrow disabled at initial offset 0', () => {
     const store = makeStore();
     const TimeSlotRow = buildTimeSlotRow(preact, store);
     const html = TimeSlotRow({ sessions: [SESSION_A, SESSION_B] });
-    expect(html).to.not.include('sg-time-row__arrow--prev');
+    expect(html).to.include('sg-time-row__arrow--prev');
+    expect(html).to.include('disabled=true');
   });
 
   it('renders card wraps for multiple sessions (next arrow requires real layout)', () => {
@@ -94,10 +97,11 @@ describe('TimeSlotRow', () => {
     expect(count).to.equal(2);
   });
 
-  it('does not show next arrow for a single session', () => {
+  it('renders the next arrow disabled for a single session', () => {
     const store = makeStore();
     const TimeSlotRow = buildTimeSlotRow(preact, store);
     const html = TimeSlotRow({ sessions: [SESSION_A] });
-    expect(html).to.not.include('sg-time-row__arrow--next');
+    expect(html).to.include('sg-time-row__arrow--next');
+    expect(html).to.include('disabled=true');
   });
 });

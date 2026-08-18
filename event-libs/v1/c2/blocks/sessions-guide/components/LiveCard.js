@@ -9,6 +9,7 @@ import { toggleScheduleWithFeedback, toggleFavoriteWithFeedback } from '../../..
 import { IconPlay, IconCalendarCheck, IconCalendarPlus, IconHeartFilled, IconHeartOutline } from './icons.js';
 import { setSessionParam, clearSessionParams, safeUrl, isSamePage } from '../utils/url.js';
 import { CategoryBadge } from './CategoryBadge.js';
+import { scrollBehavior } from '../utils/motion.js';
 import { getTrackIcon } from '../../../../utils/tier-1-event-config.js';
 import { isBehaviorEnabled } from '../utils/behavior-flags.js';
 
@@ -69,7 +70,7 @@ export function LiveCard({ session, variant = 'live' }) {
     if (isSamePage(watchHref)) {
       dispatch({ type: 'CLOSE_DRAWER' });
       history.pushState({}, '', clearSessionParams());
-      window.scrollTo({ top: 0, behavior: 'smooth' });
+      window.scrollTo({ top: 0, behavior: scrollBehavior() });
       return;
     }
     window.location.href = watchHref;
@@ -140,7 +141,7 @@ export function LiveCard({ session, variant = 'live' }) {
           ${schedulingEnabled && html`<button
             class=${'sg-live-card__btn sg-live-card__btn--schedule' + (isScheduled ? ' is-scheduled' : '') + (isPending ? ' is-pending' : '')}
             onclick=${handleSchedule}
-            aria-label=${isScheduled ? 'Remove from schedule' : 'Add to schedule'}
+            aria-label=${isScheduled ? `Remove ${session.title} from schedule` : `Add ${session.title} to schedule`}
             aria-pressed=${String(isScheduled)}
             disabled=${isPending}
             daa-ll=${isScheduled ? 'Remove-from-Schedule' : 'Add-to-Schedule'}
@@ -149,7 +150,7 @@ export function LiveCard({ session, variant = 'live' }) {
           ${favoritingEnabled && html`<button
             class=${'sg-live-card__btn sg-live-card__btn--favorite' + (isFavorited ? ' is-favorited' : '') + (isPending ? ' is-pending' : '')}
             onclick=${handleFavorite}
-            aria-label=${isFavorited ? 'Remove from favorites' : 'Add to favorites'}
+            aria-label=${isFavorited ? `Remove ${session.title} from favorites` : `Add ${session.title} to favorites`}
             aria-pressed=${String(isFavorited)}
             disabled=${isPending}
             daa-ll=${isFavorited ? 'Remove-from-Favorites' : 'Add-to-Favorites'}

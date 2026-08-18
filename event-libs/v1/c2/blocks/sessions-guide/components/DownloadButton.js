@@ -13,7 +13,6 @@ export function DownloadButton() {
       class="sg-download-btn"
       onclick=${handleDownload}
       aria-label="Download schedule as .ics calendar file"
-      title="Download .ics"
       type="button"
     ></button>
   `;

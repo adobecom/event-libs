@@ -3,8 +3,7 @@ import { useSessionGuide } from '../store/index.js';
 import { sessionsStatus } from '../../../../utils/session-store.js';
 import { DrawerHeader } from './DrawerHeader.js';
 import { ViewRouter } from './ViewRouter.js';
-import { FilterPanel } from './FilterPanel.js';
-import { LoadingState } from './LoadingState.js';
+import { LoadingState, sessionsStatusMessage } from './LoadingState.js';
 
 export function FullPageShell() {
   const { state, dispatch } = useSessionGuide();
@@ -74,14 +73,20 @@ export function FullPageShell() {
   return html`
     <div class="sg-full-page">
       <div class="sg-full-page__header-wrap">
-        <${DrawerHeader} onClose=${noop} onFilterToggle=${() => setFilterOpen((o) => !o)} filterOpen=${filterOpen} hideClose=${true} />
+        <${DrawerHeader}
+          onClose=${noop}
+          onFilterToggle=${() => setFilterOpen((o) => !o)}
+          onFilterClose=${() => setFilterOpen(false)}
+          filterOpen=${filterOpen}
+          hideClose=${true}
+        />
       </div>
-      <div class="sg-full-page__body">
+      <div class="sg-full-page__body" aria-busy=${String(sessionsStatus.value === 'loading')}>
+        <div class="sg-sr-only" role="status" aria-live="polite">${sessionsStatusMessage(sessionsStatus.value)}</div>
         ${sessionsStatus.value === 'loading' && html`<${LoadingState} />`}
         ${sessionsStatus.value === 'error' && html`<div class="sg-error" role="alert">Failed to load sessions.</div>`}
         ${sessionsStatus.value === 'ready' && html`<${ViewRouter} />`}
       </div>
-      ${filterOpen && html`<${FilterPanel} onClose=${() => setFilterOpen(false)} />`}
     </div>
   `;
 }

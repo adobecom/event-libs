@@ -6,10 +6,10 @@ import {
 import { DrawerHeader } from './DrawerHeader.js';
 import { ViewRouter } from './ViewRouter.js';
 import { SessionDetailOverlay } from './SessionDetailOverlay.js';
-import { FilterPanel } from './FilterPanel.js';
-import { LoadingState } from './LoadingState.js';
+import { LoadingState, sessionsStatusMessage } from './LoadingState.js';
 import { setSessionParam, setSessionsParam, clearSessionParams } from '../utils/url.js';
 import { trapFocus } from '../utils/focus-trap.js';
+import { prefersReducedMotion } from '../utils/motion.js';
 
 // No top gap on mobile/tablet (drawer covers the full screen); 20px gap on desktop.
 const getTopMargin = () => (window.matchMedia('(max-width: 1279px)').matches ? 0 : 20);
@@ -48,9 +48,13 @@ export function DrawerShell() {
   function setTop(top, animate) {
     const el = drawerRef.current;
     if (!el) return;
-    el.style.transition = animate
-      ? 'top 0.45s cubic-bezier(0.4, 0, 0.2, 1)'
-      : 'top 0.08s linear';
+    if (prefersReducedMotion()) {
+      el.style.transition = 'none';
+    } else {
+      el.style.transition = animate
+        ? 'top 0.45s cubic-bezier(0.4, 0, 0.2, 1)'
+        : 'top 0.08s linear';
+    }
     el.style.top = `${top}px`;
     currentTopRef.current = top;
   }
@@ -81,7 +85,7 @@ export function DrawerShell() {
         requestAnimationFrame(() => setTop(getTopMargin(), true));
       });
     } else if (drawerState === 'hidden') {
-      el.style.transition = 'top 0.45s cubic-bezier(0.4, 0, 0.2, 1)';
+      el.style.transition = prefersReducedMotion() ? 'none' : 'top 0.45s cubic-bezier(0.4, 0, 0.2, 1)';
       el.style.top = '100vh';
       document.body.style.overflow = '';
       expandedRef.current = false;
@@ -247,6 +251,11 @@ export function DrawerShell() {
   }
 
   function handleFilterToggle() {
+    // The panel is a tall anchored card on desktop; in peek the drawer only occupies the
+    // bottom of the viewport, so it would hang off-screen. Expand first to make room.
+    if (!filterOpen && state.drawerState === 'peek') {
+      dispatch({ type: 'SET_DRAWER', drawer: 'expanded' });
+    }
     setFilterOpen((prev) => !prev);
   }
 
@@ -267,11 +276,16 @@ export function DrawerShell() {
         <${DrawerHeader}
           onClose=${closeDrawer}
           onFilterToggle=${handleFilterToggle}
+          onFilterClose=${handleFilterClose}
           filterOpen=${filterOpen}
           hideControls=${hasDetail}
         />
         <div class="sg-drawer__body">
-          <div class=${`sg-body-scroll${isExpanded ? ' sg-body-scroll--scrollable' : ''}`}>
+          <div
+            class=${`sg-body-scroll${isExpanded ? ' sg-body-scroll--scrollable' : ''}`}
+            aria-busy=${String(sessionsStatus.value === 'loading')}
+          >
+            <div class="sg-sr-only" role="status" aria-live="polite">${sessionsStatusMessage(sessionsStatus.value)}</div>
             ${sessionsStatus.value === 'loading' && html`<${LoadingState} />`}
             ${sessionsStatus.value === 'error' && html`<div class="sg-error" role="alert">Failed to load sessions.</div>`}
             ${sessionsStatus.value === 'ready' && html`<${ViewRouter} />`}
@@ -280,7 +294,6 @@ export function DrawerShell() {
             ${hasDetail && html`<${SessionDetailOverlay} onBack=${handleDetailBack} />`}
           </div>
         </div>
-        ${filterOpen && html`<${FilterPanel} onClose=${handleFilterClose} />`}
       </div>
       ${!isOpen && html`<button class="sg-cta-btn" onclick=${openDrawer} daa-ll="Session-Guide-Open" type="button">
         View all sessions
