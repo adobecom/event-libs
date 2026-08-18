@@ -372,6 +372,49 @@ export function resumeMpcVideo(iframe, progress) {
   }, ADOBE_TV_ORIGIN);
 }
 
+// ISO-8601 duration ("PT40M40S") → seconds — same parser the exploratory
+// new-video-playlist branch's utils-new.js used for the same purpose.
+export function convertIsoDurationToSeconds(iso) {
+  if (!iso || typeof iso !== 'string') return 0;
+  const match = iso.match(/P(?:(\d+)Y)?(?:(\d+)M)?(?:(\d+)D)?(?:T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?)?/);
+  if (!match) return 0;
+  const hours = parseInt(match[4] || 0, 10);
+  const minutes = parseInt(match[5] || 0, 10);
+  const seconds = parseInt(match[6] || 0, 10);
+  return (hours * 3600) + (minutes * 60) + seconds;
+}
+
+const mpcDurationCache = new Map(); // mpcVideoId -> seconds
+const mpcDurationInflight = new Map(); // mpcVideoId -> Promise<number|null>
+
+// Fallback only — MPC's own postMessage tick/pause/complete events don't reliably carry
+// `length` (confirmed live: a real 'pause' event had `currentTime` but no `length` at
+// all). Queried once per MPC video id (cached + in-flight-deduplicated) via MPC's own
+// JSON-LD metadata endpoint — same approach the exploratory new-video-playlist branch's
+// utils-new.js already used (fetchVideoDuration).
+async function fetchMpcVideoDuration(mpcVideoId) {
+  if (!mpcVideoId) return null;
+  if (mpcDurationCache.has(mpcVideoId)) return mpcDurationCache.get(mpcVideoId);
+  if (mpcDurationInflight.has(mpcVideoId)) return mpcDurationInflight.get(mpcVideoId);
+
+  const promise = (async () => {
+    try {
+      const response = await fetch(`${ADOBE_TV_ORIGIN}/v/${mpcVideoId}?format=json-ld`);
+      const json = await response.json();
+      const seconds = convertIsoDurationToSeconds(json?.jsonLinkedData?.duration || '') || null;
+      if (seconds != null) mpcDurationCache.set(mpcVideoId, seconds);
+      return seconds;
+    } catch (e) {
+      window.lana?.log(`[video-playlist] could not fetch mpc video duration for "${mpcVideoId}": ${e.message}`);
+      return null;
+    } finally {
+      mpcDurationInflight.delete(mpcVideoId);
+    }
+  })();
+  mpcDurationInflight.set(mpcVideoId, promise);
+  return promise;
+}
+
 // Live-updates the current session's OWN row (pinned first in the topic playlist, per
 // its "now playing" highlight — see render()) as its video actually plays — same
 // UI-update pattern the exploratory new-video-playlist branch's PlayerManager used
@@ -382,17 +425,26 @@ export function resumeMpcVideo(iframe, progress) {
 // cached: the player can start ticking before render() has built the row at all (it
 // depends on the async catalog fetch), so a no-op until the row exists is simpler than
 // coordinating the two.
-function updateRowProgressUI(sessionId, secondsWatched, length) {
+//
+// Deliberately takes no secondsWatched/length of its own — always called right after
+// saveVideoProgress(sessionId, ...), so re-reading getVideoProgress(sessionId) here picks
+// up its already-merged result instead of duplicating that merge logic. This matters in
+// practice: real MPC messages don't reliably carry `length` on every state (confirmed
+// live — a real `pause` event had `currentTime` but no `length` at all), so using the
+// raw per-message value directly would keep re-collapsing progress back to 0%/blank
+// duration the moment a length-less message arrived, exactly what was observed.
+function updateRowProgressUI(sessionId) {
   const row = [...document.querySelectorAll('.video-playlist-row')]
     .find((r) => r.dataset.itemId === sessionId);
   if (!row) return;
+  const progress = getVideoProgress(sessionId);
   const fill = row.querySelector('.video-playlist-row-progress-fill');
-  if (fill) fill.style.width = `${computeProgressPercent({ secondsWatched, length })}%`;
+  if (fill) fill.style.width = `${computeProgressPercent(progress)}%`;
   // Self-corrects the row's own duration label the moment the real, player-reported
   // length is known — the catalog's own scheduled-slot duration can genuinely differ
   // from it (see buildTopicView).
   const durationEl = row.querySelector('.video-playlist-row-duration');
-  if (durationEl && length) durationEl.textContent = formatDuration(Math.round(length / 60));
+  if (durationEl && progress?.length) durationEl.textContent = formatDuration(Math.round(progress.length / 60));
 }
 
 // MPC posts window messages from video.tv.adobe.com — same postMessage envelope this
@@ -402,26 +454,45 @@ function updateRowProgressUI(sessionId, secondsWatched, length) {
 // page only ever embeds its own session's video, so which session is playing is already
 // known unambiguously, unlike the multi-card-on-one-page model the envelope originally
 // came from.
+// MPC doesn't reliably include `length` on any given message — falls back to querying
+// it once (cached) from MPC's own JSON-LD metadata endpoint when neither this message
+// nor a previously-saved entry for this session already has it.
+function ensureMpcLength(sessionId, mpcVideoId, currentTime, length) {
+  if (length != null) return;
+  if (getVideoProgress(sessionId)?.length != null) return;
+  fetchMpcVideoDuration(mpcVideoId).then((fetchedLength) => {
+    if (fetchedLength == null) return;
+    const latest = getVideoProgress(sessionId);
+    saveVideoProgress(sessionId, latest?.secondsWatched ?? currentTime, fetchedLength);
+    updateRowProgressUI(sessionId);
+  });
+}
+
 function watchMpcPlayback(sessionId, iframe, onComplete) {
   let lastTickSecond = null;
   const handler = (event) => {
     if (event.origin !== ADOBE_TV_ORIGIN) return;
     if (event.data?.type !== MPC_MESSAGE_TYPE) return;
-    const { state, currentTime, length } = event.data;
+    const {
+      state, id: mpcVideoId, currentTime, length,
+    } = event.data;
     switch (state) {
       case MPC_STATE_LOAD:
         resumeMpcVideo(iframe, getVideoProgress(sessionId));
+        ensureMpcLength(sessionId, mpcVideoId, currentTime, length);
         break;
       case MPC_STATE_PAUSE:
         saveVideoProgress(sessionId, currentTime, length);
-        updateRowProgressUI(sessionId, currentTime, length);
+        updateRowProgressUI(sessionId);
+        ensureMpcLength(sessionId, mpcVideoId, currentTime, length);
         break;
       case MPC_STATE_TICK: {
         const tickSecond = Math.floor(currentTime);
         if (tickSecond !== lastTickSecond && tickSecond % PROGRESS_TICK_SECONDS === 0) {
           lastTickSecond = tickSecond;
           saveVideoProgress(sessionId, currentTime, length);
-          updateRowProgressUI(sessionId, currentTime, length);
+          updateRowProgressUI(sessionId);
+          ensureMpcLength(sessionId, mpcVideoId, currentTime, length);
         }
         break;
       }
@@ -433,7 +504,7 @@ function watchMpcPlayback(sessionId, iframe, onComplete) {
         const finalLength = length ?? getVideoProgress(sessionId)?.length ?? null;
         if (finalLength != null) {
           saveVideoProgress(sessionId, finalLength, finalLength);
-          updateRowProgressUI(sessionId, finalLength, finalLength);
+          updateRowProgressUI(sessionId);
         }
         onComplete();
         break;
@@ -491,7 +562,7 @@ async function watchYouTubePlayback(sessionId, iframe, onComplete) {
             const duration = event.target?.getDuration?.();
             if (currentTime != null && duration != null) {
               saveVideoProgress(sessionId, currentTime, duration);
-              updateRowProgressUI(sessionId, currentTime, duration);
+              updateRowProgressUI(sessionId);
             }
           }, PROGRESS_TICK_SECONDS * 1000);
         } else if (event.data === window.YT.PlayerState.ENDED) {
@@ -499,7 +570,7 @@ async function watchYouTubePlayback(sessionId, iframe, onComplete) {
           const duration = event.target?.getDuration?.();
           if (duration) {
             saveVideoProgress(sessionId, duration, duration);
-            updateRowProgressUI(sessionId, duration, duration);
+            updateRowProgressUI(sessionId);
           }
           onComplete();
         } else {
