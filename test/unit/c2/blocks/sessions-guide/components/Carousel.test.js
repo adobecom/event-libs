@@ -92,6 +92,22 @@ describe('Carousel', () => {
     expect(html).to.include('sg-carousel__arrow--next');
   });
 
+  it('renders the left time gutter when formatTime is supplied', () => {
+    const store = makeStore();
+    const Carousel = buildCarousel(preact, store);
+    const html = Carousel({ sessions: [SESSION_A], formatTime: () => '9:00AM' });
+    expect(html).to.include('sg-carousel__time');
+  });
+
+  // Recommended carousels pass no formatTime — with no gutter element the strip starts
+  // flush with the section's left edge instead of being indented by it.
+  it('omits the time gutter when no formatTime is supplied', () => {
+    const store = makeStore();
+    const Carousel = buildCarousel(preact, store);
+    const html = Carousel({ sessions: [SESSION_A] });
+    expect(html).to.not.include('sg-carousel__time');
+  });
+
   it('renders no arrows for a single session', () => {
     const store = makeStore();
     const Carousel = buildCarousel(preact, store);
