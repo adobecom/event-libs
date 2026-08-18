@@ -1850,6 +1850,9 @@
   .sg-live-card:is(:hover, :focus-within) .sg-live-card__track { color: #fff; }
   .sg-live-card:is(:hover, :focus-within) .sg-live-card__track-row { color: #fff; }
 
+  /* Track colors can't be trusted against the dark hover fill — always go white. */
+  .sg-live-card:is(:hover, :focus-within) .sg-category-badge__icon-color { color: #fff; }
+
   .sg-live-card__time {
     font-size: var(--s2a-font-size-sm);
     color: var(--s2a-color-gray-700);
@@ -2157,6 +2160,9 @@
 
   .sg-live-card:is(:hover, :focus-within) .sg-live-card__track-row { color: #fff; }
 
+  /* Track colors can't be trusted against the dark hover fill — always go white. */
+  .sg-live-card:is(:hover, :focus-within) .sg-category-badge__icon-color { color: #fff; }
+
   .sg-live-card__time {
     font-size: var(--s2a-font-size-sm);
     color: var(--s2a-color-gray-700);
@@ -2460,6 +2466,9 @@
 
   .sg-card:is(:hover, :focus-within) .sg-category-badge { color: #fff; }
 
+  /* Track colors can't be trusted against the dark hover fill — always go white. */
+  .sg-card:is(:hover, :focus-within) .sg-category-badge__icon-color { color: #fff; }
+
   .sg-card:is(:hover, :focus-within) .sg-icon-btn--outlined.sg-icon-btn--on-light {
     border-color: var(--s2a-color-border-inverse, #fff);
     color: var(--s2a-color-content-knockout, #fff);
@@ -2594,6 +2603,7 @@
   .sg-card:is(:hover, :focus-within) .sg-card__title { color: var(--s2a-color-gray-900); }
   .sg-card:is(:hover, :focus-within) .sg-card__track { color: var(--s2a-color-gray-900); }
   .sg-card:is(:hover, :focus-within) .sg-category-badge { color: var(--s2a-color-gray-900); }
+  .sg-card:is(:hover, :focus-within) .sg-category-badge__icon-color { color: var(--sg-badge-icon-color, currentcolor); }
   .sg-card:is(:hover, :focus-within) .sg-card__time { color: var(--s2a-color-gray-600); }
 
   .sg-card:is(:hover, :focus-within) .sg-icon-btn--outlined.sg-icon-btn--on-light {
@@ -2685,11 +2695,15 @@
   white-space: nowrap;
 }
 
+/* Icon paints the authored track color, set inline as --sg-badge-icon-color by
+   CategoryBadge.js. Cards that darken on hover override `color` to white — see
+   the .sg-card/.sg-live-card hover rules in the desktop breakpoints. */
 .sg-category-badge__icon-color {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+  color: var(--sg-badge-icon-color, currentcolor);
 }
 
 .sg-icon {
@@ -2711,13 +2725,15 @@
   font-size: 12px;
 }
 
-/* "+N" indicator for a session's additionalTracks */
+/* "+N" indicator for a session's additionalTracks — Figma "Component/S/Bold",
+   full-strength content-default (currentcolor so it inverts with the label on
+   dark card hover), no dimming. */
 .sg-category-badge__count {
-  font-size: 12px;
-  font-weight: 700;
-  line-height: 16px;
+  font-size: var(--s2a-font-size-xs);
+  font-weight: var(--s2a-font-weight-adobe-clean-bold);
+  line-height: var(--s2a-font-line-height-16);
+  letter-spacing: 0;
   color: currentcolor;
-  opacity: 0.72;
 }
 
 /* ── Icon Button (S2A Foundations) ──────────────────────────────────── */

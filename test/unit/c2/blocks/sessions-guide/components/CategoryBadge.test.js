@@ -23,7 +23,7 @@ describe('CategoryBadge', () => {
 
   it('applies the color from an exact-key config match', () => {
     const html = CategoryBadge({ session: session({ track: 'Social Media' }) });
-    expect(html).to.include('color:#FF6B35');
+    expect(html).to.include('--sg-badge-icon-color:#FF6B35');
   });
 
   it('shows the primary track as the label', () => {
@@ -34,7 +34,7 @@ describe('CategoryBadge', () => {
   it('falls back to the universal black color (no icon) when the track has no authored config entry', () => {
     const html = CategoryBadge({ session: session({ track: 'Mainstage' }) });
     expect(html).to.include('Mainstage');
-    expect(html).to.include('color:#000000');
+    expect(html).to.include('--sg-badge-icon-color:#000000');
   });
 
   it('renders nothing when there is no primary track and no override (no "Other" badge)', () => {
@@ -54,6 +54,6 @@ describe('CategoryBadge', () => {
   it('shows the override text and the universal black default color when unconfigured', () => {
     const html = CategoryBadge({ session: session({ trackOverride: 'custom label', additionalTracks: ['Video'] }) });
     expect(html).to.include('custom label');
-    expect(html).to.include('color:#000000');
+    expect(html).to.include('--sg-badge-icon-color:#000000');
   });
 });
