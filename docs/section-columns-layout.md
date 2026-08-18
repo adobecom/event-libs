@@ -155,11 +155,32 @@ edge):
 | Section Layout | columns |
 | Columns Max Width | 1200px |
 
-Use any CSS length or percentage — reuse an existing width rather than picking an
-arbitrary number: Milo's own container resolves to `1200px` at wide desktop
-(`--grid-container-width`), and the C2 rich-media measure tokens resolve to
-`848px`/`1192px` narrow/wide. This never uses `100vw`, so it doesn't trigger the
-scrollbar-width overflow bug that viewport-width-based centering can.
+Use any valid CSS `background`-style value — including a `var()` reference, since
+this is set via `main.style.setProperty()`, not parsed/validated. Prefer
+referencing an existing width token over typing its current resolved number, so
+the row tracks that token if it's ever redefined:
+
+| Metadata | |
+|---|---|
+| Columns Max Width | `var(--s2a-layout-rich-media-content-measure-wide, 1192px)` |
+
+For Milo's own container width, skip this key entirely and use the `container`
+style keyword instead (below) — it's already a generic, reusable Section
+Metadata keyword, unlike the C2 measure tokens, which are only ever consumed
+inside specific component CSS (`.milo-video`, `mobile-rider.css`) and have no
+equivalent generic keyword to reuse. This never uses `100vw`, so it doesn't
+trigger the scrollbar-width overflow bug that viewport-width-based centering
+can.
+
+**Reusing Milo's container width directly, without typing `1200px`.** Instead of
+authoring a `Columns Max Width` value at all, tag any one of the row's
+`column-span-*` sections with Milo's own `container` style keyword (the same
+one used on any ordinary Milo section, via Section Metadata's `style` field —
+`s spacing, column-span-2, container`). The row then resolves its max-width to
+`--grid-container-width` directly, so it stays in sync with Milo's own
+container width instead of a copy-pasted value that can drift out of sync with
+it. A `Columns Max Width` metadata value takes precedence when both are
+present.
 
 **12. Gap between columns.** Add a `Columns Gap` metadata key with one of Milo's
 own spacing keywords — `none`, `xxs`, `xs`, `s`, `m`, `l`, `xl`, `xxl`, `xxxl`
@@ -256,6 +277,15 @@ before *and* after itself, which is exactly what makes it render alone.
   it land next to, and silently merge into, a row it wasn't authored next to. The
   full-width override makes that outcome impossible — a sticky section always
   renders alone on its own line, wherever it ends up.
+- **A grouped section's own `.content` max-width is neutralized (`max-width: 100%`).**
+  Milo's default `main > .section > .content { max-width: var(--grid-container-width) }`
+  applies to every section regardless of this feature, and `--grid-container-width`
+  is a *percentage* (`83.4%`) below the 1440px breakpoint, not a fixed length —
+  left in place, a column's own content would shrink by another 83.4% of its
+  already-narrowed box on top of whatever cap the row itself got from `Columns Max
+  Width`/`container`, compounding down to a visibly over-padded column. The row-level
+  cap is meant to be the only width constraint on the group; each column now just
+  fills its flex-allocated share.
 - **`grid-width-6/8/10` (and their `-desktop` variants) have their padding reset
   to `0` when combined with `column-span-*`.** Those Milo classes compute padding
   from `calc((100vw - Npx) / 2)` — the viewport width, not the section's actual
