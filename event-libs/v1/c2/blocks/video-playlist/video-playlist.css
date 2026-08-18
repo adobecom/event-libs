@@ -563,4 +563,23 @@
     width: 12px;
     height: 8px;
   }
+
+  /* Figma: "s2a/typography/heading-6" — overrides the shared desktop title rule above
+     (Title Small Black) with the mobile drawer's own heading-6 tokens. */
+  .video-playlist-title {
+    color: var(--s2a-color-content-default);
+    font-family: var(--s2a-font-family-heading);
+    font-size: var(--s2a-typography-font-size-heading-6);
+    font-weight: 900;
+    line-height: var(--s2a-typography-line-height-title-6, 18px);
+    letter-spacing: var(--s2a-typography-letter-spacing-heading-6);
+  }
+
+  /* Figma inspect: fixed 136x77 (136/77 aspect-ratio), 6px border-radius — mobile keeps a
+     fixed size rather than the desktop breakpoint-scaled widths above. */
+  .video-playlist-row-thumb {
+    width: 136px;
+    aspect-ratio: 136 / 77;
+    border-radius: 6px;
+  }
 }
