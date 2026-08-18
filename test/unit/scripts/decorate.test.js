@@ -1245,6 +1245,55 @@ describe('applySectionColumnsLayout', () => {
     const main = document.querySelector('main');
     expect(main.style.getPropertyValue('--section-columns-gap')).to.equal('0');
   });
+
+  it('sets --column-span-weight from an arbitrary column-span-<N> class, not just 1/2/3', () => {
+    setMetadata('section-layout', 'columns');
+    document.body.innerHTML = '<main><div class="section column-span-7"></div></main>';
+    applySectionColumnsLayout();
+    const section = document.querySelector('.section');
+    expect(section.style.getPropertyValue('--column-span-weight')).to.equal('7');
+    expect(section.style.getPropertyValue('--column-span-weight-tablet')).to.equal('');
+    expect(section.style.getPropertyValue('--column-span-weight-desktop')).to.equal('');
+  });
+
+  it('sets the tablet and desktop weight properties from their suffixed classes independently', () => {
+    setMetadata('section-layout', 'columns');
+    document.body.innerHTML = '<main><div class="section column-span-5-tablet column-span-4-desktop"></div></main>';
+    applySectionColumnsLayout();
+    const section = document.querySelector('.section');
+    expect(section.style.getPropertyValue('--column-span-weight')).to.equal('');
+    expect(section.style.getPropertyValue('--column-span-weight-tablet')).to.equal('5');
+    expect(section.style.getPropertyValue('--column-span-weight-desktop')).to.equal('4');
+  });
+
+  it('leaves an untagged section with no column-span weight properties', () => {
+    setMetadata('section-layout', 'columns');
+    document.body.innerHTML = '<main><div class="section"></div></main>';
+    applySectionColumnsLayout();
+    const section = document.querySelector('.section');
+    expect(section.style.getPropertyValue('--column-span-weight')).to.equal('');
+    expect(section.style.getPropertyValue('--column-span-weight-tablet')).to.equal('');
+    expect(section.style.getPropertyValue('--column-span-weight-desktop')).to.equal('');
+  });
+
+  it('clears a previously-set weight when a later call finds the class removed', () => {
+    setMetadata('section-layout', 'columns');
+    document.body.innerHTML = '<main><div class="section column-span-3"></div></main>';
+    applySectionColumnsLayout();
+    const section = document.querySelector('.section');
+    expect(section.style.getPropertyValue('--column-span-weight')).to.equal('3');
+
+    section.classList.remove('column-span-3');
+    applySectionColumnsLayout();
+    expect(section.style.getPropertyValue('--column-span-weight')).to.equal('');
+  });
+
+  it('does not touch weight properties on sections when the layout is disabled', () => {
+    document.body.innerHTML = '<main><div class="section column-span-2"></div></main>';
+    applySectionColumnsLayout();
+    const section = document.querySelector('.section');
+    expect(section.style.getPropertyValue('--column-span-weight')).to.equal('');
+  });
 });
 
 describe('applyPageBackground', () => {

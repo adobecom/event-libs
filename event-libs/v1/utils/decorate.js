@@ -1091,11 +1091,36 @@ const COLUMNS_GAP_TOKENS = {
   xxxl: 'var(--spacing-xxxl, 80px)',
 };
 
+const COLUMN_SPAN_RE = /^column-span-(\d+)(?:-(tablet|desktop))?$/;
+
+const COLUMN_SPAN_PROPERTIES = {
+  base: '--column-span-weight',
+  tablet: '--column-span-weight-tablet',
+  desktop: '--column-span-weight-desktop',
+};
+
+function applyColumnSpanWeights(main) {
+  main.querySelectorAll(':scope > .section').forEach((section) => {
+    const weights = {};
+    section.classList.forEach((className) => {
+      const match = className.match(COLUMN_SPAN_RE);
+      if (match) weights[match[2] || 'base'] = match[1];
+    });
+    Object.entries(COLUMN_SPAN_PROPERTIES).forEach(([tier, property]) => {
+      if (weights[tier]) section.style.setProperty(property, weights[tier]);
+      else section.style.removeProperty(property);
+    });
+  });
+}
+
 export function applySectionColumnsLayout() {
   const main = document.querySelector('main');
   if (!main) return;
   const enabled = getMetadata('section-layout')?.trim().toLowerCase() === 'columns';
-  if (enabled) addStylesToEventPage();
+  if (enabled) {
+    addStylesToEventPage();
+    applyColumnSpanWeights(main);
+  }
   main.classList.toggle('section-columns', enabled);
 
   const maxWidth = enabled && getMetadata('columns-max-width')?.trim();

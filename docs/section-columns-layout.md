@@ -48,7 +48,10 @@ arbitrary) ratio split of blocks that can share one section's styling and
 only needs a ratio at desktop. Reach for `column-span-*` when the split needs
 to cross section boundaries (independent background/spacing/theme per
 column, or multiple blocks stacked in a column), or needs a ratio to hold —
-or change — below 1200px.
+or change — below 1200px. Real designs also aren't limited to `layout`'s four
+preset ratios or small integers — e.g. a design calling for a 5:7 split in one
+breakpoint band and a 2:1 split in another needs `column-span-<N>` to accept
+an arbitrary `N`, not just 1/2/3.
 
 ## Authoring
 
@@ -64,8 +67,8 @@ This applies to the whole page's `<main>`, not any one section.
 block of content you want as a potential column, same as any other EDS page.
 
 **3. Group sections into a row** — add a **Section Metadata** block inside each
-section you want side-by-side, with a `style` row set to `column-span-1`,
-`column-span-2`, or `column-span-3`:
+section you want side-by-side, with a `style` row set to `column-span-<N>`,
+where `N` is any positive whole number:
 
 | Section Metadata | |
 |---|---|
@@ -74,8 +77,10 @@ section you want side-by-side, with a `style` row set to `column-span-1`,
 - `column-span-1` — equal share of the row (default weight for a tagged section)
 - `column-span-2` — twice the width of a `column-span-1` neighbor
 - `column-span-3` — three times the width of a `column-span-1` neighbor
+- `N` isn't capped at 3 — use whatever number the design calls for (e.g.
+  `column-span-5` next to `column-span-7` for a 5:7 split)
 
-`column-span-*` is a **weight**, not a slot number — a section's actual share of
+`column-span-<N>` is a **weight**, not a slot number — a section's actual share of
 the row is *its own weight ÷ the sum of every weight in that row*. So:
 
 - `column-span-1` + `column-span-1` → 50% / 50%
@@ -117,14 +122,15 @@ not add a separate mechanism for that.
 **9. Below 600px viewport width**, every section collapses back to plain vertical
 stacking regardless of tagging — there's no authoring for this, it's automatic.
 
-**10. Column ratios can vary by breakpoint.** `column-span-1/2/3` (no suffix)
-applies at **900px and up**, same as before. Two more tiers are available:
+**10. Column ratios can vary by breakpoint.** `column-span-<N>` (no suffix)
+applies at **900px and up**, same as before. Two more tiers are available,
+each accepting any `N`, independently of what the other tiers use:
 
-- `column-span-1/2/3-tablet` — applies from **600px up to 1200px**. Use it to
+- `column-span-<N>-tablet` — applies from **600px up to 1200px**. Use it to
   group sections into a row earlier than the 900px default, or to give a section a
   different ratio in that band. A section with no `-tablet` class stays full-width
   until the next tier that does tag it.
-- `column-span-1/2/3-desktop` — applies at **1200px and up**, overriding whatever
+- `column-span-<N>-desktop` — applies at **1200px and up**, overriding whatever
   ratio the section had at the tier below it (own `-tablet` class, or the base
   900px class).
 - `column-stack-tablet` — forces a section back to full-width for the 600–1199px
@@ -132,8 +138,11 @@ applies at **900px and up**, same as before. Two more tiers are available:
   that groups it into a row above or below that band.
 
 A section can carry more than one of these at once (e.g.
-`column-span-1-tablet, column-span-2-desktop`) to get a different ratio at each
-tier. Same weight-ratio math applies within each tier independently.
+`column-span-5-tablet, column-span-4-desktop` — a 5:7 split in the tablet band,
+a 4:8 split at desktop) to get a different ratio, with a different weight, at
+each tier. Same weight-ratio math applies within each tier independently; a
+tier's weight has no relationship to any other tier's weight for that same
+section.
 
 **11. Collective row max-width.** By default a row spans `<main>`'s own full
 width — untagged sections do too, so there's no visual change. Add a page
@@ -254,10 +263,10 @@ before *and* after itself, which is exactly what makes it render alone.
   a fraction of a shared row. Combining `grid-width-*` with `column-span-*` is
   therefore effectively a no-op for the width constraint: the section just fills
   its column's real width, same as carrying no width option at all.
-- **Grouping mechanism is pure CSS**, via `flex-wrap`, not CSS Grid. Every
-  `.section` defaults to `flex: 1 1 100%` (forces it alone onto its own line —
-  visually identical to normal stacking). A `column-span-*` class overrides that
-  to `flex: N 1 0; min-width: 0`, letting the section shrink from 100% and pack
+- **Grouping mechanism is `flex-wrap`, not CSS Grid.** Every `.section`
+  defaults to `flex: 1 1 100%` (forces it alone onto its own line — visually
+  identical to normal stacking). A `column-span-<N>` class overrides that to
+  `flex: N 1 0; min-width: 0`, letting the section shrink from 100% and pack
   onto a shared line with adjacent similarly-tagged siblings. `flex-basis: 0`
   means the entire row width counts as free space, distributed by `flex-grow`
   ratio — this is the whole authoring model in the previous section: a row's
@@ -273,6 +282,27 @@ before *and* after itself, which is exactly what makes it render alone.
   in the group or what span numbers they use. A fixed-track CSS Grid would
   leave a visible gap whenever a
   group's spans didn't sum to the grid's total column count.
+- **`N` is arbitrary, not a small enum, which is the one place this feature
+  isn't pure CSS.** CSS selectors can match a class *name* but can't parse a
+  *number* out of one into a usable `flex-grow` value — that's the one thing
+  only JS can do here. `applyColumnSpanWeights()` (`decorate.js`, called from
+  `applySectionColumnsLayout()`) reads each direct-child `.section`'s
+  classList, regex-matches `column-span-(\d+)(-tablet|-desktop)?`, and writes
+  the number onto the section as one of `--column-span-weight`,
+  `--column-span-weight-tablet`, or `--column-span-weight-desktop`. Each
+  breakpoint tier's CSS rule then just does `flex: var(--column-span-weight-X,
+  ...) 1 0` — one rule per tier, not one rule per span value, so this reads a
+  weight of `47` exactly as easily as `1`. This is why the mechanism no longer
+  needs a hardcoded set of `column-span-1/2/3[-tablet|-desktop]` classes: the
+  earlier version enumerated 9 explicit selectors (one per weight, per tier)
+  and would have needed a 10th, 11th, … for every new weight a design called
+  for — this version needs exactly 3, for the rest of this feature's life.
+  Each tier's CSS uses an explicit `var()` fallback chain (rather than relying
+  on cascade order between competing same-specificity selectors, which is
+  exactly the class of bug a stricter review caught in an earlier version of
+  this file) to resolve which tier's weight wins when a section carries more
+  than one: at 900px+, the base (unsuffixed) weight wins over `-tablet` if
+  both are set; at 1200px+, `-desktop` wins over both.
 - The base (unsuffixed `column-span-*`) breakpoint stayed at 900px — this repo's
   own existing stack→side-by-side precedent (`event-agenda.css`,
   `event-partners.css`, `bento-cards.css`) — for back-compat with pages authored
@@ -297,6 +327,7 @@ before *and* after itself, which is exactly what makes it render alone.
   rows is left to each section's own Milo spacing class, so the two don't stack on
   top of each other.
 - The `[class*='column-span-']` attribute selector (rather than enumerating
-  `column-span-1/2/3` and their `-tablet`/`-desktop` variants) is what the
-  min-width reset, the `grid-width-*` padding reset, and the max-width escape
-  margin all key off — one rule per concern instead of one per span value.
+  every `column-span-<N>` and its `-tablet`/`-desktop` variants) is what the
+  min-width reset, the `grid-width-*` padding reset, the weight `flex` rule,
+  and the max-width escape margin all key off — one rule per concern, for any
+  `N`, instead of one per span value.
