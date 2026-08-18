@@ -1,10 +1,12 @@
 # upcoming-sessions
 
-Horizontally-scrolling carousel of upcoming session cards, authored via a sibling
-`.section-metadata` block's `upcoming-sessions` key (JSON array of sessions) rather than
-this block's own table — Milo's `section-metadata` block only surfaces a fixed set of
-known keys, so a custom key must be read directly from the sibling block by
-`readSectionMetadata()`.
+Horizontally-scrolling carousel of upcoming session cards. Never hand-authored — an
+author builds the session list in the Tier 1 Event Configurator's Homepage editor, copies
+its "Copy Link" output, and pastes that link into the page's doc body. `decorate.js`'s
+`tec-homepage` auto-block builder decodes the link's hash payload and replaces it with a
+`.upcoming-sessions` div carrying the decoded `{ heading, entries }` config as a
+`data-upcoming-sessions-config` attribute, which this block's `init()` reads directly —
+no `section-metadata` involved.
 
 This block never displays a "live" state. The instant a session starts, its card is
 removed entirely rather than switching to a live badge/routing — every visible card is

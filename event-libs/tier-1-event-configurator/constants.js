@@ -9,8 +9,9 @@ const PAGES = {
 
 // Two config surfaces: Global (pasted into an event page's tier-1-event-config
 // metadata, consumed across the event experience — Session Guide, Event App, etc.)
-// and Homepage (pasted into a single homepage block's own section-metadata —
-// upcoming-sessions or card-c2/Featured Sessions — nothing else reads it).
+// and Homepage (authored as a single link pasted into a homepage page's doc body,
+// decoded and rendered by upcoming-sessions.js or featured-sessions.js — nothing
+// else reads it).
 const CONFIG_TYPES = {
   GLOBAL: 'global',
   HOMEPAGE_UPCOMING_SESSIONS: 'homepage-upcoming-sessions',
@@ -20,6 +21,19 @@ const CONFIG_TYPES = {
 const HOMEPAGE_CONFIG_TYPE_OPTIONS = [
   { value: CONFIG_TYPES.HOMEPAGE_UPCOMING_SESSIONS, label: 'Upcoming Sessions' },
   { value: CONFIG_TYPES.HOMEPAGE_FEATURED_SESSIONS, label: 'Featured Sessions' },
+];
+
+// Same shape as Schedule Maker's DA_ORIGIN/DA_APP_PATH (event-libs/schedule-maker/constants.js).
+const DA_ORIGIN = 'https://da.live';
+const DA_APP_PATH = 'tools/da-apps/tier-1-event-configurator';
+
+// Query-string key the authored Homepage link's payload is base64-encoded under, in the
+// URL hash — decorate.js's tec-homepage auto-block builder reads this same key.
+const HOMEPAGE_LINK_HASH_KEY = 'tecHomepage';
+
+const HOMEPAGE_THEME_OPTIONS = [
+  { value: 'light', label: 'Light' },
+  { value: 'dark', label: 'Dark' },
 ];
 
 function isHomepageConfigType(configType) {
@@ -62,4 +76,8 @@ export {
   HOMEPAGE_CONFIG_TYPE_OPTIONS,
   HOMEPAGE_SESSION_FIELDS,
   isHomepageConfigType,
+  DA_ORIGIN,
+  DA_APP_PATH,
+  HOMEPAGE_LINK_HASH_KEY,
+  HOMEPAGE_THEME_OPTIONS,
 };

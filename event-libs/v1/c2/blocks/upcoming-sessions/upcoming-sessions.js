@@ -171,10 +171,14 @@ export function buildCard(session) {
   const topBadge = buildCategoryBadge(session.track);
   if (topBadge) badgeRow.append(topBadge);
 
-  createTag('p', { class: 'sg-card__title' }, session.enTitle, { parent: body });
+  // session.enTitle/primaryCategory(session) below are attacker-influenced (decoded from
+  // the link's hash payload, not hand-authored in DA) — createTag's string `html` argument
+  // runs through insertAdjacentHTML, so these are set via .textContent to keep them as
+  // inert text rather than parsed markup.
+  createTag('p', { class: 'sg-card__title' }, '', { parent: body }).textContent = session.enTitle || '';
 
   const footer = createTag('div', { class: 'sg-card__footer' }, '', { parent: body });
-  createTag('span', { class: 'sg-card__track sg-card__track--footer' }, primaryCategory(session), { parent: footer });
+  createTag('span', { class: 'sg-card__track sg-card__track--footer' }, '', { parent: footer }).textContent = primaryCategory(session);
   const footerBadgeWrap = createTag('span', { class: 'sg-card__footer-badge' }, '', { parent: footer });
   const footerBadge = buildCategoryBadge(session.track);
   if (footerBadge) footerBadgeWrap.append(footerBadge);
@@ -319,18 +323,6 @@ function attachToPrecedingBlock(el) {
   }
 }
 
-function readSectionMetadata(el, key) {
-  const metadataBlock = el.closest('.section')?.querySelector(':scope > .section-metadata');
-  if (!metadataBlock) return null;
-  const rows = metadataBlock.querySelectorAll(':scope > div');
-  for (const row of rows) {
-    const cells = row.querySelectorAll(':scope > div');
-    const rowKey = cells[0]?.textContent?.trim().toLowerCase();
-    if (rowKey === key) return cells[1]?.textContent?.trim() ?? '';
-  }
-  return null;
-}
-
 function startMobileRiderPolling(sessions, onStarted) {
   const mrSessions = sessions.filter((s) => s.mrStreamId);
   if (!mrSessions.length) return null;
@@ -385,18 +377,17 @@ async function decorate(el) {
 
   attachToPrecedingBlock(el);
 
-  const rows = el.querySelectorAll(':scope > div');
-  const heading = rows[0]?.textContent?.trim();
-  const payload = readSectionMetadata(el, 'upcoming-sessions');
-
-  let sessions = [];
+  let config = null;
   try {
-    sessions = payload ? JSON.parse(payload) : [];
+    config = el.dataset.upcomingSessionsConfig ? JSON.parse(el.dataset.upcomingSessionsConfig) : null;
   } catch (error) {
     window.lana?.log(`upcoming-sessions: failed to parse session payload: ${error.message}`);
     el.remove();
     return;
   }
+
+  const heading = config?.heading || 'Upcoming Sessions';
+  let sessions = Array.isArray(config?.entries) ? config.entries : [];
 
   if (!sessions.length) {
     el.remove();
@@ -418,7 +409,10 @@ async function decorate(el) {
   renderTrack(track, sessions);
 
   const header = createTag('div', { class: 'upcoming-sessions-header' }, '', { parent: el });
-  if (heading) createTag('h6', { class: 'upcoming-sessions-heading' }, heading, { parent: header });
+  // heading is attacker-influenced (decoded from the link's hash payload) — see the
+  // .textContent note on session.enTitle in buildCard() above for why this isn't passed
+  // as createTag's html argument.
+  if (heading) createTag('h6', { class: 'upcoming-sessions-heading' }, '', { parent: header }).textContent = heading;
   header.append(buildCarouselControls(track));
 
   el.append(track);
