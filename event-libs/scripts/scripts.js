@@ -11,7 +11,7 @@
  */
 
 import { LIBS, getMetadata } from '../v1/utils/utils.js';
-import decorateArea from '../v1/utils/decorate.js';
+import decorateArea, { applySectionColumnsLayout } from '../v1/utils/decorate.js';
 import { EVENT_BLOCKS, EVENT_BLOCKS_C2 } from '../v1/libs.js';
 
 const {
@@ -93,4 +93,7 @@ decorateArea();
 (async function loadPage() {
   await loadLana({ clientId: 'events-milo' });
   await loadArea();
+  // Opt-in flex-column section layout — no-op unless the page authors
+  // `section-layout: columns`. Loads its own CSS. (event-libs #232 / da-events #52.)
+  applySectionColumnsLayout();
 }());
