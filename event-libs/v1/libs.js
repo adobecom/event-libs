@@ -31,6 +31,10 @@ const EVENT_BLOCKS_C2 = [
   'sessions-guide',
   'sessions-guide-full-page',
   'session-state-demo',
+  'session-details',
+  'featured-products',
+  'speakers',
+  'session-resources',
 ];
 
 // Import only the most essential utilities that are always needed

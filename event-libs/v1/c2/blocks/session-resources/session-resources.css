@@ -1,0 +1,88 @@
+/*
+ * Session Resources (MWPW-203473). Mobile-first.
+ * "file name … CTA" rows; first 2 shown, rest revealed by the toggle.
+ */
+
+.session-resources {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s2a-spacing-16, 16px);
+  margin-bottom: var(--s2a-spacing-8, 8px);
+}
+
+.session-resources-title {
+  margin: 0;
+  color: var(--s2a-color-gray-1000, #000);
+  font-size: var(--s2a-font-size-18, 1.125rem);
+  font-weight: 900;
+  line-height: var(--s2a-typography-line-height-heading-6, 18px);
+  letter-spacing: var(--s2a-typography-letter-spacing-heading-6);
+}
+
+.session-resources-empty {
+  margin: 0;
+  color: var(--s2a-color-gray-1000, #000);
+  font-size: var(--s2a-font-size-16, 1rem);
+}
+
+.session-resources-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s2a-spacing-8, 8px);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.session-resource {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s2a-spacing-16, 16px);
+  padding: var(--s2a-spacing-16, 16px);
+  border: 1px solid var(--s2a-color-gray-200, #e1e1e1);
+  border-radius: var(--s2a-border-radius-16, 16px);
+  color: var(--s2a-color-gray-1000, #000);
+  font-size: var(--s2a-font-size-16, 1rem);
+}
+
+.session-resource.is-overflow {
+  display: none;
+}
+
+.session-resources.is-expanded .session-resource.is-overflow {
+  display: flex;
+}
+
+.session-resource-cta {
+  flex: 0 0 auto;
+  color: var(--s2a-color-gray-1000, #000);
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.session-resources-toggle {
+  /* 24 above (8 + 16 container gap) and 24 below (16 + 8 block margin) */
+  margin-block: var(--s2a-spacing-8, 8px) var(--s2a-spacing-16, 16px);
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s2a-spacing-8, 8px);
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--s2a-color-gray-1000, #000);
+  font-size: var(--s2a-font-size-14, 0.875rem);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.session-resources-toggle svg {
+  width: 8px;
+  height: 5px;
+  transition: transform 0.2s ease;
+}
+
+.session-resources-toggle[aria-expanded="true"] svg {
+  transform: rotate(180deg);
+}
