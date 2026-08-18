@@ -385,9 +385,14 @@ export function resumeMpcVideo(iframe, progress) {
 function updateRowProgressUI(sessionId, secondsWatched, length) {
   const row = [...document.querySelectorAll('.video-playlist-row')]
     .find((r) => r.dataset.itemId === sessionId);
-  const fill = row?.querySelector('.video-playlist-row-progress-fill');
-  if (!fill) return;
-  fill.style.width = `${computeProgressPercent({ secondsWatched, length })}%`;
+  if (!row) return;
+  const fill = row.querySelector('.video-playlist-row-progress-fill');
+  if (fill) fill.style.width = `${computeProgressPercent({ secondsWatched, length })}%`;
+  // Self-corrects the row's own duration label the moment the real, player-reported
+  // length is known — the catalog's own scheduled-slot duration can genuinely differ
+  // from it (see buildTopicView).
+  const durationEl = row.querySelector('.video-playlist-row-duration');
+  if (durationEl && length) durationEl.textContent = formatDuration(Math.round(length / 60));
 }
 
 // MPC posts window messages from video.tv.adobe.com — same postMessage envelope this
@@ -752,7 +757,18 @@ function buildTopicView(el, allRows, {
         // session has none of its own — otherwise the row would render with no thumbnail
         // (and no play-icon overlay, since that's gated on thumbnailUrl too).
         thumbnailUrl: session.thumbnailUrl || defaultThumbnail,
-        durationLabel: formatDuration(session.duration),
+        // The catalog's own `duration` is the originally-scheduled slot length (minutes)
+        // — it can genuinely differ from the real recorded video's own length (edits,
+        // Q&A trimmed, etc.), which is exactly what the visible player reports. Prefer
+        // the real, player-reported length (seconds, saved locally the first time either
+        // this or the current session's own page actually loaded that video) whenever
+        // it's known, so the row's duration matches what the player itself shows.
+        durationLabel: (() => {
+          const realLengthSeconds = getVideoProgress(session.id)?.length;
+          return realLengthSeconds
+            ? formatDuration(Math.round(realLengthSeconds / 60))
+            : formatDuration(session.duration);
+        })(),
         href: session.sessionPageUrl,
       },
       {
