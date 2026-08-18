@@ -211,8 +211,8 @@
   margin: 0;
   border-radius: var(--s2a-border-radius-round);
   /* stylelint-disable-next-line color-no-hex -- no matching --s2a- token for this exact
-     Figma off-track gray */
-  background: #dbdbdb;
+     Figma off-track color */
+  background: #00000029;
   flex-shrink: 0;
   cursor: pointer;
   transition: background 0.2s ease;
