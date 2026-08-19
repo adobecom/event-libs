@@ -9,6 +9,7 @@
  */
 import { createTag, getMetadata } from '../../../utils/utils.js';
 import { initTierOneEventConfig } from '../../../utils/tier-1-event-config.js';
+import { applySectionColumnsLayout } from '../../../utils/decorate.js';
 import { renderTrackTags } from './track-tags.js';
 import { renderGdprCopy, renderClosedCaption, renderLegalDisclaimer } from './disclaimer-cc-legal.js';
 import { renderDescriptionClamp } from './description-clamp.js';
@@ -19,6 +20,14 @@ import { mountSessionState } from './session-state-view.js';
 
 export default async function init(el) {
   el.replaceChildren();
+
+  // TEMP (demo only — must not ship): applies the opt-in `section-layout: columns`
+  // layout. It lives here because the page's entry scripts.js is served from the
+  // deployed origin (?eventlibs=local doesn't swap it) and decorateArea() runs
+  // before the metadata block reaches <head>. This block's init runs during
+  // loadArea, so the metadata is readable. No-op unless authored. The production
+  // home is the consuming site's decorateArea (da-events#52).
+  applySectionColumnsLayout();
 
   // Ensure the Tier 1 Event Configurator config is loaded before any sub-feature
   // reads it (getTrackIcon). Idempotent — no-ops if decorateEvent already ran it.
