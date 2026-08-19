@@ -5,11 +5,10 @@ import { useConfigs } from '../context/ConfigsContext.js';
 import { useDA } from '../context/DAContext.js';
 import {
   copyTextToClipboard, extractDistinctTracks, extractDistinctOverrideTexts, extractDistinctProducts,
-  isTrackIconEntryComplete, getDisplayTitle, stringifyConfig,
-  buildSessionAuthorEntry, buildHomepageConfigURL, copyLinkToClipboard,
+  isTrackIconEntryComplete, getDisplayTitle, stringifyConfig, copyHomepageConfigLink,
 } from '../utils.js';
 import {
-  CONFIG_TYPES, HOMEPAGE_SESSION_FIELDS, isHomepageConfigType, HOMEPAGE_THEME_OPTIONS,
+  CONFIG_TYPES, HOMEPAGE_FIELD_BY_TYPE, isHomepageConfigType, HOMEPAGE_THEME_OPTIONS,
 } from '../constants.js';
 import TrackIconEditor from '../components/TrackIconEditor.js';
 import OverrideTrackIconEditor from '../components/OverrideTrackIconEditor.js';
@@ -17,41 +16,6 @@ import ProductIconEditor from '../components/ProductIconEditor.js';
 import FeaturedSessionsEditor from '../components/FeaturedSessionsEditor.js';
 import EpochDateTimeField from '../components/EpochDateTimeField.js';
 import LoadingInline from '../components/LoadingInline.js';
-
-// UI-only labels/hints per Homepage config type, layered onto the shared field/metaField
-// names from constants.js (the single source of truth ConfigsContext.js's emptyConfig()/
-// startDuplicateConfig() also key off) rather than redeclaring them here.
-const HOMEPAGE_FIELD_BY_TYPE = {
-  [CONFIG_TYPES.HOMEPAGE_UPCOMING_SESSIONS]: {
-    ...HOMEPAGE_SESSION_FIELDS[CONFIG_TYPES.HOMEPAGE_UPCOMING_SESSIONS],
-    headingField: 'upcomingSessionsHeading',
-    themeField: 'upcomingSessionsTheme',
-    // upcoming-sessions.js reads mrStreamId (drives its Mobile Rider live-drop
-    // polling) but never reads watchUrl or imageUrl — its cards are text-only,
-    // no structural change from the pre-link-authoring version.
-    metaFields: ['mrStreamId'],
-    metaHint: 'Mobile Rider stream ID is an optional per-session override',
-    label: 'Upcoming Sessions',
-    blockHint: 'the upcoming-sessions block',
-    linkPrefix: 'event-upcoming-sessions',
-  },
-  [CONFIG_TYPES.HOMEPAGE_FEATURED_SESSIONS]: {
-    ...HOMEPAGE_SESSION_FIELDS[CONFIG_TYPES.HOMEPAGE_FEATURED_SESSIONS],
-    // No headingField/themeField — featured-sessions.js doesn't author a heading or
-    // support a theme; unlike Upcoming Sessions, this surface is always ratio-16-9
-    // cards, no config-driven visual variation.
-    // The featured-sessions block's generated event-card markup + session-routing.js
-    // read all three — watchUrl is where a click routes once the session goes live,
-    // mrStreamId is what tells it a session is Mobile-Rider-backed at all, and
-    // imageUrl is required for a session to render as a card at all (event-card.js
-    // removes any card with no resolvable image).
-    metaFields: ['watchUrl', 'mrStreamId', 'imageUrl'],
-    metaHint: 'Watch URL / Mobile Rider stream ID are optional per-session overrides — image is required for a session to appear',
-    label: 'Featured Sessions',
-    blockHint: 'the featured-sessions block',
-    linkPrefix: 'event-featured-sessions',
-  },
-};
 
 export default function ConfigEditor() {
   const { goToLibrary } = useNavigation();
@@ -135,23 +99,7 @@ export default function ConfigEditor() {
   };
 
   const handleCopyHomepageLink = async () => {
-    const sessionsById = new Map(sessions.map((s) => [s.sessionId, s]));
-    const metaById = activeConfig.config[homepageMeta.metaField] || {};
-    const entries = (activeConfig.config[homepageMeta.field] || [])
-      .filter((id) => sessionsById.has(id))
-      .map((id) => buildSessionAuthorEntry(sessionsById.get(id), sessionTimes, metaById[id]));
-    const heading = homepageMeta.headingField
-      ? (activeConfig.config[homepageMeta.headingField] || homepageMeta.label)
-      : undefined;
-    const theme = homepageMeta.themeField
-      ? (activeConfig.config[homepageMeta.themeField] || 'light')
-      : undefined;
-    const url = buildHomepageConfigURL(org, repo, configType, eventId, heading, theme, entries);
-    const formattedDate = new Date().toLocaleString('en-US', {
-      weekday: 'long', month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit',
-    });
-    const linkText = `${homepageMeta.linkPrefix}: ${getDisplayTitle(activeConfig)} – ${formattedDate}`;
-    const ok = await copyLinkToClipboard(url, linkText);
+    const ok = await copyHomepageConfigLink(org, repo, activeConfig, homepageMeta, sessions, sessionTimes);
     if (ok) setToastSuccess(`Link copied — paste it directly into ${homepageMeta.blockHint}'s doc body`);
     else setToastError('Could not copy the link — please retry');
   };

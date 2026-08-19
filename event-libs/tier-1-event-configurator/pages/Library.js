@@ -6,11 +6,14 @@ import Modal from '../components/Modal.js';
 import { useNavigation } from '../context/NavigationContext.js';
 import { useConfigs } from '../context/ConfigsContext.js';
 import { useEventEnv } from '../context/EventEnvContext.js';
+import { useDA } from '../context/DAContext.js';
+import { getEventSessionCatalog } from '../../v1/utils/esp-controller.js';
 import {
-  copyTextToClipboard, formatUpdatedTime, getDisplayTitle,
+  copyTextToClipboard, copyHomepageConfigLink, formatUpdatedTime, getDisplayTitle,
 } from '../utils.js';
 import {
-  EVENT_BROWSE_ENABLED, CONFIG_TYPES, HOMEPAGE_CONFIG_TYPE_OPTIONS, isHomepageConfigType,
+  EVENT_BROWSE_ENABLED, CONFIG_TYPES, HOMEPAGE_CONFIG_TYPE_OPTIONS, HOMEPAGE_FIELD_BY_TYPE,
+  isHomepageConfigType,
 } from '../constants.js';
 
 function configTypeLabel(configType) {
@@ -52,7 +55,9 @@ function ConfigList({
             <div class="tec-library__item-actions">
               <button type="button" class="tec-btn tec-btn--quiet" onClick=${() => onEdit(row)}>Edit</button>
               <button type="button" class="tec-btn tec-btn--quiet" onClick=${() => onDuplicate(row)}>Duplicate</button>
-              <button type="button" class="tec-btn tec-btn--quiet" onClick=${() => onCopy(row)}>Copy config</button>
+              <button type="button" class="tec-btn tec-btn--quiet" onClick=${() => onCopy(row)}>
+                ${isHomepageConfigType(row.configType) ? 'Copy Link' : 'Copy config'}
+              </button>
               <button type="button" class="tec-btn tec-btn--quiet tec-btn--danger" onClick=${() => onDelete(row)}>Delete</button>
             </div>
           </li>
@@ -75,6 +80,20 @@ export default function Library() {
     setToastError,
   } = useConfigs();
   const { envName, setEnv } = useEventEnv();
+  const { org, repo } = useDA();
+
+  // Fetches a row's session catalog from the ESP env it was authored against, then restores
+  // whichever env the library was showing — mirrors openEdit's per-row env switch below, but
+  // scoped to a single fetch instead of a permanent switch, since this doesn't navigate away.
+  const fetchRowSessionCatalog = useCallback(async (row) => {
+    const currentEnv = envName;
+    setEnv(row.eventServiceEnv || 'prod');
+    try {
+      return await getEventSessionCatalog(row.eventId);
+    } finally {
+      setEnv(currentEnv);
+    }
+  }, [envName, setEnv]);
 
   const [globalSearch, setGlobalSearch] = useState('');
   const [homepageSearch, setHomepageSearch] = useState('');
@@ -179,7 +198,23 @@ export default function Library() {
     window.lana?.log(`tier-1-event-configurator: EventPicker failed, falling back to ManualEventLookup. ${message}`);
   }, []);
 
-  const handleCopyConfig = useCallback(async (row) => {
+  // Homepage rows aren't pasted into tier-1-event-config as JSON — they're shared as the
+  // single authored link decoded by upcoming-sessions.js/featured-sessions.js, same as
+  // ConfigEditor.js's own "Copy Link" button (copyHomepageConfigLink is the shared
+  // implementation both call, so a link copied from either place is identical).
+  const handleCopyHomepageLink = useCallback(async (row) => {
+    const homepageMeta = HOMEPAGE_FIELD_BY_TYPE[row.configType];
+    const result = await fetchRowSessionCatalog(row);
+    if (!result.ok) {
+      setToastError('Could not load this event\'s sessions — copy the link from the editor instead');
+      return;
+    }
+    const ok = await copyHomepageConfigLink(org, repo, row, homepageMeta, result.data.sessions, result.data.sessionTimes);
+    if (ok) setToastSuccess(`Link copied — paste it directly into ${homepageMeta.blockHint}'s doc body`);
+    else setToastError('Could not copy the link — please retry');
+  }, [org, repo, fetchRowSessionCatalog, setToastSuccess, setToastError]);
+
+  const handleCopyGlobalConfig = useCallback(async (row) => {
     // Minified, not stringifyConfig's pretty-printed form: DA joins a metadata cell's
     // multi-line content back with ", ", corrupting multi-line JSON with stray commas.
     const ok = await copyTextToClipboard(JSON.stringify(row.config));
@@ -187,13 +222,12 @@ export default function Library() {
       setToastError('Could not copy config — copy it manually from the editor instead');
       return;
     }
-    // Homepage rows aren't pasted into tier-1-event-config — they're copy-pasted via the
-    // editor's own "Copy <type> JSON" button into that block's section-metadata instead.
-    const destination = isHomepageConfigType(row.configType)
-      ? ''
-      : ' — paste it into the page\'s tier-1-event-config metadata';
-    setToastSuccess(`Copied config for ${getDisplayTitle(row)}${destination}`);
+    setToastSuccess(`Copied config for ${getDisplayTitle(row)} — paste it into the page's tier-1-event-config metadata`);
   }, [setToastSuccess, setToastError]);
+
+  const handleCopyConfig = useCallback((row) => (
+    isHomepageConfigType(row.configType) ? handleCopyHomepageLink(row) : handleCopyGlobalConfig(row)
+  ), [handleCopyHomepageLink, handleCopyGlobalConfig]);
 
   const confirmDelete = useCallback(async () => {
     if (!rowPendingDelete) return;
