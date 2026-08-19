@@ -1374,6 +1374,55 @@ describe('Events Form', () => {
   });
 });
 
+describe('addTerms', () => {
+  let addTerms;
+
+  before(async () => {
+    const module = await import('../../../../event-libs/v1/blocks/events-form/events-form.js');
+    addTerms = module.addTerms;
+  });
+
+  function buildForm() {
+    const form = document.createElement('form');
+    const submitWrapper = document.createElement('div');
+    submitWrapper.className = 'events-form-submit-wrapper';
+    form.append(submitWrapper);
+    return form;
+  }
+
+  it('keeps every authored <p> in the cell, including the last one', () => {
+    const form = buildForm();
+    const terms = document.createElement('div');
+    terms.innerHTML = '<p>First line of the RSVP description.</p><p>Second line that must not be dropped.</p>';
+
+    addTerms(form, terms);
+
+    const paragraphs = form.querySelectorAll('.event-terms-wrapper p');
+    expect(paragraphs.length).to.equal(2);
+    expect(paragraphs[0].textContent).to.equal('First line of the RSVP description.');
+    expect(paragraphs[1].textContent).to.equal('Second line that must not be dropped.');
+  });
+
+  it('strips <li> elements from the cell', () => {
+    const form = buildForm();
+    const terms = document.createElement('div');
+    terms.innerHTML = '<p>Intro paragraph.</p><ul><li>should be stripped</li></ul>';
+
+    addTerms(form, terms);
+
+    expect(form.querySelectorAll('.event-terms-wrapper li').length).to.equal(0);
+  });
+
+  it('does nothing when the cell is empty', () => {
+    const form = buildForm();
+    const terms = document.createElement('div');
+
+    addTerms(form, terms);
+
+    expect(form.querySelector('.event-terms-wrapper')).to.equal(null);
+  });
+});
+
 describe('createSelect - multi-select combobox condensed view', () => {
   let createSelect;
   let sandbox;
