@@ -1,5 +1,4 @@
 import { useState, useEffect, useMemo, html } from '../../v1/deps/htm-preact.js';
-import { getEventSessionCatalog } from '../../v1/utils/esp-controller.js';
 import { useNavigation } from '../context/NavigationContext.js';
 import { useConfigs } from '../context/ConfigsContext.js';
 import { useDA } from '../context/DAContext.js';
@@ -22,7 +21,7 @@ export default function ConfigEditor() {
   const {
     activeConfig, saveActiveConfig, clearActiveConfig, updateTrackIcon,
     updateOverrideTrackIcon, updateOverrideDefaultIcon, updateProduct, updateConfigField,
-    setToastSuccess, setToastError,
+    setToastSuccess, setToastError, getSessionCatalogForRow,
   } = useConfigs();
   const { org, repo } = useDA();
 
@@ -33,16 +32,20 @@ export default function ConfigEditor() {
   const [isSaving, setIsSaving] = useState(false);
 
   const eventId = activeConfig?.eventId;
+  const eventServiceEnv = activeConfig?.eventServiceEnv;
   const configType = activeConfig?.configType || CONFIG_TYPES.GLOBAL;
   const isHomepage = isHomepageConfigType(configType);
   const homepageMeta = HOMEPAGE_FIELD_BY_TYPE[configType];
 
+  // getSessionCatalogForRow caches by (eventId, env) — if Library.js already prefetched this
+  // row (Homepage rows are prefetched as soon as the library loads), opening it for edit right
+  // after reuses that result instead of hitting ESP a second time.
   useEffect(() => {
     if (!eventId) return undefined;
     let cancelled = false;
     setIsLoadingSessions(true);
     setSessionsError(null);
-    getEventSessionCatalog(eventId).then((result) => {
+    getSessionCatalogForRow({ eventId, eventServiceEnv }).then((result) => {
       if (cancelled) return;
       if (!result.ok) {
         setSessionsError(result.error || 'Failed to load sessions for this event');
@@ -54,7 +57,7 @@ export default function ConfigEditor() {
       if (!cancelled) setIsLoadingSessions(false);
     });
     return () => { cancelled = true; };
-  }, [eventId]);
+  }, [eventId, eventServiceEnv, getSessionCatalogForRow]);
 
   const tracks = useMemo(() => extractDistinctTracks(sessions), [sessions]);
   const overrideTexts = useMemo(() => extractDistinctOverrideTexts(sessions), [sessions]);
