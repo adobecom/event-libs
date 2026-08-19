@@ -185,14 +185,17 @@ npx serve . --listen 3000
 
 ### Switching ESP env
 
-`?espenv=`/`?eccEnv=` query params **don't work** through the DA-proxied
-route above — DA's SDK only forwards `context.ref` through the iframe
-handshake, so a query param on the parent `da.live/app/...` URL never
-reaches this app (same limitation Schedule Maker documents for
-`?milolibs=`).
+`?espenv=`/`?eccEnv=` on the parent `da.live/app/...` URL **do** reach this app:
+DA's shell (`da.live/nx/blocks/shell/shell.js`) appends both the parent's search
+and hash to the iframe src, and `getEventServiceEnv()` reads `espenv`/`eccEnv`
+off `window.location.search`. An earlier version of this section claimed the
+opposite — that only `context.ref` crosses the handshake — which is wrong, and
+may date from before the shell forwarded the search.
 
-**Use the app's own environment picker instead (2026-07-24, per Daniel) —**
-its home is `ManualEventLookup.js`'s **Environment** dropdown, next to the
+**Prefer the app's own environment picker anyway (2026-07-24, per Daniel) —**
+it persists for the session and shows a loud banner whenever it isn't prod,
+where a query param silently forces the same env with no visible indication.
+Its home is `ManualEventLookup.js`'s **Environment** dropdown, next to the
 Event ID field. Since `EventPicker` (the full browse/search catalog) is the
 default flow for New config/Duplicate, reach it via the automatic
 fallback — `EventPicker`'s `listAllEvents()` call needs to fail first
