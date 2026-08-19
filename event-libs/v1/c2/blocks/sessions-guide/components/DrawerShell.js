@@ -282,12 +282,18 @@ export function DrawerShell() {
     setFilterOpen(false);
   }
 
+  // data-lenis-prevent: pages with a parallax or rich-content section load Milo's Lenis
+  // smooth-scroll, which holds a non-passive window wheel/touch listener and
+  // preventDefault()s every event to drive its own virtual scroll — starving every scroll
+  // container in here. Lenis matches the attribute with closest(), so tagging the drawer
+  // covers the whole subtree; the backdrop keeps the locked page behind it from scrolling.
   return html`
     <div class="sg-shell">
-      ${isOpen && html`<div class="sg-backdrop" onclick=${closeDrawer} aria-hidden="true"></div>`}
+      ${isOpen && html`<div class="sg-backdrop" onclick=${closeDrawer} aria-hidden="true" data-lenis-prevent></div>`}
       <div
         class=${'sg-drawer' + (hasDetail ? ' sg-drawer--detail-open' : '')}
         ref=${drawerRef}
+        data-lenis-prevent
         role=${isOpen ? 'dialog' : undefined}
         aria-modal=${isOpen ? 'true' : undefined}
         aria-label=${isOpen ? 'Sessions guide' : undefined}

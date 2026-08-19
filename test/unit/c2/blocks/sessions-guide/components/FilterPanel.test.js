@@ -102,6 +102,12 @@ describe('FilterPanel', () => {
     expect(out).to.include('Reset all');
   });
 
+  // Without this, Milo's Lenis smooth-scroll (loaded by parallax/rich-content sections)
+  // preventDefault()s every wheel and touchmove, and the option list can't be scrolled.
+  it('opts the panel out of Lenis scroll hijacking', () => {
+    expect(render()).to.include('data-lenis-prevent');
+  });
+
   it('shows an empty state when the active category has no options', () => {
     // No session carries a "Region" value, so its option list is empty.
     setState({ filterCategories: [{ id: 'Region', label: 'Region' }] });

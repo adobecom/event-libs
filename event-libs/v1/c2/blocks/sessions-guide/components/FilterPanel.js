@@ -85,10 +85,13 @@ export function FilterPanel({ onClose }) {
   const currentSet = localFilters[activeCategory] instanceof Set ? localFilters[activeCategory] : new Set();
   const activeLabel = filterCategories.find(({ id }) => id === activeCategory)?.label || 'Filter options';
 
+  // data-lenis-prevent: the panel's option list scrolls itself, and on the full-page surface
+  // it sits outside the drawer that otherwise fends Lenis off (see DrawerShell.js).
   return html`
     <div
       class="sg-filter-panel"
       ref=${panelRef}
+      data-lenis-prevent
       role="dialog"
       aria-modal=${isTakeover() ? 'true' : undefined}
       aria-labelledby="sg-filter-panel-title"

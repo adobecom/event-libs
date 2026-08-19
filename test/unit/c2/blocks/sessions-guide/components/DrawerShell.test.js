@@ -1,5 +1,6 @@
 import { expect } from '@esm-bundle/chai';
-import { resolveSessionGuideRequest } from '../../../../../../event-libs/v1/c2/blocks/sessions-guide/components/DrawerShell.js';
+import { resolveSessionGuideRequest, DrawerShell } from '../../../../../../event-libs/v1/c2/blocks/sessions-guide/components/DrawerShell.js';
+import { SessionGuideContext } from '../../../../../../event-libs/v1/c2/blocks/sessions-guide/store/index.js';
 
 const SESSION = { id: 'session-1', title: 'Building with AI' };
 
@@ -36,5 +37,26 @@ describe('resolveSessionGuideRequest', () => {
     const context = makeContext({ authValue: { isLoggedIn: true, isRegistered: true, userFirstName: 'Daniel' } });
     const result = resolveSessionGuideRequest({ sessionId: 'session-1' }, context);
     expect(result.defaultView).to.equal('my-sessions');
+  });
+});
+
+// The drawer and its backdrop must opt out of Milo's Lenis smooth-scroll, which is loaded
+// by parallax/rich-content sections and preventDefault()s every wheel and touchmove to
+// drive its own virtual scroll — starving every scroll container inside the drawer.
+describe('DrawerShell scroll ownership', () => {
+  beforeEach(() => {
+    SessionGuideContext._current = {
+      state: {
+        drawerState: 'expanded', activeSessionId: null, activeFilters: {}, activeView: 'live-upcoming', guideConfig: {},
+      },
+      dispatch: () => {},
+    };
+  });
+
+  it('marks the drawer and backdrop data-lenis-prevent while open', () => {
+    const out = DrawerShell();
+    expect(out).to.include('sg-drawer');
+    const occurrences = out.split('data-lenis-prevent').length - 1;
+    expect(occurrences).to.equal(2);
   });
 });
