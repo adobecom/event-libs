@@ -74,8 +74,6 @@ function buildBanner(contentEl, bannerId) {
   return banner;
 }
 
-const TRUTHY_VALUES = new Set(['true', 'on', 'yes']);
-
 const CONFIG_KEYS = new Set(['banner-id', 'rf-data-check', 'below-nav', 'message']);
 
 export default async function init(el) {
@@ -100,16 +98,12 @@ export default async function init(el) {
   if (!contentCell) return;
 
   const bannerId = config['banner-id'] || getMetadata('banner-id') || '';
-  const rfGateEnabled = TRUTHY_VALUES.has(
-    (config['rf-data-check'] ?? getMetadata('rf-data-check') ?? 'false').toLowerCase(),
-  );
+  const rfGateEnabled = Boolean(config['rf-data-check'] ?? getMetadata('rf-data-check'));
   // Authors placing this banner at the very top of the page (above/overlapping the
   // sticky GNAV header) opt into a top offset that clears it — engineering-owned
   // exception to the "no fixed placement" rule (see README), since GNAV's own height
   // isn't something this generic block can detect on its own.
-  const belowNav = TRUTHY_VALUES.has(
-    (config['below-nav'] ?? getMetadata('below-nav') ?? 'false').toLowerCase(),
-  );
+  const belowNav = Boolean(config['below-nav'] ?? getMetadata('below-nav'));
 
   if (isDismissed(bannerId)) {
     el.remove();

@@ -39,13 +39,13 @@ need to remember which shape to use:
   below) — reusing the same id across multiple placements treats them as "the same
   banner" for dismiss purposes on purpose; give each independently-dismissible
   banner its own id.
-- `rf-data-check` — truthy (`true`/`on`/`yes`) to gate visibility on in-person
-  registration (see below); anything else (or omitted) shows unconditionally to
-  everyone.
-- `below-nav` — truthy (`true`/`on`/`yes`) when this banner is placed at the very top
-  of the page, so it needs a top offset to clear the sticky GNAV header instead of
-  rendering underneath it. Omit (or `false`) for any other placement — see Layout
-  below for why this isn't automatic.
+- `rf-data-check` — presence-gated: author the row (any value) to gate visibility on
+  in-person registration (see below); omit the row entirely to show unconditionally
+  to everyone.
+- `below-nav` — presence-gated: author the row (any value) when this banner is placed
+  at the very top of the page, so it needs a top offset to clear the sticky GNAV
+  header instead of rendering underneath it. Omit for any other placement — see
+  Layout below for why this isn't automatic.
 - `message` — **required** (whether authored under this label or as a bare row).
   Rich content, same authoring conventions as any other block (links via markdown,
   bold/italic, etc.) — no new authoring paradigm.
@@ -56,7 +56,7 @@ page-wide default can be set once instead of repeating it on every instance.
 
 ## RF-gated visibility
 
-When `rf-data-check: true`, the banner only renders for visitors registered for the
+When the `rf-data-check` row is authored, the banner only renders for visitors registered for the
 in-person event. This block does **not** make its own RainFocus call — it consumes
 the registration signal already resolved by `da-events`' GNAV integration
 (`da-events` PR #51, `events/scripts/registration-cache.js`), via the documented
