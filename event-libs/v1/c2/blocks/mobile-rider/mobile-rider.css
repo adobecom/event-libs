@@ -48,15 +48,24 @@
   gap: var(--s2a-spacing-md);
 }
 
+/* Figma: "s2a/typography/heading-5" — 2-line clamp, not single-line ellipsis. */
 .mobile-rider-info-bar-title {
   flex: 1 1 auto;
   min-width: 0;
   margin: 0;
-  font-size: var(--s2a-font-size-lg);
-  font-weight: var(--s2a-font-weight-adobe-clean-extrabold, 800);
   overflow: hidden;
+  color: var(--s2a-color-content-default);
+  font-family: var(--s2a-font-family-heading);
+  font-size: var(--s2a-typography-font-size-heading-5);
+  font-weight: 900;
+  line-height: var(--s2a-typography-line-height-heading-5);
+  letter-spacing: var(--s2a-font-letter-spacing-4xl);
   text-overflow: ellipsis;
-  white-space: nowrap;
+  /* stylelint-disable-next-line value-no-vendor-prefix -- required for -webkit-line-clamp */
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
 }
 
 .mobile-rider-info-bar-toggle {
@@ -145,13 +154,11 @@
   align-items: center;
   gap: var(--s2a-spacing-xs);
   margin-bottom: var(--s2a-spacing-sm);
-  font-size: var(--s2a-font-size-sm);
-  font-weight: 700;
 }
 
 .mobile-rider-info-bar-category-icon-color {
   display: inline-flex;
-  color: var(--s2a-color-gray-25);
+  color: var(--s2a-color-content-default);
 }
 
 .mobile-rider-info-bar-category-icon {
@@ -159,10 +166,28 @@
   height: var(--s2a-spacing-md);
 }
 
+/* Figma: "Component/L/Medium" */
+.mobile-rider-info-bar-category-label {
+  color: var(--s2a-color-border-default);
+  font-family: var(--s2a-font-family-default);
+  font-size: var(--s2a-font-size-md, 16px);
+  font-weight: 500;
+  line-height: 125%;
+  letter-spacing: 0;
+}
+
+/* Figma: "Body/S" */
 .mobile-rider-info-bar-description {
+  overflow: hidden;
   margin: 0 0 var(--s2a-spacing-md);
-  font-size: var(--s2a-font-size-md);
-  color: var(--s2a-color-transparent-white-64, rgb(255 255 255 / 64%));
+  color: var(--s2a-color-content-subtle);
+  font-family: var(--s2a-font-family-default);
+  font-size: var(--s2a-font-size-sm, 14px);
+  font-weight: 400;
+  line-height: 150%;
+  letter-spacing: 0;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .mobile-rider-info-bar-more {
