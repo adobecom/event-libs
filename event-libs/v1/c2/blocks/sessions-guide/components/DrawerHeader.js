@@ -11,14 +11,31 @@ import { ViewDropdown } from './ViewDropdown.js';
 import { DownloadButton } from './DownloadButton.js';
 import { FilterPanel } from './FilterPanel.js';
 
-// Authored headings are 4 literal strings keyed by auth state x event lifecycle — no
-// placeholder interpolation, unlike the hardcoded default's first-name greeting. A blank/
-// unauthored string for the relevant key falls back to that hardcoded default.
+// Authors write a {firstName} placeholder into the logged-in headings to greet the viewer by
+// name — single brace to match the repo's other authored templates (dictionary-manager.js,
+// date-time-helper.js). Double braces and alternate spellings are accepted too, since authors
+// type the token by hand in the Session Guide Configurator.
+const NAME_WORDS = '(?:first[\\s_-]?name|user[\\s_-]?name|name)';
+const NAME_TOKEN = `(?:\\{\\{\\s*${NAME_WORDS}\\s*\\}\\}|\\{\\s*${NAME_WORDS}\\s*\\})`;
+
+// With no name to substitute (the token authored into a logged-out heading), the token is
+// dropped along with any trailing comma so the copy still reads as a sentence.
+export function interpolateHeading(heading, userFirstName) {
+  if (!heading) return heading;
+  if (userFirstName) return heading.replace(new RegExp(NAME_TOKEN, 'gi'), userFirstName);
+  const stripped = heading.replace(new RegExp(`${NAME_TOKEN}[,:]?\\s*`, 'gi'), '').trim();
+  // A token stripped off the front leaves the following word starting the sentence lowercase.
+  if (!new RegExp(`^${NAME_TOKEN}`, 'i').test(heading.trim())) return stripped;
+  return stripped.charAt(0).toUpperCase() + stripped.slice(1);
+}
+
+// Authored headings are 4 strings keyed by auth state x event lifecycle. A blank/unauthored
+// string for the relevant key falls back to the hardcoded default.
 export function resolveDrawerTitle(headings, { isLoggedIn, userFirstName, isPost }) {
   const loggedIn = !!(isLoggedIn && userFirstName);
   const key = `${loggedIn ? 'loggedIn' : 'loggedOut'}${isPost ? 'PostEvent' : ''}`;
   const defaultTitle = loggedIn ? `${userFirstName}, see what's happening` : "See what's happening at MAX";
-  return (headings || {})[key] || defaultTitle;
+  return interpolateHeading((headings || {})[key], userFirstName) || defaultTitle;
 }
 
 export function DrawerHeader({

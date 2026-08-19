@@ -31,8 +31,20 @@ planned. FilterPanel.js's own markup/UI is unchanged — pending Figma.
 `resolveDrawerTitle(headings, { isLoggedIn, userFirstName, isPost })` in
 `DrawerHeader.js` selects the right of the four authored strings by
 `(isLoggedIn, isPost)`; `isPost` comes from the same `isPostEvent()` used
-elsewhere (see item 4's status note), not a separately-built signal. Original
-spec below, kept for context:
+elsewhere (see item 4's status note), not a separately-built signal.
+
+Extended 2026-08-18: the selected string is then run through
+`interpolateHeading()`, which swaps a `{firstName}` placeholder for
+`auth.value.userFirstName` (from `imsProfile.first_name`). Single brace matches
+the repo's other authored templates (`dictionary-manager.js`,
+`date-time-helper.js`); double braces and `{first_name}`/`{userName}`/`{name}`
+are accepted case-insensitively because authors type the token by hand. Only the
+two logged-in headings can use it — `resolveDrawerTitle` already routes viewers
+with no first name to the matching logged-out heading — and a token that reaches
+a logged-out heading anyway is stripped (with a trailing comma) rather than
+rendered literally. The configurator's Headings section documents this inline.
+
+Original spec below, kept for context:
 
 `DrawerHeader.js` currently shows a single hardcoded fallback title
 (`"See what's happening at MAX"`) when the viewer isn't logged in, or a

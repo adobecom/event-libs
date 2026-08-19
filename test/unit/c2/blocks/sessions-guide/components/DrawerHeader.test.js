@@ -1,5 +1,5 @@
 import { expect } from '@esm-bundle/chai';
-import { resolveDrawerTitle } from '../../../../../../event-libs/v1/c2/blocks/sessions-guide/components/DrawerHeader.js';
+import { resolveDrawerTitle, interpolateHeading } from '../../../../../../event-libs/v1/c2/blocks/sessions-guide/components/DrawerHeader.js';
 
 describe('DrawerHeader resolveDrawerTitle', () => {
   const headings = {
@@ -49,5 +49,49 @@ describe('DrawerHeader resolveDrawerTitle', () => {
   it('treats isLoggedIn without a userFirstName as logged out', () => {
     expect(resolveDrawerTitle(headings, { isLoggedIn: true, userFirstName: null, isPost: false }))
       .to.equal('See what\'s on at MAX');
+  });
+
+  it('interpolates the {firstName} placeholder in an authored logged-in heading', () => {
+    expect(resolveDrawerTitle(
+      { loggedIn: '{firstName}, see what\'s happening' },
+      { isLoggedIn: true, userFirstName: 'Dana', isPost: false },
+    )).to.equal('Dana, see what\'s happening');
+    expect(resolveDrawerTitle(
+      { loggedInPostEvent: 'Welcome back, {firstName}!' },
+      { isLoggedIn: true, userFirstName: 'Dana', isPost: true },
+    )).to.equal('Welcome back, Dana!');
+  });
+});
+
+describe('DrawerHeader interpolateHeading', () => {
+  it('replaces every occurrence of the canonical single-brace token', () => {
+    expect(interpolateHeading('{firstName}, hi {firstName}', 'Dana')).to.equal('Dana, hi Dana');
+  });
+
+  it('accepts double braces, alternate spellings, and inner whitespace', () => {
+    ['{{firstName}}', '{first_name}', '{first-name}', '{ first name }', '{userName}', '{name}']
+      .forEach((token) => {
+        expect(interpolateHeading(`${token}, welcome`, 'Dana')).to.equal('Dana, welcome');
+      });
+  });
+
+  it('is case-insensitive on the token name', () => {
+    expect(interpolateHeading('{FIRSTNAME}, welcome', 'Dana')).to.equal('Dana, welcome');
+  });
+
+  it('leaves headings without a token untouched', () => {
+    expect(interpolateHeading('See what\'s on at MAX', 'Dana')).to.equal('See what\'s on at MAX');
+  });
+
+  it('drops the token and a trailing comma when there is no name', () => {
+    expect(interpolateHeading('{firstName}, see what\'s happening', null))
+      .to.equal('See what\'s happening');
+    expect(interpolateHeading('{firstName} see what\'s happening', ''))
+      .to.equal('See what\'s happening');
+  });
+
+  it('passes blank and missing headings straight through', () => {
+    expect(interpolateHeading('', 'Dana')).to.equal('');
+    expect(interpolateHeading(undefined, 'Dana')).to.equal(undefined);
   });
 });

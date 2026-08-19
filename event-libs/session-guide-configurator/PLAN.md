@@ -153,7 +153,9 @@ against MWPW-194336 can follow along.
    tell them apart in the saved-configs list — the linked event's own title alone isn't
    unique per row anymore.
 4. **Headings.** Stays as-is: 4 variants — logged-out/live, logged-in/live,
-   logged-out/post-event, logged-in/post-event.
+   logged-out/post-event, logged-in/post-event. The two logged-in variants accept a
+   `{firstName}` placeholder that the consuming side swaps for the viewer's IMS first
+   name (added 2026-08-18) — see the handoff doc's §2.
 5. **Filters. Designed 2026-07-29 — see §7 for the full field-level design.** No
    per-value CRUD (values are always live-derived, never authored — confirmed
    2026-07-29). Category-level select/unselect/rename/reorder is real work for this

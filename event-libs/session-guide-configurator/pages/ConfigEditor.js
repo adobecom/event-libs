@@ -170,6 +170,12 @@ export default function ConfigEditor() {
       <section class="sgc-editor__section">
         <h2>Headings</h2>
         <p class="sgc-editor__section-hint">Shown reflects the viewer's auth state, and separately their pre-/post-event state.</p>
+        <p class="sgc-editor__section-hint">
+          In the two logged-in headings, type <code>{firstName}</code> wherever the viewer's own
+          first name should appear — e.g. <code>{firstName}, see what's happening</code> renders as
+          "Dana, see what's happening". Viewers with no first name on their profile are shown the
+          matching logged-out heading instead, so the logged-out fields can't use the placeholder.
+        </p>
         <label class="sgc-editor__field-label">
           Logged-out
           <input
@@ -184,6 +190,7 @@ export default function ConfigEditor() {
           <input
             type="text"
             class="sgc-field sgc-editor__heading-input"
+            placeholder="{firstName}, see what's happening"
             value=${activeConfig.config.headings.loggedIn}
             onInput=${(e) => updateNestedConfigField('headings', 'loggedIn', e.target.value)}
           />
@@ -202,6 +209,7 @@ export default function ConfigEditor() {
           <input
             type="text"
             class="sgc-field sgc-editor__heading-input"
+            placeholder="{firstName}, catch up on what you missed"
             value=${activeConfig.config.headings.loggedInPostEvent}
             onInput=${(e) => updateNestedConfigField('headings', 'loggedInPostEvent', e.target.value)}
           />
