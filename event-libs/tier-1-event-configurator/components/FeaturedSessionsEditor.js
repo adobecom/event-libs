@@ -5,6 +5,32 @@ import { getSessionTrack, formatSessionTime } from '../utils.js';
 import SearchInput from './SearchInput.js';
 import ImagePickerModal from './ImagePickerModal.js';
 
+function ReplaceIcon() {
+  return html`
+    <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true" focusable="false">
+      <path d="M2 8a6 6 0 0 1 10.24-4.24M14 8a6 6 0 0 1-10.24 4.24" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" />
+      <path d="M12 1.5v3h-3M4 14.5v-3h3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" />
+    </svg>
+  `;
+}
+
+function CloseIcon() {
+  return html`
+    <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true" focusable="false">
+      <path d="M3 3l10 10M13 3 3 13" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" />
+    </svg>
+  `;
+}
+
+function TrashIcon() {
+  return html`
+    <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true" focusable="false">
+      <path d="M2.5 4h11M6 4V2.5a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1V4M6.5 7.5v4M9.5 7.5v4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" />
+      <path d="M3.5 4l.6 9a1 1 0 0 0 1 .9h5.8a1 1 0 0 0 1-.9l.6-9" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" />
+    </svg>
+  `;
+}
+
 function DragHandleIcon() {
   return html`
     <svg width="10" height="16" viewBox="0 0 10 16" aria-hidden="true" focusable="false">
@@ -278,20 +304,26 @@ export default function FeaturedSessionsEditor({
           value=${value} \
           onInput=${(e) => onMetaChange(sessionId, { [field]: e.target.value })} \
         />
-        ${isImage && html`
+        ${isImage && !value && html`
           <button \
             type="button" \
             class="tec-btn tec-btn--outline tec-btn--s" \
             onClick=${() => setImagePickerFor(sessionId)} \
-          >${value ? 'Change…' : 'Add image…'}</button>
+          >Add image…</button>
         `}
         ${isImage && value && html`
           <button \
             type="button" \
-            class="tec-btn tec-btn--quiet tec-btn--s tec-btn--danger" \
+            class="tec-btn tec-btn--icon tec-btn--icon-s" \
+            aria-label="Replace ${META_FIELD_DEFS[field].label} for ${title}" \
+            onClick=${() => setImagePickerFor(sessionId)} \
+          ><${ReplaceIcon} /></button>
+          <button \
+            type="button" \
+            class="tec-btn tec-btn--icon tec-btn--icon-s tec-btn--danger" \
             aria-label="Remove ${META_FIELD_DEFS[field].label} for ${title}" \
             onClick=${() => onMetaChange(sessionId, { [field]: '' })} \
-          >Remove</button>
+          ><${TrashIcon} /></button>
         `}
       </div>
     `;
@@ -309,7 +341,7 @@ export default function FeaturedSessionsEditor({
             const title = session?.enTitle || sessionId;
             return html`
               <li \
-                class="tec-featured-editor__row ${sessionId === draggedId ? 'is-dragging' : ''}" \
+                class="tec-featured-editor__row tec-featured-editor__row--selected ${sessionId === draggedId ? 'is-dragging' : ''}" \
                 key=${sessionId} \
                 ref=${(node) => setItemRef(sessionId, node)} \
               >
@@ -340,7 +372,12 @@ export default function FeaturedSessionsEditor({
                     `}
                   `}
                 </div>
-                <button type="button" class="tec-btn tec-btn--quiet tec-btn--s tec-btn--danger" onClick=${() => handleRemove(sessionId)}>Remove</button>
+                <button \
+                  type="button" \
+                  class="tec-btn tec-btn--icon tec-btn--icon-s tec-btn--danger tec-featured-editor__remove" \
+                  aria-label="Remove ${title}" \
+                  onClick=${() => handleRemove(sessionId)} \
+                ><${CloseIcon} /></button>
               </li>
             `;
           })}
