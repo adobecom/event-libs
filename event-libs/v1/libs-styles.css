@@ -32,11 +32,11 @@ a.con-button.no-event {
 }
 
 @media (max-width: 767px) {
-  .desktop-only { display: none; }
+  .desktop-only { display: none !important; }
 }
 
 @media (min-width: 768px) {
-  .mobile-only { display: none; }
+  .mobile-only { display: none !important; }
 
   .section.grid {
     display: grid;

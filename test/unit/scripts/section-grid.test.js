@@ -171,17 +171,25 @@ describe('section grid layout (CSS)', () => {
 
     expect(mobile, 'mobile-range media rule').to.exist;
     expect(notMobile, 'non-mobile-range media rule').to.exist;
-    expect([...mobile.cssRules].some((r) => r.selectorText === '.desktop-only' && r.style.display === 'none')).to.be.true;
-    expect([...notMobile.cssRules].some((r) => r.selectorText === '.mobile-only' && r.style.display === 'none')).to.be.true;
+
+    const desktopOnly = [...mobile.cssRules].find((r) => r.selectorText === '.desktop-only');
+    const mobileOnly = [...notMobile.cssRules].find((r) => r.selectorText === '.mobile-only');
+
+    expect(desktopOnly, '.desktop-only rule').to.exist;
+    expect(mobileOnly, '.mobile-only rule').to.exist;
+    expect(desktopOnly.style.display).to.equal('none');
+    expect(desktopOnly.style.getPropertyPriority('display')).to.equal('important');
+    expect(mobileOnly.style.display).to.equal('none');
+    expect(mobileOnly.style.getPropertyPriority('display')).to.equal('important');
   });
 
-  it('shows .mobile-only and hides .desktop-only at the current (non-mobile) test viewport', () => {
+  it('shows .mobile-only and hides .desktop-only at the current (non-mobile) test viewport, even when another rule sets display', () => {
     document.body.innerHTML = `
-      <div class="mobile-only" id="mo">mobile</div>
-      <div class="desktop-only" id="do">desktop</div>
+      <div class="mobile-only" id="mo" style="display: flex">mobile</div>
+      <div class="desktop-only" id="do" style="display: flex">desktop</div>
     `;
 
     expect(getComputedStyle(document.getElementById('mo')).display).to.equal('none');
-    expect(getComputedStyle(document.getElementById('do')).display).to.not.equal('none');
+    expect(getComputedStyle(document.getElementById('do')).display).to.equal('flex');
   });
 });
