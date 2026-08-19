@@ -1,0 +1,19 @@
+request_summary: "{audit | fix | add} on {BlockName}"
+scope: "{Full | Partial — root cause outside requested file(s): [list]}"
+mode: "{audit | fix | add}"
+observed:
+  - "{facts found in the block}"
+actions_taken:
+  - "{change or finding description}"
+verification:
+  lint: "{pass | fail | not-run — npm run lint}"
+  stylelint_c2: "{pass | fail | n-a — npx stylelint <path>, since lint:css skips c2}"
+  tests: "{N passed, N failed | not-run — npx wtr <test> --node-resolve --port=2000}"
+artifacts:
+  - "{file path or none}"
+issues_remaining:
+  - "{anything out of scope or needing design/token/authoring changes}"
+ownership_notes:
+  - "{which findings are Code vs Authoring vs Config vs Design}"
+recommendations:
+  - "{next actions}"
