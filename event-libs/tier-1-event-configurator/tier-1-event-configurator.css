@@ -288,7 +288,7 @@ body {
 }
 
 .tec-toast .tec-btn--icon {
-  color: var(--s2a-color-content-knockout);
+  color: currentcolor;
 }
 
 .tec-btn--icon:hover:not(:disabled) {
@@ -310,8 +310,8 @@ body {
 }
 
 .tec-toast .tec-btn--icon:hover:not(:disabled) {
-  background: var(--s2a-color-transparent-white-16);
-  color: var(--s2a-color-content-knockout);
+  background: rgb(0 0 0 / 8%);
+  color: currentcolor;
 }
 
 .tec-btn--full {
@@ -360,27 +360,28 @@ select.tec-field {
 .tec-toast {
   position: fixed;
   bottom: var(--tec-spacing-lg);
-  right: var(--tec-spacing-lg);
+  left: 50%;
+  transform: translateX(-50%);
   z-index: 2000;
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   gap: var(--tec-spacing-sm);
   max-width: 420px;
   padding: var(--tec-spacing-sm) var(--tec-spacing-md);
   border-radius: var(--tec-border-radius);
-  color: var(--s2a-color-content-knockout);
   box-shadow: var(--tec-shadow-md);
   font-size: 14px;
-  font-weight: 600;
   animation: tec-toast-in 0.18s ease-out;
 }
 
 .tec-toast--success {
-  background: var(--tec-color-success);
+  background: var(--tec-color-success-bg);
+  color: var(--tec-color-success);
 }
 
 .tec-toast--error {
-  background: var(--tec-color-error);
+  background: var(--tec-color-error-bg);
+  color: var(--tec-color-error);
 }
 
 .tec-toast__message {
@@ -390,12 +391,12 @@ select.tec-field {
 @keyframes tec-toast-in {
   from {
     opacity: 0;
-    transform: translateY(8px);
+    transform: translateX(-50%) translateY(8px);
   }
 
   to {
     opacity: 1;
-    transform: translateY(0);
+    transform: translateX(-50%) translateY(0);
   }
 }
 
