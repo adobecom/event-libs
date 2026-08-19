@@ -9,7 +9,6 @@
  */
 import { createTag, getMetadata } from '../../../utils/utils.js';
 import { initTierOneEventConfig } from '../../../utils/tier-1-event-config.js';
-import { applySectionColumnsLayout } from '../../../utils/decorate.js';
 import { renderTrackTags } from './track-tags.js';
 import { renderGdprCopy, renderClosedCaption, renderLegalDisclaimer } from './disclaimer-cc-legal.js';
 import { renderDescriptionClamp } from './description-clamp.js';
@@ -20,12 +19,6 @@ import { mountSessionState } from './session-state-view.js';
 
 export default async function init(el) {
   el.replaceChildren();
-
-  // Apply the opt-in flex-column layout (`section-layout: columns`). Done here
-  // because the session page's entry scripts.js runs decorateArea() before the
-  // metadata block is in <head>; this block's init runs after, so the metadata is
-  // readable. No-op unless authored. TODO: move to the page entry once deployed.
-  applySectionColumnsLayout();
 
   // Ensure the Tier 1 Event Configurator config is loaded before any sub-feature
   // reads it (getTrackIcon). Idempotent — no-ops if decorateEvent already ran it.

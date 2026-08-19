@@ -3,7 +3,7 @@
  * 2-col grid of bordered tiles: colored logo + name + ↗ link.
  */
 
-.featured-products {
+.event-featured-products {
   display: flex;
   flex-direction: column;
   gap: var(--s2a-spacing-16, 16px);
@@ -40,7 +40,7 @@
   display: none;
 }
 
-.featured-products.is-expanded .featured-product.is-overflow {
+.event-featured-products.is-expanded .featured-product.is-overflow {
   display: flex;
 }
 

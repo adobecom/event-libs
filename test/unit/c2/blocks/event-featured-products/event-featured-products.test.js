@@ -1,7 +1,7 @@
 import { expect } from '@esm-bundle/chai';
 import { setMetadata } from '../../../../../event-libs/v1/utils/utils.js';
 import { setFederalRootOverride } from '../../../../../event-libs/v1/features/icons/federal-icons.js';
-import init from '../../../../../event-libs/v1/c2/blocks/featured-products/featured-products.js';
+import init from '../../../../../event-libs/v1/c2/blocks/event-featured-products/event-featured-products.js';
 
 // Shared configurator config for all tests — the tier-1-event-config module caches on
 // first load, so keep it constant and vary only the Product attribute per test.

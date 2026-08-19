@@ -4,7 +4,7 @@ import {
   renderGdprCopy,
   renderClosedCaption,
   renderLegalDisclaimer,
-} from '../../../../../event-libs/v1/c2/blocks/session-details/disclaimer-cc-legal.js';
+} from '../../../../../event-libs/v1/c2/blocks/event-session-details/disclaimer-cc-legal.js';
 
 const attr = (name, value) => ({ name, inputType: 'text', enabled: true, values: [{ value }] });
 

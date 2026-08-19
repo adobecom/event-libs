@@ -1,6 +1,6 @@
 import { expect } from '@esm-bundle/chai';
 import { setMetadata } from '../../../../../event-libs/v1/utils/utils.js';
-import init from '../../../../../event-libs/v1/c2/blocks/session-resources/session-resources.js';
+import init from '../../../../../event-libs/v1/c2/blocks/event-session-resources/event-session-resources.js';
 
 function setMaterials(list) {
   setMetadata('material-list', JSON.stringify(list));

@@ -1,6 +1,6 @@
 import { expect } from '@esm-bundle/chai';
 import { setMetadata } from '../../../../../event-libs/v1/utils/utils.js';
-import { renderDescriptionClamp } from '../../../../../event-libs/v1/c2/blocks/session-details/description-clamp.js';
+import { renderDescriptionClamp } from '../../../../../event-libs/v1/c2/blocks/event-session-details/description-clamp.js';
 
 describe('Description "More" Clamp', () => {
   beforeEach(() => {

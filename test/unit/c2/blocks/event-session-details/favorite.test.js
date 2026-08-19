@@ -1,6 +1,6 @@
 import { expect } from '@esm-bundle/chai';
 import { setMetadata } from '../../../../../event-libs/v1/utils/utils.js';
-import { renderFavorite } from '../../../../../event-libs/v1/c2/blocks/session-details/favorite.js';
+import { renderFavorite } from '../../../../../event-libs/v1/c2/blocks/event-session-details/favorite.js';
 import { favorited, sessions, auth } from '../../../../../event-libs/v1/utils/session-store.js';
 import { toast } from '../../../../../event-libs/v1/features/toast/toast.js';
 

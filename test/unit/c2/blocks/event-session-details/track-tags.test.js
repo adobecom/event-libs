@@ -1,6 +1,6 @@
 import { expect } from '@esm-bundle/chai';
 import { setMetadata } from '../../../../../event-libs/v1/utils/utils.js';
-import { renderTrackTags } from '../../../../../event-libs/v1/c2/blocks/session-details/track-tags.js';
+import { renderTrackTags } from '../../../../../event-libs/v1/c2/blocks/event-session-details/track-tags.js';
 
 const attr = (name, inputType, values) => ({ name, inputType, enabled: true, values });
 

@@ -3,7 +3,7 @@
  * Avatar + name/role rows; first 5 shown, rest revealed by the toggle.
  */
 
-.speakers {
+.event-speakers {
   display: flex;
   flex-direction: column;
   gap: var(--s2a-spacing-16, 16px);
@@ -42,7 +42,7 @@
   display: none;
 }
 
-.speakers.is-expanded .speaker.is-overflow {
+.event-speakers.is-expanded .speaker.is-overflow {
   display: flex;
 }
 

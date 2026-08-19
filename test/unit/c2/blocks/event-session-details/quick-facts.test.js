@@ -1,6 +1,6 @@
 import { expect } from '@esm-bundle/chai';
 import { setMetadata } from '../../../../../event-libs/v1/utils/utils.js';
-import { renderQuickFacts } from '../../../../../event-libs/v1/c2/blocks/session-details/quick-facts.js';
+import { renderQuickFacts } from '../../../../../event-libs/v1/c2/blocks/event-session-details/quick-facts.js';
 
 const attr = (name, values) => ({ name, inputType: 'multi-select', enabled: true, values });
 

@@ -2,7 +2,7 @@ import { expect } from '@esm-bundle/chai';
 import { setMetadata } from '../../../../../event-libs/v1/utils/utils.js';
 import {
   getSessionTimes, getState, formatDateTime, renderStatus,
-} from '../../../../../event-libs/v1/c2/blocks/session-details/session-state-view.js';
+} from '../../../../../event-libs/v1/c2/blocks/event-session-details/session-state-view.js';
 
 const SESSION_TIMES = '[{"startTimeMillis":1794518100000,"endTimeMillis":1794520800000,"timezone":"America/Los_Angeles","sessionId":"x"}]';
 

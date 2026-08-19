@@ -3,7 +3,7 @@
  * "file name … CTA" rows; first 2 shown, rest revealed by the toggle.
  */
 
-.session-resources {
+.event-session-resources {
   display: flex;
   flex-direction: column;
   gap: var(--s2a-spacing-16, 16px);
@@ -50,7 +50,7 @@
   display: none;
 }
 
-.session-resources.is-expanded .session-resource.is-overflow {
+.event-session-resources.is-expanded .session-resource.is-overflow {
   display: flex;
 }
 

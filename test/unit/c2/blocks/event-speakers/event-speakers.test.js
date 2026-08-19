@@ -1,6 +1,6 @@
 import { expect } from '@esm-bundle/chai';
 import { setMetadata } from '../../../../../event-libs/v1/utils/utils.js';
-import init from '../../../../../event-libs/v1/c2/blocks/speakers/speakers.js';
+import init from '../../../../../event-libs/v1/c2/blocks/event-speakers/event-speakers.js';
 
 function setSpeakers(list) {
   setMetadata('speakers', JSON.stringify(list));

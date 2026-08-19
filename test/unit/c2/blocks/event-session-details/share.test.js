@@ -1,6 +1,6 @@
 import { expect } from '@esm-bundle/chai';
 import { setMetadata } from '../../../../../event-libs/v1/utils/utils.js';
-import { renderShare } from '../../../../../event-libs/v1/c2/blocks/session-details/share.js';
+import { renderShare } from '../../../../../event-libs/v1/c2/blocks/event-session-details/share.js';
 import { toast } from '../../../../../event-libs/v1/features/toast/toast.js';
 
 const tick = () => new Promise((r) => { setTimeout(r); });
