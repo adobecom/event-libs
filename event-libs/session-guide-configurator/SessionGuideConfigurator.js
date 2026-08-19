@@ -5,7 +5,7 @@ import { useNavigation } from './context/NavigationContext.js';
 import { useConfigs } from './context/ConfigsContext.js';
 import { useDA } from './context/DAContext.js';
 import { useEventEnv } from './context/EventEnvContext.js';
-import { readConfigLinkPayload, rowFromConfigLinkPayload } from './utils.js';
+import { readConfigLinkPayload, rowFromConfigLinkPayload, clearConfigLinkFromUrl } from './utils.js';
 import { PAGES, EVENT_SERVICE_ENV_OPTIONS } from './constants.js';
 
 const TOAST_TIMEOUT_MS = 6000;
@@ -37,7 +37,7 @@ export default function SessionGuideConfigurator() {
     goToEditor();
     // Consume it, so leaving the tab and returning lands on the library rather than
     // re-opening this config with no way past it. Clears only this iframe's URL.
-    history.replaceState(null, '', `${window.location.pathname}${window.location.search}`);
+    clearConfigLinkFromUrl();
   }, [hasLoaded, configs, setEnv, startEditConfig, goToEditor]);
 
   const envLabel = EVENT_SERVICE_ENV_OPTIONS.find((opt) => opt.value === envName)?.label || envName;

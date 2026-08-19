@@ -3,6 +3,7 @@ import {
   createSessionGuideConfigURL,
   readConfigLinkPayload,
   rowFromConfigLinkPayload,
+  clearConfigLinkFromUrl,
 } from '../../../event-libs/session-guide-configurator/utils.js';
 
 function makeRow(overrides = {}) {
@@ -88,6 +89,50 @@ describe('session-guide-configurator utils', () => {
       const url = createSessionGuideConfigURL(makeRow(), 'o', 'r');
       const encoded = new URL(url).hash.replace(/^#sgConfig=/, '');
       expect(readConfigLinkPayload(`#other=1&sgConfig=${encoded}`).configId).to.equal('cfg-1');
+    });
+
+    // Links copied before the payload moved to the hash. DA's shell forwards the search into
+    // the iframe too, so these can still re-open rather than dead-ending on the library.
+    it('falls back to a legacy ?sgConfig= query param when the hash has none', () => {
+      const encoded = new URL(createSessionGuideConfigURL(makeRow(), 'o', 'r')).hash.replace(/^#sgConfig=/, '');
+      expect(readConfigLinkPayload('', `?sgConfig=${encoded}`).configId).to.equal('cfg-1');
+      expect(readConfigLinkPayload('', `?ref=doliva&sgConfig=${encoded}`).configId).to.equal('cfg-1');
+    });
+
+    it('prefers the hash over the search when both carry a payload', () => {
+      const fromHash = new URL(createSessionGuideConfigURL(makeRow(), 'o', 'r')).hash.replace(/^#sgConfig=/, '');
+      const fromSearch = new URL(createSessionGuideConfigURL(
+        makeRow({ configId: 'cfg-stale' }), 'o', 'r',
+      )).hash.replace(/^#sgConfig=/, '');
+      expect(readConfigLinkPayload(`#sgConfig=${fromHash}`, `?sgConfig=${fromSearch}`).configId)
+        .to.equal('cfg-1');
+    });
+
+    it('ignores a truncated legacy query param rather than decoding garbage', () => {
+      expect(readConfigLinkPayload('', '?sgConfig=eyJhIjox')).to.equal(null);
+    });
+
+    it('returns null when neither the hash nor the search carries a payload', () => {
+      expect(readConfigLinkPayload('', '?ref=doliva')).to.equal(null);
+    });
+  });
+
+  describe('clearConfigLinkFromUrl', () => {
+    const originalUrl = window.location.href;
+    afterEach(() => history.replaceState(null, '', originalUrl));
+
+    it('drops the payload from the hash but keeps ref, so the app stays on its branch', () => {
+      history.replaceState(null, '', '/test-path?ref=doliva#sgConfig=abc');
+      clearConfigLinkFromUrl();
+      expect(window.location.hash).to.equal('');
+      expect(new URLSearchParams(window.location.search).get('ref')).to.equal('doliva');
+    });
+
+    it('drops a legacy payload from the search while keeping the other params', () => {
+      history.replaceState(null, '', '/test-path?ref=doliva&sgConfig=abc');
+      clearConfigLinkFromUrl();
+      expect(new URLSearchParams(window.location.search).get('sgConfig')).to.equal(null);
+      expect(new URLSearchParams(window.location.search).get('ref')).to.equal('doliva');
     });
   });
 

@@ -48,13 +48,25 @@ export function createSessionGuideConfigURL(row, org, repo) {
   return url.toString();
 }
 
-// Decodes a copied link's payload out of a URL hash, or null. Same decoder and 20-char floor
-// as decorate.js, so a link that renders a block is exactly a link that re-opens here.
-export function readConfigLinkPayload(hash = window.location.hash) {
-  const match = (hash || '').match(new RegExp(`[#&]${CONFIG_LINK_HASH_KEY}=([A-Za-z0-9+/=%-]{20,})`));
-  if (!match) return null;
-  const parsed = parseEncodedConfig(match[1]);
+// Decodes a copied link's payload out of the URL, or null. Reads the hash first, then the
+// search, so links copied before the payload moved to the hash still re-open — DA's shell
+// forwards both into the iframe. Same decoder and 20-char floor as decorate.js, so a link
+// that renders a block is exactly a link that re-opens here.
+export function readConfigLinkPayload(hash = window.location.hash, search = window.location.search) {
+  const hashMatch = (hash || '').match(new RegExp(`[#&]${CONFIG_LINK_HASH_KEY}=([A-Za-z0-9+/=%-]{20,})`));
+  const encoded = hashMatch?.[1] || new URLSearchParams(search || '').get(CONFIG_LINK_HASH_KEY);
+  if (!encoded || encoded.length < 20) return null;
+  const parsed = parseEncodedConfig(encoded);
   return parsed && typeof parsed === 'object' ? parsed : null;
+}
+
+// Drops a consumed payload from this iframe's URL, from either place it can arrive. Keeps
+// every other param — `ref` in particular, which picks the branch the app is loaded from.
+export function clearConfigLinkFromUrl() {
+  const url = new URL(window.location.href);
+  url.searchParams.delete(CONFIG_LINK_HASH_KEY);
+  url.hash = '';
+  history.replaceState(null, '', `${url.pathname}${url.search}`);
 }
 
 // Rebuilds an editable row for a config missing from this repo's library (link from another
