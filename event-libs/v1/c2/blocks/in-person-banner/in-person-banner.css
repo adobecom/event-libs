@@ -1,0 +1,98 @@
+@import '../../styles/tokens.css';
+
+.in-person-banner {
+  box-sizing: border-box;
+  width: 100%;
+}
+
+.in-person-banner-inner {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  gap: var(--s2a-spacing-none);
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 1440px;
+  margin: 0 auto;
+  padding: var(--s2a-spacing-md) 64px;
+  background: var(--s2a-color-background-default);
+  font-family: var(--s2a-font-family-default);
+}
+
+/* Figma inspect: "s2a/typography/heading-6", shared by both the copy and the link
+   below (link adds its own underline on top). */
+.in-person-banner-copy {
+  max-width: 800px;
+  margin: 0 auto;
+  color: var(--s2a-color-content-default);
+  font-family: var(--s2a-font-family-heading);
+  font-size: var(--s2a-typography-font-size-heading-6);
+  font-weight: 900;
+  line-height: var(--s2a-typography-line-height-title-6, 18px);
+  letter-spacing: var(--s2a-typography-letter-spacing-heading-6);
+  text-align: center;
+}
+
+.in-person-banner-copy p {
+  margin: 0;
+}
+
+.in-person-banner-link {
+  color: var(--s2a-color-content-default);
+  font-family: var(--s2a-font-family-heading);
+  font-size: var(--s2a-typography-font-size-heading-6);
+  font-weight: 900;
+  line-height: var(--s2a-typography-line-height-title-6, 18px);
+  letter-spacing: var(--s2a-typography-letter-spacing-heading-6);
+  text-decoration-line: underline;
+  text-decoration-style: solid;
+  text-decoration-skip-ink: auto;
+  text-decoration-thickness: auto;
+  text-underline-offset: auto;
+  text-underline-position: from-font;
+}
+
+.in-person-banner-close {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: none;
+  background: none;
+  color: inherit;
+  cursor: pointer;
+}
+
+.in-person-banner-close svg {
+  width: 16px;
+  height: 16px;
+}
+
+@media (max-width: 767px) {
+  /* Figma inspect (mobile frame): padding uses the viewport-side-margins token for its
+     inline edges rather than the fixed 64px desktop padding. */
+  .in-person-banner-inner {
+    align-items: flex-start;
+    gap: var(--s2a-spacing-none);
+    padding: var(--s2a-spacing-md) var(--s2a-viewport-side-margins, var(--s2a-spacing-sm));
+  }
+
+  /* Reserves room for the absolutely-positioned close button (32px gap + its own
+     24px box + 2px inset) so copy text never runs underneath it. */
+  .in-person-banner-copy {
+    margin: 0;
+    padding-right: 58px;
+  }
+
+  /* Figma inspect: close button sits 32px right of the copy, 36px from the block's
+     top edge, 2px inset from the block's own right edge. */
+  .in-person-banner-close {
+    position: absolute;
+    top: 36px;
+    right: 2px;
+  }
+}
