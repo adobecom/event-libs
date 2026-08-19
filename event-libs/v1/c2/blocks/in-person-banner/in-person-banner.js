@@ -62,6 +62,13 @@ function buildBanner(contentEl, bannerId) {
 
 const CONFIG_KEYS = new Set(['banner-id', 'rf-data-check', 'below-nav', 'message']);
 
+// Authors write the literal word "false" for an off boolean row (see below-nav in the
+// README example) — Boolean(str) can't tell that apart from any other non-empty string,
+// so this parses the actual authored value instead of just checking presence.
+function isTruthyConfigValue(value) {
+  return (value ?? '').trim().toLowerCase() === 'true';
+}
+
 export default async function init(el) {
   const rows = [...el.querySelectorAll(':scope > div')];
   const config = {};
@@ -79,8 +86,8 @@ export default async function init(el) {
   if (!contentCell) return;
 
   const bannerId = config['banner-id'] || getMetadata('banner-id') || '';
-  const rfGateEnabled = Boolean(config['rf-data-check'] ?? getMetadata('rf-data-check'));
-  const belowNav = Boolean(config['below-nav'] ?? getMetadata('below-nav'));
+  const rfGateEnabled = isTruthyConfigValue(config['rf-data-check'] ?? getMetadata('rf-data-check'));
+  const belowNav = isTruthyConfigValue(config['below-nav'] ?? getMetadata('below-nav'));
 
   if (isDismissed(bannerId)) {
     el.remove();

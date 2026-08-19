@@ -24,8 +24,8 @@ per instance — never inherited from the page's own theme.
 | In-Person Banner (dark) |  |
 | --- | --- |
 | banner-id | in-person-2026 |
-| rf-data-check | on |
-| below-nav | true |
+| rf-data-check | true |
+| below-nav | false |
 | message | Registered for in-person MAX? Find detailed information on your [attendee dashboard](https://...). |
 ```
 
@@ -39,16 +39,18 @@ need to remember which shape to use:
   below) — reusing the same id across multiple placements treats them as "the same
   banner" for dismiss purposes on purpose; give each independently-dismissible
   banner its own id.
-- `rf-data-check` — presence-gated: author the row (any value) to gate visibility on
-  in-person registration (see below); omit the row entirely to show unconditionally
-  to everyone.
-- `below-nav` — presence-gated: author the row (any value) when this banner is placed
-  at the very top of the page, so it needs a top offset to clear the sticky GNAV
-  header instead of rendering underneath it. Omit for any other placement — see
-  Layout below for why this isn't automatic.
+- `rf-data-check` — exactly `true` (case-insensitive) to gate visibility on in-person
+  registration (see below); `false` or omitted shows unconditionally to everyone.
+- `below-nav` — exactly `true` (case-insensitive) when this banner is placed at the
+  very top of the page, so it needs a top offset to clear the sticky GNAV header
+  instead of rendering underneath it. `false` or omitted for any other placement —
+  see Layout below for why this isn't automatic.
 - `message` — **required** (whether authored under this label or as a bare row).
   Rich content, same authoring conventions as any other block (links via markdown,
   bold/italic, etc.) — no new authoring paradigm.
+
+Both `rf-data-check` and `below-nav` are parsed, not just presence-checked — writing
+the row with the value `false` correctly means off, the same as omitting the row.
 
 If `banner-id`/`rf-data-check`/`below-nav` aren't authored as a row, `init()` falls
 back to page-level metadata of the same name (`getMetadata('banner-id')`, etc.), so a
@@ -56,7 +58,7 @@ page-wide default can be set once instead of repeating it on every instance.
 
 ## RF-gated visibility
 
-When the `rf-data-check` row is authored, the banner only renders for visitors registered for the
+When `rf-data-check` is `true`, the banner only renders for visitors registered for the
 in-person event. This block does **not** make its own RainFocus call — it consumes
 the registration signal already resolved by `da-events`' GNAV integration
 (`da-events` PR #51, `events/scripts/registration-cache.js`), via the documented
