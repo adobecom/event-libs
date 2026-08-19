@@ -34,6 +34,16 @@
   list-style: none;
 }
 
+/* Two columns from 900px — the same breakpoint at which the page goes to a
+   side-by-side section-columns layout and this block lands in the wider main
+   column. Rows stay full-width below that. */
+@media (min-width: 900px) {
+  .session-resources-list {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
 .session-resource {
   display: flex;
   align-items: center;
