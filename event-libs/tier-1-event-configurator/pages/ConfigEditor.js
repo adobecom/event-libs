@@ -353,7 +353,7 @@ export default function ConfigEditor() {
             id="tec-broadcast-path"
             type="text"
             class="tec-field tec-editor__rf-input"
-            placeholder="/max/broadcast.html"
+            placeholder="/max/2026/broadcast.html"
             value=${activeConfig.config.broadcastPath || ''}
             onInput=${(e) => updateConfigField('broadcastPath', e.target.value)}
           />

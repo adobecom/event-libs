@@ -10,6 +10,19 @@ export const SUSI_OPTIONS = {
   },
 };
 export const SERIES_404_MAP_PATH = '/events/default/series-404-map.json';
+
+// MAX 2026's own pages. Paths only — they resolve against whatever domain is serving the
+// page. Used as the fallback for a Tier 1 Event Config that doesn't author its own
+// (getWatchDestination) and as the base for building session page URLs. Any other event
+// authors homepagePath/broadcastPath instead of adding its paths here.
+export const MAX_EVENT_PAGES = {
+  // The published path; the doc itself is authored at /max-new.html.
+  homepage: '/max.html',
+  broadcast: '/max/2026/broadcast.html',
+  sessionGuide: '/max/2026/sessions.html',
+  // Individual session pages are this base + the session's slug + '.html'.
+  sessionBase: '/max/2026/sessions/',
+};
 export const ALLOWED_EMAIL_DOMAINS = ['@adobe.com', '@adobetest.com'];
 export const ENV_MAP = {
   dev: {

@@ -86,7 +86,34 @@ describe('services/sessions/sessions-api', () => {
 
     it('derives slug and sessionPageUrl from the drafts URL, not the URL itself', () => {
       expect(full.slug).to.equal('full-stack-session-s001');
-      expect(full.sessionPageUrl).to.equal('/sessions/full-stack-session-s001');
+      // Rebuilt under MAX 2026's real session-page base, not the bare /sessions/ this
+      // emitted before — that path doesn't exist on adobe.com.
+      expect(full.sessionPageUrl).to.equal('/max/2026/sessions/full-stack-session-s001.html');
+    });
+
+    it('leaves sessionPageUrl empty when there is no URL to derive a slug from', () => {
+      const [noUrl] = mapEslPayloadToRawSessions({
+        sessions: [{ sessionId: 's-3', sessionCode: 'S003', customAttributes: [] }],
+        sessionTimes: [],
+        speakers: [],
+      });
+      expect(noUrl.slug).to.equal('');
+      expect(noUrl.sessionPageUrl).to.equal('');
+    });
+
+    it('does not double up the extension when the drafts URL already ends in .html', () => {
+      const [withExt] = mapEslPayloadToRawSessions({
+        sessions: [{
+          sessionId: 's-4',
+          sessionCode: 'S004',
+          url: 'https://www.adobe.com/drafts/esp-dev/max/2026/sessions/already-html-s004.html',
+          customAttributes: [],
+        }],
+        sessionTimes: [],
+        speakers: [],
+      });
+      expect(withExt.slug).to.equal('already-html-s004');
+      expect(withExt.sessionPageUrl).to.equal('/max/2026/sessions/already-html-s004.html');
     });
 
     it('takes rfCode from the earliest sessionTime\'s externalSessionTimeId, "rf-" prefix stripped', () => {

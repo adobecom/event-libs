@@ -1,6 +1,6 @@
 import { constructRequestOptions } from '../../utils/esp-controller.js';
 import { getEventServiceEnv } from '../../utils/utils.js';
-import { ENV_MAP } from '../../utils/constances.js';
+import { ENV_MAP, MAX_EVENT_PAGES } from '../../utils/constances.js';
 
 // TEMPORARY: disabled — every session in the real MAX26 catalog is currently a draft/test
 // row, so enforcing this today would hide the whole catalog. Flip to `true` once real,
@@ -187,7 +187,13 @@ function buildCustomAttributeValueMap(session) {
 function slugFromUrl(url) {
   if (!url) return '';
   const segments = url.split('?')[0].split('#')[0].split('/').filter(Boolean);
-  return segments[segments.length - 1] || '';
+  return (segments[segments.length - 1] || '').replace(/\.html$/, '');
+}
+
+// Rebuilt from the slug rather than taken from `sessions[].url` (see above). MAX 2026's
+// session pages live under /max/2026/sessions/, not the bare /sessions/ this used to emit.
+function sessionPageUrlFromSlug(slug) {
+  return slug ? `${MAX_EVENT_PAGES.sessionBase}${slug}.html` : '';
 }
 
 // `published: false` marks a draft/test row that must never reach real visitors once
@@ -259,7 +265,7 @@ export function mapEslPayloadToRawSessions(payload) {
       isOnline: formatValues.includes('Online'),
       videoAvailable: formatValues.includes('Online') || formatValues.includes('On demand, post event'),
       isLivestreamed: extractCustomAttributeValues(session, 'Livestreamed Content').includes('Live'),
-      sessionPageUrl: slug ? `/sessions/${slug}` : '',
+      sessionPageUrl: sessionPageUrlFromSlug(slug),
       isKeynote: type === 'Keynote',
       thumbnailUrl: thumbnail?.imageUrl ?? null,
       copyrightDisclaimer: extractCustomAttributeValue(session, ['Legal Disclaimer', 'LegalDisclaimer']) || undefined,

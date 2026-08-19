@@ -17,7 +17,7 @@ describe('getWatchDestination — unauthored event pages', () => {
   });
 
   it('falls back to MAX\'s broadcast page for a live online-only session', () => {
-    expect(getWatchDestination(session({ isOnline: true }), 'live')).to.equal('/max/broadcast.html');
+    expect(getWatchDestination(session({ isOnline: true }), 'live')).to.equal('/max/2026/broadcast.html');
   });
 
   it('still returns empty for a live session that is neither livestreamed nor online', () => {
