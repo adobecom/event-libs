@@ -40,7 +40,10 @@ async function isRegisteredInPerson() {
 }
 
 function buildBanner(contentEl, bannerId) {
-  const banner = createTag('div', { class: 'in-person-banner-inner' });
+  // role="status" + aria-live="polite" — same live-region primitive as
+  // features/toast/toast.js — so assistive tech both perceives the message on render
+  // and gets an announcement when dismissal removes this container from the DOM.
+  const banner = createTag('div', { class: 'in-person-banner-inner', role: 'status', 'aria-live': 'polite' });
   const copy = createTag('div', { class: 'in-person-banner-copy' }, contentEl.innerHTML, { parent: banner });
   copy.querySelectorAll('a').forEach((a) => a.classList.add('in-person-banner-link'));
 
