@@ -11,17 +11,22 @@ export const SUSI_OPTIONS = {
 };
 export const SERIES_404_MAP_PATH = '/events/default/series-404-map.json';
 
+// The two consumer-facing Adobe.com hosts. Session page URLs come out of the session catalog
+// on the prod host regardless of tier, so non-prod pages rewrite them (see
+// sessionPageUrlForEnv).
+export const ADOBE_PROD_HOST = 'www.adobe.com';
+export const ADOBE_STAGE_HOST = 'www.stage.adobe.com';
+
 // MAX 2026's own pages. Paths only — they resolve against whatever domain is serving the
 // page. Used as the fallback for a Tier 1 Event Config that doesn't author its own
-// (getWatchDestination) and as the base for building session page URLs. Any other event
-// authors homepagePath/broadcastPath instead of adding its paths here.
+// (getWatchDestination). Any other event authors homepagePath/broadcastPath instead of
+// adding its paths here. Individual session pages are deliberately absent: the session
+// catalog gives each session's own URL, so nothing needs to build those paths.
 export const MAX_EVENT_PAGES = {
   // The published path; the doc itself is authored at /max-new.html.
   homepage: '/max.html',
   broadcast: '/max/2026/broadcast.html',
   sessionGuide: '/max/2026/sessions.html',
-  // Individual session pages are this base + the session's slug + '.html'.
-  sessionBase: '/max/2026/sessions/',
 };
 export const ALLOWED_EMAIL_DOMAINS = ['@adobe.com', '@adobetest.com'];
 export const ENV_MAP = {

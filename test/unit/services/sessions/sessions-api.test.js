@@ -2,7 +2,7 @@ import { expect } from '@esm-bundle/chai';
 
 import {
   mapEslPayloadToRawSessions, normalizeSessions, isSessionPublished, ENFORCE_PUBLISHED_FILTER,
-  getSessionProducts, extractDistinctProducts,
+  getSessionProducts, extractDistinctProducts, sessionPageUrlForEnv,
 } from '../../../../event-libs/v1/services/sessions/sessions-api.js';
 
 function customAttr(name, values) {
@@ -84,14 +84,14 @@ describe('services/sessions/sessions-api', () => {
       expect(full.endTimeUtc).to.equal(new Date(1500).toISOString());
     });
 
-    it('derives slug and sessionPageUrl from the drafts URL, not the URL itself', () => {
+    // The catalog's url already resolves the session's own page, so it passes through
+    // untouched here — only its host is env-adjusted, in normalizeSessions.
+    it('takes sessionPageUrl straight from the catalog url, and the slug from its last segment', () => {
       expect(full.slug).to.equal('full-stack-session-s001');
-      // Rebuilt under MAX 2026's real session-page base, not the bare /sessions/ this
-      // emitted before — that path doesn't exist on adobe.com.
-      expect(full.sessionPageUrl).to.equal('/max/2026/sessions/full-stack-session-s001.html');
+      expect(full.sessionPageUrl).to.equal('https://www.adobe.com/drafts/esp-dev/max/2025/sessions/full-stack-session-s001');
     });
 
-    it('leaves sessionPageUrl empty when there is no URL to derive a slug from', () => {
+    it('leaves sessionPageUrl empty when the session has no url at all', () => {
       const [noUrl] = mapEslPayloadToRawSessions({
         sessions: [{ sessionId: 's-3', sessionCode: 'S003', customAttributes: [] }],
         sessionTimes: [],
@@ -101,19 +101,17 @@ describe('services/sessions/sessions-api', () => {
       expect(noUrl.sessionPageUrl).to.equal('');
     });
 
-    it('does not double up the extension when the drafts URL already ends in .html', () => {
+    it('strips a trailing .html when deriving the slug, leaving the url itself alone', () => {
+      const url = 'https://www.adobe.com/max/2026/sessions/already-html-s004.html';
       const [withExt] = mapEslPayloadToRawSessions({
         sessions: [{
-          sessionId: 's-4',
-          sessionCode: 'S004',
-          url: 'https://www.adobe.com/drafts/esp-dev/max/2026/sessions/already-html-s004.html',
-          customAttributes: [],
+          sessionId: 's-4', sessionCode: 'S004', url, customAttributes: [],
         }],
         sessionTimes: [],
         speakers: [],
       });
       expect(withExt.slug).to.equal('already-html-s004');
-      expect(withExt.sessionPageUrl).to.equal('/max/2026/sessions/already-html-s004.html');
+      expect(withExt.sessionPageUrl).to.equal(url);
     });
 
     it('takes rfCode from the earliest sessionTime\'s externalSessionTimeId, "rf-" prefix stripped', () => {
@@ -376,6 +374,57 @@ describe('services/sessions/sessions-api', () => {
       expect(withMap.customAttributeValues).to.deep.equal({ 'attr-1': ['A'] });
       const [withoutMap] = normalizeSessions([{ id: 's-2' }]);
       expect(withoutMap.customAttributeValues).to.deep.equal({});
+    });
+
+    // The test harness runs with Milo env "local", so the non-prod branch is what applies here.
+    it('rewrites a prod-host session page URL to stage on a non-prod page', () => {
+      const [normalized] = normalizeSessions([{
+        id: 's-1', sessionPageUrl: 'https://www.adobe.com/max/2026/sessions/acom-test-1003-1',
+      }]);
+      expect(normalized.sessionPageUrl)
+        .to.equal('https://www.stage.adobe.com/max/2026/sessions/acom-test-1003-1');
+    });
+
+    it('preserves the path, query, and hash while swapping only the host', () => {
+      const [normalized] = normalizeSessions([{
+        id: 's-1', sessionPageUrl: 'https://www.adobe.com/max/2026/sessions/a-b?x=1#top',
+      }]);
+      expect(normalized.sessionPageUrl)
+        .to.equal('https://www.stage.adobe.com/max/2026/sessions/a-b?x=1#top');
+    });
+
+    it('leaves a root-relative or non-prod-host URL exactly as authored', () => {
+      const [relative] = normalizeSessions([{ id: 's-1', sessionPageUrl: '/sessions/mock-slug' }]);
+      expect(relative.sessionPageUrl).to.equal('/sessions/mock-slug');
+      const [other] = normalizeSessions([{ id: 's-2', sessionPageUrl: 'https://example.com/s' }]);
+      expect(other.sessionPageUrl).to.equal('https://example.com/s');
+    });
+
+    it('defaults a missing session page URL to an empty string', () => {
+      const [normalized] = normalizeSessions([{ id: 's-1' }]);
+      expect(normalized.sessionPageUrl).to.equal('');
+    });
+  });
+
+  describe('sessionPageUrlForEnv', () => {
+    const PROD_URL = 'https://www.adobe.com/max/2026/sessions/acom-test-1003-1';
+
+    it('leaves the prod host alone on a prod page', () => {
+      expect(sessionPageUrlForEnv(PROD_URL, true)).to.equal(PROD_URL);
+    });
+
+    it('swaps to the stage host on any non-prod page', () => {
+      expect(sessionPageUrlForEnv(PROD_URL, false))
+        .to.equal('https://www.stage.adobe.com/max/2026/sessions/acom-test-1003-1');
+    });
+
+    it('is a no-op for an empty URL, in either env', () => {
+      expect(sessionPageUrlForEnv('', false)).to.equal('');
+      expect(sessionPageUrlForEnv(undefined, true)).to.equal('');
+    });
+
+    it('returns an unparseable value untouched rather than throwing', () => {
+      expect(sessionPageUrlForEnv('not a url', false)).to.equal('not a url');
     });
   });
 

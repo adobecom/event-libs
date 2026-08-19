@@ -1,6 +1,26 @@
 import { constructRequestOptions } from '../../utils/esp-controller.js';
-import { getEventServiceEnv } from '../../utils/utils.js';
-import { ENV_MAP, MAX_EVENT_PAGES } from '../../utils/constances.js';
+import { getEventServiceEnv, getEventConfig } from '../../utils/utils.js';
+import { ENV_MAP, ADOBE_PROD_HOST, ADOBE_STAGE_HOST } from '../../utils/constances.js';
+
+// The session catalog returns each session's real page URL, but always on prod's host. Point
+// it at stage for any non-prod page, so a stage/local visitor isn't sent to production.
+// Keyed on Milo's page env rather than the ESP tier — same distinction, and same reason, as
+// session-store.js's defaultRfApiUrlForEnv(). Anything not an absolute prod-host URL (a
+// root-relative path, hand-authored data) is left exactly as it came in.
+export function sessionPageUrlForEnv(
+  url,
+  isProd = getEventConfig()?.miloConfig?.env?.name === 'prod',
+) {
+  if (!url || isProd) return url || '';
+  try {
+    const parsed = new URL(url);
+    if (parsed.hostname !== ADOBE_PROD_HOST) return url;
+    parsed.hostname = ADOBE_STAGE_HOST;
+    return parsed.toString();
+  } catch {
+    return url;
+  }
+}
 
 // TEMPORARY: disabled — every session in the real MAX26 catalog is currently a draft/test
 // row, so enforcing this today would hide the whole catalog. Flip to `true` once real,
@@ -49,7 +69,7 @@ export function normalizeSessions(rawSessions) {
     inPerson: Boolean(s.inPerson),
     isLivestreamed: Boolean(s.isLivestreamed),
     isOnline: Boolean(s.isOnline),
-    sessionPageUrl: s.sessionPageUrl || '',
+    sessionPageUrl: sessionPageUrlForEnv(s.sessionPageUrl),
     isKeynote: Boolean(s.isKeynote),
     thumbnailUrl: s.thumbnailUrl ?? null,
     customAttributeValues: s.customAttributeValues || {},
@@ -182,18 +202,14 @@ function buildCustomAttributeValueMap(session) {
   return map;
 }
 
-// `sessions[].url` is an internal drafts/staging link, not usable as a production page
-// URL — but its last path segment is exactly the slug we want.
+// `sessions[].url` already resolves to the session's real page (e.g.
+// https://www.adobe.com/max/2026/sessions/{slug}), so it's used as-is rather than rebuilt —
+// only its host needs adjusting per env, which normalizeSessions() handles. Its last path
+// segment is also exactly the slug we want.
 function slugFromUrl(url) {
   if (!url) return '';
   const segments = url.split('?')[0].split('#')[0].split('/').filter(Boolean);
   return (segments[segments.length - 1] || '').replace(/\.html$/, '');
-}
-
-// Rebuilt from the slug rather than taken from `sessions[].url` (see above). MAX 2026's
-// session pages live under /max/2026/sessions/, not the bare /sessions/ this used to emit.
-function sessionPageUrlFromSlug(slug) {
-  return slug ? `${MAX_EVENT_PAGES.sessionBase}${slug}.html` : '';
 }
 
 // `published: false` marks a draft/test row that must never reach real visitors once
@@ -265,7 +281,7 @@ export function mapEslPayloadToRawSessions(payload) {
       isOnline: formatValues.includes('Online'),
       videoAvailable: formatValues.includes('Online') || formatValues.includes('On demand, post event'),
       isLivestreamed: extractCustomAttributeValues(session, 'Livestreamed Content').includes('Live'),
-      sessionPageUrl: sessionPageUrlFromSlug(slug),
+      sessionPageUrl: session.url || '',
       isKeynote: type === 'Keynote',
       thumbnailUrl: thumbnail?.imageUrl ?? null,
       copyrightDisclaimer: extractCustomAttributeValue(session, ['Legal Disclaimer', 'LegalDisclaimer']) || undefined,
