@@ -112,6 +112,7 @@
 @media (min-width: 1280px) {
   .upcoming-sessions-controls {
     display: flex;
+    margin-right: var(--s2a-spacing-lg, 24px);
     flex-shrink: 0;
     align-items: center;
     gap: var(--s2a-spacing-md, 16px);
@@ -332,7 +333,12 @@
     align-items: flex-start;
     justify-content: space-between;
     gap: var(--s2a-spacing-xs, 8px);
-    margin-top: var(--s2a-spacing-md, 16px);
+    margin-top: auto;
+    padding-top: var(--s2a-spacing-md);
+    position: absolute;
+    left: var(--s2a-spacing-lg, 24px);
+    right: var(--s2a-spacing-lg, 24px);
+    bottom: var(--s2a-spacing-lg, 24px);
   }
 
   .upcoming-sessions .sg-card__track--footer {
