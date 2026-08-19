@@ -1,13 +1,19 @@
 /*
  * Description "More" Clamp (MWPW-203470). Mobile-first.
- * Collapsed to --desc-lines lines with a gradient fade-to-card, revealed by a
- * Show more/less toggle. No character-count truncation — line-based + fade so it
- * stays responsive. Desktop unclamp is added later.
+ * Collapsed to --desc-lines lines with a native line clamp, revealed by a Show
+ * more/less toggle. No character-count truncation — line-based, so it stays
+ * responsive.
+ *
+ * The clamp's automatic ellipsis is the "there's more" affordance. It replaced an
+ * earlier gradient fade-to-card: fading text that's otherwise legible pushes it
+ * under the 4.5:1 contrast minimum (WCAG 1.4.3), while the ellipsis renders at full
+ * contrast. Same pattern as profile-cards and sessions-hub.
+ *
+ * Desktop unclamp is added later.
  */
 
 .session-description {
   --desc-lines: 6; /* visible lines when collapsed */
-  --desc-fade-lines: 2; /* how many lines the fade spans */
 
   display: flex;
   flex-direction: column;
@@ -16,29 +22,24 @@
 }
 
 .session-description-text {
-  position: relative;
-  max-height: calc(var(--desc-lines) * 1lh);
   margin: 0;
   overflow: hidden;
   color: var(--s2a-color-gray-1000, #000);
   font-size: var(--s2a-font-size-16, 1rem);
   line-height: 1.3;
-}
+  line-clamp: var(--desc-lines);
 
-/* Gradient fade over the last lines — only while clamped (overflowing). */
-.session-description.is-clamped:not(.is-expanded) .session-description-text::after {
-  content: '';
-  position: absolute;
-  inset-inline: 0;
-  bottom: 0;
-  height: calc(var(--desc-fade-lines) * 1lh);
-  background: linear-gradient(transparent, var(--s2a-color-gray-25, #fff));
-  pointer-events: none;
+  /* stylelint-disable-next-line value-no-vendor-prefix -- Safari needs -webkit-box for line clamp */
+  display: -webkit-box;
+  -webkit-line-clamp: var(--desc-lines);
+  -webkit-box-orient: vertical;
 }
 
 .session-description.is-expanded .session-description-text {
-  max-height: none;
+  display: block;
   overflow: visible;
+  line-clamp: unset;
+  -webkit-line-clamp: unset;
 }
 
 .session-description-toggle {

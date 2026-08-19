@@ -40,7 +40,10 @@
   justify-content: space-between;
   gap: var(--s2a-spacing-16, 16px);
   padding: var(--s2a-spacing-16, 16px);
-  border: 1px solid var(--s2a-color-gray-200, #e1e1e1);
+
+  /* gray-500 is the lightest step in the ramp that clears WCAG 1.4.11 (3:1) for a
+     UI component boundary — gray-400 #c6c6c6 is only 1.71:1. */
+  border: 1px solid var(--s2a-color-gray-500, #8f8f8f);
   border-radius: var(--s2a-border-radius-16, 16px);
   color: var(--s2a-color-gray-1000, #000);
   font-size: var(--s2a-font-size-16, 1rem);
