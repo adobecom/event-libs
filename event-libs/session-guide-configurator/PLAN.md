@@ -88,9 +88,11 @@ there:**
   no need to open it in the editor first).
 
 **Current contract — the link is a round trip:**
-- **Payload lives in the hash**, `#sgConfig={base64}`. DA forwards only the parent page's
-  hash into an app iframe, so a `?sgConfig=` link could be pasted onto a page but could
-  never re-open itself in the app. `decorate.js` reads both, so older links still decode.
+- **Payload lives in the hash**, `#sgConfig={base64}`, matching `#schedule=` and
+  `#tecHomepage=`. DA's app shell (`da.live/nx/blocks/shell/shell.js`) forwards both the
+  search and the hash into the iframe, so a query param would reach the app too — the hash
+  just keeps a multi-KB payload out of the query string the shell reads `ref` from.
+  `decorate.js` reads both, so older `?sgConfig=` links still decode.
 - **Target is the consolidated Event Configurator page**, since Session Guide Config is a
   tab there rather than its own tool. `TierOneEventConfigurator.js` opens on that tab when
   the hash carries a payload; `SessionGuideConfigurator.js` opens the config and clears the

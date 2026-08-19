@@ -6,9 +6,10 @@ const CONFIGS_SHEET_PATH = '/tools/da-apps/session-guide-configurator/configs.js
 const DA_ORIGIN = 'https://da.live';
 const DA_APP_PATH = 'tools/da-apps/tier-1-event-configurator';
 
-// Key the copied link's base64 payload lives under, in the URL *hash*: DA forwards only the
-// parent page's hash into an app iframe, never query params, so a `?sgConfig=` link could
-// never re-open itself here. decorate.js's auto-block builder reads the same key.
+// Key the copied link's base64 payload lives under, in the URL hash. DA's app shell forwards
+// both the search and the hash into the iframe, so either would reach us; the hash keeps a
+// multi-KB payload out of the query string the shell also reads `ref` from, and matches
+// Schedule Maker's `#schedule=`. decorate.js's auto-block builder reads the same key.
 const CONFIG_LINK_HASH_KEY = 'sgConfig';
 
 const PAGES = {

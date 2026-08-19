@@ -30,7 +30,7 @@ describe('session-guide-configurator utils', () => {
       expect(url.pathname).to.equal('/app/myorg/myrepo/tools/da-apps/tier-1-event-configurator');
     });
 
-    it('puts the payload in the hash, not a query param — DA only forwards the hash', () => {
+    it('puts the payload in the hash, matching #schedule= and #tecHomepage=', () => {
       const url = new URL(createSessionGuideConfigURL(makeRow(), 'o', 'r'));
       expect(url.hash).to.match(/^#sgConfig=/);
       expect(url.searchParams.get('sgConfig')).to.equal(null);
