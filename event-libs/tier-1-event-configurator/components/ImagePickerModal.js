@@ -4,7 +4,7 @@ import {
 import Modal from './Modal.js';
 import LoadingInline from './LoadingInline.js';
 import { useDA } from '../context/DAContext.js';
-import { listFolder, uploadMedia, getContentUrl } from '../scripts/da-controller.js';
+import { listFolder, uploadMedia, getAemLiveUrl } from '../scripts/da-controller.js';
 
 const IMAGE_EXT_PATTERN = /^(jpe?g|png|gif|webp|svg)$/i;
 
@@ -120,7 +120,7 @@ export default function ImagePickerModal({ isOpen, onClose, onUploaded }) {
   }, [isOpen, org, repo, phase, selectedFolderPath]);
 
   const handleSelectExisting = (item) => {
-    onUploaded(getContentUrl(item.path));
+    onUploaded(getAemLiveUrl(org, repo, item.path));
   };
 
   const resetToRoot = () => {
@@ -305,7 +305,7 @@ export default function ImagePickerModal({ isOpen, onClose, onUploaded }) {
                   title=${getItemName(item.path)}
                   onClick=${() => handleSelectExisting(item)}
                 >
-                  <img src=${getContentUrl(item.path)} alt=${getItemName(item.path)} loading="lazy" />
+                  <img src=${getAemLiveUrl(org, repo, item.path)} alt=${getItemName(item.path)} loading="lazy" />
                   <span class="tec-fb-image-thumb-name">${getItemName(item.path)}</span>
                 </button>
               `)}

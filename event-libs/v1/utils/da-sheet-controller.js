@@ -233,6 +233,16 @@ export function getContentUrl(itemPath) {
   return `${CONTENT_DA_ORIGIN}${itemPath}`;
 }
 
+// content.da.live (getContentUrl above) requires a Bearer-token Authorization header, which a
+// plain <img> tag can never send — so it 401s unconditionally, session or no session. This is
+// the CDN-served, unauthenticated equivalent for displaying/reusing an image that already lives
+// in DA. `itemPath` is the full DA listing path (still prefixed with /org/repo, as returned by
+// listFolder), matching the org/repo passed in.
+export function getAemLiveUrl(org, repo, itemPath) {
+  const relativePath = itemPath.replace(`/${org}/${repo}`, '');
+  return `https://main--${repo}--${org}.aem.live${relativePath}`;
+}
+
 // Lists the folders and files directly inside `path` (not recursive), folders first.
 export async function listFolder(org, repo, path) {
   if (hasUnsafePathSegment(path)) return { ok: false, status: 400, error: 'Invalid path' };
@@ -250,7 +260,8 @@ export async function listFolder(org, repo, path) {
 // no explicit folder-creation call, a folder becomes real the moment a file lands in it) as
 // multipart form data, matching the upload convention documented in
 // .claude/skills/build-content-from-figma/SKILL.md (POST .../source/... with a `data` field
-// carrying the file blob). Returns the public content.da.live URL the image is served from.
+// carrying the file blob). Returns the public aem.live URL the image is served from — that CDN
+// serves unauthenticated, unlike content.da.live which requires a DA session.
 export async function uploadMedia(org, repo, path, file) {
   if (hasUnsafePathSegment(path)) return { ok: false, status: 400, error: 'Invalid path' };
   // file.name comes from the native file picker, not app-controlled navigation — a stray
@@ -280,5 +291,11 @@ export async function uploadMedia(org, repo, path, file) {
     window.lana?.log(`DA uploadMedia error ${resp.status}: ${url} — ${error}`);
     return { ok: false, status: resp.status, error };
   }
-  return { ok: true, status: resp.status, url: getContentUrl(`/${org}/${repo}${normalizedPath}/${encodedName}`) };
+  const body = await resp.json().catch(() => null);
+  const liveUrl = body?.aem?.liveUrl;
+  if (!liveUrl) {
+    window.lana?.log(`DA uploadMedia: missing aem.liveUrl in response — ${url}`);
+    return { ok: false, status: resp.status, error: 'Missing aem.liveUrl in upload response' };
+  }
+  return { ok: true, status: resp.status, url: liveUrl };
 }
