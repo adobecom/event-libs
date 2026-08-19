@@ -70,6 +70,15 @@ a.con-button.no-event {
   .section.grid.row-gap-xl { row-gap: var(--s2a-spacing-32, 32px); }
   .section.grid.row-gap-xxl { row-gap: var(--s2a-spacing-40, 40px); }
   .section.grid.row-gap-xxxl { row-gap: var(--s2a-spacing-48, 48px); }
+
+  .section.container-desktop {
+    --grid-max-width: var(--grid-max-width-default, 1920px);
+    --grid-content-width: var(--grid-max-width);
+
+    width: auto;
+    max-width: none;
+    padding-inline: max(var(--grid-margin-width, 24px), calc((100% - var(--grid-content-width)) / 2));
+  }
 }
 
 @media (min-width: 768px) and (max-width: 1023px) {

@@ -107,4 +107,20 @@ describe('section grid layout (CSS)', () => {
     expect(getComputedStyle(background).gridColumnStart).to.equal('auto');
     expect(getComputedStyle(document.getElementById('a')).gridColumnStart).to.equal('1');
   });
+
+  it('caps .section.container-desktop width at the same breakpoint the grid stops being single-column', () => {
+    document.body.innerHTML = `
+      <main style="width: 1400px">
+        <div class="section container-desktop" id="capped"></div>
+        <div class="section" id="plain"></div>
+      </main>
+    `;
+
+    const capped = getComputedStyle(document.getElementById('capped'));
+    const plain = getComputedStyle(document.getElementById('plain'));
+
+    expect(capped.maxWidth).to.equal('none');
+    expect(parseFloat(capped.paddingLeft)).to.be.greaterThan(0);
+    expect(parseFloat(plain.paddingLeft)).to.equal(0);
+  });
 });
