@@ -92,4 +92,19 @@ describe('section grid layout (CSS)', () => {
     expect(col2.height).to.equal(200);
     expect(col1.bottom).to.be.lessThan(col2.bottom);
   });
+
+  it('excludes the section-background element from the default grid-column assignment', () => {
+    document.body.innerHTML = `
+      <main>
+        <div class="section grid grid-tablet-2-1">
+          <picture class="section-background"></picture>
+          <div id="a" style="height:40px"></div>
+        </div>
+      </main>
+    `;
+
+    const background = document.querySelector('.section-background');
+    expect(getComputedStyle(background).gridColumnStart).to.equal('auto');
+    expect(getComputedStyle(document.getElementById('a')).gridColumnStart).to.equal('1');
+  });
 });

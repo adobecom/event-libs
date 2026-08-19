@@ -15,23 +15,6 @@
   background: var(--s2a-color-gray-25, #fff);
 }
 
-main:has(.event-session-details) {
-  padding: var(--s2a-spacing-16, 16px);
-  background: var(--s2a-color-gray-75, #f3f3f3);
-}
-
-@media (min-width: 768px) {
-  main:has(.event-session-details) {
-    padding-inline: var(--s2a-spacing-40, 40px);
-  }
-}
-
-@media (min-width: 1024px) {
-  main:has(.event-session-details) {
-    padding-inline: max(8%, (100% - 1470px) / 2);
-  }
-}
-
 /* Eyebrow: track tags then state-driven status, flush left, split by a pipe. */
 .session-eyebrow {
   display: flex;

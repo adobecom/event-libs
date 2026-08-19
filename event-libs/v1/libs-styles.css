@@ -40,7 +40,7 @@ a.con-button.no-event {
     row-gap: var(--s2a-spacing-lg, 24px);
   }
 
-  .section.grid > * { grid-column: 1; }
+  .section.grid > *:not(.section-background) { grid-column: 1; }
   .section.grid > .grid-col-1 { grid-column: 1; }
   .section.grid > .grid-col-2 { grid-column: 2; }
 
