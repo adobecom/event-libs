@@ -11,8 +11,9 @@ block already applies to the section and Milo already applies to block variants.
 **A section only splits into columns at a breakpoint where you've explicitly picked a
 ratio for that breakpoint.** With no ratio class at all, a `grid` section renders
 identically to a normal stacked section at every width — full-width blocks, source
-order. This means mobile never splits (there's no mobile ratio class), and tablet only
-splits if you add a `grid-tablet-*` class, independently of whether desktop splits.
+order. This means mobile never splits (there's no mobile ratio class), and tablet,
+laptop, and desktop each only split if you add their own `grid-tablet-*` /
+`grid-laptop-*` / `grid-desktop-*` class, independently of the others.
 
 ## Authoring
 
@@ -60,21 +61,26 @@ tier stays stacked unless it also gets a ratio class.
 | `1-3` / `3-1` | 1:3 / 3:1 |
 | `10-90` … `90-10` (steps of 10, e.g. `30-70`, `40-60`, `50-50`, `70-30`) | Any 10%-increment split |
 
-Prefix with `grid-tablet-` for `768–1023px` or `grid-desktop-` for `≥1024px`, e.g.
-`grid-tablet-1-1`, `grid-desktop-30-70`. Author either or both independently — for
-example `grid-desktop-2-1` alone keeps the section stacked through tablet and only
-splits 2:1 at desktop, which is the common "stack on tablet, split on desktop" pattern.
-You can also author *different* ratios for each tier, since the two classes are gated
-to mutually exclusive breakpoints and never conflict — e.g. `grid-tablet-90-10,
-grid-desktop-70-30` stays nearly full-width through tablet, then opens the secondary
-column up further at desktop.
+Prefix with `grid-tablet-` for `768–1023px`, `grid-laptop-` for `1024–1439px`, or
+`grid-desktop-` for `≥1440px`, e.g. `grid-tablet-1-1`, `grid-laptop-30-70`,
+`grid-desktop-60-40`. Author any subset of the three independently — for example
+`grid-desktop-2-1` alone keeps the section stacked through tablet and laptop and only
+splits 2:1 at desktop, which is the common "stack until the widest tier, split there"
+pattern.
+
+You can also author *different* ratios per tier, since the three classes are gated to
+mutually exclusive breakpoints and never conflict — e.g. `grid-tablet-90-10,
+grid-laptop-70-30, grid-desktop-50-50` stays nearly full-width through tablet, opens up
+further at laptop, and reaches an even split at desktop.
 
 **5. Move a block to a different column at a different breakpoint (optional)** — add
-`grid-col-1-tablet` / `grid-col-2-tablet` or `grid-col-1-desktop` / `grid-col-2-desktop`
-alongside (or instead of) the base `grid-col-1` / `grid-col-2`. The breakpoint-specific
-class overrides the base assignment only at that breakpoint (and only matters once that
-breakpoint has an active ratio). The same pattern exists for order: `grid-order-1-tablet`
-… `grid-order-6-tablet`, `grid-order-1-desktop` … `grid-order-6-desktop`.
+`grid-col-1-tablet` / `grid-col-2-tablet`, `grid-col-1-laptop` / `grid-col-2-laptop`, or
+`grid-col-1-desktop` / `grid-col-2-desktop` alongside (or instead of) the base
+`grid-col-1` / `grid-col-2`. The breakpoint-specific class overrides the base assignment
+only at that breakpoint (and only matters once that breakpoint has an active ratio). The
+same pattern exists for order: `grid-order-1-tablet` … `grid-order-6-tablet`,
+`grid-order-1-laptop` … `grid-order-6-laptop`, `grid-order-1-desktop` …
+`grid-order-6-desktop`.
 
 **6. Configure spacing (optional)** — `column-gap` and `row-gap` each default to
 `var(--s2a-spacing-lg, 24px)` once the section is `grid`, and are independently
@@ -176,8 +182,13 @@ fragments specifically where a column needs to be immune to the other column's h
 - `event-libs/v1/libs-styles.css` — all the `grid`, `grid-col-*`, `grid-order-*`,
   `col-gap-*`/`row-gap-*`, and ratio rules. The base rule (`display: grid`, gaps) is
   gated `@media (min-width: 768px)`; ratio classes are further gated to their own
-  breakpoint tier (`768–1023px` or `≥1024px`) so a tablet ratio never leaks into
-  desktop or vice versa.
+  breakpoint tier (`768–1023px` tablet, `1024–1439px` laptop, or `≥1440px` desktop) so a
+  ratio picked for one tier never leaks into another.
+- Same file — `.section.container-desktop`, a `style` value that caps and centers a
+  section's width from `768px` up (the same breakpoint the grid stops being a single
+  column), and the global `.mobile-only` / `.desktop-only` visibility utilities
+  (`display: none` below `768px` / at `768px` and up respectively) — usable on any
+  element, not just `.section`.
 - `event-libs/v1/blocks/grid-column/` and `event-libs/v1/c2/blocks/grid-column/` — the
   fragment-wrapper block for true masonry columns (one copy per foundation, matching the
   existing `chrono-box`/`mobile-rider` precedent of per-foundation block copies). Its

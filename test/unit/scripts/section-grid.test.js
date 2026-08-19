@@ -124,10 +124,10 @@ describe('section grid layout (CSS)', () => {
     expect(parseFloat(plain.paddingLeft)).to.equal(0);
   });
 
-  it('applies a different ratio per breakpoint when both are authored on the same section', () => {
+  it('applies a different ratio per breakpoint when several are authored on the same section', () => {
     document.body.innerHTML = `
       <main style="width: 900px">
-        <div class="section grid grid-tablet-90-10 grid-desktop-70-30" id="s">
+        <div class="section grid grid-tablet-90-10 grid-laptop-70-30 grid-desktop-50-50" id="s">
           <div class="grid-col-1" id="a" style="height:40px"></div>
           <div class="grid-col-2" id="b" style="height:40px"></div>
         </div>
@@ -138,11 +138,50 @@ describe('section grid layout (CSS)', () => {
       .trim().split(/\s+/).map(parseFloat);
     const ratio = cols[0] / cols[1];
 
-    if (window.matchMedia('(min-width: 1024px)').matches) {
+    if (window.matchMedia('(min-width: 1440px)').matches) {
+      expect(ratio).to.be.closeTo(1, 0.1);
+    } else if (window.matchMedia('(min-width: 1024px) and (max-width: 1439px)').matches) {
       expect(ratio).to.be.closeTo(7 / 3, 0.3);
     } else {
       expect(window.matchMedia('(min-width: 768px) and (max-width: 1023px)').matches).to.be.true;
       expect(ratio).to.be.closeTo(9, 0.5);
     }
+  });
+
+  function findMediaRule(conditionText) {
+    const { cssRules } = document.getElementById('event-libs-styles').sheet;
+    return [...cssRules].find((rule) => rule.media && rule.conditionText === conditionText);
+  }
+
+  it('scopes grid-laptop-* to 1024–1439px and grid-desktop-* to 1440px and up', () => {
+    const laptop = findMediaRule('(min-width: 1024px) and (max-width: 1439px)');
+    const desktop = findMediaRule('(min-width: 1440px)');
+
+    expect(laptop, 'laptop tier media rule').to.exist;
+    expect(desktop, 'desktop tier media rule').to.exist;
+    expect([...laptop.cssRules].some((r) => r.selectorText === '.section.grid.grid-laptop-70-30')).to.be.true;
+    expect([...desktop.cssRules].some((r) => r.selectorText === '.section.grid.grid-desktop-70-30')).to.be.true;
+    expect([...laptop.cssRules].some((r) => r.selectorText === '.section.grid.grid-desktop-70-30')).to.be.false;
+    expect([...desktop.cssRules].some((r) => r.selectorText === '.section.grid.grid-laptop-70-30')).to.be.false;
+  });
+
+  it('hides .desktop-only below 768px and .mobile-only at 768px and up', () => {
+    const mobile = findMediaRule('(max-width: 767px)');
+    const notMobile = findMediaRule('(min-width: 768px)');
+
+    expect(mobile, 'mobile-range media rule').to.exist;
+    expect(notMobile, 'non-mobile-range media rule').to.exist;
+    expect([...mobile.cssRules].some((r) => r.selectorText === '.desktop-only' && r.style.display === 'none')).to.be.true;
+    expect([...notMobile.cssRules].some((r) => r.selectorText === '.mobile-only' && r.style.display === 'none')).to.be.true;
+  });
+
+  it('shows .mobile-only and hides .desktop-only at the current (non-mobile) test viewport', () => {
+    document.body.innerHTML = `
+      <div class="mobile-only" id="mo">mobile</div>
+      <div class="desktop-only" id="do">desktop</div>
+    `;
+
+    expect(getComputedStyle(document.getElementById('mo')).display).to.equal('none');
+    expect(getComputedStyle(document.getElementById('do')).display).to.not.equal('none');
   });
 });

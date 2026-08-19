@@ -31,7 +31,13 @@ a.con-button.no-event {
   opacity: 0.5;
 }
 
+@media (max-width: 767px) {
+  .desktop-only { display: none; }
+}
+
 @media (min-width: 768px) {
+  .mobile-only { display: none; }
+
   .section.grid {
     display: grid;
     grid-auto-flow: dense;
@@ -108,7 +114,34 @@ a.con-button.no-event {
   .section.grid > .grid-order-6-tablet { order: 6; }
 }
 
-@media (min-width: 1024px) {
+@media (min-width: 1024px) and (max-width: 1439px) {
+  .section.grid.grid-laptop-1-1 { grid-template-columns: 1fr 1fr; }
+  .section.grid.grid-laptop-1-2 { grid-template-columns: 1fr 2fr; }
+  .section.grid.grid-laptop-2-1 { grid-template-columns: 2fr 1fr; }
+  .section.grid.grid-laptop-1-3 { grid-template-columns: 1fr 3fr; }
+  .section.grid.grid-laptop-3-1 { grid-template-columns: 3fr 1fr; }
+  .section.grid.grid-laptop-10-90 { grid-template-columns: 1fr 9fr; }
+  .section.grid.grid-laptop-20-80 { grid-template-columns: 2fr 8fr; }
+  .section.grid.grid-laptop-30-70 { grid-template-columns: 3fr 7fr; }
+  .section.grid.grid-laptop-40-60 { grid-template-columns: 4fr 6fr; }
+  .section.grid.grid-laptop-50-50 { grid-template-columns: 5fr 5fr; }
+  .section.grid.grid-laptop-60-40 { grid-template-columns: 6fr 4fr; }
+  .section.grid.grid-laptop-70-30 { grid-template-columns: 7fr 3fr; }
+  .section.grid.grid-laptop-80-20 { grid-template-columns: 8fr 2fr; }
+  .section.grid.grid-laptop-90-10 { grid-template-columns: 9fr 1fr; }
+
+  .section.grid > .grid-col-1-laptop { grid-column: 1; }
+  .section.grid > .grid-col-2-laptop { grid-column: 2; }
+
+  .section.grid > .grid-order-1-laptop { order: 1; }
+  .section.grid > .grid-order-2-laptop { order: 2; }
+  .section.grid > .grid-order-3-laptop { order: 3; }
+  .section.grid > .grid-order-4-laptop { order: 4; }
+  .section.grid > .grid-order-5-laptop { order: 5; }
+  .section.grid > .grid-order-6-laptop { order: 6; }
+}
+
+@media (min-width: 1440px) {
   .section.grid.grid-desktop-1-1 { grid-template-columns: 1fr 1fr; }
   .section.grid.grid-desktop-1-2 { grid-template-columns: 1fr 2fr; }
   .section.grid.grid-desktop-2-1 { grid-template-columns: 2fr 1fr; }
