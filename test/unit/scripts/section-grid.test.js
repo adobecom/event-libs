@@ -165,31 +165,42 @@ describe('section grid layout (CSS)', () => {
     expect([...desktop.cssRules].some((r) => r.selectorText === '.section.grid.grid-laptop-70-30')).to.be.false;
   });
 
-  it('hides .desktop-only below 768px and .mobile-only at 768px and up', () => {
-    const mobile = findMediaRule('(max-width: 767px)');
-    const notMobile = findMediaRule('(min-width: 768px)');
+  it('scopes tablet-up/-down, laptop-up/-down, and desktop-up/-down to the right side of each breakpoint, with !important', () => {
+    const belowTablet = findMediaRule('(max-width: 767px)');
+    const atOrAboveTablet = findMediaRule('(min-width: 768px)');
+    const belowLaptop = findMediaRule('(max-width: 1023px)');
+    const atOrAboveLaptop = findMediaRule('(min-width: 1024px)');
+    const belowDesktop = findMediaRule('(max-width: 1439px)');
+    const atOrAboveDesktop = findMediaRule('(min-width: 1440px)');
 
-    expect(mobile, 'mobile-range media rule').to.exist;
-    expect(notMobile, 'non-mobile-range media rule').to.exist;
-
-    const desktopOnly = [...mobile.cssRules].find((r) => r.selectorText === '.desktop-only');
-    const mobileOnly = [...notMobile.cssRules].find((r) => r.selectorText === '.mobile-only');
-
-    expect(desktopOnly, '.desktop-only rule').to.exist;
-    expect(mobileOnly, '.mobile-only rule').to.exist;
-    expect(desktopOnly.style.display).to.equal('none');
-    expect(desktopOnly.style.getPropertyPriority('display')).to.equal('important');
-    expect(mobileOnly.style.display).to.equal('none');
-    expect(mobileOnly.style.getPropertyPriority('display')).to.equal('important');
+    [
+      [belowTablet, '.tablet-up'],
+      [atOrAboveTablet, '.tablet-down'],
+      [belowLaptop, '.laptop-up'],
+      [atOrAboveLaptop, '.laptop-down'],
+      [belowDesktop, '.desktop-up'],
+      [atOrAboveDesktop, '.desktop-down'],
+    ].forEach(([mediaRule, selector]) => {
+      expect(mediaRule, `${selector} media rule`).to.exist;
+      const rule = [...mediaRule.cssRules].find((r) => r.selectorText === selector);
+      expect(rule, `${selector} rule`).to.exist;
+      expect(rule.style.display).to.equal('none');
+      expect(rule.style.getPropertyPriority('display')).to.equal('important');
+    });
   });
 
-  it('shows .mobile-only and hides .desktop-only at the current (non-mobile) test viewport, even when another rule sets display', () => {
+  it('combines tablet-up + laptop-down to isolate the tablet range, even against another rule setting display', () => {
+    expect(window.innerWidth, 'test viewport must be in the tablet range for this test to be meaningful')
+      .to.be.within(768, 1023);
+
     document.body.innerHTML = `
-      <div class="mobile-only" id="mo" style="display: flex">mobile</div>
-      <div class="desktop-only" id="do" style="display: flex">desktop</div>
+      <div class="tablet-up laptop-down" id="tabletOnly" style="display: flex">tablet only</div>
+      <div class="tablet-down" id="mobileOnly">mobile only</div>
+      <div class="laptop-up" id="laptopUp">laptop and up</div>
     `;
 
-    expect(getComputedStyle(document.getElementById('mo')).display).to.equal('none');
-    expect(getComputedStyle(document.getElementById('do')).display).to.equal('flex');
+    expect(getComputedStyle(document.getElementById('tabletOnly')).display).to.equal('flex');
+    expect(getComputedStyle(document.getElementById('mobileOnly')).display).to.equal('none');
+    expect(getComputedStyle(document.getElementById('laptopUp')).display).to.equal('none');
   });
 });

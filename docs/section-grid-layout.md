@@ -186,9 +186,15 @@ fragments specifically where a column needs to be immune to the other column's h
   ratio picked for one tier never leaks into another.
 - Same file — `.section.container-desktop`, a `style` value that caps and centers a
   section's width from `768px` up (the same breakpoint the grid stops being a single
-  column), and the global `.mobile-only` / `.desktop-only` visibility utilities
-  (`display: none` below `768px` / at `768px` and up respectively) — usable on any
-  element, not just `.section`.
+  column), and six global responsive visibility utilities, usable on any element (not
+  just `.section`): `tablet-up` / `tablet-down`, `laptop-up` / `laptop-down`, and
+  `desktop-up` / `desktop-down`. Each is named after where a tier *starts* (`768px` for
+  tablet, `1024px` for laptop, `1440px` for desktop) — `-up` hides below that start line,
+  `-down` hides at and above it — so `display: none !important` always wins over another
+  rule's `display`. Combine them to build any range: `tablet-up` alone hides mobile only;
+  `tablet-up` + `laptop-down` together show an element *only* in the tablet range
+  (`768–1023px`); `laptop-up` + `desktop-down` shows laptop-only (`1024–1439px`); and so
+  on.
 - `event-libs/v1/blocks/grid-column/` and `event-libs/v1/c2/blocks/grid-column/` — the
   fragment-wrapper block for true masonry columns (one copy per foundation, matching the
   existing `chrono-box`/`mobile-rider` precedent of per-foundation block copies). Its
