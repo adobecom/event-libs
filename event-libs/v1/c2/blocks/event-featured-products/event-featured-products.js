@@ -14,6 +14,7 @@
  */
 import { createTag } from '../../../utils/utils.js';
 import { getAttrValues } from '../../utils/custom-attributes.js';
+import { readBackgroundConfig } from '../../utils/background-config.js';
 import { getProduct, initTierOneEventConfig } from '../../../utils/tier-1-event-config.js';
 import { fetchFederalProductIcon } from '../../../features/icons/federal-icons.js';
 
@@ -47,11 +48,14 @@ async function paintProductIcon(slot, iconName) {
 }
 
 export default async function init(el) {
+  const background = readBackgroundConfig(el);
+
   // Ensure the configurator config is loaded before getProduct reads it.
   initTierOneEventConfig();
 
   const products = getAttrValues('Product').map((v) => v.label).filter(Boolean);
   el.replaceChildren();
+  if (background) el.style.background = background;
   if (!products.length) return;
 
   const title = createTag('h2', { class: 'featured-products-title' }, 'Featured products ');

@@ -9,6 +9,7 @@
  */
 import { createTag, getMetadata } from '../../../utils/utils.js';
 import { initTierOneEventConfig } from '../../../utils/tier-1-event-config.js';
+import { readBackgroundConfig } from '../../utils/background-config.js';
 import { renderTrackTags } from './track-tags.js';
 import { renderGdprCopy, renderClosedCaption, renderLegalDisclaimer } from './disclaimer-cc-legal.js';
 import { renderDescriptionClamp } from './description-clamp.js';
@@ -18,7 +19,9 @@ import { renderFavorite } from './favorite.js';
 import { mountSessionState } from './session-state-view.js';
 
 export default async function init(el) {
+  const background = readBackgroundConfig(el);
   el.replaceChildren();
+  if (background) el.style.background = background;
 
   // Ensure the Tier 1 Event Configurator config is loaded before any sub-feature
   // reads it (getTrackIcon). Idempotent — no-ops if decorateEvent already ran it.

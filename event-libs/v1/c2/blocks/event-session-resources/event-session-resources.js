@@ -12,6 +12,7 @@
  */
 import { createTag } from '../../../utils/utils.js';
 import { getJsonMetadata } from '../../utils/custom-attributes.js';
+import { readBackgroundConfig } from '../../utils/background-config.js';
 
 const MOBILE_LIMIT = 2;
 const DOWNLOADABLE = /\.(pdf|zip|pptx?|docx?|xlsx?|key|psd|ai|indd|mp4|mov)(\?|$)/i;
@@ -24,12 +25,14 @@ const ctaLabel = (m) => (DOWNLOADABLE.test(m.fileURL || '') ? 'Download' : 'Open
 let instances = 0;
 
 export default async function init(el) {
+  const background = readBackgroundConfig(el);
   const materials = getJsonMetadata('material-list', []);
   const published = Array.isArray(materials)
     ? materials.filter((m) => m && m.published !== false && m.fileURL)
     : [];
 
   el.replaceChildren();
+  if (background) el.style.background = background;
   el.append(createTag('h2', { class: 'session-resources-title' }, 'Session resources'));
 
   if (!published.length) {
