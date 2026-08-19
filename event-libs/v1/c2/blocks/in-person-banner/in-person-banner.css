@@ -5,6 +5,14 @@
   width: 100%;
 }
 
+/* Authored via `below-nav: true` — clears the sticky GNAV header when a banner is
+   placed at the very top of the page. Reads GNAV's own --global-height-nav (see
+   header.global-navigation) rather than hardcoding 80px, so this stays correct if
+   GNAV's height ever changes; 80px is only a fallback if that variable isn't set. */
+.in-person-banner.in-person-banner-below-nav {
+  margin-top: var(--global-height-nav, 80px);
+}
+
 .in-person-banner-inner {
   position: relative;
   display: flex;
@@ -17,6 +25,7 @@
   margin: 0 auto;
   padding: var(--s2a-spacing-md) 64px;
   background: var(--s2a-color-background-default);
+  color: var(--s2a-color-content-default);
   font-family: var(--s2a-font-family-default);
 }
 

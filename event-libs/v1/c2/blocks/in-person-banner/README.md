@@ -24,26 +24,35 @@ per instance — never inherited from the page's own theme.
 | In-Person Banner (dark) |  |
 | --- | --- |
 | banner-id | in-person-2026 |
-| rf-data-check | true |
-| Registered for in-person MAX? Find detailed information on your [attendee dashboard](https://...). |  |
+| rf-data-check | on |
+| below-nav | true |
+| message | Registered for in-person MAX? Find detailed information on your [attendee dashboard](https://...). |
 ```
 
-- **Row 1 (optional) — config.** Key/value pairs, same shape Section Metadata rows
-  use elsewhere in this repo:
-  - `banner-id` — **required for dismiss to work**. A stable string identifying this
-    banner instance. Dismissing a banner is remembered per `banner-id` (see Dismiss
-    below) — reusing the same id across multiple placements treats them as "the same
-    banner" for dismiss purposes on purpose; give each independently-dismissible
-    banner its own id.
-  - `rf-data-check` — `true` to gate visibility on in-person registration (see below),
-    `false` or omitted to show unconditionally to everyone.
-- **Last row (required) — copy.** Rich content, same authoring conventions as any
-  other block (links via markdown, bold/italic, etc.) — no new authoring paradigm.
+Config rows are labeled key/value pairs (label in column 1, value in column 2). The
+copy itself can be authored either as an explicit `message` row (shown above) **or**
+as a bare, unlabeled row with no label cell — both are supported, so authors don't
+need to remember which shape to use:
 
-If `banner-id`/`rf-data-check` aren't authored as a config row, `init()` falls back to
-page-level metadata of the same name (`getMetadata('banner-id')`/
-`getMetadata('rf-data-check')`), so a page-wide default can be set once instead of
-repeating it on every instance.
+- `banner-id` — **required for dismiss to work**. A stable string identifying this
+  banner instance. Dismissing a banner is remembered per `banner-id` (see Dismiss
+  below) — reusing the same id across multiple placements treats them as "the same
+  banner" for dismiss purposes on purpose; give each independently-dismissible
+  banner its own id.
+- `rf-data-check` — truthy (`true`/`on`/`yes`) to gate visibility on in-person
+  registration (see below); anything else (or omitted) shows unconditionally to
+  everyone.
+- `below-nav` — truthy (`true`/`on`/`yes`) when this banner is placed at the very top
+  of the page, so it needs a top offset to clear the sticky GNAV header instead of
+  rendering underneath it. Omit (or `false`) for any other placement — see Layout
+  below for why this isn't automatic.
+- `message` — **required** (whether authored under this label or as a bare row).
+  Rich content, same authoring conventions as any other block (links via markdown,
+  bold/italic, etc.) — no new authoring paradigm.
+
+If `banner-id`/`rf-data-check`/`below-nav` aren't authored as a row, `init()` falls
+back to page-level metadata of the same name (`getMetadata('banner-id')`, etc.), so a
+page-wide default can be set once instead of repeating it on every instance.
 
 ## RF-gated visibility
 
@@ -87,4 +96,8 @@ exists for this.
 - Mobile (`max-width: 767px`): copy left-aligns and the `×` sits at the top-right of a
   taller, stacked layout, matching the Figma mobile frames.
 - No fixed placement — the block behaves the same regardless of where an author puts
-  it on the page (top of page, below nav, mid-page, etc.).
+  it on the page (top of page, below nav, mid-page, etc.). The one exception: a
+  banner placed at the very top of the page can render underneath the sticky GNAV
+  header, since this generic block has no way to detect GNAV's own height on its
+  own — that's what the `below-nav` config row opts into (reads GNAV's own
+  `--global-height-nav`, falling back to `80px` if that variable isn't set).

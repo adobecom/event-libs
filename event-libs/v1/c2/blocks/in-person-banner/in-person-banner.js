@@ -1,7 +1,10 @@
 import { createTag, getMetadata } from '../../../utils/utils.js';
 
 const DISMISSED_STORAGE_KEY = 'in-person-banner:dismissed';
-const CLOSE_ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M8.84849 8.0001L13.0137 3.83526C13.248 3.60088 13.248 3.22119 13.0137 2.98682C12.7793 2.75244 12.3996 2.75244 12.1652 2.98682L8 7.15166L3.83477 2.98682C3.60039 2.75244 3.2207 2.75244 2.98633 2.98682C2.75195 3.22119 2.75195 3.60088 2.98633 3.83526L7.15151 8.0001L2.98633 12.1649C2.75195 12.3993 2.75195 12.779 2.98633 13.0134C3.10351 13.1306 3.25703 13.1892 3.41054 13.1892C3.56406 13.1892 3.71758 13.1306 3.83476 13.0134L7.99999 8.84854L12.1652 13.0134C12.2824 13.1306 12.4359 13.1892 12.5894 13.1892C12.743 13.1892 12.8965 13.1306 13.0137 13.0134C13.248 12.779 13.248 12.3993 13.0137 12.1649L8.84849 8.0001Z" fill="#DBDBDB"/></svg>';
+// fill="currentColor" (not the Figma dark-mode paste's literal #DBDBDB) so the icon
+// inherits .in-person-banner-close's own themed color and stays visible in both light
+// and dark mode, rather than washing out against whichever theme it wasn't drawn for.
+const CLOSE_ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M8.84849 8.0001L13.0137 3.83526C13.248 3.60088 13.248 3.22119 13.0137 2.98682C12.7793 2.75244 12.3996 2.75244 12.1652 2.98682L8 7.15166L3.83477 2.98682C3.60039 2.75244 3.2207 2.75244 2.98633 2.98682C2.75195 3.22119 2.75195 3.60088 2.98633 3.83526L7.15151 8.0001L2.98633 12.1649C2.75195 12.3993 2.75195 12.779 2.98633 13.0134C3.10351 13.1306 3.25703 13.1892 3.41054 13.1892C3.56406 13.1892 3.71758 13.1306 3.83476 13.0134L7.99999 8.84854L12.1652 13.0134C12.2824 13.1306 12.4359 13.1892 12.5894 13.1892C12.743 13.1892 12.8965 13.1306 13.0137 13.0134C13.248 12.779 13.248 12.3993 13.0137 12.1649L8.84849 8.0001Z" fill="currentColor"/></svg>';
 
 // Own storage helpers rather than a shared getVideoProgress-style utility — a single
 // small, banner-scoped map (bannerId -> true) is all this needs, and keeping it local
@@ -71,24 +74,42 @@ function buildBanner(contentEl, bannerId) {
   return banner;
 }
 
-export default async function init(el) {
-  const rows = [...el.querySelectorAll(':scope > div')];
-  const configRow = rows.length > 1 ? rows[0] : null;
-  const contentRow = rows[rows.length - 1];
-  if (!contentRow) return;
+const TRUTHY_VALUES = new Set(['true', 'on', 'yes']);
 
-  const config = configRow
-    ? [...configRow.querySelectorAll(':scope > div')].reduce((acc, cell, i, cells) => {
-      if (i % 2 !== 0) return acc;
-      const key = cell.textContent.trim().toLowerCase();
-      const value = cells[i + 1]?.textContent.trim() || '';
-      if (key) acc[key] = value;
-      return acc;
-    }, {})
-    : {};
+const CONFIG_KEYS = new Set(['banner-id', 'rf-data-check', 'below-nav', 'message']);
+
+export default async function init(el) {
+  // Config rows are labeled key/value pairs (banner-id, rf-data-check, and optionally
+  // an explicit `message` row); the copy itself can also be authored as a bare,
+  // unlabeled row (a single cell, or a first cell that isn't a recognized config key)
+  // — both authoring shapes are in real use, so both are supported. Whichever appears
+  // last wins as the content row if more than one bare row is present.
+  const rows = [...el.querySelectorAll(':scope > div')];
+  const config = {};
+  let contentCell = null;
+  rows.forEach((row) => {
+    const cells = [...row.querySelectorAll(':scope > div')];
+    const key = cells[0]?.textContent.trim().toLowerCase();
+    if (cells.length >= 2 && key && CONFIG_KEYS.has(key)) {
+      if (key === 'message') contentCell = cells[1];
+      else config[key] = cells[1].textContent.trim();
+    } else {
+      contentCell = cells[0] || row;
+    }
+  });
+  if (!contentCell) return;
 
   const bannerId = config['banner-id'] || getMetadata('banner-id') || '';
-  const rfGateEnabled = (config['rf-data-check'] ?? getMetadata('rf-data-check') ?? 'false').toLowerCase() === 'true';
+  const rfGateEnabled = TRUTHY_VALUES.has(
+    (config['rf-data-check'] ?? getMetadata('rf-data-check') ?? 'false').toLowerCase(),
+  );
+  // Authors placing this banner at the very top of the page (above/overlapping the
+  // sticky GNAV header) opt into a top offset that clears it — engineering-owned
+  // exception to the "no fixed placement" rule (see README), since GNAV's own height
+  // isn't something this generic block can detect on its own.
+  const belowNav = TRUTHY_VALUES.has(
+    (config['below-nav'] ?? getMetadata('below-nav') ?? 'false').toLowerCase(),
+  );
 
   if (isDismissed(bannerId)) {
     el.remove();
@@ -105,8 +126,8 @@ export default async function init(el) {
   // own C2 token CSS (tokens.css/sessions-guide-tokens.css) actually keys off, not the
   // .dark class alone (see sessions-guide.js for the same pattern).
   el.dataset.theme = el.classList.contains('dark') ? 'dark' : 'light';
+  el.classList.toggle('in-person-banner-below-nav', belowNav);
 
-  const contentCell = contentRow.querySelector(':scope > div') || contentRow;
   const banner = buildBanner(contentCell, bannerId);
   el.replaceChildren(banner);
 }
