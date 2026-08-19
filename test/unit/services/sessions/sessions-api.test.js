@@ -3,6 +3,7 @@ import { expect } from '@esm-bundle/chai';
 import {
   mapEslPayloadToRawSessions, normalizeSessions, isSessionPublished, ENFORCE_PUBLISHED_FILTER,
   getSessionProducts, extractDistinctProducts, sessionPageUrlForEnv,
+  getSessionAdditionalTracks, extractDistinctAllTracks,
 } from '../../../../event-libs/v1/services/sessions/sessions-api.js';
 
 function customAttr(name, values) {
@@ -448,5 +449,37 @@ describe('services/sessions/sessions-api', () => {
       ];
       expect(extractDistinctProducts(sessions)).to.deep.equal(['Illustrator', 'Photoshop']);
     });
+  });
+});
+
+// Additional Event Site Tracks values are real tracks at render time — resolveTrackBadge()
+// lanes them and LiveCard badges the first one — so a per-track icon map has to cover them.
+describe('additional event site tracks', () => {
+  const session = (primary, additional) => ({
+    customAttributes: [
+      customAttr('Primary Event Site Track', [selectValue(primary)]),
+      customAttr('Additional Event Site Tracks', additional.map((a) => selectValue(a))),
+    ],
+  });
+
+  it('reads every value of the multi-select, not just the first', () => {
+    expect(getSessionAdditionalTracks(session('Design', ['Branding', 'Video']))).to.deep.equal(['Branding', 'Video']);
+  });
+
+  it('returns an empty array when the attribute is absent (MAX25 sessions)', () => {
+    expect(getSessionAdditionalTracks({ customAttributes: [] })).to.deep.equal([]);
+  });
+
+  it('unions primary and additional tracks, deduped and sorted', () => {
+    const sessions = [
+      session('Design', ['Branding']),
+      session('Branding', ['Video']),
+    ];
+    expect(extractDistinctAllTracks(sessions)).to.deep.equal(['Branding', 'Design', 'Video']);
+  });
+
+  it('still returns primary tracks when no session has additional ones', () => {
+    const sessions = [{ customAttributes: [customAttr('Primary Event Site Track', [selectValue('Design')])] }];
+    expect(extractDistinctAllTracks(sessions)).to.deep.equal(['Design']);
   });
 });

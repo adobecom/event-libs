@@ -16,6 +16,20 @@ export function groupByStartTime(sessions) {
   return [...map.entries()].sort(([a], [b]) => (a < b ? -1 : 1)).map(([, v]) => v);
 }
 
+// Badge for one named track, with no session context and so never a count. "Additional
+// Event Site Tracks" draw from the same authored trackIcons map as the primary track, so
+// an additional track's badge resolves through getTrackIcon() exactly like a primary one.
+export function resolveNamedTrackBadge(trackName) {
+  if (!trackName) return null;
+  const trackIcon = getTrackIcon(trackName);
+  return {
+    label: trackName,
+    icon: trackIcon?.icon || null,
+    color: trackIcon?.color || DEFAULT_ICON_COLOR,
+    count: 0,
+  };
+}
+
 // Digital Agenda Track badge/swimlane model — full case table in PLAN.md §16.2. In short:
 // an override, when present, always wins the lane and badge over the primary track; a
 // session with neither is excluded entirely (no "Other" bucket).

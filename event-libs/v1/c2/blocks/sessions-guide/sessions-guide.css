@@ -850,6 +850,15 @@
   gap: var(--s2a-spacing-xs);
 }
 
+/* Second badge (first additional event-site track) in the slot the time would take on a
+   live card. inline-flex so the ::before divider added from 1024px up centers as a flex
+   item — see .sg-live-card__time::before, which it shares its rules with. */
+.sg-live-card__track-extra {
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+}
+
 .sg-live-card__body {
   flex: 1;
   display: flex;
@@ -870,7 +879,8 @@
   transition: color 0.2s;
 }
 
-.sg-live-card:is(:hover, :focus-within) .sg-live-card__track { color: inherit; }
+.sg-live-card:is(:hover, :focus-within) .sg-live-card__track,
+.sg-live-card:is(:hover, :focus-within) .sg-live-card__track-extra { color: inherit; }
 
 .sg-live-card__time {
   font-size: var(--s2a-font-size-sm);
@@ -954,10 +964,6 @@
   white-space: nowrap;
   line-height: 1.2;
   transition: background 0.2s, color 0.2s, border-color 0.2s;
-}
-
-.sg-live-card__btn-label {
-  display: none;
 }
 
 .sg-live-card__btn--watch {
@@ -1688,6 +1694,7 @@
   }
 
   .sg-live-card:is(:hover, :focus-within) .sg-live-card__track,
+  .sg-live-card:is(:hover, :focus-within) .sg-live-card__track-extra,
   .sg-live-card:is(:hover, :focus-within) .sg-live-card__time,
   .sg-live-card:is(:hover, :focus-within) .sg-live-card__title,
   .sg-live-card:is(:hover, :focus-within) .sg-live-card__desc { color: inherit; }
@@ -1850,7 +1857,8 @@
   }
 
   .sg-live-card:is(:hover, :focus-within) .sg-live-card__track { color: #fff; }
-  .sg-live-card:is(:hover, :focus-within) .sg-live-card__track-row { color: #fff; }
+  .sg-live-card:is(:hover, :focus-within) .sg-live-card__track-row,
+  .sg-live-card:is(:hover, :focus-within) .sg-live-card__track-extra { color: #fff; }
 
   /* Track colors can't be trusted against the dark hover fill — always go white. */
   .sg-live-card:is(:hover, :focus-within) .sg-category-badge__icon-color { color: #fff; }
@@ -1862,7 +1870,8 @@
     margin: 0;
   }
 
-  .sg-live-card__time::before {
+  .sg-live-card__time::before,
+  .sg-live-card__track-extra::before {
     content: '';
     display: inline-block;
     width: 1px;
@@ -1874,7 +1883,8 @@
 
   .sg-live-card:is(:hover, :focus-within) .sg-live-card__time { color: #fff; }
 
-  .sg-live-card:is(:hover, :focus-within) .sg-live-card__time::before { background: rgb(255 255 255 / 40%); }
+  .sg-live-card:is(:hover, :focus-within) .sg-live-card__time::before,
+  .sg-live-card:is(:hover, :focus-within) .sg-live-card__track-extra::before { background: rgb(255 255 255 / 40%); }
 
   .sg-live-card__title {
     font-size: var(--s2a-font-size-2xl);
@@ -1900,8 +1910,6 @@
 
   .sg-live-card__actions { gap: var(--s2a-spacing-sm); }
 
-  .sg-live-card__btn-label { display: inline; }
-
   .sg-live-card__btn--watch {
     background: var(--s2a-color-gray-800);
     color: #fff;
@@ -1920,8 +1928,6 @@
     background: #fff;
     border: 2px solid #000;
     color: #000;
-    width: auto;
-    padding: 0 var(--s2a-spacing-lg);
   }
 
   .sg-live-card:is(:hover, :focus-within) .sg-live-card__btn--favorite {
@@ -2079,6 +2085,13 @@
     scroll-snap-align: none;
   }
 
+  /* Cards run to the container edge instead of stopping at the section's 20px right
+     padding. Only the clipping track bleeds — the section keeps its padding so the title
+     and the nav arrows (anchored to .sg-carousel, not the track) stay on the same inset. */
+  .sg-carousel__track {
+    margin-right: -20px;
+  }
+
   /* Nav arrows sit at the top-right of the section header. The nav lives in
      .sg-carousel__body, so it anchors to the relatively-positioned carousel. */
   .sg-carousel__nav {
@@ -2165,7 +2178,8 @@
 
   .sg-live-card:is(:hover, :focus-within) .sg-live-card__track { color: #fff; }
 
-  .sg-live-card:is(:hover, :focus-within) .sg-live-card__track-row { color: #fff; }
+  .sg-live-card:is(:hover, :focus-within) .sg-live-card__track-row,
+  .sg-live-card:is(:hover, :focus-within) .sg-live-card__track-extra { color: #fff; }
 
   /* Track colors can't be trusted against the dark hover fill — always go white. */
   .sg-live-card:is(:hover, :focus-within) .sg-category-badge__icon-color { color: #fff; }
@@ -2178,7 +2192,8 @@
   }
 
   /* Vertical divider between track and time, matching the Figma meta row. */
-  .sg-live-card__time::before {
+  .sg-live-card__time::before,
+  .sg-live-card__track-extra::before {
     content: '';
     display: inline-block;
     width: 1px;
@@ -2190,7 +2205,8 @@
 
   .sg-live-card:is(:hover, :focus-within) .sg-live-card__time { color: #fff; }
 
-  .sg-live-card:is(:hover, :focus-within) .sg-live-card__time::before { background: rgb(255 255 255 / 40%); }
+  .sg-live-card:is(:hover, :focus-within) .sg-live-card__time::before,
+  .sg-live-card:is(:hover, :focus-within) .sg-live-card__track-extra::before { background: rgb(255 255 255 / 40%); }
 
   .sg-live-card__title {
     font-size: var(--s2a-font-size-3xl);
@@ -2243,12 +2259,6 @@
     background: #fff;
     border: 2px solid #000;
     color: #000;
-    width: auto;
-    padding: 0 var(--s2a-spacing-lg);
-  }
-
-  .sg-live-card__btn-label {
-    display: inline;
   }
 
   .sg-live-card:is(:hover, :focus-within) .sg-live-card__btn--favorite {

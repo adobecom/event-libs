@@ -33,6 +33,27 @@ const LIVE_SESSION = {
 
 const NO_THUMB_SESSION = { ...LIVE_SESSION, id: 'session-no-thumb', thumbnailUrl: null };
 
+// "Additional Event Site Tracks" is multi-select upstream; only the first is badged.
+const LIVE_TWO_TRACKS = {
+  ...LIVE_SESSION,
+  id: 'session-two-tracks',
+  additionalTracks: ['Branding', 'Ignored Second'],
+};
+
+const UPCOMING_SESSION = {
+  ...LIVE_SESSION,
+  id: 'session-upcoming',
+  startTimeUtc: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+  endTimeUtc: new Date(Date.now() + 90 * 60 * 1000).toISOString(),
+};
+
+const ON_DEMAND_SESSION = {
+  ...LIVE_SESSION,
+  id: 'session-past',
+  startTimeUtc: new Date(Date.now() - 90 * 60 * 1000).toISOString(),
+  endTimeUtc: new Date(Date.now() - 60 * 60 * 1000).toISOString(),
+};
+
 function makeStore(guideConfigOverrides = {}) {
   const store = buildStore(preact);
   store.SessionGuideContext._current = {
@@ -180,5 +201,85 @@ describe('LiveCard', () => {
     const store = makeStore({ behaviorFlags: { enableWatchNowCtas: false } });
     const LiveCard = buildLiveCard(preact, store);
     expect(LiveCard({ session: LIVE_SESSION })).to.not.include('Watch now');
+  });
+
+  // The time only earns its place on an upcoming Recommended card: a live card shows a
+  // progress bar and remaining duration instead, and a start time is noise once on demand.
+  describe('time display', () => {
+    const render = (session, props) => {
+      const LiveCard = buildLiveCard(preact, makeStore());
+      return LiveCard({ session, ...props });
+    };
+
+    it('shows the time range on an upcoming Recommended card', () => {
+      const out = render(UPCOMING_SESSION, { variant: 'recommended' });
+      expect(out).to.include('sg-live-card__time');
+      // en dash separator — proves a start–end range rendered, not a bare start time
+      expect(out).to.include('\u2013');
+    });
+
+    it('omits the time on a live card', () => {
+      expect(render(LIVE_SESSION, {})).to.not.include('sg-live-card__time');
+    });
+
+    it('omits the time on an upcoming card outside the Recommended carousel', () => {
+      expect(render(UPCOMING_SESSION, { variant: 'live' })).to.not.include('sg-live-card__time');
+    });
+
+    it('omits the time on a Recommended card that has gone on demand', () => {
+      expect(render(ON_DEMAND_SESSION, { variant: 'recommended' })).to.not.include('sg-live-card__time');
+    });
+  });
+  // A live session with an additional event-site track badges both tracks side by side in
+  // the time's slot, and drops the "+1" that would otherwise double count the second one.
+  describe('additional track badge', () => {
+    const render = (session, props) => {
+      const LiveCard = buildLiveCard(preact, makeStore());
+      return LiveCard({ session, ...props });
+    };
+
+    it('renders a second badge for the first additional track on a live card', () => {
+      const out = render(LIVE_TWO_TRACKS, {});
+      expect(out).to.include('sg-live-card__track-extra');
+      expect(out).to.include('Branding');
+    });
+
+    it('uses only the first additional track', () => {
+      expect(render(LIVE_TWO_TRACKS, {})).to.not.include('Ignored Second');
+    });
+
+    it('drops the +1 count when the second track is badged', () => {
+      expect(render(LIVE_TWO_TRACKS, {})).to.not.include('sg-category-badge__count');
+    });
+
+    it('keeps the +1 count when the session is not live', () => {
+      const upcoming = {
+        ...LIVE_TWO_TRACKS,
+        startTimeUtc: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+        endTimeUtc: new Date(Date.now() + 90 * 60 * 1000).toISOString(),
+      };
+      const out = render(upcoming, { variant: 'recommended' });
+      expect(out).to.not.include('sg-live-card__track-extra');
+      expect(out).to.include('sg-category-badge__count');
+    });
+
+    it('renders no second badge for a live session with no additional tracks', () => {
+      expect(render(LIVE_SESSION, {})).to.not.include('sg-live-card__track-extra');
+    });
+  });
+  // The favourite CTA is icon-only now, so the accessible name lives entirely in aria-label.
+  describe('favorite CTA', () => {
+    it('renders the heart with no visible label text', () => {
+      const LiveCard = buildLiveCard(preact, makeStore());
+      const out = LiveCard({ session: LIVE_SESSION });
+      expect(out).to.include('sg-live-card__btn--favorite');
+      expect(out).to.not.include('sg-live-card__btn-label');
+      expect(out).to.not.include('>Favorite<');
+    });
+
+    it('keeps an accessible name that names the session', () => {
+      const LiveCard = buildLiveCard(preact, makeStore());
+      expect(LiveCard({ session: LIVE_SESSION })).to.include('Add MAX Keynote to favorites');
+    });
   });
 });

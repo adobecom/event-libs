@@ -1,11 +1,13 @@
 import {
-  getSessionTrack, extractDistinctTracks, getSessionOverrideText, extractDistinctOverrideTexts,
+  getSessionTrack, extractDistinctTracks, extractDistinctAllTracks,
+  getSessionAdditionalTracks, getSessionOverrideText, extractDistinctOverrideTexts,
   getSessionProducts, extractDistinctProducts,
 } from '../v1/services/sessions/sessions-api.js';
 import { DA_ORIGIN, DA_APP_PATH, HOMEPAGE_LINK_HASH_KEY } from './constants.js';
 
 export {
-  getSessionTrack, extractDistinctTracks, getSessionOverrideText, extractDistinctOverrideTexts,
+  getSessionTrack, extractDistinctTracks, extractDistinctAllTracks,
+  getSessionAdditionalTracks, getSessionOverrideText, extractDistinctOverrideTexts,
   getSessionProducts, extractDistinctProducts,
 };
 

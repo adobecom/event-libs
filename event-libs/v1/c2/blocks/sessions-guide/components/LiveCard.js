@@ -43,6 +43,14 @@ export function LiveCard({ session, variant = 'live' }) {
   const startTime = formatShortTime(session.startTimeUtc, userTz);
   const endTime = session.endTimeUtc ? formatShortTime(session.endTimeUtc, userTz) : '';
   const timeRange = endTime ? `${startTime} – ${endTime}` : startTime;
+  // Only an upcoming Recommended card states its time. A live card shows the progress bar
+  // and remaining duration instead, and a start time says nothing useful once a session is
+  // on demand.
+  const showTime = variant === 'recommended' && sessionState === 'upcoming';
+  // A live session with an additional event-site track badges both, side by side, in the
+  // slot the time would otherwise take. Only the first additional track is used — the ESP
+  // field is multi-select but the badge model supports one (see resolveTrackBadge).
+  const secondTrack = sessionState === 'live' ? (session.additionalTracks || [])[0] : undefined;
 
   const cardClass = [
     'sg-live-card',
@@ -123,9 +131,12 @@ export function LiveCard({ session, variant = 'live' }) {
       <div class="sg-live-card__body">
         <div class="sg-live-card__meta">
           <div class="sg-live-card__track-row">
-            ${html`<${CategoryBadge} session=${session} />`}
+            ${html`<${CategoryBadge} session=${session} hideCount=${!!secondTrack} />`}
           </div>
-          <p class="sg-live-card__time">${timeRange}</p>
+          ${secondTrack && html`<span class="sg-live-card__track-extra">
+            <${CategoryBadge} track=${secondTrack} />
+          </span>`}
+          ${showTime && html`<p class="sg-live-card__time">${timeRange}</p>`}
         </div>
         ${surface === 'widget'
     ? html`<button
@@ -155,8 +166,7 @@ export function LiveCard({ session, variant = 'live' }) {
             disabled=${isPending}
             daa-ll=${isFavorited ? 'Remove-from-Favorites' : 'Add-to-Favorites'}
             type="button"
-          >${isFavorited ? html`<${IconHeartFilled} />` : html`<${IconHeartOutline} />`
-          }<span class="sg-live-card__btn-label">${isFavorited ? 'Favorited' : 'Favorite'}</span></button>`}
+          >${isFavorited ? html`<${IconHeartFilled} />` : html`<${IconHeartOutline} />`}</button>`}
         </div>
       </div>
     </div>

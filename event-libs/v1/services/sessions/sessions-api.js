@@ -100,6 +100,29 @@ export function extractDistinctTracks(sessions) {
   return [...tracks].sort();
 }
 
+const ADDITIONAL_TRACK_ATTRIBUTE_NAME = 'Additional Event Site Tracks';
+
+// Additional Event Site Tracks is a multi-select drawing from the same vocabulary as the
+// primary track, and the runtime treats its values as real tracks: resolveTrackBadge() gives
+// them their own swimlanes and LiveCard badges the first one. Mirrors getSessionProducts()
+// rather than getSessionTrack(), which only ever takes the first value.
+export function getSessionAdditionalTracks(session) {
+  const attr = (session?.customAttributes || []).find((a) => a?.name === ADDITIONAL_TRACK_ATTRIBUTE_NAME);
+  return (attr?.values || []).map((v) => v?.label ?? v?.value).filter(Boolean);
+}
+
+// Every distinct track in the catalog, primary and additional together — what a per-track
+// icon/color mapping needs to cover, since either kind can end up on a badge.
+export function extractDistinctAllTracks(sessions) {
+  const tracks = new Set();
+  (sessions || []).forEach((session) => {
+    const primary = getSessionTrack(session);
+    if (primary) tracks.add(primary);
+    getSessionAdditionalTracks(session).forEach((value) => tracks.add(value));
+  });
+  return [...tracks].sort();
+}
+
 const OVERRIDE_ATTRIBUTE_NAME = 'Override Primary Event Site Track';
 
 // Override Primary Event Site Track is free text, not a select — each distinct value an

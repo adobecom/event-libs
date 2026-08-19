@@ -4,7 +4,8 @@ import { useNavigation } from '../context/NavigationContext.js';
 import { useConfigs } from '../context/ConfigsContext.js';
 import { useDA } from '../context/DAContext.js';
 import {
-  copyTextToClipboard, extractDistinctTracks, extractDistinctOverrideTexts, extractDistinctProducts,
+  copyTextToClipboard, extractDistinctTracks, extractDistinctAllTracks,
+  extractDistinctOverrideTexts, extractDistinctProducts,
   isTrackIconEntryComplete, getDisplayTitle, stringifyConfig,
   buildSessionAuthorEntry, buildHomepageConfigURL, copyLinkToClipboard,
 } from '../utils.js';
@@ -93,6 +94,10 @@ export default function ConfigEditor() {
   }, [eventId]);
 
   const tracks = useMemo(() => extractDistinctTracks(sessions), [sessions]);
+  // Track icons/colors map every track a session can badge, so it covers Additional Event
+  // Site Tracks too — `tracks` above stays primary-only for the featured-sessions picker,
+  // whose filter matches on the primary track alone.
+  const iconTracks = useMemo(() => extractDistinctAllTracks(sessions), [sessions]);
   const overrideTexts = useMemo(() => extractDistinctOverrideTexts(sessions), [sessions]);
   const products = useMemo(() => extractDistinctProducts(sessions), [sessions]);
 
@@ -107,8 +112,8 @@ export default function ConfigEditor() {
   // Global-only: Homepage configs don't author track icons at all.
   const incompleteTracks = useMemo(() => {
     if (!activeConfig || isHomepage) return [];
-    return tracks.filter((track) => !isTrackIconEntryComplete(activeConfig.config.trackIcons?.[track]));
-  }, [tracks, activeConfig, isHomepage]);
+    return iconTracks.filter((track) => !isTrackIconEntryComplete(activeConfig.config.trackIcons?.[track]));
+  }, [iconTracks, activeConfig, isHomepage]);
 
   const handleCancel = () => {
     clearActiveConfig();
@@ -228,7 +233,7 @@ export default function ConfigEditor() {
         ${isLoadingSessions && html`<${LoadingInline} label="Loading sessions…" />`}
         ${sessionsError && html`<p class="tec-editor__error">${sessionsError}</p>`}
         ${!isLoadingSessions && !sessionsError && html`
-          <p class="tec-editor__section-hint">${sessions.length} session(s) found — ${tracks.length} distinct track(s), ${products.length} distinct product(s).</p>
+          <p class="tec-editor__section-hint">${sessions.length} session(s) found — ${iconTracks.length} distinct track(s) (primary + additional), ${products.length} distinct product(s).</p>
         `}
       </section>
 
@@ -245,7 +250,7 @@ export default function ConfigEditor() {
           `}
           ${!isLoadingSessions && !sessionsError && html`
             <${TrackIconEditor}
-              tracks=${tracks}
+              tracks=${iconTracks}
               trackIcons=${activeConfig.config.trackIcons}
               onChange=${updateTrackIcon}
             />
