@@ -1,4 +1,6 @@
-import { useState, useEffect, useMemo, useCallback, html } from '../../v1/deps/htm-preact.js';
+import {
+  useState, useEffect, useMemo, useCallback, useRef, html,
+} from '../../v1/deps/htm-preact.js';
 import SearchInput from '../components/SearchInput.js';
 import EventPicker from '../components/EventPicker.js';
 import ManualEventLookup from '../components/ManualEventLookup.js';
@@ -21,7 +23,7 @@ function configTypeLabel(configType) {
 }
 
 function ConfigList({
-  rows, search, onSearch, searchId, emptyHint, onEdit, onDuplicate, onCopy, onDelete,
+  rows, search, onSearch, searchId, emptyHint, onEdit, onDuplicate, onCopy, onDelete, onWarmCopy,
 }) {
   return html`
     <${SearchInput} \
@@ -37,7 +39,12 @@ function ConfigList({
     ${rows.length > 0 && html`
       <ul class="tec-library__list">
         ${rows.map((row) => html`
-          <li class="tec-library__item" key=${`${row.eventId}:${row.configType || CONFIG_TYPES.GLOBAL}`}>
+          <li \
+            class="tec-library__item" \
+            key=${`${row.eventId}:${row.configType || CONFIG_TYPES.GLOBAL}`} \
+            onMouseEnter=${() => onWarmCopy?.(row)} \
+            onFocusCapture=${() => onWarmCopy?.(row)} \
+          >
             <div class="tec-library__item-info">
               <span class="tec-library__item-title-row">
                 <span class="tec-library__item-title">${getDisplayTitle(row)}</span>
@@ -94,6 +101,22 @@ export default function Library() {
       setEnv(currentEnv);
     }
   }, [envName, setEnv]);
+
+  // The ESP session-catalog fetch that "Copy Link" needs (row.config only stores session IDs,
+  // not the titles/tracks/times the link is built from) can take several seconds — long enough
+  // that browsers can drop the click's clipboard-write permission by the time it resolves.
+  // ConfigEditor.js's own "Copy Link" avoids this because its session data is already loaded
+  // before the click; here there's no equivalent "already open" moment, so instead the catalog
+  // is pre-warmed on hover/focus (usually well before the click lands) and cached per
+  // eventId+env so a click never re-awaits a fetch it's already kicked off or completed.
+  const rowCatalogCache = useRef(new Map());
+  const warmRowSessionCatalog = useCallback((row) => {
+    const key = `${row.eventId}:${row.eventServiceEnv || 'prod'}`;
+    if (!rowCatalogCache.current.has(key)) {
+      rowCatalogCache.current.set(key, fetchRowSessionCatalog(row));
+    }
+    return rowCatalogCache.current.get(key);
+  }, [fetchRowSessionCatalog]);
 
   const [globalSearch, setGlobalSearch] = useState('');
   const [homepageSearch, setHomepageSearch] = useState('');
@@ -204,7 +227,7 @@ export default function Library() {
   // implementation both call, so a link copied from either place is identical).
   const handleCopyHomepageLink = useCallback(async (row) => {
     const homepageMeta = HOMEPAGE_FIELD_BY_TYPE[row.configType];
-    const result = await fetchRowSessionCatalog(row);
+    const result = await warmRowSessionCatalog(row);
     if (!result.ok) {
       setToastError('Could not load this event\'s sessions — copy the link from the editor instead');
       return;
@@ -212,7 +235,7 @@ export default function Library() {
     const ok = await copyHomepageConfigLink(org, repo, row, homepageMeta, result.data.sessions, result.data.sessionTimes);
     if (ok) setToastSuccess(`Link copied — paste it directly into ${homepageMeta.blockHint}'s doc body`);
     else setToastError('Could not copy the link — please retry');
-  }, [org, repo, fetchRowSessionCatalog, setToastSuccess, setToastError]);
+  }, [org, repo, warmRowSessionCatalog, setToastSuccess, setToastError]);
 
   const handleCopyGlobalConfig = useCallback(async (row) => {
     // Minified, not stringifyConfig's pretty-printed form: DA joins a metadata cell's
@@ -303,6 +326,7 @@ export default function Library() {
           onEdit=${openEdit} \
           onDuplicate=${openDuplicatePicker} \
           onCopy=${handleCopyConfig} \
+          onWarmCopy=${warmRowSessionCatalog} \
           onDelete=${(row) => setRowPendingDelete(row)} \
         />
       </section>
