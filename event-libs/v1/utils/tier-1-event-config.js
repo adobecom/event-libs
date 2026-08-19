@@ -68,3 +68,14 @@ export function getProduct(productName) {
 export function getAllowDoubleBooking() {
   return !!tierOneEventConfig.allowDoubleBooking;
 }
+
+// Where a live session plays: the event's own homepage (livestreamed) or broadcast page
+// (online-only). Every event puts these somewhere different. '' when unauthored — the
+// caller picks the fallback.
+export function getHomepagePath() {
+  return tierOneEventConfig.homepagePath || '';
+}
+
+export function getBroadcastPath() {
+  return tierOneEventConfig.broadcastPath || '';
+}

@@ -33,6 +33,8 @@ function emptyConfig(configType = CONFIG_TYPES.GLOBAL) {
     rfApiUrl: '',
     rfProfileId: '',
     registerUrl: '',
+    homepagePath: '',
+    broadcastPath: '',
   };
 }
 

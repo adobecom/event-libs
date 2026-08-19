@@ -1,3 +1,5 @@
+import { getHomepagePath, getBroadcastPath } from './tier-1-event-config.js';
+
 // `?serverTime=<ms>` simulates landing on the page at a specific instant, for testing
 // time-driven transitions without waiting for a real session's start/end. It's an origin,
 // not a freeze — simulated time keeps advancing at the same rate as the real clock from
@@ -71,6 +73,12 @@ export function isPostEvent(sessionList, liveStreamActiveIds, nowMs, eventEndMs)
   return allEnded || pastEventEnd;
 }
 
+// Fallback for Tier 1 configs predating the authorable homepagePath/broadcastPath fields,
+// which would otherwise silently lose their "Watch now" CTAs. Author those fields rather
+// than adding another event's paths here.
+const LEGACY_HOMEPAGE_PATH = '/max.html';
+const LEGACY_BROADCAST_PATH = '/max/broadcast.html';
+
 /**
  * Where "Watch now" navigates: homepage player if isLivestreamed, broadcast page if
  * isOnline, own session page if on-demand, '' otherwise. Root-relative since the
@@ -79,8 +87,7 @@ export function isPostEvent(sessionList, liveStreamActiveIds, nowMs, eventEndMs)
 export function getWatchDestination(session, sessionState) {
   if (sessionState === 'on-demand') return session.sessionPageUrl || '';
   if (sessionState !== 'live') return '';
-  // TODO: Maybe it needs to come from configs in case of Summit or other events with different homepage/broadcast pages.
-  if (session.isLivestreamed) return '/max.html';
-  if (session.isOnline) return '/max/broadcast.html';
+  if (session.isLivestreamed) return getHomepagePath() || LEGACY_HOMEPAGE_PATH;
+  if (session.isOnline) return getBroadcastPath() || LEGACY_BROADCAST_PATH;
   return '';
 }

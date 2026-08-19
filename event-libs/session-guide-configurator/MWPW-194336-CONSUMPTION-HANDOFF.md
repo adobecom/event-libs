@@ -1,7 +1,7 @@
 # MWPW-194336 handoff — consuming-side work this app's output requires
 
 This app (Session Guide Configurator) is authoring/export-only: it produces
-a config blob, base64-encodes it into a `?sgConfig=` URL, and `decorate.js`'s
+a config blob, base64-encodes it into a `#sgConfig=` URL, and `decorate.js`'s
 `prebuildAutoBlock` decodes that at page-decoration time into the
 `sessions-guide`/`sessions-guide-full-page` block's own
 `data-session-guide-config` attribute. `utils/parse-config.js` reads that

@@ -4,6 +4,8 @@ import {
   getTrackIcon,
   getOverrideTrackIcon,
   getAllowDoubleBooking,
+  getHomepagePath,
+  getBroadcastPath,
 } from '../../../event-libs/v1/utils/tier-1-event-config.js';
 
 const CONFIG = {
@@ -18,6 +20,7 @@ const CONFIG = {
     },
   },
   allowDoubleBooking: true,
+  homepagePath: '/summit.html',
 };
 
 describe('tier-1-event-config', () => {
@@ -60,6 +63,14 @@ describe('tier-1-event-config', () => {
 
   it('reads allowDoubleBooking off the same parsed config', () => {
     expect(getAllowDoubleBooking()).to.equal(true);
+  });
+
+  it('reads the authored homepage path off the same parsed config', () => {
+    expect(getHomepagePath()).to.equal('/summit.html');
+  });
+
+  it('returns empty for an event page the config does not declare — the caller decides the fallback', () => {
+    expect(getBroadcastPath()).to.equal('');
   });
 
   it('is idempotent — a second init() call does not re-parse or clear the config', () => {

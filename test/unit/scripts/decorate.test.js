@@ -2465,5 +2465,79 @@ describe('decorateEvent - Array Iteration', () => {
       expect(parent.querySelector('.featured-sessions')).to.be.null;
       expect(parent.querySelector('a')).to.equal(link);
     });
+
+    // Session Guide and Homepage links now share the consolidated Event Configurator path,
+    // so the two auto-blocks are told apart by payload key alone.
+    function buildSessionGuideLink(config, { legacy = false } = {}) {
+      const encoded = encodeTecConfig(config);
+      const path = legacy
+        ? 'tools/da-apps/session-guide-configurator'
+        : 'tools/da-apps/tier-1-event-configurator';
+      const suffix = legacy ? `?sgConfig=${encoded}` : `#sgConfig=${encoded}`;
+      const link = document.createElement('a');
+      link.href = `https://da.live/app/adobecom/da-events/${path}${suffix}`;
+      return link;
+    }
+
+    it('builds a sessions-guide div for a #sgConfig= link on the consolidated path', async () => {
+      const parent = document.createElement('div');
+      const p = document.createElement('p');
+      const config = { eventId: 'event-1', surface: 'widget', theme: 'dark' };
+      p.appendChild(buildSessionGuideLink(config));
+      parent.appendChild(p);
+
+      processAutoBlockLinks(parent);
+      await new Promise((resolve) => { setTimeout(resolve, 50); });
+
+      const block = parent.querySelector('.sessions-guide');
+      expect(block).to.not.be.null;
+      // Same path as a Homepage link now — the payload key is what disambiguates.
+      expect(parent.querySelector('.upcoming-sessions')).to.be.null;
+      expect(parent.querySelector('.featured-sessions')).to.be.null;
+      expect(JSON.parse(block.dataset.sessionGuideConfig)).to.deep.equal(config);
+    });
+
+    it('builds the full-page variant for a surface:page config', async () => {
+      const parent = document.createElement('div');
+      const p = document.createElement('p');
+      p.appendChild(buildSessionGuideLink({ eventId: 'event-1', surface: 'page' }));
+      parent.appendChild(p);
+
+      processAutoBlockLinks(parent);
+      await new Promise((resolve) => { setTimeout(resolve, 50); });
+
+      expect(parent.querySelector('.sessions-guide-full-page')).to.not.be.null;
+    });
+
+    it('still builds a sessions-guide div for a legacy ?sgConfig= link on the old path', async () => {
+      const parent = document.createElement('div');
+      const p = document.createElement('p');
+      const config = { eventId: 'event-1', surface: 'widget' };
+      p.appendChild(buildSessionGuideLink(config, { legacy: true }));
+      parent.appendChild(p);
+
+      processAutoBlockLinks(parent);
+      await new Promise((resolve) => { setTimeout(resolve, 50); });
+
+      const block = parent.querySelector('.sessions-guide');
+      expect(block).to.not.be.null;
+      expect(JSON.parse(block.dataset.sessionGuideConfig)).to.deep.equal(config);
+    });
+
+    it('does not treat a Homepage link as a Session Guide config, or vice versa', async () => {
+      const parent = document.createElement('div');
+      const p = document.createElement('p');
+      p.appendChild(buildTecHomepageLink({
+        eventId: 'event-1', configType: 'homepage-upcoming-sessions', entries: [{ sessionId: 's1' }],
+      }));
+      parent.appendChild(p);
+
+      processAutoBlockLinks(parent);
+      await new Promise((resolve) => { setTimeout(resolve, 50); });
+
+      expect(parent.querySelector('.upcoming-sessions')).to.not.be.null;
+      expect(parent.querySelector('.sessions-guide')).to.be.null;
+      expect(parent.querySelector('.sessions-guide-full-page')).to.be.null;
+    });
   });
 });

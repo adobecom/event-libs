@@ -651,11 +651,14 @@ export function processAutoBlockLinks(parent) {
   // c2: true — this block has a C2 copy under v1/c2/blocks/, so on a
   // `foundation: c2` page load it from there instead of the classic v1/blocks/.
   const isC2 = getMetadata('foundation') === 'c2';
+  // Session Guide and Homepage links share the consolidated Event Configurator path, so only
+  // their payload key tells them apart. Matching the key also catches older `?sgConfig=`
+  // links that pointed at the standalone app.
   const autoBlockIdentifiers = {
     'chrono-box': { pattern: 'schedule-maker' },
     'mobile-rider': { pattern: 'mobilerider.com', selfInit: true, c2: true },
-    'sessions-guide': { pattern: 'session-guide-configurator' },
-    'tec-homepage': { pattern: 'tools/da-apps/tier-1-event-configurator' },
+    'sessions-guide': { pattern: 'sgConfig=' },
+    'tec-homepage': { pattern: 'tecHomepage=' },
   };
 
   Object.entries(autoBlockIdentifiers).forEach(([blockName, { pattern, selfInit, c2 }]) => {

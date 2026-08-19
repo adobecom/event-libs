@@ -337,6 +337,29 @@ export default function ConfigEditor() {
         </section>
 
         <section class="tec-editor__section">
+          <h2>Event pages</h2>
+          <p class="tec-editor__section-hint">Where a session's "Watch now" CTA sends attendees while it's live: the event homepage for livestreamed sessions, the broadcast page for online-only ones. Root-relative paths on this event's own site. Leave blank and the page falls back to MAX's paths.</p>
+          <label class="tec-editor__field-label" for="tec-homepage-path">Homepage path</label>
+          <input
+            id="tec-homepage-path"
+            type="text"
+            class="tec-field tec-editor__rf-input"
+            placeholder="/max.html"
+            value=${activeConfig.config.homepagePath || ''}
+            onInput=${(e) => updateConfigField('homepagePath', e.target.value)}
+          />
+          <label class="tec-editor__field-label" for="tec-broadcast-path">Broadcast page path</label>
+          <input
+            id="tec-broadcast-path"
+            type="text"
+            class="tec-field tec-editor__rf-input"
+            placeholder="/max/broadcast.html"
+            value=${activeConfig.config.broadcastPath || ''}
+            onInput=${(e) => updateConfigField('broadcastPath', e.target.value)}
+          />
+        </section>
+
+        <section class="tec-editor__section">
           <h2>Config JSON</h2>
           <p class="tec-editor__section-hint">This is what gets saved to the row, and what you'll paste into the page's <strong><code>tier-1-event-config</code></strong> metadata after saving.</p>
           <pre class="tec-editor__config-preview">${configPreview}</pre>

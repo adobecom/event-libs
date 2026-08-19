@@ -1,21 +1,44 @@
-import { useEffect, html } from '../v1/deps/htm-preact.js';
+import { useEffect, useRef, html } from '../v1/deps/htm-preact.js';
 import Library from './pages/Library.js';
 import ConfigEditor from './pages/ConfigEditor.js';
 import { useNavigation } from './context/NavigationContext.js';
 import { useConfigs } from './context/ConfigsContext.js';
 import { useDA } from './context/DAContext.js';
 import { useEventEnv } from './context/EventEnvContext.js';
+import { readConfigLinkPayload, rowFromConfigLinkPayload } from './utils.js';
 import { PAGES, EVENT_SERVICE_ENV_OPTIONS } from './constants.js';
 
 const TOAST_TIMEOUT_MS = 6000;
 
 export default function SessionGuideConfigurator() {
   const { isLoading: isDaLoading, error: daError } = useDA();
-  const { activePage } = useNavigation();
-  const { envName } = useEventEnv();
+  const { activePage, goToEditor } = useNavigation();
+  const { envName, setEnv } = useEventEnv();
   const {
     toastError, clearToastError, toastSuccess, clearToastSuccess, isInitialLoading, error,
+    hasLoaded, configs, startEditConfig,
   } = useConfigs();
+
+  // Opens the config a copied link carries, once the library has loaded. Prefers the saved
+  // row with the same configId: a link pasted onto a page can be older than the row it came
+  // from, and saving that stale copy would overwrite the newer one.
+  const linkHandled = useRef(false);
+  useEffect(() => {
+    if (linkHandled.current || !hasLoaded) return;
+    linkHandled.current = true;
+    const payload = readConfigLinkPayload();
+    if (!payload) return;
+    const saved = payload.configId
+      && configs.find((row) => row.configId === payload.configId);
+    const row = saved || rowFromConfigLinkPayload(payload);
+    // A page reload resets the env override, so restore the row's env (as Library.js does).
+    setEnv(row.eventServiceEnv || 'prod');
+    startEditConfig(row);
+    goToEditor();
+    // Consume it, so leaving the tab and returning lands on the library rather than
+    // re-opening this config with no way past it. Clears only this iframe's URL.
+    history.replaceState(null, '', `${window.location.pathname}${window.location.search}`);
+  }, [hasLoaded, configs, setEnv, startEditConfig, goToEditor]);
 
   const envLabel = EVENT_SERVICE_ENV_OPTIONS.find((opt) => opt.value === envName)?.label || envName;
 
