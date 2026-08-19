@@ -117,13 +117,55 @@ first block can get pushed down to whatever row the *other* column's cursor has 
 reached, instead of starting at row 1. `dense` gives each column its own independent
 placement instead.
 
-**Residual limitation:** a row *track*'s height is still shared across both columns —
-if column 1 and column 2 each have a block at the same row index (this only ever
-happens at row 1, since after that each column's remaining blocks occupy rows the other
-column has no block in), that row's height is the taller of the two, even though
-`align-items: start` keeps the shorter block's own box from stretching. This can only
-visibly matter if the shorter column has more blocks after that shared row — the extra
-whitespace shows up above its next block, not around the shared row's own blocks.
+**Residual limitation — true masonry needs `grid-column`, not flat tagged blocks.** A row
+*track*'s height is still shared across both columns: if column 1 and column 2 each have
+a block at the same row index (this only ever happens at row 1, since after that each
+column's remaining blocks occupy rows the other column has no block in), that row's
+height is the taller of the two, even though `align-items: start` keeps the shorter
+block's own box from stretching. With flat tagged blocks, this is only cosmetic when
+column heights are roughly similar — but it means row 1's height is always
+`max(column 1's first block, column 2's first block)`, so a column whose first block is
+much taller than the other column's first block will inflate that shared row for both
+columns. If you need genuinely independent column heights regardless of content height
+(true masonry — see the `grid-column` block below), don't tag individual blocks with
+`grid-col-*`; give each column its own `grid-column` block instead.
+
+## True masonry: independent column heights via `grid-column`
+
+Flat tagged blocks (above) always share row 1's height across both columns — that's a
+hard CSS Grid limitation (confirmed: even switching to flexbox doesn't avoid it, since
+the same row/line-sharing applies to flex-wrap too). Getting a column's height to depend
+*only* on its own content — e.g. three 40px blocks in column 1 totaling 120px, ending
+higher on the page than a single 200px block in column 2 — requires each column to be a
+real, separate DOM container, not a flat sibling.
+
+The `grid-column` block (`event-libs/v1/blocks/grid-column/`, `event-libs/v1/c2/blocks/grid-column/`)
+is exactly that: a minimal block whose only job is to load a Milo fragment as its content.
+Milo's own fragment mechanism (`loadFragment`) creates a real, persistent container and
+re-runs normal block/section decoration on it — so a fragment's blocks stack via ordinary
+block flow, completely independent of anything outside it. This is the same mechanism
+`promotional-content` already uses in this codebase to embed fragment content; `grid-column`
+is a plain, reusable wrapper around it. (`chrono-box` also uses `loadFragment`, but it's
+solely the Timing Framework's countdown/schedule-swap block — not a general-purpose
+container, and not related to this feature.)
+
+**Authoring:**
+
+1. Author each column's actual content (the blocks that should stack inside that column)
+   as its own separate document, published as a fragment.
+2. In the grid section, add one **Grid Column** block per column, each containing a link
+   to that column's fragment — `Grid Column` (defaults to column 1), `Grid Column
+   (grid-col-2)` for the second. The same `grid-col-*-tablet`/`-desktop` and `grid-order-*`
+   variants from steps 2–5 above apply to a `grid-column` block exactly like any other
+   block, since it's just an ordinary block with a link inside it.
+3. Everything from step 1 (turn the section into a `grid`) and step 4 (pick a ratio) still
+   applies — `grid-column` blocks are placed into the grid's columns the same way any
+   other block is; they just happen to render independently-flowing content instead of a
+   single block's own markup.
+
+Mixing flat tagged blocks and `grid-column` blocks in the same grid section is fine —
+use flat blocks where content heights are naturally similar, and `grid-column` +
+fragments specifically where a column needs to be immune to the other column's height.
 
 ## Implementation
 
@@ -132,6 +174,11 @@ whitespace shows up above its next block, not around the shared row's own blocks
   gated `@media (min-width: 768px)`; ratio classes are further gated to their own
   breakpoint tier (`768–1023px` or `≥1024px`) so a tablet ratio never leaks into
   desktop or vice versa.
+- `event-libs/v1/blocks/grid-column/` and `event-libs/v1/c2/blocks/grid-column/` — the
+  fragment-wrapper block for true masonry columns (one copy per foundation, matching the
+  existing `chrono-box`/`mobile-rider` precedent of per-foundation block copies). Its
+  `init(el)` just finds the block's own link and calls Milo's `loadFragment(link)` — no
+  other logic.
 - `event-libs/v1/utils/decorate.js` — `decorateArea()` loads this stylesheet
   (`addStylesToEventPage()`) unconditionally, synchronously, for the main document and
   for every fragment, so the grid classnames always have their CSS available before

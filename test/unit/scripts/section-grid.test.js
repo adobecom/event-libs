@@ -64,4 +64,32 @@ describe('section grid layout (CSS)', () => {
 
     expect(left('a')).to.be.lessThan(left('c'));
   });
+
+  it('gives truly independent column heights when each column is a real nested container (grid-column + fragment), not flat tagged siblings', () => {
+    document.body.innerHTML = `
+      <main>
+        <div class="section grid grid-tablet-2-1">
+          <div class="grid-column grid-col-1" id="col1">
+            <div class="fragment">
+              <div style="height:40px"></div>
+              <div style="height:40px"></div>
+              <div style="height:40px"></div>
+            </div>
+          </div>
+          <div class="grid-column grid-col-2" id="col2">
+            <div class="fragment">
+              <div style="height:200px"></div>
+            </div>
+          </div>
+        </div>
+      </main>
+    `;
+
+    const col1 = document.getElementById('col1').getBoundingClientRect();
+    const col2 = document.getElementById('col2').getBoundingClientRect();
+
+    expect(col1.height).to.equal(120);
+    expect(col2.height).to.equal(200);
+    expect(col1.bottom).to.be.lessThan(col2.bottom);
+  });
 });
