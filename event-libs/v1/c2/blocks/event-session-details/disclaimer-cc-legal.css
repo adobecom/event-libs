@@ -1,0 +1,47 @@
+/*
+ * Disclaimer / CC / Legal Info Slots (MWPW-203467). Mobile-first.
+ * Small, muted supporting text under the title / at the abstract end.
+ */
+
+.session-gdpr-copy,
+.session-closed-caption {
+  margin: 0;
+  color: var(--s2a-color-gray-1000, #000);
+  font-size: var(--s2a-font-size-12, 0.75rem);
+  line-height: var(--s2a-typography-line-height-body-xs); /* 150% */
+  letter-spacing: var(--s2a-typography-letter-spacing-body-xs);
+}
+
+/* Same treatment as the description text, but bolded. */
+.session-legal-disclaimer {
+  margin: 0;
+  color: var(--s2a-color-gray-1000, #000);
+  font-size: var(--s2a-font-size-16, 1rem);
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+.session-closed-caption {
+  display: flex;
+  align-items: center;
+  gap: var(--s2a-spacing-8, 8px);
+  color: #2c2c2c;
+}
+
+/* Closed captions show only in the On-Demand state (session-state-view toggles
+   [hidden]); the explicit display above would otherwise override [hidden]. */
+.session-closed-caption[hidden] {
+  display: none;
+}
+
+.session-cc-icon {
+  display: inline-flex;
+  flex: 0 0 auto;
+  width: 18px;
+  height: 18px;
+}
+
+.session-cc-icon svg {
+  width: 100%;
+  height: 100%;
+}
