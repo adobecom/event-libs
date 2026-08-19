@@ -202,6 +202,19 @@ function currentSessionHasEnded(sessionTimes, nowMs) {
 // deliberately not looked up from allSessions here, since the current session's own topic
 // value should come from the page's own metadata when available, not require that session
 // to already be present in the fetched catalog.
+// Ascending by the session's own scheduled start time — IPOD sessions (no session-times
+// of their own, startTimeUtc is '') have no real start time to compare, so they sort
+// after every scheduled session rather than at an arbitrary position. Array.sort is
+// already stable (spec-guaranteed since ES2019), so IPOD sessions keep their original
+// catalog-relative order among themselves, same as scheduled sessions with an identical
+// start time.
+function compareByStartTime(a, b) {
+  if (!a.startTimeUtc && !b.startTimeUtc) return 0;
+  if (!a.startTimeUtc) return 1;
+  if (!b.startTimeUtc) return -1;
+  return new Date(a.startTimeUtc).getTime() - new Date(b.startTimeUtc).getTime();
+}
+
 export function resolveTopicPlaylist(
   currentSessionId,
   topics,
@@ -217,7 +230,7 @@ export function resolveTopicPlaylist(
     && (s.playlistAssignment || []).some((t) => topics.includes(t))
     && hasPremiered(s, eventStartMs, nowMs));
 
-  return rows.length >= minSessions ? rows : [];
+  return rows.length >= minSessions ? rows.slice().sort(compareByStartTime) : [];
 }
 
 // Individual Session Pages carry the current session's own identity as page metadata —
