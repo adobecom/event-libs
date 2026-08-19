@@ -572,24 +572,24 @@
     transform: rotate(180deg);
   }
 
-  /* Figma: mobile "Play all" switch — OFF track #7D7D7D (thumb stays white, per the
-     shared desktop rule above), ON track #DBDBDB with a #111 thumb. */
+  /* Figma: mobile "Play all" switch — OFF track #7D7D7D, ON track #DBDBDB; thumb stays
+     #111 in both states. */
   .video-playlist-autoplay-toggle {
     /* stylelint-disable-next-line color-no-hex -- no matching --s2a- token for this
        exact Figma mobile track color */
     background: #7d7d7d;
   }
 
+  .video-playlist-autoplay-toggle::before {
+    /* stylelint-disable-next-line color-no-hex -- no matching --s2a- token for this
+       exact Figma mobile thumb color */
+    background: #111;
+  }
+
   .video-playlist-autoplay-toggle:checked {
     /* stylelint-disable-next-line color-no-hex -- no matching --s2a- token for this
        exact Figma mobile track color */
     background: #dbdbdb;
-  }
-
-  .video-playlist-autoplay-toggle:checked::before {
-    /* stylelint-disable-next-line color-no-hex -- no matching --s2a- token for this
-       exact Figma mobile thumb color */
-    background: #111;
   }
 
   /* Figma: "s2a/typography/heading-6" — overrides the shared desktop title rule above
