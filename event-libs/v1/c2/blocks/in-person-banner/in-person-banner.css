@@ -81,6 +81,25 @@
   height: 16px;
 }
 
+/* Figma inspect (tablet frame): single-row layout like desktop, but the close button
+   pins to the block's bottom-right corner instead of vertically centering with the
+   copy — 16px from both the right and bottom edges, 16x16 box. */
+@media (min-width: 768px) and (max-width: 1023px) {
+  /* Reserves room for the absolutely-positioned close button so copy text never runs
+     underneath it at narrower tablet widths. */
+  .in-person-banner-copy {
+    padding-right: 32px;
+  }
+
+  .in-person-banner-close {
+    position: absolute;
+    right: 16px;
+    bottom: 16px;
+    width: 16px;
+    height: 16px;
+  }
+}
+
 @media (max-width: 767px) {
   /* Figma inspect (mobile frame): padding uses the viewport-side-margins token for its
      inline edges rather than the fixed 64px desktop padding. */
