@@ -40,6 +40,11 @@
   color: var(--s2a-color-gray-25);
   font-family: var(--s2a-font-family-default);
   padding: var(--s2a-spacing-lg) var(--s2a-spacing-md);
+
+  /* Rounds the bottom corners at every width — was previously desktop-only
+     (min-width: 1024px), leaving mobile/tablet with square corners. */
+  border-radius: 0 0 var(--s2a-border-radius-24, 24px) var(--s2a-border-radius-24, 24px);
+  overflow: hidden;
 }
 
 .mobile-rider-info-bar-header {
@@ -187,7 +192,11 @@
   line-height: 150%;
   letter-spacing: 0;
   text-overflow: ellipsis;
-  white-space: nowrap;
+  /* stylelint-disable-next-line value-no-vendor-prefix -- required for -webkit-line-clamp */
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
 }
 
 .mobile-rider-info-bar-more {
@@ -249,18 +258,16 @@
 
   /* The info bar sits flush below the video — square the video's bottom corners so it
      doesn't clash with the bar's own square top, and round the bar's bottom corners
-     instead, so the two read as one continuous rounded card. */
+     instead (see .mobile-rider-info-bar's own base rule), so the two read as one
+     continuous rounded card. */
   .mobile-rider-player:has(.mobile-rider-info-bar) .mobile-rider-container {
     border-radius: var(--s2a-border-radius-24, 24px) var(--s2a-border-radius-24, 24px) 0 0;
   }
-
-  .mobile-rider-info-bar {
-    border-radius: 0 0 var(--s2a-border-radius-24, 24px) var(--s2a-border-radius-24, 24px);
-    overflow: hidden;
-  }
 }
 
-.mobile-rider :is(h1, h2, h3, h4, h5, h6) {
+/* Excludes .mobile-rider-info-bar-title — that <h3> carries its own deliberate
+   heading-5 typography (see above) and must not be reverted to browser defaults. */
+.mobile-rider :is(h1, h2, h3, h4, h5, h6):not(.mobile-rider-info-bar-title) {
   font-size: revert;
   font-weight: revert;
   font-family: revert;
