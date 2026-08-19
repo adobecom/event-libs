@@ -1,6 +1,8 @@
-import { createTag } from '../../../utils/utils.js';
+import { createTag, loadStyle } from '../../../utils/utils.js';
 
 const ICON_ARROW_RIGHT = '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false"><path d="M3.5 8H12.5M12.5 8L8.5 4M12.5 8L8.5 12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+
+const BLOCK_CSS_URL = new URL('./event-carousel.css', import.meta.url).href;
 
 let autoId = 0;
 
@@ -140,6 +142,8 @@ function buildArrows(track) {
 }
 
 export default async function init(el) {
+  loadStyle(BLOCK_CSS_URL);
+
   const track = locateTrack(el);
   if (!track) {
     el.remove();

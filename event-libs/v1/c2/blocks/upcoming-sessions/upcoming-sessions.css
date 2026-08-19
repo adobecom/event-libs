@@ -310,7 +310,7 @@
     width: 375px;
     height: 108px;
     padding: var(--s2a-spacing-lg, 24px);
-    gap: 0;
+    gap: var(--s2a-spacing-md, 16px);
   }
 
   .upcoming-sessions .sg-card__body {

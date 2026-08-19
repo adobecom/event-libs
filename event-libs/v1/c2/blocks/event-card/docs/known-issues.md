@@ -48,63 +48,16 @@ business logic for deciding which ids it cares about and when:
 Covered by `test/unit/services/sessions/mobile-rider-poller.test.js`
 (batching, refcounted registration, subscribe/unsubscribe).
 
-## 3. `event-card` hydrator eagerly imported on every page — confirmed on the LCP path, fix is cross-repo
+## 3. `event-card` hydrator eagerly imported on every page — resolved by removal
 
-**File:** `event-libs/v1/hydrate/hydrate.js:3` —
-`import hydrateEventCard from './event-card.js';` is a static, eager import, and
-`hydrate.js` is itself unconditionally imported by `decorate.js`.
+**Was:** `event-libs/v1/hydrate/hydrate.js` statically imported
+`hydrate/event-card.js`, which was confirmed on the LCP-critical path (every page
+paid to fetch/parse/evaluate that module before Milo's `loadLCPImage()` ran, via
+`libs.js` → `decorate.js` → `hydrate.js`'s eager import chain), regardless of
+whether the page authored any `event-card` block.
 
-**Confirmed impact — this is genuinely on the LCP-critical path, not just
-theoretically eager.** Traced the real call chain:
-
-- `da-events/events/scripts/scripts.js:23-40` does a **top-level `await
-  Promise.all([import(utils.js), import(libs.js)])`** — page script execution
-  is paused here until both resolve.
-- Only after that resolves does `decorateArea()` run (same file, line 42),
-  whose *first* action is `loadLCPImage()` — removing `loading="lazy"` from the
-  hero `<img>` so the browser starts fetching it.
-- `libs.js` eagerly imports `decorate.js` → `hydrate.js` → `event-card.js`'s
-  hydrator. So every page pays for fetching, parsing, and evaluating that
-  module **before** the hero image's `loading` attribute is even removed —
-  directly delaying LCP, on every page, regardless of whether it authors any
-  `event-card` block.
-
-**Marginal cost is small, though.** `event-card.js`'s own imports
-(`constances.js`, `utils.js`) are already unconditionally loaded elsewhere in
-the same eager chain (needed by `image-links.js` and many other consumers), so
-the *only* thing event-card specifically adds is its own one ~90-line file and one
-extra HTTP request — likely single-digit milliseconds, not a dramatic
-regression.
-
-**Why the fix can't stay inside this repo.** `decorateEvent()` calls
-`hydrateBlocks(parent)` synchronously, and it must finish before
-`processTemplateInAllNodes()` runs a few lines later in the same function —
-that's the exact bug `event-card/docs/session-hydration.md` §9 already documents
-fixing by making this hydrator static/synchronous. Two ways to make it lazy
-without reopening that race:
-
-1. **Parallelize the fetch, don't nest it.** Issue a *third*, conditional
-   dynamic import for `hydrate/event-card.js` from `da-events/events/scripts/
-   scripts.js`'s existing `Promise.all([...])` (gated on a cheap synchronous
-   check — e.g. `document.querySelector('.event-card.hydrate')` or
-   `foundation: c2` metadata), then synchronously `registerHydrator('event-card',
-   ...)` once that import resolves, before `decorateArea()`/`decorateEvent()`
-   run. This keeps `decorateEvent()` itself fully synchronous — the ordering
-   guarantee is preserved because the module is already loaded and registered
-   by the time `hydrateBlocks()` looks it up. **This requires editing
-   `da-events`' `scripts.js`, a separate repo from this branch/PR** — not
-   something `event-libs` alone can land.
-2. **Make `decorateEvent` async and thread `await` through every call
-   site** (`da-events`' `decorateArea()`, plus `event-libs`'s own
-   `events-form.js:1096`). Avoids touching `scripts.js`'s import list, but
-   risks delaying everything else `decorateEvent` does (metadata processing,
-   session-state bootstrap, template/link resolution) relative to Milo's
-   `loadArea()`, for every block on every page — a much larger blast radius
-   for a one-file saving.
-
-**Recommendation:** given the modest payoff (one file, one request) versus the
-coordination cost (a `da-events` change to this repo's consumer, or a
-higher-risk async refactor touching every block's timing), leave this as a
-tracked issue rather than fix it speculatively from `event-libs` alone. Revisit
-if/when `da-events` is in scope in the same work session, so option 1 can be
-implemented and tested end-to-end in one pass.
+**Resolved:** the whole `hydrate`/`featured-sessions`-classname/session-code
+mechanism (`hydrate/event-card.js`) was deleted — Featured Sessions is now built
+by `event-libs/v1/c2/blocks/featured-sessions/`, generating cards directly from
+the Homepage configurator's link payload with no hydration pass at all. There is
+nothing left in `hydrate.js`'s eager import chain for this concern to apply to.

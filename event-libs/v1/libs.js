@@ -25,16 +25,17 @@ const EVENT_BLOCKS_C2 = [
   'event-card',
   'event-carousel',
   'upcoming-sessions',
+  'featured-sessions',
   'chrono-box',
   'mobile-rider',
   'event-marquee',
   'sessions-guide',
   'sessions-guide-full-page',
   'session-state-demo',
-  'session-details',
-  'featured-products',
-  'speakers',
-  'session-resources',
+  'event-session-details',
+  'event-featured-products',
+  'event-speakers',
+  'event-session-resources',
 ];
 
 // Import only the most essential utilities that are always needed

@@ -2404,5 +2404,66 @@ describe('decorateEvent - Array Iteration', () => {
       expect(chronoBox).to.not.be.null;
       expect(chronoBox.getAttribute('data-schedule-repo')).to.equal('adobecom/da-events-fg-pink');
     });
+
+    function encodeTecConfig(config) {
+      return window.btoa(unescape(encodeURIComponent(JSON.stringify(config))));
+    }
+
+    function buildTecHomepageLink(config) {
+      const link = document.createElement('a');
+      link.href = `https://da.live/app/adobecom/da-events/tools/da-apps/tier-1-event-configurator#tecHomepage=${encodeTecConfig(config)}`;
+      return link;
+    }
+
+    it('builds an upcoming-sessions div for a homepage-upcoming-sessions link', async () => {
+      const parent = document.createElement('div');
+      const p = document.createElement('p');
+      const config = {
+        eventId: 'event-1', configType: 'homepage-upcoming-sessions', heading: 'Upcoming', entries: [{ sessionId: 's1' }],
+      };
+      p.appendChild(buildTecHomepageLink(config));
+      parent.appendChild(p);
+
+      processAutoBlockLinks(parent);
+      await new Promise((resolve) => { setTimeout(resolve, 50); });
+
+      const block = parent.querySelector('.upcoming-sessions');
+      expect(block).to.not.be.null;
+      expect(parent.querySelector('.featured-sessions')).to.be.null;
+      expect(JSON.parse(block.dataset.upcomingSessionsConfig)).to.deep.equal(config);
+    });
+
+    it('builds a featured-sessions div for a homepage-featured-sessions link', async () => {
+      const parent = document.createElement('div');
+      const p = document.createElement('p');
+      const config = {
+        eventId: 'event-1', configType: 'homepage-featured-sessions', heading: 'Featured', entries: [{ sessionId: 's1' }],
+      };
+      p.appendChild(buildTecHomepageLink(config));
+      parent.appendChild(p);
+
+      processAutoBlockLinks(parent);
+      await new Promise((resolve) => { setTimeout(resolve, 50); });
+
+      const block = parent.querySelector('.featured-sessions');
+      expect(block).to.not.be.null;
+      expect(parent.querySelector('.upcoming-sessions')).to.be.null;
+      expect(JSON.parse(block.dataset.featuredSessionsConfig)).to.deep.equal(config);
+    });
+
+    it('leaves the link alone when entries is missing/invalid', async () => {
+      const parent = document.createElement('div');
+      const p = document.createElement('p');
+      const link = buildTecHomepageLink({ eventId: 'event-1', configType: 'homepage-upcoming-sessions' });
+      p.appendChild(link);
+      parent.appendChild(p);
+
+      processAutoBlockLinks(parent);
+      await new Promise((resolve) => { setTimeout(resolve, 50); });
+
+      expect(parent.querySelector('.upcoming-sessions')).to.be.null;
+      expect(parent.querySelector('.featured-sessions')).to.be.null;
+      expect(parent.querySelector('a')).to.equal(link);
+    });
   });
 });
