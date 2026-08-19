@@ -34,6 +34,7 @@ a.con-button.no-event {
 @media (min-width: 768px) {
   .section.grid {
     display: grid;
+    grid-auto-flow: dense;
     align-items: start;
     column-gap: var(--s2a-spacing-lg, 24px);
     row-gap: var(--s2a-spacing-lg, 24px);

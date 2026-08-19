@@ -104,17 +104,26 @@ and only split 2:1 at desktop, with 16px gaps:
 
 ## How column stacking behaves
 
-Once a ratio is active, grid auto-placement fills each column top-to-bottom
-independently: multiple blocks assigned to column 1 stack down through rows 1, 2, 3…;
-blocks in column 2 do the same in their own rows. `align-items: start` means a column's
-content is never stretched to match a taller neighbor.
+Once a ratio is active, grid auto-placement (`grid-auto-flow: dense`) fills each column
+top-to-bottom independently: multiple blocks assigned to column 1 stack down through
+rows 1, 2, 3…; blocks in column 2 do the same in their own rows, starting from row 1
+regardless of how many blocks column 1 has. `align-items: start` means a column's
+content is never stretched to match a taller neighbor, and the two columns are free to
+end at different total heights ("misalign" naturally, by design).
 
-**Limitation:** row *tracks* are shared across columns by index — if column 1 has a
-block at row 2 and column 2 also has a block at row 2, those two rows' *tops* align
-(normal CSS grid behavior), even though each column's content still renders at its own
-height below that. This only matters when both columns have the same number of stacked
-blocks; a lopsided column count (e.g. 3 blocks in column 1, 1 in column 2) renders with
-no coupling past the shared rows.
+`dense` matters here, not just `align-items: start` — without it, the default (sparse)
+auto-placement algorithm shares a single row cursor across both columns, so a column's
+first block can get pushed down to whatever row the *other* column's cursor has already
+reached, instead of starting at row 1. `dense` gives each column its own independent
+placement instead.
+
+**Residual limitation:** a row *track*'s height is still shared across both columns —
+if column 1 and column 2 each have a block at the same row index (this only ever
+happens at row 1, since after that each column's remaining blocks occupy rows the other
+column has no block in), that row's height is the taller of the two, even though
+`align-items: start` keeps the shorter block's own box from stretching. This can only
+visibly matter if the shorter column has more blocks after that shared row — the extra
+whitespace shows up above its next block, not around the shared row's own blocks.
 
 ## Implementation
 
