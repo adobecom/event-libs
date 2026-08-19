@@ -123,4 +123,26 @@ describe('section grid layout (CSS)', () => {
     expect(parseFloat(capped.paddingLeft)).to.be.greaterThan(0);
     expect(parseFloat(plain.paddingLeft)).to.equal(0);
   });
+
+  it('applies a different ratio per breakpoint when both are authored on the same section', () => {
+    document.body.innerHTML = `
+      <main style="width: 900px">
+        <div class="section grid grid-tablet-90-10 grid-desktop-70-30" id="s">
+          <div class="grid-col-1" id="a" style="height:40px"></div>
+          <div class="grid-col-2" id="b" style="height:40px"></div>
+        </div>
+      </main>
+    `;
+
+    const cols = getComputedStyle(document.getElementById('s')).gridTemplateColumns
+      .trim().split(/\s+/).map(parseFloat);
+    const ratio = cols[0] / cols[1];
+
+    if (window.matchMedia('(min-width: 1024px)').matches) {
+      expect(ratio).to.be.closeTo(7 / 3, 0.3);
+    } else {
+      expect(window.matchMedia('(min-width: 768px) and (max-width: 1023px)').matches).to.be.true;
+      expect(ratio).to.be.closeTo(9, 0.5);
+    }
+  });
 });

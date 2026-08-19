@@ -64,6 +64,10 @@ Prefix with `grid-tablet-` for `768–1023px` or `grid-desktop-` for `≥1024px`
 `grid-tablet-1-1`, `grid-desktop-30-70`. Author either or both independently — for
 example `grid-desktop-2-1` alone keeps the section stacked through tablet and only
 splits 2:1 at desktop, which is the common "stack on tablet, split on desktop" pattern.
+You can also author *different* ratios for each tier, since the two classes are gated
+to mutually exclusive breakpoints and never conflict — e.g. `grid-tablet-90-10,
+grid-desktop-70-30` stays nearly full-width through tablet, then opens the secondary
+column up further at desktop.
 
 **5. Move a block to a different column at a different breakpoint (optional)** — add
 `grid-col-1-tablet` / `grid-col-2-tablet` or `grid-col-1-desktop` / `grid-col-2-desktop`
