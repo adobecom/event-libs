@@ -8,6 +8,9 @@
   flex-direction: column;
   gap: var(--s2a-spacing-16, 16px);
   margin-bottom: var(--s2a-spacing-8, 8px);
+  padding: var(--s2a-spacing-24, 24px);
+  border-radius: var(--s2a-border-radius-16, 16px);
+  background: var(--s2a-color-gray-25, #fff);
 }
 
 .speakers-title {

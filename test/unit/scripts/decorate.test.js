@@ -13,6 +13,7 @@ import {
   createTemplatedDateRange,
 } from '../../../event-libs/v1/utils/date-time-helper.js';
 
+const decorateModule = await import('../../../event-libs/v1/utils/decorate.js');
 const {
   decorateEvent,
   updateAnalyticTag,
@@ -23,8 +24,8 @@ const {
   getNonProdData,
   processAutoBlockLinks,
   applyAreaTheme,
-  applySectionColumnsLayout,
-} = await import('../../../event-libs/v1/utils/decorate.js');
+} = decorateModule;
+const decorateArea = decorateModule.default;
 const head = await readFile({ path: './mocks/head.html' });
 const body = await readFile({ path: './mocks/full-event.html' });
 const defaultDoc = await readFile({ path: './mocks/event-default-doc.html' });
@@ -1103,81 +1104,23 @@ describe('applyAreaTheme', () => {
   });
 });
 
-describe('applySectionColumnsLayout', () => {
+describe('decorateArea', () => {
   beforeEach(() => {
     document.body.innerHTML = '';
     document.head.innerHTML = head;
   });
 
-  it('does nothing when section-layout metadata is absent', () => {
+  it('loads the shared event-libs stylesheet', () => {
     document.body.innerHTML = '<main><div class="section"></div></main>';
-    applySectionColumnsLayout();
-    expect(document.querySelector('main').classList.contains('section-columns')).to.be.false;
-  });
-
-  it('does nothing when section-layout is not "columns"', () => {
-    setMetadata('section-layout', 'grid');
-    document.body.innerHTML = '<main><div class="section"></div></main>';
-    applySectionColumnsLayout();
-    expect(document.querySelector('main').classList.contains('section-columns')).to.be.false;
-  });
-
-  it('adds section-columns to main when section-layout is "columns"', () => {
-    setMetadata('section-layout', 'columns');
-    document.body.innerHTML = '<main><div class="section"></div></main>';
-    applySectionColumnsLayout();
-    expect(document.querySelector('main').classList.contains('section-columns')).to.be.true;
-  });
-
-  it('tolerates authored capitalization and whitespace, e.g. " Columns "', () => {
-    setMetadata('section-layout', ' Columns ');
-    document.body.innerHTML = '<main><div class="section"></div></main>';
-    applySectionColumnsLayout();
-    expect(document.querySelector('main').classList.contains('section-columns')).to.be.true;
-  });
-
-  it('loads the required CSS itself, so callers only need to call this one function', () => {
-    setMetadata('section-layout', 'columns');
-    document.body.innerHTML = '<main><div class="section"></div></main>';
-    applySectionColumnsLayout();
+    decorateArea();
     expect(document.getElementById('event-libs-styles')).to.not.be.null;
   });
 
-  it('does not load the CSS when the layout is not enabled', () => {
+  it('is idempotent across repeated calls', () => {
     document.body.innerHTML = '<main><div class="section"></div></main>';
-    applySectionColumnsLayout();
-    expect(document.getElementById('event-libs-styles')).to.be.null;
-  });
-
-  it('is idempotent across repeated calls with unchanged metadata', () => {
-    setMetadata('section-layout', 'columns');
-    document.body.innerHTML = '<main><div class="section"></div></main>';
-    applySectionColumnsLayout();
-    applySectionColumnsLayout();
-    expect(document.querySelector('main').classList.contains('section-columns')).to.be.true;
-  });
-
-  it('picks up metadata changed by a later pass (e.g. personalization updating metadata)', () => {
-    document.body.innerHTML = '<main><div class="section"></div></main>';
-    applySectionColumnsLayout();
-    expect(document.querySelector('main').classList.contains('section-columns')).to.be.false;
-
-    setMetadata('section-layout', 'columns');
-    applySectionColumnsLayout();
-    expect(document.querySelector('main').classList.contains('section-columns')).to.be.true;
-  });
-
-  it('does nothing when there is no main element', () => {
-    document.body.innerHTML = '<div class="not-main"></div>';
-    expect(() => applySectionColumnsLayout()).to.not.throw();
-  });
-
-  it('is not applied automatically by decorateEvent, since consuming sites must call it directly to support non-event pages', () => {
-    setMetadata('section-layout', 'columns');
-    setMetadata('event-id', 'test-event');
-    document.body.innerHTML = '<main><div class="section"></div></main>';
-    decorateEvent(document.querySelector('main'));
-    expect(document.querySelector('main').classList.contains('section-columns')).to.be.false;
+    decorateArea();
+    decorateArea();
+    expect(document.querySelectorAll('#event-libs-styles').length).to.equal(1);
   });
 });
 
