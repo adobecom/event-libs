@@ -34,6 +34,13 @@
   list-style: none;
 }
 
+@media (min-width: 900px) {
+  .session-resources-list {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
 .session-resource {
   display: flex;
   align-items: center;
