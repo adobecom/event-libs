@@ -1,6 +1,7 @@
 import { html, useState, useEffect, useRef } from '../../../../deps/htm-preact.js';
 import { useSessionGuide } from '../store/index.js';
 import { checkViewAccess } from '../../../../services/sessions/action-feedback.js';
+import { IconCheckmark } from './icons.js';
 
 const VIEWS = [
   { value: 'live-upcoming', label: 'Live & upcoming' },
@@ -105,7 +106,12 @@ export function ViewDropdown() {
               tabindex="0"
               aria-selected=${String(state.activeView === v.value)}
               daa-ll="View-Toggle-${v.value}"
-            >${v.label}</li>
+            >
+              <span class="sg-view-menu-item__check" aria-hidden="true">
+                ${state.activeView === v.value && html`<${IconCheckmark} />`}
+              </span>
+              <span class="sg-view-menu-item__label">${v.label}</span>
+            </li>
           `)}
         </ul>
       `}

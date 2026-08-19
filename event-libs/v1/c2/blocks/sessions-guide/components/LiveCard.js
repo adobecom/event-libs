@@ -43,14 +43,14 @@ export function LiveCard({ session, variant = 'live' }) {
   const startTime = formatShortTime(session.startTimeUtc, userTz);
   const endTime = session.endTimeUtc ? formatShortTime(session.endTimeUtc, userTz) : '';
   const timeRange = endTime ? `${startTime} – ${endTime}` : startTime;
-  // Only an upcoming Recommended card states its time. A live card shows the progress bar
-  // and remaining duration instead, and a start time says nothing useful once a session is
-  // on demand.
+  // The meta row's second slot is shared. An upcoming Recommended card states its time
+  // there; every other card badges its first additional event-site track instead, so live
+  // and past Recommended cards get the same two-badge treatment. A live card never needs the
+  // time (it has a progress bar and remaining duration), and a start time says nothing once a
+  // session is on demand. Only the first additional track is used — the ESP field is
+  // multi-select but the badge model supports one (see resolveTrackBadge).
   const showTime = variant === 'recommended' && sessionState === 'upcoming';
-  // A live session with an additional event-site track badges both, side by side, in the
-  // slot the time would otherwise take. Only the first additional track is used — the ESP
-  // field is multi-select but the badge model supports one (see resolveTrackBadge).
-  const secondTrack = sessionState === 'live' ? (session.additionalTracks || [])[0] : undefined;
+  const secondTrack = showTime ? undefined : (session.additionalTracks || [])[0];
 
   const cardClass = [
     'sg-live-card',

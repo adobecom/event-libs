@@ -326,48 +326,77 @@
 }
 
 .sg-view-btn--open {
-  background: #e8e8e8;
   border: none;
 }
 
 .sg-view-chevron {
   display: inline-block;
-  width: 12px;
-  height: 12px;
-  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+  width: 10px;
+  height: 6px;
+  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='black' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
   mask-repeat: no-repeat;
   mask-size: contain;
+  mask-position: center;
   background-color: currentcolor;
+  transition: transform 0.2s ease;
+}
+
+/* Caret points at the open menu. */
+.sg-view-btn--open .sg-view-chevron {
+  transform: scaleY(-1);
 }
 
 .sg-view-menu {
   position: absolute;
-  top: calc(100% + 4px);
+  top: calc(100% + 10px);
   right: 0;
-  min-width: 180px;
+  min-width: 134px;
   list-style: none;
   margin: 0;
-  padding: var(--s2a-spacing-2xs) 0;
+  padding: var(--s2a-spacing-xs);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
   background: var(--s2a-color-background-default, #fff);
-  border: 1px solid var(--s2a-color-border-subtle);
-  border-radius: var(--s2a-border-radius-sm);
-  box-shadow: 0 4px 16px rgb(0 0 0 / 12%);
+  border-radius: 10px;
+  box-shadow:
+    0 0 1px rgb(0 0 0 / 12%),
+    0 2px 3px rgb(0 0 0 / 4%),
+    0 4px 6px rgb(0 0 0 / 8%);
   z-index: 100;
 }
 
 .sg-view-menu-item {
-  padding: var(--s2a-spacing-xs) var(--s2a-spacing-md);
+  display: flex;
+  align-items: center;
+  gap: var(--s2a-spacing-xs);
+  padding: 6px var(--s2a-spacing-xs);
+  border-radius: 6px;
   font-size: var(--s2a-font-size-sm);
   cursor: pointer;
   color: var(--s2a-color-content-default);
+  white-space: nowrap;
 }
 
 .sg-view-menu-item:hover {
   background: var(--s2a-color-gray-75);
 }
 
+/* Always rendered, empty when unselected, so every label lines up on one left edge
+   whether or not its row owns the checkmark. */
+.sg-view-menu-item__check {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  color: var(--s2a-color-blue-900);
+}
+
+/* Selection reads from the checkmark, not from weight — Figma keeps every label regular. */
 .sg-view-menu-item--selected {
-  font-weight: var(--s2a-font-weight-adobe-clean-bold);
+  font-weight: var(--s2a-font-weight-adobe-clean-regular, 400);
 }
 
 /* ── Body Scroll ─────────────────────────────────────────── */
@@ -449,6 +478,8 @@
   mask-position: center;
 }
 
+/* Outlined circle, matching Figma's "Icon Button XL / XL Primary Outline" and the pill
+   treatment on its Filter sibling — 2px gray-100 ring rather than a bare icon. */
 .sg-search-btn {
   display: flex;
   align-items: center;
@@ -457,14 +488,14 @@
   min-width: 40px;
   height: 40px;
   border-radius: 20px;
-  border: none;
-  background: transparent;
+  border: 2px solid var(--s2a-color-gray-100);
+  background: var(--s2a-color-background-default, #fff);
   cursor: pointer;
   flex-shrink: 0;
 }
 
 .sg-search-btn:hover {
-  background: rgb(0 0 0 / 6%);
+  background: rgb(0 0 0 / 4%);
 }
 
 .sg-search-btn.active {
@@ -2018,14 +2049,8 @@
   .sg-view-btn {
     width: auto;
     justify-content: flex-start;
-    background: var(--s2a-color-background-default, #fff);
-    border: 1px solid var(--s2a-color-border-subtle);
-    border-radius: var(--s2a-border-radius-round);
-  }
-
-  .sg-view-btn--open {
-    background: var(--s2a-color-background-default, #fff);
-    border-color: var(--s2a-color-border-default);
+    gap: var(--s2a-spacing-sm);
+    padding: 0 var(--s2a-spacing-lg);
   }
 
   /* ── Filter ────────────────────────────────────────────────── */

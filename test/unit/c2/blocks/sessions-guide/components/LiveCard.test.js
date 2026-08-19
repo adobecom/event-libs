@@ -40,6 +40,13 @@ const LIVE_TWO_TRACKS = {
   additionalTracks: ['Branding', 'Ignored Second'],
 };
 
+const PAST_TWO_TRACKS = {
+  ...LIVE_TWO_TRACKS,
+  id: 'session-past-two-tracks',
+  startTimeUtc: new Date(Date.now() - 90 * 60 * 1000).toISOString(),
+  endTimeUtc: new Date(Date.now() - 60 * 60 * 1000).toISOString(),
+};
+
 const UPCOMING_SESSION = {
   ...LIVE_SESSION,
   id: 'session-upcoming',
@@ -252,7 +259,9 @@ describe('LiveCard', () => {
       expect(render(LIVE_TWO_TRACKS, {})).to.not.include('sg-category-badge__count');
     });
 
-    it('keeps the +1 count when the session is not live', () => {
+    // The second slot holds the time for an upcoming Recommended card, so the extra badge
+    // stands down there and the "+1" carries the additional track instead.
+    it('keeps the +1 count on an upcoming Recommended card, where the time takes the slot', () => {
       const upcoming = {
         ...LIVE_TWO_TRACKS,
         startTimeUtc: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
@@ -261,6 +270,14 @@ describe('LiveCard', () => {
       const out = render(upcoming, { variant: 'recommended' });
       expect(out).to.not.include('sg-live-card__track-extra');
       expect(out).to.include('sg-category-badge__count');
+    });
+
+    it('badges both tracks on a past Recommended card, same as a live one', () => {
+      const out = render(PAST_TWO_TRACKS, { variant: 'recommended' });
+      expect(out).to.include('sg-live-card__track-extra');
+      expect(out).to.include('Branding');
+      expect(out).to.not.include('sg-category-badge__count');
+      expect(out).to.not.include('sg-live-card__time');
     });
 
     it('renders no second badge for a live session with no additional tracks', () => {
