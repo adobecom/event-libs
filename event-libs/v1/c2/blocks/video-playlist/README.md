@@ -35,6 +35,8 @@ not the primary path):
 | `session-id` | No | page's own `session-id` metadata | Only needed as a fallback if that metadata is missing. |
 | `playlist-title` | No | `More like this` | Heading shown above the topic playlist. Ignored in the Chapters variant (always titled "Chapters"). |
 | `minimum-sessions` | No | `4` | Minimum number of matching on-demand sessions required before the topic playlist renders at all. |
+| `maximum-sessions` | No | `7` | Ceiling on total rows ever rendered — rows beyond this are never built, so "Show more" can never reveal more than this. Once expanded, the list scrolls internally beyond ~4 visible rows. |
+| `default-thumbnail` | No | — | Fallback thumbnail URL used for a row whose own session has no thumbnail of its own. |
 | `chapters` | No | — | JSON array authored for the Chapters variant: `[{"label": "Intro", "timestampSeconds": 0}, ...]`. No backend field exists for this — it's hand-authored per session. |
 
 ## How the topic playlist is resolved
@@ -180,6 +182,19 @@ row's thumbnail/meta (a row can't be a native `<button>` itself once it
 needs to contain another `<button>`) — its click handler calls
 `stopPropagation()` so favoriting a row never also navigates to it.
 
+## The current session's own row
+
+The current session is **prepended** to the topic playlist's displayed rows
+(`render()` in `video-playlist.js`) and highlighted via the same
+`highlightRow` used for the Chapters variant's first chapter — so the
+viewer can tell which row is theirs while browsing "more like this". This
+is purely a **display** concern: `resolveTopicPlaylist`'s own return value
+(used for `minSessions` gating and for `nextRow`, the actual next session
+to autoplay to) still only ever contains **other** qualifying sessions,
+unaffected — the current session never counts toward `minimum-sessions`.
+It does occupy one of the `maximum-sessions` display slots, though, since
+that cap applies to the final, current-session-included display list.
+
 ## Row selection
 
 Selecting a topic-playlist row **navigates to that session's own page**
@@ -198,12 +213,19 @@ for free.
 
 - **Desktop (≥1024px)**: right-rail, `.section:has(> .video-playlist)`
   becomes a row flex container (no JS DOM-wrapping) — the preceding player
-  block takes the remaining space, this block becomes a fixed 360px rail.
+  block takes the remaining space, this block becomes a fixed-width rail
+  that widens per breakpoint (349px at 1024px, 392px at 1440px, 487px at
+  1920px, per Figma inspect).
+  The section itself also carries the same responsive side-margin scale
+  `event-marquee.css` uses (86px/124px/220px at 1024/1440/1920), since
+  that scale isn't inherited from anywhere global.
   A "Show more" button (topic-playlist only, shown once there are more than
   `SHOW_MORE_INITIAL_ROWS` (4) rows) reveals the remaining rows via a CSS
   `nth-child` cap — independent of the mobile drawer's `is-expanded` state
   below, which covers an unrelated need (the full list already scrolls on
-  mobile, so there's no cap there).
+  mobile, so there's no cap there). Per Figma, expanding never changes the
+  rail's own width — only the row count — so `is-expanded` has no CSS width
+  effect on desktop at all (it's mobile-drawer-height-only; see Drawer).
 - **Mobile (<1024px)**: a `position: fixed` bottom sheet, open on load.
   Collapsing/expanding is governed by `computeDrawerCapPx`/
   `clampedTitleBottom` in `video-playlist.js` — the drawer can never expand
