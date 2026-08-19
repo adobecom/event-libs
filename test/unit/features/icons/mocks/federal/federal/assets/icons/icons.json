@@ -1,0 +1,19 @@
+{
+  "total": 2,
+  "offset": 0,
+  "limit": 2,
+  "data": [
+    {
+      "key": "checkmark",
+      "icon": "https://main--federal--adobecom.aem.live/federal/assets/icons/svgs/checkmark.svg",
+      "notation": ":checkmark: checkmark"
+    },
+    {
+      "key": "chevron-right",
+      "icon": "https://main--federal--adobecom.aem.live/federal/assets/icons/svgs/chevron-right.svg",
+      "notation": ":chevron-right: chevron-right"
+    }
+  ],
+  "columns": ["key", "icon", "notation"],
+  ":type": "sheet"
+}

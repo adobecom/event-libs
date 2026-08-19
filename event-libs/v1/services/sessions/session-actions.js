@@ -1,5 +1,5 @@
 import {
-  auth, sessions, scheduled, pendingActions, scheduleSession, favoriteSession,
+  auth, sessions, scheduled, pendingActions, toggleSchedule, toggleFavorite,
 } from '../../utils/session-store.js';
 
 // Discriminated failure reason so callers can decide their own UI (toast copy,
@@ -27,13 +27,14 @@ function findScheduleConflict(incoming, allSessions, scheduledIds) {
   ) || null;
 }
 
-function assertAuthorized() {
+// Exported so action-feedback.js's checkViewAccess() can reuse the same check.
+export function assertAuthorized() {
   const { isLoggedIn, isRegistered } = auth.value;
   if (isLoggedIn !== true) throw new SessionActionError('auth-required');
   if (isRegistered !== true) throw new SessionActionError('registration-required');
 }
 
-export async function scheduleAction(session, { showConflictModal = false } = {}) {
+export async function toggleScheduleAction(session, { showConflictModal = false } = {}) {
   assertAuthorized();
   if (pendingActions.value.has(session.id)) return;
 
@@ -44,27 +45,27 @@ export async function scheduleAction(session, { showConflictModal = false } = {}
   }
 
   try {
-    await scheduleSession(session);
+    await toggleSchedule(session);
   } catch (err) {
     throw new SessionActionError('network', { cause: err });
   }
 }
 
-export async function favoriteAction(session) {
+export async function toggleFavoriteAction(session) {
   assertAuthorized();
   if (pendingActions.value.has(session.id)) return;
 
   try {
-    await favoriteSession(session);
+    await toggleFavorite(session);
   } catch (err) {
     throw new SessionActionError('network', { cause: err });
   }
 }
 
-// Used by a caller's conflict-modal "keep incoming" confirm handler — scheduleSession
+// Used by a caller's conflict-modal "keep incoming" confirm handler — toggleSchedule
 // toggles based on current state, so removing the conflict then adding the incoming
 // session reuses the same mutator without bespoke swap logic.
 export async function resolveScheduleConflict(conflict, incoming) {
-  await scheduleSession(conflict);
-  await scheduleSession(incoming);
+  await toggleSchedule(conflict);
+  await toggleSchedule(incoming);
 }

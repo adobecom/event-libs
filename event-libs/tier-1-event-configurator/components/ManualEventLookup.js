@@ -5,8 +5,9 @@ import { useEventEnv } from '../context/EventEnvContext.js';
 import { EVENT_SERVICE_ENV_OPTIONS } from '../constants.js';
 
 // New Config/Duplicate's fallback when EventPicker's browse fails at
-// runtime (Library.js's browseFailed). Also the one place to target a
-// non-prod ESP tier — the choice persists for the rest of the session.
+// runtime (Library.js's browseFailed). Shares its env picker with
+// EventPicker via EventEnvContext, so a switch here also gives EventPicker
+// another shot at that env; the choice otherwise persists for the session.
 export default function ManualEventLookup({
   isOpen, onClose, onSelect, title = 'Enter an Event ID',
 }) {

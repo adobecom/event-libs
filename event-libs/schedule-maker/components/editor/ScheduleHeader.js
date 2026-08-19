@@ -7,8 +7,10 @@ import { DA_ORIGIN } from '../../constants.js';
 
 export default function ScheduleHeader() {
   const { org, repo } = useDA();
-  const { activeSchedule, hasUnsavedChanges, docRefs } = useSchedulesData();
-  const { updateScheduleLocally, discardChangesToActiveSchedule } = useSchedulesOperations();
+  const { activeSchedule, hasUnsavedChanges, setActiveSchedule } = useSchedulesData();
+  const {
+    updateScheduleLocally, discardChangesToActiveSchedule, sortBlocksLocally, createAndAddSchedule,
+  } = useSchedulesOperations();
   const { setToastSuccess, setToastError } = useSchedulesUI();
 
   const [isEditingScheduleTitle, setIsEditingScheduleTitle] = useState(false);
@@ -16,15 +18,35 @@ export default function ScheduleHeader() {
   const handleCopyLink = async () => {
     if (!activeSchedule) return;
     try {
-      const didCopy = await ScheduleURLUtility.copyScheduleToClipboard(activeSchedule, org, repo);
-      if (didCopy) {
-        setToastSuccess('Link copied to clipboard');
+      const { copied, wasReordered } = await ScheduleURLUtility.copyScheduleToClipboard(activeSchedule, org, repo);
+      if (copied) {
+        if (wasReordered) {
+          sortBlocksLocally();
+          setToastSuccess('Blocks were out of order and have been sorted by start time. Link copied to clipboard.');
+        } else {
+          setToastSuccess('Link copied to clipboard');
+        }
       } else {
         setToastError('Failed to copy link to clipboard');
       }
     } catch (error) {
       window.lana?.log(`Error copying link: ${error}`);
     }
+  };
+
+  // Starts an independent schedule seeded from the current one's content, with
+  // a fresh scheduleId/createdTime/modificationTime — for authors building a
+  // variant, not updating this schedule in place. Copy Link never does this:
+  // it always keeps the same scheduleId, since placing/replacing links for the
+  // same logical schedule is its own, more common job.
+  const handleDuplicate = () => {
+    if (!activeSchedule) return;
+    const duplicated = createAndAddSchedule({
+      ...activeSchedule,
+      title: `${activeSchedule.title} (Copy)`,
+    });
+    setActiveSchedule(duplicated);
+    setToastSuccess('Duplicated as a new, independent schedule');
   };
 
   if (!activeSchedule) {
@@ -70,6 +92,15 @@ export default function ScheduleHeader() {
             Discard
           </sp-action-button>
         `}
+        <sp-action-button size="m" onclick=${handleDuplicate} title="Start a new, independent schedule from this one's current content">
+          <sp-icon slot="icon">
+            <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <rect x="2.5" y="4.5" width="9" height="9" rx="1" stroke="currentColor" stroke-width="1.3"/>
+              <path d="M6.5 4.5V3.5C6.5 2.94772 6.94772 2.5 7.5 2.5H14.5C15.0523 2.5 15.5 2.94772 15.5 3.5V10.5C15.5 11.0523 15.0523 11.5 14.5 11.5H13.5" stroke="currentColor" stroke-width="1.3" fill="none"/>
+            </svg>
+          </sp-icon>
+          Duplicate
+        </sp-action-button>
         <sp-action-button size="m" onclick=${handleCopyLink}>
           <sp-icon slot="icon">
             <svg width="20" height="21" viewBox="0 0 20 21" fill="currentColor">
@@ -79,10 +110,39 @@ export default function ScheduleHeader() {
           Copy link
         </sp-action-button>
       </div>
-      ${docRefs[activeSchedule.scheduleId]?.length > 0 && html`
+      ${activeSchedule.hasConflictingVersions && html`
+        <div class="sm-editor__conflict-warning">
+          <p class="sm-editor__conflict-warning-summary">
+            ⚠ This schedule shares an ID with ${activeSchedule.conflictingVersions.length} other version(s) that have different content:
+          </p>
+          <ul class="sm-editor__conflict-warning-list">
+            ${activeSchedule.conflictingVersions.map((sib) => html`
+              <li>
+                “${sib.title}” —
+                ${sib.referencedInDocs.length > 0
+                  ? sib.referencedInDocs.map((path, i) => html`
+                    ${i > 0 && ', '}<a
+                      class="sm-editor__doc-ref"
+                      href="${DA_ORIGIN}/edit#/${org}/${repo}${path.replace(/\.html$/, '')}"
+                      target="_blank"
+                      rel="noreferrer"
+                    >${path.replace(/\.html$/, '')}</a>
+                  `)
+                  : 'no doc currently found'}
+              </li>
+            `)}
+          </ul>
+          <p class="sm-editor__conflict-warning-hint">
+            If these are meant to be independent schedules, open the other version and click Duplicate.
+            If this is really the same schedule, decide which content is correct (editing first if needed), then Copy Link
+            and replace every doc reference for this schedule — both listed above and in "Referenced in" below — with the new link.
+          </p>
+        </div>
+      `}
+      ${activeSchedule.referencedInDocs?.length > 0 && html`
         <div class="sm-editor__doc-refs">
           <span class="sm-editor__doc-refs-label">Referenced in:</span>
-          ${docRefs[activeSchedule.scheduleId].map((path) => html`
+          ${activeSchedule.referencedInDocs.map((path) => html`
             <a
               class="sm-editor__doc-ref"
               href="${DA_ORIGIN}/edit#/${org}/${repo}${path.replace(/\.html$/, '')}"

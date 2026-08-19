@@ -19,14 +19,18 @@ const EVENT_BLOCKS = [
   'youtube-chat',
   'image-links',
   'venue-map',
-  'sessions-guide',
-  'sessions-guide-full-page',
-  'session-state-demo',
 ];
 
 const EVENT_BLOCKS_C2 = [
+  'event-card',
+  'event-carousel',
+  'upcoming-sessions',
   'chrono-box',
   'mobile-rider',
+  'event-marquee',
+  'sessions-guide',
+  'sessions-guide-full-page',
+  'session-state-demo',
 ];
 
 // Import only the most essential utilities that are always needed
@@ -48,6 +52,7 @@ import {
   getNonProdData,
   validatePageAndRedirect,
   processAutoBlockLinks,
+  applySectionColumnsLayout,
 } from './utils/decorate.js';
 
 import { registerHydrator } from './hydrate/hydrate.js';
@@ -66,6 +71,7 @@ export {
   getNonProdData,
   validatePageAndRedirect,
   processAutoBlockLinks,
+  applySectionColumnsLayout,
   registerHydrator,
   repeatTemplate,
   EVENT_BLOCKS,

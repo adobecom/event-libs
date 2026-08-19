@@ -1058,10 +1058,10 @@ function processTemplateInAllNodes(parent, extraData) {
 
 function addStylesToEventPage() {
   const styleId = 'event-libs-styles';
-  
+
   // Check if styles are already loaded
   if (document.getElementById(styleId)) return;
-  
+
   // Create and append the stylesheet link
   const link = document.createElement('link');
   link.id = styleId;
@@ -1070,8 +1070,31 @@ function addStylesToEventPage() {
   document.head.appendChild(link);
 }
 
+// Not called from decorateEvent: decorateEvent only runs on pages with an
+// event-id, but this layout is meant for static/non-event pages too. The
+// consuming site's own decorateArea should call this directly, unconditionally.
+// Always resolves the real page <main> directly rather than relying on a
+// `parent`/`area` argument, since callers may re-enter with fragment/MEP
+// elements. Re-reads metadata on every call (no cached "checked" flag) so a
+// later personalization pass that updates `section-layout` still takes effect.
+// Calls addStylesToEventPage() itself so callers only need this one function
+// to get both the CSS and the class toggle.
+export function applySectionColumnsLayout() {
+  const main = document.querySelector('main');
+  if (!main) return;
+  const enabled = getMetadata('section-layout')?.trim().toLowerCase() === 'columns';
+  if (enabled) addStylesToEventPage();
+  main.classList.toggle('section-columns', enabled);
+}
+
 // e.g. "dark", "dark(blocks:hero-marquee,profile-cards)", or "dark(blocks:text[first],agenda)"
 const BLOCK_TOKEN_RE = /^([^[\]]+?)(?:\[\s*(first|last|[1-9]\d*)\s*\])?$/;
+
+const PAGE_BLOCK_SELECTOR = [
+  'main > div > div[class]',
+  'main .chrono-box .fragment > div > div[class]',
+  'main .promotional-content .fragment > div > div[class]',
+].join(', ');
 
 function parseThemeValue(raw) {
   const value = raw?.toLowerCase().trim();
@@ -1107,25 +1130,33 @@ export function applyAreaTheme(area = document) {
 
     const isDocument = area === document;
     const blocks = isDocument
-      ? area.body.querySelectorAll('main > div > div[class]')
+      ? area.body.querySelectorAll(PAGE_BLOCK_SELECTOR)
       : area.querySelectorAll('div[class]');
 
     if (blockTokens) {
-      const blockList = Array.from(blocks);
+      const localList = Array.from(blocks);
+      const positionalTokens = blockTokens.filter((t) => t.selector);
       const plainNames = blockTokens.filter((t) => !t.selector).map((t) => t.name);
-      const positionalTargets = new Set();
-      blockTokens.filter((t) => t.selector).forEach(({ name, selector }) => {
-        const group = blockList.filter((b) => b.classList.contains(name));
-        const index = selector === 'first' ? 0
-          : selector === 'last' ? group.length - 1
-            : Number(selector) - 1;
-        if (group[index]) positionalTargets.add(group[index]);
-      });
 
-      blockList.forEach((block) => {
-        const matches = plainNames.some((name) => block.classList.contains(name))
-          || positionalTargets.has(block);
-        if (!matches) return;
+      if (positionalTokens.length) {
+        const pageBlockList = isDocument
+          ? localList
+          : Array.from(document.body.querySelectorAll(PAGE_BLOCK_SELECTOR));
+        positionalTokens.forEach(({ name, selector }) => {
+          const group = pageBlockList.filter((b) => b.classList.contains(name));
+          const index = selector === 'first' ? 0
+            : selector === 'last' ? group.length - 1
+              : Number(selector) - 1;
+          const target = group[index];
+          group.forEach((block) => {
+            block.classList.remove('dark', 'light');
+            if (block === target) block.classList.add(themeValue);
+          });
+        });
+      }
+
+      localList.forEach((block) => {
+        if (!plainNames.some((name) => block.classList.contains(name))) return;
         block.classList.remove('dark', 'light');
         block.classList.add(themeValue);
       });
@@ -1185,17 +1216,11 @@ export function decorateEvent(parent) {
 
   if (!getMetadata('event-id')) return;
 
-  // Bootstraps the page-wide Tier 1 Event Configurator app output (track icons/colors,
-  // allowDoubleBooking, rfApiUrl/rfProfileId, ...) ahead of any block's own init(), so
-  // any block can call getTrackIcon()/getAllowDoubleBooking() regardless of tier. Cheap
-  // parse, no network cost, so unlike initSessionState() below it isn't gated further.
-  initTierOneEventConfig();
-
-  // Bootstraps shared, page-level session state (sessions, favorites, scheduled, auth)
-  // ahead of any block's own init() — no-ops when tier-1-event-config isn't authored.
-  // Also gated on tier-1-event-state-enabled since event-id alone is already authored
-  // broadly in prod; we don't want to bootstrap this on every page that happens to have it.
-  if (getMetadata('tier-1-event-state-enabled') === 'true') {
+  // Bootstraps Tier 1 Event Configurator output + shared session state ahead of any
+  // block's own init(). Gated on tier-1-event-config, not just event-id, since that's
+  // the real signal a page wants this.
+  if (getMetadata('tier-1-event-config')) {
+    initTierOneEventConfig();
     initSessionState();
   }
 

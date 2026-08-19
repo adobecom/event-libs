@@ -2,13 +2,16 @@ import {
   useState, useEffect, useMemo, html,
 } from '../../v1/deps/htm-preact.js';
 import { getEventSessionCatalog } from '../../v1/utils/esp-controller.js';
-import { extractDistinctTracks, deriveFacetableAttributes } from '../../v1/services/sessions/sessions-api.js';
+import {
+  extractDistinctTracks, extractDistinctOverrideTexts, deriveFacetableAttributes,
+} from '../../v1/services/sessions/sessions-api.js';
 import { useNavigation } from '../context/NavigationContext.js';
 import { useConfigs } from '../context/ConfigsContext.js';
 import { useDA } from '../context/DAContext.js';
 import { getDisplayTitle, copyRowLinkWithToast } from '../utils.js';
 import SwimlaneOrderEditor from '../components/SwimlaneOrderEditor.js';
 import FiltersEditor from '../components/FiltersEditor.js';
+import RecommendedSessionsEditor from '../components/RecommendedSessionsEditor.js';
 import LoadingInline from '../components/LoadingInline.js';
 
 export default function ConfigEditor() {
@@ -21,6 +24,7 @@ export default function ConfigEditor() {
 
   const [isSaving, setIsSaving] = useState(false);
   const [sessions, setSessions] = useState([]);
+  const [sessionTimes, setSessionTimes] = useState([]);
   const [isLoadingSessions, setIsLoadingSessions] = useState(false);
   const [sessionsError, setSessionsError] = useState(null);
 
@@ -38,7 +42,15 @@ export default function ConfigEditor() {
         return;
       }
       setSessions(result.data.sessions);
-      seedSwimlaneOrder(extractDistinctTracks(result.data.sessions));
+      setSessionTimes(result.data.sessionTimes);
+      // Swimlanes include real tracks and override-lane names (each distinct Override
+      // Primary Event Site Track value is its own swimlane, matching groupByTrack()) —
+      // deduped in case a track name and override text collide.
+      const swimlaneCandidates = [...new Set([
+        ...extractDistinctTracks(result.data.sessions),
+        ...extractDistinctOverrideTexts(result.data.sessions),
+      ])];
+      seedSwimlaneOrder(swimlaneCandidates);
       seedFilterCategories(deriveFacetableAttributes(result.data.sessions));
     }).finally(() => {
       if (!cancelled) setIsLoadingSessions(false);
@@ -47,6 +59,7 @@ export default function ConfigEditor() {
   }, [eventId, seedSwimlaneOrder, seedFilterCategories]);
 
   const tracks = useMemo(() => extractDistinctTracks(sessions), [sessions]);
+  const overrideTexts = useMemo(() => extractDistinctOverrideTexts(sessions), [sessions]);
 
   const handleCancel = () => {
     clearActiveConfig();
@@ -86,7 +99,7 @@ export default function ConfigEditor() {
         ${isLoadingSessions && html`<${LoadingInline} label="Loading sessions…" />`}
         ${sessionsError && html`<p class="sgc-editor__error">${sessionsError}</p>`}
         ${!isLoadingSessions && !sessionsError && html`
-          <p class="sgc-editor__section-hint">${sessions.length} session(s) found — ${tracks.length} distinct track(s).</p>
+          <p class="sgc-editor__section-hint">${sessions.length} session(s) found — ${tracks.length} distinct track(s), ${overrideTexts.length} distinct override lane(s).</p>
         `}
       </section>
 
@@ -221,20 +234,12 @@ export default function ConfigEditor() {
           />
           Enable Watch Now CTAs
         </label>
-        <label class="sgc-editor__checkbox">
-          <input
-            type="checkbox"
-            checked=${!!activeConfig.config.behaviorFlags.enableBrandConciergeRibbon}
-            onChange=${(e) => updateNestedConfigField('behaviorFlags', 'enableBrandConciergeRibbon', e.target.checked)}
-          />
-          Enable Brand Concierge Ribbon
-        </label>
         <p class="sgc-editor__section-hint">Allowing double-booking of overlapping sessions is set at the event level via the linked Tier 1 config, not here.</p>
       </section>
 
       <section class="sgc-editor__section">
         <h2>On-demand swimlane order</h2>
-        <p class="sgc-editor__section-hint">Drag to reorder, or focus a handle and press arrow up/down. Unselect a track to hide it from the session guide entirely, or edit its name to change how it's labeled here — the original value stays shown alongside for reference. Track icons/colors are still managed globally via the Tier 1 Event Configurator.</p>
+        <p class="sgc-editor__section-hint">Includes both real tracks and Override Primary Event Site Track lanes — each distinct override text is its own swimlane, same as on the live page. Drag to reorder, or focus a handle and press arrow up/down. Unselect an entry to hide it from the session guide entirely, or edit its name to change how it's labeled here — the original value stays shown alongside for reference. Icons/colors are still managed globally via the Tier 1 Event Configurator.</p>
         ${isLoadingSessions && html`<${LoadingInline} label="Loading tracks…" />`}
         ${sessionsError && html`<p class="sgc-editor__error">${sessionsError}</p>`}
         ${!isLoadingSessions && !sessionsError && html`
@@ -254,6 +259,22 @@ export default function ConfigEditor() {
           <${FiltersEditor} \
             categories=${activeConfig.config.filterCategories} \
             onChange=${(next) => updateConfigField('filterCategories', next)} \
+          />
+        `}
+      </section>
+
+      <section class="sgc-editor__section">
+        <h2>Recommended Sessions</h2>
+        <p class="sgc-editor__section-hint">Fills the live carousel when nothing is currently live, and the on-demand view's featured row. Falls back to a randomized selection of the day's sessions when nothing is picked here.</p>
+        ${isLoadingSessions && html`<${LoadingInline} label="Loading sessions…" />`}
+        ${sessionsError && html`<p class="sgc-editor__error">${sessionsError}</p>`}
+        ${!isLoadingSessions && !sessionsError && html`
+          <${RecommendedSessionsEditor} \
+            sessions=${sessions} \
+            sessionTimes=${sessionTimes} \
+            tracks=${tracks} \
+            recommendedSessions=${activeConfig.config.recommendedSessions} \
+            onChange=${(next) => updateConfigField('recommendedSessions', next)} \
           />
         `}
       </section>

@@ -507,6 +507,32 @@
   text-decoration: underline;
 }
 
+.sm-editor__conflict-warning {
+  width: 100%;
+  font-size: 0.75rem;
+  color: var(--sm-color-warning-text, #7a4d00);
+  background: var(--sm-color-warning-bg, #fff3e0);
+  border: 1px solid var(--sm-color-warning-border, #f0c674);
+  border-radius: var(--sm-radius-sm, 4px);
+  padding: var(--sm-spacing-sm);
+  margin-bottom: var(--sm-spacing-sm);
+}
+
+.sm-editor__conflict-warning-summary {
+  margin: 0 0 var(--sm-spacing-xs, 4px);
+  font-weight: 600;
+}
+
+.sm-editor__conflict-warning-list {
+  margin: 0 0 var(--sm-spacing-xs, 4px);
+  padding-left: 1.25em;
+}
+
+.sm-editor__conflict-warning-hint {
+  margin: 0;
+  color: var(--sm-color-text-secondary, #6e6e6e);
+}
+
 .sm-editor__header-title {
   display: flex;
   align-items: center;
@@ -703,12 +729,21 @@
   box-sizing: border-box;
   block-size: 32px;
   inline-size: 180px;
+  /* stylelint-disable-next-line property-no-vendor-prefix -- no unprefixed equivalent removes Firefox's number-input spinner */
+  -moz-appearance: textfield;
 }
 
 .sm-input--epoch:focus {
   outline: var(--sm-border-width-thick) solid rgb(20 122 243);
   outline-offset: var(--sm-border-width-thick);
   border-color: #000;
+}
+
+.sm-input--epoch::-webkit-outer-spin-button,
+.sm-input--epoch::-webkit-inner-spin-button {
+  /* stylelint-disable-next-line property-no-vendor-prefix -- no unprefixed equivalent removes Chrome/Safari's number-input spinner */
+  -webkit-appearance: none;
+  margin: 0;
 }
 
 .sm-datetime-pt-hint {

@@ -339,6 +339,78 @@ const { fetchCampaignMap, resetCampaignMapCache } = (() => {
 
 export { resetCampaignMapCache };
 
+const { waitForAdobeIMS, resetAdobeIMSWatcher } = (() => {
+  const POLL_INTERVAL_MS = 100;
+  const POLL_MAX_ATTEMPTS = 100;
+
+  let installed = false;
+  const pendingResolvers = new Set();
+
+  const isAdobeIMSReady = () => !!(window.adobeIMS && typeof window.adobeIMS.getAccessToken === 'function');
+
+  const notifyReady = () => {
+    pendingResolvers.forEach((settle) => settle());
+    pendingResolvers.clear();
+  };
+
+  const ensureWatcher = () => {
+    if (installed) return;
+    installed = true;
+
+    try {
+      let adobeIMSValue = window.adobeIMS;
+      Object.defineProperty(window, 'adobeIMS', {
+        configurable: true,
+        get() { return adobeIMSValue; },
+        set(value) {
+          adobeIMSValue = value;
+          if (isAdobeIMSReady()) notifyReady();
+        },
+      });
+    } catch (e) {
+      let attempts = 0;
+      const poll = setInterval(() => {
+        if (isAdobeIMSReady()) {
+          clearInterval(poll);
+          notifyReady();
+        } else if (attempts >= POLL_MAX_ATTEMPTS) {
+          clearInterval(poll);
+        }
+        attempts += 1;
+      }, POLL_INTERVAL_MS);
+    }
+  };
+
+  return {
+    waitForAdobeIMS: (timeoutMs = POLL_MAX_ATTEMPTS * POLL_INTERVAL_MS) => {
+      if (isAdobeIMSReady()) return Promise.resolve();
+
+      ensureWatcher();
+
+      return new Promise((resolve) => {
+        let settled = false;
+        let timeoutId;
+        const settle = () => {
+          if (settled) return;
+          settled = true;
+          clearTimeout(timeoutId);
+          pendingResolvers.delete(settle);
+          resolve();
+        };
+
+        pendingResolvers.add(settle);
+        timeoutId = setTimeout(settle, timeoutMs);
+      });
+    },
+    resetAdobeIMSWatcher: () => {
+      installed = false;
+      notifyReady();
+    },
+  };
+})();
+
+export { waitForAdobeIMS, resetAdobeIMSWatcher };
+
 /**
  * Returns the campaign ID from the current URL search params if present and valid.
  * @param {URLSearchParams} [searchParams] - Optional search params (defaults to window.location.search).
@@ -845,4 +917,10 @@ export function loadLink(href, {
 
 export function loadStyle(href, callback) {
   return loadLink(href, { rel: 'stylesheet', callback });
+}
+
+// Returns url only if it starts with https://, http://, or / — blocks javascript: URIs.
+export function safeUrl(url) {
+  if (!url) return undefined;
+  return /^(https?:\/\/|\/)/.test(url) ? url : undefined;
 }
