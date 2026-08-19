@@ -20,6 +20,9 @@ const CHEVRON_ICON = '<svg xmlns="http://www.w3.org/2000/svg" width="8" height="
 
 const ctaLabel = (m) => (DOWNLOADABLE.test(m.fileURL || '') ? 'Download' : 'Open');
 
+// Suffixes the aria-controls id so multiple instances on one page stay unique.
+let instances = 0;
+
 export default async function init(el) {
   const materials = getJsonMetadata('material-list', []);
   const published = Array.isArray(materials)
@@ -38,20 +41,29 @@ export default async function init(el) {
   published.forEach((m, i) => {
     const item = createTag('li', { class: 'session-resource' });
     if (i >= MOBILE_LIMIT) item.classList.add('is-overflow');
-    item.append(createTag('span', { class: 'session-resource-name' }, m.fileName || m.fileTypeName || 'Resource'));
+    const name = m.fileName || m.fileTypeName || 'Resource';
+    item.append(createTag('span', { class: 'session-resource-name' }, name));
     item.append(createTag('a', {
       class: 'session-resource-cta',
       href: m.fileURL,
       target: '_blank',
       rel: 'noopener noreferrer',
+      // The visible text is only "Open"/"Download" and the file name is a sibling,
+      // so name the link for AT link lists and flag the new tab.
+      'aria-label': `${ctaLabel(m)} ${name} (opens in new tab)`,
     }, ctaLabel(m)));
     list.append(item);
   });
   el.append(list);
 
   if (published.length > MOBILE_LIMIT) {
+    instances += 1;
+    list.id = `session-resources-list-${instances}`; // unique per instance for aria-controls
     const toggle = createTag('button', {
-      class: 'session-resources-toggle', type: 'button', 'aria-expanded': 'false',
+      class: 'session-resources-toggle',
+      type: 'button',
+      'aria-expanded': 'false',
+      'aria-controls': list.id,
     });
     const label = createTag('span', {}, 'Show more');
     toggle.append(label);

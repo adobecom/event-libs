@@ -22,8 +22,10 @@ describe('session-details schedule', () => {
     setMetadata('session-id', 'sid');
     const btn = renderSchedule();
     expect(btn.classList.contains('session-schedule')).to.be.true;
-    expect(btn.getAttribute('aria-pressed')).to.equal('false');
     expect(btn.textContent).to.contain('Add to schedule');
+    // The visible label carries the state, so aria-pressed is intentionally absent
+    // (setting both would double-announce it).
+    expect(btn.hasAttribute('aria-pressed')).to.be.false;
   });
 
   it('reflects the scheduled signal', () => {
@@ -31,7 +33,6 @@ describe('session-details schedule', () => {
     const btn = renderSchedule();
     scheduled.value = new Set(['sid']);
     expect(btn.classList.contains('is-scheduled')).to.be.true;
-    expect(btn.getAttribute('aria-pressed')).to.equal('true');
     expect(btn.textContent).to.contain('Added to schedule');
   });
 

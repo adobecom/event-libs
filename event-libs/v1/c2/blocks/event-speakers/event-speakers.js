@@ -15,6 +15,9 @@ import { getJsonMetadata } from '../../utils/custom-attributes.js';
 
 const MOBILE_LIMIT = 5;
 
+// Suffixes the aria-controls id so multiple instances on one page stay unique.
+let instances = 0;
+
 // Chevron next to the toggle label; rotates 180° when expanded (see CSS).
 const CHEVRON_ICON = '<svg xmlns="http://www.w3.org/2000/svg" width="8" height="5" viewBox="0 0 8 5" fill="none" aria-hidden="true"><path d="M1 1L4 4L7 1" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 
@@ -31,11 +34,15 @@ function renderAvatar(s) {
   const avatar = createTag('span', { class: 'speaker-avatar' });
   const url = photoUrl(s);
   if (url) {
+    // Decorative unless the author supplied altText: the speaker's name is the very
+    // next element, so falling back to it would announce the name twice.
     avatar.append(createTag('img', {
-      class: 'speaker-photo', src: url, alt: s.photo?.altText || fullName(s), loading: 'lazy',
+      class: 'speaker-photo', src: url, alt: s.photo?.altText || '', loading: 'lazy',
     }));
   } else {
+    // Initials are a visual stand-in for the adjacent name — hide from AT.
     avatar.classList.add('speaker-avatar--placeholder');
+    avatar.setAttribute('aria-hidden', 'true');
     avatar.textContent = initials(s) || '?';
   }
   return avatar;
@@ -64,8 +71,13 @@ export default async function init(el) {
   el.append(list);
 
   if (speakers.length > MOBILE_LIMIT) {
+    instances += 1;
+    list.id = `speakers-list-${instances}`; // unique per instance for aria-controls
     const toggle = createTag('button', {
-      class: 'speakers-toggle', type: 'button', 'aria-expanded': 'false',
+      class: 'speakers-toggle',
+      type: 'button',
+      'aria-expanded': 'false',
+      'aria-controls': list.id,
     });
     const label = createTag('span', {}, 'Show more');
     toggle.append(label);

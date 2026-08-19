@@ -23,7 +23,8 @@ describe('session-details favorite', () => {
     const btn = renderFavorite();
     expect(btn.classList.contains('session-favorite')).to.be.true;
     expect(btn.getAttribute('aria-pressed')).to.equal('false');
-    expect(btn.getAttribute('aria-label')).to.equal('Add to favorites');
+    // Name stays constant; aria-pressed carries the state (avoids double announcement).
+    expect(btn.getAttribute('aria-label')).to.equal('Favorite this session');
     expect(btn.querySelector('svg')).to.not.be.null;
   });
 
@@ -33,7 +34,7 @@ describe('session-details favorite', () => {
     favorited.value = new Set(['sid']);
     expect(btn.classList.contains('is-favorited')).to.be.true;
     expect(btn.getAttribute('aria-pressed')).to.equal('true');
-    expect(btn.getAttribute('aria-label')).to.equal('Remove from favorites');
+    expect(btn.getAttribute('aria-label')).to.equal('Favorite this session');
   });
 
   it('shows a login toast when favoriting while signed out', async () => {

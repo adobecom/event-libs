@@ -28,7 +28,11 @@ export default async function init(el) {
   const eyebrow = createTag('div', { class: 'session-eyebrow' });
   const trackTags = renderTrackTags();
   if (trackTags) eyebrow.append(trackTags);
-  const statusSlot = createTag('span', { class: 'session-status-slot' });
+  // Persistent live region: the status changes on a timer at the session's
+  // start/end boundary, not from a user action, so the swap has to be announced.
+  const statusSlot = createTag('span', {
+    class: 'session-status-slot', role: 'status', 'aria-live': 'polite',
+  });
   eyebrow.append(statusSlot);
   el.append(eyebrow);
 

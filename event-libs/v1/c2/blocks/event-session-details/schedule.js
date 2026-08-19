@@ -39,10 +39,13 @@ export function renderSchedule() {
     class: 'session-primary-cta-btn session-schedule',
   });
 
+  // No `aria-pressed` here: the visible label itself flips to "Added to schedule",
+  // so the accessible name already carries the state. Setting both would announce
+  // it twice ("Added to schedule, pressed"), and a stable name would contradict the
+  // visible text (WCAG 2.5.3 Label in Name).
   const paint = () => {
     const isScheduled = scheduled.value.has(sessionId);
     btn.innerHTML = `${CALENDAR_ICON}<span>${isScheduled ? 'Added to schedule' : 'Add to schedule'}</span>`;
-    btn.setAttribute('aria-pressed', String(isScheduled));
     btn.classList.toggle('is-scheduled', isScheduled);
   };
   paint();

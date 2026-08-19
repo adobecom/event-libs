@@ -30,6 +30,10 @@ async function paintTrackIcon(slot, iconName) {
     if (!svg) return;
     svg.setAttribute('width', '16');
     svg.setAttribute('height', '16');
+    // Decorative — the track name sits right beside it. resolveIcon returns the raw
+    // sprite SVG, which may carry a <title> that would otherwise be announced too.
+    svg.setAttribute('aria-hidden', 'true');
+    svg.setAttribute('focusable', 'false');
     slot.replaceChildren(svg);
   } catch (err) {
     window.lana?.log(`[track-tags] icon "${iconName}" failed to resolve: ${err.message}`);

@@ -1,7 +1,7 @@
 import { expect } from '@esm-bundle/chai';
 import { setMetadata } from '../../../../../event-libs/v1/utils/utils.js';
 import {
-  getSessionTimes, getState, formatDateTime, renderStatus,
+  getSessionTimes, getState, formatDateTime, renderStatus, mountSessionState,
 } from '../../../../../event-libs/v1/c2/blocks/event-session-details/session-state-view.js';
 
 const SESSION_TIMES = '[{"startTimeMillis":1794518100000,"endTimeMillis":1794520800000,"timezone":"America/Los_Angeles","sessionId":"x"}]';
@@ -68,6 +68,78 @@ describe('session-state-view', () => {
     it('on-demand renders On-demand', () => {
       const el = renderStatus('on-demand', times);
       expect(el.textContent).to.equal('On-demand');
+    });
+  });
+
+  describe('mountSessionState', () => {
+    // start 150ms out, end well beyond: mount lands in 'upcoming', then the
+    // scheduled boundary flips it to 'live' (the controller adds a 500ms cushion).
+    const soonLive = () => {
+      const start = Date.now() + 150;
+      setMetadata('session-times', JSON.stringify([{
+        startTimeMillis: start, endTimeMillis: start + 3600000, timezone: 'UTC',
+      }]));
+    };
+    const slots = () => {
+      const statusSlot = document.createElement('span');
+      const primaryCtaSlot = document.createElement('span');
+      document.body.append(statusSlot, primaryCtaSlot);
+      return { statusSlot, primaryCtaSlot };
+    };
+
+    beforeEach(() => { document.body.innerHTML = ''; });
+
+    it('does nothing without session-times', () => {
+      const { statusSlot, primaryCtaSlot } = slots();
+      mountSessionState({ statusSlot, primaryCtaSlot });
+      expect(statusSlot.textContent).to.equal('');
+      expect(primaryCtaSlot.children.length).to.equal(0);
+    });
+
+    it('renders the status and the state-owned CTA on mount', () => {
+      setMetadata('session-id', 'sid');
+      soonLive();
+      const { statusSlot, primaryCtaSlot } = slots();
+      mountSessionState({ statusSlot, primaryCtaSlot });
+      expect(statusSlot.querySelector('.session-status--upcoming')).to.not.be.null;
+      expect(primaryCtaSlot.querySelector('.session-schedule')).to.not.be.null;
+    });
+
+    it('defers the CTA swap while the old CTA has focus, then flushes on focusout', async () => {
+      setMetadata('session-id', 'sid');
+      soonLive();
+      const { statusSlot, primaryCtaSlot } = slots();
+      const elsewhere = document.createElement('button');
+      document.body.append(elsewhere);
+
+      mountSessionState({ statusSlot, primaryCtaSlot });
+      primaryCtaSlot.querySelector('.session-schedule').focus();
+
+      // Past the boundary: the status must update, but the focused CTA must stay put.
+      await new Promise((r) => { setTimeout(r, 800); });
+      expect(statusSlot.textContent).to.equal('Live');
+      expect(primaryCtaSlot.querySelector('.session-schedule')).to.not.be.null;
+      expect(primaryCtaSlot.querySelector('.session-watch-now')).to.be.null;
+
+      // Focus leaves -> the held swap lands. The explicit dispatch keeps this
+      // deterministic: a backgrounded test browser updates document.activeElement
+      // but doesn't reliably fire focusout, and the real event (when it does fire)
+      // just flushes first, making the dispatch a no-op.
+      elsewhere.focus();
+      primaryCtaSlot.dispatchEvent(new FocusEvent('focusout', { bubbles: true }));
+      expect(primaryCtaSlot.querySelector('.session-watch-now')).to.not.be.null;
+      expect(primaryCtaSlot.querySelector('.session-schedule')).to.be.null;
+    });
+
+    it('swaps immediately when the CTA is not focused', async () => {
+      setMetadata('session-id', 'sid');
+      soonLive();
+      const { statusSlot, primaryCtaSlot } = slots();
+      mountSessionState({ statusSlot, primaryCtaSlot });
+
+      await new Promise((r) => { setTimeout(r, 800); });
+      expect(statusSlot.textContent).to.equal('Live');
+      expect(primaryCtaSlot.querySelector('.session-watch-now')).to.not.be.null;
     });
   });
 });

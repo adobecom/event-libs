@@ -12,17 +12,23 @@ import { createTag, getMetadata } from '../../../utils/utils.js';
 // Chevron next to the toggle label; rotates 180° when expanded (see CSS).
 const CHEVRON_ICON = '<svg xmlns="http://www.w3.org/2000/svg" width="8" height="5" viewBox="0 0 8 5" fill="none" aria-hidden="true"><path d="M1 1L4 4L7 1" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 
+// Suffixes the aria-controls id so multiple instances on one page stay unique.
+let instances = 0;
+
 export function renderDescriptionClamp(doc = document) {
   const text = (getMetadata('description', doc) || '').trim();
   if (!text) return null;
 
   const el = createTag('div', { class: 'session-description' });
-  const body = createTag('p', { class: 'session-description-text' }, text);
+  instances += 1;
+  const textId = `session-description-text-${instances}`;
+  const body = createTag('p', { class: 'session-description-text', id: textId }, text);
 
   const toggle = createTag('button', {
     class: 'session-description-toggle',
     type: 'button',
     'aria-expanded': 'false',
+    'aria-controls': textId,
   });
   const label = createTag('span', {}, 'Show more');
   toggle.append(label);

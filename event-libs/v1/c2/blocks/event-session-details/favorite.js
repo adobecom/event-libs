@@ -40,15 +40,19 @@ export function renderFavorite() {
     });
   }
 
+  // Icon-only toggle: the accessible name stays constant and `aria-pressed` carries
+  // the state. A name that flipped too would double-announce it ("Remove from
+  // favorites, pressed").
   const btn = createTag('button', {
     type: 'button',
     class: 'session-action session-favorite',
+    'aria-label': 'Favorite this session',
+    'aria-pressed': 'false',
   });
 
   const paint = () => {
     const isFavorited = favorited.value.has(sessionId);
     btn.innerHTML = isFavorited ? ICON_HEART_FILLED : ICON_HEART_OUTLINE;
-    btn.setAttribute('aria-label', isFavorited ? 'Remove from favorites' : 'Add to favorites');
     btn.setAttribute('aria-pressed', String(isFavorited));
     btn.classList.toggle('is-favorited', isFavorited);
   };

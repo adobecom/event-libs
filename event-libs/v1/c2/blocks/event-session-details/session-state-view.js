@@ -104,13 +104,43 @@ export function mountSessionState({ statusSlot, primaryCtaSlot, ccEl }) {
   const scheduleBtn = renderSchedule();
   const watchBtn = renderWatchNow();
 
-  const apply = (state) => {
-    if (statusSlot) statusSlot.replaceChildren(renderStatus(state, times));
-    if (primaryCtaSlot) {
-      if (state === 'upcoming' && scheduleBtn) primaryCtaSlot.replaceChildren(scheduleBtn);
-      else if (state === 'live') primaryCtaSlot.replaceChildren(watchBtn);
-      else primaryCtaSlot.replaceChildren();
+  // The CTA a given state owns (null = no CTA). scheduleBtn is null without a
+  // session id, which correctly collapses to "no CTA".
+  const ctaFor = (state) => {
+    if (state === 'upcoming') return scheduleBtn;
+    if (state === 'live') return watchBtn;
+    return null;
+  };
+
+  const applyCta = (btn) => {
+    if (btn) primaryCtaSlot.replaceChildren(btn);
+    else primaryCtaSlot.replaceChildren();
+  };
+
+  // A boundary can fire while the user is on the CTA. Replacing it then would
+  // remove the focused element and drop focus to <body> (WCAG 2.4.3), so hold the
+  // swap until focus leaves the slot. The eyebrow status is a live region, so the
+  // new state is still announced immediately either way.
+  let pending; // undefined = nothing deferred; null = "clear the CTA"
+  const flushCta = () => {
+    if (pending === undefined) return;
+    const btn = pending;
+    pending = undefined;
+    applyCta(btn);
+  };
+  const setCta = (btn) => {
+    if (primaryCtaSlot.contains(document.activeElement)) {
+      pending = btn;
+      primaryCtaSlot.addEventListener('focusout', flushCta, { once: true });
+      return;
     }
+    applyCta(btn);
+  };
+
+  const apply = (state) => {
+    // CTA before status, so the announcement lands on a DOM that already offers it.
+    if (primaryCtaSlot) setCta(ctaFor(state));
+    if (statusSlot) statusSlot.replaceChildren(renderStatus(state, times));
     if (ccEl) ccEl.hidden = state !== 'on-demand';
   };
 
