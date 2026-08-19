@@ -90,18 +90,20 @@
     padding: var(--s2a-spacing-md) var(--s2a-viewport-side-margins, var(--s2a-spacing-sm));
   }
 
-  /* Reserves room for the absolutely-positioned close button (32px gap + its own
-     24px box + 2px inset) so copy text never runs underneath it. */
+  /* Reserves room for the absolutely-positioned close button (its own 16px box + 16px
+     inset from the block's right edge) so copy text never runs underneath it. */
   .in-person-banner-copy {
     margin: 0;
-    padding-right: 58px;
+    padding-right: 32px;
   }
 
-  /* Figma inspect: close button sits 32px right of the copy, 36px from the block's
-     top edge, 2px inset from the block's own right edge. */
+  /* Figma inspect: close button is a 16x16 box, 16px from the block's top edge, 16px
+     inset from the block's own right edge. */
   .in-person-banner-close {
     position: absolute;
-    top: 36px;
-    right: 2px;
+    top: 18px;
+    right: 16px;
+    width: 16px;
+    height: 16px;
   }
 }
