@@ -1,10 +1,12 @@
 # upcoming-sessions
 
-Horizontally-scrolling carousel of upcoming session cards, authored via a sibling
-`.section-metadata` block's `upcoming-sessions` key (JSON array of sessions) rather than
-this block's own table — Milo's `section-metadata` block only surfaces a fixed set of
-known keys, so a custom key must be read directly from the sibling block by
-`readSectionMetadata()`.
+Horizontally-scrolling carousel of upcoming session cards. Never hand-authored — an
+author builds the session list in the Tier 1 Event Configurator's Homepage editor, copies
+its "Copy Link" output, and pastes that link into the page's doc body. `decorate.js`'s
+`tec-homepage` auto-block builder decodes the link's hash payload and replaces it with a
+`.upcoming-sessions` div carrying the decoded `{ heading, entries }` config as a
+`data-upcoming-sessions-config` attribute, which this block's `init()` reads directly —
+no `section-metadata` involved.
 
 This block never displays a "live" state. The instant a session starts, its card is
 removed entirely rather than switching to a live badge/routing — every visible card is
@@ -32,20 +34,27 @@ render.
 - **MR (Mobile Rider) sessions**: excluded from the time-based timers above. Their
   removal is owned solely by `startMobileRiderPolling()`'s poll confirmation — MR is the
   authoritative "has this session actually started" signal for them, not the scheduled
-  time. Polling for a given session only begins once its own scheduled start time
-  arrives (plus a per-session `setTimeout` kick exactly at that instant, so polling
-  starts immediately rather than waiting for the next 30s interval boundary). The first
-  time MR confirms a session started, `onStarted(startedIds)` fires, the card is
-  removed, and that session's `mrStreamId` is permanently excluded from further polling.
-  Once every MR session is resolved, the interval clears itself automatically.
+  time. A given session's `mrStreamId` is only registered with the shared poller (see
+  below) once its own scheduled start time arrives (plus a per-session `setTimeout` kick
+  exactly at that instant, so registration happens immediately rather than waiting for
+  the next 30s poll boundary). The first time MR confirms a session started, that id is
+  unregistered and `onStarted(startedIds)` fires, dropping the card — this block never
+  cares about a session's "stop time," so once confirmed, that id is gone from every
+  future poll for good.
 - `dropSession()` removes a session from both the DOM and the in-memory `sessions` list
   together, so a later full re-render (favorited/scheduled/pending state changes)
   can't resurrect a card that already started.
 
-This block owns its own Mobile Rider polling (via the real `MobileRiderController`,
-hitting `overlay-admin-integration.mobilerider.com`) rather than relying on
-`session-store.js`'s shared/mocked poller — `session-store.js`'s `liveStreamActiveIds`
-signal is irrelevant here for the same reason this block has no live state at all.
+MR polling itself goes through the shared registry at
+`event-libs/v1/services/sessions/mobile-rider-poller.js`
+(`registerStreamIds`/`unregisterStreamIds`/`subscribe`), not a poller local to this
+block — if `event-card`'s Featured Sessions cards are also on the page tracking
+overlapping `mrStreamId`s, both blocks' ids get batched into the same underlying
+`getMediaStatus()` call instead of two independent 30s loops hitting
+`overlay-admin-integration.mobilerider.com`. `session-store.js`'s own
+`liveStreamActiveIds` signal is still irrelevant here — it's backed by a mocked
+`fetchLiveStatus()`, not real MR data, and this block has no live state to feed it
+anyway.
 
 ## Removal animation (FLIP)
 
@@ -72,7 +81,7 @@ without waiting for real time to pass. Read once at module load as an *offset* f
 real clock (not a frozen value) — `now()` still advances in real time from that point,
 so `setTimeout`-based timers and the MR poll keep firing correctly relative to it.
 Absent/invalid `timing` falls back to the real `Date.now()`. The identical override
-exists in `card-c2/session-routing.js`.
+exists in `event-card/session-routing.js`.
 
 ## Re-decoration cleanup
 
@@ -117,7 +126,7 @@ the same section, but only if that block opts in via an `attach-upcoming` class
   2. **Action buttons** — sessions-guide reveals the action-icon column only on
      hover/`.is-scheduled`/`.is-favorited`, which leaves buttons unreachable on
      touch/keyboard otherwise. This card keeps them always visible at every breakpoint.
-- The dark surface variant is authored as `dark-theme` (not `dark`) deliberately —
+- The dark surface variant is authored as `dark-card` (not `dark`) deliberately —
   `dark` is a reserved global Milo class that paints a solid dark background site-wide,
   which would collide with this block's own local "dark card surface" meaning.
 - Desktop (`@media (min-width: 1280px)`) uses a fixed `margin-top` on `.sg-card__footer`

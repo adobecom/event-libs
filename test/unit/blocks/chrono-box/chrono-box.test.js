@@ -1,4 +1,5 @@
 import { expect } from '@esm-bundle/chai';
+import { setMetadata } from '../../../../event-libs/v1/utils/utils.js';
 
 describe('Chrono Box', () => {
   describe('exports', () => {
@@ -8,6 +9,42 @@ describe('Chrono Box', () => {
       expect(mod.registerChronoBoxOutboundCleanup).to.be.a('function');
       expect(mod.cleanupChronoBoxOutboundNodes).to.be.a('function');
       expect(mod.ensureChronoBoxReparentObserver).to.be.a('function');
+      expect(mod.revalidatePageTheme).to.be.a('function');
+    });
+  });
+
+  describe('revalidatePageTheme', () => {
+    beforeEach(() => {
+      document.body.innerHTML = '';
+      document.head.innerHTML = '';
+    });
+
+    it('re-applies a page-wide positional theme rule against the current, live DOM', async () => {
+      const { revalidatePageTheme } = await import('../../../../event-libs/v1/blocks/chrono-box/chrono-box.js');
+
+      setMetadata('custom-attributes', JSON.stringify([
+        { name: 'theme', values: [{ value: 'dark(blocks:text[first])' }] },
+      ]));
+      document.body.innerHTML = `
+        <main><div>
+          <div class="text" id="t1"></div>
+        </div></main>
+      `;
+
+      revalidatePageTheme();
+      expect(document.getElementById('t1').classList.contains('dark')).to.be.true;
+
+      // Simulate a chrono-box fragment that resolves later and lands earlier in the DOM
+      // than a block already themed by a previous call.
+      const t0 = document.createElement('div');
+      t0.className = 'text';
+      t0.id = 't0';
+      document.querySelector('main > div').prepend(t0);
+
+      revalidatePageTheme();
+
+      expect(document.getElementById('t0').classList.contains('dark')).to.be.true;
+      expect(document.getElementById('t1').classList.contains('dark')).to.be.false;
     });
   });
 

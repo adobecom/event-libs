@@ -310,6 +310,49 @@ describe('services/sessions/sessions-api', () => {
     });
   });
 
+  describe('mapEslPayloadToRawSessions customAttributeValues', () => {
+    // attributeId/inputType are the fields deriveFacetableAttributes()/the Session Guide
+    // Configurator's authored filterCategories key off — customAttr() above omits them,
+    // so existing fixtures above naturally produce an empty customAttributeValues map.
+    function facetableAttr(attributeId, values, inputType = 'single-select') {
+      return { attributeId, inputType, values, enabled: true };
+    }
+
+    const payload = {
+      speakers: [],
+      sessionTimes: [],
+      sessions: [
+        {
+          sessionId: 's-1',
+          customAttributes: [
+            facetableAttr('attr-technical-level', [selectValue('Intermediate')]),
+            facetableAttr('attr-audience', [selectValue('Designer'), selectValue('Developer')], 'multi-select'),
+            facetableAttr('attr-region', [selectValue('AMER')]),
+            facetableAttr('attr-disabled', [selectValue('Ignored')], 'single-select'),
+            { ...facetableAttr('attr-free-text', [textValue('not indexable')]), inputType: 'text' },
+          ],
+        },
+      ],
+    };
+    payload.sessions[0].customAttributes[3].enabled = false;
+
+    const [session] = mapEslPayloadToRawSessions(payload);
+
+    it('builds a generic attributeId-keyed map from any single/multi-select customAttribute', () => {
+      expect(session.customAttributeValues['attr-technical-level']).to.deep.equal(['Intermediate']);
+      expect(session.customAttributeValues['attr-audience']).to.deep.equal(['Designer', 'Developer']);
+    });
+
+    it('covers attributes with no hand-built flat field (e.g. Region) automatically', () => {
+      expect(session.customAttributeValues['attr-region']).to.deep.equal(['AMER']);
+    });
+
+    it('excludes disabled attributes and non-select input types', () => {
+      expect(session.customAttributeValues).to.not.have.property('attr-disabled');
+      expect(session.customAttributeValues).to.not.have.property('attr-free-text');
+    });
+  });
+
   describe('normalizeSessions', () => {
     it('defaults resources/mrStreamId even when the real-data mapper omits them', () => {
       const [normalized] = normalizeSessions([{ id: 's-1', audience: ['Designer'] }]);
@@ -361,6 +404,13 @@ describe('services/sessions/sessions-api', () => {
 
       const [bare] = normalizeSessions([{ id: 's-2' }]);
       expect(bare.dvrTimingHours).to.equal(0);
+    });
+
+    it('passes customAttributeValues through, defaulting to {} when absent', () => {
+      const [withMap] = normalizeSessions([{ id: 's-1', customAttributeValues: { 'attr-1': ['A'] } }]);
+      expect(withMap.customAttributeValues).to.deep.equal({ 'attr-1': ['A'] });
+      const [withoutMap] = normalizeSessions([{ id: 's-2' }]);
+      expect(withoutMap.customAttributeValues).to.deep.equal({});
     });
   });
 

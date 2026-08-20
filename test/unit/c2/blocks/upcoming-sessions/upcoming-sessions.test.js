@@ -4,39 +4,21 @@ import {
   scheduled, favorited, pendingActions, liveStreamActiveIds, sessionGuideRequest,
 } from '../../../../../event-libs/v1/utils/session-store.js';
 import { setEventConfig } from '../../../../../event-libs/v1/utils/utils.js';
+import { initTierOneEventConfig } from '../../../../../event-libs/v1/utils/tier-1-event-config.js';
 
-function buildSectionMetadata(entries) {
-  const el = document.createElement('div');
-  el.className = 'section-metadata';
-  Object.entries(entries).forEach(([key, value]) => {
-    const row = document.createElement('div');
-    const keyCell = document.createElement('div');
-    keyCell.textContent = key;
-    const valueCell = document.createElement('div');
-    valueCell.textContent = value;
-    row.append(keyCell, valueCell);
-    el.append(row);
-  });
-  return el;
-}
-
-// Mirrors the real authored shape: the block itself only has the heading row;
-// the session array lives in a sibling .section-metadata block, both inside
-// the same .section wrapper.
+// Mirrors the real auto-built shape: decorate.js's tec-homepage auto-block builder
+// replaces the authored link with a bare div carrying the decoded { heading, entries }
+// config as a data-upcoming-sessions-config attribute — no authored rows, no sibling
+// section-metadata block.
 function buildBlock(sessions, heading = 'Upcoming') {
   const section = document.createElement('div');
   section.className = 'section';
 
   const el = document.createElement('div');
   el.className = 'upcoming-sessions carousel clip-end';
-  const headingRow = document.createElement('div');
-  headingRow.append(document.createElement('div'));
-  headingRow.firstChild.textContent = heading;
-  el.append(headingRow);
+  el.dataset.upcomingSessionsConfig = JSON.stringify({ heading, entries: sessions });
 
-  const metadata = buildSectionMetadata({ 'upcoming-sessions': JSON.stringify(sessions) });
-
-  section.append(el, metadata);
+  section.append(el);
   document.body.append(section);
   return el;
 }
@@ -66,6 +48,13 @@ function session(overrides = {}) {
 describe('upcoming-sessions', () => {
   before(() => {
     setEventConfig({}, { miloLibs: '/test/unit/features/icons/mocks/libs' });
+    // No built-in track defaults (see tier-1-event-config.js) — author the one track
+    // these tests actually need a badge for.
+    const meta = document.createElement('meta');
+    meta.name = 'tier-1-event-config';
+    meta.content = JSON.stringify({ trackIcons: { Video: { icon: 'video', color: '#F44336' } } });
+    document.head.appendChild(meta);
+    initTierOneEventConfig();
   });
 
   beforeEach(() => {
@@ -78,7 +67,7 @@ describe('upcoming-sessions', () => {
   });
 
   describe('init(el)', () => {
-    it('renders a card per authored session', async () => {
+    it('renders a card per session in the config', async () => {
       const el = buildBlock([session()]);
       await init(el);
       const cards = el.querySelectorAll('.upcoming-sessions-card');
@@ -86,11 +75,18 @@ describe('upcoming-sessions', () => {
       expect(cards[0].textContent).to.contain('Intro to Adobe Express');
     });
 
-    it('renders the heading as an accessible label', async () => {
+    it('renders the authored heading as an accessible label', async () => {
       const el = buildBlock([session()], 'Upcoming');
       await init(el);
       expect(el.getAttribute('aria-label')).to.equal('Upcoming');
       expect(el.querySelector('.upcoming-sessions-heading').textContent).to.equal('Upcoming');
+    });
+
+    it('falls back to a default heading when none is authored', async () => {
+      const el = buildBlock([session()], '');
+      await init(el);
+      expect(el.getAttribute('aria-label')).to.equal('Upcoming Sessions');
+      expect(el.querySelector('.upcoming-sessions-heading').textContent).to.equal('Upcoming Sessions');
     });
 
     it('marks data-few-sessions=true (arrows hidden) with 3 or fewer sessions', async () => {
@@ -137,36 +133,26 @@ describe('upcoming-sessions', () => {
       expect(el.dataset.fewSessions).to.equal('true');
     });
 
-    it('removes itself entirely when the authored array is empty', async () => {
+    it('removes itself entirely when the entries array is empty', async () => {
       const el = buildBlock([]);
       await init(el);
       expect(el.isConnected).to.equal(false);
     });
 
-    it('removes itself entirely when there is no sibling section-metadata block', async () => {
+    it('removes itself entirely when there is no config data attribute at all', async () => {
       const el = document.createElement('div');
       el.className = 'upcoming-sessions carousel clip-end';
-      const headingRow = document.createElement('div');
-      headingRow.append(document.createElement('div'));
-      headingRow.firstChild.textContent = 'Upcoming';
-      el.append(headingRow);
       document.body.append(el);
 
       await init(el);
       expect(el.isConnected).to.equal(false);
     });
 
-    it('removes itself entirely when the section-metadata payload fails to parse', async () => {
-      const section = document.createElement('div');
-      section.className = 'section';
+    it('removes itself entirely when the config payload fails to parse', async () => {
       const el = document.createElement('div');
       el.className = 'upcoming-sessions carousel clip-end';
-      const headingRow = document.createElement('div');
-      headingRow.append(document.createElement('div'));
-      el.append(headingRow);
-      const metadata = buildSectionMetadata({ 'upcoming-sessions': 'not json' });
-      section.append(el, metadata);
-      document.body.append(section);
+      el.dataset.upcomingSessionsConfig = 'not json';
+      document.body.append(el);
 
       await init(el);
       expect(el.isConnected).to.equal(false);
@@ -179,12 +165,8 @@ describe('upcoming-sessions', () => {
       hero.className = 'hero attach-upcoming';
       const block = document.createElement('div');
       block.className = 'upcoming-sessions carousel clip-end';
-      const headingRow = document.createElement('div');
-      headingRow.append(document.createElement('div'));
-      headingRow.firstChild.textContent = 'Upcoming';
-      block.append(headingRow);
-      const metadata = buildSectionMetadata({ 'upcoming-sessions': JSON.stringify([session()]) });
-      section.append(hero, block, metadata);
+      block.dataset.upcomingSessionsConfig = JSON.stringify({ heading: 'Upcoming', entries: [session()] });
+      section.append(hero, block);
       document.body.append(section);
 
       await init(block);
@@ -316,12 +298,11 @@ describe('upcoming-sessions', () => {
       expect(footer.querySelector('.sg-card__time')).to.not.equal(null);
     });
 
-    it('falls back to the mainstage badge (not no badge) when the track has no icon config match', () => {
+    it('renders no badge (not a mainstage fallback) when the track has no icon config match', () => {
+      // No built-in defaults, and 'mainstage' isn't specially guaranteed to exist either
+      // (see tier-1-event-config.js/upcoming-sessions.js) — no config, no badge.
       const card = buildCard(session({ track: 'Not A Real Track' }));
-      const badge = card.querySelector('.sg-category-badge');
-      expect(badge).to.not.equal(null);
-      // The label is the raw track string itself, not a curated one.
-      expect(badge.querySelector('.sg-category-badge__label').textContent).to.equal('Not A Real Track');
+      expect(card.querySelector('.sg-category-badge')).to.equal(null);
       expect(card.querySelector('.sg-card__track--footer').textContent).to.equal('Not A Real Track');
     });
 

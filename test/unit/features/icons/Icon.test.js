@@ -20,4 +20,9 @@ describe('Icon', () => {
     expect(markup).to.include('sg-detail__channel-icon');
     expect(markup).to.include('sg-icon');
   });
+
+  it('accepts a custom resolve function without throwing', () => {
+    const customResolve = () => Promise.resolve(null);
+    expect(() => Icon({ name: 'photoshop-64', resolve: customResolve })).to.not.throw();
+  });
 });

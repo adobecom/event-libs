@@ -1,8 +1,12 @@
 import { LIBS } from './utils.js';
 import BlockMediator from '../deps/block-mediator.min.js';
-import { getBaseAttendeePayload, getEventAttendeePayload } from './data-utils.js';
+import {
+  getBaseAttendeePayload,
+  getEventAttendeePayload,
+  getUnrecognizedAttendeeFields,
+} from './data-utils.js';
 import { ENV_MAP } from './constances.js';
-import { getEventConfig, getEventServiceEnv } from './utils.js';
+import { getEventConfig, getEventServiceEnv, waitForAdobeIMS } from './utils.js';
 
 export const getCaasTags = (() => {
   let cache;
@@ -35,19 +39,6 @@ export const getCaasTags = (() => {
     return promise;
   };
 })();
-
-export function waitForAdobeIMS() {
-  return new Promise((resolve) => {
-    const checkIMS = () => {
-      if (window.adobeIMS && window.adobeIMS.getAccessToken) {
-        resolve();
-      } else {
-        setTimeout(checkIMS, 100);
-      }
-    };
-    checkIMS();
-  });
-}
 
 // Override for callers with no window.adobeIMS at all (e.g. the standalone
 // tier-1-event-configurator DA app, which has no Milo/IMS bootstrap) — set
@@ -752,12 +743,16 @@ export async function getAndCreateAndAddAttendee(eventId, attendeeData, rsvpToke
     }
   }
 
-  // Use EventAttendee filter for adding attendee to event
-  const eventAttendeePayload = getEventAttendeePayload({
-    ...newAttendeeData,
-    ...attendeeData,
-    registrationStatus,
-  });
+  // Use EventAttendee filter for adding attendee to event; forward any
+  // custom fields the RSVP form submitted that neither filter recognizes.
+  const eventAttendeePayload = {
+    ...getEventAttendeePayload({
+      ...newAttendeeData,
+      ...attendeeData,
+      registrationStatus,
+    }),
+    ...getUnrecognizedAttendeeFields(attendeeData),
+  };
 
   // For a guest, this call both registers and consumes the rsvp token
   // server-side in one step.

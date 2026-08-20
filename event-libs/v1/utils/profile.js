@@ -1,6 +1,6 @@
 import BlockMediator from '../deps/block-mediator.min.js';
 import { getEventAttendee, validateRsvpToken } from './esp-controller.js';
-import { getMetadata, getRsvpToken } from './utils.js';
+import { getMetadata, getRsvpToken, waitForAdobeIMS } from './utils.js';
 
 export async function getProfile() {
   const { feds, adobeProfile, fedsConfig, adobeIMS } = window;
@@ -23,7 +23,7 @@ export async function getProfile() {
   return profile;
 }
 
-export function lazyCaptureProfile() {
+export async function lazyCaptureProfile() {
   const isEventPage = getMetadata('event-id');
   if (!isEventPage) return;
 
@@ -32,23 +32,8 @@ export function lazyCaptureProfile() {
     return;
   }
 
-  try {
-    let adobeIMSValue;
-    Object.defineProperty(window, 'adobeIMS', {
-      get() {
-        return adobeIMSValue;
-      },
-      set(value) {
-        adobeIMSValue = value;
-        if (value) {
-          captureProfile();
-        }
-      },
-      configurable: true,
-    });
-  } catch (e) {
-    pollForAdobeIMS();
-  }
+  await waitForAdobeIMS();
+  if (window.adobeIMS) captureProfile();
 
   async function captureProfile() {
     // An RSVP token always bypasses Adobe ID login, regardless of whether the
@@ -83,19 +68,5 @@ export function lazyCaptureProfile() {
         BlockMediator.set('imsProfile', { noProfile: true });
       }
     }
-  }
-
-  function pollForAdobeIMS() {
-    let counter = 0;
-    const maxAttempts = 100;
-    const interval = setInterval(() => {
-      if (window.adobeIMS) {
-        clearInterval(interval);
-        captureProfile();
-      } else if (counter >= maxAttempts) {
-        clearInterval(interval);
-      }
-      counter += 1;
-    }, 100);
   }
 }

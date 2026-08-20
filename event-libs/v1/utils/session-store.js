@@ -208,10 +208,13 @@ export function initSessionState() {
 
   apiConfig = {
     apiUrl: tierOneConfig.rfApiUrl || defaultRfApiUrlForEnv(),
-    eventId: getMetadata('event-id'),
+    // tier-1-event-config's own eventId (stamped in by the Tier 1 Event Configurator at
+    // save time) is the real source of truth for which event's catalog to fetch — page
+    // `event-id` metadata is only a fallback for a config authored without one.
+    eventId: tierOneConfig.eventId || getMetadata('event-id'),
     profileId: tierOneConfig.rfProfileId || DEFAULT_RF_PROFILE_ID,
     registerUrl: tierOneConfig.registerUrl || '/register',
-    manualCutoff: getMetadata('manual-on-demand-transition-time') || null,
+    eventEndMs: tierOneConfig.eventEndDateTime || null,
     mrEnv: deriveMrEnv(),
   };
 

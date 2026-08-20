@@ -9,12 +9,11 @@ import {
 import { getTrackIcon } from '../../../utils/tier-1-event-config.js';
 import { resolveIcon } from '../../../features/icons/icon-resolver.js';
 import { toggleScheduleWithFeedback, toggleFavoriteWithFeedback } from '../../../services/sessions/action-feedback.js';
-import MobileRiderController from '../../../services/sessions/mobile-rider-controller.js';
+import { registerStreamIds, unregisterStreamIds, subscribe } from '../../../services/sessions/mobile-rider-poller.js';
 
 const ROTATE_OUT_MS = 350;
 const SLIDE_MS = 350;
 const SLIDE_EASING = 'cubic-bezier(0.22, 1, 0.36, 1)';
-const MR_POLL_INTERVAL_MS = 30_000;
 
 const TIMING_OVERRIDE_OFFSET_MS = (() => {
   const raw = new URLSearchParams(window.location.search).get('timing');
@@ -27,8 +26,6 @@ function now() {
   return TIMING_OVERRIDE_OFFSET_MS === null ? Date.now() : Date.now() + TIMING_OVERRIDE_OFFSET_MS;
 }
 
-const mobileRiderController = new MobileRiderController();
-
 const EVENT_CONFIG = { title: '', showConflictModal: false, registerUrl: '/register' };
 
 const ICON_CALENDAR_CHECK = '<svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false"><path d="M7.86427 15.7344C7.64161 15.7344 7.43068 15.6357 7.2881 15.4648L3.54103 10.9668C3.27541 10.6484 3.31935 10.1748 3.63673 9.91015C3.95411 9.64453 4.42677 9.68652 4.69337 10.0059L7.84669 13.792L15.2861 4.32323C15.542 3.99706 16.0147 3.94139 16.3389 4.19628C16.665 4.45214 16.7217 4.92382 16.4658 5.24901L8.4541 15.4473C8.31445 15.626 8.10156 15.7314 7.875 15.7344L7.86427 15.7344Z" fill="currentColor"/></svg>';
@@ -39,7 +36,7 @@ const ICON_ARROW_RIGHT = '<svg width="16" height="16" viewBox="0 0 16 16" fill="
 
 function buildCategoryBadge(track) {
   if (!track) return null;
-  const entry = getTrackIcon(track) || getTrackIcon('mainstage');
+  const entry = getTrackIcon(track);
   if (!entry) return null;
 
   const badge = createTag('span', { class: 'sg-category-badge sg-category-badge--sm' });
@@ -174,10 +171,14 @@ export function buildCard(session) {
   const topBadge = buildCategoryBadge(session.track);
   if (topBadge) badgeRow.append(topBadge);
 
-  createTag('p', { class: 'sg-card__title' }, session.enTitle, { parent: body });
+  // session.enTitle/primaryCategory(session) below are attacker-influenced (decoded from
+  // the link's hash payload, not hand-authored in DA) — createTag's string `html` argument
+  // runs through insertAdjacentHTML, so these are set via .textContent to keep them as
+  // inert text rather than parsed markup.
+  createTag('p', { class: 'sg-card__title' }, '', { parent: body }).textContent = session.enTitle || '';
 
   const footer = createTag('div', { class: 'sg-card__footer' }, '', { parent: body });
-  createTag('span', { class: 'sg-card__track sg-card__track--footer' }, primaryCategory(session), { parent: footer });
+  createTag('span', { class: 'sg-card__track sg-card__track--footer' }, '', { parent: footer }).textContent = primaryCategory(session);
   const footerBadgeWrap = createTag('span', { class: 'sg-card__footer-badge' }, '', { parent: footer });
   const footerBadge = buildCategoryBadge(session.track);
   if (footerBadge) footerBadgeWrap.append(footerBadge);
@@ -322,62 +323,42 @@ function attachToPrecedingBlock(el) {
   }
 }
 
-function readSectionMetadata(el, key) {
-  const metadataBlock = el.closest('.section')?.querySelector(':scope > .section-metadata');
-  if (!metadataBlock) return null;
-  const rows = metadataBlock.querySelectorAll(':scope > div');
-  for (const row of rows) {
-    const cells = row.querySelectorAll(':scope > div');
-    const rowKey = cells[0]?.textContent?.trim().toLowerCase();
-    if (rowKey === key) return cells[1]?.textContent?.trim() ?? '';
-  }
-  return null;
-}
-
 function startMobileRiderPolling(sessions, onStarted) {
   const mrSessions = sessions.filter((s) => s.mrStreamId);
   if (!mrSessions.length) return null;
 
+  const mrStreamIds = new Set(mrSessions.map((s) => s.mrStreamId));
   const resolvedIds = new Set();
-  let intervalId = null;
+  const registeredIds = new Set();
 
-  function dueIds(nowMs) {
-    return [...new Set(
-      mrSessions
-        .filter((s) => !resolvedIds.has(s.mrStreamId) && (s.sessionTime?.startTimeMillis ?? 0) <= nowMs)
-        .map((s) => s.mrStreamId),
-    )];
+  function onDue(mrStreamId) {
+    if (registeredIds.has(mrStreamId)) return;
+    registeredIds.add(mrStreamId);
+    registerStreamIds([mrStreamId]);
   }
 
-  async function tick() {
-    const ids = dueIds(now());
-    if (!ids.length) return;
-    try {
-      const { active } = await mobileRiderController.getMediaStatus(ids);
-      const startedIds = ids.filter((id) => active.includes(id));
-      if (!startedIds.length) return;
-      startedIds.forEach((id) => resolvedIds.add(id));
-      onStarted(startedIds);
-      if (intervalId && mrSessions.every((s) => resolvedIds.has(s.mrStreamId))) {
-        clearInterval(intervalId);
-        intervalId = null;
-      }
-    } catch (error) {
-      window.lana?.log(`upcoming-sessions: mobile rider poll failed: ${error.message}`);
+  const startTimers = [];
+  mrSessions.forEach((s) => {
+    const untilStart = (s.sessionTime?.startTimeMillis ?? 0) - now();
+    if (untilStart > 0) {
+      startTimers.push(setTimeout(() => onDue(s.mrStreamId), untilStart));
+    } else {
+      onDue(s.mrStreamId);
     }
-  }
+  });
 
-  const startTimers = mrSessions
-    .map((s) => (s.sessionTime?.startTimeMillis ?? 0) - now())
-    .filter((untilStart) => untilStart > 0)
-    .map((untilStart) => setTimeout(tick, untilStart));
-
-  tick();
-  intervalId = setInterval(tick, MR_POLL_INTERVAL_MS);
+  const unsubscribe = subscribe(({ active }) => {
+    const startedIds = active.filter((id) => mrStreamIds.has(id) && !resolvedIds.has(id));
+    if (!startedIds.length) return;
+    startedIds.forEach((id) => resolvedIds.add(id));
+    unregisterStreamIds(startedIds);
+    onStarted(startedIds);
+  });
 
   return () => {
     startTimers.forEach(clearTimeout);
-    if (intervalId) clearInterval(intervalId);
+    unsubscribe();
+    unregisterStreamIds([...registeredIds].filter((id) => !resolvedIds.has(id)));
   };
 }
 
@@ -396,18 +377,17 @@ async function decorate(el) {
 
   attachToPrecedingBlock(el);
 
-  const rows = el.querySelectorAll(':scope > div');
-  const heading = rows[0]?.textContent?.trim();
-  const payload = readSectionMetadata(el, 'upcoming-sessions');
-
-  let sessions = [];
+  let config = null;
   try {
-    sessions = payload ? JSON.parse(payload) : [];
+    config = el.dataset.upcomingSessionsConfig ? JSON.parse(el.dataset.upcomingSessionsConfig) : null;
   } catch (error) {
     window.lana?.log(`upcoming-sessions: failed to parse session payload: ${error.message}`);
     el.remove();
     return;
   }
+
+  const heading = config?.heading || 'Upcoming Sessions';
+  let sessions = Array.isArray(config?.entries) ? config.entries : [];
 
   if (!sessions.length) {
     el.remove();
@@ -429,7 +409,10 @@ async function decorate(el) {
   renderTrack(track, sessions);
 
   const header = createTag('div', { class: 'upcoming-sessions-header' }, '', { parent: el });
-  if (heading) createTag('h6', { class: 'upcoming-sessions-heading' }, heading, { parent: header });
+  // heading is attacker-influenced (decoded from the link's hash payload) — see the
+  // .textContent note on session.enTitle in buildCard() above for why this isn't passed
+  // as createTag's html argument.
+  if (heading) createTag('h6', { class: 'upcoming-sessions-heading' }, '', { parent: header }).textContent = heading;
   header.append(buildCarouselControls(track));
 
   el.append(track);

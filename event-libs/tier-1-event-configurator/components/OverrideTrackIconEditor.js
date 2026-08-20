@@ -1,5 +1,5 @@
 import { html } from '../../v1/deps/htm-preact.js';
-import { DEFAULT_OVERRIDE_TRACK_ICON, KNOWN_ICON_SLUGS } from '../default-track-icons.js';
+import { DEFAULT_ICON_COLOR } from '../default-track-icons.js';
 import IconPicker, { useIconSlugOptions } from './IconPicker.js';
 
 // Override text is free text, not a real track, and each distinct value is its own
@@ -8,9 +8,9 @@ import IconPicker, { useIconSlugOptions } from './IconPicker.js';
 export default function OverrideTrackIconEditor({
   overrideTexts, overrideTrackIcons, defaultOverrideIcon, onChangeMapped, onChangeDefault,
 }) {
-  const iconSlugs = useIconSlugOptions(KNOWN_ICON_SLUGS);
-  const defaultIcon = defaultOverrideIcon?.icon ?? DEFAULT_OVERRIDE_TRACK_ICON.icon;
-  const defaultColor = defaultOverrideIcon?.color ?? DEFAULT_OVERRIDE_TRACK_ICON.color;
+  const iconSlugs = useIconSlugOptions();
+  const defaultIcon = defaultOverrideIcon?.icon ?? '';
+  const defaultColor = defaultOverrideIcon?.color ?? DEFAULT_ICON_COLOR;
 
   return html`
     <div class="tec-override-editor">

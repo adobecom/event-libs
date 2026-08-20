@@ -528,6 +528,16 @@ function processHashtagLinks(parent) {
   
 }
 
+// Guards against the real risk of this manual copy/paste hand-off: an author pasting the
+// wrong event's link onto the wrong page. Log-only — not a security control, just authoring
+// hygiene, so it never blocks the block from building.
+function warnIfEventIdMismatch(label, config) {
+  const pageEventId = getMetadata('event-id');
+  if (config.eventId && pageEventId && config.eventId !== pageEventId) {
+    window.lana?.log(`[${label}] eventId mismatch: config authored for ${config.eventId}, page is ${pageEventId}`);
+  }
+}
+
 function prebuildAutoBlock(blockName, link) {
   let blockEl;
   const autoBlockBuilders = {
@@ -586,12 +596,7 @@ function prebuildAutoBlock(blockName, link) {
         return null;
       }
 
-      // Guards against the real risk of this manual copy/paste hand-off: an author
-      // pasting the wrong event's link onto the wrong page.
-      const pageEventId = getMetadata('event-id');
-      if (config.eventId && pageEventId && config.eventId !== pageEventId) {
-        window.lana?.log(`[sessions-guide] eventId mismatch: config authored for ${config.eventId}, page is ${pageEventId}`);
-      }
+      warnIfEventIdMismatch('sessions-guide', config);
 
       // No authoring-table path exists for this block — sessions-guide.js's init()
       // reads data-session-guide-config only.
@@ -600,6 +605,35 @@ function prebuildAutoBlock(blockName, link) {
       return createTag('div', {
         class: blockClass,
         'data-session-guide-config': JSON.stringify(config),
+      });
+    },
+    'tec-homepage': (link) => {
+      const url = new URL(link.href);
+      const hashMatch = url.hash.match(/[#&]tecHomepage=([A-Za-z0-9+/=%-]{20,})/);
+      const config = parseEncodedConfig(hashMatch?.[1]);
+
+      if (!config || !Array.isArray(config.entries)) {
+        return null;
+      }
+
+      warnIfEventIdMismatch('tec-homepage', config);
+
+      // Both Homepage config types share one link format/pattern — configType picks
+      // which block (and which data attribute its own init() reads) gets built. Theme
+      // stays a plain class (same one an author would previously have hand-added) so
+      // existing dark-card CSS applies with no block-side changes.
+      const themeClass = config.theme === 'dark' ? ' dark-card' : '';
+
+      if (config.configType === 'homepage-featured-sessions') {
+        return createTag('div', {
+          class: `featured-sessions${themeClass}`,
+          'data-featured-sessions-config': JSON.stringify(config),
+        });
+      }
+
+      return createTag('div', {
+        class: `upcoming-sessions${themeClass}`,
+        'data-upcoming-sessions-config': JSON.stringify(config),
       });
     },
   }
@@ -621,6 +655,7 @@ export function processAutoBlockLinks(parent) {
     'chrono-box': { pattern: 'schedule-maker' },
     'mobile-rider': { pattern: 'mobilerider.com', selfInit: true, c2: true },
     'sessions-guide': { pattern: 'session-guide-configurator' },
+    'tec-homepage': { pattern: 'tools/da-apps/tier-1-event-configurator' },
   };
 
   Object.entries(autoBlockIdentifiers).forEach(([blockName, { pattern, selfInit, c2 }]) => {
@@ -1058,10 +1093,10 @@ function processTemplateInAllNodes(parent, extraData) {
 
 function addStylesToEventPage() {
   const styleId = 'event-libs-styles';
-  
+
   // Check if styles are already loaded
   if (document.getElementById(styleId)) return;
-  
+
   // Create and append the stylesheet link
   const link = document.createElement('link');
   link.id = styleId;
@@ -1072,6 +1107,12 @@ function addStylesToEventPage() {
 
 // e.g. "dark", "dark(blocks:hero-marquee,profile-cards)", or "dark(blocks:text[first],agenda)"
 const BLOCK_TOKEN_RE = /^([^[\]]+?)(?:\[\s*(first|last|[1-9]\d*)\s*\])?$/;
+
+const PAGE_BLOCK_SELECTOR = [
+  'main > div > div[class]',
+  'main .chrono-box .fragment > div > div[class]',
+  'main .promotional-content .fragment > div > div[class]',
+].join(', ');
 
 function parseThemeValue(raw) {
   const value = raw?.toLowerCase().trim();
@@ -1107,25 +1148,33 @@ export function applyAreaTheme(area = document) {
 
     const isDocument = area === document;
     const blocks = isDocument
-      ? area.body.querySelectorAll('main > div > div[class]')
+      ? area.body.querySelectorAll(PAGE_BLOCK_SELECTOR)
       : area.querySelectorAll('div[class]');
 
     if (blockTokens) {
-      const blockList = Array.from(blocks);
+      const localList = Array.from(blocks);
+      const positionalTokens = blockTokens.filter((t) => t.selector);
       const plainNames = blockTokens.filter((t) => !t.selector).map((t) => t.name);
-      const positionalTargets = new Set();
-      blockTokens.filter((t) => t.selector).forEach(({ name, selector }) => {
-        const group = blockList.filter((b) => b.classList.contains(name));
-        const index = selector === 'first' ? 0
-          : selector === 'last' ? group.length - 1
-            : Number(selector) - 1;
-        if (group[index]) positionalTargets.add(group[index]);
-      });
 
-      blockList.forEach((block) => {
-        const matches = plainNames.some((name) => block.classList.contains(name))
-          || positionalTargets.has(block);
-        if (!matches) return;
+      if (positionalTokens.length) {
+        const pageBlockList = isDocument
+          ? localList
+          : Array.from(document.body.querySelectorAll(PAGE_BLOCK_SELECTOR));
+        positionalTokens.forEach(({ name, selector }) => {
+          const group = pageBlockList.filter((b) => b.classList.contains(name));
+          const index = selector === 'first' ? 0
+            : selector === 'last' ? group.length - 1
+              : Number(selector) - 1;
+          const target = group[index];
+          group.forEach((block) => {
+            block.classList.remove('dark', 'light');
+            if (block === target) block.classList.add(themeValue);
+          });
+        });
+      }
+
+      localList.forEach((block) => {
+        if (!plainNames.some((name) => block.classList.contains(name))) return;
         block.classList.remove('dark', 'light');
         block.classList.add(themeValue);
       });
@@ -1185,17 +1234,11 @@ export function decorateEvent(parent) {
 
   if (!getMetadata('event-id')) return;
 
-  // Bootstraps the page-wide Tier 1 Event Configurator app output (track icons/colors,
-  // allowDoubleBooking, rfApiUrl/rfProfileId, ...) ahead of any block's own init(), so
-  // any block can call getTrackIcon()/getAllowDoubleBooking() regardless of tier. Cheap
-  // parse, no network cost, so unlike initSessionState() below it isn't gated further.
-  initTierOneEventConfig();
-
-  // Bootstraps shared, page-level session state (sessions, favorites, scheduled, auth)
-  // ahead of any block's own init() — no-ops when tier-1-event-config isn't authored.
-  // Also gated on tier-1-event-state-enabled since event-id alone is already authored
-  // broadly in prod; we don't want to bootstrap this on every page that happens to have it.
-  if (getMetadata('tier-1-event-state-enabled') === 'true') {
+  // Bootstraps Tier 1 Event Configurator output + shared session state ahead of any
+  // block's own init(). Gated on tier-1-event-config, not just event-id, since that's
+  // the real signal a page wants this.
+  if (getMetadata('tier-1-event-config')) {
+    initTierOneEventConfig();
     initSessionState();
   }
 
@@ -1227,6 +1270,8 @@ export function decorateEvent(parent) {
 }
 
 export default function decorateArea(area = document) {
+  addStylesToEventPage();
+
   const eagerLoad = (parent, selector) => {
     const img = parent.querySelector(selector);
     img?.removeAttribute('loading');

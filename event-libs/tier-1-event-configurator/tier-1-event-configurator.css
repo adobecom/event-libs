@@ -1,53 +1,62 @@
 /* stylelint-disable selector-class-pattern */
 
+@import url('../v1/c2/styles/tokens.css');
 @import url('./components/Modal.css');
 
 :root {
   /* Brand */
-  --tec-color-primary: #1473e6;
-  --tec-color-primary-hover: #0d66d0;
-  --tec-color-primary-down: #095aba;
-  --tec-color-on-primary: #fff;
+  --tec-color-primary: var(--s2a-color-blue-900);
+  --tec-color-primary-hover: var(--s2a-color-blue-1000);
+  --tec-color-primary-down: var(--s2a-color-blue-1100);
+  --tec-color-on-primary: var(--s2a-color-content-knockout);
 
   /* Neutrals */
-  --tec-color-text-primary: #1d1d1d;
-  --tec-color-text-secondary: #6e6e6e;
-  --tec-color-text-placeholder: #959595;
-  --tec-color-border: #d5d5d5;
-  --tec-color-border-hover: #b3b3b3;
-  --tec-color-background: #fafafa;
-  --tec-color-surface: #fff;
-  --tec-color-surface-hover: #f5f5f5;
+  --tec-color-text-primary: var(--s2a-color-content-default);
+  --tec-color-text-secondary: var(--s2a-color-content-subtle);
+  --tec-color-text-placeholder: var(--s2a-color-gray-500);
+  --tec-color-border: var(--s2a-color-border-subtle);
+  --tec-color-border-hover: var(--s2a-color-border-default);
+  --tec-color-background: var(--s2a-color-background-subtle);
+  --tec-color-surface: var(--s2a-color-background-default);
+  --tec-color-surface-hover: var(--s2a-color-gray-75);
 
   /* Semantic */
-  --tec-color-error: #d7373f;
-  --tec-color-error-bg: #fdecea;
-  --tec-color-success: #268e6c;
-  --tec-color-success-bg: #e9f7f1;
+  --tec-color-error: var(--s2a-color-content-utility-error);
+  --tec-color-error-bg: var(--s2a-color-red-100);
+  --tec-color-success: var(--s2a-color-green-900);
+  --tec-color-success-bg: var(--s2a-color-green-100);
+  --tec-color-warning: var(--s2a-color-orange-900);
+  --tec-color-warning-bg: var(--s2a-color-orange-100);
+  --tec-color-warning-border: var(--s2a-color-orange-300);
+  --tec-color-focus-ring: rgb(59 99 251 / 15%);
 
   /* Shape */
-  --tec-border-radius-sm: 4px;
-  --tec-border-radius: 8px;
-  --tec-border-radius-lg: 12px;
+  --tec-border-radius-sm: var(--s2a-border-radius-xs);
+  --tec-border-radius: var(--s2a-border-radius-sm);
+  --tec-border-radius-lg: var(--s2a-border-radius-md);
 
   /* Spacing */
-  --tec-spacing-xs: 8px;
-  --tec-spacing-sm: 12px;
-  --tec-spacing-md: 16px;
-  --tec-spacing-lg: 24px;
-  --tec-spacing-xl: 32px;
+  --tec-spacing-xs: var(--s2a-spacing-xs);
+  --tec-spacing-sm: var(--s2a-spacing-sm);
+  --tec-spacing-md: var(--s2a-spacing-md);
+  --tec-spacing-lg: var(--s2a-spacing-lg);
+  --tec-spacing-xl: var(--s2a-spacing-xl);
 
   /* Elevation */
-  --tec-shadow-sm: 0 1px 2px rgb(0 0 0 / 6%);
-  --tec-shadow-md: 0 4px 12px rgb(0 0 0 / 8%);
-  --tec-shadow-lg: 0 20px 25px -5px rgb(0 0 0 / 10%), 0 10px 10px -5px rgb(0 0 0 / 4%);
+  --tec-shadow-sm: var(--s2a-shadow-level-1-x) var(--s2a-shadow-level-1-y) var(--s2a-shadow-level-1-blur) var(--s2a-shadow-level-1-color);
+  --tec-shadow-md: var(--s2a-shadow-level-2-x) var(--s2a-shadow-level-2-y) var(--s2a-shadow-level-2-blur) var(--s2a-shadow-level-2-color);
+  --tec-shadow-lg: var(--s2a-shadow-level-4-x) var(--s2a-shadow-level-4-y) var(--s2a-shadow-level-4-blur) var(--s2a-shadow-level-4-color);
 
   /* Typography */
-  --tec-font-family: var(--body-font-family, adobe-clean, adobe-clean-serif, sans-serif);
+  --tec-font-family: var(--body-font-family, var(--s2a-font-family-adobe-clean));
 }
 
 * {
   box-sizing: border-box;
+}
+
+body {
+  margin: 0;
 }
 
 /* Visually hidden but still announced by screen readers — used for
@@ -72,6 +81,42 @@
   -webkit-font-smoothing: antialiased;
 }
 
+.tec-app-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 0 var(--tec-spacing-lg);
+  background: var(--tec-color-surface);
+  border-bottom: 1px solid var(--tec-color-border);
+}
+
+.tec-app-tab {
+  appearance: none;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  padding: 14px 4px;
+  margin: 0 var(--tec-spacing-sm);
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--tec-color-text-secondary);
+  cursor: pointer;
+}
+
+.tec-app-tab:hover {
+  color: var(--tec-color-text-primary);
+}
+
+.tec-app-tab:focus-visible {
+  outline: 2px solid var(--tec-color-primary);
+  outline-offset: 2px;
+}
+
+.tec-app-tab--active {
+  color: var(--tec-color-text-primary);
+  border-bottom-color: var(--tec-color-primary);
+}
+
 .tec-loading,
 .tec-error {
   display: flex;
@@ -86,9 +131,9 @@
 }
 
 .tec-content {
+  padding: var(--tec-spacing-xl) var(--tec-spacing-lg) 96px;
   max-width: 960px;
   margin: 0 auto;
-  padding: var(--tec-spacing-xl) var(--tec-spacing-lg) 96px;
 }
 
 .tec-page__title {
@@ -109,9 +154,9 @@
    hitting prod. Never rendered at all when targeting prod, so there's no
    visual noise in the common case. */
 .tec-env-banner {
-  background: #fdf0e0;
-  color: #7a4a00;
-  border-bottom: 1px solid #f0c987;
+  background: var(--tec-color-warning-bg);
+  color: var(--tec-color-warning);
+  border-bottom: 1px solid var(--tec-color-warning-border);
   padding: 10px var(--tec-spacing-lg);
   font-size: 13px;
   text-align: center;
@@ -161,7 +206,7 @@
   font-family: inherit;
   font-weight: 700;
   font-size: 14px;
-  border-radius: 16px;
+  border-radius: var(--s2a-border-radius-round);
   border: 1px solid transparent;
   cursor: pointer;
   white-space: nowrap;
@@ -183,13 +228,13 @@
 .tec-btn--s {
   padding: 5px 12px;
   font-size: 13px;
-  border-radius: 13px;
+  border-radius: var(--s2a-border-radius-round);
 }
 
 .tec-btn--l {
   padding: 10px 24px;
   font-size: 16px;
-  border-radius: 18px;
+  border-radius: var(--s2a-border-radius-round);
 }
 
 .tec-btn--primary {
@@ -242,9 +287,31 @@
   height: 32px;
 }
 
+.tec-toast .tec-btn--icon {
+  color: currentcolor;
+}
+
 .tec-btn--icon:hover:not(:disabled) {
   background: var(--tec-color-surface-hover);
   color: var(--tec-color-text-primary);
+}
+
+.tec-btn--icon.tec-btn--icon-s {
+  width: 28px;
+  height: 28px;
+  padding: 5px;
+  border: 1px solid var(--tec-color-border-hover);
+}
+
+.tec-btn--icon.tec-btn--danger:hover:not(:disabled) {
+  background: var(--tec-color-error-bg);
+  color: var(--tec-color-error);
+  border-color: var(--tec-color-error);
+}
+
+.tec-toast .tec-btn--icon:hover:not(:disabled) {
+  background: rgb(0 0 0 / 8%);
+  color: currentcolor;
 }
 
 .tec-btn--full {
@@ -272,7 +339,7 @@
 .tec-field:focus-visible {
   outline: none;
   border-color: var(--tec-color-primary);
-  box-shadow: 0 0 0 3px rgb(20 115 230 / 15%);
+  box-shadow: 0 0 0 3px var(--tec-color-focus-ring);
 }
 
 .tec-field::placeholder {
@@ -293,28 +360,28 @@ select.tec-field {
 .tec-toast {
   position: fixed;
   bottom: var(--tec-spacing-lg);
-  right: var(--tec-spacing-lg);
+  left: 50%;
+  transform: translateX(-50%);
   z-index: 2000;
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   gap: var(--tec-spacing-sm);
   max-width: 420px;
   padding: var(--tec-spacing-sm) var(--tec-spacing-md);
   border-radius: var(--tec-border-radius);
-  background: var(--tec-color-surface);
   box-shadow: var(--tec-shadow-md);
   font-size: 14px;
-  font-weight: 600;
-  border-left: 4px solid var(--tec-color-text-secondary);
   animation: tec-toast-in 0.18s ease-out;
 }
 
 .tec-toast--success {
-  border-left-color: var(--tec-color-success);
+  background: var(--tec-color-success-bg);
+  color: var(--tec-color-success);
 }
 
 .tec-toast--error {
-  border-left-color: var(--tec-color-error);
+  background: var(--tec-color-error-bg);
+  color: var(--tec-color-error);
 }
 
 .tec-toast__message {
@@ -324,12 +391,12 @@ select.tec-field {
 @keyframes tec-toast-in {
   from {
     opacity: 0;
-    transform: translateY(8px);
+    transform: translateX(-50%) translateY(8px);
   }
 
   to {
     opacity: 1;
-    transform: translateY(0);
+    transform: translateX(-50%) translateY(0);
   }
 }
 
@@ -411,9 +478,9 @@ select.tec-field {
    row, so it stays quiet in the common (prod) case. */
 .tec-library__item-env {
   flex-shrink: 0;
-  background: #fdf0e0;
-  color: #7a4a00;
-  border: 1px solid #f0c987;
+  background: var(--tec-color-warning-bg);
+  color: var(--tec-color-warning);
+  border: 1px solid var(--tec-color-warning-border);
   border-radius: 999px;
   padding: 1px 8px;
   font-size: 11px;
@@ -447,7 +514,7 @@ select.tec-field {
 
 .tec-search-input:focus-within {
   border-color: var(--tec-color-primary);
-  box-shadow: 0 0 0 3px rgb(20 115 230 / 15%);
+  box-shadow: 0 0 0 3px var(--tec-color-focus-ring);
 }
 
 .tec-search-input__icon {
@@ -651,7 +718,7 @@ select.tec-field {
 
 .tec-editor__header {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   gap: var(--tec-spacing-sm);
   margin-bottom: var(--tec-spacing-lg);
 }
@@ -720,6 +787,33 @@ select.tec-field {
   width: 100%;
   max-width: 480px;
   margin-bottom: var(--tec-spacing-sm);
+}
+
+.tec-editor__datetime-group + .tec-editor__datetime-group {
+  margin-top: var(--tec-spacing-md);
+}
+
+.tec-editor__datetime-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--tec-spacing-md);
+}
+
+.tec-editor__datetime-col {
+  flex: 1 1 220px;
+}
+
+.tec-editor__datetime-col .tec-editor__rf-input {
+  width: 100%;
+  max-width: none;
+}
+
+.tec-editor__heading-input {
+  width: 100%;
+  max-width: 640px;
+  padding: 10px 14px;
+  font-size: 16px;
+  margin-bottom: var(--tec-spacing-md);
 }
 
 .tec-editor__checkbox {
@@ -895,6 +989,27 @@ select.tec-field {
   cursor: pointer;
 }
 
+.tec-track-editor__icon-input {
+  flex: 1;
+  min-width: 160px;
+}
+
+.tec-track-editor__url-input {
+  flex: 1;
+  min-width: 200px;
+}
+
+.tec-track-editor__preview-wrap {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--tec-color-background);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
 .tec-track-editor__color-input:hover {
   border-color: var(--tec-color-border-hover);
 }
@@ -913,6 +1028,7 @@ select.tec-field {
 .tec-featured-editor__column {
   flex: 1;
   min-width: 0;
+  overflow-y: auto;
 }
 
 .tec-featured-editor__column h3 {
@@ -946,7 +1062,6 @@ select.tec-field {
   flex-direction: column;
   gap: 6px;
   max-height: 360px;
-  overflow-y: auto;
 }
 
 .tec-featured-editor__row {
@@ -957,6 +1072,24 @@ select.tec-field {
   background: var(--tec-color-background);
   border: 1px solid var(--tec-color-border);
   border-radius: var(--tec-border-radius-sm);
+}
+
+/* Selected-session rows (left column) can grow tall once meta-field inputs are
+   showing, so align to the top instead of center — puts the remove button in
+   the row's top-right corner rather than vertically centered against the
+   whole (now potentially multi-line) row. Available-session rows (right
+   column, no meta fields) keep the base center alignment untouched. */
+.tec-featured-editor__row.tec-featured-editor__row--selected {
+  align-items: flex-start;
+  cursor: grab;
+}
+
+.tec-featured-editor__remove {
+  flex-shrink: 0;
+}
+
+.tec-btn--icon.tec-btn--icon-s.tec-featured-editor__remove {
+  border: none;
 }
 
 .tec-featured-editor__row.is-dragging {
@@ -1027,8 +1160,8 @@ select.tec-field {
 }
 
 .tec-editor__config-preview {
-  background: #1d1d1d;
-  color: #e1e1e1;
+  background: var(--s2a-color-gray-900);
+  color: var(--s2a-color-gray-200);
   border-radius: var(--tec-border-radius);
   padding: var(--tec-spacing-md);
   overflow-x: auto;
@@ -1049,4 +1182,339 @@ select.tec-field {
   background: rgb(250 250 250 / 90%);
   backdrop-filter: blur(6px);
   border-top: 1px solid var(--tec-color-border);
+}
+
+/* Library — grouped by config type (Global / Homepage) */
+
+.tec-library__group {
+  margin-bottom: var(--tec-spacing-xl);
+  padding-bottom: var(--tec-spacing-lg);
+  border-bottom: 1px solid var(--tec-color-border);
+}
+
+.tec-library__group:last-of-type {
+  border-bottom: none;
+}
+
+.tec-library__group-header {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--tec-spacing-md);
+  margin-bottom: var(--tec-spacing-md);
+}
+
+.tec-library__group-icon {
+  font-size: 20px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.tec-library__group-heading {
+  flex: 1;
+  min-width: 0;
+}
+
+.tec-library__group-heading h2 {
+  display: flex;
+  align-items: center;
+  gap: var(--tec-spacing-sm);
+  margin: 0 0 4px;
+  font-size: 17px;
+}
+
+.tec-library__group-desc {
+  margin: 0;
+  color: var(--tec-color-text-secondary);
+  font-size: 13px;
+}
+
+.tec-library__group-badge {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  padding: 2px 10px;
+  border-radius: 999px;
+}
+
+.tec-library__group-badge--global {
+  background: var(--s2a-color-blue-200);
+  color: var(--tec-color-primary);
+}
+
+.tec-library__group-badge--homepage {
+  background: var(--tec-color-success-bg);
+  color: var(--tec-color-success);
+}
+
+.tec-library__item-type {
+  flex-shrink: 0;
+  background: var(--tec-color-surface-hover);
+  color: var(--tec-color-text-secondary);
+  border: 1px solid var(--tec-color-border);
+  border-radius: 999px;
+  padding: 1px 8px;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.tec-library__new-menu {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.tec-library__new-menu-list {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 4px);
+  z-index: 10;
+  background: var(--tec-color-surface);
+  border: 1px solid var(--tec-color-border);
+  border-radius: var(--tec-border-radius);
+  box-shadow: var(--tec-shadow-sm);
+  min-width: 180px;
+  overflow: hidden;
+}
+
+.tec-library__new-menu-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: var(--tec-spacing-sm) var(--tec-spacing-md);
+  background: none;
+  border: none;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.tec-library__new-menu-item:hover {
+  background: var(--tec-color-surface-hover);
+}
+
+.tec-library__how-differ {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--tec-spacing-md);
+  padding: var(--tec-spacing-md);
+  background: var(--tec-color-surface-hover);
+  border: 1px solid var(--tec-color-border);
+  border-radius: var(--tec-border-radius);
+}
+
+.tec-library__how-differ p {
+  margin: 4px 0 0;
+  color: var(--tec-color-text-secondary);
+  font-size: 13px;
+}
+
+/* Per-session Watch URL / Mobile Rider stream ID / Image overrides — see
+   MOBILE-RIDER-STREAM-ID-GAP.md for why these are hand-authored here rather
+   than sourced from the ESP session catalog. */
+
+.tec-featured-editor__meta-fields {
+  display: flex;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.tec-featured-editor__meta-field {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+}
+
+.tec-featured-editor__thumb {
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+  object-fit: cover;
+  border-radius: var(--tec-border-radius-sm);
+  border: 1px solid var(--tec-color-border);
+}
+
+.tec-field--s {
+  flex: 1;
+  min-width: 0;
+  padding: 4px 8px;
+  font-size: 12px;
+}
+
+/* ==========================================================================
+    DA Folder Browser + Image Upload (ImagePickerModal)
+   ========================================================================== */
+
+.tec-fb-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tec-spacing-sm);
+}
+
+.tec-fb-error {
+  background-color: var(--tec-color-error-bg);
+  color: var(--tec-color-error);
+  padding: var(--tec-spacing-sm) var(--tec-spacing-md);
+  border-radius: var(--tec-border-radius-sm);
+  font-size: 14px;
+}
+
+.tec-fb-columns {
+  display: flex;
+  height: 320px;
+  overflow-x: auto;
+  border: 1px solid var(--tec-color-border);
+  border-radius: var(--tec-border-radius-sm);
+  min-height: 0;
+}
+
+.tec-fb-column {
+  min-width: 200px;
+  border-right: 1px solid var(--tec-color-border);
+  overflow-y: auto;
+  flex-shrink: 0;
+}
+
+.tec-fb-column:last-child { border-right: none; }
+
+.tec-fb-column--loading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: var(--tec-spacing-lg);
+}
+
+.tec-fb-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--tec-color-text-primary);
+  user-select: none;
+}
+
+.tec-fb-item:hover { background-color: var(--tec-color-surface-hover); }
+
+.tec-fb-item--active {
+  background-color: var(--tec-color-primary);
+  color: var(--tec-color-on-primary);
+}
+
+.tec-fb-item-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tec-fb-item-chevron {
+  margin-left: auto;
+  opacity: 0.4;
+  font-size: 16px;
+}
+
+.tec-fb-breadcrumbs {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 2px;
+  padding: 6px 0;
+  font-size: 12px;
+  color: var(--tec-color-text-secondary);
+  border-top: 1px solid var(--tec-color-border);
+}
+
+.tec-fb-breadcrumb-sep {
+  color: var(--tec-color-text-placeholder);
+  padding: 0 2px;
+}
+
+.tec-fb-breadcrumb-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: 3px;
+  font-size: 12px;
+  color: var(--tec-color-primary);
+}
+
+.tec-fb-breadcrumb-btn:hover { background-color: var(--tec-color-surface-hover); }
+
+.tec-fb-breadcrumb-btn--current {
+  color: var(--tec-color-text-primary);
+  cursor: default;
+}
+
+.tec-fb-breadcrumb-btn:disabled { cursor: default; }
+
+.tec-fb-add-folder {
+  display: flex;
+  gap: var(--tec-spacing-sm);
+  align-items: center;
+}
+
+.tec-fb-selected-path {
+  display: flex;
+  align-items: center;
+  gap: var(--tec-spacing-sm);
+  padding: 6px 0;
+  font-size: 13px;
+  border-top: 1px solid var(--tec-color-border);
+}
+
+.tec-fb-selected-label {
+  font-weight: 600;
+  color: var(--tec-color-text-secondary);
+}
+
+.tec-fb-selected-value {
+  color: var(--tec-color-text-primary);
+  word-break: break-all;
+}
+
+.tec-fb-actions {
+  display: flex;
+  gap: var(--tec-spacing-md);
+  justify-content: flex-end;
+  padding-top: var(--tec-spacing-sm);
+}
+
+.tec-fb-image-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+  gap: var(--tec-spacing-sm);
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.tec-fb-image-thumb {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: var(--tec-spacing-xs);
+  border: 1px solid var(--tec-color-border);
+  border-radius: var(--tec-border-radius-sm);
+  background: none;
+  cursor: pointer;
+}
+
+.tec-fb-image-thumb:hover { background-color: var(--tec-color-surface-hover); }
+
+.tec-fb-image-thumb img {
+  width: 100%;
+  height: 70px;
+  object-fit: cover;
+  border-radius: var(--tec-border-radius-sm);
+}
+
+.tec-fb-image-thumb-name {
+  font-size: 12px;
+  color: var(--tec-color-text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
 }
