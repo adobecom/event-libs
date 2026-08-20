@@ -1105,23 +1105,6 @@ function addStylesToEventPage() {
   document.head.appendChild(link);
 }
 
-// Not called from decorateEvent: decorateEvent only runs on pages with an
-// event-id, but this layout is meant for static/non-event pages too. The
-// consuming site's own decorateArea should call this directly, unconditionally.
-// Always resolves the real page <main> directly rather than relying on a
-// `parent`/`area` argument, since callers may re-enter with fragment/MEP
-// elements. Re-reads metadata on every call (no cached "checked" flag) so a
-// later personalization pass that updates `section-layout` still takes effect.
-// Calls addStylesToEventPage() itself so callers only need this one function
-// to get both the CSS and the class toggle.
-export function applySectionColumnsLayout() {
-  const main = document.querySelector('main');
-  if (!main) return;
-  const enabled = getMetadata('section-layout')?.trim().toLowerCase() === 'columns';
-  if (enabled) addStylesToEventPage();
-  main.classList.toggle('section-columns', enabled);
-}
-
 // e.g. "dark", "dark(blocks:hero-marquee,profile-cards)", or "dark(blocks:text[first],agenda)"
 const BLOCK_TOKEN_RE = /^([^[\]]+?)(?:\[\s*(first|last|[1-9]\d*)\s*\])?$/;
 
@@ -1287,6 +1270,8 @@ export function decorateEvent(parent) {
 }
 
 export default function decorateArea(area = document) {
+  addStylesToEventPage();
+
   const eagerLoad = (parent, selector) => {
     const img = parent.querySelector(selector);
     img?.removeAttribute('loading');

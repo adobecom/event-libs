@@ -8,6 +8,9 @@
   flex-direction: column;
   gap: var(--s2a-spacing-16, 16px);
   margin-bottom: var(--s2a-spacing-8, 8px);
+  padding: var(--s2a-spacing-24, 24px);
+  border-radius: var(--s2a-border-radius-16, 16px);
+  background: var(--s2a-color-gray-25, #fff);
 }
 
 .featured-products-title {
@@ -56,6 +59,7 @@
      UI component boundary — gray-400 #c6c6c6 is only 1.71:1. */
   border: 1px solid var(--s2a-color-gray-500, #8f8f8f);
   border-radius: var(--s2a-border-radius-16, 16px);
+  background: var(--s2a-color-gray-25, #fff);
   color: var(--s2a-color-gray-1000, #000);
   font-size: var(--s2a-font-size-14, 0.875rem);
   font-weight: 700;

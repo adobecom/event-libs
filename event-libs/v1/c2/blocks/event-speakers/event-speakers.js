@@ -12,6 +12,7 @@
  */
 import { createTag } from '../../../utils/utils.js';
 import { getJsonMetadata } from '../../utils/custom-attributes.js';
+import { readBackgroundConfig } from '../../utils/background-config.js';
 
 const MOBILE_LIMIT = 5;
 
@@ -49,8 +50,10 @@ function renderAvatar(s) {
 }
 
 export default async function init(el) {
+  const background = readBackgroundConfig(el);
   const speakers = getJsonMetadata('speakers', []);
   el.replaceChildren();
+  if (background) el.style.background = background;
   if (!Array.isArray(speakers) || !speakers.length) return;
 
   const title = createTag('h2', { class: 'speakers-title' }, 'Speakers ');

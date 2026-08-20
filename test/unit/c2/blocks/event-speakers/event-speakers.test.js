@@ -12,6 +12,16 @@ function block() {
   return el;
 }
 
+function backgroundRow(value) {
+  const row = document.createElement('div');
+  const key = document.createElement('div');
+  key.textContent = 'Background';
+  const val = document.createElement('div');
+  val.textContent = value;
+  row.append(key, val);
+  return row;
+}
+
 describe('Speakers', () => {
   beforeEach(() => {
     document.head.innerHTML = '';
@@ -75,5 +85,20 @@ describe('Speakers', () => {
     const el = block();
     await init(el);
     expect(el.children).to.have.lengthOf(0);
+  });
+
+  it('applies an authored Background row as the block background', async () => {
+    setSpeakers([{ firstName: 'Ada', lastName: 'Lovelace' }]);
+    const el = block();
+    el.append(backgroundRow('#ff0000'));
+    await init(el);
+    expect(el.style.background).to.equal('rgb(255, 0, 0)');
+  });
+
+  it('leaves the background unset when no Background row is authored', async () => {
+    setSpeakers([{ firstName: 'Ada', lastName: 'Lovelace' }]);
+    const el = block();
+    await init(el);
+    expect(el.style.background).to.equal('');
   });
 });
