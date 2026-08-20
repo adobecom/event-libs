@@ -1,7 +1,23 @@
 # Video Playlist (C2)
 
-Authored on an Individual Session Page, alongside a video player block
-(Mobile Rider, or a `.milo-video` MPC/YouTube embed) in the **same section**.
+Authored on an Individual Session Page, in its own grid-column fragment
+(alongside a separate `video-player` block, in a different grid-column
+fragment — see that block's own README for embedding/tracking). This block
+handles the topic-playlist/chapters list only; it does not embed or track
+the current session's own video itself — including deciding whether to
+render at all: it requires a real embeddable video to exist on the page
+(same check `video-player.js` uses; see "No video, no playlist" below), not
+merely that the session has ended.
+
+The two blocks communicate only through `localStorage`
+(`video-playlist:progress`, `video-playlist:play-all`) and page-wide
+`CustomEvent`s (`video-player:progress`, `video-player:state`) — never a
+direct reference — so either can load independently, in either order,
+regardless of which grid column/fragment it's actually authored in.
+`video-player.js` only reports raw playback state (play/pause/ended); this
+block owns every decision about what to do with that state (e.g. "Play
+all" advancing on `ended` — see Play all below).
+
 Renders one of two variants automatically — no explicit variant to author:
 
 - **Chapters** — when the page's own `session-type` metadata is `Keynote`
@@ -97,90 +113,81 @@ attempt in `video-playlist.js`, that needs correcting against a real embed.
 
 ## Loading the current session's own video
 
-The Individual Session Page's own `session-times` metadata carries this
-session's ready-to-embed `videos[]` — entries shaped like `{ provider:
-'mpc', url: 'https://video.tv.adobe.com/v/3458940?autoplay=true&quality=9&
-end=nothing&learn=on', kind: 'onDemand' }` — confirmed against real data.
-On init, this block reads that metadata (independent of whether the
-topic-playlist/chapters list ends up rendering at all) and loads the
-`provider: 'mpc'` entry's URL — already fully-formed; nothing is
-constructed client-side — into the player mounted alongside it in the same
-`.section`.
+Handled entirely by the separate `video-player` block — see its own README
+for embedding, provider handling, and resume-on-load. This block never
+embeds a player itself.
 
-If a `.milo-video` is already mounted there, its iframe is replaced.
-**Real pages have been seen with no video block authored in the section at
-all** — in that case (or if only a `.mobile-rider` is present, which can't
-host either embed as-is), a fresh `.milo-video` container is built and
-inserted as a sibling, mirroring Milo's own `adobetv.js`/`youtube.js`
-autoblock markup (same classes/attrs), so it picks up the same global
-sizing (`libs/styles/iframe.css`) a real Milo-decorated embed would.
+## No video, no playlist
 
-Both `mpc` and `youtube` providers are handled — **`youtube`'s exact url
-shape is unconfirmed against real data** (no real sample seen yet), so
-`extractYouTubeId()` extracts an id defensively from whatever shape shows
-up (embed URL, watch URL, or a bare id) rather than assuming one. YouTube
-additionally gets `enablejsapi=1` + an `id` added (Milo's own autoblock
-doesn't add these — it never needs to observe player state), needed for
-completion tracking below.
+`init()` requires the current page to actually have a real, embeddable
+video (`hasEmbeddableVideo()`, checking `session-times` metadata for an
+`mpc`/`youtube` provider entry) before rendering anything at all — the same
+check `video-player.js` uses to decide whether it has anything to embed,
+deliberately duplicated here rather than shared via a cross-block signal
+(per product: this block should use the same underlying logic the player
+itself uses, not depend on whether that block actually loaded/rendered
+successfully as a separate concern). A session having *ended* is a
+different question from a session *having a video at all* — both gates are
+checked independently, and either one failing removes this block.
 
-## Play all / completion tracking
-
-Once loaded, the current session's player is watched for completion —
-mechanism depends on provider, since MPC and YouTube signal it completely
-differently:
-
-- **`mpc`**: listens for the `window.postMessage` envelope AdobeTV's own
-  player posts — `{ type: 'mpcStatus', state: 'load'|'pause'|'tick'|'complete',
-  id, currentTime, length }` from `https://video.tv.adobe.com` (origin-checked).
-- **`youtube`**: loads the YouTube IFrame API (`https://www.youtube.com/
-  iframe_api`, only if not already present) and watches `YT.Player`'s
-  `onReady`/`onStateChange`.
+## Play all
 
 A "Play all" toggle is rendered alongside the topic-playlist title (not
 shown for Chapters — advancing to a different session doesn't apply
 there). Its state persists to `localStorage` (`video-playlist:play-all`) —
 a plain in-memory flag wouldn't survive the full-page navigation that
-advancing to the next session's own page requires. When the current video
-completes and Play all is on, the block navigates to the **first resolved
-topic-playlist row's own page** — that page loads its own video the same
-way, continuing the chain indefinitely.
+advancing to the next session's own page requires.
+
+**This block owns the entire advance decision** — `video-player.js` only
+reports raw playback state (a page-wide `video-player:state` `CustomEvent`,
+detail `{ sessionId, state }` where `state` is `'play'`/`'pause'`/`'ended'`);
+it makes no decision about what should happen on `ended`. `init()` here
+listens for that event, and on `ended` for the *current* session
+specifically (a different session's video is never embedded on this page):
+reads the "Play all" preference, and if enabled, resolves the next session
+by reading `data-href` directly off this block's own rendered rows (the
+first row whose `data-item-id` isn't the current session, in
+`resolveTopicPlaylist`'s own ascending-by-start-time order) and navigates.
+No direct reference between the two blocks — they may load in either order
+and don't share JS scope.
 
 ## Watch progress + resume
 
 Every session's own page saves its own watch progress to `localStorage`
 (`video-playlist:progress`, keyed by **session id**, not any provider's
 video id — only the session's own page ever embeds its video, so which
-session is playing is always unambiguous). `saveVideoProgress`/
-`getVideoProgress` in `video-playlist.js` read/write this map; the same
-data drives two things:
+session is playing is always unambiguous) — written by `video-player.js`,
+not this block. `getVideoProgress`/`computeProgressPercent` here only
+**read** that map:
 
-1. **Resume on load** — `MPC_STATE_LOAD` (`resumeMpcVideo`) or YouTube's
-   `onReady` seeks the player to the last-saved position, unless that
-   position is within `RESUME_RESTART_THRESHOLD_SECONDS` (30s) of the end
-   (a finished session shouldn't "resume" 1s before its own end).
-2. **Per-row progress bars** — each topic-playlist row reads the matching
-   session's saved progress (`computeProgressPercent`) at render time and
-   shows it as a filled bar next to the duration. Since a row's own session
-   isn't embedded on THIS page, its progress is a snapshot from the last
-   time the viewer was on that session's own page, not live.
+- **Per-row progress bars** — each topic-playlist row reads the matching
+  session's saved progress at render time and shows it as a filled bar next
+  to the duration. Since a row's own session isn't embedded on THIS page
+  (except the current session's own row), this is a snapshot from the last
+  time the viewer was on that session's own page, not live for those rows.
+- **Live updates for the current session's own row** — `video-player.js`
+  dispatches a page-wide `video-player:progress` `CustomEvent` (detail:
+  `{ sessionId }`) whenever it saves new progress; this block listens for
+  it in `init()` and re-reads/re-renders that one row's progress bar and
+  duration label, so the "now playing" row updates live as the video
+  actually plays, without the two blocks referencing each other directly.
 
-MPC ticks are throttled to `PROGRESS_TICK_SECONDS` (5s); YouTube has no
-equivalent continuous event, so progress is polled via
-`getCurrentTime()`/`getDuration()` on the same cadence while
-`PlayerState.PLAYING`.
+Resume-on-load is handled entirely in `video-player.js`.
 
 Client-only persistence (no backend field exists for per-viewer watch
 progress today).
 
 ## Favorites
 
-Each topic-playlist row has a favorite/heart toggle (`isFavorite`/
-`toggleFavoriteLocal`, `video-playlist:favorites` in `localStorage`,
-keyed by session id) — also client-only; no backend field exists for this
-either. The button is a real, separate `<button>` sibling next to the
-row's thumbnail/meta (a row can't be a native `<button>` itself once it
-needs to contain another `<button>`) — its click handler calls
-`stopPropagation()` so favoriting a row never also navigates to it.
+Each topic-playlist row has a favorite/heart toggle backed by the same
+shared, real RF-backed mechanism `upcoming-sessions.js`/`sessions-guide`
+use (`favorited`/`pendingActions` signals in `utils/session-store.js`,
+`toggleFavoriteWithFeedback` in `services/sessions/action-feedback.js`) —
+not a local/`localStorage` reimplementation. The button is a real, separate
+`<button>` sibling next to the row's thumbnail/meta (a row can't be a
+native `<button>` itself once it needs to contain another `<button>`) —
+its click handler calls `stopPropagation()` so favoriting a row never also
+navigates to it.
 
 ## The current session's own row
 
@@ -189,11 +196,12 @@ The current session is **prepended** to the topic playlist's displayed rows
 `highlightRow` used for the Chapters variant's first chapter — so the
 viewer can tell which row is theirs while browsing "more like this". This
 is purely a **display** concern: `resolveTopicPlaylist`'s own return value
-(used for `minSessions` gating and for `nextRow`, the actual next session
-to autoplay to) still only ever contains **other** qualifying sessions,
-unaffected — the current session never counts toward `minimum-sessions`.
-It does occupy one of the `maximum-sessions` display slots, though, since
-that cap applies to the final, current-session-included display list.
+(used for `minimum-sessions` gating) still only ever contains **other**
+qualifying sessions, unaffected — the current session never counts toward
+it. It does occupy one of the `maximum-sessions` display slots, though,
+since that cap applies to the final, current-session-included display
+list. (See Play all above for how `video-player.js` determines the actual
+next-session target from these rendered rows.)
 
 ## Row selection
 
@@ -211,21 +219,27 @@ for free.
 
 ## Responsive layout
 
-- **Desktop (≥1024px)**: right-rail, `.section:has(> .video-playlist)`
-  becomes a row flex container (no JS DOM-wrapping) — the preceding player
-  block takes the remaining space, this block becomes a fixed-width rail
-  that widens per breakpoint (349px at 1024px, 392px at 1440px, 487px at
-  1920px, per Figma inspect).
-  The section itself also carries the same responsive side-margin scale
-  `event-marquee.css` uses (86px/124px/220px at 1024/1440/1920), since
-  that scale isn't inherited from anywhere global.
-  A "Show more" button (topic-playlist only, shown once there are more than
-  `SHOW_MORE_INITIAL_ROWS` (4) rows) reveals the remaining rows via a CSS
-  `nth-child` cap — independent of the mobile drawer's `is-expanded` state
-  below, which covers an unrelated need (the full list already scrolls on
-  mobile, so there's no cap there). Per Figma, expanding never changes the
-  rail's own width — only the row count — so `is-expanded` has no CSS width
-  effect on desktop at all (it's mobile-drawer-height-only; see Drawer).
+**Known gap, not yet solved**: the previous desktop right-rail treatment
+depended on this block and its player sharing one `.section`
+(`.section:has(> .video-playlist)`), so the player took the remaining flex
+space and this block became a fixed-width rail beside it. Now that the
+player lives in a separate `video-player` block/fragment (see the top of
+this README), that `:has()`-based layout no longer applies — this block
+currently only has its own standalone width per breakpoint (349px at
+1024px, 392px at 1440px, 487px at 1920px, per Figma inspect), with no
+side-by-side arrangement wired up yet. The actual two-column grid layout
+(via `grid-column` fragments) needs revisiting once the real page-template
+DOM is confirmed.
+
+- **Desktop (≥1024px)**: this block's own standalone width per breakpoint
+  above. A "Show more" button (topic-playlist only, shown once there are
+  more than `SHOW_MORE_INITIAL_ROWS` (4) rows) reveals the remaining rows
+  via a CSS `nth-child` cap — independent of the mobile drawer's
+  `is-expanded` state below, which covers an unrelated need (the full list
+  already scrolls on mobile, so there's no cap there). Per Figma, expanding
+  never changes the rail's own width — only the row count — so
+  `is-expanded` has no CSS width effect on desktop at all (it's
+  mobile-drawer-height-only; see Drawer).
 - **Mobile (<1024px)**: a `position: fixed` bottom sheet, open on load.
   Collapsing/expanding is governed by `computeDrawerCapPx`/
   `clampedTitleBottom` in `video-playlist.js` — the drawer can never expand

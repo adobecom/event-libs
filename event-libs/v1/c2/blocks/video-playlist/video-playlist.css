@@ -1,47 +1,11 @@
 @import '../../styles/tokens.css';
 
-/* Per Figma inspect (both the 1024px desktop rail and the 768px mobile drawer), the
-   video itself gets a 16px corner radius — c2-global.css's own default for .milo-video
-   is 24px (and only applies at min-width:1024px in the first place, so mobile gets none
-   at all without this). Unconditional so it covers mobile; the desktop media query below
-   additionally needs !important to beat c2-global's higher-specificity desktop rule. */
-.section:has(> .video-playlist) .milo-video {
-  border-radius: var(--s2a-border-radius-md, 16px);
-  overflow: hidden;
-}
-
-/* Desktop right-rail: the section holding a player block immediately followed by
-   video-playlist becomes a row flex container, with the player taking the remaining
-   space and this block becoming a fixed-width rail beside it — same ":has()" pattern
-   event-marquee.css already uses, no JS DOM-wrapping needed. */
+/* Standalone width/layout for this block on its own (e.g. inside its own grid-column
+   fragment, alongside a separate video-player block in another column) — the previous
+   .section:has(> .video-playlist) side-by-side rail depended on the player and this
+   block sharing one .section, which a two-fragment page layout no longer guarantees.
+   Revisit once the actual page-template grid-column DOM is confirmed. */
 @media (min-width: 1024px) {
-  .section:has(> .video-playlist) {
-    display: flex;
-    align-items: flex-start;
-    gap: var(--s2a-spacing-xs);
-    padding-inline: 86px;
-  }
-
-  .section:has(> .video-playlist) > :not(.video-playlist) {
-    flex: 1 1 auto;
-    min-width: 0;
-  }
-
-  /* ../../styles/c2-global.css caps every .milo-video at a fixed reading-width measure,
-     centers it, and rounds it to 24px (`:root:has(meta[foundation=c2]) .milo-video {
-     max-width: ...; margin: 0 auto; border-radius: 24px; }`) — a sensible default for a
-     video used standalone, but it wins over the flex rule above and the 16px radius rule
-     at the top of this file regardless of load order: that selector's specificity (0,4,1)
-     beats this file's class-based selectors (0,3,0). Needs to be beaten here, not edited
-     globally — other pages rely on the standalone centered default. Same "!important to
-     defeat a shared foundation/global default in one specific layout" precedent as
-     mobile-rider.css. */
-  .section:has(> .video-playlist) > .milo-video {
-    max-width: none !important;
-    margin: 0 !important;
-    border-radius: var(--s2a-border-radius-md, 16px) !important;
-  }
-
   /* Desktop card is light (per Figma inspect: background:#FFF) — the inverse of the
      mobile bottom-sheet's dark theme below. Every color that needs to contrast against
      the card is expressed as a --vp-* custom property so this is the only place the
@@ -109,17 +73,10 @@
   }
 }
 
-/* Same responsive side-margin scale as event-marquee.css (the only other C2 block using
-   the `:has()` full-bleed-row pattern) — not inherited from anywhere global (Milo's own
-   grid uses a percentage-based --grid-container-width, and c2-global.css doesn't touch
-   .section margins at all), so each block that bleeds a .section to the viewport edge
-   owns this scale itself. Mobile isn't included here: below 1024px the video-playlist
-   drawer is an intentionally edge-to-edge bottom sheet, not part of this row. */
+/* This block's own responsive width, independent of any shared-section layout (see the
+   note above the min-width:1024px block) — mobile isn't included here: below 1024px the
+   video-playlist drawer is an intentionally edge-to-edge bottom sheet. */
 @media (min-width: 1440px) {
-  .section:has(> .video-playlist) {
-    padding-inline: var(--s2a-layout-lg);
-  }
-
   /* 392px = 360px content (per Figma inspect at 1440px) + 16px+16px padding-inline. */
   .video-playlist {
     flex-basis: 392px;
@@ -127,10 +84,6 @@
 }
 
 @media (min-width: 1920px) {
-  .section:has(> .video-playlist) {
-    padding-inline: 220px;
-  }
-
   /* 487px = 455px content (per Figma inspect at 1920px) + 16px+16px padding-inline. */
   .video-playlist {
     flex-basis: 487px;

@@ -1,0 +1,10 @@
+@import '../../styles/tokens.css';
+
+/* Per Figma inspect (both the 1024px desktop rail and the 768px mobile drawer), the
+   video itself gets a 16px corner radius — c2-global.css's own default for .milo-video
+   is 24px (and only applies at min-width:1024px in the first place, so mobile gets none
+   at all without this). */
+.video-player .milo-video {
+  border-radius: var(--s2a-border-radius-md, 16px);
+  overflow: hidden;
+}
