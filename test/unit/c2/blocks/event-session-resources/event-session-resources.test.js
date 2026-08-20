@@ -29,18 +29,42 @@ describe('Session Resources', () => {
 
   it('renders a row per published resource with name + CTA link', async () => {
     setMaterials([
-      { fileName: 'Session Slides.pdf', fileURL: 'https://x/slides.pdf', published: true },
-      { fileName: 'Presentation', fileURL: 'https://x/deck', published: true },
+      { fileTypeName: 'Session slides', fileURL: 'https://x/slides.pdf', published: true },
+      { fileTypeName: 'Presentation', fileURL: 'https://x/deck', published: true },
     ]);
     const el = block();
     await init(el);
     expect(el.querySelector('.session-resources-title').textContent).to.equal('Session resources');
     const rows = [...el.querySelectorAll('.session-resource')];
     expect(rows).to.have.lengthOf(2);
-    expect(rows[0].querySelector('.session-resource-name').textContent).to.equal('Session Slides.pdf');
+    expect(rows[0].querySelector('.session-resource-name').textContent).to.equal('Session slides');
     const cta = rows[0].querySelector('.session-resource-cta');
     expect(cta.getAttribute('href')).to.equal('https://x/slides.pdf');
     expect(cta.getAttribute('target')).to.equal('_blank');
+  });
+
+  it('prefers fileTypeName over fileName, which is often not reader-friendly', async () => {
+    setMaterials([{
+      fileTypeName: 'Session slides',
+      fileName: 'Screenshot 2026-08-13 at 11.23.26 AM.png',
+      fileURL: 'https://x/slides.pdf',
+      published: true,
+    }]);
+    const el = block();
+    await init(el);
+    expect(el.querySelector('.session-resource-name').textContent).to.equal('Session slides');
+  });
+
+  it('falls back to the file extension when fileTypeName is absent', async () => {
+    setMaterials([
+      { fileName: 'Magdiel_Lopez_MAX_2026_Session_Outline', fileURL: 'https://x/a.pdf', published: true },
+      { fileName: 'whatever', fileURL: 'https://x/b.PPTX?v=2', published: true },
+      { fileName: 'whatever', fileURL: 'https://x/no-extension', published: true },
+    ]);
+    const el = block();
+    await init(el);
+    const names = [...el.querySelectorAll('.session-resource-name')].map((n) => n.textContent);
+    expect(names).to.deep.equal(['Resource (PDF)', 'Resource (PPTX)', 'Resource']);
   });
 
   it('labels downloadable files "Download" and other URLs "Open"', async () => {
@@ -56,9 +80,9 @@ describe('Session Resources', () => {
 
   it('skips unpublished resources and those without a URL', async () => {
     setMaterials([
-      { fileName: 'Draft', fileURL: 'https://x/d.pdf', published: false },
-      { fileName: 'NoUrl', published: true },
-      { fileName: 'Good', fileURL: 'https://x/g.pdf', published: true },
+      { fileTypeName: 'Draft', fileURL: 'https://x/d.pdf', published: false },
+      { fileTypeName: 'NoUrl', published: true },
+      { fileTypeName: 'Good', fileURL: 'https://x/g.pdf', published: true },
     ]);
     const el = block();
     await init(el);

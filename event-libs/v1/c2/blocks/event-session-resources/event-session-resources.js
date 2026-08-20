@@ -21,6 +21,19 @@ const CHEVRON_ICON = '<svg xmlns="http://www.w3.org/2000/svg" width="8" height="
 
 const ctaLabel = (m) => (DOWNLOADABLE.test(m.fileURL || '') ? 'Download' : 'Open');
 
+// Trailing extension of the file URL, ignoring any query/hash.
+const EXT_RE = /\.([a-z0-9]{1,8})(?:[?#]|$)/i;
+
+// The row label comes from fileTypeName ("Session slides"), not fileName: authored
+// file names are frequently not reader-friendly ("Screenshot 2026-08-13 at
+// 11.23.26 AM.png", "Magdiel_Lopez_MAX_2026_Session_Outline"). With no fileTypeName,
+// fall back to the file's extension so the row still says what it is.
+const resourceName = (m) => {
+  if (m.fileTypeName) return m.fileTypeName;
+  const ext = (m.fileURL || '').match(EXT_RE)?.[1];
+  return ext ? `Resource (${ext.toUpperCase()})` : 'Resource';
+};
+
 // Suffixes the aria-controls id so multiple instances on one page stay unique.
 let instances = 0;
 
@@ -44,7 +57,7 @@ export default async function init(el) {
   published.forEach((m, i) => {
     const item = createTag('li', { class: 'session-resource' });
     if (i >= MOBILE_LIMIT) item.classList.add('is-overflow');
-    const name = m.fileName || m.fileTypeName || 'Resource';
+    const name = resourceName(m);
     item.append(createTag('span', { class: 'session-resource-name' }, name));
     item.append(createTag('a', {
       class: 'session-resource-cta',
