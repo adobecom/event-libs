@@ -523,13 +523,21 @@ export default async function init(el) {
   // removes this loader along with everything else in that section).
   el.append(createTag('div', { class: 'video-player-loader', 'aria-hidden': 'true' }));
 
-  // Doesn't embed yet — see awaitEmbedDecision above. The LOSING instance's whole
-  // section is removed by video-playlist.js itself (see announceVideoDecision there);
-  // this instance only ever embeds if it's confirmed the winner, so the loser's iframe
-  // never starts loading/playing at all.
-  const isWinner = await awaitEmbedDecision(el);
-  el.querySelector('.video-player-loader')?.remove();
-  if (!isWinner) return;
-
-  loadVideoPlayer(el, sessionId, currentVideo);
+  // Deliberately NOT awaited here — Milo's own loadArea() decorates sections
+  // SEQUENTIALLY (a for-of loop awaiting each section's Promise.all in turn, see
+  // libs/utils/utils.js), so an `await` on this block's own init() return value would
+  // stall every section AFTER this one — and page-wide deferred features
+  // (documentPostSectionLoading/loadDeferred) — for however long the decision takes to
+  // land (up to DECISION_FALLBACK_MS). Confirmed live: this caused the whole page to
+  // feel stuck, not just the video area. init() itself returns immediately once the
+  // loader is up; the actual embed-or-not decision continues in this detached flow.
+  (async () => {
+    // The LOSING instance's whole section is removed by video-playlist.js itself (see
+    // announceVideoDecision there); this instance only ever embeds if it's confirmed
+    // the winner, so the loser's iframe never starts loading/playing at all.
+    const isWinner = await awaitEmbedDecision(el);
+    el.querySelector('.video-player-loader')?.remove();
+    if (!isWinner) return;
+    loadVideoPlayer(el, sessionId, currentVideo);
+  })();
 }
