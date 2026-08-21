@@ -767,8 +767,57 @@
   margin-left: 2px;
 }
 
+/* From 768px, where the pill widens for its "Filter" label and shows the count, an active
+   filter set only darkens the glyph. */
 .sg-filter-btn--active .sg-filter-icon {
   background-color: var(--s2a-color-gray-800);
+}
+
+/* Below 768px the button is a 40px icon-only circle with no room for a number — an 18px glyph
+   plus an 18px badge overflows it, which is how the badge ended up colliding with the ring —
+   so "filters are applied" is carried by a solid selected fill instead and the count is
+   hidden. A max-width block rather than this file's usual mobile-first shape because the fill
+   is mobile-only: reverting the fill, glyph, hover, and both dark variants at 768px would be
+   five undo rules instead of one guard. The button's aria-label carries the count at every
+   width, so assistive tech never depends on the badge being visible. */
+@media (max-width: 767px) {
+  .sg-filter-count-badge {
+    display: none;
+  }
+
+  /* Doubled class rather than the bare .sg-filter-btn--active: this file is @imported at the
+     top of sessions-guide.css, so that file's own `.sg-filter-btn { background: transparent }`
+     is later in the cascade and wins at equal specificity. The base 2px black-10% ring stays
+     put: invisible against the black fill on light, a soft edge against the white one on dark. */
+  .sg-filter-btn.sg-filter-btn--active {
+    background: var(--s2a-color-gray-1000);
+  }
+
+  .sg-filter-btn--active .sg-filter-icon {
+    background-color: var(--s2a-color-content-knockout);
+  }
+
+  /* Overrides .sg-filter-btn:hover, which would otherwise wash the fill out to 4% black. */
+  .sg-filter-btn.sg-filter-btn--active:hover {
+    background: var(--s2a-color-gray-1000);
+    opacity: 0.85;
+  }
+
+  /* Inverted on the dark drawer, where a near-black fill would vanish. Spelled out per theme
+     rather than via *-default tokens because those don't flip inside .sg-portal — the dark
+     token scope in sessions-guide-tokens.css only covers .sessions-guide[data-theme="dark"],
+     which is why the rest of this file's dark rules are hand-written pairs too. */
+  [data-theme="dark"] .sg-filter-btn--active,
+  .sg-portal[data-theme="dark"] .sg-filter-btn--active,
+  [data-theme="dark"] .sg-filter-btn--active:hover,
+  .sg-portal[data-theme="dark"] .sg-filter-btn--active:hover {
+    background: var(--s2a-color-gray-25);
+  }
+
+  [data-theme="dark"] .sg-filter-btn--active .sg-filter-icon,
+  .sg-portal[data-theme="dark"] .sg-filter-btn--active .sg-filter-icon {
+    background-color: var(--s2a-color-gray-1000);
+  }
 }
 
 /* ── Filter panel ─────────────────────────────────────────────
@@ -781,14 +830,27 @@
      1024px  3-column option grid
      1280px  anchored popover card per Figma 9145:43766, 4-column grid */
 .sg-filter-panel {
+  /* Owns the panel's inset so the drilled Save bar can cancel it and bleed its hairline to
+     the panel edges without the two values drifting apart — see __actions--drill. */
+  --sg-filter-panel-pad: var(--s2a-spacing-md);
+
   position: fixed;
   inset: 0;
   z-index: 200;
   display: flex;
   flex-direction: column;
-  padding: var(--s2a-spacing-md);
+  padding: var(--sg-filter-panel-pad);
   background: var(--s2a-color-background-default, #fff);
   animation: sg-filter-in 0.2s ease;
+}
+
+/* Both mobile frames (11519:32578 category list, 11519:32675 options) pad the takeover at
+   24px; the tablet takeover keeps the tighter 16px. Must follow the rule above, not lead it —
+   a media query adds no specificity, so the later declaration of the property wins. */
+@media (max-width: 767px) {
+  .sg-filter-panel {
+    --sg-filter-panel-pad: var(--s2a-spacing-lg);
+  }
 }
 
 @keyframes sg-filter-in {
@@ -993,14 +1055,16 @@
   gap: var(--s2a-spacing-sm);
 }
 
+/* Figma 11519:32717: a white bar pinned under the options, its hairline running the full
+   panel width. Negative margins cancel the panel's own padding so the bar bleeds to the
+   edges, then it re-applies that padding around the button. */
 .sg-filter-panel__actions--drill {
   flex-shrink: 0;
-  padding-top: var(--s2a-spacing-md);
+  margin: 0 calc(-1 * var(--sg-filter-panel-pad)) calc(-1 * var(--sg-filter-panel-pad));
+  padding: var(--sg-filter-panel-pad);
   border-top: 1px solid var(--s2a-color-border-subtle);
   background: var(--s2a-color-background-default);
 }
-
-.sg-filter-panel__save { flex: 1; }
 
 .sg-filter-panel__cat-badge {
   display: inline-flex;
@@ -1039,7 +1103,7 @@
   margin: 0;
 }
 
-/* A full-width action bar on mobile — 48px touch targets, Apply weighted wider.
+/* A full-width stacked pair on mobile, 16px apart (Figma 11519:32627).
    Becomes Figma's stacked 116x32 pair at 768px. */
 .sg-filter-panel__actions {
   grid-area: actions;
@@ -1048,11 +1112,17 @@
   gap: var(--s2a-spacing-md);
 }
 
+/* Figma "L Button" (11519:32628/32629): a full-width pill sized by 16px/24px padding, so it
+   lands at ~49px. `flex: none` is load-bearing — .sg-filter-panel__actions is a column, where
+   `flex: 1` sets a zero flex-basis on the *height* axis and collapsed these to their 18.8px
+   text height regardless of any height declared here. min-height keeps the 48px touch target
+   if the label ever wraps. */
 .sg-filter-panel__apply,
 .sg-filter-panel__reset {
-  flex: 1;
-  height: 48px;
-  padding: 0 var(--s2a-spacing-lg);
+  flex: none;
+  width: 100%;
+  min-height: 48px;
+  padding: var(--s2a-spacing-md) var(--s2a-spacing-lg);
   border: 1px solid rgb(0 0 0 / 10%);
   border-radius: var(--s2a-border-radius-round);
   font-family: var(--s2a-font-family-adobe-clean);
@@ -1070,8 +1140,10 @@
 
 .sg-filter-panel__apply:hover { opacity: 0.85; }
 
+/* Figma outlines the secondary buttons in gray-400, a step darker than Apply's 10% black. */
 .sg-filter-panel__reset {
   background: transparent;
+  border-color: var(--s2a-color-gray-400);
   color: var(--s2a-color-content-default);
 }
 
@@ -1192,11 +1264,15 @@
     gap: var(--s2a-spacing-md);
   }
 
+  /* Figma 9145:43768's fixed pair — min-height and the mobile padding have to come back off,
+     or the 32px pill can't hold its height. */
   .sg-filter-panel__apply,
   .sg-filter-panel__reset {
     flex: none;
     width: 116px;
     height: 32px;
+    min-height: 0;
+    padding: 0 var(--s2a-spacing-lg);
   }
 
   .sg-filter-panel__options {
@@ -1228,7 +1304,9 @@
     right: 0;
     width: min(1133px, calc(100vw - 48px));
     height: min(560px, calc(100vh - 200px));
-    padding: var(--s2a-spacing-lg);
+
+    --sg-filter-panel-pad: var(--s2a-spacing-lg);
+
     border: 1px solid rgb(0 0 0 / 10%);
     border-radius: 20px;
     overflow: hidden;

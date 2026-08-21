@@ -39,6 +39,13 @@ export function resolveDrawerTitle(headings, { isLoggedIn, userFirstName, isPost
   return interpolateHeading((headings || {})[key], userFirstName) || defaultTitle;
 }
 
+// The count badge is hidden below 768px, where the button is a 40px icon-only circle that
+// signals an active filter set with a solid fill instead (sessions-guide-overlays.css). That
+// makes this label the only place the number is exposed at mobile widths — keep it counted.
+export function filterButtonLabel(activeFilterCount) {
+  return activeFilterCount > 0 ? `Filter sessions, ${activeFilterCount} active` : 'Filter sessions';
+}
+
 export function DrawerHeader({
   onClose, onFilterToggle, onFilterClose, filterOpen, hideClose, hideControls,
 }) {
@@ -127,7 +134,7 @@ export function DrawerHeader({
               <button
                 class=${'sg-filter-btn' + (filterOpen ? ' sg-filter-btn--open' : '') + (activeFilterCount > 0 ? ' sg-filter-btn--active' : '')}
                 onclick=${onFilterToggle}
-                aria-label=${activeFilterCount > 0 ? `Filter sessions, ${activeFilterCount} active` : 'Filter sessions'}
+                aria-label=${filterButtonLabel(activeFilterCount)}
                 aria-haspopup="dialog"
                 aria-expanded=${String(!!filterOpen)}
                 aria-controls=${filterOpen ? 'sg-filter-panel-options' : undefined}

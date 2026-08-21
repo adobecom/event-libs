@@ -1,5 +1,5 @@
 import { expect } from '@esm-bundle/chai';
-import { resolveDrawerTitle, interpolateHeading } from '../../../../../../event-libs/v1/c2/blocks/sessions-guide/components/DrawerHeader.js';
+import { resolveDrawerTitle, interpolateHeading, filterButtonLabel } from '../../../../../../event-libs/v1/c2/blocks/sessions-guide/components/DrawerHeader.js';
 
 describe('DrawerHeader resolveDrawerTitle', () => {
   const headings = {
@@ -60,6 +60,20 @@ describe('DrawerHeader resolveDrawerTitle', () => {
       { loggedInPostEvent: 'Welcome back, {firstName}!' },
       { isLoggedIn: true, userFirstName: 'Dana', isPost: true },
     )).to.equal('Welcome back, Dana!');
+  });
+});
+
+// Below 768px the visible count badge is hidden and a solid fill marks the active state, so
+// this label is the only thing carrying the number to assistive tech.
+describe('DrawerHeader filterButtonLabel', () => {
+  it('announces the active filter count', () => {
+    expect(filterButtonLabel(1)).to.equal('Filter sessions, 1 active');
+    expect(filterButtonLabel(12)).to.equal('Filter sessions, 12 active');
+  });
+
+  it('omits the count when no filters are applied', () => {
+    expect(filterButtonLabel(0)).to.equal('Filter sessions');
+    expect(filterButtonLabel(undefined)).to.equal('Filter sessions');
   });
 });
 
