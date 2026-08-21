@@ -95,9 +95,17 @@ function currentSessionHasEnded(sessionTimes, nowMs) {
 // extracts an id defensively rather than assuming one shape.
 const EMBEDDABLE_PROVIDERS = ['mpc', 'youtube'];
 
+// This block only ever shows the on-demand recording, never a live stream — an MPC
+// template's own videos[] array order isn't reliable evidence of which one that is (a
+// real template has been seen with a `youtube` `liveStream` entry sitting BEFORE the
+// `mpc` `onDemand` entry), so `kind` must be checked explicitly rather than trusting
+// `.find()`'s first-match order. Falls back to whatever's embeddable if no `onDemand`
+// entry exists at all, rather than showing nothing — a session with a real embeddable
+// video and no onDemand-kind entry is likely a data gap, not a "no video" case.
 function pickEmbeddableVideo(sessionTimes) {
-  const videos = (sessionTimes || []).flatMap((t) => t?.videos || []);
-  return videos.find((v) => EMBEDDABLE_PROVIDERS.includes(v.provider)) || null;
+  const videos = (sessionTimes || []).flatMap((t) => t?.videos || [])
+    .filter((v) => EMBEDDABLE_PROVIDERS.includes(v.provider));
+  return videos.find((v) => v.kind === 'onDemand') || videos[0] || null;
 }
 
 const ADOBE_TV_ORIGIN = 'https://video.tv.adobe.com';
@@ -406,6 +414,19 @@ function loadVideoPlayer(el, sessionId, video) {
   else watchMpcPlayback(sessionId, iframe);
 }
 
+// This block and video-playlist are authored as siblings inside the same .section (see
+// the session-page-template-columns-col3 fragment) — when video-playlist has nothing to
+// show and removes itself (see its own removeBlock()/'video-playlist:removed' dispatch),
+// this block should take the full row instead of leaving unused space beside it. Checked
+// directly against the live DOM (not a cached flag), since video-playlist's own removal
+// can happen synchronously (its early gates) or asynchronously, well after this block's
+// own init() has already run and rendered.
+function updateFullWidth(el) {
+  const section = el.closest('.section');
+  const hasPlaylist = Boolean(section?.querySelector('.video-playlist'));
+  el.classList.toggle('video-player-full-width', !hasPlaylist);
+}
+
 export default async function init(el) {
   if (!document.getElementById('video-player-css')) {
     createTag('link', { rel: 'stylesheet', href: BLOCK_CSS_URL, id: 'video-player-css' }, '', { parent: document.head });
@@ -444,4 +465,10 @@ export default async function init(el) {
   }
 
   loadVideoPlayer(el, sessionId, currentVideo);
+
+  // Covers both timings: video-playlist may already be gone by now (its own gates run
+  // synchronously, before this even starts), or it may remove itself later once its
+  // async catalog fetch resolves to nothing — re-check on that event too.
+  updateFullWidth(el);
+  window.addEventListener('video-playlist:removed', () => updateFullWidth(el));
 }

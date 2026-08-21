@@ -113,3 +113,21 @@ equivalent continuous event, so progress is polled via
 
 Client-only persistence (no backend field exists for per-viewer watch
 progress today).
+
+## Full width when there's no playlist
+
+On the current session-page template (`session-page-template-columns-col3`
+fragment), this block and `video-playlist` are authored as plain siblings
+inside the same `.section` — not a fixed grid/flex row. If `video-playlist`
+has nothing to show and removes itself (any of its own gates failing, or
+too few qualifying sessions once its catalog fetch resolves — see that
+block's own README), this block adds `video-player-full-width` to itself
+so it takes the section's full width instead of leaving unused space where
+the playlist would have been.
+
+Checked directly against the live DOM (`section.querySelector('.video-playlist')`),
+not a cached flag — both at this block's own `init()` (covers `video-playlist`
+already being gone synchronously, before this even runs) and again on a
+page-wide `video-playlist:removed` event (covers `video-playlist` removing
+itself later, asynchronously, after this block already rendered). Only
+this block's own width changes; nothing else in the section is touched.

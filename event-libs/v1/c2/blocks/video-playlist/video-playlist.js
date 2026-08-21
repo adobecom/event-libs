@@ -199,10 +199,15 @@ export function resolveTopicPlaylist(
 ) {
   if (!topics.length) return [];
 
+  // A Set so each session's own membership check is O(1) rather than re-scanning the
+  // full topics array per playlistAssignment value, per session — this loop already
+  // runs over the WHOLE catalog on every call, so an O(n) lookup repeated per session
+  // adds up fast on a large event with hundreds of sessions.
+  const topicSet = new Set(topics);
   const nowMs = getNowMs();
   const rows = allSessions.filter((s) => s.id !== currentSessionId
     && s.hasVideoSource
-    && (s.playlistAssignment || []).some((t) => topics.includes(t))
+    && (s.playlistAssignment || []).some((t) => topicSet.has(t))
     && hasPremiered(s, eventStartMs, nowMs));
 
   return rows.length >= minSessions ? rows.slice().sort(compareByStartTime) : [];
@@ -610,6 +615,16 @@ function buildAutoplayToggle(el) {
   checkbox.addEventListener('change', () => setShouldAutoPlay(checkbox.checked));
 }
 
+// Every early-exit path in init()/render() below removes this block instead of leaving
+// an empty shell — dispatched here (not at each individual el.remove() call site) so
+// nothing can forget to announce it. video-player.js (a separate block, possibly in its
+// own grid-column) listens for this to expand into the now-empty column rather than
+// leaving unused grid space beside it — see that block's own handling of this event.
+function removeBlock(el) {
+  window.dispatchEvent(new CustomEvent('video-playlist:removed'));
+  el.remove();
+}
+
 export default async function init(el) {
   if (!document.getElementById('video-playlist-css')) {
     createTag('link', { rel: 'stylesheet', href: BLOCK_CSS_URL, id: 'video-playlist-css' }, '', { parent: document.head });
@@ -627,7 +642,7 @@ export default async function init(el) {
   const sessionId = getMetadata('session-id') || cfg['session-id'];
   if (!sessionId) {
     window.lana?.log('[video-playlist] no session-id (page metadata or authored) — nothing to render');
-    el.remove();
+    removeBlock(el);
     return;
   }
 
@@ -637,7 +652,7 @@ export default async function init(el) {
   // to embed (see hasEmbeddableVideo above).
   if (!hasEmbeddableVideo(sessionTimes)) {
     window.lana?.log('[video-playlist] no embeddable video on this page — nothing to render');
-    el.remove();
+    removeBlock(el);
     return;
   }
 
@@ -647,7 +662,7 @@ export default async function init(el) {
   // sibling of videos), not the catalog, so this never has to wait on sessions.value.
   if (!currentSessionHasEnded(sessionTimes, getNowMs())) {
     window.lana?.log('[video-playlist] current session has not ended yet — nothing to render');
-    el.remove();
+    removeBlock(el);
     return;
   }
 
@@ -709,7 +724,7 @@ export default async function init(el) {
       ? chapters
       : resolveTopicPlaylist(sessionId, topics, sessionList, minSessions, eventStartMs);
     if (!rows.length) {
-      el.remove();
+      removeBlock(el);
       return;
     }
     // The minSessions gate above is about OTHER qualifying sessions only — unaffected by

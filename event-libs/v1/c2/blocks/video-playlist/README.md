@@ -1,22 +1,29 @@
 # Video Playlist (C2)
 
-Authored on an Individual Session Page, in its own grid-column fragment
-(alongside a separate `video-player` block, in a different grid-column
-fragment — see that block's own README for embedding/tracking). This block
-handles the topic-playlist/chapters list only; it does not embed or track
-the current session's own video itself — including deciding whether to
-render at all: it requires a real embeddable video to exist on the page
-(same check `video-player.js` uses; see "No video, no playlist" below), not
-merely that the session has ended.
+Authored on an Individual Session Page as a sibling of a separate
+`video-player` block, inside the same `.section` (see that block's own
+README for embedding/tracking). This block handles the topic-playlist/
+chapters list only; it does not embed or track the current session's own
+video itself — including deciding whether to render at all: it requires a
+real embeddable video to exist on the page (same check `video-player.js`
+uses; see "No video, no playlist" below), not merely that the session has
+ended.
 
 The two blocks communicate only through `localStorage`
 (`video-playlist:progress`, `video-playlist:play-all`) and page-wide
-`CustomEvent`s (`video-player:progress`, `video-player:state`) — never a
-direct reference — so either can load independently, in either order,
-regardless of which grid column/fragment it's actually authored in.
-`video-player.js` only reports raw playback state (play/pause/ended); this
-block owns every decision about what to do with that state (e.g. "Play
-all" advancing on `ended` — see Play all below).
+`CustomEvent`s — never a direct reference — so either can load
+independently, in either order:
+
+- `video-player:progress` / `video-player:state` — dispatched by
+  `video-player.js`, reporting progress and raw playback state
+  (play/pause/ended). This block owns every decision about what to do with
+  that state (e.g. "Play all" advancing on `ended` — see Play all below);
+  `video-player.js` makes none of those decisions itself.
+- `video-playlist:removed` — dispatched by **this** block (via its own
+  `removeBlock()` helper) right before it removes itself, for any of the
+  reasons below. `video-player.js` listens for this to expand to the
+  section's full width instead of leaving unused space beside it — see
+  that block's own "Full width when there's no playlist" section.
 
 Renders one of two variants automatically — no explicit variant to author:
 
@@ -26,9 +33,11 @@ Renders one of two variants automatically — no explicit variant to author:
 - **Topic playlist** — otherwise: a list of other on-demand sessions sharing a
   topic with the current session, auto-resolved from real session-catalog data.
 
-If there's nothing to show — fewer than the configured minimum on-demand
-sessions for the topic playlist, or no chapters authored for the chapters
-variant — the block removes itself. There's no empty state.
+If there's nothing to show — no embeddable video on the page, the session
+hasn't ended yet, fewer than the configured minimum on-demand sessions for
+the topic playlist, or no chapters authored for the chapters variant — the
+block removes itself (via `removeBlock()`, so `video-player.js` is always
+notified). There's no empty state.
 
 ## Authoring
 
