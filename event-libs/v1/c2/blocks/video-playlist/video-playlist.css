@@ -1,5 +1,23 @@
 @import '../../styles/tokens.css';
 
+/* Toggled by showVideoContainer() in video-playlist.js — exactly one of the two
+   authored sections (full-width player-only vs. player+playlist) is ever visible,
+   decided once resolveTopicPlaylist's own min-sessions/topic result is known.
+   video-playlist-container defaults to hidden (not video-container) so the full-width,
+   player-only section is what paints first — fastest path to LCP, and no layout shift
+   waiting on the async catalog fetch for the common "no playlist" case. */
+.section.video-container.is-hidden {
+  display: none;
+}
+
+.section.video-playlist-container {
+  display: none;
+}
+
+.section.video-playlist-container.is-shown {
+  display: block;
+}
+
 /* Standalone width/layout for this block on its own (e.g. inside its own grid-column
    fragment, alongside a separate video-player block in another column) — the previous
    .section:has(> .video-playlist) side-by-side rail depended on the player and this

@@ -620,8 +620,23 @@ function buildAutoplayToggle(el) {
 // nothing can forget to announce it. video-player.js (a separate block, possibly in its
 // own grid-column) listens for this to expand into the now-empty column rather than
 // leaving unused grid space beside it — see that block's own handling of this event.
+// Two whole sections are authored on every Individual Session Page — a full-width,
+// player-only `.section.video-container`, and this two-column player+playlist
+// `.section.video-playlist-container` — never both at once. Which one is correct is
+// only knowable once resolveTopicPlaylist has actually run (min-sessions/topic
+// matching), so this is called from render() below once that result is in hand, not at
+// page load — see the "player-only vs player+playlist" split noted in this block's
+// README for why a static author-time choice isn't possible here.
+function showVideoContainer(hasPlaylist) {
+  document.querySelector('.section.video-container')
+    ?.classList.toggle('is-hidden', hasPlaylist);
+  document.querySelector('.section.video-playlist-container')
+    ?.classList.toggle('is-shown', hasPlaylist);
+}
+
 function removeBlock(el) {
   window.dispatchEvent(new CustomEvent('video-playlist:removed'));
+  showVideoContainer(false);
   el.remove();
 }
 
@@ -727,6 +742,11 @@ export default async function init(el) {
       removeBlock(el);
       return;
     }
+    // Chapters always render inside the playlist-container layout by authoring
+    // convention (it's a different Keynote-only variant, not the topic-playlist
+    // min-sessions decision this toggle exists for) — only the topic-playlist path
+    // actually decides between the two authored sections.
+    if (!isChapterVariant) showVideoContainer(true);
     // The minSessions gate above is about OTHER qualifying sessions only — unaffected by
     // this. Prepending the current session is purely a display concern: the viewer sees
     // it as the highlighted/"now playing" row (see highlightRow call in buildTopicView
