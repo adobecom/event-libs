@@ -252,6 +252,24 @@ DOM is confirmed.
   mobile-drawer-height-only; see Drawer).
 - **Mobile (<1024px)**: a `position: fixed` bottom sheet, open on load.
   Collapsing/expanding is governed by `computeDrawerCapPx`/
-  `clampedTitleBottom` in `video-playlist.js` — the drawer can never expand
-  far enough to fully cover the session title; at least 2 lines of it stay
-  visible (Option B, per product decision).
+  `clampedTitleBottom` in `video-playlist.js` — the drawer's expanded height
+  is capped by whichever is more restrictive of two constraints (never
+  fully covers the session title's first 2 lines; never covers the video
+  player either, wherever its own bottom edge is, since it may live in a
+  sibling fragment — see `findPlayerBottom`), but never shrinks below
+  `DRAWER_MIN_EXPANDED_PX` (150px, roughly one row) even on a very short
+  viewport where both of those constraints would otherwise squeeze it
+  smaller — the minimum floor wins in that edge case, over strict
+  title/player avoidance.
+  - The chevron toggle jumps between two fixed states: fully collapsed
+    (`DRAWER_FLOOR_PX`, 75px) and the cap above.
+  - The handle bar (`.video-playlist-handle`) supports real drag-to-resize
+    via Pointer Events (`Drawer`'s own `#bindDrag`) — dragging moves the
+    drawer freely between those same two bounds, snapping to whichever
+    fixed state is closer once released, so the toggle button's own
+    `aria-expanded`/chevron rotation always end up correct regardless of
+    whether the user tapped or dragged.
+  - An authored `background` row (see Authoring above) only ever applies
+    at desktop — set as the `--vp-authored-bg` custom property, not a
+    direct inline `background`, specifically so it can't outrank (via
+    inline-style specificity) the mobile drawer's own dark theme.

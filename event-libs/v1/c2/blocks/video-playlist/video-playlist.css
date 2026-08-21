@@ -10,9 +10,11 @@
      mobile bottom-sheet's dark theme below. Every color that needs to contrast against
      the card is expressed as a --vp-* custom property so this is the only place the
      theme needs to flip; the mobile block below defines the same set for its own (dark)
-     theme. */
+     theme. --vp-authored-bg (set inline by readBackgroundConfig() in the JS) overrides
+     the default here ONLY — deliberately not referenced at all in the mobile block
+     below, so an authored Background row never bleeds into the dark bottom-sheet. */
   .video-playlist {
-    --vp-bg: var(--s2a-color-gray-25);
+    --vp-bg: var(--vp-authored-bg, var(--s2a-color-gray-25));
     --vp-fg: var(--s2a-color-gray-900);
     --vp-row-bg: var(--s2a-color-gray-50);
     --vp-track-bg: var(--s2a-color-transparent-black-16);
@@ -501,11 +503,29 @@
     transition: max-height 0.3s ease;
   }
 
+  /* Real drag target now (see Drawer's #bindDrag), not just decorative — sized to a
+     comfortable touch target (the visible bar is drawn via ::before, kept at its
+     original small size) with touch-action:none so a vertical drag gesture here
+     resizes the drawer instead of also trying to scroll the page underneath it. */
   .video-playlist-handle {
-    display: block;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 24px;
+    margin-bottom: var(--s2a-spacing-sm);
+    touch-action: none;
+    cursor: grab;
+  }
+
+  .video-playlist-handle:active {
+    cursor: grabbing;
+  }
+
+  .video-playlist-handle::before {
+    content: '';
     width: 36px;
     height: 4px;
-    margin: 0 auto var(--s2a-spacing-sm);
     border-radius: var(--s2a-border-radius-round);
     background: var(--s2a-color-transparent-white-24, rgb(255 255 255 / 24%));
   }

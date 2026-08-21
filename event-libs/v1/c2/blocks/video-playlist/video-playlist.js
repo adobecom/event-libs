@@ -23,6 +23,10 @@ const FALLBACK_EVENT_START_MS = new Date('2026-11-08T08:00:00-04:00').getTime();
 const DESKTOP_BREAKPOINT_PX = 1024;
 const DRAWER_GAP_PX = 16;
 const DRAWER_FLOOR_PX = 75;
+// Absolute minimum expanded height — roughly one playlist row's worth — so a very
+// short viewport (where titleBottom + gap would otherwise squeeze the drawer down to
+// almost nothing) still shows at least a sliver of the list, not just the title bar.
+const DRAWER_MIN_EXPANDED_PX = 150;
 const TITLE_LINE_CAP = 2;
 const AUTOPLAY_STORAGE_KEY = 'video-playlist:play-all';
 const PROGRESS_STORAGE_KEY = 'video-playlist:progress';
@@ -94,12 +98,22 @@ function parseJsonMetadata(name) {
 
 /**
  * Drawer expand cap ("Option B"): the drawer's open height may never push its top edge
- * above titleBottom + gap, i.e. it can never fully cover the session title. Falls back to
- * a fraction of the viewport when the title hasn't been measured yet (first paint).
+ * above titleBottom + gap (i.e. it can never fully cover the session title), NOR above
+ * playerBottom + gap (i.e. it can never cover the video player either, wherever that
+ * player's own bottom edge is — see the drag handler's own measurement for how this is
+ * found across a fragment boundary). Whichever constraint is more restrictive (smaller
+ * cap) wins. Falls back to a fraction of the viewport when the title hasn't been
+ * measured yet (first paint). Never returns less than DRAWER_MIN_EXPANDED_PX, even if
+ * both constraints would otherwise squeeze it smaller — a very short viewport still
+ * shows at least a sliver of the list rather than being crushed to the title bar alone.
  */
-export function computeDrawerCapPx(viewportHeight, titleBottom, { floor = 0, gap = 0 } = {}) {
+export function computeDrawerCapPx(viewportHeight, titleBottom, {
+  floor = 0, gap = 0, playerBottom = null, minExpanded = 0,
+} = {}) {
   if (titleBottom == null) return Math.max(floor, viewportHeight * 0.7);
-  return Math.max(floor, viewportHeight - titleBottom - gap);
+  const titleCap = viewportHeight - titleBottom - gap;
+  const playerCap = playerBottom == null ? Infinity : viewportHeight - playerBottom - gap;
+  return Math.max(floor, minExpanded, Math.min(titleCap, playerCap));
 }
 
 /**
@@ -300,14 +314,31 @@ function updateRowProgressUI(sessionId) {
   if (durationEl && progress?.length) durationEl.textContent = formatDuration(Math.round(progress.length / 60));
 }
 
+// .video-player may live in a sibling fragment (the two-column mobile/tablet layout),
+// so a plain el.closest('.section') never reaches it — same structural lookup
+// announceVideoDecision/isInsidePlaylistContainer already use elsewhere in this repo.
+function findPlayerBottom(el) {
+  const gridColumn = el.closest('.grid-column');
+  const outerSection = gridColumn?.parentElement?.closest('.section') || el.closest('.section');
+  const player = outerSection?.querySelector('.video-player');
+  return player ? player.getBoundingClientRect().bottom : null;
+}
+
 class Drawer {
-  constructor(el, { titleEl, toggleEl }) {
+  constructor(el, { titleEl, toggleEl, handleEl }) {
     this.el = el;
     this.titleEl = titleEl;
     // aria-expanded belongs on the toggle button (the ARIA disclosure control), not the
     // drawer content it controls — this.el only ever gets the CSS state class.
     this.toggleEl = toggleEl;
+    this.handleEl = handleEl;
     this.expanded = false;
+    // Persisted across resizes/re-applies while dragging is in progress — a live
+    // px value the user chose via the handle, distinct from the two fixed floor/cap
+    // states toggle() switches between. Cleared back to null on toggle() so a chevron
+    // tap always returns to one of those two clean, known states.
+    this.dragHeightPx = null;
+    if (this.handleEl) this.#bindDrag();
   }
 
   isDesktop() {
@@ -321,11 +352,26 @@ class Drawer {
     return clampedTitleBottom(rect.top, rect.height, lineHeight, TITLE_LINE_CAP);
   }
 
-  applyMobileHeight() {
-    const cap = computeDrawerCapPx(window.innerHeight, this.measureTitleBottom(), {
+  // The single, authoritative expanded-height ceiling — never covers the title's first
+  // TITLE_LINE_CAP lines, never covers the player, never smaller than
+  // DRAWER_MIN_EXPANDED_PX. Used both by the fixed expand/collapse states AND as the
+  // upper clamp while dragging, so a drag gesture can never exceed what a chevron tap
+  // would already allow.
+  measureCapPx() {
+    return computeDrawerCapPx(window.innerHeight, this.measureTitleBottom(), {
       floor: DRAWER_FLOOR_PX,
       gap: DRAWER_GAP_PX,
+      playerBottom: findPlayerBottom(this.el),
+      minExpanded: DRAWER_MIN_EXPANDED_PX,
     });
+  }
+
+  applyMobileHeight() {
+    const cap = this.measureCapPx();
+    if (this.dragHeightPx != null) {
+      this.el.style.maxHeight = `${Math.min(Math.max(this.dragHeightPx, DRAWER_FLOOR_PX), cap)}px`;
+      return;
+    }
     this.el.style.maxHeight = this.expanded ? `${cap}px` : `${DRAWER_FLOOR_PX}px`;
   }
 
@@ -337,12 +383,57 @@ class Drawer {
 
   toggle() {
     this.expanded = !this.expanded;
+    this.dragHeightPx = null;
     this.#apply();
   }
 
   setInitial({ expanded }) {
     this.expanded = expanded;
     this.#apply();
+  }
+
+  // Real drag-to-resize on the handle bar — per the Figma annotation ("Drawer can be
+  // swiped up to open all the way, or swiped down to close"): dragging moves the
+  // drawer's top edge freely between DRAWER_FLOOR_PX (fully collapsed) and this.cap
+  // (title/player-avoiding ceiling, same one the chevron toggle respects), rather than
+  // only jumping between those two fixed states. Pointer Events (not separate touch/
+  // mouse listeners) so the same code path covers touchscreens and mouse-drag alike.
+  #bindDrag() {
+    let dragStartY = null;
+    let dragStartHeight = null;
+
+    const onPointerMove = (event) => {
+      if (dragStartY == null) return;
+      const cap = this.measureCapPx();
+      const delta = dragStartY - event.clientY;
+      const next = Math.min(Math.max(dragStartHeight + delta, DRAWER_FLOOR_PX), cap);
+      this.dragHeightPx = next;
+      this.el.style.maxHeight = `${next}px`;
+    };
+
+    const onPointerUp = () => {
+      if (dragStartY == null) return;
+      dragStartY = null;
+      window.removeEventListener('pointermove', onPointerMove);
+      window.removeEventListener('pointerup', onPointerUp);
+      // Snaps to whichever fixed state the drag ended closer to, so releasing mid-drag
+      // doesn't leave the drawer parked at an arbitrary height with no toggle affordance
+      // (aria-expanded/the chevron's own rotation) reflecting it correctly.
+      const cap = this.measureCapPx();
+      const midpoint = (DRAWER_FLOOR_PX + cap) / 2;
+      const endedHeight = this.dragHeightPx ?? dragStartHeight;
+      this.dragHeightPx = null;
+      this.expanded = endedHeight >= midpoint;
+      this.#apply();
+    };
+
+    this.handleEl.addEventListener('pointerdown', (event) => {
+      if (this.isDesktop()) return;
+      dragStartY = event.clientY;
+      dragStartHeight = this.el.getBoundingClientRect().height;
+      window.addEventListener('pointermove', onPointerMove);
+      window.addEventListener('pointerup', onPointerUp, { once: true });
+    });
   }
 }
 
@@ -678,8 +769,14 @@ export default async function init(el) {
   // el's children. An inline style deliberately outranks the light/dark --vp-bg theme
   // token below, matching those other blocks' own convention of overriding their
   // default background when one is authored.
+  // Set as a custom property, not `background` directly — an inline `background` would
+  // have higher specificity than the mobile drawer's own dark-theme --vp-bg at every
+  // width, including the ≤1023px bottom-sheet, which must keep its own dark background
+  // regardless of what's authored here (confirmed regression: the authored value was
+  // bleeding into the mobile drawer). CSS decides whether/where --vp-authored-bg
+  // actually applies (see the min-width:1024px rule using it) — desktop only.
   const background = readBackgroundConfig(el);
-  if (background) el.style.background = background;
+  if (background) el.style.setProperty('--vp-authored-bg', background);
 
   const cfg = [...el.querySelectorAll(':scope > div > div:first-child')].reduce((acc, div) => {
     const key = div.textContent.trim().toLowerCase().replace(/ /g, '-');
@@ -794,10 +891,10 @@ export default async function init(el) {
 
     el.replaceChildren();
 
-    // Decorative bottom-sheet drag affordance — mobile-only (see CSS), hidden from
-    // assistive tech since it carries no information the toggle button below doesn't
-    // already expose via aria-expanded.
-    createTag('div', { class: 'video-playlist-handle', 'aria-hidden': 'true' }, '', { parent: el });
+    // Real swipe-to-resize affordance — mobile-only (see CSS), hidden from assistive
+    // tech since dragging it changes no information the toggle button below doesn't
+    // already expose via aria-expanded (see Drawer's own #bindDrag).
+    const handle = createTag('div', { class: 'video-playlist-handle', 'aria-hidden': 'true' }, '', { parent: el });
 
     const top = createTag('div', { class: 'video-playlist-top' }, '', { parent: el });
 
@@ -817,8 +914,13 @@ export default async function init(el) {
       buildTopicView(el, displayRows, { maxSessions, defaultThumbnail, currentSessionId: sessionId });
     }
 
-    const titleEl = el.closest('.section')?.querySelector('h1, h2') || null;
-    const drawer = new Drawer(el, { titleEl, toggleEl: toggle });
+    // .section is only this fragment's own inner wrapper on the two-column mobile/
+    // tablet layout — the actual session title lives in a sibling fragment, same
+    // structural-lookup limitation findPlayerBottom above works around.
+    const gridColumn = el.closest('.grid-column');
+    const outerSection = gridColumn?.parentElement?.closest('.section') || el.closest('.section');
+    const titleEl = outerSection?.querySelector('h1, h2') || null;
+    const drawer = new Drawer(el, { titleEl, toggleEl: toggle, handleEl: handle });
     toggle.addEventListener('click', () => drawer.toggle());
     window.addEventListener('resize', () => drawer.applyMobileHeight());
 
