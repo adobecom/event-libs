@@ -620,18 +620,29 @@ function buildAutoplayToggle(el) {
 // nothing can forget to announce it. video-player.js (a separate block, possibly in its
 // own grid-column) listens for this to expand into the now-empty column rather than
 // leaving unused grid space beside it — see that block's own handling of this event.
-// Two whole sections are authored on every Individual Session Page — a full-width,
-// player-only `.section.video-container`, and this two-column player+playlist
-// `.section.video-playlist-container` — never both at once. Which one is correct is
-// only knowable once resolveTopicPlaylist has actually run (min-sessions/topic
-// matching), so this is called from render() below once that result is in hand, not at
-// page load — see the "player-only vs player+playlist" split noted in this block's
-// README for why a static author-time choice isn't possible here.
+//
+// Two whole SECTIONS are authored — `.section.video-container` (full-width player-only)
+// and `.section.video-playlist-container` (a real CSS Grid row shared with OTHER,
+// unrelated blocks: event-featured-products, event-speakers, event-session-resources,
+// etc.) — but only the two video blocks themselves are ever toggled here, never the
+// section. Hiding/resizing the whole video-playlist-container section would also break
+// that grid's layout for every other block sharing its row — confirmed live: overriding
+// its `display` clobbered `grid-template-columns: 2fr 1fr` entirely. `.video-player`
+// (inside `.video-container`) and `.video-playlist` (inside `.video-playlist-container`)
+// are the only elements swapped; every sibling block in both sections is left alone.
+//
+// A brief opacity transition (not an abrupt display swap) softens which block was
+// picked — this only ever runs once, right after resolveTopicPlaylist's own result is
+// known, so it reads as "the page settled" rather than a visible layout jump.
 function showVideoContainer(hasPlaylist) {
-  document.querySelector('.section.video-container')
-    ?.classList.toggle('is-hidden', hasPlaylist);
-  document.querySelector('.section.video-playlist-container')
-    ?.classList.toggle('is-shown', hasPlaylist);
+  const player = document.querySelector('.video-container .video-player');
+  const playlistSectionPlayer = document.querySelector('.video-playlist-container .video-player');
+  player?.classList.toggle('is-hidden', hasPlaylist);
+  // The player+playlist section authors its OWN .video-player (a separate instance,
+  // same block, embedding the same session's video) — that one shows exactly when the
+  // full-width one hides, never both.
+  playlistSectionPlayer?.classList.toggle('is-hidden', !hasPlaylist);
+  document.querySelector('.video-playlist-container .video-playlist')?.classList.toggle('is-hidden', !hasPlaylist);
 }
 
 function removeBlock(el) {

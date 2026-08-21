@@ -1,23 +1,5 @@
 @import '../../styles/tokens.css';
 
-/* Toggled by showVideoContainer() in video-playlist.js — exactly one of the two
-   authored sections (full-width player-only vs. player+playlist) is ever visible,
-   decided once resolveTopicPlaylist's own min-sessions/topic result is known.
-   video-playlist-container defaults to hidden (not video-container) so the full-width,
-   player-only section is what paints first — fastest path to LCP, and no layout shift
-   waiting on the async catalog fetch for the common "no playlist" case. */
-.section.video-container.is-hidden {
-  display: none;
-}
-
-.section.video-playlist-container {
-  display: none;
-}
-
-.section.video-playlist-container.is-shown {
-  display: block;
-}
-
 /* Standalone width/layout for this block on its own (e.g. inside its own grid-column
    fragment, alongside a separate video-player block in another column) — the previous
    .section:has(> .video-playlist) side-by-side rail depended on the player and this
@@ -115,6 +97,40 @@
   font-family: var(--s2a-font-family-default);
   border-radius: var(--s2a-border-radius-md, 16px);
   padding: var(--s2a-spacing-md) var(--s2a-spacing-md) var(--s2a-spacing-lg);
+}
+
+/* Toggled by showVideoContainer() in video-playlist.js — exactly one of the two
+   player instances (the full-width .video-container's own, or the
+   .video-playlist-container's own, alongside .video-playlist) is ever shown, decided
+   once resolveTopicPlaylist's own min-sessions/topic result is known. Only these two
+   BLOCKS are ever hidden — never their parent .section, which is a real CSS Grid row
+   shared with other, unrelated blocks (event-featured-products, event-speakers, etc.)
+   that must keep rendering/laying out normally regardless of this decision.
+
+   The .video-playlist-container section's own .video-player and .video-playlist start
+   hidden (not the full-width one) so the full-width player paints first with zero
+   gating — fastest path to LCP for the common case, no layout shift waiting on the
+   async catalog fetch. A brief fade (not an abrupt display swap) softens whichever
+   swap actually happens, since it only ever happens once. */
+.video-playlist-container .video-player,
+.video-playlist-container .video-playlist {
+  display: none;
+}
+
+.video-container .video-player,
+.video-playlist-container .video-player:not(.is-hidden),
+.video-playlist-container .video-playlist:not(.is-hidden) {
+  display: block;
+  animation: video-playlist-fade-in 0.2s ease;
+}
+
+.video-container .video-player.is-hidden {
+  display: none;
+}
+
+@keyframes video-playlist-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
 /* Decorative bottom-sheet drag affordance — mobile-only, see the max-width block below. */
