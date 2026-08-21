@@ -1137,10 +1137,14 @@
     border-right: 1px solid var(--s2a-color-gray-75);
   }
 
+  /* The right padding keeps the count badges clear of the divider and of the overlay
+     scrollbar that appears once the category list outgrows the column; scrollbar-gutter
+     does the same for platforms with classic scrollbars. */
   .sg-filter-panel__sidebar {
     gap: var(--s2a-spacing-xl);
-    padding-right: 0;
+    padding-right: var(--s2a-spacing-sm);
     overflow-y: auto;
+    scrollbar-gutter: stable;
   }
 
   .sg-filter-panel__cats {
@@ -1155,13 +1159,30 @@
   .sg-filter-panel__cat {
     justify-content: flex-start;
     padding: 0;
+    white-space: normal;
+    color: var(--s2a-color-content-subtle);
   }
 
   .sg-filter-panel__cat-chevron { display: none; }
 
-  .sg-filter-panel__cat {
-    white-space: normal;
-    color: var(--s2a-color-content-subtle);
+  /* Counts sit on a right-hand rail: pinned to the column's right edge and, when the label
+     wraps, held level with its first line. The text takes whatever width is left over.
+     `overflow-wrap: anywhere` rather than `break-word` because only `anywhere` also lowers
+     the text's min-content size — that's what lets flexbox shrink it instead of pushing the
+     badge past the column edge on a long unbroken label ("Playlist assignment/name"). Spaces
+     are still the preferred break, so it only splits a word as a last resort. */
+  .sg-filter-panel__cat-label {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    width: 100%;
+    overflow-wrap: anywhere;
+  }
+
+  /* margin-top centres the 18px badge on the 24px first line. */
+  .sg-filter-panel__cat-badge {
+    flex: none;
+    margin-top: 3px;
   }
 
   .sg-filter-panel__cat--active { color: var(--s2a-color-content-default); }
