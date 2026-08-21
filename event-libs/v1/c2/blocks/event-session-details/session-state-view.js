@@ -59,13 +59,66 @@ export function formatDateTime(ms, timeZone) {
   return `${date}, ${time}`;
 }
 
-export function renderStatus(state, times) {
+// Providers video-player can embed (its own EMBEDDABLE_PROVIDERS list).
+const EMBEDDABLE_PROVIDERS = ['mpc', 'youtube'];
+
+// Does this session already have a playable *recording*? Reads the page's own
+// `session-times` metadata, whose entries carry a `videos[]` sibling — confirmed real
+// shape: { provider: 'mpc', url: '…', kind: 'onDemand' }, with 'liveStream' and 'dvr'
+// also seen on the same session.
+//
+// `liveStream` entries are excluded deliberately: a session can still carry its
+// livestream URL after it ends, and that is not the recording. video-player.js's
+// pickEmbeddableVideo() currently accepts any kind, so a session whose only embeddable
+// entry is a liveStream would get a player but no recording — the eyebrow would say
+// "Coming soon" there. Flagged for Hari rather than silently matching it.
+export function hasPlayableVideo(doc = document) {
+  let entries;
+  try {
+    entries = JSON.parse(getMetadata('session-times', doc) || '[]');
+  } catch {
+    return false;
+  }
+  return (entries || [])
+    .flatMap((t) => t?.videos || [])
+    .some((v) => EMBEDDABLE_PROVIDERS.includes(v?.provider) && v?.kind !== 'liveStream');
+}
+
+// Format values are compared on an alphanumeric-only normalization because the same value
+// appears in two shapes: real page data carries value 'on-demand-post-event' alongside
+// label 'On demand, post event'. Normalizing both sides means either form matches.
+const normalizeAttr = (s) => (s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+
+function hasFormat(doc, normalized) {
+  return getAttrValues('Format', doc)
+    .some(({ label, value }) => normalizeAttr(value) === normalized
+      || normalizeAttr(label) === normalized);
+}
+
+// IPOD = In-Person On Demand: delivered in person at the event, then posted as a recording
+// afterwards. Only these sessions can be "Coming soon" — they're the ones with a real gap
+// between the session ending and the recording appearing.
+//
+// There is no explicit IPOD attribute on the page; the classifier is Format carrying BOTH
+// values. Confirmed against the real "A.COM IPOD Test Session" page, whose Format is
+// [in-person | In-Person, on-demand-post-event | On demand, post event]. In-person-only
+// (never posted) and online/virtual sessions both fail this test and stay "On-demand".
+function isIpodSession(doc = document) {
+  return hasFormat(doc, 'inperson') && hasFormat(doc, 'ondemandpostevent');
+}
+
+export function renderStatus(state, times, doc = document) {
   const el = createTag('span', { class: `session-status session-status--${state}` });
   if (state === 'live') {
     el.append(createTag('span', { class: 'session-status-dot', 'aria-hidden': 'true' }));
     el.append(createTag('span', {}, 'Live'));
   } else if (state === 'on-demand') {
-    el.textContent = 'On-demand';
+    // An IPOD session past its end time whose recording isn't attached yet — say so rather
+    // than advertising an on-demand video the page can't play. Non-IPOD sessions always
+    // read "On-demand", regardless of whether a video is present.
+    const pending = isIpodSession(doc) && !hasPlayableVideo(doc);
+    el.classList.toggle('session-status--coming-soon', pending);
+    el.textContent = pending ? 'Coming soon' : 'On-demand';
   } else {
     el.textContent = formatDateTime(times.start, times.timezone);
   }
