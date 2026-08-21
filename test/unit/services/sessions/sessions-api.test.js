@@ -54,6 +54,9 @@ describe('services/sessions/sessions-api', () => {
             customAttr('Product', [selectValue('Adobe Photoshop', 'adobe-photoshop')]),
             customAttr('Format', [selectValue('In-Person', 'in-person'), selectValue('On demand, post event', 'on-demand-post-event')]),
             customAttr('LegalDisclaimer', [textValue('<p>Copyright.</p>')]),
+            customAttr('Industry', [selectValue('Retail'), selectValue('Media')]),
+            customAttr('Closed Caption Information', [textValue('Closed captions available in English and German')]),
+            customAttr('IPOD or GDPR Copy', [textValue('Recording notice lorem ipsum.')]),
           ],
         },
         {
@@ -176,12 +179,33 @@ describe('services/sessions/sessions-api', () => {
       expect(full.speakers[0].photo).to.be.null;
     });
 
+    // Detail-view copy (Sessions Guide VizD R1). Both text attributes are rendered
+    // verbatim, so the mapper must not reshape them.
+    it('maps industry, closed captions, and the IPOD/GDPR notice', () => {
+      expect(full.industry).to.deep.equal(['Retail', 'Media']);
+      expect(full.closedCaptions).to.equal('Closed captions available in English and German');
+      expect(full.legalCopy).to.equal('Recording notice lorem ipsum.');
+    });
+
+    it('accepts the alternate IPOD/GDPR attribute spelling', () => {
+      const [alt] = mapEslPayloadToRawSessions({
+        sessions: [{
+          sessionId: 'alt',
+          customAttributes: [customAttr('IPOD/GDPR Copy', [textValue('Slashed name.')])],
+        }],
+      });
+      expect(alt.legalCopy).to.equal('Slashed name.');
+    });
+
     it('leaves fields with no source in the payload unset on a bare session', () => {
       expect(bare.startTimeUtc).to.equal('');
       expect(bare.track).to.equal('');
       expect(bare.speakers).to.deep.equal([]);
       expect(bare.thumbnailUrl).to.be.null;
       expect(bare.isKeynote).to.be.false;
+      expect(bare.industry).to.deep.equal([]);
+      expect(bare.closedCaptions).to.equal('');
+      expect(bare.legalCopy).to.equal('');
     });
   });
 
@@ -368,6 +392,22 @@ describe('services/sessions/sessions-api', () => {
     it('defaults contentCategory to an empty array when absent (mock fixtures)', () => {
       const [normalized] = normalizeSessions([{ id: 's-1', audience: 'All' }]);
       expect(normalized.contentCategory).to.deep.equal([]);
+    });
+
+    it('defaults the detail-view copy fields so the rows simply do not render', () => {
+      const [normalized] = normalizeSessions([{ id: 's-1' }]);
+      expect(normalized.industry).to.deep.equal([]);
+      expect(normalized.closedCaptions).to.equal('');
+      expect(normalized.legalCopy).to.equal('');
+    });
+
+    it('passes the detail-view copy fields through when present', () => {
+      const [normalized] = normalizeSessions([{
+        id: 's-1', industry: 'Retail', closedCaptions: 'Captions in English', legalCopy: 'Notice.',
+      }]);
+      expect(normalized.industry).to.deep.equal(['Retail']);
+      expect(normalized.closedCaptions).to.equal('Captions in English');
+      expect(normalized.legalCopy).to.equal('Notice.');
     });
 
     it('passes customAttributeValues through, defaulting to {} when absent', () => {

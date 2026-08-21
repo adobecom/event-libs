@@ -58,6 +58,9 @@ describe('OnDemandView (recommendedSessions authored)', () => {
     expect(html).to.include('Recommended');
   });
 
+  // The absence of a time label/gutter on a recommended carousel is covered where it can
+  // actually be observed — Carousel.test.js's "omits the time gutter when no formatTime is
+  // supplied" — since the shim above never invokes a nested component's body.
   it('ignores the viewer\'s active filters — recommended is a curated list, not a filtered one', () => {
     // A track filter that excludes PAST_VIDEO from the byTrack grouping below must
     // not remove the recommended section above, since it's built from onDemandRaw,

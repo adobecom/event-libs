@@ -56,6 +56,12 @@ export function normalizeSessions(rawSessions) {
     technicalLevel: s.technicalLevel || '',
     contentCategory: coerceArray(s.contentCategory),
     audience: coerceArray(s.audience),
+    industry: coerceArray(s.industry),
+    // Detail-view-only copy (Sessions Guide VizD R1): the captions sentence and the
+    // IPOD/GDPR notice both sit under the session title. Real attributes, but only
+    // authored on some sessions — each row is hidden when its value is empty.
+    closedCaptions: s.closedCaptions || '',
+    legalCopy: s.legalCopy || '',
     // Additional Event Site Tracks / Override Primary Event Site Track: MAX26-only
     // fields, absent from MAX25 sessions — naturally empty/'' for those, which is exactly
     // the single-track fallback behavior we want for them.
@@ -298,6 +304,13 @@ export function mapEslPayloadToRawSessions(payload) {
       type,
       technicalLevel: extractCustomAttributeValue(session, 'Technical Level'),
       audience: extractCustomAttributeValues(session, 'Audience'),
+      industry: extractCustomAttributeValues(session, 'Industry'),
+      // Both authored as free text and rendered verbatim in the detail view — the
+      // captions attribute carries the whole sentence ("Closed captions available in
+      // …"), not just a language list. Two name spellings are tried for the notice
+      // because the audited payload and the Figma annotation disagree on the slash.
+      closedCaptions: extractCustomAttributeValue(session, 'Closed Caption Information'),
+      legalCopy: extractCustomAttributeValue(session, ['IPOD or GDPR Copy', 'IPOD/GDPR Copy']),
       speakers,
       products: extractCustomAttributeValues(session, 'Product'),
       inPerson: formatValues.includes('In-Person'),

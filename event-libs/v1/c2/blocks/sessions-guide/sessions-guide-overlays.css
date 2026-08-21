@@ -78,46 +78,66 @@
   mask-position: center;
 }
 
-/* Mobile-first: flat white layout (Figma 9145:48433). Tablet/desktop card
-   layout (Figma 9145:48558) lives in the min-width:768px block below. */
+/* Mobile-first, per Sessions Guide VizD R1 (mobile 1299:69503, tablet 1299:69634,
+   desktop 1323:138829). One structure at every width: a tinted body holding a stack of
+   white pods 8px apart. The pods live in two column wrappers so the desktop frame's two
+   independently-stacking columns are possible; below 1280px the wrappers collapse with
+   display:contents and the pods order themselves (see .sg-detail__col below). */
+/* gray-75 is the authored tint and is a primitive, so it does not flip with the theme —
+   the dark override at the bottom of this file swaps it for the darkest surface. */
 .sg-detail__body {
   display: flex;
   flex-direction: column;
+  background: var(--s2a-color-gray-75);
 }
 
-/* Back button wrapper — mobile: sticky at top, desktop: left column */
+/* Back row. Mobile keeps it on the white of the summary pod, which is flush with the
+   header above it; from 768px it becomes its own 60px row on the tinted body. */
 .sg-detail__back-wrap {
   position: sticky;
   top: 0;
   z-index: 5;
-  padding: var(--s2a-spacing-md) var(--s2a-spacing-lg);
+  padding: var(--s2a-spacing-lg) var(--s2a-spacing-lg) 0;
   background: var(--s2a-color-background-default);
-  border-bottom: 1px solid var(--s2a-color-border-subtle);
   flex-shrink: 0;
 }
 
-/* Column containers — stacked on mobile */
 .sg-detail__cols {
-  padding: var(--s2a-spacing-lg);
   display: flex;
   flex-direction: column;
-  gap: var(--s2a-spacing-3xl);
+  gap: var(--s2a-spacing-xs);
   flex: 1;
 }
 
-.sg-detail__col {
-  display: flex;
-  flex-direction: column;
-  gap: var(--s2a-spacing-lg);
-}
-
+/* Below 1280px SessionDetailOverlay.js renders the pods as one flat stack, so there are no
+   column wrappers to style here — see .sg-detail__cols--split for the desktop layout. */
+/* 16px between a pod's heading and its content, every pod, every breakpoint. */
 .sg-detail__group {
   display: flex;
   flex-direction: column;
+  gap: var(--s2a-spacing-md);
+  padding: var(--s2a-spacing-lg);
+  background: var(--s2a-color-background-default);
+  border-radius: 24px;
 }
 
+/* Figma opens the gap between a list and its Show more toggle wider than the 16px above:
+   20px in the products pod, 24px in the speakers and resources pods. The pod's own gap
+   covers 16 of that; these top up the remainder. */
+.sg-detail__group--products .sg-detail__more {
+  margin-top: 4px;
+}
+
+.sg-detail__group--speakers .sg-detail__more,
+.sg-detail__group--resources .sg-detail__more {
+  margin-top: var(--s2a-spacing-xs);
+}
+
+/* Continues the white of the back row and the header above it. Its sections sit 16px apart
+   on mobile and open up to 24px from 768px (the tablet/desktop frames). */
 .sg-detail__group--summary {
-  gap: var(--s2a-spacing-lg);
+  padding-top: var(--s2a-spacing-md);
+  border-radius: 0 0 24px 24px;
 }
 
 .sg-detail__summary {
@@ -150,6 +170,14 @@
   font-size: var(--s2a-font-size-sm);
   font-weight: var(--s2a-font-weight-adobe-clean-medium);
   color: var(--s2a-color-content-default);
+}
+
+/* Separates the channel badge from the time — only rendered when both are present. */
+.sg-detail__meta-divider {
+  width: 1px;
+  height: 20px;
+  flex-shrink: 0;
+  background: var(--s2a-color-border-subtle);
 }
 
 /* Additional Event Site Tracks stacked alongside the primary badge */
@@ -190,6 +218,32 @@
   line-height: 1.1;
   color: var(--s2a-color-content-default);
   margin: 0;
+}
+
+/* Captions sentence and the IPOD/GDPR notice, both authored free text (see
+   sessions-api.js) and both hidden when unauthored. */
+.sg-detail__captions {
+  display: flex;
+  align-items: center;
+  gap: var(--s2a-spacing-xs);
+  margin: 0;
+  font-size: var(--s2a-font-size-xs);
+  line-height: 18px;
+  color: var(--s2a-color-content-default);
+}
+
+/* The authored decorative grey of the captions glyph — no token matches it. */
+.sg-detail__captions-icon {
+  display: inline-flex;
+  flex-shrink: 0;
+  color: #a2a2a2;
+}
+
+.sg-detail__legal {
+  margin: 0;
+  font-size: var(--s2a-font-size-xs);
+  line-height: 18px;
+  color: var(--s2a-color-content-default);
 }
 
 .sg-detail__recording-badge {
@@ -464,26 +518,36 @@
 }
 
 .sg-detail__product-card {
+  position: relative;
   display: flex;
   align-items: center;
-  gap: var(--s2a-spacing-sm);
+  gap: 10px;
   padding: var(--s2a-spacing-md);
-  border: 2px solid var(--s2a-color-border-subtle);
-  border-radius: var(--s2a-border-radius-md);
+  border: 1px solid var(--s2a-color-gray-400);
+  border-radius: var(--s2a-border-radius-16);
   background: var(--s2a-color-background-default);
+  text-decoration: none;
+}
+
+.sg-detail__product-card:hover {
+  border-color: var(--s2a-color-content-default);
 }
 
 .sg-detail__product-icon {
   width: 32px;
   height: 32px;
   flex-shrink: 0;
+}
+
+/* Tiles whose product has no authored icon in the Tier 1 config keep a neutral glyph
+   rather than a ragged gap where the app icon would be. */
+.sg-detail__product-icon--placeholder {
   border-radius: var(--s2a-border-radius-sm);
   background: var(--s2a-color-gray-800);
-  mask: none;
   position: relative;
 }
 
-.sg-detail__product-icon::after {
+.sg-detail__product-icon--placeholder::after {
   content: '';
   position: absolute;
   inset: 0;
@@ -494,12 +558,23 @@
 }
 
 .sg-detail__product-name {
-  font-family: var(--s2a-font-family-adobe-clean-display);
-  font-weight: var(--s2a-font-weight-adobe-clean-extrabold);
+  flex: 1 0 0;
+  min-width: 0;
+  font-family: var(--s2a-font-family-adobe-clean);
+  font-weight: var(--s2a-font-weight-adobe-clean-black);
   font-size: var(--s2a-font-size-md);
-  line-height: 1;
-  letter-spacing: -0.16px;
+  line-height: 16px;
   color: var(--s2a-color-content-default);
+}
+
+/* Marks the tile as leaving the guide — parked in the tile's top-right corner, sized and
+   offset per Figma (10px at right 6.5/top 7). */
+.sg-detail__product-linkout {
+  position: absolute;
+  top: 7px;
+  right: 6.5px;
+  display: inline-flex;
+  color: var(--s2a-color-gray-600);
 }
 
 /* ── Session resources ───────────────────────────────────── */
@@ -542,77 +617,52 @@
   margin: 0;
 }
 
-/* ── Tablet & desktop (Figma 9145:48558) ─────────────────── */
+/* ── Tablet: pods float on the tinted body, still one column (Figma 1299:69634) ── */
 
 @media (min-width: 768px) {
   .sg-detail__body {
-    display: flex;
-    flex-direction: row;
-    align-items: flex-start;
-    padding: var(--s2a-spacing-lg);
-    gap: var(--s2a-spacing-sm);
-    background: var(--s2a-color-background-subtle);
+    padding: 0 var(--s2a-spacing-lg) var(--s2a-spacing-lg);
   }
 
+  /* Its own row above the pods now, not a left rail. */
   .sg-detail__back-wrap {
-    width: 60px;
-    flex-shrink: 0;
-    position: sticky;
-    top: var(--s2a-spacing-lg);
-    align-self: flex-start;
+    height: 60px;
+    display: flex;
+    align-items: center;
     padding: 0;
     background: transparent;
-    border-bottom: none;
     z-index: auto;
-  }
-
-  .sg-detail__cols {
-    padding: 0;
-    flex: 1;
-    min-width: 0;
-    flex-direction: row;
-    gap: var(--s2a-spacing-xs);
-    align-items: flex-start;
-  }
-
-  .sg-detail__col--main {
-    flex: 1;
-    min-width: 0;
-    gap: var(--s2a-spacing-xs);
-  }
-
-  .sg-detail__col--side {
-    width: 383px;
-    flex-shrink: 0;
-    position: sticky;
-    top: var(--s2a-spacing-lg);
-    align-self: flex-start;
-    gap: 0;
   }
 
   .sg-detail__group {
     width: 100%;
-    padding: var(--s2a-spacing-lg);
-    border-radius: 20px;
-    background: var(--s2a-color-background-default);
   }
 
   .sg-detail__group--summary {
     gap: var(--s2a-spacing-lg);
+    padding-top: var(--s2a-spacing-lg);
+    border-radius: 20px;
+  }
+
+  /* Badge and time hug the left together, rather than sitting at opposite ends. */
+  .sg-detail__summary-top {
+    justify-content: flex-start;
+    gap: var(--s2a-spacing-sm);
   }
 
   .sg-detail__title {
     font-size: var(--s2a-font-size-2xl);
   }
 
-  /* Full description, no fade/More toggle on larger screens. */
+  /* Full description at this width per the frames; only the description's own toggle is
+     dropped — the list pods keep their Show more affordance. */
   .sg-detail__desc-wrap {
     max-height: none;
     overflow: visible;
     mask-image: none;
   }
 
-  .sg-detail__more {
+  .sg-detail__details .sg-detail__more {
     display: none;
   }
 
@@ -621,19 +671,10 @@
   }
 
   .sg-detail__speakers {
-    display: flex;
-    flex-direction: column;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: var(--s2a-spacing-md);
-  }
-
-  .sg-detail__products {
-    display: flex;
-    gap: var(--s2a-spacing-xs);
-  }
-
-  .sg-detail__product-card {
-    flex: 1 0 0;
-    min-width: 0;
+    align-items: start;
   }
 
   .sg-detail__resources {
@@ -643,6 +684,69 @@
   .sg-detail__resource-card {
     flex: 1 0 0;
     min-width: 0;
+  }
+}
+
+/* ── Desktop: two independently-stacking columns (Figma 1323:139140 — 773 + 8 + 383,
+   inside a 1164 content column centred in the 1400 drawer) ─────────────────────── */
+
+@media (min-width: 1280px) {
+  .sg-detail__back-wrap {
+    padding-left: var(--s2a-spacing-20);
+  }
+
+  /* --split is set by the component at this width, alongside the two-column DOM order. */
+  .sg-detail__cols--split {
+    flex-direction: row;
+    align-items: flex-start;
+    gap: var(--s2a-spacing-xs);
+    width: 100%;
+    max-width: 1164px;
+    margin: 0 auto;
+  }
+
+  /* Each column stacks its own pods 8px apart rather than being row-aligned with the much
+     taller summary pod. */
+  .sg-detail__col {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s2a-spacing-xs);
+    min-width: 0;
+  }
+
+  .sg-detail__col--main {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .sg-detail__col--side {
+    width: 383px;
+    flex-shrink: 0;
+  }
+
+  .sg-detail__title {
+    font-size: var(--s2a-font-size-4xl);
+    line-height: 32px;
+    letter-spacing: -1px;
+  }
+
+  .sg-detail__summary-top {
+    gap: var(--s2a-spacing-sm);
+  }
+
+  /* The desktop frame (1323:139144) sets the CTA row 24px below the title/captions/legal
+     block, where the narrower frames keep the whole summary on one 16px rhythm. */
+  .sg-detail__actions {
+    margin-top: var(--s2a-spacing-xs);
+  }
+
+  .sg-detail__time {
+    color: var(--s2a-color-gray-700);
+  }
+
+  /* Back to a single column: the side column is too narrow for two speakers abreast. */
+  .sg-detail__speakers {
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 
@@ -1132,6 +1236,30 @@
   background: var(--s2a-color-background-default);
   color: var(--s2a-color-content-default);
   border-color: var(--s2a-color-transparent-white-16);
+}
+
+/* The detail view's pods are white-on-tint in light mode. Both surfaces invert to
+   near-black in dark, which would leave pod and body indistinguishable — so drop the body
+   to the darkest surface and lift the pods (and the tiles inside them) instead, the same
+   way the filter pills are handled below. */
+[data-theme="dark"] .sg-detail__body,
+.sg-portal[data-theme="dark"] .sg-detail__body {
+  background: var(--s2a-color-background-default);
+}
+
+[data-theme="dark"] .sg-detail__group,
+.sg-portal[data-theme="dark"] .sg-detail__group,
+[data-theme="dark"] .sg-detail__back-wrap,
+.sg-portal[data-theme="dark"] .sg-detail__back-wrap {
+  background: var(--s2a-color-background-subtle);
+}
+
+[data-theme="dark"] .sg-detail__product-card,
+.sg-portal[data-theme="dark"] .sg-detail__product-card,
+[data-theme="dark"] .sg-detail__resource-card,
+.sg-portal[data-theme="dark"] .sg-detail__resource-card {
+  background: transparent;
+  border-color: var(--s2a-color-border-subtle);
 }
 
 /* Figma dark frames (9145:44777/44778/44779): pills sit slightly lighter than the
