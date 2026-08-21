@@ -29,20 +29,23 @@
     flex: 0 0 349px;
     align-self: stretch;
     max-height: 100%;
-    overflow-y: auto;
+  }
 
-    /* Persistently visible, styled scrollbar — the OS default (an auto-hiding overlay
-       scrollbar on macOS/some browsers) otherwise only appears on hover, which reads as
-       "there's nothing more to see" when there actually is. */
+  /* Persistently visible, styled scrollbar on the actual scroll container
+     (.video-playlist-list, not the whole block — see the flex-column restructure
+     above) — the OS default (an auto-hiding overlay scrollbar on macOS/some browsers)
+     otherwise only appears on hover, which reads as "there's nothing more to see" when
+     there actually is. */
+  .video-playlist-list {
     scrollbar-width: thin;
     scrollbar-color: var(--s2a-color-gray-300) transparent;
   }
 
-  .video-playlist::-webkit-scrollbar {
+  .video-playlist-list::-webkit-scrollbar {
     width: 6px;
   }
 
-  .video-playlist::-webkit-scrollbar-thumb {
+  .video-playlist-list::-webkit-scrollbar-thumb {
     background: var(--s2a-color-gray-300);
     border-radius: var(--s2a-border-radius-round);
   }
@@ -92,7 +95,13 @@
   }
 }
 
+/* Flex column so the header (handle + title/toggle/play-all row) and the "Show more"
+   button stay pinned in place while only .video-playlist-list itself scrolls between
+   them — previously overflow-y/max-height lived on this element directly, which
+   scrolled the header away along with the rows. */
 .video-playlist {
+  display: flex;
+  flex-direction: column;
   box-sizing: border-box;
   background: var(--vp-bg);
   color: var(--vp-fg);
@@ -100,6 +109,13 @@
   border-radius: var(--s2a-border-radius-md, 16px);
   padding: var(--s2a-spacing-md) var(--s2a-spacing-md) var(--s2a-spacing-lg);
   margin-bottom: var(--s2a-spacing-8, 8px);
+  overflow: hidden;
+}
+
+.video-playlist-handle,
+.video-playlist-top,
+.video-playlist-show-more {
+  flex-shrink: 0;
 }
 
 /* Applied by announceVideoDecision() in video-playlist.js to whichever of the two
@@ -210,12 +226,18 @@
   transform: translateX(14px);
 }
 
+/* flex: 1 1 auto + min-height: 0 + overflow-y: auto is what actually makes THIS
+   element (not the outer .video-playlist) the scroll container, per the flex-column
+   restructure at the top of this file — the header/show-more stay pinned outside it. */
 .video-playlist-list {
   display: flex;
+  flex: 1 1 auto;
   flex-direction: column;
   align-items: flex-start;
   gap: var(--s2a-spacing-xs);
+  min-height: 0;
   padding: var(--s2a-spacing-xs) 0 var(--s2a-spacing-lg);
+  overflow-y: auto;
   box-sizing: border-box;
 }
 
@@ -246,13 +268,15 @@
   text-decoration: none;
 }
 
-/* Hover and currently-playing share the exact same treatment (per Figma) — a solid card
-   in the theme's inverse colors (light-on-dark card gets a light highlight; dark-on-light
-   desktop card gets a DARK highlight — see the --vp-playing-* custom properties). */
-.video-playlist-row:hover,
+/* Per Figma's "Session tile states" spec — Selected is a solid light card with dark
+   text in BOTH the light desktop card and the dark mobile drawer, i.e. NOT theme-
+   inverted (unlike an earlier version of this rule, which shared :hover's
+   theme-inverse --vp-playing-* treatment — hover instead only ever reveals the
+   favorite/play action icons, already handled by .video-playlist-row-actions above,
+   with no background change of its own). */
 .video-playlist-row.is-playing {
-  background: var(--vp-playing-bg);
-  color: var(--vp-playing-fg);
+  background: var(--s2a-color-gray-25, #fff);
+  color: var(--s2a-color-gray-900, #1e1e1e);
 }
 
 .video-playlist-row:focus-visible,
@@ -354,9 +378,12 @@
   overflow: hidden;
 }
 
-.video-playlist-row:hover .video-playlist-row-progress-track,
+/* Fixed light track (not theme-inverted --vp-playing-track-bg) — matches the Selected
+   row's own fixed light-card background above; the dark filled portion
+   (.video-playlist-row-progress-fill) already follows via currentcolor once .is-playing
+   sets a dark `color`. */
 .video-playlist-row.is-playing .video-playlist-row-progress-track {
-  background: var(--vp-playing-track-bg);
+  background: var(--s2a-color-gray-200, #e0e0e0);
 }
 
 .video-playlist-row-progress-fill {
@@ -375,9 +402,8 @@
   color: var(--vp-muted);
 }
 
-.video-playlist-row:hover .video-playlist-row-duration,
 .video-playlist-row.is-playing .video-playlist-row-duration {
-  color: var(--vp-playing-muted);
+  color: var(--s2a-color-content-subtle, #6e6e6e);
 }
 
 /* Favorite + play stacked together, per Figma's row "Hover" state — see buildRow. */
@@ -499,7 +525,6 @@
     bottom: 0;
     z-index: 2;
     border-radius: var(--s2a-border-radius-md, 16px) var(--s2a-border-radius-md, 16px) 0 0;
-    overflow-y: auto;
     transition: max-height 0.3s ease;
   }
 
