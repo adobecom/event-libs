@@ -421,7 +421,10 @@ function loadVideoPlayer(el, sessionId, video) {
 // video-playlist.js. Without coordination both would start playing immediately and
 // independently, which is exactly the "both players briefly visible" problem this
 // resolves: instead of embedding right away, each instance registers as pending and
-// waits for the page-wide decision event before deciding whether it's the winner.
+// waits for the page-wide decision event before deciding whether it's the winner —
+// showing a lightweight loader in its own place meanwhile (see init()'s own
+// .video-player-loader), since video-playlist.js's catalog fetch driving that decision
+// has been measured at ~3.5s and the video area would otherwise sit visually empty.
 const DECISION_FALLBACK_MS = 4000;
 
 // Deliberately NOT keyed off an authored marker class (`.video-container`/
@@ -509,11 +512,23 @@ export default async function init(el) {
     return;
   }
 
+  // Shown immediately, in place of the real embed, while awaitEmbedDecision below is
+  // still pending (video-playlist.js's own catalog fetch has been measured at ~3.5s) —
+  // without this, BOTH sections stay visually empty for that whole window (this page
+  // has no other content gating on the same decision, so the rest of the page renders
+  // fine; only the video area itself has nothing to show yet), which reads as a blank,
+  // broken page rather than "still loading." Removed the moment the real decision
+  // lands, whichever way it goes — the winner replaces it with the real embed, the
+  // loser's whole section collapses via video-playlist.js's own is-collapsing (which
+  // removes this loader along with everything else in that section).
+  el.append(createTag('div', { class: 'video-player-loader', 'aria-hidden': 'true' }));
+
   // Doesn't embed yet — see awaitEmbedDecision above. The LOSING instance's whole
   // section is removed by video-playlist.js itself (see announceVideoDecision there);
   // this instance only ever embeds if it's confirmed the winner, so the loser's iframe
   // never starts loading/playing at all.
   const isWinner = await awaitEmbedDecision(el);
+  el.querySelector('.video-player-loader')?.remove();
   if (!isWinner) return;
 
   loadVideoPlayer(el, sessionId, currentVideo);
