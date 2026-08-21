@@ -1,6 +1,19 @@
 import { expect } from '@esm-bundle/chai';
 import { setMetadata } from '../../../../../event-libs/v1/utils/utils.js';
 import init from '../../../../../event-libs/v1/c2/blocks/event-session-resources/event-session-resources.js';
+import { auth } from '../../../../../event-libs/v1/utils/session-store.js';
+import { toast } from '../../../../../event-libs/v1/features/toast/toast.js';
+
+const SIGNED_OUT = { isLoggedIn: null, isRegistered: undefined, userFirstName: null };
+const SIGNED_IN = { isLoggedIn: true, isRegistered: true, userFirstName: 'Ada' };
+const UNREGISTERED = { isLoggedIn: true, isRegistered: false, userFirstName: 'Ada' };
+
+// Clicks and reports whether navigation was allowed through (i.e. not gated).
+function clickAllowed(cta) {
+  const e = new MouseEvent('click', { bubbles: true, cancelable: true });
+  cta.dispatchEvent(e);
+  return !e.defaultPrevented;
+}
 
 function setMaterials(list) {
   setMetadata('material-list', JSON.stringify(list));
@@ -25,6 +38,8 @@ function backgroundRow(value) {
 describe('Session Resources', () => {
   beforeEach(() => {
     document.head.innerHTML = '';
+    auth.value = SIGNED_OUT;
+    toast.value = null;
   });
 
   it('renders a row per published resource with name + CTA link', async () => {
@@ -88,6 +103,52 @@ describe('Session Resources', () => {
     await init(el);
     const names = [...el.querySelectorAll('.session-resource-name')].map((n) => n.textContent);
     expect(names).to.deep.equal(['Good']);
+  });
+
+  describe('download gating', () => {
+    const oneOfEach = () => setMaterials([
+      { fileTypeName: 'Slides', fileURL: 'https://x/slides.pdf', published: true },
+      { fileTypeName: 'Link', fileURL: 'https://x/deck', published: true },
+    ]);
+    const ctas = (el) => [...el.querySelectorAll('.session-resource-cta')];
+
+    it('blocks a Download while signed out and shows a login toast', async () => {
+      oneOfEach();
+      const el = block();
+      await init(el);
+      expect(clickAllowed(ctas(el)[0])).to.be.false;
+      expect(toast.value?.message).to.match(/login required to download slides/i);
+      expect(toast.value?.ctaLabel).to.match(/login/i);
+    });
+
+    it('blocks a Download when signed in but not registered, and prompts to register', async () => {
+      oneOfEach();
+      const el = block();
+      await init(el);
+      auth.value = UNREGISTERED;
+      expect(clickAllowed(ctas(el)[0])).to.be.false;
+      expect(toast.value?.message).to.match(/registration.*required to download slides/i);
+      expect(toast.value?.ctaLabel).to.match(/register/i);
+    });
+
+    it('lets a Download through once signed in and registered, with no toast', async () => {
+      oneOfEach();
+      const el = block();
+      await init(el);
+      auth.value = SIGNED_IN;
+      expect(clickAllowed(ctas(el)[0])).to.be.true;
+      expect(toast.value).to.be.null;
+    });
+
+    it('never gates an "Open" link, even signed out', async () => {
+      oneOfEach();
+      const el = block();
+      await init(el);
+      const open = ctas(el)[1];
+      expect(open.textContent).to.equal('Open');
+      expect(clickAllowed(open)).to.be.true;
+      expect(toast.value).to.be.null;
+    });
   });
 
   it('renders the "No resources" empty state when none are published', async () => {

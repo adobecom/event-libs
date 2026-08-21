@@ -5,14 +5,21 @@
  * rest. "No resources" empty state when none are published. Links open in a new
  * tab.
  *
- * NOTE: download gating (logged-in AND registered, via the session-action guard
- * + toast) is wired in the signals/CTA pass (MWPW-203474). For now the CTA is a
- * plain new-tab link. The CTA label ("Download" vs "Open") is inferred from the
- * file URL; RF may later supply explicit CTA text.
+ * "Download" CTAs are gated on sign-in + event registration via the shared
+ * session-action guard, reusing the same login/registration toast as the favorite
+ * and add-to-schedule CTAs. "Open" links are not gated. The CTA label ("Download"
+ * vs "Open") is inferred from the file URL; RF may later supply explicit CTA text.
+ *
+ * NOTE: this is a UX gate, not access control — the file URL is in the DOM, so a
+ * copied link or modifier-click still reaches it. Protecting the asset itself needs
+ * a signed/expiring URL or a server-side check.
  */
-import { createTag } from '../../../utils/utils.js';
+import { createTag, getMetadata } from '../../../utils/utils.js';
 import { getJsonMetadata } from '../../utils/custom-attributes.js';
 import { readBackgroundConfig } from '../../utils/background-config.js';
+import { initSessionState, getApiConfig } from '../../../utils/session-store.js';
+import { assertAuthorized } from '../../../services/sessions/session-actions.js';
+import { showAuthToast } from '../../../services/sessions/action-feedback.js';
 
 const MOBILE_LIMIT = 2;
 const DOWNLOADABLE = /\.(pdf|zip|pptx?|docx?|xlsx?|key|psd|ai|indd|mp4|mov)(\?|$)/i;
@@ -44,6 +51,15 @@ export default async function init(el) {
     ? materials.filter((m) => m && m.published !== false && m.fileURL)
     : [];
 
+  // Boot the page-level state engine so `auth` reflects the real IMS/registration
+  // state. Idempotent, and a no-op without a Tier 1 config — see the gate below.
+  initSessionState();
+  // showAuthToast expects { title, registerUrl } (not Milo's global config).
+  const eventConfig = {
+    title: getMetadata('event-title') || getMetadata('title') || '',
+    registerUrl: getApiConfig()?.registerUrl || '/register',
+  };
+
   el.replaceChildren();
   if (background) el.style.background = background;
   el.append(createTag('h2', { class: 'session-resources-title' }, 'Session resources'));
@@ -58,16 +74,33 @@ export default async function init(el) {
     const item = createTag('li', { class: 'session-resource' });
     if (i >= MOBILE_LIMIT) item.classList.add('is-overflow');
     const name = resourceName(m);
+    const label = ctaLabel(m);
     item.append(createTag('span', { class: 'session-resource-name' }, name));
-    item.append(createTag('a', {
+    const cta = createTag('a', {
       class: 'session-resource-cta',
       href: m.fileURL,
       target: '_blank',
       rel: 'noopener noreferrer',
       // The visible text is only "Open"/"Download" and the file name is a sibling,
       // so name the link for AT link lists and flag the new tab.
-      'aria-label': `${ctaLabel(m)} ${name} (opens in new tab)`,
-    }, ctaLabel(m)));
+      'aria-label': `${label} ${name} (opens in new tab)`,
+    }, label);
+
+    // Downloads require sign-in + event registration; "Open" links stay ungated.
+    // Blocking on click (rather than rendering a disabled link) keeps the row usable
+    // the moment the visitor signs in, with no re-render.
+    if (label === 'Download') {
+      cta.addEventListener('click', (e) => {
+        try {
+          assertAuthorized();
+        } catch (err) {
+          e.preventDefault();
+          showAuthToast(err.reason, { eventConfig, actionLabel: `download ${name}` });
+        }
+      });
+    }
+
+    item.append(cta);
     list.append(item);
   });
   el.append(list);

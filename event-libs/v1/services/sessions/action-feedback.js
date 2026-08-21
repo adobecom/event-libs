@@ -9,10 +9,11 @@ import {
 } from '../../utils/session-store.js';
 import { getNowMs, isPostEvent } from '../../utils/session-state.js';
 
-// Shared toast copy for the two auth-related SessionActionError reasons — used both by
-// runSessionAction's action failures and checkViewAccess's navigation gate, so login/
-// registration toasts read consistently everywhere they appear.
-function showAuthToast(reason, { eventConfig, actionLabel }) {
+// Shared toast copy for the two auth-related SessionActionError reasons — used by
+// runSessionAction's action failures, checkViewAccess's navigation gate, and blocks
+// that gate a plain link (session resources' Download), so login/registration toasts
+// read consistently everywhere they appear.
+export function showAuthToast(reason, { eventConfig, actionLabel }) {
   if (reason === 'auth-required') {
     showToast({
       message: `Login required to ${actionLabel}`,
