@@ -75,6 +75,8 @@ export function normalizeSessions(rawSessions) {
     inPerson: Boolean(s.inPerson),
     isLivestreamed: Boolean(s.isLivestreamed),
     isOnline: Boolean(s.isOnline),
+    // See isOnDemandOnlyFormat() — the Session Guide keeps these out of Live & Upcoming.
+    onDemandOnly: Boolean(s.onDemandOnly),
     sessionPageUrl: sessionPageUrlForEnv(s.sessionPageUrl),
     isKeynote: Boolean(s.isKeynote),
     thumbnailUrl: s.thumbnailUrl ?? null,
@@ -88,6 +90,26 @@ export function normalizeSessions(rawSessions) {
 // resolve. Exported so tier-1-event-configurator/utils.js (which needs the same
 // attribute for its own track editor) doesn't carry a second, independently-drifting copy.
 export const TRACK_ATTRIBUTE_NAMES = ['Primary Event Site Track', 'Primary Track for Agenda (Digital Agenda)'];
+
+const FORMAT_ONLINE = 'Online';
+const FORMAT_ON_DEMAND_POST_EVENT = 'On demand, post event';
+
+/**
+ * "IPOD" sessions — in-person content whose only digital availability is the post-event
+ * recording. They have no live airing to be live or upcoming, so the Session Guide shows
+ * them under On Demand and nowhere else.
+ *
+ * Signature confirmed against the real MAX26 catalog: the two "A.COM IPOD Test Session"
+ * rows carry Format `In-Person` + `On demand, post event` with no `Online` value and no
+ * `Livestreamed Content`. Sessions that do air online carry `Online` alongside the same
+ * on-demand value ("A.COM Master Test Session"), which is why the on-demand value alone
+ * can't be the marker.
+ */
+export function isOnDemandOnlyFormat(formatValues, isLivestreamed) {
+  return formatValues.includes(FORMAT_ON_DEMAND_POST_EVENT)
+    && !formatValues.includes(FORMAT_ONLINE)
+    && !isLivestreamed;
+}
 
 // Generic session/track helpers, not Tier-1-specific — shared here so
 // tier-1-event-configurator and session-guide-configurator use the same implementation
@@ -247,6 +269,20 @@ export function isSessionPublished(session) {
   return session.published !== false;
 }
 
+/**
+ * In-person-only sessions: Format is `In-Person` with no `Online`, no `On demand, post event`,
+ * and no livestream — there is no digital way to watch them at all. The Session Guide is an
+ * online experience, so they're dropped from the catalog here rather than filtered per view,
+ * which keeps every view, day tab, and deep link consistent with one rule.
+ *
+ * Takes a mapped raw session (post-`Format` derivation), so `inPerson` being true means the
+ * value was explicitly authored. A session with no Format at all keeps its place — absent
+ * data isn't a statement that the session is in-person-only.
+ */
+export function isInPersonOnly(session) {
+  return session.inPerson && !session.isOnline && !session.videoAvailable && !session.isLivestreamed;
+}
+
 // Joins the ESL/ESP catalog payload's flat, relational arrays (sessions/sessionTimes/
 // speakers, related by id) into the raw-session shape normalizeSessions() expects.
 export function mapEslPayloadToRawSessions(payload) {
@@ -280,6 +316,8 @@ export function mapEslPayloadToRawSessions(payload) {
       }));
 
     const formatValues = extractCustomAttributeValues(session, 'Format');
+    const isOnline = formatValues.includes(FORMAT_ONLINE);
+    const isLivestreamed = extractCustomAttributeValues(session, 'Livestreamed Content').includes('Live');
     const type = extractCustomAttributeValue(session, ['Type', 'Session Type']);
     const slug = slugFromUrl(session.url);
     const thumbnail = (session.images || []).find((img) => img.imageKind === 'session-card-image');
@@ -314,9 +352,10 @@ export function mapEslPayloadToRawSessions(payload) {
       speakers,
       products: extractCustomAttributeValues(session, 'Product'),
       inPerson: formatValues.includes('In-Person'),
-      isOnline: formatValues.includes('Online'),
-      videoAvailable: formatValues.includes('Online') || formatValues.includes('On demand, post event'),
-      isLivestreamed: extractCustomAttributeValues(session, 'Livestreamed Content').includes('Live'),
+      isOnline,
+      videoAvailable: isOnline || formatValues.includes(FORMAT_ON_DEMAND_POST_EVENT),
+      isLivestreamed,
+      onDemandOnly: isOnDemandOnlyFormat(formatValues, isLivestreamed),
       sessionPageUrl: session.url || '',
       isKeynote: type === 'Keynote',
       thumbnailUrl: thumbnail?.imageUrl ?? null,
@@ -327,7 +366,9 @@ export function mapEslPayloadToRawSessions(payload) {
       // defaults both to empty/null.
       customAttributeValues: buildCustomAttributeValueMap(session),
     };
-  });
+  })
+    // Applied after the map because the rule reads the derived Format booleans.
+    .filter((session) => !isInPersonOnly(session));
 }
 
 // `/session-catalog` is a confirmed-public ESP endpoint — no auth token or group-id

@@ -1,7 +1,8 @@
 import { expect } from '@esm-bundle/chai';
 
 import {
-  mapEslPayloadToRawSessions, normalizeSessions, isSessionPublished, ENFORCE_PUBLISHED_FILTER,
+  mapEslPayloadToRawSessions, normalizeSessions, isSessionPublished, isInPersonOnly,
+  ENFORCE_PUBLISHED_FILTER,
   getSessionProducts, extractDistinctProducts, sessionPageUrlForEnv,
   getSessionAdditionalTracks, extractDistinctAllTracks,
 } from '../../../../event-libs/v1/services/sessions/sessions-api.js';
@@ -165,6 +166,41 @@ describe('services/sessions/sessions-api', () => {
       expect(bare.isLivestreamed).to.be.false;
     });
 
+    // "IPOD" sessions. full's Format (In-Person + On demand, post event, no Online, no
+    // livestream) is the real signature of the catalog's "A.COM IPOD Test Session" rows.
+    it('flags an in-person, on-demand-only Format as onDemandOnly', () => {
+      expect(full.onDemandOnly).to.be.true;
+    });
+
+    it('leaves a session with no on-demand Format value unflagged', () => {
+      expect(bare.onDemandOnly).to.be.false;
+    });
+
+    it('does not flag a session that also airs online', () => {
+      const [both] = mapEslPayloadToRawSessions({
+        sessions: [{
+          sessionId: 'both',
+          customAttributes: [customAttr('Format', [
+            selectValue('In-Person'), selectValue('Online'), selectValue('On demand, post event'),
+          ])],
+        }],
+      });
+      expect(both.onDemandOnly).to.be.false;
+    });
+
+    it('does not flag a livestreamed session carrying the same on-demand Format', () => {
+      const [streamed] = mapEslPayloadToRawSessions({
+        sessions: [{
+          sessionId: 'streamed',
+          customAttributes: [
+            customAttr('Format', [selectValue('In-Person'), selectValue('On demand, post event')]),
+            customAttr('Livestreamed Content', [selectValue('Live')]),
+          ],
+        }],
+      });
+      expect(streamed.onDemandOnly).to.be.false;
+    });
+
     it('picks the session-card-image thumbnail, not the hero image', () => {
       expect(full.thumbnailUrl).to.equal('card.jpg');
     });
@@ -206,6 +242,41 @@ describe('services/sessions/sessions-api', () => {
       expect(bare.industry).to.deep.equal([]);
       expect(bare.closedCaptions).to.equal('');
       expect(bare.legalCopy).to.equal('');
+    });
+  });
+
+  describe('isInPersonOnly', () => {
+    it('is true for a session whose only Format value is In-Person', () => {
+      const [dropped] = mapEslPayloadToRawSessions({
+        sessions: [
+          { sessionId: 'in-person', customAttributes: [customAttr('Format', [selectValue('In-Person')])] },
+          { sessionId: 'keeper', customAttributes: [customAttr('Format', [selectValue('Online')])] },
+        ],
+      });
+      // The in-person-only row is gone, so the first mapped session is the online one.
+      expect(dropped.id).to.equal('keeper');
+    });
+
+    it('keeps an in-person session that also airs online or is recorded', () => {
+      expect(isInPersonOnly({ inPerson: true, isOnline: true, videoAvailable: true })).to.be.false;
+      expect(isInPersonOnly({ inPerson: true, isOnline: false, videoAvailable: true })).to.be.false;
+      expect(isInPersonOnly({ inPerson: true, isLivestreamed: true })).to.be.false;
+    });
+
+    it('keeps a session with no Format authored at all — absent data is not a claim', () => {
+      expect(isInPersonOnly({ inPerson: false })).to.be.false;
+      const noFormat = mapEslPayloadToRawSessions({ sessions: [{ sessionId: 'no-format', customAttributes: [] }] });
+      expect(noFormat.map((s) => s.id)).to.deep.equal(['no-format']);
+    });
+
+    it('keeps the whole catalog when every session has a digital format', () => {
+      const kept = mapEslPayloadToRawSessions({
+        sessions: [
+          { sessionId: 'a', customAttributes: [customAttr('Format', [selectValue('Online')])] },
+          { sessionId: 'b', customAttributes: [customAttr('Format', [selectValue('In-Person'), selectValue('On demand, post event')])] },
+        ],
+      });
+      expect(kept.map((s) => s.id)).to.deep.equal(['a', 'b']);
     });
   });
 
@@ -374,6 +445,13 @@ describe('services/sessions/sessions-api', () => {
       const [normalized] = normalizeSessions([{ id: 's-1', audience: ['Designer'] }]);
       expect(normalized.resources).to.deep.equal([]);
       expect(normalized.mrStreamId).to.be.null;
+    });
+
+    it('carries the mapper-derived onDemandOnly flag through, defaulting to false', () => {
+      const [flagged] = normalizeSessions([{ id: 's-1', onDemandOnly: true }]);
+      const [plain] = normalizeSessions([{ id: 's-2' }]);
+      expect(flagged.onDemandOnly).to.be.true;
+      expect(plain.onDemandOnly).to.be.false;
     });
 
     it('coerces mock-style plain-string audience into an array', () => {

@@ -92,9 +92,21 @@ export function groupByTrack(sessions, swimlaneOrder) {
   );
 }
 
+/**
+ * On-demand-only ("IPOD") sessions belong to the On Demand view alone: they carry a scheduled
+ * slot in the catalog, but no live airing of that slot exists to be live, upcoming, or
+ * previously aired. Dropping them from a list here is what keeps them out of Live & Upcoming
+ * regardless of what their timestamps say. The flag is derived from the Format custom
+ * attribute — see sessions-api.js's isOnDemandOnlyFormat().
+ */
+export function excludeOnDemandOnly(sessions) {
+  return sessions.filter((s) => !s.onDemandOnly);
+}
+
 // Live Now section: MR sessions use poll status; non-MR sessions use time window.
 export function liveSessions(sessions, liveStreamActiveIds, activeDay, userTz, nowMs) {
   return sessions.filter((s) => {
+    if (s.onDemandOnly) return false;
     if (getSessionDayKey(s, userTz) !== activeDay) return false;
     if (s.mrStreamId) return isInLiveNow(s, liveStreamActiveIds, nowMs);
     return isSessionLive(s, nowMs);
@@ -104,6 +116,7 @@ export function liveSessions(sessions, liveStreamActiveIds, activeDay, userTz, n
 // Upcoming sessions: MR sessions use poll status; non-MR use time window.
 export function upcomingSessions(sessions, liveStreamActiveIds, activeDay, userTz, nowMs) {
   return sessions.filter((s) => {
+    if (s.onDemandOnly) return false;
     if (getSessionDayKey(s, userTz) !== activeDay) return false;
     if (s.mrStreamId) return deriveSessionState(s, liveStreamActiveIds, nowMs) === 'upcoming';
     return isSessionUpcoming(s, nowMs);
@@ -113,6 +126,7 @@ export function upcomingSessions(sessions, liveStreamActiveIds, activeDay, userT
 // On-demand sessions: MR sessions use poll status; non-MR use time window.
 export function onDemandSessions(sessions, liveStreamActiveIds, nowMs) {
   return sessions.filter((s) => {
+    if (s.onDemandOnly) return true;
     if (s.mrStreamId) return deriveSessionState(s, liveStreamActiveIds, nowMs) === 'on-demand';
     return !isSessionLive(s, nowMs) && !isSessionUpcoming(s, nowMs);
   });
@@ -126,7 +140,7 @@ export function onDemandSessions(sessions, liveStreamActiveIds, nowMs) {
  * Falls back to a deterministic random selection of up to 3 day sessions when no ids configured.
  */
 export function getRecommendedSessions(sessions, recommendedIds, activeDay, userTz) {
-  const daySessions = sessionsForDay(sessions, activeDay, userTz);
+  const daySessions = excludeOnDemandOnly(sessionsForDay(sessions, activeDay, userTz));
 
   if (recommendedIds && recommendedIds.length > 0) {
     const daySessionsById = new Map(daySessions.map((s) => [s.id, s]));

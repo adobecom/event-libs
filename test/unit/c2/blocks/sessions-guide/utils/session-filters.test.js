@@ -2,7 +2,7 @@ import { expect } from '@esm-bundle/chai';
 import {
   sessionsForDay, groupByStartTime, groupByTrack, resolveTrackBadge,
   liveSessions, upcomingSessions, onDemandSessions, getRecommendedSessions,
-  getOnDemandRecommendedSessions, getFilterValue, filterSessions,
+  getOnDemandRecommendedSessions, getFilterValue, filterSessions, excludeOnDemandOnly,
 } from '../../../../../../event-libs/v1/c2/blocks/sessions-guide/utils/session-filters.js';
 import { getSessionDayKey } from '../../../../../../event-libs/v1/c2/blocks/sessions-guide/utils/time.js';
 
@@ -32,6 +32,15 @@ const UPCOMING_2 = {
   startTimeUtc: h(1), endTimeUtc: h(2),
   mrStreamId: null,
 };
+// An "IPOD" session: scheduled like any other, but on-demand-only per its Format attribute.
+// Its slot is in the future, so every time-window check would otherwise call it upcoming.
+const ON_DEMAND_ONLY = {
+  id: 'ipod', track: 'Design',
+  startTimeUtc: h(1), endTimeUtc: h(2),
+  mrStreamId: null,
+  onDemandOnly: true,
+};
+const ON_DEMAND_ONLY_LIVE_SLOT = { ...ON_DEMAND_ONLY, id: 'ipod-live-slot', startTimeUtc: h(-0.5) };
 
 // Derive day keys directly from session times so tests pass in any system timezone
 const LIVE_DAY = getSessionDayKey(LIVE, TZ);
@@ -97,11 +106,21 @@ describe('session-filters/liveSessions', () => {
     expect(result.map((s) => s.id)).to.deep.equal(['live']);
   });
 
+  it('never treats an on-demand-only session as live, even inside its own slot', () => {
+    const day = getSessionDayKey(ON_DEMAND_ONLY_LIVE_SLOT, TZ);
+    const result = liveSessions([ON_DEMAND_ONLY_LIVE_SLOT], new Set(), day, TZ, NOW);
+    expect(result).to.deep.equal([]);
+  });
 });
 
 describe('session-filters/upcomingSessions', () => {
   it('returns sessions starting in the future for the active day', () => {
     const result = upcomingSessions([LIVE, UPCOMING, PAST], new Set(), UPCOMING_DAY, TZ, NOW);
+    expect(result.map((s) => s.id)).to.deep.equal(['upcoming']);
+  });
+
+  it('excludes on-demand-only sessions whose slot is still in the future', () => {
+    const result = upcomingSessions([UPCOMING, ON_DEMAND_ONLY], new Set(), UPCOMING_DAY, TZ, NOW);
     expect(result.map((s) => s.id)).to.deep.equal(['upcoming']);
   });
 });
@@ -111,12 +130,30 @@ describe('session-filters/onDemandSessions', () => {
     const result = onDemandSessions([LIVE, UPCOMING, PAST], new Set(), NOW);
     expect(result.map((s) => s.id)).to.deep.equal(['past']);
   });
+
+  it('includes on-demand-only sessions regardless of their scheduled slot', () => {
+    const result = onDemandSessions([UPCOMING, ON_DEMAND_ONLY, ON_DEMAND_ONLY_LIVE_SLOT], new Set(), NOW);
+    expect(result.map((s) => s.id)).to.deep.equal(['ipod', 'ipod-live-slot']);
+  });
+});
+
+describe('session-filters/excludeOnDemandOnly', () => {
+  it('drops only the on-demand-only sessions', () => {
+    const result = excludeOnDemandOnly([LIVE, ON_DEMAND_ONLY, UPCOMING]);
+    expect(result.map((s) => s.id)).to.deep.equal(['live', 'upcoming']);
+  });
 });
 
 describe('session-filters/getRecommendedSessions', () => {
   it('returns sessions matching recommendedIds for the active day', () => {
     const result = getRecommendedSessions([LIVE, UPCOMING, PAST], ['live', 'past'], LIVE_DAY, TZ);
     expect(result.map((s) => s.id)).to.include('live');
+  });
+
+  it('never recommends an on-demand-only session in the live carousel', () => {
+    const day = getSessionDayKey(ON_DEMAND_ONLY, TZ);
+    const result = getRecommendedSessions([ON_DEMAND_ONLY], ['ipod'], day, TZ);
+    expect(result).to.deep.equal([]);
   });
 
   it('excludes recommended ids not on the active day', () => {

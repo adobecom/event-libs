@@ -33,6 +33,11 @@ export function getNowMs() {
  * @returns {'live'|'upcoming'|'on-demand'}
  */
 export function deriveSessionState(session, liveStreamActiveIds, nowMs) {
+  // On-demand-only ("IPOD") sessions have no live airing, so their state never depends on the
+  // clock or an MR stream even though they carry a scheduled slot — see sessions-api.js's
+  // isOnDemandOnlyFormat().
+  if (session.onDemandOnly) return 'on-demand';
+
   const start = Date.parse(session.startTimeUtc);
   const end = Date.parse(session.endTimeUtc);
 
