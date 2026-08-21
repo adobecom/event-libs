@@ -410,6 +410,16 @@
   overflow-y: auto;
 }
 
+/* Both carry tabindex="-1" purely as the landing target for a Back to top jump. Neither is a
+   tab stop or a control, so the UA ring — drawn around the entire list — is noise: the jump
+   itself is the cue, and the next Tab lands on a real control with its own visible ring. */
+.sg-body-scroll:focus,
+.sg-body-scroll:focus-visible,
+.sg-full-page:focus,
+.sg-full-page:focus-visible {
+  outline: none;
+}
+
 /* ── Close Button ────────────────────────────────────────── */
 
 .sg-close-btn {
@@ -2038,6 +2048,12 @@
     width: auto;
   }
 
+  /* Figma nests Filter + Search in their own 16px-gap group, matching the 16px between
+     the dropdown and that pair. Base stays 8px for the tighter narrow-viewport header. */
+  .sg-filter-wrap {
+    gap: var(--s2a-spacing-md);
+  }
+
   /* ── View Dropdown ─────────────────────────────────────────── */
 
   .sg-view-dropdown-wrap {
@@ -2438,8 +2454,13 @@
                 border-width 0.45s ease;
   }
 
-  :is(.sessions-guide, .sg-portal) .sg-card.is-scheduled:hover,
-  :is(.sessions-guide, .sg-portal) .sg-card.is-favorited:hover {
+  /* The resting .is-scheduled/.is-favorited rule above ties on specificity with the
+     generic :hover/:focus-within rule and is declared later, so it wins for these cards —
+     the dark treatment has to be restated here. :focus-within is as necessary as :hover:
+     without it a keyboard user tabbing through an already-scheduled or already-favorited
+     card gets no dark state at all, while every other card darkens. */
+  :is(.sessions-guide, .sg-portal) .sg-card.is-scheduled:is(:hover, :focus-within),
+  :is(.sessions-guide, .sg-portal) .sg-card.is-favorited:is(:hover, :focus-within) {
     background: var(--s2a-color-gray-900);
     min-height: 150px;
     box-shadow: 0 6px 24px rgb(0 0 0 / 18%);
@@ -2636,8 +2657,8 @@
   :is(.sessions-guide, .sg-portal) .sg-card { transition: none; }
 
   :is(.sessions-guide, .sg-portal) .sg-card:is(:hover, :focus-within),
-  :is(.sessions-guide, .sg-portal) .sg-card.is-scheduled:hover,
-  :is(.sessions-guide, .sg-portal) .sg-card.is-favorited:hover {
+  :is(.sessions-guide, .sg-portal) .sg-card.is-scheduled:is(:hover, :focus-within),
+  :is(.sessions-guide, .sg-portal) .sg-card.is-favorited:is(:hover, :focus-within) {
     width: 379px;
     min-height: 124px;
     background: var(--s2a-color-gray-50);
@@ -2956,4 +2977,92 @@
 
 .sg-icon-btn--transparent.sg-icon-btn--on-dark:active:not(:disabled) {
   background: var(--s2a-color-transparent-white-16, rgb(255 255 255 / 16%));
+}
+
+
+/* ── Back to Top (Figma 9145:44653) ────────────────────────────────── */
+
+/* Desktop only: the narrower layouts are a full-screen takeover where the header is a
+   short flick away, so the affordance would only cover content. Kept in sync with the
+   1280px breakpoint the drawer and filter panel already use. */
+.sg-back-to-top {
+  display: none;
+}
+
+@media (min-width: 1280px) {
+  .sg-back-to-top {
+    position: absolute;
+    /* Pulled left by the padding below so the arrow and label still sit at the design's
+       20px inset from the drawer edge — only the glass extends further out. */
+    left: calc(var(--s2a-spacing-20, 20px) - var(--s2a-spacing-xs));
+    bottom: var(--s2a-spacing-20, 20px);
+    z-index: 40;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    /* Figma leaves the left padding at 0, which cuts the blur off hard against the arrow.
+       Matched to the other three sides instead so the frosting fades in symmetrically. */
+    gap: var(--s2a-spacing-xs);
+    padding: var(--s2a-spacing-xs);
+    border: none;
+    border-radius: var(--s2a-border-radius-sm);
+    background: rgb(255 255 255 / 20%);
+    backdrop-filter: blur(3px);
+    cursor: pointer;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.2s ease, visibility 0.2s ease;
+  }
+
+  /* Fades in once the list has been scrolled (see shouldShowBackToTop). */
+  .sg-back-to-top--visible {
+    opacity: 1;
+    visibility: visible;
+  }
+
+  /* Full-page surface: the window scrolls, so the button anchors to the viewport rather
+     than to the drawer body. */
+  .sg-back-to-top--fixed {
+    position: fixed;
+    z-index: 60;
+  }
+
+  .sg-back-to-top__arrow {
+    width: 40px;
+    height: 40px;
+    border-radius: var(--s2a-radius-corner-full, 999px);
+    background: #010101;
+    backdrop-filter: blur(15px);
+    color: var(--s2a-color-content-knockout, #fff);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+
+  .sg-back-to-top__label {
+    font-family: var(--s2a-font-family-adobe-clean-display);
+    font-weight: var(--s2a-font-weight-adobe-clean-bold);
+    font-size: var(--s2a-font-size-16, 16px);
+    line-height: 0.9;
+    letter-spacing: 0.16px;
+    /* Figma specifies black; the token keeps it legible if the drawer is themed dark. */
+    color: var(--s2a-color-content-default, #000);
+    white-space: nowrap;
+  }
+
+  .sg-back-to-top:hover .sg-back-to-top__arrow {
+    background: var(--s2a-color-gray-800, #292929);
+  }
+
+  .sg-back-to-top:focus-visible {
+    outline: 1px solid var(--s2a-color-focus-ring-default, #3b63fb);
+    outline-offset: 1px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sg-back-to-top {
+    transition: none;
+  }
 }

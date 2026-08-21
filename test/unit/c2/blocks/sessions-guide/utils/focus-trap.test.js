@@ -79,6 +79,60 @@ describe('sessions-guide/utils/focus-trap', () => {
     expect(document.activeElement).to.equal(outsideButton);
   });
 
+  // BackToTop stays mounted between jumps, faded out and inert. Counting it as a focusable
+  // made it the trap's phantom last item: activeElement could never equal it, so Tab past
+  // the real last control was never wrapped and escaped into the browser chrome.
+  it('ignores an inert trailing element when wrapping Tab', () => {
+    const inertBtn = document.createElement('button');
+    inertBtn.id = 'faded';
+    inertBtn.inert = true;
+    container.appendChild(inertBtn);
+
+    trapFocus(container);
+    container.querySelector('#last').focus();
+    fireTab();
+    expect(document.activeElement.id).to.equal('first');
+  });
+
+  it('ignores a trailing element hidden with visibility:hidden when wrapping Tab', () => {
+    const hiddenBtn = document.createElement('button');
+    hiddenBtn.id = 'invisible';
+    hiddenBtn.style.visibility = 'hidden';
+    container.appendChild(hiddenBtn);
+
+    trapFocus(container);
+    container.querySelector('#last').focus();
+    fireTab();
+    expect(document.activeElement.id).to.equal('first');
+  });
+
+  it('ignores focusables nested inside an inert subtree', () => {
+    const wrap = document.createElement('div');
+    wrap.inert = true;
+    wrap.innerHTML = '<button id="nested">Nested</button>';
+    container.appendChild(wrap);
+
+    trapFocus(container);
+    container.querySelector('#last').focus();
+    fireTab();
+    expect(document.activeElement.id).to.equal('first');
+  });
+
+  it('still treats a visible, non-inert trailing element as the boundary', () => {
+    const realBtn = document.createElement('button');
+    realBtn.id = 'real-last';
+    container.appendChild(realBtn);
+
+    trapFocus(container);
+    container.querySelector('#last').focus();
+    fireTab();
+    // #last is no longer the boundary, so the trap leaves this Tab to the browser.
+    expect(document.activeElement.id).to.equal('last');
+    realBtn.focus();
+    fireTab();
+    expect(document.activeElement.id).to.equal('first');
+  });
+
   it('does not throw when the container has no focusable elements', () => {
     const empty = document.createElement('div');
     document.body.appendChild(empty);

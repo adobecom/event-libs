@@ -6,6 +6,7 @@ import {
 import { DrawerHeader } from './DrawerHeader.js';
 import { ViewRouter } from './ViewRouter.js';
 import { SessionDetailOverlay } from './SessionDetailOverlay.js';
+import { BackToTop } from './BackToTop.js';
 import { LoadingState, sessionsStatusMessage } from './LoadingState.js';
 import { setSessionParam, setSessionsParam, clearSessionParams } from '../utils/url.js';
 import { trapFocus } from '../utils/focus-trap.js';
@@ -44,6 +45,7 @@ export function resolveSessionGuideRequest(request, { sessionsStatusValue, sessi
 export function DrawerShell() {
   const { state, dispatch } = useSessionGuide();
   const drawerRef = useRef(null);
+  const bodyScrollRef = useRef(null);
   const currentTopRef = useRef(0);
   const expandedRef = useRef(false);
   const touchPrevYRef = useRef(0);
@@ -282,6 +284,8 @@ export function DrawerShell() {
     setFilterOpen(false);
   }
 
+  // The scroll body carries tabindex="-1" so it is not a tab stop itself, but can still take
+  // BackToTop's programmatic focus after a jump — see the comment in BackToTop.js.
   // data-lenis-prevent: pages with a parallax or rich-content section load Milo's Lenis
   // smooth-scroll, which holds a non-passive window wheel/touch listener and
   // preventDefault()s every event to drive its own virtual scroll — starving every scroll
@@ -308,6 +312,8 @@ export function DrawerShell() {
         <div class="sg-drawer__body">
           <div
             class=${`sg-body-scroll${isExpanded ? ' sg-body-scroll--scrollable' : ''}`}
+            ref=${bodyScrollRef}
+            tabindex="-1"
             aria-busy=${String(sessionsStatus.value === 'loading')}
             onfocusin=${() => { if (!expandedRef.current && drawerStateRef.current === 'peek') commitExpanded(); }}
           >
@@ -319,6 +325,7 @@ export function DrawerShell() {
           <div class=${'sg-detail-panel' + (hasDetail ? ' sg-detail-panel--open' : '')}>
             ${hasDetail && html`<${SessionDetailOverlay} onBack=${handleDetailBack} />`}
           </div>
+          ${!hasDetail && html`<${BackToTop} scrollerRef=${bodyScrollRef} />`}
         </div>
       </div>
       ${!isOpen && html`<button class="sg-cta-btn" onclick=${openDrawer} daa-ll="Session-Guide-Open" type="button">

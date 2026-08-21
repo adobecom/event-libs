@@ -13,6 +13,25 @@ import { IconCheckmark } from './icons.js';
 // tech the rest of the drawer is unavailable. Kept in sync with the 1280px CSS breakpoint.
 const isTakeover = () => !window.matchMedia?.('(min-width: 1280px)').matches;
 
+// Mobile is a two-screen drill-down (Figma 11519-32674 / 11519-32675): a list of categories,
+// then the chosen category's options. Tablet and desktop show both columns at once, so a
+// category is always selected there. Tracked reactively rather than read once, so resizing
+// across the breakpoint lands on a coherent screen.
+const MOBILE_QUERY = '(max-width: 767px)';
+const matchesMobile = () => !!window.matchMedia?.(MOBILE_QUERY).matches;
+
+function useIsMobile() {
+  const [isMobile, setIsMobile] = useState(matchesMobile);
+  useEffect(() => {
+    const mq = window.matchMedia?.(MOBILE_QUERY);
+    if (!mq) return undefined;
+    const onChange = (e) => setIsMobile(e.matches);
+    mq.addEventListener('change', onChange);
+    return () => mq.removeEventListener('change', onChange);
+  }, []);
+  return isMobile;
+}
+
 export function FilterPanel({ onClose }) {
   const { state, dispatch } = useSessionGuide();
   const panelRef = useRef(null);
@@ -31,9 +50,17 @@ export function FilterPanel({ onClose }) {
     return init;
   });
 
+  const firstCategoryId = filterCategories?.length ? filterCategories[0].id : null;
+  const isMobile = useIsMobile();
   const [activeCategory, setActiveCategory] = useState(
-    filterCategories && filterCategories.length > 0 ? filterCategories[0].id : null,
+    () => (matchesMobile() ? null : firstCategoryId),
   );
+
+  // Crossing up out of mobile with nothing selected would strand the options column empty —
+  // the wider layouts always render both columns.
+  useEffect(() => {
+    if (!isMobile && activeCategory === null) setActiveCategory(firstCategoryId);
+  }, [isMobile]);
 
   // Derive unique option values from sessions for each category — auto-tracks
   // `sessions.value` and only recomputes when it actually changes.
@@ -85,8 +112,72 @@ export function FilterPanel({ onClose }) {
   const currentSet = localFilters[activeCategory] instanceof Set ? localFilters[activeCategory] : new Set();
   const activeLabel = filterCategories.find(({ id }) => id === activeCategory)?.label || 'Filter options';
 
+  // On mobile the options are their own screen, reached by drilling into a category.
+  const drilledIn = isMobile && activeCategory !== null;
+
+  const optionsList = html`
+    <div class="sg-filter-panel__options" id="sg-filter-panel-options" role="group" aria-label=${activeLabel}>
+      ${currentOptions.map((opt) => {
+    // Any option value that happens to be a real configured product (regardless of
+    // which category it's in) gets its product icon — no need to special-case "is
+    // this the Product category", same graceful-fallback pattern as getTrackIcon().
+    const isSelected = currentSet.has(opt);
+    const productIcon = getProduct(opt)?.icon;
+    return html`
+          <button
+            type="button"
+            class=${'sg-filter-pill' + (isSelected ? ' sg-filter-pill--selected' : '')}
+            onclick=${() => toggleOption(activeCategory, opt)}
+            aria-pressed=${String(isSelected)}
+          >
+            <span class="sg-filter-pill__content">
+              ${productIcon && html`<${Icon} name=${productIcon} size=${24} resolve=${fetchFederalProductIcon} className="sg-filter-pill__icon" />`}
+              <span class="sg-filter-pill__label">${opt}</span>
+            </span>
+            ${isSelected && html`<${IconCheckmark} />`}
+          </button>
+        `;
+  })}
+      ${currentOptions.length === 0 && html`<p class="sg-filter-panel__empty">No options available.</p>`}
+    </div>
+  `;
+
   // data-lenis-prevent: the panel's option list scrolls itself, and on the full-page surface
   // it sits outside the drawer that otherwise fends Lenis off (see DrawerShell.js).
+  // ── Mobile screen 2: one category's options, with a back affordance and Save ──
+  if (drilledIn) {
+    return html`
+      <div
+        class="sg-filter-panel sg-filter-panel--drilled"
+        ref=${panelRef}
+        data-lenis-prevent
+        role="dialog"
+        aria-modal=${isTakeover() ? 'true' : undefined}
+        aria-labelledby="sg-filter-panel-title"
+      >
+        <div class="sg-filter-panel__drill-header">
+          <button
+            class="sg-filter-panel__back"
+            onclick=${() => setActiveCategory(null)}
+            type="button"
+            aria-label="Back to filter categories"
+          ><span class="sg-filter-panel__back-icon" aria-hidden="true"></span></button>
+          <h3 class="sg-filter-panel__drill-title" id="sg-filter-panel-title">${activeLabel}</h3>
+        </div>
+        ${optionsList}
+        <div class="sg-filter-panel__actions sg-filter-panel__actions--drill">
+          <button
+            class="sg-filter-panel__reset sg-filter-panel__save"
+            onclick=${() => setActiveCategory(null)}
+            daa-ll="Filter-Save-Category"
+            type="button"
+          >Save</button>
+        </div>
+      </div>
+    `;
+  }
+
+  // ── Mobile screen 1 (category list) and the tablet/desktop two-column layout ──
   return html`
     <div
       class="sg-filter-panel"
@@ -111,41 +202,22 @@ export function FilterPanel({ onClose }) {
                     class=${'sg-filter-panel__cat' + (activeCategory === id ? ' sg-filter-panel__cat--active' : '')}
                     onclick=${() => setActiveCategory(id)}
                     aria-pressed=${String(activeCategory === id)}
-                    aria-controls="sg-filter-panel-options"
+                    aria-controls=${isMobile ? undefined : 'sg-filter-panel-options'}
+                    aria-expanded=${isMobile ? 'false' : undefined}
                     type="button"
                   >
-                    ${label}
-                    ${catCount > 0 && html`<span class="sg-filter-panel__cat-badge">${catCount}</span><span class="sg-sr-only"> ${catCount} selected</span>`}
+                    <span class="sg-filter-panel__cat-label">
+                      ${label}
+                      ${catCount > 0 && html`<span class="sg-filter-panel__cat-badge">${catCount}</span><span class="sg-sr-only"> ${catCount} selected</span>`}
+                    </span>
+                    <span class="sg-filter-panel__cat-chevron" aria-hidden="true"></span>
                   </button>
                 </li>
               `;
   })}
           </ul>
         </div>
-        <div class="sg-filter-panel__options" id="sg-filter-panel-options" role="group" aria-label=${activeLabel}>
-          ${currentOptions.map((opt) => {
-    // Any option value that happens to be a real configured product (regardless of
-    // which category it's in) gets its product icon — no need to special-case "is
-    // this the Product category", same graceful-fallback pattern as getTrackIcon().
-    const isSelected = currentSet.has(opt);
-    const productIcon = getProduct(opt)?.icon;
-    return html`
-              <button
-                type="button"
-                class=${'sg-filter-pill' + (isSelected ? ' sg-filter-pill--selected' : '')}
-                onclick=${() => toggleOption(activeCategory, opt)}
-                aria-pressed=${String(isSelected)}
-              >
-                <span class="sg-filter-pill__content">
-                  ${productIcon && html`<${Icon} name=${productIcon} size=${24} resolve=${fetchFederalProductIcon} className="sg-filter-pill__icon" />`}
-                  <span class="sg-filter-pill__label">${opt}</span>
-                </span>
-                ${isSelected && html`<${IconCheckmark} />`}
-              </button>
-            `;
-  })}
-          ${currentOptions.length === 0 && html`<p class="sg-filter-panel__empty">No options available.</p>`}
-        </div>
+        ${!isMobile && optionsList}
         <div class="sg-filter-panel__actions">
           <button class="sg-filter-panel__apply" onclick=${apply} daa-ll="Filter-Apply" type="button">Apply</button>
           <button class="sg-filter-panel__reset" onclick=${reset} daa-ll="Filter-Reset-All" type="button">Reset all</button>

@@ -1,6 +1,7 @@
 import { html, useState, useEffect, useRef } from '../../../../deps/htm-preact.js';
 import { useSessionGuide } from '../store/index.js';
 import { checkViewAccess } from '../../../../services/sessions/action-feedback.js';
+import { isOutsideClick } from '../utils/outside-click.js';
 import { IconCheckmark } from './icons.js';
 
 const VIEWS = [
@@ -31,7 +32,7 @@ export function ViewDropdown() {
   useEffect(() => {
     if (!open) return undefined;
     function onClickOutside(e) {
-      if (wrapRef.current && !wrapRef.current.contains(e.target)) setOpen(false);
+      if (isOutsideClick(wrapRef.current, e.target)) setOpen(false);
     }
     document.addEventListener('click', onClickOutside);
     return () => document.removeEventListener('click', onClickOutside);

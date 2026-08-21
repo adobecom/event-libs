@@ -5,8 +5,19 @@
 const FOCUSABLE_SELECTOR = 'a[href], button:not([disabled]), input:not([disabled]), '
   + 'select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
+// offsetParent alone only rules out display:none and detached nodes. An element the browser
+// refuses to focus for any other reason must be excluded too, or it becomes a phantom
+// boundary: the wrap-around below compares against document.activeElement, which such an
+// element can never be, so Tab walks straight out of the trap and into the browser chrome.
+// The live case is BackToTop.js, which stays mounted-but-inert while faded out.
+function isFocusable(el) {
+  if (el.offsetParent === null) return false;
+  if (el.closest('[inert]')) return false;
+  return getComputedStyle(el).visibility !== 'hidden';
+}
+
 function getFocusables(containerEl) {
-  return [...containerEl.querySelectorAll(FOCUSABLE_SELECTOR)].filter((el) => el.offsetParent !== null);
+  return [...containerEl.querySelectorAll(FOCUSABLE_SELECTOR)].filter(isFocusable);
 }
 
 /**

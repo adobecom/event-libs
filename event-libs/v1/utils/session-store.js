@@ -31,7 +31,6 @@ export const sessionGuideRequest = signal(null);
 let initialized = false;
 let apiConfig = null;
 let myDataAttempted = false;
-let hasLoggedImsStatus = false;
 let realAuthConfirmed = false;
 let rfAuthToken = null;
 let rfAuthTokenStarted = false;
@@ -51,14 +50,6 @@ function deriveMrEnv() {
 function defaultRfApiUrlForEnv() {
   const isProd = getEventConfig()?.miloConfig?.env?.name === 'prod';
   return isProd ? DEFAULT_RF_API_URL : STAGE_RF_API_URL;
-}
-
-// One-off diagnostic for live testing.
-function logImsLoginOnce() {
-  if (hasLoggedImsStatus || !auth.value.isLoggedIn) return;
-  hasLoggedImsStatus = true;
-  // eslint-disable-next-line no-console
-  console.log('[session-store] IMS login confirmed:', auth.value);
 }
 
 // Exchanges the real IMS profile's userId for an rfAuthToken (RF's jwt endpoint), so
@@ -92,7 +83,6 @@ function syncAuth() {
     isLoggedIn: !!(profile && !profile.noProfile && profile.account_type !== 'guest'),
     userFirstName: profile?.first_name ?? null,
   };
-  logImsLoginOnce();
   if (auth.value.isLoggedIn && profile.userId) {
     exchangeRfAuthToken(profile.userId);
   } else {
@@ -149,23 +139,12 @@ function maybeLoadMyData() {
 
 async function loadSessions() {
   sessionsStatus.value = 'loading';
-  // eslint-disable-next-line no-console
-  console.log('[session-store] loading session catalog', {
-    eventId: apiConfig.eventId,
-    eventServiceEnv: getEventServiceEnv()?.name,
-  });
   try {
     const fetched = await fetchSessions(apiConfig.eventId);
     // Batched so components reading both `sessions` and `sessionsStatus` re-render once.
     batch(() => {
       sessions.value = fetched;
       sessionsStatus.value = 'ready';
-    });
-    // eslint-disable-next-line no-console
-    console.log('[session-store] session catalog loaded', {
-      eventId: apiConfig.eventId,
-      sessionCount: fetched.length,
-      sampleSessionIds: fetched.slice(0, 5).map((session) => session.id),
     });
     const mrSessions = sessions.value.filter((s) => s.mrStreamId);
     startPolling(mrSessions, apiConfig.mrEnv, (active) => { liveStreamActiveIds.value = active; });
@@ -219,11 +198,7 @@ function parseTierOneEventConfig() {
 // when tier-1-event-config metadata is absent (mirrors the `event-id` gate decorateEvent
 // already uses for page-wide setup).
 export function initSessionState() {
-  if (initialized) {
-    // eslint-disable-next-line no-console
-    console.log('[session-store] initialization skipped: store is already initialized', apiConfig);
-    return;
-  }
+  if (initialized) return;
   const tierOneConfig = parseTierOneEventConfig();
   if (!tierOneConfig) {
     // eslint-disable-next-line no-console
@@ -243,14 +218,6 @@ export function initSessionState() {
     eventEndMs: tierOneConfig.eventEndDateTime || null,
     mrEnv: deriveMrEnv(),
   };
-
-  // eslint-disable-next-line no-console
-  console.log('[session-store] initialized', {
-    eventId: apiConfig.eventId,
-    apiUrl: apiConfig.apiUrl,
-    profileId: apiConfig.profileId,
-    mrEnv: apiConfig.mrEnv,
-  });
 
   if (!apiConfig.eventId) {
     // eslint-disable-next-line no-console

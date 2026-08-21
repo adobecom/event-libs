@@ -114,4 +114,36 @@ describe('FilterPanel', () => {
     const out = render();
     expect(out).to.include('sg-filter-panel__empty');
   });
+  // Mobile is a two-screen drill-down (Figma 11519-32674/32675): the categories are screen
+  // one and a category's options are screen two, so they are never rendered together. The
+  // wider layouts show both columns at once.
+  describe('responsive layout', () => {
+    let originalMatchMedia;
+
+    beforeEach(() => { originalMatchMedia = window.matchMedia; });
+    afterEach(() => { window.matchMedia = originalMatchMedia; });
+
+    const forceMobile = (mobile) => {
+      window.matchMedia = (q) => ({
+        matches: q.includes('max-width: 767px') ? mobile : !mobile,
+        addEventListener: () => {},
+        removeEventListener: () => {},
+      });
+    };
+
+    it('renders only the category list on mobile, with drill-in chevrons', () => {
+      forceMobile(true);
+      const out = render();
+      expect(out).to.include('sg-filter-panel__cat-chevron');
+      expect(out).to.not.include('sg-filter-panel__options');
+      expect(out).to.not.include('sg-filter-pill');
+    });
+
+    it('renders categories and their options together above mobile', () => {
+      forceMobile(false);
+      const out = render();
+      expect(out).to.include('sg-filter-panel__options');
+      expect(out).to.include('sg-filter-pill');
+    });
+  });
 });

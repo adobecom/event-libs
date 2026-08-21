@@ -6,6 +6,7 @@ import {
   auth, sessions, liveStreamActiveIds, sessionStateVersion, getApiConfig,
 } from '../../../../utils/session-store.js';
 import { isPostEvent, getNowMs } from '../../../../utils/session-state.js';
+import { isOutsideClick } from '../utils/outside-click.js';
 import { DateTabs } from './DateTabs.js';
 import { ViewDropdown } from './ViewDropdown.js';
 import { DownloadButton } from './DownloadButton.js';
@@ -49,11 +50,13 @@ export function DrawerHeader({
   const closeFilter = onFilterClose || (() => {});
 
   // Desktop popover dismissal: close when a click lands outside the filter wrap (button +
-  // panel). Mirrors ViewDropdown; harmless on mobile where the panel is a full takeover.
+  // panel). Mirrors ViewDropdown. On mobile the panel is a full takeover, so the only way
+  // this fires is the drill-down re-rendering the tapped category row away mid-dispatch —
+  // which isOutsideClick() deliberately does not treat as a click-away.
   useEffect(() => {
     if (!filterOpen) return undefined;
     function onClickOutside(e) {
-      if (filterWrapRef.current && !filterWrapRef.current.contains(e.target)) closeFilter();
+      if (isOutsideClick(filterWrapRef.current, e.target)) closeFilter();
     }
     document.addEventListener('click', onClickOutside);
     return () => document.removeEventListener('click', onClickOutside);
