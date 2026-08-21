@@ -137,7 +137,7 @@ describe('SessionDetailOverlay', () => {
     it('links a product that has an authored pageUrl, and marks it as leaving the guide', () => {
       const out = render({ products: ['Photoshop'] });
       // The test stub renders interpolated attribute values unquoted.
-      expect(out).to.include('href=https://www.adobe.com/products/photoshop');
+      expect(out).to.include('href="https://www.adobe.com/products/photoshop"');
       expect(out).to.include('sg-detail__product-linkout');
       expect(out).to.include('daa-ll="Featured-Product"');
     });
@@ -155,12 +155,12 @@ describe('SessionDetailOverlay', () => {
       expect(out).to.include('(10)');
       expect(out).to.include('Product 6');
       expect(out).to.not.include('Product 7');
-      expect(out).to.include('aria-controls=sg-detail-products');
+      expect(out).to.include('aria-controls="sg-detail-products"');
     });
 
     it('offers no toggle when the list fits the collapsed length', () => {
       const out = render({ products: ['Photoshop', 'Illustrator'] });
-      expect(out).to.not.include('aria-controls=sg-detail-products');
+      expect(out).to.not.include('aria-controls="sg-detail-products"');
     });
   });
 
@@ -174,7 +174,7 @@ describe('SessionDetailOverlay', () => {
       expect(out).to.include('(7)');
       expect(out).to.include('Speaker 5');
       expect(out).to.not.include('Speaker 6');
-      expect(out).to.include('aria-controls=sg-detail-speakers');
+      expect(out).to.include('aria-controls="sg-detail-speakers"');
     });
 
     it('falls back to a placeholder when a speaker has no photo', () => {
@@ -195,7 +195,7 @@ describe('SessionDetailOverlay', () => {
       expect(out).to.include('Sample PSD');
       expect(out).to.include('Open');
       expect(out).to.not.include('Extra');
-      expect(out).to.include('aria-controls=sg-detail-resources');
+      expect(out).to.include('aria-controls="sg-detail-resources"');
     });
 
     it('defaults the action label to Download', () => {

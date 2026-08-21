@@ -130,12 +130,12 @@ describe('SessionCard', () => {
   it('shows aria-pressed=true on schedule button when scheduled', () => {
     scheduled.value = new Set(['session-1']);
     const html = renderCard(UPCOMING_SESSION);
-    expect(html).to.include('aria-pressed=true');
+    expect(html).to.include('aria-pressed="true"');
   });
 
   it('shows aria-pressed=false on schedule button when not scheduled', () => {
     const html = renderCard(UPCOMING_SESSION);
-    expect(html).to.include('aria-pressed=false');
+    expect(html).to.include('aria-pressed="false"');
   });
 
   it('dispatches SCHEDULE_ADD when schedule button clicked and registered', () => {
@@ -171,17 +171,17 @@ describe('SessionCard', () => {
 
   it('tags the card daa-ll as Session-Card-Navigate on the page surface', () => {
     const html = renderCard(UPCOMING_SESSION);
-    expect(html).to.include('daa-ll=Session-Card-Navigate');
+    expect(html).to.include('daa-ll="Session-Card-Navigate"');
   });
 
   it('tags the card daa-ll as Session-Card-Open on the widget surface for a live/upcoming session', () => {
     const html = renderCard(UPCOMING_SESSION, { guideConfig: { ...BASE_CONFIG, surface: 'widget' } });
-    expect(html).to.include('daa-ll=Session-Card-Open');
+    expect(html).to.include('daa-ll="Session-Card-Open"');
   });
 
   it('tags the card daa-ll as On-Demand-Card-Navigate on the widget surface for an on-demand session', () => {
     const html = renderCard(ONDEMAND_SESSION, { guideConfig: { ...BASE_CONFIG, surface: 'widget' } });
-    expect(html).to.include('daa-ll=On-Demand-Card-Navigate');
+    expect(html).to.include('daa-ll="On-Demand-Card-Navigate"');
   });
 
   // Only the schedule button is asserted here — the favorite IconButton is embedded
@@ -189,9 +189,9 @@ describe('SessionCard', () => {
   // which this test mock's minimal component-tag parser can't resolve (real htm/preact
   // renders it correctly; this is a mock limitation, not a production bug).
   it('tags the schedule button with Add-/Remove- daa-ll labels matching its state', () => {
-    expect(renderCard(UPCOMING_SESSION)).to.include('daa-ll=Add-to-Schedule');
+    expect(renderCard(UPCOMING_SESSION)).to.include('daa-ll="Add-to-Schedule"');
     scheduled.value = new Set(['session-1']);
-    expect(renderCard(UPCOMING_SESSION)).to.include('daa-ll=Remove-from-Schedule');
+    expect(renderCard(UPCOMING_SESSION)).to.include('daa-ll="Remove-from-Schedule"');
   });
 
   it('tags the previously-aired play button with daa-ll=Watch-Now', () => {
@@ -199,7 +199,7 @@ describe('SessionCard', () => {
     store.SessionGuideContext._current = makeCtx();
     const SessionCard = buildSessionCard(preact, store);
     const html = SessionCard({ session: ONDEMAND_SESSION, forceOnDemand: true });
-    expect(html).to.include('daa-ll=Watch-Now');
+    expect(html).to.include('daa-ll="Watch-Now"');
   });
 
   it('omits the schedule button when enableScheduling is false', () => {
@@ -226,7 +226,7 @@ describe('SessionCard', () => {
     });
     const SessionCard = buildSessionCard(preact, store);
     const html = SessionCard({ session: ONDEMAND_SESSION, forceOnDemand: true });
-    expect(html).to.include('daa-ll=Watch-Now');
+    expect(html).to.include('daa-ll="Watch-Now"');
   });
 
   it('does not dispatch when isRegistered is not true (no-op guard)', () => {

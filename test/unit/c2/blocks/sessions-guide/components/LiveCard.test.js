@@ -183,13 +183,13 @@ describe('LiveCard', () => {
   it('tags the schedule/favorite buttons with Add-/Remove- daa-ll labels matching their state', () => {
     const store = makeStore();
     const LiveCard = buildLiveCard(preact, store);
-    expect(LiveCard({ session: LIVE_SESSION })).to.include('daa-ll=Add-to-Schedule');
-    expect(LiveCard({ session: LIVE_SESSION })).to.include('daa-ll=Add-to-Favorites');
+    expect(LiveCard({ session: LIVE_SESSION })).to.include('daa-ll="Add-to-Schedule"');
+    expect(LiveCard({ session: LIVE_SESSION })).to.include('daa-ll="Add-to-Favorites"');
     scheduled.value = new Set(['session-keynote']);
     favorited.value = new Set(['session-keynote']);
     const html = LiveCard({ session: LIVE_SESSION });
-    expect(html).to.include('daa-ll=Remove-from-Schedule');
-    expect(html).to.include('daa-ll=Remove-from-Favorites');
+    expect(html).to.include('daa-ll="Remove-from-Schedule"');
+    expect(html).to.include('daa-ll="Remove-from-Favorites"');
   });
 
   it('omits the schedule button when enableScheduling is false', () => {

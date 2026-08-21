@@ -84,7 +84,7 @@ describe('TimeSlotRow', () => {
     const TimeSlotRow = buildTimeSlotRow(preact, store);
     const html = TimeSlotRow({ sessions: [SESSION_A, SESSION_B] });
     expect(html).to.include('sg-time-row__arrow--prev');
-    expect(html).to.include('disabled=true');
+    expect(html).to.include('disabled="true"');
   });
 
   it('renders card wraps for multiple sessions (next arrow requires real layout)', () => {
@@ -102,6 +102,6 @@ describe('TimeSlotRow', () => {
     const TimeSlotRow = buildTimeSlotRow(preact, store);
     const html = TimeSlotRow({ sessions: [SESSION_A] });
     expect(html).to.include('sg-time-row__arrow--next');
-    expect(html).to.include('disabled=true');
+    expect(html).to.include('disabled="true"');
   });
 });

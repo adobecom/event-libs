@@ -66,8 +66,8 @@ describe('Carousel', () => {
     const store = makeStore();
     const Carousel = buildCarousel(preact, store);
     const html = Carousel({ sessions: [SESSION_A, SESSION_B] });
-    expect(html).to.include('key=a');
-    expect(html).to.include('key=b');
+    expect(html).to.include('key="a"');
+    expect(html).to.include('key="b"');
   });
 
   it('renders the cards container', () => {
@@ -82,7 +82,7 @@ describe('Carousel', () => {
     const Carousel = buildCarousel(preact, store);
     const html = Carousel({ sessions: [SESSION_A, SESSION_B] });
     expect(html).to.include('sg-carousel__arrow--prev');
-    expect(html).to.include('disabled=true');
+    expect(html).to.include('disabled="true"');
   });
 
   it('renders next arrow when multiple sessions exist', () => {
@@ -112,7 +112,7 @@ describe('Carousel', () => {
     const store = makeStore();
     const Carousel = buildCarousel(preact, store);
     const html = Carousel({ sessions: [SESSION_A] });
-    expect(html).to.include('key=a');
+    expect(html).to.include('key="a"');
     expect(html).to.not.include('sg-carousel__arrow');
   });
 });

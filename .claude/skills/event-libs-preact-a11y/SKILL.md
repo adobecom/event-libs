@@ -133,7 +133,9 @@ and announcements. Keep source-of-truth state unified so visible and accessible 
 
 The Web Test Runner middleware replaces the production Preact bundle with
 `test/unit/mocks/deps/htm-preact.js`. That mock serializes templates to strings, does not attach
-event handlers, and stubs `useEffect`/`useLayoutEffect` as no-ops.
+event handlers, and stubs `useEffect`/`useLayoutEffect` as no-ops. It quotes interpolated
+attribute values the way real htm does, so an `aria-label=${label}` survives into the rendered
+output; assert the quoted form (`aria-label="…"`).
 
 Therefore:
 
@@ -153,6 +155,31 @@ Run:
 - `npx wtr <nearest-test-files> --node-resolve --port=2000`
 
 Report pre-existing failures separately and do not fix unrelated debt.
+
+#### Automated axe checks
+
+The string mock serializes templates into real DOM, so axe can read roles, names, and initial
+ARIA — but never state transitions, focus movement, or anything an effect would have produced.
+Scope each layer to what it can actually prove:
+
+- **Unit.** `expectAccessible(el)` from `test/unit/helpers/a11y.js` runs axe-core scoped to
+  WCAG 2.1 A/AA tags. See `test/unit/c2/blocks/sessions-guide/components/a11y.test.js` for the
+  working pattern, and add a case there when a fix touches roles, names, or initial ARIA.
+- **Live page.** The `a11y` MCP server runs axe in a real browser — the only layer that
+  reaches effect-driven ARIA, focus order, and computed contrast. Point `test_accessibility`
+  at a `localhost:3868` page for overlays, drawers, and filter panels.
+
+Two traps make a unit scan pass while proving nothing:
+
+- **Empty signals.** A component rendered with empty `sessions`/`scheduled` signals yields an
+  empty state, not a card. Seed from `mocks/session-fixtures.js` (`SESSION_VARIANTS`, `CATALOG`)
+  — `mocks/sessions.json` is a stale sample response, not a current-schema fixture.
+- **Effect-gated state.** Anything a `useEffect` would set never happens, so app-level views
+  render empty regardless of seeding — `activeDay` is the canonical example. Mount the leaf
+  component with props (or set `SessionGuideContext._current` directly, as
+  `SessionDetailOverlay.test.js` does) instead of scanning through `App`.
+
+Never report a passing unit axe scan as evidence that keyboard or focus behavior works.
 
 ### Step 6 — Output
 

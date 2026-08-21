@@ -159,6 +159,20 @@ Run targeted checks for touched source files:
 
 Report any pre-existing failures separately. Do not fix unrelated lint or test failures.
 
+#### Automated axe checks
+
+Two layers, and they catch different things:
+
+- **Unit (structural, cheap, runs on every commit).** `expectAccessible(el)` from
+  `test/unit/helpers/a11y.js` runs axe-core scoped to WCAG 2.1 A/AA tags after `init(el)`.
+  Add one to the block's test whenever this skill touches roles, names, labels, or ARIA.
+  It proves static structure only — the unit fixtures are small, so a clean result is not
+  proof the live block is clean.
+- **Live page (behavioral, deeper).** The `a11y` MCP server runs axe in a real browser.
+  Point `test_accessibility` at a `localhost:3868` page for computed contrast, real
+  stylesheets, and rendered content the unit fixtures never produce. `check_color_contrast`
+  and `check_aria_attributes` take raw values, so they need no server.
+
 Fill the structured output card for every run and attach the relevant mode template. Do not end
 with a prose-only recap in place of these templates.
 
