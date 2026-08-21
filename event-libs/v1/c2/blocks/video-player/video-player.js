@@ -415,18 +415,28 @@ function loadVideoPlayer(el, sessionId, video) {
 }
 
 // Two separate `.video-player` instances are authored on every session page — one
-// inside the full-width `.section.video-container`, one inside the two-column
-// `.section.video-playlist-container` (see video-playlist.js's own README) — and only
-// ONE of them should ever actually embed/play a video; the other's section is torn down
-// entirely by video-playlist.js. Without coordination both would start playing
-// immediately and independently, which is exactly the "both players briefly visible"
-// problem this resolves: instead of embedding right away, each instance registers as
-// pending and waits for the page-wide decision event before deciding whether it's the
-// winner.
+// inside a full-width, player-only section, one inside a two-column section alongside
+// video-playlist (see video-playlist.js's own README) — and only ONE of them should
+// ever actually embed/play a video; the other's section is torn down entirely by
+// video-playlist.js. Without coordination both would start playing immediately and
+// independently, which is exactly the "both players briefly visible" problem this
+// resolves: instead of embedding right away, each instance registers as pending and
+// waits for the page-wide decision event before deciding whether it's the winner.
 const DECISION_FALLBACK_MS = 4000;
 
+// Deliberately NOT keyed off an authored marker class (`.video-container`/
+// `.video-playlist-container`) — a real page has been seen where that Section
+// Metadata Style row was missing/not applied, which silently broke video embedding
+// entirely with no visible error. Instead: does a `.video-playlist` block exist
+// anywhere in the same GRID section as this player (not just its own immediate
+// `.section`, which is only the fragment's own inner wrapper — video-player and
+// video-playlist live in sibling fragments, each with their own inner `.section`,
+// both nested inside one shared outer grid `.section`). `.grid-column` is that
+// fragment-loader wrapper; its own parent is the real shared ancestor to search from.
 function isInsidePlaylistContainer(el) {
-  return Boolean(el.closest('.section.video-playlist-container'));
+  const gridColumn = el.closest('.grid-column');
+  const outerSection = gridColumn?.parentElement?.closest('.section') || el.closest('.section');
+  return Boolean(outerSection?.querySelector('.video-playlist'));
 }
 
 // Resolves true/false ("I am the winning instance") exactly once. Milo inits each

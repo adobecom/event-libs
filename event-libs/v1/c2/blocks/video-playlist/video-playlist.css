@@ -100,14 +100,15 @@
 }
 
 /* Applied by announceVideoDecision() in video-playlist.js to whichever of the two
-   authored sections (.video-container full-width player-only, or
-   .video-playlist-container player+playlist) loses the decision — its own
-   video-player.js instance never even embeds a video (see awaitEmbedDecision there), so
-   this only ever fades out an empty/never-populated section before removing it, not a
-   populated one. transitionend (not a timer) triggers the actual el.remove(), so this
-   duration is the only thing that needs to stay in sync between the two files. */
-.section.video-container.is-collapsing,
-.section.video-playlist-container.is-collapsing {
+   sections (full-width player-only, or this block's own player+playlist) loses the
+   decision — found structurally, NOT via an authored marker class (see the JS comment)
+   — its own video-player.js instance never even embeds a video (see awaitEmbedDecision
+   there), so this only ever fades out an empty/never-populated section before removing
+   it, not a populated one. transitionend (not a timer) triggers the actual el.remove(),
+   so this duration is the only thing that needs to stay in sync between the two files —
+   deliberately a plain `.section.is-collapsing` selector (not scoped to a marker class)
+   since JS finds the target section by structure, not by class. */
+.section.is-collapsing {
   overflow: hidden;
   opacity: 0;
   max-height: 0;

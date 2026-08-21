@@ -615,19 +615,34 @@ function buildAutoplayToggle(el) {
   checkbox.addEventListener('change', () => setShouldAutoPlay(checkbox.checked));
 }
 
-// Two whole SECTIONS are authored on every session page — `.section.video-container`
-// (full-width, player-only) and `.section.video-playlist-container` (a real CSS Grid row
-// shared with OTHER, unrelated blocks: event-featured-products, event-speakers,
-// event-session-resources, etc.) — each with its OWN, separate `.video-player` block
-// instance. Neither embeds a video in its own init() — both instances wait for this
-// decision first (see video-player.js's own awaitEmbedDecision), so dispatching it here
-// is what actually triggers the WINNING instance to embed for the first time; the
-// LOSING instance never embeds at all. Dispatched exactly once, as early as possible
-// (every early-exit path in init()/render() below routes through removeBlock(), so
-// nothing can forget to announce it). Only the LOSING section is torn down — with a
-// fade-out transition (see .video-container.is-collapsing/
-// .video-playlist-container.is-collapsing in the CSS) so the layout settles smoothly
-// instead of an abrupt empty-space jump.
+// Two whole SECTIONS are authored on every session page — a full-width, player-only
+// section, and a two-column section (this block's own) shared with OTHER, unrelated
+// blocks (event-featured-products, event-speakers, event-session-resources, etc.) —
+// each with its OWN, separate `.video-player` block instance. Neither embeds a video in
+// its own init() — both instances wait for this decision first (see video-player.js's
+// own awaitEmbedDecision), so dispatching it here is what actually triggers the WINNING
+// instance to embed for the first time; the LOSING instance never embeds at all.
+// Dispatched exactly once, as early as possible (every early-exit path in init()/
+// render() below routes through removeBlock(), so nothing can forget to announce it).
+// Only the LOSING section is torn down — with a fade-out transition (see .is-collapsing
+// in the CSS) so the layout settles smoothly instead of an abrupt empty-space jump.
+//
+// Deliberately NOT keyed off an authored marker class (`.video-container`/
+// `.video-playlist-container`) — a real page has been seen where that Section Metadata
+// Style row was missing, which silently broke this entirely with no visible error.
+// Instead: every `.section` on the page that contains a `.video-player` is a candidate
+// (there are exactly two — the full-width player-only one, and this block's own,
+// alongside `.video-playlist`); whichever one does NOT match `hasPlaylist`'s outcome is
+// the loser. `.grid-column` is the fragment-loader wrapper each `.video-player` actually
+// sits inside — its own parent is the real shared ancestor to search from, since a
+// fragment's own inner `.section` (`el.closest('.section')` alone) never reaches its
+// sibling fragment's content.
+function findVideoSections() {
+  return [...new Set([...document.querySelectorAll('.video-player')]
+    .map((player) => player.closest('.grid-column')?.parentElement?.closest('.section') || player.closest('.section'))
+    .filter(Boolean))];
+}
+
 function announceVideoDecision(hasPlaylist) {
   // Milo inits each block's own module independently — there's no guarantee
   // video-player.js's own 'video-playlist:decision' listener is already attached by
@@ -638,7 +653,8 @@ function announceVideoDecision(hasPlaylist) {
   // event — see video-player.js's own awaitEmbedDecision.
   window.__videoPlaylistDecision = hasPlaylist;
   window.dispatchEvent(new CustomEvent('video-playlist:decision', { detail: { hasPlaylist } }));
-  const losingSection = document.querySelector(hasPlaylist ? '.section.video-container' : '.section.video-playlist-container');
+  const losingSection = findVideoSections()
+    .find((section) => Boolean(section.querySelector('.video-playlist')) !== hasPlaylist);
   if (!losingSection || losingSection.classList.contains('is-collapsing')) return;
   losingSection.classList.add('is-collapsing');
   losingSection.addEventListener('transitionend', () => losingSection.remove(), { once: true });
