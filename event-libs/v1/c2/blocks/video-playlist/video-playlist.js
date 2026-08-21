@@ -5,6 +5,7 @@ import {
 import { deriveSessionState, getNowMs } from '../../../utils/session-state.js';
 import { extractCustomAttributeSlugs } from '../../../services/sessions/sessions-api.js';
 import { toggleFavoriteWithFeedback } from '../../../services/sessions/action-feedback.js';
+import { readBackgroundConfig } from '../../utils/background-config.js';
 
 // Matches the placeholder upcoming-sessions.js uses for the same call — no shared,
 // page-level "eventConfig" builder exists yet with this exact {title, registerUrl} shape
@@ -670,6 +671,15 @@ export default async function init(el) {
   if (!document.getElementById('video-playlist-css')) {
     createTag('link', { rel: 'stylesheet', href: BLOCK_CSS_URL, id: 'video-playlist-css' }, '', { parent: document.head });
   }
+
+  // Same authored "Background" row + shared C2 utility every other block in this
+  // section (event-featured-products, event-speakers, event-session-resources,
+  // event-session-details) already uses — read before render() below ever touches
+  // el's children. An inline style deliberately outranks the light/dark --vp-bg theme
+  // token below, matching those other blocks' own convention of overriding their
+  // default background when one is authored.
+  const background = readBackgroundConfig(el);
+  if (background) el.style.background = background;
 
   const cfg = [...el.querySelectorAll(':scope > div > div:first-child')].reduce((acc, div) => {
     const key = div.textContent.trim().toLowerCase().replace(/ /g, '-');

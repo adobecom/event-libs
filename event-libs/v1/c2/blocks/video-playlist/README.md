@@ -63,6 +63,7 @@ not the primary path):
 | `maximum-sessions` | No | `7` | Ceiling on total rows ever rendered — rows beyond this are never built, so "Show more" can never reveal more than this. Once expanded, the list scrolls internally beyond ~4 visible rows. |
 | `default-thumbnail` | No | — | Fallback thumbnail URL used for a row whose own session has no thumbnail of its own. |
 | `chapters` | No | — | JSON array authored for the Chapters variant: `[{"label": "Intro", "timestampSeconds": 0}, ...]`. No backend field exists for this — it's hand-authored per session. |
+| `background` | No | light/dark theme default (`--vp-bg`) | Same authored "Background" row + `readBackgroundConfig()` utility every other block in this section (event-featured-products, event-speakers, event-session-resources, event-session-details) already supports — sets an inline `background` that overrides the theme default. |
 
 ## How the topic playlist is resolved
 
