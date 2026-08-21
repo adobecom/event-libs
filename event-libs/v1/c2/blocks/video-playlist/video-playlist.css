@@ -99,38 +99,19 @@
   padding: var(--s2a-spacing-md) var(--s2a-spacing-md) var(--s2a-spacing-lg);
 }
 
-/* Toggled by showVideoContainer() in video-playlist.js — exactly one of the two
-   player instances (the full-width .video-container's own, or the
-   .video-playlist-container's own, alongside .video-playlist) is ever shown, decided
-   once resolveTopicPlaylist's own min-sessions/topic result is known. Only these two
-   BLOCKS are ever hidden — never their parent .section, which is a real CSS Grid row
-   shared with other, unrelated blocks (event-featured-products, event-speakers, etc.)
-   that must keep rendering/laying out normally regardless of this decision.
-
-   The .video-playlist-container section's own .video-player and .video-playlist start
-   hidden (not the full-width one) so the full-width player paints first with zero
-   gating — fastest path to LCP for the common case, no layout shift waiting on the
-   async catalog fetch. A brief fade (not an abrupt display swap) softens whichever
-   swap actually happens, since it only ever happens once. */
-.video-playlist-container .video-player,
-.video-playlist-container .video-playlist {
-  display: none;
-}
-
-.video-container .video-player,
-.video-playlist-container .video-player:not(.is-hidden),
-.video-playlist-container .video-playlist:not(.is-hidden) {
-  display: block;
-  animation: video-playlist-fade-in 0.2s ease;
-}
-
-.video-container .video-player.is-hidden {
-  display: none;
-}
-
-@keyframes video-playlist-fade-in {
-  from { opacity: 0; }
-  to { opacity: 1; }
+/* Applied by announceVideoDecision() in video-playlist.js to whichever of the two
+   authored sections (.video-container full-width player-only, or
+   .video-playlist-container player+playlist) loses the decision — its own
+   video-player.js instance never even embeds a video (see awaitEmbedDecision there), so
+   this only ever fades out an empty/never-populated section before removing it, not a
+   populated one. transitionend (not a timer) triggers the actual el.remove(), so this
+   duration is the only thing that needs to stay in sync between the two files. */
+.section.video-container.is-collapsing,
+.section.video-playlist-container.is-collapsing {
+  overflow: hidden;
+  opacity: 0;
+  max-height: 0;
+  transition: opacity 0.25s ease, max-height 0.25s ease;
 }
 
 /* Decorative bottom-sheet drag affordance — mobile-only, see the max-width block below. */

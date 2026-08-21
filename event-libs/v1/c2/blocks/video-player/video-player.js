@@ -414,17 +414,52 @@ function loadVideoPlayer(el, sessionId, video) {
   else watchMpcPlayback(sessionId, iframe);
 }
 
-// This block and video-playlist are authored as siblings inside the same .section (see
-// the session-page-template-columns-col3 fragment) — when video-playlist has nothing to
-// show and removes itself (see its own removeBlock()/'video-playlist:removed' dispatch),
-// this block should take the full row instead of leaving unused space beside it. Checked
-// directly against the live DOM (not a cached flag), since video-playlist's own removal
-// can happen synchronously (its early gates) or asynchronously, well after this block's
-// own init() has already run and rendered.
-function updateFullWidth(el) {
-  const section = el.closest('.section');
-  const hasPlaylist = Boolean(section?.querySelector('.video-playlist'));
-  el.classList.toggle('video-player-full-width', !hasPlaylist);
+// Two separate `.video-player` instances are authored on every session page — one
+// inside the full-width `.section.video-container`, one inside the two-column
+// `.section.video-playlist-container` (see video-playlist.js's own README) — and only
+// ONE of them should ever actually embed/play a video; the other's section is torn down
+// entirely by video-playlist.js. Without coordination both would start playing
+// immediately and independently, which is exactly the "both players briefly visible"
+// problem this resolves: instead of embedding right away, each instance registers as
+// pending and waits for the page-wide decision event before deciding whether it's the
+// winner.
+const DECISION_FALLBACK_MS = 4000;
+
+function isInsidePlaylistContainer(el) {
+  return Boolean(el.closest('.section.video-playlist-container'));
+}
+
+// Resolves true/false ("I am the winning instance") exactly once. Milo inits each
+// block's own module independently — there's no guarantee this listener is attached
+// before video-playlist.js's own init() has already run and announced its decision (a
+// transient CustomEvent alone could be missed, stalling the WINNING player behind the
+// fallback timeout below). window.__videoPlaylistDecision is checked FIRST as a latch
+// covering that race; the event covers the normal case where this listener attaches
+// first; DECISION_FALLBACK_MS covers a page with no video-playlist block authored at
+// all (only .video-container exists — no decision will ever come, and the full-width
+// player must still embed rather than wait forever).
+function awaitEmbedDecision(el) {
+  if (window.__videoPlaylistDecision != null) {
+    return Promise.resolve(isInsidePlaylistContainer(el)
+      ? window.__videoPlaylistDecision
+      : !window.__videoPlaylistDecision);
+  }
+  return new Promise((resolve) => {
+    let settled = false;
+    const settle = (hasPlaylist) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      window.removeEventListener('video-playlist:decision', onDecision);
+      resolve(isInsidePlaylistContainer(el) ? hasPlaylist : !hasPlaylist);
+    };
+    const onDecision = (event) => settle(event.detail.hasPlaylist);
+    window.addEventListener('video-playlist:decision', onDecision);
+    // Fallback only ever benefits the full-width instance in practice — a
+    // video-playlist-container instance with no video-playlist block on the page has
+    // nothing to show anyway (that section's whole point is the pairing).
+    const timer = setTimeout(() => settle(false), DECISION_FALLBACK_MS);
+  });
 }
 
 export default async function init(el) {
@@ -464,11 +499,12 @@ export default async function init(el) {
     return;
   }
 
-  loadVideoPlayer(el, sessionId, currentVideo);
+  // Doesn't embed yet — see awaitEmbedDecision above. The LOSING instance's whole
+  // section is removed by video-playlist.js itself (see announceVideoDecision there);
+  // this instance only ever embeds if it's confirmed the winner, so the loser's iframe
+  // never starts loading/playing at all.
+  const isWinner = await awaitEmbedDecision(el);
+  if (!isWinner) return;
 
-  // Covers both timings: video-playlist may already be gone by now (its own gates run
-  // synchronously, before this even starts), or it may remove itself later once its
-  // async catalog fetch resolves to nothing — re-check on that event too.
-  updateFullWidth(el);
-  window.addEventListener('video-playlist:removed', () => updateFullWidth(el));
+  loadVideoPlayer(el, sessionId, currentVideo);
 }

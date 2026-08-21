@@ -8,10 +8,3 @@
   border-radius: var(--s2a-border-radius-md, 16px);
   overflow: hidden;
 }
-
-/* Applied when video-playlist (this block's own sibling inside the same .section — see
-   updateFullWidth in video-player.js) has nothing to show and removed itself. Only this
-   block's own width changes; nothing else in the section is affected. */
-.video-player.video-player-full-width {
-  width: 100%;
-}
