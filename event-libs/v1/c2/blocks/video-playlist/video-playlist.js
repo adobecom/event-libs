@@ -366,7 +366,17 @@ class Drawer {
     });
   }
 
+  // Guarded here, not just at call sites — confirmed live: the window resize listener
+  // (see render() below) called this directly, bypassing #apply()'s own isDesktop()
+  // check, so resizing the browser at ANY width (including full desktop) was setting an
+  // inline max-height meant only for the mobile bottom-sheet, visibly squeezing the
+  // desktop card. Desktop's own height comes from plain CSS (max-height: 100% within
+  // its flex row), never from this JS-computed cap.
   applyMobileHeight() {
+    if (this.isDesktop()) {
+      this.el.style.maxHeight = '';
+      return;
+    }
     const cap = this.measureCapPx();
     if (this.dragHeightPx != null) {
       this.el.style.maxHeight = `${Math.min(Math.max(this.dragHeightPx, DRAWER_FLOOR_PX), cap)}px`;
