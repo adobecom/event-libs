@@ -273,10 +273,18 @@
    inverted (unlike an earlier version of this rule, which shared :hover's
    theme-inverse --vp-playing-* treatment — hover instead only ever reveals the
    favorite/play action icons, already handled by .video-playlist-row-actions above,
-   with no background change of its own). */
+   with no background change of its own).
+   A background-only change is invisible on the desktop card specifically — confirmed
+   live: the default row background (--vp-row-bg, --s2a-color-gray-50 = #f8f8f8) and
+   this rule's own gray-25 (#fff) differ by ~2.7% lightness, imperceptible on screen.
+   The outline (not a border, which would shift layout by its own width) gives the
+   selected row a real, visible boundary regardless of how close the two backgrounds
+   are, on any theme. */
 .video-playlist-row.is-playing {
   background: var(--s2a-color-gray-25, #fff);
   color: var(--s2a-color-gray-900, #1e1e1e);
+  outline: 1px solid var(--s2a-color-gray-300, #d6d6d6);
+  outline-offset: -1px;
 }
 
 .video-playlist-row:focus-visible,
