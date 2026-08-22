@@ -268,13 +268,10 @@
   text-decoration: none;
 }
 
-/* Per Figma's "Session tile states" spec — Hover AND Selected share the exact same
-   dark-card treatment on desktop (#1E1E1E background, white text) — the mobile drawer
-   uses its own --s2a-color-gray-900 instead (see the max-width:1023px block below). */
 .video-playlist-row:hover,
 .video-playlist-row.is-playing {
-  background: #1e1e1e;
-  color: var(--s2a-color-gray-25, #fff);
+  background: var(--vp-playing-bg);
+  color: var(--vp-playing-fg);
 }
 
 .video-playlist-row:focus-visible,
@@ -376,12 +373,9 @@
   overflow: hidden;
 }
 
-/* Matches the dark #1E1E1E Hover/Selected card above — the filled portion
-   (.video-playlist-row-progress-fill) already follows via currentcolor once that rule
-   sets a white `color`. */
 .video-playlist-row:hover .video-playlist-row-progress-track,
 .video-playlist-row.is-playing .video-playlist-row-progress-track {
-  background: var(--s2a-color-transparent-white-24, rgb(255 255 255 / 24%));
+  background: var(--vp-playing-track-bg);
 }
 
 .video-playlist-row-progress-fill {
@@ -402,7 +396,7 @@
 
 .video-playlist-row:hover .video-playlist-row-duration,
 .video-playlist-row.is-playing .video-playlist-row-duration {
-  color: var(--s2a-color-transparent-white-64, rgb(255 255 255 / 64%));
+  color: var(--vp-playing-muted);
 }
 
 /* Favorite + play stacked together, per Figma's row "Hover" state — see buildRow. */
@@ -513,6 +507,10 @@
     --vp-row-bg: transparent;
     --vp-track-bg: var(--s2a-color-transparent-white-24);
     --vp-muted: var(--s2a-color-transparent-white-64);
+    --vp-playing-bg: var(--s2a-color-gray-25);
+    --vp-playing-fg: var(--s2a-color-gray-900);
+    --vp-playing-track-bg: var(--s2a-color-gray-300);
+    --vp-playing-muted: var(--s2a-color-gray-700);
 
     position: fixed;
     left: 0;
@@ -521,13 +519,6 @@
     z-index: 2;
     border-radius: var(--s2a-border-radius-md, 16px) var(--s2a-border-radius-md, 16px) 0 0;
     transition: max-height 0.3s ease;
-  }
-
-  /* Mobile Hover/Selected uses --s2a-color-gray-900 (not desktop's literal #1E1E1E). */
-  .video-playlist-row:hover,
-  .video-playlist-row.is-playing {
-    background: var(--s2a-color-gray-900);
-    color: var(--s2a-color-gray-25, #fff);
   }
 
   /* Real drag target now (see Drawer's #bindDrag), not just decorative — sized to a
