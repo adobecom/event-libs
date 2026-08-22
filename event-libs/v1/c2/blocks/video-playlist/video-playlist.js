@@ -863,8 +863,31 @@ export default async function init(el) {
   const defaultThumbnail = cfg['default-thumbnail'] || '';
   const chapters = parseChapters(cfg.chapters);
 
+  // The current session isn't guaranteed to be present in the fetched catalog at all
+  // (confirmed live: an IPOD test session's own entry, matching the page's own
+  // session-id, was simply absent from the payload) — without this, `current` comes
+  // back undefined, the current session's own row is never prepended to the list, and
+  // highlightRow(list, sessionId) below silently finds nothing to highlight, since no
+  // row in the list carries that id at all. Synthesizes a minimal stand-in directly
+  // from page metadata/DOM so the current session's row (and its "now playing"
+  // highlight) always exists, matching the design intent regardless of whether the
+  // catalog happened to include it.
+  function synthesizeCurrentSession() {
+    const gridColumn = el.closest('.grid-column');
+    const outerSection = gridColumn?.parentElement?.closest('.section') || el.closest('.section');
+    const titleFromDom = outerSection?.querySelector('h1, h2')?.textContent?.trim();
+    return {
+      id: sessionId,
+      title: titleFromDom || getMetadata('og:title') || '',
+      thumbnailUrl: getMetadata('og:image') || null,
+      duration: 0,
+      sessionPageUrl: '',
+      isKeynote: isKeynoteFromMetadata,
+    };
+  }
+
   const render = (sessionList) => {
-    const current = sessionList.find((s) => s.id === sessionId);
+    const current = sessionList.find((s) => s.id === sessionId) || synthesizeCurrentSession();
     const isChapterVariant = chapters.length > 0 || isKeynoteFromMetadata || (!pageCustomAttributes && current?.isKeynote);
 
     const topics = resolveCurrentSessionTopics(pageCustomAttributes, current);

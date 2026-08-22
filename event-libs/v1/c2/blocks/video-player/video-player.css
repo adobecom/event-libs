@@ -1,5 +1,9 @@
 @import '../../styles/tokens.css';
 
+.video-player {
+  margin-bottom: var(--s2a-spacing-8, 8px);
+}
+
 /* Per Figma inspect (both the 1024px desktop rail and the 768px mobile drawer), the
    video itself gets a 16px corner radius — c2-global.css's own default for .milo-video
    is 24px (and only applies at min-width:1024px in the first place, so mobile gets none

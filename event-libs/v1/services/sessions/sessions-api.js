@@ -212,6 +212,18 @@ function slugFromUrl(url) {
   return segments[segments.length - 1] || '';
 }
 
+// "Video Duration (hr:min:sec)" — confirmed real customAttributes[].name, formatted
+// "HH:MM:SS" (e.g. "00:40:40") — the actual recorded video's own length, which can
+// genuinely differ from sessionLengthInMinutes (the originally-scheduled SLOT length,
+// e.g. a 60-minute slot for a 40m40s recording). Returns minutes (rounded), matching
+// the unit sessionLengthInMinutes/duration already use elsewhere in this module.
+function parseVideoDurationMinutes(hms) {
+  const match = /^(\d+):(\d{2}):(\d{2})$/.exec(hms || '');
+  if (!match) return null;
+  const [, h, m, s] = match.map(Number);
+  return Math.round((h * 3600 + m * 60 + s) / 60);
+}
+
 // `published: false` marks a draft/test row that must never reach real visitors once
 // ENFORCE_PUBLISHED_FILTER is on. Missing the field is treated as visible (fail open).
 export function isSessionPublished(session) {
@@ -266,7 +278,14 @@ export function mapEslPayloadToRawSessions(payload) {
       description: session.localizations?.['en-US']?.description || '',
       startTimeUtc: firstTime ? new Date(firstTime.startTimeMillis).toISOString() : '',
       endTimeUtc: firstTime ? new Date(firstTime.endTimeMillis).toISOString() : '',
-      duration: session.sessionLengthInMinutes || 0,
+      // "Video Duration (hr:min:sec)" (the real recorded video's own length) takes
+      // precedence over sessionLengthInMinutes (the originally-scheduled slot length,
+      // which can genuinely differ — e.g. a 60-minute slot for a 40m40s recording).
+      // video-playlist.js's own row rendering further overrides this with the real,
+      // player-reported length (localStorage) once someone has actually watched it —
+      // this is only the fallback shown before that's ever been cached.
+      duration: parseVideoDurationMinutes(extractCustomAttributeValue(session, 'Video Duration (hr:min:sec)'))
+        ?? session.sessionLengthInMinutes ?? 0,
       track: extractCustomAttributeValue(session, TRACK_ATTRIBUTE_NAMES),
       contentCategory: extractCustomAttributeValues(session, ['Category', 'Programming Category']),
       // MAX26-only — see normalizeSessions() for why no MAX25 fallback is needed here.
