@@ -514,14 +514,20 @@ export default async function init(el) {
 
   // Shown immediately, in place of the real embed, while awaitEmbedDecision below is
   // still pending (video-playlist.js's own catalog fetch has been measured at ~3.5s) —
-  // without this, BOTH sections stay visually empty for that whole window (this page
-  // has no other content gating on the same decision, so the rest of the page renders
-  // fine; only the video area itself has nothing to show yet), which reads as a blank,
-  // broken page rather than "still loading." Removed the moment the real decision
-  // lands, whichever way it goes — the winner replaces it with the real embed, the
-  // loser's whole section collapses via video-playlist.js's own is-collapsing (which
-  // removes this loader along with everything else in that section).
-  el.append(createTag('div', { class: 'video-player-loader', 'aria-hidden': 'true' }));
+  // without this, the video area would sit visually empty that whole window (this page
+  // has no other content gating on the same decision). Only the full-width instance
+  // shows this — confirmed live: both instances showing their own loader at once reads
+  // as two duplicated, broken-looking spinners rather than "one video loading." The
+  // full-width instance is the far more common winner (see awaitEmbedDecision's own
+  // fallback comment), so it gets the loading affordance; the playlist-container
+  // instance just stays empty/invisible until it's actually confirmed the winner, at
+  // which point it embeds directly with no loader step of its own. Removed the moment
+  // the real decision lands, whichever way it goes — either replaced by the real embed,
+  // or torn down along with the rest of its section via video-playlist.js's own
+  // is-collapsing.
+  if (!isInsidePlaylistContainer(el)) {
+    el.append(createTag('div', { class: 'video-player-loader', 'aria-hidden': 'true' }));
+  }
 
   // Deliberately NOT awaited here — Milo's own loadArea() decorates sections
   // SEQUENTIALLY (a for-of loop awaiting each section's Promise.all in turn, see

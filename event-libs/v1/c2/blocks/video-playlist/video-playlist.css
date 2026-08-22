@@ -98,13 +98,24 @@
 /* Flex column so the header (handle + title/toggle/play-all row) and the "Show more"
    button stay pinned in place while only .video-playlist-list itself scrolls between
    them — previously overflow-y/max-height lived on this element directly, which
-   scrolled the header away along with the rows. */
+   scrolled the header away along with the rows.
+
+   --vp-bg/--vp-fg are only ever DEFINED inside the min-width:1024px/max-width:1023px
+   theme blocks above — this base rule has no unconditional fallback of its own, unlike
+   sibling blocks (event-featured-products, event-speakers) which hardcode a static
+   background at their own base selector. Confirmed live: before either media query has
+   resolved a value (or if it briefly doesn't), background/color fall back to their
+   initial transparent/inherited values, letting the raw authored table (session-id,
+   minimum-sessions, playlist-title, ...) show through until init()'s own
+   el.replaceChildren() repaints it — a real, visible flash of unstyled content other
+   blocks don't have. var(..., fallback) gives this the same guaranteed paint the other
+   blocks get, before either theme block or any JS has run at all. */
 .video-playlist {
   display: flex;
   flex-direction: column;
   box-sizing: border-box;
-  background: var(--vp-bg);
-  color: var(--vp-fg);
+  background: var(--vp-bg, var(--s2a-color-gray-25, #fff));
+  color: var(--vp-fg, var(--s2a-color-gray-900, #1e1e1e));
   font-family: var(--s2a-font-family-default);
   border-radius: var(--s2a-border-radius-md, 16px);
   padding: var(--s2a-spacing-md) var(--s2a-spacing-md) var(--s2a-spacing-lg);
