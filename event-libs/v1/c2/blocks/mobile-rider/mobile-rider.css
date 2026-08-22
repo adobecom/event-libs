@@ -34,9 +34,11 @@
   display: none;
 }
 
+/* Transparent by default per PDM direction — an authored `Background` row (see
+   mobile-rider.js's own #initInfoBar) sets an inline style that overrides this. */
 .mobile-rider-info-bar {
   box-sizing: border-box;
-  background: var(--s2a-color-gray-900);
+  background: transparent;
   color: var(--s2a-color-gray-25);
   font-family: var(--s2a-font-family-default);
   padding: var(--s2a-spacing-lg) var(--s2a-spacing-md);
@@ -221,10 +223,6 @@
 @media (max-width: 767px) {
   .mobile-rider-info-bar-title {
     font-size: var(--s2a-font-size-md);
-  }
-
-  .mobile-rider-info-bar-toggle-label {
-    display: none;
   }
 
   /* No clamp on mobile — the full description shows; "View all details" still links to

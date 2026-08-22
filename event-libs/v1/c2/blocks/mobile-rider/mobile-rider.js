@@ -211,7 +211,15 @@ class MobileRider {
     if (!aboutEnabled) return;
 
     const sessionId = cfg['session-id'];
-    const bar = createTag('div', { class: 'mobile-rider-info-bar' }, '', { parent: this.root });
+    // Authorable per PDM direction — defaults to transparent (see mobile-rider.css's own
+    // base rule) when no `Background` row is authored, letting the video underneath
+    // show through; an inline style here deliberately outranks that CSS default the
+    // same way readBackgroundConfig()'s convention does for other C2 blocks
+    // (event-featured-products, event-speakers, video-playlist).
+    const bar = createTag('div', {
+      class: 'mobile-rider-info-bar',
+      style: cfg.background ? `background:${cfg.background}` : '',
+    }, '', { parent: this.root });
     const header = createTag('div', { class: 'mobile-rider-info-bar-header' }, '', { parent: bar });
     createTag('h3', { class: 'mobile-rider-info-bar-title' }, cfg['session-title'] || '', { parent: header });
 
@@ -219,8 +227,8 @@ class MobileRider {
       type: 'button',
       class: 'mobile-rider-info-bar-toggle',
       'aria-expanded': 'false',
+      'aria-label': 'About this session',
     }, '', { parent: header });
-    createTag('span', { class: 'mobile-rider-info-bar-toggle-label' }, 'About this session', { parent: toggle });
     createTag('span', { class: 'mobile-rider-info-bar-chevron' }, ICON_CHEVRON_DOWN, { parent: toggle });
 
     toggle.addEventListener('click', () => {
