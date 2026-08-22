@@ -237,13 +237,21 @@ class MobileRider {
     if (cfg['session-description']) {
       createTag('p', { class: 'mobile-rider-info-bar-description' }, cfg['session-description'], { parent: panel });
     }
+    // Mobile-only link to the full session page (CSS hides it above the mobile
+    // breakpoint — see mobile-rider.css) — desktop/tablet's 2-line-clamped description
+    // has no equivalent "see more" affordance since the card itself is the full detail
+    // view there; mobile's un-clamped description still can't show everything (session
+    // resources, speakers, etc.), so this is its own escape hatch to that content.
     const more = createTag('button', {
       type: 'button',
       class: 'mobile-rider-info-bar-more',
     }, 'View all details', { parent: panel });
     more.addEventListener('click', () => openSessionGuideDetail(sessionId));
 
-    const actions = createTag('div', { class: 'mobile-rider-info-bar-actions' }, '', { parent: header });
+    // Moved into the panel (not the always-visible header) per the redesigned "Session
+    // tile states" — favorite/share now live below the description, not beside the
+    // title, at every breakpoint.
+    const actions = createTag('div', { class: 'mobile-rider-info-bar-actions' }, '', { parent: panel });
     actions.append(buildShareButton({ id: sessionId, title: cfg['session-title'] || '' }));
 
     initSessionState();

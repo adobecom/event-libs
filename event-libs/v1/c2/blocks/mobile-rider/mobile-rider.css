@@ -102,12 +102,15 @@
   transform: rotate(180deg);
 }
 
+/* Left-aligned below the description/"View all details" now, not pushed to the far
+   right of the title row — per the redesigned "Session tile states" layout, where
+   favorite/share sit as their own row inside the expandable panel at every breakpoint. */
 .mobile-rider-info-bar-actions {
   display: flex;
   align-items: center;
   gap: var(--s2a-spacing-xs);
   flex-shrink: 0;
-  margin-left: auto;
+  margin-top: var(--s2a-spacing-md);
 }
 
 .mobile-rider-info-bar .mobile-rider-action {
@@ -199,7 +202,10 @@
   line-clamp: 2;
 }
 
+/* Shown at every breakpoint — links to the full session page regardless of whether the
+   description here is clamped (desktop/tablet) or shown in full (mobile). */
 .mobile-rider-info-bar-more {
+  display: block;
   border: none;
   background: none;
   color: inherit;
@@ -208,6 +214,7 @@
   font-weight: 700;
   text-decoration: underline;
   padding: 0;
+  margin-top: var(--s2a-spacing-sm);
   cursor: pointer;
 }
 
@@ -218,6 +225,14 @@
 
   .mobile-rider-info-bar-toggle-label {
     display: none;
+  }
+
+  /* No clamp on mobile — the full description shows; "View all details" still links to
+     the full session page for content beyond the description itself (resources,
+     speakers, etc.), not as a "read more" for truncated text. */
+  .mobile-rider-info-bar-description {
+    -webkit-line-clamp: unset;
+    line-clamp: unset;
   }
 }
 
