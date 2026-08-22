@@ -876,6 +876,11 @@ export default async function init(el) {
     const gridColumn = el.closest('.grid-column');
     const outerSection = gridColumn?.parentElement?.closest('.section') || el.closest('.section');
     const titleFromDom = outerSection?.querySelector('h1, h2')?.textContent?.trim();
+    // If session-times carries its own startTimeMillis (unconfirmed on this shape —
+    // only endTimeMillis is documented as always present), use it so this entry sorts
+    // into its real chronological position via compareByStartTime, same as every other
+    // row, rather than always falling to the end of the list.
+    const startTimeMillis = (sessionTimes || [])[0]?.startTimeMillis;
     return {
       id: sessionId,
       title: titleFromDom || getMetadata('og:title') || '',
@@ -883,6 +888,7 @@ export default async function init(el) {
       duration: 0,
       sessionPageUrl: '',
       isKeynote: isKeynoteFromMetadata,
+      startTimeUtc: Number.isFinite(startTimeMillis) ? new Date(startTimeMillis).toISOString() : '',
     };
   }
 
@@ -905,12 +911,19 @@ export default async function init(el) {
     // question just never applies to this variant.
     announceVideoDecision(true);
     // The minSessions gate above is about OTHER qualifying sessions only — unaffected by
-    // this. Prepending the current session is purely a display concern: the viewer sees
+    // this. Including the current session is purely a display concern: the viewer sees
     // it as the highlighted/"now playing" row (see highlightRow call in buildTopicView
     // below), so they know which one is theirs, without it counting toward minSessions.
     // "Play all"'s actual next-session target is resolved by video-player.js (a separate
     // block) directly off these rendered rows' own data-href, not tracked here.
-    const displayRows = !isChapterVariant && current ? [current, ...rows] : rows;
+    //
+    // Sorted into its correct chronological position alongside `rows` (NOT force-
+    // prepended to the top) — the current session premiered at its own real start time
+    // like any other, and the list is already sorted that way; pinning it first would
+    // contradict the sort order rows already have.
+    const displayRows = !isChapterVariant && current
+      ? [current, ...rows].sort(compareByStartTime)
+      : rows;
 
     el.replaceChildren();
 
