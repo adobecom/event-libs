@@ -41,9 +41,14 @@ The Individual Session Page's own `session-times` metadata carries this
 session's ready-to-embed `videos[]` — entries shaped like `{ provider:
 'mpc', url: 'https://video.tv.adobe.com/v/3458940?autoplay=true&quality=9&
 end=nothing&learn=on', kind: 'onDemand' }` — confirmed against real data.
-On init, this block reads that metadata and loads the `provider: 'mpc'`
-entry's URL — already fully-formed; nothing is constructed client-side —
-into itself.
+`pickEmbeddableVideo()` is **strictly `onDemand`-only** — a `youtube`/`mpc`
+entry with any other `kind` (e.g. `liveStream`) is never selected, with
+**no fallback**. A session with an embeddable video entry but no
+`onDemand`-kind one is treated identically to having no video at all (the
+block removes itself) — this deliberately does not attempt to show a
+livestream or any other non-on-demand kind. On init, this block reads that
+metadata and loads the matching entry's URL — already fully-formed;
+nothing is constructed client-side — into itself.
 
 If a `.milo-video` is already mounted inside this block, its iframe is
 replaced. **Real pages have been seen with no video block authored at

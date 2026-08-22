@@ -99,13 +99,14 @@ const EMBEDDABLE_PROVIDERS = ['mpc', 'youtube'];
 // template's own videos[] array order isn't reliable evidence of which one that is (a
 // real template has been seen with a `youtube` `liveStream` entry sitting BEFORE the
 // `mpc` `onDemand` entry), so `kind` must be checked explicitly rather than trusting
-// `.find()`'s first-match order. Falls back to whatever's embeddable if no `onDemand`
-// entry exists at all, rather than showing nothing — a session with a real embeddable
-// video and no onDemand-kind entry is likely a data gap, not a "no video" case.
+// `.find()`'s first-match order. Strictly `onDemand`-only, deliberately no fallback to
+// any other kind (e.g. `liveStream`) — this block only ever shows the on-demand
+// recording, once the session's own end time has passed; a session with no
+// `onDemand`-kind entry is treated the same as having no video at all.
 function pickEmbeddableVideo(sessionTimes) {
   const videos = (sessionTimes || []).flatMap((t) => t?.videos || [])
     .filter((v) => EMBEDDABLE_PROVIDERS.includes(v.provider));
-  return videos.find((v) => v.kind === 'onDemand') || videos[0] || null;
+  return videos.find((v) => v.kind === 'onDemand') || null;
 }
 
 const ADOBE_TV_ORIGIN = 'https://video.tv.adobe.com';

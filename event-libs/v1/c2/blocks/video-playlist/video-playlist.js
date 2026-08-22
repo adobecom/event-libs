@@ -127,6 +127,13 @@ export function clampedTitleBottom(titleTop, titleHeight, lineHeight, lineCap) {
   return titleTop + Math.min(titleHeight, capHeight);
 }
 
+// Delegates to the shared deriveSessionState utility (not a plain nowMs > endTimeUtc
+// comparison) specifically FOR its MR-stream awareness: an MR-backed session
+// (mrStreamId present) can still be genuinely live/in-progress past its own
+// SCHEDULED end time if Mobile Rider's poll API reports the stream still active — the
+// authored end time is only ever a plan, not a guarantee the session actually ended on
+// schedule. A candidate only belongs in the playlist once it's truly in the on-demand
+// state, not merely "past its scheduled end time."
 function isOnDemand(session, nowMs) {
   return deriveSessionState(session, liveStreamActiveIds.value, nowMs) === 'on-demand';
 }
@@ -142,11 +149,11 @@ const MS_PER_HOUR = 3600000;
 // attribute; `eventStartMs` is the current page's own `local-start-time-millis` metadata
 // (same event for every session in the topic playlist, so valid for all of them, not
 // just the current session — see event-agenda.js for the same metadata key in use
-// elsewhere). Scheduled sessions are unaffected — they still premiere via their own
-// endTimeUtc, exactly as isOnDemand/deriveSessionState already computed. No DVR time
-// configured at all (0/missing) means the IPOD recording has no wait — available
-// immediately (with a video source, already required separately by the caller), not
-// gated on eventStartMs at all.
+// elsewhere). Scheduled sessions are unaffected — they still premiere via isOnDemand
+// above (their own endTimeUtc, MR-stream-aware). No DVR time configured at all
+// (0/missing) means the IPOD recording has no wait — available immediately (with a
+// video source, already required separately by the caller), not gated on eventStartMs
+// at all.
 function hasPremiered(session, eventStartMs, nowMs) {
   if (session.startTimeUtc && session.endTimeUtc) return isOnDemand(session, nowMs);
   if (!session.dvrTimingHours) return true;
@@ -230,15 +237,13 @@ export function resolveTopicPlaylist(
 
 // Individual Session Pages carry the current session's own identity as page metadata —
 // `session-id` (its real catalog id) and `custom-attributes` (its full raw customAttributes
-// blob, same shape sessions-api.js reads from the live catalog). Preferring these over the
-// fetched catalog means the current session's own topic value (and Keynote-ness) is known
-// synchronously, without depending on that session actually being present in the fetched
-// list — falls back to the catalog entry only if page metadata is missing.
-export function resolveCurrentSessionTopics(pageCustomAttributes, catalogSession) {
-  if (pageCustomAttributes) {
-    return extractCustomAttributeSlugs({ customAttributes: pageCustomAttributes }, 'Playlist on session page');
-  }
-  return catalogSession?.playlistOnSessionPage || [];
+// blob, same shape sessions-api.js reads from the live catalog). `Playlist on session
+// page` is a hard gate, not just a data source with a fallback: if the current
+// session's own custom attributes don't carry it at all, this session has no playlist
+// — full stop, regardless of whether the fetched catalog might have a value for it
+// under playlistOnSessionPage. No catalog fallback is consulted for this at all.
+export function resolveCurrentSessionTopics(pageCustomAttributes) {
+  return extractCustomAttributeSlugs({ customAttributes: pageCustomAttributes || [] }, 'Playlist on session page');
 }
 
 // Chapters have no backend data model (confirmed — nothing in session-catalog represents
@@ -906,7 +911,7 @@ export default async function init(el) {
     const current = sessionList.find((s) => s.id === sessionId) || synthesizeCurrentSession();
     const isChapterVariant = chapters.length > 0 || isKeynoteFromMetadata || (!pageCustomAttributes && current?.isKeynote);
 
-    const topics = resolveCurrentSessionTopics(pageCustomAttributes, current);
+    const topics = resolveCurrentSessionTopics(pageCustomAttributes);
     const rows = isChapterVariant
       ? chapters
       : resolveTopicPlaylist(sessionId, topics, sessionList, minSessions, eventStartMs);

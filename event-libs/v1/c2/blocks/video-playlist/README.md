@@ -67,12 +67,18 @@ not the primary path):
 
 ## How the topic playlist is resolved
 
-Reads the **current session's own** `Playlist on session page` value(s) —
-preferring the page's own `custom-attributes` metadata (parsed with
-`sessions-api.js`'s exported `extractCustomAttributeSlugs`, the same
-extractor the real catalog fetch uses), falling back to the session's entry
-in the fetched catalog only if that metadata is missing. This means the
-current session's own topic value is known **synchronously**, without
+`Playlist on session page` is a **hard gate**, not just a data source: if
+the current session's own `custom-attributes` page metadata doesn't carry
+this attribute at all, this session has no playlist — full stop. Nothing
+is built, and the fetched catalog is never even filtered/looped for topic
+matches. There is deliberately **no fallback** to the fetched catalog's own
+`playlistOnSessionPage` field for this check — if the page metadata is
+missing the attribute, that's treated the same as "no playlist," even if
+the catalog might have a value once it loads.
+
+When the attribute IS present, its value(s) are read via
+`sessions-api.js`'s exported `extractCustomAttributeSlugs` (the same
+extractor the real catalog fetch uses) — known **synchronously**, without
 depending on that session having already loaded into the catalog.
 
 That topic value then filters the full session-catalog (`sessions.value`
