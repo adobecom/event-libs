@@ -34,26 +34,16 @@
   display: none;
 }
 
-/* Transparent by default per PDM direction — an authored `Background` row (see
-   mobile-rider.js's own #initInfoBar) sets an inline style that overrides this. */
 .mobile-rider-info-bar {
   box-sizing: border-box;
   background: transparent;
   color: var(--s2a-color-content-default);
   font-family: var(--s2a-font-family-default);
   padding: var(--s2a-spacing-lg) 0;
-
-  /* Rounds the bottom corners at every width — was previously desktop-only
-     (min-width: 1024px), leaving mobile/tablet with square corners. */
   border-radius: 0 0 var(--s2a-border-radius-24, 24px) var(--s2a-border-radius-24, 24px);
   overflow: hidden;
 }
 
-/* Milo core's own `.dark` block-modifier rule (libs/styles/styles.css) sets a real
-   background-color directly on .mobile-rider.dark itself — confirmed live via
-   DevTools, this is the actual dark fill showing behind the block, not something
-   .mobile-rider-info-bar's own background ever touched. Overridden here at the same
-   root, so it never needs to fight the info-bar's own transparent default at all. */
 .mobile-rider.dark {
   background-color: transparent;
 }
@@ -77,7 +67,6 @@
   line-height: var(--s2a-typography-line-height-heading-5);
   letter-spacing: var(--s2a-font-letter-spacing-4xl);
   text-overflow: ellipsis;
-  /* stylelint-disable-next-line value-no-vendor-prefix -- required for -webkit-line-clamp */
   display: -webkit-box;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
@@ -113,9 +102,6 @@
   transform: rotate(180deg);
 }
 
-/* Left-aligned below the description/"View all details" now, not pushed to the far
-   right of the title row — per the redesigned "Session tile states" layout, where
-   favorite/share sit as their own row inside the expandable panel at every breakpoint. */
 .mobile-rider-info-bar-actions {
   display: flex;
   align-items: center;
@@ -151,7 +137,6 @@
   color: var(--s2a-color-brand-adobe-red);
 }
 
-/* Animated auto-height collapse via CSS grid, no JS height measurement needed. */
 .mobile-rider-info-bar-panel-wrap {
   display: grid;
   grid-template-rows: 0fr;
@@ -213,12 +198,6 @@
   line-clamp: 2;
 }
 
-/* Hidden by default — only shown per-breakpoint when its own
-   data-view-all-{mobile,tablet,desktop} attribute (set in mobile-rider.js from the
-   authored `view-all-details-devices` row) is "true" for the CURRENT breakpoint. Not
-   authored at all means the element itself is never created (see mobile-rider.js), so
-   there's nothing to show regardless of these rules. Breakpoints match this file's own
-   existing convention: <768px mobile, 768–1023px tablet, >=1024px desktop. */
 .mobile-rider-info-bar-more {
   display: none;
   border: none;
@@ -238,9 +217,6 @@
     font-size: var(--s2a-font-size-md);
   }
 
-  /* No clamp on mobile — the full description shows; "View all details" still links to
-     the full session page for content beyond the description itself (resources,
-     speakers, etc.), not as a "read more" for truncated text. */
   .mobile-rider-info-bar-description {
     -webkit-line-clamp: unset;
     line-clamp: unset;
@@ -306,17 +282,11 @@
     overflow: hidden;
   }
 
-  /* The info bar sits flush below the video — square the video's bottom corners so it
-     doesn't clash with the bar's own square top, and round the bar's bottom corners
-     instead (see .mobile-rider-info-bar's own base rule), so the two read as one
-     continuous rounded card. */
   .mobile-rider-player:has(.mobile-rider-info-bar) .mobile-rider-container {
     border-radius: var(--s2a-border-radius-24, 24px) var(--s2a-border-radius-24, 24px) 0 0;
   }
 }
 
-/* Excludes .mobile-rider-info-bar-title — that <h3> carries its own deliberate
-   heading-5 typography (see above) and must not be reverted to browser defaults. */
 .mobile-rider :is(h1, h2, h3, h4, h5, h6):not(.mobile-rider-info-bar-title) {
   font-size: revert;
   font-weight: revert;
