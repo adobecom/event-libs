@@ -175,17 +175,19 @@ function currentSessionHasEnded(sessionTimes, nowMs) {
   return nowMs >= entry.endTimeMillis;
 }
 
-// Same check video-player.js uses to decide whether it has anything to embed at all
-// (duplicated deliberately rather than shared via an event/import, per product: this
-// block should render only when a real video actually exists on the page, using the
-// same logic the player itself uses — not a separate "did the player block actually
-// load" signal from a cross-block event). No point showing "more like this" alongside
-// a page that has nothing playing.
+// Same check video-player.js's pickEmbeddableVideo uses to decide whether it has
+// anything to embed at all (duplicated deliberately rather than shared via an event/
+// import, per product: this block should render only when the player itself would
+// actually have something playing, using the same logic it uses — not a separate "did
+// the player block actually load" signal from a cross-block event). onDemand-gated the
+// same way: a page whose only video entry is e.g. a liveStream is treated as having no
+// embeddable video at all, matching the player's own strict onDemand-only selection —
+// no point showing "more like this" alongside a page with nothing actually playing.
 const EMBEDDABLE_PROVIDERS = ['mpc', 'youtube'];
 
 function hasEmbeddableVideo(sessionTimes) {
   const videos = (sessionTimes || []).flatMap((t) => t?.videos || []);
-  return videos.some((v) => EMBEDDABLE_PROVIDERS.includes(v.provider));
+  return videos.some((v) => EMBEDDABLE_PROVIDERS.includes(v.provider) && v.kind === 'onDemand');
 }
 
 // Matches OTHER sessions whose "Playlist assignment/name" includes any of the given
@@ -246,51 +248,11 @@ export function resolveCurrentSessionTopics(pageCustomAttributes) {
   return extractCustomAttributeSlugs({ customAttributes: pageCustomAttributes || [] }, 'Playlist on session page');
 }
 
-// Chapters have no backend data model (confirmed — nothing in session-catalog represents
-// timestamps within a video). Authored as a `chapters` Section Metadata JSON value:
-// [{ "label": "...", "timestampSeconds": 0 }, ...] — same "structured JSON in a metadata
-// value" convention tier-1-event-config already uses elsewhere in this codebase.
-function parseChapters(raw) {
-  if (!raw) return [];
-  try {
-    const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed)) return [];
-    return parsed
-      .filter((c) => c && typeof c.label === 'string' && Number.isFinite(c.timestampSeconds))
-      .map((c, i) => ({ id: `chapter-${i}`, title: c.label, timestampSeconds: c.timestampSeconds }));
-  } catch (e) {
-    window.lana?.log(`[video-playlist] invalid chapters JSON: ${e.message}`);
-    return [];
-  }
-}
-
 function formatDuration(minutes) {
   if (!minutes) return '';
   const h = Math.floor(minutes / 60);
   const m = minutes % 60;
   return h ? `${h}h ${m}m` : `${m}m`;
-}
-
-function formatTimestamp(totalSeconds) {
-  const m = Math.floor(totalSeconds / 60);
-  const s = Math.floor(totalSeconds % 60);
-  return `${m}:${String(s).padStart(2, '0')}`;
-}
-
-// Best-effort seek within the CURRENT player — unlike switching to a different session
-// (which may require an entirely different player type, not solved in this pass; see
-// README), a chapter seek stays within the SAME already-loaded Mobile Rider player, so it
-// only needs that player's own seek API. Verified live before shipping — mobile-rider.js
-// exposes window.__mr_player but this codebase has never needed to seek it before now.
-function seekCurrentPlayer(seconds) {
-  const player = window.__mr_player;
-  if (!player) {
-    window.lana?.log('[video-playlist] no active player to seek — chapter seek is a no-op');
-    return;
-  }
-  if (typeof player.seek === 'function') player.seek(seconds);
-  else if ('currentTime' in player) player.currentTime = seconds;
-  else window.lana?.log('[video-playlist] active player exposes no known seek API');
 }
 
 // Adobe Analytics reads these declaratively (daa-ll/daa-lh), same convention already
@@ -523,69 +485,48 @@ function buildPlayButton(activate) {
   return button;
 }
 
-// `favoritable` gates every topic-playlist-only addition (progress bar, favorite/play
-// buttons) — Chapters rows call this with no third argument at all, so their markup is
-// byte-for-byte what it always was.
-function buildRow(item, { onSelect, favoritable = false }) {
-  // The outer row stays a plain div, not a <button>/<a> itself — the favorite/play
-  // <button>s below must sit outside the anchor (an <a> can never validly contain
-  // another focusable control), so the row is the shared container for both the real
-  // <a> (thumbnail/title/progress) and the actions column, as siblings.
+// Every row is a topic-playlist row — real <a href> (navigates to the matched session's
+// own page) rather than a synthetic click handler, giving native browser affordances
+// (status-bar URL preview on hover, right-click/middle-click/ctrl-click "open in new
+// tab"). The outer row stays a plain div, not the <a> itself — the favorite/play
+// <button>s below must sit outside the anchor (an <a> can never validly contain another
+// focusable control), so the row is the shared container for both the real <a>
+// (thumbnail/title/progress) and the actions column, as siblings.
+function buildRow(item, { onSelect }) {
   const row = createTag('div', {
     class: 'video-playlist-row',
     role: 'listitem',
-    ...(item.href ? {} : { tabindex: '0' }),
     'data-item-id': item.id,
-    ...(item.href ? { 'data-href': item.href } : {}),
+    'data-href': item.href,
     ...analyticsAttrs('playlist-item-select'),
   });
 
-  // Real <a href> when the row navigates (topic rows) — gives native browser affordances
-  // (status-bar URL preview on hover, right-click/middle-click/ctrl-click "open in new
-  // tab") that a synthetic click handler can't. Chapters rows (seek in-place, no href)
-  // keep the plain-div + row-level click/keydown handling they always had.
-  const content = item.href
-    ? createTag('a', { class: 'video-playlist-row-content', href: item.href }, '', { parent: row })
-    : createTag('div', { class: 'video-playlist-row-content' }, '', { parent: row });
+  const content = createTag('a', { class: 'video-playlist-row-content', href: item.href }, '', { parent: row });
 
   if (item.thumbnailUrl) {
     const thumbWrap = createTag('div', { class: 'video-playlist-row-thumb-wrap' }, '', { parent: content });
     createTag('img', { class: 'video-playlist-row-thumb', src: item.thumbnailUrl, alt: '' }, '', { parent: thumbWrap });
-    if (favoritable) createTag('span', { class: 'video-playlist-row-play-icon' }, THUMB_PLAY_ICON_SVG, { parent: thumbWrap });
+    createTag('span', { class: 'video-playlist-row-play-icon' }, THUMB_PLAY_ICON_SVG, { parent: thumbWrap });
   }
 
   const meta = createTag('div', { class: 'video-playlist-row-meta' }, '', { parent: content });
   createTag('span', { class: 'video-playlist-row-title' }, item.title, { parent: meta });
 
-  if (favoritable) {
-    const progress = createTag('div', { class: 'video-playlist-row-progress' }, '', { parent: meta });
-    const track = createTag('div', { class: 'video-playlist-row-progress-track' }, '', { parent: progress });
-    const fill = createTag('div', { class: 'video-playlist-row-progress-fill' }, '', { parent: track });
-    fill.style.width = `${computeProgressPercent(getVideoProgress(item.id))}%`;
-    if (item.durationLabel) createTag('span', { class: 'video-playlist-row-duration' }, item.durationLabel, { parent: progress });
-  } else if (item.durationLabel) {
-    createTag('span', { class: 'video-playlist-row-duration' }, item.durationLabel, { parent: meta });
-  }
+  const progress = createTag('div', { class: 'video-playlist-row-progress' }, '', { parent: meta });
+  const track = createTag('div', { class: 'video-playlist-row-progress-track' }, '', { parent: progress });
+  const fill = createTag('div', { class: 'video-playlist-row-progress-fill' }, '', { parent: track });
+  fill.style.width = `${computeProgressPercent(getVideoProgress(item.id))}%`;
+  if (item.durationLabel) createTag('span', { class: 'video-playlist-row-duration' }, item.durationLabel, { parent: progress });
 
   const activate = () => onSelect(item, row);
 
   // Favorite + play sit stacked together as a hover/focus-revealed action column (per
   // Figma's "Hover" row state) — outside the <a> above, as its sibling, since a <button>
   // can never nest inside a real <a> any more than inside a real <button>.
-  if (favoritable) {
-    const actions = createTag('div', { class: 'video-playlist-row-actions' }, '', { parent: row });
-    actions.appendChild(buildFavoriteButton(item));
-    actions.appendChild(buildPlayButton(activate));
-  }
+  const actions = createTag('div', { class: 'video-playlist-row-actions' }, '', { parent: row });
+  actions.appendChild(buildFavoriteButton(item));
+  actions.appendChild(buildPlayButton(activate));
 
-  if (!item.href) {
-    row.addEventListener('click', activate);
-    row.addEventListener('keydown', (event) => {
-      if (event.key !== 'Enter' && event.key !== ' ') return;
-      event.preventDefault();
-      activate();
-    });
-  }
   return row;
 }
 
@@ -596,23 +537,6 @@ function highlightRow(list, activeId) {
     if (isActive) row.setAttribute('aria-current', 'true');
     else row.removeAttribute('aria-current');
   });
-}
-
-function buildChaptersView(el, chapters) {
-  const list = createTag('div', { class: 'video-playlist-list', role: 'list' }, '', { parent: el });
-  chapters.forEach((chapter) => {
-    const row = buildRow(
-      { ...chapter, durationLabel: formatTimestamp(chapter.timestampSeconds) },
-      {
-        onSelect: (item) => {
-          seekCurrentPlayer(item.timestampSeconds);
-          highlightRow(list, item.id);
-        },
-      },
-    );
-    list.append(row);
-  });
-  if (chapters.length) highlightRow(list, chapters[0].id);
 }
 
 function buildTopicView(el, allRows, {
@@ -657,14 +581,13 @@ function buildTopicView(el, allRows, {
         onSelect: (item) => {
           if (item.href) window.location.assign(item.href);
         },
-        favoritable: true,
       },
     );
     list.append(row);
   });
 
-  // Marks the current session's own row as "now playing" — same highlightRow used for
-  // the Chapters variant's first chapter — so the viewer can tell which row is theirs.
+  // Marks the current session's own row as "now playing" so the viewer can tell which
+  // one is theirs.
   if (currentSessionId) highlightRow(list, currentSessionId);
 
   // Reflects favorite/unfavorite actions taken anywhere else on the page (or a previous
@@ -705,8 +628,7 @@ function buildTopicView(el, allRows, {
   }
 }
 
-// "Play all": a checkbox next to the topic playlist (not shown for Chapters — advancing
-// to a different session doesn't apply there) that persists across the full-page
+// "Play all": a checkbox next to the topic playlist that persists across the full-page
 // navigation to the next session (see AUTOPLAY_STORAGE_KEY). Reflects the stored
 // preference on render; the actual advance-on-complete happens in init()'s onComplete
 // callback, which reads this same preference at the moment the current video ends.
@@ -830,7 +752,6 @@ export default async function init(el) {
   }
 
   const pageCustomAttributes = parseJsonMetadata('custom-attributes');
-  const isKeynoteFromMetadata = (getMetadata('session-type') || '').toLowerCase() === 'keynote';
   // Same page-metadata key event-agenda.js already reads for the event's own start time —
   // needed for IPOD sessions' premiere formula (see hasPremiered above). One event start
   // time applies to every session in the topic playlist, not just the current one.
@@ -876,7 +797,6 @@ export default async function init(el) {
   const minSessions = Number.parseInt(cfg['minimum-sessions'], 10) || DEFAULT_MIN_SESSIONS;
   const maxSessions = Number.parseInt(cfg['maximum-sessions'], 10) || DEFAULT_MAX_SESSIONS;
   const defaultThumbnail = cfg['default-thumbnail'] || '';
-  const chapters = parseChapters(cfg.chapters);
 
   // The current session isn't guaranteed to be present in the fetched catalog at all
   // (confirmed live: an IPOD test session's own entry, matching the page's own
@@ -902,28 +822,19 @@ export default async function init(el) {
       thumbnailUrl: getMetadata('og:image') || null,
       duration: 0,
       sessionPageUrl: '',
-      isKeynote: isKeynoteFromMetadata,
       startTimeUtc: Number.isFinite(startTimeMillis) ? new Date(startTimeMillis).toISOString() : '',
     };
   }
 
   const render = (sessionList) => {
     const current = sessionList.find((s) => s.id === sessionId) || synthesizeCurrentSession();
-    const isChapterVariant = chapters.length > 0 || isKeynoteFromMetadata || (!pageCustomAttributes && current?.isKeynote);
 
     const topics = resolveCurrentSessionTopics(pageCustomAttributes);
-    const rows = isChapterVariant
-      ? chapters
-      : resolveTopicPlaylist(sessionId, topics, sessionList, minSessions, eventStartMs);
+    const rows = resolveTopicPlaylist(sessionId, topics, sessionList, minSessions, eventStartMs);
     if (!rows.length) {
       removeBlock(el);
       return;
     }
-    // Chapters always render inside the playlist-container layout by authoring
-    // convention (it's a different Keynote-only variant, not the topic-playlist
-    // min-sessions decision this exists for) — still announced as hasPlaylist:true so
-    // video-player.js's own waiting instances resolve either way; the min-sessions
-    // question just never applies to this variant.
     announceVideoDecision(true);
     // The minSessions gate above is about OTHER qualifying sessions only — unaffected by
     // this. Including the current session is purely a display concern: the viewer sees
@@ -936,9 +847,7 @@ export default async function init(el) {
     // prepended to the top) — the current session premiered at its own real start time
     // like any other, and the list is already sorted that way; pinning it first would
     // contradict the sort order rows already have.
-    const displayRows = !isChapterVariant && current
-      ? [current, ...rows].sort(compareByStartTime)
-      : rows;
+    const displayRows = current ? [current, ...rows].sort(compareByStartTime) : rows;
 
     el.replaceChildren();
 
@@ -949,7 +858,7 @@ export default async function init(el) {
 
     const top = createTag('div', { class: 'video-playlist-top' }, '', { parent: el });
 
-    const title = isChapterVariant ? 'Chapters' : (cfg['playlist-title'] || 'More like this');
+    const title = cfg['playlist-title'] || 'More like this';
     createTag('h3', { class: 'video-playlist-title' }, title, { parent: top });
 
     const toggle = createTag('button', {
@@ -959,11 +868,8 @@ export default async function init(el) {
       ...analyticsAttrs('playlist-toggle-switch'),
     }, TOGGLE_CHEVRON_SVG, { parent: top });
 
-    if (isChapterVariant) buildChaptersView(el, rows);
-    else {
-      buildAutoplayToggle(top);
-      buildTopicView(el, displayRows, { maxSessions, defaultThumbnail, currentSessionId: sessionId });
-    }
+    buildAutoplayToggle(top);
+    buildTopicView(el, displayRows, { maxSessions, defaultThumbnail, currentSessionId: sessionId });
 
     // .section is only this fragment's own inner wrapper on the two-column mobile/
     // tablet layout — the actual session title lives in a sibling fragment, same

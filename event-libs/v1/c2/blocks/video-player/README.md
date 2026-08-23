@@ -1,19 +1,18 @@
 # Video Player (C2)
 
-Authored on an Individual Session Page, in its own grid-column fragment
-(alongside a separate `video-playlist` block, in a different grid-column
-fragment — see that block's own README for the topic playlist/chapters
-list). This block handles embedding and tracking the current session's own
-video only; it does not resolve or render any playlist itself.
+Authored on an Individual Session Page. This block handles embedding and
+tracking the current session's own video only; it does not resolve or
+render any playlist itself (see the separate `video-playlist` block's own
+README for the topic playlist).
 
-Split out of what was originally a single `video-playlist` block, once the
-session-page template moved to a two-column `grid-column` layout (player |
-playlist) where each column loads its own fragment independently — the two
-blocks no longer share a DOM section, so player-embedding couldn't stay
-coupled to the playlist's own rendering. They communicate only through
-`localStorage` and a page-wide `CustomEvent`, never a direct reference, so
-either can load independently in either order, regardless of which grid
-column/fragment it's authored in.
+**Two separate `.video-player` instances are authored on every session
+page** — one inside a full-width, player-only section, one inside a
+two-column section alongside `video-playlist` (see that block's own
+README) — and only ONE of them ever actually embeds/plays a video. See
+"Which instance actually plays" below for how the two coordinate. They
+communicate only through `localStorage`, page-wide `CustomEvent`s, and one
+`window`-latched flag — never a direct reference — so either block can
+load independently, in either order.
 
 ## Authoring
 
@@ -119,20 +118,46 @@ equivalent continuous event, so progress is polled via
 Client-only persistence (no backend field exists for per-viewer watch
 progress today).
 
-## Full width when there's no playlist
+## Which instance actually plays
 
-On the current session-page template (`session-page-template-columns-col3`
-fragment), this block and `video-playlist` are authored as plain siblings
-inside the same `.section` — not a fixed grid/flex row. If `video-playlist`
-has nothing to show and removes itself (any of its own gates failing, or
-too few qualifying sessions once its catalog fetch resolves — see that
-block's own README), this block adds `video-player-full-width` to itself
-so it takes the section's full width instead of leaving unused space where
-the playlist would have been.
+Because two `.video-player` instances exist on the page, embedding a video
+immediately in each one's own `init()` would start both playing at once —
+visibly, briefly, until one is torn down. Instead, neither instance embeds
+right away; each registers as pending and waits for a single page-wide
+decision, made by `video-playlist.js`, about whether a real topic playlist
+is actually going to render:
 
-Checked directly against the live DOM (`section.querySelector('.video-playlist')`),
-not a cached flag — both at this block's own `init()` (covers `video-playlist`
-already being gone synchronously, before this even runs) and again on a
-page-wide `video-playlist:removed` event (covers `video-playlist` removing
-itself later, asynchronously, after this block already rendered). Only
-this block's own width changes; nothing else in the section is touched.
+- If `video-playlist` has something to show, the **`video-playlist`-container
+  instance** wins (embeds); the full-width, player-only instance's whole
+  `.section` is removed (with a fade-out — see `.is-collapsing` in the CSS)
+  so no empty space is left behind.
+- If `video-playlist` has nothing to show (any of its own gates failing, or
+  removed for having no video to recommend from), the **full-width
+  instance** wins instead, and the `video-playlist`-container's section is
+  removed.
+- If no `video-playlist` block is authored on the page at all, the
+  full-width instance still wins after a `DECISION_FALLBACK_MS` (4s)
+  timeout — nothing will ever announce a decision in that case.
+
+The decision is dispatched exactly once by `video-playlist.js`
+(`announceVideoDecision`) as a page-wide `video-playlist:decision`
+`CustomEvent`, and also latched onto `window.__videoPlaylistDecision` — the
+latch exists because Milo inits each block's own module independently, so
+there's no guarantee this block's own listener (`awaitEmbedDecision`) is
+attached before the event fires; a late listener reads the latch directly
+instead of only ever listening for the event.
+
+Each instance determines whether it's the `video-playlist`-container one
+via `isInsidePlaylistContainer()` — not an authored marker class, but a
+live DOM check (does a `.video-playlist` block exist inside the same outer
+grid `.section`, across the `grid-column` fragment boundary if needed) —
+then compares that against the decision to know if it personally won.
+
+While waiting, only the full-width instance shows a lightweight loader
+(`.video-player-loader`) in its own place, since `video-playlist.js`'s own
+catalog fetch (driving this decision) has been measured at ~3.5s and that
+instance is otherwise the more common winner; the `video-playlist`-container
+instance just stays empty until confirmed the winner. The decision flow
+itself is **not awaited** by `init()` — Milo decorates sections
+sequentially, so blocking on this would stall every later section on the
+page for up to `DECISION_FALLBACK_MS`.

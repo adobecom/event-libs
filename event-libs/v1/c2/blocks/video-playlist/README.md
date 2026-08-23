@@ -2,12 +2,15 @@
 
 Authored on an Individual Session Page as a sibling of a separate
 `video-player` block, inside the same `.section` (see that block's own
-README for embedding/tracking). This block handles the topic-playlist/
-chapters list only; it does not embed or track the current session's own
-video itself — including deciding whether to render at all: it requires a
-real embeddable video to exist on the page (same check `video-player.js`
-uses; see "No video, no playlist" below), not merely that the session has
-ended.
+README for embedding/tracking). This block handles the topic-playlist list
+only; it does not embed or track the current session's own video itself —
+including deciding whether to render at all: it requires a real,
+**on-demand** embeddable video to exist on the page (same onDemand-only
+check `video-player.js`'s own `pickEmbeddableVideo()` uses; see "No video,
+no playlist" below), not merely that the session has ended. A page whose
+only video entry is, say, a `liveStream` kind is treated the same as having
+no video at all — this block never renders "more like this" next to a
+player that itself has nothing to embed.
 
 The two blocks communicate only through `localStorage`
 (`video-playlist:progress`, `video-playlist:play-all`) and page-wide
@@ -19,25 +22,22 @@ independently, in either order:
   (play/pause/ended). This block owns every decision about what to do with
   that state (e.g. "Play all" advancing on `ended` — see Play all below);
   `video-player.js` makes none of those decisions itself.
-- `video-playlist:removed` — dispatched by **this** block (via its own
-  `removeBlock()` helper) right before it removes itself, for any of the
-  reasons below. `video-player.js` listens for this to expand to the
-  section's full width instead of leaving unused space beside it — see
-  that block's own "Full width when there's no playlist" section.
+- `video-playlist:decision` — dispatched by **this** block
+  (`announceVideoDecision()`) once it knows whether it has anything to
+  show at all (`hasPlaylist: true`/`false`). The two `video-player`
+  instances on the page (see that block's own "Which instance actually
+  plays" section) wait on this decision to know which one of them should
+  actually embed and which one's whole section should be removed instead.
 
-Renders one of two variants automatically — no explicit variant to author:
+Renders exactly one variant — a topic playlist: a list of other on-demand
+sessions sharing a topic with the current session, auto-resolved from real
+session-catalog data.
 
-- **Chapters** — when the page's own `session-type` metadata is `Keynote`
-  (long-form Keynotes/Sneaks content), or when a `chapters` row is authored
-  (see below).
-- **Topic playlist** — otherwise: a list of other on-demand sessions sharing a
-  topic with the current session, auto-resolved from real session-catalog data.
-
-If there's nothing to show — no embeddable video on the page, the session
-hasn't ended yet, fewer than the configured minimum on-demand sessions for
-the topic playlist, or no chapters authored for the chapters variant — the
-block removes itself (via `removeBlock()`, so `video-player.js` is always
-notified). There's no empty state.
+If there's nothing to show — no on-demand embeddable video on the page,
+the session hasn't ended yet, or fewer than the configured minimum
+on-demand sessions match the current session's topic — the block removes
+itself (via `removeBlock()`, so `video-player.js` is always notified).
+There's no empty state.
 
 ## Authoring
 
@@ -58,11 +58,10 @@ not the primary path):
 | Field | Required | Default | Notes |
 |---|---|---|---|
 | `session-id` | No | page's own `session-id` metadata | Only needed as a fallback if that metadata is missing. |
-| `playlist-title` | No | `More like this` | Heading shown above the topic playlist. Ignored in the Chapters variant (always titled "Chapters"). |
+| `playlist-title` | No | `More like this` | Heading shown above the topic playlist. |
 | `minimum-sessions` | No | `4` | Minimum number of matching on-demand sessions required before the topic playlist renders at all. |
 | `maximum-sessions` | No | `7` | Ceiling on total rows ever rendered — rows beyond this are never built, so "Show more" can never reveal more than this. Once expanded, the list scrolls internally beyond ~4 visible rows. |
 | `default-thumbnail` | No | — | Fallback thumbnail URL used for a row whose own session has no thumbnail of its own. |
-| `chapters` | No | — | JSON array authored for the Chapters variant: `[{"label": "Intro", "timestampSeconds": 0}, ...]`. No backend field exists for this — it's hand-authored per session. |
 | `background` | No | light/dark theme default (`--vp-bg`) | Same authored "Background" row + `readBackgroundConfig()` utility every other block in this section (event-featured-products, event-speakers, event-session-resources, event-session-details) already supports — sets an inline `background` that overrides the theme default. |
 
 ## How the topic playlist is resolved
@@ -85,8 +84,6 @@ That topic value then filters the full session-catalog (`sessions.value`
 from `utils/session-store.js`) for **other** sessions whose `Playlist
 assignment/name` includes it. No mapping table between the two attributes
 is needed or maintained — both draw from the same slug vocabulary.
-`isKeynote`/Chapters detection follows the same page-metadata-first
-pattern, via the page's own `session-type` value.
 
 A matching session must also qualify as a real, watchable row:
 
@@ -120,13 +117,6 @@ time having passed. A session whose recording isn't processed yet could
 theoretically still appear as a row. Flagged to product; no existing data
 field supports fixing this today.
 
-## Chapter seeking
-
-Chapters seek within the **same, already-loaded** player — `window.__mr_player`
-(Mobile Rider). This has not been exercised against a live page before; if
-the real player's seek API differs from the `seek(seconds)`/`currentTime`
-attempt in `video-playlist.js`, that needs correcting against a real embed.
-
 ## Loading the current session's own video
 
 Handled entirely by the separate `video-player` block — see its own README
@@ -135,22 +125,24 @@ embeds a player itself.
 
 ## No video, no playlist
 
-`init()` requires the current page to actually have a real, embeddable
-video (`hasEmbeddableVideo()`, checking `session-times` metadata for an
-`mpc`/`youtube` provider entry) before rendering anything at all — the same
-check `video-player.js` uses to decide whether it has anything to embed,
-deliberately duplicated here rather than shared via a cross-block signal
-(per product: this block should use the same underlying logic the player
-itself uses, not depend on whether that block actually loaded/rendered
-successfully as a separate concern). A session having *ended* is a
-different question from a session *having a video at all* — both gates are
-checked independently, and either one failing removes this block.
+`init()` requires the current page to actually have a real, **on-demand**
+embeddable video (`hasEmbeddableVideo()`, checking `session-times`
+metadata for an `mpc`/`youtube` provider entry whose `kind` is
+`'onDemand'`) before rendering anything at all — the same onDemand-only
+check `video-player.js`'s own `pickEmbeddableVideo()` uses, deliberately
+duplicated here rather than shared via a cross-block signal (per product:
+this block should use the same underlying logic the player itself uses,
+not depend on whether that block actually loaded/rendered successfully as
+a separate concern, and should never render "more like this" for a page
+whose only video is something the player itself would never embed, e.g. a
+`liveStream` entry). A session having *ended* is a different question from
+a session *having an on-demand video at all* — both gates are checked
+independently, and either one failing removes this block.
 
 ## Play all
 
-A "Play all" toggle is rendered alongside the topic-playlist title (not
-shown for Chapters — advancing to a different session doesn't apply
-there). Its state persists to `localStorage` (`video-playlist:play-all`) —
+A "Play all" toggle is rendered alongside the topic-playlist title. Its
+state persists to `localStorage` (`video-playlist:play-all`) —
 a plain in-memory flag wouldn't survive the full-page navigation that
 advancing to the next session's own page requires.
 
@@ -207,9 +199,9 @@ navigates to it.
 
 ## The current session's own row
 
-The current session is **prepended** to the topic playlist's displayed rows
-(`render()` in `video-playlist.js`) and highlighted via the same
-`highlightRow` used for the Chapters variant's first chapter — so the
+The current session is merged into the topic playlist's displayed rows
+(`render()` in `video-playlist.js`, sorted into its correct chronological
+position, not force-prepended) and highlighted via `highlightRow` so the
 viewer can tell which row is theirs while browsing "more like this". This
 is purely a **display** concern: `resolveTopicPlaylist`'s own return value
 (used for `minimum-sessions` gating) still only ever contains **other**
@@ -228,10 +220,12 @@ session's own page carries `session-times`), so there's nothing to swap
 to. Navigating is always correct regardless: the destination page loads
 its own video the exact same way, via its own `session-times` metadata.
 
-Each row is a `<div role="listitem" tabindex="0">`, not a native
-`<button>` — see Favorites above for why — with its own `keydown` handler
-(Enter/Space) restoring the keyboard activation a real button would give
-for free.
+Each row is a `<div role="listitem">` wrapping a real `<a href>` (giving
+native browser affordances — status-bar URL preview on hover,
+right-click/middle-click/ctrl-click "open in new tab" — a synthetic click
+handler can't) — the favorite/play `<button>`s sit outside that `<a>` as
+siblings, since a `<button>` can never validly nest inside a real `<a>`
+(see Favorites above).
 
 ## Responsive layout
 
