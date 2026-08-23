@@ -858,6 +858,21 @@ export default async function init(el) {
 
     const top = createTag('div', { class: 'video-playlist-top' }, '', { parent: el });
 
+    // Mobile-only collapsed "peek" (see CSS: hidden on desktop, hidden on mobile once
+    // .is-expanded) — per Figma, the collapsed drawer shows "Up next" + the next
+    // unplayed session's own title, not the playlist's title, so a viewer glancing at
+    // the peek knows what's coming next without opening the drawer. "Next" is whichever
+    // row immediately follows the current session in displayRows' own chronological
+    // order — same row Play all would actually advance to (see the 'ended' listener
+    // above), not merely the first row in the list.
+    const currentIndex = displayRows.findIndex((row) => row.id === sessionId);
+    const nextSession = displayRows[currentIndex + 1] || null;
+    if (nextSession) {
+      const upNext = createTag('div', { class: 'video-playlist-up-next' }, '', { parent: top });
+      createTag('span', { class: 'video-playlist-up-next-label' }, 'Up next', { parent: upNext });
+      createTag('span', { class: 'video-playlist-up-next-title' }, nextSession.title, { parent: upNext });
+    }
+
     const title = cfg['playlist-title'] || 'More like this';
     createTag('h3', { class: 'video-playlist-title' }, title, { parent: top });
 
@@ -879,10 +894,24 @@ export default async function init(el) {
     const titleEl = outerSection?.querySelector('h1, h2') || null;
     const drawer = new Drawer(el, { titleEl, toggleEl: toggle, handleEl: handle });
     toggle.addEventListener('click', () => drawer.toggle());
+    // Per Figma: the entire collapsed "Up next" peek is tappable to open, not just the
+    // chevron button itself. Only wired for the COLLAPSED state — once expanded, `top`
+    // contains the playlist title/autoplay toggle, which must stay independently
+    // interactive rather than closing the drawer on every click. stopPropagation on the
+    // toggle's own click isn't needed here since drawer.toggle() is idempotent-safe to
+    // call twice in the same tick, but checking `!drawer.expanded` avoids the redundant
+    // call and, more importantly, prevents a tap on "Play all" while expanded from also
+    // toggling the drawer shut via bubbling.
+    top.addEventListener('click', (event) => {
+      if (drawer.expanded || event.target === toggle || toggle.contains(event.target)) return;
+      drawer.toggle();
+    });
     window.addEventListener('resize', () => drawer.applyMobileHeight());
 
-    // Desktop: open by default at player height. Mobile: open on load, per the ticket.
-    drawer.setInitial({ expanded: true });
+    // Desktop: open by default at player height. Mobile: collapsed "Up next" peek on
+    // load, per Figma — the viewer opens it explicitly rather than it taking up the
+    // full drawer height immediately.
+    drawer.setInitial({ expanded: drawer.isDesktop() });
     el.dispatchEvent(new CustomEvent('video-playlist:view', { bubbles: true }));
   };
 

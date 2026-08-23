@@ -187,6 +187,14 @@
   display: none;
 }
 
+/* Mobile-only collapsed "Up next" peek — see the max-width:1023px block below for its
+   actual visibility rules (shown collapsed, hidden once expanded) and the mobile-only
+   title/toggle it swaps places with. No rule needed at this (desktop) scope: the peek
+   is never even shown outside that block. */
+.video-playlist-up-next {
+  display: none;
+}
+
 .video-playlist-autoplay {
   display: flex;
   flex: 0 0 auto;
@@ -590,6 +598,65 @@
     transform: rotate(180deg);
   }
 
+  /* Per Figma: the collapsed peek shows "Up next" + the next session's own title
+     instead of the playlist's title/autoplay row — swapped for the reverse the moment
+     the drawer expands (Drawer's own #apply() toggles .is-expanded on this same
+     element). Hidden entirely if no next session exists at all (see the JS — the
+     element itself is never built in that case), same as every other row already
+     collapses to nothing when its data doesn't apply. */
+  .video-playlist-up-next {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  .video-playlist.is-expanded .video-playlist-up-next {
+    display: none;
+  }
+
+  .video-playlist-up-next-label {
+    font-size: var(--s2a-font-size-sm);
+    font-weight: 700;
+  }
+
+  .video-playlist-up-next-title {
+    overflow: hidden;
+    font-family: var(--s2a-font-family-heading);
+    font-size: var(--s2a-typography-font-size-heading-6);
+    font-weight: 900;
+    line-height: var(--s2a-typography-line-height-title-6, 18px);
+    letter-spacing: var(--s2a-typography-letter-spacing-heading-6);
+    text-overflow: ellipsis;
+    /* stylelint-disable-next-line value-no-vendor-prefix -- required for -webkit-line-clamp */
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+  }
+
+  /* The playlist title/autoplay switch (the EXPANDED-only content on this same row)
+     starts hidden on mobile — the collapsed peek above is what's shown until the
+     drawer's own .is-expanded lands (see Drawer's #apply()). */
+  .video-playlist-title,
+  .video-playlist-autoplay {
+    display: none;
+  }
+
+  .video-playlist.is-expanded .video-playlist-autoplay {
+    display: flex;
+  }
+
+  /* Whole collapsed peek is tappable to open (see the JS's own top.addEventListener) —
+     a pointer cursor communicates that before the tap, same as the handle/toggle. */
+  .video-playlist-top {
+    cursor: pointer;
+  }
+
+  .video-playlist.is-expanded .video-playlist-top {
+    cursor: default;
+  }
+
   /* Figma: mobile "Play all" switch — OFF track #7D7D7D, ON track #DBDBDB; thumb stays
      #111 in both states. */
   .video-playlist-autoplay-toggle {
@@ -621,6 +688,11 @@
     font-weight: 900;
     line-height: var(--s2a-typography-line-height-title-6, 18px);
     letter-spacing: var(--s2a-typography-letter-spacing-heading-6);
+  }
+
+  .video-playlist.is-expanded .video-playlist-title {
+    /* stylelint-disable-next-line value-no-vendor-prefix -- required for -webkit-line-clamp */
+    display: -webkit-box;
   }
 
   /* Figma inspect: fixed 136x77 (136/77 aspect-ratio) — mobile keeps a fixed size rather
