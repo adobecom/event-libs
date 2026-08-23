@@ -393,19 +393,13 @@ class Drawer {
       dragStartY = null;
       window.removeEventListener('pointermove', onPointerMove);
       window.removeEventListener('pointerup', onPointerUp);
-      // Free-form height: the drawer stays exactly where the user dragged it to (see
-      // applyMobileHeight's own dragHeightPx branch, which #apply() below invokes),
-      // rather than snapping to one of two fixed states — per product, a landscape
-      // viewport's own cap can be quite short, and the user should be able to park the
-      // drawer at whatever partial height actually shows what they want to see, not
-      // just "fully open" or "fully closed." `expanded`/aria-expanded still flip at the
-      // midpoint purely so the toggle's own chevron rotation reflects "closer to open"
-      // vs "closer to closed" — it no longer drives the actual rendered height while a
-      // drag height is set.
+      // Snaps to whichever fixed state the drag ended closer to, so releasing mid-drag
+      // doesn't leave the drawer parked at an arbitrary height with no toggle affordance
+      // (aria-expanded/the chevron's own rotation) reflecting it correctly.
       const cap = this.measureCapPx();
       const midpoint = (DRAWER_FLOOR_PX + cap) / 2;
       const endedHeight = this.dragHeightPx ?? dragStartHeight;
-      this.dragHeightPx = Math.min(Math.max(endedHeight, DRAWER_FLOOR_PX), cap);
+      this.dragHeightPx = null;
       this.expanded = endedHeight >= midpoint;
       this.#apply();
     };
