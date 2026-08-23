@@ -16,6 +16,24 @@ const ICON_HEART_FILLED = '<svg width="20" height="20" viewBox="0 0 20 20" fill=
 const ICON_SHARE = '<svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false"><path d="M14.5 6.5C15.8807 6.5 17 5.38071 17 4C17 2.61929 15.8807 1.5 14.5 1.5C13.1193 1.5 12 2.61929 12 4C12 4.16249 12.0154 4.32158 12.0447 4.4759L6.68625 7.62766C6.21886 7.09565 5.5387 6.76 4.78125 6.76C3.39871 6.76 2.28125 7.87746 2.28125 9.26C2.28125 10.6425 3.39871 11.76 4.78125 11.76C5.53927 11.76 6.21996 11.4239 6.68738 10.8912L12.0447 14.0416C12.0154 14.1959 12 14.355 12 14.5175C12 15.8982 13.1193 17.0175 14.5 17.0175C15.8807 17.0175 17 15.8982 17 14.5175C17 13.1368 15.8807 12.0175 14.5 12.0175C13.7412 12.0175 13.0603 12.3546 12.5928 12.8879L7.23752 9.73838C7.26721 9.58281 7.28125 9.42246 7.28125 9.26C7.28125 9.09708 7.26714 8.93627 7.23731 8.78028L12.5936 5.6289C13.0611 6.16257 13.7417 6.5 14.5 6.5Z" fill="currentColor"/></svg>';
 const ICON_CHEVRON_DOWN = '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false"><path d="M4 6L8 10L12 6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 
+// Same convention upcoming-sessions.js already uses for its own page-level data — a
+// Section Metadata table authored as a SIBLING block in the same .section (not inside
+// this block itself), keyed by row name. mobile-rider and upcoming-sessions are
+// authored under the same section on this page template, so this metadata is already
+// available without requiring the author to repeat `session-id` on the mobile-rider
+// block's own table too.
+function readSectionMetadata(el, key) {
+  const metadataBlock = el.closest('.section')?.querySelector(':scope > .section-metadata');
+  if (!metadataBlock) return null;
+  const rows = metadataBlock.querySelectorAll(':scope > div');
+  for (const row of rows) {
+    const cells = row.querySelectorAll(':scope > div');
+    const rowKey = cells[0]?.textContent?.trim().toLowerCase();
+    if (rowKey === key) return cells[1]?.textContent?.trim() ?? '';
+  }
+  return null;
+}
+
 function buildCategoryBadge(track) {
   if (!track) return null;
   const entry = getTrackIcon(track) || getTrackIcon('mainstage');
@@ -193,7 +211,11 @@ class MobileRider {
 
       await this.injectPlayer(videoId, this.cfg.skinid, this.cfg.aslid);
 
-      if (this.cfg['session-id']) this.#initInfoBar(this.cfg);
+      // Same section-metadata table upcoming-sessions.js already reads for this page —
+      // avoids making the author repeat session-id on the mobile-rider block itself when
+      // it's already authored there.
+      const sessionId = this.cfg['session-id'] || readSectionMetadata(this.el, 'session-id');
+      if (sessionId) this.#initInfoBar(this.cfg, sessionId);
     } catch (e) { this.log(e.message); }
   }
 
@@ -214,11 +236,10 @@ class MobileRider {
   // can't be authored), so it alone still waits on the sessions store to resolve session-id.
   // about-session-enabled gates the whole bar, not just the toggle/panel — per direct
   // product direction, title/Share/Favorite shouldn't render either when it's false.
-  #initInfoBar(cfg) {
+  #initInfoBar(cfg, sessionId) {
     const aboutEnabled = cfg['about-session-enabled'] === true;
     if (!aboutEnabled) return;
 
-    const sessionId = cfg['session-id'];
     // Authorable per PDM direction — defaults to transparent (see mobile-rider.css's own
     // base rule) when no `Background` row is authored, letting the video underneath
     // show through; an inline style here deliberately outranks that CSS default the
@@ -280,7 +301,11 @@ class MobileRider {
     actions.append(buildShareButton({ id: sessionId, title: cfg['session-title'] || '' }));
 
     initSessionState();
-    const addFavorite = (session) => actions.append(buildFavoriteButton(session));
+    // Favorite (async — only resolves once the session-store catalog fetch finds a
+    // match) must still land BEFORE share (already appended, synchronously, above) —
+    // prepend rather than append, so the order is correct regardless of which button
+    // is actually added to the DOM first.
+    const addFavorite = (session) => actions.prepend(buildFavoriteButton(session));
     const existing = sessions.value.find((s) => s.id === sessionId);
     if (existing) {
       addFavorite(existing);
