@@ -41,12 +41,21 @@
   background: transparent;
   color: var(--s2a-color-gray-25);
   font-family: var(--s2a-font-family-default);
-  padding: var(--s2a-spacing-lg) var(--s2a-spacing-md);
+  padding: var(--s2a-spacing-lg) 0;
 
   /* Rounds the bottom corners at every width — was previously desktop-only
      (min-width: 1024px), leaving mobile/tablet with square corners. */
   border-radius: 0 0 var(--s2a-border-radius-24, 24px) var(--s2a-border-radius-24, 24px);
   overflow: hidden;
+}
+
+/* Milo's own block-modifier syntax ("Mobile Rider (dark)") resolves into a `dark`
+   class — read as data-theme="dark" in mobile-rider.js's own init(). Forces
+   transparent here even over an authored `Background` inline style (!important is the
+   only way a stylesheet rule can outrank an inline style) — the dark variant's own
+   ambient dark fill should never be double-covered by the info-bar's own background. */
+.mobile-rider[data-theme="dark"] .mobile-rider-info-bar {
+  background: transparent !important;
 }
 
 .mobile-rider-info-bar-header {
@@ -204,10 +213,14 @@
   line-clamp: 2;
 }
 
-/* Shown at every breakpoint — links to the full session page regardless of whether the
-   description here is clamped (desktop/tablet) or shown in full (mobile). */
+/* Hidden by default — only shown per-breakpoint when its own
+   data-view-all-{mobile,tablet,desktop} attribute (set in mobile-rider.js from the
+   authored `view-all-details-devices` row) is "true" for the CURRENT breakpoint. Not
+   authored at all means the element itself is never created (see mobile-rider.js), so
+   there's nothing to show regardless of these rules. Breakpoints match this file's own
+   existing convention: <768px mobile, 768–1023px tablet, >=1024px desktop. */
 .mobile-rider-info-bar-more {
-  display: block;
+  display: none;
   border: none;
   background: none;
   color: inherit;
@@ -231,6 +244,30 @@
   .mobile-rider-info-bar-description {
     -webkit-line-clamp: unset;
     line-clamp: unset;
+  }
+
+  .mobile-rider-info-bar-more[data-view-all-mobile="true"] {
+    display: block;
+  }
+
+  .mobile-rider-info-bar {
+    padding: var(--s2a-spacing-lg);
+  }
+}
+
+@media (min-width: 768px) and (max-width: 1023px) {
+  .mobile-rider-info-bar-more[data-view-all-tablet="true"] {
+    display: block;
+  }
+
+  .mobile-rider-info-bar {
+    padding: var(--s2a-spacing-lg) 88px;
+  }
+}
+
+@media (min-width: 1024px) {
+  .mobile-rider-info-bar-more[data-view-all-desktop="true"] {
+    display: block;
   }
 }
 

@@ -22,9 +22,10 @@ function buildCategoryBadge(track) {
   if (!entry) return null;
 
   const badge = createTag('span', { class: 'mobile-rider-info-bar-category' });
+  // No inline color override — always the CSS default (--s2a-color-content-default),
+  // regardless of what entry.color (the Tier 1 config's per-track color) says.
   const iconColor = createTag('span', {
     class: 'mobile-rider-info-bar-category-icon-color',
-    style: entry.color ? `color:${entry.color}` : '',
   }, '', { parent: badge });
   createTag('span', { class: 'mobile-rider-info-bar-category-label' }, track, { parent: badge });
 
@@ -172,6 +173,13 @@ class MobileRider {
       if (!document.getElementById('mobile-rider-css')) {
         createTag('link', { rel: 'stylesheet', href: BLOCK_CSS_URL, id: 'mobile-rider-css' }, '', { parent: document.head });
       }
+      // Milo's own block-modifier syntax already resolved "Mobile Rider (dark)" into a
+      // `dark` class on this.el before init() runs — same data-theme convention other
+      // C2 blocks in this repo use (see in-person-banner.js). The info-bar's own
+      // background needs this to force transparent in the dark variant specifically
+      // (see mobile-rider.css) rather than showing whatever ambient dark fill the
+      // block itself carries in that variant.
+      this.el.dataset.theme = this.el.classList.contains('dark') ? 'dark' : 'light';
       this.cfg = this.#parseCfg();
       await Promise.all([loadScript(), this.el.closest('.chrono-box') ? this.#loadStore() : null]);
 
@@ -245,16 +253,25 @@ class MobileRider {
     if (cfg['session-description']) {
       createTag('p', { class: 'mobile-rider-info-bar-description' }, cfg['session-description'], { parent: panel });
     }
-    // Mobile-only link to the full session page (CSS hides it above the mobile
-    // breakpoint — see mobile-rider.css) — desktop/tablet's 2-line-clamped description
-    // has no equivalent "see more" affordance since the card itself is the full detail
-    // view there; mobile's un-clamped description still can't show everything (session
-    // resources, speakers, etc.), so this is its own escape hatch to that content.
-    const more = createTag('button', {
-      type: 'button',
-      class: 'mobile-rider-info-bar-more',
-    }, 'View all details', { parent: panel });
-    more.addEventListener('click', () => openSessionGuideDetail(sessionId));
+    // Authored as a comma-separated device list (e.g. "mobile, tablet, desktop") —
+    // not authored at all means don't render the button, full stop (per product: no
+    // default-visible fallback). Per-device visibility is real CSS (see
+    // mobile-rider.css's own three breakpoint blocks reading these data-view-all-*
+    // attributes) rather than the repo's now-missing shared -up/-down utility classes,
+    // so this block owns its own responsive rules independent of that convention.
+    const viewAllDetailsDevices = new Set(
+      (cfg['view-all-details-devices'] || '').split(',').map((d) => d.trim().toLowerCase()).filter(Boolean),
+    );
+    if (viewAllDetailsDevices.size) {
+      const more = createTag('button', {
+        type: 'button',
+        class: 'mobile-rider-info-bar-more',
+        'data-view-all-mobile': String(viewAllDetailsDevices.has('mobile')),
+        'data-view-all-tablet': String(viewAllDetailsDevices.has('tablet')),
+        'data-view-all-desktop': String(viewAllDetailsDevices.has('desktop')),
+      }, 'View all details', { parent: panel });
+      more.addEventListener('click', () => openSessionGuideDetail(sessionId));
+    }
 
     // Moved into the panel (not the always-visible header) per the redesigned "Session
     // tile states" — favorite/share now live below the description, not beside the
