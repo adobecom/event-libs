@@ -39,7 +39,7 @@
 .mobile-rider-info-bar {
   box-sizing: border-box;
   background: transparent;
-  color: var(--s2a-color-gray-25);
+  color: var(--s2a-color-content-default);
   font-family: var(--s2a-font-family-default);
   padding: var(--s2a-spacing-lg) 0;
 
