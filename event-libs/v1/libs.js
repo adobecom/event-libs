@@ -10,6 +10,7 @@ const EVENT_BLOCKS = [
   'event-schema',
   'event-subscription-form',
   'events-form',
+  'grid-column',
   'mobile-rider',
   'preview-bar',
   'profile-cards',
@@ -19,17 +20,24 @@ const EVENT_BLOCKS = [
   'youtube-chat',
   'image-links',
   'venue-map',
-  'sessions-guide',
-  'sessions-guide-full-page',
-  'session-state-demo',
 ];
 
 const EVENT_BLOCKS_C2 = [
-  'card-c2',
-  'slider',
+  'event-card',
+  'event-carousel',
   'upcoming-sessions',
+  'featured-sessions',
   'chrono-box',
+  'grid-column',
   'mobile-rider',
+  'event-marquee',
+  'sessions-guide',
+  'sessions-guide-full-page',
+  'session-state-demo',
+  'event-session-details',
+  'event-featured-products',
+  'event-speakers',
+  'event-session-resources',
 ];
 
 // Import only the most essential utilities that are always needed

@@ -1,0 +1,110 @@
+.carousel-track {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  margin-block: var(--s2a-spacing-32, 32px);
+}
+
+.carousel-track::-webkit-scrollbar {
+  display: none;
+}
+
+.carousel-track > .event-card {
+  scroll-snap-align: start;
+}
+
+.carousel-controls {
+  display: none;
+}
+
+@media (width >= 900px) {
+  .carousel-controls {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+  }
+}
+
+.carousel-heading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  text-align: center;
+}
+
+.carousel-pills {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+}
+
+.carousel-pill {
+  padding: 8px 16px;
+  border-radius: 999px;
+  border: 1px solid #000;
+  background: transparent;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  color: #000;
+  cursor: pointer;
+}
+
+.carousel-pill.is-active {
+  background: #000;
+  color: #fff;
+}
+
+.carousel-arrows {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 16px;
+  width: 100%;
+  padding-inline: 24px;
+}
+
+.carousel-arrow {
+  box-sizing: border-box;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: var(--s2a-spacing-2xl, 48px);
+  height: var(--s2a-spacing-2xl, 48px);
+  border-radius: var(--s2a-border-radius-round, 999px);
+  border: var(--s2a-border-width-sm, 1px) solid var(--s2a-color-transparent-white-24, rgb(255 255 255 / 24%));
+  background: var(--s2a-color-transparent-black-64, rgb(0 0 0 / 64%));
+  backdrop-filter: blur(4px);
+  color: var(--s2a-color-gray-25, #fff);
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.carousel-arrow:hover {
+  background: var(--s2a-color-transparent-black-80, rgb(0 0 0 / 80%));
+}
+
+.carousel-arrow:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.carousel-arrow-prev {
+  transform: rotate(180deg);
+}
+
+@media (width <= 767px) {
+  .carousel-arrows {
+    padding-inline: 16px;
+  }
+
+  .carousel-track > .event-card {
+    scroll-snap-align: center;
+  }
+}

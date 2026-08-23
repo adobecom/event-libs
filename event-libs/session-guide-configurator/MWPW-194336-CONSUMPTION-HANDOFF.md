@@ -6,43 +6,33 @@ a config blob, base64-encodes it into a `?sgConfig=` URL, and `decorate.js`'s
 `sessions-guide`/`sessions-guide-full-page` block's own
 `data-session-guide-config` attribute. `utils/parse-config.js` reads that
 attribute and puts `eventId`, `headings`, `behaviorFlags`, `swimlaneOrder`,
-and `authoredFilterCategories` onto `guideConfig` — but as of the Phase 7
-plumbing pass (2026-08-03), nothing downstream actually *reads* those four
-fields yet. `filterCategories` itself is deliberately left pointing at
-`FilterPanel.js`'s pre-existing legacy default, not the new authored shape —
-see item 1 for why. Everything below is what needs to change to make each
-field actually affect rendering. See `PLAN.md` §7 for the fuller narrative
-behind the filters design; this doc is the consolidated, trackable checklist
-(same role as `tier-1-event-configurator/MWPW-200314-HANDOFF.md` for that
-app).
+and `filterCategories` onto `guideConfig` — all four now actually drive
+rendering (items 1-4 below), completed across MWPW-200314's item 12. See
+`PLAN.md` §7 for the fuller narrative behind the filters design; this doc is
+the consolidated, trackable checklist (same role as
+`tier-1-event-configurator/MWPW-200314-HANDOFF.md` for that app).
 
-## 1. Filters — wire `authoredFilterCategories` into `FilterPanel.js` (not started)
+## 1. Filters — wire `authoredFilterCategories` into `FilterPanel.js` — done (MWPW-200314 item 12)
 
-`FilterPanel.js` currently reads `guideConfig.filterCategories` (shape
-`{id, label}[]`, hardcoded to `track`/`type`) and derives each category's
-options by indexing sessions directly — `sessions.value.forEach((s) => s[id])`.
-That mechanism needs replacing, not extending:
+`parse-config.js` now maps authored `filterCategories`
+(`{attributeId, label, displayName, enabled}[]`) directly to `{id, label}`
+(`id` = `attributeId`), enabled-filtered, in authored order — no authored
+config (or every entry disabled) yields `[]`, which `FilterPanel.js` already
+renders as no panel. `session-filters.js`'s `getFilterValue()` resolves a
+category's session value via a generic `customAttributeValues` map
+(`sessions-api.js`'s `mapEslPayloadToRawSessions()`, built from raw
+`customAttributes[]` at fetch time rather than called live per-render), with
+a flat-field fallback kept for defensiveness. `DEFAULT_FILTER_CATEGORIES` and
+the `authoredFilterCategories`/`filterCategories` split are both retired, as
+planned. FilterPanel.js's own markup/UI is unchanged — pending Figma.
 
-- Run the same `deriveFacetableAttributes()` (already shared, in
-  `v1/services/sessions/sessions-api.js`) over the block's own already-fetched
-  session catalog.
-- Filter/order the result through `guideConfig.authoredFilterCategories`
-  (shape `{attributeId, label, displayName, enabled}[]` — `label` is the
-  original ESP label, unused at render time but kept so the configurator's
-  own editor can show it) — keep only `enabled` entries, in authored order.
-- Render `displayName` (not `label`) as the category tab text.
-- Look up each session's value for a category by `attributeId` against its
-  `customAttributes[]` (same shape `getSessionTrack()` already reads for
-  swimlanes — see item 3), not `s[id]` — sessions don't have flat
-  `track`/`type` properties; that was always the legacy authoring format's
-  own simplification, not a real session field.
-- Once this is live, delete `parse-config.js`'s `DEFAULT_FILTER_CATEGORIES`
-  fallback and the `filterCategories`/`authoredFilterCategories` split
-  entirely — `authoredFilterCategories` only exists as a separate field to
-  avoid breaking `FilterPanel.js` mid-migration; it shouldn't outlive this
-  item.
+## 2. Headings — wire `headings` into `DrawerHeader.js` — done (MWPW-200314 item 12)
 
-## 2. Headings — wire `headings` into `DrawerHeader.js` (not started)
+`resolveDrawerTitle(headings, { isLoggedIn, userFirstName, isPost })` in
+`DrawerHeader.js` selects the right of the four authored strings by
+`(isLoggedIn, isPost)`; `isPost` comes from the same `isPostEvent()` used
+elsewhere (see item 4's status note), not a separately-built signal. Original
+spec below, kept for context:
 
 `DrawerHeader.js` currently shows a single hardcoded fallback title
 (`"See what's happening at MAX"`) when the viewer isn't logged in, or a
@@ -69,7 +59,7 @@ by the time this was revisited — but `groupByTrack`'s sort logic hadn't been u
 the `[{track,displayName,enabled}]` shape described below, so ordering silently had zero
 effect, `enabled` was never applied, and `displayName` never reached the rendered label.
 Also extended to cover override-lane names, not just tracks. Full fix + root cause in
-`event-libs/v1/blocks/sessions-guide/PLAN.md` §16.3's correction note. Original spec
+`event-libs/v1/c2/blocks/sessions-guide/PLAN.md` §16.3's correction note. Original spec
 below, kept for context:
 
 `OnDemandView.js`'s `groupByTrack(available)` (in `utils/session-filters.js`)
@@ -92,26 +82,32 @@ match sessions, `displayName` is the author's editable override). Needs:
   `groupByTrack` would otherwise produce, rather than dropping it (dropping
   is only correct for a track the author explicitly disabled).
 
-## 4. Behavior flags — wire into their respective gating points (not started)
+## 4. Behavior flags — wire into their respective gating points — done (MWPW-200314 item 12)
 
-`behaviorFlags: { enableScheduling, enableFavoriting, enableWatchNowCtas, enableBrandConciergeRibbon }`
+`isBehaviorEnabled(guideConfig, flag)` (new `utils/behavior-flags.js`) gates
+all three flags at the points identified below, in `LiveCard.js`/
+`SessionCard.js`/`SessionDetailOverlay.js`. Post-event state itself (`isPost`,
+also used by item 2's headings) is now driven by the Tier 1 Event
+Configurator's `eventEndDateTime` via `isPostEvent()`, not the old
+`manualCutoff` metadata. Original spec below, kept for context:
+
+`behaviorFlags: { enableScheduling, enableFavoriting, enableWatchNowCtas }`
 — none of these are read anywhere yet. Concrete gating points found by
 inspection:
 
 - **`enableScheduling`** → the "Add to schedule"/"Scheduled" buttons in
   `LiveCard.js`, `SessionCard.js`, and `SessionDetailOverlay.js` (all call
-  `handleSchedule`/`scheduleWithFeedback`). When disabled, hide the button
+  `handleSchedule`/`toggleScheduleWithFeedback`). When disabled, hide the button
   (or the whole schedule affordance) rather than disabling it — TBD with
   design.
 - **`enableFavoriting`** → the favorite/heart buttons in the same three
-  files (`handleFavorite`/`favoriteWithFeedback`).
+  files (`handleFavorite`/`toggleFavoriteWithFeedback`).
 - **`enableWatchNowCtas`** → the "Watch now" button in `LiveCard.js` (and
   `SessionDetailOverlay.js`'s live/on-demand variant of the same CTA).
-- **`enableBrandConciergeRibbon`** → **no such component exists in the
-  codebase yet.** This flag is forward-looking — whoever picks this item up
-  needs to confirm with product/design whether the ribbon is being built as
-  part of this same handoff or is a separate, not-yet-scoped feature before
-  wiring the flag to anything.
+
+`enableBrandConciergeRibbon` was removed (2026-08-13) — the ribbon is out of
+scope for the next event and never had a corresponding component in the
+codebase.
 
 ## Test-plan items relevant to the consuming side
 

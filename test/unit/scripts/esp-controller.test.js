@@ -1,6 +1,7 @@
 import { expect } from '@esm-bundle/chai';
 import sinon from 'sinon';
 import BlockMediator from '../../../event-libs/v1/deps/block-mediator.min.js';
+import { waitForAdobeIMS, resetAdobeIMSWatcher } from '../../../event-libs/v1/utils/utils.js';
 
 describe('Adobe Event Service API', () => {
   let api;
@@ -12,6 +13,7 @@ describe('Adobe Event Service API', () => {
 
   beforeEach(() => {
     sandbox = sinon.createSandbox();
+    resetAdobeIMSWatcher();
   });
 
   afterEach(() => {
@@ -29,8 +31,59 @@ describe('Adobe Event Service API', () => {
   describe('waitForAdobeIMS', () => {
     it('should resolve when adobeIMS is available', async () => {
       window.adobeIMS = { getAccessToken: () => ({ token: 'fake-token' }) };
-      await api.waitForAdobeIMS();
+      await waitForAdobeIMS();
       expect(window.adobeIMS.getAccessToken()).to.have.property('token', 'fake-token');
+    });
+
+    it('should resolve once adobeIMS is assigned after the fact', async () => {
+      delete window.adobeIMS;
+
+      const waitPromise = waitForAdobeIMS();
+      await new Promise((resolve) => { setTimeout(resolve, 0); });
+      window.adobeIMS = { getAccessToken: () => ({ token: 'later-token' }) };
+
+      await waitPromise;
+      expect(window.adobeIMS.getAccessToken()).to.have.property('token', 'later-token');
+    });
+
+    it('should give up and resolve after the timeout when adobeIMS never appears', async () => {
+      delete window.adobeIMS;
+      const clock = sandbox.useFakeTimers();
+
+      const waitPromise = waitForAdobeIMS();
+      await clock.tickAsync(10000);
+      await waitPromise;
+
+      expect(window.adobeIMS).to.be.undefined;
+    });
+
+    it('should not treat a getAccessToken-less object as ready', async () => {
+      delete window.adobeIMS;
+      const clock = sandbox.useFakeTimers();
+
+      const waitPromise = waitForAdobeIMS();
+      window.adobeIMS = { getProfile: () => Promise.resolve({}) };
+      await clock.tickAsync(1000);
+
+      let settledEarly = false;
+      waitPromise.then(() => { settledEarly = true; });
+      await Promise.resolve();
+      expect(settledEarly).to.be.false;
+
+      await clock.tickAsync(9000);
+      await waitPromise;
+    });
+
+    it('should notify every concurrent caller from a single adobeIMS assignment', async () => {
+      delete window.adobeIMS;
+
+      const first = waitForAdobeIMS();
+      const second = waitForAdobeIMS();
+      await new Promise((resolve) => { setTimeout(resolve, 0); });
+      window.adobeIMS = { getAccessToken: () => ({ token: 'shared-token' }) };
+
+      await Promise.all([first, second]);
+      expect(window.adobeIMS.getAccessToken()).to.have.property('token', 'shared-token');
     });
   });
 
@@ -182,13 +235,24 @@ describe('Adobe Event Service API', () => {
 
     it('should degrade gracefully (no throw, no Authorization) when a token is passed with no IMS session', async () => {
       delete window.adobeIMS;
+      const clock = sandbox.useFakeTimers();
       const fetchStub = sandbox.stub(window, 'fetch').resolves({ json: () => ({}), ok: true });
 
-      await api.createAttendee({ name: 'John Doe' }, 'tok-1');
+      try {
+        const attendeePromise = api.createAttendee({ name: 'John Doe' }, 'tok-1');
+        await clock.tickAsync(10000);
+        await attendeePromise;
 
-      const options = fetchStub.firstCall.args[1];
-      expect(options.headers.get('x-adobe-esp-rsvp-token')).to.equal('tok-1');
-      expect(options.headers.has('Authorization')).to.be.false;
+        const options = fetchStub.firstCall.args[1];
+        expect(options.headers.get('x-adobe-esp-rsvp-token')).to.equal('tok-1');
+        expect(options.headers.has('Authorization')).to.be.false;
+      } finally {
+        window.adobeIMS = {
+          getAccessToken: () => ({ token: 'fake-token' }),
+          getProfile: () => Promise.resolve({ name: 'Test User' }),
+          signIn: () => {},
+        };
+      }
     });
   });
 
@@ -243,13 +307,24 @@ describe('Adobe Event Service API', () => {
 
     it('should degrade gracefully (no throw, no Authorization) when a token is passed with no IMS session', async () => {
       delete window.adobeIMS;
+      const clock = sandbox.useFakeTimers();
       const fetchStub = sandbox.stub(window, 'fetch').resolves({ json: () => ({}), ok: true });
 
-      await api.addAttendeeToEvent('123', { name: 'John Doe' }, 'tok-1');
+      try {
+        const attendeePromise = api.addAttendeeToEvent('123', { name: 'John Doe' }, 'tok-1');
+        await clock.tickAsync(10000);
+        await attendeePromise;
 
-      const options = fetchStub.firstCall.args[1];
-      expect(options.headers.get('x-adobe-esp-rsvp-token')).to.equal('tok-1');
-      expect(options.headers.has('Authorization')).to.be.false;
+        const options = fetchStub.firstCall.args[1];
+        expect(options.headers.get('x-adobe-esp-rsvp-token')).to.equal('tok-1');
+        expect(options.headers.has('Authorization')).to.be.false;
+      } finally {
+        window.adobeIMS = {
+          getAccessToken: () => ({ token: 'fake-token' }),
+          getProfile: () => Promise.resolve({ name: 'Test User' }),
+          signIn: () => {},
+        };
+      }
     });
   });
 
@@ -535,6 +610,26 @@ describe('Adobe Event Service API', () => {
       const result = await api.getAndCreateAndAddAttendee(eventId, dataWithCampaign);
       expect(result.ok).to.be.true;
       expect(result.data.registrationStatus).to.equal('waitlisted');
+    });
+
+    it('should forward custom fields unrecognized by either filter into the add-to-event payload, but not fields recognized only by the base attendee filter', async () => {
+      const fetchStub = sandbox.stub(window, 'fetch');
+      fetchStub.onCall(0).resolves({ json: () => ({ eventId, isFull: false }), ok: true });
+      fetchStub.onCall(1).resolves({ json: () => (attendeeResp), ok: true, status: 200 });
+      fetchStub.onCall(2).resolves({ json: () => (attendeeResp), ok: true });
+      fetchStub.onCall(3).resolves({ json: () => ({ registrationStatus: 'registered' }), ok: true });
+
+      const dataWithCustomField = {
+        ...attendeeData,
+        jobTitle: 'Engineer',
+        customEventQuestion: 'Yes, I will attend the workshop',
+      };
+      await api.getAndCreateAndAddAttendee(eventId, dataWithCustomField);
+
+      const addToEventOptions = fetchStub.getCall(3).args[1];
+      const addToEventBody = JSON.parse(addToEventOptions.body);
+      expect(addToEventBody.customEventQuestion).to.equal('Yes, I will attend the workshop');
+      expect(addToEventBody).to.not.have.property('jobTitle');
     });
 
     it('should fall back to event-level status when campaign lookup fails', async () => {

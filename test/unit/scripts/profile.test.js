@@ -1,7 +1,7 @@
 import { expect } from '@esm-bundle/chai';
 import sinon from 'sinon';
 import { getProfile, lazyCaptureProfile } from '../../../event-libs/v1/utils/profile.js';
-import { setEventConfig } from '../../../event-libs/v1/utils/utils.js';
+import { setEventConfig, resetAdobeIMSWatcher } from '../../../event-libs/v1/utils/utils.js';
 import BlockMediator from '../../../event-libs/v1/deps/block-mediator.min.js';
 
 describe('Profile Functions', () => {
@@ -10,6 +10,7 @@ describe('Profile Functions', () => {
 
   beforeEach(() => {
     clock = sinon.useFakeTimers();
+    resetAdobeIMSWatcher();
     window.feds = null;
     window.adobeProfile = null;
     window.fedsConfig = null;
@@ -62,7 +63,7 @@ describe('Profile Functions', () => {
     expect(profile).to.deep.equal({ name: 'John Doe' });
   });
 
-  it('lazyCapture starts with the polling system', async () => {
+  it('lazyCapture resolves synchronously when adobeIMS is already available', async () => {
     window.feds = {
       services: {
         universalnav: { interface: { adobeProfile: { getUserProfile: () => Promise.resolve({ name: 'John Doe' }) } } },
@@ -72,6 +73,7 @@ describe('Profile Functions', () => {
     window.adobeProfile = { getUserProfile: () => Promise.resolve({ name: 'Jane Doe' }) };
     window.fedsConfig = { universalNav: true };
     window.adobeIMS = { getProfile: () => Promise.resolve({ name: 'IMS User' }) };
+    sinon.stub(window, 'fetch').resolves({ json: () => ({}), ok: true });
 
     lazyCaptureProfile();
 
@@ -80,7 +82,7 @@ describe('Profile Functions', () => {
     expect(BlockMediator.get('rsvpData')).to.be.undefined;
   });
 
-  it('should stop polling after 10 retries', async () => {
+  it('should fire captureProfile once adobeIMS is assigned after waiting', async () => {
     lazyCaptureProfile();
 
     await clock.tick(8000);

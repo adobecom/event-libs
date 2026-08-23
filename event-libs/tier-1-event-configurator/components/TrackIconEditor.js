@@ -1,12 +1,12 @@
 import { html } from '../../v1/deps/htm-preact.js';
 import IconPicker, { useIconSlugOptions } from './IconPicker.js';
-import { getDefaultTrackIcon, DEFAULT_ICON_COLOR, KNOWN_ICON_SLUGS } from '../default-track-icons.js';
+import { DEFAULT_ICON_COLOR } from '../default-track-icons.js';
 import { isTrackIconEntryComplete } from '../utils.js';
 
 export default function TrackIconEditor({ tracks, trackIcons, onChange }) {
   // Called unconditionally, before the early return below — Preact hooks must run in
   // the same order on every render.
-  const iconSlugs = useIconSlugOptions(KNOWN_ICON_SLUGS);
+  const iconSlugs = useIconSlugOptions();
 
   if (!tracks || tracks.length === 0) {
     return html`<p class="tec-track-editor__empty">No tracks found in this event's sessions yet.</p>`;
@@ -16,8 +16,7 @@ export default function TrackIconEditor({ tracks, trackIcons, onChange }) {
     <ul class="tec-track-editor__list">
       ${tracks.map((track) => {
         const authored = trackIcons?.[track];
-        const fallback = getDefaultTrackIcon(track);
-        const icon = authored?.icon ?? fallback?.icon ?? '';
+        const icon = authored?.icon ?? '';
         const color = authored?.color ?? DEFAULT_ICON_COLOR;
         const complete = isTrackIconEntryComplete(authored);
 

@@ -13,6 +13,7 @@ import {
   createTemplatedDateRange,
 } from '../../../event-libs/v1/utils/date-time-helper.js';
 
+const decorateModule = await import('../../../event-libs/v1/utils/decorate.js');
 const {
   decorateEvent,
   updateAnalyticTag,
@@ -23,7 +24,8 @@ const {
   getNonProdData,
   processAutoBlockLinks,
   applyAreaTheme,
-} = await import('../../../event-libs/v1/utils/decorate.js');
+} = decorateModule;
+const decorateArea = decorateModule.default;
 const head = await readFile({ path: './mocks/head.html' });
 const body = await readFile({ path: './mocks/full-event.html' });
 const defaultDoc = await readFile({ path: './mocks/event-default-doc.html' });
@@ -951,6 +953,174 @@ describe('applyAreaTheme', () => {
     applyAreaTheme();
     const cols = document.querySelectorAll('.section-metadata > div > div');
     expect(cols[1].textContent).to.equal('xxl-spacing');
+  });
+
+  it('self-heals a stale positional mark when the page-wide first block changes between invocations', () => {
+    setThemeAttribute('theme', 'dark(blocks:text[first])');
+    document.body.innerHTML = `
+      <main><div>
+        <div class="text" id="t1"></div>
+        <div class="text" id="t2"></div>
+      </div></main>
+    `;
+    applyAreaTheme();
+    expect(document.getElementById('t1').classList.contains('dark')).to.be.true;
+
+    const t0 = document.createElement('div');
+    t0.className = 'text';
+    t0.id = 't0';
+    document.querySelector('main > div').prepend(t0);
+
+    applyAreaTheme();
+
+    expect(document.getElementById('t0').classList.contains('dark')).to.be.true;
+    expect(document.getElementById('t1').classList.contains('dark')).to.be.false;
+    expect(document.getElementById('t2').classList.contains('dark')).to.be.false;
+  });
+
+  it('resolves a positional selector against the page-wide block list, ignoring a narrower area boundary', () => {
+    setThemeAttribute('theme', 'dark(blocks:text[last])');
+    document.body.innerHTML = `
+      <main>
+        <div id="area"><div class="text" id="t1"></div></div>
+        <div><div class="text" id="t2"></div></div>
+      </main>
+    `;
+    const area = document.getElementById('area');
+    applyAreaTheme(area);
+
+    expect(document.getElementById('t2').classList.contains('dark')).to.be.true;
+    expect(document.getElementById('t1').classList.contains('dark')).to.be.false;
+  });
+
+  it("does not let a detached, pre-insertion decoration pass (Milo's fragment.js DOMParser document) leave a stale mark that survives the page-wide revalidation call once the fragment lands live", () => {
+    setThemeAttribute('theme', 'dark(blocks:text[first])');
+    document.body.innerHTML = `
+      <main><div>
+        <div class="text" id="t1"></div>
+      </div></main>
+    `;
+    // An earlier page-wide pass (e.g. initial decorateEvent) already marked the real first block.
+    applyAreaTheme();
+    expect(document.getElementById('t1').classList.contains('dark')).to.be.true;
+
+    // Milo decorates the incoming chrono-box fragment on a detached div, never attached to
+    // document, before it's swapped in (see fragment.js).
+    const fragmentArea = document.createElement('div');
+    const tFrag = document.createElement('div');
+    tFrag.className = 'text';
+    tFrag.id = 't-frag';
+    fragmentArea.append(tFrag);
+    applyAreaTheme(fragmentArea);
+
+    // The fragment now lands in the live DOM, after t1.
+    document.querySelector('main > div').append(tFrag);
+
+    // chrono-box calls revalidatePageTheme() -> applyAreaTheme() (default/document) once live.
+    applyAreaTheme();
+
+    expect(document.getElementById('t1').classList.contains('dark')).to.be.true;
+    expect(document.getElementById('t-frag').classList.contains('dark')).to.be.false;
+  });
+
+  it('resolves a positional selector against a block nested inside a chrono-box/fragment wrapper', () => {
+    // Mirrors the real DOM Milo produces for a loaded fragment: the anchor that triggered
+    // loadFragment gets replaced by div.fragment, whose own top-level "section" divs (from
+    // the fragment's `body > div` sections) become its direct children — nesting the block
+    // several levels below `main > div`, where the plain `main > div > div[class]` selector
+    // alone would never reach it.
+    setThemeAttribute('theme', 'dark(blocks:text[first])');
+    document.body.innerHTML = `
+      <main>
+        <div>
+          <div class="chrono-box">
+            <div class="fragment" data-path="/fragments/hero-pre">
+              <div>
+                <div class="text" id="t-nested"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div>
+          <div class="text" id="t-top-level"></div>
+        </div>
+      </main>
+    `;
+
+    applyAreaTheme();
+
+    expect(document.getElementById('t-nested').classList.contains('dark')).to.be.true;
+    expect(document.getElementById('t-top-level').classList.contains('dark')).to.be.false;
+  });
+
+  it('resolves a positional selector against a block nested inside a promotional-content fragment wrapper', () => {
+    setThemeAttribute('theme', 'dark(blocks:text[first])');
+    document.body.innerHTML = `
+      <main>
+        <div>
+          <div class="promotional-content">
+            <div class="fragment" data-path="/fragments/product-blade">
+              <div>
+                <div class="text" id="t-nested"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div>
+          <div class="text" id="t-top-level"></div>
+        </div>
+      </main>
+    `;
+
+    applyAreaTheme();
+
+    expect(document.getElementById('t-nested').classList.contains('dark')).to.be.true;
+    expect(document.getElementById('t-top-level').classList.contains('dark')).to.be.false;
+  });
+
+  it('does not reach into an unrelated fragment outside chrono-box/promotional-content (e.g. events-form consent)', () => {
+    setThemeAttribute('theme', 'dark(blocks:text[first])');
+    document.body.innerHTML = `
+      <main>
+        <div>
+          <div class="events-form">
+            <div class="fragment" data-path="/fragments/terms-and-conditions">
+              <div>
+                <div class="text" id="t-unrelated-fragment"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div>
+          <div class="text" id="t-top-level"></div>
+        </div>
+      </main>
+    `;
+
+    applyAreaTheme();
+
+    expect(document.getElementById('t-top-level').classList.contains('dark')).to.be.true;
+    expect(document.getElementById('t-unrelated-fragment').classList.contains('dark')).to.be.false;
+  });
+});
+
+describe('decorateArea', () => {
+  beforeEach(() => {
+    document.body.innerHTML = '';
+    document.head.innerHTML = head;
+  });
+
+  it('loads the shared event-libs stylesheet', () => {
+    document.body.innerHTML = '<main><div class="section"></div></main>';
+    decorateArea();
+    expect(document.getElementById('event-libs-styles')).to.not.be.null;
+  });
+
+  it('is idempotent across repeated calls', () => {
+    document.body.innerHTML = '<main><div class="section"></div></main>';
+    decorateArea();
+    decorateArea();
+    expect(document.querySelectorAll('#event-libs-styles').length).to.equal(1);
   });
 });
 
@@ -2176,6 +2346,67 @@ describe('decorateEvent - Array Iteration', () => {
       const chronoBox = parent.querySelector('.chrono-box');
       expect(chronoBox).to.not.be.null;
       expect(chronoBox.getAttribute('data-schedule-repo')).to.equal('adobecom/da-events-fg-pink');
+    });
+
+    function encodeTecConfig(config) {
+      return window.btoa(unescape(encodeURIComponent(JSON.stringify(config))));
+    }
+
+    function buildTecHomepageLink(config) {
+      const link = document.createElement('a');
+      link.href = `https://da.live/app/adobecom/da-events/tools/da-apps/tier-1-event-configurator#tecHomepage=${encodeTecConfig(config)}`;
+      return link;
+    }
+
+    it('builds an upcoming-sessions div for a homepage-upcoming-sessions link', async () => {
+      const parent = document.createElement('div');
+      const p = document.createElement('p');
+      const config = {
+        eventId: 'event-1', configType: 'homepage-upcoming-sessions', heading: 'Upcoming', entries: [{ sessionId: 's1' }],
+      };
+      p.appendChild(buildTecHomepageLink(config));
+      parent.appendChild(p);
+
+      processAutoBlockLinks(parent);
+      await new Promise((resolve) => { setTimeout(resolve, 50); });
+
+      const block = parent.querySelector('.upcoming-sessions');
+      expect(block).to.not.be.null;
+      expect(parent.querySelector('.featured-sessions')).to.be.null;
+      expect(JSON.parse(block.dataset.upcomingSessionsConfig)).to.deep.equal(config);
+    });
+
+    it('builds a featured-sessions div for a homepage-featured-sessions link', async () => {
+      const parent = document.createElement('div');
+      const p = document.createElement('p');
+      const config = {
+        eventId: 'event-1', configType: 'homepage-featured-sessions', heading: 'Featured', entries: [{ sessionId: 's1' }],
+      };
+      p.appendChild(buildTecHomepageLink(config));
+      parent.appendChild(p);
+
+      processAutoBlockLinks(parent);
+      await new Promise((resolve) => { setTimeout(resolve, 50); });
+
+      const block = parent.querySelector('.featured-sessions');
+      expect(block).to.not.be.null;
+      expect(parent.querySelector('.upcoming-sessions')).to.be.null;
+      expect(JSON.parse(block.dataset.featuredSessionsConfig)).to.deep.equal(config);
+    });
+
+    it('leaves the link alone when entries is missing/invalid', async () => {
+      const parent = document.createElement('div');
+      const p = document.createElement('p');
+      const link = buildTecHomepageLink({ eventId: 'event-1', configType: 'homepage-upcoming-sessions' });
+      p.appendChild(link);
+      parent.appendChild(p);
+
+      processAutoBlockLinks(parent);
+      await new Promise((resolve) => { setTimeout(resolve, 50); });
+
+      expect(parent.querySelector('.upcoming-sessions')).to.be.null;
+      expect(parent.querySelector('.featured-sessions')).to.be.null;
+      expect(parent.querySelector('a')).to.equal(link);
     });
   });
 });

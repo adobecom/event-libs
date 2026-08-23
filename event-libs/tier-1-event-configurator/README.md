@@ -21,35 +21,36 @@ Edit instead of duplicating a row), the ESP event picker + session fetch
 why, and the automatic fallback to manual entry if it fails), the track
 icon/color editor (with save-blocking
 validation — a track can't be saved with only an icon or only a color set),
-the allow-double-booking toggle, and the featured-sessions picker
-(`FeaturedSessionsEditor.js` — search + track filter, each session's date/
-start time in its own venue timezone, add/remove, drag-and-drop reorder
-with a keyboard-operable fallback, writing a flat ordered `featuredSessions`
-array). All consuming-side wiring (MWPW-200314, separate branch/PR) is
-still open — see [MWPW-200314-HANDOFF.md](./MWPW-200314-HANDOFF.md) for the
-consolidated task list.
+and the allow-double-booking toggle. All consuming-side wiring (MWPW-200314,
+separate branch/PR) is still open — see
+[MWPW-200314-HANDOFF.md](./MWPW-200314-HANDOFF.md) for the consolidated task
+list.
+
+**No Global-level featured/recommended-sessions picker.** That concept moved
+to session-guide-configurator's own "Recommended Sessions" — Session Guide's
+carousel is its own app's concern, not this event-wide config's. `FeaturedSessionsEditor.js`
+(the picker/reorder component) still exists in this app, but only for the
+Homepage config types below.
 
 **Phase 2 scope note:** this app only adds the `allowDoubleBooking` boolean
 to the form/Config JSON. The consuming-side wiring (renaming
-`track-icon-config.js` to a broader singleton, wiring `scheduleAction`'s
+`track-icon-config.js` to a broader singleton, wiring `toggleScheduleAction`'s
 `showConflictModal` param, retiring sessions-guide's per-block
 `show-conflict-modal` table row) is explicitly MWPW-200314's territory, per
 PLAN.md §6 — not built here.
 
-**Track icon editor implementation note:** `default-track-icons.js` re-exports
-`DEFAULT_TRACK_ICON_CONFIG`/`DEFAULT_OVERRIDE_TRACK_ICON` from the real
-`event-libs/v1/utils/tier-1-event-config.js` rather than carrying its own copy.
+**Track icon editor implementation note:** no built-in default icon/color map —
+authors pick both explicitly for every track (`default-track-icons.js` re-exports
+`DEFAULT_ICON_COLOR`, the one universal fallback color, from the real
+`event-libs/v1/utils/tier-1-event-config.js` rather than carrying its own copy).
 `IconPicker.js` (a searchable combobox, since a native `<select>` can't render
 an icon + name per option) renders each option through the real, shared
 `event-libs/v1/features/icons/Icon.js`/`icon-resolver.js` — the same
-federal-CDN-first, then-Milo, then-event-libs'-own-`track-icons.svg` chain
-session-guide's live badges use — so the picker and the live page never
-drift. Its option list itself comes from `useIconSlugOptions()`
-(`default-track-icons.js`), which merges the curated `KNOWN_ICON_SLUGS` with
-federal's live `icons.json` inventory, so newly-uploaded federal icons appear
-with no code change. (The app previously carried its own duplicate sprite-fetch
-module, `track-icon-sprite.js`, for the period before this branch existed on `dev`;
-it's been retired now that the real shared resolver is available.)
+federal-CDN-first, then-Milo-as-backup chain session-guide's live badges use
+(no other fallback — an icon in neither source doesn't render) — so the
+picker and the live page never drift. Its option list itself comes from
+`useIconSlugOptions()` (`IconPicker.js`), sourced entirely from federal's live
+`icons.json` inventory, so newly-uploaded federal icons appear with no code change.
 
 **Known interim gap:** the track list shown in the editor comes from a raw
 `getEventSessionCatalog()` call in `event-libs/v1/utils/esp-controller.js`,
@@ -101,14 +102,14 @@ unchanged).
   target a non-prod tier for testing.
 - `components/TrackIconEditor.js` — per-track icon/color pickers.
 - `components/ProductIconEditor.js` — per-product icon picker (no color — products
-  already have their own colored SVGs).
-- `components/IconPicker.js` — the shared searchable icon combobox both editors above
-  render per row (a native `<select>` can't show an icon + name per option); also hosts
-  `useIconSlugOptions()`, which merges an optional curated base list with federal's live
+  already have their own colored SVGs) plus a product page URL field.
+- `components/IconPicker.js` — the shared searchable icon combobox TrackIconEditor and
+  OverrideTrackIconEditor render per row (a native `<select>` can't show an icon + name
+  per option); also hosts `useIconSlugOptions()`, sourced entirely from federal's live
   `icons.json` inventory.
-- `components/FeaturedSessionsEditor.js` — featured-sessions picker: search +
-  track filter over the already-fetched session catalog, add/remove, ↑/↓
-  reorder into a flat ordered `featuredSessions` array.
+- `components/FeaturedSessionsEditor.js` — session picker: search + track filter
+  over the already-fetched session catalog, add/remove, ↑/↓ reorder into a flat
+  ordered array. Homepage config types only — see "Data model" below.
 - `components/Modal.js`, `components/SearchInput.js` — generic, ported from Schedule Maker.
 
 ## Data model
@@ -127,9 +128,8 @@ One shared DA sheet per content-repo at
     "eventTitle": "...",
     "updated": "2026-07-22T21:30:00.000Z",
     "trackIcons": { "Track Name": { "icon": "icon-slug", "color": "#RRGGBB" } },
-    "productIcons": { "Product Name": "icon-slug" },
+    "products": { "Product Name": { "icon": "icon-slug", "pageUrl": "https://..." } },
     "allowDoubleBooking": true,
-    "featuredSessions": ["sessionId1", "sessionId2"],
     "rfApiUrl": "https://www.adobe.com/max-api/",
     "rfProfileId": "..."
   },
@@ -142,6 +142,10 @@ One shared DA sheet per content-repo at
 **`eventServiceEnv`, added 2026-07-24 (bug fix, per Daniel).** Row-level only — never stamped into `config`, since it's an authoring-time detail (which ESP tier this event's data came from), irrelevant to the live page that eventually reads `config`. Captured from the active environment picker selection when a row is created (`Library.js` reads it off `EventEnvContext`), and restored via `setEnv()` whenever that row is reopened for Edit. Fixes a real bug: without this, a full page reload reset the env override to its default (prod), so editing a Dev-authored row after a reload silently refetched its session catalog from Prod instead.
 
 **`config.rfApiUrl`/`config.rfProfileId`, added for [MWPW-200311](https://jira.corp.adobe.com/browse/MWPW-200311).** Nested in `config` like `trackIcons`/`allowDoubleBooking` — one JSON payload, not extra metadata rows. `event-libs/v1/utils/session-store.js` reads both straight off the parsed `tier-1-event-config` metadata, falling back to `DEFAULT_RF_API_URL`/`DEFAULT_RF_PROFILE_ID` (`event-libs/v1/services/sessions/rainfocus.js`) when either is blank. Never carried over on Duplicate — reusing another event's RF profile id would misroute this event's live schedule/favorites calls.
+
+**`config.overrideTrackIcons` is one field, not two.** Shape: `{ default: {icon,color} | null, byText: { "override text": {icon,color} } }` — `byText` maps a specific Override Primary Event Site Track text to its own icon/color, `default` is the event-wide fallback for any text not mapped there. `getOverrideTrackIcon()` (`v1/utils/tier-1-event-config.js`) checks `byText` first, then `default`. Previously two separate top-level fields (`overrideTrackIcon`/`overrideTrackIcons`); merged so there's nowhere for the two to drift apart, without using a reserved sentinel key inside the map (which could collide with real author-typed override text).
+
+**`config.homepageFeaturedSessions`/`config.homepageFeaturedSessionsMeta` only exist on a Homepage-Featured-Sessions row** — feed the card-c2 Featured Sessions homepage block, and are never read from `tier-1-event-config` metadata directly, only copy-pasted out via "Copy Featured Sessions JSON" into that block's own section-metadata. There's no Global-level equivalent — Session Guide's own recommended-sessions carousel is authored in session-guide-configurator instead (see that app's README).
 
 `config` is the exact value an author copies into their event page's own
 `tier-1-event-config` metadata row — this app never touches the page itself.

@@ -3,6 +3,7 @@ import { expect } from '@esm-bundle/chai';
 import {
   getBaseAttendeePayload,
   getEventAttendeePayload,
+  getUnrecognizedAttendeeFields,
 } from '../../../event-libs/v1/utils/data-utils.js';
 
 describe('data-utils', () => {
@@ -100,6 +101,61 @@ describe('data-utils', () => {
     it('returns argument unchanged when falsy', () => {
       expect(getBaseAttendeePayload(null)).to.equal(null);
       expect(getBaseAttendeePayload(undefined)).to.equal(undefined);
+    });
+  });
+
+  describe('getUnrecognizedAttendeeFields', () => {
+    it('returns fields not recognized by either filter', () => {
+      const out = getUnrecognizedAttendeeFields({
+        firstName: 'Ada',
+        customEventQuestion: 'Yes, I will attend the workshop',
+      });
+      expect(out).to.deep.equal({ customEventQuestion: 'Yes, I will attend the workshop' });
+    });
+
+    it('excludes fields recognized by the base attendee filter even when absent from the event filter', () => {
+      const out = getUnrecognizedAttendeeFields({
+        jobTitle: 'Engineer',
+        customField: 'x',
+      });
+      expect(out).to.deep.equal({ customField: 'x' });
+    });
+
+    it('excludes fields recognized by the event attendee filter', () => {
+      const out = getUnrecognizedAttendeeFields({
+        requiresTicket: true,
+        customField: 'x',
+      });
+      expect(out).to.deep.equal({ customField: 'x' });
+    });
+
+    it('drops invalid values (empty string, null, undefined)', () => {
+      const out = getUnrecognizedAttendeeFields({
+        customField: '',
+        anotherCustomField: null,
+        thirdCustomField: undefined,
+        keepMe: 'value',
+      });
+      expect(out).to.deep.equal({ keepMe: 'value' });
+    });
+
+    it('returns an empty object when falsy', () => {
+      expect(getUnrecognizedAttendeeFields(null)).to.deep.equal({});
+      expect(getUnrecognizedAttendeeFields(undefined)).to.deep.equal({});
+    });
+
+    it('excludes a key recognized by both filters', () => {
+      const out = getUnrecognizedAttendeeFields({
+        firstName: 'Ada',
+        customField: 'x',
+      });
+      expect(out).to.deep.equal({ customField: 'x' });
+    });
+
+    it('rejects prototype-chain property names', () => {
+      const out = getUnrecognizedAttendeeFields(JSON.parse('{"__proto__":{"polluted":true},"constructor":"x","customField":"y"}'));
+      expect(out).to.deep.equal({ customField: 'y' });
+      expect({}.polluted).to.be.undefined;
     });
   });
 });
