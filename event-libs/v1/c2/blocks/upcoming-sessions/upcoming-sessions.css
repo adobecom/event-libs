@@ -3,33 +3,6 @@
   padding: var(--s2a-spacing-md, 16px);
 }
 
-/* Scoped to sections authored with Section Metadata's style: livestream-layout — aligns this
-   block's left edge to event-marquee.css's own .event-marquee-foreground padding-inline
-   tiers (the "Split video marquee" Figma grid: 24/86/124/220px at S/M/L/XL) wherever it
-   sits inside one of those sections (e.g. alongside mobile-rider), without needing a
-   separate block modifier authored on upcoming-sessions itself. */
-.section.livestream-layout .upcoming-sessions {
-  padding-left: var(--s2a-spacing-lg, 24px);
-}
-
-@media (min-width: 1024px) {
-  .section.livestream-layout .upcoming-sessions {
-    padding-left: 86px;
-  }
-}
-
-@media (min-width: 1440px) {
-  .section.livestream-layout .upcoming-sessions {
-    padding-left: var(--s2a-layout-lg);
-  }
-}
-
-@media (min-width: 1920px) {
-  .section.livestream-layout .upcoming-sessions {
-    padding-left: 220px;
-  }
-}
-
 .upcoming-sessions--attached {
   position: absolute;
   left: 0;

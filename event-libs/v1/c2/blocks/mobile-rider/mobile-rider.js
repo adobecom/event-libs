@@ -215,24 +215,10 @@ class MobileRider {
       || createTag('div', { class: 'video-wrapper' }, '', { parent: this.root });
   }
 
-  // Renders as a sibling of .video-wrapper, not inside it — untouched by injectPlayer's
-  // wrap.innerHTML resets (ASL toggles, re-embeds) once built.
-  // Title/category/description are authored directly (cfg), not pulled from the sessions
-  // store — that fetch is async and gated on tier-1-event-config being present, which made
-  // the bar render empty whenever that hadn't loaded (or never would). Favorite is the one
-  // exception: favoriteAction() needs the real session object's rfCode (a RainFocus id that
-  // can't be authored), so it alone still waits on the sessions store to resolve session-id.
-  // about-session-enabled gates the whole bar, not just the toggle/panel — per direct
-  // product direction, title/Share/Favorite shouldn't render either when it's false.
   #initInfoBar(cfg, sessionId) {
     const aboutEnabled = cfg['about-session-enabled'] === true;
     if (!aboutEnabled) return;
 
-    // Authorable per PDM direction — defaults to transparent (see mobile-rider.css's own
-    // base rule) when no `Background` row is authored, letting the video underneath
-    // show through; an inline style here deliberately outranks that CSS default the
-    // same way readBackgroundConfig()'s convention does for other C2 blocks
-    // (event-featured-products, event-speakers, video-playlist).
     const bar = createTag('div', {
       class: 'mobile-rider-info-bar',
       style: cfg.background ? `background:${cfg.background}` : '',
@@ -262,12 +248,6 @@ class MobileRider {
     if (cfg['session-description']) {
       createTag('p', { class: 'mobile-rider-info-bar-description' }, cfg['session-description'], { parent: panel });
     }
-    // Authored as a comma-separated device list (e.g. "mobile, tablet, desktop") —
-    // not authored at all means don't render the button, full stop (per product: no
-    // default-visible fallback). Per-device visibility is real CSS (see
-    // mobile-rider.css's own three breakpoint blocks reading these data-view-all-*
-    // attributes) rather than the repo's now-missing shared -up/-down utility classes,
-    // so this block owns its own responsive rules independent of that convention.
     const viewAllDetailsDevices = new Set(
       (cfg['view-all-details-devices'] || '').split(',').map((d) => d.trim().toLowerCase()).filter(Boolean),
     );
@@ -282,17 +262,10 @@ class MobileRider {
       more.addEventListener('click', () => openSessionGuideDetail(sessionId));
     }
 
-    // Moved into the panel (not the always-visible header) per the redesigned "Session
-    // tile states" — favorite/share now live below the description, not beside the
-    // title, at every breakpoint.
     const actions = createTag('div', { class: 'mobile-rider-info-bar-actions' }, '', { parent: panel });
     actions.append(buildShareButton({ id: sessionId, title: cfg['session-title'] || '' }));
 
     initSessionState();
-    // Favorite (async — only resolves once the session-store catalog fetch finds a
-    // match) must still land BEFORE share (already appended, synchronously, above) —
-    // prepend rather than append, so the order is correct regardless of which button
-    // is actually added to the DOM first.
     const addFavorite = (session) => actions.prepend(buildFavoriteButton(session));
     const existing = sessions.value.find((s) => s.id === sessionId);
     if (existing) {
