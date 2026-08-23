@@ -543,9 +543,13 @@
   /* Real drag target now (see Drawer's #bindDrag), not just decorative — sized to a
      comfortable touch target (the visible bar is drawn via ::before, kept at its
      original small size) with touch-action:none so a vertical drag gesture here
-     resizes the drawer instead of also trying to scroll the page underneath it. */
+     resizes the drawer instead of also trying to scroll the page underneath it.
+     Collapsed state has no drag affordance at all — per Figma, only "Up next" + the
+     chevron show there (see .video-playlist-up-next); the handle only appears once
+     expanded, where dragging it back down all the way is how the viewer returns to
+     collapsed (in addition to tapping the chevron). */
   .video-playlist-handle {
-    display: flex;
+    display: none;
     align-items: center;
     justify-content: center;
     width: 100%;
@@ -565,6 +569,10 @@
     height: 4px;
     border-radius: var(--s2a-border-radius-round);
     background: var(--s2a-color-transparent-white-24, rgb(255 255 255 / 24%));
+  }
+
+  .video-playlist.is-expanded .video-playlist-handle {
+    display: flex;
   }
 
   .video-playlist-autoplay {
