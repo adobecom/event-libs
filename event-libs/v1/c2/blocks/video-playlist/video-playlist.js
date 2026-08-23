@@ -864,14 +864,16 @@ export default async function init(el) {
     // the peek knows what's coming next without opening the drawer. "Next" is whichever
     // row immediately follows the current session in displayRows' own chronological
     // order — same row Play all would actually advance to (see the 'ended' listener
-    // above), not merely the first row in the list.
+    // above). Falls back to the very first row when the current session isn't found in
+    // displayRows at all, or already sorts last (e.g. it's the most recent premiere) —
+    // this element must always render something on mobile, since it (not the title) is
+    // what the collapsed CSS shows; there is always at least one row here, since an
+    // empty `rows` result already caused removeBlock() to bail out above.
     const currentIndex = displayRows.findIndex((row) => row.id === sessionId);
-    const nextSession = displayRows[currentIndex + 1] || null;
-    if (nextSession) {
-      const upNext = createTag('div', { class: 'video-playlist-up-next' }, '', { parent: top });
-      createTag('span', { class: 'video-playlist-up-next-label' }, 'Up next', { parent: upNext });
-      createTag('span', { class: 'video-playlist-up-next-title' }, nextSession.title, { parent: upNext });
-    }
+    const nextSession = displayRows[currentIndex + 1] || displayRows[0];
+    const upNext = createTag('div', { class: 'video-playlist-up-next' }, '', { parent: top });
+    createTag('span', { class: 'video-playlist-up-next-label' }, 'Up next', { parent: upNext });
+    createTag('span', { class: 'video-playlist-up-next-title' }, nextSession.title, { parent: upNext });
 
     const title = cfg['playlist-title'] || 'More like this';
     createTag('h3', { class: 'video-playlist-title' }, title, { parent: top });

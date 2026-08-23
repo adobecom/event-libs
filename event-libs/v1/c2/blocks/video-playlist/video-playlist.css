@@ -598,12 +598,12 @@
     transform: rotate(180deg);
   }
 
-  /* Per Figma: the collapsed peek shows "Up next" + the next session's own title
-     instead of the playlist's title/autoplay row — swapped for the reverse the moment
-     the drawer expands (Drawer's own #apply() toggles .is-expanded on this same
-     element). Hidden entirely if no next session exists at all (see the JS — the
-     element itself is never built in that case), same as every other row already
-     collapses to nothing when its data doesn't apply. */
+  /* Per Figma: the collapsed peek shows "Up next" + a session's own title instead of
+     the playlist's title/autoplay row — swapped for the reverse the moment the drawer
+     expands (Drawer's own #apply() toggles .is-expanded on this same element). Always
+     built (see the JS — falls back to the first row when there's no literal "next"
+     one), since this element is what the collapsed CSS shows instead of the title, not
+     an addition alongside it. */
   .video-playlist-up-next {
     display: flex;
     flex-direction: column;
