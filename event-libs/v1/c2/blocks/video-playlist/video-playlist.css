@@ -616,9 +616,13 @@
     display: none;
   }
 
+  /* Figma: "s2a/typography/eyebrow" */
   .video-playlist-up-next-label {
-    font-size: var(--s2a-font-size-sm);
-    font-weight: 700;
+    font-family: var(--s2a-font-family-eyebrow);
+    font-size: var(--s2a-typography-font-size-eyebrow);
+    font-weight: var(--s2a-font-weight-eyebrow);
+    line-height: var(--s2a-typography-line-height-eyebrow);
+    letter-spacing: var(--s2a-typography-letter-spacing-eyebrow);
   }
 
   .video-playlist-up-next-title {
