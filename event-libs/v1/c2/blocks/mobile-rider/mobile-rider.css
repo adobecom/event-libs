@@ -49,13 +49,13 @@
   overflow: hidden;
 }
 
-/* Milo's own block-modifier syntax ("Mobile Rider (dark)") resolves into a `dark`
-   class — read as data-theme="dark" in mobile-rider.js's own init(). Forces
-   transparent here even over an authored `Background` inline style (!important is the
-   only way a stylesheet rule can outrank an inline style) — the dark variant's own
-   ambient dark fill should never be double-covered by the info-bar's own background. */
-.mobile-rider[data-theme="dark"] .mobile-rider-info-bar {
-  background: transparent !important;
+/* Milo core's own `.dark` block-modifier rule (libs/styles/styles.css) sets a real
+   background-color directly on .mobile-rider.dark itself — confirmed live via
+   DevTools, this is the actual dark fill showing behind the block, not something
+   .mobile-rider-info-bar's own background ever touched. Overridden here at the same
+   root, so it never needs to fight the info-bar's own transparent default at all. */
+.mobile-rider.dark {
+  background-color: transparent;
 }
 
 .mobile-rider-info-bar-header {
