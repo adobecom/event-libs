@@ -2,6 +2,8 @@
 import { expect } from '@esm-bundle/chai';
 import sinon from 'sinon';
 import { sessions, favorited } from '../../../../event-libs/v1/utils/session-store.js';
+import { setEventConfig } from '../../../../event-libs/v1/utils/utils.js';
+import { initTierOneEventConfig } from '../../../../event-libs/v1/utils/tier-1-event-config.js';
 
 const defaultHtml = `
 <div class="mobile-rider">
@@ -48,6 +50,12 @@ function runMobileRiderSuite(modulePath, variantLabel) {
 
     before(async () => {
       ({ default: init } = await import(modulePath));
+      setEventConfig({}, { miloLibs: '/test/unit/features/icons/mocks/libs' });
+      const meta = document.createElement('meta');
+      meta.name = 'tier-1-event-config';
+      meta.content = JSON.stringify({ trackIcons: { Education: { icon: 'video', color: '#F44336' } } });
+      document.head.appendChild(meta);
+      initTierOneEventConfig();
     });
 
     beforeEach(() => {
@@ -898,7 +906,7 @@ function runMobileRiderSuite(modulePath, variantLabel) {
     // Title/category/description are authored fields now, not pulled from the sessions
     // store — only Favorite (via rfCode) still needs the store to resolve session-id.
     function sessionInfoBarHtml({
-      title = 'Watch Day 1 Keynote', aboutEnabled, category, description,
+      title = 'Watch Day 1 Keynote', aboutEnabled, category, description, viewAllDetailsDevices,
     } = {}) {
       const row = (key, val) => (val === undefined ? '' : `<div><div>${key}</div><div>${val}</div></div>`);
       return `
@@ -909,6 +917,7 @@ function runMobileRiderSuite(modulePath, variantLabel) {
           ${row('about-session-enabled', aboutEnabled)}
           ${row('session-category', category)}
           ${row('session-description', description)}
+          ${row('view-all-details-devices', viewAllDetailsDevices)}
         </div>
       `;
     }
@@ -975,7 +984,9 @@ function runMobileRiderSuite(modulePath, variantLabel) {
     });
 
     it('opens the Session Guide detail view for this session when View all details is clicked', async () => {
-      document.body.innerHTML = sessionInfoBarHtml({ aboutEnabled: 'true', description: 'Lorem ipsum' });
+      document.body.innerHTML = sessionInfoBarHtml({
+        aboutEnabled: 'true', description: 'Lorem ipsum', viewAllDetailsDevices: 'mobile, tablet, desktop',
+      });
       const el = document.querySelector('.mobile-rider');
       riderInstance = init(el);
       await new Promise((resolve) => { setTimeout(resolve, 50); });

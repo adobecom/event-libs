@@ -5,9 +5,9 @@ import {
 } from '../../../utils/session-store.js';
 import { getTrackIcon } from '../../../utils/tier-1-event-config.js';
 import { resolveIcon } from '../../../features/icons/icon-resolver.js';
-import { favoriteWithFeedback } from '../../../services/sessions/action-feedback.js';
+import { toggleFavoriteWithFeedback } from '../../../services/sessions/action-feedback.js';
 import { showToast } from '../../../features/toast/toast.js';
-import { setSessionParam } from '../../../blocks/sessions-guide/utils/url.js';
+import { setSessionParam } from '../sessions-guide/utils/url.js';
 
 const BLOCK_CSS_URL = new URL('./mobile-rider.css', import.meta.url).href;
 
@@ -75,7 +75,7 @@ function buildFavoriteButton(session) {
   favorited.subscribe(paint);
 
   btn.addEventListener('click', () => {
-    favoriteWithFeedback(session, {
+    toggleFavoriteWithFeedback(session, {
       eventConfig: { title: session.title || '', registerUrl: getApiConfig()?.registerUrl || '/register' },
       isFavorited: favorited.value.has(session.id),
     });
