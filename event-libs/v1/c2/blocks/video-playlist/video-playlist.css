@@ -538,6 +538,15 @@
     z-index: 2;
     border-radius: var(--s2a-border-radius-md, 16px) var(--s2a-border-radius-md, 16px) 0 0;
     transition: max-height 0.3s ease;
+
+    /* Figma inspect: collapsed peek's own padding is 9px 16px 16px — distinct from the
+       shared base rule's 16px/16px/24px (desktop card + expanded mobile drawer both use
+       that instead, see .is-expanded below). */
+    padding: 9px var(--s2a-spacing-md) var(--s2a-spacing-md);
+  }
+
+  .video-playlist.is-expanded {
+    padding: var(--s2a-spacing-md) var(--s2a-spacing-md) var(--s2a-spacing-lg);
   }
 
   /* Real drag target now (see Drawer's #bindDrag), not just decorative — sized to a
@@ -606,6 +615,25 @@
     transform: rotate(180deg);
   }
 
+  /* Collapsed row must never wrap — .video-playlist-top's own base rule is flex-wrap:
+     wrap (needed so .video-playlist-autoplay can drop to its own line once expanded,
+     via flex-basis:100% below), but while collapsed only .video-playlist-up-next and
+     the toggle are actually visible; without this, the up-next block's own 2-line
+     clamped title grows tall/wide enough to push the toggle onto a wrapped second line,
+     which then gets clipped off entirely by the collapsed drawer's fixed max-height
+     (confirmed live: the chevron disappeared, not just visually hidden). Whole
+     collapsed peek is also tappable to open (see the JS's own top.addEventListener) —
+     a pointer cursor communicates that before the tap, same as the handle/toggle. */
+  .video-playlist-top {
+    flex-wrap: nowrap;
+    cursor: pointer;
+  }
+
+  .video-playlist.is-expanded .video-playlist-top {
+    flex-wrap: wrap;
+    cursor: default;
+  }
+
   /* Per Figma: the collapsed peek shows "Up next" + a session's own title instead of
      the playlist's title/autoplay row — swapped for the reverse the moment the drawer
      expands (Drawer's own #apply() toggles .is-expanded on this same element). Always
@@ -615,7 +643,7 @@
   .video-playlist-up-next {
     display: flex;
     flex-direction: column;
-    gap: 2px;
+    gap: var(--s2a-spacing-xs, 8px);
     flex: 1 1 auto;
     min-width: 0;
   }
@@ -657,16 +685,6 @@
 
   .video-playlist.is-expanded .video-playlist-autoplay {
     display: flex;
-  }
-
-  /* Whole collapsed peek is tappable to open (see the JS's own top.addEventListener) —
-     a pointer cursor communicates that before the tap, same as the handle/toggle. */
-  .video-playlist-top {
-    cursor: pointer;
-  }
-
-  .video-playlist.is-expanded .video-playlist-top {
-    cursor: default;
   }
 
   /* Figma: mobile "Play all" switch — OFF track #7D7D7D, ON track #DBDBDB; thumb stays
