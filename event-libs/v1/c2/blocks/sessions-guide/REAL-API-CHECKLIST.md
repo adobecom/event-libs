@@ -110,21 +110,33 @@ has none.
 
 Known gaps in the real mapping (not blockers, just incomplete real-data coverage):
 - `resources[]` always `[]` — backend hasn't shipped this field yet.
-- `mrStreamId` always `null` — the catalog carries no attribute for the Mobile Rider **live**
-  stream id, which is what `poller.js` keys on. The two video ids it *does* send are for
-  different players and neither substitutes:
-  - `MPC ID` → a VOD asset on **Adobe Video TV**.
-  - `Mobilerider Video ID (DVR)` → the **Mobile Rider recording of a finished stream**, i.e.
-    what some sessions become watchable from after the live window closes.
+- `mrStreamId` always `null` — the catalog carries no attribute for it yet. It is the Mobile
+  Rider **live** stream id that `poller.js` keys on, authored in RainFocus and inbound as a new
+  attribute, tentatively named **`Mobilerider Live Stream ID`**. Mapping it in
+  `mapEslPayloadToRawSessions()` is the single change that turns stream polling on, so it stays
+  unmapped until the name is confirmed.
 
-  A new custom attribute is expected to carry the live id, tentatively named
-  **`Mobilerider Live Stream ID`**. Mapping it in `mapEslPayloadToRawSessions()` is the single
-  change that turns stream polling on, so it stays unmapped until the name is confirmed.
 - Sessions with multiple `sessionTimes` (recurring/repeated) only surface their earliest
   occurrence.
 - `CategoryBadge`'s icon set — `getTrackIcon()` has no built-in default map anymore (see
   `event-libs/v1/utils/tier-1-event-config.js`); every Track needs an authored
   `track-icon-config` entry to show a badge at all — a content/authoring task, not a code gap.
+
+### Video sources
+
+A session's video comes from one of **four** attributes, each its own player. These are
+alternatives, not a fallback chain — a session carries whichever it was produced for, so an
+empty field means "not this source", never "try another".
+
+| Attribute | Field | Player | State |
+|---|---|---|---|
+| `Mobilerider Live Stream ID` | `mrStreamId` | Mobile Rider **live** | inbound; name tentative |
+| `MPC ID` | `mpcId` | **Adobe Video TV** | mapped, unread |
+| `YouTube ID` | `youTubeId` | **YouTube** | mapped, unread |
+| `Mobilerider Video ID (DVR)` | `mrDvrVideoId` | Mobile Rider **post-stream recording**, gated by `DVR Timing (in hours)` | mapped, unread |
+
+`Skin ID` → `mrSkinId` is the Mobile Rider player skin, and applies only to the two Mobile
+Rider sources. All of the above are mapped ahead of the playback work and read by nothing yet.
 
 ---
 

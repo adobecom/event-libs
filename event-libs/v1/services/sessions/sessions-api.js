@@ -80,8 +80,13 @@ export function normalizeSessions(rawSessions) {
     hasOnDemandFormat: Boolean(s.hasOnDemandFormat),
     // null (not 0) when unauthored — 0 would mean "available the moment the event starts".
     dvrDelayHours: s.dvrDelayHours ?? null,
-    // Unread; for the DVR playback work.
-    dvrVideoId: s.dvrVideoId || '',
+    // Unread; for the playback work. One field per video source, named for the player it
+    // belongs to — mr* is Mobile Rider (mrStreamId live, mrDvrVideoId the recording), mpcId is
+    // Adobe Video TV, youTubeId is YouTube. A session carries whichever it was produced for, so
+    // an empty one means "not this source", never "fall back to another".
+    mpcId: s.mpcId || '',
+    youTubeId: s.youTubeId || '',
+    mrDvrVideoId: s.mrDvrVideoId || '',
     mrSkinId: s.mrSkinId || '',
     videoDuration: s.videoDuration || '',
     sessionPageUrl: sessionPageUrlForEnv(s.sessionPageUrl),
@@ -411,16 +416,31 @@ export function mapEslPayloadToRawSessions(payload) {
       products: extractCustomAttributeValues(session, 'Product'),
       productAttributeId: getProductAttributeId(session),
       dvrDelayHours: parseDvrDelayHours(extractCustomAttributeValue(session, 'DVR Timing (in hours)')),
-      // Unread, mapped ahead of the playback work. Three different video sources are in play
-      // and none of them is the live stream (see mrStreamId below):
-      //   `Mobilerider Video ID (DVR)` — the Mobile Rider recording of a stream that just
-      //      ended, i.e. what some sessions become watchable from once the live window closes.
-      //   `MPC ID` — a VOD asset on Adobe Video TV. Deliberately unmapped: it is a separate
-      //      player from Mobile Rider, and nothing reads it until the playback work lands.
-      //   `Skin ID` — the Mobile Rider player skin/theme.
+      // A session's video can come from four different sources, each its own attribute and its
+      // own player. Live is one; the other three are all VOD, and a session picks whichever it
+      // was produced for — they are alternatives, not a fallback chain:
+      //
+      //   LIVE  `Mobilerider Live Stream ID` -> mrStreamId, polled for on-air status.
+      //         Authored in RainFocus and inbound on the catalog; see mrStreamId below.
+      //   VOD   `MPC ID`                     -> mpcId,        Adobe Video TV.
+      //   VOD   `YouTube ID`                 -> youTubeId,    YouTube-hosted sessions.
+      //   VOD   `Mobilerider Video ID (DVR)` -> mrDvrVideoId, the Mobile Rider recording of a
+      //         stream that has ended, i.e. what some sessions become watchable from once the
+      //         live window closes — gated by `DVR Timing (in hours)` above.
+      //
+      // The `mr` prefix marks the two Mobile Rider ids (live and DVR) as belonging to the same
+      // player, which is also the pair `Skin ID` applies to. mpcId and youTubeId are neither.
+      //
+      // All four are unread today, mapped ahead of the playback work so it has the data. Which
+      // one a session carries is the only thing that says which player to reach for, so none of
+      // them may be treated as a stand-in for another. `Skin ID` is the Mobile Rider player
+      // skin, and applies only to the two Mobile Rider sources.
+      //
       // videoDuration stays verbatim: the catalog writes 60 minutes as `00:60:00`, so it is
       // not reliably HH:MM:SS.
-      dvrVideoId: extractCustomAttributeValue(session, 'Mobilerider Video ID (DVR)'),
+      mpcId: extractCustomAttributeValue(session, 'MPC ID'),
+      youTubeId: extractCustomAttributeValue(session, 'YouTube ID'),
+      mrDvrVideoId: extractCustomAttributeValue(session, 'Mobilerider Video ID (DVR)'),
       mrSkinId: extractCustomAttributeValue(session, 'Skin ID'),
       videoDuration: extractCustomAttributeValue(session, 'Video Duration'),
       inPerson: hasFormatValue(formatValues, FORMAT_IN_PERSON),
@@ -432,12 +452,12 @@ export function mapEslPayloadToRawSessions(payload) {
       thumbnailUrl: thumbnail?.imageUrl ?? null,
       legalDisclaimer: extractCustomAttributeValue(session, ['Legal Disclaimer', 'LegalDisclaimer']) || undefined,
       // resources[]/mrStreamId intentionally omitted — no source in this payload yet.
-      // resources[] is still in development backend-side. mrStreamId is the Mobile Rider
-      // *live* id the poller keys on, and the catalog simply has no attribute carrying it:
-      // `MPC ID` is Adobe Video TV VOD and `Mobilerider Video ID (DVR)` is the post-stream
-      // recording, so neither substitutes for it. A new custom attribute is expected,
-      // tentatively named `Mobilerider Live Stream ID` — map it here once the name is
-      // confirmed, which is also what switches stream polling on.
+      // resources[] is still in development backend-side. mrStreamId is the Mobile Rider *live*
+      // stream id the poller keys on: it is authored in RainFocus and is inbound on the catalog
+      // as a new attribute, tentatively named `Mobilerider Live Stream ID`. Map it here once the
+      // name is confirmed — that is also what switches stream polling on, so check the
+      // on-demand-vs-live question in PM-QUESTIONS.md first. The three VOD ids above are for
+      // other players entirely and none of them substitutes for it.
       // normalizeSessions() defaults both to empty/null.
       customAttributeValues: buildCustomAttributeValueMap(session),
     };

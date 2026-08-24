@@ -223,9 +223,15 @@ interface Session {
   speakers: Speaker[];
   products: string[];
   resources: Resource[];
-  mrStreamId: string | null;     // Mobile Rider LIVE stream ID; non-null = MR session.
-                                 // Always null today: no catalog attribute carries it.
-                                 // Expected as `Mobilerider Live Stream ID` (tentative).
+  // Four video sources, one field each, named for the player. Alternatives, not a fallback
+  // chain — a session carries whichever it was produced for.
+  mrStreamId: string | null;     // Mobile Rider LIVE; non-null = MR session. Always null
+                                 // today: inbound as `Mobilerider Live Stream ID` (tentative).
+  mpcId: string;                 // `MPC ID` -> Adobe Video TV. Mapped, unread.
+  youTubeId: string;             // `YouTube ID` -> YouTube. Mapped, unread.
+  mrDvrVideoId: string;          // `Mobilerider Video ID (DVR)` -> post-stream recording,
+                                 // gated by `DVR Timing (in hours)`. Mapped, unread.
+  mrSkinId: string;              // `Skin ID` -> Mobile Rider player skin (mr* sources only).
   inPerson: boolean;             // Format carries `In person`
   isOnline: boolean;             // Format carries `Online`
   hasOnDemandFormat: boolean;    // Format carries `On demand, post event`

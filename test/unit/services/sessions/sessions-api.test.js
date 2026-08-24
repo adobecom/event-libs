@@ -408,19 +408,19 @@ describe('services/sessions/sessions-api', () => {
           ],
         }],
       });
-      expect(session.dvrVideoId).to.equal('ubKVqWmTT5');
+      expect(session.mrDvrVideoId).to.equal('ubKVqWmTT5');
       expect(session.mrSkinId).to.equal('adobe');
       expect(session.videoDuration).to.equal('00:60:00');
 
       const [normalized] = normalizeSessions([session]);
-      expect(normalized.dvrVideoId).to.equal('ubKVqWmTT5');
+      expect(normalized.mrDvrVideoId).to.equal('ubKVqWmTT5');
       expect(normalized.mrSkinId).to.equal('adobe');
       expect(normalized.videoDuration).to.equal('00:60:00');
     });
 
     it('defaults the playback fields to empty strings when unauthored', () => {
       const [normalized] = normalizeSessions([{ id: 's-1' }]);
-      expect(normalized.dvrVideoId).to.equal('');
+      expect(normalized.mrDvrVideoId).to.equal('');
       expect(normalized.mrSkinId).to.equal('');
       expect(normalized.videoDuration).to.equal('');
     });
@@ -517,6 +517,58 @@ describe('services/sessions/sessions-api', () => {
   // yield [] today and pick the values up the moment either casing appears.
   // Confirmed unused for MAX 26: the catalog still sends it, but nothing may key off it, so
   // neither generic path that picks attributes up on its own is allowed to surface it.
+  // Four sources, four attributes, four players. A session carries whichever it was produced
+  // for, so these are alternatives rather than a fallback chain -- no field may be read as a
+  // stand-in for another.
+  describe('video source ids', () => {
+    const withAttrs = (attrs) => mapEslPayloadToRawSessions({
+      speakers: [],
+      sessionTimes: [],
+      sessions: [{ sessionId: 's-1', sessionCode: 'S1', customAttributes: [ONLINE_FORMAT, ...attrs] }],
+    })[0];
+
+    it('maps each VOD source to its own field', () => {
+      const s1 = withAttrs([
+        customAttr('MPC ID', [textValue('3458902')]),
+        customAttr('YouTube ID', [textValue('O7z5ufUh8hc')]),
+        customAttr('Mobilerider Video ID (DVR)', [textValue('ubKVqWmTT5')]),
+        customAttr('Skin ID', [textValue('adobe')]),
+      ]);
+      expect(s1.mpcId).to.equal('3458902');
+      expect(s1.youTubeId).to.equal('O7z5ufUh8hc');
+      expect(s1.mrDvrVideoId).to.equal('ubKVqWmTT5');
+      expect(s1.mrSkinId).to.equal('adobe');
+    });
+
+    it('leaves the other sources empty when only one is authored', () => {
+      const onlyYt = withAttrs([customAttr('YouTube ID', [textValue('O7z5ufUh8hc')])]);
+      expect(onlyYt.youTubeId).to.equal('O7z5ufUh8hc');
+      expect(onlyYt.mpcId).to.equal('');
+      expect(onlyYt.mrDvrVideoId).to.equal('');
+    });
+
+    it('never borrows one id for another, and never for the live stream', () => {
+      const onlyMpc = withAttrs([customAttr('MPC ID', [textValue('3458902')])]);
+      expect(onlyMpc.youTubeId).to.equal('');
+      expect(onlyMpc.mrDvrVideoId).to.equal('');
+      // The live id has its own attribute, still inbound -- MPC is not a stand-in for it.
+      expect(normalizeSessions([onlyMpc])[0].mrStreamId).to.be.null;
+    });
+
+    it('carries every id through normalizeSessions, defaulting to empty', () => {
+      const bare = normalizeSessions([withAttrs([])])[0];
+      expect(bare.mpcId).to.equal('');
+      expect(bare.youTubeId).to.equal('');
+      expect(bare.mrDvrVideoId).to.equal('');
+      const full = normalizeSessions([withAttrs([
+        customAttr('MPC ID', [textValue('3458902')]),
+        customAttr('YouTube ID', [textValue('O7z5ufUh8hc')]),
+      ])])[0];
+      expect(full.mpcId).to.equal('3458902');
+      expect(full.youTubeId).to.equal('O7z5ufUh8hc');
+    });
+  });
+
   describe('ignored attributes', () => {
     const GATED = {
       name: 'Gated Video',

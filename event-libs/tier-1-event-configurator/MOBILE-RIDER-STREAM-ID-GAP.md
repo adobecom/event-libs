@@ -33,11 +33,16 @@ Two separate things were conflated here. Both are true:
 The two video ids the catalog *does* send are for different players and neither
 substitutes for the live id:
 
-| Attribute | What it is | Use |
+| Attribute | Field | Player |
 |---|---|---|
-| `MPC ID` | Adobe Media Publishing Cloud asset id | VOD playback on **Adobe Video TV** |
-| `Mobilerider Video ID (DVR)` | Mobile Rider recording of a **finished** stream | what some sessions become watchable from after the live window closes, delayed by `DVR Timing (in hours)` |
-| *(missing)* | Mobile Rider **live** stream id | what `poller.js` polls for on-air status |
+| `MPC ID` | `mpcId` | **Adobe Video TV** (Adobe Media Publishing Cloud asset) |
+| `YouTube ID` | `youTubeId` | **YouTube**-hosted sessions |
+| `Mobilerider Video ID (DVR)` | `mrDvrVideoId` | Mobile Rider recording of a **finished** stream — what some sessions become watchable from after the live window closes, delayed by `DVR Timing (in hours)` |
+| *(inbound)* | `mrStreamId` | Mobile Rider **live** — what `poller.js` polls for on-air status |
+
+Four sources, four players, and they are **alternatives rather than a fallback chain**: a session
+carries whichever it was produced for, so an empty field means "not this source", never "try
+another". All three VOD ids are mapped today and read by nothing; only the live id is missing.
 
 A new custom attribute is expected to carry the live id, tentatively named
 **`Mobilerider Live Stream ID`**. So the thing to wait for is a *pending attribute*
