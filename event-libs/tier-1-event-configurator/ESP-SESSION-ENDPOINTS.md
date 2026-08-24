@@ -72,6 +72,8 @@ No `resources[]`/`mrStreamId`/`videoAvailable` on the session itself (matches ex
 ```
 **`videos` is explicitly stripped before this leaves the service** (`_fetchAllEventSessionTimes()`: `times.map(({videos: _videos, ...time}) => time)`), with a code comment citing MWPW-200437 — private streaming details must never be exposed via this public catalog endpoint. Confirms the existing project note that `mrStreamId`/`videoAvailable` being absent is deliberate, not a schema gap.
 
+**Update 2026-08-24 — this is no longer the route to the live stream id.** `videos` stays stripped, but per product the Mobile Rider *live* stream id will be delivered as an ordinary custom attribute instead, tentatively **`Mobilerider Live Stream ID`**. The two video ids the catalog sends today are for different players: `MPC ID` is an Adobe Video TV VOD asset, and `Mobilerider Video ID (DVR)` is the Mobile Rider recording of a *finished* stream. Neither answers "is this on air now?". See `MOBILE-RIDER-STREAM-ID-GAP.md`.
+
 **Top-level `speakers[]`** (full record, series-scoped):
 ```json
 {

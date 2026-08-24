@@ -461,14 +461,54 @@ describe('services/sessions/sessions-api', () => {
       expect(mapped.map((s) => s.id)).to.deep.equal(['keeper']);
     });
 
-    // A dropped session is invisible, so the removal has to be traceable.
-    it('logs the ids it dropped', () => {
+    // A dropped session is invisible, so the removal has to be traceable -- and by something
+    // an author can act on, which the id alone is not.
+    function captureLog(payload) {
       const logged = [];
       const originalLana = window.lana;
       window.lana = { log: (msg) => logged.push(msg) };
-      mapEslPayloadToRawSessions({ sessions: [{ sessionId: 'mpc', customAttributes: [] }] });
-      window.lana = originalLana;
-      expect(logged.join('\n')).to.include('mpc');
+      try {
+        mapEslPayloadToRawSessions(payload);
+      } finally {
+        window.lana = originalLana;
+      }
+      return logged.join('\n');
+    }
+
+    it('logs the code, title and id of what it dropped', () => {
+      const out = captureLog({
+        sessions: [{
+          sessionId: 'mpc',
+          sessionCode: '1003',
+          localizations: { 'en-US': { title: 'A.COM IPOD Test Session - MPC' } },
+          customAttributes: [],
+        }],
+      });
+      expect(out).to.include('dropped 1 session(s)');
+      expect(out).to.include('1003');
+      expect(out).to.include('A.COM IPOD Test Session - MPC');
+      expect(out).to.include('mpc');
+    });
+
+    it('falls back to enTitle, and marks a row with neither code nor title', () => {
+      expect(captureLog({
+        sessions: [{ sessionId: 'a', sessionCode: 'S1', enTitle: 'From enTitle', customAttributes: [] }],
+      })).to.include('From enTitle');
+      expect(captureLog({ sessions: [{ sessionId: 'b', customAttributes: [] }] }))
+        .to.include('(no code) "(untitled)" [b]');
+    });
+
+    // A wholesale Format authoring failure must not emit an unbounded log line.
+    it('caps the enumeration at 10 but still reports the true total', () => {
+      const out = captureLog({
+        sessions: Array.from({ length: 14 }, (_, i) => ({
+          sessionId: `s-${i}`, sessionCode: `C${i}`, enTitle: `T${i}`, customAttributes: [],
+        })),
+      });
+      expect(out).to.include('dropped 14 session(s)');
+      expect(out).to.include('+4 more');
+      expect(out).to.include('C9');
+      expect(out).to.not.include('C10');
     });
   });
 

@@ -76,7 +76,7 @@ So the split is: `BlockMediator` still owns what it already owned (`imsProfile`,
 `decorateEvent()` additionally requires `tier-1-event-config` metadata to be present before it even calls `initSessionState()` (see MWPW-200314-HANDOFF.md / decorate.js). `event-id` alone is already authored broadly across prod event pages for unrelated purposes, so gating on it alone would seed sessions-guide's mock data (`sg:dev-auth`, mock scheduled/favorited) on pages that never intend to use it. Presence of `tier-1-event-config` is the explicit opt-in, separate from — and checked before — the `rainfocus-api-url` gate inside `initSessionState()` itself.
 
 ### Polling architecture
-A single `setInterval` (30 s) starts inside `session-store.js` after sessions are loaded (when `sessionsStatus.value === 'ready'`). It calls the Mobile Rider batch API for all sessions that have an `mrStreamId`. The polling engine self-stops when all MR sessions report inactive (stream day over). `poller.js`'s `startPolling(mrSessions, env, onUpdate, intervalMs)` takes a plain callback instead of a dispatch function — decoupling it from ever being tied to a specific reducer.
+A single `setInterval` (30 s) starts inside `session-store.js` after sessions are loaded (when `sessionsStatus.value === 'ready'`). It calls the Mobile Rider batch API for all sessions that have an `mrStreamId` — which is no sessions today, since the catalog carries no live-stream-id attribute yet (see REAL-API-CHECKLIST.md), so the poll is inert until `Mobilerider Live Stream ID` (tentative) ships. The polling engine self-stops when all MR sessions report inactive (stream day over). `poller.js`'s `startPolling(mrSessions, env, onUpdate, intervalMs)` takes a plain callback instead of a dispatch function — decoupling it from ever being tied to a specific reducer.
 
 ### Session-state ticker
 MR polling only gives components an ambient re-render on a live-status change — a page with only non-MR sessions had no mechanism to notice a session crossing its start/end time purely because the clock moved forward, short of a user interacting with something else first. `event-libs/v1/services/sessions/session-state-ticker.js`'s `startSessionStateTicker(getSessions, getLiveStreamActiveIds, onChange, { intervalMs, getNow })` runs on its own 15 s interval (also started from `session-store.js`, unconditionally — not gated on MR sessions existing), diffs `deriveSessionState()` per session against its last-known value, and only calls `onChange` when at least one session's bucket actually changed. `session-store.js` wires `onChange` to bump the shared `sessionStateVersion` signal. It self-stops once every session is on-demand, mirroring the MR poller's own self-stop.
@@ -222,7 +222,9 @@ interface Session {
   speakers: Speaker[];
   products: string[];
   resources: Resource[];
-  mrStreamId: string | null;     // Mobile Rider stream ID; non-null = MR session
+  mrStreamId: string | null;     // Mobile Rider LIVE stream ID; non-null = MR session.
+                                 // Always null today: no catalog attribute carries it.
+                                 // Expected as `Mobilerider Live Stream ID` (tentative).
   inPerson: boolean;             // Format carries `In person`
   isOnline: boolean;             // Format carries `Online`
   hasOnDemandFormat: boolean;    // Format carries `On demand, post event`

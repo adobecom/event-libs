@@ -110,9 +110,16 @@ has none.
 
 Known gaps in the real mapping (not blockers, just incomplete real-data coverage):
 - `resources[]` always `[]` — backend hasn't shipped this field yet.
-- `mrStreamId` always `null` — video/stream data is deliberately stripped from this public
-  endpoint until a session goes live; needs a different, likely time-gated/authenticated
-  fetch once that's designed.
+- `mrStreamId` always `null` — the catalog carries no attribute for the Mobile Rider **live**
+  stream id, which is what `poller.js` keys on. The two video ids it *does* send are for
+  different players and neither substitutes:
+  - `MPC ID` → a VOD asset on **Adobe Video TV**.
+  - `Mobilerider Video ID (DVR)` → the **Mobile Rider recording of a finished stream**, i.e.
+    what some sessions become watchable from after the live window closes.
+
+  A new custom attribute is expected to carry the live id, tentatively named
+  **`Mobilerider Live Stream ID`**. Mapping it in `mapEslPayloadToRawSessions()` is the single
+  change that turns stream polling on, so it stays unmapped until the name is confirmed.
 - Sessions with multiple `sessionTimes` (recurring/repeated) only surface their earliest
   occurrence.
 - `CategoryBadge`'s icon set — `getTrackIcon()` has no built-in default map anymore (see

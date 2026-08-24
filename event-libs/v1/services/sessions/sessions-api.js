@@ -297,6 +297,17 @@ export function isMissingFormat(session) {
   return extractCustomAttributeValues(session, 'Format').length === 0;
 }
 
+const DROP_LOG_LIMIT = 10;
+
+// Identifies a raw catalog row in a log. sessionCode is what an author can search RainFocus
+// by, the title is what they recognise it as, and the id is what the API keys on — the id
+// alone is not enough to go and fix the row.
+function describeRawSession(session) {
+  const code = session.sessionCode || '(no code)';
+  const title = session.localizations?.['en-US']?.title || session.enTitle || '(untitled)';
+  return `${code} "${title}" [${session.sessionId}]`;
+}
+
 // Joins the ESL/ESP catalog payload's flat, relational arrays (sessions/sessionTimes/
 // speakers, related by id) into the raw-session shape normalizeSessions() expects.
 export function mapEslPayloadToRawSessions(payload) {
@@ -308,16 +319,20 @@ export function mapEslPayloadToRawSessions(payload) {
   });
 
   const candidates = [];
-  const droppedIds = [];
+  const dropped = [];
   (payload.sessions || []).forEach((session) => {
     if (ENFORCE_PUBLISHED_FILTER && !isSessionPublished(session)) return;
-    if (isMissingFormat(session)) droppedIds.push(session.sessionId);
+    if (isMissingFormat(session)) dropped.push(session);
     else candidates.push(session);
   });
-  // Named because an empty Format is a mis-authored row, and the session otherwise just
-  // goes missing from the guide with nothing to trace it by.
-  if (droppedIds.length > 0) {
-    window.lana?.log(`[sessions-api] dropped ${droppedIds.length} session(s) with no Format value: ${droppedIds.join(', ')}`);
+  // An empty Format is a mis-authored row and dropping it is intentional, but the session
+  // then appears in no view at all, so the removal has to be traceable. The count is always
+  // exact; the enumeration is capped so a wholesale authoring failure can't emit an
+  // unbounded log line.
+  if (dropped.length > 0) {
+    const listed = dropped.slice(0, DROP_LOG_LIMIT).map(describeRawSession).join('; ');
+    const rest = dropped.length - DROP_LOG_LIMIT;
+    window.lana?.log(`[sessions-api] dropped ${dropped.length} session(s) with no Format value: ${listed}${rest > 0 ? `; +${rest} more` : ''}`);
   }
 
   return candidates
@@ -377,8 +392,15 @@ export function mapEslPayloadToRawSessions(payload) {
       products: extractCustomAttributeValues(session, 'Product'),
       productAttributeId: getProductAttributeId(session),
       dvrDelayHours: parseDvrDelayHours(extractCustomAttributeValue(session, 'DVR Timing (in hours)')),
-      // Unread, mapped ahead of the playback work. videoDuration stays verbatim: the catalog
-      // writes 60 minutes as `00:60:00`, so it is not reliably HH:MM:SS.
+      // Unread, mapped ahead of the playback work. Three different video sources are in play
+      // and none of them is the live stream (see mrStreamId below):
+      //   `Mobilerider Video ID (DVR)` — the Mobile Rider recording of a stream that just
+      //      ended, i.e. what some sessions become watchable from once the live window closes.
+      //   `MPC ID` — a VOD asset on Adobe Video TV. Deliberately unmapped: it is a separate
+      //      player from Mobile Rider, and nothing reads it until the playback work lands.
+      //   `Skin ID` — the Mobile Rider player skin/theme.
+      // videoDuration stays verbatim: the catalog writes 60 minutes as `00:60:00`, so it is
+      // not reliably HH:MM:SS.
       dvrVideoId: extractCustomAttributeValue(session, 'Mobilerider Video ID (DVR)'),
       mrSkinId: extractCustomAttributeValue(session, 'Skin ID'),
       videoDuration: extractCustomAttributeValue(session, 'Video Duration'),
@@ -390,10 +412,14 @@ export function mapEslPayloadToRawSessions(payload) {
       isKeynote: type === 'Keynote',
       thumbnailUrl: thumbnail?.imageUrl ?? null,
       copyrightDisclaimer: extractCustomAttributeValue(session, ['Legal Disclaimer', 'LegalDisclaimer']) || undefined,
-      // resources[]/mrStreamId intentionally omitted — no source in this payload yet
-      // (resources still in development backend-side; video/stream data is deliberately
-      // withheld from this public endpoint until the session goes live). normalizeSessions()
-      // defaults both to empty/null.
+      // resources[]/mrStreamId intentionally omitted — no source in this payload yet.
+      // resources[] is still in development backend-side. mrStreamId is the Mobile Rider
+      // *live* id the poller keys on, and the catalog simply has no attribute carrying it:
+      // `MPC ID` is Adobe Video TV VOD and `Mobilerider Video ID (DVR)` is the post-stream
+      // recording, so neither substitutes for it. A new custom attribute is expected,
+      // tentatively named `Mobilerider Live Stream ID` — map it here once the name is
+      // confirmed, which is also what switches stream polling on.
+      // normalizeSessions() defaults both to empty/null.
       customAttributeValues: buildCustomAttributeValueMap(session),
     };
   })
