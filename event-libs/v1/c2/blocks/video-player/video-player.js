@@ -1,6 +1,7 @@
 import { createTag, getMetadata, LIBS } from '../../../utils/utils.js';
 import { getNowMs } from '../../../utils/session-state.js';
 import BlockMediator from '../../../deps/block-mediator.min.js';
+import { showVideoLayoutLoader, hideVideoLayoutLoader } from '../../utils/video-layout-loader.js';
 
 // Shared getter/setter/subscriber store (same imsProfile/rsvpData pattern
 // session-store.js already uses) — video-playlist.js sets this once it knows whether it
@@ -399,13 +400,18 @@ export default async function init(el) {
     return;
   }
 
+  // Owned by a shared module (video-layout-loader.js), not this instance's own el —
+  // exactly one loader shows page-wide regardless of how many .video-player instances
+  // are waiting on the same decision. Still only requested by the non-playlist-container
+  // instance (the more likely winner — see awaitEmbedDecision's own comment) so it
+  // appears where the video is actually more likely to land, not both places at once.
   if (!isInsidePlaylistContainer(el)) {
-    el.append(createTag('div', { class: 'video-player-loader', 'aria-hidden': 'true' }));
+    showVideoLayoutLoader(el);
   }
 
   (async () => {
     const isWinner = await awaitEmbedDecision(el);
-    el.querySelector('.video-player-loader')?.remove();
+    hideVideoLayoutLoader();
     if (!isWinner) return;
     loadVideoPlayer(el, sessionId, currentVideo);
   })();
