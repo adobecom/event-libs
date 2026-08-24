@@ -590,6 +590,55 @@ describe('services/sessions/sessions-api', () => {
     });
   });
 
+  // Gated Video is not used by MAX 26 logic and never will be. It is deliberately left in the
+  // data -- it reaches customAttributeValues and the configurator's facet list like any other
+  // select, so an author can see it and unmark it as a filter. What must stay true is that no
+  // code keys off it: no derived session field, no branch, no special case.
+  describe('Gated Video is data only, never logic', () => {
+    const GATED = {
+      name: 'Gated Video',
+      attributeId: 'gated-attr-id',
+      inputType: 'single-select',
+      values: [{ valueId: 'yes-id', label: 'Yes', value: 'yes', ordinal: 0 }],
+    };
+    const payload = {
+      speakers: [],
+      sessionTimes: [],
+      sessions: [{ sessionId: 's-1', sessionCode: 'S1', customAttributes: [ONLINE_FORMAT, GATED] }],
+    };
+
+    // Everything except the generic attributeId-keyed map, which is where it is allowed.
+    const withoutGenericMap = (session) => {
+      const copy = { ...session };
+      delete copy.customAttributeValues;
+      return copy;
+    };
+
+    it('derives no session field from it', () => {
+      const [mapped] = mapEslPayloadToRawSessions(payload);
+      const rest = withoutGenericMap(normalizeSessions([mapped])[0]);
+      expect(JSON.stringify(rest).toLowerCase()).to.not.include('gated');
+      expect(Object.keys(rest)).to.not.include('gatedVideo');
+    });
+
+    it('does not change placement, badges or any other derived flag', () => {
+      const withGated = mapEslPayloadToRawSessions(payload)[0];
+      const withoutGated = mapEslPayloadToRawSessions({
+        ...payload,
+        sessions: [{ sessionId: 's-1', sessionCode: 'S1', customAttributes: [ONLINE_FORMAT] }],
+      })[0];
+      expect(withoutGenericMap(withGated)).to.deep.equal(withoutGenericMap(withoutGated));
+    });
+
+    // The other half of the intent: it stays visible to authors rather than being hidden.
+    it('still reaches customAttributeValues and the facet list, so an author can unmark it', () => {
+      const [mapped] = mapEslPayloadToRawSessions(payload);
+      expect(mapped.customAttributeValues['gated-attr-id']).to.deep.equal(['Yes']);
+      expect(deriveFacetableAttributes(payload.sessions).map((f) => f.attributeId))
+        .to.include('gated-attr-id');
+    });
+  });
+
   describe('drop reporting', () => {
     const IN_PERSON = customAttr('Format', [selectValue('In-Person', 'in-person')]);
 
