@@ -1,5 +1,14 @@
 import { createTag, getMetadata, LIBS } from '../../../utils/utils.js';
 import { getNowMs } from '../../../utils/session-state.js';
+import BlockMediator from '../../../deps/block-mediator.min.js';
+
+// Shared getter/setter/subscriber store (same imsProfile/rsvpData pattern
+// session-store.js already uses) — video-playlist.js sets this once it knows whether it
+// has anything to show; both video-player instances on the page read/subscribe to it to
+// decide which one actually embeds. Replaces a prior window.__videoPlaylistDecision
+// latch + CustomEvent pair with the same mechanism the rest of the codebase already uses
+// for this kind of cross-block signal.
+const VIDEO_LAYOUT_DECISION_KEY = 'videoLayoutDecision';
 
 const BLOCK_CSS_URL = new URL('./video-player.css', import.meta.url).href;
 const MILO_IFRAME_CSS_URL = `${LIBS}/styles/iframe.css`;
@@ -335,10 +344,9 @@ function isInsidePlaylistContainer(el) {
 }
 
 function awaitEmbedDecision(el) {
-  if (window.__videoPlaylistDecision != null) {
-    return Promise.resolve(isInsidePlaylistContainer(el)
-      ? window.__videoPlaylistDecision
-      : !window.__videoPlaylistDecision);
+  const existing = BlockMediator.get(VIDEO_LAYOUT_DECISION_KEY);
+  if (existing != null) {
+    return Promise.resolve(isInsidePlaylistContainer(el) ? existing.hasPlaylist : !existing.hasPlaylist);
   }
   return new Promise((resolve) => {
     let settled = false;
@@ -346,11 +354,13 @@ function awaitEmbedDecision(el) {
       if (settled) return;
       settled = true;
       clearTimeout(timer);
-      window.removeEventListener('video-playlist:decision', onDecision);
+      unsubscribe();
       resolve(isInsidePlaylistContainer(el) ? hasPlaylist : !hasPlaylist);
     };
-    const onDecision = (event) => settle(event.detail.hasPlaylist);
-    window.addEventListener('video-playlist:decision', onDecision);
+    const unsubscribe = BlockMediator.subscribe(
+      VIDEO_LAYOUT_DECISION_KEY,
+      ({ newValue }) => settle(newValue.hasPlaylist),
+    );
     const timer = setTimeout(() => settle(false), DECISION_FALLBACK_MS);
   });
 }

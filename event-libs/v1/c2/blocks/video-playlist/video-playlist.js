@@ -6,7 +6,13 @@ import { deriveSessionState, getNowMs } from '../../../utils/session-state.js';
 import { extractCustomAttributeSlugs } from '../../../services/sessions/sessions-api.js';
 import { toggleFavoriteWithFeedback } from '../../../services/sessions/action-feedback.js';
 import { readBackgroundConfig } from '../../utils/background-config.js';
+import BlockMediator from '../../../deps/block-mediator.min.js';
 
+// Shared getter/setter/subscriber store (same imsProfile/rsvpData pattern
+// session-store.js already uses) — set once this block knows whether it has anything to
+// show; both video-player instances on the page read/subscribe to it (see that block's
+// own awaitEmbedDecision) to decide which one actually embeds.
+const VIDEO_LAYOUT_DECISION_KEY = 'videoLayoutDecision';
 
 const EVENT_CONFIG = { title: '', registerUrl: '/register' };
 
@@ -440,8 +446,7 @@ function findVideoSections() {
 }
 
 function announceVideoDecision(hasPlaylist) {
-  window.__videoPlaylistDecision = hasPlaylist;
-  window.dispatchEvent(new CustomEvent('video-playlist:decision', { detail: { hasPlaylist } }));
+  BlockMediator.set(VIDEO_LAYOUT_DECISION_KEY, { hasPlaylist });
   const losingSection = findVideoSections()
     .find((section) => Boolean(section.querySelector('.video-playlist')) !== hasPlaylist);
   if (!losingSection || losingSection.classList.contains('is-collapsing')) return;
