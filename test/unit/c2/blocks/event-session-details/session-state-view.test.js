@@ -71,6 +71,88 @@ describe('session-state-view', () => {
     });
   });
 
+  describe('renderStatus on-demand: Coming soon for an IPOD session with no recording yet', () => {
+    const times = { start: 1794518100000, timezone: 'America/Los_Angeles' };
+    // Real page shapes. IPOD = Format carrying both in-person and on-demand-post-event.
+    const IPOD = [{ value: 'in-person', label: 'In-Person' }, { value: 'on-demand-post-event', label: 'On demand, post event' }];
+    const IN_PERSON_ONLY = [{ value: 'in-person', label: 'In-Person' }];
+    const ONLINE = [{ value: 'online', label: 'Online' }];
+    const POST_EVENT_ONLY = [{ value: 'on-demand-post-event', label: 'On demand, post event' }];
+    const MPC_RECORDING = { provider: 'mpc', url: 'https://video.tv.adobe.com/v/3433462', kind: 'onDemand' };
+
+    const setPage = ({ videos = [], format = [] }) => {
+      setMetadata('session-times', JSON.stringify([{ endTimeMillis: 1, videos }]));
+      setMetadata('custom-attributes', JSON.stringify([{ name: 'Format', values: format }]));
+    };
+
+    it('IPOD with no recording yet -> Coming soon', () => {
+      setPage({ videos: [], format: IPOD });
+      const el = renderStatus('on-demand', times);
+      expect(el.textContent).to.equal('Coming soon');
+      expect(el.classList.contains('session-status--coming-soon')).to.be.true;
+    });
+
+    it('IPOD once the recording is attached -> On-demand', () => {
+      setPage({ videos: [MPC_RECORDING], format: IPOD });
+      expect(renderStatus('on-demand', times).textContent).to.equal('On-demand');
+    });
+
+    it('IPOD with only a leftover liveStream entry -> Coming soon', () => {
+      setPage({
+        videos: [{ provider: 'youtube', url: 'https://youtube.com/watch?v=x', kind: 'liveStream' }],
+        format: IPOD,
+      });
+      expect(renderStatus('on-demand', times).textContent).to.equal('Coming soon');
+    });
+
+    it('IPOD with a non-embeddable provider only -> Coming soon', () => {
+      setPage({ videos: [{ provider: 'mobilerider', url: 'x', kind: 'dvr' }], format: IPOD });
+      expect(renderStatus('on-demand', times).textContent).to.equal('Coming soon');
+    });
+
+    it('matches the Format slug even with no display label', () => {
+      setPage({
+        videos: [],
+        format: [{ value: 'in-person', label: '' }, { value: 'on-demand-post-event', label: '' }],
+      });
+      expect(renderStatus('on-demand', times).textContent).to.equal('Coming soon');
+    });
+
+    // Everything below is NOT IPOD, so it stays On-demand regardless of video presence.
+    it('online/virtual session with no video -> On-demand (not IPOD)', () => {
+      setPage({ videos: [], format: ONLINE });
+      expect(renderStatus('on-demand', times).textContent).to.equal('On-demand');
+    });
+
+    it('on-demand-post-event without in-person -> On-demand (not IPOD)', () => {
+      setPage({ videos: [], format: POST_EVENT_ONLY });
+      expect(renderStatus('on-demand', times).textContent).to.equal('On-demand');
+    });
+
+    it('in-person only, never posted -> On-demand (not IPOD)', () => {
+      setPage({ videos: [], format: IN_PERSON_ONLY });
+      expect(renderStatus('on-demand', times).textContent).to.equal('On-demand');
+    });
+
+    it('no Format attribute at all -> On-demand', () => {
+      setPage({ videos: [], format: [] });
+      expect(renderStatus('on-demand', times).textContent).to.equal('On-demand');
+    });
+
+    // The real template session: youtube liveStream + mpc onDemand + mobilerider dvr.
+    it('the real IPOD template session (mpc onDemand present) -> On-demand', () => {
+      setPage({
+        videos: [
+          { provider: 'youtube', url: 'https://www.youtube.com/watch?v=O7z5ufUh8hc', kind: 'liveStream' },
+          MPC_RECORDING,
+          { provider: 'mobilerider', url: 'https://mobilerider.com/video/0srCQZ5MIu', kind: 'dvr' },
+        ],
+        format: IPOD,
+      });
+      expect(renderStatus('on-demand', times).textContent).to.equal('On-demand');
+    });
+  });
+
   describe('mountSessionState', () => {
     // start 150ms out, end well beyond: mount lands in 'upcoming', then the
     // scheduled boundary flips it to 'live' (the controller adds a 500ms cushion).

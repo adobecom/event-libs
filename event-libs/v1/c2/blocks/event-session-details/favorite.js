@@ -1,12 +1,3 @@
-/*
- * Favorite (MWPW-203474) — sub-feature of session-details.
- * Heart toggle that saves this session to the attendee's RainFocus favorites.
- * Persistent across all states. Reuses the page-level session-state engine and
- * the shared auth/registration gate — the login/registration toast fires
- * automatically via toggleFavoriteWithFeedback. Mirrors event-marquee.js's
- * buildFavoriteButton, but resolves the real session (with rfSessionId) so the
- * toggle actually persists rather than being a visual stub.
- */
 import { createTag, getMetadata } from '../../../utils/utils.js';
 import {
   initSessionState, sessions, favorited, getApiConfig,
@@ -18,20 +9,15 @@ const ICON_HEART_FILLED = '<svg width="20" height="20" viewBox="0 0 20 20" fill=
 
 export function renderFavorite() {
   const sessionId = getMetadata('session-id');
-  if (!sessionId) return null; // nothing to favorite without a session id
+  if (!sessionId) return null;
 
-  // Boot the page-level state engine (idempotent; no-ops without tier-1 config).
   initSessionState();
 
-  // action-feedback expects { title, registerUrl } (not Milo's global config).
   const eventConfig = {
     title: getMetadata('event-title') || getMetadata('title') || '',
     registerUrl: getApiConfig()?.registerUrl || '/register',
   };
 
-  // Start with a minimal session so the heart renders immediately; upgrade to the
-  // real object (carrying rfSessionId) once the catalog loads so the API mutation
-  // targets the right session. `favorited` keys on session.id either way.
   let session = sessions.value.find((s) => s.id === sessionId) || { id: sessionId };
   if (!session.rfSessionId) {
     const unsubscribe = sessions.subscribe((list) => {
@@ -40,9 +26,6 @@ export function renderFavorite() {
     });
   }
 
-  // Icon-only toggle: the accessible name stays constant and `aria-pressed` carries
-  // the state. A name that flipped too would double-announce it ("Remove from
-  // favorites, pressed").
   const btn = createTag('button', {
     type: 'button',
     class: 'session-action session-favorite',

@@ -1,8 +1,3 @@
-/*
- * Speakers (MWPW-203471). Mobile-first.
- * Avatar + name/role rows; first 5 shown, rest revealed by the toggle.
- */
-
 .event-speakers {
   display: flex;
   flex-direction: column;
@@ -89,7 +84,6 @@
 }
 
 .speakers-toggle {
-  /* 24 above (8 + 16 container gap) and 24 below (16 + 8 block margin) */
   margin-block: var(--s2a-spacing-8, 8px) var(--s2a-spacing-16, 16px);
   align-self: flex-start;
   display: inline-flex;

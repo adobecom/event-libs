@@ -1,9 +1,3 @@
-/*
- * Track Tags (MWPW-203475). Mobile-first eyebrow labels.
- * Icon + track name, one per row, stacked when there is more than one track
- * (per the MWPW-200288 mobile design). No pill/badge background.
- */
-
 .track-tags {
   display: flex;
   flex-direction: column;
@@ -27,7 +21,6 @@
   height: var(--s2a-spacing-16, 16px);
 }
 
-/* No configured/resolved icon and no star fallback — collapse the slot. */
 .track-tag-icon:empty {
   display: none;
 }

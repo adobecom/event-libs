@@ -1,9 +1,3 @@
-/*
- * Share (MWPW-203472) — sub-feature of session-details.
- * Native share with a copy-link fallback + toast. Persistent across all states.
- * Ports event-marquee.js's buildShareButton logic; reads the published `url` +
- * `title` metadata, falling back to the current document.
- */
 import { createTag, getMetadata } from '../../../utils/utils.js';
 import { showToast } from '../../../features/toast/toast.js';
 
