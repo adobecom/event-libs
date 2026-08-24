@@ -1,9 +1,8 @@
 import { expect } from '@esm-bundle/chai';
 import { dvrAvailableAtMs, isDvrPending } from '../../../event-libs/v1/utils/session-state.js';
 
-// `DVR Timing (in hours)` counts from the event's start, not the session's own end — every
-// session in the audited catalog carries the same value (772), an event-wide policy stamped
-// onto each row rather than a per-session offset.
+// Counts from the event start, not the session's own end — every DVR row in the audited
+// catalog carries the same 772, an event-wide policy rather than a per-session offset.
 const HOUR = 3_600_000;
 const EVENT_START = Date.parse('2026-11-10T14:00:00.000Z');
 
@@ -41,7 +40,7 @@ describe('isDvrPending', () => {
     expect(isDvrPending(session, EVENT_START + 11 * HOUR, EVENT_START)).to.be.false;
   });
 
-  // Fails open — a missing input never withholds a recording that may well be there.
+  // Fails open — a missing input never withholds a recording that may be there.
   it('is false when either input is missing', () => {
     expect(isDvrPending({ dvrDelayHours: null }, EVENT_START, EVENT_START)).to.be.false;
     expect(isDvrPending(session, EVENT_START, null)).to.be.false;

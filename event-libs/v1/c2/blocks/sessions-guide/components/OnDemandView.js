@@ -25,8 +25,7 @@ export function OnDemandView() {
   sessionStateVersion.value;
   const nowMs = getNowMs();
 
-  // eventStartMs is what a session's authored DVR delay counts from — a recording that
-  // isn't published yet stays out of this view (see isDvrPending).
+  // A recording whose DVR window hasn't opened stays out of this view — see isDvrPending().
   const onDemandRaw = onDemandSessions(sessions, liveStreamActiveIds, nowMs, getApiConfig()?.eventStartMs);
   // Recommended ignores the viewer's active filters/search, same as LiveUpcomingView's
   // recommended carousel — it's a curated highlight reel, not a filtered result set.

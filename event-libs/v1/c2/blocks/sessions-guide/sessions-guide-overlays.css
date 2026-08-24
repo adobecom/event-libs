@@ -246,16 +246,6 @@
   color: var(--s2a-color-content-default);
 }
 
-.sg-detail__recording-badge {
-  display: inline-block;
-  background: var(--s2a-color-background-subtle);
-  border-radius: var(--s2a-border-radius-xs);
-  padding: 4px var(--s2a-spacing-sm);
-  font-size: var(--s2a-font-size-xs);
-  font-weight: var(--s2a-font-weight-adobe-clean-bold);
-  color: var(--s2a-color-content-subtle);
-}
-
 /* ── Action row ──────────────────────────────────────────── */
 
 .sg-detail__actions {
@@ -1190,14 +1180,11 @@
 }
 
 /* ── Mobile screen 1: the category list owns the takeover's leftover height ───
-   Placed after the base rules it overrides — a media query adds no specificity, so the
-   later declaration of a property wins. */
+   Placed after the base rules it overrides — a media query adds no specificity. */
 @media (max-width: 767px) {
-  /* Screen 1 renders no option list (that's screen 2), which leaves the category list as
-     the only flexible row: it has to scroll inside the takeover rather than push
-     Apply/Reset off the bottom of the viewport once an event authors more categories than
-     fit. min-height is what lets the two nested boxes shrink below their content — a grid
-     item and a flex item both floor at their content height otherwise. */
+  /* No option list on this screen (that's screen 2), so the category list is the flexible row
+     and scrolls, rather than pushing Apply/Reset off the viewport when a config has more
+     categories than fit. min-height lets the nested boxes shrink below their content. */
   .sg-filter-panel__body {
     grid-template:
       "sidebar" minmax(0, 1fr)
@@ -1215,9 +1202,8 @@
     overflow-y: auto;
   }
 
-  /* Reserves room for the absolutely-positioned close button on the title's own row, so the
-     category rows below stay full width — their hairlines and chevrons reach the panel's
-     padding edge instead of stopping 32px short. */
+  /* Clears the absolute close button on the title's row only, so the category rows below stay
+     full width — hairlines and chevrons reach the panel's padding edge. */
   .sg-filter-panel__title {
     padding-right: var(--s2a-spacing-xl);
   }

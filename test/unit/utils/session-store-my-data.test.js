@@ -44,7 +44,7 @@ describe('session-store: myData maps RF ids to our session ids', () => {
           ok: true,
           status: 200,
           json: async () => ({
-            // Format is required for a row to survive the catalog mapper — see isMissingFormat.
+            // Required to survive the catalog mapper — see isMissingFormat.
             sessions: [
               {
                 sessionId: 's-001', sessionCode: 'S001', externalSessionId: 'rf-S001SESS', customAttributes: [ONLINE_FORMAT],

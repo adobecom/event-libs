@@ -1,8 +1,8 @@
 import { expect } from '@esm-bundle/chai';
 import { deriveSessionState, isInLiveNow } from '../../../event-libs/v1/utils/session-state.js';
 
-// On-demand-only sessions may carry a scheduled slot, but the guide never surfaces them as
-// airing — their state is on-demand no matter what the clock or the Mobile Rider poll says.
+// These may carry a scheduled slot, but are never surfaced as airing — on-demand whatever
+// the clock or the Mobile Rider poll says.
 function onDemandFormatSession(overrides = {}) {
   return {
     startTimeUtc: '2026-11-11T15:30:00.000Z',
@@ -37,8 +37,7 @@ describe('deriveSessionState — sessions carrying the on-demand Format', () => 
     expect(deriveSessionState(session, new Set(['stream-1']), DURING)).to.equal('on-demand');
   });
 
-  // isInLiveNow is MR-only and deliberately left untouched: such a session can
-  // legitimately carry a live stream now that the Format value alone decides placement, so the
+  // isInLiveNow stays MR-only: such a session can legitimately carry a live stream, so the
   // view filters (liveSessions) are what keep it out of Live Now.
   it('leaves an ordinary upcoming session unaffected', () => {
     const scheduled = onDemandFormatSession({ hasOnDemandFormat: false });

@@ -4,8 +4,7 @@ import { SessionGuideContext } from '../../../../../../event-libs/v1/c2/blocks/s
 import { sessions } from '../../../../../../event-libs/v1/utils/session-store.js';
 import { initTierOneEventConfig } from '../../../../../../event-libs/v1/utils/tier-1-event-config.js';
 
-// 'Photoshop' and 'Illustrator' are authored products, so only their pills get an icon;
-// every other option value (incl. "Not product specific") falls through to text-only.
+// Only authored products get an icon; every other value falls through to text-only.
 const TIER_ONE_CONFIG = {
   products: {
     Photoshop: { icon: 'photoshop-64', pageUrl: '/photoshop' },
@@ -19,10 +18,9 @@ const FILTER_CATEGORIES = [
   { id: 'Audience', label: 'Audience' },
 ];
 
-// getFilterValue reads customAttributeValues[id] first, then the flat field — these use
-// the flat field, which is enough to exercise option derivation. productAttributeId is
-// what marks 'Product' as the product category (see FilterPanel's showProductIcons);
-// 'Illustrator' is deliberately also an Audience value, as it is in the real catalog.
+// Flat fields (getFilterValue falls back to them) are enough to exercise option derivation.
+// productAttributeId marks 'Product' as the product category; 'Illustrator' is deliberately
+// also an Audience value, as it is in the real catalog.
 const SESSIONS = [
   {
     id: 's1', productAttributeId: 'Product', Product: 'Photoshop', Type: 'Lab', Audience: 'Illustrator',
@@ -90,8 +88,7 @@ describe('FilterPanel', () => {
     expect(iconCount).to.equal(1);
   });
 
-  // 'Illustrator' is both an authored product and a real Audience option (the job role) —
-  // outside the product category it has to stay text-only.
+  // 'Illustrator' is also a real Audience option (the job role) — text-only there.
   it('never renders a product icon in a non-product category', () => {
     setState({ filterCategories: [{ id: 'Audience', label: 'Audience' }] });
     const out = render();

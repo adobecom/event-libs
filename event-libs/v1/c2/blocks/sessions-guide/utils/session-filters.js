@@ -92,13 +92,8 @@ export function groupByTrack(sessions, swimlaneOrder) {
   );
 }
 
-/**
- * A session whose Format carries the on-demand value belongs to the On Demand view alone: it
- * may still carry a scheduled slot in the catalog, but the guide never surfaces that slot as
- * live, upcoming, or previously aired. Dropping such sessions here is what keeps them out of
- * Live & Upcoming regardless of what their timestamps say — see sessions-api.js's
- * hasOnDemandFormat().
- */
+// Belongs to On Demand alone: it may carry a scheduled slot, but the guide never surfaces that
+// slot as live, upcoming or previously aired, whatever its timestamps say.
 export function excludeOnDemandFormat(sessions) {
   return sessions.filter((s) => !s.hasOnDemandFormat);
 }
@@ -123,11 +118,9 @@ export function upcomingSessions(sessions, liveStreamActiveIds, activeDay, userT
   });
 }
 
-// On-demand sessions: MR sessions use poll status; non-MR use time window. A session whose
-// DVR window hasn't opened yet is held back whichever way it qualified — its recording doesn't
-// exist to play, so listing it would only offer a dead Watch action. eventStartMs comes from
-// the caller (getApiConfig().eventStartMs) rather than being read here, keeping this module
-// free of store imports like every other rule in it.
+// On-demand sessions: MR sessions use poll status; non-MR use time window. A pending DVR window
+// holds a session back whichever way it qualified — there is no recording to play yet.
+// eventStartMs is passed in, keeping this module free of store imports like its other rules.
 export function onDemandSessions(sessions, liveStreamActiveIds, nowMs, eventStartMs) {
   return sessions.filter((s) => {
     if (isDvrPending(s, nowMs, eventStartMs)) return false;

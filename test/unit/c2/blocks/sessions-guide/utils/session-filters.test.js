@@ -32,8 +32,7 @@ const UPCOMING_2 = {
   startTimeUtc: h(1), endTimeUtc: h(2),
   mrStreamId: null,
 };
-// Scheduled like any other session, but carrying the on-demand value in its Format attribute.
-// Its slot is in the future, so every time-window check would otherwise call it upcoming.
+// Slot is in the future, so every time-window check would otherwise call it upcoming.
 const ON_DEMAND_FORMAT = {
   id: 'ipod', track: 'Design',
   startTimeUtc: h(1), endTimeUtc: h(2),
@@ -41,9 +40,7 @@ const ON_DEMAND_FORMAT = {
   hasOnDemandFormat: true,
 };
 const ON_DEMAND_FORMAT_LIVE_SLOT = { ...ON_DEMAND_FORMAT, id: 'ipod-live-slot', startTimeUtc: h(-0.5) };
-// The on-demand Format value wins outright: this session also claims to be online and
-// livestreamed, sits inside its own slot, and has an active Mobile Rider stream — and still
-// belongs to On Demand alone.
+// Also online, livestreamed, inside its own slot and streaming — still On Demand alone.
 const ON_DEMAND_FORMAT_ALSO_AIRING = {
   ...ON_DEMAND_FORMAT,
   id: 'ipod-also-airing',
@@ -163,8 +160,7 @@ describe('session-filters/onDemandSessions', () => {
     expect(result.map((s) => s.id)).to.deep.equal(['ipod', 'ipod-live-slot']);
   });
 
-  // A recording that isn't published yet has nothing to play, so ending isn't enough — the
-  // session's DVR window (event start + its authored hours) has to have opened.
+  // Ending isn't enough — the DVR window (event start + authored hours) has to have opened.
   describe('DVR availability', () => {
     const EVENT_START = NOW - 2 * 3_600_000; // event started two hours ago
     const dvr = (id, hours, overrides = {}) => ({ ...PAST, id, dvrDelayHours: hours, ...overrides });
@@ -189,7 +185,7 @@ describe('session-filters/onDemandSessions', () => {
       expect(onDemandSessions([pending], new Set(), NOW, EVENT_START)).to.deep.equal([]);
     });
 
-    // Fail open: no DVR timing authored, or no event start to count from, withholds nothing.
+    // Fails open — a missing input withholds nothing.
     it('withholds nothing when the session has no DVR timing', () => {
       const result = onDemandSessions([{ ...PAST, dvrDelayHours: null }], new Set(), NOW, EVENT_START);
       expect(result.map((s) => s.id)).to.deep.equal(['past']);
@@ -226,8 +222,7 @@ describe('session-filters/getRecommendedSessions', () => {
     expect(result).to.deep.equal([]);
   });
 
-  // Being hand-picked as a recommended session doesn't buy a way back in, on either the
-  // authored path or the random fallback.
+  // Being hand-picked doesn't buy a way back in, authored path or random fallback.
   it('never recommends one that also airs online, authored or filled in', () => {
     const day = getSessionDayKey(ON_DEMAND_FORMAT_ALSO_AIRING, TZ);
     expect(getRecommendedSessions([ON_DEMAND_FORMAT_ALSO_AIRING], ['ipod-also-airing'], day, TZ))

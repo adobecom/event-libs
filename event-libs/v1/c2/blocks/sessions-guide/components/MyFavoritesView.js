@@ -30,7 +30,7 @@ export function MyFavoritesView() {
   // eslint-disable-next-line no-unused-expressions
   sessionStateVersion.value;
   const nowMs = getNowMs();
-  // What a session's authored DVR delay counts from — see isDvrPending().
+  // What a DVR delay counts from — see isDvrPending().
   const eventStartMs = getApiConfig()?.eventStartMs;
 
   // Logged-out/unregistered visitors never see this view's content — a toast fires and

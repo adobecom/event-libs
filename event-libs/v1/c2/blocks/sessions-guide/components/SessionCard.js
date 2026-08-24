@@ -31,16 +31,7 @@ export function SessionCard({ session, forceOnDemand = false, timeDisplay = 'dur
   const upcomingTimeLabel = (timeDisplay === 'duration' && session.endTimeUtc)
     ? formatDuration(session.startTimeUtc, session.endTimeUtc)
     : formatSessionTime(session.startTimeUtc, userTz);
-  // eslint-disable-next-line no-nested-ternary
-  const timeLabel = forceOnDemand
-    ? 'ON DEMAND'
-    : (onDemandNatural
-      // In-person with neither Online nor the on-demand Format value, so there is no
-      // recording to play. Unreachable today: isInPersonOnly() drops that exact
-      // combination from the catalog (see PM question A5 on the DVR gap).
-      ? (session.inPerson && !session.isOnline && !session.hasOnDemandFormat
-        ? 'Recording coming soon' : 'ON DEMAND')
-      : upcomingTimeLabel);
+  const timeLabel = onDemand ? 'ON DEMAND' : upcomingTimeLabel;
   const endShort = (!onDemand && session.endTimeUtc) ? formatShortTime(session.endTimeUtc, userTz) : '';
   const timeRange = onDemand
     ? timeLabel

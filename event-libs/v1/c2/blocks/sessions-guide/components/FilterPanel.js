@@ -79,9 +79,8 @@ export function FilterPanel({ onClose }) {
     return opts;
   }).value;
 
-  // Which authored category is the Product one — its id is the Product attribute's own
-  // attributeId, which sessions-api surfaces on every session. Event-wide, so the first
-  // session that carries it answers for the whole catalog.
+  // The product category's id is the Product attribute's own id, event-wide — so the first
+  // session carrying it answers for the whole catalog.
   const productCategoryId = useComputed(
     () => sessions.value.find((s) => s.productAttributeId)?.productAttributeId || null,
   ).value;
@@ -122,9 +121,8 @@ export function FilterPanel({ onClose }) {
   // On mobile the options are their own screen, reached by drilling into a category.
   const drilledIn = isMobile && activeCategory !== null;
 
-  // Product icons belong to the product category alone. Several option values are shared
-  // across categories — `Illustrator` is both a product and an Audience job role — so
-  // matching a value against the authored products map isn't enough on its own.
+  // Product icons belong to the product category alone: `Illustrator` is both a product and an
+  // Audience job role, so matching against the products map isn't enough on its own.
   const showProductIcons = activeCategory !== null && activeCategory === productCategoryId;
 
   const optionsList = html`

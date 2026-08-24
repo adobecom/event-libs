@@ -215,8 +215,7 @@ export function initSessionState() {
     eventId: tierOneConfig.eventId || getMetadata('event-id'),
     profileId: tierOneConfig.rfProfileId || DEFAULT_RF_PROFILE_ID,
     registerUrl: tierOneConfig.registerUrl || '/register',
-    // Both authored as UTC epoch ms. eventStartMs is the reference point DVR availability
-    // counts from — see session-state.js's isDvrPending().
+    // UTC epoch ms. eventStartMs is what DVR availability counts from — see isDvrPending().
     eventStartMs: tierOneConfig.eventStartDateTime || null,
     eventEndMs: tierOneConfig.eventEndDateTime || null,
     mrEnv: deriveMrEnv(),
