@@ -7,7 +7,8 @@ import { useNavigation } from './context/NavigationContext.js';
 import { useConfigs } from './context/ConfigsContext.js';
 import { useDA } from './context/DAContext.js';
 import { useEventEnv } from './context/EventEnvContext.js';
-import { PAGES, EVENT_SERVICE_ENV_OPTIONS } from './constants.js';
+import { decodeHomepageConfigParam } from './utils.js';
+import { PAGES, EVENT_SERVICE_ENV_OPTIONS, HOMEPAGE_LINK_HASH_KEY } from './constants.js';
 
 import { DAProvider as SgcDAProvider } from '../session-guide-configurator/context/DAContext.js';
 import { EventEnvProvider as SgcEventEnvProvider } from '../session-guide-configurator/context/EventEnvContext.js';
@@ -16,6 +17,7 @@ import { ConfigsProvider as SgcConfigsProvider } from '../session-guide-configur
 import SessionGuideConfigurator from '../session-guide-configurator/SessionGuideConfigurator.js';
 
 const TOAST_TIMEOUT_MS = 6000;
+const HOMEPAGE_LINK_HASH_RE = new RegExp(`[#&]${HOMEPAGE_LINK_HASH_KEY}=([A-Za-z0-9+/=%-]{20,})`);
 
 const TABS = [
   { id: 'event', label: 'Event Config' },
@@ -43,10 +45,11 @@ function SessionGuideTab() {
 // just extracted so it can live inside a tab instead of owning the whole page.
 function EventConfigTab() {
   const { isLoading: isDaLoading, error: daError } = useDA();
-  const { activePage } = useNavigation();
+  const { activePage, goToEditor } = useNavigation();
   const { envName } = useEventEnv();
   const {
     toastError, clearToastError, toastSuccess, clearToastSuccess, isInitialLoading, error,
+    findConfigByEventId, startEditConfig, setToastError,
   } = useConfigs();
 
   const envLabel = EVENT_SERVICE_ENV_OPTIONS.find((opt) => opt.value === envName)?.label || envName;
@@ -63,6 +66,26 @@ function EventConfigTab() {
     const timer = setTimeout(clearToastSuccess, TOAST_TIMEOUT_MS);
     return () => clearTimeout(timer);
   }, [toastSuccess, clearToastSuccess]);
+
+  // Deep-link back into a Homepage config from a "Copy Link" URL (see ConfigEditor.js's
+  // handleCopyHomepageLink) — only once the config library has actually loaded, so
+  // findConfigByEventId isn't run against an empty, not-yet-fetched configs array. Reads only
+  // window.location.hash, never .search — DA's iframe only forwards the hash through to this
+  // app (same constraint Schedule Maker documents for its own `schedule=` links).
+  useEffect(() => {
+    if (isInitialLoading || error) return;
+    const match = window.location.hash.match(HOMEPAGE_LINK_HASH_RE);
+    if (!match) return;
+    const decoded = decodeHomepageConfigParam(match[1]);
+    if (!decoded) return;
+    const row = findConfigByEventId(decoded.eventId, decoded.configType);
+    if (!row) {
+      setToastError('Config not found for this link — it may have been deleted.');
+      return;
+    }
+    startEditConfig(row);
+    goToEditor();
+  }, [isInitialLoading, error]);
 
   if (isDaLoading) {
     return html`
