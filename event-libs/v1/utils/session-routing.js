@@ -69,13 +69,13 @@ export default function attachSessionRouting(el) {
   const activate = () => runAction(resolveCardAction(el.dataset));
 
   el.addEventListener('click', (e) => {
-    if (e.target.closest('a') && (e.metaKey || e.ctrlKey || e.shiftKey)) return;
+    if (e.target.closest('a')) return;
     e.preventDefault();
     activate();
   });
 
   el.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter' || e.key === ' ') {
+    if (e.key === 'Enter' && !e.target.closest('a')) {
       e.preventDefault();
       activate();
     }
