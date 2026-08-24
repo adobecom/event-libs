@@ -9,6 +9,10 @@ import {
   DEFAULT_RF_API_URL, STAGE_RF_API_URL, DEFAULT_RF_PROFILE_ID,
 } from '../services/sessions/rainfocus.js';
 import { mountToast } from '../features/toast/toast.js';
+import { initSwanConfig } from '../features/swan-notifications/swan-config.js';
+import {
+  reconcileSwanNotifications, notifySessionScheduled, notifySessionUnscheduled,
+} from '../features/swan-notifications/swan-notifications.js';
 
 // Shared, page-level state. Preact components read `.value` directly during
 // render for fine-grained reactivity; non-Preact code uses `.subscribe()`/`.peek()`.
@@ -122,6 +126,15 @@ async function loadMyData() {
       favorited.value = new Set(mapToSessionIds(data.favorited, 'sessionID', 'rfSessionId'));
       auth.value = { ...auth.value, isRegistered: !!(data.loggedInUser && Object.keys(data.loggedInUser).length > 0) };
     });
+    // One-time full reconciliation against SWAN's bookkeeping service, now that both
+    // the session catalog and the user's confirmed schedule have settled — the
+    // self-healing backstop for any per-action toggleSchedule() notification call
+    // that failed transiently. Called unconditionally: isSwanEnabled() only reflects
+    // config resolved so far, and initSwanConfig()'s own sheet fetch may still be in
+    // flight here — reconcileSwanNotifications() awaits that itself before checking,
+    // so gating on isSwanEnabled() here too could race ahead of the fetch and skip
+    // reconciliation entirely on a page that's actually configured.
+    reconcileSwanNotifications(() => sessions.value, () => scheduled.value);
   } catch (err) {
     window.lana?.log(`[session-store] myData fetch failed: ${err.message}`);
   }
@@ -218,6 +231,7 @@ export function initSessionState() {
     mrEnv: deriveMrEnv(),
   };
 
+  initSwanConfig();
   mountToast();
   syncAuth();
   BlockMediator.subscribe('imsProfile', syncAuth);
@@ -258,6 +272,10 @@ export async function toggleSchedule(session) {
     else addToSet(scheduled, session.id);
     setPending(session.id, false);
   });
+  // Fire-and-forget: a SWAN/ANS failure must never fail or roll back an already-
+  // successful RainFocus schedule mutation — each function swallows its own errors.
+  if (isScheduled) notifySessionUnscheduled(session);
+  else notifySessionScheduled(session);
 }
 
 export async function toggleFavorite(session) {

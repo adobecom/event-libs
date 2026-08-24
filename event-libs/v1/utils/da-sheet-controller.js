@@ -9,7 +9,11 @@
 const DA_ADMIN_ORIGIN = 'https://admin.da.live';
 const CONTENT_DA_ORIGIN = 'https://content.da.live';
 const ADMIN_HLX_ORIGIN = 'https://admin.hlx.page';
-const OWNED_SHEET_NAME = 'data'; // the only sheet name any app built on this ever writes.
+// The only sheet name any app built on this ever writes. Exported so runtime code that
+// needs to read a published sheet directly (e.g. swan-config.js resolving a configId,
+// via a plain unauthenticated fetch rather than this file's own authenticated readSheet())
+// can parse the same shape without redeclaring the string literal.
+export const OWNED_SHEET_NAME = 'data';
 
 let daToken = null;
 let sdkDaFetch = null;
