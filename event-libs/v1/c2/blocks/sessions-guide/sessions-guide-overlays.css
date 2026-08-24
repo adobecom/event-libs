@@ -220,25 +220,7 @@
   margin: 0;
 }
 
-/* Captions sentence and the IPOD/GDPR notice, both authored free text (see
-   sessions-api.js) and both hidden when unauthored. */
-.sg-detail__captions {
-  display: flex;
-  align-items: center;
-  gap: var(--s2a-spacing-xs);
-  margin: 0;
-  font-size: var(--s2a-font-size-xs);
-  line-height: 18px;
-  color: var(--s2a-color-content-default);
-}
-
-/* The authored decorative grey of the captions glyph — no token matches it. */
-.sg-detail__captions-icon {
-  display: inline-flex;
-  flex-shrink: 0;
-  color: #a2a2a2;
-}
-
+/* The IPOD/GDPR notice: authored free text (see sessions-api.js), hidden when unauthored. */
 .sg-detail__legal {
   margin: 0;
   font-size: var(--s2a-font-size-xs);
@@ -601,10 +583,26 @@
   white-space: nowrap;
 }
 
-.sg-detail__copyright {
+/* Authored HTML (see utils/rich-text.js): the value brings its own <p>/<b>/<br>/<a>, so the
+   wrapper only sets the type ramp and neutralises the paragraph margins the browser would
+   otherwise apply to markup we did not author. */
+.sg-detail__legal-disclaimer {
   font-size: var(--s2a-font-size-xs);
   color: var(--s2a-color-content-subtle);
   margin: 0;
+}
+
+.sg-detail__legal-disclaimer p {
+  margin: 0 0 var(--s2a-spacing-xs);
+}
+
+.sg-detail__legal-disclaimer p:last-child {
+  margin-bottom: 0;
+}
+
+.sg-detail__legal-disclaimer a {
+  color: inherit;
+  text-decoration: underline;
 }
 
 /* ── Tablet: pods float on the tinted body, still one column (Figma 1299:69634) ── */

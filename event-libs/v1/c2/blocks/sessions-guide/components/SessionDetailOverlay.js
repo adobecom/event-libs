@@ -9,8 +9,9 @@ import { toggleScheduleWithFeedback, toggleFavoriteWithFeedback } from '../../..
 import { showToast } from '../../../../features/toast/toast.js';
 import { deriveSessionState, getWatchDestination } from '../../../../utils/session-state.js';
 import { setSessionParam, sessionParamValue, clearSessionParams, safeUrl, isSamePage } from '../utils/url.js';
+import { sanitizedRichText } from '../utils/rich-text.js';
 import {
-  IconHeartFilled, IconHeartOutline, IconClosedCaption, IconLinkOut,
+  IconHeartFilled, IconHeartOutline, IconLinkOut,
 } from './icons.js';
 import { Icon } from '../../../../features/icons/Icon.js';
 import { fetchFederalProductIcon } from '../../../../features/icons/federal-icons.js';
@@ -195,14 +196,7 @@ export function SessionDetailOverlay({ onBack }) {
 
                 <h2 class="sg-detail__title">${session.title}</h2>
 
-                ${session.closedCaptions && html`
-                  <p class="sg-detail__captions">
-                    <span class="sg-detail__captions-icon"><${IconClosedCaption} /></span>
-                    ${session.closedCaptions}
-                  </p>
-                `}
-
-                ${session.legalCopy && html`<p class="sg-detail__legal">${session.legalCopy}</p>`}
+                ${session.ipodOrGdprCopy && html`<p class="sg-detail__legal">${session.ipodOrGdprCopy}</p>`}
 
                 <div class="sg-detail__actions">
                   ${showWatchCta
@@ -356,8 +350,12 @@ export function SessionDetailOverlay({ onBack }) {
               </div>
   `;
 
-  const copyright = session.copyrightDisclaimer
-    && html`<p class="sg-detail__copyright">${session.copyrightDisclaimer}</p>`;
+  // Authored HTML, not text — a div because the value's own <p> tags cannot nest inside one.
+  const legalDisclaimer = session.legalDisclaimer && html`
+              <div
+                class="sg-detail__legal-disclaimer"
+                dangerouslySetInnerHTML=${{ __html: sanitizedRichText(session.legalDisclaimer) }}
+              ></div>`;
 
   // Desktop splits into a wide main column and a 383px side column, each stacking its own
   // pods; every narrower width is one stack in reading order. The order lives here rather
@@ -367,7 +365,7 @@ export function SessionDetailOverlay({ onBack }) {
           <div class="sg-detail__col sg-detail__col--main">
             ${summaryPod}
             ${resourcesPod}
-            ${copyright}
+            ${legalDisclaimer}
           </div>
           <div class="sg-detail__col sg-detail__col--side">
             ${productsPod}
@@ -379,7 +377,7 @@ export function SessionDetailOverlay({ onBack }) {
           ${productsPod}
           ${speakersPod}
           ${resourcesPod}
-          ${copyright}
+          ${legalDisclaimer}
         `;
 
   return html`

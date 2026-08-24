@@ -35,7 +35,7 @@ function makeSession(overrides = {}) {
     industry: [],
     aiFocus: [],
     closedCaptions: '',
-    legalCopy: '',
+    ipodOrGdprCopy: '',
     speakers: [],
     products: [],
     resources: [],
@@ -99,23 +99,47 @@ describe('SessionDetailOverlay', () => {
     expect(out).to.include('sg-detail__meta-divider');
   });
 
-  describe('captions and legal copy', () => {
-    it('omits both rows when the fields are empty', () => {
-      const out = render();
-      expect(out).to.not.include('sg-detail__captions');
-      expect(out).to.not.include('sg-detail__legal');
+  describe('IPOD/GDPR copy', () => {
+    it('omits the row when the field is empty', () => {
+      expect(render()).to.not.include('sg-detail__legal');
     });
 
-    it('renders the captions sentence verbatim when authored', () => {
-      const out = render({ closedCaptions: 'Closed captions available in English and German' });
-      expect(out).to.include('sg-detail__captions');
-      expect(out).to.include('Closed captions available in English and German');
-    });
-
-    it('renders the IPOD/GDPR notice when authored', () => {
-      const out = render({ legalCopy: 'Recording notice.' });
+    it('renders the notice when authored', () => {
+      const out = render({ ipodOrGdprCopy: 'Recording notice.' });
       expect(out).to.include('sg-detail__legal');
       expect(out).to.include('Recording notice.');
+    });
+  });
+
+  // The captions row was removed from this view. closedCaptions is still carried on the
+  // session, so assert the value cannot leak back into the markup on its own.
+  describe('closed captions (removed from this view)', () => {
+    it('renders nothing for closedCaptions, authored or not', () => {
+      expect(render()).to.not.include('sg-detail__captions');
+      const out = render({ closedCaptions: 'Closed captions available in English and German' });
+      expect(out).to.not.include('sg-detail__captions');
+      expect(out).to.not.include('Closed captions available in English and German');
+    });
+  });
+
+  // The disclaimer is authored HTML, rendered via dangerouslySetInnerHTML. The htm stub
+  // renders object-valued attributes as `=""`, so the injected markup cannot be asserted from
+  // here -- utils/rich-text.test.js covers the sanitizing and link rewriting directly. What
+  // this pins is that the wrapper appears only when the field is set.
+  describe('legal disclaimer', () => {
+    it('omits the wrapper when the field is empty', () => {
+      expect(render()).to.not.include('sg-detail__legal-disclaimer');
+    });
+
+    it('renders the wrapper when the field is authored', () => {
+      const out = render({ legalDisclaimer: '<p><b>Copyrighted by Adobe Inc.</b></p>' });
+      expect(out).to.include('sg-detail__legal-disclaimer');
+    });
+
+    // A div, because the authored value brings its own <p> and <p><p> is invalid nesting.
+    it('wraps it in a div, not a paragraph', () => {
+      const out = render({ legalDisclaimer: '<p>Legal.</p>' });
+      expect(out).to.match(/<div[^>]*class="sg-detail__legal-disclaimer"/);
     });
   });
 

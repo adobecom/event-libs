@@ -24,7 +24,7 @@ export function makeSession(overrides = {}) {
     audience: ['Designers'],
     industry: [],
     closedCaptions: '',
-    legalCopy: '',
+    ipodOrGdprCopy: '',
     speakers: [
       { name: 'Jane Smith', title: 'Creative Director', photo: null },
       { name: 'Tomasz Wiśniewski', title: 'AEM Engineer', photo: 'data:image/gif;base64,R0lGODlhAQABAAAAACw=' },

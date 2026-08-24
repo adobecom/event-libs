@@ -59,11 +59,10 @@ export function normalizeSessions(rawSessions) {
     // Not in the catalog yet — see the mapper. Empty until the attribute is authored, which
     // hides its row in the detail view rather than showing a blank one.
     aiFocus: coerceArray(s.aiFocus),
-    // Detail-view-only copy (Sessions Guide VizD R1): the captions sentence and the
-    // IPOD/GDPR notice both sit under the session title. Real attributes, but only
-    // authored on some sessions — each row is hidden when its value is empty.
+    // ipodOrGdprCopy sits under the session title in the detail view, hidden when empty.
+    // closedCaptions is carried but no longer rendered anywhere — see the mapper.
     closedCaptions: s.closedCaptions || '',
-    legalCopy: s.legalCopy || '',
+    ipodOrGdprCopy: s.ipodOrGdprCopy || '',
     // Additional Event Site Tracks / Override Primary Event Site Track: MAX26-only
     // fields, absent from MAX25 sessions — naturally empty/'' for those, which is exactly
     // the single-track fallback behavior we want for them.
@@ -89,7 +88,7 @@ export function normalizeSessions(rawSessions) {
     isKeynote: Boolean(s.isKeynote),
     thumbnailUrl: s.thumbnailUrl ?? null,
     customAttributeValues: s.customAttributeValues || {},
-    ...(s.copyrightDisclaimer ? { copyrightDisclaimer: s.copyrightDisclaimer } : {}),
+    ...(s.legalDisclaimer ? { legalDisclaimer: s.legalDisclaimer } : {}),
   }));
 }
 
@@ -390,12 +389,13 @@ export function mapEslPayloadToRawSessions(payload) {
       // and every other one in the payload is Title Case (`Technical Level`, `Category`), but
       // the name reached us as "AI focus". Multi-value read so a single-select still works.
       aiFocus: extractCustomAttributeValues(session, ['AI Focus', 'AI focus']),
-      // Both authored as free text and rendered verbatim in the detail view — the
-      // captions attribute carries the whole sentence ("Closed captions available in
-      // …"), not just a language list. Two name spellings are tried for the notice
-      // because the audited payload and the Figma annotation disagree on the slash.
+      // Both authored as free text. closedCaptions is mapped but no longer rendered — the
+      // detail view's captions row was removed — and carries the whole sentence ("Closed
+      // captions available in …"), not just a language list, so it is ready if the copy
+      // reappears elsewhere. Two name spellings are tried for the IPOD/GDPR notice because
+      // the audited payload and the Figma annotation disagree on the slash.
       closedCaptions: extractCustomAttributeValue(session, 'Closed Caption Information'),
-      legalCopy: extractCustomAttributeValue(session, ['IPOD or GDPR Copy', 'IPOD/GDPR Copy']),
+      ipodOrGdprCopy: extractCustomAttributeValue(session, ['IPOD or GDPR Copy', 'IPOD/GDPR Copy']),
       speakers,
       products: extractCustomAttributeValues(session, 'Product'),
       productAttributeId: getProductAttributeId(session),
@@ -419,7 +419,7 @@ export function mapEslPayloadToRawSessions(payload) {
       sessionPageUrl: session.url || '',
       isKeynote: type === 'Keynote',
       thumbnailUrl: thumbnail?.imageUrl ?? null,
-      copyrightDisclaimer: extractCustomAttributeValue(session, ['Legal Disclaimer', 'LegalDisclaimer']) || undefined,
+      legalDisclaimer: extractCustomAttributeValue(session, ['Legal Disclaimer', 'LegalDisclaimer']) || undefined,
       // resources[]/mrStreamId intentionally omitted — no source in this payload yet.
       // resources[] is still in development backend-side. mrStreamId is the Mobile Rider
       // *live* id the poller keys on, and the catalog simply has no attribute carrying it:

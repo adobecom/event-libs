@@ -251,7 +251,7 @@ describe('services/sessions/sessions-api', () => {
     });
 
     it('extracts the copyright disclaimer text', () => {
-      expect(full.copyrightDisclaimer).to.equal('<p>Copyright.</p>');
+      expect(full.legalDisclaimer).to.equal('<p>Copyright.</p>');
     });
 
     it('joins speakers by id, sorted by ordinal', () => {
@@ -265,7 +265,7 @@ describe('services/sessions/sessions-api', () => {
     it('maps industry, closed captions, and the IPOD/GDPR notice', () => {
       expect(full.industry).to.deep.equal(['Retail', 'Media']);
       expect(full.closedCaptions).to.equal('Closed captions available in English and German');
-      expect(full.legalCopy).to.equal('Recording notice lorem ipsum.');
+      expect(full.ipodOrGdprCopy).to.equal('Recording notice lorem ipsum.');
     });
 
     it('accepts the alternate IPOD/GDPR attribute spelling', () => {
@@ -275,7 +275,7 @@ describe('services/sessions/sessions-api', () => {
           customAttributes: [ONLINE_FORMAT, customAttr('IPOD/GDPR Copy', [textValue('Slashed name.')])],
         }],
       });
-      expect(alt.legalCopy).to.equal('Slashed name.');
+      expect(alt.ipodOrGdprCopy).to.equal('Slashed name.');
     });
 
     it('leaves fields with no source in the payload unset on a bare session', () => {
@@ -286,7 +286,7 @@ describe('services/sessions/sessions-api', () => {
       expect(bare.isKeynote).to.be.false;
       expect(bare.industry).to.deep.equal([]);
       expect(bare.closedCaptions).to.equal('');
-      expect(bare.legalCopy).to.equal('');
+      expect(bare.ipodOrGdprCopy).to.equal('');
     });
   });
 
@@ -633,7 +633,7 @@ describe('services/sessions/sessions-api', () => {
       expect(max26.track).to.equal('Branding');
       expect(max26.contentCategory).to.deep.equal(['Thought Leadership']);
       expect(max26.type).to.equal('Session');
-      expect(max26.copyrightDisclaimer).to.equal('<p>MAX26 copyright.</p>');
+      expect(max26.legalDisclaimer).to.equal('<p>MAX26 copyright.</p>');
     });
 
     it('extracts additionalTracks (multi-select) and trackOverride (free text)', () => {
@@ -734,16 +734,16 @@ describe('services/sessions/sessions-api', () => {
       const [normalized] = normalizeSessions([{ id: 's-1' }]);
       expect(normalized.industry).to.deep.equal([]);
       expect(normalized.closedCaptions).to.equal('');
-      expect(normalized.legalCopy).to.equal('');
+      expect(normalized.ipodOrGdprCopy).to.equal('');
     });
 
     it('passes the detail-view copy fields through when present', () => {
       const [normalized] = normalizeSessions([{
-        id: 's-1', industry: 'Retail', closedCaptions: 'Captions in English', legalCopy: 'Notice.',
+        id: 's-1', industry: 'Retail', closedCaptions: 'Captions in English', ipodOrGdprCopy: 'Notice.',
       }]);
       expect(normalized.industry).to.deep.equal(['Retail']);
       expect(normalized.closedCaptions).to.equal('Captions in English');
-      expect(normalized.legalCopy).to.equal('Notice.');
+      expect(normalized.ipodOrGdprCopy).to.equal('Notice.');
     });
 
     it('passes customAttributeValues through, defaulting to {} when absent', () => {

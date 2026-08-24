@@ -233,7 +233,8 @@ interface Session {
   watchUrl: string;              // Watch Now destination
   isKeynote: boolean;
   thumbnailUrl: string | null;   // video thumbnail; null when unavailable
-  copyrightDisclaimer?: string;
+  legalDisclaimer?: string;      // `Legal Disclaimer` -- authored HTML, sanitized then
+                                 // injected (see utils/rich-text.js), not plain text
 }
 
 // This block's own per-instance authoring config, parsed by parse-config.js's
