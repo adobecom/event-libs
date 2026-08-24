@@ -629,6 +629,12 @@ schedule/favorite gate:
     eventConfig })` (same "extract the decision logic so it's testable without simulating a
     click" pattern as `DrawerShell.js`'s `resolveSessionGuideRequest`) — a blocked click
     never dispatches `SET_VIEW` to the gated view at all, so there's no flash.
+- **Post-event, `Live & upcoming` is not offered at all.** The store auto-transitions out of
+  it (see the auto-transition effect), so selecting it just bounced straight back to On demand
+  — a dead option. `visibleViews(isPost)` in `ViewDropdown.js` drops it, and the empty-state
+  buttons in `MySessionsView`/`MyFavoritesView` retarget to On demand and relabel to match.
+  Both read post-event state through `utils/use-post-event.js`'s `useIsPostEvent()`, shared
+  with `DrawerHeader`.
   - `MySessionsView`/`MyFavoritesView` themselves, via a `useEffect` keyed on
     `auth.value.isLoggedIn`/`isRegistered` that dispatches the fallback if blocked, with the
     view rendering `null` in the meantime. This is the safety net for every path that can

@@ -1,12 +1,10 @@
 import {
-  html, useState, useEffect, useRef, useComputed,
+  html, useState, useEffect, useRef,
 } from '../../../../deps/htm-preact.js';
 import { useSessionGuide } from '../store/index.js';
-import {
-  auth, sessions, liveStreamActiveIds, sessionStateVersion, getApiConfig,
-} from '../../../../utils/session-store.js';
-import { isPostEvent, getNowMs } from '../../../../utils/session-state.js';
+import { auth } from '../../../../utils/session-store.js';
 import { isOutsideClick } from '../utils/outside-click.js';
+import { useIsPostEvent } from '../utils/use-post-event.js';
 import { DateTabs } from './DateTabs.js';
 import { ViewDropdown } from './ViewDropdown.js';
 import { DownloadButton } from './DownloadButton.js';
@@ -69,13 +67,7 @@ export function DrawerHeader({
     return () => document.removeEventListener('click', onClickOutside);
   }, [filterOpen]);
 
-  // sessionStateVersion has no value of its own, only read so this recomputes on a pure
-  // time-driven transition too (see store/index.js's auto-transition effect for why).
-  const isPost = useComputed(() => {
-    void sessionStateVersion.value;
-    const eventEndMs = getApiConfig()?.eventEndMs;
-    return isPostEvent(sessions.value, liveStreamActiveIds.value, getNowMs(), eventEndMs);
-  }).value;
+  const isPost = useIsPostEvent();
 
   const title = resolveDrawerTitle(state.guideConfig.headings, {
     isLoggedIn: auth.value.isLoggedIn,
