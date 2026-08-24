@@ -2,6 +2,7 @@ import { html } from '../../../../deps/htm-preact.js';
 import { useSessionGuide } from '../store/index.js';
 import {
   sessions as sessionsSignal, liveStreamActiveIds as liveStreamActiveIdsSignal, sessionStateVersion,
+  getApiConfig,
 } from '../../../../utils/session-store.js';
 import { TrackRow } from './TrackRow.js';
 import { Carousel } from './Carousel.js';
@@ -24,7 +25,9 @@ export function OnDemandView() {
   sessionStateVersion.value;
   const nowMs = getNowMs();
 
-  const onDemandRaw = onDemandSessions(sessions, liveStreamActiveIds, nowMs);
+  // eventStartMs is what a session's authored DVR delay counts from — a recording that
+  // isn't published yet stays out of this view (see isDvrPending).
+  const onDemandRaw = onDemandSessions(sessions, liveStreamActiveIds, nowMs, getApiConfig()?.eventStartMs);
   // Recommended ignores the viewer's active filters/search, same as LiveUpcomingView's
   // recommended carousel — it's a curated highlight reel, not a filtered result set.
   const recommended = getOnDemandRecommendedSessions(onDemandRaw, state.guideConfig?.recommendedSessions);

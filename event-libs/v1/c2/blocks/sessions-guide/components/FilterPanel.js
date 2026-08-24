@@ -79,6 +79,13 @@ export function FilterPanel({ onClose }) {
     return opts;
   }).value;
 
+  // Which authored category is the Product one — its id is the Product attribute's own
+  // attributeId, which sessions-api surfaces on every session. Event-wide, so the first
+  // session that carries it answers for the whole catalog.
+  const productCategoryId = useComputed(
+    () => sessions.value.find((s) => s.productAttributeId)?.productAttributeId || null,
+  ).value;
+
   // Count of active filters across all categories
   const totalActiveCount = Object.values(activeFilters).reduce(
     (sum, set) => sum + (set instanceof Set ? set.size : 0),
@@ -115,14 +122,17 @@ export function FilterPanel({ onClose }) {
   // On mobile the options are their own screen, reached by drilling into a category.
   const drilledIn = isMobile && activeCategory !== null;
 
+  // Product icons belong to the product category alone. Several option values are shared
+  // across categories — `Illustrator` is both a product and an Audience job role — so
+  // matching a value against the authored products map isn't enough on its own.
+  const showProductIcons = activeCategory !== null && activeCategory === productCategoryId;
+
   const optionsList = html`
     <div class="sg-filter-panel__options" id="sg-filter-panel-options" role="group" aria-label=${activeLabel}>
       ${currentOptions.map((opt) => {
-    // Any option value that happens to be a real configured product (regardless of
-    // which category it's in) gets its product icon — no need to special-case "is
-    // this the Product category", same graceful-fallback pattern as getTrackIcon().
+    // An unmapped product stays text-only — same graceful fallback as getTrackIcon().
     const isSelected = currentSet.has(opt);
-    const productIcon = getProduct(opt)?.icon;
+    const productIcon = showProductIcons ? getProduct(opt)?.icon : null;
     return html`
           <button
             type="button"

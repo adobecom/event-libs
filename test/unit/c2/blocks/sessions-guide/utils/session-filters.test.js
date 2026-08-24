@@ -2,7 +2,7 @@ import { expect } from '@esm-bundle/chai';
 import {
   sessionsForDay, groupByStartTime, groupByTrack, resolveTrackBadge,
   liveSessions, upcomingSessions, onDemandSessions, getRecommendedSessions,
-  getOnDemandRecommendedSessions, getFilterValue, filterSessions, excludeOnDemandOnly,
+  getOnDemandRecommendedSessions, getFilterValue, filterSessions, excludeOnDemandFormat,
 } from '../../../../../../event-libs/v1/c2/blocks/sessions-guide/utils/session-filters.js';
 import { getSessionDayKey } from '../../../../../../event-libs/v1/c2/blocks/sessions-guide/utils/time.js';
 
@@ -32,15 +32,27 @@ const UPCOMING_2 = {
   startTimeUtc: h(1), endTimeUtc: h(2),
   mrStreamId: null,
 };
-// An "IPOD" session: scheduled like any other, but on-demand-only per its Format attribute.
+// Scheduled like any other session, but carrying the on-demand value in its Format attribute.
 // Its slot is in the future, so every time-window check would otherwise call it upcoming.
-const ON_DEMAND_ONLY = {
+const ON_DEMAND_FORMAT = {
   id: 'ipod', track: 'Design',
   startTimeUtc: h(1), endTimeUtc: h(2),
   mrStreamId: null,
-  onDemandOnly: true,
+  hasOnDemandFormat: true,
 };
-const ON_DEMAND_ONLY_LIVE_SLOT = { ...ON_DEMAND_ONLY, id: 'ipod-live-slot', startTimeUtc: h(-0.5) };
+const ON_DEMAND_FORMAT_LIVE_SLOT = { ...ON_DEMAND_FORMAT, id: 'ipod-live-slot', startTimeUtc: h(-0.5) };
+// The on-demand Format value wins outright: this session also claims to be online and
+// livestreamed, sits inside its own slot, and has an active Mobile Rider stream — and still
+// belongs to On Demand alone.
+const ON_DEMAND_FORMAT_ALSO_AIRING = {
+  ...ON_DEMAND_FORMAT,
+  id: 'ipod-also-airing',
+  startTimeUtc: h(-0.5),
+  isOnline: true,
+  isLivestreamed: true,
+  mrStreamId: 'stream-1',
+};
+const AIRING_STREAM_IDS = new Set(['stream-1']);
 
 // Derive day keys directly from session times so tests pass in any system timezone
 const LIVE_DAY = getSessionDayKey(LIVE, TZ);
@@ -106,9 +118,15 @@ describe('session-filters/liveSessions', () => {
     expect(result.map((s) => s.id)).to.deep.equal(['live']);
   });
 
-  it('never treats an on-demand-only session as live, even inside its own slot', () => {
-    const day = getSessionDayKey(ON_DEMAND_ONLY_LIVE_SLOT, TZ);
-    const result = liveSessions([ON_DEMAND_ONLY_LIVE_SLOT], new Set(), day, TZ, NOW);
+  it('never treats a session carrying the on-demand Format as live, even inside its own slot', () => {
+    const day = getSessionDayKey(ON_DEMAND_FORMAT_LIVE_SLOT, TZ);
+    const result = liveSessions([ON_DEMAND_FORMAT_LIVE_SLOT], new Set(), day, TZ, NOW);
+    expect(result).to.deep.equal([]);
+  });
+
+  it('keeps it out of Live Now even when it also airs online with an active stream', () => {
+    const day = getSessionDayKey(ON_DEMAND_FORMAT_ALSO_AIRING, TZ);
+    const result = liveSessions([ON_DEMAND_FORMAT_ALSO_AIRING], AIRING_STREAM_IDS, day, TZ, NOW);
     expect(result).to.deep.equal([]);
   });
 });
@@ -119,9 +137,18 @@ describe('session-filters/upcomingSessions', () => {
     expect(result.map((s) => s.id)).to.deep.equal(['upcoming']);
   });
 
-  it('excludes on-demand-only sessions whose slot is still in the future', () => {
-    const result = upcomingSessions([UPCOMING, ON_DEMAND_ONLY], new Set(), UPCOMING_DAY, TZ, NOW);
+  it('excludes a session carrying the on-demand Format whose slot is still in the future', () => {
+    const result = upcomingSessions([UPCOMING, ON_DEMAND_FORMAT], new Set(), UPCOMING_DAY, TZ, NOW);
     expect(result.map((s) => s.id)).to.deep.equal(['upcoming']);
+  });
+
+  it('excludes one that also airs online, stream active or not', () => {
+    const futureAlsoAiring = { ...ON_DEMAND_FORMAT_ALSO_AIRING, startTimeUtc: h(1), endTimeUtc: h(2) };
+    const sessions = [UPCOMING, futureAlsoAiring];
+    expect(upcomingSessions(sessions, AIRING_STREAM_IDS, UPCOMING_DAY, TZ, NOW).map((s) => s.id))
+      .to.deep.equal(['upcoming']);
+    expect(upcomingSessions(sessions, new Set(), UPCOMING_DAY, TZ, NOW).map((s) => s.id))
+      .to.deep.equal(['upcoming']);
   });
 });
 
@@ -131,15 +158,58 @@ describe('session-filters/onDemandSessions', () => {
     expect(result.map((s) => s.id)).to.deep.equal(['past']);
   });
 
-  it('includes on-demand-only sessions regardless of their scheduled slot', () => {
-    const result = onDemandSessions([UPCOMING, ON_DEMAND_ONLY, ON_DEMAND_ONLY_LIVE_SLOT], new Set(), NOW);
+  it('includes sessions carrying the on-demand Format regardless of their scheduled slot', () => {
+    const result = onDemandSessions([UPCOMING, ON_DEMAND_FORMAT, ON_DEMAND_FORMAT_LIVE_SLOT], new Set(), NOW);
     expect(result.map((s) => s.id)).to.deep.equal(['ipod', 'ipod-live-slot']);
+  });
+
+  // A recording that isn't published yet has nothing to play, so ending isn't enough — the
+  // session's DVR window (event start + its authored hours) has to have opened.
+  describe('DVR availability', () => {
+    const EVENT_START = NOW - 2 * 3_600_000; // event started two hours ago
+    const dvr = (id, hours, overrides = {}) => ({ ...PAST, id, dvrDelayHours: hours, ...overrides });
+
+    it('withholds an ended session whose DVR window has not opened yet', () => {
+      const result = onDemandSessions([dvr('pending', 5)], new Set(), NOW, EVENT_START);
+      expect(result).to.deep.equal([]);
+    });
+
+    it('releases it once event start + DVR hours has passed', () => {
+      const result = onDemandSessions([dvr('ready', 1)], new Set(), NOW, EVENT_START);
+      expect(result.map((s) => s.id)).to.deep.equal(['ready']);
+    });
+
+    it('withholds a session carrying the on-demand Format too', () => {
+      const pending = { ...ON_DEMAND_FORMAT, id: 'ipod-pending', dvrDelayHours: 5 };
+      expect(onDemandSessions([pending], new Set(), NOW, EVENT_START)).to.deep.equal([]);
+    });
+
+    it('withholds an MR session whose stream has gone inactive but whose DVR is pending', () => {
+      const pending = dvr('mr-pending', 5, { mrStreamId: 'stream-1' });
+      expect(onDemandSessions([pending], new Set(), NOW, EVENT_START)).to.deep.equal([]);
+    });
+
+    // Fail open: no DVR timing authored, or no event start to count from, withholds nothing.
+    it('withholds nothing when the session has no DVR timing', () => {
+      const result = onDemandSessions([{ ...PAST, dvrDelayHours: null }], new Set(), NOW, EVENT_START);
+      expect(result.map((s) => s.id)).to.deep.equal(['past']);
+    });
+
+    it('withholds nothing when no event start is authored', () => {
+      const result = onDemandSessions([dvr('no-anchor', 5)], new Set(), NOW, null);
+      expect(result.map((s) => s.id)).to.deep.equal(['no-anchor']);
+    });
+
+    it('treats 0 hours as available from the event start, not as unauthored', () => {
+      const result = onDemandSessions([dvr('immediate', 0)], new Set(), NOW, EVENT_START);
+      expect(result.map((s) => s.id)).to.deep.equal(['immediate']);
+    });
   });
 });
 
-describe('session-filters/excludeOnDemandOnly', () => {
-  it('drops only the on-demand-only sessions', () => {
-    const result = excludeOnDemandOnly([LIVE, ON_DEMAND_ONLY, UPCOMING]);
+describe('session-filters/excludeOnDemandFormat', () => {
+  it('drops only the sessions carrying the on-demand Format', () => {
+    const result = excludeOnDemandFormat([LIVE, ON_DEMAND_FORMAT, UPCOMING]);
     expect(result.map((s) => s.id)).to.deep.equal(['live', 'upcoming']);
   });
 });
@@ -150,10 +220,19 @@ describe('session-filters/getRecommendedSessions', () => {
     expect(result.map((s) => s.id)).to.include('live');
   });
 
-  it('never recommends an on-demand-only session in the live carousel', () => {
-    const day = getSessionDayKey(ON_DEMAND_ONLY, TZ);
-    const result = getRecommendedSessions([ON_DEMAND_ONLY], ['ipod'], day, TZ);
+  it('never recommends a session carrying the on-demand Format in the live carousel', () => {
+    const day = getSessionDayKey(ON_DEMAND_FORMAT, TZ);
+    const result = getRecommendedSessions([ON_DEMAND_FORMAT], ['ipod'], day, TZ);
     expect(result).to.deep.equal([]);
+  });
+
+  // Being hand-picked as a recommended session doesn't buy a way back in, on either the
+  // authored path or the random fallback.
+  it('never recommends one that also airs online, authored or filled in', () => {
+    const day = getSessionDayKey(ON_DEMAND_FORMAT_ALSO_AIRING, TZ);
+    expect(getRecommendedSessions([ON_DEMAND_FORMAT_ALSO_AIRING], ['ipod-also-airing'], day, TZ))
+      .to.deep.equal([]);
+    expect(getRecommendedSessions([ON_DEMAND_FORMAT_ALSO_AIRING], [], day, TZ)).to.deep.equal([]);
   });
 
   it('excludes recommended ids not on the active day', () => {

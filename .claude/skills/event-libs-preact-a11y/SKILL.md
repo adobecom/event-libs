@@ -172,8 +172,8 @@ Scope each layer to what it can actually prove:
 Two traps make a unit scan pass while proving nothing:
 
 - **Empty signals.** A component rendered with empty `sessions`/`scheduled` signals yields an
-  empty state, not a card. Seed from `mocks/session-fixtures.js` (`SESSION_VARIANTS`, `CATALOG`)
-  — `mocks/sessions.json` is a stale sample response, not a current-schema fixture.
+  empty state, not a card. Seed from `mocks/session-fixtures.js` (`SESSION_VARIANTS`, `CATALOG`),
+  the only current-schema fixture source.
 - **Effect-gated state.** Anything a `useEffect` would set never happens, so app-level views
   render empty regardless of seeding — `activeDay` is the canonical example. Mount the leaf
   component with props (or set `SessionGuideContext._current` directly, as

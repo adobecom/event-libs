@@ -69,14 +69,20 @@ export function normalizeSessions(rawSessions) {
     trackOverride: s.trackOverride || '',
     speakers: s.speakers || [],
     products: s.products || [],
+    productAttributeId: s.productAttributeId || '',
     resources: s.resources || [],
     mrStreamId: s.mrStreamId ?? null,
-    videoAvailable: Boolean(s.videoAvailable),
     inPerson: Boolean(s.inPerson),
     isLivestreamed: Boolean(s.isLivestreamed),
     isOnline: Boolean(s.isOnline),
-    // See isOnDemandOnlyFormat() — the Session Guide keeps these out of Live & Upcoming.
-    onDemandOnly: Boolean(s.onDemandOnly),
+    // See hasOnDemandFormat() — the Session Guide keeps these out of Live & Upcoming.
+    hasOnDemandFormat: Boolean(s.hasOnDemandFormat),
+    // null (not 0) when unauthored — 0 would mean "available the moment the event starts".
+    dvrDelayHours: s.dvrDelayHours ?? null,
+    // Carried for the DVR playback work that will consume them; nothing reads them yet.
+    dvrVideoId: s.dvrVideoId || '',
+    mrSkinId: s.mrSkinId || '',
+    videoDuration: s.videoDuration || '',
     sessionPageUrl: sessionPageUrlForEnv(s.sessionPageUrl),
     isKeynote: Boolean(s.isKeynote),
     thumbnailUrl: s.thumbnailUrl ?? null,
@@ -92,23 +98,52 @@ export function normalizeSessions(rawSessions) {
 export const TRACK_ATTRIBUTE_NAMES = ['Primary Event Site Track', 'Primary Track for Agenda (Digital Agenda)'];
 
 const FORMAT_ONLINE = 'Online';
+const FORMAT_IN_PERSON = 'In person';
 const FORMAT_ON_DEMAND_POST_EVENT = 'On demand, post event';
 
 /**
- * "IPOD" sessions — in-person content whose only digital availability is the post-event
- * recording. They have no live airing to be live or upcoming, so the Session Guide shows
- * them under On Demand and nowhere else.
- *
- * Signature confirmed against the real MAX26 catalog: the two "A.COM IPOD Test Session"
- * rows carry Format `In-Person` + `On demand, post event` with no `Online` value and no
- * `Livestreamed Content`. Sessions that do air online carry `Online` alongside the same
- * on-demand value ("A.COM Master Test Session"), which is why the on-demand value alone
- * can't be the marker.
+ * Format values are matched through this rather than compared with `includes()`, because the
+ * real catalog is not consistent about their spelling: the audited payload carries the label
+ * `In person` where this file's rule was written for `In-Person`, and each value also has a
+ * slug form (`on-demand-post-event`) that surfaces whenever the localized label is missing —
+ * extractCustomAttributeValues() falls back to `value` for exactly that case. Folding case,
+ * spaces, and punctuation away makes every one of those spellings match, so a Format rule
+ * can't silently stop applying over a hyphen.
  */
-export function isOnDemandOnlyFormat(formatValues, isLivestreamed) {
-  return formatValues.includes(FORMAT_ON_DEMAND_POST_EVENT)
-    && !formatValues.includes(FORMAT_ONLINE)
-    && !isLivestreamed;
+function foldFormatValue(value) {
+  return String(value ?? '').toLowerCase().replace(/[^a-z0-9]/g, '');
+}
+
+function hasFormatValue(formatValues, marker) {
+  const target = foldFormatValue(marker);
+  return (formatValues || []).some((value) => foldFormatValue(value) === target);
+}
+
+/**
+ * The `On demand, post event` Format value alone keeps a session out of Live, Upcoming,
+ * Previously aired, and the Recommended carousel — it shows under On Demand instead.
+ *
+ * Deliberately unconditional. Any other Format value alongside it, or a `Livestreamed
+ * Content` of `Live`, does not win the session back into Live & Upcoming: carrying the
+ * on-demand value at all is the whole rule, so such a session is never surfaced as airing.
+ */
+export function hasOnDemandFormat(formatValues) {
+  return hasFormatValue(formatValues, FORMAT_ON_DEMAND_POST_EVENT);
+}
+
+/**
+ * `DVR Timing (in hours)` — how long after the event starts a session's recording becomes
+ * playable. A session's own end time isn't the whole story: some recordings aren't published
+ * until well after the session airs, so the On Demand view holds the session back until this
+ * has elapsed (see session-state.js's isDvrPending()).
+ *
+ * Authored as free text, so a blank or non-numeric value yields null, meaning "no DVR delay" —
+ * the session's end time alone governs, exactly as before.
+ */
+export function parseDvrDelayHours(rawValue) {
+  if (rawValue === '' || rawValue === null || rawValue === undefined) return null;
+  const hours = Number(rawValue);
+  return Number.isFinite(hours) && hours >= 0 ? hours : null;
 }
 
 // Generic session/track helpers, not Tier-1-specific — shared here so
@@ -177,6 +212,16 @@ const PRODUCT_ATTRIBUTE_NAME = 'Product';
 export function getSessionProducts(session) {
   const attr = (session?.customAttributes || []).find((a) => a?.name === PRODUCT_ATTRIBUTE_NAME);
   return (attr?.values || []).map((v) => v?.label ?? v?.value).filter(Boolean);
+}
+
+// The Product attribute's own attributeId — the same key it takes in
+// customAttributeValues, and so the id an authored product filter category is keyed by.
+// FilterPanel.js needs it to tell the product category apart from every other one:
+// values like `Illustrator` are also real Audience options (the job role), and only the
+// product category should badge them with a product icon.
+export function getProductAttributeId(session) {
+  const attr = (session?.customAttributes || []).find((a) => a?.name === PRODUCT_ATTRIBUTE_NAME);
+  return attr?.attributeId || '';
 }
 
 export function extractDistinctProducts(sessions) {
@@ -270,17 +315,38 @@ export function isSessionPublished(session) {
 }
 
 /**
- * In-person-only sessions: Format is `In-Person` with no `Online`, no `On demand, post event`,
- * and no livestream — there is no digital way to watch them at all. The Session Guide is an
- * online experience, so they're dropped from the catalog here rather than filtered per view,
- * which keeps every view, day tab, and deep link consistent with one rule.
+ * In-person-only sessions: Format is `In person` with no `Online` and no `On demand, post
+ * event` — there is no digital way to watch them at all. The Session Guide is an online
+ * experience, so they're dropped from the catalog here rather than filtered per view, which
+ * keeps every view, day tab, and deep link consistent with one rule.
+ *
+ * One term per Format value, read directly — no derived "is there video" flag in between,
+ * since such a flag conflates the three values and hides which one actually decided the drop.
+ *
+ * `Livestreamed Content` deliberately takes no part: it decides where a live "Watch now" sends
+ * the viewer (event homepage vs broadcast page — see getWatchDestination()), never which view a
+ * session belongs to. An in-person-only session is never livestreamed in the first place, so a
+ * row carrying both is mis-authored and is dropped on the strength of its Format, rather than
+ * being rescued by the stray flag.
  *
  * Takes a mapped raw session (post-`Format` derivation), so `inPerson` being true means the
- * value was explicitly authored. A session with no Format at all keeps its place — absent
- * data isn't a statement that the session is in-person-only.
+ * value was explicitly authored. Sessions with no Format at all never reach this check —
+ * isMissingFormat() has already dropped them.
  */
 export function isInPersonOnly(session) {
-  return session.inPerson && !session.isOnline && !session.videoAvailable && !session.isLivestreamed;
+  return session.inPerson && !session.isOnline && !session.hasOnDemandFormat;
+}
+
+/**
+ * A row with no Format value at all — an empty `customAttributes`, or a Format attribute with
+ * no values — says nothing about how its session can be watched: not live, not online, not
+ * recorded. There is no view the guide could honestly place it in, so it is dropped from the
+ * catalog outright and appears nowhere, not even under On Demand.
+ *
+ * Takes a raw ESL session (pre-map), since it reads `customAttributes` directly.
+ */
+export function isMissingFormat(session) {
+  return extractCustomAttributeValues(session, 'Format').length === 0;
 }
 
 // Joins the ESL/ESP catalog payload's flat, relational arrays (sessions/sessionTimes/
@@ -293,8 +359,19 @@ export function mapEslPayloadToRawSessions(payload) {
     timesBySessionId.get(t.sessionId).push(t);
   });
 
-  return (payload.sessions || [])
-    .filter((session) => !ENFORCE_PUBLISHED_FILTER || isSessionPublished(session))
+  const candidates = (payload.sessions || [])
+    .filter((session) => !ENFORCE_PUBLISHED_FILTER || isSessionPublished(session));
+
+  // An empty Format is a mis-authored ESP row, not a legitimate state, so the sessions it
+  // silently removes from the catalog are named — otherwise a session simply goes missing
+  // from the guide with nothing to trace it by.
+  const missingFormat = candidates.filter(isMissingFormat);
+  if (missingFormat.length > 0) {
+    window.lana?.log(`[sessions-api] dropped ${missingFormat.length} session(s) with no Format value: ${missingFormat.map((s) => s.sessionId).join(', ')}`);
+  }
+
+  return candidates
+    .filter((session) => !isMissingFormat(session))
     .map((session) => {
     // Some real sessions (canceled, TBD, overflow-room placeholders) have no scheduled
     // sessionTime yet — startTimeUtc/endTimeUtc fall through to '' below, and
@@ -316,7 +393,7 @@ export function mapEslPayloadToRawSessions(payload) {
       }));
 
     const formatValues = extractCustomAttributeValues(session, 'Format');
-    const isOnline = formatValues.includes(FORMAT_ONLINE);
+    const isOnline = hasFormatValue(formatValues, FORMAT_ONLINE);
     const isLivestreamed = extractCustomAttributeValues(session, 'Livestreamed Content').includes('Live');
     const type = extractCustomAttributeValue(session, ['Type', 'Session Type']);
     const slug = slugFromUrl(session.url);
@@ -351,11 +428,19 @@ export function mapEslPayloadToRawSessions(payload) {
       legalCopy: extractCustomAttributeValue(session, ['IPOD or GDPR Copy', 'IPOD/GDPR Copy']),
       speakers,
       products: extractCustomAttributeValues(session, 'Product'),
-      inPerson: formatValues.includes('In-Person'),
+      productAttributeId: getProductAttributeId(session),
+      dvrDelayHours: parseDvrDelayHours(extractCustomAttributeValue(session, 'DVR Timing (in hours)')),
+      // Mapped ahead of the playback work that will consume them, so the data is already on the
+      // session when that lands. Nothing reads these yet. `videoDuration` stays the verbatim
+      // authored string — the real catalog contains `00:60:00`, so it is not reliably a
+      // canonical HH:MM:SS value and any future parsing has to tolerate minutes >= 60.
+      dvrVideoId: extractCustomAttributeValue(session, 'Mobilerider Video ID (DVR)'),
+      mrSkinId: extractCustomAttributeValue(session, 'Skin ID'),
+      videoDuration: extractCustomAttributeValue(session, 'Video Duration'),
+      inPerson: hasFormatValue(formatValues, FORMAT_IN_PERSON),
       isOnline,
-      videoAvailable: isOnline || formatValues.includes(FORMAT_ON_DEMAND_POST_EVENT),
       isLivestreamed,
-      onDemandOnly: isOnDemandOnlyFormat(formatValues, isLivestreamed),
+      hasOnDemandFormat: hasOnDemandFormat(formatValues),
       sessionPageUrl: session.url || '',
       isKeynote: type === 'Keynote',
       thumbnailUrl: thumbnail?.imageUrl ?? null,

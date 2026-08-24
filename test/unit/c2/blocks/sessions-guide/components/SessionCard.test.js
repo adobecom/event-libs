@@ -23,7 +23,6 @@ const UPCOMING_SESSION = {
   track: 'Design',
   startTimeUtc: '2099-10-28T17:00:00Z',
   endTimeUtc: '2099-10-28T18:00:00Z',
-  videoAvailable: false,
   inPerson: false,
   sessionPageUrl: '/sessions/building-with-ai',
 };
@@ -36,7 +35,6 @@ const ONDEMAND_SESSION = {
   track: 'Design',
   startTimeUtc: '2020-01-01T10:00:00Z',
   endTimeUtc: '2020-01-01T11:00:00Z',
-  videoAvailable: true,
   inPerson: false,
   sessionPageUrl: '/sessions/past',
 };

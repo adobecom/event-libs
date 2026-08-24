@@ -22,6 +22,35 @@ export function getNowMs() {
   return SERVER_TIME_ORIGIN + (Date.now() - PAGE_LOAD_MS);
 }
 
+const HOUR_MS = 3_600_000;
+
+/**
+ * When a session's recording becomes playable: the event's start plus the session's authored
+ * `DVR Timing (in hours)`. Null when either input is missing, meaning there is no DVR delay to
+ * wait on.
+ *
+ * Counted from the event's start rather than the session's own end because that is how the
+ * attribute is authored — every session in the audited catalog carries the same value (772),
+ * an event-wide policy stamped onto each row, not a per-session offset.
+ */
+export function dvrAvailableAtMs(session, eventStartMs) {
+  if (session?.dvrDelayHours == null || !eventStartMs) return null;
+  return eventStartMs + session.dvrDelayHours * HOUR_MS;
+}
+
+/**
+ * True while a session's recording is authored but not yet published. A session's end time
+ * alone would put it in the On Demand view the moment it finishes, with nothing to play; this
+ * holds it back until its DVR window opens.
+ *
+ * Fails open: with no DVR timing on the session, or no authored event start to count from,
+ * nothing is withheld and the end time governs as it always did.
+ */
+export function isDvrPending(session, nowMs, eventStartMs) {
+  const availableAt = dvrAvailableAtMs(session, eventStartMs);
+  return availableAt !== null && nowMs < availableAt;
+}
+
 /**
  * Derives live/upcoming/on-demand state for a session.
  * Uses MR poll results for mrStreamId sessions; pure time-window for all others.
@@ -33,10 +62,10 @@ export function getNowMs() {
  * @returns {'live'|'upcoming'|'on-demand'}
  */
 export function deriveSessionState(session, liveStreamActiveIds, nowMs) {
-  // On-demand-only ("IPOD") sessions have no live airing, so their state never depends on the
-  // clock or an MR stream even though they carry a scheduled slot — see sessions-api.js's
-  // isOnDemandOnlyFormat().
-  if (session.onDemandOnly) return 'on-demand';
+  // A session whose Format carries the on-demand value is never surfaced as airing, so its
+  // state depends on neither the clock nor an MR stream even when it has a scheduled slot and
+  // an active stream — see sessions-api.js's hasOnDemandFormat().
+  if (session.hasOnDemandFormat) return 'on-demand';
 
   const start = Date.parse(session.startTimeUtc);
   const end = Date.parse(session.endTimeUtc);

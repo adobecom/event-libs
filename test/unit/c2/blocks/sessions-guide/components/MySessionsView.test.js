@@ -29,13 +29,13 @@ function h(offsetHours) {
 const UPCOMING_SESSION = {
   id: 'u-1', title: 'Upcoming', description: '', track: 'Design',
   startTimeUtc: h(2), endTimeUtc: h(3),
-  videoAvailable: false, inPerson: false, sessionPageUrl: '/u-1',
+  inPerson: false, sessionPageUrl: '/u-1',
   mrStreamId: null, thumbnailUrl: null,
 };
 const PAST_SESSION = {
   id: 'p-1', title: 'Past', description: '', track: 'Video',
   startTimeUtc: h(-4), endTimeUtc: h(-3),
-  videoAvailable: true, inPerson: false, sessionPageUrl: '/p-1',
+  inPerson: false, sessionPageUrl: '/p-1',
   mrStreamId: null, thumbnailUrl: null,
 };
 

@@ -4,24 +4,32 @@ import { SessionGuideContext } from '../../../../../../event-libs/v1/c2/blocks/s
 import { sessions } from '../../../../../../event-libs/v1/utils/session-store.js';
 import { initTierOneEventConfig } from '../../../../../../event-libs/v1/utils/tier-1-event-config.js';
 
-// One product ('Photoshop') is authored, so only its pill gets an icon; every other
-// option value (incl. "Not product specific") falls through to text-only.
+// 'Photoshop' and 'Illustrator' are authored products, so only their pills get an icon;
+// every other option value (incl. "Not product specific") falls through to text-only.
 const TIER_ONE_CONFIG = {
   products: {
     Photoshop: { icon: 'photoshop-64', pageUrl: '/photoshop' },
+    Illustrator: { icon: 'illustrator-64', pageUrl: '/illustrator' },
   },
 };
 
 const FILTER_CATEGORIES = [
   { id: 'Product', label: 'Product' },
   { id: 'Type', label: 'Session Type' },
+  { id: 'Audience', label: 'Audience' },
 ];
 
 // getFilterValue reads customAttributeValues[id] first, then the flat field — these use
-// the flat field, which is enough to exercise option derivation.
+// the flat field, which is enough to exercise option derivation. productAttributeId is
+// what marks 'Product' as the product category (see FilterPanel's showProductIcons);
+// 'Illustrator' is deliberately also an Audience value, as it is in the real catalog.
 const SESSIONS = [
-  { id: 's1', Product: 'Photoshop', Type: 'Lab' },
-  { id: 's2', Product: 'Not product specific', Type: 'Session' },
+  {
+    id: 's1', productAttributeId: 'Product', Product: 'Photoshop', Type: 'Lab', Audience: 'Illustrator',
+  },
+  {
+    id: 's2', productAttributeId: 'Product', Product: 'Not product specific', Type: 'Session', Audience: 'Marketer',
+  },
 ];
 
 function setState({ filterCategories = FILTER_CATEGORIES, activeFilters = {} } = {}) {
@@ -80,6 +88,15 @@ describe('FilterPanel', () => {
     // "Photoshop" is authored, "Not product specific" is not — exactly one icon.
     const iconCount = out.split('sg-icon').length - 1;
     expect(iconCount).to.equal(1);
+  });
+
+  // 'Illustrator' is both an authored product and a real Audience option (the job role) —
+  // outside the product category it has to stay text-only.
+  it('never renders a product icon in a non-product category', () => {
+    setState({ filterCategories: [{ id: 'Audience', label: 'Audience' }] });
+    const out = render();
+    expect(out).to.include('Illustrator');
+    expect(out).to.not.include('sg-icon');
   });
 
   it('marks a pill selected (border + checkmark) when its value is in activeFilters', () => {

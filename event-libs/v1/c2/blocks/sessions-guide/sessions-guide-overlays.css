@@ -892,15 +892,13 @@
 
 .sg-filter-panel__close:hover { color: var(--s2a-color-content-default); }
 
-/* Title + category switcher. The right padding keeps the title clear of the close
-   button while they share a row; from 768px the sidebar owns its own column. */
+/* Title + category switcher. */
 .sg-filter-panel__sidebar {
   grid-area: sidebar;
   min-width: 0;
   display: flex;
   flex-direction: column;
   gap: var(--s2a-spacing-sm);
-  padding-right: var(--s2a-spacing-xl);
 }
 
 .sg-filter-panel__title {
@@ -1189,6 +1187,40 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* ── Mobile screen 1: the category list owns the takeover's leftover height ───
+   Placed after the base rules it overrides — a media query adds no specificity, so the
+   later declaration of a property wins. */
+@media (max-width: 767px) {
+  /* Screen 1 renders no option list (that's screen 2), which leaves the category list as
+     the only flexible row: it has to scroll inside the takeover rather than push
+     Apply/Reset off the bottom of the viewport once an event authors more categories than
+     fit. min-height is what lets the two nested boxes shrink below their content — a grid
+     item and a flex item both floor at their content height otherwise. */
+  .sg-filter-panel__body {
+    grid-template:
+      "sidebar" minmax(0, 1fr)
+      "actions" auto
+      / minmax(0, 1fr);
+  }
+
+  .sg-filter-panel__sidebar {
+    min-height: 0;
+  }
+
+  /* Only the list scrolls, so the "Filters" heading stays put. */
+  .sg-filter-panel__cats {
+    min-height: 0;
+    overflow-y: auto;
+  }
+
+  /* Reserves room for the absolutely-positioned close button on the title's own row, so the
+     category rows below stay full width — their hairlines and chevrons reach the panel's
+     padding edge instead of stopping 32px short. */
+  .sg-filter-panel__title {
+    padding-right: var(--s2a-spacing-xl);
+  }
 }
 
 /* ── Tablet: categories become a sidebar column, actions sit beneath it ─────── */

@@ -27,7 +27,6 @@ const LIVE_SESSION = {
   thumbnailUrl: 'https://example.com/thumb.jpg',
   isOnline: true,
   sessionPageUrl: '/sessions/max-keynote',
-  videoAvailable: false,
   inPerson: false,
 };
 

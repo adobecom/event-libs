@@ -224,8 +224,9 @@ interface Session {
   products: string[];
   resources: Resource[];
   mrStreamId: string | null;     // Mobile Rider stream ID; non-null = MR session
-  videoAvailable: boolean;       // recording is ready
-  inPerson: boolean;             // in-person session ("Recording coming soon" until videoAvailable)
+  inPerson: boolean;             // Format carries `In person`
+  isOnline: boolean;             // Format carries `Online`
+  hasOnDemandFormat: boolean;    // Format carries `On demand, post event`
   sessionPageUrl: string;
   watchUrl: string;              // Watch Now destination
   isKeynote: boolean;
@@ -473,7 +474,8 @@ Breakpoint at 1280 px: CTA goes to `peek` on wide, directly to `expanded` on nar
 - `dismissingIds.has(session.id)` drives `sg-card--collapsing` for exit animation
 - Time label logic:
   - `forceOnDemand` → `'ON DEMAND'`
-  - `onDemandNatural && inPerson && !videoAvailable` → `'Recording coming soon'`
+  - `onDemandNatural && inPerson && !isOnline && !hasOnDemandFormat` → `'Recording coming soon'`
+    (unreachable today — isInPersonOnly() drops that combination from the catalog)
   - `onDemandNatural` → `'ON DEMAND'`
   - else → `formatSessionTime(startTimeUtc, userTz)` with short end time
 - Card click:
@@ -653,8 +655,8 @@ copy/CTA logic via a shared `showAuthToast()` helper rather than duplicating it.
 No longer a reducer case (`LIVE_STATUS_UPDATE` doesn't exist). Implemented as a `useEffect` in `SessionGuideProvider` (`store/index.js`) that subscribes to the shared `sessions`/`liveStreamActiveIds` signals and dispatches a plain `SET_VIEW`. Post-event auto-transition: `allEnded || pastManualCutoff` (cutoff from `getApiConfig().manualCutoff`) and `activeView === 'live-upcoming'` → switch to `'on-demand'`.
 
 ### 5.4 In-person on-demand cards ✅
-- `session.inPerson && !session.videoAvailable` → time label "Recording coming soon" in `SessionCard`; detail overlay shows "Recording coming soon" badge
-- `session.inPerson && session.videoAvailable` → navigates to `session.sessionPageUrl`
+- `session.inPerson && !session.isOnline && !session.hasOnDemandFormat` → time label "Recording coming soon" in `SessionCard`; detail overlay shows "Recording coming soon" badge. Unreachable today — isInPersonOnly() drops that combination from the catalog
+- an in-person session that is also `Online` or on-demand → navigates to `session.sessionPageUrl`
 
 ---
 
@@ -668,7 +670,7 @@ No longer a reducer case (`LIVE_STATUS_UPDATE` doesn't exist). Implemented as a 
 - Actions:
   - Upcoming sessions: Schedule / Scheduled toggle button (primary) + Favorite icon button + Share icon button
   - Live/on-demand sessions: Watch now link (primary) + Favorite icon button + Share icon button
-  - "Recording coming soon" badge for in-person sessions without `videoAvailable`
+  - "Recording coming soon" badge for in-person sessions with no online or on-demand Format value
 - Description expand/collapse: "More" / "Less" button with `is-expanded` class; local `descExpanded` state
 - Attributes list: Technical level, Track, Content category, Audience (filtered for non-empty values)
 - Share: `navigator.share()` if available; else `navigator.clipboard.writeText()` with "Link copied" toast; swallows `AbortError`
@@ -1151,7 +1153,7 @@ test/unit/blocks/sessions-guide/
   components/TimeSlotRow.test.js
   mocks/
     default.html
-    sessions.json               # sample sessions API response
+    session-fixtures.js         # current-schema session builders
 
 test/unit/features/toast/
   toast.test.js                  # features/toast/toast.js — signal, mount idempotency, rendering, dismiss

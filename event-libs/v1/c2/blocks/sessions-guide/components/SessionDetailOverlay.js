@@ -73,7 +73,11 @@ export function SessionDetailOverlay({ onBack }) {
   const watchNowEnabled = isBehaviorEnabled(guideConfig, 'enableWatchNowCtas');
   const isLive = sessionState === 'live';
   const onDemand = sessionState === 'on-demand';
-  const recordingComing = onDemand && session.inPerson && !session.videoAvailable;
+  // In-person with neither Online nor the on-demand Format value, so there is no recording
+  // to play. Unreachable today: isInPersonOnly() drops that exact combination from the
+  // catalog (see PM question A5 on the DVR gap).
+  const recordingComing = onDemand && session.inPerson && !session.isOnline
+    && !session.hasOnDemandFormat;
   const watchHref = safeUrl(getWatchDestination(session, sessionState));
   // Live / on-demand sessions surface "Watch now" (disabled if there's no real
   // destination); upcoming sessions surface "Add to schedule". Either can be turned off

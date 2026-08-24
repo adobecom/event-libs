@@ -7,7 +7,7 @@ import { Carousel } from './Carousel.js';
 import { TimeSlotRow } from './TimeSlotRow.js';
 import {
   liveSessions, upcomingSessions, groupByStartTime, filterSessions, getRecommendedSessions,
-  sessionsForDay, excludeOnDemandOnly,
+  sessionsForDay, excludeOnDemandFormat,
 } from '../utils/session-filters.js';
 import { getNowMs, formatShortTime, formatTimezoneAbbr } from '../utils/time.js';
 
@@ -44,7 +44,7 @@ export function LiveUpcomingView() {
   // Previously aired: all sessions for the day, shown when nothing is upcoming or live.
   // On-demand-only sessions never aired, so they stay out of here too — On Demand owns them.
   const previouslyAiredSlots = (timeSlots.length === 0 && live.length === 0)
-    ? groupByStartTime(excludeOnDemandOnly(sessionsForDay(sessions, activeDay, userTz)))
+    ? groupByStartTime(excludeOnDemandFormat(sessionsForDay(sessions, activeDay, userTz)))
     : [];
 
   return html`

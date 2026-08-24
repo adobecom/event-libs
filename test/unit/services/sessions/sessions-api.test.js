@@ -1,9 +1,9 @@
 import { expect } from '@esm-bundle/chai';
 
 import {
-  mapEslPayloadToRawSessions, normalizeSessions, isSessionPublished, isInPersonOnly,
+  mapEslPayloadToRawSessions, normalizeSessions, isSessionPublished, isInPersonOnly, isMissingFormat,
   ENFORCE_PUBLISHED_FILTER,
-  getSessionProducts, extractDistinctProducts, sessionPageUrlForEnv,
+  getSessionProducts, extractDistinctProducts, getProductAttributeId, sessionPageUrlForEnv, parseDvrDelayHours,
   getSessionAdditionalTracks, extractDistinctAllTracks,
 } from '../../../../event-libs/v1/services/sessions/sessions-api.js';
 
@@ -18,6 +18,10 @@ function selectValue(label, value = label.toLowerCase()) {
 function textValue(value) {
   return { value, _ordinal: null };
 }
+
+// Every real catalog row carries a Format value, and the mapper drops any row that doesn't
+// (see isMissingFormat) — so fixtures that aren't about Format still need one to survive.
+const ONLINE_FORMAT = customAttr('Format', [selectValue('Online')]);
 
 describe('services/sessions/sessions-api', () => {
   describe('mapEslPayloadToRawSessions', () => {
@@ -61,14 +65,15 @@ describe('services/sessions/sessions-api', () => {
           ],
         },
         {
-          // Minimal session: no times, no speakers, no matching customAttributes at all.
+          // Minimal session: no times, no speakers, and no customAttribute the mapper reads
+          // beyond the Format value every row must carry.
           sessionId: 's-2',
           sessionCode: 'S002',
           url: 'https://www.adobe.com/drafts/esp-dev/max/2025/sessions/bare-session-s002',
           enTitle: 'Bare Session',
           speakers: [],
           images: [],
-          customAttributes: [],
+          customAttributes: [ONLINE_FORMAT],
         },
       ],
     };
@@ -98,7 +103,7 @@ describe('services/sessions/sessions-api', () => {
 
     it('leaves sessionPageUrl empty when the session has no url at all', () => {
       const [noUrl] = mapEslPayloadToRawSessions({
-        sessions: [{ sessionId: 's-3', sessionCode: 'S003', customAttributes: [] }],
+        sessions: [{ sessionId: 's-3', sessionCode: 'S003', customAttributes: [ONLINE_FORMAT] }],
         sessionTimes: [],
         speakers: [],
       });
@@ -110,7 +115,7 @@ describe('services/sessions/sessions-api', () => {
       const url = 'https://www.adobe.com/max/2026/sessions/already-html-s004.html';
       const [withExt] = mapEslPayloadToRawSessions({
         sessions: [{
-          sessionId: 's-4', sessionCode: 'S004', url, customAttributes: [],
+          sessionId: 's-4', sessionCode: 'S004', url, customAttributes: [ONLINE_FORMAT],
         }],
         sessionTimes: [],
         speakers: [],
@@ -151,14 +156,14 @@ describe('services/sessions/sessions-api', () => {
       expect(full.isKeynote).to.be.true;
     });
 
-    it('derives inPerson/videoAvailable from Format values', () => {
-      expect(full.inPerson).to.be.true;
-      expect(full.videoAvailable).to.be.true;
-    });
-
-    it('derives isOnline from Format specifically, not the broader videoAvailable', () => {
+    // One flag per Format value, each read on its own — there is no derived "is there video"
+    // field rolling them together.
+    it('derives one flag per Format value', () => {
       // full's Format is In-Person + On demand, post event — no 'Online' value.
+      expect(full.inPerson).to.be.true;
+      expect(full.hasOnDemandFormat).to.be.true;
       expect(full.isOnline).to.be.false;
+      expect(full).to.not.have.property('videoAvailable');
     });
 
     it('derives isLivestreamed from the Livestreamed Content customAttribute', () => {
@@ -166,17 +171,17 @@ describe('services/sessions/sessions-api', () => {
       expect(bare.isLivestreamed).to.be.false;
     });
 
-    // "IPOD" sessions. full's Format (In-Person + On demand, post event, no Online, no
-    // livestream) is the real signature of the catalog's "A.COM IPOD Test Session" rows.
-    it('flags an in-person, on-demand-only Format as onDemandOnly', () => {
-      expect(full.onDemandOnly).to.be.true;
+    // The `On demand, post event` Format value is the whole rule — the session is kept out of
+    // Live & Upcoming whatever else it carries.
+    it('flags an in-person, on-demand-only Format as hasOnDemandFormat', () => {
+      expect(full.hasOnDemandFormat).to.be.true;
     });
 
     it('leaves a session with no on-demand Format value unflagged', () => {
-      expect(bare.onDemandOnly).to.be.false;
+      expect(bare.hasOnDemandFormat).to.be.false;
     });
 
-    it('does not flag a session that also airs online', () => {
+    it('still flags a session that also carries the Online Format value', () => {
       const [both] = mapEslPayloadToRawSessions({
         sessions: [{
           sessionId: 'both',
@@ -185,10 +190,13 @@ describe('services/sessions/sessions-api', () => {
           ])],
         }],
       });
-      expect(both.onDemandOnly).to.be.false;
+      expect(both.hasOnDemandFormat).to.be.true;
+      // The Format value still means what it says elsewhere — only the guide's
+      // live/upcoming placement is unconditional.
+      expect(both.isOnline).to.be.true;
     });
 
-    it('does not flag a livestreamed session carrying the same on-demand Format', () => {
+    it('still flags a livestreamed session carrying the same on-demand Format', () => {
       const [streamed] = mapEslPayloadToRawSessions({
         sessions: [{
           sessionId: 'streamed',
@@ -198,7 +206,52 @@ describe('services/sessions/sessions-api', () => {
           ],
         }],
       });
-      expect(streamed.onDemandOnly).to.be.false;
+      expect(streamed.hasOnDemandFormat).to.be.true;
+      expect(streamed.isLivestreamed).to.be.true;
+    });
+
+    // Verbatim from the real catalog row that was still showing in Live & Upcoming. Note the
+    // label is `In person`, not the `In-Person` this file's rule was originally written for —
+    // which is why Format values are matched on a folded form rather than compared exactly.
+    it('flags the real payload spelling, and reads its In person label', () => {
+      const [real] = mapEslPayloadToRawSessions({
+        sessions: [{
+          sessionId: 'real',
+          customAttributes: [{
+            name: 'Format',
+            attributeId: '3ae5e01d-fb31-4e76-a0ec-d80b6c5d53d3',
+            inputType: 'multi-select',
+            label: 'Format',
+            enabled: true,
+            values: [
+              {
+                valueId: '6a731a1b-9b31-4c41-9499-0e56753290d1', label: 'In person', value: 'in-person', ordinal: 0,
+              },
+              {
+                valueId: '3a912a6c-970d-4e4e-8807-e906e2b8ebb5', label: 'On demand, post event', value: 'on-demand-post-event', ordinal: 1,
+              },
+            ],
+          }],
+        }],
+      });
+      expect(real.hasOnDemandFormat).to.be.true;
+      expect(real.inPerson).to.be.true;
+    });
+
+    // A value whose localized label is missing falls back to its slug (see
+    // extractCustomAttributeValues), which no exact comparison would ever have matched.
+    it('flags the slug form of the value when the label is absent', () => {
+      const [slugged] = mapEslPayloadToRawSessions({
+        sessions: [{
+          sessionId: 'slugged',
+          customAttributes: [customAttr('Format', [
+            { valueId: 'v1', value: 'in-person', ordinal: 0 },
+            { valueId: 'v2', value: 'on-demand-post-event', ordinal: 1 },
+          ])],
+        }],
+      });
+      expect(slugged.hasOnDemandFormat).to.be.true;
+      expect(slugged.inPerson).to.be.true;
     });
 
     it('picks the session-card-image thumbnail, not the hero image', () => {
@@ -227,7 +280,7 @@ describe('services/sessions/sessions-api', () => {
       const [alt] = mapEslPayloadToRawSessions({
         sessions: [{
           sessionId: 'alt',
-          customAttributes: [customAttr('IPOD/GDPR Copy', [textValue('Slashed name.')])],
+          customAttributes: [ONLINE_FORMAT, customAttr('IPOD/GDPR Copy', [textValue('Slashed name.')])],
         }],
       });
       expect(alt.legalCopy).to.equal('Slashed name.');
@@ -258,15 +311,34 @@ describe('services/sessions/sessions-api', () => {
     });
 
     it('keeps an in-person session that also airs online or is recorded', () => {
-      expect(isInPersonOnly({ inPerson: true, isOnline: true, videoAvailable: true })).to.be.false;
-      expect(isInPersonOnly({ inPerson: true, isOnline: false, videoAvailable: true })).to.be.false;
-      expect(isInPersonOnly({ inPerson: true, isLivestreamed: true })).to.be.false;
+      expect(isInPersonOnly({ inPerson: true, isOnline: true })).to.be.false;
+      expect(isInPersonOnly({ inPerson: true, isOnline: false, hasOnDemandFormat: true })).to.be.false;
     });
 
-    it('keeps a session with no Format authored at all — absent data is not a claim', () => {
+    // `Livestreamed Content` routes a live "Watch now" (homepage vs broadcast page); it never
+    // decides which view a session belongs to. In-person-only sessions aren't livestreamed at
+    // all, so a row carrying both is mis-authored and its Format still drops it.
+    it('is decided by Format alone — a stray livestream flag does not rescue the row', () => {
+      expect(isInPersonOnly({ inPerson: true, isLivestreamed: true })).to.be.true;
+
+      const mapped = mapEslPayloadToRawSessions({
+        sessions: [
+          {
+            sessionId: 'in-person-livestreamed',
+            customAttributes: [
+              customAttr('Format', [selectValue('In-Person')]),
+              customAttr('Livestreamed Content', [selectValue('Live')]),
+            ],
+          },
+          { sessionId: 'keeper', customAttributes: [ONLINE_FORMAT] },
+        ],
+      });
+      expect(mapped.map((s) => s.id)).to.deep.equal(['keeper']);
+    });
+
+    // A session with no Format never reaches this predicate — isMissingFormat drops it first.
+    it('is false for a mapped session with no Format-derived flags set', () => {
       expect(isInPersonOnly({ inPerson: false })).to.be.false;
-      const noFormat = mapEslPayloadToRawSessions({ sessions: [{ sessionId: 'no-format', customAttributes: [] }] });
-      expect(noFormat.map((s) => s.id)).to.deep.equal(['no-format']);
     });
 
     it('keeps the whole catalog when every session has a digital format', () => {
@@ -294,14 +366,126 @@ describe('services/sessions/sessions-api', () => {
     });
   });
 
+  // `772` is the value every DVR-carrying session in the audited prod catalog uses.
+  describe('DVR timing', () => {
+    const mapWithDvr = (raw) => mapEslPayloadToRawSessions({
+      sessions: [{
+        sessionId: 'dvr',
+        customAttributes: [ONLINE_FORMAT, customAttr('DVR Timing (in hours)', [textValue(raw)])],
+      }],
+    })[0];
+
+    it('parses the authored hours off the session', () => {
+      expect(mapWithDvr('772').dvrDelayHours).to.equal(772);
+    });
+
+    it('keeps 0 as 0 rather than collapsing it to unauthored', () => {
+      expect(mapWithDvr('0').dvrDelayHours).to.equal(0);
+    });
+
+    it('is null for a blank or non-numeric value', () => {
+      expect(mapWithDvr('').dvrDelayHours).to.be.null;
+      expect(mapWithDvr('soon').dvrDelayHours).to.be.null;
+    });
+
+    it('is null for a session with no DVR attribute at all', () => {
+      const [noDvr] = mapEslPayloadToRawSessions({
+        sessions: [{ sessionId: 'no-dvr', customAttributes: [ONLINE_FORMAT] }],
+      });
+      expect(noDvr.dvrDelayHours).to.be.null;
+    });
+
+    it('survives normalization, defaulting to null', () => {
+      expect(normalizeSessions([mapWithDvr('772')])[0].dvrDelayHours).to.equal(772);
+      expect(normalizeSessions([{ id: 's-1' }])[0].dvrDelayHours).to.be.null;
+    });
+
+    // Mapped ahead of the playback work; values are the real prod ones.
+    it('carries the DVR playback fields through, verbatim', () => {
+      const [session] = mapEslPayloadToRawSessions({
+        sessions: [{
+          sessionId: 'playback',
+          customAttributes: [
+            ONLINE_FORMAT,
+            customAttr('Mobilerider Video ID (DVR)', [textValue('ubKVqWmTT5')]),
+            customAttr('Skin ID', [textValue('adobe')]),
+            // Not canonical HH:MM:SS — the real catalog authors 60 minutes this way.
+            customAttr('Video Duration', [textValue('00:60:00')]),
+          ],
+        }],
+      });
+      expect(session.dvrVideoId).to.equal('ubKVqWmTT5');
+      expect(session.mrSkinId).to.equal('adobe');
+      expect(session.videoDuration).to.equal('00:60:00');
+
+      const [normalized] = normalizeSessions([session]);
+      expect(normalized.dvrVideoId).to.equal('ubKVqWmTT5');
+      expect(normalized.mrSkinId).to.equal('adobe');
+      expect(normalized.videoDuration).to.equal('00:60:00');
+    });
+
+    it('defaults the playback fields to empty strings when unauthored', () => {
+      const [normalized] = normalizeSessions([{ id: 's-1' }]);
+      expect(normalized.dvrVideoId).to.equal('');
+      expect(normalized.mrSkinId).to.equal('');
+      expect(normalized.videoDuration).to.equal('');
+    });
+
+    it('parses the same values through the exported helper', () => {
+      expect(parseDvrDelayHours('772')).to.equal(772);
+      expect(parseDvrDelayHours('')).to.be.null;
+      expect(parseDvrDelayHours(undefined)).to.be.null;
+      expect(parseDvrDelayHours('-4')).to.be.null;
+    });
+  });
+
+  // Modelled on the real "A.COM IPOD Test Session - MPC" row, whose customAttributes array is
+  // empty in the live catalog: with no Format there is no view the guide could place it in, so
+  // it is dropped outright rather than defaulting into Upcoming.
+  describe('isMissingFormat', () => {
+    it('is true for a row with an empty customAttributes array', () => {
+      expect(isMissingFormat({ sessionId: 'mpc', customAttributes: [] })).to.be.true;
+    });
+
+    it('is true for a Format attribute carrying no values', () => {
+      expect(isMissingFormat({ customAttributes: [customAttr('Format', [])] })).to.be.true;
+    });
+
+    it('is false as soon as any Format value is present', () => {
+      expect(isMissingFormat({ customAttributes: [ONLINE_FORMAT] })).to.be.false;
+    });
+
+    it('drops the Format-less row from the mapped catalog, keeping its siblings', () => {
+      const mapped = mapEslPayloadToRawSessions({
+        speakers: [],
+        sessionTimes: [],
+        sessions: [
+          { sessionId: 'mpc', enTitle: 'A.COM IPOD Test Session - MPC', customAttributes: [] },
+          { sessionId: 'keeper', customAttributes: [ONLINE_FORMAT] },
+        ],
+      });
+      expect(mapped.map((s) => s.id)).to.deep.equal(['keeper']);
+    });
+
+    // A dropped session is invisible in the UI, so the removal has to be traceable.
+    it('logs the ids it dropped', () => {
+      const logged = [];
+      const originalLana = window.lana;
+      window.lana = { log: (msg) => logged.push(msg) };
+      mapEslPayloadToRawSessions({ sessions: [{ sessionId: 'mpc', customAttributes: [] }] });
+      window.lana = originalLana;
+      expect(logged.join('\n')).to.include('mpc');
+    });
+  });
+
   describe('mapEslPayloadToRawSessions published filtering', () => {
     const payload = {
       speakers: [],
       sessionTimes: [],
       sessions: [
-        { sessionId: 'draft', sessionCode: 'D1', published: false, customAttributes: [] },
-        { sessionId: 'live', sessionCode: 'L1', published: true, customAttributes: [] },
-        { sessionId: 'no-field', sessionCode: 'N1', customAttributes: [] },
+        { sessionId: 'draft', sessionCode: 'D1', published: false, customAttributes: [ONLINE_FORMAT] },
+        { sessionId: 'live', sessionCode: 'L1', published: true, customAttributes: [ONLINE_FORMAT] },
+        { sessionId: 'no-field', sessionCode: 'N1', customAttributes: [ONLINE_FORMAT] },
       ],
     };
 
@@ -354,6 +538,7 @@ describe('services/sessions/sessions-api', () => {
         {
           sessionId: 'max26-session',
           customAttributes: [
+            ONLINE_FORMAT,
             customAttr('Primary Event Site Track', [selectValue('Branding')]),
             customAttr('Category', [selectValue('Thought Leadership')]),
             customAttr('Type', [selectValue('Session')]),
@@ -366,6 +551,7 @@ describe('services/sessions/sessions-api', () => {
           // MAX25-shaped: old attribute names, no MAX26-only fields at all.
           sessionId: 'max25-session',
           customAttributes: [
+            ONLINE_FORMAT,
             customAttr('Primary Track for Agenda (Digital Agenda)', [selectValue('Branding')]),
             customAttr('Programming Category', [selectValue('How To')]),
           ],
@@ -412,6 +598,7 @@ describe('services/sessions/sessions-api', () => {
         {
           sessionId: 's-1',
           customAttributes: [
+            ONLINE_FORMAT,
             facetableAttr('attr-technical-level', [selectValue('Intermediate')]),
             facetableAttr('attr-audience', [selectValue('Designer'), selectValue('Developer')], 'multi-select'),
             facetableAttr('attr-region', [selectValue('AMER')]),
@@ -421,7 +608,10 @@ describe('services/sessions/sessions-api', () => {
         },
       ],
     };
-    payload.sessions[0].customAttributes[3].enabled = false;
+    // Found by id rather than index, so inserting a fixture attribute can't silently disable
+    // the wrong one.
+    payload.sessions[0].customAttributes
+      .find((a) => a.attributeId === 'attr-disabled').enabled = false;
 
     const [session] = mapEslPayloadToRawSessions(payload);
 
@@ -447,11 +637,11 @@ describe('services/sessions/sessions-api', () => {
       expect(normalized.mrStreamId).to.be.null;
     });
 
-    it('carries the mapper-derived onDemandOnly flag through, defaulting to false', () => {
-      const [flagged] = normalizeSessions([{ id: 's-1', onDemandOnly: true }]);
+    it('carries the mapper-derived hasOnDemandFormat flag through, defaulting to false', () => {
+      const [flagged] = normalizeSessions([{ id: 's-1', hasOnDemandFormat: true }]);
       const [plain] = normalizeSessions([{ id: 's-2' }]);
-      expect(flagged.onDemandOnly).to.be.true;
-      expect(plain.onDemandOnly).to.be.false;
+      expect(flagged.hasOnDemandFormat).to.be.true;
+      expect(plain.hasOnDemandFormat).to.be.false;
     });
 
     it('coerces mock-style plain-string audience into an array', () => {
@@ -566,6 +756,45 @@ describe('services/sessions/sessions-api', () => {
         { customAttributes: [] },
       ];
       expect(extractDistinctProducts(sessions)).to.deep.equal(['Illustrator', 'Photoshop']);
+    });
+  });
+
+  // FilterPanel.js scopes product icons to the product filter category by this id, so an
+  // Audience option like 'Illustrator' never renders one.
+  describe('getProductAttributeId', () => {
+    it('returns the Product attribute\'s own attributeId', () => {
+      const session = {
+        customAttributes: [
+          { ...customAttr('Audience', [selectValue('Illustrator')]), attributeId: 'attr-audience' },
+          { ...customAttr('Product', [selectValue('Illustrator')]), attributeId: 'attr-product' },
+        ],
+      };
+      expect(getProductAttributeId(session)).to.equal('attr-product');
+    });
+
+    it('returns an empty string when the session has no Product attribute', () => {
+      expect(getProductAttributeId({ customAttributes: [] })).to.equal('');
+    });
+
+    it('survives mapping and normalization onto the session', () => {
+      const payload = {
+        speakers: [],
+        sessionTimes: [],
+        sessions: [{
+          sessionId: 's-1',
+          customAttributes: [
+            ONLINE_FORMAT,
+            { ...customAttr('Product', [selectValue('Photoshop')]), attributeId: 'attr-product', inputType: 'multi-select' },
+          ],
+        }],
+      };
+      const [normalized] = normalizeSessions(mapEslPayloadToRawSessions(payload));
+      expect(normalized.productAttributeId).to.equal('attr-product');
+    });
+
+    it('defaults to an empty string on a session normalized without one', () => {
+      const [normalized] = normalizeSessions([{ id: 's-1' }]);
+      expect(normalized.productAttributeId).to.equal('');
     });
   });
 });

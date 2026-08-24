@@ -40,7 +40,6 @@ function makeSession(overrides = {}) {
     products: [],
     resources: [],
     mrStreamId: null,
-    videoAvailable: false,
     inPerson: false,
     isLivestreamed: false,
     isOnline: false,
@@ -215,7 +214,6 @@ describe('SessionDetailOverlay', () => {
       const out = render({
         startTimeUtc: new Date(Date.now() - 3 * HOUR).toISOString(),
         endTimeUtc: new Date(Date.now() - 2 * HOUR).toISOString(),
-        videoAvailable: true,
       });
       expect(out).to.include('Watch now');
       expect(out).to.not.include('Add to schedule');

@@ -1,9 +1,6 @@
 /*
  * Realistic session objects on the current ESL-normalized schema, for tests that need
  * components to actually render content rather than an empty state.
- *
- * `mocks/sessions.json` predates fields like contentCategory/customAttributeValues and
- * is kept only as a sample API response — prefer these builders in new tests.
  */
 
 const HOUR = 3600e3;
@@ -36,7 +33,6 @@ export function makeSession(overrides = {}) {
     products: ['Photoshop', 'Adobe Firefly'],
     resources: [{ title: 'Docs', url: 'https://experienceleague.adobe.com/docs' }],
     mrStreamId: null,
-    videoAvailable: false,
     inPerson: false,
     isLivestreamed: false,
     isOnline: true,
@@ -66,7 +62,6 @@ export const SESSION_VARIANTS = {
     title: 'Premiere Rush: Quick Video on Mobile',
     startTimeUtc: new Date(Date.now() - 3 * HOUR).toISOString(),
     endTimeUtc: new Date(Date.now() - 2 * HOUR).toISOString(),
-    videoAvailable: true,
     watchUrl: '/watch/premiere-rush',
   }),
   inPersonOnly: makeSession({
@@ -76,7 +71,6 @@ export const SESSION_VARIANTS = {
     endTimeUtc: new Date(Date.now() - 2 * HOUR).toISOString(),
     inPerson: true,
     isOnline: false,
-    videoAvailable: false,
   }),
   keynote: makeSession({
     id: 's-keynote',

@@ -1,5 +1,5 @@
 import { getSessionDayKey, isSessionLive, isSessionUpcoming } from './time.js';
-import { deriveSessionState, isInLiveNow } from '../../../../utils/session-state.js';
+import { deriveSessionState, isInLiveNow, isDvrPending } from '../../../../utils/session-state.js';
 import { getTrackIcon, getOverrideTrackIcon, DEFAULT_ICON_COLOR } from '../../../../utils/tier-1-event-config.js';
 
 export function sessionsForDay(sessions, activeDay, userTz) {
@@ -93,20 +93,20 @@ export function groupByTrack(sessions, swimlaneOrder) {
 }
 
 /**
- * On-demand-only ("IPOD") sessions belong to the On Demand view alone: they carry a scheduled
- * slot in the catalog, but no live airing of that slot exists to be live, upcoming, or
- * previously aired. Dropping them from a list here is what keeps them out of Live & Upcoming
- * regardless of what their timestamps say. The flag is derived from the Format custom
- * attribute — see sessions-api.js's isOnDemandOnlyFormat().
+ * A session whose Format carries the on-demand value belongs to the On Demand view alone: it
+ * may still carry a scheduled slot in the catalog, but the guide never surfaces that slot as
+ * live, upcoming, or previously aired. Dropping such sessions here is what keeps them out of
+ * Live & Upcoming regardless of what their timestamps say — see sessions-api.js's
+ * hasOnDemandFormat().
  */
-export function excludeOnDemandOnly(sessions) {
-  return sessions.filter((s) => !s.onDemandOnly);
+export function excludeOnDemandFormat(sessions) {
+  return sessions.filter((s) => !s.hasOnDemandFormat);
 }
 
 // Live Now section: MR sessions use poll status; non-MR sessions use time window.
 export function liveSessions(sessions, liveStreamActiveIds, activeDay, userTz, nowMs) {
   return sessions.filter((s) => {
-    if (s.onDemandOnly) return false;
+    if (s.hasOnDemandFormat) return false;
     if (getSessionDayKey(s, userTz) !== activeDay) return false;
     if (s.mrStreamId) return isInLiveNow(s, liveStreamActiveIds, nowMs);
     return isSessionLive(s, nowMs);
@@ -116,17 +116,22 @@ export function liveSessions(sessions, liveStreamActiveIds, activeDay, userTz, n
 // Upcoming sessions: MR sessions use poll status; non-MR use time window.
 export function upcomingSessions(sessions, liveStreamActiveIds, activeDay, userTz, nowMs) {
   return sessions.filter((s) => {
-    if (s.onDemandOnly) return false;
+    if (s.hasOnDemandFormat) return false;
     if (getSessionDayKey(s, userTz) !== activeDay) return false;
     if (s.mrStreamId) return deriveSessionState(s, liveStreamActiveIds, nowMs) === 'upcoming';
     return isSessionUpcoming(s, nowMs);
   });
 }
 
-// On-demand sessions: MR sessions use poll status; non-MR use time window.
-export function onDemandSessions(sessions, liveStreamActiveIds, nowMs) {
+// On-demand sessions: MR sessions use poll status; non-MR use time window. A session whose
+// DVR window hasn't opened yet is held back whichever way it qualified — its recording doesn't
+// exist to play, so listing it would only offer a dead Watch action. eventStartMs comes from
+// the caller (getApiConfig().eventStartMs) rather than being read here, keeping this module
+// free of store imports like every other rule in it.
+export function onDemandSessions(sessions, liveStreamActiveIds, nowMs, eventStartMs) {
   return sessions.filter((s) => {
-    if (s.onDemandOnly) return true;
+    if (isDvrPending(s, nowMs, eventStartMs)) return false;
+    if (s.hasOnDemandFormat) return true;
     if (s.mrStreamId) return deriveSessionState(s, liveStreamActiveIds, nowMs) === 'on-demand';
     return !isSessionLive(s, nowMs) && !isSessionUpcoming(s, nowMs);
   });
@@ -140,7 +145,7 @@ export function onDemandSessions(sessions, liveStreamActiveIds, nowMs) {
  * Falls back to a deterministic random selection of up to 3 day sessions when no ids configured.
  */
 export function getRecommendedSessions(sessions, recommendedIds, activeDay, userTz) {
-  const daySessions = excludeOnDemandOnly(sessionsForDay(sessions, activeDay, userTz));
+  const daySessions = excludeOnDemandFormat(sessionsForDay(sessions, activeDay, userTz));
 
   if (recommendedIds && recommendedIds.length > 0) {
     const daySessionsById = new Map(daySessions.map((s) => [s.id, s]));
