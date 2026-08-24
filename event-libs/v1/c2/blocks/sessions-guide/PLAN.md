@@ -925,9 +925,9 @@ Key rules, not obvious from the table alone:
   field was only ever meant to hold one value, even though the ESP field
   is multi-select, so the badge is always a plain "+1", never "+N".
 - Icon/color for an override lane come from `getOverrideTrackIcon(overrideText)`
-  (`tier-1-event-config.js`) — a **per-override-text map** (`overrideTrackIcons`) checked
-  first, falling back to a single event-wide default (`overrideTrackIcon`), falling back to
-  the built-in default (`{ icon: 'star', color: '#6E6E6E' }`).
+  (`tier-1-event-config.js`) — a **per-override-text map** (`overrideTrackIcons.byText`),
+  authored explicitly per text. No event-wide default and no built-in default (both dropped
+  2026-08-24): an unmapped text gets no icon and `DEFAULT_ICON_COLOR` at render time.
 - `stackedTracks` (for the detail/session-page stacked-badge display) is the *additional*
   track(s) only when an override applies (the override text isn't a real track, so it isn't
   itself "stacked", and the primary track — if any — is also dropped from the stack once
@@ -980,12 +980,11 @@ throughout, since `groupByTrack` was already name-agnostic between the two.
 Since each distinct override text is its own swimlane (16.2), the configurator needs a
 per-text icon mapping, not a single field — `OverrideTrackIconEditor.js` was rebuilt from
 a single icon+color row into a `TrackIconEditor.js`-style list, one row per distinct
-override text found in the event's real sessions (`extractDistinctOverrideTexts`), plus a
-separate "default" row for `overrideTrackIcon` (the event-wide fallback shown for any text
-not yet mapped). New config fields: `overrideTrackIcons: { [text]: {icon, color} }`
-(per-text map) and `overrideTrackIcon: {icon, color} | null` (single default, unchanged
-from the first pass). `ConfigsContext.js` got a new `updateOverrideTrackIcon(text, updates)`
-mirroring `updateTrackIcon(track, updates)`. Added a `star` `<symbol>` to both
+override text found in the event's real sessions (`extractDistinctOverrideTexts`). Config
+field: `overrideTrackIcons: { byText: { [text]: {icon, color} } }`. The event-wide default row
+was removed 2026-08-24 — every text is authored explicitly, mirroring `TrackIconEditor`,
+including its "colour set with no icon" incompleteness warning. `ConfigsContext.js` has
+`updateOverrideTrackIcon(text, updates)` mirroring `updateTrackIcon(track, updates)`. Added a `star` `<symbol>` to both
 `v1/features/icons/track-icons.svg` and the configurator's own copy of that sprite (the
 only icon slug not tied to a real track name) — used as the built-in override default.
 

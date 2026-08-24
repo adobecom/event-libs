@@ -12,6 +12,7 @@ describe('CategoryBadge', () => {
     meta.name = 'tier-1-event-config';
     meta.content = JSON.stringify({
       trackIcons: { 'Social Media': { icon: 'social-media', color: '#FF6B35' } },
+      overrideTrackIcons: { byText: { 'this is a test': { icon: 'override-64', color: '#00AA00' } } },
     });
     document.head.appendChild(meta);
     initTierOneEventConfig();
@@ -55,5 +56,27 @@ describe('CategoryBadge', () => {
     const html = CategoryBadge({ session: session({ trackOverride: 'custom label', additionalTracks: ['Video'] }) });
     expect(html).to.include('custom label');
     expect(html).to.include('--sg-badge-icon-color:#000000');
+  });
+
+  // An override's own authored icon/colour has to reach the badge — it comes from
+  // overrideTrackIcons.byText, not the trackIcons map the primary track uses.
+  it('applies the authored icon and colour for a mapped override text', () => {
+    const html = CategoryBadge({ session: session({ trackOverride: 'this is a test' }) });
+    expect(html).to.include('this is a test');
+    expect(html).to.include('--sg-badge-icon-color:#00AA00');
+  });
+
+  it('prefers the override icon over the primary track, since the override wins the badge', () => {
+    const html = CategoryBadge({
+      session: session({ track: 'Social Media', trackOverride: 'this is a test' }),
+    });
+    expect(html).to.include('this is a test');
+    expect(html).to.include('--sg-badge-icon-color:#00AA00');
+    expect(html).to.not.include('#FF6B35');
+  });
+
+  it('leaves a mapped track unaffected by the override map', () => {
+    const html = CategoryBadge({ session: session({ track: 'Social Media' }) });
+    expect(html).to.include('--sg-badge-icon-color:#FF6B35');
   });
 });

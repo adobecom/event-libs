@@ -21,7 +21,7 @@ export default function ConfigEditor() {
   const { goToLibrary } = useNavigation();
   const {
     activeConfig, saveActiveConfig, clearActiveConfig, updateTrackIcon,
-    updateOverrideTrackIcon, updateOverrideDefaultIcon, updateProduct, updateConfigField,
+    updateOverrideTrackIcon, updateProduct, updateConfigField,
     setToastSuccess, setToastError, getSessionCatalogForRow,
   } = useConfigs();
   const { org, repo } = useDA();
@@ -216,9 +216,7 @@ export default function ConfigEditor() {
             <${OverrideTrackIconEditor}
               overrideTexts=${overrideTexts}
               overrideTrackIcons=${activeConfig.config.overrideTrackIcons?.byText}
-              defaultOverrideIcon=${activeConfig.config.overrideTrackIcons?.default}
               onChangeMapped=${updateOverrideTrackIcon}
-              onChangeDefault=${updateOverrideDefaultIcon}
             />
           `}
         </section>
