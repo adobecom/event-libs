@@ -99,15 +99,17 @@ describe('SessionDetailOverlay', () => {
     expect(out).to.include('sg-detail__meta-divider');
   });
 
+  // Authored HTML like the disclaimer below -- the catalog sends
+  // `<p><strong>Bold test. Favorite this session…</strong></p>` -- so the same htm-stub caveat
+  // applies: only the wrapper is assertable here, the markup itself in utils/rich-text.test.js.
   describe('IPOD/GDPR copy', () => {
-    it('omits the row when the field is empty', () => {
-      expect(render()).to.not.include('sg-detail__legal');
+    it('omits the wrapper when the field is empty', () => {
+      expect(render()).to.not.include('sg-detail__legal"');
     });
 
-    it('renders the notice when authored', () => {
-      const out = render({ ipodOrGdprCopy: 'Recording notice.' });
-      expect(out).to.include('sg-detail__legal');
-      expect(out).to.include('Recording notice.');
+    it('renders the wrapper when authored', () => {
+      const out = render({ ipodOrGdprCopy: '<p><strong>Recording notice.</strong></p>' });
+      expect(out).to.match(/<div[^>]*class="sg-detail__legal"/);
     });
   });
 
@@ -182,6 +184,77 @@ describe('SessionDetailOverlay', () => {
       expect(out).to.not.include('Technical level');
       expect(out).to.not.include('Audience');
       expect(out).to.include('Track');
+    });
+  });
+
+  // Figma 8:6754: the pod keeps its heading and shows one non-interactive card instead of
+  // disappearing. This is the state every session is in today -- resources[] has no backend
+  // source yet, so the real catalog always returns it empty.
+  describe('session resources', () => {
+    it('still renders the pod, with an empty-state card, when there are none', () => {
+      const out = render({ resources: [] });
+      expect(out).to.include('sg-detail__group--resources');
+      expect(out).to.include('Session resources');
+      expect(out).to.include('sg-detail__resource-card--empty');
+      expect(out).to.include('No materials available for this session');
+    });
+
+    it('offers no Show more toggle in the empty state', () => {
+      const out = render({ resources: [] });
+      expect(out).to.not.include('sg-detail-resources');
+      expect(out).to.not.include('session resources');
+    });
+
+    it('renders real resources as links, with no empty-state card', () => {
+      const out = render({ resources: [{ title: 'Sample PSD', url: 'https://example.com/a.psd' }] });
+      expect(out).to.include('Sample PSD');
+      expect(out).to.include('href="https://example.com/a.psd"');
+      expect(out).to.not.include('sg-detail__resource-card--empty');
+    });
+  });
+
+  // The count is only meaningful when the list is truncated, so it appears under exactly the
+  // condition that grows the Show more toggle -- over 6 products, over 5 speakers.
+  describe('pod heading counts', () => {
+    const products = (n) => Array.from({ length: n }, (_, i) => `Product ${i}`);
+    const speakers = (n) => Array.from({ length: n }, (_, i) => ({ name: `Speaker ${i}`, title: '' }));
+
+    // The description carries its own Show more, so the toggle has to be looked for inside
+    // the pod rather than anywhere in the markup.
+    const pod = (out, name) => {
+      const start = out.indexOf(`sg-detail__group--${name}`);
+      if (start === -1) return '';
+      const next = out.indexOf('sg-detail__group--', start + 1);
+      return out.slice(start, next === -1 ? undefined : next);
+    };
+
+    it('hides the products count at exactly the collapsed length', () => {
+      const out = render({ products: products(6) });
+      expect(out).to.include('Featured products');
+      expect(out).to.not.include('sg-detail__count');
+      expect(pod(out, 'products')).to.not.include('sg-detail__more');
+    });
+
+    it('shows the products count once the list is truncated', () => {
+      const out = render({ products: products(7) });
+      expect(out).to.include('<span class="sg-detail__count">(7)</span>');
+      expect(pod(out, 'products')).to.include('sg-detail__more');
+    });
+
+    it('hides the speakers count at exactly the collapsed length', () => {
+      const out = render({ speakers: speakers(5) });
+      expect(out).to.include('Speakers');
+      expect(out).to.not.include('sg-detail__count');
+    });
+
+    it('shows the speakers count once the list is truncated', () => {
+      const out = render({ speakers: speakers(6) });
+      expect(out).to.include('<span class="sg-detail__count">(6)</span>');
+    });
+
+    it('hides it for a single-item list too', () => {
+      expect(render({ products: products(1), speakers: speakers(1) }))
+        .to.not.include('sg-detail__count');
     });
   });
 

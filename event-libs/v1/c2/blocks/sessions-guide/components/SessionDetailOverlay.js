@@ -196,7 +196,11 @@ export function SessionDetailOverlay({ onBack }) {
 
                 <h2 class="sg-detail__title">${session.title}</h2>
 
-                ${session.ipodOrGdprCopy && html`<p class="sg-detail__legal">${session.ipodOrGdprCopy}</p>`}
+                ${session.ipodOrGdprCopy && html`
+                  <div
+                    class="sg-detail__legal"
+                    dangerouslySetInnerHTML=${{ __html: sanitizedRichText(session.ipodOrGdprCopy) }}
+                  ></div>`}
 
                 <div class="sg-detail__actions">
                   ${showWatchCta
@@ -282,18 +286,29 @@ export function SessionDetailOverlay({ onBack }) {
             </div>
   `;
 
-  const resourcesPod = resources.length > 0 && html`
+  // The pod renders whether or not there are resources: with none, Figma 8:6754 keeps the
+  // heading and puts a single non-interactive card in place of the list, rather than dropping
+  // the section. Worth knowing this is the state every session is in today — `resources[]` has
+  // no backend source yet, so the catalog always returns it empty.
+  const hasResources = resources.length > 0;
+  const resourcesPod = html`
               <div class="sg-detail__group sg-detail__group--resources">
                 <h3 class="sg-detail__section-label">Session resources</h3>
-                <div class="sg-detail__resources" id="sg-detail-resources">
-                  ${shownResources.map((r) => html`
-                    <a class="sg-detail__resource-card" href=${safeUrl(r.url)} target="_blank" rel="noopener noreferrer">
-                      <span class="sg-detail__resource-name">${r.title || r.label || r.url}</span>
-                      <span class="sg-detail__resource-action">${r.action || 'Download'}</span>
-                    </a>
-                  `)}
-                </div>
-                ${resources.length > COLLAPSED_RESOURCES
+                ${hasResources
+    ? html`
+                      <div class="sg-detail__resources" id="sg-detail-resources">
+                        ${shownResources.map((r) => html`
+                          <a class="sg-detail__resource-card" href=${safeUrl(r.url)} target="_blank" rel="noopener noreferrer">
+                            <span class="sg-detail__resource-name">${r.title || r.label || r.url}</span>
+                            <span class="sg-detail__resource-action">${r.action || 'Download'}</span>
+                          </a>
+                        `)}
+                      </div>`
+    : html`
+                      <div class="sg-detail__resources">
+                        <p class="sg-detail__resource-card sg-detail__resource-card--empty">No materials available for this session</p>
+                      </div>`}
+                ${hasResources && resources.length > COLLAPSED_RESOURCES
     && showMoreToggle(resourcesExpanded, setResourcesExpanded, 'session resources', 'sg-detail-resources')}
               </div>
   `;
@@ -301,7 +316,8 @@ export function SessionDetailOverlay({ onBack }) {
   const productsPod = products.length > 0 && html`
               <div class="sg-detail__group sg-detail__group--products">
                 <h3 class="sg-detail__section-label">
-                  Featured products <span class="sg-detail__count">(${products.length})</span>
+                  Featured products ${products.length > COLLAPSED_PRODUCTS
+    && html`<span class="sg-detail__count">(${products.length})</span>`}
                 </h3>
                 <div class="sg-detail__products" id="sg-detail-products">
                   ${shownProducts.map((p) => {
@@ -330,7 +346,8 @@ export function SessionDetailOverlay({ onBack }) {
   const speakersPod = speakers.length > 0 && html`
               <div class="sg-detail__group sg-detail__group--speakers">
                 <h3 class="sg-detail__section-label">
-                  Speakers <span class="sg-detail__count">(${speakers.length})</span>
+                  Speakers ${speakers.length > COLLAPSED_SPEAKERS
+    && html`<span class="sg-detail__count">(${speakers.length})</span>`}
                 </h3>
                 <div class="sg-detail__speakers" id="sg-detail-speakers">
                   ${shownSpeakers.map((sp) => html`

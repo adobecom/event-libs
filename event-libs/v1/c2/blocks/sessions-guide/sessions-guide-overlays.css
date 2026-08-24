@@ -85,9 +85,13 @@
    display:contents and the pods order themselves (see .sg-detail__col below). */
 /* gray-75 is the authored tint and is a primitive, so it does not flip with the theme —
    the dark override at the bottom of this file swaps it for the darkest surface. */
+
+/* flex: 1 0 auto so the tint fills the panel when the content is shorter than it, without
+   ever being squeezed below its content height when the content is taller and scrolls. */
 .sg-detail__body {
   display: flex;
   flex-direction: column;
+  flex: 1 0 auto;
   background: var(--s2a-color-gray-75);
 }
 
@@ -220,12 +224,31 @@
   margin: 0;
 }
 
-/* The IPOD/GDPR notice: authored free text (see sessions-api.js), hidden when unauthored. */
+/* The IPOD/GDPR notice: authored HTML like the disclaimer (see utils/rich-text.js), hidden
+   when unauthored. Sits inside the summary pod, so it needs no inset of its own. */
 .sg-detail__legal {
   margin: 0;
   font-size: var(--s2a-font-size-xs);
   line-height: 18px;
   color: var(--s2a-color-content-default);
+}
+
+/* Shared by both authored-HTML blocks: neutralise the margins the browser applies to markup
+   we did not author, and make links legible without recolouring them. */
+.sg-detail__legal p,
+.sg-detail__legal-disclaimer p {
+  margin: 0 0 var(--s2a-spacing-xs);
+}
+
+.sg-detail__legal p:last-child,
+.sg-detail__legal-disclaimer p:last-child {
+  margin-bottom: 0;
+}
+
+.sg-detail__legal a,
+.sg-detail__legal-disclaimer a {
+  color: inherit;
+  text-decoration: underline;
 }
 
 /* ── Action row ──────────────────────────────────────────── */
@@ -569,6 +592,17 @@
   text-decoration: none;
 }
 
+/* Empty state (Figma 8:6754): same card frame as a real resource, but it is a <p> rather than
+   a link, so nothing about it should read as actionable. Only the copy colour differs — gray-600
+   is the token the design names. */
+.sg-detail__resource-card--empty {
+  justify-content: flex-start;
+  margin: 0;
+  font-size: var(--s2a-font-size-md);
+  line-height: 24px;
+  color: var(--s2a-color-gray-600);
+}
+
 .sg-detail__resource-name {
   font-size: var(--s2a-font-size-md);
   line-height: 24px;
@@ -584,25 +618,13 @@
 }
 
 /* Authored HTML (see utils/rich-text.js): the value brings its own <p>/<b>/<br>/<a>, so the
-   wrapper only sets the type ramp and neutralises the paragraph margins the browser would
-   otherwise apply to markup we did not author. */
+   wrapper only sets the type ramp. Unlike the IPOD/GDPR notice it sits outside any pod, so it
+   carries the pods' own horizontal padding to line its text up with theirs, not their edges. */
 .sg-detail__legal-disclaimer {
   font-size: var(--s2a-font-size-xs);
   color: var(--s2a-color-content-subtle);
   margin: 0;
-}
-
-.sg-detail__legal-disclaimer p {
-  margin: 0 0 var(--s2a-spacing-xs);
-}
-
-.sg-detail__legal-disclaimer p:last-child {
-  margin-bottom: 0;
-}
-
-.sg-detail__legal-disclaimer a {
-  color: inherit;
-  text-decoration: underline;
+  padding-inline: var(--s2a-spacing-lg);
 }
 
 /* ── Tablet: pods float on the tinted body, still one column (Figma 1299:69634) ── */
