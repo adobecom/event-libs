@@ -182,6 +182,26 @@ export function buildHomepageConfigURL(org, repo, configType, eventId, heading, 
   return url.toString();
 }
 
+// Reverse of buildHomepageConfigURL. Tries a few decode variants (mirroring Schedule Maker's
+// decodeScheduleParam) so a link that's been through an extra layer of URL-encoding (e.g.
+// pasted somewhere that percent-encodes hash fragments) still decodes.
+export function decodeHomepageConfigParam(raw) {
+  const attempts = [
+    () => atob(decodeURIComponent(raw)),
+    () => atob(decodeURIComponent(decodeURIComponent(raw))),
+    () => atob(raw),
+  ];
+  for (let i = 0; i < attempts.length; i += 1) {
+    try {
+      const obj = JSON.parse(attempts[i]());
+      if (obj && obj.eventId && obj.configType) return obj;
+    } catch {
+      // try next decode variant
+    }
+  }
+  return null;
+}
+
 // Copies a real hyperlink (not just the bare URL string) to the clipboard, so pasting into
 // DA's rich-text doc body lands as a clickable link with real link text — the ClipboardItem
 // HTML path is what makes that possible; copyTextToClipboard's plain-text fallback can't
