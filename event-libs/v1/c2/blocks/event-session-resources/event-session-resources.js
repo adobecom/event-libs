@@ -5,14 +5,9 @@
  * rest. "No resources" empty state when none are published. Links open in a new
  * tab.
  *
- * "Download" CTAs are gated on sign-in + event registration via the shared
- * session-action guard, reusing the same login/registration toast as the favorite
- * and add-to-schedule CTAs. "Open" links are not gated. The CTA label ("Download"
- * vs "Open") is inferred from the file URL; RF may later supply explicit CTA text.
- *
- * NOTE: this is a UX gate, not access control — the file URL is in the DOM, so a
- * copied link or modifier-click still reaches it. Protecting the asset itself needs
- * a signed/expiring URL or a server-side check.
+ * "Download" CTAs are gated on sign-in + event registration; "Open" links are not.
+ * The gate is UX only — the file URL is in the DOM, so real protection needs a
+ * signed/expiring URL or a server-side check.
  */
 import { createTag, getMetadata } from '../../../utils/utils.js';
 import { getJsonMetadata } from '../../utils/custom-attributes.js';
@@ -28,13 +23,8 @@ const CHEVRON_ICON = '<svg xmlns="http://www.w3.org/2000/svg" width="8" height="
 
 const ctaLabel = (m) => (DOWNLOADABLE.test(m.fileURL || '') ? 'Download' : 'Open');
 
-// Trailing extension of the file URL, ignoring any query/hash.
 const EXT_RE = /\.([a-z0-9]{1,8})(?:[?#]|$)/i;
 
-// The row label comes from fileTypeName ("Session slides"), not fileName: authored
-// file names are frequently not reader-friendly ("Screenshot 2026-08-13 at
-// 11.23.26 AM.png", "Magdiel_Lopez_MAX_2026_Session_Outline"). With no fileTypeName,
-// fall back to the file's extension so the row still says what it is.
 const resourceName = (m) => {
   if (m.fileTypeName) return m.fileTypeName;
   const ext = (m.fileURL || '').match(EXT_RE)?.[1];
@@ -51,10 +41,8 @@ export default async function init(el) {
     ? materials.filter((m) => m && m.published !== false && m.fileURL)
     : [];
 
-  // Boot the page-level state engine so `auth` reflects the real IMS/registration
-  // state. Idempotent, and a no-op without a Tier 1 config — see the gate below.
+  // Idempotent; without it `auth` stays { isLoggedIn: null } and every click is blocked.
   initSessionState();
-  // showAuthToast expects { title, registerUrl } (not Milo's global config).
   const eventConfig = {
     title: getMetadata('event-title') || getMetadata('title') || '',
     registerUrl: getApiConfig()?.registerUrl || '/register',
@@ -86,9 +74,6 @@ export default async function init(el) {
       'aria-label': `${label} ${name} (opens in new tab)`,
     }, label);
 
-    // Downloads require sign-in + event registration; "Open" links stay ungated.
-    // Blocking on click (rather than rendering a disabled link) keeps the row usable
-    // the moment the visitor signs in, with no re-render.
     if (label === 'Download') {
       cta.addEventListener('click', (e) => {
         try {
