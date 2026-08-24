@@ -41,7 +41,6 @@ function stripRfPrefix(id) {
 export function normalizeSessions(rawSessions) {
   return rawSessions.map((s) => ({
     id: s.id || '',
-    slug: s.slug || '',
     rfCode: s.rfCode || '',
     // RF-native session id (not session-time id) — toggleSessionInterest (favoriting)
     // keys on this instead of rfCode.
@@ -275,16 +274,6 @@ function buildCustomAttributeValueMap(session) {
   return map;
 }
 
-// `sessions[].url` already resolves to the session's real page (e.g.
-// https://www.adobe.com/max/2026/sessions/{slug}), so it's used as-is rather than rebuilt —
-// only its host needs adjusting per env, which normalizeSessions() handles. Its last path
-// segment is also exactly the slug we want.
-function slugFromUrl(url) {
-  if (!url) return '';
-  const segments = url.split('?')[0].split('#')[0].split('/').filter(Boolean);
-  return (segments[segments.length - 1] || '').replace(/\.html$/, '');
-}
-
 // `published: false` marks a draft/test row that must never reach real visitors once
 // ENFORCE_PUBLISHED_FILTER is on. Missing the field is treated as visible (fail open).
 export function isSessionPublished(session) {
@@ -356,12 +345,10 @@ export function mapEslPayloadToRawSessions(payload) {
     const isOnline = hasFormatValue(formatValues, FORMAT_ONLINE);
     const isLivestreamed = extractCustomAttributeValues(session, 'Livestreamed Content').includes('Live');
     const type = extractCustomAttributeValue(session, ['Type', 'Session Type']);
-    const slug = slugFromUrl(session.url);
     const thumbnail = (session.images || []).find((img) => img.imageKind === 'session-card-image');
 
     return {
       id: session.sessionId,
-      slug,
       // Schedule (addSession/removeSession) keys on the per-time-slot id; favoriting
       // (toggleSessionInterest) keys on the session-level id instead — two distinct RF ids.
       rfCode: stripRfPrefix(firstTime?.externalSessionTimeId),

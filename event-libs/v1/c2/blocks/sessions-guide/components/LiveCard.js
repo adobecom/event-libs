@@ -7,7 +7,7 @@ import {
 } from '../../../../utils/session-store.js';
 import { toggleScheduleWithFeedback, toggleFavoriteWithFeedback } from '../../../../services/sessions/action-feedback.js';
 import { IconPlay, IconCalendarCheck, IconCalendarPlus, IconHeartFilled, IconHeartOutline } from './icons.js';
-import { setSessionParam, clearSessionParams, safeUrl, isSamePage } from '../utils/url.js';
+import { setSessionParam, sessionParamValue, clearSessionParams, safeUrl, isSamePage } from '../utils/url.js';
 import { CategoryBadge } from './CategoryBadge.js';
 import { scrollBehavior } from '../utils/motion.js';
 import { getTrackIcon } from '../../../../utils/tier-1-event-config.js';
@@ -110,9 +110,7 @@ export function LiveCard({ session, variant = 'live' }) {
   function handleCardClick() {
     if (surface !== 'widget') return;
     dispatch({ type: 'SET_ACTIVE_SESSION', sessionId: session.id });
-    const slug = session.slug || session.id;
-    const rfCode = session.rfCode || session.id;
-    history.pushState({}, '', setSessionParam(`${slug}-${rfCode}`));
+    history.pushState({}, '', setSessionParam(sessionParamValue(session)));
   }
 
   return html`

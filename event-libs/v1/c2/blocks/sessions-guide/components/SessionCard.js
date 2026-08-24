@@ -3,7 +3,7 @@ import { useSessionGuide } from '../store/index.js';
 import { isSessionOnDemand, formatSessionTime, formatShortTime, formatDuration, getNowMs } from '../utils/time.js';
 import { scheduled, favorited, pendingActions } from '../../../../utils/session-store.js';
 import { toggleScheduleWithFeedback, toggleFavoriteWithFeedback } from '../../../../services/sessions/action-feedback.js';
-import { setSessionParam, safeUrl } from '../utils/url.js';
+import { setSessionParam, sessionParamValue, safeUrl } from '../utils/url.js';
 import { CategoryBadge } from './CategoryBadge.js';
 import { IconButton } from './IconButton.js';
 import { IconPlay, IconCalendarCheck, IconCalendarPlus, IconHeartFilled, IconHeartOutline } from './icons.js';
@@ -128,9 +128,7 @@ export function SessionCard({ session, forceOnDemand = false, timeDisplay = 'dur
       return;
     }
     dispatch({ type: 'SET_ACTIVE_SESSION', sessionId: session.id });
-    const slug = session.slug || session.id;
-    const rfCode = session.rfCode || session.id;
-    history.pushState({}, '', setSessionParam(`${slug}-${rfCode}`));
+    history.pushState({}, '', setSessionParam(sessionParamValue(session)));
   }
 
   // eslint-disable-next-line no-nested-ternary

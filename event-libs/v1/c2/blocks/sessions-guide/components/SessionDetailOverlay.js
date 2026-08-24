@@ -8,7 +8,7 @@ import {
 import { toggleScheduleWithFeedback, toggleFavoriteWithFeedback } from '../../../../services/sessions/action-feedback.js';
 import { showToast } from '../../../../features/toast/toast.js';
 import { deriveSessionState, getWatchDestination } from '../../../../utils/session-state.js';
-import { setSessionParam, clearSessionParams, safeUrl, isSamePage } from '../utils/url.js';
+import { setSessionParam, sessionParamValue, clearSessionParams, safeUrl, isSamePage } from '../utils/url.js';
 import {
   IconHeartFilled, IconHeartOutline, IconClosedCaption, IconLinkOut,
 } from './icons.js';
@@ -113,9 +113,7 @@ export function SessionDetailOverlay({ onBack }) {
 
   async function handleShare(e) {
     e.stopPropagation();
-    const slug = session.slug || session.id;
-    const rfCode = session.rfCode || session.id;
-    const shareUrl = window.location.origin + setSessionParam(`${slug}-${rfCode}`);
+    const shareUrl = window.location.origin + setSessionParam(sessionParamValue(session));
     try {
       if (navigator.share) {
         await navigator.share({ title: session.title, url: shareUrl });

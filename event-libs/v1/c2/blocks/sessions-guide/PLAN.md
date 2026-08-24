@@ -62,7 +62,7 @@ All template output uses `` html`...` `` from `htm-preact.js`. File extensions a
 | IMS profile | `BlockMediator` | Read `imsProfile` — existing project pattern; bridged into the shared `auth` signal by `session-store.js` |
 | RSVP / registration | `BlockMediator` | Read `rsvpData.registered` — existing project pattern; bridged into the shared `auth` signal |
 | Inter-block (same page) | `BlockMediator` (legacy keys) + `session-store.js` signals (new shared keys) | `BlockMediator` keeps owning `imsProfile`/`rsvpData`/`espData` as before; new cross-block session data goes through signals instead of adding more `BlockMediator` keys |
-| URL state | `history.pushState` | Widget: `?sessions` / `?session=<slug>-<rfCode>`. Full page: `?view=` / `?filter=` / `?search=` |
+| URL state | `history.pushState` | Widget: `?sessions` / `?session=<url-slug>`. Full page: `?view=` / `?filter=` / `?search=` |
 
 ### Why signals, not just BlockMediator
 The original design kept all session state in this block's own Preact Context, on the theory that the widget and full-page surfaces are on different pages and in-memory state can't survive navigation anyway. That held until a cross-block requirement came in: other blocks on the *same* page (favorites badges, registration-aware CTAs, etc.) need to read sessions/favorites/scheduled/auth too — state scoped to one block's Context isn't reachable from outside it.
@@ -208,7 +208,6 @@ Toast and conflict-modal state moved out of this reducer entirely — see `event
 ```typescript
 interface Session {
   id: string;
-  slug: string;                  // for URL params: ?session=<slug>-<rfCode>
   rfCode: string;                // Rainfocus session code
   title: string;
   description: string;
@@ -405,7 +404,7 @@ Sessions are fetched once by `session-store.js`'s `loadSessions()`, kicked off f
 **Triggers:**
 - **CTA button** — Preact-rendered `position: fixed; bottom: 0` button inside `DrawerShell` (only rendered when `drawerState === 'hidden'`)
 - **`?sessions` URL param** — checked on mount in `DrawerShell`; auto-opens to `expanded`
-- **`?session=<slug>-<rfCode>` URL param** — auto-opens to `expanded` + resolves `activeSessionId` once sessions are loaded
+- **`?session=<url-slug>` URL param** — auto-opens to `expanded` + resolves `activeSessionId` once sessions are loaded
 
 **State machine:**
 
@@ -674,7 +673,7 @@ No longer a reducer case (`LIVE_STATUS_UPDATE` doesn't exist). Implemented as a 
 ### 6.2 URL param for open overlay (widget) ✅
 - `DrawerShell` handles `handleDetailBack()`: pushes `setSessionsParam()` URL
 - `DrawerShell` handles `closeDrawer()`: pushes `clearSessionParams()` URL
-- Opening detail: `SessionCard` / `LiveCard` push `setSessionParam(slug-rfCode)` URL
+- Opening detail: `SessionCard` / `LiveCard` push `setSessionParam(sessionParamValue(session))` URL
 - `popstate` listener in `DrawerShell` restores state from URL without pushing new entries
 
 ### 6.3 State sync ✅
@@ -749,7 +748,7 @@ There **is** a separate block entry, `sessions-guide-full-page.js`, registered a
 | Shell | Peek-to-expand drawer in portal | Inline layout in block element |
 | Session card click | Opens detail overlay (upcoming/live); navigates (on-demand) | Always navigates to session page |
 | Session detail overlay | Yes (`sg-detail-panel` inside drawer) | No |
-| URL params | `?sessions`, `?session=<slug>-<rfCode>` | `?view=`, `?filter=`, `?search=` |
+| URL params | `?sessions`, `?session=<url-slug>` | `?view=`, `?filter=`, `?search=` |
 | CTA button | "View all sessions" fixed button | Not rendered |
 
 ### 9.3 URL param management (full page) ✅
@@ -768,7 +767,7 @@ There **is** a separate block entry, `sessions-guide-full-page.js`, registered a
 - Close → `history.pushState({}, '', clearSessionParams())`
 
 ### 10.2 Session detail URL ✅
-- Open detail → `history.pushState({}, '', setSessionParam('slug-rfCode'))` (drops `?sessions=`)
+- Open detail → `history.pushState({}, '', setSessionParam('<url-slug>'))` (drops `?sessions=`)
 - Close detail (keep drawer open) → `history.pushState({}, '', setSessionsParam())`
 
 ### 10.3 popstate handler ✅
@@ -836,7 +835,7 @@ Tests mirror `test/unit/blocks/sessions-guide/`. Coverage status to be assessed 
 ### 14.3 Integration tests (priority order)
 - Full view rendering for all 4 views
 - Poll-driven state update: `session-store.js`'s `liveStreamActiveIds` signal changing on a poll tick, and the on-demand auto-transition `useEffect` reacting to it
-- URL param handling: `?sessions` auto-opens, `?session=slug-rfCode` resolves detail
+- URL param handling: `?sessions` auto-opens, `?session=<url-slug>` resolves detail
 - Filter + search composition
 
 ---

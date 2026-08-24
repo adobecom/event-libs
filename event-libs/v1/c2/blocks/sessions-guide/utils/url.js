@@ -18,12 +18,37 @@ export function setSessionsParam() {
   return buildUrl(params);
 }
 
-// Opens a session detail: sets `session=<slug>`, drops the `sessions` flag.
+// Opens a session detail: sets `session=<url-slug>`, drops the `sessions` flag.
 export function setSessionParam(value) {
   const params = new URLSearchParams(window.location.search);
   params.delete('sessions');
   params.set('session', value);
   return buildUrl(params);
+}
+
+// The catalog already slugifies enTitle + sessionCode into the session's own page url, so its
+// last path segment is the identity we deep-link by — no second slug to keep in step. e.g.
+// .../max/2026/sessions/acom-ipod-test-session-no-mpc-1003-1 -> acom-ipod-test-session-no-mpc-1003-1
+// Host rewriting (sessionPageUrlForEnv) and root-relative authored values both leave it alone.
+export function sessionUrlSlug(url) {
+  if (!url) return '';
+  const segments = url.split('?')[0].split('#')[0].split('/').filter(Boolean);
+  return (segments[segments.length - 1] || '').replace(/\.html$/, '');
+}
+
+// The deep-link identity of a session. Falls back to the session id for rows with no url,
+// which is also what openSessionGuideDetail() writes for its own deep link.
+export function sessionParamValue(session) {
+  return sessionUrlSlug(session.sessionPageUrl) || session.id || '';
+}
+
+// Reverse of sessionParamValue(). Matched whole against either form — the slug and the id
+// both carry dashes, so splitting the param on one would truncate it.
+export function findSessionByParam(sessionList, param) {
+  if (!param) return null;
+  return sessionList.find(
+    (s) => sessionUrlSlug(s.sessionPageUrl) === param || s.id === param,
+  ) || null;
 }
 
 // Closes the drawer: removes both of the widget's params.

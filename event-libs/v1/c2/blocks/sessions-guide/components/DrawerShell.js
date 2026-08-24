@@ -8,7 +8,9 @@ import { ViewRouter } from './ViewRouter.js';
 import { SessionDetailOverlay } from './SessionDetailOverlay.js';
 import { BackToTop } from './BackToTop.js';
 import { LoadingState, sessionsStatusMessage } from './LoadingState.js';
-import { setSessionParam, setSessionsParam, clearSessionParams } from '../utils/url.js';
+import {
+  setSessionParam, setSessionsParam, clearSessionParams, findSessionByParam, sessionParamValue,
+} from '../utils/url.js';
 import { trapFocus } from '../utils/focus-trap.js';
 import { prefersReducedMotion } from '../utils/motion.js';
 
@@ -169,7 +171,7 @@ export function DrawerShell() {
     };
   }, [state.drawerState]);
 
-  // URL deep-linking on mount: open drawer for ?sessions, open detail for ?session=slug
+  // URL deep-linking on mount: open drawer for ?sessions, open detail for ?session=<url-slug>
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     if (params.has('sessions') || params.has('session')) {
@@ -181,17 +183,14 @@ export function DrawerShell() {
     }
   }, []);
 
-  // URL deep-linking: resolve ?session=slug once sessions are loaded
+  // URL deep-linking: resolve ?session=<url-slug> once sessions are loaded.
   useEffect(() => {
     if (sessionsStatus.value !== 'ready') return;
-    const params = new URLSearchParams(window.location.search);
-    const sessionParam = params.get('session');
+    const sessionParam = new URLSearchParams(window.location.search).get('session');
     if (!sessionParam) return;
-    // URL format: slug-rfCode (rfCode is after the last dash)
-    const lastDash = sessionParam.lastIndexOf('-');
-    const rfCode = lastDash >= 0 ? sessionParam.slice(lastDash + 1) : sessionParam;
-    const found = sessions.value.find((s) => s.rfCode === rfCode || s.id === sessionParam);
+    const found = findSessionByParam(sessions.value, sessionParam);
     if (found) dispatch({ type: 'SET_ACTIVE_SESSION', sessionId: found.id });
+    else window.lana?.log(`[sessions-guide] ?session=${sessionParam} matched no session`);
   }, [sessionsStatus.value]);
 
   // External API: other blocks call openSessionGuideDetail(sessionId) (session-store.js) to
@@ -212,7 +211,11 @@ export function DrawerShell() {
     }
     dispatch({ type: 'SET_DRAWER', drawer: 'expanded', defaultView: result.defaultView });
     dispatch({ type: 'SET_ACTIVE_SESSION', sessionId: result.sessionId });
-    history.pushState({}, '', setSessionParam(result.sessionId));
+    // Written as the url slug like every other entry point, so the param has one shape.
+    const opened = sessions.value.find((s) => s.id === result.sessionId);
+    history.pushState({}, '', setSessionParam(
+      opened ? sessionParamValue(opened) : result.sessionId,
+    ));
   }), []);
 
   // Keep sessionsRef current so the popstate handler always sees the latest list

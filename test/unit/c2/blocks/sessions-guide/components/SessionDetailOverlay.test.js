@@ -20,7 +20,6 @@ const HOUR = 3600e3;
 function makeSession(overrides = {}) {
   return {
     id: 's-1',
-    slug: 'day-one-keynote',
     rfCode: 'RF1',
     title: 'Day One Keynote',
     description: 'A session about everything.',

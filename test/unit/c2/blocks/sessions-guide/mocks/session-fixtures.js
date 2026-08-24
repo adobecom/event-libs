@@ -8,7 +8,6 @@ const HOUR = 3600e3;
 export function makeSession(overrides = {}) {
   return {
     id: 's-1',
-    slug: 'building-with-ai',
     rfCode: 'S001',
     rfSessionId: 'RF-S001',
     title: 'Building with AI: A Practical Guide',
@@ -74,7 +73,6 @@ export const SESSION_VARIANTS = {
   }),
   keynote: makeSession({
     id: 's-keynote',
-    slug: 'max-keynote',
     rfCode: 'K001',
     title: 'MAX Keynote',
     track: 'Featured',

@@ -95,8 +95,7 @@ describe('services/sessions/sessions-api', () => {
 
     // The catalog's url already resolves the session's own page, so it passes through
     // untouched here — only its host is env-adjusted, in normalizeSessions.
-    it('takes sessionPageUrl straight from the catalog url, and the slug from its last segment', () => {
-      expect(full.slug).to.equal('full-stack-session-s001');
+    it('takes sessionPageUrl straight from the catalog url', () => {
       expect(full.sessionPageUrl).to.equal('https://www.adobe.com/drafts/esp-dev/max/2025/sessions/full-stack-session-s001');
     });
 
@@ -106,11 +105,10 @@ describe('services/sessions/sessions-api', () => {
         sessionTimes: [],
         speakers: [],
       });
-      expect(noUrl.slug).to.equal('');
       expect(noUrl.sessionPageUrl).to.equal('');
     });
 
-    it('strips a trailing .html when deriving the slug, leaving the url itself alone', () => {
+    it('leaves a trailing .html on the url alone', () => {
       const url = 'https://www.adobe.com/max/2026/sessions/already-html-s004.html';
       const [withExt] = mapEslPayloadToRawSessions({
         sessions: [{
@@ -119,7 +117,6 @@ describe('services/sessions/sessions-api', () => {
         sessionTimes: [],
         speakers: [],
       });
-      expect(withExt.slug).to.equal('already-html-s004');
       expect(withExt.sessionPageUrl).to.equal(url);
     });
 
