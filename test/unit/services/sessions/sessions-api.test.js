@@ -4,7 +4,8 @@ import {
   mapEslPayloadToRawSessions, normalizeSessions, isSessionPublished, isInPersonOnly, isMissingFormat,
   ENFORCE_PUBLISHED_FILTER,
   getSessionProducts, extractDistinctProducts, getProductAttributeId, sessionPageUrlForEnv, parseDvrDelayHours,
-  getSessionAdditionalTracks, extractDistinctAllTracks,
+  getSessionAdditionalTracks, extractDistinctAllTracks, deriveFacetableAttributes,
+  IGNORED_ATTRIBUTE_NAMES,
 } from '../../../../event-libs/v1/services/sessions/sessions-api.js';
 
 function customAttr(name, values) {
@@ -514,6 +515,56 @@ describe('services/sessions/sessions-api', () => {
 
   // The attribute is expected but not shipped. The read is wired up ahead of it, so it must
   // yield [] today and pick the values up the moment either casing appears.
+  // Confirmed unused for MAX 26: the catalog still sends it, but nothing may key off it, so
+  // neither generic path that picks attributes up on its own is allowed to surface it.
+  describe('ignored attributes', () => {
+    const GATED = {
+      name: 'Gated Video',
+      attributeId: 'gated-attr-id',
+      inputType: 'single-select',
+      values: [{ valueId: 'yes-id', label: 'Yes', value: 'yes', ordinal: 0 }],
+    };
+    const KEPT = {
+      name: 'Category',
+      attributeId: 'category-attr-id',
+      inputType: 'single-select',
+      values: [{ valueId: 'tl-id', label: 'Thought Leadership', value: 'thought-leadership', ordinal: 0 }],
+    };
+    const payload = {
+      speakers: [],
+      sessionTimes: [],
+      sessions: [{ sessionId: 's-1', sessionCode: 'S1', customAttributes: [ONLINE_FORMAT, GATED, KEPT] }],
+    };
+
+    it('names Gated Video as ignored', () => {
+      expect(IGNORED_ATTRIBUTE_NAMES).to.include('Gated Video');
+    });
+
+    it('keeps it out of the facets the configurator offers as filter categories', () => {
+      const facets = deriveFacetableAttributes(payload.sessions);
+      const ids = facets.map((f) => f.attributeId);
+      expect(ids).to.not.include('gated-attr-id');
+      expect(ids).to.include('category-attr-id');
+    });
+
+    it('keeps it out of the value map the runtime filters read', () => {
+      const [mapped] = mapEslPayloadToRawSessions(payload);
+      expect(mapped.customAttributeValues).to.not.have.property('gated-attr-id');
+      expect(mapped.customAttributeValues['category-attr-id']).to.deep.equal(['Thought Leadership']);
+    });
+
+    it('survives normalizeSessions with it still absent', () => {
+      const [normalized] = normalizeSessions(mapEslPayloadToRawSessions(payload));
+      expect(normalized.customAttributeValues).to.not.have.property('gated-attr-id');
+    });
+
+    it('maps no session field for it', () => {
+      const [mapped] = mapEslPayloadToRawSessions(payload);
+      expect(JSON.stringify(mapped)).to.not.include('Gated Video');
+      expect(JSON.stringify(mapped)).to.not.include('gated-attr-id');
+    });
+  });
+
   describe('mapEslPayloadToRawSessions AI focus (pending attribute)', () => {
     const withAttrs = (attrs) => mapEslPayloadToRawSessions({
       speakers: [],

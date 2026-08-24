@@ -210,6 +210,15 @@ export function extractDistinctProducts(sessions) {
   return [...products].sort();
 }
 
+// Attributes the catalog sends that the guide must never surface. `Gated Video` is confirmed
+// unused for MAX 26 (2026-08-24): it still arrives on some sessions, but nothing is to key off
+// it, so it is filtered out of both generic paths that would otherwise pick it up on their own
+// — the facets the configurator offers as filter categories, and the value map the runtime
+// filters read. Matched on `name`; the attributeId is event-specific and would not travel.
+export const IGNORED_ATTRIBUTE_NAMES = ['Gated Video'];
+
+const isIgnoredAttribute = (attr) => IGNORED_ATTRIBUTE_NAMES.includes(attr?.name);
+
 // Derives facetable custom attributes + their distinct values from an already-fetched
 // session catalog, mirroring the enabled/inputType/valueId filtering ESP's own
 // /session-facets endpoint applies server-side, so results match it without an extra
@@ -219,6 +228,7 @@ export function deriveFacetableAttributes(sessions) {
   (sessions || []).forEach((session) => {
     (session.customAttributes || []).forEach((attr) => {
       if (attr.enabled === false) return;
+      if (isIgnoredAttribute(attr)) return;
       if (!['single-select', 'multi-select'].includes(attr.inputType)) return;
       if (!attributeMap.has(attr.attributeId)) {
         attributeMap.set(attr.attributeId, { attributeId: attr.attributeId, label: attr.label, values: new Map() });
@@ -270,6 +280,7 @@ function buildCustomAttributeValueMap(session) {
   const map = {};
   (session.customAttributes || []).forEach((attr) => {
     if (attr.enabled === false) return;
+    if (isIgnoredAttribute(attr)) return;
     if (!['single-select', 'multi-select'].includes(attr.inputType)) return;
     map[attr.attributeId] = (attr.values || []).map((v) => v?.label ?? v?.value).filter(Boolean);
   });
