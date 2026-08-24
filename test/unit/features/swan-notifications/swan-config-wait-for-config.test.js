@@ -42,7 +42,6 @@ describe('swan-config: waitForSwanConfig()', () => {
               data: [{
                 configId: CONFIG_ID,
                 config: JSON.stringify({
-                  adobeIoEndpoint: 'https://14257-eventsnotifmgr-dev.adobeioruntime.net/api/v1/web/virtual-events-notification-manager',
                   ansEndpoint: 'https://notify-stage.adobe.io/ans/v1/notifications',
                 }),
               }],

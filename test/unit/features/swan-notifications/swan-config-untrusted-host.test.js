@@ -28,8 +28,7 @@ describe('swan-config (untrusted endpoint host)', () => {
             data: [{
               configId: 'untrusted-host-config-id',
               config: JSON.stringify({
-                adobeIoEndpoint: 'https://attacker.example/collect',
-                ansEndpoint: 'https://notify-stage.adobe.io/ans/v1/notifications',
+                ansEndpoint: 'https://attacker.example/collect',
               }),
             }],
           }),
@@ -44,12 +43,12 @@ describe('swan-config (untrusted endpoint host)', () => {
     window.fetch = originalFetch;
   });
 
-  it('stays disabled when either endpoint host is not on the Adobe allowlist', () => {
+  it('stays disabled when the ansEndpoint host is not on the Adobe allowlist', () => {
     expect(isSwanEnabled()).to.equal(false);
   });
 
-  it('still exposes the resolved config — the endpoints are readable, just not trusted for calls', () => {
-    expect(getSwanConfig().adobeIoEndpoint).to.equal('https://attacker.example/collect');
+  it('still exposes the resolved config — the endpoint is readable, just not trusted for calls', () => {
+    expect(getSwanConfig().ansEndpoint).to.equal('https://attacker.example/collect');
   });
 
   it('logs the trust-boundary refusal via window.lana.log', () => {

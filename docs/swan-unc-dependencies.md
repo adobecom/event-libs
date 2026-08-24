@@ -32,7 +32,7 @@ SWAN never calls UNC's API. The actual flow is:
 ```
 event-libs (this repo)  →  ANS (Adobe Notification Service)  →  UNC (renders the bell UI)
         │
-        └────────────────→  bookkeeping service (tracks which ANS ids belong to which session)
+        └────────────────→  ESP swan-notifications resource (tracks which ANS ids belong to which session)
 ```
 
 UNC is a passive listener on ANS — whatever notification records exist in ANS for the
@@ -54,9 +54,8 @@ appears "broken" during setup; check gnav config first.
 
 ### 1. Adobe IMS
 Already available in event-libs via `session-store.js`'s existing IMS wiring — no new
-setup. Used for `window.adobeIMS.getAccessToken().token` (Bearer auth on every ANS/
-bookkeeping call) and `tokenService.getTokenAndProfile()` (the `user-id` claim ANS
-requires).
+setup. Used for `window.adobeIMS.getAccessToken().token` (Bearer auth on every ANS/ESP
+call) and `tokenService.getTokenAndProfile()` (the `user-id` claim ANS requires).
 
 ### 2. ANS — Adobe Notification Service
 External, owned by Adobe's notification platform team, not this repo.
@@ -74,17 +73,24 @@ External, owned by Adobe's notification platform team, not this repo.
   in **seconds**, not milliseconds — undocumented, confirmed only by reading the prior
   implementation.
 
-### 3. Bookkeeping service (Adobe I/O Runtime action)
-A small, bespoke serverless action whose only job is tracking which ANS notification ids
-belong to which session — ANS itself has no list/diff endpoint of its own.
+### 3. Bookkeeping — ESP `swan-notifications` resource
+Tracks which ANS notification ids belong to which session — ANS itself has no list/diff
+endpoint of its own. This lives on `events-service-platform` (ESP), the same
+Node/Express + DynamoDB backend event-libs already depends on for the session catalog
+(`services/sessions/sessions-api.js`), not a separate bespoke service — see
+`events-service-platform/src/managers/swanNotificationsMgr.js` and
+`src/routes/attendees/swan-notifications/`.
 
-- Endpoints: `GET {adobeIoEndpoint}/list`, `POST {adobeIoEndpoint}/store`,
-  `POST {adobeIoEndpoint}/delete/{notificationId}`.
-- Auth: `Authorization: Bearer <IMS token>` + `Content-Type: application/json` — no other
-  headers.
-- Only known value (stage/dev): `https://14257-eventsnotifmgr-dev.adobeioruntime.net/api/v1/web/virtual-events-notification-manager`.
-- **Ownership and portability to event-libs-hosted origins (da-events) is unconfirmed** —
-  see [Open risks](#open-risks--resolve-before-going-live).
+- Endpoints (attendee-scoped, `me` resolves from the IMS bearer token — same convention
+  as `esp-controller.js`'s `getAttendee()`): `GET /v1/attendees/me/swan-notifications`,
+  `POST /v1/attendees/me/swan-notifications` (body `{ rfCode, notificationId }`),
+  `DELETE /v1/attendees/me/swan-notifications/{rfCode}`.
+- Auth: same `constructRequestOptions()` helper every other ESP call in this repo uses
+  (`Authorization: Bearer <IMS token>`, `x-api-key: acom_event_service`, etc.) — see
+  `ans-controller.js`.
+- Endpoint is resolved from `ENV_MAP` (`event-libs/v1/utils/constances.js`), fixed in
+  source per environment like every other ESP call — not authored, and not affected by
+  the ANS production-URL gap below.
 
 ### 4. RainFocus & ESP/ESL session catalog
 No new dependency — both already used elsewhere in event-libs
@@ -123,18 +129,19 @@ for the field-by-field authoring reference.
 
 The feature is a no-op (`isSwanEnabled()` returns `false`) whenever: no `configId` is
 authored, the ID doesn't resolve to any row in the published sheet, or the resolved
-config is missing `adobeIoEndpoint`/`ansEndpoint`. See `swan-config.js` for the
-resolution/fallback logic and `swan-payload.js`/`ans-controller.js` for how each field is
-used.
+config is missing `ansEndpoint`. See `swan-config.js` for the resolution/fallback logic
+and `swan-payload.js`/`ans-controller.js` for how each field is used. The bookkeeping
+endpoint isn't part of this check at all — it isn't authored (see
+[Bookkeeping](#3-bookkeeping--esp-swan-notifications-resource) above).
 
-**Trust boundary:** because `ansEndpoint`/`adobeIoEndpoint` carry the visitor's live
-Adobe IMS access token (`Authorization: Bearer ...`) on every request, the authoring
-app locks these two fields to a Stage/Production dropdown (`SWAN_ENV_OPTIONS` in
-`swan-notification-configurator/constants.js`) mapped to fixed, code-owned endpoint
-pairs — an author can no longer type an arbitrary URL into them at all. `swan-config.js`
+**Trust boundary:** because `ansEndpoint` carries the visitor's live Adobe IMS access
+token (`Authorization: Bearer ...`) on every request, the authoring app locks this field
+to a Stage/Production dropdown (`SWAN_ENV_OPTIONS` in
+`swan-notification-configurator/constants.js`) mapped to a fixed, code-owned endpoint —
+an author can no longer type an arbitrary URL into it at all. `swan-config.js`
 additionally keeps a host allowlist (`.adobe.io`, `.adobeioruntime.net`, `.adobe.com`) as
 defense-in-depth against the sheet being hand-edited outside the app; a resolved config
-with either endpoint on a non-Adobe host is treated as disabled rather than sending the
+with the endpoint on a non-Adobe host is treated as disabled rather than sending the
 token there. If a legitimate future endpoint lives on a different Adobe-owned host,
 extend the allowlist in `swan-config.js` **and** add it to `SWAN_ENV_OPTIONS`.
 
@@ -149,23 +156,20 @@ authoring a real config for a production event:
   whole sheet (see [Configuration](#configuration)), which means anyone with the URL —
   not just visitors to the specific event page — can read every authored event's
   `eventId`/`backendEventTitle`, potentially ahead of that event's own page going live.
-  No credentials or endpoint access are exposed by this (the stage `ansEndpoint`/
-  `adobeIoEndpoint` values are already public in the authoring app's own source), so
-  severity is low/moderate. This is a known, accepted trade-off of keeping this a "lite"
-  single-sheet tool rather than splitting authoring data from public runtime data — revisit
-  if event-name confidentiality before launch becomes a real requirement.
-- **No production ANS or bookkeeping-action URL exists anywhere in source.** Obtain real
-  values from whichever team owns ANS and the Adobe I/O Runtime bookkeeping action, then
-  fill them into `SWAN_ENV_OPTIONS`'s `production` entry in
+  No credentials or endpoint access are exposed by this (the stage `ansEndpoint` value is
+  already public in the authoring app's own source), so severity is low/moderate. This is
+  a known, accepted trade-off of keeping this a "lite" single-sheet tool rather than
+  splitting authoring data from public runtime data — revisit if event-name
+  confidentiality before launch becomes a real requirement.
+- **No production ANS URL exists anywhere in source.** Obtain a real value from whichever
+  team owns ANS, then fill it into `SWAN_ENV_OPTIONS`'s `production` entry in
   `event-libs/swan-notification-configurator/constants.js` — that single edit is all
   that's needed to enable the "Production" option in the authoring app (it renders
-  disabled until then).
-- **Bookkeeping-action ownership/portability is unconfirmed** for event-libs-hosted
-  origins. It may currently be scoped to northstar's own AEM origins only — if so,
-  event-libs needs its own deployment, which is a real scope addition, not just config.
-- **CORS from da-events' actual publish domain** against both ANS and the bookkeeping
-  action has not been verified. Confirm with a manual preflight check
-  (`curl -H "Origin: <da-events-domain>"`) against both before wiring a real endpoint.
+  disabled until then). The bookkeeping endpoint needs no equivalent fix — it's already
+  first-party ESP infra with real dev/stage/prod deployments.
+- **CORS from da-events' actual publish domain** against ANS has not been verified.
+  Confirm with a manual preflight check (`curl -H "Origin: <da-events-domain>"`) before
+  wiring a real endpoint.
 - **UNC `appId` coordination.** No UniversalNav/gnav configuration exists in event-libs or
   da-events today — whoever authors `swan-notification-config.appId` must coordinate
   directly with whoever configures gnav's `universal-nav` metadata on the same pages.
@@ -192,11 +196,11 @@ authoring a real config for a production event:
    runtime, so if this doesn't return the row, nothing downstream will work.
 3. Paste the copied config ID into the test page's `swan-notification-config` metadata
    row. Confirm gnav's `universal-nav` metadata and `unav.uncAppId` are set to match.
-4. Schedule a session as a signed-in test user; confirm a `POST` to `{adobeIoEndpoint}/store`
-   and `ansEndpoint` both fire (browser network tab), and that the bookkeeping service's
-   `/list` endpoint reflects the new entry.
-5. Unschedule the same session; confirm the `PUT`+`EXPIRED` call to `ansEndpoint` and the
-   `POST {adobeIoEndpoint}/delete/{id}` call both fire.
+4. Schedule a session as a signed-in test user; confirm a `POST` to
+   `/v1/attendees/me/swan-notifications` (ESP) and `ansEndpoint` both fire (browser
+   network tab), and that a `GET` to that same ESP endpoint reflects the new entry.
+5. Unschedule the same session; confirm the `PUT`+`EXPIRED` call to `ansEndpoint` and a
+   `DELETE /v1/attendees/me/swan-notifications/{rfCode}` call to ESP both fire.
 6. Reload the page as the same user; confirm `reconcileSwanNotifications()` runs once
    (no duplicate notifications created for an already-scheduled session).
 7. Only once 3–5 are confirmed working should UNC's actual bell-icon rendering be checked

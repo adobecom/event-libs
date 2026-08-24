@@ -9,12 +9,16 @@ const CONFIG_SHEET_PATH = '/tools/da-apps/swan-notification-configurator/configs
 const CONFIG_ID = 'ans-controller-test-config-id';
 
 const CONFIG = {
-  adobeIoEndpoint: 'https://14257-eventsnotifmgr-dev.adobeioruntime.net/api/v1/web/virtual-events-notification-manager',
   ansEndpoint: 'https://notify-stage.adobe.io/ans/v1/notifications',
   notificationType: 'com.adobe.events.v1',
   notificationSubType: 'max26.scheduled.notifications',
   appId: 'custom-app-id',
 };
+
+// The bookkeeping endpoint is resolved from ENV_MAP (see esp-controller.js), not
+// authored — getEventServiceEnv() defaults to ENV_MAP.prod when no override/metadata
+// is present, so this is the URL every bookkeeping test should expect.
+const BOOKKEEPING_ENDPOINT = 'https://events-service-platform.adobe.io/v1/attendees/me/swan-notifications';
 
 describe('ans-controller', () => {
   let originalFetch;
@@ -77,13 +81,19 @@ describe('ans-controller', () => {
     });
   });
 
-  it('fetchAdobeIoNotifications GETs {adobeIoEndpoint}/list with bookkeeping headers', async () => {
-    stubFetch([{ id: 'n-1', metadata: { sessionId: 'RF-1' } }]);
+  it('fetchAdobeIoNotifications GETs the ESP bookkeeping endpoint and normalizes the response', async () => {
+    stubFetch({ items: [{ rfCode: 'RF-1', notificationId: 'n-1' }] });
     const result = await fetchAdobeIoNotifications();
     expect(result).to.deep.equal([{ id: 'n-1', metadata: { sessionId: 'RF-1' } }]);
-    expect(lastUrl).to.equal(`${CONFIG.adobeIoEndpoint}/list`);
+    expect(lastUrl).to.equal(BOOKKEEPING_ENDPOINT);
     expect(lastOptions.method).to.equal('GET');
-    expect(lastOptions.headers.Authorization).to.equal('Bearer ims-token');
+    expect(lastOptions.headers.get('Authorization')).to.equal('Bearer ims-token');
+  });
+
+  it('fetchAdobeIoNotifications returns an empty array when the list has no items', async () => {
+    stubFetch({ items: [] });
+    const result = await fetchAdobeIoNotifications();
+    expect(result).to.deep.equal([]);
   });
 
   describe('createAnsNotification', () => {
@@ -109,6 +119,19 @@ describe('ans-controller', () => {
       expect(notification['sub-type']).to.equal(CONFIG.notificationSubType);
       expect(notification.timestamp).to.equal(1000);
       expect(JSON.parse(notification.payload)).to.deep.equal(payload);
+    });
+
+    it('warns via window.lana.log when adobeUserId is missing, rather than sending a malformed request silently', async () => {
+      stubFetch({ notifications: { notification: [] } });
+      const originalLana = window.lana;
+      const loggedMessages = [];
+      window.lana = { log: (msg) => loggedMessages.push(msg) };
+      try {
+        await createAnsNotification({ adobeUserId: null, timingProperties: { triggerNotificationTime: 1 }, payload: {} });
+      } finally {
+        window.lana = originalLana;
+      }
+      expect(loggedMessages.some((m) => m.includes('adobeUserId'))).to.equal(true);
     });
 
     it('throws when the HTTP request itself fails', async () => {
@@ -146,12 +169,12 @@ describe('ans-controller', () => {
   });
 
   describe('bookkeeping calls', () => {
-    it('storeBookkeepingEntry POSTs {adobeIoEndpoint}/store with id + session metadata', async () => {
+    it('storeBookkeepingEntry POSTs the ESP bookkeeping endpoint with rfCode + notificationId', async () => {
       stubFetch({});
       await storeBookkeepingEntry({ notificationId: 'n-1', rfCode: 'RF-1' });
-      expect(lastUrl).to.equal(`${CONFIG.adobeIoEndpoint}/store`);
+      expect(lastUrl).to.equal(BOOKKEEPING_ENDPOINT);
       expect(lastOptions.method).to.equal('POST');
-      expect(JSON.parse(lastOptions.body)).to.deep.equal({ id: 'n-1', metadata: { sessionId: 'RF-1' } });
+      expect(JSON.parse(lastOptions.body)).to.deep.equal({ rfCode: 'RF-1', notificationId: 'n-1' });
     });
 
     it('throws when storeBookkeepingEntry receives a non-ok response', async () => {
@@ -165,22 +188,35 @@ describe('ans-controller', () => {
       expect(error).to.be.an('error');
     });
 
-    it('deleteBookkeepingEntry POSTs {adobeIoEndpoint}/delete/{id}', async () => {
+    it('deleteBookkeepingEntry DELETEs the ESP bookkeeping endpoint by rfCode', async () => {
       stubFetch({});
-      await deleteBookkeepingEntry('n-1');
-      expect(lastUrl).to.equal(`${CONFIG.adobeIoEndpoint}/delete/n-1`);
-      expect(lastOptions.method).to.equal('POST');
+      await deleteBookkeepingEntry('RF-1');
+      expect(lastUrl).to.equal(`${BOOKKEEPING_ENDPOINT}/RF-1`);
+      expect(lastOptions.method).to.equal('DELETE');
     });
 
     it('throws when deleteBookkeepingEntry receives a non-ok response', async () => {
       stubFetch({}, { ok: false, status: 500 });
       let error;
       try {
-        await deleteBookkeepingEntry('n-1');
+        await deleteBookkeepingEntry('RF-1');
       } catch (err) {
         error = err;
       }
       expect(error).to.be.an('error');
+    });
+
+    it('deleteBookkeepingEntry throws immediately on a missing rfCode, without making a network call', async () => {
+      let fetchCalled = false;
+      window.fetch = async () => { fetchCalled = true; return { ok: true, status: 200, json: async () => ({}) }; };
+      let error;
+      try {
+        await deleteBookkeepingEntry(undefined);
+      } catch (err) {
+        error = err;
+      }
+      expect(error).to.be.an('error');
+      expect(fetchCalled).to.equal(false);
     });
 
     it('throws when fetchAdobeIoNotifications receives a non-ok response', async () => {

@@ -10,13 +10,17 @@ const CONFIG_ID = 'swan-notifications-test-config-id';
 
 const CONFIG = {
   eventName: 'MAX 2026',
-  adobeIoEndpoint: 'https://14257-eventsnotifmgr-dev.adobeioruntime.net/api/v1/web/virtual-events-notification-manager',
   ansEndpoint: 'https://notify-stage.adobe.io/ans/v1/notifications',
   notificationType: 'com.adobe.events.v1',
   notificationSubType: 'max26.scheduled.notifications',
   appId: 'adobecom',
   upcomingOffsetMinutes: 5,
 };
+
+// The bookkeeping endpoint is resolved from ENV_MAP (see esp-controller.js), not
+// authored — getEventServiceEnv() defaults to ENV_MAP.prod when no override/metadata
+// is present, so this is the URL every bookkeeping call in these tests goes to.
+const BOOKKEEPING_ENDPOINT = 'https://events-service-platform.adobe.io/v1/attendees/me/swan-notifications';
 
 function makeSession(rfCode, overrides = {}) {
   return {
@@ -69,8 +73,8 @@ describe('swan-notifications', () => {
         nextNotificationId += 1;
         return { ok: true, status: 200, json: async () => ({ notifications: { notification: [{ 'notification-id': `n-generated-${nextNotificationId}` }] } }) };
       }
-      if (url === `${CONFIG.adobeIoEndpoint}/list`) {
-        return { ok: true, status: 200, json: async () => [] };
+      if (url === BOOKKEEPING_ENDPOINT && (options.method || 'GET') === 'GET') {
+        return { ok: true, status: 200, json: async () => ({ items: [] }) };
       }
       return { ok: true, status: 200, json: async () => ({}) };
     };
@@ -90,9 +94,9 @@ describe('swan-notifications', () => {
       expect(ansCreate).to.exist;
       expect(ansCreate.body.notifications.notification[0]['user-id']).to.deep.equal(['user-1']);
 
-      const store = calls.find((c) => c.url === `${CONFIG.adobeIoEndpoint}/store`);
+      const store = calls.find((c) => c.url === BOOKKEEPING_ENDPOINT && c.method === 'POST');
       expect(store).to.exist;
-      expect(store.body).to.deep.equal({ id: 'n-generated-1', metadata: { sessionId: 'RF-100' } });
+      expect(store.body).to.deep.equal({ rfCode: 'RF-100', notificationId: 'n-generated-1' });
     });
 
     it('expires the matching ANS notification and deletes its bookkeeping entry on unschedule', async () => {
@@ -106,7 +110,7 @@ describe('swan-notifications', () => {
       expect(expire).to.exist;
       expect(expire.body.notifications.notification[0]).to.deep.equal({ 'notification-id': 'n-generated-1', state: 'EXPIRED' });
 
-      const del = calls.find((c) => c.url === `${CONFIG.adobeIoEndpoint}/delete/n-generated-1`);
+      const del = calls.find((c) => c.url === `${BOOKKEEPING_ENDPOINT}/RF-101` && c.method === 'DELETE');
       expect(del).to.exist;
     });
 
@@ -164,14 +168,16 @@ describe('swan-notifications', () => {
 
       window.fetch = async (url, options = {}) => {
         calls.push({ url, method: options.method || 'GET', body: options.body ? JSON.parse(options.body) : null });
-        if (url === `${CONFIG.adobeIoEndpoint}/list`) {
+        if (url === BOOKKEEPING_ENDPOINT && (options.method || 'GET') === 'GET') {
           return {
             ok: true,
             status: 200,
-            json: async () => [
-              { id: 'n-keep', metadata: { sessionId: 'RF-keep' } },
-              { id: 'n-orphan', metadata: { sessionId: 'RF-orphan' } },
-            ],
+            json: async () => ({
+              items: [
+                { notificationId: 'n-keep', rfCode: 'RF-keep' },
+                { notificationId: 'n-orphan', rfCode: 'RF-orphan' },
+              ],
+            }),
           };
         }
         if (url === CONFIG.ansEndpoint && options.method === 'POST') {
@@ -185,31 +191,33 @@ describe('swan-notifications', () => {
       const expireOrphan = calls.find((c) => c.url === CONFIG.ansEndpoint && c.method === 'PUT');
       expect(expireOrphan.body.notifications.notification[0]['notification-id']).to.equal('n-orphan');
 
-      const deleteOrphan = calls.find((c) => c.url === `${CONFIG.adobeIoEndpoint}/delete/n-orphan`);
+      const deleteOrphan = calls.find((c) => c.url === `${BOOKKEEPING_ENDPOINT}/RF-orphan` && c.method === 'DELETE');
       expect(deleteOrphan).to.exist;
 
       // Exactly one create, and it's for RF-create specifically — not merely "some create
       // happened," which wouldn't catch a regression that also recreates RF-keep.
       const creates = calls.filter((c) => c.url === CONFIG.ansEndpoint && c.method === 'POST');
       expect(creates).to.have.lengthOf(1);
-      const storeForCreate = calls.find((c) => c.url === `${CONFIG.adobeIoEndpoint}/store`);
-      expect(storeForCreate.body.metadata.sessionId).to.equal('RF-create');
+      const storeForCreate = calls.find((c) => c.url === BOOKKEEPING_ENDPOINT && c.method === 'POST');
+      expect(storeForCreate.body.rfCode).to.equal('RF-create');
 
-      const noExpireForKeep = calls.find((c) => c.url === `${CONFIG.adobeIoEndpoint}/delete/n-keep`);
+      const noExpireForKeep = calls.find((c) => c.url === `${BOOKKEEPING_ENDPOINT}/RF-keep` && c.method === 'DELETE');
       expect(noExpireForKeep).to.not.exist;
     });
 
     it('expires every existing notification when nothing is scheduled anymore', async () => {
       window.fetch = async (url, options = {}) => {
         calls.push({ url, method: options.method || 'GET', body: options.body ? JSON.parse(options.body) : null });
-        if (url === `${CONFIG.adobeIoEndpoint}/list`) {
+        if (url === BOOKKEEPING_ENDPOINT && (options.method || 'GET') === 'GET') {
           return {
             ok: true,
             status: 200,
-            json: async () => [
-              { id: 'n-a', metadata: { sessionId: 'RF-a' } },
-              { id: 'n-b', metadata: { sessionId: 'RF-b' } },
-            ],
+            json: async () => ({
+              items: [
+                { notificationId: 'n-a', rfCode: 'RF-a' },
+                { notificationId: 'n-b', rfCode: 'RF-b' },
+              ],
+            }),
           };
         }
         return { ok: true, status: 200, json: async () => ({}) };
@@ -219,7 +227,7 @@ describe('swan-notifications', () => {
 
       const expires = calls.filter((c) => c.url === CONFIG.ansEndpoint && c.method === 'PUT');
       expect(expires).to.have.lengthOf(2);
-      const deletes = calls.filter((c) => c.url === `${CONFIG.adobeIoEndpoint}/delete/n-a` || c.url === `${CONFIG.adobeIoEndpoint}/delete/n-b`);
+      const deletes = calls.filter((c) => (c.url === `${BOOKKEEPING_ENDPOINT}/RF-a` || c.url === `${BOOKKEEPING_ENDPOINT}/RF-b`) && c.method === 'DELETE');
       expect(deletes).to.have.lengthOf(2);
       const creates = calls.filter((c) => c.url === CONFIG.ansEndpoint && c.method === 'POST');
       expect(creates).to.have.lengthOf(0);
@@ -228,8 +236,8 @@ describe('swan-notifications', () => {
     it('treats a bookkeeping entry with no metadata at all as orphaned instead of throwing', async () => {
       window.fetch = async (url, options = {}) => {
         calls.push({ url, method: options.method || 'GET' });
-        if (url === `${CONFIG.adobeIoEndpoint}/list`) {
-          return { ok: true, status: 200, json: async () => [{ id: 'n-no-metadata' }] };
+        if (url === BOOKKEEPING_ENDPOINT && (options.method || 'GET') === 'GET') {
+          return { ok: true, status: 200, json: async () => ({ items: [{ notificationId: 'n-no-metadata' }] }) };
         }
         return { ok: true, status: 200, json: async () => ({}) };
       };
@@ -267,9 +275,9 @@ describe('swan-notifications', () => {
 
       window.fetch = async (url, options = {}) => {
         calls.push({ url, method: options.method || 'GET', body: options.body ? JSON.parse(options.body) : null });
-        if (url === `${CONFIG.adobeIoEndpoint}/list`) {
+        if (url === BOOKKEEPING_ENDPOINT && (options.method || 'GET') === 'GET') {
           // Stale snapshot: doesn't know about RF-concurrent yet.
-          return { ok: true, status: 200, json: async () => [] };
+          return { ok: true, status: 200, json: async () => ({ items: [] }) };
         }
         return { ok: true, status: 200, json: async () => ({}) };
       };

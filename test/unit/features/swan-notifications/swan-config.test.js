@@ -8,7 +8,6 @@ const CONFIG_ID = 'test-config-id-1';
 
 const CONFIG = {
   eventName: 'MAX 2026',
-  adobeIoEndpoint: 'https://14257-eventsnotifmgr-dev.adobeioruntime.net/api/v1/web/virtual-events-notification-manager',
   ansEndpoint: 'https://notify-stage.adobe.io/ans/v1/notifications',
   notificationType: 'com.adobe.events.v1',
   notificationSubType: 'max26.scheduled.notifications',
@@ -57,7 +56,7 @@ describe('swan-config', () => {
       window.fetch = originalFetch;
     });
 
-    it('is enabled once both adobeIoEndpoint and ansEndpoint are present and on a trusted host', () => {
+    it('is enabled once ansEndpoint is present and on a trusted host', () => {
       expect(isSwanEnabled()).to.equal(true);
     });
 

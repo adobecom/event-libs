@@ -74,11 +74,13 @@ export function waitForSwanConfig(timeoutMs = 8000) {
   return Promise.race([initPromise, new Promise((resolve) => { setTimeout(resolve, timeoutMs); })]);
 }
 
-// ansEndpoint/adobeIoEndpoint ultimately came from an authored DA sheet, not hardcoded —
-// unlike every other external endpoint this codebase calls with an IMS bearer token (see
-// esp-controller.js's ENV_MAP), which are fixed in source. The authoring app locks these
+// ansEndpoint ultimately came from an authored DA sheet, not hardcoded — unlike every
+// other external endpoint this codebase calls with an IMS bearer token (see
+// esp-controller.js's ENV_MAP), which are fixed in source. The authoring app locks it
 // to a Stage/Production dropdown rather than free text, but this check remains valuable
-// defense-in-depth against the sheet being hand-edited outside the app.
+// defense-in-depth against the sheet being hand-edited outside the app. The bookkeeping
+// endpoint no longer needs this check — it's resolved from ENV_MAP like every other ESP
+// call (see ans-controller.js), not authored.
 const ALLOWED_HOST_SUFFIXES = ['.adobe.io', '.adobeioruntime.net', '.adobe.com'];
 
 function isAllowedEndpointHost(url) {
@@ -90,15 +92,15 @@ function isAllowedEndpointHost(url) {
   }
 }
 
-// adobeIoEndpoint/ansEndpoint are the two required fields — everything else (appId,
-// notificationType/SubType, offsets, icon/image) has a sensible fallback in
-// swan-payload.js/ans-controller.js, but without real, trusted endpoints there's nothing
-// safe to call.
+// ansEndpoint is the one required field — everything else (appId, notificationType/
+// SubType, offsets, icon/image) has a sensible fallback in swan-payload.js/
+// ans-controller.js, but without a real, trusted ANS endpoint there's nothing safe to
+// call.
 export function isSwanEnabled() {
-  const { adobeIoEndpoint, ansEndpoint } = swanConfig;
-  if (!adobeIoEndpoint || !ansEndpoint) return false;
-  if (!isAllowedEndpointHost(adobeIoEndpoint) || !isAllowedEndpointHost(ansEndpoint)) {
-    window.lana?.log('[swan-config] ansEndpoint/adobeIoEndpoint host is not on the trusted Adobe allowlist — SWAN disabled rather than send the IMS token to an untrusted origin');
+  const { ansEndpoint } = swanConfig;
+  if (!ansEndpoint) return false;
+  if (!isAllowedEndpointHost(ansEndpoint)) {
+    window.lana?.log('[swan-config] ansEndpoint host is not on the trusted Adobe allowlist — SWAN disabled rather than send the IMS token to an untrusted origin');
     return false;
   }
   return true;

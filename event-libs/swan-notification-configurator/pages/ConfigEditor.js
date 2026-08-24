@@ -76,7 +76,7 @@ export default function ConfigEditor() {
 
       <section class="snc-editor__section">
         <h2>Environment</h2>
-        <p class="snc-editor__section-hint">Picks the ANS/bookkeeping endpoint pair — never typed directly, to keep the visitor's live sign-in token from ever being sent to an untrusted URL.</p>
+        <p class="snc-editor__section-hint">Picks the ANS endpoint — never typed directly, to keep the visitor's live sign-in token from ever being sent to an untrusted URL.</p>
         <select
           class="snc-field"
           value=${activeConfig.config.environment}

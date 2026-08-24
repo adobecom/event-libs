@@ -83,19 +83,19 @@ const ConfigsProvider = ({ children }) => {
     });
   }, []);
 
-  // Resolves the locked dropdown's chosen environment to real endpoint URLs at save
-  // time — ans-controller.js/swan-payload.js keep reading ansEndpoint/adobeIoEndpoint
-  // exactly as before, unaware a dropdown is even involved. Storing environment
-  // alongside the resolved URLs (not just the URLs) lets the editor re-select the right
-  // dropdown option on a later edit without reverse-mapping a URL back to a name.
+  // Resolves the locked dropdown's chosen environment to a real endpoint URL at save
+  // time — ans-controller.js/swan-payload.js keep reading ansEndpoint exactly as
+  // before, unaware a dropdown is even involved. Storing environment alongside the
+  // resolved URL (not just the URL) lets the editor re-select the right dropdown
+  // option on a later edit without reverse-mapping a URL back to a name.
   const saveActiveConfig = useCallback(async () => {
     if (!activeConfig || !org || !repo) return { ok: false };
     const envOption = SWAN_ENV_OPTIONS.find((o) => o.value === activeConfig.config.environment);
     // ConfigEditor.js's saveDisabled guard is the primary defense, but this context layer
     // is the actual save entry point — a future caller/UI regression that bypasses that
-    // guard must still not be able to publish a config with no real endpoints (which
+    // guard must still not be able to publish a config with no real endpoint (which
     // isSwanEnabled() would treat as merely "disabled," not obviously wrong, at runtime).
-    if (!envOption?.ansEndpoint || !envOption?.adobeIoEndpoint) {
+    if (!envOption?.ansEndpoint) {
       const message = 'Select a fully-configured environment before saving.';
       setToastError(message);
       return { ok: false, error: message };
@@ -103,7 +103,6 @@ const ConfigsProvider = ({ children }) => {
     const resolvedConfig = {
       ...activeConfig.config,
       ansEndpoint: envOption.ansEndpoint,
-      adobeIoEndpoint: envOption.adobeIoEndpoint,
     };
     const result = await upsertConfigController(org, repo, { ...activeConfig, config: resolvedConfig });
     if (!result.ok) {

@@ -68,7 +68,7 @@ async function expireNotificationForSession(session) {
   const notificationId = notificationIdsByRfCode.get(session.rfCode);
   if (!notificationId) return;
   await expireAnsNotification(notificationId);
-  await deleteBookkeepingEntry(notificationId);
+  await deleteBookkeepingEntry(session.rfCode);
   notificationIdsByRfCode.delete(session.rfCode);
 }
 
@@ -127,7 +127,7 @@ export async function reconcileSwanNotifications(getSessions, getScheduled) {
 
     const expireResults = await Promise.allSettled(toExpire.map(async (notification) => {
       await expireAnsNotification(notification.id);
-      await deleteBookkeepingEntry(notification.id);
+      await deleteBookkeepingEntry(notification.metadata?.sessionId);
       notificationIdsByRfCode.delete(notification.metadata?.sessionId);
     }));
     const createResults = await Promise.allSettled(

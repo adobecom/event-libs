@@ -14,7 +14,6 @@ const CONFIG_ID = 'session-store-hook-test-config-id';
 
 const SWAN_CONFIG = {
   eventName: 'MAX 2026',
-  adobeIoEndpoint: 'https://14257-eventsnotifmgr-dev.adobeioruntime.net/api/v1/web/virtual-events-notification-manager',
   ansEndpoint: 'https://notify-stage.adobe.io/ans/v1/notifications',
   notificationType: 'com.adobe.events.v1',
   notificationSubType: 'max26.scheduled.notifications',
