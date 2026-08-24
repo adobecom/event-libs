@@ -78,11 +78,7 @@
   mask-position: center;
 }
 
-/* Mobile-first, per Sessions Guide VizD R1 (mobile 1299:69503, tablet 1299:69634,
-   desktop 1323:138829). One structure at every width: a tinted body holding a stack of
-   white pods 8px apart. The pods live in two column wrappers so the desktop frame's two
-   independently-stacking columns are possible; below 1280px the wrappers collapse with
-   display:contents and the pods order themselves (see .sg-detail__col below). */
+/* Tinted body holding white pods. See docs/sessions-guide-implementation-notes.md. */
 /* gray-75 is the authored tint and is a primitive, so it does not flip with the theme —
    the dark override at the bottom of this file swaps it for the darkest surface. */
 
@@ -125,9 +121,7 @@
   border-radius: 24px;
 }
 
-/* Figma opens the gap between a list and its Show more toggle wider than the 16px above:
-   20px in the products pod, 24px in the speakers and resources pods. The pod's own gap
-   covers 16 of that; these top up the remainder. */
+/* Tops up the pod gap to Figma's wider list-to-toggle gap. */
 .sg-detail__group--products .sg-detail__more {
   margin-top: 4px;
 }
@@ -592,9 +586,7 @@
   text-decoration: none;
 }
 
-/* Empty state (Figma 8:6754): same card frame as a real resource, but it is a <p> rather than
-   a link, so nothing about it should read as actionable. Only the copy colour differs — gray-600
-   is the token the design names. */
+/* Empty state: the resource card frame, non-interactive, gray-600 copy per the design. */
 .sg-detail__resource-card--empty {
   justify-content: flex-start;
   margin: 0;
@@ -617,9 +609,7 @@
   white-space: nowrap;
 }
 
-/* Authored HTML (see utils/rich-text.js): the value brings its own <p>/<b>/<br>/<a>, so the
-   wrapper only sets the type ramp. Unlike the IPOD/GDPR notice it sits outside any pod, so it
-   carries the pods' own horizontal padding to line its text up with theirs, not their edges. */
+/* Authored HTML. Sits outside any pod, so it carries the pods' padding to align its text. */
 .sg-detail__legal-disclaimer {
   font-size: var(--s2a-font-size-xs);
   color: var(--s2a-color-content-subtle);
@@ -783,22 +773,15 @@
   background-color: var(--s2a-color-gray-800);
 }
 
-/* Below 768px the button is a 40px icon-only circle with no room for a number — an 18px glyph
-   plus an 18px badge overflows it, which is how the badge ended up colliding with the ring —
-   so "filters are applied" is carried by a solid selected fill instead and the count is
-   hidden. A max-width block rather than this file's usual mobile-first shape because the fill
-   is mobile-only: reverting the fill, glyph, hover, and both dark variants at 768px would be
-   five undo rules instead of one guard. The button's aria-label carries the count at every
-   width, so assistive tech never depends on the badge being visible. */
+/* Mobile-only: a solid fill replaces the count, which doesn't fit the 40px circle. max-width
+   rather than mobile-first so this is one guard instead of five undo rules at 768px.
+   See docs/sessions-guide-implementation-notes.md. */
 @media (max-width: 767px) {
   .sg-filter-count-badge {
     display: none;
   }
 
-  /* Doubled class rather than the bare .sg-filter-btn--active: this file is @imported at the
-     top of sessions-guide.css, so that file's own `.sg-filter-btn { background: transparent }`
-     is later in the cascade and wins at equal specificity. The base 2px black-10% ring stays
-     put: invisible against the black fill on light, a soft edge against the white one on dark. */
+  /* Doubled to outrank sessions-guide.css, which @imports this file and so comes later. */
   .sg-filter-btn.sg-filter-btn--active {
     background: var(--s2a-color-gray-1000);
   }
@@ -813,10 +796,7 @@
     opacity: 0.85;
   }
 
-  /* Inverted on the dark drawer, where a near-black fill would vanish. Spelled out per theme
-     rather than via *-default tokens because those don't flip inside .sg-portal — the dark
-     token scope in sessions-guide-tokens.css only covers .sessions-guide[data-theme="dark"],
-     which is why the rest of this file's dark rules are hand-written pairs too. */
+  /* Per-theme pair: *-default tokens don't flip inside .sg-portal. */
   [data-theme="dark"] .sg-filter-btn--active,
   .sg-portal[data-theme="dark"] .sg-filter-btn--active,
   [data-theme="dark"] .sg-filter-btn--active:hover,
@@ -831,14 +811,8 @@
 }
 
 /* ── Filter panel ─────────────────────────────────────────────
-   Mobile-first, laid out with grid areas so one DOM order (categories → options
-   → actions, which is also the mobile reading order) serves every breakpoint:
-     base    full-screen takeover, stacked — title + scrolling category strip,
-             then a single-column option list, then a full-width action bar
-     768px   categories become the fixed 145px sidebar of Figma 9145:43768,
-             with Apply/Reset pinned beneath it and a 2-column option grid
-     1024px  3-column option grid
-     1280px  anchored popover card per Figma 9145:43766, 4-column grid */
+   Grid areas, so one DOM order serves every breakpoint. Per-width layouts in
+   docs/sessions-guide-implementation-notes.md. */
 .sg-filter-panel {
   /* Owns the panel's inset so the drilled Save bar can cancel it and bleed its hairline to
      the panel edges without the two values drifting apart — see __actions--drill. */
@@ -854,9 +828,7 @@
   animation: sg-filter-in 0.2s ease;
 }
 
-/* Both mobile frames (11519:32578 category list, 11519:32675 options) pad the takeover at
-   24px; the tablet takeover keeps the tighter 16px. Must follow the rule above, not lead it —
-   a media query adds no specificity, so the later declaration of the property wins. */
+/* Must follow the rule above: a media query adds no specificity, so order decides. */
 @media (max-width: 767px) {
   .sg-filter-panel {
     --sg-filter-panel-pad: var(--s2a-spacing-lg);
@@ -937,9 +909,7 @@
 }
 
 /* A horizontally scrolling strip on mobile; a vertical list from 768px up. */
-/* Mobile (Figma 11519-32674): a vertical list of drill-in rows separated by hairlines, so
-   each category is a full-width tap target. From 768px up the same list becomes the sidebar
-   column and the dividers/chevrons come off. */
+/* Mobile: full-width drill-in rows. From 768px the same list becomes the sidebar. */
 .sg-filter-panel__cats {
   list-style: none;
   margin: 0;
@@ -958,10 +928,7 @@
   border-bottom: 1px solid var(--s2a-color-border-subtle);
 }
 
-/* Every label is bold 16/24 in Figma, with no background box (the list gap supplies the
-   spacing). Figma dims the inactive ones to 50% opacity, which lands at 3.95:1 on light
-   and fails 1.4.3 for 16px bold — so the dim state uses content-subtle (6.6:1) instead,
-   which reads near-identically. Selection is also carried by aria-pressed. */
+/* content-subtle, not Figma's 50% opacity, which fails 1.4.3 at 16px bold. */
 .sg-filter-panel__cat {
   display: flex;
   align-items: center;
@@ -1063,9 +1030,7 @@
   gap: var(--s2a-spacing-sm);
 }
 
-/* Figma 11519:32717: a white bar pinned under the options, its hairline running the full
-   panel width. Negative margins cancel the panel's own padding so the bar bleeds to the
-   edges, then it re-applies that padding around the button. */
+/* Negative margins bleed the bar past the panel padding, then re-apply it inside. */
 .sg-filter-panel__actions--drill {
   flex-shrink: 0;
   margin: 0 calc(-1 * var(--sg-filter-panel-pad)) calc(-1 * var(--sg-filter-panel-pad));
@@ -1120,11 +1085,8 @@
   gap: var(--s2a-spacing-md);
 }
 
-/* Figma "L Button" (11519:32628/32629): a full-width pill sized by 16px/24px padding, so it
-   lands at ~49px. `flex: none` is load-bearing — .sg-filter-panel__actions is a column, where
-   `flex: 1` sets a zero flex-basis on the *height* axis and collapsed these to their 18.8px
-   text height regardless of any height declared here. min-height keeps the 48px touch target
-   if the label ever wraps. */
+/* `flex: none` is load-bearing — in this column, `flex: 1` collapses these to text height.
+   See docs/sessions-guide-implementation-notes.md. */
 .sg-filter-panel__apply,
 .sg-filter-panel__reset {
   flex: none;
@@ -1157,9 +1119,7 @@
 
 .sg-filter-panel__reset:hover { background: var(--s2a-color-background-subtle); }
 
-/* Figma "Checkbox (M)": 48px tall, 12px radius, icon + label left, checkmark
-   right when selected. The border is always there but transparent until
-   selected, so selecting never nudges the grid. */
+/* Border is always present but transparent, so selecting never nudges the grid. */
 .sg-filter-pill {
   display: flex;
   align-items: center;
@@ -1202,9 +1162,7 @@
 /* ── Mobile screen 1: the category list owns the takeover's leftover height ───
    Placed after the base rules it overrides — a media query adds no specificity. */
 @media (max-width: 767px) {
-  /* No option list on this screen (that's screen 2), so the category list is the flexible row
-     and scrolls, rather than pushing Apply/Reset off the viewport when a config has more
-     categories than fit. min-height lets the nested boxes shrink below their content. */
+  /* The category list scrolls so Apply/Reset stay in view. min-height lets it shrink. */
   .sg-filter-panel__body {
     grid-template:
       "sidebar" minmax(0, 1fr)
@@ -1247,9 +1205,7 @@
     border-right: 1px solid var(--s2a-color-gray-75);
   }
 
-  /* The right padding keeps the count badges clear of the divider and of the overlay
-     scrollbar that appears once the category list outgrows the column; scrollbar-gutter
-     does the same for platforms with classic scrollbars. */
+  /* Keeps the count badges clear of the divider and the scrollbar. */
   .sg-filter-panel__sidebar {
     gap: var(--s2a-spacing-xl);
     padding-right: var(--s2a-spacing-sm);
@@ -1275,12 +1231,9 @@
 
   .sg-filter-panel__cat-chevron { display: none; }
 
-  /* Counts sit on a right-hand rail: pinned to the column's right edge and, when the label
-     wraps, held level with its first line. The text takes whatever width is left over.
-     `overflow-wrap: anywhere` rather than `break-word` because only `anywhere` also lowers
-     the text's min-content size — that's what lets flexbox shrink it instead of pushing the
-     badge past the column edge on a long unbroken label ("Playlist assignment/name"). Spaces
-     are still the preferred break, so it only splits a word as a last resort. */
+  /* `anywhere`, not `break-word`: only it lowers min-content size, which is what stops a long
+     label pushing the badge past the column edge.
+     See docs/sessions-guide-implementation-notes.md. */
   .sg-filter-panel__cat-label {
     display: flex;
     align-items: flex-start;
@@ -1325,15 +1278,8 @@
 }
 
 /* ── Desktop: anchored popover card ─────────────────────────────
-   Dismiss-on-click-away card anchored to the filter button (.sg-filter-wrap),
-   overlaying the widget instead of taking it over — mirrors sessions-hub's
-   sh-filter-panel and this block's own ViewDropdown. Click-away is wired in
-   DrawerHeader.js. Geometry is Figma 9145:43766 — 24px padding, 20px radius. Width and
-   height are capped tighter than the frame's 1307x880 (1133x560), and the options grid
-   below fills the width it actually gets instead of a hard-coded column count, so the
-   card stays proportionate on wide viewports. Both stay fixed rather than max-* so the
-   sidebar column's bottom row pins Apply/Reset as designed; the category list and the
-   options grid each scroll internally when they outgrow the card. */
+   Click-away wired in DrawerHeader.js. Fixed rather than max-* so Apply/Reset stay pinned.
+   See docs/sessions-guide-implementation-notes.md. */
 @media (min-width: 1280px) {
   .sg-filter-panel {
     position: absolute;
@@ -1355,9 +1301,7 @@
       0 217px 87px rgb(0 0 0 / 1%);
   }
 
-  /* 4 columns at the capped 1133px width, same as the Figma frame, but derived from the
-     track width rather than fixed — if the panel shrinks (narrow desktop, longer sidebar
-     labels, a future width change) the pills reflow to 3 instead of squeezing. */
+  /* Derived from the track width, so pills reflow to 3 rather than squeeze. */
   .sg-filter-panel__options {
     grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
     padding: var(--s2a-spacing-lg);
@@ -1375,10 +1319,7 @@
   border-color: var(--s2a-color-transparent-white-16);
 }
 
-/* The detail view's pods are white-on-tint in light mode. Both surfaces invert to
-   near-black in dark, which would leave pod and body indistinguishable — so drop the body
-   to the darkest surface and lift the pods (and the tiles inside them) instead, the same
-   way the filter pills are handled below. */
+/* Body drops to the darkest surface and the pods lift, or the two are indistinguishable. */
 [data-theme="dark"] .sg-detail__body,
 .sg-portal[data-theme="dark"] .sg-detail__body {
   background: var(--s2a-color-background-default);
@@ -1399,9 +1340,7 @@
   border-color: var(--s2a-color-border-subtle);
 }
 
-/* Figma dark frames (9145:44777/44778/44779): pills sit slightly lighter than the
-   options-area container. Default/subtle are near-inverted in dark, so flip the pair
-   explicitly rather than reuse the light-mode assignment. */
+/* Default/subtle are near-inverted in dark, so the pair is flipped explicitly. */
 [data-theme="dark"] .sg-filter-panel__options,
 .sg-portal[data-theme="dark"] .sg-filter-panel__options {
   background: var(--s2a-color-background-default);

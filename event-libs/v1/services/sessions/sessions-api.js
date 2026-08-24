@@ -2,11 +2,8 @@ import { constructRequestOptions } from '../../utils/esp-controller.js';
 import { getEventServiceEnv, getEventConfig } from '../../utils/utils.js';
 import { ENV_MAP, ADOBE_PROD_HOST, ADOBE_STAGE_HOST } from '../../utils/constances.js';
 
-// The session catalog returns each session's real page URL, but always on prod's host. Point
-// it at stage for any non-prod page, so a stage/local visitor isn't sent to production.
-// Keyed on Milo's page env rather than the ESP tier — same distinction, and same reason, as
-// session-store.js's defaultRfApiUrlForEnv(). Anything not an absolute prod-host URL (a
-// root-relative path, hand-authored data) is left exactly as it came in.
+// Catalog URLs always carry prod's host; point non-prod pages at stage.
+// See docs/sessions-guide-implementation-notes.md.
 export function sessionPageUrlForEnv(
   url,
   isProd = getEventConfig()?.miloConfig?.env?.name === 'prod',
@@ -22,9 +19,7 @@ export function sessionPageUrlForEnv(
   }
 }
 
-// TEMPORARY: disabled — every session in the real MAX26 catalog is currently a draft/test
-// row, so enforcing this today would hide the whole catalog. Flip to `true` once real,
-// published content exists.
+// TEMPORARY: every MAX26 row is still a draft, so enforcing this would hide the catalog.
 export const ENFORCE_PUBLISHED_FILTER = false;
 
 function coerceArray(value) {
@@ -32,8 +27,7 @@ function coerceArray(value) {
   return value ? [value] : [];
 }
 
-// ESP prefixes its own external*Id fields with "rf-" as internal namespacing —
-// RainFocus's own API always expects the bare id, with no prefix.
+// RainFocus expects the bare id; ESP namespaces its own with `rf-`.
 function stripRfPrefix(id) {
   return id ? id.replace(/^rf-/, '') : '';
 }
@@ -42,8 +36,7 @@ export function normalizeSessions(rawSessions) {
   return rawSessions.map((s) => ({
     id: s.id || '',
     rfCode: s.rfCode || '',
-    // RF-native session id (not session-time id) — toggleSessionInterest (favoriting)
-    // keys on this instead of rfCode.
+    // Session-level id; favoriting keys on this, scheduling on rfCode.
     rfSessionId: s.rfSessionId || '',
     title: s.title || '',
     description: s.description || '',
@@ -56,16 +49,12 @@ export function normalizeSessions(rawSessions) {
     contentCategory: coerceArray(s.contentCategory),
     audience: coerceArray(s.audience),
     industry: coerceArray(s.industry),
-    // Not in the catalog yet — see the mapper. Empty until the attribute is authored, which
-    // hides its row in the detail view rather than showing a blank one.
+    // Not in the catalog yet — empty hides its detail row.
     aiFocus: coerceArray(s.aiFocus),
-    // ipodOrGdprCopy sits under the session title in the detail view, hidden when empty.
-    // closedCaptions is carried but no longer rendered anywhere — see the mapper.
+    // closedCaptions is carried but no longer rendered anywhere.
     closedCaptions: s.closedCaptions || '',
     ipodOrGdprCopy: s.ipodOrGdprCopy || '',
-    // Additional Event Site Tracks / Override Primary Event Site Track: MAX26-only
-    // fields, absent from MAX25 sessions — naturally empty/'' for those, which is exactly
-    // the single-track fallback behavior we want for them.
+    // MAX26-only; empty on MAX25 sessions, which is the fallback we want.
     additionalTracks: coerceArray(s.additionalTracks),
     trackOverride: s.trackOverride || '',
     speakers: s.speakers || [],
@@ -76,14 +65,12 @@ export function normalizeSessions(rawSessions) {
     inPerson: Boolean(s.inPerson),
     isLivestreamed: Boolean(s.isLivestreamed),
     isOnline: Boolean(s.isOnline),
-    // See hasOnDemandFormat() — the Session Guide keeps these out of Live & Upcoming.
+    // Keeps a session out of Live & Upcoming — see hasOnDemandFormat().
     hasOnDemandFormat: Boolean(s.hasOnDemandFormat),
-    // null (not 0) when unauthored — 0 would mean "available the moment the event starts".
+    // null, not 0: 0 means available from the moment the event starts.
     dvrDelayHours: s.dvrDelayHours ?? null,
-    // Unread; for the playback work. One field per video source, named for the player it
-    // belongs to — mr* is Mobile Rider (mrStreamId live, mrDvrVideoId the recording), mpcId is
-    // Adobe Video TV, youTubeId is YouTube. A session carries whichever it was produced for, so
-    // an empty one means "not this source", never "fall back to another".
+    // One field per video source, named for its player. Alternatives, not a fallback chain.
+    // All unread; see "Video sources" in docs/sessions-guide-implementation-notes.md.
     mpcId: s.mpcId || '',
     youTubeId: s.youTubeId || '',
     mrDvrVideoId: s.mrDvrVideoId || '',
@@ -97,15 +84,11 @@ export function normalizeSessions(rawSessions) {
   }));
 }
 
-// ESP renamed this (and a few other) custom attributes for MAX26 — try the current name
-// first, fall back to the MAX25 name so events authored under either schema still
-// resolve. Exported so tier-1-event-configurator/utils.js (which needs the same
-// attribute for its own track editor) doesn't carry a second, independently-drifting copy.
+// MAX26 name first, MAX25 fallback. Exported so the configurator shares one copy.
 export const TRACK_ATTRIBUTE_NAMES = ['Primary Event Site Track', 'Primary Track for Agenda (Digital Agenda)'];
 
-// Folded (case, spaces and punctuation stripped) because the catalog is inconsistent: prod
-// labels the value `In-Person`, stage `In person`, and a value with no localized label falls
-// back to its slug (`on-demand-post-event`). Exact comparison breaks on any of those.
+// Folded because the catalog is inconsistent (`In-Person` / `In person` / slug forms).
+// See "Format value folding" in docs/sessions-guide-implementation-notes.md.
 const NON_ALPHANUMERIC = /[^a-z0-9]/g;
 const foldFormatValue = (value) => String(value ?? '').toLowerCase().replace(NON_ALPHANUMERIC, '');
 
@@ -117,14 +100,12 @@ function hasFormatValue(formatValues, foldedMarker) {
   return (formatValues || []).some((value) => foldFormatValue(value) === foldedMarker);
 }
 
-// Unconditional: carrying this value at all keeps a session out of Live, Upcoming, Previously
-// aired and Recommended, whatever else its Format or `Livestreamed Content` says.
+// Unconditional: this value alone bars Live, Upcoming, Previously aired and Recommended.
 export function hasOnDemandFormat(formatValues) {
   return hasFormatValue(formatValues, FORMAT_ON_DEMAND_POST_EVENT);
 }
 
-// Hours after the event starts that a recording becomes playable — see isDvrPending(). Free
-// text, so blank/whitespace/non-numeric all mean "no delay" (null), not 0.
+// Free text, so blank/whitespace/non-numeric all mean no delay (null), not 0.
 export function parseDvrDelayHours(rawValue) {
   const trimmed = String(rawValue ?? '').trim();
   if (!trimmed) return null;
@@ -132,9 +113,7 @@ export function parseDvrDelayHours(rawValue) {
   return Number.isFinite(hours) && hours >= 0 ? hours : null;
 }
 
-// Generic session/track helpers, not Tier-1-specific — shared here so
-// tier-1-event-configurator and session-guide-configurator use the same implementation
-// instead of one importing from the other's UI code.
+// Shared by both configurators so neither imports the other's UI code.
 export function getSessionTrack(session) {
   const attr = (session?.customAttributes || []).find((a) => TRACK_ATTRIBUTE_NAMES.includes(a?.name));
   return attr?.values?.[0]?.label ?? attr?.values?.[0]?.value ?? null;
@@ -151,17 +130,13 @@ export function extractDistinctTracks(sessions) {
 
 const ADDITIONAL_TRACK_ATTRIBUTE_NAME = 'Additional Event Site Tracks';
 
-// Additional Event Site Tracks is a multi-select drawing from the same vocabulary as the
-// primary track, and the runtime treats its values as real tracks: resolveTrackBadge() gives
-// them their own swimlanes and LiveCard badges the first one. Mirrors getSessionProducts()
-// rather than getSessionTrack(), which only ever takes the first value.
+// All values, not just the first — the runtime treats these as real tracks.
 export function getSessionAdditionalTracks(session) {
   const attr = (session?.customAttributes || []).find((a) => a?.name === ADDITIONAL_TRACK_ATTRIBUTE_NAME);
   return (attr?.values || []).map((v) => v?.label ?? v?.value).filter(Boolean);
 }
 
-// Every distinct track in the catalog, primary and additional together — what a per-track
-// icon/color mapping needs to cover, since either kind can end up on a badge.
+// Primary + additional: either kind can end up on a badge.
 export function extractDistinctAllTracks(sessions) {
   const tracks = new Set();
   (sessions || []).forEach((session) => {
@@ -174,9 +149,7 @@ export function extractDistinctAllTracks(sessions) {
 
 const OVERRIDE_ATTRIBUTE_NAME = 'Override Primary Event Site Track';
 
-// Override Primary Event Site Track is free text, not a select — each distinct value an
-// author has typed becomes its own swimlane, so the configurator needs to know the full
-// set of distinct texts in use to offer a per-value icon mapping (mirrors getSessionTrack).
+// Free text, so every distinct value an author typed becomes its own swimlane.
 export function getSessionOverrideText(session) {
   const attr = (session?.customAttributes || []).find((a) => a?.name === OVERRIDE_ATTRIBUTE_NAME);
   return attr?.values?.[0]?.label ?? attr?.values?.[0]?.value ?? null;
@@ -193,15 +166,13 @@ export function extractDistinctOverrideTexts(sessions) {
 
 const PRODUCT_ATTRIBUTE_NAME = 'Product';
 
-// Product is multi-select (a session can tag several products), unlike track/override —
-// so this returns every value on the session, not just the first.
+// Multi-select, unlike track/override — returns every value.
 export function getSessionProducts(session) {
   const attr = (session?.customAttributes || []).find((a) => a?.name === PRODUCT_ATTRIBUTE_NAME);
   return (attr?.values || []).map((v) => v?.label ?? v?.value).filter(Boolean);
 }
 
-// Also its key in customAttributeValues, so it identifies the product filter category —
-// FilterPanel.js badges product icons there only. `Illustrator` is an Audience value too.
+// Identifies the product filter category; `Illustrator` is an Audience value too.
 export function getProductAttributeId(session) {
   const attr = (session?.customAttributes || []).find((a) => a?.name === PRODUCT_ATTRIBUTE_NAME);
   return attr?.attributeId || '';
@@ -215,19 +186,13 @@ export function extractDistinctProducts(sessions) {
   return [...products].sort();
 }
 
-// Attributes the catalog sends that the guide must never surface. `Gated Video` is confirmed
-// unused for MAX 26 (2026-08-24): it still arrives on some sessions, but nothing is to key off
-// it, so it is filtered out of both generic paths that would otherwise pick it up on their own
-// — the facets the configurator offers as filter categories, and the value map the runtime
-// filters read. Matched on `name`; the attributeId is event-specific and would not travel.
+// Attributes the catalog sends that the guide must never surface. Matched on name, since
+// attributeId is per-event. See docs/sessions-guide-implementation-notes.md.
 export const IGNORED_ATTRIBUTE_NAMES = ['Gated Video'];
 
 const isIgnoredAttribute = (attr) => IGNORED_ATTRIBUTE_NAMES.includes(attr?.name);
 
-// Derives facetable custom attributes + their distinct values from an already-fetched
-// session catalog, mirroring the enabled/inputType/valueId filtering ESP's own
-// /session-facets endpoint applies server-side, so results match it without an extra
-// network round-trip.
+// Mirrors ESP's own /session-facets filtering, without the extra round-trip.
 export function deriveFacetableAttributes(sessions) {
   const attributeMap = new Map(); // attributeId -> { attributeId, label, values: Map<valueId, {...}> }
   (sessions || []).forEach((session) => {
@@ -257,14 +222,8 @@ export function deriveFacetableAttributes(sessions) {
   }));
 }
 
-// customAttributes carry things like track/audience/technical-level as name+values pairs
-// rather than plain session fields. `values[]` holds the value(s) actually selected for
-// that session (see events-service-platform's resolveCustomAttributes), not the full
-// option list.
-//
-// `name` may be a single string or an array of candidate names, tried in order — used for
-// attributes ESP renamed between MAX25 and MAX26 (a given session only ever carries one of
-// the two, so "first found" is unambiguous in practice).
+// `name` may be an array of candidates, tried in order — for attributes ESP renamed
+// between MAX25 and MAX26. Names are matched exactly.
 function extractCustomAttributeValues(session, name) {
   const candidates = Array.isArray(name) ? name : [name];
   const attr = (session.customAttributes || []).find((a) => candidates.includes(a?.name));
@@ -275,12 +234,8 @@ function extractCustomAttributeValue(session, name) {
   return extractCustomAttributeValues(session, name)[0] || '';
 }
 
-// Generic attributeId-keyed map of every filterable customAttribute on a session, built
-// straight from the raw payload rather than a hand-named whitelist — so any attribute the
-// Session Guide Configurator's FiltersEditor.js offers (via deriveFacetableAttributes())
-// resolves here automatically, with no per-field mapping needed as new ones get authored.
-// Same single-select/multi-select + enabled guard deriveFacetableAttributes() applies, so
-// this only ever contains attributes that could actually be authored as a filter category.
+// attributeId-keyed, built from the raw payload so newly authored filter categories
+// resolve with no per-field mapping.
 function buildCustomAttributeValueMap(session) {
   const map = {};
   (session.customAttributes || []).forEach((attr) => {
@@ -292,42 +247,32 @@ function buildCustomAttributeValueMap(session) {
   return map;
 }
 
-// `published: false` marks a draft/test row that must never reach real visitors once
-// ENFORCE_PUBLISHED_FILTER is on. Missing the field is treated as visible (fail open).
+// Missing field is treated as visible (fail open).
 export function isSessionPublished(session) {
   return session.published !== false;
 }
 
-/**
- * No digital way to watch at all, so the guide drops it from the catalog rather than filtering
- * per view — one rule for every view, day tab and deep link.
- *
- * One term per Format value: `Livestreamed Content` takes no part (it only routes a live Watch
- * now — see getWatchDestination()), and no derived "is there video" flag sits in between.
- */
+// No digital way to watch, so it is dropped from the catalog rather than per view.
+// See docs/sessions-guide-implementation-notes.md.
 export function isInPersonOnly(session) {
   return session.inPerson && !session.isOnline && !session.hasOnDemandFormat;
 }
 
-// No Format says nothing about how a session can be watched, so there is no view to place it
-// in and it is dropped outright. Takes a raw ESL session — it reads customAttributes.
+// Takes a raw ESL session — reads customAttributes.
 export function isMissingFormat(session) {
   return extractCustomAttributeValues(session, 'Format').length === 0;
 }
 
 const DROP_LOG_LIMIT = 10;
 
-// Identifies a raw catalog row in a log. sessionCode is what an author can search RainFocus
-// by, the title is what they recognise it as, and the id is what the API keys on — the id
-// alone is not enough to go and fix the row.
+// sessionCode is what an author can search RainFocus by; the id alone is not enough.
 function describeRawSession(session) {
   const code = session.sessionCode || '(no code)';
   const title = session.localizations?.['en-US']?.title || session.enTitle || '(untitled)';
   return `${code} "${title}" [${session.sessionId}]`;
 }
 
-// Joins the ESL/ESP catalog payload's flat, relational arrays (sessions/sessionTimes/
-// speakers, related by id) into the raw-session shape normalizeSessions() expects.
+// Joins the catalog's flat relational arrays into the shape normalizeSessions() expects.
 export function mapEslPayloadToRawSessions(payload) {
   const speakersById = new Map((payload.speakers || []).map((sp) => [sp.speakerId, sp]));
   const timesBySessionId = new Map();
@@ -343,10 +288,8 @@ export function mapEslPayloadToRawSessions(payload) {
     if (isMissingFormat(session)) dropped.push(session);
     else candidates.push(session);
   });
-  // An empty Format is a mis-authored row and dropping it is intentional, but the session
-  // then appears in no view at all, so the removal has to be traceable. The count is always
-  // exact; the enumeration is capped so a wholesale authoring failure can't emit an
-  // unbounded log line.
+  // Dropping is intentional, but the session then appears nowhere — so it must be traceable.
+  // Count is exact; the enumeration is capped so a mass failure can't flood the log.
   if (dropped.length > 0) {
     const listed = dropped.slice(0, DROP_LOG_LIMIT).map(describeRawSession).join('; ');
     const rest = dropped.length - DROP_LOG_LIMIT;
@@ -355,9 +298,7 @@ export function mapEslPayloadToRawSessions(payload) {
 
   return candidates
     .map((session) => {
-    // Some real sessions (canceled, TBD, overflow-room placeholders) have no scheduled
-    // sessionTime yet — startTimeUtc/endTimeUtc fall through to '' below, and
-    // utils/time.js's formatters/getSessionDayKey() are guarded to handle that gracefully.
+    // Real rows can have no sessionTime yet; time.js is guarded for the '' that follows.
     const times = (timesBySessionId.get(session.sessionId) || [])
       .slice()
       .sort((a, b) => (a.startTimeMillis ?? 0) - (b.startTimeMillis ?? 0));
@@ -382,8 +323,7 @@ export function mapEslPayloadToRawSessions(payload) {
 
     return {
       id: session.sessionId,
-      // Schedule (addSession/removeSession) keys on the per-time-slot id; favoriting
-      // (toggleSessionInterest) keys on the session-level id instead — two distinct RF ids.
+      // Per-time-slot id, used for scheduling. Favoriting uses rfSessionId.
       rfCode: stripRfPrefix(firstTime?.externalSessionTimeId),
       rfSessionId: stripRfPrefix(session.externalSessionId),
       title: session.localizations?.['en-US']?.title || session.enTitle || '',
@@ -393,51 +333,26 @@ export function mapEslPayloadToRawSessions(payload) {
       duration: session.sessionLengthInMinutes || 0,
       track: extractCustomAttributeValue(session, TRACK_ATTRIBUTE_NAMES),
       contentCategory: extractCustomAttributeValues(session, ['Category', 'Programming Category']),
-      // MAX26-only — see normalizeSessions() for why no MAX25 fallback is needed here.
+      // MAX26-only; no MAX25 fallback needed.
       additionalTracks: extractCustomAttributeValues(session, 'Additional Event Site Tracks'),
       trackOverride: extractCustomAttributeValue(session, 'Override Primary Event Site Track'),
       type,
       technicalLevel: extractCustomAttributeValue(session, 'Technical Level'),
       audience: extractCustomAttributeValues(session, 'Audience'),
       industry: extractCustomAttributeValues(session, 'Industry'),
-      // Not in the catalog yet — the attribute is coming, so the read is wired up ahead of it
-      // and yields [] until then. Both casings are tried: attribute names are matched exactly
-      // and every other one in the payload is Title Case (`Technical Level`, `Category`), but
-      // the name reached us as "AI focus". Multi-value read so a single-select still works.
+      // Not in the catalog yet; both casings tried since names match exactly.
       aiFocus: extractCustomAttributeValues(session, ['AI Focus', 'AI focus']),
-      // Both authored as free text. closedCaptions is mapped but no longer rendered — the
-      // detail view's captions row was removed — and carries the whole sentence ("Closed
-      // captions available in …"), not just a language list, so it is ready if the copy
-      // reappears elsewhere. Two name spellings are tried for the IPOD/GDPR notice because
-      // the audited payload and the Figma annotation disagree on the slash.
+      // closedCaptions is no longer rendered anywhere. ipodOrGdprCopy is authored HTML.
+      // See docs/sessions-guide-implementation-notes.md.
       closedCaptions: extractCustomAttributeValue(session, 'Closed Caption Information'),
       ipodOrGdprCopy: extractCustomAttributeValue(session, ['IPOD or GDPR Copy', 'IPOD/GDPR Copy']),
       speakers,
       products: extractCustomAttributeValues(session, 'Product'),
       productAttributeId: getProductAttributeId(session),
       dvrDelayHours: parseDvrDelayHours(extractCustomAttributeValue(session, 'DVR Timing (in hours)')),
-      // A session's video can come from four different sources, each its own attribute and its
-      // own player. Live is one; the other three are all VOD, and a session picks whichever it
-      // was produced for — they are alternatives, not a fallback chain:
-      //
-      //   LIVE  `Mobilerider Live Stream ID` -> mrStreamId, polled for on-air status.
-      //         Authored in RainFocus and inbound on the catalog; see mrStreamId below.
-      //   VOD   `MPC ID`                     -> mpcId,        Adobe Video TV.
-      //   VOD   `YouTube ID`                 -> youTubeId,    YouTube-hosted sessions.
-      //   VOD   `Mobilerider Video ID (DVR)` -> mrDvrVideoId, the Mobile Rider recording of a
-      //         stream that has ended, i.e. what some sessions become watchable from once the
-      //         live window closes — gated by `DVR Timing (in hours)` above.
-      //
-      // The `mr` prefix marks the two Mobile Rider ids (live and DVR) as belonging to the same
-      // player, which is also the pair `Skin ID` applies to. mpcId and youTubeId are neither.
-      //
-      // All four are unread today, mapped ahead of the playback work so it has the data. Which
-      // one a session carries is the only thing that says which player to reach for, so none of
-      // them may be treated as a stand-in for another. `Skin ID` is the Mobile Rider player
-      // skin, and applies only to the two Mobile Rider sources.
-      //
-      // videoDuration stays verbatim: the catalog writes 60 minutes as `00:60:00`, so it is
-      // not reliably HH:MM:SS.
+      // Three VOD sources, one field each; live is mrStreamId below. Unread, and never
+      // substitutes for one another. videoDuration is verbatim (`00:60:00` is not HH:MM:SS).
+      // See "Video sources" in docs/sessions-guide-implementation-notes.md.
       mpcId: extractCustomAttributeValue(session, 'MPC ID'),
       youTubeId: extractCustomAttributeValue(session, 'YouTube ID'),
       mrDvrVideoId: extractCustomAttributeValue(session, 'Mobilerider Video ID (DVR)'),
@@ -451,14 +366,9 @@ export function mapEslPayloadToRawSessions(payload) {
       isKeynote: type === 'Keynote',
       thumbnailUrl: thumbnail?.imageUrl ?? null,
       legalDisclaimer: extractCustomAttributeValue(session, ['Legal Disclaimer', 'LegalDisclaimer']) || undefined,
-      // resources[]/mrStreamId intentionally omitted — no source in this payload yet.
-      // resources[] is still in development backend-side. mrStreamId is the Mobile Rider *live*
-      // stream id the poller keys on: it is authored in RainFocus and is inbound on the catalog
-      // as a new attribute, tentatively named `Mobilerider Live Stream ID`. Map it here once the
-      // name is confirmed — that is also what switches stream polling on, so check the
-      // on-demand-vs-live question in PM-QUESTIONS.md first. The three VOD ids above are for
-      // other players entirely and none of them substitutes for it.
-      // normalizeSessions() defaults both to empty/null.
+      // resources[]/mrStreamId omitted — no source in this payload yet. Mapping the inbound
+      // `Mobilerider Live Stream ID` here is what switches stream polling on; see
+      // REAL-API-CHECKLIST.md first. normalizeSessions() defaults both to empty/null.
       customAttributeValues: buildCustomAttributeValueMap(session),
     };
   })

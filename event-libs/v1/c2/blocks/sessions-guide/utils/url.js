@@ -1,8 +1,5 @@
-// Helpers for toggling the widget's own query params (`sessions` / `session`)
-// while preserving any other params already present on the URL.
-
-// safeUrl is generic (no sessions-guide-specific logic) and shared with
-// session-routing.js — defined once in the shared utils module.
+// Toggles the widget's own `sessions` / `session` params, preserving any others.
+// safeUrl is generic and shared with session-routing.js, so it lives in shared utils.
 export { safeUrl } from '../../../../utils/utils.js';
 
 function buildUrl(params) {
@@ -28,12 +25,10 @@ export function setSessionParam(value) {
 
 const HTML_EXT = /\.html$/;
 
-// The catalog already slugifies enTitle + sessionCode into the session's own page url, so its
-// last path segment is the identity we deep-link by — no second slug to keep in step. e.g.
-// .../max/2026/sessions/acom-ipod-test-session-no-mpc-1003-1 -> acom-ipod-test-session-no-mpc-1003-1
-// Parsed rather than split so the host can never be mistaken for a segment; host rewriting
-// (sessionPageUrlForEnv) and root-relative authored values both leave the path alone. The
-// empties filter is what makes a trailing slash resolve to the segment before it.
+// Last path segment of the session's own url, which the catalog already slugified from
+// enTitle + sessionCode. Parsed so a bare host can't be mistaken for a segment; the empties
+// filter is what makes a trailing slash resolve to the segment before it.
+// See "Deep linking" in docs/sessions-guide-implementation-notes.md.
 export function sessionUrlSlug(url) {
   if (!url) return '';
   let pathname;
@@ -46,14 +41,12 @@ export function sessionUrlSlug(url) {
   return (segments[segments.length - 1] || '').replace(HTML_EXT, '');
 }
 
-// The deep-link identity of a session. Falls back to the session id for rows with no url,
-// which is also what openSessionGuideDetail() writes for its own deep link.
+// Falls back to the session id, which is also what openSessionGuideDetail() writes.
 export function sessionParamValue(session) {
   return sessionUrlSlug(session.sessionPageUrl) || session.id || '';
 }
 
-// Reverse of sessionParamValue(). Matched whole against either form — the slug and the id
-// both carry dashes, so splitting the param on one would truncate it.
+// Matched whole against either form: both carry dashes, so splitting would truncate them.
 export function findSessionByParam(sessionList, param) {
   if (!param) return null;
   return sessionList.find(
@@ -69,8 +62,7 @@ export function clearSessionParams() {
   return buildUrl(params);
 }
 
-// Whether `href` points at the page currently being viewed (ignoring query/hash) — used to
-// skip reloading a "Watch now" destination the widget is already embedded on.
+// Skips reloading a "Watch now" destination the widget is already embedded on.
 export function isSamePage(href) {
   if (!href) return false;
   try {

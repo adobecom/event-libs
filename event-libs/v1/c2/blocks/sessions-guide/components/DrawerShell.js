@@ -17,22 +17,18 @@ import { prefersReducedMotion } from '../utils/motion.js';
 // No top gap on mobile/tablet (drawer covers the full screen); 20px gap on desktop.
 const getTopMargin = () => (window.matchMedia('(max-width: 1279px)').matches ? 0 : 20);
 
-// Lock the page behind the drawer. Both html and body are set: which one is the viewport's
-// scrolling element depends on the host page (the widget is embedded on author-built
-// pages), and body's overflow doesn't propagate to the viewport when html is the scroller
-// — which is how the background kept capturing the wheel on desktop.
+// Both html and body: which one scrolls depends on the host page, and body's overflow
+// doesn't propagate to the viewport when html is the scroller.
 function lockPageScroll(locked) {
   const value = locked ? 'hidden' : '';
   document.documentElement.style.overflow = value;
   document.body.style.overflow = value;
 }
 
-// The view to land on when opening the drawer fresh, shared by every open path below
-// (mount deep-link, popstate, manual open, external openSessionGuideDetail request).
+// Shared by every open path below, so they can't drift apart.
 const getDefaultView = (isRegistered) => (isRegistered ? 'my-sessions' : 'live-upcoming');
 
-// Pure decision logic for the openSessionGuideDetail(sessionId) external API, kept
-// separate from the useEffect below so it's directly unit-testable.
+// Kept out of the effect below so it's directly unit-testable.
 export function resolveSessionGuideRequest(request, { sessionsStatusValue, sessionsValue, authValue }) {
   if (!request || sessionsStatusValue !== 'ready') return null;
   const found = sessionsValue.find((s) => s.id === request.sessionId);
@@ -81,9 +77,8 @@ export function DrawerShell() {
     if (!el) return;
     const { drawerState } = state;
 
-    // Keyed off "is the drawer open at all" rather than living inside the branches below:
-    // the expanded branch is skipped when a gesture handler has already flipped
-    // expandedRef, which silently left the page unlocked.
+    // Outside the branches below: the expanded branch is skipped when a gesture handler
+    // already flipped expandedRef, which left the page unlocked.
     lockPageScroll(drawerState !== 'hidden');
 
     if (drawerState === 'peek') {
@@ -131,14 +126,9 @@ export function DrawerShell() {
     else setTop(newTop, false);
   }
 
-  // Drag-to-expand gesture. Bound to the window, because in peek the drawer covers only
-  // the bottom of the viewport and a wheel over the backdrop never reached the element.
-  //
-  // Attached ONLY in peek, and the handlers re-check for peek. These listeners are
-  // non-passive and call preventDefault, so anything wider swallows the wheel that the
-  // expanded drawer needs for its own scrolling: gating on "not hidden" plus a mutable
-  // expandedRef meant one stale ref silently froze scrolling everywhere. Peek is the only
-  // state this gesture exists in, so that is what it keys off.
+  // Bound to the window: in peek a wheel over the backdrop never reaches the drawer.
+  // Attached only in peek, and re-checked in the handlers — these are non-passive and
+  // preventDefault, so any wider gate swallows the wheel the expanded drawer needs.
   useEffect(() => {
     if (state.drawerState !== 'peek') return undefined;
 
@@ -192,16 +182,12 @@ export function DrawerShell() {
     if (!sessionParam) return;
     const found = findSessionByParam(sessions.value, sessionParam);
     if (found) dispatch({ type: 'SET_ACTIVE_SESSION', sessionId: found.id });
-    // Bounded: the param is untrusted URL input, and URLSearchParams decodes %0A into a
-    // real newline, which would forge a second log line.
+    // Bounded: URLSearchParams decodes %0A, which would forge a second log line.
     else window.lana?.log(`[sessions-guide] ?session=${encodeURIComponent(sessionParam).slice(0, 100)} matched no session`);
   }, [sessionsStatus.value]);
 
-  // External API: other blocks call openSessionGuideDetail(sessionId) (session-store.js) to
-  // open us straight to a session's detail view. sessions/sessionsStatus are the same
-  // page-level signals a caller's own session data comes from, so by the time a card is
-  // clickable, sessions are already 'ready' here too — no buffering needed for a request
-  // that arrives before load.
+  // openSessionGuideDetail() from another block. Callers read the same page-level signals,
+  // so sessions are already 'ready' by the time one can be clicked — no buffering needed.
   useEffect(() => sessionGuideRequest.subscribe((request) => {
     const result = resolveSessionGuideRequest(request, {
       sessionsStatusValue: sessionsStatus.value,
@@ -224,7 +210,7 @@ export function DrawerShell() {
   useEffect(() => sessions.subscribe((v) => { sessionsRef.current = v; }), []);
 
   // popstate listener — restores state from URL without pushing new history entries
-  // Registered once (stable []); reads sessions via ref to avoid re-registering on every poll.
+  // Registered once; reads sessions via ref to avoid re-registering on every poll.
   useEffect(() => {
     function handlePopState() {
       const params = new URLSearchParams(window.location.search);
@@ -256,8 +242,7 @@ export function DrawerShell() {
     history.pushState({}, '', clearSessionParams());
   }
 
-  // Traps Tab focus within the drawer while open and closes it on Escape, mirroring
-  // Milo's shared modal (which this hand-rolled, gesture-driven drawer can't use directly).
+  // Milo's shared modal can't wrap this hand-rolled, gesture-driven drawer.
   useEffect(() => (isOpen ? trapFocus(drawerRef.current, closeDrawer) : undefined), [isOpen]);
 
   function openDrawer() {
@@ -276,8 +261,7 @@ export function DrawerShell() {
   }
 
   function handleFilterToggle() {
-    // The panel is a tall anchored card on desktop; in peek the drawer only occupies the
-    // bottom of the viewport, so it would hang off-screen. Expand first to make room.
+    // In peek the drawer only occupies the bottom, so the tall panel would hang off-screen.
     if (!filterOpen && state.drawerState === 'peek') {
       dispatch({ type: 'SET_DRAWER', drawer: 'expanded' });
     }
@@ -288,13 +272,9 @@ export function DrawerShell() {
     setFilterOpen(false);
   }
 
-  // The scroll body carries tabindex="-1" so it is not a tab stop itself, but can still take
-  // BackToTop's programmatic focus after a jump — see the comment in BackToTop.js.
-  // data-lenis-prevent: pages with a parallax or rich-content section load Milo's Lenis
-  // smooth-scroll, which holds a non-passive window wheel/touch listener and
-  // preventDefault()s every event to drive its own virtual scroll — starving every scroll
-  // container in here. Lenis matches the attribute with closest(), so tagging the drawer
-  // covers the whole subtree; the backdrop keeps the locked page behind it from scrolling.
+  // tabindex="-1" is not a tab stop, but takes BackToTop's programmatic focus after a jump.
+  // data-lenis-prevent opts the whole subtree out of Milo's Lenis smooth-scroll, which
+  // preventDefault()s every wheel and would starve the scroll containers in here.
   return html`
     <div class="sg-shell">
       ${isOpen && html`<div class="sg-backdrop" onclick=${closeDrawer} aria-hidden="true" data-lenis-prevent></div>`}

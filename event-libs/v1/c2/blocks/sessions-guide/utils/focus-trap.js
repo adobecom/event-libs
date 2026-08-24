@@ -1,15 +1,12 @@
-// Milo's shared focus trap (blocks/modal/modal.js) is baked into its own imperative,
-// append-to-body dialog and can't target an already-mounted, Preact-managed container —
-// hence this lighter, standalone version (see trapFocus() below).
+// Milo's trap is baked into its own append-to-body dialog and can't target an
+// already-mounted, Preact-managed container.
 
 const FOCUSABLE_SELECTOR = 'a[href], button:not([disabled]), input:not([disabled]), '
   + 'select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
-// offsetParent alone only rules out display:none and detached nodes. An element the browser
-// refuses to focus for any other reason must be excluded too, or it becomes a phantom
-// boundary: the wrap-around below compares against document.activeElement, which such an
-// element can never be, so Tab walks straight out of the trap and into the browser chrome.
-// The live case is BackToTop.js, which stays mounted-but-inert while faded out.
+// An element the browser refuses to focus becomes a phantom boundary: it can never be
+// document.activeElement, so the wrap-around below lets Tab walk out of the trap.
+// The live case is BackToTop.js, mounted-but-inert while faded out.
 function isFocusable(el) {
   if (el.offsetParent === null) return false;
   if (el.closest('[inert]')) return false;
@@ -20,11 +17,7 @@ function getFocusables(containerEl) {
   return [...containerEl.querySelectorAll(FOCUSABLE_SELECTOR)].filter(isFocusable);
 }
 
-/**
- * Traps Tab/Shift+Tab focus cycling within `containerEl`, calls `onEscape` on Escape,
- * and restores focus on cleanup to whatever was focused before the trap activated.
- * Returns a cleanup function.
- */
+// Cycles Tab within containerEl, calls onEscape, and restores prior focus on cleanup.
 export function trapFocus(containerEl, onEscape) {
   if (!containerEl) return () => {};
   const previouslyFocused = document.activeElement;
@@ -32,9 +25,7 @@ export function trapFocus(containerEl, onEscape) {
   const [first] = getFocusables(containerEl);
   (first || containerEl).focus?.({ preventScroll: true });
 
-  // Traps nest (the filter panel sits inside the drawer), and both listen on their own
-  // container, so an unstopped key would bubble to the outer trap and dismiss it too.
-  // Stopping propagation once handled keeps Escape scoped to the innermost surface.
+  // Traps nest, so an unstopped Escape would bubble out and dismiss the outer one too.
   function onKeydown(e) {
     if (e.key === 'Escape') {
       e.stopPropagation();

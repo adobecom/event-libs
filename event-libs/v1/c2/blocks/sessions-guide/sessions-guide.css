@@ -121,9 +121,8 @@
     animation: none;
   }
 
-  /* Card expansion, row collapse, carousel paging and the filter fade are all
-     decorative. The drawer's own slide is set inline by DrawerShell.setTop(), which
-     CSS can't override — it checks prefers-reduced-motion in JS instead. */
+  /* The drawer's own slide is set inline by DrawerShell.setTop(), so it checks the
+     motion preference in JS instead. */
   .sg-card,
   .sg-card__actions,
   .sg-live-card,
@@ -410,9 +409,8 @@
   overflow-y: auto;
 }
 
-/* Both carry tabindex="-1" purely as the landing target for a Back to top jump. Neither is a
-   tab stop or a control, so the UA ring — drawn around the entire list — is noise: the jump
-   itself is the cue, and the next Tab lands on a real control with its own visible ring. */
+/* tabindex="-1" is only a Back-to-top landing target, so the UA ring around the whole
+   list is noise. */
 .sg-body-scroll:focus,
 .sg-body-scroll:focus-visible,
 .sg-full-page:focus,
@@ -891,9 +889,7 @@
   gap: var(--s2a-spacing-xs);
 }
 
-/* Second badge (first additional event-site track) in the slot the time would take on a
-   live card. inline-flex so the ::before divider added from 1024px up centers as a flex
-   item — see .sg-live-card__time::before, which it shares its rules with. */
+/* inline-flex so the ::before divider added at 1024px centers as a flex item. */
 .sg-live-card__track-extra {
   display: inline-flex;
   align-items: center;
@@ -1239,9 +1235,7 @@
   overflow: hidden;
 }
 
-/* Card titles are real <button>s (not the whole card) so keyboard/screen-reader users get
-   one unambiguous control instead of a button nested inside a button — reset browser button
-   chrome here, before .sg-card__title's own rule so its explicit type/color values win. */
+/* Titles are real buttons, so reset UA chrome before .sg-card__title's own rule. */
 .sg-card__title-btn {
   display: block;
   text-align: left;
@@ -2126,9 +2120,7 @@
     scroll-snap-align: none;
   }
 
-  /* Cards run to the container edge instead of stopping at the section's 20px right
-     padding. Only the clipping track bleeds — the section keeps its padding so the title
-     and the nav arrows (anchored to .sg-carousel, not the track) stay on the same inset. */
+  /* Only the track bleeds past the section padding; title and arrows keep the inset. */
   .sg-carousel__track {
     margin-right: -20px;
   }
@@ -2348,10 +2340,8 @@
     width: auto;
   }
 
-  /* The viewport does the horizontal clipping (windowing) instead of the
-     track, so the arrows — which live in the track, outside the viewport —
-     can overhang the edges without being clipped. overflow-x:clip +
-     overflow-y:visible is an allowed combo, so card shadows still show. */
+  /* The viewport clips, not the track, so the arrows can overhang. clip + visible is an
+     allowed combo, so card shadows still show. */
   .sg-time-row__viewport {
     overflow-x: clip;
     overflow-y: visible;
@@ -2454,11 +2444,8 @@
                 border-width 0.45s ease;
   }
 
-  /* The resting .is-scheduled/.is-favorited rule above ties on specificity with the
-     generic :hover/:focus-within rule and is declared later, so it wins for these cards —
-     the dark treatment has to be restated here. :focus-within is as necessary as :hover:
-     without it a keyboard user tabbing through an already-scheduled or already-favorited
-     card gets no dark state at all, while every other card darkens. */
+  /* Restated because the resting .is-scheduled/.is-favorited rule ties on specificity and
+     is declared later. :focus-within matters as much as :hover for keyboard users. */
   :is(.sessions-guide, .sg-portal) .sg-card.is-scheduled:is(:hover, :focus-within),
   :is(.sessions-guide, .sg-portal) .sg-card.is-favorited:is(:hover, :focus-within) {
     background: var(--s2a-color-gray-900);
@@ -2631,10 +2618,8 @@
     overflow: hidden;
   }
 
-  /* Row dismiss: collapses vertically + fades out.
-     max-height is driven by JS (TimeSlotRow/TrackRow) so the transition starts
-     from the row's actual rendered height instead of the 600px CSS baseline,
-     keeping the vertical slide in sync with the card's horizontal collapse. */
+  /* max-height is set by JS from the row's real height, so the vertical slide stays in
+     sync with the card's horizontal collapse. */
   .sg-time-row--collapsing {
     opacity: 0 !important;
     margin-top: 0 !important;
@@ -2648,9 +2633,8 @@
   }
 }
 
-/* ── Suppress card hover effects on touch desktops (≥1280px, hover: none) ──
-   Mobile/tablet base styles already group :hover with the rest state, so
-   no suppression is needed below 1280px — these resets are desktop-specific. */
+/* ── Suppress card hover on touch desktops (≥1280px, hover: none) ──
+   Below 1280px the base styles already group :hover with the rest state. */
 
 @media (hover: none) and (min-width: 1280px) {
   /* Kill transitions so tap-triggered :hover resets are instant */
@@ -2761,9 +2745,7 @@
   white-space: nowrap;
 }
 
-/* Icon paints the authored track color, set inline as --sg-badge-icon-color by
-   CategoryBadge.js. Cards that darken on hover override `color` to white — see
-   the .sg-card/.sg-live-card hover rules in the desktop breakpoints. */
+/* --sg-badge-icon-color is set inline by CategoryBadge.js; hover overrides it to white. */
 .sg-category-badge__icon-color {
   display: inline-flex;
   align-items: center;
@@ -2982,9 +2964,7 @@
 
 /* ── Back to Top (Figma 9145:44653) ────────────────────────────────── */
 
-/* Desktop only: the narrower layouts are a full-screen takeover where the header is a
-   short flick away, so the affordance would only cover content. Kept in sync with the
-   1280px breakpoint the drawer and filter panel already use. */
+/* Desktop only: narrower layouts are a takeover where the header is a flick away. */
 .sg-back-to-top {
   display: none;
 }
