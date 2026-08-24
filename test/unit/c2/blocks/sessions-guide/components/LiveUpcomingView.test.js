@@ -13,13 +13,13 @@ const LIVE_SESSION = {
   id: 'live-1', title: 'Live Session', description: 'Live now',
   track: 'Design', startTimeUtc: h(-0.5), endTimeUtc: h(1),
   mrStreamId: null, thumbnailUrl: null,
-  videoAvailable: false, inPerson: false, sessionPageUrl: '/live-1',
+  inPerson: false, sessionPageUrl: '/live-1',
 };
 const UPCOMING_SESSION = {
   id: 'upcoming-1', title: 'Upcoming Session', description: 'Starts soon',
   track: 'Video', startTimeUtc: h(1), endTimeUtc: h(2),
   mrStreamId: null, thumbnailUrl: null,
-  videoAvailable: false, inPerson: false, sessionPageUrl: '/upcoming-1',
+  inPerson: false, sessionPageUrl: '/upcoming-1',
 };
 
 // Derive day keys from session times — guarantees match with getSessionDayKey
@@ -55,13 +55,13 @@ describe('LiveUpcomingView', () => {
     const store = makeStore([LIVE_SESSION]);
     const View = buildLiveUpcomingView(preact, store);
     expect(View({})).to.include('sg-carousel-section');
-    expect(View({})).to.include('Live now');
+    expect(View({})).to.include('Live sessions');
   });
 
   it('hides live section when no live sessions', () => {
     const store = makeStore([UPCOMING_SESSION], UPCOMING_DAY);
     const View = buildLiveUpcomingView(preact, store);
-    expect(View({})).to.not.include('Live now');
+    expect(View({})).to.not.include('Live sessions');
   });
 
   it('shows upcoming section', () => {

@@ -19,13 +19,13 @@ const SESSION_A = {
   id: 'a', title: 'Keynote A', description: 'Desc A', track: 'Featured',
   startTimeUtc: '2026-10-28T16:00:00Z', endTimeUtc: '2026-10-28T17:30:00Z',
   thumbnailUrl: null, sessionPageUrl: '/sessions/a',
-  videoAvailable: false, inPerson: false,
+  inPerson: false,
 };
 const SESSION_B = {
   id: 'b', title: 'Keynote B', description: 'Desc B', track: 'Featured',
   startTimeUtc: '2026-10-28T18:00:00Z', endTimeUtc: '2026-10-28T19:00:00Z',
   thumbnailUrl: 'https://example.com/b.jpg', sessionPageUrl: '/sessions/b',
-  videoAvailable: false, inPerson: false,
+  inPerson: false,
 };
 
 function makeStore() {
@@ -66,8 +66,8 @@ describe('Carousel', () => {
     const store = makeStore();
     const Carousel = buildCarousel(preact, store);
     const html = Carousel({ sessions: [SESSION_A, SESSION_B] });
-    expect(html).to.include('key=a');
-    expect(html).to.include('key=b');
+    expect(html).to.include('key="a"');
+    expect(html).to.include('key="b"');
   });
 
   it('renders the cards container', () => {
@@ -82,7 +82,7 @@ describe('Carousel', () => {
     const Carousel = buildCarousel(preact, store);
     const html = Carousel({ sessions: [SESSION_A, SESSION_B] });
     expect(html).to.include('sg-carousel__arrow--prev');
-    expect(html).to.include('disabled=true');
+    expect(html).to.include('disabled="true"');
   });
 
   it('renders next arrow when multiple sessions exist', () => {
@@ -92,11 +92,27 @@ describe('Carousel', () => {
     expect(html).to.include('sg-carousel__arrow--next');
   });
 
+  it('renders the left time gutter when formatTime is supplied', () => {
+    const store = makeStore();
+    const Carousel = buildCarousel(preact, store);
+    const html = Carousel({ sessions: [SESSION_A], formatTime: () => '9:00AM' });
+    expect(html).to.include('sg-carousel__time');
+  });
+
+  // Recommended carousels pass no formatTime — with no gutter element the strip starts
+  // flush with the section's left edge instead of being indented by it.
+  it('omits the time gutter when no formatTime is supplied', () => {
+    const store = makeStore();
+    const Carousel = buildCarousel(preact, store);
+    const html = Carousel({ sessions: [SESSION_A] });
+    expect(html).to.not.include('sg-carousel__time');
+  });
+
   it('renders no arrows for a single session', () => {
     const store = makeStore();
     const Carousel = buildCarousel(preact, store);
     const html = Carousel({ sessions: [SESSION_A] });
-    expect(html).to.include('key=a');
+    expect(html).to.include('key="a"');
     expect(html).to.not.include('sg-carousel__arrow');
   });
 });

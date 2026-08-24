@@ -3,7 +3,8 @@ import { useNavigation } from '../context/NavigationContext.js';
 import { useConfigs } from '../context/ConfigsContext.js';
 import { useDA } from '../context/DAContext.js';
 import {
-  copyTextToClipboard, extractDistinctTracks, extractDistinctOverrideTexts, extractDistinctProducts,
+  copyTextToClipboard, extractDistinctTracks, extractDistinctAllTracks,
+  extractDistinctOverrideTexts, extractDistinctProducts,
   isTrackIconEntryComplete, getDisplayTitle, stringifyConfig, copyHomepageConfigLink,
 } from '../utils.js';
 import {
@@ -60,6 +61,10 @@ export default function ConfigEditor() {
   }, [eventId, eventServiceEnv, getSessionCatalogForRow]);
 
   const tracks = useMemo(() => extractDistinctTracks(sessions), [sessions]);
+  // Track icons/colors map every track a session can badge, so it covers Additional Event
+  // Site Tracks too — `tracks` above stays primary-only for the featured-sessions picker,
+  // whose filter matches on the primary track alone.
+  const iconTracks = useMemo(() => extractDistinctAllTracks(sessions), [sessions]);
   const overrideTexts = useMemo(() => extractDistinctOverrideTexts(sessions), [sessions]);
   const products = useMemo(() => extractDistinctProducts(sessions), [sessions]);
 
@@ -74,8 +79,8 @@ export default function ConfigEditor() {
   // Global-only: Homepage configs don't author track icons at all.
   const incompleteTracks = useMemo(() => {
     if (!activeConfig || isHomepage) return [];
-    return tracks.filter((track) => !isTrackIconEntryComplete(activeConfig.config.trackIcons?.[track]));
-  }, [tracks, activeConfig, isHomepage]);
+    return iconTracks.filter((track) => !isTrackIconEntryComplete(activeConfig.config.trackIcons?.[track]));
+  }, [iconTracks, activeConfig, isHomepage]);
 
   const handleCancel = () => {
     clearActiveConfig();
@@ -179,7 +184,7 @@ export default function ConfigEditor() {
         ${isLoadingSessions && html`<${LoadingInline} label="Loading sessions…" />`}
         ${sessionsError && html`<p class="tec-editor__error">${sessionsError}</p>`}
         ${!isLoadingSessions && !sessionsError && html`
-          <p class="tec-editor__section-hint">${sessions.length} session(s) found — ${tracks.length} distinct track(s), ${products.length} distinct product(s).</p>
+          <p class="tec-editor__section-hint">${sessions.length} session(s) found — ${iconTracks.length} distinct track(s) (primary + additional), ${products.length} distinct product(s).</p>
         `}
       </section>
 
@@ -196,7 +201,7 @@ export default function ConfigEditor() {
           `}
           ${!isLoadingSessions && !sessionsError && html`
             <${TrackIconEditor}
-              tracks=${tracks}
+              tracks=${iconTracks}
               trackIcons=${activeConfig.config.trackIcons}
               onChange=${updateTrackIcon}
             />
@@ -284,6 +289,29 @@ export default function ConfigEditor() {
             placeholder="/register"
             value=${activeConfig.config.registerUrl || ''}
             onInput=${(e) => updateConfigField('registerUrl', e.target.value)}
+          />
+        </section>
+
+        <section class="tec-editor__section">
+          <h2>Event pages</h2>
+          <p class="tec-editor__section-hint">Where a session's "Watch now" CTA sends attendees while it's live: the event homepage for livestreamed sessions, the broadcast page for online-only ones. Root-relative paths on this event's own site. Leave blank and the page falls back to MAX's paths.</p>
+          <label class="tec-editor__field-label" for="tec-homepage-path">Homepage path</label>
+          <input
+            id="tec-homepage-path"
+            type="text"
+            class="tec-field tec-editor__rf-input"
+            placeholder="/max.html"
+            value=${activeConfig.config.homepagePath || ''}
+            onInput=${(e) => updateConfigField('homepagePath', e.target.value)}
+          />
+          <label class="tec-editor__field-label" for="tec-broadcast-path">Broadcast page path</label>
+          <input
+            id="tec-broadcast-path"
+            type="text"
+            class="tec-field tec-editor__rf-input"
+            placeholder="/max/2026/broadcast.html"
+            value=${activeConfig.config.broadcastPath || ''}
+            onInput=${(e) => updateConfigField('broadcastPath', e.target.value)}
           />
         </section>
 

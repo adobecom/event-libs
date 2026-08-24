@@ -62,7 +62,7 @@ All template output uses `` html`...` `` from `htm-preact.js`. File extensions a
 | IMS profile | `BlockMediator` | Read `imsProfile` — existing project pattern; bridged into the shared `auth` signal by `session-store.js` |
 | RSVP / registration | `BlockMediator` | Read `rsvpData.registered` — existing project pattern; bridged into the shared `auth` signal |
 | Inter-block (same page) | `BlockMediator` (legacy keys) + `session-store.js` signals (new shared keys) | `BlockMediator` keeps owning `imsProfile`/`rsvpData`/`espData` as before; new cross-block session data goes through signals instead of adding more `BlockMediator` keys |
-| URL state | `history.pushState` | Widget: `?sessions` / `?session=<slug>-<rfCode>`. Full page: `?view=` / `?filter=` / `?search=` |
+| URL state | `history.pushState` | Widget: `?sessions` / `?session=<url-slug>`. Full page: `?view=` / `?filter=` / `?search=` |
 
 ### Why signals, not just BlockMediator
 The original design kept all session state in this block's own Preact Context, on the theory that the widget and full-page surfaces are on different pages and in-memory state can't survive navigation anyway. That held until a cross-block requirement came in: other blocks on the *same* page (favorites badges, registration-aware CTAs, etc.) need to read sessions/favorites/scheduled/auth too — state scoped to one block's Context isn't reachable from outside it.
@@ -76,7 +76,7 @@ So the split is: `BlockMediator` still owns what it already owned (`imsProfile`,
 `decorateEvent()` additionally requires `tier-1-event-config` metadata to be present before it even calls `initSessionState()` (see MWPW-200314-HANDOFF.md / decorate.js). `event-id` alone is already authored broadly across prod event pages for unrelated purposes, so gating on it alone would seed sessions-guide's mock data (`sg:dev-auth`, mock scheduled/favorited) on pages that never intend to use it. Presence of `tier-1-event-config` is the explicit opt-in, separate from — and checked before — the `rainfocus-api-url` gate inside `initSessionState()` itself.
 
 ### Polling architecture
-A single `setInterval` (30 s) starts inside `session-store.js` after sessions are loaded (when `sessionsStatus.value === 'ready'`). It calls the Mobile Rider batch API for all sessions that have an `mrStreamId`. The polling engine self-stops when all MR sessions report inactive (stream day over). `poller.js`'s `startPolling(mrSessions, env, onUpdate, intervalMs)` takes a plain callback instead of a dispatch function — decoupling it from ever being tied to a specific reducer.
+A single `setInterval` (30 s) starts inside `session-store.js` after sessions are loaded (when `sessionsStatus.value === 'ready'`). It calls the Mobile Rider batch API for all sessions that have an `mrStreamId` — which is no sessions today, since the catalog carries no live-stream-id attribute yet (see REAL-API-CHECKLIST.md), so the poll is inert until `Mobilerider Live Stream ID` (tentative) ships. The polling engine self-stops when all MR sessions report inactive (stream day over). `poller.js`'s `startPolling(mrSessions, env, onUpdate, intervalMs)` takes a plain callback instead of a dispatch function — decoupling it from ever being tied to a specific reducer.
 
 ### Session-state ticker
 MR polling only gives components an ambient re-render on a live-status change — a page with only non-MR sessions had no mechanism to notice a session crossing its start/end time purely because the clock moved forward, short of a user interacting with something else first. `event-libs/v1/services/sessions/session-state-ticker.js`'s `startSessionStateTicker(getSessions, getLiveStreamActiveIds, onChange, { intervalMs, getNow })` runs on its own 15 s interval (also started from `session-store.js`, unconditionally — not gated on MR sessions existing), diffs `deriveSessionState()` per session against its last-known value, and only calls `onChange` when at least one session's bucket actually changed. `session-store.js` wires `onChange` to bump the shared `sessionStateVersion` signal. It self-stops once every session is on-demand, mirroring the MR poller's own self-stop.
@@ -208,7 +208,6 @@ Toast and conflict-modal state moved out of this reducer entirely — see `event
 ```typescript
 interface Session {
   id: string;
-  slug: string;                  // for URL params: ?session=<slug>-<rfCode>
   rfCode: string;                // Rainfocus session code
   title: string;
   description: string;
@@ -220,17 +219,28 @@ interface Session {
   technicalLevel: string;
   category: string;
   audience: string;
+  aiFocus: string[];             // `AI Focus` -- no catalog attribute yet, so [] today
   speakers: Speaker[];
   products: string[];
   resources: Resource[];
-  mrStreamId: string | null;     // Mobile Rider stream ID; non-null = MR session
-  videoAvailable: boolean;       // recording is ready
-  inPerson: boolean;             // in-person session ("Recording coming soon" until videoAvailable)
+  // Four video sources, one field each, named for the player. Alternatives, not a fallback
+  // chain — a session carries whichever it was produced for.
+  mrStreamId: string | null;     // Mobile Rider LIVE; non-null = MR session. Always null
+                                 // today: inbound as `Mobilerider Live Stream ID` (tentative).
+  mpcId: string;                 // `MPC ID` -> Adobe Video TV. Mapped, unread.
+  youTubeId: string;             // `YouTube ID` -> YouTube. Mapped, unread.
+  mrDvrVideoId: string;          // `Mobilerider Video ID (DVR)` -> post-stream recording,
+                                 // gated by `DVR Timing (in hours)`. Mapped, unread.
+  mrSkinId: string;              // `Skin ID` -> Mobile Rider player skin (mr* sources only).
+  inPerson: boolean;             // Format carries `In person`
+  isOnline: boolean;             // Format carries `Online`
+  hasOnDemandFormat: boolean;    // Format carries `On demand, post event`
   sessionPageUrl: string;
   watchUrl: string;              // Watch Now destination
   isKeynote: boolean;
   thumbnailUrl: string | null;   // video thumbnail; null when unavailable
-  copyrightDisclaimer?: string;
+  legalDisclaimer?: string;      // `Legal Disclaimer` -- authored HTML, sanitized then
+                                 // injected (see utils/rich-text.js), not plain text
 }
 
 // This block's own per-instance authoring config, parsed by parse-config.js's
@@ -404,7 +414,7 @@ Sessions are fetched once by `session-store.js`'s `loadSessions()`, kicked off f
 **Triggers:**
 - **CTA button** — Preact-rendered `position: fixed; bottom: 0` button inside `DrawerShell` (only rendered when `drawerState === 'hidden'`)
 - **`?sessions` URL param** — checked on mount in `DrawerShell`; auto-opens to `expanded`
-- **`?session=<slug>-<rfCode>` URL param** — auto-opens to `expanded` + resolves `activeSessionId` once sessions are loaded
+- **`?session=<url-slug>` URL param** — auto-opens to `expanded` + resolves `activeSessionId` once sessions are loaded
 
 **State machine:**
 
@@ -473,7 +483,6 @@ Breakpoint at 1280 px: CTA goes to `peek` on wide, directly to `expanded` on nar
 - `dismissingIds.has(session.id)` drives `sg-card--collapsing` for exit animation
 - Time label logic:
   - `forceOnDemand` → `'ON DEMAND'`
-  - `onDemandNatural && inPerson && !videoAvailable` → `'Recording coming soon'`
   - `onDemandNatural` → `'ON DEMAND'`
   - else → `formatSessionTime(startTimeUtc, userTz)` with short end time
 - Card click:
@@ -653,8 +662,7 @@ copy/CTA logic via a shared `showAuthToast()` helper rather than duplicating it.
 No longer a reducer case (`LIVE_STATUS_UPDATE` doesn't exist). Implemented as a `useEffect` in `SessionGuideProvider` (`store/index.js`) that subscribes to the shared `sessions`/`liveStreamActiveIds` signals and dispatches a plain `SET_VIEW`. Post-event auto-transition: `allEnded || pastManualCutoff` (cutoff from `getApiConfig().manualCutoff`) and `activeView === 'live-upcoming'` → switch to `'on-demand'`.
 
 ### 5.4 In-person on-demand cards ✅
-- `session.inPerson && !session.videoAvailable` → time label "Recording coming soon" in `SessionCard`; detail overlay shows "Recording coming soon" badge
-- `session.inPerson && session.videoAvailable` → navigates to `session.sessionPageUrl`
+- an in-person session that is also `Online` or on-demand → navigates to `session.sessionPageUrl`
 
 ---
 
@@ -668,15 +676,14 @@ No longer a reducer case (`LIVE_STATUS_UPDATE` doesn't exist). Implemented as a 
 - Actions:
   - Upcoming sessions: Schedule / Scheduled toggle button (primary) + Favorite icon button + Share icon button
   - Live/on-demand sessions: Watch now link (primary) + Favorite icon button + Share icon button
-  - "Recording coming soon" badge for in-person sessions without `videoAvailable`
 - Description expand/collapse: "More" / "Less" button with `is-expanded` class; local `descExpanded` state
-- Attributes list: Technical level, Track, Content category, Audience (filtered for non-empty values)
+- Attributes list, in this fixed order per design: **Technical level, Track, AI focus, Audience, Category** (each row hidden when its value is empty). `AI focus` has no catalog attribute yet, so it never renders today; `Industry` was removed from this list and is not in the real catalog either.
 - Share: `navigator.share()` if available; else `navigator.clipboard.writeText()` with "Link copied" toast; swallows `AbortError`
 
 ### 6.2 URL param for open overlay (widget) ✅
 - `DrawerShell` handles `handleDetailBack()`: pushes `setSessionsParam()` URL
 - `DrawerShell` handles `closeDrawer()`: pushes `clearSessionParams()` URL
-- Opening detail: `SessionCard` / `LiveCard` push `setSessionParam(slug-rfCode)` URL
+- Opening detail: `SessionCard` / `LiveCard` push `setSessionParam(sessionParamValue(session))` URL
 - `popstate` listener in `DrawerShell` restores state from URL without pushing new entries
 
 ### 6.3 State sync ✅
@@ -751,7 +758,7 @@ There **is** a separate block entry, `sessions-guide-full-page.js`, registered a
 | Shell | Peek-to-expand drawer in portal | Inline layout in block element |
 | Session card click | Opens detail overlay (upcoming/live); navigates (on-demand) | Always navigates to session page |
 | Session detail overlay | Yes (`sg-detail-panel` inside drawer) | No |
-| URL params | `?sessions`, `?session=<slug>-<rfCode>` | `?view=`, `?filter=`, `?search=` |
+| URL params | `?sessions`, `?session=<url-slug>` | `?view=`, `?filter=`, `?search=` |
 | CTA button | "View all sessions" fixed button | Not rendered |
 
 ### 9.3 URL param management (full page) ✅
@@ -770,7 +777,7 @@ There **is** a separate block entry, `sessions-guide-full-page.js`, registered a
 - Close → `history.pushState({}, '', clearSessionParams())`
 
 ### 10.2 Session detail URL ✅
-- Open detail → `history.pushState({}, '', setSessionParam('slug-rfCode'))` (drops `?sessions=`)
+- Open detail → `history.pushState({}, '', setSessionParam('<url-slug>'))` (drops `?sessions=`)
 - Close detail (keep drawer open) → `history.pushState({}, '', setSessionsParam())`
 
 ### 10.3 popstate handler ✅
@@ -838,7 +845,7 @@ Tests mirror `test/unit/blocks/sessions-guide/`. Coverage status to be assessed 
 ### 14.3 Integration tests (priority order)
 - Full view rendering for all 4 views
 - Poll-driven state update: `session-store.js`'s `liveStreamActiveIds` signal changing on a poll tick, and the on-demand auto-transition `useEffect` reacting to it
-- URL param handling: `?sessions` auto-opens, `?session=slug-rfCode` resolves detail
+- URL param handling: `?sessions` auto-opens, `?session=<url-slug>` resolves detail
 - Filter + search composition
 
 ---
@@ -878,7 +885,8 @@ a session only ever carries one of the two, so this is unambiguous in practice):
 | Field | MAX26 name | MAX25 fallback |
 |---|---|---|
 | Primary track | `Primary Event Site Track` | `Primary Track for Agenda (Digital Agenda)` |
-| Content category | `Category` | `Programming Category` |
+| Content category (labelled **Category** in the detail view) | `Category` | `Programming Category` |
+| AI focus | `AI Focus` *(tentative, not shipped yet)* | — |
 | Session type | `Type` | `Session Type` |
 | Copyright | `Legal Disclaimer` | `LegalDisclaimer` |
 
@@ -1151,7 +1159,7 @@ test/unit/blocks/sessions-guide/
   components/TimeSlotRow.test.js
   mocks/
     default.html
-    sessions.json               # sample sessions API response
+    session-fixtures.js         # current-schema session builders
 
 test/unit/features/toast/
   toast.test.js                  # features/toast/toast.js — signal, mount idempotency, rendering, dismiss

@@ -23,7 +23,6 @@ const UPCOMING_SESSION = {
   track: 'Design',
   startTimeUtc: '2099-10-28T17:00:00Z',
   endTimeUtc: '2099-10-28T18:00:00Z',
-  videoAvailable: false,
   inPerson: false,
   sessionPageUrl: '/sessions/building-with-ai',
 };
@@ -36,7 +35,6 @@ const ONDEMAND_SESSION = {
   track: 'Design',
   startTimeUtc: '2020-01-01T10:00:00Z',
   endTimeUtc: '2020-01-01T11:00:00Z',
-  videoAvailable: true,
   inPerson: false,
   sessionPageUrl: '/sessions/past',
 };
@@ -110,32 +108,32 @@ describe('SessionCard', () => {
 
   it('shows schedule button for upcoming session', () => {
     const html = renderCard(UPCOMING_SESSION);
-    expect(html).to.include('Add to schedule');
+    expect(html).to.include('Add Building with AI to schedule');
   });
 
   it('shows on-demand label and hides schedule button for on-demand session', () => {
     const html = renderCard(ONDEMAND_SESSION);
     expect(html).to.include('ON DEMAND');
-    expect(html).to.not.include('Add to schedule');
+    expect(html).to.not.include('to schedule');
     expect(html).to.include('sg-card--on-demand');
   });
 
   it('always shows favorite button', () => {
     const upcoming = renderCard(UPCOMING_SESSION);
     const onDemand = renderCard(ONDEMAND_SESSION);
-    expect(upcoming).to.include('Add to favorites');
-    expect(onDemand).to.include('Add to favorites');
+    expect(upcoming).to.include('Add Building with AI to favorites');
+    expect(onDemand).to.include('to favorites');
   });
 
   it('shows aria-pressed=true on schedule button when scheduled', () => {
     scheduled.value = new Set(['session-1']);
     const html = renderCard(UPCOMING_SESSION);
-    expect(html).to.include('aria-pressed=true');
+    expect(html).to.include('aria-pressed="true"');
   });
 
   it('shows aria-pressed=false on schedule button when not scheduled', () => {
     const html = renderCard(UPCOMING_SESSION);
-    expect(html).to.include('aria-pressed=false');
+    expect(html).to.include('aria-pressed="false"');
   });
 
   it('dispatches SCHEDULE_ADD when schedule button clicked and registered', () => {
@@ -148,7 +146,7 @@ describe('SessionCard', () => {
     const SessionCard = buildSessionCard(preact, store);
     const rendered = SessionCard({ session: UPCOMING_SESSION });
     // Extract onclick from rendered HTML is not straightforward; test dispatch guard instead
-    expect(rendered).to.include('Add to schedule');
+    expect(rendered).to.include('Add Building with AI to schedule');
   });
 
   it('shows duration by default for upcoming sessions', () => {
@@ -171,17 +169,17 @@ describe('SessionCard', () => {
 
   it('tags the card daa-ll as Session-Card-Navigate on the page surface', () => {
     const html = renderCard(UPCOMING_SESSION);
-    expect(html).to.include('daa-ll=Session-Card-Navigate');
+    expect(html).to.include('daa-ll="Session-Card-Navigate"');
   });
 
   it('tags the card daa-ll as Session-Card-Open on the widget surface for a live/upcoming session', () => {
     const html = renderCard(UPCOMING_SESSION, { guideConfig: { ...BASE_CONFIG, surface: 'widget' } });
-    expect(html).to.include('daa-ll=Session-Card-Open');
+    expect(html).to.include('daa-ll="Session-Card-Open"');
   });
 
   it('tags the card daa-ll as On-Demand-Card-Navigate on the widget surface for an on-demand session', () => {
     const html = renderCard(ONDEMAND_SESSION, { guideConfig: { ...BASE_CONFIG, surface: 'widget' } });
-    expect(html).to.include('daa-ll=On-Demand-Card-Navigate');
+    expect(html).to.include('daa-ll="On-Demand-Card-Navigate"');
   });
 
   // Only the schedule button is asserted here — the favorite IconButton is embedded
@@ -189,9 +187,9 @@ describe('SessionCard', () => {
   // which this test mock's minimal component-tag parser can't resolve (real htm/preact
   // renders it correctly; this is a mock limitation, not a production bug).
   it('tags the schedule button with Add-/Remove- daa-ll labels matching its state', () => {
-    expect(renderCard(UPCOMING_SESSION)).to.include('daa-ll=Add-to-Schedule');
+    expect(renderCard(UPCOMING_SESSION)).to.include('daa-ll="Add-to-Schedule"');
     scheduled.value = new Set(['session-1']);
-    expect(renderCard(UPCOMING_SESSION)).to.include('daa-ll=Remove-from-Schedule');
+    expect(renderCard(UPCOMING_SESSION)).to.include('daa-ll="Remove-from-Schedule"');
   });
 
   it('tags the previously-aired play button with daa-ll=Watch-Now', () => {
@@ -199,7 +197,7 @@ describe('SessionCard', () => {
     store.SessionGuideContext._current = makeCtx();
     const SessionCard = buildSessionCard(preact, store);
     const html = SessionCard({ session: ONDEMAND_SESSION, forceOnDemand: true });
-    expect(html).to.include('daa-ll=Watch-Now');
+    expect(html).to.include('daa-ll="Watch-Now"');
   });
 
   it('omits the schedule button when enableScheduling is false', () => {
@@ -226,7 +224,7 @@ describe('SessionCard', () => {
     });
     const SessionCard = buildSessionCard(preact, store);
     const html = SessionCard({ session: ONDEMAND_SESSION, forceOnDemand: true });
-    expect(html).to.include('daa-ll=Watch-Now');
+    expect(html).to.include('daa-ll="Watch-Now"');
   });
 
   it('does not dispatch when isRegistered is not true (no-op guard)', () => {

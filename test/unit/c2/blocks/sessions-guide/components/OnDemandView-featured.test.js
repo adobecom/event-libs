@@ -20,13 +20,13 @@ function h(offsetHours) {
 const PAST_DESIGN = {
   id: 'd-1', title: 'Design Talk', description: '', track: 'Design',
   startTimeUtc: h(-4), endTimeUtc: h(-3),
-  videoAvailable: true, inPerson: false, sessionPageUrl: '/d-1',
+  inPerson: false, sessionPageUrl: '/d-1',
   mrStreamId: null, thumbnailUrl: null,
 };
 const PAST_VIDEO = {
   id: 'v-1', title: 'Video Talk', description: '', track: 'Video',
   startTimeUtc: h(-6), endTimeUtc: h(-5),
-  videoAvailable: true, inPerson: false, sessionPageUrl: '/v-1',
+  inPerson: false, sessionPageUrl: '/v-1',
   mrStreamId: null, thumbnailUrl: null,
 };
 
@@ -58,6 +58,9 @@ describe('OnDemandView (recommendedSessions authored)', () => {
     expect(html).to.include('Recommended');
   });
 
+  // The absence of a time label/gutter on a recommended carousel is covered where it can
+  // actually be observed — Carousel.test.js's "omits the time gutter when no formatTime is
+  // supplied" — since the shim above never invokes a nested component's body.
   it('ignores the viewer\'s active filters — recommended is a curated list, not a filtered one', () => {
     // A track filter that excludes PAST_VIDEO from the byTrack grouping below must
     // not remove the recommended section above, since it's built from onDemandRaw,

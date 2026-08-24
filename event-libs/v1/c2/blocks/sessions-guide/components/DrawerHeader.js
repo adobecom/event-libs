@@ -6,25 +6,68 @@ import {
   auth, sessions, liveStreamActiveIds, sessionStateVersion, getApiConfig,
 } from '../../../../utils/session-store.js';
 import { isPostEvent, getNowMs } from '../../../../utils/session-state.js';
+import { isOutsideClick } from '../utils/outside-click.js';
 import { DateTabs } from './DateTabs.js';
 import { ViewDropdown } from './ViewDropdown.js';
 import { DownloadButton } from './DownloadButton.js';
+import { FilterPanel } from './FilterPanel.js';
 
-// Authored headings are 4 literal strings keyed by auth state x event lifecycle — no
-// placeholder interpolation, unlike the hardcoded default's first-name greeting. A blank/
-// unauthored string for the relevant key falls back to that hardcoded default.
+// Authors write a {firstName} placeholder into the logged-in headings to greet the viewer by
+// name — single brace to match the repo's other authored templates (dictionary-manager.js,
+// date-time-helper.js). Double braces and alternate spellings are accepted too, since authors
+// type the token by hand in the Session Guide Configurator.
+const NAME_WORDS = '(?:first[\\s_-]?name|user[\\s_-]?name|name)';
+const NAME_TOKEN = `(?:\\{\\{\\s*${NAME_WORDS}\\s*\\}\\}|\\{\\s*${NAME_WORDS}\\s*\\})`;
+
+// With no name to substitute (the token authored into a logged-out heading), the token is
+// dropped along with any trailing comma so the copy still reads as a sentence.
+export function interpolateHeading(heading, userFirstName) {
+  if (!heading) return heading;
+  if (userFirstName) return heading.replace(new RegExp(NAME_TOKEN, 'gi'), userFirstName);
+  const stripped = heading.replace(new RegExp(`${NAME_TOKEN}[,:]?\\s*`, 'gi'), '').trim();
+  // A token stripped off the front leaves the following word starting the sentence lowercase.
+  if (!new RegExp(`^${NAME_TOKEN}`, 'i').test(heading.trim())) return stripped;
+  return stripped.charAt(0).toUpperCase() + stripped.slice(1);
+}
+
+// Authored headings are 4 strings keyed by auth state x event lifecycle. A blank/unauthored
+// string for the relevant key falls back to the hardcoded default.
 export function resolveDrawerTitle(headings, { isLoggedIn, userFirstName, isPost }) {
   const loggedIn = !!(isLoggedIn && userFirstName);
   const key = `${loggedIn ? 'loggedIn' : 'loggedOut'}${isPost ? 'PostEvent' : ''}`;
   const defaultTitle = loggedIn ? `${userFirstName}, see what's happening` : "See what's happening at MAX";
-  return (headings || {})[key] || defaultTitle;
+  return interpolateHeading((headings || {})[key], userFirstName) || defaultTitle;
 }
 
-export function DrawerHeader({ onClose, onFilterToggle, filterOpen, hideClose, hideControls }) {
+// The count badge is hidden below 768px, where the button is a 40px icon-only circle that
+// signals an active filter set with a solid fill instead (sessions-guide-overlays.css). That
+// makes this label the only place the number is exposed at mobile widths — keep it counted.
+export function filterButtonLabel(activeFilterCount) {
+  return activeFilterCount > 0 ? `Filter sessions, ${activeFilterCount} active` : 'Filter sessions';
+}
+
+export function DrawerHeader({
+  onClose, onFilterToggle, onFilterClose, filterOpen, hideClose, hideControls,
+}) {
   const { state, dispatch } = useSessionGuide();
   const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
   const mobileSearchRef = useRef(null);
+  const filterWrapRef = useRef(null);
   const { activeFilters, activeView } = state;
+  const closeFilter = onFilterClose || (() => {});
+
+  // Desktop popover dismissal: close when a click lands outside the filter wrap (button +
+  // panel). Mirrors ViewDropdown. On mobile the panel is a full takeover, so the only way
+  // this fires is the drill-down re-rendering the tapped category row away mid-dispatch —
+  // which isOutsideClick() deliberately does not treat as a click-away.
+  useEffect(() => {
+    if (!filterOpen) return undefined;
+    function onClickOutside(e) {
+      if (isOutsideClick(filterWrapRef.current, e.target)) closeFilter();
+    }
+    document.addEventListener('click', onClickOutside);
+    return () => document.removeEventListener('click', onClickOutside);
+  }, [filterOpen]);
 
   // sessionStateVersion has no value of its own, only read so this recomputes on a pure
   // time-driven transition too (see store/index.js's auto-transition effect for why).
@@ -87,19 +130,20 @@ export function DrawerHeader({ onClose, onFilterToggle, filterOpen, hideClose, h
           <div class="sg-right-controls">
             ${activeView === 'my-sessions' && html`<${DownloadButton} />`}
             <${ViewDropdown} />
-            <div class="sg-filter-wrap">
+            <div class="sg-filter-wrap" ref=${filterWrapRef}>
               <button
                 class=${'sg-filter-btn' + (filterOpen ? ' sg-filter-btn--open' : '') + (activeFilterCount > 0 ? ' sg-filter-btn--active' : '')}
                 onclick=${onFilterToggle}
-                aria-label="Filter sessions"
-                aria-haspopup="true"
+                aria-label=${filterButtonLabel(activeFilterCount)}
+                aria-haspopup="dialog"
                 aria-expanded=${String(!!filterOpen)}
+                aria-controls=${filterOpen ? 'sg-filter-panel-options' : undefined}
                 daa-ll="Filter-Open"
                 type="button"
               >
                 <span class="sg-filter-icon" aria-hidden="true"></span>
                 <span class="sg-filter-btn-label">Filter</span>
-                ${activeFilterCount > 0 && html`<span class="sg-filter-count-badge" aria-label="${activeFilterCount} active filters">${activeFilterCount}</span>`}
+                ${activeFilterCount > 0 && html`<span class="sg-filter-count-badge" aria-hidden="true">${activeFilterCount}</span>`}
               </button>
               <button
                 class=${`sg-search-btn${mobileSearchOpen ? ' active' : ''}`}
@@ -110,6 +154,7 @@ export function DrawerHeader({ onClose, onFilterToggle, filterOpen, hideClose, h
               >
                 <span class="sg-search-icon" aria-hidden="true"></span>
               </button>
+              ${filterOpen && html`<${FilterPanel} onClose=${closeFilter} />`}
             </div>
           </div>
         </div>
@@ -121,6 +166,7 @@ export function DrawerHeader({ onClose, onFilterToggle, filterOpen, hideClose, h
               class="sg-mobile-search-input"
               ref=${mobileSearchRef}
               type="search"
+              aria-label="Search sessions"
               placeholder="Search sessions..."
               autocomplete="off"
               spellcheck="false"

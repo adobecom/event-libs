@@ -1,8 +1,8 @@
-// `?serverTime=<ms>` simulates landing on the page at a specific instant, for testing
-// time-driven transitions without waiting for a real session's start/end. It's an origin,
-// not a freeze — simulated time keeps advancing at the same rate as the real clock from
-// whatever instant the page loaded, so a tester can park just before a transition and
-// watch it happen rather than the clock staying frozen forever.
+import { getHomepagePath, getBroadcastPath } from './tier-1-event-config.js';
+import { MAX_EVENT_PAGES } from './constances.js';
+
+// `?serverTime=<ms>` simulates landing at a given instant. An origin, not a freeze — the
+// clock keeps advancing, so a tester can park just before a transition and watch it happen.
 const SERVER_TIME_ORIGIN = (() => {
   try {
     const raw = new URLSearchParams(window.location.search).get('serverTime');
@@ -19,50 +19,51 @@ export function getNowMs() {
   return SERVER_TIME_ORIGIN + (Date.now() - PAGE_LOAD_MS);
 }
 
-/**
- * Derives live/upcoming/on-demand state for a session.
- * Uses MR poll results for mrStreamId sessions; pure time-window for all others.
- * Never stored in the reducer — computed fresh at render time.
- *
- * @param {object} session
- * @param {Set<string>} liveStreamActiveIds - active mrStreamIds from latest MR poll
- * @param {number} nowMs - timestamp at render time
- * @returns {'live'|'upcoming'|'on-demand'}
- */
+const HOUR_MS = 3_600_000;
+
+// Counted from the event start, not the session end — the attribute is authored event-wide.
+export function dvrAvailableAtMs(session, eventStartMs) {
+  if (session?.dvrDelayHours == null || !eventStartMs) return null;
+  return eventStartMs + session.dvrDelayHours * HOUR_MS;
+}
+
+// Ending isn't enough to reach On Demand. Fails open when either input is missing.
+export function isDvrPending(session, nowMs, eventStartMs) {
+  const availableAt = dvrAvailableAtMs(session, eventStartMs);
+  return availableAt !== null && nowMs < availableAt;
+}
+
+// MR poll results for mrStreamId sessions, pure time-window for the rest. Never stored in
+// the reducer — computed fresh at render time.
 export function deriveSessionState(session, liveStreamActiveIds, nowMs) {
+  // Never airing, so neither the clock nor an active MR stream applies.
+  if (session.hasOnDemandFormat) return 'on-demand';
+
   const start = Date.parse(session.startTimeUtc);
   const end = Date.parse(session.endTimeUtc);
 
   if (session.mrStreamId) {
-    // MR session: inactive in poll API = on-demand regardless of time
+    // Inactive in the poll = on-demand regardless of time.
     if (!liveStreamActiveIds.has(session.mrStreamId)) {
       return nowMs < start ? 'upcoming' : 'on-demand';
     }
     return nowMs >= start ? 'live' : 'upcoming';
   }
 
-  // Non-MR: pure time window
   if (nowMs > end) return 'on-demand';
   if (nowMs >= start) return 'live';
   return 'upcoming';
 }
 
-/**
- * Whether a session should appear in the Live Now section.
- * Only MR sessions past their start time that are active in the MR API qualify.
- */
+// Only MR sessions past their start time and active in the MR API.
 export function isInLiveNow(session, liveStreamActiveIds, nowMs) {
   if (!session.mrStreamId) return false;
   const start = Date.parse(session.startTimeUtc);
   return nowMs >= start && liveStreamActiveIds.has(session.mrStreamId);
 }
 
-/**
- * Whether the event has functionally ended: every session is on-demand, or the Tier 1
- * Event Configurator's authored eventEndDateTime (a UTC epoch ms) has passed. An empty
- * session list alone never satisfies "every session is on-demand", but eventEndMs having
- * passed is independently sufficient regardless of session count.
- */
+// Every session on-demand, or the authored eventEndMs has passed. An empty list alone never
+// satisfies the former; eventEndMs is independently sufficient.
 export function isPostEvent(sessionList, liveStreamActiveIds, nowMs, eventEndMs) {
   const pastEventEnd = eventEndMs ? nowMs >= eventEndMs : false;
   const allEnded = sessionList.length > 0 && sessionList.every(
@@ -71,16 +72,12 @@ export function isPostEvent(sessionList, liveStreamActiveIds, nowMs, eventEndMs)
   return allEnded || pastEventEnd;
 }
 
-/**
- * Where "Watch now" navigates: homepage player if isLivestreamed, broadcast page if
- * isOnline, own session page if on-demand, '' otherwise. Root-relative since the
- * destination pages live on whatever domain is currently serving this page.
- */
+// Root-relative: the destinations live on whatever domain is serving this page. Falls back
+// to MAX's pages for configs predating the authorable homepagePath/broadcastPath.
 export function getWatchDestination(session, sessionState) {
   if (sessionState === 'on-demand') return session.sessionPageUrl || '';
   if (sessionState !== 'live') return '';
-  // TODO: Maybe it needs to come from configs in case of Summit or other events with different homepage/broadcast pages.
-  if (session.isLivestreamed) return '/max.html';
-  if (session.isOnline) return '/max/broadcast.html';
+  if (session.isLivestreamed) return getHomepagePath() || MAX_EVENT_PAGES.homepage;
+  if (session.isOnline) return getBroadcastPath() || MAX_EVENT_PAGES.broadcast;
   return '';
 }

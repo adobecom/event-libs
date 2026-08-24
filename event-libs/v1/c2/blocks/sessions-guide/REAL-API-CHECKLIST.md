@@ -110,14 +110,33 @@ has none.
 
 Known gaps in the real mapping (not blockers, just incomplete real-data coverage):
 - `resources[]` always `[]` — backend hasn't shipped this field yet.
-- `mrStreamId` always `null` — video/stream data is deliberately stripped from this public
-  endpoint until a session goes live; needs a different, likely time-gated/authenticated
-  fetch once that's designed.
+- `mrStreamId` always `null` — the catalog carries no attribute for it yet. It is the Mobile
+  Rider **live** stream id that `poller.js` keys on, authored in RainFocus and inbound as a new
+  attribute, tentatively named **`Mobilerider Live Stream ID`**. Mapping it in
+  `mapEslPayloadToRawSessions()` is the single change that turns stream polling on, so it stays
+  unmapped until the name is confirmed.
+
 - Sessions with multiple `sessionTimes` (recurring/repeated) only surface their earliest
   occurrence.
 - `CategoryBadge`'s icon set — `getTrackIcon()` has no built-in default map anymore (see
   `event-libs/v1/utils/tier-1-event-config.js`); every Track needs an authored
   `track-icon-config` entry to show a badge at all — a content/authoring task, not a code gap.
+
+### Video sources
+
+A session's video comes from one of **four** attributes, each its own player. These are
+alternatives, not a fallback chain — a session carries whichever it was produced for, so an
+empty field means "not this source", never "try another".
+
+| Attribute | Field | Player | State |
+|---|---|---|---|
+| `Mobilerider Live Stream ID` | `mrStreamId` | Mobile Rider **live** | inbound; name tentative |
+| `MPC ID` | `mpcId` | **Adobe Video TV** | mapped, unread |
+| `YouTube ID` | `youTubeId` | **YouTube** | mapped, unread |
+| `Mobilerider Video ID (DVR)` | `mrDvrVideoId` | Mobile Rider **post-stream recording**, gated by `DVR Timing (in hours)` | mapped, unread |
+
+`Skin ID` → `mrSkinId` is the Mobile Rider player skin, and applies only to the two Mobile
+Rider sources. All of the above are mapped ahead of the playback work and read by nothing yet.
 
 ---
 

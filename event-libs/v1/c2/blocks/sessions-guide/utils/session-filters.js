@@ -1,5 +1,5 @@
 import { getSessionDayKey, isSessionLive, isSessionUpcoming } from './time.js';
-import { deriveSessionState, isInLiveNow } from '../../../../utils/session-state.js';
+import { deriveSessionState, isInLiveNow, isDvrPending } from '../../../../utils/session-state.js';
 import { getTrackIcon, getOverrideTrackIcon, DEFAULT_ICON_COLOR } from '../../../../utils/tier-1-event-config.js';
 
 export function sessionsForDay(sessions, activeDay, userTz) {
@@ -16,9 +16,20 @@ export function groupByStartTime(sessions) {
   return [...map.entries()].sort(([a], [b]) => (a < b ? -1 : 1)).map(([, v]) => v);
 }
 
-// Digital Agenda Track badge/swimlane model — full case table in PLAN.md §16.2. In short:
-// an override, when present, always wins the lane and badge over the primary track; a
-// session with neither is excluded entirely (no "Other" bucket).
+// No session context, so never a count. Additional tracks draw from the same trackIcons map.
+export function resolveNamedTrackBadge(trackName) {
+  if (!trackName) return null;
+  const trackIcon = getTrackIcon(trackName);
+  return {
+    label: trackName,
+    icon: trackIcon?.icon || null,
+    color: trackIcon?.color || DEFAULT_ICON_COLOR,
+    count: 0,
+  };
+}
+
+// An override always wins the lane and badge over the primary track; a session with neither
+// is excluded entirely. Full case table in PLAN.md §16.2.
 export function resolveTrackBadge(session) {
   const hasPrimary = !!session.track;
   const hasOverride = !!session.trackOverride;
@@ -52,9 +63,8 @@ export function resolveTrackBadge(session) {
   };
 }
 
-// Places each session into every lane from resolveTrackBadge().swimlanes. swimlaneOrder
-// (authored [{ track, displayName, enabled }]) controls a lane's enabled state, display
-// name, and order; unlisted swimlanes stay enabled under their raw name, appended last.
+// swimlaneOrder controls a lane's enabled state, name and order; unlisted lanes stay
+// enabled under their raw name, appended last.
 export function groupByTrack(sessions, swimlaneOrder) {
   const map = new Map();
   for (const s of sessions) {
@@ -78,9 +88,15 @@ export function groupByTrack(sessions, swimlaneOrder) {
   );
 }
 
+// On Demand only: a scheduled slot is never surfaced as live, upcoming or previously aired.
+export function excludeOnDemandFormat(sessions) {
+  return sessions.filter((s) => !s.hasOnDemandFormat);
+}
+
 // Live Now section: MR sessions use poll status; non-MR sessions use time window.
 export function liveSessions(sessions, liveStreamActiveIds, activeDay, userTz, nowMs) {
   return sessions.filter((s) => {
+    if (s.hasOnDemandFormat) return false;
     if (getSessionDayKey(s, userTz) !== activeDay) return false;
     if (s.mrStreamId) return isInLiveNow(s, liveStreamActiveIds, nowMs);
     return isSessionLive(s, nowMs);
@@ -90,29 +106,28 @@ export function liveSessions(sessions, liveStreamActiveIds, activeDay, userTz, n
 // Upcoming sessions: MR sessions use poll status; non-MR use time window.
 export function upcomingSessions(sessions, liveStreamActiveIds, activeDay, userTz, nowMs) {
   return sessions.filter((s) => {
+    if (s.hasOnDemandFormat) return false;
     if (getSessionDayKey(s, userTz) !== activeDay) return false;
     if (s.mrStreamId) return deriveSessionState(s, liveStreamActiveIds, nowMs) === 'upcoming';
     return isSessionUpcoming(s, nowMs);
   });
 }
 
-// On-demand sessions: MR sessions use poll status; non-MR use time window.
-export function onDemandSessions(sessions, liveStreamActiveIds, nowMs) {
+// A pending DVR window holds a session back whichever way it qualified. eventStartMs is
+// passed in, keeping this module free of store imports.
+export function onDemandSessions(sessions, liveStreamActiveIds, nowMs, eventStartMs) {
   return sessions.filter((s) => {
+    if (isDvrPending(s, nowMs, eventStartMs)) return false;
+    if (s.hasOnDemandFormat) return true;
     if (s.mrStreamId) return deriveSessionState(s, liveStreamActiveIds, nowMs) === 'on-demand';
     return !isSessionLive(s, nowMs) && !isSessionUpcoming(s, nowMs);
   });
 }
 
-/**
- * Recommended sessions for the active day, shown in the live carousel when nothing is
- * live. When recommendedIds is non-empty, maps them to sessions on the active day in
- * authored order (max 3) — not the catalog's order, so
- * RecommendedSessionsEditor.js's reorder UI actually affects display order.
- * Falls back to a deterministic random selection of up to 3 day sessions when no ids configured.
- */
+// Shown in the live carousel when nothing is live. Authored order, not the catalog's, so the
+// configurator's reorder UI takes effect. Falls back to a deterministic pick of up to 3.
 export function getRecommendedSessions(sessions, recommendedIds, activeDay, userTz) {
-  const daySessions = sessionsForDay(sessions, activeDay, userTz);
+  const daySessions = excludeOnDemandFormat(sessionsForDay(sessions, activeDay, userTz));
 
   if (recommendedIds && recommendedIds.length > 0) {
     const daySessionsById = new Map(daySessions.map((s) => [s.id, s]));
@@ -122,13 +137,8 @@ export function getRecommendedSessions(sessions, recommendedIds, activeDay, user
   return deterministicShuffle(daySessions, activeDay).slice(0, 3);
 }
 
-/**
- * Recommended sessions for the on-demand view: same authored recommendedIds array as
- * getRecommendedSessions, in the same authored order, but ID-membership only — no
- * day-scoping (on-demand content isn't tied to a single event day) and no shuffle
- * fallback (nothing to show when nothing's authored, unlike the live carousel's need
- * to fill dead space when nothing's live).
- */
+// Same authored ids and order as getRecommendedSessions, but membership only: no day-scoping
+// and no shuffle fallback.
 export function getOnDemandRecommendedSessions(sessions, recommendedIds) {
   if (!recommendedIds || recommendedIds.length === 0) return [];
   const sessionsById = new Map(sessions.map((s) => [s.id, s]));
@@ -146,11 +156,8 @@ function deterministicShuffle(arr, seed) {
   return result;
 }
 
-// Every authored filter category's id is an ESP attributeId, resolved against
-// customAttributeValues. The flat-field fallback (session[categoryId]) is kept for any
-// category id that isn't attributeId-keyed, so a plain session field still works if one's
-// ever passed directly — nothing currently does, since the old hardcoded track/type
-// defaults were retired.
+// Category ids are ESP attributeIds, resolved against customAttributeValues. The flat-field
+// fallback covers a plain session field, though nothing passes one today.
 export function getFilterValue(session, categoryId) {
   const v = session.customAttributeValues?.[categoryId];
   return v !== undefined ? v : session[categoryId];

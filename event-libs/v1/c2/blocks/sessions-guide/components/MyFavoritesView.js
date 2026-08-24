@@ -2,7 +2,7 @@ import { html, useMemo, useEffect } from '../../../../deps/htm-preact.js';
 import { useSessionGuide } from '../store/index.js';
 import {
   sessions as sessionsSignal, favorited as favoritedSignal,
-  liveStreamActiveIds as liveStreamActiveIdsSignal, auth, sessionStateVersion,
+  liveStreamActiveIds as liveStreamActiveIdsSignal, auth, sessionStateVersion, getApiConfig,
 } from '../../../../utils/session-store.js';
 import { checkViewAccess } from '../../../../services/sessions/action-feedback.js';
 import { TimeSlotRow } from './TimeSlotRow.js';
@@ -30,6 +30,8 @@ export function MyFavoritesView() {
   // eslint-disable-next-line no-unused-expressions
   sessionStateVersion.value;
   const nowMs = getNowMs();
+  // What a DVR delay counts from — see isDvrPending().
+  const eventStartMs = getApiConfig()?.eventStartMs;
 
   // Logged-out/unregistered visitors never see this view's content — a toast fires and
   // they're bounced to a fallback view instead. Re-checked on every auth change, not just
@@ -54,7 +56,7 @@ export function MyFavoritesView() {
       const st = deriveSessionState(s, liveStreamActiveIds, nowMs);
       return st === 'upcoming';
     });
-    const onDemandRaw = onDemandSessions(dayFavorited, liveStreamActiveIds, nowMs);
+    const onDemandRaw = onDemandSessions(dayFavorited, liveStreamActiveIds, nowMs, eventStartMs);
 
     const filteredUpcomingSessions = filterSessions(activeAndUpcoming, activeFilters, searchQuery);
     return {
@@ -62,7 +64,7 @@ export function MyFavoritesView() {
       timeSlots: groupByStartTime(filteredUpcomingSessions),
       filteredOnDemand: filterSessions(onDemandRaw, activeFilters, searchQuery),
     };
-  }, [sessions, favorited, liveStreamActiveIds, activeDay, userTz, nowMs, activeFilters, searchQuery]);
+  }, [sessions, favorited, liveStreamActiveIds, activeDay, userTz, nowMs, activeFilters, searchQuery, eventStartMs]);
 
   const hasUpcoming = timeSlots.length > 0;
   const hasOnDemand = filteredOnDemand.length > 0;
@@ -82,7 +84,7 @@ export function MyFavoritesView() {
         <div class="sg-carousel-section sg-carousel-section--live">
           <${Carousel}
             sessions=${live}
-            title="Live now"
+            title="Live sessions"
             formatTime=${(s) => formatShortTime(s.startTimeUtc, userTz)}
             formatTimezone=${(s) => formatTimezoneAbbr(s.startTimeUtc, userTz)}
           />

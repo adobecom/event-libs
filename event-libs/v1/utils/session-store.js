@@ -19,26 +19,21 @@ export const favorited = signal(new Set());
 export const scheduled = signal(new Set());
 export const auth = signal({ isLoggedIn: null, isRegistered: undefined, userFirstName: null });
 export const pendingActions = signal(new Set());
-// Bumped only when a session's derived state (upcoming/live/on-demand) actually changes —
-// see session-state-ticker.js. Components read this purely to establish a re-render
-// dependency; the value itself carries no meaning beyond "something transitioned."
+// Bumped only when a derived session state changes. Read purely as a re-render dependency;
+// the value itself carries no meaning.
 export const sessionStateVersion = signal(0);
-// Set by openSessionGuideDetail() below; sessions-guide's DrawerShell subscribes to open
-// its detail view for the given session. A new object on every call (even repeat calls
-// for the same sessionId) so the signal always notifies.
+// A new object on every call, even for the same sessionId, so the signal always notifies.
 export const sessionGuideRequest = signal(null);
 
 let initialized = false;
 let apiConfig = null;
 let myDataAttempted = false;
-let hasLoggedImsStatus = false;
 let realAuthConfirmed = false;
 let rfAuthToken = null;
 let rfAuthTokenStarted = false;
 let rfAuthTokenSettled = false;
 
-// getEventServiceEnv() resolves dev/dev02/stage/stage02/prod/local; the media-relay
-// backend only has dev/stage/prod environments, so the finer-grained names collapse.
+// The media-relay backend only has dev/stage/prod, so the finer-grained envs collapse.
 function deriveMrEnv() {
   const env = getEventServiceEnv()?.name || 'dev';
   if (env.startsWith('stage')) return 'stage';
@@ -46,26 +41,15 @@ function deriveMrEnv() {
   return 'dev';
 }
 
-// Milo's own page env (see mobile-rider.js's getEnv() for the same pattern), not the
-// ESP-specific event-service-env — see STAGE_RF_API_URL in rainfocus.js for why this matters.
+// Milo's page env, not event-service-env — see STAGE_RF_API_URL in rainfocus.js.
 function defaultRfApiUrlForEnv() {
   const isProd = getEventConfig()?.miloConfig?.env?.name === 'prod';
   return isProd ? DEFAULT_RF_API_URL : STAGE_RF_API_URL;
 }
 
-// One-off diagnostic for live testing.
-function logImsLoginOnce() {
-  if (hasLoggedImsStatus || !auth.value.isLoggedIn) return;
-  hasLoggedImsStatus = true;
-  // eslint-disable-next-line no-console
-  console.log('[session-store] IMS login confirmed:', auth.value);
-}
-
-// Exchanges the real IMS profile's userId for an rfAuthToken (RF's jwt endpoint), so
-// myData/schedule/favorite calls are attributed to the real signed-in attendee. The real
-// response field is unconfirmed (northstar never called this endpoint) — tries the likely
-// candidates. Runs once; rfAuthTokenSettled (not rfAuthTokenStarted) gates maybeLoadMyData()
-// so it can't fire mid-exchange with a still-null token.
+// Exchanges the IMS userId for an rfAuthToken. The response field is unconfirmed, so the
+// likely candidates are tried. rfAuthTokenSettled gates maybeLoadMyData() so it can't fire
+// mid-exchange with a null token.
 async function exchangeRfAuthToken(clientId) {
   if (rfAuthTokenStarted) return;
   rfAuthTokenStarted = true;
@@ -80,9 +64,7 @@ async function exchangeRfAuthToken(clientId) {
   maybeLoadMyData();
 }
 
-// isRegistered isn't set here at all — rsvpData doesn't apply to T1 events; loadMyData()
-// derives it from RF's own loggedInUser field instead, once the jwt exchange and myData call
-// complete.
+// isRegistered is not set here: rsvpData doesn't apply to T1 events. loadMyData() derives it.
 function syncAuth() {
   const profile = BlockMediator.get('imsProfile');
   if (profile === undefined) return;
@@ -92,28 +74,23 @@ function syncAuth() {
     isLoggedIn: !!(profile && !profile.noProfile && profile.account_type !== 'guest'),
     userFirstName: profile?.first_name ?? null,
   };
-  logImsLoginOnce();
   if (auth.value.isLoggedIn && profile.userId) {
     exchangeRfAuthToken(profile.userId);
   } else {
-    // Not logged in, or logged in with no userId to exchange — either way, mark the
-    // exchange as settled so maybeLoadMyData() isn't blocked on it forever.
+    // Mark settled either way, so maybeLoadMyData() isn't blocked forever.
     rfAuthTokenSettled = true;
     maybeLoadMyData();
   }
 }
 
-// mySchedule[]/sessionInterests[] entries are RF's own objects, not bare ids — schedule
-// entries key on sessionTimeID (→ rfCode), favorite entries key on sessionID (→ rfSessionId).
+// RF's own objects, not bare ids: schedule keys on sessionTimeID, favorites on sessionID.
 function mapToSessionIds(entries, idField, matchField) {
   const idByRf = new Map(sessions.value.map((s) => [s[matchField], s.id]));
   return (entries || []).map((entry) => idByRf.get(entry[idField])).filter(Boolean);
 }
 
-// Populates scheduled/favorited from the real RF response, once the session catalog (needed
-// for mapToSessionIds()) has loaded. Also derives isRegistered from loggedInUser — the only
-// registration signal myData gives us (unconfirmed mapping, verify against a real unregistered
-// attendee).
+// Needs the catalog loaded for mapToSessionIds(). isRegistered comes from loggedInUser, the
+// only registration signal myData gives — mapping still unverified.
 async function loadMyData() {
   try {
     const data = await fetchMyData(rfAuthToken, apiConfig.profileId, apiConfig.apiUrl);
@@ -127,11 +104,8 @@ async function loadMyData() {
   }
 }
 
-// myData is a per-attendee schedule/favorites call — pointless (and liable to error or return
-// someone else's stale-looking empty state) for a logged-out visitor, unlike the ESL session
-// catalog, which loads for everyone regardless of auth. Waits for the jwt exchange to have
-// settled too, so it doesn't fire with a still-null rfAuthToken while that's in flight. Runs
-// once, whichever of catalog/auth/token resolves last.
+// Per-attendee, so it is skipped for a logged-out visitor, unlike the catalog. Runs once,
+// whichever of catalog/auth/token resolves last.
 function maybeLoadMyData() {
   if (myDataAttempted) return;
   if (sessionsStatus.value !== 'ready') return;
@@ -139,8 +113,7 @@ function maybeLoadMyData() {
   if (!rfAuthTokenSettled) return;
   myDataAttempted = true;
   if (!rfAuthToken) {
-    // myData can't succeed without a token — skip it rather than firing a call that's
-    // guaranteed to fail. isRegistered stays undefined (unknown), not asserted false.
+    // No token means guaranteed failure. isRegistered stays undefined, not false.
     window.lana?.log('[session-store] no RF auth token — skipping myData, registration status unknown');
     return;
   }
@@ -158,8 +131,7 @@ async function loadSessions() {
     });
     const mrSessions = sessions.value.filter((s) => s.mrStreamId);
     startPolling(mrSessions, apiConfig.mrEnv, (active) => { liveStreamActiveIds.value = active; });
-    // Unlike MR polling, this always runs — a page with only non-MR sessions still needs
-    // upcoming/live/on-demand transitions to happen without waiting for a user interaction.
+    // Always runs: non-MR sessions still need transitions without a user interaction.
     startSessionStateTicker(
       () => sessions.value,
       () => liveStreamActiveIds.value,
@@ -167,6 +139,12 @@ async function loadSessions() {
     );
     maybeLoadMyData();
   } catch (err) {
+    // eslint-disable-next-line no-console
+    console.error('[session-store] session catalog failed to load', {
+      eventId: apiConfig.eventId,
+      eventServiceEnv: getEventServiceEnv()?.name,
+      error: err,
+    });
     window.lana?.log(`[session-store] sessions fetch failed: ${err.message}`);
     sessionsStatus.value = 'error';
   }
@@ -176,11 +154,8 @@ export function getApiConfig() {
   return apiConfig;
 }
 
-// General-purpose entry point for any block to open Session Guide directly to a
-// session's detail view (e.g. a card click in Upcoming Sessions/Featured Sessions),
-// without duplicating Session Guide's internal drawer/URL logic. No-ops if the
-// sessions-guide block isn't authored/mounted on the current page — the caller is
-// expected to know it's present, same as it must for the session data itself.
+// Lets any block open Session Guide straight to a detail view. No-ops if the block isn't
+// mounted on the page.
 export function openSessionGuideDetail(sessionId) {
   sessionGuideRequest.value = { sessionId };
 }
@@ -197,26 +172,33 @@ function parseTierOneEventConfig() {
   }
 }
 
-// Idempotent — safe to call multiple times; no-ops after the first successful init and
-// when tier-1-event-config metadata is absent (mirrors the `event-id` gate decorateEvent
-// already uses for page-wide setup).
+// Idempotent; no-ops after the first success and when the metadata is absent.
 export function initSessionState() {
   if (initialized) return;
   const tierOneConfig = parseTierOneEventConfig();
-  if (!tierOneConfig) return;
+  if (!tierOneConfig) {
+    // eslint-disable-next-line no-console
+    console.warn('[session-store] initialization skipped: tier-1-event-config metadata is missing or invalid');
+    return;
+  }
   initialized = true;
 
   apiConfig = {
     apiUrl: tierOneConfig.rfApiUrl || defaultRfApiUrlForEnv(),
-    // tier-1-event-config's own eventId (stamped in by the Tier 1 Event Configurator at
-    // save time) is the real source of truth for which event's catalog to fetch — page
-    // `event-id` metadata is only a fallback for a config authored without one.
+    // The config's own eventId is the source of truth; page metadata is only a fallback.
     eventId: tierOneConfig.eventId || getMetadata('event-id'),
     profileId: tierOneConfig.rfProfileId || DEFAULT_RF_PROFILE_ID,
     registerUrl: tierOneConfig.registerUrl || '/register',
+    // UTC epoch ms. DVR availability counts from eventStartMs.
+    eventStartMs: tierOneConfig.eventStartDateTime || null,
     eventEndMs: tierOneConfig.eventEndDateTime || null,
     mrEnv: deriveMrEnv(),
   };
+
+  if (!apiConfig.eventId) {
+    // eslint-disable-next-line no-console
+    console.warn('[session-store] no event ID found; the session catalog request will not have a valid event key');
+  }
 
   mountToast();
   syncAuth();

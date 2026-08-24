@@ -7,8 +7,9 @@ import {
 } from '../../../../utils/session-store.js';
 import { toggleScheduleWithFeedback, toggleFavoriteWithFeedback } from '../../../../services/sessions/action-feedback.js';
 import { IconPlay, IconCalendarCheck, IconCalendarPlus, IconHeartFilled, IconHeartOutline } from './icons.js';
-import { setSessionParam, clearSessionParams, safeUrl, isSamePage } from '../utils/url.js';
+import { setSessionParam, sessionParamValue, clearSessionParams, safeUrl, isSamePage } from '../utils/url.js';
 import { CategoryBadge } from './CategoryBadge.js';
+import { scrollBehavior } from '../utils/motion.js';
 import { getTrackIcon } from '../../../../utils/tier-1-event-config.js';
 import { isBehaviorEnabled } from '../utils/behavior-flags.js';
 
@@ -42,6 +43,14 @@ export function LiveCard({ session, variant = 'live' }) {
   const startTime = formatShortTime(session.startTimeUtc, userTz);
   const endTime = session.endTimeUtc ? formatShortTime(session.endTimeUtc, userTz) : '';
   const timeRange = endTime ? `${startTime} – ${endTime}` : startTime;
+  // The meta row's second slot is shared. An upcoming Recommended card states its time
+  // there; every other card badges its first additional event-site track instead, so live
+  // and past Recommended cards get the same two-badge treatment. A live card never needs the
+  // time (it has a progress bar and remaining duration), and a start time says nothing once a
+  // session is on demand. Only the first additional track is used — the ESP field is
+  // multi-select but the badge model supports one (see resolveTrackBadge).
+  const showTime = variant === 'recommended' && sessionState === 'upcoming';
+  const secondTrack = showTime ? undefined : (session.additionalTracks || [])[0];
 
   const cardClass = [
     'sg-live-card',
@@ -69,7 +78,7 @@ export function LiveCard({ session, variant = 'live' }) {
     if (isSamePage(watchHref)) {
       dispatch({ type: 'CLOSE_DRAWER' });
       history.pushState({}, '', clearSessionParams());
-      window.scrollTo({ top: 0, behavior: 'smooth' });
+      window.scrollTo({ top: 0, behavior: scrollBehavior() });
       return;
     }
     window.location.href = watchHref;
@@ -101,9 +110,7 @@ export function LiveCard({ session, variant = 'live' }) {
   function handleCardClick() {
     if (surface !== 'widget') return;
     dispatch({ type: 'SET_ACTIVE_SESSION', sessionId: session.id });
-    const slug = session.slug || session.id;
-    const rfCode = session.rfCode || session.id;
-    history.pushState({}, '', setSessionParam(`${slug}-${rfCode}`));
+    history.pushState({}, '', setSessionParam(sessionParamValue(session)));
   }
 
   return html`
@@ -122,9 +129,12 @@ export function LiveCard({ session, variant = 'live' }) {
       <div class="sg-live-card__body">
         <div class="sg-live-card__meta">
           <div class="sg-live-card__track-row">
-            ${html`<${CategoryBadge} session=${session} />`}
+            ${html`<${CategoryBadge} session=${session} hideCount=${!!secondTrack} />`}
           </div>
-          <p class="sg-live-card__time">${timeRange}</p>
+          ${secondTrack && html`<span class="sg-live-card__track-extra">
+            <${CategoryBadge} track=${secondTrack} />
+          </span>`}
+          ${showTime && html`<p class="sg-live-card__time">${timeRange}</p>`}
         </div>
         ${surface === 'widget'
     ? html`<button
@@ -140,7 +150,7 @@ export function LiveCard({ session, variant = 'live' }) {
           ${schedulingEnabled && html`<button
             class=${'sg-live-card__btn sg-live-card__btn--schedule' + (isScheduled ? ' is-scheduled' : '') + (isPending ? ' is-pending' : '')}
             onclick=${handleSchedule}
-            aria-label=${isScheduled ? 'Remove from schedule' : 'Add to schedule'}
+            aria-label=${isScheduled ? `Remove ${session.title} from schedule` : `Add ${session.title} to schedule`}
             aria-pressed=${String(isScheduled)}
             disabled=${isPending}
             daa-ll=${isScheduled ? 'Remove-from-Schedule' : 'Add-to-Schedule'}
@@ -149,13 +159,12 @@ export function LiveCard({ session, variant = 'live' }) {
           ${favoritingEnabled && html`<button
             class=${'sg-live-card__btn sg-live-card__btn--favorite' + (isFavorited ? ' is-favorited' : '') + (isPending ? ' is-pending' : '')}
             onclick=${handleFavorite}
-            aria-label=${isFavorited ? 'Remove from favorites' : 'Add to favorites'}
+            aria-label=${isFavorited ? `Remove ${session.title} from favorites` : `Add ${session.title} to favorites`}
             aria-pressed=${String(isFavorited)}
             disabled=${isPending}
             daa-ll=${isFavorited ? 'Remove-from-Favorites' : 'Add-to-Favorites'}
             type="button"
-          >${isFavorited ? html`<${IconHeartFilled} />` : html`<${IconHeartOutline} />`
-          }<span class="sg-live-card__btn-label">${isFavorited ? 'Favorited' : 'Favorite'}</span></button>`}
+          >${isFavorited ? html`<${IconHeartFilled} />` : html`<${IconHeartOutline} />`}</button>`}
         </div>
       </div>
     </div>

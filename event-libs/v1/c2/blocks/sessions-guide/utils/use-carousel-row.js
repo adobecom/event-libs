@@ -13,7 +13,10 @@ export function useCarouselRow(sessions, cardStateKey) {
   const allDismissing = sessions?.every((s) => dismissingIds.has(s.id)) || false;
 
   const [offset, setOffset] = useState(0);
-  const [{ tx, showNext }, setMeasure] = useState({ tx: 0, showNext: false });
+  // lastVisible is the index of the last card fully inside the viewport. Cards outside
+  // [offset, lastVisible] are translated out of a clipped viewport, so the rows mark them
+  // `inert` — otherwise Tab moves focus onto cards the user cannot see.
+  const [{ tx, showNext, lastVisible }, setMeasure] = useState({ tx: 0, showNext: false, lastVisible: Infinity });
   const stripRef = useRef(null);
   const viewportRef = useRef(null);
   const rowRef = useRef(null);
@@ -60,10 +63,32 @@ export function useCarouselRow(sessions, cardStateKey) {
     // so its action buttons stay reachable when the viewport is tight.
     const HOVER_CARD_WIDTH = 427;
     const effectiveTotal = totalWidth - cards[cards.length - 1].offsetWidth + HOVER_CARD_WIDTH;
-    setMeasure({ tx: newTx, showNext: effectiveTotal - newTx > viewport.offsetWidth + 1 });
+
+    let used = 0;
+    let last = offset;
+    for (let i = offset; i < cards.length; i += 1) {
+      used += cards[i].offsetWidth + (i > offset ? gap : 0);
+      if (used > viewport.offsetWidth + 1) break;
+      last = i;
+    }
+
+    setMeasure({
+      tx: newTx,
+      showNext: effectiveTotal - newTx > viewport.offsetWidth + 1,
+      lastVisible: last,
+    });
   }, [offset, cardStateKey]);
 
   return {
-    dismissingIds, allDismissing, offset, setOffset, tx, showNext, stripRef, viewportRef, rowRef,
+    dismissingIds,
+    allDismissing,
+    offset,
+    setOffset,
+    tx,
+    showNext,
+    lastVisible,
+    stripRef,
+    viewportRef,
+    rowRef,
   };
 }
