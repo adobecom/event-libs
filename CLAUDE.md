@@ -159,8 +159,27 @@ Project-specific slash commands:
 - `/simplify` — review changed code for redundancy and reuse opportunities before committing
 - `/commit` — generates a correctly formatted commit message; use instead of writing manually
 - `/build-block-from-figma` — build a new event-libs block from Figma designs; reads Figma frames, generates JS/CSS under `event-libs/v1/blocks/`, registers in `EVENT_BLOCKS`, scaffolds a WTR test, then runs Playwright visual comparison, axe-core accessibility audit, and Lighthouse performance audit. **Requires:** Figma MCP, Playwright MCP. **Prompts for:** preview URL (localhost:3868), Figma frame URLs per viewport.
+- `/event-a11y` — WCAG 2.1 AA accessibility workflow for event-libs blocks, in three modes: **audit** (severity-ranked report, no edits), **fix** (targeted changes), or **add** (instrument a bare block). Static source review against a per-element checklist plus an ARIA pattern guide; ends with lint + unit-test verification. Ported from `adobecom/unity`'s `unity-a11y` — see [.claude/skills/event-a11y/README.md](.claude/skills/event-a11y/README.md) for what was adapted. Complements the runtime axe-core audit inside `/build-block-from-figma`.
 - `/event-libs-a11y` — audit, fix, or add WCAG 2.1 AA accessibility for event-libs blocks, features, and utilities, with repo-specific DOM patterns, scoped changes, targeted verification, and structured reports.
 - `/event-libs-preact-a11y` — audit, fix, or add accessibility for Preact/HTM components such as the sessions guide, including Context/Signals state, reactive ARIA, portals, focus lifecycle, and test-layer limitations.
+
+### Accessibility
+
+Complementary tools — they catch different things:
+
+- **`/event-a11y`** — static review of the source (semantics, accessible names, ARIA state,
+  keyboard/focus, reading order, ownership of authored content). Catches what a rendered scan
+  can't see, like `aria-pressed` that's never updated on the async `BlockMediator` path.
+- **`/event-libs-a11y`** and **`/event-libs-preact-a11y`** — the same ground, but keyed to this
+  repo's own patterns: `createTag` DOM for the first, and Context/Signals/portals/focus
+  lifecycle for Preact components like the sessions guide for the second.
+- **axe-core agent** in `/build-block-from-figma` — runtime scan of the rendered page via
+  Playwright. Catches computed contrast and focus visibility, which static review can't settle.
+  The unit suite also scans leaf components via `test/unit/helpers/a11y.js`.
+
+⚠️ `npm run lint:css` only globs `event-libs/v1/blocks/**/*.css` and `event-libs/v1/styles/*.css`
+— it does **not** cover `event-libs/v1/c2/blocks/`. Lint C2 block CSS directly:
+`npx stylelint event-libs/v1/c2/blocks/<name>/<name>.css`.
 
 ### Linting
 

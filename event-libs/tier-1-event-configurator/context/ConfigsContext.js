@@ -1,12 +1,14 @@
 import {
-  createContext, useState, useContext, useCallback, useEffect, html,
+  createContext, useState, useContext, useCallback, useEffect, useRef, html,
 } from '../../v1/deps/htm-preact.js';
 import {
   getConfigs,
   upsertConfig as upsertConfigController,
   deleteConfig as deleteConfigController,
 } from '../scripts/da-controller.js';
+import { getEventSessionCatalog } from '../../v1/utils/esp-controller.js';
 import { useDA } from './DAContext.js';
+import { useEventEnv } from './EventEnvContext.js';
 import { getDisplayTitle } from '../utils.js';
 import { CONFIG_TYPES, HOMEPAGE_SESSION_FIELDS, isHomepageConfigType } from '../constants.js';
 
@@ -40,6 +42,34 @@ function emptyConfig(configType = CONFIG_TYPES.GLOBAL) {
 
 const ConfigsProvider = ({ children }) => {
   const { org, repo } = useDA();
+  const { envName, setEnv } = useEventEnv();
+
+  // Shared by Library.js (prefetching every Homepage row up front) and ConfigEditor.js
+  // (loading the active row's sessions) so opening a row for edit right after Library
+  // already warmed its catalog doesn't re-hit ESP for data that's already in hand.
+  // Keyed by (eventId, env) — a row's config type doesn't affect what session-catalog data
+  // comes back for its event.
+  const sessionCatalogCache = useRef(new Map());
+  const getSessionCatalogForRow = useCallback((row) => {
+    const key = `${row.eventId}:${row.eventServiceEnv || 'prod'}`;
+    let promise = sessionCatalogCache.current.get(key);
+    if (!promise) {
+      // getEventSessionCatalog reads the ESP env from this shared global override, not from
+      // an argument — flip it to the row's own authored env for the fetch, then restore
+      // whatever the caller had active, mirroring Library.js's per-row env switch on Edit.
+      promise = (async () => {
+        const currentEnv = envName;
+        setEnv(row.eventServiceEnv || 'prod');
+        try {
+          return await getEventSessionCatalog(row.eventId);
+        } finally {
+          setEnv(currentEnv);
+        }
+      })();
+      sessionCatalogCache.current.set(key, promise);
+    }
+    return promise;
+  }, [envName, setEnv]);
 
   const [configs, setConfigs] = useState([]);
   const [isInitialLoading, setIsInitialLoading] = useState(false);
@@ -286,6 +316,7 @@ const ConfigsProvider = ({ children }) => {
     updateConfigField,
     saveActiveConfig,
     removeConfig,
+    getSessionCatalogForRow,
   };
 
   return html`

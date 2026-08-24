@@ -205,6 +205,32 @@ export async function copyLinkToClipboard(url, text) {
   }
 }
 
+// Builds the shareable Homepage config link for `row` and copies it to the clipboard — the
+// single implementation ConfigEditor.js's "Copy Link" button and Library.js's per-row
+// "Copy Link" action both call, so a link copied from either place is built identically.
+// `sessions`/`sessionTimes` are the row's event's live ESP session catalog (Library.js fetches
+// it on demand since it doesn't keep one loaded per row the way ConfigEditor does for the
+// single active config).
+export async function copyHomepageConfigLink(org, repo, row, homepageMeta, sessions, sessionTimes) {
+  const sessionsById = new Map((sessions || []).map((s) => [s.sessionId, s]));
+  const metaById = row.config[homepageMeta.metaField] || {};
+  const entries = (row.config[homepageMeta.field] || [])
+    .filter((id) => sessionsById.has(id))
+    .map((id) => buildSessionAuthorEntry(sessionsById.get(id), sessionTimes, metaById[id]));
+  const heading = homepageMeta.headingField
+    ? (row.config[homepageMeta.headingField] || homepageMeta.label)
+    : undefined;
+  const theme = homepageMeta.themeField
+    ? (row.config[homepageMeta.themeField] || 'light')
+    : undefined;
+  const url = buildHomepageConfigURL(org, repo, row.configType, row.eventId, heading, theme, entries);
+  const formattedDate = new Date().toLocaleString('en-US', {
+    weekday: 'long', month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit',
+  });
+  const linkText = `${homepageMeta.linkPrefix}: ${getDisplayTitle(row)} – ${formattedDate}`;
+  return copyLinkToClipboard(url, linkText);
+}
+
 // Converts a "YYYY-MM-DDTHH:mm" <input type="datetime-local"> value, interpreted as wall-clock
 // time in `timeZone`, to a UTC epoch in milliseconds. Two-pass: the first pass's offset is
 // itself computed from a UTC guess, so a DST boundary right at the entered instant could be

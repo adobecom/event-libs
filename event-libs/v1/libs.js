@@ -10,6 +10,7 @@ const EVENT_BLOCKS = [
   'event-schema',
   'event-subscription-form',
   'events-form',
+  'grid-column',
   'mobile-rider',
   'preview-bar',
   'profile-cards',
@@ -27,11 +28,16 @@ const EVENT_BLOCKS_C2 = [
   'upcoming-sessions',
   'featured-sessions',
   'chrono-box',
+  'grid-column',
   'mobile-rider',
   'event-marquee',
   'sessions-guide',
   'sessions-guide-full-page',
   'session-state-demo',
+  'event-session-details',
+  'event-featured-products',
+  'event-speakers',
+  'event-session-resources',
 ];
 
 // Import only the most essential utilities that are always needed
@@ -53,7 +59,6 @@ import {
   getNonProdData,
   validatePageAndRedirect,
   processAutoBlockLinks,
-  applySectionColumnsLayout,
 } from './utils/decorate.js';
 
 import { registerHydrator } from './hydrate/hydrate.js';
@@ -72,7 +77,6 @@ export {
   getNonProdData,
   validatePageAndRedirect,
   processAutoBlockLinks,
-  applySectionColumnsLayout,
   registerHydrator,
   repeatTemplate,
   EVENT_BLOCKS,
