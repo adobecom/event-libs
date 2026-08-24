@@ -921,7 +921,8 @@ Key rules, not obvious from the table alone:
   bucket — every session sharing the exact same free-text value lands in the same lane;
   different text values get separate lanes.
 - **Additional Event Site Tracks only ever supports one value** (confirmed with Daniel) —
-  `resolveTrackBadge` defensively caps it at 1 (`.slice(0, 1)`) even though the ESP field
+  `resolveTrackBadge` caps it at 1 (`.slice(0, 1)`) — confirmed correct, not defensive: the
+  field was only ever meant to hold one value, even though the ESP field
   is multi-select, so the badge is always a plain "+1", never "+N".
 - Icon/color for an override lane come from `getOverrideTrackIcon(overrideText)`
   (`tier-1-event-config.js`) — a **per-override-text map** (`overrideTrackIcons`) checked
@@ -936,7 +937,9 @@ Key rules, not obvious from the table alone:
 ### 16.3 Swimlane placement + ordering — `groupByTrack(sessions, swimlaneOrder)` ✅
 
 Rewritten from single-track-keyed grouping to placing a session into one swimlane per
-`resolveTrackBadge().swimlanes` entry, skipping sessions `resolveTrackBadge()` excludes.
+`resolveSwimlanes()` entry. A session with no primary track and no override gets **no badge**
+but is still laned by its additional track if it has one (PM answer, 2026-08-24); only a session
+with no track of any kind is left out of every lane.
 Second param is the Session Guide Configurator's authored `swimlaneOrder` (item 12) —
 listed tracks sort first in authored order, unlisted tracks follow in first-seen order.
 Wired into `OnDemandView.js`/`MySessionsView.js`/`MyFavoritesView.js` via

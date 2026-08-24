@@ -59,16 +59,23 @@ and Recommended — unconditionally, whatever else its Format or `Livestreamed C
 `getWatchDestination()`). There is no derived "is there video" flag in between — callers read
 the three Format booleans directly.
 
-### isMissingFormat and the drop log
+### The two catalog drops, and reporting them
 
-No Format value says nothing about how a session can be watched, so there is no view it can be
-placed in and it is dropped from the catalog outright rather than filtered per view — one rule
-for every view, day tab and deep link.
+Two rules remove a session from the catalog entirely rather than filtering it per view, so one
+rule covers every view, day tab and deep link. Both are confirmed intended (PM, 2026-08-24):
 
-Dropping is intentional, but the session then appears nowhere, so the removal is logged with
-each row's `sessionCode` and title alongside its id: the id alone isn't searchable in RainFocus.
-The count is always exact; the enumeration is capped at `DROP_LOG_LIMIT` with a `+N more`
-suffix so a wholesale authoring failure can't emit an unbounded log line.
+- **no `Format` value** — says nothing about how the session can be watched, so there is no view
+  it can be placed in
+- **in-person only** — no digital way to watch at all
+
+Both are reported by `reportDroppedSessions()`. `lana` gets the count and a capped enumeration in
+every env; **below prod each row is also `console.warn`ed with the rule that removed it**, which
+is what an author needs to go and fix the row. Each row is named by `sessionCode` and title as
+well as id, because the id alone isn't searchable in RainFocus. The count is always exact; the
+enumeration is capped at `DROP_LOG_LIMIT` so a wholesale authoring failure can't flood the log.
+
+`isProd` is an injectable parameter with a `getEventConfig()` default, matching
+`sessionPageUrlForEnv()` in the same file, so the env branch is testable without mocking config.
 
 ### Attribute name fallbacks
 
@@ -107,25 +114,6 @@ The attribute's own id is also its key in `customAttributeValues`, which is how 
 identifies the product filter category — it badges product icons *there only*, because
 `Illustrator` is both a product and an `Audience` job role and matching on the value alone would
 badge the wrong pills.
-
-### IGNORED_ATTRIBUTE_NAMES
-
-Attributes the catalog sends that the guide must never surface. `Gated Video` is confirmed
-unused for MAX 26: it still arrives on some sessions, but nothing may key off it.
-
-Two paths pick attributes up generically, on nothing more than being an enabled single/multi
-select with `valueId`s, so both consult this list:
-
-- `deriveFacetableAttributes()` — offers filter categories to the Session Guide Configurator,
-  and new facets seed `enabled: true`, so an ignored attribute would otherwise reach the panel
-  unless an author noticed and switched it off.
-- `buildCustomAttributeValueMap()` — feeds `customAttributeValues`, which the runtime filters
-  read via `getFilterValue()`.
-
-Matched on `name`, not `attributeId` — the id is per-event and wouldn't travel.
-
-Adding a name here is also the mechanism for keeping any other plainly-internal attribute out
-of the filter panel, instead of disabling it by hand per event.
 
 ### deriveFacetableAttributes
 

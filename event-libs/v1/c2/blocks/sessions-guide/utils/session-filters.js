@@ -28,13 +28,23 @@ export function resolveNamedTrackBadge(trackName) {
   };
 }
 
+// ESP set the field up as multi-select, but it was only ever meant to hold one value.
+const additionalTracksOf = (session) => (session.additionalTracks || []).slice(0, 1);
+
+// Lanes a session belongs in, which is not the same question as what badge it gets: with no
+// primary track and no override it gets no badge, but its additional track still places it.
+export function resolveSwimlanes(session) {
+  const badge = resolveTrackBadge(session);
+  if (badge) return badge.swimlanes;
+  return additionalTracksOf(session);
+}
+
 // An override always wins the lane and badge over the primary track; a session with neither
-// is excluded entirely. Full case table in PLAN.md §16.2.
+// gets no badge at all. Full case table in PLAN.md §16.2.
 export function resolveTrackBadge(session) {
   const hasPrimary = !!session.track;
   const hasOverride = !!session.trackOverride;
-  // Only one additional track is supported even though the ESP field is multi-select.
-  const additional = (session.additionalTracks || []).slice(0, 1);
+  const additional = additionalTracksOf(session);
 
   if (!hasPrimary && !hasOverride) return null;
 
@@ -68,9 +78,7 @@ export function resolveTrackBadge(session) {
 export function groupByTrack(sessions, swimlaneOrder) {
   const map = new Map();
   for (const s of sessions) {
-    const badge = resolveTrackBadge(s);
-    if (!badge) continue;
-    badge.swimlanes.forEach((track) => {
+    resolveSwimlanes(s).forEach((track) => {
       if (!map.has(track)) map.set(track, []);
       map.get(track).push(s);
     });

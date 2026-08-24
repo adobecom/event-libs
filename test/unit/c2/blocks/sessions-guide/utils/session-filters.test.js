@@ -1,6 +1,6 @@
 import { expect } from '@esm-bundle/chai';
 import {
-  sessionsForDay, groupByStartTime, groupByTrack, resolveTrackBadge,
+  sessionsForDay, groupByStartTime, groupByTrack, resolveTrackBadge, resolveSwimlanes,
   liveSessions, upcomingSessions, onDemandSessions, getRecommendedSessions,
   getOnDemandRecommendedSessions, getFilterValue, filterSessions, excludeOnDemandFormat,
 } from '../../../../../../event-libs/v1/c2/blocks/sessions-guide/utils/session-filters.js';
@@ -437,6 +437,32 @@ describe('session-filters/resolveTrackBadge', () => {
 
   it('returns null when there is no primary track and no override', () => {
     expect(resolveTrackBadge({ id: 's-1', track: '', trackOverride: '', additionalTracks: [] })).to.be.null;
+  });
+
+  // A session with no primary track and no override gets no badge, but an additional track
+  // still places it in that lane -- badge and lane are separate questions.
+  it('gives no badge with neither a primary track nor an override, even with an additional', () => {
+    const session = { id: 's-1', track: '', trackOverride: '', additionalTracks: ['Video'] };
+    expect(resolveTrackBadge(session)).to.be.null;
+    expect(resolveSwimlanes(session)).to.deep.equal(['Video']);
+  });
+
+  it('places a badge-less session in its additional track lane', () => {
+    const session = { id: 's-1', track: '', trackOverride: '', additionalTracks: ['Video'] };
+    const lanes = groupByTrack([session]);
+    expect(lanes.map(([track]) => track)).to.deep.equal(['Video']);
+    expect(lanes[0][1]).to.deep.equal([session]);
+  });
+
+  it('leaves a session with no track of any kind out of every lane', () => {
+    const session = { id: 's-1', track: '', trackOverride: '', additionalTracks: [] };
+    expect(resolveSwimlanes(session)).to.deep.equal([]);
+    expect(groupByTrack([session])).to.deep.equal([]);
+  });
+
+  it('still caps additional tracks at one, since the field was meant to be single-valued', () => {
+    const session = { id: 's-1', track: '', trackOverride: '', additionalTracks: ['Video', 'Design'] };
+    expect(resolveSwimlanes(session)).to.deep.equal(['Video']);
   });
 });
 

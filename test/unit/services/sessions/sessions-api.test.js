@@ -5,7 +5,7 @@ import {
   ENFORCE_PUBLISHED_FILTER,
   getSessionProducts, extractDistinctProducts, getProductAttributeId, sessionPageUrlForEnv, parseDvrDelayHours,
   getSessionAdditionalTracks, extractDistinctAllTracks, deriveFacetableAttributes,
-  IGNORED_ATTRIBUTE_NAMES,
+  reportDroppedSessions,
 } from '../../../../event-libs/v1/services/sessions/sessions-api.js';
 
 function customAttr(name, values) {
@@ -515,105 +515,157 @@ describe('services/sessions/sessions-api', () => {
 
   // The attribute is expected but not shipped. The read is wired up ahead of it, so it must
   // yield [] today and pick the values up the moment either casing appears.
-  // Confirmed unused for MAX 26: the catalog still sends it, but nothing may key off it, so
-  // neither generic path that picks attributes up on its own is allowed to surface it.
-  // Four sources, four attributes, four players. A session carries whichever it was produced
-  // for, so these are alternatives rather than a fallback chain -- no field may be read as a
-  // stand-in for another.
-  describe('video source ids', () => {
-    const withAttrs = (attrs) => mapEslPayloadToRawSessions({
-      speakers: [],
-      sessionTimes: [],
-      sessions: [{ sessionId: 's-1', sessionCode: 'S1', customAttributes: [ONLINE_FORMAT, ...attrs] }],
-    })[0];
+  // Both drops hide a session from every view, so both have to be reported, and below prod
+  // each one has to say which rule removed it.
+  // Now the only thing deciding which facets the configurator offers as filter categories --
+  // the hardcoded ignore list was removed once the session guide config became the gate.
+  describe('deriveFacetableAttributes', () => {
+    const attr = (name, id, inputType, values, extra = {}) => ({
+      name, attributeId: id, label: name, inputType, values, ...extra,
+    });
+    const val = (label, valueId, ordinal = 0) => ({ label, value: label.toLowerCase(), valueId, ordinal });
 
-    it('maps each VOD source to its own field', () => {
-      const s1 = withAttrs([
-        customAttr('MPC ID', [textValue('3458902')]),
-        customAttr('YouTube ID', [textValue('O7z5ufUh8hc')]),
-        customAttr('Mobilerider Video ID (DVR)', [textValue('ubKVqWmTT5')]),
-        customAttr('Skin ID', [textValue('adobe')]),
+    it('returns one entry per attribute, with its distinct values', () => {
+      const facets = deriveFacetableAttributes([
+        { customAttributes: [attr('Track', 'track-id', 'multi-select', [val('Photography', 'p-id')])] },
+        { customAttributes: [attr('Track', 'track-id', 'multi-select', [val('Branding', 'b-id')])] },
       ]);
-      expect(s1.mpcId).to.equal('3458902');
-      expect(s1.youTubeId).to.equal('O7z5ufUh8hc');
-      expect(s1.mrDvrVideoId).to.equal('ubKVqWmTT5');
-      expect(s1.mrSkinId).to.equal('adobe');
+      expect(facets).to.have.lengthOf(1);
+      expect(facets[0].attributeId).to.equal('track-id');
+      expect(facets[0].values.map((v) => v.label)).to.have.members(['Photography', 'Branding']);
     });
 
-    it('leaves the other sources empty when only one is authored', () => {
-      const onlyYt = withAttrs([customAttr('YouTube ID', [textValue('O7z5ufUh8hc')])]);
-      expect(onlyYt.youTubeId).to.equal('O7z5ufUh8hc');
-      expect(onlyYt.mpcId).to.equal('');
-      expect(onlyYt.mrDvrVideoId).to.equal('');
+    it('counts how many sessions carry each value', () => {
+      const facets = deriveFacetableAttributes([
+        { customAttributes: [attr('Track', 't', 'multi-select', [val('Photography', 'p')])] },
+        { customAttributes: [attr('Track', 't', 'multi-select', [val('Photography', 'p')])] },
+      ]);
+      expect(facets[0].values[0].count).to.equal(2);
     });
 
-    it('never borrows one id for another, and never for the live stream', () => {
-      const onlyMpc = withAttrs([customAttr('MPC ID', [textValue('3458902')])]);
-      expect(onlyMpc.youTubeId).to.equal('');
-      expect(onlyMpc.mrDvrVideoId).to.equal('');
-      // The live id has its own attribute, still inbound -- MPC is not a stand-in for it.
-      expect(normalizeSessions([onlyMpc])[0].mrStreamId).to.be.null;
+    it('sorts values by ordinal, not by first appearance', () => {
+      const facets = deriveFacetableAttributes([{
+        customAttributes: [attr('Track', 't', 'multi-select', [val('Second', 's', 2), val('First', 'f', 1)])],
+      }]);
+      expect(facets[0].values.map((v) => v.label)).to.deep.equal(['First', 'Second']);
     });
 
-    it('carries every id through normalizeSessions, defaulting to empty', () => {
-      const bare = normalizeSessions([withAttrs([])])[0];
-      expect(bare.mpcId).to.equal('');
-      expect(bare.youTubeId).to.equal('');
-      expect(bare.mrDvrVideoId).to.equal('');
-      const full = normalizeSessions([withAttrs([
-        customAttr('MPC ID', [textValue('3458902')]),
-        customAttr('YouTube ID', [textValue('O7z5ufUh8hc')]),
-      ])])[0];
-      expect(full.mpcId).to.equal('3458902');
-      expect(full.youTubeId).to.equal('O7z5ufUh8hc');
+    // The three guards that mirror ESP's own /session-facets endpoint.
+    it('skips a disabled attribute', () => {
+      const facets = deriveFacetableAttributes([{
+        customAttributes: [attr('Track', 't', 'multi-select', [val('Photography', 'p')], { enabled: false })],
+      }]);
+      expect(facets).to.deep.equal([]);
+    });
+
+    it('skips free-text attributes, which are not indexable', () => {
+      const facets = deriveFacetableAttributes([{
+        customAttributes: [attr('MPC ID', 'mpc', 'text', [{ value: '3458902', _ordinal: null }])],
+      }]);
+      expect(facets).to.deep.equal([]);
+    });
+
+    it('skips a value with no valueId', () => {
+      const facets = deriveFacetableAttributes([{
+        customAttributes: [attr('Track', 't', 'multi-select', [{ label: 'No id', value: 'no-id' }])],
+      }]);
+      expect(facets[0].values).to.deep.equal([]);
+    });
+
+    it('is empty for no sessions at all', () => {
+      expect(deriveFacetableAttributes([])).to.deep.equal([]);
+      expect(deriveFacetableAttributes(undefined)).to.deep.equal([]);
+    });
+
+    // Nothing is excluded by name any more, so an internal-looking attribute still appears --
+    // the config is what keeps it off the panel.
+    it('offers every qualifying attribute, including internal-looking ones', () => {
+      const facets = deriveFacetableAttributes([{
+        customAttributes: [
+          attr('Track', 't', 'multi-select', [val('Photography', 'p')]),
+          attr('Gated Video', 'g', 'single-select', [val('Yes', 'y')]),
+        ],
+      }]);
+      expect(facets.map((f) => f.attributeId)).to.have.members(['t', 'g']);
     });
   });
 
-  describe('ignored attributes', () => {
-    const GATED = {
-      name: 'Gated Video',
-      attributeId: 'gated-attr-id',
-      inputType: 'single-select',
-      values: [{ valueId: 'yes-id', label: 'Yes', value: 'yes', ordinal: 0 }],
-    };
-    const KEPT = {
-      name: 'Category',
-      attributeId: 'category-attr-id',
-      inputType: 'single-select',
-      values: [{ valueId: 'tl-id', label: 'Thought Leadership', value: 'thought-leadership', ordinal: 0 }],
-    };
-    const payload = {
-      speakers: [],
-      sessionTimes: [],
-      sessions: [{ sessionId: 's-1', sessionCode: 'S1', customAttributes: [ONLINE_FORMAT, GATED, KEPT] }],
-    };
+  describe('drop reporting', () => {
+    const IN_PERSON = customAttr('Format', [selectValue('In-Person', 'in-person')]);
 
-    it('names Gated Video as ignored', () => {
-      expect(IGNORED_ATTRIBUTE_NAMES).to.include('Gated Video');
+    // The env is injected rather than mocked, the same shape sessionPageUrlForEnv uses.
+    function capture(run) {
+      const logged = [];
+      const warned = [];
+      const originalLana = window.lana;
+      const originalWarn = console.warn;
+      window.lana = { log: (m) => logged.push(m) };
+      console.warn = (...args) => warned.push(args);
+      try {
+        run();
+      } finally {
+        window.lana = originalLana;
+        console.warn = originalWarn;
+      }
+      return { lana: logged.join('\n'), warned };
+    }
+
+    const viaMapper = (sessions) => capture(
+      () => mapEslPayloadToRawSessions({ speakers: [], sessionTimes: [], sessions }),
+    );
+
+    const ROWS = [
+      { sessionId: 'no-fmt', sessionCode: 'NF1', enTitle: 'No Format Row', customAttributes: [] },
+      { sessionId: 'in-person', sessionCode: 'IP1', enTitle: 'In Person Row', customAttributes: [IN_PERSON] },
+      { sessionId: 'keeper', sessionCode: 'K1', enTitle: 'Keeper', customAttributes: [ONLINE_FORMAT] },
+    ];
+
+    it('drops both the Format-less and the in-person-only row, keeping the rest', () => {
+      const mapped = mapEslPayloadToRawSessions({ speakers: [], sessionTimes: [], sessions: ROWS });
+      expect(mapped.map((m) => m.id)).to.deep.equal(['keeper']);
     });
 
-    it('keeps it out of the facets the configurator offers as filter categories', () => {
-      const facets = deriveFacetableAttributes(payload.sessions);
-      const ids = facets.map((f) => f.attributeId);
-      expect(ids).to.not.include('gated-attr-id');
-      expect(ids).to.include('category-attr-id');
+    it('reports both rows and their reasons to lana', () => {
+      const { lana } = viaMapper(ROWS);
+      expect(lana).to.include('dropped 2 session(s)');
+      expect(lana).to.include('no Format value');
+      expect(lana).to.include('in-person only');
+      expect(lana).to.include('NF1');
+      expect(lana).to.include('IP1');
     });
 
-    it('keeps it out of the value map the runtime filters read', () => {
-      const [mapped] = mapEslPayloadToRawSessions(payload);
-      expect(mapped.customAttributeValues).to.not.have.property('gated-attr-id');
-      expect(mapped.customAttributeValues['category-attr-id']).to.deep.equal(['Thought Leadership']);
+    // The in-person-only drop used to be silent -- no log of any kind.
+    it('names the in-person-only row, which previously vanished without trace', () => {
+      const { lana } = viaMapper([ROWS[1]]);
+      expect(lana).to.include('In Person Row');
+      expect(lana).to.include('in-person only');
     });
 
-    it('survives normalizeSessions with it still absent', () => {
-      const [normalized] = normalizeSessions(mapEslPayloadToRawSessions(payload));
-      expect(normalized.customAttributeValues).to.not.have.property('gated-attr-id');
+    it('consoles each dropped row with its reason below prod', () => {
+      const { warned } = capture(() => reportDroppedSessions(
+        [[ROWS[0], 'no Format value'], [ROWS[1], 'in-person only']],
+        false,
+      ));
+      expect(warned).to.have.lengthOf(1);
+      const [message, rows] = warned[0];
+      expect(message).to.include('2 session(s) hidden from every view');
+      expect(rows.map((r) => r.reason)).to.have.members(['no Format value', 'in-person only']);
+      expect(rows.map((r) => r.sessionCode)).to.have.members(['NF1', 'IP1']);
     });
 
-    it('maps no session field for it', () => {
-      const [mapped] = mapEslPayloadToRawSessions(payload);
-      expect(JSON.stringify(mapped)).to.not.include('Gated Video');
-      expect(JSON.stringify(mapped)).to.not.include('gated-attr-id');
+    it('stays out of the console on prod, but still reports to lana', () => {
+      const { lana, warned } = capture(() => reportDroppedSessions(
+        [[ROWS[0], 'no Format value'], [ROWS[1], 'in-person only']],
+        true,
+      ));
+      expect(warned).to.have.lengthOf(0);
+      expect(lana).to.include('dropped 2 session(s)');
+    });
+
+    it('logs nothing at all when nothing is dropped', () => {
+      const { lana, warned } = viaMapper([ROWS[2]]);
+      expect(lana).to.equal('');
+      expect(warned).to.have.lengthOf(0);
     });
   });
 

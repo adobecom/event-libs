@@ -186,19 +186,12 @@ export function extractDistinctProducts(sessions) {
   return [...products].sort();
 }
 
-// Attributes the catalog sends that the guide must never surface. Matched on name, since
-// attributeId is per-event. See docs/sessions-guide-implementation-notes.md.
-export const IGNORED_ATTRIBUTE_NAMES = ['Gated Video'];
-
-const isIgnoredAttribute = (attr) => IGNORED_ATTRIBUTE_NAMES.includes(attr?.name);
-
 // Mirrors ESP's own /session-facets filtering, without the extra round-trip.
 export function deriveFacetableAttributes(sessions) {
   const attributeMap = new Map(); // attributeId -> { attributeId, label, values: Map<valueId, {...}> }
   (sessions || []).forEach((session) => {
     (session.customAttributes || []).forEach((attr) => {
       if (attr.enabled === false) return;
-      if (isIgnoredAttribute(attr)) return;
       if (!['single-select', 'multi-select'].includes(attr.inputType)) return;
       if (!attributeMap.has(attr.attributeId)) {
         attributeMap.set(attr.attributeId, { attributeId: attr.attributeId, label: attr.label, values: new Map() });
@@ -240,7 +233,6 @@ function buildCustomAttributeValueMap(session) {
   const map = {};
   (session.customAttributes || []).forEach((attr) => {
     if (attr.enabled === false) return;
-    if (isIgnoredAttribute(attr)) return;
     if (!['single-select', 'multi-select'].includes(attr.inputType)) return;
     map[attr.attributeId] = (attr.values || []).map((v) => v?.label ?? v?.value).filter(Boolean);
   });
@@ -272,6 +264,32 @@ function describeRawSession(session) {
   return `${code} "${title}" [${session.sessionId}]`;
 }
 
+// Dropping is intentional, but the session then appears in no view at all, so it has to be
+// traceable. lana carries the count everywhere; below prod each row is also consoled with its
+// reason, which is what an author needs to go and fix it. Count is exact, enumeration capped.
+export function reportDroppedSessions(
+  dropped,
+  isProd = getEventConfig()?.miloConfig?.env?.name === 'prod',
+) {
+  if (dropped.length === 0) return;
+  const listed = dropped.slice(0, DROP_LOG_LIMIT)
+    .map(([session, reason]) => `${describeRawSession(session)} — ${reason}`)
+    .join('; ');
+  const rest = dropped.length - DROP_LOG_LIMIT;
+  window.lana?.log(`[sessions-api] dropped ${dropped.length} session(s): ${listed}${rest > 0 ? `; +${rest} more` : ''}`);
+
+  if (isProd) return;
+  // eslint-disable-next-line no-console
+  console.warn(`[sessions-api] ${dropped.length} session(s) hidden from every view:`, dropped.map(
+    ([session, reason]) => ({
+      reason,
+      sessionCode: session.sessionCode || '',
+      title: session.localizations?.['en-US']?.title || session.enTitle || '',
+      sessionId: session.sessionId,
+    }),
+  ));
+}
+
 // Joins the catalog's flat relational arrays into the shape normalizeSessions() expects.
 export function mapEslPayloadToRawSessions(payload) {
   const speakersById = new Map((payload.speakers || []).map((sp) => [sp.speakerId, sp]));
@@ -285,18 +303,11 @@ export function mapEslPayloadToRawSessions(payload) {
   const dropped = [];
   (payload.sessions || []).forEach((session) => {
     if (ENFORCE_PUBLISHED_FILTER && !isSessionPublished(session)) return;
-    if (isMissingFormat(session)) dropped.push(session);
+    if (isMissingFormat(session)) dropped.push([session, 'no Format value']);
     else candidates.push(session);
   });
-  // Dropping is intentional, but the session then appears nowhere — so it must be traceable.
-  // Count is exact; the enumeration is capped so a mass failure can't flood the log.
-  if (dropped.length > 0) {
-    const listed = dropped.slice(0, DROP_LOG_LIMIT).map(describeRawSession).join('; ');
-    const rest = dropped.length - DROP_LOG_LIMIT;
-    window.lana?.log(`[sessions-api] dropped ${dropped.length} session(s) with no Format value: ${listed}${rest > 0 ? `; +${rest} more` : ''}`);
-  }
 
-  return candidates
+  const mapped = candidates
     .map((session) => {
     // Real rows can have no sessionTime yet; time.js is guarded for the '' that follows.
     const times = (timesBySessionId.get(session.sessionId) || [])
@@ -373,7 +384,14 @@ export function mapEslPayloadToRawSessions(payload) {
     };
   })
     // Applied after the map because the rule reads the derived Format booleans.
-    .filter((session) => !isInPersonOnly(session));
+    .filter((raw, i) => {
+      if (!isInPersonOnly(raw)) return true;
+      dropped.push([candidates[i], 'in-person only']);
+      return false;
+    });
+
+  reportDroppedSessions(dropped);
+  return mapped;
 }
 
 // `/session-catalog` is a confirmed-public ESP endpoint — no auth token or group-id
