@@ -159,5 +159,24 @@ describe('FilterPanel', () => {
       expect(out).to.include('sg-filter-panel__options');
       expect(out).to.include('sg-filter-pill');
     });
+
+    // Drilling in unmounts the category button rather than expanding anything next to it,
+    // so a toggle/disclosure state there could only ever announce as permanently off.
+    it('leaves the mobile category buttons free of toggle and disclosure state', () => {
+      forceMobile(true);
+      const out = render();
+      expect(out).to.include('sg-filter-panel__cat');
+      expect(out).to.not.include('aria-expanded');
+      expect(out).to.not.include('aria-pressed');
+      expect(out).to.not.include('aria-controls');
+    });
+
+    it('keeps aria-pressed and aria-controls on the category buttons above mobile', () => {
+      forceMobile(false);
+      const out = render();
+      expect(out).to.include('aria-controls="sg-filter-panel-options"');
+      expect(out).to.include('aria-pressed="true"');
+      expect(out).to.include('aria-pressed="false"');
+    });
   });
 });

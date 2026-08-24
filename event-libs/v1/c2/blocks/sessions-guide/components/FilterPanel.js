@@ -203,15 +203,17 @@ export function FilterPanel({ onClose }) {
           </h3>
           <ul class="sg-filter-panel__cats" role="list">
             ${filterCategories.map(({ id, label }) => {
+    // On mobile these navigate to the options screen, unmounting themselves, so they are
+    // neither toggles nor disclosures — aria-pressed/-controls would only ever announce a
+    // state the user cannot reach. Above mobile the options sit alongside, so both apply.
     const catCount = localFilters[id]?.size || 0;
     return html`
                 <li>
                   <button
                     class=${'sg-filter-panel__cat' + (activeCategory === id ? ' sg-filter-panel__cat--active' : '')}
                     onclick=${() => setActiveCategory(id)}
-                    aria-pressed=${String(activeCategory === id)}
+                    aria-pressed=${isMobile ? undefined : String(activeCategory === id)}
                     aria-controls=${isMobile ? undefined : 'sg-filter-panel-options'}
-                    aria-expanded=${isMobile ? 'false' : undefined}
                     type="button"
                   >
                     <span class="sg-filter-panel__cat-label">
