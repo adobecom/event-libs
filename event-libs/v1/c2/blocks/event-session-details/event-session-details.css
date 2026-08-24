@@ -1,9 +1,7 @@
-/* Session Details / Overview (MWPW-203474). Mobile-first, stacked. */
 @import './track-tags.css';
 @import './description-clamp.css';
 @import './quick-facts.css';
 @import './disclaimer-cc-legal.css';
-@import './share.css';
 
 .event-session-details {
   display: flex;
@@ -15,14 +13,11 @@
   background: var(--s2a-color-gray-25, #fff);
 }
 
-/* Eyebrow: track tags then state-driven status, flush left, split by a pipe. */
 .session-eyebrow {
   display: flex;
-  align-items: stretch; /* status slot (the pipe) stretches to the tags' height */
+  align-items: stretch;
 }
 
-/* "tags | status" — the pipe lives on the slot so it spans the full height of the
-   stacked tags; 12px on each side; centered status; hidden until a status exists. */
 .session-status-slot {
   display: inline-flex;
   align-items: flex-start;
@@ -55,7 +50,6 @@
   background: #e34850;
 }
 
-/* Action row: [ primary CTA (state engine) ] favorite · share. */
 .session-actions {
   display: flex;
   align-items: center;
@@ -90,7 +84,6 @@
   outline-offset: 2px;
 }
 
-/* Leading primary CTA — dark pill (Add to schedule / Watch now). */
 .session-primary-cta:empty {
   display: none;
 }
@@ -134,7 +127,6 @@
   letter-spacing: var(--s2a-typography-letter-spacing-heading-3);
 }
 
-/* Desktop: step the title down to heading-4. */
 @media (min-width: 1024px) {
   .event-session-details .session-title {
     font-size: var(--s2a-typography-font-size-heading-4);

@@ -1,12 +1,3 @@
-/*
- * Session Details / Overview (MWPW-203474 + MWPW-200288 state engine)
- * Top white card of the Session Details Page. Reads RF metadata once, owns the
- * time-driven Pre-Live / Live / On-Demand state, and mounts the sub-features in
- * mobile stack order:
- *   eyebrow (track-tags + status) -> title -> gdpr/ipod copy -> closed caption ->
- *   [primary CTA + favorite + share] -> description-clamp -> quick-facts -> legal
- * Sub-features: MWPW-203475 / 203470 / 203468 / 203467 / 203472 / 200288
- */
 import { createTag, getMetadata } from '../../../utils/utils.js';
 import { initTierOneEventConfig } from '../../../utils/tier-1-event-config.js';
 import { readBackgroundConfig } from '../../utils/background-config.js';
@@ -23,35 +14,25 @@ export default async function init(el) {
   el.replaceChildren();
   if (background) el.style.background = background;
 
-  // Ensure the Tier 1 Event Configurator config is loaded before any sub-feature
-  // reads it (getTrackIcon). Idempotent — no-ops if decorateEvent already ran it.
   initTierOneEventConfig();
 
-  // Eyebrow — track tags + a state-driven status (date/time | Live | On-demand).
   const eyebrow = createTag('div', { class: 'session-eyebrow' });
   const trackTags = renderTrackTags();
   if (trackTags) eyebrow.append(trackTags);
-  // Persistent live region: the status changes on a timer at the session's
-  // start/end boundary, not from a user action, so the swap has to be announced.
   const statusSlot = createTag('span', {
     class: 'session-status-slot', role: 'status', 'aria-live': 'polite',
   });
   eyebrow.append(statusSlot);
   el.append(eyebrow);
 
-  // Session title.
   const title = getMetadata('title') || getMetadata('en-title');
   if (title) el.append(createTag('h1', { class: 'session-title' }, title));
 
-  // Supporting copy under the title. Closed caption is state-gated (On-Demand
-  // only) by the controller below — render it, then let mountSessionState toggle.
   const gdpr = renderGdprCopy();
   if (gdpr) el.append(gdpr);
   const closedCaption = renderClosedCaption();
   if (closedCaption) el.append(closedCaption);
 
-  // Action row: [ state-driven primary CTA ] favorite · share. The primary CTA
-  // (Add to schedule / Watch now / none) is filled by the state controller.
   const primaryCtaSlot = createTag('span', { class: 'session-primary-cta' });
   const favorite = renderFavorite();
   const share = renderShare();
@@ -61,10 +42,8 @@ export default async function init(el) {
   if (share) actions.append(share);
   el.append(actions);
 
-  // Wire the time-driven state: eyebrow status, primary CTA, CC visibility.
   mountSessionState({ statusSlot, primaryCtaSlot, ccEl: closedCaption });
 
-  // Abstract: description -> quick-fact tags -> legal disclaimer.
   const description = renderDescriptionClamp();
   if (description) el.append(description);
   const quickFacts = renderQuickFacts();

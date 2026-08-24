@@ -1,14 +1,3 @@
-/*
- * Session Resources (MWPW-203473)
- * Standalone white card. Rows of "file name … Open/Download" from the top-level
- * `material-list` (RF files[]). Mobile: first 2 shown, "Show more" reveals the
- * rest. "No resources" empty state when none are published. Links open in a new
- * tab.
- *
- * "Download" CTAs are gated on sign-in + event registration; "Open" links are not.
- * The gate is UX only — the file URL is in the DOM, so real protection needs a
- * signed/expiring URL or a server-side check.
- */
 import { createTag, getMetadata } from '../../../utils/utils.js';
 import { getJsonMetadata } from '../../utils/custom-attributes.js';
 import { readBackgroundConfig } from '../../utils/background-config.js';
@@ -18,7 +7,6 @@ import { showAuthToast } from '../../../services/sessions/action-feedback.js';
 
 const MOBILE_LIMIT = 2;
 const DOWNLOADABLE = /\.(pdf|zip|pptx?|docx?|xlsx?|key|psd|ai|indd|mp4|mov)(\?|$)/i;
-// Chevron next to the toggle label; rotates 180° when expanded (see CSS).
 const CHEVRON_ICON = '<svg xmlns="http://www.w3.org/2000/svg" width="8" height="5" viewBox="0 0 8 5" fill="none" aria-hidden="true"><path d="M1 1L4 4L7 1" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 
 const ctaLabel = (m) => (DOWNLOADABLE.test(m.fileURL || '') ? 'Download' : 'Open');
@@ -31,7 +19,6 @@ const resourceName = (m) => {
   return ext ? `Resource (${ext.toUpperCase()})` : 'Resource';
 };
 
-// Suffixes the aria-controls id so multiple instances on one page stay unique.
 let instances = 0;
 
 export default async function init(el) {
@@ -41,7 +28,6 @@ export default async function init(el) {
     ? materials.filter((m) => m && m.published !== false && m.fileURL)
     : [];
 
-  // Idempotent; without it `auth` stays { isLoggedIn: null } and every click is blocked.
   initSessionState();
   const eventConfig = {
     title: getMetadata('event-title') || getMetadata('title') || '',
@@ -69,8 +55,6 @@ export default async function init(el) {
       href: m.fileURL,
       target: '_blank',
       rel: 'noopener noreferrer',
-      // The visible text is only "Open"/"Download" and the file name is a sibling,
-      // so name the link for AT link lists and flag the new tab.
       'aria-label': `${label} ${name} (opens in new tab)`,
     }, label);
 
@@ -92,7 +76,7 @@ export default async function init(el) {
 
   if (published.length > MOBILE_LIMIT) {
     instances += 1;
-    list.id = `session-resources-list-${instances}`; // unique per instance for aria-controls
+    list.id = `session-resources-list-${instances}`;
     const toggle = createTag('button', {
       class: 'session-resources-toggle',
       type: 'button',

@@ -1,21 +1,3 @@
-/*
- * Track Tags (MWPW-203475) — sub-feature of session-details.
- *
- * Eyebrow track labels: leading icon + track name, one per row, stacked when a
- * session has more than one track (per the MWPW-200288 mobile design). No
- * pill/badge background.
- *
- * Ordered list from custom-attributes:
- *   - Override Primary Event Site Track (text) REPLACES Primary when present.
- *   - else Primary Event Site Track (single-select label).
- *   - then Additional Event Site Tracks (multi-select labels), stacked after.
- *
- * Icons/colors come from the Tier 1 Event Configurator via getTrackIcon()
- * (authored trackIcons, else built-in defaults). The icon slug resolves through
- * the shared icon system (resolveIcon: Milo icons -> track-icons.svg sprite) and
- * is tinted with the configured color. A generic star is the fallback for an
- * Override with no Primary behind it and no configured icon.
- */
 import { createTag } from '../../../utils/utils.js';
 import { getAttrLabel, getAttrText, getAttrValues } from '../../utils/custom-attributes.js';
 import { getTrackIcon, getOverrideTrackIcon, DEFAULT_ICON_COLOR } from '../../../utils/tier-1-event-config.js';
@@ -30,8 +12,6 @@ async function paintTrackIcon(slot, iconName) {
     if (!svg) return;
     svg.setAttribute('width', '16');
     svg.setAttribute('height', '16');
-    // Decorative — the track name sits right beside it. resolveIcon returns the raw
-    // sprite SVG, which may carry a <title> that would otherwise be announced too.
     svg.setAttribute('aria-hidden', 'true');
     svg.setAttribute('focusable', 'false');
     slot.replaceChildren(svg);
@@ -59,9 +39,6 @@ export function renderTrackTags(doc = document) {
   tags.forEach(({ label, kind, star }) => {
     const tag = createTag('span', { class: `track-tag track-tag--${kind}` });
     const slot = createTag('span', { class: 'track-tag-icon' });
-    // Override tracks resolve through getOverrideTrackIcon (per-text map, then the
-    // event-wide default); regular tracks through getTrackIcon. Color falls back
-    // to DEFAULT_ICON_COLOR — same model as resolveTrackBadge in sessions-guide.
     const cfg = kind === 'override' ? getOverrideTrackIcon(label) : getTrackIcon(label);
     slot.style.color = cfg?.color || DEFAULT_ICON_COLOR;
     if (cfg?.icon) {

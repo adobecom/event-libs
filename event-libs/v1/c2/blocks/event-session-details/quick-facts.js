@@ -1,17 +1,6 @@
-/*
- * Quick Facts (MWPW-203468) — sub-feature of session-details.
- * Label/value rows from custom-attributes, rendered as a definition list:
- *   Technical level: Beginner
- *   Product: Photoshop, Illustrator
- *   ...
- * Each row renders only when its attribute has values. AI Focus has no RF
- * attribute yet, so it renders only if/when one appears.
- */
 import { createTag } from '../../../utils/utils.js';
 import { getAttrValues } from '../../utils/custom-attributes.js';
 
-// Ordered per the MWPW-200288 abstract: Technical level, Track, AI Focus,
-// Product, Audience, Category.
 const QUICK_FACTS = [
   { label: 'Technical level', name: 'Technical Level' },
   { label: 'Track', name: 'Track' },
