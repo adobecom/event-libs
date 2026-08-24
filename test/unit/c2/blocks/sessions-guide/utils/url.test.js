@@ -51,6 +51,15 @@ describe('sessions-guide/utils/url', () => {
       expect(sessionUrlSlug('/sessions/max-keynote?foo=bar#baz')).to.equal('max-keynote');
     });
 
+    it('never mistakes the host for a segment when there is no path', () => {
+      expect(sessionUrlSlug('https://www.adobe.com/')).to.equal('');
+      expect(sessionUrlSlug('https://www.adobe.com')).to.equal('');
+    });
+
+    it('resolves a trailing slash to the segment before it', () => {
+      expect(sessionUrlSlug('https://www.adobe.com/max/2026/sessions/acom-1003-1/')).to.equal('acom-1003-1');
+    });
+
     it('is empty for an absent url', () => {
       expect(sessionUrlSlug('')).to.equal('');
       expect(sessionUrlSlug(undefined)).to.equal('');

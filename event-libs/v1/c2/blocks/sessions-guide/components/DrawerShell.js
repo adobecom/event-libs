@@ -40,6 +40,8 @@ export function resolveSessionGuideRequest(request, { sessionsStatusValue, sessi
   return {
     found: true,
     sessionId: found.id,
+    // Resolved here so the caller doesn't search the same list by the same key again.
+    sessionParam: sessionParamValue(found),
     defaultView: getDefaultView(authValue.isRegistered),
   };
 }
@@ -190,7 +192,9 @@ export function DrawerShell() {
     if (!sessionParam) return;
     const found = findSessionByParam(sessions.value, sessionParam);
     if (found) dispatch({ type: 'SET_ACTIVE_SESSION', sessionId: found.id });
-    else window.lana?.log(`[sessions-guide] ?session=${sessionParam} matched no session`);
+    // Bounded: the param is untrusted URL input, and URLSearchParams decodes %0A into a
+    // real newline, which would forge a second log line.
+    else window.lana?.log(`[sessions-guide] ?session=${encodeURIComponent(sessionParam).slice(0, 100)} matched no session`);
   }, [sessionsStatus.value]);
 
   // External API: other blocks call openSessionGuideDetail(sessionId) (session-store.js) to
@@ -211,11 +215,8 @@ export function DrawerShell() {
     }
     dispatch({ type: 'SET_DRAWER', drawer: 'expanded', defaultView: result.defaultView });
     dispatch({ type: 'SET_ACTIVE_SESSION', sessionId: result.sessionId });
-    // Written as the url slug like every other entry point, so the param has one shape.
-    const opened = sessions.value.find((s) => s.id === result.sessionId);
-    history.pushState({}, '', setSessionParam(
-      opened ? sessionParamValue(opened) : result.sessionId,
-    ));
+    // The url slug, like every other entry point, so the param has one shape.
+    history.pushState({}, '', setSessionParam(result.sessionParam));
   }), []);
 
   // Keep sessionsRef current so the popstate handler always sees the latest list

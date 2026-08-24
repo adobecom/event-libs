@@ -203,10 +203,10 @@ export function FilterPanel({ onClose }) {
           </h3>
           <ul class="sg-filter-panel__cats" role="list">
             ${filterCategories.map(({ id, label }) => {
+    const catCount = localFilters[id]?.size || 0;
     // On mobile these navigate to the options screen, unmounting themselves, so they are
     // neither toggles nor disclosures — aria-pressed/-controls would only ever announce a
     // state the user cannot reach. Above mobile the options sit alongside, so both apply.
-    const catCount = localFilters[id]?.size || 0;
     return html`
                 <li>
                   <button

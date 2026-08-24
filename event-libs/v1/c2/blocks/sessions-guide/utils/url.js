@@ -26,14 +26,24 @@ export function setSessionParam(value) {
   return buildUrl(params);
 }
 
+const HTML_EXT = /\.html$/;
+
 // The catalog already slugifies enTitle + sessionCode into the session's own page url, so its
 // last path segment is the identity we deep-link by — no second slug to keep in step. e.g.
 // .../max/2026/sessions/acom-ipod-test-session-no-mpc-1003-1 -> acom-ipod-test-session-no-mpc-1003-1
-// Host rewriting (sessionPageUrlForEnv) and root-relative authored values both leave it alone.
+// Parsed rather than split so the host can never be mistaken for a segment; host rewriting
+// (sessionPageUrlForEnv) and root-relative authored values both leave the path alone. The
+// empties filter is what makes a trailing slash resolve to the segment before it.
 export function sessionUrlSlug(url) {
   if (!url) return '';
-  const segments = url.split('?')[0].split('#')[0].split('/').filter(Boolean);
-  return (segments[segments.length - 1] || '').replace(/\.html$/, '');
+  let pathname;
+  try {
+    ({ pathname } = new URL(url, window.location.origin));
+  } catch {
+    return '';
+  }
+  const segments = pathname.split('/').filter(Boolean);
+  return (segments[segments.length - 1] || '').replace(HTML_EXT, '');
 }
 
 // The deep-link identity of a session. Falls back to the session id for rows with no url,
