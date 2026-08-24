@@ -4,22 +4,11 @@
   margin-bottom: var(--s2a-spacing-8, 8px);
 }
 
-/* Per Figma inspect (both the 1024px desktop rail and the 768px mobile drawer), the
-   video itself gets a 16px corner radius — c2-global.css's own default for .milo-video
-   is 24px (and only applies at min-width:1024px in the first place, so mobile gets none
-   at all without this). */
 .video-player .milo-video {
   border-radius: var(--s2a-border-radius-md, 16px);
   overflow: hidden;
 }
 
-/* Shown while awaitEmbedDecision() is pending — video-playlist.js's own catalog fetch
-   has been measured at ~3.5s, and without this the video area would otherwise sit
-   visually empty that whole time (the rest of the page has no reason to wait on the
-   same decision, so only this area needs its own "still loading" signal). Aspect-ratio
-   matches .milo-video's own 16:9 so nothing shifts in height once the real embed (or
-   the section's own removal) replaces it. Same spinner convention as sessions-guide's
-   own .sg-loading-state__spinner. */
 .video-player-loader {
   display: flex;
   align-items: center;
