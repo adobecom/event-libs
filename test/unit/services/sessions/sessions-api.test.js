@@ -512,6 +512,41 @@ describe('services/sessions/sessions-api', () => {
     });
   });
 
+  // The attribute is expected but not shipped. The read is wired up ahead of it, so it must
+  // yield [] today and pick the values up the moment either casing appears.
+  describe('mapEslPayloadToRawSessions AI focus (pending attribute)', () => {
+    const withAttrs = (attrs) => mapEslPayloadToRawSessions({
+      speakers: [],
+      sessionTimes: [],
+      sessions: [{ sessionId: 's-1', sessionCode: 'S1', customAttributes: [ONLINE_FORMAT, ...attrs] }],
+    })[0];
+
+    it('is empty while no such attribute is authored', () => {
+      expect(withAttrs([]).aiFocus).to.deep.equal([]);
+      expect(normalizeSessions([withAttrs([])])[0].aiFocus).to.deep.equal([]);
+    });
+
+    it('reads the Title Case name', () => {
+      const s1 = withAttrs([customAttr('AI Focus', [selectValue('Generative AI', 'generative-ai')])]);
+      expect(s1.aiFocus).to.deep.equal(['Generative AI']);
+    });
+
+    it('also reads the lowercase-f spelling the name reached us as', () => {
+      const s1 = withAttrs([customAttr('AI focus', [selectValue('Agentic')])]);
+      expect(s1.aiFocus).to.deep.equal(['Agentic']);
+    });
+
+    it('keeps every value, so a multi-select works', () => {
+      const s1 = withAttrs([customAttr('AI Focus', [selectValue('Generative AI', 'gen-ai'), selectValue('Agentic')])]);
+      expect(s1.aiFocus).to.deep.equal(['Generative AI', 'Agentic']);
+    });
+
+    it('survives normalizeSessions', () => {
+      const s1 = withAttrs([customAttr('AI Focus', [selectValue('Agentic')])]);
+      expect(normalizeSessions([s1])[0].aiFocus).to.deep.equal(['Agentic']);
+    });
+  });
+
   describe('mapEslPayloadToRawSessions published filtering', () => {
     const payload = {
       speakers: [],

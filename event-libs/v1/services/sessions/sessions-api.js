@@ -56,6 +56,9 @@ export function normalizeSessions(rawSessions) {
     contentCategory: coerceArray(s.contentCategory),
     audience: coerceArray(s.audience),
     industry: coerceArray(s.industry),
+    // Not in the catalog yet — see the mapper. Empty until the attribute is authored, which
+    // hides its row in the detail view rather than showing a blank one.
+    aiFocus: coerceArray(s.aiFocus),
     // Detail-view-only copy (Sessions Guide VizD R1): the captions sentence and the
     // IPOD/GDPR notice both sit under the session title. Real attributes, but only
     // authored on some sessions — each row is hidden when its value is empty.
@@ -382,6 +385,11 @@ export function mapEslPayloadToRawSessions(payload) {
       technicalLevel: extractCustomAttributeValue(session, 'Technical Level'),
       audience: extractCustomAttributeValues(session, 'Audience'),
       industry: extractCustomAttributeValues(session, 'Industry'),
+      // Not in the catalog yet — the attribute is coming, so the read is wired up ahead of it
+      // and yields [] until then. Both casings are tried: attribute names are matched exactly
+      // and every other one in the payload is Title Case (`Technical Level`, `Category`), but
+      // the name reached us as "AI focus". Multi-value read so a single-select still works.
+      aiFocus: extractCustomAttributeValues(session, ['AI Focus', 'AI focus']),
       // Both authored as free text and rendered verbatim in the detail view — the
       // captions attribute carries the whole sentence ("Closed captions available in
       // …"), not just a language list. Two name spellings are tried for the notice

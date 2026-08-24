@@ -129,12 +129,15 @@ export function SessionDetailOverlay({ onBack }) {
     }
   }
 
+  // Fixed order, per design. `AI focus` has no catalog attribute yet, so its row simply does
+  // not render until one is authored — same as any other unauthored attribute here. `Industry`
+  // is deliberately absent: it is not in this list and does not exist in the real catalog.
   const attrs = [
-    ['Industry', session.industry?.join(', ')],
     ['Technical level', session.technicalLevel],
     ['Track', session.track],
-    ['Content category', session.contentCategory?.join(', ')],
+    ['AI focus', session.aiFocus?.join(', ')],
     ['Audience', session.audience?.join(', ')],
+    ['Category', session.contentCategory?.join(', ')],
   ].filter(([, value]) => value);
 
   // Each list pod renders its collapsed slice with the full count in the heading, so the

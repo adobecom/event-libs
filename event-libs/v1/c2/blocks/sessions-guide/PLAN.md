@@ -219,6 +219,7 @@ interface Session {
   technicalLevel: string;
   category: string;
   audience: string;
+  aiFocus: string[];             // `AI Focus` -- no catalog attribute yet, so [] today
   speakers: Speaker[];
   products: string[];
   resources: Resource[];
@@ -669,7 +670,7 @@ No longer a reducer case (`LIVE_STATUS_UPDATE` doesn't exist). Implemented as a 
   - Upcoming sessions: Schedule / Scheduled toggle button (primary) + Favorite icon button + Share icon button
   - Live/on-demand sessions: Watch now link (primary) + Favorite icon button + Share icon button
 - Description expand/collapse: "More" / "Less" button with `is-expanded` class; local `descExpanded` state
-- Attributes list: Technical level, Track, Content category, Audience (filtered for non-empty values)
+- Attributes list, in this fixed order per design: **Technical level, Track, AI focus, Audience, Category** (each row hidden when its value is empty). `AI focus` has no catalog attribute yet, so it never renders today; `Industry` was removed from this list and is not in the real catalog either.
 - Share: `navigator.share()` if available; else `navigator.clipboard.writeText()` with "Link copied" toast; swallows `AbortError`
 
 ### 6.2 URL param for open overlay (widget) ✅
@@ -877,7 +878,8 @@ a session only ever carries one of the two, so this is unambiguous in practice):
 | Field | MAX26 name | MAX25 fallback |
 |---|---|---|
 | Primary track | `Primary Event Site Track` | `Primary Track for Agenda (Digital Agenda)` |
-| Content category | `Category` | `Programming Category` |
+| Content category (labelled **Category** in the detail view) | `Category` | `Programming Category` |
+| AI focus | `AI Focus` *(tentative, not shipped yet)* | — |
 | Session type | `Type` | `Session Type` |
 | Copyright | `Legal Disclaimer` | `LegalDisclaimer` |
 

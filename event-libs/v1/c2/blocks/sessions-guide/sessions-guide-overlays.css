@@ -430,7 +430,7 @@
   transform: rotate(180deg);
 }
 
-/* Attribute list (Industry/Technical level/Track/…) — tablet+ only per design. */
+/* Attribute list (Technical level/Track/AI focus/Audience/Category) — tablet+ only per design. */
 .sg-detail__attrs {
   display: none;
   flex-direction: column;

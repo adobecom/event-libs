@@ -33,6 +33,7 @@ function makeSession(overrides = {}) {
     contentCategory: ['How To'],
     audience: ['Designers'],
     industry: [],
+    aiFocus: [],
     closedCaptions: '',
     legalCopy: '',
     speakers: [],
@@ -119,15 +120,44 @@ describe('SessionDetailOverlay', () => {
   });
 
   describe('attribute list', () => {
-    it('leads with Industry when it is authored', () => {
-      const out = render({ industry: ['Retail', 'Media'] });
-      expect(out).to.include('Industry');
-      expect(out).to.include('Retail, Media');
-      expect(out.indexOf('Industry')).to.be.lessThan(out.indexOf('Technical level'));
+    // Fixed order per design: Technical level, Track, AI focus, Audience, Category.
+    it('renders the five attributes in the designed order', () => {
+      const out = render({ aiFocus: ['Generative AI'] });
+      const order = ['Technical level', 'Track', 'AI focus', 'Audience', 'Category']
+        .map((label) => out.indexOf(label));
+      expect(order.every((i) => i > -1), `missing a label: ${order}`).to.be.true;
+      expect(order).to.deep.equal([...order].sort((a, b) => a - b));
     });
 
-    it('drops the Industry row when the field is empty', () => {
-      expect(render()).to.not.include('Industry');
+    it('labels the content category "Category", not "Content category"', () => {
+      const out = render();
+      expect(out).to.include('Category');
+      expect(out).to.not.include('Content category');
+      expect(out).to.include('How To');
+    });
+
+    // The attribute does not exist in the catalog yet, so the row must stay away rather than
+    // render an empty one -- and appear on its own once authoring starts.
+    it('omits the AI focus row until the attribute is authored', () => {
+      expect(render()).to.not.include('AI focus');
+    });
+
+    it('renders AI focus, joined, once it is authored', () => {
+      const out = render({ aiFocus: ['Generative AI', 'Agentic'] });
+      expect(out).to.include('AI focus');
+      expect(out).to.include('Generative AI, Agentic');
+    });
+
+    // Dropped from the list: not in the design, and absent from the real catalog.
+    it('never renders an Industry row, even when the field carries values', () => {
+      expect(render({ industry: ['Retail', 'Media'] })).to.not.include('Industry');
+    });
+
+    it('drops any row whose value is empty', () => {
+      const out = render({ technicalLevel: '', audience: [], contentCategory: [] });
+      expect(out).to.not.include('Technical level');
+      expect(out).to.not.include('Audience');
+      expect(out).to.include('Track');
     });
   });
 
