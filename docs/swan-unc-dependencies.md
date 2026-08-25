@@ -20,8 +20,9 @@ RainFocus (schedule source of truth)
         │  session-store.js: toggleSchedule() / scheduled signal
         ▼
 event-libs SWAN feature (this repo)
-        │  compute timing, build an entry, diff against what's already in UNC's
-        │  store (filtered to entries this feature created)
+        │  compute timing, build an entry, diff against this feature's own local
+        │  state (never scans UNC's store wholesale — only ever looks up the
+        │  deterministic id for a session it already knows about)
         ▼
 UNC's local notification store (window.feds.data.notifications, or wherever the
 UniversalNav bundle actually exposes it — see Open Questions)
@@ -64,35 +65,42 @@ confirmed.
 
 ## Open questions for the UNC team
 
-These block real, verified end-to-end behavior — everything above is designed
-against the placeholder shape and needs confirmation:
+Trimmed to what actually blocks or changes this implementation — each of these
+either makes `unc-store.js` non-functional or invalidates a specific design
+decision below if the answer isn't what we assumed:
 
 1. **What is the actual global/path** in the current UniversalNav bundle that
    `da-events` loads (via milo's `global-navigation.js` →
    `adobeccstatic.com/unav/<version>/UniversalNav.js`)? Is it really
    `window.feds.data.notifications`, or a differently-namespaced equivalent — e.g.
    under `window.UniversalNav` itself, alongside its existing `getComponent()`/
-   `reload()` surface?
+   `reload()` surface? Without this, `unc-store.js` doesn't work at all.
 2. **What entry schema** does `add(entry)`/`edit(id, partialData)` expect
-   (title/message/url/icon/timestamp/expiry/read-state/category), and what's
-   required vs. optional?
-3. **What does `remove(identifier)` take** — a caller-supplied id (so our
-   deterministic `swan-${rfCode}` scheme works), or an id the store assigns back
-   from `add()` that we'd have to capture?
-4. **Does an entry auto-expire/hide** once some timestamp field passes, or must we
-   explicitly `edit()`/`remove()` it ourselves at on-demand time?
-5. **Is the store shared across products** in one `localStorage` key with no
-   product-scoping field, or does it already support a `source`/category tag we
-   should use so our diff logic never touches another team's entries? (This
-   feature already tags every entry it creates with `source: 'swan-events'` —
-   see [`swan-payload.js`](../event-libs/v1/features/swan-notifications/swan-payload.js)
-   — assuming the field is at least harmless to include even if UNC doesn't act on it.)
-6. **Timing/readiness** — can we reliably wait on a `feds.data.notifications.loaded`
+   (title/message/url/icon/timestamp/read-state/category), what's required vs.
+   optional, and does an entry auto-expire/hide once some timestamp field passes
+   (harmless either way — this feature already `edit()`/`remove()`s explicitly at
+   every stage transition, so an answer here wouldn't change any code, just
+   whether that's redundant with something UNC also does)?
+3. **What does `remove(identifier)` take** — a caller-supplied id, or an id the
+   store assigns back from `add()` that we'd have to capture? This is the one
+   that actually changes the design: `swan-notifications.js` uses a deterministic
+   `swan-${rfCode}` id specifically so no id-mapping/bookkeeping is needed at all.
+   If `remove()` requires a store-assigned id instead, that assumption breaks and
+   some form of id tracking has to come back.
+4. **Timing/readiness** — can we reliably wait on a `feds.data.notifications.loaded`
    (or equivalent) event before the first `add()` call, and is there any race with
-   SWAN's own page-load init to worry about?
-7. **Does `universal-nav` gnav metadata / `unav.uncAppId` config still matter** at
-   all now that we're not routing through ANS, or was that purely an ANS-routing
-   concern we can now ignore?
+   SWAN's own page-load init to worry about? `unc-store.js`'s `whenUncStoreReady()`
+   is built entirely around this event existing and firing reliably.
+
+Two questions from an earlier draft were cut as not actually load-bearing: whether
+the store is shared across products with no scoping field (this feature's diff
+logic never scans the store wholesale — it only ever looks up ids it already
+constructed itself, so an answer wouldn't change any code; the `source:
+'swan-events'` tag on every entry, see
+[`swan-payload.js`](../event-libs/v1/features/swan-notifications/swan-payload.js),
+is purely informational), and whether `universal-nav`/`unav.uncAppId` gnav config
+still matters (that was an ANS-routing concern; the new design has no `appId`
+field anywhere).
 
 ## Configuration
 
