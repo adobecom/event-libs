@@ -1,7 +1,8 @@
 import { expect } from '@esm-bundle/chai';
 import { setMetadata } from '../../../../../event-libs/v1/utils/utils.js';
 import {
-  getSessionTimes, getState, formatDateTime, renderStatus, mountSessionState,
+  getSessionTimes, getAllSessionTimes, getState, nextBoundary, formatDateTime, renderStatus,
+  mountSessionState,
 } from '../../../../../event-libs/v1/c2/blocks/event-session-details/session-state-view.js';
 
 const SESSION_TIMES = '[{"startTimeMillis":1794518100000,"endTimeMillis":1794520800000,"timezone":"America/Los_Angeles","sessionId":"x"}]';
@@ -30,6 +31,44 @@ describe('session-state-view', () => {
       setMetadata('session-times', 'not json');
       expect(getSessionTimes()).to.be.null;
     });
+
+    // RainFocus does not order sessionTimes chronologically: 21 of the 40 published
+    // multi-slot MAX26 sessions have a first entry that is not the earliest.
+    it('returns the earliest slot, not the first in array order', () => {
+      setMetadata('session-times', JSON.stringify([
+        { startTimeMillis: 5000, endTimeMillis: 6000, timezone: 'UTC' },
+        { startTimeMillis: 1000, endTimeMillis: 2000, timezone: 'UTC' },
+      ]));
+      expect(getSessionTimes()).to.deep.equal({ start: 1000, end: 2000, timezone: 'UTC' });
+    });
+  });
+
+  describe('getAllSessionTimes', () => {
+    it('sorts every slot by start', () => {
+      setMetadata('session-times', JSON.stringify([
+        { startTimeMillis: 5000, endTimeMillis: 6000, timezone: 'UTC' },
+        { startTimeMillis: 1000, endTimeMillis: 2000, timezone: 'UTC' },
+        { startTimeMillis: 3000, endTimeMillis: 4000, timezone: 'UTC' },
+      ]));
+      expect(getAllSessionTimes().map((s) => s.start)).to.deep.equal([1000, 3000, 5000]);
+    });
+
+    it('drops slots with no start and applies the length fallback per slot', () => {
+      setMetadata('session-times', JSON.stringify([
+        { startTimeMillis: 1000, timezone: 'UTC' },
+        { endTimeMillis: 9999, timezone: 'UTC' },
+      ]));
+      setMetadata('session-length-in-minutes', '30');
+      expect(getAllSessionTimes()).to.deep.equal([
+        { start: 1000, end: 1000 + (30 * 60000), timezone: 'UTC' },
+      ]);
+    });
+
+    it('returns [] when absent or invalid', () => {
+      expect(getAllSessionTimes()).to.deep.equal([]);
+      setMetadata('session-times', 'not json');
+      expect(getAllSessionTimes()).to.deep.equal([]);
+    });
   });
 
   describe('getState', () => {
@@ -41,6 +80,47 @@ describe('session-state-view', () => {
       expect(getState(2000, times)).to.equal('live');
     });
     it('is on-demand after end', () => expect(getState(2001, times)).to.equal('on-demand'));
+
+    // A 10am session with a 6pm premiere: live inside either slot, on-demand in the gap.
+    describe('multiple slots', () => {
+      const slots = [{ start: 1000, end: 2000 }, { start: 5000, end: 6000 }];
+      it('is upcoming before the earliest start', () => {
+        expect(getState(500, slots)).to.equal('upcoming');
+      });
+      it('is live inside the first slot', () => expect(getState(1500, slots)).to.equal('live'));
+      it('is on-demand between the slots', () => {
+        expect(getState(2001, slots)).to.equal('on-demand');
+        expect(getState(4999, slots)).to.equal('on-demand');
+      });
+      it('is live again inside the second slot', () => {
+        expect(getState(5000, slots)).to.equal('live');
+        expect(getState(6000, slots)).to.equal('live');
+      });
+      it('is on-demand after the final end', () => {
+        expect(getState(6001, slots)).to.equal('on-demand');
+      });
+      it('ignores array order', () => {
+        const reversed = [{ start: 5000, end: 6000 }, { start: 1000, end: 2000 }];
+        expect(getState(500, reversed)).to.equal('upcoming');
+        expect(getState(1500, reversed)).to.equal('live');
+      });
+    });
+  });
+
+  describe('nextBoundary', () => {
+    const slots = [{ start: 1000, end: 2000 }, { start: 5000, end: 6000 }];
+    it('targets the first start before anything has begun', () => {
+      expect(nextBoundary(500, slots)).to.equal(1000);
+    });
+    it('targets the current slot end while live', () => {
+      expect(nextBoundary(1500, slots)).to.equal(2000);
+    });
+    it('targets the next slot start from inside the gap', () => {
+      expect(nextBoundary(2001, slots)).to.equal(5000);
+    });
+    it('returns null once every slot has ended, so the timer stops', () => {
+      expect(nextBoundary(6001, slots)).to.be.null;
+    });
   });
 
   describe('formatDateTime', () => {
@@ -222,6 +302,51 @@ describe('session-state-view', () => {
       await new Promise((r) => { setTimeout(r, 800); });
       expect(statusSlot.textContent).to.equal('Live');
       expect(primaryCtaSlot.querySelector('.session-watch-now')).to.not.be.null;
+    });
+
+    // A 10am session that has finished, with a 6pm premiere still to come. The eyebrow
+    // reads On-demand, but Add to schedule comes back because the final end has not passed.
+    it('offers Add to schedule in the gap between slots, then Watch now at the premiere', async () => {
+      setMetadata('session-id', 'sid');
+      const premiere = Date.now() + 150;
+      setMetadata('session-times', JSON.stringify([
+        { startTimeMillis: premiere, endTimeMillis: premiere + 3600000, timezone: 'UTC' },
+        { startTimeMillis: Date.now() - 7200000, endTimeMillis: Date.now() - 3600000, timezone: 'UTC' },
+      ]));
+      const { statusSlot, primaryCtaSlot } = slots();
+      mountSessionState({ statusSlot, primaryCtaSlot });
+
+      expect(statusSlot.textContent).to.equal('On-demand');
+      expect(primaryCtaSlot.querySelector('.session-schedule')).to.not.be.null;
+
+      await new Promise((r) => { setTimeout(r, 800); });
+      expect(statusSlot.textContent).to.equal('Live');
+      expect(primaryCtaSlot.querySelector('.session-watch-now')).to.not.be.null;
+      expect(primaryCtaSlot.querySelector('.session-schedule')).to.be.null;
+    });
+
+    it('drops the CTA entirely once the final slot has ended', () => {
+      setMetadata('session-id', 'sid');
+      setMetadata('session-times', JSON.stringify([
+        { startTimeMillis: Date.now() - 7200000, endTimeMillis: Date.now() - 3600000, timezone: 'UTC' },
+        { startTimeMillis: Date.now() - 3000000, endTimeMillis: Date.now() - 1800000, timezone: 'UTC' },
+      ]));
+      const { statusSlot, primaryCtaSlot } = slots();
+      mountSessionState({ statusSlot, primaryCtaSlot });
+
+      expect(statusSlot.textContent).to.equal('On-demand');
+      expect(primaryCtaSlot.children.length).to.equal(0);
+    });
+
+    it('still drops the CTA after a single slot ends', () => {
+      setMetadata('session-id', 'sid');
+      setMetadata('session-times', JSON.stringify([
+        { startTimeMillis: Date.now() - 7200000, endTimeMillis: Date.now() - 3600000, timezone: 'UTC' },
+      ]));
+      const { statusSlot, primaryCtaSlot } = slots();
+      mountSessionState({ statusSlot, primaryCtaSlot });
+
+      expect(primaryCtaSlot.children.length).to.equal(0);
     });
   });
 });

@@ -50,18 +50,47 @@ The status slot is created as a **persistent live region**
 State is a **pure client-side time comparison**, per the ticket — there is no status
 field to read, so it never waits on the catalog:
 
-| State | Condition | Eyebrow | Primary CTA | Closed captions |
-|---|---|---|---|---|
-| `upcoming` | `now < start` | `Nov 11, 9:00 AM PST` | Add to schedule | hidden |
-| `live` | `start ≤ now ≤ end` | red dot + `Live` | Watch now | hidden |
-| `on-demand` | `now > end` | `On-demand` / `Coming soon` | none | shown |
+| State | Condition | Eyebrow | Closed captions |
+|---|---|---|---|
+| `upcoming` | `now` is before every slot's start | `Nov 11, 9:00 AM PST` | hidden |
+| `live` | `now` is inside **any** slot (inclusive) | red dot + `Live` | hidden |
+| `on-demand` | anything else — after a slot, or between slots | `On-demand` / `Coming soon` | shown |
+
+The **primary CTA is resolved separately from the state**, because "can I still schedule
+this?" is not the same question as "is it on now?":
+
+| Condition | Primary CTA |
+|---|---|
+| `live` | Watch now |
+| `now < finalEnd` (the latest slot's end) | Add to schedule |
+| otherwise | none |
 
 Transitions happen with **no reload**: `evaluate()` re-arms a `setTimeout` at the next
 boundary. Delays are clamped to `MAX_TIMEOUT` (`2**31 - 1`) and re-armed, because a
 far-future session would otherwise overflow a 32-bit delay and fire immediately.
 
-`getSessionTimes()` reads the first `session-times` entry and falls back to
-`session-length-in-minutes` for the end time when `endTimeMillis` is absent.
+### Multiple time slots
+
+A session can hold several `session-times` entries — a repeat in-person lab, or a 10am
+session with a 6pm premiere. `getAllSessionTimes()` returns **every** slot, **sorted by
+start**, each with its own `session-length-in-minutes` end fallback. `getSessionTimes()`
+returns the earliest, and is what the `upcoming` eyebrow date renders from.
+
+**Sorting is load-bearing, not tidiness.** RainFocus does not order `sessionTimes`
+chronologically: of the 40 published multi-slot MAX26 sessions, **21 have a first array
+entry that is not the earliest** (e.g. `L6317` is `[Nov 12 13:30, Nov 11 08:00]`). Reading
+index 0 would show the later date in the eyebrow and report `upcoming` straight through the
+session's real first occurrence. `mapEslPayloadToRawSessions()` sorts for the same reason.
+
+`getState()` accepts either a slot array or a single `{start, end}`, so a 10am/6pm session
+walks `upcoming → live → on-demand → live → on-demand`, and `nextBoundary()` finds the
+soonest of every remaining start and end — so the page wakes for the premiere instead of
+stopping at the first slot's end. It returns `null` only once all slots have ended, which
+is what finally cancels the timer.
+
+**The video player is not involved.** It stays gated on post-event and does not react to
+these transitions; between slots the on-demand recording is what shows. The only thing that
+changes across a premiere boundary is the eyebrow status and the primary CTA.
 
 ### "Coming soon" — IPOD sessions with no recording yet
 

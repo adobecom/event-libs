@@ -8,25 +8,43 @@ const MAX_TIMEOUT = 2 ** 31 - 1;
 const BROADCAST_URL = 'https://www.adobe.com/max/2026/broadcast.html';
 const PLAY_ICON = '<svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M4.27412 16.204C3.91596 16.204 3.55825 16.1073 3.23613 15.9148C2.61869 15.5457 2.25 14.8953 2.25 14.1764V3.8246C2.25 3.10565 2.6187 2.45527 3.23613 2.08612C3.85313 1.71786 4.59976 1.6994 5.23345 2.0413L14.8645 7.21719C15.5219 7.57051 15.9302 8.25429 15.9302 9.00049C15.9302 9.74669 15.5219 10.4305 14.8645 10.7838L5.23345 15.9597C4.93066 16.1232 4.60195 16.204 4.27412 16.204ZM4.2772 3.14696C4.1168 3.14696 3.99067 3.20849 3.92871 3.24541C3.82983 3.30429 3.6 3.4792 3.6 3.8246V14.1764C3.6 14.5218 3.82983 14.6967 3.92871 14.7555C4.02758 14.8144 4.28994 14.934 4.59448 14.7714L14.2251 9.59549C14.5455 9.42235 14.5802 9.12176 14.5802 9.00047C14.5802 8.87919 14.5455 8.5786 14.2251 8.40546L4.59448 3.22958C4.48067 3.16894 4.373 3.14696 4.2772 3.14696Z" fill="currentColor"/></svg>';
 
-export function getSessionTimes(doc = document) {
-  let entry;
+export function getAllSessionTimes(doc = document) {
+  let entries;
   try {
-    [entry] = JSON.parse(getMetadata('session-times', doc) || '[]');
+    entries = JSON.parse(getMetadata('session-times', doc) || '[]');
   } catch (e) {
     window.lana?.log(`[session-details] invalid session-times JSON: ${e.message}`);
-    return null;
+    return [];
   }
-  if (!entry?.startTimeMillis) return null;
-  const start = Number(entry.startTimeMillis);
   const lengthMs = (Number(getMetadata('session-length-in-minutes', doc)) || 0) * 60000;
-  const end = Number(entry.endTimeMillis) || (start + lengthMs) || start;
-  return { start, end, timezone: entry.timezone || undefined };
+  return (Array.isArray(entries) ? entries : [])
+    .filter((entry) => entry?.startTimeMillis)
+    .map((entry) => {
+      const start = Number(entry.startTimeMillis);
+      const end = Number(entry.endTimeMillis) || (start + lengthMs) || start;
+      return { start, end, timezone: entry.timezone || undefined };
+    })
+    .sort((a, b) => a.start - b.start);
 }
 
-export function getState(nowMs, { start, end }) {
-  if (nowMs < start) return 'upcoming';
-  if (nowMs <= end) return 'live';
-  return 'on-demand';
+export function getSessionTimes(doc = document) {
+  return getAllSessionTimes(doc)[0] || null;
+}
+
+export function getState(nowMs, slots) {
+  const list = Array.isArray(slots) ? slots : [slots];
+  if (!list.length) return 'on-demand';
+  if (list.some(({ start, end }) => nowMs >= start && nowMs <= end)) return 'live';
+  return nowMs < Math.min(...list.map(({ start }) => start)) ? 'upcoming' : 'on-demand';
+}
+
+export function nextBoundary(nowMs, slots) {
+  const points = [];
+  slots.forEach(({ start, end }) => {
+    if (nowMs < start) points.push(start);
+    if (nowMs <= end) points.push(end);
+  });
+  return points.length ? Math.min(...points) : null;
 }
 
 export function formatDateTime(ms, timeZone) {
@@ -94,16 +112,17 @@ function renderWatchNow() {
 }
 
 export function mountSessionState({ statusSlot, primaryCtaSlot, ccEl }) {
-  const times = getSessionTimes();
-  if (!times) return;
+  const slots = getAllSessionTimes();
+  if (!slots.length) return;
+  const earliest = slots[0];
+  const finalEnd = Math.max(...slots.map(({ end }) => end));
 
   const scheduleBtn = renderSchedule();
   const watchBtn = renderWatchNow();
 
-  const ctaFor = (state) => {
-    if (state === 'upcoming') return scheduleBtn;
+  const ctaFor = (state, nowMs) => {
     if (state === 'live') return watchBtn;
-    return null;
+    return nowMs < finalEnd ? scheduleBtn : null;
   };
 
   const applyCta = (btn) => {
@@ -127,18 +146,17 @@ export function mountSessionState({ statusSlot, primaryCtaSlot, ccEl }) {
     applyCta(btn);
   };
 
-  const apply = (state) => {
-    if (primaryCtaSlot) setCta(ctaFor(state));
-    if (statusSlot) statusSlot.replaceChildren(renderStatus(state, times));
+  const apply = (state, nowMs) => {
+    if (primaryCtaSlot) setCta(ctaFor(state, nowMs));
+    if (statusSlot) statusSlot.replaceChildren(renderStatus(state, earliest));
     if (ccEl) ccEl.hidden = state !== 'on-demand';
   };
 
   const evaluate = () => {
     const now = getNowMs();
-    const state = getState(now, times);
-    apply(state);
-    const boundary = now < times.start ? times.start : (now <= times.end ? times.end : null);
-    if (boundary) setTimeout(evaluate, Math.min((boundary - now) + 500, MAX_TIMEOUT));
+    apply(getState(now, slots), now);
+    const boundary = nextBoundary(now, slots);
+    if (boundary !== null) setTimeout(evaluate, Math.min((boundary - now) + 500, MAX_TIMEOUT));
   };
   evaluate();
 }
