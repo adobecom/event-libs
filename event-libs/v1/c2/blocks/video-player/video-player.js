@@ -19,6 +19,32 @@ function ensureMiloIframeCss() {
   createTag('link', { rel: 'stylesheet', href: MILO_IFRAME_CSS_URL, id: 'milo-iframe-css' }, '', { parent: document.head });
 }
 
+const VIDEO_PROVIDER_ORIGINS = {
+  mpc: ['https://video.tv.adobe.com'],
+  // Real YouTube embeds also connect to i.ytimg.com (thumbnails) and
+  // googlevideo.com (the actual media stream) — preconnecting all three gets the
+  // TCP/TLS handshake for each origin out of the way before the iframe itself even
+  // starts requesting them.
+  youtube: ['https://www.youtube.com', 'https://i.ytimg.com', 'https://www.google.com'],
+};
+
+// Warms the connection to whichever provider's origin(s) this session's video actually
+// needs, as early as init() knows `currentVideo.provider` — well before the
+// layout-decision/loader gating below, so by the time the winning instance's
+// loadVideoPlayer() actually sets the iframe's src, the DNS/TCP/TLS handshake for that
+// origin is already underway (or done) instead of starting cold at that later point.
+// Deduped by id so re-running init() (or the same origin needed by both instances on a
+// page) never appends the same <link> twice.
+function preconnectVideoProvider(provider) {
+  (VIDEO_PROVIDER_ORIGINS[provider] || []).forEach((origin) => {
+    const id = `preconnect-${origin.replace(/[^a-z0-9]/gi, '-')}`;
+    if (document.getElementById(id)) return;
+    createTag('link', {
+      rel: 'preconnect', href: origin, crossorigin: '', id,
+    }, '', { parent: document.head });
+  });
+}
+
 const PROGRESS_STORAGE_KEY = 'video-playlist:progress';
 const PROGRESS_TICK_SECONDS = 5;
 const RESUME_RESTART_THRESHOLD_SECONDS = 30;
@@ -399,6 +425,12 @@ export default async function init(el) {
     el.remove();
     return;
   }
+
+  // Fired here, not inside loadVideoPlayer() — this runs on BOTH instances
+  // (win-or-lose is still unknown at this point), well before the layout-decision wait
+  // below, so the connection is warming during that wait instead of only starting once
+  // the winner is confirmed and the iframe's src is actually set.
+  preconnectVideoProvider(currentVideo.provider);
 
   // Owned by a shared module (video-layout-loader.js), not this instance's own el —
   // exactly one loader shows page-wide regardless of how many .video-player instances
