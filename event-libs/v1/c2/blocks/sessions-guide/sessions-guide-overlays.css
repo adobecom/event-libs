@@ -91,12 +91,10 @@
   background: var(--s2a-color-gray-75);
 }
 
-/* Back row. Mobile keeps it on the white of the summary pod, which is flush with the
-   header above it; from 768px it becomes its own 60px row on the tinted body. */
+/* Back row. Static — scrolls away with the rest of the panel instead of pinning to the
+   top. Mobile keeps it on the white of the summary pod, which is flush with the header
+   above it; from 768px it becomes its own 60px row on the tinted body. */
 .sg-detail__back-wrap {
-  position: sticky;
-  top: 0;
-  z-index: 5;
   padding: var(--s2a-spacing-lg) var(--s2a-spacing-lg) 0;
   background: var(--s2a-color-background-default);
   flex-shrink: 0;
@@ -561,9 +559,8 @@
     padding: 0 var(--s2a-spacing-lg) var(--s2a-spacing-lg);
   }
 
-  /* Its own row above the pods now, not a left rail. Same tint as the body behind it —
-     opaque, not transparent, so a pod scrolling underneath the sticky row can't show
-     through and overlap the Back label. */
+  /* Its own row above the pods now, not a left rail. Same tint as the body behind it,
+     so it reads as part of the tinted surface rather than a separate white bar. */
   .sg-detail__back-wrap {
     height: 60px;
     display: flex;
