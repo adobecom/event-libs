@@ -11,7 +11,7 @@ import { deriveSessionState, getWatchDestination } from '../../../../utils/sessi
 import { setSessionParam, sessionParamValue, clearSessionParams, safeUrl, isSamePage } from '../utils/url.js';
 import { sanitizedRichText } from '../utils/rich-text.js';
 import {
-  IconHeartFilled, IconHeartOutline, IconLinkOut,
+  IconHeartFilled, IconHeartOutline, IconLinkOut, IconCalendarCheck, IconCalendarPlus,
 } from './icons.js';
 import { Icon } from '../../../../features/icons/Icon.js';
 import { fetchFederalProductIcon } from '../../../../features/icons/federal-icons.js';
@@ -221,7 +221,7 @@ export function SessionDetailOverlay({ onBack }) {
                           daa-ll=${isScheduled ? 'Remove-from-Schedule' : 'Add-to-Schedule'}
                           type="button"
                         >
-                          <span class=${'sg-detail__btn-icon ' + (isScheduled ? 'sg-detail__btn-icon--check' : 'sg-detail__btn-icon--plus')} aria-hidden="true"></span>
+                          ${isScheduled ? html`<${IconCalendarCheck} />` : html`<${IconCalendarPlus} />`}
                           ${isScheduled ? 'Scheduled' : 'Add to schedule'}
                         </button>
                       `}
