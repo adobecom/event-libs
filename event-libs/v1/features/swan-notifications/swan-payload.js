@@ -1,14 +1,12 @@
-// Pure functions — session/config in, timing/payload objects out. No fetch, no
+// Pure functions — session/config in, timing/entry objects out. No fetch, no
 // module-level state, so these are trivially unit-testable in isolation from
-// ans-controller.js's network layer.
+// unc-store.js's/swan-notifications.js's storage layer.
 
-// Matches the default northstar's authoring UI fell back to (SwanNotificationsUI.js's
-// defaultProps). Guards against Number(undefined) === NaN silently turning into a
-// null/dropped timestamp in the ANS request when an author omits the field.
+// Guards against Number(undefined) === NaN silently turning into a null/dropped
+// trigger time when an author omits the field.
 const DEFAULT_UPCOMING_OFFSET_MINUTES = 5;
 
-// Mirrors northstar's SWANNotificationsService.calculateSessionTimes(): three key
-// instants derived from the session's start/end time and the authored lead time.
+// Three key instants derived from the session's start/end time and the lead time.
 export function calculateSessionTimes(session, upcomingOffsetMinutes) {
   const startTimeMs = Date.parse(session.startTimeUtc);
   const endTimeMs = Date.parse(session.endTimeUtc);
@@ -21,10 +19,8 @@ export function calculateSessionTimes(session, upcomingOffsetMinutes) {
   };
 }
 
-// sessionPageUrl is a relative path (e.g. "/sessions/my-session") — ANS payloads are
-// consumed outside page context (OS push, UNC widget), so it must be absolute at
-// creation time. Resolved against the creating page's own origin; see this feature's
-// open-risk note on whether that's correct for every delivery context.
+// sessionPageUrl is a relative path (e.g. "/sessions/my-session") — resolved against
+// the current page's own origin, since that's the only origin this feature ever runs in.
 function resolveSessionUrl(sessionPageUrl) {
   if (!sessionPageUrl) return window.location.origin;
   try {
@@ -34,27 +30,33 @@ function resolveSessionUrl(sessionPageUrl) {
   }
 }
 
-// Builds the ANS notification payload for a session. ESP's normalized session has a
-// single sessionPageUrl (unlike northstar's AEM liveUrl/cardUrl split), so targetUrl
-// and onDemandUrl resolve to the same URL.
-export function buildNotificationPayload(session, timingProperties, swanConfig) {
+// Identifies every entry SWAN creates in UNC's (shared) local notification store, so
+// reconcile/diff logic never touches an entry another product created.
+export const SWAN_ENTRY_SOURCE = 'swan-events';
+
+// Deterministic id from rfCode alone — no separate id-mapping/bookkeeping needed to
+// find "this session's" entry again for an edit/remove call.
+export function buildLocalNotificationId(rfCode) {
+  return `swan-${rfCode}`;
+}
+
+// Builds the entry passed to UNC store's add()/edit() for a session at a given stage
+// ('reminder' | 'live' | 'on-demand'). Schema is a placeholder pending confirmation
+// with the UNC team — see docs/swan-unc-dependencies.md.
+export function buildLocalNotificationEntry(session, stage, swanConfig) {
   const url = resolveSessionUrl(session.sessionPageUrl);
   const title = `Adobe ${swanConfig.eventName || 'Event'} Session`;
   const content = session.title || title;
 
   return {
-    targetUrl: url,
-    onDemandUrl: url,
-    serviceIcon: { iconUrl: swanConfig.defaultNotificationIconUrl || '' },
-    image: { imageUrl: swanConfig.defaultNotificationImageUrl || '' },
-    // ANS expects these two fields in seconds, not ms — confirmed against northstar's
-    // own implementation, which flags it as an undocumented quirk.
-    goLiveTime: timingProperties.triggerLiveBadgeTime / 1000,
-    goLiveExpireTime: timingProperties.triggerOnDemandBadgeTime / 1000,
+    id: buildLocalNotificationId(session.rfCode),
+    source: SWAN_ENTRY_SOURCE,
+    stage,
     title,
-    content,
     message: content,
-    OSTitle: title,
-    OSMessage: content,
+    url,
+    icon: swanConfig.defaultNotificationIconUrl || '',
+    image: swanConfig.defaultNotificationImageUrl || '',
+    timestamp: Date.now(),
   };
 }

@@ -16,18 +16,12 @@ import { NavigationProvider as SgcNavigationProvider } from '../session-guide-co
 import { ConfigsProvider as SgcConfigsProvider } from '../session-guide-configurator/context/ConfigsContext.js';
 import SessionGuideConfigurator from '../session-guide-configurator/SessionGuideConfigurator.js';
 
-import { DAProvider as SncDAProvider } from '../swan-notification-configurator/context/DAContext.js';
-import { NavigationProvider as SncNavigationProvider } from '../swan-notification-configurator/context/NavigationContext.js';
-import { ConfigsProvider as SncConfigsProvider } from '../swan-notification-configurator/context/ConfigsContext.js';
-import SwanNotificationConfigurator from '../swan-notification-configurator/SwanNotificationConfigurator.js';
-
 const TOAST_TIMEOUT_MS = 6000;
 const HOMEPAGE_LINK_HASH_RE = new RegExp(`[#&]${HOMEPAGE_LINK_HASH_KEY}=([A-Za-z0-9+/=%-]{20,})`);
 
 const TABS = [
   { id: 'event', label: 'Event Config' },
   { id: 'session-guide', label: 'Session Guide Config' },
-  { id: 'swan', label: 'SWAN Notifications' },
 ];
 
 // Mounts Session Guide Configurator's own, unmodified provider stack + component — same
@@ -44,22 +38,6 @@ function SessionGuideTab() {
         </${SgcNavigationProvider}>
       </${SgcEventEnvProvider}>
     </${SgcDAProvider}>
-  `;
-}
-
-// Unlike SessionGuideTab, this one DOES share state with the Tier 1 config below —
-// eventId/eventName are passed down from the Event Config tab's own useConfigs(), since
-// this app has no independent event picker of its own (a SWAN config only makes sense
-// for an event that already has a Tier 1 config open).
-function SwanNotificationsTab({ eventId, eventName }) {
-  return html`
-    <${SncDAProvider}>
-      <${SncNavigationProvider}>
-        <${SncConfigsProvider}>
-          <${SwanNotificationConfigurator} eventId=${eventId} eventName=${eventName} />
-        </${SncConfigsProvider}>
-      </${SncNavigationProvider}>
-    </${SncDAProvider}>
   `;
 }
 
@@ -170,10 +148,6 @@ function EventConfigTab() {
 
 export default function TierOneEventConfigurator() {
   const [activeTabId, setActiveTabId] = useState(TABS[0].id);
-  // Same ConfigsContext EventConfigTab already reads (this component renders inside
-  // the same top-level ConfigsProvider) — read here too so the SWAN tab can inherit
-  // eventId/eventName instead of needing its own event picker.
-  const { activeConfig } = useConfigs();
 
   return html`
     <div class="tec-app">
@@ -191,9 +165,6 @@ export default function TierOneEventConfigurator() {
       </nav>
       ${activeTabId === 'event' && html`<${EventConfigTab} />`}
       ${activeTabId === 'session-guide' && html`<${SessionGuideTab} />`}
-      ${activeTabId === 'swan' && html`
-        <${SwanNotificationsTab} eventId=${activeConfig?.eventId} eventName=${activeConfig?.backendEventTitle} />
-      `}
     </div>
   `;
 }

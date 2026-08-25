@@ -1,74 +1,54 @@
 import { expect } from '@esm-bundle/chai';
-import {
-  initSwanConfig, isSwanEnabled, getSwanConfig,
-} from '../../../../event-libs/v1/features/swan-notifications/swan-config.js';
+import { isSwanEnabled, getSwanConfig } from '../../../../event-libs/v1/features/swan-notifications/swan-config.js';
 
-const CONFIG_SHEET_PATH = '/tools/da-apps/swan-notification-configurator/configs.json';
-const CONFIG_ID = 'test-config-id-1';
-
-const CONFIG = {
-  eventName: 'MAX 2026',
-  ansEndpoint: 'https://notify-stage.adobe.io/ans/v1/notifications',
-  notificationType: 'com.adobe.events.v1',
-  notificationSubType: 'max26.scheduled.notifications',
-  appId: 'adobecom',
-  defaultNotificationIconUrl: 'https://example.com/icon.png',
-  defaultNotificationImageUrl: 'https://example.com/image.png',
-  upcomingOffsetMinutes: 5,
-};
+function setMeta(name, content) {
+  document.head.querySelector(`meta[name="${name}"]`)?.remove();
+  if (content === undefined) return;
+  const meta = document.createElement('meta');
+  meta.name = name;
+  meta.content = content;
+  document.head.appendChild(meta);
+}
 
 describe('swan-config', () => {
-  it('is disabled and returns an empty config before any metadata is authored', async () => {
-    // No metadata authored yet in this test, so initSwanConfig() no-ops without ever
-    // calling fetch — window.fetch is deliberately left untouched here.
-    await initSwanConfig();
-    expect(isSwanEnabled()).to.equal(false);
-    expect(getSwanConfig()).to.deep.equal({});
+  afterEach(() => {
+    setMeta('swan-notifications');
+    setMeta('tier-1-event-config');
   });
 
-  describe('once swan-notification-config metadata holds a resolvable configId', () => {
-    let originalFetch;
-    let fetchCallCount;
-
-    // A describe's own before() runs before any beforeEach in the same or an ancestor
-    // suite (Mocha's actual hook ordering) — so the fetch stub has to be set up here,
-    // inline, rather than in an outer beforeEach that wouldn't yet be in effect when
-    // this hook runs.
-    before(async () => {
-      const meta = document.createElement('meta');
-      meta.name = 'swan-notification-config';
-      meta.content = CONFIG_ID;
-      document.head.appendChild(meta);
-
-      originalFetch = window.fetch;
-      fetchCallCount = 0;
-      window.fetch = async (url) => {
-        fetchCallCount += 1;
-        if (url === CONFIG_SHEET_PATH) {
-          return { ok: true, status: 200, json: async () => ({ data: [{ configId: CONFIG_ID, config: JSON.stringify(CONFIG) }] }) };
-        }
-        return { ok: false, status: 404, json: async () => ({}) };
-      };
-      await initSwanConfig();
+  describe('isSwanEnabled', () => {
+    it('is disabled when the swan-notifications metadata flag is absent', () => {
+      expect(isSwanEnabled()).to.equal(false);
     });
 
-    after(() => {
-      window.fetch = originalFetch;
+    it('is disabled for any value other than the literal string "true"', () => {
+      setMeta('swan-notifications', 'yes');
+      expect(isSwanEnabled()).to.equal(false);
     });
 
-    it('is enabled once ansEndpoint is present and on a trusted host', () => {
+    it('is enabled once the flag is authored as "true"', () => {
+      setMeta('swan-notifications', 'true');
       expect(isSwanEnabled()).to.equal(true);
     });
+  });
 
-    it('exposes every field from the resolved sheet row verbatim', () => {
-      expect(getSwanConfig()).to.deep.equal(CONFIG);
+  describe('getSwanConfig', () => {
+    it('returns hardcoded defaults with a generic event name when no tier-1-event-config is present', () => {
+      const config = getSwanConfig();
+      expect(config.eventName).to.equal('Event');
+      expect(config.upcomingOffsetMinutes).to.equal(5);
+      expect(config.defaultNotificationIconUrl).to.equal('');
+      expect(config.defaultNotificationImageUrl).to.equal('');
     });
 
-    it('is idempotent — a second init() call does not re-fetch or clear the config', async () => {
-      const callsBefore = fetchCallCount;
-      await initSwanConfig();
-      expect(fetchCallCount).to.equal(callsBefore);
+    it('derives eventName from tier-1-event-config metadata when present', () => {
+      setMeta('tier-1-event-config', JSON.stringify({ backendEventTitle: 'MAX 2026' }));
       expect(getSwanConfig().eventName).to.equal('MAX 2026');
+    });
+
+    it('falls back to defaults when tier-1-event-config metadata is malformed JSON', () => {
+      setMeta('tier-1-event-config', '{not-json');
+      expect(getSwanConfig().eventName).to.equal('Event');
     });
   });
 });

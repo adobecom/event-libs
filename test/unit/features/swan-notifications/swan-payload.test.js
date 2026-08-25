@@ -1,6 +1,6 @@
 import { expect } from '@esm-bundle/chai';
 import {
-  calculateSessionTimes, buildNotificationPayload,
+  calculateSessionTimes, buildLocalNotificationEntry, buildLocalNotificationId, SWAN_ENTRY_SOURCE,
 } from '../../../../event-libs/v1/features/swan-notifications/swan-payload.js';
 
 describe('swan-payload', () => {
@@ -38,43 +38,45 @@ describe('swan-payload', () => {
     });
   });
 
-  describe('buildNotificationPayload', () => {
-    const timingProperties = calculateSessionTimes(session, 5);
+  describe('buildLocalNotificationId', () => {
+    it('is deterministic from rfCode alone', () => {
+      expect(buildLocalNotificationId('RF-1')).to.equal('swan-RF-1');
+      expect(buildLocalNotificationId('RF-1')).to.equal(buildLocalNotificationId('RF-1'));
+    });
+  });
+
+  describe('buildLocalNotificationEntry', () => {
     const swanConfig = {
       eventName: 'MAX 2026',
       defaultNotificationIconUrl: 'https://example.com/icon.png',
       defaultNotificationImageUrl: 'https://example.com/image.png',
     };
 
-    it('resolves the relative sessionPageUrl to an absolute URL for both target and on-demand', () => {
-      const payload = buildNotificationPayload(session, timingProperties, swanConfig);
-      const expectedUrl = new URL(session.sessionPageUrl, window.location.origin).toString();
-      expect(payload.targetUrl).to.equal(expectedUrl);
-      expect(payload.onDemandUrl).to.equal(expectedUrl);
+    it('ids and tags the entry so a diff pass can find/own it', () => {
+      const entry = buildLocalNotificationEntry(session, 'reminder', swanConfig);
+      expect(entry.id).to.equal('swan-RF-1');
+      expect(entry.source).to.equal(SWAN_ENTRY_SOURCE);
+      expect(entry.stage).to.equal('reminder');
     });
 
-    it('converts goLiveTime/goLiveExpireTime to seconds, not ms', () => {
-      const payload = buildNotificationPayload(session, timingProperties, swanConfig);
-      expect(payload.goLiveTime).to.equal(timingProperties.triggerLiveBadgeTime / 1000);
-      expect(payload.goLiveExpireTime).to.equal(timingProperties.triggerOnDemandBadgeTime / 1000);
+    it('resolves the relative sessionPageUrl to an absolute URL', () => {
+      const entry = buildLocalNotificationEntry(session, 'live', swanConfig);
+      expect(entry.url).to.equal(new URL(session.sessionPageUrl, window.location.origin).toString());
     });
 
     it('carries the configured icon/image URLs through unchanged', () => {
-      const payload = buildNotificationPayload(session, timingProperties, swanConfig);
-      expect(payload.serviceIcon).to.deep.equal({ iconUrl: swanConfig.defaultNotificationIconUrl });
-      expect(payload.image).to.deep.equal({ imageUrl: swanConfig.defaultNotificationImageUrl });
+      const entry = buildLocalNotificationEntry(session, 'reminder', swanConfig);
+      expect(entry.icon).to.equal(swanConfig.defaultNotificationIconUrl);
+      expect(entry.image).to.equal(swanConfig.defaultNotificationImageUrl);
     });
 
-    it('uses the session title for content/message, falling back to a generic title otherwise', () => {
-      const payload = buildNotificationPayload(session, timingProperties, swanConfig);
-      expect(payload.title).to.equal('Adobe MAX 2026 Session');
-      expect(payload.content).to.equal('My Session');
-      expect(payload.message).to.equal('My Session');
-      expect(payload.OSTitle).to.equal('Adobe MAX 2026 Session');
-      expect(payload.OSMessage).to.equal('My Session');
+    it('uses the session title for message, falling back to a generic title otherwise', () => {
+      const entry = buildLocalNotificationEntry(session, 'reminder', swanConfig);
+      expect(entry.title).to.equal('Adobe MAX 2026 Session');
+      expect(entry.message).to.equal('My Session');
 
-      const untitled = buildNotificationPayload({ ...session, title: '' }, timingProperties, swanConfig);
-      expect(untitled.content).to.equal('Adobe MAX 2026 Session');
+      const untitled = buildLocalNotificationEntry({ ...session, title: '' }, 'reminder', swanConfig);
+      expect(untitled.message).to.equal('Adobe MAX 2026 Session');
     });
   });
 });

@@ -9,7 +9,6 @@ import {
   DEFAULT_RF_API_URL, STAGE_RF_API_URL, DEFAULT_RF_PROFILE_ID,
 } from '../services/sessions/rainfocus.js';
 import { mountToast } from '../features/toast/toast.js';
-import { initSwanConfig } from '../features/swan-notifications/swan-config.js';
 import {
   reconcileSwanNotifications, notifySessionScheduled, notifySessionUnscheduled,
 } from '../features/swan-notifications/swan-notifications.js';
@@ -126,14 +125,10 @@ async function loadMyData() {
       favorited.value = new Set(mapToSessionIds(data.favorited, 'sessionID', 'rfSessionId'));
       auth.value = { ...auth.value, isRegistered: !!(data.loggedInUser && Object.keys(data.loggedInUser).length > 0) };
     });
-    // One-time full reconciliation against SWAN's bookkeeping service, now that both
-    // the session catalog and the user's confirmed schedule have settled — the
-    // self-healing backstop for any per-action toggleSchedule() notification call
-    // that failed transiently. Called unconditionally: isSwanEnabled() only reflects
-    // config resolved so far, and initSwanConfig()'s own sheet fetch may still be in
-    // flight here — reconcileSwanNotifications() awaits that itself before checking,
-    // so gating on isSwanEnabled() here too could race ahead of the fetch and skip
-    // reconciliation entirely on a page that's actually configured.
+    // Immediate reconciliation now that both the session catalog and the user's
+    // confirmed schedule have settled, rather than waiting for the next
+    // session-state-ticker.js tick (up to intervalMs away) to apply any stage
+    // transition that's already due.
     reconcileSwanNotifications(() => sessions.value, () => scheduled.value);
   } catch (err) {
     window.lana?.log(`[session-store] myData fetch failed: ${err.message}`);
@@ -177,6 +172,15 @@ async function loadSessions() {
       () => sessions.value,
       () => liveStreamActiveIds.value,
       () => { sessionStateVersion.value += 1; },
+      {
+        // Must be onTick, not onChange: onChange only fires when a session's coarse
+        // upcoming/live/on-demand bucket flips, which has no boundary at SWAN's
+        // reminder lead time (start minus a few minutes) — gating reconcile on it would
+        // mean the T-5-minute reminder is never applied by the periodic tick at all,
+        // only ever by the one-shot call below or by a schedule action that happens to
+        // land after the trigger time already passed.
+        onTick: () => reconcileSwanNotifications(() => sessions.value, () => scheduled.value),
+      },
     );
     maybeLoadMyData();
   } catch (err) {
@@ -231,7 +235,6 @@ export function initSessionState() {
     mrEnv: deriveMrEnv(),
   };
 
-  initSwanConfig();
   mountToast();
   syncAuth();
   BlockMediator.subscribe('imsProfile', syncAuth);
