@@ -50,11 +50,13 @@ MR polling itself goes through the shared registry at
 (`registerStreamIds`/`unregisterStreamIds`/`subscribe`), not a poller local to this
 block — if `event-card`'s Featured Sessions cards are also on the page tracking
 overlapping `mrStreamId`s, both blocks' ids get batched into the same underlying
-`getMediaStatus()` call instead of two independent 30s loops hitting
-`overlay-admin-integration.mobilerider.com`. `session-store.js`'s own
-`liveStreamActiveIds` signal is still irrelevant here — it's backed by a mocked
-`fetchLiveStatus()`, not real MR data, and this block has no live state to feed it
-anyway.
+`fetchLiveStatus()` call instead of two independent 30s loops. This registry calls
+`services/sessions/mobile-rider.js`'s `fetchLiveStatus(ids, env)` (env-aware — prod vs
+dev/stage host, via `session-store.js`'s `getApiConfig().mrEnv`), the same function
+`sessions-guide`'s own polling uses, so both surfaces now hit the correct environment
+consistently. `session-store.js`'s own `liveStreamActiveIds` signal is still irrelevant
+here — this block has no live state to feed it, and maintains its own
+`liveStreamActiveIds` locally via the shared registry's `subscribe()`.
 
 ## Removal animation (FLIP)
 

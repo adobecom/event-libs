@@ -5,20 +5,29 @@ findings from that review were block-specific and already fixed or closed as
 not-applicable; these three are still open and span shared infrastructure that
 `event-card` (and `upcoming-sessions`) depend on.
 
-## 1. Byte-identical duplicate MobileRider controller file
+## 1. Duplicate MobileRider controller file — resolved, and a real env bug found in the process
 
-**Files:** `event-libs/v1/services/sessions/mobile-rider-controller.js` and
+**Was:** `event-libs/v1/services/sessions/mobile-rider-controller.js` and
 `event-libs/v1/features/timing-framework/plugins/mobile-rider/mobile-rider-controller.js`
-— still byte-identical as of this writing.
+were byte-identical, and the former hardcoded a single host
+(`overlay-admin-integration.mobilerider.com`) with no environment awareness at
+all — unlike `services/sessions/mobile-rider.js`'s `fetchLiveStatus(ids, env)`,
+which correctly switches between `overlay-admin.mobilerider.com` (prod) and
+`overlay-admin-dev.mobilerider.com` (dev/stage) based on `session-store.js`'s
+`getApiConfig().mrEnv`. This meant `upcoming-sessions.js`/`session-routing.js`
+polled the same MR host regardless of dev/stage/prod, while `sessions-guide`
+(via `poller.js` → `mobile-rider.js`) correctly split by environment.
 
-**Impact:** a future fix or endpoint change (auth header, base URL, error-shape
-handling) applied to one copy silently fails to apply to the other.
-`isMediaActive`/`getMediaStatusMap` are duplicated in the older file but never
-called by `utils/session-routing.js`/`upcoming-sessions.js` — only `getMediaStatus` is
-used.
-
-**Fix:** delete the newer duplicate and import the existing controller from
-`features/timing-framework/plugins/mobile-rider/`.
+**Fix:** `mobile-rider-poller.js` now imports `fetchLiveStatus` from
+`mobile-rider.js` instead of instantiating `MobileRiderController`, passing
+`getApiConfig()?.mrEnv` on each tick (converting its Set results back to
+arrays to keep `upcoming-sessions.js`/`session-routing.js`'s existing
+`.filter()`/array-based consumers unchanged). `services/sessions/
+mobile-rider-controller.js` is deleted as unused. TF's own copy at
+`features/timing-framework/plugins/mobile-rider/mobile-rider-controller.js`
+is untouched — it's a separate, still-duplicated concern (TF's schedule-skip
+decision, not live-status polling for session cards) worth a follow-up but
+out of scope here.
 
 ## 2. Two independent MobileRider poll loops — fixed
 

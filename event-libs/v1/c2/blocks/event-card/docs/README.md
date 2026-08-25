@@ -38,10 +38,11 @@ every `.event-card[data-mr-stream-id]` on the page with the shared registry at
 (`registerStreamIds`/`subscribe`) and never unregisters — this block needs ongoing
 live→on-demand tracking, unlike `upcoming-sessions`, which drops an id the moment
 it's confirmed started. The registry itself batches ids from every registered
-caller into a single `getMediaStatus()` call per 30s tick, so if `upcoming-sessions`
-is also polling overlapping ids on the same page, both blocks share one underlying
-request instead of two independent loops. Results feed a local `liveStreamActiveIds`
-set that `deriveSessionState` reads from.
+caller into a single `fetchLiveStatus()` call per 30s tick (env-aware — prod vs
+dev/stage host, via `session-store.js`'s `getApiConfig().mrEnv`), so if
+`upcoming-sessions` is also polling overlapping ids on the same page, both blocks
+share one underlying request instead of two independent loops. Results feed a local
+`liveStreamActiveIds` set that `deriveSessionState` reads from.
 
 ### `?serverTime=<epoch-ms>` override
 

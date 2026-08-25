@@ -1,8 +1,8 @@
-import MobileRiderController from './mobile-rider-controller.js';
+import { fetchLiveStatus } from './mobile-rider.js';
+import { getApiConfig } from '../../utils/session-store.js';
 
 const POLL_INTERVAL_MS = 30_000;
 
-const controller = new MobileRiderController();
 const refCounts = new Map();
 const listeners = new Set();
 let intervalId = null;
@@ -11,8 +11,8 @@ async function tick() {
   const ids = [...refCounts.keys()];
   if (!ids.length) return;
   try {
-    const { active = [], inactive = [] } = await controller.getMediaStatus(ids);
-    listeners.forEach((listener) => listener({ active, inactive }));
+    const { active, inactive } = await fetchLiveStatus(ids, getApiConfig()?.mrEnv);
+    listeners.forEach((listener) => listener({ active: [...active], inactive: [...inactive] }));
   } catch (error) {
     window.lana?.log(`mobile-rider-poller: poll failed: ${error.message}`);
   }
