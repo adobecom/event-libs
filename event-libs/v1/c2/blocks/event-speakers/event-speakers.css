@@ -18,6 +18,7 @@
 }
 
 .speakers-count {
+  font-family: var(--body-font-family);
   font-weight: 400;
 }
 

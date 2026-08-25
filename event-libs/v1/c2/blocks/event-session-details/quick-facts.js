@@ -5,7 +5,6 @@ const QUICK_FACTS = [
   { label: 'Technical level', name: 'Technical Level' },
   { label: 'Track', name: 'Track' },
   { label: 'AI Focus', name: 'AI Focus' },
-  { label: 'Product', name: 'Product' },
   { label: 'Audience', name: 'Audience' },
   { label: 'Category', name: 'Category' },
 ];
