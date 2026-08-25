@@ -157,11 +157,32 @@ background was authorable this could not happen.
 **Fix:** constrain the allowed values, or add a dark variant that flips text and
 focus-ring colors (owner: Qiyun / Kat).
 
-## 12. `AI Focus` has no RainFocus attribute
+## 12. `Track` and `AI Focus` quick facts await the RF→DA sync
 
 **Files:** `event-session-details/quick-facts.js` (`QUICK_FACTS`)
 
-**Impact:** the row is specified in the MWPW-200288 abstract and is listed in the config,
-but no such custom attribute exists yet, so it silently never renders.
+**Impact:** both rows are configured and both attributes **do** exist in RainFocus, but
+neither reaches the page, so both silently never render. Confirmed 2026-08-24 against the
+RF `entityDataDump` for `MAX26sss1mIiY19qLgszzzSESSIONHUB` (272 sessions):
 
-**Fix:** none needed in code — it renders as soon as the attribute appears. Tracking only.
+| Attribute | In RainFocus | In page `custom-attributes` |
+|---|---|---|
+| `Track` | yes — 260 sessions | **no** |
+| `AI Focus` | yes — 147 sessions | **no** |
+
+`Track` is a distinct attribute from the three the eyebrow uses (`Primary event site
+track` 135, `Additional event site tracks` 23, `Override Primary Event Site Track` 1) and
+is the most widely populated of the four. The test session
+`session-page-template-columns` carries `Track = Accelerating Creativity with AI` in RF
+while its page metadata has no `Track` entry at all.
+
+**Watch the synced name, not the RF name.** The sync renames attributes in transit, so an
+exact-name lookup can miss even once the attribute flows: RF `Programming Category` →
+page `Category`, RF `Session Type` → page `Type`, RF `LegalDisclaimer` → page `Legal
+Disclaimer`, RF `Video Duration (hr:min:sec)` → page `Video Duration`. `getCustomAttribute`
+matches case-insensitively but does no fuzzy matching, so if `Track` or `AI Focus` land
+under a different name the rows stay empty.
+
+**Fix:** no code change — both render as soon as the sync carries them. Confirm the exact
+synced names with Sekhar; add a name-alias array (as `sessions-api.js` already does with
+`['AI Focus', 'AI focus']`) if they differ from the RF names.
