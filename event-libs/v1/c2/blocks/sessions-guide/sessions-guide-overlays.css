@@ -561,14 +561,15 @@
     padding: 0 var(--s2a-spacing-lg) var(--s2a-spacing-lg);
   }
 
-  /* Its own row above the pods now, not a left rail. */
+  /* Its own row above the pods now, not a left rail. Same tint as the body behind it —
+     opaque, not transparent, so a pod scrolling underneath the sticky row can't show
+     through and overlap the Back label. */
   .sg-detail__back-wrap {
     height: 60px;
     display: flex;
     align-items: center;
     padding: 0;
-    background: transparent;
-    z-index: auto;
+    background: var(--s2a-color-gray-75);
   }
 
   .sg-detail__group {
