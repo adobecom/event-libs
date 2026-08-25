@@ -25,27 +25,37 @@ URLs; or (c) a token-gated CDN origin.
 If it returns per-session entitlement or gated asset URLs, that is the hook. Owner: Sekhar
 / Daniel.
 
-## 2. `liveStream` handling diverges from `video-player`
+## 2. `video-player` reads an unsorted `sessionTimes[0]`
 
-**Files:** `event-session-details/session-state-view.js` (`hasPlayableVideo`) vs.
-`c2/blocks/video-player/video-player.js` (`pickEmbeddableVideo`)
+**Files:** `c2/blocks/video-player/video-player.js` (`currentSessionHasEnded`) —
+on the unmerged **`latest-playlist`** branch, not on `dev`
 
-**Impact:** two related defects in the player, and a visible disagreement with the eyebrow.
+**Resolved since first written:** `pickEmbeddableVideo()` used to accept any `kind` and
+return the first embeddable entry by array order, which meant the youtube `liveStream` at
+index 0 won over the mpc `onDemand` on the real MPC template. It now resolves
+`.find((v) => v.kind === 'onDemand')`, so that defect is gone, and
+`hasPlayableVideo()` has been aligned to the same `kind === 'onDemand'` test — the two
+predicates are now identical and cannot disagree.
 
-`pickEmbeddableVideo()` accepts **any** `kind` and returns the **first** embeddable entry
-*by array order*. On the real MPC template the youtube `liveStream` sits at index 0, ahead
-of the mpc `onDemand` — and the player only runs post-event, so it embeds the livestream
-URL and never reaches the authored recording, losing that URL's `quality=9`,
-`end=nothing`, `learn=on` params plus MPC captions/analytics. It usually does not *look*
-broken, because YouTube leaves the archived stream at the same watch URL.
+**Still open:** the player's post-event gate is
+`nowMs >= sessionTimes[0].endTimeMillis`, reading the array **unsorted**. RainFocus does not
+order `sessionTimes` chronologically — 21 of the 40 published multi-slot MAX26 sessions have
+a first entry that is not the earliest. Two consequences:
 
-Separately, `hasPlayableVideo()` deliberately excludes `kind: 'liveStream'`, so a session
-whose **only** embeddable entry is a liveStream gets a player while the eyebrow says
-"Coming soon" — a contradiction on one page.
+- A repeat lab authored later-slot-first (`L6317` = `[Nov 12 13:30, Nov 11 08:00]`) hides the
+  player for a full day after its real first occurrence has ended.
+- A 10am session with a 6pm premiere authored premiere-first compares against 7pm, so the
+  intended 10:45–18:00 on-demand window renders **no player at all**.
 
-**Fix (owner: Hari):** in `pickEmbeddableVideo`, skip `liveStream` post-event, and prefer
-`onDemand` explicitly rather than relying on array order. The array-order dependency is
-the more serious of the two.
+`mapEslPayloadToRawSessions()` and `session-state-view.js` both sort before taking the
+earliest; this is the remaining place that does not.
+
+**Fix (owner: Hari):** sort by `startTimeMillis` before indexing, or import
+`getAllSessionTimes()` from `session-state-view.js`.
+
+**Also worth confirming:** `currentSessionHasEnded()` returns `true` when there is no entry
+or `endTimeMillis` is not a finite number, so an unscheduled session that has a video would
+pass the gate.
 
 ## 3. `mobilerider` / `dvr` is a recording but is not counted as one
 

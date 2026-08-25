@@ -66,7 +66,7 @@ export function hasPlayableVideo(doc = document) {
   }
   return (entries || [])
     .flatMap((t) => t?.videos || [])
-    .some((v) => EMBEDDABLE_PROVIDERS.includes(v?.provider) && v?.kind !== 'liveStream');
+    .some((v) => EMBEDDABLE_PROVIDERS.includes(v?.provider) && v?.kind === 'onDemand');
 }
 
 const normalizeAttr = (s) => (s || '').toLowerCase().replace(/[^a-z0-9]/g, '');

@@ -88,9 +88,16 @@ soonest of every remaining start and end — so the page wakes for the premiere 
 stopping at the first slot's end. It returns `null` only once all slots have ended, which
 is what finally cancels the timer.
 
-**The video player is not involved.** It stays gated on post-event and does not react to
-these transitions; between slots the on-demand recording is what shows. The only thing that
+**The video player is not involved.** `video-player` decides once at init and never
+re-evaluates, gating on `now >= sessionTimes[0].endTimeMillis` — i.e. past the **earliest**
+slot's end, not the final one. That is intentional: the first on-demand window already
+carries the recording, and the player stays put through the premiere. The only thing that
 changes across a premiere boundary is the eyebrow status and the primary CTA.
+
+⚠️ That gate reads `sessionTimes[0]` **unsorted** (the block lives on the unmerged
+`latest-playlist` branch). For a session authored premiere-first — `[{6pm}, {10am}]` — it
+compares against 7pm, so the 10:45–18:00 on-demand window would render **no player at all**,
+contradicting the intended behavior. Sorting there is a prerequisite; owner Hari.
 
 ### "Coming soon" — IPOD sessions with no recording yet
 
@@ -109,9 +116,16 @@ essentially its stream archive and lands immediately, whereas the real MPC templ
 carries `DVR Timing (in hours)` of **772** (~32 days).
 
 **Has a recording** — `hasPlayableVideo()` looks for an entry in `session-times[].videos[]`
-whose `provider` is `mpc` or `youtube`, **excluding `kind: 'liveStream'`**. A session keeps
-its livestream URL after it ends, and that is not the recording; without the exclusion a
-stale entry would claim "On-demand". Real data carries all three kinds on one session:
+whose `provider` is `mpc` or `youtube` **and** whose `kind` is exactly **`onDemand`**.
+
+This deliberately mirrors `video-player`'s `pickEmbeddableVideo()`, which resolves
+`.find((v) => v.kind === 'onDemand')` against the same providers. The eyebrow must not
+promise a recording the player would refuse to embed, so the two predicates are kept
+identical rather than merely similar — an earlier `kind !== 'liveStream'` form was looser
+and would have read "On-demand" for, say, an `mpc`/`dvr` entry that renders no player.
+Excluding `liveStream` matters on its own account too: a session keeps its livestream URL
+after it ends, and that is not the recording. Real data carries all three kinds on one
+session:
 
 ```json
 [ { "provider": "youtube",     "kind": "liveStream", "url": "…/watch?v=…" },
