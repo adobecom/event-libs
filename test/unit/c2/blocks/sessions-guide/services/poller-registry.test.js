@@ -1,5 +1,5 @@
 import { expect } from '@esm-bundle/chai';
-import { registerStreamIds, unregisterStreamIds, subscribe } from '../../../../event-libs/v1/services/sessions/mobile-rider-poller.js';
+import { registerStreamIds, unregisterStreamIds, subscribe } from '../../../../../../event-libs/v1/services/sessions/poller.js';
 
 function stubFetch(responses) {
   const calls = [];
@@ -12,7 +12,7 @@ function stubFetch(responses) {
   return calls;
 }
 
-describe('mobile-rider-poller', () => {
+describe('poller registry', () => {
   let realFetch;
 
   beforeEach(() => {

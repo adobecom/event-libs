@@ -18,56 +18,44 @@ which correctly switches between `overlay-admin.mobilerider.com` (prod) and
 polled the same MR host regardless of dev/stage/prod, while `sessions-guide`
 (via `poller.js` → `mobile-rider.js`) correctly split by environment.
 
-**Fix:** `mobile-rider-poller.js` now imports `fetchLiveStatus` from
+**Fix:** the shared registry (see #4 below) calls `fetchLiveStatus` from
 `mobile-rider.js` instead of instantiating `MobileRiderController`, passing
-`getApiConfig()?.mrEnv` on each tick (converting its Set results back to
-arrays to keep `upcoming-sessions.js`/`session-routing.js`'s existing
-`.filter()`/array-based consumers unchanged). `services/sessions/
+`getApiConfig()?.mrEnv` on each tick. `services/sessions/
 mobile-rider-controller.js` is deleted as unused. TF's own copy at
 `features/timing-framework/plugins/mobile-rider/mobile-rider-controller.js`
 is untouched — it's a separate, still-duplicated concern (TF's schedule-skip
 decision, not live-status polling for session cards) worth a follow-up but
 out of scope here.
 
-## 4. `poller.js`/`mobile-rider-poller.js` consolidated onto one registry
-
-**Was:** two separate MR pollers existed — `services/sessions/poller.js`
-(single fixed list, one `onUpdate` callback, used only by `session-store.js`/
-`sessions-guide`) and `mobile-rider-poller.js` (ref-counted, multi-subscriber
-registry, used by `upcoming-sessions.js`/`session-routing.js`). Same
-underlying `fetchLiveStatus()` call, duplicated poll-loop machinery.
-
-**Fix:** `mobile-rider-poller.js`'s registry gained per-`intervalMs` grouping
-(`registerStreamIds(ids, { intervalMs })`), so every default-cadence consumer
-(`upcoming-sessions`, `event-card`, and now `session-store.js`) batches into
-one shared 30s `fetchLiveStatus()` call, while a caller needing a different
-cadence (this module's own fast-ticking unit tests) still gets its own
-independent group/interval. `subscribe()` gained an optional `watchIds`
-param that scopes a listener to ticks whose *queried* id set overlaps
-`watchIds` (not what came back — a real "queried, absent from both lists"
-result still notifies) and pre-filters `{active, inactive}` down to just
-those ids; omitted, a listener still gets every tick's raw, unfiltered
-result (existing behavior, unchanged for direct registry subscribers).
-`poller.js` is now a thin adapter over this registry, preserving its exact
-`startPolling(mrSessions, env, onUpdate, intervalMs)`/`stopPolling()` shape
-and its "auto-stop once every one of my ids is inactive" behavior — zero
-change required in `session-store.js`.
-
-## 2. Two independent MobileRider poll loops — fixed
+## 2. Two independent MobileRider poll loops, and two separate poller modules — fixed
 
 **Was:** `utils/session-routing.js` and `upcoming-sessions/upcoming-sessions.js`
 each ran their own `setInterval`-based MR poll loop, hitting
 `overlay-admin-integration.mobilerider.com` independently even when both blocks
-were on the same page tracking overlapping `mrStreamId`s.
+were on the same page tracking overlapping `mrStreamId`s — and separately,
+`services/sessions/poller.js` (single fixed list, one `onUpdate` callback, used
+only by `session-store.js`/`sessions-guide`) duplicated the same
+`fetchLiveStatus()` poll-loop machinery under a different module.
 
-**Fix:** both now go through a shared registry,
-`event-libs/v1/services/sessions/mobile-rider-poller.js`
-(`registerStreamIds`/`unregisterStreamIds`/`subscribe`), which holds a single
-`setInterval` and batches the *union* of every currently-registered id across
-every caller into one `getMediaStatus()` call per tick, fanning the result out
-to all subscribers. Each block's own per-session gating is unchanged — this
-only replaces *where the actual fetch/interval lives*, not each block's
-business logic for deciding which ids it cares about and when:
+**Fix:** everything now lives in `event-libs/v1/services/sessions/poller.js`:
+- `registerStreamIds`/`unregisterStreamIds`/`subscribe` — a ref-counted,
+  multi-subscriber registry, grouped by `intervalMs` so every default-cadence
+  consumer (`upcoming-sessions`, `event-card`, and `session-store.js`) batches
+  into one shared 30s `fetchLiveStatus()` call, while a caller needing a
+  different cadence (this module's own fast-ticking unit tests) still gets its
+  own independent group/interval. `subscribe()`'s optional `watchIds` param
+  scopes a listener to ticks whose *queried* id set overlaps it (based on what
+  was queried, not what came back — a real "queried, absent from both lists"
+  result still notifies) and pre-filters `{active, inactive}` down to just
+  those ids; omitted, a listener gets every tick's raw, unfiltered result.
+- `startPolling`/`stopPolling` — a thin adapter over that registry, preserving
+  `session-store.js`'s exact existing call shape and its "auto-stop once every
+  one of my ids is inactive" behavior. Zero change required in
+  `session-store.js`.
+
+Each block's own per-session gating is unchanged — this only replaces *where
+the actual fetch/interval lives*, not each block's business logic for deciding
+which ids it cares about and when:
 
 - `upcoming-sessions.js` still gates each session's registration on its own
   scheduled start time (per-session `setTimeout`, unchanged), and still
@@ -78,8 +66,10 @@ business logic for deciding which ids it cares about and when:
   stream-id]` snapshot once and never unregisters — it still needs ongoing
   live→on-demand tracking for its own cards, unchanged.
 
-Covered by `test/unit/services/sessions/mobile-rider-poller.test.js`
-(batching, refcounted registration, subscribe/unsubscribe).
+Covered by `test/unit/c2/blocks/sessions-guide/services/poller.test.js`
+(`startPolling`/`stopPolling` adapter behavior) and `poller-registry.test.js`
+(batching, refcounted registration, subscribe/unsubscribe on the registry
+itself).
 
 ## 3. `event-card` hydrator eagerly imported on every page — resolved by removal
 

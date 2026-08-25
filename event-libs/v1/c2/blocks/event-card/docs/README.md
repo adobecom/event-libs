@@ -34,15 +34,17 @@ Cards with `data-mr-stream-id` need to know which MR streams are currently
 broadcasting to distinguish "live" from "upcoming"/"on-demand" (non-MR cards ignore
 this and use pure time-window checks). The first MR-backed card wired up registers
 every `.event-card[data-mr-stream-id]` on the page with the shared registry at
-`event-libs/v1/services/sessions/mobile-rider-poller.js`
-(`registerStreamIds`/`subscribe`) and never unregisters — this block needs ongoing
-live→on-demand tracking, unlike `upcoming-sessions`, which drops an id the moment
-it's confirmed started. The registry itself batches ids from every registered
-caller into a single `fetchLiveStatus()` call per 30s tick (env-aware — prod vs
-dev/stage host, via `session-store.js`'s `getApiConfig().mrEnv`), so if
-`upcoming-sessions` is also polling overlapping ids on the same page, both blocks
-share one underlying request instead of two independent loops. Results feed a local
-`liveStreamActiveIds` set that `deriveSessionState` reads from.
+`event-libs/v1/services/sessions/poller.js`
+(`registerStreamIds`/`subscribe` — the same module `session-store.js`'s
+`startPolling`/`stopPolling` adapter sits on top of) and never unregisters —
+this block needs ongoing live→on-demand tracking, unlike `upcoming-sessions`,
+which drops an id the moment it's confirmed started. The registry itself
+batches ids from every default-cadence registered caller into a single
+`fetchLiveStatus()` call per 30s tick (env-aware — prod vs dev/stage host, via
+`session-store.js`'s `getApiConfig().mrEnv`), so if `upcoming-sessions` (and
+`sessions-guide`) are also polling overlapping ids on the same page, all of
+them share one underlying request instead of independent loops. Results feed
+a local `liveStreamActiveIds` set that `deriveSessionState` reads from.
 
 ### `?serverTime=<epoch-ms>` override
 
