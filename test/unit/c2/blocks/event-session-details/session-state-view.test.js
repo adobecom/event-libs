@@ -53,6 +53,31 @@ describe('session-state-view', () => {
       expect(getAllSessionTimes().map((s) => s.start)).to.deep.equal([1000, 3000, 5000]);
     });
 
+    // `startTimeMillis` is an absolute epoch value, so the date is part of the comparison —
+    // these are L6317's real slots, authored later-day-first across two different days.
+    it('sorts across dates, not just clock times', () => {
+      const nov12at1330 = 1794519000000;
+      const nov11at0800 = 1794412800000;
+      setMetadata('session-times', JSON.stringify([
+        { startTimeMillis: nov12at1330, endTimeMillis: nov12at1330 + 5400000, timezone: 'America/Los_Angeles' },
+        { startTimeMillis: nov11at0800, endTimeMillis: nov11at0800 + 5400000, timezone: 'America/Los_Angeles' },
+      ]));
+      expect(getAllSessionTimes().map((s) => s.start)).to.deep.equal([nov11at0800, nov12at1330]);
+      expect(getSessionTimes().start).to.equal(nov11at0800);
+    });
+
+    // Slots in different zones still order correctly, because epoch millis are absolute
+    // and `timezone` is only carried for display.
+    it('orders correctly across timezones', () => {
+      setMetadata('session-times', JSON.stringify([
+        { startTimeMillis: 2000, endTimeMillis: 3000, timezone: 'Asia/Tokyo' },
+        { startTimeMillis: 1000, endTimeMillis: 1500, timezone: 'America/New_York' },
+      ]));
+      expect(getAllSessionTimes().map((s) => [s.start, s.timezone])).to.deep.equal([
+        [1000, 'America/New_York'], [2000, 'Asia/Tokyo'],
+      ]);
+    });
+
     it('drops slots with no start and applies the length fallback per slot', () => {
       setMetadata('session-times', JSON.stringify([
         { startTimeMillis: 1000, timezone: 'UTC' },
