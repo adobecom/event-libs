@@ -15,7 +15,7 @@ import {
 } from './icons.js';
 import { Icon } from '../../../../features/icons/Icon.js';
 import { fetchFederalProductIcon } from '../../../../features/icons/federal-icons.js';
-import { getTrackIcon, getProduct } from '../../../../utils/tier-1-event-config.js';
+import { getProduct } from '../../../../utils/tier-1-event-config.js';
 import { resolveTrackBadge } from '../utils/session-filters.js';
 import { isBehaviorEnabled } from '../utils/behavior-flags.js';
 import { scrollBehavior } from '../utils/motion.js';
@@ -164,19 +164,6 @@ export function SessionDetailOverlay({ onBack }) {
                     <div class="sg-detail__channel">
                       <${Icon} name=${trackBadge.icon} size=${20} className="sg-detail__channel-icon" />
                       <span class="sg-detail__channel-name">${trackBadge.label}</span>
-                    </div>
-                  `}
-                  ${trackBadge?.stackedTracks && html`
-                    <div class="sg-detail__track-stack">
-                      ${trackBadge.stackedTracks.map((track) => {
-    const icon = getTrackIcon(track);
-    return html`
-                          <span class="sg-detail__track-chip" key=${track}>
-                            <${Icon} name=${icon?.icon} size=${16} className="sg-detail__track-chip-icon" />
-                            ${track}
-                          </span>
-                        `;
-  })}
                     </div>
                   `}
                   ${trackBadge && timeRange && html`<span class="sg-detail__meta-divider" aria-hidden="true"></span>`}
