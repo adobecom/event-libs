@@ -52,6 +52,7 @@ describe('services/sessions/sessions-api', () => {
           images: [{ imageKind: 'session-hero-image', imageUrl: 'hero.jpg' }, { imageKind: 'session-card-image', imageUrl: 'card.jpg' }],
           customAttributes: [
             customAttr('Primary Track for Agenda (Digital Agenda)', [selectValue('Photography')]),
+            customAttr('Track', [selectValue('Business'), selectValue('Creativity')]),
             customAttr('Programming Category', [selectValue('How To')]),
             customAttr('Technical Level', [selectValue('Intermediate')]),
             customAttr('Audience', [selectValue('Designer'), selectValue('Developer')]),
@@ -137,9 +138,16 @@ describe('services/sessions/sessions-api', () => {
       expect(bare.rfSessionId).to.equal('');
     });
 
-    it('maps track and contentCategory from separate attributes', () => {
-      expect(full.track).to.equal('Photography');
+    it('maps primaryTrack and contentCategory from separate attributes', () => {
+      expect(full.primaryTrack).to.equal('Photography');
       expect(full.contentCategory).to.deep.equal(['How To']);
+    });
+
+    // "Track" is a real, distinct customAttribute from "Primary Event Site Track" (see
+    // ESP-SESSION-ENDPOINTS.md) — confirms the two are never conflated.
+    it('maps tracks from the separate "Track" customAttribute, not the primary track', () => {
+      expect(full.tracks).to.deep.equal(['Business', 'Creativity']);
+      expect(bare.tracks).to.deep.equal([]);
     });
 
     it('maps technicalLevel, audience, and products', () => {
@@ -281,7 +289,7 @@ describe('services/sessions/sessions-api', () => {
 
     it('leaves fields with no source in the payload unset on a bare session', () => {
       expect(bare.startTimeUtc).to.equal('');
-      expect(bare.track).to.equal('');
+      expect(bare.primaryTrack).to.equal('');
       expect(bare.speakers).to.deep.equal([]);
       expect(bare.thumbnailUrl).to.be.null;
       expect(bare.isKeynote).to.be.false;
@@ -834,7 +842,7 @@ describe('services/sessions/sessions-api', () => {
     const [max26, max25] = mapEslPayloadToRawSessions(max26Payload);
 
     it('resolves the MAX26 track/category/type/disclaimer attribute names', () => {
-      expect(max26.track).to.equal('Branding');
+      expect(max26.primaryTrack).to.equal('Branding');
       expect(max26.contentCategory).to.deep.equal(['Thought Leadership']);
       expect(max26.type).to.equal('Session');
       expect(max26.legalDisclaimer).to.equal('<p>MAX26 copyright.</p>');
@@ -846,7 +854,7 @@ describe('services/sessions/sessions-api', () => {
     });
 
     it('still resolves track/category via the MAX25 attribute names as a fallback', () => {
-      expect(max25.track).to.equal('Branding');
+      expect(max25.primaryTrack).to.equal('Branding');
       expect(max25.contentCategory).to.deep.equal(['How To']);
     });
 
@@ -932,6 +940,13 @@ describe('services/sessions/sessions-api', () => {
     it('defaults contentCategory to an empty array when absent (mock fixtures)', () => {
       const [normalized] = normalizeSessions([{ id: 's-1', audience: 'All' }]);
       expect(normalized.contentCategory).to.deep.equal([]);
+    });
+
+    it('coerces tracks and defaults it to an empty array when absent', () => {
+      const [withValue] = normalizeSessions([{ id: 's-1', tracks: 'Business' }]);
+      const [absent] = normalizeSessions([{ id: 's-2' }]);
+      expect(withValue.tracks).to.deep.equal(['Business']);
+      expect(absent.tracks).to.deep.equal([]);
     });
 
     it('defaults the detail-view copy fields so the rows simply do not render', () => {

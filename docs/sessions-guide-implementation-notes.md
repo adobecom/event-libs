@@ -83,8 +83,8 @@ ESP renamed several custom attributes between MAX25 and MAX26. `extractCustomAtt
 takes either a single name or an array of candidates tried in order. A given session only ever
 carries one of a renamed pair, so "first found" is unambiguous.
 
-`TRACK_ATTRIBUTE_NAMES` is exported so `tier-1-event-configurator/utils.js` — which needs the
-same attribute for its own track editor — doesn't carry a second copy that can drift.
+`PRIMARY_TRACK_ATTRIBUTE_NAMES` is exported so `tier-1-event-configurator/utils.js` — which
+needs the same attribute for its own track editor — doesn't carry a second copy that can drift.
 
 Names are matched **exactly**: `name === label` on every attribute and there is no machine-safe
 slug, so matching means comparing display strings verbatim, parentheses and all.
@@ -97,10 +97,15 @@ wanted — no explicit MAX25 branch needed.
 
 ### Track helpers
 
-- `getSessionTrack()` / `getSessionAdditionalTracks()` — Additional tracks are a multi-select
-  drawing from the same vocabulary as the primary track, and the runtime treats them as real
-  tracks: `resolveTrackBadge()` gives them their own swimlanes and `LiveCard` badges the first.
-  So it mirrors `getSessionProducts()` (all values) rather than `getSessionTrack()` (first only).
+- `getSessionPrimaryTrack()` / `getSessionAdditionalTracks()` — Additional tracks are a
+  multi-select drawing from the same vocabulary as the primary track, and the runtime treats
+  them as real tracks: `resolveTrackBadge()` gives them their own swimlanes and `LiveCard`
+  badges the first. So it mirrors `getSessionProducts()` (all values) rather than
+  `getSessionPrimaryTrack()` (first only).
+- On the normalized session object, the ESL "Track" topic-tag customAttribute — a real,
+  distinct attribute from `PRIMARY_TRACK_ATTRIBUTE_NAMES` — lands in `tracks` (array); the
+  primary track lands in `primaryTrack` (string). Only the detail overlay's "Track" attr row
+  reads `tracks`; everything badge/swimlane-related reads `primaryTrack`.
 - `extractDistinctAllTracks()` — primary and additional together, which is what a per-track
   icon/colour mapping has to cover since either kind can end up on a badge.
 - `extractDistinctOverrideTexts()` — the override is **free text**, not a select, so every

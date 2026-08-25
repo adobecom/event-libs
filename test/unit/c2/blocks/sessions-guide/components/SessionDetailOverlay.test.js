@@ -26,7 +26,8 @@ function makeSession(overrides = {}) {
     // Upcoming by default, so the schedule CTA is the one on screen.
     startTimeUtc: new Date(Date.now() + 2 * HOUR).toISOString(),
     endTimeUtc: new Date(Date.now() + 3 * HOUR).toISOString(),
-    track: 'Photography',
+    primaryTrack: 'Photography',
+    tracks: ['Business'],
     additionalTracks: [],
     trackOverride: '',
     technicalLevel: 'General',
@@ -174,6 +175,20 @@ describe('SessionDetailOverlay', () => {
       expect(out).to.not.include('Technical level');
       expect(out).to.not.include('Audience');
       expect(out).to.include('Track');
+    });
+
+    // The "Track" row is the separate "Track" topic-tag customAttribute, not the primary
+    // Event Site Track (`session.primaryTrack`, rendered separately as the channel badge)
+    // or `additionalTracks` — see sessions-api.js.
+    it('renders the Track row from tracks, not additionalTracks', () => {
+      const out = render({ tracks: ['Business', 'Creativity'], additionalTracks: ['Storytelling'] });
+      expect(out).to.include('Business, Creativity');
+      expect(out).to.not.include('Storytelling');
+    });
+
+    it('omits the Track row when tracks has no values', () => {
+      const out = render({ tracks: [] });
+      expect(out).to.not.include('Track');
     });
   });
 

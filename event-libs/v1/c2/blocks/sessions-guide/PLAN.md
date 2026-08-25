@@ -1037,6 +1037,36 @@ was removed outright, not kept for backward compatibility — this is now the on
 `rfApiUrl`/`rfProfileId`: reusing another event's registration page would send attendees
 to register for the wrong event.
 
+### 16.9 Detail overlay chip removal + primary/topic-tag field rename ✅ (2026-08-25)
+
+- Removed `.sg-detail__track-stack`/`.sg-detail__track-chip` (16.6's "known gap") from
+  `SessionDetailOverlay.js` and `sessions-guide-overlays.css` entirely — chips are not a
+  thing in the design for this view. `stackedTracks` on `resolveTrackBadge()`'s return
+  value is now dead for this consumer but left in place (still documented at 16.2/16.4);
+  nothing else reads it.
+- The detail overlay's "Track" attr row was pointed at `session.track`, which is actually
+  Primary Event Site Track — wrong per design (that value already renders as the channel
+  badge). The real "Track" topic-tag customAttribute (see `ESP-SESSION-ENDPOINTS.md`) had
+  been extracted once before as `session.category` and removed as dead code at 16.7; it
+  needed to come back for this row specifically.
+- Renamed the session model for clarity, since three real, distinct concepts had been
+  sharing confusable names:
+  - `track` → `primaryTrack` (Primary Event Site Track / Primary Track for Agenda —
+    `PRIMARY_TRACK_ATTRIBUTE_NAMES`, was `TRACK_ATTRIBUTE_NAMES`)
+  - new `tracks` (the `Track` topic-tag customAttribute, multi-value) — only consumed by
+    the detail overlay's "Track" row
+  - `additionalTracks` — unchanged
+  - Helpers: `getSessionTrack()` → `getSessionPrimaryTrack()`,
+    `extractDistinctTracks()` → `extractDistinctPrimaryTracks()`
+  - Not renamed (deliberately generic/separate contracts): `swimlaneOrder[].track` (a
+    swimlane key, which can be a primary track name *or* an override text),
+    `CategoryBadge`'s `track` prop (an arbitrary named-track override), `TrackRow`'s
+    `track` prop (a swimlane display label), and `upcoming-sessions.js`/
+    `featured-sessions.js`'s authored `entry.track` (a separate, homepage-link-authored
+    shape — `tier-1-event-configurator/utils.js`'s `buildSessionAuthorEntry()` still
+    calls `getSessionPrimaryTrack()` to fill it, but keeps the output key `track` to match
+    that contract).
+
 ---
 
 ## Dependency Map

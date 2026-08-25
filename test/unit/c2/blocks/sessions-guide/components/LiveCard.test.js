@@ -19,7 +19,7 @@ const LIVE_SESSION = {
   id: 'session-keynote',
   title: 'MAX Keynote',
   description: 'The opening keynote.',
-  track: 'Featured',
+  primaryTrack: 'Featured',
   // Relative to "now" (not a fixed date) so the session always lands in the
   // 'live' sessionState regardless of when the suite runs.
   startTimeUtc: new Date(Date.now() - 30 * 60 * 1000).toISOString(),

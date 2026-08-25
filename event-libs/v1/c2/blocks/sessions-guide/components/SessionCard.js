@@ -26,7 +26,7 @@ export function SessionCard({ session, forceOnDemand = false, timeDisplay = 'dur
   const [hoverAnim, setHoverAnim] = useState(null);
   const onDemandNatural = isSessionOnDemand(session, getNowMs());
   const onDemand = forceOnDemand || onDemandNatural;
-  const trackColor = getTrackIcon(session.track)?.color || '';
+  const trackColor = getTrackIcon(session.primaryTrack)?.color || '';
 
   const upcomingTimeLabel = (timeDisplay === 'duration' && session.endTimeUtc)
     ? formatDuration(session.startTimeUtc, session.endTimeUtc)
@@ -151,7 +151,7 @@ export function SessionCard({ session, forceOnDemand = false, timeDisplay = 'dur
         >${session.title}</button>
         <p class="sg-card__desc">${session.description}</p>
         <div class="sg-card__footer">
-          <span class="sg-card__track sg-card__track--footer" style=${'color:' + trackColor}>${session.track}</span>
+          <span class="sg-card__track sg-card__track--footer" style=${'color:' + trackColor}>${session.primaryTrack}</span>
           <span class="sg-card__footer-badge"><${CategoryBadge} session=${session} size="sm" /></span>
           <span class="sg-card__time">${timeLabel}</span>
         </div>

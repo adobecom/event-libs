@@ -3,7 +3,7 @@ import { CategoryBadge } from '../../../../../../event-libs/v1/c2/blocks/session
 import { initTierOneEventConfig } from '../../../../../../event-libs/v1/utils/tier-1-event-config.js';
 
 function session(overrides = {}) {
-  return { id: 's-1', track: '', trackOverride: '', additionalTracks: [], ...overrides };
+  return { id: 's-1', primaryTrack: '', trackOverride: '', additionalTracks: [], ...overrides };
 }
 
 describe('CategoryBadge', () => {
@@ -19,21 +19,21 @@ describe('CategoryBadge', () => {
   });
 
   it('renders without throwing', () => {
-    expect(() => CategoryBadge({ session: session({ track: 'Social Media' }) })).to.not.throw();
+    expect(() => CategoryBadge({ session: session({ primaryTrack: 'Social Media' }) })).to.not.throw();
   });
 
   it('applies the color from an exact-key config match', () => {
-    const html = CategoryBadge({ session: session({ track: 'Social Media' }) });
+    const html = CategoryBadge({ session: session({ primaryTrack: 'Social Media' }) });
     expect(html).to.include('--sg-badge-icon-color:#FF6B35');
   });
 
   it('shows the primary track as the label', () => {
-    const html = CategoryBadge({ session: session({ track: 'Social Media' }) });
+    const html = CategoryBadge({ session: session({ primaryTrack: 'Social Media' }) });
     expect(html).to.include('Social Media');
   });
 
   it('falls back to the universal black color (no icon) when the track has no authored config entry', () => {
-    const html = CategoryBadge({ session: session({ track: 'Mainstage' }) });
+    const html = CategoryBadge({ session: session({ primaryTrack: 'Mainstage' }) });
     expect(html).to.include('Mainstage');
     expect(html).to.include('--sg-badge-icon-color:#000000');
   });
@@ -43,12 +43,12 @@ describe('CategoryBadge', () => {
   });
 
   it('applies the --sm modifier class when size is "sm"', () => {
-    const html = CategoryBadge({ session: session({ track: 'Social Media' }), size: 'sm' });
+    const html = CategoryBadge({ session: session({ primaryTrack: 'Social Media' }), size: 'sm' });
     expect(html).to.include('sg-category-badge--sm');
   });
 
   it('shows a +N count when the session has additional tracks', () => {
-    const html = CategoryBadge({ session: session({ track: 'Social Media', additionalTracks: ['Video'] }) });
+    const html = CategoryBadge({ session: session({ primaryTrack: 'Social Media', additionalTracks: ['Video'] }) });
     expect(html).to.include('+1');
   });
 
@@ -68,7 +68,7 @@ describe('CategoryBadge', () => {
 
   it('prefers the override icon over the primary track, since the override wins the badge', () => {
     const html = CategoryBadge({
-      session: session({ track: 'Social Media', trackOverride: 'this is a test' }),
+      session: session({ primaryTrack: 'Social Media', trackOverride: 'this is a test' }),
     });
     expect(html).to.include('this is a test');
     expect(html).to.include('--sg-badge-icon-color:#00AA00');
@@ -76,7 +76,7 @@ describe('CategoryBadge', () => {
   });
 
   it('leaves a mapped track unaffected by the override map', () => {
-    const html = CategoryBadge({ session: session({ track: 'Social Media' }) });
+    const html = CategoryBadge({ session: session({ primaryTrack: 'Social Media' }) });
     expect(html).to.include('--sg-badge-icon-color:#FF6B35');
   });
 });

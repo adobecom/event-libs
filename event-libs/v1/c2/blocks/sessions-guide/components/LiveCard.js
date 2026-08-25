@@ -39,7 +39,7 @@ export function LiveCard({ session, variant = 'live' }) {
     ? formatDuration(session.startTimeUtc, session.endTimeUtc, { short: true })
     : '';
 
-  const trackColor = getTrackIcon(session.track)?.color || '';
+  const trackColor = getTrackIcon(session.primaryTrack)?.color || '';
   const startTime = formatShortTime(session.startTimeUtc, userTz);
   const endTime = session.endTimeUtc ? formatShortTime(session.endTimeUtc, userTz) : '';
   const timeRange = endTime ? `${startTime} – ${endTime}` : startTime;

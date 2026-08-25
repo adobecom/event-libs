@@ -42,7 +42,7 @@ export function resolveSwimlanes(session) {
 // An override always wins the lane and badge over the primary track; a session with neither
 // gets no badge at all. Full case table in PLAN.md §16.2.
 export function resolveTrackBadge(session) {
-  const hasPrimary = !!session.track;
+  const hasPrimary = !!session.primaryTrack;
   const hasOverride = !!session.trackOverride;
   const additional = additionalTracksOf(session);
 
@@ -61,15 +61,15 @@ export function resolveTrackBadge(session) {
     };
   }
 
-  const trackIcon = getTrackIcon(session.track);
+  const trackIcon = getTrackIcon(session.primaryTrack);
   return {
-    label: session.track,
+    label: session.primaryTrack,
     icon: trackIcon?.icon || null,
     color: trackIcon?.color || DEFAULT_ICON_COLOR,
     count: additional.length,
     isOverride: false,
-    swimlanes: [session.track, ...additional],
-    stackedTracks: additional.length > 0 ? [session.track, ...additional] : null,
+    swimlanes: [session.primaryTrack, ...additional],
+    stackedTracks: additional.length > 0 ? [session.primaryTrack, ...additional] : null,
   };
 }
 
@@ -203,7 +203,7 @@ function matchesSearch(session, q) {
     session.title?.toLowerCase().includes(q)
     || session.description?.toLowerCase().includes(q)
     || session.speakers?.some((sp) => sp.name?.toLowerCase().includes(q))
-    || session.track?.toLowerCase().includes(q)
+    || session.primaryTrack?.toLowerCase().includes(q)
     || session.type?.toLowerCase().includes(q)
   );
 }

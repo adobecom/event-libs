@@ -3,7 +3,7 @@ import { useNavigation } from '../context/NavigationContext.js';
 import { useConfigs } from '../context/ConfigsContext.js';
 import { useDA } from '../context/DAContext.js';
 import {
-  copyTextToClipboard, extractDistinctTracks, extractDistinctAllTracks,
+  copyTextToClipboard, extractDistinctPrimaryTracks, extractDistinctAllTracks,
   extractDistinctOverrideTexts, extractDistinctProducts,
   isTrackIconEntryComplete, getDisplayTitle, stringifyConfig, copyHomepageConfigLink,
 } from '../utils.js';
@@ -60,10 +60,10 @@ export default function ConfigEditor() {
     return () => { cancelled = true; };
   }, [eventId, eventServiceEnv, getSessionCatalogForRow]);
 
-  const tracks = useMemo(() => extractDistinctTracks(sessions), [sessions]);
+  const primaryTracks = useMemo(() => extractDistinctPrimaryTracks(sessions), [sessions]);
   // Track icons/colors map every track a session can badge, so it covers Additional Event
-  // Site Tracks too — `tracks` above stays primary-only for the featured-sessions picker,
-  // whose filter matches on the primary track alone.
+  // Site Tracks too — `primaryTracks` above stays primary-only for the featured-sessions
+  // picker, whose filter matches on the primary track alone.
   const iconTracks = useMemo(() => extractDistinctAllTracks(sessions), [sessions]);
   const overrideTexts = useMemo(() => extractDistinctOverrideTexts(sessions), [sessions]);
   const products = useMemo(() => extractDistinctProducts(sessions), [sessions]);
@@ -360,7 +360,7 @@ export default function ConfigEditor() {
             <${FeaturedSessionsEditor} \
               sessions=${sessions} \
               sessionTimes=${sessionTimes} \
-              tracks=${tracks} \
+              tracks=${primaryTracks} \
               featuredSessions=${activeConfig.config[homepageMeta.field]} \
               onChange=${(next) => updateConfigField(homepageMeta.field, next)} \
               heading="${homepageMeta.label} (display order)" \

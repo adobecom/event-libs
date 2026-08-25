@@ -43,7 +43,10 @@ export function normalizeSessions(rawSessions) {
     startTimeUtc: s.startTimeUtc || '',
     endTimeUtc: s.endTimeUtc || '',
     duration: s.duration || 0,
-    track: s.track || '',
+    primaryTrack: s.primaryTrack || '',
+    // The `Track` topic-tag attribute — distinct from `primaryTrack` (Primary Event Site
+    // Track) and `additionalTracks`. Only consumed by the detail overlay's "Track" attr row.
+    tracks: coerceArray(s.tracks),
     type: s.type || '',
     technicalLevel: s.technicalLevel || '',
     contentCategory: coerceArray(s.contentCategory),
@@ -85,7 +88,7 @@ export function normalizeSessions(rawSessions) {
 }
 
 // MAX26 name first, MAX25 fallback. Exported so the configurator shares one copy.
-export const TRACK_ATTRIBUTE_NAMES = ['Primary Event Site Track', 'Primary Track for Agenda (Digital Agenda)'];
+export const PRIMARY_TRACK_ATTRIBUTE_NAMES = ['Primary Event Site Track', 'Primary Track for Agenda (Digital Agenda)'];
 
 // Folded because the catalog is inconsistent (`In-Person` / `In person` / slug forms).
 // See "Format value folding" in docs/sessions-guide-implementation-notes.md.
@@ -114,15 +117,15 @@ export function parseDvrDelayHours(rawValue) {
 }
 
 // Shared by both configurators so neither imports the other's UI code.
-export function getSessionTrack(session) {
-  const attr = (session?.customAttributes || []).find((a) => TRACK_ATTRIBUTE_NAMES.includes(a?.name));
+export function getSessionPrimaryTrack(session) {
+  const attr = (session?.customAttributes || []).find((a) => PRIMARY_TRACK_ATTRIBUTE_NAMES.includes(a?.name));
   return attr?.values?.[0]?.label ?? attr?.values?.[0]?.value ?? null;
 }
 
-export function extractDistinctTracks(sessions) {
+export function extractDistinctPrimaryTracks(sessions) {
   const tracks = new Set();
   (sessions || []).forEach((session) => {
-    const value = getSessionTrack(session);
+    const value = getSessionPrimaryTrack(session);
     if (value) tracks.add(value);
   });
   return [...tracks].sort();
@@ -140,7 +143,7 @@ export function getSessionAdditionalTracks(session) {
 export function extractDistinctAllTracks(sessions) {
   const tracks = new Set();
   (sessions || []).forEach((session) => {
-    const primary = getSessionTrack(session);
+    const primary = getSessionPrimaryTrack(session);
     if (primary) tracks.add(primary);
     getSessionAdditionalTracks(session).forEach((value) => tracks.add(value));
   });
@@ -342,7 +345,10 @@ export function mapEslPayloadToRawSessions(payload) {
       startTimeUtc: firstTime ? new Date(firstTime.startTimeMillis).toISOString() : '',
       endTimeUtc: firstTime ? new Date(firstTime.endTimeMillis).toISOString() : '',
       duration: session.sessionLengthInMinutes || 0,
-      track: extractCustomAttributeValue(session, TRACK_ATTRIBUTE_NAMES),
+      primaryTrack: extractCustomAttributeValue(session, PRIMARY_TRACK_ATTRIBUTE_NAMES),
+      // "Track" is a real, distinct attribute from `PRIMARY_TRACK_ATTRIBUTE_NAMES` above —
+      // a topic-tag, not the Primary Event Site Track. See ESP-SESSION-ENDPOINTS.md.
+      tracks: extractCustomAttributeValues(session, 'Track'),
       contentCategory: extractCustomAttributeValues(session, ['Category', 'Programming Category']),
       // MAX26-only; no MAX25 fallback needed.
       additionalTracks: extractCustomAttributeValues(session, 'Additional Event Site Tracks'),

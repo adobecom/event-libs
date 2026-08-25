@@ -16,12 +16,12 @@ const BASE_CONFIG = {
 };
 
 const SESSION_A = {
-  id: 'a', title: 'Session A', description: 'Desc A', track: 'Design',
+  id: 'a', title: 'Session A', description: 'Desc A', primaryTrack: 'Design',
   startTimeUtc: '2099-10-28T17:00:00Z', endTimeUtc: '2099-10-28T18:00:00Z',
   inPerson: false, sessionPageUrl: '/a',
 };
 const SESSION_B = {
-  id: 'b', title: 'Session B', description: 'Desc B', track: 'Video',
+  id: 'b', title: 'Session B', description: 'Desc B', primaryTrack: 'Video',
   startTimeUtc: '2099-10-28T17:00:00Z', endTimeUtc: '2099-10-28T18:00:00Z',
   inPerson: false, sessionPageUrl: '/b',
 };

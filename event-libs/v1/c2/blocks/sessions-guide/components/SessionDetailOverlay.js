@@ -126,7 +126,7 @@ export function SessionDetailOverlay({ onBack }) {
   // is deliberately absent: it is not in this list and does not exist in the real catalog.
   const attrs = [
     ['Technical level', session.technicalLevel],
-    ['Track', session.track],
+    ['Track', session.tracks?.join(', ')],
     ['AI focus', session.aiFocus?.join(', ')],
     ['Audience', session.audience?.join(', ')],
     ['Category', session.contentCategory?.join(', ')],
