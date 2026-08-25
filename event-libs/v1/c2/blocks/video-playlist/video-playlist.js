@@ -431,6 +431,11 @@ function buildTopicView(el, allRows, {
       type: 'button',
       class: 'video-playlist-show-more',
       'aria-expanded': 'false',
+      // Per Figma's accessibility spec: accessible name "Show more sessions" (not just
+      // the visible "Show more" text) — the visible label stays "Show more"/"Show less"
+      // per the design, but the aria-label spells out what's being expanded for
+      // assistive tech, same as it toggles below.
+      'aria-label': 'Show more sessions',
       ...analyticsAttrs('playlist-show-more'),
     }, '', { parent: el });
     const label = createTag('span', {}, 'Show more', { parent: showMore });
@@ -439,6 +444,7 @@ function buildTopicView(el, allRows, {
     showMore.addEventListener('click', () => {
       const expanded = list.classList.toggle('is-showing-more');
       showMore.setAttribute('aria-expanded', String(expanded));
+      showMore.setAttribute('aria-label', expanded ? 'Show less sessions' : 'Show more sessions');
       label.textContent = expanded ? 'Show less' : 'Show more';
     });
   }
