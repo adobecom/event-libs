@@ -114,17 +114,10 @@ export function SessionDetailOverlay({ onBack }) {
     e.stopPropagation();
     const shareUrl = window.location.origin + setSessionParam(sessionParamValue(session));
     try {
-      if (navigator.share) {
-        await navigator.share({ title: session.title, url: shareUrl });
-      } else if (navigator.clipboard?.writeText) {
-        await navigator.clipboard.writeText(shareUrl);
-        showToast({ message: 'Link copied', variant: 'positive' });
-      }
+      await navigator.clipboard.writeText(shareUrl);
+      showToast({ message: 'Link copied!', variant: 'positive' });
     } catch (err) {
-      // Swallow the user-cancelled share dialog; log anything else.
-      if (err?.name !== 'AbortError') {
-        window.lana?.log(`[sessions-guide] detail share failed: ${err.message}`);
-      }
+      window.lana?.log(`[sessions-guide] detail share failed: ${err.message}`);
     }
   }
 

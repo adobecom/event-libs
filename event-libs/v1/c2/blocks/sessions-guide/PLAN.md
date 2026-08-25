@@ -684,7 +684,7 @@ No longer a reducer case (`LIVE_STATUS_UPDATE` doesn't exist). Implemented as a 
   - Live/on-demand sessions: Watch now link (primary) + Favorite icon button + Share icon button
 - Description expand/collapse: "More" / "Less" button with `is-expanded` class; local `descExpanded` state
 - Attributes list, in this fixed order per design: **Technical level, Track, AI focus, Audience, Category** (each row hidden when its value is empty). `AI focus` has no catalog attribute yet, so it never renders today; `Industry` was removed from this list and is not in the real catalog either.
-- Share: `navigator.share()` if available; else `navigator.clipboard.writeText()` with "Link copied" toast; swallows `AbortError`
+- Share: always `navigator.clipboard.writeText()` with "Link copied!" toast (no native share sheet)
 
 ### 6.2 URL param for open overlay (widget) ✅
 - `DrawerShell` handles `handleDetailBack()`: pushes `setSessionsParam()` URL
