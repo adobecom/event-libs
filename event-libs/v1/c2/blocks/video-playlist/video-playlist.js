@@ -216,17 +216,33 @@ class Drawer {
     });
   }
 
+  // Dragging (see #bindDrag below) is allowed to go all the way to the top of the
+  // viewport — deliberately NOT the same title/player-avoiding cap the chevron toggle's
+  // own fixed expand target uses (measureCapPx above, left untouched). The user is
+  // explicitly choosing to cover the title (and even the player, if they drag that far)
+  // via a direct manipulation gesture, which is a different intent than the toggle's own
+  // one-tap "open to a sensible default" behavior — per product, this also matters most
+  // in landscape, where the toggle's own cap can otherwise be too small to see the list.
+  measureDragCapPx() {
+    return window.innerHeight;
+  }
+
   applyMobileHeight() {
     if (this.isDesktop()) {
       this.el.style.maxHeight = '';
       return;
     }
-    const cap = this.measureCapPx();
+    // A persisted drag height (see #bindDrag's own onPointerUp, which no longer clears
+    // this on release) is re-clamped against measureDragCapPx() — the same full-viewport
+    // ceiling dragging itself respects — not measureCapPx()'s title-avoiding cap, so a
+    // free-form height the user chose past that cap doesn't get silently snapped back
+    // down the next time this runs (e.g. on window resize).
     if (this.dragHeightPx != null) {
-      this.el.style.maxHeight = `${Math.min(Math.max(this.dragHeightPx, DRAWER_FLOOR_PX), cap)}px`;
+      const dragCap = this.measureDragCapPx();
+      this.el.style.maxHeight = `${Math.min(Math.max(this.dragHeightPx, DRAWER_FLOOR_PX), dragCap)}px`;
       return;
     }
-    this.el.style.maxHeight = this.expanded ? `${cap}px` : `${DRAWER_FLOOR_PX}px`;
+    this.el.style.maxHeight = this.expanded ? `${this.measureCapPx()}px` : `${DRAWER_FLOOR_PX}px`;
   }
 
   #apply() {
@@ -252,22 +268,29 @@ class Drawer {
 
     const onPointerMove = (event) => {
       if (dragStartY == null) return;
-      const cap = this.measureCapPx();
+      const cap = this.measureDragCapPx();
       const delta = dragStartY - event.clientY;
       const next = Math.min(Math.max(dragStartHeight + delta, DRAWER_FLOOR_PX), cap);
       this.dragHeightPx = next;
       this.el.style.maxHeight = `${next}px`;
     };
 
+    // Free-form: the drawer stays exactly where the user drags it to, clamped only
+    // between DRAWER_FLOOR_PX and measureDragCapPx() (the full viewport, not the
+    // toggle's own title/player-avoiding cap) — no snapping to a fixed
+    // expanded/collapsed state on release. `expanded` still tracks whether the drawer
+    // ended up past the (unrelated) chevron-toggle cap's own midpoint, purely so
+    // aria-expanded/the chevron's rotation reflect "open" vs "closed" correctly; it no
+    // longer drives the actual rendered height once a drag height is set (see
+    // applyMobileHeight's own dragHeightPx branch).
     const onPointerUp = () => {
       if (dragStartY == null) return;
       dragStartY = null;
       window.removeEventListener('pointermove', onPointerMove);
       window.removeEventListener('pointerup', onPointerUp);
-      const cap = this.measureCapPx();
-      const midpoint = (DRAWER_FLOOR_PX + cap) / 2;
+      const toggleCap = this.measureCapPx();
+      const midpoint = (DRAWER_FLOOR_PX + toggleCap) / 2;
       const endedHeight = this.dragHeightPx ?? dragStartHeight;
-      this.dragHeightPx = null;
       this.expanded = endedHeight >= midpoint;
       this.#apply();
     };
