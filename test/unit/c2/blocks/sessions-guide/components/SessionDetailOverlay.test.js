@@ -124,24 +124,14 @@ describe('SessionDetailOverlay', () => {
     });
   });
 
-  // The disclaimer is authored HTML, rendered via dangerouslySetInnerHTML. The htm stub
-  // renders object-valued attributes as `=""`, so the injected markup cannot be asserted from
-  // here -- utils/rich-text.test.js covers the sanitizing and link rewriting directly. What
-  // this pins is that the wrapper appears only when the field is set.
+  // The disclaimer is sourced from the public sessions catalog, which is reachable before an
+  // event goes live. It never renders in the guide's overlay, authored or not -- the
+  // individual session page hydrates it directly on page creation instead.
   describe('legal disclaimer', () => {
-    it('omits the wrapper when the field is empty', () => {
+    it('never renders, even when the field is authored', () => {
       expect(render()).to.not.include('sg-detail__legal-disclaimer');
-    });
-
-    it('renders the wrapper when the field is authored', () => {
       const out = render({ legalDisclaimer: '<p><b>Copyrighted by Adobe Inc.</b></p>' });
-      expect(out).to.include('sg-detail__legal-disclaimer');
-    });
-
-    // A div, because the authored value brings its own <p> and <p><p> is invalid nesting.
-    it('wraps it in a div, not a paragraph', () => {
-      const out = render({ legalDisclaimer: '<p>Legal.</p>' });
-      expect(out).to.match(/<div[^>]*class="sg-detail__legal-disclaimer"/);
+      expect(out).to.not.include('sg-detail__legal-disclaimer');
     });
   });
 
@@ -187,29 +177,15 @@ describe('SessionDetailOverlay', () => {
     });
   });
 
-  // Figma 8:6754: the pod keeps its heading and shows one non-interactive card instead of
-  // disappearing. This is the state every session is in today -- resources[] has no backend
-  // source yet, so the real catalog always returns it empty.
+  // Session resources are sourced from the public sessions catalog, which is reachable before
+  // an event goes live. The pod never renders in the guide's overlay -- the individual session
+  // page hydrates it directly on page creation instead.
   describe('session resources', () => {
-    it('still renders the pod, with an empty-state card, when there are none', () => {
-      const out = render({ resources: [] });
-      expect(out).to.include('sg-detail__group--resources');
-      expect(out).to.include('Session resources');
-      expect(out).to.include('sg-detail__resource-card--empty');
-      expect(out).to.include('No materials available for this session');
-    });
-
-    it('offers no Show more toggle in the empty state', () => {
-      const out = render({ resources: [] });
-      expect(out).to.not.include('sg-detail-resources');
-      expect(out).to.not.include('session resources');
-    });
-
-    it('renders real resources as links, with no empty-state card', () => {
+    it('never renders the pod, with or without resources', () => {
+      expect(render({ resources: [] })).to.not.include('sg-detail__group--resources');
       const out = render({ resources: [{ title: 'Sample PSD', url: 'https://example.com/a.psd' }] });
-      expect(out).to.include('Sample PSD');
-      expect(out).to.include('href="https://example.com/a.psd"');
-      expect(out).to.not.include('sg-detail__resource-card--empty');
+      expect(out).to.not.include('sg-detail__group--resources');
+      expect(out).to.not.include('Sample PSD');
     });
   });
 
@@ -305,27 +281,6 @@ describe('SessionDetailOverlay', () => {
     it('falls back to a placeholder when a speaker has no photo', () => {
       const out = render({ speakers: [speakers[0]] });
       expect(out).to.include('sg-detail__speaker-photo--placeholder');
-    });
-  });
-
-  describe('session resources', () => {
-    const resources = [
-      { title: 'Sample PSD', url: 'https://example.com/a.psd' },
-      { title: 'Presentation', url: 'https://example.com/b.pdf', action: 'Open' },
-      { title: 'Extra', url: 'https://example.com/c.pdf' },
-    ];
-
-    it('collapses past two and honours a per-resource action label', () => {
-      const out = render({ resources });
-      expect(out).to.include('Sample PSD');
-      expect(out).to.include('Open');
-      expect(out).to.not.include('Extra');
-      expect(out).to.include('aria-controls="sg-detail-resources"');
-    });
-
-    it('defaults the action label to Download', () => {
-      const out = render({ resources: [resources[0]] });
-      expect(out).to.include('Download');
     });
   });
 

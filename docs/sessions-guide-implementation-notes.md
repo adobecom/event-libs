@@ -184,19 +184,22 @@ disagree on the slash. It is **authored HTML**, rendered through `utils/rich-tex
 
 ### Authored HTML
 
-`legalDisclaimer` (`Legal Disclaimer`) and `ipodOrGdprCopy` (`IPOD or GDPR Copy`) both arrive as
-HTML — `<p>`, `<b>`/`<strong>`, `<br/>` and links. `utils/rich-text.js`'s `sanitizedRichText()`
-runs them through the vendored `deps/html-sanitizer.js` (whitelisted tags/attributes,
-protocol-checked hrefs) and forces links to `target="_blank" rel="noopener noreferrer"` —
-following a legal link in place would discard the visitor's position in the drawer.
-
-Both render into a `<div>`, not a `<p>`: the values bring their own paragraphs and `<p><p>` is
-invalid nesting, so the browser would close the outer one and the styling would fall off.
+`ipodOrGdprCopy` (`IPOD or GDPR Copy`) arrives as HTML — `<p>`, `<b>`/`<strong>`, `<br/>` and
+links. `utils/rich-text.js`'s `sanitizedRichText()` runs it through the vendored
+`deps/html-sanitizer.js` (whitelisted tags/attributes, protocol-checked hrefs) and forces links
+to `target="_blank" rel="noopener noreferrer"` — following a legal link in place would discard
+the visitor's position in the drawer. It renders into a `<div>`, not a `<p>`: the value brings
+its own paragraphs and `<p><p>` is invalid nesting, so the browser would close the outer one and
+the styling would fall off.
 
 The htm test stub renders object-valued attributes as `=""`, so `dangerouslySetInnerHTML`
 content never reaches the asserted string — component tests can only assert the wrapper, and
 the markup itself is covered in `rich-text.test.js`. Verify rendering in a browser via
 `not-tracked/sg-detail-preview.html`.
+
+`legalDisclaimer` (`Legal Disclaimer`) is carried on the session but deliberately never
+rendered in this overlay — see "Session resources and legal disclaimer are pre-event
+sensitive" below.
 
 ### Attribute list
 
@@ -209,11 +212,15 @@ doesn't exist in the real catalog either.
 `sg-detail__count` appears only when the list is actually truncated, so it tracks the Show more
 toggle exactly: over 6 products (`COLLAPSED_PRODUCTS`), over 5 speakers (`COLLAPSED_SPEAKERS`).
 
-### Empty session resources
+### Session resources and legal disclaimer are pre-event sensitive
 
-The pod keeps its heading and shows one non-interactive card instead of disappearing. This is
-the state every session is in today — `resources[]` has no backend source yet, so the catalog
-always returns it empty.
+Neither the "Session resources" pod nor the legal disclaimer renders in the detail overlay.
+Both are sourced from the public sessions catalog endpoint, which is reachable before an event
+goes live, so surfacing them here would leak that data pre-event. The individual session page
+hydrates both directly on page creation instead, where the exposure isn't a pre-event leak.
+`resources` and `legalDisclaimer` are still carried on the normalized session object
+(`services/sessions/sessions-api.js`) for that consumer — they are just never read by
+`SessionDetailOverlay.js`.
 
 ### Full-height body
 
@@ -307,8 +314,8 @@ Things that look removable and are not:
 - **Mobile takeover padding must follow the base rule, not lead it.** A media query adds no
   specificity, so the later declaration of the property wins.
 - **Show more gap top-ups.** Figma opens the gap between a list and its Show more toggle wider
-  than the 16px pod gap — 20px in products, 24px in speakers and resources. The pod's own gap
-  covers 16; the per-pod rules top up the remainder.
+  than the 16px pod gap — 20px in products, 24px in speakers. The pod's own gap covers 16; the
+  per-pod rules top up the remainder.
 
 ### Dark theme
 

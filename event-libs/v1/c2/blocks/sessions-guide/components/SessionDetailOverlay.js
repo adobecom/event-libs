@@ -20,17 +20,16 @@ import { resolveTrackBadge } from '../utils/session-filters.js';
 import { isBehaviorEnabled } from '../utils/behavior-flags.js';
 import { scrollBehavior } from '../utils/motion.js';
 
-// Collapsed lengths of the three list pods, per the Figma frames (products 1325:141847,
-// speakers 1325:141990, resources 1325:142031). A pod only grows a "Show more" toggle when
-// it actually has more than this.
+// Collapsed lengths of the list pods, per the Figma frames (products 1325:141847,
+// speakers 1325:141990). A pod only grows a "Show more" toggle when it actually has more
+// than this.
 const COLLAPSED_PRODUCTS = 6;
 const COLLAPSED_SPEAKERS = 5;
-const COLLAPSED_RESOURCES = 2;
 
 // Only the desktop frame splits the pods into two columns (1323:139140). Tracked reactively
 // — and used to pick the DOM order rather than CSS `order`, so tab order always follows what
-// is on screen: summary → products → speakers → resources when stacked, column by column
-// when split. Same hook shape as FilterPanel.js's useIsMobile().
+// is on screen: summary → products → speakers when stacked, column by column when split.
+// Same hook shape as FilterPanel.js's useIsMobile().
 const DESKTOP_QUERY = '(min-width: 1280px)';
 const matchesDesktop = () => !!window.matchMedia?.(DESKTOP_QUERY).matches;
 
@@ -54,7 +53,6 @@ export function SessionDetailOverlay({ onBack }) {
   const [descExpanded, setDescExpanded] = useState(false);
   const [productsExpanded, setProductsExpanded] = useState(false);
   const [speakersExpanded, setSpeakersExpanded] = useState(false);
-  const [resourcesExpanded, setResourcesExpanded] = useState(false);
   const isDesktop = useIsDesktop();
 
   const session = sessions.value.find((s) => s.id === activeSessionId);
@@ -145,10 +143,8 @@ export function SessionDetailOverlay({ onBack }) {
   // toggle is only offered when it changes what's on screen.
   const products = session.products || [];
   const speakers = session.speakers || [];
-  const resources = session.resources || [];
   const shownProducts = productsExpanded ? products : products.slice(0, COLLAPSED_PRODUCTS);
   const shownSpeakers = speakersExpanded ? speakers : speakers.slice(0, COLLAPSED_SPEAKERS);
-  const shownResources = resourcesExpanded ? resources : resources.slice(0, COLLAPSED_RESOURCES);
 
   // Shared "Show more"/"Show less" affordance for the list pods — same markup as the
   // description's More/Less toggle, with an explicit label for screen readers since the
@@ -286,33 +282,6 @@ export function SessionDetailOverlay({ onBack }) {
             </div>
   `;
 
-  // The pod renders whether or not there are resources: with none, Figma 8:6754 keeps the
-  // heading and puts a single non-interactive card in place of the list, rather than dropping
-  // the section. Worth knowing this is the state every session is in today — `resources[]` has
-  // no backend source yet, so the catalog always returns it empty.
-  const hasResources = resources.length > 0;
-  const resourcesPod = html`
-              <div class="sg-detail__group sg-detail__group--resources">
-                <h3 class="sg-detail__section-label">Session resources</h3>
-                ${hasResources
-    ? html`
-                      <div class="sg-detail__resources" id="sg-detail-resources">
-                        ${shownResources.map((r) => html`
-                          <a class="sg-detail__resource-card" href=${safeUrl(r.url)} target="_blank" rel="noopener noreferrer">
-                            <span class="sg-detail__resource-name">${r.title || r.label || r.url}</span>
-                            <span class="sg-detail__resource-action">${r.action || 'Download'}</span>
-                          </a>
-                        `)}
-                      </div>`
-    : html`
-                      <div class="sg-detail__resources">
-                        <p class="sg-detail__resource-card sg-detail__resource-card--empty">No materials available for this session</p>
-                      </div>`}
-                ${hasResources && resources.length > COLLAPSED_RESOURCES
-    && showMoreToggle(resourcesExpanded, setResourcesExpanded, 'session resources', 'sg-detail-resources')}
-              </div>
-  `;
-
   const productsPod = products.length > 0 && html`
               <div class="sg-detail__group sg-detail__group--products">
                 <h3 class="sg-detail__section-label">
@@ -367,22 +336,18 @@ export function SessionDetailOverlay({ onBack }) {
               </div>
   `;
 
-  // Authored HTML, not text — a div because the value's own <p> tags cannot nest inside one.
-  const legalDisclaimer = session.legalDisclaimer && html`
-              <div
-                class="sg-detail__legal-disclaimer"
-                dangerouslySetInnerHTML=${{ __html: sanitizedRichText(session.legalDisclaimer) }}
-              ></div>`;
-
   // Desktop splits into a wide main column and a 383px side column, each stacking its own
   // pods; every narrower width is one stack in reading order. The order lives here rather
   // than in CSS so the tab order matches what is on screen at both layouts.
+  //
+  // Session resources and the legal disclaimer are deliberately not rendered here: both are
+  // sourced from the public sessions catalog, which is reachable before an event goes live.
+  // Individual session pages hydrate them directly on page creation instead, where exposure
+  // isn't a pre-event leak.
   const pods = isDesktop
     ? html`
           <div class="sg-detail__col sg-detail__col--main">
             ${summaryPod}
-            ${resourcesPod}
-            ${legalDisclaimer}
           </div>
           <div class="sg-detail__col sg-detail__col--side">
             ${productsPod}
@@ -393,8 +358,6 @@ export function SessionDetailOverlay({ onBack }) {
           ${summaryPod}
           ${productsPod}
           ${speakersPod}
-          ${resourcesPod}
-          ${legalDisclaimer}
         `;
 
   return html`

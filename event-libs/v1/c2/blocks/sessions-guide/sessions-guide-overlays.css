@@ -126,8 +126,7 @@
   margin-top: 4px;
 }
 
-.sg-detail__group--speakers .sg-detail__more,
-.sg-detail__group--resources .sg-detail__more {
+.sg-detail__group--speakers .sg-detail__more {
   margin-top: var(--s2a-spacing-xs);
 }
 
@@ -227,20 +226,17 @@
   color: var(--s2a-color-content-default);
 }
 
-/* Shared by both authored-HTML blocks: neutralise the margins the browser applies to markup
-   we did not author, and make links legible without recolouring them. */
-.sg-detail__legal p,
-.sg-detail__legal-disclaimer p {
+/* Neutralise the margins the browser applies to markup we did not author, and make links
+   legible without recolouring them. */
+.sg-detail__legal p {
   margin: 0 0 var(--s2a-spacing-xs);
 }
 
-.sg-detail__legal p:last-child,
-.sg-detail__legal-disclaimer p:last-child {
+.sg-detail__legal p:last-child {
   margin-bottom: 0;
 }
 
-.sg-detail__legal a,
-.sg-detail__legal-disclaimer a {
+.sg-detail__legal a {
   color: inherit;
   text-decoration: underline;
 }
@@ -566,57 +562,6 @@
   color: var(--s2a-color-gray-600);
 }
 
-/* ── Session resources ───────────────────────────────────── */
-
-.sg-detail__resources {
-  display: flex;
-  flex-direction: column;
-  gap: var(--s2a-spacing-xs);
-}
-
-.sg-detail__resource-card {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--s2a-spacing-md);
-  padding: var(--s2a-spacing-md);
-  border: 2px solid var(--s2a-color-border-subtle);
-  border-radius: var(--s2a-border-radius-md);
-  background: var(--s2a-color-background-default);
-  text-decoration: none;
-}
-
-/* Empty state: the resource card frame, non-interactive, gray-600 copy per the design. */
-.sg-detail__resource-card--empty {
-  justify-content: flex-start;
-  margin: 0;
-  font-size: var(--s2a-font-size-md);
-  line-height: 24px;
-  color: var(--s2a-color-gray-600);
-}
-
-.sg-detail__resource-name {
-  font-size: var(--s2a-font-size-md);
-  line-height: 24px;
-  color: var(--s2a-color-content-default);
-}
-
-.sg-detail__resource-action {
-  font-weight: var(--s2a-font-weight-adobe-clean-bold);
-  font-size: var(--s2a-font-size-md);
-  line-height: 24px;
-  color: var(--s2a-color-content-default);
-  white-space: nowrap;
-}
-
-/* Authored HTML. Sits outside any pod, so it carries the pods' padding to align its text. */
-.sg-detail__legal-disclaimer {
-  font-size: var(--s2a-font-size-xs);
-  color: var(--s2a-color-content-subtle);
-  margin: 0;
-  padding-inline: var(--s2a-spacing-lg);
-}
-
 /* ── Tablet: pods float on the tinted body, still one column (Figma 1299:69634) ── */
 
 @media (min-width: 768px) {
@@ -675,15 +620,6 @@
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: var(--s2a-spacing-md);
     align-items: start;
-  }
-
-  .sg-detail__resources {
-    flex-direction: row;
-  }
-
-  .sg-detail__resource-card {
-    flex: 1 0 0;
-    min-width: 0;
   }
 }
 
@@ -1333,9 +1269,7 @@
 }
 
 [data-theme="dark"] .sg-detail__product-card,
-.sg-portal[data-theme="dark"] .sg-detail__product-card,
-[data-theme="dark"] .sg-detail__resource-card,
-.sg-portal[data-theme="dark"] .sg-detail__resource-card {
+.sg-portal[data-theme="dark"] .sg-detail__product-card {
   background: transparent;
   border-color: var(--s2a-color-border-subtle);
 }
