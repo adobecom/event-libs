@@ -291,7 +291,9 @@ const SHOW_MORE_CHEVRON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="8"
 function setFavoriteButtonState(button, item, isFav) {
   button.classList.toggle('is-favorited', isFav);
   button.setAttribute('aria-pressed', String(isFav));
-  button.setAttribute('aria-label', `${isFav ? 'Remove' : 'Add'} ${item.title} ${isFav ? 'from' : 'to'} favorites`);
+  // Per Figma's accessibility spec: "Favorite [session title]" / "Unfavorite [session
+  // title]" — not the previous "Add/Remove ... to/from favorites" phrasing.
+  button.setAttribute('aria-label', `${isFav ? 'Unfavorite' : 'Favorite'} ${item.title}`);
   button.setAttribute('daa-ll', isFav ? 'playlist-item-unfavorite' : 'playlist-item-favorite');
 }
 
@@ -301,6 +303,16 @@ function buildFavoriteButton(item) {
 
   button.addEventListener('click', async (event) => {
     event.stopPropagation();
+    // A mouse/touch click reports a nonzero event.detail (the click count); a
+    // keyboard-triggered click (Enter/Space) always reports 0. Blurring only in the
+    // mouse case clears the lingering :focus-within that otherwise keeps
+    // .video-playlist-row-actions visible after the pointer leaves — clicking the
+    // button focuses it by default, and CSS treats focus the same as hover for
+    // revealing the actions column, so without this a mouse click leaves the row
+    // looking "stuck" open until something else steals focus. Keyboard users still
+    // keep the actions column visible while tabbed to it, which is the correct,
+    // intentional behavior for that input method.
+    if (event.detail > 0) button.blur();
     if (pendingActions.value.has(item.id)) return;
     await toggleFavoriteWithFeedback(item, {
       eventConfig: EVENT_CONFIG,
@@ -310,15 +322,20 @@ function buildFavoriteButton(item) {
   return button;
 }
 
-function buildPlayButton(activate) {
+// Per Figma's accessibility spec: a real, focusable button with its own name ("Play
+// [session title]") — not aria-hidden/tabindex="-1" as before. Its own click still does
+// exactly what clicking the row itself does (see `activate` in buildRow); this only
+// gives keyboard/assistive-tech users an explicit, separately-labeled way to trigger the
+// same action, rather than relying solely on the row's own (differently-labeled) link.
+function buildPlayButton(activate, title) {
   const button = createTag('button', {
     type: 'button',
     class: 'video-playlist-row-play',
-    'aria-hidden': 'true',
-    tabindex: '-1',
+    'aria-label': `Play ${title}`,
   }, PLAY_ICON_SVG);
   button.addEventListener('click', (event) => {
     event.stopPropagation();
+    if (event.detail > 0) button.blur();
     activate();
   });
   return button;
@@ -353,7 +370,7 @@ function buildRow(item, { onSelect }) {
   const activate = () => onSelect(item, row);
   const actions = createTag('div', { class: 'video-playlist-row-actions' }, '', { parent: row });
   actions.appendChild(buildFavoriteButton(item));
-  actions.appendChild(buildPlayButton(activate));
+  actions.appendChild(buildPlayButton(activate, item.title));
 
   return row;
 }
