@@ -6,6 +6,7 @@ import {
   initSessionState,
   openSessionGuideDetail,
 } from '../../../utils/session-store.js';
+import { getNowMs } from '../../../utils/session-state.js';
 import { getTrackIcon } from '../../../utils/tier-1-event-config.js';
 import { resolveIcon } from '../../../features/icons/icon-resolver.js';
 import { toggleScheduleWithFeedback, toggleFavoriteWithFeedback } from '../../../services/sessions/action-feedback.js';
@@ -14,17 +15,6 @@ import { registerStreamIds, unregisterStreamIds, subscribe } from '../../../serv
 const ROTATE_OUT_MS = 350;
 const SLIDE_MS = 350;
 const SLIDE_EASING = 'cubic-bezier(0.22, 1, 0.36, 1)';
-
-const TIMING_OVERRIDE_OFFSET_MS = (() => {
-  const raw = new URLSearchParams(window.location.search).get('timing');
-  if (!raw) return null;
-  const parsed = Number(raw);
-  return Number.isFinite(parsed) ? parsed - Date.now() : null;
-})();
-
-function now() {
-  return TIMING_OVERRIDE_OFFSET_MS === null ? Date.now() : Date.now() + TIMING_OVERRIDE_OFFSET_MS;
-}
 
 const EVENT_CONFIG = { title: '', showConflictModal: false, registerUrl: '/register' };
 
@@ -304,7 +294,7 @@ function scheduleStateTimers(sessions, dropSession) {
     const { sessionTime } = session;
     if (!sessionTime) return;
 
-    const untilStart = sessionTime.startTimeMillis - now();
+    const untilStart = sessionTime.startTimeMillis - getNowMs();
     if (untilStart > 0) {
       timers.push(setTimeout(() => dropSession(session.sessionId), untilStart));
     } else {
@@ -339,7 +329,7 @@ function startMobileRiderPolling(sessions, onStarted) {
 
   const startTimers = [];
   mrSessions.forEach((s) => {
-    const untilStart = (s.sessionTime?.startTimeMillis ?? 0) - now();
+    const untilStart = (s.sessionTime?.startTimeMillis ?? 0) - getNowMs();
     if (untilStart > 0) {
       startTimers.push(setTimeout(() => onDue(s.mrStreamId), untilStart));
     } else {

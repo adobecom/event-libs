@@ -74,14 +74,17 @@ derived fresh per render, not diffed), but the track's `scrollLeft` is captured 
 restored across that rebuild so a background update (e.g. a session going live) doesn't
 yank a mid-browse user back to the start of the carousel.
 
-## `?timing=<epoch-ms>` override
+## `?serverTime=<epoch-ms>` override
 
 Lets QA simulate "now" as any instant (e.g. right before a session starts, or mid-live)
-without waiting for real time to pass. Read once at module load as an *offset* from the
-real clock (not a frozen value) — `now()` still advances in real time from that point,
-so `setTimeout`-based timers and the MR poll keep firing correctly relative to it.
-Absent/invalid `timing` falls back to the real `Date.now()`. The identical override
-exists in `event-card/session-routing.js`.
+without waiting for real time to pass. Uses the shared `getNowMs()` override from
+`utils/session-state.js` — read once at page load as an origin (not a frozen value), so
+time still advances in real time from that point, and `setTimeout`-based timers and the
+MR poll keep firing correctly relative to it. Absent/invalid `serverTime` falls back to
+the real `Date.now()`. The same override drives `utils/session-routing.js` (used by
+`event-card`), `sessions-guide`, and the rest of the Timing Framework, so one
+`serverTime` value simulates "now" consistently across every time-aware block on the
+page.
 
 ## Re-decoration cleanup
 
