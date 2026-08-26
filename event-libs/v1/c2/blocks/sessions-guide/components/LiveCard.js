@@ -110,7 +110,7 @@ export function LiveCard({ session, variant = 'live' }) {
   if (sessionState === 'upcoming') {
     if (variant === 'recommended' && schedulingEnabled) {
       primaryCta = html`<button
-        class=${'sg-live-card__btn sg-live-card__btn--watch' + (isScheduled ? ' is-scheduled' : '') + (isPending ? ' is-pending' : '')}
+        class=${'sg-live-card__btn sg-live-card__btn--schedule-cta' + (isScheduled ? ' is-scheduled' : '') + (isPending ? ' is-pending' : '')}
         onclick=${handleSchedule}
         disabled=${isPending}
         daa-ll=${isScheduled ? 'Remove-from-Schedule' : 'Add-to-Schedule'}

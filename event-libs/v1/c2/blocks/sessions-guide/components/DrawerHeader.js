@@ -44,12 +44,22 @@ export function filterButtonLabel(activeFilterCount) {
   return activeFilterCount > 0 ? `Filter sessions, ${activeFilterCount} active` : 'Filter sessions';
 }
 
+// True once the desktop breakpoint's inline search (not the mobile/tablet below-row one) is
+// the visible instance — checked at interaction time rather than watched continuously, since
+// only clicks/focus/blur on the search controls need to know which layout is live.
+function isDesktopSearchLayout() {
+  return window.matchMedia('(min-width: 1280px)').matches;
+}
+
 export function DrawerHeader({
   onClose, onFilterToggle, onFilterClose, filterOpen, hideClose, hideControls,
 }) {
   const { state, dispatch } = useSessionGuide();
-  const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
   const mobileSearchRef = useRef(null);
+  const desktopSearchRef = useRef(null);
+  const desktopSearchWrapRef = useRef(null);
+  const desktopSearchToggleRef = useRef(null);
   const filterWrapRef = useRef(null);
   const { activeFilters, activeView } = state;
   const closeFilter = onFilterClose || (() => {});
@@ -80,32 +90,59 @@ export function DrawerHeader({
     0,
   );
 
+  function focusVisibleSearchInput() {
+    (isDesktopSearchLayout() ? desktopSearchRef : mobileSearchRef).current?.focus();
+  }
+
+  function openSearch() {
+    setSearchOpen(true);
+    requestAnimationFrame(focusVisibleSearchInput);
+  }
+
+  function closeSearch() {
+    setSearchOpen(false);
+    dispatch({ type: 'SET_SEARCH', query: '' });
+    // The icon button only exists in the DOM once searchOpen flips back to false (it's
+    // swapped for the field on open) — wait for that render before trying to focus it.
+    if (isDesktopSearchLayout()) requestAnimationFrame(() => desktopSearchToggleRef.current?.focus());
+  }
+
   useEffect(() => {
-    if (!mobileSearchOpen) return undefined;
+    if (!searchOpen) return undefined;
     function onKeyDown(e) {
-      if (e.key === 'Escape') {
-        setMobileSearchOpen(false);
+      if (e.key !== 'Escape') return;
+      // First Escape clears the text but leaves the field open — an Escape on an already-
+      // empty field is what collapses it. Matches the two-stage convention several other
+      // expanding-search implementations use (e.g. GitHub's header search).
+      if (state.searchQuery) {
         dispatch({ type: 'SET_SEARCH', query: '' });
+        return;
       }
+      closeSearch();
     }
     document.addEventListener('keydown', onKeyDown);
     return () => document.removeEventListener('keydown', onKeyDown);
-  }, [mobileSearchOpen]);
+  }, [searchOpen, state.searchQuery]);
 
-  function openMobileSearch() {
-    setMobileSearchOpen(true);
-    requestAnimationFrame(() => mobileSearchRef.current?.focus());
-  }
-
-  function closeMobileSearch() {
-    setMobileSearchOpen(false);
-    dispatch({ type: 'SET_SEARCH', query: '' });
+  // Desktop's inline field only auto-collapses once it's both unfocused and empty — a click
+  // on the explicit clear button (which calls closeSearch itself) dismisses a non-empty one.
+  // Not applied to the mobile/tablet row: it's a deliberate full takeover there, so leaving
+  // it open until an explicit close keeps a stray tap from discarding someone's typing.
+  function onDesktopSearchBlur(e) {
+    if (state.searchQuery) return;
+    if (desktopSearchWrapRef.current?.contains(e.relatedTarget)) return;
+    setSearchOpen(false);
   }
 
   function onSearchInput(e) {
     dispatch({ type: 'SET_SEARCH', query: e.target.value });
   }
 
+  // Two separate search markups below, CSS-toggled by breakpoint rather than JS: sg-search-btn
+  // + sg-mobile-search-row is the plain icon-opens-a-full-width-row-below treatment (mobile/
+  // tablet); sg-search-inline is the desktop-only icon-morphs-into-the-field treatment. Both
+  // share searchOpen/state.searchQuery, so resizing across the 1280px breakpoint mid-search
+  // doesn't lose anything — only which one is visible (and focused) changes.
   return html`
     <header class="sg-header">
       ${!hideClose && html`
@@ -117,7 +154,7 @@ export function DrawerHeader({
       </div>
 
       ${!hideControls && html`
-        <div class=${`sg-header-controls${mobileSearchOpen ? ' sg-header-controls--search-active' : ''}`}>
+        <div class=${`sg-header-controls${searchOpen ? ' sg-header-controls--search-active' : ''}`}>
           <${DateTabs} />
           <div class="sg-right-controls">
             ${activeView === 'my-sessions' && html`<${DownloadButton} />`}
@@ -137,21 +174,61 @@ export function DrawerHeader({
                 <span class="sg-filter-btn-label">Filter</span>
                 ${activeFilterCount > 0 && html`<span class="sg-filter-count-badge" aria-hidden="true">${activeFilterCount}</span>`}
               </button>
+
               <button
-                class=${`sg-search-btn${mobileSearchOpen ? ' active' : ''}`}
-                onclick=${openMobileSearch}
+                class=${`sg-search-btn${searchOpen ? ' active' : ''}`}
+                onclick=${openSearch}
                 aria-label="Search sessions"
-                aria-expanded=${String(mobileSearchOpen)}
+                aria-expanded=${String(searchOpen)}
                 type="button"
               >
                 <span class="sg-search-icon" aria-hidden="true"></span>
               </button>
+
+              <div
+                class=${`sg-search-inline${searchOpen ? ' sg-search-inline--open' : ''}`}
+                ref=${desktopSearchWrapRef}
+                onclick=${() => { if (searchOpen) desktopSearchRef.current?.focus(); }}
+              >
+                ${searchOpen
+    ? html`<span class="sg-search-inline__icon" aria-hidden="true"><span class="sg-search-icon" aria-hidden="true"></span></span>`
+    : html`<button
+                    ref=${desktopSearchToggleRef}
+                    class="sg-search-inline__icon-btn"
+                    onclick=${openSearch}
+                    aria-label="Search sessions"
+                    aria-expanded="false"
+                    aria-controls="sg-search-inline-input"
+                    type="button"
+                  ><span class="sg-search-icon" aria-hidden="true"></span></button>`}
+                <input
+                  id="sg-search-inline-input"
+                  class="sg-search-inline__input"
+                  ref=${desktopSearchRef}
+                  type="search"
+                  aria-label="Search sessions"
+                  placeholder="Search sessions..."
+                  autocomplete="off"
+                  spellcheck="false"
+                  tabindex=${searchOpen ? undefined : '-1'}
+                  value=${state.searchQuery}
+                  oninput=${onSearchInput}
+                  onblur=${onDesktopSearchBlur}
+                />
+                ${searchOpen && html`<button
+                  class="sg-search-inline__clear"
+                  onclick=${closeSearch}
+                  aria-label="Clear search"
+                  type="button"
+                >✕</button>`}
+              </div>
+
               ${filterOpen && html`<${FilterPanel} onClose=${closeFilter} />`}
             </div>
           </div>
         </div>
 
-        <div class=${`sg-mobile-search-row${mobileSearchOpen ? ' sg-mobile-search-row--open' : ''}`}>
+        <div class=${`sg-mobile-search-row${searchOpen ? ' sg-mobile-search-row--open' : ''}`}>
           <div class="sg-mobile-search-wrap">
             <span class="sg-search-field-icon" aria-hidden="true"></span>
             <input
@@ -167,7 +244,7 @@ export function DrawerHeader({
             />
             <button
               class="sg-search-clear-btn"
-              onclick=${closeMobileSearch}
+              onclick=${closeSearch}
               aria-label="Clear search"
               type="button"
             >✕</button>
