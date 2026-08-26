@@ -58,7 +58,7 @@ not the primary path):
 | Field | Required | Default | Notes |
 |---|---|---|---|
 | `session-id` | No | page's own `session-id` metadata | Only needed as a fallback if that metadata is missing. |
-| `playlist-title` | No | `Playlist on session page` metadata's own label, else `More like this` | Heading shown above the topic playlist. An authored row here always wins over the metadata-derived default — see "How the playlist title is resolved" below. |
+| `playlist-title` | No | `Playlist on session page` metadata's own label, else `More like this` | Heading shown above the topic playlist. Only used when that metadata label isn't available — see "How the playlist title is resolved" below. |
 | `minimum-sessions` | No | `4` | Minimum number of matching on-demand sessions required before the topic playlist renders at all. |
 | `maximum-sessions` | No | `7` | Ceiling on total rows ever rendered — rows beyond this are never built, so "Show more" can never reveal more than this. Once expanded, the list scrolls internally beyond ~4 visible rows. |
 | `default-thumbnail` | No | — | Fallback thumbnail URL used for a row whose own session has no thumbnail of its own. |
@@ -66,15 +66,16 @@ not the primary path):
 
 ## How the playlist title is resolved
 
-Three-tier fallback, in order: an authored `playlist-title` row always wins if present
-(an explicit author override); otherwise the title is derived from the SAME
-`Playlist on session page` custom attribute the topic filter itself already reads (see
-below) — its human-readable **label** (e.g. `"Social Media and Marketing"`), not the
-machine slug (`"social-media-and-marketing"`) that attribute's other use needs for
-topic matching; if neither is available, the hardcoded `"More like this"` is the final
-fallback. This attribute is a multi-select field but only ever carries one value in
-practice for this purpose, so `extractCustomAttributeValue` (first value only) is
-correct here, unlike `extractCustomAttributeSlugs` (all values) used for topic matching.
+Three-tier fallback, in order: the `Playlist on session page` custom attribute's own
+human-readable **label** (e.g. `"Social Media and Marketing"`, not the machine slug
+`"social-media-and-marketing"` that same attribute's other use needs for topic matching)
+takes precedence whenever it's available — this is the SAME attribute the topic filter
+itself already reads (see below). An authored `playlist-title` row is only consulted as
+a fallback when that metadata label isn't available (not the other way around); if
+neither is available, the hardcoded `"More like this"` is the final fallback. This
+attribute is a multi-select field but only ever carries one value in practice for this
+purpose, so `extractCustomAttributeValue` (first value only) is correct here, unlike
+`extractCustomAttributeSlugs` (all values) used for topic matching.
 
 ## How the topic playlist is resolved
 
