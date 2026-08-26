@@ -328,20 +328,13 @@ function startMobileRiderPolling(sessions, onStarted) {
   registerStreamIds(mrStreamIds);
 
   const unsubscribe = subscribe(({ active, inactive }) => {
-    const startedIds = active.filter((id) => {
+    const doneIds = [...active, ...inactive].filter((id) => {
       if (!mrStreamIds.includes(id) || resolvedIds.has(id)) return false;
       const startTimeMillis = sessionByStreamId.get(id)?.sessionTime?.startTimeMillis;
-      if (typeof startTimeMillis !== 'number') return true;
+      if (typeof startTimeMillis !== 'number') return active.includes(id);
       return startTimeMillis <= getNowMs();
     });
 
-    const endedIds = inactive.filter((id) => {
-      if (!mrStreamIds.includes(id) || resolvedIds.has(id)) return false;
-      const endTimeMillis = sessionByStreamId.get(id)?.sessionTime?.endTimeMillis;
-      return typeof endTimeMillis === 'number' && endTimeMillis < getNowMs();
-    });
-
-    const doneIds = [...startedIds, ...endedIds];
     if (!doneIds.length) return;
     doneIds.forEach((id) => resolvedIds.add(id));
     unregisterStreamIds(doneIds);
