@@ -328,31 +328,13 @@ function startMobileRiderPolling(sessions, onStarted) {
   registerStreamIds(mrStreamIds);
 
   const unsubscribe = subscribe(({ active, inactive }) => {
-    // `active` alone is not sufficient proof that THIS session just went live: some MR
-    // setups flip every stream for the day to `active` up front (venue/account-level
-    // provisioning) and only flip a given id to `inactive` once its own segment ends. In
-    // that setup, a later session's id can already read `active` well before its own
-    // scheduled start — e.g. a 9am/10am/11am/12pm lineup where all four ids go active at
-    // the start of the day, so at 9:30am mr-2/mr-3/mr-4 would already read `active` too.
-    // Gate on the session's own authored start time as well, so `active` only counts once
-    // this specific session's window has actually begun.
     const startedIds = active.filter((id) => {
       if (!mrStreamIds.includes(id) || resolvedIds.has(id)) return false;
       const startTimeMillis = sessionByStreamId.get(id)?.sessionTime?.startTimeMillis;
-      // No authored start time at all — fall back to trusting `active` outright, same as
-      // before this fix, rather than never dropping a session we have no way to time-gate.
       if (typeof startTimeMillis !== 'number') return true;
       return startTimeMillis <= getNowMs();
     });
 
-    // Safety net: the "active" transition above can be missed entirely — a short-lived
-    // stream that starts and ends between two 30s polls, a poller that wasn't registered
-    // until after the session already went live, an MR API hiccup during the live window,
-    // or a visitor (or QA with a simulated serverTime) landing on the page after the
-    // session already ended. In all of those cases MR reports the stream `inactive`
-    // forever and this block would otherwise never drop the card. Once the session's own
-    // authored end time has passed, an `inactive` report means "already aired," not "not
-    // started yet," so it's safe to treat it the same as a confirmed start.
     const endedIds = inactive.filter((id) => {
       if (!mrStreamIds.includes(id) || resolvedIds.has(id)) return false;
       const endTimeMillis = sessionByStreamId.get(id)?.sessionTime?.endTimeMillis;
