@@ -1,5 +1,5 @@
 import { safeUrl } from './utils.js';
-import { deriveSessionState } from './session-state.js';
+import { deriveSessionState, getNowMs } from './session-state.js';
 import { openSessionGuideDetail } from './session-store.js';
 import { registerStreamIds, subscribe } from '../services/sessions/mobile-rider-poller.js';
 
@@ -22,18 +22,7 @@ function startMobileRiderPolling() {
   registerStreamIds(streamIds);
 }
 
-const TIMING_OVERRIDE_OFFSET_MS = (() => {
-  const raw = new URLSearchParams(window.location.search).get('timing');
-  if (!raw) return null;
-  const parsed = Number(raw);
-  return Number.isFinite(parsed) ? parsed - Date.now() : null;
-})();
-
-function now() {
-  return TIMING_OVERRIDE_OFFSET_MS === null ? Date.now() : Date.now() + TIMING_OVERRIDE_OFFSET_MS;
-}
-
-export function resolveCardAction(dataset, nowMs = now(), activeStreamIds = liveStreamActiveIds) {
+export function resolveCardAction(dataset, nowMs = getNowMs(), activeStreamIds = liveStreamActiveIds) {
   const { sessionId, sessionUrl, watchUrl, mrStreamId } = dataset;
   const state = deriveSessionState(
     { startTimeUtc: dataset.startTimeUtc, endTimeUtc: dataset.endTimeUtc, mrStreamId },
@@ -69,13 +58,13 @@ export default function attachSessionRouting(el) {
   const activate = () => runAction(resolveCardAction(el.dataset));
 
   el.addEventListener('click', (e) => {
-    if (e.target.closest('a') && (e.metaKey || e.ctrlKey || e.shiftKey)) return;
+    if (e.target.closest('a')) return;
     e.preventDefault();
     activate();
   });
 
   el.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter' || e.key === ' ') {
+    if (e.key === 'Enter' && !e.target.closest('a')) {
       e.preventDefault();
       activate();
     }

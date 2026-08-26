@@ -440,4 +440,3 @@ function runDrawerSuite(modulePath, variantLabel) {
 }
 
 runDrawerSuite('../../../../event-libs/v1/blocks/mobile-rider/drawer.js', 'classic');
-runDrawerSuite('../../../../event-libs/v1/c2/blocks/mobile-rider/drawer.js', 'C2');

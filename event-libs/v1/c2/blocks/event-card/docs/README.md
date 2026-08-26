@@ -55,12 +55,15 @@ is also polling overlapping ids on the same page, both blocks share one underlyi
 request instead of two independent loops. Results feed a local `liveStreamActiveIds`
 set that `deriveSessionState` reads from.
 
-### `?timing=<epoch-ms>` override
+### `?serverTime=<epoch-ms>` override
 
 Lets QA simulate "now" as any instant (e.g. mid-live) without waiting for real time.
-Read once at module load as an *offset* from the real clock, so `now()` still advances
-in real time from that point rather than freezing. Absent/invalid falls back to the
-real `Date.now()`. The identical override exists in `upcoming-sessions.js`.
+Uses the shared `getNowMs()` override from `utils/session-state.js` — read once at page
+load as an origin, so time still advances in real time from that point rather than
+freezing. Absent/invalid falls back to the real `Date.now()`. The same override drives
+`upcoming-sessions.js`, `sessions-guide`, and the rest of the Timing Framework, so one
+`serverTime` value simulates "now" consistently across every time-aware block on the
+page.
 
 ### Click target
 

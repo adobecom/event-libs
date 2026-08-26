@@ -74,18 +74,39 @@ function buildPills(pillsRow) {
       type: 'button',
       role: 'tab',
       'aria-selected': i === 0 ? 'true' : 'false',
+      tabindex: i === 0 ? '0' : '-1',
     }, label);
     if (i === 0) pill.classList.add('is-active');
-    pill.addEventListener('click', () => {
-      pillsContainer.querySelectorAll('.carousel-pill').forEach((btn) => {
-        btn.classList.remove('is-active');
-        btn.setAttribute('aria-selected', 'false');
-      });
-      pill.classList.add('is-active');
-      pill.setAttribute('aria-selected', 'true');
-    });
     pillsContainer.append(pill);
   });
+
+  const selectPill = (pill, { focus } = {}) => {
+    pillsContainer.querySelectorAll('.carousel-pill').forEach((btn) => {
+      const isTarget = btn === pill;
+      btn.classList.toggle('is-active', isTarget);
+      btn.setAttribute('aria-selected', String(isTarget));
+      btn.tabIndex = isTarget ? 0 : -1;
+    });
+    if (focus) pill.focus();
+  };
+
+  const tabs = [...pillsContainer.querySelectorAll('.carousel-pill')];
+  tabs.forEach((pill, i) => {
+    pill.addEventListener('click', () => selectPill(pill));
+    pill.addEventListener('keydown', (e) => {
+      const keyToIndex = {
+        ArrowRight: (i + 1) % tabs.length,
+        ArrowLeft: (i - 1 + tabs.length) % tabs.length,
+        Home: 0,
+        End: tabs.length - 1,
+      };
+      const nextIndex = keyToIndex[e.key];
+      if (nextIndex === undefined) return;
+      e.preventDefault();
+      selectPill(tabs[nextIndex], { focus: true });
+    });
+  });
+
   return pillsContainer;
 }
 

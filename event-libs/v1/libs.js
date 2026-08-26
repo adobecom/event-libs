@@ -34,6 +34,7 @@ const EVENT_BLOCKS_C2 = [
   'sessions-guide',
   'sessions-guide-full-page',
   'session-state-demo',
+  'in-person-banner',
   'event-session-details',
   'event-featured-products',
   'event-speakers',
