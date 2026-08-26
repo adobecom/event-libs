@@ -50,3 +50,13 @@ export function subscribe(listener) {
   listeners.add(listener);
   return () => listeners.delete(listener);
 }
+
+export async function getInitialStatus(ids) {
+  if (!ids?.length) return { active: [], inactive: [] };
+  try {
+    return await controller.getMediaStatus(ids);
+  } catch (error) {
+    window.lana?.log(`mobile-rider-poller: initial status fetch failed: ${error.message}`);
+    return { active: [], inactive: [] };
+  }
+}

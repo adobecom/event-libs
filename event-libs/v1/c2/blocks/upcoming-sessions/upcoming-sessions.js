@@ -10,7 +10,9 @@ import { getNowMs } from '../../../utils/session-state.js';
 import { getTrackIcon } from '../../../utils/tier-1-event-config.js';
 import { resolveIcon } from '../../../features/icons/icon-resolver.js';
 import { toggleScheduleWithFeedback, toggleFavoriteWithFeedback } from '../../../services/sessions/action-feedback.js';
-import { registerStreamIds, unregisterStreamIds, subscribe } from '../../../services/sessions/mobile-rider-poller.js';
+import {
+  registerStreamIds, unregisterStreamIds, subscribe, getInitialStatus,
+} from '../../../services/sessions/mobile-rider-poller.js';
 
 const ROTATE_OUT_MS = 350;
 const SLIDE_MS = 350;
@@ -318,6 +320,17 @@ function detachFromPrecedingBlock(el) {
   previous?.classList.remove('attach-upcoming--has-overlay');
 }
 
+async function resolveInitialActiveSessions(sessions) {
+  const mrStreamIds = sessions.filter((s) => s.mrStreamId).map((s) => s.mrStreamId);
+  if (!mrStreamIds.length) return sessions;
+
+  const { active = [] } = await getInitialStatus(mrStreamIds);
+  if (!active.length) return sessions;
+
+  const activeSet = new Set(active);
+  return sessions.filter((session) => !activeSet.has(session.mrStreamId));
+}
+
 function startMobileRiderPolling(sessions, onStarted) {
   const mrSessions = sessions.filter((s) => s.mrStreamId);
   if (!mrSessions.length) return null;
@@ -367,6 +380,13 @@ async function decorate(el) {
   const heading = config?.heading || 'Upcoming Sessions';
   let sessions = Array.isArray(config?.entries) ? config.entries : [];
 
+  if (!sessions.length) {
+    detachFromPrecedingBlock(el);
+    el.remove();
+    return;
+  }
+
+  sessions = await resolveInitialActiveSessions(sessions);
   if (!sessions.length) {
     detachFromPrecedingBlock(el);
     el.remove();
