@@ -148,3 +148,15 @@ lite-youtube .lty-playbtn:focus {
     height: 100%;
   }
 }
+
+@media (min-width: 1024px) {
+  .youtube-chat[data-variant="rounded-contained"] .youtube-stream:not(.has-chat) .youtube-video-container {
+    border-radius: var(--s2a-border-radius-24, 24px);
+    overflow: hidden;
+    max-width: var(--s2a-layout-rich-media-content-measure-wide, 1192px);
+    margin: 0 auto;
+    aspect-ratio: 16 / 9;
+    height: auto;
+    padding-bottom: 0;
+  }
+}
