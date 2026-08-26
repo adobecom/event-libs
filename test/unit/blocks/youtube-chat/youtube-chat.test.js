@@ -337,6 +337,54 @@ function runYouTubeChatSuite(modulePath, variantLabel) {
         expect(block.querySelector('.youtube-chat-container')).to.be.null;
         expect(block.querySelector('.youtube-stream').classList.contains('single-column')).to.be.true;
       });
+
+      it('should keep live chat off when chatenabled is authored as anything other than "true"', async () => {
+        block.innerHTML = `
+          <div>
+            <div>videoid</div>
+            <div>dQw4w9WgXcQ</div>
+          </div>
+          <div>
+            <div>autoplay</div>
+            <div>true</div>
+          </div>
+          <div>
+            <div>chatenabled</div>
+            <div>false</div>
+          </div>
+        `;
+
+        const { default: init } = await import(modulePath);
+        await init(block);
+
+        expect(block.querySelector('.youtube-chat-container')).to.be.null;
+        expect(block.querySelector('.youtube-stream').classList.contains('single-column')).to.be.true;
+      });
+
+      // Whitespace-tolerant parsing (isTruthyConfigValue) is a C2-only tightening —
+      // the classic block's inline `?.toLowerCase() === 'true'` check has no trim().
+      (variantLabel === 'C2' ? it : it.skip)('should tolerate authored whitespace around "true" when enabling live chat', async () => {
+        block.innerHTML = `
+          <div>
+            <div>videoid</div>
+            <div>dQw4w9WgXcQ</div>
+          </div>
+          <div>
+            <div>autoplay</div>
+            <div>true</div>
+          </div>
+          <div>
+            <div>chatenabled</div>
+            <div> true </div>
+          </div>
+        `;
+
+        const { default: init } = await import(modulePath);
+        await init(block);
+
+        expect(block.querySelector('.youtube-chat-container')).to.not.be.null;
+        expect(block.querySelector('.youtube-stream').classList.contains('has-chat')).to.be.true;
+      });
     });
   });
 }
