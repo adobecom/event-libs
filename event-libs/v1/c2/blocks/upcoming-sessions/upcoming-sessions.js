@@ -322,28 +322,15 @@ function startMobileRiderPolling(sessions, onStarted) {
   const mrSessions = sessions.filter((s) => s.mrStreamId);
   if (!mrSessions.length) return null;
 
-  const mrStreamIds = new Set(mrSessions.map((s) => s.mrStreamId));
+  // Register every mrStreamId as soon as the block loads, not at its scheduled
+  // start time — a stream can go live ahead of its listed start time, and we
+  // need to catch that instead of waiting for the clock to catch up.
+  const mrStreamIds = mrSessions.map((s) => s.mrStreamId);
   const resolvedIds = new Set();
-  const registeredIds = new Set();
-
-  function onDue(mrStreamId) {
-    if (registeredIds.has(mrStreamId)) return;
-    registeredIds.add(mrStreamId);
-    registerStreamIds([mrStreamId]);
-  }
-
-  const startTimers = [];
-  mrSessions.forEach((s) => {
-    const untilStart = (s.sessionTime?.startTimeMillis ?? 0) - getNowMs();
-    if (untilStart > 0) {
-      startTimers.push(setTimeout(() => onDue(s.mrStreamId), untilStart));
-    } else {
-      onDue(s.mrStreamId);
-    }
-  });
+  registerStreamIds(mrStreamIds);
 
   const unsubscribe = subscribe(({ active }) => {
-    const startedIds = active.filter((id) => mrStreamIds.has(id) && !resolvedIds.has(id));
+    const startedIds = active.filter((id) => mrStreamIds.includes(id) && !resolvedIds.has(id));
     if (!startedIds.length) return;
     startedIds.forEach((id) => resolvedIds.add(id));
     unregisterStreamIds(startedIds);
@@ -351,9 +338,8 @@ function startMobileRiderPolling(sessions, onStarted) {
   });
 
   return () => {
-    startTimers.forEach(clearTimeout);
     unsubscribe();
-    unregisterStreamIds([...registeredIds].filter((id) => !resolvedIds.has(id)));
+    unregisterStreamIds(mrStreamIds.filter((id) => !resolvedIds.has(id)));
   };
 }
 
