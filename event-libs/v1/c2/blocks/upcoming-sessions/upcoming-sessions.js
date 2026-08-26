@@ -411,6 +411,13 @@ async function decorate(el) {
     removeCard(el, sessionId);
     sessions = sessions.filter((session) => session.sessionId !== sessionId);
     updateFewSessions();
+    if (!sessions.length) {
+      const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      setTimeout(() => {
+        el._upcomingSessionsCleanup?.();
+        el.remove();
+      }, reduceMotion ? 0 : ROTATE_OUT_MS);
+    }
   }
 
   let timers = scheduleStateTimers(sessions, dropSession);
