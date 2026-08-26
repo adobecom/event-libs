@@ -2116,14 +2116,19 @@
     outline-offset: 2px;
   }
 
+  /* 36px, not the pill's own 40px: .sg-search-inline's 40px already includes its 2px border
+     (box-sizing: border-box), so its content box — what this actually has to fill — is
+     40px minus that border on both sides. Sizing this to the outer 40px overflowed the
+     content box by 2px a side, and overflow:hidden on the pill clipped it asymmetrically —
+     the icon looked pushed off-center rather than actually being centered and cut off. */
   .sg-search-inline__icon-btn,
   .sg-search-inline__icon {
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 40px;
-    height: 40px;
-    min-width: 40px;
+    width: 36px;
+    height: 36px;
+    min-width: 36px;
     flex-shrink: 0;
   }
 
