@@ -356,7 +356,6 @@
   .upcoming-sessions .sg-card__actions {
     flex-direction: column;
     width: var(--s2a-spacing-2xl, 48px);
-    padding-left: var(--s2a-spacing-md, 16px);
     margin-top: 0;
     opacity: 1;
     pointer-events: auto;
