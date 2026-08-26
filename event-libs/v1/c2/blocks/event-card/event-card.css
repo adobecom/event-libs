@@ -62,25 +62,25 @@
 }
 
 
-.event-card[data-card-variant="ratio-1-1"] .card-media {
+.event-card[data-card-variant="media-square"] .card-media {
   aspect-ratio: 1 / 1;
 }
 
-.event-card[data-card-variant="ratio-4-3"] .card-media {
+.event-card[data-card-variant="media-standard"] .card-media {
   aspect-ratio: 4 / 3;
 }
 
-.event-card[data-card-variant="ratio-3-4"] .card-media {
+.event-card[data-card-variant="media-standard-rev"] .card-media {
   aspect-ratio: 3 / 4;
   border-radius: 16px;
 }
 
-.event-card[data-card-variant="ratio-4-5"] .card-media {
+.event-card[data-card-variant="standard-m"] .card-media {
   aspect-ratio: 4 / 5;
   border-radius: 16px;
 }
 
-.event-card[data-card-variant="ratio-16-9"] .card-media {
+.event-card[data-card-variant="media-wide"] .card-media {
   aspect-ratio: 16 / 9;
 }
 
