@@ -30,13 +30,6 @@ function isTruthyConfigValue(value) {
   return (value ?? '').trim().toLowerCase() === 'true';
 }
 
-const VARIANTS = ['rounded-contained'];
-const DEFAULT_VARIANT = 'default';
-
-function getVariant(el) {
-  return VARIANTS.find((variant) => el.classList.contains(variant)) || DEFAULT_VARIANT;
-}
-
 export class YouTubeChat {
   constructor() {
     this.config = null;
@@ -52,13 +45,11 @@ export class YouTubeChat {
       this.config = readBlockConfig(block);
       this.videoId = this.config.videoid;
       this.chatEnabled = isTruthyConfigValue(this.config.chatenabled);
-      const variant = getVariant(block);
 
       if (!this.videoId) throw new Error('Invalid or missing video ID.');
 
       YouTubeChat.preconnect();
       block.textContent = '';
-      block.dataset.variant = variant;
       block.append(this.buildStream());
     } catch (err) {
       window.lana?.log(`YouTube Chat Block: ${err.message}`);

@@ -385,34 +385,6 @@ function runYouTubeChatSuite(modulePath, variantLabel) {
         expect(block.querySelector('.youtube-chat-container')).to.not.be.null;
         expect(block.querySelector('.youtube-stream').classList.contains('has-chat')).to.be.true;
       });
-
-      // The rounded-contained visual variant only exists on the C2 copy.
-      (variantLabel === 'C2' ? describe : describe.skip)('rounded-contained variant', () => {
-        beforeEach(() => {
-          block.innerHTML = `
-            <div>
-              <div>videoid</div>
-              <div>dQw4w9WgXcQ</div>
-            </div>
-          `;
-        });
-
-        it('should default to the "default" variant when no modifier class is authored', async () => {
-          const { default: init } = await import(modulePath);
-          await init(block);
-
-          expect(block.dataset.variant).to.equal('default');
-        });
-
-        it('should resolve the "rounded-contained" variant from an authored modifier class', async () => {
-          block.classList.add('rounded-contained');
-
-          const { default: init } = await import(modulePath);
-          await init(block);
-
-          expect(block.dataset.variant).to.equal('rounded-contained');
-        });
-      });
     });
   });
 }

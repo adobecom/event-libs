@@ -150,7 +150,7 @@ lite-youtube .lty-playbtn:focus {
 }
 
 @media (min-width: 1024px) {
-  .youtube-chat[data-variant="rounded-contained"] .youtube-stream:not(.has-chat) .youtube-video-container {
+  .youtube-chat .youtube-stream:not(.has-chat) .youtube-video-container {
     border-radius: var(--s2a-border-radius-24, 24px);
     overflow: hidden;
     max-width: var(--s2a-layout-rich-media-content-measure-wide, 1192px);
