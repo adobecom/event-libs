@@ -1,6 +1,6 @@
 @import '../../styles/tokens.css';
 
-.youtube-chat .youtube-stream {
+.event-youtube .youtube-stream {
   display: flex;
   max-width: 100%;
   margin: 0 auto;
@@ -8,7 +8,7 @@
   transition: all 0.3s ease-in-out;
 }
 
-.youtube-chat .youtube-video-container {
+.event-youtube .youtube-video-container {
   width: 100%;
   max-width: 100%;
   flex: 1 1 auto;
@@ -19,7 +19,7 @@
   transition: width 0.3s ease-in-out, max-width 0.3s ease-in-out;
 }
 
-.youtube-chat .youtube-video-container .iframe-container {
+.event-youtube .youtube-video-container .iframe-container {
   position: absolute;
   top: 0;
   left: 0;
@@ -72,7 +72,7 @@ lite-youtube .lty-playbtn:focus {
   width: 1px;
 }
 
-.youtube-chat .youtube-chat-placeholder {
+.event-youtube .youtube-chat-placeholder {
   position: absolute;
   top: 50%;
   left: 50%;
@@ -86,7 +86,7 @@ lite-youtube .lty-playbtn:focus {
   border: 1px solid var(--s2a-color-border-subtle, #ddd);
 }
 
-.youtube-chat .youtube-chat-container {
+.event-youtube .youtube-chat-container {
   width: 100%;
   max-width: 100%;
   flex: 1 1 auto;
@@ -94,15 +94,15 @@ lite-youtube .lty-playbtn:focus {
   transition: all 0.3s ease-in-out;
 }
 
-.youtube-chat .youtube-chat-container .iframe-container {
+.event-youtube .youtube-chat-container .iframe-container {
   height: 100%;
   padding-bottom: 0;
   position: relative;
   width: 100%;
 }
 
-.youtube-chat .youtube-chat-container iframe,
-.youtube-chat .youtube-video-container iframe {
+.event-youtube .youtube-chat-container iframe,
+.event-youtube .youtube-video-container iframe {
   height: 100%;
   width: 100%;
   left: 0;
@@ -111,28 +111,28 @@ lite-youtube .lty-playbtn:focus {
 }
 
 @media screen and (min-width: 1200px) {
-  .youtube-chat .youtube-stream:not(.has-chat) .youtube-video-container {
+  .event-youtube .youtube-stream:not(.has-chat) .youtube-video-container {
     width: 100%;
     max-width: 100%;
     height: 0;
     padding-bottom: 56.25%;
   }
 
-  .youtube-chat .youtube-stream.has-chat .youtube-video-container {
+  .event-youtube .youtube-stream.has-chat .youtube-video-container {
     width: 100%;
     max-width: 100%;
     height: 0;
     padding-bottom: 42.1875%;
   }
 
-  .youtube-chat .youtube-stream.has-chat:not(.single-column) .youtube-video-container {
+  .event-youtube .youtube-stream.has-chat:not(.single-column) .youtube-video-container {
     width: 75%;
     max-width: 75%;
     height: 0;
     padding-bottom: 42.1875%;
   }
 
-  .youtube-chat .youtube-stream.has-chat:not(.single-column) .youtube-chat-container {
+  .event-youtube .youtube-stream.has-chat:not(.single-column) .youtube-chat-container {
     flex: 1 1 1%;
     min-height: 0;
     height: auto;
@@ -140,7 +140,7 @@ lite-youtube .lty-playbtn:focus {
     position: relative;
   }
 
-  .youtube-chat .youtube-stream.has-chat:not(.single-column) .youtube-chat-container .iframe-container {
+  .event-youtube .youtube-stream.has-chat:not(.single-column) .youtube-chat-container .iframe-container {
     position: absolute;
     top: 0;
     left: 0;
@@ -150,7 +150,7 @@ lite-youtube .lty-playbtn:focus {
 }
 
 @media (min-width: 1024px) {
-  .youtube-chat .youtube-stream:not(.has-chat) .youtube-video-container {
+  .event-youtube .youtube-stream:not(.has-chat) .youtube-video-container {
     border-radius: var(--s2a-border-radius-24, 24px);
     overflow: hidden;
     max-width: var(--s2a-layout-rich-media-content-measure-wide, 1192px);

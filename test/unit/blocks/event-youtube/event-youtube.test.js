@@ -3,9 +3,9 @@ import sinon from 'sinon';
 import { readFile } from '@web/test-runner-commands';
 
 const defaultHtml = await readFile({ path: './mocks/default.html' });
-const modulePath = '../../../../event-libs/v1/blocks/youtube-chat/youtube-chat.js';
+const modulePath = '../../../../event-libs/v1/c2/blocks/event-youtube/event-youtube.js';
 
-describe('YouTube Chat Module', () => {
+describe('Event YouTube Module', () => {
   let sandbox;
 
   beforeEach(() => {
@@ -356,6 +356,29 @@ describe('YouTube Chat Module', () => {
 
       expect(block.querySelector('.youtube-chat-container')).to.be.null;
       expect(block.querySelector('.youtube-stream').classList.contains('single-column')).to.be.true;
+    });
+
+    it('should tolerate authored whitespace around "true" when enabling live chat', async () => {
+      block.innerHTML = `
+        <div>
+          <div>videoid</div>
+          <div>dQw4w9WgXcQ</div>
+        </div>
+        <div>
+          <div>autoplay</div>
+          <div>true</div>
+        </div>
+        <div>
+          <div>chatenabled</div>
+          <div> true </div>
+        </div>
+      `;
+
+      const { default: init } = await import(modulePath);
+      await init(block);
+
+      expect(block.querySelector('.youtube-chat-container')).to.not.be.null;
+      expect(block.querySelector('.youtube-stream').classList.contains('has-chat')).to.be.true;
     });
   });
 });

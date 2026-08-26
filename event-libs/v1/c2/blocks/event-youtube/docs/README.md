@@ -1,4 +1,4 @@
-# youtube-chat
+# event-youtube
 
 Embeds a YouTube video with an optional live-chat panel.
 

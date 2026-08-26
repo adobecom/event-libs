@@ -39,7 +39,7 @@ const EVENT_BLOCKS_C2 = [
   'event-featured-products',
   'event-speakers',
   'event-session-resources',
-  'youtube-chat',
+  'event-youtube',
 ];
 
 // Import only the most essential utilities that are always needed

@@ -52,7 +52,7 @@ export class YouTubeChat {
       block.textContent = '';
       block.append(this.buildStream());
     } catch (err) {
-      window.lana?.log(`YouTube Chat Block: ${err.message}`);
+      window.lana?.log(`Event YouTube Block: ${err.message}`);
       block.remove();
     }
   }
