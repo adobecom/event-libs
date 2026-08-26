@@ -1,28 +1,41 @@
-/* ── Download Button (Phase 4) ───────────────────────────────── */
+/* ── Download Button (Figma 9145:39931 — "Icon Button M / M Secondary") ────────── */
 
 .sg-download-btn {
-  width: 36px;
-  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
   border: none;
-  background: transparent;
   cursor: pointer;
   border-radius: var(--s2a-border-radius-round);
   flex-shrink: 0;
-  background-color: var(--s2a-color-content-default);
-  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath d='M10 13.5l-5-5h3V2h4v6.5h3l-5 5zm-7 3v1.5h14V16.5H3z'/%3E%3C/svg%3E");
-  mask-repeat: no-repeat;
-  mask-size: 20px;
-  mask-position: center;
-  opacity: 0.7;
+
+  /* Figma's authored value has no matching step in the transparent-black scale below —
+     the closest defined tokens (12/16) are used for the hover/active escalation instead. */
+  background: rgb(0 0 0 / 9%);
+  color: var(--s2a-color-content-default, #292929);
+  transition: background 0.15s ease, opacity 0.15s ease;
 }
 
-.sg-download-btn:hover { opacity: 1; }
+.sg-download-btn svg {
+  width: 20px;
+  height: 20px;
+}
 
 .sg-download-btn:disabled {
   opacity: 0.3;
   cursor: default;
   pointer-events: none;
 }
+
+.sg-download-btn:focus-visible {
+  outline: 1px solid var(--s2a-color-focus-ring-default, #3b63fb);
+  outline-offset: 1px;
+}
+
+.sg-download-btn:hover:not(:disabled) { background: var(--s2a-color-transparent-black-12, rgb(0 0 0 / 12%)); }
+.sg-download-btn:active:not(:disabled) { background: var(--s2a-color-transparent-black-16, rgb(0 0 0 / 16%)); }
 
 /* ── Session Detail Overlay (Phase 6) ────────────────────────── */
 

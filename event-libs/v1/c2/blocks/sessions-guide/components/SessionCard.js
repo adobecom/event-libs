@@ -1,7 +1,8 @@
 import { html, useState } from '../../../../deps/htm-preact.js';
 import { useSessionGuide } from '../store/index.js';
-import { isSessionOnDemand, formatSessionTime, formatShortTime, formatDuration, getNowMs } from '../utils/time.js';
-import { scheduled, favorited, pendingActions } from '../../../../utils/session-store.js';
+import { isSessionOnDemand, formatSessionTime, formatDuration, getNowMs } from '../utils/time.js';
+import { isDvrPending } from '../../../../utils/session-state.js';
+import { scheduled, favorited, pendingActions, getEventApiConfig } from '../../../../utils/session-store.js';
 import { toggleScheduleWithFeedback, toggleFavoriteWithFeedback } from '../../../../services/sessions/action-feedback.js';
 import { setSessionParam, sessionParamValue, safeUrl } from '../utils/url.js';
 import { CategoryBadge } from './CategoryBadge.js';
@@ -24,18 +25,19 @@ export function SessionCard({ session, forceOnDemand = false, timeDisplay = 'dur
   const schedulingEnabled = isBehaviorEnabled(guideConfig, 'enableScheduling');
   const favoritingEnabled = isBehaviorEnabled(guideConfig, 'enableFavoriting');
   const [hoverAnim, setHoverAnim] = useState(null);
-  const onDemandNatural = isSessionOnDemand(session, getNowMs());
+  const nowMs = getNowMs();
+  const onDemandNatural = isSessionOnDemand(session, nowMs);
   const onDemand = forceOnDemand || onDemandNatural;
   const trackColor = getTrackIcon(session.primaryTrack)?.color || '';
 
   const upcomingTimeLabel = (timeDisplay === 'duration' && session.endTimeUtc)
     ? formatDuration(session.startTimeUtc, session.endTimeUtc)
     : formatSessionTime(session.startTimeUtc, userTz);
-  const timeLabel = onDemand ? 'ON DEMAND' : upcomingTimeLabel;
-  const endShort = (!onDemand && session.endTimeUtc) ? formatShortTime(session.endTimeUtc, userTz) : '';
-  const timeRange = onDemand
-    ? timeLabel
-    : (endShort ? `${formatShortTime(session.startTimeUtc, userTz)} – ${endShort}` : timeLabel);
+  // A session with a DVR delay isn't watchable yet if the delay window (from the event's own
+  // start, not this session's) hasn't elapsed — see isDvrPending. No dvrDelayHours, or no
+  // known event start, means it's just on demand with no wait.
+  const dvrPending = onDemand && isDvrPending(session, nowMs, getEventApiConfig()?.eventStartMs);
+  const timeLabel = onDemand ? (dvrPending ? 'AVAILABLE SOON' : 'ON DEMAND') : upcomingTimeLabel;
 
   const cardClass = [
     'sg-card',
@@ -149,14 +151,13 @@ export function SessionCard({ session, forceOnDemand = false, timeDisplay = 'dur
           onclick=${(e) => { e.stopPropagation(); handleClick(); }}
           daa-ll=${cardDaaLl}
         >${session.title}</button>
-        <p class="sg-card__desc">${session.description}</p>
         <div class="sg-card__footer">
           <span class="sg-card__track sg-card__track--footer" style=${'color:' + trackColor}>${session.primaryTrack}</span>
           <span class="sg-card__footer-badge"><${CategoryBadge} session=${session} size="sm" /></span>
           <span class="sg-card__time">${timeLabel}</span>
         </div>
       </div>
-      <div class="sg-card__actions" data-time=${timeRange} onclick=${(e) => e.stopPropagation()} ontouchend=${handleActionsTouchEnd}>
+      <div class="sg-card__actions" data-time=${timeLabel} onclick=${(e) => e.stopPropagation()} ontouchend=${handleActionsTouchEnd}>
         ${forceOnDemand && html`<${IconButton}
           variant="solid"
           context="on-dark"

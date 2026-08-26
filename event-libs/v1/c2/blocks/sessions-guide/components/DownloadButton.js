@@ -2,6 +2,7 @@ import { html } from '../../../../deps/htm-preact.js';
 import { sessions, scheduled } from '../../../../utils/session-store.js';
 import { downloadICS } from '../utils/ics.js';
 import { showToast } from '../../../../features/toast/toast.js';
+import { IconDownload } from './icons.js';
 
 // Exported so this is directly unit-testable: the test-time htm-preact mock drops
 // function props entirely (`onclick=${fn}` renders nothing), so a real click can't be
@@ -21,9 +22,10 @@ export function DownloadButton() {
       class="sg-download-btn"
       onclick=${() => downloadSchedule(sessions.value, scheduled.value)}
       aria-label="Download schedule as .ics calendar file"
+      title="Download"
       disabled=${isEmpty}
       daa-ll="Download-Schedule"
       type="button"
-    ></button>
+    ><${IconDownload} /></button>
   `;
 }

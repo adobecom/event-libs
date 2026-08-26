@@ -1,4 +1,4 @@
-import { html } from '../../../../deps/htm-preact.js';
+import { html, useEffect, useState } from '../../../../deps/htm-preact.js';
 import { useSessionGuide } from '../store/index.js';
 import { formatShortTime, formatDuration, getNowMs } from '../utils/time.js';
 import { deriveSessionState, getWatchDestination } from '../../../../utils/session-state.js';
@@ -15,6 +15,21 @@ import { isBehaviorEnabled } from '../utils/behavior-flags.js';
 
 export const buildLiveCard = () => LiveCard;
 
+// A non-MR session only gets a fresh render from the shared session-state ticker when some
+// session's live/upcoming/on-demand bucket actually flips — which can go untriggered for a
+// while if nothing else on the page is transitioning, leaving the progress bar visibly stuck.
+// An MR session gets an equivalent refresh for free every ~30s from the poller reassigning
+// liveStreamActiveIds. Exported so the cadence is one shared constant, not a magic number.
+export const PROGRESS_REFRESH_MS = 30_000;
+
+export function computeProgressPct(session, nowMs) {
+  const startMs = Date.parse(session.startTimeUtc);
+  const endMs = Date.parse(session.endTimeUtc);
+  const duration = endMs - startMs;
+  const elapsed = Math.min(Math.max(nowMs - startMs, 0), duration);
+  return duration > 0 ? Math.round((elapsed / duration) * 100) : 0;
+}
+
 export function LiveCard({ session, variant = 'live' }) {
   const { state, dispatch } = useSessionGuide();
   const { guideConfig } = state;
@@ -30,11 +45,18 @@ export function LiveCard({ session, variant = 'live' }) {
   const nowMs = getNowMs();
   const sessionState = deriveSessionState(session, liveStreamActiveIds.value, nowMs);
 
-  const startMs = Date.parse(session.startTimeUtc);
-  const endMs = Date.parse(session.endTimeUtc);
-  const duration = endMs - startMs;
-  const elapsed = Math.min(Math.max(nowMs - startMs, 0), duration);
-  const progressPct = duration > 0 ? Math.round((elapsed / duration) * 100) : 0;
+  // Forces a re-render every PROGRESS_REFRESH_MS while live, purely so progressPct below gets
+  // recomputed against the current clock — see PROGRESS_REFRESH_MS for why this can't rely on
+  // the shared session-state ticker alone.
+  const [, forceProgressTick] = useState(0);
+  useEffect(() => {
+    if (sessionState !== 'live') return undefined;
+    const id = setInterval(() => forceProgressTick((n) => n + 1), PROGRESS_REFRESH_MS);
+    return () => clearInterval(id);
+  }, [sessionState]);
+
+  const duration = Date.parse(session.endTimeUtc) - Date.parse(session.startTimeUtc);
+  const progressPct = computeProgressPct(session, nowMs);
   const durationLabel = duration >= 0
     ? formatDuration(session.startTimeUtc, session.endTimeUtc, { short: true })
     : '';
@@ -99,12 +121,13 @@ export function LiveCard({ session, variant = 'live' }) {
         }</button>`;
     }
   } else if (watchHref && watchNowEnabled) {
+    const isOnDemand = sessionState === 'on-demand';
     primaryCta = html`<button
       class="sg-live-card__btn sg-live-card__btn--watch"
       onclick=${handleWatch}
-      daa-ll="Watch-Now"
+      daa-ll=${isOnDemand ? 'Watch-On-Demand' : 'Watch-Now'}
       type="button"
-    ><${IconPlay} />Watch now</button>`;
+    ><${IconPlay} />${isOnDemand ? 'Watch on demand' : 'Watch now'}</button>`;
   }
 
   // On demand: match SessionCard/TrackRow — the whole card always navigates straight to

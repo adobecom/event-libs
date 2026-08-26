@@ -108,6 +108,19 @@ describe('Carousel', () => {
     expect(html).to.not.include('sg-carousel__time');
   });
 
+  // .sg-section-time is the mobile-only header time — hidden from 768px up in favor of
+  // .sg-carousel__time/-tz, which already show both — so it needs the timezone appended too.
+  it('includes the timezone in the header time label, not just the time', () => {
+    const store = makeStore();
+    const Carousel = buildCarousel(preact, store);
+    const html = Carousel({
+      sessions: [SESSION_A],
+      formatTime: () => '9:00 AM',
+      formatTimezone: () => 'PDT',
+    });
+    expect(html).to.include('<span class="sg-section-time">9:00 AM PDT</span>');
+  });
+
   it('renders no arrows for a single session', () => {
     const store = makeStore();
     const Carousel = buildCarousel(preact, store);

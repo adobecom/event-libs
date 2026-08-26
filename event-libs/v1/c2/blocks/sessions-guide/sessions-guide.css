@@ -838,7 +838,7 @@
 
 .sg-live-card__progress-row {
   position: absolute;
-  top: 16px;
+  bottom: 16px;
   left: 16px;
   right: 16px;
   display: flex;
@@ -942,8 +942,13 @@
   vertical-align: middle;
 }
 
-.sg-live-card:is(:hover, :focus-within) .sg-live-card__time::before,
-.sg-live-card:is(:hover, :focus-within) .sg-live-card__track-extra::before { background: rgb(255 255 255 / 40%); }
+/* The hover/focus fill only turns dark at 1024px+ (see .sg-live-card:is(:hover, :focus-within)
+   in the 1024-1279px and 1280px+ blocks) — below that it stays #fff, so this lighter divider
+   color would go invisible against it. Scoped to match, not applied below 1024px. */
+@media (min-width: 1024px) {
+  .sg-live-card:is(:hover, :focus-within) .sg-live-card__time::before,
+  .sg-live-card:is(:hover, :focus-within) .sg-live-card__track-extra::before { background: rgb(255 255 255 / 40%); }
+}
 
 .sg-live-card:is(:hover, :focus-within) .sg-live-card__time { color: inherit; }
 
@@ -989,21 +994,10 @@
 
 .sg-live-card:is(:hover, :focus-within) .sg-live-card__title { color: inherit; }
 
+/* Hidden mobile through regular tablet (<1024px) — re-shown at 1024px+ below. */
 .sg-live-card__desc {
-  font-size: var(--s2a-font-size-sm);
-  line-height: 1.2;
-  letter-spacing: -0.14px;
-  color: rgb(0 0 0 / 60%);
-  margin: var(--s2a-spacing-xs) 0 0;
-  /* stylelint-disable-next-line value-no-vendor-prefix */
-  display: -webkit-box;
-  -webkit-line-clamp: 1;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-  transition: color 0.2s;
+  display: none;
 }
-
-.sg-live-card:is(:hover, :focus-within) .sg-live-card__desc { color: inherit; }
 
 .sg-live-card__actions {
   display: flex;
@@ -1046,26 +1040,18 @@
   display: none;
 }
 
+/* Figma 10533:55223 ("Icon Button XL / XL Primary Outline") — a solid dark border at rest,
+   not the near-invisible light gray this used to sit at on white. The heart glyph itself
+   (outline vs filled, see LiveCard.js) already carries the favorited/not distinction, so the
+   border no longer needs its own light/dark toggle. */
 .sg-live-card__btn--favorite {
   background: #fff;
-  border: 2px solid #dadada;
+  border: 1px solid #292929;
   color: #292929;
   width: 40px;
   padding: 0;
   flex-shrink: 0;
   justify-content: center;
-}
-
-.sg-live-card__btn--favorite.is-favorited {
-  border-color: #292929;
-}
-
-.sg-live-card:is(:hover, :focus-within) .sg-live-card__btn--favorite {
-  border-color: #dadada;
-}
-
-.sg-live-card:is(:hover, :focus-within) .sg-live-card__btn--favorite.is-favorited {
-  border-color: #292929;
 }
 
 
@@ -1301,28 +1287,6 @@
 }
 
 .sg-card:is(:hover, :focus-within) .sg-card__title { color: var(--s2a-color-gray-900); }
-
-.sg-card__desc {
-  font-size: var(--s2a-font-size-xs);
-  color: var(--s2a-color-gray-600);
-  line-height: 1.5;
-  height: 18px;
-  margin: 0;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-height: none;
-  opacity: 1;
-  margin-top: 0;
-  display: block;
-  transition: none;
-}
-
-.sg-card:is(:hover, :focus-within) .sg-card__desc {
-  max-height: none;
-  margin-top: 0;
-  opacity: 1;
-}
 
 .sg-card__footer {
   display: none;
@@ -1580,7 +1544,6 @@
   .sg-date-tab {
     flex: none;
     width: 80px;
-    font-size: var(--s2a-font-size-md);
   }
 
   .sg-right-controls {
@@ -1703,12 +1666,6 @@
     border: 1px solid rgb(255 255 255 / 15%);
   }
 
-  .sg-live-card__progress-row {
-    top: 16px;
-    left: 16px;
-    right: 16px;
-  }
-
   .sg-live-card__body {
     padding: var(--s2a-spacing-md);
     justify-content: flex-start;
@@ -1743,22 +1700,10 @@
     color: var(--s2a-color-content-default);
   }
 
-  .sg-live-card__desc {
-    font-size: var(--s2a-font-size-sm);
-    color: rgb(0 0 0 / 60%);
-    letter-spacing: -0.14px;
-    /* stylelint-disable-next-line value-no-vendor-prefix */
-    display: -webkit-box;
-    -webkit-line-clamp: 1;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
-  }
-
   .sg-live-card:is(:hover, :focus-within) .sg-live-card__track,
   .sg-live-card:is(:hover, :focus-within) .sg-live-card__track-extra,
   .sg-live-card:is(:hover, :focus-within) .sg-live-card__time,
-  .sg-live-card:is(:hover, :focus-within) .sg-live-card__title,
-  .sg-live-card:is(:hover, :focus-within) .sg-live-card__desc { color: inherit; }
+  .sg-live-card:is(:hover, :focus-within) .sg-live-card__title { color: inherit; }
 
   .sg-live-card__actions { gap: 12px; }
 
@@ -1776,11 +1721,9 @@
 
   .sg-live-card__btn--favorite {
     background: #fff;
-    border: 2px solid #dadada;
+    border: 1px solid #292929;
     color: #292929;
   }
-
-  .sg-live-card:is(:hover, :focus-within) .sg-live-card__btn--favorite { border-color: #dadada; }
 }
 
 /* ── Tablet only: floating carousel arrows ───────────────────────────────── */
@@ -1993,7 +1936,7 @@
 
   .sg-live-card__btn--favorite {
     background: #fff;
-    border: 2px solid #000;
+    border: 1px solid #000;
     color: #000;
   }
 
@@ -2001,6 +1944,13 @@
     background: transparent;
     border-color: #fff;
     color: #fff;
+  }
+
+  /* Same specificity as the base rule's hover+favorited override (which keeps a dark
+     #292929 border for a white hover fill) but declared later, so it wins here — the card's
+     hover fill turns black at this breakpoint, and a dark border on black is invisible. */
+  .sg-live-card:is(:hover, :focus-within) .sg-live-card__btn--favorite.is-favorited {
+    border-color: #fff;
   }
 }
 
@@ -2282,6 +2232,12 @@
     /* Reserved at 2 lines' worth of height, same reasoning as .sg-live-card__title, so a
        1-line description doesn't leave its card shorter than a neighboring 2-line one. */
     min-height: calc(2 * 1.2em);
+
+    /* Shown again from here up — hidden below 1024px (mobile/tablet). Set explicitly rather
+       than relying on the 1024-1279px block's own display: -webkit-box to cascade up, since
+       that block's max-width means it doesn't apply at this breakpoint at all. */
+    /* stylelint-disable-next-line value-no-vendor-prefix */
+    display: -webkit-box;
     -webkit-line-clamp: 2;
     -webkit-box-orient: vertical;
     overflow: hidden;
@@ -2320,6 +2276,13 @@
     background: transparent;
     border-color: #fff;
     color: #fff;
+  }
+
+  /* Same specificity as the base rule's hover+favorited override (which keeps a dark
+     #292929 border for a white hover fill) but declared later, so it wins here — the card's
+     hover fill turns black at this breakpoint, and a dark border on black is invisible. */
+  .sg-live-card:is(:hover, :focus-within) .sg-live-card__btn--favorite.is-favorited {
+    border-color: #fff;
   }
 
   /* ── Time slot rows ────────────────────────────────────────── */
@@ -2494,29 +2457,6 @@
 
   .sg-card:is(:hover, :focus-within) .sg-card__title { color: #fff; }
 
-  .sg-card__desc {
-    font-size: var(--s2a-font-size-sm);
-    color: rgb(255 255 255 / 65%);
-    line-height: 1.45;
-    height: auto;
-    max-height: 0;
-    opacity: 0;
-    margin-top: 0;
-    display: block;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    transition: max-height 0.32s cubic-bezier(0.22, 1, 0.36, 1),
-                margin-top 0.32s cubic-bezier(0.22, 1, 0.36, 1),
-                opacity 0.25s ease 0.05s;
-  }
-
-  .sg-card:is(:hover, :focus-within) .sg-card__desc {
-    max-height: 22px;
-    margin-top: var(--s2a-spacing-xs);
-    opacity: 1;
-  }
-
   .sg-card__footer {
     display: flex;
     align-items: flex-end;
@@ -2681,12 +2621,6 @@
   .sg-card:is(:hover, :focus-within) .sg-icon-btn--outlined.sg-icon-btn--on-light {
     border-color: var(--s2a-color-border-default, #292929);
     color: var(--s2a-color-content-default, #000);
-  }
-
-  .sg-card:is(:hover, :focus-within) .sg-card__desc {
-    max-height: 0;
-    margin-top: 0;
-    opacity: 0;
   }
 
   .sg-card:is(:hover, :focus-within) .sg-card__actions {
@@ -2904,7 +2838,7 @@
 .sg-icon-btn--solid.sg-icon-btn--on-dark {
   background: var(--s2a-color-background-default, #fff);
   color: var(--s2a-color-content-default, #000);
-  border: var(--s2a-border-width-sm) solid var(--s2a-color-gray-100, #e0e0e0);
+  border: var(--s2a-border-width-sm) solid #000;
 }
 
 .sg-icon-btn--solid.sg-icon-btn--on-dark:hover:not(:disabled) {
