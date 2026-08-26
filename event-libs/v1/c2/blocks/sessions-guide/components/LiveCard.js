@@ -107,7 +107,10 @@ export function LiveCard({ session, variant = 'live' }) {
     ><${IconPlay} />Watch now</button>`;
   }
 
-  function handleCardClick() {
+  // On demand: match SessionCard/TrackRow — the whole card always navigates straight to
+  // the session page, regardless of surface, instead of opening the in-widget overlay.
+  function handleCardClick(e) {
+    if (sessionState === 'on-demand') { handleWatch(e); return; }
     if (surface !== 'widget') return;
     dispatch({ type: 'SET_ACTIVE_SESSION', sessionId: session.id });
     history.pushState({}, '', setSessionParam(sessionParamValue(session)));
@@ -140,7 +143,7 @@ export function LiveCard({ session, variant = 'live' }) {
     ? html`<button
               class="sg-live-card__title sg-live-card__title-btn"
               type="button"
-              onclick=${(e) => { e.stopPropagation(); handleCardClick(); }}
+              onclick=${(e) => { e.stopPropagation(); handleCardClick(e); }}
               daa-ll="Session-Card-Open"
             >${session.title}</button>`
     : html`<p class="sg-live-card__title">${session.title}</p>`}

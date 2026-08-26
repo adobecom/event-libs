@@ -1037,20 +1037,20 @@ describe('services/sessions/sessions-api', () => {
     });
 
     // The test harness runs with Milo env "local", so the non-prod branch is what applies here.
-    it('rewrites a prod-host session page URL to stage on a non-prod page', () => {
+    it('rewrites a prod-host session page URL to the current page origin on a non-prod page', () => {
       const [normalized] = normalizeSessions([{
         id: 's-1', sessionPageUrl: 'https://www.adobe.com/max/2026/sessions/acom-test-1003-1',
       }]);
       expect(normalized.sessionPageUrl)
-        .to.equal('https://www.stage.adobe.com/max/2026/sessions/acom-test-1003-1');
+        .to.equal(`${window.location.origin}/max/2026/sessions/acom-test-1003-1`);
     });
 
-    it('preserves the path, query, and hash while swapping only the host', () => {
+    it('preserves the path, query, and hash while swapping only the origin', () => {
       const [normalized] = normalizeSessions([{
         id: 's-1', sessionPageUrl: 'https://www.adobe.com/max/2026/sessions/a-b?x=1#top',
       }]);
       expect(normalized.sessionPageUrl)
-        .to.equal('https://www.stage.adobe.com/max/2026/sessions/a-b?x=1#top');
+        .to.equal(`${window.location.origin}/max/2026/sessions/a-b?x=1#top`);
     });
 
     it('leaves a root-relative or non-prod-host URL exactly as authored', () => {
@@ -1073,9 +1073,20 @@ describe('services/sessions/sessions-api', () => {
       expect(sessionPageUrlForEnv(PROD_URL, true)).to.equal(PROD_URL);
     });
 
-    it('swaps to the stage host on any non-prod page', () => {
-      expect(sessionPageUrlForEnv(PROD_URL, false))
+    it('rewrites to the current page origin on any non-prod page', () => {
+      expect(sessionPageUrlForEnv(PROD_URL, false, 'https://www.stage.adobe.com'))
         .to.equal('https://www.stage.adobe.com/max/2026/sessions/acom-test-1003-1');
+    });
+
+    it('rewrites to a Helix preview-branch origin, not a hardcoded stage host', () => {
+      const previewOrigin = 'https://main--da-events-fg-pink--adobecom.aem.page';
+      expect(sessionPageUrlForEnv(PROD_URL, false, previewOrigin))
+        .to.equal(`${previewOrigin}/max/2026/sessions/acom-test-1003-1`);
+    });
+
+    it('defaults the origin to the current page when not overridden', () => {
+      expect(sessionPageUrlForEnv(PROD_URL, false))
+        .to.equal(`${window.location.origin}/max/2026/sessions/acom-test-1003-1`);
     });
 
     it('is a no-op for an empty URL, in either env', () => {

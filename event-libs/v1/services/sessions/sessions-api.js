@@ -1,19 +1,21 @@
 import { constructRequestOptions } from '../../utils/esp-controller.js';
 import { getEventServiceEnv, getEventConfig } from '../../utils/utils.js';
-import { ENV_MAP, ADOBE_PROD_HOST, ADOBE_STAGE_HOST } from '../../utils/constances.js';
+import { ENV_MAP, ADOBE_PROD_HOST } from '../../utils/constances.js';
 
-// Catalog URLs always carry prod's host; point non-prod pages at stage.
-// See docs/sessions-guide-implementation-notes.md.
+// Catalog URLs always carry prod's host; on any non-prod page (stage, local, a Helix
+// preview branch), point them at the current page's own origin instead, so a click on a
+// session card lands back on the same domain/branch the visitor is already on rather than
+// production or a hardcoded stage host. See docs/sessions-guide-implementation-notes.md.
 export function sessionPageUrlForEnv(
   url,
   isProd = getEventConfig()?.miloConfig?.env?.name === 'prod',
+  currentOrigin = window.location.origin,
 ) {
   if (!url || isProd) return url || '';
   try {
     const parsed = new URL(url);
     if (parsed.hostname !== ADOBE_PROD_HOST) return url;
-    parsed.hostname = ADOBE_STAGE_HOST;
-    return parsed.toString();
+    return `${currentOrigin}${parsed.pathname}${parsed.search}${parsed.hash}`;
   } catch {
     return url;
   }

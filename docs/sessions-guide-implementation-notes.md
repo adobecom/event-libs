@@ -12,9 +12,11 @@ Code keeps only short markers. Where one points here, the heading is named in th
 
 ### sessionPageUrlForEnv
 
-The catalog returns each session's real page URL but always on prod's host. A stage or local
-visitor must not be sent to production, so the host is rewritten for any non-prod page. Keyed
-on **Milo's page env**, not the ESP tier — the same distinction, for the same reason, as
+The catalog returns each session's real page URL but always on prod's host. A stage, local, or
+Helix preview-branch visitor must not be sent to production, so on any non-prod page the origin
+(protocol + host) is rewritten to match the *current page's own origin* — not a hardcoded stage
+domain — so a click lands back on the same domain/branch the visitor is already on. Keyed on
+**Milo's page env**, not the ESP tier — the same distinction, for the same reason, as
 `session-store.js`'s `defaultRfApiUrlForEnv()`. Anything that isn't an absolute prod-host URL
 (root-relative paths, hand-authored fixtures) passes through untouched.
 
