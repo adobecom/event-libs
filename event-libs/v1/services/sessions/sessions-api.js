@@ -170,7 +170,13 @@ function extractCustomAttributeValues(session, name) {
   return (attr?.values || []).map((v) => v?.label ?? v?.value).filter(Boolean);
 }
 
-function extractCustomAttributeValue(session, name) {
+// Exported so video-playlist.js can run this directly on an Individual Session Page's
+// own `custom-attributes` metadata (the current session's raw customAttributes blob,
+// embedded page-side) — same reasoning extractCustomAttributeSlugs above is already
+// exported for, but returning the human-readable label (v.label ?? v.value) instead of
+// the machine slug, since this is for display (the playlist's own title), not for
+// matching against another session's attribute values.
+export function extractCustomAttributeValue(session, name) {
   return extractCustomAttributeValues(session, name)[0] || '';
 }
 

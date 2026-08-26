@@ -3,7 +3,7 @@ import {
   sessions, initSessionState, liveStreamActiveIds, favorited, pendingActions,
 } from '../../../utils/session-store.js';
 import { deriveSessionState, getNowMs } from '../../../utils/session-state.js';
-import { extractCustomAttributeSlugs } from '../../../services/sessions/sessions-api.js';
+import { extractCustomAttributeSlugs, extractCustomAttributeValue } from '../../../services/sessions/sessions-api.js';
 import { toggleFavoriteWithFeedback } from '../../../services/sessions/action-feedback.js';
 import { readBackgroundConfig } from '../../utils/background-config.js';
 import BlockMediator from '../../../deps/block-mediator.min.js';
@@ -154,6 +154,22 @@ export function resolveTopicPlaylist(
 
 export function resolveCurrentSessionTopics(pageCustomAttributes) {
   return extractCustomAttributeSlugs({ customAttributes: pageCustomAttributes || [] }, 'Playlist on session page');
+}
+
+// The playlist's own heading, per product: pulled from the SAME `Playlist on session
+// page` attribute resolveCurrentSessionTopics above already reads (a multi-select, but
+// only ever carrying one value at any given time in practice) — its human-readable
+// label (e.g. "Social Media and Marketing"), not the machine slug that attribute's other
+// use (topic matching) needs. An authored `playlist-title` row still wins if present
+// (an explicit author override outranks the metadata-derived default), and the
+// hardcoded "More like this" remains the final fallback when neither is available.
+export function resolvePlaylistTitle(pageCustomAttributes, authoredTitle) {
+  if (authoredTitle) return authoredTitle;
+  const label = extractCustomAttributeValue(
+    { customAttributes: pageCustomAttributes || [] },
+    'Playlist on session page',
+  );
+  return label || 'More like this';
 }
 
 function formatDuration(minutes) {
@@ -603,7 +619,7 @@ export default async function init(el) {
     createTag('span', { class: 'video-playlist-up-next-label' }, 'Up next', { parent: upNext });
     createTag('span', { class: 'video-playlist-up-next-title' }, nextSession.title, { parent: upNext });
 
-    const title = cfg['playlist-title'] || 'More like this';
+    const title = resolvePlaylistTitle(pageCustomAttributes, cfg['playlist-title']);
     createTag('h3', { class: 'video-playlist-title' }, title, { parent: top });
 
     const toggle = createTag('button', {
