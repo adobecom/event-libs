@@ -71,9 +71,9 @@ const HOMEPAGE_FIELD_BY_TYPE = {
   },
   [CONFIG_TYPES.HOMEPAGE_FEATURED_SESSIONS]: {
     ...HOMEPAGE_SESSION_FIELDS[CONFIG_TYPES.HOMEPAGE_FEATURED_SESSIONS],
-    // No headingField/themeField — featured-sessions.js doesn't author a heading or
-    // support a theme; unlike Upcoming Sessions, this surface is always ratio-16-9
-    // cards, no config-driven visual variation.
+    // No headingField — featured-sessions.js doesn't author a heading; unlike Upcoming
+    // Sessions, this surface has no section header at all.
+    themeField: 'featuredSessionsTheme',
     // The featured-sessions block's generated event-card markup + session-routing.js
     // read all three — watchUrl is where a click routes once the session goes live,
     // mrStreamId is what tells it a session is Mobile-Rider-backed at all, and
@@ -84,6 +84,21 @@ const HOMEPAGE_FIELD_BY_TYPE = {
     label: 'Featured Sessions',
     blockHint: 'the featured-sessions block',
     linkPrefix: 'event-featured-sessions',
+    // Card CTA text, authored once per config (not per-session) and applied to every
+    // card — featured-sessions.js picks one of the three at render time based on each
+    // entry's own sessionTime vs. the viewer's clock. Config-level keys, not part of
+    // HOMEPAGE_SESSION_FIELDS since they aren't per-session overrides.
+    ctaFields: {
+      prior: 'ctaTextPrior',
+      during: 'ctaTextDuring',
+      after: 'ctaTextAfter',
+    },
+    ctaDefaults: {
+      prior: 'Learn more',
+      during: 'Watch now',
+      after: 'Watch on-demand',
+    },
+    ctaHint: 'CTA text shown on every card, chosen per-session by comparing the session\'s own time to the viewer\'s clock — before it starts, while it\'s live, and after it ends. Leave any blank to fall back to its default.',
   },
 };
 

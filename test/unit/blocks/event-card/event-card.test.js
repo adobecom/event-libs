@@ -81,6 +81,24 @@ describe('event-card', () => {
     expect(img.src).to.equal('https://example.com/media/session.jpg');
   });
 
+  it('defaults to light theme when no dark-card class is authored', async () => {
+    document.body.innerHTML = await readFile({ path: './mocks/ratio-4-3.html' });
+    const el = document.querySelector('.event-card');
+    await init(el);
+
+    expect(el.dataset.cardTheme).to.equal('light');
+  });
+
+  it('sets dark theme from a dark-card class present before init', async () => {
+    document.body.innerHTML = await readFile({ path: './mocks/ratio-4-3.html' });
+    const el = document.querySelector('.event-card');
+    el.classList.add('dark-card');
+    await init(el);
+
+    expect(el.dataset.cardTheme).to.equal('dark');
+    expect(el.classList.contains('dark-card')).to.equal(true);
+  });
+
   it('keeps a cross-origin authored <img> at its real absolute URL, not a same-origin pathname', async () => {
     document.body.innerHTML = `
       <div class="event-card ratio-16-9">

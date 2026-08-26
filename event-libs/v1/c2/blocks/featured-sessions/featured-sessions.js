@@ -33,8 +33,36 @@ function setRoutingData(card, entry) {
 // card with no sessionId never gets session-routing.js's click interception (and thus
 // never gets safeUrl's own re-check) and would otherwise navigate a raw click straight
 // off the unsanitized href.
-function buildAuthoredCard(entry) {
-  const card = createTag('div', { class: 'event-card ratio-16-9' });
+// Default wording, used when the configurator's own three CTA text boxes (config.cta)
+// are left blank for a given state.
+const DEFAULT_CTA_TEXT = {
+  prior: 'Learn more',
+  during: 'Watch now',
+  after: 'Watch on-demand',
+};
+
+// A session with no sessionTime (time unknown) is treated as "prior" — the same
+// "Learn more" wording it always showed before per-state CTAs existed.
+function getSessionCtaState(entry) {
+  const { startTimeMillis, endTimeMillis } = entry.sessionTime || {};
+  if (!startTimeMillis) return 'prior';
+  const now = Date.now();
+  if (now < startTimeMillis) return 'prior';
+  if (endTimeMillis && now > endTimeMillis) return 'after';
+  return 'during';
+}
+
+function getCtaText(entry, cta) {
+  const state = getSessionCtaState(entry);
+  return cta?.[state] || DEFAULT_CTA_TEXT[state];
+}
+
+// theme is 'dark' or 'light' (config.theme) — 'dark-card' is event-card.js's own
+// generic theme-switch class (see event-card.js's getTheme()), added here rather than
+// duplicating any dark-mode styling in this block's own CSS.
+function buildAuthoredCard(entry, cta, theme) {
+  const themeClass = theme === 'dark' ? ' dark-card' : '';
+  const card = createTag('div', { class: `event-card ratio-16-9${themeClass}` });
   const mediaWrapper = createTag('div', {}, '', { parent: card });
   if (entry.imageUrl) {
     createTag('img', { src: entry.imageUrl, alt: '' }, '', { parent: mediaWrapper });
@@ -46,7 +74,7 @@ function buildAuthoredCard(entry) {
   createTag('p', {}, '', { parent: textRoot }).textContent = entry.track || '';
   const ctaP = createTag('p', {}, '', { parent: textRoot });
   const ctaHref = safeUrl(entry.url);
-  if (ctaHref) createTag('a', { href: ctaHref }, 'Learn more', { parent: ctaP });
+  if (ctaHref) createTag('a', { href: ctaHref }, getCtaText(entry, cta), { parent: ctaP });
 
   setRoutingData(card, entry);
   return card;
@@ -73,7 +101,7 @@ export default async function init(el) {
   el.setAttribute('aria-label', 'Featured Sessions');
 
   const track = createTag('div', { class: 'carousel-track' });
-  const cards = entries.map(buildAuthoredCard);
+  const cards = entries.map((entry) => buildAuthoredCard(entry, config.cta, config.theme));
   cards.forEach((card) => track.append(card));
 
   const marker = createTag('div', { class: 'event-carousel' });

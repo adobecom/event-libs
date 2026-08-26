@@ -7,6 +7,18 @@ five aspect-ratio variants authored via class name: `ratio-1-1`, `ratio-4-3` (de
 If no media image is found, the card removes itself — a card with no image is not a
 valid authored card.
 
+## Theme
+
+Light (the default) or dark, authored/generated the same way as the ratio variants —
+a `dark-card` class present on the card *before* `init()` runs. `init()`'s `getTheme()`
+reads that class and sets `data-card-theme="dark"` on the card (nothing for light, the
+implicit default), which `event-card.css`'s `[data-card-theme="dark"]` rules key off
+to invert title/description/CTA colors. `dark-card` mirrors the class name
+`upcoming-sessions.js`/`decorate.js`'s `tec-homepage` builder already use for their own
+dark surfaces, so any caller building cards programmatically (e.g.
+`event-libs/v1/c2/blocks/featured-sessions/`, which reads a config-level `theme` and
+adds the class per generated card) opts into dark mode the same way an author would.
+
 ## Session-driven cards
 
 Cards built by other flows (e.g. `event-libs/v1/c2/blocks/featured-sessions/`) can carry

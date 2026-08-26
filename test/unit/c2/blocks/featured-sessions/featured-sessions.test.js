@@ -128,4 +128,81 @@ describe('featured-sessions', () => {
     await init(el);
     expect(el.isConnected).to.equal(false);
   });
+
+  describe('theme', () => {
+    it('defaults to light — no dark-card class on the generated card', async () => {
+      const el = buildBlock({ entries: [entry()] });
+      await init(el);
+
+      const card = el.querySelector('.event-card');
+      expect(card.classList.contains('dark-card')).to.equal(false);
+      expect(card.dataset.cardTheme).to.equal('light');
+    });
+
+    it('adds dark-card (event-card\'s own generic theme class) when config.theme is dark', async () => {
+      const el = buildBlock({ theme: 'dark', entries: [entry()] });
+      await init(el);
+
+      const card = el.querySelector('.event-card');
+      expect(card.classList.contains('dark-card')).to.equal(true);
+      expect(card.dataset.cardTheme).to.equal('dark');
+    });
+  });
+
+  describe('per-state CTA text', () => {
+    const NOW = Date.now();
+
+    it('defaults to "Learn more" pre-session when config.cta is absent', async () => {
+      const el = buildBlock({
+        entries: [entry({ sessionTime: { startTimeMillis: NOW + 1000000, endTimeMillis: NOW + 2000000 } })],
+      });
+      await init(el);
+      expect(el.querySelector('.card-cta').textContent).to.equal('Learn more');
+    });
+
+    it('uses config.cta.prior before the session starts', async () => {
+      const el = buildBlock({
+        cta: { prior: 'Coming soon', during: 'Live now', after: 'Catch the replay' },
+        entries: [entry({ sessionTime: { startTimeMillis: NOW + 1000000, endTimeMillis: NOW + 2000000 } })],
+      });
+      await init(el);
+      expect(el.querySelector('.card-cta').textContent).to.equal('Coming soon');
+    });
+
+    it('uses config.cta.during while the session is live', async () => {
+      const el = buildBlock({
+        cta: { prior: 'Coming soon', during: 'Live now', after: 'Catch the replay' },
+        entries: [entry({ sessionTime: { startTimeMillis: NOW - 1000, endTimeMillis: NOW + 1000000 } })],
+      });
+      await init(el);
+      expect(el.querySelector('.card-cta').textContent).to.equal('Live now');
+    });
+
+    it('uses config.cta.after once the session has ended', async () => {
+      const el = buildBlock({
+        cta: { prior: 'Coming soon', during: 'Live now', after: 'Catch the replay' },
+        entries: [entry({ sessionTime: { startTimeMillis: NOW - 2000000, endTimeMillis: NOW - 1000000 } })],
+      });
+      await init(el);
+      expect(el.querySelector('.card-cta').textContent).to.equal('Catch the replay');
+    });
+
+    it('falls back to the built-in default for a blank state while others are set', async () => {
+      const el = buildBlock({
+        cta: { during: 'Live now' },
+        entries: [entry({ sessionTime: { startTimeMillis: NOW - 2000000, endTimeMillis: NOW - 1000000 } })],
+      });
+      await init(el);
+      expect(el.querySelector('.card-cta').textContent).to.equal('Watch on-demand');
+    });
+
+    it('treats an entry with no sessionTime as "prior"', async () => {
+      const el = buildBlock({
+        cta: { prior: 'Coming soon', during: 'Live now', after: 'Catch the replay' },
+        entries: [entry()],
+      });
+      await init(el);
+      expect(el.querySelector('.card-cta').textContent).to.equal('Coming soon');
+    });
+  });
 });

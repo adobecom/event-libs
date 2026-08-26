@@ -7,6 +7,17 @@ function getVariant(el) {
   return VARIANTS.find((variant) => el.classList.contains(variant)) || DEFAULT_VARIANT;
 }
 
+// 'dark-card' mirrors the class name upcoming-sessions.js/decorate.js's tec-homepage
+// builder already apply to a block wrapper for its own dark theme — reused here as
+// event-card's own generic theme switch so any caller (authored or built
+// programmatically, like featured-sessions.js) opts a card into dark mode the same way.
+// Light is the default: an event-card with no theme class renders light.
+const DEFAULT_THEME = 'light';
+
+function getTheme(el) {
+  return el.classList.contains('dark-card') ? 'dark' : DEFAULT_THEME;
+}
+
 function isSameOrigin(url) {
   try {
     return new URL(url, window.location.href).origin === window.location.origin;
@@ -68,6 +79,7 @@ function buildBody(contentWrapper) {
 export default async function init(el) {
   const [mediaWrapper, contentWrapper] = [...el.querySelectorAll(':scope > div')];
   const variant = getVariant(el);
+  const theme = getTheme(el);
   const media = buildMedia(mediaWrapper);
 
   if (!media) {
@@ -79,6 +91,7 @@ export default async function init(el) {
   el.innerHTML = '';
   el.append(media, body);
   el.dataset.cardVariant = variant;
+  el.dataset.cardTheme = theme;
 
   if (el.dataset.sessionId) {
     const { default: attachSessionRouting } = await import('../../../utils/session-routing.js');
