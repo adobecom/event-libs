@@ -84,6 +84,10 @@
   aspect-ratio: 16 / 9;
 }
 
+.event-card[data-card-variant="media-tall"] .card-media {
+  aspect-ratio: 9 / 16;
+}
+
 
 .event-card .card-body {
   display: flex;

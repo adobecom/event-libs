@@ -1,6 +1,6 @@
 import { createTag, createOptimizedPicture } from '../../../utils/utils.js';
 
-const VARIANTS = ['media-square', 'media-standard', 'media-standard-rev', 'standard-m', 'media-wide'];
+const VARIANTS = ['media-square', 'media-standard', 'media-standard-rev', 'standard-m', 'media-wide', 'media-tall'];
 const DEFAULT_VARIANT = 'media-standard';
 
 function getVariant(el) {

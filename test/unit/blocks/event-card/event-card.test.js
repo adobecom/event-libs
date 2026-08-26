@@ -44,6 +44,18 @@ describe('event-card', () => {
     expect(el.querySelector('.card-cta').textContent).to.equal('Watch now');
   });
 
+  it('renders a body-layout card for media-tall too', async () => {
+    document.body.innerHTML = await readFile({ path: './mocks/media-tall.html' });
+    const el = document.querySelector('.event-card');
+    await init(el);
+
+    expect(el.dataset.cardVariant).to.equal('media-tall');
+    expect(el.querySelector('.card-media picture')).to.exist;
+    expect(el.querySelector('.card-title').textContent).to.equal('Featured Session Title');
+    expect(el.querySelector('.card-description').textContent).to.equal('Featured session description goes here.');
+    expect(el.querySelector('.card-cta').textContent).to.equal('Watch now');
+  });
+
   it('defaults to media-standard when no variant class is authored', async () => {
     document.body.innerHTML = await readFile({ path: './mocks/media-standard.html' });
     const el = document.querySelector('.event-card');
