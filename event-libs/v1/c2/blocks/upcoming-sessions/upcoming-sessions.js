@@ -322,9 +322,6 @@ function startMobileRiderPolling(sessions, onStarted) {
   const mrSessions = sessions.filter((s) => s.mrStreamId);
   if (!mrSessions.length) return null;
 
-  // Register every mrStreamId as soon as the block loads, not at its scheduled
-  // start time — a stream can go live ahead of its listed start time, and we
-  // need to catch that instead of waiting for the clock to catch up.
   const mrStreamIds = mrSessions.map((s) => s.mrStreamId);
   const resolvedIds = new Set();
   registerStreamIds(mrStreamIds);
