@@ -18,6 +18,12 @@
 
 .sg-download-btn:hover { opacity: 1; }
 
+.sg-download-btn:disabled {
+  opacity: 0.3;
+  cursor: default;
+  pointer-events: none;
+}
+
 /* ── Session Detail Overlay (Phase 6) ────────────────────────── */
 
 .sg-detail-panel {
