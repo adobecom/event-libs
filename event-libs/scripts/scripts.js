@@ -93,4 +93,8 @@ decorateArea();
 (async function loadPage() {
   await loadLana({ clientId: 'events-milo' });
   await loadArea();
+  if (getMetadata('override-milo-ace1209')) {
+    const { default: initMiloSiteRedesignOverride } = await import('../v1/features/milo-site-redesign-override/index.js');
+    initMiloSiteRedesignOverride();
+  }
 }());
