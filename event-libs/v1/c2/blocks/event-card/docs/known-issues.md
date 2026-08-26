@@ -11,16 +11,21 @@ not-applicable; these three are still open and span shared infrastructure that
 `event-libs/v1/features/timing-framework/plugins/mobile-rider/mobile-rider-controller.js`
 were byte-identical, and the former hardcoded a single host
 (`overlay-admin-integration.mobilerider.com`) with no environment awareness at
-all — unlike `services/sessions/mobile-rider.js`'s `fetchLiveStatus(ids, env)`,
-which correctly switches between `overlay-admin.mobilerider.com` (prod) and
-`overlay-admin-dev.mobilerider.com` (dev/stage) based on `session-store.js`'s
-`getApiConfig().mrEnv`. This meant `upcoming-sessions.js`/`session-routing.js`
-polled the same MR host regardless of dev/stage/prod, while `sessions-guide`
-(via `poller.js` → `mobile-rider.js`) correctly split by environment.
+all — meaning it happened to be *right* for dev/QA/stage (confirmed with the
+MobileRider integration owner: that's the actual shared non-prod host) but
+*wrong* for prod, which should hit `overlay-admin-prod.mobilerider.com`
+instead. Separately, `services/sessions/mobile-rider.js`'s
+`fetchLiveStatus(ids, env)` guessed at two *different*, both-incorrect
+hostnames (`overlay-admin.mobilerider.com` / `overlay-admin-dev.mobilerider.com`)
+that were never verified against a real stream — confirmed 404 on a real id
+during testing.
 
 **Fix:** the shared registry (see #4 below) calls `fetchLiveStatus` from
 `mobile-rider.js` instead of instantiating `MobileRiderController`, passing
-`getApiConfig()?.mrEnv` on each tick. `services/sessions/
+`getApiConfig()?.mrEnv` on each tick — `mobile-rider.js` itself now uses the
+confirmed-correct hosts (`overlay-admin-prod.mobilerider.com` for prod,
+`overlay-admin-integration.mobilerider.com` for dev/QA/stage, matching what
+`MobileRiderController` was already hitting for non-prod). `services/sessions/
 mobile-rider-controller.js` is deleted as unused. TF's own copy at
 `features/timing-framework/plugins/mobile-rider/mobile-rider-controller.js`
 is untouched — it's a separate, still-duplicated concern (TF's schedule-skip
