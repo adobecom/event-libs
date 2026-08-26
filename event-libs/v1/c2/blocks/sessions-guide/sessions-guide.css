@@ -959,6 +959,15 @@
   margin: var(--s2a-spacing-lg) 0 0;
   color: var(--s2a-color-content-default);
   transition: color 0.2s;
+
+  /* Clamped to 2 lines and reserved at that height, so a 1-line title doesn't leave its
+     card shorter than a neighboring 2-line one. */
+  min-height: calc(2 * 1.1em);
+  /* stylelint-disable-next-line value-no-vendor-prefix */
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
 .sg-live-card:is(:hover, :focus-within) .sg-live-card__title { color: inherit; }
@@ -1807,6 +1816,14 @@
     padding-right: 0;
   }
 
+  /* Cancels .sg-carousel-section's 20px right padding, same trick as the desktop
+     breakpoint below — without it, this rule stays at the 768px+ breakpoint's
+     margin-right:0 and the peeking card gets clipped at the section's padding edge
+     instead of bleeding to the section's true outer edge. */
+  .sg-carousel__track {
+    margin-right: -20px;
+  }
+
   .sg-carousel__card-wrap {
     scroll-snap-align: none;
   }
@@ -1818,8 +1835,11 @@
     right: 0;
   }
 
+  /* No position here — .sg-carousel__nav (position:absolute) must anchor to the outer,
+     unconditionally-relative .sg-carousel instead, so it lands next to the section title,
+     not on top of the card row below. See the desktop breakpoint, which relies on the same
+     fallback. */
   .sg-carousel__body {
-    position: relative;
     align-items: center;
     gap: 36px;
   }
@@ -1853,9 +1873,13 @@
     border-color: #000;
   }
 
+  /* height:auto (not a fixed px value) cancels the base rule's mobile height and lets the
+     image stretch (align-items:stretch on .sg-live-card) to match whatever height the
+     content column ends up needing now that title/desc each reserve 2 lines — so it
+     always fills the card instead of stopping at a stale fixed value. */
   .sg-live-card__image {
     width: 425px;
-    height: 240px;
+    height: auto;
     border-radius: var(--s2a-border-radius-md);
     border: none;
   }
@@ -1934,6 +1958,11 @@
     letter-spacing: -0.14px;
     white-space: normal;
     text-overflow: clip;
+
+    /* Reserved at 2 lines' worth of height, same reasoning as .sg-live-card__title, so a
+       1-line description doesn't leave its card shorter than a neighboring 2-line one. */
+    min-height: calc(2 * 1.2em);
+
     /* stylelint-disable-next-line value-no-vendor-prefix */
     display: -webkit-box;
     -webkit-line-clamp: 2;
@@ -2173,9 +2202,10 @@
     border-color: #000;
   }
 
+  /* height:auto — see the tablet breakpoint's identical rule for why. */
   .sg-live-card__image {
     width: 560px;
-    height: 316px;
+    height: auto;
     border-radius: var(--s2a-border-radius-md);
     border: none;
   }
@@ -2260,6 +2290,10 @@
     color: #000;
     white-space: normal;
     text-overflow: clip;
+
+    /* Reserved at 2 lines' worth of height, same reasoning as .sg-live-card__title, so a
+       1-line description doesn't leave its card shorter than a neighboring 2-line one. */
+    min-height: calc(2 * 1.2em);
     -webkit-line-clamp: 2;
     -webkit-box-orient: vertical;
     overflow: hidden;
