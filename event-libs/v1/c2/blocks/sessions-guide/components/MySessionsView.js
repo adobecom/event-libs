@@ -2,7 +2,7 @@ import { html, useMemo, useEffect } from '../../../../deps/htm-preact.js';
 import { useSessionGuide } from '../store/index.js';
 import {
   sessions as sessionsSignal, scheduled as scheduledSignal,
-  liveStreamActiveIds as liveStreamActiveIdsSignal, auth, sessionStateVersion, getApiConfig,
+  liveStreamActiveIds as liveStreamActiveIdsSignal, auth, sessionStateVersion,
 } from '../../../../utils/session-store.js';
 import { checkViewAccess } from '../../../../services/sessions/action-feedback.js';
 import { TimeSlotRow } from './TimeSlotRow.js';
@@ -32,8 +32,6 @@ export function MySessionsView() {
   sessionStateVersion.value;
   const nowMs = getNowMs();
   const isPost = useIsPostEvent();
-  // What a DVR delay counts from — see isDvrPending().
-  const eventStartMs = getApiConfig()?.eventStartMs;
 
   // Logged-out/unregistered visitors never see this view's content — a toast fires and
   // they're bounced to a fallback view instead. Re-checked on every auth change, not just
@@ -58,7 +56,7 @@ export function MySessionsView() {
       const st = deriveSessionState(s, liveStreamActiveIds, nowMs);
       return st === 'upcoming';
     });
-    const onDemandRaw = onDemandSessions(dayScheduled, liveStreamActiveIds, nowMs, eventStartMs);
+    const onDemandRaw = onDemandSessions(dayScheduled, liveStreamActiveIds, nowMs);
 
     const filteredUpcomingSessions = filterSessions(activeAndUpcoming, activeFilters, searchQuery);
     return {
@@ -66,7 +64,7 @@ export function MySessionsView() {
       timeSlots: groupByStartTime(filteredUpcomingSessions),
       filteredOnDemand: filterSessions(onDemandRaw, activeFilters, searchQuery),
     };
-  }, [sessions, scheduled, liveStreamActiveIds, activeDay, userTz, nowMs, activeFilters, searchQuery, eventStartMs]);
+  }, [sessions, scheduled, liveStreamActiveIds, activeDay, userTz, nowMs, activeFilters, searchQuery]);
 
   const hasUpcoming = timeSlots.length > 0;
   const hasOnDemand = filteredOnDemand.length > 0;

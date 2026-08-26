@@ -160,46 +160,18 @@ describe('session-filters/onDemandSessions', () => {
     expect(result.map((s) => s.id)).to.deep.equal(['ipod', 'ipod-live-slot']);
   });
 
-  // Ending isn't enough — the DVR window (event start + authored hours) has to have opened.
-  describe('DVR availability', () => {
-    const EVENT_START = NOW - 2 * 3_600_000; // event started two hours ago
-    const dvr = (id, hours, overrides = {}) => ({ ...PAST, id, dvrDelayHours: hours, ...overrides });
+  // DVR Timing (in hours) is no longer part of this gate (PM, 2026-08-26) — a session with
+  // dvrDelayHours authored is treated exactly like one without it. The field is still
+  // carried on the session for a later "Recording coming soon" display treatment, just not
+  // read here. See docs/sessions-guide-implementation-notes.md.
+  it('ignores dvrDelayHours entirely for an ended session', () => {
+    const result = onDemandSessions([{ ...PAST, dvrDelayHours: 999 }], new Set(), NOW);
+    expect(result.map((s) => s.id)).to.deep.equal(['past']);
+  });
 
-    it('withholds an ended session whose DVR window has not opened yet', () => {
-      const result = onDemandSessions([dvr('pending', 5)], new Set(), NOW, EVENT_START);
-      expect(result).to.deep.equal([]);
-    });
-
-    it('releases it once event start + DVR hours has passed', () => {
-      const result = onDemandSessions([dvr('ready', 1)], new Set(), NOW, EVENT_START);
-      expect(result.map((s) => s.id)).to.deep.equal(['ready']);
-    });
-
-    it('withholds a session carrying the on-demand Format too', () => {
-      const pending = { ...ON_DEMAND_FORMAT, id: 'ipod-pending', dvrDelayHours: 5 };
-      expect(onDemandSessions([pending], new Set(), NOW, EVENT_START)).to.deep.equal([]);
-    });
-
-    it('withholds an MR session whose stream has gone inactive but whose DVR is pending', () => {
-      const pending = dvr('mr-pending', 5, { mrStreamId: 'stream-1' });
-      expect(onDemandSessions([pending], new Set(), NOW, EVENT_START)).to.deep.equal([]);
-    });
-
-    // Fails open — a missing input withholds nothing.
-    it('withholds nothing when the session has no DVR timing', () => {
-      const result = onDemandSessions([{ ...PAST, dvrDelayHours: null }], new Set(), NOW, EVENT_START);
-      expect(result.map((s) => s.id)).to.deep.equal(['past']);
-    });
-
-    it('withholds nothing when no event start is authored', () => {
-      const result = onDemandSessions([dvr('no-anchor', 5)], new Set(), NOW, null);
-      expect(result.map((s) => s.id)).to.deep.equal(['no-anchor']);
-    });
-
-    it('treats 0 hours as available from the event start, not as unauthored', () => {
-      const result = onDemandSessions([dvr('immediate', 0)], new Set(), NOW, EVENT_START);
-      expect(result.map((s) => s.id)).to.deep.equal(['immediate']);
-    });
+  it('ignores dvrDelayHours entirely for an on-demand-Format session', () => {
+    const result = onDemandSessions([{ ...ON_DEMAND_FORMAT, dvrDelayHours: 999 }], new Set(), NOW);
+    expect(result.map((s) => s.id)).to.deep.equal(['ipod']);
   });
 });
 

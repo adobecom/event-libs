@@ -1,5 +1,5 @@
 import { getSessionDayKey, isSessionLive, isSessionUpcoming } from './time.js';
-import { deriveSessionState, isInLiveNow, isDvrPending } from '../../../../utils/session-state.js';
+import { deriveSessionState, isInLiveNow } from '../../../../utils/session-state.js';
 import { getTrackIcon, getOverrideTrackIcon, DEFAULT_ICON_COLOR } from '../../../../utils/tier-1-event-config.js';
 
 export function sessionsForDay(sessions, activeDay, userTz) {
@@ -121,11 +121,12 @@ export function upcomingSessions(sessions, liveStreamActiveIds, activeDay, userT
   });
 }
 
-// A pending DVR window holds a session back whichever way it qualified. eventStartMs is
-// passed in, keeping this module free of store imports.
-export function onDemandSessions(sessions, liveStreamActiveIds, nowMs, eventStartMs) {
+// DVR Timing (in hours) is no longer part of this gate (PM, 2026-08-26) — a session lands
+// in On Demand as soon as its state resolves there, full stop. `dvrDelayHours` is still
+// carried on the session for a later "Recording coming soon" display treatment, just not
+// read here.
+export function onDemandSessions(sessions, liveStreamActiveIds, nowMs) {
   return sessions.filter((s) => {
-    if (isDvrPending(s, nowMs, eventStartMs)) return false;
     if (s.hasOnDemandFormat) return true;
     if (s.mrStreamId) return deriveSessionState(s, liveStreamActiveIds, nowMs) === 'on-demand';
     return !isSessionLive(s, nowMs) && !isSessionUpcoming(s, nowMs);

@@ -1,6 +1,6 @@
 import { useComputed } from '../../../../deps/htm-preact.js';
 import {
-  sessions, liveStreamActiveIds, sessionStateVersion, getApiConfig,
+  sessions, liveStreamActiveIds, sessionStateVersion, getEventApiConfig,
 } from '../../../../utils/session-store.js';
 import { isPostEvent, getNowMs } from '../../../../utils/session-state.js';
 
@@ -9,6 +9,6 @@ import { isPostEvent, getNowMs } from '../../../../utils/session-state.js';
 export function useIsPostEvent() {
   return useComputed(() => {
     void sessionStateVersion.value;
-    return isPostEvent(sessions.value, liveStreamActiveIds.value, getNowMs(), getApiConfig()?.eventEndMs);
+    return isPostEvent(sessions.value, liveStreamActiveIds.value, getNowMs(), getEventApiConfig()?.eventEndMs);
   }).value;
 }

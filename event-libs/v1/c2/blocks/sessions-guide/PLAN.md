@@ -315,7 +315,7 @@ only:
 - `theme` (`light` | `dark`; defaults: widget=`'dark'`, page=`'light'`)
 - `surface` derived from `el.classList.contains('page')`
 - `userTz` set via `detectUserTimezone()`
-- `registerUrl` is **not** authored here — it's merged in from `getApiConfig()` (see below) after `parseSessionsGuideConfig()` runs
+- `registerUrl` is **not** authored here — it's merged in from `getEventApiConfig()` (see below) after `parseSessionsGuideConfig()` runs
 
 `rainfocus-api-url`, `rainfocus-api-profile-id`, `register-url`, and `manual-on-demand-transition-time` moved to **page metadata** (read by `session-store.js`, not this block) since they gate data other blocks need too, not just this widget's presentation. See `REAL-API-CHECKLIST.md` for the current metadata keys.
 
@@ -347,7 +347,7 @@ All service files exist and export the correct API surface; all currently return
 **`event-libs/v1/utils/session-store.js`** (shared, page-level) exports:
 - Signals: `sessions`, `sessionsStatus`, `liveStreamActiveIds`, `favorited`, `scheduled`, `auth`, `pendingActions`
 - `initSessionState()` — idempotent bootstrap, gated on `rainfocus-api-url` metadata, called from `decorateEvent()`
-- `getApiConfig()` — the parsed metadata (`apiUrl`, `profileId`, `registerUrl`, `manualCutoff`, `mrEnv`)
+- `getEventApiConfig()` — the parsed metadata (`apiUrl`, `eventId`, `rfProfileId`, `registerUrl`, `eventStartMs`, `eventEndMs`, `mrEnv`); renamed from `getApiConfig()`/`profileId` (2026-08-26) since the shape is really this event's config, not just its API connection details
 - `toggleSchedule(session)` / `toggleFavorite(session)` — mutators that call the RF API and update the signals + localStorage
 
 **`store/index.js`** (block-local) exports:
@@ -1066,6 +1066,51 @@ to register for the wrong event.
     shape — `tier-1-event-configurator/utils.js`'s `buildSessionAuthorEntry()` still
     calls `getSessionPrimaryTrack()` to fill it, but keeps the output key `track` to match
     that contract).
+
+## Phase 17 — Format visibility matrix + DVR Timing removed from filtering ✅ (2026-08-26)
+
+Confirmed, per-view visibility table for the 3 valid Format combinations (see Phase 16's
+`invalidFormatReason` for the other 5, which are dropped from the catalog entirely and never
+reach this):
+
+| Format | Live & upcoming | My sessions | My favorites | On demand |
+|---|---|---|---|---|
+| Online | ✅ | ✅ (if scheduled) | ✅ (if favorited) | ✅ (past end, or MR poll) |
+| In person, Online | ✅ | ✅ (if scheduled) | ✅ (if favorited) | ✅ (past end, or MR poll) |
+| In person, On demand, post event | ❌ | ❌ (can only schedule from Live & upcoming, which it never appears in) | ✅ (if favorited from On demand) | ✅ |
+
+Traced against the code and confirmed already correct with **no changes needed**:
+`deriveSessionState()`'s unconditional `hasOnDemandFormat → 'on-demand'` already keeps the
+third row out of Live & Upcoming and My Sessions' upcoming tab; `MyFavoritesView.js` already
+has its own on-demand tab (identical mechanism to `MySessionsView.js`), so favoriting from On
+Demand already surfaces it there too.
+
+**One real change:** `DVR Timing (in hours)` is no longer part of `onDemandSessions()`'s
+gate at all (PM, 2026-08-26) — dropped the `isDvrPending()` check and the `eventStartMs` param
+from `onDemandSessions()` itself, and its threading through `OnDemandView.js`/
+`MySessionsView.js`/`MyFavoritesView.js`. `dvrDelayHours` stays on the session model (still
+parsed from the real attribute) for a later "Recording coming soon" vs "On-demand" display
+treatment — a separate, not-yet-scoped ticket, tracked here as a pointer for whoever picks it
+up. `event-session-details` already has an analogous, independent "Coming soon" state
+(`isIpodSession` + `hasPlayableVideo`) that doesn't read DVR Timing either — worth a look
+before designing the guide's version.
+
+`isDvrPending()`/`dvrAvailableAtMs()` themselves were briefly deleted as dead code, then
+restored (2026-08-26) as shared `utils/session-state.js` utilities — unused by the guide's own
+filtering now, but kept for other blocks that may need to know whether a session's recording
+window has opened. Same reasoning for `eventApiConfig.eventStartMs` (see below): not read by
+this block right now, but cheap, already-authored data worth keeping available.
+
+### 17.1 `session-store.js` naming pass ✅ (2026-08-26)
+
+- `getApiConfig()` → `getEventApiConfig()`, and its module-level `apiConfig` var →
+  `eventApiConfig` — the old name undersold what the object actually holds: `eventId`,
+  `eventStartMs`, `eventEndMs`, `registerUrl` alongside the real API-connection fields
+  (`apiUrl`, `rfProfileId`, `mrEnv`). Not named `getEventConfig()`/`eventConfig` — that would
+  collide in meaning with the unrelated, pre-existing `getEventConfig()` in `utils/utils.js`
+  (Milo's page-level config).
+- `profileId` → `rfProfileId` on the same object, so it's unambiguous which system's profile
+  id this is without having to chase the assignment back to `rainfocus.js`.
 
 ---
 

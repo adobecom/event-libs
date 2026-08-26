@@ -180,9 +180,17 @@ before flipping it.
 `videoDuration` is kept verbatim: the catalog writes 60 minutes as `00:60:00`, so it is not
 reliably `HH:MM:SS`.
 
-`dvrDelayHours` is hours after the event starts that a recording becomes playable (see
-`isDvrPending()`). Free text, so blank / whitespace / non-numeric all mean "no delay" (`null`),
-never `0` — `0` would mean available from the moment the event starts.
+`dvrDelayHours` is hours after the event starts that a recording becomes playable. Free text,
+so blank / whitespace / non-numeric all mean "no delay" (`null`), never `0` — `0` would mean
+available from the moment the event starts. **Not read by the guide's own filtering** — the
+`isDvrPending()`/`dvrAvailableAtMs()` gate that used to withhold a session from
+`onDemandSessions()` until this window opened was removed from that call site (PM,
+2026-08-26): DVR Timing no longer affects which view a session appears in. Both functions
+still live in `utils/session-state.js` as shared utilities for any other block that needs
+them — they're just unused by `session-filters.js` now. `dvrDelayHours` itself is still
+carried on the session for a later "Recording coming soon" vs "On-demand" display treatment
+(tracked separately, not yet built for the guide — `event-session-details` already has an
+analogous, independent "Coming soon" state, see its own docs).
 
 ### aiFocus
 
