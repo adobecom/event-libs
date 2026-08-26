@@ -62,13 +62,31 @@ the three Format booleans directly.
 ### The two catalog drops, and reporting them
 
 Two rules remove a session from the catalog entirely rather than filtering it per view, so one
-rule covers every view, day tab and deep link. Both are confirmed intended (PM, 2026-08-24):
+rule covers every view, day tab and deep link:
 
-- **no `Format` value** — says nothing about how the session can be watched, so there is no view
-  it can be placed in
-- **in-person only** — no digital way to watch at all
+- **no `Format` value** (`isMissingFormat`) — says nothing about how the session can be watched,
+  so there is no view it can be placed in.
+- **an invalid `Format` combination** (`invalidFormatReason`) — `Format` is multi-select over
+  three real values (`In person`, `Online`, `On demand, post event`), but only two shapes give a
+  session an unambiguous way to be watched. Confirmed table (PM, 2026-08-26):
 
-Both are reported by `reportDroppedSessions()`. `lana` gets the count and a capped enumeration in
+  | Format value(s) | Kept? | Reason if dropped |
+  |---|---|---|
+  | *(none)* | ❌ | `no Format value` |
+  | In person | ❌ | `in-person only` |
+  | Online | ✅ | — |
+  | On demand, post event | ❌ | `on-demand, post event without in-person` |
+  | In person, Online | ✅ | — |
+  | In person, On demand, post event | ✅ | — |
+  | Online, On demand, post event | ❌ | `online and on-demand, post event together` |
+  | In person, Online, On demand, post event | ❌ | `online and on-demand, post event together` |
+
+  In short: `Online` and `On demand, post event` are mutually exclusive — a session is either
+  online (optionally also in-person), or an in-person-only session whose recording lands later.
+  `On demand, post event` with neither `Online` nor `In person` (or any other combination with no
+  recognized digital signal at all) falls through to `no digital way to watch`.
+
+Both rules are reported by `reportDroppedSessions()`. `lana` gets the count and a capped enumeration in
 every env; **below prod each row is also `console.warn`ed with the rule that removed it**, which
 is what an author needs to go and fix the row. Each row is named by `sessionCode` and title as
 well as id, because the id alone isn't searchable in RainFocus. The count is always exact; the

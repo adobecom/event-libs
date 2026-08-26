@@ -1,7 +1,7 @@
 import { expect } from '@esm-bundle/chai';
 
 import {
-  mapEslPayloadToRawSessions, normalizeSessions, isSessionPublished, isInPersonOnly, isMissingFormat,
+  mapEslPayloadToRawSessions, normalizeSessions, isSessionPublished, invalidFormatReason, isMissingFormat,
   ENFORCE_PUBLISHED_FILTER,
   getSessionProducts, extractDistinctProducts, getProductAttributeId, sessionPageUrlForEnv, parseDvrDelayHours,
   getSessionAdditionalTracks, extractDistinctAllTracks, deriveFacetableAttributes,
@@ -184,8 +184,11 @@ describe('services/sessions/sessions-api', () => {
       expect(bare.hasOnDemandFormat).to.be.false;
     });
 
-    it('still flags a session that also carries the Online Format value', () => {
-      const [both] = mapEslPayloadToRawSessions({
+    // Online and On demand, post event are mutually exclusive — see the invalidFormatReason
+    // combination table below. All three values together is invalid for the same reason as
+    // Online + On demand, post event alone.
+    it('drops a session carrying all three Format values, Online included', () => {
+      const mapped = mapEslPayloadToRawSessions({
         sessions: [{
           sessionId: 'both',
           customAttributes: [customAttr('Format', [
@@ -193,10 +196,7 @@ describe('services/sessions/sessions-api', () => {
           ])],
         }],
       });
-      expect(both.hasOnDemandFormat).to.be.true;
-      // The Format value still means what it says elsewhere — only the guide's
-      // live/upcoming placement is unconditional.
-      expect(both.isOnline).to.be.true;
+      expect(mapped).to.deep.equal([]);
     });
 
     it('still flags a livestreamed session carrying the same on-demand Format', () => {
@@ -299,27 +299,66 @@ describe('services/sessions/sessions-api', () => {
     });
   });
 
-  describe('isInPersonOnly', () => {
-    it('is true for a session whose only Format value is In-Person', () => {
-      const [dropped] = mapEslPayloadToRawSessions({
+  // Full combination table (PM, 2026-08-26) — see docs/sessions-guide-implementation-notes.md.
+  // Online and On demand, post event are mutually exclusive: a session is either online
+  // (optionally also in-person), or an in-person-only session whose recording lands later.
+  describe('invalidFormatReason', () => {
+    it('is null (valid) for Online alone', () => {
+      expect(invalidFormatReason({ inPerson: false, isOnline: true, hasOnDemandFormat: false })).to.be.null;
+    });
+
+    it('is null (valid) for In person + Online', () => {
+      expect(invalidFormatReason({ inPerson: true, isOnline: true, hasOnDemandFormat: false })).to.be.null;
+    });
+
+    it('is null (valid) for In person + On demand, post event', () => {
+      expect(invalidFormatReason({ inPerson: true, isOnline: false, hasOnDemandFormat: true })).to.be.null;
+    });
+
+    it('rejects In person alone as "in-person only"', () => {
+      expect(invalidFormatReason({ inPerson: true, isOnline: false, hasOnDemandFormat: false }))
+        .to.equal('in-person only');
+    });
+
+    it('rejects On demand, post event alone as missing in-person', () => {
+      expect(invalidFormatReason({ inPerson: false, isOnline: false, hasOnDemandFormat: true }))
+        .to.equal('on-demand, post event without in-person');
+    });
+
+    it('rejects Online + On demand, post event together, with or without In person', () => {
+      expect(invalidFormatReason({ inPerson: false, isOnline: true, hasOnDemandFormat: true }))
+        .to.equal('online and on-demand, post event together');
+      expect(invalidFormatReason({ inPerson: true, isOnline: true, hasOnDemandFormat: true }))
+        .to.equal('online and on-demand, post event together');
+    });
+
+    // No-Format sessions never reach this predicate — isMissingFormat drops them first. A
+    // session whose only Format value(s) don't fold to any recognized marker (or that
+    // somehow reaches here with none set) has nothing to watch it with either.
+    it('rejects a mapped session with no recognized Format flags at all', () => {
+      expect(invalidFormatReason({ inPerson: false, isOnline: false, hasOnDemandFormat: false }))
+        .to.equal('no digital way to watch');
+    });
+
+    // `Livestreamed Content` only routes a live Watch now; a row carrying both is
+    // mis-authored, and Format alone still decides it.
+    it('is decided by Format alone — a stray livestream flag does not rescue the row', () => {
+      expect(invalidFormatReason({
+        inPerson: true, isOnline: false, hasOnDemandFormat: false, isLivestreamed: true,
+      })).to.equal('in-person only');
+    });
+
+    it('drops the in-person-only row end to end, keeping the rest', () => {
+      const mapped = mapEslPayloadToRawSessions({
         sessions: [
           { sessionId: 'in-person', customAttributes: [customAttr('Format', [selectValue('In-Person')])] },
           { sessionId: 'keeper', customAttributes: [customAttr('Format', [selectValue('Online')])] },
         ],
       });
-      // The in-person-only row is gone, so the first mapped session is the online one.
-      expect(dropped.id).to.equal('keeper');
+      expect(mapped.map((s) => s.id)).to.deep.equal(['keeper']);
     });
 
-    it('keeps an in-person session that also airs online or is recorded', () => {
-      expect(isInPersonOnly({ inPerson: true, isOnline: true })).to.be.false;
-      expect(isInPersonOnly({ inPerson: true, isOnline: false, hasOnDemandFormat: true })).to.be.false;
-    });
-
-    // `Livestreamed Content` only routes a live Watch now; a row carrying both is mis-authored.
-    it('is decided by Format alone — a stray livestream flag does not rescue the row', () => {
-      expect(isInPersonOnly({ inPerson: true, isLivestreamed: true })).to.be.true;
-
+    it('drops an in-person session livestreamed but not otherwise online or recorded', () => {
       const mapped = mapEslPayloadToRawSessions({
         sessions: [
           {
@@ -335,19 +374,44 @@ describe('services/sessions/sessions-api', () => {
       expect(mapped.map((s) => s.id)).to.deep.equal(['keeper']);
     });
 
-    // No-Format sessions never reach this predicate — isMissingFormat drops them first.
-    it('is false for a mapped session with no Format-derived flags set', () => {
-      expect(isInPersonOnly({ inPerson: false })).to.be.false;
-    });
-
-    it('keeps the whole catalog when every session has a digital format', () => {
-      const kept = mapEslPayloadToRawSessions({
+    it('drops Online + On demand, post event together end to end', () => {
+      const mapped = mapEslPayloadToRawSessions({
         sessions: [
-          { sessionId: 'a', customAttributes: [customAttr('Format', [selectValue('Online')])] },
-          { sessionId: 'b', customAttributes: [customAttr('Format', [selectValue('In-Person'), selectValue('On demand, post event')])] },
+          {
+            sessionId: 'invalid',
+            customAttributes: [customAttr('Format', [selectValue('Online'), selectValue('On demand, post event')])],
+          },
+          { sessionId: 'keeper', customAttributes: [ONLINE_FORMAT] },
         ],
       });
-      expect(kept.map((s) => s.id)).to.deep.equal(['a', 'b']);
+      expect(mapped.map((s) => s.id)).to.deep.equal(['keeper']);
+    });
+
+    it('drops On demand, post event with no In person end to end', () => {
+      const mapped = mapEslPayloadToRawSessions({
+        sessions: [
+          { sessionId: 'invalid', customAttributes: [customAttr('Format', [selectValue('On demand, post event')])] },
+          { sessionId: 'keeper', customAttributes: [ONLINE_FORMAT] },
+        ],
+      });
+      expect(mapped.map((s) => s.id)).to.deep.equal(['keeper']);
+    });
+
+    it('keeps every valid combination in the same catalog', () => {
+      const kept = mapEslPayloadToRawSessions({
+        sessions: [
+          { sessionId: 'online', customAttributes: [customAttr('Format', [selectValue('Online')])] },
+          {
+            sessionId: 'in-person-online',
+            customAttributes: [customAttr('Format', [selectValue('In-Person'), selectValue('Online')])],
+          },
+          {
+            sessionId: 'in-person-on-demand',
+            customAttributes: [customAttr('Format', [selectValue('In-Person'), selectValue('On demand, post event')])],
+          },
+        ],
+      });
+      expect(kept.map((s) => s.id)).to.deep.equal(['online', 'in-person-online', 'in-person-on-demand']);
     });
   });
 

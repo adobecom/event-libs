@@ -52,12 +52,9 @@ export function normalizeSessions(rawSessions) {
     contentCategory: coerceArray(s.contentCategory),
     audience: coerceArray(s.audience),
     industry: coerceArray(s.industry),
-    // Not in the catalog yet — empty hides its detail row.
     aiFocus: coerceArray(s.aiFocus),
-    // closedCaptions is carried but no longer rendered anywhere.
     closedCaptions: s.closedCaptions || '',
     ipodOrGdprCopy: s.ipodOrGdprCopy || '',
-    // MAX26-only; empty on MAX25 sessions, which is the fallback we want.
     additionalTracks: coerceArray(s.additionalTracks),
     trackOverride: s.trackOverride || '',
     speakers: s.speakers || [],
@@ -68,9 +65,7 @@ export function normalizeSessions(rawSessions) {
     inPerson: Boolean(s.inPerson),
     isLivestreamed: Boolean(s.isLivestreamed),
     isOnline: Boolean(s.isOnline),
-    // Keeps a session out of Live & Upcoming — see hasOnDemandFormat().
     hasOnDemandFormat: Boolean(s.hasOnDemandFormat),
-    // null, not 0: 0 means available from the moment the event starts.
     dvrDelayHours: s.dvrDelayHours ?? null,
     // One field per video source, named for its player. Alternatives, not a fallback chain.
     // All unread; see "Video sources" in docs/sessions-guide-implementation-notes.md.
@@ -247,10 +242,16 @@ export function isSessionPublished(session) {
   return session.published !== false;
 }
 
-// No digital way to watch, so it is dropped from the catalog rather than per view.
-// See docs/sessions-guide-implementation-notes.md.
-export function isInPersonOnly(session) {
-  return session.inPerson && !session.isOnline && !session.hasOnDemandFormat;
+// Format is multi-select; only two combinations give a session a real, unambiguous way to
+// be watched: Online (with or without In person), or In person + On demand, post event (a
+// recording that lands after the fact). Every other combination is mis-authored and the
+// session is dropped from the catalog rather than per view. Confirmed table in
+// docs/sessions-guide-implementation-notes.md. Returns the drop reason, or null if valid.
+export function invalidFormatReason({ inPerson, isOnline, hasOnDemandFormat }) {
+  if (isOnline && hasOnDemandFormat) return 'online and on-demand, post event together';
+  if (hasOnDemandFormat && !inPerson) return 'on-demand, post event without in-person';
+  if (!isOnline && !hasOnDemandFormat) return inPerson ? 'in-person only' : 'no digital way to watch';
+  return null;
 }
 
 // Takes a raw ESL session — reads customAttributes.
@@ -302,16 +303,34 @@ export function mapEslPayloadToRawSessions(payload) {
     timesBySessionId.get(t.sessionId).push(t);
   });
 
+  // Every drop reason lives here, together, so there's one place to see every way a
+  // session can be hidden from the catalog. Both checks derive from the same raw Format
+  // customAttribute — isMissingFormat reads it directly; invalidFormatReason needs it
+  // folded into booleans first, computed once here and threaded through to the map below
+  // instead of recomputed there.
   const candidates = [];
   const dropped = [];
   (payload.sessions || []).forEach((session) => {
     if (ENFORCE_PUBLISHED_FILTER && !isSessionPublished(session)) return;
-    if (isMissingFormat(session)) dropped.push([session, 'no Format value']);
-    else candidates.push(session);
+    if (isMissingFormat(session)) {
+      dropped.push([session, 'no Format value']);
+      return;
+    }
+    const formatValues = extractCustomAttributeValues(session, 'Format');
+    const formatFlags = {
+      inPerson: hasFormatValue(formatValues, FORMAT_IN_PERSON),
+      isOnline: hasFormatValue(formatValues, FORMAT_ONLINE),
+      hasOnDemandFormat: hasOnDemandFormat(formatValues),
+    };
+    const reason = invalidFormatReason(formatFlags);
+    if (reason) {
+      dropped.push([session, reason]);
+      return;
+    }
+    candidates.push({ session, formatFlags });
   });
 
-  const mapped = candidates
-    .map((session) => {
+  const mapped = candidates.map(({ session, formatFlags }) => {
     // Real rows can have no sessionTime yet; time.js is guarded for the '' that follows.
     const times = (timesBySessionId.get(session.sessionId) || [])
       .slice()
@@ -329,8 +348,6 @@ export function mapEslPayloadToRawSessions(payload) {
         photo: null,
       }));
 
-    const formatValues = extractCustomAttributeValues(session, 'Format');
-    const isOnline = hasFormatValue(formatValues, FORMAT_ONLINE);
     const isLivestreamed = extractCustomAttributeValues(session, 'Livestreamed Content').includes('Live');
     const type = extractCustomAttributeValue(session, ['Type', 'Session Type']);
     const thumbnail = (session.images || []).find((img) => img.imageKind === 'session-card-image');
@@ -346,55 +363,36 @@ export function mapEslPayloadToRawSessions(payload) {
       endTimeUtc: firstTime ? new Date(firstTime.endTimeMillis).toISOString() : '',
       duration: session.sessionLengthInMinutes || 0,
       primaryTrack: extractCustomAttributeValue(session, PRIMARY_TRACK_ATTRIBUTE_NAMES),
-      // "Track" is a real, distinct attribute from `PRIMARY_TRACK_ATTRIBUTE_NAMES` above —
-      // a topic-tag, not the Primary Event Site Track. See ESP-SESSION-ENDPOINTS.md.
+      trackOverride: extractCustomAttributeValue(session, 'Override Primary Event Site Track'),
+      additionalTracks: extractCustomAttributeValues(session, 'Additional Event Site Tracks'),
       tracks: extractCustomAttributeValues(session, 'Track'),
       contentCategory: extractCustomAttributeValues(session, ['Category', 'Programming Category']),
-      // MAX26-only; no MAX25 fallback needed.
-      additionalTracks: extractCustomAttributeValues(session, 'Additional Event Site Tracks'),
-      trackOverride: extractCustomAttributeValue(session, 'Override Primary Event Site Track'),
       type,
       technicalLevel: extractCustomAttributeValue(session, 'Technical Level'),
       audience: extractCustomAttributeValues(session, 'Audience'),
       industry: extractCustomAttributeValues(session, 'Industry'),
       // Not in the catalog yet; both casings tried since names match exactly.
       aiFocus: extractCustomAttributeValues(session, ['AI Focus', 'AI focus']),
-      // closedCaptions is no longer rendered anywhere. ipodOrGdprCopy is authored HTML.
-      // See docs/sessions-guide-implementation-notes.md.
       closedCaptions: extractCustomAttributeValue(session, 'Closed Caption Information'),
       ipodOrGdprCopy: extractCustomAttributeValue(session, ['IPOD or GDPR Copy', 'IPOD/GDPR Copy']),
       speakers,
       products: extractCustomAttributeValues(session, 'Product'),
       productAttributeId: getProductAttributeId(session),
       dvrDelayHours: parseDvrDelayHours(extractCustomAttributeValue(session, 'DVR Timing (in hours)')),
-      // Three VOD sources, one field each; live is mrStreamId below. Unread, and never
-      // substitutes for one another. videoDuration is verbatim (`00:60:00` is not HH:MM:SS).
-      // See "Video sources" in docs/sessions-guide-implementation-notes.md.
       mpcId: extractCustomAttributeValue(session, 'MPC ID'),
       youTubeId: extractCustomAttributeValue(session, 'YouTube ID'),
       mrDvrVideoId: extractCustomAttributeValue(session, 'Mobilerider Video ID (DVR)'),
       mrSkinId: extractCustomAttributeValue(session, 'Skin ID'),
       videoDuration: extractCustomAttributeValue(session, 'Video Duration'),
-      inPerson: hasFormatValue(formatValues, FORMAT_IN_PERSON),
-      isOnline,
+      ...formatFlags,
       isLivestreamed,
-      hasOnDemandFormat: hasOnDemandFormat(formatValues),
       sessionPageUrl: session.url || '',
       isKeynote: type === 'Keynote',
       thumbnailUrl: thumbnail?.imageUrl ?? null,
       legalDisclaimer: extractCustomAttributeValue(session, ['Legal Disclaimer', 'LegalDisclaimer']) || undefined,
-      // resources[]/mrStreamId omitted — no source in this payload yet. Mapping the inbound
-      // `Mobilerider Live Stream ID` here is what switches stream polling on; see
-      // REAL-API-CHECKLIST.md first. normalizeSessions() defaults both to empty/null.
       customAttributeValues: buildCustomAttributeValueMap(session),
     };
-  })
-    // Applied after the map because the rule reads the derived Format booleans.
-    .filter((raw, i) => {
-      if (!isInPersonOnly(raw)) return true;
-      dropped.push([candidates[i], 'in-person only']);
-      return false;
-    });
+  });
 
   reportDroppedSessions(dropped);
   return mapped;
