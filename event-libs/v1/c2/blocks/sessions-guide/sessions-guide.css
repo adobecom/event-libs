@@ -928,6 +928,23 @@
   transition: color 0.2s;
 }
 
+/* Vertical divider between track and time, matching the Figma meta row — applies at every
+   breakpoint, not just desktop, since a card with a second track badge or a visible time
+   needs the same separator on mobile. */
+.sg-live-card__time::before,
+.sg-live-card__track-extra::before {
+  content: '';
+  display: inline-block;
+  width: 1px;
+  height: 12px;
+  margin-right: var(--s2a-spacing-sm);
+  background: var(--s2a-color-gray-300);
+  vertical-align: middle;
+}
+
+.sg-live-card:is(:hover, :focus-within) .sg-live-card__time::before,
+.sg-live-card:is(:hover, :focus-within) .sg-live-card__track-extra::before { background: rgb(255 255 255 / 40%); }
+
 .sg-live-card:is(:hover, :focus-within) .sg-live-card__time { color: inherit; }
 
 /* Same reasoning as .sg-card__title-btn above — a real <button>, not the whole card. */
@@ -1929,21 +1946,7 @@
     margin: 0;
   }
 
-  .sg-live-card__time::before,
-  .sg-live-card__track-extra::before {
-    content: '';
-    display: inline-block;
-    width: 1px;
-    height: 12px;
-    margin-right: var(--s2a-spacing-sm);
-    background: var(--s2a-color-gray-300);
-    vertical-align: middle;
-  }
-
   .sg-live-card:is(:hover, :focus-within) .sg-live-card__time { color: #fff; }
-
-  .sg-live-card:is(:hover, :focus-within) .sg-live-card__time::before,
-  .sg-live-card:is(:hover, :focus-within) .sg-live-card__track-extra::before { background: rgb(255 255 255 / 40%); }
 
   .sg-live-card__title {
     font-size: var(--s2a-font-size-2xl);
@@ -2254,22 +2257,7 @@
     margin: 0;
   }
 
-  /* Vertical divider between track and time, matching the Figma meta row. */
-  .sg-live-card__time::before,
-  .sg-live-card__track-extra::before {
-    content: '';
-    display: inline-block;
-    width: 1px;
-    height: 12px;
-    margin-right: var(--s2a-spacing-sm);
-    background: var(--s2a-color-gray-300);
-    vertical-align: middle;
-  }
-
   .sg-live-card:is(:hover, :focus-within) .sg-live-card__time { color: #fff; }
-
-  .sg-live-card:is(:hover, :focus-within) .sg-live-card__time::before,
-  .sg-live-card:is(:hover, :focus-within) .sg-live-card__track-extra::before { background: rgb(255 255 255 / 40%); }
 
   .sg-live-card__title {
     font-size: var(--s2a-font-size-3xl);
