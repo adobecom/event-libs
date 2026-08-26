@@ -323,6 +323,24 @@ export default function ConfigEditor() {
         </section>
       `}
 
+      ${isHomepage && homepageMeta.themeField && html`
+        <section class="tec-editor__section">
+          <h2>Theme</h2>
+          ${HOMEPAGE_THEME_OPTIONS.map((opt) => html`
+            <label class="tec-editor__radio" key=${opt.value}>
+              <input
+                type="radio"
+                name="tec-homepage-theme"
+                value=${opt.value}
+                checked=${(activeConfig.config[homepageMeta.themeField] || 'light') === opt.value}
+                onChange=${() => updateConfigField(homepageMeta.themeField, opt.value)}
+              />
+              ${opt.label}
+            </label>
+          `)}
+        </section>
+      `}
+
       ${isHomepage && html`
         <section class="tec-editor__section">
           <h2>${homepageMeta.label}</h2>
@@ -344,17 +362,6 @@ export default function ConfigEditor() {
               value=${activeConfig.config[homepageMeta.headingField] || ''}
               onInput=${(e) => updateConfigField(homepageMeta.headingField, e.target.value)}
             />
-          `}
-          ${homepageMeta.themeField && html`
-            <label class="tec-editor__field-label" for="tec-homepage-theme">Card theme</label>
-            <select
-              id="tec-homepage-theme"
-              class="tec-field"
-              value=${activeConfig.config[homepageMeta.themeField] || 'light'}
-              onChange=${(e) => updateConfigField(homepageMeta.themeField, e.target.value)}
-            >
-              ${HOMEPAGE_THEME_OPTIONS.map((opt) => html`<option value=${opt.value} key=${opt.value}>${opt.label}</option>`)}
-            </select>
           `}
           ${homepageMeta.ctaFields && html`
             <p class="tec-editor__section-hint">${homepageMeta.ctaHint}</p>
