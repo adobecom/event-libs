@@ -3,10 +3,6 @@ import { getApiConfig } from '../../utils/session-store.js';
 
 const DEFAULT_POLL_INTERVAL_MS = 30_000;
 
-// Grouped by intervalMs so every real (default-cadence) consumer batches into one shared
-// fetchLiveStatus() call, while a caller needing a different cadence (e.g. this module's
-// own fast-ticking tests) gets its own independent group/interval without disturbing the
-// default one.
 const groups = new Map();
 const listeners = new Set();
 
@@ -63,11 +59,6 @@ export function unregisterStreamIds(ids, { intervalMs = DEFAULT_POLL_INTERVAL_MS
   stopPollingIfIdle(g, intervalMs);
 }
 
-// `watchIds`, when given, scopes this listener to ticks whose queried id set overlaps it —
-// based on what was queried, not what came back, so a real "queried but absent from either
-// list" result still notifies (unlike a tick from a wholly unrelated group/interval, which
-// never does). The listener itself still only ever sees `{ active, inactive }`, pre-filtered
-// down to just its own ids. Omit `watchIds` to get every tick's raw, unfiltered result.
 export function subscribe(listener, watchIds) {
   const watchSet = watchIds ? new Set(watchIds) : null;
   const entry = {

@@ -1,7 +1,5 @@
 // Mobile Rider's batch media-status endpoint — only two environments on their side, not
 // ESP's finer-grained split; `env` is session-store.js's already-collapsed mrEnv.
-// Confirmed with the MobileRider integration owner: dev/QA/stage all share the same
-// "integration" host, only prod is separate.
 const MR_PROD_BASE_URL = 'https://overlay-admin-prod.mobilerider.com';
 const MR_INTEGRATION_BASE_URL = 'https://overlay-admin-integration.mobilerider.com';
 
