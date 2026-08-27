@@ -18,7 +18,7 @@ export function showAuthToast({ eventConfig, actionLabel }) {
     message: `Register or sign in to ${actionLabel}.`,
     variant: 'informative',
     ctaLabel: 'Register/Sign in',
-    ctaHref: eventConfig.registerUrl,
+    ctaHref: eventConfig.registerUrl || '/register',
   });
 }
 
@@ -104,7 +104,7 @@ export function checkViewAccess(view, { eventConfig }) {
   try {
     assertAuthorized();
     return null;
-  } catch (err) {
+  } catch {
     showAuthToast({ eventConfig, actionLabel: `view ${label}` });
     return fallbackViewForUnauthorized();
   }

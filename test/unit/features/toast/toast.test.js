@@ -103,19 +103,34 @@ describe('features/toast', () => {
       expect(newer.classList.contains('sg-toast--neutral')).to.be.true;
     });
 
-    it('sets alertdialog/alert roles and reveals content to assistive tech after mount', async () => {
+    it('sets alertdialog/status roles and reveals content to assistive tech after mount', async () => {
       showToast({ message: 'Link copied', variant: 'positive' });
       const el = region.querySelector('.sg-toast');
       expect(el.getAttribute('role')).to.equal('alertdialog');
       expect(el.getAttribute('tabindex')).to.equal('0');
 
       const content = el.querySelector('.sg-toast__body');
-      expect(content.getAttribute('role')).to.equal('alert');
+      expect(content.getAttribute('role')).to.equal('status');
       expect(content.getAttribute('aria-hidden')).to.equal('true');
 
       await nextFrames();
       expect(el.classList.contains('sg-toast--visible')).to.be.true;
       expect(content.hasAttribute('aria-hidden')).to.be.false;
+    });
+
+    it('uses role="status" (polite) for informative/positive/neutral, reserving role="alert" (assertive) for negative', () => {
+      showToast({ message: 'Register or sign in to favorite.', variant: 'informative' });
+      showToast({ message: 'Added to favorites', variant: 'positive' });
+      showToast({ message: 'Removed from favorites', variant: 'neutral' });
+      showToast({ message: 'Something went wrong. Please try again.', variant: 'negative' });
+
+      const bodies = [...region.querySelectorAll('.sg-toast__body')];
+      const roleByVariant = Object.fromEntries(
+        bodies.map((body) => [body.closest('.sg-toast').className.match(/sg-toast--(\w+)/)[1], body.getAttribute('role')]),
+      );
+      expect(roleByVariant).to.deep.equal({
+        informative: 'status', positive: 'status', neutral: 'status', negative: 'alert',
+      });
     });
 
     it('renders a CTA link inline in the body when ctaHref is provided', () => {

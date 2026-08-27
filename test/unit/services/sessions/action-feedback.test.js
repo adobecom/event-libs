@@ -54,6 +54,12 @@ describe('services/sessions/action-feedback', () => {
     expect(toasts.value[0].ctaHref).to.equal('/register');
   });
 
+  it('falls back to /register when eventConfig has no registerUrl', async () => {
+    const authFn = () => Promise.reject(new SessionActionError('auth-required'));
+    await runSessionAction(authFn, { eventConfig: { title: 'Adobe MAX 2026' }, actionLabel: 'add to schedule' });
+    expect(toasts.value[0].ctaHref).to.equal('/register');
+  });
+
   it('shows the shared conflict modal on a scheduling conflict', async () => {
     const existingSession = { id: 'existing' };
     const incoming = { id: 'incoming' };

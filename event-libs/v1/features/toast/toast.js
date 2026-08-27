@@ -101,8 +101,14 @@ function renderToastContent(el, data) {
   // Mounted aria-hidden, revealed one frame after the enter transition starts — mirrors
   // react-aria's useToast isVisible-after-layout-effect trick so screen readers announce
   // reliably once, instead of missing or double-announcing at initial (incomplete) mount.
+  // role="alert" (assertive) is reserved for the negative variant — every other variant
+  // is a routine, often-stacked confirmation, and assertive announcements would interrupt
+  // each other rather than queue politely.
   const body = createTag('div', {
-    class: 'sg-toast__body', role: 'alert', 'aria-atomic': 'true', 'aria-hidden': 'true',
+    class: 'sg-toast__body',
+    role: data.variant === 'negative' ? 'alert' : 'status',
+    'aria-atomic': 'true',
+    'aria-hidden': 'true',
   });
   const msg = createTag('span', { class: 'sg-toast__msg', id: `sg-toast-msg-${data.id}` });
   msg.textContent = data.message;
