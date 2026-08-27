@@ -69,6 +69,38 @@ branch has no defined timeline, and reimplementing the effect from scratch in
 event-libs would mean maintaining a second, divergent version while Milo's own keeps
 evolving underneath it.
 
+## Authoring
+
+Two page-level metadata flags, plus two blocks inside the target section.
+
+**Metadata block** (page-level):
+
+| Metadata | |
+|---|---|
+| foundation | c2 |
+| override-milo-ace1209 | true |
+
+`foundation: c2` is a Milo-level flag, not an event-libs one — Milo resolves blocks
+from `libs/c2/blocks/` only when it's set. `explore-card` has no C1 counterpart at all,
+so without this flag the block won't load; `section-metadata` has both a C1 and C2
+version, so without it you'd silently get the wrong one. `override-milo-ace1209` must
+be the literal string `true` — the check in `scripts.js` is `=== 'true'`, not a bare
+presence check.
+
+**Section Metadata block**, inside the section that should stack on mobile:
+
+| Section Metadata | |
+|---|---|
+| style | bento, stack-mobile |
+
+(comma-separate with any other style keywords already used on that section.)
+
+**Explore Card blocks**, one per topic card, authored inside the same section per that
+block's own shape (a content column — icon, heading, link — and a background
+image/video column). Any number of cards works; this implementation computes
+per-card stacking depth generically, unlike the unrelated `elastic-carousel` block,
+which hardcodes exactly 5.
+
 ## Decision: vendor a flagged override
 
 Vendor only the two confirmed-missing pieces into event-libs, gated by a metadata
