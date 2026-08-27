@@ -23,9 +23,10 @@ describe('session-details schedule', () => {
     const btn = renderSchedule();
     expect(btn.classList.contains('session-schedule')).to.be.true;
     expect(btn.textContent).to.contain('Add to schedule');
-    // The visible label carries the state, so aria-pressed is intentionally absent
-    // (setting both would double-announce it).
-    expect(btn.hasAttribute('aria-pressed')).to.be.false;
+    // The visible label states a state, not an action, so aria-pressed carries the toggle
+    // affordance. No aria-label, so the visible text stays the accessible name (2.5.3).
+    expect(btn.getAttribute('aria-pressed')).to.equal('false');
+    expect(btn.hasAttribute('aria-label')).to.be.false;
   });
 
   it('reflects the scheduled signal', () => {
@@ -34,6 +35,18 @@ describe('session-details schedule', () => {
     scheduled.value = new Set(['sid']);
     expect(btn.classList.contains('is-scheduled')).to.be.true;
     expect(btn.textContent).to.contain('Added to schedule');
+  });
+
+  // The visible label is a state ("Added to schedule"), so aria-pressed is what tells a
+  // screen-reader user the button toggles back off. Matches sessions-guide.
+  it('exposes toggle state via aria-pressed', () => {
+    setMetadata('session-id', 'sid');
+    const btn = renderSchedule();
+    expect(btn.getAttribute('aria-pressed')).to.equal('false');
+    scheduled.value = new Set(['sid']);
+    expect(btn.getAttribute('aria-pressed')).to.equal('true');
+    scheduled.value = new Set();
+    expect(btn.getAttribute('aria-pressed')).to.equal('false');
   });
 
   // The visible label flips to "Added to schedule", and Milo only auto-tags once at

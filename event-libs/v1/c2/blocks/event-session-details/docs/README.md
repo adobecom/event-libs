@@ -411,10 +411,13 @@ These are deliberate and were verified; changing them regresses a WCAG criterion
   `<body>` (2.4.3). `setCta()` holds the new CTA in `pending` and applies it on
   `focusout`. `apply()` sets the CTA **before** the status so the announcement lands on a
   DOM that already offers it.
-- **Favorite:** stable accessible name + `aria-pressed`. **Schedule:** no `aria-pressed`,
-  because its visible label itself flips to "Added to schedule" — setting both
-  double-announces the state, and a fixed name would contradict the visible text (2.5.3
-  Label in Name).
+- **Favorite:** stable accessible name + `aria-pressed`. **Schedule:** `aria-pressed` too,
+  and no `aria-label` — the visible text is the accessible name (2.5.3 Label in Name).
+  This reverses an earlier call to omit `aria-pressed` on the grounds that the visible label
+  already flips to "Added to schedule". That label states a *state*, not an *action*, so
+  nothing in it tells the user the button toggles back off — `aria-pressed` is what carries
+  that, and both `sessions-guide` surfaces set it. The mild redundancy of hearing
+  "Added to schedule, pressed" is worth the affordance.
 - **Injected SVGs get `aria-hidden` + `focusable="false"`.** `resolveIcon` and
   `fetchFederalProductIcon` return raw sprite SVGs that may carry a `<title>`, which would
   otherwise be announced alongside the adjacent label — or added to a tile link's
