@@ -62,17 +62,44 @@ this?" is not the same question as "is it on now?":
 | Condition | Primary CTA |
 |---|---|
 | `live` | Watch now |
-| **IPOD session** | **none** — see below |
+| **Format has no `online`** | **none** — see below |
 | `now < finalEnd` (the latest slot's end) | Add to schedule |
 | otherwise | none |
 
-**IPOD sessions never offer Add to schedule**
-([MWPW-205503](https://jira.corp.adobe.com/browse/MWPW-205503)). An IPOD session is attended
-in person and posted afterwards, so there is nothing for a remote visitor to be reminded of;
-before this, an IPOD page showed a full pre-event layout with a schedule button. The button is
-**not built at all** rather than built and withheld, so `renderSchedule()` never runs and
-never subscribes to the `scheduled` signal. Favorite and share are unaffected — they are
-state- and format-independent. Watch now still appears if such a session goes `live`.
+### Add to schedule is gated on Format `online`
+
+`addSession` posts `virtual: true` — required, or RainFocus defaults to in-person-only and
+rejects with `responseCode 27`. But RainFocus accepts `virtual: true` **only** for a session
+time flagged `virtualTime`, otherwise failing with *"Cannot schedule virtually for a session
+time that is not virtual"*. So the button must only appear where that flag is set.
+
+**`virtualTime` is not synced to the page** — `session-times` entries carry
+`startTimeMillis` / `endTimeMillis` / `videos` / `location`, and no virtual flag. Format
+`online` predicts it exactly across all 166 published MAX26 sessions, with zero violations:
+
+| Format | Sessions | Has a virtual session time |
+|---|---|---|
+| `In person` | 132 | 0 |
+| `Online` | 31 | 31 |
+| `In person + Online` | 3 | 3 |
+
+So `online` is the gate. It is deliberately **not** keyed on IPOD
+([MWPW-205503](https://jira.corp.adobe.com/browse/MWPW-205503) reports an IPOD page showing a
+pre-event schedule button, and this fixes it, but IPOD is the wrong axis):
+
+- A pure IPOD session has no `online`, so it gets no button — the reported bug.
+- An IPOD session that **is** also online is schedulable, and an IPOD rule would wrongly hide it.
+- A plain `In person` session is **not** IPOD yet is equally unschedulable — an IPOD rule
+  would show a button whose click fails. All 132 of them.
+
+The button is **not built at all** rather than built and withheld, so `renderSchedule()` never
+runs and never subscribes to the `scheduled` signal on a page that could not schedule anyway.
+Favorite and share are unaffected — both are state- and format-independent — and Watch now
+still appears if an unschedulable session goes `live`.
+
+⚠️ Test sessions `1001` and `1002` declare `Online` in Format but have `virtualTime: false`,
+the only violations of the correlation above. They will still error on click; no client-side
+rule can fix that, and they fail in Northstar too. Owner: Sekhar.
 
 Transitions happen with **no reload**: `evaluate()` re-arms a `setTimeout` at the next
 boundary. Delays are clamped to `MAX_TIMEOUT` (`2**31 - 1`) and re-armed, because a

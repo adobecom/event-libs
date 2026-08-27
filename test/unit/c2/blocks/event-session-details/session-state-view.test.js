@@ -282,6 +282,12 @@ describe('session-state-view', () => {
       return { statusSlot, primaryCtaSlot };
     };
 
+    // Add to schedule is gated on Format `online` (MWPW-205503). Tests below that exercise the
+    // CTA machinery rather than the gate need a session that can actually be scheduled.
+    const onlineFormat = () => setMetadata('custom-attributes', JSON.stringify([
+      { name: 'Format', inputType: 'multi-select', enabled: true, values: [{ value: 'online', label: 'Online' }] },
+    ]));
+
     beforeEach(() => { document.body.innerHTML = ''; });
 
     it('does nothing without session-times', () => {
@@ -293,6 +299,7 @@ describe('session-state-view', () => {
 
     it('renders the status and the state-owned CTA on mount', () => {
       setMetadata('session-id', 'sid');
+      onlineFormat();
       soonLive();
       const { statusSlot, primaryCtaSlot } = slots();
       mountSessionState({ statusSlot, primaryCtaSlot });
@@ -302,6 +309,7 @@ describe('session-state-view', () => {
 
     it('defers the CTA swap while the old CTA has focus, then flushes on focusout', async () => {
       setMetadata('session-id', 'sid');
+      onlineFormat();
       soonLive();
       const { statusSlot, primaryCtaSlot } = slots();
       const elsewhere = document.createElement('button');
@@ -341,6 +349,7 @@ describe('session-state-view', () => {
     // reads On-demand, but Add to schedule comes back because the final end has not passed.
     it('offers Add to schedule in the gap between slots, then Watch now at the premiere', async () => {
       setMetadata('session-id', 'sid');
+      onlineFormat();
       const premiere = Date.now() + 150;
       setMetadata('session-times', JSON.stringify([
         { startTimeMillis: premiere, endTimeMillis: premiere + 3600000, timezone: 'UTC' },
@@ -372,50 +381,61 @@ describe('session-state-view', () => {
       expect(watch.getAttribute('daa-ll')).to.equal('Watch-Now');
     });
 
-    // IPOD is attended in person and posted afterwards, so there is nothing to schedule.
-    describe('IPOD sessions never offer Add to schedule', () => {
+    // Add to schedule posts `virtual: true`, which RainFocus rejects unless the session time
+    // is `virtualTime`. That flag is not synced to the page; Format `online` predicts it
+    // exactly across all 166 published MAX26 sessions, so it is the gate. See MWPW-205503.
+    describe('Add to schedule is gated on Format online', () => {
       const setFormat = (values) => setMetadata('custom-attributes', JSON.stringify([
         { name: 'Format', inputType: 'multi-select', enabled: true, values },
       ]));
-      const IPOD = [{ value: 'in-person', label: 'In-Person' }, { value: 'on-demand-post-event', label: 'On demand, post event' }];
+      const IN_PERSON = { value: 'in-person', label: 'In-Person' };
+      const ONLINE = { value: 'online', label: 'Online' };
+      const POST_EVENT = { value: 'on-demand-post-event', label: 'On demand, post event' };
 
-      it('shows no CTA before start when the session is IPOD', () => {
+      const mount = (values) => {
         setMetadata('session-id', 'sid');
-        setFormat(IPOD);
+        setFormat(values);
         soonLive();
-        const { statusSlot, primaryCtaSlot } = slots();
-        mountSessionState({ statusSlot, primaryCtaSlot });
+        const s = slots();
+        mountSessionState(s);
+        return s;
+      };
+
+      it('offers it for an online session', () => {
+        expect(mount([ONLINE]).primaryCtaSlot.querySelector('.session-schedule')).to.not.be.null;
+      });
+
+      it('offers it for in-person + online (the hybrid case)', () => {
+        expect(mount([IN_PERSON, ONLINE]).primaryCtaSlot.querySelector('.session-schedule')).to.not.be.null;
+      });
+
+      // The case that separates this gate from an IPOD-based one: IPOD *and* online is
+      // schedulable, because its session time is virtual.
+      it('offers it for an IPOD session that is also online', () => {
+        expect(mount([IN_PERSON, ONLINE, POST_EVENT]).primaryCtaSlot.querySelector('.session-schedule'))
+          .to.not.be.null;
+      });
+
+      it('withholds it for a pure IPOD session', () => {
+        const { statusSlot, primaryCtaSlot } = mount([IN_PERSON, POST_EVENT]);
         expect(statusSlot.querySelector('.session-status--upcoming')).to.not.be.null;
-        expect(primaryCtaSlot.querySelector('.session-schedule')).to.be.null;
         expect(primaryCtaSlot.children.length).to.equal(0);
       });
 
-      it('still shows Watch now once an IPOD session is live', async () => {
-        setMetadata('session-id', 'sid');
-        setFormat(IPOD);
-        soonLive();
-        const { statusSlot, primaryCtaSlot } = slots();
-        mountSessionState({ statusSlot, primaryCtaSlot });
+      // Not IPOD, but still unschedulable — an IPOD-keyed rule would have shown a button here
+      // and the click would have failed.
+      it('withholds it for a plain in-person session', () => {
+        expect(mount([IN_PERSON]).primaryCtaSlot.children.length).to.equal(0);
+      });
+
+      it('withholds it when Format is absent entirely', () => {
+        expect(mount([]).primaryCtaSlot.children.length).to.equal(0);
+      });
+
+      it('still shows Watch now once an unschedulable session is live', async () => {
+        const { primaryCtaSlot } = mount([IN_PERSON, POST_EVENT]);
         await new Promise((r) => { setTimeout(r, 800); });
         expect(primaryCtaSlot.querySelector('.session-watch-now')).to.not.be.null;
-      });
-
-      it('offers Add to schedule for a non-IPOD session with the same times', () => {
-        setMetadata('session-id', 'sid');
-        setFormat([{ value: 'online', label: 'Online' }]);
-        soonLive();
-        const { statusSlot, primaryCtaSlot } = slots();
-        mountSessionState({ statusSlot, primaryCtaSlot });
-        expect(primaryCtaSlot.querySelector('.session-schedule')).to.not.be.null;
-      });
-
-      it('offers Add to schedule for in-person without on-demand-post-event', () => {
-        setMetadata('session-id', 'sid');
-        setFormat([{ value: 'in-person', label: 'In-Person' }]);
-        soonLive();
-        const { statusSlot, primaryCtaSlot } = slots();
-        mountSessionState({ statusSlot, primaryCtaSlot });
-        expect(primaryCtaSlot.querySelector('.session-schedule')).to.not.be.null;
       });
     });
 
