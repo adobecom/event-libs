@@ -2,7 +2,7 @@ import { expect } from '@esm-bundle/chai';
 import { setMetadata } from '../../../../../event-libs/v1/utils/utils.js';
 import { renderSchedule } from '../../../../../event-libs/v1/c2/blocks/event-session-details/schedule.js';
 import { scheduled, sessions, auth } from '../../../../../event-libs/v1/utils/session-store.js';
-import { toast } from '../../../../../event-libs/v1/features/toast/toast.js';
+import { toasts } from '../../../../../event-libs/v1/features/toast/toast.js';
 
 describe('session-details schedule', () => {
   beforeEach(() => {
@@ -11,7 +11,7 @@ describe('session-details schedule', () => {
     scheduled.value = new Set();
     sessions.value = [];
     auth.value = { isLoggedIn: null, isRegistered: undefined, userFirstName: null };
-    toast.value = null;
+    toasts.value = [];
   });
 
   it('returns null without a session id', () => {
@@ -40,6 +40,6 @@ describe('session-details schedule', () => {
     setMetadata('session-id', 'sid');
     renderSchedule().click();
     await new Promise((r) => { setTimeout(r); });
-    expect(toast.value?.message).to.match(/login/i);
+    expect(toasts.value[0]?.message).to.match(/login/i);
   });
 });

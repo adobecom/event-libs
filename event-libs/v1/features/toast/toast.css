@@ -1,17 +1,41 @@
 /* ── Toast ─────────────────────────────────────────────────────── */
 
-/* Base state: hidden and offset. JS mounts the element here, paints one frame,
-   then adds .sg-toast--visible to trigger the CSS transition (no @keyframes flash). */
-.sg-toast {
+/* Stack container — anchors and orders the whole toast queue. column-reverse so the
+   newest (unshifted to the front of the toasts[] array, appended last to the DOM)
+   lands closest to the anchor edge and pushes older toasts away from it. */
+.sg-toast-region {
   position: fixed;
   bottom: 80px;
   left: 50%;
+  transform: translateX(-50%);
+  z-index: 200;
+  display: flex;
+  flex-direction: column-reverse;
+  align-items: center;
+  gap: 12px;
+  pointer-events: none;
+}
+
+/* Desktop: anchored bottom-right, toasts slide in/out from the right */
+@media (min-width: 1280px) {
+  .sg-toast-region {
+    bottom: 56px;
+    left: auto;
+    right: 56px;
+    transform: none;
+    align-items: flex-end;
+  }
+}
+
+/* Base state: hidden and offset. JS mounts the element here, paints one frame,
+   then adds .sg-toast--visible to trigger the CSS transition (no @keyframes flash). */
+.sg-toast {
   opacity: 0;
-  transform: translateX(-50%) translateY(calc(100% + 12px));
+  transform: translateY(calc(100% + 12px));
   pointer-events: none;
   transition: opacity 400ms ease, transform 400ms ease;
   display: flex;
-  align-items: stretch;
+  flex-direction: column;
   min-width: 220px;
   max-width: min(600px, calc(100vw - 32px));
   border-radius: 10px;
@@ -20,25 +44,16 @@
   color: var(--s2a-color-content-knockout, #fff);
   box-shadow: 0 4px 20px rgb(0 0 0 / 20%);
   overflow: hidden;
-  z-index: 200;
-}
-
-.sg-toast[hidden] {
-  display: none;
 }
 
 .sg-toast--visible {
   opacity: 1;
-  transform: translateX(-50%) translateY(0);
+  transform: translateY(0);
   pointer-events: auto;
 }
 
-/* Desktop: anchored bottom-right, slides in/out from the right */
 @media (min-width: 1280px) {
   .sg-toast {
-    bottom: 56px;
-    left: auto;
-    right: 56px;
     transform: translateX(calc(100% + 56px));
   }
 
@@ -52,6 +67,20 @@
 .sg-toast--negative    { background: var(--s2a-color-background-utility-error, #d73220); }
 .sg-toast--neutral     { background: var(--s2a-color-gray-700, #505050); }
 
+.sg-toast__row {
+  display: flex;
+  align-items: flex-start;
+}
+
+/* flex + min-width: 0 lets the message wrap instead of forcing the row (and the CTA/
+   close button squeezed into it) to overflow on narrow viewports. */
+.sg-toast__content {
+  display: flex;
+  align-items: flex-start;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
 .sg-toast__icon-wrap {
   align-items: flex-start;
   display: flex;
@@ -61,40 +90,15 @@
 
 .sg-toast__msg {
   flex: 1;
+  min-width: 0;
   font-weight: var(--s2a-font-weight-adobe-clean-regular);
   line-height: 18px;
   padding: 19px 16px 19px 8px;
+  overflow-wrap: break-word;
 }
 
 .sg-toast--neutral .sg-toast__msg {
   padding-left: 16px;
-}
-
-.sg-toast__cta {
-  align-items: center;
-  align-self: center;
-  background: transparent;
-  border: 2px solid var(--s2a-color-transparent-white-16, rgb(255 255 255 / 16%));
-  border-radius: 16px;
-  color: var(--s2a-color-content-knockout, #fff);
-  cursor: pointer;
-  display: inline-flex;
-  flex-shrink: 0;
-  font-family: inherit;
-  font-size: var(--s2a-font-size-sm);
-  font-weight: var(--s2a-font-weight-adobe-clean-bold);
-  justify-content: center;
-  line-height: 18px;
-  margin: 12px 12px 12px 0;
-  min-width: 72px;
-  padding: 7px 16px;
-  text-decoration: none;
-  white-space: nowrap;
-}
-
-.sg-toast__cta:hover {
-  background: var(--s2a-color-transparent-white-12, rgb(255 255 255 / 12%));
-  text-decoration: none;
 }
 
 .sg-toast__close {
@@ -116,4 +120,35 @@
 
 .sg-toast__close:hover {
   background: var(--s2a-color-transparent-white-12, rgb(255 255 255 / 12%));
+}
+
+/* CTA gets its own full-width row below the message, instead of sharing the row with
+   icon/message/close — on narrow viewports that shared row had no room left for it. */
+.sg-toast__cta-row {
+  display: flex;
+  padding: 0 16px 16px;
+}
+
+.sg-toast__cta {
+  align-items: center;
+  background: transparent;
+  border: 2px solid var(--s2a-color-transparent-white-16, rgb(255 255 255 / 16%));
+  border-radius: 16px;
+  box-sizing: border-box;
+  color: var(--s2a-color-content-knockout, #fff);
+  cursor: pointer;
+  display: flex;
+  font-family: inherit;
+  font-size: var(--s2a-font-size-sm);
+  font-weight: var(--s2a-font-weight-adobe-clean-bold);
+  justify-content: center;
+  line-height: 18px;
+  padding: 7px 16px;
+  text-decoration: none;
+  width: 100%;
+}
+
+.sg-toast__cta:hover {
+  background: var(--s2a-color-transparent-white-12, rgb(255 255 255 / 12%));
+  text-decoration: none;
 }
