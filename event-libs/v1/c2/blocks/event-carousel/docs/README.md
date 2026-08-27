@@ -41,3 +41,16 @@ a user scroll first.
 
 Same right-arrow icon SVG is reused for both buttons — "prev" is rotated 180deg via CSS
 (`.carousel-arrow-prev`), matching the Figma component (one icon asset, two directions).
+
+## Theme
+
+Light (the default) or dark, section-driven — mirrors `event-card.js`'s own `getTheme()`.
+`init()`'s `getTheme()` checks `el.closest('.section')` for a `dark` class (the same
+plain class `decorate.js`'s `applyAreaTheme()`/DA's Section Metadata `style: dark`
+authoring already lands on the section) and sets `data-carousel-theme` on `el`
+accordingly — nothing to configure per block or per link. The default arrow is a
+dark/frosted glass circle with a white icon, built to sit on a light section;
+`event-carousel.css`'s `.carousel-controls[data-carousel-theme="dark"] .carousel-arrow`
+rules invert that to a light/frosted circle with a black icon so it stays visible
+against a dark section instead. A `dark-carousel` class present on `el` itself before
+`init()` runs is honored too, as a manual override.

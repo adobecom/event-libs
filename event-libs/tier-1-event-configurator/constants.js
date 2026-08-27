@@ -71,9 +71,11 @@ const HOMEPAGE_FIELD_BY_TYPE = {
   },
   [CONFIG_TYPES.HOMEPAGE_FEATURED_SESSIONS]: {
     ...HOMEPAGE_SESSION_FIELDS[CONFIG_TYPES.HOMEPAGE_FEATURED_SESSIONS],
-    // No headingField — featured-sessions.js doesn't author a heading; unlike Upcoming
-    // Sessions, this surface has no section header at all.
-    themeField: 'featuredSessionsTheme',
+    // No headingField/themeField — featured-sessions.js doesn't author a heading, and
+    // its cards' dark/light theme isn't config-driven at all: event-card.js reads it
+    // straight off the containing DA section's own "dark" style metadata (see
+    // event-card.js's getTheme()), so authoring a Featured Sessions link inside a
+    // Section Metadata "style: dark" section is enough — no per-link toggle needed.
     // The featured-sessions block's generated event-card markup + session-routing.js
     // read all three — watchUrl is where a click routes once the session goes live,
     // mrStreamId is what tells it a session is Mobile-Rider-backed at all, and

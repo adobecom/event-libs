@@ -11,6 +11,17 @@ function nextAutoId() {
   return `carousel-${autoId}`;
 }
 
+// Mirrors event-card.js's own getTheme(): dark/light is section-driven, read straight
+// off the ancestor `.section`'s own "dark" style-metadata class (see decorate.js's
+// applyAreaTheme() / DA's Section Metadata "style: dark" authoring) rather than
+// anything configured per-block. `dark-carousel` on `el` itself is honored as a manual
+// override, for a carousel that needs to force dark independent of its section.
+function getTheme(el) {
+  if (el.classList.contains('dark-carousel')) return 'dark';
+  if (el.closest('.section')?.classList.contains('dark')) return 'dark';
+  return 'light';
+}
+
 function locateTrack(el) {
   let sib = el.nextElementSibling;
   if (sib?.classList.contains('carousel-track')) return sib;
@@ -179,9 +190,11 @@ export default async function init(el) {
   const header = buildHeader(headingRow);
   const pills = buildPills(pillsRow);
   const arrows = buildArrows(track);
+  const theme = getTheme(el);
 
   el.innerHTML = '';
   el.classList.add('carousel-controls');
+  el.dataset.carouselTheme = theme;
   if (header) el.append(header);
   if (pills) el.append(pills);
   el.append(arrows);

@@ -12,11 +12,14 @@ function entry(overrides = {}) {
   };
 }
 
-function buildBlock(config) {
+function buildBlock(config, { dark = false } = {}) {
   const el = document.createElement('div');
   el.className = 'featured-sessions';
   el.dataset.featuredSessionsConfig = JSON.stringify(config);
-  document.body.append(el);
+  const section = document.createElement('div');
+  section.className = dark ? 'section dark' : 'section';
+  section.append(el);
+  document.body.append(section);
   return el;
 }
 
@@ -130,7 +133,7 @@ describe('featured-sessions', () => {
   });
 
   describe('theme', () => {
-    it('defaults to light — no dark-card class on the generated card', async () => {
+    it('defaults to light in a section with no dark style metadata', async () => {
       const el = buildBlock({ entries: [entry()] });
       await init(el);
 
@@ -139,12 +142,12 @@ describe('featured-sessions', () => {
       expect(card.dataset.cardTheme).to.equal('light');
     });
 
-    it('adds dark-card (event-card\'s own generic theme class) when config.theme is dark', async () => {
-      const el = buildBlock({ theme: 'dark', entries: [entry()] });
+    it('inherits dark from the containing section, with no config.theme or per-card wiring', async () => {
+      const el = buildBlock({ entries: [entry()] }, { dark: true });
       await init(el);
 
       const card = el.querySelector('.event-card');
-      expect(card.classList.contains('dark-card')).to.equal(true);
+      expect(card.classList.contains('dark-card')).to.equal(false);
       expect(card.dataset.cardTheme).to.equal('dark');
     });
   });

@@ -99,6 +99,31 @@ describe('event-card', () => {
     expect(el.classList.contains('dark-card')).to.equal(true);
   });
 
+  it('inherits dark theme from an ancestor .section.dark, with no card-level class needed', async () => {
+    document.body.innerHTML = await readFile({ path: './mocks/ratio-4-3.html' });
+    const el = document.querySelector('.event-card');
+    const section = document.createElement('div');
+    section.className = 'section dark';
+    section.append(el);
+    document.body.append(section);
+    await init(el);
+
+    expect(el.dataset.cardTheme).to.equal('dark');
+    expect(el.classList.contains('dark-card')).to.equal(false);
+  });
+
+  it('stays light inside a .section with no dark class', async () => {
+    document.body.innerHTML = await readFile({ path: './mocks/ratio-4-3.html' });
+    const el = document.querySelector('.event-card');
+    const section = document.createElement('div');
+    section.className = 'section';
+    section.append(el);
+    document.body.append(section);
+    await init(el);
+
+    expect(el.dataset.cardTheme).to.equal('light');
+  });
+
   it('keeps a cross-origin authored <img> at its real absolute URL, not a same-origin pathname', async () => {
     document.body.innerHTML = `
       <div class="event-card ratio-16-9">

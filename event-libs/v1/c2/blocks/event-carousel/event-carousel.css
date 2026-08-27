@@ -99,6 +99,22 @@
   transform: rotate(180deg);
 }
 
+/* Dark theme — data-carousel-theme is set by init() from the ancestor section's own
+   "dark" style-metadata class (see event-carousel.js's getTheme(), mirroring
+   event-card.js's own). The default (light, above) glass is a dark/frosted circle
+   with a white icon, built to sit on a light section; on a dark section that same
+   glass would disappear, so this inverts it to a light/frosted circle with a black
+   icon instead — background/border/icon values only, no other changes. */
+.carousel-controls[data-carousel-theme="dark"] .carousel-arrow {
+  border-color: #e1e1e1;
+  background: #f3f3f3;
+  color: #000;
+}
+
+.carousel-controls[data-carousel-theme="dark"] .carousel-arrow:hover {
+  background: #e1e1e1;
+}
+
 @media (width <= 767px) {
   .carousel-arrows {
     padding-inline: 16px;

@@ -11,17 +11,13 @@ a `data-featured-sessions-config` attribute, which this block's `init()` reads.
 Unlike Upcoming Sessions, this surface has no config-driven heading — always the
 same fixed `aria-label`, no author-editable heading text.
 
-Card theme (light/default or dark) is config-level, picked from the same
-light/dark `<select>` the Upcoming Sessions configurator already has, saved as
-`config.featuredSessionsTheme` and carried in the link as `config.theme` — the exact
-same `theme` field/decode path `decorate.js`'s `tec-homepage` builder already uses for
-Upcoming Sessions (see its `themeClass` handling). Unlike Upcoming Sessions, though,
-that theme class lands on individual `.event-card`s rather than the block wrapper:
-`init()` reads `config.theme` and adds a `dark-card` class to each generated card
-before calling `event-card.js`'s own `init()` on it, since `event-card.js` owns
-dark/light styling generically (`getTheme()`/`data-card-theme` in
-`event-card.js`/`event-card.css`) — light is event-card's own default, with no class
-needed.
+Card theme (light/dark) is not config-driven at all — unlike Upcoming Sessions'
+own block-wrapper `theme`/`dark-card` toggle, there's nothing to author per link.
+Each generated card themes itself the same way any hand-authored `event-card` would:
+`event-card.js`'s own `init()` reads dark/light straight off the containing DA
+section's "dark" style-metadata class (see `event-card.js`'s `getTheme()`). Put a
+Featured Sessions link in a section authored with Section Metadata `style: dark`, and
+every card in it renders dark automatically — no per-link/per-card wiring needed here.
 
 The card CTA text is config-level (authored once for the whole block, not
 per-session) via three text boxes in the Featured Sessions configurator — one each

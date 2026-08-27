@@ -57,12 +57,11 @@ function getCtaText(entry, cta) {
   return cta?.[state] || DEFAULT_CTA_TEXT[state];
 }
 
-// theme is 'dark' or 'light' (config.theme) — 'dark-card' is event-card.js's own
-// generic theme-switch class (see event-card.js's getTheme()), added here rather than
-// duplicating any dark-mode styling in this block's own CSS.
-function buildAuthoredCard(entry, cta, theme) {
-  const themeClass = theme === 'dark' ? ' dark-card' : '';
-  const card = createTag('div', { class: `event-card ratio-16-9${themeClass}` });
+// No theme wiring here — event-card.js's own getTheme() reads dark/light straight off
+// the containing DA section's "dark" style-metadata class, so a card built here themes
+// itself automatically along with whatever section it ends up in.
+function buildAuthoredCard(entry, cta) {
+  const card = createTag('div', { class: 'event-card ratio-16-9' });
   const mediaWrapper = createTag('div', {}, '', { parent: card });
   if (entry.imageUrl) {
     createTag('img', { src: entry.imageUrl, alt: '' }, '', { parent: mediaWrapper });
@@ -101,7 +100,7 @@ export default async function init(el) {
   el.setAttribute('aria-label', 'Featured Sessions');
 
   const track = createTag('div', { class: 'carousel-track' });
-  const cards = entries.map((entry) => buildAuthoredCard(entry, config.cta, config.theme));
+  const cards = entries.map((entry) => buildAuthoredCard(entry, config.cta));
   cards.forEach((card) => track.append(card));
 
   const marker = createTag('div', { class: 'event-carousel' });

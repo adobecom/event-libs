@@ -7,15 +7,20 @@ function getVariant(el) {
   return VARIANTS.find((variant) => el.classList.contains(variant)) || DEFAULT_VARIANT;
 }
 
-// 'dark-card' mirrors the class name upcoming-sessions.js/decorate.js's tec-homepage
-// builder already apply to a block wrapper for its own dark theme — reused here as
-// event-card's own generic theme switch so any caller (authored or built
-// programmatically, like featured-sessions.js) opts a card into dark mode the same way.
-// Light is the default: an event-card with no theme class renders light.
+// Dark/light is section-driven, not per-card: decorate.js's applyAreaTheme() (and DA's
+// own Section Metadata "style: dark" authoring) already lands a plain "dark" class
+// directly on the ancestor `.section` — the same signal every other themed block in
+// this repo keys off, so a card automatically flips to dark the moment its section
+// does, with nothing to author or wire up per-card or per-block. `dark-card` on the
+// card itself is still honored as a manual override, for a card that needs to force
+// dark independent of its section (or a section not yet migrated to the metadata
+// convention). Light is the default: no class anywhere means light.
 const DEFAULT_THEME = 'light';
 
 function getTheme(el) {
-  return el.classList.contains('dark-card') ? 'dark' : DEFAULT_THEME;
+  if (el.classList.contains('dark-card')) return 'dark';
+  if (el.closest('.section')?.classList.contains('dark')) return 'dark';
+  return DEFAULT_THEME;
 }
 
 function isSameOrigin(url) {
