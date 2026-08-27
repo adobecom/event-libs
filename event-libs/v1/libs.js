@@ -94,9 +94,4 @@ export const eventsDelayedActions = async () => {
     const { default: initMetaPixel } = await import('../scripts/meta-pixel.js');
     initMetaPixel();
   }
-
-  if (getMetadata('override-milo-ace1209') === 'true') {
-    const { default: initMiloSiteRedesignOverride } = await import('./features/milo-site-redesign-override/index.js');
-    initMiloSiteRedesignOverride().catch((e) => window.lana?.log(`milo-site-redesign-override failed: ${e}`, { tags: 'bento-stack', severity: 'info' }));
-  }
 };

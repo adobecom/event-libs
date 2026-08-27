@@ -677,6 +677,14 @@ export function processAutoBlockLinks(parent) {
       link.closest('p') ? link.closest('p').replaceWith(blockEl) : link.replaceWith(blockEl);
     })).catch((e) => window.lana?.log(`[${blockName}] autoblock init failed: ${e.message}`));
   });
+
+  // Unconditional and independent of the event-id gate below — this is a static-authoring
+  // feature, not an event one, so it must not depend on decorateEvent() ever running.
+  if (getMetadata('override-milo-ace1209') === 'true') {
+    import('../features/milo-site-redesign-override/index.js')
+      .then(({ default: initMiloSiteRedesignOverride }) => initMiloSiteRedesignOverride())
+      .catch((e) => window.lana?.log(`milo-site-redesign-override failed to load: ${e}`, { tags: 'bento-stack', severity: 'info' }));
+  }
 }
 
 export function updatePictureElement(imageUrl, parentPic, altText) {

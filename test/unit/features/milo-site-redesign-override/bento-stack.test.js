@@ -8,6 +8,7 @@ describe('Milo site-redesign-override: bento-stack', () => {
   beforeEach(() => {
     document.body.innerHTML = '';
     document.head.innerHTML = '';
+    delete document.body.dataset.bentoStackOverrideStarted;
   });
 
   it('sets --card-idx per card and --slides on the section', async () => {
@@ -43,5 +44,17 @@ describe('Milo site-redesign-override: bento-stack', () => {
     cards.forEach((card, i) => {
       expect(card.style.getPropertyValue('--card-idx')).to.equal(String(i));
     });
+  });
+
+  it('picks up a matching section added to the DOM after init runs', async () => {
+    document.body.innerHTML = '<div id="host"></div>';
+
+    await initMiloSiteRedesignOverride();
+    document.getElementById('host').innerHTML = body;
+    const section = document.querySelector('.section.bento.stack-mobile');
+
+    await new Promise((resolve) => { setTimeout(resolve, 50); });
+
+    expect(section.style.getPropertyValue('--slides')).to.equal('3');
   });
 });

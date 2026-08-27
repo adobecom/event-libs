@@ -124,20 +124,36 @@ Milo block is forked or shadowed.
   (`--s2a-*`, `--parallax-easing`) already ships on Milo `main`, so nothing else needs
   vendoring alongside it.
 - `event-libs/v1/features/milo-site-redesign-override/index.js` — event-libs' own
-  substitute for Milo's not-yet-shipped `handleBentoStack()` hook: finds
-  `.section.bento.stack-mobile` sections, loads the CSS, and calls `initBentoStack()`
-  per section.
-- A single gate in `eventsDelayedActions()` (`event-libs/v1/libs.js`): if the page has
-  `override-milo-ace1209` metadata set to `true`, dynamically import and run the
-  override. Zero cost for every page that doesn't opt in.
+  substitute for Milo's not-yet-shipped `handleBentoStack()` hook: scans for
+  `.section.bento.stack-mobile` sections and, since it can run before those classes
+  exist yet (see below), also watches for them via a `MutationObserver`, loading the
+  CSS and calling `initBentoStack()` per section as they appear.
+- A single gate in `processAutoBlockLinks()` (`event-libs/v1/utils/decorate.js`): if the
+  page has `override-milo-ace1209` metadata set to `true`, dynamically import and run
+  the override. Zero cost for every page that doesn't opt in.
 
-  `eventsDelayedActions()` — not `event-libs/scripts/scripts.js` — is the actual
-  integration point consumer sites call. `event-libs/scripts/scripts.js` is only
-  event-libs' own local dev-server entry point (`npm run event-libs`); consumer sites
-  like da-events have their own `scripts.js` with their own `CONFIG`/`loadPage`, and
-  only import specific named exports from `event-libs`'s `libs.js` barrel file — calling
-  `eventsDelayedActions()` after their own `loadArea()`, the same way the existing
-  `meta-pixel` metadata flag already works.
+### Integration point
+
+This is a static-authoring feature — it must work on pages with no `event-id`, not
+just event pages. That rules out two more obvious-looking hooks:
+
+- `event-libs/scripts/scripts.js` is only event-libs' own local dev-server entry point
+  (`npm run event-libs`). Consumer sites like da-events have their own `scripts.js`
+  with their own `CONFIG`/`loadPage`, and only import specific named exports from
+  `event-libs`'s `libs.js` barrel file — this file never runs on a live site.
+- `decorateEvent()` (`event-libs/v1/utils/decorate.js`) runs earlier, but da-events
+  calls it from its own `scripts.js` behind `if (!getMetadata('event-id')) return;` —
+  a gate in a separate repo this PR can't change — and `decorateEvent()` has its own
+  identical internal gate besides.
+
+`processAutoBlockLinks()` is the one function that's both shared from event-libs *and*
+called unconditionally by da-events, before any `event-id` check. It also runs before
+Milo's own block loader decorates `section-metadata`/`explore-card` — the vendored
+`bento-stack.js` already tolerates cards not being ready yet (bounded polling for
+`.explore-card-content`), but the *section* itself doesn't have `bento`/`stack-mobile`
+classes yet at this point either, so `index.js` can't rely on a one-shot scan here — it
+registers a `MutationObserver` to catch the classes whenever `section-metadata`'s own
+`init()` actually applies them, later, during Milo's normal block decoration.
 
 The vendored `bento-stack.js` is kept byte-for-byte identical to its Milo source,
 including its inline comments — this is a deliberate exception to this repo's
@@ -147,8 +163,8 @@ future re-sync or removal.
 ### Opting out later
 
 Once Milo ships `handleBentoStack()` and the CSS to `main`, remove the
-`milo-site-redesign-override` folder, its one hook in `scripts.js`, and the
-`override-milo-ace1209` metadata flag from opted-in pages. No markup changes are
+`milo-site-redesign-override` folder, its one hook in `processAutoBlockLinks()`, and
+the `override-milo-ace1209` metadata flag from opted-in pages. No markup changes are
 needed — the DOM and classes authors use are identical whether the override or Milo's
 native support is doing the work.
 
