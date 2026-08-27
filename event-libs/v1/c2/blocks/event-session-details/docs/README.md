@@ -323,7 +323,11 @@ The ticket states a session carries at most 3 files. The block does not enforce 
 would silently hide data — so the count is whatever the sync delivers plus up to two links.
 
 **CTA label** is inferred from the file URL — `Download` for known document/media
-extensions, else `Open`. RainFocus may later supply explicit CTA text.
+extensions, else `Open`. RainFocus may later supply explicit CTA text. `Download` CTAs also
+carry the `download` attribute, which is currently **inert**: the assets are cross-origin on
+`static.rainfocus.com`, and browsers honour `download` only same-origin. It is kept so the
+behaviour is already right once the asset is served from an Adobe origin — see known-issues
+item 1, which covers why a `Download` on a PDF opens a preview today.
 
 **Download gating.** `Download` CTAs require sign-in **and** event registration;
 `Open` links are ungated. The click calls `assertAuthorized()` (the shared guard behind

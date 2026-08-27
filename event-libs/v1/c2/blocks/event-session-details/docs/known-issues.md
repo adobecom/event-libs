@@ -5,7 +5,7 @@ Open items across the four session page blocks (`event-session-details`,
 the code as of 2026-08-24 so the source can stay comment-free — see
 [README.md](README.md) for how the blocks work.
 
-## 1. Download gating is a UX gate, not access control
+## 1. Download gating is a UX gate, and "Download" does not download
 
 **Files:** `event-session-resources/event-session-resources.js`
 
@@ -24,6 +24,35 @@ URLs; or (c) a token-gated CDN origin.
 `attendeeAccess` endpoint) already exists and is unit-tested, but is **called by nothing**.
 If it returns per-session entitlement or gated asset URLs, that is the hook. Owner: Sekhar
 / Daniel.
+
+### The same endpoint also fixes "Download" not downloading
+
+A `Download` CTA does not download a PDF — it opens a preview tab. Measured on a real asset:
+
+```
+GET https://static.rainfocus.com/adobe/m26/sess/…/finalpresentation/….pdf
+HTTP/2 200
+content-type: application/pdf
+```
+
+No `Content-Disposition`, and no `Access-Control-Allow-Origin`. Three consequences:
+
+1. **`Content-Disposition: attachment` is absent**, so the browser previews anything it can
+   render. That header is the authoritative control and it is server-side.
+2. **The `download` attribute cannot help.** It is set on `Download` CTAs, but Chrome and
+   Firefox honour it only for same-origin URLs (plus `blob:`/`data:`) — and these assets are
+   cross-origin from the page. It is deliberately kept as correct intent: it starts working the
+   moment the asset is served same-origin, which is what an Adobe-origin endpoint would do.
+3. **The fetch-to-blob workaround is also blocked**, for want of a CORS header.
+
+Only renderable types are affected — `pdf`, `mp4`, `mov` and images preview; `zip`, `pptx`,
+`docx`, `xlsx`, `key`, `psd`, `ai`, `indd` download regardless. That still matters, because
+`finalpresentation` is the only attendee-facing type and both real examples are PDFs.
+
+**Fix:** either option (a) above — an auth-checked Adobe-origin endpoint, which sets
+`Content-Disposition: attachment` and makes the asset same-origin, solving gating *and* this in
+one change — or, as a standalone ask to Sekhar / RainFocus, add
+`Content-Disposition: attachment` to those CDN responses, which needs no client change at all.
 
 ## 2. `video-player` reads an unsorted `sessionTimes[0]`
 

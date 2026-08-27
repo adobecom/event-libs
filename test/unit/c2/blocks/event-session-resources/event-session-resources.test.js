@@ -82,6 +82,22 @@ describe('Session Resources', () => {
     expect(names).to.deep.equal(['Resource (PDF)', 'Resource (PPTX)', 'Resource']);
   });
 
+  // Inert while the assets are cross-origin on static.rainfocus.com, but correct in intent and
+  // effective the moment they are served same-origin. See docs/known-issues.md item 1.
+  it('marks Download CTAs with the download attribute, and Open CTAs without', async () => {
+    setMaterials([
+      { description: 'Slides', url: 'https://x/slides.pdf' },
+      { description: 'Reference', url: 'https://x/page' },
+    ]);
+    const el = block();
+    await init(el);
+    const [dl, open] = [...el.querySelectorAll('.session-resource-cta')];
+    expect(dl.textContent).to.equal('Download');
+    expect(dl.hasAttribute('download')).to.be.true;
+    expect(open.textContent).to.equal('Open');
+    expect(open.hasAttribute('download')).to.be.false;
+  });
+
   it('labels downloadable files "Download" and other URLs "Open"', async () => {
     setMaterials([
       { fileName: 'Slides', fileURL: 'https://x/slides.pdf', published: true },

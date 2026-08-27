@@ -74,15 +74,17 @@ export default async function init(el) {
     if (i >= MOBILE_LIMIT) item.classList.add('is-overflow');
     const label = ctaLabel(href);
     item.append(createTag('span', { class: 'session-resource-name' }, name));
+    const isDownload = label === 'Download';
     const cta = createTag('a', {
       class: 'session-resource-cta',
       href,
       target: '_blank',
       rel: 'noopener noreferrer',
+      ...(isDownload ? { download: '' } : {}),
       'aria-label': `${label} ${name} (opens in new tab)`,
     }, label);
 
-    if (label === 'Download') {
+    if (isDownload) {
       cta.addEventListener('click', (e) => {
         try {
           assertAuthorized();
