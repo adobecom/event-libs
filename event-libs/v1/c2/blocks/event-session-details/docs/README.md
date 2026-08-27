@@ -62,8 +62,17 @@ this?" is not the same question as "is it on now?":
 | Condition | Primary CTA |
 |---|---|
 | `live` | Watch now |
+| **IPOD session** | **none** — see below |
 | `now < finalEnd` (the latest slot's end) | Add to schedule |
 | otherwise | none |
+
+**IPOD sessions never offer Add to schedule**
+([MWPW-205503](https://jira.corp.adobe.com/browse/MWPW-205503)). An IPOD session is attended
+in person and posted afterwards, so there is nothing for a remote visitor to be reminded of;
+before this, an IPOD page showed a full pre-event layout with a schedule button. The button is
+**not built at all** rather than built and withheld, so `renderSchedule()` never runs and
+never subscribes to the `scheduled` signal. Favorite and share are unaffected — they are
+state- and format-independent. Watch now still appears if such a session goes `live`.
 
 Transitions happen with **no reload**: `evaluate()` re-arms a `setTimeout` at the next
 boundary. Delays are clamped to `MAX_TIMEOUT` (`2**31 - 1`) and re-armed, because a

@@ -372,6 +372,53 @@ describe('session-state-view', () => {
       expect(watch.getAttribute('daa-ll')).to.equal('Watch-Now');
     });
 
+    // IPOD is attended in person and posted afterwards, so there is nothing to schedule.
+    describe('IPOD sessions never offer Add to schedule', () => {
+      const setFormat = (values) => setMetadata('custom-attributes', JSON.stringify([
+        { name: 'Format', inputType: 'multi-select', enabled: true, values },
+      ]));
+      const IPOD = [{ value: 'in-person', label: 'In-Person' }, { value: 'on-demand-post-event', label: 'On demand, post event' }];
+
+      it('shows no CTA before start when the session is IPOD', () => {
+        setMetadata('session-id', 'sid');
+        setFormat(IPOD);
+        soonLive();
+        const { statusSlot, primaryCtaSlot } = slots();
+        mountSessionState({ statusSlot, primaryCtaSlot });
+        expect(statusSlot.querySelector('.session-status--upcoming')).to.not.be.null;
+        expect(primaryCtaSlot.querySelector('.session-schedule')).to.be.null;
+        expect(primaryCtaSlot.children.length).to.equal(0);
+      });
+
+      it('still shows Watch now once an IPOD session is live', async () => {
+        setMetadata('session-id', 'sid');
+        setFormat(IPOD);
+        soonLive();
+        const { statusSlot, primaryCtaSlot } = slots();
+        mountSessionState({ statusSlot, primaryCtaSlot });
+        await new Promise((r) => { setTimeout(r, 800); });
+        expect(primaryCtaSlot.querySelector('.session-watch-now')).to.not.be.null;
+      });
+
+      it('offers Add to schedule for a non-IPOD session with the same times', () => {
+        setMetadata('session-id', 'sid');
+        setFormat([{ value: 'online', label: 'Online' }]);
+        soonLive();
+        const { statusSlot, primaryCtaSlot } = slots();
+        mountSessionState({ statusSlot, primaryCtaSlot });
+        expect(primaryCtaSlot.querySelector('.session-schedule')).to.not.be.null;
+      });
+
+      it('offers Add to schedule for in-person without on-demand-post-event', () => {
+        setMetadata('session-id', 'sid');
+        setFormat([{ value: 'in-person', label: 'In-Person' }]);
+        soonLive();
+        const { statusSlot, primaryCtaSlot } = slots();
+        mountSessionState({ statusSlot, primaryCtaSlot });
+        expect(primaryCtaSlot.querySelector('.session-schedule')).to.not.be.null;
+      });
+    });
+
     it('drops the CTA entirely once the final slot has ended', () => {
       setMetadata('session-id', 'sid');
       setMetadata('session-times', JSON.stringify([

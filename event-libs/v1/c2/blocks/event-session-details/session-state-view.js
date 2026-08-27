@@ -119,7 +119,11 @@ export function mountSessionState({ statusSlot, primaryCtaSlot, ccEl }) {
   const earliest = slots[0];
   const finalEnd = Math.max(...slots.map(({ end }) => end));
 
-  const scheduleBtn = renderSchedule();
+  // An IPOD session is attended in person and posted afterwards, so there is nothing for a
+  // remote visitor to be reminded of — the schedule CTA is never offered, and the button is
+  // not built at all rather than built and withheld.
+  const ipod = isIpodSession();
+  const scheduleBtn = ipod ? null : renderSchedule();
   const watchBtn = renderWatchNow();
 
   const ctaFor = (state, nowMs) => {
