@@ -831,24 +831,6 @@ select.tec-field {
   cursor: pointer;
 }
 
-/* Mirrors session-guide-configurator's own .sgc-editor__radio — same stacked
-   label-per-option look as its Theme section. */
-.tec-editor__radio {
-  display: flex;
-  align-items: center;
-  gap: var(--tec-spacing-sm);
-  font-size: 14px;
-  margin-bottom: var(--tec-spacing-xs);
-  cursor: pointer;
-}
-
-.tec-editor__radio input[type='radio'] {
-  width: 16px;
-  height: 16px;
-  accent-color: var(--tec-color-primary);
-  cursor: pointer;
-}
-
 .tec-editor__error {
   color: var(--tec-color-error);
   background: var(--tec-color-error-bg);

@@ -333,7 +333,7 @@ describe('upcoming-sessions', () => {
       expect(el.classList.contains('dark-card')).to.equal(true);
     });
 
-    it('leaves an already-authored dark-card class alone (e.g. from an authored config.theme) even outside a dark section', async () => {
+    it('leaves an already-present dark-card class alone even outside a dark section', async () => {
       const el = buildBlock([session()]);
       el.classList.add('dark-card');
       await init(el);

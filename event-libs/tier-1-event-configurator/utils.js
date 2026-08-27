@@ -174,9 +174,9 @@ function getTimezoneOffsetMinutes(timeZone, utcDate) {
 // off the authored link and render upcoming-sessions.js / featured-sessions.js with no extra
 // lookup. `unescape(encodeURIComponent(...))` keeps btoa from choking on non-Latin1 characters
 // (e.g. accented session titles).
-export function buildHomepageConfigURL(org, repo, configType, eventId, heading, theme, entries, cta) {
+export function buildHomepageConfigURL(org, repo, configType, eventId, heading, entries, cta) {
   const payload = {
-    eventId, configType, heading, theme, generatedTime: new Date().toISOString(), entries,
+    eventId, configType, heading, generatedTime: new Date().toISOString(), entries,
   };
   if (cta) payload.cta = cta;
   const base64 = btoa(unescape(encodeURIComponent(JSON.stringify(payload))));
@@ -241,9 +241,6 @@ export async function copyHomepageConfigLink(org, repo, row, homepageMeta, sessi
   const heading = homepageMeta.headingField
     ? (row.config[homepageMeta.headingField] || homepageMeta.label)
     : undefined;
-  const theme = homepageMeta.themeField
-    ? (row.config[homepageMeta.themeField] || 'light')
-    : undefined;
   let cta;
   if (homepageMeta.ctaFields) {
     cta = {};
@@ -252,7 +249,7 @@ export async function copyHomepageConfigLink(org, repo, row, homepageMeta, sessi
       if (value) cta[state] = value;
     });
   }
-  const url = buildHomepageConfigURL(org, repo, row.configType, row.eventId, heading, theme, entries, cta);
+  const url = buildHomepageConfigURL(org, repo, row.configType, row.eventId, heading, entries, cta);
   const formattedDate = new Date().toLocaleString('en-US', {
     weekday: 'long', month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit',
   });

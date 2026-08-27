@@ -8,7 +8,7 @@ import {
   isTrackIconEntryComplete, getDisplayTitle, stringifyConfig, copyHomepageConfigLink,
 } from '../utils.js';
 import {
-  CONFIG_TYPES, HOMEPAGE_FIELD_BY_TYPE, isHomepageConfigType, HOMEPAGE_THEME_OPTIONS,
+  CONFIG_TYPES, HOMEPAGE_FIELD_BY_TYPE, isHomepageConfigType,
 } from '../constants.js';
 import TrackIconEditor from '../components/TrackIconEditor.js';
 import OverrideTrackIconEditor from '../components/OverrideTrackIconEditor.js';
@@ -320,24 +320,6 @@ export default function ConfigEditor() {
           <p class="tec-editor__section-hint">This is what gets saved to the row, and what you'll paste into the page's <strong><code>tier-1-event-config</code></strong> metadata after saving.</p>
           <pre class="tec-editor__config-preview">${configPreview}</pre>
           <button type="button" class="tec-btn tec-btn--outline" onClick=${handleCopy}>Copy config</button>
-        </section>
-      `}
-
-      ${isHomepage && homepageMeta.themeField && html`
-        <section class="tec-editor__section">
-          <h2>Theme</h2>
-          ${HOMEPAGE_THEME_OPTIONS.map((opt) => html`
-            <label class="tec-editor__radio" key=${opt.value}>
-              <input
-                type="radio"
-                name="tec-homepage-theme"
-                value=${opt.value}
-                checked=${(activeConfig.config[homepageMeta.themeField] || 'light') === opt.value}
-                onChange=${() => updateConfigField(homepageMeta.themeField, opt.value)}
-              />
-              ${opt.label}
-            </label>
-          `)}
         </section>
       `}
 

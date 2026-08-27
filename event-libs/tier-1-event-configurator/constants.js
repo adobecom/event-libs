@@ -31,11 +31,6 @@ const DA_APP_PATH = 'tools/da-apps/tier-1-event-configurator';
 // URL hash — decorate.js's tec-homepage auto-block builder reads this same key.
 const HOMEPAGE_LINK_HASH_KEY = 'tecHomepage';
 
-const HOMEPAGE_THEME_OPTIONS = [
-  { value: 'light', label: 'Light' },
-  { value: 'dark', label: 'Dark' },
-];
-
 function isHomepageConfigType(configType) {
   return configType === CONFIG_TYPES.HOMEPAGE_UPCOMING_SESSIONS
     || configType === CONFIG_TYPES.HOMEPAGE_FEATURED_SESSIONS;
@@ -59,7 +54,11 @@ const HOMEPAGE_FIELD_BY_TYPE = {
   [CONFIG_TYPES.HOMEPAGE_UPCOMING_SESSIONS]: {
     ...HOMEPAGE_SESSION_FIELDS[CONFIG_TYPES.HOMEPAGE_UPCOMING_SESSIONS],
     headingField: 'upcomingSessionsHeading',
-    themeField: 'upcomingSessionsTheme',
+    // No themeField — dark/light isn't config-driven: upcoming-sessions.js's own
+    // decorate() reads it straight off the containing DA section's own "dark" style
+    // metadata (the same signal event-card.js/event-carousel.js key off), so a
+    // Homepage link needs no Theme pick — placing it in a Section Metadata
+    // "style: dark" section is enough.
     // upcoming-sessions.js reads mrStreamId (drives its Mobile Rider live-drop
     // polling) but never reads watchUrl or imageUrl — its cards are text-only,
     // no structural change from the pre-link-authoring version.
@@ -134,5 +133,4 @@ export {
   DA_ORIGIN,
   DA_APP_PATH,
   HOMEPAGE_LINK_HASH_KEY,
-  HOMEPAGE_THEME_OPTIONS,
 };

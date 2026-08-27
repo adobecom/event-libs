@@ -131,16 +131,15 @@ the same section, but only if that block opts in via an `attach-upcoming` class
      touch/keyboard otherwise. This card keeps them always visible at every breakpoint.
 - The dark surface variant is authored as `dark-card` (not `dark`) deliberately —
   `dark` is a reserved global Milo class that paints a solid dark background site-wide,
-  which would collide with this block's own local "dark card surface" meaning. `dark-card`
-  can still land on `el` two ways: explicitly, from decorate.js's `tec-homepage` builder
-  reading an authored `config.theme` (the Upcoming Sessions configurator's own Theme
-  pick), or automatically, from `decorate()` itself reading a plain `dark` class on the
-  *ancestor* `.section` (DA's own Section Metadata `style: dark` authoring / decorate.js's
+  which would collide with this block's own local "dark card surface" meaning. There's no
+  Theme pick in the Upcoming Sessions configurator (removed — dark/light was never
+  config-driven for Featured Sessions either, see its own README): `decorate()` itself
+  adds `dark-card` to `el` automatically when the *ancestor* `.section` carries a plain
+  `dark` class (DA's own Section Metadata `style: dark` authoring / decorate.js's
   `applyAreaTheme()`) — the same section-driven signal `event-card.js`'s/
-  `event-carousel.js`'s own `getTheme()` key off, so a Homepage link needs no Theme pick
-  at all if it's simply placed in an already-dark section. Either path only ever adds
-  `dark-card` to `el` itself, never touches `dark` on `el`, so there's no ambiguity with
-  the reserved global class this note is about.
+  `event-carousel.js`'s own `getTheme()` key off. Only ever adds `dark-card` to `el`
+  itself, never touches `dark` on `el`, so there's no ambiguity with the reserved global
+  class this note is about.
 - Desktop (`@media (min-width: 1280px)`) uses a fixed `margin-top` on `.sg-card__footer`
   rather than `margin-top: auto` (which sessions-guide uses, since its card is
   min-height/grows to fit content) — this card is fixed-height, so `auto` would push the
