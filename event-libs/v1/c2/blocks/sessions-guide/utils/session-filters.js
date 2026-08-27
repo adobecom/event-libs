@@ -16,14 +16,35 @@ export function groupByStartTime(sessions) {
   return [...map.entries()].sort(([a], [b]) => (a < b ? -1 : 1)).map(([, v]) => v);
 }
 
-// Digital Agenda Track badge/swimlane model — full case table in PLAN.md §16.2. In short:
-// an override, when present, always wins the lane and badge over the primary track; a
-// session with neither is excluded entirely (no "Other" bucket).
+// No session context, so never a count. Additional tracks draw from the same trackIcons map.
+export function resolveNamedTrackBadge(trackName) {
+  if (!trackName) return null;
+  const trackIcon = getTrackIcon(trackName);
+  return {
+    label: trackName,
+    icon: trackIcon?.icon || null,
+    color: trackIcon?.color || DEFAULT_ICON_COLOR,
+    count: 0,
+  };
+}
+
+// ESP set the field up as multi-select, but it was only ever meant to hold one value.
+const additionalTracksOf = (session) => (session.additionalTracks || []).slice(0, 1);
+
+// Lanes a session belongs in, which is not the same question as what badge it gets: with no
+// primary track and no override it gets no badge, but its additional track still places it.
+export function resolveSwimlanes(session) {
+  const badge = resolveTrackBadge(session);
+  if (badge) return badge.swimlanes;
+  return additionalTracksOf(session);
+}
+
+// An override always wins the lane and badge over the primary track; a session with neither
+// gets no badge at all. Full case table in PLAN.md §16.2.
 export function resolveTrackBadge(session) {
-  const hasPrimary = !!session.track;
+  const hasPrimary = !!session.primaryTrack;
   const hasOverride = !!session.trackOverride;
-  // Only one additional track is supported even though the ESP field is multi-select.
-  const additional = (session.additionalTracks || []).slice(0, 1);
+  const additional = additionalTracksOf(session);
 
   if (!hasPrimary && !hasOverride) return null;
 
@@ -40,27 +61,24 @@ export function resolveTrackBadge(session) {
     };
   }
 
-  const trackIcon = getTrackIcon(session.track);
+  const trackIcon = getTrackIcon(session.primaryTrack);
   return {
-    label: session.track,
+    label: session.primaryTrack,
     icon: trackIcon?.icon || null,
     color: trackIcon?.color || DEFAULT_ICON_COLOR,
     count: additional.length,
     isOverride: false,
-    swimlanes: [session.track, ...additional],
-    stackedTracks: additional.length > 0 ? [session.track, ...additional] : null,
+    swimlanes: [session.primaryTrack, ...additional],
+    stackedTracks: additional.length > 0 ? [session.primaryTrack, ...additional] : null,
   };
 }
 
-// Places each session into every lane from resolveTrackBadge().swimlanes. swimlaneOrder
-// (authored [{ track, displayName, enabled }]) controls a lane's enabled state, display
-// name, and order; unlisted swimlanes stay enabled under their raw name, appended last.
+// swimlaneOrder controls a lane's enabled state, name and order; unlisted lanes stay
+// enabled under their raw name, appended last.
 export function groupByTrack(sessions, swimlaneOrder) {
   const map = new Map();
   for (const s of sessions) {
-    const badge = resolveTrackBadge(s);
-    if (!badge) continue;
-    badge.swimlanes.forEach((track) => {
+    resolveSwimlanes(s).forEach((track) => {
       if (!map.has(track)) map.set(track, []);
       map.get(track).push(s);
     });
@@ -78,9 +96,15 @@ export function groupByTrack(sessions, swimlaneOrder) {
   );
 }
 
+// On Demand only: a scheduled slot is never surfaced as live, upcoming or previously aired.
+export function excludeOnDemandFormat(sessions) {
+  return sessions.filter((s) => !s.hasOnDemandFormat);
+}
+
 // Live Now section: MR sessions use poll status; non-MR sessions use time window.
 export function liveSessions(sessions, liveStreamActiveIds, activeDay, userTz, nowMs) {
   return sessions.filter((s) => {
+    if (s.hasOnDemandFormat) return false;
     if (getSessionDayKey(s, userTz) !== activeDay) return false;
     if (s.mrStreamId) return isInLiveNow(s, liveStreamActiveIds, nowMs);
     return isSessionLive(s, nowMs);
@@ -90,29 +114,29 @@ export function liveSessions(sessions, liveStreamActiveIds, activeDay, userTz, n
 // Upcoming sessions: MR sessions use poll status; non-MR use time window.
 export function upcomingSessions(sessions, liveStreamActiveIds, activeDay, userTz, nowMs) {
   return sessions.filter((s) => {
+    if (s.hasOnDemandFormat) return false;
     if (getSessionDayKey(s, userTz) !== activeDay) return false;
     if (s.mrStreamId) return deriveSessionState(s, liveStreamActiveIds, nowMs) === 'upcoming';
     return isSessionUpcoming(s, nowMs);
   });
 }
 
-// On-demand sessions: MR sessions use poll status; non-MR use time window.
+// DVR Timing (in hours) is no longer part of this gate (PM, 2026-08-26) — a session lands
+// in On Demand as soon as its state resolves there, full stop. `dvrDelayHours` is still
+// carried on the session for a later "Recording coming soon" display treatment, just not
+// read here.
 export function onDemandSessions(sessions, liveStreamActiveIds, nowMs) {
   return sessions.filter((s) => {
+    if (s.hasOnDemandFormat) return true;
     if (s.mrStreamId) return deriveSessionState(s, liveStreamActiveIds, nowMs) === 'on-demand';
     return !isSessionLive(s, nowMs) && !isSessionUpcoming(s, nowMs);
   });
 }
 
-/**
- * Recommended sessions for the active day, shown in the live carousel when nothing is
- * live. When recommendedIds is non-empty, maps them to sessions on the active day in
- * authored order (max 3) — not the catalog's order, so
- * RecommendedSessionsEditor.js's reorder UI actually affects display order.
- * Falls back to a deterministic random selection of up to 3 day sessions when no ids configured.
- */
+// Shown in the live carousel when nothing is live. Authored order, not the catalog's, so the
+// configurator's reorder UI takes effect. Falls back to a deterministic pick of up to 3.
 export function getRecommendedSessions(sessions, recommendedIds, activeDay, userTz) {
-  const daySessions = sessionsForDay(sessions, activeDay, userTz);
+  const daySessions = excludeOnDemandFormat(sessionsForDay(sessions, activeDay, userTz));
 
   if (recommendedIds && recommendedIds.length > 0) {
     const daySessionsById = new Map(daySessions.map((s) => [s.id, s]));
@@ -122,13 +146,8 @@ export function getRecommendedSessions(sessions, recommendedIds, activeDay, user
   return deterministicShuffle(daySessions, activeDay).slice(0, 3);
 }
 
-/**
- * Recommended sessions for the on-demand view: same authored recommendedIds array as
- * getRecommendedSessions, in the same authored order, but ID-membership only — no
- * day-scoping (on-demand content isn't tied to a single event day) and no shuffle
- * fallback (nothing to show when nothing's authored, unlike the live carousel's need
- * to fill dead space when nothing's live).
- */
+// Same authored ids and order as getRecommendedSessions, but membership only: no day-scoping
+// and no shuffle fallback.
 export function getOnDemandRecommendedSessions(sessions, recommendedIds) {
   if (!recommendedIds || recommendedIds.length === 0) return [];
   const sessionsById = new Map(sessions.map((s) => [s.id, s]));
@@ -146,11 +165,8 @@ function deterministicShuffle(arr, seed) {
   return result;
 }
 
-// Every authored filter category's id is an ESP attributeId, resolved against
-// customAttributeValues. The flat-field fallback (session[categoryId]) is kept for any
-// category id that isn't attributeId-keyed, so a plain session field still works if one's
-// ever passed directly — nothing currently does, since the old hardcoded track/type
-// defaults were retired.
+// Category ids are ESP attributeIds, resolved against customAttributeValues. The flat-field
+// fallback covers a plain session field, though nothing passes one today.
 export function getFilterValue(session, categoryId) {
   const v = session.customAttributeValues?.[categoryId];
   return v !== undefined ? v : session[categoryId];
@@ -188,7 +204,7 @@ function matchesSearch(session, q) {
     session.title?.toLowerCase().includes(q)
     || session.description?.toLowerCase().includes(q)
     || session.speakers?.some((sp) => sp.name?.toLowerCase().includes(q))
-    || session.track?.toLowerCase().includes(q)
+    || session.primaryTrack?.toLowerCase().includes(q)
     || session.type?.toLowerCase().includes(q)
   );
 }

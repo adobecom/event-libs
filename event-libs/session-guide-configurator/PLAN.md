@@ -60,6 +60,8 @@ generic the same way — a signal to double-check, not a spec to follow literall
 
 ## 3a. URL encoding + consumption (confirmed 2026-07-29, per Daniel)
 
+**Superseded — see "Current contract" at the end of this section.**
+
 **Encode/decode plumbing already exists and is fully generic — nothing new to build
 there:**
 - Decode: `parseEncodedConfig()` (`event-libs/v1/utils/utils.js:146`) — already shared,
@@ -84,6 +86,23 @@ there:**
   sites sharing the same logic: `ConfigEditor.js`'s action bar (the config currently
   open, saved or not) and `Library.js`'s per-row actions (any already-saved config,
   no need to open it in the editor first).
+
+**Current contract — the link is a round trip:**
+- **Payload lives in the hash**, `#sgConfig={base64}`, matching `#schedule=` and
+  `#tecHomepage=`. DA's app shell (`da.live/nx/blocks/shell/shell.js`) forwards both the
+  search and the hash into the iframe, so a query param would reach the app too — the hash
+  just keeps a multi-KB payload out of the query string the shell reads `ref` from.
+  `decorate.js` reads both, so older `?sgConfig=` links still decode.
+- **Target is the consolidated Event Configurator page**, since Session Guide Config is a
+  tab there rather than its own tool. `TierOneEventConfigurator.js` opens on that tab when
+  the hash carries a payload; `SessionGuideConfigurator.js` opens the config and clears the
+  hash so the tab isn't stuck on it.
+- **Registration matches the payload key**, not the path — both link types share one path,
+  so `sgConfig=` vs. `tecHomepage=` is the only thing telling them apart.
+- **The link carries `configId`/`componentName`/`backendEventTitle`/`eventServiceEnv`** so
+  clicking it can rebuild an editable row. A saved row with the same `configId` wins over
+  the link's copy, which can be older than the row it came from. `parse-config.js` ignores
+  these keys.
 
 **The manual authoring-table experience is retired entirely, not kept as a fallback —
 this was the one real design fork, and it's resolved.** `chrono-box`'s builder doesn't
@@ -134,7 +153,9 @@ against MWPW-194336 can follow along.
    tell them apart in the saved-configs list — the linked event's own title alone isn't
    unique per row anymore.
 4. **Headings.** Stays as-is: 4 variants — logged-out/live, logged-in/live,
-   logged-out/post-event, logged-in/post-event.
+   logged-out/post-event, logged-in/post-event. The two logged-in variants accept a
+   `{firstName}` placeholder that the consuming side swaps for the viewer's IMS first
+   name (added 2026-08-18) — see the handoff doc's §2.
 5. **Filters. Designed 2026-07-29 — see §7 for the full field-level design.** No
    per-value CRUD (values are always live-derived, never authored — confirmed
    2026-07-29). Category-level select/unselect/rename/reorder is real work for this

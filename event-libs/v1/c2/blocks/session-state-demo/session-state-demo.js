@@ -1,7 +1,7 @@
 import { createTag } from '../../../utils/utils.js';
 import {
   sessions, sessionsStatus, favorited, scheduled, auth, pendingActions,
-  liveStreamActiveIds, sessionStateVersion, sessionGuideRequest, getApiConfig,
+  liveStreamActiveIds, sessionStateVersion, sessionGuideRequest, getEventApiConfig,
   openSessionGuideDetail,
 } from '../../../utils/session-store.js';
 import { toggleFavoriteWithFeedback, toggleScheduleWithFeedback } from '../../../services/sessions/action-feedback.js';
@@ -10,7 +10,7 @@ import { deriveSessionState, getNowMs } from '../../../utils/session-state.js';
 // Reference implementation for SHARED-STATE-USAGE.md's patterns — reads the page-level
 // session-store signals and mutates them through action-feedback.js/openSessionGuideDetail(),
 // with no Preact dependency. Not authored on any real event page. eventConfig is
-// getApiConfig() itself, same object any other block would forward — not a demo-only shape.
+// getEventApiConfig() itself, same object any other block would forward — not a demo-only shape.
 
 function renderRow(parent, label) {
   const row = createTag('p', { class: 'session-state-demo__row' }, '', { parent });
@@ -67,7 +67,7 @@ export default async function init(el) {
     const [firstSession] = sessions.value;
     if (!firstSession || pendingActions.value.has(firstSession.id)) return;
     toggleFavoriteWithFeedback(firstSession, {
-      eventConfig: getApiConfig() || {},
+      eventConfig: getEventApiConfig() || {},
       isFavorited: favorited.value.has(firstSession.id),
     });
   });
@@ -82,7 +82,7 @@ export default async function init(el) {
     const [firstSession] = sessions.value;
     if (!firstSession || pendingActions.value.has(firstSession.id)) return;
     toggleScheduleWithFeedback(firstSession, {
-      eventConfig: getApiConfig() || {},
+      eventConfig: getEventApiConfig() || {},
       isScheduled: scheduled.value.has(firstSession.id),
     });
   });

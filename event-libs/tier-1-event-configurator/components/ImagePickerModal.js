@@ -4,7 +4,9 @@ import {
 import Modal from './Modal.js';
 import LoadingInline from './LoadingInline.js';
 import { useDA } from '../context/DAContext.js';
-import { listFolder, uploadMedia, getContentUrl } from '../scripts/da-controller.js';
+import {
+  listFolder, getAemLiveUrl, uploadAndPublishMedia,
+} from '../scripts/da-controller.js';
 
 const IMAGE_EXT_PATTERN = /^(jpe?g|png|gif|webp|svg)$/i;
 
@@ -120,7 +122,7 @@ export default function ImagePickerModal({ isOpen, onClose, onUploaded }) {
   }, [isOpen, org, repo, phase, selectedFolderPath]);
 
   const handleSelectExisting = (item) => {
-    onUploaded(getContentUrl(item.path));
+    onUploaded(getAemLiveUrl(org, repo, item.path));
   };
 
   const resetToRoot = () => {
@@ -188,7 +190,7 @@ export default function ImagePickerModal({ isOpen, onClose, onUploaded }) {
     setIsUploading(true);
     setUploadError(null);
     try {
-      const result = await uploadMedia(org, repo, selectedFolderPath, file);
+      const result = await uploadAndPublishMedia(org, repo, selectedFolderPath, file);
       if (!result.ok) {
         if (result.status === 401) setUploadError('Unauthorized — sign in at da.live first.');
         else if (result.status === 0) setUploadError('Unable to reach DA — sign in at da.live first, or check your connection.');
@@ -305,7 +307,7 @@ export default function ImagePickerModal({ isOpen, onClose, onUploaded }) {
                   title=${getItemName(item.path)}
                   onClick=${() => handleSelectExisting(item)}
                 >
-                  <img src=${getContentUrl(item.path)} alt=${getItemName(item.path)} loading="lazy" />
+                  <img src=${getAemLiveUrl(org, repo, item.path)} alt=${getItemName(item.path)} loading="lazy" />
                   <span class="tec-fb-image-thumb-name">${getItemName(item.path)}</span>
                 </button>
               `)}

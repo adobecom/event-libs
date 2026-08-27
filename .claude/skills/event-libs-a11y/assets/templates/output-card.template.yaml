@@ -1,0 +1,13 @@
+request_summary: "{audit | fix | add} on {ComponentName}"
+scope: "{Full | Partial — root cause outside requested file(s): [list]}"
+mode: "{audit | fix | add}"
+observed:
+  - "{facts found in the component}"
+actions_taken:
+  - "{change or finding description}"
+artifacts:
+  - "{file path or none}"
+issues_remaining:
+  - "{anything out of scope or needing design/token changes}"
+recommendations:
+  - "{next actions}"

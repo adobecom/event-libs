@@ -513,6 +513,15 @@
   margin: 0 0 var(--sgc-spacing-sm);
 }
 
+.sgc-editor__section-hint code {
+  font-family: monospace;
+  font-size: 12px;
+  background: var(--sgc-color-background);
+  border: 1px solid var(--sgc-color-border);
+  border-radius: 3px;
+  padding: 1px 4px;
+}
+
 .sgc-editor__title-input {
   width: 100%;
 }

@@ -14,11 +14,11 @@ export default function Schedules() {
   const { setActiveSchedule } = useSchedulesData();
   const [isAddScheduleModalOpen, setIsAddScheduleModalOpen] = useState(false);
 
-  // On mount, check if the URL hash carries schedule data (#schedule={b64}).
-  // DA forwards only the parent page's hash to this iframe app — not query
-  // params — so an old ECC ?schedule= link will not auto-open here (it can
-  // still be found via Sync from the sidebar list). Copy Link now emits
-  // #schedule=, so freshly-copied links auto-open here on paste.
+  // On mount, check if the URL hash carries schedule data (#schedule={b64}) — the format
+  // Copy Link emits, so freshly-copied links auto-open here on paste. DA's app shell
+  // (da.live/nx/blocks/shell/shell.js) forwards both the search and the hash into this
+  // iframe, so an old ECC ?schedule= link does reach us; it just isn't read here, so find
+  // it via Sync from the sidebar list instead.
   useEffect(() => {
     const hash = window.location.hash;
     if (!hash) return;

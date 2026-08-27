@@ -528,6 +528,16 @@ function processHashtagLinks(parent) {
   
 }
 
+// Guards against the real risk of this manual copy/paste hand-off: an author pasting the
+// wrong event's link onto the wrong page. Log-only — not a security control, just authoring
+// hygiene, so it never blocks the block from building.
+function warnIfEventIdMismatch(label, config) {
+  const pageEventId = getMetadata('event-id');
+  if (config.eventId && pageEventId && config.eventId !== pageEventId) {
+    window.lana?.log(`[${label}] eventId mismatch: config authored for ${config.eventId}, page is ${pageEventId}`);
+  }
+}
+
 function prebuildAutoBlock(blockName, link) {
   let blockEl;
   const autoBlockBuilders = {
@@ -586,12 +596,7 @@ function prebuildAutoBlock(blockName, link) {
         return null;
       }
 
-      // Guards against the real risk of this manual copy/paste hand-off: an author
-      // pasting the wrong event's link onto the wrong page.
-      const pageEventId = getMetadata('event-id');
-      if (config.eventId && pageEventId && config.eventId !== pageEventId) {
-        window.lana?.log(`[sessions-guide] eventId mismatch: config authored for ${config.eventId}, page is ${pageEventId}`);
-      }
+      warnIfEventIdMismatch('sessions-guide', config);
 
       // No authoring-table path exists for this block — sessions-guide.js's init()
       // reads data-session-guide-config only.
@@ -600,6 +605,35 @@ function prebuildAutoBlock(blockName, link) {
       return createTag('div', {
         class: blockClass,
         'data-session-guide-config': JSON.stringify(config),
+      });
+    },
+    'tec-homepage': (link) => {
+      const url = new URL(link.href);
+      const hashMatch = url.hash.match(/[#&]tecHomepage=([A-Za-z0-9+/=%-]{20,})/);
+      const config = parseEncodedConfig(hashMatch?.[1]);
+
+      if (!config || !Array.isArray(config.entries)) {
+        return null;
+      }
+
+      warnIfEventIdMismatch('tec-homepage', config);
+
+      // Both Homepage config types share one link format/pattern — configType picks
+      // which block (and which data attribute its own init() reads) gets built. Theme
+      // stays a plain class (same one an author would previously have hand-added) so
+      // existing dark-card CSS applies with no block-side changes.
+      const themeClass = config.theme === 'dark' ? ' dark-card' : '';
+
+      if (config.configType === 'homepage-featured-sessions') {
+        return createTag('div', {
+          class: `featured-sessions${themeClass}`,
+          'data-featured-sessions-config': JSON.stringify(config),
+        });
+      }
+
+      return createTag('div', {
+        class: `upcoming-sessions${themeClass}`,
+        'data-upcoming-sessions-config': JSON.stringify(config),
       });
     },
   }
@@ -617,10 +651,14 @@ export function processAutoBlockLinks(parent) {
   // c2: true — this block has a C2 copy under v1/c2/blocks/, so on a
   // `foundation: c2` page load it from there instead of the classic v1/blocks/.
   const isC2 = getMetadata('foundation') === 'c2';
+  // Session Guide and Homepage links share the consolidated Event Configurator path, so only
+  // their payload key tells them apart. Matching the key also catches older `?sgConfig=`
+  // links that pointed at the standalone app.
   const autoBlockIdentifiers = {
     'chrono-box': { pattern: 'schedule-maker' },
     'mobile-rider': { pattern: 'mobilerider.com', selfInit: true, c2: true },
-    'sessions-guide': { pattern: 'session-guide-configurator' },
+    'sessions-guide': { pattern: 'sgConfig=' },
+    'tec-homepage': { pattern: 'tecHomepage=' },
   };
 
   Object.entries(autoBlockIdentifiers).forEach(([blockName, { pattern, selfInit, c2 }]) => {
@@ -1070,23 +1108,6 @@ function addStylesToEventPage() {
   document.head.appendChild(link);
 }
 
-// Not called from decorateEvent: decorateEvent only runs on pages with an
-// event-id, but this layout is meant for static/non-event pages too. The
-// consuming site's own decorateArea should call this directly, unconditionally.
-// Always resolves the real page <main> directly rather than relying on a
-// `parent`/`area` argument, since callers may re-enter with fragment/MEP
-// elements. Re-reads metadata on every call (no cached "checked" flag) so a
-// later personalization pass that updates `section-layout` still takes effect.
-// Calls addStylesToEventPage() itself so callers only need this one function
-// to get both the CSS and the class toggle.
-export function applySectionColumnsLayout() {
-  const main = document.querySelector('main');
-  if (!main) return;
-  const enabled = getMetadata('section-layout')?.trim().toLowerCase() === 'columns';
-  if (enabled) addStylesToEventPage();
-  main.classList.toggle('section-columns', enabled);
-}
-
 // e.g. "dark", "dark(blocks:hero-marquee,profile-cards)", or "dark(blocks:text[first],agenda)"
 const BLOCK_TOKEN_RE = /^([^[\]]+?)(?:\[\s*(first|last|[1-9]\d*)\s*\])?$/;
 
@@ -1214,15 +1235,14 @@ export function decorateEvent(parent) {
     return;
   }
 
-  if (!getMetadata('event-id')) return;
-
   // Bootstraps Tier 1 Event Configurator output + shared session state ahead of any
-  // block's own init(). Gated on tier-1-event-config, not just event-id, since that's
-  // the real signal a page wants this.
-  if (getMetadata('tier-1-event-config')) {
+  // block's own init().
+  const tierOneEventConfig = getMetadata('tier-1-event-config');
+  if (tierOneEventConfig) {
     initTierOneEventConfig();
     initSessionState();
   }
+  if (!getMetadata('event-id')) return;
 
   // Hydrate metadata with user-friendly transformations
   addStylesToEventPage();
@@ -1252,6 +1272,8 @@ export function decorateEvent(parent) {
 }
 
 export default function decorateArea(area = document) {
+  addStylesToEventPage();
+
   const eagerLoad = (parent, selector) => {
     const img = parent.querySelector(selector);
     img?.removeAttribute('loading');
@@ -1270,5 +1292,3 @@ export default function decorateArea(area = document) {
     eagerLoad(marquee, 'div:last-child > div:last-child img');
   }());
 }
-
-

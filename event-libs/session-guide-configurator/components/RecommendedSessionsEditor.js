@@ -1,7 +1,7 @@
 import {
   useState, useMemo, useCallback, useRef, useLayoutEffect, useEffect, html,
 } from '../../v1/deps/htm-preact.js';
-import { getSessionTrack } from '../../v1/services/sessions/sessions-api.js';
+import { getSessionPrimaryTrack } from '../../v1/services/sessions/sessions-api.js';
 import { formatSessionTime } from '../utils.js';
 import SearchInput from './SearchInput.js';
 
@@ -49,7 +49,7 @@ export default function RecommendedSessionsEditor({
   }, [sessionTimes]);
 
   const getSessionMeta = useCallback((session) => {
-    const track = getSessionTrack(session) || '—';
+    const track = getSessionPrimaryTrack(session) || '—';
     const time = formatSessionTime(earliestTimeBySessionId.get(session.sessionId));
     return time ? `${track} · ${time}` : track;
   }, [earliestTimeBySessionId]);
@@ -70,7 +70,7 @@ export default function RecommendedSessionsEditor({
     const term = search.trim().toLowerCase();
     return (sessions || []).filter((session) => {
       if (recommendedSet.has(session.sessionId)) return false;
-      if (trackFilter && getSessionTrack(session) !== trackFilter) return false;
+      if (trackFilter && getSessionPrimaryTrack(session) !== trackFilter) return false;
       if (!term) return true;
       const title = (session.enTitle || '').toLowerCase();
       return title.includes(term) || (session.sessionId || '').toLowerCase().includes(term);

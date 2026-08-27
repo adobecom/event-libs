@@ -8,6 +8,7 @@
 
 const DA_ADMIN_ORIGIN = 'https://admin.da.live';
 const CONTENT_DA_ORIGIN = 'https://content.da.live';
+const ADMIN_HLX_ORIGIN = 'https://admin.hlx.page';
 const OWNED_SHEET_NAME = 'data'; // the only sheet name any app built on this ever writes.
 
 let daToken = null;
@@ -218,11 +219,29 @@ export async function mutateSheet(org, repo, path, mutate, sheetName = OWNED_SHE
 // org/repo than the one the app resolved. Reject at the source rather than trying to sanitize
 // a full path string after the fact.
 function hasUnsafePathSegment(path) {
-  return (path || '').split('/').some((segment) => segment === '.' || segment === '..');
+  return (path || '').split('/').some((segment) => {
+    let decoded = segment;
+    try {
+      decoded = decodeURIComponent(segment);
+    } catch {
+      return true;
+    }
+    return decoded === '.' || decoded === '..';
+  });
 }
 
 export function getContentUrl(itemPath) {
   return `${CONTENT_DA_ORIGIN}${itemPath}`;
+}
+
+// content.da.live (getContentUrl above) requires a Bearer-token Authorization header, which a
+// plain <img> tag can never send — so it 401s unconditionally, session or no session. This is
+// the CDN-served, unauthenticated equivalent for displaying/reusing an image that already lives
+// in DA. `itemPath` is the full DA listing path (still prefixed with /org/repo, as returned by
+// listFolder), matching the org/repo passed in.
+export function getAemLiveUrl(org, repo, itemPath) {
+  const relativePath = itemPath.replace(`/${org}/${repo}`, '');
+  return `https://main--${repo}--${org}.aem.live${relativePath}`;
 }
 
 // Lists the folders and files directly inside `path` (not recursive), folders first.
@@ -242,7 +261,8 @@ export async function listFolder(org, repo, path) {
 // no explicit folder-creation call, a folder becomes real the moment a file lands in it) as
 // multipart form data, matching the upload convention documented in
 // .claude/skills/build-content-from-figma/SKILL.md (POST .../source/... with a `data` field
-// carrying the file blob). Returns the public content.da.live URL the image is served from.
+// carrying the file blob). Returns the public content.da.live URL the file is served from —
+// raw DA storage, not a real site asset; see uploadAndPublishMedia for a servable aem.live URL.
 export async function uploadMedia(org, repo, path, file) {
   if (hasUnsafePathSegment(path)) return { ok: false, status: 400, error: 'Invalid path' };
   // file.name comes from the native file picker, not app-controlled navigation — a stray
@@ -253,7 +273,8 @@ export async function uploadMedia(org, repo, path, file) {
   }
   const normalizedPath = path === '/' ? '' : path;
   const encodedName = encodeURIComponent(file.name);
-  const url = `${DA_ADMIN_ORIGIN}/source/${org}/${repo}${normalizedPath}/${encodedName}`;
+  const filePath = `${normalizedPath}/${encodedName}`;
+  const url = `${DA_ADMIN_ORIGIN}/source/${org}/${repo}${filePath}`;
   const formData = new FormData();
   formData.append('data', file, file.name);
 
@@ -272,5 +293,54 @@ export async function uploadMedia(org, repo, path, file) {
     window.lana?.log(`DA uploadMedia error ${resp.status}: ${url} — ${error}`);
     return { ok: false, status: resp.status, error };
   }
-  return { ok: true, status: resp.status, url: getContentUrl(`/${org}/${repo}${normalizedPath}/${encodedName}`) };
+  return { ok: true, status: resp.status, url: `${CONTENT_DA_ORIGIN}/${org}/${repo}${filePath}`, filePath };
+}
+
+// Shared POST-with-no-body primitive for admin.hlx.page's preview/live actions (see
+// previewAsset/publishAsset below) — same shape, different action segment.
+async function hlxAction(action, org, repo, path, branch) {
+  if (hasUnsafePathSegment(path)) return { ok: false, status: 400, error: 'Invalid path' };
+  const url = `${ADMIN_HLX_ORIGIN}/${action}/${org}/${repo}/${branch}${path}`;
+  const headers = new Headers();
+  if (daToken) headers.append('Authorization', `Bearer ${daToken}`);
+  let resp;
+  try {
+    resp = await doFetch(url, { method: 'POST', headers });
+  } catch (err) {
+    window.lana?.log(`DA ${action} network error: ${err} — ${url}`);
+    return { ok: false, status: 0, error: 'Network error' };
+  }
+  if (!resp.ok) {
+    const error = await resp.text().catch(() => resp.statusText);
+    window.lana?.log(`DA ${action} error ${resp.status}: ${url} — ${error}`);
+    return { ok: false, status: resp.status, error };
+  }
+  return { ok: true, status: resp.status };
+}
+
+// `branch` defaults to 'main' — DA-authored content has no branch concept of its own (unlike
+// event-libs' own context.ref, which only selects which JS bundle this app loads); 'main' is
+// also the only branch the one documented precedent for this
+// (.claude/skills/build-content-from-figma/SKILL.md) ever targets.
+export function previewAsset(org, repo, path, branch = 'main') {
+  return hlxAction('preview', org, repo, path, branch);
+}
+
+export function publishAsset(org, repo, path, branch = 'main') {
+  return hlxAction('live', org, repo, path, branch);
+}
+
+// Uploads, previews, then publishes a single file in one call — the entry point callers need
+// for "make this a real, live site asset." Short-circuits on the first failing step; on success
+// returns the public aem.live URL the file is now servable from. `path` is the destination
+// folder (same convention as uploadMedia/listFolder), not the full file path — the exact
+// filename (and its URL-encoding) is uploadMedia's own concern.
+export async function uploadAndPublishMedia(org, repo, path, file, branch = 'main') {
+  const uploaded = await uploadMedia(org, repo, path, file);
+  if (!uploaded.ok) return uploaded;
+  const previewed = await previewAsset(org, repo, uploaded.filePath, branch);
+  if (!previewed.ok) return previewed;
+  const published = await publishAsset(org, repo, uploaded.filePath, branch);
+  if (!published.ok) return published;
+  return { ok: true, url: `https://${branch}--${repo}--${org}.aem.live${uploaded.filePath}` };
 }

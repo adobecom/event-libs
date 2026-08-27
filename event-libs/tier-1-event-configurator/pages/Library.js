@@ -1,4 +1,6 @@
-import { useState, useEffect, useMemo, useCallback, html } from '../../v1/deps/htm-preact.js';
+import {
+  useState, useEffect, useMemo, useCallback, html,
+} from '../../v1/deps/htm-preact.js';
 import SearchInput from '../components/SearchInput.js';
 import EventPicker from '../components/EventPicker.js';
 import ManualEventLookup from '../components/ManualEventLookup.js';
@@ -6,19 +8,28 @@ import Modal from '../components/Modal.js';
 import { useNavigation } from '../context/NavigationContext.js';
 import { useConfigs } from '../context/ConfigsContext.js';
 import { useEventEnv } from '../context/EventEnvContext.js';
+import { useDA } from '../context/DAContext.js';
 import {
-  copyTextToClipboard, formatUpdatedTime, getDisplayTitle,
+  copyTextToClipboard, copyHomepageConfigLink, formatUpdatedTime, getDisplayTitle,
 } from '../utils.js';
 import {
-  EVENT_BROWSE_ENABLED, CONFIG_TYPES, HOMEPAGE_CONFIG_TYPE_OPTIONS, isHomepageConfigType,
+  EVENT_BROWSE_ENABLED, CONFIG_TYPES, HOMEPAGE_CONFIG_TYPE_OPTIONS, HOMEPAGE_FIELD_BY_TYPE,
+  isHomepageConfigType,
 } from '../constants.js';
 
 function configTypeLabel(configType) {
   return HOMEPAGE_CONFIG_TYPE_OPTIONS.find((opt) => opt.value === configType)?.label || null;
 }
 
+// Homepage rows are keyed by (eventId, env) for session-catalog caching/readiness — a config
+// row's own key (eventId, configType) isn't enough, since the same event's Upcoming Sessions
+// and Featured Sessions rows share one identical catalog fetch.
+function rowCatalogKey(row) {
+  return `${row.eventId}:${row.eventServiceEnv || 'prod'}`;
+}
+
 function ConfigList({
-  rows, search, onSearch, searchId, emptyHint, onEdit, onDuplicate, onCopy, onDelete,
+  rows, search, onSearch, searchId, emptyHint, onEdit, onDuplicate, onCopy, onDelete, isCopyReady,
 }) {
   return html`
     <${SearchInput} \
@@ -34,7 +45,7 @@ function ConfigList({
     ${rows.length > 0 && html`
       <ul class="tec-library__list">
         ${rows.map((row) => html`
-          <li class="tec-library__item" key=${`${row.eventId}:${row.configType || CONFIG_TYPES.GLOBAL}`}>
+          <li class="tec-library__item" key=${row.configId || `${row.eventId}:${row.configType || CONFIG_TYPES.GLOBAL}`}>
             <div class="tec-library__item-info">
               <span class="tec-library__item-title-row">
                 <span class="tec-library__item-title">${getDisplayTitle(row)}</span>
@@ -52,7 +63,15 @@ function ConfigList({
             <div class="tec-library__item-actions">
               <button type="button" class="tec-btn tec-btn--quiet" onClick=${() => onEdit(row)}>Edit</button>
               <button type="button" class="tec-btn tec-btn--quiet" onClick=${() => onDuplicate(row)}>Duplicate</button>
-              <button type="button" class="tec-btn tec-btn--quiet" onClick=${() => onCopy(row)}>Copy config</button>
+              <button \
+                type="button" \
+                class="tec-btn tec-btn--quiet" \
+                onClick=${() => onCopy(row)} \
+                disabled=${isHomepageConfigType(row.configType) && !isCopyReady?.(row)} \
+                title=${isHomepageConfigType(row.configType) && !isCopyReady?.(row) ? 'Loading this event\'s sessions…' : undefined} \
+              >
+                ${isHomepageConfigType(row.configType) ? 'Copy Link' : 'Copy config'}
+              </button>
               <button type="button" class="tec-btn tec-btn--quiet tec-btn--danger" onClick=${() => onDelete(row)}>Delete</button>
             </div>
           </li>
@@ -73,8 +92,41 @@ export default function Library() {
     removeConfig,
     setToastSuccess,
     setToastError,
+    getSessionCatalogForRow,
   } = useConfigs();
   const { envName, setEnv } = useEventEnv();
+  const { org, repo } = useDA();
+
+  // The ESP session-catalog fetch that "Copy Link" needs (row.config only stores session IDs,
+  // not the titles/tracks/times the link is built from) can take several seconds — long enough
+  // that browsers drop the click's clipboard-write permission by the time it resolves.
+  // ConfigEditor.js's own "Copy Link" avoids this because its session data is already loaded
+  // before the click; here there's no equivalent "already open" moment, so instead every
+  // Homepage row's catalog is prefetched up front (below) and its "Copy Link" button stays
+  // disabled until that row's fetch lands — a click only ever awaits an already-resolved
+  // promise, so the clipboard write always runs inside that click's own activation window.
+  // getSessionCatalogForRow (from ConfigsContext) caches by (eventId, env), so if you then
+  // click "Edit" on a row already prefetched here, ConfigEditor.js reuses this same result
+  // instead of hitting ESP again.
+  const [readyCatalogKeys, setReadyCatalogKeys] = useState(() => new Set());
+
+  useEffect(() => {
+    const homepageConfigs = configs.filter((row) => isHomepageConfigType(row.configType));
+    // Sequential, not Promise.all: getSessionCatalogForRow flips the shared env-override
+    // global for the duration of an uncached fetch, so concurrent calls for rows on
+    // different envs would race and could fetch one row's catalog against another row's env.
+    let cancelled = false;
+    (async () => {
+      for (const row of homepageConfigs) {
+        if (cancelled) return;
+        const key = rowCatalogKey(row);
+        // eslint-disable-next-line no-await-in-loop
+        await getSessionCatalogForRow(row);
+        if (!cancelled) setReadyCatalogKeys((prev) => (prev.has(key) ? prev : new Set(prev).add(key)));
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [configs, getSessionCatalogForRow]);
 
   const [globalSearch, setGlobalSearch] = useState('');
   const [homepageSearch, setHomepageSearch] = useState('');
@@ -149,15 +201,17 @@ export default function Library() {
     goToEditor();
   }, [setEnv, startEditConfig, goToEditor]);
 
-  // Event-ID+type collision guard: picking an event that already has a row
-  // for this same config type routes to Edit for that row instead of
-  // creating a second row — this is what makes (Event ID, config type)
-  // collision-proof by construction, not something enforced only at save
-  // time (PLAN.md Phase 4). A different config type for the same event is
-  // never a collision — Global and Homepage rows coexist independently.
+  // Event-ID+type collision guard: picking an event that already has a Global
+  // row routes to Edit for that row instead of creating a second one — Global
+  // is genuinely one config per Event ID (PLAN.md Phase 4). Homepage config
+  // types are exempt: a single event can carry several named Upcoming/Featured
+  // Sessions configs side by side (see `configName`), so New always creates a
+  // fresh row there regardless of what already exists for that event+type.
   const handlePickEvent = useCallback((event) => {
     setPickerOpen(false);
-    const existing = findConfigByEventId(event.eventId, pendingConfigType);
+    const isNewFlow = pickerMode !== 'duplicate' || !duplicateSource;
+    const guardApplies = isNewFlow && pendingConfigType === CONFIG_TYPES.GLOBAL;
+    const existing = guardApplies ? findConfigByEventId(event.eventId, pendingConfigType) : null;
     if (existing) {
       setToastSuccess('A config already exists for this event — editing it');
       openEdit(existing);
@@ -179,7 +233,26 @@ export default function Library() {
     window.lana?.log(`tier-1-event-configurator: EventPicker failed, falling back to ManualEventLookup. ${message}`);
   }, []);
 
-  const handleCopyConfig = useCallback(async (row) => {
+  // Homepage rows aren't pasted into tier-1-event-config as JSON — they're shared as the
+  // single authored link decoded by upcoming-sessions.js/featured-sessions.js, same as
+  // ConfigEditor.js's own "Copy Link" button (copyHomepageConfigLink is the shared
+  // implementation both call, so a link copied from either place is identical).
+  const handleCopyHomepageLink = useCallback(async (row) => {
+    const homepageMeta = HOMEPAGE_FIELD_BY_TYPE[row.configType];
+    // The button is disabled until this row's key is in readyCatalogKeys, so this is always
+    // already resolved (and cached) by the time a click can happen — no fresh fetch (and no
+    // stale clipboard activation) is possible here.
+    const result = await getSessionCatalogForRow(row);
+    if (!result.ok) {
+      setToastError('Could not load this event\'s sessions — copy the link from the editor instead');
+      return;
+    }
+    const ok = await copyHomepageConfigLink(org, repo, row, homepageMeta, result.data.sessions, result.data.sessionTimes);
+    if (ok) setToastSuccess(`Link copied — paste it directly into ${homepageMeta.blockHint}'s doc body`);
+    else setToastError('Could not copy the link — please retry');
+  }, [org, repo, getSessionCatalogForRow, setToastSuccess, setToastError]);
+
+  const handleCopyGlobalConfig = useCallback(async (row) => {
     // Minified, not stringifyConfig's pretty-printed form: DA joins a metadata cell's
     // multi-line content back with ", ", corrupting multi-line JSON with stray commas.
     const ok = await copyTextToClipboard(JSON.stringify(row.config));
@@ -187,17 +260,16 @@ export default function Library() {
       setToastError('Could not copy config — copy it manually from the editor instead');
       return;
     }
-    // Homepage rows aren't pasted into tier-1-event-config — they're copy-pasted via the
-    // editor's own "Copy <type> JSON" button into that block's section-metadata instead.
-    const destination = isHomepageConfigType(row.configType)
-      ? ''
-      : ' — paste it into the page\'s tier-1-event-config metadata';
-    setToastSuccess(`Copied config for ${getDisplayTitle(row)}${destination}`);
+    setToastSuccess(`Copied config for ${getDisplayTitle(row)} — paste it into the page's tier-1-event-config metadata`);
   }, [setToastSuccess, setToastError]);
+
+  const handleCopyConfig = useCallback((row) => (
+    isHomepageConfigType(row.configType) ? handleCopyHomepageLink(row) : handleCopyGlobalConfig(row)
+  ), [handleCopyHomepageLink, handleCopyGlobalConfig]);
 
   const confirmDelete = useCallback(async () => {
     if (!rowPendingDelete) return;
-    await removeConfig(rowPendingDelete.eventId, rowPendingDelete.configType || CONFIG_TYPES.GLOBAL);
+    await removeConfig(rowPendingDelete);
     setRowPendingDelete(null);
   }, [rowPendingDelete, removeConfig]);
 
@@ -269,6 +341,7 @@ export default function Library() {
           onEdit=${openEdit} \
           onDuplicate=${openDuplicatePicker} \
           onCopy=${handleCopyConfig} \
+          isCopyReady=${(row) => readyCatalogKeys.has(rowCatalogKey(row))} \
           onDelete=${(row) => setRowPendingDelete(row)} \
         />
       </section>

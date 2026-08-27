@@ -9,7 +9,7 @@ This doc shows how.
 
 | Module | Exports | Use for |
 |---|---|---|
-| `event-libs/v1/utils/session-store.js` | Signals: `sessions`, `sessionsStatus`, `liveStreamActiveIds`, `favorited`, `scheduled`, `auth`, `pendingActions`. Function: `getApiConfig()` | Reading state |
+| `event-libs/v1/utils/session-store.js` | Signals: `sessions`, `sessionsStatus`, `liveStreamActiveIds`, `favorited`, `scheduled`, `auth`, `pendingActions`. Function: `getEventApiConfig()` | Reading state |
 | `event-libs/v1/services/sessions/action-feedback.js` | `toggleScheduleWithFeedback(session, opts)`, `toggleFavoriteWithFeedback(session, opts)` | Mutating state (recommended — includes the auth gate, conflict detection, and toast feedback) |
 | `event-libs/v1/services/sessions/session-actions.js` | `toggleScheduleAction(session, opts)`, `toggleFavoriteAction(session)`, `SessionActionError` | Lower-level mutations, only if you need custom feedback UI instead of the shared toast/modal |
 | `event-libs/v1/features/toast/toast.js` | `showToast(opts)`, `hideToast()` | Any ad-hoc feedback message |

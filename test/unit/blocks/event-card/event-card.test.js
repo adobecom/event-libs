@@ -80,4 +80,23 @@ describe('event-card', () => {
     // The real absolute (possibly cross-origin) URL, not rewritten to a same-origin path.
     expect(img.src).to.equal('https://example.com/media/session.jpg');
   });
+
+  it('keeps a cross-origin authored <img> at its real absolute URL, not a same-origin pathname', async () => {
+    document.body.innerHTML = `
+      <div class="event-card ratio-16-9">
+        <div><div><img src="https://example.com/media/session.jpg" alt="Session"></div></div>
+        <div><div>
+          <p>Session Title</p>
+          <p>Session description goes here.</p>
+          <p><a href="https://example.com">Register</a></p>
+        </div></div>
+      </div>
+    `;
+    const el = document.querySelector('.event-card');
+    await init(el);
+
+    const img = el.querySelector('.card-media picture img');
+    expect(img).to.exist;
+    expect(img.src).to.equal('https://example.com/media/session.jpg');
+  });
 });

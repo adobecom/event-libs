@@ -38,7 +38,6 @@ export function OnDemandView() {
           <${Carousel}
             sessions=${recommended}
             title="Recommended"
-            formatTime=${() => 'Trending'}
             variant="recommended"
           />
         </div>

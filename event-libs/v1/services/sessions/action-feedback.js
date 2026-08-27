@@ -5,14 +5,14 @@ import { showToast } from '../../features/toast/toast.js';
 import { showConflictModal } from '../../features/conflict-modal/conflict-modal.js';
 import { getAllowDoubleBooking } from '../../utils/tier-1-event-config.js';
 import {
-  sessions, sessionsStatus, liveStreamActiveIds, getApiConfig,
+  sessions, sessionsStatus, liveStreamActiveIds, getEventApiConfig,
 } from '../../utils/session-store.js';
 import { getNowMs, isPostEvent } from '../../utils/session-state.js';
 
 // Shared toast copy for the two auth-related SessionActionError reasons — used both by
 // runSessionAction's action failures and checkViewAccess's navigation gate, so login/
 // registration toasts read consistently everywhere they appear.
-function showAuthToast(reason, { eventConfig, actionLabel }) {
+export function showAuthToast(reason, { eventConfig, actionLabel }) {
   if (reason === 'auth-required') {
     showToast({
       message: `Login required to ${actionLabel}`,
@@ -100,7 +100,7 @@ const GATED_VIEW_LABELS = { 'my-sessions': 'My sessions', 'my-favorites': 'My fa
 // during the event, On demand once isPostEvent() (shared with the auto-transition below).
 function fallbackViewForUnauthorized() {
   if (sessionsStatus.value !== 'ready' || !sessions.value.length) return 'live-upcoming';
-  const eventEndMs = getApiConfig()?.eventEndMs;
+  const eventEndMs = getEventApiConfig()?.eventEndMs;
   return isPostEvent(sessions.value, liveStreamActiveIds.value, getNowMs(), eventEndMs)
     ? 'on-demand'
     : 'live-upcoming';

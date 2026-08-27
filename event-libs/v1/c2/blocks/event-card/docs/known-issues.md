@@ -5,36 +5,62 @@ findings from that review were block-specific and already fixed or closed as
 not-applicable; these three are still open and span shared infrastructure that
 `event-card` (and `upcoming-sessions`) depend on.
 
-## 1. Byte-identical duplicate MobileRider controller file
+## 1. Duplicate MobileRider controller file — resolved, and a real env bug found in the process
 
-**Files:** `event-libs/v1/services/sessions/mobile-rider-controller.js` and
+**Was:** `event-libs/v1/services/sessions/mobile-rider-controller.js` and
 `event-libs/v1/features/timing-framework/plugins/mobile-rider/mobile-rider-controller.js`
-— still byte-identical as of this writing.
+were byte-identical, and the former hardcoded a single host
+(`overlay-admin-integration.mobilerider.com`) with no environment awareness at
+all — meaning it happened to be *right* for dev/QA/stage (confirmed with the
+MobileRider integration owner: that's the actual shared non-prod host) but
+*wrong* for prod, which should hit `overlay-admin-prod.mobilerider.com`
+instead. Separately, `services/sessions/mobile-rider.js`'s
+`fetchLiveStatus(ids, env)` guessed at two *different*, both-incorrect
+hostnames (`overlay-admin.mobilerider.com` / `overlay-admin-dev.mobilerider.com`)
+that were never verified against a real stream — confirmed 404 on a real id
+during testing.
 
-**Impact:** a future fix or endpoint change (auth header, base URL, error-shape
-handling) applied to one copy silently fails to apply to the other.
-`isMediaActive`/`getMediaStatusMap` are duplicated in the older file but never
-called by `utils/session-routing.js`/`upcoming-sessions.js` — only `getMediaStatus` is
-used.
+**Fix:** the shared registry (see #4 below) calls `fetchLiveStatus` from
+`mobile-rider.js` instead of instantiating `MobileRiderController`, passing
+`getApiConfig()?.mrEnv` on each tick — `mobile-rider.js` itself now uses the
+confirmed-correct hosts (`overlay-admin-prod.mobilerider.com` for prod,
+`overlay-admin-integration.mobilerider.com` for dev/QA/stage, matching what
+`MobileRiderController` was already hitting for non-prod). `services/sessions/
+mobile-rider-controller.js` is deleted as unused. TF's own copy at
+`features/timing-framework/plugins/mobile-rider/mobile-rider-controller.js`
+is untouched — it's a separate, still-duplicated concern (TF's schedule-skip
+decision, not live-status polling for session cards) worth a follow-up but
+out of scope here.
 
-**Fix:** delete the newer duplicate and import the existing controller from
-`features/timing-framework/plugins/mobile-rider/`.
-
-## 2. Two independent MobileRider poll loops — fixed
+## 2. Two independent MobileRider poll loops, and two separate poller modules — fixed
 
 **Was:** `utils/session-routing.js` and `upcoming-sessions/upcoming-sessions.js`
 each ran their own `setInterval`-based MR poll loop, hitting
 `overlay-admin-integration.mobilerider.com` independently even when both blocks
-were on the same page tracking overlapping `mrStreamId`s.
+were on the same page tracking overlapping `mrStreamId`s — and separately,
+`services/sessions/poller.js` (single fixed list, one `onUpdate` callback, used
+only by `session-store.js`/`sessions-guide`) duplicated the same
+`fetchLiveStatus()` poll-loop machinery under a different module.
 
-**Fix:** both now go through a shared registry,
-`event-libs/v1/services/sessions/mobile-rider-poller.js`
-(`registerStreamIds`/`unregisterStreamIds`/`subscribe`), which holds a single
-`setInterval` and batches the *union* of every currently-registered id across
-every caller into one `getMediaStatus()` call per tick, fanning the result out
-to all subscribers. Each block's own per-session gating is unchanged — this
-only replaces *where the actual fetch/interval lives*, not each block's
-business logic for deciding which ids it cares about and when:
+**Fix:** everything now lives in `event-libs/v1/services/sessions/poller.js`:
+- `registerStreamIds`/`unregisterStreamIds`/`subscribe` — a ref-counted,
+  multi-subscriber registry, grouped by `intervalMs` so every default-cadence
+  consumer (`upcoming-sessions`, `event-card`, and `session-store.js`) batches
+  into one shared 30s `fetchLiveStatus()` call, while a caller needing a
+  different cadence (this module's own fast-ticking unit tests) still gets its
+  own independent group/interval. `subscribe()`'s optional `watchIds` param
+  scopes a listener to ticks whose *queried* id set overlaps it (based on what
+  was queried, not what came back — a real "queried, absent from both lists"
+  result still notifies) and pre-filters `{active, inactive}` down to just
+  those ids; omitted, a listener gets every tick's raw, unfiltered result.
+- `startPolling`/`stopPolling` — a thin adapter over that registry, preserving
+  `session-store.js`'s exact existing call shape and its "auto-stop once every
+  one of my ids is inactive" behavior. Zero change required in
+  `session-store.js`.
+
+Each block's own per-session gating is unchanged — this only replaces *where
+the actual fetch/interval lives*, not each block's business logic for deciding
+which ids it cares about and when:
 
 - `upcoming-sessions.js` still gates each session's registration on its own
   scheduled start time (per-session `setTimeout`, unchanged), and still
@@ -45,66 +71,21 @@ business logic for deciding which ids it cares about and when:
   stream-id]` snapshot once and never unregisters — it still needs ongoing
   live→on-demand tracking for its own cards, unchanged.
 
-Covered by `test/unit/services/sessions/mobile-rider-poller.test.js`
-(batching, refcounted registration, subscribe/unsubscribe).
+Covered by `test/unit/c2/blocks/sessions-guide/services/poller.test.js`
+(`startPolling`/`stopPolling` adapter behavior) and `poller-registry.test.js`
+(batching, refcounted registration, subscribe/unsubscribe on the registry
+itself).
 
-## 3. `event-card` hydrator eagerly imported on every page — confirmed on the LCP path, fix is cross-repo
+## 3. `event-card` hydrator eagerly imported on every page — resolved by removal
 
-**File:** `event-libs/v1/hydrate/hydrate.js:3` —
-`import hydrateEventCard from './event-card.js';` is a static, eager import, and
-`hydrate.js` is itself unconditionally imported by `decorate.js`.
+**Was:** `event-libs/v1/hydrate/hydrate.js` statically imported
+`hydrate/event-card.js`, which was confirmed on the LCP-critical path (every page
+paid to fetch/parse/evaluate that module before Milo's `loadLCPImage()` ran, via
+`libs.js` → `decorate.js` → `hydrate.js`'s eager import chain), regardless of
+whether the page authored any `event-card` block.
 
-**Confirmed impact — this is genuinely on the LCP-critical path, not just
-theoretically eager.** Traced the real call chain:
-
-- `da-events/events/scripts/scripts.js:23-40` does a **top-level `await
-  Promise.all([import(utils.js), import(libs.js)])`** — page script execution
-  is paused here until both resolve.
-- Only after that resolves does `decorateArea()` run (same file, line 42),
-  whose *first* action is `loadLCPImage()` — removing `loading="lazy"` from the
-  hero `<img>` so the browser starts fetching it.
-- `libs.js` eagerly imports `decorate.js` → `hydrate.js` → `event-card.js`'s
-  hydrator. So every page pays for fetching, parsing, and evaluating that
-  module **before** the hero image's `loading` attribute is even removed —
-  directly delaying LCP, on every page, regardless of whether it authors any
-  `event-card` block.
-
-**Marginal cost is small, though.** `event-card.js`'s own imports
-(`constances.js`, `utils.js`) are already unconditionally loaded elsewhere in
-the same eager chain (needed by `image-links.js` and many other consumers), so
-the *only* thing event-card specifically adds is its own one ~90-line file and one
-extra HTTP request — likely single-digit milliseconds, not a dramatic
-regression.
-
-**Why the fix can't stay inside this repo.** `decorateEvent()` calls
-`hydrateBlocks(parent)` synchronously, and it must finish before
-`processTemplateInAllNodes()` runs a few lines later in the same function —
-that's the exact bug `event-card/docs/session-hydration.md` §9 already documents
-fixing by making this hydrator static/synchronous. Two ways to make it lazy
-without reopening that race:
-
-1. **Parallelize the fetch, don't nest it.** Issue a *third*, conditional
-   dynamic import for `hydrate/event-card.js` from `da-events/events/scripts/
-   scripts.js`'s existing `Promise.all([...])` (gated on a cheap synchronous
-   check — e.g. `document.querySelector('.event-card.hydrate')` or
-   `foundation: c2` metadata), then synchronously `registerHydrator('event-card',
-   ...)` once that import resolves, before `decorateArea()`/`decorateEvent()`
-   run. This keeps `decorateEvent()` itself fully synchronous — the ordering
-   guarantee is preserved because the module is already loaded and registered
-   by the time `hydrateBlocks()` looks it up. **This requires editing
-   `da-events`' `scripts.js`, a separate repo from this branch/PR** — not
-   something `event-libs` alone can land.
-2. **Make `decorateEvent` async and thread `await` through every call
-   site** (`da-events`' `decorateArea()`, plus `event-libs`'s own
-   `events-form.js:1096`). Avoids touching `scripts.js`'s import list, but
-   risks delaying everything else `decorateEvent` does (metadata processing,
-   session-state bootstrap, template/link resolution) relative to Milo's
-   `loadArea()`, for every block on every page — a much larger blast radius
-   for a one-file saving.
-
-**Recommendation:** given the modest payoff (one file, one request) versus the
-coordination cost (a `da-events` change to this repo's consumer, or a
-higher-risk async refactor touching every block's timing), leave this as a
-tracked issue rather than fix it speculatively from `event-libs` alone. Revisit
-if/when `da-events` is in scope in the same work session, so option 1 can be
-implemented and tested end-to-end in one pass.
+**Resolved:** the whole `hydrate`/`featured-sessions`-classname/session-code
+mechanism (`hydrate/event-card.js`) was deleted — Featured Sessions is now built
+by `event-libs/v1/c2/blocks/featured-sessions/`, generating cards directly from
+the Homepage configurator's link payload with no hydration pass at all. There is
+nothing left in `hydrate.js`'s eager import chain for this concern to apply to.

@@ -1,4 +1,5 @@
-import { DA_ORIGIN, DA_APP_PATH } from './constants.js';
+import { parseEncodedConfig } from '../v1/utils/utils.js';
+import { DA_ORIGIN, DA_APP_PATH, CONFIG_LINK_HASH_KEY } from './constants.js';
 
 // componentName is the primary label, not just a fallback — an event can have
 // multiple configs, so its title alone isn't unique per row.
@@ -29,15 +30,58 @@ export async function copyTextToClipboard(text) {
   }
 }
 
-// Encodes a config blob into a URL pointing at this app. decorate.js's
-// prebuildAutoBlock decodes it via the shared parseEncodedConfig() (v1/utils/utils.js)
-// at decoration time — there is no manual authoring-table path for this block.
-export function createSessionGuideConfigURL(configBlob, org, repo) {
-  const jsonString = JSON.stringify(configBlob);
-  const base64JsonString = btoa(unescape(encodeURIComponent(jsonString)));
+// Carried in the link alongside the config blob so clicking it can rebuild an editable row.
+// The block side ignores them — parse-config.js picks only the keys it knows.
+const ROW_FIELDS = ['configId', 'componentName', 'backendEventTitle', 'eventServiceEnv'];
+
+// Encodes a library row into a URL that works both ways: decorate.js's prebuildAutoBlock
+// builds the block from it when pasted into an event page, and clicking it re-opens the
+// config here (readConfigLinkPayload).
+export function createSessionGuideConfigURL(row, org, repo) {
+  const payload = { ...row.config };
+  ROW_FIELDS.forEach((field) => {
+    if (row[field]) payload[field] = row[field];
+  });
+  const base64JsonString = btoa(unescape(encodeURIComponent(JSON.stringify(payload))));
   const url = new URL(`${DA_ORIGIN}/app/${org}/${repo}/${DA_APP_PATH}`);
-  url.searchParams.set('sgConfig', base64JsonString);
+  url.hash = `${CONFIG_LINK_HASH_KEY}=${base64JsonString}`;
   return url.toString();
+}
+
+// Decodes a copied link's payload out of the URL, or null. Reads the hash first, then the
+// search, so links copied before the payload moved to the hash still re-open — DA's shell
+// forwards both into the iframe. Same decoder and 20-char floor as decorate.js, so a link
+// that renders a block is exactly a link that re-opens here.
+export function readConfigLinkPayload(hash = window.location.hash, search = window.location.search) {
+  const hashMatch = (hash || '').match(new RegExp(`[#&]${CONFIG_LINK_HASH_KEY}=([A-Za-z0-9+/=%-]{20,})`));
+  const encoded = hashMatch?.[1] || new URLSearchParams(search || '').get(CONFIG_LINK_HASH_KEY);
+  if (!encoded || encoded.length < 20) return null;
+  const parsed = parseEncodedConfig(encoded);
+  return parsed && typeof parsed === 'object' ? parsed : null;
+}
+
+// Drops a consumed payload from this iframe's URL, from either place it can arrive. Keeps
+// every other param — `ref` in particular, which picks the branch the app is loaded from.
+export function clearConfigLinkFromUrl() {
+  const url = new URL(window.location.href);
+  url.searchParams.delete(CONFIG_LINK_HASH_KEY);
+  url.hash = '';
+  history.replaceState(null, '', `${url.pathname}${url.search}`);
+}
+
+// Rebuilds an editable row for a config missing from this repo's library (link from another
+// repo, or the row was deleted). Keeps the configId so saving doesn't fork a new row.
+export function rowFromConfigLinkPayload(payload) {
+  const config = { ...payload };
+  ROW_FIELDS.forEach((field) => delete config[field]);
+  return {
+    configId: payload.configId || crypto.randomUUID(),
+    componentName: payload.componentName || '',
+    eventId: payload.eventId || '',
+    backendEventTitle: payload.backendEventTitle || payload.eventId || '',
+    eventServiceEnv: payload.eventServiceEnv || 'prod',
+    config,
+  };
 }
 
 // Copies a rich hyperlink (an <a> element, not just the bare URL string) so pasting
@@ -100,7 +144,7 @@ export function formatUpdatedTime(isoString) {
 // Shared by ConfigEditor.js (the open config, saved or not) and Library.js (any saved
 // row) — builds the link, copies it, and reports the result via the given toast setters.
 export async function copyRowLinkWithToast(row, org, repo, setToastSuccess, setToastError) {
-  const url = createSessionGuideConfigURL(row.config, org, repo);
+  const url = createSessionGuideConfigURL(row, org, repo);
   const formattedDate = formatUpdatedTime(row.updated);
   const linkText = formattedDate
     ? `Session Guide: ${getDisplayTitle(row)} – ${formattedDate}`
