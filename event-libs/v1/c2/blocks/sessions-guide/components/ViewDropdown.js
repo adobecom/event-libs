@@ -2,6 +2,7 @@ import { html, useState, useEffect, useRef } from '../../../../deps/htm-preact.j
 import { useSessionGuide } from '../store/index.js';
 import { checkViewAccess } from '../../../../services/sessions/action-feedback.js';
 import { isOutsideClick } from '../utils/outside-click.js';
+import { useIsPostEvent } from '../utils/use-post-event.js';
 import { IconCheckmark } from './icons.js';
 
 const VIEWS = [
@@ -10,6 +11,12 @@ const VIEWS = [
   { value: 'my-favorites', label: 'My favorites' },
   { value: 'on-demand', label: 'On demand' },
 ];
+
+// Post-event there is nothing live or upcoming left, and the store bounces the view straight
+// back to On demand, so offering it is a dead option.
+export function visibleViews(isPost) {
+  return isPost ? VIEWS.filter((v) => v.value !== 'live-upcoming') : VIEWS;
+}
 
 export const buildViewDropdown = () => ViewDropdown;
 
@@ -26,8 +33,11 @@ export function ViewDropdown() {
   const menuRef = useRef(null);
   const triggerRef = useRef(null);
 
-  const activeLabel = VIEWS.find((v) => v.value === state.activeView)?.label || 'Live & upcoming';
-  const selectedIndex = Math.max(0, VIEWS.findIndex((v) => v.value === state.activeView));
+  const views = visibleViews(useIsPostEvent());
+  // activeView can briefly still be live-upcoming post-event, before the store transitions
+  // it — fall back to the first offered option rather than naming the hidden one.
+  const activeLabel = views.find((v) => v.value === state.activeView)?.label || views[0]?.label;
+  const selectedIndex = Math.max(0, views.findIndex((v) => v.value === state.activeView));
 
   useEffect(() => {
     if (!open) return undefined;
@@ -62,22 +72,22 @@ export function ViewDropdown() {
     const focusOption = (i) => menuRef.current?.children[i]?.focus();
     if (e.key === 'Enter' || e.key === ' ') {
       e.preventDefault();
-      selectView(VIEWS[idx].value);
+      selectView(views[idx].value);
     } else if (e.key === 'Escape') {
       e.preventDefault();
       closeAndRefocus();
     } else if (e.key === 'ArrowDown') {
       e.preventDefault();
-      focusOption((idx + 1) % VIEWS.length);
+      focusOption((idx + 1) % views.length);
     } else if (e.key === 'ArrowUp') {
       e.preventDefault();
-      focusOption((idx - 1 + VIEWS.length) % VIEWS.length);
+      focusOption((idx - 1 + views.length) % views.length);
     } else if (e.key === 'Home') {
       e.preventDefault();
       focusOption(0);
     } else if (e.key === 'End') {
       e.preventDefault();
-      focusOption(VIEWS.length - 1);
+      focusOption(views.length - 1);
     }
   }
 
@@ -97,7 +107,7 @@ export function ViewDropdown() {
       </button>
       ${open && html`
         <ul class="sg-view-menu" id="sg-view-menu" role="listbox" aria-label="Session view" ref=${menuRef}>
-          ${VIEWS.map((v, idx) => html`
+          ${views.map((v, idx) => html`
             <li
               class=${`sg-view-menu-item${state.activeView === v.value ? ' sg-view-menu-item--selected' : ''}`}
               onclick=${() => selectView(v.value)}

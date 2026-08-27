@@ -1,5 +1,5 @@
 import { getSessionDayKey, isSessionLive, isSessionUpcoming } from './time.js';
-import { deriveSessionState, isInLiveNow, isDvrPending } from '../../../../utils/session-state.js';
+import { deriveSessionState, isInLiveNow } from '../../../../utils/session-state.js';
 import { getTrackIcon, getOverrideTrackIcon, DEFAULT_ICON_COLOR } from '../../../../utils/tier-1-event-config.js';
 
 export function sessionsForDay(sessions, activeDay, userTz) {
@@ -28,13 +28,23 @@ export function resolveNamedTrackBadge(trackName) {
   };
 }
 
+// ESP set the field up as multi-select, but it was only ever meant to hold one value.
+const additionalTracksOf = (session) => (session.additionalTracks || []).slice(0, 1);
+
+// Lanes a session belongs in, which is not the same question as what badge it gets: with no
+// primary track and no override it gets no badge, but its additional track still places it.
+export function resolveSwimlanes(session) {
+  const badge = resolveTrackBadge(session);
+  if (badge) return badge.swimlanes;
+  return additionalTracksOf(session);
+}
+
 // An override always wins the lane and badge over the primary track; a session with neither
-// is excluded entirely. Full case table in PLAN.md §16.2.
+// gets no badge at all. Full case table in PLAN.md §16.2.
 export function resolveTrackBadge(session) {
-  const hasPrimary = !!session.track;
+  const hasPrimary = !!session.primaryTrack;
   const hasOverride = !!session.trackOverride;
-  // Only one additional track is supported even though the ESP field is multi-select.
-  const additional = (session.additionalTracks || []).slice(0, 1);
+  const additional = additionalTracksOf(session);
 
   if (!hasPrimary && !hasOverride) return null;
 
@@ -51,15 +61,15 @@ export function resolveTrackBadge(session) {
     };
   }
 
-  const trackIcon = getTrackIcon(session.track);
+  const trackIcon = getTrackIcon(session.primaryTrack);
   return {
-    label: session.track,
+    label: session.primaryTrack,
     icon: trackIcon?.icon || null,
     color: trackIcon?.color || DEFAULT_ICON_COLOR,
     count: additional.length,
     isOverride: false,
-    swimlanes: [session.track, ...additional],
-    stackedTracks: additional.length > 0 ? [session.track, ...additional] : null,
+    swimlanes: [session.primaryTrack, ...additional],
+    stackedTracks: additional.length > 0 ? [session.primaryTrack, ...additional] : null,
   };
 }
 
@@ -68,9 +78,7 @@ export function resolveTrackBadge(session) {
 export function groupByTrack(sessions, swimlaneOrder) {
   const map = new Map();
   for (const s of sessions) {
-    const badge = resolveTrackBadge(s);
-    if (!badge) continue;
-    badge.swimlanes.forEach((track) => {
+    resolveSwimlanes(s).forEach((track) => {
       if (!map.has(track)) map.set(track, []);
       map.get(track).push(s);
     });
@@ -113,11 +121,12 @@ export function upcomingSessions(sessions, liveStreamActiveIds, activeDay, userT
   });
 }
 
-// A pending DVR window holds a session back whichever way it qualified. eventStartMs is
-// passed in, keeping this module free of store imports.
-export function onDemandSessions(sessions, liveStreamActiveIds, nowMs, eventStartMs) {
+// DVR Timing (in hours) is no longer part of this gate (PM, 2026-08-26) — a session lands
+// in On Demand as soon as its state resolves there, full stop. `dvrDelayHours` is still
+// carried on the session for a later "Recording coming soon" display treatment, just not
+// read here.
+export function onDemandSessions(sessions, liveStreamActiveIds, nowMs) {
   return sessions.filter((s) => {
-    if (isDvrPending(s, nowMs, eventStartMs)) return false;
     if (s.hasOnDemandFormat) return true;
     if (s.mrStreamId) return deriveSessionState(s, liveStreamActiveIds, nowMs) === 'on-demand';
     return !isSessionLive(s, nowMs) && !isSessionUpcoming(s, nowMs);
@@ -195,7 +204,7 @@ function matchesSearch(session, q) {
     session.title?.toLowerCase().includes(q)
     || session.description?.toLowerCase().includes(q)
     || session.speakers?.some((sp) => sp.name?.toLowerCase().includes(q))
-    || session.track?.toLowerCase().includes(q)
+    || session.primaryTrack?.toLowerCase().includes(q)
     || session.type?.toLowerCase().includes(q)
   );
 }

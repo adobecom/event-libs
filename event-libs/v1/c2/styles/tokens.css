@@ -4,9 +4,8 @@
    Last verified: 2026-05-26
 
    Shared C2 tokens — import this file from any block under c2/blocks/.
-   Duplicated here from blocks/sessions-guide/sessions-guide-tokens.css so
-   sessions-guide's own migration to c2/ can happen independently; once that
-   block moves, it should switch to this file and the local copy can go away.
+   sessions-guide imported its own standalone copy (sessions-guide-tokens.css) until it
+   migrated to this shared file; that local copy is gone now, this is the only one.
 
    Local extensions beyond the package:
      - Full font-family stacks (package ships single font name only)

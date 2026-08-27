@@ -1,9 +1,9 @@
 import { expect } from '@esm-bundle/chai';
 
-// session-store.js holds module-level singleton state (initialized, apiConfig, etc.) that
+// session-store.js holds module-level singleton state (initialized, eventApiConfig, etc.) that
 // @web/test-runner does not reliably reset between test files sharing a worker session —
 // cache-bust the import so this file gets its own fresh instance regardless.
-const { initSessionState, getApiConfig } = await import(`../../../event-libs/v1/utils/session-store.js?t=${Math.random()}`);
+const { initSessionState, getEventApiConfig } = await import(`../../../event-libs/v1/utils/session-store.js?t=${Math.random()}`);
 
 describe('session-store: no tier-1-event-config authored', () => {
   before(() => {
@@ -12,8 +12,8 @@ describe('session-store: no tier-1-event-config authored', () => {
     document.head.querySelector('meta[name="tier-1-event-config"]')?.remove();
   });
 
-  it('no-ops without initializing apiConfig', () => {
+  it('no-ops without initializing eventApiConfig', () => {
     initSessionState();
-    expect(getApiConfig()).to.be.null;
+    expect(getEventApiConfig()).to.be.null;
   });
 });

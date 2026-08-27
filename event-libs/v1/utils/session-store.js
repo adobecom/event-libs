@@ -26,7 +26,7 @@ export const sessionStateVersion = signal(0);
 export const sessionGuideRequest = signal(null);
 
 let initialized = false;
-let apiConfig = null;
+let eventApiConfig = null;
 let myDataAttempted = false;
 let realAuthConfirmed = false;
 let rfAuthToken = null;
@@ -54,7 +54,7 @@ async function exchangeRfAuthToken(clientId) {
   if (rfAuthTokenStarted) return;
   rfAuthTokenStarted = true;
   try {
-    const data = await fetchAuthToken(clientId, apiConfig.profileId, apiConfig.apiUrl);
+    const data = await fetchAuthToken(clientId, eventApiConfig.rfProfileId, eventApiConfig.apiUrl);
     rfAuthToken = data?.rfAuthToken ?? data?.token ?? data?.jwt ?? data?.authToken ?? null;
     if (!rfAuthToken) window.lana?.log('[session-store] jwt exchange returned no recognizable token field');
   } catch (err) {
@@ -93,7 +93,7 @@ function mapToSessionIds(entries, idField, matchField) {
 // only registration signal myData gives — mapping still unverified.
 async function loadMyData() {
   try {
-    const data = await fetchMyData(rfAuthToken, apiConfig.profileId, apiConfig.apiUrl);
+    const data = await fetchMyData(rfAuthToken, eventApiConfig.rfProfileId, eventApiConfig.apiUrl);
     batch(() => {
       scheduled.value = new Set(mapToSessionIds(data.scheduled, 'sessionTimeID', 'rfCode'));
       favorited.value = new Set(mapToSessionIds(data.favorited, 'sessionID', 'rfSessionId'));
@@ -123,14 +123,14 @@ function maybeLoadMyData() {
 async function loadSessions() {
   sessionsStatus.value = 'loading';
   try {
-    const fetched = await fetchSessions(apiConfig.eventId);
+    const fetched = await fetchSessions(eventApiConfig.eventId);
     // Batched so components reading both `sessions` and `sessionsStatus` re-render once.
     batch(() => {
       sessions.value = fetched;
       sessionsStatus.value = 'ready';
     });
     const mrSessions = sessions.value.filter((s) => s.mrStreamId);
-    startPolling(mrSessions, apiConfig.mrEnv, (active) => { liveStreamActiveIds.value = active; });
+    startPolling(mrSessions, eventApiConfig.mrEnv, (active) => { liveStreamActiveIds.value = active; });
     // Always runs: non-MR sessions still need transitions without a user interaction.
     startSessionStateTicker(
       () => sessions.value,
@@ -141,7 +141,7 @@ async function loadSessions() {
   } catch (err) {
     // eslint-disable-next-line no-console
     console.error('[session-store] session catalog failed to load', {
-      eventId: apiConfig.eventId,
+      eventId: eventApiConfig.eventId,
       eventServiceEnv: getEventServiceEnv()?.name,
       error: err,
     });
@@ -150,8 +150,8 @@ async function loadSessions() {
   }
 }
 
-export function getApiConfig() {
-  return apiConfig;
+export function getEventApiConfig() {
+  return eventApiConfig;
 }
 
 // Lets any block open Session Guide straight to a detail view. No-ops if the block isn't
@@ -183,19 +183,18 @@ export function initSessionState() {
   }
   initialized = true;
 
-  apiConfig = {
+  eventApiConfig = {
     apiUrl: tierOneConfig.rfApiUrl || defaultRfApiUrlForEnv(),
     // The config's own eventId is the source of truth; page metadata is only a fallback.
     eventId: tierOneConfig.eventId || getMetadata('event-id'),
-    profileId: tierOneConfig.rfProfileId || DEFAULT_RF_PROFILE_ID,
+    rfProfileId: tierOneConfig.rfProfileId || DEFAULT_RF_PROFILE_ID,
     registerUrl: tierOneConfig.registerUrl || '/register',
-    // UTC epoch ms. DVR availability counts from eventStartMs.
     eventStartMs: tierOneConfig.eventStartDateTime || null,
     eventEndMs: tierOneConfig.eventEndDateTime || null,
     mrEnv: deriveMrEnv(),
   };
 
-  if (!apiConfig.eventId) {
+  if (!eventApiConfig.eventId) {
     // eslint-disable-next-line no-console
     console.warn('[session-store] no event ID found; the session catalog request will not have a valid event key');
   }
@@ -226,9 +225,9 @@ export async function toggleSchedule(session) {
   setPending(session.id, true);
   try {
     if (isScheduled) {
-      await removeSession(session.rfCode, rfAuthToken, apiConfig.profileId, apiConfig.apiUrl);
+      await removeSession(session.rfCode, rfAuthToken, eventApiConfig.rfProfileId, eventApiConfig.apiUrl);
     } else {
-      await addSession(session.rfCode, rfAuthToken, apiConfig.profileId, apiConfig.apiUrl);
+      await addSession(session.rfCode, rfAuthToken, eventApiConfig.rfProfileId, eventApiConfig.apiUrl);
     }
   } catch (err) {
     setPending(session.id, false);
@@ -247,7 +246,7 @@ export async function toggleFavorite(session) {
   setPending(session.id, true);
   try {
     // Favoriting keys on rfSessionId, not rfCode — sessionTimeId is left empty.
-    await toggleSessionInterest('', session.rfSessionId, rfAuthToken, apiConfig.profileId, apiConfig.apiUrl);
+    await toggleSessionInterest('', session.rfSessionId, rfAuthToken, eventApiConfig.rfProfileId, eventApiConfig.apiUrl);
   } catch (err) {
     setPending(session.id, false);
     throw err;

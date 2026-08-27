@@ -131,8 +131,8 @@ the same section, but only if that block opts in via an `attach-upcoming` class
 
 - Design tokens come from `milo/libs/c2/styles/styles.css` (the C2 foundation
   stylesheet, guaranteed loaded whenever this block's `foundation: c2` metadata is
-  present) rather than `sessions-guide-tokens.css`, which isn't guaranteed present on a
-  page that doesn't load the sessions-guide block. Every `var()` has a literal fallback
+  present) rather than `c2/styles/tokens.css`, which isn't guaranteed present on a
+  page that doesn't load a block that imports it. Every `var()` has a literal fallback
   matching the Figma dev-mode export. Values with no exact matching token (e.g.
   `#8a8a8a`, `#f2f2f2`, `blur(4.6875px)`) are left as plain literals rather than forcing
   a mismatched token.

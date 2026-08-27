@@ -38,12 +38,11 @@ export function getTrackIcon(trackName) {
   return trackIcons[trackName] || trackIcons[slug] || null;
 }
 
-// byText maps one override text, default covers the rest. null when neither is authored —
-// callers apply DEFAULT_ICON_COLOR themselves.
+// Each override text is mapped explicitly; there is no event-wide fallback. null when the
+// text has no entry — callers apply DEFAULT_ICON_COLOR themselves.
 export function getOverrideTrackIcon(overrideText) {
-  const override = tierOneEventConfig.overrideTrackIcons || {};
-  const byText = override.byText || {};
-  return byText[overrideText] || override.default || null;
+  if (!overrideText) return null;
+  return (tierOneEventConfig.overrideTrackIcons?.byText || {})[overrideText] || null;
 }
 
 // { icon, pageUrl } or null. Purely the authored map, keyed by exact product name —

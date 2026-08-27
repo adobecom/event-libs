@@ -11,11 +11,10 @@ export const SUSI_OPTIONS = {
 };
 export const SERIES_404_MAP_PATH = '/events/default/series-404-map.json';
 
-// The two consumer-facing Adobe.com hosts. Session page URLs come out of the session catalog
-// on the prod host regardless of tier, so non-prod pages rewrite them (see
-// sessionPageUrlForEnv).
+// Session page URLs come out of the session catalog on this host regardless of tier, so
+// pages served elsewhere (stage, local, a Helix preview branch) rewrite them to their own
+// origin instead (see sessionPageUrlForEnv).
 export const ADOBE_PROD_HOST = 'www.adobe.com';
-export const ADOBE_STAGE_HOST = 'www.stage.adobe.com';
 
 // MAX 2026's own pages. Paths only — they resolve against whatever domain is serving the
 // page. Used as the fallback for a Tier 1 Event Config that doesn't author its own

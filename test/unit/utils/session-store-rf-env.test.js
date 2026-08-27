@@ -2,11 +2,11 @@ import { expect } from '@esm-bundle/chai';
 import { setMetadata, getEventConfig, updateEventConfig } from '../../../event-libs/v1/utils/utils.js';
 import { DEFAULT_RF_API_URL, STAGE_RF_API_URL } from '../../../event-libs/v1/services/sessions/rainfocus.js';
 
-// session-store.js holds module-level singleton state (initialized, apiConfig, etc.) that
+// session-store.js holds module-level singleton state (initialized, eventApiConfig, etc.) that
 // @web/test-runner does not reliably reset between test files sharing a worker session —
 // cache-bust the import so this file gets its own fresh instance regardless.
 const {
-  initSessionState, getApiConfig, sessionsStatus,
+  initSessionState, getEventApiConfig, sessionsStatus,
 } = await import(`../../../event-libs/v1/utils/session-store.js?t=${Math.random()}`);
 
 function waitForSessionsReady() {
@@ -30,7 +30,7 @@ describe('session-store: RF endpoint default matches milo\'s real page env', () 
     originalConfig = getEventConfig();
     updateEventConfig(originalConfig, { ...originalConfig.miloConfig, env: { name: 'prod' } });
 
-    // Only apiConfig is under test here, not the session catalog — stub the real ESL
+    // Only eventApiConfig is under test here, not the session catalog — stub the real ESL
     // fetch (event-id is unset, so it'd otherwise hit the network) with an empty payload.
     originalFetch = window.fetch;
     window.fetch = async () => new Response(JSON.stringify({ sessions: [], sessionTimes: [], speakers: [] }));
@@ -47,8 +47,8 @@ describe('session-store: RF endpoint default matches milo\'s real page env', () 
   });
 
   it('uses DEFAULT_RF_API_URL (not STAGE_RF_API_URL) when miloConfig.env.name is prod', () => {
-    const apiConfig = getApiConfig();
-    expect(apiConfig.apiUrl).to.equal(DEFAULT_RF_API_URL);
-    expect(apiConfig.apiUrl).to.not.equal(STAGE_RF_API_URL);
+    const eventApiConfig = getEventApiConfig();
+    expect(eventApiConfig.apiUrl).to.equal(DEFAULT_RF_API_URL);
+    expect(eventApiConfig.apiUrl).to.not.equal(STAGE_RF_API_URL);
   });
 });

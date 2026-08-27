@@ -1,14 +1,14 @@
 import { h, render } from '../../../deps/htm-preact.js';
 import { SessionGuideProvider } from './store/index.js';
 import { App } from './components/App.js';
-import { getApiConfig } from '../../../utils/session-store.js';
+import { getEventApiConfig } from '../../../utils/session-store.js';
 import { parseSessionsGuideConfig } from './utils/parse-config.js';
 
 export default async function init(el) {
   const guideConfig = parseSessionsGuideConfig(el, { logPrefix: 'sessions-guide' });
   // registerUrl comes from session-store (shared across blocks), already bootstrapped
   // by decorateEvent before this block's init() runs.
-  guideConfig.registerUrl = getApiConfig()?.registerUrl || '/register';
+  guideConfig.registerUrl = getEventApiConfig()?.registerUrl || '/register';
 
   el.innerHTML = '';
 
