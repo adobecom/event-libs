@@ -29,9 +29,6 @@ async function tick(g) {
     window.lana?.log(`poller: poll failed: ${error.message}`);
   } finally {
     g.inFlight = false;
-    // An id joined mid-flight (see requestImmediateTick) — it was queried too late to be in
-    // the request that just landed, so re-tick right away instead of leaving it to wait out
-    // the rest of the interval.
     if (g.refetchNeeded) {
       g.refetchNeeded = false;
       tick(g);
@@ -39,10 +36,6 @@ async function tick(g) {
   }
 }
 
-// Fires (or queues) a tick outside the regular interval, for ids that would otherwise sit
-// unpolled until the next scheduled tick. Coalesces a burst of synchronous calls (e.g.
-// several blocks registering ids in the same turn) into a single extra fetch, and defers to
-// the in-flight fetch's own follow-up instead of starting a second concurrent request.
 function requestImmediateTick(g) {
   if (g.inFlight) {
     g.refetchNeeded = true;
@@ -72,14 +65,9 @@ function stopPollingIfIdle(g, intervalMs) {
 export function registerStreamIds(ids, { intervalMs = DEFAULT_POLL_INTERVAL_MS } = {}) {
   if (!ids?.length) return;
   const g = group(intervalMs);
-  // Checked before the ref counts below are updated: an id already being tracked (another
-  // caller just bumped its ref count) is already due on the next scheduled tick like every
-  // other tracked id, so it doesn't need a tick of its own.
   const hasNewIds = ids.some((id) => !g.refCounts.has(id));
   ids.forEach((id) => g.refCounts.set(id, (g.refCounts.get(id) || 0) + 1));
   if (g.intervalId && hasNewIds) {
-    // Joining a group that's already polling — don't make these ids wait out the rest of the
-    // interval (up to intervalMs) for their first live-status check.
     requestImmediateTick(g);
   } else {
     ensurePolling(g, intervalMs);
