@@ -114,6 +114,10 @@ export function SessionDetailOverlay({ onBack }) {
     e.stopPropagation();
     const shareUrl = window.location.origin + setSessionParam(sessionParamValue(session));
     try {
+      // Checked explicitly rather than navigator.clipboard?.writeText(...): optional-chaining
+      // past a missing clipboard API would resolve `await undefined` immediately and fall
+      // through to the success toast below without ever having copied anything.
+      if (!navigator.clipboard) throw new Error('Clipboard API unavailable');
       await navigator.clipboard.writeText(shareUrl);
       showToast({ message: 'Link copied!', variant: 'positive' });
     } catch (err) {

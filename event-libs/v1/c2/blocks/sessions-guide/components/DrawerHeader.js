@@ -57,6 +57,7 @@ export function DrawerHeader({
   const { state, dispatch } = useSessionGuide();
   const [searchOpen, setSearchOpen] = useState(false);
   const mobileSearchRef = useRef(null);
+  const mobileSearchToggleRef = useRef(null);
   const desktopSearchRef = useRef(null);
   const desktopSearchWrapRef = useRef(null);
   const desktopSearchToggleRef = useRef(null);
@@ -102,27 +103,30 @@ export function DrawerHeader({
   function closeSearch() {
     setSearchOpen(false);
     dispatch({ type: 'SET_SEARCH', query: '' });
-    // The icon button only exists in the DOM once searchOpen flips back to false (it's
-    // swapped for the field on open) — wait for that render before trying to focus it.
-    if (isDesktopSearchLayout()) requestAnimationFrame(() => desktopSearchToggleRef.current?.focus());
+    // The desktop icon button only exists in the DOM once searchOpen flips back to false
+    // (it's swapped for the field on open) — wait for that render before trying to focus it.
+    // The mobile/tablet toggle stays mounted throughout, but rAF keeps both paths identical.
+    const toggleRef = isDesktopSearchLayout() ? desktopSearchToggleRef : mobileSearchToggleRef;
+    requestAnimationFrame(() => toggleRef.current?.focus());
   }
 
-  useEffect(() => {
-    if (!searchOpen) return undefined;
-    function onKeyDown(e) {
-      if (e.key !== 'Escape') return;
-      // First Escape clears the text but leaves the field open — an Escape on an already-
-      // empty field is what collapses it. Matches the two-stage convention several other
-      // expanding-search implementations use (e.g. GitHub's header search).
-      if (state.searchQuery) {
-        dispatch({ type: 'SET_SEARCH', query: '' });
-        return;
-      }
-      closeSearch();
+  // Attached directly to the search inputs (not a document-level listener) and stopped from
+  // propagating: DrawerShell wraps the whole widget in trapFocus(), whose own keydown handler
+  // lives on .sg-drawer — an ancestor of these inputs — and unconditionally closes the entire
+  // drawer on Escape. A document-level listener here would never even see the event, since the
+  // trap's ancestor handler intercepts and stops it first on the way up.
+  function onSearchEscape(e) {
+    if (e.key !== 'Escape') return;
+    e.stopPropagation();
+    // First Escape clears the text but leaves the field open — an Escape on an already-empty
+    // field is what collapses it. Matches the two-stage convention several other expanding-
+    // search implementations use (e.g. GitHub's header search).
+    if (state.searchQuery) {
+      dispatch({ type: 'SET_SEARCH', query: '' });
+      return;
     }
-    document.addEventListener('keydown', onKeyDown);
-    return () => document.removeEventListener('keydown', onKeyDown);
-  }, [searchOpen, state.searchQuery]);
+    closeSearch();
+  }
 
   // Desktop's inline field only auto-collapses once it's both unfocused and empty — a click
   // on the explicit clear button (which calls closeSearch itself) dismisses a non-empty one.
@@ -176,6 +180,7 @@ export function DrawerHeader({
               </button>
 
               <button
+                ref=${mobileSearchToggleRef}
                 class=${`sg-search-btn${searchOpen ? ' active' : ''}`}
                 onclick=${openSearch}
                 aria-label="Search sessions"
@@ -207,12 +212,14 @@ export function DrawerHeader({
                   ref=${desktopSearchRef}
                   type="search"
                   aria-label="Search sessions"
+                  aria-hidden=${searchOpen ? undefined : 'true'}
                   placeholder="Search sessions..."
                   autocomplete="off"
                   spellcheck="false"
                   tabindex=${searchOpen ? undefined : '-1'}
                   value=${state.searchQuery}
                   oninput=${onSearchInput}
+                  onkeydown=${onSearchEscape}
                   onblur=${onDesktopSearchBlur}
                 />
                 ${searchOpen && html`<button
@@ -241,6 +248,7 @@ export function DrawerHeader({
               spellcheck="false"
               value=${state.searchQuery}
               oninput=${onSearchInput}
+              onkeydown=${onSearchEscape}
             />
             <button
               class="sg-search-clear-btn"
