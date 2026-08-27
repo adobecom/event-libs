@@ -32,15 +32,41 @@ render.
   it fires (or is already past — e.g. a long-backgrounded tab recomputing on
   `visibilitychange`), the card is dropped immediately.
 - **MR (Mobile Rider) sessions**: excluded from the time-based timers above. Their
-  removal is owned solely by `startMobileRiderPolling()`'s poll confirmation — MR is the
-  authoritative "has this session actually started" signal for them, not the scheduled
-  time. A given session's `mrStreamId` is only registered with the shared poller (see
-  below) once its own scheduled start time arrives (plus a per-session `setTimeout` kick
-  exactly at that instant, so registration happens immediately rather than waiting for
-  the next 30s poll boundary). The first time MR confirms a session started, that id is
-  unregistered and `onStarted(startedIds)` fires, dropping the card — this block never
-  cares about a session's "stop time," so once confirmed, that id is gone from every
-  future poll for good.
+  removal is owned by `startMobileRiderPolling()`, gated on each session's own authored
+  `sessionTime.startTimeMillis` — MR's raw `active`/`inactive` flags are **not**, by
+  themselves, trustworthy "has this session started/ended" signals:
+  - `active` can be true for a session well before it's actually live — some MR setups
+    flip every stream for the day to `active` up front (account/venue-level
+    provisioning), only flipping a given id to `inactive` once its own segment ends. On
+    its own, `active` would falsely read as "started" for a session hours away.
+  - `inactive` can equally mean "hasn't started yet" (nothing to report) or "already
+    ended" (including ending early/underrunning its own scheduled window) — the flag
+    alone can't distinguish the two.
+
+  The fix: **once a session's own `startTimeMillis` has passed, both `active` and
+  `inactive` are trusted outright** — either one means "no longer upcoming" (it's either
+  live now, or it already aired/underran). Before that instant, only `active` is ever
+  meaningful, and even then it's ignored, since a stream reporting active ahead of its own
+  schedule is exactly the day-provisioning false positive above. This mirrors
+  `deriveSessionState()`'s (`utils/session-state.js`) own MR handling, used by
+  `event-card`/Featured Sessions — same signal, same trust model, just a binary
+  upcoming/not-upcoming outcome here instead of upcoming/live/on-demand. (A session with
+  no authored start time at all falls back to trusting `active` outright, since there's
+  nothing to gate it against.)
+
+  Every `mrStreamId` is registered with the shared poller (see below) immediately at
+  `decorate()` time, regardless of how far off its own start time is — there is no
+  per-session delayed registration. The first time a poll resolves a session via the rule
+  above, that id is unregistered and `onStarted(doneIds)` fires, dropping the card — this
+  block never cares about re-entering a resolved session, so once resolved, that id is
+  gone from every future poll for good.
+
+  **There is no reliable "session started" signal from MR at all** — only a `streamend`
+  player event exists (attached once a player is already embedded, e.g. in the
+  `mobile-rider` block), and the poll's `active` flag is provisioning-level, not
+  per-session. The `startTimeMillis` gate above is the only defense against a premature
+  drop; there is currently no way to independently confirm a session is actually live
+  beyond trusting the authored schedule plus MR's (start-time-gated) status.
 - `dropSession()` removes a session from both the DOM and the in-memory `sessions` list
   together, so a later full re-render (favorited/scheduled/pending state changes)
   can't resurrect a card that already started.
