@@ -8,6 +8,7 @@ export function renderShare() {
     type: 'button',
     class: 'session-action session-share',
     'aria-label': 'Share',
+    'daa-ll': 'Share',
   }, ICON_SHARE);
 
   btn.addEventListener('click', async () => {

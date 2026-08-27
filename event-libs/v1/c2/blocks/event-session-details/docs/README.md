@@ -284,6 +284,53 @@ when a speaker has no headshot.
 
 Unconfirmed against the ticket — see known-issues.
 
+## Analytics (DAA)
+
+Most of this is **already handled by Milo** and deliberately left alone
+([MWPW-205399](https://jira.corp.adobe.com/browse/MWPW-205399)). Milo's decoration pass
+assigns standard section and block identifiers and auto-derives a `daa-ll` for every link
+and button from its visible text:
+
+| Level | Value | Source |
+|---|---|---|
+| Section | `s1`, `s2` | Milo — standard section naming |
+| Block | `b1\|event-session-d`, `b2\|event-session-r`, … | Milo (block name, truncated) |
+| Product tile | `Photoshop-1--Featured products 7` | Milo — carries the product name |
+| Resource CTA | `Download-1--Session resources` | Milo |
+| Show-more toggles | `Show more-6--Session resources` | Milo |
+
+We add an explicit `daa-ll` in exactly two situations, and nowhere else:
+
+**1. The element is created after Milo's pass.** `Watch now` is swapped into the CTA slot at
+a state boundary, long after decoration, so it is never auto-tagged — measured as
+`daa-ll: null` on a page in the `live` state. It carries `Watch-Now` from construction.
+(`Add to schedule` *is* auto-tagged when the page happens to load in `upcoming`, but relying
+on that would leave it untagged whenever the page loads mid-gap and the CTA is inserted
+later.)
+
+**2. The label changes after the first paint.** Favorite and Add to schedule both flip
+visible state, and Milo tags once — so the auto value freezes at whatever it was on load
+(and truncates: `Favorite this sessio-2--…`). Both set `daa-ll` inside their `paint()`, which
+already runs on mount and on every signal change, so add and remove are distinguishable:
+
+| Control | Values |
+|---|---|
+| Favorite | `Add-to-Favorites` / `Remove-from-Favorites` |
+| Add to schedule | `Add-to-Schedule` / `Remove-from-Schedule` |
+| Watch now | `Watch-Now` |
+| Share | `Share` |
+
+**Labels are copied verbatim from `sessions-guide`** (`components/LiveCard.js`,
+`SessionDetailOverlay.js`) so the same action rolls up across both surfaces rather than
+splitting into two report lines.
+
+Deliberately **not** used here: `updateAnalyticTag()` from `utils/decorate.js`. It appends
+`|<event-title>`, which is right for the RSVP button but would make every session's label
+unique and defeat roll-up. Per-session breakdown comes from the page dimension instead.
+
+Product tiles keep Milo's auto value because it already includes the product name, which is
+more useful than `sessions-guide`'s generic `Featured-Product`.
+
 ## Accessibility decisions
 
 These are deliberate and were verified; changing them regresses a WCAG criterion.

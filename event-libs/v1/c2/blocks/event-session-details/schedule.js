@@ -33,6 +33,7 @@ export function renderSchedule() {
   const paint = () => {
     const isScheduled = scheduled.value.has(sessionId);
     btn.innerHTML = `${CALENDAR_ICON}<span>${isScheduled ? 'Added to schedule' : 'Add to schedule'}</span>`;
+    btn.setAttribute('daa-ll', isScheduled ? 'Remove-from-Schedule' : 'Add-to-Schedule');
     btn.classList.toggle('is-scheduled', isScheduled);
   };
   paint();

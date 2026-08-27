@@ -358,6 +358,20 @@ describe('session-state-view', () => {
       expect(primaryCtaSlot.querySelector('.session-schedule')).to.be.null;
     });
 
+    // Watch now is swapped in after Milo's analytics pass has already run, so it is the one
+    // CTA that never gets auto-tagged — it has to carry daa-ll from construction.
+    it('tags Watch now for analytics', async () => {
+      setMetadata('session-id', 'sid');
+      soonLive();
+      const { statusSlot, primaryCtaSlot } = slots();
+      mountSessionState({ statusSlot, primaryCtaSlot });
+
+      await new Promise((r) => { setTimeout(r, 800); });
+      const watch = primaryCtaSlot.querySelector('.session-watch-now');
+      expect(watch).to.not.be.null;
+      expect(watch.getAttribute('daa-ll')).to.equal('Watch-Now');
+    });
+
     it('drops the CTA entirely once the final slot has ended', () => {
       setMetadata('session-id', 'sid');
       setMetadata('session-times', JSON.stringify([

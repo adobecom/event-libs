@@ -36,6 +36,18 @@ describe('session-details schedule', () => {
     expect(btn.textContent).to.contain('Added to schedule');
   });
 
+  // The visible label flips to "Added to schedule", and Milo only auto-tags once at
+  // decoration, so daa-ll is repainted alongside it. Labels match sessions-guide's LiveCard.
+  it('tracks add vs remove in daa-ll and updates it on toggle', () => {
+    setMetadata('session-id', 'sid');
+    const btn = renderSchedule();
+    expect(btn.getAttribute('daa-ll')).to.equal('Add-to-Schedule');
+    scheduled.value = new Set(['sid']);
+    expect(btn.getAttribute('daa-ll')).to.equal('Remove-from-Schedule');
+    scheduled.value = new Set();
+    expect(btn.getAttribute('daa-ll')).to.equal('Add-to-Schedule');
+  });
+
   it('shows a login toast when scheduling while signed out', async () => {
     setMetadata('session-id', 'sid');
     renderSchedule().click();

@@ -21,6 +21,7 @@ describe('session-details share', () => {
     const btn = renderShare();
     expect(btn.classList.contains('session-share')).to.be.true;
     expect(btn.getAttribute('aria-label')).to.equal('Share');
+    expect(btn.getAttribute('daa-ll')).to.equal('Share');
     expect(btn.querySelector('svg')).to.not.be.null;
   });
 

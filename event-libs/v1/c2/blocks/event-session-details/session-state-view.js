@@ -106,7 +106,9 @@ function getWatchSession(doc = document) {
 
 function renderWatchNow() {
   const href = getWatchDestination(getWatchSession(), 'live') || BROADCAST_URL;
-  const a = createTag('a', { class: 'session-primary-cta-btn session-watch-now', href });
+  const a = createTag('a', {
+    class: 'session-primary-cta-btn session-watch-now', href, 'daa-ll': 'Watch-Now',
+  });
   a.innerHTML = `${PLAY_ICON}<span>Watch now</span>`;
   return a;
 }

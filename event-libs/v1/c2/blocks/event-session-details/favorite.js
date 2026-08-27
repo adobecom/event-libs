@@ -37,6 +37,7 @@ export function renderFavorite() {
     const isFavorited = favorited.value.has(sessionId);
     btn.innerHTML = isFavorited ? ICON_HEART_FILLED : ICON_HEART_OUTLINE;
     btn.setAttribute('aria-pressed', String(isFavorited));
+    btn.setAttribute('daa-ll', isFavorited ? 'Remove-from-Favorites' : 'Add-to-Favorites');
     btn.classList.toggle('is-favorited', isFavorited);
   };
   paint();
