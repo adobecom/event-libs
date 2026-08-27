@@ -211,9 +211,22 @@ Both start from a minimal `{ id }` session so the control renders immediately, t
 subscribe to `sessions` and swap in the real catalog object once it arrives (needed for
 `rfSessionId` / `rfCode`).
 
-**Share** (`share.js`) uses `navigator.share` where available, else copies the link and
-shows the shared `features/toast/toast.js` toast. It reads the published `url` + `title`
-metadata, falling back to the current document.
+**Share** (`share.js`) **always copies the link** and confirms with the shared
+`features/toast/toast.js` toast, reading the published `url` metadata and falling back to
+`window.location.href`.
+
+It deliberately does **not** use `navigator.share`
+([MWPW-205502](https://jira.corp.adobe.com/browse/MWPW-205502)). The native sheet listed a
+long set of OS targets where design wants one predictable action, and because it resolved
+before the toast line was reached, a *successful* share produced no feedback at all — the
+toast only ever appeared on the non-`navigator.share` fallback path. A failed copy now shows a
+negative toast rather than failing silently, so the click always confirms one way or the other.
+
+⚠️ `c2/blocks/event-marquee/event-marquee.js` still carries the original
+`navigator.share`-first version this was copied from, so it has the same defect.
+`sessions-guide`'s `SessionDetailOverlay` has a third variant ("Link copied", and it guards
+`navigator.clipboard?.writeText`). Three implementations of one behaviour — worth consolidating
+into a shared helper.
 
 ## Track tags (`track-tags.js`)
 
