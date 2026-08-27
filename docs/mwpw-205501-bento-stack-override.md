@@ -138,6 +138,17 @@ Milo block is forked or shadowed.
   companion change in the `da-events` repo (separate PR) — not a workaround to avoid
   one.
 
+### base-card CSS override
+
+A second, unrelated feature is stacked on top of this one, using the same
+`initMiloSiteRedesignOverride()` entry point and `override-milo-ace1209` flag: a
+token-only CSS fix for `base-card` (`libs/c2/blocks/base-card/`) so its text goes
+white/light inside a `dark`-styled section. See
+[docs/mwpw-205498-base-card-override.md](./mwpw-205498-base-card-override.md) for the
+full writeup — it's a much smaller diff than bento-stack (`base-card.js` is unmodified
+upstream; only four CSS rules differ), but it hits a CSS cascade race against Milo's
+own `base-card.css` that bento-stack never had to deal with.
+
 ### Integration point
 
 This is a static-authoring feature — it must work on pages with no `event-id`, not

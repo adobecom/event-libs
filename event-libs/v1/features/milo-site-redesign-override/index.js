@@ -32,6 +32,15 @@ function handleMatches(root) {
   return Promise.all(matches.map(handleSection));
 }
 
+// base-card.js itself already ships unchanged on Milo main and is loaded by Milo's own
+// C2 block loader -- only its CSS has diverged (a handful of --s2a-color-content-* token
+// swaps not yet on main). Since it's pure CSS with no measurement dependency, it just
+// needs to be present on the page; unlike bento-stack there's no per-section init to run.
+function loadBaseCardOverride() {
+  const baseCardCssUrl = new URL('./base-card.css', import.meta.url).href;
+  return new Promise((resolve) => { loadStyle(baseCardCssUrl, resolve); });
+}
+
 // Called from processAutoBlockLinks(), which runs before Milo's own block decoration —
 // section-metadata hasn't added the bento/stack-mobile classes yet at call time, so an
 // upfront scan alone would miss everything. The observer catches them whenever
@@ -39,6 +48,11 @@ function handleMatches(root) {
 export default function initMiloSiteRedesignOverride() {
   if (document.body.dataset.bentoStackOverrideStarted) return Promise.resolve();
   document.body.dataset.bentoStackOverrideStarted = 'true';
+  // Marks the page for base-card.css: Milo's own base-card.css loads later (during its
+  // block loader's normal decoration, after this hook) and would otherwise win the
+  // cascade on shared selectors. Scoping our override under this body class gives it
+  // higher specificity than Milo's, independent of stylesheet load order.
+  document.body.classList.add('milo-site-redesign-override');
 
   observer?.disconnect();
   const initialScan = handleMatches(document.body);
@@ -51,5 +65,5 @@ export default function initMiloSiteRedesignOverride() {
   });
   observer.observe(document.body, { attributes: true, attributeFilter: ['class'], childList: true, subtree: true });
 
-  return initialScan;
+  return Promise.all([initialScan, loadBaseCardOverride()]);
 }
