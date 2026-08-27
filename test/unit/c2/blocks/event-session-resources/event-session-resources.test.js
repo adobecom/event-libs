@@ -185,4 +185,90 @@ describe('Session Resources', () => {
     await init(el);
     expect(el.style.background).to.equal('');
   });
+
+  // MWPW-205400. The shape below is verified real synced output from
+  // max/2026/sessions/acom-master-test-session-1002 — `url` / `description` / `title` /
+  // `ordinal`, with no `fileURL`, `fileTypeName` or `published` at all.
+  describe('real synced material-list shape', () => {
+    const REAL = {
+      description: 'Final Presentation',
+      materialId: '4e287893-5510-40fd-9247-6d9e8b6ffa8a',
+      title: 'MAX 2025 Breakout Recording Process.pdf',
+      url: 'https://static.rainfocus.com/adobe/m26/sess/x/finalpresentation/deck.pdf',
+      materialSource: 'external',
+      ordinal: 0,
+    };
+
+    it('reads url and description, with no published flag present', async () => {
+      setMaterials([REAL]);
+      const el = block();
+      await init(el);
+      const rows = [...el.querySelectorAll('.session-resource')];
+      expect(rows.length).to.equal(1);
+      expect(rows[0].querySelector('.session-resource-name').textContent).to.equal('Final Presentation');
+      expect(rows[0].querySelector('.session-resource-cta').getAttribute('href')).to.equal(REAL.url);
+      expect(rows[0].querySelector('.session-resource-cta').textContent).to.equal('Download');
+    });
+
+    it('orders by ordinal rather than array order', async () => {
+      setMaterials([
+        { ...REAL, description: 'Third', ordinal: 2, url: 'https://x/c.pdf' },
+        { ...REAL, description: 'First', ordinal: 0, url: 'https://x/a.pdf' },
+        { ...REAL, description: 'Second', ordinal: 1, url: 'https://x/b.pdf' },
+      ]);
+      const el = block();
+      await init(el);
+      expect([...el.querySelectorAll('.session-resource-name')].map((n) => n.textContent))
+        .to.deep.equal(['First', 'Second', 'Third']);
+    });
+
+    it('falls back to the extension when description is absent', async () => {
+      setMaterials([{ url: 'https://x/thing.pptx', ordinal: 0 }]);
+      const el = block();
+      await init(el);
+      expect(el.querySelector('.session-resource-name').textContent).to.equal('Resource (PPTX)');
+    });
+  });
+
+  describe('Dropbox and CC Library link attributes', () => {
+    const setAttrs = (list) => setMetadata('custom-attributes', JSON.stringify(list));
+    const textAttr = (name, value) => ({
+      name, inputType: 'text', enabled: true, values: [{ value, _ordinal: null }],
+    });
+
+    it('renders both links after the material files, in ticket order', async () => {
+      setMaterials([{ description: 'Final Presentation', url: 'https://x/deck.pdf', ordinal: 0 }]);
+      setAttrs([
+        textAttr('CC Library Link for Session Page', 'https://www.adobe.com/creativecloud/libraries.html'),
+        textAttr('Dropbox Link for Session Page', 'https://www.dropbox.com/'),
+      ]);
+      const el = block();
+      await init(el);
+      const rows = [...el.querySelectorAll('.session-resource')];
+      expect(rows.map((r) => r.querySelector('.session-resource-name').textContent))
+        .to.deep.equal(['Final Presentation', 'Dropbox Link', 'CC Library Link']);
+      // Extensionless destinations are Open, not Download, so they are not sign-in gated.
+      expect(rows[1].querySelector('.session-resource-cta').textContent).to.equal('Open');
+      expect(rows[1].querySelector('.session-resource-cta').getAttribute('href')).to.equal('https://www.dropbox.com/');
+    });
+
+    it('renders links with no material files at all', async () => {
+      setAttrs([textAttr('Dropbox Link for Session Page', 'https://www.dropbox.com/')]);
+      const el = block();
+      await init(el);
+      expect(el.querySelector('.session-resources-empty')).to.be.null;
+      expect([...el.querySelectorAll('.session-resource-name')].map((n) => n.textContent))
+        .to.deep.equal(['Dropbox Link']);
+    });
+
+    it('skips a link attribute that is present but empty', async () => {
+      setAttrs([
+        textAttr('Dropbox Link for Session Page', '   '),
+        textAttr('CC Library Link for Session Page', ''),
+      ]);
+      const el = block();
+      await init(el);
+      expect(el.querySelector('.session-resources-empty')).to.not.be.null;
+    });
+  });
 });

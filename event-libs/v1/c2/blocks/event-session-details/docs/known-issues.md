@@ -72,17 +72,38 @@ be a player.
 yes, add `mobilerider` to the recording test rather than sniffing the DOM for a
 `.mobile-rider` block, which is timing-fragile during decoration.
 
-## 4. `fileTypeName` can repeat across rows
+## 4. `description` repeats across rows, and internal file types can leak
 
-**Files:** `event-session-resources/event-session-resources.js` (`resourceName`)
+**Files:** `event-session-resources/event-session-resources.js` (`readMaterials`)
 
-**Impact:** rows are labelled by `fileTypeName` because `fileName` is often unusable. But
-`fileTypeName` is a *type*, not a name — a session publishing two PDFs both typed
-"Session slides" renders two identical rows, where `fileName` at least distinguished them.
-The `aria-label` inherits the same ambiguity.
+**Impact (label collisions):** rows are labelled by `description` (RF's `fileTypeName`)
+because `title` is often unusable. But it is a *type*, not a name, so two published files of
+the same type render two identical rows — and this is now confirmed at scale rather than
+hypothetical. Across the 275-session MAX26 dump, of 125 files: **107 are typed `Outline`** and
+8 `Draft Presentation`. Any session publishing two of a type collides. The `aria-label`
+inherits the ambiguity.
 
-**Fix:** check real RainFocus data for how often it repeats (owner: Kat). If common,
-disambiguate — e.g. append an index, or fall back to `fileName` on collision.
+**Impact (type leakage):** the block filters on published state only, never on *type*. The
+`fileTypeCode` values present in real data are:
+
+| `fileTypeCode` | `fileTypeName` | Count | Attendee-facing? |
+|---|---|---|---|
+| `outline` | Outline | 107 | No — speaker's own `.docx`/`.pdf` submission |
+| `draftpresentation` | Draft Presentation | 8 | No — explicitly a draft |
+| `speaker` | Sponsor Speaker Headshot | 7 | No — a `.jpg`/`.png` portrait |
+| `finalpresentation` | Final Presentation | 2 | **Yes** |
+| `sessionimageupload` | Session Image Upload | 1 | No — the session card image |
+
+Only **1 of 125** is currently `published: true` (a `finalpresentation`), so the publish flag
+is doing the work today. But nothing stops an accidentally-published `outline` from rendering
+as an attendee "Download" of the speaker's internal notes, or a headshot appearing as a
+session resource.
+
+**Fix:** confirm the attendee-facing allowlist with Kat — almost certainly
+`finalpresentation` alone — and filter on `fileTypeCode` in addition to publish state, so the
+publish flag stops being the only guard. Note `fileTypeCode` is present in the RainFocus
+`files[]` payload but **not** in the synced `material-list`, whose entries expose
+`description` / `title` / `url` / `ordinal` only — so exposing it is a sync-side ask first.
 
 ## 5. `auth` has a pending window that reads as "not signed in"
 

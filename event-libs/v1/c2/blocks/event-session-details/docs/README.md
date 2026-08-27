@@ -233,11 +233,42 @@ filtered to entries that are published and have a `fileURL`. "No resources" empt
 when none qualify. Links open in a new tab. First 2 shown, rest revealed by Show more;
 two-up grid from 900px.
 
-**Row label** comes from `fileTypeName` ("Session slides"), **not** `fileName` — authored
-file names are frequently unusable (`Screenshot 2026-08-13 at 11.23.26 AM.png`,
-`Magdiel_Lopez_MAX_2026_Session_Outline`). With no `fileTypeName`, it falls back to the
-URL's extension: `Resource (PDF)`, `Resource (PPTX)` (query stripped, uppercased), or
-plain `Resource` when there is no extension.
+Per [MWPW-205400](https://jira.corp.adobe.com/browse/MWPW-205400) resources arrive from
+**two** places, rendered in this order:
+
+**1. `material-list`** — presentation files. The shape the RF → DA sync actually emits,
+verified against `max/2026/sessions/acom-master-test-session-1002`:
+
+```json
+{ "description": "Final Presentation",
+  "title": "MAX 2025 Breakout Recording Process.pdf",
+  "url": "https://static.rainfocus.com/…/finalpresentation/….pdf",
+  "materialId": "4e287893-…", "materialSource": "external", "ordinal": 0 }
+```
+
+Note `url` / `description` / `title` — **not** `fileURL` / `fileTypeName` / `fileName`, and
+no `published` at all: the sync filters unpublished files out upstream, so the block only
+guards an explicit `published: false`. The older spelling is still accepted, so a sync change
+in either direction cannot blank the block. Rows are ordered by `ordinal`, not array order.
+
+**Row label** comes from `description` (RF's `fileTypeName`, e.g. "Final Presentation"),
+**not** `title` — authored file names are frequently unusable
+(`Screenshot 2026-08-13 at 11.23.26 AM.png`, `Magdiel_Lopez_MAX_2026_Session_Outline`). With
+neither, it falls back to the URL's extension: `Resource (PDF)`, `Resource (PPTX)` (query
+stripped, uppercased), or plain `Resource`.
+
+**2. Two single-URL custom attributes**, appended after the files:
+
+| Attribute | Row label | attributeId |
+|---|---|---|
+| `Dropbox Link for Session Page` | `Dropbox Link` | `e485c1c4-9688-4e5a-9891-9563ea5d89ac` |
+| `CC Library Link for Session Page` | `CC Library Link` | `2503567c-d1ce-4be2-bb1e-b0f5678dcd59` |
+
+Matched by name; blank values are skipped. Both are extensionless destinations, so they get
+**Open** rather than Download and are therefore **not** sign-in gated.
+
+The ticket states a session carries at most 3 files. The block does not enforce that — a cap
+would silently hide data — so the count is whatever the sync delivers plus up to two links.
 
 **CTA label** is inferred from the file URL — `Download` for known document/media
 extensions, else `Open`. RainFocus may later supply explicit CTA text.
