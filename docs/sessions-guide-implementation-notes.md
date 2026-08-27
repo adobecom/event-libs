@@ -353,8 +353,8 @@ Things that look removable and are not:
 ### Dark theme
 
 Dark rules are hand-written per-theme pairs rather than `*-default` tokens, because those don't
-flip inside `.sg-portal` — the dark token scope in `sessions-guide-tokens.css` only covers
-`.sessions-guide[data-theme="dark"]`.
+flip inside `.sg-portal` — the dark token scope in the shared `c2/styles/tokens.css` (imported
+by `sessions-guide.css`) only covers `.sessions-guide[data-theme="dark"]`.
 
 The detail view's pods are white-on-tint in light mode. Both surfaces invert to near-black in
 dark, which would make pod and body indistinguishable, so the body drops to the darkest surface
