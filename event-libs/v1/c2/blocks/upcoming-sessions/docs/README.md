@@ -129,13 +129,14 @@ the same section, but only if that block opts in via an `attach-upcoming` class
 
 ## CSS notes (`upcoming-sessions.css`)
 
-- Design tokens come from `milo/libs/c2/styles/styles.css` (the C2 foundation
-  stylesheet, guaranteed loaded whenever this block's `foundation: c2` metadata is
-  present) rather than `c2/styles/tokens.css`, which isn't guaranteed present on a
-  page that doesn't load a block that imports it. Every `var()` has a literal fallback
-  matching the Figma dev-mode export. Values with no exact matching token (e.g.
-  `#8a8a8a`, `#f2f2f2`, `blur(4.6875px)`) are left as plain literals rather than forcing
-  a mismatched token.
+- Design tokens: `c2/styles/tokens.css` now loads page-wide via `c2-global.css`
+  whenever `foundation: c2` is present (see `scripts.js`'s `loadStyles`), and for
+  font-family specifically its full stacks intentionally override the bare names
+  Milo's own `c2/styles/styles.css` defines. Every `var()` here still carries a
+  literal fallback matching the Figma dev-mode export regardless, as defense against
+  any stylesheet load failure. Values with no exact matching token (e.g. `#8a8a8a`,
+  `#f2f2f2`, `blur(4.6875px)`) are left as plain literals rather than forcing a
+  mismatched token.
 - The `.sg-card`/`.sg-icon-btn`/`.sg-category-badge` families are copied from
   `sessions-guide.css` (see `SessionCard.js`) so cards visually match Session Guide's
   real session card. Copied on purpose, not `@import`'d, so this block has no runtime

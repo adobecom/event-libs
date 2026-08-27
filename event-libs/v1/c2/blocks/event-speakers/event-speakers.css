@@ -18,7 +18,7 @@
 }
 
 .speakers-count {
-  font-family: var(--body-font-family);
+  font-family: var(--body-font-family, var(--s2a-font-family-body));
   font-weight: 400;
 }
 

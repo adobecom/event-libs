@@ -81,6 +81,7 @@ decorateArea();
   // to match the C2 blocks — otherwise the page renders in a C1 styling context.
   const stylesPrefix = IS_C2 ? '/c2' : '';
   const paths = [`${LIBS}${stylesPrefix}/styles/styles.css`];
+  if (IS_C2) { paths.push(`${EVENT_LIBS_BASE}/c2/styles/c2-global.css`); }
   if (STYLES) { paths.push(STYLES); }
   paths.forEach((path) => {
     const link = document.createElement('link');

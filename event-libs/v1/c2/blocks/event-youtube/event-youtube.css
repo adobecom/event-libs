@@ -1,5 +1,3 @@
-@import '../../styles/tokens.css';
-
 .event-youtube .youtube-stream {
   display: flex;
   max-width: 100%;

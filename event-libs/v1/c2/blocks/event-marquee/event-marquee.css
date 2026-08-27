@@ -1,5 +1,3 @@
-@import '../../styles/tokens.css';
-
 .event-marquee-upcoming-wrapper {
   position: relative;
 }
@@ -123,24 +121,29 @@
   object-fit: cover;
 }
 
-.event-marquee-video-title,
-.event-marquee-countdown-label {
+.event-marquee-video-title {
+  margin: var(--s2a-spacing-md) 0 0;
   font-family: var(--s2a-font-family-label);
   font-size: var(--s2a-typography-font-size-label);
   font-weight: var(--s2a-font-weight-label);
   line-height: var(--s2a-typography-line-height-label);
   letter-spacing: var(--s2a-typography-letter-spacing-label);
+  font-style: normal;
 }
 
-.event-marquee-video-title {
-  margin: var(--s2a-spacing-md) 0 0;
+.event-marquee-countdown-label {
+  font-family: var(--s2a-font-family-body);
+  font-size: var(--s2a-typography-font-size-body-md);
+  font-weight: var(--s2a-font-weight-body);
+  line-height: var(--s2a-typography-line-height-body-md);
+  letter-spacing: var(--s2a-typography-letter-spacing-body-md);
   font-style: normal;
 }
 
 .event-marquee-countdown {
   display: flex;
   flex-direction: column;
-  gap: var(--s2a-spacing-3xs);
+  gap: var(--s2a-spacing-xs);
 }
 
 .event-marquee-countdown-clock {
