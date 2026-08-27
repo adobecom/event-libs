@@ -18,6 +18,10 @@ function group(intervalMs) {
 }
 
 async function tick(g) {
+  if (g.inFlight) {
+    g.refetchNeeded = true;
+    return;
+  }
   const ids = [...g.refCounts.keys()];
   if (!ids.length) return;
   g.inFlight = true;
