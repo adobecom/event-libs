@@ -20,7 +20,7 @@ export function renderShare() {
     try {
       if (!navigator.clipboard?.writeText) throw new Error('clipboard unavailable');
       await navigator.clipboard.writeText(url);
-      showToast({ message: 'Link copied to clipboard', variant: 'positive' });
+      showToast({ message: 'Link copied', variant: 'positive' });
     } catch (e) {
       // Never leave the click silent — a failed copy is still feedback the user needs.
       showToast({ message: 'Could not copy link', variant: 'negative' });

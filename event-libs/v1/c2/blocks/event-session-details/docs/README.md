@@ -222,11 +222,14 @@ before the toast line was reached, a *successful* share produced no feedback at 
 toast only ever appeared on the non-`navigator.share` fallback path. A failed copy now shows a
 negative toast rather than failing silently, so the click always confirms one way or the other.
 
-⚠️ `c2/blocks/event-marquee/event-marquee.js` still carries the original
-`navigator.share`-first version this was copied from, so it has the same defect.
-`sessions-guide`'s `SessionDetailOverlay` has a third variant ("Link copied", and it guards
-`navigator.clipboard?.writeText`). Three implementations of one behaviour — worth consolidating
-into a shared helper.
+The toast copy is **"Link copied"**, matching `sessions-guide`'s `SessionDetailOverlay`.
+`event-marquee` says "Link copied to clipboard"; this block briefly did too, because the whole
+handler was copied from there.
+
+⚠️ Both other implementations still try `navigator.share` first, so **both carry the defect
+MWPW-205502 describes**: `c2/blocks/event-marquee/event-marquee.js` and
+`sessions-guide/components/SessionDetailOverlay.js`. Three implementations of one behaviour —
+worth consolidating into a shared helper, which would also settle the wording in one place.
 
 ## Track tags (`track-tags.js`)
 
