@@ -156,7 +156,11 @@ Primary behind it and no configured icon.
 
 **Quick facts** (`quick-facts.js`) renders a `<dl>` of label/value rows from
 custom-attributes, ordered per the MWPW-200288 abstract: Technical level, Track, AI
-Focus, Product, Audience, Category. Each row renders only when its attribute has values.
+Focus, Audience, Category. Each row renders only when its attribute has values.
+
+`Product` is deliberately **not** a quick fact, even though the abstract lists it —
+`event-featured-products` already renders the same `Product` attribute as tiles on the same
+page, so a row here duplicated it.
 
 **Disclaimer / CC / Legal** (`disclaimer-cc-legal.js`) renders three verbatim text slots,
 each only when its attribute is populated: `IPOD or GDPR Copy` (under the title),

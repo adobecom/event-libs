@@ -6,25 +6,15 @@ import {
   initSessionState,
   openSessionGuideDetail,
 } from '../../../utils/session-store.js';
+import { getNowMs } from '../../../utils/session-state.js';
 import { getTrackIcon } from '../../../utils/tier-1-event-config.js';
 import { resolveIcon } from '../../../features/icons/icon-resolver.js';
 import { toggleScheduleWithFeedback, toggleFavoriteWithFeedback } from '../../../services/sessions/action-feedback.js';
-import { registerStreamIds, unregisterStreamIds, subscribe } from '../../../services/sessions/mobile-rider-poller.js';
+import { registerStreamIds, unregisterStreamIds, subscribe } from '../../../services/sessions/poller.js';
 
 const ROTATE_OUT_MS = 350;
 const SLIDE_MS = 350;
 const SLIDE_EASING = 'cubic-bezier(0.22, 1, 0.36, 1)';
-
-const TIMING_OVERRIDE_OFFSET_MS = (() => {
-  const raw = new URLSearchParams(window.location.search).get('timing');
-  if (!raw) return null;
-  const parsed = Number(raw);
-  return Number.isFinite(parsed) ? parsed - Date.now() : null;
-})();
-
-function now() {
-  return TIMING_OVERRIDE_OFFSET_MS === null ? Date.now() : Date.now() + TIMING_OVERRIDE_OFFSET_MS;
-}
 
 const EVENT_CONFIG = { title: '', showConflictModal: false, registerUrl: '/register' };
 
@@ -304,7 +294,7 @@ function scheduleStateTimers(sessions, dropSession) {
     const { sessionTime } = session;
     if (!sessionTime) return;
 
-    const untilStart = sessionTime.startTimeMillis - now();
+    const untilStart = sessionTime.startTimeMillis - getNowMs();
     if (untilStart > 0) {
       timers.push(setTimeout(() => dropSession(session.sessionId), untilStart));
     } else {
@@ -323,42 +313,37 @@ function attachToPrecedingBlock(el) {
   }
 }
 
+function detachFromPrecedingBlock(el) {
+  const previous = el.previousElementSibling;
+  previous?.classList.remove('attach-upcoming--has-overlay');
+}
+
 function startMobileRiderPolling(sessions, onStarted) {
   const mrSessions = sessions.filter((s) => s.mrStreamId);
   if (!mrSessions.length) return null;
 
-  const mrStreamIds = new Set(mrSessions.map((s) => s.mrStreamId));
+  const mrStreamIds = mrSessions.map((s) => s.mrStreamId);
+  const sessionByStreamId = new Map(mrSessions.map((s) => [s.mrStreamId, s]));
   const resolvedIds = new Set();
-  const registeredIds = new Set();
+  registerStreamIds(mrStreamIds);
 
-  function onDue(mrStreamId) {
-    if (registeredIds.has(mrStreamId)) return;
-    registeredIds.add(mrStreamId);
-    registerStreamIds([mrStreamId]);
-  }
+  const unsubscribe = subscribe(({ active, inactive }) => {
+    const doneIds = [...active, ...inactive].filter((id) => {
+      if (!mrStreamIds.includes(id) || resolvedIds.has(id)) return false;
+      const startTimeMillis = sessionByStreamId.get(id)?.sessionTime?.startTimeMillis;
+      if (typeof startTimeMillis !== 'number') return active.includes(id);
+      return startTimeMillis <= getNowMs();
+    });
 
-  const startTimers = [];
-  mrSessions.forEach((s) => {
-    const untilStart = (s.sessionTime?.startTimeMillis ?? 0) - now();
-    if (untilStart > 0) {
-      startTimers.push(setTimeout(() => onDue(s.mrStreamId), untilStart));
-    } else {
-      onDue(s.mrStreamId);
-    }
-  });
-
-  const unsubscribe = subscribe(({ active }) => {
-    const startedIds = active.filter((id) => mrStreamIds.has(id) && !resolvedIds.has(id));
-    if (!startedIds.length) return;
-    startedIds.forEach((id) => resolvedIds.add(id));
-    unregisterStreamIds(startedIds);
-    onStarted(startedIds);
+    if (!doneIds.length) return;
+    doneIds.forEach((id) => resolvedIds.add(id));
+    unregisterStreamIds(doneIds);
+    onStarted(doneIds);
   });
 
   return () => {
-    startTimers.forEach(clearTimeout);
     unsubscribe();
-    unregisterStreamIds([...registeredIds].filter((id) => !resolvedIds.has(id)));
+    unregisterStreamIds(mrStreamIds.filter((id) => !resolvedIds.has(id)));
   };
 }
 
@@ -390,6 +375,7 @@ async function decorate(el) {
   let sessions = Array.isArray(config?.entries) ? config.entries : [];
 
   if (!sessions.length) {
+    detachFromPrecedingBlock(el);
     el.remove();
     return;
   }
@@ -421,6 +407,14 @@ async function decorate(el) {
     removeCard(el, sessionId);
     sessions = sessions.filter((session) => session.sessionId !== sessionId);
     updateFewSessions();
+    if (!sessions.length) {
+      const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      setTimeout(() => {
+        el._upcomingSessionsCleanup?.();
+        detachFromPrecedingBlock(el);
+        el.remove();
+      }, reduceMotion ? 0 : ROTATE_OUT_MS);
+    }
   }
 
   let timers = scheduleStateTimers(sessions, dropSession);

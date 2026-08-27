@@ -32,29 +32,57 @@ render.
   it fires (or is already past — e.g. a long-backgrounded tab recomputing on
   `visibilitychange`), the card is dropped immediately.
 - **MR (Mobile Rider) sessions**: excluded from the time-based timers above. Their
-  removal is owned solely by `startMobileRiderPolling()`'s poll confirmation — MR is the
-  authoritative "has this session actually started" signal for them, not the scheduled
-  time. A given session's `mrStreamId` is only registered with the shared poller (see
-  below) once its own scheduled start time arrives (plus a per-session `setTimeout` kick
-  exactly at that instant, so registration happens immediately rather than waiting for
-  the next 30s poll boundary). The first time MR confirms a session started, that id is
-  unregistered and `onStarted(startedIds)` fires, dropping the card — this block never
-  cares about a session's "stop time," so once confirmed, that id is gone from every
-  future poll for good.
+  removal is owned by `startMobileRiderPolling()`, gated on each session's own authored
+  `sessionTime.startTimeMillis` — MR's raw `active`/`inactive` flags are **not**, by
+  themselves, trustworthy "has this session started/ended" signals:
+  - `active` can be true for a session well before it's actually live — some MR setups
+    flip every stream for the day to `active` up front (account/venue-level
+    provisioning), only flipping a given id to `inactive` once its own segment ends. On
+    its own, `active` would falsely read as "started" for a session hours away.
+  - `inactive` can equally mean "hasn't started yet" (nothing to report) or "already
+    ended" (including ending early/underrunning its own scheduled window) — the flag
+    alone can't distinguish the two.
+
+  The fix: **once a session's own `startTimeMillis` has passed, both `active` and
+  `inactive` are trusted outright** — either one means "no longer upcoming" (it's either
+  live now, or it already aired/underran). Before that instant, only `active` is ever
+  meaningful, and even then it's ignored, since a stream reporting active ahead of its own
+  schedule is exactly the day-provisioning false positive above. This mirrors
+  `deriveSessionState()`'s (`utils/session-state.js`) own MR handling, used by
+  `event-card`/Featured Sessions — same signal, same trust model, just a binary
+  upcoming/not-upcoming outcome here instead of upcoming/live/on-demand. (A session with
+  no authored start time at all falls back to trusting `active` outright, since there's
+  nothing to gate it against.)
+
+  Every `mrStreamId` is registered with the shared poller (see below) immediately at
+  `decorate()` time, regardless of how far off its own start time is — there is no
+  per-session delayed registration. The first time a poll resolves a session via the rule
+  above, that id is unregistered and `onStarted(doneIds)` fires, dropping the card — this
+  block never cares about re-entering a resolved session, so once resolved, that id is
+  gone from every future poll for good.
+
+  **There is no reliable "session started" signal from MR at all** — only a `streamend`
+  player event exists (attached once a player is already embedded, e.g. in the
+  `mobile-rider` block), and the poll's `active` flag is provisioning-level, not
+  per-session. The `startTimeMillis` gate above is the only defense against a premature
+  drop; there is currently no way to independently confirm a session is actually live
+  beyond trusting the authored schedule plus MR's (start-time-gated) status.
 - `dropSession()` removes a session from both the DOM and the in-memory `sessions` list
   together, so a later full re-render (favorited/scheduled/pending state changes)
   can't resurrect a card that already started.
 
 MR polling itself goes through the shared registry at
-`event-libs/v1/services/sessions/mobile-rider-poller.js`
+`event-libs/v1/services/sessions/poller.js`
 (`registerStreamIds`/`unregisterStreamIds`/`subscribe`), not a poller local to this
-block — if `event-card`'s Featured Sessions cards are also on the page tracking
-overlapping `mrStreamId`s, both blocks' ids get batched into the same underlying
-`getMediaStatus()` call instead of two independent 30s loops hitting
-`overlay-admin-integration.mobilerider.com`. `session-store.js`'s own
-`liveStreamActiveIds` signal is still irrelevant here — it's backed by a mocked
-`fetchLiveStatus()`, not real MR data, and this block has no live state to feed it
-anyway.
+block — if `event-card`'s Featured Sessions cards (or `sessions-guide`, via that same
+module's `startPolling`/`stopPolling` adapter) are also on the page tracking
+overlapping `mrStreamId`s, all of them get batched into the same underlying
+`fetchLiveStatus()` call instead of independent loops. `fetchLiveStatus(ids, env)`
+(`services/sessions/mobile-rider.js`) is env-aware — prod vs dev/stage host, via
+`session-store.js`'s `getApiConfig().mrEnv` — so every surface hits the correct
+environment consistently. `session-store.js`'s own `liveStreamActiveIds` signal is
+still irrelevant here — this block has no live state to feed it, and maintains its
+own `liveStreamActiveIds` locally via the shared registry's `subscribe()`.
 
 ## Removal animation (FLIP)
 
@@ -74,14 +102,17 @@ derived fresh per render, not diffed), but the track's `scrollLeft` is captured 
 restored across that rebuild so a background update (e.g. a session going live) doesn't
 yank a mid-browse user back to the start of the carousel.
 
-## `?timing=<epoch-ms>` override
+## `?serverTime=<epoch-ms>` override
 
 Lets QA simulate "now" as any instant (e.g. right before a session starts, or mid-live)
-without waiting for real time to pass. Read once at module load as an *offset* from the
-real clock (not a frozen value) — `now()` still advances in real time from that point,
-so `setTimeout`-based timers and the MR poll keep firing correctly relative to it.
-Absent/invalid `timing` falls back to the real `Date.now()`. The identical override
-exists in `event-card/session-routing.js`.
+without waiting for real time to pass. Uses the shared `getNowMs()` override from
+`utils/session-state.js` — read once at page load as an origin (not a frozen value), so
+time still advances in real time from that point, and `setTimeout`-based timers and the
+MR poll keep firing correctly relative to it. Absent/invalid `serverTime` falls back to
+the real `Date.now()`. The same override drives `utils/session-routing.js` (used by
+`event-card`), `sessions-guide`, and the rest of the Timing Framework, so one
+`serverTime` value simulates "now" consistently across every time-aware block on the
+page.
 
 ## Re-decoration cleanup
 

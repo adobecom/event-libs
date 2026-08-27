@@ -17,18 +17,29 @@ describe('Quick Facts', () => {
     setAttrs([
       attr('Category', [{ value: 'how-to', label: 'How To' }]),
       attr('Technical Level', [{ value: 'beginner', label: 'Beginner' }]),
-      attr('Product', [
-        { value: 'photoshop', label: 'Photoshop' },
-        { value: 'illustrator', label: 'Illustrator' },
+      attr('Audience', [
+        { value: 'educator', label: 'Educator' },
+        { value: 'developer', label: 'Developer' },
       ]),
     ]);
     const el = renderQuickFacts();
     const rows = [...el.querySelectorAll('.session-quick-fact')];
-    // ordered per QUICK_FACTS (Technical level before Product before Category)
+    // ordered per QUICK_FACTS (Technical level before Audience before Category)
     expect(rows.map((r) => r.querySelector('.session-quick-fact-label').textContent))
-      .to.deep.equal(['Technical level:', 'Product:', 'Category:']);
+      .to.deep.equal(['Technical level:', 'Audience:', 'Category:']);
     expect(rows[1].querySelector('.session-quick-fact-value').textContent)
-      .to.equal('Photoshop, Illustrator');
+      .to.equal('Educator, Developer');
+  });
+
+  it('omits Product — it has its own event-featured-products block', () => {
+    setAttrs([
+      attr('Technical Level', [{ value: 'beginner', label: 'Beginner' }]),
+      attr('Product', [{ value: 'photoshop', label: 'Photoshop' }]),
+    ]);
+    const el = renderQuickFacts();
+    const labels = [...el.querySelectorAll('.session-quick-fact-label')].map((l) => l.textContent);
+    expect(labels).to.deep.equal(['Technical level:']);
+    expect(el.textContent).to.not.include('Photoshop');
   });
 
   it('skips attributes with no values and AI Focus (no RF attribute)', () => {
