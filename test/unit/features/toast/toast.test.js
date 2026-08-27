@@ -109,7 +109,7 @@ describe('features/toast', () => {
       expect(el.getAttribute('role')).to.equal('alertdialog');
       expect(el.getAttribute('tabindex')).to.equal('0');
 
-      const content = el.querySelector('.sg-toast__content');
+      const content = el.querySelector('.sg-toast__body');
       expect(content.getAttribute('role')).to.equal('alert');
       expect(content.getAttribute('aria-hidden')).to.equal('true');
 
@@ -118,10 +118,10 @@ describe('features/toast', () => {
       expect(content.hasAttribute('aria-hidden')).to.be.false;
     });
 
-    it('renders a CTA link in its own row when ctaHref is provided', () => {
+    it('renders a CTA link inline in the body when ctaHref is provided', () => {
       showToast({ message: 'Register', ctaLabel: 'Register now', ctaHref: '/register' });
       const el = region.querySelector('.sg-toast');
-      const cta = el.querySelector('.sg-toast__cta-row .sg-toast__cta');
+      const cta = el.querySelector('.sg-toast__body .sg-toast__cta');
       expect(cta.tagName).to.equal('A');
       expect(cta.getAttribute('href')).to.equal('/register');
       expect(cta.textContent).to.equal('Register now');
@@ -131,7 +131,7 @@ describe('features/toast', () => {
       let called = false;
       showToast({ message: 'Login required', ctaLabel: 'Login', ctaAction: () => { called = true; } });
       const el = region.querySelector('.sg-toast');
-      const cta = el.querySelector('.sg-toast__cta-row .sg-toast__cta');
+      const cta = el.querySelector('.sg-toast__body .sg-toast__cta');
       expect(cta.tagName).to.equal('BUTTON');
       cta.click();
       expect(called).to.be.true;

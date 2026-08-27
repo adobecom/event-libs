@@ -35,7 +35,7 @@
   pointer-events: none;
   transition: opacity 400ms ease, transform 400ms ease;
   display: flex;
-  flex-direction: column;
+  align-items: flex-start;
   min-width: 220px;
   max-width: min(600px, calc(100vw - 32px));
   border-radius: 10px;
@@ -67,20 +67,6 @@
 .sg-toast--negative    { background: var(--s2a-color-background-utility-error, #d73220); }
 .sg-toast--neutral     { background: var(--s2a-color-gray-700, #505050); }
 
-.sg-toast__row {
-  display: flex;
-  align-items: flex-start;
-}
-
-/* flex + min-width: 0 lets the message wrap instead of forcing the row (and the CTA/
-   close button squeezed into it) to overflow on narrow viewports. */
-.sg-toast__content {
-  display: flex;
-  align-items: flex-start;
-  flex: 1 1 auto;
-  min-width: 0;
-}
-
 .sg-toast__icon-wrap {
   align-items: flex-start;
   display: flex;
@@ -88,17 +74,31 @@
   padding: 18px 0 18px 16px;
 }
 
+/* flex-wrap: the message and CTA share one line when the card's content fits (it hugs
+   its content up to max-width, so this stays compact); once they don't fit together,
+   the CTA wraps to its own line — right-aligned, natural width, not a full-width row. */
+.sg-toast__body {
+  display: flex;
+  flex: 1 1 auto;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  column-gap: 12px;
+  row-gap: 8px;
+  min-width: 0;
+  padding: 19px 16px 19px 8px;
+}
+
+.sg-toast--neutral .sg-toast__body {
+  padding-left: 16px;
+}
+
 .sg-toast__msg {
-  flex: 1;
+  flex: 1 1 auto;
   min-width: 0;
   font-weight: var(--s2a-font-weight-adobe-clean-regular);
   line-height: 18px;
-  padding: 19px 16px 19px 8px;
   overflow-wrap: break-word;
-}
-
-.sg-toast--neutral .sg-toast__msg {
-  padding-left: 16px;
 }
 
 .sg-toast__close {
@@ -122,30 +122,24 @@
   background: var(--s2a-color-transparent-white-12, rgb(255 255 255 / 12%));
 }
 
-/* CTA gets its own full-width row below the message, instead of sharing the row with
-   icon/message/close — on narrow viewports that shared row had no room left for it. */
-.sg-toast__cta-row {
-  display: flex;
-  padding: 0 16px 16px;
-}
-
 .sg-toast__cta {
   align-items: center;
   background: transparent;
   border: 2px solid var(--s2a-color-transparent-white-16, rgb(255 255 255 / 16%));
   border-radius: 16px;
-  box-sizing: border-box;
   color: var(--s2a-color-content-knockout, #fff);
   cursor: pointer;
-  display: flex;
+  display: inline-flex;
+  flex-shrink: 0;
   font-family: inherit;
   font-size: var(--s2a-font-size-sm);
   font-weight: var(--s2a-font-weight-adobe-clean-bold);
   justify-content: center;
   line-height: 18px;
+  min-width: 72px;
   padding: 7px 16px;
   text-decoration: none;
-  width: 100%;
+  white-space: nowrap;
 }
 
 .sg-toast__cta:hover {

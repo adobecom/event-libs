@@ -92,35 +92,34 @@ function renderToastContent(el, data) {
   el.textContent = '';
   el.className = ['sg-toast', `sg-toast--${data.variant}`].join(' ');
 
-  const row = createTag('div', { class: 'sg-toast__row' });
+  const icon = ICONS[data.variant];
+  if (icon) el.append(createTag('span', { class: 'sg-toast__icon-wrap' }, icon));
 
+  // flex-wrap body: message + CTA share one line when they fit (card just grows to hug
+  // its content, per Figma), and the CTA drops to its own right-aligned line — not a
+  // full-width row — once the card hits its max-width and they no longer fit together.
   // Mounted aria-hidden, revealed one frame after the enter transition starts — mirrors
   // react-aria's useToast isVisible-after-layout-effect trick so screen readers announce
   // reliably once, instead of missing or double-announcing at initial (incomplete) mount.
-  const content = createTag('div', {
-    class: 'sg-toast__content', role: 'alert', 'aria-atomic': 'true', 'aria-hidden': 'true',
+  const body = createTag('div', {
+    class: 'sg-toast__body', role: 'alert', 'aria-atomic': 'true', 'aria-hidden': 'true',
   });
-  const icon = ICONS[data.variant];
-  if (icon) content.append(createTag('span', { class: 'sg-toast__icon-wrap' }, icon));
   const msg = createTag('span', { class: 'sg-toast__msg', id: `sg-toast-msg-${data.id}` });
   msg.textContent = data.message;
-  content.append(msg);
-  row.append(content);
-
-  const closeBtn = createTag('button', { class: 'sg-toast__close', 'aria-label': 'Dismiss notification', type: 'button' }, CLOSE_ICON);
-  row.append(closeBtn);
-  el.append(row);
+  body.append(msg);
 
   if (data.ctaLabel && (data.ctaHref || data.ctaAction)) {
-    const ctaRow = createTag('div', { class: 'sg-toast__cta-row' });
     const cta = data.ctaHref
       ? createTag('a', { class: 'sg-toast__cta', href: data.ctaHref })
       : createTag('button', { class: 'sg-toast__cta', type: 'button' });
     cta.textContent = data.ctaLabel;
     if (!data.ctaHref) cta.addEventListener('click', data.ctaAction);
-    ctaRow.append(cta);
-    el.append(ctaRow);
+    body.append(cta);
   }
+  el.append(body);
+
+  const closeBtn = createTag('button', { class: 'sg-toast__close', 'aria-label': 'Dismiss notification', type: 'button' }, CLOSE_ICON);
+  el.append(closeBtn);
 
   return closeBtn;
 }
@@ -207,7 +206,7 @@ export function mountToast() {
       requestAnimationFrame(() => {
         requestAnimationFrame(() => {
           el.classList.add('sg-toast--visible');
-          el.querySelector('.sg-toast__content')?.removeAttribute('aria-hidden');
+          el.querySelector('.sg-toast__body')?.removeAttribute('aria-hidden');
         });
       });
     });
