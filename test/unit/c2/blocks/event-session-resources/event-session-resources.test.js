@@ -112,23 +112,23 @@ describe('Session Resources', () => {
     ]);
     const ctas = (el) => [...el.querySelectorAll('.session-resource-cta')];
 
-    it('blocks a Download while signed out and shows a login toast', async () => {
+    it('blocks a Download while signed out and shows a register/sign-in toast', async () => {
       oneOfEach();
       const el = block();
       await init(el);
       expect(clickAllowed(ctas(el)[0])).to.be.false;
-      expect(toasts.value[0]?.message).to.match(/login required to download slides/i);
-      expect(toasts.value[0]?.ctaLabel).to.match(/login/i);
+      expect(toasts.value[0]?.message).to.match(/register or sign in to download slides/i);
+      expect(toasts.value[0]?.ctaLabel).to.equal('Register/Sign in');
     });
 
-    it('blocks a Download when signed in but not registered, and prompts to register', async () => {
+    it('blocks a Download when signed in but not registered, with the same register/sign-in toast', async () => {
       oneOfEach();
       const el = block();
       await init(el);
       auth.value = UNREGISTERED;
       expect(clickAllowed(ctas(el)[0])).to.be.false;
-      expect(toasts.value[0]?.message).to.match(/registration.*required to download slides/i);
-      expect(toasts.value[0]?.ctaLabel).to.match(/register/i);
+      expect(toasts.value[0]?.message).to.match(/register or sign in to download slides/i);
+      expect(toasts.value[0]?.ctaLabel).to.equal('Register/Sign in');
     });
 
     it('lets a Download through once signed in and registered, with no toast', async () => {

@@ -36,10 +36,10 @@ describe('session-details schedule', () => {
     expect(btn.textContent).to.contain('Added to schedule');
   });
 
-  it('shows a login toast when scheduling while signed out', async () => {
+  it('shows a register/sign-in toast when scheduling while signed out', async () => {
     setMetadata('session-id', 'sid');
     renderSchedule().click();
     await new Promise((r) => { setTimeout(r); });
-    expect(toasts.value[0]?.message).to.match(/login/i);
+    expect(toasts.value[0]?.message).to.match(/register or sign in/i);
   });
 });

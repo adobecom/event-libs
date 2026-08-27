@@ -38,19 +38,19 @@ describe('services/sessions/action-feedback', () => {
     expect(toasts.value).to.have.lengthOf(0);
   });
 
-  it('shows a login-required toast on auth-required', async () => {
-    const actionFn = () => Promise.reject(new SessionActionError('auth-required'));
-    await runSessionAction(actionFn, { eventConfig, actionLabel: 'add to schedule' });
-    expect(toasts.value[0].message).to.equal('Login required to add to schedule');
-    expect(toasts.value[0].ctaLabel).to.equal('Login to Adobe');
+  it('shows the same register-or-sign-in toast for auth-required and registration-required', async () => {
+    const authFn = () => Promise.reject(new SessionActionError('auth-required'));
+    await runSessionAction(authFn, { eventConfig, actionLabel: 'add to schedule' });
+    expect(toasts.value[0].message).to.equal('Register or sign in to add to schedule.');
+    expect(toasts.value[0].ctaLabel).to.equal('Register/Sign in');
+    expect(toasts.value[0].ctaHref).to.equal('/register');
     expect(toasts.value[0].duration).to.be.null;
-  });
 
-  it('shows a registration-required toast including the event title', async () => {
-    const actionFn = () => Promise.reject(new SessionActionError('registration-required'));
-    await runSessionAction(actionFn, { eventConfig, actionLabel: 'add to favorites' });
-    expect(toasts.value[0].message).to.equal('Registration for Adobe MAX 2026 required to add to favorites');
-    expect(toasts.value[0].ctaLabel).to.equal('Register');
+    toasts.value = [];
+    const regFn = () => Promise.reject(new SessionActionError('registration-required'));
+    await runSessionAction(regFn, { eventConfig, actionLabel: 'add to schedule' });
+    expect(toasts.value[0].message).to.equal('Register or sign in to add to schedule.');
+    expect(toasts.value[0].ctaLabel).to.equal('Register/Sign in');
     expect(toasts.value[0].ctaHref).to.equal('/register');
   });
 
@@ -117,20 +117,21 @@ describe('services/sessions/action-feedback', () => {
       expect(toasts.value).to.have.lengthOf(0);
     });
 
-    it('blocks with a login toast when logged out', () => {
+    it('blocks with a register/sign-in toast when logged out', () => {
       auth.value = { isLoggedIn: false, isRegistered: false, userFirstName: null };
       const fallback = checkViewAccess('my-sessions', { eventConfig });
       expect(fallback).to.equal('live-upcoming');
-      expect(toasts.value[0].message).to.equal('Login required to view My sessions');
-      expect(toasts.value[0].ctaLabel).to.equal('Login to Adobe');
+      expect(toasts.value[0].message).to.equal('Register or sign in to view My sessions.');
+      expect(toasts.value[0].ctaLabel).to.equal('Register/Sign in');
+      expect(toasts.value[0].ctaHref).to.equal('/register');
     });
 
-    it('blocks with a registration toast (including event title) when logged in but not registered', () => {
+    it('blocks with the same register/sign-in toast when logged in but not registered', () => {
       auth.value = { isLoggedIn: true, isRegistered: false, userFirstName: null };
       const fallback = checkViewAccess('my-favorites', { eventConfig });
       expect(fallback).to.equal('live-upcoming');
-      expect(toasts.value[0].message).to.equal('Registration for Adobe MAX 2026 required to view My favorites');
-      expect(toasts.value[0].ctaLabel).to.equal('Register');
+      expect(toasts.value[0].message).to.equal('Register or sign in to view My favorites.');
+      expect(toasts.value[0].ctaLabel).to.equal('Register/Sign in');
       expect(toasts.value[0].ctaHref).to.equal('/register');
     });
 

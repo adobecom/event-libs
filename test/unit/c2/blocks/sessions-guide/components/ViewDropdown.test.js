@@ -27,16 +27,16 @@ describe('ViewDropdown resolveViewSelection', () => {
     expect(toasts.value).to.have.lengthOf(0);
   });
 
-  it('redirects to the fallback and shows a login toast when logged out', () => {
+  it('redirects to the fallback and shows a register/sign-in toast when logged out', () => {
     auth.value = { isLoggedIn: false, isRegistered: false, userFirstName: null };
     expect(resolveViewSelection('my-sessions', { eventConfig })).to.equal('live-upcoming');
-    expect(toasts.value[0].message).to.equal('Login required to view My sessions');
+    expect(toasts.value[0].message).to.equal('Register or sign in to view My sessions.');
   });
 
-  it('redirects to the fallback and shows a registration toast when unregistered', () => {
+  it('redirects to the fallback and shows a register/sign-in toast when unregistered', () => {
     auth.value = { isLoggedIn: true, isRegistered: false, userFirstName: null };
     expect(resolveViewSelection('my-favorites', { eventConfig })).to.equal('live-upcoming');
-    expect(toasts.value[0].message).to.equal('Registration for Adobe MAX 2026 required to view My favorites');
+    expect(toasts.value[0].message).to.equal('Register or sign in to view My favorites.');
   });
 });
 

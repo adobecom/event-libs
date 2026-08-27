@@ -37,10 +37,10 @@ describe('session-details favorite', () => {
     expect(btn.getAttribute('aria-label')).to.equal('Favorite this session');
   });
 
-  it('shows a login toast when favoriting while signed out', async () => {
+  it('shows a register/sign-in toast when favoriting while signed out', async () => {
     setMetadata('session-id', 'sid');
     renderFavorite().click();
     await new Promise((r) => { setTimeout(r); });
-    expect(toasts.value[0]?.message).to.match(/login/i);
+    expect(toasts.value[0]?.message).to.match(/register or sign in/i);
   });
 });
