@@ -72,7 +72,7 @@ be a player.
 yes, add `mobilerider` to the recording test rather than sniffing the DOM for a
 `.mobile-rider` block, which is timing-fragile during decoration.
 
-## 4. `description` repeats across rows, and internal file types can leak
+## 4. `description` repeats across rows; `material-list` scoping is sync-side
 
 **Files:** `event-session-resources/event-session-resources.js` (`readMaterials`)
 
@@ -83,8 +83,16 @@ hypothetical. Across the 275-session MAX26 dump, of 125 files: **107 are typed `
 8 `Draft Presentation`. Any session publishing two of a type collides. The `aria-label`
 inherits the ambiguity.
 
-**Impact (type leakage):** the block filters on published state only, never on *type*. The
-`fileTypeCode` values present in real data are:
+**Contract:** everything in `material-list` is rendered. The block does **not** filter by
+type, and deliberately so — the sync is already the gate (RainFocus holds 125 files across
+the event; `acom-master-test-session-1002`'s synced `material-list` holds 1, because the sync
+drops unpublished ones upstream). Which file types are attendee-facing is a content decision
+owned by the data, so adding a second gate here would duplicate that policy in a place it can
+drift from, and make a missing resource require checking two filters instead of one.
+
+**What that puts on the sync (owner: Sekhar):** only attendee-facing files should reach
+`material-list`. Today publish state is the only thing separating them, and most of what
+RainFocus attaches to a session is internal:
 
 | `fileTypeCode` | `fileTypeName` | Count | Attendee-facing? |
 |---|---|---|---|
@@ -94,16 +102,18 @@ inherits the ambiguity.
 | `finalpresentation` | Final Presentation | 2 | **Yes** |
 | `sessionimageupload` | Session Image Upload | 1 | No — the session card image |
 
-Only **1 of 125** is currently `published: true` (a `finalpresentation`), so the publish flag
-is doing the work today. But nothing stops an accidentally-published `outline` from rendering
-as an attendee "Download" of the speaker's internal notes, or a headshot appearing as a
-session resource.
+Only **1 of 125** is currently `published: true` (a `finalpresentation`), so publish state is
+holding today. The exposure grows as the event nears, when coordinators publish final decks
+across hundreds of sessions and the lists they click through are dominated by those 107
+outlines. A single mis-publish renders `Outline  ⟶ Download` and hands an attendee the
+speaker's raw `.docx`. Not a security hole — the files are on a public CDN either way and
+someone must actively publish them — but we would be advertising internal material.
 
-**Fix:** confirm the attendee-facing allowlist with Kat — almost certainly
-`finalpresentation` alone — and filter on `fileTypeCode` in addition to publish state, so the
-publish flag stops being the only guard. Note `fileTypeCode` is present in the RainFocus
-`files[]` payload but **not** in the synced `material-list`, whose entries expose
-`description` / `title` / `url` / `ordinal` only — so exposing it is a sync-side ask first.
+**Fix (sync-side):** restrict `material-list` to attendee-facing types, almost certainly
+`finalpresentation` alone — confirm the allowlist with Kat. `fileTypeCode` is the stable key
+to gate on; it exists in the RainFocus `files[]` payload but is dropped on the way to the
+page, so the synced entries carry only `description` / `title` / `url` / `ordinal`. Nothing to
+change in the block: if a file reaches `material-list`, it renders.
 
 ## 5. `auth` has a pending window that reads as "not signed in"
 
