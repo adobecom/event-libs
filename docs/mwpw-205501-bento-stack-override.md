@@ -1,66 +1,57 @@
-# Proposal: borrowing Milo's WIP "bento stack" mobile effect via a flagged override
+# Bento stack mobile override (MWPW-205501)
 
-**Status:** proposal, for team alignment before merging. A working implementation
-already exists on branch `mwpw-205501-bento-stack-override` so the approach can be
-reviewed against real code, not just described.
+**Status:** implemented — [PR #289](https://github.com/adobecom/event-libs/pull/289).
 
-## Background
+## Problem
 
 [MWPW-205501](https://jira.corp.adobe.com/browse/MWPW-205501) asks for the "Explore
 Sessions by Topic" bento-grid section on the Post-Event Homepage to use an elastic,
-stacking/overlay scroll effect on mobile instead of a standard grid. The ticket points
-at Milo's `site-redesign-foundation` branch as the reference implementation.
+stacking/overlay scroll effect on mobile instead of a standard grid.
 
-Two things in the ticket needed correcting before any implementation could start:
+Two terminology corrections against the ticket text:
 
-1. **The named target block doesn't exist in event-libs.** The ticket calls it a "C2
-   explore-card/bento-layout" block. No block by that name exists here — the only
-   bento-grid-of-cards component is `bento-cards` (`event-libs/v1/blocks/bento-cards/`),
-   and it's a non-C2 block with its own DOM shape, its own tokens, and its own existing
-   mobile behavior (a `milo-carousel`-based swap below 900px).
-2. **The reference path looked dead, then turned out not to be.** An initial pass
-   searched Milo's `libs/mep/ace1209` for a standalone `elastic-carousel` block by name,
-   found nothing, and concluded the path was stale scaffolding. That was a wrong search
-   term, not a dead end — re-verification (prompted by a reviewer noticing recent
-   activity) confirmed `libs/mep/ace1209/section-metadata/` had commits as recent as the
-   day before this investigation, and the real mechanism lives there under a different
-   name than assumed (see below).
+- The relevant event-libs component for a bento grid of cards is `bento-cards`
+  (`event-libs/v1/blocks/bento-cards/`) — a non-C2 block with its own DOM shape, its
+  own tokens, and its own existing mobile behavior (a `milo-carousel`-based swap below
+  900px). No block named "explore-card/bento-layout" exists in event-libs.
+- The reference implementation lives in Milo's `section-metadata` block, under
+  `libs/mep/ace1209/section-metadata/` on the `site-redesign-foundation` branch — not
+  in a standalone carousel block.
 
-## What's actually on `site-redesign-foundation`
+## Where the effect lives in Milo
 
-The mobile stacking effect is implemented in Milo's `section-metadata` block, not a
-standalone carousel block:
+The mobile stacking effect is part of Milo's `section-metadata` block, applied to
+`explore-card` children:
 
 - `.section.bento.stack-mobile` — a class combination on a Milo Section, applied by
-  `section-metadata.js`'s already-generic, keyword-driven class-adding logic (it accepts
+  `section-metadata.js`'s generic, keyword-driven class-adding logic (it accepts
   whatever an author types into the `style`/`layout` metadata row — no allow-list).
 - `explore-card` — the block used for each card inside that section.
 - `libs/features/bento-stack.js` — a small, dependency-free feature module that measures
   each card's natural height via `ResizeObserver`, sets `--card-idx` (per card) and
   `--slides` (per section) as CSS custom properties, and adds a `.bento-stack-ready`
-  class to unlock the stacking CSS. If it fails to load, the section just renders as a
-  normal static grid — no broken state.
+  class to unlock the stacking CSS. If it fails to load, the section renders as a
+  normal static grid.
 - The stacking itself is pure CSS: `position: sticky` + CSS Scroll-Driven Animations
   (`animation-timeline: view()`, `animation-range`), with per-card offsets computed
-  generically from `--card-idx`/`--slides` (works for any card count, unlike a
-  superficially similar but unrelated `elastic-carousel` C2 block that hardcodes exactly
-  5 slides via `nth-child`). Two fallbacks already exist in the CSS: `@supports not
+  generically from `--card-idx`/`--slides` (works for any card count — unlike the
+  unrelated `elastic-carousel` C2 block, which hardcodes exactly 5 slides via
+  `nth-child`). Two fallbacks are already built into the CSS: `@supports not
   (animation-timeline: view())` and `prefers-reduced-motion`, both degrading to a plain
   static stacked column.
-- Dark mode needs no separate work — the token system and `.dark`/`.light` convention
-  already ship on Milo `main`, and the only SRF-specific dark-mode nuance is a few
-  `.dark`-aware rules already inside the stacking CSS block itself.
+- Dark mode needs no separate handling — the token system and `.dark`/`.light`
+  convention already ship on Milo `main`, and the only stack-specific dark-mode nuance
+  is a few `.dark`-aware rules already inside the stacking CSS block itself.
 
-Merged PR history on `site-redesign-foundation` (#5913 "Bento layout foundation", #6322
-"Mobile bento support", #6515 "Align side-by-side to Bento") shows this has been
-iterated on since May 2026 — it's a real, maturing feature of an in-progress
-site-wide redesign, not a throwaway experiment.
+This has been in active development on `site-redesign-foundation` since May 2026
+(PRs #5913 "Bento layout foundation", #6322 "Mobile bento support", #6515 "Align
+side-by-side to Bento") — a maturing part of an in-progress site-wide redesign, not a
+throwaway experiment.
 
-## Why this isn't a simple "just build it in event-libs" problem
+## Constraint: da-events loads both Milo and event-libs
 
-da-events loads **both** Milo and event-libs — they aren't mutually exclusive. Diffing
-Milo's `main` against the `site-redesign-foundation` copies narrows the true gap to
-something much smaller than "the whole feature is missing":
+da-events loads Milo and event-libs together, not one or the other. Milo `main`
+already ships everything except two pieces:
 
 | Already on Milo `main` | Only on `site-redesign-foundation` |
 |---|---|
@@ -69,18 +60,18 @@ something much smaller than "the whole feature is missing":
 | C2 `--s2a-*` design tokens, `--parallax-easing` | A 6-line hook in `section-metadata.js` (`handleBentoStack()` + one call site) |
 
 Because `section-metadata.js` on `main` already applies whatever classes an author
-supplies, a da-events page can **already** author a `section-metadata` + `explore-card`
-section with `bento, stack-mobile` styles today, using stock Milo. Nothing about the
-authoring experience needs to wait.
+supplies, a da-events page can author a `section-metadata` + `explore-card` section
+with `bento, stack-mobile` styles today, using stock Milo — the authoring experience
+doesn't depend on anything below.
 
-The two missing pieces, though, are genuinely not in `main` yet, and the team doesn't
-want to either (a) wait an unknown amount of time for them to graduate off a WIP branch,
-or (b) write a parallel, from-scratch implementation in event-libs while Milo's own
-version keeps evolving underneath it.
+The two missing pieces are not on `main` yet. Waiting for them to graduate off a WIP
+branch has no defined timeline, and reimplementing the effect from scratch in
+event-libs would mean maintaining a second, divergent version while Milo's own keeps
+evolving underneath it.
 
-## Proposed approach: `milo-site-redesign-override`
+## Decision: vendor a flagged override
 
-Vendor **only** the two confirmed-missing pieces into event-libs, gated by a metadata
+Vendor only the two confirmed-missing pieces into event-libs, gated by a metadata
 flag, as a page-level feature — not a block, since `explore-card`/`section-metadata`
 are Milo's own blocks and already render correctly on `main` with zero changes. No
 Milo block is forked or shadowed.
@@ -98,8 +89,14 @@ Milo block is forked or shadowed.
   `.section.bento.stack-mobile` sections, loads the CSS, and calls `initBentoStack()`
   per section.
 - A single gate in `event-libs/scripts/scripts.js`, after Milo's own block loading
-  completes: if the page has `override-milo-ace1209` metadata set, dynamically import
-  and run the override. Zero cost for every page that doesn't opt in.
+  completes: if the page has `override-milo-ace1209` metadata set to `true`,
+  dynamically import and run the override. Zero cost for every page that doesn't opt
+  in.
+
+The vendored `bento-stack.js` is kept byte-for-byte identical to its Milo source,
+including its inline comments — this is a deliberate exception to this repo's
+no-comments convention, made to preserve exact diffability against upstream for
+future re-sync or removal.
 
 ### Opting out later
 
@@ -111,10 +108,15 @@ native support is doing the work.
 
 ### Known risk
 
-`bento-stack.js` is effectively zero-risk (no imports, verbatim). `bento-stack.css` is
-a literal excerpt of a file that's still actively changing upstream — the exact source
-commit SHA should be recorded in the PR that introduces this, so a future re-sync or
-removal is traceable.
+`bento-stack.js` is effectively zero-risk (no imports, verbatim copy). `bento-stack.css`
+is a literal excerpt of a file that's still actively changing upstream — the exact
+source commit SHA is recorded in the PR, so a future re-sync or removal is traceable.
+
+A handful of narrow-edge-case behaviors inherited from the vendored `bento-stack.js`
+(a `measuring`-guard race that can drop a resize event, a `--gnav-offset` fallback that
+can stick to a stale value, a `bento-stack-ready` check/set race, an idle
+`ResizeObserver` if a section is detached outside Milo's own `replaceInner()` cycle)
+are accepted as-is rather than patched locally, to avoid forking the vendor copy.
 
 ## Open questions for alignment
 
