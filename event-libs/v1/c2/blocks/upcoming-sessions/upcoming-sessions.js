@@ -10,7 +10,7 @@ import { getNowMs } from '../../../utils/session-state.js';
 import { getTrackIcon } from '../../../utils/tier-1-event-config.js';
 import { resolveIcon } from '../../../features/icons/icon-resolver.js';
 import { toggleScheduleWithFeedback, toggleFavoriteWithFeedback } from '../../../services/sessions/action-feedback.js';
-import { registerStreamIds, unregisterStreamIds, subscribe } from '../../../services/sessions/mobile-rider-poller.js';
+import { registerStreamIds, unregisterStreamIds, subscribe } from '../../../services/sessions/poller.js';
 
 const ROTATE_OUT_MS = 350;
 const SLIDE_MS = 350;
