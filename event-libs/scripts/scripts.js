@@ -93,8 +93,4 @@ decorateArea();
 (async function loadPage() {
   await loadLana({ clientId: 'events-milo' });
   await loadArea();
-  if (getMetadata('override-milo-ace1209') === 'true') {
-    const { default: initMiloSiteRedesignOverride } = await import('../v1/features/milo-site-redesign-override/index.js');
-    initMiloSiteRedesignOverride().catch((e) => window.lana?.log(`milo-site-redesign-override failed: ${e}`, { tags: 'bento-stack', severity: 'info' }));
-  }
 }());

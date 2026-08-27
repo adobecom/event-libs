@@ -127,10 +127,17 @@ Milo block is forked or shadowed.
   substitute for Milo's not-yet-shipped `handleBentoStack()` hook: finds
   `.section.bento.stack-mobile` sections, loads the CSS, and calls `initBentoStack()`
   per section.
-- A single gate in `event-libs/scripts/scripts.js`, after Milo's own block loading
-  completes: if the page has `override-milo-ace1209` metadata set to `true`,
-  dynamically import and run the override. Zero cost for every page that doesn't opt
-  in.
+- A single gate in `eventsDelayedActions()` (`event-libs/v1/libs.js`): if the page has
+  `override-milo-ace1209` metadata set to `true`, dynamically import and run the
+  override. Zero cost for every page that doesn't opt in.
+
+  `eventsDelayedActions()` — not `event-libs/scripts/scripts.js` — is the actual
+  integration point consumer sites call. `event-libs/scripts/scripts.js` is only
+  event-libs' own local dev-server entry point (`npm run event-libs`); consumer sites
+  like da-events have their own `scripts.js` with their own `CONFIG`/`loadPage`, and
+  only import specific named exports from `event-libs`'s `libs.js` barrel file — calling
+  `eventsDelayedActions()` after their own `loadArea()`, the same way the existing
+  `meta-pixel` metadata flag already works.
 
 The vendored `bento-stack.js` is kept byte-for-byte identical to its Milo source,
 including its inline comments — this is a deliberate exception to this repo's
