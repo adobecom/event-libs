@@ -33,9 +33,6 @@ export function renderSchedule() {
   const paint = () => {
     const isScheduled = scheduled.value.has(sessionId);
     btn.innerHTML = `${CALENDAR_ICON}<span>${isScheduled ? 'Added to schedule' : 'Add to schedule'}</span>`;
-    // The visible label is a state, not an action, so nothing in it says the button toggles
-    // back off. aria-pressed supplies that, matching sessions-guide's LiveCard and
-    // SessionDetailOverlay. No aria-label: the visible text is the accessible name (2.5.3).
     btn.setAttribute('aria-pressed', String(isScheduled));
     btn.setAttribute('daa-ll', isScheduled ? 'Remove-from-Schedule' : 'Add-to-Schedule');
     btn.classList.toggle('is-scheduled', isScheduled);

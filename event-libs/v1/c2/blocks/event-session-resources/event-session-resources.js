@@ -4,15 +4,12 @@ import { readBackgroundConfig } from '../../utils/background-config.js';
 import { initSessionState, getApiConfig } from '../../../utils/session-store.js';
 import { assertAuthorized } from '../../../services/sessions/session-actions.js';
 import { showAuthToast } from '../../../services/sessions/action-feedback.js';
+import { showToast } from '../../../features/toast/toast.js';
 
 const MOBILE_LIMIT = 2;
 const DOWNLOADABLE = /\.(pdf|zip|pptx?|docx?|xlsx?|key|psd|ai|indd|mp4|mov)(\?|$)/i;
 const CHEVRON_ICON = '<svg xmlns="http://www.w3.org/2000/svg" width="8" height="5" viewBox="0 0 8 5" fill="none" aria-hidden="true"><path d="M1 1L4 4L7 1" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 
-// Per MWPW-205400 resources arrive from two places: presentation files in `material-list`,
-// and two single-URL custom attributes. Matched on name; the ticket's attributeIds are
-// e485c1c4-9688-4e5a-9891-9563ea5d89ac (Dropbox) and
-// 2503567c-d1ce-4be2-bb1e-b0f5678dcd59 (CC Library).
 const LINK_ATTRS = [
   { attr: 'Dropbox Link for Session Page', name: 'Dropbox Link' },
   { attr: 'CC Library Link for Session Page', name: 'CC Library Link' },
@@ -27,13 +24,6 @@ const fallbackName = (href) => {
   return ext ? `Resource (${ext.toUpperCase()})` : 'Resource';
 };
 
-/**
- * `material-list` entries as the RF -> DA sync actually emits them: `url`, `description`
- * (the RF fileTypeName, e.g. "Final Presentation"), `title` (the raw upload filename) and
- * `ordinal`. The older `fileURL`/`fileTypeName`/`fileName` spelling is still accepted so a
- * sync change in either direction cannot blank the block. The sync already drops unpublished
- * files, so `published` is usually absent; the check only guards an explicit `false`.
- */
 function readMaterials(doc = document) {
   const list = getJsonMetadata('material-list', [], doc);
   if (!Array.isArray(list)) return [];
@@ -99,7 +89,9 @@ export default async function init(el) {
         } catch (err) {
           e.preventDefault();
           showAuthToast(err.reason, { eventConfig, actionLabel: `download ${name}` });
+          return;
         }
+        showToast({ message: 'Session resource downloaded', variant: 'positive' });
       });
     }
 

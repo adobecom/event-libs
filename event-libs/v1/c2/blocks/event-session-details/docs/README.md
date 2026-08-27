@@ -336,6 +336,11 @@ with no re-render.
 `{ isLoggedIn: null }` and the guard throws unless `isLoggedIn === true`, so without it
 every click is blocked, including signed-in users.
 
+An authorized `Download` click confirms with a **"Session resource downloaded"** toast. It
+reports that the download *started*, not that it finished — the browser owns the transfer once
+the click goes through and reports nothing back. It fires only on the authorized path, so it
+can never appear alongside the login/registration toast, and never on an `Open` link.
+
 ⚠️ This is a **UX gate, not access control** — see known-issues.
 
 ## `event-featured-products`
@@ -425,7 +430,9 @@ These are deliberate and were verified; changing them regresses a WCAG criterion
 - **The CTA swap defers while focused.** If the boundary fires while the user is on
   "Add to schedule", replacing it would remove the focused element and drop focus to
   `<body>` (2.4.3). `setCta()` holds the new CTA in `pending` and applies it on
-  `focusout`. `apply()` sets the CTA **before** the status so the announcement lands on a
+  `focusout`. `pending` is deliberately tri-state: `undefined` means nothing is deferred,
+  while `null` means "a deferred clear" — so a CTA that should disappear is not mistaken for
+  no pending change. `apply()` sets the CTA **before** the status so the announcement lands on a
   DOM that already offers it.
 - **Favorite:** stable accessible name + `aria-pressed`. **Schedule:** `aria-pressed` too,
   and no `aria-label` — the visible text is the accessible name (2.5.3 Label in Name).

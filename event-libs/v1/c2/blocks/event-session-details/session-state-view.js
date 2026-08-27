@@ -81,19 +81,6 @@ function isIpodSession(doc = document) {
   return hasFormat(doc, 'inperson') && hasFormat(doc, 'ondemandpostevent');
 }
 
-/**
- * Whether "Add to schedule" can succeed. `addSession` posts `virtual: true`, which RainFocus
- * accepts only for a session time flagged `virtualTime` — otherwise it fails with "Cannot
- * schedule virtually for a session time that is not virtual". That flag is not carried into
- * page metadata, but Format `online` predicts it exactly across all 166 published MAX26
- * sessions (132 `In person` → none virtual; 31 `Online` and 3 `In person + Online` → all
- * virtual, zero violations), so it is the gate we can evaluate from the page alone.
- *
- * A session without `online` therefore gets no schedule CTA — which covers a pure IPOD
- * session (MWPW-205503), attended in person and posted afterwards, without keying on IPOD
- * itself: an IPOD session that is *also* online is schedulable, and a plain in-person session
- * is not, even though it is not IPOD.
- */
 function isSchedulableSession(doc = document) {
   return hasFormat(doc, 'online');
 }
@@ -136,8 +123,6 @@ export function mountSessionState({ statusSlot, primaryCtaSlot, ccEl }) {
   const earliest = slots[0];
   const finalEnd = Math.max(...slots.map(({ end }) => end));
 
-  // Not built at all rather than built and withheld, so renderSchedule() never runs and never
-  // subscribes to the `scheduled` signal on a page that could not schedule anyway.
   const scheduleBtn = isSchedulableSession() ? renderSchedule() : null;
   const watchBtn = renderWatchNow();
 
@@ -151,7 +136,7 @@ export function mountSessionState({ statusSlot, primaryCtaSlot, ccEl }) {
     else primaryCtaSlot.replaceChildren();
   };
 
-  let pending; // undefined = nothing deferred; null = "clear the CTA"
+  let pending;
   const flushCta = () => {
     if (pending === undefined) return;
     const btn = pending;

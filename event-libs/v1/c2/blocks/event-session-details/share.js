@@ -11,10 +11,6 @@ export function renderShare() {
     'daa-ll': 'Share',
   }, ICON_SHARE);
 
-  // Copy-to-clipboard only, deliberately not `navigator.share` (MWPW-205502). The native
-  // share sheet offered a long list of OS targets where design wants one predictable action,
-  // and it resolved without ever reaching a toast, so a successful share gave no feedback at
-  // all. Copying always confirms.
   btn.addEventListener('click', async () => {
     const url = getMetadata('url') || window.location.href;
     try {
@@ -22,7 +18,6 @@ export function renderShare() {
       await navigator.clipboard.writeText(url);
       showToast({ message: 'Link copied', variant: 'positive' });
     } catch (e) {
-      // Never leave the click silent — a failed copy is still feedback the user needs.
       showToast({ message: 'Could not copy link', variant: 'negative' });
       window.lana?.log(`[session-details] share failed: ${e.message}`);
     }

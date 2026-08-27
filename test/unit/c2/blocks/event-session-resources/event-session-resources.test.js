@@ -131,16 +131,27 @@ describe('Session Resources', () => {
       expect(toast.value?.ctaLabel).to.match(/register/i);
     });
 
-    it('lets a Download through once signed in and registered, with no toast', async () => {
+    it('lets a Download through once signed in and registered, and confirms with a toast', async () => {
       oneOfEach();
       const el = block();
       await init(el);
       auth.value = SIGNED_IN;
       expect(clickAllowed(ctas(el)[0])).to.be.true;
-      expect(toast.value).to.be.null;
+      expect(toast.value?.message).to.equal('Session resource downloaded');
+      expect(toast.value?.variant).to.equal('positive');
     });
 
-    it('never gates an "Open" link, even signed out', async () => {
+    // The confirmation must not fire on the blocked path, or it would contradict the login
+    // toast that replaced it.
+    it('shows no download confirmation when the Download is blocked', async () => {
+      oneOfEach();
+      const el = block();
+      await init(el);
+      expect(clickAllowed(ctas(el)[0])).to.be.false;
+      expect(toast.value?.message).to.not.equal('Session resource downloaded');
+    });
+
+    it('never gates an "Open" link, and does not confirm it as a download', async () => {
       oneOfEach();
       const el = block();
       await init(el);
