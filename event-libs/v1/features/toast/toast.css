@@ -86,18 +86,23 @@
   column-gap: 12px;
   row-gap: 8px;
   min-width: 0;
-  padding: 19px 16px 19px 8px;
+  padding: 10px 16px 10px 8px;
 }
 
 .sg-toast--neutral .sg-toast__body {
   padding-left: 16px;
 }
 
+/* Padded to the same 36px total height as .sg-toast__cta (2px border + 7px*2 padding +
+   18px line-height) so a single-line message and the CTA share a common line height —
+   without this they'd size to their own natural heights and the CTA (taller) would push
+   .sg-toast__body's box taller than the icon/close columns, misaligning them vertically. */
 .sg-toast__msg {
   flex: 1 1 auto;
   min-width: 0;
   font-weight: var(--s2a-font-weight-adobe-clean-regular);
   line-height: 18px;
+  padding: 9px 0;
   overflow-wrap: break-word;
 }
 
