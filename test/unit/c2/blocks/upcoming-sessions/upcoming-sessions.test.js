@@ -10,9 +10,9 @@ import { initTierOneEventConfig } from '../../../../../event-libs/v1/utils/tier-
 // replaces the authored link with a bare div carrying the decoded { heading, entries }
 // config as a data-upcoming-sessions-config attribute — no authored rows, no sibling
 // section-metadata block.
-function buildBlock(sessions, heading = 'Upcoming') {
+function buildBlock(sessions, heading = 'Upcoming', { dark = false } = {}) {
   const section = document.createElement('div');
-  section.className = 'section';
+  section.className = dark ? 'section dark' : 'section';
 
   const el = document.createElement('div');
   el.className = 'upcoming-sessions carousel clip-end';
@@ -315,6 +315,30 @@ describe('upcoming-sessions', () => {
       const card = buildCard(session());
       expect(card.querySelector('.sg-card__btn--schedule')).to.not.equal(null);
       expect(card.querySelector('.sg-card__btn--favorite')).to.not.equal(null);
+    });
+  });
+
+  describe('theme', () => {
+    it('does not add dark-card in a section with no dark style metadata', async () => {
+      const el = buildBlock([session()]);
+      await init(el);
+
+      expect(el.classList.contains('dark-card')).to.equal(false);
+    });
+
+    it('adds dark-card automatically from the containing section, mirroring event-card/event-carousel', async () => {
+      const el = buildBlock([session()], 'Upcoming', { dark: true });
+      await init(el);
+
+      expect(el.classList.contains('dark-card')).to.equal(true);
+    });
+
+    it('leaves an already-authored dark-card class alone (e.g. from an authored config.theme) even outside a dark section', async () => {
+      const el = buildBlock([session()]);
+      el.classList.add('dark-card');
+      await init(el);
+
+      expect(el.classList.contains('dark-card')).to.equal(true);
     });
   });
 
