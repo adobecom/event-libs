@@ -6,20 +6,29 @@ import {
 import { DrawerHeader } from './DrawerHeader.js';
 import { ViewRouter } from './ViewRouter.js';
 import { SessionDetailOverlay } from './SessionDetailOverlay.js';
-import { FilterPanel } from './FilterPanel.js';
-import { LoadingState } from './LoadingState.js';
-import { setSessionParam, setSessionsParam, clearSessionParams } from '../utils/url.js';
+import { BackToTop } from './BackToTop.js';
+import { LoadingState, sessionsStatusMessage } from './LoadingState.js';
+import {
+  setSessionParam, setSessionsParam, clearSessionParams, findSessionByParam, sessionParamValue,
+} from '../utils/url.js';
 import { trapFocus } from '../utils/focus-trap.js';
+import { prefersReducedMotion } from '../utils/motion.js';
 
 // No top gap on mobile/tablet (drawer covers the full screen); 20px gap on desktop.
 const getTopMargin = () => (window.matchMedia('(max-width: 1279px)').matches ? 0 : 20);
 
-// The view to land on when opening the drawer fresh, shared by every open path below
-// (mount deep-link, popstate, manual open, external openSessionGuideDetail request).
+// Both html and body: which one scrolls depends on the host page, and body's overflow
+// doesn't propagate to the viewport when html is the scroller.
+function lockPageScroll(locked) {
+  const value = locked ? 'hidden' : '';
+  document.documentElement.style.overflow = value;
+  document.body.style.overflow = value;
+}
+
+// Shared by every open path below, so they can't drift apart.
 const getDefaultView = (isRegistered) => (isRegistered ? 'my-sessions' : 'live-upcoming');
 
-// Pure decision logic for the openSessionGuideDetail(sessionId) external API, kept
-// separate from the useEffect below so it's directly unit-testable.
+// Kept out of the effect below so it's directly unit-testable.
 export function resolveSessionGuideRequest(request, { sessionsStatusValue, sessionsValue, authValue }) {
   if (!request || sessionsStatusValue !== 'ready') return null;
   const found = sessionsValue.find((s) => s.id === request.sessionId);
@@ -27,6 +36,8 @@ export function resolveSessionGuideRequest(request, { sessionsStatusValue, sessi
   return {
     found: true,
     sessionId: found.id,
+    // Resolved here so the caller doesn't search the same list by the same key again.
+    sessionParam: sessionParamValue(found),
     defaultView: getDefaultView(authValue.isRegistered),
   };
 }
@@ -34,6 +45,7 @@ export function resolveSessionGuideRequest(request, { sessionsStatusValue, sessi
 export function DrawerShell() {
   const { state, dispatch } = useSessionGuide();
   const drawerRef = useRef(null);
+  const bodyScrollRef = useRef(null);
   const currentTopRef = useRef(0);
   const expandedRef = useRef(false);
   const touchPrevYRef = useRef(0);
@@ -48,9 +60,13 @@ export function DrawerShell() {
   function setTop(top, animate) {
     const el = drawerRef.current;
     if (!el) return;
-    el.style.transition = animate
-      ? 'top 0.45s cubic-bezier(0.4, 0, 0.2, 1)'
-      : 'top 0.08s linear';
+    if (prefersReducedMotion()) {
+      el.style.transition = 'none';
+    } else {
+      el.style.transition = animate
+        ? 'top 0.45s cubic-bezier(0.4, 0, 0.2, 1)'
+        : 'top 0.08s linear';
+    }
     el.style.top = `${top}px`;
     currentTopRef.current = top;
   }
@@ -61,9 +77,12 @@ export function DrawerShell() {
     if (!el) return;
     const { drawerState } = state;
 
+    // Outside the branches below: the expanded branch is skipped when a gesture handler
+    // already flipped expandedRef, which left the page unlocked.
+    lockPageScroll(drawerState !== 'hidden');
+
     if (drawerState === 'peek') {
       expandedRef.current = false;
-      document.body.style.overflow = 'hidden';
       // ≤1440px viewport width → 55% of viewport height; >1440px → 65%
       const peekHeight = Math.round(window.innerHeight * (window.innerWidth > 1440 ? 0.65 : 0.55));
       const peekTop = Math.max(getTopMargin(), window.innerHeight - peekHeight);
@@ -73,7 +92,6 @@ export function DrawerShell() {
         requestAnimationFrame(() => setTop(peekTop, true));
       });
     } else if (drawerState === 'expanded' && !expandedRef.current) {
-      document.body.style.overflow = 'hidden';
       expandedRef.current = true;
       el.style.transition = 'none';
       el.style.top = '100vh';
@@ -81,34 +99,43 @@ export function DrawerShell() {
         requestAnimationFrame(() => setTop(getTopMargin(), true));
       });
     } else if (drawerState === 'hidden') {
-      el.style.transition = 'top 0.45s cubic-bezier(0.4, 0, 0.2, 1)';
+      el.style.transition = prefersReducedMotion() ? 'none' : 'top 0.45s cubic-bezier(0.4, 0, 0.2, 1)';
       el.style.top = '100vh';
-      document.body.style.overflow = '';
       expandedRef.current = false;
       currentTopRef.current = 0;
       setFilterOpen(false);
     }
   }, [state.drawerState]);
 
-  // Gesture handlers — attached once on mount, use refs for current values
+  // Never leave the host page locked if the block unmounts while the drawer is open.
+  useEffect(() => () => lockPageScroll(false), []);
+
+  // Commit the peek -> expanded transition. Shared by the drag gestures and the
+  // focus-driven path below so they can't drift apart.
+  function commitExpanded() {
+    expandedRef.current = true;
+    setTop(getTopMargin(), true);
+    dispatch({ type: 'SET_DRAWER', drawer: 'expanded' });
+  }
+
+  // Drag the drawer up by `distance` px, committing to expanded once it reaches the top.
+  function dragUpBy(distance) {
+    const topMargin = getTopMargin();
+    const newTop = Math.max(topMargin, currentTopRef.current - distance);
+    if (newTop <= topMargin) commitExpanded();
+    else setTop(newTop, false);
+  }
+
+  // Bound to the window: in peek a wheel over the backdrop never reaches the drawer.
+  // Attached only in peek, and re-checked in the handlers — these are non-passive and
+  // preventDefault, so any wider gate swallows the wheel the expanded drawer needs.
   useEffect(() => {
-    const el = drawerRef.current;
-    if (!el) return undefined;
+    if (state.drawerState !== 'peek') return undefined;
 
     function onWheel(e) {
-      if (drawerStateRef.current === 'hidden' || expandedRef.current) return;
+      if (drawerStateRef.current !== 'peek') return;
       e.preventDefault();
-      if (e.deltaY > 0) {
-        const topMargin = getTopMargin();
-        const newTop = Math.max(topMargin, currentTopRef.current - Math.abs(e.deltaY) * 1.2);
-        if (newTop <= topMargin) {
-          expandedRef.current = true;
-          setTop(topMargin, true);
-          dispatch({ type: 'SET_DRAWER', drawer: 'expanded' });
-        } else {
-          setTop(newTop, false);
-        }
-      }
+      if (e.deltaY > 0) dragUpBy(Math.abs(e.deltaY) * 1.2);
     }
 
     function onTouchStart(e) {
@@ -116,35 +143,27 @@ export function DrawerShell() {
     }
 
     function onTouchMove(e) {
-      if (drawerStateRef.current === 'hidden' || expandedRef.current) return;
+      if (drawerStateRef.current !== 'peek') return;
       const delta = touchPrevYRef.current - e.touches[0].clientY;
       touchPrevYRef.current = e.touches[0].clientY;
       if (delta > 0) {
-        const topMargin = getTopMargin();
-        const newTop = Math.max(topMargin, currentTopRef.current - delta * 1.5);
-        if (newTop <= topMargin) {
-          expandedRef.current = true;
-          setTop(topMargin, true);
-          dispatch({ type: 'SET_DRAWER', drawer: 'expanded' });
-        } else {
-          setTop(newTop, false);
-        }
+        dragUpBy(delta * 1.5);
         e.preventDefault();
       }
     }
 
-    el.addEventListener('wheel', onWheel, { passive: false });
-    el.addEventListener('touchstart', onTouchStart, { passive: true });
-    el.addEventListener('touchmove', onTouchMove, { passive: false });
+    window.addEventListener('wheel', onWheel, { passive: false });
+    window.addEventListener('touchstart', onTouchStart, { passive: true });
+    window.addEventListener('touchmove', onTouchMove, { passive: false });
 
     return () => {
-      el.removeEventListener('wheel', onWheel);
-      el.removeEventListener('touchstart', onTouchStart);
-      el.removeEventListener('touchmove', onTouchMove);
+      window.removeEventListener('wheel', onWheel);
+      window.removeEventListener('touchstart', onTouchStart);
+      window.removeEventListener('touchmove', onTouchMove);
     };
-  }, []);
+  }, [state.drawerState]);
 
-  // URL deep-linking on mount: open drawer for ?sessions, open detail for ?session=slug
+  // URL deep-linking on mount: open drawer for ?sessions, open detail for ?session=<url-slug>
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     if (params.has('sessions') || params.has('session')) {
@@ -156,24 +175,19 @@ export function DrawerShell() {
     }
   }, []);
 
-  // URL deep-linking: resolve ?session=slug once sessions are loaded
+  // URL deep-linking: resolve ?session=<url-slug> once sessions are loaded.
   useEffect(() => {
     if (sessionsStatus.value !== 'ready') return;
-    const params = new URLSearchParams(window.location.search);
-    const sessionParam = params.get('session');
+    const sessionParam = new URLSearchParams(window.location.search).get('session');
     if (!sessionParam) return;
-    // URL format: slug-rfCode (rfCode is after the last dash)
-    const lastDash = sessionParam.lastIndexOf('-');
-    const rfCode = lastDash >= 0 ? sessionParam.slice(lastDash + 1) : sessionParam;
-    const found = sessions.value.find((s) => s.rfCode === rfCode || s.id === sessionParam);
+    const found = findSessionByParam(sessions.value, sessionParam);
     if (found) dispatch({ type: 'SET_ACTIVE_SESSION', sessionId: found.id });
+    // Bounded: URLSearchParams decodes %0A, which would forge a second log line.
+    else window.lana?.log(`[sessions-guide] ?session=${encodeURIComponent(sessionParam).slice(0, 100)} matched no session`);
   }, [sessionsStatus.value]);
 
-  // External API: other blocks call openSessionGuideDetail(sessionId) (session-store.js) to
-  // open us straight to a session's detail view. sessions/sessionsStatus are the same
-  // page-level signals a caller's own session data comes from, so by the time a card is
-  // clickable, sessions are already 'ready' here too — no buffering needed for a request
-  // that arrives before load.
+  // openSessionGuideDetail() from another block. Callers read the same page-level signals,
+  // so sessions are already 'ready' by the time one can be clicked — no buffering needed.
   useEffect(() => sessionGuideRequest.subscribe((request) => {
     const result = resolveSessionGuideRequest(request, {
       sessionsStatusValue: sessionsStatus.value,
@@ -187,7 +201,8 @@ export function DrawerShell() {
     }
     dispatch({ type: 'SET_DRAWER', drawer: 'expanded', defaultView: result.defaultView });
     dispatch({ type: 'SET_ACTIVE_SESSION', sessionId: result.sessionId });
-    history.pushState({}, '', setSessionParam(result.sessionId));
+    // The url slug, like every other entry point, so the param has one shape.
+    history.pushState({}, '', setSessionParam(result.sessionParam));
   }), []);
 
   // Keep sessionsRef current so the popstate handler always sees the latest list
@@ -195,7 +210,7 @@ export function DrawerShell() {
   useEffect(() => sessions.subscribe((v) => { sessionsRef.current = v; }), []);
 
   // popstate listener — restores state from URL without pushing new history entries
-  // Registered once (stable []); reads sessions via ref to avoid re-registering on every poll.
+  // Registered once; reads sessions via ref to avoid re-registering on every poll.
   useEffect(() => {
     function handlePopState() {
       const params = new URLSearchParams(window.location.search);
@@ -227,8 +242,7 @@ export function DrawerShell() {
     history.pushState({}, '', clearSessionParams());
   }
 
-  // Traps Tab focus within the drawer while open and closes it on Escape, mirroring
-  // Milo's shared modal (which this hand-rolled, gesture-driven drawer can't use directly).
+  // Milo's shared modal can't wrap this hand-rolled, gesture-driven drawer.
   useEffect(() => (isOpen ? trapFocus(drawerRef.current, closeDrawer) : undefined), [isOpen]);
 
   function openDrawer() {
@@ -247,6 +261,10 @@ export function DrawerShell() {
   }
 
   function handleFilterToggle() {
+    // In peek the drawer only occupies the bottom, so the tall panel would hang off-screen.
+    if (!filterOpen && state.drawerState === 'peek') {
+      dispatch({ type: 'SET_DRAWER', drawer: 'expanded' });
+    }
     setFilterOpen((prev) => !prev);
   }
 
@@ -254,12 +272,16 @@ export function DrawerShell() {
     setFilterOpen(false);
   }
 
+  // tabindex="-1" is not a tab stop, but takes BackToTop's programmatic focus after a jump.
+  // data-lenis-prevent opts the whole subtree out of Milo's Lenis smooth-scroll, which
+  // preventDefault()s every wheel and would starve the scroll containers in here.
   return html`
     <div class="sg-shell">
-      ${isOpen && html`<div class="sg-backdrop" onclick=${closeDrawer} aria-hidden="true"></div>`}
+      ${isOpen && html`<div class="sg-backdrop" onclick=${closeDrawer} aria-hidden="true" data-lenis-prevent></div>`}
       <div
         class=${'sg-drawer' + (hasDetail ? ' sg-drawer--detail-open' : '')}
         ref=${drawerRef}
+        data-lenis-prevent
         role=${isOpen ? 'dialog' : undefined}
         aria-modal=${isOpen ? 'true' : undefined}
         aria-label=${isOpen ? 'Sessions guide' : undefined}
@@ -267,11 +289,19 @@ export function DrawerShell() {
         <${DrawerHeader}
           onClose=${closeDrawer}
           onFilterToggle=${handleFilterToggle}
+          onFilterClose=${handleFilterClose}
           filterOpen=${filterOpen}
           hideControls=${hasDetail}
         />
         <div class="sg-drawer__body">
-          <div class=${`sg-body-scroll${isExpanded ? ' sg-body-scroll--scrollable' : ''}`}>
+          <div
+            class=${`sg-body-scroll${isExpanded ? ' sg-body-scroll--scrollable' : ''}`}
+            ref=${bodyScrollRef}
+            tabindex="-1"
+            aria-busy=${String(sessionsStatus.value === 'loading')}
+            onfocusin=${() => { if (!expandedRef.current && drawerStateRef.current === 'peek') commitExpanded(); }}
+          >
+            <div class="sg-sr-only" role="status" aria-live="polite">${sessionsStatusMessage(sessionsStatus.value)}</div>
             ${sessionsStatus.value === 'loading' && html`<${LoadingState} />`}
             ${sessionsStatus.value === 'error' && html`<div class="sg-error" role="alert">Failed to load sessions.</div>`}
             ${sessionsStatus.value === 'ready' && html`<${ViewRouter} />`}
@@ -279,8 +309,8 @@ export function DrawerShell() {
           <div class=${'sg-detail-panel' + (hasDetail ? ' sg-detail-panel--open' : '')}>
             ${hasDetail && html`<${SessionDetailOverlay} onBack=${handleDetailBack} />`}
           </div>
+          ${!hasDetail && html`<${BackToTop} scrollerRef=${bodyScrollRef} />`}
         </div>
-        ${filterOpen && html`<${FilterPanel} onClose=${handleFilterClose} />`}
       </div>
       ${!isOpen && html`<button class="sg-cta-btn" onclick=${openDrawer} daa-ll="Session-Guide-Open" type="button">
         View all sessions

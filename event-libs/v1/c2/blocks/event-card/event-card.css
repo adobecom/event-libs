@@ -45,7 +45,6 @@
 
 
 .event-card .card-title {
-  font-family: 'Adobe Clean Display', serif;
   font-weight: 900;
   font-size: 24px;
   line-height: 24px;
@@ -55,7 +54,6 @@
 }
 
 .event-card .card-description {
-  font-family: 'Adobe Clean', sans-serif;
   font-weight: 400;
   font-size: 16px;
   line-height: 20px;
@@ -99,7 +97,6 @@
   align-items: center;
   gap: 8px;
   margin-top: 16px;
-  font-family: 'Adobe Clean', sans-serif;
   font-weight: 700;
   font-size: 14px;
   line-height: 18px;

@@ -13,21 +13,45 @@ polling Mobile Rider directly and dropping/updating the session once MR confirms
 the stream actually started, instead of trusting only the scheduled time.
 
 **There is currently no ESP/RF field this can be read from.** Confirmed in
-`event-libs/v1/services/sessions/sessions-api.js` (`mapEslPayloadToRawSessions`,
-around line 459):
+`mapEslPayloadToRawSessions()` (`event-libs/v1/services/sessions/sessions-api.js`),
+which omits `mrStreamId` and lets `normalizeSessions()` default it to `null` for
+every real session.
 
-```js
-// resources[]/mrStreamId intentionally omitted — no source in this payload yet
-// (resources still in development backend-side; video/stream data is deliberately
-// withheld from this public endpoint until the session goes live). normalizeSessions()
-// defaults both to empty/null.
-```
+### Why — updated 2026-08-24
 
-`normalizeSessions()` (same file, ~line 348) defaults every real session's
-`mrStreamId` to `null` unconditionally. This means **Session Guide itself has no
-live Mobile Rider integration wired up from real ESP/ESL data today** — mock data
-aside — so there's no existing "correct" configured pattern to copy for the
-Homepage configurator either. Both surfaces are blocked on the same backend gap.
+Two separate things were conflated here. Both are true:
+
+1. **`sessionTimes[].videos` really is stripped** before the catalog leaves the
+   service — `_fetchAllEventSessionTimes()` maps it out, citing MWPW-200437, because
+   private streaming details must not be exposed on a public endpoint. See
+   `ESP-SESSION-ENDPOINTS.md`. That part of the original note was correct.
+2. **But that is no longer the route we are waiting on.** Per product, the live
+   stream id will be delivered as an ordinary **custom attribute** instead, which
+   sidesteps the stripped `videos` array entirely — so there is no time-gated or
+   authenticated fetch to design, just an attribute to map.
+
+The two video ids the catalog *does* send are for different players and neither
+substitutes for the live id:
+
+| Attribute | Field | Player |
+|---|---|---|
+| `MPC ID` | `mpcId` | **Adobe Video TV** (Adobe Media Publishing Cloud asset) |
+| `YouTube ID` | `youTubeId` | **YouTube**-hosted sessions |
+| `Mobilerider Video ID (DVR)` | `mrDvrVideoId` | Mobile Rider recording of a **finished** stream — what some sessions become watchable from after the live window closes, delayed by `DVR Timing (in hours)` |
+| *(inbound)* | `mrStreamId` | Mobile Rider **live** — what `poller.js` polls for on-air status |
+
+Four sources, four players, and they are **alternatives rather than a fallback chain**: a session
+carries whichever it was produced for, so an empty field means "not this source", never "try
+another". All three VOD ids are mapped today and read by nothing; only the live id is missing.
+
+A new custom attribute is expected to carry the live id, tentatively named
+**`Mobilerider Live Stream ID`**. So the thing to wait for is a *pending attribute*
+on a payload we already fetch — not access to a locked-down one.
+
+This still means **Session Guide has no live Mobile Rider integration wired up from
+real ESP/ESL data today** — mock data aside — so there's no existing "correct"
+configured pattern to copy for the Homepage configurator either. Both surfaces are
+blocked on the same missing attribute.
 
 ## Current state in the Homepage configurator
 
@@ -54,6 +78,8 @@ field either).
    should consume it the same way, so building a workaround now risks being
    thrown away.
 
-Revisit if/when ESP/RF actually exposes a real stream-id field — at that point
-this manual field becomes redundant and both surfaces should switch to reading
-it directly instead.
+Revisit once **`Mobilerider Live Stream ID`** (name tentative) appears on the
+catalog: map it in `mapEslPayloadToRawSessions()`, at which point this manual
+configurator field becomes redundant and both surfaces should read it directly.
+Note that mapping it is also what switches MR polling on, letting sessions show as
+Live — see A1 in the session-guide PM questions before flipping it.

@@ -4,6 +4,8 @@ import {
   getTrackIcon,
   getOverrideTrackIcon,
   getAllowDoubleBooking,
+  getHomepagePath,
+  getBroadcastPath,
 } from '../../../event-libs/v1/utils/tier-1-event-config.js';
 
 const CONFIG = {
@@ -18,6 +20,7 @@ const CONFIG = {
     },
   },
   allowDoubleBooking: true,
+  homepagePath: '/summit.html',
 };
 
 describe('tier-1-event-config', () => {
@@ -50,16 +53,31 @@ describe('tier-1-event-config', () => {
     expect(getTrackIcon(undefined)).to.equal(null);
   });
 
-  it('resolves an override icon from the per-override-text map first', () => {
+  it('resolves an override icon from the per-override-text map', () => {
     expect(getOverrideTrackIcon('custom label')).to.deep.equal({ icon: 'video', color: '#123456' });
   });
 
-  it('falls back to the event-wide default for an unmapped override text', () => {
-    expect(getOverrideTrackIcon('some other text')).to.deep.equal({ icon: 'business', color: '#111111' });
+  // The event-wide default was dropped 2026-08-24 — every override text is authored
+  // explicitly, so an unmapped one resolves to nothing at all.
+  it('returns null for an unmapped override text, with no event-wide default', () => {
+    expect(getOverrideTrackIcon('some other text')).to.equal(null);
+  });
+
+  it('returns null for an empty/undefined override text', () => {
+    expect(getOverrideTrackIcon('')).to.equal(null);
+    expect(getOverrideTrackIcon(undefined)).to.equal(null);
   });
 
   it('reads allowDoubleBooking off the same parsed config', () => {
     expect(getAllowDoubleBooking()).to.equal(true);
+  });
+
+  it('reads the authored homepage path off the same parsed config', () => {
+    expect(getHomepagePath()).to.equal('/summit.html');
+  });
+
+  it('returns empty for an event page the config does not declare — the caller decides the fallback', () => {
+    expect(getBroadcastPath()).to.equal('');
   });
 
   it('is idempotent — a second init() call does not re-parse or clear the config', () => {

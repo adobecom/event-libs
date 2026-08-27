@@ -1,7 +1,7 @@
 import { expect } from '@esm-bundle/chai';
 import * as preact from '../../../../mocks/deps/htm-preact.js';
 import { buildStore } from '../../../../../../event-libs/v1/c2/blocks/sessions-guide/store/index.js';
-import { buildLiveCard } from '../../../../../../event-libs/v1/c2/blocks/sessions-guide/components/LiveCard.js';
+import { buildLiveCard, computeProgressPct } from '../../../../../../event-libs/v1/c2/blocks/sessions-guide/components/LiveCard.js';
 import {
   scheduled, favorited, pendingActions, liveStreamActiveIds,
 } from '../../../../../../event-libs/v1/utils/session-store.js';
@@ -19,7 +19,7 @@ const LIVE_SESSION = {
   id: 'session-keynote',
   title: 'MAX Keynote',
   description: 'The opening keynote.',
-  track: 'Featured',
+  primaryTrack: 'Featured',
   // Relative to "now" (not a fixed date) so the session always lands in the
   // 'live' sessionState regardless of when the suite runs.
   startTimeUtc: new Date(Date.now() - 30 * 60 * 1000).toISOString(),
@@ -27,11 +27,38 @@ const LIVE_SESSION = {
   thumbnailUrl: 'https://example.com/thumb.jpg',
   isOnline: true,
   sessionPageUrl: '/sessions/max-keynote',
-  videoAvailable: false,
   inPerson: false,
 };
 
 const NO_THUMB_SESSION = { ...LIVE_SESSION, id: 'session-no-thumb', thumbnailUrl: null };
+
+// "Additional Event Site Tracks" is multi-select upstream; only the first is badged.
+const LIVE_TWO_TRACKS = {
+  ...LIVE_SESSION,
+  id: 'session-two-tracks',
+  additionalTracks: ['Branding', 'Ignored Second'],
+};
+
+const PAST_TWO_TRACKS = {
+  ...LIVE_TWO_TRACKS,
+  id: 'session-past-two-tracks',
+  startTimeUtc: new Date(Date.now() - 90 * 60 * 1000).toISOString(),
+  endTimeUtc: new Date(Date.now() - 60 * 60 * 1000).toISOString(),
+};
+
+const UPCOMING_SESSION = {
+  ...LIVE_SESSION,
+  id: 'session-upcoming',
+  startTimeUtc: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+  endTimeUtc: new Date(Date.now() + 90 * 60 * 1000).toISOString(),
+};
+
+const ON_DEMAND_SESSION = {
+  ...LIVE_SESSION,
+  id: 'session-past',
+  startTimeUtc: new Date(Date.now() - 90 * 60 * 1000).toISOString(),
+  endTimeUtc: new Date(Date.now() - 60 * 60 * 1000).toISOString(),
+};
 
 function makeStore(guideConfigOverrides = {}) {
   const store = buildStore(preact);
@@ -134,6 +161,15 @@ describe('LiveCard', () => {
     expect(LiveCard({ session: LIVE_SESSION })).to.include('daa-ll="Watch-Now"');
   });
 
+  it('labels the watch button "Watch on demand" once the session has gone on demand', () => {
+    const store = makeStore();
+    const LiveCard = buildLiveCard(preact, store);
+    const out = LiveCard({ session: ON_DEMAND_SESSION });
+    expect(out).to.include('Watch on demand');
+    expect(out).to.not.include('Watch now');
+    expect(out).to.include('daa-ll="Watch-On-Demand"');
+  });
+
   it('tags the card title button with daa-ll=Session-Card-Open on the widget surface', () => {
     const store = makeStore();
     const LiveCard = buildLiveCard(preact, store);
@@ -155,13 +191,13 @@ describe('LiveCard', () => {
   it('tags the schedule/favorite buttons with Add-/Remove- daa-ll labels matching their state', () => {
     const store = makeStore();
     const LiveCard = buildLiveCard(preact, store);
-    expect(LiveCard({ session: LIVE_SESSION })).to.include('daa-ll=Add-to-Schedule');
-    expect(LiveCard({ session: LIVE_SESSION })).to.include('daa-ll=Add-to-Favorites');
+    expect(LiveCard({ session: LIVE_SESSION })).to.include('daa-ll="Add-to-Schedule"');
+    expect(LiveCard({ session: LIVE_SESSION })).to.include('daa-ll="Add-to-Favorites"');
     scheduled.value = new Set(['session-keynote']);
     favorited.value = new Set(['session-keynote']);
     const html = LiveCard({ session: LIVE_SESSION });
-    expect(html).to.include('daa-ll=Remove-from-Schedule');
-    expect(html).to.include('daa-ll=Remove-from-Favorites');
+    expect(html).to.include('daa-ll="Remove-from-Schedule"');
+    expect(html).to.include('daa-ll="Remove-from-Favorites"');
   });
 
   it('omits the schedule button when enableScheduling is false', () => {
@@ -180,5 +216,116 @@ describe('LiveCard', () => {
     const store = makeStore({ behaviorFlags: { enableWatchNowCtas: false } });
     const LiveCard = buildLiveCard(preact, store);
     expect(LiveCard({ session: LIVE_SESSION })).to.not.include('Watch now');
+  });
+
+  // The time only earns its place on an upcoming Recommended card: a live card shows a
+  // progress bar and remaining duration instead, and a start time is noise once on demand.
+  describe('time display', () => {
+    const render = (session, props) => {
+      const LiveCard = buildLiveCard(preact, makeStore());
+      return LiveCard({ session, ...props });
+    };
+
+    it('shows the time range on an upcoming Recommended card', () => {
+      const out = render(UPCOMING_SESSION, { variant: 'recommended' });
+      expect(out).to.include('sg-live-card__time');
+      // en dash separator — proves a start–end range rendered, not a bare start time
+      expect(out).to.include('\u2013');
+    });
+
+    it('omits the time on a live card', () => {
+      expect(render(LIVE_SESSION, {})).to.not.include('sg-live-card__time');
+    });
+
+    it('omits the time on an upcoming card outside the Recommended carousel', () => {
+      expect(render(UPCOMING_SESSION, { variant: 'live' })).to.not.include('sg-live-card__time');
+    });
+
+    it('omits the time on a Recommended card that has gone on demand', () => {
+      expect(render(ON_DEMAND_SESSION, { variant: 'recommended' })).to.not.include('sg-live-card__time');
+    });
+  });
+  // A live session with an additional event-site track badges both tracks side by side in
+  // the time's slot, and drops the "+1" that would otherwise double count the second one.
+  describe('additional track badge', () => {
+    const render = (session, props) => {
+      const LiveCard = buildLiveCard(preact, makeStore());
+      return LiveCard({ session, ...props });
+    };
+
+    it('renders a second badge for the first additional track on a live card', () => {
+      const out = render(LIVE_TWO_TRACKS, {});
+      expect(out).to.include('sg-live-card__track-extra');
+      expect(out).to.include('Branding');
+    });
+
+    it('uses only the first additional track', () => {
+      expect(render(LIVE_TWO_TRACKS, {})).to.not.include('Ignored Second');
+    });
+
+    it('drops the +1 count when the second track is badged', () => {
+      expect(render(LIVE_TWO_TRACKS, {})).to.not.include('sg-category-badge__count');
+    });
+
+    // The second slot holds the time for an upcoming Recommended card, so the extra badge
+    // stands down there and the "+1" carries the additional track instead.
+    it('keeps the +1 count on an upcoming Recommended card, where the time takes the slot', () => {
+      const upcoming = {
+        ...LIVE_TWO_TRACKS,
+        startTimeUtc: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+        endTimeUtc: new Date(Date.now() + 90 * 60 * 1000).toISOString(),
+      };
+      const out = render(upcoming, { variant: 'recommended' });
+      expect(out).to.not.include('sg-live-card__track-extra');
+      expect(out).to.include('sg-category-badge__count');
+    });
+
+    it('badges both tracks on a past Recommended card, same as a live one', () => {
+      const out = render(PAST_TWO_TRACKS, { variant: 'recommended' });
+      expect(out).to.include('sg-live-card__track-extra');
+      expect(out).to.include('Branding');
+      expect(out).to.not.include('sg-category-badge__count');
+      expect(out).to.not.include('sg-live-card__time');
+    });
+
+    it('renders no second badge for a live session with no additional tracks', () => {
+      expect(render(LIVE_SESSION, {})).to.not.include('sg-live-card__track-extra');
+    });
+  });
+  // The favourite CTA is icon-only now, so the accessible name lives entirely in aria-label.
+  describe('favorite CTA', () => {
+    it('renders the heart with no visible label text', () => {
+      const LiveCard = buildLiveCard(preact, makeStore());
+      const out = LiveCard({ session: LIVE_SESSION });
+      expect(out).to.include('sg-live-card__btn--favorite');
+      expect(out).to.not.include('sg-live-card__btn-label');
+      expect(out).to.not.include('>Favorite<');
+    });
+
+    it('keeps an accessible name that names the session', () => {
+      const LiveCard = buildLiveCard(preact, makeStore());
+      expect(LiveCard({ session: LIVE_SESSION })).to.include('Add MAX Keynote to favorites');
+    });
+  });
+
+  describe('computeProgressPct', () => {
+    const session = { startTimeUtc: '2026-01-01T00:00:00.000Z', endTimeUtc: '2026-01-01T01:00:00.000Z' };
+
+    it('is 0 before the session starts', () => {
+      expect(computeProgressPct(session, Date.parse('2025-12-31T23:00:00.000Z'))).to.equal(0);
+    });
+
+    it('is 50 at the halfway point', () => {
+      expect(computeProgressPct(session, Date.parse('2026-01-01T00:30:00.000Z'))).to.equal(50);
+    });
+
+    it('clamps at 100 once the session has ended', () => {
+      expect(computeProgressPct(session, Date.parse('2026-01-01T02:00:00.000Z'))).to.equal(100);
+    });
+
+    it('is 0 for a zero-duration session, instead of dividing by zero', () => {
+      const zeroDuration = { startTimeUtc: session.startTimeUtc, endTimeUtc: session.startTimeUtc };
+      expect(computeProgressPct(zeroDuration, Date.parse(session.startTimeUtc))).to.equal(0);
+    });
   });
 });

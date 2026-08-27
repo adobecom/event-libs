@@ -28,7 +28,7 @@ function buildOption(name, value, session, onSelect) {
 
   const meta = createTag('div', { class: 'sg-conflict-option__meta' });
   const track = createTag('span', { class: 'sg-conflict-option__track' });
-  track.textContent = session.track || '';
+  track.textContent = session.primaryTrack || '';
   const duration = createTag('span', { class: 'sg-conflict-option__duration' });
   if (session.startTimeUtc && session.endTimeUtc) {
     duration.textContent = formatDuration(session.startTimeUtc, session.endTimeUtc, { short: true });

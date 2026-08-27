@@ -7,12 +7,13 @@ five aspect-ratio variants authored via class name: `ratio-1-1`, `ratio-4-3` (de
 If no media image is found, the card removes itself — a card with no image is not a
 valid authored card.
 
-## Session-hydrated cards
+## Session-driven cards
 
-Cards rendered by other flows (e.g. Featured Sessions) can carry `data-session-id` and
-related `data-*` attributes (`data-start-time-utc`, `data-end-time-utc`, `data-mr-stream-id`,
-`data-watch-url`, `data-session-url`). When present, `utils/session-routing.js` is
-lazy-loaded to make the card clickable and route it based on derived session state.
+Cards built by other flows (e.g. `event-libs/v1/c2/blocks/featured-sessions/`) can carry
+`data-session-id` and related `data-*` attributes (`data-start-time-utc`,
+`data-end-time-utc`, `data-mr-stream-id`, `data-watch-url`, `data-session-url`) before
+calling this block's own `init()` on the generated card. When present, `utils/session-routing.js`
+is lazy-loaded to make the card clickable and route it based on derived session state.
 Plain authored cards (no `data-session-id`) are unaffected — this is a no-op for them.
 
 ## session-routing.js
@@ -33,21 +34,27 @@ Cards with `data-mr-stream-id` need to know which MR streams are currently
 broadcasting to distinguish "live" from "upcoming"/"on-demand" (non-MR cards ignore
 this and use pure time-window checks). The first MR-backed card wired up registers
 every `.event-card[data-mr-stream-id]` on the page with the shared registry at
-`event-libs/v1/services/sessions/mobile-rider-poller.js`
-(`registerStreamIds`/`subscribe`) and never unregisters — this block needs ongoing
-live→on-demand tracking, unlike `upcoming-sessions`, which drops an id the moment
-it's confirmed started. The registry itself batches ids from every registered
-caller into a single `getMediaStatus()` call per 30s tick, so if `upcoming-sessions`
-is also polling overlapping ids on the same page, both blocks share one underlying
-request instead of two independent loops. Results feed a local `liveStreamActiveIds`
-set that `deriveSessionState` reads from.
+`event-libs/v1/services/sessions/poller.js`
+(`registerStreamIds`/`subscribe` — the same module `session-store.js`'s
+`startPolling`/`stopPolling` adapter sits on top of) and never unregisters —
+this block needs ongoing live→on-demand tracking, unlike `upcoming-sessions`,
+which drops an id the moment it's confirmed started. The registry itself
+batches ids from every default-cadence registered caller into a single
+`fetchLiveStatus()` call per 30s tick (env-aware — prod vs dev/stage host, via
+`session-store.js`'s `getApiConfig().mrEnv`), so if `upcoming-sessions` (and
+`sessions-guide`) are also polling overlapping ids on the same page, all of
+them share one underlying request instead of independent loops. Results feed
+a local `liveStreamActiveIds` set that `deriveSessionState` reads from.
 
-### `?timing=<epoch-ms>` override
+### `?serverTime=<epoch-ms>` override
 
 Lets QA simulate "now" as any instant (e.g. mid-live) without waiting for real time.
-Read once at module load as an *offset* from the real clock, so `now()` still advances
-in real time from that point rather than freezing. Absent/invalid falls back to the
-real `Date.now()`. The identical override exists in `upcoming-sessions.js`.
+Uses the shared `getNowMs()` override from `utils/session-state.js` — read once at page
+load as an origin, so time still advances in real time from that point rather than
+freezing. Absent/invalid falls back to the real `Date.now()`. The same override drives
+`upcoming-sessions.js`, `sessions-guide`, and the rest of the Timing Framework, so one
+`serverTime` value simulates "now" consistently across every time-aware block on the
+page.
 
 ### Click target
 

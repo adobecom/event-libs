@@ -13,6 +13,7 @@ import {
   createTemplatedDateRange,
 } from '../../../event-libs/v1/utils/date-time-helper.js';
 
+const decorateModule = await import('../../../event-libs/v1/utils/decorate.js');
 const {
   decorateEvent,
   updateAnalyticTag,
@@ -23,11 +24,21 @@ const {
   getNonProdData,
   processAutoBlockLinks,
   applyAreaTheme,
-  applySectionColumnsLayout,
-} = await import('../../../event-libs/v1/utils/decorate.js');
+} = decorateModule;
+const decorateArea = decorateModule.default;
 const head = await readFile({ path: './mocks/head.html' });
 const body = await readFile({ path: './mocks/full-event.html' });
 const defaultDoc = await readFile({ path: './mocks/event-default-doc.html' });
+
+/** Polls rather than waiting a fixed number of ms, which get throttled unpredictably when many test files run concurrently. */
+async function waitFor(conditionFn, timeoutMs = 5000) {
+  const start = Date.now();
+  while (Date.now() - start < timeoutMs) {
+    if (conditionFn()) return;
+    await new Promise((r) => setTimeout(r, 20));
+  }
+  throw new Error('waitFor: condition not met within timeout');
+}
 
 function checkForDoubleSquareBrackets() {
   const bodyContent = document.body.innerHTML;
@@ -1103,81 +1114,23 @@ describe('applyAreaTheme', () => {
   });
 });
 
-describe('applySectionColumnsLayout', () => {
+describe('decorateArea', () => {
   beforeEach(() => {
     document.body.innerHTML = '';
     document.head.innerHTML = head;
   });
 
-  it('does nothing when section-layout metadata is absent', () => {
+  it('loads the shared event-libs stylesheet', () => {
     document.body.innerHTML = '<main><div class="section"></div></main>';
-    applySectionColumnsLayout();
-    expect(document.querySelector('main').classList.contains('section-columns')).to.be.false;
-  });
-
-  it('does nothing when section-layout is not "columns"', () => {
-    setMetadata('section-layout', 'grid');
-    document.body.innerHTML = '<main><div class="section"></div></main>';
-    applySectionColumnsLayout();
-    expect(document.querySelector('main').classList.contains('section-columns')).to.be.false;
-  });
-
-  it('adds section-columns to main when section-layout is "columns"', () => {
-    setMetadata('section-layout', 'columns');
-    document.body.innerHTML = '<main><div class="section"></div></main>';
-    applySectionColumnsLayout();
-    expect(document.querySelector('main').classList.contains('section-columns')).to.be.true;
-  });
-
-  it('tolerates authored capitalization and whitespace, e.g. " Columns "', () => {
-    setMetadata('section-layout', ' Columns ');
-    document.body.innerHTML = '<main><div class="section"></div></main>';
-    applySectionColumnsLayout();
-    expect(document.querySelector('main').classList.contains('section-columns')).to.be.true;
-  });
-
-  it('loads the required CSS itself, so callers only need to call this one function', () => {
-    setMetadata('section-layout', 'columns');
-    document.body.innerHTML = '<main><div class="section"></div></main>';
-    applySectionColumnsLayout();
+    decorateArea();
     expect(document.getElementById('event-libs-styles')).to.not.be.null;
   });
 
-  it('does not load the CSS when the layout is not enabled', () => {
+  it('is idempotent across repeated calls', () => {
     document.body.innerHTML = '<main><div class="section"></div></main>';
-    applySectionColumnsLayout();
-    expect(document.getElementById('event-libs-styles')).to.be.null;
-  });
-
-  it('is idempotent across repeated calls with unchanged metadata', () => {
-    setMetadata('section-layout', 'columns');
-    document.body.innerHTML = '<main><div class="section"></div></main>';
-    applySectionColumnsLayout();
-    applySectionColumnsLayout();
-    expect(document.querySelector('main').classList.contains('section-columns')).to.be.true;
-  });
-
-  it('picks up metadata changed by a later pass (e.g. personalization updating metadata)', () => {
-    document.body.innerHTML = '<main><div class="section"></div></main>';
-    applySectionColumnsLayout();
-    expect(document.querySelector('main').classList.contains('section-columns')).to.be.false;
-
-    setMetadata('section-layout', 'columns');
-    applySectionColumnsLayout();
-    expect(document.querySelector('main').classList.contains('section-columns')).to.be.true;
-  });
-
-  it('does nothing when there is no main element', () => {
-    document.body.innerHTML = '<div class="not-main"></div>';
-    expect(() => applySectionColumnsLayout()).to.not.throw();
-  });
-
-  it('is not applied automatically by decorateEvent, since consuming sites must call it directly to support non-event pages', () => {
-    setMetadata('section-layout', 'columns');
-    setMetadata('event-id', 'test-event');
-    document.body.innerHTML = '<main><div class="section"></div></main>';
-    decorateEvent(document.querySelector('main'));
-    expect(document.querySelector('main').classList.contains('section-columns')).to.be.false;
+    decorateArea();
+    decorateArea();
+    expect(document.querySelectorAll('#event-libs-styles').length).to.equal(1);
   });
 });
 
@@ -2351,7 +2304,7 @@ describe('decorateEvent - Array Iteration', () => {
         parent.appendChild(link);
 
         processAutoBlockLinks(parent);
-        await new Promise((resolve) => { setTimeout(resolve, 50); });
+        await waitFor(() => document.getElementById('mobile-rider-css'));
 
         const cssLink = document.getElementById('mobile-rider-css');
         expect(cssLink, 'block CSS injected — the module ran').to.not.be.null;
@@ -2403,6 +2356,141 @@ describe('decorateEvent - Array Iteration', () => {
       const chronoBox = parent.querySelector('.chrono-box');
       expect(chronoBox).to.not.be.null;
       expect(chronoBox.getAttribute('data-schedule-repo')).to.equal('adobecom/da-events-fg-pink');
+    });
+
+    function encodeTecConfig(config) {
+      return window.btoa(unescape(encodeURIComponent(JSON.stringify(config))));
+    }
+
+    function buildTecHomepageLink(config) {
+      const link = document.createElement('a');
+      link.href = `https://da.live/app/adobecom/da-events/tools/da-apps/tier-1-event-configurator#tecHomepage=${encodeTecConfig(config)}`;
+      return link;
+    }
+
+    it('builds an upcoming-sessions div for a homepage-upcoming-sessions link', async () => {
+      const parent = document.createElement('div');
+      const p = document.createElement('p');
+      const config = {
+        eventId: 'event-1', configType: 'homepage-upcoming-sessions', heading: 'Upcoming', entries: [{ sessionId: 's1' }],
+      };
+      p.appendChild(buildTecHomepageLink(config));
+      parent.appendChild(p);
+
+      processAutoBlockLinks(parent);
+      await new Promise((resolve) => { setTimeout(resolve, 50); });
+
+      const block = parent.querySelector('.upcoming-sessions');
+      expect(block).to.not.be.null;
+      expect(parent.querySelector('.featured-sessions')).to.be.null;
+      expect(JSON.parse(block.dataset.upcomingSessionsConfig)).to.deep.equal(config);
+    });
+
+    it('builds a featured-sessions div for a homepage-featured-sessions link', async () => {
+      const parent = document.createElement('div');
+      const p = document.createElement('p');
+      const config = {
+        eventId: 'event-1', configType: 'homepage-featured-sessions', heading: 'Featured', entries: [{ sessionId: 's1' }],
+      };
+      p.appendChild(buildTecHomepageLink(config));
+      parent.appendChild(p);
+
+      processAutoBlockLinks(parent);
+      await new Promise((resolve) => { setTimeout(resolve, 50); });
+
+      const block = parent.querySelector('.featured-sessions');
+      expect(block).to.not.be.null;
+      expect(parent.querySelector('.upcoming-sessions')).to.be.null;
+      expect(JSON.parse(block.dataset.featuredSessionsConfig)).to.deep.equal(config);
+    });
+
+    it('leaves the link alone when entries is missing/invalid', async () => {
+      const parent = document.createElement('div');
+      const p = document.createElement('p');
+      const link = buildTecHomepageLink({ eventId: 'event-1', configType: 'homepage-upcoming-sessions' });
+      p.appendChild(link);
+      parent.appendChild(p);
+
+      processAutoBlockLinks(parent);
+      await new Promise((resolve) => { setTimeout(resolve, 50); });
+
+      expect(parent.querySelector('.upcoming-sessions')).to.be.null;
+      expect(parent.querySelector('.featured-sessions')).to.be.null;
+      expect(parent.querySelector('a')).to.equal(link);
+    });
+
+    // Session Guide and Homepage links now share the consolidated Event Configurator path,
+    // so the two auto-blocks are told apart by payload key alone.
+    function buildSessionGuideLink(config, { legacy = false } = {}) {
+      const encoded = encodeTecConfig(config);
+      const path = legacy
+        ? 'tools/da-apps/session-guide-configurator'
+        : 'tools/da-apps/tier-1-event-configurator';
+      const suffix = legacy ? `?sgConfig=${encoded}` : `#sgConfig=${encoded}`;
+      const link = document.createElement('a');
+      link.href = `https://da.live/app/adobecom/da-events/${path}${suffix}`;
+      return link;
+    }
+
+    it('builds a sessions-guide div for a #sgConfig= link on the consolidated path', async () => {
+      const parent = document.createElement('div');
+      const p = document.createElement('p');
+      const config = { eventId: 'event-1', surface: 'widget', theme: 'dark' };
+      p.appendChild(buildSessionGuideLink(config));
+      parent.appendChild(p);
+
+      processAutoBlockLinks(parent);
+      await new Promise((resolve) => { setTimeout(resolve, 50); });
+
+      const block = parent.querySelector('.sessions-guide');
+      expect(block).to.not.be.null;
+      // Same path as a Homepage link now — the payload key is what disambiguates.
+      expect(parent.querySelector('.upcoming-sessions')).to.be.null;
+      expect(parent.querySelector('.featured-sessions')).to.be.null;
+      expect(JSON.parse(block.dataset.sessionGuideConfig)).to.deep.equal(config);
+    });
+
+    it('builds the full-page variant for a surface:page config', async () => {
+      const parent = document.createElement('div');
+      const p = document.createElement('p');
+      p.appendChild(buildSessionGuideLink({ eventId: 'event-1', surface: 'page' }));
+      parent.appendChild(p);
+
+      processAutoBlockLinks(parent);
+      await new Promise((resolve) => { setTimeout(resolve, 50); });
+
+      expect(parent.querySelector('.sessions-guide-full-page')).to.not.be.null;
+    });
+
+    it('still builds a sessions-guide div for a legacy ?sgConfig= link on the old path', async () => {
+      const parent = document.createElement('div');
+      const p = document.createElement('p');
+      const config = { eventId: 'event-1', surface: 'widget' };
+      p.appendChild(buildSessionGuideLink(config, { legacy: true }));
+      parent.appendChild(p);
+
+      processAutoBlockLinks(parent);
+      await new Promise((resolve) => { setTimeout(resolve, 50); });
+
+      const block = parent.querySelector('.sessions-guide');
+      expect(block).to.not.be.null;
+      expect(JSON.parse(block.dataset.sessionGuideConfig)).to.deep.equal(config);
+    });
+
+    it('does not treat a Homepage link as a Session Guide config, or vice versa', async () => {
+      const parent = document.createElement('div');
+      const p = document.createElement('p');
+      p.appendChild(buildTecHomepageLink({
+        eventId: 'event-1', configType: 'homepage-upcoming-sessions', entries: [{ sessionId: 's1' }],
+      }));
+      parent.appendChild(p);
+
+      processAutoBlockLinks(parent);
+      await new Promise((resolve) => { setTimeout(resolve, 50); });
+
+      expect(parent.querySelector('.upcoming-sessions')).to.not.be.null;
+      expect(parent.querySelector('.sessions-guide')).to.be.null;
+      expect(parent.querySelector('.sessions-guide-full-page')).to.be.null;
     });
   });
 });

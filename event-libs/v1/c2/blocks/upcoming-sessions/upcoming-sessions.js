@@ -6,25 +6,15 @@ import {
   initSessionState,
   openSessionGuideDetail,
 } from '../../../utils/session-store.js';
+import { getNowMs } from '../../../utils/session-state.js';
 import { getTrackIcon } from '../../../utils/tier-1-event-config.js';
 import { resolveIcon } from '../../../features/icons/icon-resolver.js';
 import { toggleScheduleWithFeedback, toggleFavoriteWithFeedback } from '../../../services/sessions/action-feedback.js';
-import { registerStreamIds, unregisterStreamIds, subscribe } from '../../../services/sessions/mobile-rider-poller.js';
+import { registerStreamIds, unregisterStreamIds, subscribe } from '../../../services/sessions/poller.js';
 
 const ROTATE_OUT_MS = 350;
 const SLIDE_MS = 350;
 const SLIDE_EASING = 'cubic-bezier(0.22, 1, 0.36, 1)';
-
-const TIMING_OVERRIDE_OFFSET_MS = (() => {
-  const raw = new URLSearchParams(window.location.search).get('timing');
-  if (!raw) return null;
-  const parsed = Number(raw);
-  return Number.isFinite(parsed) ? parsed - Date.now() : null;
-})();
-
-function now() {
-  return TIMING_OVERRIDE_OFFSET_MS === null ? Date.now() : Date.now() + TIMING_OVERRIDE_OFFSET_MS;
-}
 
 const EVENT_CONFIG = { title: '', showConflictModal: false, registerUrl: '/register' };
 
@@ -171,10 +161,14 @@ export function buildCard(session) {
   const topBadge = buildCategoryBadge(session.track);
   if (topBadge) badgeRow.append(topBadge);
 
-  createTag('p', { class: 'sg-card__title' }, session.enTitle, { parent: body });
+  // session.enTitle/primaryCategory(session) below are attacker-influenced (decoded from
+  // the link's hash payload, not hand-authored in DA) — createTag's string `html` argument
+  // runs through insertAdjacentHTML, so these are set via .textContent to keep them as
+  // inert text rather than parsed markup.
+  createTag('p', { class: 'sg-card__title' }, '', { parent: body }).textContent = session.enTitle || '';
 
   const footer = createTag('div', { class: 'sg-card__footer' }, '', { parent: body });
-  createTag('span', { class: 'sg-card__track sg-card__track--footer' }, primaryCategory(session), { parent: footer });
+  createTag('span', { class: 'sg-card__track sg-card__track--footer' }, '', { parent: footer }).textContent = primaryCategory(session);
   const footerBadgeWrap = createTag('span', { class: 'sg-card__footer-badge' }, '', { parent: footer });
   const footerBadge = buildCategoryBadge(session.track);
   if (footerBadge) footerBadgeWrap.append(footerBadge);
@@ -300,7 +294,7 @@ function scheduleStateTimers(sessions, dropSession) {
     const { sessionTime } = session;
     if (!sessionTime) return;
 
-    const untilStart = sessionTime.startTimeMillis - now();
+    const untilStart = sessionTime.startTimeMillis - getNowMs();
     if (untilStart > 0) {
       timers.push(setTimeout(() => dropSession(session.sessionId), untilStart));
     } else {
@@ -319,54 +313,37 @@ function attachToPrecedingBlock(el) {
   }
 }
 
-function readSectionMetadata(el, key) {
-  const metadataBlock = el.closest('.section')?.querySelector(':scope > .section-metadata');
-  if (!metadataBlock) return null;
-  const rows = metadataBlock.querySelectorAll(':scope > div');
-  for (const row of rows) {
-    const cells = row.querySelectorAll(':scope > div');
-    const rowKey = cells[0]?.textContent?.trim().toLowerCase();
-    if (rowKey === key) return cells[1]?.textContent?.trim() ?? '';
-  }
-  return null;
+function detachFromPrecedingBlock(el) {
+  const previous = el.previousElementSibling;
+  previous?.classList.remove('attach-upcoming--has-overlay');
 }
 
 function startMobileRiderPolling(sessions, onStarted) {
   const mrSessions = sessions.filter((s) => s.mrStreamId);
   if (!mrSessions.length) return null;
 
-  const mrStreamIds = new Set(mrSessions.map((s) => s.mrStreamId));
+  const mrStreamIds = mrSessions.map((s) => s.mrStreamId);
+  const sessionByStreamId = new Map(mrSessions.map((s) => [s.mrStreamId, s]));
   const resolvedIds = new Set();
-  const registeredIds = new Set();
+  registerStreamIds(mrStreamIds);
 
-  function onDue(mrStreamId) {
-    if (registeredIds.has(mrStreamId)) return;
-    registeredIds.add(mrStreamId);
-    registerStreamIds([mrStreamId]);
-  }
+  const unsubscribe = subscribe(({ active, inactive }) => {
+    const doneIds = [...active, ...inactive].filter((id) => {
+      if (!mrStreamIds.includes(id) || resolvedIds.has(id)) return false;
+      const startTimeMillis = sessionByStreamId.get(id)?.sessionTime?.startTimeMillis;
+      if (typeof startTimeMillis !== 'number') return active.includes(id);
+      return startTimeMillis <= getNowMs();
+    });
 
-  const startTimers = [];
-  mrSessions.forEach((s) => {
-    const untilStart = (s.sessionTime?.startTimeMillis ?? 0) - now();
-    if (untilStart > 0) {
-      startTimers.push(setTimeout(() => onDue(s.mrStreamId), untilStart));
-    } else {
-      onDue(s.mrStreamId);
-    }
-  });
-
-  const unsubscribe = subscribe(({ active }) => {
-    const startedIds = active.filter((id) => mrStreamIds.has(id) && !resolvedIds.has(id));
-    if (!startedIds.length) return;
-    startedIds.forEach((id) => resolvedIds.add(id));
-    unregisterStreamIds(startedIds);
-    onStarted(startedIds);
+    if (!doneIds.length) return;
+    doneIds.forEach((id) => resolvedIds.add(id));
+    unregisterStreamIds(doneIds);
+    onStarted(doneIds);
   });
 
   return () => {
-    startTimers.forEach(clearTimeout);
     unsubscribe();
-    unregisterStreamIds([...registeredIds].filter((id) => !resolvedIds.has(id)));
+    unregisterStreamIds(mrStreamIds.filter((id) => !resolvedIds.has(id)));
   };
 }
 
@@ -385,20 +362,20 @@ async function decorate(el) {
 
   attachToPrecedingBlock(el);
 
-  const rows = el.querySelectorAll(':scope > div');
-  const heading = rows[0]?.textContent?.trim();
-  const payload = readSectionMetadata(el, 'upcoming-sessions');
-
-  let sessions = [];
+  let config = null;
   try {
-    sessions = payload ? JSON.parse(payload) : [];
+    config = el.dataset.upcomingSessionsConfig ? JSON.parse(el.dataset.upcomingSessionsConfig) : null;
   } catch (error) {
     window.lana?.log(`upcoming-sessions: failed to parse session payload: ${error.message}`);
     el.remove();
     return;
   }
 
+  const heading = config?.heading || 'Upcoming Sessions';
+  let sessions = Array.isArray(config?.entries) ? config.entries : [];
+
   if (!sessions.length) {
+    detachFromPrecedingBlock(el);
     el.remove();
     return;
   }
@@ -418,7 +395,10 @@ async function decorate(el) {
   renderTrack(track, sessions);
 
   const header = createTag('div', { class: 'upcoming-sessions-header' }, '', { parent: el });
-  if (heading) createTag('h6', { class: 'upcoming-sessions-heading' }, heading, { parent: header });
+  // heading is attacker-influenced (decoded from the link's hash payload) — see the
+  // .textContent note on session.enTitle in buildCard() above for why this isn't passed
+  // as createTag's html argument.
+  if (heading) createTag('h6', { class: 'upcoming-sessions-heading' }, '', { parent: header }).textContent = heading;
   header.append(buildCarouselControls(track));
 
   el.append(track);
@@ -427,6 +407,14 @@ async function decorate(el) {
     removeCard(el, sessionId);
     sessions = sessions.filter((session) => session.sessionId !== sessionId);
     updateFewSessions();
+    if (!sessions.length) {
+      const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      setTimeout(() => {
+        el._upcomingSessionsCleanup?.();
+        detachFromPrecedingBlock(el);
+        el.remove();
+      }, reduceMotion ? 0 : ROTATE_OUT_MS);
+    }
   }
 
   let timers = scheduleStateTimers(sessions, dropSession);

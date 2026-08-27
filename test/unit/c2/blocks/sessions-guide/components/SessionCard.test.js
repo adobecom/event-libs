@@ -6,6 +6,7 @@ import {
   scheduled, favorited, pendingActions, auth,
 } from '../../../../../../event-libs/v1/utils/session-store.js';
 import { initTierOneEventConfig } from '../../../../../../event-libs/v1/utils/tier-1-event-config.js';
+import { initSessionState } from '../../../../../../event-libs/v1/utils/session-store.js';
 
 const BASE_CONFIG = {
   title: 'Adobe MAX 2026',
@@ -20,10 +21,9 @@ const UPCOMING_SESSION = {
   id: 'session-1',
   title: 'Building with AI',
   description: 'Learn AI integration.',
-  track: 'Design',
+  primaryTrack: 'Design',
   startTimeUtc: '2099-10-28T17:00:00Z',
   endTimeUtc: '2099-10-28T18:00:00Z',
-  videoAvailable: false,
   inPerson: false,
   sessionPageUrl: '/sessions/building-with-ai',
 };
@@ -33,10 +33,9 @@ const ONDEMAND_SESSION = {
   id: 'session-2',
   title: 'Past Session',
   description: 'Ended.',
-  track: 'Design',
+  primaryTrack: 'Design',
   startTimeUtc: '2020-01-01T10:00:00Z',
   endTimeUtc: '2020-01-01T11:00:00Z',
-  videoAvailable: true,
   inPerson: false,
   sessionPageUrl: '/sessions/past',
 };
@@ -110,32 +109,32 @@ describe('SessionCard', () => {
 
   it('shows schedule button for upcoming session', () => {
     const html = renderCard(UPCOMING_SESSION);
-    expect(html).to.include('Add to schedule');
+    expect(html).to.include('Add Building with AI to schedule');
   });
 
   it('shows on-demand label and hides schedule button for on-demand session', () => {
     const html = renderCard(ONDEMAND_SESSION);
     expect(html).to.include('ON DEMAND');
-    expect(html).to.not.include('Add to schedule');
+    expect(html).to.not.include('to schedule');
     expect(html).to.include('sg-card--on-demand');
   });
 
   it('always shows favorite button', () => {
     const upcoming = renderCard(UPCOMING_SESSION);
     const onDemand = renderCard(ONDEMAND_SESSION);
-    expect(upcoming).to.include('Add to favorites');
-    expect(onDemand).to.include('Add to favorites');
+    expect(upcoming).to.include('Add Building with AI to favorites');
+    expect(onDemand).to.include('to favorites');
   });
 
   it('shows aria-pressed=true on schedule button when scheduled', () => {
     scheduled.value = new Set(['session-1']);
     const html = renderCard(UPCOMING_SESSION);
-    expect(html).to.include('aria-pressed=true');
+    expect(html).to.include('aria-pressed="true"');
   });
 
   it('shows aria-pressed=false on schedule button when not scheduled', () => {
     const html = renderCard(UPCOMING_SESSION);
-    expect(html).to.include('aria-pressed=false');
+    expect(html).to.include('aria-pressed="false"');
   });
 
   it('dispatches SCHEDULE_ADD when schedule button clicked and registered', () => {
@@ -148,7 +147,7 @@ describe('SessionCard', () => {
     const SessionCard = buildSessionCard(preact, store);
     const rendered = SessionCard({ session: UPCOMING_SESSION });
     // Extract onclick from rendered HTML is not straightforward; test dispatch guard instead
-    expect(rendered).to.include('Add to schedule');
+    expect(rendered).to.include('Add Building with AI to schedule');
   });
 
   it('shows duration by default for upcoming sessions', () => {
@@ -171,17 +170,17 @@ describe('SessionCard', () => {
 
   it('tags the card daa-ll as Session-Card-Navigate on the page surface', () => {
     const html = renderCard(UPCOMING_SESSION);
-    expect(html).to.include('daa-ll=Session-Card-Navigate');
+    expect(html).to.include('daa-ll="Session-Card-Navigate"');
   });
 
   it('tags the card daa-ll as Session-Card-Open on the widget surface for a live/upcoming session', () => {
     const html = renderCard(UPCOMING_SESSION, { guideConfig: { ...BASE_CONFIG, surface: 'widget' } });
-    expect(html).to.include('daa-ll=Session-Card-Open');
+    expect(html).to.include('daa-ll="Session-Card-Open"');
   });
 
   it('tags the card daa-ll as On-Demand-Card-Navigate on the widget surface for an on-demand session', () => {
     const html = renderCard(ONDEMAND_SESSION, { guideConfig: { ...BASE_CONFIG, surface: 'widget' } });
-    expect(html).to.include('daa-ll=On-Demand-Card-Navigate');
+    expect(html).to.include('daa-ll="On-Demand-Card-Navigate"');
   });
 
   // Only the schedule button is asserted here — the favorite IconButton is embedded
@@ -189,9 +188,9 @@ describe('SessionCard', () => {
   // which this test mock's minimal component-tag parser can't resolve (real htm/preact
   // renders it correctly; this is a mock limitation, not a production bug).
   it('tags the schedule button with Add-/Remove- daa-ll labels matching its state', () => {
-    expect(renderCard(UPCOMING_SESSION)).to.include('daa-ll=Add-to-Schedule');
+    expect(renderCard(UPCOMING_SESSION)).to.include('daa-ll="Add-to-Schedule"');
     scheduled.value = new Set(['session-1']);
-    expect(renderCard(UPCOMING_SESSION)).to.include('daa-ll=Remove-from-Schedule');
+    expect(renderCard(UPCOMING_SESSION)).to.include('daa-ll="Remove-from-Schedule"');
   });
 
   it('tags the previously-aired play button with daa-ll=Watch-Now', () => {
@@ -199,7 +198,7 @@ describe('SessionCard', () => {
     store.SessionGuideContext._current = makeCtx();
     const SessionCard = buildSessionCard(preact, store);
     const html = SessionCard({ session: ONDEMAND_SESSION, forceOnDemand: true });
-    expect(html).to.include('daa-ll=Watch-Now');
+    expect(html).to.include('daa-ll="Watch-Now"');
   });
 
   it('omits the schedule button when enableScheduling is false', () => {
@@ -226,7 +225,7 @@ describe('SessionCard', () => {
     });
     const SessionCard = buildSessionCard(preact, store);
     const html = SessionCard({ session: ONDEMAND_SESSION, forceOnDemand: true });
-    expect(html).to.include('daa-ll=Watch-Now');
+    expect(html).to.include('daa-ll="Watch-Now"');
   });
 
   it('does not dispatch when isRegistered is not true (no-op guard)', () => {
@@ -240,5 +239,45 @@ describe('SessionCard', () => {
     const rendered = SessionCard({ session: UPCOMING_SESSION });
     expect(rendered).to.include('sg-card'); // renders fine even when unregistered
     expect(dispatched.length).to.equal(0); // no dispatch on mount
+  });
+
+  // "AVAILABLE SOON" vs "ON DEMAND" hinges on a real eventStartMs from session-store.js's own
+  // config (not guideConfig), authored on the same tier-1-event-config meta tag the file's
+  // top-level before() already set up for trackIcons — merged in here, once, since
+  // initSessionState() is idempotent and every case below shares one real event start time.
+  describe('AVAILABLE SOON vs ON DEMAND (DVR delay)', () => {
+    const HOUR = 60 * 60 * 1000;
+    // 5 hours before "now" at test-run time, so the two cases below only need to vary
+    // dvrDelayHours against one fixed, real eventStartMs rather than mocking the clock.
+    const eventStartMs = Date.now() - 5 * HOUR;
+
+    before(() => {
+      const meta = document.head.querySelector('meta[name="tier-1-event-config"]');
+      const existing = JSON.parse(meta.content || '{}');
+      meta.content = JSON.stringify({ ...existing, eventId: 'test-event', eventStartDateTime: eventStartMs });
+      initSessionState();
+    });
+
+    it('shows AVAILABLE SOON while now is before eventStart + dvrDelayHours', () => {
+      // availableAt = eventStartMs + 10h = 5h from now.
+      const pending = { ...ONDEMAND_SESSION, id: 'session-pending', dvrDelayHours: 10 };
+      const html = renderCard(pending);
+      expect(html).to.include('AVAILABLE SOON');
+      expect(html).to.not.include('ON DEMAND');
+    });
+
+    it('shows ON DEMAND once eventStart + dvrDelayHours has passed', () => {
+      // availableAt = eventStartMs + 1h = 4h ago.
+      const elapsed = { ...ONDEMAND_SESSION, id: 'session-elapsed', dvrDelayHours: 1 };
+      const html = renderCard(elapsed);
+      expect(html).to.include('ON DEMAND');
+      expect(html).to.not.include('AVAILABLE SOON');
+    });
+
+    it('shows ON DEMAND for a session with no dvrDelayHours, even with a real eventStartMs', () => {
+      const html = renderCard(ONDEMAND_SESSION);
+      expect(html).to.include('ON DEMAND');
+      expect(html).to.not.include('AVAILABLE SOON');
+    });
   });
 });
