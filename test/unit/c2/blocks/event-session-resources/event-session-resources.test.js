@@ -2,7 +2,7 @@ import { expect } from '@esm-bundle/chai';
 import { setMetadata } from '../../../../../event-libs/v1/utils/utils.js';
 import init from '../../../../../event-libs/v1/c2/blocks/event-session-resources/event-session-resources.js';
 import { auth } from '../../../../../event-libs/v1/utils/session-store.js';
-import { toast } from '../../../../../event-libs/v1/features/toast/toast.js';
+import { toasts } from '../../../../../event-libs/v1/features/toast/toast.js';
 
 const SIGNED_OUT = { isLoggedIn: null, isRegistered: undefined, userFirstName: null };
 const SIGNED_IN = { isLoggedIn: true, isRegistered: true, userFirstName: 'Ada' };
@@ -39,7 +39,7 @@ describe('Session Resources', () => {
   beforeEach(() => {
     document.head.innerHTML = '';
     auth.value = SIGNED_OUT;
-    toast.value = null;
+    toasts.value = [];
   });
 
   it('renders a row per published resource with name + CTA link', async () => {
@@ -117,8 +117,8 @@ describe('Session Resources', () => {
       const el = block();
       await init(el);
       expect(clickAllowed(ctas(el)[0])).to.be.false;
-      expect(toast.value?.message).to.match(/login required to download slides/i);
-      expect(toast.value?.ctaLabel).to.match(/login/i);
+      expect(toasts.value[0]?.message).to.match(/login required to download slides/i);
+      expect(toasts.value[0]?.ctaLabel).to.match(/login/i);
     });
 
     it('blocks a Download when signed in but not registered, and prompts to register', async () => {
@@ -127,8 +127,8 @@ describe('Session Resources', () => {
       await init(el);
       auth.value = UNREGISTERED;
       expect(clickAllowed(ctas(el)[0])).to.be.false;
-      expect(toast.value?.message).to.match(/registration.*required to download slides/i);
-      expect(toast.value?.ctaLabel).to.match(/register/i);
+      expect(toasts.value[0]?.message).to.match(/registration.*required to download slides/i);
+      expect(toasts.value[0]?.ctaLabel).to.match(/register/i);
     });
 
     it('lets a Download through once signed in and registered, with no toast', async () => {
@@ -137,7 +137,7 @@ describe('Session Resources', () => {
       await init(el);
       auth.value = SIGNED_IN;
       expect(clickAllowed(ctas(el)[0])).to.be.true;
-      expect(toast.value).to.be.null;
+      expect(toasts.value).to.have.lengthOf(0);
     });
 
     it('never gates an "Open" link, even signed out', async () => {
@@ -147,7 +147,7 @@ describe('Session Resources', () => {
       const open = ctas(el)[1];
       expect(open.textContent).to.equal('Open');
       expect(clickAllowed(open)).to.be.true;
-      expect(toast.value).to.be.null;
+      expect(toasts.value).to.have.lengthOf(0);
     });
   });
 
