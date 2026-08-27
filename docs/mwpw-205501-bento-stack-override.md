@@ -87,13 +87,20 @@ version, so without it you'd silently get the wrong one. `override-milo-ace1209`
 be the literal string `true` — the check in `scripts.js` is `=== 'true'`, not a bare
 presence check.
 
-**Section Metadata block**, inside the section that should stack on mobile:
+**Section Metadata block**, inside the section that should stack on mobile — `bento,
+stack-mobile` goes in its own `layout` row, separate from `style` (which carries
+unrelated per-viewport classes like spacing/parallax/container, if any are already
+used on that section):
 
 | Section Metadata | |
 |---|---|
-| style | bento, stack-mobile |
+| layout | bento, stack-mobile |
 
-(comma-separate with any other style keywords already used on that section.)
+`layout` and `style` both route through the same generic class-adding logic in
+`section-metadata.js`, so this is a naming convention rather than a functional
+requirement — but real authored content (a live page on `site-redesign-foundation`)
+uses `layout` specifically for `bento, stack-mobile`, so match that rather than
+`style`.
 
 **Explore Card blocks**, one per topic card, authored inside the same section per that
 block's own shape (a content column — icon, heading, link — and a background
