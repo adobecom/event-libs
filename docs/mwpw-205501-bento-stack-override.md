@@ -138,6 +138,26 @@ Milo block is forked or shadowed.
   companion change in the `da-events` repo (separate PR) — not a workaround to avoid
   one.
 
+### base-card CSS override
+
+`base-card` (`libs/c2/blocks/base-card/`, the card used inside `explore-card`'s media
+column) is a separate case from bento-stack: `base-card.js` is already byte-for-byte
+identical between Milo `main` and `site-redesign-foundation` — nothing to vendor there.
+Only `base-card.css` has diverged, by four rules that swap raw color tokens for the
+newer semantic ones (`--s2a-color-gray-1000` → `--s2a-color-content-heading` /
+`--s2a-color-content-default`, `--s2a-color-transparent-black-64` →
+`--s2a-color-content-subtle`, plus an `:has(a)` guard on the image hover-scale rule).
+All three semantic tokens already ship in `libs/c2/styles/styles.css` on `main`, so this
+is a pure override with no missing dependency.
+
+- `event-libs/v1/features/milo-site-redesign-override/base-card.css` — just those four
+  flattened rules, scoped to `.base-card`.
+- `index.js` loads it unconditionally (via the same `override-milo-ace1209` gate) as
+  soon as the override initializes. Unlike `bento-stack.css`, this needs no per-section
+  scan or `MutationObserver`: it's a plain style override with no measurement or
+  initialization dependency, so it only needs to be present on the page, not applied at
+  a particular moment.
+
 ### Integration point
 
 This is a static-authoring feature — it must work on pages with no `event-id`, not
