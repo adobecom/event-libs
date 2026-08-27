@@ -150,13 +150,35 @@ newer semantic ones (`--s2a-color-gray-1000` → `--s2a-color-content-heading` /
 All three semantic tokens already ship in `libs/c2/styles/styles.css` on `main`, so this
 is a pure override with no missing dependency.
 
-- `event-libs/v1/features/milo-site-redesign-override/base-card.css` — just those four
+- `event-libs/v1/features/milo-site-redesign-override/base-card.css` — those four
   flattened rules, scoped to `.base-card`.
 - `index.js` loads it unconditionally (via the same `override-milo-ace1209` gate) as
   soon as the override initializes. Unlike `bento-stack.css`, this needs no per-section
   scan or `MutationObserver`: it's a plain style override with no measurement or
   initialization dependency, so it only needs to be present on the page, not applied at
   a particular moment.
+
+**Cascade race, unique to base-card:** unlike `bento-stack.css` (which targets
+`.section.bento.stack-mobile`, a selector that doesn't exist in any Milo `main`
+stylesheet), Milo's own `base-card.css` already ships on `main` and defines the exact
+same selectors this override touches. Both stylesheets end up on the page, and Milo's
+own copy loads later — during its block loader's normal decoration, after this
+feature's early hook — so at equal specificity it wins the cascade and silently reverts
+the override. To fix this without forking the whole block (see "why not just replace
+Milo's base-card" below), every selector in `base-card.css` is scoped under a
+`body.milo-site-redesign-override` marker that `index.js` sets synchronously as soon as
+the feature initializes — before Milo's own stylesheet is even requested. That gives
+this override's rules higher specificity than Milo's, independent of load order.
+
+**Why not just take over the block entirely:** an alternative would be to mark
+`.base-card` as `data-block-status="loaded"` before Milo's own block loader reaches it,
+so Milo skips it, and have event-libs run its own full vendored copy of both
+`base-card.js` and `base-card.css` instead. That would remove the race at its source,
+but it means forking the whole block rather than the four lines that actually differ —
+exactly what this feature's "vendor a flagged override, don't fork a block" decision
+(above) was written to avoid. It also races against Milo's own block-loading scan
+instead of a sibling stylesheet, which is a less predictable target. Not worth it for a
+token-only diff.
 
 ### Integration point
 

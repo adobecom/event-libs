@@ -48,6 +48,11 @@ function loadBaseCardOverride() {
 export default function initMiloSiteRedesignOverride() {
   if (document.body.dataset.bentoStackOverrideStarted) return Promise.resolve();
   document.body.dataset.bentoStackOverrideStarted = 'true';
+  // Marks the page for base-card.css: Milo's own base-card.css loads later (during its
+  // block loader's normal decoration, after this hook) and would otherwise win the
+  // cascade on shared selectors. Scoping our override under this body class gives it
+  // higher specificity than Milo's, independent of stylesheet load order.
+  document.body.classList.add('milo-site-redesign-override');
 
   observer?.disconnect();
   const initialScan = handleMatches(document.body);
