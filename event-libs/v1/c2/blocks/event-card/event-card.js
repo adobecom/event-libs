@@ -1,7 +1,8 @@
-import { createTag, createOptimizedPicture } from '../../../utils/utils.js';
+import { createTag, createOptimizedPicture, loadStyle } from '../../../utils/utils.js';
 
 const VARIANTS = ['ratio-1-1', 'ratio-4-3', 'ratio-3-4', 'ratio-4-5', 'ratio-16-9'];
 const DEFAULT_VARIANT = 'ratio-4-3';
+const BLOCK_CSS_URL = new URL('./event-card.css', import.meta.url).href;
 
 function getVariant(el) {
   return VARIANTS.find((variant) => el.classList.contains(variant)) || DEFAULT_VARIANT;
@@ -66,6 +67,8 @@ function buildBody(contentWrapper) {
 }
 
 export default async function init(el) {
+  loadStyle(BLOCK_CSS_URL);
+
   const [mediaWrapper, contentWrapper] = [...el.querySelectorAll(':scope > div')];
   const variant = getVariant(el);
   const media = buildMedia(mediaWrapper);
