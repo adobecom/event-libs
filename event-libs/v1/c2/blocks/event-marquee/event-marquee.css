@@ -10,7 +10,7 @@
   overflow: hidden;
   width: 100%;
   color: var(--s2a-color-content-default);
-  font-family: var(--s2a-font-family-default);
+  font-family: var(--body-font-family);
   display: flex;
   flex-direction: column;
 }
@@ -123,28 +123,32 @@
   object-fit: cover;
 }
 
-.event-marquee-video-title,
-.event-marquee-countdown-label {
-  font-family: var(--s2a-font-family-label);
+.event-marquee-video-title {
+  margin: var(--s2a-spacing-md) 0 0;
+  font-family: var(--body-font-family);
   font-size: var(--s2a-typography-font-size-label);
   font-weight: var(--s2a-font-weight-label);
   line-height: var(--s2a-typography-line-height-label);
   letter-spacing: var(--s2a-typography-letter-spacing-label);
+  font-style: normal;
 }
 
-.event-marquee-video-title {
-  margin: var(--s2a-spacing-md) 0 0;
-  font-style: normal;
+.event-marquee-countdown-label {
+  font-family: var(--body-font-family);
+  font-size: var(--s2a-typography-font-size-body-md);
+  font-weight: var(--s2a-font-weight-body);
+  line-height: var(--s2a-typography-line-height-body-md);
+  letter-spacing: var(--s2a-typography-letter-spacing-body-md);
 }
 
 .event-marquee-countdown {
   display: flex;
   flex-direction: column;
-  gap: var(--s2a-spacing-3xs);
+  gap: var(--s2a-spacing-xs);
 }
 
 .event-marquee-countdown-clock {
-  font-family: var(--s2a-font-family-heading);
+  font-family: var(--heading-font-family);
   font-weight: var(--s2a-font-weight-heading);
   font-size: var(--s2a-typography-font-size-heading-4);
   line-height: var(--s2a-typography-line-height-heading-4);
