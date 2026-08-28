@@ -9,28 +9,17 @@ import {
 } from '../../utils/session-store.js';
 import { getNowMs, isPostEvent } from '../../utils/session-state.js';
 
-// Shared toast copy for the two auth-related SessionActionError reasons — used both by
-// runSessionAction's action failures and checkViewAccess's navigation gate, so login/
-// registration toasts read consistently everywhere they appear.
-export function showAuthToast(reason, { eventConfig, actionLabel }) {
-  if (reason === 'auth-required') {
-    showToast({
-      message: `Login required to ${actionLabel}`,
-      variant: 'informative',
-      ctaLabel: 'Login to Adobe',
-      ctaAction: () => window.adobeIMS?.signIn(),
-      duration: null,
-    });
-  } else if (reason === 'registration-required') {
-    const eventName = eventConfig.title ? ` for ${eventConfig.title}` : '';
-    showToast({
-      message: `Registration${eventName} required to ${actionLabel}`,
-      variant: 'informative',
-      ctaLabel: 'Register',
-      ctaHref: eventConfig.registerUrl,
-      duration: null,
-    });
-  }
+// Shared toast copy for gated actions — used both by runSessionAction's action failures
+// and checkViewAccess's navigation gate. Login and registration are treated as a single
+// pool now (no more auth-required vs registration-required distinction in the copy), so
+// every gated action gets the same message/CTA, always pointing at the registration link.
+export function showAuthToast({ eventConfig, actionLabel }) {
+  showToast({
+    message: `Register or sign in to ${actionLabel}.`,
+    variant: 'informative',
+    ctaLabel: 'Register/Sign in',
+    ctaHref: eventConfig.registerUrl || '/register',
+  });
 }
 
 // Translates a SessionActionError (thrown by the shared, UI-agnostic session-actions
@@ -44,7 +33,7 @@ export async function runSessionAction(actionFn, {
     if (successMessage) showToast({ message: successMessage, variant: successVariant });
   } catch (err) {
     if (err.reason === 'auth-required' || err.reason === 'registration-required') {
-      showAuthToast(err.reason, { eventConfig, actionLabel });
+      showAuthToast({ eventConfig, actionLabel });
       // The triggering button still has native focus, which keeps a hover-styled card
       // looking "stuck" via :focus-within long after the pointer has moved away —
       // give the caller a chance to blur it now that the action didn't go through.
@@ -81,7 +70,7 @@ export function toggleScheduleWithFeedback(session, {
     () => toggleScheduleAction(session, { showConflictModal: !getAllowDoubleBooking() }),
     {
       eventConfig,
-      actionLabel: 'add to schedule',
+      actionLabel: 'add to your schedule',
       successMessage: isScheduled ? 'Removed from schedule' : 'Added to schedule',
       successVariant: isScheduled ? 'neutral' : 'positive',
       onBlocked,
@@ -96,7 +85,7 @@ export function toggleFavoriteWithFeedback(session, {
     () => toggleFavoriteAction(session),
     {
       eventConfig,
-      actionLabel: 'add to favorites',
+      actionLabel: 'favorite',
       successMessage: isFavorited ? 'Removed from favorites' : 'Added to favorites',
       successVariant: isFavorited ? 'neutral' : 'positive',
       onBlocked,
@@ -125,8 +114,8 @@ export function checkViewAccess(view, { eventConfig }) {
   try {
     assertAuthorized();
     return null;
-  } catch (err) {
-    showAuthToast(err.reason, { eventConfig, actionLabel: `view ${label}` });
+  } catch {
+    showAuthToast({ eventConfig, actionLabel: `view ${label}` });
     return fallbackViewForUnauthorized();
   }
 }

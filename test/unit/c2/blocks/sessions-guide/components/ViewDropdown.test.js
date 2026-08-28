@@ -1,6 +1,6 @@
 import { expect } from '@esm-bundle/chai';
 import { resolveViewSelection, visibleViews } from '../../../../../../event-libs/v1/c2/blocks/sessions-guide/components/ViewDropdown.js';
-import { toast } from '../../../../../../event-libs/v1/features/toast/toast.js';
+import { toasts } from '../../../../../../event-libs/v1/features/toast/toast.js';
 import {
   auth, sessions, sessionsStatus, liveStreamActiveIds,
 } from '../../../../../../event-libs/v1/utils/session-store.js';
@@ -9,7 +9,7 @@ describe('ViewDropdown resolveViewSelection', () => {
   const eventConfig = { title: 'Adobe MAX 2026', registerUrl: '/register' };
 
   beforeEach(() => {
-    toast.value = null;
+    toasts.value = [];
     sessions.value = [];
     sessionsStatus.value = 'idle';
     liveStreamActiveIds.value = new Set();
@@ -18,25 +18,25 @@ describe('ViewDropdown resolveViewSelection', () => {
   it('always allows an ungated view, regardless of auth', () => {
     auth.value = { isLoggedIn: false, isRegistered: false, userFirstName: null };
     expect(resolveViewSelection('live-upcoming', { eventConfig })).to.equal('live-upcoming');
-    expect(toast.value).to.be.null;
+    expect(toasts.value).to.have.lengthOf(0);
   });
 
   it('lands on the requested gated view when logged in and registered', () => {
     auth.value = { isLoggedIn: true, isRegistered: true, userFirstName: null };
     expect(resolveViewSelection('my-sessions', { eventConfig })).to.equal('my-sessions');
-    expect(toast.value).to.be.null;
+    expect(toasts.value).to.have.lengthOf(0);
   });
 
-  it('redirects to the fallback and shows a login toast when logged out', () => {
+  it('redirects to the fallback and shows a register/sign-in toast when logged out', () => {
     auth.value = { isLoggedIn: false, isRegistered: false, userFirstName: null };
     expect(resolveViewSelection('my-sessions', { eventConfig })).to.equal('live-upcoming');
-    expect(toast.value.message).to.equal('Login required to view My sessions');
+    expect(toasts.value[0].message).to.equal('Register or sign in to view My sessions.');
   });
 
-  it('redirects to the fallback and shows a registration toast when unregistered', () => {
+  it('redirects to the fallback and shows a register/sign-in toast when unregistered', () => {
     auth.value = { isLoggedIn: true, isRegistered: false, userFirstName: null };
     expect(resolveViewSelection('my-favorites', { eventConfig })).to.equal('live-upcoming');
-    expect(toast.value.message).to.equal('Registration for Adobe MAX 2026 required to view My favorites');
+    expect(toasts.value[0].message).to.equal('Register or sign in to view My favorites.');
   });
 });
 

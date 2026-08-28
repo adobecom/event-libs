@@ -2,7 +2,7 @@ import { expect } from '@esm-bundle/chai';
 
 import { runSessionAction, toggleScheduleWithFeedback, checkViewAccess } from '../../../../event-libs/v1/services/sessions/action-feedback.js';
 import { SessionActionError } from '../../../../event-libs/v1/services/sessions/session-actions.js';
-import { toast } from '../../../../event-libs/v1/features/toast/toast.js';
+import { toasts } from '../../../../event-libs/v1/features/toast/toast.js';
 import { conflict } from '../../../../event-libs/v1/features/conflict-modal/conflict-modal.js';
 import {
   auth, sessions, sessionsStatus, liveStreamActiveIds, scheduled, pendingActions,
@@ -14,7 +14,7 @@ describe('services/sessions/action-feedback', () => {
   let originalLog;
 
   beforeEach(() => {
-    toast.value = null;
+    toasts.value = [];
     conflict.value = null;
     loggedMessages = [];
     originalLog = window.lana.log;
@@ -29,21 +29,29 @@ describe('services/sessions/action-feedback', () => {
     await runSessionAction(() => Promise.resolve(), {
       eventConfig, actionLabel: 'add to schedule', successMessage: 'Added to schedule', successVariant: 'positive',
     });
-    expect(toast.value.message).to.equal('Added to schedule');
-    expect(toast.value.variant).to.equal('positive');
+    expect(toasts.value[0].message).to.equal('Added to schedule');
+    expect(toasts.value[0].variant).to.equal('positive');
   });
 
   it('shows nothing when the action resolves without a successMessage', async () => {
     await runSessionAction(() => Promise.resolve(), { eventConfig, actionLabel: 'add to schedule' });
-    expect(toast.value).to.be.null;
+    expect(toasts.value).to.have.lengthOf(0);
   });
 
-  it('shows a login-required toast on auth-required', async () => {
-    const actionFn = () => Promise.reject(new SessionActionError('auth-required'));
-    await runSessionAction(actionFn, { eventConfig, actionLabel: 'add to schedule' });
-    expect(toast.value.message).to.equal('Login required to add to schedule');
-    expect(toast.value.ctaLabel).to.equal('Login to Adobe');
-    expect(toast.value.duration).to.be.null;
+  it('shows the same register-or-sign-in toast for auth-required and registration-required', async () => {
+    const authFn = () => Promise.reject(new SessionActionError('auth-required'));
+    await runSessionAction(authFn, { eventConfig, actionLabel: 'add to schedule' });
+    expect(toasts.value[0].message).to.equal('Register or sign in to add to schedule.');
+    expect(toasts.value[0].ctaLabel).to.equal('Register/Sign in');
+    expect(toasts.value[0].ctaHref).to.equal('/register');
+    expect(toasts.value[0].duration).to.be.null;
+
+    toasts.value = [];
+    const regFn = () => Promise.reject(new SessionActionError('registration-required'));
+    await runSessionAction(regFn, { eventConfig, actionLabel: 'add to schedule' });
+    expect(toasts.value[0].message).to.equal('Register or sign in to add to schedule.');
+    expect(toasts.value[0].ctaLabel).to.equal('Register/Sign in');
+    expect(toasts.value[0].ctaHref).to.equal('/register');
   });
 
   it('invokes onBlocked when the action is gated on auth-required or registration-required, not on other failures', async () => {
@@ -69,12 +77,10 @@ describe('services/sessions/action-feedback', () => {
     expect(blockedCount).to.equal(2);
   });
 
-  it('shows a registration-required toast including the event title', async () => {
-    const actionFn = () => Promise.reject(new SessionActionError('registration-required'));
-    await runSessionAction(actionFn, { eventConfig, actionLabel: 'add to favorites' });
-    expect(toast.value.message).to.equal('Registration for Adobe MAX 2026 required to add to favorites');
-    expect(toast.value.ctaLabel).to.equal('Register');
-    expect(toast.value.ctaHref).to.equal('/register');
+  it('falls back to /register when eventConfig has no registerUrl', async () => {
+    const authFn = () => Promise.reject(new SessionActionError('auth-required'));
+    await runSessionAction(authFn, { eventConfig: { title: 'Adobe MAX 2026' }, actionLabel: 'add to schedule' });
+    expect(toasts.value[0].ctaHref).to.equal('/register');
   });
 
   it('shows the shared conflict modal on a scheduling conflict', async () => {
@@ -87,14 +93,14 @@ describe('services/sessions/action-feedback', () => {
     expect(conflict.value.existing).to.equal(existingSession);
     expect(conflict.value.incoming).to.equal(incoming);
     expect(conflict.value.onConfirm).to.be.a('function');
-    expect(toast.value).to.be.null;
+    expect(toasts.value).to.have.lengthOf(0);
   });
 
   it('shows a generic error toast and logs on any other failure', async () => {
     const actionFn = () => Promise.reject(new SessionActionError('network', { cause: new Error('boom') }));
     await runSessionAction(actionFn, { eventConfig, actionLabel: 'add to schedule' });
-    expect(toast.value.message).to.equal('Something went wrong. Please try again.');
-    expect(toast.value.variant).to.equal('negative');
+    expect(toasts.value[0].message).to.equal('Something went wrong. Please try again.');
+    expect(toasts.value[0].variant).to.equal('negative');
     expect(loggedMessages[0]).to.include('add to schedule failed');
   });
 
@@ -130,31 +136,32 @@ describe('services/sessions/action-feedback', () => {
       auth.value = { isLoggedIn: false, isRegistered: false, userFirstName: null };
       const fallback = checkViewAccess('live-upcoming', { eventConfig });
       expect(fallback).to.be.null;
-      expect(toast.value).to.be.null;
+      expect(toasts.value).to.have.lengthOf(0);
     });
 
     it('allows a gated view when logged in and registered, with no toast', () => {
       auth.value = { isLoggedIn: true, isRegistered: true, userFirstName: null };
       const fallback = checkViewAccess('my-sessions', { eventConfig });
       expect(fallback).to.be.null;
-      expect(toast.value).to.be.null;
+      expect(toasts.value).to.have.lengthOf(0);
     });
 
-    it('blocks with a login toast when logged out', () => {
+    it('blocks with a register/sign-in toast when logged out', () => {
       auth.value = { isLoggedIn: false, isRegistered: false, userFirstName: null };
       const fallback = checkViewAccess('my-sessions', { eventConfig });
       expect(fallback).to.equal('live-upcoming');
-      expect(toast.value.message).to.equal('Login required to view My sessions');
-      expect(toast.value.ctaLabel).to.equal('Login to Adobe');
+      expect(toasts.value[0].message).to.equal('Register or sign in to view My sessions.');
+      expect(toasts.value[0].ctaLabel).to.equal('Register/Sign in');
+      expect(toasts.value[0].ctaHref).to.equal('/register');
     });
 
-    it('blocks with a registration toast (including event title) when logged in but not registered', () => {
+    it('blocks with the same register/sign-in toast when logged in but not registered', () => {
       auth.value = { isLoggedIn: true, isRegistered: false, userFirstName: null };
       const fallback = checkViewAccess('my-favorites', { eventConfig });
       expect(fallback).to.equal('live-upcoming');
-      expect(toast.value.message).to.equal('Registration for Adobe MAX 2026 required to view My favorites');
-      expect(toast.value.ctaLabel).to.equal('Register');
-      expect(toast.value.ctaHref).to.equal('/register');
+      expect(toasts.value[0].message).to.equal('Register or sign in to view My favorites.');
+      expect(toasts.value[0].ctaLabel).to.equal('Register/Sign in');
+      expect(toasts.value[0].ctaHref).to.equal('/register');
     });
 
     it('falls back to live-upcoming when sessions have not loaded yet', () => {
