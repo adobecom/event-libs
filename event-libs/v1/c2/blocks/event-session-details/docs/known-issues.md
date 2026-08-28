@@ -160,8 +160,8 @@ pending state) rather than rejecting it outright.
 
 ## 6. Show-more limits are unconfirmed
 
-**Files:** `event-session-resources.js` (`MOBILE_LIMIT` 2), `event-speakers.js`
-(`MOBILE_LIMIT` 5), `event-featured-products.js` (`VISIBLE_LIMIT` 6)
+**Files:** `event-session-resources.js` (`VISIBLE_LIMIT` 2), `event-speakers.js`
+(`VISIBLE_LIMIT` 5), `event-featured-products.js` (`VISIBLE_LIMIT` 6)
 
 **Impact:** Featured Products' acceptance criteria prose says mobile 4 / desktop 6, while
 the Figma appears to show 6 at both. Holding at 6, non-responsive. Session resources now
@@ -172,13 +172,24 @@ single row of two — the desktop limit likely wants to be 4.
 
 ## 7. Desktop behavior is deferred in three places
 
-**Files:** `description-clamp.js`, `event-speakers.js`
+**Files:** `description-clamp.js`, `event-speakers.js`, `event-session-resources.js`
 
-**Impact:** the description clamp and the speakers toggle were specified as mobile-only —
-desktop should show the full text and all speakers with no toggle. Both currently clamp at
-every width. Noted in the original tickets as part of "the desktop pass".
+**Impact:** the description clamp and the speakers/resources toggles were specified as
+mobile-only — desktop should show the full text and all items with no toggle. All of them
+currently truncate at **every** width: none of the `.is-overflow` rules sit inside a media
+query, and `--desc-lines` is unconditional. Noted in the original tickets as part of "the
+desktop pass".
 
-**Fix:** unclamp above the desktop breakpoint once the desktop design is settled.
+Speakers and resources previously named their constant `MOBILE_LIMIT`, which described that
+intent rather than the behaviour and made the gap easy to miss — `event-featured-products`
+already used the accurate `VISIBLE_LIMIT`. All three now use `VISIBLE_LIMIT`. **The rename
+changed no behaviour**; it only stopped the name asserting something untrue.
+
+**Fix:** wrap the `.is-overflow` rules and the clamp in a max-width media query once the
+desktop design is settled. Note this interacts with the count rule — if desktop shows every
+item with no toggle, then per Figma ("no number listed" when the module cannot expand) desktop
+should show no count either, which makes the count condition width-dependent rather than
+purely count-based.
 
 ## 8. Toggle labels are not internationalized
 

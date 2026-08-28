@@ -67,7 +67,7 @@ describe('Speakers', () => {
     expect(avatar.querySelector('img')).to.be.null;
   });
 
-  it('shows a working Show more toggle only when over the mobile limit (5)', async () => {
+  it('shows a working Show more toggle only when over the visible limit (5)', async () => {
     const many = Array.from({ length: 7 }, (_, i) => ({ firstName: 'S', lastName: `${i}` }));
     setSpeakers(many);
     const el = block();

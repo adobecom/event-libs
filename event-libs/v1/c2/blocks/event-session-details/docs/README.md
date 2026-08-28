@@ -412,8 +412,8 @@ when a speaker has no headshot.
 
 | Block | Shown before "Show more" | Constant |
 |---|---|---|
-| Session resources | 2 | `MOBILE_LIMIT` |
-| Speakers | 5 | `MOBILE_LIMIT` |
+| Session resources | 2 | `VISIBLE_LIMIT` |
+| Speakers | 5 | `VISIBLE_LIMIT` |
 | Featured products | 6 | `VISIBLE_LIMIT` |
 | Description | 6 lines | `--desc-lines` |
 

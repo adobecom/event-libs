@@ -6,7 +6,7 @@ import { assertAuthorized } from '../../../services/sessions/session-actions.js'
 import { showAuthToast } from '../../../services/sessions/action-feedback.js';
 import { showToast } from '../../../features/toast/toast.js';
 
-const MOBILE_LIMIT = 2;
+const VISIBLE_LIMIT = 2;
 const DOWNLOADABLE = /\.(pdf|zip|pptx?|docx?|xlsx?|key|psd|ai|indd|mp4|mov)(\?|$)/i;
 const CHEVRON_ICON = '<svg xmlns="http://www.w3.org/2000/svg" width="8" height="5" viewBox="0 0 8 5" fill="none" aria-hidden="true"><path d="M1 1L4 4L7 1" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 
@@ -71,7 +71,7 @@ export default async function init(el) {
   const list = createTag('ul', { class: 'session-resources-list' });
   published.forEach(({ name, href }, i) => {
     const item = createTag('li', { class: 'session-resource' });
-    if (i >= MOBILE_LIMIT) item.classList.add('is-overflow');
+    if (i >= VISIBLE_LIMIT) item.classList.add('is-overflow');
     const label = ctaLabel(href);
     item.append(createTag('span', { class: 'session-resource-name' }, name));
     const isDownload = label === 'Download';
@@ -102,7 +102,7 @@ export default async function init(el) {
   });
   el.append(list);
 
-  if (published.length > MOBILE_LIMIT) {
+  if (published.length > VISIBLE_LIMIT) {
     instances += 1;
     list.id = `session-resources-list-${instances}`;
     const toggle = createTag('button', {
