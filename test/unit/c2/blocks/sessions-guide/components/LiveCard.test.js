@@ -1,7 +1,7 @@
 import { expect } from '@esm-bundle/chai';
 import * as preact from '../../../../mocks/deps/htm-preact.js';
 import { buildStore } from '../../../../../../event-libs/v1/c2/blocks/sessions-guide/store/index.js';
-import { buildLiveCard } from '../../../../../../event-libs/v1/c2/blocks/sessions-guide/components/LiveCard.js';
+import { buildLiveCard, computeProgressPct } from '../../../../../../event-libs/v1/c2/blocks/sessions-guide/components/LiveCard.js';
 import {
   scheduled, favorited, pendingActions, liveStreamActiveIds,
 } from '../../../../../../event-libs/v1/utils/session-store.js';
@@ -19,7 +19,7 @@ const LIVE_SESSION = {
   id: 'session-keynote',
   title: 'MAX Keynote',
   description: 'The opening keynote.',
-  track: 'Featured',
+  primaryTrack: 'Featured',
   // Relative to "now" (not a fixed date) so the session always lands in the
   // 'live' sessionState regardless of when the suite runs.
   startTimeUtc: new Date(Date.now() - 30 * 60 * 1000).toISOString(),
@@ -161,6 +161,15 @@ describe('LiveCard', () => {
     expect(LiveCard({ session: LIVE_SESSION })).to.include('daa-ll="Watch-Now"');
   });
 
+  it('labels the watch button "Watch on demand" once the session has gone on demand', () => {
+    const store = makeStore();
+    const LiveCard = buildLiveCard(preact, store);
+    const out = LiveCard({ session: ON_DEMAND_SESSION });
+    expect(out).to.include('Watch on demand');
+    expect(out).to.not.include('Watch now');
+    expect(out).to.include('daa-ll="Watch-On-Demand"');
+  });
+
   it('tags the card title button with daa-ll=Session-Card-Open on the widget surface', () => {
     const store = makeStore();
     const LiveCard = buildLiveCard(preact, store);
@@ -296,6 +305,27 @@ describe('LiveCard', () => {
     it('keeps an accessible name that names the session', () => {
       const LiveCard = buildLiveCard(preact, makeStore());
       expect(LiveCard({ session: LIVE_SESSION })).to.include('Add MAX Keynote to favorites');
+    });
+  });
+
+  describe('computeProgressPct', () => {
+    const session = { startTimeUtc: '2026-01-01T00:00:00.000Z', endTimeUtc: '2026-01-01T01:00:00.000Z' };
+
+    it('is 0 before the session starts', () => {
+      expect(computeProgressPct(session, Date.parse('2025-12-31T23:00:00.000Z'))).to.equal(0);
+    });
+
+    it('is 50 at the halfway point', () => {
+      expect(computeProgressPct(session, Date.parse('2026-01-01T00:30:00.000Z'))).to.equal(50);
+    });
+
+    it('clamps at 100 once the session has ended', () => {
+      expect(computeProgressPct(session, Date.parse('2026-01-01T02:00:00.000Z'))).to.equal(100);
+    });
+
+    it('is 0 for a zero-duration session, instead of dividing by zero', () => {
+      const zeroDuration = { startTimeUtc: session.startTimeUtc, endTimeUtc: session.startTimeUtc };
+      expect(computeProgressPct(zeroDuration, Date.parse(session.startTimeUtc))).to.equal(0);
     });
   });
 });

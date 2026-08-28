@@ -11,13 +11,13 @@ function h(offsetHours) {
 // Sessions declared before day-key derivation
 const LIVE_SESSION = {
   id: 'live-1', title: 'Live Session', description: 'Live now',
-  track: 'Design', startTimeUtc: h(-0.5), endTimeUtc: h(1),
+  primaryTrack: 'Design', startTimeUtc: h(-0.5), endTimeUtc: h(1),
   mrStreamId: null, thumbnailUrl: null,
   inPerson: false, sessionPageUrl: '/live-1',
 };
 const UPCOMING_SESSION = {
   id: 'upcoming-1', title: 'Upcoming Session', description: 'Starts soon',
-  track: 'Video', startTimeUtc: h(1), endTimeUtc: h(2),
+  primaryTrack: 'Video', startTimeUtc: h(1), endTimeUtc: h(2),
   mrStreamId: null, thumbnailUrl: null,
   inPerson: false, sessionPageUrl: '/upcoming-1',
 };

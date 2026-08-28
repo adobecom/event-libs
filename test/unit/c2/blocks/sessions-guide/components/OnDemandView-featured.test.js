@@ -18,13 +18,13 @@ function h(offsetHours) {
 }
 
 const PAST_DESIGN = {
-  id: 'd-1', title: 'Design Talk', description: '', track: 'Design',
+  id: 'd-1', title: 'Design Talk', description: '', primaryTrack: 'Design',
   startTimeUtc: h(-4), endTimeUtc: h(-3),
   inPerson: false, sessionPageUrl: '/d-1',
   mrStreamId: null, thumbnailUrl: null,
 };
 const PAST_VIDEO = {
-  id: 'v-1', title: 'Video Talk', description: '', track: 'Video',
+  id: 'v-1', title: 'Video Talk', description: '', primaryTrack: 'Video',
   startTimeUtc: h(-6), endTimeUtc: h(-5),
   inPerson: false, sessionPageUrl: '/v-1',
   mrStreamId: null, thumbnailUrl: null,
@@ -65,7 +65,7 @@ describe('OnDemandView (recommendedSessions authored)', () => {
     // A track filter that excludes PAST_VIDEO from the byTrack grouping below must
     // not remove the recommended section above, since it's built from onDemandRaw,
     // not the filtered `available` list.
-    const store = makeStore([PAST_DESIGN, PAST_VIDEO], { track: new Set(['Design']) });
+    const store = makeStore([PAST_DESIGN, PAST_VIDEO], { primaryTrack: new Set(['Design']) });
     const View = buildOnDemandView(preact, store);
     const html = View({});
     expect(html).to.include('sg-carousel-section--recommended');

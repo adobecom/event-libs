@@ -2,7 +2,7 @@ import {
   createContext, useReducer, useContext, useEffect, h,
 } from '../../../../deps/htm-preact.js';
 import {
-  sessions, sessionsStatus, liveStreamActiveIds, auth, getApiConfig, sessionStateVersion,
+  sessions, sessionsStatus, liveStreamActiveIds, auth, getEventApiConfig, sessionStateVersion,
 } from '../../../../utils/session-store.js';
 import { isPostEvent } from '../../../../utils/session-state.js';
 import { getNowMs, getSessionDayKey } from '../utils/time.js';
@@ -122,7 +122,7 @@ export function SessionGuideProvider({ guideConfig, children }) {
     function checkAutoTransition() {
       if (state.activeView !== 'live-upcoming') return;
       if (sessionsStatus.value !== 'ready' || !sessions.value.length) return;
-      const eventEndMs = getApiConfig()?.eventEndMs;
+      const eventEndMs = getEventApiConfig()?.eventEndMs;
       if (isPostEvent(sessions.value, liveStreamActiveIds.value, getNowMs(), eventEndMs)) {
         dispatch({ type: 'SET_VIEW', view: 'on-demand' });
       }

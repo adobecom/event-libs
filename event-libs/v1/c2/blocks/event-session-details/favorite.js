@@ -1,6 +1,6 @@
 import { createTag, getMetadata } from '../../../utils/utils.js';
 import {
-  initSessionState, sessions, favorited, getApiConfig,
+  initSessionState, sessions, favorited, getEventApiConfig,
 } from '../../../utils/session-store.js';
 import { toggleFavoriteWithFeedback } from '../../../services/sessions/action-feedback.js';
 
@@ -15,7 +15,7 @@ export function renderFavorite() {
 
   const eventConfig = {
     title: getMetadata('event-title') || getMetadata('title') || '',
-    registerUrl: getApiConfig()?.registerUrl || '/register',
+    registerUrl: getEventApiConfig()?.registerUrl || '/register',
   };
 
   let session = sessions.value.find((s) => s.id === sessionId) || { id: sessionId };
