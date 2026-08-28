@@ -46,6 +46,29 @@ describe('services/sessions/action-feedback', () => {
     expect(toast.value.duration).to.be.null;
   });
 
+  it('invokes onBlocked when the action is gated on auth-required or registration-required, not on other failures', async () => {
+    let blockedCount = 0;
+    const onBlocked = () => { blockedCount += 1; };
+
+    await runSessionAction(() => Promise.reject(new SessionActionError('auth-required')), {
+      eventConfig, actionLabel: 'add to schedule', onBlocked,
+    });
+    expect(blockedCount).to.equal(1);
+
+    await runSessionAction(() => Promise.reject(new SessionActionError('registration-required')), {
+      eventConfig, actionLabel: 'add to schedule', onBlocked,
+    });
+    expect(blockedCount).to.equal(2);
+
+    await runSessionAction(() => Promise.reject(new SessionActionError('network')), {
+      eventConfig, actionLabel: 'add to schedule', onBlocked,
+    });
+    expect(blockedCount).to.equal(2);
+
+    await runSessionAction(() => Promise.resolve(), { eventConfig, actionLabel: 'add to schedule', onBlocked });
+    expect(blockedCount).to.equal(2);
+  });
+
   it('shows a registration-required toast including the event title', async () => {
     const actionFn = () => Promise.reject(new SessionActionError('registration-required'));
     await runSessionAction(actionFn, { eventConfig, actionLabel: 'add to favorites' });
