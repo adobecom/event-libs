@@ -1866,13 +1866,13 @@
     border-color: #000;
   }
 
-  /* height:auto (not a fixed px value) cancels the base rule's mobile height and lets the
-     image stretch (align-items:stretch on .sg-live-card) to match whatever height the
-     content column ends up needing now that title/desc each reserve 2 lines — so it
-     always fills the card instead of stopping at a stale fixed value. */
+  /* Fixed, not auto (Figma: 425x240) — see the desktop breakpoint's identical rule for
+     why: a real <img>'s height:100% against an auto parent falls back to its own
+     intrinsic aspect ratio instead of matching the text column like the placeholder div
+     does, so two sibling cards could end up different heights depending on photo ratio. */
   .sg-live-card__image {
     width: 425px;
-    height: auto;
+    height: 240px;
     border-radius: var(--s2a-border-radius-md);
     border: none;
   }
