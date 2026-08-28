@@ -1,7 +1,7 @@
 import { createTag, createOptimizedPicture, loadStyle } from '../../../utils/utils.js';
 
-const VARIANTS = ['ratio-1-1', 'ratio-4-3', 'ratio-3-4', 'ratio-4-5', 'ratio-16-9'];
-const DEFAULT_VARIANT = 'ratio-4-3';
+const VARIANTS = ['media-square', 'media-standard', 'media-standard-rev', 'standard-m', 'media-wide', 'media-tall'];
+const DEFAULT_VARIANT = 'media-standard';
 const BLOCK_CSS_URL = new URL('./event-card.css', import.meta.url).href;
 
 function getVariant(el) {
