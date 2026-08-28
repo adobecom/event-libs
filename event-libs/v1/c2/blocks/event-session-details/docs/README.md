@@ -229,14 +229,24 @@ before the toast line was reached, a *successful* share produced no feedback at 
 toast only ever appeared on the non-`navigator.share` fallback path. A failed copy now shows a
 negative toast rather than failing silently, so the click always confirms one way or the other.
 
-The toast copy is **"Link copied"**, matching `sessions-guide`'s `SessionDetailOverlay`.
-`event-marquee` says "Link copied to clipboard"; this block briefly did too, because the whole
-handler was copied from there.
+The toast copy is **"Link copied!"**, matching `sessions-guide`'s `SessionDetailOverlay`,
+which gained the exclamation in `29ce11db` (MWPW-200314 part 5). This block briefly said
+"Link copied to clipboard", because the whole handler was copied from `event-marquee`.
 
-⚠️ Both other implementations still try `navigator.share` first, so **both carry the defect
-MWPW-205502 describes**: `c2/blocks/event-marquee/event-marquee.js` and
-`sessions-guide/components/SessionDetailOverlay.js`. Three implementations of one behaviour —
-worth consolidating into a shared helper, which would also settle the wording in one place.
+⚠️ There are **four** share handlers in this repo and **three** different strings:
+
+| Where | Copy | `navigator.share` first? |
+|---|---|---|
+| `event-session-details/share.js` | `Link copied!` | no — fixed here |
+| `sessions-guide/components/SessionDetailOverlay.js` | `Link copied!` | **yes** |
+| `c2/blocks/event-marquee/event-marquee.js` | `Link copied to clipboard` | **yes** |
+| `c2/blocks/mobile-rider/mobile-rider.js` | `Link copied to clipboard` | **yes** |
+
+The three that still try `navigator.share` first all carry the defect
+[MWPW-205502](https://jira.corp.adobe.com/browse/MWPW-205502) describes: the OS share sheet,
+and no toast on the path that succeeds. Consolidating into one shared helper would fix all
+three and settle the wording in a single place — this string has already had to be re-aligned
+once because the guide moved.
 
 ## Track tags (`track-tags.js`)
 

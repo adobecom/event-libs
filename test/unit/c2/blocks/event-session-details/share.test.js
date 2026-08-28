@@ -36,7 +36,7 @@ describe('session-details share', () => {
     renderShare().click();
     await tick();
     expect(copied).to.equal('https://example.com/s');
-    expect(toasts.value[0]?.message).to.equal('Link copied');
+    expect(toasts.value[0]?.message).to.equal('Link copied!');
     expect(toasts.value[0]?.variant).to.equal('positive');
   });
 
@@ -62,7 +62,7 @@ describe('session-details share', () => {
     await tick();
     expect(shared).to.be.false;
     expect(copied).to.equal('https://example.com/s');
-    expect(toasts.value[0]?.message).to.equal('Link copied');
+    expect(toasts.value[0]?.message).to.equal('Link copied!');
   });
 
   it('shows a negative toast when the clipboard write rejects', async () => {
