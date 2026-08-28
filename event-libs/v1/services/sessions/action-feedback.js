@@ -26,7 +26,7 @@ export function showAuthToast({ eventConfig, actionLabel }) {
 // layer) into a toast or conflict modal via the shared, page-level modules — usable by
 // both Preact and vanilla blocks.
 export async function runSessionAction(actionFn, {
-  eventConfig, actionLabel, successMessage, successVariant = 'positive',
+  eventConfig, actionLabel, successMessage, successVariant = 'positive', onBlocked,
 }) {
   try {
     await actionFn();
@@ -34,6 +34,10 @@ export async function runSessionAction(actionFn, {
   } catch (err) {
     if (err.reason === 'auth-required' || err.reason === 'registration-required') {
       showAuthToast({ eventConfig, actionLabel });
+      // The triggering button still has native focus, which keeps a hover-styled card
+      // looking "stuck" via :focus-within long after the pointer has moved away —
+      // give the caller a chance to blur it now that the action didn't go through.
+      onBlocked?.();
     } else if (err.reason === 'conflict') {
       const { conflict, incoming } = err.meta;
       showConflictModal({
@@ -57,7 +61,9 @@ export async function runSessionAction(actionFn, {
 
 // Thin, pre-labeled wrappers around runSessionAction so every schedule/favorite call
 // site shares the same success copy instead of repeating it at each call site.
-export function toggleScheduleWithFeedback(session, { eventConfig, isScheduled }) {
+export function toggleScheduleWithFeedback(session, {
+  eventConfig, isScheduled, onBlocked,
+}) {
   // One shared, page-level read (not eventConfig, which is per-block) — inverted,
   // since allowing double booking means suppressing the conflict modal.
   return runSessionAction(
@@ -67,11 +73,14 @@ export function toggleScheduleWithFeedback(session, { eventConfig, isScheduled }
       actionLabel: 'add to your schedule',
       successMessage: isScheduled ? 'Removed from schedule' : 'Added to schedule',
       successVariant: isScheduled ? 'neutral' : 'positive',
+      onBlocked,
     },
   );
 }
 
-export function toggleFavoriteWithFeedback(session, { eventConfig, isFavorited }) {
+export function toggleFavoriteWithFeedback(session, {
+  eventConfig, isFavorited, onBlocked,
+}) {
   return runSessionAction(
     () => toggleFavoriteAction(session),
     {
@@ -79,6 +88,7 @@ export function toggleFavoriteWithFeedback(session, { eventConfig, isFavorited }
       actionLabel: 'favorite',
       successMessage: isFavorited ? 'Removed from favorites' : 'Added to favorites',
       successVariant: isFavorited ? 'neutral' : 'positive',
+      onBlocked,
     },
   );
 }
