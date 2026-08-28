@@ -205,6 +205,30 @@ the link stays on the no-catalog path:
 `BROADCAST_URL` is a **fallback only**, used when the helper yields nothing. The real URL
 is to be sourced from config inside `getWatchDestination` — see known-issues.
 
+## Action row sizing
+
+Per design, the row is 32px tall and the three controls are styled differently:
+
+| Control | Box | Border | Icon |
+|---|---|---|---|
+| Primary CTA (Watch now / Add to schedule) | pill, **height 32** | none | 18px |
+| Favorite | **32×32 circle** | 1px, radius 999px | **16px** |
+| Share | **no box** | none | **20px** |
+
+`.session-action` therefore carries only what favorite and share share — flex centring, no
+padding, `currentColor`, and the focus ring. The circle lives on `.session-favorite` alone, so
+share is a bare icon that aligns via the row's `align-items: center` (all three centre on the
+same y).
+
+The favorite icon is 16px inside a 32px circle while share is a bare 20px, which is why the
+icon sizes are set per control rather than on `.session-action`.
+
+**Both heart states stay optically identical.** The supplied outline heart is a 16-unit
+viewBox and the existing filled heart is 20-unit, but each occupies ~90% of its box
+(14.4/16 vs 18.0/20), so both render to the same 14.4px of visible artwork at 16px — no size
+jump on toggle. Design supplied only the unfavorited outline; if a matching filled 16-unit
+heart arrives it is a drop-in replacement for `ICON_HEART_FILLED`.
+
 ## Favorite, Add to schedule, Share
 
 **Favorite** (`favorite.js`) and **Add to schedule** (`schedule.js`) reuse the production
