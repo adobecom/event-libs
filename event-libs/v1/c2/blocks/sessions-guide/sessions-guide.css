@@ -578,6 +578,12 @@
   color: rgb(0 0 0 / 40%);
 }
 
+/* Suppress the browser's own type="search" cancel button — a custom .sg-search-clear-btn
+   already renders next to it, so without this both appear once the field has a value. */
+.sg-mobile-search-input::-webkit-search-cancel-button {
+  appearance: none;
+}
+
 .sg-search-clear-btn {
   width: 28px;
   height: 28px;
@@ -2164,6 +2170,13 @@
   .sg-search-inline--open .sg-search-inline__input {
     opacity: 1;
     transition-delay: 0.1s;
+  }
+
+  /* Suppress the browser's own type="search" cancel button — a custom
+     .sg-search-inline__clear already renders next to it once searchOpen is true, so
+     without this both appear once the field has a value. */
+  .sg-search-inline__input::-webkit-search-cancel-button {
+    appearance: none;
   }
 
   .sg-search-inline__input::placeholder {
