@@ -30,6 +30,16 @@ const head = await readFile({ path: './mocks/head.html' });
 const body = await readFile({ path: './mocks/full-event.html' });
 const defaultDoc = await readFile({ path: './mocks/event-default-doc.html' });
 
+/** Polls rather than waiting a fixed number of ms, which get throttled unpredictably when many test files run concurrently. */
+async function waitFor(conditionFn, timeoutMs = 5000) {
+  const start = Date.now();
+  while (Date.now() - start < timeoutMs) {
+    if (conditionFn()) return;
+    await new Promise((r) => setTimeout(r, 20));
+  }
+  throw new Error('waitFor: condition not met within timeout');
+}
+
 function checkForDoubleSquareBrackets() {
   const bodyContent = document.body.innerHTML;
   const regex = /\[\[.*?\]\]/g;
@@ -2294,7 +2304,7 @@ describe('decorateEvent - Array Iteration', () => {
         parent.appendChild(link);
 
         processAutoBlockLinks(parent);
-        await new Promise((resolve) => { setTimeout(resolve, 50); });
+        await waitFor(() => document.getElementById('mobile-rider-css'));
 
         const cssLink = document.getElementById('mobile-rider-css');
         expect(cssLink, 'block CSS injected — the module ran').to.not.be.null;

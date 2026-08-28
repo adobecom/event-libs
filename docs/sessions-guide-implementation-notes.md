@@ -12,9 +12,11 @@ Code keeps only short markers. Where one points here, the heading is named in th
 
 ### sessionPageUrlForEnv
 
-The catalog returns each session's real page URL but always on prod's host. A stage or local
-visitor must not be sent to production, so the host is rewritten for any non-prod page. Keyed
-on **Milo's page env**, not the ESP tier — the same distinction, for the same reason, as
+The catalog returns each session's real page URL but always on prod's host. A stage, local, or
+Helix preview-branch visitor must not be sent to production, so on any non-prod page the origin
+(protocol + host) is rewritten to match the *current page's own origin* — not a hardcoded stage
+domain — so a click lands back on the same domain/branch the visitor is already on. Keyed on
+**Milo's page env**, not the ESP tier — the same distinction, for the same reason, as
 `session-store.js`'s `defaultRfApiUrlForEnv()`. Anything that isn't an absolute prod-host URL
 (root-relative paths, hand-authored fixtures) passes through untouched.
 
@@ -59,16 +61,41 @@ and Recommended — unconditionally, whatever else its Format or `Livestreamed C
 `getWatchDestination()`). There is no derived "is there video" flag in between — callers read
 the three Format booleans directly.
 
-### isMissingFormat and the drop log
+### The two catalog drops, and reporting them
 
-No Format value says nothing about how a session can be watched, so there is no view it can be
-placed in and it is dropped from the catalog outright rather than filtered per view — one rule
-for every view, day tab and deep link.
+Two rules remove a session from the catalog entirely rather than filtering it per view, so one
+rule covers every view, day tab and deep link:
 
-Dropping is intentional, but the session then appears nowhere, so the removal is logged with
-each row's `sessionCode` and title alongside its id: the id alone isn't searchable in RainFocus.
-The count is always exact; the enumeration is capped at `DROP_LOG_LIMIT` with a `+N more`
-suffix so a wholesale authoring failure can't emit an unbounded log line.
+- **no `Format` value** (`isMissingFormat`) — says nothing about how the session can be watched,
+  so there is no view it can be placed in.
+- **an invalid `Format` combination** (`invalidFormatReason`) — `Format` is multi-select over
+  three real values (`In person`, `Online`, `On demand, post event`), but only two shapes give a
+  session an unambiguous way to be watched. Confirmed table (PM, 2026-08-26):
+
+  | Format value(s) | Kept? | Reason if dropped |
+  |---|---|---|
+  | *(none)* | ❌ | `no Format value` |
+  | In person | ❌ | `in-person only` |
+  | Online | ✅ | — |
+  | On demand, post event | ❌ | `on-demand, post event without in-person` |
+  | In person, Online | ✅ | — |
+  | In person, On demand, post event | ✅ | — |
+  | Online, On demand, post event | ❌ | `online and on-demand, post event together` |
+  | In person, Online, On demand, post event | ❌ | `online and on-demand, post event together` |
+
+  In short: `Online` and `On demand, post event` are mutually exclusive — a session is either
+  online (optionally also in-person), or an in-person-only session whose recording lands later.
+  `On demand, post event` with neither `Online` nor `In person` (or any other combination with no
+  recognized digital signal at all) falls through to `no digital way to watch`.
+
+Both rules are reported by `reportDroppedSessions()`. `lana` gets the count and a capped enumeration in
+every env; **below prod each row is also `console.warn`ed with the rule that removed it**, which
+is what an author needs to go and fix the row. Each row is named by `sessionCode` and title as
+well as id, because the id alone isn't searchable in RainFocus. The count is always exact; the
+enumeration is capped at `DROP_LOG_LIMIT` so a wholesale authoring failure can't flood the log.
+
+`isProd` is an injectable parameter with a `getEventConfig()` default, matching
+`sessionPageUrlForEnv()` in the same file, so the env branch is testable without mocking config.
 
 ### Attribute name fallbacks
 
@@ -76,8 +103,8 @@ ESP renamed several custom attributes between MAX25 and MAX26. `extractCustomAtt
 takes either a single name or an array of candidates tried in order. A given session only ever
 carries one of a renamed pair, so "first found" is unambiguous.
 
-`TRACK_ATTRIBUTE_NAMES` is exported so `tier-1-event-configurator/utils.js` — which needs the
-same attribute for its own track editor — doesn't carry a second copy that can drift.
+`PRIMARY_TRACK_ATTRIBUTE_NAMES` is exported so `tier-1-event-configurator/utils.js` — which
+needs the same attribute for its own track editor — doesn't carry a second copy that can drift.
 
 Names are matched **exactly**: `name === label` on every attribute and there is no machine-safe
 slug, so matching means comparing display strings verbatim, parentheses and all.
@@ -90,10 +117,15 @@ wanted — no explicit MAX25 branch needed.
 
 ### Track helpers
 
-- `getSessionTrack()` / `getSessionAdditionalTracks()` — Additional tracks are a multi-select
-  drawing from the same vocabulary as the primary track, and the runtime treats them as real
-  tracks: `resolveTrackBadge()` gives them their own swimlanes and `LiveCard` badges the first.
-  So it mirrors `getSessionProducts()` (all values) rather than `getSessionTrack()` (first only).
+- `getSessionPrimaryTrack()` / `getSessionAdditionalTracks()` — Additional tracks are a
+  multi-select drawing from the same vocabulary as the primary track, and the runtime treats
+  them as real tracks: `resolveTrackBadge()` gives them their own swimlanes and `LiveCard`
+  badges the first. So it mirrors `getSessionProducts()` (all values) rather than
+  `getSessionPrimaryTrack()` (first only).
+- On the normalized session object, the ESL "Track" topic-tag customAttribute — a real,
+  distinct attribute from `PRIMARY_TRACK_ATTRIBUTE_NAMES` — lands in `tracks` (array); the
+  primary track lands in `primaryTrack` (string). Only the detail overlay's "Track" attr row
+  reads `tracks`; everything badge/swimlane-related reads `primaryTrack`.
 - `extractDistinctAllTracks()` — primary and additional together, which is what a per-track
   icon/colour mapping has to cover since either kind can end up on a badge.
 - `extractDistinctOverrideTexts()` — the override is **free text**, not a select, so every
@@ -107,25 +139,6 @@ The attribute's own id is also its key in `customAttributeValues`, which is how 
 identifies the product filter category — it badges product icons *there only*, because
 `Illustrator` is both a product and an `Audience` job role and matching on the value alone would
 badge the wrong pills.
-
-### IGNORED_ATTRIBUTE_NAMES
-
-Attributes the catalog sends that the guide must never surface. `Gated Video` is confirmed
-unused for MAX 26: it still arrives on some sessions, but nothing may key off it.
-
-Two paths pick attributes up generically, on nothing more than being an enabled single/multi
-select with `valueId`s, so both consult this list:
-
-- `deriveFacetableAttributes()` — offers filter categories to the Session Guide Configurator,
-  and new facets seed `enabled: true`, so an ignored attribute would otherwise reach the panel
-  unless an author noticed and switched it off.
-- `buildCustomAttributeValueMap()` — feeds `customAttributeValues`, which the runtime filters
-  read via `getFilterValue()`.
-
-Matched on `name`, not `attributeId` — the id is per-event and wouldn't travel.
-
-Adding a name here is also the mechanism for keeping any other plainly-internal attribute out
-of the filter panel, instead of disabling it by hand per event.
 
 ### deriveFacetableAttributes
 
@@ -169,9 +182,17 @@ before flipping it.
 `videoDuration` is kept verbatim: the catalog writes 60 minutes as `00:60:00`, so it is not
 reliably `HH:MM:SS`.
 
-`dvrDelayHours` is hours after the event starts that a recording becomes playable (see
-`isDvrPending()`). Free text, so blank / whitespace / non-numeric all mean "no delay" (`null`),
-never `0` — `0` would mean available from the moment the event starts.
+`dvrDelayHours` is hours after the event starts that a recording becomes playable. Free text,
+so blank / whitespace / non-numeric all mean "no delay" (`null`), never `0` — `0` would mean
+available from the moment the event starts. **Not read by the guide's own filtering** — the
+`isDvrPending()`/`dvrAvailableAtMs()` gate that used to withhold a session from
+`onDemandSessions()` until this window opened was removed from that call site (PM,
+2026-08-26): DVR Timing no longer affects which view a session appears in. Both functions
+still live in `utils/session-state.js` as shared utilities for any other block that needs
+them — they're just unused by `session-filters.js` now. `dvrDelayHours` itself is still
+carried on the session for a later "Recording coming soon" vs "On-demand" display treatment
+(tracked separately, not yet built for the guide — `event-session-details` already has an
+analogous, independent "Coming soon" state, see its own docs).
 
 ### aiFocus
 
@@ -196,19 +217,22 @@ disagree on the slash. It is **authored HTML**, rendered through `utils/rich-tex
 
 ### Authored HTML
 
-`legalDisclaimer` (`Legal Disclaimer`) and `ipodOrGdprCopy` (`IPOD or GDPR Copy`) both arrive as
-HTML — `<p>`, `<b>`/`<strong>`, `<br/>` and links. `utils/rich-text.js`'s `sanitizedRichText()`
-runs them through the vendored `deps/html-sanitizer.js` (whitelisted tags/attributes,
-protocol-checked hrefs) and forces links to `target="_blank" rel="noopener noreferrer"` —
-following a legal link in place would discard the visitor's position in the drawer.
-
-Both render into a `<div>`, not a `<p>`: the values bring their own paragraphs and `<p><p>` is
-invalid nesting, so the browser would close the outer one and the styling would fall off.
+`ipodOrGdprCopy` (`IPOD or GDPR Copy`) arrives as HTML — `<p>`, `<b>`/`<strong>`, `<br/>` and
+links. `utils/rich-text.js`'s `sanitizedRichText()` runs it through the vendored
+`deps/html-sanitizer.js` (whitelisted tags/attributes, protocol-checked hrefs) and forces links
+to `target="_blank" rel="noopener noreferrer"` — following a legal link in place would discard
+the visitor's position in the drawer. It renders into a `<div>`, not a `<p>`: the value brings
+its own paragraphs and `<p><p>` is invalid nesting, so the browser would close the outer one and
+the styling would fall off.
 
 The htm test stub renders object-valued attributes as `=""`, so `dangerouslySetInnerHTML`
 content never reaches the asserted string — component tests can only assert the wrapper, and
 the markup itself is covered in `rich-text.test.js`. Verify rendering in a browser via
 `not-tracked/sg-detail-preview.html`.
+
+`legalDisclaimer` (`Legal Disclaimer`) is carried on the session but deliberately never
+rendered in this overlay — see "Session resources and legal disclaimer are pre-event
+sensitive" below.
 
 ### Attribute list
 
@@ -221,11 +245,15 @@ doesn't exist in the real catalog either.
 `sg-detail__count` appears only when the list is actually truncated, so it tracks the Show more
 toggle exactly: over 6 products (`COLLAPSED_PRODUCTS`), over 5 speakers (`COLLAPSED_SPEAKERS`).
 
-### Empty session resources
+### Session resources and legal disclaimer are pre-event sensitive
 
-The pod keeps its heading and shows one non-interactive card instead of disappearing. This is
-the state every session is in today — `resources[]` has no backend source yet, so the catalog
-always returns it empty.
+Neither the "Session resources" pod nor the legal disclaimer renders in the detail overlay.
+Both are sourced from the public sessions catalog endpoint, which is reachable before an event
+goes live, so surfacing them here would leak that data pre-event. The individual session page
+hydrates both directly on page creation instead, where the exposure isn't a pre-event leak.
+`resources` and `legalDisclaimer` are still carried on the normalized session object
+(`services/sessions/sessions-api.js`) for that consumer — they are just never read by
+`SessionDetailOverlay.js`.
 
 ### Full-height body
 
@@ -319,14 +347,14 @@ Things that look removable and are not:
 - **Mobile takeover padding must follow the base rule, not lead it.** A media query adds no
   specificity, so the later declaration of the property wins.
 - **Show more gap top-ups.** Figma opens the gap between a list and its Show more toggle wider
-  than the 16px pod gap — 20px in products, 24px in speakers and resources. The pod's own gap
-  covers 16; the per-pod rules top up the remainder.
+  than the 16px pod gap — 20px in products, 24px in speakers. The pod's own gap covers 16; the
+  per-pod rules top up the remainder.
 
 ### Dark theme
 
 Dark rules are hand-written per-theme pairs rather than `*-default` tokens, because those don't
-flip inside `.sg-portal` — the dark token scope in `sessions-guide-tokens.css` only covers
-`.sessions-guide[data-theme="dark"]`.
+flip inside `.sg-portal` — the dark token scope in the shared `c2/styles/tokens.css` (imported
+by `sessions-guide.css`) only covers `.sessions-guide[data-theme="dark"]`.
 
 The detail view's pods are white-on-tint in light mode. Both surfaces invert to near-black in
 dark, which would make pod and body indistinguishable, so the body drops to the darkest surface

@@ -1,7 +1,7 @@
 import { expect } from '@esm-bundle/chai';
 import { setMetadata } from '../../../../../event-libs/v1/utils/utils.js';
 import { renderShare } from '../../../../../event-libs/v1/c2/blocks/event-session-details/share.js';
-import { toast } from '../../../../../event-libs/v1/features/toast/toast.js';
+import { toasts } from '../../../../../event-libs/v1/features/toast/toast.js';
 
 const tick = () => new Promise((r) => { setTimeout(r); });
 
@@ -9,7 +9,7 @@ describe('session-details share', () => {
   beforeEach(() => {
     document.head.innerHTML = '';
     document.body.innerHTML = '';
-    toast.value = null;
+    toasts.value = [];
   });
 
   afterEach(() => {
@@ -36,8 +36,8 @@ describe('session-details share', () => {
     renderShare().click();
     await tick();
     expect(copied).to.equal('https://example.com/s');
-    expect(toast.value?.message).to.equal('Link copied');
-    expect(toast.value?.variant).to.equal('positive');
+    expect(toasts.value[0]?.message).to.equal('Link copied');
+    expect(toasts.value[0]?.variant).to.equal('positive');
   });
 
   it('falls back to the current location when url metadata is absent', async () => {
@@ -62,7 +62,7 @@ describe('session-details share', () => {
     await tick();
     expect(shared).to.be.false;
     expect(copied).to.equal('https://example.com/s');
-    expect(toast.value?.message).to.equal('Link copied');
+    expect(toasts.value[0]?.message).to.equal('Link copied');
   });
 
   it('shows a negative toast when the clipboard write rejects', async () => {
@@ -70,8 +70,8 @@ describe('session-details share', () => {
     stubClipboard(async () => { throw new Error('denied'); });
     renderShare().click();
     await tick();
-    expect(toast.value?.message).to.equal('Could not copy link');
-    expect(toast.value?.variant).to.equal('negative');
+    expect(toasts.value[0]?.message).to.equal('Could not copy link');
+    expect(toasts.value[0]?.variant).to.equal('negative');
   });
 
   it('shows a negative toast when the clipboard API is missing entirely', async () => {
@@ -79,7 +79,7 @@ describe('session-details share', () => {
     Object.defineProperty(navigator, 'clipboard', { value: undefined, configurable: true, writable: true });
     renderShare().click();
     await tick();
-    expect(toast.value?.message).to.equal('Could not copy link');
-    expect(toast.value?.variant).to.equal('negative');
+    expect(toasts.value[0]?.message).to.equal('Could not copy link');
+    expect(toasts.value[0]?.variant).to.equal('negative');
   });
 });

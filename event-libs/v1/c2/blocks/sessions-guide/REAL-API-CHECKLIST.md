@@ -73,7 +73,7 @@ After removal, `syncAuth()` falls through directly to reading `imsProfile` and `
 <meta name="rainfocus-api-profile-id" content="...">
 ```
 
-These already live in page metadata (not this block's authoring table) so the shared bootstrap can start fetching before any block mounts — just point them at the real Rainfocus endpoint/profile once it exists. `register-url` now lives in the Tier 1 Event Configurator instead of flat metadata (see the status note above); `manual-on-demand-transition-time` metadata is gone entirely — post-event state is driven solely by the Tier 1 Event Configurator's `eventEndDateTime` (`getApiConfig().eventEndMs`, consumed by `isPostEvent()` in `session-state.js`).
+These already live in page metadata (not this block's authoring table) so the shared bootstrap can start fetching before any block mounts — just point them at the real Rainfocus endpoint/profile once it exists. `register-url` now lives in the Tier 1 Event Configurator instead of flat metadata (see the status note above); `manual-on-demand-transition-time` metadata is gone entirely — post-event state is driven solely by the Tier 1 Event Configurator's `eventEndDateTime` (`getEventApiConfig().eventEndMs`, consumed by `isPostEvent()` in `session-state.js`).
 
 **Also required:** `tier-1-event-config` metadata — `decorateEvent()` (`event-libs/v1/utils/decorate.js`) gates both `initTierOneEventConfig()` and `initSessionState()` on it being present, so pages must author that config before the shared store bootstraps at all. (The standalone `tier-1-event-state-enabled` opt-in flag this section used to describe was retired — presence of `tier-1-event-config` is the gate now.)
 
@@ -85,7 +85,7 @@ These already live in page metadata (not this block's authoring table) so the sh
 
 Every function is currently a stub returning hardcoded data. Replace with real `fetch` calls to the Rainfocus API.
 
-Credentials needed per call: `rfAuthToken` (from FEDS/IMS), `clientId` (IMS userId), `rfApiProfileId` and `rfApiUrl` (from `session-store.js`'s `getApiConfig()`).
+Credentials needed per call: `rfAuthToken` (from FEDS/IMS), `clientId` (IMS userId), `rfProfileId` and `rfApiUrl` (from `session-store.js`'s `getEventApiConfig()`).
 
 ---
 

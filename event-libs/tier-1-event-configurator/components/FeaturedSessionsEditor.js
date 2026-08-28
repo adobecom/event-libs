@@ -1,7 +1,7 @@
 import {
   useState, useMemo, useCallback, useRef, useLayoutEffect, useEffect, html,
 } from '../../v1/deps/htm-preact.js';
-import { getSessionTrack, formatSessionTime } from '../utils.js';
+import { getSessionPrimaryTrack, formatSessionTime } from '../utils.js';
 import SearchInput from './SearchInput.js';
 import ImagePickerModal from './ImagePickerModal.js';
 
@@ -103,7 +103,7 @@ export default function FeaturedSessionsEditor({
   }, [sessionTimes]);
 
   const getSessionMeta = useCallback((session) => {
-    const track = getSessionTrack(session) || '—';
+    const track = getSessionPrimaryTrack(session) || '—';
     const time = formatSessionTime(earliestTimeBySessionId.get(session.sessionId));
     return time ? `${track} · ${time}` : track;
   }, [earliestTimeBySessionId]);
@@ -124,7 +124,7 @@ export default function FeaturedSessionsEditor({
     const term = search.trim().toLowerCase();
     return (sessions || []).filter((session) => {
       if (featuredSet.has(session.sessionId)) return false;
-      if (trackFilter && getSessionTrack(session) !== trackFilter) return false;
+      if (trackFilter && getSessionPrimaryTrack(session) !== trackFilter) return false;
       if (!term) return true;
       const title = (session.enTitle || '').toLowerCase();
       return title.includes(term) || (session.sessionId || '').toLowerCase().includes(term);

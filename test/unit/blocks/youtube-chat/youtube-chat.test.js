@@ -3,6 +3,7 @@ import sinon from 'sinon';
 import { readFile } from '@web/test-runner-commands';
 
 const defaultHtml = await readFile({ path: './mocks/default.html' });
+const modulePath = '../../../../event-libs/v1/blocks/youtube-chat/youtube-chat.js';
 
 describe('YouTube Chat Module', () => {
   let sandbox;
@@ -20,7 +21,7 @@ describe('YouTube Chat Module', () => {
     let youtubeChat;
 
     beforeEach(async () => {
-      const { YouTubeChat } = await import('../../../../event-libs/v1/blocks/youtube-chat/youtube-chat.js');
+      const { YouTubeChat } = await import(modulePath);
       youtubeChat = new YouTubeChat();
     });
 
@@ -170,7 +171,7 @@ describe('YouTube Chat Module', () => {
       it('should add preconnect links for YouTube domains', async () => {
         const originalHead = document.head.innerHTML;
 
-        const { YouTubeChat } = await import('../../../../event-libs/v1/blocks/youtube-chat/youtube-chat.js');
+        const { YouTubeChat } = await import(modulePath);
         YouTubeChat.preconnect();
 
         const links = document.querySelectorAll('link[rel="preconnect"]');
@@ -186,7 +187,7 @@ describe('YouTube Chat Module', () => {
       it('should only add preconnect links once', async () => {
         const originalHead = document.head.innerHTML;
 
-        const { YouTubeChat } = await import('../../../../event-libs/v1/blocks/youtube-chat/youtube-chat.js');
+        const { YouTubeChat } = await import(modulePath);
         YouTubeChat.preconnect();
         const firstCount = document.querySelectorAll('link[rel="preconnect"]').length;
 
@@ -296,7 +297,7 @@ describe('YouTube Chat Module', () => {
     });
 
     it('should export init function and handle initialization', async () => {
-      const { default: init, YouTubeChat } = await import('../../../../event-libs/v1/blocks/youtube-chat/youtube-chat.js');
+      const { default: init, YouTubeChat } = await import(modulePath);
 
       expect(typeof init).to.equal('function');
       expect(typeof YouTubeChat).to.equal('function');
@@ -313,6 +314,48 @@ describe('YouTube Chat Module', () => {
         // Expected to fail due to missing video ID in test HTML
         expect(error).to.be.instanceOf(Error);
       }
+    });
+
+    it('should default live chat to off when no chatenabled row is authored', async () => {
+      block.innerHTML = `
+        <div>
+          <div>videoid</div>
+          <div>dQw4w9WgXcQ</div>
+        </div>
+        <div>
+          <div>autoplay</div>
+          <div>true</div>
+        </div>
+      `;
+
+      const { default: init } = await import(modulePath);
+      await init(block);
+
+      expect(block.querySelector('.youtube-chat-container')).to.be.null;
+      expect(block.querySelector('.youtube-stream').classList.contains('single-column')).to.be.true;
+    });
+
+    it('should keep live chat off when chatenabled is authored as anything other than "true"', async () => {
+      block.innerHTML = `
+        <div>
+          <div>videoid</div>
+          <div>dQw4w9WgXcQ</div>
+        </div>
+        <div>
+          <div>autoplay</div>
+          <div>true</div>
+        </div>
+        <div>
+          <div>chatenabled</div>
+          <div>false</div>
+        </div>
+      `;
+
+      const { default: init } = await import(modulePath);
+      await init(block);
+
+      expect(block.querySelector('.youtube-chat-container')).to.be.null;
+      expect(block.querySelector('.youtube-stream').classList.contains('single-column')).to.be.true;
     });
   });
 });

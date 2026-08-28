@@ -10,7 +10,7 @@ import { getNowMs } from '../../../utils/session-state.js';
 import { getTrackIcon } from '../../../utils/tier-1-event-config.js';
 import { resolveIcon } from '../../../features/icons/icon-resolver.js';
 import { toggleScheduleWithFeedback, toggleFavoriteWithFeedback } from '../../../services/sessions/action-feedback.js';
-import { registerStreamIds, unregisterStreamIds, subscribe } from '../../../services/sessions/mobile-rider-poller.js';
+import { registerStreamIds, unregisterStreamIds, subscribe } from '../../../services/sessions/poller.js';
 
 const ROTATE_OUT_MS = 350;
 const SLIDE_MS = 350;
@@ -317,38 +317,28 @@ function startMobileRiderPolling(sessions, onStarted) {
   const mrSessions = sessions.filter((s) => s.mrStreamId);
   if (!mrSessions.length) return null;
 
-  const mrStreamIds = new Set(mrSessions.map((s) => s.mrStreamId));
+  const mrStreamIds = mrSessions.map((s) => s.mrStreamId);
+  const sessionByStreamId = new Map(mrSessions.map((s) => [s.mrStreamId, s]));
   const resolvedIds = new Set();
-  const registeredIds = new Set();
+  registerStreamIds(mrStreamIds);
 
-  function onDue(mrStreamId) {
-    if (registeredIds.has(mrStreamId)) return;
-    registeredIds.add(mrStreamId);
-    registerStreamIds([mrStreamId]);
-  }
+  const unsubscribe = subscribe(({ active, inactive }) => {
+    const doneIds = [...active, ...inactive].filter((id) => {
+      if (!mrStreamIds.includes(id) || resolvedIds.has(id)) return false;
+      const startTimeMillis = sessionByStreamId.get(id)?.sessionTime?.startTimeMillis;
+      if (typeof startTimeMillis !== 'number') return active.includes(id);
+      return startTimeMillis <= getNowMs();
+    });
 
-  const startTimers = [];
-  mrSessions.forEach((s) => {
-    const untilStart = (s.sessionTime?.startTimeMillis ?? 0) - getNowMs();
-    if (untilStart > 0) {
-      startTimers.push(setTimeout(() => onDue(s.mrStreamId), untilStart));
-    } else {
-      onDue(s.mrStreamId);
-    }
-  });
-
-  const unsubscribe = subscribe(({ active }) => {
-    const startedIds = active.filter((id) => mrStreamIds.has(id) && !resolvedIds.has(id));
-    if (!startedIds.length) return;
-    startedIds.forEach((id) => resolvedIds.add(id));
-    unregisterStreamIds(startedIds);
-    onStarted(startedIds);
+    if (!doneIds.length) return;
+    doneIds.forEach((id) => resolvedIds.add(id));
+    unregisterStreamIds(doneIds);
+    onStarted(doneIds);
   });
 
   return () => {
-    startTimers.forEach(clearTimeout);
     unsubscribe();
-    unregisterStreamIds([...registeredIds].filter((id) => !resolvedIds.has(id)));
+    unregisterStreamIds(mrStreamIds.filter((id) => !resolvedIds.has(id)));
   };
 }
 
@@ -378,11 +368,6 @@ async function decorate(el) {
 
   const heading = config?.heading || 'Upcoming Sessions';
   let sessions = Array.isArray(config?.entries) ? config.entries : [];
-
-  if (!sessions.length) {
-    el.remove();
-    return;
-  }
 
   initSessionState();
 

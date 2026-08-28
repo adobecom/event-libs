@@ -1,4 +1,4 @@
-@import './sessions-guide-tokens.css';
+@import '../../styles/tokens.css';
 @import './sessions-guide-overlays.css';
 
 .sessions-guide {
@@ -130,7 +130,9 @@
   .sg-time-row__cards,
   .sg-carousel__cards,
   .sg-detail-panel,
-  .sg-backdrop {
+  .sg-backdrop,
+  .sg-search-inline,
+  .sg-search-inline__input {
     transition: none;
   }
 
@@ -147,6 +149,7 @@
   .sg-close-btn,
   .sg-filter-btn,
   .sg-search-btn,
+  .sg-search-inline,
   .sg-download-btn {
     border: 1px solid currentcolor;
   }
@@ -575,6 +578,12 @@
   color: rgb(0 0 0 / 40%);
 }
 
+/* Suppress the browser's own type="search" cancel button — a custom .sg-search-clear-btn
+   already renders next to it, so without this both appear once the field has a value. */
+.sg-mobile-search-input::-webkit-search-cancel-button {
+  appearance: none;
+}
+
 .sg-search-clear-btn {
   width: 28px;
   height: 28px;
@@ -590,6 +599,13 @@
 
 .sg-search-clear-btn:hover {
   background: rgb(0 0 0 / 7%);
+}
+
+/* ── Desktop Inline Search (1280px+ only — see the 1280px block for the rest). Below
+   1280px this stays out of layout and out of the accessibility tree entirely — sg-search-btn
+   + sg-mobile-search-row is what mobile/tablet use instead. ─────────────────────── */
+.sg-search-inline {
+  display: none;
 }
 
 /* ── CTA Button ──────────────────────────────────────────── */
@@ -838,7 +854,7 @@
 
 .sg-live-card__progress-row {
   position: absolute;
-  top: 16px;
+  bottom: 16px;
   left: 16px;
   right: 16px;
   display: flex;
@@ -928,6 +944,28 @@
   transition: color 0.2s;
 }
 
+/* Vertical divider between track and time, matching the Figma meta row — applies at every
+   breakpoint, not just desktop, since a card with a second track badge or a visible time
+   needs the same separator on mobile. */
+.sg-live-card__time::before,
+.sg-live-card__track-extra::before {
+  content: '';
+  display: inline-block;
+  width: 1px;
+  height: 12px;
+  margin-right: var(--s2a-spacing-sm);
+  background: var(--s2a-color-gray-300);
+  vertical-align: middle;
+}
+
+/* The hover/focus fill only turns dark at 1024px+ (see .sg-live-card:is(:hover, :focus-within)
+   in the 1024-1279px and 1280px+ blocks) — below that it stays #fff, so this lighter divider
+   color would go invisible against it. Scoped to match, not applied below 1024px. */
+@media (min-width: 1024px) {
+  .sg-live-card:is(:hover, :focus-within) .sg-live-card__time::before,
+  .sg-live-card:is(:hover, :focus-within) .sg-live-card__track-extra::before { background: rgb(255 255 255 / 40%); }
+}
+
 .sg-live-card:is(:hover, :focus-within) .sg-live-card__time { color: inherit; }
 
 /* Same reasoning as .sg-card__title-btn above — a real <button>, not the whole card. */
@@ -959,25 +997,23 @@
   margin: var(--s2a-spacing-lg) 0 0;
   color: var(--s2a-color-content-default);
   transition: color 0.2s;
+
+  /* Clamped to 2 lines and reserved at that height, so a 1-line title doesn't leave its
+     card shorter than a neighboring 2-line one. */
+  min-height: calc(2 * 1.1em);
+  /* stylelint-disable-next-line value-no-vendor-prefix */
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
 .sg-live-card:is(:hover, :focus-within) .sg-live-card__title { color: inherit; }
 
+/* Hidden mobile through regular tablet (<1024px) — re-shown at 1024px+ below. */
 .sg-live-card__desc {
-  font-size: var(--s2a-font-size-sm);
-  line-height: 1.2;
-  letter-spacing: -0.14px;
-  color: rgb(0 0 0 / 60%);
-  margin: var(--s2a-spacing-xs) 0 0;
-  /* stylelint-disable-next-line value-no-vendor-prefix */
-  display: -webkit-box;
-  -webkit-line-clamp: 1;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-  transition: color 0.2s;
+  display: none;
 }
-
-.sg-live-card:is(:hover, :focus-within) .sg-live-card__desc { color: inherit; }
 
 .sg-live-card__actions {
   display: flex;
@@ -1016,30 +1052,31 @@
   color: #fff;
 }
 
+/* Figma 11658:143458 ("Button / Primary / Solid / On Light") — the upcoming Recommended
+   card's schedule CTA reads "Add to schedule"/"Added to schedule", not "Watch", so it gets
+   the outlined on-light treatment instead of the Watch button's solid dark fill. */
+.sg-live-card__btn--schedule-cta {
+  background: #fff;
+  border: 1px solid #000;
+  color: #000;
+}
+
 .sg-live-card__btn--schedule {
   display: none;
 }
 
+/* Figma 10533:55223 ("Icon Button XL / XL Primary Outline") — a solid dark border at rest,
+   not the near-invisible light gray this used to sit at on white. The heart glyph itself
+   (outline vs filled, see LiveCard.js) already carries the favorited/not distinction, so the
+   border no longer needs its own light/dark toggle. */
 .sg-live-card__btn--favorite {
   background: #fff;
-  border: 2px solid #dadada;
+  border: 1px solid #292929;
   color: #292929;
   width: 40px;
   padding: 0;
   flex-shrink: 0;
   justify-content: center;
-}
-
-.sg-live-card__btn--favorite.is-favorited {
-  border-color: #292929;
-}
-
-.sg-live-card:is(:hover, :focus-within) .sg-live-card__btn--favorite {
-  border-color: #dadada;
-}
-
-.sg-live-card:is(:hover, :focus-within) .sg-live-card__btn--favorite.is-favorited {
-  border-color: #292929;
 }
 
 
@@ -1275,28 +1312,6 @@
 }
 
 .sg-card:is(:hover, :focus-within) .sg-card__title { color: var(--s2a-color-gray-900); }
-
-.sg-card__desc {
-  font-size: var(--s2a-font-size-xs);
-  color: var(--s2a-color-gray-600);
-  line-height: 1.5;
-  height: 18px;
-  margin: 0;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-height: none;
-  opacity: 1;
-  margin-top: 0;
-  display: block;
-  transition: none;
-}
-
-.sg-card:is(:hover, :focus-within) .sg-card__desc {
-  max-height: none;
-  margin-top: 0;
-  opacity: 1;
-}
 
 .sg-card__footer {
   display: none;
@@ -1554,7 +1569,6 @@
   .sg-date-tab {
     flex: none;
     width: 80px;
-    font-size: var(--s2a-font-size-md);
   }
 
   .sg-right-controls {
@@ -1677,12 +1691,6 @@
     border: 1px solid rgb(255 255 255 / 15%);
   }
 
-  .sg-live-card__progress-row {
-    top: 16px;
-    left: 16px;
-    right: 16px;
-  }
-
   .sg-live-card__body {
     padding: var(--s2a-spacing-md);
     justify-content: flex-start;
@@ -1717,22 +1725,10 @@
     color: var(--s2a-color-content-default);
   }
 
-  .sg-live-card__desc {
-    font-size: var(--s2a-font-size-sm);
-    color: rgb(0 0 0 / 60%);
-    letter-spacing: -0.14px;
-    /* stylelint-disable-next-line value-no-vendor-prefix */
-    display: -webkit-box;
-    -webkit-line-clamp: 1;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
-  }
-
   .sg-live-card:is(:hover, :focus-within) .sg-live-card__track,
   .sg-live-card:is(:hover, :focus-within) .sg-live-card__track-extra,
   .sg-live-card:is(:hover, :focus-within) .sg-live-card__time,
-  .sg-live-card:is(:hover, :focus-within) .sg-live-card__title,
-  .sg-live-card:is(:hover, :focus-within) .sg-live-card__desc { color: inherit; }
+  .sg-live-card:is(:hover, :focus-within) .sg-live-card__title { color: inherit; }
 
   .sg-live-card__actions { gap: 12px; }
 
@@ -1748,13 +1744,19 @@
     color: #fff;
   }
 
-  .sg-live-card__btn--favorite {
+  .sg-live-card__btn--schedule-cta {
     background: #fff;
-    border: 2px solid #dadada;
-    color: #292929;
+    border: 1px solid #000;
+    color: #000;
+    min-width: auto;
+    padding: 0 var(--s2a-spacing-lg);
   }
 
-  .sg-live-card:is(:hover, :focus-within) .sg-live-card__btn--favorite { border-color: #dadada; }
+  .sg-live-card__btn--favorite {
+    background: #fff;
+    border: 1px solid #292929;
+    color: #292929;
+  }
 }
 
 /* ── Tablet only: floating carousel arrows ───────────────────────────────── */
@@ -1807,6 +1809,14 @@
     padding-right: 0;
   }
 
+  /* Cancels .sg-carousel-section's 20px right padding, same trick as the desktop
+     breakpoint below — without it, this rule stays at the 768px+ breakpoint's
+     margin-right:0 and the peeking card gets clipped at the section's padding edge
+     instead of bleeding to the section's true outer edge. */
+  .sg-carousel__track {
+    margin-right: -20px;
+  }
+
   .sg-carousel__card-wrap {
     scroll-snap-align: none;
   }
@@ -1818,8 +1828,11 @@
     right: 0;
   }
 
+  /* No position here — .sg-carousel__nav (position:absolute) must anchor to the outer,
+     unconditionally-relative .sg-carousel instead, so it lands next to the section title,
+     not on top of the card row below. See the desktop breakpoint, which relies on the same
+     fallback. */
   .sg-carousel__body {
-    position: relative;
     align-items: center;
     gap: 36px;
   }
@@ -1853,9 +1866,13 @@
     border-color: #000;
   }
 
+  /* height:auto (not a fixed px value) cancels the base rule's mobile height and lets the
+     image stretch (align-items:stretch on .sg-live-card) to match whatever height the
+     content column ends up needing now that title/desc each reserve 2 lines — so it
+     always fills the card instead of stopping at a stale fixed value. */
   .sg-live-card__image {
     width: 425px;
-    height: 240px;
+    height: auto;
     border-radius: var(--s2a-border-radius-md);
     border: none;
   }
@@ -1905,21 +1922,7 @@
     margin: 0;
   }
 
-  .sg-live-card__time::before,
-  .sg-live-card__track-extra::before {
-    content: '';
-    display: inline-block;
-    width: 1px;
-    height: 12px;
-    margin-right: var(--s2a-spacing-sm);
-    background: var(--s2a-color-gray-300);
-    vertical-align: middle;
-  }
-
   .sg-live-card:is(:hover, :focus-within) .sg-live-card__time { color: #fff; }
-
-  .sg-live-card:is(:hover, :focus-within) .sg-live-card__time::before,
-  .sg-live-card:is(:hover, :focus-within) .sg-live-card__track-extra::before { background: rgb(255 255 255 / 40%); }
 
   .sg-live-card__title {
     font-size: var(--s2a-font-size-2xl);
@@ -1934,6 +1937,11 @@
     letter-spacing: -0.14px;
     white-space: normal;
     text-overflow: clip;
+
+    /* Reserved at 2 lines' worth of height, same reasoning as .sg-live-card__title, so a
+       1-line description doesn't leave its card shorter than a neighboring 2-line one. */
+    min-height: calc(2 * 1.2em);
+
     /* stylelint-disable-next-line value-no-vendor-prefix */
     display: -webkit-box;
     -webkit-line-clamp: 2;
@@ -1957,11 +1965,27 @@
     color: #111;
   }
 
+  .sg-live-card__btn--schedule-cta {
+    background: #fff;
+    border: 1px solid #000;
+    color: #000;
+    min-width: auto;
+    padding: 0 var(--s2a-spacing-lg);
+  }
+
+  /* The card's hover fill turns black at this breakpoint — flip to a white border/text
+     so the outline stays visible instead of vanishing into it. */
+  .sg-live-card:is(:hover, :focus-within) .sg-live-card__btn--schedule-cta {
+    background: transparent;
+    border-color: #fff;
+    color: #fff;
+  }
+
   .sg-live-card__btn--schedule { display: none; }
 
   .sg-live-card__btn--favorite {
     background: #fff;
-    border: 2px solid #000;
+    border: 1px solid #000;
     color: #000;
   }
 
@@ -1969,6 +1993,13 @@
     background: transparent;
     border-color: #fff;
     color: #fff;
+  }
+
+  /* Same specificity as the base rule's hover+favorited override (which keeps a dark
+     #292929 border for a white hover fill) but declared later, so it wins here — the card's
+     hover fill turns black at this breakpoint, and a dark border on black is invisible. */
+  .sg-live-card:is(:hover, :focus-within) .sg-live-card__btn--favorite.is-favorited {
+    border-color: #fff;
   }
 }
 
@@ -2046,6 +2077,132 @@
      the dropdown and that pair. Base stays 8px for the tighter narrow-viewport header. */
   .sg-filter-wrap {
     gap: var(--s2a-spacing-md);
+  }
+
+  /* ── Desktop Inline Search (Figma 10114:52057) ────────────────
+     The icon morphs in place into the field instead of opening the row below (mobile/
+     tablet's treatment) — sg-search-btn/sg-mobile-search-row are hidden here, and
+     sg-search-inline (display:none below 1280px) takes over. One persistent input, sized
+     by flex layout rather than its own width transition, so overflow:hidden on the pill
+     plus a single width transition on the pill is all that has to animate. */
+  .sg-search-btn {
+    display: none;
+  }
+
+  .sg-mobile-search-row {
+    display: none !important;
+  }
+
+  .sg-search-inline {
+    display: inline-flex;
+    align-items: center;
+
+    /* Explicit rather than relying on .sg-portal's inherited border-box: with a declared
+       height/width plus a border, content-box would add the border on top (40px -> 44px),
+       throwing the icon off-center relative to the same-height Filter button next to it. */
+    box-sizing: border-box;
+    height: 40px;
+    width: 40px;
+    border-radius: var(--s2a-border-radius-round, 999px);
+    border: 2px solid var(--s2a-color-gray-100);
+    background: var(--s2a-color-background-default, #fff);
+    overflow: hidden;
+    flex-shrink: 0;
+    transition: width 0.28s cubic-bezier(0.4, 0, 0.2, 1), border-color 0.28s ease;
+  }
+
+  .sg-search-inline--open {
+    width: 216px;
+    border-color: #131313;
+    cursor: text;
+  }
+
+  .sg-search-inline:focus-within {
+    outline: 1px solid var(--s2a-color-focus-ring-default, #3b63fb);
+    outline-offset: 2px;
+  }
+
+  /* 36px, not the pill's own 40px: .sg-search-inline's 40px already includes its 2px border
+     (box-sizing: border-box), so its content box — what this actually has to fill — is
+     40px minus that border on both sides. Sizing this to the outer 40px overflowed the
+     content box by 2px a side, and overflow:hidden on the pill clipped it asymmetrically —
+     the icon looked pushed off-center rather than actually being centered and cut off. */
+  .sg-search-inline__icon-btn,
+  .sg-search-inline__icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    min-width: 36px;
+    flex-shrink: 0;
+  }
+
+  .sg-search-inline__icon-btn {
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    padding: 0;
+  }
+
+  .sg-search-inline__icon-btn:hover {
+    background: rgb(0 0 0 / 4%);
+  }
+
+  .sg-search-inline__input {
+    flex: 1;
+    min-width: 0;
+    border: none;
+    outline: none;
+    background: transparent;
+    font-family: var(--s2a-font-family-adobe-clean);
+    font-size: var(--s2a-font-size-md);
+    color: #131313;
+    height: 100%;
+    padding: 0;
+
+    /* Text/placeholder only fade in once the pill has (mostly) finished widening, rather
+       than appearing instantly and looking like it's popping out of a too-small box. */
+    opacity: 0;
+    transition: opacity 0.15s ease;
+  }
+
+  .sg-search-inline--open .sg-search-inline__input {
+    opacity: 1;
+    transition-delay: 0.1s;
+  }
+
+  /* Suppress the browser's own type="search" cancel button — a custom
+     .sg-search-inline__clear already renders next to it once searchOpen is true, so
+     without this both appear once the field has a value. */
+  .sg-search-inline__input::-webkit-search-cancel-button {
+    appearance: none;
+  }
+
+  .sg-search-inline__input::placeholder {
+    color: rgb(0 0 0 / 40%);
+  }
+
+  .sg-search-inline__clear {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    min-width: 28px;
+    margin-right: 6px;
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    border-radius: 50%;
+    font-size: var(--s2a-font-size-lg);
+    color: #444;
+    line-height: 1;
+    flex-shrink: 0;
+  }
+
+  .sg-search-inline__clear:hover {
+    background: rgb(0 0 0 / 7%);
   }
 
   /* ── View Dropdown ─────────────────────────────────────────── */
@@ -2173,9 +2330,10 @@
     border-color: #000;
   }
 
+  /* height:auto — see the tablet breakpoint's identical rule for why. */
   .sg-live-card__image {
     width: 560px;
-    height: 316px;
+    height: auto;
     border-radius: var(--s2a-border-radius-md);
     border: none;
   }
@@ -2224,22 +2382,7 @@
     margin: 0;
   }
 
-  /* Vertical divider between track and time, matching the Figma meta row. */
-  .sg-live-card__time::before,
-  .sg-live-card__track-extra::before {
-    content: '';
-    display: inline-block;
-    width: 1px;
-    height: 12px;
-    margin-right: var(--s2a-spacing-sm);
-    background: var(--s2a-color-gray-300);
-    vertical-align: middle;
-  }
-
   .sg-live-card:is(:hover, :focus-within) .sg-live-card__time { color: #fff; }
-
-  .sg-live-card:is(:hover, :focus-within) .sg-live-card__time::before,
-  .sg-live-card:is(:hover, :focus-within) .sg-live-card__track-extra::before { background: rgb(255 255 255 / 40%); }
 
   .sg-live-card__title {
     font-size: var(--s2a-font-size-3xl);
@@ -2260,6 +2403,16 @@
     color: #000;
     white-space: normal;
     text-overflow: clip;
+
+    /* Reserved at 2 lines' worth of height, same reasoning as .sg-live-card__title, so a
+       1-line description doesn't leave its card shorter than a neighboring 2-line one. */
+    min-height: calc(2 * 1.2em);
+
+    /* Shown again from here up — hidden below 1024px (mobile/tablet). Set explicitly rather
+       than relying on the 1024-1279px block's own display: -webkit-box to cascade up, since
+       that block's max-width means it doesn't apply at this breakpoint at all. */
+    /* stylelint-disable-next-line value-no-vendor-prefix */
+    display: -webkit-box;
     -webkit-line-clamp: 2;
     -webkit-box-orient: vertical;
     overflow: hidden;
@@ -2283,6 +2436,22 @@
     color: #111;
   }
 
+  .sg-live-card__btn--schedule-cta {
+    background: #fff;
+    border: 2px solid #000;
+    color: #000;
+    min-width: auto;
+    padding: 0 var(--s2a-spacing-lg);
+  }
+
+  /* The card's hover fill turns black at this breakpoint — flip to a white border/text
+     so the outline stays visible instead of vanishing into it. */
+  .sg-live-card:is(:hover, :focus-within) .sg-live-card__btn--schedule-cta {
+    background: transparent;
+    border-color: #fff;
+    color: #fff;
+  }
+
   /* Design shows only Watch now + Favorite on the desktop live card. */
   .sg-live-card__btn--schedule {
     display: none;
@@ -2298,6 +2467,13 @@
     background: transparent;
     border-color: #fff;
     color: #fff;
+  }
+
+  /* Same specificity as the base rule's hover+favorited override (which keeps a dark
+     #292929 border for a white hover fill) but declared later, so it wins here — the card's
+     hover fill turns black at this breakpoint, and a dark border on black is invisible. */
+  .sg-live-card:is(:hover, :focus-within) .sg-live-card__btn--favorite.is-favorited {
+    border-color: #fff;
   }
 
   /* ── Time slot rows ────────────────────────────────────────── */
@@ -2472,29 +2648,6 @@
 
   .sg-card:is(:hover, :focus-within) .sg-card__title { color: #fff; }
 
-  .sg-card__desc {
-    font-size: var(--s2a-font-size-sm);
-    color: rgb(255 255 255 / 65%);
-    line-height: 1.45;
-    height: auto;
-    max-height: 0;
-    opacity: 0;
-    margin-top: 0;
-    display: block;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    transition: max-height 0.32s cubic-bezier(0.22, 1, 0.36, 1),
-                margin-top 0.32s cubic-bezier(0.22, 1, 0.36, 1),
-                opacity 0.25s ease 0.05s;
-  }
-
-  .sg-card:is(:hover, :focus-within) .sg-card__desc {
-    max-height: 22px;
-    margin-top: var(--s2a-spacing-xs);
-    opacity: 1;
-  }
-
   .sg-card__footer {
     display: flex;
     align-items: flex-end;
@@ -2659,12 +2812,6 @@
   .sg-card:is(:hover, :focus-within) .sg-icon-btn--outlined.sg-icon-btn--on-light {
     border-color: var(--s2a-color-border-default, #292929);
     color: var(--s2a-color-content-default, #000);
-  }
-
-  .sg-card:is(:hover, :focus-within) .sg-card__desc {
-    max-height: 0;
-    margin-top: 0;
-    opacity: 0;
   }
 
   .sg-card:is(:hover, :focus-within) .sg-card__actions {
@@ -2882,7 +3029,7 @@
 .sg-icon-btn--solid.sg-icon-btn--on-dark {
   background: var(--s2a-color-background-default, #fff);
   color: var(--s2a-color-content-default, #000);
-  border: var(--s2a-border-width-sm) solid var(--s2a-color-gray-100, #e0e0e0);
+  border: var(--s2a-border-width-sm) solid #000;
 }
 
 .sg-icon-btn--solid.sg-icon-btn--on-dark:hover:not(:disabled) {
@@ -2962,83 +3109,80 @@
 }
 
 
-/* ── Back to Top (Figma 9145:44653) ────────────────────────────────── */
+/* ── Back to Top (Figma 9145:44653 — desktop; same treatment carried to mobile/tablet
+   since the show-on-scroll behavior isn't breakpoint-specific) ─────────────────────── */
 
-/* Desktop only: narrower layouts are a takeover where the header is a flick away. */
 .sg-back-to-top {
-  display: none;
+  position: absolute;
+
+  /* Pulled left by the padding below so the arrow and label still sit at the design's
+     20px inset from the drawer edge — only the glass extends further out. */
+  left: calc(var(--s2a-spacing-20, 20px) - var(--s2a-spacing-xs));
+  bottom: var(--s2a-spacing-20, 20px);
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+
+  /* Figma leaves the left padding at 0, which cuts the blur off hard against the arrow.
+     Matched to the other three sides instead so the frosting fades in symmetrically. */
+  gap: var(--s2a-spacing-xs);
+  padding: var(--s2a-spacing-xs);
+  border: none;
+  border-radius: var(--s2a-border-radius-sm);
+  background: rgb(255 255 255 / 20%);
+  backdrop-filter: blur(3px);
+  cursor: pointer;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.2s ease, visibility 0.2s ease;
 }
 
-@media (min-width: 1280px) {
-  .sg-back-to-top {
-    position: absolute;
-    /* Pulled left by the padding below so the arrow and label still sit at the design's
-       20px inset from the drawer edge — only the glass extends further out. */
-    left: calc(var(--s2a-spacing-20, 20px) - var(--s2a-spacing-xs));
-    bottom: var(--s2a-spacing-20, 20px);
-    z-index: 40;
-    display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-    /* Figma leaves the left padding at 0, which cuts the blur off hard against the arrow.
-       Matched to the other three sides instead so the frosting fades in symmetrically. */
-    gap: var(--s2a-spacing-xs);
-    padding: var(--s2a-spacing-xs);
-    border: none;
-    border-radius: var(--s2a-border-radius-sm);
-    background: rgb(255 255 255 / 20%);
-    backdrop-filter: blur(3px);
-    cursor: pointer;
-    opacity: 0;
-    visibility: hidden;
-    transition: opacity 0.2s ease, visibility 0.2s ease;
-  }
+/* Fades in once the list has been scrolled (see shouldShowBackToTop). */
+.sg-back-to-top--visible {
+  opacity: 1;
+  visibility: visible;
+}
 
-  /* Fades in once the list has been scrolled (see shouldShowBackToTop). */
-  .sg-back-to-top--visible {
-    opacity: 1;
-    visibility: visible;
-  }
+/* Full-page surface: the window scrolls, so the button anchors to the viewport rather
+   than to the drawer body. */
+.sg-back-to-top--fixed {
+  position: fixed;
+  z-index: 60;
+}
 
-  /* Full-page surface: the window scrolls, so the button anchors to the viewport rather
-     than to the drawer body. */
-  .sg-back-to-top--fixed {
-    position: fixed;
-    z-index: 60;
-  }
+.sg-back-to-top__arrow {
+  width: 40px;
+  height: 40px;
+  border-radius: var(--s2a-radius-corner-full, 999px);
+  background: #010101;
+  backdrop-filter: blur(15px);
+  color: var(--s2a-color-content-knockout, #fff);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
 
-  .sg-back-to-top__arrow {
-    width: 40px;
-    height: 40px;
-    border-radius: var(--s2a-radius-corner-full, 999px);
-    background: #010101;
-    backdrop-filter: blur(15px);
-    color: var(--s2a-color-content-knockout, #fff);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    flex-shrink: 0;
-  }
+.sg-back-to-top__label {
+  font-family: var(--s2a-font-family-adobe-clean-display);
+  font-weight: var(--s2a-font-weight-adobe-clean-bold);
+  font-size: var(--s2a-font-size-16, 16px);
+  line-height: 0.9;
+  letter-spacing: 0.16px;
 
-  .sg-back-to-top__label {
-    font-family: var(--s2a-font-family-adobe-clean-display);
-    font-weight: var(--s2a-font-weight-adobe-clean-bold);
-    font-size: var(--s2a-font-size-16, 16px);
-    line-height: 0.9;
-    letter-spacing: 0.16px;
-    /* Figma specifies black; the token keeps it legible if the drawer is themed dark. */
-    color: var(--s2a-color-content-default, #000);
-    white-space: nowrap;
-  }
+  /* Figma specifies black; the token keeps it legible if the drawer is themed dark. */
+  color: var(--s2a-color-content-default, #000);
+  white-space: nowrap;
+}
 
-  .sg-back-to-top:hover .sg-back-to-top__arrow {
-    background: var(--s2a-color-gray-800, #292929);
-  }
+.sg-back-to-top:hover .sg-back-to-top__arrow {
+  background: var(--s2a-color-gray-800, #292929);
+}
 
-  .sg-back-to-top:focus-visible {
-    outline: 1px solid var(--s2a-color-focus-ring-default, #3b63fb);
-    outline-offset: 1px;
-  }
+.sg-back-to-top:focus-visible {
+  outline: 1px solid var(--s2a-color-focus-ring-default, #3b63fb);
+  outline-offset: 1px;
 }
 
 @media (prefers-reduced-motion: reduce) {

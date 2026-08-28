@@ -1,7 +1,7 @@
 import { createTag, getMetadata } from '../../../utils/utils.js';
 import { getJsonMetadata, getAttrText } from '../../utils/custom-attributes.js';
 import { readBackgroundConfig } from '../../utils/background-config.js';
-import { initSessionState, getApiConfig } from '../../../utils/session-store.js';
+import { initSessionState, getEventApiConfig } from '../../../utils/session-store.js';
 import { assertAuthorized } from '../../../services/sessions/session-actions.js';
 import { showAuthToast } from '../../../services/sessions/action-feedback.js';
 import { showToast } from '../../../features/toast/toast.js';
@@ -56,7 +56,7 @@ export default async function init(el) {
   initSessionState();
   const eventConfig = {
     title: getMetadata('event-title') || getMetadata('title') || '',
-    registerUrl: getApiConfig()?.registerUrl || '/register',
+    registerUrl: getEventApiConfig()?.registerUrl || '/register',
   };
 
   el.replaceChildren();
@@ -88,9 +88,9 @@ export default async function init(el) {
       cta.addEventListener('click', (e) => {
         try {
           assertAuthorized();
-        } catch (err) {
+        } catch {
           e.preventDefault();
-          showAuthToast(err.reason, { eventConfig, actionLabel: `download ${name}` });
+          showAuthToast({ eventConfig, actionLabel: `download ${name}` });
           return;
         }
         showToast({ message: 'Session resource downloaded', variant: 'positive' });

@@ -78,7 +78,7 @@ export function Carousel({
       <div class="sg-carousel__header">
         <h3 class="sg-section-title">
           ${title}
-          ${timeLabel && html`<span class="sg-section-time">${timeLabel}</span>`}
+          ${timeLabel && html`<span class="sg-section-time">${timeLabel}${tzLabel ? ` ${tzLabel}` : ''}</span>`}
         </h3>
       </div>
       <div class="sg-carousel__body">
