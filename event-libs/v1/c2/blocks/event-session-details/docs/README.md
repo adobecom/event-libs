@@ -229,15 +229,18 @@ before the toast line was reached, a *successful* share produced no feedback at 
 toast only ever appeared on the non-`navigator.share` fallback path. A failed copy now shows a
 negative toast rather than failing silently, so the click always confirms one way or the other.
 
-The toast copy is **"Link copied!"**, matching `sessions-guide`'s `SessionDetailOverlay`,
-which gained the exclamation in `29ce11db` (MWPW-200314 part 5). This block briefly said
-"Link copied to clipboard", because the whole handler was copied from `event-marquee`.
+The toast copy is **"Link copied"**. This block briefly said "Link copied to clipboard",
+because the whole handler was copied from `event-marquee`.
+
+It is deliberately *not* matched to `sessions-guide`, which says "Link copied!" since
+`29ce11db` (MWPW-200314 part 5). The two differ by an exclamation mark only; toast copy is not
+an analytics value, so nothing aggregates on it and the difference is cosmetic.
 
 ⚠️ There are **four** share handlers in this repo and **three** different strings:
 
 | Where | Copy | `navigator.share` first? |
 |---|---|---|
-| `event-session-details/share.js` | `Link copied!` | no — fixed here |
+| `event-session-details/share.js` | `Link copied` | no — fixed here |
 | `sessions-guide/components/SessionDetailOverlay.js` | `Link copied!` | **yes** |
 | `c2/blocks/event-marquee/event-marquee.js` | `Link copied to clipboard` | **yes** |
 | `c2/blocks/mobile-rider/mobile-rider.js` | `Link copied to clipboard` | **yes** |
@@ -245,8 +248,7 @@ which gained the exclamation in `29ce11db` (MWPW-200314 part 5). This block brie
 The three that still try `navigator.share` first all carry the defect
 [MWPW-205502](https://jira.corp.adobe.com/browse/MWPW-205502) describes: the OS share sheet,
 and no toast on the path that succeeds. Consolidating into one shared helper would fix all
-three and settle the wording in a single place — this string has already had to be re-aligned
-once because the guide moved.
+three and settle the wording in a single place.
 
 ## Track tags (`track-tags.js`)
 

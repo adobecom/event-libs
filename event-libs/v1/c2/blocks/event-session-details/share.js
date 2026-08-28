@@ -16,7 +16,7 @@ export function renderShare() {
     try {
       if (!navigator.clipboard?.writeText) throw new Error('clipboard unavailable');
       await navigator.clipboard.writeText(url);
-      showToast({ message: 'Link copied!', variant: 'positive' });
+      showToast({ message: 'Link copied', variant: 'positive' });
     } catch (e) {
       showToast({ message: 'Could not copy link', variant: 'negative' });
       window.lana?.log(`[session-details] share failed: ${e.message}`);
