@@ -2330,10 +2330,15 @@
     border-color: #000;
   }
 
-  /* height:auto — see the tablet breakpoint's identical rule for why. */
+  /* Fixed, not auto (Figma: 560x316). A real <img> with height:100% against an auto
+     parent falls back to its own intrinsic aspect ratio (a replaced-element rule, unlike
+     the thumb-placeholder div, which just collapses to 0 and lets align-items:stretch
+     match the text column instead) — so two sibling cards in the same carousel row could
+     end up different heights depending on each session's own photo ratio. object-fit:cover
+     on the img crops any ratio to this fixed box instead. */
   .sg-live-card__image {
     width: 560px;
-    height: auto;
+    height: 316px;
     border-radius: var(--s2a-border-radius-md);
     border: none;
   }
