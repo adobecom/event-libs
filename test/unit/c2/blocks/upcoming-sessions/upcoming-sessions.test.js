@@ -133,19 +133,21 @@ describe('upcoming-sessions', () => {
       expect(el.dataset.fewSessions).to.equal('true');
     });
 
-    it('removes itself entirely when the entries array is empty', async () => {
+    it('keeps the heading rendered when the entries array is empty (removal is manual/operational)', async () => {
       const el = buildBlock([]);
       await init(el);
-      expect(el.isConnected).to.equal(false);
+      expect(el.isConnected).to.equal(true);
+      expect(el.querySelector('.upcoming-sessions-heading')).to.exist;
     });
 
-    it('removes itself entirely when there is no config data attribute at all', async () => {
+    it('keeps the heading rendered when there is no config data attribute at all', async () => {
       const el = document.createElement('div');
       el.className = 'upcoming-sessions carousel clip-end';
       document.body.append(el);
 
       await init(el);
-      expect(el.isConnected).to.equal(false);
+      expect(el.isConnected).to.equal(true);
+      expect(el.querySelector('.upcoming-sessions-heading')).to.exist;
     });
 
     it('removes itself entirely when the config payload fails to parse', async () => {
