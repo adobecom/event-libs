@@ -6,6 +6,10 @@ import { getMetadata } from '../../utils/utils.js';
 const DEFAULT_UPCOMING_OFFSET_MINUTES = 5;
 const DEFAULT_NOTIFICATION_ICON_URL = '';
 const DEFAULT_NOTIFICATION_IMAGE_URL = '';
+// UNC drops a scheduled (schedule_at) notification as "too stale" if it's still unfired
+// once this many seconds pass its due time — sized generously since our own check for it
+// only runs every ~15s and a backgrounded/throttled tab can fall behind that.
+const DEFAULT_SCHEDULE_TIME_BUFFER_SECONDS = 3600;
 
 // Parses the Tier 1 Event Configurator's payload (MWPW-200311); null if absent/invalid.
 // Duplicated from session-store.js's own parseTierOneEventConfig() rather than shared,
@@ -34,5 +38,6 @@ export function getSwanConfig() {
     upcomingOffsetMinutes: DEFAULT_UPCOMING_OFFSET_MINUTES,
     defaultNotificationIconUrl: DEFAULT_NOTIFICATION_ICON_URL,
     defaultNotificationImageUrl: DEFAULT_NOTIFICATION_IMAGE_URL,
+    scheduleTimeBufferSeconds: DEFAULT_SCHEDULE_TIME_BUFFER_SECONDS,
   };
 }

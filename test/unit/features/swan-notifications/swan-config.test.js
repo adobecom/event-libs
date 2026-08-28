@@ -39,6 +39,7 @@ describe('swan-config', () => {
       expect(config.upcomingOffsetMinutes).to.equal(5);
       expect(config.defaultNotificationIconUrl).to.equal('');
       expect(config.defaultNotificationImageUrl).to.equal('');
+      expect(config.scheduleTimeBufferSeconds).to.equal(3600);
     });
 
     it('derives eventName from tier-1-event-config metadata when present', () => {

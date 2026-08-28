@@ -1,5 +1,6 @@
 import { expect } from '@esm-bundle/chai';
 import { setMetadata } from '../../../event-libs/v1/utils/utils.js';
+import { buildCampaignId } from '../../../event-libs/v1/features/swan-notifications/swan-payload.js';
 
 // session-store.js holds module-level singleton state that @web/test-runner does not
 // reliably reset between test files sharing a worker session — cache-bust the import
@@ -28,20 +29,9 @@ function settlesWithin(promise, ms) {
   return Promise.race([promise.then(() => true), timeout]);
 }
 
-function makeStore() {
-  const entries = new Map();
-  return {
-    add(entry) { entries.set(entry.id, entry); },
-    edit(id, entry) { entries.set(id, entry); },
-    remove(id) { entries.delete(id); },
-    get() { return [...entries.values()]; },
-  };
-}
-
 describe('session-store: toggleSchedule fires SWAN notification hooks without blocking on them', () => {
   let originalFetch;
   let originalFeds;
-  let store;
 
   before(async () => {
     originalFetch = window.fetch;
@@ -56,8 +46,12 @@ describe('session-store: toggleSchedule fires SWAN notification hooks without bl
     };
 
     originalFeds = window.feds;
-    store = makeStore();
-    window.feds = { data: { notifications: store } };
+    // Deliberately absent — unc-client.js's whenUncReady() will hang (waiting on
+    // feds.data.notifications.loaded) until the test itself supplies it below. If
+    // toggleSchedule() were regressed to await notifySessionScheduled() inline, its own
+    // promise would hang right along with this one, and settlesWithin() below would return
+    // false instead of true.
+    delete window.feds;
 
     const meta = document.createElement('meta');
     meta.name = 'swan-notifications';
@@ -76,7 +70,7 @@ describe('session-store: toggleSchedule fires SWAN notification hooks without bl
     document.head.querySelector('meta[name="swan-notifications"]')?.remove();
   });
 
-  it('resolves and updates the scheduled signal without waiting on the SWAN/UNC hook', async () => {
+  it('resolves and updates the scheduled signal even though the SWAN/UNC hook is still pending', async () => {
     const session = {
       id: 'sess-1',
       rfCode: 'RF-1',
@@ -90,8 +84,21 @@ describe('session-store: toggleSchedule fires SWAN notification hooks without bl
     expect(resolvedInTime).to.equal(true);
     expect(scheduled.value.has('sess-1')).to.equal(true);
 
-    // Give the fire-and-forget SWAN call a tick to actually run against the store.
+    // Only now let UNC "become ready" — proves the fire-and-forget SWAN call really was
+    // still in flight above, not merely fast.
+    const calls = [];
+    const uncInstance = {
+      UpsertReminderFeatureFlag: (data) => calls.push({
+        method: 'UpsertReminderFeatureFlag', campaignID: data.campaignRules[0].campaignID,
+      }),
+      DeleteReminderFeatureFlag: () => {},
+      AnalyticsEventFromHost: () => {},
+    };
+    window.feds = { data: { notifications: uncInstance } };
+    window.dispatchEvent(new CustomEvent('feds.data.notifications.loaded'));
+
     await new Promise((resolve) => setTimeout(resolve, 0));
-    expect(store.get().some((entry) => entry.id === 'swan-RF-1')).to.equal(true);
+    const upsert = calls.find((c) => c.method === 'UpsertReminderFeatureFlag');
+    expect(upsert?.campaignID).to.equal(buildCampaignId('RF-1', 'live'));
   });
 });

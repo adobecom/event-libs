@@ -1,20 +1,11 @@
 import { expect } from '@esm-bundle/chai';
+import sinon from 'sinon';
 import {
   notifySessionScheduled, notifySessionUnscheduled, reconcileSwanNotifications,
 } from '../../../../event-libs/v1/features/swan-notifications/swan-notifications.js';
-import { SWAN_ENTRY_SOURCE } from '../../../../event-libs/v1/features/swan-notifications/swan-payload.js';
+import { buildCampaignId } from '../../../../event-libs/v1/features/swan-notifications/swan-payload.js';
 
-const LOCAL_STATE_KEY = 'swan-notification-state';
-
-function makeStore() {
-  const entries = new Map();
-  return {
-    add(entry) { entries.set(entry.id, entry); },
-    edit(id, entry) { entries.set(id, entry); },
-    remove(id) { entries.delete(id); },
-    get() { return [...entries.values()]; },
-  };
-}
+const LOCAL_STATE_KEY = 'swan-notification-state-v2';
 
 // now + offsetMs, as an ISO string — startOffsetMs/endOffsetMs are negative for "in the past".
 function iso(offsetMs) {
@@ -36,7 +27,7 @@ const MIN = 60 * 1000;
 
 describe('swan-notifications', () => {
   let originalFeds;
-  let store;
+  let calls;
 
   beforeEach(() => {
     const meta = document.createElement('meta');
@@ -45,8 +36,20 @@ describe('swan-notifications', () => {
     document.head.appendChild(meta);
 
     originalFeds = window.feds;
-    store = makeStore();
-    window.feds = { data: { notifications: store } };
+    calls = [];
+    const uncInstance = {
+      UpsertReminderFeatureFlag: (data) => calls.push({
+        method: 'UpsertReminderFeatureFlag',
+        campaignID: data.campaignRules[0].campaignID,
+        campaignRule: data.campaignRules[0].campaignRule,
+      }),
+      DeleteReminderFeatureFlag: (data) => calls.push({
+        method: 'DeleteReminderFeatureFlag',
+        campaignID: data.campaignRules[0].campaignID,
+      }),
+      AnalyticsEventFromHost: (eventData) => calls.push({ method: 'AnalyticsEventFromHost', eventData }),
+    };
+    window.feds = { data: { notifications: uncInstance } };
     window.localStorage.removeItem(LOCAL_STATE_KEY);
   });
 
@@ -54,94 +57,152 @@ describe('swan-notifications', () => {
     window.feds = originalFeds;
     window.localStorage.removeItem(LOCAL_STATE_KEY);
     document.head.querySelector('meta[name="swan-notifications"]')?.remove();
+    sinon.restore();
   });
 
   describe('notifySessionScheduled / notifySessionUnscheduled', () => {
-    it('adds a reminder entry once the trigger time has already passed', async () => {
-      // Starts in 2 min, offset defaults to 5 min, so the reminder trigger (start - 5min)
-      // is 3 min in the past already.
-      const session = makeSession('RF-100', { startOffsetMs: 2 * MIN, endOffsetMs: 62 * MIN });
+    it('registers a reminder rule with schedule_at when the trigger time is still in the future', async () => {
+      const session = makeSession('RF-100', { startOffsetMs: 60 * MIN, endOffsetMs: 120 * MIN });
       await notifySessionScheduled(session);
 
-      const [entry] = store.get();
-      expect(entry.id).to.equal('swan-RF-100');
-      expect(entry.stage).to.equal('reminder');
-      // Tagged so a reconcile/diff pass never touches another product's entries in the
-      // same (shared) store — verified here end-to-end, not just on the raw payload builder.
-      expect(entry.source).to.equal(SWAN_ENTRY_SOURCE);
+      const upsert = calls.find((c) => c.method === 'UpsertReminderFeatureFlag');
+      expect(upsert.campaignID).to.equal(buildCampaignId('RF-100', 'reminder'));
+      const channelDetails = upsert.campaignRule.events[0].notification_channels[0].channel_details;
+      expect(channelDetails.schedule_at).to.be.a('number');
+
+      const fire = calls.find((c) => c.method === 'AnalyticsEventFromHost');
+      expect(fire.eventData).to.deep.equal({ swan_campaign_id: upsert.campaignID });
+
+      expect(calls.some((c) => c.method === 'DeleteReminderFeatureFlag')).to.equal(false);
     });
 
-    it('does not add an entry before the reminder trigger time', async () => {
-      const session = makeSession('RF-101', { startOffsetMs: 60 * MIN, endOffsetMs: 120 * MIN });
+    it('registers the reminder rule with schedule_after: 0 once its trigger time has already passed', async () => {
+      const session = makeSession('RF-101', { startOffsetMs: 2 * MIN, endOffsetMs: 62 * MIN });
       await notifySessionScheduled(session);
-      expect(store.get()).to.have.lengthOf(0);
+      const upsert = calls.find((c) => c.method === 'UpsertReminderFeatureFlag');
+      const channelDetails = upsert.campaignRule.events[0].notification_channels[0].channel_details;
+      expect(channelDetails.schedule_after).to.equal(0);
+      expect(channelDetails.schedule_at).to.equal(undefined);
     });
 
-    it('removes the matching entry on unschedule', async () => {
+    it('registers the live stage directly (skipping reminder) for a session already underway when scheduled', async () => {
       const session = makeSession('RF-102', { startOffsetMs: -MIN, endOffsetMs: 30 * MIN });
       await notifySessionScheduled(session);
-      expect(store.get()).to.have.lengthOf(1);
-
-      await notifySessionUnscheduled(session);
-      expect(store.get()).to.have.lengthOf(0);
+      const upsert = calls.find((c) => c.method === 'UpsertReminderFeatureFlag');
+      expect(upsert.campaignID).to.equal(buildCampaignId('RF-102', 'live'));
     });
 
-    it('no-ops on unschedule when there is no known entry for the session', async () => {
+    it('deletes whatever stage is currently active on unschedule', async () => {
+      const session = makeSession('RF-103', { startOffsetMs: -MIN, endOffsetMs: 30 * MIN });
+      await notifySessionScheduled(session);
+      calls = [];
+
+      await notifySessionUnscheduled(session);
+      const del = calls.find((c) => c.method === 'DeleteReminderFeatureFlag');
+      expect(del.campaignID).to.equal(buildCampaignId('RF-103', 'live'));
+    });
+
+    it('no-ops on unschedule when there is no known active stage for the session', async () => {
       await notifySessionUnscheduled(makeSession('RF-never-scheduled', { startOffsetMs: MIN, endOffsetMs: 2 * MIN }));
-      expect(store.get()).to.have.lengthOf(0);
+      expect(calls).to.have.lengthOf(0);
     });
 
     it('no-ops when the session has no rfCode', async () => {
       await notifySessionScheduled({ id: 'no-rfcode' });
       await notifySessionUnscheduled({ id: 'no-rfcode' });
-      expect(store.get()).to.have.lengthOf(0);
+      expect(calls).to.have.lengthOf(0);
+    });
+
+    it('skips a session with malformed start/end timestamps rather than misclassifying its stage', async () => {
+      const badSession = {
+        id: 'session-bad', rfCode: 'RF-bad', startTimeUtc: 'not-a-date', endTimeUtc: 'also-not-a-date',
+      };
+      await notifySessionScheduled(badSession);
+      expect(calls).to.have.lengthOf(0);
+      const state = JSON.parse(window.localStorage.getItem(LOCAL_STATE_KEY) || '{}');
+      expect(state['RF-bad']).to.equal(undefined);
     });
 
     it('is a no-op entirely when SWAN is not enabled on the page', async () => {
       document.head.querySelector('meta[name="swan-notifications"]')?.remove();
       const session = makeSession('RF-disabled', { startOffsetMs: -MIN, endOffsetMs: 30 * MIN });
       await notifySessionScheduled(session);
-      expect(store.get()).to.have.lengthOf(0);
+      expect(calls).to.have.lengthOf(0);
+    });
+
+    it('does not persist state for a failed transition, so it can be retried once UNC becomes available', async () => {
+      // No UNC instance available on this page load — registerReminderRule/fireHostEvent
+      // both resolve false (via whenUncReady()'s own timeout) rather than throw.
+      delete window.feds;
+      const clock = sinon.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+      const session = makeSession('RF-retry', { startOffsetMs: -MIN, endOffsetMs: 30 * MIN });
+
+      const scheduledPromise = notifySessionScheduled(session);
+      await clock.tickAsync(8000); // let whenUncReady()'s default timeout elapse
+      await scheduledPromise;
+      clock.restore();
+
+      // Must NOT be recorded as applied — the forward-only stage guard would otherwise
+      // permanently skip retrying this session, since it'd look like "already done."
+      let state = JSON.parse(window.localStorage.getItem(LOCAL_STATE_KEY) || '{}');
+      expect(state['RF-retry']).to.equal(undefined);
+
+      // Once UNC is available, the very next reconcile should succeed.
+      window.feds = {
+        data: {
+          notifications: {
+            UpsertReminderFeatureFlag: (data) => calls.push({
+              method: 'UpsertReminderFeatureFlag', campaignID: data.campaignRules[0].campaignID,
+            }),
+            DeleteReminderFeatureFlag: () => {},
+            AnalyticsEventFromHost: (eventData) => calls.push({ method: 'AnalyticsEventFromHost', eventData }),
+          },
+        },
+      };
+      calls = [];
+      await reconcileSwanNotifications(() => [session], () => new Set([session.id]));
+
+      state = JSON.parse(window.localStorage.getItem(LOCAL_STATE_KEY) || '{}');
+      expect(state['RF-retry']?.stage).to.equal('live');
+      expect(calls.some((c) => c.method === 'UpsertReminderFeatureFlag')).to.equal(true);
     });
   });
 
   describe('reconcileSwanNotifications', () => {
-    it('creates for scheduled sessions past their trigger time, removes orphaned entries, leaves matched pairs alone', async () => {
-      const keep = makeSession('RF-keep', { startOffsetMs: -MIN, endOffsetMs: 30 * MIN });
-      const toCreate = makeSession('RF-create', { startOffsetMs: -MIN, endOffsetMs: 30 * MIN });
-      await notifySessionScheduled(keep);
-      store.add({ id: 'swan-RF-orphan', stage: 'reminder' }); // simulates a stale entry from a since-unscheduled session
+    it('advances a session from reminder to live in the correct order: register new, fire, then delete the previous stage', async () => {
+      const reminderSession = makeSession('RF-progress', { startOffsetMs: 60 * MIN, endOffsetMs: 120 * MIN });
+      await notifySessionScheduled(reminderSession);
+      calls = [];
 
-      // Force local state to believe RF-orphan is still tracked, mirroring what a prior
-      // notifySessionScheduled('RF-orphan') call would have left behind.
-      const state = JSON.parse(window.localStorage.getItem(LOCAL_STATE_KEY) || '{}');
-      state['RF-orphan'] = { stage: 'reminder', dismissed: false };
-      window.localStorage.setItem(LOCAL_STATE_KEY, JSON.stringify(state));
+      const liveSession = makeSession('RF-progress', { startOffsetMs: -MIN, endOffsetMs: 30 * MIN });
+      await reconcileSwanNotifications(() => [liveSession], () => new Set([liveSession.id]));
 
-      await reconcileSwanNotifications(
-        () => [keep, toCreate],
-        () => new Set([keep.id, toCreate.id]),
-      );
-
-      const ids = store.get().map((e) => e.id);
-      expect(ids).to.include('swan-RF-keep');
-      expect(ids).to.include('swan-RF-create');
-      expect(ids).to.not.include('swan-RF-orphan');
+      expect(calls.map((c) => c.method)).to.deep.equal([
+        'UpsertReminderFeatureFlag', 'AnalyticsEventFromHost', 'DeleteReminderFeatureFlag',
+      ]);
+      expect(calls[0].campaignID).to.equal(buildCampaignId('RF-progress', 'live'));
+      expect(calls[2].campaignID).to.equal(buildCampaignId('RF-progress', 'reminder'));
     });
 
-    it('removes every tracked entry when nothing is scheduled anymore', async () => {
-      const a = makeSession('RF-a', { startOffsetMs: -MIN, endOffsetMs: 30 * MIN });
-      const b = makeSession('RF-b', { startOffsetMs: -MIN, endOffsetMs: 30 * MIN });
-      await notifySessionScheduled(a);
-      await notifySessionScheduled(b);
-      expect(store.get()).to.have.lengthOf(2);
+    it('never re-applies a stage already reached, even across repeated reconcile calls at the same time', async () => {
+      const session = makeSession('RF-stable', { startOffsetMs: -MIN, endOffsetMs: 30 * MIN });
+      await notifySessionScheduled(session);
+      calls = [];
+
+      await reconcileSwanNotifications(() => [session], () => new Set([session.id]));
+      await reconcileSwanNotifications(() => [session], () => new Set([session.id]));
+      expect(calls).to.have.lengthOf(0);
+    });
+
+    it('deletes the active stage and drops local state for a session no longer scheduled', async () => {
+      const session = makeSession('RF-orphan', { startOffsetMs: -MIN, endOffsetMs: 30 * MIN });
+      await notifySessionScheduled(session);
+      calls = [];
 
       await reconcileSwanNotifications(() => [], () => new Set());
-      expect(store.get()).to.have.lengthOf(0);
-      // Not just the store — a regression that calls store.remove() but forgets to
-      // clear local state would leave RF-a/RF-b stuck as "active" and never re-added
-      // even if they got scheduled again (applyStage's current?.stage === stage guard
-      // would think nothing changed).
+      const del = calls.find((c) => c.method === 'DeleteReminderFeatureFlag');
+      expect(del.campaignID).to.equal(buildCampaignId('RF-orphan', 'live'));
+
       const state = JSON.parse(window.localStorage.getItem(LOCAL_STATE_KEY) || '{}');
       expect(state).to.deep.equal({});
     });
@@ -156,37 +217,41 @@ describe('swan-notifications', () => {
       expect(threw).to.equal(false);
     });
 
-    it('updates an entry in place (edit, not a duplicate add) as a session crosses live/on-demand', async () => {
-      const session = makeSession('RF-progress', { startOffsetMs: 2 * MIN, endOffsetMs: 62 * MIN });
-      await notifySessionScheduled(session);
-      expect(store.get()[0].stage).to.equal('reminder');
+    it('ignores an overlapping reconcile call while one is still in flight, rather than racing its localStorage write', async () => {
+      const session = makeSession('RF-overlap', { startOffsetMs: -MIN, endOffsetMs: 30 * MIN });
+      // Neither call is awaited before the other starts — reconcileSwanNotifications sets
+      // its in-flight guard synchronously, before its first await, so the second call is
+      // guaranteed to see it already set regardless of how slow UNC itself is.
+      const firstPass = reconcileSwanNotifications(() => [session], () => new Set([session.id]));
+      const secondPass = reconcileSwanNotifications(() => [session], () => new Set([session.id]));
+      await Promise.all([firstPass, secondPass]);
 
-      // Re-run reconcile once the session has actually gone live/on-demand relative to now.
-      const liveSession = makeSession('RF-progress', { startOffsetMs: -30 * MIN, endOffsetMs: -MIN });
-      await reconcileSwanNotifications(() => [liveSession], () => new Set([liveSession.id]));
-
-      expect(store.get()).to.have.lengthOf(1);
-      expect(store.get()[0].stage).to.equal('on-demand');
+      const upserts = calls.filter((c) => c.method === 'UpsertReminderFeatureFlag');
+      expect(upserts).to.have.lengthOf(1);
     });
 
-    it('does not resurrect an entry the user dismissed directly via the UNC bell, even once its stage would otherwise change', async () => {
-      // Starts in 2 min: reminder trigger already passed, live boundary has not.
-      const reminderSession = makeSession('RF-dismissed', { startOffsetMs: 2 * MIN, endOffsetMs: 62 * MIN });
+    it('advances a session all the way through reminder -> live -> on-demand, one active campaign at a time', async () => {
+      const rfCode = 'RF-full-lifecycle';
+      const reminderSession = makeSession(rfCode, { startOffsetMs: 60 * MIN, endOffsetMs: 120 * MIN });
       await notifySessionScheduled(reminderSession);
-      expect(store.get()[0].stage).to.equal('reminder');
 
-      // Simulate the user clearing it via UNC's own UI — that call never goes through
-      // this module, so only the store changes; local state still thinks it's active
-      // until the next reconcile pass notices the mismatch.
-      store.remove('swan-RF-dismissed');
-
-      // A naive "scheduled but no local-state stage yet" check would treat this as
-      // needing its *first* add — the real regression this guards against is
-      // resurrecting it once the session progresses to a genuinely new stage, not just
-      // leaving it alone while nothing changes.
-      const liveSession = makeSession('RF-dismissed', { startOffsetMs: -MIN, endOffsetMs: 30 * MIN });
+      const liveSession = makeSession(rfCode, { startOffsetMs: -MIN, endOffsetMs: 30 * MIN });
       await reconcileSwanNotifications(() => [liveSession], () => new Set([liveSession.id]));
-      expect(store.get()).to.have.lengthOf(0);
+
+      const onDemandSession = makeSession(rfCode, { startOffsetMs: -30 * MIN, endOffsetMs: -MIN });
+      await reconcileSwanNotifications(() => [onDemandSession], () => new Set([onDemandSession.id]));
+
+      const state = JSON.parse(window.localStorage.getItem(LOCAL_STATE_KEY) || '{}');
+      expect(state[rfCode].stage).to.equal('on-demand');
+      expect(state[rfCode].campaignId).to.equal(buildCampaignId(rfCode, 'on-demand'));
+
+      // Exactly one delete per completed transition (reminder->live, live->on-demand) — never
+      // more than one stage's campaign registered/active at a time.
+      const deletes = calls.filter((c) => c.method === 'DeleteReminderFeatureFlag').map((c) => c.campaignID);
+      expect(deletes).to.deep.equal([
+        buildCampaignId(rfCode, 'reminder'),
+        buildCampaignId(rfCode, 'live'),
+      ]);
     });
   });
 });

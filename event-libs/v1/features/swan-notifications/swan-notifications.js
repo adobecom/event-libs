@@ -1,24 +1,21 @@
 // Public orchestration API for SWAN notifications. session-store.js's toggleSchedule()
 // calls notifySessionScheduled/notifySessionUnscheduled directly, fire-and-forget, on
 // every user-initiated add/remove. reconcileSwanNotifications() runs on every
-// session-state-ticker.js tick (plus once right after loadMyData() resolves), since
-// there's no server-side scheduled delivery anymore — a session's reminder/live/
-// on-demand transition only ever gets applied to UNC's store while this tab is open
-// and a tick happens to land after the trigger time passes.
+// session-state-ticker.js tick (plus once right after loadMyData() resolves) to catch a
+// live/on-demand transition, which needs host-driven timing — only the reminder stage can
+// lean on UNC's own schedule_at + internal poller (see swan-payload.js).
 import { isSwanEnabled, getSwanConfig } from './swan-config.js';
-import {
-  calculateSessionTimes, buildLocalNotificationEntry, buildLocalNotificationId,
-} from './swan-payload.js';
-import { whenUncStoreReady } from './unc-store.js';
+import { calculateSessionTimes, buildStageCampaignRule } from './swan-payload.js';
+import { registerReminderRule, deleteReminderRule, fireHostEvent } from './unc-client.js';
 
-// Per-rfCode local state, distinct from whatever UNC's own store persists: UNC's store
-// is the rendering surface (and a user can clear an entry there directly via the bell),
-// not a reliable diff source. If we only checked "is there an entry in the store," a
-// user-dismissed entry would get silently recreated on the next reconcile pass. This
-// map remembers which stage was last applied per session, so a session already at that
-// stage is left alone, and a dismissed one isn't resurrected until it's unscheduled and
-// scheduled again.
-const LOCAL_STATE_KEY = 'swan-notification-state';
+// Per-rfCode: which single stage's rule is currently registered/active, and its campaignId
+// (needed to delete it once superseded). v2 because the shape changed from the previous
+// placeholder-store design (no more `dismissed` — there's no read-back API in the real UNC
+// contract to ever detect a bell dismissal, so that whole mechanism was dropped; a plain
+// forward-only state machine, below, is what actually prevents duplicate bell entries).
+const LOCAL_STATE_KEY = 'swan-notification-state-v2';
+
+const STAGE_RANK = { reminder: 1, live: 2, 'on-demand': 3 };
 
 function readLocalState() {
   try {
@@ -37,51 +34,58 @@ function writeLocalState(state) {
   }
 }
 
-// A user can dismiss a notification directly via the real UNC bell UI, which calls the
-// store's own remove() — this repo never hears about that call. Detect it here by
-// noticing the store no longer has an entry our local state believes is active, and
-// mark it dismissed so the next applyStage() pass doesn't recreate it. Must run before
-// applyStage() on every reconcile pass.
-function syncDismissedFromStore(store, state) {
-  const existingIds = new Set(store.get().map((entry) => entry.id));
-  Object.keys(state).forEach((rfCode) => {
-    const entryState = state[rfCode];
-    if (entryState?.stage && !entryState.dismissed && !existingIds.has(buildLocalNotificationId(rfCode))) {
-      state[rfCode] = { ...entryState, dismissed: true };
-    }
-  });
-}
-
-function deriveStage(timingProperties, now) {
+// Unlike a prior version of this logic, always returns a stage rather than null before the
+// reminder trigger time — a session gets a reminder rule registered as soon as it's
+// scheduled (with schedule_at if the trigger time is still ahead), so UNC's own poller, not
+// our ticker, is what actually delivers it on time.
+function desiredStage(timingProperties, now) {
   if (now >= timingProperties.triggerOnDemandBadgeTime) return 'on-demand';
   if (now >= timingProperties.triggerLiveBadgeTime) return 'live';
-  if (now >= timingProperties.triggerNotificationTime) return 'reminder';
-  return null;
+  return 'reminder';
 }
 
-// Applies whatever stage transition (if any) is due for one session, mutating `state`
-// in place. No-ops if it isn't time yet, the session is already at that stage, or the
-// user dismissed this session's entry (nothing here clears `dismissed` — only
-// notifySessionScheduled(), on a fresh schedule action, does that).
-function applyStage(store, state, session, swanConfig, now) {
+// Registers the newly-desired stage's rule, fires its matching host event, then deletes
+// whatever stage was previously registered — in that order, so there's never a moment with
+// nothing registered for an already-scheduled session. No-ops if already at (or,
+// defensively, past) the desired stage: forward-only is the only guard against duplicate
+// bell entries this design has, since there's no way to read back what UNC is currently
+// showing. That guard is exactly why state must only be updated once register+fire are
+// actually confirmed to have gone through — both resolve `false` rather than throw (e.g.
+// UNC isn't ready yet on this page load), and marking a stage "done" that never actually
+// reached UNC would permanently block ever retrying it.
+async function applyStage(session, swanConfig, now, state) {
   const timingProperties = calculateSessionTimes(session, swanConfig.upcomingOffsetMinutes);
-  const stage = deriveStage(timingProperties, now);
-  const current = state[session.rfCode];
-  if (!stage || current?.dismissed || current?.stage === stage) return;
-  const entry = buildLocalNotificationEntry(session, stage, swanConfig);
-  if (current?.stage) store.edit(entry.id, entry);
-  else store.add(entry);
-  state[session.rfCode] = { stage, dismissed: false };
+  if (!Number.isFinite(timingProperties.triggerNotificationTime)
+    || !Number.isFinite(timingProperties.triggerLiveBadgeTime)
+    || !Number.isFinite(timingProperties.triggerOnDemandBadgeTime)) {
+    window.lana?.log(`[swan-notifications] session ${session.rfCode} has invalid start/end timestamps — skipping`);
+    return;
+  }
+  const stage = desiredStage(timingProperties, now);
+  const existing = state[session.rfCode];
+  if (existing && STAGE_RANK[existing.stage] >= STAGE_RANK[stage]) return;
+
+  const scheduleAtSeconds = stage === 'reminder' && now < timingProperties.triggerNotificationTime
+    ? Math.floor(timingProperties.triggerNotificationTime / 1000)
+    : undefined;
+  const { campaignId, campaignRule, hostEvent } = buildStageCampaignRule(session, stage, swanConfig, { scheduleAtSeconds });
+
+  const registered = await registerReminderRule(campaignId, campaignRule);
+  const fired = registered && await fireHostEvent(hostEvent);
+  if (!registered || !fired) {
+    window.lana?.log(`[swan-notifications] failed to apply stage "${stage}" for ${session.rfCode} — will retry next reconcile`);
+    return;
+  }
+  if (existing?.campaignId) await deleteReminderRule(existing.campaignId);
+
+  state[session.rfCode] = { stage, campaignId };
 }
 
 export async function notifySessionScheduled(session) {
   if (!isSwanEnabled() || !session?.rfCode) return;
   try {
-    const store = await whenUncStoreReady();
-    if (!store) return;
     const state = readLocalState();
-    delete state[session.rfCode]; // fresh slate — a session-guide toggle can rescind an earlier dismissal.
-    applyStage(store, state, session, getSwanConfig(), Date.now());
+    await applyStage(session, getSwanConfig(), Date.now(), state);
     writeLocalState(state);
   } catch (err) {
     window.lana?.log(`[swan-notifications] notifySessionScheduled failed for ${session.rfCode}: ${err.message}`);
@@ -91,9 +95,9 @@ export async function notifySessionScheduled(session) {
 export async function notifySessionUnscheduled(session) {
   if (!isSwanEnabled() || !session?.rfCode) return;
   try {
-    const store = await whenUncStoreReady();
     const state = readLocalState();
-    if (store && state[session.rfCode]?.stage) store.remove(buildLocalNotificationId(session.rfCode));
+    const existing = state[session.rfCode];
+    if (existing?.campaignId) await deleteReminderRule(existing.campaignId);
     delete state[session.rfCode];
     writeLocalState(state);
   } catch (err) {
@@ -101,14 +105,22 @@ export async function notifySessionUnscheduled(session) {
   }
 }
 
+// Guards against two reconcile passes overlapping: each applyStage() call can take up to
+// ~24s in the worst case (three sequential unc-client.js calls, each with its own 8s
+// whenUncReady() timeout if UNC is slow to initialize) — longer than the ~15s ticker
+// interval that drives this. Without this guard, a slow pass still in flight when the next
+// tick fires would race the new pass's read-modify-write of the same localStorage key;
+// whichever writes last would silently clobber the other's update. Skipping an overlapping
+// tick is harmless — the next one 15s later picks up wherever the in-flight pass left off.
+let reconcileInFlight = false;
+
 // getSessions/getScheduled are getter callbacks (not signal imports), matching
 // session-state-ticker.js's/poller.js's existing convention, so this module has no
 // dependency on session-store.js and can't form a circular import.
 export async function reconcileSwanNotifications(getSessions, getScheduled) {
-  if (!isSwanEnabled()) return;
+  if (!isSwanEnabled() || reconcileInFlight) return;
+  reconcileInFlight = true;
   try {
-    const store = await whenUncStoreReady();
-    if (!store) return;
     const swanConfig = getSwanConfig();
     const now = Date.now();
     const sessionsById = new Map(getSessions().map((s) => [s.id, s]));
@@ -120,17 +132,23 @@ export async function reconcileSwanNotifications(getSessions, getScheduled) {
     const scheduledRfCodes = new Set(scheduledSessions.map((s) => s.rfCode));
 
     const state = readLocalState();
-    syncDismissedFromStore(store, state);
-    scheduledSessions.forEach((session) => applyStage(store, state, session, swanConfig, now));
+    for (const session of scheduledSessions) {
+      // eslint-disable-next-line no-await-in-loop
+      await applyStage(session, swanConfig, now, state);
+    }
 
-    Object.keys(state).forEach((rfCode) => {
-      if (scheduledRfCodes.has(rfCode)) return;
-      if (state[rfCode]?.stage) store.remove(buildLocalNotificationId(rfCode));
+    const orphanedRfCodes = Object.keys(state).filter((rfCode) => !scheduledRfCodes.has(rfCode));
+    for (const rfCode of orphanedRfCodes) {
+      const existing = state[rfCode];
+      // eslint-disable-next-line no-await-in-loop
+      if (existing?.campaignId) await deleteReminderRule(existing.campaignId);
       delete state[rfCode];
-    });
+    }
 
     writeLocalState(state);
   } catch (err) {
     window.lana?.log(`[swan-notifications] reconcile failed: ${err.message}`);
+  } finally {
+    reconcileInFlight = false;
   }
 }

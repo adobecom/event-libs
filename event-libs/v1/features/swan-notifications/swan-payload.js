@@ -1,6 +1,5 @@
-// Pure functions — session/config in, timing/entry objects out. No fetch, no
-// module-level state, so these are trivially unit-testable in isolation from
-// unc-store.js's/swan-notifications.js's storage layer.
+// Pure functions — session/config in, rule/event objects out. No fetch, no module-level
+// state, so these are trivially unit-testable in isolation from unc-client.js's engine layer.
 
 // Guards against Number(undefined) === NaN silently turning into a null/dropped
 // trigger time when an author omits the field.
@@ -30,33 +29,60 @@ function resolveSessionUrl(sessionPageUrl) {
   }
 }
 
-// Identifies every entry SWAN creates in UNC's (shared) local notification store, so
-// reconcile/diff logic never touches an entry another product created.
-export const SWAN_ENTRY_SOURCE = 'swan-events';
-
-// Deterministic id from rfCode alone — no separate id-mapping/bookkeeping needed to
-// find "this session's" entry again for an edit/remove call.
-export function buildLocalNotificationId(rfCode) {
-  return `swan-${rfCode}`;
+// Deterministic per (rfCode, stage) — a UNC rule can only ever deliver one notification
+// per "journey" (confirmed against UNC's engine source: multi-stage chaining is a
+// drop-off/escalation model, not "the same notification, edited three times"), so
+// reminder/live/on-demand are three independent rules, not one entry updated in place.
+export function buildCampaignId(rfCode, stage) {
+  return `swan-${rfCode}-${stage}`;
 }
 
-// Builds the entry passed to UNC store's add()/edit() for a session at a given stage
-// ('reminder' | 'live' | 'on-demand'). Schema is a placeholder pending confirmation
-// with the UNC team — see docs/swan-unc-dependencies.md.
-export function buildLocalNotificationEntry(session, stage, swanConfig) {
+function buildNotificationContent(session, swanConfig) {
   const url = resolveSessionUrl(session.sessionPageUrl);
   const title = `Adobe ${swanConfig.eventName || 'Event'} Session`;
-  const content = session.title || title;
-
+  const message = session.title || title;
   return {
-    id: buildLocalNotificationId(session.rfCode),
-    source: SWAN_ENTRY_SOURCE,
-    stage,
     title,
-    message: content,
+    message,
     url,
     icon: swanConfig.defaultNotificationIconUrl || '',
     image: swanConfig.defaultNotificationImageUrl || '',
-    timestamp: Date.now(),
   };
+}
+
+// Builds a single-stage UNC rule (stage: 1, wait_for_next_event: 0 — fires on its own
+// first match, no journey chaining) plus the host event that matches it. event_data's sole
+// key (swan_campaign_id) is unique per call, so this can never accidentally match a
+// different stage's still-registered rule. `local: true` and a plain `payload` string keep
+// this network-free — never set `contentURL` (fetches from ODIN CDN) or a tracking-server
+// session_tracking_mechanism here.
+//
+// scheduleAtSeconds (epoch seconds), when given, lets UNC's own ~60s internal poller hold
+// the notification until that time and fire it without any further action from this code —
+// used for the reminder stage when its trigger time is still in the future. Omitted
+// (schedule_after: 0), the notification fires as soon as the host event below is sent —
+// used for the reminder stage once already due, and always for live/on-demand, since those
+// are only ever built once our own ticker has already determined the transition is due.
+export function buildStageCampaignRule(session, stage, swanConfig, { scheduleAtSeconds } = {}) {
+  const campaignId = buildCampaignId(session.rfCode, stage);
+  const channelDetails = {
+    local: true,
+    notification_type: 'swan-session',
+    notification_subtype: stage,
+    schedule_time_buffer: swanConfig.scheduleTimeBufferSeconds,
+    payload: JSON.stringify(buildNotificationContent(session, swanConfig)),
+  };
+  if (scheduleAtSeconds) channelDetails.schedule_at = scheduleAtSeconds;
+  else channelDetails.schedule_after = 0;
+
+  const campaignRule = {
+    events: [{
+      stage: 1,
+      wait_for_next_event: 0,
+      event_details: [{ surface_id: '', event_data: { swan_campaign_id: campaignId } }],
+      notification_channels: [{ channel_name: 'ADD_NOTIFICATION', channel_details: channelDetails }],
+    }],
+  };
+
+  return { campaignId, campaignRule, hostEvent: { swan_campaign_id: campaignId } };
 }
