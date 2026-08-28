@@ -44,9 +44,9 @@ export default async function init(el) {
   }
 
   const showCount = speakers.length > VISIBLE_LIMIT;
-  const title = createTag('h2', { class: 'speakers-title' }, showCount ? 'Speakers ' : 'Speakers');
+  const title = createTag('h2', { class: 'speakers-title' }, 'Speakers');
   if (showCount) {
-    title.append(createTag('span', { class: 'speakers-count' }, `(${speakers.length})`));
+    title.append(createTag('span', { class: 'speakers-count' }, ` (${speakers.length})`));
   }
   el.append(title);
 

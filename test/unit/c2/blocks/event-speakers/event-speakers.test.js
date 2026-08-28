@@ -79,7 +79,7 @@ describe('Speakers', () => {
     expect(el.classList.contains('is-expanded')).to.be.true;
     expect(toggle.textContent).to.equal('Show less');
   });
-      
+
   it('omits the count at the visible limit and shows it just above', async () => {
     const atLimit = Array.from({ length: 5 }, (_, i) => ({ firstName: 'S', lastName: `${i}` }));
     let el = block();
@@ -92,7 +92,7 @@ describe('Speakers', () => {
     el = block();
     setSpeakers(overLimit);
     await init(el);
-    expect(el.querySelector('.speakers-count').textContent).to.equal('(6)');
+    expect(el.querySelector('.speakers-count').textContent).to.equal(' (6)');
   });
 
   it('renders an empty state when there are no speakers', async () => {

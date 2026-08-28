@@ -111,8 +111,8 @@ describe('Featured Products', () => {
     el = block();
     setProducts(Array.from({ length: 7 }, (_, i) => `Product ${i}`));
     await init(el);
-    expect(el.querySelector('.featured-products-count').textContent).to.equal('(7)');
-    });
+    expect(el.querySelector('.featured-products-count').textContent).to.equal(' (7)');
+  });
 
   it('removes the block entirely when there are no products', async () => {
     setProducts([]);
