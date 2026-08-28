@@ -195,7 +195,7 @@ purely count-based.
 
 **Files:** all four blocks ("Show more" / "Show less"), `session-state-view.js`
 ("Live", "On-demand", "Coming soon", "Watch now"), `event-session-resources.js`
-("Download", "Open", "No resources", "Session resources")
+("Download", "Open", "No materials available for this session", "Session resources")
 
 **Impact:** every user-facing string is a hardcoded English placeholder.
 

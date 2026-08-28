@@ -64,7 +64,7 @@ export default async function init(el) {
   el.append(createTag('h2', { class: 'session-resources-title' }, 'Session resources'));
 
   if (!published.length) {
-    el.append(createTag('p', { class: 'session-resources-empty' }, 'No resources'));
+    el.append(createTag('p', { class: 'session-resources-empty' }, 'No materials available for this session'));
     return;
   }
 

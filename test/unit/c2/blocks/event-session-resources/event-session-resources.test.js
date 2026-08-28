@@ -179,11 +179,11 @@ describe('Session Resources', () => {
     });
   });
 
-  it('renders the "No resources" empty state when none are published', async () => {
+  it('renders the empty state when none are published', async () => {
     setMaterials([]);
     const el = block();
     await init(el);
-    expect(el.querySelector('.session-resources-empty').textContent).to.equal('No resources');
+    expect(el.querySelector('.session-resources-empty').textContent).to.equal('No materials available for this session');
     expect(el.querySelector('.session-resources-list')).to.be.null;
   });
 

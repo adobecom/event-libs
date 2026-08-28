@@ -324,7 +324,8 @@ a `ResizeObserver` on the paragraph catches width/layout changes and `document.f
 ## `event-session-resources`
 
 Rows of "name … Open/Download" from the top-level `material-list` (RainFocus `files[]`),
-filtered to entries that are published and have a `fileURL`. "No resources" empty state
+filtered to entries that are published and have a `fileURL`. "No materials available for this
+session" empty state
 when none qualify. Links open in a new tab. First 2 shown, rest revealed by Show more;
 two-up grid from 900px.
 
@@ -364,6 +365,14 @@ Matched by name; blank values are skipped. Both are extensionless destinations, 
 
 The ticket states a session carries at most 3 files. The block does not enforce that — a cap
 would silently hide data — so the count is whatever the sync delivers plus up to two links.
+
+**Empty-state wording** follows the Figma frame verbatim: *"No materials available for this
+session"*. Note it says **materials** while the heading says **Session resources**, and the
+[naming thread](https://www.figma.com/design/716muSMQegdQmIhmDMt24S/Sessions-Detail-VizD-R1-8.17.26?node-id=8-6711&m=dev)
+settled on *resources* as the user-facing noun — *materials* is RainFocus's internal word
+(`material-list`). The shape matches `event-speakers`' *"No speakers available for this
+session"*, so the two blocks are consistent with each other; whether the noun should be
+*resources* is still Kat's call.
 
 **CTA label** is inferred from the file URL — `Download` for known document/media
 extensions, else `Open`. RainFocus may later supply explicit CTA text. `Download` CTAs also
