@@ -37,10 +37,17 @@ export default async function init(el) {
   const speakers = getJsonMetadata('speakers', []);
   el.replaceChildren();
   if (background) el.style.background = background;
-  if (!Array.isArray(speakers) || !speakers.length) return;
+  if (!Array.isArray(speakers) || !speakers.length) {
+    el.append(createTag('h2', { class: 'speakers-title' }, 'Speakers'));
+    el.append(createTag('p', { class: 'speakers-empty' }, 'No speakers available for this session'));
+    return;
+  }
 
-  const title = createTag('h2', { class: 'speakers-title' }, 'Speakers ');
-  title.append(createTag('span', { class: 'speakers-count' }, `(${speakers.length})`));
+  const showCount = speakers.length > VISIBLE_LIMIT;
+  const title = createTag('h2', { class: 'speakers-title' }, showCount ? 'Speakers ' : 'Speakers');
+  if (showCount) {
+    title.append(createTag('span', { class: 'speakers-count' }, `(${speakers.length})`));
+  }
   el.append(title);
 
   const list = createTag('ul', { class: 'speakers-list' });

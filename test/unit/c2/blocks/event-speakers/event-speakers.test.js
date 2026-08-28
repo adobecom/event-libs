@@ -34,7 +34,7 @@ describe('Speakers', () => {
     ]);
     const el = block();
     await init(el);
-    expect(el.querySelector('.speakers-title').textContent).to.equal('Speakers (2)');
+    expect(el.querySelector('.speakers-title').textContent).to.equal('Speakers');
     const rows = [...el.querySelectorAll('.speaker')];
     expect(rows).to.have.lengthOf(2);
     expect(rows[0].querySelector('.speaker-name').textContent).to.equal('Shantanu Narayen');
@@ -79,12 +79,29 @@ describe('Speakers', () => {
     expect(el.classList.contains('is-expanded')).to.be.true;
     expect(toggle.textContent).to.equal('Show less');
   });
+      
+  it('omits the count at the visible limit and shows it just above', async () => {
+    const atLimit = Array.from({ length: 5 }, (_, i) => ({ firstName: 'S', lastName: `${i}` }));
+    let el = block();
+    setSpeakers(atLimit);
+    await init(el);
+    expect(el.querySelector('.speakers-title').textContent).to.equal('Speakers');
+    expect(el.querySelector('.speakers-count')).to.be.null;
 
-  it('renders nothing when there are no speakers', async () => {
+    const overLimit = Array.from({ length: 6 }, (_, i) => ({ firstName: 'S', lastName: `${i}` }));
+    el = block();
+    setSpeakers(overLimit);
+    await init(el);
+    expect(el.querySelector('.speakers-count').textContent).to.equal('(6)');
+  });
+
+  it('renders an empty state when there are no speakers', async () => {
     setSpeakers([]);
     const el = block();
     await init(el);
-    expect(el.children).to.have.lengthOf(0);
+    expect(el.querySelector('.speakers-title').textContent).to.equal('Speakers');
+    expect(el.querySelector('.speakers-empty').textContent).to.equal('No speakers available for this session');
+    expect(el.children).to.have.lengthOf(2);
   });
 
   it('applies an authored Background row as the block background', async () => {

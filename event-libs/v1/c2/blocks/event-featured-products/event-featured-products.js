@@ -32,10 +32,16 @@ export default async function init(el) {
   const products = getAttrValues('Product').map((v) => v.label).filter(Boolean);
   el.replaceChildren();
   if (background) el.style.background = background;
-  if (!products.length) return;
+    if (!products.length) {
+    el.remove();
+    return;
+  }
 
-  const title = createTag('h2', { class: 'featured-products-title' }, 'Featured products ');
-  title.append(createTag('span', { class: 'featured-products-count' }, `(${products.length})`));
+  const showCount = products.length > VISIBLE_LIMIT;
+  const title = createTag('h2', { class: 'featured-products-title' }, showCount ? 'Featured products ' : 'Featured products');
+  if (showCount) {
+    title.append(createTag('span', { class: 'featured-products-count' }, `(${products.length})`));
+  }
   el.append(title);
 
   const list = createTag('ul', { class: 'featured-products-list' });
