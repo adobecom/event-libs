@@ -45,6 +45,13 @@ already ran it.
 The status slot is created as a **persistent live region**
 (`role="status" aria-live="polite"`) — see Accessibility below.
 
+The eyebrow's vertical divider is a `border-left` on the status slot, applied through
+`.session-eyebrow > * + .session-status-slot` — **only when something precedes it**. A session
+with no eyebrow tracks would otherwise render a stray leading pipe and 24px of indent before
+the date. Note this is about the *eyebrow* track attributes (`Primary Event Site Track`,
+`Additional Event Site Tracks`, `Override Primary Event Site Track`); a session can carry a
+`Track` or `Primary Track for Agenda (Digital Agenda)` value and still have no eyebrow tags.
+
 ## Session state engine (`session-state-view.js`)
 
 State is a **pure client-side time comparison**, per the ticket — there is no status

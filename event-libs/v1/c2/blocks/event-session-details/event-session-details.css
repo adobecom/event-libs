@@ -21,6 +21,9 @@
 .session-status-slot {
   display: inline-flex;
   align-items: flex-start;
+}
+
+.session-eyebrow > * + .session-status-slot {
   margin-left: var(--s2a-spacing-12, 12px);
   padding-left: var(--s2a-spacing-12, 12px);
   border-left: 1px solid var(--s2a-color-gray-300, #cacaca);
