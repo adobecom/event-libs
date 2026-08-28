@@ -316,11 +316,6 @@ function attachToPrecedingBlock(el) {
   }
 }
 
-function detachFromPrecedingBlock(el) {
-  const previous = el.previousElementSibling;
-  previous?.classList.remove('attach-upcoming--has-overlay');
-}
-
 export default async function init(el) {
   performance.mark('upcoming-sessions:init-start');
   try {
@@ -347,12 +342,6 @@ async function decorate(el) {
 
   const heading = config?.heading || 'Upcoming Sessions';
   let sessions = (Array.isArray(config?.entries) ? config.entries : []).filter((session) => !isPastSession(session));
-
-  if (!sessions.length) {
-    detachFromPrecedingBlock(el);
-    el.remove();
-    return;
-  }
 
   initSessionState();
 
@@ -381,14 +370,6 @@ async function decorate(el) {
     removeCard(el, sessionId);
     sessions = sessions.filter((session) => session.sessionId !== sessionId);
     updateFewSessions();
-    if (!sessions.length) {
-      const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-      setTimeout(() => {
-        el._upcomingSessionsCleanup?.();
-        detachFromPrecedingBlock(el);
-        el.remove();
-      }, reduceMotion ? 0 : ROTATE_OUT_MS);
-    }
   }
 
   let timers = scheduleStateTimers(sessions, dropSession);

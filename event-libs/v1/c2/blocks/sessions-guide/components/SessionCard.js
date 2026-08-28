@@ -80,19 +80,27 @@ export function SessionCard({ session, forceOnDemand = false, timeDisplay = 'dur
 
   async function handleSchedule(e) {
     e.stopPropagation();
+    // Captured now — e.currentTarget is nulled out once the event finishes dispatching,
+    // but onBlocked fires later, after the (possibly rejected) action settles.
+    const btn = e.currentTarget;
     await withDismissAnimation(
       e,
       activeView === 'my-sessions' && isScheduled,
-      () => toggleScheduleWithFeedback(session, { eventConfig: guideConfig, isScheduled }),
+      () => toggleScheduleWithFeedback(session, {
+        eventConfig: guideConfig, isScheduled, onBlocked: () => btn.blur(),
+      }),
     );
   }
 
   async function handleFavorite(e) {
     e.stopPropagation();
+    const btn = e.currentTarget;
     await withDismissAnimation(
       e,
       activeView === 'my-favorites' && isFavorited,
-      () => toggleFavoriteWithFeedback(session, { eventConfig: guideConfig, isFavorited }),
+      () => toggleFavoriteWithFeedback(session, {
+        eventConfig: guideConfig, isFavorited, onBlocked: () => btn.blur(),
+      }),
     );
   }
 

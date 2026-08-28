@@ -21,24 +21,35 @@ const UPCOMING_SESSION = {
   mrStreamId: null, thumbnailUrl: null,
   inPerson: false, sessionPageUrl: '/upcoming-1',
 };
+// Small offset (matches LIVE_SESSION's own -0.5h window) to keep the same calendar-day
+// assumption other fixtures already rely on, while still being fully in the past.
+const AIRED_SESSION = {
+  id: 'aired-1', title: 'Recorded Talk', description: 'Already happened',
+  primaryTrack: 'Design', startTimeUtc: h(-1), endTimeUtc: h(-0.5),
+  mrStreamId: null, thumbnailUrl: null,
+  inPerson: false, sessionPageUrl: '/aired-1',
+};
 
 // Derive day keys from session times — guarantees match with getSessionDayKey
 const TZ = 'America/Los_Angeles';
 const fmt = (ms) => new Intl.DateTimeFormat('en-CA', { timeZone: TZ }).format(new Date(ms));
 const TODAY = fmt(Date.parse(LIVE_SESSION.startTimeUtc));
 const UPCOMING_DAY = fmt(Date.parse(UPCOMING_SESSION.startTimeUtc));
+// Derived from AIRED_SESSION's own timestamp, not TODAY — near a Pacific-time midnight
+// boundary, a -1h and a -0.5h offset from "now" can land on different calendar days.
+const AIRED_DAY = fmt(Date.parse(AIRED_SESSION.startTimeUtc));
 
 const BASE_CONFIG = {
   userTz: TZ, surface: 'page',
   title: '', filterCategories: [], theme: 'dark',
 };
 
-function makeStore(sessionList, activeDay = TODAY) {
+function makeStore(sessionList, activeDay = TODAY, extraState = {}) {
   sessions.value = sessionList;
   liveStreamActiveIds.value = new Set();
   const store = buildStore(preact);
   store.SessionGuideContext._current = {
-    state: { activeDay, guideConfig: { ...BASE_CONFIG } },
+    state: { activeDay, guideConfig: { ...BASE_CONFIG }, ...extraState },
     dispatch: () => {},
   };
   return store;
@@ -88,5 +99,25 @@ describe('LiveUpcomingView', () => {
     const store = makeStore([]);
     const View = buildLiveUpcomingView(preact, store);
     expect(View({})).to.not.include('sg-carousel-section--recommended');
+  });
+
+  it('shows a Previously aired session that matches the active search', () => {
+    const store = makeStore([AIRED_SESSION], AIRED_DAY, { searchQuery: 'recorded' });
+    const View = buildLiveUpcomingView(preact, store);
+    expect(View({})).to.include('Previously aired');
+  });
+
+  it('hides a Previously aired session that does not match the active search', () => {
+    const store = makeStore([AIRED_SESSION], AIRED_DAY, { searchQuery: 'nonexistent term' });
+    const View = buildLiveUpcomingView(preact, store);
+    expect(View({})).to.not.include('Previously aired');
+  });
+
+  it('hides a Previously aired session excluded by the active track filter', () => {
+    const store = makeStore([AIRED_SESSION], AIRED_DAY, {
+      activeFilters: { primaryTrack: new Set(['Video']) },
+    });
+    const View = buildLiveUpcomingView(preact, store);
+    expect(View({})).to.not.include('Previously aired');
   });
 });
