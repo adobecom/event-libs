@@ -402,7 +402,7 @@ export default async function init(el) {
     acc[key] = div.nextElementSibling?.textContent?.trim() || '';
     return acc;
   }, {});
-
+  console.log('[video-player] cfg', cfg);
   const sessionId = getMetadata('session-id') || cfg['session-id'];
   if (!sessionId) {
     window.lana?.log('[video-player] no session-id (page metadata or authored) — nothing to render');
