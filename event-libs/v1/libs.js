@@ -33,6 +33,7 @@ const EVENT_BLOCKS_C2 = [
   'event-marquee',
   'sessions-guide',
   'sessions-guide-full-page',
+  'session-broadcast',
   'session-state-demo',
   'in-person-banner',
   'event-session-details',

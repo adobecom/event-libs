@@ -1,0 +1,144 @@
+import { expect } from '@esm-bundle/chai';
+import {
+  UP_NEXT_CAP,
+  getLiveSessions,
+  getDefaultLiveSession,
+  getAlsoLiveSessions,
+  getUpNextSessions,
+  getBroadcastSchedule,
+} from '../../../../../../event-libs/v1/c2/blocks/session-broadcast/utils/broadcast-schedule.js';
+
+const MIN = 60_000;
+
+function session(id, startOffsetMin, endOffsetMin, overrides = {}) {
+  const now = Date.now();
+  return {
+    id,
+    startTimeUtc: new Date(now + startOffsetMin * MIN).toISOString(),
+    endTimeUtc: new Date(now + endOffsetMin * MIN).toISOString(),
+    hasOnDemandFormat: false,
+    mrStreamId: null,
+    ...overrides,
+  };
+}
+
+describe('broadcast-schedule', () => {
+  const nowMs = Date.now();
+  const liveStreamActiveIds = new Set();
+
+  describe('getLiveSessions', () => {
+    it('returns only currently-live sessions, sorted earliest-start first', () => {
+      const s1 = session('a', -10, 10);
+      const s2 = session('b', -20, 5); // started earlier, still live
+      const upcoming = session('c', 10, 20);
+      const ended = session('d', -30, -10);
+      const result = getLiveSessions([s1, s2, upcoming, ended], liveStreamActiveIds, nowMs);
+      expect(result.map((s) => s.id)).to.deep.equal(['b', 'a']);
+    });
+
+    it('supports 6 concurrent live sessions with no artificial cap', () => {
+      const sessionList = Array.from({ length: 6 }, (_, i) => session(`s${i}`, -5, 10));
+      expect(getLiveSessions(sessionList, liveStreamActiveIds, nowMs)).to.have.length(6);
+    });
+
+    it('returns an empty array when nothing is live', () => {
+      const sessionList = [session('a', 10, 20), session('b', -30, -10)];
+      expect(getLiveSessions(sessionList, liveStreamActiveIds, nowMs)).to.deep.equal([]);
+    });
+  });
+
+  describe('getDefaultLiveSession', () => {
+    it('picks the earliest-starting live session', () => {
+      const s1 = session('a', -10, 10);
+      const s2 = session('b', -20, 5);
+      expect(getDefaultLiveSession([s1, s2], liveStreamActiveIds, nowMs).id).to.equal('b');
+    });
+
+    it('returns null when nothing is live', () => {
+      expect(getDefaultLiveSession([session('a', 10, 20)], liveStreamActiveIds, nowMs)).to.equal(null);
+    });
+  });
+
+  describe('getAlsoLiveSessions', () => {
+    it('excludes the active session from the live set', () => {
+      const s1 = session('a', -10, 10);
+      const s2 = session('b', -5, 15);
+      const result = getAlsoLiveSessions([s1, s2], liveStreamActiveIds, nowMs, 'a');
+      expect(result.map((s) => s.id)).to.deep.equal(['b']);
+    });
+
+    it('is empty when only one session is live (caller hides the carousel)', () => {
+      const s1 = session('a', -10, 10);
+      const result = getAlsoLiveSessions([s1], liveStreamActiveIds, nowMs, 'a');
+      expect(result).to.deep.equal([]);
+    });
+  });
+
+  describe('getUpNextSessions', () => {
+    it('returns only upcoming sessions, chronological by start time', () => {
+      const s1 = session('a', 30, 40);
+      const s2 = session('b', 10, 20);
+      const live = session('c', -5, 10);
+      const result = getUpNextSessions([s1, s2, live], liveStreamActiveIds, nowMs);
+      expect(result.map((s) => s.id)).to.deep.equal(['b', 'a']);
+    });
+
+    it(`caps the list at ${UP_NEXT_CAP} by default`, () => {
+      const sessionList = Array.from(
+        { length: UP_NEXT_CAP + 5 },
+        (_, i) => session(`s${i}`, i + 1, i + 10),
+      );
+      expect(getUpNextSessions(sessionList, liveStreamActiveIds, nowMs)).to.have.length(UP_NEXT_CAP);
+    });
+
+    it('returns fewer than the cap when fewer sessions remain (backfilling naturally supported)', () => {
+      const sessionList = [session('a', 10, 20), session('b', 20, 30)];
+      expect(getUpNextSessions(sessionList, liveStreamActiveIds, nowMs)).to.have.length(2);
+    });
+
+    it('breaks ties between same-start-time sessions using the injected random function', () => {
+      const s1 = session('a', 10, 20);
+      const s2 = session('b', 10, 20); // identical start time
+      let calls = 0;
+      // First call (for s1) returns 0.9, second (for s2) returns 0.1 — s2 should sort first.
+      const random = () => { calls += 1; return calls === 1 ? 0.9 : 0.1; };
+      const result = getUpNextSessions([s1, s2], liveStreamActiveIds, nowMs, { random });
+      expect(result.map((s) => s.id)).to.deep.equal(['b', 'a']);
+    });
+
+    it('accepts a custom cap', () => {
+      const sessionList = Array.from({ length: 5 }, (_, i) => session(`s${i}`, i + 1, i + 10));
+      expect(getUpNextSessions(sessionList, liveStreamActiveIds, nowMs, { cap: 3 })).to.have.length(3);
+    });
+  });
+
+  describe('getBroadcastSchedule', () => {
+    it('combines active/alsoLive/upNext into one shape', () => {
+      const active = session('a', -10, 10);
+      const other = session('b', -5, 15);
+      const upcoming = session('c', 10, 20);
+      const result = getBroadcastSchedule(
+        [active, other, upcoming],
+        liveStreamActiveIds,
+        nowMs,
+        { activeSessionId: 'a' },
+      );
+      expect(result.activeSession.id).to.equal('a');
+      expect(result.alsoLive.map((s) => s.id)).to.deep.equal(['b']);
+      expect(result.upNext.map((s) => s.id)).to.deep.equal(['c']);
+    });
+
+    it('falls back to the default live session when the requested activeSessionId is no longer live', () => {
+      const s1 = session('a', -10, 10); // still live, earliest
+      const ended = session('b', -30, -10); // no longer live
+      const result = getBroadcastSchedule([s1, ended], liveStreamActiveIds, nowMs, { activeSessionId: 'b' });
+      expect(result.activeSession.id).to.equal('a');
+    });
+
+    it('returns a null activeSession and empty alsoLive when nothing is live', () => {
+      const result = getBroadcastSchedule([session('a', 10, 20)], liveStreamActiveIds, nowMs, {});
+      expect(result.activeSession).to.equal(null);
+      expect(result.alsoLive).to.deep.equal([]);
+    });
+  });
+});
