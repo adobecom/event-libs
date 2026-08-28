@@ -62,9 +62,9 @@ export default async function init(el) {
       cta.addEventListener('click', (e) => {
         try {
           assertAuthorized();
-        } catch (err) {
+        } catch {
           e.preventDefault();
-          showAuthToast(err.reason, { eventConfig, actionLabel: `download ${name}` });
+          showAuthToast({ eventConfig, actionLabel: `download ${name}` });
         }
       });
     }

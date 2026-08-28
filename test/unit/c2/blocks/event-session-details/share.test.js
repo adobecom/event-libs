@@ -1,7 +1,7 @@
 import { expect } from '@esm-bundle/chai';
 import { setMetadata } from '../../../../../event-libs/v1/utils/utils.js';
 import { renderShare } from '../../../../../event-libs/v1/c2/blocks/event-session-details/share.js';
-import { toast } from '../../../../../event-libs/v1/features/toast/toast.js';
+import { toasts } from '../../../../../event-libs/v1/features/toast/toast.js';
 
 const tick = () => new Promise((r) => { setTimeout(r); });
 
@@ -9,7 +9,7 @@ describe('session-details share', () => {
   beforeEach(() => {
     document.head.innerHTML = '';
     document.body.innerHTML = '';
-    toast.value = null;
+    toasts.value = [];
   });
 
   afterEach(() => {
@@ -46,6 +46,6 @@ describe('session-details share', () => {
     renderShare().click();
     await tick();
     expect(copied).to.equal('https://example.com/s');
-    expect(toast.value?.message).to.equal('Link copied to clipboard');
+    expect(toasts.value[0]?.message).to.equal('Link copied to clipboard');
   });
 });
