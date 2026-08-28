@@ -285,6 +285,11 @@ function renderTrack(track, sessions) {
   track.scrollLeft = scrollLeft;
 }
 
+function isPastSession(session) {
+  const startTimeMillis = session.sessionTime?.startTimeMillis;
+  return typeof startTimeMillis === 'number' && startTimeMillis <= getNowMs();
+}
+
 function scheduleStateTimers(sessions, dropSession) {
   const timers = [];
 
@@ -341,7 +346,7 @@ async function decorate(el) {
   }
 
   const heading = config?.heading || 'Upcoming Sessions';
-  let sessions = Array.isArray(config?.entries) ? config.entries : [];
+  let sessions = (Array.isArray(config?.entries) ? config.entries : []).filter((session) => !isPastSession(session));
 
   if (!sessions.length) {
     detachFromPrecedingBlock(el);
