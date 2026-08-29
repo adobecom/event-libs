@@ -128,24 +128,33 @@ decision, made by `video-playlist.js`, about whether a real topic playlist
 is actually going to render:
 
 - If `video-playlist` has something to show, the **`video-playlist`-container
-  instance** wins (embeds); the full-width, player-only instance's whole
-  `.section` is removed (with a fade-out — see `.is-collapsing` in the CSS)
-  so no empty space is left behind.
+  instance** wins (embeds); the full-width, player-only instance's own
+  `.video-player` element is removed (with a fade-out — see `.is-collapsing`
+  in the CSS) so no empty space is left behind.
 - If `video-playlist` has nothing to show (any of its own gates failing, or
   removed for having no video to recommend from), the **full-width
-  instance** wins instead, and the `video-playlist`-container's section is
-  removed.
+  instance** wins instead, and the `video-playlist`-container's own
+  `.video-player` element is removed.
 - If no `video-playlist` block is authored on the page at all, the
   full-width instance still wins after a `DECISION_FALLBACK_MS` (4s)
   timeout — nothing will ever announce a decision in that case.
 
-The decision is dispatched exactly once by `video-playlist.js`
-(`announceVideoDecision`) as a page-wide `video-playlist:decision`
-`CustomEvent`, and also latched onto `window.__videoPlaylistDecision` — the
-latch exists because Milo inits each block's own module independently, so
-there's no guarantee this block's own listener (`awaitEmbedDecision`) is
-attached before the event fires; a late listener reads the latch directly
-instead of only ever listening for the event.
+Only the losing **`.video-player` element itself** is ever collapsed/removed
+— never its containing `.section`/`.grid-column`. Both columns on the real
+session-page template carry other, unrelated blocks alongside the video
+ones (confirmed live: `event-session-details`/`event-session-resources`
+alongside the player-only instance; `event-featured-products`/
+`event-speakers`/`event-session-resources` alongside the
+`video-playlist`-container instance) — removing the whole section/column
+instead of just the losing element would wipe that other content out too.
+
+The decision is set exactly once by `video-playlist.js`
+(`announceVideoDecision`) on a shared `BlockMediator` store
+(`videoLayoutDecision`), read via `BlockMediator.get`/`.subscribe` — the
+same getter/setter/subscriber pattern `session-store.js` already uses for
+`imsProfile`/`rsvpData`, so either block can read the current decision or
+subscribe to it regardless of load order, with no direct reference between
+the two files.
 
 Each instance determines whether it's the `video-playlist`-container one
 via `isInsidePlaylistContainer()` — not an authored marker class, but a

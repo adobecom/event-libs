@@ -500,19 +500,25 @@ function buildAutoplayToggle(el) {
   checkbox.addEventListener('change', () => setShouldAutoPlay(checkbox.checked));
 }
 
-function findVideoSections() {
-  return [...new Set([...document.querySelectorAll('.video-player')]
-    .map((player) => player.closest('.grid-column')?.parentElement?.closest('.section') || player.closest('.section'))
-    .filter(Boolean))];
+// Each `.video-player`'s own containing `.section` is SHARED with other, unrelated
+// blocks authored alongside it (confirmed live: event-session-details/
+// event-session-resources in the player-only column; event-featured-products/
+// event-speakers/event-session-resources in the video-playlist column) — collapsing/
+// removing that whole section (or its .grid-column wrapper) would wipe out all of
+// that other content too, not just the losing video block. Only the SPECIFIC losing
+// `.video-player` element itself is ever collapsed/removed here; every sibling block
+// in its section is left untouched.
+function findLosingVideoPlayer(hasPlaylist) {
+  return [...document.querySelectorAll('.video-player')]
+    .find((player) => Boolean(player.closest('.section')?.querySelector('.video-playlist')) !== hasPlaylist);
 }
 
 function announceVideoDecision(hasPlaylist) {
   BlockMediator.set(VIDEO_LAYOUT_DECISION_KEY, { hasPlaylist });
-  const losingSection = findVideoSections()
-    .find((section) => Boolean(section.querySelector('.video-playlist')) !== hasPlaylist);
-  if (!losingSection || losingSection.classList.contains('is-collapsing')) return;
-  losingSection.classList.add('is-collapsing');
-  losingSection.addEventListener('transitionend', () => losingSection.remove(), { once: true });
+  const losingPlayer = findLosingVideoPlayer(hasPlaylist);
+  if (!losingPlayer || losingPlayer.classList.contains('is-collapsing')) return;
+  losingPlayer.classList.add('is-collapsing');
+  losingPlayer.addEventListener('transitionend', () => losingPlayer.remove(), { once: true });
 }
 
 function removeBlock(el) {

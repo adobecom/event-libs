@@ -140,20 +140,22 @@
   display: none;
 }
 
-/* Applied by announceVideoDecision() in video-playlist.js to whichever of the two
-   sections (full-width player-only, or this block's own player+playlist) loses the
-   decision — found structurally, NOT via an authored marker class (see the JS comment)
-   — its own video-player.js instance never even embeds a video (see awaitEmbedDecision
-   there), so this only ever fades out an empty/never-populated section before removing
-   it, not a populated one. transitionend (not a timer) triggers the actual el.remove(),
-   so this duration is the only thing that needs to stay in sync between the two files —
-   deliberately a plain `.section.is-collapsing` selector (not scoped to a marker class)
-   since JS finds the target section by structure, not by class. */
-.section.is-collapsing {
+/* Applied by announceVideoDecision() in video-playlist.js directly to whichever
+   .video-player element loses the decision — NOT its containing .section, which is
+   shared with other, unrelated blocks (event-featured-products, event-speakers,
+   event-session-details, event-session-resources, ...) authored alongside it;
+   collapsing/removing the whole section would wipe those out too. The losing
+   video-player.js instance never even embeds a video in the first place (see that
+   block's own awaitEmbedDecision), so this only ever fades out an empty,
+   never-populated element before removing it, not a populated one. transitionend
+   (not a timer) triggers the actual el.remove(), so this duration is the only thing
+   that needs to stay in sync between the two files. */
+.video-player.is-collapsing {
   overflow: hidden;
   opacity: 0;
   max-height: 0;
-  transition: opacity 0.25s ease, max-height 0.25s ease;
+  margin-bottom: 0;
+  transition: opacity 0.25s ease, max-height 0.25s ease, margin-bottom 0.25s ease;
 }
 
 /* Decorative bottom-sheet drag affordance — mobile-only, see the max-width block below. */

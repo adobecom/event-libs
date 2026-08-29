@@ -13,21 +13,24 @@ no video at all — this block never renders "more like this" next to a
 player that itself has nothing to embed.
 
 The two blocks communicate only through `localStorage`
-(`video-playlist:progress`, `video-playlist:play-all`) and page-wide
-`CustomEvent`s — never a direct reference — so either can load
-independently, in either order:
+(`video-playlist:progress`, `video-playlist:play-all`), page-wide
+`CustomEvent`s, and one shared `BlockMediator` store — never a direct
+reference — so either can load independently, in either order:
 
 - `video-player:progress` / `video-player:state` — dispatched by
   `video-player.js`, reporting progress and raw playback state
   (play/pause/ended). This block owns every decision about what to do with
   that state (e.g. "Play all" advancing on `ended` — see Play all below);
   `video-player.js` makes none of those decisions itself.
-- `video-playlist:decision` — dispatched by **this** block
-  (`announceVideoDecision()`) once it knows whether it has anything to
-  show at all (`hasPlaylist: true`/`false`). The two `video-player`
-  instances on the page (see that block's own "Which instance actually
-  plays" section) wait on this decision to know which one of them should
-  actually embed and which one's whole section should be removed instead.
+- `videoLayoutDecision` — a `BlockMediator` store (get/set/subscribe, same
+  pattern `session-store.js` uses for `imsProfile`/`rsvpData`) set by
+  **this** block (`announceVideoDecision()`) once it knows whether it has
+  anything to show at all (`hasPlaylist: true`/`false`). The two
+  `video-player` instances on the page (see that block's own "Which
+  instance actually plays" section) read/subscribe to this to know which
+  one of them should actually embed — and which one's own `.video-player`
+  element (not its containing section, which is shared with other
+  unrelated blocks) should be removed instead.
 
 Renders exactly one variant — a topic playlist: a list of other on-demand
 sessions sharing a topic with the current session, auto-resolved from real
