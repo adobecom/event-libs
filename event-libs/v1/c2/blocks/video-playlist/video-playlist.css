@@ -141,16 +141,22 @@
 }
 
 /* Applied by announceVideoDecision() in video-playlist.js directly to whichever
-   .video-player element loses the decision — NOT its containing .section, which is
-   shared with other, unrelated blocks (event-featured-products, event-speakers,
-   event-session-details, event-session-resources, ...) authored alongside it;
-   collapsing/removing the whole section would wipe those out too. The losing
-   video-player.js instance never even embeds a video in the first place (see that
-   block's own awaitEmbedDecision), so this only ever fades out an empty,
-   never-populated element before removing it, not a populated one. transitionend
-   (not a timer) triggers the actual el.remove(), so this duration is the only thing
-   that needs to stay in sync between the two files. */
-.video-player.is-collapsing {
+   element(s) lose the layout decision — never a shared containing section, which
+   carries other, unrelated blocks (event-featured-products, event-speakers,
+   event-session-details, event-session-resources, ...) authored alongside the video
+   ones; collapsing/removing that would wipe those out too. Three possible targets:
+   the whole `.video-container` (full-width, player-only layout, when
+   video-playlist.js wins) or the specific `.video-player`/`.video-playlist` elements
+   inside `.video-playlist-container` (when it loses) — never the container itself in
+   that second case, since it's shared with other blocks. The losing video-player.js
+   instance never even embeds a video in the first place (see that block's own
+   awaitEmbedDecision), so this only ever fades out an empty, never-populated element
+   before removing it, not a populated one. transitionend (not a timer) triggers the
+   actual el.remove(), so this duration is the only thing that needs to stay in sync
+   between the two files. */
+.video-container.is-collapsing,
+.video-player.is-collapsing,
+.video-playlist.is-collapsing {
   overflow: hidden;
   opacity: 0;
   max-height: 0;

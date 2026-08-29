@@ -25,12 +25,12 @@ reference — so either can load independently, in either order:
 - `videoLayoutDecision` — a `BlockMediator` store (get/set/subscribe, same
   pattern `session-store.js` uses for `imsProfile`/`rsvpData`) set by
   **this** block (`announceVideoDecision()`) once it knows whether it has
-  anything to show at all (`hasPlaylist: true`/`false`). The two
-  `video-player` instances on the page (see that block's own "Which
-  instance actually plays" section) read/subscribe to this to know which
-  one of them should actually embed — and which one's own `.video-player`
-  element (not its containing section, which is shared with other
-  unrelated blocks) should be removed instead.
+  anything to show at all (`hasPlaylist: true`/`false`). The `video-player`
+  instance on the page (see that block's own "Which instance actually
+  plays" section) reads/subscribes to this to know whether it should
+  actually embed. This block also acts directly on the two author-applied
+  marker classes (`.video-container`/`.video-playlist-container` — see
+  Authoring below) to remove whichever side lost.
 
 Renders exactly one variant — a topic playlist: a list of other on-demand
 sessions sharing a topic with the current session, auto-resolved from real
@@ -66,6 +66,40 @@ not the primary path):
 | `maximum-sessions` | No | `7` | Ceiling on total rows ever rendered — rows beyond this are never built, so "Show more" can never reveal more than this. Once expanded, the list scrolls internally beyond ~4 visible rows. |
 | `default-thumbnail` | No | — | Fallback thumbnail URL used for a row whose own session has no thumbnail of its own. |
 | `background` | No | light/dark theme default (`--vp-bg`) | Same authored "Background" row + `readBackgroundConfig()` utility every other block in this section (event-featured-products, event-speakers, event-session-resources, event-session-details) already supports — sets an inline `background` that overrides the theme default. |
+
+**This block's own containing SECTION also needs a marker class**, authored
+via that Section Metadata block's own "Style" row (standard Milo
+convention — adds the given class(es) to the section) —
+`video-playlist-container`. See `video-player`'s own README, "Authoring,"
+for the matching `video-container` class on the other, full-width section —
+these two are how `announceVideoDecision()` below finds each side without
+depending on the page's actual DOM/fragment structure.
+
+## Which video-player wins, and what gets removed
+
+Full mechanism (both instances, the shared `BlockMediator` decision store,
+timing) lives in `video-player`'s own README — this section covers only
+what THIS block does once it knows whether it has anything to show:
+
+- **Has a playlist** (`announceVideoDecision(true)`): the whole
+  `.video-container` section is collapsed/removed (fade-out via
+  `.is-collapsing` — see the CSS) — it only ever holds a `.video-player`,
+  so removing all of it is safe.
+- **No playlist** (`announceVideoDecision(false)`, via `removeBlock()`):
+  only the specific `.video-player` and `.video-playlist` elements inside
+  `.video-playlist-container` are collapsed/removed — never the container
+  itself, since it's shared with other, unrelated blocks authored
+  alongside it (event-featured-products, event-speakers,
+  event-session-resources, ...). This block's own `el.remove()` (from
+  `removeBlock()`) handles removing itself; `announceVideoDecision` here
+  additionally removes the sibling `.video-player` in the same container.
+
+Both branches look up their target via `document.querySelector('.video-container')`/
+`.querySelector('.video-playlist-container')` — the author-applied marker
+classes, not inferred DOM structure. This replaced an earlier
+`.grid-column`/`.closest('.section')` structural walk that broke once the
+two columns turned out to live in separate `.fragment > .section` trees
+with no section reachable from either side.
 
 ## How the playlist title is resolved
 

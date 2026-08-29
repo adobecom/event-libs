@@ -500,37 +500,37 @@ function buildAutoplayToggle(el) {
   checkbox.addEventListener('change', () => setShouldAutoPlay(checkbox.checked));
 }
 
-// `.video-player`'s own `.closest('.section')` only ever reaches the INNER,
-// fragment-local section (each column is its own `.fragment > .section`, per the real
-// page DOM) — .video-playlist lives in a DIFFERENT fragment/section under the sibling
-// `.grid-column`, so that lookup alone never finds it (confirmed live: always
-// undefined). Same structural walk findPlayerBottom/synthesizeCurrentSession already
-// use elsewhere in this file: `.grid-column`'s own parent is the real shared OUTER
-// section both columns sit inside, which IS where a sibling column's `.video-playlist`
-// is actually reachable from.
-//
-// That outer section is SHARED with other, unrelated blocks authored alongside the
-// video ones (confirmed live: event-session-details/event-session-resources in the
-// player-only column; event-featured-products/event-speakers/event-session-resources
-// in the video-playlist column) — collapsing/removing the whole section (or its
-// `.grid-column` wrapper) would wipe out all of that other content too. Only the
-// SPECIFIC losing `.video-player` element itself is ever collapsed/removed here; every
-// sibling block in its section is left untouched.
-function findLosingVideoPlayer(hasPlaylist) {
-  return [...document.querySelectorAll('.video-player')]
-    .find((player) => {
-      const gridColumn = player.closest('.grid-column');
-      const outerSection = gridColumn?.parentElement?.closest('.section') || player.closest('.section');
-      return Boolean(outerSection?.querySelector('.video-playlist')) !== hasPlaylist;
-    });
+// Author-applied marker classes (e.g. via Section Metadata's "Style" row) on each
+// candidate section — NOT inferred from DOM structure. A prior `.closest('.section')`/
+// `.grid-column` walk proved fragile in practice: it broke outright once the two
+// columns turned out to be separate `.fragment > .section` trees with no shared
+// section reachable via `.closest()` from either side, and any future template change
+// could break a structural guess again. `.video-container` = the full-width,
+// player-only layout (only ever has a `.video-player` in it, nothing else to protect —
+// removing the whole thing when it loses is fine). `.video-playlist-container` = the
+// two-column layout, sharing its section with other unrelated blocks (confirmed live:
+// event-featured-products/event-speakers/event-session-resources) — so losing there
+// only ever removes the specific `.video-player`/`.video-playlist` elements inside it,
+// never the container itself or its other siblings.
+function collapseAndRemove(target) {
+  if (!target || target.classList.contains('is-collapsing')) return;
+  target.classList.add('is-collapsing');
+  target.addEventListener('transitionend', () => target.remove(), { once: true });
 }
 
 function announceVideoDecision(hasPlaylist) {
   BlockMediator.set(VIDEO_LAYOUT_DECISION_KEY, { hasPlaylist });
-  const losingPlayer = findLosingVideoPlayer(hasPlaylist);
-  if (!losingPlayer || losingPlayer.classList.contains('is-collapsing')) return;
-  losingPlayer.classList.add('is-collapsing');
-  losingPlayer.addEventListener('transitionend', () => losingPlayer.remove(), { once: true });
+  if (hasPlaylist) {
+    // video-playlist won — the full-width, player-only container (if authored) is the
+    // loser, removed entirely.
+    collapseAndRemove(document.querySelector('.video-container'));
+    return;
+  }
+  // The full-width container wins by default — the video-playlist-container's own two
+  // video blocks are the losers, its other sibling blocks are left untouched.
+  const playlistContainer = document.querySelector('.video-playlist-container');
+  collapseAndRemove(playlistContainer?.querySelector('.video-player'));
+  collapseAndRemove(playlistContainer?.querySelector('.video-playlist'));
 }
 
 function removeBlock(el) {

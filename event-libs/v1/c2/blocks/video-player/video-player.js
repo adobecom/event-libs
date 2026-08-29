@@ -364,10 +364,15 @@ function loadVideoPlayer(el, sessionId, video) {
 
 const DECISION_FALLBACK_MS = 4000;
 
+// Author-applied marker class (see README's own Authoring section) on the containing
+// `.section` — e.g. via that Section Metadata's "Style" row — rather than inferring
+// layout from DOM structure (a prior `.grid-column`/`.closest('.section')` walk proved
+// fragile: it broke outright once the two columns turned out to be separate
+// `.fragment > .section` trees, not a shared one). `.video-playlist-container` is the
+// two-column layout (this instance sits alongside a `video-playlist` block); its
+// absence means this is the full-width, player-only `.video-container` layout instead.
 function isInsidePlaylistContainer(el) {
-  const gridColumn = el.closest('.grid-column');
-  const outerSection = gridColumn?.parentElement?.closest('.section') || el.closest('.section');
-  return Boolean(outerSection?.querySelector('.video-playlist'));
+  return Boolean(el.closest('.video-playlist-container'));
 }
 
 function awaitEmbedDecision(el) {
@@ -402,7 +407,6 @@ export default async function init(el) {
     acc[key] = div.nextElementSibling?.textContent?.trim() || '';
     return acc;
   }, {});
-  console.log('[video-player] cfg', cfg);
   const sessionId = getMetadata('session-id') || cfg['session-id'];
   if (!sessionId) {
     window.lana?.log('[video-player] no session-id (page metadata or authored) — nothing to render');

@@ -11,8 +11,8 @@ two-column section alongside `video-playlist` (see that block's own
 README) — and only ONE of them ever actually embeds/plays a video. See
 "Which instance actually plays" below for how the two coordinate. They
 communicate only through `localStorage`, page-wide `CustomEvent`s, and one
-`window`-latched flag — never a direct reference — so either block can
-load independently, in either order.
+shared `BlockMediator` store — never a direct reference — so either block
+can load independently, in either order.
 
 ## Authoring
 
@@ -29,6 +29,16 @@ on the block itself:
 | Field | Required | Default | Notes |
 |---|---|---|---|
 | `session-id` | No | page's own `session-id` metadata | Only needed as a fallback if that metadata is missing. |
+
+**Each of the two containing SECTIONS also needs one marker class**, authored
+via that Section Metadata block's own "Style" row (standard Milo
+convention — adds the given class(es) to the section) — `video-container`
+on the full-width, player-only section; `video-playlist-container` on the
+two-column section shared with `video-playlist` (and any other blocks
+authored alongside it, e.g. `event-featured-products`/`event-speakers`/
+`event-session-resources`). See `video-playlist`'s own README, "Which
+instance actually plays," for exactly how these drive the winner/loser
+removal.
 
 If the current session hasn't ended yet (checked against its own
 `session-times` `endTimeMillis`), or it has no embeddable video source at
@@ -127,26 +137,21 @@ right away; each registers as pending and waits for a single page-wide
 decision, made by `video-playlist.js`, about whether a real topic playlist
 is actually going to render:
 
-- If `video-playlist` has something to show, the **`video-playlist`-container
-  instance** wins (embeds); the full-width, player-only instance's own
-  `.video-player` element is removed (with a fade-out — see `.is-collapsing`
-  in the CSS) so no empty space is left behind.
+- If `video-playlist` has something to show, the **`video-playlist-container`
+  instance** wins (embeds); the whole `.video-container` section is removed
+  (with a fade-out — see `.is-collapsing` in the CSS) so no empty space is
+  left behind. `.video-container` only ever holds a `.video-player`, so
+  removing the whole thing is safe.
 - If `video-playlist` has nothing to show (any of its own gates failing, or
-  removed for having no video to recommend from), the **full-width
-  instance** wins instead, and the `video-playlist`-container's own
-  `.video-player` element is removed.
+  removed for having no video to recommend from), the **`video-container`
+  instance** wins instead. Only the specific `.video-player` and
+  `.video-playlist` elements inside `.video-playlist-container` are
+  removed — never the container itself, since it's shared with other
+  unrelated blocks (confirmed live: `event-featured-products`/
+  `event-speakers`/`event-session-resources`).
 - If no `video-playlist` block is authored on the page at all, the
-  full-width instance still wins after a `DECISION_FALLBACK_MS` (4s)
+  `video-container` instance still wins after a `DECISION_FALLBACK_MS` (4s)
   timeout — nothing will ever announce a decision in that case.
-
-Only the losing **`.video-player` element itself** is ever collapsed/removed
-— never its containing `.section`/`.grid-column`. Both columns on the real
-session-page template carry other, unrelated blocks alongside the video
-ones (confirmed live: `event-session-details`/`event-session-resources`
-alongside the player-only instance; `event-featured-products`/
-`event-speakers`/`event-session-resources` alongside the
-`video-playlist`-container instance) — removing the whole section/column
-instead of just the losing element would wipe that other content out too.
 
 The decision is set exactly once by `video-playlist.js`
 (`announceVideoDecision`) on a shared `BlockMediator` store
@@ -156,11 +161,15 @@ same getter/setter/subscriber pattern `session-store.js` already uses for
 subscribe to it regardless of load order, with no direct reference between
 the two files.
 
-Each instance determines whether it's the `video-playlist`-container one
-via `isInsidePlaylistContainer()` — not an authored marker class, but a
-live DOM check (does a `.video-playlist` block exist inside the same outer
-grid `.section`, across the `grid-column` fragment boundary if needed) —
-then compares that against the decision to know if it personally won.
+Each instance determines whether it's the `video-playlist-container` one
+via `isInsidePlaylistContainer()` — `el.closest('.video-playlist-container')`,
+the author-applied marker class (see Authoring above), not an inferred DOM
+structure. An earlier version of this check walked up through
+`.grid-column`/`.closest('.section')` to find a sibling column's own
+`.video-playlist` — that broke outright once the two columns turned out to
+be separate `.fragment > .section` trees with no section reachable from
+either side via `.closest()`, so the explicit marker class replaced it
+entirely.
 
 While waiting, only the full-width instance shows a lightweight loader
 (`.video-player-loader`) in its own place, since `video-playlist.js`'s own
