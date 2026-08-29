@@ -1,6 +1,6 @@
 import { createTag, getMetadata } from '../../../utils/utils.js';
 import {
-  sessions, initSessionState, liveStreamActiveIds, favorited, pendingActions,
+  sessions, sessionsStatus, initSessionState, liveStreamActiveIds, favorited, pendingActions,
 } from '../../../utils/session-store.js';
 import { deriveSessionState, getNowMs } from '../../../utils/session-state.js';
 import { extractCustomAttributeSlugs, extractCustomAttributeValue } from '../../../services/sessions/sessions-api.js';
@@ -644,15 +644,39 @@ export default async function init(el) {
     el.dispatchEvent(new CustomEvent('video-playlist:view', { bubbles: true }));
   };
 
+  // A catalog fetch that errors out, or genuinely resolves with zero sessions, never
+  // makes `sessions.value` non-empty — without this, the block below would wait on
+  // `sessions.subscribe` forever, leaving a stray, unstyled, never-decided
+  // `.video-playlist` stuck in the layout indefinitely (confirmed live: the raw block
+  // sits in its two-column section with no rows, no removal, and video-player's own
+  // instances never resolve their embed decision either, since announceVideoDecision()
+  // is never reached). sessionsStatus reaching 'ready' (even with an empty list) or
+  // 'error' is the fetch's own terminal signal — either one means no more sessions are
+  // ever coming, so this block has definitively nothing to show.
   const existing = sessions.value;
   if (existing.length) {
     render(existing);
+  } else if (sessionsStatus.value === 'ready' || sessionsStatus.value === 'error') {
+    removeBlock(el);
   } else {
-    const unsubscribe = sessions.subscribe((list) => {
-      if (list.length) {
-        render(list);
-        unsubscribe();
-      }
+    // Both `.subscribe()` calls below fire synchronously once, with each signal's
+    // current value, before either assignment below completes — declared as `let`
+    // upfront (not `const` at each call site) so neither callback can reference the
+    // other before it's assigned, regardless of subscribe order.
+    let unsubscribeSessions;
+    let unsubscribeStatus;
+    unsubscribeSessions = sessions.subscribe((list) => {
+      if (!list.length) return;
+      unsubscribeSessions();
+      unsubscribeStatus();
+      render(list);
+    });
+    unsubscribeStatus = sessionsStatus.subscribe((status) => {
+      if (status !== 'ready' && status !== 'error') return;
+      if (sessions.value.length) return;
+      unsubscribeSessions();
+      unsubscribeStatus();
+      removeBlock(el);
     });
   }
 }
