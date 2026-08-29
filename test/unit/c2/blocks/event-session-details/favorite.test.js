@@ -37,6 +37,19 @@ describe('session-details favorite', () => {
     expect(btn.getAttribute('aria-label')).to.equal('Favorite this session');
   });
 
+  // Milo's auto-tagging runs once at decoration, so a label that changes on toggle would
+  // otherwise stay frozen at its first value. Labels match sessions-guide's LiveCard so the
+  // two surfaces roll up together in reporting.
+  it('tracks add vs remove in daa-ll and updates it on toggle', () => {
+    setMetadata('session-id', 'sid');
+    const btn = renderFavorite();
+    expect(btn.getAttribute('daa-ll')).to.equal('Add-to-Favorites');
+    favorited.value = new Set(['sid']);
+    expect(btn.getAttribute('daa-ll')).to.equal('Remove-from-Favorites');
+    favorited.value = new Set();
+    expect(btn.getAttribute('daa-ll')).to.equal('Add-to-Favorites');
+  });
+
   it('shows a register/sign-in toast when favoriting while signed out', async () => {
     setMetadata('session-id', 'sid');
     renderFavorite().click();

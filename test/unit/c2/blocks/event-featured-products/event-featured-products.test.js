@@ -52,7 +52,7 @@ describe('Featured Products', () => {
     setProducts(['Photoshop', 'Illustrator', 'Fresco']);
     const el = block();
     await init(el);
-    expect(el.querySelector('.featured-products-title').textContent).to.equal('Featured products (3)');
+    expect(el.querySelector('.featured-products-title').textContent).to.equal('Featured products');
     const names = [...el.querySelectorAll('.featured-product-name')].map((n) => n.textContent);
     expect(names).to.deep.equal(['Photoshop', 'Illustrator', 'Fresco']);
   });
@@ -101,11 +101,27 @@ describe('Featured Products', () => {
     expect(toggle.textContent).to.equal('Show less');
   });
 
-  it('renders nothing when there are no products', async () => {
+  it('omits the count at the visible limit and shows it just above', async () => {
+    let el = block();
+    setProducts(Array.from({ length: 6 }, (_, i) => `Product ${i}`));
+    await init(el);
+    expect(el.querySelector('.featured-products-title').textContent).to.equal('Featured products');
+    expect(el.querySelector('.featured-products-count')).to.be.null;
+
+    el = block();
+    setProducts(Array.from({ length: 7 }, (_, i) => `Product ${i}`));
+    await init(el);
+    expect(el.querySelector('.featured-products-count').textContent).to.equal(' (7)');
+  });
+
+  it('removes the block entirely when there are no products', async () => {
     setProducts([]);
     const el = block();
+    const parent = document.createElement('div');
+    parent.append(el);
     await init(el);
-    expect(el.children).to.have.lengthOf(0);
+    expect(el.parentNode).to.be.null;
+    expect(parent.children).to.have.lengthOf(0);
   });
 
   it('applies an authored Background row as the block background and removes the row', async () => {
