@@ -5,7 +5,7 @@ import { scrollBehavior } from '../utils/motion.js';
 export const buildCarousel = () => Carousel;
 
 export function Carousel({
-  sessions, title, formatTime, formatTimezone, variant = 'live',
+  sessions, title, formatTime, formatTimezone, variant = 'live', onCardClick, onWatchSamePage,
 }) {
   // Hooks run before the empty-list bail-out — returning first would change hook order
   // between an empty and a populated render.
@@ -94,7 +94,7 @@ export function Carousel({
               class="sg-carousel__card-wrap"
               key=${s.id}
               inert=${paged && (i < offset || i >= offset + visibleCountRef.current) ? true : undefined}
-            ><${LiveCard} session=${s} variant=${variant} /></div>`)}
+            ><${LiveCard} session=${s} variant=${variant} onCardClick=${onCardClick} onWatchSamePage=${onWatchSamePage} /></div>`)}
           </div>
         </div>
         ${sessions.length > 1 && html`

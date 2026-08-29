@@ -1,0 +1,130 @@
+@import '../../styles/tokens.css';
+@import '../event-youtube/event-youtube.css';
+
+.session-broadcast {
+  font-family: var(--s2a-font-family-adobe-clean);
+  color: var(--s2a-color-content-default);
+  box-sizing: border-box;
+}
+
+.session-broadcast *,
+.session-broadcast *::before,
+.session-broadcast *::after {
+  box-sizing: inherit;
+}
+
+.sb-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.sb-app {
+  display: block;
+}
+
+.sb-error,
+.sb-empty {
+  padding: var(--s2a-spacing-lg);
+  color: var(--s2a-color-content-subtle);
+  text-align: center;
+}
+
+/* ── Player ──────────────────────────────────────────────── */
+
+/* Sizing/rounded-corner treatment comes from event-youtube.css's own .youtube-video-container
+   (the `event-youtube` class on this same element is what activates those scoped rules) —
+   this only needs a fallback background while the iframe loads in. */
+.sb-player__mount {
+  width: 100%;
+  background: var(--s2a-color-gray-900, #000);
+}
+
+.sb-player__unsupported {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  color: var(--s2a-color-content-subtle);
+  background: var(--s2a-color-gray-900, #000);
+}
+
+/* ── Session info panel ─────────────────────────────────── */
+
+.sb-info {
+  padding: var(--s2a-spacing-md);
+}
+
+.sb-info__row {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--s2a-spacing-sm);
+}
+
+.sb-info__title {
+  flex: 1;
+  margin: 0;
+  font-size: var(--s2a-font-size-lg);
+}
+
+.sb-info__favorite,
+.sb-info__expand {
+  flex: none;
+  background: none;
+  border: 0;
+  cursor: pointer;
+}
+
+.sb-info__duration {
+  margin: var(--s2a-spacing-2xs) 0 0;
+  color: var(--s2a-color-content-subtle);
+  font-size: var(--s2a-font-size-sm);
+}
+
+.sb-info__desc-wrap {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+}
+
+.sb-info__desc-wrap.is-expanded {
+  display: block;
+  -webkit-line-clamp: unset;
+  line-clamp: unset;
+}
+
+.sb-info__desc {
+  margin: var(--s2a-spacing-2xs) 0 0;
+}
+
+.sb-info__view-all {
+  margin-top: var(--s2a-spacing-sm);
+  color: var(--s2a-color-content-accent, inherit);
+  background: none;
+  border: 0;
+  cursor: pointer;
+}
+
+/* ── Carousel sections ──────────────────────────────────── */
+
+.sb-carousel-section {
+  padding: var(--s2a-spacing-md);
+}
+
+/* Desktop widens out; mobile-first default above is intentionally unconstrained. */
+@media (min-width: 1024px) {
+  .sb-info,
+  .sb-carousel-section {
+    max-width: 1192px;
+    margin: 0 auto;
+  }
+}

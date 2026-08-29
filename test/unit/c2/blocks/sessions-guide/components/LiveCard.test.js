@@ -308,6 +308,39 @@ describe('LiveCard', () => {
     });
   });
 
+  // Real click-triggered branching (which path handleCardClick/handleWatch take) can't be
+  // exercised by this string-render harness — no test in this suite simulates a real click,
+  // since the htm-preact stub renders function attrs as `""`, losing the reference entirely.
+  // These guard the render contract for session-broadcast's integration: the new optional
+  // props are accepted without throwing and don't change markup on the surfaces that ignore
+  // them. Interactive verification happens via a preview harness in a real browser instead.
+  describe('onCardClick / onWatchSamePage (session-broadcast integration)', () => {
+    function pageSurfaceStore() {
+      const store = buildStore(preact);
+      store.SessionGuideContext._current = {
+        state: { guideConfig: { ...BASE_CONFIG, surface: 'page' } },
+        dispatch: () => {},
+      };
+      return store;
+    }
+
+    it('accepts onCardClick/onWatchSamePage without throwing, on the page surface', () => {
+      const LiveCard = buildLiveCard(preact, pageSurfaceStore());
+      expect(() => LiveCard({
+        session: LIVE_SESSION, onCardClick: () => {}, onWatchSamePage: () => {},
+      })).to.not.throw();
+    });
+
+    it('renders identical markup whether or not onCardClick/onWatchSamePage are supplied', () => {
+      const LiveCard = buildLiveCard(preact, pageSurfaceStore());
+      const withCallbacks = LiveCard({
+        session: LIVE_SESSION, onCardClick: () => {}, onWatchSamePage: () => {},
+      });
+      const without = LiveCard({ session: LIVE_SESSION });
+      expect(withCallbacks).to.equal(without);
+    });
+  });
+
   describe('computeProgressPct', () => {
     const session = { startTimeUtc: '2026-01-01T00:00:00.000Z', endTimeUtc: '2026-01-01T01:00:00.000Z' };
 

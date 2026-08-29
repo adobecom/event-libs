@@ -30,7 +30,9 @@ export function computeProgressPct(session, nowMs) {
   return duration > 0 ? Math.round((elapsed / duration) * 100) : 0;
 }
 
-export function LiveCard({ session, variant = 'live' }) {
+export function LiveCard({
+  session, variant = 'live', onCardClick, onWatchSamePage,
+}) {
   const { state, dispatch } = useSessionGuide();
   const { guideConfig } = state;
   const { userTz, surface } = guideConfig;
@@ -96,8 +98,11 @@ export function LiveCard({ session, variant = 'live' }) {
   function handleWatch(e) {
     e.stopPropagation();
     // Already on the destination page (e.g. the widget is embedded on the homepage/broadcast
-    // page itself) — close the widget instead of reloading the page out from under the player.
+    // page itself) — let the caller decide what "already here" means (session-broadcast wants
+    // to switch its own primary player, not close a drawer that doesn't exist there) instead of
+    // reloading the page out from under whatever is already playing.
     if (isSamePage(watchHref)) {
+      if (onWatchSamePage) { onWatchSamePage(session); return; }
       dispatch({ type: 'CLOSE_DRAWER' });
       history.pushState({}, '', clearSessionParams());
       window.scrollTo({ top: 0, behavior: scrollBehavior() });
@@ -134,9 +139,15 @@ export function LiveCard({ session, variant = 'live' }) {
   // the session page, regardless of surface, instead of opening the in-widget overlay.
   function handleCardClick(e) {
     if (sessionState === 'on-demand') { handleWatch(e); return; }
-    if (surface !== 'widget') return;
-    dispatch({ type: 'SET_ACTIVE_SESSION', sessionId: session.id });
-    history.pushState({}, '', setSessionParam(sessionParamValue(session)));
+    if (surface === 'widget') {
+      dispatch({ type: 'SET_ACTIVE_SESSION', sessionId: session.id });
+      history.pushState({}, '', setSessionParam(sessionParamValue(session)));
+      return;
+    }
+    // Non-widget surfaces have no in-widget overlay of their own to open — onCardClick lets
+    // a caller like session-broadcast (no drawer, no Context) supply its own "open detail"
+    // behavior instead. Defaults to the prior no-op when nothing is supplied.
+    onCardClick?.(session);
   }
 
   return html`

@@ -128,4 +128,16 @@ describe('Carousel', () => {
     expect(html).to.include('key="a"');
     expect(html).to.not.include('sg-carousel__arrow');
   });
+
+  // onCardClick/onWatchSamePage are threaded straight through to LiveCard for
+  // session-broadcast's integration (no local modal/URL handling of its own) — see the
+  // matching describe block in LiveCard.test.js for why this only guards the render
+  // contract rather than exercising the click itself.
+  it('accepts onCardClick/onWatchSamePage without throwing', () => {
+    const store = makeStore();
+    const Carousel = buildCarousel(preact, store);
+    expect(() => Carousel({
+      sessions: [SESSION_A], onCardClick: () => {}, onWatchSamePage: () => {},
+    })).to.not.throw();
+  });
 });
