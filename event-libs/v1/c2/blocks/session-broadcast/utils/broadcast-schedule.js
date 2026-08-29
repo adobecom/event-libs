@@ -1,15 +1,19 @@
-import { deriveSessionState } from '../../../../utils/session-state.js';
+import { deriveSessionState, isBroadcastEligible } from '../../../../utils/session-state.js';
 
 // Ticket says 15, the PRD says 30 — shipping 15 for this iteration (see plan's Up Next cap
 // note); a single named constant so the real number is a one-line change once confirmed.
 export const UP_NEXT_CAP = 15;
 
+// isBroadcastEligible excludes mainstage/keynote sessions (isLivestreamed) — those belong on
+// the homepage per the ticket, not here, regardless of whether they're live or upcoming. Every
+// function below filters through it so the session pool this page ever shows or plays from is
+// never contaminated by homepage-only content.
 function isLive(session, liveStreamActiveIds, nowMs) {
-  return deriveSessionState(session, liveStreamActiveIds, nowMs) === 'live';
+  return isBroadcastEligible(session) && deriveSessionState(session, liveStreamActiveIds, nowMs) === 'live';
 }
 
 function isUpcoming(session, liveStreamActiveIds, nowMs) {
-  return deriveSessionState(session, liveStreamActiveIds, nowMs) === 'upcoming';
+  return isBroadcastEligible(session) && deriveSessionState(session, liveStreamActiveIds, nowMs) === 'upcoming';
 }
 
 function byStartTimeAsc(a, b) {

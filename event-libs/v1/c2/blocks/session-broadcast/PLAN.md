@@ -71,8 +71,9 @@ Only remaining action, not a blocker: let Analytics (Charlie, building a dimensi
 - `session-broadcast/utils/broadcast-url.js` — state-only `pushState`/`replaceState` helpers; entry param named `watch` (see param-naming note above). **Done**, 14 tests.
 - Block scaffolding + `EVENT_BLOCKS_C2` registration. **Done.**
 - Confirmed for free: the in-person banner and footer newsletter signup are existing blocks (`in-person-banner`, `event-subscription-form`), not this story's concern.
+- **Fixed post-Phase-1** (user caught this): the session pool had no eligibility filter — a live mainstage/keynote session could have played in Broadcast, though keynotes belong on the homepage only (ticket: Out of Scope). Added `isBroadcastEligible(session)` to `event-libs/v1/utils/session-state.js` (`!isLivestreamed && isOnline` — the same fields `getWatchDestination()` already keys off), filtered through it in `broadcast-schedule.js`'s `isLive`/`isUpcoming`. Verified with keynote fixtures in the preview harness that never appear anywhere on the page.
 
-**Exit criteria — met**: existing sessions-guide tests still pass; new unit tests cover schedule aggregation and URL helpers against fixture data (0 live, 1 live, 6 concurrent live, upcoming backfill). Full suite green (2042 passed), lint clean.
+**Exit criteria — met**: existing sessions-guide tests still pass; new unit tests cover schedule aggregation and URL helpers against fixture data (0 live, 1 live, 6 concurrent live, upcoming backfill, mainstage/keynote exclusion). Full suite green (2070 passed), lint clean.
 
 ### Phase 1 — Core page shell, State 1, YouTube only — ✅ DONE
 - `BroadcastApp.js` (root, mounts on `initSessionState()`, derives active/alsoLive/upNext via `getBroadcastSchedule()`) + `BroadcastBody` exported alongside for direct testability.
@@ -141,7 +142,7 @@ Tests mirror source under `test/unit/c2/blocks/session-broadcast/**`, following 
 ## State & data reuse map
 
 - `event-libs/v1/utils/session-store.js` — `initSessionState()`, `sessions`/`favorited`/`scheduled`/`auth`/`liveStreamActiveIds` signals, `getEventApiConfig()`, and **`openSessionGuideDetail(sessionId)`**
-- `event-libs/v1/utils/session-state.js` — `getNowMs()`, `deriveSessionState()`, `getWatchDestination()`
+- `event-libs/v1/utils/session-state.js` — `getNowMs()`, `deriveSessionState()`, `getWatchDestination()`, `isBroadcastEligible()`
 - `event-libs/v1/services/sessions/session-state-ticker.js` — `startSessionStateTicker()`
 - `event-libs/v1/services/sessions/session-actions.js` + `action-feedback.js` — `toggleScheduleWithFeedback`, `toggleFavoriteWithFeedback`
 - `event-libs/v1/utils/tier-1-event-config.js` — `getTrackIcon()`, `getProduct()`, `getBroadcastPath()`

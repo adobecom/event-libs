@@ -75,6 +75,16 @@ export function isPostEvent(sessionList, liveStreamActiveIds, nowMs, eventEndMs)
   return allEnded || pastEventEnd;
 }
 
+// A session belongs on the Broadcast page only if it's the kind getWatchDestination() would
+// actually route there once live — mainstage/keynote sessions (isLivestreamed) are homepage
+// content regardless of isOnline (ticket: "Keynote/sneaks will be on homepage main player" is
+// explicitly out of scope for Broadcast). Session Broadcast's own schedule aggregation
+// (session-broadcast/utils/broadcast-schedule.js) filters its session pool through this so a
+// live keynote can never end up playing in, or occupying a slot in, the Broadcast page.
+export function isBroadcastEligible(session) {
+  return !session.isLivestreamed && !!session.isOnline;
+}
+
 // Root-relative: the destinations live on whatever domain is serving this page. Falls back
 // to MAX's pages for configs predating the authorable homepagePath/broadcastPath.
 export function getWatchDestination(session, sessionState) {

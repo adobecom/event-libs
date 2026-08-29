@@ -10,6 +10,9 @@ import {
 
 const MIN = 60_000;
 
+// isOnline: true by default — a plain broadcast-eligible session, per isBroadcastEligible()
+// (session-state.js). Tests below that specifically exercise the mainstage/keynote exclusion
+// override isLivestreamed/isOnline explicitly.
 function session(id, startOffsetMin, endOffsetMin, overrides = {}) {
   const now = Date.now();
   return {
@@ -18,6 +21,8 @@ function session(id, startOffsetMin, endOffsetMin, overrides = {}) {
     endTimeUtc: new Date(now + endOffsetMin * MIN).toISOString(),
     hasOnDemandFormat: false,
     mrStreamId: null,
+    isOnline: true,
+    isLivestreamed: false,
     ...overrides,
   };
 }
@@ -44,6 +49,21 @@ describe('broadcast-schedule', () => {
     it('returns an empty array when nothing is live', () => {
       const sessionList = [session('a', 10, 20), session('b', -30, -10)];
       expect(getLiveSessions(sessionList, liveStreamActiveIds, nowMs)).to.deep.equal([]);
+    });
+
+    // Mainstage/keynote sessions belong on the homepage (getWatchDestination routes them
+    // there), not Broadcast — ticket: "Keynote/sneaks will be on homepage main player" is
+    // explicitly out of scope here, regardless of the session otherwise being live.
+    it('excludes a live mainstage/keynote session (isLivestreamed), even if also marked isOnline', () => {
+      const keynote = session('keynote', -10, 10, { isLivestreamed: true, isOnline: true });
+      const breakout = session('breakout', -10, 10);
+      const result = getLiveSessions([keynote, breakout], liveStreamActiveIds, nowMs);
+      expect(result.map((s) => s.id)).to.deep.equal(['breakout']);
+    });
+
+    it('excludes a live session that is neither online nor livestreamed (e.g. in-person only)', () => {
+      const inPersonOnly = session('in-person', -10, 10, { isOnline: false });
+      expect(getLiveSessions([inPersonOnly], liveStreamActiveIds, nowMs)).to.deep.equal([]);
     });
   });
 
@@ -81,6 +101,13 @@ describe('broadcast-schedule', () => {
       const live = session('c', -5, 10);
       const result = getUpNextSessions([s1, s2, live], liveStreamActiveIds, nowMs);
       expect(result.map((s) => s.id)).to.deep.equal(['b', 'a']);
+    });
+
+    it('excludes an upcoming mainstage/keynote session — it belongs on the homepage, not here', () => {
+      const keynote = session('keynote', 10, 20, { isLivestreamed: true, isOnline: true });
+      const breakout = session('breakout', 10, 20);
+      const result = getUpNextSessions([keynote, breakout], liveStreamActiveIds, nowMs);
+      expect(result.map((s) => s.id)).to.deep.equal(['breakout']);
     });
 
     it(`caps the list at ${UP_NEXT_CAP} by default`, () => {

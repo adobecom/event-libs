@@ -62,6 +62,7 @@ describe('BroadcastBody', () => {
       startTimeUtc: new Date(Date.now() - HOUR / 2).toISOString(),
       endTimeUtc: new Date(Date.now() + HOUR / 2).toISOString(),
       youTubeId: 'yt-1',
+      isOnline: true,
     }];
     const out = BroadcastBody({ config: CONFIG });
     expect(out).to.not.include('sb-empty');
