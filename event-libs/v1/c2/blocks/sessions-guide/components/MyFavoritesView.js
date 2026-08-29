@@ -12,6 +12,7 @@ import {
   groupByStartTime, groupByTrack, onDemandSessions, filterSessions, sessionsForDay, liveSessions,
 } from '../utils/session-filters.js';
 import { getNowMs, formatShortTime, formatTimezoneAbbr } from '../utils/time.js';
+import { useIsPostEvent } from '../utils/use-post-event.js';
 import { deriveSessionState } from '../../../../utils/session-state.js';
 
 export const buildMyFavoritesView = () => MyFavoritesView;
@@ -30,6 +31,7 @@ export function MyFavoritesView() {
   // eslint-disable-next-line no-unused-expressions
   sessionStateVersion.value;
   const nowMs = getNowMs();
+  const isPost = useIsPostEvent();
 
   // Logged-out/unregistered visitors never see this view's content — a toast fires and
   // they're bounced to a fallback view instead. Re-checked on every auth change, not just
@@ -82,7 +84,7 @@ export function MyFavoritesView() {
         <div class="sg-carousel-section sg-carousel-section--live">
           <${Carousel}
             sessions=${live}
-            title="Live now"
+            title="Live sessions"
             formatTime=${(s) => formatShortTime(s.startTimeUtc, userTz)}
             formatTimezone=${(s) => formatTimezoneAbbr(s.startTimeUtc, userTz)}
           />
@@ -94,8 +96,8 @@ export function MyFavoritesView() {
           <button
             class="sg-my-favorites__see-live-btn"
             type="button"
-            onclick=${() => dispatch({ type: 'SET_VIEW', view: 'live-upcoming' })}
-          >See Live & upcoming</button>
+            onclick=${() => dispatch({ type: 'SET_VIEW', view: isPost ? 'on-demand' : 'live-upcoming' })}
+          >${isPost ? 'See On demand' : 'See Live & upcoming'}</button>
         </div>
       ` : html`
         <div class="sg-my-sessions-tab-bar">

@@ -651,11 +651,14 @@ export function processAutoBlockLinks(parent) {
   // c2: true — this block has a C2 copy under v1/c2/blocks/, so on a
   // `foundation: c2` page load it from there instead of the classic v1/blocks/.
   const isC2 = getMetadata('foundation') === 'c2';
+  // Session Guide and Homepage links share the consolidated Event Configurator path, so only
+  // their payload key tells them apart. Matching the key also catches older `?sgConfig=`
+  // links that pointed at the standalone app.
   const autoBlockIdentifiers = {
     'chrono-box': { pattern: 'schedule-maker' },
     'mobile-rider': { pattern: 'mobilerider.com', selfInit: true, c2: true },
-    'sessions-guide': { pattern: 'session-guide-configurator' },
-    'tec-homepage': { pattern: 'tools/da-apps/tier-1-event-configurator' },
+    'sessions-guide': { pattern: 'sgConfig=' },
+    'tec-homepage': { pattern: 'tecHomepage=' },
   };
 
   Object.entries(autoBlockIdentifiers).forEach(([blockName, { pattern, selfInit, c2 }]) => {
@@ -1232,15 +1235,14 @@ export function decorateEvent(parent) {
     return;
   }
 
-  if (!getMetadata('event-id')) return;
-
   // Bootstraps Tier 1 Event Configurator output + shared session state ahead of any
-  // block's own init(). Gated on tier-1-event-config, not just event-id, since that's
-  // the real signal a page wants this.
-  if (getMetadata('tier-1-event-config')) {
+  // block's own init().
+  const tierOneEventConfig = getMetadata('tier-1-event-config');
+  if (tierOneEventConfig) {
     initTierOneEventConfig();
     initSessionState();
   }
+  if (!getMetadata('event-id')) return;
 
   // Hydrate metadata with user-friendly transformations
   addStylesToEventPage();
@@ -1290,5 +1292,3 @@ export default function decorateArea(area = document) {
     eagerLoad(marquee, 'div:last-child > div:last-child img');
   }());
 }
-
-

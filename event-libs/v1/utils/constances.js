@@ -10,6 +10,23 @@ export const SUSI_OPTIONS = {
   },
 };
 export const SERIES_404_MAP_PATH = '/events/default/series-404-map.json';
+
+// Session page URLs come out of the session catalog on this host regardless of tier, so
+// pages served elsewhere (stage, local, a Helix preview branch) rewrite them to their own
+// origin instead (see sessionPageUrlForEnv).
+export const ADOBE_PROD_HOST = 'www.adobe.com';
+
+// MAX 2026's own pages. Paths only — they resolve against whatever domain is serving the
+// page. Used as the fallback for a Tier 1 Event Config that doesn't author its own
+// (getWatchDestination). Any other event authors homepagePath/broadcastPath instead of
+// adding its paths here. Individual session pages are deliberately absent: the session
+// catalog gives each session's own URL, so nothing needs to build those paths.
+export const MAX_EVENT_PAGES = {
+  // The published path; the doc itself is authored at /max-new.html.
+  homepage: '/max.html',
+  broadcast: '/max/2026/broadcast.html',
+  sessionGuide: '/max/2026/sessions.html',
+};
 export const ALLOWED_EMAIL_DOMAINS = ['@adobe.com', '@adobetest.com'];
 export const ENV_MAP = {
   dev: {

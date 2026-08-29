@@ -3,7 +3,7 @@ import {
 } from '../../v1/deps/htm-preact.js';
 import { getEventSessionCatalog } from '../../v1/utils/esp-controller.js';
 import {
-  extractDistinctTracks, extractDistinctOverrideTexts, deriveFacetableAttributes,
+  extractDistinctPrimaryTracks, extractDistinctOverrideTexts, deriveFacetableAttributes,
 } from '../../v1/services/sessions/sessions-api.js';
 import { useNavigation } from '../context/NavigationContext.js';
 import { useConfigs } from '../context/ConfigsContext.js';
@@ -47,7 +47,7 @@ export default function ConfigEditor() {
       // Primary Event Site Track value is its own swimlane, matching groupByTrack()) —
       // deduped in case a track name and override text collide.
       const swimlaneCandidates = [...new Set([
-        ...extractDistinctTracks(result.data.sessions),
+        ...extractDistinctPrimaryTracks(result.data.sessions),
         ...extractDistinctOverrideTexts(result.data.sessions),
       ])];
       seedSwimlaneOrder(swimlaneCandidates);
@@ -58,7 +58,7 @@ export default function ConfigEditor() {
     return () => { cancelled = true; };
   }, [eventId, seedSwimlaneOrder, seedFilterCategories]);
 
-  const tracks = useMemo(() => extractDistinctTracks(sessions), [sessions]);
+  const primaryTracks = useMemo(() => extractDistinctPrimaryTracks(sessions), [sessions]);
   const overrideTexts = useMemo(() => extractDistinctOverrideTexts(sessions), [sessions]);
 
   const handleCancel = () => {
@@ -99,7 +99,7 @@ export default function ConfigEditor() {
         ${isLoadingSessions && html`<${LoadingInline} label="Loading sessions…" />`}
         ${sessionsError && html`<p class="sgc-editor__error">${sessionsError}</p>`}
         ${!isLoadingSessions && !sessionsError && html`
-          <p class="sgc-editor__section-hint">${sessions.length} session(s) found — ${tracks.length} distinct track(s), ${overrideTexts.length} distinct override lane(s).</p>
+          <p class="sgc-editor__section-hint">${sessions.length} session(s) found — ${primaryTracks.length} distinct track(s), ${overrideTexts.length} distinct override lane(s).</p>
         `}
       </section>
 
@@ -170,6 +170,12 @@ export default function ConfigEditor() {
       <section class="sgc-editor__section">
         <h2>Headings</h2>
         <p class="sgc-editor__section-hint">Shown reflects the viewer's auth state, and separately their pre-/post-event state.</p>
+        <p class="sgc-editor__section-hint">
+          In the two logged-in headings, type <code>{firstName}</code> wherever the viewer's own
+          first name should appear — e.g. <code>{firstName}, see what's happening</code> renders as
+          "Dana, see what's happening". Viewers with no first name on their profile are shown the
+          matching logged-out heading instead, so the logged-out fields can't use the placeholder.
+        </p>
         <label class="sgc-editor__field-label">
           Logged-out
           <input
@@ -184,6 +190,7 @@ export default function ConfigEditor() {
           <input
             type="text"
             class="sgc-field sgc-editor__heading-input"
+            placeholder="{firstName}, see what's happening"
             value=${activeConfig.config.headings.loggedIn}
             onInput=${(e) => updateNestedConfigField('headings', 'loggedIn', e.target.value)}
           />
@@ -202,6 +209,7 @@ export default function ConfigEditor() {
           <input
             type="text"
             class="sgc-field sgc-editor__heading-input"
+            placeholder="{firstName}, catch up on what you missed"
             value=${activeConfig.config.headings.loggedInPostEvent}
             onInput=${(e) => updateNestedConfigField('headings', 'loggedInPostEvent', e.target.value)}
           />
@@ -272,7 +280,7 @@ export default function ConfigEditor() {
           <${RecommendedSessionsEditor} \
             sessions=${sessions} \
             sessionTimes=${sessionTimes} \
-            tracks=${tracks} \
+            tracks=${primaryTracks} \
             recommendedSessions=${activeConfig.config.recommendedSessions} \
             onChange=${(next) => updateConfigField('recommendedSessions', next)} \
           />

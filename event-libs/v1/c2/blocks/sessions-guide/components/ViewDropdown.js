@@ -1,6 +1,9 @@
 import { html, useState, useEffect, useRef } from '../../../../deps/htm-preact.js';
 import { useSessionGuide } from '../store/index.js';
 import { checkViewAccess } from '../../../../services/sessions/action-feedback.js';
+import { isOutsideClick } from '../utils/outside-click.js';
+import { useIsPostEvent } from '../utils/use-post-event.js';
+import { IconCheckmark } from './icons.js';
 
 const VIEWS = [
   { value: 'live-upcoming', label: 'Live & upcoming' },
@@ -8,6 +11,12 @@ const VIEWS = [
   { value: 'my-favorites', label: 'My favorites' },
   { value: 'on-demand', label: 'On demand' },
 ];
+
+// Post-event there is nothing live or upcoming left, and the store bounces the view straight
+// back to On demand, so offering it is a dead option.
+export function visibleViews(isPost) {
+  return isPost ? VIEWS.filter((v) => v.value !== 'live-upcoming') : VIEWS;
+}
 
 export const buildViewDropdown = () => ViewDropdown;
 
@@ -24,13 +33,16 @@ export function ViewDropdown() {
   const menuRef = useRef(null);
   const triggerRef = useRef(null);
 
-  const activeLabel = VIEWS.find((v) => v.value === state.activeView)?.label || 'Live & upcoming';
-  const selectedIndex = Math.max(0, VIEWS.findIndex((v) => v.value === state.activeView));
+  const views = visibleViews(useIsPostEvent());
+  // activeView can briefly still be live-upcoming post-event, before the store transitions
+  // it — fall back to the first offered option rather than naming the hidden one.
+  const activeLabel = views.find((v) => v.value === state.activeView)?.label || views[0]?.label;
+  const selectedIndex = Math.max(0, views.findIndex((v) => v.value === state.activeView));
 
   useEffect(() => {
     if (!open) return undefined;
     function onClickOutside(e) {
-      if (wrapRef.current && !wrapRef.current.contains(e.target)) setOpen(false);
+      if (isOutsideClick(wrapRef.current, e.target)) setOpen(false);
     }
     document.addEventListener('click', onClickOutside);
     return () => document.removeEventListener('click', onClickOutside);
@@ -57,18 +69,25 @@ export function ViewDropdown() {
   // Each option is its own tab stop (Tab cycles through them like a real list); arrow
   // keys additionally jump directly between options, matching listbox conventions.
   function handleOptionKeydown(e, idx) {
+    const focusOption = (i) => menuRef.current?.children[i]?.focus();
     if (e.key === 'Enter' || e.key === ' ') {
       e.preventDefault();
-      selectView(VIEWS[idx].value);
+      selectView(views[idx].value);
     } else if (e.key === 'Escape') {
       e.preventDefault();
       closeAndRefocus();
     } else if (e.key === 'ArrowDown') {
       e.preventDefault();
-      menuRef.current?.children[(idx + 1) % VIEWS.length]?.focus();
+      focusOption((idx + 1) % views.length);
     } else if (e.key === 'ArrowUp') {
       e.preventDefault();
-      menuRef.current?.children[(idx - 1 + VIEWS.length) % VIEWS.length]?.focus();
+      focusOption((idx - 1 + views.length) % views.length);
+    } else if (e.key === 'Home') {
+      e.preventDefault();
+      focusOption(0);
+    } else if (e.key === 'End') {
+      e.preventDefault();
+      focusOption(views.length - 1);
     }
   }
 
@@ -79,24 +98,31 @@ export function ViewDropdown() {
         class=${`sg-view-btn${open ? ' sg-view-btn--open' : ''}`}
         onclick=${() => setOpen(!open)}
         aria-haspopup="listbox"
-        aria-expanded=${open}
+        aria-expanded=${String(open)}
+        aria-controls=${open ? 'sg-view-menu' : undefined}
         type="button"
       >
         ${activeLabel}
         <span class="sg-view-chevron" aria-hidden="true"></span>
       </button>
       ${open && html`
-        <ul class="sg-view-menu" role="listbox" ref=${menuRef}>
-          ${VIEWS.map((v, idx) => html`
+        <ul class="sg-view-menu" id="sg-view-menu" role="listbox" aria-label="Session view" ref=${menuRef}>
+          ${views.map((v, idx) => html`
             <li
               class=${`sg-view-menu-item${state.activeView === v.value ? ' sg-view-menu-item--selected' : ''}`}
               onclick=${() => selectView(v.value)}
               onkeydown=${(e) => handleOptionKeydown(e, idx)}
               role="option"
+              key=${v.value}
               tabindex="0"
-              aria-selected=${state.activeView === v.value}
+              aria-selected=${String(state.activeView === v.value)}
               daa-ll="View-Toggle-${v.value}"
-            >${v.label}</li>
+            >
+              <span class="sg-view-menu-item__check" aria-hidden="true">
+                ${state.activeView === v.value && html`<${IconCheckmark} />`}
+              </span>
+              <span class="sg-view-menu-item__label">${v.label}</span>
+            </li>
           `)}
         </ul>
       `}

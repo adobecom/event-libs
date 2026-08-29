@@ -3,6 +3,7 @@ import { readFile } from '@web/test-runner-commands';
 import { setEventConfig } from '../../../../../event-libs/v1/utils/utils.js';
 import { eventConfig } from '../../../scripts/mocks/event-config.js';
 import { sessions, sessionsStatus } from '../../../../../event-libs/v1/utils/session-store.js';
+import { expectAccessible } from '../../../helpers/a11y.js';
 import init from '../../../../../event-libs/v1/c2/blocks/sessions-guide/sessions-guide.js';
 
 const body = await readFile({ path: './mocks/default.html' });
@@ -45,5 +46,10 @@ describe('sessions-guide', () => {
     await init(el);
     expect(el.querySelector('.sg-view')).to.exist;
     expect(el.querySelector('.sg-loading')).to.not.exist;
+  });
+
+  it('has no WCAG 2.1 AA violations once rendered', async () => {
+    await init(el);
+    await expectAccessible(el);
   });
 });

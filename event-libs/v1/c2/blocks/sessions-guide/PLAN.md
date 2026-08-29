@@ -62,7 +62,7 @@ All template output uses `` html`...` `` from `htm-preact.js`. File extensions a
 | IMS profile | `BlockMediator` | Read `imsProfile` — existing project pattern; bridged into the shared `auth` signal by `session-store.js` |
 | RSVP / registration | `BlockMediator` | Read `rsvpData.registered` — existing project pattern; bridged into the shared `auth` signal |
 | Inter-block (same page) | `BlockMediator` (legacy keys) + `session-store.js` signals (new shared keys) | `BlockMediator` keeps owning `imsProfile`/`rsvpData`/`espData` as before; new cross-block session data goes through signals instead of adding more `BlockMediator` keys |
-| URL state | `history.pushState` | Widget: `?sessions` / `?session=<slug>-<rfCode>`. Full page: `?view=` / `?filter=` / `?search=` |
+| URL state | `history.pushState` | Widget: `?sessions` / `?session=<url-slug>`. Full page: `?view=` / `?filter=` / `?search=` |
 
 ### Why signals, not just BlockMediator
 The original design kept all session state in this block's own Preact Context, on the theory that the widget and full-page surfaces are on different pages and in-memory state can't survive navigation anyway. That held until a cross-block requirement came in: other blocks on the *same* page (favorites badges, registration-aware CTAs, etc.) need to read sessions/favorites/scheduled/auth too — state scoped to one block's Context isn't reachable from outside it.
@@ -76,7 +76,7 @@ So the split is: `BlockMediator` still owns what it already owned (`imsProfile`,
 `decorateEvent()` additionally requires `tier-1-event-config` metadata to be present before it even calls `initSessionState()` (see MWPW-200314-HANDOFF.md / decorate.js). `event-id` alone is already authored broadly across prod event pages for unrelated purposes, so gating on it alone would seed sessions-guide's mock data (`sg:dev-auth`, mock scheduled/favorited) on pages that never intend to use it. Presence of `tier-1-event-config` is the explicit opt-in, separate from — and checked before — the `rainfocus-api-url` gate inside `initSessionState()` itself.
 
 ### Polling architecture
-A single `setInterval` (30 s) starts inside `session-store.js` after sessions are loaded (when `sessionsStatus.value === 'ready'`). It calls the Mobile Rider batch API for all sessions that have an `mrStreamId`. The polling engine self-stops when all MR sessions report inactive (stream day over). `poller.js`'s `startPolling(mrSessions, env, onUpdate, intervalMs)` takes a plain callback instead of a dispatch function — decoupling it from ever being tied to a specific reducer.
+A single `setInterval` (30 s) starts inside `session-store.js` after sessions are loaded (when `sessionsStatus.value === 'ready'`). It calls the Mobile Rider batch API for all sessions that have an `mrStreamId` — which is no sessions today, since the catalog carries no live-stream-id attribute yet (see REAL-API-CHECKLIST.md), so the poll is inert until `Mobilerider Live Stream ID` (tentative) ships. The polling engine self-stops when all MR sessions report inactive (stream day over). `poller.js`'s `startPolling(mrSessions, env, onUpdate, intervalMs)` takes a plain callback instead of a dispatch function — decoupling it from ever being tied to a specific reducer.
 
 ### Session-state ticker
 MR polling only gives components an ambient re-render on a live-status change — a page with only non-MR sessions had no mechanism to notice a session crossing its start/end time purely because the clock moved forward, short of a user interacting with something else first. `event-libs/v1/services/sessions/session-state-ticker.js`'s `startSessionStateTicker(getSessions, getLiveStreamActiveIds, onChange, { intervalMs, getNow })` runs on its own 15 s interval (also started from `session-store.js`, unconditionally — not gated on MR sessions existing), diffs `deriveSessionState()` per session against its last-known value, and only calls `onChange` when at least one session's bucket actually changed. `session-store.js` wires `onChange` to bump the shared `sessionStateVersion` signal. It self-stops once every session is on-demand, mirroring the MR poller's own self-stop.
@@ -208,7 +208,6 @@ Toast and conflict-modal state moved out of this reducer entirely — see `event
 ```typescript
 interface Session {
   id: string;
-  slug: string;                  // for URL params: ?session=<slug>-<rfCode>
   rfCode: string;                // Rainfocus session code
   title: string;
   description: string;
@@ -220,17 +219,28 @@ interface Session {
   technicalLevel: string;
   category: string;
   audience: string;
+  aiFocus: string[];             // `AI Focus` -- no catalog attribute yet, so [] today
   speakers: Speaker[];
   products: string[];
   resources: Resource[];
-  mrStreamId: string | null;     // Mobile Rider stream ID; non-null = MR session
-  videoAvailable: boolean;       // recording is ready
-  inPerson: boolean;             // in-person session ("Recording coming soon" until videoAvailable)
+  // Four video sources, one field each, named for the player. Alternatives, not a fallback
+  // chain — a session carries whichever it was produced for.
+  mrStreamId: string | null;     // Mobile Rider LIVE; non-null = MR session. Always null
+                                 // today: inbound as `Mobilerider Live Stream ID` (tentative).
+  mpcId: string;                 // `MPC ID` -> Adobe Video TV. Mapped, unread.
+  youTubeId: string;             // `YouTube ID` -> YouTube. Mapped, unread.
+  mrDvrVideoId: string;          // `Mobilerider Video ID (DVR)` -> post-stream recording,
+                                 // gated by `DVR Timing (in hours)`. Mapped, unread.
+  mrSkinId: string;              // `Skin ID` -> Mobile Rider player skin (mr* sources only).
+  inPerson: boolean;             // Format carries `In person`
+  isOnline: boolean;             // Format carries `Online`
+  hasOnDemandFormat: boolean;    // Format carries `On demand, post event`
   sessionPageUrl: string;
   watchUrl: string;              // Watch Now destination
   isKeynote: boolean;
   thumbnailUrl: string | null;   // video thumbnail; null when unavailable
-  copyrightDisclaimer?: string;
+  legalDisclaimer?: string;      // `Legal Disclaimer` -- authored HTML, sanitized then
+                                 // injected (see utils/rich-text.js), not plain text
 }
 
 // This block's own per-instance authoring config, parsed by parse-config.js's
@@ -305,7 +315,7 @@ only:
 - `theme` (`light` | `dark`; defaults: widget=`'dark'`, page=`'light'`)
 - `surface` derived from `el.classList.contains('page')`
 - `userTz` set via `detectUserTimezone()`
-- `registerUrl` is **not** authored here — it's merged in from `getApiConfig()` (see below) after `parseSessionsGuideConfig()` runs
+- `registerUrl` is **not** authored here — it's merged in from `getEventApiConfig()` (see below) after `parseSessionsGuideConfig()` runs
 
 `rainfocus-api-url`, `rainfocus-api-profile-id`, `register-url`, and `manual-on-demand-transition-time` moved to **page metadata** (read by `session-store.js`, not this block) since they gate data other blocks need too, not just this widget's presentation. See `REAL-API-CHECKLIST.md` for the current metadata keys.
 
@@ -337,7 +347,7 @@ All service files exist and export the correct API surface; all currently return
 **`event-libs/v1/utils/session-store.js`** (shared, page-level) exports:
 - Signals: `sessions`, `sessionsStatus`, `liveStreamActiveIds`, `favorited`, `scheduled`, `auth`, `pendingActions`
 - `initSessionState()` — idempotent bootstrap, gated on `rainfocus-api-url` metadata, called from `decorateEvent()`
-- `getApiConfig()` — the parsed metadata (`apiUrl`, `profileId`, `registerUrl`, `manualCutoff`, `mrEnv`)
+- `getEventApiConfig()` — the parsed metadata (`apiUrl`, `eventId`, `rfProfileId`, `registerUrl`, `eventStartMs`, `eventEndMs`, `mrEnv`); renamed from `getApiConfig()`/`profileId` (2026-08-26) since the shape is really this event's config, not just its API connection details
 - `toggleSchedule(session)` / `toggleFavorite(session)` — mutators that call the RF API and update the signals + localStorage
 
 **`store/index.js`** (block-local) exports:
@@ -404,7 +414,7 @@ Sessions are fetched once by `session-store.js`'s `loadSessions()`, kicked off f
 **Triggers:**
 - **CTA button** — Preact-rendered `position: fixed; bottom: 0` button inside `DrawerShell` (only rendered when `drawerState === 'hidden'`)
 - **`?sessions` URL param** — checked on mount in `DrawerShell`; auto-opens to `expanded`
-- **`?session=<slug>-<rfCode>` URL param** — auto-opens to `expanded` + resolves `activeSessionId` once sessions are loaded
+- **`?session=<url-slug>` URL param** — auto-opens to `expanded` + resolves `activeSessionId` once sessions are loaded
 
 **State machine:**
 
@@ -473,7 +483,6 @@ Breakpoint at 1280 px: CTA goes to `peek` on wide, directly to `expanded` on nar
 - `dismissingIds.has(session.id)` drives `sg-card--collapsing` for exit animation
 - Time label logic:
   - `forceOnDemand` → `'ON DEMAND'`
-  - `onDemandNatural && inPerson && !videoAvailable` → `'Recording coming soon'`
   - `onDemandNatural` → `'ON DEMAND'`
   - else → `formatSessionTime(startTimeUtc, userTz)` with short end time
 - Card click:
@@ -620,6 +629,12 @@ schedule/favorite gate:
     eventConfig })` (same "extract the decision logic so it's testable without simulating a
     click" pattern as `DrawerShell.js`'s `resolveSessionGuideRequest`) — a blocked click
     never dispatches `SET_VIEW` to the gated view at all, so there's no flash.
+- **Post-event, `Live & upcoming` is not offered at all.** The store auto-transitions out of
+  it (see the auto-transition effect), so selecting it just bounced straight back to On demand
+  — a dead option. `visibleViews(isPost)` in `ViewDropdown.js` drops it, and the empty-state
+  buttons in `MySessionsView`/`MyFavoritesView` retarget to On demand and relabel to match.
+  Both read post-event state through `utils/use-post-event.js`'s `useIsPostEvent()`, shared
+  with `DrawerHeader`.
   - `MySessionsView`/`MyFavoritesView` themselves, via a `useEffect` keyed on
     `auth.value.isLoggedIn`/`isRegistered` that dispatches the fallback if blocked, with the
     view rendering `null` in the meantime. This is the safety net for every path that can
@@ -653,8 +668,7 @@ copy/CTA logic via a shared `showAuthToast()` helper rather than duplicating it.
 No longer a reducer case (`LIVE_STATUS_UPDATE` doesn't exist). Implemented as a `useEffect` in `SessionGuideProvider` (`store/index.js`) that subscribes to the shared `sessions`/`liveStreamActiveIds` signals and dispatches a plain `SET_VIEW`. Post-event auto-transition: `allEnded || pastManualCutoff` (cutoff from `getApiConfig().manualCutoff`) and `activeView === 'live-upcoming'` → switch to `'on-demand'`.
 
 ### 5.4 In-person on-demand cards ✅
-- `session.inPerson && !session.videoAvailable` → time label "Recording coming soon" in `SessionCard`; detail overlay shows "Recording coming soon" badge
-- `session.inPerson && session.videoAvailable` → navigates to `session.sessionPageUrl`
+- an in-person session that is also `Online` or on-demand → navigates to `session.sessionPageUrl`
 
 ---
 
@@ -668,15 +682,14 @@ No longer a reducer case (`LIVE_STATUS_UPDATE` doesn't exist). Implemented as a 
 - Actions:
   - Upcoming sessions: Schedule / Scheduled toggle button (primary) + Favorite icon button + Share icon button
   - Live/on-demand sessions: Watch now link (primary) + Favorite icon button + Share icon button
-  - "Recording coming soon" badge for in-person sessions without `videoAvailable`
 - Description expand/collapse: "More" / "Less" button with `is-expanded` class; local `descExpanded` state
-- Attributes list: Technical level, Track, Content category, Audience (filtered for non-empty values)
-- Share: `navigator.share()` if available; else `navigator.clipboard.writeText()` with "Link copied" toast; swallows `AbortError`
+- Attributes list, in this fixed order per design: **Technical level, Track, AI focus, Audience, Category** (each row hidden when its value is empty). `AI focus` has no catalog attribute yet, so it never renders today; `Industry` was removed from this list and is not in the real catalog either.
+- Share: always `navigator.clipboard.writeText()` with "Link copied!" toast (no native share sheet)
 
 ### 6.2 URL param for open overlay (widget) ✅
 - `DrawerShell` handles `handleDetailBack()`: pushes `setSessionsParam()` URL
 - `DrawerShell` handles `closeDrawer()`: pushes `clearSessionParams()` URL
-- Opening detail: `SessionCard` / `LiveCard` push `setSessionParam(slug-rfCode)` URL
+- Opening detail: `SessionCard` / `LiveCard` push `setSessionParam(sessionParamValue(session))` URL
 - `popstate` listener in `DrawerShell` restores state from URL without pushing new entries
 
 ### 6.3 State sync ✅
@@ -751,7 +764,7 @@ There **is** a separate block entry, `sessions-guide-full-page.js`, registered a
 | Shell | Peek-to-expand drawer in portal | Inline layout in block element |
 | Session card click | Opens detail overlay (upcoming/live); navigates (on-demand) | Always navigates to session page |
 | Session detail overlay | Yes (`sg-detail-panel` inside drawer) | No |
-| URL params | `?sessions`, `?session=<slug>-<rfCode>` | `?view=`, `?filter=`, `?search=` |
+| URL params | `?sessions`, `?session=<url-slug>` | `?view=`, `?filter=`, `?search=` |
 | CTA button | "View all sessions" fixed button | Not rendered |
 
 ### 9.3 URL param management (full page) ✅
@@ -770,7 +783,7 @@ There **is** a separate block entry, `sessions-guide-full-page.js`, registered a
 - Close → `history.pushState({}, '', clearSessionParams())`
 
 ### 10.2 Session detail URL ✅
-- Open detail → `history.pushState({}, '', setSessionParam('slug-rfCode'))` (drops `?sessions=`)
+- Open detail → `history.pushState({}, '', setSessionParam('<url-slug>'))` (drops `?sessions=`)
 - Close detail (keep drawer open) → `history.pushState({}, '', setSessionsParam())`
 
 ### 10.3 popstate handler ✅
@@ -838,7 +851,7 @@ Tests mirror `test/unit/blocks/sessions-guide/`. Coverage status to be assessed 
 ### 14.3 Integration tests (priority order)
 - Full view rendering for all 4 views
 - Poll-driven state update: `session-store.js`'s `liveStreamActiveIds` signal changing on a poll tick, and the on-demand auto-transition `useEffect` reacting to it
-- URL param handling: `?sessions` auto-opens, `?session=slug-rfCode` resolves detail
+- URL param handling: `?sessions` auto-opens, `?session=<url-slug>` resolves detail
 - Filter + search composition
 
 ---
@@ -878,7 +891,8 @@ a session only ever carries one of the two, so this is unambiguous in practice):
 | Field | MAX26 name | MAX25 fallback |
 |---|---|---|
 | Primary track | `Primary Event Site Track` | `Primary Track for Agenda (Digital Agenda)` |
-| Content category | `Category` | `Programming Category` |
+| Content category (labelled **Category** in the detail view) | `Category` | `Programming Category` |
+| AI focus | `AI Focus` *(tentative, not shipped yet)* | — |
 | Session type | `Type` | `Session Type` |
 | Copyright | `Legal Disclaimer` | `LegalDisclaimer` |
 
@@ -913,12 +927,13 @@ Key rules, not obvious from the table alone:
   bucket — every session sharing the exact same free-text value lands in the same lane;
   different text values get separate lanes.
 - **Additional Event Site Tracks only ever supports one value** (confirmed with Daniel) —
-  `resolveTrackBadge` defensively caps it at 1 (`.slice(0, 1)`) even though the ESP field
+  `resolveTrackBadge` caps it at 1 (`.slice(0, 1)`) — confirmed correct, not defensive: the
+  field was only ever meant to hold one value, even though the ESP field
   is multi-select, so the badge is always a plain "+1", never "+N".
 - Icon/color for an override lane come from `getOverrideTrackIcon(overrideText)`
-  (`tier-1-event-config.js`) — a **per-override-text map** (`overrideTrackIcons`) checked
-  first, falling back to a single event-wide default (`overrideTrackIcon`), falling back to
-  the built-in default (`{ icon: 'star', color: '#6E6E6E' }`).
+  (`tier-1-event-config.js`) — a **per-override-text map** (`overrideTrackIcons.byText`),
+  authored explicitly per text. No event-wide default and no built-in default (both dropped
+  2026-08-24): an unmapped text gets no icon and `DEFAULT_ICON_COLOR` at render time.
 - `stackedTracks` (for the detail/session-page stacked-badge display) is the *additional*
   track(s) only when an override applies (the override text isn't a real track, so it isn't
   itself "stacked", and the primary track — if any — is also dropped from the stack once
@@ -928,7 +943,9 @@ Key rules, not obvious from the table alone:
 ### 16.3 Swimlane placement + ordering — `groupByTrack(sessions, swimlaneOrder)` ✅
 
 Rewritten from single-track-keyed grouping to placing a session into one swimlane per
-`resolveTrackBadge().swimlanes` entry, skipping sessions `resolveTrackBadge()` excludes.
+`resolveSwimlanes()` entry. A session with no primary track and no override gets **no badge**
+but is still laned by its additional track if it has one (PM answer, 2026-08-24); only a session
+with no track of any kind is left out of every lane.
 Second param is the Session Guide Configurator's authored `swimlaneOrder` (item 12) —
 listed tracks sort first in authored order, unlisted tracks follow in first-seen order.
 Wired into `OnDemandView.js`/`MySessionsView.js`/`MyFavoritesView.js` via
@@ -969,12 +986,11 @@ throughout, since `groupByTrack` was already name-agnostic between the two.
 Since each distinct override text is its own swimlane (16.2), the configurator needs a
 per-text icon mapping, not a single field — `OverrideTrackIconEditor.js` was rebuilt from
 a single icon+color row into a `TrackIconEditor.js`-style list, one row per distinct
-override text found in the event's real sessions (`extractDistinctOverrideTexts`), plus a
-separate "default" row for `overrideTrackIcon` (the event-wide fallback shown for any text
-not yet mapped). New config fields: `overrideTrackIcons: { [text]: {icon, color} }`
-(per-text map) and `overrideTrackIcon: {icon, color} | null` (single default, unchanged
-from the first pass). `ConfigsContext.js` got a new `updateOverrideTrackIcon(text, updates)`
-mirroring `updateTrackIcon(track, updates)`. Added a `star` `<symbol>` to both
+override text found in the event's real sessions (`extractDistinctOverrideTexts`). Config
+field: `overrideTrackIcons: { byText: { [text]: {icon, color} } }`. The event-wide default row
+was removed 2026-08-24 — every text is authored explicitly, mirroring `TrackIconEditor`,
+including its "colour set with no icon" incompleteness warning. `ConfigsContext.js` has
+`updateOverrideTrackIcon(text, updates)` mirroring `updateTrackIcon(track, updates)`. Added a `star` `<symbol>` to both
 `v1/features/icons/track-icons.svg` and the configurator's own copy of that sprite (the
 only icon slug not tied to a real track name) — used as the built-in override default.
 
@@ -1020,6 +1036,81 @@ was removed outright, not kept for backward compatibility — this is now the on
 `startDuplicateConfig` resets it blank for the same reason it already resets
 `rfApiUrl`/`rfProfileId`: reusing another event's registration page would send attendees
 to register for the wrong event.
+
+### 16.9 Detail overlay chip removal + primary/topic-tag field rename ✅ (2026-08-25)
+
+- Removed `.sg-detail__track-stack`/`.sg-detail__track-chip` (16.6's "known gap") from
+  `SessionDetailOverlay.js` and `sessions-guide-overlays.css` entirely — chips are not a
+  thing in the design for this view. `stackedTracks` on `resolveTrackBadge()`'s return
+  value is now dead for this consumer but left in place (still documented at 16.2/16.4);
+  nothing else reads it.
+- The detail overlay's "Track" attr row was pointed at `session.track`, which is actually
+  Primary Event Site Track — wrong per design (that value already renders as the channel
+  badge). The real "Track" topic-tag customAttribute (see `ESP-SESSION-ENDPOINTS.md`) had
+  been extracted once before as `session.category` and removed as dead code at 16.7; it
+  needed to come back for this row specifically.
+- Renamed the session model for clarity, since three real, distinct concepts had been
+  sharing confusable names:
+  - `track` → `primaryTrack` (Primary Event Site Track / Primary Track for Agenda —
+    `PRIMARY_TRACK_ATTRIBUTE_NAMES`, was `TRACK_ATTRIBUTE_NAMES`)
+  - new `tracks` (the `Track` topic-tag customAttribute, multi-value) — only consumed by
+    the detail overlay's "Track" row
+  - `additionalTracks` — unchanged
+  - Helpers: `getSessionTrack()` → `getSessionPrimaryTrack()`,
+    `extractDistinctTracks()` → `extractDistinctPrimaryTracks()`
+  - Not renamed (deliberately generic/separate contracts): `swimlaneOrder[].track` (a
+    swimlane key, which can be a primary track name *or* an override text),
+    `CategoryBadge`'s `track` prop (an arbitrary named-track override), `TrackRow`'s
+    `track` prop (a swimlane display label), and `upcoming-sessions.js`/
+    `featured-sessions.js`'s authored `entry.track` (a separate, homepage-link-authored
+    shape — `tier-1-event-configurator/utils.js`'s `buildSessionAuthorEntry()` still
+    calls `getSessionPrimaryTrack()` to fill it, but keeps the output key `track` to match
+    that contract).
+
+## Phase 17 — Format visibility matrix + DVR Timing removed from filtering ✅ (2026-08-26)
+
+Confirmed, per-view visibility table for the 3 valid Format combinations (see Phase 16's
+`invalidFormatReason` for the other 5, which are dropped from the catalog entirely and never
+reach this):
+
+| Format | Live & upcoming | My sessions | My favorites | On demand |
+|---|---|---|---|---|
+| Online | ✅ | ✅ (if scheduled) | ✅ (if favorited) | ✅ (past end, or MR poll) |
+| In person, Online | ✅ | ✅ (if scheduled) | ✅ (if favorited) | ✅ (past end, or MR poll) |
+| In person, On demand, post event | ❌ | ❌ (can only schedule from Live & upcoming, which it never appears in) | ✅ (if favorited from On demand) | ✅ |
+
+Traced against the code and confirmed already correct with **no changes needed**:
+`deriveSessionState()`'s unconditional `hasOnDemandFormat → 'on-demand'` already keeps the
+third row out of Live & Upcoming and My Sessions' upcoming tab; `MyFavoritesView.js` already
+has its own on-demand tab (identical mechanism to `MySessionsView.js`), so favoriting from On
+Demand already surfaces it there too.
+
+**One real change:** `DVR Timing (in hours)` is no longer part of `onDemandSessions()`'s
+gate at all (PM, 2026-08-26) — dropped the `isDvrPending()` check and the `eventStartMs` param
+from `onDemandSessions()` itself, and its threading through `OnDemandView.js`/
+`MySessionsView.js`/`MyFavoritesView.js`. `dvrDelayHours` stays on the session model (still
+parsed from the real attribute) for a later "Recording coming soon" vs "On-demand" display
+treatment — a separate, not-yet-scoped ticket, tracked here as a pointer for whoever picks it
+up. `event-session-details` already has an analogous, independent "Coming soon" state
+(`isIpodSession` + `hasPlayableVideo`) that doesn't read DVR Timing either — worth a look
+before designing the guide's version.
+
+`isDvrPending()`/`dvrAvailableAtMs()` themselves were briefly deleted as dead code, then
+restored (2026-08-26) as shared `utils/session-state.js` utilities — unused by the guide's own
+filtering now, but kept for other blocks that may need to know whether a session's recording
+window has opened. Same reasoning for `eventApiConfig.eventStartMs` (see below): not read by
+this block right now, but cheap, already-authored data worth keeping available.
+
+### 17.1 `session-store.js` naming pass ✅ (2026-08-26)
+
+- `getApiConfig()` → `getEventApiConfig()`, and its module-level `apiConfig` var →
+  `eventApiConfig` — the old name undersold what the object actually holds: `eventId`,
+  `eventStartMs`, `eventEndMs`, `registerUrl` alongside the real API-connection fields
+  (`apiUrl`, `rfProfileId`, `mrEnv`). Not named `getEventConfig()`/`eventConfig` — that would
+  collide in meaning with the unrelated, pre-existing `getEventConfig()` in `utils/utils.js`
+  (Milo's page-level config).
+- `profileId` → `rfProfileId` on the same object, so it's unambiguous which system's profile
+  id this is without having to chase the assignment back to `rainfocus.js`.
 
 ---
 
@@ -1151,7 +1242,7 @@ test/unit/blocks/sessions-guide/
   components/TimeSlotRow.test.js
   mocks/
     default.html
-    sessions.json               # sample sessions API response
+    session-fixtures.js         # current-schema session builders
 
 test/unit/features/toast/
   toast.test.js                  # features/toast/toast.js — signal, mount idempotency, rendering, dismiss

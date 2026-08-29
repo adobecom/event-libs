@@ -1,4 +1,4 @@
-import { html, useState } from '../../../../deps/htm-preact.js';
+import { html, useState, useEffect } from '../../../../deps/htm-preact.js';
 import { IconButton } from './IconButton.js';
 import { useSessionGuide } from '../store/index.js';
 import { formatSessionTime, formatShortTime, getNowMs } from '../utils/time.js';
@@ -8,12 +8,42 @@ import {
 import { toggleScheduleWithFeedback, toggleFavoriteWithFeedback } from '../../../../services/sessions/action-feedback.js';
 import { showToast } from '../../../../features/toast/toast.js';
 import { deriveSessionState, getWatchDestination } from '../../../../utils/session-state.js';
-import { setSessionParam, clearSessionParams, safeUrl, isSamePage } from '../utils/url.js';
-import { IconHeartFilled, IconHeartOutline } from './icons.js';
+import { setSessionParam, sessionParamValue, clearSessionParams, safeUrl, isSamePage } from '../utils/url.js';
+import { sanitizedRichText } from '../utils/rich-text.js';
+import {
+  IconHeartFilled, IconHeartOutline, IconLinkOut, IconCalendarCheck, IconCalendarPlus,
+} from './icons.js';
 import { Icon } from '../../../../features/icons/Icon.js';
-import { getTrackIcon } from '../../../../utils/tier-1-event-config.js';
+import { fetchFederalProductIcon } from '../../../../features/icons/federal-icons.js';
+import { getProduct } from '../../../../utils/tier-1-event-config.js';
 import { resolveTrackBadge } from '../utils/session-filters.js';
 import { isBehaviorEnabled } from '../utils/behavior-flags.js';
+import { scrollBehavior } from '../utils/motion.js';
+
+// Collapsed lengths of the list pods, per the Figma frames (products 1325:141847,
+// speakers 1325:141990). A pod only grows a "Show more" toggle when it actually has more
+// than this.
+const COLLAPSED_PRODUCTS = 6;
+const COLLAPSED_SPEAKERS = 5;
+
+// Only the desktop frame splits the pods into two columns (1323:139140). Tracked reactively
+// — and used to pick the DOM order rather than CSS `order`, so tab order always follows what
+// is on screen: summary → products → speakers when stacked, column by column when split.
+// Same hook shape as FilterPanel.js's useIsMobile().
+const DESKTOP_QUERY = '(min-width: 1280px)';
+const matchesDesktop = () => !!window.matchMedia?.(DESKTOP_QUERY).matches;
+
+function useIsDesktop() {
+  const [isDesktop, setIsDesktop] = useState(matchesDesktop);
+  useEffect(() => {
+    const mq = window.matchMedia?.(DESKTOP_QUERY);
+    if (!mq) return undefined;
+    const onChange = (e) => setIsDesktop(e.matches);
+    mq.addEventListener('change', onChange);
+    return () => mq.removeEventListener('change', onChange);
+  }, []);
+  return isDesktop;
+}
 
 export function SessionDetailOverlay({ onBack }) {
   const { state, dispatch } = useSessionGuide();
@@ -21,6 +51,9 @@ export function SessionDetailOverlay({ onBack }) {
   const { userTz } = guideConfig;
 
   const [descExpanded, setDescExpanded] = useState(false);
+  const [productsExpanded, setProductsExpanded] = useState(false);
+  const [speakersExpanded, setSpeakersExpanded] = useState(false);
+  const isDesktop = useIsDesktop();
 
   const session = sessions.value.find((s) => s.id === activeSessionId);
   if (!session) return null;
@@ -39,7 +72,6 @@ export function SessionDetailOverlay({ onBack }) {
   const watchNowEnabled = isBehaviorEnabled(guideConfig, 'enableWatchNowCtas');
   const isLive = sessionState === 'live';
   const onDemand = sessionState === 'on-demand';
-  const recordingComing = onDemand && session.inPerson && !session.videoAvailable;
   const watchHref = safeUrl(getWatchDestination(session, sessionState));
   // Live / on-demand sessions surface "Watch now" (disabled if there's no real
   // destination); upcoming sessions surface "Add to schedule". Either can be turned off
@@ -55,7 +87,7 @@ export function SessionDetailOverlay({ onBack }) {
       e.preventDefault();
       dispatch({ type: 'CLOSE_DRAWER' });
       history.pushState({}, '', clearSessionParams());
-      window.scrollTo({ top: 0, behavior: 'smooth' });
+      window.scrollTo({ top: 0, behavior: scrollBehavior() });
     }
   }
 
@@ -80,43 +112,55 @@ export function SessionDetailOverlay({ onBack }) {
 
   async function handleShare(e) {
     e.stopPropagation();
-    const slug = session.slug || session.id;
-    const rfCode = session.rfCode || session.id;
-    const shareUrl = window.location.origin + setSessionParam(`${slug}-${rfCode}`);
+    const shareUrl = window.location.origin + setSessionParam(sessionParamValue(session));
     try {
-      if (navigator.share) {
-        await navigator.share({ title: session.title, url: shareUrl });
-      } else if (navigator.clipboard?.writeText) {
-        await navigator.clipboard.writeText(shareUrl);
-        showToast({ message: 'Link copied', variant: 'positive' });
-      }
+      // Checked explicitly rather than navigator.clipboard?.writeText(...): optional-chaining
+      // past a missing clipboard API would resolve `await undefined` immediately and fall
+      // through to the success toast below without ever having copied anything.
+      if (!navigator.clipboard) throw new Error('Clipboard API unavailable');
+      await navigator.clipboard.writeText(shareUrl);
+      showToast({ message: 'Link copied!', variant: 'positive' });
     } catch (err) {
-      // Swallow the user-cancelled share dialog; log anything else.
-      if (err?.name !== 'AbortError') {
-        window.lana?.log(`[sessions-guide] detail share failed: ${err.message}`);
-      }
+      window.lana?.log(`[sessions-guide] detail share failed: ${err.message}`);
     }
   }
 
+  // Fixed order, per design. `AI focus` has no catalog attribute yet, so its row simply does
+  // not render until one is authored — same as any other unauthored attribute here. `Industry`
+  // is deliberately absent: it is not in this list and does not exist in the real catalog.
   const attrs = [
     ['Technical level', session.technicalLevel],
-    ['Track', session.track],
-    ['Content category', session.contentCategory?.join(', ')],
+    ['Track', session.tracks?.join(', ')],
+    ['AI focus', session.aiFocus?.join(', ')],
     ['Audience', session.audience?.join(', ')],
+    ['Category', session.contentCategory?.join(', ')],
   ].filter(([, value]) => value);
 
-  return html`
-    <div class="sg-detail" role="region" aria-label="Session detail">
-      <div class="sg-detail__body">
-        <div class="sg-detail__back-wrap">
-          <button class="sg-detail__back" onclick=${onBack} type="button" aria-label="Back to sessions list">
-            <span class="sg-detail__back-icon" aria-hidden="true"></span>
-            Back
-          </button>
-        </div>
+  // Each list pod renders its collapsed slice with the full count in the heading, so the
+  // toggle is only offered when it changes what's on screen.
+  const products = session.products || [];
+  const speakers = session.speakers || [];
+  const shownProducts = productsExpanded ? products : products.slice(0, COLLAPSED_PRODUCTS);
+  const shownSpeakers = speakersExpanded ? speakers : speakers.slice(0, COLLAPSED_SPEAKERS);
 
-        <div class="sg-detail__cols">
-          <div class="sg-detail__col sg-detail__col--main">
+  // Shared "Show more"/"Show less" affordance for the list pods — same markup as the
+  // description's More/Less toggle, with an explicit label for screen readers since the
+  // visible text alone doesn't say what expands.
+  const showMoreToggle = (expanded, setExpanded, label, controls) => html`
+    <button
+      class="sg-detail__more"
+      onclick=${() => setExpanded((v) => !v)}
+      type="button"
+      aria-expanded=${String(expanded)}
+      aria-controls=${controls}
+    >
+      <span class="sg-sr-only">${expanded ? `Show fewer ${label}` : `Show all ${label}`}</span>
+      <span aria-hidden="true">${expanded ? 'Show less' : 'Show more'}</span>
+      <span class="sg-detail__more-icon" aria-hidden="true"></span>
+    </button>
+  `;
+
+  const summaryPod = html`
             <div class="sg-detail__group sg-detail__group--summary">
               <div class="sg-detail__summary">
                 <div class="sg-detail__summary-top">
@@ -126,25 +170,17 @@ export function SessionDetailOverlay({ onBack }) {
                       <span class="sg-detail__channel-name">${trackBadge.label}</span>
                     </div>
                   `}
-                  ${trackBadge?.stackedTracks && html`
-                    <div class="sg-detail__track-stack">
-                      ${trackBadge.stackedTracks.map((track) => {
-    const icon = getTrackIcon(track);
-    return html`
-                          <span class="sg-detail__track-chip" key=${track}>
-                            <${Icon} name=${icon?.icon} size=${16} className="sg-detail__track-chip-icon" />
-                            ${track}
-                          </span>
-                        `;
-  })}
-                    </div>
-                  `}
+                  ${trackBadge && timeRange && html`<span class="sg-detail__meta-divider" aria-hidden="true"></span>`}
                   ${timeRange && html`<span class="sg-detail__time">${timeRange}</span>`}
                 </div>
 
                 <h2 class="sg-detail__title">${session.title}</h2>
 
-                ${recordingComing && html`<div class="sg-detail__recording-badge">Recording coming soon</div>`}
+                ${session.ipodOrGdprCopy && html`
+                  <div
+                    class="sg-detail__legal"
+                    dangerouslySetInnerHTML=${{ __html: sanitizedRichText(session.ipodOrGdprCopy) }}
+                  ></div>`}
 
                 <div class="sg-detail__actions">
                   ${showWatchCta
@@ -169,7 +205,7 @@ export function SessionDetailOverlay({ onBack }) {
                           daa-ll=${isScheduled ? 'Remove-from-Schedule' : 'Add-to-Schedule'}
                           type="button"
                         >
-                          <span class=${'sg-detail__btn-icon ' + (isScheduled ? 'sg-detail__btn-icon--check' : 'sg-detail__btn-icon--plus')} aria-hidden="true"></span>
+                          ${isScheduled ? html`<${IconCalendarCheck} />` : html`<${IconCalendarPlus} />`}
                           ${isScheduled ? 'Scheduled' : 'Add to schedule'}
                         </button>
                       `}
@@ -201,8 +237,7 @@ export function SessionDetailOverlay({ onBack }) {
 
               ${session.description && html`
                 <div class="sg-detail__details">
-                  <h3 class="sg-detail__section-label">Session details</h3>
-                  <div class=${'sg-detail__desc-wrap' + (descExpanded ? ' is-expanded' : '')}>
+                  <div class=${'sg-detail__desc-wrap' + (descExpanded ? ' is-expanded' : '')} id="sg-detail-desc">
                     <p class="sg-detail__desc">${session.description}</p>
                   </div>
                   <button
@@ -210,8 +245,10 @@ export function SessionDetailOverlay({ onBack }) {
                     onclick=${() => setDescExpanded((v) => !v)}
                     type="button"
                     aria-expanded=${String(descExpanded)}
+                    aria-controls="sg-detail-desc"
                   >
-                    ${descExpanded ? 'Less' : 'More'}
+                    <span class="sg-sr-only">${descExpanded ? 'Show less of the session description' : 'Show more of the session description'}</span>
+                    <span aria-hidden="true">${descExpanded ? 'Less' : 'More'}</span>
                     <span class="sg-detail__more-icon" aria-hidden="true"></span>
                   </button>
                   ${attrs.length > 0 && html`
@@ -227,51 +264,49 @@ export function SessionDetailOverlay({ onBack }) {
                 </div>
               `}
             </div>
+  `;
 
-            ${session.products?.length > 0 && html`
+  const productsPod = products.length > 0 && html`
               <div class="sg-detail__group sg-detail__group--products">
-                <h3 class="sg-detail__section-label">Featured products</h3>
-                <div class="sg-detail__products">
-                  ${session.products.map((p) => html`
-                    <div class="sg-detail__product-card">
-                      <span class="sg-detail__product-icon" aria-hidden="true"></span>
+                <h3 class="sg-detail__section-label">
+                  Featured products ${products.length > COLLAPSED_PRODUCTS
+    && html`<span class="sg-detail__count">(${products.length})</span>`}
+                </h3>
+                <div class="sg-detail__products" id="sg-detail-products">
+                  ${shownProducts.map((p) => {
+    // Product icon and destination both come from the Tier 1 Event Configurator's
+    // authored products map — same resolution FilterPanel.js uses for its pills.
+    // An unmapped product has nowhere to link, so it stays a plain tile.
+    const product = getProduct(p);
+    const href = safeUrl(product?.pageUrl);
+    const inner = html`
+                      ${product?.icon
+    ? html`<${Icon} name=${product.icon} size=${32} resolve=${fetchFederalProductIcon} className="sg-detail__product-icon" />`
+    : html`<span class="sg-detail__product-icon sg-detail__product-icon--placeholder" aria-hidden="true"></span>`}
                       <span class="sg-detail__product-name">${p}</span>
-                    </div>
-                  `)}
+                      ${href && html`<span class="sg-detail__product-linkout" aria-hidden="true"><${IconLinkOut} /></span>`}
+                    `;
+    return href
+      ? html`<a class="sg-detail__product-card" href=${href} target="_blank" rel="noopener noreferrer" daa-ll="Featured-Product">${inner}</a>`
+      : html`<div class="sg-detail__product-card">${inner}</div>`;
+  })}
                 </div>
+                ${products.length > COLLAPSED_PRODUCTS
+    && showMoreToggle(productsExpanded, setProductsExpanded, 'featured products', 'sg-detail-products')}
               </div>
-            `}
+  `;
 
-            ${session.resources?.length > 0 && html`
-              <div class="sg-detail__group sg-detail__group--resources">
-                <h3 class="sg-detail__section-label">Session resources</h3>
-                <div class="sg-detail__resources">
-                  ${session.resources.map((r) => html`
-                    <a class="sg-detail__resource-card" href=${safeUrl(r.url)} target="_blank" rel="noopener noreferrer">
-                      <span class="sg-detail__resource-name">${r.title || r.label || r.url}</span>
-                      <span class="sg-detail__resource-action">Download</span>
-                    </a>
-                  `)}
-                </div>
-              </div>
-            `}
-
-            ${session.copyrightDisclaimer && html`
-              <p class="sg-detail__copyright">${session.copyrightDisclaimer}</p>
-            `}
-          </div>
-
-          ${session.speakers?.length > 0 && html`
-            <div class="sg-detail__col sg-detail__col--side">
+  const speakersPod = speakers.length > 0 && html`
               <div class="sg-detail__group sg-detail__group--speakers">
                 <h3 class="sg-detail__section-label">
-                  Speakers <span class="sg-detail__count">(${session.speakers.length})</span>
+                  Speakers ${speakers.length > COLLAPSED_SPEAKERS
+    && html`<span class="sg-detail__count">(${speakers.length})</span>`}
                 </h3>
-                <div class="sg-detail__speakers">
-                  ${session.speakers.map((sp) => html`
+                <div class="sg-detail__speakers" id="sg-detail-speakers">
+                  ${shownSpeakers.map((sp) => html`
                     <div class="sg-detail__speaker">
                       ${sp.photo
-    ? html`<img class="sg-detail__speaker-photo" src=${sp.photo} alt=${sp.name} width="56" height="56" loading="lazy" decoding="async" />`
+    ? html`<img class="sg-detail__speaker-photo" src=${sp.photo} alt="" width="56" height="56" loading="lazy" decoding="async" />`
     : html`<span class="sg-detail__speaker-photo sg-detail__speaker-photo--placeholder" aria-hidden="true"></span>`}
                       <div class="sg-detail__speaker-info">
                         <span class="sg-detail__speaker-name">${sp.name}</span>
@@ -280,9 +315,47 @@ export function SessionDetailOverlay({ onBack }) {
                     </div>
                   `)}
                 </div>
+                ${speakers.length > COLLAPSED_SPEAKERS
+    && showMoreToggle(speakersExpanded, setSpeakersExpanded, 'speakers', 'sg-detail-speakers')}
               </div>
-            </div>
-          `}
+  `;
+
+  // Desktop splits into a wide main column and a 383px side column, each stacking its own
+  // pods; every narrower width is one stack in reading order. The order lives here rather
+  // than in CSS so the tab order matches what is on screen at both layouts.
+  //
+  // Session resources and the legal disclaimer are deliberately not rendered here: both are
+  // sourced from the public sessions catalog, which is reachable before an event goes live.
+  // Individual session pages hydrate them directly on page creation instead, where exposure
+  // isn't a pre-event leak.
+  const pods = isDesktop
+    ? html`
+          <div class="sg-detail__col sg-detail__col--main">
+            ${summaryPod}
+          </div>
+          <div class="sg-detail__col sg-detail__col--side">
+            ${productsPod}
+            ${speakersPod}
+          </div>
+        `
+    : html`
+          ${summaryPod}
+          ${productsPod}
+          ${speakersPod}
+        `;
+
+  return html`
+    <div class="sg-detail" role="region" aria-label="Session detail">
+      <div class="sg-detail__body">
+        <div class="sg-detail__back-wrap">
+          <button class="sg-detail__back" onclick=${onBack} type="button" aria-label="Back to sessions list">
+            <span class="sg-detail__back-icon" aria-hidden="true"></span>
+            Back
+          </button>
+        </div>
+
+        <div class=${'sg-detail__cols' + (isDesktop ? ' sg-detail__cols--split' : '')}>
+          ${pods}
         </div>
       </div>
     </div>

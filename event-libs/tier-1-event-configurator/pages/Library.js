@@ -45,7 +45,7 @@ function ConfigList({
     ${rows.length > 0 && html`
       <ul class="tec-library__list">
         ${rows.map((row) => html`
-          <li class="tec-library__item" key=${`${row.eventId}:${row.configType || CONFIG_TYPES.GLOBAL}`}>
+          <li class="tec-library__item" key=${row.configId || `${row.eventId}:${row.configType || CONFIG_TYPES.GLOBAL}`}>
             <div class="tec-library__item-info">
               <span class="tec-library__item-title-row">
                 <span class="tec-library__item-title">${getDisplayTitle(row)}</span>
@@ -201,15 +201,17 @@ export default function Library() {
     goToEditor();
   }, [setEnv, startEditConfig, goToEditor]);
 
-  // Event-ID+type collision guard: picking an event that already has a row
-  // for this same config type routes to Edit for that row instead of
-  // creating a second row — this is what makes (Event ID, config type)
-  // collision-proof by construction, not something enforced only at save
-  // time (PLAN.md Phase 4). A different config type for the same event is
-  // never a collision — Global and Homepage rows coexist independently.
+  // Event-ID+type collision guard: picking an event that already has a Global
+  // row routes to Edit for that row instead of creating a second one — Global
+  // is genuinely one config per Event ID (PLAN.md Phase 4). Homepage config
+  // types are exempt: a single event can carry several named Upcoming/Featured
+  // Sessions configs side by side (see `configName`), so New always creates a
+  // fresh row there regardless of what already exists for that event+type.
   const handlePickEvent = useCallback((event) => {
     setPickerOpen(false);
-    const existing = findConfigByEventId(event.eventId, pendingConfigType);
+    const isNewFlow = pickerMode !== 'duplicate' || !duplicateSource;
+    const guardApplies = isNewFlow && pendingConfigType === CONFIG_TYPES.GLOBAL;
+    const existing = guardApplies ? findConfigByEventId(event.eventId, pendingConfigType) : null;
     if (existing) {
       setToastSuccess('A config already exists for this event — editing it');
       openEdit(existing);
@@ -267,7 +269,7 @@ export default function Library() {
 
   const confirmDelete = useCallback(async () => {
     if (!rowPendingDelete) return;
-    await removeConfig(rowPendingDelete.eventId, rowPendingDelete.configType || CONFIG_TYPES.GLOBAL);
+    await removeConfig(rowPendingDelete);
     setRowPendingDelete(null);
   }, [rowPendingDelete, removeConfig]);
 

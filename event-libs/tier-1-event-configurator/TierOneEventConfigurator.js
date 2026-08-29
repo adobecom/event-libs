@@ -15,6 +15,7 @@ import { EventEnvProvider as SgcEventEnvProvider } from '../session-guide-config
 import { NavigationProvider as SgcNavigationProvider } from '../session-guide-configurator/context/NavigationContext.js';
 import { ConfigsProvider as SgcConfigsProvider } from '../session-guide-configurator/context/ConfigsContext.js';
 import SessionGuideConfigurator from '../session-guide-configurator/SessionGuideConfigurator.js';
+import { readConfigLinkPayload } from '../session-guide-configurator/utils.js';
 
 const TOAST_TIMEOUT_MS = 6000;
 const HOMEPAGE_LINK_HASH_RE = new RegExp(`[#&]${HOMEPAGE_LINK_HASH_KEY}=([A-Za-z0-9+/=%-]{20,})`);
@@ -147,7 +148,11 @@ function EventConfigTab() {
 }
 
 export default function TierOneEventConfigurator() {
-  const [activeTabId, setActiveTabId] = useState(TABS[0].id);
+  // A copied Session Guide link lands here with its config in the hash, so open on that tab
+  // — SessionGuideConfigurator opens the config itself. Lazy, so the hash is read once.
+  const [activeTabId, setActiveTabId] = useState(
+    () => (readConfigLinkPayload() ? 'session-guide' : TABS[0].id),
+  );
 
   return html`
     <div class="tec-app">

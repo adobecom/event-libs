@@ -1,7 +1,7 @@
 import { createTag, getMetadata } from '../../../utils/utils.js';
 import { getJsonMetadata } from '../../utils/custom-attributes.js';
 import { readBackgroundConfig } from '../../utils/background-config.js';
-import { initSessionState, getApiConfig } from '../../../utils/session-store.js';
+import { initSessionState, getEventApiConfig } from '../../../utils/session-store.js';
 import { assertAuthorized } from '../../../services/sessions/session-actions.js';
 import { showAuthToast } from '../../../services/sessions/action-feedback.js';
 
@@ -31,7 +31,7 @@ export default async function init(el) {
   initSessionState();
   const eventConfig = {
     title: getMetadata('event-title') || getMetadata('title') || '',
-    registerUrl: getApiConfig()?.registerUrl || '/register',
+    registerUrl: getEventApiConfig()?.registerUrl || '/register',
   };
 
   el.replaceChildren();

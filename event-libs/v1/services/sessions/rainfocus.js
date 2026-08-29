@@ -1,21 +1,14 @@
-// RainFocus (RF) live schedule/favorites API, ported from northstar's rainFocus.js. Endpoint +
-// profile id come from the Tier 1 Event Configurator's tier-1-event-config payload (see
-// session-store.js), falling back to the defaults below. clientId is only sent by
-// fetchAuthToken — every other endpoint's real params omit it.
-//
-// fetchAuthToken/fetchScheduled/fetchFavorited/fetchAttendeeAccess/dropAndSwapSession are
-// unused here (ported for parity with northstar's full endpoint set) — their response shapes
-// are unconfirmed, unlike fetchMyData's.
+// RainFocus schedule/favorites API, ported from northstar. Endpoint and profile id come from
+// tier-1-event-config, falling back to the defaults below. clientId is only sent by
+// fetchAuthToken. Several exports are unused, ported for parity, with unconfirmed shapes.
 
-// Same-origin Adobe.com proxy over RainFocus's real API (avoids CORS/IP allowlist) — maps
-// these endpoint names to RainFocus's own /api/adobe/v2/* paths on events.rainfocus.com.
+// Same-origin Adobe.com proxy over RainFocus's API, avoiding CORS and the IP allowlist.
 export const DEFAULT_RF_API_URL = 'https://www.adobe.com/max-api/';
 
-// Proxies to a separate RainFocus host (events-stg.rainfocus.com) — tokens aren't portable
-// between the two, and milo's local env mirrors stage IMS, so this covers local dev too.
+// Separate RainFocus host; tokens aren't portable between the two. Covers local dev too.
 export const STAGE_RF_API_URL = 'https://www.stage.adobe.com/max-api/';
 
-// Not secrets — RainFocus restricts access by IP allowlist, not by this value.
+// Not secrets: RainFocus restricts by IP allowlist.
 export const RF_PROFILE_IDS = {
   max25: 'MAX25ggj84gt2s0u73vzzzSESSIONHUB',
   max26: 'MAX26sss1mIiY19qLgszzzSESSIONHUB',
@@ -24,7 +17,7 @@ export const RF_PROFILE_IDS = {
 // Current/upcoming event — update when the next MAX supersedes it.
 export const DEFAULT_RF_PROFILE_ID = RF_PROFILE_IDS.max26;
 
-// Same value for every event so far (Summit and MAX) — legacy per-event widget ids retired.
+// Same for every event so far; per-event widget ids retired.
 export const RF_WIDGET_ID = 'RCitHYXguvb7I6o4Ps9T5weDqIK9xRYb';
 
 const ENDPOINTS = {
@@ -41,7 +34,7 @@ const ENDPOINTS = {
 
 function buildUrl(rfApiUrl, endpoint, params) {
   const base = rfApiUrl || DEFAULT_RF_API_URL;
-  // Ensure a trailing slash so endpoint appends rather than replacing the last path segment.
+  // Trailing slash so the endpoint appends rather than replaces the last segment.
   const url = new URL(endpoint, base.endsWith('/') ? base : `${base}/`);
   Object.entries(params).forEach(([key, value]) => {
     if (value !== undefined && value !== null && value !== '') url.searchParams.set(key, value);
@@ -76,9 +69,7 @@ export async function fetchAuthToken(clientId, rfApiProfileId, rfApiUrl) {
   return rawFetch(rfApiUrl, ENDPOINTS.AUTH, { rfApiProfileId, clientId });
 }
 
-// The first call on landing on an event page — schedule + favorites in one request. Real
-// response also includes exhibitorInterests/exhibitorLeadSetting/exhibitorLeads — not needed
-// here. loggedInUser: a populated attendee record is session-store.js's registration signal.
+// Schedule + favorites in one request. A populated loggedInUser is the registration signal.
 export async function fetchMyData(rfAuthToken, rfApiProfileId, rfApiUrl) {
   const data = await rawFetch(rfApiUrl, ENDPOINTS.MY_DATA, {
     rfApiProfileId, rfAuthToken, rfWidgetId: RF_WIDGET_ID,
@@ -90,7 +81,7 @@ export async function fetchMyData(rfAuthToken, rfApiProfileId, rfApiUrl) {
   };
 }
 
-// Standalone equivalents of fetchMyData's two pieces, without the exhibitor/user data.
+// Standalone equivalents of fetchMyData's two pieces.
 export async function fetchScheduled(rfAuthToken, rfApiProfileId, rfApiUrl) {
   const data = await rawFetch(rfApiUrl, ENDPOINTS.GET_SCHEDULE, { rfApiProfileId, rfAuthToken });
   return data?.mySchedule ?? [];
@@ -103,8 +94,7 @@ export async function fetchFavorited(rfAuthToken, rfApiProfileId, rfApiUrl) {
 
 export async function addSession(sessionTimeId, rfAuthToken, rfApiProfileId, rfApiUrl) {
   const data = await rawFetch(rfApiUrl, ENDPOINTS.ADD_TO_SCHEDULE, {
-    // Required — without it RF defaults to in-person-only attendance and rejects with
-    // responseCode 27, even for attendees eligible for online/hybrid sessions.
+    // Required, or RF defaults to in-person-only and rejects with responseCode 27.
     rfApiProfileId, rfAuthToken, sessionTimeId, virtual: true,
   });
   return handleWriteResponse(data);
@@ -117,9 +107,7 @@ export async function removeSession(sessionTimeId, rfAuthToken, rfApiProfileId, 
   return handleWriteResponse(data);
 }
 
-// Atomically drops dropSessionItems (RF sessionTimeIds, semicolon-separated per northstar)
-// while adding sessionTimeId — northstar's own conflict UI called removeSession then
-// addSession sequentially instead of this combined endpoint.
+// Atomic drop-and-add. dropSessionItems is semicolon-separated RF sessionTimeIds.
 export async function dropAndSwapSession(sessionTimeId, dropSessionItems, rfAuthToken, rfApiProfileId, rfApiUrl) {
   const data = await rawFetch(rfApiUrl, ENDPOINTS.ADD_AND_REMOVE_FROM_SCHEDULE, {
     rfApiProfileId, rfAuthToken, sessionTimeId, dropSessionItems,

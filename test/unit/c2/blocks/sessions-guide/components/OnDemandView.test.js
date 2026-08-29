@@ -9,21 +9,21 @@ function h(offsetHours) {
 }
 
 const PAST_DESIGN = {
-  id: 'd-1', title: 'Design Talk', description: '', track: 'Design',
+  id: 'd-1', title: 'Design Talk', description: '', primaryTrack: 'Design',
   startTimeUtc: h(-4), endTimeUtc: h(-3),
-  videoAvailable: true, inPerson: false, sessionPageUrl: '/d-1',
+  inPerson: false, sessionPageUrl: '/d-1',
   mrStreamId: null, thumbnailUrl: null,
 };
 const PAST_VIDEO = {
-  id: 'v-1', title: 'Video Talk', description: '', track: 'Video',
+  id: 'v-1', title: 'Video Talk', description: '', primaryTrack: 'Video',
   startTimeUtc: h(-6), endTimeUtc: h(-5),
-  videoAvailable: true, inPerson: false, sessionPageUrl: '/v-1',
+  inPerson: false, sessionPageUrl: '/v-1',
   mrStreamId: null, thumbnailUrl: null,
 };
 const UPCOMING = {
-  id: 'u-1', title: 'Upcoming', description: '', track: 'Dev',
+  id: 'u-1', title: 'Upcoming', description: '', primaryTrack: 'Dev',
   startTimeUtc: h(2), endTimeUtc: h(3),
-  videoAvailable: false, inPerson: false, sessionPageUrl: '/u-1',
+  inPerson: false, sessionPageUrl: '/u-1',
   mrStreamId: null, thumbnailUrl: null,
 };
 

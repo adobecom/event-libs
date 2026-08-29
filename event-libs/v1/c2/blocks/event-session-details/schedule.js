@@ -1,6 +1,6 @@
 import { createTag, getMetadata } from '../../../utils/utils.js';
 import {
-  initSessionState, sessions, scheduled, getApiConfig,
+  initSessionState, sessions, scheduled, getEventApiConfig,
 } from '../../../utils/session-store.js';
 import { toggleScheduleWithFeedback } from '../../../services/sessions/action-feedback.js';
 
@@ -14,7 +14,7 @@ export function renderSchedule() {
 
   const eventConfig = {
     title: getMetadata('event-title') || getMetadata('title') || '',
-    registerUrl: getApiConfig()?.registerUrl || '/register',
+    registerUrl: getEventApiConfig()?.registerUrl || '/register',
   };
 
   let session = sessions.value.find((s) => s.id === sessionId) || { id: sessionId };

@@ -143,7 +143,7 @@ One shared DA sheet per content-repo at
 
 **`config.rfApiUrl`/`config.rfProfileId`, added for [MWPW-200311](https://jira.corp.adobe.com/browse/MWPW-200311).** Nested in `config` like `trackIcons`/`allowDoubleBooking` — one JSON payload, not extra metadata rows. `event-libs/v1/utils/session-store.js` reads both straight off the parsed `tier-1-event-config` metadata, falling back to `DEFAULT_RF_API_URL`/`DEFAULT_RF_PROFILE_ID` (`event-libs/v1/services/sessions/rainfocus.js`) when either is blank. Never carried over on Duplicate — reusing another event's RF profile id would misroute this event's live schedule/favorites calls.
 
-**`config.overrideTrackIcons` is one field, not two.** Shape: `{ default: {icon,color} | null, byText: { "override text": {icon,color} } }` — `byText` maps a specific Override Primary Event Site Track text to its own icon/color, `default` is the event-wide fallback for any text not mapped there. `getOverrideTrackIcon()` (`v1/utils/tier-1-event-config.js`) checks `byText` first, then `default`. Previously two separate top-level fields (`overrideTrackIcon`/`overrideTrackIcons`); merged so there's nowhere for the two to drift apart, without using a reserved sentinel key inside the map (which could collide with real author-typed override text).
+**`config.overrideTrackIcons` has no default.** Shape: `{ byText: { "override text": {icon,color} } }` — every Override Primary Event Site Track text is mapped explicitly, mirroring `trackIcons`. The `default` event-wide fallback was dropped 2026-08-24: an unmapped text now gets no icon and falls back to `DEFAULT_ICON_COLOR` at render time, the same as an unmapped track. `getOverrideTrackIcon()` (`v1/utils/tier-1-event-config.js`) returns `null` for anything not in `byText`. The map stays nested under `byText` so no author-typed override text can collide with a config key.
 
 **`config.homepageFeaturedSessions`/`config.homepageFeaturedSessionsMeta` only exist on a Homepage-Featured-Sessions row** — feed the card-c2 Featured Sessions homepage block, and are never read from `tier-1-event-config` metadata directly, only copy-pasted out via "Copy Featured Sessions JSON" into that block's own section-metadata. There's no Global-level equivalent — Session Guide's own recommended-sessions carousel is authored in session-guide-configurator instead (see that app's README).
 
@@ -185,14 +185,17 @@ npx serve . --listen 3000
 
 ### Switching ESP env
 
-`?espenv=`/`?eccEnv=` query params **don't work** through the DA-proxied
-route above — DA's SDK only forwards `context.ref` through the iframe
-handshake, so a query param on the parent `da.live/app/...` URL never
-reaches this app (same limitation Schedule Maker documents for
-`?milolibs=`).
+`?espenv=`/`?eccEnv=` on the parent `da.live/app/...` URL **do** reach this app:
+DA's shell (`da.live/nx/blocks/shell/shell.js`) appends both the parent's search
+and hash to the iframe src, and `getEventServiceEnv()` reads `espenv`/`eccEnv`
+off `window.location.search`. An earlier version of this section claimed the
+opposite — that only `context.ref` crosses the handshake — which is wrong, and
+may date from before the shell forwarded the search.
 
-**Use the app's own environment picker instead (2026-07-24, per Daniel) —**
-its home is `ManualEventLookup.js`'s **Environment** dropdown, next to the
+**Prefer the app's own environment picker anyway (2026-07-24, per Daniel) —**
+it persists for the session and shows a loud banner whenever it isn't prod,
+where a query param silently forces the same env with no visible indication.
+Its home is `ManualEventLookup.js`'s **Environment** dropdown, next to the
 Event ID field. Since `EventPicker` (the full browse/search catalog) is the
 default flow for New config/Duplicate, reach it via the automatic
 fallback — `EventPicker`'s `listAllEvents()` call needs to fail first
