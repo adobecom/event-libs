@@ -132,6 +132,7 @@ components/SessionInfoPanel.js                 # Phase 1
 components/EndedState.js                       # Phase 3
 utils/broadcast-url.js                         # Phase 0 — done
 utils/broadcast-schedule.js                    # Phase 0 — done
+utils/broadcast-debug.js                       # dev-only, not ticket scope — console.table of the on-page schedule behind ?debug; delete before this ships
 session-broadcast.css                          # mobile-first, built up across phases
 ```
 

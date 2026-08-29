@@ -12,6 +12,7 @@ import { findSessionByParam } from '../../sessions-guide/utils/url.js';
 import { LoadingState, sessionsStatusMessage } from '../../sessions-guide/components/LoadingState.js';
 import { getBroadcastSchedule, getLiveSessions } from '../utils/broadcast-schedule.js';
 import { readWatchParam, stripWatchParam, pushSessionState, getHistorySessionId } from '../utils/broadcast-url.js';
+import { logBroadcastSchedule } from '../utils/broadcast-debug.js';
 import { PlayerHost } from './PlayerHost.js';
 import { SessionInfoPanel } from './SessionInfoPanel.js';
 import { AlsoLiveCarousel } from './AlsoLiveCarousel.js';
@@ -75,6 +76,7 @@ export function BroadcastBody({ config }) {
   const schedule = getBroadcastSchedule(sessions.value, liveStreamActiveIds.value, nowMs, {
     activeSessionId: manualSessionId,
   });
+  logBroadcastSchedule(schedule);
 
   return html`
     <div class="sb-app" aria-busy=${String(sessionsStatus.value === 'loading')}>
