@@ -40,6 +40,16 @@ authored alongside it, e.g. `event-featured-products`/`event-speakers`/
 instance actually plays," for exactly how these drive the winner/loser
 removal.
 
+Both sections are also commonly authored with a `spacing-sm` Style value
+(external, section-level vertical padding) — `.video-container`'s own
+default is too generous for this specific layout, so `video-player.css`
+overrides it directly (`padding-bottom: 10px`) scoped to `.section.video-container`.
+Since that rule targets the class, not any inferred structure, it only ever
+applies when this section is actually present (the winning instance); when
+`video-playlist` wins instead, `.video-container` is removed from the DOM
+entirely, leaving nothing for the override to match — the other section's
+own `spacing-sm` padding is never affected either way.
+
 If the current session hasn't ended yet (checked against its own
 `session-times` `endTimeMillis`), or it has no embeddable video source at
 all, this block removes itself. There's no empty state.
