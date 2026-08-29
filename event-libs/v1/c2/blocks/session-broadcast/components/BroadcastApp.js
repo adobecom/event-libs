@@ -76,7 +76,7 @@ export function BroadcastBody({ config }) {
   const schedule = getBroadcastSchedule(sessions.value, liveStreamActiveIds.value, nowMs, {
     activeSessionId: manualSessionId,
   });
-  logBroadcastSchedule(schedule);
+  logBroadcastSchedule(sessions.value, liveStreamActiveIds.value, nowMs, schedule);
 
   return html`
     <div class="sb-app" aria-busy=${String(sessionsStatus.value === 'loading')}>
