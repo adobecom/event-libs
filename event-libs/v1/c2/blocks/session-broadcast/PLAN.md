@@ -72,6 +72,7 @@ Only remaining action, not a blocker: let Analytics (Charlie, building a dimensi
 - Block scaffolding + `EVENT_BLOCKS_C2` registration. **Done.**
 - Confirmed for free: the in-person banner and footer newsletter signup are existing blocks (`in-person-banner`, `event-subscription-form`), not this story's concern.
 - **Fixed post-Phase-1** (user caught this): the session pool had no eligibility filter — a live mainstage/keynote session could have played in Broadcast, though keynotes belong on the homepage only (ticket: Out of Scope). Added `isBroadcastEligible(session)` to `event-libs/v1/utils/session-state.js` (`!isLivestreamed && isOnline` — the same fields `getWatchDestination()` already keys off), filtered through it in `broadcast-schedule.js`'s `isLive`/`isUpcoming`. Verified with keynote fixtures in the preview harness that never appear anywhere on the page.
+- **Second defensive filter, added later** (user request): an otherwise-eligible session with no player ID configured has nothing to actually play — added `hasPlayableVideoSource(session)` to `broadcast-schedule.js` (checks `youTubeId`/`mpcId`/`mrStreamId`, so MobileRider sessions start showing for free once that adapter ships), filtered alongside `isBroadcastEligible`. Verified against the real, unenhanced catalog snapshot — where all 34 eligible sessions genuinely lack a video id — that `getLiveSessions`/`getUpNextSessions` now correctly return zero.
 
 **Exit criteria — met**: existing sessions-guide tests still pass; new unit tests cover schedule aggregation and URL helpers against fixture data (0 live, 1 live, 6 concurrent live, upcoming backfill, mainstage/keynote exclusion). Full suite green (2070 passed), lint clean.
 
@@ -153,6 +154,7 @@ Tests mirror source under `test/unit/c2/blocks/session-broadcast/**`, following 
 - `event-libs/v1/services/sessions/session-state-ticker.js` — `startSessionStateTicker()`
 - `event-libs/v1/services/sessions/session-actions.js` + `action-feedback.js` — `toggleScheduleWithFeedback`, `toggleFavoriteWithFeedback`
 - `event-libs/v1/utils/tier-1-event-config.js` — `getTrackIcon()`, `getProduct()`, `getBroadcastPath()`, `getSessionGuidePath()`
+- `session-broadcast/utils/broadcast-schedule.js` — also exports `hasPlayableVideoSource(session)`, the authoring-gap protection above
 - `event-libs/v1/utils/session-state.js` — also `isPostEvent()`, the same function sessions-guide's own auto-transition uses
 - `event-libs/v1/features/toast/toast.js` — `showToast()`
 - `event-libs/v1/services/sessions/poller.js`'s ref-counted interval pattern — model for future MobileRider polling

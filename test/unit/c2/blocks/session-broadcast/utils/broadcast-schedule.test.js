@@ -6,13 +6,15 @@ import {
   getAlsoLiveSessions,
   getUpNextSessions,
   getBroadcastSchedule,
+  hasPlayableVideoSource,
 } from '../../../../../../event-libs/v1/c2/blocks/session-broadcast/utils/broadcast-schedule.js';
 
 const MIN = 60_000;
 
-// isOnline: true by default — a plain broadcast-eligible session, per isBroadcastEligible()
-// (session-state.js). Tests below that specifically exercise the mainstage/keynote exclusion
-// override isLivestreamed/isOnline explicitly.
+// isOnline: true, youTubeId set by default — a plain broadcast-eligible, video-having session,
+// per isBroadcastEligible()/hasPlayableVideoSource() (session-state.js / this module). Tests
+// below that specifically exercise the mainstage/keynote or missing-video exclusions override
+// isLivestreamed/isOnline/youTubeId explicitly.
 function session(id, startOffsetMin, endOffsetMin, overrides = {}) {
   const now = Date.now();
   return {
@@ -23,6 +25,8 @@ function session(id, startOffsetMin, endOffsetMin, overrides = {}) {
     mrStreamId: null,
     isOnline: true,
     isLivestreamed: false,
+    youTubeId: 'yt-default',
+    mpcId: '',
     ...overrides,
   };
 }
@@ -64,6 +68,29 @@ describe('broadcast-schedule', () => {
     it('excludes a live session that is neither online nor livestreamed (e.g. in-person only)', () => {
       const inPersonOnly = session('in-person', -10, 10, { isOnline: false });
       expect(getLiveSessions([inPersonOnly], liveStreamActiveIds, nowMs)).to.deep.equal([]);
+    });
+
+    // Defensive precaution against an authoring gap: an otherwise-eligible session with no
+    // player ID configured has nothing to actually play — better to never list it at all than
+    // let a viewer click into a session with no video behind it.
+    it('excludes a live, otherwise-eligible session with no video source configured', () => {
+      const noVideo = session('no-video', -10, 10, { youTubeId: '', mpcId: '', mrStreamId: null });
+      const withVideo = session('with-video', -10, 10);
+      const result = getLiveSessions([noVideo, withVideo], liveStreamActiveIds, nowMs);
+      expect(result.map((s) => s.id)).to.deep.equal(['with-video']);
+    });
+
+    it('includes a live session whose only video source is mpcId', () => {
+      const mpcOnly = session('mpc-only', -10, 10, { youTubeId: '', mpcId: '3458902' });
+      expect(getLiveSessions([mpcOnly], liveStreamActiveIds, nowMs).map((s) => s.id)).to.deep.equal(['mpc-only']);
+    });
+
+    it('includes a live session whose only video source is mrStreamId', () => {
+      // mrStreamId sessions derive live state from the MR poll set, not pure time (see
+      // deriveSessionState) — needs its stream id present in liveStreamActiveIds to read as live.
+      const mrOnly = session('mr-only', -10, 10, { youTubeId: '', mpcId: '', mrStreamId: 'mr-1' });
+      const activeIds = new Set(['mr-1']);
+      expect(getLiveSessions([mrOnly], activeIds, nowMs).map((s) => s.id)).to.deep.equal(['mr-only']);
     });
   });
 
@@ -108,6 +135,13 @@ describe('broadcast-schedule', () => {
       const breakout = session('breakout', 10, 20);
       const result = getUpNextSessions([keynote, breakout], liveStreamActiveIds, nowMs);
       expect(result.map((s) => s.id)).to.deep.equal(['breakout']);
+    });
+
+    it('excludes an upcoming, otherwise-eligible session with no video source configured', () => {
+      const noVideo = session('no-video', 10, 20, { youTubeId: '', mpcId: '', mrStreamId: null });
+      const withVideo = session('with-video', 10, 20);
+      const result = getUpNextSessions([noVideo, withVideo], liveStreamActiveIds, nowMs);
+      expect(result.map((s) => s.id)).to.deep.equal(['with-video']);
     });
 
     it(`caps the list at ${UP_NEXT_CAP} by default`, () => {
@@ -182,6 +216,28 @@ describe('broadcast-schedule', () => {
       expect(result.activeSession).to.equal(null);
       expect(result.alsoLive).to.deep.equal([]);
       expect(result.endedSession).to.equal(null);
+    });
+  });
+
+  describe('hasPlayableVideoSource', () => {
+    it('is true when youTubeId is set', () => {
+      expect(hasPlayableVideoSource({ youTubeId: 'abc', mpcId: '', mrStreamId: null })).to.be.true;
+    });
+
+    it('is true when mpcId is set', () => {
+      expect(hasPlayableVideoSource({ youTubeId: '', mpcId: '3458902', mrStreamId: null })).to.be.true;
+    });
+
+    it('is true when mrStreamId is set', () => {
+      expect(hasPlayableVideoSource({ youTubeId: '', mpcId: '', mrStreamId: 'mr-1' })).to.be.true;
+    });
+
+    it('is false when no video source field is set', () => {
+      expect(hasPlayableVideoSource({ youTubeId: '', mpcId: '', mrStreamId: null })).to.be.false;
+    });
+
+    it('is false for an empty session object (missing fields entirely)', () => {
+      expect(hasPlayableVideoSource({})).to.be.false;
     });
   });
 });

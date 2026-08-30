@@ -4,16 +4,33 @@ import { deriveSessionState, isBroadcastEligible } from '../../../../utils/sessi
 // note); a single named constant so the real number is a one-line change once confirmed.
 export const UP_NEXT_CAP = 15;
 
+// A session can pass isBroadcastEligible (right type — online, not a mainstage/keynote) and
+// still have nothing to actually play if authoring never set a player ID for it — PlayerHost
+// would fall back to its "isn't supported yet" message, exposing a session with no video
+// behind it. This is a defensive precaution against exactly that authoring gap, not a product
+// requirement: better to simply never list a session on the page than let a viewer click into
+// one with nothing to watch. Checks all three recognized video-source fields, not just the
+// ones with a built adapter today, so MobileRider sessions start showing for free once that
+// adapter ships, with no change needed here.
+export function hasPlayableVideoSource(session) {
+  return !!(session.youTubeId || session.mpcId || session.mrStreamId);
+}
+
 // isBroadcastEligible excludes mainstage/keynote sessions (isLivestreamed) — those belong on
 // the homepage per the ticket, not here, regardless of whether they're live or upcoming. Every
-// function below filters through it so the session pool this page ever shows or plays from is
-// never contaminated by homepage-only content.
+// function below filters through both this and hasPlayableVideoSource so the session pool this
+// page ever shows or plays from is never contaminated by homepage-only content or by a session
+// with no configured video source.
 function isLive(session, liveStreamActiveIds, nowMs) {
-  return isBroadcastEligible(session) && deriveSessionState(session, liveStreamActiveIds, nowMs) === 'live';
+  return isBroadcastEligible(session)
+    && hasPlayableVideoSource(session)
+    && deriveSessionState(session, liveStreamActiveIds, nowMs) === 'live';
 }
 
 function isUpcoming(session, liveStreamActiveIds, nowMs) {
-  return isBroadcastEligible(session) && deriveSessionState(session, liveStreamActiveIds, nowMs) === 'upcoming';
+  return isBroadcastEligible(session)
+    && hasPlayableVideoSource(session)
+    && deriveSessionState(session, liveStreamActiveIds, nowMs) === 'upcoming';
 }
 
 function byStartTimeAsc(a, b) {
