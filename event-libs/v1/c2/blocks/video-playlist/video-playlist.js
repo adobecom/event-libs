@@ -518,18 +518,35 @@ function collapseAndRemove(target) {
   target.addEventListener('transitionend', () => target.remove(), { once: true });
 }
 
+// `data-embedded="true"` is set by video-player.js's own loadVideoPlayer() the moment
+// an instance actually commits and embeds a real video (see that file's own comment) —
+// NOT at "decided to try," but after the fact. Checked here for exactly one reason: a
+// LATE-arriving decision (this block's own catalog fetch responding after that
+// instance's own DECISION_FALLBACK_MS timeout already resolved it as the fallback
+// winner) must never tear an already-playing video out with nothing to replace it —
+// the visitor keeps watching whatever won the race, even if it turns out to be the
+// "wrong" side for this one page load, rather than the video disappearing entirely.
+function hasEmbeddedVideoPlayer(container) {
+  return container?.querySelector('.video-player')?.dataset.embedded === 'true';
+}
+
 function announceVideoDecision(hasPlaylist) {
   BlockMediator.set(VIDEO_LAYOUT_DECISION_KEY, { hasPlaylist });
   if (hasPlaylist) {
     // video-playlist won — the full-width, player-only container (if authored) is the
-    // loser, removed entirely.
-    collapseAndRemove(document.querySelector('.video-container'));
+    // loser, removed entirely — unless its own .video-player already embedded (see
+    // hasEmbeddedVideoPlayer above), in which case it's left alone.
+    const videoContainer = document.querySelector('.video-container');
+    if (!hasEmbeddedVideoPlayer(videoContainer)) collapseAndRemove(videoContainer);
     return;
   }
   // The full-width container wins by default — the video-playlist-container's own two
-  // video blocks are the losers, its other sibling blocks are left untouched.
+  // video blocks are the losers, its other sibling blocks are left untouched. Same
+  // already-embedded guard applies to its own .video-player (its .video-playlist has
+  // no equivalent "already committed" state to protect — this block itself owns that
+  // removal via removeBlock()/el.remove(), already called before this runs).
   const playlistContainer = document.querySelector('.video-playlist-container');
-  collapseAndRemove(playlistContainer?.querySelector('.video-player'));
+  if (!hasEmbeddedVideoPlayer(playlistContainer)) collapseAndRemove(playlistContainer?.querySelector('.video-player'));
   collapseAndRemove(playlistContainer?.querySelector('.video-playlist'));
 }
 

@@ -360,6 +360,14 @@ function loadVideoPlayer(el, sessionId, video) {
 
   if (video.provider === 'youtube') watchYouTubePlayback(sessionId, iframe);
   else watchMpcPlayback(sessionId, iframe);
+
+  // Marks this instance as having actually committed and embedded a real video — read
+  // by video-playlist.js's own announceVideoDecision() so a LATE-arriving decision
+  // (e.g. the session catalog fetch that decision depends on responding after this
+  // instance's own DECISION_FALLBACK_MS timeout already resolved it as the winner)
+  // never tears out an already-playing video with nothing to replace it. Set only here
+  // — after the embed has actually started — not any earlier "decided to try" point.
+  el.dataset.embedded = 'true';
 }
 
 const DECISION_FALLBACK_MS = 4000;

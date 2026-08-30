@@ -175,6 +175,23 @@ is actually going to render:
   `video-container` instance still wins after a `DECISION_FALLBACK_MS` (4s)
   timeout — nothing will ever announce a decision in that case.
 
+**A late-arriving decision never tears out an already-playing video.** The
+session catalog fetch `video-playlist.js`'s own decision depends on can be
+slow enough that BOTH instances' `DECISION_FALLBACK_MS` timers fire first —
+per the fallback logic above, `video-container` always wins that race (it
+resolves `true` on timeout regardless of the other instance), embeds, and
+moves on. If the catalog call then finally responds afterward and
+`announceVideoDecision` runs for real, it would otherwise remove
+`video-container` a second time — visibly tearing out a video the visitor
+is already watching, with nothing to replace it (the `video-playlist`-
+container instance already gave up at its own timeout and never
+re-subscribes). `loadVideoPlayer()` sets `el.dataset.embedded = 'true'` the
+moment an instance actually commits to embedding (not merely "decided to
+try"); `announceVideoDecision` checks this before removing either side's
+`.video-player`, and leaves an already-embedded one alone even if the
+decision technically says it should have lost. The visitor keeps watching
+whatever won the race, rather than the video disappearing entirely.
+
 The decision is set exactly once by `video-playlist.js`
 (`announceVideoDecision`) on a shared `BlockMediator` store
 (`videoLayoutDecision`), read via `BlockMediator.get`/`.subscribe` — the
