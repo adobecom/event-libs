@@ -3,29 +3,52 @@ import {
   favorited, pendingActions, getEventApiConfig, openSessionGuideDetail,
 } from '../../../../utils/session-store.js';
 import { toggleFavoriteWithFeedback } from '../../../../services/sessions/action-feedback.js';
-import { formatDuration } from '../../../../utils/date-time-helper.js';
-import { IconHeartFilled, IconHeartOutline } from '../../sessions-guide/components/icons.js';
+import { safeUrl } from '../../../../utils/utils.js';
+import { showToast } from '../../../../features/toast/toast.js';
+import { useSessionGuide } from '../../sessions-guide/store/index.js';
+import { formatShortTime } from '../../sessions-guide/utils/time.js';
+import { CategoryBadge } from '../../sessions-guide/components/CategoryBadge.js';
+import {
+  IconHeartFilled, IconHeartOutline, IconShare, IconChevronRight,
+} from '../../sessions-guide/components/icons.js';
 import { trackBroadcastEvent } from '../utils/broadcast-analytics.js';
 
-// Always visible (collapsed): title, truncated abstract, duration, Favorite CTA. Per the
-// PRD, Add-to-Schedule is never shown here — it's disabled for any session that's already
-// live, and this panel only ever describes the one active in the primary player. Expanding
-// via the caret reveals the full description and a "view all details" CTA that opens the
-// real Session Guide detail view (see the plan's Architecture Decisions — no local modal).
+// Matches the Figma "Session Broadcast Page" info-panel component (mobile: node 2325:29821
+// collapsed / 2325:29820 expanded). Collapsed shows title + caret, a clamped description, and
+// Favorite + Share actions. Expanding reorders content: actions move directly under the
+// title, followed by a channel badge + start-time row, the full untruncated description, and
+// a "View all details" link — the only thing that opens the real Session Guide detail view
+// (no local modal — see the plan's Architecture Decisions).
 export function SessionInfoPanel({ session, viewAllDetailsLabel = 'View all details' }) {
   const [expanded, setExpanded] = useState(false);
+  const { state } = useSessionGuide();
+  const { userTz } = state.guideConfig;
 
   if (!session) return null;
 
   const isFavorited = favorited.value.has(session.id);
   const isPending = pendingActions.value.has(session.id);
-  const durationLabel = session.endTimeUtc
-    ? formatDuration(session.startTimeUtc, session.endTimeUtc, { short: true })
-    : '';
+  const startTime = formatShortTime(session.startTimeUtc, userTz);
 
   async function handleFavorite(e) {
     e.stopPropagation();
     await toggleFavoriteWithFeedback(session, { eventConfig: getEventApiConfig(), isFavorited });
+  }
+
+  // Copies the session's own page URL (not a sessions-guide `?session=` deep link — that
+  // param belongs to the widget's own convention, not Broadcast's) to the clipboard, same
+  // success/failure handling as SessionDetailOverlay.js's own Share action.
+  async function handleShare(e) {
+    e.stopPropagation();
+    const shareUrl = safeUrl(session.sessionPageUrl);
+    if (!shareUrl) return;
+    try {
+      if (!navigator.clipboard) throw new Error('Clipboard API unavailable');
+      await navigator.clipboard.writeText(shareUrl);
+      showToast({ message: 'Link copied!', variant: 'positive' });
+    } catch (err) {
+      window.lana?.log(`[session-broadcast] share failed: ${err.message}`);
+    }
   }
 
   function handleViewAllDetails() {
@@ -41,19 +64,31 @@ export function SessionInfoPanel({ session, viewAllDetailsLabel = 'View all deta
     });
   }
 
+  const actions = html`
+    <div class="sb-info__actions">
+      <button
+        class="sb-info__icon-btn"
+        type="button"
+        onclick=${handleFavorite}
+        disabled=${isPending}
+        aria-pressed=${String(isFavorited)}
+        aria-label=${isFavorited ? `Remove ${session.title} from favorites` : `Add ${session.title} to favorites`}
+        daa-ll=${isFavorited ? 'Remove-from-Favorites' : 'Add-to-Favorites'}
+      >${isFavorited ? html`<${IconHeartFilled} />` : html`<${IconHeartOutline} />`}</button>
+      <button
+        class="sb-info__icon-btn"
+        type="button"
+        onclick=${handleShare}
+        aria-label=${`Share ${session.title}`}
+        daa-ll="Share"
+      ><${IconShare} /></button>
+    </div>
+  `;
+
   return html`
     <div class="sb-info" role="region" aria-label="Now playing session info">
       <div class="sb-info__row">
         <h2 class="sb-info__title">${session.title}</h2>
-        <button
-          class="sb-info__favorite"
-          type="button"
-          onclick=${handleFavorite}
-          disabled=${isPending}
-          aria-pressed=${String(isFavorited)}
-          aria-label=${isFavorited ? `Remove ${session.title} from favorites` : `Add ${session.title} to favorites`}
-          daa-ll=${isFavorited ? 'Remove-from-Favorites' : 'Add-to-Favorites'}
-        >${isFavorited ? html`<${IconHeartFilled} />` : html`<${IconHeartOutline} />`}</button>
         <button
           class="sb-info__expand"
           type="button"
@@ -62,13 +97,20 @@ export function SessionInfoPanel({ session, viewAllDetailsLabel = 'View all deta
           aria-controls="sb-info-desc"
         >
           <span class="sb-sr-only">${expanded ? 'Show less session info' : 'Show more session info'}</span>
-          <span class="sb-info__expand-icon" aria-hidden="true"></span>
+          <span class=${'sb-info__expand-icon' + (expanded ? ' is-expanded' : '')} aria-hidden="true"><${IconChevronRight} /></span>
         </button>
       </div>
-      ${durationLabel && html`<p class="sb-info__duration">${durationLabel}</p>`}
+      ${expanded && actions}
+      ${expanded && html`
+        <div class="sb-info__meta">
+          <${CategoryBadge} session=${session} hideCount=${true} />
+          ${startTime && html`<span class="sb-info__time">${startTime}</span>`}
+        </div>
+      `}
       <div class=${'sb-info__desc-wrap' + (expanded ? ' is-expanded' : '')} id="sb-info-desc">
         <p class="sb-info__desc">${session.description}</p>
       </div>
+      ${!expanded && actions}
       ${expanded && html`
         <button
           class="sb-info__view-all"

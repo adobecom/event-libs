@@ -4,8 +4,14 @@ import { scrollBehavior } from '../utils/motion.js';
 
 export const buildCarousel = () => Carousel;
 
+// CardComponent defaults to LiveCard (every existing caller is unaffected) — session-broadcast
+// passes SessionCard for its Upcoming section instead, whose "no image" .sg-card styling is a
+// closer match to that design than LiveCard's own recommended variant. Both components accept
+// the same session/onCardClick shape; SessionCard simply ignores the props it doesn't use
+// (variant, onWatchSamePage).
 export function Carousel({
   sessions, title, formatTime, formatTimezone, variant = 'live', onCardClick, onWatchSamePage,
+  CardComponent = LiveCard, timeDisplay,
 }) {
   // Hooks run before the empty-list bail-out — returning first would change hook order
   // between an empty and a populated render.
@@ -94,7 +100,7 @@ export function Carousel({
               class="sg-carousel__card-wrap"
               key=${s.id}
               inert=${paged && (i < offset || i >= offset + visibleCountRef.current) ? true : undefined}
-            ><${LiveCard} session=${s} variant=${variant} onCardClick=${onCardClick} onWatchSamePage=${onWatchSamePage} /></div>`)}
+            ><${CardComponent} session=${s} variant=${variant} onCardClick=${onCardClick} onWatchSamePage=${onWatchSamePage} timeDisplay=${timeDisplay} /></div>`)}
           </div>
         </div>
         ${sessions.length > 1 && html`

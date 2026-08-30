@@ -1016,6 +1016,15 @@
   margin-top: var(--s2a-spacing-lg);
 }
 
+/* `live` variant only (session-broadcast's Also Live carousel) — pushed to the row's far
+   end via its own margin rather than `justify-content: space-between` on the row itself, so
+   every other consumer of this row (no such element ever renders for them) is unaffected. */
+.sg-live-card__actions-time {
+  margin-left: auto;
+  color: var(--s2a-color-gray-600, #717171);
+  font-size: var(--s2a-font-size-xs, 12px);
+}
+
 .sg-live-card__btn {
   position: relative;
   display: flex;

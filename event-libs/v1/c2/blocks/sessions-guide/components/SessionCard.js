@@ -1,6 +1,8 @@
 import { html, useState } from '../../../../deps/htm-preact.js';
 import { useSessionGuide } from '../store/index.js';
-import { isSessionOnDemand, formatSessionTime, formatDuration, getNowMs } from '../utils/time.js';
+import {
+  isSessionOnDemand, formatSessionTime, formatShortTime, formatDuration, getNowMs,
+} from '../utils/time.js';
 import { isDvrPending } from '../../../../utils/session-state.js';
 import { scheduled, favorited, pendingActions, getEventApiConfig } from '../../../../utils/session-store.js';
 import { toggleScheduleWithFeedback, toggleFavoriteWithFeedback } from '../../../../services/sessions/action-feedback.js';
@@ -13,7 +15,9 @@ import { isBehaviorEnabled } from '../utils/behavior-flags.js';
 
 export const buildSessionCard = () => SessionCard;
 
-export function SessionCard({ session, forceOnDemand = false, timeDisplay = 'duration' }) {
+export function SessionCard({
+  session, forceOnDemand = false, timeDisplay = 'duration', onCardClick,
+}) {
   const { state, dispatch } = useSessionGuide();
   const { guideConfig, activeView } = state;
   const dismissingIds = state.dismissingIds || new Set();
@@ -30,9 +34,19 @@ export function SessionCard({ session, forceOnDemand = false, timeDisplay = 'dur
   const onDemand = forceOnDemand || onDemandNatural;
   const trackColor = getTrackIcon(session.primaryTrack)?.color || '';
 
-  const upcomingTimeLabel = (timeDisplay === 'duration' && session.endTimeUtc)
-    ? formatDuration(session.startTimeUtc, session.endTimeUtc)
-    : formatSessionTime(session.startTimeUtc, userTz);
+  // 'range' — session-broadcast's Upcoming section, per the Figma design (e.g.
+  // "9:15AM - 9:45AM") — reuses the same start–end formatting LiveCard.js already builds for
+  // its own recommended variant.
+  let upcomingTimeLabel;
+  if (timeDisplay === 'range' && session.endTimeUtc) {
+    const startShort = formatShortTime(session.startTimeUtc, userTz);
+    const endShort = formatShortTime(session.endTimeUtc, userTz);
+    upcomingTimeLabel = `${startShort} - ${endShort}`;
+  } else if (timeDisplay === 'duration' && session.endTimeUtc) {
+    upcomingTimeLabel = formatDuration(session.startTimeUtc, session.endTimeUtc);
+  } else {
+    upcomingTimeLabel = formatSessionTime(session.startTimeUtc, userTz);
+  }
   // A session with a DVR delay isn't watchable yet if the delay window (from the event's own
   // start, not this session's) hasn't elapsed — see isDvrPending. No dvrDelayHours, or no
   // known event start, means it's just on demand with no wait.
@@ -119,6 +133,11 @@ export function SessionCard({ session, forceOnDemand = false, timeDisplay = 'dur
 
   function handleClick() {
     if (surface === 'page') {
+      // A non-widget caller like session-broadcast has no in-widget overlay of its own to
+      // navigate away from — onCardClick lets it supply its own "open detail" behavior
+      // instead (same escape hatch LiveCard.js already offers). Defaults to the original
+      // straight-to-session-page navigation when nothing is supplied.
+      if (onCardClick) { onCardClick(session); return; }
       const dest = safeUrl(session.sessionPageUrl);
       if (dest) window.location.href = dest;
       return;
@@ -135,7 +154,7 @@ export function SessionCard({ session, forceOnDemand = false, timeDisplay = 'dur
 
   // eslint-disable-next-line no-nested-ternary
   const cardDaaLl = surface === 'page'
-    ? 'Session-Card-Navigate'
+    ? (onCardClick ? 'Session-Card-Open' : 'Session-Card-Navigate')
     : (onDemand ? 'On-Demand-Card-Navigate' : 'Session-Card-Open');
 
   return html`

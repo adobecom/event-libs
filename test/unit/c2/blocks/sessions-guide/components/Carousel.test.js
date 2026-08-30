@@ -2,6 +2,7 @@ import { expect } from '@esm-bundle/chai';
 import * as preact from '../../../../mocks/deps/htm-preact.js';
 import { buildStore } from '../../../../../../event-libs/v1/c2/blocks/sessions-guide/store/index.js';
 import { buildCarousel } from '../../../../../../event-libs/v1/c2/blocks/sessions-guide/components/Carousel.js';
+import { buildSessionCard } from '../../../../../../event-libs/v1/c2/blocks/sessions-guide/components/SessionCard.js';
 
 const BASE_CONFIG = {
   userTz: 'America/Los_Angeles',
@@ -139,5 +140,26 @@ describe('Carousel', () => {
     expect(() => Carousel({
       sessions: [SESSION_A], onCardClick: () => {}, onWatchSamePage: () => {},
     })).to.not.throw();
+  });
+
+  // session-broadcast's Upcoming section passes SessionCard instead of the default LiveCard —
+  // see UpNextCarousel.js. Like the onCardClick/onWatchSamePage tests above, the card itself
+  // sits inside a multi-sibling template whose first literal isn't a bare `<`, so this mock
+  // doesn't actually invoke it as a component (see LiveCard.test.js's own note on this same
+  // limitation) — this only guards the render contract, not the card's real output. Real
+  // rendering is verified via a preview harness in a real browser instead.
+  describe('CardComponent', () => {
+    it('accepts a CardComponent override without throwing', () => {
+      const store = makeStore();
+      const Carousel = buildCarousel(preact, store);
+      const SessionCard = buildSessionCard(preact, store);
+      expect(() => Carousel({ sessions: [SESSION_A], CardComponent: SessionCard })).to.not.throw();
+    });
+
+    it('defaults to LiveCard when no CardComponent is supplied', () => {
+      const store = makeStore();
+      const Carousel = buildCarousel(preact, store);
+      expect(() => Carousel({ sessions: [SESSION_A] })).to.not.throw();
+    });
   });
 });

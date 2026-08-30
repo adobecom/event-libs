@@ -202,6 +202,7 @@ export function LiveCard({
             daa-ll=${isFavorited ? 'Remove-from-Favorites' : 'Add-to-Favorites'}
             type="button"
           >${isFavorited ? html`<${IconHeartFilled} />` : html`<${IconHeartOutline} />`}</button>`}
+          ${variant === 'live' && durationLabel && html`<span class="sg-live-card__actions-time">${durationLabel}</span>`}
         </div>
       </div>
     </div>

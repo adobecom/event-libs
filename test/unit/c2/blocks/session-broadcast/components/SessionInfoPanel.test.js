@@ -1,6 +1,7 @@
 import { expect } from '@esm-bundle/chai';
 import { SessionInfoPanel } from '../../../../../../event-libs/v1/c2/blocks/session-broadcast/components/SessionInfoPanel.js';
 import { favorited, pendingActions } from '../../../../../../event-libs/v1/utils/session-store.js';
+import { SessionGuideContext } from '../../../../../../event-libs/v1/c2/blocks/sessions-guide/store/index.js';
 
 const HOUR = 3600e3;
 
@@ -16,6 +17,10 @@ describe('SessionInfoPanel', () => {
   beforeEach(() => {
     favorited.value = new Set();
     pendingActions.value = new Set();
+    SessionGuideContext._current = {
+      state: { guideConfig: { userTz: 'America/Los_Angeles' } },
+      dispatch: () => {},
+    };
   });
 
   it('renders nothing when there is no active session', () => {
@@ -26,16 +31,6 @@ describe('SessionInfoPanel', () => {
     const out = SessionInfoPanel({ session: SESSION });
     expect(out).to.include('Pixel & Product');
     expect(out).to.include('A session about everything.');
-  });
-
-  it('renders a duration label when the session has an end time', () => {
-    const out = SessionInfoPanel({ session: SESSION });
-    expect(out).to.include('sb-info__duration');
-  });
-
-  it('omits the duration label when there is no end time', () => {
-    const out = SessionInfoPanel({ session: { ...SESSION, endTimeUtc: null } });
-    expect(out).to.not.include('sb-info__duration');
   });
 
   it('shows Add-to-Favorites when not favorited', () => {
@@ -49,11 +44,16 @@ describe('SessionInfoPanel', () => {
     expect(out).to.include('daa-ll="Remove-from-Favorites"');
   });
 
+  it('shows a Share action alongside Favorite', () => {
+    const out = SessionInfoPanel({ session: SESSION });
+    expect(out).to.include('daa-ll="Share"');
+  });
+
   // The caret/expand toggle uses local component state, which the mocked htm-preact's
   // useState setter no-ops (see test/unit/mocks/deps/htm-preact.js) — the expanded branch
-  // (the "view all details" CTA) can't be reached through this string-render harness.
-  // Collapsed is the only state testable here; expand/collapse itself is verified via a
-  // preview harness in a real browser instead.
+  // (channel/time row, untruncated description, "view all details" CTA) can't be reached
+  // through this string-render harness. Collapsed is the only state testable here;
+  // expand/collapse itself is verified via a preview harness in a real browser instead.
   it('starts collapsed — no "view all details" CTA until expanded', () => {
     const out = SessionInfoPanel({ session: SESSION });
     expect(out).to.not.include('sb-info__view-all');

@@ -44,6 +44,7 @@
 .sb-player__mount {
   width: 100%;
   background: var(--s2a-color-gray-900, #000);
+  border: 1px solid rgb(255 255 255 / 15%);
 }
 
 .sb-player__unsupported {
@@ -54,12 +55,41 @@
   aspect-ratio: 16 / 9;
   color: var(--s2a-color-content-subtle);
   background: var(--s2a-color-gray-900, #000);
+  border: 1px solid rgb(255 255 255 / 15%);
 }
 
-/* ── Session info panel ─────────────────────────────────── */
+/* ── Session info panel ──────────────────────────────────
+   Matches Figma's "Session Broadcast Page" info-panel component (mobile: node 2325:29821
+   collapsed / 2325:29820 expanded) — a dark card directly under the player, rounded on its
+   bottom corners only (the player above already rounds the top). Every direct child shares one
+   flex-column gap; Figma's collapsed title→description gap is a tighter 8px than the 16px used
+   everywhere else in the panel, which this doesn't reproduce exactly — a minor, accepted
+   simplification, not a structural difference.
 
+   This card is *unconditionally* dark regardless of the page's own light/dark theme — the
+   plain --s2a-color-background-default/-content-default/etc. tokens flip per theme (see
+   tokens.css's light vs [data-theme="dark"] blocks), so using them directly would go
+   invisible (white-on-white) on a light-themed page. Overriding them locally here, scoped to
+   .sb-info, mirrors the same pattern sessions-guide's own .sessions-guide[data-theme="dark"]
+   uses for its dark surfaces — every descendant (CategoryBadge included) that reads these
+   standard token names now resolves to the fixed dark values below instead. */
 .sb-info {
-  padding: var(--s2a-spacing-md);
+  --s2a-color-background-default: var(--s2a-color-gray-900, #131313);
+  --s2a-color-content-default: #fff;
+  --s2a-color-content-subtle: rgb(255 255 255 / 64%);
+  --s2a-color-border-default: #fff;
+
+  display: flex;
+  flex-direction: column;
+  gap: var(--s2a-spacing-md);
+  padding: var(--s2a-spacing-lg);
+  color: var(--s2a-color-content-default);
+  background: var(--s2a-color-background-default);
+  border-radius: 0 0 var(--s2a-border-radius-md, 16px) var(--s2a-border-radius-md, 16px);
+  box-shadow:
+    0 0 1px rgb(0 0 0 / 12%),
+    0 2px 3px rgb(0 0 0 / 4%),
+    0 4px 6px rgb(0 0 0 / 8%);
 }
 
 .sb-info__row {
@@ -71,21 +101,62 @@
 .sb-info__title {
   flex: 1;
   margin: 0;
+  font-family: var(--s2a-font-family-heading);
   font-size: var(--s2a-font-size-lg);
+  font-weight: var(--s2a-font-weight-heading, 900);
 }
 
-.sb-info__favorite,
 .sb-info__expand {
   flex: none;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  color: inherit;
   background: none;
   border: 0;
   cursor: pointer;
 }
 
-.sb-info__duration {
-  margin: var(--s2a-spacing-2xs) 0 0;
-  color: var(--s2a-color-content-subtle);
-  font-size: var(--s2a-font-size-sm);
+.sb-info__expand-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transform: rotate(90deg);
+  transition: transform 0.2s ease;
+}
+
+.sb-info__expand-icon.is-expanded { transform: rotate(-90deg); }
+
+.sb-info__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--s2a-spacing-sm);
+}
+
+/* Frosted-glass icon button — same formula as sessions-guide's .sg-card__btn, restated here
+   rather than shared across blocks since it's a handful of literal constants, not logic. */
+.sb-info__icon-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  color: var(--s2a-color-gray-900);
+  cursor: pointer;
+  background: rgb(255 255 255 / 80%);
+  border: 1px solid rgb(255 255 255 / 40%);
+  border-radius: 999px;
+  backdrop-filter: blur(4.687px);
+}
+
+.sb-info__meta {
+  display: flex;
+  align-items: center;
+  gap: var(--s2a-spacing-md);
+  color: var(--s2a-color-border-default);
+  font-size: var(--s2a-font-size-md, 16px);
 }
 
 .sb-info__desc-wrap {
@@ -94,6 +165,8 @@
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
   line-clamp: 2;
+  color: var(--s2a-color-content-subtle);
+  font-size: var(--s2a-font-size-sm);
 }
 
 .sb-info__desc-wrap.is-expanded {
@@ -102,13 +175,11 @@
   line-clamp: unset;
 }
 
-.sb-info__desc {
-  margin: var(--s2a-spacing-2xs) 0 0;
-}
+.sb-info__desc { margin: 0; }
 
 .sb-info__view-all {
-  margin-top: var(--s2a-spacing-sm);
-  color: var(--s2a-color-content-accent, inherit);
+  color: var(--s2a-color-border-default);
+  font-weight: bold;
   background: none;
   border: 0;
   cursor: pointer;

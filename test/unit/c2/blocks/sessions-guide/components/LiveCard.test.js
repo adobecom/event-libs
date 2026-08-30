@@ -308,6 +308,23 @@ describe('LiveCard', () => {
     });
   });
 
+  // Per the Figma "Also Live" card (session-broadcast's carousel), the live variant shows a
+  // trailing duration next to Watch Now/Favorite — a different slot than the progress-bar
+  // overlay's own duration label (sg-live-card__duration), which already existed.
+  describe('actions-row duration (live variant only)', () => {
+    it('shows the session duration next to the actions for the live variant', () => {
+      const LiveCard = buildLiveCard(preact, makeStore());
+      const out = LiveCard({ session: LIVE_SESSION, variant: 'live' });
+      expect(out).to.include('sg-live-card__actions-time');
+    });
+
+    it('omits it for the recommended variant', () => {
+      const LiveCard = buildLiveCard(preact, makeStore());
+      const out = LiveCard({ session: UPCOMING_SESSION, variant: 'recommended' });
+      expect(out).to.not.include('sg-live-card__actions-time');
+    });
+  });
+
   // Real click-triggered branching (which path handleCardClick/handleWatch take) can't be
   // exercised by this string-render harness — no test in this suite simulates a real click,
   // since the htm-preact stub renders function attrs as `""`, losing the reference entirely.

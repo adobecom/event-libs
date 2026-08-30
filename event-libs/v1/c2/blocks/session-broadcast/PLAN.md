@@ -200,6 +200,67 @@ Tests mirror source under `test/unit/c2/blocks/session-broadcast/**`, following 
 - `expectAccessible()` coverage added for `SessionInfoPanel`, `EndedState` (with/without background image), `PlayerHost`'s unsupported branch, and both carousels' section wrapper — axe-core clean on all of them.
 - Session Guide FAB is the existing widget block; confirmed placement during Phase 1.
 
+## Phase 6 — Visual redesign from real Figma frames (in progress)
+
+The prior phases shipped functionally-correct-but-visually-rough UI (gray placeholder boxes,
+default HTML controls). The user is now sending real Figma frames screen-by-screen (mobile
+first, then wider breakpoints) to bring the UI to spec. Nav/FAB/footer are excluded — out of
+scope, page-level authored content per earlier decisions.
+
+**Mobile "live" state — done**, per `MAX26-Sessions-Broadcast_Rd3_Review_070726` node
+`4975:45510` (page) / `2325:29821` + `2325:29820` (info-panel collapsed/expanded variants):
+- `SessionInfoPanel.js` rebuilt to match exactly: collapsed shows title+caret, clamped
+  description, Favorite+Share actions; expanding reorders content — actions move directly
+  under the title, followed by a channel badge (`CategoryBadge`, reused) + start-time row, the
+  full description, and a "View all details" link (unchanged behavior — opens the real Session
+  Guide detail view via `openSessionGuideDetail`, no local modal). The prior "duration" label
+  is gone; the design uses a start-time instead, shown only when expanded.
+- Two new icons added to `sessions-guide/components/icons.js` from real Figma SVG exports
+  (never hand-drawn, per the design-to-code skill's rule): `IconShare` (node 37:96614) and
+  `IconChevronRight` (node 8873:23273, rotated via CSS for the up/down caret).
+- New `handleShare`: copies `session.sessionPageUrl` to the clipboard (not a sessions-guide
+  `?session=` deep link — that param belongs to the widget's own convention), same
+  success/failure handling as `SessionDetailOverlay.js`'s own Share action.
+- **Real bug caught during this pass**: the panel's dark background was built with the plain
+  `--s2a-color-background-default`/`-content-default`/etc. tokens, which are *theme-relative*
+  (flip between a light and a `[data-theme="dark"]` value in tokens.css) — on a light-themed
+  page this rendered white-on-white, invisible. Fixed by locally overriding those same token
+  names on `.sb-info` to fixed dark values, mirroring the exact pattern sessions-guide's own
+  `.sessions-guide[data-theme="dark"]` already uses for its dark surfaces — every descendant
+  (including the reused `CategoryBadge`) now inherits the fixed dark palette automatically.
+- Player container given the Figma border treatment (`1px solid rgb(255 255 255 / 15%)`).
+
+**Also-Live cards — done**: confirmed with the user that the trailing stat next to Watch
+Now/Favorite is the session's duration (e.g. "30m"), not a time range — the Figma sample data
+was just inconsistent between the two example cards. Added `sg-live-card__actions-time`,
+rendered only for `variant === 'live'`, pushed to the row's far end via its own
+`margin-left: auto` rather than `justify-content: space-between` on the shared row, so every
+other `LiveCard` consumer (no such element ever renders for them) is unaffected.
+
+**Upcoming cards — done**: switched to `SessionCard.js` instead of `LiveCard.js`'s
+`recommended` variant, per the visual comparison confirming `.sg-card`'s "no image" styling is
+the closer match. This needed three small, backward-compatible additions to shared code:
+- `Carousel.js` gained a `CardComponent` prop (defaults to `LiveCard` — every existing caller
+  unaffected) and now forwards `timeDisplay` through to whichever card it renders.
+- `SessionCard.js` gained an optional `onCardClick` override on its `surface === 'page'`
+  branch (same escape hatch `LiveCard.js` already had) — without it, Broadcast's Upcoming
+  cards would navigate straight to the session page instead of opening the detail overlay.
+- `SessionCard.js` gained a `timeDisplay="range"` option (start–end, e.g. "9:15AM - 9:45AM"),
+  alongside the existing `'duration'`/plain-time options — none of the three prior modes
+  produced a range.
+- `UpNextCarousel.js` now passes `CardComponent=${SessionCard}` + `timeDisplay="range"`.
+
+New/updated tests: `SessionCard.test.js` (range formatting, `onCardClick`'s daa-ll swap),
+`LiveCard.test.js` (`actions-time` present only for `live`), `Carousel.test.js`
+(`CardComponent` override, render-contract only — same nested-template mock limitation as the
+existing `onCardClick`/`onWatchSamePage` tests).
+
+**Real-browser verification**: full-page screenshot at 375px confirms the whole mobile "live"
+state (player, info panel collapsed/expanded, Also Live cards with the new duration stat,
+Upcoming cards with icon-only actions + time range) now matches the Figma frame closely.
+
+Desktop/tablet frames not yet provided — mobile only so far.
+
 ## Explicitly out of scope (fast-follow)
 
 - MobileRider real playback (stub adapter only)
