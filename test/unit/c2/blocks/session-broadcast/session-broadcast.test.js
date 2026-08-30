@@ -2,6 +2,9 @@ import { expect } from '@esm-bundle/chai';
 import init, { parseBroadcastConfig } from '../../../../../event-libs/v1/c2/blocks/session-broadcast/session-broadcast.js';
 import { sessionsStatus } from '../../../../../event-libs/v1/utils/session-store.js';
 
+// "Session ended image" supports two authoring styles (see extractSessionEndedImageUrl's
+// comment): a link to the image asset, or an embedded picture. The fixture builds a real
+// anchor for that row by default; embedded-picture authoring gets its own test below.
 function block(rows) {
   const el = document.createElement('div');
   el.className = 'session-broadcast';
@@ -10,7 +13,14 @@ function block(rows) {
     const k = document.createElement('div');
     k.textContent = key;
     const v = document.createElement('div');
-    v.textContent = value;
+    if (key === 'Session ended image') {
+      const a = document.createElement('a');
+      a.href = value;
+      a.textContent = 'image';
+      v.append(a);
+    } else {
+      v.textContent = value;
+    }
     row.append(k, v);
     el.append(row);
   });
@@ -24,7 +34,7 @@ describe('parseBroadcastConfig', () => {
       alsoLiveTitle: 'Currently Live',
       upcomingTitle: 'Upcoming',
       viewAllDetailsLabel: 'View all details',
-      sessionEndedImageHtml: '',
+      sessionEndedImageUrl: '',
     });
   });
 
@@ -33,18 +43,35 @@ describe('parseBroadcastConfig', () => {
       ['Also live title', 'Live Now'],
       ['Upcoming title', 'Coming Up'],
       ['View all details label', 'See more'],
-      ['Session ended image', '<img src="ended.png">'],
+      ['Session ended image', 'https://example.com/ended.png'],
     ]));
     expect(config.alsoLiveTitle).to.equal('Live Now');
     expect(config.upcomingTitle).to.equal('Coming Up');
     expect(config.viewAllDetailsLabel).to.equal('See more');
-    expect(config.sessionEndedImageHtml).to.include('ended.png');
+    expect(config.sessionEndedImageUrl).to.include('ended.png');
   });
 
   it('falls back to the default for any row left unauthored, independently of the others', () => {
     const config = parseBroadcastConfig(block([['Also live title', 'Live Now']]));
     expect(config.alsoLiveTitle).to.equal('Live Now');
     expect(config.upcomingTitle).to.equal('Upcoming');
+  });
+
+  it('also accepts "Session ended image" authored as an embedded picture, not just a link', () => {
+    const el = block([]);
+    const row = document.createElement('div');
+    const label = document.createElement('div');
+    label.textContent = 'Session ended image';
+    const value = document.createElement('div');
+    const picture = document.createElement('picture');
+    const img = document.createElement('img');
+    img.src = 'https://example.com/ended.png';
+    picture.append(img);
+    value.append(picture);
+    row.append(label, value);
+    el.append(row);
+
+    expect(parseBroadcastConfig(el).sessionEndedImageUrl).to.equal('https://example.com/ended.png');
   });
 });
 

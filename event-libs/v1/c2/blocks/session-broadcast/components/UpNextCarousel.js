@@ -1,6 +1,12 @@
 import { html } from '../../../../deps/htm-preact.js';
 import { Carousel } from '../../sessions-guide/components/Carousel.js';
 import { openSessionGuideDetail } from '../../../../utils/session-store.js';
+import { trackBroadcastEvent } from '../utils/broadcast-analytics.js';
+
+function handleCardClick(session) {
+  openSessionGuideDetail(session.id);
+  trackBroadcastEvent(`Broadcast-Session-Detail-Open | ${session.id}`);
+}
 
 // Capped/sorted upcoming sessions (utils/broadcast-schedule.js). variant="recommended" is
 // deliberate, not a mismatch: that's the one LiveCard variant that shows a start/end time
@@ -16,7 +22,7 @@ export function UpNextCarousel({ sessions, title = 'Upcoming' }) {
         sessions=${sessions}
         title=${title}
         variant="recommended"
-        onCardClick=${(session) => openSessionGuideDetail(session.id)}
+        onCardClick=${handleCardClick}
       />
     </div>
   `;

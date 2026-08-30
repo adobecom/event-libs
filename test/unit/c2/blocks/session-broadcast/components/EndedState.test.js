@@ -53,4 +53,21 @@ describe('EndedState', () => {
     const out = EndedState({ session: SESSION });
     expect(out).to.not.include('Add-to-Schedule');
   });
+
+  it('omits the background layer when no session-ended image is authored', () => {
+    const out = EndedState({ session: SESSION });
+    expect(out).to.not.include('sb-ended__bg');
+  });
+
+  it('renders the authored session-ended image URL as a decorative background', () => {
+    const out = EndedState({ session: SESSION, sessionEndedImageUrl: 'https://example.com/ended.png' });
+    expect(out).to.include('sb-ended__bg');
+    expect(out).to.include('src="https://example.com/ended.png"');
+    expect(out).to.include('alt=""');
+  });
+
+  it('omits the background image for an unsafe URL (e.g. a javascript: scheme)', () => {
+    const out = EndedState({ session: SESSION, sessionEndedImageUrl: 'javascript:alert(1)' });
+    expect(out).to.not.include('sb-ended__bg');
+  });
 });

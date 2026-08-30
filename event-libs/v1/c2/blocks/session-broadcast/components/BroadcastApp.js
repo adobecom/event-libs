@@ -16,6 +16,7 @@ import { LoadingState, sessionsStatusMessage } from '../../sessions-guide/compon
 import { getBroadcastSchedule, getLiveSessions } from '../utils/broadcast-schedule.js';
 import { readWatchParam, stripWatchParam, pushSessionState, getHistorySessionId } from '../utils/broadcast-url.js';
 import { logBroadcastSchedule } from '../utils/broadcast-debug.js';
+import { trackBroadcastEvent, getEntryPoint } from '../utils/broadcast-analytics.js';
 import { PlayerHost } from './PlayerHost.js';
 import { SessionInfoPanel } from './SessionInfoPanel.js';
 import { EndedState } from './EndedState.js';
@@ -37,7 +38,10 @@ export function BroadcastBody({ config }) {
   const [manualSessionId, setManualSessionId] = useState(() => getHistorySessionId());
   const [entryResolved, setEntryResolved] = useState(false);
 
-  useEffect(() => { initSessionState(); }, []);
+  useEffect(() => {
+    initSessionState();
+    trackBroadcastEvent(`Broadcast-Page-View | ${getEntryPoint()}`);
+  }, []);
 
   // Manual switches (via onSwitchSession below) update history.state directly; back/forward
   // navigation fires popstate instead, so this is the only way this state changes for that path.
@@ -71,6 +75,7 @@ export function BroadcastBody({ config }) {
   function handleSwitchSession(session) {
     pushSessionState(session.id);
     setManualSessionId(session.id);
+    trackBroadcastEvent(`Broadcast-Session-Switch | ${session.id}`);
   }
 
   // Re-render dependency on time-driven session-state transitions — value itself is unused.
@@ -120,7 +125,7 @@ export function BroadcastBody({ config }) {
           <${PlayerHost} session=${schedule.activeSession} />
           <${SessionInfoPanel} session=${schedule.activeSession} viewAllDetailsLabel=${config.viewAllDetailsLabel} />
         `}
-        ${!schedule.activeSession && schedule.endedSession && html`<${EndedState} session=${schedule.endedSession} />`}
+        ${!schedule.activeSession && schedule.endedSession && html`<${EndedState} session=${schedule.endedSession} sessionEndedImageUrl=${config.sessionEndedImageUrl} />`}
         <${AlsoLiveCarousel} sessions=${schedule.alsoLive} title=${config.alsoLiveTitle} onSwitchSession=${handleSwitchSession} />
         <${UpNextCarousel} sessions=${schedule.upNext} title=${config.upcomingTitle} />
         ${nothingAtAll && html`

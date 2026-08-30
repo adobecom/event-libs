@@ -1,5 +1,6 @@
 import { html, useEffect, useRef } from '../../../../../deps/htm-preact.js';
 import { YouTubeChat } from '../../../event-youtube/event-youtube.js';
+import { trackBroadcastEvent } from '../../utils/broadcast-analytics.js';
 
 // Reuses event-youtube.js's autoplay path directly (see the plan's Architecture Decisions —
 // Milo's LiteYTEmbed is always click-to-play, with no supported way to autoplay on load).
@@ -11,6 +12,14 @@ import { YouTubeChat } from '../../../event-youtube/event-youtube.js';
 // under it (`.event-youtube .youtube-stream`, etc.) — the standard block-CSS-scoping
 // convention. Reusing that stylesheet (imported by session-broadcast.css) instead of
 // duplicating its sizing/rounded-corner rules needs this ancestor class present.
+//
+// Play/watch-time analytics note: the raw autoplay iframe event-youtube.js builds carries no
+// enablejsapi param, so there's no onStateChange bridge to hook real play/pause events from
+// without hand-building the iframe ourselves (buildEmbedUrl has no passthrough param, and
+// duplicating buildStream()'s CSS-dependent markup just to add one query param isn't worth
+// it) — this fires a single best-effort "started watching" event on mount instead of true
+// per-state fidelity. MPC gets real play/pause fidelity for free via adobetv.js's own
+// postMessage contract (see MpcPlayerAdapter.js) — this asymmetry is intentional.
 export function YouTubePlayerAdapter({ session }) {
   const containerRef = useRef(null);
 
@@ -22,6 +31,7 @@ export function YouTubePlayerAdapter({ session }) {
     player.config = { autoplay: 'true', videotitle: session.title };
     player.videoId = session.youTubeId;
     container.appendChild(player.buildStream());
+    trackBroadcastEvent(`Broadcast-Play-Start | ${session.id}`);
 
     return () => { container.innerHTML = ''; };
   }, [session?.id]);

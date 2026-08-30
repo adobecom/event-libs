@@ -109,14 +109,23 @@ Only remaining action, not a blocker: let Analytics (Charlie, building a dimensi
 
 **Exit criteria — met**: forcing the last session to end triggers State 2/3 → redirect; the redirect gate (nothing live/also-live/upcoming) naturally never fires while any future session exists, so day-to-day rollover needs no separate code path.
 
-### Phase 4 — Analytics, accessibility, authoring polish
-- `daa-ll` tagging on all button CTAs, same pattern as `SessionCard.js`
-- Imperative `sendAnalytics` (via `${miloLibs}/blocks/modal/modal.js`) for page view, session switch, play/watch-time, panel expansion, modal open
-- Auto-generated alt text `[session name] + decorative img`
-- Full `expectAccessible()` pass; mobile-first CSS anchored to the existing `1279px` breakpoint convention
-- Wire authored block-content rows (carousel titles, expanded-CTA copy, session-ended background image)
+### Phase 4 — Analytics, accessibility, authoring polish — ✅ DONE
+- **`daa-ll` tagging — found already done**: `Favorite`/`View-All-Details`/`Watch-On-Demand` were already tagged on `SessionInfoPanel.js`/`EndedState.js` back in Phase 1/3, and `Watch-Now`/`Add-to-Schedule`/`Add-to-Favorites` come for free from reusing `LiveCard.js` in both carousels — nothing left to add.
+- New `utils/broadcast-analytics.js`: `trackBroadcastEvent(name)` dynamically imports `sendAnalytics` from `${miloLibs}/blocks/modal/modal.js` (same path `events-form.js` already uses) and fires `sendAnalytics(new Event(name))` — `sendAnalytics` takes no separate payload, so any dimension travels in the event name itself, matching `eventFormSendAnalytics`'s own string-concatenation pattern. `getEntryPoint()` classifies `document.referrer` into `direct`/`external`/`session-guide`/`homepage` — no CTA-tagged entry param exists to read instead, and the ticket's AC doesn't name one.
+- Wired: page view (mount, with entry-point dimension), session switch (`handleSwitchSession`), panel expansion (`SessionInfoPanel`'s caret, fires only on expand not collapse), session-detail-modal open (all three `openSessionGuideDetail` call sites — `SessionInfoPanel`, `AlsoLiveCarousel`, `UpNextCarousel`). Carousel interactions and Add-to-Schedule/Favorite are already covered by the reused `daa-ll` tags above — no separate imperative event for those.
+- **Play/watch-time — intentionally asymmetric, documented in code**: MPC gets real play/pause fidelity for free, since `adobetv.js` already listens on `window` for `postMessage({state, id})` from `video.tv.adobe.com` as a public contract — `MpcPlayerAdapter.js` adds a second listener for the same messages. YouTube gets a single best-effort "started watching" event on mount instead of true `onStateChange` fidelity: `event-youtube.js`'s `buildEmbedUrl()` has no passthrough param for `enablejsapi=1`, and hand-building the iframe ourselves to add one would mean duplicating `buildStream()`'s CSS-dependent markup — not worth it for an analytics nice-to-have. Flagged as a known gap, not silently dropped.
+- `EndedState.js` now accepts `sessionEndedImageUrl` (the one previously-parsed-but-unused authored field) and renders it as a plain, decorative (`alt=""`) `<img>` background layer.
+- **Real bug found during actual DA-page testing, not caught by any harness — two rounds**:
+  - **Round 1**: the field was originally authored as an *embedded picture* and read via `readBlockConfig`'s raw-`innerHTML` fallback branch, then rendered via `sanitizedRichText` + `dangerouslySetInnerHTML` (mirroring `SessionDetailOverlay.js`'s pattern for authored rich text). This looked correct in the preview harness but silently failed on the real page: Milo's site-wide `decorateImageLinks()` (`libs/utils/utils.js`) runs over *every* `<img>` on the page as part of `decorateSection()` — before any block's own `init()` gets a chance to read its config rows — and converts any `<img alt*="|">` whose pre-`|` segment resolves to an `.mp4` URL into an autoplay background `<video>` (a real, useful convention elsewhere for hero/marquee background video). Many Adobe asset-library images carry that `|`-delimited alt-text convention as stored metadata regardless of which block's config row they're embedded in — happened with two different asset picks in a row.
+  - **First fix attempt (too narrow)**: changed the *authoring convention* to "link the row's text to the image's URL" instead of embedding a picture — sidesteps the Milo collision by construction (no `<img>` for that pass to find), but required an unusual DA authoring pattern. **Round 2**: the user re-authored the row as a normal embedded picture again (the natural DA flow — pasting/inserting an image always produces a `<picture>`), this time with plain `alt=""` (no Milo collision), yet the background still didn't render — because the code no longer had any path for extracting a URL out of an embedded picture at all; `readBlockConfig`'s generic fallback would've returned the raw (relative, unresolved) picture markup as one long HTML string, which fails `safeUrl()`'s `^(https?:\/\/|\/)` check outright.
+  - **Actual fix**: `session-broadcast.js` now has its own `extractSessionEndedImageUrl(el)`, run directly against the live block DOM (not through `readBlockConfig`'s generic path), which accepts *either* authoring style — a linked `<a href>` (`.href`, already absolute) or an embedded picture's fallback `<img>` (`.src`, read as a live DOM **property**, which the browser has already resolved to an absolute URL, unlike reading the raw attribute out of a serialized HTML string). This makes the natural "just embed an image" DA flow work correctly (as long as that asset's alt text doesn't independently trigger the Milo collision), while the link convention remains available as a fully collision-immune fallback if a future asset pick reintroduces the `|`-alt issue. `EndedState.js` is unchanged from the prior fix — it only ever sees a resolved URL string either way.
+- **Alt text — found already covered**: `LiveCard.js` already sets `alt=${session.title}` on every thumbnail it renders (Also Live/Up Next inherit this for free); the only new image surface Phase 4 added, the ended-state background, is decorative and given `alt=""` (the standard treatment for a purely decorative `<img>`), not a wrapping `aria-hidden`.
+- New `components/a11y.test.js`: `expectAccessible()` over `SessionInfoPanel`, `EndedState` (with and without the background image), `PlayerHost`'s unsupported-type branch, and both carousels' wrapping section markup — mirrors sessions-guide's own `a11y.test.js` pattern. Player adapters themselves aren't scanned here (they mount real third-party iframes only in a real browser, per the existing YouTubePlayerAdapter.test.js/MpcPlayerAdapter.test.js notes).
+- CSS: the one existing breakpoint (`min-width: 1024px`) renamed to `1280px` to match the "wide" threshold already used elsewhere in sessions-guide (`FilterPanel.js`/`SessionDetailOverlay.js`/`DrawerShell.js`), rather than being a Broadcast-specific number. A full Figma-frame-accurate pixel pass is still Phase 5's job, once those frames are available — this was a consistency fix, not a redesign.
 
-**Exit criteria**: axe-core clean on all rendered states; all "Required events" firing (not yet Analytics-team-signed-off).
+**Real-browser verification**: initial pass (embedded-picture authoring) looked correct in the preview harness but failed on the actual DA test page (see the bug write-up above) — caught and fixed via the user's own real-page testing, not the harness. Re-verified post-fix in the harness with the new linked-URL authoring convention: background image renders correctly behind the marquee text, decorative and non-interactive, no console errors. Clicked Watch Now on an Also Live card (session-switch) and the info-panel caret (panel-expand) — both existing flows work unchanged, no new console errors from the analytics calls (the dynamic `sendAnalytics` import fails harmlessly against localhost, caught and logged via `lana`, exactly as designed).
+
+**Exit criteria — met**: `npm test` 2107 passed/0 failed (full suite, including the new `broadcast-analytics.test.js` and `a11y.test.js`); `npm run lint` clean. axe-core clean on every scanned state. All ticket "Required events" fire except true YouTube watch-time granularity (documented gap above) — not yet Analytics-team-signed-off, per the ticket's own acknowledged-unresolved taxonomy.
 
 ### Phase 5 — QA hardening
 - Full WTR suite for the new block + regression run of sessions-guide's suite
@@ -139,6 +148,7 @@ components/SessionInfoPanel.js                 # Phase 1
 components/EndedState.js                       # Phase 3 — done
 utils/broadcast-url.js                         # Phase 0 — done
 utils/broadcast-schedule.js                    # Phase 0 — done
+utils/broadcast-analytics.js                   # Phase 4 — done
 utils/broadcast-debug.js                       # dev-only, not ticket scope — console.table of the on-page schedule behind ?debug; delete before this ships
 session-broadcast.css                          # mobile-first, built up across phases
 ```
@@ -164,9 +174,9 @@ Tests mirror source under `test/unit/c2/blocks/session-broadcast/**`, following 
 
 `PlayerHost.js` owns a single mounted adapter at a time, keyed by which video-source field is populated (`youTubeId` / `mpcId` / `mrStreamId` — mutually exclusive). Switching player type unmounts and remounts the whole adapter, never swaps just `src`.
 
-**YouTube adapter**: import `YouTubeChat` from `event-libs/v1/c2/blocks/event-youtube/event-youtube.js` (local, no dynamic Milo import). Per-switch, construct a fresh `new YouTubeChat()` (its `init()`/`buildStream()` isn't meant to be re-run on the same instance — fine, since `PlayerHost` already remounts a fresh adapter on every switch), set `instance.config = { autoplay: 'true' }` and `instance.videoId = <youTubeId>` directly (the same seam its own tests use), call `instance.buildStream()`, append the result. Hits `insertAutoplayIframe()` — a real autoplaying iframe, no click-to-play facade. Leave `chatenabled` unset. **Phase 4 addition**: no YT IFrame JS API events out of the box — append `enablejsapi=1` and promote the iframe into a `new window.YT.Player(iframeEl, { events: {...} })` after insertion for `onStateChange`-driven watch-time analytics.
+**YouTube adapter**: import `YouTubeChat` from `event-libs/v1/c2/blocks/event-youtube/event-youtube.js` (local, no dynamic Milo import). Per-switch, construct a fresh `new YouTubeChat()` (its `init()`/`buildStream()` isn't meant to be re-run on the same instance — fine, since `PlayerHost` already remounts a fresh adapter on every switch), set `instance.config = { autoplay: 'true' }` and `instance.videoId = <youTubeId>` directly (the same seam its own tests use), call `instance.buildStream()`, append the result. Hits `insertAutoplayIframe()` — a real autoplaying iframe, no click-to-play facade. Leave `chatenabled` unset. **Phase 4 decision, not built**: promoting the iframe to a real `YT.Player` for `onStateChange` fidelity was evaluated and rejected — `buildEmbedUrl()` has no passthrough param for `enablejsapi=1`, and hand-building the iframe to add one would duplicate `buildStream()`'s CSS-dependent markup. Ships with a single best-effort "started watching" event on mount instead (`broadcast-analytics.js`).
 
-**MPC adapter — done**: builds a real (temporarily attached) `<a href="https://video.tv.adobe.com/v/<mpcId>?autoplay=true">`, dynamically imports `${miloLibs}/blocks/adobetv/adobetv.js`, calls `init(a)`. **Autoplay confirmed working** via a live spike. Also injects `adobetv.css` once via a dynamic `<link>`. The `postMessage` `{ state: 'play'|'pause' }` events `adobetv.js` itself listens for remain available for Phase 4 analytics — not wired up yet.
+**MPC adapter — done**: builds a real (temporarily attached) `<a href="https://video.tv.adobe.com/v/<mpcId>?autoplay=true">`, dynamically imports `${miloLibs}/blocks/adobetv/adobetv.js`, calls `init(a)`. **Autoplay confirmed working** via a live spike. Also injects `adobetv.css` once via a dynamic `<link>`. **Phase 4**: the `postMessage` `{ state: 'play'|'pause' }` events `adobetv.js` itself listens for are now also observed by a second listener in `MpcPlayerAdapter.js`, giving MPC real play/pause analytics fidelity — YouTube's asymmetric best-effort treatment above is the deliberate tradeoff, not an oversight.
 
 **MobileRider adapter**: stub that logs via `lana` and no-ops; seam for a future ticket, modeled on `mobile-rider.js`'s `injectPlayer()`.
 
@@ -176,18 +186,19 @@ Tests mirror source under `test/unit/c2/blocks/session-broadcast/**`, following 
 - On manual switch: `history.pushState({ session: id }, '', <same clean URL>)` — visible URL never changes, back/forward works via `popstate` reading `event.state.session`.
 - In-page "share" CTA copies `session.sessionPageUrl`, not the broadcast URL.
 
-## Analytics (Phase 4)
+## Analytics (Phase 4 — done)
 
-- `daa-ll` + Milo's `decorateDefaultLinkAnalytics` for button-like CTAs.
-- `sendAnalytics` (from `${miloLibs}/blocks/modal/modal.js`) for page view, session switch, play/watch-time, panel expansion, modal open.
-- Video play/watch-time: YouTube via `YT.Player.onStateChange`; MPC via the `postMessage` play/pause listener.
-- Event taxonomy/schema explicitly unresolved per the ticket/PRD — build against the "Required events" list, expect rework once Analytics confirms.
+- `daa-ll` + Milo's `decorateDefaultLinkAnalytics` for button-like CTAs — already present from Phase 1/3, plus whatever `LiveCard.js` already tags.
+- `trackBroadcastEvent()` (`utils/broadcast-analytics.js`, dynamically imports `sendAnalytics` from `${miloLibs}/blocks/modal/modal.js`) for page view, session switch, panel expansion, modal open.
+- Video play/watch-time: MPC via the real `postMessage` play/pause listener (full fidelity, free); YouTube via a single best-effort "started watching" event on mount (`YT.Player.onStateChange` fidelity was evaluated and rejected — see the Player abstraction section above for why).
+- Event taxonomy/schema explicitly unresolved per the ticket/PRD — built against the "Required events" list, expect rework once Analytics confirms. `getEntryPoint()`'s referrer-based heuristic is a best guess for the same reason — no concrete entry-point mechanism is named anywhere in the ticket/PRD.
 
-## Accessibility & responsiveness (Phase 4-5)
+## Accessibility & responsiveness (Phase 4 — done; Phase 5 pending)
 
 - Mobile-first CSS, no hardcoded vertical spacing.
-- Reuse the `matchMedia`-per-component pattern from sessions-guide; anchor to the existing `1279px` breakpoint.
-- Session Guide FAB is the existing widget block; confirm placement during Phase 1.
+- The one existing breakpoint renamed `1024px` → `1280px` to match the "wide" threshold already used elsewhere in sessions-guide; a full Figma-frame-accurate pass is still Phase 5's job once frames are available.
+- `expectAccessible()` coverage added for `SessionInfoPanel`, `EndedState` (with/without background image), `PlayerHost`'s unsupported branch, and both carousels' section wrapper — axe-core clean on all of them.
+- Session Guide FAB is the existing widget block; confirmed placement during Phase 1.
 
 ## Explicitly out of scope (fast-follow)
 

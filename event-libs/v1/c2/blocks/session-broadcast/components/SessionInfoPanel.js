@@ -5,6 +5,7 @@ import {
 import { toggleFavoriteWithFeedback } from '../../../../services/sessions/action-feedback.js';
 import { formatDuration } from '../../../../utils/date-time-helper.js';
 import { IconHeartFilled, IconHeartOutline } from '../../sessions-guide/components/icons.js';
+import { trackBroadcastEvent } from '../utils/broadcast-analytics.js';
 
 // Always visible (collapsed): title, truncated abstract, duration, Favorite CTA. Per the
 // PRD, Add-to-Schedule is never shown here — it's disabled for any session that's already
@@ -29,6 +30,15 @@ export function SessionInfoPanel({ session, viewAllDetailsLabel = 'View all deta
 
   function handleViewAllDetails() {
     openSessionGuideDetail(session.id);
+    trackBroadcastEvent(`Broadcast-Session-Detail-Open | ${session.id}`);
+  }
+
+  function handleToggleExpand() {
+    setExpanded((v) => {
+      const next = !v;
+      if (next) trackBroadcastEvent(`Broadcast-Panel-Expand | ${session.id}`);
+      return next;
+    });
   }
 
   return html`
@@ -47,7 +57,7 @@ export function SessionInfoPanel({ session, viewAllDetailsLabel = 'View all deta
         <button
           class="sb-info__expand"
           type="button"
-          onclick=${() => setExpanded((v) => !v)}
+          onclick=${handleToggleExpand}
           aria-expanded=${String(expanded)}
           aria-controls="sb-info-desc"
         >

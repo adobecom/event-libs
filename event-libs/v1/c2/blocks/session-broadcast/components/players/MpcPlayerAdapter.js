@@ -1,5 +1,6 @@
 import { html, useEffect, useRef } from '../../../../../deps/htm-preact.js';
 import { LIBS, getEventConfig } from '../../../../../utils/utils.js';
+import { trackBroadcastEvent } from '../../utils/broadcast-analytics.js';
 
 // Milo's adobetv.css (the shared `.milo-video`/`.milo-video iframe` 16:9 sizing rules, from
 // libs/styles/iframe.css) isn't loaded automatically the way it would be if Milo's own
@@ -23,6 +24,21 @@ function ensureAdobeTvStyles(miloLibs) {
 // auto-pause. Confirmed via a live spike (video.tv.adobe.com/v/<id>, with vs without
 // ?autoplay=true) that Milo's own unmodified URL, with just autoplay=true appended, actually
 // autoplays — no "tap to play" fallback needed.
+// adobetv.js's own createIframe() already listens on `window` for postMessage events from
+// `https://video.tv.adobe.com` carrying `{ state: 'play'|'pause', id }` (it uses these to set
+// the iframe's `data-playing` attribute for its own visibility-based auto-pause). That's a
+// public postMessage contract, not an internal, so a second listener here can observe the
+// exact same events for real play/pause analytics fidelity — no need to touch adobetv.js or
+// duplicate its iframe-creation logic.
+function handlePlaybackMessage(session) {
+  return (event) => {
+    if (event.origin !== 'https://video.tv.adobe.com' || !event.data) return;
+    const { state, id } = event.data;
+    if (!['play', 'pause'].includes(state) || String(id) !== String(session.mpcId)) return;
+    trackBroadcastEvent(`Broadcast-${state === 'play' ? 'Play' : 'Pause'} | ${session.id}`);
+  };
+}
+
 export function MpcPlayerAdapter({ session }) {
   const containerRef = useRef(null);
 
@@ -31,6 +47,9 @@ export function MpcPlayerAdapter({ session }) {
     if (!container || !session?.mpcId) return undefined;
 
     let cancelled = false;
+    const onMessage = handlePlaybackMessage(session);
+    window.addEventListener('message', onMessage);
+
     (async () => {
       const miloLibs = getEventConfig()?.miloConfig?.miloLibs ?? LIBS;
       ensureAdobeTvStyles(miloLibs);
@@ -45,6 +64,7 @@ export function MpcPlayerAdapter({ session }) {
 
     return () => {
       cancelled = true;
+      window.removeEventListener('message', onMessage);
       container.innerHTML = '';
     };
   }, [session?.id]);
