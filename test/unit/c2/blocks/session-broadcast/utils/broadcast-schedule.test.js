@@ -155,17 +155,33 @@ describe('broadcast-schedule', () => {
       expect(result.upNext.map((s) => s.id)).to.deep.equal(['c']);
     });
 
-    it('falls back to the default live session when the requested activeSessionId is no longer live', () => {
-      const s1 = session('a', -10, 10); // still live, earliest
-      const ended = session('b', -30, -10); // no longer live
+    // PRD: "Auto-switching - no sessions should auto transition a user without their action"
+    // is explicitly Out of Scope — a committed session that ends must never be silently
+    // replaced by a different live session. The caller (BroadcastApp/EndedState) is the one
+    // that decides what to show instead, using activeSession: null + endedSession.
+    it('does not fall back to a different live session once the committed one ends — surfaces endedSession instead', () => {
+      const s1 = session('a', -10, 10); // still live, earliest — must NOT be auto-picked
+      const ended = session('b', -30, -10); // the committed session, no longer live
       const result = getBroadcastSchedule([s1, ended], liveStreamActiveIds, nowMs, { activeSessionId: 'b' });
-      expect(result.activeSession.id).to.equal('a');
+      expect(result.activeSession).to.equal(null);
+      expect(result.endedSession.id).to.equal('b');
+      // Every currently-live session becomes a join candidate once none of them is "active".
+      expect(result.alsoLive.map((s) => s.id)).to.deep.equal(['a']);
     });
 
-    it('returns a null activeSession and empty alsoLive when nothing is live', () => {
+    it('only auto-picks a default when activeSessionId was never committed (initial load)', () => {
+      const s1 = session('a', -10, 10);
+      const s2 = session('b', -20, 5); // started earlier
+      const result = getBroadcastSchedule([s1, s2], liveStreamActiveIds, nowMs, {});
+      expect(result.activeSession.id).to.equal('b');
+      expect(result.endedSession).to.equal(null);
+    });
+
+    it('returns a null activeSession and empty alsoLive when nothing is live and nothing was ever committed', () => {
       const result = getBroadcastSchedule([session('a', 10, 20)], liveStreamActiveIds, nowMs, {});
       expect(result.activeSession).to.equal(null);
       expect(result.alsoLive).to.deep.equal([]);
+      expect(result.endedSession).to.equal(null);
     });
   });
 });

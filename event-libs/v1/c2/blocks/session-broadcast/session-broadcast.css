@@ -114,6 +114,50 @@
   cursor: pointer;
 }
 
+/* ── Ended state (States 2 & 3) ─────────────────────────── */
+
+.sb-ended {
+  padding: var(--s2a-spacing-md);
+}
+
+.sb-ended__eyebrow {
+  margin: 0;
+  color: var(--s2a-color-content-subtle);
+  font-size: var(--s2a-font-size-sm);
+}
+
+.sb-ended__title {
+  margin: var(--s2a-spacing-2xs) 0 0;
+  font-size: var(--s2a-font-size-lg);
+}
+
+.sb-ended__desc {
+  margin: var(--s2a-spacing-2xs) 0 0;
+}
+
+.sb-ended__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--s2a-spacing-sm);
+  margin-top: var(--s2a-spacing-sm);
+}
+
+.sb-ended__watch {
+  display: inline-flex;
+  align-items: center;
+  padding: var(--s2a-spacing-2xs) var(--s2a-spacing-md);
+  color: var(--s2a-color-content-inverse, #fff);
+  text-decoration: none;
+  background: var(--s2a-color-background-inverse, #000);
+  border-radius: 999px;
+}
+
+.sb-ended__favorite {
+  background: none;
+  border: 0;
+  cursor: pointer;
+}
+
 /* ── Carousel sections ──────────────────────────────────── */
 
 .sb-carousel-section {

@@ -98,11 +98,15 @@ Only remaining action, not a blocker: let Analytics (Charlie, building a dimensi
 
 **Exit criteria — met**: switching from a live MPC session to a live YouTube session (and back) works via full section remount; concurrent mixed-type live sets render correctly.
 
-### Phase 3 — States 2 & 3 (session ended) + on-demand transition
-- `EndedState.js` covering State 2 (other live sessions active) and State 3 (upcoming only). Confirmed: sessions roll day-over-day with no interruption; only once there are zero upcoming sessions left for the entire event does the page redirect (real navigation) to on-demand Session Guide.
-- Up Next's cap is a single named constant — confirm real value (15 vs 30) before this phase locks in QA fixtures.
+### Phase 3 — States 2 & 3 (session ended) + on-demand transition — ✅ DONE
+- **Real bug caught mid-design, fixed here**: `getBroadcastSchedule`'s original fallback silently picked a *different* live session as primary whenever the committed one ended — violating the PRD's explicit "no sessions should auto transition a user without their action" (Out of Scope). Redesigned: `activeSessionId` is now a commitment, not a preference. The only automatic pick is the one-time initial-load default; once committed, an ended session returns `activeSession: null` + `endedSession: <that session>` instead of silently swapping. `alsoLive` becomes every currently-live session in that case. Tests updated/added.
+- `EndedState.js` — one shared "Session ended." marquee (title, description, Watch on demand, Favorite) for both State 2 and State 3, per the Figma review's higher-fidelity layout — the Also Live/Up Next carousels rendered below it are what "join a live"/"see what's upcoming" actually are.
+- `BroadcastApp.js` — added the one-time initial-default-commit effect, and the end-of-event redirect using the already-existing `isPostEvent()` (same function sessions-guide's own auto-transition uses). Added `getSessionGuidePath()` to `tier-1-event-config.js` (mirrors `getHomepagePath()`/`getBroadcastPath()`).
+- Up Next's cap stays 15 (Phase 0's constant) — still pending the PM follow-up on 15 vs 30, not a blocker.
 
-**Exit criteria**: forcing (via `?serverTime=`) the last session to end triggers State 2 → State 3 → redirect; forcing an end-of-*day* boundary confirms the page keeps rolling instead of redirecting.
+**Real-browser verification**: forced a committed session to be already-ended while others stayed live — confirmed `EndedState` renders with no auto-switch, and clicking "Watch Live" on an Also Live card correctly exits ended state. Separately forced every session on-demand via the console and confirmed a real redirect fired to `/max/2026/sessions.html`.
+
+**Exit criteria — met**: forcing the last session to end triggers State 2/3 → redirect; the redirect gate (nothing live/also-live/upcoming) naturally never fires while any future session exists, so day-to-day rollover needs no separate code path.
 
 ### Phase 4 — Analytics, accessibility, authoring polish
 - `daa-ll` tagging on all button CTAs, same pattern as `SessionCard.js`
@@ -131,7 +135,7 @@ components/players/MobileRiderPlayerAdapter.js # Phase 1 stub only — seam for 
 components/AlsoLiveCarousel.js                 # Phase 1
 components/UpNextCarousel.js                   # Phase 1
 components/SessionInfoPanel.js                 # Phase 1
-components/EndedState.js                       # Phase 3
+components/EndedState.js                       # Phase 3 — done
 utils/broadcast-url.js                         # Phase 0 — done
 utils/broadcast-schedule.js                    # Phase 0 — done
 utils/broadcast-debug.js                       # dev-only, not ticket scope — console.table of the on-page schedule behind ?debug; delete before this ships
@@ -148,7 +152,8 @@ Tests mirror source under `test/unit/c2/blocks/session-broadcast/**`, following 
 - `event-libs/v1/utils/session-state.js` — `getNowMs()`, `deriveSessionState()`, `getWatchDestination()`, `isBroadcastEligible()`
 - `event-libs/v1/services/sessions/session-state-ticker.js` — `startSessionStateTicker()`
 - `event-libs/v1/services/sessions/session-actions.js` + `action-feedback.js` — `toggleScheduleWithFeedback`, `toggleFavoriteWithFeedback`
-- `event-libs/v1/utils/tier-1-event-config.js` — `getTrackIcon()`, `getProduct()`, `getBroadcastPath()`
+- `event-libs/v1/utils/tier-1-event-config.js` — `getTrackIcon()`, `getProduct()`, `getBroadcastPath()`, `getSessionGuidePath()`
+- `event-libs/v1/utils/session-state.js` — also `isPostEvent()`, the same function sessions-guide's own auto-transition uses
 - `event-libs/v1/features/toast/toast.js` — `showToast()`
 - `event-libs/v1/services/sessions/poller.js`'s ref-counted interval pattern — model for future MobileRider polling
 - `event-libs/v1/c2/blocks/sessions-guide/components/Carousel.js` and `LiveCard.js`'s `computeProgressPct`/`PROGRESS_REFRESH_MS`

@@ -65,3 +65,9 @@ export function getHomepagePath() {
 export function getBroadcastPath() {
   return tierOneEventConfig.broadcastPath || '';
 }
+
+// Where Broadcast redirects once every session for the entire event has aired (ticket:
+// "redirects to the on demand session guide"), per session-broadcast/components/EndedState.js.
+export function getSessionGuidePath() {
+  return tierOneEventConfig.sessionGuidePath || '';
+}

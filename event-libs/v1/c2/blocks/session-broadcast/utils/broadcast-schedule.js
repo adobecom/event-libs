@@ -59,20 +59,54 @@ export function getUpNextSessions(sessionList, liveStreamActiveIds, nowMs, {
     .map(({ session }) => session);
 }
 
-// Single entry point BroadcastApp calls on every ticker tick: the primary session (the
-// explicitly-requested one if it's still live, else the default), everyone else live, and the
-// capped/sorted upcoming list.
+// Single entry point BroadcastApp calls on every ticker tick: the primary session, everyone
+// else live, the capped/sorted upcoming list, and — see `endedSession` below — whichever
+// session just stopped being the primary session, if any.
+//
+// `activeSessionId` is a *commitment*, not a preference: once a session has been chosen (by
+// the one-time initial default pick, a manual "Watch Live" click, or the entry `?watch=`
+// param), it stays the reference point until it stops being live — it is never silently
+// swapped out for a different live session on its own. The PRD is explicit about this
+// ("Auto-switching - no sessions should auto transition a user without their action" is listed
+// under Out of Scope), so when the committed session ends, this returns `activeSession: null`
+// and surfaces it as `endedSession` instead of quietly picking a new default — the caller
+// (BroadcastApp/EndedState) renders the ended-state interstitial and waits for the viewer to
+// pick something from `alsoLive` (which becomes every currently-live session in this case,
+// since none of them is "active") or `upNext`.
+//
+// The *only* time an automatic pick happens is when `activeSessionId` is null/undefined —
+// i.e. nothing has ever been committed yet, matching the ticket's initial-load behavior
+// ("the first session in the current time block").
 export function getBroadcastSchedule(sessionList, liveStreamActiveIds, nowMs, {
   activeSessionId, cap, random,
 } = {}) {
   const liveSessions = getLiveSessions(sessionList, liveStreamActiveIds, nowMs);
-  const requestedActive = activeSessionId
-    ? liveSessions.find((s) => s.id === activeSessionId)
-    : null;
-  const activeSession = requestedActive || liveSessions[0] || null;
+  const upNext = getUpNextSessions(sessionList, liveStreamActiveIds, nowMs, { cap, random });
+
+  if (!activeSessionId) {
+    const activeSession = liveSessions[0] || null;
+    return {
+      activeSession,
+      alsoLive: liveSessions.filter((s) => s.id !== activeSession?.id),
+      upNext,
+      endedSession: null,
+    };
+  }
+
+  const stillLive = liveSessions.find((s) => s.id === activeSessionId);
+  if (stillLive) {
+    return {
+      activeSession: stillLive,
+      alsoLive: liveSessions.filter((s) => s.id !== activeSessionId),
+      upNext,
+      endedSession: null,
+    };
+  }
+
   return {
-    activeSession,
-    alsoLive: liveSessions.filter((s) => s.id !== activeSession?.id),
-    upNext: getUpNextSessions(sessionList, liveStreamActiveIds, nowMs, { cap, random }),
+    activeSession: null,
+    alsoLive: liveSessions,
+    upNext,
+    endedSession: sessionList.find((s) => s.id === activeSessionId) || null,
   };
 }

@@ -73,4 +73,58 @@ describe('BroadcastBody', () => {
     const out = BroadcastBody({ config: CONFIG });
     expect(out).to.include('aria-busy="false"');
   });
+
+  // EndedState (unlike PlayerHost/AlsoLiveCarousel/etc.) IS invoked for real by this harness —
+  // it's wrapped in its own bare `html`<${EndedState} .../>`` call, the one shape the mock
+  // resolves (see the note at the top of this file) — so its actual rendered content is a
+  // meaningful assertion here, not just a markup-presence check.
+  describe('no-auto-switch (PRD: "no sessions should auto transition a user without their action")', () => {
+    it('shows the ended-state instead of silently switching to a different live session', () => {
+      sessionsStatus.value = 'ready';
+      const endedSession = {
+        id: 'ended-1',
+        title: 'The One That Ended',
+        description: 'It aired already.',
+        startTimeUtc: new Date(Date.now() - 2 * HOUR).toISOString(),
+        endTimeUtc: new Date(Date.now() - HOUR).toISOString(),
+        youTubeId: 'yt-1',
+        isOnline: true,
+        sessionPageUrl: '/s/ended-1',
+      };
+      const otherLive = {
+        id: 'other-live',
+        title: 'Still Going',
+        startTimeUtc: new Date(Date.now() - HOUR / 2).toISOString(),
+        endTimeUtc: new Date(Date.now() + HOUR / 2).toISOString(),
+        youTubeId: 'yt-2',
+        isOnline: true,
+      };
+      sessions.value = [endedSession, otherLive];
+      // Simulates "ended-1" having been committed earlier (initial default pick, a manual
+      // switch, or the entry ?watch= param) — BroadcastBody's useState initializer reads
+      // this via getHistorySessionId().
+      history.pushState({ session: 'ended-1' }, '', window.location.pathname);
+
+      const out = BroadcastBody({ config: CONFIG });
+      expect(out).to.include('sb-ended');
+      expect(out).to.include('Session ended.');
+      expect(out).to.include('The One That Ended');
+      expect(out).to.not.include('sb-empty');
+    });
+
+    it('still auto-picks a default when nothing has ever been committed (initial load)', () => {
+      sessionsStatus.value = 'ready';
+      sessions.value = [{
+        id: 's-1',
+        title: 'Live now',
+        startTimeUtc: new Date(Date.now() - HOUR / 2).toISOString(),
+        endTimeUtc: new Date(Date.now() + HOUR / 2).toISOString(),
+        youTubeId: 'yt-1',
+        isOnline: true,
+      }];
+      const out = BroadcastBody({ config: CONFIG });
+      expect(out).to.not.include('sb-ended');
+      expect(out).to.not.include('sb-empty');
+    });
+  });
 });
