@@ -7,12 +7,27 @@ import { extractCustomAttributeSlugs, extractCustomAttributeValue } from '../../
 import { toggleFavoriteWithFeedback } from '../../../services/sessions/action-feedback.js';
 import { readBackgroundConfig } from '../../utils/background-config.js';
 import BlockMediator from '../../../deps/block-mediator.min.js';
+import {
+  VIDEO_LAYOUT_DECISION_KEY,
+  PROGRESS_STORAGE_KEY,
+  VIDEO_CONTAINER_CLASS,
+  VIDEO_PLAYLIST_CONTAINER_CLASS,
+  readJsonFromStorage,
+  parseJsonMetadata as parseSharedJsonMetadata,
+  currentSessionHasEnded,
+  findOnDemandVideos,
+  readAuthoredConfig,
+  resolveSessionId,
+  ensureStylesheet,
+} from '../../utils/video-session.js';
 
-// Shared getter/setter/subscriber store (same imsProfile/rsvpData pattern
-// session-store.js already uses) — set once this block knows whether it has anything to
-// show; both video-player instances on the page read/subscribe to it (see that block's
-// own awaitEmbedDecision) to decide which one actually embeds.
-const VIDEO_LAYOUT_DECISION_KEY = 'videoLayoutDecision';
+const LOG_SCOPE = 'video-playlist';
+
+function logError(message) {
+  window.lana?.log(`[${LOG_SCOPE}] ${message}`);
+}
+
+const parseJsonMetadata = (name) => parseSharedJsonMetadata(name, LOG_SCOPE);
 
 const EVENT_CONFIG = { title: '', registerUrl: '/register' };
 
@@ -30,15 +45,18 @@ const DRAWER_FLOOR_PX = 75;
 const DRAWER_MIN_EXPANDED_PX = 150;
 const TITLE_LINE_CAP = 2;
 const AUTOPLAY_STORAGE_KEY = 'video-playlist:play-all';
-const PROGRESS_STORAGE_KEY = 'video-playlist:progress';
 const SHOW_MORE_INITIAL_ROWS = 4;
 const DEFAULT_MAX_SESSIONS = 7;
 
-
+/**
+ * "Play all" persists across the full-page navigation that advancing to the next
+ * session's own page requires — an in-memory flag wouldn't survive that reload.
+ */
 function getShouldAutoPlay() {
   try {
     return localStorage.getItem(AUTOPLAY_STORAGE_KEY) === 'true';
-  } catch {
+  } catch (error) {
+    logError(`could not read play-all preference: ${error.message}`);
     return false;
   }
 }
@@ -46,43 +64,28 @@ function getShouldAutoPlay() {
 function setShouldAutoPlay(value) {
   try {
     localStorage.setItem(AUTOPLAY_STORAGE_KEY, String(value));
-  } catch (e) {
-    window.lana?.log(`[video-playlist] could not persist play-all preference: ${e.message}`);
+  } catch (error) {
+    logError(`could not persist play-all preference: ${error.message}`);
   }
 }
 
-function readJson(key, fallback) {
-  try {
-    const raw = localStorage.getItem(key);
-    return raw ? JSON.parse(raw) : fallback;
-  } catch (e) {
-    window.lana?.log(`[video-playlist] localStorage read failed for "${key}": ${e.message}`);
-    return fallback;
-  }
-}
-
+/**
+ * Written by video-player.js on whichever page actually embeds a given session's video;
+ * only ever READ here, purely to render each row's progress bar and duration.
+ */
 export function getVideoProgress(sessionId) {
-  return readJson(PROGRESS_STORAGE_KEY, {})[sessionId] || null;
+  return readJsonFromStorage(PROGRESS_STORAGE_KEY, {}, LOG_SCOPE)[sessionId] || null;
 }
 
+/**
+ * 0-100, clamped. `completed` reflects the LAST saved secondsWatched rather than a
+ * permanent once-true flag, so a rewatch after finishing recomputes a lower percentage.
+ */
 export function computeProgressPercent(progress) {
   if (!progress) return 0;
   if (progress.completed) return 100;
   if (!progress.length) return 0;
   return Math.max(0, Math.min(100, (progress.secondsWatched / progress.length) * 100));
-}
-
-// Individual Session Pages carry several JSON blobs as page metadata (custom-attributes,
-// session-times) — same parse-with-guard shape each time.
-function parseJsonMetadata(name) {
-  const raw = getMetadata(name);
-  if (!raw) return null;
-  try {
-    return JSON.parse(raw);
-  } catch (e) {
-    window.lana?.log(`[video-playlist] invalid ${name} page metadata: ${e.message}`);
-    return null;
-  }
 }
 
 export function computeDrawerCapPx(viewportHeight, titleBottom, {
@@ -105,6 +108,14 @@ function isOnDemand(session, nowMs) {
 
 const MS_PER_HOUR = 3600000;
 
+/**
+ * Whether a candidate row's own recording is available yet.
+ *
+ * Scheduled sessions premiere via their own end time (MR-stream-aware, see isOnDemand).
+ * IPOD sessions — recorded in person, with no scheduled session-times of their own —
+ * premiere `dvrTimingHours` after the EVENT's start instead, matching Northstar's own
+ * SessionsDataSyncServiceImpl formula. No DVR time configured at all means no wait.
+ */
 function hasPremiered(session, eventStartMs, nowMs) {
   if (session.startTimeUtc && session.endTimeUtc) return isOnDemand(session, nowMs);
   if (!session.dvrTimingHours) return true;
@@ -112,20 +123,19 @@ function hasPremiered(session, eventStartMs, nowMs) {
   return nowMs >= eventStartMs + session.dvrTimingHours * MS_PER_HOUR;
 }
 
-// than hiding a page we can't positively evaluate.
-function currentSessionHasEnded(sessionTimes, nowMs) {
-  const entry = (sessionTimes || [])[0];
-  if (!entry || !Number.isFinite(entry.endTimeMillis)) return true;
-  return nowMs >= entry.endTimeMillis;
-}
-
-const EMBEDDABLE_PROVIDERS = ['mpc', 'youtube'];
-
+/**
+ * Same onDemand-only check video-player.js applies before embedding — there's no point
+ * recommending "more like this" beside a player that itself has nothing to show.
+ */
 function hasEmbeddableVideo(sessionTimes) {
-  const videos = (sessionTimes || []).flatMap((t) => t?.videos || []);
-  return videos.some((v) => EMBEDDABLE_PROVIDERS.includes(v.provider) && v.kind === 'onDemand');
+  return findOnDemandVideos(sessionTimes).length > 0;
 }
 
+/**
+ * Ascending by scheduled start time. IPOD sessions have no real start time to compare, so
+ * they sort after every scheduled one; Array.sort is stable, so they keep their original
+ * catalog-relative order among themselves.
+ */
 function compareByStartTime(a, b) {
   if (!a.startTimeUtc && !b.startTimeUtc) return 0;
   if (!a.startTimeUtc) return 1;
@@ -193,11 +203,42 @@ function updateRowProgressUI(sessionId) {
   if (durationEl && progress?.length) durationEl.textContent = formatDuration(Math.round(progress.length / 60));
 }
 
-function findPlayerBottom(el) {
+/**
+ * The nearest section that can see BOTH this block and its sibling content. This block's
+ * own `.closest('.section')` reaches only its fragment-local section, so the outer grid
+ * section (its `.grid-column`'s parent) is checked first.
+ */
+function findEnclosingSection(el) {
   const gridColumn = el.closest('.grid-column');
-  const outerSection = gridColumn?.parentElement?.closest('.section') || el.closest('.section');
-  const player = outerSection?.querySelector('.video-player');
+  return gridColumn?.parentElement?.closest('.section') || el.closest('.section');
+}
+
+/** The session page's own visible heading, used as the drawer's expand ceiling. */
+function findSessionHeading(el) {
+  return findEnclosingSection(el)?.querySelector('h1, h2') || null;
+}
+
+function findSessionHeadingText(el) {
+  return findSessionHeading(el)?.textContent?.trim() || '';
+}
+
+function findPlayerBottom(el) {
+  const player = findEnclosingSection(el)?.querySelector('.video-player');
   return player ? player.getBoundingClientRect().bottom : null;
+}
+
+/**
+ * Runs `teardown` once the element leaves the document, so page-wide listeners and
+ * pending frames don't outlive the block that owns them.
+ */
+function onElementDetached(element, teardown) {
+  const observer = new MutationObserver(() => {
+    if (element.isConnected) return;
+    observer.disconnect();
+    teardown();
+  });
+  observer.observe(document.body, { childList: true, subtree: true });
+  return observer;
 }
 
 class Drawer {
@@ -500,53 +541,73 @@ function buildAutoplayToggle(el) {
   checkbox.addEventListener('change', () => setShouldAutoPlay(checkbox.checked));
 }
 
-// Author-applied marker classes (e.g. via Section Metadata's "Style" row) on each
-// candidate section — NOT inferred from DOM structure. A prior `.closest('.section')`/
-// `.grid-column` walk proved fragile in practice: it broke outright once the two
-// columns turned out to be separate `.fragment > .section` trees with no shared
-// section reachable via `.closest()` from either side, and any future template change
-// could break a structural guess again. `.video-container` = the full-width,
-// player-only layout (only ever has a `.video-player` in it, nothing else to protect —
-// removing the whole thing when it loses is fine). `.video-playlist-container` = the
-// two-column layout, sharing its section with other unrelated blocks (confirmed live:
-// event-featured-products/event-speakers/event-session-resources) — so losing there
-// only ever removes the specific `.video-player`/`.video-playlist` elements inside it,
-// never the container itself or its other siblings.
+// Matches the collapse transition in video-playlist.css. Only a safety net: the real
+// removal is driven by transitionend, which never fires when the element has no
+// transition to run (reduced-motion, an already-hidden element, CSS not yet applied) —
+// without this fallback such an element would keep its `is-collapsing` class forever and
+// never actually leave the DOM.
+const COLLAPSE_TRANSITION_MS = 250;
+const COLLAPSE_FALLBACK_MS = COLLAPSE_TRANSITION_MS + 100;
+
+/**
+ * Fades an element out, then removes it. Re-entry safe: an element already collapsing is
+ * left alone rather than restarting its transition.
+ */
 function collapseAndRemove(target) {
   if (!target || target.classList.contains('is-collapsing')) return;
   target.classList.add('is-collapsing');
-  target.addEventListener('transitionend', () => target.remove(), { once: true });
+
+  let removed = false;
+  const removeOnce = () => {
+    if (removed) return;
+    removed = true;
+    clearTimeout(fallbackTimer);
+    target.remove();
+  };
+
+  target.addEventListener('transitionend', removeOnce, { once: true });
+  const fallbackTimer = setTimeout(removeOnce, COLLAPSE_FALLBACK_MS);
 }
 
-// `data-embedded="true"` is set by video-player.js's own loadVideoPlayer() the moment
-// an instance actually commits and embeds a real video (see that file's own comment) —
-// NOT at "decided to try," but after the fact. Checked here for exactly one reason: a
-// LATE-arriving decision (this block's own catalog fetch responding after that
-// instance's own DECISION_FALLBACK_MS timeout already resolved it as the fallback
-// winner) must never tear an already-playing video out with nothing to replace it —
-// the visitor keeps watching whatever won the race, even if it turns out to be the
-// "wrong" side for this one page load, rather than the video disappearing entirely.
+/**
+ * `data-embedded="true"` is set by video-player.js's own loadVideoPlayer() the moment an
+ * instance actually commits and embeds a real video — NOT at "decided to try", but after
+ * the fact. Checked for exactly one reason: a LATE-arriving decision (this block's own
+ * catalog fetch responding after that instance's own fallback timeout already resolved it
+ * as the winner) must never tear an already-playing video out with nothing to replace it.
+ * The visitor keeps watching whatever won the race, even if it turns out to be the
+ * "wrong" side for this page load, rather than the video vanishing entirely.
+ */
 function hasEmbeddedVideoPlayer(container) {
   return container?.querySelector('.video-player')?.dataset.embedded === 'true';
 }
 
+/**
+ * Publishes the page-wide layout decision and tears down whichever side lost.
+ *
+ * Both candidate sections are found by their author-applied marker class (see the
+ * README's Authoring section), never by inferred DOM structure — a prior
+ * `.closest('.section')`/`.grid-column` walk broke outright once the two columns turned
+ * out to be separate `.fragment > .section` trees.
+ */
 function announceVideoDecision(hasPlaylist) {
   BlockMediator.set(VIDEO_LAYOUT_DECISION_KEY, { hasPlaylist });
+
   if (hasPlaylist) {
-    // video-playlist won — the full-width, player-only container (if authored) is the
-    // loser, removed entirely — unless its own .video-player already embedded (see
-    // hasEmbeddedVideoPlayer above), in which case it's left alone.
-    const videoContainer = document.querySelector('.video-container');
+    // The full-width container only ever holds a `.video-player`, so there's nothing
+    // else in it to protect — the whole section goes.
+    const videoContainer = document.querySelector(`.${VIDEO_CONTAINER_CLASS}`);
     if (!hasEmbeddedVideoPlayer(videoContainer)) collapseAndRemove(videoContainer);
     return;
   }
-  // The full-width container wins by default — the video-playlist-container's own two
-  // video blocks are the losers, its other sibling blocks are left untouched. Same
-  // already-embedded guard applies to its own .video-player (its .video-playlist has
-  // no equivalent "already committed" state to protect — this block itself owns that
-  // removal via removeBlock()/el.remove(), already called before this runs).
-  const playlistContainer = document.querySelector('.video-playlist-container');
-  if (!hasEmbeddedVideoPlayer(playlistContainer)) collapseAndRemove(playlistContainer?.querySelector('.video-player'));
+
+  // The playlist container is SHARED with unrelated blocks (event-featured-products,
+  // event-speakers, event-session-resources, ...), so only its own two video blocks are
+  // removed — never the container itself or any sibling.
+  const playlistContainer = document.querySelector(`.${VIDEO_PLAYLIST_CONTAINER_CLASS}`);
+  if (!hasEmbeddedVideoPlayer(playlistContainer)) {
+    collapseAndRemove(playlistContainer?.querySelector('.video-player'));
+  }
   collapseAndRemove(playlistContainer?.querySelector('.video-playlist'));
 }
 
@@ -556,86 +617,189 @@ function removeBlock(el) {
   el.remove();
 }
 
-export default async function init(el) {
-  if (!document.getElementById('video-playlist-css')) {
-    createTag('link', { rel: 'stylesheet', href: BLOCK_CSS_URL, id: 'video-playlist-css' }, '', { parent: document.head });
-  }
+/**
+ * Everything this block needs from the page, or null when any gate fails. Each gate is
+ * checked synchronously off page metadata — no catalog fetch to wait on.
+ */
+function resolveRenderContext(el) {
+  const config = readAuthoredConfig(el);
 
-  const background = readBackgroundConfig(el);
-  if (background) el.style.setProperty('--vp-authored-bg', background);
-
-  const cfg = [...el.querySelectorAll(':scope > div > div:first-child')].reduce((acc, div) => {
-    const key = div.textContent.trim().toLowerCase().replace(/ /g, '-');
-    acc[key] = div.nextElementSibling?.textContent?.trim() || '';
-    return acc;
-  }, {});
-
-  const sessionId = getMetadata('session-id') || cfg['session-id'];
+  const sessionId = resolveSessionId(config);
   if (!sessionId) {
-    window.lana?.log('[video-playlist] no session-id (page metadata or authored) — nothing to render');
-    removeBlock(el);
-    return;
+    logError('no session-id (page metadata or authored) — nothing to render');
+    return null;
   }
 
   const sessionTimes = parseJsonMetadata('session-times');
   if (!hasEmbeddableVideo(sessionTimes)) {
-    window.lana?.log('[video-playlist] no embeddable video on this page — nothing to render');
-    removeBlock(el);
-    return;
+    logError('no embeddable video on this page — nothing to render');
+    return null;
   }
 
   if (!currentSessionHasEnded(sessionTimes, getNowMs())) {
-    window.lana?.log('[video-playlist] current session has not ended yet — nothing to render');
-    removeBlock(el);
-    return;
+    logError('current session has not ended yet — nothing to render');
+    return null;
   }
 
-  const pageCustomAttributes = parseJsonMetadata('custom-attributes');
-  const eventStartMs = (() => {
-    const ms = Number(getMetadata('local-start-time-millis'));
-    if (Number.isFinite(ms) && ms > 0) return ms;
-    return FALLBACK_EVENT_START_MS;
-  })();
+  const authoredEventStartMs = Number(getMetadata('local-start-time-millis'));
+  return {
+    config,
+    sessionId,
+    sessionTimes,
+    pageCustomAttributes: parseJsonMetadata('custom-attributes'),
+    eventStartMs: Number.isFinite(authoredEventStartMs) && authoredEventStartMs > 0
+      ? authoredEventStartMs
+      : FALLBACK_EVENT_START_MS,
+    minSessions: Number.parseInt(config['minimum-sessions'], 10) || DEFAULT_MIN_SESSIONS,
+    maxSessions: Number.parseInt(config['maximum-sessions'], 10) || DEFAULT_MAX_SESSIONS,
+    defaultThumbnail: config['default-thumbnail'] || '',
+  };
+}
 
-  window.addEventListener('video-player:progress', (event) => {
-    updateRowProgressUI(event.detail.sessionId);
-  });
+/**
+ * Page-wide listeners for the separate video-player block's own events. Returns a
+ * teardown so they don't outlive this block — Milo can re-decorate an area, and a removed
+ * playlist shouldn't keep reacting to playback.
+ */
+function listenForPlayerEvents(el, sessionId) {
+  const handleProgress = (event) => updateRowProgressUI(event.detail.sessionId);
 
-  window.addEventListener('video-player:state', (event) => {
+  // "Play all" advance is owned entirely here: video-player.js only reports raw playback
+  // state, and this block decides whether/where to navigate off its own rendered rows.
+  const handleState = (event) => {
     if (event.detail.sessionId !== sessionId) return;
     if (event.detail.state !== 'ended') return;
     if (!getShouldAutoPlay()) return;
+
     const nextRow = [...el.querySelectorAll('.video-playlist-row[data-href]')]
       .find((row) => row.dataset.itemId !== sessionId);
     if (!nextRow?.dataset.href) return;
+
+    // window.location.assign isn't stubbable in a real browser, so the resolved target is
+    // exposed here first — that attribute is the assertable part of this behavior.
     el.dataset.autoAdvanceHref = nextRow.dataset.href;
     window.location.assign(nextRow.dataset.href);
-  });
+  };
+
+  window.addEventListener('video-player:progress', handleProgress);
+  window.addEventListener('video-player:state', handleState);
+
+  return () => {
+    window.removeEventListener('video-player:progress', handleProgress);
+    window.removeEventListener('video-player:state', handleState);
+  };
+}
+
+export default async function init(el) {
+  ensureStylesheet('video-playlist-css', BLOCK_CSS_URL);
+
+  const background = readBackgroundConfig(el);
+  if (background) el.style.setProperty('--vp-authored-bg', background);
+
+  const context = resolveRenderContext(el);
+  if (!context) {
+    removeBlock(el);
+    return;
+  }
+  const {
+    sessionId, sessionTimes, pageCustomAttributes, eventStartMs,
+    minSessions, maxSessions, defaultThumbnail, config: cfg,
+  } = context;
+
+  // Registered before any render/removal path below, so the listeners are cleaned up
+  // however this block ends up leaving the DOM (a failed gate, an empty catalog, or a
+  // later re-decorate) — not only after a successful render.
+  const stopListeningForPlayerEvents = listenForPlayerEvents(el, sessionId);
+  onElementDetached(el, stopListeningForPlayerEvents);
 
   initSessionState();
 
-  const minSessions = Number.parseInt(cfg['minimum-sessions'], 10) || DEFAULT_MIN_SESSIONS;
-  const maxSessions = Number.parseInt(cfg['maximum-sessions'], 10) || DEFAULT_MAX_SESSIONS;
-  const defaultThumbnail = cfg['default-thumbnail'] || '';
-
+  /**
+   * The current session isn't guaranteed to be in the fetched catalog at all (confirmed
+   * live: an IPOD test session's own entry was simply absent). Without a stand-in, its
+   * row would never render and the "now playing" highlight would find nothing to mark, so
+   * this builds a minimal one straight from page metadata and the DOM.
+   */
   function synthesizeCurrentSession() {
-    const gridColumn = el.closest('.grid-column');
-    const outerSection = gridColumn?.parentElement?.closest('.section') || el.closest('.section');
-    const titleFromDom = outerSection?.querySelector('h1, h2')?.textContent?.trim();
     const startTimeMillis = (sessionTimes || [])[0]?.startTimeMillis;
     return {
       id: sessionId,
-      title: titleFromDom || getMetadata('og:title') || '',
+      title: findSessionHeadingText(el) || getMetadata('og:title') || '',
       thumbnailUrl: getMetadata('og:image') || null,
       duration: 0,
       sessionPageUrl: '',
+      // Sorts into its real chronological position like any other row when known.
       startTimeUtc: Number.isFinite(startTimeMillis) ? new Date(startTimeMillis).toISOString() : '',
     };
   }
 
-  const render = (sessionList) => {
-    const current = sessionList.find((s) => s.id === sessionId) || synthesizeCurrentSession();
+  /** Header: the collapsed "Up next" peek, the playlist title, and the drawer toggle. */
+  function buildHeader(displayRows) {
+    const header = createTag('div', { class: 'video-playlist-top' }, '', { parent: el });
 
+    // Per Figma, the collapsed drawer shows what's coming next rather than the playlist's
+    // own title. "Next" is the row after the current session — the same one "Play all"
+    // would advance to — falling back to the first row when the current session sorts
+    // last or isn't found.
+    const currentIndex = displayRows.findIndex((row) => row.id === sessionId);
+    const nextSession = displayRows[currentIndex + 1] || displayRows[0];
+    const upNext = createTag('div', { class: 'video-playlist-up-next' }, '', { parent: header });
+    createTag('span', { class: 'video-playlist-up-next-label' }, 'Up next', { parent: upNext });
+    createTag('span', { class: 'video-playlist-up-next-title' }, nextSession.title, { parent: upNext });
+
+    const title = resolvePlaylistTitle(pageCustomAttributes, cfg['playlist-title']);
+    createTag('h3', { class: 'video-playlist-title' }, title, { parent: header });
+
+    const toggle = createTag('button', {
+      type: 'button',
+      class: 'video-playlist-toggle',
+      'aria-expanded': 'false',
+      ...analyticsAttrs('playlist-toggle-switch'),
+    }, TOGGLE_CHEVRON_SVG, { parent: header });
+
+    buildAutoplayToggle(header);
+    return { header, toggle };
+  }
+
+  /** Wires the mobile bottom-sheet drawer and its resize handling. */
+  function setUpDrawer({ header, toggle, handle }) {
+    const drawer = new Drawer(el, {
+      titleEl: findSessionHeading(el),
+      toggleEl: toggle,
+      handleEl: handle,
+    });
+
+    toggle.addEventListener('click', () => drawer.toggle());
+
+    // Per Figma the entire collapsed peek opens the drawer — but only while collapsed, so
+    // an expanded header's own controls (title, "Play all") stay independently clickable.
+    header.addEventListener('click', (event) => {
+      if (drawer.expanded || toggle.contains(event.target)) return;
+      drawer.toggle();
+    });
+
+    // Throttled to one measurement per frame: resize fires continuously while dragging a
+    // window edge, and applyMobileHeight() reads layout (getBoundingClientRect,
+    // getComputedStyle) on every call.
+    let pendingResizeFrame = null;
+    const handleResize = () => {
+      if (pendingResizeFrame != null) return;
+      pendingResizeFrame = requestAnimationFrame(() => {
+        pendingResizeFrame = null;
+        drawer.applyMobileHeight();
+      });
+    };
+    window.addEventListener('resize', handleResize);
+    onElementDetached(el, () => {
+      window.removeEventListener('resize', handleResize);
+      if (pendingResizeFrame != null) cancelAnimationFrame(pendingResizeFrame);
+    });
+
+    // Desktop is not a drawer at all (always open); mobile opens to the collapsed peek.
+    drawer.setInitial({ expanded: drawer.isDesktop() });
+  }
+
+  const render = (sessionList) => {
     const topics = resolveCurrentSessionTopics(pageCustomAttributes);
     const rows = resolveTopicPlaylist(sessionId, topics, sessionList, minSessions, eventStartMs);
     if (!rows.length) {
@@ -643,39 +807,19 @@ export default async function init(el) {
       return;
     }
     announceVideoDecision(true);
-    const displayRows = current ? [current, ...rows].sort(compareByStartTime) : rows;
+
+    // The current session is a DISPLAY concern only — it never counted toward
+    // minSessions above, but it does occupy one of the maxSessions slots, and it sorts
+    // into its own chronological position rather than being pinned first.
+    const current = sessionList.find((s) => s.id === sessionId) || synthesizeCurrentSession();
+    const displayRows = [current, ...rows].sort(compareByStartTime);
+
     el.replaceChildren();
     const handle = createTag('div', { class: 'video-playlist-handle', 'aria-hidden': 'true' }, '', { parent: el });
-    const top = createTag('div', { class: 'video-playlist-top' }, '', { parent: el });
-    const currentIndex = displayRows.findIndex((row) => row.id === sessionId);
-    const nextSession = displayRows[currentIndex + 1] || displayRows[0];
-    const upNext = createTag('div', { class: 'video-playlist-up-next' }, '', { parent: top });
-    createTag('span', { class: 'video-playlist-up-next-label' }, 'Up next', { parent: upNext });
-    createTag('span', { class: 'video-playlist-up-next-title' }, nextSession.title, { parent: upNext });
-
-    const title = resolvePlaylistTitle(pageCustomAttributes, cfg['playlist-title']);
-    createTag('h3', { class: 'video-playlist-title' }, title, { parent: top });
-
-    const toggle = createTag('button', {
-      type: 'button',
-      class: 'video-playlist-toggle',
-      'aria-expanded': 'false',
-      ...analyticsAttrs('playlist-toggle-switch'),
-    }, TOGGLE_CHEVRON_SVG, { parent: top });
-
-    buildAutoplayToggle(top);
+    const { header, toggle } = buildHeader(displayRows);
     buildTopicView(el, displayRows, { maxSessions, defaultThumbnail, currentSessionId: sessionId });
-    const gridColumn = el.closest('.grid-column');
-    const outerSection = gridColumn?.parentElement?.closest('.section') || el.closest('.section');
-    const titleEl = outerSection?.querySelector('h1, h2') || null;
-    const drawer = new Drawer(el, { titleEl, toggleEl: toggle, handleEl: handle });
-    toggle.addEventListener('click', () => drawer.toggle());
-    top.addEventListener('click', (event) => {
-      if (drawer.expanded || event.target === toggle || toggle.contains(event.target)) return;
-      drawer.toggle();
-    });
-    window.addEventListener('resize', () => drawer.applyMobileHeight());
-    drawer.setInitial({ expanded: drawer.isDesktop() });
+    setUpDrawer({ header, toggle, handle });
+
     el.dispatchEvent(new CustomEvent('video-playlist:view', { bubbles: true }));
   };
 

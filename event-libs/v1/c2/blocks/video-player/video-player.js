@@ -1,22 +1,40 @@
-import { createTag, getMetadata, LIBS } from '../../../utils/utils.js';
+import { createTag, LIBS } from '../../../utils/utils.js';
 import { getNowMs } from '../../../utils/session-state.js';
 import BlockMediator from '../../../deps/block-mediator.min.js';
 import { showVideoLayoutLoader, hideVideoLayoutLoader } from '../../utils/video-layout-loader.js';
+import {
+  VIDEO_LAYOUT_DECISION_KEY,
+  PROGRESS_STORAGE_KEY,
+  VIDEO_PLAYLIST_CONTAINER_CLASS,
+  readJsonFromStorage,
+  writeJsonToStorage,
+  parseJsonMetadata as parseSharedJsonMetadata,
+  currentSessionHasEnded,
+  findOnDemandVideos,
+  readAuthoredConfig,
+  resolveSessionId,
+  ensureStylesheet,
+} from '../../utils/video-session.js';
 
-// Shared getter/setter/subscriber store (same imsProfile/rsvpData pattern
-// session-store.js already uses) — video-playlist.js sets this once it knows whether it
-// has anything to show; both video-player instances on the page read/subscribe to it to
-// decide which one actually embeds. Replaces a prior window.__videoPlaylistDecision
-// latch + CustomEvent pair with the same mechanism the rest of the codebase already uses
-// for this kind of cross-block signal.
-const VIDEO_LAYOUT_DECISION_KEY = 'videoLayoutDecision';
-
+const LOG_SCOPE = 'video-player';
 const BLOCK_CSS_URL = new URL('./video-player.css', import.meta.url).href;
 const MILO_IFRAME_CSS_URL = `${LIBS}/styles/iframe.css`;
 
+function logError(message) {
+  window.lana?.log(`[${LOG_SCOPE}] ${message}`);
+}
+
+const parseJsonMetadata = (name) => parseSharedJsonMetadata(name, LOG_SCOPE);
+
+/**
+ * Real adobetv.js/youtube.js autoblocks only ever run via Milo's own block loader, which
+ * auto-attaches each block's own CSS as a side effect. buildMiloVideo below mirrors that
+ * markup directly (bypassing the autoblock, since there's no authored link to decorate),
+ * so nothing else triggers that load — without this a freshly built `.milo-video` has no
+ * intrinsic size at all.
+ */
 function ensureMiloIframeCss() {
-  if (document.getElementById('milo-iframe-css')) return;
-  createTag('link', { rel: 'stylesheet', href: MILO_IFRAME_CSS_URL, id: 'milo-iframe-css' }, '', { parent: document.head });
+  ensureStylesheet('milo-iframe-css', MILO_IFRAME_CSS_URL);
 }
 
 const VIDEO_PROVIDER_ORIGINS = {
@@ -45,70 +63,39 @@ function preconnectVideoProvider(provider) {
   });
 }
 
-const PROGRESS_STORAGE_KEY = 'video-playlist:progress';
 const PROGRESS_TICK_SECONDS = 5;
 const RESUME_RESTART_THRESHOLD_SECONDS = 30;
 
-function readJson(key, fallback) {
-  try {
-    const raw = localStorage.getItem(key);
-    return raw ? JSON.parse(raw) : fallback;
-  } catch (e) {
-    window.lana?.log(`[video-player] localStorage read failed for "${key}": ${e.message}`);
-    return fallback;
-  }
-}
-
-function writeJson(key, value) {
-  try {
-    localStorage.setItem(key, JSON.stringify(value));
-  } catch (e) {
-    window.lana?.log(`[video-player] localStorage write failed for "${key}": ${e.message}`);
-  }
-}
-
 export function getVideoProgress(sessionId) {
-  return readJson(PROGRESS_STORAGE_KEY, {})[sessionId] || null;
+  return readJsonFromStorage(PROGRESS_STORAGE_KEY, {}, LOG_SCOPE)[sessionId] || null;
 }
 
+/**
+ * `completed` is derived fresh from THIS secondsWatched every time, never latched on — a
+ * rewatch (e.g. after autoplay moves on and the viewer comes back) must be able to fall
+ * back below 100%. `length` falls back to any previously saved value, since MPC's own
+ * events don't reliably carry it.
+ */
 export function saveVideoProgress(sessionId, secondsWatched, length = null) {
   if (!sessionId) return;
-  const all = readJson(PROGRESS_STORAGE_KEY, {});
-  const previous = all[sessionId];
-  const resolvedLength = length ?? previous?.length ?? null;
-  all[sessionId] = {
+  const progressBySession = readJsonFromStorage(PROGRESS_STORAGE_KEY, {}, LOG_SCOPE);
+  const resolvedLength = length ?? progressBySession[sessionId]?.length ?? null;
+  progressBySession[sessionId] = {
     secondsWatched,
     length: resolvedLength,
     completed: Boolean(resolvedLength && secondsWatched >= resolvedLength),
   };
-  writeJson(PROGRESS_STORAGE_KEY, all);
+  writeJsonToStorage(PROGRESS_STORAGE_KEY, progressBySession, LOG_SCOPE);
 }
 
-// Individual Session Pages carry several JSON blobs as page metadata (custom-attributes,
-// session-times) — same parse-with-guard shape each time.
-function parseJsonMetadata(name) {
-  const raw = getMetadata(name);
-  if (!raw) return null;
-  try {
-    return JSON.parse(raw);
-  } catch (e) {
-    window.lana?.log(`[video-player] invalid ${name} page metadata: ${e.message}`);
-    return null;
-  }
-}
-
-function currentSessionHasEnded(sessionTimes, nowMs) {
-  const entry = (sessionTimes || [])[0];
-  if (!entry || !Number.isFinite(entry.endTimeMillis)) return true;
-  return nowMs >= entry.endTimeMillis;
-}
-
-const EMBEDDABLE_PROVIDERS = ['mpc', 'youtube'];
-
+/**
+ * The one on-demand recording this block will embed. An MPC template's own `videos[]`
+ * order isn't reliable evidence of which entry that is (a real template has been seen
+ * with a `youtube` `liveStream` entry ahead of the `mpc` `onDemand` one), so `kind` is
+ * matched explicitly rather than trusting first-match order.
+ */
 function pickEmbeddableVideo(sessionTimes) {
-  const videos = (sessionTimes || []).flatMap((t) => t?.videos || [])
-    .filter((v) => EMBEDDABLE_PROVIDERS.includes(v.provider));
-  return videos.find((v) => v.kind === 'onDemand') || null;
+  return findOnDemandVideos(sessionTimes)[0] || null;
 }
 
 const ADOBE_TV_ORIGIN = 'https://video.tv.adobe.com';
@@ -165,53 +152,71 @@ function buildMiloVideo(video) {
   return container;
 }
 
+/**
+ * Resumes playback from a previously saved position. Skipped when that position is within
+ * RESUME_RESTART_THRESHOLD_SECONDS of the end — resuming a session the viewer already
+ * finished would just restart it a second before the credits.
+ */
 export function resumeMpcVideo(iframe, progress) {
-  if (!progress || !progress.length) return;
+  if (!progress?.length) return;
   if (progress.secondsWatched >= progress.length - RESUME_RESTART_THRESHOLD_SECONDS) return;
-  iframe.contentWindow?.postMessage({
-    type: MPC_ACTION_TYPE,
-    action: 'play',
-    currentTime: Math.floor(progress.secondsWatched),
-  }, ADOBE_TV_ORIGIN);
+  try {
+    iframe.contentWindow?.postMessage({
+      type: MPC_ACTION_TYPE,
+      action: 'play',
+      currentTime: Math.floor(progress.secondsWatched),
+    }, ADOBE_TV_ORIGIN);
+  } catch (error) {
+    // A cross-origin frame can throw on access if the player navigated away.
+    logError(`could not resume mpc playback: ${error.message}`);
+  }
 }
 
-// ISO-8601 duration ("PT40M40S") → seconds — same parser the exploratory
-// new-video-playlist branch's utils-new.js used for the same purpose.
+/** ISO-8601 duration ("PT40M40S") → seconds. Returns 0 for anything unparseable. */
 export function convertIsoDurationToSeconds(iso) {
   if (!iso || typeof iso !== 'string') return 0;
   const match = iso.match(/P(?:(\d+)Y)?(?:(\d+)M)?(?:(\d+)D)?(?:T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?)?/);
   if (!match) return 0;
-  const hours = parseInt(match[4] || 0, 10);
-  const minutes = parseInt(match[5] || 0, 10);
-  const seconds = parseInt(match[6] || 0, 10);
-  return (hours * 3600) + (minutes * 60) + seconds;
+  const [, , , , hours = '0', minutes = '0', seconds = '0'] = match;
+  return (parseInt(hours, 10) * 3600) + (parseInt(minutes, 10) * 60) + parseInt(seconds, 10);
 }
 
-const mpcDurationCache = new Map(); // mpcVideoId -> seconds
-const mpcDurationInflight = new Map(); // mpcVideoId -> Promise<number|null>
+const mpcDurationByVideoId = new Map(); // mpcVideoId -> seconds
+const inflightDurationRequests = new Map(); // mpcVideoId -> Promise<number|null>
+const MPC_DURATION_TIMEOUT_MS = 8000;
 
-
+/**
+ * Fallback source for a video's length, queried once per MPC video id (cached, and
+ * deduplicated while in flight) from MPC's own JSON-LD metadata endpoint.
+ */
 async function fetchMpcVideoDuration(mpcVideoId) {
   if (!mpcVideoId) return null;
-  if (mpcDurationCache.has(mpcVideoId)) return mpcDurationCache.get(mpcVideoId);
-  if (mpcDurationInflight.has(mpcVideoId)) return mpcDurationInflight.get(mpcVideoId);
+  if (mpcDurationByVideoId.has(mpcVideoId)) return mpcDurationByVideoId.get(mpcVideoId);
+  if (inflightDurationRequests.has(mpcVideoId)) return inflightDurationRequests.get(mpcVideoId);
 
-  const promise = (async () => {
+  const request = (async () => {
     try {
-      const response = await fetch(`${ADOBE_TV_ORIGIN}/v/${mpcVideoId}?format=json-ld`);
-      const json = await response.json();
-      const seconds = convertIsoDurationToSeconds(json?.jsonLinkedData?.duration || '') || null;
-      if (seconds != null) mpcDurationCache.set(mpcVideoId, seconds);
+      // Raw fetch has no timeout of its own — without this a hung request would keep its
+      // in-flight entry (and this promise) alive for the life of the page.
+      const response = await fetch(
+        `${ADOBE_TV_ORIGIN}/v/${mpcVideoId}?format=json-ld`,
+        { signal: AbortSignal.timeout(MPC_DURATION_TIMEOUT_MS) },
+      );
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const payload = await response.json();
+      const seconds = convertIsoDurationToSeconds(payload?.jsonLinkedData?.duration || '') || null;
+      if (seconds != null) mpcDurationByVideoId.set(mpcVideoId, seconds);
       return seconds;
-    } catch (e) {
-      window.lana?.log(`[video-player] could not fetch mpc video duration for "${mpcVideoId}": ${e.message}`);
+    } catch (error) {
+      logError(`could not fetch mpc video duration for "${mpcVideoId}": ${error.message}`);
       return null;
     } finally {
-      mpcDurationInflight.delete(mpcVideoId);
+      inflightDurationRequests.delete(mpcVideoId);
     }
   })();
-  mpcDurationInflight.set(mpcVideoId, promise);
-  return promise;
+
+  inflightDurationRequests.set(mpcVideoId, request);
+  return request;
 }
 
 
@@ -223,139 +228,269 @@ function notifyStateChanged(sessionId, state) {
   window.dispatchEvent(new CustomEvent('video-player:state', { detail: { sessionId, state } }));
 }
 
+/**
+ * MPC's own messages don't reliably carry `length` (confirmed live: a real 'pause' event
+ * had `currentTime` but no `length` at all), so it's backfilled once from MPC's metadata
+ * endpoint when neither this message nor previously saved progress already has it.
+ */
 function ensureMpcLength(sessionId, mpcVideoId, currentTime, length) {
   if (length != null) return;
   if (getVideoProgress(sessionId)?.length != null) return;
-  fetchMpcVideoDuration(mpcVideoId).then((fetchedLength) => {
-    if (fetchedLength == null) return;
-    const latest = getVideoProgress(sessionId);
-    saveVideoProgress(sessionId, latest?.secondsWatched ?? currentTime, fetchedLength);
-    notifyProgressChanged(sessionId);
-  });
+  fetchMpcVideoDuration(mpcVideoId)
+    .then((fetchedLength) => {
+      if (fetchedLength == null) return;
+      const latest = getVideoProgress(sessionId);
+      saveVideoProgress(sessionId, latest?.secondsWatched ?? currentTime, fetchedLength);
+      notifyProgressChanged(sessionId);
+    })
+    .catch((error) => logError(`could not backfill mpc duration: ${error.message}`));
 }
 
+/**
+ * Runs `teardown` once the element leaves the document, so a player's own listeners and
+ * timers don't outlive the DOM node that owns them. Needed because a losing instance's
+ * `.video-player` is removed by video-playlist.js (see collapseAndRemove there) well
+ * after this block already attached its playback watchers — and because Milo can
+ * re-decorate an area, running init() again over a fresh element.
+ */
+function onDetached(element, teardown) {
+  const observer = new MutationObserver(() => {
+    if (element.isConnected) return;
+    observer.disconnect();
+    teardown();
+  });
+  observer.observe(document.body, { childList: true, subtree: true });
+  return observer;
+}
+
+/**
+ * MPC posts window messages from video.tv.adobe.com shaped as
+ * `{ type: 'mpcStatus', state: 'load'|'pause'|'tick'|'complete', id, currentTime, length }`.
+ * Progress is always keyed on the CLOSURE's `sessionId`, never `data.id` — this page only
+ * ever embeds its own session's video, so which session is playing is unambiguous.
+ */
 function watchMpcPlayback(sessionId, iframe) {
-  let lastTickSecond = null;
-  const handler = (event) => {
+  // Throttles the ~per-frame tick stream down to one save per PROGRESS_TICK_SECONDS.
+  let lastSavedTickSecond = null;
+
+  const saveTickProgress = ({ mpcVideoId, currentTime, length }) => {
+    const tickSecond = Math.floor(currentTime);
+    const isNewSecond = tickSecond !== lastSavedTickSecond;
+    if (!isNewSecond || tickSecond % PROGRESS_TICK_SECONDS !== 0) return;
+    lastSavedTickSecond = tickSecond;
+    saveVideoProgress(sessionId, currentTime, length);
+    notifyProgressChanged(sessionId);
+    ensureMpcLength(sessionId, mpcVideoId, currentTime, length);
+  };
+
+  const handleComplete = ({ length }) => {
+    // Real completion events carry `length`; a bare `state: 'complete'` must not clobber
+    // saved progress with an undefined secondsWatched, so only persist a known length.
+    const finalLength = length ?? getVideoProgress(sessionId)?.length ?? null;
+    if (finalLength != null) {
+      saveVideoProgress(sessionId, finalLength, finalLength);
+      notifyProgressChanged(sessionId);
+    }
+    notifyStateChanged(sessionId, 'ended');
+  };
+
+  const handlers = {
+    [MPC_STATE_LOAD]: (payload) => {
+      resumeMpcVideo(iframe, getVideoProgress(sessionId));
+      ensureMpcLength(sessionId, payload.mpcVideoId, payload.currentTime, payload.length);
+    },
+    [MPC_STATE_PAUSE]: (payload) => {
+      saveVideoProgress(sessionId, payload.currentTime, payload.length);
+      notifyProgressChanged(sessionId);
+      notifyStateChanged(sessionId, 'pause');
+      ensureMpcLength(sessionId, payload.mpcVideoId, payload.currentTime, payload.length);
+    },
+    [MPC_STATE_TICK]: (payload) => {
+      saveTickProgress(payload);
+      // A tick only ever arrives while actually playing. Fired on every message (not
+      // throttled like the save above) since 'play' is a discrete transition a listener
+      // needs promptly, not a value to sample.
+      notifyStateChanged(sessionId, 'play');
+    },
+    [MPC_STATE_COMPLETE]: handleComplete,
+  };
+
+  const handleMessage = (event) => {
     if (event.origin !== ADOBE_TV_ORIGIN) return;
     if (event.data?.type !== MPC_MESSAGE_TYPE) return;
-    const {
-      state, id: mpcVideoId, currentTime, length,
-    } = event.data;
-    switch (state) {
-      case MPC_STATE_LOAD:
-        resumeMpcVideo(iframe, getVideoProgress(sessionId));
-        ensureMpcLength(sessionId, mpcVideoId, currentTime, length);
-        break;
-      case MPC_STATE_PAUSE:
-        saveVideoProgress(sessionId, currentTime, length);
-        notifyProgressChanged(sessionId);
-        notifyStateChanged(sessionId, 'pause');
-        ensureMpcLength(sessionId, mpcVideoId, currentTime, length);
-        break;
-      case MPC_STATE_TICK: {
-        const tickSecond = Math.floor(currentTime);
-        if (tickSecond !== lastTickSecond && tickSecond % PROGRESS_TICK_SECONDS === 0) {
-          lastTickSecond = tickSecond;
-          saveVideoProgress(sessionId, currentTime, length);
-          notifyProgressChanged(sessionId);
-          ensureMpcLength(sessionId, mpcVideoId, currentTime, length);
-        }
-        notifyStateChanged(sessionId, 'play');
-        break;
-      }
-      case MPC_STATE_COMPLETE: {
-        const finalLength = length ?? getVideoProgress(sessionId)?.length ?? null;
-        if (finalLength != null) {
-          saveVideoProgress(sessionId, finalLength, finalLength);
-          notifyProgressChanged(sessionId);
-        }
-        notifyStateChanged(sessionId, 'ended');
-        break;
-      }
-      default:
-        break;
+
+    const handler = handlers[event.data.state];
+    if (!handler) return;
+
+    try {
+      handler({
+        mpcVideoId: event.data.id,
+        currentTime: event.data.currentTime,
+        length: event.data.length,
+      });
+    } catch (error) {
+      // A malformed message must not take down the listener for every later one.
+      logError(`could not handle mpc "${event.data.state}" message: ${error.message}`);
     }
   };
-  window.addEventListener('message', handler);
+
+  window.addEventListener('message', handleMessage);
+  onDetached(iframe, () => window.removeEventListener('message', handleMessage));
 }
+
+const YOUTUBE_IFRAME_API_URL = 'https://www.youtube.com/iframe_api';
+const YOUTUBE_API_TIMEOUT_MS = 10000;
+
+/**
+ * One shared load promise for the whole page. Two concurrent callers previously each
+ * overwrote `window.onYouTubeIframeAPIReady` while capturing a different `previous`, so
+ * the last write won and the earlier caller's promise never resolved. Caching the promise
+ * means the global is installed exactly once, no matter how many players wait on it.
+ */
+let youTubeApiReady = null;
 
 function ensureYouTubeIframeApi() {
   if (window.YT?.Player) return Promise.resolve();
-  const hasScript = [...document.scripts].some((s) => s.src.includes('youtube.com/iframe_api'));
-  if (!hasScript) {
-    createTag('script', { src: 'https://www.youtube.com/iframe_api' }, '', { parent: document.head });
-  }
-  return new Promise((resolve) => {
-    const previous = window.onYouTubeIframeAPIReady;
+  if (youTubeApiReady) return youTubeApiReady;
+
+  youTubeApiReady = new Promise((resolve, reject) => {
+    const previousHandler = window.onYouTubeIframeAPIReady;
+    const timeoutId = setTimeout(() => {
+      // Never resolving would leave watchYouTubePlayback awaiting forever, silently
+      // dropping all playback tracking for this session.
+      youTubeApiReady = null;
+      reject(new Error(`YouTube IFrame API did not load within ${YOUTUBE_API_TIMEOUT_MS}ms`));
+    }, YOUTUBE_API_TIMEOUT_MS);
+
     window.onYouTubeIframeAPIReady = () => {
-      previous?.();
+      clearTimeout(timeoutId);
+      previousHandler?.();
       resolve();
     };
+
+    const alreadyRequested = [...document.scripts]
+      .some((script) => script.src.includes('youtube.com/iframe_api'));
+    if (!alreadyRequested) {
+      const script = createTag('script', { src: YOUTUBE_IFRAME_API_URL }, '', { parent: document.head });
+      script.addEventListener('error', () => {
+        clearTimeout(timeoutId);
+        youTubeApiReady = null;
+        reject(new Error('YouTube IFrame API script failed to load'));
+      }, { once: true });
+    }
   });
+
+  return youTubeApiReady;
+}
+
+/** Seeks to the last-watched position, unless the viewer already finished the video. */
+function resumeYouTubeVideo(player, sessionId) {
+  const saved = getVideoProgress(sessionId);
+  const duration = player?.getDuration?.();
+  if (!saved?.length || !duration) return;
+  if (saved.secondsWatched >= duration - RESUME_RESTART_THRESHOLD_SECONDS) return;
+  try {
+    player.seekTo(saved.secondsWatched, true);
+  } catch (error) {
+    logError(`could not resume youtube playback: ${error.message}`);
+  }
 }
 
 async function watchYouTubePlayback(sessionId, iframe) {
-  await ensureYouTubeIframeApi();
+  try {
+    await ensureYouTubeIframeApi();
+  } catch (error) {
+    // Playback still works — the embed is a plain iframe — only progress tracking and
+    // resume are lost, so this degrades rather than breaking the player.
+    logError(`youtube playback tracking unavailable: ${error.message}`);
+    return;
+  }
+  // Set only when a real 11-char video id was extracted; without it YT.Player has no
+  // element to bind to.
   if (!iframe.id) return;
-  let progressInterval = null;
+
+  let progressIntervalId = null;
   const stopProgressPolling = () => {
-    if (progressInterval == null) return;
-    clearInterval(progressInterval);
-    progressInterval = null;
+    if (progressIntervalId == null) return;
+    clearInterval(progressIntervalId);
+    progressIntervalId = null;
   };
-  // eslint-disable-next-line no-new -- the player instance manages itself via the events
-  // callbacks; nothing here needs to hold a reference to it afterward.
-  new window.YT.Player(iframe.id, {
-    events: {
-      onReady: (event) => {
-        const saved = getVideoProgress(sessionId);
-        const duration = event.target?.getDuration?.();
-        if (saved?.length && duration && saved.secondsWatched < duration - RESUME_RESTART_THRESHOLD_SECONDS) {
-          event.target.seekTo(saved.secondsWatched, true);
-        }
+
+  const saveCurrentProgress = (player) => {
+    const currentTime = player?.getCurrentTime?.();
+    const duration = player?.getDuration?.();
+    if (currentTime == null || duration == null) return;
+    saveVideoProgress(sessionId, currentTime, duration);
+    notifyProgressChanged(sessionId);
+  };
+
+  // Without this, a player removed mid-playback (exactly what happens to the losing
+  // instance — see video-playlist.js's collapseAndRemove) keeps its interval alive
+  // forever, polling a detached player and writing progress for a video nobody is
+  // watching.
+  onDetached(iframe, stopProgressPolling);
+
+  const handleStateChange = (event) => {
+    const { PlayerState } = window.YT;
+    // Every branch stops polling first: PLAYING restarts it, the rest leave it stopped.
+    stopProgressPolling();
+
+    if (event.data === PlayerState.PLAYING) {
+      // The IFrame API has no continuous "tick" event (unlike MPC's postMessage stream),
+      // so progress is sampled on the same cadence the MPC path uses.
+      progressIntervalId = setInterval(
+        () => saveCurrentProgress(event.target),
+        PROGRESS_TICK_SECONDS * 1000,
+      );
+      notifyStateChanged(sessionId, 'play');
+      return;
+    }
+    if (event.data === PlayerState.PAUSED) {
+      notifyStateChanged(sessionId, 'pause');
+      return;
+    }
+    if (event.data === PlayerState.ENDED) {
+      const duration = event.target?.getDuration?.();
+      if (duration) {
+        saveVideoProgress(sessionId, duration, duration);
+        notifyProgressChanged(sessionId);
+      }
+      notifyStateChanged(sessionId, 'ended');
+    }
+  };
+
+  try {
+    // eslint-disable-next-line no-new -- the player instance manages itself via the
+    // events callbacks; nothing here needs to hold a reference to it afterward.
+    new window.YT.Player(iframe.id, {
+      events: {
+        onReady: (event) => resumeYouTubeVideo(event.target, sessionId),
+        onStateChange: handleStateChange,
+        onError: (event) => logError(`youtube player reported error code ${event.data}`),
       },
-      onStateChange: (event) => {
-        if (event.data === window.YT.PlayerState.PLAYING) {
-          stopProgressPolling();
-          progressInterval = setInterval(() => {
-            const currentTime = event.target?.getCurrentTime?.();
-            const duration = event.target?.getDuration?.();
-            if (currentTime != null && duration != null) {
-              saveVideoProgress(sessionId, currentTime, duration);
-              notifyProgressChanged(sessionId);
-            }
-          }, PROGRESS_TICK_SECONDS * 1000);
-          notifyStateChanged(sessionId, 'play');
-        } else if (event.data === window.YT.PlayerState.PAUSED) {
-          stopProgressPolling();
-          notifyStateChanged(sessionId, 'pause');
-        } else if (event.data === window.YT.PlayerState.ENDED) {
-          stopProgressPolling();
-          const duration = event.target?.getDuration?.();
-          if (duration) {
-            saveVideoProgress(sessionId, duration, duration);
-            notifyProgressChanged(sessionId);
-          }
-          notifyStateChanged(sessionId, 'ended');
-        } else {
-          stopProgressPolling();
-        }
-      },
-    },
-  });
+    });
+  } catch (error) {
+    stopProgressPolling();
+    logError(`could not attach youtube player: ${error.message}`);
+  }
 }
 
+/**
+ * Embeds the video into this block and starts provider-appropriate playback tracking
+ * (MPC and YouTube expose completely different state signals).
+ */
 function loadVideoPlayer(el, sessionId, video) {
-  const built = buildMiloVideo(video);
-  const iframe = built.firstElementChild;
+  const builtContainer = buildMiloVideo(video);
+  const iframe = builtContainer.firstElementChild;
 
-  const existingMiloVideo = el.querySelector('.milo-video');
-  if (existingMiloVideo) {
-    existingMiloVideo.replaceChildren(iframe);
+  // Real pages have been seen with an authored `.milo-video`, with only a
+  // `.mobile-rider` (which can't host either embed as-is), or with nothing at all.
+  const authoredMiloVideo = el.querySelector('.milo-video');
+  if (authoredMiloVideo) {
+    authoredMiloVideo.replaceChildren(iframe);
   } else {
     el.querySelector('.mobile-rider')?.remove();
-    el.append(built);
+    el.append(builtContainer);
   }
 
   if (video.provider === 'youtube') watchYouTubePlayback(sessionId, iframe);
@@ -372,71 +507,97 @@ function loadVideoPlayer(el, sessionId, video) {
 
 const DECISION_FALLBACK_MS = 4000;
 
-// Author-applied marker class (see README's own Authoring section) on the containing
-// `.section` — e.g. via that Section Metadata's "Style" row — rather than inferring
-// layout from DOM structure (a prior `.grid-column`/`.closest('.section')` walk proved
-// fragile: it broke outright once the two columns turned out to be separate
-// `.fragment > .section` trees, not a shared one). `.video-playlist-container` is the
-// two-column layout (this instance sits alongside a `video-playlist` block); its
-// absence means this is the full-width, player-only `.video-container` layout instead.
+/**
+ * Which of the two authored layouts this instance sits in, per the author-applied marker
+ * class on its containing section (see the README's Authoring section) rather than any
+ * inferred DOM structure — a prior `.grid-column`/`.closest('.section')` walk broke
+ * outright once the two columns turned out to be separate `.fragment > .section` trees.
+ */
 function isInsidePlaylistContainer(el) {
-  return Boolean(el.closest('.video-playlist-container'));
+  return Boolean(el.closest(`.${VIDEO_PLAYLIST_CONTAINER_CLASS}`));
 }
 
+/** Whether THIS instance embeds, given the page-wide decision. */
+function isWinningInstance(el, hasPlaylist) {
+  return isInsidePlaylistContainer(el) ? hasPlaylist : !hasPlaylist;
+}
+
+/**
+ * Resolves once the page-wide layout decision is known. Reads any decision already made
+ * (covering the race where video-playlist.js announced before this block's own init ran),
+ * otherwise subscribes and races a fallback timer so a page with no video-playlist block
+ * at all — or a stalled session-catalog fetch — still resolves instead of waiting forever.
+ */
 function awaitEmbedDecision(el) {
-  const existing = BlockMediator.get(VIDEO_LAYOUT_DECISION_KEY);
-  if (existing != null) {
-    return Promise.resolve(isInsidePlaylistContainer(el) ? existing.hasPlaylist : !existing.hasPlaylist);
+  const existingDecision = BlockMediator.get(VIDEO_LAYOUT_DECISION_KEY);
+  if (existingDecision != null) {
+    return Promise.resolve(isWinningInstance(el, existingDecision.hasPlaylist));
   }
+
   return new Promise((resolve) => {
     let settled = false;
+    let unsubscribe = () => {};
+
     const settle = (hasPlaylist) => {
       if (settled) return;
       settled = true;
-      clearTimeout(timer);
+      clearTimeout(fallbackTimer);
       unsubscribe();
-      resolve(isInsidePlaylistContainer(el) ? hasPlaylist : !hasPlaylist);
+      resolve(isWinningInstance(el, hasPlaylist));
     };
-    const unsubscribe = BlockMediator.subscribe(
-      VIDEO_LAYOUT_DECISION_KEY,
-      ({ newValue }) => settle(newValue.hasPlaylist),
-    );
-    const timer = setTimeout(() => settle(false), DECISION_FALLBACK_MS);
+
+    unsubscribe = BlockMediator.subscribe(VIDEO_LAYOUT_DECISION_KEY, ({ newValue }) => {
+      // Guarded: a store cleared to undefined would otherwise throw inside this
+      // subscriber, and BlockMediator.set rethrows whatever its subscribers throw.
+      if (newValue == null) return;
+      settle(Boolean(newValue.hasPlaylist));
+    });
+
+    const fallbackTimer = setTimeout(() => settle(false), DECISION_FALLBACK_MS);
   });
 }
 
-export default async function init(el) {
-  if (!document.getElementById('video-player-css')) {
-    createTag('link', { rel: 'stylesheet', href: BLOCK_CSS_URL, id: 'video-player-css' }, '', { parent: document.head });
-  }
+/**
+ * Everything this block needs from the page, or null when any gate fails. Kept separate
+ * from init()'s own side effects so the "should we render at all" decision reads as one
+ * sequence of named checks.
+ */
+function resolveRenderContext(el) {
+  const config = readAuthoredConfig(el);
 
-  const cfg = [...el.querySelectorAll(':scope > div > div:first-child')].reduce((acc, div) => {
-    const key = div.textContent.trim().toLowerCase().replace(/ /g, '-');
-    acc[key] = div.nextElementSibling?.textContent?.trim() || '';
-    return acc;
-  }, {});
-  const sessionId = getMetadata('session-id') || cfg['session-id'];
+  const sessionId = resolveSessionId(config);
   if (!sessionId) {
-    window.lana?.log('[video-player] no session-id (page metadata or authored) — nothing to render');
-    el.remove();
-    return;
+    logError('no session-id (page metadata or authored) — nothing to render');
+    return null;
   }
 
   const sessionTimes = parseJsonMetadata('session-times');
+
   const currentVideo = pickEmbeddableVideo(sessionTimes);
   if (!currentVideo) {
-    window.lana?.log('[video-player] no embeddable video in session-times — nothing to render');
-    el.remove();
-    return;
+    logError('no embeddable video in session-times — nothing to render');
+    return null;
   }
 
   // No recording to show for a session that hasn't actually ended yet — checked
   // synchronously off the page's own session-times metadata, not any catalog fetch.
   if (!currentSessionHasEnded(sessionTimes, getNowMs())) {
-    window.lana?.log('[video-player] current session has not ended yet — nothing to render');
+    logError('current session has not ended yet — nothing to render');
+    return null;
+  }
+
+  return { sessionId, currentVideo };
+}
+
+export default async function init(el) {
+  ensureStylesheet('video-player-css', BLOCK_CSS_URL);
+
+  const context = resolveRenderContext(el);
+  if (!context) {
     el.remove();
     return;
   }
+  const { sessionId, currentVideo } = context;
 
   // Fired here, not inside loadVideoPlayer() — this runs on BOTH instances
   // (win-or-lose is still unknown at this point), well before the layout-decision wait
@@ -453,10 +614,21 @@ export default async function init(el) {
     showVideoLayoutLoader(el);
   }
 
+  // Deliberately NOT awaited: Milo's loadArea() decorates sections sequentially, so
+  // awaiting this would stall every later section (and page-wide deferred features) for
+  // however long the decision takes — up to DECISION_FALLBACK_MS. init() returns as soon
+  // as the loader is up; the embed continues in this detached flow.
   (async () => {
-    const isWinner = await awaitEmbedDecision(el);
-    hideVideoLayoutLoader();
-    if (!isWinner) return;
-    loadVideoPlayer(el, sessionId, currentVideo);
+    try {
+      const isWinner = await awaitEmbedDecision(el);
+      hideVideoLayoutLoader();
+      if (!isWinner) return;
+      loadVideoPlayer(el, sessionId, currentVideo);
+    } catch (error) {
+      // Nothing above is expected to reject, but an unhandled rejection here would be
+      // invisible — the video area would just stay on its loader forever.
+      hideVideoLayoutLoader();
+      logError(`could not resolve the video layout decision: ${error.message}`);
+    }
   })();
 }
