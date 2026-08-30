@@ -88,13 +88,15 @@ Only remaining action, not a blocker: let Analytics (Charlie, building a dimensi
 
 **Exit criteria — met**: a user can load the page, see the correct default session autoplay, switch between concurrent YouTube sessions via the Also Live carousel, and the URL/back-button behavior holds up — all without a page reload.
 
-### Phase 2 — MPC player adapter + player-type switching
-- `players/MpcPlayerAdapter.js`: synthetic-anchor + Milo `adobetv.js` `init()` reuse
-- Full teardown/remount switching in `PlayerHost.js` when player type changes (YouTube ↔ MPC), not a `src` swap
-- **Spike first**: verify against a real MPC video asset whether `?autoplay=true` actually triggers autoplay — unverified, Milo's own code never sets it
-- Mixed-timing-block validation: MPC's ~15min-simulive-with-15min-breaks vs YouTube's 30min-back-to-back, using `broadcast-schedule.js` with realistic fixture data
+### Phase 2 — MPC player adapter + player-type switching — ✅ DONE
+- **Spike done first**: tested `video.tv.adobe.com/v/<mpcId>` with vs without `?autoplay=true` directly in a browser, using a real MPC ID (`3458902`) from the real catalog snapshot. **Confirmed it autoplays** (unmuted, actively progressing) — no "tap to play" fallback needed.
+- `players/MpcPlayerAdapter.js`: synthetic-anchor + Milo `adobetv.js` `init()` reuse, exactly as planned. Also injects Milo's `adobetv.css` once via a dynamic `<link>` (same pattern event-libs' own `scripts.js` uses for the C2 foundation stylesheet) — reusing the JS alone doesn't carry Milo's `.milo-video` sizing CSS, same lesson as Phase 1's YouTube/event-youtube.css fix.
+- `PlayerHost.js`: added the `mpcId` branch. No extra teardown logic needed — a different adapter component for a different player type is itself a full unmount/remount, on top of the existing per-session `key` remount from Phase 1.
+- Mixed-type validation: verified with two genuinely concurrent live sessions of different player types (one YouTube, one real MPC video) in the preview harness, rather than synthetic timing-only fixtures.
 
-**Exit criteria**: switching from a live MPC session to a live YouTube session (and back) works via full section remount; concurrent mixed-type live sets render correctly.
+**Real-browser verification**: clicked "Watch Live" on an MPC also-live card while YouTube was playing — primary player swapped to the real MPC video (confirmed via iframe `src` + a live screenshot showing real playback), info panel updated, the previous session moved back into Also Live, zero console errors. Repeated in reverse (MPC → YouTube) with the same clean result — no reload either direction.
+
+**Exit criteria — met**: switching from a live MPC session to a live YouTube session (and back) works via full section remount; concurrent mixed-type live sets render correctly.
 
 ### Phase 3 — States 2 & 3 (session ended) + on-demand transition
 - `EndedState.js` covering State 2 (other live sessions active) and State 3 (upcoming only). Confirmed: sessions roll day-over-day with no interruption; only once there are zero upcoming sessions left for the entire event does the page redirect (real navigation) to on-demand Session Guide.
@@ -124,7 +126,7 @@ session-broadcast.js                           # init(el): mounts BroadcastApp, 
 components/BroadcastApp.js                     # Phase 1
 components/PlayerHost.js                       # Phase 1 (YouTube), extended Phase 2 (MPC)
 components/players/YouTubePlayerAdapter.js     # Phase 1
-components/players/MpcPlayerAdapter.js         # Phase 2
+components/players/MpcPlayerAdapter.js         # Phase 2 — done
 components/players/MobileRiderPlayerAdapter.js # Phase 1 stub only — seam for a future ticket
 components/AlsoLiveCarousel.js                 # Phase 1
 components/UpNextCarousel.js                   # Phase 1
@@ -157,7 +159,7 @@ Tests mirror source under `test/unit/c2/blocks/session-broadcast/**`, following 
 
 **YouTube adapter**: import `YouTubeChat` from `event-libs/v1/c2/blocks/event-youtube/event-youtube.js` (local, no dynamic Milo import). Per-switch, construct a fresh `new YouTubeChat()` (its `init()`/`buildStream()` isn't meant to be re-run on the same instance — fine, since `PlayerHost` already remounts a fresh adapter on every switch), set `instance.config = { autoplay: 'true' }` and `instance.videoId = <youTubeId>` directly (the same seam its own tests use), call `instance.buildStream()`, append the result. Hits `insertAutoplayIframe()` — a real autoplaying iframe, no click-to-play facade. Leave `chatenabled` unset. **Phase 4 addition**: no YT IFrame JS API events out of the box — append `enablejsapi=1` and promote the iframe into a `new window.YT.Player(iframeEl, { events: {...} })` after insertion for `onStateChange`-driven watch-time analytics.
 
-**MPC adapter**: build a real (visually hidden) `<a href="https://video.tv.adobe.com/v/<mpcId>?autoplay=true">`, dynamically import `${miloLibs}/blocks/adobetv/adobetv.js`, call `init(a)`. Listen for the same `postMessage` `{ state: 'play'|'pause' }` events `adobetv.js` itself listens for. Autoplay support unverified — Phase 2 spike.
+**MPC adapter — done**: builds a real (temporarily attached) `<a href="https://video.tv.adobe.com/v/<mpcId>?autoplay=true">`, dynamically imports `${miloLibs}/blocks/adobetv/adobetv.js`, calls `init(a)`. **Autoplay confirmed working** via a live spike. Also injects `adobetv.css` once via a dynamic `<link>`. The `postMessage` `{ state: 'play'|'pause' }` events `adobetv.js` itself listens for remain available for Phase 4 analytics — not wired up yet.
 
 **MobileRider adapter**: stub that logs via `lana` and no-ops; seam for a future ticket, modeled on `mobile-rider.js`'s `injectPlayer()`.
 
@@ -189,7 +191,7 @@ Tests mirror source under `test/unit/c2/blocks/session-broadcast/**`, following 
 
 - ~~`?session=` URL param collision~~ — **resolved by renaming**: Broadcast's entry param is `?watch=`, not `?session=` (see write-up above). No PM decision needed. Only action item: let Analytics (Charlie, building a dimension for "the broadcast param") know the entry param is named `watch`.
 - ESP session-catalog rows for MAX26 are still `published: false` in test data — needs to flip before real concurrent-live testing.
-- MPC `?autoplay=true` support unverified — Phase 2 spike.
+- ~~MPC `?autoplay=true` support unverified~~ — **resolved in Phase 2**: confirmed working via a live spike against a real MPC video asset.
 - Analytics event schema unresolved per the ticket/PRD itself — expect rework once Analytics confirms.
 - Up Next cap: decided at 15 for this iteration, confirm real number (15 vs 30) with PM later.
 - Authoring Configurator scope: decided — DA block-content rows for this iteration, full configurator may come later as separate effort.

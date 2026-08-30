@@ -11,6 +11,11 @@ describe('PlayerHost', () => {
     expect(out).to.include('sb-player__mount');
   });
 
+  it('renders the MPC adapter mount for a session with an mpcId', () => {
+    const out = PlayerHost({ session: { id: 's-3', mpcId: '3458902' } });
+    expect(out).to.include('sb-player__mount');
+  });
+
   it('falls back to an unsupported-player message for an unrecognized player type', () => {
     const out = PlayerHost({ session: { id: 's-2' } });
     expect(out).to.include('sb-player__unsupported');
