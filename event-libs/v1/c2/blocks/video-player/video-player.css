@@ -12,6 +12,18 @@
   padding-bottom: 10px;
 }
 
+/* Only applies WHEN .video-container is actually present (a real sibling `~` match,
+   not `:has()`-on-self) — i.e. only on pages where video-container ends up the
+   winning instance, exactly mirroring the rule above. Assumes `.video-container`
+   is authored BEFORE `.video-playlist-container` in the page (the general sibling
+   combinator only matches a FOLLOWING sibling) — true on the current template; if an
+   author ever reorders the two sections, this stops applying rather than doing
+   anything wrong (the two sections just each fall back to their own default
+   spacing-sm padding, not a broken layout). */
+.section.video-container ~ .section.video-playlist-container {
+  padding-top: 0;
+}
+
 /* Reserves the eventual video's real box from FIRST PAINT, before init() has run at
    all — pure CSS, no JS dependency. Without this, the block has zero height until the
    loader is appended (itself gated behind session-times parsing + the layout-decision

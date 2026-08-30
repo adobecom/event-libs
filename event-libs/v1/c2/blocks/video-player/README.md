@@ -50,6 +50,18 @@ applies when this section is actually present (the winning instance); when
 entirely, leaving nothing for the override to match — the other section's
 own `spacing-sm` padding is never affected either way.
 
+The same file also zeroes `.video-playlist-container`'s own `padding-top`
+(`.section.video-container ~ .section.video-playlist-container`), but only
+via a real CSS sibling combinator — so it too only ever applies when
+`.video-container` is actually present, tracking the DOM live as it's
+removed, with no extra JS coordination needed. This assumes
+`.video-container` is authored **before** `.video-playlist-container`
+in the page (the current template's own order — a general sibling
+combinator only matches a *following* sibling); if that order were ever
+reversed, this rule simply stops applying rather than doing anything
+wrong — both sections would just fall back to their own default
+`spacing-sm` padding.
+
 If the current session hasn't ended yet (checked against its own
 `session-times` `endTimeMillis`), or it has no embeddable video source at
 all, this block removes itself. There's no empty state.
