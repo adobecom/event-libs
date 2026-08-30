@@ -2,7 +2,7 @@ import { expect } from '@esm-bundle/chai';
 import { setMetadata } from '../../../../../event-libs/v1/utils/utils.js';
 import init from '../../../../../event-libs/v1/c2/blocks/event-session-resources/event-session-resources.js';
 import { auth } from '../../../../../event-libs/v1/utils/session-store.js';
-import { toast } from '../../../../../event-libs/v1/features/toast/toast.js';
+import { toasts } from '../../../../../event-libs/v1/features/toast/toast.js';
 
 const SIGNED_OUT = { isLoggedIn: null, isRegistered: undefined, userFirstName: null };
 const SIGNED_IN = { isLoggedIn: true, isRegistered: true, userFirstName: 'Ada' };
@@ -39,7 +39,7 @@ describe('Session Resources', () => {
   beforeEach(() => {
     document.head.innerHTML = '';
     auth.value = SIGNED_OUT;
-    toast.value = null;
+    toasts.value = [];
   });
 
   it('renders a row per published resource with name + CTA link', async () => {
@@ -82,6 +82,22 @@ describe('Session Resources', () => {
     expect(names).to.deep.equal(['Resource (PDF)', 'Resource (PPTX)', 'Resource']);
   });
 
+  // Inert while the assets are cross-origin on static.rainfocus.com, but correct in intent and
+  // effective the moment they are served same-origin. See docs/known-issues.md item 1.
+  it('marks Download CTAs with the download attribute, and Open CTAs without', async () => {
+    setMaterials([
+      { description: 'Slides', url: 'https://x/slides.pdf' },
+      { description: 'Reference', url: 'https://x/page' },
+    ]);
+    const el = block();
+    await init(el);
+    const [dl, open] = [...el.querySelectorAll('.session-resource-cta')];
+    expect(dl.textContent).to.equal('Download');
+    expect(dl.hasAttribute('download')).to.be.true;
+    expect(open.textContent).to.equal('Open');
+    expect(open.hasAttribute('download')).to.be.false;
+  });
+
   it('labels downloadable files "Download" and other URLs "Open"', async () => {
     setMaterials([
       { fileName: 'Slides', fileURL: 'https://x/slides.pdf', published: true },
@@ -112,50 +128,62 @@ describe('Session Resources', () => {
     ]);
     const ctas = (el) => [...el.querySelectorAll('.session-resource-cta')];
 
-    it('blocks a Download while signed out and shows a login toast', async () => {
+    it('blocks a Download while signed out and shows a register/sign-in toast', async () => {
       oneOfEach();
       const el = block();
       await init(el);
       expect(clickAllowed(ctas(el)[0])).to.be.false;
-      expect(toast.value?.message).to.match(/login required to download slides/i);
-      expect(toast.value?.ctaLabel).to.match(/login/i);
+      expect(toasts.value[0]?.message).to.match(/register or sign in to download slides/i);
+      expect(toasts.value[0]?.ctaLabel).to.equal('Register/Sign in');
     });
 
-    it('blocks a Download when signed in but not registered, and prompts to register', async () => {
+    it('blocks a Download when signed in but not registered, with the same register/sign-in toast', async () => {
       oneOfEach();
       const el = block();
       await init(el);
       auth.value = UNREGISTERED;
       expect(clickAllowed(ctas(el)[0])).to.be.false;
-      expect(toast.value?.message).to.match(/registration.*required to download slides/i);
-      expect(toast.value?.ctaLabel).to.match(/register/i);
+      expect(toasts.value[0]?.message).to.match(/register or sign in to download slides/i);
+      expect(toasts.value[0]?.ctaLabel).to.equal('Register/Sign in');
     });
 
-    it('lets a Download through once signed in and registered, with no toast', async () => {
+    it('lets a Download through once signed in and registered, and confirms with a toast', async () => {
       oneOfEach();
       const el = block();
       await init(el);
       auth.value = SIGNED_IN;
       expect(clickAllowed(ctas(el)[0])).to.be.true;
-      expect(toast.value).to.be.null;
+      expect(toasts.value[0]?.message).to.equal('Session resource downloaded');
+      expect(toasts.value[0]?.variant).to.equal('positive');
     });
 
-    it('never gates an "Open" link, even signed out', async () => {
+    // The confirmation must not fire on the blocked path, or it would contradict the login
+    // toast that replaced it.
+    it('shows no download confirmation when the Download is blocked', async () => {
+      oneOfEach();
+      const el = block();
+      await init(el);
+      expect(clickAllowed(ctas(el)[0])).to.be.false;
+      // dev's toast system is a queue, so assert across all of them, not just the first.
+      expect(toasts.value.some((t) => t.message === 'Session resource downloaded')).to.be.false;
+    });
+
+    it('never gates an "Open" link, and does not confirm it as a download', async () => {
       oneOfEach();
       const el = block();
       await init(el);
       const open = ctas(el)[1];
       expect(open.textContent).to.equal('Open');
       expect(clickAllowed(open)).to.be.true;
-      expect(toast.value).to.be.null;
+      expect(toasts.value).to.have.lengthOf(0);
     });
   });
 
-  it('renders the "No resources" empty state when none are published', async () => {
+  it('renders the empty state when none are published', async () => {
     setMaterials([]);
     const el = block();
     await init(el);
-    expect(el.querySelector('.session-resources-empty').textContent).to.equal('No resources');
+    expect(el.querySelector('.session-resources-empty').textContent).to.equal('No materials available for this session');
     expect(el.querySelector('.session-resources-list')).to.be.null;
   });
 
@@ -184,5 +212,91 @@ describe('Session Resources', () => {
     const el = block();
     await init(el);
     expect(el.style.background).to.equal('');
+  });
+
+  // MWPW-205400. The shape below is verified real synced output from
+  // max/2026/sessions/acom-master-test-session-1002 — `url` / `description` / `title` /
+  // `ordinal`, with no `fileURL`, `fileTypeName` or `published` at all.
+  describe('real synced material-list shape', () => {
+    const REAL = {
+      description: 'Final Presentation',
+      materialId: '4e287893-5510-40fd-9247-6d9e8b6ffa8a',
+      title: 'MAX 2025 Breakout Recording Process.pdf',
+      url: 'https://static.rainfocus.com/adobe/m26/sess/x/finalpresentation/deck.pdf',
+      materialSource: 'external',
+      ordinal: 0,
+    };
+
+    it('reads url and description, with no published flag present', async () => {
+      setMaterials([REAL]);
+      const el = block();
+      await init(el);
+      const rows = [...el.querySelectorAll('.session-resource')];
+      expect(rows.length).to.equal(1);
+      expect(rows[0].querySelector('.session-resource-name').textContent).to.equal('Final Presentation');
+      expect(rows[0].querySelector('.session-resource-cta').getAttribute('href')).to.equal(REAL.url);
+      expect(rows[0].querySelector('.session-resource-cta').textContent).to.equal('Download');
+    });
+
+    it('orders by ordinal rather than array order', async () => {
+      setMaterials([
+        { ...REAL, description: 'Third', ordinal: 2, url: 'https://x/c.pdf' },
+        { ...REAL, description: 'First', ordinal: 0, url: 'https://x/a.pdf' },
+        { ...REAL, description: 'Second', ordinal: 1, url: 'https://x/b.pdf' },
+      ]);
+      const el = block();
+      await init(el);
+      expect([...el.querySelectorAll('.session-resource-name')].map((n) => n.textContent))
+        .to.deep.equal(['First', 'Second', 'Third']);
+    });
+
+    it('falls back to the extension when description is absent', async () => {
+      setMaterials([{ url: 'https://x/thing.pptx', ordinal: 0 }]);
+      const el = block();
+      await init(el);
+      expect(el.querySelector('.session-resource-name').textContent).to.equal('Resource (PPTX)');
+    });
+  });
+
+  describe('Dropbox and CC Library link attributes', () => {
+    const setAttrs = (list) => setMetadata('custom-attributes', JSON.stringify(list));
+    const textAttr = (name, value) => ({
+      name, inputType: 'text', enabled: true, values: [{ value, _ordinal: null }],
+    });
+
+    it('renders both links after the material files, in ticket order', async () => {
+      setMaterials([{ description: 'Final Presentation', url: 'https://x/deck.pdf', ordinal: 0 }]);
+      setAttrs([
+        textAttr('CC Library Link for Session Page', 'https://www.adobe.com/creativecloud/libraries.html'),
+        textAttr('Dropbox Link for Session Page', 'https://www.dropbox.com/'),
+      ]);
+      const el = block();
+      await init(el);
+      const rows = [...el.querySelectorAll('.session-resource')];
+      expect(rows.map((r) => r.querySelector('.session-resource-name').textContent))
+        .to.deep.equal(['Final Presentation', 'Dropbox Link', 'CC Library Link']);
+      // Extensionless destinations are Open, not Download, so they are not sign-in gated.
+      expect(rows[1].querySelector('.session-resource-cta').textContent).to.equal('Open');
+      expect(rows[1].querySelector('.session-resource-cta').getAttribute('href')).to.equal('https://www.dropbox.com/');
+    });
+
+    it('renders links with no material files at all', async () => {
+      setAttrs([textAttr('Dropbox Link for Session Page', 'https://www.dropbox.com/')]);
+      const el = block();
+      await init(el);
+      expect(el.querySelector('.session-resources-empty')).to.be.null;
+      expect([...el.querySelectorAll('.session-resource-name')].map((n) => n.textContent))
+        .to.deep.equal(['Dropbox Link']);
+    });
+
+    it('skips a link attribute that is present but empty', async () => {
+      setAttrs([
+        textAttr('Dropbox Link for Session Page', '   '),
+        textAttr('CC Library Link for Session Page', ''),
+      ]);
+      const el = block();
+      await init(el);
+      expect(el.querySelector('.session-resources-empty')).to.not.be.null;
+    });
   });
 });

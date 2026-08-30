@@ -85,12 +85,20 @@ export function LiveCard({
 
   async function handleSchedule(e) {
     e.stopPropagation();
-    await toggleScheduleWithFeedback(session, { eventConfig: guideConfig, isScheduled });
+    // Captured now — e.currentTarget is nulled out once the event finishes dispatching,
+    // but onBlocked fires later, after the (possibly rejected) action settles.
+    const btn = e.currentTarget;
+    await toggleScheduleWithFeedback(session, {
+      eventConfig: guideConfig, isScheduled, onBlocked: () => btn.blur(),
+    });
   }
 
   async function handleFavorite(e) {
     e.stopPropagation();
-    await toggleFavoriteWithFeedback(session, { eventConfig: guideConfig, isFavorited });
+    const btn = e.currentTarget;
+    await toggleFavoriteWithFeedback(session, {
+      eventConfig: guideConfig, isFavorited, onBlocked: () => btn.blur(),
+    });
   }
 
   const watchHref = safeUrl(getWatchDestination(session, sessionState));

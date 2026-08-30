@@ -72,7 +72,7 @@ const HOMEPAGE_FIELD_BY_TYPE = {
   [CONFIG_TYPES.HOMEPAGE_FEATURED_SESSIONS]: {
     ...HOMEPAGE_SESSION_FIELDS[CONFIG_TYPES.HOMEPAGE_FEATURED_SESSIONS],
     // No headingField/themeField — featured-sessions.js doesn't author a heading or
-    // support a theme; unlike Upcoming Sessions, this surface is always ratio-16-9
+    // support a theme; unlike Upcoming Sessions, this surface is always media-wide
     // cards, no config-driven visual variation.
     // The featured-sessions block's generated event-card markup + session-routing.js
     // read all three — watchUrl is where a click routes once the session goes live,
