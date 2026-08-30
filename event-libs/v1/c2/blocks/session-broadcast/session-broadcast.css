@@ -44,7 +44,15 @@
 .sb-player__mount {
   width: 100%;
   background: var(--s2a-color-gray-900, #000);
-  border: 1px solid rgb(255 255 255 / 15%);
+}
+
+/* Milo's own adobetv.css already resets its MPC iframe's border (.milo-video iframe {
+   border: 0 }), but event-youtube.css never resets its YouTube iframe's — the browser's own
+   default iframe border was the real remaining source of the white outline. Scoped to this
+   block's own player mount rather than event-youtube.css itself, which is also used by the
+   standalone event-youtube block outside session-broadcast. */
+.sb-player__mount iframe {
+  border: none;
 }
 
 .sb-player__unsupported {
@@ -55,7 +63,6 @@
   aspect-ratio: 16 / 9;
   color: var(--s2a-color-content-subtle);
   background: var(--s2a-color-gray-900, #000);
-  border: 1px solid rgb(255 255 255 / 15%);
 }
 
 /* ── Session info panel ──────────────────────────────────
@@ -133,8 +140,7 @@
   gap: var(--s2a-spacing-sm);
 }
 
-/* Frosted-glass icon button — same formula as sessions-guide's .sg-card__btn, restated here
-   rather than shared across blocks since it's a handful of literal constants, not logic. */
+/* Share is a bare icon, no visible chip/ring, per design. */
 .sb-info__icon-btn {
   display: flex;
   align-items: center;
@@ -143,12 +149,29 @@
   width: 40px;
   height: 40px;
   padding: 0;
-  color: var(--s2a-color-gray-900);
+  color: #fff;
   cursor: pointer;
-  background: rgb(255 255 255 / 80%);
-  border: 1px solid rgb(255 255 255 / 40%);
+  background: transparent;
+  border: 0;
+}
+
+/* Favorite keeps a transparent outline ring — confirmed against the real Figma component's
+   resolved tokens (--s2a-color-iconbutton-background-primary-outlined-default is white at 0%
+   alpha, -border-/-content-primary-outlined-default are both solid white), same for both the
+   favorited and unfavorited states (node 4975:45501 vs 4975:45494) — only the icon glyph
+   itself (outline vs filled heart) changes between them. */
+.sb-info__icon-btn--favorite {
+  border: 1px solid #fff;
   border-radius: 999px;
-  backdrop-filter: blur(4.687px);
+}
+
+/* The heart icon's own native SVG size (20px, shared with LiveCard/SessionCard's own
+   favorite buttons elsewhere) is bigger than this specific button's Figma spec (16px, node
+   4975:45501/4975:45494) — Share sits in the same row at its own correct 20px, so this only
+   targets the favorite button's icon, not the whole .sb-info__icon-btn class. */
+.sb-info__icon-btn--favorite svg {
+  width: 16px;
+  height: 16px;
 }
 
 .sb-info__meta {
@@ -158,6 +181,14 @@
   color: var(--s2a-color-border-default);
   font-size: var(--s2a-font-size-md, 16px);
 }
+
+/* CategoryBadge sets --sg-badge-icon-color inline per the session's own track color (e.g.
+   black by default) — this directly overrides the *color* property on the same element
+   instead (a more specific selector, not touching the custom property), which wins over the
+   base rule's `color: var(--sg-badge-icon-color, currentcolor)` by normal cascade order, no
+   !important needed. Matches the design: the channel icon is always white here, regardless
+   of the track's own accent color. */
+.sb-info__meta .sg-category-badge__icon-color { color: #fff; }
 
 .sb-info__desc-wrap {
   display: -webkit-box;
@@ -178,8 +209,11 @@
 .sb-info__desc { margin: 0; }
 
 .sb-info__view-all {
+  align-self: flex-start;
+  padding: 0;
   color: var(--s2a-color-border-default);
   font-weight: bold;
+  text-align: left;
   background: none;
   border: 0;
   cursor: pointer;
@@ -257,6 +291,78 @@
 .sb-carousel-section {
   padding: var(--s2a-spacing-md);
 }
+
+/* ── Also Live section (mobile, node 9931:12217) ──────────
+   The section itself sits on a light-gray background with white cards inside it — the
+   inverse of Upcoming's white-section/gray-card relationship — so this needs its own
+   background, not the shared .sb-carousel-section default. Everything below is scoped under
+   this class rather than edited on the shared sessions-guide selectors (.sg-live-card,
+   .sg-section-title, .sg-carousel__cards, etc.) — those are reused as-is by sessions-guide's
+   own Live section with a different, correct-for-that-context spec (bigger title, tighter
+   card gap, taller buttons); overriding them unscoped would silently change sessions-guide's
+   own look. Scoping to this ancestor class only ever matches Also Live's own cards. */
+.sb-carousel-section--also-live {
+  padding: var(--s2a-spacing-xl) var(--s2a-spacing-lg);
+  background: var(--s2a-color-background-subtle, #f8f8f8);
+}
+
+.sb-carousel-section--also-live .sg-carousel__header { margin-bottom: var(--s2a-spacing-sm); }
+
+.sb-carousel-section--also-live .sg-section-title {
+  color: var(--s2a-color-gray-1000, #000);
+  letter-spacing: -0.2px;
+}
+
+.sb-carousel-section--also-live .sg-carousel__cards { gap: var(--s2a-spacing-md); }
+
+.sb-carousel-section--also-live .sg-live-card {
+  width: 311px;
+  max-width: none;
+}
+
+/* Image area is taller relative to the copy section than the shared default (168px fixed) —
+   an aspect-ratio keeps that proportion (~195px at this card's own 311px width) instead of a
+   second fixed height to maintain alongside the width override above. */
+.sb-carousel-section--also-live .sg-live-card__image {
+  height: auto;
+  aspect-ratio: 300 / 188;
+}
+
+/* Progress bar moves from the image's bottom edge to its top edge — everything else about it
+   (left/right insets, track/indicator/duration styling) is unchanged. */
+.sb-carousel-section--also-live .sg-live-card__progress-row {
+  top: 6px;
+  bottom: auto;
+}
+
+.sb-carousel-section--also-live .sg-category-badge__label { font-size: var(--s2a-font-size-xs); }
+
+.sb-carousel-section--also-live .sg-live-card__title {
+  margin: var(--s2a-spacing-md) 0 0;
+  font-family: var(--body-font-family);
+  font-size: var(--s2a-font-size-md, 16px);
+  font-weight: var(--s2a-font-weight-adobe-clean-bold);
+}
+
+.sb-carousel-section--also-live .sg-live-card__btn { height: 32px; }
+
+/* Figma's compact 32px Watch-now button uses 16px side padding, not the shared 24px. */
+.sb-carousel-section--also-live .sg-live-card__btn--watch { padding: 0 var(--s2a-spacing-md); }
+
+.sb-carousel-section--also-live .sg-live-card__btn--favorite { width: 32px; }
+
+/* Same 16px-vs-20px oversized-heart fix as .sb-info__icon-btn--favorite (node 4975:45427). */
+.sb-carousel-section--also-live .sg-live-card__btn--favorite svg {
+  width: 16px;
+  height: 16px;
+}
+
+/* .sg-live-card__body (shared) uses align-items: flex-start, so .sg-live-card__actions never
+   stretches to the card's own width — leaving .sg-live-card__actions-time's margin-left:auto
+   with no free space to push into, so it sat right next to the buttons instead of the row's
+   far edge. Stretching this one row to full width (without touching the shared
+   align-items:flex-start default other children still rely on) fixes it. */
+.sb-carousel-section--also-live .sg-live-card__actions { width: 100%; }
 
 /* Desktop widens out; mobile-first default above is intentionally unconstrained. Anchored to
    the same 1280px "wide" threshold used elsewhere in sessions-guide (FilterPanel.js,

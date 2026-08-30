@@ -228,7 +228,46 @@ scope, page-level authored content per earlier decisions.
   names on `.sb-info` to fixed dark values, mirroring the exact pattern sessions-guide's own
   `.sessions-guide[data-theme="dark"]` already uses for its dark surfaces — every descendant
   (including the reused `CategoryBadge`) now inherits the fixed dark palette automatically.
-- Player container given the Figma border treatment (`1px solid rgb(255 255 255 / 15%)`).
+- Player container given the Figma border treatment (`1px solid rgb(255 255 255 / 15%)`) —
+  **removed later per user feedback**: on mobile it read as an unwanted faint white outline
+  around the video rather than a subtle frame. `.sb-player__mount`/`.sb-player__unsupported`
+  no longer set a border at all.
+- **The white outline persisted even after that removal** — traced to the `<iframe>`'s own
+  browser default border. Milo's `adobetv.css` already resets this for its MPC iframe
+  (`.milo-video iframe { border: 0 }`), but `event-youtube.css` never resets it for the
+  YouTube iframe. Fixed with `.sb-player__mount iframe { border: none }`, scoped to this
+  block's own player mount rather than editing `event-youtube.css` itself (also used by the
+  standalone `event-youtube` block outside session-broadcast). Verified via computed style:
+  the iframe's border is `0px none`.
+- **Correction after a follow-up user review**: `.sb-info__icon-btn` (Favorite/Share) was
+  originally built as a frosted-glass chip, copying sessions-guide's `.sg-card__btn` pattern by
+  analogy without checking this specific button's own tokens. The user pointed at the two real
+  Figma states (unfavorited node `4975:45501`, favorited node `4975:45494`); `get_variable_defs`
+  on the canonical instance confirmed both resolve
+  `--s2a-color-iconbutton-background-primary-outlined-default` to white at 0% alpha (fully
+  transparent) with a solid white border/icon — a transparent outline ring, not a solid chip.
+  Only the icon glyph (outline vs filled heart) differs between the two states; the button
+  chrome itself is identical. Fixed to `background: transparent; border: 1px solid #fff;`.
+- **Second follow-up correction**: collapsed actually has two of its own Figma variants —
+  node `9935:12816` (not favorited: title, caret, clamped description, actions) vs node
+  `4975:45446` (favorited: title, caret, actions — description hidden entirely). Expanded
+  always shows the description regardless of favorited state; only collapsed's visibility
+  depends on it. `SessionInfoPanel.js`'s description block now renders when
+  `expanded || !isFavorited`, matching this exactly. Verified in the browser toggling
+  `favorited` directly: collapsed+favorited hides the description, expanded still shows it
+  even while favorited.
+- **Third follow-up correction, per node `4975:45473`**: expanded's meta row showed a start
+  time ("9:15AM") instead of duration ("2h") — switched `formatShortTime` for
+  `formatDuration(..., { short: true })`, and dropped the now-unused `useSessionGuide()`/
+  `userTz` plumbing entirely (duration formatting needs no timezone). The channel-badge icon
+  in that row also needed to render white regardless of the session's own track accent color —
+  `CategoryBadge` sets `--sg-badge-icon-color` inline per-track, so a scoped
+  `.sb-info__meta .sg-category-badge__icon-color { color: #fff; }` overrides the `color`
+  property directly (a more specific selector, not fighting the custom property) — the same
+  mechanism sessions-guide's own hover states already use for this, no `!important` needed.
+  "View all details" was rendering center-aligned (a bare `<button>`'s UA-default text
+  alignment) instead of flush-left with the description above it — fixed with
+  `align-self: flex-start; text-align: left;`.
 
 **Also-Live cards — done**: confirmed with the user that the trailing stat next to Watch
 Now/Favorite is the session's duration (e.g. "30m"), not a time range — the Figma sample data
@@ -236,6 +275,49 @@ was just inconsistent between the two example cards. Added `sg-live-card__action
 rendered only for `variant === 'live'`, pushed to the row's far end via its own
 `margin-left: auto` rather than `justify-content: space-between` on the shared row, so every
 other `LiveCard` consumer (no such element ever renders for them) is unaffected.
+
+**Also-Live section spacing/dimensions — done**, per node `9931:12217` (section) / `4975:45415`
+(card): the section sits on `--s2a-color-background-subtle` (#f8f8f8) with white cards inside
+it — the inverse of Upcoming's white-section/gray-card relationship — plus a materially
+different card spec than `LiveCard.js`'s shared default (311px fixed width not a 300px cap,
+~195px aspect-ratio image not a fixed 168px, progress bar pinned to the image's top edge not
+bottom, 16px title at Bold/700 not 20px at Black/900, 12px channel-badge label not 14px, 32px
+Watch-now/Favorite buttons not 40px, 16px card gap not 8px). Every one of these is a
+**CSS-only override scoped under `.sb-carousel-section--also-live`**, added in
+`session-broadcast.css` — nothing in the shared `sessions-guide.css` selectors themselves
+(`.sg-live-card`, `.sg-section-title`, `.sg-carousel__cards`, etc.) was touched, since those
+already carry the correct, different spec for sessions-guide's own Live section. Since
+`.sb-carousel-section--also-live` only ever exists in `AlsoLiveCarousel.js`'s own DOM, there's
+no path for these rules to ever match sessions-guide's markup — confirmed by grep, not just by
+inspection. Verified in the browser: card matches the reference closely; no dev-server
+sessions-guide regression check was needed since the scoping makes a leak structurally
+impossible, not just unlikely.
+
+**Follow-up polish, same scoped block**: the `margin: 0` on the title override above was too
+aggressive — it also zeroed the gap between the channel-badge row and the title, which Figma's
+own 16px inter-child gap ("Session tiles V2") requires; restored as `margin: var(--s2a-spacing-md) 0 0`.
+Also added `font-family: var(--body-font-family)` to the same title rule (Figma's Also-Live
+title uses the body typeface, not the heading-display one `.sg-live-card__title`'s shared
+default carries), and tightened `.sg-live-card__btn--watch`'s side padding from the shared 24px
+to Figma's 16px for this card specifically.
+
+**Real bug found and fixed**: `.sg-live-card__actions-time` (the trailing duration) wasn't
+actually right-aligned on real mobile widths — `.sg-live-card__body` (shared) sets
+`align-items: flex-start`, so `.sg-live-card__actions` never stretches to the card's own
+width, leaving the time span's `margin-left: auto` with no free space to push into. Fixed by
+stretching just that row to full width, scoped the same way as everything else here
+(`.sb-carousel-section--also-live .sg-live-card__actions { width: 100% }`) rather than
+touching the shared `align-items: flex-start` other children still rely on. Verified by
+measuring bounding rects directly (screenshot-based verification wasn't reliable at this
+viewport size): the time span's right edge lands exactly on the actions row's own right edge,
+with real separation from the Favorite button on the left.
+
+**Info panel favorite icon size — done**, per node `4975:45492`/`4975:45501`: the heart icon's
+native SVG size (20px, shared with `LiveCard`/`SessionCard`'s own favorite buttons elsewhere)
+was bigger than this specific button's Figma spec (16px) — Share sits in the same row at its
+own correct 20px, so only `.sb-info__icon-btn--favorite svg` was resized, not the whole
+`.sb-info__icon-btn` class shared by both buttons. Verified via bounding rect: favorite icon
+renders at 16px, share stays at 20px.
 
 **Upcoming cards — done**: switched to `SessionCard.js` instead of `LiveCard.js`'s
 `recommended` variant, per the visual comparison confirming `.sg-card`'s "no image" styling is

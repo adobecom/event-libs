@@ -5,8 +5,7 @@ import {
 import { toggleFavoriteWithFeedback } from '../../../../services/sessions/action-feedback.js';
 import { safeUrl } from '../../../../utils/utils.js';
 import { showToast } from '../../../../features/toast/toast.js';
-import { useSessionGuide } from '../../sessions-guide/store/index.js';
-import { formatShortTime } from '../../sessions-guide/utils/time.js';
+import { formatDuration } from '../../sessions-guide/utils/time.js';
 import { CategoryBadge } from '../../sessions-guide/components/CategoryBadge.js';
 import {
   IconHeartFilled, IconHeartOutline, IconShare, IconChevronRight,
@@ -14,21 +13,27 @@ import {
 import { trackBroadcastEvent } from '../utils/broadcast-analytics.js';
 
 // Matches the Figma "Session Broadcast Page" info-panel component (mobile: node 2325:29821
-// collapsed / 2325:29820 expanded). Collapsed shows title + caret, a clamped description, and
-// Favorite + Share actions. Expanding reorders content: actions move directly under the
-// title, followed by a channel badge + start-time row, the full untruncated description, and
-// a "View all details" link — the only thing that opens the real Session Guide detail view
-// (no local modal — see the plan's Architecture Decisions).
+// collapsed / 2325:29820 expanded, duration corrected per node 4975:45473). Collapsed shows
+// title + caret, a clamped description, and Favorite + Share actions. Expanding reorders
+// content: actions move directly under the title, followed by a channel badge + duration row
+// (e.g. "2h" — not a start time), the full untruncated description, and a "View all details"
+// link — the only thing that opens the real Session Guide detail view (no local modal — see
+// the plan's Architecture Decisions).
+//
+// Collapsed has two further variants of its own, per node 9935:12816 (not favorited — shows
+// the clamped description) vs node 4975:45446 (favorited — hides the description entirely,
+// showing only title/caret/actions). Expanded always shows the description regardless of
+// favorited state — only collapsed's visibility depends on it.
 export function SessionInfoPanel({ session, viewAllDetailsLabel = 'View all details' }) {
   const [expanded, setExpanded] = useState(false);
-  const { state } = useSessionGuide();
-  const { userTz } = state.guideConfig;
 
   if (!session) return null;
 
   const isFavorited = favorited.value.has(session.id);
   const isPending = pendingActions.value.has(session.id);
-  const startTime = formatShortTime(session.startTimeUtc, userTz);
+  const durationLabel = session.endTimeUtc
+    ? formatDuration(session.startTimeUtc, session.endTimeUtc, { short: true })
+    : '';
 
   async function handleFavorite(e) {
     e.stopPropagation();
@@ -67,7 +72,7 @@ export function SessionInfoPanel({ session, viewAllDetailsLabel = 'View all deta
   const actions = html`
     <div class="sb-info__actions">
       <button
-        class="sb-info__icon-btn"
+        class="sb-info__icon-btn sb-info__icon-btn--favorite"
         type="button"
         onclick=${handleFavorite}
         disabled=${isPending}
@@ -104,12 +109,14 @@ export function SessionInfoPanel({ session, viewAllDetailsLabel = 'View all deta
       ${expanded && html`
         <div class="sb-info__meta">
           <${CategoryBadge} session=${session} hideCount=${true} />
-          ${startTime && html`<span class="sb-info__time">${startTime}</span>`}
+          ${durationLabel && html`<span class="sb-info__time">${durationLabel}</span>`}
         </div>
       `}
-      <div class=${'sb-info__desc-wrap' + (expanded ? ' is-expanded' : '')} id="sb-info-desc">
-        <p class="sb-info__desc">${session.description}</p>
-      </div>
+      ${(expanded || !isFavorited) && html`
+        <div class=${'sb-info__desc-wrap' + (expanded ? ' is-expanded' : '')} id="sb-info-desc">
+          <p class="sb-info__desc">${session.description}</p>
+        </div>
+      `}
       ${!expanded && actions}
       ${expanded && html`
         <button

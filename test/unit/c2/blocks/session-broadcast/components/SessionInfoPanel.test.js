@@ -1,7 +1,6 @@
 import { expect } from '@esm-bundle/chai';
 import { SessionInfoPanel } from '../../../../../../event-libs/v1/c2/blocks/session-broadcast/components/SessionInfoPanel.js';
 import { favorited, pendingActions } from '../../../../../../event-libs/v1/utils/session-store.js';
-import { SessionGuideContext } from '../../../../../../event-libs/v1/c2/blocks/sessions-guide/store/index.js';
 
 const HOUR = 3600e3;
 
@@ -17,10 +16,6 @@ describe('SessionInfoPanel', () => {
   beforeEach(() => {
     favorited.value = new Set();
     pendingActions.value = new Set();
-    SessionGuideContext._current = {
-      state: { guideConfig: { userTz: 'America/Los_Angeles' } },
-      dispatch: () => {},
-    };
   });
 
   it('renders nothing when there is no active session', () => {
@@ -42,6 +37,22 @@ describe('SessionInfoPanel', () => {
     favorited.value = new Set(['s-1']);
     const out = SessionInfoPanel({ session: SESSION });
     expect(out).to.include('daa-ll="Remove-from-Favorites"');
+  });
+
+  // Collapsed has two Figma variants of its own (node 9935:12816 not-favorited vs 4975:45446
+  // favorited) — favoriting hides the description entirely while collapsed. Expanded always
+  // shows it regardless (untestable here — the caret toggle needs a real browser, see below).
+  it('shows the description when collapsed and not favorited', () => {
+    const out = SessionInfoPanel({ session: SESSION });
+    expect(out).to.include('sb-info__desc-wrap');
+    expect(out).to.include('A session about everything.');
+  });
+
+  it('hides the description when collapsed and favorited', () => {
+    favorited.value = new Set(['s-1']);
+    const out = SessionInfoPanel({ session: SESSION });
+    expect(out).to.not.include('sb-info__desc-wrap');
+    expect(out).to.not.include('A session about everything.');
   });
 
   it('shows a Share action alongside Favorite', () => {
