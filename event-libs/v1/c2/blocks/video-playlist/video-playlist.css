@@ -471,11 +471,9 @@
   height: 16px;
 }
 
-/* No separate "solid heart" asset confirmed yet — favorited state reads via color
-   (brand red) rather than a filled-vs-outline shape swap. */
-.video-playlist-row-favorite.is-favorited {
-  color: var(--s2a-color-brand-adobe-red);
-}
+/* Deliberately no `.is-favorited` colour rule: the favorited state is conveyed by
+   swapping the outline heart for a solid one (see setFavoriteButtonState in the JS),
+   matching event-session-details' own favorite button rather than tinting the icon. */
 
 /* Mobile shows play centered on the thumbnail (.video-playlist-row-play-icon) instead —
    the stacked row-actions play button is desktop-only. */

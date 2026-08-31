@@ -390,11 +390,16 @@ class Drawer {
 
 const PLAY_ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M3.79922 14.4001C3.48086 14.4001 3.16289 14.3141 2.87656 14.1431C2.32773 13.8149 2 13.2368 2 12.5977V3.39617C2 2.75711 2.32774 2.17899 2.87656 1.85086C3.425 1.52352 4.08867 1.50711 4.65195 1.81102L13.2129 6.41181C13.7973 6.72587 14.1602 7.33368 14.1602 7.99696C14.1602 8.66025 13.7973 9.26806 13.2129 9.58212L4.65195 14.1829C4.38281 14.3282 4.09062 14.4001 3.79922 14.4001ZM3.80195 2.79383C3.65938 2.79383 3.54726 2.84852 3.49218 2.88133C3.4043 2.93368 3.2 3.08915 3.2 3.39617V12.5977C3.2 12.9048 3.4043 13.0602 3.49218 13.1126C3.58007 13.1649 3.81328 13.2712 4.08398 13.1266L12.6445 8.52585C12.9293 8.37195 12.9602 8.10476 12.9602 7.99695C12.9602 7.88914 12.9293 7.62195 12.6445 7.46804L4.08398 2.86727C3.98282 2.81336 3.88711 2.79383 3.80195 2.79383Z" fill="currentColor"/></svg>';
 const THUMB_PLAY_ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="13" height="15" viewBox="0 0 13 15" fill="none" aria-hidden="true"><path d="M11.925 6.11782C12.625 6.52196 12.625 7.53232 11.925 7.93647L1.575 13.912C0.875 14.3162 0 13.811 0 13.0027V1.05157C0 0.243276 0.875 -0.261905 1.575 0.14224L11.925 6.11782Z" fill="currentColor"/></svg>';
-const FAVORITE_ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M7.99957 14.3999C7.60855 14.3999 7.21753 14.2717 6.89097 14.0155C5.62222 13.0202 2.72886 10.4061 1.79137 8.87253C1.04527 7.65222 0.789022 6.14206 1.10582 4.83346C1.37769 3.71002 2.03551 2.80378 3.00856 2.21081C4.10777 1.53971 5.42692 1.41315 6.44997 1.88034C6.97809 2.12174 7.54059 2.54206 7.99293 3.01706C8.45543 2.51315 9.01129 2.10534 9.56677 1.8733C10.616 1.4319 11.9289 1.56314 12.991 2.21081C13.9636 2.80378 14.6215 3.71002 14.8933 4.83346C15.2101 6.14206 14.9539 7.65222 14.2078 8.87253C13.2722 10.403 10.3781 13.0186 9.10817 14.0155C8.78201 14.2717 8.39058 14.3999 7.99957 14.3999ZM5.10933 2.79909C4.62417 2.79909 4.10504 2.94753 3.63317 3.23581C2.93785 3.65925 2.46754 4.30925 2.27223 5.1155C2.02848 6.12174 2.23161 7.29206 2.81481 8.24597C3.5773 9.49284 6.13433 11.8968 7.63161 13.0718C7.84801 13.2421 8.15075 13.2421 8.36716 13.0718C9.86599 11.8952 12.4234 9.4905 13.184 8.24597C13.7675 7.29206 13.9707 6.12175 13.7269 5.1155C13.5316 4.30925 13.0613 3.65925 12.3664 3.23581C11.6258 2.78425 10.7304 2.68659 10.0304 2.97956C9.48474 3.20846 8.88396 3.72956 8.4992 4.30769C8.27654 4.64206 7.72264 4.64206 7.49998 4.30769C7.15193 3.78503 6.50077 3.22331 5.95154 2.97253C5.69685 2.85612 5.40972 2.79909 5.10933 2.79909Z" fill="currentColor"/></svg>';
+// Favorited state is conveyed by SWAPPING to a solid heart, not by tinting the outline —
+// same treatment (and the same two paths) event-session-details/favorite.js uses, so the
+// two blocks' favorite buttons read identically.
+const FAVORITE_ICON_OUTLINE_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M7.99957 14.3999C7.60855 14.3999 7.21753 14.2717 6.89097 14.0155C5.62222 13.0202 2.72886 10.4061 1.79137 8.87253C1.04527 7.65222 0.789022 6.14206 1.10582 4.83346C1.37769 3.71002 2.03551 2.80378 3.00856 2.21081C4.10777 1.53971 5.42692 1.41315 6.44997 1.88034C6.97809 2.12174 7.54059 2.54206 7.99293 3.01706C8.45543 2.51315 9.01129 2.10534 9.56677 1.8733C10.616 1.4319 11.9289 1.56314 12.991 2.21081C13.9636 2.80378 14.6215 3.71002 14.8933 4.83346C15.2101 6.14206 14.9539 7.65222 14.2078 8.87253C13.2722 10.403 10.3781 13.0186 9.10817 14.0155C8.78201 14.2717 8.39058 14.3999 7.99957 14.3999ZM5.10933 2.79909C4.62417 2.79909 4.10504 2.94753 3.63317 3.23581C2.93785 3.65925 2.46754 4.30925 2.27223 5.1155C2.02848 6.12174 2.23161 7.29206 2.81481 8.24597C3.5773 9.49284 6.13433 11.8968 7.63161 13.0718C7.84801 13.2421 8.15075 13.2421 8.36716 13.0718C9.86599 11.8952 12.4234 9.4905 13.184 8.24597C13.7675 7.29206 13.9707 6.12175 13.7269 5.1155C13.5316 4.30925 13.0613 3.65925 12.3664 3.23581C11.6258 2.78425 10.7304 2.68659 10.0304 2.97956C9.48474 3.20846 8.88396 3.72956 8.4992 4.30769C8.27654 4.64206 7.72264 4.64206 7.49998 4.30769C7.15193 3.78503 6.50077 3.22331 5.95154 2.97253C5.69685 2.85612 5.40972 2.79909 5.10933 2.79909Z" fill="currentColor"/></svg>';
+const FAVORITE_ICON_FILLED_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M8.61426 17.5195C9.02246 17.8398 9.51123 18 10 18C10.4888 18 10.9781 17.8398 11.3858 17.5195C12.9732 16.2734 16.5908 13.0039 17.7603 11.0908C18.6929 9.56543 19.0132 7.67773 18.6172 6.04199C18.2774 4.63769 17.4551 3.50488 16.2393 2.76367C14.9116 1.95409 13.2705 1.79003 11.959 2.34179C11.2647 2.63183 10.5698 3.1416 9.99171 3.77148C9.42628 3.17773 8.72316 2.65234 8.063 2.35058C6.78419 1.7666 5.13526 1.9248 3.76124 2.76367C2.54493 3.50488 1.72266 4.63769 1.38282 6.04199C0.98682 7.67773 1.30713 9.56543 2.23975 11.0908C3.41162 13.0078 7.02832 16.2754 8.61426 17.5195Z" fill="currentColor"/></svg>';
 const TOGGLE_CHEVRON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="17" height="10" viewBox="0 0 17 10" fill="none" aria-hidden="true"><path d="M16.7969 0.992758C16.7969 1.24793 16.6966 1.50437 16.4973 1.69481L9.08321 8.8283C8.70616 9.19265 8.10948 9.19265 7.73243 8.8283L0.300593 1.6783C-0.0878861 1.30505 -0.0993168 0.686787 0.273927 0.300856C0.64717 -0.0876221 1.26416 -0.10031 1.65137 0.274194L8.40782 6.77292L15.1465 0.290691C15.5337 -0.0838252 16.1507 -0.0711232 16.5239 0.317355C16.7067 0.505244 16.7969 0.748995 16.7969 0.992758Z" fill="#DBDBDB"/></svg>';
 const SHOW_MORE_CHEVRON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="8" height="5" viewBox="0 0 8 5" fill="none" aria-hidden="true"><path d="M1 1L4 4L7 1" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 
 function setFavoriteButtonState(button, item, isFav) {
+  button.innerHTML = isFav ? FAVORITE_ICON_FILLED_SVG : FAVORITE_ICON_OUTLINE_SVG;
   button.classList.toggle('is-favorited', isFav);
   button.setAttribute('aria-pressed', String(isFav));
   // Per Figma's accessibility spec: "Favorite [session title]" / "Unfavorite [session
@@ -404,7 +409,8 @@ function setFavoriteButtonState(button, item, isFav) {
 }
 
 function buildFavoriteButton(item) {
-  const button = createTag('button', { type: 'button', class: 'video-playlist-row-favorite' }, FAVORITE_ICON_SVG);
+  // Icon is set by setFavoriteButtonState below, which owns both states.
+  const button = createTag('button', { type: 'button', class: 'video-playlist-row-favorite' });
   setFavoriteButtonState(button, item, favorited.value.has(item.id));
 
   button.addEventListener('click', async (event) => {
@@ -622,25 +628,13 @@ function hasEmbeddedVideoPlayer(container) {
  * out to be separate `.fragment > .section` trees.
  */
 function announceVideoDecision(hasPlaylist) {
-  /* eslint-disable no-console */
-  // TEMP DIAGNOSTIC — remove before merging.
-  console.log(`[VPL-DEBUG] announceVideoDecision(hasPlaylist=${hasPlaylist})`, {
-    videoContainerByClass: Boolean(document.querySelector(`.${VIDEO_CONTAINER_CLASS}`)),
-    videoContainerByStyleRow: Boolean(findSectionWithStyle(VIDEO_CONTAINER_CLASS)),
-    playlistContainerByClass: Boolean(document.querySelector(`.${VIDEO_PLAYLIST_CONTAINER_CLASS}`)),
-    playlistContainerByStyleRow: Boolean(findSectionWithStyle(VIDEO_PLAYLIST_CONTAINER_CLASS)),
-    playersOnPage: document.querySelectorAll('.video-player').length,
-    alreadyEmbedded: document.querySelectorAll('.video-player[data-embedded="true"]').length,
-  });
   BlockMediator.set(VIDEO_LAYOUT_DECISION_KEY, { hasPlaylist });
 
   if (hasPlaylist) {
     // The full-width container only ever holds a `.video-player`, so there's nothing
     // else in it to protect — the whole section goes.
     const videoContainer = findSectionWithStyle(VIDEO_CONTAINER_CLASS);
-    const blocked = hasEmbeddedVideoPlayer(videoContainer);
-    console.log(`[VPL-DEBUG] hasPlaylist=true -> collapse .video-container? found=${Boolean(videoContainer)} alreadyEmbeddedSoSkipped=${blocked}`);
-    if (!blocked) collapseAndRemove(videoContainer);
+    if (!hasEmbeddedVideoPlayer(videoContainer)) collapseAndRemove(videoContainer);
     return;
   }
 
@@ -648,19 +642,13 @@ function announceVideoDecision(hasPlaylist) {
   // event-speakers, event-session-resources, ...), so only its own two video blocks are
   // removed — never the container itself or any sibling.
   const playlistContainer = findSectionWithStyle(VIDEO_PLAYLIST_CONTAINER_CLASS);
-  const blocked = hasEmbeddedVideoPlayer(playlistContainer);
-  console.log(`[VPL-DEBUG] hasPlaylist=false -> collapse playlist-container's player? found=${Boolean(playlistContainer?.querySelector('.video-player'))} alreadyEmbeddedSoSkipped=${blocked}`);
-  if (!blocked) {
+  if (!hasEmbeddedVideoPlayer(playlistContainer)) {
     collapseAndRemove(playlistContainer?.querySelector('.video-player'));
   }
   collapseAndRemove(playlistContainer?.querySelector('.video-playlist'));
-  /* eslint-enable no-console */
 }
 
 function removeBlock(el) {
-  // TEMP DIAGNOSTIC — remove before merging.
-  // eslint-disable-next-line no-console
-  console.log('[VPL-DEBUG] removeBlock() called — playlist has nothing to show');
   window.dispatchEvent(new CustomEvent('video-playlist:removed'));
   announceVideoDecision(false);
   el.remove();

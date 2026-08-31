@@ -566,6 +566,24 @@ describe('video-playlist', () => {
       expect(button.getAttribute('aria-label')).to.equal('Unfavorite Session A');
     });
 
+    /**
+     * The favorited state is carried by the icon SHAPE, not a colour change — the solid
+     * heart's path is a single closed fill, whereas the outline's is a two-subpath donut
+     * (its second `M` cuts the hollow centre). Matching event-session-details' own button.
+     */
+    it('swaps the outline heart for a solid one when favorited', () => {
+      const row = [...playlist.querySelectorAll('.video-playlist-row')]
+        .find((r) => r.dataset.itemId === 'a');
+      const button = row.querySelector('.video-playlist-row-favorite');
+      const subpathCount = () => (button.querySelector('path').getAttribute('d').match(/M/g) || []).length;
+
+      expect(subpathCount(), 'unfavorited heart should be a hollow outline').to.be.greaterThan(1);
+
+      favorited.value = new Set(['a']);
+
+      expect(subpathCount(), 'favorited heart should be a single solid shape').to.equal(1);
+    });
+
     it('renders the row progress bar from saved progress', async () => {
       localStorage.setItem(PROGRESS_STORAGE_KEY, JSON.stringify({
         a: { secondsWatched: 50, length: 100, completed: false },
