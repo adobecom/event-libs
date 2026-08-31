@@ -341,7 +341,219 @@ existing `onCardClick`/`onWatchSamePage` tests).
 state (player, info panel collapsed/expanded, Also Live cards with the new duration stat,
 Upcoming cards with icon-only actions + time range) now matches the Figma frame closely.
 
+**Upcoming section spacing/dimensions/states — done**, per node `9931:12218` (section) /
+`4975:45376` (default) / `4975:45389` (favorited) / `4975:45402` (scheduled). Same scoping
+convention as Also Live, under `.sb-carousel-section--up-next`:
+- Section: white background (inverse of Also Live's gray-section/white-card relationship),
+  `32px 24px` padding, section title corrected to black/-0.2px letter-spacing (same
+  `.sg-section-title` fix as Also Live), header-to-cards gap tightened to 12px. Card-to-card
+  gap needed no change — the shared 8px default already matches this section's own spec.
+- **A real, previously-undetected bug found and fixed**: `.sg-card`'s own base layout
+  (width, background, padding, border-radius, `flex-direction: column`) in
+  `sessions-guide.css` is entirely gated behind a `:is(.sessions-guide, .sg-portal)` ancestor
+  requirement — a class session-broadcast's DOM never carries. Every Upcoming card had been
+  silently rendering as an unstyled, content-sized, transparent, row-direction box the whole
+  time; nothing before this looked wrong enough in a screenshot to catch it, since both the
+  missing gray card background and the white section background looked identical. Confirmed
+  via computed style before the fix (`background: transparent`, `padding: 0px`,
+  `border-radius: 0px`, `flex-direction: row`) and after (268px/gray-50/16px/16px/column,
+  matching Figma exactly). Fixed by replicating `.sg-card`'s properties under
+  `.sb-carousel-section--up-next .sg-card` with this card's own Figma values, rather than
+  adding `.sessions-guide`/`.sg-portal` to session-broadcast's own root (which would pull in
+  every *other* rule scoped that way too, not just this one).
+- Title, badge row, actions row, and the `data-time`-driven trailing time text were all
+  already unscoped and correctly styled — the bug above was specific to the outer `.sg-card`
+  container, nothing nested inside it.
+- **Icon button states**: `SessionCard.js`'s shared `IconButton` hardcodes
+  `variant="solid" context="on-dark"` for both the schedule and favorite buttons regardless of
+  toggle state — correct for sessions-guide's own dark card contexts, but this card is light
+  (gray-50) and Figma's spec calls for two distinct treatments: frosted-glass
+  (`.sg-icon-btn--solid.sg-icon-btn--on-light`'s own values) when untoggled, and a
+  transparent/black-border chip (`.sg-icon-btn--outlined.sg-icon-btn--on-light`'s own values)
+  once scheduled/favorited. Replicated both via scoped rules keyed off the card's existing
+  `.is-scheduled`/`.is-favorited` classes and the `.sg-card__btn--schedule`/`--favorite`
+  extra-class hooks — no JS change, `SessionCard.js`'s `context` prop is untouched so
+  sessions-guide's own cards keep their current look. The icon glyph swap (calendar-plus →
+  checkmark, heart-outline → heart-filled) already worked correctly beforehand; only the chip
+  chrome was missing. `.sg-icon-btn--md`'s existing 32px/16px-icon sizing already matched
+  Figma exactly — no icon-size fix needed here, unlike the Also-Live/info-panel buttons.
+- Verified in the browser: default state matches Figma (gray card, frosted-glass buttons,
+  black title, gray time range); toggling `scheduled`/`favorited` directly confirmed both the
+  checkmark/filled-heart glyph swap and the black-border chip swap render correctly together.
+
 Desktop/tablet frames not yet provided — mobile only so far.
+
+**Carousel edge-to-edge peek fix — done (2026-08-30)**: both `.sb-carousel-section--also-live`
+and `.sb-carousel-section--up-next` had a uniform horizontal `padding` (left and right equal),
+matching Figma's own authored section-layer inset. But Figma's *rendering* of both carousels
+still shows the scrollable card row's trailing card peeking all the way to the true screen
+edge, underneath that layer's own right inset — a real right-padding value would instead clip
+that peek. Fixed by switching both rules from the 2-value `padding: xl lg;` shorthand to a
+4-value form with `0` on the right (`padding: xl 0 xl lg;`), matching the same pattern
+sessions-guide's own `.sg-carousel-section` already uses for its own carousels. Verified via
+computed style (`paddingRight: 0px` on both sections, section width stretching to the full
+viewport) and a live screenshot at a narrow viewport confirming the last card in each row now
+bleeds past the right edge instead of stopping short of it.
+
+**Session-ended background unification — done (2026-08-30)**, per node `4975:46052`. Also
+Live/Upcoming cards themselves are unchanged, per the user's explicit instruction — only the
+section chrome behind them needed to change:
+- `.sb-ended` gained a `background: #000` base plus a new `::after` scrim
+  (`linear-gradient(180deg, transparent 23%, rgba(0,0,0,.8) 58%)` layered with a flat
+  `rgba(0,0,0,.85)` tint, matching the two gradients in the Figma node) so the hero's photo
+  fades to solid black by the bottom of its own box, instead of the previous plain
+  `object-fit: cover` image with no darkening at all.
+- `.sb-app:has(.sb-ended)` sets the whole app background to black, so that flat black
+  continues seamlessly underneath Also Live/Upcoming once their own section backgrounds are
+  removed below — picked over a JS-authored state class since `:has()` only ever needs to be
+  true exactly when `EndedState` is actually in the DOM (same `:has()` pattern already used in
+  `event-marquee.css`/`mobile-rider.css`).
+- `.sb-ended ~ .sb-carousel-section--also-live` / `--up-next`: `background: transparent`
+  (previously gray-50 / white) plus their `.sg-section-title`s flipped to white — both selected
+  via the general sibling combinator off `.sb-ended` rather than a new modifier class, so this
+  only ever applies when the ended state actually rendered a sibling `.sb-ended` before them.
+  `.sg-card`/`.sg-live-card`'s own backgrounds are untouched, so the cards read correctly
+  against the new black section background exactly as Figma shows.
+- Verified via computed style in the harness (`?forceEnded=already-ended`) — `.sb-app`
+  background black, both sections' background `rgba(0,0,0,0)`, both titles `rgb(255,255,255)`
+  — and confirmed the live (non-ended) state is completely unaffected (sections keep their
+  existing gray-50/white backgrounds, `.sb-ended` absent from the DOM). The rest of the ended
+  hero's own content styling (heading-4 title, clamped description + "View more", pill/icon
+  button treatment) is a separate, not-yet-done pass — this fix was scoped to the background
+  continuity the user specifically flagged.
+
+**Session-ended hero content redesign — done (2026-08-30)**, per node `4975:46072`. Confirmed
+via `tokens.css` exactly why the user's "black on black" report was real, not a perception
+issue: `.sb-ended`'s text previously read plain `--s2a-color-content-default`/`-content-subtle`/
+`-border-default` token names, which resolve to near-black values in the page's default (light)
+theme (`content-default` → gray-1000/#000, `content-subtle` → black at 64%, `border-default` →
+gray-800) — every one of them rendered as near-invisible dark text on `.sb-ended`'s own black
+background. Fixed the same way `.sb-info` already fixes this for the now-playing panel: three
+local custom-property overrides scoped to `.sb-ended` (content-default → `#fff`, content-subtle
+→ `rgb(255 255 255 / 64%)`, border-default → `var(--s2a-color-gray-300, #dadada)`, matching the
+literal fallback colors in Figma's own extracted code) — every descendant that reads those
+standard token names, including `CategoryBadge`'s inline badge-color override, now resolves
+correctly with no per-element color overrides needed elsewhere.
+- Added the previously-missing content to `EndedState.js`: a channel-badge + duration meta row
+  (reusing sessions-guide's own `CategoryBadge`, same component `SessionInfoPanel` already
+  uses), a single-line-truncated description with a "View more"/"View less" toggle (local
+  `useState`, same pattern as `SessionInfoPanel`'s caret), and a Share icon button alongside
+  the existing Favorite one (same copy-to-clipboard handler as `SessionInfoPanel`'s own Share).
+- Typography brought up to the Figma spec: eyebrow ("Session ended.") now the actual
+  heading-4 scale (36px/900 weight) instead of a small subtle line; session title now
+  heading-5-ish (24px/900/-0.48px) instead of the old plain `--s2a-font-size-lg` with no color
+  set at all (previously fully invisible — inherited black from the page default, not just
+  low-contrast).
+- Icon buttons: initially read a zoomed screenshot of node `4975:46089` as showing a ring on
+  both Favorite and Share — corrected per the user's explicit follow-up: only Favorite keeps
+  the white outline ring (matching `.sb-info__icon-btn--favorite`'s already-verified
+  treatment); Share (`.sb-ended__icon-btn` with no modifier) is a bare icon, no ring, `border:
+  0`, same "share is unadorned" convention as `.sb-info__icon-btn` itself. Renamed
+  `.sb-ended__favorite` → `.sb-ended__icon-btn`/`.sb-ended__icon-btn--favorite` (shared base
+  class with the new Share button) to match.
+- Mobile type sizes locked to literal px values per explicit follow-up (not the responsive
+  `--s2a-typography-font-size-heading-4` token, which resolves smaller than 36px at some
+  breakpoints): eyebrow 36px, title 24px (already matched), "View more" 16px (previously
+  unset, inheriting the page's own default size).
+- `.sb-ended__meta`'s own 16px font-size didn't reach `CategoryBadge`'s label — found via
+  follow-up report: `.sg-category-badge__label` sets a literal 14px in `sessions-guide.css`,
+  which wins over the inherited 16px by specificity. Fixed with the same scoped-override
+  pattern already used two lines above for the badge's icon color:
+  `.sb-ended__meta .sg-category-badge__label { font-size: 16px; }`.
+- Same gap found in `.sb-info__meta` (the now-playing panel's own channel/duration row, per
+  node `4975:45473`): `.sg-category-badge__label`'s literal 14px also beat `.sb-info__meta`'s
+  own size there. Fixed with the identical scoped override (font-size/line-height/weight tuned
+  afterward by the user directly in a follow-up pass, current values: 16px/20px/400).
+- CategoryBadge's icon-to-label gap fixed the same day: sessions-guide.css's own
+  `.sg-category-badge` default (8px) read too wide in every context this block reuses it
+  (info panel, ended state, Also Live/Upcoming cards). One rule at the `.session-broadcast`
+  root instead of repeating it per section: `.session-broadcast .sg-category-badge { gap:
+  var(--s2a-spacing-2xs, 4px); }` — so it stays correct if CategoryBadge shows up somewhere
+  new later too. (First attempt used `--s2a-spacing-3xs`, which is actually 2px per
+  tokens.css's scale — `--s2a-spacing-2xs` is the real 4px token; caught via computed-style
+  verification, not assumed.) Also fixed a real gap in the preview harness itself: its mount
+  root never carried the `session-broadcast` class the real DA/Milo block element gets, so
+  block-root-scoped rules like this one were silently inert in that harness until now.
+- Large top padding (64px) on `.sb-ended` is this hero's own intentional, documented spacing
+  exception per CLAUDE.md's vertical-spacing rule (same category as Hero's own top-spacing
+  exception) — matches node `4975:46052`'s authored `pt-64/px-24/pb-32`.
+- New tests: meta-row/duration presence, Share `daa-ll`, collapsed-by-default "View more"
+  toggle presence (expand itself untestable in the mocked-`useState` string-render harness,
+  same documented limitation as `SessionInfoPanel.test.js`'s own caret), and no
+  desc-wrap/toggle when a session has no description. `a11y.test.js`'s existing `EndedState`
+  cases mount real Preact (not the string-render mock), so they exercise the real
+  `CategoryBadge`/`useState` path and still pass clean.
+- Verified live in the harness (`?forceEnded=already-ended`): eyebrow/title/meta/description
+  all legible white/light-gray against the dark background, "View more" toggle switches to
+  "View less" and un-clamps the description (confirmed via `is-expanded` class + button text
+  after the click, since screenshots alone can't prove a state change), Favorite correctly
+  shows the logged-out toast (same gate as every other favorite button), Share copies the link
+  and shows "Link copied!". Live (non-ended) state re-verified unaffected — `SessionInfoPanel`/
+  carousels render exactly as before.
+
+**Ended-state background bleed into Also Live — done (2026-08-30)**, per user follow-up: the
+photo was confined to `.sb-ended`'s own (short) box, not visually reaching into the space
+Figma's own version bleeds into (that frame sizes the photo against the *combined*
+hero+carousels frame, not just the hero's own content height). Moved the photo + darkening
+scrim off of `EndedState.js` entirely and onto a real CSS background:
+- `EndedState.js` no longer accepts `sessionEndedImageUrl` or renders any `<img>` — the prop
+  and the `bgImageUrl`/`safeUrl(sessionEndedImageUrl)` line are gone.
+- `BroadcastApp.js`'s `BroadcastBody` now computes `endedBgUrl` (`safeUrl(config.
+  sessionEndedImageUrl)`, only when ended) and sets it as an inline `--sb-app-ended-bg` custom
+  property on `.sb-app` itself — the one place that has both the authored config and renders
+  that element.
+- `session-broadcast.css`'s `.sb-app:has(.sb-ended)::before` renders the photo + gradient,
+  sized independently of `.sb-ended`'s own height (`height: 480px`, a fixed, Figma-approximated
+  value — the source frame's 48.81% is relative to a dynamic combined-height frame with no
+  direct CSS equivalent) so it can visually extend past the hero into Also Live below.
+- **Why a pseudo-element instead of a JS-rendered `<img>` inside `.sb-ended`** (the first
+  attempt, immediately reverted after this real finding): CSS paints a `position:absolute`
+  descendant with `z-index:auto`/`0` *after* plain in-flow siblings within the same stacking
+  context, regardless of DOM order. An `<img>` sized taller than `.sb-ended` and confined
+  inside it would therefore still paint *on top of*, not behind, the Also Live/Upcoming
+  sections that follow it in the DOM — hiding their cards, not just their background. Only a
+  *negative* z-index reliably moves a layer behind sibling content; that only works cleanly on
+  a shared ancestor of everything it needs to sit behind (`.sb-app`), not inside one of the
+  siblings itself.
+- **Second real bug caught only via live-browser verification, not code review**: with only
+  `position: relative` on `.sb-app:has(.sb-ended)` (no explicit `z-index`), the element doesn't
+  establish its own CSS stacking context (per spec, `position` alone without a non-auto
+  `z-index` doesn't create one) — so the `::before`'s `z-index: -1` escaped to compete in a
+  *higher* ancestor's stacking context instead of reliably painting behind just `.sb-app`'s own
+  background. Symptom: the photo was completely invisible, fully hidden behind `.sb-app`'s own
+  flat black fill, even though every computed-style property on the pseudo looked correct
+  (background-image, height, z-index all present) — only caught by actually looking at a
+  screenshot, not by inspecting computed styles alone. Fixed by adding `isolation: isolate` to
+  `.sb-app:has(.sb-ended)`, which forces a real stacking context with no other side effects.
+- Test coverage moved with the responsibility: `EndedState.test.js`'s three background-image
+  tests (present/omitted/unsafe-URL) and `a11y.test.js`'s "marks the authored background image
+  decorative" case are gone (nothing left in `EndedState.js` to test); `BroadcastBody.test.js`
+  gained an equivalent "ended-state background image (--sb-app-ended-bg)" suite covering all
+  four cases (authored, unauthored, unsafe URL, and — the one case that didn't exist before —
+  confirming the property is absent while a session is still live, not just when ended).
+- Verified live in the harness: the photo now visibly extends from the hero down through the
+  meta/description area before fading to solid black well before "Currently Live" begins;
+  Also Live/Upcoming's own cards render unchanged on top of it; live (non-ended) state
+  re-confirmed to carry no stray inline style or background at all.
+
+**Ended-state photo too bright — fixed same day**: the bleed fix above only carried the
+vertical fade gradient forward (0% opacity at the very top, ramping darker further down),
+dropping the flat, uniform 85% black tint the original single-box version always had layered
+on top regardless of vertical position — so the top of the photo (right behind "Session
+ended."/the title) read too bright/undertinted, hurting text contrast. Restored it as a third
+`background-image` layer (with a matching third `background-size` entry) alongside the vertical
+fade and the photo itself: `linear-gradient(0deg, rgb(0 0 0 / 85%), rgb(0 0 0 / 85%))`. The
+vertical fade still does its own job on top of that — feathering the combined darkness to fully
+solid black by where Also Live begins — it just no longer has to carry the *entire* darkening
+job on its own at every point in between.
+
+**Brighter + later fade — tuned same day per explicit follow-up**: dialed back from that fix,
+which read a bit too dark/opaque overall. Flat tint 85%→60%; vertical fade's own start pushed
+from 0%→20% (mid-stop 55%→65%, solid-black stop 85%→90%) — so more of the photo is visible near
+the very top before darkening begins, while it still reaches fully solid black at roughly the
+same point (just before Also Live) as before. Verified visually in the harness: the photo is
+noticeably more visible/recognizable near the top, text is still fully legible, and the
+transition to solid black by "Currently Live" is unchanged.
 
 ## Explicitly out of scope (fast-follow)
 

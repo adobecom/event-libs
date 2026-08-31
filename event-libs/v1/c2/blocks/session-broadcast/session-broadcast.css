@@ -13,6 +13,12 @@
   box-sizing: inherit;
 }
 
+/* sessions-guide.css's own .sg-category-badge default (8px) is tighter here everywhere this
+   block reuses CategoryBadge (info panel, ended state, Also Live/Upcoming cards) — one rule at
+   the block root instead of repeating it per section, so it stays correct if CategoryBadge
+   shows up in a new spot later too. */
+.session-broadcast .sg-category-badge { gap: var(--s2a-spacing-2xs, 4px); }
+
 .sb-sr-only {
   position: absolute;
   width: 1px;
@@ -110,6 +116,7 @@
   margin: 0;
   font-family: var(--s2a-font-family-heading);
   font-size: var(--s2a-font-size-lg);
+  line-height: 1;
   font-weight: var(--s2a-font-weight-heading, 900);
 }
 
@@ -190,6 +197,15 @@
    of the track's own accent color. */
 .sb-info__meta .sg-category-badge__icon-color { color: #fff; }
 
+/* .sg-category-badge__label sets its own literal 14px (sessions-guide.css), which wins over
+   .sb-info__meta's own font-size by specificity — override it here the same way the icon color
+   above is, per node 4975:45473's 18px duration/channel-label spec. */
+.sb-info__meta .sg-category-badge__label { 
+  font-size: 16px;
+  line-height: 20px;
+  font-weight: 400;
+}
+
 .sb-info__desc-wrap {
   display: -webkit-box;
   overflow: hidden;
@@ -221,69 +237,149 @@
 
 /* ── Ended state (States 2 & 3) ─────────────────────────── */
 
+/* Per node 4975:46072, every text/icon color below reads a standard token name
+   (content-default/content-subtle/border-default) — these flip per the page's own light/dark
+   theme (tokens.css) and resolve dark/black by default, so without a local override every
+   string here renders as black text on this state's own black background. Same fix, same
+   reasoning as .sb-info's override above: this state is unconditionally dark regardless of
+   page theme. Large top padding is this hero's own intentional, documented spacing (matches
+   node 4975:46052's 64px top / 24px sides / 32px bottom) — an exception to the "no hard-coded
+   vertical spacing" rule per CLAUDE.md, in the same vein as Hero's own top-spacing exception.
+   Background is transparent, not its own black fill — the shared darkened-photo-to-black
+   layer lives on .sb-app itself now (below), so it can bleed past this box into Also
+   Live/Upcoming; see .sb-app:has(.sb-ended)::before for why and how. */
 .sb-ended {
   position: relative;
-  padding: var(--s2a-spacing-md);
-  overflow: hidden;
-}
+  padding: var(--s2a-spacing-4xl, 64px) var(--s2a-spacing-lg, 24px) var(--s2a-spacing-xl, 32px);
+  background: transparent;
 
-/* Decorative only (empty alt in EndedState.js) — the marquee text below carries every bit of
-   information this state needs; a missing/blank authored row just leaves the plain background
-   instead of a broken image. */
-.sb-ended__bg {
-  position: absolute;
-  inset: 0;
-  z-index: 0;
-  display: block;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.sb-ended__eyebrow,
-.sb-ended__title,
-.sb-ended__desc,
-.sb-ended__actions {
-  position: relative;
-  z-index: 1;
+  --s2a-color-content-default: #fff;
+  --s2a-color-content-subtle: rgb(255 255 255 / 64%);
+  --s2a-color-border-default: var(--s2a-color-gray-300, #dadada);
 }
 
 .sb-ended__eyebrow {
   margin: 0;
-  color: var(--s2a-color-content-subtle);
-  font-size: var(--s2a-font-size-sm);
+  color: var(--s2a-color-content-default);
+  font-family: var(--s2a-font-family-heading);
+  font-size: 36px;
+  font-weight: var(--s2a-font-weight-heading, 900);
+  line-height: var(--s2a-typography-line-height-heading-2);
+  letter-spacing: var(--s2a-typography-letter-spacing-heading-2);
 }
 
 .sb-ended__title {
-  margin: var(--s2a-spacing-2xs) 0 0;
-  font-size: var(--s2a-font-size-lg);
+  margin: var(--s2a-spacing-xl, 32px) 0 0;
+  color: var(--s2a-color-content-default);
+  font-family: var(--s2a-font-family-heading);
+  font-size: 24px;
+  font-weight: var(--s2a-font-weight-heading, 900);
+  line-height: 24px;
+  letter-spacing: -0.48px;
 }
 
-.sb-ended__desc {
-  margin: var(--s2a-spacing-2xs) 0 0;
+.sb-ended__meta {
+  display: flex;
+  align-items: center;
+  gap: var(--s2a-spacing-md, 16px);
+  margin-top: var(--s2a-spacing-lg, 24px);
+  color: var(--s2a-color-border-default);
+  font-size: var(--s2a-font-size-md, 16px);
+}
+
+/* CategoryBadge sets --sg-badge-icon-color inline per the session's own track color — this
+   overrides *color* directly (wins by specificity, no !important) so the channel icon always
+   matches this row's own light-gray text here, regardless of the track's accent color, same
+   technique as .sb-info__meta above. */
+.sb-ended__meta .sg-category-badge__icon-color { color: var(--s2a-color-border-default); }
+
+/* .sg-category-badge__label sets its own literal 14px (sessions-guide.css), which wins over
+   .sb-ended__meta's own 16px by specificity — override it here the same way the icon color
+   above is, so the badge label actually matches this row's 16px meta/duration text. */
+.sb-ended__meta .sg-category-badge__label { font-size: 16px; }
+
+.sb-ended__desc-wrap {
+  margin-top: var(--s2a-spacing-2xs, 4px);
+  overflow: hidden;
+  color: var(--s2a-color-content-subtle);
+  font-size: var(--s2a-font-size-md, 16px);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.sb-ended__desc-wrap.is-expanded {
+  white-space: normal;
+  text-overflow: clip;
+}
+
+.sb-ended__desc { 
+  margin: 0;
+  line-height: 1.5;
+}
+
+.sb-ended__view-more {
+  margin-top: var(--s2a-spacing-2xs, 4px);
+  padding: 0;
+  color: var(--s2a-color-border-default);
+  font-family: var(--s2a-font-family-label);
+  font-size: 16px;
+  font-weight: bold;
+  text-align: left;
+  background: none;
+  border: 0;
+  cursor: pointer;
 }
 
 .sb-ended__actions {
   display: flex;
   align-items: center;
-  gap: var(--s2a-spacing-sm);
-  margin-top: var(--s2a-spacing-sm);
+  gap: var(--s2a-spacing-sm, 12px);
+  margin-top: var(--s2a-spacing-lg, 24px);
 }
 
 .sb-ended__watch {
   display: inline-flex;
   align-items: center;
-  padding: var(--s2a-spacing-2xs) var(--s2a-spacing-md);
-  color: var(--s2a-color-content-inverse, #fff);
+  gap: var(--s2a-spacing-xs, 8px);
+  padding: 14px var(--s2a-spacing-lg, 24px);
+  color: var(--s2a-color-button-content-primary-solid-inverse, #000);
+  font-family: var(--s2a-font-family-label);
+  font-size: var(--s2a-typography-font-size-label, 14px);
+  font-weight: var(--s2a-font-weight-label, 700);
+  line-height: var(--s2a-typography-line-height-label, 18px);
   text-decoration: none;
-  background: var(--s2a-color-background-inverse, #000);
+  background: var(--s2a-color-button-background-primary-solid-default, #fff);
+  border-radius: var(--s2a-border-radius-999, 999px);
+}
+
+.sb-ended__watch svg {
+  width: 12px;
+  height: 12px;
+}
+
+/* Share is a bare icon, no ring — only Favorite (below) gets the outlined-ring treatment. */
+.sb-ended__icon-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  color: #fff;
+  cursor: pointer;
+  background: transparent;
+  border: 0;
   border-radius: 999px;
 }
 
-.sb-ended__favorite {
-  background: none;
-  border: 0;
-  cursor: pointer;
+.sb-ended__icon-btn--favorite {
+  border: 1px solid #fff;
+}
+
+.sb-ended__icon-btn svg {
+  width: 16px;
+  height: 16px;
 }
 
 /* ── Carousel sections ──────────────────────────────────── */
@@ -300,9 +396,14 @@
    .sg-section-title, .sg-carousel__cards, etc.) — those are reused as-is by sessions-guide's
    own Live section with a different, correct-for-that-context spec (bigger title, tighter
    card gap, taller buttons); overriding them unscoped would silently change sessions-guide's
-   own look. Scoping to this ancestor class only ever matches Also Live's own cards. */
+   own look. Scoping to this ancestor class only ever matches Also Live's own cards.
+
+   No right padding, deliberately — matches sessions-guide's own .sg-carousel-section
+   (padding: lg 0 lg lg). Figma's own layer has a right inset too, but its cards still peek to
+   the actual screen edge underneath it; a real right padding would clip that peek instead of
+   letting the scrollable row bleed to the viewport edge. */
 .sb-carousel-section--also-live {
-  padding: var(--s2a-spacing-xl) var(--s2a-spacing-lg);
+  padding: var(--s2a-spacing-xl) 0 var(--s2a-spacing-xl) var(--s2a-spacing-lg);
   background: var(--s2a-color-background-subtle, #f8f8f8);
 }
 
@@ -363,6 +464,139 @@
    far edge. Stretching this one row to full width (without touching the shared
    align-items:flex-start default other children still rely on) fixes it. */
 .sb-carousel-section--also-live .sg-live-card__actions { width: 100%; }
+
+/* ── Upcoming section (mobile, node 9931:12218) ────────────
+   White section, gray-50 cards — the opposite of Also Live's gray-section/white-card
+   relationship. Everything below is scoped under this class for the same reason as Also
+   Live's own block above: sessions-guide reuses .sg-card/.sg-section-title/.sg-icon-btn
+   elsewhere with a correct, different spec for that context.
+
+   No right padding, deliberately — same peek-to-edge reasoning as .sb-carousel-section--also-live
+   above. */
+.sb-carousel-section--up-next {
+  padding: var(--s2a-spacing-xl) 0 var(--s2a-spacing-xl) var(--s2a-spacing-lg);
+  background: #fff;
+}
+
+.sb-carousel-section--up-next .sg-carousel__header { margin-bottom: var(--s2a-spacing-sm); }
+
+.sb-carousel-section--up-next .sg-section-title {
+  color: var(--s2a-color-gray-1000, #000);
+  letter-spacing: -0.2px;
+}
+
+/* .sg-card's own base styling (sessions-guide.css) requires a .sessions-guide/.sg-portal
+   ancestor class this block's DOM never has — its width/background/padding/border-radius/
+   flex-direction never applied at all (verified via computed style: was rendering as an
+   unstyled, content-sized transparent box). Replicated here with this card's own Figma
+   values, rather than adding .sessions-guide/.sg-portal to session-broadcast's own root,
+   which would pull in every other rule scoped that way too, not just this one. */
+.sb-carousel-section--up-next .sg-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  flex-shrink: 0;
+  position: relative;
+  overflow: hidden;
+  cursor: pointer;
+  width: 268px;
+  min-height: 0;
+  background: var(--s2a-color-gray-50, #f8f8f8);
+  border: none;
+  border-radius: var(--s2a-border-radius-md, 16px);
+  padding: var(--s2a-spacing-md, 16px);
+  box-shadow: none;
+}
+
+.sb-carousel-section--up-next .sg-card__badge-row { margin-bottom: var(--s2a-spacing-sm); }
+
+/* IconButton's shared solid/on-dark default (white bg, black border, no blur) is built for
+   sessions-guide's own dark card contexts — this card is light (gray-50), so the untoggled
+   buttons need the frosted-glass treatment .sg-icon-btn--solid.sg-icon-btn--on-light already
+   defines, and the toggled (scheduled/favorited) ones need
+   .sg-icon-btn--outlined.sg-icon-btn--on-light's transparent/black-border treatment —
+   replicated here rather than changing SessionCard.js's hardcoded context prop, which
+   sessions-guide's own cards still rely on. */
+.sb-carousel-section--up-next .sg-card__btn--schedule,
+.sb-carousel-section--up-next .sg-card__btn--favorite {
+  background: rgb(255 255 255 / 80%);
+  border-color: var(--s2a-color-gray-100, #e9e9e9);
+  backdrop-filter: blur(4.6875px);
+}
+
+.sb-carousel-section--up-next .sg-card.is-scheduled .sg-card__btn--schedule,
+.sb-carousel-section--up-next .sg-card.is-favorited .sg-card__btn--favorite {
+  background: transparent;
+  border-color: var(--s2a-color-gray-800, #292929);
+  backdrop-filter: blur(16px);
+}
+
+/* Per node 4975:46052: once ended, the hero's darkened-image-to-black background reads as one
+   continuous surface behind Also Live/Upcoming too, not stopping at .sb-ended's own (short)
+   box — Figma's own version sizes this photo against the combined hero+carousels frame, not
+   just the hero's own content height. :has() rather than a JS-authored state class: this only
+   ever needs to be true exactly when EndedState is actually in the DOM. Also Live/Upcoming
+   cards themselves are unchanged in this state (per the same Figma node) — only the section
+   chrome around them gives way to the shared black/photo background below. `isolation:
+   isolate` forces this element to establish its own stacking context — without it, `position:
+   relative` alone (no z-index) doesn't create one, so the ::before's negative z-index below
+   would escape to compete at a higher ancestor's stacking context instead of reliably staying
+   behind just this element's own background (confirmed empirically: the photo was invisible,
+   fully hidden by this rule's own black fill, until this was added). */
+.sb-app:has(.sb-ended) {
+  position: relative;
+  isolation: isolate;
+  background: var(--s2a-color-gray-1000, #000);
+}
+
+/* The actual photo + darkening scrim, sized independently of .sb-ended's own (much shorter)
+   content box so it can visually bleed into Also Live below. A plain descendant positioned
+   inside .sb-ended can't do this: CSS paints a positioned z-index:auto/0 descendant *after*
+   plain in-flow siblings within the same stacking context, regardless of DOM order — so
+   anything taller than .sb-ended sitting inside it would still render on top of, not behind,
+   the carousel sections that follow (hiding their cards). A negative z-index is what actually
+   moves a layer behind everything else, hence a pseudo-element on .sb-app itself rather than
+   an <img> in EndedState.js — see BroadcastApp.js's own comment for the JS side of this.
+   --sb-app-ended-bg is a plain CSS custom property (an inline style set by BroadcastApp.js),
+   not authored HTML — decorative-only, so no alt text is needed either way. Height is a fixed,
+   Figma-approximated value (the source frame's 48.81% is relative to a dynamic combined-height
+   frame that has no direct CSS equivalent here) — tune this if the bleed should reach further
+   or less far into Also Live. Two gradient layers on top of the photo, not one: the vertical
+   fade alone left the top of the photo nearly untinted (too bright, poor text contrast) — the
+   flat, uniform tint layer restores the same overall darkening the original single-box version
+   had, while the vertical fade still does the extra job of feathering it to fully solid black
+   by the point Also Live begins. Both tuned down from an earlier, darker pass per explicit
+   follow-up (flat tint 85%→60%, fade's own start pushed from 0%→20%) so more of the photo
+   shows through near the top instead of darkening immediately. */
+.sb-app:has(.sb-ended)::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: -1;
+  width: 100%;
+  height: 480px;
+  background-image:
+    linear-gradient(180deg, rgb(0 0 0 / 60%) 0%, rgb(0 0 0 / 60%) 50%, rgb(0 0 0 / 75%) 75%),
+    linear-gradient(0deg, rgb(0 0 0 / 60%), rgb(0 0 0 / 60%)),
+    var(--sb-app-ended-bg, none);
+  background-repeat: no-repeat;
+  background-position: top center;
+  background-size:
+    100% 100%,
+    100% 100%,
+    cover;
+}
+
+.sb-ended ~ .sb-carousel-section--also-live,
+.sb-ended ~ .sb-carousel-section--up-next {
+  background: transparent;
+}
+
+.sb-ended ~ .sb-carousel-section--also-live .sg-section-title,
+.sb-ended ~ .sb-carousel-section--up-next .sg-section-title {
+  color: var(--s2a-color-content-inverse, #fff);
+}
 
 /* Desktop widens out; mobile-first default above is intentionally unconstrained. Anchored to
    the same 1280px "wide" threshold used elsewhere in sessions-guide (FilterPanel.js,

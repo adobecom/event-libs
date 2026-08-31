@@ -127,4 +127,65 @@ describe('BroadcastBody', () => {
       expect(out).to.not.include('sb-empty');
     });
   });
+
+  // The ended-state background photo is a CSS background on .sb-app itself (not a JS-rendered
+  // <img> inside EndedState) so it can visually bleed past EndedState's own short box into
+  // Also Live/Upcoming below it — see session-broadcast.css's .sb-app:has(.sb-ended)::before.
+  // .sb-app's own div is the outermost literal html`` output, not a nested `<${Component}>`
+  // call, so — unlike PlayerHost/AlsoLiveCarousel/etc. — its style attribute IS reliably
+  // resolved by this mocked harness.
+  describe('ended-state background image (--sb-app-ended-bg)', () => {
+    const endedSession = {
+      id: 'ended-1',
+      title: 'The One That Ended',
+      description: 'It aired already.',
+      startTimeUtc: new Date(Date.now() - 2 * HOUR).toISOString(),
+      endTimeUtc: new Date(Date.now() - HOUR).toISOString(),
+      youTubeId: 'yt-1',
+      isOnline: true,
+      sessionPageUrl: '/s/ended-1',
+    };
+
+    beforeEach(() => {
+      sessionsStatus.value = 'ready';
+      sessions.value = [endedSession];
+      history.pushState({ session: 'ended-1' }, '', window.location.pathname);
+    });
+
+    it('sets the custom property from the authored sessionEndedImageUrl once ended', () => {
+      const out = BroadcastBody({
+        config: { ...CONFIG, sessionEndedImageUrl: 'https://example.com/ended.png' },
+      });
+      // The mocked htm-preact HTML-escapes attribute values, so quotes come back as &quot;.
+      expect(out).to.include('--sb-app-ended-bg: url(&quot;https://example.com/ended.png&quot;)');
+    });
+
+    it('omits the custom property when ended but no image is authored', () => {
+      const out = BroadcastBody({ config: CONFIG });
+      expect(out).to.not.include('--sb-app-ended-bg');
+    });
+
+    it('omits the custom property for an unsafe URL (e.g. a javascript: scheme)', () => {
+      const out = BroadcastBody({
+        config: { ...CONFIG, sessionEndedImageUrl: 'javascript:alert(1)' },
+      });
+      expect(out).to.not.include('--sb-app-ended-bg');
+    });
+
+    it('omits the custom property while a session is still live (not ended)', () => {
+      sessions.value = [{
+        id: 's-1',
+        title: 'Live now',
+        startTimeUtc: new Date(Date.now() - HOUR / 2).toISOString(),
+        endTimeUtc: new Date(Date.now() + HOUR / 2).toISOString(),
+        youTubeId: 'yt-1',
+        isOnline: true,
+      }];
+      history.pushState({ session: 's-1' }, '', window.location.pathname);
+      const out = BroadcastBody({
+        config: { ...CONFIG, sessionEndedImageUrl: 'https://example.com/ended.png' },
+      });
+      expect(out).to.not.include('--sb-app-ended-bg');
+    });
+  });
 });

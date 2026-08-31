@@ -62,13 +62,6 @@ describe('session-broadcast a11y', () => {
     await expectAccessible(mount(EndedState, { session: SESSION }));
   });
 
-  it('EndedState marks the authored background image decorative', async () => {
-    await expectAccessible(mount(EndedState, {
-      session: SESSION,
-      sessionEndedImageUrl: 'https://example.com/ended.png',
-    }));
-  });
-
   it('PlayerHost names the unsupported-player-type status message', async () => {
     await expectAccessible(mount(PlayerHost, { session: { id: 's-4' } }));
   });

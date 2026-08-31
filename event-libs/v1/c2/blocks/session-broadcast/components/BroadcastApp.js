@@ -8,6 +8,7 @@ import {
 import { getNowMs, isPostEvent } from '../../../../utils/session-state.js';
 import { getSessionGuidePath } from '../../../../utils/tier-1-event-config.js';
 import { MAX_EVENT_PAGES } from '../../../../utils/constances.js';
+import { safeUrl } from '../../../../utils/utils.js';
 import { showToast } from '../../../../features/toast/toast.js';
 import { SessionGuideProvider } from '../../sessions-guide/store/index.js';
 import { detectUserTimezone } from '../../sessions-guide/utils/time.js';
@@ -115,8 +116,23 @@ export function BroadcastBody({ config }) {
   const nothingAtAll = !schedule.activeSession && !schedule.endedSession
     && !schedule.alsoLive.length && !schedule.upNext.length;
 
+  // The ended-state background photo needs to visually bleed past .sb-ended's own (short)
+  // content box into Also Live/Upcoming below it (per node 4975:46052 — Figma's own version
+  // sizes this photo against the combined hero+carousels frame, not just the hero's own box).
+  // Rendered as a real CSS background on .sb-app itself (session-broadcast.css's
+  // .sb-app:has(.sb-ended)::before, given a negative z-index so it always paints behind the
+  // sections that follow), not a JS-rendered <img> scoped inside EndedState — a plain
+  // absolutely-positioned descendant sized taller than its own container would otherwise still
+  // paint *above* the plain, non-positioned carousel sections after it (CSS paints positioned
+  // z-index:auto descendants after in-flow siblings, regardless of DOM order), hiding their
+  // content. The URL travels down via a custom property since BroadcastApp is the only place
+  // that has both the authored config and renders .sb-app.
+  const endedActive = !schedule.activeSession && !!schedule.endedSession;
+  const endedBgUrl = endedActive ? safeUrl(config.sessionEndedImageUrl) : '';
+  const appStyle = endedBgUrl ? `--sb-app-ended-bg: url("${endedBgUrl}")` : '';
+
   return html`
-    <div class="sb-app" aria-busy=${String(sessionsStatus.value === 'loading')}>
+    <div class="sb-app" aria-busy=${String(sessionsStatus.value === 'loading')} style=${appStyle}>
       <div class="sb-sr-only" role="status" aria-live="polite">${sessionsStatusMessage(sessionsStatus.value)}</div>
       ${sessionsStatus.value === 'loading' && html`<${LoadingState} />`}
       ${sessionsStatus.value === 'error' && html`<div class="sb-error" role="alert">Failed to load sessions.</div>`}
@@ -125,7 +141,7 @@ export function BroadcastBody({ config }) {
           <${PlayerHost} session=${schedule.activeSession} />
           <${SessionInfoPanel} session=${schedule.activeSession} viewAllDetailsLabel=${config.viewAllDetailsLabel} />
         `}
-        ${!schedule.activeSession && schedule.endedSession && html`<${EndedState} session=${schedule.endedSession} sessionEndedImageUrl=${config.sessionEndedImageUrl} />`}
+        ${endedActive && html`<${EndedState} session=${schedule.endedSession} />`}
         <${AlsoLiveCarousel} sessions=${schedule.alsoLive} title=${config.alsoLiveTitle} onSwitchSession=${handleSwitchSession} />
         <${UpNextCarousel} sessions=${schedule.upNext} title=${config.upcomingTitle} />
         ${nothingAtAll && html`

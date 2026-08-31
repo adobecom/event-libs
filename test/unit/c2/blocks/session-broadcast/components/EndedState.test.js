@@ -7,6 +7,9 @@ const SESSION = {
   title: 'Pixel & Product',
   description: 'A session about everything.',
   sessionPageUrl: '/s/pixel-and-product',
+  primaryTrack: 'Design, Imaging & Illustration',
+  startTimeUtc: new Date(Date.now() - 90 * 60 * 1000).toISOString(),
+  endTimeUtc: new Date(Date.now() - 30 * 60 * 1000).toISOString(),
 };
 
 describe('EndedState', () => {
@@ -54,20 +57,35 @@ describe('EndedState', () => {
     expect(out).to.not.include('Add-to-Schedule');
   });
 
-  it('omits the background layer when no session-ended image is authored', () => {
+  // CategoryBadge is a nested custom component — the mocked htm-preact used here doesn't
+  // resolve those (see test/unit/mocks/deps/htm-preact.js), so only the meta row's own
+  // wrapper and the duration span (rendered directly by EndedState) are checkable here.
+  it('shows the meta row with the session duration', () => {
     const out = EndedState({ session: SESSION });
-    expect(out).to.not.include('sb-ended__bg');
+    expect(out).to.include('sb-ended__meta');
+    expect(out).to.include('sb-ended__time');
+    expect(out).to.include('1h');
   });
 
-  it('renders the authored session-ended image URL as a decorative background', () => {
-    const out = EndedState({ session: SESSION, sessionEndedImageUrl: 'https://example.com/ended.png' });
-    expect(out).to.include('sb-ended__bg');
-    expect(out).to.include('src="https://example.com/ended.png"');
-    expect(out).to.include('alt=""');
+  it('shows a Share action alongside Favorite', () => {
+    const out = EndedState({ session: SESSION });
+    expect(out).to.include('daa-ll="Share"');
   });
 
-  it('omits the background image for an unsafe URL (e.g. a javascript: scheme)', () => {
-    const out = EndedState({ session: SESSION, sessionEndedImageUrl: 'javascript:alert(1)' });
-    expect(out).to.not.include('sb-ended__bg');
+  // The "View more"/"View less" toggle uses local component state, which the mocked
+  // htm-preact's useState setter no-ops (see test/unit/mocks/deps/htm-preact.js) — expanding
+  // can't be reached through this string-render harness. Collapsed is the only state
+  // testable here; the toggle itself is verified via a preview harness in a real browser.
+  it('starts collapsed with a "View more" toggle when a description is present', () => {
+    const out = EndedState({ session: SESSION });
+    expect(out).to.include('sb-ended__view-more');
+    expect(out).to.include('View more');
+    expect(out).to.not.include('View less');
+  });
+
+  it('omits the description wrap and toggle when there is no description', () => {
+    const out = EndedState({ session: { ...SESSION, description: '' } });
+    expect(out).to.not.include('sb-ended__desc-wrap');
+    expect(out).to.not.include('sb-ended__view-more');
   });
 });
