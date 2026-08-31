@@ -441,9 +441,8 @@ and button from its visible text:
 | Block | `b1\|event-session-d`, `b2\|event-session-r`, … | Milo (block name, truncated) |
 | Product tile | `Photoshop-1--Featured products 7` | Milo — carries the product name |
 | Resource CTA | `Download-1--Session resources` | Milo |
-| Show-more toggles | `Show more-6--Session resources` | Milo |
 
-We add an explicit `daa-ll` in exactly two situations, and nowhere else:
+We add an explicit `daa-ll` in exactly three situations, and nowhere else:
 
 **1. The element is created after Milo's pass.** `Watch now` is swapped into the CTA slot at
 a state boundary, long after decoration, so it is never auto-tagged — measured as
@@ -463,6 +462,24 @@ already runs on mount and on every signal change, so add and remove are distingu
 | Add to schedule | `Add-to-Schedule` / `Remove-from-Schedule` |
 | Watch now | `Watch-Now` |
 | Share | `Share` |
+
+**3. The Show more/Show less toggles.** Same freezing problem as situation 2: the visible
+label flips between "Show more" and "Show less" on click, but Milo's
+`decorateSectionAnalytics` derives `daa-ll` from `textContent` once, during
+`documentPostSectionLoading`, and never revisits it
+([MWPW-205937](https://jira.corp.adobe.com/browse/MWPW-205937)). Each toggle sets `daa-ll`
+explicitly at construction (collapsed state) and again in its click handler, so expand and
+collapse are distinguishable regardless of click count:
+
+| Toggle | Values |
+|---|---|
+| Speakers | `Show-More-Speakers` / `Show-Less-Speakers` |
+| Featured products | `Show-More-Products` / `Show-Less-Products` |
+| Session resources | `Show-More-Resources` / `Show-Less-Resources` |
+| Description | `Show-More-Description` / `Show-Less-Description` |
+
+This block's own show-more toggles are covered above; `sessions-guide`'s separate show-more
+controls have a different, unrelated defect (no `daa-ll` at all) tracked separately.
 
 **Labels are copied verbatim from `sessions-guide`** (`components/LiveCard.js`,
 `SessionDetailOverlay.js`) so the same action rolls up across both surfaces rather than
