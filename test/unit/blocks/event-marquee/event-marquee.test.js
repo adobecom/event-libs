@@ -225,6 +225,7 @@ describe('event-marquee', () => {
       const favoriteBtn = el.querySelector('.event-marquee-favorite');
       expect(favoriteBtn).to.exist;
       expect(favoriteBtn.getAttribute('aria-label')).to.equal('Add to favorites');
+      expect(favoriteBtn.getAttribute('daa-ll')).to.equal('Add-to-Favorites');
       expect(favoriteBtn.classList.contains('is-favorited')).to.be.false;
     });
 
@@ -238,6 +239,7 @@ describe('event-marquee', () => {
       const favoriteBtn = el.querySelector('.event-marquee-favorite');
       expect(favoriteBtn.classList.contains('is-favorited')).to.be.true;
       expect(favoriteBtn.getAttribute('aria-label')).to.equal('Remove from favorites');
+      expect(favoriteBtn.getAttribute('daa-ll')).to.equal('Remove-from-Favorites');
     });
 
     it('does not render a Favorite button when no session-id is authored', async () => {

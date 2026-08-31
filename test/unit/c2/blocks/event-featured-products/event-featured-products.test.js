@@ -96,9 +96,15 @@ describe('Featured Products', () => {
     const toggle = el.querySelector('.featured-products-toggle');
     expect(toggle).to.not.be.null;
     expect(el.querySelectorAll('.featured-product.is-overflow')).to.have.lengthOf(1);
+    expect(toggle.getAttribute('daa-ll')).to.equal('Show-More');
     toggle.click();
     expect(el.classList.contains('is-expanded')).to.be.true;
     expect(toggle.textContent).to.equal('Show less');
+    expect(toggle.getAttribute('daa-ll')).to.equal('Show-Less');
+    toggle.click();
+    expect(el.classList.contains('is-expanded')).to.be.false;
+    expect(toggle.textContent).to.equal('Show more');
+    expect(toggle.getAttribute('daa-ll')).to.equal('Show-More');
   });
 
   it('omits the count at the visible limit and shows it just above', async () => {
