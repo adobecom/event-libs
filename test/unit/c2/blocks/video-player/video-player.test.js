@@ -395,6 +395,53 @@ describe('video-player', () => {
       expect(playlistPlayer.dataset.embedded).to.equal(undefined);
     });
 
+    /**
+     * Regression: two players embedded at once on a real page. Milo's decorateSection()
+     * resets `section.className = 'section'` and the Style-row classes are re-applied
+     * later by the section-metadata BLOCK, so a section can be mid-decoration — bare
+     * `class="section"` with only its authored metadata table — when these blocks run.
+     * Matching on the applied class alone made BOTH instances read as full-width, so both
+     * won and both embedded. Container detection reads the Style row as a fallback.
+     */
+    it('identifies the playlist container from its Style row before the class is applied', async () => {
+      const main = document.createElement('main');
+
+      const videoSection = document.createElement('div');
+      videoSection.className = 'section video-container';
+      const fullWidthPlayer = document.createElement('div');
+      fullWidthPlayer.className = 'video-player';
+      videoSection.append(fullWidthPlayer);
+
+      // Not yet decorated: no video-playlist-container class, only the authored table.
+      const undecoratedSection = document.createElement('div');
+      undecoratedSection.className = 'section';
+      const playlistPlayer = document.createElement('div');
+      playlistPlayer.className = 'video-player';
+      const metadata = document.createElement('div');
+      metadata.className = 'section-metadata';
+      const row = document.createElement('div');
+      const label = document.createElement('div');
+      label.textContent = 'style';
+      const value = document.createElement('div');
+      value.textContent = 'spacing-sm, grid, container-desktop, video-playlist-container';
+      row.append(label, value);
+      metadata.append(row);
+      undecoratedSection.append(playlistPlayer, metadata);
+
+      main.append(videoSection, undecoratedSection);
+      document.body.append(main);
+
+      BlockMediator.set(DECISION_KEY, { hasPlaylist: false });
+      await init(fullWidthPlayer);
+      await init(playlistPlayer);
+      await flush();
+
+      // hasPlaylist:false means the full-width instance wins — and the still-undecorated
+      // one must recognise itself as the playlist container and stand down.
+      expect(fullWidthPlayer.dataset.embedded).to.equal('true');
+      expect(playlistPlayer.dataset.embedded).to.equal(undefined);
+      expect(document.querySelectorAll('.video-player iframe')).to.have.lengthOf(1);
+    });
   });
 
   describe('embedding', () => {

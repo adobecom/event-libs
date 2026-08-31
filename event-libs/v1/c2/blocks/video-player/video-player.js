@@ -6,6 +6,7 @@ import {
   VIDEO_LAYOUT_DECISION_KEY,
   PROGRESS_STORAGE_KEY,
   VIDEO_PLAYLIST_CONTAINER_CLASS,
+  closestSectionWithStyle,
   readJsonFromStorage,
   writeJsonToStorage,
   parseJsonMetadata as parseSharedJsonMetadata,
@@ -514,7 +515,9 @@ const DECISION_FALLBACK_MS = 4000;
  * outright once the two columns turned out to be separate `.fragment > .section` trees.
  */
 function isInsidePlaylistContainer(el) {
-  return Boolean(el.closest(`.${VIDEO_PLAYLIST_CONTAINER_CLASS}`));
+  // Style-row aware rather than a plain class check — the class may not have been applied
+  // yet when this runs (see closestSectionWithStyle for why).
+  return Boolean(closestSectionWithStyle(el, VIDEO_PLAYLIST_CONTAINER_CLASS));
 }
 
 /** Whether THIS instance embeds, given the page-wide decision. */

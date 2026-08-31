@@ -13,6 +13,7 @@ import {
   PROGRESS_STORAGE_KEY,
   VIDEO_CONTAINER_CLASS,
   VIDEO_PLAYLIST_CONTAINER_CLASS,
+  findSectionWithStyle,
   readJsonFromStorage,
   parseJsonMetadata as parseSharedJsonMetadata,
   currentSessionHasEnded,
@@ -624,8 +625,10 @@ function announceVideoDecision(hasPlaylist) {
   /* eslint-disable no-console */
   // TEMP DIAGNOSTIC — remove before merging.
   console.log(`[VPL-DEBUG] announceVideoDecision(hasPlaylist=${hasPlaylist})`, {
-    videoContainerFound: Boolean(document.querySelector(`.${VIDEO_CONTAINER_CLASS}`)),
-    playlistContainerFound: Boolean(document.querySelector(`.${VIDEO_PLAYLIST_CONTAINER_CLASS}`)),
+    videoContainerByClass: Boolean(document.querySelector(`.${VIDEO_CONTAINER_CLASS}`)),
+    videoContainerByStyleRow: Boolean(findSectionWithStyle(VIDEO_CONTAINER_CLASS)),
+    playlistContainerByClass: Boolean(document.querySelector(`.${VIDEO_PLAYLIST_CONTAINER_CLASS}`)),
+    playlistContainerByStyleRow: Boolean(findSectionWithStyle(VIDEO_PLAYLIST_CONTAINER_CLASS)),
     playersOnPage: document.querySelectorAll('.video-player').length,
     alreadyEmbedded: document.querySelectorAll('.video-player[data-embedded="true"]').length,
   });
@@ -634,7 +637,7 @@ function announceVideoDecision(hasPlaylist) {
   if (hasPlaylist) {
     // The full-width container only ever holds a `.video-player`, so there's nothing
     // else in it to protect — the whole section goes.
-    const videoContainer = document.querySelector(`.${VIDEO_CONTAINER_CLASS}`);
+    const videoContainer = findSectionWithStyle(VIDEO_CONTAINER_CLASS);
     const blocked = hasEmbeddedVideoPlayer(videoContainer);
     console.log(`[VPL-DEBUG] hasPlaylist=true -> collapse .video-container? found=${Boolean(videoContainer)} alreadyEmbeddedSoSkipped=${blocked}`);
     if (!blocked) collapseAndRemove(videoContainer);
@@ -644,7 +647,7 @@ function announceVideoDecision(hasPlaylist) {
   // The playlist container is SHARED with unrelated blocks (event-featured-products,
   // event-speakers, event-session-resources, ...), so only its own two video blocks are
   // removed — never the container itself or any sibling.
-  const playlistContainer = document.querySelector(`.${VIDEO_PLAYLIST_CONTAINER_CLASS}`);
+  const playlistContainer = findSectionWithStyle(VIDEO_PLAYLIST_CONTAINER_CLASS);
   const blocked = hasEmbeddedVideoPlayer(playlistContainer);
   console.log(`[VPL-DEBUG] hasPlaylist=false -> collapse playlist-container's player? found=${Boolean(playlistContainer?.querySelector('.video-player'))} alreadyEmbeddedSoSkipped=${blocked}`);
   if (!blocked) {

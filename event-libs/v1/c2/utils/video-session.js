@@ -24,6 +24,55 @@ function logError(scope, message) {
   window.lana?.log(`[${scope}] ${message}`);
 }
 
+/**
+ * Whether a section carries the given Style-row class.
+ *
+ * Checking `classList` alone is NOT enough. Milo's own decorateSection() resets
+ * `section.className = 'section'`, wiping every authored class; the Style row's classes
+ * are re-applied later by the `section-metadata` BLOCK, on the normal block-loading
+ * schedule. So a section can legitimately be mid-decoration — `class="section"
+ * data-status="decorated"` with nothing else — at the moment these blocks run, which made
+ * both video-player instances conclude they were the full-width one and both embed.
+ *
+ * The authored `.section-metadata` table is in the DOM from the start either way, so it's
+ * read directly as the fallback (same approach event-marquee.js already uses for its own
+ * section metadata).
+ */
+export function sectionHasStyle(section, styleClass) {
+  if (!section) return false;
+  if (section.classList.contains(styleClass)) return true;
+
+  const metadataBlock = section.querySelector(':scope > .section-metadata');
+  if (!metadataBlock) return false;
+
+  return [...metadataBlock.querySelectorAll(':scope > div')].some((row) => {
+    const [labelCell, valueCell] = row.querySelectorAll(':scope > div');
+    if (labelCell?.textContent.trim().toLowerCase() !== 'style') return false;
+    // Authored comma-separated, and spaces become dashes — same normalization
+    // section-metadata.js applies before adding the classes.
+    return (valueCell?.textContent || '')
+      .split(',')
+      .map((style) => style.trim().replaceAll(' ', '-'))
+      .includes(styleClass);
+  });
+}
+
+/** The nearest ancestor section carrying the given Style-row class, decorated or not. */
+export function closestSectionWithStyle(el, styleClass) {
+  let section = el?.closest('.section');
+  while (section) {
+    if (sectionHasStyle(section, styleClass)) return section;
+    section = section.parentElement?.closest('.section');
+  }
+  return null;
+}
+
+/** The page's one section carrying the given Style-row class, decorated or not. */
+export function findSectionWithStyle(styleClass) {
+  return [...document.querySelectorAll('.section')]
+    .find((section) => sectionHasStyle(section, styleClass)) || null;
+}
+
 /** Reads and parses a JSON value from localStorage, falling back on any failure. */
 export function readJsonFromStorage(key, fallback, scope) {
   try {
