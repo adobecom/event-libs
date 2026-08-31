@@ -397,13 +397,7 @@ class MobileRider {
     window.__mr_player?.on?.('streamend', () => {
       this.#streamEnded = true;
       this.#cancelPendingEmbed();
-
-      this.wrap?.querySelector('.mobile-rider-container')?.classList.add('is-hidden');
-
       if (this.store) this.setStatus(vid, false);
-
-      window.__mr_player?.dispose?.();
-      window.__mr_player = null;
     });
   }
 
