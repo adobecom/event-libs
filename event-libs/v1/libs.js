@@ -30,6 +30,8 @@ const EVENT_BLOCKS_C2 = [
   'chrono-box',
   'grid-column',
   'mobile-rider',
+  'video-player',
+  'video-playlist',
   'event-marquee',
   'sessions-guide',
   'sessions-guide-full-page',

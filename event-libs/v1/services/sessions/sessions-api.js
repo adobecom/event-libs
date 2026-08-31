@@ -69,8 +69,13 @@ export function normalizeSessions(rawSessions) {
     isOnline: Boolean(s.isOnline),
     hasOnDemandFormat: Boolean(s.hasOnDemandFormat),
     dvrDelayHours: s.dvrDelayHours ?? null,
+    // video-playlist's topic filter: the CURRENT session's own playlistOnSessionPage
+    // value(s) are matched against every OTHER session's playlistAssignment. No mapping
+    // table between the two is needed — both draw from the same slug vocabulary.
+    playlistAssignment: coerceArray(s.playlistAssignment),
+    playlistOnSessionPage: coerceArray(s.playlistOnSessionPage),
     // One field per video source, named for its player. Alternatives, not a fallback chain.
-    // All unread; see "Video sources" in docs/sessions-guide-implementation-notes.md.
+    // See "Video sources" in docs/sessions-guide-implementation-notes.md.
     mpcId: s.mpcId || '',
     youTubeId: s.youTubeId || '',
     mrDvrVideoId: s.mrDvrVideoId || '',
@@ -223,8 +228,21 @@ function extractCustomAttributeValues(session, name) {
   return (attr?.values || []).map((v) => v?.label ?? v?.value).filter(Boolean);
 }
 
-function extractCustomAttributeValue(session, name) {
+// Exported so video-playlist.js can run this directly on an Individual Session Page's own
+// `custom-attributes` metadata (that session's raw customAttributes blob, embedded
+// page-side) without waiting for it to appear in the fetched catalog.
+export function extractCustomAttributeValue(session, name) {
   return extractCustomAttributeValues(session, name)[0] || '';
+}
+
+// Same lookup, but returns the machine-readable slug (`v.value`) instead of preferring the
+// display label — needed when matching one session's attribute values against another's
+// (video-playlist's topic filter), where a human-readable label would never match the slug
+// the page actually filters on.
+export function extractCustomAttributeSlugs(session, name) {
+  const candidates = Array.isArray(name) ? name : [name];
+  const attr = (session.customAttributes || []).find((a) => candidates.includes(a?.name));
+  return (attr?.values || []).map((v) => v?.value).filter(Boolean);
 }
 
 // attributeId-keyed, built from the raw payload so newly authored filter categories
@@ -386,6 +404,9 @@ export function mapEslPayloadToRawSessions(payload) {
       mrDvrVideoId: extractCustomAttributeValue(session, 'Mobilerider Video ID (DVR)'),
       mrSkinId: extractCustomAttributeValue(session, 'Skin ID'),
       videoDuration: extractCustomAttributeValue(session, 'Video Duration'),
+      // Slugs, not labels: these two are matched against each other across sessions.
+      playlistAssignment: extractCustomAttributeSlugs(session, 'Playlist assignment/name'),
+      playlistOnSessionPage: extractCustomAttributeSlugs(session, 'Playlist on session page'),
       ...formatFlags,
       isLivestreamed,
       sessionPageUrl: session.url || '',

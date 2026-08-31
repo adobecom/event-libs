@@ -65,3 +65,12 @@ export function getHomepagePath() {
 export function getBroadcastPath() {
   return tierOneEventConfig.broadcastPath || '';
 }
+
+// The EVENT's own start, authored as a UTC epoch ms — the same config eventEndDateTime is
+// read from in session-store.js. Distinct from the page-level `local-start-time-millis`
+// metadata, which carries an individual page's own local timing rather than the event's.
+// null when unauthored or non-numeric, so callers can tell "not configured" from a real 0.
+export function getEventStartMs() {
+  const startMs = Number(tierOneEventConfig.eventStartDateTime);
+  return Number.isFinite(startMs) && startMs > 0 ? startMs : null;
+}

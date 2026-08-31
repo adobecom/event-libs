@@ -1,0 +1,754 @@
+@import '../../styles/tokens.css';
+
+/* Standalone width/layout for this block on its own (e.g. inside its own grid-column
+   fragment, alongside a separate video-player block in another column) — the previous
+   .section:has(> .video-playlist) side-by-side rail depended on the player and this
+   block sharing one .section, which a two-fragment page layout no longer guarantees.
+   Revisit once the actual page-template grid-column DOM is confirmed. */
+@media (min-width: 1024px) {
+  /* Desktop card is light (per Figma inspect: background:#FFF) — the inverse of the
+     mobile bottom-sheet's dark theme below. Every color that needs to contrast against
+     the card is expressed as a --vp-* custom property so this is the only place the
+     theme needs to flip; the mobile block below defines the same set for its own (dark)
+     theme. --vp-authored-bg (set inline by readBackgroundConfig() in the JS) overrides
+     the default here ONLY — deliberately not referenced at all in the mobile block
+     below, so an authored Background row never bleeds into the dark bottom-sheet. */
+  .video-playlist {
+    --vp-bg: var(--vp-authored-bg, var(--s2a-color-gray-25));
+    --vp-fg: var(--s2a-color-gray-900);
+    --vp-row-bg: var(--s2a-color-gray-50);
+    --vp-track-bg: var(--s2a-color-transparent-black-16);
+    --vp-muted: var(--s2a-color-transparent-black-64);
+    --vp-playing-bg: var(--s2a-color-gray-900);
+    --vp-playing-fg: var(--s2a-color-gray-25);
+    --vp-playing-track-bg: var(--s2a-color-gray-700);
+    --vp-playing-muted: var(--s2a-color-transparent-white-64);
+
+    /* 349px = 317px content (per Figma inspect at 1024px) + 16px+16px padding-inline;
+       widens per breakpoint below (392px @1440px = 360px content + 32px). */
+    flex: 0 0 349px;
+    align-self: stretch;
+    max-height: 100%;
+  }
+
+  /* Persistently visible, styled scrollbar on the actual scroll container
+     (.video-playlist-list, not the whole block — see the flex-column restructure
+     above) — the OS default (an auto-hiding overlay scrollbar on macOS/some browsers)
+     otherwise only appears on hover, which reads as "there's nothing more to see" when
+     there actually is. */
+  .video-playlist-list {
+    scrollbar-width: thin;
+    scrollbar-color: var(--s2a-color-gray-300) transparent;
+  }
+
+  .video-playlist-list::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  .video-playlist-list::-webkit-scrollbar-thumb {
+    background: var(--s2a-color-gray-300);
+    border-radius: var(--s2a-border-radius-round);
+  }
+
+  /* Favorite + play (stacked in .video-playlist-row-actions) are hover/focus-revealed
+     only on desktop (per the Figma "Session tile states" spec: Default shows neither,
+     Hover shows both) — mobile has no hover concept, so they stay always-visible there
+     (see the max-width block). Collapsed to width:0 (not just opacity:0) when hidden —
+     otherwise the reserved 32px would sit unused and the title couldn't reclaim it, per
+     Figma's own Default (92-char truncation) vs Hover (65-char) row measurements.
+     margin-left cancels the row's own `gap`, which would otherwise still reserve space
+     next to a zero-width column. min-width:0 overrides flexbox's automatic minimum size
+     (which defaults to the content's — here the 32px buttons' — min-content width) that
+     would otherwise silently keep this column from ever actually shrinking below ~32px
+     despite width:0, leaving meta with nothing to reclaim. */
+  .video-playlist-row-actions {
+    width: 0;
+    min-width: 0;
+    overflow: hidden;
+    opacity: 0;
+    margin-left: calc(-1 * var(--s2a-spacing-sm));
+    transition: opacity 0.15s ease, width 0.15s ease, margin-left 0.15s ease;
+  }
+
+  .video-playlist-row:hover .video-playlist-row-actions,
+  .video-playlist-row:focus-within .video-playlist-row-actions {
+    width: 32px;
+    margin-left: 0;
+    opacity: 1;
+  }
+}
+
+/* This block's own responsive width, independent of any shared-section layout (see the
+   note above the min-width:1024px block) — mobile isn't included here: below 1024px the
+   video-playlist drawer is an intentionally edge-to-edge bottom sheet. */
+@media (min-width: 1440px) {
+  /* 392px = 360px content (per Figma inspect at 1440px) + 16px+16px padding-inline. */
+  .video-playlist {
+    flex-basis: 392px;
+  }
+}
+
+@media (min-width: 1920px) {
+  /* 487px = 455px content (per Figma inspect at 1920px) + 16px+16px padding-inline. */
+  .video-playlist {
+    flex-basis: 487px;
+  }
+}
+
+/* Flex column so the header (handle + title/toggle/play-all row) and the "Show more"
+   button stay pinned in place while only .video-playlist-list itself scrolls between
+   them — previously overflow-y/max-height lived on this element directly, which
+   scrolled the header away along with the rows.
+
+   --vp-bg/--vp-fg are only ever DEFINED inside the min-width:1024px/max-width:1023px
+   theme blocks above — this base rule has no unconditional fallback of its own, unlike
+   sibling blocks (event-featured-products, event-speakers) which hardcode a static
+   background at their own base selector. Confirmed live: before either media query has
+   resolved a value (or if it briefly doesn't), background/color fall back to their
+   initial transparent/inherited values, letting the raw authored table (session-id,
+   minimum-sessions, playlist-title, ...) show through until init()'s own
+   el.replaceChildren() repaints it — a real, visible flash of unstyled content other
+   blocks don't have. var(..., fallback) gives this the same guaranteed paint the other
+   blocks get, before either theme block or any JS has run at all. */
+.video-playlist {
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  background: var(--vp-bg, var(--s2a-color-gray-25, #fff));
+  color: var(--vp-fg, var(--s2a-color-gray-900, #1e1e1e));
+  font-family: var(--s2a-font-family-default);
+  border-radius: var(--s2a-border-radius-md, 16px);
+  padding: var(--s2a-spacing-md) var(--s2a-spacing-md) var(--s2a-spacing-lg);
+  margin-bottom: var(--s2a-spacing-8, 8px);
+  overflow: hidden;
+}
+
+.video-playlist-handle,
+.video-playlist-top,
+.video-playlist-show-more {
+  flex-shrink: 0;
+}
+
+/* Same convention mobile-rider.css already uses for its own raw authoring table: hides
+   the authored key/value rows (session-id, minimum-sessions, playlist-title, ...) that
+   would otherwise sit as plain-text direct children of this block from first paint,
+   before init()'s own el.replaceChildren() wipes them out and rebuilds the real
+   handle/top/list/show-more children below. Scoped to :not(...) rather than a blanket
+   "hide everything until JS runs" so the real rebuilt children (all carrying one of
+   these classes) are never accidentally caught by the same rule. */
+.video-playlist > :not(.video-playlist-handle, .video-playlist-top, .video-playlist-list, .video-playlist-show-more) {
+  display: none;
+}
+
+/* Applied by announceVideoDecision() in video-playlist.js directly to whichever
+   element(s) lose the layout decision — never a shared containing section, which
+   carries other, unrelated blocks (event-featured-products, event-speakers,
+   event-session-details, event-session-resources, ...) authored alongside the video
+   ones; collapsing/removing that would wipe those out too. Three possible targets:
+   the whole `.video-container` (full-width, player-only layout, when
+   video-playlist.js wins) or the specific `.video-player`/`.video-playlist` elements
+   inside `.video-playlist-container` (when it loses) — never the container itself in
+   that second case, since it's shared with other blocks. The losing video-player.js
+   instance never even embeds a video in the first place (see that block's own
+   awaitEmbedDecision), so this only ever fades out an empty, never-populated element
+   before removing it, not a populated one. transitionend (not a timer) triggers the
+   actual el.remove(), so this duration is the only thing that needs to stay in sync
+   between the two files. */
+.video-container.is-collapsing,
+.video-player.is-collapsing,
+.video-playlist.is-collapsing {
+  overflow: hidden;
+  opacity: 0;
+  max-height: 0;
+  margin-bottom: 0;
+  transition: opacity 0.25s ease, max-height 0.25s ease, margin-bottom 0.25s ease;
+}
+
+/* Decorative bottom-sheet drag affordance — mobile-only, see the max-width block below. */
+.video-playlist-handle {
+  display: none;
+}
+
+/* Title + collapse toggle (mobile) + "Play all" switch all share one flex-wrap row so
+   the same DOM order can lay out two different ways per breakpoint: desktop keeps the
+   switch on the title's own row (flex-basis:auto, pushed right via margin-left:auto);
+   mobile forces it to wrap onto its own row (flex-basis:100%, see the max-width block
+   below) below the title+toggle row. */
+.video-playlist-top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: var(--s2a-spacing-xs) var(--s2a-spacing-md);
+}
+
+.video-playlist-title {
+  /* flex-basis:0 (not auto) — with a very long title (e.g. authored text with no
+     natural break opportunities), -webkit-box's own intrinsic-size computation combined
+     with an `auto` flex-basis can size this flex item to its full max-content width
+     BEFORE line-clamp/wrap ever gets a chance to constrain it, blowing the title out to
+     many un-clamped, un-ellipsized lines spanning far past the card. Starting from a
+     zero basis and growing via flex-grow sidesteps that content-based sizing entirely. */
+  flex: 1 0 0%;
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  font-size: var(--s2a-font-size-lg);
+  font-weight: var(--s2a-font-weight-adobe-clean-black, 900);
+  line-height: 98%; /* 17.64px per Figma's "Title Small Black" type style */
+  letter-spacing: -0.54px;
+  /* stylelint-disable-next-line value-no-vendor-prefix -- required for -webkit-line-clamp */
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+
+.video-playlist-toggle {
+  display: none;
+}
+
+/* Mobile-only collapsed "Up next" peek — see the max-width:1023px block below for its
+   actual visibility rules (shown collapsed, hidden once expanded) and the mobile-only
+   title/toggle it swaps places with. No rule needed at this (desktop) scope: the peek
+   is never even shown outside that block. */
+.video-playlist-up-next {
+  display: none;
+}
+
+.video-playlist-autoplay {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: var(--s2a-spacing-xs);
+  margin: 0 0 0 auto;
+  font-size: var(--s2a-font-size-sm);
+  cursor: pointer;
+}
+
+/* Pure-CSS switch on the existing checkbox — no markup change, so existing tests that
+   drive `.video-playlist-autoplay-toggle` directly (`.checked`/change events) are
+   unaffected. Track/thumb colors are absolute (not --vp-* themed) — per Figma, this
+   switch keeps the same white-thumb look on both the light desktop card and the dark
+   mobile drawer, with a light-gray track when off and a dark track once checked. */
+.video-playlist-autoplay-toggle {
+  appearance: none;
+  position: relative;
+  width: 32px;
+  height: 18px;
+  margin: 0;
+  border-radius: var(--s2a-border-radius-round);
+  /* stylelint-disable-next-line color-no-hex -- no matching --s2a- token for this exact
+     Figma off-track color */
+  background: var(--s2a-color-gray-500);
+  flex-shrink: 0;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.video-playlist-autoplay-toggle::before {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 14px;
+  height: 14px;
+  border-radius: var(--s2a-border-radius-round);
+  background: var(--s2a-color-gray-25, #fff);
+  transition: transform 0.2s ease;
+}
+
+.video-playlist-autoplay-toggle:checked {
+  background: var(--s2a-color-gray-800);
+}
+
+.video-playlist-autoplay-toggle:checked::before {
+  transform: translateX(14px);
+}
+
+/* flex: 1 1 auto + min-height: 0 + overflow-y: auto is what actually makes THIS
+   element (not the outer .video-playlist) the scroll container, per the flex-column
+   restructure at the top of this file — the header/show-more stay pinned outside it. */
+.video-playlist-list {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--s2a-spacing-xs);
+  min-height: 0;
+  padding: var(--s2a-spacing-xs) 0 var(--s2a-spacing-lg);
+  overflow-y: auto;
+  box-sizing: border-box;
+}
+
+.video-playlist-row {
+  display: flex;
+  align-items: stretch;
+  gap: var(--s2a-spacing-sm);
+  width: 100%;
+  box-sizing: border-box;
+  border-radius: var(--s2a-border-radius-sm, 8px);
+  padding: var(--s2a-spacing-xs);
+  color: inherit;
+  font-family: inherit;
+  background: var(--vp-row-bg);
+  cursor: pointer;
+}
+
+/* The real <a> (topic rows) or plain div (Chapters rows) wrapping thumbnail + meta —
+   see buildRow. Carries the same flex layout the row itself used to apply directly, since
+   the favorite/play actions column now sits outside it as the row's own other child. */
+.video-playlist-row-content {
+  display: flex;
+  flex: 1 1 auto;
+  align-items: stretch;
+  gap: var(--s2a-spacing-sm);
+  min-width: 0;
+  color: inherit;
+  text-decoration: none;
+}
+
+.video-playlist-row:hover,
+.video-playlist-row.is-playing {
+  background: var(--vp-playing-bg);
+  color: var(--vp-playing-fg);
+}
+
+.video-playlist-row:focus-visible,
+.video-playlist-row-content:focus-visible {
+  outline: 1px solid var(--s2a-color-focus-ring-default, #3b63fb);
+  outline-offset: 2px;
+}
+
+.video-playlist-row-thumb-wrap {
+  position: relative;
+  flex-shrink: 0;
+  line-height: 0;
+}
+
+.video-playlist-row-thumb {
+  width: 96px;
+  aspect-ratio: 16 / 9;
+  border-radius: 6px;
+  object-fit: cover;
+}
+
+/* Per Figma inspect: 117.19px at 1024px, then 136.889px from 1440px up (1440 and 1920
+   share the same value — height follows from aspect-ratio in both cases). Below 1024px
+   the thumbnail keeps the 96px mobile default (not confirmed yet — mobile is next). */
+@media (min-width: 1024px) {
+  .video-playlist-row-thumb {
+    width: 117.19px;
+  }
+}
+
+@media (min-width: 1440px) {
+  .video-playlist-row-thumb {
+    width: 136.889px;
+  }
+}
+
+/* Mobile-only thumbnail play overlay — desktop shows play as a separate hover-revealed
+   button in .video-playlist-row-actions instead (see the min-width:1024px block below). */
+.video-playlist-row-play-icon {
+  display: flex;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  align-items: center;
+  justify-content: center;
+  margin: 7px 2px;
+  padding: 9px;
+  transform: translate(-50%, -50%);
+  border-radius: 20px;
+  background: var(--s2a-color-button-background-primary-solid-on-dark-hover);
+  color: #000;
+  pointer-events: none;
+}
+
+.video-playlist-row-play-icon svg {
+  width: 14px;
+  height: 14px;
+}
+
+@media (min-width: 1024px) {
+  .video-playlist-row-play-icon {
+    display: none;
+  }
+}
+
+.video-playlist-row-meta {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: var(--s2a-spacing-3xs);
+  min-width: 0;
+}
+
+.video-playlist-row-title {
+  overflow: hidden;
+  font-size: var(--s2a-font-size-sm);
+  font-weight: 700;
+  line-height: 18px;
+  letter-spacing: 0;
+  /* stylelint-disable-next-line value-no-vendor-prefix -- required for -webkit-line-clamp */
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  flex: 1 0 0;
+  align-self: stretch;
+}
+
+.video-playlist-row-progress {
+  display: flex;
+  align-items: center;
+  gap: var(--s2a-spacing-xs);
+}
+
+.video-playlist-row-progress-track {
+  flex: 1 1 auto;
+  height: 4px;
+  border-radius: var(--s2a-border-radius-round);
+  background: var(--vp-track-bg);
+  overflow: hidden;
+}
+
+.video-playlist-row:hover .video-playlist-row-progress-track,
+.video-playlist-row.is-playing .video-playlist-row-progress-track {
+  background: var(--vp-playing-track-bg);
+}
+
+.video-playlist-row-progress-fill {
+  height: 100%;
+  background: currentcolor;
+  border-radius: inherit;
+}
+
+.video-playlist-row-duration {
+  flex-shrink: 0;
+  text-align: right;
+  font-size: 11px; /* no matching token (smallest defined is 12px) */
+  font-weight: 400;
+  line-height: 14px;
+  letter-spacing: 0;
+  color: var(--vp-muted);
+}
+
+.video-playlist-row:hover .video-playlist-row-duration,
+.video-playlist-row.is-playing .video-playlist-row-duration {
+  color: var(--vp-playing-muted);
+}
+
+/* Favorite + play stacked together, per Figma's row "Hover" state — see buildRow. */
+.video-playlist-row-actions {
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  gap: var(--s2a-spacing-xs);
+}
+
+/* Frosted-glass badge, per Figma's IconButton/Core/Primary spec — a fixed dark icon on a
+   semi-transparent light circle, deliberately NOT theme-relative (--vp-*): this sits on
+   top of the thumbnail/row regardless of whether the card itself is light (desktop) or
+   dark (mobile), so it needs its own self-contained contrast, not inherited row color. */
+.video-playlist-row-favorite,
+.video-playlist-row-play {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: var(--s2a-border-width-sm, 1px) solid var(--s2a-color-gray-100);
+  border-radius: var(--s2a-border-radius-round);
+  background: rgb(255 255 255 / 80%);
+  backdrop-filter: blur(4.6875px);
+  color: var(--s2a-color-gray-900);
+  cursor: pointer;
+}
+
+.video-playlist-row-favorite svg,
+.video-playlist-row-play svg {
+  width: 16px;
+  height: 16px;
+}
+
+/* No separate "solid heart" asset confirmed yet — favorited state reads via color
+   (brand red) rather than a filled-vs-outline shape swap. */
+.video-playlist-row-favorite.is-favorited {
+  color: var(--s2a-color-brand-adobe-red);
+}
+
+/* Mobile shows play centered on the thumbnail (.video-playlist-row-play-icon) instead —
+   the stacked row-actions play button is desktop-only. */
+.video-playlist-row-play {
+  display: none;
+}
+
+@media (min-width: 1024px) {
+  .video-playlist-row-play {
+    display: flex;
+  }
+}
+
+/* Desktop-only "Show more": reveals rows beyond SHOW_MORE_INITIAL_ROWS via a plain
+   nth-child cap — independent of the mobile drawer's own is-expanded/Drawer state,
+   which already covers the equivalent need on mobile (the full list scrolls there).
+   Space below it is margin, not padding — padding would inflate the button's own flex
+   box, pushing align-items:center to center the text+chevron within that taller box
+   instead of just adding space after it (visible as a misaligned chevron inside an
+   oversized focus outline). */
+.video-playlist-show-more {
+  display: none;
+}
+
+@media (min-width: 1024px) {
+  .video-playlist-show-more {
+    display: flex;
+    gap: var(--s2a-spacing-xs);
+    border: none;
+    background: none;
+    color: #000;
+    text-align: center;
+    font-family: var(--s2a-font-family-default);
+    font-size: var(--s2a-font-size-sm);
+    font-style: normal;
+    font-weight: 700;
+    line-height: 120%; /* 16.8px */
+    cursor: pointer;
+  }
+
+  .video-playlist-show-more-chevron {
+    transition: transform 0.2s ease;
+  }
+
+  .video-playlist-show-more-chevron svg {
+    width: 100%;
+    height: 100%;
+  }
+
+  .video-playlist-show-more[aria-expanded='true'] .video-playlist-show-more-chevron {
+    transform: rotate(180deg);
+  }
+
+  .video-playlist-list:not(.is-showing-more) .video-playlist-row:nth-child(n+5) {
+    display: none;
+  }
+}
+
+/* Mobile bottom sheet: fixed to the viewport, independent of the section's own flow —
+   "peek" height by default (DRAWER_FLOOR_PX in JS), expands up to the Option-B cap
+   (computeDrawerCapPx/clampedTitleBottom in video-playlist.js) without ever fully
+   covering the session title. Dark theme — the inverse of the desktop light card above. */
+@media (max-width: 1023px) {
+  .video-playlist {
+    --vp-bg: var(--s2a-color-gray-900);
+    --vp-fg: var(--s2a-color-gray-25);
+    --vp-row-bg: transparent;
+    --vp-track-bg: var(--s2a-color-transparent-white-24);
+    --vp-muted: var(--s2a-color-transparent-white-64);
+    --vp-playing-bg: var(--s2a-color-gray-25);
+    --vp-playing-fg: var(--s2a-color-gray-900);
+    --vp-playing-track-bg: var(--s2a-color-gray-300);
+    --vp-playing-muted: var(--s2a-color-gray-700);
+
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 2;
+    border-radius: var(--s2a-border-radius-md, 16px) var(--s2a-border-radius-md, 16px) 0 0;
+    transition: max-height 0.3s ease;
+
+    /* Figma inspect: collapsed peek's own padding is 9px 16px 16px — distinct from the
+       shared base rule's 16px/16px/24px (desktop card + expanded mobile drawer both use
+       that instead, see .is-expanded below). */
+    padding: 9px var(--s2a-spacing-md) var(--s2a-spacing-md);
+  }
+
+  .video-playlist.is-expanded {
+    padding: var(--s2a-spacing-md) var(--s2a-spacing-md) var(--s2a-spacing-lg);
+  }
+
+  /* Real drag target now (see Drawer's #bindDrag), not just decorative — sized to a
+     comfortable touch target (the visible bar is drawn via ::before, kept at its
+     original small size) with touch-action:none so a vertical drag gesture here
+     resizes the drawer instead of also trying to scroll the page underneath it.
+     Collapsed state has no drag affordance at all — per Figma, only "Up next" + the
+     chevron show there (see .video-playlist-up-next); the handle only appears once
+     expanded, where dragging it back down all the way is how the viewer returns to
+     collapsed (in addition to tapping the chevron). */
+  .video-playlist-handle {
+    display: none;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 24px;
+    margin-bottom: var(--s2a-spacing-sm);
+    touch-action: none;
+    cursor: grab;
+  }
+
+  .video-playlist-handle:active {
+    cursor: grabbing;
+  }
+
+  .video-playlist-handle::before {
+    content: '';
+    width: 36px;
+    height: 4px;
+    border-radius: var(--s2a-border-radius-round);
+    background: var(--s2a-color-transparent-white-24, rgb(255 255 255 / 24%));
+  }
+
+  .video-playlist.is-expanded .video-playlist-handle {
+    display: flex;
+  }
+
+  .video-playlist-autoplay {
+    flex-basis: 100%;
+    margin-left: 0;
+  }
+
+  .video-playlist-toggle {
+    display: flex;
+    flex: 0 0 auto;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border: none;
+    border-radius: var(--s2a-border-radius-round);
+    background: none;
+    color: inherit;
+    cursor: pointer;
+  }
+
+  .video-playlist-toggle svg {
+    width: 17px;
+    height: 10px;
+    transition: transform 0.2s ease;
+  }
+
+  /* Drawer (see toggleEl.setAttribute('aria-expanded', ...)) keeps this in sync with the
+     drawer's own open/closed state — flips the chevron to point up once expanded. */
+  .video-playlist-toggle[aria-expanded='true'] svg {
+    transform: rotate(180deg);
+  }
+
+  /* Collapsed row must never wrap — .video-playlist-top's own base rule is flex-wrap:
+     wrap (needed so .video-playlist-autoplay can drop to its own line once expanded,
+     via flex-basis:100% below), but while collapsed only .video-playlist-up-next and
+     the toggle are actually visible; without this, the up-next block's own 2-line
+     clamped title grows tall/wide enough to push the toggle onto a wrapped second line,
+     which then gets clipped off entirely by the collapsed drawer's fixed max-height
+     (confirmed live: the chevron disappeared, not just visually hidden). Whole
+     collapsed peek is also tappable to open (see the JS's own top.addEventListener) —
+     a pointer cursor communicates that before the tap, same as the handle/toggle. */
+  .video-playlist-top {
+    flex-wrap: nowrap;
+    cursor: pointer;
+  }
+
+  .video-playlist.is-expanded .video-playlist-top {
+    flex-wrap: wrap;
+    cursor: default;
+  }
+
+  /* Per Figma: the collapsed peek shows "Up next" + a session's own title instead of
+     the playlist's title/autoplay row — swapped for the reverse the moment the drawer
+     expands (Drawer's own #apply() toggles .is-expanded on this same element). Always
+     built (see the JS — falls back to the first row when there's no literal "next"
+     one), since this element is what the collapsed CSS shows instead of the title, not
+     an addition alongside it. */
+  .video-playlist-up-next {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s2a-spacing-xs, 8px);
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  .video-playlist.is-expanded .video-playlist-up-next {
+    display: none;
+  }
+
+  /* Figma: "s2a/typography/eyebrow" */
+  .video-playlist-up-next-label {
+    font-family: var(--s2a-font-family-eyebrow);
+    font-size: var(--s2a-typography-font-size-eyebrow);
+    font-weight: var(--s2a-font-weight-eyebrow);
+    line-height: var(--s2a-typography-line-height-eyebrow);
+    letter-spacing: var(--s2a-typography-letter-spacing-eyebrow);
+  }
+
+  .video-playlist-up-next-title {
+    overflow: hidden;
+    font-family: var(--s2a-font-family-heading);
+    font-size: var(--s2a-typography-font-size-heading-6);
+    font-weight: 900;
+    line-height: var(--s2a-typography-line-height-title-6, 18px);
+    letter-spacing: var(--s2a-typography-letter-spacing-heading-6);
+    text-overflow: ellipsis;
+    /* stylelint-disable-next-line value-no-vendor-prefix -- required for -webkit-line-clamp */
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+  }
+
+  /* The playlist title/autoplay switch (the EXPANDED-only content on this same row)
+     starts hidden on mobile — the collapsed peek above is what's shown until the
+     drawer's own .is-expanded lands (see Drawer's #apply()). */
+  .video-playlist-title,
+  .video-playlist-autoplay {
+    display: none;
+  }
+
+  .video-playlist.is-expanded .video-playlist-autoplay {
+    display: flex;
+  }
+
+  /* Figma: mobile "Play all" switch — OFF track #7D7D7D, ON track #DBDBDB; thumb stays
+     #111 in both states. */
+  .video-playlist-autoplay-toggle {
+    /* stylelint-disable-next-line color-no-hex -- no matching --s2a- token for this
+       exact Figma mobile track color */
+    background: #7d7d7d;
+  }
+
+  .video-playlist-autoplay-toggle::before {
+    /* stylelint-disable-next-line color-no-hex -- no matching --s2a- token for this
+       exact Figma mobile thumb color */
+    background: #111;
+  }
+
+  .video-playlist-autoplay-toggle:checked {
+    /* stylelint-disable-next-line color-no-hex -- no matching --s2a- token for this
+       exact Figma mobile track color */
+    background: #dbdbdb;
+  }
+
+  /* Figma: "s2a/typography/heading-6" — overrides the shared desktop title rule above
+     (Title Small Black) with the mobile drawer's own heading-6 tokens. Deliberately no
+     explicit `color` here — --s2a-color-content-default (the Figma token) is meant for
+     light backgrounds and is invisible against the drawer's dark theme; inheriting the
+     drawer's own --vp-fg (see .video-playlist's color rule) keeps it legible instead. */
+  .video-playlist-title {
+    font-family: var(--s2a-font-family-heading);
+    font-size: var(--s2a-typography-font-size-heading-6);
+    font-weight: 900;
+    line-height: var(--s2a-typography-line-height-title-6, 18px);
+    letter-spacing: var(--s2a-typography-letter-spacing-heading-6);
+  }
+
+  .video-playlist.is-expanded .video-playlist-title {
+    /* stylelint-disable-next-line value-no-vendor-prefix -- required for -webkit-line-clamp */
+    display: -webkit-box;
+  }
+
+  /* Figma inspect: fixed 136x77 (136/77 aspect-ratio) — mobile keeps a fixed size rather
+     than the desktop breakpoint-scaled widths above (border-radius: 6px is shared, see
+     the base .video-playlist-row-thumb rule). */
+  .video-playlist-row-thumb {
+    width: 136px;
+    aspect-ratio: 136 / 77;
+  }
+}

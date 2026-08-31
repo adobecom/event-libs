@@ -1,0 +1,80 @@
+@import '../../styles/tokens.css';
+
+/* Both the `.video-container` and `.video-playlist-container` sections are authored
+   with the same `spacing-sm` Section Metadata Style value — its own bottom padding is
+   too generous for this section specifically. Scoped to the section itself (not
+   .video-player), so it only ever applies when this is the WINNING, still-present
+   instance: when video-playlist wins instead, .video-container (with this class) is
+   removed from the DOM entirely (see video-playlist.js's own announceVideoDecision),
+   leaving nothing for this rule to match — the other section's own spacing-sm padding
+   is never touched by it either way. */
+.section.video-container {
+  padding-bottom: 10px;
+}
+
+/* Only applies WHEN .video-container is actually present (a real sibling `~` match,
+   not `:has()`-on-self) — i.e. only on pages where video-container ends up the
+   winning instance, exactly mirroring the rule above. Assumes `.video-container`
+   is authored BEFORE `.video-playlist-container` in the page (the general sibling
+   combinator only matches a FOLLOWING sibling) — true on the current template; if an
+   author ever reorders the two sections, this stops applying rather than doing
+   anything wrong (the two sections just each fall back to their own default
+   spacing-sm padding, not a broken layout). */
+.section.video-container ~ .section.video-playlist-container {
+  padding-top: 0;
+}
+
+/* Reserves the eventual video's real box from FIRST PAINT, before init() has run at
+   all — pure CSS, no JS dependency. Without this, the block has zero height until the
+   loader is appended (itself gated behind session-times parsing + the layout-decision
+   gates in init()), so the page visibly grows from nothing → loader → video, each a
+   separate layout shift. A real .milo-video/.mobile-rider child fills this same box via
+   width/height:100% below, so nothing needs to un-reserve this once the real embed
+   lands — same aspect-ratio, no second shift. */
+.video-player {
+  aspect-ratio: 16 / 9;
+  margin-bottom: var(--s2a-spacing-8, 8px);
+}
+
+.video-player .milo-video,
+.video-player .mobile-rider {
+  width: 100%;
+  height: 100%;
+}
+
+.video-player .milo-video {
+  margin: 0 auto;
+  aspect-ratio: 16 / 9;
+  height: auto;
+  padding-bottom: 0;
+}
+
+.video-player-loader {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  border-radius: var(--s2a-border-radius-md, 16px);
+  background: var(--s2a-color-gray-100, #f5f5f5);
+}
+
+.video-player-loader::before {
+  content: '';
+  width: 32px;
+  height: 32px;
+  border: 3px solid var(--s2a-color-gray-200, #e0e0e0);
+  border-top-color: var(--s2a-color-gray-600, #6e6e6e);
+  border-radius: 50%;
+  animation: video-player-loader-spin 0.8s linear infinite;
+}
+
+@keyframes video-player-loader-spin {
+  to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .video-player-loader::before {
+    animation: none;
+  }
+}
