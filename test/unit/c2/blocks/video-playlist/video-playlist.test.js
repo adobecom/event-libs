@@ -8,6 +8,7 @@ import init, {
   resolveTopicPlaylist,
   resolveCurrentSessionTopics,
   resolvePlaylistTitle,
+  applyExpandedHeightCap,
 } from '../../../../../event-libs/v1/c2/blocks/video-playlist/video-playlist.js';
 import {
   sessions, sessionsStatus, favorited, pendingActions, liveStreamActiveIds,
@@ -662,7 +663,12 @@ describe('video-playlist', () => {
         .to.be.true;
     });
 
-    it('caps total rows at the authored maximum-sessions', async () => {
+    /**
+     * `maximum-sessions` caps how many rows are VISIBLE at once, not how many exist — the
+     * list scrolls to reach the rest rather than dropping them. 8 qualifying sessions plus
+     * the current one is 9 rows, all built, regardless of a maximum-sessions of 3.
+     */
+    it('builds every qualifying row regardless of maximum-sessions', async () => {
       setMeta('session-id', 'cur');
       setMeta('session-times', sessionTimesMeta());
       setMeta('custom-attributes', playlistAttribute());
@@ -674,7 +680,102 @@ describe('video-playlist', () => {
       await init(playlist);
       await flush();
 
-      expect(playlist.querySelectorAll('.video-playlist-row')).to.have.lengthOf(3);
+      expect(playlist.querySelectorAll('.video-playlist-row')).to.have.lengthOf(9);
+    });
+
+    // The cap is a max-height, not a fixed height, so a list shorter than the cap sizes to
+    // its own content — no scrollbar and no empty space below the last row.
+    it('leaves the expanded list uncapped when there are fewer rows than the maximum', async () => {
+      const playlist = await renderWithRows(6);
+      addConfigRow(playlist, 'maximum-sessions', '20');
+      const list = playlist.querySelector('.video-playlist-list');
+
+      playlist.querySelector('.video-playlist-show-more').click();
+
+      expect(list.style.maxHeight === '' || parseFloat(list.style.maxHeight) > list.scrollHeight)
+        .to.be.true;
+    });
+
+  });
+
+  /**
+   * Exercised directly rather than through init(): the cap is desktop-only and the test
+   * runner's viewport width isn't guaranteed to be >= 1024px, so driving the helper with a
+   * controlled DOM is what makes the arithmetic assertable at all.
+   */
+  describe('applyExpandedHeightCap', () => {
+    const ROW_HEIGHT = 40;
+
+    function buildList({ rowCount, expanded }) {
+      const list = document.createElement('div');
+      list.className = `video-playlist-list${expanded ? ' is-showing-more' : ''}`;
+      // Inline so the real block CSS (not loaded here) isn't needed for the measurement.
+      list.style.cssText = 'display: flex; flex-direction: column; row-gap: 0; padding: 0;';
+      Array.from({ length: rowCount }).forEach(() => {
+        const row = document.createElement('div');
+        row.className = 'video-playlist-row';
+        row.style.cssText = `height: ${ROW_HEIGHT}px; flex: 0 0 auto;`;
+        list.append(row);
+      });
+      document.body.append(list);
+      return list;
+    }
+
+    // isDesktop is passed explicitly: the test runner's viewport is 800px wide, so the
+    // desktop branch would never execute if it read window.innerWidth.
+    it('caps the expanded list to maximum-sessions rows', () => {
+      const list = buildList({ rowCount: 9, expanded: true });
+
+      applyExpandedHeightCap(list, 5, true);
+
+      expect(parseFloat(list.style.maxHeight)).to.equal(ROW_HEIGHT * 5);
+    });
+
+    it('caps to the full content height when rows and maximum match', () => {
+      const list = buildList({ rowCount: 5, expanded: true });
+
+      applyExpandedHeightCap(list, 5, true);
+
+      // Equal to the content, so it renders at natural height with nothing to scroll.
+      expect(parseFloat(list.style.maxHeight)).to.equal(list.scrollHeight);
+    });
+
+    it('sets a cap taller than the content when fewer rows than the maximum', () => {
+      const list = buildList({ rowCount: 5, expanded: true });
+
+      applyExpandedHeightCap(list, 20, true);
+
+      // A max-height above the content height never truncates and never scrolls.
+      expect(parseFloat(list.style.maxHeight)).to.be.greaterThan(list.scrollHeight);
+    });
+
+    it('clears the cap when the list is collapsed', () => {
+      const list = buildList({ rowCount: 9, expanded: true });
+      applyExpandedHeightCap(list, 5, true);
+      expect(list.style.maxHeight).to.not.equal('');
+
+      list.classList.remove('is-showing-more');
+      applyExpandedHeightCap(list, 5, true);
+
+      expect(list.style.maxHeight).to.equal('');
+    });
+
+    it('clears the cap on mobile, where the drawer owns the height', () => {
+      const list = buildList({ rowCount: 9, expanded: true });
+      applyExpandedHeightCap(list, 5, true);
+      expect(list.style.maxHeight).to.not.equal('');
+
+      applyExpandedHeightCap(list, 5, false);
+
+      expect(list.style.maxHeight).to.equal('');
+    });
+
+    it('does nothing when the list has no rows to measure', () => {
+      const list = buildList({ rowCount: 0, expanded: true });
+
+      applyExpandedHeightCap(list, 5, true);
+
+      expect(list.style.maxHeight).to.equal('');
     });
   });
 

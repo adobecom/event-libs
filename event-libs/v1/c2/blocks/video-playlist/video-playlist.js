@@ -496,10 +496,51 @@ function highlightRow(list, activeId) {
   });
 }
 
+/**
+ * Caps how TALL the expanded list may grow, in whole rows, so `maximum-sessions` limits
+ * what's visible at once while the list scrolls to reach the rest.
+ *
+ * A max-height (not a fixed height) so the list still sizes to its content when there are
+ * fewer rows than the cap — 9 authored with 5 available renders 5 rows, no scrollbar and
+ * no empty space. Measured from a real row because row height differs per breakpoint.
+ *
+ * Desktop only: below 1024px the block is a drag-resizable bottom sheet whose height the
+ * viewer sets directly (see Drawer), and a second cap would fight that. `isDesktop` is a
+ * parameter rather than read inline so the measurement can be exercised at any viewport
+ * width — the test runner's own window is narrower than the breakpoint.
+ */
+export function applyExpandedHeightCap(
+  list,
+  maxSessions,
+  isDesktop = window.innerWidth >= DESKTOP_BREAKPOINT_PX,
+) {
+  const isExpanded = list.classList.contains('is-showing-more');
+  if (!isDesktop || !isExpanded) {
+    list.style.maxHeight = '';
+    return;
+  }
+
+  const firstRow = list.querySelector('.video-playlist-row');
+  if (!firstRow) return;
+
+  const rowHeight = firstRow.getBoundingClientRect().height;
+  if (!rowHeight) return;
+
+  const gap = parseFloat(getComputedStyle(list).rowGap) || 0;
+  const listStyle = getComputedStyle(list);
+  const verticalPadding = parseFloat(listStyle.paddingTop) + parseFloat(listStyle.paddingBottom);
+  // N rows plus the N-1 gaps between them, plus the list's own padding.
+  const cap = (rowHeight * maxSessions) + (gap * (maxSessions - 1)) + verticalPadding;
+  list.style.maxHeight = `${cap}px`;
+}
+
 function buildTopicView(el, allRows, {
   maxSessions = DEFAULT_MAX_SESSIONS, defaultThumbnail = '', currentSessionId = null,
 } = {}) {
-  const rows = allRows.slice(0, maxSessions);
+  // Every qualifying session gets a row — `maximum-sessions` caps how many are VISIBLE
+  // at once (see applyExpandedHeightCap), not how many exist, so the list can scroll to
+  // reach the rest rather than silently dropping them.
+  const rows = allRows;
   const list = createTag('div', { class: 'video-playlist-list', role: 'list' }, '', { parent: el });
   rows.forEach((session) => {
     const row = buildRow(
@@ -562,8 +603,27 @@ function buildTopicView(el, allRows, {
       showMore.setAttribute('aria-expanded', String(expanded));
       showMore.setAttribute('aria-label', expanded ? 'Show less sessions' : 'Show more sessions');
       label.textContent = expanded ? 'Show less' : 'Show more';
+      applyExpandedHeightCap(list, maxSessions);
     });
   }
+
+  applyExpandedHeightCap(list, maxSessions);
+  // Row height changes with the breakpoint, and the cap is desktop-only, so it has to be
+  // recomputed rather than measured once. Throttled to one measurement per frame — resize
+  // fires continuously while dragging a window edge.
+  let pendingFrame = null;
+  const handleResize = () => {
+    if (pendingFrame != null) return;
+    pendingFrame = requestAnimationFrame(() => {
+      pendingFrame = null;
+      applyExpandedHeightCap(list, maxSessions);
+    });
+  };
+  window.addEventListener('resize', handleResize);
+  onElementDetached(el, () => {
+    window.removeEventListener('resize', handleResize);
+    if (pendingFrame != null) cancelAnimationFrame(pendingFrame);
+  });
 }
 
 function buildAutoplayToggle(el) {

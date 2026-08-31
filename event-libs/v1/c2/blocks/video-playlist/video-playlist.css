@@ -27,7 +27,12 @@
     /* 349px = 317px content (per Figma inspect at 1024px) + 16px+16px padding-inline;
        widens per breakpoint below (392px @1440px = 360px content + 32px). */
     flex: 0 0 349px;
-    align-self: stretch;
+
+    /* flex-start, not stretch: the card sizes to its own content so the row cap set by
+       applyExpandedHeightCap() is actually visible. Stretching would make the card fill
+       the player's full height and absorb the cap, leaving empty space under the list
+       instead of the intended `maximum-sessions` rows plus a scrollbar. */
+    align-self: flex-start;
     max-height: 100%;
   }
 
