@@ -195,13 +195,16 @@ describe('Session Resources', () => {
     expect(toggle).to.not.be.null;
     expect(el.querySelectorAll('.session-resource.is-overflow')).to.have.lengthOf(2);
     expect(toggle.getAttribute('daa-ll')).to.equal('Show-More-Resources');
+    expect(toggle.querySelector('.sr-only').textContent).to.equal('Show more resources');
     toggle.click();
     expect(el.classList.contains('is-expanded')).to.be.true;
-    expect(toggle.textContent).to.equal('Show less');
+    expect(toggle.querySelector('span:not(.sr-only)').textContent).to.equal('Show less');
+    expect(toggle.querySelector('.sr-only').textContent).to.equal('Show less resources');
     expect(toggle.getAttribute('daa-ll')).to.equal('Show-Less-Resources');
     toggle.click();
     expect(el.classList.contains('is-expanded')).to.be.false;
-    expect(toggle.textContent).to.equal('Show more');
+    expect(toggle.querySelector('span:not(.sr-only)').textContent).to.equal('Show more');
+    expect(toggle.querySelector('.sr-only').textContent).to.equal('Show more resources');
     expect(toggle.getAttribute('daa-ll')).to.equal('Show-More-Resources');
   });
 

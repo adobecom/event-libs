@@ -20,14 +20,16 @@ export function renderDescriptionClamp(doc = document) {
     'aria-controls': textId,
     'daa-ll': 'Show-More-Description',
   });
-  const label = createTag('span', {}, 'Show more');
-  toggle.append(label);
+  const srLabel = createTag('span', { class: 'sr-only' }, 'Show more description');
+  const label = createTag('span', { 'aria-hidden': 'true' }, 'Show more');
+  toggle.append(srLabel, label);
   toggle.insertAdjacentHTML('beforeend', CHEVRON_ICON);
   toggle.hidden = true;
   toggle.addEventListener('click', () => {
     const expanded = el.classList.toggle('is-expanded');
     toggle.setAttribute('aria-expanded', String(expanded));
     toggle.setAttribute('daa-ll', expanded ? 'Show-Less-Description' : 'Show-More-Description');
+    srLabel.textContent = expanded ? 'Show less description' : 'Show more description';
     label.textContent = expanded ? 'Show less' : 'Show more';
   });
 

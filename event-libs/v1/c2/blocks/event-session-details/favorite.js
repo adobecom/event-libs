@@ -17,6 +17,7 @@ export function renderFavorite() {
     title: getMetadata('event-title') || getMetadata('title') || '',
     registerUrl: getEventApiConfig()?.registerUrl || '/register',
   };
+  const sessionTitle = getMetadata('title') || getMetadata('en-title');
 
   let session = sessions.value.find((s) => s.id === sessionId) || { id: sessionId };
   if (!session.rfSessionId) {
@@ -29,7 +30,7 @@ export function renderFavorite() {
   const btn = createTag('button', {
     type: 'button',
     class: 'session-action session-favorite',
-    'aria-label': 'Favorite this session',
+    'aria-label': sessionTitle ? `Favorite ${sessionTitle}` : 'Favorite',
     'aria-pressed': 'false',
   });
 

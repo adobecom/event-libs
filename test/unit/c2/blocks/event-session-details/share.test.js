@@ -17,12 +17,24 @@ describe('session-details share', () => {
     delete navigator.clipboard;
   });
 
-  it('renders a share button', () => {
+  it('renders a share button with a bare label when no session title is present', () => {
     const btn = renderShare();
     expect(btn.classList.contains('session-share')).to.be.true;
     expect(btn.getAttribute('aria-label')).to.equal('Share');
     expect(btn.getAttribute('daa-ll')).to.equal('Share');
     expect(btn.querySelector('svg')).to.not.be.null;
+  });
+
+  it('includes the session title in the accessible name when present', () => {
+    setMetadata('title', 'Creative Workflows in the Cloud');
+    const btn = renderShare();
+    expect(btn.getAttribute('aria-label')).to.equal('Share Creative Workflows in the Cloud');
+  });
+
+  it('falls back to en-title when title is absent', () => {
+    setMetadata('en-title', 'Fallback Session Title');
+    const btn = renderShare();
+    expect(btn.getAttribute('aria-label')).to.equal('Share Fallback Session Title');
   });
 
   const stubClipboard = (writeText) => Object.defineProperty(navigator, 'clipboard', {
