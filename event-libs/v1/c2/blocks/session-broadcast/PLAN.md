@@ -599,7 +599,14 @@ both live and ended states after every edit). Net -58 lines.
   tablet's own spec for these two contexts isn't known yet, and merging now risks fighting that
   work rather than helping it; revisit after tablet if they're still identical then.
 
-## Explicitly out of scope (fast-follow)
+**Aggressive comment pass — done (2026-08-30)**, per explicit follow-up request: the cleanup
+above still left a lot of comment volume (Figma node IDs, multi-paragraph "why" explanations,
+historical narrative). Went through every JS and CSS file in the block a second time and cut
+hard — kept only what's non-obvious and load-bearing (gotchas, cross-file pointers, standards
+compliance), trimmed those to 1-3 lines, and deleted everything else (restated Figma node
+numbers, "confirmed via X" narrative, anything a reader could infer from the code itself).
+Net -248 lines across the block. Pure comment change — no logic touched, re-verified live and
+ended states render pixel-identical, full test suite/lint clean.
 
 - MobileRider real playback (stub adapter only)
 - "My Schedule" personalization/reordering (extension point left in `broadcast-schedule.js`, not wired up)

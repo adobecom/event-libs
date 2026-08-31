@@ -2,13 +2,8 @@ import { html } from '../../../../deps/htm-preact.js';
 import { Carousel } from '../../sessions-guide/components/Carousel.js';
 import { openSessionDetail } from '../utils/broadcast-analytics.js';
 
-// Every other currently-live session, excluding the one in the primary player — reuses
-// sessions-guide's Carousel/LiveCard wholesale (see the plan's Architecture Decisions).
-// Card clicks open the real Session Guide detail view; the Watch Live button switches
-// session-broadcast's own primary player via onSwitchSession (LiveCard's onWatchSamePage).
-// Hides itself entirely when there's nothing to show (ticket: "if only one session is live,
-// the Also Live carousel is hidden") — Carousel itself no-ops on an empty list, but the
-// section wrapper needs its own bail-out or an empty section would still render.
+// Every other currently-live session. Hides itself when empty (only one session live) —
+// Carousel no-ops on an empty list, but the section wrapper still needs its own bail-out.
 export function AlsoLiveCarousel({ sessions, title = 'Currently Live', onSwitchSession }) {
   if (!sessions || !sessions.length) return null;
 

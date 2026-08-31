@@ -1,7 +1,5 @@
-// Dev-only debug aid for building Session Broadcast — not part of the ticket's scope. Gated
-// behind `?debug` so it stays silent for real visitors: this is a buildless codebase, so
-// whatever's in source ships straight to production with no build step to strip it out. Safe
-// to delete once development wraps up.
+// Dev-only debug aid, gated behind `?debug` so it stays silent for real visitors. Safe to
+// delete once development wraps up.
 const DEBUG_ENABLED = new URLSearchParams(window.location.search).has('debug');
 
 function videoType(session) {
@@ -28,10 +26,7 @@ function toRow(session, role) {
   };
 }
 
-// Logs exactly the sessions that made it onto the page — the already-filtered/aggregated
-// schedule session-broadcast is actually rendering (see getBroadcastSchedule/
-// isBroadcastEligible), not the raw catalog — with the fields that matter for debugging
-// player/timing issues (video type, start/end in both ISO and epoch ms).
+// Logs only the sessions actually rendered (the filtered schedule), not the raw catalog.
 export function logBroadcastSchedule(schedule) {
   if (!DEBUG_ENABLED) return;
   const rows = [

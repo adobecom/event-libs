@@ -2,10 +2,8 @@ import { html, useEffect, useRef } from '../../../../../deps/htm-preact.js';
 import { LIBS, getEventConfig } from '../../../../../utils/utils.js';
 import { trackBroadcastEvent } from '../../utils/broadcast-analytics.js';
 
-// Milo's adobetv.css (the shared `.milo-video`/`.milo-video iframe` 16:9 sizing rules, from
-// libs/styles/iframe.css) isn't loaded automatically the way it would be if Milo's own
-// block-loader had mounted the `adobetv` block for us — injected once here instead, same
-// dynamic-<link> pattern event-libs' own scripts.js uses for the C2 foundation stylesheet.
+// adobetv.css isn't loaded automatically since Milo's own block-loader never mounted this
+// block — inject it once, same pattern scripts.js uses for the C2 foundation stylesheet.
 let stylesLoaded = false;
 function ensureAdobeTvStyles(miloLibs) {
   if (stylesLoaded) return;
@@ -16,20 +14,8 @@ function ensureAdobeTvStyles(miloLibs) {
   document.head.appendChild(link);
 }
 
-// Reuses Milo's adobetv.js directly — its init(a) expects a live anchor element, builds the
-// iframe as a sibling via insertAdjacentElement, and removes the anchor once done. No exported
-// "give me an iframe for video ID X" function exists, so this constructs a real, temporarily
-// attached synthetic anchor and lets Milo's own init() do everything: iframe creation, the
-// async accessible-title fetch, the play/pause postMessage listener, and visibility-based
-// auto-pause. Confirmed via a live spike (video.tv.adobe.com/v/<id>, with vs without
-// ?autoplay=true) that Milo's own unmodified URL, with just autoplay=true appended, actually
-// autoplays — no "tap to play" fallback needed.
-// adobetv.js's own createIframe() already listens on `window` for postMessage events from
-// `https://video.tv.adobe.com` carrying `{ state: 'play'|'pause', id }` (it uses these to set
-// the iframe's `data-playing` attribute for its own visibility-based auto-pause). That's a
-// public postMessage contract, not an internal, so a second listener here can observe the
-// exact same events for real play/pause analytics fidelity — no need to touch adobetv.js or
-// duplicate its iframe-creation logic.
+// adobetv.js's createIframe() listens for postMessage({ state: 'play'|'pause', id }) from
+// video.tv.adobe.com as a public contract — this listens for the same events for analytics.
 function handlePlaybackMessage(session) {
   return (event) => {
     if (event.origin !== 'https://video.tv.adobe.com' || !event.data) return;
@@ -56,6 +42,8 @@ export function MpcPlayerAdapter({ session }) {
       const { default: initAdobeTv } = await import(`${miloLibs}/blocks/adobetv/adobetv.js`);
       if (cancelled) return;
 
+      // adobetv.js's init() expects a live anchor and builds the iframe from it — no
+      // exported "give me an iframe for this ID" function exists.
       const anchor = document.createElement('a');
       anchor.href = `https://video.tv.adobe.com/v/${session.mpcId}?autoplay=true`;
       container.appendChild(anchor);

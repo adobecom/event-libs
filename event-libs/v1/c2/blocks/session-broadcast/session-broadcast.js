@@ -17,20 +17,9 @@ const DEFAULTS = {
 
 const SESSION_ENDED_IMAGE_LABEL = 'session ended image';
 
-// "Session ended image" gets its own extraction instead of readBlockConfig's generic
-// raw-innerHTML fallback, because either authoring style needs a *resolved, absolute* URL —
-// not the raw (often page-relative) markup a generic string read would give back:
-// - Linking the row's text to the image's direct URL (readBlockConfig's own <a> branch
-//   already resolves an anchor's .href to an absolute URL) is the most robust way to author
-//   this: it's immune by construction to Milo's site-wide decorateImageLinks(), which runs
-//   over every <img> on the page before any block's init() and silently swaps a picture for
-//   an empty <video> if its alt text carries a `|`-delimited video-background convention —
-//   real stored metadata on many asset-library images, regardless of which block's config row
-//   they end up in.
-// - Embedding a picture directly (the more natural DA authoring flow) still works too, as long
-//   as the picked asset's alt text doesn't trigger that collision: reading the live img.src DOM
-//   property (not a serialized HTML string) gets an already-browser-resolved absolute URL,
-//   which is what safeUrl() (BroadcastApp.js) expects.
+// Reads a resolved, absolute URL from either a linked row or an embedded picture. Prefer
+// linking the text: an embedded picture can get silently swapped for an empty <video> by
+// Milo's decorateImageLinks() if the asset's alt text carries a `|`-delimited convention.
 function extractSessionEndedImageUrl(el) {
   const row = [...el.querySelectorAll(':scope > div')]
     .find((r) => r.children[0]?.textContent.trim().toLowerCase() === SESSION_ENDED_IMAGE_LABEL);
@@ -38,8 +27,7 @@ function extractSessionEndedImageUrl(el) {
   return valueEl?.querySelector('a[href]')?.href || valueEl?.querySelector('img[src]')?.src || '';
 }
 
-// Authored as plain block-content rows (readBlockConfig), not a Configurator-app JSON blob
-// like sessions-guide — see the plan's Authoring decision.
+// Plain block-content rows, not a Configurator-app JSON blob like sessions-guide.
 export function parseBroadcastConfig(el) {
   const raw = readBlockConfig(el);
   const config = { ...DEFAULTS, sessionEndedImageUrl: extractSessionEndedImageUrl(el) };

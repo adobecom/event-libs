@@ -12,18 +12,10 @@ import {
 } from '../../sessions-guide/components/icons.js';
 import { trackBroadcastEvent } from '../utils/broadcast-analytics.js';
 
-// Matches the Figma "Session Broadcast Page" info-panel component (mobile: node 2325:29821
-// collapsed / 2325:29820 expanded, duration corrected per node 4975:45473). Collapsed shows
-// title + caret, a clamped description, and Favorite + Share actions. Expanding reorders
-// content: actions move directly under the title, followed by a channel badge + duration row
-// (e.g. "2h" — not a start time), the full untruncated description, and a "View all details"
-// link — the only thing that opens the real Session Guide detail view (no local modal — see
-// the plan's Architecture Decisions).
-//
-// Collapsed has two further variants of its own, per node 9935:12816 (not favorited — shows
-// the clamped description) vs node 4975:45446 (favorited — hides the description entirely,
-// showing only title/caret/actions). Expanded always shows the description regardless of
-// favorited state — only collapsed's visibility depends on it.
+// Collapsed: title, caret, clamped description (hidden if favorited), Favorite + Share.
+// Expanded: actions move under the title, followed by a channel/duration row, the full
+// description (always shown, regardless of favorited), and "View all details" — the only
+// thing that opens the real Session Guide detail view (no local modal).
 export function SessionInfoPanel({ session, viewAllDetailsLabel = 'View all details' }) {
   const [expanded, setExpanded] = useState(false);
 
@@ -40,9 +32,7 @@ export function SessionInfoPanel({ session, viewAllDetailsLabel = 'View all deta
     await toggleFavoriteWithFeedback(session, { eventConfig: getEventApiConfig(), isFavorited });
   }
 
-  // Copies the session's own page URL (not a sessions-guide `?session=` deep link — that
-  // param belongs to the widget's own convention, not Broadcast's) to the clipboard, same
-  // success/failure handling as SessionDetailOverlay.js's own Share action.
+  // Copies the session's own page URL, not a sessions-guide `?session=` deep link.
   async function handleShare(e) {
     e.stopPropagation();
     const shareUrl = safeUrl(session.sessionPageUrl);

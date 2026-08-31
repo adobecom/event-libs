@@ -2,13 +2,8 @@ import { html } from '../../../../deps/htm-preact.js';
 import { YouTubePlayerAdapter } from './players/YouTubePlayerAdapter.js';
 import { MpcPlayerAdapter } from './players/MpcPlayerAdapter.js';
 
-// Owns a single mounted player adapter at a time, keyed by which video-source field is
-// populated on the active session (mutually exclusive per sessions-api.js's normalized
-// shape). `key=${session.id}` makes Preact fully unmount/remount the adapter on every
-// switch — required even within the same player type, and essential across types (YouTube
-// and MPC are different player implementations, not a source swap, per the eng-sync note):
-// picking a different branch below is itself a full unmount/remount, since it's a different
-// component type at the same position — no extra teardown logic needed on top of that.
+// One mounted adapter at a time, picked by which video-source field is set. key=${session.id}
+// forces a full unmount/remount on every switch, even within the same player type.
 export function PlayerHost({ session }) {
   if (!session) return null;
 

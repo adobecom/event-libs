@@ -11,24 +11,10 @@ import {
   IconPlay, IconHeartFilled, IconHeartOutline, IconShare,
 } from '../../sessions-guide/components/icons.js';
 
-// Covers both State 2 (other sessions still live) and State 3 (nothing else live) — they
-// share the same "session ended" marquee. Per the Figma review, the actual "join a live
-// session" / "see what's upcoming" options ARE the Also Live/Up Next carousels rendered
-// right below this (see BroadcastApp), not a separate two-button interstitial the way the
-// ticket/PRD text describes it more abstractly — the carousels already do that job, and
-// AlsoLiveCarousel's onSwitchSession (unchanged from Phase 1) is exactly how "join a live
-// session" commits a new primary session and exits this state.
-// Content block matches node 4975:46072: eyebrow + title, a channel-badge/duration meta row,
-// a single-line-truncated description with a "View more"/"View less" toggle, and a Watch on
-// demand pill plus Favorite/Share icon buttons (the same outlined-ring treatment on both,
-// confirmed via a zoomed screenshot of node 4975:46089 — not the frosted-glass chip
-// session-broadcast.css uses for Also Live/Upcoming's own on-light buttons).
-//
-// The background photo itself is NOT rendered here — it's a CSS background on the shared
-// .sb-app ancestor instead (see session-broadcast.css's "Ended-state background bleed"
-// section for why), so it can visually bleed past this component's own (short) box into Also
-// Live/Upcoming below it. PLAN.md's Phase 4 writeup covers the separate decorateImageLinks()
-// authoring-convention incident that's why the URL travels as a linked row, not a picture.
+// Covers both State 2 (other sessions live) and State 3 (nothing live) — same marquee. The
+// Also Live/Up Next carousels rendered below this ARE the "join a live session"/"see what's
+// upcoming" actions, not a separate interstitial. Background photo is a CSS background on the
+// shared .sb-app ancestor (see session-broadcast.css), not rendered here.
 export function EndedState({ session }) {
   const [expanded, setExpanded] = useState(false);
 

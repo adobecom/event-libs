@@ -13,10 +13,7 @@
   box-sizing: inherit;
 }
 
-/* sessions-guide.css's own .sg-category-badge default (8px) is tighter here everywhere this
-   block reuses CategoryBadge (info panel, ended state, Also Live/Upcoming cards) — one rule at
-   the block root instead of repeating it per section, so it stays correct if CategoryBadge
-   shows up in a new spot later too. */
+/* Tighter than sessions-guide.css's own 8px default, everywhere CategoryBadge appears here. */
 .session-broadcast .sg-category-badge { gap: var(--s2a-spacing-2xs, 4px); }
 
 .sb-sr-only {
@@ -44,19 +41,14 @@
 
 /* ── Player ──────────────────────────────────────────────── */
 
-/* Sizing/rounded-corner treatment comes from event-youtube.css's own .youtube-video-container
-   (the `event-youtube` class on this same element is what activates those scoped rules) —
-   this only needs a fallback background while the iframe loads in. */
+/* Sizing/rounded corners come from event-youtube.css's .youtube-video-container; this is just
+   a fallback background while the iframe loads. */
 .sb-player__mount {
   width: 100%;
   background: var(--s2a-color-gray-900, #000);
 }
 
-/* Milo's own adobetv.css already resets its MPC iframe's border (.milo-video iframe {
-   border: 0 }), but event-youtube.css never resets its YouTube iframe's — the browser's own
-   default iframe border was the real remaining source of the white outline. Scoped to this
-   block's own player mount rather than event-youtube.css itself, which is also used by the
-   standalone event-youtube block outside session-broadcast. */
+/* event-youtube.css doesn't reset the YouTube iframe's default border. */
 .sb-player__mount iframe {
   border: none;
 }
@@ -72,20 +64,9 @@
 }
 
 /* ── Session info panel ──────────────────────────────────
-   Matches Figma's "Session Broadcast Page" info-panel component (mobile: node 2325:29821
-   collapsed / 2325:29820 expanded) — a dark card directly under the player, rounded on its
-   bottom corners only (the player above already rounds the top). Every direct child shares one
-   flex-column gap; Figma's collapsed title→description gap is a tighter 8px than the 16px used
-   everywhere else in the panel, which this doesn't reproduce exactly — a minor, accepted
-   simplification, not a structural difference.
-
-   This card is *unconditionally* dark regardless of the page's own light/dark theme — the
-   plain --s2a-color-background-default/-content-default/etc. tokens flip per theme (see
-   tokens.css's light vs [data-theme="dark"] blocks), so using them directly would go
-   invisible (white-on-white) on a light-themed page. Overriding them locally here, scoped to
-   .sb-info, mirrors the same pattern sessions-guide's own .sessions-guide[data-theme="dark"]
-   uses for its dark surfaces — every descendant (CategoryBadge included) that reads these
-   standard token names now resolves to the fixed dark values below instead. */
+   Unconditionally dark regardless of page theme — the plain --s2a-color-* tokens flip per
+   theme, so they're overridden locally here (same pattern as sessions-guide's own
+   [data-theme="dark"]); every descendant, including CategoryBadge, reads the dark values. */
 .sb-info {
   --s2a-color-background-default: var(--s2a-color-gray-900, #131313);
   --s2a-color-content-default: #fff;
@@ -162,20 +143,12 @@
   border: 0;
 }
 
-/* Favorite keeps a transparent outline ring — confirmed against the real Figma component's
-   resolved tokens (--s2a-color-iconbutton-background-primary-outlined-default is white at 0%
-   alpha, -border-/-content-primary-outlined-default are both solid white), same for both the
-   favorited and unfavorited states (node 4975:45501 vs 4975:45494) — only the icon glyph
-   itself (outline vs filled heart) changes between them. */
 .sb-info__icon-btn--favorite {
   border: 1px solid #fff;
   border-radius: 999px;
 }
 
-/* The heart icon's own native SVG size (20px, shared with LiveCard/SessionCard's own
-   favorite buttons elsewhere) is bigger than this specific button's Figma spec (16px, node
-   4975:45501/4975:45494) — Share sits in the same row at its own correct 20px, so this only
-   targets the favorite button's icon, not the whole .sb-info__icon-btn class. */
+/* Figma spec is 16px here; Share (same row) keeps the shared 20px native SVG size. */
 .sb-info__icon-btn--favorite svg {
   width: 16px;
   height: 16px;
@@ -189,17 +162,10 @@
   font-size: var(--s2a-font-size-md, 16px);
 }
 
-/* CategoryBadge sets --sg-badge-icon-color inline per the session's own track color (e.g.
-   black by default) — this directly overrides the *color* property on the same element
-   instead (a more specific selector, not touching the custom property), which wins over the
-   base rule's `color: var(--sg-badge-icon-color, currentcolor)` by normal cascade order, no
-   !important needed. Matches the design: the channel icon is always white here, regardless
-   of the track's own accent color. */
+/* Overrides CategoryBadge's inline per-track icon color — channel icon is always white here. */
 .sb-info__meta .sg-category-badge__icon-color { color: #fff; }
 
-/* .sg-category-badge__label sets its own literal 14px (sessions-guide.css), which wins over
-   .sb-info__meta's own font-size by specificity — override it here the same way the icon color
-   above is, per node 4975:45473's 18px duration/channel-label spec. */
+/* Overrides .sg-category-badge__label's own literal 14px (sessions-guide.css). */
 .sb-info__meta .sg-category-badge__label {
   font-size: 16px;
   line-height: 20px;
@@ -237,17 +203,9 @@
 
 /* ── Ended state (States 2 & 3) ─────────────────────────── */
 
-/* Per node 4975:46072, every text/icon color below reads a standard token name
-   (content-default/content-subtle/border-default) — these flip per the page's own light/dark
-   theme (tokens.css) and resolve dark/black by default, so without a local override every
-   string here renders as black text on this state's own black background. Same fix, same
-   reasoning as .sb-info's override above: this state is unconditionally dark regardless of
-   page theme. Large top padding is this hero's own intentional, documented spacing (matches
-   node 4975:46052's 64px top / 24px sides / 32px bottom) — an exception to the "no hard-coded
-   vertical spacing" rule per CLAUDE.md, in the same vein as Hero's own top-spacing exception.
-   Background is transparent, not its own black fill — the shared darkened-photo-to-black
-   layer lives on .sb-app itself now (below), so it can bleed past this box into Also
-   Live/Upcoming; see .sb-app:has(.sb-ended)::before for why and how. */
+/* Unconditionally dark, same token-override reasoning as .sb-info above. Large top padding is
+   an intentional exception to CLAUDE.md's no-hard-coded-vertical-spacing rule (matches Figma).
+   Background is transparent — the shared photo/black layer lives on .sb-app below. */
 .sb-ended {
   position: relative;
   padding: var(--s2a-spacing-4xl, 64px) var(--s2a-spacing-lg, 24px) var(--s2a-spacing-xl, 32px);
@@ -287,15 +245,8 @@
   font-size: var(--s2a-font-size-md, 16px);
 }
 
-/* CategoryBadge sets --sg-badge-icon-color inline per the session's own track color — this
-   overrides *color* directly (wins by specificity, no !important) so the channel icon always
-   matches this row's own light-gray text here, regardless of the track's accent color, same
-   technique as .sb-info__meta above. */
+/* Same overrides as .sb-info__meta above. */
 .sb-ended__meta .sg-category-badge__icon-color { color: var(--s2a-color-border-default); }
-
-/* .sg-category-badge__label sets its own literal 14px (sessions-guide.css), which wins over
-   .sb-ended__meta's own 16px by specificity — override it here the same way the icon color
-   above is, so the badge label actually matches this row's 16px meta/duration text. */
 .sb-ended__meta .sg-category-badge__label { font-size: 16px; }
 
 .sb-ended__desc-wrap {
@@ -383,32 +334,21 @@
 }
 
 /* ── Ended-state background bleed ──────────────────────────
-   Per node 4975:46052, the hero's darkened photo reads as one continuous surface behind Also
-   Live/Upcoming too, not stopping at .sb-ended's own (short) box — Figma sizes it against the
-   combined hero+carousels frame, not just the hero's own content height. Implemented as a
-   pseudo-element on .sb-app (not a JS-rendered <img> inside .sb-ended) because CSS paints a
-   positioned z-index:auto/0 descendant *after* plain in-flow siblings regardless of DOM order:
-   an <img> confined to .sb-ended but sized taller than it would still render on top of, not
-   behind, the carousel sections that follow (hiding their cards). Only a negative z-index on a
-   shared ancestor avoids that. `isolation: isolate` is required too — `position: relative`
-   alone doesn't establish a stacking context, so the ::before's negative z-index would
-   otherwise escape to a higher ancestor instead of staying behind just .sb-app's own
-   background (confirmed empirically: the photo was fully invisible without it).
-
-   --sb-app-ended-bg is a plain CSS custom property, set inline by BroadcastApp.js (the one
-   place with both the authored URL and the .sb-app element) — decorative-only, no alt text
-   needed either way. Height is a fixed, Figma-approximated value (the source frame's 48.81%
-   is relative to a dynamic combined-height frame with no direct CSS equivalent) — tune this if
-   the bleed should reach further or less far into Also Live. Three background-image layers:
-   a flat tint (overall darkening, matches the original single-box version) plus a vertical
-   fade (feathers that darkness to fully solid black by where Also Live begins) plus the photo
-   itself — tuned for legibility vs. brightness by eye, see PLAN.md for the exact history. */
+   The hero's darkened photo bleeds into Also Live/Upcoming below it, past .sb-ended's own
+   short box — a pseudo-element on .sb-app, not a JS <img> inside .sb-ended, because CSS paints
+   a positioned z-index:auto descendant *after* plain in-flow siblings regardless of DOM order;
+   an <img> here would render on top of, not behind, the sections that follow. `isolation:
+   isolate` is required too, or the ::before's negative z-index escapes to a higher ancestor
+   instead of staying behind .sb-app's own background. */
 .sb-app:has(.sb-ended) {
   position: relative;
   isolation: isolate;
   background: var(--s2a-color-gray-1000, #000);
 }
 
+/* --sb-app-ended-bg is set inline by BroadcastApp.js. Height is a fixed, Figma-approximated
+   value — tune it to change how far the bleed reaches. Three layers: flat tint (overall
+   darkening) + vertical fade (feathers to solid black) + the photo itself. */
 .sb-app:has(.sb-ended)::before {
   content: '';
   position: absolute;
@@ -436,19 +376,9 @@
 }
 
 /* ── Also Live section (mobile, node 9931:12217) ──────────
-   The section itself sits on a light-gray background with white cards inside it — the
-   inverse of Upcoming's white-section/gray-card relationship — so this needs its own
-   background, not the shared .sb-carousel-section default. Everything below is scoped under
-   this class rather than edited on the shared sessions-guide selectors (.sg-live-card,
-   .sg-section-title, .sg-carousel__cards, etc.) — those are reused as-is by sessions-guide's
-   own Live section with a different, correct-for-that-context spec (bigger title, tighter
-   card gap, taller buttons); overriding them unscoped would silently change sessions-guide's
-   own look. Scoping to this ancestor class only ever matches Also Live's own cards.
-
-   No right padding, deliberately — matches sessions-guide's own .sg-carousel-section
-   (padding: lg 0 lg lg). Figma's own layer has a right inset too, but its cards still peek to
-   the actual screen edge underneath it; a real right padding would clip that peek instead of
-   letting the scrollable row bleed to the viewport edge. */
+   Light-gray section, white cards — inverse of Upcoming. Everything below is scoped under
+   this class, not edited on the shared sessions-guide selectors, which have their own
+   correct-for-that-context spec. No right padding — cards peek to the viewport edge. */
 .sb-carousel-section--also-live {
   padding: var(--s2a-spacing-xl) 0 var(--s2a-spacing-xl) var(--s2a-spacing-lg);
   background: var(--s2a-color-background-subtle, #f8f8f8);
@@ -468,16 +398,13 @@
   max-width: none;
 }
 
-/* Image area is taller relative to the copy section than the shared default (168px fixed) —
-   an aspect-ratio keeps that proportion (~195px at this card's own 311px width) instead of a
-   second fixed height to maintain alongside the width override above. */
+/* aspect-ratio keeps the taller image proportion at this card's own 311px width. */
 .sb-carousel-section--also-live .sg-live-card__image {
   height: auto;
   aspect-ratio: 300 / 188;
 }
 
-/* Progress bar moves from the image's bottom edge to its top edge — everything else about it
-   (left/right insets, track/indicator/duration styling) is unchanged. */
+/* Progress bar moves from the image's bottom edge to its top edge. */
 .sb-carousel-section--also-live .sg-live-card__progress-row {
   top: 6px;
   bottom: auto;
@@ -494,32 +421,24 @@
 
 .sb-carousel-section--also-live .sg-live-card__btn { height: 32px; }
 
-/* Figma's compact 32px Watch-now button uses 16px side padding, not the shared 24px. */
+/* 16px side padding, not the shared 24px. */
 .sb-carousel-section--also-live .sg-live-card__btn--watch { padding: 0 var(--s2a-spacing-md); }
 
 .sb-carousel-section--also-live .sg-live-card__btn--favorite { width: 32px; }
 
-/* Same 16px-vs-20px oversized-heart fix as .sb-info__icon-btn--favorite (node 4975:45427). */
+/* Same 16px-vs-20px heart-icon fix as .sb-info__icon-btn--favorite. */
 .sb-carousel-section--also-live .sg-live-card__btn--favorite svg {
   width: 16px;
   height: 16px;
 }
 
-/* .sg-live-card__body (shared) uses align-items: flex-start, so .sg-live-card__actions never
-   stretches to the card's own width — leaving .sg-live-card__actions-time's margin-left:auto
-   with no free space to push into, so it sat right next to the buttons instead of the row's
-   far edge. Stretching this one row to full width (without touching the shared
-   align-items:flex-start default other children still rely on) fixes it. */
+/* .sg-live-card__actions-time's margin-left:auto needs the row stretched to full width to
+   have anywhere to push into (shared .sg-live-card__body default is align-items: flex-start). */
 .sb-carousel-section--also-live .sg-live-card__actions { width: 100%; }
 
 /* ── Upcoming section (mobile, node 9931:12218) ────────────
-   White section, gray-50 cards — the opposite of Also Live's gray-section/white-card
-   relationship. Everything below is scoped under this class for the same reason as Also
-   Live's own block above: sessions-guide reuses .sg-card/.sg-section-title/.sg-icon-btn
-   elsewhere with a correct, different spec for that context.
-
-   No right padding, deliberately — same peek-to-edge reasoning as .sb-carousel-section--also-live
-   above. */
+   White section, gray-50 cards — inverse of Also Live. Same scoping reasoning; no right
+   padding for the same peek-to-edge reason. */
 .sb-carousel-section--up-next {
   padding: var(--s2a-spacing-xl) 0 var(--s2a-spacing-xl) var(--s2a-spacing-lg);
   background: #fff;
@@ -532,12 +451,9 @@
   letter-spacing: -0.2px;
 }
 
-/* .sg-card's own base styling (sessions-guide.css) requires a .sessions-guide/.sg-portal
-   ancestor class this block's DOM never has — its width/background/padding/border-radius/
-   flex-direction never applied at all (verified via computed style: was rendering as an
-   unstyled, content-sized transparent box). Replicated here with this card's own Figma
-   values, rather than adding .sessions-guide/.sg-portal to session-broadcast's own root,
-   which would pull in every other rule scoped that way too, not just this one. */
+/* .sg-card's own base styling requires a .sessions-guide/.sg-portal ancestor this block's DOM
+   never has — replicated here instead of adding that class, which would pull in every other
+   rule scoped that way too. */
 .sb-carousel-section--up-next .sg-card {
   display: flex;
   flex-direction: column;
@@ -557,13 +473,8 @@
 
 .sb-carousel-section--up-next .sg-card__badge-row { margin-bottom: var(--s2a-spacing-sm); }
 
-/* IconButton's shared solid/on-dark default (white bg, black border, no blur) is built for
-   sessions-guide's own dark card contexts — this card is light (gray-50), so the untoggled
-   buttons need the frosted-glass treatment .sg-icon-btn--solid.sg-icon-btn--on-light already
-   defines, and the toggled (scheduled/favorited) ones need
-   .sg-icon-btn--outlined.sg-icon-btn--on-light's transparent/black-border treatment —
-   replicated here rather than changing SessionCard.js's hardcoded context prop, which
-   sessions-guide's own cards still rely on. */
+/* SessionCard.js hardcodes IconButton's dark-card context; this card is light (gray-50), so
+   the frosted-glass/outlined-on-light treatment is replicated here instead. */
 .sb-carousel-section--up-next .sg-card__btn--schedule,
 .sb-carousel-section--up-next .sg-card__btn--favorite {
   background: rgb(255 255 255 / 80%);
@@ -578,12 +489,8 @@
   backdrop-filter: blur(16px);
 }
 
-/* Also Live/Upcoming's own opaque section backgrounds need to give way to the shared
-   photo/black background once ended (see the "Ended-state background bleed" section above) —
-   kept here, after both sections' base rules, so specificity stays ascending (stylelint
-   no-descending-specificity: this sibling-combinator selector out-specifies the plain
-   .sb-carousel-section--also-live/--up-next rules above it). Cards themselves are unchanged in
-   this state (per node 4975:46052) — only the section chrome around them turns transparent. */
+/* Kept here, after both sections' base rules, for ascending specificity (stylelint
+   no-descending-specificity) — see "Ended-state background bleed" above for the full context. */
 .sb-ended ~ .sb-carousel-section--also-live,
 .sb-ended ~ .sb-carousel-section--up-next {
   background: transparent;
@@ -594,9 +501,7 @@
   color: var(--s2a-color-content-inverse, #fff);
 }
 
-/* Desktop widens out; mobile-first default above is intentionally unconstrained. Anchored to
-   the same 1280px "wide" threshold used elsewhere in sessions-guide (FilterPanel.js,
-   SessionDetailOverlay.js, DrawerShell.js), not a Broadcast-specific breakpoint. */
+/* Same 1280px "wide" threshold used elsewhere in sessions-guide. */
 @media (min-width: 1280px) {
   .sb-info,
   .sb-carousel-section {

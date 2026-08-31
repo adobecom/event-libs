@@ -3,11 +3,8 @@ import { Carousel } from '../../sessions-guide/components/Carousel.js';
 import { SessionCard } from '../../sessions-guide/components/SessionCard.js';
 import { openSessionDetail } from '../utils/broadcast-analytics.js';
 
-// Capped/sorted upcoming sessions (utils/broadcast-schedule.js). Renders SessionCard, not
-// LiveCard — per the Figma "no image" Upcoming card (channel badge, title, icon-only
-// Add-to-Schedule + Favorite, time range), SessionCard's own .sg-card styling is the closer
-// visual match, confirmed by comparing both against the design. timeDisplay="range" gets
-// SessionCard's start–end formatting (e.g. "9:15AM - 9:45AM") instead of its default duration.
+// Renders SessionCard, not LiveCard — matches Figma's "no image" Upcoming card. timeDisplay
+// "range" gets start–end formatting (e.g. "9:15AM - 9:45AM") instead of duration.
 export function UpNextCarousel({ sessions, title = 'Upcoming' }) {
   if (!sessions || !sessions.length) return null;
 
