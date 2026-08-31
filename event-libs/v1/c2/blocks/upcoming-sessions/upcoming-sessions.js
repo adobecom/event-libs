@@ -10,7 +10,7 @@ import { getNowMs } from '../../../utils/session-state.js';
 import { getTrackIcon } from '../../../utils/tier-1-event-config.js';
 import { resolveIcon } from '../../../features/icons/icon-resolver.js';
 import { toggleScheduleWithFeedback, toggleFavoriteWithFeedback } from '../../../services/sessions/action-feedback.js';
-import { registerStreamIds, unregisterStreamIds, subscribe } from '../../../services/sessions/mobile-rider-poller.js';
+import { registerStreamIds, unregisterStreamIds, subscribe } from '../../../services/sessions/poller.js';
 
 const ROTATE_OUT_MS = 350;
 const SLIDE_MS = 350;
@@ -313,25 +313,27 @@ function attachToPrecedingBlock(el) {
   }
 }
 
-function detachFromPrecedingBlock(el) {
-  const previous = el.previousElementSibling;
-  previous?.classList.remove('attach-upcoming--has-overlay');
-}
-
 function startMobileRiderPolling(sessions, onStarted) {
   const mrSessions = sessions.filter((s) => s.mrStreamId);
   if (!mrSessions.length) return null;
 
   const mrStreamIds = mrSessions.map((s) => s.mrStreamId);
+  const sessionByStreamId = new Map(mrSessions.map((s) => [s.mrStreamId, s]));
   const resolvedIds = new Set();
   registerStreamIds(mrStreamIds);
 
-  const unsubscribe = subscribe(({ active }) => {
-    const startedIds = active.filter((id) => mrStreamIds.includes(id) && !resolvedIds.has(id));
-    if (!startedIds.length) return;
-    startedIds.forEach((id) => resolvedIds.add(id));
-    unregisterStreamIds(startedIds);
-    onStarted(startedIds);
+  const unsubscribe = subscribe(({ active, inactive }) => {
+    const doneIds = [...active, ...inactive].filter((id) => {
+      if (!mrStreamIds.includes(id) || resolvedIds.has(id)) return false;
+      const startTimeMillis = sessionByStreamId.get(id)?.sessionTime?.startTimeMillis;
+      if (typeof startTimeMillis !== 'number') return active.includes(id);
+      return startTimeMillis <= getNowMs();
+    });
+
+    if (!doneIds.length) return;
+    doneIds.forEach((id) => resolvedIds.add(id));
+    unregisterStreamIds(doneIds);
+    onStarted(doneIds);
   });
 
   return () => {
@@ -367,12 +369,6 @@ async function decorate(el) {
   const heading = config?.heading || 'Upcoming Sessions';
   let sessions = Array.isArray(config?.entries) ? config.entries : [];
 
-  if (!sessions.length) {
-    detachFromPrecedingBlock(el);
-    el.remove();
-    return;
-  }
-
   initSessionState();
 
   el.innerHTML = '';
@@ -400,14 +396,6 @@ async function decorate(el) {
     removeCard(el, sessionId);
     sessions = sessions.filter((session) => session.sessionId !== sessionId);
     updateFewSessions();
-    if (!sessions.length) {
-      const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-      setTimeout(() => {
-        el._upcomingSessionsCleanup?.();
-        detachFromPrecedingBlock(el);
-        el.remove();
-      }, reduceMotion ? 0 : ROTATE_OUT_MS);
-    }
   }
 
   let timers = scheduleStateTimers(sessions, dropSession);

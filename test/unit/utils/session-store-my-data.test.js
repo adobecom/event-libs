@@ -2,11 +2,11 @@ import { expect } from '@esm-bundle/chai';
 import { setMetadata } from '../../../event-libs/v1/utils/utils.js';
 import BlockMediator from '../../../event-libs/v1/deps/block-mediator.min.js';
 
-// session-store.js holds module-level singleton state (initialized, apiConfig, etc.) that
+// session-store.js holds module-level singleton state (initialized, eventApiConfig, etc.) that
 // @web/test-runner does not reliably reset between test files sharing a worker session —
 // cache-bust the import so this file gets its own fresh instance regardless.
 const {
-  initSessionState, getApiConfig, sessionsStatus, scheduled, favorited, auth,
+  initSessionState, getEventApiConfig, sessionsStatus, scheduled, favorited, auth,
 } = await import(`../../../event-libs/v1/utils/session-store.js?t=${Math.random()}`);
 
 const ONLINE_FORMAT = {
@@ -101,8 +101,8 @@ describe('session-store: myData maps RF ids to our session ids', () => {
     expect(myDataRequestUrl).to.include('rfAuthToken=exchanged-token');
   });
 
-  it('resolves the real RF response into apiConfig-backed scheduled/favorited ids', () => {
-    expect(getApiConfig().apiUrl).to.equal('https://mock.example/api');
+  it('resolves the real RF response into eventApiConfig-backed scheduled/favorited ids', () => {
+    expect(getEventApiConfig().apiUrl).to.equal('https://mock.example/api');
     expect(scheduled.value).to.deep.equal(new Set(['s-001']));
     expect(favorited.value).to.deep.equal(new Set(['k-001']));
   });

@@ -1,7 +1,7 @@
 /* eslint-disable no-underscore-dangle */
 import { createTag, getEventConfig } from '../../../utils/utils.js';
 import {
-  sessions, favorited, initSessionState, openSessionGuideDetail, getApiConfig,
+  sessions, favorited, initSessionState, openSessionGuideDetail, getEventApiConfig,
 } from '../../../utils/session-store.js';
 import { getTrackIcon } from '../../../utils/tier-1-event-config.js';
 import { resolveIcon } from '../../../features/icons/icon-resolver.js';
@@ -70,7 +70,7 @@ function buildFavoriteButton(session) {
 
   btn.addEventListener('click', () => {
     toggleFavoriteWithFeedback(session, {
-      eventConfig: { title: session.title || '', registerUrl: getApiConfig()?.registerUrl || '/register' },
+      eventConfig: { title: session.title || '', registerUrl: getEventApiConfig()?.registerUrl || '/register' },
       isFavorited: favorited.value.has(session.id),
     });
   });

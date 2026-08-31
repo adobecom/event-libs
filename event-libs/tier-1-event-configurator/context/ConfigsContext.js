@@ -26,10 +26,8 @@ function emptyConfig(configType = CONFIG_TYPES.GLOBAL) {
     eventStartDateTime: null,
     eventEndDateTime: null,
     trackIcons: {},
-    // default: the event-wide fallback for any override text not mapped in byText.
-    // One field (not two) so there's nowhere for the two to drift apart, and no
-    // author-typed override text can collide with a reserved sentinel key.
-    overrideTrackIcons: { default: null, byText: {} },
+    // Nested under byText so no author-typed override text can collide with a config key.
+    overrideTrackIcons: { byText: {} },
     products: {},
     allowDoubleBooking: false,
     rfApiUrl: '',
@@ -155,7 +153,7 @@ const ConfigsProvider = ({ children }) => {
       : {
         ...emptyConfig(configType),
         trackIcons: sourceConfig.trackIcons || {},
-        overrideTrackIcons: sourceConfig.overrideTrackIcons || { default: null, byText: {} },
+        overrideTrackIcons: sourceConfig.overrideTrackIcons || { byText: {} },
         products: sourceConfig.products || {},
         allowDoubleBooking: !!sourceConfig.allowDoubleBooking,
       };
@@ -194,9 +192,8 @@ const ConfigsProvider = ({ children }) => {
     });
   }, []);
 
-  // Same merge pattern as updateTrackIcon, keyed by override text instead of track name —
-  // each distinct text an author has typed is its own swimlane, with its own entry under
-  // overrideTrackIcons.byText.
+  // Keyed by override text instead of track name; every value is authored explicitly, with
+  // no event-wide fallback.
   const updateOverrideTrackIcon = useCallback((overrideText, updates) => {
     setActiveConfig((prev) => {
       if (!prev) return prev;
@@ -211,25 +208,6 @@ const ConfigsProvider = ({ children }) => {
               ...override.byText,
               [overrideText]: { ...override.byText?.[overrideText], ...updates },
             },
-          },
-        },
-      };
-    });
-  }, []);
-
-  // Merges { icon, color } updates into overrideTrackIcons.default — the event-wide
-  // fallback applied to any override text not specifically mapped above.
-  const updateOverrideDefaultIcon = useCallback((updates) => {
-    setActiveConfig((prev) => {
-      if (!prev) return prev;
-      const override = prev.config.overrideTrackIcons || {};
-      return {
-        ...prev,
-        config: {
-          ...prev.config,
-          overrideTrackIcons: {
-            ...override,
-            default: { ...override.default, ...updates },
           },
         },
       };
@@ -325,7 +303,6 @@ const ConfigsProvider = ({ children }) => {
     clearActiveConfig,
     updateTrackIcon,
     updateOverrideTrackIcon,
-    updateOverrideDefaultIcon,
     updateProduct,
     updateConfigField,
     saveActiveConfig,

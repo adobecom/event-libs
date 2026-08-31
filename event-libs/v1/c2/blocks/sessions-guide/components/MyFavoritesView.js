@@ -2,7 +2,7 @@ import { html, useMemo, useEffect } from '../../../../deps/htm-preact.js';
 import { useSessionGuide } from '../store/index.js';
 import {
   sessions as sessionsSignal, favorited as favoritedSignal,
-  liveStreamActiveIds as liveStreamActiveIdsSignal, auth, sessionStateVersion, getApiConfig,
+  liveStreamActiveIds as liveStreamActiveIdsSignal, auth, sessionStateVersion,
 } from '../../../../utils/session-store.js';
 import { checkViewAccess } from '../../../../services/sessions/action-feedback.js';
 import { TimeSlotRow } from './TimeSlotRow.js';
@@ -12,6 +12,7 @@ import {
   groupByStartTime, groupByTrack, onDemandSessions, filterSessions, sessionsForDay, liveSessions,
 } from '../utils/session-filters.js';
 import { getNowMs, formatShortTime, formatTimezoneAbbr } from '../utils/time.js';
+import { useIsPostEvent } from '../utils/use-post-event.js';
 import { deriveSessionState } from '../../../../utils/session-state.js';
 
 export const buildMyFavoritesView = () => MyFavoritesView;
@@ -30,8 +31,7 @@ export function MyFavoritesView() {
   // eslint-disable-next-line no-unused-expressions
   sessionStateVersion.value;
   const nowMs = getNowMs();
-  // What a DVR delay counts from — see isDvrPending().
-  const eventStartMs = getApiConfig()?.eventStartMs;
+  const isPost = useIsPostEvent();
 
   // Logged-out/unregistered visitors never see this view's content — a toast fires and
   // they're bounced to a fallback view instead. Re-checked on every auth change, not just
@@ -56,7 +56,7 @@ export function MyFavoritesView() {
       const st = deriveSessionState(s, liveStreamActiveIds, nowMs);
       return st === 'upcoming';
     });
-    const onDemandRaw = onDemandSessions(dayFavorited, liveStreamActiveIds, nowMs, eventStartMs);
+    const onDemandRaw = onDemandSessions(dayFavorited, liveStreamActiveIds, nowMs);
 
     const filteredUpcomingSessions = filterSessions(activeAndUpcoming, activeFilters, searchQuery);
     return {
@@ -64,7 +64,7 @@ export function MyFavoritesView() {
       timeSlots: groupByStartTime(filteredUpcomingSessions),
       filteredOnDemand: filterSessions(onDemandRaw, activeFilters, searchQuery),
     };
-  }, [sessions, favorited, liveStreamActiveIds, activeDay, userTz, nowMs, activeFilters, searchQuery, eventStartMs]);
+  }, [sessions, favorited, liveStreamActiveIds, activeDay, userTz, nowMs, activeFilters, searchQuery]);
 
   const hasUpcoming = timeSlots.length > 0;
   const hasOnDemand = filteredOnDemand.length > 0;
@@ -96,8 +96,8 @@ export function MyFavoritesView() {
           <button
             class="sg-my-favorites__see-live-btn"
             type="button"
-            onclick=${() => dispatch({ type: 'SET_VIEW', view: 'live-upcoming' })}
-          >See Live & upcoming</button>
+            onclick=${() => dispatch({ type: 'SET_VIEW', view: isPost ? 'on-demand' : 'live-upcoming' })}
+          >${isPost ? 'See On demand' : 'See Live & upcoming'}</button>
         </div>
       ` : html`
         <div class="sg-my-sessions-tab-bar">

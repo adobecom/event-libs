@@ -1,47 +1,28 @@
 import { html } from '../../v1/deps/htm-preact.js';
 import { DEFAULT_ICON_COLOR } from '../default-track-icons.js';
 import IconPicker, { useIconSlugOptions } from './IconPicker.js';
+import { isTrackIconEntryComplete } from '../utils.js';
 
-// Override text is free text, not a real track, and each distinct value is its own
-// swimlane — mirrors TrackIconEditor's per-value list instead of a single icon/color pair.
-// defaultOverrideIcon is the fallback for any text not yet mapped below.
+// Override text is free text, not a real track, and each distinct value is its own swimlane.
+// Mirrors TrackIconEditor: every value is authored explicitly, with no event-wide fallback.
 export default function OverrideTrackIconEditor({
-  overrideTexts, overrideTrackIcons, defaultOverrideIcon, onChangeMapped, onChangeDefault,
+  overrideTexts, overrideTrackIcons, onChangeMapped,
 }) {
   const iconSlugs = useIconSlugOptions();
-  const defaultIcon = defaultOverrideIcon?.icon ?? '';
-  const defaultColor = defaultOverrideIcon?.color ?? DEFAULT_ICON_COLOR;
 
   return html`
     <div class="tec-override-editor">
-      <div class="tec-track-editor__row">
-        <span class="tec-track-editor__name">Default (unmapped override text)</span>
-        <${IconPicker}
-          value=${defaultIcon}
-          color=${defaultColor}
-          options=${iconSlugs}
-          onChange=${(newIcon) => onChangeDefault({ icon: newIcon, color: defaultColor })}
-          ariaLabel="Default override icon"
-        />
-        <input
-          type="color"
-          class="tec-track-editor__color-input"
-          value=${defaultColor}
-          onInput=${(e) => onChangeDefault({ icon: defaultIcon, color: e.target.value })}
-          aria-label="Default override icon color"
-        />
-      </div>
-
       ${overrideTexts.length === 0
     ? html`<p class="tec-track-editor__empty">No Override Primary Event Site Track text found in this event's sessions yet.</p>`
     : html`
           <ul class="tec-track-editor__list">
             ${overrideTexts.map((text) => {
     const authored = overrideTrackIcons?.[text];
-    const icon = authored?.icon ?? defaultIcon;
-    const color = authored?.color ?? defaultColor;
+    const icon = authored?.icon ?? '';
+    const color = authored?.color ?? DEFAULT_ICON_COLOR;
+    const complete = isTrackIconEntryComplete(authored);
     return html`
-                <li class="tec-track-editor__row" key=${text}>
+                <li class="tec-track-editor__row ${complete ? '' : 'is-incomplete'}" key=${text}>
                   <span class="tec-track-editor__name">${text}</span>
                   <${IconPicker}
                     value=${icon}
@@ -57,6 +38,9 @@ export default function OverrideTrackIconEditor({
                     onInput=${(e) => onChangeMapped(text, { icon, color: e.target.value })}
                     aria-label="${text} color"
                   />
+                  ${!complete && html`
+                    <span class="tec-track-editor__warning">Color set with no icon — pick one, or clear the color</span>
+                  `}
                 </li>
               `;
   })}

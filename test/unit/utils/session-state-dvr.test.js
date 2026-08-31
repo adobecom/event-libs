@@ -25,6 +25,8 @@ describe('dvrAvailableAtMs', () => {
   });
 });
 
+// Not read by the sessions-guide's own filtering (see onDemandSessions() in
+// sessions-guide/utils/session-filters.js) — kept as a shared utility for other blocks.
 describe('isDvrPending', () => {
   const session = { dvrDelayHours: 10 };
 

@@ -3,7 +3,7 @@ import {
 } from '../../v1/deps/htm-preact.js';
 import { getEventSessionCatalog } from '../../v1/utils/esp-controller.js';
 import {
-  extractDistinctTracks, extractDistinctOverrideTexts, deriveFacetableAttributes,
+  extractDistinctPrimaryTracks, extractDistinctOverrideTexts, deriveFacetableAttributes,
 } from '../../v1/services/sessions/sessions-api.js';
 import { useNavigation } from '../context/NavigationContext.js';
 import { useConfigs } from '../context/ConfigsContext.js';
@@ -47,7 +47,7 @@ export default function ConfigEditor() {
       // Primary Event Site Track value is its own swimlane, matching groupByTrack()) —
       // deduped in case a track name and override text collide.
       const swimlaneCandidates = [...new Set([
-        ...extractDistinctTracks(result.data.sessions),
+        ...extractDistinctPrimaryTracks(result.data.sessions),
         ...extractDistinctOverrideTexts(result.data.sessions),
       ])];
       seedSwimlaneOrder(swimlaneCandidates);
@@ -58,7 +58,7 @@ export default function ConfigEditor() {
     return () => { cancelled = true; };
   }, [eventId, seedSwimlaneOrder, seedFilterCategories]);
 
-  const tracks = useMemo(() => extractDistinctTracks(sessions), [sessions]);
+  const primaryTracks = useMemo(() => extractDistinctPrimaryTracks(sessions), [sessions]);
   const overrideTexts = useMemo(() => extractDistinctOverrideTexts(sessions), [sessions]);
 
   const handleCancel = () => {
@@ -99,7 +99,7 @@ export default function ConfigEditor() {
         ${isLoadingSessions && html`<${LoadingInline} label="Loading sessions…" />`}
         ${sessionsError && html`<p class="sgc-editor__error">${sessionsError}</p>`}
         ${!isLoadingSessions && !sessionsError && html`
-          <p class="sgc-editor__section-hint">${sessions.length} session(s) found — ${tracks.length} distinct track(s), ${overrideTexts.length} distinct override lane(s).</p>
+          <p class="sgc-editor__section-hint">${sessions.length} session(s) found — ${primaryTracks.length} distinct track(s), ${overrideTexts.length} distinct override lane(s).</p>
         `}
       </section>
 
@@ -280,7 +280,7 @@ export default function ConfigEditor() {
           <${RecommendedSessionsEditor} \
             sessions=${sessions} \
             sessionTimes=${sessionTimes} \
-            tracks=${tracks} \
+            tracks=${primaryTracks} \
             recommendedSessions=${activeConfig.config.recommendedSessions} \
             onChange=${(next) => updateConfigField('recommendedSessions', next)} \
           />
