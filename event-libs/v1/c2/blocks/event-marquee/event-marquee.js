@@ -1,4 +1,4 @@
-import { createTag, getEventConfig, LIBS } from '../../../utils/utils.js';
+import { createTag, getEventConfig, getMetadata, LIBS } from '../../../utils/utils.js';
 import { processAutoBlockLinks } from '../../../utils/decorate.js';
 import {
   initSessionState, sessions, favorited, getEventApiConfig,
@@ -197,6 +197,14 @@ function decorateActions(textCol, config) {
   if (shareEnabled) actions.append(buildShareButton());
 }
 
+function injectPageH1(el, textCol) {
+  if (document.querySelector('h1')) return;
+  if (document.querySelectorAll('.event-marquee')[0] !== el) return;
+  const title = getMetadata('event-title');
+  if (!title) return;
+  textCol.prepend(createTag('h1', { class: 'event-marquee-title' }, title));
+}
+
 function attachUpcomingSessionsWrapper(el) {
   if (!el.classList.contains('attach-upcoming')) return;
   if (el.parentElement?.classList.contains('event-marquee-upcoming-wrapper')) return;
@@ -224,6 +232,7 @@ export default async function init(el) {
 
   foregroundRow.classList.add('event-marquee-foreground');
   textCol.classList.add('event-marquee-text');
+  injectPageH1(el, textCol);
   decorateButtons(textCol);
 
   el._eventMarqueeCountdownStop?.();

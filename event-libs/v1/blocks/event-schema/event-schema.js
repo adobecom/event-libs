@@ -11,17 +11,33 @@ export function injectEventSchema() {
     window.lana?.log(`Failed to parse venue or photos metadata:\n${JSON.stringify(error, null, 2)}`);
   }
 
-  if (!venueObject || !photos) return;
+  const name = getMetadata('event-title');
+  const startDate = getMetadata('start-date');
+  if (!name || !startDate) return;
 
-  const imageHeroImage = photos.find((photo) => photo.imageKind === 'event-hero-image');
+  const canonicalUrl = document.head.querySelector('link[rel="canonical"]')?.href
+    || window.location.href;
 
   const schemaData = {
     '@context': 'https://schema.org',
     '@type': 'Event',
-    name: getMetadata('event-title'),
-    startDate: getMetadata('start-date'),
+    name,
+    startDate,
     endDate: getMetadata('end-date'),
-    location: {
+    description: getMetadata('description') || '',
+    organizer: {
+      '@type': 'Organization',
+      name: 'Adobe',
+      url: window.location.href,
+    },
+    offers: {
+      '@type': 'Offer',
+      url: canonicalUrl,
+    },
+  };
+
+  if (venueObject) {
+    schemaData.location = {
       '@type': 'Place',
       name: venueObject.venueName,
       address: {
@@ -32,15 +48,15 @@ export function injectEventSchema() {
         postalCode: venueObject.postalCode,
         addressCountry: venueObject.country,
       },
-    },
-    image: getImageSource(imageHeroImage),
-    description: getMetadata('description') || '',
-    organizer: {
-      '@type': 'Organization',
-      name: 'Adobe',
-      url: window.location.href,
-    },
-  };
+    };
+  }
+
+  if (Array.isArray(photos)) {
+    const heroOrCardImage = photos.find((photo) => photo.imageKind === 'event-hero-image')
+      || photos.find((photo) => photo.imageKind === 'event-card-image');
+    const imageUrl = getImageSource(heroOrCardImage);
+    if (imageUrl) schemaData.image = imageUrl;
+  }
 
   const script = document.createElement('script');
   script.type = 'application/ld+json';
