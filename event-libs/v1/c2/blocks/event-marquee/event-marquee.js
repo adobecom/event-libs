@@ -202,7 +202,9 @@ function injectPageH1(el, textCol) {
   if (document.querySelectorAll('.event-marquee')[0] !== el) return;
   const title = getMetadata('event-title');
   if (!title) return;
-  textCol.prepend(createTag('h1', { class: 'event-marquee-title' }, title));
+  const h1 = createTag('h1', { class: 'event-marquee-title' });
+  h1.textContent = title;
+  textCol.prepend(h1);
 }
 
 function attachUpcomingSessionsWrapper(el) {

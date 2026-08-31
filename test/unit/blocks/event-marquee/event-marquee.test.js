@@ -599,5 +599,15 @@ describe('event-marquee', () => {
       expect(document.querySelectorAll('h1').length).to.equal(1);
       expect(el.querySelector('h1')).to.not.exist;
     });
+
+    it('renders event-title metadata as literal text, not HTML', async () => {
+      setMetadata('event-title', '<img src=x onerror="window.xssFired = true">');
+      document.body.innerHTML = body;
+      const el = document.querySelector('.event-marquee');
+      await init(el);
+      const h1 = el.querySelector('h1.event-marquee-title');
+      expect(h1.querySelector('img')).to.not.exist;
+      expect(h1.textContent).to.equal('<img src=x onerror="window.xssFired = true">');
+    });
   });
 });

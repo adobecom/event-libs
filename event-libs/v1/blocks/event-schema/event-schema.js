@@ -6,9 +6,14 @@ export function injectEventSchema() {
 
   try {
     venueObject = JSON.parse(getMetadata('venue'));
+  } catch (error) {
+    window.lana?.log(`Failed to parse venue metadata:\n${JSON.stringify(error, null, 2)}`);
+  }
+
+  try {
     photos = JSON.parse(getMetadata('photos'));
   } catch (error) {
-    window.lana?.log(`Failed to parse venue or photos metadata:\n${JSON.stringify(error, null, 2)}`);
+    window.lana?.log(`Failed to parse photos metadata:\n${JSON.stringify(error, null, 2)}`);
   }
 
   const name = getMetadata('event-title');

@@ -124,6 +124,55 @@ describe('Event Schema Module', () => {
       expect(schemaData.image).to.equal('http://example.com/card.jpg');
     });
 
+    it('should still build image from valid photos when venue metadata is malformed', () => {
+      setMetadata('event-title', 'Sample Event');
+      setMetadata('start-date', '2024-08-01T00:00:00Z');
+      setMetadata('venue', 'invalid JSON');
+      setMetadata('photos', JSON.stringify([
+        { imageKind: 'event-hero-image', imageUrl: 'http://example.com/hero.jpg' },
+      ]));
+
+      injectEventSchema();
+
+      const script = document.querySelector('script[type="application/ld+json"]');
+      const schemaData = JSON.parse(script.textContent);
+      expect(schemaData.image).to.equal('http://example.com/hero.jpg');
+      expect(schemaData.location).to.be.undefined;
+    });
+
+    it('should still build location from valid venue when photos metadata is malformed', () => {
+      setMetadata('event-title', 'Sample Event');
+      setMetadata('start-date', '2024-08-01T00:00:00Z');
+      setMetadata('venue', JSON.stringify({
+        venueName: 'Sample Venue',
+        address: '123 Main St',
+        city: 'Sample City',
+        stateCode: 'SC',
+        postalCode: '12345',
+        country: 'US',
+      }));
+      setMetadata('photos', 'invalid JSON');
+
+      injectEventSchema();
+
+      const script = document.querySelector('script[type="application/ld+json"]');
+      const schemaData = JSON.parse(script.textContent);
+      expect(schemaData.location?.name).to.equal('Sample Venue');
+      expect(schemaData.image).to.be.undefined;
+    });
+
+    it('should omit image when photos metadata parses to a non-array value', () => {
+      setMetadata('event-title', 'Sample Event');
+      setMetadata('start-date', '2024-08-01T00:00:00Z');
+      setMetadata('photos', JSON.stringify({ imageKind: 'event-hero-image', imageUrl: 'http://example.com/hero.jpg' }));
+
+      injectEventSchema();
+
+      const script = document.querySelector('script[type="application/ld+json"]');
+      const schemaData = JSON.parse(script.textContent);
+      expect(schemaData.image).to.be.undefined;
+    });
+
     it('should handle missing metadata gracefully', () => {
       injectEventSchema();
 
