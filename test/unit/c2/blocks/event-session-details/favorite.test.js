@@ -18,23 +18,38 @@ describe('session-details favorite', () => {
     expect(renderFavorite()).to.be.null;
   });
 
-  it('renders an outline heart button', () => {
+  it('renders an outline heart button with a bare label when no session title is present', () => {
     setMetadata('session-id', 'sid');
     const btn = renderFavorite();
     expect(btn.classList.contains('session-favorite')).to.be.true;
     expect(btn.getAttribute('aria-pressed')).to.equal('false');
     // Name stays constant; aria-pressed carries the state (avoids double announcement).
-    expect(btn.getAttribute('aria-label')).to.equal('Favorite this session');
+    expect(btn.getAttribute('aria-label')).to.equal('Favorite');
     expect(btn.querySelector('svg')).to.not.be.null;
   });
 
-  it('reflects the favorited signal', () => {
+  it('includes the session title in the accessible name when present', () => {
     setMetadata('session-id', 'sid');
+    setMetadata('title', 'Creative Workflows in the Cloud');
+    const btn = renderFavorite();
+    expect(btn.getAttribute('aria-label')).to.equal('Favorite Creative Workflows in the Cloud');
+  });
+
+  it('falls back to en-title when title is absent', () => {
+    setMetadata('session-id', 'sid');
+    setMetadata('en-title', 'Fallback Session Title');
+    const btn = renderFavorite();
+    expect(btn.getAttribute('aria-label')).to.equal('Favorite Fallback Session Title');
+  });
+
+  it('reflects the favorited signal without changing the accessible name', () => {
+    setMetadata('session-id', 'sid');
+    setMetadata('title', 'Creative Workflows in the Cloud');
     const btn = renderFavorite();
     favorited.value = new Set(['sid']);
     expect(btn.classList.contains('is-favorited')).to.be.true;
     expect(btn.getAttribute('aria-pressed')).to.equal('true');
-    expect(btn.getAttribute('aria-label')).to.equal('Favorite this session');
+    expect(btn.getAttribute('aria-label')).to.equal('Favorite Creative Workflows in the Cloud');
   });
 
   // Milo's auto-tagging runs once at decoration, so a label that changes on toggle would

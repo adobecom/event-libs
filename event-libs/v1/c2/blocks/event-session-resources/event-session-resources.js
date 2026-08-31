@@ -112,13 +112,15 @@ export default async function init(el) {
       'aria-controls': list.id,
       'daa-ll': 'Show-More-Resources',
     });
-    const label = createTag('span', {}, 'Show more');
-    toggle.append(label);
+    const srLabel = createTag('span', { class: 'sr-only' }, 'Show more resources');
+    const label = createTag('span', { 'aria-hidden': 'true' }, 'Show more');
+    toggle.append(srLabel, label);
     toggle.insertAdjacentHTML('beforeend', CHEVRON_ICON);
     toggle.addEventListener('click', () => {
       const expanded = el.classList.toggle('is-expanded');
       toggle.setAttribute('aria-expanded', String(expanded));
       toggle.setAttribute('daa-ll', expanded ? 'Show-Less-Resources' : 'Show-More-Resources');
+      srLabel.textContent = expanded ? 'Show less resources' : 'Show more resources';
       label.textContent = expanded ? 'Show less' : 'Show more';
     });
     el.append(toggle);

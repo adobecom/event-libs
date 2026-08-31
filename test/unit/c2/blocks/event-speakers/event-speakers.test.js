@@ -76,13 +76,16 @@ describe('Speakers', () => {
     expect(toggle).to.not.be.null;
     expect(el.querySelectorAll('.speaker.is-overflow')).to.have.lengthOf(2);
     expect(toggle.getAttribute('daa-ll')).to.equal('Show-More-Speakers');
+    expect(toggle.querySelector('.sr-only').textContent).to.equal('Show more speakers');
     toggle.click();
     expect(el.classList.contains('is-expanded')).to.be.true;
-    expect(toggle.textContent).to.equal('Show less');
+    expect(toggle.querySelector('span:not(.sr-only)').textContent).to.equal('Show less');
+    expect(toggle.querySelector('.sr-only').textContent).to.equal('Show less speakers');
     expect(toggle.getAttribute('daa-ll')).to.equal('Show-Less-Speakers');
     toggle.click();
     expect(el.classList.contains('is-expanded')).to.be.false;
-    expect(toggle.textContent).to.equal('Show more');
+    expect(toggle.querySelector('span:not(.sr-only)').textContent).to.equal('Show more');
+    expect(toggle.querySelector('.sr-only').textContent).to.equal('Show more speakers');
     expect(toggle.getAttribute('daa-ll')).to.equal('Show-More-Speakers');
   });
 

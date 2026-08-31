@@ -25,18 +25,21 @@ describe('Description "More" Clamp', () => {
     const el = renderDescriptionClamp();
     const toggle = el.querySelector('.session-description-toggle');
     expect(toggle.getAttribute('aria-expanded')).to.equal('false');
-    expect(toggle.textContent).to.equal('Show more');
+    expect(toggle.querySelector('span:not(.sr-only)').textContent).to.equal('Show more');
+    expect(toggle.querySelector('.sr-only').textContent).to.equal('Show more description');
     expect(toggle.getAttribute('daa-ll')).to.equal('Show-More-Description');
 
     toggle.click();
     expect(el.classList.contains('is-expanded')).to.be.true;
     expect(toggle.getAttribute('aria-expanded')).to.equal('true');
-    expect(toggle.textContent).to.equal('Show less');
+    expect(toggle.querySelector('span:not(.sr-only)').textContent).to.equal('Show less');
+    expect(toggle.querySelector('.sr-only').textContent).to.equal('Show less description');
     expect(toggle.getAttribute('daa-ll')).to.equal('Show-Less-Description');
 
     toggle.click();
     expect(el.classList.contains('is-expanded')).to.be.false;
-    expect(toggle.textContent).to.equal('Show more');
+    expect(toggle.querySelector('span:not(.sr-only)').textContent).to.equal('Show more');
+    expect(toggle.querySelector('.sr-only').textContent).to.equal('Show more description');
     expect(toggle.getAttribute('daa-ll')).to.equal('Show-More-Description');
   });
 });
