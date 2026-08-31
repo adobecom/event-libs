@@ -43,16 +43,41 @@
      there actually is. */
   .video-playlist-list {
     scrollbar-width: thin;
-    scrollbar-color: var(--s2a-color-gray-300) transparent;
+    scrollbar-color: var(--s2a-color-gray-300) var(--s2a-color-transparent-black-16);
+
+    /* Reserves the scrollbar gutter in both states so revealing the cap-induced
+       scrollbar on "Show more" doesn't reflow every row by its width. `stable` alone
+       (not `both-edges`) keeps the gutter on the scrolling edge only. */
+    scrollbar-gutter: stable;
+    padding-right: var(--s2a-spacing-xs);
   }
 
+  /* `-webkit-appearance: none` is the part that actually matters: without it, WebKit
+     keeps its overlay scrollbar behaviour (fades out ~1s after scrolling, and on macOS
+     with "Show scroll bars: automatically" never appears until a scroll gesture starts),
+     and the ::-webkit-scrollbar-thumb styling below is simply ignored. Declaring it
+     switches the container to a legacy, always-present scrollbar that occupies real
+     layout width — which is why the gutter is reserved above. */
   .video-playlist-list::-webkit-scrollbar {
+    appearance: none;
     width: 6px;
+  }
+
+  /* A visible track, not `transparent` — the thumb alone against the card background
+     gives no indication of how much list remains below, which is the whole point of
+     keeping it on screen. */
+  .video-playlist-list::-webkit-scrollbar-track {
+    background: var(--s2a-color-transparent-black-16);
+    border-radius: var(--s2a-border-radius-round);
   }
 
   .video-playlist-list::-webkit-scrollbar-thumb {
     background: var(--s2a-color-gray-300);
     border-radius: var(--s2a-border-radius-round);
+  }
+
+  .video-playlist-list::-webkit-scrollbar-thumb:hover {
+    background: var(--s2a-color-gray-500);
   }
 
   /* Favorite + play (stacked in .video-playlist-row-actions) are hover/focus-revealed
@@ -506,7 +531,16 @@
 @media (min-width: 1024px) {
   .video-playlist-show-more {
     display: flex;
+
+    /* align-items:center vertically centres the chevron against the label's cap height;
+       align-self:flex-start stops the parent flex column's default `stretch` from
+       blowing the button out to the card's full width, which made its focus ring span
+       the entire pod rather than hugging the label. width:fit-content keeps the hit area
+       (and that ring) on the text+chevron alone. */
+    align-items: center;
+    align-self: flex-start;
     gap: var(--s2a-spacing-xs);
+    width: fit-content;
     border: none;
     background: none;
     color: #000;
