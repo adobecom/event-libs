@@ -347,7 +347,7 @@ function runMobileRiderSuite(modulePath, variantLabel) {
         globalThis.mobilerider.embed = sinon.stub();
       });
 
-      it('should update status and dispose player on streamend', async () => {
+      it('should update status on streamend', async () => {
         const mockStore = { get: sinon.stub().returns(true), set: sinon.stub() };
         riderInstance.store = mockStore;
         // Only the classic drawer copy still supports this; C2 dropped concurrent-video support.
@@ -376,8 +376,17 @@ function runMobileRiderSuite(modulePath, variantLabel) {
 
         if (variantLabel === 'classic') expect(riderInstance.drawer).to.be.null;
         expect(mockStore.set.called).to.be.true;
-        expect(player.dispose.called).to.be.true;
-        expect(globalThis.__mr_player).to.be.null;
+
+        // The classic copy still tears the player down on streamend; C2 deliberately
+        // no longer does — it only flags the stream ended and updates status, leaving
+        // the existing player instance in place.
+        if (variantLabel === 'classic') {
+          expect(player.dispose.called).to.be.true;
+          expect(globalThis.__mr_player).to.be.null;
+        } else {
+          expect(player.dispose.called).to.be.false;
+          expect(globalThis.__mr_player).to.equal(player);
+        }
       });
 
       it('should handle streamend when drawer is null', async () => {
@@ -429,7 +438,12 @@ function runMobileRiderSuite(modulePath, variantLabel) {
         riderInstance.injectPlayer('test-video', 'test-skin');
 
         onCall.args[1]();
-        expect(riderInstance.wrap.querySelector('.mobile-rider-container.is-hidden')).to.not.be.null;
+
+        // Only the classic copy hides the container on streamend; C2 leaves it visible.
+        // Either way the point of this test is the re-embed guard below.
+        const hiddenContainer = riderInstance.wrap.querySelector('.mobile-rider-container.is-hidden');
+        if (variantLabel === 'classic') expect(hiddenContainer).to.not.be.null;
+        else expect(hiddenContainer).to.be.null;
 
         pendingRaf?.();
         expect(globalThis.mobilerider.embed.callCount).to.equal(embedCountAfterFirst);
@@ -830,7 +844,7 @@ function runMobileRiderSuite(modulePath, variantLabel) {
       expect(player3.on.calledWith('streamend')).to.be.true;
     });
 
-    it('streamend on ASL player updates store and disposes player', async () => {
+    it('streamend on ASL player updates store', async () => {
       riderInstance.mainID = 'vid';
       const mockStore = { get: sinon.stub().returns(true), set: sinon.stub() };
       riderInstance.store = mockStore;
@@ -858,8 +872,16 @@ function runMobileRiderSuite(modulePath, variantLabel) {
       // Fire streamend on ASL player
       onCall.args[1]();
       expect(mockStore.set.calledWith('vid', false)).to.be.true;
-      expect(aslPlayer.dispose.called).to.be.true;
-      expect(globalThis.__mr_player).to.be.null;
+
+      // Classic still disposes the player on streamend; C2 deliberately leaves it in
+      // place and only updates status (see #attachEndListener there).
+      if (variantLabel === 'classic') {
+        expect(aslPlayer.dispose.called).to.be.true;
+        expect(globalThis.__mr_player).to.be.null;
+      } else {
+        expect(aslPlayer.dispose.called).to.be.false;
+        expect(globalThis.__mr_player).to.equal(aslPlayer);
+      }
     });
   });
 
