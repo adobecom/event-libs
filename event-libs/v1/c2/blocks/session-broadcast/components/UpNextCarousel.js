@@ -1,13 +1,7 @@
 import { html } from '../../../../deps/htm-preact.js';
 import { Carousel } from '../../sessions-guide/components/Carousel.js';
 import { SessionCard } from '../../sessions-guide/components/SessionCard.js';
-import { openSessionGuideDetail } from '../../../../utils/session-store.js';
-import { trackBroadcastEvent } from '../utils/broadcast-analytics.js';
-
-function handleCardClick(session) {
-  openSessionGuideDetail(session.id);
-  trackBroadcastEvent(`Broadcast-Session-Detail-Open | ${session.id}`);
-}
+import { openSessionDetail } from '../utils/broadcast-analytics.js';
 
 // Capped/sorted upcoming sessions (utils/broadcast-schedule.js). Renders SessionCard, not
 // LiveCard — per the Figma "no image" Upcoming card (channel badge, title, icon-only
@@ -24,7 +18,7 @@ export function UpNextCarousel({ sessions, title = 'Upcoming' }) {
         title=${title}
         CardComponent=${SessionCard}
         timeDisplay="range"
-        onCardClick=${handleCardClick}
+        onCardClick=${openSessionDetail}
       />
     </div>
   `;

@@ -2,8 +2,6 @@ import { expect } from '@esm-bundle/chai';
 import {
   UP_NEXT_CAP,
   getLiveSessions,
-  getDefaultLiveSession,
-  getAlsoLiveSessions,
   getUpNextSessions,
   getBroadcastSchedule,
   hasPlayableVideoSource,
@@ -91,33 +89,6 @@ describe('broadcast-schedule', () => {
       const mrOnly = session('mr-only', -10, 10, { youTubeId: '', mpcId: '', mrStreamId: 'mr-1' });
       const activeIds = new Set(['mr-1']);
       expect(getLiveSessions([mrOnly], activeIds, nowMs).map((s) => s.id)).to.deep.equal(['mr-only']);
-    });
-  });
-
-  describe('getDefaultLiveSession', () => {
-    it('picks the earliest-starting live session', () => {
-      const s1 = session('a', -10, 10);
-      const s2 = session('b', -20, 5);
-      expect(getDefaultLiveSession([s1, s2], liveStreamActiveIds, nowMs).id).to.equal('b');
-    });
-
-    it('returns null when nothing is live', () => {
-      expect(getDefaultLiveSession([session('a', 10, 20)], liveStreamActiveIds, nowMs)).to.equal(null);
-    });
-  });
-
-  describe('getAlsoLiveSessions', () => {
-    it('excludes the active session from the live set', () => {
-      const s1 = session('a', -10, 10);
-      const s2 = session('b', -5, 15);
-      const result = getAlsoLiveSessions([s1, s2], liveStreamActiveIds, nowMs, 'a');
-      expect(result.map((s) => s.id)).to.deep.equal(['b']);
-    });
-
-    it('is empty when only one session is live (caller hides the carousel)', () => {
-      const s1 = session('a', -10, 10);
-      const result = getAlsoLiveSessions([s1], liveStreamActiveIds, nowMs, 'a');
-      expect(result).to.deep.equal([]);
     });
   });
 

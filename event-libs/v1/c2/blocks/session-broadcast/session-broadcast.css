@@ -200,7 +200,7 @@
 /* .sg-category-badge__label sets its own literal 14px (sessions-guide.css), which wins over
    .sb-info__meta's own font-size by specificity — override it here the same way the icon color
    above is, per node 4975:45473's 18px duration/channel-label spec. */
-.sb-info__meta .sg-category-badge__label { 
+.sb-info__meta .sg-category-badge__label {
   font-size: 16px;
   line-height: 20px;
   font-weight: 400;
@@ -312,7 +312,7 @@
   text-overflow: clip;
 }
 
-.sb-ended__desc { 
+.sb-ended__desc {
   margin: 0;
   line-height: 1.5;
 }
@@ -380,6 +380,53 @@
 .sb-ended__icon-btn svg {
   width: 16px;
   height: 16px;
+}
+
+/* ── Ended-state background bleed ──────────────────────────
+   Per node 4975:46052, the hero's darkened photo reads as one continuous surface behind Also
+   Live/Upcoming too, not stopping at .sb-ended's own (short) box — Figma sizes it against the
+   combined hero+carousels frame, not just the hero's own content height. Implemented as a
+   pseudo-element on .sb-app (not a JS-rendered <img> inside .sb-ended) because CSS paints a
+   positioned z-index:auto/0 descendant *after* plain in-flow siblings regardless of DOM order:
+   an <img> confined to .sb-ended but sized taller than it would still render on top of, not
+   behind, the carousel sections that follow (hiding their cards). Only a negative z-index on a
+   shared ancestor avoids that. `isolation: isolate` is required too — `position: relative`
+   alone doesn't establish a stacking context, so the ::before's negative z-index would
+   otherwise escape to a higher ancestor instead of staying behind just .sb-app's own
+   background (confirmed empirically: the photo was fully invisible without it).
+
+   --sb-app-ended-bg is a plain CSS custom property, set inline by BroadcastApp.js (the one
+   place with both the authored URL and the .sb-app element) — decorative-only, no alt text
+   needed either way. Height is a fixed, Figma-approximated value (the source frame's 48.81%
+   is relative to a dynamic combined-height frame with no direct CSS equivalent) — tune this if
+   the bleed should reach further or less far into Also Live. Three background-image layers:
+   a flat tint (overall darkening, matches the original single-box version) plus a vertical
+   fade (feathers that darkness to fully solid black by where Also Live begins) plus the photo
+   itself — tuned for legibility vs. brightness by eye, see PLAN.md for the exact history. */
+.sb-app:has(.sb-ended) {
+  position: relative;
+  isolation: isolate;
+  background: var(--s2a-color-gray-1000, #000);
+}
+
+.sb-app:has(.sb-ended)::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: -1;
+  width: 100%;
+  height: 480px;
+  background-image:
+    linear-gradient(180deg, rgb(0 0 0 / 60%) 0%, rgb(0 0 0 / 60%) 50%, rgb(0 0 0 / 75%) 75%),
+    linear-gradient(0deg, rgb(0 0 0 / 60%), rgb(0 0 0 / 60%)),
+    var(--sb-app-ended-bg, none);
+  background-repeat: no-repeat;
+  background-position: top center;
+  background-size:
+    100% 100%,
+    100% 100%,
+    cover;
 }
 
 /* ── Carousel sections ──────────────────────────────────── */
@@ -531,63 +578,12 @@
   backdrop-filter: blur(16px);
 }
 
-/* Per node 4975:46052: once ended, the hero's darkened-image-to-black background reads as one
-   continuous surface behind Also Live/Upcoming too, not stopping at .sb-ended's own (short)
-   box — Figma's own version sizes this photo against the combined hero+carousels frame, not
-   just the hero's own content height. :has() rather than a JS-authored state class: this only
-   ever needs to be true exactly when EndedState is actually in the DOM. Also Live/Upcoming
-   cards themselves are unchanged in this state (per the same Figma node) — only the section
-   chrome around them gives way to the shared black/photo background below. `isolation:
-   isolate` forces this element to establish its own stacking context — without it, `position:
-   relative` alone (no z-index) doesn't create one, so the ::before's negative z-index below
-   would escape to compete at a higher ancestor's stacking context instead of reliably staying
-   behind just this element's own background (confirmed empirically: the photo was invisible,
-   fully hidden by this rule's own black fill, until this was added). */
-.sb-app:has(.sb-ended) {
-  position: relative;
-  isolation: isolate;
-  background: var(--s2a-color-gray-1000, #000);
-}
-
-/* The actual photo + darkening scrim, sized independently of .sb-ended's own (much shorter)
-   content box so it can visually bleed into Also Live below. A plain descendant positioned
-   inside .sb-ended can't do this: CSS paints a positioned z-index:auto/0 descendant *after*
-   plain in-flow siblings within the same stacking context, regardless of DOM order — so
-   anything taller than .sb-ended sitting inside it would still render on top of, not behind,
-   the carousel sections that follow (hiding their cards). A negative z-index is what actually
-   moves a layer behind everything else, hence a pseudo-element on .sb-app itself rather than
-   an <img> in EndedState.js — see BroadcastApp.js's own comment for the JS side of this.
-   --sb-app-ended-bg is a plain CSS custom property (an inline style set by BroadcastApp.js),
-   not authored HTML — decorative-only, so no alt text is needed either way. Height is a fixed,
-   Figma-approximated value (the source frame's 48.81% is relative to a dynamic combined-height
-   frame that has no direct CSS equivalent here) — tune this if the bleed should reach further
-   or less far into Also Live. Two gradient layers on top of the photo, not one: the vertical
-   fade alone left the top of the photo nearly untinted (too bright, poor text contrast) — the
-   flat, uniform tint layer restores the same overall darkening the original single-box version
-   had, while the vertical fade still does the extra job of feathering it to fully solid black
-   by the point Also Live begins. Both tuned down from an earlier, darker pass per explicit
-   follow-up (flat tint 85%→60%, fade's own start pushed from 0%→20%) so more of the photo
-   shows through near the top instead of darkening immediately. */
-.sb-app:has(.sb-ended)::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  z-index: -1;
-  width: 100%;
-  height: 480px;
-  background-image:
-    linear-gradient(180deg, rgb(0 0 0 / 60%) 0%, rgb(0 0 0 / 60%) 50%, rgb(0 0 0 / 75%) 75%),
-    linear-gradient(0deg, rgb(0 0 0 / 60%), rgb(0 0 0 / 60%)),
-    var(--sb-app-ended-bg, none);
-  background-repeat: no-repeat;
-  background-position: top center;
-  background-size:
-    100% 100%,
-    100% 100%,
-    cover;
-}
-
+/* Also Live/Upcoming's own opaque section backgrounds need to give way to the shared
+   photo/black background once ended (see the "Ended-state background bleed" section above) —
+   kept here, after both sections' base rules, so specificity stays ascending (stylelint
+   no-descending-specificity: this sibling-combinator selector out-specifies the plain
+   .sb-carousel-section--also-live/--up-next rules above it). Cards themselves are unchanged in
+   this state (per node 4975:46052) — only the section chrome around them turns transparent. */
 .sb-ended ~ .sb-carousel-section--also-live,
 .sb-ended ~ .sb-carousel-section--up-next {
   background: transparent;

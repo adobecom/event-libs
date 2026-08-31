@@ -30,7 +30,7 @@ const SESSION_ENDED_IMAGE_LABEL = 'session ended image';
 // - Embedding a picture directly (the more natural DA authoring flow) still works too, as long
 //   as the picked asset's alt text doesn't trigger that collision: reading the live img.src DOM
 //   property (not a serialized HTML string) gets an already-browser-resolved absolute URL,
-//   which is what safeUrl() in EndedState.js expects.
+//   which is what safeUrl() (BroadcastApp.js) expects.
 function extractSessionEndedImageUrl(el) {
   const row = [...el.querySelectorAll(':scope > div')]
     .find((r) => r.children[0]?.textContent.trim().toLowerCase() === SESSION_ENDED_IMAGE_LABEL);

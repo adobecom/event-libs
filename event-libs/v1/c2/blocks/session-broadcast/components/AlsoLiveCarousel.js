@@ -1,12 +1,6 @@
 import { html } from '../../../../deps/htm-preact.js';
 import { Carousel } from '../../sessions-guide/components/Carousel.js';
-import { openSessionGuideDetail } from '../../../../utils/session-store.js';
-import { trackBroadcastEvent } from '../utils/broadcast-analytics.js';
-
-function handleCardClick(session) {
-  openSessionGuideDetail(session.id);
-  trackBroadcastEvent(`Broadcast-Session-Detail-Open | ${session.id}`);
-}
+import { openSessionDetail } from '../utils/broadcast-analytics.js';
 
 // Every other currently-live session, excluding the one in the primary player — reuses
 // sessions-guide's Carousel/LiveCard wholesale (see the plan's Architecture Decisions).
@@ -24,7 +18,7 @@ export function AlsoLiveCarousel({ sessions, title = 'Currently Live', onSwitchS
         sessions=${sessions}
         title=${title}
         variant="live"
-        onCardClick=${handleCardClick}
+        onCardClick=${openSessionDetail}
         onWatchSamePage=${onSwitchSession}
       />
     </div>

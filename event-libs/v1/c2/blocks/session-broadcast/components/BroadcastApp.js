@@ -116,17 +116,10 @@ export function BroadcastBody({ config }) {
   const nothingAtAll = !schedule.activeSession && !schedule.endedSession
     && !schedule.alsoLive.length && !schedule.upNext.length;
 
-  // The ended-state background photo needs to visually bleed past .sb-ended's own (short)
-  // content box into Also Live/Upcoming below it (per node 4975:46052 — Figma's own version
-  // sizes this photo against the combined hero+carousels frame, not just the hero's own box).
-  // Rendered as a real CSS background on .sb-app itself (session-broadcast.css's
-  // .sb-app:has(.sb-ended)::before, given a negative z-index so it always paints behind the
-  // sections that follow), not a JS-rendered <img> scoped inside EndedState — a plain
-  // absolutely-positioned descendant sized taller than its own container would otherwise still
-  // paint *above* the plain, non-positioned carousel sections after it (CSS paints positioned
-  // z-index:auto descendants after in-flow siblings, regardless of DOM order), hiding their
-  // content. The URL travels down via a custom property since BroadcastApp is the only place
-  // that has both the authored config and renders .sb-app.
+  // Feeds the ended-state background photo to session-broadcast.css's ".sb-app:has(.sb-ended)"
+  // rules (see that file's "Ended-state background bleed" section for why this lives on
+  // .sb-app rather than inside EndedState.js) — BroadcastApp is the one place with both the
+  // authored config and the .sb-app element.
   const endedActive = !schedule.activeSession && !!schedule.endedSession;
   const endedBgUrl = endedActive ? safeUrl(config.sessionEndedImageUrl) : '';
   const appStyle = endedBgUrl ? `--sb-app-ended-bg: url("${endedBgUrl}")` : '';

@@ -555,6 +555,50 @@ same point (just before Also Live) as before. Verified visually in the harness: 
 noticeably more visible/recognizable near the top, text is still fully legible, and the
 transition to solid black by "Currently Live" is unchanged.
 
+**Cleanup pass before tablet — done (2026-08-30)**, per explicit request, ahead of starting the
+tablet breakpoint. Pure review/cleanup — no visual change (re-verified live in the harness for
+both live and ended states after every edit). Net -58 lines.
+- **Dead code removed**: `getDefaultLiveSession`/`getAlsoLiveSessions` in
+  `broadcast-schedule.js` — confirmed unused outside their own unit tests (superseded by
+  `getBroadcastSchedule`'s own inline "commitment, not preference" logic since the Phase 3
+  redesign; nothing in `BroadcastApp.js` has called either since). Their describe blocks in
+  `broadcast-schedule.test.js` removed too — `getBroadcastSchedule`'s own tests already cover
+  the same default-pick/exclusion behavior end to end.
+- **Duplicated logic extracted**: `AlsoLiveCarousel.js` and `UpNextCarousel.js` each had an
+  identical `handleCardClick` (open the Session Guide detail view + track the analytics event)
+  — pulled into one `openSessionDetail(session)` in `broadcast-analytics.js`, used by both.
+- **Two stale comments fixed** (both confirmed against current code before editing, not just
+  reworded): `session-broadcast.js`'s `extractSessionEndedImageUrl` doc said `safeUrl()` lives
+  in `EndedState.js` — it moved to `BroadcastApp.js` in the background-bleed refactor and the
+  comment never got updated. `EndedState.js`'s own header said "elsewhere in this file" about
+  the frosted-glass chip pattern that's actually defined in `session-broadcast.css`, not in the
+  JS file at all.
+- **CSS reorganized**: the ended-state background-bleed rules (`.sb-app:has(.sb-ended)`,
+  `::before`, and the two sibling-combinator overrides) had ended up tacked onto the end of the
+  Upcoming section purely because that's where `no-descending-specificity` forced the two
+  sibling-combinator rules to live. Split it: the two rules with no ordering dependency
+  (`.sb-app:has(.sb-ended)` and its `::before`) now live in their own labeled "Ended-state
+  background bleed" section directly after Ended State, where they conceptually belong; only
+  the two sibling-combinator rules that must stay after the base carousel-section rules
+  (for specificity ordering) stayed put, now with a comment explaining why they're separated
+  from the rest of the feature they're part of.
+- **Comment consolidation**: the `::before` rule's comment had grown into a running diary
+  across three separate tuning passes (background-bleed refactor → too-bright fix → later-fade
+  fix), each addendum quoting the specific before/after numbers of that pass. Condensed into
+  one explanation of the current design (three-layer background-image: flat tint + vertical
+  fade + photo) with a pointer to this PLAN.md file for the tuning history, rather than
+  carrying that history in the shipped CSS itself — this is a buildless project, so
+  everything in source ships straight to visitors with no build step to strip comments.
+  `BroadcastApp.js`'s own copy of the paint-order/stacking-context reasoning (now stated fully,
+  once, in the CSS file) was trimmed to a two-line pointer for the same reason.
+- **Formatting nits**: two rules had a trailing space after their opening `{` from an editor
+  autocomplete artifact (`.sb-info__meta .sg-category-badge__label`, `.sb-ended__desc`) — fixed.
+- **Considered, not done**: `.sb-info__icon-btn`/`--favorite` and `.sb-ended__icon-btn`/
+  `--favorite` are near-identical (40px circle, transparent, white ring on favorite, bare icon
+  for share) but scoped to two different, mutually-exclusive states. Left unmerged on purpose —
+  tablet's own spec for these two contexts isn't known yet, and merging now risks fighting that
+  work rather than helping it; revisit after tablet if they're still identical then.
+
 ## Explicitly out of scope (fast-follow)
 
 - MobileRider real playback (stub adapter only)

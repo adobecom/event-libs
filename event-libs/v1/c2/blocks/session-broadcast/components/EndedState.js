@@ -21,15 +21,14 @@ import {
 // Content block matches node 4975:46072: eyebrow + title, a channel-badge/duration meta row,
 // a single-line-truncated description with a "View more"/"View less" toggle, and a Watch on
 // demand pill plus Favorite/Share icon buttons (the same outlined-ring treatment on both,
-// confirmed via a zoomed screenshot of node 4975:46089 — not the frosted-glass chip used
-// elsewhere in this file for Also Live/Upcoming's on-light buttons).
+// confirmed via a zoomed screenshot of node 4975:46089 — not the frosted-glass chip
+// session-broadcast.css uses for Also Live/Upcoming's own on-light buttons).
 //
 // The background photo itself is NOT rendered here — it's a CSS background on the shared
-// .sb-app ancestor instead (see BroadcastApp.js), so it can visually bleed past this
-// component's own (short) box into Also Live/Upcoming below it. See BroadcastApp.js's own
-// comment for why (paint-order), and PLAN.md's Phase 4 writeup for the separate
-// decorateImageLinks() authoring-convention incident that's still why the URL travels as a
-// linked row rather than an embedded picture.
+// .sb-app ancestor instead (see session-broadcast.css's "Ended-state background bleed"
+// section for why), so it can visually bleed past this component's own (short) box into Also
+// Live/Upcoming below it. PLAN.md's Phase 4 writeup covers the separate decorateImageLinks()
+// authoring-convention incident that's why the URL travels as a linked row, not a picture.
 export function EndedState({ session }) {
   const [expanded, setExpanded] = useState(false);
 

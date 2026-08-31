@@ -46,20 +46,6 @@ export function getLiveSessions(sessionList, liveStreamActiveIds, nowMs) {
     .sort(byStartTimeAsc);
 }
 
-// "First session in the current time block" (ticket) — the default primary-player pick when
-// no session is explicitly selected.
-export function getDefaultLiveSession(sessionList, liveStreamActiveIds, nowMs) {
-  return getLiveSessions(sessionList, liveStreamActiveIds, nowMs)[0] || null;
-}
-
-// Every other currently-live session, excluding whichever is active in the primary player.
-// The caller hides the Also Live carousel entirely when this returns an empty array (ticket:
-// "if only one session is live, the Also Live carousel is hidden").
-export function getAlsoLiveSessions(sessionList, liveStreamActiveIds, nowMs, activeSessionId) {
-  return getLiveSessions(sessionList, liveStreamActiveIds, nowMs)
-    .filter((s) => s.id !== activeSessionId);
-}
-
 // Upcoming sessions, capped at `cap`, chronological by start time with a random tiebreak for
 // sessions sharing the same start time (ticket AC). Backfilling across day boundaries falls
 // out for free: this recomputes from live state on every ticker tick, so a session simply

@@ -1,4 +1,5 @@
 import { LIBS, getEventConfig } from '../../../../utils/utils.js';
+import { openSessionGuideDetail } from '../../../../utils/session-store.js';
 
 // Same dynamically-imported sendAnalytics events-form.js already uses (${miloLibs}/blocks/
 // modal/modal.js) — no separate payload argument exists, it takes a real Event whose `.type`
@@ -25,6 +26,14 @@ export async function trackBroadcastEvent(name) {
   } catch (err) {
     window.lana?.log(`session-broadcast analytics: ${err.message}`, { tags: 'session-broadcast' });
   }
+}
+
+// Shared by both carousels' onCardClick — opens the real Session Guide detail view (no local
+// modal, see the plan's Architecture Decisions) and tracks it in one call instead of repeating
+// this pair at each call site.
+export function openSessionDetail(session) {
+  openSessionGuideDetail(session.id);
+  trackBroadcastEvent(`Broadcast-Session-Detail-Open | ${session.id}`);
 }
 
 // No CTA-tagged entry-point query param exists (the ticket's AC just says "entry-point
