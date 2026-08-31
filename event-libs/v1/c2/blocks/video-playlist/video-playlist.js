@@ -621,13 +621,23 @@ function hasEmbeddedVideoPlayer(container) {
  * out to be separate `.fragment > .section` trees.
  */
 function announceVideoDecision(hasPlaylist) {
+  /* eslint-disable no-console */
+  // TEMP DIAGNOSTIC — remove before merging.
+  console.log(`[VPL-DEBUG] announceVideoDecision(hasPlaylist=${hasPlaylist})`, {
+    videoContainerFound: Boolean(document.querySelector(`.${VIDEO_CONTAINER_CLASS}`)),
+    playlistContainerFound: Boolean(document.querySelector(`.${VIDEO_PLAYLIST_CONTAINER_CLASS}`)),
+    playersOnPage: document.querySelectorAll('.video-player').length,
+    alreadyEmbedded: document.querySelectorAll('.video-player[data-embedded="true"]').length,
+  });
   BlockMediator.set(VIDEO_LAYOUT_DECISION_KEY, { hasPlaylist });
 
   if (hasPlaylist) {
     // The full-width container only ever holds a `.video-player`, so there's nothing
     // else in it to protect — the whole section goes.
     const videoContainer = document.querySelector(`.${VIDEO_CONTAINER_CLASS}`);
-    if (!hasEmbeddedVideoPlayer(videoContainer)) collapseAndRemove(videoContainer);
+    const blocked = hasEmbeddedVideoPlayer(videoContainer);
+    console.log(`[VPL-DEBUG] hasPlaylist=true -> collapse .video-container? found=${Boolean(videoContainer)} alreadyEmbeddedSoSkipped=${blocked}`);
+    if (!blocked) collapseAndRemove(videoContainer);
     return;
   }
 
@@ -635,13 +645,19 @@ function announceVideoDecision(hasPlaylist) {
   // event-speakers, event-session-resources, ...), so only its own two video blocks are
   // removed — never the container itself or any sibling.
   const playlistContainer = document.querySelector(`.${VIDEO_PLAYLIST_CONTAINER_CLASS}`);
-  if (!hasEmbeddedVideoPlayer(playlistContainer)) {
+  const blocked = hasEmbeddedVideoPlayer(playlistContainer);
+  console.log(`[VPL-DEBUG] hasPlaylist=false -> collapse playlist-container's player? found=${Boolean(playlistContainer?.querySelector('.video-player'))} alreadyEmbeddedSoSkipped=${blocked}`);
+  if (!blocked) {
     collapseAndRemove(playlistContainer?.querySelector('.video-player'));
   }
   collapseAndRemove(playlistContainer?.querySelector('.video-playlist'));
+  /* eslint-enable no-console */
 }
 
 function removeBlock(el) {
+  // TEMP DIAGNOSTIC — remove before merging.
+  // eslint-disable-next-line no-console
+  console.log('[VPL-DEBUG] removeBlock() called — playlist has nothing to show');
   window.dispatchEvent(new CustomEvent('video-playlist:removed'));
   announceVideoDecision(false);
   el.remove();

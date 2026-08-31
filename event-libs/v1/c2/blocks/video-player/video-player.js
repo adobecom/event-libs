@@ -529,32 +529,46 @@ function isWinningInstance(el, hasPlaylist) {
  * at all — or a stalled session-catalog fetch — still resolves instead of waiting forever.
  */
 function awaitEmbedDecision(el) {
+  // TEMP DIAGNOSTIC — remove before merging.
+  const who = el.closest(`.${VIDEO_PLAYLIST_CONTAINER_CLASS}`) ? 'PLAYLIST-CONTAINER' : 'FULL-WIDTH';
+  /* eslint-disable no-console */
   const existingDecision = BlockMediator.get(VIDEO_LAYOUT_DECISION_KEY);
+  console.log(`[VP-DEBUG] ${who} awaitEmbedDecision start; existing decision =`, existingDecision);
+
   if (existingDecision != null) {
-    return Promise.resolve(isWinningInstance(el, existingDecision.hasPlaylist));
+    const winner = isWinningInstance(el, existingDecision.hasPlaylist);
+    console.log(`[VP-DEBUG] ${who} resolved SYNC from existing decision -> isWinner=${winner}`);
+    return Promise.resolve(winner);
   }
 
   return new Promise((resolve) => {
     let settled = false;
     let unsubscribe = () => {};
 
-    const settle = (hasPlaylist) => {
-      if (settled) return;
+    const settle = (hasPlaylist, source) => {
+      if (settled) {
+        console.log(`[VP-DEBUG] ${who} settle IGNORED (already settled) from ${source}`);
+        return;
+      }
       settled = true;
       clearTimeout(fallbackTimer);
       unsubscribe();
-      resolve(isWinningInstance(el, hasPlaylist));
+      const winner = isWinningInstance(el, hasPlaylist);
+      console.log(`[VP-DEBUG] ${who} settled via ${source}; hasPlaylist=${hasPlaylist} -> isWinner=${winner}`);
+      resolve(winner);
     };
 
     unsubscribe = BlockMediator.subscribe(VIDEO_LAYOUT_DECISION_KEY, ({ newValue }) => {
+      console.log(`[VP-DEBUG] ${who} BlockMediator notified with`, newValue);
       // Guarded: a store cleared to undefined would otherwise throw inside this
       // subscriber, and BlockMediator.set rethrows whatever its subscribers throw.
       if (newValue == null) return;
-      settle(Boolean(newValue.hasPlaylist));
+      settle(Boolean(newValue.hasPlaylist), 'SUBSCRIPTION');
     });
 
-    const fallbackTimer = setTimeout(() => settle(false), DECISION_FALLBACK_MS);
+    const fallbackTimer = setTimeout(() => settle(false, `${DECISION_FALLBACK_MS}ms TIMEOUT`), DECISION_FALLBACK_MS);
   });
+  /* eslint-enable no-console */
 }
 
 /**
@@ -622,6 +636,10 @@ export default async function init(el) {
     try {
       const isWinner = await awaitEmbedDecision(el);
       hideVideoLayoutLoader();
+      // TEMP DIAGNOSTIC — remove before merging.
+      const who = el.closest(`.${VIDEO_PLAYLIST_CONTAINER_CLASS}`) ? 'PLAYLIST-CONTAINER' : 'FULL-WIDTH';
+      // eslint-disable-next-line no-console
+      console.log(`[VP-DEBUG] ${who} isWinner=${isWinner} -> ${isWinner ? 'EMBEDDING' : 'skipping'}`);
       if (!isWinner) return;
       loadVideoPlayer(el, sessionId, currentVideo);
     } catch (error) {
