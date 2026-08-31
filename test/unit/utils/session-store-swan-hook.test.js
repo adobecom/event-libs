@@ -31,7 +31,7 @@ function settlesWithin(promise, ms) {
 
 describe('session-store: toggleSchedule fires SWAN notification hooks without blocking on them', () => {
   let originalFetch;
-  let originalFeds;
+  let originalUniversalNav;
 
   before(async () => {
     originalFetch = window.fetch;
@@ -45,13 +45,13 @@ describe('session-store: toggleSchedule fires SWAN notification hooks without bl
       return { ok: true, status: 200, json: async () => ({}) };
     };
 
-    originalFeds = window.feds;
-    // Deliberately absent — unc-client.js's whenUncReady() will hang (waiting on
-    // feds.data.notifications.loaded) until the test itself supplies it below. If
+    originalUniversalNav = window.UniversalNav;
+    // Deliberately absent — unc-client.js's whenUncReady() will poll (waiting on
+    // window.UniversalNav.getComponent) until the test itself supplies it below. If
     // toggleSchedule() were regressed to await notifySessionScheduled() inline, its own
     // promise would hang right along with this one, and settlesWithin() below would return
     // false instead of true.
-    delete window.feds;
+    delete window.UniversalNav;
 
     const meta = document.createElement('meta');
     meta.name = 'swan-notifications';
@@ -65,7 +65,7 @@ describe('session-store: toggleSchedule fires SWAN notification hooks without bl
 
   after(() => {
     window.fetch = originalFetch;
-    window.feds = originalFeds;
+    window.UniversalNav = originalUniversalNav;
     document.head.querySelector('meta[name="tier-1-event-config"]')?.remove();
     document.head.querySelector('meta[name="swan-notifications"]')?.remove();
   });
@@ -87,17 +87,20 @@ describe('session-store: toggleSchedule fires SWAN notification hooks without bl
     // Only now let UNC "become ready" — proves the fire-and-forget SWAN call really was
     // still in flight above, not merely fast.
     const calls = [];
-    const uncInstance = {
-      UpsertReminderFeatureFlag: (data) => calls.push({
-        method: 'UpsertReminderFeatureFlag', campaignID: data.campaignRules[0].campaignID,
-      }),
-      DeleteReminderFeatureFlag: () => {},
-      AnalyticsEventFromHost: () => {},
+    window.UniversalNav = {
+      getComponent: async (name) => (name === 'notifications' ? {
+        instance: {
+          UpsertReminderFeatureFlag: (data) => calls.push({
+            method: 'UpsertReminderFeatureFlag', campaignID: data.campaignRules[0].campaignID,
+          }),
+          DeleteReminderFeatureFlag: () => {},
+          AnalyticsEventFromHost: () => {},
+        },
+      } : undefined),
     };
-    window.feds = { data: { notifications: uncInstance } };
-    window.dispatchEvent(new CustomEvent('feds.data.notifications.loaded'));
 
-    await new Promise((resolve) => setTimeout(resolve, 0));
+    // whenUncReady() polls every 250ms — give the next attempt a chance to run.
+    await new Promise((resolve) => setTimeout(resolve, 300));
     const upsert = calls.find((c) => c.method === 'UpsertReminderFeatureFlag');
     expect(upsert?.campaignID).to.equal(buildCampaignId('RF-1', 'live'));
   });

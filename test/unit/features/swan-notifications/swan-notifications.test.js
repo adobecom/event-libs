@@ -25,8 +25,12 @@ function makeSession(rfCode, { startOffsetMs, endOffsetMs }) {
 
 const MIN = 60 * 1000;
 
+function makeUniversalNav(uncInstance) {
+  return { getComponent: async (name) => (name === 'notifications' ? { instance: uncInstance } : undefined) };
+}
+
 describe('swan-notifications', () => {
-  let originalFeds;
+  let originalUniversalNav;
   let calls;
 
   beforeEach(() => {
@@ -35,7 +39,7 @@ describe('swan-notifications', () => {
     meta.content = 'true';
     document.head.appendChild(meta);
 
-    originalFeds = window.feds;
+    originalUniversalNav = window.UniversalNav;
     calls = [];
     const uncInstance = {
       UpsertReminderFeatureFlag: (data) => calls.push({
@@ -49,12 +53,12 @@ describe('swan-notifications', () => {
       }),
       AnalyticsEventFromHost: (eventData) => calls.push({ method: 'AnalyticsEventFromHost', eventData }),
     };
-    window.feds = { data: { notifications: uncInstance } };
+    window.UniversalNav = makeUniversalNav(uncInstance);
     window.localStorage.removeItem(LOCAL_STATE_KEY);
   });
 
   afterEach(() => {
-    window.feds = originalFeds;
+    window.UniversalNav = originalUniversalNav;
     window.localStorage.removeItem(LOCAL_STATE_KEY);
     document.head.querySelector('meta[name="swan-notifications"]')?.remove();
     sinon.restore();
@@ -132,10 +136,13 @@ describe('swan-notifications', () => {
 
     it('does not persist state for a failed transition, so it can be retried once UNC becomes available', async () => {
       // No UNC instance available on this page load — registerReminderRule/fireHostEvent
-      // both resolve false (via whenUncReady()'s own timeout) rather than throw.
-      delete window.feds;
-      const clock = sinon.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+      // both resolve false (via whenUncReady()'s own polling timeout) rather than throw.
+      delete window.UniversalNav;
       const session = makeSession('RF-retry', { startOffsetMs: -MIN, endOffsetMs: 30 * MIN });
+      // Anchored to the real current time — whenUncReady()'s deadline check uses Date.now(),
+      // so faking Date without an explicit `now` could start the fake clock at a different
+      // epoch than the session's own timestamps (computed above, before this installs).
+      const clock = sinon.useFakeTimers({ now: Date.now(), toFake: ['setTimeout', 'clearTimeout', 'Date'] });
 
       const scheduledPromise = notifySessionScheduled(session);
       await clock.tickAsync(8000); // let whenUncReady()'s default timeout elapse
@@ -148,17 +155,13 @@ describe('swan-notifications', () => {
       expect(state['RF-retry']).to.equal(undefined);
 
       // Once UNC is available, the very next reconcile should succeed.
-      window.feds = {
-        data: {
-          notifications: {
-            UpsertReminderFeatureFlag: (data) => calls.push({
-              method: 'UpsertReminderFeatureFlag', campaignID: data.campaignRules[0].campaignID,
-            }),
-            DeleteReminderFeatureFlag: () => {},
-            AnalyticsEventFromHost: (eventData) => calls.push({ method: 'AnalyticsEventFromHost', eventData }),
-          },
-        },
-      };
+      window.UniversalNav = makeUniversalNav({
+        UpsertReminderFeatureFlag: (data) => calls.push({
+          method: 'UpsertReminderFeatureFlag', campaignID: data.campaignRules[0].campaignID,
+        }),
+        DeleteReminderFeatureFlag: () => {},
+        AnalyticsEventFromHost: (eventData) => calls.push({ method: 'AnalyticsEventFromHost', eventData }),
+      });
       calls = [];
       await reconcileSwanNotifications(() => [session], () => new Set([session.id]));
 

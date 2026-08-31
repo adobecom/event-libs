@@ -4,7 +4,10 @@ SWAN (Site-Wide Alerts and Notifications) lets an attendee who schedules a sessi
 a reminder when it's about to go live, and again when it becomes available on-demand.
 The reminder is rendered by **UNC**, Adobe's Universal Notification Client — the engine
 behind the notification bell embedded in the nav. This guide documents the real,
-source-confirmed contract with UNC and the one integration seam that's still unconfirmed.
+source-confirmed contract with UNC — both the engine's own API and the way milo actually
+loads and exposes it on the page, verified by fetching and inspecting the real deployed
+bundles (`prod.adobeccstatic.com/unav/1.6/UniversalNav.js` and its lazily-loaded
+`NotificationLoader` chunk), not just the two source repos in isolation.
 
 Implementation lives in
 [`event-libs/v1/features/swan-notifications/`](../event-libs/v1/features/swan-notifications/).
@@ -23,8 +26,12 @@ event-libs SWAN feature (this repo)
         │  compute timing, register a UNC rule for the current stage, fire its matching
         │  host event, delete the previous stage's rule
         ▼
-UNC engine instance on the page (window.feds.data.notifications, or wherever it's
-actually exposed — see Open question below)
+window.UniversalNav.getComponent('notifications')   (milo's gnav, already on the page)
+        │  lazily loads NotificationLoader chunk → loads the real UNC engine bundle
+        │  (adobeccstatic.com/unc/<version>/UNC-shared.js) → constructs it, resolves
+        │  { instance }
+        ▼
+UNC engine instance (unc-client.js)
         ▼
 UNC bell UI
 ```
@@ -84,26 +91,40 @@ CDN) or a `tracking_server` session-tracking mechanism — either would reintrod
 network dependency; the payload is always a static JSON string, and `session_tracking` is
 left unset.
 
-## Open question — the one thing still unconfirmed
+## How the page obtains the live UNC instance (now confirmed, not guessed)
 
-**How does our page JS actually obtain the live `UNC` instance?** The `ccxi-unc` source
-above is the engine itself, not whatever hosts/wraps it inside milo's nav (that's a
-separate repo not available for this investigation). This is the single remaining
-placeholder assumption, isolated in
-[`unc-client.js`](../event-libs/v1/features/swan-notifications/unc-client.js): it checks
-`window.feds?.data?.notifications` synchronously, then falls back to a
-`feds.data.notifications.loaded` event — mirroring the shape of an already-established
-pattern elsewhere in this repo for exactly this kind of handoff (see
-[`sessions-guide/services/feds.js`](../event-libs/v1/c2/blocks/sessions-guide/services/feds.js)'s
-`getFedsToken()`, which does the same check-then-fall-back-to-an-event dance for
-`window.feds.data.authToken` — though it rejects on timeout and never cleans up its
-listener, where `unc-client.js` resolves `null` and always removes its own). A
-colleague familiar with UNC's Slack channel confirmed the general shape of this pattern
-(a "ready callback / object handoff," referencing an `onComponentReady.unc`-style
-convention in older utilnav wiring) but not the exact global/event name for the
-notifications engine specifically — **that's the one thing left to confirm with the UNC
-team.** Nothing else in this feature depends on guessing this correctly; every other
-design decision above is grounded directly in `ccxi-unc`'s source.
+An earlier version of this doc flagged this as the one open question — it isn't anymore.
+Fetched the actual bundles milo loads and inspected them directly (not just the two
+source repos):
+
+- Milo's `global-navigation.js` loads
+  `https://{prod,stage}.adobeccstatic.com/unav/1.6/UniversalNav.js` (confirmed: this repo
+  is separate from `ccxi-unc` — it's the nav *shell*, not the notification engine).
+  Grepping the fetched bundle found **no `window.feds` anywhere** — that was the old
+  guess, and it's simply wrong for this bundle.
+- That shell exposes `window.UniversalNav.getComponent(name)` — confirmed by reading its
+  actual (minified but readable) source: for `name === 'notifications'`, it dynamically
+  loads a separate webpack chunk (`NotificationLoader.<hash>.bundle.js`), which in turn
+  `LoadJS`-injects the real engine bundle at
+  `https://prod.adobeccstatic.com/unc/10.0/UNC-shared.js` (matching `ccxi-unc`'s own
+  webpack build output naming), constructs it as `new window.UNC.default(config)`, and
+  resolves `getComponent('notifications')` to `{ instance }`. Confirmed `instance` exposes
+  the engine's methods directly — the same bundle calls `instance.ShowNotification`/
+  `HideNotification` this way — so `instance.UpsertReminderFeatureFlag`/
+  `DeleteReminderFeatureFlag`/`AnalyticsEventFromHost` are the same calls documented above.
+- No dedicated "ready" event exists for this (checked milo's `global-navigation.js` for
+  any `dispatchEvent` around gnav/unav decoration — found none for this specifically), and
+  `getComponent()` itself resolves `undefined` (caught internally, not thrown) if called
+  before the notifications component has actually been initialized. `unc-client.js`'s
+  `whenUncReady()` therefore polls (`window.UniversalNav.getComponent('notifications')`
+  every 250ms up to an 8s budget) rather than waiting on an event.
+
+**The real remaining dependency this surfaces**: `getComponent('notifications')` only
+ever resolves a real instance once the page's gnav has the notifications component
+actually configured and initialized — i.e., `universal-nav` page metadata enabling it,
+the same mechanism milo's `applicationContext.appID`/`uncConfig` are threaded through.
+**da-events' pages need this configured** for SWAN to have anywhere to deliver to — this
+is now the one open coordination item, replacing the old instance-handoff question.
 
 ## Configuration
 
@@ -118,17 +139,19 @@ real default asset URL has been set yet) in
 
 ## Verifying the chain end-to-end
 
-1. Add `<meta name="swan-notifications" content="true">` to a test page that already
+1. Confirm the page's gnav has `universal-nav` metadata with the notifications component
+   enabled (see the coordination item above) — without this, `getComponent('notifications')`
+   never resolves a real instance and everything below silently no-ops.
+2. Add `<meta name="swan-notifications" content="true">` to a test page that already
    has `tier-1-event-config` metadata.
-2. Once the UNC-instance handoff above is confirmed and `unc-client.js` is updated
-   accordingly, schedule a session ~2 minutes out as a signed-in test user. Leave the tab
-   open; confirm a bell entry appears once the reminder's `schedule_at` time arrives,
-   without any further action from this code (validates UNC's own poller).
-3. Let the session cross its live boundary with the tab open; confirm the reminder's bell
+3. Schedule a session ~2 minutes out as a signed-in test user. Leave the tab open;
+   confirm a bell entry appears once the reminder's `schedule_at` time arrives, without
+   any further action from this code (validates UNC's own poller).
+4. Let the session cross its live boundary with the tab open; confirm the reminder's bell
    entry is removed and a new one appears for "live" (not both at once, and not a
    duplicate of "live").
-4. Let it cross the on-demand boundary; confirm the same for "live" → "on-demand".
-5. Unschedule the session at any stage; confirm its currently-active bell entry is removed.
-6. Reload mid-cycle; confirm no duplicate entry is created (the local
+5. Let it cross the on-demand boundary; confirm the same for "live" → "on-demand".
+6. Unschedule the session at any stage; confirm its currently-active bell entry is removed.
+7. Reload mid-cycle; confirm no duplicate entry is created (the local
    `swan-notification-state-v2` `localStorage` key prevents re-registering a stage
    already reached).

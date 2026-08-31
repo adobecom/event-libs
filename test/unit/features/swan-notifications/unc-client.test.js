@@ -12,72 +12,77 @@ function makeUncInstance() {
   };
 }
 
+function stubUniversalNav(getComponent) {
+  window.UniversalNav = { getComponent };
+}
+
 describe('unc-client', () => {
-  let originalFeds;
+  let originalUniversalNav;
 
   beforeEach(() => {
-    originalFeds = window.feds;
-    delete window.feds;
+    originalUniversalNav = window.UniversalNav;
+    delete window.UniversalNav;
   });
 
   afterEach(() => {
-    window.feds = originalFeds;
+    window.UniversalNav = originalUniversalNav;
     sinon.restore();
   });
 
   describe('whenUncReady', () => {
-    it('resolves immediately when a correctly-shaped instance already exists', async () => {
+    it("resolves immediately when getComponent('notifications') already yields a correctly-shaped instance", async () => {
       const uncInstance = makeUncInstance();
-      window.feds = { data: { notifications: uncInstance } };
+      stubUniversalNav(async (name) => (name === 'notifications' ? { instance: uncInstance } : undefined));
       expect(await whenUncReady()).to.equal(uncInstance);
     });
 
-    it('does not trust a global missing all of the expected methods', async () => {
+    it('does not trust an instance missing all of the expected methods', async () => {
       const clock = sinon.useFakeTimers();
-      window.feds = { data: { notifications: { some: 'other-shape' } } };
+      stubUniversalNav(async () => ({ instance: { some: 'other-shape' } }));
       const promise = whenUncReady(1000);
-      clock.tick(1000);
+      await clock.tickAsync(1000);
       expect(await promise).to.equal(null);
     });
 
-    it('does not trust a global missing even just one of the three expected methods', async () => {
+    it('does not trust an instance missing even just one of the three expected methods', async () => {
       const clock = sinon.useFakeTimers();
-      window.feds = {
-        data: {
-          notifications: {
-            UpsertReminderFeatureFlag: sinon.stub(),
-            DeleteReminderFeatureFlag: sinon.stub(),
-            // AnalyticsEventFromHost deliberately missing.
-          },
+      stubUniversalNav(async () => ({
+        instance: {
+          UpsertReminderFeatureFlag: sinon.stub(),
+          DeleteReminderFeatureFlag: sinon.stub(),
+          // AnalyticsEventFromHost deliberately missing.
         },
-      };
+      }));
       const promise = whenUncReady(1000);
-      clock.tick(1000);
+      await clock.tickAsync(1000);
       expect(await promise).to.equal(null);
     });
 
-    it('resolves once feds.data.notifications.loaded fires after the instance appears', async () => {
-      const promise = whenUncReady();
+    it('polls until getComponent starts yielding an instance, if window.UniversalNav appears late', async () => {
+      const clock = sinon.useFakeTimers();
+      const promise = whenUncReady(2000);
+      await clock.tickAsync(500);
+
       const uncInstance = makeUncInstance();
-      window.feds = { data: { notifications: uncInstance } };
-      window.dispatchEvent(new CustomEvent('feds.data.notifications.loaded'));
+      stubUniversalNav(async (name) => (name === 'notifications' ? { instance: uncInstance } : undefined));
+      await clock.tickAsync(1500);
+
       expect(await promise).to.equal(uncInstance);
     });
 
-    it('resolves to null once the timeout elapses and no instance ever appeared', async () => {
+    it('resolves to null once the timeout elapses and window.UniversalNav never appears', async () => {
       const clock = sinon.useFakeTimers();
       const promise = whenUncReady(1000);
-      clock.tick(1000);
+      await clock.tickAsync(1000);
       expect(await promise).to.equal(null);
     });
 
-    it('removes its own event listener once the timeout wins, instead of leaking it', async () => {
-      const removeSpy = sinon.spy(window, 'removeEventListener');
+    it('resolves to null if getComponent itself throws (e.g. the component was never configured on this page)', async () => {
       const clock = sinon.useFakeTimers();
+      stubUniversalNav(async () => { throw new Error('Notifications component was not initialized'); });
       const promise = whenUncReady(1000);
-      clock.tick(1000);
-      await promise;
-      expect(removeSpy.calledWith('feds.data.notifications.loaded')).to.equal(true);
+      await clock.tickAsync(1000);
+      expect(await promise).to.equal(null);
     });
   });
 
@@ -86,7 +91,7 @@ describe('unc-client', () => {
 
     beforeEach(() => {
       uncInstance = makeUncInstance();
-      window.feds = { data: { notifications: uncInstance } };
+      stubUniversalNav(async (name) => (name === 'notifications' ? { instance: uncInstance } : undefined));
     });
 
     it('registerReminderRule wraps into the real {campaignRules:[{campaignID, campaignRule}]} shape', async () => {
@@ -114,14 +119,14 @@ describe('unc-client', () => {
     });
 
     it('all three resolve false without throwing when no UNC instance is available', async () => {
-      delete window.feds;
+      delete window.UniversalNav;
       const clock = sinon.useFakeTimers();
       const results = Promise.all([
         registerReminderRule('x', {}),
         deleteReminderRule('x'),
         fireHostEvent({}),
       ]);
-      clock.tick(8000);
+      await clock.tickAsync(8000);
       expect(await results).to.deep.equal([false, false, false]);
     });
 

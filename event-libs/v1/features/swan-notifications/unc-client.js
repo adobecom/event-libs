@@ -5,14 +5,24 @@
 // trigger), DeleteReminderFeatureFlag (remove). This file's only job is resolving that
 // instance and hiding its raw message shapes from swan-notifications.js.
 //
-// How the instance is actually exposed on window is NOT confirmed — that lives in whatever
-// hosts/wraps the UNC engine inside milo's nav (a separate repo we don't have). This mirrors
-// an already-established, working pattern elsewhere in this repo for exactly this kind of
-// handoff — event-libs/v1/c2/blocks/sessions-guide/services/feds.js's getFedsToken(), which
-// checks window.feds.data.authToken then falls back to a feds.data.authToken.loaded event —
-// rather than inventing a new convention. Update readUncInstance()/READY_EVENT here once the
-// real handoff is confirmed; nothing else in this feature depends on how this resolves.
-const READY_EVENT = 'feds.data.notifications.loaded';
+// How the instance is exposed is now CONFIRMED, not guessed — fetched and inspected the
+// actual bundles milo loads (prod.adobeccstatic.com/unav/1.6/UniversalNav.js and its
+// lazily-loaded NotificationLoader.<hash>.bundle.js chunk): milo's gnav loads
+// UniversalNav.js, which exposes `window.UniversalNav.getComponent('notifications')` — an
+// async method that lazily loads the real UNC engine bundle
+// (adobeccstatic.com/unc/<version>/UNC-shared.js), constructs it as
+// `new window.UNC.default(config)`, and resolves `{ instance }`. Confirmed `instance`
+// exposes the same method surface as UNC's engine class directly (the bundle itself calls
+// `instance.ShowNotification`/`HideNotification` the same way). This only ever resolves a
+// real instance once the page's gnav has "notifications" configured as an active component
+// (`universal-nav` metadata) — see docs/swan-unc-dependencies.md for that dependency.
+//
+// getComponent() itself internally awaits the chunk load + engine construction once called,
+// but resolves `undefined` (caught internally, not thrown) if called before milo's own gnav
+// decoration has reached the point of initializing that component — there's no dedicated
+// "ready" event for this seam (checked milo's global-navigation.js), so this polls rather
+// than waiting on one.
+const POLL_INTERVAL_MS = 250;
 
 function isUncInstance(candidate) {
   return !!candidate
@@ -21,28 +31,37 @@ function isUncInstance(candidate) {
     && typeof candidate.AnalyticsEventFromHost === 'function';
 }
 
-function readUncInstance() {
-  const candidate = window.feds?.data?.notifications;
-  return isUncInstance(candidate) ? candidate : null;
+async function tryResolveInstance() {
+  if (typeof window.UniversalNav?.getComponent !== 'function') return null;
+  try {
+    const result = await window.UniversalNav.getComponent('notifications');
+    return isUncInstance(result?.instance) ? result.instance : null;
+  } catch (err) {
+    window.lana?.log(`[unc-client] getComponent('notifications') failed: ${err.message}`);
+    return null;
+  }
 }
 
-// Resolves with the UNC instance as soon as it exists and has the expected shape —
-// immediately if it's already there, otherwise once READY_EVENT fires. Never rejects: a
-// page without gnav/UNC, or one where UNC failed to load, should leave SWAN silently inert
-// rather than throwing. Both settle paths tear down the other's listener/timer.
+// Resolves with the UNC instance as soon as getComponent('notifications') yields one with
+// the expected shape, polling every POLL_INTERVAL_MS until timeoutMs elapses. Never rejects:
+// a page without gnav/UNC, or one where the notifications component isn't configured,
+// should leave SWAN silently inert rather than throwing.
 export function whenUncReady(timeoutMs = 8000) {
-  const existing = readUncInstance();
-  if (existing) return Promise.resolve(existing);
+  const deadline = Date.now() + timeoutMs;
   return new Promise((resolve) => {
-    const onReady = () => {
-      clearTimeout(timer);
-      resolve(readUncInstance());
-    };
-    const timer = setTimeout(() => {
-      window.removeEventListener(READY_EVENT, onReady);
-      resolve(null);
-    }, timeoutMs);
-    window.addEventListener(READY_EVENT, onReady, { once: true });
+    async function attempt() {
+      const instance = await tryResolveInstance();
+      if (instance) {
+        resolve(instance);
+        return;
+      }
+      if (Date.now() >= deadline) {
+        resolve(null);
+        return;
+      }
+      setTimeout(attempt, POLL_INTERVAL_MS);
+    }
+    attempt();
   });
 }
 
