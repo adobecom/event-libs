@@ -98,13 +98,14 @@ function routeCardClick(session) {
 }
 
 function buildIconButton({
-  iconSvg, label, pressed, disabled, extraClass, onClick,
+  iconSvg, label, pressed, disabled, extraClass, onClick, daaLl,
 }) {
   const btn = createTag('button', {
     class: ['sg-icon-btn', 'sg-icon-btn--solid', 'sg-icon-btn--on-dark', 'sg-icon-btn--md', extraClass].filter(Boolean).join(' '),
     type: 'button',
     'aria-label': label,
     'aria-pressed': String(pressed),
+    'daa-ll': daaLl,
   });
   if (disabled) btn.disabled = true;
   createTag('span', { class: 'sg-icon-btn__icon', 'aria-hidden': 'true' }, iconSvg, { parent: btn });
@@ -153,6 +154,7 @@ export function buildCard(session) {
     role: 'button',
     tabindex: '0',
     'aria-label': `${session.enTitle}, ${timeRange}`,
+    'daa-ll': 'Session-Card-Open',
   });
 
   const body = createTag('div', { class: 'sg-card__body' }, '', { parent: card });
@@ -184,6 +186,7 @@ export function buildCard(session) {
     disabled: isPending,
     extraClass: 'sg-card__btn--schedule',
     onClick: (e) => handleSchedule(e, session, isScheduled, scheduleBtn),
+    daaLl: isScheduled ? 'Remove-from-Schedule' : 'Add-to-Schedule',
   });
   actions.append(scheduleBtn);
 
@@ -194,6 +197,7 @@ export function buildCard(session) {
     disabled: isPending,
     extraClass: 'sg-card__btn--favorite',
     onClick: (e) => handleFavorite(e, session, isFavorited, favoriteBtn),
+    daaLl: isFavorited ? 'Remove-from-Favorites' : 'Add-to-Favorites',
   });
   actions.append(favoriteBtn);
 

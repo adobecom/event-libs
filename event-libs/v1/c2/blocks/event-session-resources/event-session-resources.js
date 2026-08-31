@@ -110,6 +110,7 @@ export default async function init(el) {
       type: 'button',
       'aria-expanded': 'false',
       'aria-controls': list.id,
+      'daa-ll': 'Show-More',
     });
     const label = createTag('span', {}, 'Show more');
     toggle.append(label);
@@ -117,6 +118,7 @@ export default async function init(el) {
     toggle.addEventListener('click', () => {
       const expanded = el.classList.toggle('is-expanded');
       toggle.setAttribute('aria-expanded', String(expanded));
+      toggle.setAttribute('daa-ll', expanded ? 'Show-Less' : 'Show-More');
       label.textContent = expanded ? 'Show less' : 'Show more';
     });
     el.append(toggle);
