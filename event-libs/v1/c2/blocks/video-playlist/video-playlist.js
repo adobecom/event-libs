@@ -5,6 +5,7 @@ import {
 import { deriveSessionState, getNowMs } from '../../../utils/session-state.js';
 import { extractCustomAttributeSlugs, extractCustomAttributeValue } from '../../../services/sessions/sessions-api.js';
 import { toggleFavoriteWithFeedback } from '../../../services/sessions/action-feedback.js';
+import { initTierOneEventConfig, getEventStartMs } from '../../../utils/tier-1-event-config.js';
 import { readBackgroundConfig } from '../../utils/background-config.js';
 import BlockMediator from '../../../deps/block-mediator.min.js';
 import {
@@ -34,10 +35,10 @@ const EVENT_CONFIG = { title: '', registerUrl: '/register' };
 const BLOCK_CSS_URL = new URL('./video-playlist.css', import.meta.url).href;
 
 const DEFAULT_MIN_SESSIONS = 4;
-// Temporary fallback for IPOD premiere timing (hasPremiered) until the backend actually
-// passes the event's own start time via local-start-time-millis page metadata — per
-// product, November 8 8am America/New_York (Miami/Eastern, GMT-4). Remove once that
-// metadata is reliably present; real metadata always takes precedence over this below.
+// Last-resort fallback for IPOD premiere timing (hasPremiered) when the Tier 1 Event
+// Configurator's own eventStartDateTime isn't authored — per product, November 8 8am
+// America/New_York (Miami/Eastern, GMT-4). The real authored value always takes
+// precedence; see resolveEventStartMs below.
 const FALLBACK_EVENT_START_MS = new Date('2026-11-08T08:00:00-04:00').getTime();
 const DESKTOP_BREAKPOINT_PX = 1024;
 const DRAWER_GAP_PX = 16;
@@ -618,6 +619,23 @@ function removeBlock(el) {
 }
 
 /**
+ * The event's own start time, used by hasPremiered() for IPOD sessions (which have no
+ * scheduled session-times of their own and premiere `dvrTimingHours` after the EVENT
+ * starts). Read from the Tier 1 Event Configurator's authored `eventStartDateTime` — the
+ * same config session-store.js reads `eventEndDateTime` from — NOT the page-level
+ * `local-start-time-millis` metadata, which carries an individual page's own local
+ * timing rather than the event's.
+ *
+ * initTierOneEventConfig() is idempotent and normally already ran during decorateEvent;
+ * called again here so this block doesn't depend on that ordering (same defensive
+ * pattern event-session-details/event-featured-products already use).
+ */
+function resolveEventStartMs() {
+  initTierOneEventConfig();
+  return getEventStartMs() ?? FALLBACK_EVENT_START_MS;
+}
+
+/**
  * Everything this block needs from the page, or null when any gate fails. Each gate is
  * checked synchronously off page metadata — no catalog fetch to wait on.
  */
@@ -641,15 +659,12 @@ function resolveRenderContext(el) {
     return null;
   }
 
-  const authoredEventStartMs = Number(getMetadata('local-start-time-millis'));
   return {
     config,
     sessionId,
     sessionTimes,
     pageCustomAttributes: parseJsonMetadata('custom-attributes'),
-    eventStartMs: Number.isFinite(authoredEventStartMs) && authoredEventStartMs > 0
-      ? authoredEventStartMs
-      : FALLBACK_EVENT_START_MS,
+    eventStartMs: resolveEventStartMs(),
     minSessions: Number.parseInt(config['minimum-sessions'], 10) || DEFAULT_MIN_SESSIONS,
     maxSessions: Number.parseInt(config['maximum-sessions'], 10) || DEFAULT_MAX_SESSIONS,
     defaultThumbnail: config['default-thumbnail'] || '',

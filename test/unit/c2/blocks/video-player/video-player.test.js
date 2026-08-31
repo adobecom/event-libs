@@ -394,6 +394,7 @@ describe('video-player', () => {
 
       expect(playlistPlayer.dataset.embedded).to.equal(undefined);
     });
+
   });
 
   describe('embedding', () => {

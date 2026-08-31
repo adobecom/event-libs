@@ -68,3 +68,14 @@ export function getProduct(productName) {
 export function getAllowDoubleBooking() {
   return !!tierOneEventConfig.allowDoubleBooking;
 }
+
+// The EVENT's own start, authored once in the Tier 1 Event Configurator as a UTC epoch
+// ms (see its own EpochDateTimeField) — the same config `eventEndDateTime` is read from
+// in session-store.js. Distinct from the page-level `local-start-time-millis` metadata,
+// which carries an individual page's own local timing rather than the event's.
+// Returns null when unauthored or non-numeric, so callers can tell "not configured"
+// apart from a real 0.
+export function getEventStartMs() {
+  const startMs = Number(tierOneEventConfig.eventStartDateTime);
+  return Number.isFinite(startMs) && startMs > 0 ? startMs : null;
+}

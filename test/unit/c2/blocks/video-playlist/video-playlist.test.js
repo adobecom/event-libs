@@ -267,6 +267,11 @@ describe('video-playlist', () => {
         .to.deep.equal(['ipod']);
     });
 
+    it('excludes an IPOD session when no event start time is known at all', () => {
+      const ipod = catalogSession({ id: 'ipod', startTimeUtc: '', endTimeUtc: '', dvrTimingHours: 5 });
+      expect(resolveTopicPlaylist('cur', topics, [ipod], 1, null)).to.deep.equal([]);
+    });
+
     it('excludes a scheduled session that has not ended yet', () => {
       const upcoming = catalogSession({
         id: 'upcoming',
@@ -274,6 +279,45 @@ describe('video-playlist', () => {
         endTimeUtc: new Date(Date.now() + 2 * HOUR_MS).toISOString(),
       });
       expect(resolveTopicPlaylist('cur', topics, [upcoming], 1)).to.deep.equal([]);
+    });
+  });
+
+  /**
+   * MUST run before any other init()-driven suite: initTierOneEventConfig() latches on
+   * its first successful read and exposes no reset, so whichever test configures it first
+   * fixes the event start time for the rest of this file.
+   */
+  describe('event start time (Tier 1 Event Configurator)', () => {
+    it('premieres IPOD rows against the authored eventStartDateTime, not page metadata', async () => {
+      // Event started 10h ago per the configurator, so a 5h DVR delay has elapsed.
+      setMeta('tier-1-event-config', JSON.stringify({
+        eventStartDateTime: Date.now() - 10 * HOUR_MS,
+      }));
+      // Deliberately contradicts it: if this page-level value were still being used, the
+      // 5h delay would NOT have elapsed and the row would be excluded.
+      setMeta('local-start-time-millis', String(Date.now() - HOUR_MS));
+      setMeta('session-id', 'cur');
+      setMeta('session-times', sessionTimesMeta());
+      setMeta('custom-attributes', playlistAttribute());
+
+      const { playlist } = buildPage();
+      addConfigRow(playlist, 'minimum-sessions', '2');
+      sessions.value = [
+        catalogSession({
+          id: 'ipod-a', startTimeUtc: '', endTimeUtc: '', dvrTimingHours: 5,
+        }),
+        catalogSession({
+          id: 'ipod-b', startTimeUtc: '', endTimeUtc: '', dvrTimingHours: 5,
+        }),
+      ];
+
+      await init(playlist);
+      await flush();
+
+      const renderedIds = [...playlist.querySelectorAll('.video-playlist-row')]
+        .map((row) => row.dataset.itemId);
+      expect(renderedIds).to.include('ipod-a');
+      expect(renderedIds).to.include('ipod-b');
     });
   });
 
