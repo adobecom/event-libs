@@ -53,6 +53,28 @@
   border: none;
 }
 
+/* c2-global.css's shared foundation caps .milo-video (the MPC player's own wrapper class) at
+   1192px centered and rounds it; event-youtube.css does the same (to 848px) for
+   .youtube-video-container — both built for typical rich-content embeds elsewhere on the
+   site, not this block's intentionally full-bleed, square-cornered player. Both source
+   selectors out-specify a normal .session-broadcast-scoped override (c2-global's via a
+   :root:has(...)+attribute-selector combo, event-youtube's via three chained classes/:not()),
+   hence !important — same pattern already used in mobile-rider.css for an equivalent
+   foundation-style override. */
+@media (min-width: 1024px) {
+  .session-broadcast .milo-video {
+    max-width: none !important;
+    margin: 0 !important;
+    border-radius: 0 !important;
+  }
+
+  .session-broadcast .youtube-video-container {
+    max-width: none !important;
+    margin: 0 !important;
+    border-radius: 0 !important;
+  }
+}
+
 .sb-player__unsupported {
   display: flex;
   align-items: center;
@@ -66,15 +88,20 @@
 /* ── Session info panel ──────────────────────────────────
    Unconditionally dark regardless of page theme — the plain --s2a-color-* tokens flip per
    theme, so they're overridden locally here (same pattern as sessions-guide's own
-   [data-theme="dark"]); every descendant, including CategoryBadge, reads the dark values. */
+   [data-theme="dark"]); every descendant, including CategoryBadge, reads the dark values.
+
+   Grid, not flex — the title/caret row and the actions row swap places between collapsed and
+   expanded, and (see the tablet media query below) sit side by side instead of stacked at
+   769px+. Named areas let one fixed DOM order (row, actions, meta, desc, viewall) render in
+   whatever visual order/arrangement the state and breakpoint need. */
 .sb-info {
   --s2a-color-background-default: var(--s2a-color-gray-900, #131313);
   --s2a-color-content-default: #fff;
   --s2a-color-content-subtle: rgb(255 255 255 / 64%);
   --s2a-color-border-default: #fff;
 
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-areas: "row" "actions";
   gap: var(--s2a-spacing-md);
   padding: var(--s2a-spacing-lg);
   color: var(--s2a-color-content-default);
@@ -86,10 +113,29 @@
     0 4px 6px rgb(0 0 0 / 8%);
 }
 
+.sb-info:has(.sb-info__desc-wrap) { grid-template-areas: "row" "desc" "actions"; }
+
+.sb-info.is-expanded {
+  grid-template-areas:
+    "row"
+    "actions"
+    "meta"
+    "desc"
+    "viewall";
+}
+
+/* Mobile only (node 4975:45446) — collapsed + favorited hides the description entirely,
+   rather than just visually: also drops its grid row so no extra gap appears where it would
+   have been. Tablet reverses this below (768px+ override) — same session, same markup, always
+   shown there per explicit follow-up. The .sb-info__desc-wrap half of this lives further down,
+   after that selector's own base rule (stylelint no-descending-specificity). */
+.sb-info.is-favorited:not(.is-expanded) { grid-template-areas: "row" "actions"; }
+
 .sb-info__row {
+  grid-area: row;
   display: flex;
-  align-items: flex-start;
-  gap: var(--s2a-spacing-sm);
+  align-items: center;
+  gap: var(--s2a-spacing-xs, 8px);
 }
 
 .sb-info__title {
@@ -123,6 +169,7 @@
 .sb-info__expand-icon.is-expanded { transform: rotate(-90deg); }
 
 .sb-info__actions {
+  grid-area: actions;
   display: flex;
   align-items: center;
   gap: var(--s2a-spacing-sm);
@@ -155,6 +202,7 @@
 }
 
 .sb-info__meta {
+  grid-area: meta;
   display: flex;
   align-items: center;
   gap: var(--s2a-spacing-md);
@@ -173,6 +221,7 @@
 }
 
 .sb-info__desc-wrap {
+  grid-area: desc;
   display: -webkit-box;
   overflow: hidden;
   -webkit-box-orient: vertical;
@@ -181,6 +230,9 @@
   color: var(--s2a-color-content-subtle);
   font-size: var(--s2a-font-size-sm);
 }
+
+/* Mobile-only hide, per the .is-favorited rule above. */
+.sb-info.is-favorited:not(.is-expanded) .sb-info__desc-wrap { display: none; }
 
 .sb-info__desc-wrap.is-expanded {
   display: block;
@@ -191,6 +243,7 @@
 .sb-info__desc { margin: 0; }
 
 .sb-info__view-all {
+  grid-area: viewall;
   align-self: flex-start;
   padding: 0;
   color: var(--s2a-color-border-default);
@@ -199,6 +252,59 @@
   background: none;
   border: 0;
   cursor: pointer;
+}
+
+/* Tablet (node 4975:45573): row and actions sit side by side instead of stacked — title/caret
+   left, Favorite/Share right. Expanded meta/desc/viewall stacking below is not covered by a
+   dedicated tablet Figma frame; extrapolated from mobile's own order pending one. */
+@media (min-width: 768px) {
+  .sb-info {
+    grid-template-columns: 1fr auto;
+    align-items: center;
+    grid-template-areas: "row actions";
+    border-radius: 0;
+  }
+
+  .sb-info:has(.sb-info__desc-wrap) {
+    grid-template-areas:
+      "row actions"
+      "desc desc";
+  }
+
+  .sb-info.is-expanded {
+    align-items: start;
+    grid-template-areas:
+      "row actions"
+      "meta meta"
+      "desc desc"
+      "viewall viewall";
+  }
+
+  /* Reverses the mobile-only .is-favorited hide above — description always shows here. */
+  .sb-info.is-favorited:not(.is-expanded) {
+    grid-template-areas:
+      "row actions"
+      "desc desc";
+  }
+
+  /* Figma has the title hug the caret tightly and ellipsis-truncate instead of mobile's
+     flex:1 (which pushes the caret to the row's far edge and lets long titles wrap — wrapping
+     is also what broke the title's vertical centering against the actions on the right). */
+  .sb-info__title {
+    flex: 0 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+
+  /* Favorite moves after Share (rightmost) — reversed from mobile's DOM/visual order. */
+  .sb-info__icon-btn--favorite { order: 1; }
+
+  .sb-info__desc-wrap { font-size: 16px; }
+
+  /* stylelint-disable-next-line value-no-vendor-prefix */
+  .sb-info.is-favorited:not(.is-expanded) .sb-info__desc-wrap { display: -webkit-box; }
 }
 
 /* ── Ended state (States 2 & 3) ─────────────────────────── */
@@ -436,6 +542,82 @@
    have anywhere to push into (shared .sg-live-card__body default is align-items: flex-start). */
 .sb-carousel-section--also-live .sg-live-card__actions { width: 100%; }
 
+/* sessions-guide.css redefines .sg-live-card as a wide, horizontal, hover-to-black desktop
+   card at both 1024-1279px and 1280px+ (two separate, near-identical blocks, built for its
+   own Live section) — not Also Live's fixed 311px vertical card here. Both out-specify our
+   own rules for properties we don't already declare (flex-direction, borders, image/body
+   sizing, hover colors), which was causing severe overflow: body forced to a fixed width
+   (425px/560px) wider than the 311px card itself, squeezing its content out of view. Resets
+   every property either block touches back to what this card already uses below 1024px. */
+@media (min-width: 1024px) {
+  .sb-carousel-section--also-live .sg-live-card {
+    flex-direction: column;
+    border: none;
+    border-radius: var(--s2a-border-radius-md);
+  }
+
+  .sb-carousel-section--also-live .sg-live-card:is(:hover, :focus-within) {
+    background: #fff;
+    border-color: transparent;
+  }
+
+  .sb-carousel-section--also-live .sg-live-card__image {
+    width: 100%;
+    border: 1px solid rgb(255 255 255 / 15%);
+  }
+
+  .sb-carousel-section--also-live .sg-live-card__progress-row {
+    left: 16px;
+    right: 16px;
+  }
+
+  .sb-carousel-section--also-live .sg-live-card__body {
+    flex: 1;
+    width: auto;
+    padding: var(--s2a-spacing-md);
+    justify-content: flex-start;
+    gap: 0;
+  }
+
+  .sb-carousel-section--also-live .sg-live-card__meta {
+    justify-content: space-between;
+    gap: var(--s2a-spacing-xs);
+  }
+
+  .sb-carousel-section--also-live .sg-live-card__track-row { gap: var(--s2a-spacing-xs); }
+
+  .sb-carousel-section--also-live .sg-live-card__track,
+  .sb-carousel-section--also-live .sg-live-card:is(:hover, :focus-within) .sg-live-card__track {
+    color: var(--s2a-color-content-default);
+  }
+
+  .sb-carousel-section--also-live .sg-live-card__time,
+  .sb-carousel-section--also-live .sg-live-card:is(:hover, :focus-within) .sg-live-card__time {
+    color: var(--s2a-color-content-default);
+  }
+
+  .sb-carousel-section--also-live .sg-live-card:is(:hover, :focus-within) .sg-category-badge__icon-color {
+    color: inherit;
+  }
+
+  /* Not part of this card's own design (no Figma frame has ever shown a description on it) —
+     sessions-guide's base rule already hides it; the two wide-desktop blocks turn it back on. */
+  .sb-carousel-section--also-live .sg-live-card__desc { display: none; }
+
+  .sb-carousel-section--also-live .sg-live-card__btn--watch,
+  .sb-carousel-section--also-live .sg-live-card:is(:hover, :focus-within) .sg-live-card__btn--watch {
+    background: #292929;
+    color: #fff;
+  }
+
+  .sb-carousel-section--also-live .sg-live-card__btn--favorite,
+  .sb-carousel-section--also-live .sg-live-card:is(:hover, :focus-within) .sg-live-card__btn--favorite {
+    background: #fff;
+    border-color: #292929;
+    color: #292929;
+  }
+}
+
 /* ── Upcoming section (mobile, node 9931:12218) ────────────
    White section, gray-50 cards — inverse of Also Live. Same scoping reasoning; no right
    padding for the same peek-to-edge reason. */
@@ -487,6 +669,41 @@
   background: transparent;
   border-color: var(--s2a-color-gray-800, #292929);
   backdrop-filter: blur(16px);
+}
+
+/* sessions-guide.css redefines .sg-card as a hover-reveal desktop card at 1280px+ (a
+   different card than .sg-live-card's own desktop redesign, same root cause): the badge
+   moves into a bottom "footer" row, .sg-card__body gets a fixed 331px width wider than this
+   card's own 268px, and .sg-card__actions collapses to width:0/opacity:0/pointer-events:none
+   until hover/focus/scheduled/favorited — icon buttons are meant to always be visible here,
+   not hover-gated. Resets every touched property back to what this card already uses below
+   1280px. (1024-1279px doesn't redefine .sg-card the way it does .sg-live-card — no reset
+   needed there.) */
+@media (min-width: 1280px) {
+  .sb-carousel-section--up-next .sg-card__body {
+    width: 100%;
+    flex: 1 1 auto;
+  }
+
+  .sb-carousel-section--up-next .sg-card__badge-row { display: flex; }
+
+  .sb-carousel-section--up-next .sg-card__footer { display: none; }
+
+  .sb-carousel-section--up-next .sg-card__actions,
+  .sb-carousel-section--up-next .sg-card:is(:hover, :focus-within) .sg-card__actions,
+  .sb-carousel-section--up-next .sg-card.is-scheduled .sg-card__actions,
+  .sb-carousel-section--up-next .sg-card.is-favorited .sg-card__actions {
+    flex-direction: row;
+    width: 100%;
+    padding-left: 0;
+    opacity: 1;
+    pointer-events: auto;
+    justify-content: center;
+  }
+
+  /* The trailing time label is generated content (content: attr(data-time)) — also hidden by
+     the same hover-reveal redesign. */
+  .sb-carousel-section--up-next .sg-card__actions::after { display: inline; }
 }
 
 /* Kept here, after both sections' base rules, for ascending specificity (stylelint

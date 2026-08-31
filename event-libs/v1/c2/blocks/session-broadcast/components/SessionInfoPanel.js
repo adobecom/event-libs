@@ -12,10 +12,15 @@ import {
 } from '../../sessions-guide/components/icons.js';
 import { trackBroadcastEvent } from '../utils/broadcast-analytics.js';
 
-// Collapsed: title, caret, clamped description (hidden if favorited), Favorite + Share.
+// Collapsed: title, caret, clamped description (hidden if favorited — mobile only, see
+// session-broadcast.css's .is-favorited rules; tablet always shows it), Favorite + Share.
 // Expanded: actions move under the title, followed by a channel/duration row, the full
 // description (always shown, regardless of favorited), and "View all details" — the only
 // thing that opens the real Session Guide detail view (no local modal).
+//
+// `actions` renders once, in a fixed DOM position — session-broadcast.css repositions it (and
+// the title row) per state/breakpoint via CSS Grid areas, since collapsed vs. expanded and
+// mobile vs. tablet all want it in a different visual spot relative to the description.
 export function SessionInfoPanel({ session, viewAllDetailsLabel = 'View all details' }) {
   const [expanded, setExpanded] = useState(false);
 
@@ -81,7 +86,11 @@ export function SessionInfoPanel({ session, viewAllDetailsLabel = 'View all deta
   `;
 
   return html`
-    <div class="sb-info" role="region" aria-label="Now playing session info">
+    <div
+      class=${'sb-info' + (expanded ? ' is-expanded' : '') + (isFavorited ? ' is-favorited' : '')}
+      role="region"
+      aria-label="Now playing session info"
+    >
       <div class="sb-info__row">
         <h2 class="sb-info__title">${session.title}</h2>
         <button
@@ -95,19 +104,18 @@ export function SessionInfoPanel({ session, viewAllDetailsLabel = 'View all deta
           <span class=${'sb-info__expand-icon' + (expanded ? ' is-expanded' : '')} aria-hidden="true"><${IconChevronRight} /></span>
         </button>
       </div>
-      ${expanded && actions}
+      ${actions}
       ${expanded && html`
         <div class="sb-info__meta">
           <${CategoryBadge} session=${session} hideCount=${true} />
           ${durationLabel && html`<span class="sb-info__time">${durationLabel}</span>`}
         </div>
       `}
-      ${(expanded || !isFavorited) && html`
+      ${session.description && html`
         <div class=${'sb-info__desc-wrap' + (expanded ? ' is-expanded' : '')} id="sb-info-desc">
           <p class="sb-info__desc">${session.description}</p>
         </div>
       `}
-      ${!expanded && actions}
       ${expanded && html`
         <button
           class="sb-info__view-all"

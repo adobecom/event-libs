@@ -193,6 +193,48 @@ Tests mirror source under `test/unit/c2/blocks/session-broadcast/**`, following 
 - Video play/watch-time: MPC via the real `postMessage` play/pause listener (full fidelity, free); YouTube via a single best-effort "started watching" event on mount (`YT.Player.onStateChange` fidelity was evaluated and rejected — see the Player abstraction section above for why).
 - Event taxonomy/schema explicitly unresolved per the ticket/PRD — built against the "Required events" list, expect rework once Analytics confirms. `getEntryPoint()`'s referrer-based heuristic is a best guess for the same reason — no concrete entry-point mechanism is named anywhere in the ticket/PRD.
 
+### How analytics works here, in event-libs generally, and in Milo (researched 2026-08-31)
+
+Two independent mechanisms, both ultimately feeding Adobe Launch/DTM (`window._satellite`):
+
+**1. Static `daa-ll`/`daa-lh` — mostly automatic, no block code needed.** Milo's
+`documentPostSectionLoading` (`milo/libs/utils/utils.js`) calls `decorateSectionAnalytics()`
+(`milo/libs/martech/attributes.js`) on every section/block on every page, post-load: tags
+`daa-im="true"` on `<main>`, `daa-lh` on sections/blocks, and auto-derives `daa-ll` for every
+link/button from its visible text via `decorateDefaultLinkAnalytics()`. Adobe Launch reads
+these attributes directly to fire tracking — neither Milo nor event-libs has a "listen for
+daa-ll clicks" handler anywhere; Milo's own code only ever *writes* the attributes. Because of
+this automatic pass, event-libs blocks only add explicit `daa-ll` for two exceptions (this
+exact rule is independently documented in `event-libs/v1/c2/blocks/event-session-details/docs/
+README.md`'s "Analytics (DAA)" section too): (a) the element is created *after* Milo's
+decoration pass (any Preact/HTM component — this is why `SessionInfoPanel.js`/`EndedState.js`/
+`SessionCard.js`/`LiveCard.js`/`IconButton.js` all carry `daa-ll` props), or (b) the label
+mutates post-paint (favorite/schedule toggle, expand caret). `event-libs/v1/utils/decorate.js`'s
+`updateAnalyticTag()` is the one shared helper for the second case, narrowly used for the RSVP
+button — deliberately not reused elsewhere since it appends `|<event-title>`, which would
+defeat roll-up for anything else. `event-libs/v1/blocks/daa-injection/daa-injection.js` is a
+dedicated authoring-time block for hand-placing `daa-lh`/`daa-ll` via a DA table row when even
+that isn't enough.
+
+**2. Dynamic `sendAnalytics()` — for events that aren't a simple click.** Defined in
+`milo/libs/blocks/modal/modal.js`: takes a real `Event` object (not a payload) and calls
+`window._satellite.track('event', { data: { web: { webInteraction: { name: event.type }}}})`,
+falling back to a one-time `alloy_sendEvent` listener if `_satellite` isn't loaded yet (consent/
+martech still initializing). Since there's no separate payload argument, any dimension has to
+travel in the event name string itself — hence `trackBroadcastEvent()`'s
+`` `Broadcast-Session-Switch | ${session.id}` `` pattern. **session-broadcast is not the only
+place doing this** — `event-libs/v1/blocks/events-form/events-form.js` independently does the
+exact same dynamic `import('${miloLibs}/blocks/modal/modal.js')` dance for its own
+`eventFormSendAnalytics()`. There is no shared event-libs wrapper for this — each block rolls
+its own. Worth a future dedup if a third consumer shows up.
+
+**Other Milo pieces worth knowing about**: `milo/libs/martech/helpers.js` (page-name helpers,
+consent/Alloy orchestration — the thing that actually dispatches `alloy_sendEvent`) and
+`milo/libs/martech/martech.js` (bootstraps the Launch/DTM bundle itself, fires
+`_satellite.track('pageload')`). `martech/attributes.js` also exports `analyticsDecorateList`/
+`analyticsGetLabel` for consistent per-list-item `daa-ll` tagging (used by gnav/footer in Milo) —
+not used anywhere in event-libs today, but a candidate for any future list-heavy UI.
+
 ## Accessibility & responsiveness (Phase 4 — done; Phase 5 pending)
 
 - Mobile-first CSS, no hardcoded vertical spacing.
@@ -599,6 +641,154 @@ both live and ended states after every edit). Net -58 lines.
   tablet's own spec for these two contexts isn't known yet, and merging now risks fighting that
   work rather than helping it; revisit after tablet if they're still identical then.
 
+**Tablet (769–1279px) — in progress**, per `MAX26-Sessions-Broadcast_Rd3_Review_070726` node
+`4975:45550`. Nav/in-person banner/footer/Session Guide FAB excluded per the user, same as
+every other frame.
+- Screenshotted the Also Live (`4975:45574`) and Upcoming (`4975:45634`) sections directly —
+  both already match the existing mobile styling exactly (same 311px/268px card widths, same
+  colors, same edge-to-edge peek behavior, confirmed the peek persists at this width despite
+  Figma's own layer again showing an equal-both-sides padding value, same pattern as the
+  mobile peek investigation). No CSS changes needed for either section at this breakpoint.
+- `SessionInfoPanel.js`/`session-broadcast.css`: the one genuine layout difference. Collapsed
+  state moves from mobile's stacked rows (title+caret, then description, then Favorite+Share)
+  to title+caret and Favorite+Share sharing one row, with description below spanning full
+  width — confirmed via a zoomed screenshot of node `4975:45571` that the icon-button treatment
+  itself (ring on Favorite, bare Share, 16px heart icon) is unchanged from mobile, so this is a
+  pure layout reflow, not a restyle.
+  - Converted `.sb-info` from flex-column to CSS Grid with named areas (`row`, `actions`,
+    `meta`, `desc`, `viewall`). `SessionInfoPanel.js` now renders `actions` exactly once, at a
+    fixed DOM position, instead of the old two-branch `${expanded && actions}` /
+    `${!expanded && actions}` split — grid-area placement doesn't care about DOM order, so one
+    render site can appear in different visual spots per state/breakpoint. Added an
+    `is-expanded` class on the root `.sb-info` div (new; nothing read this before) to select
+    the expanded template.
+  - `.sb-info:has(.sb-info__desc-wrap)` swaps in a 3-row collapsed template only when a
+    description is actually present (still hidden when favorited) — avoids an empty grid row
+    (and its `gap`) reserving space when collapsed+favorited hides the description.
+  - `@media (min-width: 769px)` puts row+actions in one grid row (`1fr auto` columns) with
+    description spanning both columns below.
+  - **Expanded state at tablet is an extrapolation, not confirmed by a dedicated frame**: kept
+    row+actions together on one line, then stacked meta/desc/viewall below in the same order
+    mobile already uses. Revisit if a tablet-expanded frame is provided and it differs.
+  - Verified live in the harness at 900px: collapsed, expanded, and favorited+collapsed
+    (description correctly hidden, no leftover gap) all match the Figma screenshot; re-checked
+    mobile (500px) and desktop (1400px, existing 1280px max-width rule) both still render
+    correctly — this change is purely additive at 769px+, nothing shifted below it.
+- **Ended state at tablet not yet covered** — no tablet frame was provided for it; currently
+  still renders with mobile's stacked layout at this breakpoint (not broken, just unstyled for
+  tablet specifically). Needs its own frame before a tablet-specific pass.
+
+**Session info panel review fixes — done**, per user follow-up against node `4975:45573` plus a
+zoomed screenshot of the title row. Breakpoint changed to **768px** (was 769px) per explicit
+follow-up.
+- **Caret not hugging the title**: `.sb-info__row`'s gap was `--s2a-spacing-sm` (12px); Figma's
+  title+caret group specs `--s2a-spacing-xs` (8px). Fixed globally (harmless at mobile, where
+  `.sb-info__title`'s own `flex:1` already puts far more than 12px between them regardless of
+  the gap value).
+- **Vertical centering, root cause**: `.sb-info__title` mobile's `flex:1` inside the narrower
+  tablet grid column was forcing long titles to wrap onto 2 lines, which is what actually broke
+  the alignment against the 40px-tall action buttons — `align-items:center` on the grid was
+  already correct, but centering a 2-line title block still looks visibly off next to
+  single-line icons. Root-caused before fixing, not patched blindly: Figma's own title node
+  uses `shrink-0` + `overflow-hidden`/`whitespace-nowrap`/`text-ellipsis`, not full-width
+  growth — ellipsis-truncating single-line title, not a wrapping one. Fixed by giving
+  `.sb-info__title` `flex: 0 1 auto; min-width: 0;` plus the ellipsis triad, scoped to the
+  768px+ media query only (mobile's own far-right-pinned caret behavior, confirmed against its
+  own earlier screenshot, is a different and still-correct spec — left untouched). Also changed
+  `.sb-info__row`'s `align-items` from `flex-start` to `center` (matches Figma's own
+  `items-center` on that inner group) — harmless at mobile, correct at tablet.
+- **Favorite/Share order reversed**: Figma has Share first, Favorite rightmost — opposite of
+  mobile's own (correct, unchanged) DOM order. Fixed with `.sb-info__icon-btn--favorite {
+  order: 1; }` inside the tablet media query — CSS-only, no DOM/tab-order change, no JS touched.
+- **Description font-size**: `.sb-info__desc-wrap` was reading `--s2a-font-size-sm` (14px);
+  Figma's tablet node explicitly specs 16px. Scoped the fix to the tablet media query only —
+  mobile's own 14px wasn't contradicted by any frame and is left as-is.
+- Verified all four via computed style at 900px, not just visually: `descFontSize: "16px"`,
+  `titleFlex: "0 1 auto"`, `favOrder: "1"`, share `x` less than favorite `x`, and title's
+  vertical center exactly equal to the favorite button's vertical center (550.25 = 550.25).
+  Re-confirmed mobile (500px) renders byte-for-byte the same as before (favorite still first,
+  stacked layout, no truncation).
+
+**MPC player full-bleed width — done**. `c2-global.css`'s shared C2 foundation stylesheet caps
+`.milo-video` (the wrapper class Milo's `adobetv.js` adds around the MPC iframe) at 1192px
+centered, starting at its own `min-width: 1024px` breakpoint — built for typical rich-content
+video embeds elsewhere on the site, not this block's intentionally full-bleed player. Its
+`:root:has(meta[name="foundation"][content="c2"]) .milo-video` selector's attribute-selector
+combo out-specifies a normal `.session-broadcast`-scoped override, so `!important` is used —
+same precedented pattern already in `mobile-rider.css` for an equivalent foundation-style
+override. Scoped to the same `1024px` breakpoint as the rule it's countering, so it's a no-op
+below that width (nothing to override there anyway). Verified live by switching to a real MPC
+session (`live-2`): first caught that an initial check at 900px proved nothing (both rules are
+gated behind `min-width: 1024px`, so neither is even active there), then re-checked at 1260px —
+past both the `1024px` activation point and the `1192px` cap itself, the width that actually
+proves the override works — computed style confirmed `max-width: none` and the player's own
+`getBoundingClientRect().width` at the full `1260px`, not clipped to `1192px`, with a real
+Adobe TV video rendering edge-to-edge.
+
+**Square corners at tablet — done**, per explicit follow-up: both players round to 24px above
+1024px (MPC via `c2-global.css`'s `.milo-video` rule, YouTube via `event-youtube.css`'s own,
+near-identical `.youtube-video-container` rule) — neither is desired for this block's
+full-bleed player. Added `border-radius: 0 !important` to both inside the same `1024px`
+media query already overriding `.milo-video`'s width, plus a new equivalent
+`!important` override for `.youtube-video-container` (event-youtube's selector chains three
+classes/`:not()`, also out-specifying a plain scoped rule). Verified at 1260px for both player
+types (switching sessions to exercise each adapter for real) — `borderRadius: "0px"` on both,
+square corners confirmed visually. Mobile re-confirmed unaffected (was already unrounded below
+1024px, nothing to override there).
+
+**YouTube width now matches MPC — done**, per explicit follow-up. Added the same
+`max-width: none !important; margin: 0 !important;` to `.session-broadcast
+.youtube-video-container`, in the same `1024px` media query, alongside its existing
+`border-radius: 0 !important`. Verified at 1260px: `maxWidth: "none"`,
+`getBoundingClientRect().width` at the full `1260px` (was capped to `848px` before), matching
+MPC's own full-bleed behavior exactly.
+
+**Session info panel square corners at tablet — done**, per explicit follow-up (design intent,
+not tied to any single Figma frame examined pixel-by-pixel). `.sb-info` normally rounds only
+its bottom corners (`0 0 16px 16px`, since the player above it already rounds its own top) —
+added `border-radius: 0;` inside the existing `@media (min-width: 768px)` block (no
+`!important` needed here, since this is our own component's rule, not fighting a foundation
+stylesheet). Verified: `0px` at 1260px, unchanged `0px 0px 16px 16px` at mobile (500px).
+
+**Also Live/Upcoming cards breaking at 1024px+ — done**, per explicit follow-up report ("this
+might be a limitation based on the original usage coming from session guide... we don't want
+to break session guide"). Root cause confirmed by direct computed-style inspection before
+writing any fix, not guessed: sessions-guide.css defines its **own** desktop redesigns of both
+shared card components — `.sg-live-card` at both `1024-1279px` *and* `1280px+` (two
+near-identical blocks), and `.sg-card` at `1280px+` only — meant for sessions-guide's own Live
+section and card grid, completely unrelated to how Broadcast reuses these same components.
+Neither block is scoped behind an ancestor class the way `.sg-card`'s *base* layout is (see
+the earlier `.sessions-guide`/`.sg-portal` ancestor-scoping bug in this same file) — these are
+bare, unscoped selectors, so they apply to Broadcast's cards too, and several of the properties
+they touch aren't ones our own scoped rules happen to override, so they slip through unopposed.
+- **`.sg-live-card` (Also Live)**: switches to `flex-direction: row` with a **fixed
+  425px/560px-wide image and body** — inside our own 311px-wide card, that's a body element
+  alone wider than its entire parent, which is what was actually visible as "breaking": the
+  image rendered, but the body (title/badge/actions) was pushed far outside the card's visible
+  bounds. Also picks up a hover-to-solid-black fill with matching white text/icon colors,
+  which — once the layout itself is fixed — would otherwise make text invisible against a card
+  we want to stay white on hover, not black.
+- **`.sg-card` (Upcoming)**: `1280px+` only (`1024-1279px` doesn't redefine `.sg-card` the way
+  it does `.sg-live-card` — confirmed by grep, not assumed). Moves the channel badge into a
+  bottom "footer" row, forces `.sg-card__body` to a fixed 331px (wider than this card's own
+  268px), and — the actual reason icon buttons appeared to vanish rather than just misplaced —
+  collapses `.sg-card__actions` to `width: 0; opacity: 0; pointer-events: none;` by default,
+  only revealing it on hover/focus/scheduled/favorited. That's a deliberate hover-reveal
+  pattern for sessions-guide's own desktop card; Broadcast's Upcoming cards want icon buttons
+  always visible, matching every other breakpoint already shipped. The trailing time label
+  (`.sg-card__actions::after`, generated from `content: attr(data-time)`) is hidden by the same
+  block too, for the same reason, and needed its own explicit reset.
+- Fixed by adding two new media-query blocks scoped under `.sb-carousel-section--also-live`
+  (`min-width: 1024px`, no upper bound — matches both sessions-guide blocks it's countering)
+  and `.sb-carousel-section--up-next` (`min-width: 1280px` only, matching the one block that
+  actually affects `.sg-card`) that reset every touched property back to what each card already
+  uses below 1024px — not a blanket unscoped fix, so sessions-guide's own Live section and card
+  grid keep their intended desktop redesigns completely untouched everywhere else on the site.
+- Verified at 1100px, 1300px, and re-confirmed unaffected at mobile (500px): both carousels'
+  cards render with visible badge/title/actions/time in the correct vertical layout at every
+  width tested, matching what was already shipped and verified for 768-1023px. Full test suite
+  (2178 passed, only the two known pre-existing flaky tests) and lint clean.
+
 **Aggressive comment pass — done (2026-08-30)**, per explicit follow-up request: the cleanup
 above still left a lot of comment volume (Figma node IDs, multi-paragraph "why" explanations,
 historical narrative). Went through every JS and CSS file in the block a second time and cut
@@ -607,6 +797,33 @@ compliance), trimmed those to 1-3 lines, and deleted everything else (restated F
 numbers, "confirmed via X" narrative, anything a reader could infer from the code itself).
 Net -248 lines across the block. Pure comment change — no logic touched, re-verified live and
 ended states render pixel-identical, full test suite/lint clean.
+
+**Tablet: description no longer hides when favorited — done**, per explicit follow-up.
+Previously `SessionInfoPanel.js` decided whether `.sb-info__desc-wrap` existed in the DOM at
+all via a JS condition (`expanded || !isFavorited`) — a presence decision, not just a styling
+one, so no CSS override could reach it once the JS chose not to render it. Moved that decision
+into CSS instead: the description now always renders whenever `session.description` is
+truthy (matching `EndedState.js`'s own simpler pattern), and a new `is-favorited` class on the
+root `.sb-info` div (mirroring the existing `is-expanded` one) lets CSS decide visibility per
+breakpoint:
+- Mobile (default): `.sb-info.is-favorited:not(.is-expanded) .sb-info__desc-wrap { display:
+  none; }`, plus a matching 2-row `grid-template-areas` override on the same selector — the
+  actual reason this needs a *grid* override, not just `display:none` on the child, is to avoid
+  the empty "desc" row's `gap` still reserving space that the mobile screenshot verification
+  earlier (see the tablet layout work above) specifically checked was clean.
+- Tablet (`768px+`): reverses both — restores the "row actions" / "desc desc" template and
+  `display: -webkit-box` (the base value) so the description always shows regardless of
+  favorited state.
+- `SessionInfoPanel.test.js`'s "hides the description when collapsed and favorited" test
+  rewritten: since favoriting no longer removes the markup (CSS does the hiding now, untestable
+  in the mocked string-render harness), it now asserts the `is-favorited` class is present
+  instead — the actual hiding is a live-browser check, done here at both 500px (mobile: heart
+  filled, description gone, no extra gap) and 900px (tablet: heart filled, description visible)
+  via direct signal manipulation, plus a check that a spurious `flow-root` computed `display`
+  value (a pre-existing Chrome normalization quirk for `-webkit-box` + line-clamp, confirmed to
+  affect the *unfavorited* case identically) wasn't something this change introduced.
+
+## Explicitly out of scope (fast-follow)
 
 - MobileRider real playback (stub adapter only)
 - "My Schedule" personalization/reordering (extension point left in `broadcast-schedule.js`, not wired up)

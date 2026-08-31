@@ -40,19 +40,23 @@ describe('SessionInfoPanel', () => {
   });
 
   // Collapsed has two Figma variants of its own (node 9935:12816 not-favorited vs 4975:45446
-  // favorited) — favoriting hides the description entirely while collapsed. Expanded always
-  // shows it regardless (untestable here — the caret toggle needs a real browser, see below).
+  // favorited) — mobile hides the description entirely while collapsed+favorited; tablet
+  // always shows it (per follow-up request). The description now always renders in the DOM;
+  // session-broadcast.css's `.is-favorited` rules do the actual hiding on mobile only, keyed
+  // off this `is-favorited` class — untestable here (CSS, not JS), verified in a real browser.
   it('shows the description when collapsed and not favorited', () => {
     const out = SessionInfoPanel({ session: SESSION });
     expect(out).to.include('sb-info__desc-wrap');
     expect(out).to.include('A session about everything.');
+    expect(out).to.not.include('is-favorited');
   });
 
-  it('hides the description when collapsed and favorited', () => {
+  it('still renders the description when collapsed and favorited — marks is-favorited for CSS', () => {
     favorited.value = new Set(['s-1']);
     const out = SessionInfoPanel({ session: SESSION });
-    expect(out).to.not.include('sb-info__desc-wrap');
-    expect(out).to.not.include('A session about everything.');
+    expect(out).to.include('sb-info__desc-wrap');
+    expect(out).to.include('A session about everything.');
+    expect(out).to.include('is-favorited');
   });
 
   it('shows a Share action alongside Favorite', () => {
