@@ -814,19 +814,24 @@ export default async function init(el) {
     removeBlock(el);
   } else {
 
-    let unsubscribeSessions;
-    let unsubscribeStatus;
-    unsubscribeSessions = sessions.subscribe((list) => {
-      if (!list.length) return;
+    let unsubscribeSessions = () => {};
+    let unsubscribeStatus = () => {};
+    const stopWaiting = () => {
       unsubscribeSessions();
       unsubscribeStatus();
+      unsubscribeSessions = () => {};
+      unsubscribeStatus = () => {};
+    };
+    onElementDetached(el, stopWaiting);
+    unsubscribeSessions = sessions.subscribe((list) => {
+      if (!list.length) return;
+      stopWaiting();
       render(list);
     });
     unsubscribeStatus = sessionsStatus.subscribe((status) => {
       if (status !== 'ready' && status !== 'error') return;
       if (sessions.value.length) return;
-      unsubscribeSessions();
-      unsubscribeStatus();
+      stopWaiting();
       removeBlock(el);
     });
   }

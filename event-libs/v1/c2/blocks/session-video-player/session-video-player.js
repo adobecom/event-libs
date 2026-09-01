@@ -382,6 +382,7 @@ async function watchYouTubePlayback(sessionId, iframe) {
       return;
     }
     if (event.data === PlayerState.PAUSED) {
+      saveCurrentProgress(event.target);
       notifyStateChanged(sessionId, 'pause');
       return;
     }
