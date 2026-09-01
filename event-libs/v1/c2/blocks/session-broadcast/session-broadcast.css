@@ -1,0 +1,1176 @@
+@import '../../styles/tokens.css';
+@import '../event-youtube/event-youtube.css';
+
+.session-broadcast {
+  font-family: var(--s2a-font-family-adobe-clean);
+  color: var(--s2a-color-content-default);
+  box-sizing: border-box;
+}
+
+.session-broadcast *,
+.session-broadcast *::before,
+.session-broadcast *::after {
+  box-sizing: inherit;
+}
+
+/* Tighter than sessions-guide.css's own 8px default, everywhere CategoryBadge appears here. */
+.session-broadcast .sg-category-badge { gap: var(--s2a-spacing-2xs, 4px); }
+
+.sb-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.sb-app {
+  display: block;
+  background: var(--s2a-color-gray-1000, #000);
+}
+
+.sb-error,
+.sb-empty {
+  padding: var(--s2a-spacing-lg);
+  color: var(--s2a-color-content-subtle);
+  text-align: center;
+}
+
+/* ── Player ──────────────────────────────────────────────── */
+
+/* Sizing/rounded corners come from event-youtube.css's .youtube-video-container; this is just
+   a fallback background while the iframe loads. */
+.sb-player__mount {
+  width: 100%;
+  background: var(--s2a-color-gray-1000, #000);
+}
+
+/* event-youtube.css doesn't reset the YouTube iframe's default border. */
+.sb-player__mount iframe {
+  border: none;
+}
+
+/* c2-global.css/event-youtube.css cap the player width and round its corners by default —
+   built for typical rich-content embeds, not this block's full-bleed tablet look. Both
+   out-specify a plain .session-broadcast-scoped selector, hence !important. Bounded to
+   1024-1279px: desktop relies on these same foundation defaults, unmodified. */
+@media (min-width: 1024px) and (max-width: 1279px) {
+  .session-broadcast .milo-video {
+    max-width: none !important;
+    margin: 0 !important;
+    border-radius: 0 !important;
+  }
+
+  .session-broadcast .youtube-video-container {
+    max-width: none !important;
+    margin: 0 !important;
+    border-radius: 0 !important;
+  }
+}
+
+.sb-player__unsupported {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  color: var(--s2a-color-content-subtle);
+  background: var(--s2a-color-gray-900, #000);
+}
+
+/* ── Session info panel ──────────────────────────────────
+   Unconditionally dark regardless of page theme — the plain --s2a-color-* tokens flip per
+   theme, so they're overridden locally here. Grid, not flex — title/actions swap places
+   between collapsed/expanded/tablet layouts via named areas. */
+.sb-info {
+  --s2a-color-background-default: var(--s2a-color-gray-900, #131313);
+  --s2a-color-content-default: #fff;
+  --s2a-color-content-subtle: rgb(255 255 255 / 64%);
+  --s2a-color-border-default: #fff;
+
+  display: grid;
+  grid-template-areas: "row" "actions";
+  gap: var(--s2a-spacing-md);
+  padding: var(--s2a-spacing-lg);
+  color: var(--s2a-color-content-default);
+  background: var(--s2a-color-background-default);
+  border-radius: 0;
+  box-shadow:
+    0 0 1px rgb(0 0 0 / 12%),
+    0 2px 3px rgb(0 0 0 / 4%),
+    0 4px 6px rgb(0 0 0 / 8%);
+}
+
+.sb-info:has(.sb-info__desc-wrap) { grid-template-areas: "row" "desc" "actions"; }
+
+.sb-info.is-expanded {
+  grid-template-areas:
+    "row"
+    "actions"
+    "meta"
+    "desc"
+    "viewall";
+}
+
+/* Mobile only — collapsed+favorited hides the description's grid row too, not just visually. */
+.sb-info.is-favorited:not(.is-expanded) { grid-template-areas: "row" "actions"; }
+
+.sb-info__row {
+  grid-area: row;
+  display: flex;
+  align-items: center;
+  gap: var(--s2a-spacing-xs, 8px);
+}
+
+.sb-info__title {
+  flex: 1;
+  margin: 0;
+  font-family: var(--s2a-font-family-heading);
+  font-size: var(--s2a-font-size-lg);
+  line-height: 1;
+  font-weight: var(--s2a-font-weight-heading, 900);
+}
+
+.sb-info__expand {
+  flex: none;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  color: inherit;
+  background: none;
+  border: 0;
+  cursor: pointer;
+}
+
+.sb-info__expand-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transform: rotate(90deg);
+  transition: transform 0.2s ease;
+}
+
+.sb-info__expand-icon.is-expanded { transform: rotate(-90deg); }
+
+.sb-info__actions {
+  grid-area: actions;
+  display: flex;
+  align-items: center;
+  gap: var(--s2a-spacing-sm);
+}
+
+/* Share is a bare icon, no visible chip/ring, per design. */
+.sb-info__icon-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  color: #fff;
+  cursor: pointer;
+  background: transparent;
+  border: 0;
+}
+
+.sb-info__icon-btn--favorite {
+  border: 1px solid #fff;
+  border-radius: 999px;
+}
+
+/* Figma spec is 16px here; Share (same row) keeps the shared 20px native SVG size. */
+.sb-info__icon-btn--favorite svg {
+  width: 16px;
+  height: 16px;
+}
+
+.sb-info__meta {
+  grid-area: meta;
+  display: flex;
+  align-items: center;
+  gap: var(--s2a-spacing-md);
+  color: var(--s2a-color-border-default);
+  font-size: var(--s2a-font-size-md, 16px);
+}
+
+/* Overrides CategoryBadge's inline per-track icon color — channel icon is always white here. */
+.sb-info__meta .sg-category-badge__icon-color { color: #fff; }
+
+/* Overrides .sg-category-badge__label's own literal 14px (sessions-guide.css). */
+.sb-info__meta .sg-category-badge__label {
+  font-size: 16px;
+  line-height: 20px;
+  font-weight: 400;
+}
+
+.sb-info__desc-wrap {
+  grid-area: desc;
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  color: var(--s2a-color-content-subtle);
+  font-size: var(--s2a-font-size-sm);
+}
+
+/* Mobile-only hide, per the .is-favorited rule above. */
+.sb-info.is-favorited:not(.is-expanded) .sb-info__desc-wrap { display: none; }
+
+.sb-info__desc-wrap.is-expanded {
+  display: block;
+  -webkit-line-clamp: unset;
+  line-clamp: unset;
+}
+
+.sb-info__desc { margin: 0; }
+
+.sb-info__view-all {
+  grid-area: viewall;
+  align-self: flex-start;
+  padding: 0;
+  color: var(--s2a-color-border-default);
+  font-weight: bold;
+  text-align: left;
+  background: none;
+  border: 0;
+  cursor: pointer;
+}
+
+/* Tablet: row and actions sit side by side instead of stacked. */
+@media (min-width: 768px) {
+  .sb-info {
+    grid-template-columns: 1fr auto;
+    align-items: center;
+    grid-template-areas: "row actions";
+  }
+
+  .sb-info:has(.sb-info__desc-wrap) {
+    grid-template-areas:
+      "row actions"
+      "desc desc";
+  }
+
+  .sb-info.is-expanded {
+    align-items: start;
+    grid-template-areas:
+      "row actions"
+      "meta meta"
+      "desc desc"
+      "viewall viewall";
+  }
+
+  /* Reverses the mobile-only .is-favorited hide above — description always shows here. */
+  .sb-info.is-favorited:not(.is-expanded) {
+    grid-template-areas:
+      "row actions"
+      "desc desc";
+  }
+
+  /* Title hugs the caret and ellipsis-truncates instead of mobile's flex:1 (which let long
+     titles wrap and break vertical centering). Letter-spacing is shared across tablet/desktop;
+     font-size/line-height differ and live in their own breakpoint blocks below. */
+  .sb-info__title {
+    flex: 0 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    letter-spacing: var(--s2a-font-letter-spacing-4xl, -0.48px);
+  }
+
+  /* Favorite moves after Share (rightmost) — reversed from mobile's DOM/visual order. */
+  .sb-info__icon-btn--favorite { order: 1; }
+
+  .sb-info__desc-wrap { font-size: 16px; }
+
+  /* stylelint-disable-next-line value-no-vendor-prefix */
+  .sb-info.is-favorited:not(.is-expanded) .sb-info__desc-wrap { display: -webkit-box; }
+
+  /* Section titles stay 18px on tablet (same as mobile) — sessions-guide's own tablet rule
+     bumps this to 24px for its own layout. The semantic size alias resolves to 16px below
+     1280px, so the fixed-value token is used instead. Scoped under .session-broadcast since
+     the sessions-guide widget/FAB may be co-mounted and shares this class. */
+  .session-broadcast .sg-section-title {
+    font-size: var(--s2a-font-size-lg, 18px);
+    line-height: var(--s2a-font-line-height-xs, 18px);
+  }
+}
+
+/* .sb-info has no background of its own from tablet up — the panel sits on .sb-app's own
+   black background instead. Kept as its own unbounded rule since the tablet-bounded block
+   below (title size) doesn't extend to desktop. */
+@media (min-width: 768px) {
+  .sb-info {
+    background: transparent;
+  }
+}
+
+@media (min-width: 768px) and (max-width: 1279px) {
+  /* Title is 20px at tablet (24px at desktop) — the 1024-1279px tier's fixed-value tokens for
+     heading-5, pinned across the whole 768-1279px range. Letter-spacing is shared/unbounded
+     above, untouched. */
+  .sb-info__title {
+    font-size: var(--s2a-font-size-xl, 20px);
+    line-height: var(--s2a-font-line-height-sm, 20px);
+  }
+}
+
+/* ── Ended state (States 2 & 3) ─────────────────────────── */
+
+/* Unconditionally dark, same theme-override reasoning as .sb-info. Large top padding is an
+   intentional exception to the no-hard-coded-vertical-spacing rule (matches Figma).
+   Background is transparent — the photo/black layer lives on .sb-app below. */
+.sb-ended {
+  position: relative;
+  padding: var(--s2a-spacing-4xl, 64px) var(--s2a-spacing-lg, 24px) var(--s2a-spacing-xl, 32px);
+  background: transparent;
+
+  --s2a-color-content-default: #fff;
+  --s2a-color-content-subtle: rgb(255 255 255 / 64%);
+  --s2a-color-border-default: var(--s2a-color-gray-300, #dadada);
+}
+
+.sb-ended__eyebrow {
+  margin: 0;
+  color: var(--s2a-color-content-default);
+  font-family: var(--s2a-font-family-heading);
+  font-size: 36px;
+  font-weight: var(--s2a-font-weight-heading, 900);
+  line-height: var(--s2a-typography-line-height-heading-2);
+  letter-spacing: var(--s2a-typography-letter-spacing-heading-2);
+}
+
+.sb-ended__title {
+  margin: var(--s2a-spacing-xl, 32px) 0 0;
+  color: var(--s2a-color-content-default);
+  font-family: var(--s2a-font-family-heading);
+  font-size: 24px;
+  font-weight: var(--s2a-font-weight-heading, 900);
+  line-height: 24px;
+  letter-spacing: -0.48px;
+}
+
+/* Eyebrow grows to 48px on tablet — the 1024-1279px tier's fixed-value tokens for heading-2,
+   pinned across the whole 768-1279px range (mobile/base stays the hardcoded 36px above). */
+@media (min-width: 768px) and (max-width: 1279px) {
+  .sb-ended__eyebrow {
+    font-size: var(--s2a-font-size-6xl, 48px);
+    line-height: var(--s2a-font-line-height-2xl, 48px);
+    letter-spacing: var(--s2a-font-letter-spacing-xl, -1.44px);
+  }
+
+  /* Title shrinks to 20px on tablet and truncates to one ellipsized line — the 1024-1279px
+     tier's fixed-value tokens for heading-5. Letter-spacing is untouched (stable fixed token,
+     not remapped per tier). */
+  .sb-ended__title {
+    font-size: var(--s2a-font-size-xl, 20px);
+    line-height: var(--s2a-font-line-height-sm, 20px);
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+}
+
+/* Desktop: aligns with the rest of the page via the same shared 1192px-centered treatment
+   .sb-info/.sb-carousel-section use. */
+@media (min-width: 1280px) {
+  /* Top grows to 124px; side padding drops to 0 since centering already provides the
+     breathing room. Bottom stays the base rule's 32px. */
+  .sb-ended {
+    max-width: 1192px;
+    margin: 0 auto;
+    padding-top: var(--s2a-layout-lg, 124px);
+    padding-right: 0;
+    padding-left: 0;
+  }
+
+  /* Eyebrow grows to 80px at desktop — this tier's value for the semantic heading-1 alias
+     (identical at 1441px+ too). */
+  .sb-ended__eyebrow {
+    font-size: var(--s2a-font-size-10xl, 80px);
+    line-height: var(--s2a-font-line-height-5xl, 76px);
+    letter-spacing: var(--s2a-font-letter-spacing-sm, -3.2px);
+  }
+
+  /* Font-size/line-height/letter-spacing already fall through from the base rule (matches
+     this tier). Truncation is new, matching tablet. Margin-top corrects to 24px to match
+     Figma's uniform gap used elsewhere in this block. */
+  .sb-ended__title {
+    margin-top: var(--s2a-spacing-lg, 24px);
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+
+  /* Frosted-glass treatment for Favorite at desktop, matching the pattern used elsewhere on
+     this page (e.g. Up Next's schedule/favorite buttons). */
+  .sb-ended__icon-btn--favorite {
+    background: rgb(255 255 255 / 80%);
+    border-color: rgb(255 255 255 / 40%);
+    backdrop-filter: blur(4.687px);
+  }
+}
+
+.sb-ended__meta {
+  display: flex;
+  align-items: center;
+  gap: var(--s2a-spacing-md, 16px);
+  margin-top: var(--s2a-spacing-lg, 24px);
+  color: var(--s2a-color-border-default);
+  font-size: var(--s2a-font-size-md, 16px);
+}
+
+/* Same overrides as .sb-info__meta above. */
+.sb-ended__meta .sg-category-badge__icon-color { color: var(--s2a-color-border-default); }
+.sb-ended__meta .sg-category-badge__label { font-size: 16px; }
+
+.sb-ended__desc-wrap {
+  margin-top: var(--s2a-spacing-2xs, 4px);
+  overflow: hidden;
+  color: var(--s2a-color-content-subtle);
+  font-size: var(--s2a-font-size-md, 16px);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.sb-ended__desc-wrap.is-expanded {
+  white-space: normal;
+  text-overflow: clip;
+}
+
+.sb-ended__desc {
+  margin: 0;
+  line-height: 1.5;
+}
+
+.sb-ended__view-more {
+  margin-top: var(--s2a-spacing-2xs, 4px);
+  padding: 0;
+  color: var(--s2a-color-border-default);
+  font-family: var(--s2a-font-family-label);
+  font-size: 16px;
+  font-weight: bold;
+  text-align: left;
+  background: none;
+  border: 0;
+  cursor: pointer;
+}
+
+.sb-ended__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--s2a-spacing-sm, 12px);
+  margin-top: var(--s2a-spacing-lg, 24px);
+}
+
+.sb-ended__watch {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s2a-spacing-xs, 8px);
+  padding: 14px var(--s2a-spacing-lg, 24px);
+  color: var(--s2a-color-button-content-primary-solid-inverse, #000);
+  font-family: var(--s2a-font-family-label);
+  font-size: var(--s2a-typography-font-size-label, 14px);
+  font-weight: var(--s2a-font-weight-label, 700);
+  line-height: var(--s2a-typography-line-height-label, 18px);
+  text-decoration: none;
+  background: var(--s2a-color-button-background-primary-solid-default, #fff);
+  border-radius: var(--s2a-border-radius-999, 999px);
+}
+
+.sb-ended__watch svg {
+  width: 12px;
+  height: 12px;
+}
+
+/* Share is a bare icon, no ring — only Favorite (below) gets the outlined-ring treatment. */
+.sb-ended__icon-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  color: #fff;
+  cursor: pointer;
+  background: transparent;
+  border: 0;
+  border-radius: 999px;
+}
+
+.sb-ended__icon-btn--favorite {
+  border: 1px solid #fff;
+}
+
+.sb-ended__icon-btn svg {
+  width: 16px;
+  height: 16px;
+}
+
+/* ── Ended-state background bleed ──────────────────────────
+   The hero's darkened photo bleeds into Also Live/Upcoming below — a pseudo-element on
+   .sb-app, not a JS <img> inside .sb-ended, since CSS paints a positioned z-index:auto
+   descendant after in-flow siblings regardless of DOM order. isolation:isolate keeps the
+   ::before's negative z-index scoped to .sb-app instead of escaping to a higher ancestor. */
+.sb-app:has(.sb-ended) {
+  position: relative;
+  isolation: isolate;
+  background: var(--s2a-color-gray-1000, #000);
+}
+
+/* --sb-app-ended-bg is set inline by BroadcastApp.js. Three layers: flat tint + vertical
+   fade + the photo itself. */
+.sb-app:has(.sb-ended)::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: -1;
+  width: 100%;
+  height: 480px;
+  background-image:
+    linear-gradient(180deg, rgb(0 0 0 / 60%) 0%, rgb(0 0 0 / 60%) 50%, rgb(0 0 0 / 75%) 75%),
+    linear-gradient(0deg, rgb(0 0 0 / 60%), rgb(0 0 0 / 60%)),
+    var(--sb-app-ended-bg, none);
+  background-repeat: no-repeat;
+  background-position: top center;
+  background-size:
+    100% 100%,
+    100% 100%,
+    cover;
+}
+
+/* Bleed extends to 80% of the viewport on tablet, darkening more aggressively toward the
+   bottom. vh, not %, since .sb-app has no explicit height (a % height would collapse to
+   auto). Prefers the larger --sb-app-ended-bg-lg source when available. */
+@media (min-width: 768px) and (max-width: 1279px) {
+  .sb-app:has(.sb-ended)::before {
+    height: 80vh;
+    background-image:
+      linear-gradient(180deg, rgb(0 0 0 / 60%) 0%, rgb(0 0 0 / 60%) 50%, rgb(0 0 0 / 90%) 90%, rgb(0 0 0 / 100%) 100%),
+      linear-gradient(0deg, rgb(0 0 0 / 60%), rgb(0 0 0 / 60%)),
+      var(--sb-app-ended-bg-lg, var(--sb-app-ended-bg, none));
+  }
+}
+
+/* Desktop reuses tablet's gradient exactly, with a taller 90vh bleed. */
+@media (min-width: 1280px) {
+  .sb-app:has(.sb-ended)::before {
+    height: 90vh;
+    background-image:
+      linear-gradient(180deg, rgb(0 0 0 / 60%) 0%, rgb(0 0 0 / 60%) 50%, rgb(0 0 0 / 90%) 90%, rgb(0 0 0 / 100%) 100%),
+      linear-gradient(0deg, rgb(0 0 0 / 60%), rgb(0 0 0 / 60%)),
+      var(--sb-app-ended-bg-lg, var(--sb-app-ended-bg, none));
+  }
+}
+
+/* ── Carousel sections ──────────────────────────────────── */
+
+.sb-carousel-section {
+  padding: var(--s2a-spacing-md);
+}
+
+/* ── Also Live section ──────────────────────────────────
+   Dark section (#262626, no equivalent --s2a-* token), white cards. Section title is white
+   for legibility; cards stay light. No right padding — cards peek to the viewport edge. */
+.sb-carousel-section--also-live {
+  padding: var(--s2a-spacing-xl) 0 var(--s2a-spacing-xl) var(--s2a-spacing-xl);
+  background: #262626;
+}
+
+.sb-carousel-section--also-live .sg-carousel__header { margin-bottom: var(--s2a-spacing-sm); }
+
+.sb-carousel-section--also-live .sg-section-title {
+  color: var(--s2a-color-content-inverse, #fff);
+  letter-spacing: -0.2px;
+}
+
+.sb-carousel-section--also-live .sg-carousel__cards { gap: var(--s2a-spacing-md); }
+
+.sb-carousel-section--also-live .sg-live-card {
+  width: 311px;
+  max-width: none;
+}
+
+/* aspect-ratio keeps the taller image proportion at this card's own 311px width. */
+.sb-carousel-section--also-live .sg-live-card__image {
+  height: auto;
+  aspect-ratio: 300 / 188;
+}
+
+/* Progress bar moves from the image's bottom edge to its top edge. */
+.sb-carousel-section--also-live .sg-live-card__progress-row {
+  top: 6px;
+  bottom: auto;
+}
+
+.sb-carousel-section--also-live .sg-category-badge__label { font-size: var(--s2a-font-size-xs); }
+
+.sb-carousel-section--also-live .sg-live-card__title {
+  margin: var(--s2a-spacing-md) 0 0;
+  font-family: var(--body-font-family);
+  font-size: var(--s2a-font-size-md, 16px);
+  font-weight: var(--s2a-font-weight-adobe-clean-bold);
+}
+
+.sb-carousel-section--also-live .sg-live-card__btn { height: 32px; }
+
+/* 16px side padding, not the shared 24px. */
+.sb-carousel-section--also-live .sg-live-card__btn--watch {
+  padding: 0 var(--s2a-spacing-md);
+  background: #000;
+}
+
+/* Re-asserted at matching specificity so Watch stays black through hover/focus-within below
+   1280px — sessions-guide's own hover rule otherwise out-specifies the plain override above.
+   At 1280px+ the long card's hover fill goes black on purpose (matching sessions-guide), so
+   this is bounded there instead — a black button would disappear against it. */
+@media (max-width: 1279px) {
+  .sb-carousel-section--also-live .sg-live-card:is(:hover, :focus-within) .sg-live-card__btn--watch {
+    background: #000;
+  }
+}
+
+.sb-carousel-section--also-live .sg-live-card__btn--favorite { width: 32px; }
+
+/* Same 16px-vs-20px heart-icon fix as .sb-info__icon-btn--favorite. */
+.sb-carousel-section--also-live .sg-live-card__btn--favorite svg {
+  width: 16px;
+  height: 16px;
+}
+
+/* .sg-live-card__actions-time's margin-left:auto needs the row stretched to full width to
+   have anywhere to push into (shared .sg-live-card__body default is align-items: flex-start). */
+.sb-carousel-section--also-live .sg-live-card__actions { width: 100%; }
+
+/* sessions-guide.css redefines .sg-live-card as a wide desktop card at 1024-1279px, forcing
+   a body width wider than this card's own 311px. Resets it back to the narrow shape here;
+   1280px+ switches to the long card instead (see its own block below), so this stays bounded. */
+@media (min-width: 1024px) and (max-width: 1279px) {
+  .sb-carousel-section--also-live .sg-live-card {
+    flex-direction: column;
+    border: none;
+    border-radius: var(--s2a-border-radius-md);
+  }
+
+  .sb-carousel-section--also-live .sg-live-card__image {
+    width: 100%;
+    border: 1px solid rgb(255 255 255 / 15%);
+  }
+
+  .sb-carousel-section--also-live .sg-live-card__progress-row {
+    left: 16px;
+    right: 16px;
+  }
+
+  .sb-carousel-section--also-live .sg-live-card__body {
+    flex: 1;
+    width: auto;
+    padding: var(--s2a-spacing-md);
+    justify-content: flex-start;
+    gap: 0;
+  }
+
+  .sb-carousel-section--also-live .sg-live-card__meta {
+    justify-content: space-between;
+    gap: var(--s2a-spacing-xs);
+  }
+
+  .sb-carousel-section--also-live .sg-live-card__track-row { gap: var(--s2a-spacing-xs); }
+
+  /* Not part of this card's design at this tier — hidden here, shown again for the long card
+     below. */
+  .sb-carousel-section--also-live .sg-live-card__desc { display: none; }
+}
+
+/* The long card at 1280px+ keeps sessions-guide's own black-hover-fill treatment instead of
+   being fought — these neutralizations stay tablet-only (1024-1279px). Watch's plain black
+   rule (elsewhere in this file) is unconditional and unaffected. */
+@media (min-width: 1024px) and (max-width: 1279px) {
+  .sb-carousel-section--also-live .sg-live-card:is(:hover, :focus-within) {
+    background: #fff;
+    border-color: transparent;
+  }
+
+  /* .sg-category-badge__label uses currentcolor, inherited from this row (not
+     .sg-live-card__track) — sessions-guide's hover rule flips the row white, so the label was
+     picking that up even after the icon's own color was fixed separately. */
+  .sb-carousel-section--also-live .sg-live-card:is(:hover, :focus-within) .sg-live-card__track-row,
+  .sb-carousel-section--also-live .sg-live-card:is(:hover, :focus-within) .sg-live-card__track-extra {
+    color: var(--s2a-color-content-default);
+  }
+
+  .sb-carousel-section--also-live .sg-live-card__track,
+  .sb-carousel-section--also-live .sg-live-card:is(:hover, :focus-within) .sg-live-card__track {
+    color: var(--s2a-color-content-default);
+  }
+
+  .sb-carousel-section--also-live .sg-live-card__time,
+  .sb-carousel-section--also-live .sg-live-card:is(:hover, :focus-within) .sg-live-card__time {
+    color: var(--s2a-color-content-default);
+  }
+
+  /* sessions-guide flips the title white on hover — no counterpart existed here, so it leaked
+     through. */
+  .sb-carousel-section--also-live .sg-live-card:is(:hover, :focus-within) .sg-live-card__title {
+    color: var(--s2a-color-content-default);
+  }
+
+  /* color:inherit climbed past .sg-category-badge (no color of its own) to an unrelated
+     ambient value instead of the badge's own per-track color. Restoring the exact var()/
+     currentcolor chain the base rule uses keeps it fixed through hover. */
+  .sb-carousel-section--also-live .sg-live-card:is(:hover, :focus-within) .sg-category-badge__icon-color {
+    color: var(--sg-badge-icon-color, currentcolor);
+  }
+
+  /* Watch stays black here too (was #292929) — resting and hover alike. */
+  .sb-carousel-section--also-live .sg-live-card__btn--watch,
+  .sb-carousel-section--also-live .sg-live-card:is(:hover, :focus-within) .sg-live-card__btn--watch {
+    background: #000;
+    color: #fff;
+  }
+
+  .sb-carousel-section--also-live .sg-live-card__btn--favorite,
+  .sb-carousel-section--also-live .sg-live-card:is(:hover, :focus-within) .sg-live-card__btn--favorite {
+    background: #fff;
+    border-color: #292929;
+    color: #292929;
+  }
+}
+
+/* ── Also Live: desktop "long card" ──────────────────────────
+   Container/background stay full-bleed (see the :not() exclusion above); only the inner
+   content (.sg-carousel) is capped/centered at 1192px. The card switches from the 311px
+   vertical shape to a 1104px horizontal one with a fixed 560x316 image, matching
+   sessions-guide's own native desktop values almost exactly — only border/radius/width/
+   progress-row differ from what the unconditional base rules above force. */
+@media (min-width: 1280px) {
+  /* Clears the base rule's left padding so .sg-carousel centers symmetrically in the full
+     viewport, which the bleed calc below depends on. */
+  .sb-carousel-section--also-live {
+    padding: var(--s2a-spacing-xl, 32px) 0;
+  }
+
+  .sb-carousel-section--also-live .sg-carousel {
+    max-width: 1192px;
+    margin: 0 auto;
+  }
+
+  /* The peek was cut off at .sg-carousel's own boundary, not the true viewport edge. With
+     .sg-carousel centered in the full viewport, the exact gap to the true edge is
+     (100vw - 1192px) / 2. */
+  .sb-carousel-section--also-live .sg-carousel__track {
+    margin-right: calc((100vw - 1192px) / -2);
+  }
+
+  /* 24px between cards at desktop, not mobile/tablet's 16px. */
+  .sb-carousel-section--also-live .sg-carousel__cards {
+    padding-right: 0;
+    gap: var(--s2a-spacing-lg, 24px);
+  }
+
+  .sb-carousel-section--also-live .sg-live-card {
+    width: 100%;
+    max-width: 1104px;
+    border: none;
+    border-radius: var(--s2a-border-radius-lg, 32px);
+  }
+
+  /* Fixed 560x316, not the narrow card's aspect-ratio box — a real <img> needs an explicit
+     height against a flex-row sibling. */
+  .sb-carousel-section--also-live .sg-live-card__image {
+    width: 560px;
+    height: 316px;
+    aspect-ratio: auto;
+    border: none;
+    border-radius: var(--s2a-border-radius-lg, 32px);
+  }
+
+  /* Back to the image's bottom edge — the narrow card's top-edge placement is that shape's
+     own design. */
+  .sb-carousel-section--also-live .sg-live-card__progress-row {
+    top: auto;
+    bottom: 13px;
+    left: 27px;
+    right: 20px;
+  }
+
+  .sb-carousel-section--also-live .sg-live-card__body {
+    flex: 1;
+    width: auto;
+    padding: var(--s2a-spacing-2xl, 40px);
+    justify-content: space-between;
+    gap: 2px;
+  }
+
+  .sb-carousel-section--also-live .sg-live-card__meta {
+    justify-content: flex-start;
+    gap: var(--s2a-spacing-sm, 12px);
+  }
+
+  .sb-carousel-section--also-live .sg-live-card__title {
+    margin: 0;
+    font-family: var(--s2a-font-family-heading);
+    font-size: var(--s2a-font-size-3xl, 32px);
+    font-weight: var(--s2a-font-weight-heading, 900);
+  }
+
+  /* Shown here, unlike the narrow card. */
+  /* stylelint-disable-next-line value-no-vendor-prefix */
+  .sb-carousel-section--also-live .sg-live-card__desc { display: -webkit-box; }
+
+  /* No trailing time label in this design's actions row (Watch now + Favorite only). */
+  .sb-carousel-section--also-live .sg-live-card__actions-time { display: none; }
+
+  .sb-carousel-section--also-live .sg-live-card__btn { height: 40px; }
+
+  .sb-carousel-section--also-live .sg-live-card__btn--watch { padding: 0 var(--s2a-spacing-lg, 24px); }
+
+  .sb-carousel-section--also-live .sg-live-card__btn--favorite { width: 40px; }
+}
+
+/* ── Upcoming section ────────────────────────────────────
+   White section, gray-50 cards — inverse of Also Live. No right padding — cards peek to the
+   viewport edge. */
+.sb-carousel-section--up-next {
+  padding: var(--s2a-spacing-xl) 0 var(--s2a-spacing-xl) var(--s2a-spacing-lg);
+}
+
+.sb-carousel-section--up-next .sg-carousel__header { margin-bottom: var(--s2a-spacing-sm); }
+
+.sb-carousel-section--up-next .sg-section-title {
+  color: var(--s2a-color-gray-25, #fff);
+  letter-spacing: -0.2px;
+}
+
+/* 16px between cards, same as Also Live — not sessions-guide's own 8px default. */
+.sb-carousel-section--up-next .sg-carousel__cards { gap: var(--s2a-spacing-md, 16px); }
+
+/* .sg-card's base styling requires a .sessions-guide/.sg-portal ancestor this DOM never has
+   — replicated here instead of adding that class, which would pull in every other rule
+   scoped that way too. */
+.sb-carousel-section--up-next .sg-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  flex-shrink: 0;
+  position: relative;
+  overflow: hidden;
+  cursor: pointer;
+  width: 268px;
+  min-height: 0;
+  background: var(--s2a-color-gray-50, #f8f8f8);
+  border: none;
+  border-radius: var(--s2a-border-radius-md, 16px);
+  padding: var(--s2a-spacing-md, 16px);
+  box-shadow: none;
+}
+
+.sb-carousel-section--up-next .sg-card__badge-row { margin-bottom: var(--s2a-spacing-sm); }
+
+/* SessionCard.js hardcodes IconButton's dark-card context; this card is light, so the
+   frosted-glass/outlined-on-light treatment is replicated here instead. */
+.sb-carousel-section--up-next .sg-card__btn--schedule,
+.sb-carousel-section--up-next .sg-card__btn--favorite {
+  background: rgb(255 255 255 / 80%);
+  border-color: var(--s2a-color-gray-100, #e9e9e9);
+  backdrop-filter: blur(4.6875px);
+}
+
+.sb-carousel-section--up-next .sg-card.is-scheduled .sg-card__btn--schedule,
+.sb-carousel-section--up-next .sg-card.is-favorited .sg-card__btn--favorite {
+  background: transparent;
+  border-color: var(--s2a-color-gray-800, #292929);
+  backdrop-filter: blur(16px);
+}
+
+/* Title-to-actions spacing on tablet matches this card's own uniform 12px gap — sessions-
+   guide's base rule only has a 2px margin meant for wrapped title lines. */
+@media (min-width: 768px) and (max-width: 1279px) {
+  .sb-carousel-section--up-next .sg-card__title {
+    margin-bottom: var(--s2a-spacing-sm, 12px);
+  }
+}
+
+/* Tablet: carousel nav arrows hidden, cards swipeable instead. sessions-guide's own
+   "Intermediate Tablet" tier (1024-1279px) otherwise turns .sg-carousel__cards into a
+   JS-transform-paged strip with the nav as the only way to reach more cards — hiding it
+   without restoring native scroll would strand overflow content. Carousel.js recomputes its
+   own paged state from computed overflow-x, so no JS changes are needed. */
+@media (min-width: 768px) and (max-width: 1279px) {
+  .sb-carousel-section--also-live .sg-carousel__nav,
+  .sb-carousel-section--up-next .sg-carousel__nav {
+    display: none;
+  }
+
+  .sb-carousel-section--also-live .sg-carousel__cards,
+  .sb-carousel-section--up-next .sg-carousel__cards {
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+
+  .sb-carousel-section--also-live .sg-carousel__card-wrap,
+  .sb-carousel-section--up-next .sg-carousel__card-wrap {
+    scroll-snap-align: start;
+  }
+
+  /* Header-to-cards gap grows to 24px on tablet (was 12px). */
+  .sb-carousel-section--also-live .sg-carousel__header,
+  .sb-carousel-section--up-next .sg-carousel__header {
+    margin-bottom: var(--s2a-spacing-lg, 24px);
+  }
+}
+
+/* Also Live card images lose their 1px border on tablet — the 1024px+ reset block adds it
+   for its own unbounded range; this bounded block wins the cascade tie for 1024-1279px,
+   leaving the border at 1280px+. */
+@media (min-width: 768px) and (max-width: 1279px) {
+  .sb-carousel-section--also-live .sg-live-card__image {
+    border: none;
+  }
+}
+
+/* Kept here, after both sections' base rules, for ascending specificity
+   (stylelint no-descending-specificity). */
+.sb-ended ~ .sb-carousel-section--also-live,
+.sb-ended ~ .sb-carousel-section--up-next {
+  background: transparent;
+}
+
+.sb-ended ~ .sb-carousel-section--also-live .sg-section-title,
+.sb-ended ~ .sb-carousel-section--up-next .sg-section-title {
+  color: var(--s2a-color-content-inverse, #fff);
+}
+
+/* Vertical padding shrinks from 32px to 24px top/bottom on tablet once the session has
+   ended (these sections sit below .sb-ended's marquee, not below the player). */
+@media (min-width: 768px) and (max-width: 1279px) {
+  .sb-ended ~ .sb-carousel-section--also-live,
+  .sb-ended ~ .sb-carousel-section--up-next {
+    padding-top: var(--s2a-spacing-lg, 24px);
+    padding-bottom: var(--s2a-spacing-xl, 32px);
+  }
+}
+
+/* Header-to-cards gap grows to 32px once ended at desktop — the shared nav-alignment rule's
+   24px still applies generally; this sibling-scoped override wins the specificity tie once
+   .sb-ended is present. */
+@media (min-width: 1280px) {
+  .sb-ended ~ .sb-carousel-section--also-live .sg-carousel__header,
+  .sb-ended ~ .sb-carousel-section--up-next .sg-carousel__header {
+    margin-bottom: var(--s2a-spacing-xl, 32px);
+  }
+
+  /* Section title stays 18px live, only grows to 24px once ended. */
+  .sb-ended ~ .sb-carousel-section--also-live .sg-section-title,
+  .sb-ended ~ .sb-carousel-section--up-next .sg-section-title {
+    font-size: var(--s2a-font-size-2xl, 24px);
+    line-height: var(--s2a-font-line-height-md, 24px);
+  }
+}
+
+/* sessions-guide's own desktop rule takes the nav out of flow (anchored to .sg-carousel), so
+   it sits beside the title — but nothing sizes .sg-carousel__header to match the nav's own
+   40px buttons, so top:0 only aligns with the title's much shorter line box. Giving the
+   header a 40px min-height makes both share the same box, and turns the clearance to the
+   cards below into a plain margin-bottom.
+   Placed after both sections' own base rules (which also set this margin) — same
+   specificity, so whichever is LAST in the file wins the tie for widths ≥1280px. */
+@media (min-width: 1280px) {
+  .sb-carousel-section--also-live .sg-carousel__header,
+  .sb-carousel-section--up-next .sg-carousel__header {
+    min-height: 40px;
+    margin-bottom: var(--s2a-spacing-lg, 24px);
+  }
+
+  .sb-carousel-section--also-live .sg-carousel__nav,
+  .sb-carousel-section--up-next .sg-carousel__nav {
+    top: 0;
+  }
+}
+
+/* .sb-info's corners are square (border-radius: 0, see its base rule).
+   1192px is the shared "desktop" (1280-1440px) wrapper value; xl desktop (1441px+) bumps it
+   to 1440px in the dedicated block near the end of this file. */
+@media (min-width: 1280px) {
+  /* :not() excludes Also Live and Up Next — both stay full-bleed, with only their inner
+     .sg-carousel capped/centered; see their own desktop blocks below. */
+  .sb-info,
+  .sb-carousel-section:not(.sb-carousel-section--also-live):not(.sb-carousel-section--up-next) {
+    max-width: 1192px;
+    margin: 0 auto;
+  }
+
+  /* No left/right padding at desktop — centering already provides the breathing room. */
+  .sb-info {
+    padding-right: 0;
+    padding-left: 0;
+  }
+
+  /* 24px at desktop, not tablet's 20px. */
+  .sb-info__title {
+    font-size: var(--s2a-font-size-2xl, 24px);
+    line-height: var(--s2a-font-line-height-md, 24px);
+  }
+}
+
+/* Desktop: Upcoming section goes dark too, matching the player/info panel and Also Live
+   above it — same full-bleed-to-the-page-edge treatment as Also Live. Unconditional (not
+   gated on .sb-ended) — the ended-state sibling rules below are more specific and still win
+   when both conditions overlap. */
+@media (min-width: 1280px) {
+  /* 32px top / 64px bottom, asymmetric per design. Horizontal padding is 0 — .sg-carousel
+     below handles centering. */
+  .sb-carousel-section--up-next {
+    padding: var(--s2a-spacing-xl, 32px) 0 var(--s2a-spacing-4xl, 64px);
+    background: var(--s2a-color-gray-1000, #000);
+  }
+
+  .sb-carousel-section--up-next .sg-carousel {
+    max-width: 1192px;
+    margin: 0 auto;
+  }
+
+  .sb-carousel-section--up-next .sg-section-title {
+    color: var(--s2a-color-content-inverse, #fff);
+  }
+
+  /* Same edge-bleed reasoning as Also Live above. */
+  .sb-carousel-section--up-next .sg-carousel__track {
+    margin-right: calc((100vw - 1192px) / -2);
+  }
+
+  /* sessions-guide's own "Upcoming" row fixes its height at the resting card height (124px),
+     so a hovered, taller card overflows the row symmetrically (overflow: visible, already
+     native here) instead of growing the row and shifting siblings down via
+     align-items: center. Horizontal reflow as the hovered card widens is still expected,
+     same as sessions-guide. */
+  .sb-carousel-section--up-next .sg-carousel__cards {
+    padding-right: 0;
+    align-items: center;
+    height: 124px;
+  }
+
+  /* Container-level width/min-height/background/shadow hover treatment is gated behind
+     sessions-guide's own .sessions-guide/.sg-portal ancestor, which this DOM never carries —
+     replicated directly here, copied exactly from sessions-guide's own values. */
+  .sb-carousel-section--up-next .sg-card {
+    /* Without this the card stays flex-direction: column (base rule), stacking actions below
+       the body instead of beside it. */
+    flex-direction: row;
+    align-items: stretch;
+    width: 379px;
+    min-height: 124px;
+    padding: var(--s2a-spacing-lg, 24px);
+
+    /* Transparent at rest, colored on hover — border-box keeps the 1px from shifting geometry
+       when it appears. */
+    border: 1px solid transparent;
+    transition: width 0.32s cubic-bezier(0.22, 1, 0.36, 1),
+      min-height 0.32s cubic-bezier(0.22, 1, 0.36, 1),
+      background 0.32s cubic-bezier(0.22, 1, 0.36, 1),
+      border-color 0.32s cubic-bezier(0.22, 1, 0.36, 1),
+      box-shadow 0.32s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  /* #262626 (Figma's "maxcolor/darkgrey", no equivalent --s2a-* token — same value used for
+     Also Live's section background above). */
+  .sb-carousel-section--up-next .sg-card:is(:hover, :focus-within) {
+    width: 427px;
+    min-height: 150px;
+    background: #262626;
+    border-color: var(--s2a-color-transparent-white-24, rgb(255 255 255 / 24%));
+    box-shadow: 0 6px 24px rgb(0 0 0 / 18%);
+    z-index: 2;
+  }
+
+  /* .is-scheduled/.is-favorited pre-widen the card at rest too, matching sessions-guide's own
+     combined-state rules. */
+  .sb-carousel-section--up-next .sg-card.is-scheduled,
+  .sb-carousel-section--up-next .sg-card.is-favorited {
+    width: 427px;
+  }
+
+  .sb-carousel-section--up-next .sg-card.is-scheduled:is(:hover, :focus-within),
+  .sb-carousel-section--up-next .sg-card.is-favorited:is(:hover, :focus-within) {
+    min-height: 150px;
+    background: #262626;
+    border-color: var(--s2a-color-transparent-white-24, rgb(255 255 255 / 24%));
+    box-shadow: 0 6px 24px rgb(0 0 0 / 18%);
+    z-index: 2;
+  }
+
+  /* An opaque white circle with the icon staying dark, matching sessions-guide (which never
+     goes transparent). .is-scheduled/.is-favorited makes the button fully transparent at
+     every state — fine on the light resting card, invisible once it sits over the dark hover
+     fill. Restoring opacity for the hover case only. */
+  .sb-carousel-section--up-next .sg-card.is-scheduled:is(:hover, :focus-within) .sg-card__btn--schedule,
+  .sb-carousel-section--up-next .sg-card.is-favorited:is(:hover, :focus-within) .sg-card__btn--favorite {
+    background: #fff;
+  }
+
+  /* 2-line clamp, matching sessions-guide's own default — asserted explicitly so a future
+     width change can't silently drop it. */
+  .sb-carousel-section--up-next .sg-card__title {
+    /* stylelint-disable-next-line value-no-vendor-prefix */
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  /* Hidden at rest — the card only has room for it once hover grows min-height above.
+     Single-line truncation, unlike the title's 2-line clamp, matching Figma. */
+  .sb-carousel-section--up-next .sg-card__description {
+    display: none;
+    font-size: 14px;
+    line-height: 1.2;
+    letter-spacing: -0.14px;
+    color: var(--s2a-color-gray-500, #8f8f8f);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    width: 100%;
+  }
+
+  .sb-carousel-section--up-next .sg-card:is(:hover, :focus-within) .sg-card__description {
+    display: block;
+  }
+}
+
+/* ── XL desktop (1441px+) ────────────────────────────────────
+   Bumps the shared 1192px content wrapper to 1440px. Placed after every 1280px+ block above,
+   repeating each selector at matching specificity so this wins the cascade tie for widths
+   ≥1441px. The edge-bleed calc for .sg-carousel__track moves in lockstep. */
+@media (min-width: 1441px) {
+  .sb-info,
+  .sb-carousel-section:not(.sb-carousel-section--also-live):not(.sb-carousel-section--up-next),
+  .sb-ended,
+  .sb-carousel-section--also-live .sg-carousel,
+  .sb-carousel-section--up-next .sg-carousel {
+    max-width: 1440px;
+  }
+
+  .sb-carousel-section--also-live .sg-carousel__track,
+  .sb-carousel-section--up-next .sg-carousel__track {
+    margin-right: calc((100vw - 1440px) / -2);
+  }
+
+  /* The player caps at the same 1440px as the rest of the wrapper, not the foundation's own
+     1480px (c2-global.css/event-youtube.css both read a token that resolves to 1480px here).
+     !important for the same reason as the tablet override near the top of this file. */
+  .session-broadcast .milo-video,
+  .session-broadcast .youtube-video-container {
+    max-width: 1440px !important;
+  }
+}

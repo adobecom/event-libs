@@ -1,6 +1,8 @@
 import { html, useState } from '../../../../deps/htm-preact.js';
 import { useSessionGuide } from '../store/index.js';
-import { isSessionOnDemand, formatSessionTime, formatDuration, getNowMs } from '../utils/time.js';
+import {
+  isSessionOnDemand, formatSessionTime, formatShortTime, formatDuration, getNowMs,
+} from '../utils/time.js';
 import { isDvrPending } from '../../../../utils/session-state.js';
 import { scheduled, favorited, pendingActions, getEventApiConfig } from '../../../../utils/session-store.js';
 import { toggleScheduleWithFeedback, toggleFavoriteWithFeedback } from '../../../../services/sessions/action-feedback.js';
@@ -13,7 +15,9 @@ import { isBehaviorEnabled } from '../utils/behavior-flags.js';
 
 export const buildSessionCard = () => SessionCard;
 
-export function SessionCard({ session, forceOnDemand = false, timeDisplay = 'duration' }) {
+export function SessionCard({
+  session, forceOnDemand = false, timeDisplay = 'duration', onCardClick, showDescription = false,
+}) {
   const { state, dispatch } = useSessionGuide();
   const { guideConfig, activeView } = state;
   const dismissingIds = state.dismissingIds || new Set();
@@ -30,12 +34,20 @@ export function SessionCard({ session, forceOnDemand = false, timeDisplay = 'dur
   const onDemand = forceOnDemand || onDemandNatural;
   const trackColor = getTrackIcon(session.primaryTrack)?.color || '';
 
-  const upcomingTimeLabel = (timeDisplay === 'duration' && session.endTimeUtc)
-    ? formatDuration(session.startTimeUtc, session.endTimeUtc)
-    : formatSessionTime(session.startTimeUtc, userTz);
-  // A session with a DVR delay isn't watchable yet if the delay window (from the event's own
-  // start, not this session's) hasn't elapsed — see isDvrPending. No dvrDelayHours, or no
-  // known event start, means it's just on demand with no wait.
+  // 'range': session-broadcast's Upcoming section (e.g. "9:15AM - 9:45AM"), reusing the same
+  // start–end formatting LiveCard.js builds for its recommended variant.
+  let upcomingTimeLabel;
+  if (timeDisplay === 'range' && session.endTimeUtc) {
+    const startShort = formatShortTime(session.startTimeUtc, userTz);
+    const endShort = formatShortTime(session.endTimeUtc, userTz);
+    upcomingTimeLabel = `${startShort} - ${endShort}`;
+  } else if (timeDisplay === 'duration' && session.endTimeUtc) {
+    upcomingTimeLabel = formatDuration(session.startTimeUtc, session.endTimeUtc);
+  } else {
+    upcomingTimeLabel = formatSessionTime(session.startTimeUtc, userTz);
+  }
+  // A DVR delay isn't watchable until the delay window elapses, measured from the event's own
+  // start, not this session's (see isDvrPending).
   const dvrPending = onDemand && isDvrPending(session, nowMs, getEventApiConfig()?.eventStartMs);
   const timeLabel = onDemand ? (dvrPending ? 'AVAILABLE SOON' : 'ON DEMAND') : upcomingTimeLabel;
 
@@ -60,9 +72,8 @@ export function SessionCard({ session, forceOnDemand = false, timeDisplay = 'dur
     setHoverAnim(null);
   }
 
-  // Shared by handleSchedule/handleFavorite: when a card is about to leave its own
-  // list (e.g. unscheduling from "My sessions"), collapse it before the action runs
-  // so the exit animation isn't cut short by the list re-rendering underneath it.
+  // Shared by handleSchedule/handleFavorite: collapses a card before it leaves its own list
+  // (e.g. unscheduling from "My sessions") so the exit animation isn't cut short by the re-render.
   async function withDismissAnimation(e, willDismiss, actionFn) {
     if (willDismiss) {
       const cardWrap = e.currentTarget.closest('.sg-card')?.parentElement;
@@ -112,9 +123,8 @@ export function SessionCard({ session, forceOnDemand = false, timeDisplay = 'dur
     if (dest) window.location.href = dest;
   }
 
-  // iOS mis-routes the synthetic click to the card div when the touch target is
-  // inside a transform + overflow:hidden ancestor (sg-time-row__cards/viewport).
-  // Handle the action on touchend and preventDefault to kill the synthetic click.
+  // iOS mis-routes the synthetic click to the card div when the touch target sits inside a
+  // transform + overflow:hidden ancestor — handled on touchend with preventDefault instead.
   async function handleActionsTouchEnd(e) {
     e.preventDefault();
     const touch = e.changedTouches[0];
@@ -127,6 +137,10 @@ export function SessionCard({ session, forceOnDemand = false, timeDisplay = 'dur
 
   function handleClick() {
     if (surface === 'page') {
+      // A non-widget caller like session-broadcast has no in-widget overlay to navigate away
+      // from — onCardClick lets it supply its own "open detail" behavior instead (same escape
+      // hatch as LiveCard.js).
+      if (onCardClick) { onCardClick(session); return; }
       const dest = safeUrl(session.sessionPageUrl);
       if (dest) window.location.href = dest;
       return;
@@ -143,7 +157,7 @@ export function SessionCard({ session, forceOnDemand = false, timeDisplay = 'dur
 
   // eslint-disable-next-line no-nested-ternary
   const cardDaaLl = surface === 'page'
-    ? 'Session-Card-Navigate'
+    ? (onCardClick ? 'Session-Card-Open' : 'Session-Card-Navigate')
     : (onDemand ? 'On-Demand-Card-Navigate' : 'Session-Card-Open');
 
   return html`
@@ -159,6 +173,7 @@ export function SessionCard({ session, forceOnDemand = false, timeDisplay = 'dur
           onclick=${(e) => { e.stopPropagation(); handleClick(); }}
           daa-ll=${cardDaaLl}
         >${session.title}</button>
+        ${showDescription && session.description && html`<p class="sg-card__description">${session.description}</p>`}
         <div class="sg-card__footer">
           <span class="sg-card__track sg-card__track--footer" style=${'color:' + trackColor}>${session.primaryTrack}</span>
           <span class="sg-card__footer-badge"><${CategoryBadge} session=${session} size="sm" /></span>

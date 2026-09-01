@@ -168,9 +168,55 @@ describe('SessionCard', () => {
     expect(html).to.match(/\d+(:\d+)?\s*(AM|PM)/i);
   });
 
+  it('shows a start–end range when timeDisplay is "range"', () => {
+    const store = buildStore(preact);
+    store.SessionGuideContext._current = makeCtx();
+    const SessionCard = buildSessionCard(preact, store);
+    const html = SessionCard({ session: UPCOMING_SESSION, timeDisplay: 'range' });
+    expect(html).to.match(/\d+(:\d+)?\s*(AM|PM)\s*-\s*\d+(:\d+)?\s*(AM|PM)/i);
+  });
+
   it('tags the card daa-ll as Session-Card-Navigate on the page surface', () => {
     const html = renderCard(UPCOMING_SESSION);
     expect(html).to.include('daa-ll="Session-Card-Navigate"');
+  });
+
+  // showDescription defaults to false so session-broadcast's Upcoming-card-only hover
+  // treatment (session-broadcast.css) doesn't leak into sessions-guide's own TimeSlotRow/
+  // TrackRow usage of this same component.
+  describe('showDescription (session-broadcast integration)', () => {
+    it('omits the description by default', () => {
+      const html = renderCard(UPCOMING_SESSION);
+      expect(html).to.not.include('sg-card__description');
+    });
+
+    it('includes the description when showDescription is true', () => {
+      const store = buildStore(preact);
+      store.SessionGuideContext._current = makeCtx();
+      const SessionCard = buildSessionCard(preact, store);
+      const html = SessionCard({ session: UPCOMING_SESSION, showDescription: true });
+      expect(html).to.include('sg-card__description');
+      expect(html).to.include('Learn AI integration.');
+    });
+
+    it('omits the description when showDescription is true but the session has none', () => {
+      const store = buildStore(preact);
+      store.SessionGuideContext._current = makeCtx();
+      const SessionCard = buildSessionCard(preact, store);
+      const html = SessionCard({ session: { ...UPCOMING_SESSION, description: '' }, showDescription: true });
+      expect(html).to.not.include('sg-card__description');
+    });
+  });
+
+  // session-broadcast (a non-widget "page" surface caller) supplies its own onCardClick to
+  // open the real Session Guide detail view instead of navigating away — same escape hatch
+  // LiveCard.js already offers on its own non-widget branch.
+  it('tags the card daa-ll as Session-Card-Open on the page surface when onCardClick is supplied', () => {
+    const store = buildStore(preact);
+    store.SessionGuideContext._current = makeCtx();
+    const SessionCard = buildSessionCard(preact, store);
+    const html = SessionCard({ session: UPCOMING_SESSION, onCardClick: () => {} });
+    expect(html).to.include('daa-ll="Session-Card-Open"');
   });
 
   it('tags the card daa-ll as Session-Card-Open on the widget surface for a live/upcoming session', () => {

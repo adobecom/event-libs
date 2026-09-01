@@ -3,7 +3,7 @@ import { useSessionGuide } from '../store/index.js';
 import { formatShortTime, formatDuration, getNowMs } from '../utils/time.js';
 import { deriveSessionState, getWatchDestination } from '../../../../utils/session-state.js';
 import {
-  scheduled, favorited, pendingActions, liveStreamActiveIds,
+  scheduled, favorited, pendingActions, liveStreamActiveIds, requestWatchSameSession,
 } from '../../../../utils/session-store.js';
 import { toggleScheduleWithFeedback, toggleFavoriteWithFeedback } from '../../../../services/sessions/action-feedback.js';
 import { IconPlay, IconCalendarCheck, IconCalendarPlus, IconHeartFilled, IconHeartOutline } from './icons.js';
@@ -16,10 +16,8 @@ import { isBehaviorEnabled } from '../utils/behavior-flags.js';
 export const buildLiveCard = () => LiveCard;
 
 // A non-MR session only gets a fresh render from the shared session-state ticker when some
-// session's live/upcoming/on-demand bucket actually flips — which can go untriggered for a
-// while if nothing else on the page is transitioning, leaving the progress bar visibly stuck.
-// An MR session gets an equivalent refresh for free every ~30s from the poller reassigning
-// liveStreamActiveIds. Exported so the cadence is one shared constant, not a magic number.
+// bucket actually flips, which can leave the progress bar visibly stuck. An MR session gets an
+// equivalent refresh for free every ~30s from the poller reassigning liveStreamActiveIds.
 export const PROGRESS_REFRESH_MS = 30_000;
 
 export function computeProgressPct(session, nowMs) {
@@ -30,7 +28,9 @@ export function computeProgressPct(session, nowMs) {
   return duration > 0 ? Math.round((elapsed / duration) * 100) : 0;
 }
 
-export function LiveCard({ session, variant = 'live' }) {
+export function LiveCard({
+  session, variant = 'live', onCardClick, onWatchSamePage, showDurationBadge = false,
+}) {
   const { state, dispatch } = useSessionGuide();
   const { guideConfig } = state;
   const { userTz, surface } = guideConfig;
@@ -45,9 +45,8 @@ export function LiveCard({ session, variant = 'live' }) {
   const nowMs = getNowMs();
   const sessionState = deriveSessionState(session, liveStreamActiveIds.value, nowMs);
 
-  // Forces a re-render every PROGRESS_REFRESH_MS while live, purely so progressPct below gets
-  // recomputed against the current clock — see PROGRESS_REFRESH_MS for why this can't rely on
-  // the shared session-state ticker alone.
+  // Forces a re-render every PROGRESS_REFRESH_MS while live so progressPct recomputes against
+  // the current clock — the shared session-state ticker alone isn't enough (see above).
   const [, forceProgressTick] = useState(0);
   useEffect(() => {
     if (sessionState !== 'live') return undefined;
@@ -65,12 +64,10 @@ export function LiveCard({ session, variant = 'live' }) {
   const startTime = formatShortTime(session.startTimeUtc, userTz);
   const endTime = session.endTimeUtc ? formatShortTime(session.endTimeUtc, userTz) : '';
   const timeRange = endTime ? `${startTime} – ${endTime}` : startTime;
-  // The meta row's second slot is shared. An upcoming Recommended card states its time
-  // there; every other card badges its first additional event-site track instead, so live
-  // and past Recommended cards get the same two-badge treatment. A live card never needs the
-  // time (it has a progress bar and remaining duration), and a start time says nothing once a
-  // session is on demand. Only the first additional track is used — the ESP field is
-  // multi-select but the badge model supports one (see resolveTrackBadge).
+  // The meta row's second slot is shared: an upcoming Recommended card shows time there, every
+  // other card badges its first additional track instead (live has a progress bar; on-demand
+  // has no meaningful start time). Only the first additional track is used since the badge
+  // model supports one, though the ESP field is multi-select (see resolveTrackBadge).
   const showTime = variant === 'recommended' && sessionState === 'upcoming';
   const secondTrack = showTime ? undefined : (session.additionalTracks || [])[0];
 
@@ -103,9 +100,14 @@ export function LiveCard({ session, variant = 'live' }) {
 
   function handleWatch(e) {
     e.stopPropagation();
-    // Already on the destination page (e.g. the widget is embedded on the homepage/broadcast
-    // page itself) — close the widget instead of reloading the page out from under the player.
+    // Already on the destination page — let the caller decide what "already here" means
+    // (session-broadcast switches its own player instead of closing a drawer that doesn't
+    // exist there), rather than reloading the page out from under what's already playing.
     if (isSamePage(watchHref)) {
+      if (onWatchSamePage) { onWatchSamePage(session); return; }
+      // The widget's own instance has no prop-level switch path — ask whatever page this is
+      // to switch itself (a no-op on pages with nothing subscribed, e.g. the homepage).
+      requestWatchSameSession(session.id);
       dispatch({ type: 'CLOSE_DRAWER' });
       history.pushState({}, '', clearSessionParams());
       window.scrollTo({ top: 0, behavior: scrollBehavior() });
@@ -142,9 +144,14 @@ export function LiveCard({ session, variant = 'live' }) {
   // the session page, regardless of surface, instead of opening the in-widget overlay.
   function handleCardClick(e) {
     if (sessionState === 'on-demand') { handleWatch(e); return; }
-    if (surface !== 'widget') return;
-    dispatch({ type: 'SET_ACTIVE_SESSION', sessionId: session.id });
-    history.pushState({}, '', setSessionParam(sessionParamValue(session)));
+    if (surface === 'widget') {
+      dispatch({ type: 'SET_ACTIVE_SESSION', sessionId: session.id });
+      history.pushState({}, '', setSessionParam(sessionParamValue(session)));
+      return;
+    }
+    // Non-widget surfaces have no in-widget overlay — onCardClick lets a caller like
+    // session-broadcast supply its own "open detail" behavior instead.
+    onCardClick?.(session);
   }
 
   return html`
@@ -170,7 +177,7 @@ export function LiveCard({ session, variant = 'live' }) {
           </span>`}
           ${showTime && html`<p class="sg-live-card__time">${timeRange}</p>`}
         </div>
-        ${surface === 'widget'
+        ${(surface === 'widget' || onCardClick)
     ? html`<button
               class="sg-live-card__title sg-live-card__title-btn"
               type="button"
@@ -199,6 +206,7 @@ export function LiveCard({ session, variant = 'live' }) {
             daa-ll=${isFavorited ? 'Remove-from-Favorites' : 'Add-to-Favorites'}
             type="button"
           >${isFavorited ? html`<${IconHeartFilled} />` : html`<${IconHeartOutline} />`}</button>`}
+          ${variant === 'live' && showDurationBadge && durationLabel && html`<span class="sg-live-card__actions-time">${durationLabel}</span>`}
         </div>
       </div>
     </div>
