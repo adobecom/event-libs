@@ -796,7 +796,7 @@ export default async function init(el) {
     announceVideoDecision(true);
 
     const current = sessionList.find((s) => s.id === sessionId) || synthesizeCurrentSession();
-    const displayRows = [current, ...rows].sort(compareByStartTime);
+    const displayRows = [current, ...rows.slice().sort(compareByStartTime)];
 
     el.replaceChildren();
     const handle = createTag('div', { class: 'session-video-playlist-handle', 'aria-hidden': 'true' }, '', { parent: el });
