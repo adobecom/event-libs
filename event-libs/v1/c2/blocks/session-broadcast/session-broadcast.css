@@ -1180,11 +1180,11 @@
    .sb-info's corners are square (border-radius: 0, see its base rule) — an earlier pass
    rounded its bottom corners to 32px to read as one merged card with the player above, per
    Figma nodes 24:22746/24:20749; corrected back to square, per explicit follow-up.
-   TODO: max-width stays a flat 1192px here even at 1441px+ ("xl desktop"), while the player
-   above grows to 1480px at that tier via the foundation's own responsive token — no xl-desktop
-   frame has been reviewed for this panel yet, so this is a known, deliberate gap, not an
-   oversight (leave until that frame exists, per this file's own "don't touch what hasn't been
-   reviewed" convention). */
+   This 1192px max-width is the shared "desktop" (1280-1440px) content wrapper value; xl
+   desktop (1441px+) bumps it to 1440px instead — see the dedicated xl-desktop block near the
+   end of this file, which overrides every one of this wrapper's uses (this rule, .sb-ended,
+   and both carousel sections' own .sg-carousel) in one place rather than repeating the bump
+   inline at each one. */
 @media (min-width: 1280px) {
   /* :not() excludes Also Live and Up Next — both sections' own containers/backgrounds now stay
      full-bleed to the page edge at this width, with only their inner content (.sg-carousel)
@@ -1346,5 +1346,41 @@
     line-clamp: 2;
     -webkit-box-orient: vertical;
     overflow: hidden;
+  }
+}
+
+/* ── XL desktop (1441px+) ────────────────────────────────────
+   First xl-desktop pass: bump the shared 1192px content wrapper (used, in one form or
+   another, by .sb-info/.sb-carousel-section's shared rule, .sb-ended, and both carousel
+   sections' own .sg-carousel) to 1440px. Placed after every 1280px+ block above and repeating
+   each selector at matching specificity, so this wins the cascade tie for widths ≥1441px
+   regardless of source order elsewhere in the file — same pattern as every breakpoint-layered
+   override already in this file. Also-Live/Up-Next's own edge-bleed calc for .sg-carousel__track
+   (currently `(100vw - 1192px) / -2`) is derived directly from this same wrapper width, so it
+   has to move in lockstep or the peeking card would drift off — updated here too. */
+@media (min-width: 1441px) {
+  .sb-info,
+  .sb-carousel-section:not(.sb-carousel-section--also-live):not(.sb-carousel-section--up-next),
+  .sb-ended,
+  .sb-carousel-section--also-live .sg-carousel,
+  .sb-carousel-section--up-next .sg-carousel {
+    max-width: 1440px;
+  }
+
+  .sb-carousel-section--also-live .sg-carousel__track,
+  .sb-carousel-section--up-next .sg-carousel__track {
+    margin-right: calc((100vw - 1440px) / -2);
+  }
+
+  /* Per follow-up: the player caps at the same 1440px as the rest of the content wrapper here,
+     not the foundation's own 1480px (c2-global.css's .milo-video rule / event-youtube.css's
+     .youtube-video-container rule both read --s2a-layout-rich-media-content-measure-wide,
+     which resolves to 1480px at this tier per tokens.css) — closing the gap flagged when the
+     wrapper bump above first went in. !important needed for the same reason as the existing
+     tablet full-bleed override near the top of this file — both foundation selectors
+     out-specify a plain .session-broadcast-scoped one. */
+  .session-broadcast .milo-video,
+  .session-broadcast .youtube-video-container {
+    max-width: 1440px !important;
   }
 }

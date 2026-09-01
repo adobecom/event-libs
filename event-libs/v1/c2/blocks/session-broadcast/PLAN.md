@@ -2057,6 +2057,39 @@ own comment for why vh, not a literal %, is used.
 
 Verified: lint clean, 144/144 tests pass unchanged (CSS-only, no behavior touched).
 
+## XL desktop (1441px+) work begins (2026-09-01)
+
+User: "Okey, now lets take care of desktop xl. To start we will bump the wrapper we have been
+using around the content from 1192 to 1440px." This closes the TODO flagged several entries
+ago (player growing to 1480px at 1441px+ via the foundation's own responsive token, while the
+info-panel/carousel content wrapper stayed flat at 1192px) — at least for the wrapper's own
+width; the player-vs-wrapper 1480-vs-1440 mismatch is a separate, still-open question, not part
+of this specific instruction.
+
+Added one new `@media (min-width: 1441px)` block, placed at the end of the file (after every
+existing 1280px+ block) so it wins the cascade tie for xl-desktop widths via source order,
+bumping every one of this wrapper's uses to 1440px in one place: the shared `.sb-info,
+.sb-carousel-section` rule, `.sb-ended`, and both carousel sections' own `.sg-carousel`. Also
+updated Also Live/Up Next's edge-bleed calc for `.sg-carousel__track` (`(100vw - 1192px) / -2`)
+to `(100vw - 1440px) / -2`, since it's derived directly from the same wrapper width and would
+otherwise leave the peeking card mispositioned at this tier.
+
+Verified: lint clean, 144/144 tests pass unchanged (CSS-only, no behavior touched).
+
+### Player also capped at 1440px at xl desktop, not the foundation's 1480px (2026-09-01)
+
+User: "The video players should also respect the maximum width of 1440px." Closes the gap
+flagged in the previous entry: the player's own width comes from the foundation (c2-global.css's
+`.milo-video` rule, event-youtube.css's `.youtube-video-container` rule), both reading
+`--s2a-layout-rich-media-content-measure-wide`, which resolves to 1480px at 1441px+ per
+tokens.css — 40px wider than the content wrapper this same tier just got bumped to. Added
+`.session-broadcast .milo-video`/`.youtube-video-container { max-width: 1440px !important; }`
+to the same xl-desktop block, `!important` for the same reason as the existing tablet full-bleed
+override earlier in this file — both foundation selectors out-specify a plain
+`.session-broadcast`-scoped one.
+
+Verified: lint clean, 144/144 tests pass unchanged (CSS-only, no behavior touched).
+
 ## Explicitly out of scope (fast-follow)
 
 - MobileRider real playback (stub adapter only)
