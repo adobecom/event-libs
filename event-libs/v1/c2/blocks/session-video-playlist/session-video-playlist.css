@@ -375,7 +375,7 @@
   padding: 0;
   border: var(--s2a-border-width-sm, 1px) solid currentcolor;
   border-radius: var(--s2a-border-radius-round);
-  background: none;
+  background: var(--s2a-color-gray-100);
   color: var(--vp-fg);
   cursor: pointer;
 }
@@ -388,6 +388,7 @@
 .session-video-playlist-row-play svg {
   width: 16px;
   height: 16px;
+  color: var(--s2a-color-button-content-primary-outlined-default);
 }
 
 .session-video-playlist-row-play {
