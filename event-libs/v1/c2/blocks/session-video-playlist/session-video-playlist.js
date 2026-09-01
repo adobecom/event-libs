@@ -500,7 +500,9 @@ function buildTopicView(el, allRows, {
         id: session.id,
         rfSessionId: session.rfSessionId,
         title: session.title,
-        thumbnailUrl: session.thumbnailUrl || defaultThumbnail,
+        // TEMP TEST: force the authored default thumbnail on every row so it can be
+        // verified. Revert to `session.thumbnailUrl || defaultThumbnail` before merging.
+        thumbnailUrl: defaultThumbnail || session.thumbnailUrl,
 
         durationLabel: (() => {
           const watchedLengthSeconds = getVideoProgress(session.id)?.length;
