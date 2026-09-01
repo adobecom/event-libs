@@ -249,15 +249,16 @@ describe('session-video-playlist', () => {
 
     it('sorts sessions with no start time (IPOD) after scheduled ones', () => {
       const scheduled = catalogSession({ id: 'scheduled' });
-      const ipod = catalogSession({ id: 'ipod', startTimeUtc: '', endTimeUtc: '' });
-      expect(resolveTopicPlaylist('cur', topics, [ipod, scheduled], 2).map((s) => s.id))
+      const ipod = catalogSession({ id: 'ipod', startTimeUtc: '', endTimeUtc: '', dvrDelayHours: 1 });
+      const eventStartMs = Date.now() - 5 * HOUR_MS;
+      expect(resolveTopicPlaylist('cur', topics, [ipod, scheduled], 2, eventStartMs).map((s) => s.id))
         .to.deep.equal(['scheduled', 'ipod']);
     });
 
-    it('includes an IPOD session with no DVR delay', () => {
+    it('excludes an IPOD session with no authored DVR delay', () => {
       const ipod = catalogSession({ id: 'ipod', startTimeUtc: '', endTimeUtc: '', dvrDelayHours: null });
-      expect(resolveTopicPlaylist('cur', topics, [ipod], 1).map((s) => s.id))
-        .to.deep.equal(['ipod']);
+      const eventStartMs = Date.now() - HOUR_MS;
+      expect(resolveTopicPlaylist('cur', topics, [ipod], 1, eventStartMs)).to.deep.equal([]);
     });
 
     // A real 0 is not the same as "unset": it means available from the event's start, so

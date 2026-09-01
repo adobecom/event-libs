@@ -98,7 +98,7 @@ const MS_PER_HOUR = 3600000;
 
 function hasPremiered(session, eventStartMs, nowMs) {
   if (session.startTimeUtc && session.endTimeUtc) return isOnDemand(session, nowMs);
-  if (session.dvrDelayHours == null) return true;
+  if (session.dvrDelayHours == null) return false;
   if (eventStartMs == null) return false;
   return nowMs >= eventStartMs + session.dvrDelayHours * MS_PER_HOUR;
 }
