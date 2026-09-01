@@ -1,16 +1,5 @@
 @import '../../styles/tokens.css';
 
-.session-video-player {
-  aspect-ratio: 16 / 9;
-  margin-bottom: var(--s2a-spacing-8, 8px);
-}
-
-.session-video-player .milo-video,
-.session-video-player .mobile-rider {
-  width: 100%;
-  height: 100%;
-}
-
 .session-video-player .milo-video {
   margin: 0 auto;
   aspect-ratio: 16 / 9;
