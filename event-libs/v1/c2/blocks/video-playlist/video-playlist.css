@@ -348,10 +348,19 @@
   text-decoration: none;
 }
 
-.video-playlist-row:hover,
 .video-playlist-row.is-playing {
   background: var(--vp-playing-bg);
   color: var(--vp-playing-fg);
+}
+
+/* Hover-only, gated to real pointer devices: on touch, :hover latches when a row is
+   pressed to scroll the list and never clears once the finger lifts, leaving the row stuck
+   in the light "playing" look (the reported bug). .is-playing above stays unconditional. */
+@media (hover: hover) {
+  .video-playlist-row:hover {
+    background: var(--vp-playing-bg);
+    color: var(--vp-playing-fg);
+  }
 }
 
 .video-playlist-row:focus-visible,
@@ -453,9 +462,14 @@
   overflow: hidden;
 }
 
-.video-playlist-row:hover .video-playlist-row-progress-track,
 .video-playlist-row.is-playing .video-playlist-row-progress-track {
   background: var(--vp-playing-track-bg);
+}
+
+@media (hover: hover) {
+  .video-playlist-row:hover .video-playlist-row-progress-track {
+    background: var(--vp-playing-track-bg);
+  }
 }
 
 .video-playlist-row-progress-fill {
@@ -474,9 +488,14 @@
   color: var(--vp-muted);
 }
 
-.video-playlist-row:hover .video-playlist-row-duration,
 .video-playlist-row.is-playing .video-playlist-row-duration {
   color: var(--vp-playing-muted);
+}
+
+@media (hover: hover) {
+  .video-playlist-row:hover .video-playlist-row-duration {
+    color: var(--vp-playing-muted);
+  }
 }
 
 /* Favorite + play stacked together, per Figma's row "Hover" state — see buildRow. */
