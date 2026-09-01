@@ -16,6 +16,7 @@ export function UpNextCarousel({ sessions, title = 'Upcoming' }) {
         CardComponent=${SessionCard}
         timeDisplay="range"
         onCardClick=${openSessionDetail}
+        showDescription=${true}
       />
     </div>
   `;

@@ -16,7 +16,7 @@ import { isBehaviorEnabled } from '../utils/behavior-flags.js';
 export const buildSessionCard = () => SessionCard;
 
 export function SessionCard({
-  session, forceOnDemand = false, timeDisplay = 'duration', onCardClick,
+  session, forceOnDemand = false, timeDisplay = 'duration', onCardClick, showDescription = false,
 }) {
   const { state, dispatch } = useSessionGuide();
   const { guideConfig, activeView } = state;
@@ -173,6 +173,7 @@ export function SessionCard({
           onclick=${(e) => { e.stopPropagation(); handleClick(); }}
           daa-ll=${cardDaaLl}
         >${session.title}</button>
+        ${showDescription && session.description && html`<p class="sg-card__description">${session.description}</p>`}
         <div class="sg-card__footer">
           <span class="sg-card__track sg-card__track--footer" style=${'color:' + trackColor}>${session.primaryTrack}</span>
           <span class="sg-card__footer-badge"><${CategoryBadge} session=${session} size="sm" /></span>

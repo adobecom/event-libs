@@ -2326,6 +2326,39 @@ full `npm test` run: `broadcast-url.test.js` now passes cleanly (0 failures attr
 the only remaining failure was the separate, already-documented `toast.test.js` ARIA-timing
 flake (unrelated, confirmed passes in isolation). `npx eslint` clean.
 
+## Upcoming card hover redesign, from Figma (2026-09-02)
+
+Figma: [Session Broadcast VizD R2 8.31.26, node 4117:61401](https://www.figma.com/design/PsafLZIADk0bgLrj9Voc6g/Session-Broadcast-VizD-R2-8.31.26?node-id=4117-61401&m=dev)
+— the "Session card - no images" hover-state annotation inside the ended-state marquee's
+"Upcoming sessions" row. Three explicit call-outs from the user, all confirmed against the
+extracted design context (not just the screenshot):
+
+1. **Single-line description on hover.** `SessionCard.js` had no description markup at all
+   (unlike `LiveCard.js`'s always-rendered, 2-line-clamped `sg-live-card__desc`) — added a new
+   `showDescription` prop (default `false`, matching the `showDurationBadge` precedent from the
+   PR-review fixes above) that renders `<p class="sg-card__description">${session.description}</p>`.
+   Threaded through `Carousel.js` (same shape as `showDurationBadge`) and set `true` only by
+   `UpNextCarousel.js` — confirmed via `grep` that `TrackRow.js`/`TimeSlotRow.js` (sessions-guide's
+   own consumers) don't pass it, so they're unaffected. CSS hides it (`display: none`) at rest —
+   the resting card has no room for it — and reveals it only on hover/focus-within, with
+   `white-space: nowrap` + `text-overflow: ellipsis` (single line, unlike the title's existing
+   2-line `-webkit-line-clamp`).
+2. **Hover background is `#262626`**, not the `#131313` (`--s2a-color-gray-900`) it was using.
+   No `--s2a-*` token matches this value (same conclusion already reached for Also Live's section
+   background elsewhere in this file) — used the raw hex with a comment, same convention.
+3. **A previously-absent thin border appears on hover**: `1px solid`, using
+   `--s2a-color-transparent-white-24` (an exact existing token match for Figma's
+   `rgba(255,255,255,0.24)` — verified against `tokens.css` rather than trusting the Figma export's
+   fallback at face value). Added `border: 1px solid transparent` at rest (so the 1px doesn't
+   shift geometry when it appears — relies on the project's global `box-sizing: border-box`) and
+   `border-color 0.32s` to the existing hover transition list.
+
+Verified: `npx stylelint`/`npx eslint` clean (one pre-existing, unrelated `-webkit-box`
+vendor-prefix violation at line 213 predates this change); new `showDescription` coverage in
+`SessionCard.test.js` (default-omitted, shown when true, omitted when true but no description);
+594/594 tests pass across sessions-guide/session-broadcast. **Needs manual hover verification**
+in a real browser — MCP browser tools were disconnected this session.
+
 ## Explicitly out of scope (fast-follow)
 
 - MobileRider real playback (stub adapter only)

@@ -1071,16 +1071,24 @@
     width: 379px;
     min-height: 124px;
     padding: var(--s2a-spacing-lg, 24px);
+
+    /* Transparent at rest, colored on hover — border-box keeps the 1px from shifting geometry
+       when it appears. */
+    border: 1px solid transparent;
     transition: width 0.32s cubic-bezier(0.22, 1, 0.36, 1),
       min-height 0.32s cubic-bezier(0.22, 1, 0.36, 1),
       background 0.32s cubic-bezier(0.22, 1, 0.36, 1),
+      border-color 0.32s cubic-bezier(0.22, 1, 0.36, 1),
       box-shadow 0.32s cubic-bezier(0.22, 1, 0.36, 1);
   }
 
+  /* #262626 (Figma's "maxcolor/darkgrey", no equivalent --s2a-* token — same value used for
+     Also Live's section background above). */
   .sb-carousel-section--up-next .sg-card:is(:hover, :focus-within) {
     width: 427px;
     min-height: 150px;
-    background: var(--s2a-color-gray-900, #131313);
+    background: #262626;
+    border-color: var(--s2a-color-transparent-white-24, rgb(255 255 255 / 24%));
     box-shadow: 0 6px 24px rgb(0 0 0 / 18%);
     z-index: 2;
   }
@@ -1095,7 +1103,8 @@
   .sb-carousel-section--up-next .sg-card.is-scheduled:is(:hover, :focus-within),
   .sb-carousel-section--up-next .sg-card.is-favorited:is(:hover, :focus-within) {
     min-height: 150px;
-    background: var(--s2a-color-gray-900, #131313);
+    background: #262626;
+    border-color: var(--s2a-color-transparent-white-24, rgb(255 255 255 / 24%));
     box-shadow: 0 6px 24px rgb(0 0 0 / 18%);
     z-index: 2;
   }
@@ -1118,6 +1127,24 @@
     line-clamp: 2;
     -webkit-box-orient: vertical;
     overflow: hidden;
+  }
+
+  /* Hidden at rest — the card only has room for it once hover grows min-height above.
+     Single-line truncation, unlike the title's 2-line clamp, matching Figma. */
+  .sb-carousel-section--up-next .sg-card__description {
+    display: none;
+    font-size: 14px;
+    line-height: 1.2;
+    letter-spacing: -0.14px;
+    color: var(--s2a-color-gray-500, #8f8f8f);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    width: 100%;
+  }
+
+  .sb-carousel-section--up-next .sg-card:is(:hover, :focus-within) .sg-card__description {
+    display: block;
   }
 }
 
