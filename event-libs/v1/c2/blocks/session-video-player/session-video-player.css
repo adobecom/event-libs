@@ -1,17 +1,12 @@
 @import '../../styles/tokens.css';
 
-.session-video-player .milo-video {
-  margin: 0 auto;
-  aspect-ratio: 16 / 9;
-  height: auto;
-  padding-bottom: 0;
+.session-video-player {
+  margin-bottom: var(--s2a-spacing-8, 24px);
 }
 
-/* The c2-global rule contains .milo-video to a centered rich-media measure (max-width +
-   margin:auto) for the full-width player. In the side-by-side grid layout the column
-   already provides that containment, so suppress it here to avoid double-insetting. */
 @media (min-width: 1024px) {
-  :root:has(meta[name="foundation"][content="c2"]) .session-video-playlist-container .session-video-player .milo-video {
+  :root:has(meta[name="foundation"][content="c2"]) .session-video-playlist-container .session-video-player .milo-video,
+  :root:has(meta[name="foundation"][content="c2"]) .session-video-container .session-video-player .milo-video {
     max-width: none;
     margin: 0;
   }
