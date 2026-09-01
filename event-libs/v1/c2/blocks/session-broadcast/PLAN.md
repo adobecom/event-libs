@@ -2266,6 +2266,43 @@ subscribers on repeat calls with distinct object identity. Real integration veri
 preview harness in a browser. `npx eslint` clean; 784/784 tests pass across
 sessions-guide/session-broadcast/utils suites.
 
+## Bug: Live carousel goes visually blank after several sessions end at once (2026-09-01)
+
+User-reported repro: loaded a draft page at `?serverTime=1794334460000`, opened Session Guide,
+scrolled to the last card in the "Live sessions" carousel (desktop, paged/transform mode), then
+several sessions ended within the same `session-state-ticker` tick. The carousel went visually
+empty with no nav buttons; toggling the day tab away and back made the one remaining live
+session reappear.
+
+Root cause, in `sessions-guide/components/Carousel.js`: `offset` (which page of the carousel is
+scrolled to) is `useState`, so it survives a re-render even when the `sessions` prop shrinks
+out from under it. With `offset` stuck at, say, 5 and the list now down to 1 session,
+`translateX = offset * cardWidth` pushed the strip transform far past its only remaining card —
+and since the nav (`sessions.length > 1`) is hidden for a single-item list, there was no button
+left to scroll back. Toggling the day unmounts/remounts `Carousel` (its parent conditionally
+renders `${live.length > 0 && html\`<${Carousel} .../>\`}`), which reset `offset` back to 0 —
+that's why it "fixed itself."
+
+**Fix**: derive `clampedOffset = Math.min(offset, maxOffset)` and use it for every render-time
+computation that previously read raw `offset` (`translateX`, `atStart`/`atEnd`, `focused`, the
+`inert` gating) — fixes the visual bug immediately, same render. Also added a
+`useEffect(() => { refreshEdges(); setOffset(...); }, [sessionCount])` to pull the underlying
+`offset` *state* back into range too (not just the derived render value) — without it, a
+partial shrink (not all the way to 1) would leave `offset` overshooting `maxOffset` by however
+much it drifted, silently absorbing that many `goPrev` clicks before the carousel visibly
+moves. Also re-runs `refreshEdges()` on a session-count change, so native-scroll mode's
+`atStart`/`atEnd` state resyncs too (browsers auto-clamp `scrollLeft` when content shrinks, but
+don't reliably fire a `scroll` event for it).
+
+Testing note: `Carousel.test.js` runs against the same string-mock htm-preact as
+`LiveCard.test.js`/`BroadcastBody.test.js` — its `useState` always returns the initial value
+with a no-op setter, `useEffect` never runs. Since the bug (and the fix) is entirely about state
+surviving a re-render across a shrinking prop, it isn't observable in that harness at all; no
+test was force-fit. `npx eslint` clean; 591/591 tests pass across sessions-guide/session-broadcast
+(no regression). **Needs manual verification** in a real browser (repro steps above) — MCP
+browser tools (`chrome-devtools`, `a11y`) are disconnected in this session (`ENOENT: npx not
+found`), so this couldn't be confirmed directly this time.
+
 ## Explicitly out of scope (fast-follow)
 
 - MobileRider real playback (stub adapter only)
