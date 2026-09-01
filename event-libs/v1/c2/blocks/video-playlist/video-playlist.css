@@ -614,6 +614,14 @@
     padding: 9px var(--s2a-spacing-md) var(--s2a-spacing-md);
   }
 
+  /* While the handle is being dragged, Drawer.#bindDrag writes max-height every frame;
+     the transition above would make the drawer ease 0.3s behind the finger. Suppressing
+     it here lets the drag track 1:1, and onPointerUp removes this class so the settle
+     (and the collapse-on-release below the midpoint) still animates. */
+  .video-playlist.is-dragging {
+    transition: none;
+  }
+
   .video-playlist.is-expanded {
     padding: var(--s2a-spacing-md) var(--s2a-spacing-md) var(--s2a-spacing-lg);
   }

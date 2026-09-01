@@ -350,13 +350,22 @@ class Drawer {
     let dragStartY = null;
     let dragStartHeight = null;
 
+    let rafId = null;
+    let pendingHeight = null;
+    const flush = () => {
+      rafId = null;
+      if (pendingHeight == null) return;
+      this.dragHeightPx = pendingHeight;
+      this.el.style.maxHeight = `${pendingHeight}px`;
+    };
     const onPointerMove = (event) => {
       if (dragStartY == null) return;
       const cap = this.measureDragCapPx();
       const delta = dragStartY - event.clientY;
-      const next = Math.min(Math.max(dragStartHeight + delta, DRAWER_FLOOR_PX), cap);
-      this.dragHeightPx = next;
-      this.el.style.maxHeight = `${next}px`;
+      // pointermove fires far faster than paint; coalescing to one style write per frame
+      // keeps the drag tracking the finger without queuing a backlog of layout work.
+      pendingHeight = Math.min(Math.max(dragStartHeight + delta, DRAWER_FLOOR_PX), cap);
+      if (rafId == null) rafId = requestAnimationFrame(flush);
     };
 
     // Free-form: the drawer stays exactly where the user drags it to, clamped only
@@ -370,12 +379,23 @@ class Drawer {
     const onPointerUp = () => {
       if (dragStartY == null) return;
       dragStartY = null;
+      if (rafId != null) { cancelAnimationFrame(rafId); flush(); }
       window.removeEventListener('pointermove', onPointerMove);
       window.removeEventListener('pointerup', onPointerUp);
+      // Re-enable the max-height transition (suppressed during the drag) so this settle
+      // animates rather than the live per-frame writes above.
+      this.el.classList.remove('is-dragging');
       const toggleCap = this.measureCapPx();
       const midpoint = (DRAWER_FLOOR_PX + toggleCap) / 2;
       const endedHeight = this.dragHeightPx ?? dragStartHeight;
       this.expanded = endedHeight >= midpoint;
+      // Ended below the midpoint: the user is closing the drawer. Drop the free-form drag
+      // height entirely so applyMobileHeight() renders the collapsed peek (DRAWER_FLOOR_PX
+      // + collapsed padding) — otherwise the height would stay pinned near the floor while
+      // is-expanded flips off underneath it, jumping the padding/handle out of sync with
+      // the height (the "it toggles" glitch). Above the midpoint the free-form height is
+      // kept, matching the expanded chrome.
+      if (!this.expanded) this.dragHeightPx = null;
       this.#apply();
     };
 
@@ -383,6 +403,9 @@ class Drawer {
       if (this.isDesktop()) return;
       dragStartY = event.clientY;
       dragStartHeight = this.el.getBoundingClientRect().height;
+      // Suppress the max-height transition while dragging so the drawer tracks the finger
+      // 1:1 instead of easing 0.3s behind every pointermove write; onPointerUp restores it.
+      this.el.classList.add('is-dragging');
       window.addEventListener('pointermove', onPointerMove);
       window.addEventListener('pointerup', onPointerUp, { once: true });
     });
