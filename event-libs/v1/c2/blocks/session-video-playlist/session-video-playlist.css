@@ -213,7 +213,6 @@
   align-items: stretch;
   gap: var(--s2a-spacing-sm);
   min-width: 0;
-  color: inherit;
   text-decoration: none;
 }
 
@@ -336,7 +335,6 @@
 .session-video-playlist-row-progress-fill {
   height: 100%;
   background: currentcolor;
-  border-radius: inherit;
 }
 
 .session-video-playlist-row-duration {
@@ -527,7 +525,6 @@
     border: none;
     border-radius: var(--s2a-border-radius-round);
     background: none;
-    color: inherit;
     cursor: pointer;
   }
 
