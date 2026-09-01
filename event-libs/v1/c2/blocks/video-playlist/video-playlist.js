@@ -783,6 +783,10 @@ export default async function init(el) {
   }
 
   const render = (sessionList) => {
+    if (hasEmbeddedVideoPlayer(findSectionWithStyle(VIDEO_CONTAINER_CLASS))) {
+      removeBlock(el);
+      return;
+    }
     const topics = resolveCurrentSessionTopics(pageCustomAttributes);
     const rows = resolveTopicPlaylist(sessionId, topics, sessionList, minSessions, eventStartMs);
     if (!rows.length) {
