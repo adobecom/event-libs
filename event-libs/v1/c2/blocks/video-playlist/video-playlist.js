@@ -322,13 +322,6 @@ class Drawer {
     // ceiling dragging itself respects — not measureCapPx()'s title-avoiding cap, so a
     // free-form height the user chose past that cap doesn't get silently snapped back
     // down the next time this runs (e.g. on window resize).
-    // While the drawer is expanded it sits over the player, so keep the player
-    // non-interactive the entire time — otherwise a touch meant to grab/drag the drawer
-    // lands on the iframe underneath and pans/scrubs it ("the player moves a bit") while
-    // the drawer doesn't respond. Collapsed, the player is visible again and must work, so
-    // release (on a short delay, to also swallow the post-touch synthesised tap).
-    if (this.expanded) this.#addPlayerGuard();
-    else this.#scheduleGuardRelease();
     if (this.dragHeightPx != null) {
       const dragCap = this.measureDragCapPx();
       this.el.style.maxHeight = `${Math.min(Math.max(this.dragHeightPx, DRAWER_FLOOR_PX), dragCap)}px`;
