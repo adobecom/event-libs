@@ -1,0 +1,27 @@
+/* Headless block — its only job is computing state and pushing it into
+   window.eventNotificationBridge. Force it invisible so a stray authored row (e.g. the
+   optional lead-time-minutes config) never renders visible chrome on a real page. */
+.ns-notification {
+  display: none !important;
+}
+
+/* QA-only, gated behind ?nsDebug=1 in mock-notification-bridge.js — never shown otherwise. */
+#ns-notification-debug-panel {
+  position: fixed;
+  right: 12px;
+  bottom: 12px;
+  z-index: 9999;
+  max-width: 320px;
+  margin: 0;
+  padding: 8px 12px;
+  list-style: none;
+  font-family: monospace;
+  font-size: 12px;
+  color: #fff;
+  background: rgb(0 0 0 / 80%);
+  border-radius: 8px;
+}
+
+#ns-notification-debug-panel li {
+  margin: 4px 0;
+}

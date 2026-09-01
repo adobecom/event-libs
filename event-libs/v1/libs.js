@@ -40,6 +40,7 @@ const EVENT_BLOCKS_C2 = [
   'event-speakers',
   'event-session-resources',
   'event-youtube',
+  'ns-notification',
 ];
 
 // Only the utilities scripts.js actually needs directly
