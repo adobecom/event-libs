@@ -10,7 +10,6 @@ import { getNowMs } from '../../../utils/session-state.js';
 import { getTrackIcon } from '../../../utils/tier-1-event-config.js';
 import { resolveIcon } from '../../../features/icons/icon-resolver.js';
 import { toggleScheduleWithFeedback, toggleFavoriteWithFeedback } from '../../../services/sessions/action-feedback.js';
-import { registerStreamIds, unregisterStreamIds, subscribe } from '../../../services/sessions/poller.js';
 
 const ROTATE_OUT_MS = 350;
 const SLIDE_MS = 350;
@@ -286,11 +285,15 @@ function renderTrack(track, sessions) {
   track.scrollLeft = scrollLeft;
 }
 
+function isPastSession(session) {
+  const startTimeMillis = session.sessionTime?.startTimeMillis;
+  return typeof startTimeMillis === 'number' && startTimeMillis <= getNowMs();
+}
+
 function scheduleStateTimers(sessions, dropSession) {
   const timers = [];
 
   sessions.forEach((session) => {
-    if (session.mrStreamId) return;
     const { sessionTime } = session;
     if (!sessionTime) return;
 
@@ -311,35 +314,6 @@ function attachToPrecedingBlock(el) {
     el.classList.add('upcoming-sessions--attached');
     previous.classList.add('attach-upcoming--has-overlay');
   }
-}
-
-function startMobileRiderPolling(sessions, onStarted) {
-  const mrSessions = sessions.filter((s) => s.mrStreamId);
-  if (!mrSessions.length) return null;
-
-  const mrStreamIds = mrSessions.map((s) => s.mrStreamId);
-  const sessionByStreamId = new Map(mrSessions.map((s) => [s.mrStreamId, s]));
-  const resolvedIds = new Set();
-  registerStreamIds(mrStreamIds);
-
-  const unsubscribe = subscribe(({ active, inactive }) => {
-    const doneIds = [...active, ...inactive].filter((id) => {
-      if (!mrStreamIds.includes(id) || resolvedIds.has(id)) return false;
-      const startTimeMillis = sessionByStreamId.get(id)?.sessionTime?.startTimeMillis;
-      if (typeof startTimeMillis !== 'number') return active.includes(id);
-      return startTimeMillis <= getNowMs();
-    });
-
-    if (!doneIds.length) return;
-    doneIds.forEach((id) => resolvedIds.add(id));
-    unregisterStreamIds(doneIds);
-    onStarted(doneIds);
-  });
-
-  return () => {
-    unsubscribe();
-    unregisterStreamIds(mrStreamIds.filter((id) => !resolvedIds.has(id)));
-  };
 }
 
 export default async function init(el) {
@@ -367,7 +341,7 @@ async function decorate(el) {
   }
 
   const heading = config?.heading || 'Upcoming Sessions';
-  let sessions = Array.isArray(config?.entries) ? config.entries : [];
+  let sessions = (Array.isArray(config?.entries) ? config.entries : []).filter((session) => !isPastSession(session));
 
   initSessionState();
 
@@ -400,13 +374,6 @@ async function decorate(el) {
 
   let timers = scheduleStateTimers(sessions, dropSession);
 
-  function onSessionsStarted(startedIds) {
-    sessions
-      .filter((session) => startedIds.includes(session.mrStreamId))
-      .forEach((session) => dropSession(session.sessionId));
-  }
-
-  const stopMobileRiderPolling = startMobileRiderPolling(sessions, onSessionsStarted);
   const unsubscribeFavorited = favorited.subscribe(() => renderTrack(track, sessions));
   const unsubscribeScheduled = scheduled.subscribe(() => renderTrack(track, sessions));
   const unsubscribePending = pendingActions.subscribe(() => renderTrack(track, sessions));
@@ -421,7 +388,6 @@ async function decorate(el) {
 
   el._upcomingSessionsCleanup = () => {
     timers.forEach(clearTimeout);
-    if (stopMobileRiderPolling) stopMobileRiderPolling();
     unsubscribeFavorited();
     unsubscribeScheduled();
     unsubscribePending();
