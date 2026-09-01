@@ -24,6 +24,9 @@ describe('BroadcastBody', () => {
     sessionsStatus.value = 'idle';
     liveStreamActiveIds.value = new Set();
     history.replaceState(null, '', window.location.pathname);
+    // manualSessionId's initializer now also reads sessionStorage — clear it so a prior test's
+    // committed session id can't leak into this one.
+    try { sessionStorage.removeItem('sb:active-session'); } catch { /* unavailable */ }
   });
 
   it('shows the loading state while sessions are loading', () => {
@@ -78,8 +81,17 @@ describe('BroadcastBody', () => {
   // it's wrapped in its own bare `html`<${EndedState} .../>`` call, the one shape the mock
   // resolves (see the note at the top of this file) — so its actual rendered content is a
   // meaningful assertion here, not just a markup-presence check.
-  describe('no-auto-switch (PRD: "no sessions should auto transition a user without their action")', () => {
-    it('shows the ended-state instead of silently switching to a different live session', () => {
+  //
+  // Automatic in-bucket advancement itself (a committed session ending and a new one getting
+  // picked) happens via the "resolve pendingCandidates" useEffect in BroadcastApp.js — this
+  // mocked htm-preact's useEffect is a total no-op (see test/unit/mocks/deps/htm-preact.js), so
+  // that effect never runs here. These tests stick to what's synchronously observable from a
+  // single render: the genuinely-terminal ended state (no next group at all, or a next group in
+  // a *different* bucket, which never gets picked automatically) resolves without needing the
+  // effect. The actual pick-and-commit is covered at the pure-function level in
+  // broadcast-schedule.test.js, and end-to-end in a real browser only.
+  describe('ended state and bucket isolation', () => {
+    it('shows the ended-state for a committed session with no next group in its own bucket', () => {
       sessionsStatus.value = 'ready';
       const endedSession = {
         id: 'ended-1',
@@ -91,15 +103,7 @@ describe('BroadcastBody', () => {
         isOnline: true,
         sessionPageUrl: '/s/ended-1',
       };
-      const otherLive = {
-        id: 'other-live',
-        title: 'Still Going',
-        startTimeUtc: new Date(Date.now() - HOUR / 2).toISOString(),
-        endTimeUtc: new Date(Date.now() + HOUR / 2).toISOString(),
-        youTubeId: 'yt-2',
-        isOnline: true,
-      };
-      sessions.value = [endedSession, otherLive];
+      sessions.value = [endedSession];
       // Simulates "ended-1" having been committed earlier (initial default pick, a manual
       // switch, or the entry ?watch= param) — BroadcastBody's useState initializer reads
       // this via getHistorySessionId().
@@ -112,19 +116,91 @@ describe('BroadcastBody', () => {
       expect(out).to.not.include('sb-empty');
     });
 
-    it('still auto-picks a default when nothing has ever been committed (initial load)', () => {
+    // Unlike the pendingCandidates-to-activeSession commit (which needs BroadcastApp.js's
+    // useEffect — a no-op in this mocked harness), this synthesis happens synchronously inside
+    // resolveBucketSchedule itself, so it's observable on the very first render with no history
+    // or sessionStorage seeding at all — a genuine first-time visitor.
+    it('surfaces the most recently aired session as ended state for a first-time visitor on a gap', () => {
       sessionsStatus.value = 'ready';
       sessions.value = [{
-        id: 's-1',
-        title: 'Live now',
-        startTimeUtc: new Date(Date.now() - HOUR / 2).toISOString(),
-        endTimeUtc: new Date(Date.now() + HOUR / 2).toISOString(),
+        id: 'last-aired',
+        title: 'The Last One That Aired',
+        startTimeUtc: new Date(Date.now() - 2 * HOUR).toISOString(),
+        endTimeUtc: new Date(Date.now() - HOUR).toISOString(),
         youTubeId: 'yt-1',
         isOnline: true,
+        sessionPageUrl: '/s/last-aired',
       }];
+      // No history.pushState, no sessionStorage seeding — manualSessionId starts truly null.
+
       const out = BroadcastBody({ config: CONFIG });
-      expect(out).to.not.include('sb-ended');
+      expect(out).to.include('sb-ended');
+      expect(out).to.include('The Last One That Aired');
       expect(out).to.not.include('sb-empty');
+    });
+
+    it('never auto-crosses buckets — a live YouTube session doesn\'t rescue an ended MPC commitment', () => {
+      sessionsStatus.value = 'ready';
+      const endedMpc = {
+        id: 'ended-mpc',
+        title: 'The One That Ended',
+        startTimeUtc: new Date(Date.now() - 2 * HOUR).toISOString(),
+        endTimeUtc: new Date(Date.now() - HOUR).toISOString(),
+        mpcId: 'mpc-1',
+        youTubeId: '',
+        videoDuration: '01:00:00',
+        isOnline: true,
+        sessionPageUrl: '/s/ended-mpc',
+      };
+      const liveYoutube = {
+        id: 'other-live',
+        title: 'Still Going',
+        startTimeUtc: new Date(Date.now() - HOUR / 2).toISOString(),
+        endTimeUtc: new Date(Date.now() + HOUR / 2).toISOString(),
+        youTubeId: 'yt-2',
+        mpcId: '',
+        isOnline: true,
+      };
+      sessions.value = [endedMpc, liveYoutube];
+      history.pushState({ session: 'ended-mpc' }, '', window.location.pathname);
+
+      const out = BroadcastBody({ config: CONFIG });
+      expect(out).to.include('sb-ended');
+      expect(out).to.include('The One That Ended');
+    });
+  });
+
+  describe('cross-refresh persistence', () => {
+    const terminalEnded = {
+      id: 'ended-1',
+      title: 'The One That Ended',
+      startTimeUtc: new Date(Date.now() - 2 * HOUR).toISOString(),
+      endTimeUtc: new Date(Date.now() - HOUR).toISOString(),
+      youTubeId: 'yt-1',
+      isOnline: true,
+      sessionPageUrl: '/s/ended-1',
+    };
+
+    it('seeds the initial commitment from sessionStorage when there is no history.state', () => {
+      sessionsStatus.value = 'ready';
+      sessions.value = [terminalEnded];
+      sessionStorage.setItem('sb:active-session', 'ended-1');
+
+      const out = BroadcastBody({ config: CONFIG });
+      expect(out).to.include('sb-ended');
+      expect(out).to.include('The One That Ended');
+    });
+
+    it('prefers history.state over a persisted sessionStorage value', () => {
+      sessionsStatus.value = 'ready';
+      const otherEnded = { ...terminalEnded, id: 'ended-2', title: 'A Different One' };
+      sessions.value = [terminalEnded, otherEnded];
+      sessionStorage.setItem('sb:active-session', 'ended-2');
+      history.pushState({ session: 'ended-1' }, '', window.location.pathname);
+
+      const out = BroadcastBody({ config: CONFIG });
+      expect(out).to.include('The One That Ended');
+      expect(out).to.not.include('A Different One');
     });
   });
 

@@ -4,6 +4,9 @@ import {
   stripWatchParam,
   pushSessionState,
   getHistorySessionId,
+  persistActiveSession,
+  getPersistedSessionId,
+  clearPersistedSession,
 } from '../../../../../../event-libs/v1/c2/blocks/session-broadcast/utils/broadcast-url.js';
 
 describe('broadcast-url', () => {
@@ -12,6 +15,7 @@ describe('broadcast-url', () => {
   afterEach(() => {
     // Reset so URL/history state never leaks between tests or into other spec files.
     history.replaceState(null, '', basePath);
+    clearPersistedSession();
   });
 
   describe('readWatchParam', () => {
@@ -87,6 +91,32 @@ describe('broadcast-url', () => {
     it('returns null when history.state carries no session', () => {
       history.replaceState({}, '', basePath);
       expect(getHistorySessionId()).to.equal(null);
+    });
+  });
+
+  describe('persistActiveSession / getPersistedSessionId / clearPersistedSession', () => {
+    it('round-trips a session id through sessionStorage', () => {
+      persistActiveSession('abc-123');
+      expect(getPersistedSessionId()).to.equal('abc-123');
+    });
+
+    it('returns null when nothing has been persisted', () => {
+      expect(getPersistedSessionId()).to.equal(null);
+    });
+
+    it('overwrites a previously persisted id', () => {
+      persistActiveSession('abc-123');
+      persistActiveSession('xyz-789');
+      expect(getPersistedSessionId()).to.equal('xyz-789');
+    });
+
+    // The exact scenario clearPersistedSession() exists for: persistActiveSession() only ever
+    // writes on a truthy id, so it can't remove a stale value on its own — a stale ?watch= link
+    // needs the dedicated clear, not just "don't persist a new one."
+    it('clears a persisted id so it cannot be restored on a later refresh', () => {
+      persistActiveSession('abc-123');
+      clearPersistedSession();
+      expect(getPersistedSessionId()).to.equal(null);
     });
   });
 });

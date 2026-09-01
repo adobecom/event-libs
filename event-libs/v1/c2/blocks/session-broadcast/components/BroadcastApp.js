@@ -14,9 +14,12 @@ import { SessionGuideProvider } from '../../sessions-guide/store/index.js';
 import { detectUserTimezone } from '../../sessions-guide/utils/time.js';
 import { findSessionByParam } from '../../sessions-guide/utils/url.js';
 import { LoadingState, sessionsStatusMessage } from '../../sessions-guide/components/LoadingState.js';
-import { getBroadcastSchedule, getLiveSessions } from '../utils/broadcast-schedule.js';
-import { readWatchParam, stripWatchParam, pushSessionState, getHistorySessionId } from '../utils/broadcast-url.js';
-import { logBroadcastSchedule } from '../utils/broadcast-debug.js';
+import { getBroadcastSchedule, isSessionLiveNow } from '../utils/broadcast-schedule.js';
+import {
+  readWatchParam, stripWatchParam, pushSessionState, getHistorySessionId,
+  persistActiveSession, getPersistedSessionId, clearPersistedSession,
+} from '../utils/broadcast-url.js';
+import { logBroadcastSchedule, logBucketGroups } from '../utils/broadcast-debug.js';
 import { trackBroadcastEvent, getEntryPoint } from '../utils/broadcast-analytics.js';
 import { PlayerHost } from './PlayerHost.js';
 import { SessionInfoPanel } from './SessionInfoPanel.js';
@@ -31,7 +34,12 @@ const GUIDE_CONFIG = { userTz: detectUserTimezone(), surface: 'page', theme: 'li
 
 // Exported separately so tests can call it directly, without mounting the Provider tree.
 export function BroadcastBody({ config }) {
-  const [manualSessionId, setManualSessionId] = useState(() => getHistorySessionId());
+  // history.state covers back/forward within the SPA session; sessionStorage is the actual
+  // cross-refresh persistence mechanism (history.state restoration on a hard reload isn't
+  // code-guaranteed) — see broadcast-url.js.
+  const [manualSessionId, setManualSessionId] = useState(
+    () => getHistorySessionId() || getPersistedSessionId(),
+  );
   const [entryResolved, setEntryResolved] = useState(false);
 
   useEffect(() => {
@@ -46,8 +54,17 @@ export function BroadcastBody({ config }) {
     return () => window.removeEventListener('popstate', handlePopState);
   }, []);
 
+  // Keep sessionStorage in sync with every commitment change (manual switch, initial pick, or
+  // in-bucket auto-transition) so a hard refresh can resume where the viewer left off.
+  useEffect(() => {
+    if (manualSessionId) persistActiveSession(manualSessionId);
+  }, [manualSessionId]);
+
   // One-shot: resolve the `?watch=` entry param once the catalog loads. Named `watch`, not
-  // `session` — sessions-guide's own widget already owns that param for something else.
+  // `session` — sessions-guide's own widget already owns that param for something else. Unlike a
+  // sessionStorage/history-restored id, a fresh `?watch=` link must resolve to something
+  // genuinely live right now or be discarded entirely (never "show ended state for it") — it's
+  // explicit new intent, not a resumed commitment.
   useEffect(() => {
     if (entryResolved || sessionsStatus.value !== 'ready') return;
     setEntryResolved(true);
@@ -55,12 +72,16 @@ export function BroadcastBody({ config }) {
     if (!watchId) return;
     const nowMs = getNowMs();
     const requested = findSessionByParam(sessions.value, watchId);
-    const isLive = requested
-      && getLiveSessions(sessions.value, liveStreamActiveIds.value, nowMs).some((s) => s.id === requested.id);
+    const isLive = requested && isSessionLiveNow(requested, liveStreamActiveIds.value, nowMs);
     if (isLive) {
       setManualSessionId(requested.id);
     } else {
       showToast({ message: 'That session has ended — showing what’s live now.', variant: 'informative' });
+      setManualSessionId(null);
+      // Discard any prior commitment outright, not just the in-memory state — a refresh right
+      // after landing on a dead link, before anything new gets a chance to commit, must not
+      // resurrect whatever was persisted before this explicit (now-invalid) intent arrived.
+      clearPersistedSession();
     }
     stripWatchParam(isLive ? requested.id : null);
   }, [sessionsStatus.value]);
@@ -79,13 +100,37 @@ export function BroadcastBody({ config }) {
     activeSessionId: manualSessionId,
   });
   logBroadcastSchedule(schedule);
+  logBucketGroups(sessions.value, liveStreamActiveIds.value, nowMs);
 
-  // The only automatic pick: once entry-param resolution has had its chance and nothing's been
-  // committed yet, lock in whatever getBroadcastSchedule's initial-load fallback picked.
+  // The one place random picks happen: getBroadcastSchedule stays pure (safe to recompute every
+  // render) and returns `pendingCandidates` instead of picking, so this effect can do the actual
+  // Math.random() exactly once and lock in the result — covers the very first pick AND every
+  // later in-bucket auto-transition (both look the same: the schedule proposed a session that
+  // isn't yet the committed one). Depend on candidates' length, not the array itself — a fresh
+  // array reference every render would otherwise re-fire this (and re-roll) on unrelated renders.
   useEffect(() => {
-    if (!entryResolved || manualSessionId) return;
-    if (schedule.activeSession) setManualSessionId(schedule.activeSession.id);
-  }, [entryResolved, manualSessionId, schedule.activeSession?.id]);
+    if (!entryResolved) return;
+    if (schedule.pendingCandidates?.length) {
+      const picked = schedule.pendingCandidates[Math.floor(Math.random() * schedule.pendingCandidates.length)];
+      setManualSessionId(picked.id);
+      return;
+    }
+    if (schedule.activeSession && schedule.activeSession.id !== manualSessionId) {
+      setManualSessionId(schedule.activeSession.id);
+      return;
+    }
+    // A first-time visitor landing on a gap: getBroadcastSchedule synthesized the most recently
+    // aired session as `endedSession` even though nothing was ever actually committed. Locking it
+    // in here (same as any other proposal above) turns it into a real commitment, so the ordinary
+    // ended/next-group walk-forward in resolveBucketSchedule takes over from here on exactly as
+    // if the viewer really had been watching it.
+    if (schedule.endedSession && schedule.endedSession.id !== manualSessionId) {
+      setManualSessionId(schedule.endedSession.id);
+    }
+  }, [
+    entryResolved, manualSessionId,
+    schedule.activeSession?.id, schedule.pendingCandidates?.length, schedule.endedSession?.id,
+  ]);
 
   // Redirect to on-demand once nothing is live, also-live, or upcoming — i.e. the whole event
   // has aired, not just the current day.

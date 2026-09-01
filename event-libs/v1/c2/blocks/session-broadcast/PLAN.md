@@ -823,6 +823,253 @@ breakpoint:
   value (a pre-existing Chrome normalization quirk for `-webkit-box` + line-clamp, confirmed to
   affect the *unfavorited* case identically) wasn't something this change introduced.
 
+## MPC/YouTube bucket & group scheduling (2026-08-31)
+
+**This reverses an earlier PRD decision.** `getBroadcastSchedule`'s original "commitment, not a
+preference" design (Phase 3) existed specifically because the PRD said "no sessions should auto
+transition a user without their action" — auto-switching was Out of Scope. The user explicitly
+asked for TV-channel-style automatic advancement instead: "We will make significant updates to
+they way we manage sessions in the broadcast page... we will now also handle 2 buckets within
+the broadcast. 1 bucket will be for sessions with MPC videos and the other bucket will be for
+the ones with youtube videos. Each bucket will now use grouping by start time." This is an
+intentional, user-directed supersession, not an oversight.
+
+**The model**: sessions split into two independent buckets by video-source field (`mpcId` →
+`'mpc'`, `youTubeId` → `'youtube'`, `getSessionBucket()`), each internally grouped by identical
+start time. Automatic advancement moves forward *within* a bucket only; only a manual click can
+cross buckets. MPC's "on screen until" boundary is `startTime + videoDuration` (RF's "Video
+Duration" custom attribute, format `"HH:MM:SS"` — the middle field can exceed 59 in real data,
+e.g. `"00:60:00"` for a 60-minute session, so `parseVideoDurationMs` sums weighted parts rather
+than validating a strict range; falls back to the authored `endTimeUtc`-derived duration if
+missing/unparseable). YouTube's boundary stays `endTimeUtc`, unchanged from today.
+
+**Explicit product rule, locked into `resolveBucketSchedule`**: once a session ends, automatic
+advancement must never fall back to a still-live sibling in its *own* group — only the next group
+(once its start has been reached or passed) or ended state. This was caught and corrected during
+review of the initial design (an early draft conflated "any live group" scanning for both the
+fresh-pick case and the post-ending-transition case, which would have let a same-group sibling
+rescue an ended session).
+
+**No explicit "pending next group" bookkeeping anywhere** — `resolveBucketSchedule` recomputes
+"is there a live group right now" / "has the next group's start been reached" fresh on every call,
+which self-heals from any starting point (including a `sessionStorage`-restored session from a
+prior visit) and produces wait-then-transition behavior for free from the existing 15s ticker.
+
+**Randomness lives in the effect, not the pure schedule function**: `getBroadcastSchedule` returns
+`pendingCandidates` (an array, or `null`) instead of picking — `Math.random()` happens exactly
+once, in `BroadcastApp.js`'s generalized auto-commit `useEffect`, which now covers both the very
+first pick and every later in-bucket auto-transition (they're indistinguishable in shape: the
+schedule proposed a session that isn't yet the committed one). Doing the pick inside the pure,
+every-render-recomputed schedule function was considered and rejected — it would either re-roll on
+every render before the commit effect flushes (visible flicker risk) or require a deterministic
+hash-based pick (not actually random — every viewer would get the same member for a given group).
+
+**Cross-refresh persistence**: the `?watch=` entry param is still stripped after one read, so a
+hard refresh needs another mechanism — added `sessionStorage` helpers (`persistActiveSession`/
+`getPersistedSessionId`, key `sb:active-session`) to `broadcast-url.js`, mirroring the existing
+try/catch-around-sessionStorage precedent in `sessions-guide/store/index.js`'s `sg:last-view` (a
+new named-helper abstraction, not a literal copy — that file inlines the calls). Seeded via
+`getHistorySessionId() || getPersistedSessionId()`; unlike the `?watch=` param (which must resolve
+to something genuinely live right now or be discarded as fresh explicit intent), a persisted/
+history-restored id is allowed to resolve to a recently-ended, pending-transition session, and the
+normal ended/waiting logic takes over exactly as if the page had never refreshed.
+
+**Cancellation handling**: the committed session's bucket is resolved against the raw (pre-
+eligibility) session list, keyed only on `mpcId`/`youTubeId` — a cancelled session typically flips
+`isOnline`/`hasOnDemandFormat` (dropping it out of the eligible pool) without touching its
+player-id fields, so it still gets the same in-bucket ended/next-group handling as a normal ending
+instead of incorrectly falling through to a cross-bucket random pick.
+
+**Also-Live/Up-Next carousels are unaffected** — confirmed with the user before implementing: they
+stay cross-bucket (mixed MPC + YouTube), which is what actually lets a viewer manually cross
+buckets by clicking a card. `getUpNextSessions` is untouched.
+
+**`isSessionLiveNow`** replaces the old exported `getLiveSessions` as the one "is this session
+live right now" check (watch-param validation, `alsoLive`, group resolution) — dispatches by
+session shape (`hasOnDemandFormat` → never live, mirroring `deriveSessionState`'s own precedence;
+`mrStreamId` → delegates to `deriveSessionState` so MobileRider keeps its existing poll-driven
+liveness untouched; everything else → the bucket-aware start/end window). `deriveSessionState`/
+`session-state.js` itself is not modified — same boundary this file already draws for
+`isBroadcastEligible`/`hasPlayableVideoSource`.
+
+**Design review**: drafted, then independently pressure-tested against the real code and several
+concrete timelines (back-to-back groups, gapped groups, mid-day cancellation, manual cross-bucket
+switch, stale-refresh restoration) before implementation — caught several real bugs before they
+became test failures: MR sessions silently dropping out of `alsoLive`, `hasOnDemandFormat` bypass,
+the cancellation-bucket-lookup issue above, and `NaN`-start-time sessions collapsing into one bogus
+group (now filtered out before grouping, `Date.parse` used for the group key instead of raw string
+equality).
+
+**Files changed**: `utils/broadcast-schedule.js` (core rewrite — `getSessionBucket`,
+`parseVideoDurationMs`, `isSessionLiveNow`, `resolveBucketSchedule` all new/exported;
+`getLiveSessions` removed), `utils/broadcast-url.js` (new sessionStorage helpers),
+`components/BroadcastApp.js` (seeded state, persistence effect, generalized auto-commit effect,
+watch-param effect swapped to `isSessionLiveNow`), `utils/broadcast-debug.js` (debug table now
+also lists `pendingCandidates`). Tests: `broadcast-schedule.test.js` rewritten with bucket-aware
+fixture helpers (`mpcSession`/`ytSession`/`minutesToDuration`) and new coverage for every rule
+above, including the same-group-sibling regression test; `BroadcastBody.test.js` updated for
+sessionStorage seeding/precedence and bucket-isolation (the actual pick-and-commit can't be
+exercised in this mocked string-render harness — `useEffect` is a no-op there — so those tests
+stick to synchronously-observable terminal states; the effect-driven transition itself is covered
+at the pure-function level and needs real-browser verification).
+
+**Verification**: `npx wtr test/unit/c2/blocks/session-broadcast/**/*.test.js` — 115/115 passed.
+Full `npm test` — 2196/2197 passed (the one failure, `toast.test.js`'s mount timeout, is the
+already-known environment-flakiness case, confirmed unrelated by re-running it in isolation
+clean). `npm run lint` clean. Manual/real-browser verification of the actual timed transitions
+is still pending — the `chrome-devtools` MCP server was disconnected for this session
+(`ENOENT: npx not found`); needs either that reconnected or a manual walkthrough on
+`localhost:3868` with `?serverTime=<ms>` before this ships.
+
+### Bug found via manual `?serverTime=` testing: committed-but-not-yet-started treated as ended
+
+Real-browser testing with `not-tracked/session-catalog-response-with-video.json` (a locally
+mocked-up back-to-back YouTube chain built for exactly this kind of manual verification — see
+that file for the timeline) surfaced a bug: jumping `?serverTime=` to a point *before* a session
+that had previously been committed (via `sessionStorage`/`history.state` from an earlier, later
+`?serverTime=` test) rendered `EndedState` for a session that hadn't even started yet.
+
+Root cause: `resolveBucketSchedule` only checked `isSessionLiveNow` to decide "still live" vs.
+"treat as ended and look for the next group" — it had no way to distinguish a session that's
+*already finished* from one that simply *hasn't started*, since both fail `isSessionLiveNow`
+identically. In production this is unreachable (`nowMs` only moves forward, and a session only
+ever becomes committed once it's confirmed live), but local testing with `?serverTime=` jumping
+non-monotonically hits it easily. **Fix**: added an explicit `committedHasStarted` check
+(`Date.parse(committedSession.startTimeUtc) <= nowMs`) — if the committed session hasn't started,
+treat it exactly like "nothing committed in this bucket" (offer whatever's currently live as
+`pendingCandidates`) rather than searching for a "next group" and surfacing a nonsensical ended
+screen. Added two regression tests in `broadcast-schedule.test.js`.
+
+### Second bug found the same way: single-hop "next group" lookup got stuck on stale groups
+
+Same manual `?serverTime=` testing, a different edge: loading well into the back-to-back YouTube
+chain (multiple groups past the previously-committed one) rendered `EndedState` for a session that
+had ended over half an hour earlier ("A.COM Adobe Live Test Session"), instead of showing the
+session actually live at that moment ("Transform Static Decks into Multimedia Experiences").
+
+Root cause: `resolveBucketSchedule`'s post-ending branch looked up exactly one group ahead of the
+committed session's own group (`groups.find((g) => g.startMs > committedStartMs)`) and, if that
+one group had *also* already ended by `nowMs`, gave up and returned `endedSession` — it never
+considered groups further out. This is reachable in production too, not just in testing: a
+backgrounded or suspended tab that resumes after more than one group's worth of time has passed
+would hit the exact same thing. **Fix**: changed the lookup from "the single next group" to
+"whichever later group (`startMs` strictly greater than the committed session's own — same-group
+siblings are still excluded, per the rule above) is actually live right now," walking forward
+through every subsequent group instead of stopping at the first one. `!liveLaterGroup` now covers
+both "waiting, nothing later has started yet" and "deep-stale resume, everything later has also
+already ended" — both correctly render as ended state; the only case that changed is finding a
+live group beyond the immediate next one. Added a regression test with three elapsed groups
+between the committed session and the one actually live now.
+
+### First-time-visitor-on-a-gap enhancement: synthesize an ended-state anchor
+
+Follow-up product decision, not a bug: a genuine first-time visitor (no `?watch=`, no
+`history.state`, no `sessionStorage` — nothing ever committed) landing on the page while nothing
+is live in either bucket previously saw a bare page — just the Up Next carousel, no player, no
+`EndedState`, no "nothing live" message either (that message only shows when Up Next is *also*
+empty). `EndedState` only ever rendered for a session that had actually been watched and then
+ended.
+
+**Decision**: when `resolveBucketSchedule`'s bootstrap ("nothing committed in this bucket") branch
+finds nothing currently live, and there genuinely was never a prior commitment (as opposed to the
+backward-time-travel "committed but hasn't started yet" case above, which already has a real,
+later commitment to resume), it now looks for the most recently aired group in that bucket and
+returns one of its members as `endedSession`. Any member works as the anchor — group-transition
+lookups only key off the picked session's own start time, so this reuses the *exact same*
+walk-forward-to-next-group logic as a real commitment, with no duplicated logic. At the top level,
+`getBroadcastSchedule` combines both buckets' synthesized picks the same way it already combines
+`pendingCandidates` — preferring whichever bucket's last group started more recently (likelier to
+have its own next group coming up sooner) — and only proceeds to this fallback when neither bucket
+has anything genuinely live right now.
+
+The synthesized pick still has to become a *real* commitment for the ordinary auto-transition
+logic to keep working correctly afterward (so it doesn't just get re-synthesized identically every
+render, or worse, mismatch once time passes) — `BroadcastApp.js`'s existing "resolve the schedule's
+proposal into `manualSessionId`" `useEffect` (previously only handling `pendingCandidates` and
+`activeSession` mismatches) now also commits an `endedSession` mismatch the same way. Once
+committed, `sessionStorage` persistence and the walk-forward next-group logic both apply exactly
+as if the viewer really had been watching it.
+
+One deliberate boundary: if nothing has ever aired at all yet in a bucket (e.g. before the very
+first session of the day/event), there's no group to synthesize from, and the bare "Up Next only"
+page is still the correct, unavoidable state — there's genuinely nothing to call "ended."
+
+Tests: `broadcast-schedule.test.js` — synthesis at both the `resolveBucketSchedule` level (surfaces
+the last aired group; does nothing when nothing has aired yet; does not fire for the not-yet-
+started backward-time-travel case) and the `getBroadcastSchedule` level (cross-bucket "most
+recent" preference; nothing-ever-aired no-op). `BroadcastBody.test.js` — this specific synthesis is
+observable in the mocked harness even without the commit effect (it happens synchronously inside
+`resolveBucketSchedule`), so there's a direct test confirming a first-time visitor (no history,
+no sessionStorage) sees `EndedState` for the last-aired session. Full suite: 2207/2207 passed,
+`npm run lint` clean.
+
+### Edge-case audit, two fixes applied
+
+Asked to think through remaining gaps after the bucket/group work above. Four came up; two were
+fixed, one was explained (see the "End-of-event redirect" note further down), one was explicitly
+dismissed by the user (a session authored with *both* `mpcId` and `youTubeId` silently defaults to
+the MPC bucket per `getSessionBucket`'s precedence — acceptable, since only one should ever be set
+per session in the first place).
+
+**Fixed — MobileRider partial support.** MobileRider real playback isn't shipping for MAX26 (per
+`PLAN.md`'s own "Explicitly out of scope"), but it was added as an optional future feature, not
+something to actively break. Before this fix, `getBroadcastSchedule`'s composition only ever
+routed a commitment through `resolveBucketSchedule` when `committedBucket` was `'mpc'` or
+`'youtube'` — a bucket-less commitment (MR today; any future player type without a bucket/group
+model) fell through to the "nothing committed anywhere" branch and got silently **replaced** by an
+MPC/YouTube bootstrap pick, even while still live. Reachable today via a manual switch or a
+`?watch=` link to a live MR session (MR sessions do validate as live — `isSessionLiveNow`'s
+`mrStreamId` branch already delegates to `deriveSessionState`). **Fix**: added a branch in
+`getBroadcastSchedule` — a bucket-less commitment that's still live is kept as `activeSession`
+directly (no group/next-group logic applies, correctly, since there's no bucket to walk forward
+within); once it stops being live, there's nothing to walk forward to either, so it falls through
+to the ordinary bootstrap exactly as if nothing had been committed. New tests cover: still-live MR
+commitment kept active despite a live YouTube session existing; falls through correctly once
+ended.
+
+**Fixed — stale `?watch=` link doesn't clear `sessionStorage`.** `persistActiveSession()` only
+ever writes on a truthy id, so `setManualSessionId(null)` (the existing response to an invalid
+watch param) never removed an *already-persisted* value. In the narrow case where nothing is live
+and nothing has ever aired in either bucket yet, the old id would sit in `sessionStorage`
+untouched, and a refresh right after landing on the dead link — before anything new got a chance
+to commit — could resurrect the session the link was meant to invalidate. **Fix**: new
+`clearPersistedSession()` in `broadcast-url.js` (a real `sessionStorage.removeItem`, not
+`persistActiveSession(null)` — that would have stored the *string* `"null"`), called from the
+watch-param effect's invalid-link branch. Added round-trip/overwrite/clear tests for the
+persistence trio in `broadcast-url.test.js` (previously untested).
+
+**Explained, not changed — end-of-event redirect gap.** `BroadcastApp.js`'s redirect-to-on-demand
+effect guards on `schedule.activeSession || schedule.alsoLive.length || schedule.upNext.length`
+and doesn't know about the new synthesized `endedSession`. Low practical risk — `getUpNextSessions`
+has no time-window cutoff (only the 15-item cap), so `upNext` being genuinely empty mid-event is
+unlikely — but structurally, if it ever were, the redirect could fire in the same tick a
+legitimately-showing `EndedState` appeared. Left as-is per discussion; worth a one-line fix
+(`&& !schedule.endedSession`) if it ever proves to matter in practice.
+
+Full suite after both fixes: 2212/2212 passed (2 unrelated, already-known-flaky failures recur
+independently across runs — `toast.test.js`'s mount timeout and `broadcast-url.test.js`'s
+`history.length`-based test, both confirmed to pass cleanly in isolation; the flakiness is
+environment/global-state contention under a full run, not a regression). `npm run lint` clean.
+
+### Third fix, found via real manual testing: deep-stale resume didn't catch up either
+
+Manually testing `1794350000000` against a real prior commitment (not a first-time visitor)
+surfaced an inconsistency between two code paths that are conceptually the same situation.
+`resolveBucketSchedule`'s "committed exists, walk forward" branch, when no later group was
+currently live, always fell back to `endedSession: committedSession` — the *original* committed
+session — regardless of how many later groups had already both started and ended in the meantime.
+That's correct for "just ended, waiting for the very next group," but wrong for a genuine
+deep-stale resume: it would perpetually re-show a stale anchor no matter how far time moved on,
+while the sibling "first-time visitor" bootstrap path (added earlier this session) *does* catch up
+to the most recently aired group in the same situation. **Fix**: before falling back to the
+original committed session, check whether any later group has already started (`startMs <= nowMs`,
+regardless of whether it's still live); if so, use the most recent such group's session as the
+ended anchor instead — unifying with the bootstrap path's behavior. Verified against the real
+catalog data (not just synthetic fixtures) via a standalone script importing the actual updated
+`resolveBucketSchedule` — confirmed `endedSession` correctly resolves to "AI-Powered Tools to
+Comprehend, Collaborate, and Create" instead of the stale "Craft in the Age of AI." New regression
+test added; 133/133 session-broadcast tests pass, lint clean.
+
 ## Explicitly out of scope (fast-follow)
 
 - MobileRider real playback (stub adapter only)
