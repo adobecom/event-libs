@@ -57,14 +57,16 @@ export function getAllowDoubleBooking() {
   return !!tierOneEventConfig.allowDoubleBooking;
 }
 
-// `?homepagePath=`, `?broadcastPath=`, `?sessionGuidePath=` override the corresponding
-// authored path for testing from a draft URL that doesn't match the eventual published one —
-// without this, isSamePage() comparisons downstream always fail to match on a draft. Same
-// convention as session-state.js's `?serverTime=`. Restricted to same-origin relative paths
-// only — a testing convenience, not a redirect target. A leading-slash check alone isn't
-// enough: browsers normalize backslashes to slashes when parsing "special" schemes, so
-// "/\evil.com" is textually relative but resolves to a different origin — verified against
-// the actual URL parser instead of pattern-matched.
+// `?homepagePath=`, `?broadcastPath=` override the corresponding authored path for testing from
+// a draft URL that doesn't match the eventual published one — without this, isSamePage()
+// comparisons downstream always fail to match on a draft. Same convention as session-state.js's
+// `?serverTime=`. Restricted to same-origin relative paths only. A leading-slash check alone
+// isn't enough: browsers normalize backslashes to slashes when parsing "special" schemes, so
+// "/\evil.com" is textually relative but resolves to a different origin — verified against the
+// actual URL parser instead of pattern-matched.
+//
+// getSessionGuidePath() deliberately does NOT support this override: it feeds a hard
+// `window.location.href` redirect (BroadcastApp.js), so query-string input must never reach it.
 function pathOverride(param) {
   try {
     const value = new URLSearchParams(window.location.search).get(param);
@@ -85,7 +87,7 @@ export function getBroadcastPath() {
 }
 
 // Where Broadcast redirects once every session for the event has aired
-// (session-broadcast/components/EndedState.js).
+// (session-broadcast/components/EndedState.js). Authored config only — see note above.
 export function getSessionGuidePath() {
-  return pathOverride('sessionGuidePath') || tierOneEventConfig.sessionGuidePath || '';
+  return tierOneEventConfig.sessionGuidePath || '';
 }

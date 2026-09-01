@@ -2181,6 +2181,19 @@ unrelated full-suite flakiness (a different test flaked on each of two runs — 
 history-length once, `toast.js` ARIA-timing once — both pass cleanly in isolation, confirming
 neither is caused by this fix).
 
+**CodeQL still flagged the same alert after the origin-check fix above** — its dataflow model
+cites the raw `.get(param)` read (`tier-1-event-config.js:70`, pre-validation) as the source and
+still traces it to the `window.location.href` sink in `BroadcastApp.js:133`, regardless of the
+`new URL(...).origin === ...` guard a few lines later. Likely a sanitizer-recognition gap in
+CodeQL's static model, not a real remaining hole (the guard is empirically correct — see above).
+Rather than fight the scanner's pattern-matching, removed the actual taint path: the
+`?sessionGuidePath=` query-param override was only ever a manual-testing convenience (not a
+feature that needs to ship), so `getSessionGuidePath()` no longer calls `pathOverride()` at all —
+it now reads only from the authored `tier-1-event-config` metadata. No query-string value can
+reach the redirect anymore. `getHomepagePath()`/`getBroadcastPath()` keep their overrides (both
+still same-origin-validated via the `new URL(...).origin` check) since neither feeds a
+`location.href` sink — only `session-state.js` reads them for a fallback lookup.
+
 ## Explicitly out of scope (fast-follow)
 
 - MobileRider real playback (stub adapter only)

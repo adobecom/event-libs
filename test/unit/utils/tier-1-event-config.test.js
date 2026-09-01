@@ -126,6 +126,13 @@ describe('tier-1-event-config', () => {
       history.replaceState(null, '', basePath);
       expect(getSessionGuidePath()).to.equal('');
     });
+
+    // getSessionGuidePath() feeds a hard window.location.href redirect (BroadcastApp.js), so
+    // unlike homepagePath/broadcastPath it never reads from the query string at all.
+    it('ignores a ?sessionGuidePath= override — authored config only', () => {
+      history.replaceState(null, '', `${basePath}?sessionGuidePath=/drafts/test-guide`);
+      expect(getSessionGuidePath()).to.equal('');
+    });
   });
 
   it('is idempotent — a second init() call does not re-parse or clear the config', () => {
