@@ -262,9 +262,8 @@
   gap: var(--s2a-spacing-xs);
   min-height: 0;
 
-  /* No vertical padding: the first/last row sit flush against the header gap above and
-     the show-more gap below, which already provide the spacing. The horizontal 0 is kept
-     so the desktop scrollbar gutter (padding-right, below) is the only inline padding. */
+  /* No padding: the first/last row sit flush against the header gap above and the
+     show-more gap below, which already provide the spacing. */
   padding: 0;
   overflow-y: auto;
   box-sizing: border-box;
@@ -276,27 +275,10 @@
    browsers: it only surfaces mid-gesture, which both reads as "there's nothing more to
    see" and gives no stable target to grab.
 
-   This group MUST stay after the base .video-playlist-list rule above, not up in the
-   first `min-width: 1024px` block at the top of the file. A media query adds no
-   specificity, so the base rule's `padding` shorthand — declared later in source order —
-   would reset the padding-right gutter below back to 0, leaving the 6px bar nowhere to
-   sit. */
+   Chrome only. Firefox styling (scrollbar-width/scrollbar-color) is deliberately omitted:
+   scrollbar-width would put Chrome on the standard scrollbar path where every ::-webkit-*
+   rule below is ignored. */
 @media (min-width: 1024px) {
-  .video-playlist-list {
-    /* Firefox only. Deliberately NOT `scrollbar-width: thin` — declaring that in Chrome
-       switches the element to the standard scrollbar path, where every ::-webkit-*
-       rule below is ignored outright. The two styling systems are mutually exclusive,
-       so Chrome is left to fall through to the ::-webkit-* group and Firefox takes
-       these two declarations instead. */
-    scrollbar-color: var(--s2a-color-gray-500) var(--s2a-color-transparent-black-16);
-
-    /* Reserves the gutter in both states so revealing the cap-induced scrollbar on
-       "Show more" doesn't reflow every row sideways by its width. `stable` alone (not
-       `both-edges`) keeps the gutter on the scrolling edge only. */
-    scrollbar-gutter: stable;
-    padding-right: var(--s2a-spacing-xs);
-  }
-
   /* `-webkit-appearance: none` is the declaration that actually pins the scrollbar on
      screen, and it must stay PREFIXED: inside ::-webkit-scrollbar, Chrome honours only
      the prefixed form and silently ignores unprefixed `appearance`, which is what
