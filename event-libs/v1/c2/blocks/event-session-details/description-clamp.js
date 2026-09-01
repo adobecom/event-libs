@@ -18,6 +18,7 @@ export function renderDescriptionClamp(doc = document) {
     type: 'button',
     'aria-expanded': 'false',
     'aria-controls': textId,
+    'daa-ll': 'Show-More-Description',
   });
   const label = createTag('span', {}, 'Show more');
   toggle.append(label);
@@ -26,6 +27,7 @@ export function renderDescriptionClamp(doc = document) {
   toggle.addEventListener('click', () => {
     const expanded = el.classList.toggle('is-expanded');
     toggle.setAttribute('aria-expanded', String(expanded));
+    toggle.setAttribute('daa-ll', expanded ? 'Show-Less-Description' : 'Show-More-Description');
     label.textContent = expanded ? 'Show less' : 'Show more';
   });
 

@@ -347,7 +347,7 @@ function runMobileRiderSuite(modulePath, variantLabel) {
         globalThis.mobilerider.embed = sinon.stub();
       });
 
-      it('should update status and dispose player on streamend', async () => {
+      it('should update status on streamend', async () => {
         const mockStore = { get: sinon.stub().returns(true), set: sinon.stub() };
         riderInstance.store = mockStore;
         // Only the classic drawer copy still supports this; C2 dropped concurrent-video support.
@@ -376,8 +376,49 @@ function runMobileRiderSuite(modulePath, variantLabel) {
 
         if (variantLabel === 'classic') expect(riderInstance.drawer).to.be.null;
         expect(mockStore.set.called).to.be.true;
-        expect(player.dispose.called).to.be.true;
-        expect(globalThis.__mr_player).to.be.null;
+
+        // The classic copy still tears the player down on streamend; C2 deliberately
+        // no longer does — it only flags the stream ended and updates status, leaving
+        // the player instance in place so the final frame stays visible and an ASL
+        // toggle or re-embed can still reuse it. injectPlayer() disposes the previous
+        // player right before embedding a new one, which is the point that matters.
+        if (variantLabel === 'classic') {
+          expect(player.dispose.called).to.be.true;
+          expect(globalThis.__mr_player).to.be.null;
+        } else {
+          expect(player.dispose.called).to.be.false;
+          expect(globalThis.__mr_player).to.equal(player);
+        }
+      });
+
+      // C2 stopped disposing on streamend, so the ONLY remaining teardown point is
+      // injectPlayer()'s own cleanup. This proves a player that survived streamend is
+      // still disposed when the next embed replaces it — i.e. the removed teardown
+      // didn't leave players leaking for the life of the page.
+      (variantLabel === 'C2' ? it : it.skip)('disposes the streamend-surviving player when the next embed starts', async () => {
+        riderInstance.store = { get: sinon.stub().returns(true), set: sinon.stub() };
+
+        const videoWrapper = document.createElement('div');
+        videoWrapper.className = 'video-wrapper';
+        el.appendChild(videoWrapper);
+        riderInstance.wrap = videoWrapper;
+        riderInstance.isEmbedding = false;
+
+        riderInstance.injectPlayer('test-video', 'test-skin');
+        const player = { off: sinon.stub(), on: sinon.stub(), dispose: sinon.stub() };
+        globalThis.__mr_player = player;
+        await new Promise((resolve) => { setTimeout(resolve, 50); });
+
+        const onCall = player.on.getCalls().find((c) => c.args[0] === 'streamend');
+        onCall.args[1]();
+        expect(player.dispose.called, 'streamend must not dispose').to.be.false;
+
+        // A new embed (e.g. the viewer switching video) must clean the old one up.
+        riderInstance.isEmbedding = false;
+        riderInstance.injectPlayer('next-video', 'test-skin');
+        await new Promise((resolve) => { setTimeout(resolve, 50); });
+
+        expect(player.dispose.called, 'next embed must dispose the old player').to.be.true;
       });
 
       it('should handle streamend when drawer is null', async () => {
@@ -429,7 +470,12 @@ function runMobileRiderSuite(modulePath, variantLabel) {
         riderInstance.injectPlayer('test-video', 'test-skin');
 
         onCall.args[1]();
-        expect(riderInstance.wrap.querySelector('.mobile-rider-container.is-hidden')).to.not.be.null;
+
+        // Only the classic copy hides the container on streamend; C2 leaves it visible.
+        // Either way, the behavior this test exists for is the re-embed guard below.
+        const hiddenContainer = riderInstance.wrap.querySelector('.mobile-rider-container.is-hidden');
+        if (variantLabel === 'classic') expect(hiddenContainer).to.not.be.null;
+        else expect(hiddenContainer).to.be.null;
 
         pendingRaf?.();
         expect(globalThis.mobilerider.embed.callCount).to.equal(embedCountAfterFirst);
@@ -830,7 +876,7 @@ function runMobileRiderSuite(modulePath, variantLabel) {
       expect(player3.on.calledWith('streamend')).to.be.true;
     });
 
-    it('streamend on ASL player updates store and disposes player', async () => {
+    it('streamend on ASL player updates store', async () => {
       riderInstance.mainID = 'vid';
       const mockStore = { get: sinon.stub().returns(true), set: sinon.stub() };
       riderInstance.store = mockStore;
@@ -858,8 +904,16 @@ function runMobileRiderSuite(modulePath, variantLabel) {
       // Fire streamend on ASL player
       onCall.args[1]();
       expect(mockStore.set.calledWith('vid', false)).to.be.true;
-      expect(aslPlayer.dispose.called).to.be.true;
-      expect(globalThis.__mr_player).to.be.null;
+
+      // Classic still disposes on streamend; C2 leaves the player in place and only
+      // updates status (see #attachEndListener there).
+      if (variantLabel === 'classic') {
+        expect(aslPlayer.dispose.called).to.be.true;
+        expect(globalThis.__mr_player).to.be.null;
+      } else {
+        expect(aslPlayer.dispose.called).to.be.false;
+        expect(globalThis.__mr_player).to.equal(aslPlayer);
+      }
     });
   });
 

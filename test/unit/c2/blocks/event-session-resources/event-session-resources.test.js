@@ -194,15 +194,15 @@ describe('Session Resources', () => {
     const toggle = el.querySelector('.session-resources-toggle');
     expect(toggle).to.not.be.null;
     expect(el.querySelectorAll('.session-resource.is-overflow')).to.have.lengthOf(2);
-    expect(toggle.getAttribute('daa-ll')).to.equal('Show-More');
+    expect(toggle.getAttribute('daa-ll')).to.equal('Show-More-Resources');
     toggle.click();
     expect(el.classList.contains('is-expanded')).to.be.true;
     expect(toggle.textContent).to.equal('Show less');
-    expect(toggle.getAttribute('daa-ll')).to.equal('Show-Less');
+    expect(toggle.getAttribute('daa-ll')).to.equal('Show-Less-Resources');
     toggle.click();
     expect(el.classList.contains('is-expanded')).to.be.false;
     expect(toggle.textContent).to.equal('Show more');
-    expect(toggle.getAttribute('daa-ll')).to.equal('Show-More');
+    expect(toggle.getAttribute('daa-ll')).to.equal('Show-More-Resources');
   });
 
   it('applies an authored Background row as the block background', async () => {
