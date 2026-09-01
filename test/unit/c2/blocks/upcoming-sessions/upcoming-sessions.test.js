@@ -133,6 +133,39 @@ describe('upcoming-sessions', () => {
       expect(el.dataset.fewSessions).to.equal('true');
     });
 
+    it('never renders a session whose start time has already passed', async () => {
+      const past = session({
+        sessionId: 'past-session',
+        sessionTime: {
+          startTimeMillis: Date.now() - 60_000,
+          endTimeMillis: Date.now() + 60_000,
+          timezone: 'America/Los_Angeles',
+        },
+      });
+      const upcoming = session({ sessionId: 'upcoming-session' });
+      const el = buildBlock([past, upcoming]);
+      await init(el);
+      expect(el.querySelector('[data-session-id="past-session"]')).to.not.exist;
+      expect(el.querySelector('[data-session-id="upcoming-session"]')).to.exist;
+    });
+
+    it('drops a mobile-rider session as soon as its start time passes, same as any other session', async () => {
+      const started = session({
+        sessionId: 'mr-session',
+        mrStreamId: 'stream-1',
+        sessionTime: {
+          startTimeMillis: Date.now() - 60_000,
+          endTimeMillis: Date.now() + 3_600_000,
+          timezone: 'America/Los_Angeles',
+        },
+      });
+      const el = buildBlock([started]);
+
+      await init(el);
+
+      expect(el.querySelector('[data-session-id="mr-session"]')).to.not.exist;
+    });
+
     it('keeps the heading rendered when the entries array is empty (removal is manual/operational)', async () => {
       const el = buildBlock([]);
       await init(el);
