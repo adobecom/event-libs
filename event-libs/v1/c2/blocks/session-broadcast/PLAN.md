@@ -823,6 +823,48 @@ breakpoint:
   value (a pre-existing Chrome normalization quirk for `-webkit-box` + line-clamp, confirmed to
   affect the *unfavorited* case identically) wasn't something this change introduced.
 
+**`.sg-section-title` tablet size (Figma node 4975:45576)**: sessions-guide's own `@media
+(min-width: 768px)` rule bumps `.sg-section-title` up to `--s2a-font-size-2xl` (24px) for its own
+layout — Broadcast's Also-Live/Up-Next section titles ("Currently Live," "Up Next") need to stay
+at 18px at tablet, same as mobile, per the Figma spec (color/letter-spacing were already correct
+via the existing mobile-scoped `--also-live`/`--up-next` rules). Added a reset in the existing
+tablet `@media` block, scoped `.session-broadcast .sg-section-title` (not bare — the
+sessions-guide widget/FAB is typically co-mounted on the same page and shares this class).
+**Real bug caught via the user's own browser inspection**: the first attempt used the semantic
+`--s2a-typography-font-size-heading-6`/`-line-height-heading-6` tokens (matching the Figma
+export's own fallback values) — but those aliases are *intentionally* responsive in this
+codebase's `tokens.css`, remapped to `--s2a-font-size-md` (16px) below 1280px and only becoming
+18px at 1280px+, so they measured as 16px in the browser at tablet width, not 18px. Fixed by
+switching to the underlying fixed-value scale tokens (`--s2a-font-size-lg`/`--s2a-font-line-height-
+xs`, both = 18px, defined once before any `@media` block, never remapped) — the exact same token
+`.sg-section-title`'s own base/mobile rule already uses, so this now reads as "stay the same size
+as mobile" rather than routing through a breakpoint-dependent semantic role that only sometimes
+coincides with the intended value. `npx stylelint` clean (only the pre-existing accepted
+`-webkit-box` finding).
+
+**Carousel nav hidden on tablet, swipe instead**: per Figma, the Also-Live/Up-Next carousel nav
+arrows (`.sg-carousel__nav`) shouldn't show on tablet — cards should be swipeable instead.
+Investigated before touching anything, since sessions-guide's own carousel behavior is
+breakpoint-dependent in a way that made this riskier than a simple hide: at 768-1023px cards
+already scroll natively (`.sg-carousel__cards` keeps `overflow-x: auto` + scroll-snap; the nav is
+only a floating enhancement there), but at 1024-1279px ("Intermediate Tablet" per sessions-guide's
+own naming) the strip switches to `overflow: visible` with **no native scroll at all** — it's
+paged entirely by JS transform (`Carousel.js`'s `paged` state, itself derived from computed
+`overflow-x`), and the nav arrows are the *only* way to reach additional cards there. Since this
+block's own tablet range is documented as 768-1279px (spans both sessions-guide sub-tiers), hiding
+the nav without also restoring native scroll for the 1024-1279px half would have stranded anyone
+with more cards than fit on screen. Fix: one `@media (min-width: 768px) and (max-width: 1279px)`
+block, scoped under both `.sb-carousel-section--also-live`/`--up-next`, that hides `.sg-carousel__
+nav` and restores `.sg-carousel__cards`'s native-scroll properties (`overflow-x: auto`,
+`scroll-snap-type: x mandatory`, `-webkit-overflow-scrolling: touch`, `scrollbar-width: none`) plus
+`.sg-carousel__card-wrap`'s `scroll-snap-align: start` — all no-ops below 1024px (already the
+native-scroll default there), and the meaningful fix at 1024-1279px. No `Carousel.js` changes
+needed: it already recomputes its own `paged` state from computed `overflow-x` on measure/resize,
+so restoring the CSS is enough for it to self-correct back to native-scroll mode. `npx stylelint`
+clean (only the pre-existing accepted `-webkit-box` finding). Real-browser verification (swipe
+actually works at both tablet sub-tiers, nav stays hidden, desktop 1280px+ unaffected) still
+pending — needs the `chrome-devtools` MCP server reconnected or a manual walkthrough.
+
 ## MPC/YouTube bucket & group scheduling (2026-08-31)
 
 **This reverses an earlier PRD decision.** `getBroadcastSchedule`'s original "commitment, not a

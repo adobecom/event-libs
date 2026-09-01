@@ -305,6 +305,21 @@
 
   /* stylelint-disable-next-line value-no-vendor-prefix */
   .sb-info.is-favorited:not(.is-expanded) .sb-info__desc-wrap { display: -webkit-box; }
+
+  /* Figma (node 4975:45576): section titles ("Also Live", "Up Next") stay the same 18px size on
+     tablet as mobile. sessions-guide's own tablet rule bumps .sg-section-title up to
+     font-size-2xl (24px) for its own layout; reset back down for Broadcast specifically.
+     --s2a-typography-font-size-heading-6 (the semantic alias) is NOT the right token here — it's
+     intentionally responsive and only resolves to 18px at 1280px+ (16px below that, per
+     tokens.css), so it wouldn't actually enforce 18px at this breakpoint. Using the fixed-value
+     scale token instead — the exact one sessions-guide's own base/mobile rule already uses for
+     this element, so this is "stay the same size as mobile," not a new value. Scoped under
+     .session-broadcast, not bare — the sessions-guide widget/FAB is typically co-mounted on the
+     same page and shares this class. */
+  .session-broadcast .sg-section-title {
+    font-size: var(--s2a-font-size-lg, 18px);
+    line-height: var(--s2a-font-line-height-xs, 18px);
+  }
 }
 
 /* ── Ended state (States 2 & 3) ─────────────────────────── */
@@ -704,6 +719,35 @@
   /* The trailing time label is generated content (content: attr(data-time)) — also hidden by
      the same hover-reveal redesign. */
   .sb-carousel-section--up-next .sg-card__actions::after { display: inline; }
+}
+
+/* Per Figma: on tablet (this block's own 768-1279px range) the carousel nav arrows should not
+   show — cards are swipeable instead. sessions-guide's own "Intermediate Tablet" tier
+   (1024-1279px) turns .sg-carousel__cards into a non-scrollable, JS-transform-paged strip
+   (Carousel.js's `paged` state, derived from computed overflow-x) with the nav arrows as the
+   ONLY way to reach more cards — hiding the nav there without restoring native scroll would
+   strand anyone with more cards than fit on screen. Below 1024px this half is a no-op: cards
+   already scroll natively and the nav is only a floating enhancement over them.
+   Carousel.js recomputes `paged` from computed overflow-x on its own — restoring the CSS here
+   is enough to flip it back to native-scroll mode, no JS changes needed. */
+@media (min-width: 768px) and (max-width: 1279px) {
+  .sb-carousel-section--also-live .sg-carousel__nav,
+  .sb-carousel-section--up-next .sg-carousel__nav {
+    display: none;
+  }
+
+  .sb-carousel-section--also-live .sg-carousel__cards,
+  .sb-carousel-section--up-next .sg-carousel__cards {
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+
+  .sb-carousel-section--also-live .sg-carousel__card-wrap,
+  .sb-carousel-section--up-next .sg-carousel__card-wrap {
+    scroll-snap-align: start;
+  }
 }
 
 /* Kept here, after both sections' base rules, for ascending specificity (stylelint
