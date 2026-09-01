@@ -12,12 +12,10 @@ import {
 } from '../../sessions-guide/components/icons.js';
 import { trackBroadcastEvent } from '../utils/broadcast-analytics.js';
 
-// Collapsed vs. expanded changes which actions/meta show and whether the description is
-// clamped (hidden entirely if favorited, mobile only — see .is-favorited in the CSS). "View
-// all details" is the only path to the real Session Guide detail view; there's no local modal.
-//
-// `actions` renders once in a fixed DOM position — session-broadcast.css repositions it via
-// CSS Grid areas per state/breakpoint, since each combination wants a different visual spot.
+// Collapsed vs. expanded changes which actions/meta show and clamps the description (hidden
+// entirely if favorited, mobile only — .is-favorited in the CSS). "View all details" opens the
+// real Session Guide detail view; there's no local modal. `actions` renders once in a fixed DOM
+// position — CSS Grid areas reposition it per state/breakpoint.
 export function SessionInfoPanel({ session, viewAllDetailsLabel = 'View all details' }) {
   const [expanded, setExpanded] = useState(false);
 

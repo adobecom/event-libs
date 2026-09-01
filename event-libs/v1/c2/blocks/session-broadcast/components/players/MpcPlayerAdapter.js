@@ -2,8 +2,8 @@ import { html, useEffect, useRef } from '../../../../../deps/htm-preact.js';
 import { LIBS, getEventConfig } from '../../../../../utils/utils.js';
 import { trackBroadcastEvent } from '../../utils/broadcast-analytics.js';
 
-// adobetv.css isn't loaded automatically since Milo's own block-loader never mounted this
-// block — inject it once, same pattern scripts.js uses for the C2 foundation stylesheet.
+// adobetv.css never auto-loads since Milo's block-loader never mounted this block — inject
+// once, same pattern as scripts.js's C2 foundation stylesheet.
 let stylesLoaded = false;
 function ensureAdobeTvStyles(miloLibs) {
   if (stylesLoaded) return;
@@ -14,8 +14,8 @@ function ensureAdobeTvStyles(miloLibs) {
   document.head.appendChild(link);
 }
 
-// adobetv.js's createIframe() listens for postMessage({ state: 'play'|'pause', id }) from
-// video.tv.adobe.com as a public contract — this listens for the same events for analytics.
+// adobetv.js's iframe posts {state:'play'|'pause', id} from video.tv.adobe.com as a public
+// contract — mirrored here for analytics.
 function handlePlaybackMessage(session) {
   return (event) => {
     if (event.origin !== 'https://video.tv.adobe.com' || !event.data) return;
@@ -42,8 +42,8 @@ export function MpcPlayerAdapter({ session }) {
       const { default: initAdobeTv } = await import(`${miloLibs}/blocks/adobetv/adobetv.js`);
       if (cancelled) return;
 
-      // adobetv.js's init() expects a live anchor and builds the iframe from it — no
-      // exported "give me an iframe for this ID" function exists.
+      // init() expects a live anchor and builds the iframe from it — no direct "iframe for
+      // this ID" export exists.
       const anchor = document.createElement('a');
       anchor.href = `https://video.tv.adobe.com/v/${session.mpcId}?autoplay=true`;
       container.appendChild(anchor);

@@ -1,5 +1,4 @@
-// Dev-only debug aid, gated behind `?debug` so it stays silent for real visitors. Safe to
-// delete once development wraps up.
+// Dev-only, gated behind `?debug` — safe to delete once development wraps up.
 import { isBroadcastEligible } from '../../../../utils/session-state.js';
 import {
   hasPlayableVideoSource, getSessionBucket, isSessionLiveNow, groupSessionsByStart,
@@ -50,8 +49,7 @@ function groupStatus(group, liveStreamActiveIds, nowMs) {
   return group.startMs > nowMs ? 'upcoming' : 'ended';
 }
 
-// "mm:ss" until the group's start, negative (still "mm:ss", just sign-prefixed) once it's passed
-// — e.g. "-02:15" means this group started 2m15s ago.
+// "mm:ss" until start, sign-prefixed once passed — e.g. "-02:15" = started 2m15s ago.
 function formatRelativeTime(deltaMs) {
   const sign = deltaMs < 0 ? '-' : '';
   const totalSeconds = Math.round(Math.abs(deltaMs) / 1000);
@@ -71,8 +69,8 @@ function groupRow(group, index, liveStreamActiveIds, nowMs) {
   };
 }
 
-// Logs every bucket's groups straight from the raw catalog, independent of whatever got
-// committed, so resolveBucketSchedule's "check the next group" logic can be sanity-checked.
+// Every bucket's groups from the raw catalog, independent of what's committed — sanity-checks
+// resolveBucketSchedule's "next group" logic.
 export function logBucketGroups(sessionList, liveStreamActiveIds, nowMs) {
   if (!DEBUG_ENABLED) return;
   const eligible = sessionList.filter((s) => isBroadcastEligible(s) && hasPlayableVideoSource(s));

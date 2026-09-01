@@ -2,8 +2,8 @@ import { html } from '../../../../deps/htm-preact.js';
 import { YouTubePlayerAdapter } from './players/YouTubePlayerAdapter.js';
 import { MpcPlayerAdapter } from './players/MpcPlayerAdapter.js';
 
-// One mounted adapter at a time, picked by which video-source field is set. key=${session.id}
-// forces a full unmount/remount on every switch, even within the same player type.
+// One adapter at a time, picked by which video-source field is set. key=${session.id} forces
+// a full remount on every switch, even within the same player type.
 export function PlayerHost({ session }) {
   if (!session) return null;
 
