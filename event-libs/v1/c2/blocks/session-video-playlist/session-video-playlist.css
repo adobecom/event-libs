@@ -568,7 +568,6 @@
   }
 
   .session-video-playlist-up-next-label {
-    font-family: var(--s2a-font-family-eyebrow);
     font-size: var(--s2a-typography-font-size-eyebrow);
     font-weight: var(--s2a-font-weight-eyebrow);
     line-height: var(--s2a-typography-line-height-eyebrow);
@@ -577,7 +576,6 @@
 
   .session-video-playlist-up-next-title {
     overflow: hidden;
-    font-family: var(--s2a-font-family-heading);
     font-size: var(--s2a-typography-font-size-heading-6);
     font-weight: 900;
     line-height: var(--s2a-typography-line-height-title-6, 18px);
@@ -617,7 +615,6 @@
   }
 
   .session-video-playlist-title {
-    font-family: var(--s2a-font-family-heading);
     font-size: var(--s2a-typography-font-size-heading-6);
     font-weight: 900;
     line-height: var(--s2a-typography-line-height-title-6, 18px);
