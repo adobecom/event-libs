@@ -111,7 +111,7 @@ describe('BroadcastBody', () => {
 
       const out = BroadcastBody({ config: CONFIG });
       expect(out).to.include('sb-ended');
-      expect(out).to.include('Session ended.');
+      expect(out).to.include('Session complete.');
       expect(out).to.include('The One That Ended');
       expect(out).to.not.include('sb-empty');
     });
@@ -239,6 +239,24 @@ describe('BroadcastBody', () => {
     it('omits the custom property when ended but no image is authored', () => {
       const out = BroadcastBody({ config: CONFIG });
       expect(out).to.not.include('--sb-app-ended-bg');
+    });
+
+    it('also sets --sb-app-ended-bg-lg when a larger picture source was authored', () => {
+      const out = BroadcastBody({
+        config: {
+          ...CONFIG,
+          sessionEndedImageUrl: 'https://example.com/ended.png',
+          sessionEndedImageUrlLarge: 'https://example.com/ended.png?width=2000',
+        },
+      });
+      expect(out).to.include('--sb-app-ended-bg-lg: url(&quot;https://example.com/ended.png?width=2000&quot;)');
+    });
+
+    it('omits --sb-app-ended-bg-lg when no larger source was authored', () => {
+      const out = BroadcastBody({
+        config: { ...CONFIG, sessionEndedImageUrl: 'https://example.com/ended.png' },
+      });
+      expect(out).to.not.include('--sb-app-ended-bg-lg');
     });
 
     it('omits the custom property for an unsafe URL (e.g. a javascript: scheme)', () => {

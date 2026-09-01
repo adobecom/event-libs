@@ -147,10 +147,15 @@ export function BroadcastBody({ config }) {
     && !schedule.alsoLive.length && !schedule.upNext.length;
 
   // Feeds session-broadcast.css's .sb-app:has(.sb-ended) background rules (see that file for
-  // why this lives on .sb-app, not EndedState.js).
+  // why this lives on .sb-app, not EndedState.js). --sb-app-ended-bg-lg is optional — only set
+  // when the authored row's <picture> (if any) yielded a bigger source; the tablet CSS falls
+  // back to --sb-app-ended-bg when it's absent, so this never regresses the single-image case.
   const endedActive = !schedule.activeSession && !!schedule.endedSession;
   const endedBgUrl = endedActive ? safeUrl(config.sessionEndedImageUrl) : '';
-  const appStyle = endedBgUrl ? `--sb-app-ended-bg: url("${endedBgUrl}")` : '';
+  const endedBgUrlLarge = endedActive ? safeUrl(config.sessionEndedImageUrlLarge) : '';
+  const appStyle = endedBgUrl
+    ? `--sb-app-ended-bg: url("${endedBgUrl}");${endedBgUrlLarge ? ` --sb-app-ended-bg-lg: url("${endedBgUrlLarge}");` : ''}`
+    : '';
 
   return html`
     <div class="sb-app" aria-busy=${String(sessionsStatus.value === 'loading')} style=${appStyle}>

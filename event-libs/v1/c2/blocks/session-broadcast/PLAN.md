@@ -865,6 +865,196 @@ clean (only the pre-existing accepted `-webkit-box` finding). Real-browser verif
 actually works at both tablet sub-tiers, nav stays hidden, desktop 1280px+ unaffected) still
 pending — needs the `chrome-devtools` MCP server reconnected or a manual walkthrough.
 
+**`.sb-ended__eyebrow` ("Session ended.") tablet size (Figma node 4975:46368)**: grows to a larger
+treatment on tablet. First attempt used the raw Figma-export fallback values (56px/56px-line-
+height/-1.68px-letter-spacing) at face value — those turned out to be this codebase's *1280px+
+desktop* tier for the shared `--s2a-typography-*-heading-2` tokens, one tier too large. **Corrected
+by the user against the actual design to 48px** — the 1024-1279px tier's full, consistent set
+(48px font-size/48px line-height/-1.44px letter-spacing; mobile/base is 32px/-0.96px/32px,
+unrelated — matches the already-hardcoded 36px-font-size mobile rule, itself a deliberate
+deviation from the semantic scale). Still deliberately not using the semantic aliases directly:
+they'd correctly give 48px at 1024-1279px but wrongly drop to 32px below that, and this block's
+tablet range starts at 768px. Fixed by hardcoding to the fixed-value scale tokens
+(`--s2a-font-size-6xl`/`-line-height-2xl`/`-letter-spacing-xl`) pinned to the 1024-1279px tier's
+values across the whole 768-1279px tablet range, scoped to tablet only — desktop's own treatment
+for this element hasn't been given a frame yet, so it's deliberately left alone (still the
+pre-existing hardcoded 36px). **Lesson for next time**: a Figma-exported fallback value being
+internally consistent with *some* tier of this codebase's token system doesn't mean it's the
+*right* tier for the breakpoint being asked about — worth a quick user confirmation on the actual
+number before treating an exported fallback as ground truth, not just checking that it resolves
+to *a* real value. `npx stylelint` clean (only the pre-existing accepted `-webkit-box` finding).
+
+**`.sb-ended__title` (the session title) tablet size + truncation (Figma file "Session Broadcast
+VizD R1 8.17.26", node 24:21713 — a different Figma file than the rest of this page's frames)**:
+first pass trusted the raw Figma-export fallback values (24px font-size/24px line-height) and,
+since the existing unconditional rule already hardcodes 24px/24px, concluded "already matches, no
+change needed" — the exact same trap as the eyebrow fix above. 24px is this codebase's 1280px+
+desktop tier for the shared heading-5 tokens, not tablet. **Corrected by the user against the
+actual design to 20px** — the 1024-1279px tier's value (`--s2a-font-size-xl`/
+`--s2a-font-line-height-sm`, both 20px; mobile/base is 18px, unrelated). Fixed by adding explicit
+`font-size`/`line-height` overrides using those fixed-value tokens to the same tablet-scoped
+(`768-1279px`) block. letter-spacing (-0.48px) was never at risk and needed no correction — it's a
+stable, non-remapped fixed token (`--s2a-font-letter-spacing-4xl`), not a semantic alias.
+Also added `overflow: hidden; white-space: nowrap; text-overflow: ellipsis;` in the same rule —
+the design shows the title truncated to a single ellipsized line
+(`overflow-hidden`/`text-ellipsis` in the export), which the base rule never did at all, so a long
+title would otherwise wrap across multiple lines. Scoped to tablet only since no mobile frame was
+referenced for this specific change. `npx stylelint` clean (only the pre-existing accepted
+`-webkit-box` finding). **Same lesson as the eyebrow fix, now confirmed twice in a row**: treat a
+Figma-exported fallback as a starting hypothesis to verify against `tokens.css`'s actual tier
+breakdown, never as ground truth — "the base rule already hardcodes this value" is not evidence
+it's correct for a *different* breakpoint than whatever it was originally hardcoded for.
+
+**Ended-state spacing rhythm verified against Figma (same "Session Broadcast VizD R1 8.17.26"
+file, node 24:21712, covering `.sb-ended__title` → `.sb-ended__meta` → `.sb-ended__desc-wrap` →
+`.sb-ended__view-more` → `.sb-ended__actions`) — no changes needed.** Checked all four gaps
+(title→meta 24px, meta's own internal gap 16px, meta→desc-wrap 4px, desc-wrap→view-more 4px,
+meta-group→actions 24px, actions' own internal gap 12px) against the existing CSS and they match
+exactly (`--s2a-spacing-lg`/`-md`/`-2xs`/`-sm`). Unlike the typography tokens above, spacing tokens
+are defined once before any `@media` block in `tokens.css` and never remapped at any breakpoint —
+confirmed before relying on that, given the pattern of typography aliases being unexpectedly
+responsive. This spacing was evidently already built correctly from earlier project work. Note:
+this design node doesn't include `.sb-ended__eyebrow`, so `.sb-ended__title`'s own top margin
+(relative to the eyebrow above it) is unverified against this specific design — needs its own
+frame if that gap ever needs checking.
+
+**`.sb-ended__desc` tablet truncation switched from CSS pixel-width to a fixed 70-character count
+(Figma node 24:21722, same file)**: the collapsed description was truncating "way later" than the
+design calls for — the existing CSS (`white-space: nowrap` + `text-overflow: ellipsis` on
+`.sb-ended__desc-wrap`) truncates based on however much text fits the container's actual rendered
+pixel width, which on our real tablet layout fits noticeably more text than the design's reference
+box. Confirmed the intended cutoff directly against a zoomed screenshot of the design (not assumed
+from the exported code's full text content, which is the untruncated source string) — exactly 70
+characters: `"Lorem ipsum dolor sit amet consectetur. Leo cursus dui fermentum
+neque"`. Implemented as a fixed 70-char JS truncation (`truncateChars()`) applied only when
+collapsed *and* in the tablet range, gated by a new `useIsTabletRange()` hook in `EndedState.js` —
+same `matchMedia`-per-component convention already established by `FilterPanel.js`'s
+`useIsMobile()`/`SessionDetailOverlay.js`'s `useIsDesktop()` (no shared hook exists in this
+codebase; each component defines its own identically-shaped one). No character-count truncation
+utility existed anywhere in the repo to reuse — `event-session-details/description-clamp.js`'s
+`measure()` is a `scrollHeight`-based CSS-line-clamp toggle, not a character-count helper.
+Expanded state and mobile/desktop are untouched — they keep the existing full-text/CSS-ellipsis
+behavior; only the collapsed-and-tablet combination is affected. Tests mock `window.matchMedia`
+directly (same pattern as `FilterPanel.test.js`'s "responsive layout" describe block), since the
+mocked htm-preact's `useEffect` is a no-op — only the `useState` initializer's synchronous
+`matchMedia` read is exercised there; the reactive resize-driven update needs a real-browser check.
+136/136 session-broadcast tests pass (3 new), `npm run lint` clean.
+
+**Also Live card image: no 1px border on tablet**: `.sg-live-card__image`'s
+`border: 1px solid rgb(255 255 255 / 15%)` comes from the existing `@media (min-width: 1024px)`
+reset block (originally written for desktop, with no upper bound, so it also reaches the
+1024-1279px portion of tablet). Per design, tablet shouldn't have this border at all. Added a
+`@media (min-width: 768px) and (max-width: 1279px)` override setting `border: none`, placed after
+the 1024px+ block so it wins the cascade tie for the 1024-1279px overlap (same specificity, later
+source order) while leaving the border in place at 1280px+ (desktop). 768-1023px never had the
+border to begin with (the 1024px+ reset doesn't reach that low), so the override is a no-op there.
+`npx stylelint` clean (only the pre-existing accepted `-webkit-box` finding).
+
+**Ended-state background: taller bleed + darker fade on tablet, plus an optional bigger image
+source.** Per design, tablet extends the background bleed to 80% of the viewport (not the fixed
+480px mobile/base value) and darkens the vertical fade's 75%-stop to 90% opacity (was 75%). Used
+`80vh`, not a literal `80%` — this `::before` is absolutely positioned with `.sb-app` as its
+containing block, and `.sb-app` has no explicit height of its own (only `display: block`), so a
+percentage height here would resolve to `auto` per the CSS spec and the bleed would collapse to
+nothing; `80vh` has no such dependency.
+
+Separately, asked whether a bigger image could be pulled in for the larger tablet+ box. Investigated
+first, since this touches code that was deliberately simplified once before to fix a real bug:
+`sessionEndedImageUrl` used to be authored as an embedded `<picture>`, which Milo's
+`decorateImageLinks()` could silently swap for an empty `<video>` if the asset's alt text carried a
+`|`-delimited convention — the fix at the time was to change authoring to a plain link instead (see
+the Analytics/Phase-4 section above). Reintroducing a `<picture>` naively would have reintroduced
+that same risk. Investigation found the row can naturally carry **both** at once — DA's "linked
+image" authoring nests the `<picture>` inside the `<a>`, they aren't mutually exclusive — so a safe
+middle path exists: keep reading the single default URL exactly as before (unchanged, still
+collision-proof via the `<a href>`/`<img src>` fallback chain), and *additionally* look for a
+`<picture>` in that same row purely to extract a URL string from its largest `<source>` (by parsing
+`width=` out of each `srcset`) — never rendering the picture itself back into the page. If Milo's
+decoration pass ever did collision-convert that picture away, this simply finds nothing and falls
+back to the single default URL everywhere, identical to the behavior before this existed — it can
+only ever match or improve on today's behavior, never regress it.
+
+Implementation: `session-broadcast.js`'s `parseBroadcastConfig` gained a second field,
+`sessionEndedImageUrlLarge` (via new `extractLargestPictureUrl()`); `BroadcastApp.js` sets an
+additional `--sb-app-ended-bg-lg` custom property only when that field is present; the tablet CSS
+block uses `var(--sb-app-ended-bg-lg, var(--sb-app-ended-bg, none))` so it prefers the bigger
+source when available. 142/142 session-broadcast tests pass (6 new), `npm run lint` clean.
+
+**Follow-up bug: desktop never referenced `--sb-app-ended-bg-lg` at all.** Reported via real
+testing on a live DA page (auth-gated, so verified by reasoning through the actual authored markup
+the user pasted rather than fetching it): the small (750px) image kept loading. Wrote a regression
+test using that exact real HTML (a bare `<picture>` with no wrapping `<a>` — this specific asset
+wasn't authored as a "linked image," unlike the assumption in the original design notes above) to
+rule out an extraction bug first — `extractLargestPictureUrl()` correctly resolved to the
+`width=2000` source, confirming the JS side was already right. The actual gap: only the base rule
+(mobile, all breakpoints by default) and the 768-1279px tablet block existed for
+`.sb-app:has(.sb-ended)::before` — nothing at 1280px+ referenced `--sb-app-ended-bg-lg` at all, so
+desktop fell through to the base rule's `--sb-app-ended-bg`-only `background-image`. User confirmed
+the larger image should apply at both tablet *and* desktop (mobile stays small, intentionally).
+Added a `@media (min-width: 1280px)` block using the same `-lg`-preferring `background-image`
+value, keeping desktop's existing 480px height and 60/60/75%-opacity gradient stops as-is — no
+desktop-specific height/gradient redesign was requested, only the image resolution. 143/143
+session-broadcast tests pass (1 new, using the real authored markup verbatim), `npm run lint`
+clean.
+
+**Root cause of that same report, actually found: `source.srcset` is never auto-resolved to an
+absolute URL.** The desktop-rule gap above was real but not the whole story — after fixing it, the
+image still didn't switch. Diagnosed by checking the live page's inline style (`--sb-app-ended-bg-
+lg` was completely absent, not just unused), which ruled out a CSS cascade issue and pointed back
+at the JS. The actual bug: unlike `a.href`/`img.src` (which the browser always resolves to an
+absolute URL), `source.srcset` reflects the raw authored attribute string as-is — `srcset` is a
+list microsyntax (comma-separated url+descriptor pairs), so there's no single URL for the browser
+to resolve automatically. DA authors relative paths here (`./media_....jpg?width=2000...`), so
+`extractLargestPictureUrl()` was correctly identifying the right source by width but returning a
+*relative* string, which then failed `BroadcastApp.js`'s `safeUrl()` check
+(`/^(https?:\/\/|\/)/`) and got silently dropped — never reaching `--sb-app-ended-bg-lg` at all.
+This is exactly why the earlier "real DA-authored markup" regression test didn't catch it: that
+test only asserted `.include('width=2000')`, which stayed true even for the unresolved relative
+string — a genuine blind spot in the test, not just the implementation.
+
+**Fix**: added `resolveUrl()` (`new URL(url, document.baseURI).href`, with a try/catch) and
+`firstSrcsetUrl()` (extracts the URL token from one `srcset` candidate, ignoring the list/descriptor
+syntax `srcset` allows, even though none of our sources use it), and resolve the picked source's
+URL through them before returning it from `extractLargestPictureUrl()`. Added a new test that
+asserts the *exact* resolved absolute URL (not just a substring) and matches it against
+`/^https?:\/\//`, specifically to close the blind spot the previous test left open. 144/144
+session-broadcast tests pass (1 new), `npm run lint` clean. Diagnosed entirely through user-supplied
+evidence (the live page is auth-gated, `WebFetch` returned 401) — the exact real authored HTML,
+then a direct check of the live inline style — rather than fetching the page directly.
+
+**Up Next card: title-to-actions spacing on tablet (Figma node 4975:46423, "Session card - no
+images")**: `sessions-guide.css`'s base `.sg-card__title` only carries a 2px `margin-bottom` —
+clearly meant for spacing between wrapped title lines, not the gap down to the next group. The
+design's own top-level layout gives every group in this card (badge row → title → actions) a
+uniform 12px gap (`--s2a-spacing-sm`), the same token already used for the badge-row's own
+`margin-bottom` in this file. Added a `@media (min-width: 768px) and (max-width: 1279px)` override
+bumping `.sg-card__title`'s `margin-bottom` to `--s2a-spacing-sm` (12px), scoped to tablet only
+since that's what was asked and mobile wasn't reported as needing a change. `npx stylelint` clean
+(only the pre-existing accepted `-webkit-box` finding).
+
+**Carousel header-to-cards gap grows to 24px on tablet**: both `.sb-carousel-section--also-live`
+and `--up-next`'s base rules set `.sg-carousel__header`'s `margin-bottom` to `--s2a-spacing-sm`
+(12px); tablet needs `--s2a-spacing-lg` (24px) instead. Added to the existing tablet
+(`768-1279px`) block alongside the carousel-nav/swipe rules, since it applies identically to both
+sections. `npx stylelint` clean (only the pre-existing accepted `-webkit-box` finding).
+
+**Section vertical padding drops to 24px each on tablet — but only once the session has ended.**
+First pass applied this unconditionally (both sections, always) — corrected by the user: the base
+32px (`--s2a-spacing-xl`) top/bottom is right in general; it only shrinks to 24px
+(`--s2a-spacing-lg`) on tablet specifically when these carousel sections sit below `.sb-ended`'s
+marquee (not below the live player). Reworked to use the same `.sb-ended ~ .sb-carousel-section--
+also-live`/`--up-next` sibling-selector pattern already established for this file's other
+ended-state-only overrides (background/`.sg-section-title` color), combined with the tablet media
+query. Two adjacent sections' combined gap goes from 64px (32+32) to 48px (24+24) in that state
+only; left padding untouched; the normal (non-ended) tablet padding is back to unchanged 32px.
+`npx stylelint` clean (only the pre-existing accepted `-webkit-box` finding).
+
+**Copy change: "Session ended." → "Session complete."** Updated `.sb-ended__eyebrow`'s text and
+the region's `aria-label` (was `"Session ended"`, no period, now `"Session complete"`) in
+`EndedState.js`, plus the corresponding assertions in `EndedState.test.js`/`BroadcastBody.test.js`.
+Left the "Session ended image" config-row label/tests alone — that's an unrelated authoring-field
+name, not user-facing marquee copy. 144/144 session-broadcast tests pass, `npm run lint` clean.
+
 ## MPC/YouTube bucket & group scheduling (2026-08-31)
 
 **This reverses an earlier PRD decision.** `getBroadcastSchedule`'s original "commitment, not a

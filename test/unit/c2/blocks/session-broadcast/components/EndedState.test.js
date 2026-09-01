@@ -22,9 +22,9 @@ describe('EndedState', () => {
     expect(EndedState({ session: null })).to.equal(null);
   });
 
-  it('renders the "Session ended." eyebrow, title, and description', () => {
+  it('renders the "Session complete." eyebrow, title, and description', () => {
     const out = EndedState({ session: SESSION });
-    expect(out).to.include('Session ended.');
+    expect(out).to.include('Session complete.');
     expect(out).to.include('Pixel & Product');
     expect(out).to.include('A session about everything.');
   });
@@ -87,5 +87,50 @@ describe('EndedState', () => {
     const out = EndedState({ session: { ...SESSION, description: '' } });
     expect(out).to.not.include('sb-ended__desc-wrap');
     expect(out).to.not.include('sb-ended__view-more');
+  });
+
+  // Figma (tablet-only spec, "Session Broadcast VizD R1 8.17.26" node 24:21722): the collapsed
+  // description truncates at a fixed 70 characters on tablet, not whatever a single CSS-ellipsis
+  // line happens to fit at the container's actual rendered width. Mocking window.matchMedia
+  // directly (same pattern as FilterPanel.test.js's "responsive layout" describe block) since
+  // the mocked htm-preact's useEffect is a no-op — only the useState initializer's synchronous
+  // matchMedia read is exercised here; the reactive resize-driven update is a real-browser check.
+  describe('tablet description truncation', () => {
+    let originalMatchMedia;
+    const LONG_DESCRIPTION = 'Lorem ipsum dolor sit amet consectetur. Leo cursus dui fermentum '
+      + 'neque ut risus consectetur pulvinar. Euismod non ullamcorper interdum euismod ac egestas.';
+
+    beforeEach(() => { originalMatchMedia = window.matchMedia; });
+    afterEach(() => { window.matchMedia = originalMatchMedia; });
+
+    const forceTabletRange = (isTablet) => {
+      window.matchMedia = (q) => ({
+        matches: q.includes('768px') && q.includes('1279px') ? isTablet : false,
+        addEventListener: () => {},
+        removeEventListener: () => {},
+      });
+    };
+
+    it('truncates the collapsed description to 70 characters plus an ellipsis on tablet', () => {
+      forceTabletRange(true);
+      const out = EndedState({ session: { ...SESSION, description: LONG_DESCRIPTION } });
+      const expected = 'Lorem ipsum dolor sit amet consectetur. Leo cursus dui fermentum neque';
+      expect(expected).to.have.length(70);
+      expect(out).to.include(`${expected}…`);
+      expect(out).to.not.include(LONG_DESCRIPTION);
+    });
+
+    it('does not truncate a description already under 70 characters on tablet', () => {
+      forceTabletRange(true);
+      const out = EndedState({ session: SESSION }); // 'A session about everything.'
+      expect(out).to.include('A session about everything.');
+      expect(out).to.not.include('A session about everything.…');
+    });
+
+    it('leaves the description untouched outside the tablet range', () => {
+      forceTabletRange(false);
+      const out = EndedState({ session: { ...SESSION, description: LONG_DESCRIPTION } });
+      expect(out).to.include(LONG_DESCRIPTION);
+    });
   });
 });
