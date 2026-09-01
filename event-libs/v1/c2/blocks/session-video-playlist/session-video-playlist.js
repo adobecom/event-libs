@@ -391,7 +391,10 @@ function buildFavoriteButton(item) {
 
     if (event.detail > 0) button.blur();
     if (pendingActions.value.has(item.id)) return;
-    await toggleFavoriteWithFeedback(item, {
+    // The synthesized current-session row has no rfSessionId (only catalog sessions carry
+    // it, and favouriting keys on it) — resolve it from the freshest catalog at click time.
+    const rfSessionId = item.rfSessionId || sessions.value.find((s) => s.id === item.id)?.rfSessionId;
+    await toggleFavoriteWithFeedback({ ...item, rfSessionId }, {
       eventConfig: EVENT_CONFIG,
       isFavorited: favorited.value.has(item.id),
     });
