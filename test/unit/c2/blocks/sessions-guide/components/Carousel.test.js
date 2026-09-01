@@ -16,13 +16,13 @@ const BASE_CONFIG = {
 };
 
 const SESSION_A = {
-  id: 'a', title: 'Keynote A', description: 'Desc A', track: 'Featured',
+  id: 'a', title: 'Keynote A', description: 'Desc A', primaryTrack: 'Featured',
   startTimeUtc: '2026-10-28T16:00:00Z', endTimeUtc: '2026-10-28T17:30:00Z',
   thumbnailUrl: null, sessionPageUrl: '/sessions/a',
   inPerson: false,
 };
 const SESSION_B = {
-  id: 'b', title: 'Keynote B', description: 'Desc B', track: 'Featured',
+  id: 'b', title: 'Keynote B', description: 'Desc B', primaryTrack: 'Featured',
   startTimeUtc: '2026-10-28T18:00:00Z', endTimeUtc: '2026-10-28T19:00:00Z',
   thumbnailUrl: 'https://example.com/b.jpg', sessionPageUrl: '/sessions/b',
   inPerson: false,
@@ -106,6 +106,19 @@ describe('Carousel', () => {
     const Carousel = buildCarousel(preact, store);
     const html = Carousel({ sessions: [SESSION_A] });
     expect(html).to.not.include('sg-carousel__time');
+  });
+
+  // .sg-section-time is the mobile-only header time — hidden from 768px up in favor of
+  // .sg-carousel__time/-tz, which already show both — so it needs the timezone appended too.
+  it('includes the timezone in the header time label, not just the time', () => {
+    const store = makeStore();
+    const Carousel = buildCarousel(preact, store);
+    const html = Carousel({
+      sessions: [SESSION_A],
+      formatTime: () => '9:00 AM',
+      formatTimezone: () => 'PDT',
+    });
+    expect(html).to.include('<span class="sg-section-time">9:00 AM PDT</span>');
   });
 
   it('renders no arrows for a single session', () => {

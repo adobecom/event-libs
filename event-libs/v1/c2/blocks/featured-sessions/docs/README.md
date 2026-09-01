@@ -32,7 +32,7 @@ falls back to a built-in default ("Learn more" / "Watch now" / "Watch on-demand"
 For each entry, `init()` builds the same "pre-hydration" DOM shape
 `event-card.js`'s own `init()` already expects from hand-authored markup (a media
 wrapper with an `<img>`, a content wrapper with title/track/CTA `<p>`s), always with
-the `ratio-16-9` variant class, sets the session-routing `data-*` attributes
+the `media-wide` variant class, sets the session-routing `data-*` attributes
 (`data-session-id`, `data-mr-stream-id`, `data-watch-url`, `data-session-url`,
 `data-start-time-utc`, `data-end-time-utc`), then calls `event-card.js`'s own
 `init(cardEl)` on it directly — reusing its media/body build and `session-routing.js`

@@ -6,6 +6,7 @@ import {
   scheduled, favorited, pendingActions, auth,
 } from '../../../../../../event-libs/v1/utils/session-store.js';
 import { initTierOneEventConfig } from '../../../../../../event-libs/v1/utils/tier-1-event-config.js';
+import { initSessionState } from '../../../../../../event-libs/v1/utils/session-store.js';
 
 const BASE_CONFIG = {
   title: 'Adobe MAX 2026',
@@ -20,7 +21,7 @@ const UPCOMING_SESSION = {
   id: 'session-1',
   title: 'Building with AI',
   description: 'Learn AI integration.',
-  track: 'Design',
+  primaryTrack: 'Design',
   startTimeUtc: '2099-10-28T17:00:00Z',
   endTimeUtc: '2099-10-28T18:00:00Z',
   inPerson: false,
@@ -32,7 +33,7 @@ const ONDEMAND_SESSION = {
   id: 'session-2',
   title: 'Past Session',
   description: 'Ended.',
-  track: 'Design',
+  primaryTrack: 'Design',
   startTimeUtc: '2020-01-01T10:00:00Z',
   endTimeUtc: '2020-01-01T11:00:00Z',
   inPerson: false,
@@ -238,5 +239,45 @@ describe('SessionCard', () => {
     const rendered = SessionCard({ session: UPCOMING_SESSION });
     expect(rendered).to.include('sg-card'); // renders fine even when unregistered
     expect(dispatched.length).to.equal(0); // no dispatch on mount
+  });
+
+  // "AVAILABLE SOON" vs "ON DEMAND" hinges on a real eventStartMs from session-store.js's own
+  // config (not guideConfig), authored on the same tier-1-event-config meta tag the file's
+  // top-level before() already set up for trackIcons — merged in here, once, since
+  // initSessionState() is idempotent and every case below shares one real event start time.
+  describe('AVAILABLE SOON vs ON DEMAND (DVR delay)', () => {
+    const HOUR = 60 * 60 * 1000;
+    // 5 hours before "now" at test-run time, so the two cases below only need to vary
+    // dvrDelayHours against one fixed, real eventStartMs rather than mocking the clock.
+    const eventStartMs = Date.now() - 5 * HOUR;
+
+    before(() => {
+      const meta = document.head.querySelector('meta[name="tier-1-event-config"]');
+      const existing = JSON.parse(meta.content || '{}');
+      meta.content = JSON.stringify({ ...existing, eventId: 'test-event', eventStartDateTime: eventStartMs });
+      initSessionState();
+    });
+
+    it('shows AVAILABLE SOON while now is before eventStart + dvrDelayHours', () => {
+      // availableAt = eventStartMs + 10h = 5h from now.
+      const pending = { ...ONDEMAND_SESSION, id: 'session-pending', dvrDelayHours: 10 };
+      const html = renderCard(pending);
+      expect(html).to.include('AVAILABLE SOON');
+      expect(html).to.not.include('ON DEMAND');
+    });
+
+    it('shows ON DEMAND once eventStart + dvrDelayHours has passed', () => {
+      // availableAt = eventStartMs + 1h = 4h ago.
+      const elapsed = { ...ONDEMAND_SESSION, id: 'session-elapsed', dvrDelayHours: 1 };
+      const html = renderCard(elapsed);
+      expect(html).to.include('ON DEMAND');
+      expect(html).to.not.include('AVAILABLE SOON');
+    });
+
+    it('shows ON DEMAND for a session with no dvrDelayHours, even with a real eventStartMs', () => {
+      const html = renderCard(ONDEMAND_SESSION);
+      expect(html).to.include('ON DEMAND');
+      expect(html).to.not.include('AVAILABLE SOON');
+    });
   });
 });

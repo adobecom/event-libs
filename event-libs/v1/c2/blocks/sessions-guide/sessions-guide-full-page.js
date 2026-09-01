@@ -2,7 +2,7 @@
 // Registered as 'sessions-guide-full-page' — author writes the block with class "sessions-guide-full-page".
 // Identical init flow as sessions-guide.js but surface is forced to 'page'.
 import { LIBS, getEventConfig } from '../../../utils/utils.js';
-import { getApiConfig } from '../../../utils/session-store.js';
+import { getEventApiConfig } from '../../../utils/session-store.js';
 import { parseSessionsGuideConfig } from './utils/parse-config.js';
 
 async function loadPreact() {
@@ -12,7 +12,7 @@ async function loadPreact() {
 
 export default async function init(el) {
   const guideConfig = parseSessionsGuideConfig(el, { logPrefix: 'sessions-guide-full-page', forcedSurface: 'page' });
-  guideConfig.registerUrl = getApiConfig()?.registerUrl || '/register';
+  guideConfig.registerUrl = getEventApiConfig()?.registerUrl || '/register';
 
   const preact = await loadPreact();
   const { render } = preact;

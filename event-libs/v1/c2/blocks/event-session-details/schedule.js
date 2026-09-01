@@ -1,6 +1,6 @@
 import { createTag, getMetadata } from '../../../utils/utils.js';
 import {
-  initSessionState, sessions, scheduled, getApiConfig,
+  initSessionState, sessions, scheduled, getEventApiConfig,
 } from '../../../utils/session-store.js';
 import { toggleScheduleWithFeedback } from '../../../services/sessions/action-feedback.js';
 
@@ -14,7 +14,7 @@ export function renderSchedule() {
 
   const eventConfig = {
     title: getMetadata('event-title') || getMetadata('title') || '',
-    registerUrl: getApiConfig()?.registerUrl || '/register',
+    registerUrl: getEventApiConfig()?.registerUrl || '/register',
   };
 
   let session = sessions.value.find((s) => s.id === sessionId) || { id: sessionId };
@@ -33,6 +33,8 @@ export function renderSchedule() {
   const paint = () => {
     const isScheduled = scheduled.value.has(sessionId);
     btn.innerHTML = `${CALENDAR_ICON}<span>${isScheduled ? 'Added to schedule' : 'Add to schedule'}</span>`;
+    btn.setAttribute('aria-pressed', String(isScheduled));
+    btn.setAttribute('daa-ll', isScheduled ? 'Remove-from-Schedule' : 'Add-to-Schedule');
     btn.classList.toggle('is-scheduled', isScheduled);
   };
   paint();

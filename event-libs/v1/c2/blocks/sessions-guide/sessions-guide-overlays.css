@@ -1,22 +1,41 @@
-/* ── Download Button (Phase 4) ───────────────────────────────── */
+/* ── Download Button (Figma 9145:39931 — "Icon Button M / M Secondary") ────────── */
 
 .sg-download-btn {
-  width: 36px;
-  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
   border: none;
-  background: transparent;
   cursor: pointer;
   border-radius: var(--s2a-border-radius-round);
   flex-shrink: 0;
-  background-color: var(--s2a-color-content-default);
-  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath d='M10 13.5l-5-5h3V2h4v6.5h3l-5 5zm-7 3v1.5h14V16.5H3z'/%3E%3C/svg%3E");
-  mask-repeat: no-repeat;
-  mask-size: 20px;
-  mask-position: center;
-  opacity: 0.7;
+
+  /* Figma's authored value has no matching step in the transparent-black scale below —
+     the closest defined tokens (12/16) are used for the hover/active escalation instead. */
+  background: rgb(0 0 0 / 9%);
+  color: var(--s2a-color-content-default, #292929);
+  transition: background 0.15s ease, opacity 0.15s ease;
 }
 
-.sg-download-btn:hover { opacity: 1; }
+.sg-download-btn svg {
+  width: 20px;
+  height: 20px;
+}
+
+.sg-download-btn:disabled {
+  opacity: 0.3;
+  cursor: default;
+  pointer-events: none;
+}
+
+.sg-download-btn:focus-visible {
+  outline: 1px solid var(--s2a-color-focus-ring-default, #3b63fb);
+  outline-offset: 1px;
+}
+
+.sg-download-btn:hover:not(:disabled) { background: var(--s2a-color-transparent-black-12, rgb(0 0 0 / 12%)); }
+.sg-download-btn:active:not(:disabled) { background: var(--s2a-color-transparent-black-16, rgb(0 0 0 / 16%)); }
 
 /* ── Session Detail Overlay (Phase 6) ────────────────────────── */
 
@@ -58,7 +77,7 @@
   background: transparent;
   border: none;
   cursor: pointer;
-  font-family: var(--s2a-font-family-adobe-clean);
+  font-family: var(--body-font-family);
   font-weight: var(--s2a-font-weight-adobe-clean-bold);
   font-size: var(--s2a-font-size-sm);
   color: var(--s2a-color-content-default);
@@ -91,12 +110,10 @@
   background: var(--s2a-color-gray-75);
 }
 
-/* Back row. Mobile keeps it on the white of the summary pod, which is flush with the
-   header above it; from 768px it becomes its own 60px row on the tinted body. */
+/* Back row. Static — scrolls away with the rest of the panel instead of pinning to the
+   top. Mobile keeps it on the white of the summary pod, which is flush with the header
+   above it; from 768px it becomes its own 60px row on the tinted body. */
 .sg-detail__back-wrap {
-  position: sticky;
-  top: 0;
-  z-index: 5;
   padding: var(--s2a-spacing-lg) var(--s2a-spacing-lg) 0;
   background: var(--s2a-color-background-default);
   flex-shrink: 0;
@@ -126,8 +143,7 @@
   margin-top: 4px;
 }
 
-.sg-detail__group--speakers .sg-detail__more,
-.sg-detail__group--resources .sg-detail__more {
+.sg-detail__group--speakers .sg-detail__more {
   margin-top: var(--s2a-spacing-xs);
 }
 
@@ -178,31 +194,6 @@
   background: var(--s2a-color-border-subtle);
 }
 
-/* Additional Event Site Tracks stacked alongside the primary badge */
-.sg-detail__track-stack {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: var(--s2a-spacing-2xs);
-}
-
-.sg-detail__track-chip {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  font-size: var(--s2a-font-size-xs);
-  color: var(--s2a-color-content-default);
-  background: var(--s2a-color-gray-100, #f5f5f5);
-  border-radius: 999px;
-  padding: 2px 8px;
-}
-
-.sg-detail__track-chip-icon {
-  width: 16px;
-  height: 16px;
-  flex-shrink: 0;
-}
-
 .sg-detail__time {
   font-size: var(--s2a-font-size-sm);
   color: var(--s2a-color-content-default);
@@ -210,7 +201,7 @@
 }
 
 .sg-detail__title {
-  font-family: var(--s2a-font-family-adobe-clean-display);
+  font-family: var(--heading-font-family);
   font-weight: var(--s2a-font-weight-adobe-clean-display-black);
   font-size: var(--s2a-font-size-xl);
   line-height: 1.1;
@@ -227,20 +218,17 @@
   color: var(--s2a-color-content-default);
 }
 
-/* Shared by both authored-HTML blocks: neutralise the margins the browser applies to markup
-   we did not author, and make links legible without recolouring them. */
-.sg-detail__legal p,
-.sg-detail__legal-disclaimer p {
+/* Neutralise the margins the browser applies to markup we did not author, and make links
+   legible without recolouring them. */
+.sg-detail__legal p {
   margin: 0 0 var(--s2a-spacing-xs);
 }
 
-.sg-detail__legal p:last-child,
-.sg-detail__legal-disclaimer p:last-child {
+.sg-detail__legal p:last-child {
   margin-bottom: 0;
 }
 
-.sg-detail__legal a,
-.sg-detail__legal-disclaimer a {
+.sg-detail__legal a {
   color: inherit;
   text-decoration: underline;
 }
@@ -258,7 +246,7 @@
   min-width: 90px;
   padding: 0 18px;
   border-radius: var(--s2a-border-radius-round);
-  font-family: var(--s2a-font-family-adobe-clean);
+  font-family: var(--body-font-family);
   font-weight: var(--s2a-font-weight-adobe-clean-bold);
   font-size: var(--s2a-font-size-md);
   cursor: pointer;
@@ -297,14 +285,6 @@
 
 .sg-detail__btn-icon--play {
   mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath d='M6 4l11 6-11 6V4z'/%3E%3C/svg%3E");
-}
-
-.sg-detail__btn-icon--plus {
-  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath d='M10 4v12M4 10h12' stroke='black' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E");
-}
-
-.sg-detail__btn-icon--check {
-  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath d='M4 10l4 4 8-8' stroke='black' stroke-width='2' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
 }
 
 .sg-detail__icon-btn {
@@ -366,7 +346,7 @@
 }
 
 .sg-detail__section-label {
-  font-family: var(--s2a-font-family-adobe-clean);
+  font-family: var(--body-font-family);
   font-size: var(--s2a-font-size-lg);
   font-weight: var(--s2a-font-weight-adobe-clean-extrabold);
   letter-spacing: -0.54px;
@@ -408,7 +388,7 @@
   border: none;
   cursor: pointer;
   padding: 0;
-  font-family: var(--s2a-font-family-adobe-clean);
+  font-family: var(--body-font-family);
   font-weight: var(--s2a-font-weight-adobe-clean-bold);
   font-size: var(--s2a-font-size-sm);
   color: var(--s2a-color-content-default);
@@ -549,7 +529,7 @@
 .sg-detail__product-name {
   flex: 1 0 0;
   min-width: 0;
-  font-family: var(--s2a-font-family-adobe-clean);
+  font-family: var(--body-font-family);
   font-weight: var(--s2a-font-weight-adobe-clean-black);
   font-size: var(--s2a-font-size-md);
   line-height: 16px;
@@ -566,57 +546,6 @@
   color: var(--s2a-color-gray-600);
 }
 
-/* ── Session resources ───────────────────────────────────── */
-
-.sg-detail__resources {
-  display: flex;
-  flex-direction: column;
-  gap: var(--s2a-spacing-xs);
-}
-
-.sg-detail__resource-card {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--s2a-spacing-md);
-  padding: var(--s2a-spacing-md);
-  border: 2px solid var(--s2a-color-border-subtle);
-  border-radius: var(--s2a-border-radius-md);
-  background: var(--s2a-color-background-default);
-  text-decoration: none;
-}
-
-/* Empty state: the resource card frame, non-interactive, gray-600 copy per the design. */
-.sg-detail__resource-card--empty {
-  justify-content: flex-start;
-  margin: 0;
-  font-size: var(--s2a-font-size-md);
-  line-height: 24px;
-  color: var(--s2a-color-gray-600);
-}
-
-.sg-detail__resource-name {
-  font-size: var(--s2a-font-size-md);
-  line-height: 24px;
-  color: var(--s2a-color-content-default);
-}
-
-.sg-detail__resource-action {
-  font-weight: var(--s2a-font-weight-adobe-clean-bold);
-  font-size: var(--s2a-font-size-md);
-  line-height: 24px;
-  color: var(--s2a-color-content-default);
-  white-space: nowrap;
-}
-
-/* Authored HTML. Sits outside any pod, so it carries the pods' padding to align its text. */
-.sg-detail__legal-disclaimer {
-  font-size: var(--s2a-font-size-xs);
-  color: var(--s2a-color-content-subtle);
-  margin: 0;
-  padding-inline: var(--s2a-spacing-lg);
-}
-
 /* ── Tablet: pods float on the tinted body, still one column (Figma 1299:69634) ── */
 
 @media (min-width: 768px) {
@@ -624,14 +553,14 @@
     padding: 0 var(--s2a-spacing-lg) var(--s2a-spacing-lg);
   }
 
-  /* Its own row above the pods now, not a left rail. */
+  /* Its own row above the pods now, not a left rail. Same tint as the body behind it,
+     so it reads as part of the tinted surface rather than a separate white bar. */
   .sg-detail__back-wrap {
     height: 60px;
     display: flex;
     align-items: center;
     padding: 0;
-    background: transparent;
-    z-index: auto;
+    background: var(--s2a-color-gray-75);
   }
 
   .sg-detail__group {
@@ -675,15 +604,6 @@
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: var(--s2a-spacing-md);
     align-items: start;
-  }
-
-  .sg-detail__resources {
-    flex-direction: row;
-  }
-
-  .sg-detail__resource-card {
-    flex: 1 0 0;
-    min-width: 0;
   }
 }
 
@@ -885,7 +805,7 @@
 
 .sg-filter-panel__title {
   margin: 0;
-  font-family: var(--s2a-font-family-adobe-clean-display);
+  font-family: var(--heading-font-family);
   font-weight: var(--s2a-font-weight-adobe-clean-display-black);
   font-size: var(--s2a-font-size-2xl);
   line-height: 1;
@@ -938,7 +858,7 @@
   padding: var(--s2a-spacing-md) 0;
   background: transparent;
   border: none;
-  font-family: var(--s2a-font-family-adobe-clean);
+  font-family: var(--body-font-family);
   font-size: var(--s2a-font-size-md);
   font-weight: var(--s2a-font-weight-adobe-clean-bold);
   line-height: var(--s2a-font-line-height-24);
@@ -1012,7 +932,7 @@
 .sg-filter-panel__drill-title {
   grid-column: 2;
   margin: 0;
-  font-family: var(--s2a-font-family-adobe-clean);
+  font-family: var(--body-font-family);
   font-weight: var(--s2a-font-weight-adobe-clean-bold);
   font-size: var(--s2a-font-size-lg);
   line-height: 1.3;
@@ -1095,7 +1015,7 @@
   padding: var(--s2a-spacing-md) var(--s2a-spacing-lg);
   border: 1px solid rgb(0 0 0 / 10%);
   border-radius: var(--s2a-border-radius-round);
-  font-family: var(--s2a-font-family-adobe-clean);
+  font-family: var(--body-font-family);
   font-weight: var(--s2a-font-weight-adobe-clean-bold);
   font-size: var(--s2a-font-size-sm);
   line-height: 1.2;
@@ -1130,7 +1050,7 @@
   background: var(--s2a-color-background-default);
   border: 1px solid transparent;
   border-radius: var(--s2a-border-radius-12);
-  font-family: var(--s2a-font-family-adobe-clean);
+  font-family: var(--body-font-family);
   font-size: var(--s2a-font-size-sm);
   line-height: var(--s2a-font-line-height-18);
   color: var(--s2a-color-content-default);
@@ -1333,9 +1253,7 @@
 }
 
 [data-theme="dark"] .sg-detail__product-card,
-.sg-portal[data-theme="dark"] .sg-detail__product-card,
-[data-theme="dark"] .sg-detail__resource-card,
-.sg-portal[data-theme="dark"] .sg-detail__resource-card {
+.sg-portal[data-theme="dark"] .sg-detail__product-card {
   background: transparent;
   border-color: var(--s2a-color-border-subtle);
 }

@@ -1,7 +1,7 @@
 import { createTag, getEventConfig, LIBS } from '../../../utils/utils.js';
 import { processAutoBlockLinks } from '../../../utils/decorate.js';
 import {
-  initSessionState, sessions, favorited, getApiConfig,
+  initSessionState, sessions, favorited, getEventApiConfig,
 } from '../../../utils/session-store.js';
 import { toggleFavoriteWithFeedback } from '../../../services/sessions/action-feedback.js';
 import { showToast } from '../../../features/toast/toast.js';
@@ -184,7 +184,7 @@ function decorateActions(textCol, config) {
     initSessionState();
     // Mirrors sessions-guide.js's own config shape for toggleFavoriteWithFeedback/action-feedback.js —
     // { title, registerUrl } — not Milo's unrelated global getEventConfig().
-    const feedbackConfig = { title: config.title, registerUrl: getApiConfig()?.registerUrl || '/register' };
+    const feedbackConfig = { title: config.title, registerUrl: getEventApiConfig()?.registerUrl || '/register' };
     const favoriteSlot = createTag('span', { class: 'event-marquee-favorite-slot' }, '', { parent: actions });
     // TEMP: render immediately with a fallback session object so the button is
     // visible for visual/DOM review even without real session data — favorite

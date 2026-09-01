@@ -27,7 +27,10 @@ export function dvrAvailableAtMs(session, eventStartMs) {
   return eventStartMs + session.dvrDelayHours * HOUR_MS;
 }
 
-// Ending isn't enough to reach On Demand. Fails open when either input is missing.
+// Not read by the sessions-guide's own filtering (PM decision, 2026-08-26 — see
+// onDemandSessions() in sessions-guide/utils/session-filters.js) — kept as a shared utility
+// for any other block that needs to know whether a session's recording window has opened.
+// Fails open when either input is missing.
 export function isDvrPending(session, nowMs, eventStartMs) {
   const availableAt = dvrAvailableAtMs(session, eventStartMs);
   return availableAt !== null && nowMs < availableAt;

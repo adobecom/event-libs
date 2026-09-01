@@ -61,7 +61,7 @@ function getCtaText(entry, cta) {
 // the containing DA section's "dark" style-metadata class, so a card built here themes
 // itself automatically along with whatever section it ends up in.
 function buildAuthoredCard(entry, cta) {
-  const card = createTag('div', { class: 'event-card ratio-16-9' });
+  const card = createTag('div', { class: 'event-card media-wide' });
   const mediaWrapper = createTag('div', {}, '', { parent: card });
   if (entry.imageUrl) {
     createTag('img', { src: entry.imageUrl, alt: '' }, '', { parent: mediaWrapper });

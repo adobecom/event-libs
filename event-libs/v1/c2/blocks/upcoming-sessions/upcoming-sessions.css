@@ -196,7 +196,7 @@
 }
 
 .upcoming-sessions .sg-card__title {
-  font-family: 'Adobe Clean Spectrum VF', 'Adobe Clean', adobe-clean, 'Trebuchet MS', sans-serif;
+  font-family: 'Adobe Clean Spectrum VF', var(--body-font-family);
   font-weight: var(--s2a-font-weight-adobe-clean-extrabold, 800);
   font-size: var(--s2a-font-size-md, 16px);
   line-height: 1.25;
@@ -497,7 +497,7 @@
 }
 
 .upcoming-sessions .sg-category-badge__label {
-  font-family: 'Adobe Clean Spectrum VF', 'Adobe Clean', adobe-clean, 'Trebuchet MS', sans-serif;
+  font-family: 'Adobe Clean Spectrum VF', var(--body-font-family);
   font-weight: var(--s2a-font-weight-adobe-clean-medium, 500);
   font-size: var(--s2a-font-size-xs, 12px);
   line-height: var(--s2a-font-line-height-2xs, 16px);

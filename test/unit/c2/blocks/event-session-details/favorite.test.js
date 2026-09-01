@@ -2,7 +2,7 @@ import { expect } from '@esm-bundle/chai';
 import { setMetadata } from '../../../../../event-libs/v1/utils/utils.js';
 import { renderFavorite } from '../../../../../event-libs/v1/c2/blocks/event-session-details/favorite.js';
 import { favorited, sessions, auth } from '../../../../../event-libs/v1/utils/session-store.js';
-import { toast } from '../../../../../event-libs/v1/features/toast/toast.js';
+import { toasts } from '../../../../../event-libs/v1/features/toast/toast.js';
 
 describe('session-details favorite', () => {
   beforeEach(() => {
@@ -11,7 +11,7 @@ describe('session-details favorite', () => {
     favorited.value = new Set();
     sessions.value = [];
     auth.value = { isLoggedIn: null, isRegistered: undefined, userFirstName: null };
-    toast.value = null;
+    toasts.value = [];
   });
 
   it('returns null without a session id', () => {
@@ -37,10 +37,23 @@ describe('session-details favorite', () => {
     expect(btn.getAttribute('aria-label')).to.equal('Favorite this session');
   });
 
-  it('shows a login toast when favoriting while signed out', async () => {
+  // Milo's auto-tagging runs once at decoration, so a label that changes on toggle would
+  // otherwise stay frozen at its first value. Labels match sessions-guide's LiveCard so the
+  // two surfaces roll up together in reporting.
+  it('tracks add vs remove in daa-ll and updates it on toggle', () => {
+    setMetadata('session-id', 'sid');
+    const btn = renderFavorite();
+    expect(btn.getAttribute('daa-ll')).to.equal('Add-to-Favorites');
+    favorited.value = new Set(['sid']);
+    expect(btn.getAttribute('daa-ll')).to.equal('Remove-from-Favorites');
+    favorited.value = new Set();
+    expect(btn.getAttribute('daa-ll')).to.equal('Add-to-Favorites');
+  });
+
+  it('shows a register/sign-in toast when favoriting while signed out', async () => {
     setMetadata('session-id', 'sid');
     renderFavorite().click();
     await new Promise((r) => { setTimeout(r); });
-    expect(toast.value?.message).to.match(/login/i);
+    expect(toasts.value[0]?.message).to.match(/register or sign in/i);
   });
 });

@@ -1,12 +1,12 @@
 import {
-  getSessionTrack, extractDistinctTracks, extractDistinctAllTracks,
+  getSessionPrimaryTrack, extractDistinctPrimaryTracks, extractDistinctAllTracks,
   getSessionAdditionalTracks, getSessionOverrideText, extractDistinctOverrideTexts,
   getSessionProducts, extractDistinctProducts,
 } from '../v1/services/sessions/sessions-api.js';
 import { DA_ORIGIN, DA_APP_PATH, HOMEPAGE_LINK_HASH_KEY } from './constants.js';
 
 export {
-  getSessionTrack, extractDistinctTracks, extractDistinctAllTracks,
+  getSessionPrimaryTrack, extractDistinctPrimaryTracks, extractDistinctAllTracks,
   getSessionAdditionalTracks, getSessionOverrideText, extractDistinctOverrideTexts,
   getSessionProducts, extractDistinctProducts,
 };
@@ -126,7 +126,9 @@ export function buildSessionAuthorEntry(session, sessionTimes, meta) {
     sessionId: session.sessionId,
     sessionCode: session.sessionCode,
     enTitle: session.enTitle,
-    track: getSessionTrack(session) || '',
+    // Key stays `track` — this mirrors upcoming-sessions.js/featured-sessions.js's own
+    // authored-entry shape (see comment above), not the ESL session model's `primaryTrack`.
+    track: getSessionPrimaryTrack(session) || '',
     url: session.url,
   };
   if (meta?.watchUrl) entry.watchUrl = meta.watchUrl;
