@@ -42,6 +42,7 @@ const DEFAULT_MIN_SESSIONS = 4;
 // precedence; see resolveEventStartMs below.
 const FALLBACK_EVENT_START_MS = new Date('2026-11-08T08:00:00-04:00').getTime();
 const DESKTOP_BREAKPOINT_PX = 1024;
+const VIEWPORT_CAP_GUTTER_PX = 24;
 const DRAWER_GAP_PX = 16;
 const DRAWER_FLOOR_PX = 75;
 const DRAWER_MIN_EXPANDED_PX = 150;
@@ -530,7 +531,22 @@ export function applyExpandedHeightCap(
   const listStyle = getComputedStyle(list);
   const verticalPadding = parseFloat(listStyle.paddingTop) + parseFloat(listStyle.paddingBottom);
   // N rows plus the N-1 gaps between them, plus the list's own padding.
-  const cap = (rowHeight * maxSessions) + (gap * (maxSessions - 1)) + verticalPadding;
+  const rowsCap = (rowHeight * maxSessions) + (gap * (maxSessions - 1)) + verticalPadding;
+
+  // Also clamp to what the list can actually occupy on screen. Without this, a large
+  // `maximum-sessions` produces a cap taller than the viewport: the whole .video-playlist
+  // card then overflows the viewport bottom, so the wheel scrolls the PAGE to reveal the
+  // rest of the card and the inner list never overflows its own box — which is why the
+  // scrollbar appeared over the page/thumbnails instead of inside the list and the list
+  // wouldn't scroll. Bounding the cap to the space between the list's top and the viewport
+  // bottom (leaving a small gutter) guarantees the list itself is the overflowing element,
+  // so it owns the scroll and shows its own scrollbar. Falls back to rowsCap if the list
+  // isn't laid out yet (top === 0).
+  const listTop = list.getBoundingClientRect().top;
+  const viewportCap = window.innerHeight - listTop - VIEWPORT_CAP_GUTTER_PX;
+  const cap = listTop > 0 && viewportCap > rowHeight
+    ? Math.min(rowsCap, viewportCap)
+    : rowsCap;
   list.style.maxHeight = `${cap}px`;
 }
 
