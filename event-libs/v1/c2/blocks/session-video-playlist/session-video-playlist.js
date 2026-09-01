@@ -2,7 +2,7 @@ import { createTag, getMetadata } from '../../../utils/utils.js';
 import {
   sessions, sessionsStatus, initSessionState, liveStreamActiveIds, favorited, pendingActions,
 } from '../../../utils/session-store.js';
-import { deriveSessionState, getNowMs } from '../../../utils/session-state.js';
+import { deriveSessionState, getNowMs, dvrAvailableAtMs } from '../../../utils/session-state.js';
 import { extractCustomAttributeSlugs, extractCustomAttributeValue } from '../../../services/sessions/sessions-api.js';
 import { toggleFavoriteWithFeedback } from '../../../services/sessions/action-feedback.js';
 import { initTierOneEventConfig, getEventStartMs } from '../../../utils/tier-1-event-config.js';
@@ -94,13 +94,11 @@ function isOnDemand(session, nowMs) {
   return deriveSessionState(session, liveStreamActiveIds.value, nowMs) === 'on-demand';
 }
 
-const MS_PER_HOUR = 3600000;
-
 function hasPremiered(session, eventStartMs, nowMs) {
   if (session.startTimeUtc && session.endTimeUtc) return isOnDemand(session, nowMs);
-  if (session.dvrDelayHours == null) return false;
-  if (eventStartMs == null) return false;
-  return nowMs >= eventStartMs + session.dvrDelayHours * MS_PER_HOUR;
+  const availableAt = dvrAvailableAtMs(session, eventStartMs);
+  if (availableAt == null) return false;
+  return nowMs >= availableAt;
 }
 
 function hasEmbeddableVideo(sessionTimes) {
