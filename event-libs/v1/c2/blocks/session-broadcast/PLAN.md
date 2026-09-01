@@ -2204,9 +2204,15 @@ Rather than fight the scanner's pattern-matching, removed the actual taint path:
 `?sessionGuidePath=` query-param override was only ever a manual-testing convenience (not a
 feature that needs to ship), so `getSessionGuidePath()` no longer calls `pathOverride()` at all —
 it now reads only from the authored `tier-1-event-config` metadata. No query-string value can
-reach the redirect anymore. `getHomepagePath()`/`getBroadcastPath()` keep their overrides (both
-still same-origin-validated via the `new URL(...).origin` check) since neither feeds a
-`location.href` sink — only `session-state.js` reads them for a fallback lookup.
+reach the redirect anymore.
+
+**`?homepagePath=`/`?broadcastPath=` removed too (2026-09-01)** — same reasoning applies to
+these: neither was a feature that needed to ship, just a manual-testing convenience for pointing
+at a draft URL. `pathOverride()` is deleted entirely; `getHomepagePath()`/`getBroadcastPath()`
+now read only from the authored config, matching `getSessionGuidePath()`. Removed the
+now-obsolete "query-param path overrides" describe block from `tier-1-event-config.test.js`
+(the backslash-bypass regression test along with it, since there's no longer a code path for it
+to guard). `npx eslint` clean; 11/11 tests pass in the file.
 
 ## Explicitly out of scope (fast-follow)
 
