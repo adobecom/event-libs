@@ -1,7 +1,7 @@
 import { expect } from '@esm-bundle/chai';
 import sinon from 'sinon';
 import { readFile } from '@web/test-runner-commands';
-import { setEventConfig, setMetadata } from '../../../../event-libs/v1/utils/utils.js';
+import { setEventConfig } from '../../../../event-libs/v1/utils/utils.js';
 import { sessions, favorited } from '../../../../event-libs/v1/utils/session-store.js';
 import init from '../../../../event-libs/v1/c2/blocks/event-marquee/event-marquee.js';
 
@@ -559,55 +559,6 @@ describe('event-marquee', () => {
 
       expect(clearIntervalSpy.calledOnce).to.be.true;
       expect(el.querySelector('.event-marquee-countdown')).to.not.exist;
-    });
-  });
-
-  describe('Page H1', () => {
-    it('injects an <h1> with the event-title into the first event-marquee on the page', async () => {
-      setMetadata('event-title', 'Adobe Summit Paris 2026');
-      document.body.innerHTML = body;
-      const el = document.querySelector('.event-marquee');
-      await init(el);
-      const h1 = el.querySelector('h1.event-marquee-title');
-      expect(h1).to.exist;
-      expect(h1.textContent).to.equal('Adobe Summit Paris 2026');
-      expect(el.querySelector('.event-marquee-text').firstElementChild).to.equal(h1);
-    });
-
-    it('does not inject an <h1> when event-title metadata is missing', async () => {
-      document.body.innerHTML = body;
-      const el = document.querySelector('.event-marquee');
-      await init(el);
-      expect(el.querySelector('h1')).to.not.exist;
-    });
-
-    it('only injects into the first of multiple event-marquee instances on the page', async () => {
-      setMetadata('event-title', 'Adobe Summit Paris 2026');
-      document.body.innerHTML = `${body}${videoVariantHtml({ sessionId: '' })}`;
-      const [firstEl, secondEl] = document.querySelectorAll('.event-marquee');
-      await init(secondEl);
-      await init(firstEl);
-      expect(firstEl.querySelectorAll('h1').length).to.equal(1);
-      expect(secondEl.querySelector('h1')).to.not.exist;
-    });
-
-    it('does not inject a second <h1> when the page already has one', async () => {
-      setMetadata('event-title', 'Adobe Summit Paris 2026');
-      document.body.innerHTML = `<h1>Existing title</h1>${body}`;
-      const el = document.querySelector('.event-marquee');
-      await init(el);
-      expect(document.querySelectorAll('h1').length).to.equal(1);
-      expect(el.querySelector('h1')).to.not.exist;
-    });
-
-    it('renders event-title metadata as literal text, not HTML', async () => {
-      setMetadata('event-title', '<img src=x onerror="window.xssFired = true">');
-      document.body.innerHTML = body;
-      const el = document.querySelector('.event-marquee');
-      await init(el);
-      const h1 = el.querySelector('h1.event-marquee-title');
-      expect(h1.querySelector('img')).to.not.exist;
-      expect(h1.textContent).to.equal('<img src=x onerror="window.xssFired = true">');
     });
   });
 });

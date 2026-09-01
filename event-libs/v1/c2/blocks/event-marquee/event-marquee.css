@@ -123,8 +123,7 @@
   object-fit: cover;
 }
 
-.event-marquee-video-title,
-.event-marquee-title {
+.event-marquee-video-title {
   margin: var(--s2a-spacing-md) 0 0;
   font-family: var(--body-font-family);
   font-size: var(--s2a-typography-font-size-label);
