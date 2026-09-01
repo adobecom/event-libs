@@ -636,6 +636,16 @@ function resolveEventStartMs() {
   return getEventStartMs() ?? FALLBACK_EVENT_START_MS;
 }
 
+function readDefaultThumbnail(el) {
+  const labelCell = [...el.querySelectorAll(':scope > div > div:first-child')]
+    .find((cell) => cell.textContent.trim().toLowerCase().replace(/ /g, '-') === 'default-thumbnail');
+  const valueCell = labelCell?.nextElementSibling;
+  if (!valueCell) return '';
+  return valueCell.querySelector('img')?.src
+    || valueCell.querySelector('a')?.href
+    || valueCell.textContent.trim();
+}
+
 function resolveRenderContext(el) {
   const config = readAuthoredConfig(el);
 
@@ -664,7 +674,7 @@ function resolveRenderContext(el) {
     eventStartMs: resolveEventStartMs(),
     minSessions: Number.parseInt(config['minimum-sessions'], 10) || DEFAULT_MIN_SESSIONS,
     maxSessions: Number.parseInt(config['maximum-sessions'], 10) || DEFAULT_MAX_SESSIONS,
-    defaultThumbnail: config['default-thumbnail'] || '',
+    defaultThumbnail: readDefaultThumbnail(el) || config['default-thumbnail'] || '',
   };
 }
 
