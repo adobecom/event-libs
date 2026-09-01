@@ -199,14 +199,28 @@ function ensureMpcLength(sessionId, mpcVideoId, currentTime, length) {
     .catch((error) => logError(`could not backfill mpc duration: ${error.message}`));
 }
 
+const detachWatchers = new Set();
+let detachObserver = null;
+
 function onDetached(element, teardown) {
-  const observer = new MutationObserver(() => {
-    if (element.isConnected) return;
-    observer.disconnect();
-    teardown();
-  });
-  observer.observe(document.body, { childList: true, subtree: true });
-  return observer;
+  const watcher = { element, teardown };
+  detachWatchers.add(watcher);
+
+  if (!detachObserver) {
+    detachObserver = new MutationObserver(() => {
+      detachWatchers.forEach((w) => {
+        if (w.element.isConnected) return;
+        detachWatchers.delete(w);
+        w.teardown();
+      });
+      if (detachWatchers.size === 0) {
+        detachObserver.disconnect();
+        detachObserver = null;
+      }
+    });
+    detachObserver.observe(document.body, { childList: true, subtree: true });
+  }
+  return watcher;
 }
 
 function watchMpcPlayback(sessionId, iframe) {
