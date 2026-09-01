@@ -553,6 +553,23 @@
   }
 }
 
+/* When a row is hovered/focused its background flips to the dark "playing" look, so the
+   favorite/play buttons revealed with it must switch to --vp-playing-fg too — otherwise the
+   dark --vp-fg icon+border sits invisibly on the now-dark row (the missing-buttons bug on
+   desktop hover). Same swap .is-playing already gets above. Hover is gated to real pointer
+   devices so it can't latch on touch. */
+.video-playlist-row:focus-within .video-playlist-row-favorite,
+.video-playlist-row:focus-within .video-playlist-row-play {
+  color: var(--vp-playing-fg);
+}
+
+@media (hover: hover) {
+  .video-playlist-row:hover .video-playlist-row-favorite,
+  .video-playlist-row:hover .video-playlist-row-play {
+    color: var(--vp-playing-fg);
+  }
+}
+
 /* Desktop-only "Show more": reveals rows beyond SHOW_MORE_INITIAL_ROWS via a plain
    nth-child cap — independent of the mobile drawer's own is-expanded/Drawer state,
    which already covers the equivalent need on mobile (the full list scrolls there).
