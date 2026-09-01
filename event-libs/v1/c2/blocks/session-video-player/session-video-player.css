@@ -11,7 +11,7 @@
    margin:auto) for the full-width player. In the side-by-side grid layout the column
    already provides that containment, so suppress it here to avoid double-insetting. */
 @media (min-width: 1024px) {
-  .session-video-playlist-container .session-video-player .milo-video {
+  :root:has(meta[name="foundation"][content="c2"]) .session-video-playlist-container .session-video-player .milo-video {
     max-width: none;
     margin: 0;
   }
