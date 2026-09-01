@@ -320,6 +320,9 @@ function watchMpcPlayback(sessionId, iframe) {
     if (event.origin !== ADOBE_TV_ORIGIN) return;
     if (event.data?.type !== MPC_MESSAGE_TYPE) return;
 
+    // eslint-disable-next-line no-console
+    console.log(`[VP-DBG] MPC msg state=${event.data.state} t=${Math.round(performance.now())} currentTime=${event.data.currentTime}`);
+
     const handler = handlers[event.data.state];
     if (!handler) return;
 
@@ -433,6 +436,8 @@ async function watchYouTubePlayback(sessionId, iframe) {
 
   const handleStateChange = (event) => {
     const { PlayerState } = window.YT;
+    // eslint-disable-next-line no-console
+    console.log(`[VP-DBG] YT state=${event.data} t=${Math.round(performance.now())}`);
     // Every branch stops polling first: PLAYING restarts it, the rest leave it stopped.
     stopProgressPolling();
 

@@ -365,9 +365,13 @@ class Drawer {
       if (guardedPlayers.length) return;
       guardedPlayers = [...document.querySelectorAll('.video-player')];
       guardedPlayers.forEach((player) => { player.style.pointerEvents = 'none'; });
+      // eslint-disable-next-line no-console
+      console.log(`[VPL-DBG] guard ON players=${guardedPlayers.length} t=${Math.round(performance.now())}`);
     };
     const releasePlayerGuard = () => {
       guardedPlayers.forEach((player) => { player.style.pointerEvents = ''; });
+      // eslint-disable-next-line no-console
+      console.log(`[VPL-DBG] guard OFF t=${Math.round(performance.now())}`);
       guardedPlayers = [];
     };
     // Held ~350ms past pointerup: dragging down collapses the drawer out from under the
@@ -408,8 +412,10 @@ class Drawer {
     // aria-expanded/the chevron's rotation reflect "open" vs "closed" correctly; it no
     // longer drives the actual rendered height once a drag height is set (see
     // applyMobileHeight's own dragHeightPx branch).
-    const onPointerUp = () => {
+    const onPointerUp = (event) => {
       if (dragStartY == null) return;
+      // eslint-disable-next-line no-console
+      console.log(`[VPL-DBG] pointerup type=${event?.type} y=${Math.round(event?.clientY ?? -1)} t=${Math.round(performance.now())}`);
       dragStartY = null;
       if (rafId != null) { cancelAnimationFrame(rafId); flush(); }
       if (activePointerId != null && this.handleEl.hasPointerCapture?.(activePointerId)) {
@@ -439,6 +445,8 @@ class Drawer {
 
     this.handleEl.addEventListener('pointerdown', (event) => {
       if (this.isDesktop()) return;
+      // eslint-disable-next-line no-console
+      console.log(`[VPL-DBG] pointerdown type=${event.pointerType} y=${Math.round(event.clientY)} t=${Math.round(performance.now())}`);
       dragStartY = event.clientY;
       dragStartHeight = this.el.getBoundingClientRect().height;
       // Capture the pointer so the whole gesture is delivered to the handle even while the
