@@ -1,5 +1,6 @@
 import { expect } from '@esm-bundle/chai';
-import { resolveCardAction } from '../../../event-libs/v1/utils/session-routing.js';
+import attachSessionRouting, { resolveCardAction } from '../../../event-libs/v1/utils/session-routing.js';
+import { sessionGuideRequest } from '../../../event-libs/v1/utils/session-store.js';
 
 const HOUR = 60 * 60 * 1000;
 const NOW = Date.parse('2026-07-21T10:00:00.000Z');
@@ -92,6 +93,79 @@ describe('event-card session routing', () => {
         endTimeUtc: iso(NOW + 2 * HOUR),
       }, NOW);
       expect(action).to.deep.equal({ type: 'none' });
+    });
+  });
+
+  describe('attachSessionRouting', () => {
+    // attachSessionRouting's activate() calls resolveCardAction with the real clock
+    // (no injectable nowMs), so these use Date.now() rather than the fixed NOW above.
+    // window.location.assign is locked down (non-configurable) inside the WTR test
+    // iframe, so the live/on-demand cases below only assert what they *don't* do
+    // (open the Session Guide) rather than the exact navigate target — that exact
+    // URL-per-state behavior is already covered by the resolveCardAction unit tests.
+    const realNow = Date.now();
+
+    beforeEach(() => {
+      document.body.innerHTML = '';
+      sessionGuideRequest.value = null;
+    });
+
+    function buildCard({ startTimeUtc, endTimeUtc, sessionUrl, watchUrl }) {
+      const card = document.createElement('div');
+      card.dataset.sessionId = 'sess-1';
+      card.dataset.startTimeUtc = startTimeUtc;
+      card.dataset.endTimeUtc = endTimeUtc;
+      if (sessionUrl) card.dataset.sessionUrl = sessionUrl;
+      if (watchUrl) card.dataset.watchUrl = watchUrl;
+      const cta = document.createElement('a');
+      cta.className = 'card-cta';
+      cta.href = sessionUrl || watchUrl || '#';
+      card.append(cta);
+      document.body.append(card);
+      attachSessionRouting(card);
+      return { card, cta };
+    }
+
+    it('opens the Session Guide when the CTA link is clicked on an upcoming session', () => {
+      const { cta } = buildCard({
+        startTimeUtc: iso(realNow + HOUR),
+        endTimeUtc: iso(realNow + 2 * HOUR),
+        sessionUrl: 'https://adobe.com/sessions/s1',
+      });
+      cta.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+      expect(sessionGuideRequest.value).to.deep.equal({ sessionId: 'sess-1' });
+    });
+
+    it('opens the Session Guide when clicking the card body (not the CTA) on an upcoming session', () => {
+      const { card } = buildCard({
+        startTimeUtc: iso(realNow + HOUR),
+        endTimeUtc: iso(realNow + 2 * HOUR),
+        sessionUrl: 'https://adobe.com/sessions/s1',
+      });
+      card.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+      expect(sessionGuideRequest.value).to.deep.equal({ sessionId: 'sess-1' });
+    });
+
+    it('does not open the Session Guide when the CTA link is clicked on a live session', () => {
+      const { cta } = buildCard({
+        startTimeUtc: iso(realNow - HOUR),
+        endTimeUtc: iso(realNow + HOUR),
+        sessionUrl: 'https://adobe.com/sessions/s1',
+        watchUrl: 'https://adobe.com/watch/s1',
+      });
+      cta.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+      expect(sessionGuideRequest.value).to.equal(null);
+    });
+
+    it('does not open the Session Guide when the whole card is clicked on an on-demand session', () => {
+      const { card } = buildCard({
+        startTimeUtc: iso(realNow - 2 * HOUR),
+        endTimeUtc: iso(realNow - HOUR),
+        sessionUrl: 'https://adobe.com/sessions/s1',
+        watchUrl: 'https://adobe.com/watch/s1',
+      });
+      card.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+      expect(sessionGuideRequest.value).to.equal(null);
     });
   });
 });

@@ -94,7 +94,7 @@ describe('event-card', () => {
   });
 
   it('defaults to light theme when no dark-card class is authored', async () => {
-    document.body.innerHTML = await readFile({ path: './mocks/ratio-4-3.html' });
+    document.body.innerHTML = await readFile({ path: './mocks/media-standard.html' });
     const el = document.querySelector('.event-card');
     await init(el);
 
@@ -102,7 +102,7 @@ describe('event-card', () => {
   });
 
   it('sets dark theme from a dark-card class present before init', async () => {
-    document.body.innerHTML = await readFile({ path: './mocks/ratio-4-3.html' });
+    document.body.innerHTML = await readFile({ path: './mocks/media-standard.html' });
     const el = document.querySelector('.event-card');
     el.classList.add('dark-card');
     await init(el);
@@ -112,7 +112,7 @@ describe('event-card', () => {
   });
 
   it('inherits dark theme from an ancestor .section.dark, with no card-level class needed', async () => {
-    document.body.innerHTML = await readFile({ path: './mocks/ratio-4-3.html' });
+    document.body.innerHTML = await readFile({ path: './mocks/media-standard.html' });
     const el = document.querySelector('.event-card');
     const section = document.createElement('div');
     section.className = 'section dark';
@@ -125,7 +125,7 @@ describe('event-card', () => {
   });
 
   it('stays light inside a .section with no dark class', async () => {
-    document.body.innerHTML = await readFile({ path: './mocks/ratio-4-3.html' });
+    document.body.innerHTML = await readFile({ path: './mocks/media-standard.html' });
     const el = document.querySelector('.event-card');
     const section = document.createElement('div');
     section.className = 'section';
