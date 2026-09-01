@@ -10,11 +10,10 @@ import { readBackgroundConfig } from '../../utils/background-config.js';
 import BlockMediator from '../../../deps/block-mediator.min.js';
 import {
   VIDEO_LAYOUT_DECISION_KEY,
-  PROGRESS_STORAGE_KEY,
   VIDEO_CONTAINER_CLASS,
   VIDEO_PLAYLIST_CONTAINER_CLASS,
   findSectionWithStyle,
-  readJsonFromStorage,
+  getVideoProgress as readVideoProgress,
   parseJsonMetadata as parseSharedJsonMetadata,
   currentSessionHasEnded,
   findOnDemandVideos,
@@ -66,9 +65,7 @@ function setShouldAutoPlay(value) {
   }
 }
 
-export function getVideoProgress(sessionId) {
-  return readJsonFromStorage(PROGRESS_STORAGE_KEY, {}, LOG_SCOPE)[sessionId] || null;
-}
+export const getVideoProgress = (sessionId) => readVideoProgress(sessionId, LOG_SCOPE);
 
 export function computeProgressPercent(progress) {
   if (!progress) return 0;
@@ -742,11 +739,10 @@ export default async function init(el) {
   function buildHeader(displayRows) {
     const header = createTag('div', { class: 'session-video-playlist-top' }, '', { parent: el });
 
-    const currentIndex = displayRows.findIndex((row) => row.id === sessionId);
-    const nextSession = displayRows[currentIndex + 1] || displayRows[0];
+    const nextSession = displayRows.find((row) => row.id !== sessionId);
     const upNext = createTag('div', { class: 'session-video-playlist-up-next' }, '', { parent: header });
     createTag('span', { class: 'session-video-playlist-up-next-label' }, 'Up next', { parent: upNext });
-    createTag('span', { class: 'session-video-playlist-up-next-title' }, nextSession.title, { parent: upNext });
+    createTag('span', { class: 'session-video-playlist-up-next-title' }, nextSession?.title || '', { parent: upNext });
 
     const title = resolvePlaylistTitle(pageCustomAttributes, cfg['playlist-title']);
     createTag('h3', { class: 'session-video-playlist-title' }, title, { parent: header });

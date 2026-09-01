@@ -1,13 +1,5 @@
 @import '../../styles/tokens.css';
 
-.section.session-video-container {
-  padding-bottom: 10px;
-}
-
-.section.session-video-container ~ .section.session-video-playlist-container {
-  padding-top: 0;
-}
-
 .session-video-player {
   aspect-ratio: 16 / 9;
   margin-bottom: var(--s2a-spacing-8, 8px);
@@ -24,6 +16,16 @@
   aspect-ratio: 16 / 9;
   height: auto;
   padding-bottom: 0;
+}
+
+/* The c2-global rule contains .milo-video to a centered rich-media measure (max-width +
+   margin:auto) for the full-width player. In the side-by-side grid layout the column
+   already provides that containment, so suppress it here to avoid double-insetting. */
+@media (min-width: 1024px) {
+  .session-video-playlist-container .session-video-player .milo-video {
+    max-width: none;
+    margin: 0;
+  }
 }
 
 .session-video-player-loader {

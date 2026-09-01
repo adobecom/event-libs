@@ -9,6 +9,7 @@ import {
   closestSectionWithStyle,
   readJsonFromStorage,
   writeJsonToStorage,
+  getVideoProgress as readVideoProgress,
   parseJsonMetadata as parseSharedJsonMetadata,
   currentSessionHasEnded,
   findOnDemandVideos,
@@ -50,9 +51,7 @@ function preconnectVideoProvider(provider) {
 const PROGRESS_TICK_SECONDS = 5;
 const RESUME_RESTART_THRESHOLD_SECONDS = 30;
 
-export function getVideoProgress(sessionId) {
-  return readJsonFromStorage(PROGRESS_STORAGE_KEY, {}, LOG_SCOPE)[sessionId] || null;
-}
+export const getVideoProgress = (sessionId) => readVideoProgress(sessionId, LOG_SCOPE);
 
 export function saveVideoProgress(sessionId, secondsWatched, length = null) {
   if (!sessionId) return;
@@ -164,7 +163,7 @@ async function fetchMpcVideoDuration(mpcVideoId) {
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const payload = await response.json();
       const seconds = convertIsoDurationToSeconds(payload?.jsonLinkedData?.duration || '') || null;
-      if (seconds != null) mpcDurationByVideoId.set(mpcVideoId, seconds);
+      mpcDurationByVideoId.set(mpcVideoId, seconds);
       return seconds;
     } catch (error) {
       logError(`could not fetch mpc video duration for "${mpcVideoId}": ${error.message}`);

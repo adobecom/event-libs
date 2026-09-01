@@ -52,7 +52,6 @@
   box-sizing: border-box;
   background: var(--vp-bg, var(--s2a-color-gray-25, #fff));
   color: var(--vp-fg, var(--s2a-color-gray-900, #1e1e1e));
-  font-family: var(--s2a-font-family-default);
   border-radius: var(--s2a-border-radius-md, 16px);
   padding: var(--s2a-spacing-md) var(--s2a-spacing-md) var(--s2a-spacing-lg);
   margin-bottom: var(--s2a-spacing-8, 8px);
@@ -204,8 +203,6 @@
   box-sizing: border-box;
   border-radius: var(--s2a-border-radius-sm, 8px);
   padding: var(--s2a-spacing-xs);
-  color: inherit;
-  font-family: inherit;
   background: var(--vp-row-bg);
   cursor: pointer;
 }
@@ -433,7 +430,7 @@
     background: none;
     color: #000;
     text-align: center;
-    font-family: var(--s2a-font-family-default);
+    font-family: inherit;
     font-size: var(--s2a-font-size-sm);
     font-style: normal;
     font-weight: 700;
