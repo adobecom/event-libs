@@ -486,7 +486,7 @@
 
   .session-video-playlist-row.is-playing .session-video-playlist-row-favorite,
   .session-video-playlist-row.is-playing .session-video-playlist-row-play {
-    background: var(--s2a-color-gray-100);
+    background: var(--vp-playing-bg);
   }
 
   .session-video-playlist-handle {
