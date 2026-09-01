@@ -1,7 +1,7 @@
 @import '../../styles/tokens.css';
 
 .session-video-player {
-  margin-bottom: var(--s2a-spacing-8, 24px);
+  padding-bottom: var(--s2a-spacing-8, 8px);
 }
 
 @media (min-width: 1024px) {
