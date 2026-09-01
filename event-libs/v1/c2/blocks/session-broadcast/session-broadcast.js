@@ -24,17 +24,17 @@ function getSessionEndedImageValueEl(el) {
   return row?.children[1];
 }
 
-// Reads a resolved, absolute URL from either a linked row or an embedded picture. Prefer
-// linking the text: an embedded picture can get silently swapped for an empty <video> by
-// Milo's decorateImageLinks() if the asset's alt text carries a `|`-delimited convention.
+// Absolute URL from a linked row or embedded picture. Prefer linking text — an embedded
+// picture can get silently swapped for an empty <video> by Milo's decorateImageLinks() if
+// alt carries a `|`-delimited convention.
 function extractSessionEndedImageUrl(el) {
   const valueEl = getSessionEndedImageValueEl(el);
   return valueEl?.querySelector('a[href]')?.href || valueEl?.querySelector('img[src]')?.src || '';
 }
 
-// Unlike a.href/img.src, srcset is never auto-resolved to an absolute URL by the browser (it's
-// a list microsyntax, not a single URL). DA authors relative paths here, so this must resolve
-// by hand or the relative URL gets silently rejected by safeUrl()'s absolute-URL check downstream.
+// Unlike a.href/img.src, srcset is never auto-resolved (it's a list microsyntax, not a URL) —
+// DA authors relative paths here, so this resolves by hand or safeUrl()'s absolute-URL check
+// silently rejects it downstream.
 function resolveUrl(url) {
   try {
     return new URL(url, document.baseURI).href;
@@ -43,16 +43,14 @@ function resolveUrl(url) {
   }
 }
 
-// Takes the first comma-separated srcset candidate and strips any trailing width/density
-// descriptor (e.g. "image.jpg 2x").
+// First comma-separated candidate, stripped of its width/density descriptor (e.g. "2x").
 function firstSrcsetUrl(srcset) {
   return (srcset || '').trim().split(',')[0]?.trim().split(/\s+/)[0] || '';
 }
 
-// A bigger variant for tablet+, read from the row's own authored <picture> (nested inside the
-// <a>, since a "linked image" cell can carry both). Only ever reads a URL string, never
-// re-renders the <picture> — if decorateImageLinks() already swapped it for an empty <video>,
-// this just degrades to reusing the single default URL everywhere.
+// Bigger variant for tablet+, from the row's authored <picture> (nested in the <a> — a "linked
+// image" cell can carry both). Reads a URL only, never re-renders — if decorateImageLinks()
+// already swapped it for an empty <video>, this degrades to the single default URL everywhere.
 function extractLargestPictureUrl(el) {
   const picture = getSessionEndedImageValueEl(el)?.querySelector('picture');
   const sources = [...(picture?.querySelectorAll('source[srcset]') || [])];

@@ -11,9 +11,8 @@ import {
   IconPlay, IconHeartFilled, IconHeartOutline, IconShare,
 } from '../../sessions-guide/components/icons.js';
 
-// Same matchMedia-hook shape as FilterPanel.js's useIsMobile()/SessionDetailOverlay.js's
-// useIsDesktop() — per-component convention here, not a shared hook. Unbounded from 768px:
-// tablet and desktop both use fixed-character truncation, unlike mobile's CSS ellipsis below it.
+// Same pattern as FilterPanel.js's useIsMobile()/SessionDetailOverlay.js's useIsDesktop(), not
+// shared. 768px+: tablet and desktop both use fixed-character truncation; mobile keeps CSS ellipsis.
 const TRUNCATED_QUERY = '(min-width: 768px)';
 const matchesTruncatedRange = () => !!window.matchMedia?.(TRUNCATED_QUERY).matches;
 
@@ -29,17 +28,15 @@ function useIsTruncatedRange() {
   return isTruncatedRange;
 }
 
-// Figma spec: collapsed description truncates at a fixed 70 characters, not whatever a single
-// CSS-ellipsis line fits at the container's actual rendered width (which showed more text
-// than the design calls for).
+// Figma: collapsed description truncates at a fixed 70 chars, not whatever a CSS-ellipsis
+// line fits at actual rendered width.
 const TRUNCATED_DESC_MAX_CHARS = 70;
 function truncateChars(text, maxChars) {
   return text.length > maxChars ? `${text.slice(0, maxChars)}…` : text;
 }
 
-// Covers both "other sessions live" and "nothing live" — same markup; the Also Live/Up Next
-// carousels below ARE the fallback actions. Background photo is a CSS background on the
-// shared .sb-app ancestor (session-broadcast.css), not rendered here.
+// Covers "other sessions live" and "nothing live" with the same markup — Also Live/Up Next
+// below are the fallback actions. Background photo is a CSS background on .sb-app, not here.
 export function EndedState({ session }) {
   const [expanded, setExpanded] = useState(false);
   const isTruncatedRange = useIsTruncatedRange();
@@ -52,8 +49,7 @@ export function EndedState({ session }) {
   const durationLabel = session.endTimeUtc
     ? formatDuration(session.startTimeUtc, session.endTimeUtc, { short: true })
     : '';
-  // Only the collapsed tablet/desktop view uses character-count truncation; mobile keeps its
-  // CSS-driven single-line ellipsis untouched.
+  // Only collapsed tablet/desktop uses char-count truncation; mobile keeps its own CSS ellipsis.
   const descriptionText = (!expanded && isTruncatedRange && session.description)
     ? truncateChars(session.description, TRUNCATED_DESC_MAX_CHARS)
     : session.description;

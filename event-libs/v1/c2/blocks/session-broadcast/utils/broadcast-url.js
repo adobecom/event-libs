@@ -1,6 +1,5 @@
-// The URL never shows a param, even while switching — manual switches carry the id in
-// history.state. Named `watch`, not `session`, since sessions-guide's own widget already owns
-// `?session=`/`?sessions=`.
+// The URL never shows a param, even mid-switch — manual switches carry the id in history.state.
+// Named `watch`, not `session`, since sessions-guide's widget already owns `?session=`/`?sessions=`.
 const ENTRY_PARAM = 'watch';
 
 function cleanUrl() {
@@ -29,16 +28,15 @@ export function getHistorySessionId() {
   return history.state?.session || null;
 }
 
-// history.state survives soft navigation but a hard refresh isn't code-guaranteed to restore
-// it — sessionStorage is the real persistence mechanism, wrapped in try/catch like
-// sessions-guide's own `sg:last-view` (sessions-guide/store/index.js).
+// history.state doesn't survive a hard refresh — sessionStorage is the real persistence,
+// wrapped in try/catch like sessions-guide's own `sg:last-view` (store/index.js).
 const SS_ACTIVE_SESSION = 'sb:active-session';
 
 export function persistActiveSession(sessionId) {
   try {
     sessionStorage.setItem(SS_ACTIVE_SESSION, sessionId);
   } catch {
-    // unavailable (private browsing, disabled storage) — refresh persistence just won't work.
+    // unavailable — refresh persistence just won't work.
   }
 }
 
@@ -50,8 +48,8 @@ export function getPersistedSessionId() {
   }
 }
 
-// A stale/invalid ?watch= link needs to actively discard any prior commitment —
-// persistActiveSession() only ever writes on a truthy id, so it can't remove an old value.
+// A stale ?watch= link must actively discard any prior commitment — persistActiveSession()
+// only ever writes a truthy id, never clears one.
 export function clearPersistedSession() {
   try {
     sessionStorage.removeItem(SS_ACTIVE_SESSION);

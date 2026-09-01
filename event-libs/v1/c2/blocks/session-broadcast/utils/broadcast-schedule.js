@@ -3,23 +3,22 @@ import { deriveSessionState, isBroadcastEligible } from '../../../../utils/sessi
 // Ticket says 15, PRD says 30 — shipping 15 (see PLAN.md).
 export const UP_NEXT_CAP = 15;
 
-// A session can be eligible but still have no player ID authored — better to never list it
-// than let a viewer click into nothing. Checks all three fields so MobileRider sessions start
-// showing for free once that adapter ships.
+// No player ID authored means nothing to click into — checks all three fields so MobileRider
+// sessions show for free once that adapter ships.
 export function hasPlayableVideoSource(session) {
   return !!(session.youTubeId || session.mpcId || session.mrStreamId);
 }
 
-// mpcId/youTubeId are alternatives, not a fallback chain — a session belongs to at most one
-// bucket. MobileRider/no-player sessions have no bucket but still show up via isSessionLiveNow.
+// Alternatives, not a fallback chain — a session belongs to at most one bucket. MobileRider/
+// no-player sessions have none but still show via isSessionLiveNow.
 export function getSessionBucket(session) {
   if (session.mpcId) return 'mpc';
   if (session.youTubeId) return 'youtube';
   return null;
 }
 
-// "HH:MM:SS" from RF's "Video Duration" attribute — the middle field can exceed 59 (e.g.
-// "00:60:00"), so this sums weighted parts rather than validating strict ranges.
+// RF's "Video Duration", HH:MM:SS — minutes can exceed 59 (e.g. "00:60:00"), so this sums
+// weighted parts, no range validation.
 export function parseVideoDurationMs(videoDuration) {
   if (!videoDuration) return null;
   const parts = videoDuration.split(':').map(Number);
@@ -28,8 +27,8 @@ export function parseVideoDurationMs(videoDuration) {
   return ((h * 3600) + (m * 60) + s) * 1000;
 }
 
-// MPC's "on screen until" boundary is start + video duration, not endTimeUtc — falls back to
-// the authored window if duration is missing/unparseable. YouTube uses endTimeUtc unchanged.
+// MPC ends at start + video duration, not endTimeUtc — falls back to the authored window if
+// duration is missing. YouTube uses endTimeUtc unchanged.
 function sessionEndsAtMs(session) {
   const startMs = Date.parse(session.startTimeUtc);
   if (getSessionBucket(session) === 'mpc') {
@@ -39,9 +38,8 @@ function sessionEndsAtMs(session) {
   return Date.parse(session.endTimeUtc);
 }
 
-// The one "is this session live right now" check used everywhere liveness matters — dispatches
-// by session shape so MobileRider keeps its existing poll-driven liveness (deriveSessionState)
-// and on-demand sessions are never live.
+// The one liveness check used everywhere — dispatches by session shape: MobileRider keeps its
+// poll-driven deriveSessionState, on-demand is never live.
 export function isSessionLiveNow(session, liveStreamActiveIds, nowMs) {
   if (session.hasOnDemandFormat) return false;
   if (session.mrStreamId) return deriveSessionState(session, liveStreamActiveIds, nowMs) === 'live';
@@ -59,10 +57,8 @@ function byStartTimeAsc(a, b) {
   return Date.parse(a.startTimeUtc) - Date.parse(b.startTimeUtc);
 }
 
-// Upcoming sessions, capped and chronological, with a stable tiebreak (by id) for
-// same-start-time ties — a random tiebreak reshuffled on every re-render since this isn't
-// memoized, visibly swapping card order every ~15s ticker tick for no reason. Cross-bucket —
-// not part of the automatic advancement model below.
+// Capped, chronological, id-tiebroken for same-start-time ties — random reshuffled every
+// re-render since this isn't memoized. Cross-bucket, not part of the advancement model below.
 export function getUpNextSessions(sessionList, liveStreamActiveIds, nowMs, { cap = UP_NEXT_CAP } = {}) {
   return sessionList
     .filter((s) => isUpcoming(s, liveStreamActiveIds, nowMs))
@@ -70,9 +66,9 @@ export function getUpNextSessions(sessionList, liveStreamActiveIds, nowMs, { cap
     .slice(0, cap);
 }
 
-// Groups = sessions sharing an identical start time, sorted ascending. Grouped by parsed
-// numeric time, not the raw string, so differently-formatted-but-identical timestamps still
-// merge. Exported for broadcast-debug.js's console logging.
+// Sessions sharing a start time, sorted ascending. Grouped by parsed numeric time, not the raw
+// string, so differently-formatted-but-identical timestamps still merge. Exported for
+// broadcast-debug.js.
 export function groupSessionsByStart(bucketSessions) {
   const map = new Map();
   bucketSessions.forEach((session) => {
@@ -85,12 +81,11 @@ export function groupSessionsByStart(bucketSessions) {
     .sort((a, b) => a.startMs - b.startMs);
 }
 
-// Resolves ONE bucket's schedule. Two distinct cases: nothing committed (any live group is fair
-// game; falls back to the most recently aired group as a synthesized `endedSession` if nothing's
-// live) vs. a committed session that just ended (auto-advance may only go to the next started
-// group or to ended state — never back to a still-live sibling in its own group; manual
-// selection still can). Stays pure — callers do the actual random pick/ended-session commit
-// exactly once (see BroadcastApp.js).
+// Resolves one bucket's schedule. Nothing committed: any live group is fair game, falling back
+// to the most recent aired group as a synthesized endedSession. Committed session ended:
+// advance only to the next started group or ended state — never back to a still-live sibling
+// in its own group (manual selection still can). Pure — callers commit the pick once
+// (BroadcastApp.js).
 export function resolveBucketSchedule(bucketSessions, committedSession, nowMs, liveStreamActiveIds) {
   if (committedSession && isSessionLiveNow(committedSession, liveStreamActiveIds, nowMs)) {
     return { activeSession: committedSession, pendingCandidates: null, endedSession: null };
@@ -102,16 +97,15 @@ export function resolveBucketSchedule(bucketSessions, committedSession, nowMs, l
     && Date.parse(committedSession.startTimeUtc) <= nowMs;
 
   if (!committedSession || !committedHasStarted) {
-    // A fresh/reset pick, not a "next group" lookup — every currently-live session in the
-    // bucket is fair game regardless of group (groups only matter for the transition below).
+    // A fresh pick, not a "next group" lookup — every currently-live session in the bucket is
+    // fair game (groups only matter for the transition below).
     const candidates = bucketSessions.filter((m) => isSessionLiveNow(m, liveStreamActiveIds, nowMs));
     if (candidates.length) {
       return { activeSession: null, pendingCandidates: candidates, endedSession: null };
     }
 
-    // Nothing live and no prior commitment: surface the most recently aired group as an ended
-    // session instead of a bare page. Any member works as the anchor since group-transition
-    // lookups key off its start time, so the walk-forward logic below takes over from here.
+    // Nothing live, no prior commitment: surface the most recent aired group as ended, not a
+    // bare page. Any member works as the anchor since transition lookups key off start time.
     if (!committedSession) {
       const groups = groupSessionsByStart(bucketSessions);
       const pastGroups = groups.filter((g) => g.startMs <= nowMs);
@@ -124,9 +118,9 @@ export function resolveBucketSchedule(bucketSessions, committedSession, nowMs, l
     return { activeSession: null, pendingCandidates: null, endedSession: null };
   }
 
-  // Walk forward to whichever later group is actually live right now, not just the immediate
-  // next one — a single-hop lookup gets stuck showing stale "ended" if a backgrounded tab
-  // resumes after more than one later group has already started and ended.
+  // Walks to whichever later group is live now, not just the next one — a single-hop lookup
+  // would get stuck stale if a backgrounded tab resumes after several later groups have
+  // already come and gone.
   const groups = groupSessionsByStart(bucketSessions);
   const committedStartMs = Date.parse(committedSession.startTimeUtc);
   const laterGroups = groups.filter((g) => g.startMs > committedStartMs);
@@ -135,10 +129,9 @@ export function resolveBucketSchedule(bucketSessions, committedSession, nowMs, l
   );
 
   if (!liveLaterGroup) {
-    // No later group live: either genuinely waiting (show the committed session as ended —
-    // correct for the very next check) or a deep-stale resume where later groups already aired
-    // without being shown — catch up to whichever started most recently instead of showing a
-    // permanently stale anchor.
+    // No later group live: either genuinely waiting, or a deep-stale resume where later groups
+    // already aired unseen — catch up to whichever started most recently instead of staying
+    // permanently stale.
     const pastLaterGroups = laterGroups.filter((g) => g.startMs <= nowMs);
     const mostRecentPastGroup = pastLaterGroups[pastLaterGroups.length - 1];
     const endedSession = mostRecentPastGroup ? mostRecentPastGroup.members[0] : committedSession;
@@ -149,9 +142,9 @@ export function resolveBucketSchedule(bucketSessions, committedSession, nowMs, l
   return { activeSession: null, pendingCandidates: candidates, endedSession: null };
 }
 
-// `activeSessionId` is bucket-scoped: automatic advancement can move it within its own bucket,
-// but only a manual switch (handleSwitchSession) can move it cross-bucket — supersedes the
-// earlier "no auto-switching" PRD decision for the in-bucket case (see PLAN.md).
+// activeSessionId is bucket-scoped: automatic advancement moves it within its bucket; only a
+// manual switch crosses buckets. Supersedes the earlier "no auto-switching" PRD decision
+// in-bucket (PLAN.md).
 export function getBroadcastSchedule(sessionList, liveStreamActiveIds, nowMs, {
   activeSessionId, cap,
 } = {}) {
@@ -162,9 +155,9 @@ export function getBroadcastSchedule(sessionList, liveStreamActiveIds, nowMs, {
   const mpcSessions = eligible.filter((s) => getSessionBucket(s) === 'mpc');
   const ytSessions = eligible.filter((s) => getSessionBucket(s) === 'youtube');
 
-  // Resolved against the raw list, keyed only on mpcId/youTubeId — a cancelled session flips
-  // isOnline/hasOnDemandFormat but not its player-id fields, so it still resolves to its bucket
-  // for normal ended/next-group handling instead of a cross-bucket jump.
+  // Against the raw list, keyed on mpcId/youTubeId — a cancelled session flips isOnline/
+  // hasOnDemandFormat but not its player-id fields, so it still resolves to its bucket instead
+  // of jumping cross-bucket.
   const committedRaw = activeSessionId ? validSessions.find((s) => s.id === activeSessionId) : null;
   const committedBucket = committedRaw ? getSessionBucket(committedRaw) : null;
 
@@ -174,9 +167,8 @@ export function getBroadcastSchedule(sessionList, liveStreamActiveIds, nowMs, {
   } else if (committedBucket === 'youtube') {
     result = resolveBucketSchedule(ytSessions, committedRaw, nowMs, liveStreamActiveIds);
   } else if (committedRaw && isSessionLiveNow(committedRaw, liveStreamActiveIds, nowMs)) {
-    // A committed session with no bucket (MobileRider today) has no group/next-group concept —
-    // a still-live commitment is kept as-is; once it stops being live it falls through to the
-    // cross-bucket bootstrap below, same as if nothing had ever been committed.
+    // No-bucket commitment (MobileRider today) has no group concept — kept as-is while live;
+    // once it ends, falls through to the bootstrap below as if nothing was ever committed.
     result = { activeSession: committedRaw, pendingCandidates: null, endedSession: null };
   }
 
@@ -190,9 +182,8 @@ export function getBroadcastSchedule(sessionList, liveStreamActiveIds, nowMs, {
     if (candidates.length) {
       result = { activeSession: null, pendingCandidates: candidates, endedSession: null };
     } else {
-      // Nothing live in either bucket: surface whichever bucket's most-recently-aired group
-      // started more recently as the ended session, so a first-time visitor gets Session Ended
-      // with a path forward instead of a bare page.
+      // Nothing live anywhere: surface whichever bucket aired most recently as ended, so a
+      // first-time visitor gets a path forward instead of a bare page.
       const endedCandidates = [mpcBootstrap.endedSession, ytBootstrap.endedSession].filter(Boolean);
       const pickedEnded = endedCandidates
         .sort((a, b) => Date.parse(b.startTimeUtc) - Date.parse(a.startTimeUtc))[0] || null;
@@ -201,9 +192,8 @@ export function getBroadcastSchedule(sessionList, liveStreamActiveIds, nowMs, {
   }
 
   const allLive = eligible.filter((s) => isSessionLiveNow(s, liveStreamActiveIds, nowMs));
-  // Excludes activeSession (already committed) and every pendingCandidate (about to be one) —
-  // otherwise the session BroadcastApp's effect is about to commit briefly renders in both the
-  // pending pick and Also Live for the one render before that effect flushes.
+  // Excludes activeSession and every pendingCandidate — otherwise the about-to-commit session
+  // briefly renders in both places for one render before BroadcastApp's effect flushes.
   const pendingIds = new Set((result.pendingCandidates || []).map((s) => s.id));
   return {
     activeSession: result.activeSession,
