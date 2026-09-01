@@ -165,6 +165,7 @@
   flex-wrap: wrap;
   align-items: flex-start;
   gap: var(--s2a-spacing-xs) var(--s2a-spacing-md);
+  padding-bottom: var(--s2a-spacing-8, 8px);
 }
 
 .video-playlist-title {
@@ -260,7 +261,11 @@
   align-items: flex-start;
   gap: var(--s2a-spacing-xs);
   min-height: 0;
-  padding: var(--s2a-spacing-xs) 0 var(--s2a-spacing-lg);
+
+  /* No vertical padding: the first/last row sit flush against the header gap above and
+     the show-more gap below, which already provide the spacing. The horizontal 0 is kept
+     so the desktop scrollbar gutter (padding-right, below) is the only inline padding. */
+  padding: 0;
   overflow-y: auto;
   box-sizing: border-box;
 }
@@ -556,6 +561,7 @@
 @media (min-width: 1024px) {
   .video-playlist-show-more {
     display: flex;
+    padding-top: var(--s2a-spacing-lg, 24px);
 
     /* align-items:center vertically centres the chevron against the label's cap height;
        align-self:flex-start stops the parent flex column's default `stretch` from
