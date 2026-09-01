@@ -112,6 +112,16 @@ describe('tier-1-event-config', () => {
       expect(getBroadcastPath()).to.equal('');
     });
 
+    // A single leading "/" plus a backslash is textually relative, but browsers normalize
+    // backslashes to slashes when parsing http(s) URLs, so "/\evil.example" resolves to a
+    // different origin — a leading-slash-only check (this function's previous implementation)
+    // would have let it through. CodeQL flagged the redirect this feeds (BroadcastApp.js);
+    // confirmed the bypass against the real URL parser before fixing.
+    it('rejects a backslash-based protocol-relative override (/\\host/path)', () => {
+      history.replaceState(null, '', `${basePath}?broadcastPath=${encodeURIComponent('/\\evil.example/phish')}`);
+      expect(getBroadcastPath()).to.equal('');
+    });
+
     it('falls back to the authored config when no override param is present', () => {
       history.replaceState(null, '', basePath);
       expect(getSessionGuidePath()).to.equal('');

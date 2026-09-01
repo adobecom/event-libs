@@ -61,11 +61,15 @@ export function getAllowDoubleBooking() {
 // authored path for testing from a draft URL that doesn't match the eventual published one —
 // without this, isSamePage() comparisons downstream always fail to match on a draft. Same
 // convention as session-state.js's `?serverTime=`. Restricted to same-origin relative paths
-// only — a testing convenience, not a redirect target.
+// only — a testing convenience, not a redirect target. A leading-slash check alone isn't
+// enough: browsers normalize backslashes to slashes when parsing "special" schemes, so
+// "/\evil.com" is textually relative but resolves to a different origin — verified against
+// the actual URL parser instead of pattern-matched.
 function pathOverride(param) {
   try {
     const value = new URLSearchParams(window.location.search).get(param);
-    return value && /^\/(?!\/)/.test(value) ? value : '';
+    if (!value) return '';
+    return new URL(value, window.location.origin).origin === window.location.origin ? value : '';
   } catch {
     return '';
   }

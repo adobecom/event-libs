@@ -2142,6 +2142,45 @@ more" toggle missing `aria-expanded`/`aria-controls`; `SessionInfoPanel.js`'s da
 `EndedState.js`/`SessionInfoPanel.js`; unguarded dynamic import in `MpcPlayerAdapter.js`;
 `tier-1-event-config.js`'s ungated URL-param path override.
 
+## Security fix: open redirect via backslash-based origin bypass (2026-09-01)
+
+GitHub Advanced Security / CodeQL flagged `BroadcastApp.js:133`'s post-event redirect
+(`window.location.href = getSessionGuidePath() || ...`) as both a "client-side XSS" and
+"client-side URL redirect" finding, tracing back to `getSessionGuidePath()`'s underlying
+`?sessionGuidePath=` query-param override (added earlier this session for draft-URL testing).
+
+**Confirmed real, not a false positive** — verified against Node's spec-compliant `URL` parser
+(same WHATWG spec browsers use) before touching any code:
+```
+new URL('/\evil.example', 'https://mysite.com').origin  →  'https://evil.example'
+```
+Browsers normalize backslashes to forward slashes when parsing "special" schemes (http/https),
+so a value that's textually relative (one leading `/`) can still resolve to a completely
+different origin. Both `pathOverride()`'s guard regex (`/^\/(?!\/)/`, blocks `//evil.com` but
+not `/\evil.com`) and the pre-existing, unrelated `safeUrl()` (`utils/utils.js`,
+`/^(https?:\/\/|\/)/`, same gap) had this exact bypass — confirmed the regex itself matches the
+malicious string before fixing either.
+
+**Fix**: replaced both regex checks with actual URL-parser validation —
+`new URL(value, window.location.origin).origin === window.location.origin` — for the
+leading-slash branch specifically. `safeUrl()` still allows explicit `https?://` URLs
+unconditionally (by design — session pages/video links are often legitimately cross-origin);
+`pathOverride()` is stricter (same-origin only, matching its "testing convenience, not a
+redirect target" contract) and rejects absolute cross-origin URLs outright.
+
+Added regression coverage that didn't exist before: `safeUrl` had zero tests at all (new
+`describe('safeUrl', ...)` block in `test/unit/utils/utils.test.js`, 6 cases covering the
+valid paths plus the javascript:/protocol-relative/backslash blocks); added the missing
+backslash-bypass case to `tier-1-event-config.test.js`'s existing "query-param path overrides"
+describe block, alongside its already-present (and already-passing) `//host` and absolute-URL
+rejection tests.
+
+Verified: `npx eslint` clean on both source files and both test files; 46/46 tests pass across
+`utils.test.js`/`tier-1-event-config.test.js` (7 new); full `npm test` green modulo pre-existing,
+unrelated full-suite flakiness (a different test flaked on each of two runs — `broadcast-url`
+history-length once, `toast.js` ARIA-timing once — both pass cleanly in isolation, confirming
+neither is caused by this fix).
+
 ## Explicitly out of scope (fast-follow)
 
 - MobileRider real playback (stub adapter only)
