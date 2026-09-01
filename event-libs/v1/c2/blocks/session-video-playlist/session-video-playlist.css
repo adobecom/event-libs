@@ -484,6 +484,11 @@
     padding: var(--s2a-spacing-md) var(--s2a-spacing-md) var(--s2a-spacing-lg);
   }
 
+  .session-video-playlist-row.is-playing .session-video-playlist-row-favorite,
+  .session-video-playlist-row.is-playing .session-video-playlist-row-play {
+    background: var(--s2a-color-gray-100);
+  }
+
   .session-video-playlist-handle {
     display: none;
     align-items: center;
