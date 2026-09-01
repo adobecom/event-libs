@@ -28,15 +28,14 @@ import { AlsoLiveCarousel } from './AlsoLiveCarousel.js';
 import { UpNextCarousel } from './UpNextCarousel.js';
 
 // Minimal config for LiveCard/Carousel, which hard-depend on useSessionGuide() — no drawer,
-// filters, or day-tabs here. surface: 'page' keeps LiveCard's own click/watch handling out of
-// the way in favor of the onCardClick/onWatchSamePage props passed below.
+// filters, or day-tabs here. surface: 'page' defers click/watch handling to the
+// onCardClick/onWatchSamePage props passed below instead of LiveCard's own.
 const GUIDE_CONFIG = { userTz: detectUserTimezone(), surface: 'page', theme: 'light' };
 
 // Exported separately so tests can call it directly, without mounting the Provider tree.
 export function BroadcastBody({ config }) {
-  // history.state covers back/forward within the SPA session; sessionStorage is the actual
-  // cross-refresh persistence mechanism (history.state restoration on a hard reload isn't
-  // code-guaranteed) — see broadcast-url.js.
+  // history.state covers SPA back/forward; sessionStorage handles cross-refresh persistence
+  // since history.state restoration on a hard reload isn't code-guaranteed (see broadcast-url.js).
   const [manualSessionId, setManualSessionId] = useState(
     () => getHistorySessionId() || getPersistedSessionId(),
   );
@@ -54,17 +53,15 @@ export function BroadcastBody({ config }) {
     return () => window.removeEventListener('popstate', handlePopState);
   }, []);
 
-  // Keep sessionStorage in sync with every commitment change (manual switch, initial pick, or
-  // in-bucket auto-transition) so a hard refresh can resume where the viewer left off.
+  // Keep sessionStorage in sync with every commitment change so a hard refresh can resume
+  // where the viewer left off.
   useEffect(() => {
     if (manualSessionId) persistActiveSession(manualSessionId);
   }, [manualSessionId]);
 
-  // One-shot: resolve the `?watch=` entry param once the catalog loads. Named `watch`, not
-  // `session` — sessions-guide's own widget already owns that param for something else. Unlike a
-  // sessionStorage/history-restored id, a fresh `?watch=` link must resolve to something
-  // genuinely live right now or be discarded entirely (never "show ended state for it") — it's
-  // explicit new intent, not a resumed commitment.
+  // One-shot: resolves `?watch=` once the catalog loads (named `watch`, not `session`, since
+  // sessions-guide's own widget already owns that param). A fresh link must resolve to something
+  // live right now or be discarded entirely — it's new intent, not a resumed commitment.
   useEffect(() => {
     if (entryResolved || sessionsStatus.value !== 'ready') return;
     setEntryResolved(true);
@@ -78,9 +75,8 @@ export function BroadcastBody({ config }) {
     } else {
       showToast({ message: 'That session has ended — showing what’s live now.', variant: 'informative' });
       setManualSessionId(null);
-      // Discard any prior commitment outright, not just the in-memory state — a refresh right
-      // after landing on a dead link, before anything new gets a chance to commit, must not
-      // resurrect whatever was persisted before this explicit (now-invalid) intent arrived.
+      // Also clears persisted storage, not just in-memory state, so a refresh right after a
+      // dead link can't resurrect the prior (now-invalid) commitment.
       clearPersistedSession();
     }
     stripWatchParam(isLive ? requested.id : null);
@@ -102,12 +98,9 @@ export function BroadcastBody({ config }) {
   logBroadcastSchedule(schedule);
   logBucketGroups(sessions.value, liveStreamActiveIds.value, nowMs);
 
-  // The one place random picks happen: getBroadcastSchedule stays pure (safe to recompute every
-  // render) and returns `pendingCandidates` instead of picking, so this effect can do the actual
-  // Math.random() exactly once and lock in the result — covers the very first pick AND every
-  // later in-bucket auto-transition (both look the same: the schedule proposed a session that
-  // isn't yet the committed one). Depend on candidates' length, not the array itself — a fresh
-  // array reference every render would otherwise re-fire this (and re-roll) on unrelated renders.
+  // getBroadcastSchedule stays pure and returns `pendingCandidates` instead of picking; this
+  // effect is the one place Math.random() runs, locking in the pick once. Depends on candidates'
+  // length, not the array itself, since a fresh reference every render would otherwise re-roll.
   useEffect(() => {
     if (!entryResolved) return;
     if (schedule.pendingCandidates?.length) {
@@ -119,11 +112,9 @@ export function BroadcastBody({ config }) {
       setManualSessionId(schedule.activeSession.id);
       return;
     }
-    // A first-time visitor landing on a gap: getBroadcastSchedule synthesized the most recently
-    // aired session as `endedSession` even though nothing was ever actually committed. Locking it
-    // in here (same as any other proposal above) turns it into a real commitment, so the ordinary
-    // ended/next-group walk-forward in resolveBucketSchedule takes over from here on exactly as
-    // if the viewer really had been watching it.
+    // First-time visitor landing on a gap: `endedSession` is synthesized even though nothing was
+    // actually committed yet. Locking it in here lets the normal ended/next-group walk-forward
+    // in resolveBucketSchedule take over as if the viewer really had been watching it.
     if (schedule.endedSession && schedule.endedSession.id !== manualSessionId) {
       setManualSessionId(schedule.endedSession.id);
     }
@@ -146,10 +137,9 @@ export function BroadcastBody({ config }) {
   const nothingAtAll = !schedule.activeSession && !schedule.endedSession
     && !schedule.alsoLive.length && !schedule.upNext.length;
 
-  // Feeds session-broadcast.css's .sb-app:has(.sb-ended) background rules (see that file for
-  // why this lives on .sb-app, not EndedState.js). --sb-app-ended-bg-lg is optional — only set
-  // when the authored row's <picture> (if any) yielded a bigger source; the tablet CSS falls
-  // back to --sb-app-ended-bg when it's absent, so this never regresses the single-image case.
+  // Feeds session-broadcast.css's .sb-app:has(.sb-ended) background rules (lives on .sb-app,
+  // not EndedState.js). --sb-app-ended-bg-lg is optional — set only when a bigger source exists;
+  // tablet CSS falls back to --sb-app-ended-bg when absent.
   const endedActive = !schedule.activeSession && !!schedule.endedSession;
   const endedBgUrl = endedActive ? safeUrl(config.sessionEndedImageUrl) : '';
   const endedBgUrlLarge = endedActive ? safeUrl(config.sessionEndedImageUrlLarge) : '';

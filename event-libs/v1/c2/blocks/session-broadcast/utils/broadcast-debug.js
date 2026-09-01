@@ -71,9 +71,8 @@ function groupRow(group, index, liveStreamActiveIds, nowMs) {
   };
 }
 
-// Logs every bucket's groups (live/upcoming/ended) straight from the raw catalog — independent
-// of whatever got committed — so resolveBucketSchedule's "check the next group" logic can be
-// sanity-checked against what's actually authored, not just what ended up on screen.
+// Logs every bucket's groups straight from the raw catalog, independent of whatever got
+// committed, so resolveBucketSchedule's "check the next group" logic can be sanity-checked.
 export function logBucketGroups(sessionList, liveStreamActiveIds, nowMs) {
   if (!DEBUG_ENABLED) return;
   const eligible = sessionList.filter((s) => isBroadcastEligible(s) && hasPlayableVideoSource(s));

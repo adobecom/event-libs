@@ -54,22 +54,10 @@
   border: none;
 }
 
-/* c2-global.css's shared foundation caps .milo-video (the MPC player's own wrapper class) at
-   --s2a-layout-rich-media-content-measure-wide (848px at this tier) centered and rounds it;
-   event-youtube.css does the same for .youtube-video-container — both built for typical
-   rich-content embeds elsewhere on the site, not this block's intentionally full-bleed,
-   square-cornered player on TABLET specifically. Both source selectors out-specify a normal
-   .session-broadcast-scoped override (c2-global's via a :root:has(...)+attribute-selector
-   combo, event-youtube's via three chained classes/:not()), hence !important — same pattern
-   already used in mobile-rider.css for an equivalent foundation-style override.
-
-   Bounded to 1024-1279px only. Desktop (Figma "Session Broadcast VizD R1 8.17.26", node
-   24:22745/24:22744) wants the player back to a contained, rounded-corner treatment —
-   1192px wide at 1280-1440px, 1480px at 1441px+, 24px radius throughout — which is exactly
-   what the foundation rules above already produce on their own via the same responsive
-   --s2a-layout-rich-media-content-measure-wide token (see tokens.css's 1280px/1441px tiers).
-   No new desktop-specific rule is needed: simply not suppressing the foundation past tablet
-   is the fix. */
+/* c2-global.css/event-youtube.css cap the player width and round its corners by default —
+   built for typical rich-content embeds, not this block's full-bleed tablet look. Both
+   out-specify a plain .session-broadcast-scoped selector, hence !important. Bounded to
+   1024-1279px: desktop relies on these same foundation defaults, unmodified. */
 @media (min-width: 1024px) and (max-width: 1279px) {
   .session-broadcast .milo-video {
     max-width: none !important;
@@ -96,13 +84,8 @@
 
 /* ── Session info panel ──────────────────────────────────
    Unconditionally dark regardless of page theme — the plain --s2a-color-* tokens flip per
-   theme, so they're overridden locally here (same pattern as sessions-guide's own
-   [data-theme="dark"]); every descendant, including CategoryBadge, reads the dark values.
-
-   Grid, not flex — the title/caret row and the actions row swap places between collapsed and
-   expanded, and (see the tablet media query below) sit side by side instead of stacked at
-   769px+. Named areas let one fixed DOM order (row, actions, meta, desc, viewall) render in
-   whatever visual order/arrangement the state and breakpoint need. */
+   theme, so they're overridden locally here. Grid, not flex — title/actions swap places
+   between collapsed/expanded/tablet layouts via named areas. */
 .sb-info {
   --s2a-color-background-default: var(--s2a-color-gray-900, #131313);
   --s2a-color-content-default: #fff;
@@ -133,11 +116,7 @@
     "viewall";
 }
 
-/* Mobile only (node 4975:45446) — collapsed + favorited hides the description entirely,
-   rather than just visually: also drops its grid row so no extra gap appears where it would
-   have been. Tablet reverses this below (768px+ override) — same session, same markup, always
-   shown there per explicit follow-up. The .sb-info__desc-wrap half of this lives further down,
-   after that selector's own base rule (stylelint no-descending-specificity). */
+/* Mobile only — collapsed+favorited hides the description's grid row too, not just visually. */
 .sb-info.is-favorited:not(.is-expanded) { grid-template-areas: "row" "actions"; }
 
 .sb-info__row {
@@ -263,9 +242,7 @@
   cursor: pointer;
 }
 
-/* Tablet (node 4975:45573): row and actions sit side by side instead of stacked — title/caret
-   left, Favorite/Share right. Expanded meta/desc/viewall stacking below is not covered by a
-   dedicated tablet Figma frame; extrapolated from mobile's own order pending one. */
+/* Tablet: row and actions sit side by side instead of stacked. */
 @media (min-width: 768px) {
   .sb-info {
     grid-template-columns: 1fr auto;
@@ -295,13 +272,9 @@
       "desc desc";
   }
 
-  /* Figma has the title hug the caret tightly and ellipsis-truncate instead of mobile's
-     flex:1 (which pushes the caret to the row's far edge and lets long titles wrap — wrapping
-     is also what broke the title's vertical centering against the actions on the right).
-     Letter-spacing (per nodes 24:20749 tablet / 24:22746 desktop, both showing the same -0.48px
-     export value) is the one title property that's identical at both breakpoints, hence set
-     unbounded here; font-size/line-height differ (20px tablet vs. 24px desktop) and live in
-     their own breakpoint-scoped rules below. */
+  /* Title hugs the caret and ellipsis-truncates instead of mobile's flex:1 (which let long
+     titles wrap and break vertical centering). Letter-spacing is shared across tablet/desktop;
+     font-size/line-height differ and live in their own breakpoint blocks below. */
   .sb-info__title {
     flex: 0 1 auto;
     min-width: 0;
@@ -319,29 +292,19 @@
   /* stylelint-disable-next-line value-no-vendor-prefix */
   .sb-info.is-favorited:not(.is-expanded) .sb-info__desc-wrap { display: -webkit-box; }
 
-  /* Figma (node 4975:45576): section titles ("Also Live", "Up Next") stay the same 18px size on
-     tablet as mobile. sessions-guide's own tablet rule bumps .sg-section-title up to
-     font-size-2xl (24px) for its own layout; reset back down for Broadcast specifically.
-     --s2a-typography-font-size-heading-6 (the semantic alias) is NOT the right token here — it's
-     intentionally responsive and only resolves to 18px at 1280px+ (16px below that, per
-     tokens.css), so it wouldn't actually enforce 18px at this breakpoint. Using the fixed-value
-     scale token instead — the exact one sessions-guide's own base/mobile rule already uses for
-     this element, so this is "stay the same size as mobile," not a new value. Scoped under
-     .session-broadcast, not bare — the sessions-guide widget/FAB is typically co-mounted on the
-     same page and shares this class. */
+  /* Section titles stay 18px on tablet (same as mobile) — sessions-guide's own tablet rule
+     bumps this to 24px for its own layout. The semantic size alias resolves to 16px below
+     1280px, so the fixed-value token is used instead. Scoped under .session-broadcast since
+     the sessions-guide widget/FAB may be co-mounted and shares this class. */
   .session-broadcast .sg-section-title {
     font-size: var(--s2a-font-size-lg, 18px);
     line-height: var(--s2a-font-line-height-xs, 18px);
   }
 }
 
-/* Per design: .sb-info has no background of its own from tablet up — only mobile (below 768px)
-   keeps the dark background from the base rule above. At tablet and desktop the panel sits
-   directly on .sb-app's own black background instead, reading as part of the page rather than
-   a distinct dark card. Originally scoped to tablet only (768-1279px); widened to also cover
-   desktop per explicit follow-up — kept as its own unbounded rule rather than folded into the
-   768-1279px block below, since that block's other rule (title size) does NOT extend to
-   desktop and must stay bounded. */
+/* .sb-info has no background of its own from tablet up — the panel sits on .sb-app's own
+   black background instead. Kept as its own unbounded rule since the tablet-bounded block
+   below (title size) doesn't extend to desktop. */
 @media (min-width: 768px) {
   .sb-info {
     background: transparent;
@@ -349,13 +312,9 @@
 }
 
 @media (min-width: 768px) and (max-width: 1279px) {
-  /* Correction: the title's own size at tablet is 20px, not the 24px used at desktop — despite
-     both reviewed Figma frames (24:20749 tablet, 24:22746 desktop) showing the same literal
-     24px export fallback. --s2a-font-size-xl/--s2a-font-line-height-sm are this codebase's
-     1024-1279px tier values for the semantic heading-5 alias; pinned as fixed tokens across the
-     whole 768-1279px tablet range, same "one value for the whole tablet range" precedent as the
-     ended-state eyebrow/title fixes. Letter-spacing is untouched (stays -0.48px, set alongside
-     font-size in the unbounded 768px+ block above) — only font-size was called out as wrong. */
+  /* Title is 20px at tablet (24px at desktop) — the 1024-1279px tier's fixed-value tokens for
+     heading-5, pinned across the whole 768-1279px range. Letter-spacing is shared/unbounded
+     above, untouched. */
   .sb-info__title {
     font-size: var(--s2a-font-size-xl, 20px);
     line-height: var(--s2a-font-line-height-sm, 20px);
@@ -364,9 +323,9 @@
 
 /* ── Ended state (States 2 & 3) ─────────────────────────── */
 
-/* Unconditionally dark, same token-override reasoning as .sb-info above. Large top padding is
-   an intentional exception to CLAUDE.md's no-hard-coded-vertical-spacing rule (matches Figma).
-   Background is transparent — the shared photo/black layer lives on .sb-app below. */
+/* Unconditionally dark, same theme-override reasoning as .sb-info. Large top padding is an
+   intentional exception to the no-hard-coded-vertical-spacing rule (matches Figma).
+   Background is transparent — the photo/black layer lives on .sb-app below. */
 .sb-ended {
   position: relative;
   padding: var(--s2a-spacing-4xl, 64px) var(--s2a-spacing-lg, 24px) var(--s2a-spacing-xl, 32px);
@@ -397,17 +356,8 @@
   letter-spacing: -0.48px;
 }
 
-/* Figma (node 4975:46368): the eyebrow (copy since updated to "Session complete.") grows to a larger 48px treatment on tablet —
-   confirmed with the user against the design directly (not the raw Figma-export fallback, which
-   reported 56px — that's this codebase's 1280px+ desktop tier for the shared heading-2 token,
-   one tier too large for tablet). 48px/48px line-height/-1.44px letter-spacing is the 1024-1279px
-   tier's set (mobile/base is 32px/-0.96px/32px, unrelated — matches the already-hardcoded 36px
-   mobile rule, itself a deliberate deviation from the semantic scale). Still deliberately NOT
-   using the semantic --s2a-typography-*-heading-2 aliases directly: they'd correctly give 48px at
-   1024-1279px but wrongly drop to 32px below that, and this block's own tablet range starts at
-   768px. Using the underlying fixed-value scale tokens instead, pinned to the 1024-1279px tier's
-   values for the whole 768-1279px tablet range. Scoped to tablet only — desktop's own treatment
-   for this element hasn't been reviewed yet (no frame provided), so intentionally left alone. */
+/* Eyebrow grows to 48px on tablet — the 1024-1279px tier's fixed-value tokens for heading-2,
+   pinned across the whole 768-1279px range (mobile/base stays the hardcoded 36px above). */
 @media (min-width: 768px) and (max-width: 1279px) {
   .sb-ended__eyebrow {
     font-size: var(--s2a-font-size-6xl, 48px);
@@ -415,15 +365,9 @@
     letter-spacing: var(--s2a-font-letter-spacing-xl, -1.44px);
   }
 
-  /* Figma (separate file "Session Broadcast VizD R1 8.17.26", node 24:21713): the session title
-     shrinks to 20px/20px line-height on tablet and truncates to a single ellipsized line.
-     First pass trusted the raw Figma-export fallback (24px/24px) and treated the base rule's
-     already-hardcoded 24px/24px as "matching, no change needed" — same trap as the eyebrow fix
-     above: 24px is this codebase's 1280px+ desktop tier for heading-5, not tablet. Corrected by
-     the user against the actual design to 20px — the 1024-1279px tier's value
-     (--s2a-font-size-xl/--s2a-font-line-height-sm, both 20px; mobile/base is 18px, unrelated).
-     letter-spacing (-0.48px) is untouched and still correct — it's a stable, non-remapped fixed
-     token (--s2a-font-letter-spacing-4xl), not a semantic alias, so it was never at risk. */
+  /* Title shrinks to 20px on tablet and truncates to one ellipsized line — the 1024-1279px
+     tier's fixed-value tokens for heading-5. Letter-spacing is untouched (stable fixed token,
+     not remapped per tier). */
   .sb-ended__title {
     font-size: var(--s2a-font-size-xl, 20px);
     line-height: var(--s2a-font-line-height-sm, 20px);
@@ -433,15 +377,11 @@
   }
 }
 
-/* Figma ("Session Broadcast VizD R1 8.17.26", node 24:22862, desktop ended state): the whole
-   block aligns with everything else on the page at this width, so it needs the same shared
-   1192px-centered treatment .sb-info/.sb-carousel-section already use, rather than the plain
-   fixed side padding (--s2a-spacing-lg, 24px) the base rule uses below this width. */
+/* Desktop: aligns with the rest of the page via the same shared 1192px-centered treatment
+   .sb-info/.sb-carousel-section use. */
 @media (min-width: 1280px) {
-  /* Top grows to 124px; side padding drops to 0 — the max-width/margin: auto centering above
-     already provides the horizontal breathing room, matching how Also Live/Up Next clear their
-     own side padding once they switch to the same centered-content pattern at this width.
-     Bottom is untouched (still the base rule's 32px). */
+  /* Top grows to 124px; side padding drops to 0 since centering already provides the
+     breathing room. Bottom stays the base rule's 32px. */
   .sb-ended {
     max-width: 1192px;
     margin: 0 auto;
@@ -450,26 +390,17 @@
     padding-left: 0;
   }
 
-  /* Eyebrow grows from the mobile 36px all the way to 80px/76px line-height/-3.2px letter-
-     spacing — this codebase's exact 1280-1440px (and 1441px+, identical at both tiers) values
-     for the semantic heading-1 alias, confirmed against tokens.css rather than trusted from the
-     Figma export's raw fallback alone (same discipline as the tablet eyebrow/title fixes
-     above), and here they happen to match the literal export number exactly. No desktop frame
-     had been reviewed for this element before now, hence no prior override existed at all. */
+  /* Eyebrow grows to 80px at desktop — this tier's value for the semantic heading-1 alias
+     (identical at 1441px+ too). */
   .sb-ended__eyebrow {
     font-size: var(--s2a-font-size-10xl, 80px);
     line-height: var(--s2a-font-line-height-5xl, 76px);
     letter-spacing: var(--s2a-font-letter-spacing-sm, -3.2px);
   }
 
-  /* Font-size/line-height/letter-spacing already fall through correctly from the base rule
-     (24px/24px/-0.48px is both the mobile default AND this tier's own value — the tablet
-     override above is the only range that differs). Truncation is new here, matching what
-     tablet already does for the same reason (a long session title shouldn't wrap or overflow
-     the column). Margin-top corrects to 24px (--s2a-spacing-lg) from the base rule's 32px
-     (--s2a-spacing-xl) — Figma's own eyebrow-to-title gap here is the same 24px used for every
-     other gap in this block (meta, actions); 32px is presumably still correct for mobile/
-     tablet (unreviewed here, left alone) but doesn't match this specific frame. */
+  /* Font-size/line-height/letter-spacing already fall through from the base rule (matches
+     this tier). Truncation is new, matching tablet. Margin-top corrects to 24px to match
+     Figma's uniform gap used elsewhere in this block. */
   .sb-ended__title {
     margin-top: var(--s2a-spacing-lg, 24px);
     overflow: hidden;
@@ -477,10 +408,8 @@
     text-overflow: ellipsis;
   }
 
-  /* Figma shows the frosted-glass treatment (blur + translucent white fill/border) for Favorite
-     here, not the simple transparent-with-solid-border look the base rule uses below this
-     width — matching the same frosted pattern already used elsewhere on this page (e.g.
-     .sb-carousel-section--up-next's schedule/favorite buttons). */
+  /* Frosted-glass treatment for Favorite at desktop, matching the pattern used elsewhere on
+     this page (e.g. Up Next's schedule/favorite buttons). */
   .sb-ended__icon-btn--favorite {
     background: rgb(255 255 255 / 80%);
     border-color: rgb(255 255 255 / 40%);
@@ -586,21 +515,18 @@
 }
 
 /* ── Ended-state background bleed ──────────────────────────
-   The hero's darkened photo bleeds into Also Live/Upcoming below it, past .sb-ended's own
-   short box — a pseudo-element on .sb-app, not a JS <img> inside .sb-ended, because CSS paints
-   a positioned z-index:auto descendant *after* plain in-flow siblings regardless of DOM order;
-   an <img> here would render on top of, not behind, the sections that follow. `isolation:
-   isolate` is required too, or the ::before's negative z-index escapes to a higher ancestor
-   instead of staying behind .sb-app's own background. */
+   The hero's darkened photo bleeds into Also Live/Upcoming below — a pseudo-element on
+   .sb-app, not a JS <img> inside .sb-ended, since CSS paints a positioned z-index:auto
+   descendant after in-flow siblings regardless of DOM order. isolation:isolate keeps the
+   ::before's negative z-index scoped to .sb-app instead of escaping to a higher ancestor. */
 .sb-app:has(.sb-ended) {
   position: relative;
   isolation: isolate;
   background: var(--s2a-color-gray-1000, #000);
 }
 
-/* --sb-app-ended-bg is set inline by BroadcastApp.js. Height is a fixed, Figma-approximated
-   value — tune it to change how far the bleed reaches. Three layers: flat tint (overall
-   darkening) + vertical fade (feathers to solid black) + the photo itself. */
+/* --sb-app-ended-bg is set inline by BroadcastApp.js. Three layers: flat tint + vertical
+   fade + the photo itself. */
 .sb-app:has(.sb-ended)::before {
   content: '';
   position: absolute;
@@ -621,15 +547,9 @@
     cover;
 }
 
-/* Per design: on tablet the bleed extends much further down (80% of the viewport, not the fixed
-   480px above) and the vertical fade darkens more aggressively toward the bottom (75%-stop
-   opacity 90% instead of 75%). Using 80vh rather than a literal 80% — this element is absolutely
-   positioned with .sb-app as its containing block, and .sb-app has no explicit height of its own
-   (only `display: block`), so a percentage height here would resolve to `auto` per the CSS spec
-   and the bleed would collapse to nothing. 80vh has no such dependency. Prefers
-   --sb-app-ended-bg-lg (a bigger source pulled from the authored row's own <picture>, if one
-   exists — see session-broadcast.js) over the single default image, since a taller box shows more
-   of it; falls back to the same default everywhere when no larger source was found. */
+/* Bleed extends to 80% of the viewport on tablet, darkening more aggressively toward the
+   bottom. vh, not %, since .sb-app has no explicit height (a % height would collapse to
+   auto). Prefers the larger --sb-app-ended-bg-lg source when available. */
 @media (min-width: 768px) and (max-width: 1279px) {
   .sb-app:has(.sb-ended)::before {
     height: 80vh;
@@ -640,10 +560,7 @@
   }
 }
 
-/* Per follow-up: desktop reuses tablet's own gradient exactly (60%/60%/90%/100% stops, not the
-   base rule's 60/60/75), just a taller bleed — 90vh instead of tablet's 80vh. Same 100%-height-
-   collapses-to-nothing reasoning as tablet's own comment above (percentage height needs an
-   explicit-height containing block .sb-app never has; vh has no such dependency). */
+/* Desktop reuses tablet's gradient exactly, with a taller 90vh bleed. */
 @media (min-width: 1280px) {
   .sb-app:has(.sb-ended)::before {
     height: 90vh;
@@ -661,17 +578,8 @@
 }
 
 /* ── Also Live section ──────────────────────────────────
-   Dark section, white cards. Figma (node 24:20683, "Session Broadcast/Also Live Section")
-   moved this section's background from the original mobile-only light-gray
-   (var(--s2a-color-background-subtle, #f8f8f8), node 9931:12217) to a dark
-   var(--maxcolor/darkgrey, #262626) — unconditionally, no breakpoint constraint on that frame
-   — matching the page's now-always-dark theme (see .sb-app's own background above). Section
-   title flips to white for legibility on the new dark background; cards themselves are
-   untouched, still white/light per the design. #262626 has no equivalent --s2a-* scale token
-   (closest, gray-800, is #292929) — hardcoded, same as the desktop-only rule this replaces
-   below. Everything below is scoped under this class, not edited on the shared sessions-guide
-   selectors, which have their own correct-for-that-context spec. No right padding — cards peek
-   to the viewport edge. */
+   Dark section (#262626, no equivalent --s2a-* token), white cards. Section title is white
+   for legibility; cards stay light. No right padding — cards peek to the viewport edge. */
 .sb-carousel-section--also-live {
   padding: var(--s2a-spacing-xl) 0 var(--s2a-spacing-xl) var(--s2a-spacing-xl);
   background: #262626;
@@ -720,16 +628,10 @@
   background: #000;
 }
 
-/* sessions-guide.css's own hover/focus-within rule for this button —
-   `.sg-live-card:is(:hover, :focus-within) .sg-live-card__btn--watch` — out-specifies the
-   plain #000 override above (3 selector segments vs. 2), so it wins the moment the card gains
-   :focus-within, e.g. from clicking the adjacent Favorite button, not just from actually
-   hovering Watch. Re-asserted here at matching specificity so it stays black below 1280px.
-   Bounded to max-width: 1279px — at 1280px+ the long card's hover fill deliberately goes black
-   (per explicit follow-up, matching sessions-guide's own native desktop treatment), and a black
-   button would disappear against it; that breakpoint instead lets sessions-guide's own native
-   hover inversion (white background, dark text) take over, same as the rest of the card's
-   content. */
+/* Re-asserted at matching specificity so Watch stays black through hover/focus-within below
+   1280px — sessions-guide's own hover rule otherwise out-specifies the plain override above.
+   At 1280px+ the long card's hover fill goes black on purpose (matching sessions-guide), so
+   this is bounded there instead — a black button would disappear against it. */
 @media (max-width: 1279px) {
   .sb-carousel-section--also-live .sg-live-card:is(:hover, :focus-within) .sg-live-card__btn--watch {
     background: #000;
@@ -748,16 +650,9 @@
    have anywhere to push into (shared .sg-live-card__body default is align-items: flex-start). */
 .sb-carousel-section--also-live .sg-live-card__actions { width: 100%; }
 
-/* sessions-guide.css redefines .sg-live-card as a wide, horizontal, hover-to-black desktop
-   card at both 1024-1279px and 1280px+ (two separate, near-identical blocks, built for its
-   own Live section) — not Also Live's fixed 311px vertical card used at this tier. Both
-   out-specify our own rules for properties we don't already declare (flex-direction, borders,
-   image/body sizing, hover colors), which was causing severe overflow: body forced to a fixed
-   width (425px/560px) wider than the 311px card itself, squeezing its content out of view.
-   Resets every property either block touches back to what this card already uses below 1024px.
-   Bounded to 1024-1279px only — 1280px+ switches to the desktop "long card" instead (see its
-   own dedicated block further down), so this reset must stop suppressing sessions-guide's own
-   1280px+ card shape rather than also fighting it there. */
+/* sessions-guide.css redefines .sg-live-card as a wide desktop card at 1024-1279px, forcing
+   a body width wider than this card's own 311px. Resets it back to the narrow shape here;
+   1280px+ switches to the long card instead (see its own block below), so this stays bounded. */
 @media (min-width: 1024px) and (max-width: 1279px) {
   .sb-carousel-section--also-live .sg-live-card {
     flex-direction: column;
@@ -790,32 +685,23 @@
 
   .sb-carousel-section--also-live .sg-live-card__track-row { gap: var(--s2a-spacing-xs); }
 
-  /* Not part of this card's own design (no Figma frame has ever shown a description on it at
-     this tier) — sessions-guide's base rule already hides it; the wide-desktop block below
-     turns it back on for the long card. */
+  /* Not part of this card's design at this tier — hidden here, shown again for the long card
+     below. */
   .sb-carousel-section--also-live .sg-live-card__desc { display: none; }
 }
 
-/* Correction: the color/hover-state neutralizations below are tablet-only (1024-1279px), not
-   unbounded — the long card at 1280px+ is meant to keep sessions-guide's own native "card fill
-   goes black, content turns white" hover treatment (per explicit follow-up: "upon hover we
-   should display the card background as black like we do on session guide and the content
-   inside the cards should change to white"), not have it fought. Only the plain/resting-state
-   Watch-now-is-black rule (a separate, always-unconditional rule earlier in this file, not part
-   of this block) still applies at every width — that one is about the resting button, not the
-   hover fill, and stays black regardless of breakpoint. */
+/* The long card at 1280px+ keeps sessions-guide's own black-hover-fill treatment instead of
+   being fought — these neutralizations stay tablet-only (1024-1279px). Watch's plain black
+   rule (elsewhere in this file) is unconditional and unaffected. */
 @media (min-width: 1024px) and (max-width: 1279px) {
   .sb-carousel-section--also-live .sg-live-card:is(:hover, :focus-within) {
     background: #fff;
     border-color: transparent;
   }
 
-  /* .sg-category-badge__label uses `color: currentcolor` (sessions-guide.css), so it inherits
-     whatever computed color its ancestor — this row, not .sg-live-card__track itself — resolves
-     to. sessions-guide's hover rules flip .sg-live-card__track-row (and __track-extra) to
-     white, which the label was silently picking up even after the icon's own color was fixed,
-     since the icon reads --sg-badge-icon-color directly while the label has no such override
-     to fall back on. */
+  /* .sg-category-badge__label uses currentcolor, inherited from this row (not
+     .sg-live-card__track) — sessions-guide's hover rule flips the row white, so the label was
+     picking that up even after the icon's own color was fixed separately. */
   .sb-carousel-section--also-live .sg-live-card:is(:hover, :focus-within) .sg-live-card__track-row,
   .sb-carousel-section--also-live .sg-live-card:is(:hover, :focus-within) .sg-live-card__track-extra {
     color: var(--s2a-color-content-default);
@@ -831,26 +717,20 @@
     color: var(--s2a-color-content-default);
   }
 
-  /* sessions-guide.css flips the title to white on hover/focus-within (its own dark hover-fill
-     redesign, itself already neutralized via the card's own background/border-color reset) —
-     this one property had no counterpart here, so it leaked through even though the card's
-     fill never actually goes dark under broadcast. */
+  /* sessions-guide flips the title white on hover — no counterpart existed here, so it leaked
+     through. */
   .sb-carousel-section--also-live .sg-live-card:is(:hover, :focus-within) .sg-live-card__title {
     color: var(--s2a-color-content-default);
   }
 
-  /* Correction: `color: inherit` climbed past .sg-category-badge (which sets no color of its
-     own) to whatever ambient color the card's text context resolves to — not the badge's own
-     per-track color, so it still visibly changed on hover. CategoryBadge.js sets
-     --sg-badge-icon-color inline per track; restoring the exact var()/currentcolor fallback
-     chain the base rule (sessions-guide.css) uses keeps the icon's own color fixed through
-     hover instead of drifting to an unrelated ambient value. */
+  /* color:inherit climbed past .sg-category-badge (no color of its own) to an unrelated
+     ambient value instead of the badge's own per-track color. Restoring the exact var()/
+     currentcolor chain the base rule uses keeps it fixed through hover. */
   .sb-carousel-section--also-live .sg-live-card:is(:hover, :focus-within) .sg-category-badge__icon-color {
     color: var(--sg-badge-icon-color, currentcolor);
   }
 
-  /* Correction: Watch now stays black here too (was #292929) — user confirmed it should
-     always be black, resting and hover/focus-within alike, matching the plain rule above. */
+  /* Watch stays black here too (was #292929) — resting and hover alike. */
   .sb-carousel-section--also-live .sg-live-card__btn--watch,
   .sb-carousel-section--also-live .sg-live-card:is(:hover, :focus-within) .sg-live-card__btn--watch {
     background: #000;
@@ -865,22 +745,15 @@
   }
 }
 
-/* ── Also Live: desktop "long card" (Figma node 24:22750) ──────────────────
-   Container/background stay full-bleed to the page edge (no max-width, see the :not()
-   exclusion above) — only the inner content is capped/centered at the shared 1192px, via
-   .sg-carousel (the header+cards wrapper), not the section itself. The card switches from the
-   311px vertical shape (still forced at every width by the unconditional base rules above,
-   which out-specify sessions-guide's own bare selectors) to a wide 1104px horizontal card with
-   a fixed 560x316 image, matching sessions-guide's own native desktop values almost exactly —
-   only border/radius, width/max-width, and progress-row position differ from what this file's
-   unconditional base rules already force, so only those need correcting here. Button padding
-   and description/actions-time visibility are this design's own deltas from the narrow card. */
+/* ── Also Live: desktop "long card" ──────────────────────────
+   Container/background stay full-bleed (see the :not() exclusion above); only the inner
+   content (.sg-carousel) is capped/centered at 1192px. The card switches from the 311px
+   vertical shape to a 1104px horizontal one with a fixed 560x316 image, matching
+   sessions-guide's own native desktop values almost exactly — only border/radius/width/
+   progress-row differ from what the unconditional base rules above force. */
 @media (min-width: 1280px) {
-  /* The base rule's left padding (--s2a-spacing-xl, for the mobile/tablet peek-to-edge look)
-     would otherwise offset .sg-carousel's own margin: 0 auto centering asymmetrically (32px
-     padding on the left, none on the right) — clearing it here lets .sg-carousel center
-     symmetrically in the full, now-unpadded viewport width, which the bleed calc just below
-     depends on. */
+  /* Clears the base rule's left padding so .sg-carousel centers symmetrically in the full
+     viewport, which the bleed calc below depends on. */
   .sb-carousel-section--also-live {
     padding: var(--s2a-spacing-xl, 32px) 0;
   }
@@ -890,20 +763,14 @@
     margin: 0 auto;
   }
 
-  /* The peeking card was being cut off at .sg-carousel's own 1192px boundary, not the true
-     viewport edge — .sg-carousel__track (sessions-guide.css) only ever bleeds by a small fixed
-     amount (its own -20px, sized for a different, non-full-bleed section), and
-     .sg-carousel__cards' own 16px padding-right ate further into that. Once .sg-carousel is
-     confirmed centered in the full viewport (via the padding removal above), the exact distance
-     from its right edge to the true viewport edge is (100vw - 1192px) / 2 — pulling the track
-     out by that amount, and dropping the cards' own padding-right, lets the peek reach the
-     actual screen edge instead of stopping at the content column's edge. */
+  /* The peek was cut off at .sg-carousel's own boundary, not the true viewport edge. With
+     .sg-carousel centered in the full viewport, the exact gap to the true edge is
+     (100vw - 1192px) / 2. */
   .sb-carousel-section--also-live .sg-carousel__track {
     margin-right: calc((100vw - 1192px) / -2);
   }
 
-  /* Per design: 24px between cards at desktop, not the 16px (--s2a-spacing-md) used at
-     mobile/tablet (see the base rule above). */
+  /* 24px between cards at desktop, not mobile/tablet's 16px. */
   .sb-carousel-section--also-live .sg-carousel__cards {
     padding-right: 0;
     gap: var(--s2a-spacing-lg, 24px);
@@ -917,8 +784,7 @@
   }
 
   /* Fixed 560x316, not the narrow card's aspect-ratio box — a real <img> needs an explicit
-     height here (see sessions-guide.css's own identical rule/comment for why aspect-ratio or
-     height:auto doesn't work against a flex row sibling). */
+     height against a flex-row sibling. */
   .sb-carousel-section--also-live .sg-live-card__image {
     width: 560px;
     height: 316px;
@@ -927,8 +793,8 @@
     border-radius: var(--s2a-border-radius-lg, 32px);
   }
 
-  /* Back to the image's bottom edge — the narrow card's own top-edge placement (base rule
-     above) is that shape's own design, not this one's. */
+  /* Back to the image's bottom edge — the narrow card's top-edge placement is that shape's
+     own design. */
   .sb-carousel-section--also-live .sg-live-card__progress-row {
     top: auto;
     bottom: 13px;
@@ -956,7 +822,7 @@
     font-weight: var(--s2a-font-weight-heading, 900);
   }
 
-  /* Shown here, unlike the narrow card (no frame has ever shown a description on that shape). */
+  /* Shown here, unlike the narrow card. */
   /* stylelint-disable-next-line value-no-vendor-prefix */
   .sb-carousel-section--also-live .sg-live-card__desc { display: -webkit-box; }
 
@@ -970,9 +836,9 @@
   .sb-carousel-section--also-live .sg-live-card__btn--favorite { width: 40px; }
 }
 
-/* ── Upcoming section (mobile, node 9931:12218) ────────────
-   White section, gray-50 cards — inverse of Also Live. Same scoping reasoning; no right
-   padding for the same peek-to-edge reason. */
+/* ── Upcoming section ────────────────────────────────────
+   White section, gray-50 cards — inverse of Also Live. No right padding — cards peek to the
+   viewport edge. */
 .sb-carousel-section--up-next {
   padding: var(--s2a-spacing-xl) 0 var(--s2a-spacing-xl) var(--s2a-spacing-lg);
 }
@@ -984,15 +850,12 @@
   letter-spacing: -0.2px;
 }
 
-/* Per design: 16px between cards here and in Also Live above, not sessions-guide's own 8px
-   default (--s2a-spacing-xs) on mobile/tablet. Also Live already sets this (see its own
-   .sg-carousel__cards rule above); Up Next had no equivalent override at all, so it was
-   silently inheriting the 8px default. */
+/* 16px between cards, same as Also Live — not sessions-guide's own 8px default. */
 .sb-carousel-section--up-next .sg-carousel__cards { gap: var(--s2a-spacing-md, 16px); }
 
-/* .sg-card's own base styling requires a .sessions-guide/.sg-portal ancestor this block's DOM
-   never has — replicated here instead of adding that class, which would pull in every other
-   rule scoped that way too. */
+/* .sg-card's base styling requires a .sessions-guide/.sg-portal ancestor this DOM never has
+   — replicated here instead of adding that class, which would pull in every other rule
+   scoped that way too. */
 .sb-carousel-section--up-next .sg-card {
   display: flex;
   flex-direction: column;
@@ -1012,8 +875,8 @@
 
 .sb-carousel-section--up-next .sg-card__badge-row { margin-bottom: var(--s2a-spacing-sm); }
 
-/* SessionCard.js hardcodes IconButton's dark-card context; this card is light (gray-50), so
-   the frosted-glass/outlined-on-light treatment is replicated here instead. */
+/* SessionCard.js hardcodes IconButton's dark-card context; this card is light, so the
+   frosted-glass/outlined-on-light treatment is replicated here instead. */
 .sb-carousel-section--up-next .sg-card__btn--schedule,
 .sb-carousel-section--up-next .sg-card__btn--favorite {
   background: rgb(255 255 255 / 80%);
@@ -1028,40 +891,19 @@
   backdrop-filter: blur(16px);
 }
 
-/* Figma (node 4975:46423, "Session card - no images"): title-to-actions spacing on tablet
-   should match the card's own uniform 12px gap (--s2a-spacing-sm — the same value already used
-   between the badge row and title, and the one this card's other top-level groups share).
-   sessions-guide.css's base .sg-card__title only has a 2px margin-bottom, clearly meant for
-   spacing between wrapped title lines rather than the gap to the next group below it. */
+/* Title-to-actions spacing on tablet matches this card's own uniform 12px gap — sessions-
+   guide's base rule only has a 2px margin meant for wrapped title lines. */
 @media (min-width: 768px) and (max-width: 1279px) {
   .sb-carousel-section--up-next .sg-card__title {
     margin-bottom: var(--s2a-spacing-sm, 12px);
   }
 }
 
-/* sessions-guide.css redefines .sg-card as a hover-reveal desktop card at 1280px+ (a
-   different card than .sg-live-card's own desktop redesign, same root cause): the badge
-   moves into a bottom "footer" row, .sg-card__body gets a fixed 331px width, and
-   .sg-card__actions collapses to width:0/opacity:0/pointer-events:none until hover/focus/
-   scheduled/favorited. Per explicit follow-up ("go with upcoming card styling and behavior
-   from session guide"), this is now adopted rather than reset — and every one of those rules
-   (.sg-card__body, __badge-row, __footer, __track--footer, __footer-badge, __actions,
-   __actions::after, __title/__time hover colors) is a BARE selector in sessions-guide.css,
-   not gated behind a `.sessions-guide`/`.sg-portal` ancestor the way the container-level
-   `.sg-card`/`.sg-card:is(:hover, :focus-within)` rules are — so once nothing here fights
-   them, they apply automatically with no code of our own needed. Only the container-level
-   width/min-height/background/shadow hover treatment is ancestor-gated and still needs its
-   own explicit replica; see the block below. */
-
-/* Per Figma: on tablet (this block's own 768-1279px range) the carousel nav arrows should not
-   show — cards are swipeable instead. sessions-guide's own "Intermediate Tablet" tier
-   (1024-1279px) turns .sg-carousel__cards into a non-scrollable, JS-transform-paged strip
-   (Carousel.js's `paged` state, derived from computed overflow-x) with the nav arrows as the
-   ONLY way to reach more cards — hiding the nav there without restoring native scroll would
-   strand anyone with more cards than fit on screen. Below 1024px this half is a no-op: cards
-   already scroll natively and the nav is only a floating enhancement over them.
-   Carousel.js recomputes `paged` from computed overflow-x on its own — restoring the CSS here
-   is enough to flip it back to native-scroll mode, no JS changes needed. */
+/* Tablet: carousel nav arrows hidden, cards swipeable instead. sessions-guide's own
+   "Intermediate Tablet" tier (1024-1279px) otherwise turns .sg-carousel__cards into a
+   JS-transform-paged strip with the nav as the only way to reach more cards — hiding it
+   without restoring native scroll would strand overflow content. Carousel.js recomputes its
+   own paged state from computed overflow-x, so no JS changes are needed. */
 @media (min-width: 768px) and (max-width: 1279px) {
   .sb-carousel-section--also-live .sg-carousel__nav,
   .sb-carousel-section--up-next .sg-carousel__nav {
@@ -1081,28 +923,24 @@
     scroll-snap-align: start;
   }
 
-  /* Per design: header-to-cards gap grows to 24px on tablet (was 12px, --s2a-spacing-sm, per the
-     base rules above). */
+  /* Header-to-cards gap grows to 24px on tablet (was 12px). */
   .sb-carousel-section--also-live .sg-carousel__header,
   .sb-carousel-section--up-next .sg-carousel__header {
     margin-bottom: var(--s2a-spacing-lg, 24px);
   }
 }
 
-/* Per design: Also Live card images should not have the 1px border on tablet. The
-   min-width:1024px reset block above adds it for its own no-upper-bound range (1024px+,
-   originally meant for desktop) — this bounded block wins the cascade tie for the 1024-1279px
-   overlap (same specificity, later in source order), leaving the border in place at 1280px+.
-   768-1023px never had the border in the first place (that reset block doesn't reach that low),
-   so this is a no-op there. */
+/* Also Live card images lose their 1px border on tablet — the 1024px+ reset block adds it
+   for its own unbounded range; this bounded block wins the cascade tie for 1024-1279px,
+   leaving the border at 1280px+. */
 @media (min-width: 768px) and (max-width: 1279px) {
   .sb-carousel-section--also-live .sg-live-card__image {
     border: none;
   }
 }
 
-/* Kept here, after both sections' base rules, for ascending specificity (stylelint
-   no-descending-specificity) — see "Ended-state background bleed" above for the full context. */
+/* Kept here, after both sections' base rules, for ascending specificity
+   (stylelint no-descending-specificity). */
 .sb-ended ~ .sb-carousel-section--also-live,
 .sb-ended ~ .sb-carousel-section--up-next {
   background: transparent;
@@ -1113,11 +951,8 @@
   color: var(--s2a-color-content-inverse, #fff);
 }
 
-/* Per design: the 32px (--s2a-spacing-xl) vertical padding on these sections is correct
-   generally — it only shrinks to 24px (--s2a-spacing-lg) top/bottom, on tablet, specifically
-   once the session has ended (i.e. these sections sit below .sb-ended's marquee, not below the
-   player). Two adjacent sections' combined gap goes from 64px (32+32) to 48px (24+24) in that
-   state only. Left padding untouched. */
+/* Vertical padding shrinks from 32px to 24px top/bottom on tablet once the session has
+   ended (these sections sit below .sb-ended's marquee, not below the player). */
 @media (min-width: 768px) and (max-width: 1279px) {
   .sb-ended ~ .sb-carousel-section--also-live,
   .sb-ended ~ .sb-carousel-section--up-next {
@@ -1126,21 +961,16 @@
   }
 }
 
-/* Per follow-up: header-to-cards gap grows to 32px specifically once the session has ended at
-   desktop — the shared nav-alignment rule (24px, min-height:40px) still applies generally;
-   this sibling-scoped override (3 classes vs. 2) wins the specificity tie regardless of source
-   order once .sb-ended is present. */
+/* Header-to-cards gap grows to 32px once ended at desktop — the shared nav-alignment rule's
+   24px still applies generally; this sibling-scoped override wins the specificity tie once
+   .sb-ended is present. */
 @media (min-width: 1280px) {
   .sb-ended ~ .sb-carousel-section--also-live .sg-carousel__header,
   .sb-ended ~ .sb-carousel-section--up-next .sg-carousel__header {
     margin-bottom: var(--s2a-spacing-xl, 32px);
   }
 
-  /* Correction: "More live sessions"/"Upcoming sessions" stays 18px at desktop while the
-     session is still live (the general rule, unbounded from 768px, already gives that) — it
-     only grows to 24px once ended. An earlier pass wrongly applied 24px unconditionally at
-     desktop; scoped here to the ended-state sibling selector instead, alongside the existing
-     color override above. */
+  /* Section title stays 18px live, only grows to 24px once ended. */
   .sb-ended ~ .sb-carousel-section--also-live .sg-section-title,
   .sb-ended ~ .sb-carousel-section--up-next .sg-section-title {
     font-size: var(--s2a-font-size-2xl, 24px);
@@ -1148,21 +978,13 @@
   }
 }
 
-/* Carousel nav arrows (both sections): sessions-guide.css's own desktop rule takes them out of
-   flow (position: absolute; top: 0; right: 0;, anchored to .sg-carousel) so they sit beside
-   the section title instead of beside the cards — but nothing sizes .sg-carousel__header to
-   actually match the 40px-tall nav buttons, so "top: 0" only aligns with the title's own
-   (much shorter) line box, not a real 40px band, and the gap to the cards below is whatever's
-   left over from the title's height alone rather than a deliberate value. Giving the header a
-   40px min-height (matching .sg-carousel__arrow's own fixed size) makes both header and nav
-   share the same 40px box — so their tops genuinely align — and turns the required 24px
-   clearance to the cards below into a plain, deterministic margin-bottom, not something that
-   depends on which title token happens to be in effect.
-   Deliberately placed here, after both sections' own unconditional base rules (each of which
-   also sets .sg-carousel__header's margin-bottom, at 12px) rather than nearer the Also Live
-   desktop block above — same specificity on both sides, so whichever comes LAST in the file
-   wins the cascade tie for widths ≥1280px; placed too early once, Up Next's own later base
-   rule silently re-won and undid the 24px value here. */
+/* sessions-guide's own desktop rule takes the nav out of flow (anchored to .sg-carousel), so
+   it sits beside the title — but nothing sizes .sg-carousel__header to match the nav's own
+   40px buttons, so top:0 only aligns with the title's much shorter line box. Giving the
+   header a 40px min-height makes both share the same box, and turns the clearance to the
+   cards below into a plain margin-bottom.
+   Placed after both sections' own base rules (which also set this margin) — same
+   specificity, so whichever is LAST in the file wins the tie for widths ≥1280px. */
 @media (min-width: 1280px) {
   .sb-carousel-section--also-live .sg-carousel__header,
   .sb-carousel-section--up-next .sg-carousel__header {
@@ -1176,60 +998,38 @@
   }
 }
 
-/* Same 1280px "wide" threshold used elsewhere in sessions-guide.
-   .sb-info's corners are square (border-radius: 0, see its base rule) — an earlier pass
-   rounded its bottom corners to 32px to read as one merged card with the player above, per
-   Figma nodes 24:22746/24:20749; corrected back to square, per explicit follow-up.
-   This 1192px max-width is the shared "desktop" (1280-1440px) content wrapper value; xl
-   desktop (1441px+) bumps it to 1440px instead — see the dedicated xl-desktop block near the
-   end of this file, which overrides every one of this wrapper's uses (this rule, .sb-ended,
-   and both carousel sections' own .sg-carousel) in one place rather than repeating the bump
-   inline at each one. */
+/* .sb-info's corners are square (border-radius: 0, see its base rule).
+   1192px is the shared "desktop" (1280-1440px) wrapper value; xl desktop (1441px+) bumps it
+   to 1440px in the dedicated block near the end of this file. */
 @media (min-width: 1280px) {
-  /* :not() excludes Also Live and Up Next — both sections' own containers/backgrounds now stay
-     full-bleed to the page edge at this width, with only their inner content (.sg-carousel)
-     capped instead; see their own dedicated desktop blocks further down. */
+  /* :not() excludes Also Live and Up Next — both stay full-bleed, with only their inner
+     .sg-carousel capped/centered; see their own desktop blocks below. */
   .sb-info,
   .sb-carousel-section:not(.sb-carousel-section--also-live):not(.sb-carousel-section--up-next) {
     max-width: 1192px;
     margin: 0 auto;
   }
 
-  /* Per follow-up: no left/right padding at desktop — the max-width/margin: auto centering
-     above already provides the breathing room, same reasoning as Also Live/Up Next clearing
-     their own side padding once they switch to this centered-content pattern. Top/bottom
-     (the base rule's --s2a-spacing-lg) stay untouched. */
+  /* No left/right padding at desktop — centering already provides the breathing room. */
   .sb-info {
     padding-right: 0;
     padding-left: 0;
   }
 
-  /* Per node 24:22746 — 24px, not tablet's 20px (see the tablet-scoped rule above; letter-
-     spacing is shared/unbounded and lives on the base title rule). */
+  /* 24px at desktop, not tablet's 20px. */
   .sb-info__title {
     font-size: var(--s2a-font-size-2xl, 24px);
     line-height: var(--s2a-font-line-height-md, 24px);
   }
 }
 
-/* Figma (node 24:22727, live-state desktop page; node 24:22751, "Session Broadcast/Upcoming
-   Section", specifically): unlike mobile/tablet's white Upcoming section, desktop keeps it
-   dark too — black, matching the player/info panel and Also Live (which is dark unconditionally
-   at every breakpoint now, see the base rule above) above it. The cards themselves are mostly
-   untouched (still light, per the design) — the section background and its title (illegible
-   dark-on-dark otherwise) flip, and the section's own container/background follows the exact
-   same full-bleed-to-the-page-edge treatment Also Live already has: capped at 1192px, the
-   background would render as a boxed rectangle with visible light gutters on either side
-   instead of a true edge-to-edge black band, contradicting the screenshot. This is unconditional
-   within its own range (not gated on `.sb-ended` the way the existing dark-background sibling
-   rules below are) — those cover the ended-state photo bleed specifically and, being more
-   specific selectors, still win when both a session has ended and the page is at desktop width.
-   Left unbounded above 1280px (no xl-desktop frame contradicts it yet), same as the max-width
-   rule above. */
+/* Desktop: Upcoming section goes dark too, matching the player/info panel and Also Live
+   above it — same full-bleed-to-the-page-edge treatment as Also Live. Unconditional (not
+   gated on .sb-ended) — the ended-state sibling rules below are more specific and still win
+   when both conditions overlap. */
 @media (min-width: 1280px) {
-  /* 32px top / 64px bottom, not the symmetric 32px/32px used below this width (base rule
-     above) — asymmetric per the design. Horizontal padding is 0: .sg-carousel below handles
-     centering the content at 1192px instead, same split as Also Live. */
+  /* 32px top / 64px bottom, asymmetric per design. Horizontal padding is 0 — .sg-carousel
+     below handles centering. */
   .sb-carousel-section--up-next {
     padding: var(--s2a-spacing-xl, 32px) 0 var(--s2a-spacing-4xl, 64px);
     background: var(--s2a-color-gray-1000, #000);
@@ -1244,50 +1044,28 @@
     color: var(--s2a-color-content-inverse, #fff);
   }
 
-  /* Same reasoning as Also Live's own identical fix: sessions-guide.css's track only ever
-     bleeds by a small fixed amount sized for a different, non-full-bleed section, and
-     .sg-carousel__cards' own padding-right eats further into that. With .sg-carousel confirmed
-     centered in the full viewport (via the section's own 0 horizontal padding above), the exact
-     gap from its right edge to the true viewport edge is (100vw - 1192px) / 2. */
+  /* Same edge-bleed reasoning as Also Live above. */
   .sb-carousel-section--up-next .sg-carousel__track {
     margin-right: calc((100vw - 1192px) / -2);
   }
 
-  /* Per follow-up: sessions-guide's own "Upcoming"-style row (.sg-time-row__cards, a different
-     row component from this shared carousel one) also fixes its own height at 124px — the
-     RESTING card height, not the hovered one — so when align-items: center (added above)
-     re-centers a hovered, taller (150px) card within that unchanging 124px line, the extra
-     height simply overflows the row's own box symmetrically above/below (overflow: visible;
-     sessions-guide.css's own native 1280px+ rule for .sg-carousel__cards already sets this,
-     unscoped, so it's already in effect here) — nothing about the row's own size changes, so
-     sibling cards never need to shift position at all. Without an explicit height here, this
-     row is auto-sized to its tallest child instead, so a hovered card growing taller genuinely
-     grows the row itself, and align-items: center re-centers every *other* card within that
-     now-taller line too — the "pushes all cards down" the user was seeing. Height, not just
-     alignment, is the fix; horizontal reflow (siblings shifting right as the hovered card's
-     width grows) is expected either way — sessions-guide's own row does the exact same thing,
-     it just isn't fighting a growing vertical size at the same time. */
+  /* sessions-guide's own "Upcoming" row fixes its height at the resting card height (124px),
+     so a hovered, taller card overflows the row symmetrically (overflow: visible, already
+     native here) instead of growing the row and shifting siblings down via
+     align-items: center. Horizontal reflow as the hovered card widens is still expected,
+     same as sessions-guide. */
   .sb-carousel-section--up-next .sg-carousel__cards {
     padding-right: 0;
     align-items: center;
     height: 124px;
   }
 
-  /* Per explicit follow-up ("go with upcoming card styling and behavior from session guide"):
-     the container-level width/min-height/background/shadow hover treatment IS gated behind
-     sessions-guide.css's own `:is(.sessions-guide, .sg-portal)` ancestor selector, which this
-     file's DOM never carries — unlike the descendant rules above, this half needs its own
-     explicit replica. Values (379px→427px width, 124px→150px min-height, gray-50→gray-900
-     background, the shadow) are copied exactly from sessions-guide.css's own rule, not the
-     327px/24px-padding figures an earlier pass derived from the static Figma frame — those
-     frames only ever showed content examples, never the interactive states this follow-up is
-     actually about. */
+  /* Container-level width/min-height/background/shadow hover treatment is gated behind
+     sessions-guide's own .sessions-guide/.sg-portal ancestor, which this DOM never carries —
+     replicated directly here, copied exactly from sessions-guide's own values. */
   .sb-carousel-section--up-next .sg-card {
-    /* Missing from the first pass: without this, the card stayed the base rule's
-       flex-direction: column, stacking the actions column *below* the body instead of
-       beside it — sessions-guide's own container rule switches to a row layout here so the
-       hover-revealed actions column slides in from the right, next to the text, not
-       underneath it. */
+    /* Without this the card stays flex-direction: column (base rule), stacking actions below
+       the body instead of beside it. */
     flex-direction: row;
     align-items: stretch;
     width: 379px;
@@ -1307,8 +1085,8 @@
     z-index: 2;
   }
 
-  /* .is-scheduled/.is-favorited pre-widen the card even at rest (no dark fill/shadow until
-     also hovered) — same as sessions-guide.css's own combined-state rules. */
+  /* .is-scheduled/.is-favorited pre-widen the card at rest too, matching sessions-guide's own
+     combined-state rules. */
   .sb-carousel-section--up-next .sg-card.is-scheduled,
   .sb-carousel-section--up-next .sg-card.is-favorited {
     width: 427px;
@@ -1322,23 +1100,17 @@
     z-index: 2;
   }
 
-  /* Correction: matching the user-supplied screenshot exactly — an opaque white circle with
-     the icon staying dark (currentColor's own default, #000, from the base .sg-icon-btn rule),
-     not a white icon on a transparent button. Pre-existing bug, surfaced by the card's own
-     hover darkening above: .is-scheduled/.is-favorited (base rule further up) makes the button
-     fully transparent at every state, which was fine on the light resting card but disappears
-     entirely once the now-transparent button sits over this dark hover background. Restoring an
-     opaque background specifically for the hover case (sessions-guide's own card keeps this
-     opaque circle at every state, never going transparent to begin with) fixes it without
-     touching the resting-state transparent/outlined look. */
+  /* An opaque white circle with the icon staying dark, matching sessions-guide (which never
+     goes transparent). .is-scheduled/.is-favorited makes the button fully transparent at
+     every state — fine on the light resting card, invisible once it sits over the dark hover
+     fill. Restoring opacity for the hover case only. */
   .sb-carousel-section--up-next .sg-card.is-scheduled:is(:hover, :focus-within) .sg-card__btn--schedule,
   .sb-carousel-section--up-next .sg-card.is-favorited:is(:hover, :focus-within) .sg-card__btn--favorite {
     background: #fff;
   }
 
-  /* Explicit per follow-up ("let's keep title maximum to 2 lines") — already sessions-guide.css's
-     own base-rule default (-webkit-line-clamp: 2), and nothing here removes it, but asserted
-     directly now that the card is wider, so a future width change can't silently drop it. */
+  /* 2-line clamp, matching sessions-guide's own default — asserted explicitly so a future
+     width change can't silently drop it. */
   .sb-carousel-section--up-next .sg-card__title {
     /* stylelint-disable-next-line value-no-vendor-prefix */
     display: -webkit-box;
@@ -1350,14 +1122,9 @@
 }
 
 /* ── XL desktop (1441px+) ────────────────────────────────────
-   First xl-desktop pass: bump the shared 1192px content wrapper (used, in one form or
-   another, by .sb-info/.sb-carousel-section's shared rule, .sb-ended, and both carousel
-   sections' own .sg-carousel) to 1440px. Placed after every 1280px+ block above and repeating
-   each selector at matching specificity, so this wins the cascade tie for widths ≥1441px
-   regardless of source order elsewhere in the file — same pattern as every breakpoint-layered
-   override already in this file. Also-Live/Up-Next's own edge-bleed calc for .sg-carousel__track
-   (currently `(100vw - 1192px) / -2`) is derived directly from this same wrapper width, so it
-   has to move in lockstep or the peeking card would drift off — updated here too. */
+   Bumps the shared 1192px content wrapper to 1440px. Placed after every 1280px+ block above,
+   repeating each selector at matching specificity so this wins the cascade tie for widths
+   ≥1441px. The edge-bleed calc for .sg-carousel__track moves in lockstep. */
 @media (min-width: 1441px) {
   .sb-info,
   .sb-carousel-section:not(.sb-carousel-section--also-live):not(.sb-carousel-section--up-next),
@@ -1372,13 +1139,9 @@
     margin-right: calc((100vw - 1440px) / -2);
   }
 
-  /* Per follow-up: the player caps at the same 1440px as the rest of the content wrapper here,
-     not the foundation's own 1480px (c2-global.css's .milo-video rule / event-youtube.css's
-     .youtube-video-container rule both read --s2a-layout-rich-media-content-measure-wide,
-     which resolves to 1480px at this tier per tokens.css) — closing the gap flagged when the
-     wrapper bump above first went in. !important needed for the same reason as the existing
-     tablet full-bleed override near the top of this file — both foundation selectors
-     out-specify a plain .session-broadcast-scoped one. */
+  /* The player caps at the same 1440px as the rest of the wrapper, not the foundation's own
+     1480px (c2-global.css/event-youtube.css both read a token that resolves to 1480px here).
+     !important for the same reason as the tablet override near the top of this file. */
   .session-broadcast .milo-video,
   .session-broadcast .youtube-video-container {
     max-width: 1440px !important;

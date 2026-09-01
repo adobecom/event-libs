@@ -15,6 +15,7 @@ export function AlsoLiveCarousel({ sessions, title = 'Currently Live', onSwitchS
         variant="live"
         onCardClick=${openSessionDetail}
         onWatchSamePage=${onSwitchSession}
+        showDurationBadge=${true}
       />
     </div>
   `;

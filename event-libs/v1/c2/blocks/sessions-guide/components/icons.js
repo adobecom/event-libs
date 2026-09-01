@@ -24,28 +24,24 @@ export function IconLinkOut() {
   return html`<svg width="10" height="10" viewBox="0 0 10 10" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false"><path d="M8.57143 0.714286H3.57143C3.17662 0.714286 2.85714 1.03376 2.85714 1.42857C2.85714 1.82338 3.17662 2.14286 3.57143 2.14286H6.8471L0.92355 8.06641C0.644536 8.34542 0.644536 8.79744 0.92355 9.07645C1.06306 9.21596 1.24581 9.28571 1.42857 9.28571C1.61133 9.28571 1.79409 9.21596 1.93359 9.07645L7.85714 3.1529V6.42857C7.85714 6.82338 8.17662 7.14286 8.57143 7.14286C8.96624 7.14286 9.28571 6.82338 9.28571 6.42857V1.42857C9.28571 1.03376 8.96624 0.714286 8.57143 0.714286Z" fill="currentColor"/></svg>`;
 }
 
-// Figma's "Functional / Arrow" (Sessions Guide handoff, 9145:44656), exported as authored —
-// a down arrow — and rotated 180deg here so it points up. Its natural 9x11 size is kept so it
-// lands at the 12px icon size the design's carousel button uses.
+// Exported as authored (a down arrow), rotated 180deg here to point up. Natural 9x11 size
+// kept so it lands at the 12px carousel-button icon size.
 export function IconArrowUp() {
   return html`<svg width="9" height="11" viewBox="0 0 8.87397 10.8804" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false"><path transform="rotate(180 4.436985 5.4402)" d="M4.43703 0C4.82858 3.9936e-08 5.14591 0.317454 5.14601 0.708984V8.46094L7.66457 5.94238C7.94145 5.66602 8.38975 5.66583 8.66652 5.94238C8.94316 6.21922 8.94309 6.66843 8.66652 6.94531L4.93898 10.6729C4.66212 10.9497 4.21298 10.9496 3.93605 10.6729L0.207534 6.94531C-0.0692075 6.66845 -0.0691485 6.21928 0.207534 5.94238C0.484438 5.66579 0.933633 5.66567 1.21046 5.94238L3.72804 8.45996V0.708984C3.72815 0.317462 4.04548 1.24591e-05 4.43703 0Z" fill="currentColor"/></svg>`;
 }
 
-// Figma's S2_Icon_Download_20_N (Sessions Guide handoff, node 8205:61815), exported as
-// authored — fill swapped to currentColor to match this file's other icons.
+// Exported as authored; fill swapped to currentColor to match this file's other icons.
 export function IconDownload() {
   return html`<svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false"><path d="M13.5303 9.42676C13.2383 9.13477 12.7637 9.13281 12.4697 9.42676L10.7529 11.1409V2.75C10.7529 2.33594 10.417 2 10.0029 2C9.58886 2 9.25292 2.33594 9.25292 2.75V11.1494L7.53026 9.42675C7.23729 9.13378 6.76268 9.13378 6.46971 9.42675C6.17674 9.71972 6.17674 10.1943 6.46971 10.4873L9.46776 13.4853C9.61424 13.6318 9.80565 13.7051 9.99803 13.7051C10.1894 13.7051 10.3818 13.6318 10.5283 13.4853L13.5302 10.4873C13.8232 10.1953 13.8232 9.71973 13.5303 9.42676Z" fill="currentColor"/><path d="M15.75 18H4.25C3.00977 18 2 16.9902 2 15.75V13.7285C2 13.3145 2.33594 12.9785 2.75 12.9785C3.16406 12.9785 3.5 13.3145 3.5 13.7285V15.75C3.5 16.1631 3.83691 16.5 4.25 16.5H15.75C16.1631 16.5 16.5 16.1631 16.5 15.75V13.7285C16.5 13.3145 16.8359 12.9785 17.25 12.9785C17.6641 12.9785 18 13.3145 18 13.7285V15.75C18 16.9902 16.9902 18 15.75 18Z" fill="currentColor"/></svg>`;
 }
 
-// Figma's S2_Icon_ShareAndroid_20_N (Sessions Broadcast handoff, node 37:96614), exported as
-// authored — fill swapped to currentColor to match this file's other icons.
+// Exported as authored; fill swapped to currentColor to match this file's other icons.
 export function IconShare() {
   return html`<svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false"><path d="M15 13.25C14.2319 13.25 13.5383 13.568 13.0389 14.0772L6.68213 10.5919C6.72437 10.4007 6.75 10.2036 6.75 9.99998C6.75 9.79637 6.72437 9.59922 6.68213 9.40806L13.0389 5.92271C13.5383 6.43199 14.2319 6.74998 15 6.74998C16.5166 6.74998 17.75 5.51658 17.75 3.99998C17.75 2.48338 16.5166 1.24998 15 1.24998C13.4834 1.24998 12.25 2.48338 12.25 3.99998C12.25 4.20701 12.2772 4.40696 12.3208 4.60105L5.96973 8.08762C5.46961 7.57273 4.77295 7.24997 4 7.24997C2.4834 7.24997 1.25 8.48337 1.25 9.99997C1.25 11.5166 2.4834 12.75 4 12.75C4.77295 12.75 5.4696 12.4272 5.96973 11.9123L12.3208 15.3989C12.2772 15.593 12.25 15.7929 12.25 16C12.25 17.5166 13.4834 18.75 15 18.75C16.5166 18.75 17.75 17.5166 17.75 16C17.75 14.4834 16.5166 13.25 15 13.25ZM15 2.74998C15.6895 2.74998 16.25 3.31053 16.25 3.99998C16.25 4.68943 15.6895 5.24998 15 5.24998C14.3105 5.24998 13.75 4.68943 13.75 3.99998C13.75 3.31053 14.3105 2.74998 15 2.74998ZM2.75 9.99998C2.75 9.31053 3.31055 8.74998 4 8.74998C4.68945 8.74998 5.25 9.31053 5.25 9.99998C5.25 10.6894 4.68945 11.25 4 11.25C3.31055 11.25 2.75 10.6894 2.75 9.99998ZM15 17.25C14.3105 17.25 13.75 16.6894 13.75 16C13.75 15.3105 14.3105 14.75 15 14.75C15.6895 14.75 16.25 15.3105 16.25 16C16.25 16.6894 15.6895 17.25 15 17.25Z" fill="currentColor"/></svg>`;
 }
 
-// Figma's S2a_Icon_Chevron_Right (Sessions Broadcast handoff, node 8873:23273), exported as
-// authored — fill swapped to currentColor. Points right by default; callers rotate it via CSS
-// for the up/down expand-caret treatment (see .sb-info__expand-icon).
+// Exported as authored; fill swapped to currentColor. Points right by default; callers rotate
+// it via CSS for the up/down expand-caret treatment (see .sb-info__expand-icon).
 export function IconChevronRight() {
   return html`<svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false"><path d="M4.85714 15.1429C4.56473 15.1429 4.27232 15.0312 4.04911 14.808C3.60269 14.3616 3.60269 13.6384 4.04911 13.192L9.24108 8L4.04911 2.80803C3.60269 2.36161 3.60269 1.63839 4.04911 1.19197C4.49553 0.745543 5.21875 0.745543 5.66518 1.19197L11.6652 7.19197C12.1116 7.63839 12.1116 8.36161 11.6652 8.80803L5.66518 14.808C5.44197 15.0312 5.14955 15.1429 4.85714 15.1429Z" fill="currentColor"/></svg>`;
 }

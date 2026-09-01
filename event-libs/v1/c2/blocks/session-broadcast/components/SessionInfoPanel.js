@@ -12,15 +12,12 @@ import {
 } from '../../sessions-guide/components/icons.js';
 import { trackBroadcastEvent } from '../utils/broadcast-analytics.js';
 
-// Collapsed: title, caret, clamped description (hidden if favorited — mobile only, see
-// session-broadcast.css's .is-favorited rules; tablet always shows it), Favorite + Share.
-// Expanded: actions move under the title, followed by a channel/duration row, the full
-// description (always shown, regardless of favorited), and "View all details" — the only
-// thing that opens the real Session Guide detail view (no local modal).
+// Collapsed vs. expanded changes which actions/meta show and whether the description is
+// clamped (hidden entirely if favorited, mobile only — see .is-favorited in the CSS). "View
+// all details" is the only path to the real Session Guide detail view; there's no local modal.
 //
-// `actions` renders once, in a fixed DOM position — session-broadcast.css repositions it (and
-// the title row) per state/breakpoint via CSS Grid areas, since collapsed vs. expanded and
-// mobile vs. tablet all want it in a different visual spot relative to the description.
+// `actions` renders once in a fixed DOM position — session-broadcast.css repositions it via
+// CSS Grid areas per state/breakpoint, since each combination wants a different visual spot.
 export function SessionInfoPanel({ session, viewAllDetailsLabel = 'View all details' }) {
   const [expanded, setExpanded] = useState(false);
 

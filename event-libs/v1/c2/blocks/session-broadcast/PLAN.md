@@ -2090,6 +2090,58 @@ override earlier in this file — both foundation selectors out-specify a plain
 
 Verified: lint clean, 144/144 tests pass unchanged (CSS-only, no behavior touched).
 
+## Comment cleanup + PR/accessibility review, fixes (2026-09-01)
+
+Ran an aggressive comment-trim pass across `session-broadcast.css` (1386→1149 lines) and 17
+other touched JS files (session-broadcast components/utils, plus shared `sessions-guide`
+files reused for this block), cutting narrative/process comments ("per explicit follow-up,"
+"the user confirmed," debugging-journey history) down to the one sentence that states the
+actual current-state constraint — that history already lives in this file. Then ran a full
+PR review (three parallel passes: session-broadcast components, session-broadcast utils/CSS,
+shared sessions-guide files) plus a Preact accessibility audit against the whole branch diff.
+Two critical issues were found and fixed:
+
+### Fixed: `.sg-live-card__actions-time` leaked into sessions-guide's own existing carousels
+
+The new trailing-duration span (added earlier this session for Also Live's card) was gated on
+`variant === 'live'` — sessions-guide's own pre-existing *default* variant, not a new opt-in.
+Verified `LiveUpcomingView.js` already calls `Carousel` with `variant="live"` for its own
+"Live sessions" section, so the badge was about to appear there too, contradicting the
+in-code comment claiming isolation. Added a new `showDurationBadge` prop (default `false`,
+threaded through `Carousel.js` → `LiveCard.js`), set explicitly `true` only by
+`AlsoLiveCarousel.js`; the render condition is now `variant === 'live' && showDurationBadge &&
+durationLabel` (both conditions required, so nothing changes for any existing caller).
+Updated `LiveCard.test.js`'s "actions-row duration" describe block to assert the new opt-in
+contract instead of the old always-on-for-live-variant one.
+
+### Fixed: Also Live cards' "view session detail" was keyboard-inaccessible
+
+At `surface: 'page'` (session-broadcast's usage), `LiveCard`'s title rendered as a plain `<p>`
+— only `surface: 'widget'` got the real `<button>` version. The whole-card `onCardClick`
+action (wired to `openSessionDetail`) only fired from a bare `<div onclick>`, so keyboard/
+screen-reader users had no way to reach it at all — "Watch now" stayed reachable via its own
+button, but "view details" was mouse-only. Widened the title's button/paragraph condition to
+`surface === 'widget' || onCardClick` — confirmed via `grep` that `surface: 'page'` is only
+ever set by `BroadcastApp.js`'s `GUIDE_CONFIG`, so this change is safely scoped to
+session-broadcast's own usage. Rewrote the two `LiveCard.test.js` assertions that had
+literally asserted the old, inaccessible behavior ("renders identical markup whether or not
+onCardClick is supplied") to instead assert the button now appears when `onCardClick` is
+supplied on the page surface.
+
+Both fixes verified: `npx eslint` clean on all touched files, 208/208 tests pass across
+`LiveCard`/`Carousel`/`LiveUpcomingView`/`MyFavoritesView`/session-broadcast's own suites, full
+`npm test` green (2227/2228, one pre-existing flaky `broadcast-url.test.js` history-length
+assertion confirmed unrelated — passes cleanly in isolation, only flakes in the full 142-file
+suite due to shared browser `history` state across tests).
+
+**Left for follow-up, not fixed** (warn/nit severity, not blocking): Up Next's possible
+missing background below 1280px (flagged once already, unaddressed); `getUpNextSessions`'
+per-render random tiebreak reshuffling same-start-time sessions; `EndedState.js`'s "View
+more" toggle missing `aria-expanded`/`aria-controls`; `SessionInfoPanel.js`'s dangling
+`aria-controls` for descriptionless sessions; duplicated favorite/share handlers between
+`EndedState.js`/`SessionInfoPanel.js`; unguarded dynamic import in `MpcPlayerAdapter.js`;
+`tier-1-event-config.js`'s ungated URL-param path override.
+
 ## Explicitly out of scope (fast-follow)
 
 - MobileRider real playback (stub adapter only)

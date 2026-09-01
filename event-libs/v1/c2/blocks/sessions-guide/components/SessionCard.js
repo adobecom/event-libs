@@ -34,9 +34,8 @@ export function SessionCard({
   const onDemand = forceOnDemand || onDemandNatural;
   const trackColor = getTrackIcon(session.primaryTrack)?.color || '';
 
-  // 'range' — session-broadcast's Upcoming section, per the Figma design (e.g.
-  // "9:15AM - 9:45AM") — reuses the same start–end formatting LiveCard.js already builds for
-  // its own recommended variant.
+  // 'range': session-broadcast's Upcoming section (e.g. "9:15AM - 9:45AM"), reusing the same
+  // start–end formatting LiveCard.js builds for its recommended variant.
   let upcomingTimeLabel;
   if (timeDisplay === 'range' && session.endTimeUtc) {
     const startShort = formatShortTime(session.startTimeUtc, userTz);
@@ -47,9 +46,8 @@ export function SessionCard({
   } else {
     upcomingTimeLabel = formatSessionTime(session.startTimeUtc, userTz);
   }
-  // A session with a DVR delay isn't watchable yet if the delay window (from the event's own
-  // start, not this session's) hasn't elapsed — see isDvrPending. No dvrDelayHours, or no
-  // known event start, means it's just on demand with no wait.
+  // A DVR delay isn't watchable until the delay window elapses, measured from the event's own
+  // start, not this session's (see isDvrPending).
   const dvrPending = onDemand && isDvrPending(session, nowMs, getEventApiConfig()?.eventStartMs);
   const timeLabel = onDemand ? (dvrPending ? 'AVAILABLE SOON' : 'ON DEMAND') : upcomingTimeLabel;
 
@@ -74,9 +72,8 @@ export function SessionCard({
     setHoverAnim(null);
   }
 
-  // Shared by handleSchedule/handleFavorite: when a card is about to leave its own
-  // list (e.g. unscheduling from "My sessions"), collapse it before the action runs
-  // so the exit animation isn't cut short by the list re-rendering underneath it.
+  // Shared by handleSchedule/handleFavorite: collapses a card before it leaves its own list
+  // (e.g. unscheduling from "My sessions") so the exit animation isn't cut short by the re-render.
   async function withDismissAnimation(e, willDismiss, actionFn) {
     if (willDismiss) {
       const cardWrap = e.currentTarget.closest('.sg-card')?.parentElement;
@@ -126,9 +123,8 @@ export function SessionCard({
     if (dest) window.location.href = dest;
   }
 
-  // iOS mis-routes the synthetic click to the card div when the touch target is
-  // inside a transform + overflow:hidden ancestor (sg-time-row__cards/viewport).
-  // Handle the action on touchend and preventDefault to kill the synthetic click.
+  // iOS mis-routes the synthetic click to the card div when the touch target sits inside a
+  // transform + overflow:hidden ancestor — handled on touchend with preventDefault instead.
   async function handleActionsTouchEnd(e) {
     e.preventDefault();
     const touch = e.changedTouches[0];
@@ -141,10 +137,9 @@ export function SessionCard({
 
   function handleClick() {
     if (surface === 'page') {
-      // A non-widget caller like session-broadcast has no in-widget overlay of its own to
-      // navigate away from — onCardClick lets it supply its own "open detail" behavior
-      // instead (same escape hatch LiveCard.js already offers). Defaults to the original
-      // straight-to-session-page navigation when nothing is supplied.
+      // A non-widget caller like session-broadcast has no in-widget overlay to navigate away
+      // from — onCardClick lets it supply its own "open detail" behavior instead (same escape
+      // hatch as LiveCard.js).
       if (onCardClick) { onCardClick(session); return; }
       const dest = safeUrl(session.sessionPageUrl);
       if (dest) window.location.href = dest;

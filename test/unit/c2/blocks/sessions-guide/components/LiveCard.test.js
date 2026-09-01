@@ -310,17 +310,26 @@ describe('LiveCard', () => {
 
   // Per the Figma "Also Live" card (session-broadcast's carousel), the live variant shows a
   // trailing duration next to Watch Now/Favorite — a different slot than the progress-bar
-  // overlay's own duration label (sg-live-card__duration), which already existed.
-  describe('actions-row duration (live variant only)', () => {
-    it('shows the session duration next to the actions for the live variant', () => {
+  // overlay's own duration label (sg-live-card__duration), which already existed. Gated on
+  // showDurationBadge specifically (not variant === 'live', which is sessions-guide's own
+  // pre-existing default and would otherwise leak this into its unrelated Live/My Favorites
+  // carousels) — see LiveUpcomingView.js/MyFavoritesView.js, neither of which opts in.
+  describe('actions-row duration (opt-in via showDurationBadge)', () => {
+    it('shows the session duration when showDurationBadge is true', () => {
       const LiveCard = buildLiveCard(preact, makeStore());
-      const out = LiveCard({ session: LIVE_SESSION, variant: 'live' });
+      const out = LiveCard({ session: LIVE_SESSION, variant: 'live', showDurationBadge: true });
       expect(out).to.include('sg-live-card__actions-time');
     });
 
-    it('omits it for the recommended variant', () => {
+    it('omits it by default for the live variant', () => {
       const LiveCard = buildLiveCard(preact, makeStore());
-      const out = LiveCard({ session: UPCOMING_SESSION, variant: 'recommended' });
+      const out = LiveCard({ session: LIVE_SESSION, variant: 'live' });
+      expect(out).to.not.include('sg-live-card__actions-time');
+    });
+
+    it('omits it for the recommended variant even with showDurationBadge', () => {
+      const LiveCard = buildLiveCard(preact, makeStore());
+      const out = LiveCard({ session: UPCOMING_SESSION, variant: 'recommended', showDurationBadge: true });
       expect(out).to.not.include('sg-live-card__actions-time');
     });
   });
@@ -348,13 +357,22 @@ describe('LiveCard', () => {
       })).to.not.throw();
     });
 
-    it('renders identical markup whether or not onCardClick/onWatchSamePage are supplied', () => {
+    // Deliberately NOT identical: the title becomes a real, keyboard-focusable <button> when
+    // onCardClick is supplied on the page surface (matching the widget surface's own already-
+    // accessible pattern) — a bare <div onclick> with no focusable equivalent inside it would
+    // otherwise make "open session detail" mouse/pointer-only for session-broadcast's cards.
+    it('renders the title as a button when onCardClick is supplied on the page surface', () => {
       const LiveCard = buildLiveCard(preact, pageSurfaceStore());
-      const withCallbacks = LiveCard({
-        session: LIVE_SESSION, onCardClick: () => {}, onWatchSamePage: () => {},
-      });
+      const withCallback = LiveCard({ session: LIVE_SESSION, onCardClick: () => {} });
       const without = LiveCard({ session: LIVE_SESSION });
-      expect(withCallbacks).to.equal(without);
+      expect(withCallback).to.include('sg-live-card__title-btn');
+      expect(without).to.not.include('sg-live-card__title-btn');
+    });
+
+    it('onWatchSamePage alone does not affect the title markup', () => {
+      const LiveCard = buildLiveCard(preact, pageSurfaceStore());
+      const out = LiveCard({ session: LIVE_SESSION, onWatchSamePage: () => {} });
+      expect(out).to.not.include('sg-live-card__title-btn');
     });
   });
 

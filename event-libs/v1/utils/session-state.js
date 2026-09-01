@@ -27,10 +27,9 @@ export function dvrAvailableAtMs(session, eventStartMs) {
   return eventStartMs + session.dvrDelayHours * HOUR_MS;
 }
 
-// Not read by the sessions-guide's own filtering (PM decision, 2026-08-26 — see
-// onDemandSessions() in sessions-guide/utils/session-filters.js) — kept as a shared utility
-// for any other block that needs to know whether a session's recording window has opened.
-// Fails open when either input is missing.
+// Not read by sessions-guide's own filtering (see onDemandSessions() in
+// sessions-guide/utils/session-filters.js) — kept as a shared utility for any block that
+// needs it. Fails open when either input is missing.
 export function isDvrPending(session, nowMs, eventStartMs) {
   const availableAt = dvrAvailableAtMs(session, eventStartMs);
   return availableAt !== null && nowMs < availableAt;
@@ -75,12 +74,10 @@ export function isPostEvent(sessionList, liveStreamActiveIds, nowMs, eventEndMs)
   return allEnded || pastEventEnd;
 }
 
-// A session belongs on the Broadcast page only if it's the kind getWatchDestination() would
-// actually route there once live — mainstage/keynote sessions (isLivestreamed) are homepage
-// content regardless of isOnline (ticket: "Keynote/sneaks will be on homepage main player" is
-// explicitly out of scope for Broadcast). Session Broadcast's own schedule aggregation
-// (session-broadcast/utils/broadcast-schedule.js) filters its session pool through this so a
-// live keynote can never end up playing in, or occupying a slot in, the Broadcast page.
+// A session belongs on the Broadcast page only if getWatchDestination() would actually route
+// there once live — mainstage/keynote sessions (isLivestreamed) are homepage content
+// regardless of isOnline. broadcast-schedule.js filters its pool through this so a live
+// keynote never occupies a Broadcast slot.
 export function isBroadcastEligible(session) {
   return !session.isLivestreamed && !!session.isOnline;
 }

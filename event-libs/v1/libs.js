@@ -1,4 +1,3 @@
-// Core constants
 const EVENT_BLOCKS = [
   'bento-cards',
   'chrono-box',
@@ -43,8 +42,7 @@ const EVENT_BLOCKS_C2 = [
   'event-youtube',
 ];
 
-// Import only the most essential utilities that are always needed
-// These are the functions that the importer's scripts.js actually uses
+// Only the utilities scripts.js actually needs directly
 import {
   getEventServiceEnv,
   getMetadata,
@@ -55,8 +53,7 @@ import {
   getEventConfig,
 } from './utils/utils.js';
 
-// Pre-load the most commonly used functions from decorate.js
-// This reduces the initial network load while keeping critical functions available
+// Pre-load the most commonly used functions from decorate.js to reduce initial network load
 import {
   decorateEvent,
   getNonProdData,

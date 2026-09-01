@@ -32,11 +32,9 @@ function extractSessionEndedImageUrl(el) {
   return valueEl?.querySelector('a[href]')?.href || valueEl?.querySelector('img[src]')?.src || '';
 }
 
-// Unlike a.href/img.src, source.srcset (property or attribute) is NEVER resolved to an absolute
-// URL by the browser — srcset is a list microsyntax (comma-separated url+descriptor pairs), not
-// a single URL, so there's nothing for the browser to resolve automatically. DA authors relative
-// paths here ("./image.jpg?width=2000..."), which must be resolved by hand or a relative URL
-// leaks straight into safeUrl()'s absolute-URL check downstream and gets silently rejected.
+// Unlike a.href/img.src, srcset is never auto-resolved to an absolute URL by the browser (it's
+// a list microsyntax, not a single URL). DA authors relative paths here, so this must resolve
+// by hand or the relative URL gets silently rejected by safeUrl()'s absolute-URL check downstream.
 function resolveUrl(url) {
   try {
     return new URL(url, document.baseURI).href;
@@ -45,22 +43,16 @@ function resolveUrl(url) {
   }
 }
 
-// The first URL token of one srcset candidate (ignores any trailing width/density descriptor,
-// e.g. "image.jpg 2x" — our own authored sources never carry one, but this stays correct either
-// way) and takes only the first comma-separated candidate (srcset supports a list; every source
-// here only ever has one).
+// Takes the first comma-separated srcset candidate and strips any trailing width/density
+// descriptor (e.g. "image.jpg 2x").
 function firstSrcsetUrl(srcset) {
   return (srcset || '').trim().split(',')[0]?.trim().split(/\s+/)[0] || '';
 }
 
-// A bigger variant for tablet+, read from the row's own authored <picture> (if DA happened to
-// embed one alongside the link — the two aren't mutually exclusive; a "linked image" cell keeps
-// its <picture> nested inside the <a>). Only ever reads a URL string out of it, never renders
-// the <picture> itself back into the page — so unlike the original picture-embedding bug, this
-// can't reintroduce the decorateImageLinks() collision: if that already swapped this picture for
-// an empty <video> (alt text carrying a `|`-delimited convention), querySelector('picture')
-// simply finds nothing here and this degrades to reusing the single default URL everywhere,
-// identical to the behavior before this existed.
+// A bigger variant for tablet+, read from the row's own authored <picture> (nested inside the
+// <a>, since a "linked image" cell can carry both). Only ever reads a URL string, never
+// re-renders the <picture> — if decorateImageLinks() already swapped it for an empty <video>,
+// this just degrades to reusing the single default URL everywhere.
 function extractLargestPictureUrl(el) {
   const picture = getSessionEndedImageValueEl(el)?.querySelector('picture');
   const sources = [...(picture?.querySelectorAll('source[srcset]') || [])];

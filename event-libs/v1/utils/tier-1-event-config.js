@@ -58,15 +58,10 @@ export function getAllowDoubleBooking() {
 }
 
 // `?homepagePath=`, `?broadcastPath=`, `?sessionGuidePath=` override the corresponding
-// authored path for testing from a URL that doesn't match it yet — e.g. a DA draft path
-// (/max/2026/drafts/<user>/broadcast) vs. the page's eventual published one
-// (/max/2026/broadcast.html). Without this, isSamePage() comparisons downstream
-// (getWatchDestination(), used by LiveCard's "Watch now" same-page switch; EndedState's
-// end-of-event redirect target) always fail to match on a draft, since they compare the
-// current pathname against whatever these getters return. Same convention as
-// session-state.js's `?serverTime=`. Restricted to same-origin relative paths (must start
-// with a single `/`, not `//`) — this is a testing convenience, not a redirect target, so it
-// must not accept an absolute/cross-origin URL.
+// authored path for testing from a draft URL that doesn't match the eventual published one —
+// without this, isSamePage() comparisons downstream always fail to match on a draft. Same
+// convention as session-state.js's `?serverTime=`. Restricted to same-origin relative paths
+// only — a testing convenience, not a redirect target.
 function pathOverride(param) {
   try {
     const value = new URLSearchParams(window.location.search).get(param);
@@ -85,8 +80,8 @@ export function getBroadcastPath() {
   return pathOverride('broadcastPath') || tierOneEventConfig.broadcastPath || '';
 }
 
-// Where Broadcast redirects once every session for the entire event has aired (ticket:
-// "redirects to the on demand session guide"), per session-broadcast/components/EndedState.js.
+// Where Broadcast redirects once every session for the event has aired
+// (session-broadcast/components/EndedState.js).
 export function getSessionGuidePath() {
   return pathOverride('sessionGuidePath') || tierOneEventConfig.sessionGuidePath || '';
 }
