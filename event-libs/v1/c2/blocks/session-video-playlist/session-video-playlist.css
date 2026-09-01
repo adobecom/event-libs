@@ -429,6 +429,7 @@
     border: none;
     background: none;
     text-align: center;
+    font-family: inherit;
     font-size: var(--s2a-font-size-sm);
     font-style: normal;
     font-weight: 700;
