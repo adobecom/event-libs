@@ -1736,6 +1736,165 @@ existing desktop long-card block, alongside the bleed-to-edge fix already there.
 
 Verified: lint clean, 144/144 tests pass unchanged (CSS-only, no behavior touched).
 
+### Upcoming section: desktop card sizing + full-bleed container (Figma node 24:22751) (2026-09-01)
+
+User: "Lets move forward with upcoming session desktop now... spacing is very similar between
+nav and cards ... to what we already did with 'also live' section. Let keep title maximum to
+2 lines."
+
+The nav/header-to-cards spacing fix from the earlier Also Live work was already shared between
+both sections (`.sb-carousel-section--also-live .sg-carousel__header, .sb-carousel-section--up-
+next .sg-carousel__header { min-height: 40px; margin-bottom: 24px; }`), so nothing new was
+needed there — confirmed it already covers Up Next. New work, extending the existing desktop
+dark-background block for Up Next (added a few requests ago):
+
+- **Full-bleed container, matching Also Live**: the Figma frame shows the section's black
+  background spanning the true viewport edge to edge, not boxed at 1192px — but Up Next wasn't
+  excluded from the shared `.sb-info, .sb-carousel-section { max-width: 1192px; margin: 0 auto; }`
+  rule the way Also Live was, so its background was rendering as a centered rectangle with
+  visible gutters. Excluded it too (`:not(.sb-carousel-section--up-next)`), then capped
+  `.sg-carousel` at 1192px/auto-margin instead, same split as Also Live. This is scope beyond
+  the literal ask (only nav spacing + title clamp were named) but directly matches what the
+  Figma frame's own screenshot shows, and mirrors an already-established pattern — flagging it
+  rather than silently doing it.
+- **Asymmetric vertical padding**: 32px top / 64px bottom (was symmetric 32px/32px below this
+  width) — read directly from the frame's `pt-32/pb-64` values.
+- **Peek bleeds to the true viewport edge**: same fix as Also Live's own — with `.sg-carousel`
+  confirmed centered in the (now unpadded) full viewport, pulled `.sg-carousel__track` out by
+  `(100vw - 1192px) / 2` and zeroed `.sg-carousel__cards`'s padding-right.
+- **Card width/padding**: grew from 268px/16px (mobile/tablet) to a fixed 375px/24px, matching
+  the frame's literal 327px inner-column width plus 24px padding each side (border-box).
+- **Title 2-line clamp**: already sessions-guide.css's own base-rule default
+  (`-webkit-line-clamp: 2`) and nothing removes it, so nothing was actually broken — asserted it
+  explicitly anyway per the follow-up, so a future width/layout change can't silently drop it.
+- **Card-to-card gap**: already 16px (set in an earlier request) and matches this frame's own
+  `gap-[16px]` exactly at desktop too — no change needed, unlike Also Live which needed a
+  different (24px) desktop-specific value.
+
+Verified: lint clean, 144/144 tests pass unchanged (CSS-only, no behavior touched).
+
+### Upcoming card hover/focus: matched sessions-guide's own upcoming card (2026-09-01)
+
+User: three more Figma frames (24:22986/24:22987/24:22988) as "source of truth for spacing and
+general guidance," but the explicit ask was behavioral: "I want the same hover and focus effects
+you see in upcoming session guide," referencing `sg-time-row__card-wrap` specifically.
+
+The 3 frames turned out to be 3 *content* variants of the same static card (with/without a
+favorite button, short vs. 2-line-truncated title) — not resting/hover/focus states; they
+confirmed the spacing already implemented (24px padding, 327px column, 16px internal gap, 16px
+radius, `#f8f8f8` background) matches exactly, no changes needed there.
+
+For the actual hover/focus behavior, traced `sg-time-row__card-wrap` and found it's a **pure
+layout wrapper** with no interactive styling of its own (`sessions-guide.css:1188-1199` — just
+`flex-shrink`/`width`/a collapse-animation transition). The real effect lives on the child
+`.sg-card`, gated behind `:is(.sessions-guide, .sg-portal) .sg-card:is(:hover, :focus-within)`
+(`sessions-guide.css:2569-2612`) — a selector this file's DOM never matches, since broadcast
+never carries a `.sessions-guide`/`.sg-portal` ancestor class (same reason this file already
+replicates `.sg-card`'s base styling directly, per the comment on that rule). Native effect:
+width grows 379px→427px (+48px), `box-shadow: 0 6px 24px rgb(0 0 0 / 18%)` appears, `z-index: 2`,
+all via a `0.32s cubic-bezier(0.22, 1, 0.36, 1)` transition — background does NOT change on
+plain hover (that only happens combined with `is-scheduled`/`is-favorited`, a separate state).
+
+Replicated directly under `.sb-carousel-section--up-next .sg-card`, scaled from this card's own
+375px baseline (→ 423px on hover/focus, same +48px delta) with the identical shadow/z-index/
+transition timing.
+
+Verified: lint clean, 144/144 tests pass unchanged (CSS-only, no behavior touched).
+
+### Correction: adopt sessions-guide's full desktop .sg-card behavior, not just hover (2026-09-01)
+
+User: "Still not there. go with upcoming card styling and behavior from session guide." Then,
+mid-turn, clarified scope: "I am referring to the card itself and at desktop. The current
+carrousel works well" — i.e. this is about `.sg-card` specifically, not carousel-level
+mechanics (nav, gap, bleed), which stay untouched.
+
+A full audit of sessions-guide.css's `@media (min-width: 1280px)` `.sg-card` rules found the
+previous attempt was only half right: it replicated the container's hover-growth delta, but
+left in place an OLD, load-bearing reset block (originally from an earlier phase, predating
+this session) that actively fights sessions-guide's own native desktop redesign — forcing the
+badge row to stay visible, the footer hidden, actions always-visible (not hover-gated), and the
+trailing time label shown. Critically, every one of those descendant rules
+(`.sg-card__body`/`__badge-row`/`__footer`/`__track--footer`/`__footer-badge`/`__actions`/
+`__actions::after`, plus `__title`/`__time`'s hover-color flips) is a **bare** selector in
+sessions-guide.css — not gated behind the `.sessions-guide`/`.sg-portal` ancestor class this
+file's DOM lacks — so they were already silently trying to apply; only that old reset was
+blocking them.
+
+**Removed the reset block entirely** — badge/footer swap, hover-gated actions reveal, and
+title/time hover-to-white now all come from sessions-guide.css natively, verbatim, zero code of
+our own needed.
+
+**Expanded the container-level replica** (the one half that *is* ancestor-gated and genuinely
+needs its own copy) to match sessions-guide's exact values instead of the earlier pass's
+Figma-derived approximation: width 379px→427px (was 375→423, a guess scaled off the static
+content-only Figma frames from two requests ago — those frames never showed an interactive
+state, so treating their literal 327px/24px math as the hover-behavior source was itself the
+mistake), min-height 124px→150px (new), background gray-50→gray-900 on hover (new — this is
+what makes the now-native white title/time hover-colors actually legible, previously missing),
+plus the `.is-scheduled`/`.is-favorited` pre-widened combined states, matching sessions-guide's
+own rule set one-for-one.
+
+Verified: lint clean, 144/144 tests pass unchanged (CSS-only, no behavior touched).
+
+### Correction: actions column was at the bottom, not the side (2026-09-01)
+
+User posted a screenshot: "Not quite there. the upcoming actions are showing at the bottom
+instead of on the side like they do on session guide." Root cause: the container-level replica
+copied width/min-height/padding/background/box-shadow/transition from sessions-guide.css's own
+`.sg-card` rule but missed `flex-direction: row` (and `align-items: stretch`), also part of
+that same rule. Without it, the card stayed the base rule's `flex-direction: column`, stacking
+`.sg-card__actions` *below* `.sg-card__body` instead of beside it — confirmed via
+`SessionCard.js:171-187` that body and actions are direct siblings under `.sg-card`, so the
+parent's own flex-direction is what actually decides their arrangement. Added the missing
+properties; the hover-revealed actions column now slides in from the right, next to the text.
+
+Verified: lint clean, 144/144 tests pass unchanged (CSS-only, no behavior touched).
+
+### Correction: Up Next header margin-bottom source-order bug (2026-09-01)
+
+User: "sg-carousel__header is still using margin bottom var(--s2a-spacing-sm); instead of lg."
+Both the shared desktop nav-alignment rule (`.sb-carousel-section--up-next .sg-carousel__header
+{ margin-bottom: var(--s2a-spacing-lg) }`, gated `@media (min-width: 1280px)`) and Up Next's own
+unconditional base rule (`{ margin-bottom: var(--s2a-spacing-sm) }`, 12px) target the identical
+selector at identical specificity — a tie CSS breaks by source order, last-in-file wins,
+*regardless* of the media query. Also Live's equivalent base rule sits early in the file (line
+624), before the desktop block, so it was never a problem there — but Up Next's whole base
+section happened to land physically after the shared desktop block (an ordering artifact from
+when that block was first added), so its unconditional 12px rule was silently winning the tie
+at every width, including 1280px+, undoing the intended 24px.
+
+Moved the whole nav-alignment block down, to just after both sections' own base rules (right
+before the shared max-width block), so it's now textually last for both selectors — matching
+Also Live's own already-correct ordering. Left a comment explaining the source-order dependency
+so this doesn't regress if something gets inserted between them again.
+
+Verified: lint clean, 144/144 tests pass unchanged (CSS-only, no behavior touched).
+
+### Scheduled/favorited icon disappears on hover — pre-existing bug, surfaced by dark hover (2026-09-01)
+
+User posted a screenshot: "The hover effect is inverting the scheduled icon and not keeping it
+white so we can see it like it does in the session guide," then, mid-turn: "The same is
+happening with the favorited icon FYI." Traced via a full-repo icon-color audit: the checkmark/
+heart icons are inline SVGs with `fill="currentColor"` (`icons.js`), and this file's own
+existing `.is-scheduled`/`.is-favorited` rule (`session-broadcast.css:968-973`, predates this
+session — a "frosted/outlined" look for the confirmed state) makes the button fully
+`background: transparent` without ever setting its own `color`. That's not a bug on its own —
+sessions-guide's native card never hits this because its scheduled/favorited buttons keep an
+opaque white circle behind the icon regardless of card state — but it became one the moment
+this session's work made the card itself darken on hover: the icon's inherited black
+`currentColor` now disappears into that same-color transparent button over a near-black card.
+
+First attempt added `color: #fff` on the icon itself — wrong fix. User followed up with a
+screenshot of the desired result: a solid opaque white circle with the icon staying **dark**,
+not a white icon on a transparent button — exactly sessions-guide's own approach (opaque circle
+at every state, icon color untouched). Corrected to `background: #fff` on the same
+`.sg-card.is-scheduled:is(:hover, :focus-within) .sg-card__btn--schedule` selector (and the
+`.is-favorited`/`--favorite` equivalent), restoring the opaque backdrop specifically for the
+hover case while leaving the resting-state transparent/outlined look and its dark border
+untouched.
+
+Verified: lint clean, 144/144 tests pass unchanged (CSS-only, no behavior touched).
+
 ## Explicitly out of scope (fast-follow)
 
 - MobileRider real playback (stub adapter only)
