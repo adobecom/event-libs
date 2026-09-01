@@ -1138,6 +1138,10 @@
      Single-line truncation, unlike the title's 2-line clamp, matching Figma. */
   .sb-carousel-section--up-next .sg-card__description {
     display: none;
+
+    /* .sg-card__body has gap: 0 (sessions-guide.css) — margin on the description itself, not
+       the title, so it only affects layout while actually shown (hover). */
+    margin-top: var(--s2a-spacing-xs, 8px);
     font-size: 14px;
     line-height: 1.2;
     letter-spacing: -0.14px;
