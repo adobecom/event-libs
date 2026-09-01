@@ -622,6 +622,17 @@
     transition: none;
   }
 
+  /* Drag shield: covers the viewport (above the player iframe at z-index:auto, below the
+     drawer at z-index:2) only while the handle is being dragged, so the iframe can't pick
+     up the pointer and toggle play/pause. Inserted/removed by Drawer.#bindDrag. Transparent
+     but hit-testable; ns-resize keeps the drag cursor consistent over the whole gesture. */
+  .video-playlist-drag-shield {
+    position: fixed;
+    inset: 0;
+    z-index: 1;
+    cursor: ns-resize;
+  }
+
   .video-playlist.is-expanded {
     padding: var(--s2a-spacing-md) var(--s2a-spacing-md) var(--s2a-spacing-lg);
   }

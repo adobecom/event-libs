@@ -350,6 +350,23 @@ class Drawer {
     let dragStartY = null;
     let dragStartHeight = null;
     let activePointerId = null;
+    let shield = null;
+
+    // A transparent full-viewport overlay inserted above the player <iframe> (but below the
+    // drawer, which is z-index:2) for the life of the drag. setPointerCapture keeps the
+    // drag events flowing to the handle, but a cross-origin iframe can still pick up the
+    // OS-level mouse/touch under the cursor and read it as a click — toggling play/pause
+    // when the drag passes over the player. The shield makes the iframe physically
+    // unhittable while dragging; it's removed the instant the gesture ends.
+    const addShield = () => {
+      if (shield) return;
+      shield = createTag('div', { class: 'video-playlist-drag-shield' });
+      document.body.append(shield);
+    };
+    const removeShield = () => {
+      shield?.remove();
+      shield = null;
+    };
 
     let rafId = null;
     let pendingHeight = null;
@@ -385,6 +402,7 @@ class Drawer {
         this.handleEl.releasePointerCapture(activePointerId);
       }
       activePointerId = null;
+      removeShield();
       this.handleEl.removeEventListener('pointermove', onPointerMove);
       this.handleEl.removeEventListener('pointerup', onPointerUp);
       this.handleEl.removeEventListener('pointercancel', onPointerUp);
@@ -419,6 +437,7 @@ class Drawer {
       // Suppress the max-height transition while dragging so the drawer tracks the finger
       // 1:1 instead of easing 0.3s behind every pointermove write; onPointerUp restores it.
       this.el.classList.add('is-dragging');
+      addShield();
       this.handleEl.addEventListener('pointermove', onPointerMove);
       this.handleEl.addEventListener('pointerup', onPointerUp, { once: true });
       this.handleEl.addEventListener('pointercancel', onPointerUp, { once: true });
