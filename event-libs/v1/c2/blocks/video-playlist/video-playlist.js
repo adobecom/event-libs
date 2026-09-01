@@ -349,6 +349,7 @@ class Drawer {
   #bindDrag() {
     let dragStartY = null;
     let dragStartHeight = null;
+    let activePointerId = null;
 
     let rafId = null;
     let pendingHeight = null;
@@ -380,8 +381,13 @@ class Drawer {
       if (dragStartY == null) return;
       dragStartY = null;
       if (rafId != null) { cancelAnimationFrame(rafId); flush(); }
-      window.removeEventListener('pointermove', onPointerMove);
-      window.removeEventListener('pointerup', onPointerUp);
+      if (activePointerId != null && this.handleEl.hasPointerCapture?.(activePointerId)) {
+        this.handleEl.releasePointerCapture(activePointerId);
+      }
+      activePointerId = null;
+      this.handleEl.removeEventListener('pointermove', onPointerMove);
+      this.handleEl.removeEventListener('pointerup', onPointerUp);
+      this.handleEl.removeEventListener('pointercancel', onPointerUp);
       // Re-enable the max-height transition (suppressed during the drag) so this settle
       // animates rather than the live per-frame writes above.
       this.el.classList.remove('is-dragging');
@@ -403,11 +409,19 @@ class Drawer {
       if (this.isDesktop()) return;
       dragStartY = event.clientY;
       dragStartHeight = this.el.getBoundingClientRect().height;
+      // Capture the pointer so the whole gesture is delivered to the handle even while the
+      // pointer travels over the player <iframe>. Without this the iframe swallows the
+      // pointer stream mid-drag — pointermove stops firing, and the raw down/up land on the
+      // player, which reads them as a click and toggles play/pause. Capture also lets the
+      // move/up/cancel listeners live on the handle itself rather than window.
+      activePointerId = event.pointerId;
+      this.handleEl.setPointerCapture?.(activePointerId);
       // Suppress the max-height transition while dragging so the drawer tracks the finger
       // 1:1 instead of easing 0.3s behind every pointermove write; onPointerUp restores it.
       this.el.classList.add('is-dragging');
-      window.addEventListener('pointermove', onPointerMove);
-      window.addEventListener('pointerup', onPointerUp, { once: true });
+      this.handleEl.addEventListener('pointermove', onPointerMove);
+      this.handleEl.addEventListener('pointerup', onPointerUp, { once: true });
+      this.handleEl.addEventListener('pointercancel', onPointerUp, { once: true });
     });
   }
 }
