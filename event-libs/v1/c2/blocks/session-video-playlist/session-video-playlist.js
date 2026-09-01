@@ -16,7 +16,7 @@ import {
   getVideoProgress as readVideoProgress,
   parseJsonMetadata as parseSharedJsonMetadata,
   currentSessionHasEnded,
-  findOnDemandVideos,
+  findEmbeddableVideos,
   readAuthoredConfig,
   resolveSessionId,
   ensureStylesheet,
@@ -100,7 +100,7 @@ function hasPremiered(session, eventStartMs, nowMs) {
 }
 
 function hasEmbeddableVideo(sessionTimes) {
-  return findOnDemandVideos(sessionTimes).length > 0;
+  return findEmbeddableVideos(sessionTimes).length > 0;
 }
 
 function compareByStartTime(a, b) {
@@ -437,7 +437,7 @@ function buildRow(item, { onSelect }) {
   const track = createTag('div', { class: 'session-video-playlist-row-progress-track' }, '', { parent: progress });
   const fill = createTag('div', { class: 'session-video-playlist-row-progress-fill' }, '', { parent: track });
   fill.style.width = `${computeProgressPercent(getVideoProgress(item.id))}%`;
-  if (item.durationLabel) createTag('span', { class: 'session-video-playlist-row-duration' }, item.durationLabel, { parent: progress });
+  createTag('span', { class: 'session-video-playlist-row-duration' }, item.durationLabel || '', { parent: progress });
 
   const activate = () => onSelect(item, row);
   const actions = createTag('div', { class: 'session-video-playlist-row-actions' }, '', { parent: row });

@@ -12,7 +12,7 @@ import {
   getVideoProgress as readVideoProgress,
   parseJsonMetadata as parseSharedJsonMetadata,
   currentSessionHasEnded,
-  findOnDemandVideos,
+  findEmbeddableVideos,
   readAuthoredConfig,
   resolveSessionId,
   ensureStylesheet,
@@ -66,7 +66,7 @@ export function saveVideoProgress(sessionId, secondsWatched, length = null) {
 }
 
 function pickEmbeddableVideo(sessionTimes) {
-  return findOnDemandVideos(sessionTimes)[0] || null;
+  return findEmbeddableVideos(sessionTimes)[0] || null;
 }
 
 const ADOBE_TV_ORIGIN = 'https://video.tv.adobe.com';
@@ -400,7 +400,14 @@ async function watchYouTubePlayback(sessionId, iframe) {
 
     new window.YT.Player(iframe.id, {
       events: {
-        onReady: (event) => resumeYouTubeVideo(event.target, sessionId),
+        onReady: (event) => {
+          resumeYouTubeVideo(event.target, sessionId);
+          const duration = event.target?.getDuration?.();
+          if (duration) {
+            saveVideoProgress(sessionId, getVideoProgress(sessionId)?.secondsWatched ?? 0, duration);
+            notifyProgressChanged(sessionId);
+          }
+        },
         onStateChange: handleStateChange,
         onError: (event) => logError(`youtube player reported error code ${event.data}`),
       },

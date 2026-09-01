@@ -84,7 +84,7 @@ export function currentSessionHasEnded(sessionTimes, nowMs) {
   return nowMs >= firstEntry.endTimeMillis;
 }
 
-export function findOnDemandVideos(sessionTimes) {
+export function findEmbeddableVideos(sessionTimes) {
   return (sessionTimes || [])
     .flatMap((entry) => entry?.videos || [])
     .filter((video) => EMBEDDABLE_PROVIDERS.includes(video?.provider));

@@ -353,11 +353,11 @@ describe('session-video-playlist', () => {
       expect(playlist.isConnected).to.be.false;
     });
 
-    it('removes the block when the page has no onDemand video', async () => {
+    it('removes the block when no video has an embeddable provider', async () => {
       const { playlist } = buildPage();
       setMeta('session-id', 'cur');
       setMeta('session-times', sessionTimesMeta({
-        videos: [{ provider: 'mpc', url: `${ADOBE_TV_ORIGIN}/v/1`, kind: 'liveStream' }],
+        videos: [{ provider: 'vimeo', url: 'https://vimeo.com/1', kind: 'onDemand' }],
       }));
 
       await init(playlist);

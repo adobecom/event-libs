@@ -251,11 +251,23 @@ describe('session-video-player', () => {
       expect(fullWidthPlayer.isConnected).to.be.false;
     });
 
-    it('removes the block when the only video is a liveStream, not onDemand', async () => {
+    it('keeps a liveStream video once the session has ended (kind is not gated)', async () => {
       const { fullWidthPlayer } = buildPage();
       setMeta('session-id', 's-1');
       setMeta('session-times', sessionTimes({
         videos: [{ provider: 'mpc', url: `${ADOBE_TV_ORIGIN}/v/1`, kind: 'liveStream' }],
+      }));
+
+      await init(fullWidthPlayer);
+
+      expect(fullWidthPlayer.isConnected).to.be.true;
+    });
+
+    it('removes the block when no video has an embeddable provider', async () => {
+      const { fullWidthPlayer } = buildPage();
+      setMeta('session-id', 's-1');
+      setMeta('session-times', sessionTimes({
+        videos: [{ provider: 'vimeo', url: 'https://vimeo.com/1', kind: 'onDemand' }],
       }));
 
       await init(fullWidthPlayer);
@@ -273,7 +285,7 @@ describe('session-video-player', () => {
       expect(fullWidthPlayer.isConnected).to.be.false;
     });
 
-    it('treats a missing endTimeMillis permissively as ended', async () => {
+    it('removes the block when endTimeMillis is missing (cannot confirm the session ended)', async () => {
       const { fullWidthPlayer } = buildPage();
       setMeta('session-id', 's-1');
       setMeta('session-times', JSON.stringify([{
@@ -281,9 +293,8 @@ describe('session-video-player', () => {
       }]));
 
       await init(fullWidthPlayer);
-      await flush();
 
-      expect(fullWidthPlayer.isConnected).to.be.true;
+      expect(fullWidthPlayer.isConnected).to.be.false;
     });
 
     it('survives invalid session-times JSON without throwing', async () => {
