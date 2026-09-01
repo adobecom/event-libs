@@ -47,6 +47,7 @@ const TITLE_LINE_CAP = 2;
 const AUTOPLAY_STORAGE_KEY = 'session-video-playlist:play-all';
 const SHOW_MORE_INITIAL_ROWS = 4;
 const DEFAULT_MAX_SESSIONS = 7;
+let playlistInstanceId = 0;
 
 function getShouldAutoPlay() {
   try {
@@ -257,6 +258,7 @@ class Drawer {
   #apply() {
     this.el.classList.toggle('is-expanded', this.expanded);
     this.toggleEl?.setAttribute('aria-expanded', String(this.expanded));
+    this.toggleEl?.setAttribute('aria-label', this.expanded ? 'Collapse playlist' : 'Expand playlist');
     if (!this.isDesktop()) this.applyMobileHeight();
   }
 
@@ -703,6 +705,8 @@ function listenForPlayerEvents(el, sessionId) {
 
 export default async function init(el) {
   ensureStylesheet('session-video-playlist-css', BLOCK_CSS_URL);
+  playlistInstanceId += 1;
+  const LIST_ID = `session-video-playlist-list-${playlistInstanceId}`;
 
   const background = readBackgroundConfig(el);
   if (background) el.style.setProperty('--vp-authored-bg', background);
@@ -751,6 +755,8 @@ export default async function init(el) {
       type: 'button',
       class: 'session-video-playlist-toggle',
       'aria-expanded': 'false',
+      'aria-label': 'Expand playlist',
+      'aria-controls': LIST_ID,
       ...analyticsAttrs('playlist-toggle-switch'),
     }, TOGGLE_CHEVRON_SVG, { parent: header });
 
@@ -810,6 +816,7 @@ export default async function init(el) {
     const handle = createTag('div', { class: 'session-video-playlist-handle', 'aria-hidden': 'true' }, '', { parent: el });
     const { header, toggle } = buildHeader(displayRows);
     buildTopicView(el, displayRows, { maxSessions, defaultThumbnail, currentSessionId: sessionId });
+    el.querySelector('.session-video-playlist-list')?.setAttribute('id', LIST_ID);
     setUpDrawer({ header, toggle, handle });
 
     el.dispatchEvent(new CustomEvent('session-video-playlist:view', { bubbles: true }));
