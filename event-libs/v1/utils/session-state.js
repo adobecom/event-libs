@@ -83,11 +83,19 @@ export function isBroadcastEligible(session) {
 }
 
 // Root-relative: the destinations live on whatever domain is serving this page. Falls back
-// to MAX's pages for configs predating the authorable homepagePath/broadcastPath.
+// to MAX's pages for configs predating the authorable homepagePath/broadcastPath. The
+// Broadcast page hosts many sessions at once, so `?watch=<id>` (broadcast-url.js's
+// ENTRY_PARAM) tells it which one to commit to on arrival — without it, Broadcast falls back
+// to its own default schedule pick, which may not be the session the viewer actually clicked.
+// `session.id` is absent for event-session-details' metadata-scraped pseudo-session, which
+// has no catalog id to send — that caller keeps landing on the bare broadcast path.
 export function getWatchDestination(session, sessionState) {
   if (sessionState === 'on-demand') return session.sessionPageUrl || '';
   if (sessionState !== 'live') return '';
   if (session.isLivestreamed) return getHomepagePath() || MAX_EVENT_PAGES.homepage;
-  if (session.isOnline) return getBroadcastPath() || MAX_EVENT_PAGES.broadcast;
+  if (session.isOnline) {
+    const path = getBroadcastPath() || MAX_EVENT_PAGES.broadcast;
+    return session.id ? `${path}?${new URLSearchParams({ watch: session.id })}` : path;
+  }
   return '';
 }

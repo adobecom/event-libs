@@ -2214,6 +2214,58 @@ now-obsolete "query-param path overrides" describe block from `tier-1-event-conf
 (the backslash-bypass regression test along with it, since there's no longer a code path for it
 to guard). `npx eslint` clean; 11/11 tests pass in the file.
 
+Also added a manual-testing override for a related but separate gap: `isSamePage()`
+(`sessions-guide/utils/url.js`) always compares the "Watch now" destination's pathname against
+`window.location.pathname`, which is never a match from a DA draft URL — so clicking "Watch now"
+on a draft page always navigates away instead of switching the player in place, unlike on the
+real published page. `?pretend-broadcast=true` forces the same-page branch regardless of actual
+path. No security concern (never feeds a URL, only ever returns `true`). 22/22 tests pass in
+`url.test.js`.
+
+## `?watch=<id>` now appended for live Broadcast destinations (2026-09-01)
+
+`getWatchDestination()` (`utils/session-state.js`) sent a "Watch now" click to the bare
+broadcast path with no indication of *which* session the viewer clicked — Broadcast has no way
+to know intent, so it fell back to its own default schedule pick, which may not match. Now
+appends `?watch=<session.id>` (broadcast-url.js's own `ENTRY_PARAM`) when routing a live,
+online-only session to the broadcast page. `session.id` is absent for
+`event-session-details`' metadata-scraped pseudo-session (no catalog id exists there) — that
+caller is unaffected, still gets the bare path. Homepage/on-demand destinations are unchanged.
+Updated `session-state-watch-destination(-defaults).test.js`'s broadcast-path assertions and
+added a regression case for the missing-id fallback. `npx eslint` clean; 35/35 tests pass across
+both files; 159/159 pass across `LiveCard`/`SessionDetailOverlay`/`event-session-details`
+(unaffected callers, confirmed no regression).
+
+That fixed cross-page navigation (arriving fresh via `?watch=`). A separate gap existed for the
+*same-page* case: the standalone `sessions-guide` widget (its own FAB/drawer, authored
+alongside Broadcast on the same page per Phase 1's note above) has no prop-level way to trigger
+a switch — only `AlsoLiveCarousel`'s own `LiveCard` instances get `onWatchSamePage`, wired to
+`handleSwitchSession`. The widget's `LiveCard.js`/`SessionDetailOverlay.js` had no such prop at
+all; when `isSamePage()` was true there, they just closed the drawer and scrolled to top,
+**never switching the actual player** — correct behavior on the homepage (one live stream, so
+"already here" genuinely means nothing to switch), silently wrong on Broadcast (several
+concurrent live sessions).
+
+**Fix**: a new shared signal in `session-store.js`, `watchSameSessionRequest` /
+`requestWatchSameSession(sessionId)` — the mirror image of the existing
+`sessionGuideRequest`/`openSessionGuideDetail()` (that one lets Broadcast open the widget's
+detail view; this one lets the widget ask whatever page it's on to switch). `LiveCard.js`'s and
+`SessionDetailOverlay.js`'s same-page branches now call it alongside the existing
+close-drawer/scroll-to-top, unconditionally — no page-type branching in shared code. It's a
+genuine no-op on pages with nothing subscribed (matching `openSessionGuideDetail`'s own
+"no-ops if the block isn't mounted" contract), so the homepage's behavior is byte-for-byte
+unchanged. `BroadcastApp.js` subscribes and re-validates liveness via `isSessionLiveNow()`
+before calling `handleSwitchSession()` — the request could be stale by the time it fires.
+
+Testing note: this repo's `LiveCard.test.js`/`BroadcastBody.test.js` run against a string-mock
+htm-preact where `useEffect` is a no-op and no real click ever fires (already documented in both
+files) — real click→signal→subscribe behavior can't be exercised at that layer, so no test was
+force-fit there. Added direct coverage for the new store function instead (mirroring the
+existing `openSessionGuideDetail` test in `session-store.test.js`): sets the signal, notifies
+subscribers on repeat calls with distinct object identity. Real integration verified via the
+preview harness in a browser. `npx eslint` clean; 784/784 tests pass across
+sessions-guide/session-broadcast/utils suites.
+
 ## Explicitly out of scope (fast-follow)
 
 - MobileRider real playback (stub adapter only)

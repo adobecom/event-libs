@@ -3,7 +3,7 @@ import {
 } from '../../../../deps/htm-preact.js';
 import {
   sessions, sessionsStatus, liveStreamActiveIds, sessionStateVersion, initSessionState,
-  getEventApiConfig,
+  getEventApiConfig, watchSameSessionRequest,
 } from '../../../../utils/session-store.js';
 import { getNowMs, isPostEvent } from '../../../../utils/session-state.js';
 import { getSessionGuidePath } from '../../../../utils/tier-1-event-config.js';
@@ -87,6 +87,18 @@ export function BroadcastBody({ config }) {
     setManualSessionId(session.id);
     trackBroadcastEvent(`Broadcast-Session-Switch | ${session.id}`);
   }
+
+  // The Session Guide widget's own live-session cards/detail overlay are a separate mount
+  // with no prop-level switch path back into Broadcast's player state — this shared signal
+  // (requestWatchSameSession() in session-store.js) is the only channel. Re-validated live
+  // here rather than trusting the click, since the request could be stale by the time it fires.
+  useEffect(() => watchSameSessionRequest.subscribe((request) => {
+    if (!request) return;
+    const requested = sessions.value.find((s) => s.id === request.sessionId);
+    if (requested && isSessionLiveNow(requested, liveStreamActiveIds.value, getNowMs())) {
+      handleSwitchSession(requested);
+    }
+  }), []);
 
   // Re-render on time-driven session-state transitions; value itself is unused.
   // eslint-disable-next-line no-unused-expressions

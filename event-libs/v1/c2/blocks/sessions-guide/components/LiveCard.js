@@ -3,7 +3,7 @@ import { useSessionGuide } from '../store/index.js';
 import { formatShortTime, formatDuration, getNowMs } from '../utils/time.js';
 import { deriveSessionState, getWatchDestination } from '../../../../utils/session-state.js';
 import {
-  scheduled, favorited, pendingActions, liveStreamActiveIds,
+  scheduled, favorited, pendingActions, liveStreamActiveIds, requestWatchSameSession,
 } from '../../../../utils/session-store.js';
 import { toggleScheduleWithFeedback, toggleFavoriteWithFeedback } from '../../../../services/sessions/action-feedback.js';
 import { IconPlay, IconCalendarCheck, IconCalendarPlus, IconHeartFilled, IconHeartOutline } from './icons.js';
@@ -105,6 +105,9 @@ export function LiveCard({
     // exist there), rather than reloading the page out from under what's already playing.
     if (isSamePage(watchHref)) {
       if (onWatchSamePage) { onWatchSamePage(session); return; }
+      // The widget's own instance has no prop-level switch path — ask whatever page this is
+      // to switch itself (a no-op on pages with nothing subscribed, e.g. the homepage).
+      requestWatchSameSession(session.id);
       dispatch({ type: 'CLOSE_DRAWER' });
       history.pushState({}, '', clearSessionParams());
       window.scrollTo({ top: 0, behavior: scrollBehavior() });

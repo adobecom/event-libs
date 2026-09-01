@@ -11,6 +11,7 @@ const CONFIG = {
 
 function session(overrides = {}) {
   return {
+    id: 's1',
     startTimeUtc: '2026-01-01T10:00:00.000Z',
     endTimeUtc: '2026-01-01T11:00:00.000Z',
     ...overrides,
@@ -30,8 +31,8 @@ describe('getWatchDestination — authored event pages', () => {
     expect(getWatchDestination(session({ isLivestreamed: true }), 'live')).to.equal('/summit.html');
   });
 
-  it('sends a live online-only session to the authored broadcast path', () => {
-    expect(getWatchDestination(session({ isOnline: true }), 'live')).to.equal('/summit/broadcast.html');
+  it('sends a live online-only session to the authored broadcast path, carrying ?watch=<id>', () => {
+    expect(getWatchDestination(session({ isOnline: true }), 'live')).to.equal('/summit/broadcast.html?watch=s1');
   });
 
   it('prefers the homepage path when a session is both livestreamed and online', () => {
