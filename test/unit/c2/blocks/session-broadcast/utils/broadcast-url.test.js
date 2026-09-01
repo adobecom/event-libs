@@ -1,4 +1,5 @@
 import { expect } from '@esm-bundle/chai';
+import sinon from 'sinon';
 import {
   readWatchParam,
   stripWatchParam,
@@ -13,6 +14,7 @@ describe('broadcast-url', () => {
   const basePath = window.location.pathname;
 
   afterEach(() => {
+    sinon.restore();
     // Reset so URL/history state never leaks between tests or into other spec files.
     history.replaceState(null, '', basePath);
     clearPersistedSession();
@@ -62,10 +64,16 @@ describe('broadcast-url', () => {
       expect(history.state).to.deep.equal({ session: 'abc-123' });
     });
 
+    // Asserts which history method actually ran, not history.length — the full suite shares
+    // one browser session across ~140+ spec files, and history.length hits a hard cap well
+    // before this file's turn (confirmed: it sticks at a fixed value and pushState can no
+    // longer increase it), which made a length-based assertion deterministically fail in CI.
     it('does not add a new history entry (uses replaceState)', () => {
-      const before = history.length;
+      const replaceStateSpy = sinon.spy(history, 'replaceState');
+      const pushStateSpy = sinon.spy(history, 'pushState');
       stripWatchParam(null);
-      expect(history.length).to.equal(before);
+      expect(replaceStateSpy.calledOnce).to.equal(true);
+      expect(pushStateSpy.called).to.equal(false);
     });
   });
 
@@ -80,10 +88,14 @@ describe('broadcast-url', () => {
       expect(getHistorySessionId()).to.equal('xyz-789');
     });
 
-    it('adds a new history entry (uses pushState)', () => {
-      const before = history.length;
+    // See the note on the replaceState test above for why this asserts the method called
+    // rather than history.length.
+    it('adds a new history entry (uses pushState, not replaceState)', () => {
+      const pushStateSpy = sinon.spy(history, 'pushState');
+      const replaceStateSpy = sinon.spy(history, 'replaceState');
       pushSessionState('xyz-789');
-      expect(history.length).to.equal(before + 1);
+      expect(pushStateSpy.calledOnce).to.equal(true);
+      expect(replaceStateSpy.called).to.equal(false);
     });
   });
 

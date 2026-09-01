@@ -2303,6 +2303,29 @@ test was force-fit. `npx eslint` clean; 591/591 tests pass across sessions-guide
 browser tools (`chrome-devtools`, `a11y`) are disconnected in this session (`ENOENT: npx not
 found`), so this couldn't be confirmed directly this time.
 
+## CI fix: `broadcast-url.test.js` history.length assertions (2026-09-02)
+
+Two tests (`pushSessionState > adds a new history entry`, `stripWatchParam > does not add a new
+history entry`) had been dismissed earlier this session as "pre-existing flakiness," but the
+user reported the `pushState` one failing **consistently** in CI, not intermittently. Actually
+investigated instead of re-dismissing it: reproduced via a full `npm test` run — the assertion
+failed with `expected 50 to equal 51`, and confirmed `history.length` was stuck at exactly 50
+even across repeated `pushState()` calls. Root cause: headless Chrome caps `history.length` per
+session, and Web Test Runner shares one browser session across all ~142 spec files in a full
+run — by the time this file's turn comes up, cumulative `pushState`/`replaceState` calls from
+every earlier file have already saturated it. Once capped, `history.length` can never be read
+back down (there's no script-accessible way to shrink it), so a length-based assertion is
+deterministically doomed in a full-suite run, not flaky — it just hadn't been *investigated* as
+one before.
+
+**Fix**: stopped asserting on `history.length` entirely. Both tests now use `sinon.spy(history,
+'pushState'/'replaceState')` (matching this repo's existing spy convention, e.g.
+`event-marquee.test.js`'s `sinon.spy(window, 'setInterval')`) to assert which method was
+actually called, with `sinon.restore()` added to the file's existing `afterEach`. Verified via a
+full `npm test` run: `broadcast-url.test.js` now passes cleanly (0 failures attributed to it);
+the only remaining failure was the separate, already-documented `toast.test.js` ARIA-timing
+flake (unrelated, confirmed passes in isolation). `npx eslint` clean.
+
 ## Explicitly out of scope (fast-follow)
 
 - MobileRider real playback (stub adapter only)
