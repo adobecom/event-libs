@@ -433,6 +433,61 @@
   }
 }
 
+/* Figma ("Session Broadcast VizD R1 8.17.26", node 24:22862, desktop ended state): the whole
+   block aligns with everything else on the page at this width, so it needs the same shared
+   1192px-centered treatment .sb-info/.sb-carousel-section already use, rather than the plain
+   fixed side padding (--s2a-spacing-lg, 24px) the base rule uses below this width. */
+@media (min-width: 1280px) {
+  /* Top grows to 124px; side padding drops to 0 — the max-width/margin: auto centering above
+     already provides the horizontal breathing room, matching how Also Live/Up Next clear their
+     own side padding once they switch to the same centered-content pattern at this width.
+     Bottom is untouched (still the base rule's 32px). */
+  .sb-ended {
+    max-width: 1192px;
+    margin: 0 auto;
+    padding-top: var(--s2a-layout-lg, 124px);
+    padding-right: 0;
+    padding-left: 0;
+  }
+
+  /* Eyebrow grows from the mobile 36px all the way to 80px/76px line-height/-3.2px letter-
+     spacing — this codebase's exact 1280-1440px (and 1441px+, identical at both tiers) values
+     for the semantic heading-1 alias, confirmed against tokens.css rather than trusted from the
+     Figma export's raw fallback alone (same discipline as the tablet eyebrow/title fixes
+     above), and here they happen to match the literal export number exactly. No desktop frame
+     had been reviewed for this element before now, hence no prior override existed at all. */
+  .sb-ended__eyebrow {
+    font-size: var(--s2a-font-size-10xl, 80px);
+    line-height: var(--s2a-font-line-height-5xl, 76px);
+    letter-spacing: var(--s2a-font-letter-spacing-sm, -3.2px);
+  }
+
+  /* Font-size/line-height/letter-spacing already fall through correctly from the base rule
+     (24px/24px/-0.48px is both the mobile default AND this tier's own value — the tablet
+     override above is the only range that differs). Truncation is new here, matching what
+     tablet already does for the same reason (a long session title shouldn't wrap or overflow
+     the column). Margin-top corrects to 24px (--s2a-spacing-lg) from the base rule's 32px
+     (--s2a-spacing-xl) — Figma's own eyebrow-to-title gap here is the same 24px used for every
+     other gap in this block (meta, actions); 32px is presumably still correct for mobile/
+     tablet (unreviewed here, left alone) but doesn't match this specific frame. */
+  .sb-ended__title {
+    margin-top: var(--s2a-spacing-lg, 24px);
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+
+  /* Figma shows the frosted-glass treatment (blur + translucent white fill/border) for Favorite
+     here, not the simple transparent-with-solid-border look the base rule uses below this
+     width — matching the same frosted pattern already used elsewhere on this page (e.g.
+     .sb-carousel-section--up-next's schedule/favorite buttons). */
+  .sb-ended__icon-btn--favorite {
+    background: rgb(255 255 255 / 80%);
+    border-color: rgb(255 255 255 / 40%);
+    backdrop-filter: blur(4.687px);
+  }
+}
+
 .sb-ended__meta {
   display: flex;
   align-items: center;
@@ -829,6 +884,15 @@
     padding: var(--s2a-spacing-xl, 32px) 0;
   }
 
+  /* Per follow-up: "More live sessions" grows to 24px at desktop — the general 18px rule
+     (unbounded from 768px, tablet's own value) otherwise wins here too, since this element's
+     color is already unconditional/dark at every width and has no desktop-scoped block of its
+     own to piggyback the size onto. */
+  .sb-carousel-section--also-live .sg-section-title {
+    font-size: var(--s2a-font-size-2xl, 24px);
+    line-height: var(--s2a-font-line-height-md, 24px);
+  }
+
   .sb-carousel-section--also-live .sg-carousel {
     max-width: 1192px;
     margin: 0 auto;
@@ -1070,6 +1134,17 @@
   }
 }
 
+/* Per follow-up: header-to-cards gap grows to 32px specifically once the session has ended at
+   desktop — the shared nav-alignment rule (24px, min-height:40px) still applies generally;
+   this sibling-scoped override (3 classes vs. 2) wins the specificity tie regardless of source
+   order once .sb-ended is present. */
+@media (min-width: 1280px) {
+  .sb-ended ~ .sb-carousel-section--also-live .sg-carousel__header,
+  .sb-ended ~ .sb-carousel-section--up-next .sg-carousel__header {
+    margin-bottom: var(--s2a-spacing-xl, 32px);
+  }
+}
+
 /* Carousel nav arrows (both sections): sessions-guide.css's own desktop rule takes them out of
    flow (position: absolute; top: 0; right: 0;, anchored to .sg-carousel) so they sit beside
    the section title instead of beside the cards — but nothing sizes .sg-carousel__header to
@@ -1155,6 +1230,8 @@
 
   .sb-carousel-section--up-next .sg-section-title {
     color: var(--s2a-color-content-inverse, #fff);
+    font-size: var(--s2a-font-size-2xl, 24px);
+    line-height: var(--s2a-font-line-height-md, 24px);
   }
 
   /* Same reasoning as Also Live's own identical fix: sessions-guide.css's track only ever

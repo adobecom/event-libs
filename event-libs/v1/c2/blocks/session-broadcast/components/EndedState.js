@@ -13,27 +13,33 @@ import {
 
 // Same matchMedia-hook shape as FilterPanel.js's useIsMobile()/SessionDetailOverlay.js's
 // useIsDesktop() — this codebase's established per-component convention, not a shared hook.
-const TABLET_QUERY = '(min-width: 768px) and (max-width: 1279px)';
-const matchesTabletRange = () => !!window.matchMedia?.(TABLET_QUERY).matches;
+// Unbounded from 768px (tablet AND desktop) per explicit follow-up ("use the same truncation
+// we had for tablet") on the desktop ended-state pass (node 24:22862) — desktop's own
+// collapsed description is single-line-ellipsis too, same as tablet's fixed-character-count
+// approach, not the resting mobile/base behavior below 768px.
+const TRUNCATED_QUERY = '(min-width: 768px)';
+const matchesTruncatedRange = () => !!window.matchMedia?.(TRUNCATED_QUERY).matches;
 
-function useIsTabletRange() {
-  const [isTabletRange, setIsTabletRange] = useState(matchesTabletRange);
+function useIsTruncatedRange() {
+  const [isTruncatedRange, setIsTruncatedRange] = useState(matchesTruncatedRange);
   useEffect(() => {
-    const mq = window.matchMedia?.(TABLET_QUERY);
+    const mq = window.matchMedia?.(TRUNCATED_QUERY);
     if (!mq) return undefined;
-    const onChange = (e) => setIsTabletRange(e.matches);
+    const onChange = (e) => setIsTruncatedRange(e.matches);
     mq.addEventListener('change', onChange);
     return () => mq.removeEventListener('change', onChange);
   }, []);
-  return isTabletRange;
+  return isTruncatedRange;
 }
 
-// Figma (tablet-only spec, "Session Broadcast VizD R1 8.17.26" node 24:21722): the collapsed
-// description truncates at a fixed 70 characters, not whatever a single CSS-ellipsis line
-// happens to fit at the container's actual rendered width (which was showing meaningfully more
-// text than the design calls for). Character count confirmed directly against the design's
-// rendered screenshot, not assumed from a token/spec value.
-const TABLET_DESC_MAX_CHARS = 70;
+// Figma (tablet spec, "Session Broadcast VizD R1 8.17.26" node 24:21722; reused at desktop
+// per explicit follow-up, node 24:22862): the collapsed description truncates at a fixed 70
+// characters, not whatever a single CSS-ellipsis line happens to fit at the container's actual
+// rendered width (which was showing meaningfully more text than the design calls for).
+// Character count confirmed directly against the tablet design's rendered screenshot, not
+// assumed from a token/spec value; reused as-is at desktop rather than re-measured, per the
+// user's own "the same truncation" framing.
+const TRUNCATED_DESC_MAX_CHARS = 70;
 function truncateChars(text, maxChars) {
   return text.length > maxChars ? `${text.slice(0, maxChars)}…` : text;
 }
@@ -44,7 +50,7 @@ function truncateChars(text, maxChars) {
 // shared .sb-app ancestor (see session-broadcast.css), not rendered here.
 export function EndedState({ session }) {
   const [expanded, setExpanded] = useState(false);
-  const isTabletRange = useIsTabletRange();
+  const isTruncatedRange = useIsTruncatedRange();
 
   if (!session) return null;
 
@@ -54,10 +60,10 @@ export function EndedState({ session }) {
   const durationLabel = session.endTimeUtc
     ? formatDuration(session.startTimeUtc, session.endTimeUtc, { short: true })
     : '';
-  // Only the collapsed tablet view uses character-count truncation — expanded always shows the
-  // full text, and mobile/desktop keep their existing CSS-driven single-line ellipsis untouched.
-  const descriptionText = (!expanded && isTabletRange && session.description)
-    ? truncateChars(session.description, TABLET_DESC_MAX_CHARS)
+  // Only the collapsed tablet/desktop view uses character-count truncation — expanded always
+  // shows the full text, and mobile keeps its existing CSS-driven single-line ellipsis untouched.
+  const descriptionText = (!expanded && isTruncatedRange && session.description)
+    ? truncateChars(session.description, TRUNCATED_DESC_MAX_CHARS)
     : session.description;
 
   async function handleFavorite(e) {

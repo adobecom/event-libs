@@ -1938,6 +1938,91 @@ vertical one.
 
 Verified: lint clean, 144/144 tests pass unchanged (CSS-only, no behavior touched).
 
+### Desktop ended state: eyebrow/title/meta/desc/view-more/actions (Figma node 24:22862) (2026-09-01)
+
+User: "For desktop ended state lets cover sb-ended__eyebrow, sb-ended__title, sb-ended__meta,
+sb-ended__desc-wrap, sb-ended__view-more, and sb-ended__actions. Lets have those line up with
+the content of the page and to get the right sizing, spaces and dimensions," then mid-turn:
+"Let also use the same truncation we had for tablet."
+
+Auditing each element against the frame found most were **already correct** — the base
+(unconditional) rules happened to already match this tier exactly: meta's 16px/16px-gap/#dadada
+color, desc-wrap's single-line ellipsis/16px/subtle color, view-more's 16px/bold, actions'
+12px gap, and the Watch-on-demand button's 14px/24px padding and white-solid/black-text
+treatment. Real gaps found and fixed:
+
+- **Alignment ("line up with the content of the page")**: `.sb-ended` had no desktop-scoped
+  max-width at all — added the same shared `max-width: 1192px; margin: 0 auto;` treatment
+  `.sb-info`/`.sb-carousel-section` already use, so it now aligns with everything else instead
+  of using the base rule's plain fixed side padding.
+- **Eyebrow**: no desktop override had ever existed (only tablet's 48px one) — was silently
+  falling back to the mobile 36px value. Added 80px/76px/-3.2px, verified against tokens.css's
+  1280-1440px tier for the semantic heading-1 alias (identical at 1441px+ too, so no xl-desktop
+  gap this time) rather than trusted from the raw Figma export alone, per this file's own
+  established discipline — here they happened to match exactly.
+- **Title**: font-size/line-height/letter-spacing already correct (24px/24px/-0.48px is both
+  the mobile base value and this tier's own, coincidentally) — only truncation (single-line
+  ellipsis, matching tablet) was missing, plus a margin-top correction from the base rule's 32px
+  to 24px, matching Figma's own uniform 24px gap used between every section in this block.
+- **Description truncation, extended to desktop** (mid-turn follow-up): the tablet-only
+  70-character JS truncation (`EndedState.js`'s `useIsTabletRange`/`TABLET_DESC_MAX_CHARS`) is
+  now `useIsTruncatedRange`/`TRUNCATED_DESC_MAX_CHARS`, with the query widened from `(min-width:
+  768px) and (max-width: 1279px)` to unbounded `(min-width: 768px)` — reusing the exact same
+  70-char limit rather than re-measuring a new desktop-specific count, per "the same truncation
+  we had for tablet." Updated `EndedState.test.js`'s mock/describe block/test names to match
+  (mock previously required the query to include both `768px` and `1279px`, which would have
+  silently broken once the production query dropped the upper bound).
+- **Favorite icon-button**: switched from the simple transparent/solid-white-border look to the
+  frosted-glass treatment (blur + translucent white fill/border) Figma shows, matching the same
+  pattern already used elsewhere on this page (Up Next's schedule/favorite buttons).
+- **Left alone**: Share's bare-icon treatment already matches (Figma's own layer metadata
+  oddly implies button chrome, but the rendered screenshot shows a bare icon, matching what
+  this file already does — trusted the screenshot over the metadata, same as prior sessions'
+  precedent for build-vs-metadata mismatches).
+
+Verified: lint (CSS) clean, lint (JS, via `npx eslint` on `EndedState.js`/`EndedState.test.js`)
+clean, 144/144 tests pass (including the widened truncation-range coverage).
+
+### Desktop .sb-ended padding: 124px top, 0 sides (2026-09-01)
+
+User: "The padding top for sb-ended on desktop should be 124px, for left 0 padding since we are
+getting breathing room from from the margin auto and it should match the following content."
+Added to the existing desktop block: `padding-top: var(--s2a-layout-lg, 124px)` and
+`padding-right`/`padding-left: 0` (cleared both sides, not just left, matching how Also Live/
+Up Next clear their own side padding once they switch to this same centered-content pattern —
+the user's own "match the following content" framing). Bottom stays the base rule's 32px,
+untouched.
+
+Verified: lint clean, 144/144 tests pass unchanged (CSS-only, no behavior touched).
+
+### Also Live/Upcoming section title: 24px at desktop (2026-09-01)
+
+User: "On desktop session ended sg-section-title should be 24px or --s2a-font-size-2xl." The
+general unconditional rule (`.session-broadcast .sg-section-title`, unbounded from 768px)
+otherwise wins at every width above tablet too, since neither section's own title-color rule
+had a desktop-scoped block of its own to piggyback a font-size onto — Also Live's color is
+unconditional/dark at every width, Up Next's only goes dark from 1280px+ specifically. Applied
+to both (not just the ended-state sibling rule) since this is the same title element in either
+app state, and a live-vs-ended inconsistency seemed more likely to be an oversight than
+intentional. Added `font-size: var(--s2a-font-size-2xl, 24px)` plus a matching
+`line-height: var(--s2a-font-line-height-md, 24px)` (the general rule's own 18px line-height
+would otherwise pair oddly with the larger text) to Up Next's existing desktop dark-theme block
+and a new one for Also Live.
+
+Verified: lint clean, 144/144 tests pass unchanged (CSS-only, no behavior touched).
+
+### Ended-state header-to-cards gap: 32px at desktop (2026-09-01)
+
+User: "On desktop session ended sg-carousel__header should have a margin bottom of 32px or
+--s2a-spacing-xl." Unlike the section-title fix just above, this one is explicitly scoped to
+the ended state only — the shared nav-alignment rule's 24px still applies generally (live
+state). Added a new `.sb-ended ~ .sb-carousel-section--*  .sg-carousel__header` rule at 1280px+,
+matching this file's own established sibling-combinator pattern for ended-state-only overrides
+(3 selector segments vs. the shared rule's 2, so it wins the specificity tie regardless of
+source order once `.sb-ended` is present).
+
+Verified: lint clean, 144/144 tests pass unchanged (CSS-only, no behavior touched).
+
 ## Explicitly out of scope (fast-follow)
 
 - MobileRider real playback (stub adapter only)
