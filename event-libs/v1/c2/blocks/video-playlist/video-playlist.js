@@ -270,11 +270,12 @@ function onElementDetached(element, teardown) {
 }
 
 class Drawer {
-  constructor(el, { titleEl, toggleEl, handleEl }) {
+  constructor(el, { titleEl, toggleEl, handleEl, headerEl }) {
     this.el = el;
     this.titleEl = titleEl;
     this.toggleEl = toggleEl;
     this.handleEl = handleEl;
+    this.headerEl = headerEl;
     this.expanded = false;
     this.dragHeightPx = null;
     if (this.handleEl) this.#bindDrag();
@@ -321,6 +322,13 @@ class Drawer {
     // ceiling dragging itself respects — not measureCapPx()'s title-avoiding cap, so a
     // free-form height the user chose past that cap doesn't get silently snapped back
     // down the next time this runs (e.g. on window resize).
+    // While the drawer is expanded it sits over the player, so keep the player
+    // non-interactive the entire time — otherwise a touch meant to grab/drag the drawer
+    // lands on the iframe underneath and pans/scrubs it ("the player moves a bit") while
+    // the drawer doesn't respond. Collapsed, the player is visible again and must work, so
+    // release (on a short delay, to also swallow the post-touch synthesised tap).
+    if (this.expanded) this.#addPlayerGuard();
+    else this.#scheduleGuardRelease();
     if (this.dragHeightPx != null) {
       const dragCap = this.measureDragCapPx();
       this.el.style.maxHeight = `${Math.min(Math.max(this.dragHeightPx, DRAWER_FLOOR_PX), dragCap)}px`;
@@ -346,45 +354,42 @@ class Drawer {
     this.#apply();
   }
 
+  // --- Player guard ------------------------------------------------------------------
+  // Neutralise the player <iframe>(s) by setting pointer-events:none on each `.video-player`
+  // whenever the drawer is expanded over them (see applyMobileHeight) or a drag is in
+  // flight. A cross-origin iframe otherwise picks up the OS-level touch under the finger:
+  // a gesture meant to grab/drag the drawer instead pans/scrubs the player ("the player
+  // moves a bit") while the drawer doesn't respond. pointer-events:none makes the iframe
+  // untouchable regardless of stacking context (a z-index overlay can't guarantee it paints
+  // above a player in another fragment).
+  #addPlayerGuard() {
+    if (this.guardReleaseTimer) { clearTimeout(this.guardReleaseTimer); this.guardReleaseTimer = null; }
+    if (this.guardedPlayers?.length) return;
+    this.guardedPlayers = [...document.querySelectorAll('.video-player')];
+    this.guardedPlayers.forEach((player) => { player.style.pointerEvents = 'none'; });
+  }
+
+  #releasePlayerGuard() {
+    this.guardedPlayers?.forEach((player) => { player.style.pointerEvents = ''; });
+    this.guardedPlayers = [];
+  }
+
+  // Held ~350ms so the post-touch synthesised tap that lands where the drawer just uncovered
+  // (dragging down reveals the player under the finger) is absorbed before the player goes
+  // live again.
+  #scheduleGuardRelease() {
+    if (this.guardReleaseTimer) clearTimeout(this.guardReleaseTimer);
+    this.guardReleaseTimer = setTimeout(() => {
+      this.guardReleaseTimer = null;
+      this.#releasePlayerGuard();
+    }, 350);
+  }
+
   #bindDrag() {
     let dragStartY = null;
     let dragStartHeight = null;
     let activePointerId = null;
-    let guardedPlayers = [];
-    let guardReleaseTimer = null;
-
-    // Neutralise the player <iframe>(s) for the life of the drag by setting pointer-events:
-    // none directly on each `.video-player`. setPointerCapture keeps the drag events flowing
-    // to the handle, but a cross-origin iframe still picks up the OS-level touch/mouse under
-    // the finger and reads it as a click — toggling play/pause whenever the drag passes over
-    // the player. pointer-events:none makes the iframe untouchable regardless of stacking
-    // context (a z-index overlay can't guarantee it paints above a player in another
-    // fragment). Applied to the block, it covers the iframe within.
-    const addPlayerGuard = () => {
-      if (guardReleaseTimer) { clearTimeout(guardReleaseTimer); guardReleaseTimer = null; }
-      if (guardedPlayers.length) return;
-      guardedPlayers = [...document.querySelectorAll('.video-player')];
-      guardedPlayers.forEach((player) => { player.style.pointerEvents = 'none'; });
-      // eslint-disable-next-line no-console
-      console.log(`[VPL-DBG] guard ON players=${guardedPlayers.length} t=${Math.round(performance.now())}`);
-    };
-    const releasePlayerGuard = () => {
-      guardedPlayers.forEach((player) => { player.style.pointerEvents = ''; });
-      // eslint-disable-next-line no-console
-      console.log(`[VPL-DBG] guard OFF t=${Math.round(performance.now())}`);
-      guardedPlayers = [];
-    };
-    // Held ~350ms past pointerup: dragging down collapses the drawer out from under the
-    // finger, so the player ends up beneath the release point and touch synthesises a click
-    // there right after pointerup. Keeping the guard on absorbs that one stray tap; the
-    // player becomes interactive again a moment later.
-    const scheduleGuardRelease = () => {
-      if (guardReleaseTimer) clearTimeout(guardReleaseTimer);
-      guardReleaseTimer = setTimeout(() => {
-        guardReleaseTimer = null;
-        releasePlayerGuard();
-      }, 350);
-    };
+    let captureEl = null;
 
     let rafId = null;
     let pendingHeight = null;
@@ -395,8 +400,10 @@ class Drawer {
       this.el.style.maxHeight = `${pendingHeight}px`;
     };
     let loggedFirstMove = false;
+    let moveCount = 0;
     const onPointerMove = (event) => {
       if (dragStartY == null) return;
+      moveCount += 1;
       if (!loggedFirstMove) {
         loggedFirstMove = true;
         // eslint-disable-next-line no-console
@@ -421,17 +428,18 @@ class Drawer {
     const onPointerUp = (event) => {
       if (dragStartY == null) return;
       // eslint-disable-next-line no-console
-      console.log(`[VPL-DBG] ${event?.type === 'pointercancel' ? 'POINTERCANCEL' : 'pointerup'} type=${event?.type} y=${Math.round(event?.clientY ?? -1)} t=${Math.round(performance.now())}`);
+      console.log(`[VPL-DBG] ${event?.type === 'pointercancel' ? 'POINTERCANCEL' : 'pointerup'} y=${Math.round(event?.clientY ?? -1)} moves=${moveCount} dragHeightPx=${this.dragHeightPx == null ? 'null' : Math.round(this.dragHeightPx)} t=${Math.round(performance.now())}`);
       dragStartY = null;
       if (rafId != null) { cancelAnimationFrame(rafId); flush(); }
-      if (activePointerId != null && this.handleEl.hasPointerCapture?.(activePointerId)) {
-        this.handleEl.releasePointerCapture(activePointerId);
+      if (activePointerId != null && captureEl?.hasPointerCapture?.(activePointerId)) {
+        captureEl.releasePointerCapture(activePointerId);
       }
       activePointerId = null;
-      scheduleGuardRelease();
-      this.handleEl.removeEventListener('pointermove', onPointerMove);
-      this.handleEl.removeEventListener('pointerup', onPointerUp);
-      this.handleEl.removeEventListener('pointercancel', onPointerUp);
+      this.#scheduleGuardRelease();
+      captureEl?.removeEventListener('pointermove', onPointerMove);
+      captureEl?.removeEventListener('pointerup', onPointerUp);
+      captureEl?.removeEventListener('pointercancel', onPointerUp);
+      captureEl = null;
       // Re-enable the max-height transition (suppressed during the drag) so this settle
       // animates rather than the live per-frame writes above.
       this.el.classList.remove('is-dragging');
@@ -449,28 +457,46 @@ class Drawer {
       this.#apply();
     };
 
-    this.handleEl.addEventListener('pointerdown', (event) => {
+    // A press on the header band counts as a drag ONLY when the drawer is already expanded
+    // (collapsed uses tap-to-open via the header click handler) and NOT on one of the
+    // header's own interactive controls — the toggle chevron and the "Play all" switch must
+    // still take their taps. The thin handle bar is always a drag surface. Widening the
+    // target this way is the fix for "drag down does nothing": the 24px handle alone was too
+    // small to reliably grab, so presses landed on the player behind/beside it instead.
+    const interactiveInHeader = (target) => Boolean(
+      target.closest?.('button, a, input, label, [role="switch"], [role="button"]'),
+    );
+    const startDrag = (event) => {
       if (this.isDesktop()) return;
+      if (dragStartY != null) return;
+      const surface = event.currentTarget;
+      if (surface === this.headerEl && (!this.expanded || interactiveInHeader(event.target))) return;
       // eslint-disable-next-line no-console
-      console.log(`[VPL-DBG] pointerdown type=${event.pointerType} y=${Math.round(event.clientY)} t=${Math.round(performance.now())}`);
+      console.log(`[VPL-DBG] pointerdown surface=${surface === this.headerEl ? 'header' : 'handle'} type=${event.pointerType} y=${Math.round(event.clientY)} t=${Math.round(performance.now())}`);
       dragStartY = event.clientY;
       dragStartHeight = this.el.getBoundingClientRect().height;
-      // Capture the pointer so the whole gesture is delivered to the handle even while the
-      // pointer travels over the player <iframe>. Without this the iframe swallows the
-      // pointer stream mid-drag — pointermove stops firing, and the raw down/up land on the
-      // player, which reads them as a click and toggles play/pause. Capture also lets the
-      // move/up/cancel listeners live on the handle itself rather than window.
+      // Capture the pointer so the whole gesture is delivered to this surface even while the
+      // pointer travels over the player <iframe>: without capture the iframe swallows the
+      // stream mid-drag. Capture also lets the move/up/cancel listeners live on the surface
+      // rather than window.
       loggedFirstMove = false;
+      moveCount = 0;
       activePointerId = event.pointerId;
-      this.handleEl.setPointerCapture?.(activePointerId);
+      captureEl = surface;
+      captureEl.setPointerCapture?.(activePointerId);
       // Suppress the max-height transition while dragging so the drawer tracks the finger
       // 1:1 instead of easing 0.3s behind every pointermove write; onPointerUp restores it.
       this.el.classList.add('is-dragging');
-      addPlayerGuard();
-      this.handleEl.addEventListener('pointermove', onPointerMove);
-      this.handleEl.addEventListener('pointerup', onPointerUp, { once: true });
-      this.handleEl.addEventListener('pointercancel', onPointerUp, { once: true });
-    });
+      this.#addPlayerGuard();
+      captureEl.addEventListener('pointermove', onPointerMove);
+      captureEl.addEventListener('pointerup', onPointerUp, { once: true });
+      captureEl.addEventListener('pointercancel', onPointerUp, { once: true });
+    };
+
+    this.handleEl.addEventListener('pointerdown', startDrag);
+    // touch-action:none on the header band too (see CSS) so a vertical drag here resizes the
+    // drawer instead of the browser claiming it as a scroll.
+    this.headerEl?.addEventListener('pointerdown', startDrag);
   }
 }
 
@@ -979,6 +1005,7 @@ export default async function init(el) {
       titleEl: findSessionHeading(el),
       toggleEl: toggle,
       handleEl: handle,
+      headerEl: header,
     });
 
     toggle.addEventListener('click', () => drawer.toggle());

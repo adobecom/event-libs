@@ -708,7 +708,19 @@
 
   .video-playlist.is-expanded .video-playlist-top {
     flex-wrap: wrap;
-    cursor: default;
+    cursor: grab;
+
+    /* Expanded, the header band is a drag surface too (see Drawer.#bindDrag) — not just
+       the thin handle, which was too small to reliably grab. touch-action:none stops the
+       browser claiming a vertical drag here as a page/list scroll so it resizes the drawer
+       instead. The toggle and "Play all" controls inside still work: touch-action governs
+       only scroll/pan/zoom gestures, never a tap/click, and the JS also refuses to start a
+       drag when the press lands on one of them. */
+    touch-action: none;
+  }
+
+  .video-playlist.is-expanded .video-playlist-top:active {
+    cursor: grabbing;
   }
 
   /* Per Figma: the collapsed peek shows "Up next" + a session's own title instead of
