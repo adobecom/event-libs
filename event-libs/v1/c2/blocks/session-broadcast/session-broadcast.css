@@ -875,6 +875,10 @@
 
 .sb-carousel-section--up-next .sg-card__badge-row { margin-bottom: var(--s2a-spacing-sm); }
 
+/* Desktop-only reveal (see the min-width: 1280px block below, where the hover treatment lives)
+   — mobile/tablet never show it, hover or not. */
+.sb-carousel-section--up-next .sg-card__description { display: none; }
+
 /* SessionCard.js hardcodes IconButton's dark-card context; this card is light, so the
    frosted-glass/outlined-on-light treatment is replicated here instead. */
 .sb-carousel-section--up-next .sg-card__btn--schedule,
@@ -1129,7 +1133,8 @@
     overflow: hidden;
   }
 
-  /* Hidden at rest — the card only has room for it once hover grows min-height above.
+  /* Desktop-only — mobile/tablet keep the base rule's display: none (no hover concept there).
+     Hidden at rest here too: the card only has room for it once hover grows min-height below.
      Single-line truncation, unlike the title's 2-line clamp, matching Figma. */
   .sb-carousel-section--up-next .sg-card__description {
     display: none;
