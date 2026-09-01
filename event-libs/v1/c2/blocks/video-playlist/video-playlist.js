@@ -112,16 +112,9 @@ function isOnDemand(session, nowMs) {
 const MS_PER_HOUR = 3600000;
 
 /**
- * Whether a candidate row's own recording is available yet.
- *
- * Scheduled sessions premiere via their own end time (MR-stream-aware, see isOnDemand).
- * IPOD sessions — recorded in person, with no scheduled session-times of their own —
- * premiere `dvrDelayHours` after the EVENT's start instead, matching Northstar's own
- * SessionsDataSyncServiceImpl formula.
- *
- * `dvrDelayHours` is null when no delay is authored (see parseDvrDelayHours) — that means
- * no wait at all. A real 0 is different: it means "available from the moment the event
- * starts", which still has to be compared against eventStartMs.
+ * Whether a candidate row's recording is available yet: scheduled sessions premiere via
+ * their end time; IPOD sessions premiere `dvrDelayHours` after the event start. A null
+ * dvrDelayHours means no wait; a real 0 means available from event start.
  */
 function hasPremiered(session, eventStartMs, nowMs) {
   if (session.startTimeUtc && session.endTimeUtc) return isOnDemand(session, nowMs);
@@ -138,11 +131,7 @@ function hasEmbeddableVideo(sessionTimes) {
   return findOnDemandVideos(sessionTimes).length > 0;
 }
 
-/**
- * Ascending by scheduled start time. IPOD sessions have no real start time to compare, so
- * they sort after every scheduled one; Array.sort is stable, so they keep their original
- * catalog-relative order among themselves.
- */
+// Ascending by scheduled start time; IPOD sessions (no start time) sort last, stably.
 function compareByStartTime(a, b) {
   if (!a.startTimeUtc && !b.startTimeUtc) return 0;
   if (!a.startTimeUtc) return 1;
@@ -150,11 +139,7 @@ function compareByStartTime(a, b) {
   return new Date(a.startTimeUtc).getTime() - new Date(b.startTimeUtc).getTime();
 }
 
-/**
- * Whether a session has any video to play at all. The catalog carries one field per
- * provider (alternatives, not a fallback chain — see sessions-api.js), so any one of them
- * being present is enough to make the row worth listing.
- */
+// Whether a session has any playable video source (the provider fields are alternatives).
 function hasVideoSource(session) {
   return Boolean(session.mpcId || session.youTubeId || session.mrDvrVideoId);
 }
@@ -182,13 +167,8 @@ export function resolveCurrentSessionTopics(pageCustomAttributes) {
   return extractCustomAttributeSlugs({ customAttributes: pageCustomAttributes || [] }, 'Playlist on session page');
 }
 
-// The playlist's own heading, per product: the SAME `Playlist on session page`
-// attribute resolveCurrentSessionTopics above already reads (a multi-select, but only
-// ever carrying one value at any given time in practice) takes precedence — its
-// human-readable label (e.g. "Social Media and Marketing"), not the machine slug that
-// attribute's other use (topic matching) needs. An authored `playlist-title` row is
-// only consulted as a fallback when that metadata label isn't available, and the
-// hardcoded "More like this" remains the final fallback when neither is.
+// Heading precedence: the `Playlist on session page` attribute's label, then an authored
+// `playlist-title`, then the hardcoded "More like this".
 export function resolvePlaylistTitle(pageCustomAttributes, authoredTitle) {
   const label = extractCustomAttributeValue(
     { customAttributes: pageCustomAttributes || [] },
@@ -204,11 +184,8 @@ function formatDuration(minutes) {
   return h ? `${h}h ${m}m` : `${m}m`;
 }
 
-/**
- * The catalog's `videoDuration` ("HH:MM:SS", the real recorded length) in minutes, or null
- * when unauthored/malformed. Preferred over `duration`, which is the originally-scheduled
- * SLOT length and can genuinely differ — a 60-minute slot for a 40m40s recording.
- */
+// Catalog `videoDuration` ("HH:MM:SS", the real recorded length) in minutes, or null.
+// Preferred over `duration`, which is the scheduled slot length and can differ.
 function parseVideoDurationMinutes(hms) {
   const match = /^(\d+):(\d{2}):(\d{2})$/.exec(hms || '');
   if (!match) return null;
@@ -231,11 +208,8 @@ function updateRowProgressUI(sessionId) {
   if (durationEl && progress?.length) durationEl.textContent = formatDuration(Math.round(progress.length / 60));
 }
 
-/**
- * The nearest section that can see BOTH this block and its sibling content. This block's
- * own `.closest('.section')` reaches only its fragment-local section, so the outer grid
- * section (its `.grid-column`'s parent) is checked first.
- */
+// Nearest section seeing both this block and its siblings — the outer grid section, since
+// this block's own .closest('.section') only reaches its fragment-local one.
 function findEnclosingSection(el) {
   const gridColumn = el.closest('.grid-column');
   return gridColumn?.parentElement?.closest('.section') || el.closest('.section');
@@ -301,13 +275,8 @@ class Drawer {
     });
   }
 
-  // Dragging (see #bindDrag below) is allowed to go all the way to the top of the
-  // viewport — deliberately NOT the same title/player-avoiding cap the chevron toggle's
-  // own fixed expand target uses (measureCapPx above, left untouched). The user is
-  // explicitly choosing to cover the title (and even the player, if they drag that far)
-  // via a direct manipulation gesture, which is a different intent than the toggle's own
-  // one-tap "open to a sensible default" behavior — per product, this also matters most
-  // in landscape, where the toggle's own cap can otherwise be too small to see the list.
+  // Dragging may cover the full viewport — unlike the chevron toggle's title/player-avoiding
+  // cap (measureCapPx) — since it's an explicit direct-manipulation gesture.
   measureDragCapPx() {
     return window.innerHeight;
   }
@@ -317,11 +286,8 @@ class Drawer {
       this.el.style.maxHeight = '';
       return;
     }
-    // A persisted drag height (see #bindDrag's own onPointerUp, which no longer clears
-    // this on release) is re-clamped against measureDragCapPx() — the same full-viewport
-    // ceiling dragging itself respects — not measureCapPx()'s title-avoiding cap, so a
-    // free-form height the user chose past that cap doesn't get silently snapped back
-    // down the next time this runs (e.g. on window resize).
+    // A persisted drag height is re-clamped against the full-viewport cap (not the
+    // title-avoiding one) so a free-form height isn't snapped back down on resize.
     if (this.dragHeightPx != null) {
       const dragCap = this.measureDragCapPx();
       this.el.style.maxHeight = `${Math.min(Math.max(this.dragHeightPx, DRAWER_FLOOR_PX), dragCap)}px`;
@@ -347,14 +313,8 @@ class Drawer {
     this.#apply();
   }
 
-  // --- Player guard ------------------------------------------------------------------
-  // Neutralise the player <iframe>(s) by setting pointer-events:none on each `.video-player`
-  // whenever the drawer is expanded over them (see applyMobileHeight) or a drag is in
-  // flight. A cross-origin iframe otherwise picks up the OS-level touch under the finger:
-  // a gesture meant to grab/drag the drawer instead pans/scrubs the player ("the player
-  // moves a bit") while the drawer doesn't respond. pointer-events:none makes the iframe
-  // untouchable regardless of stacking context (a z-index overlay can't guarantee it paints
-  // above a player in another fragment).
+  // While a drag is in flight, pointer-events:none on each `.video-player` stops the
+  // cross-origin iframe under the finger from panning/scrubbing instead of the drawer.
   #addPlayerGuard() {
     if (this.guardReleaseTimer) { clearTimeout(this.guardReleaseTimer); this.guardReleaseTimer = null; }
     if (this.guardedPlayers?.length) return;
@@ -367,9 +327,7 @@ class Drawer {
     this.guardedPlayers = [];
   }
 
-  // Held ~350ms so the post-touch synthesised tap that lands where the drawer just uncovered
-  // (dragging down reveals the player under the finger) is absorbed before the player goes
-  // live again.
+  // Held ~350ms past release so the synthesised tap on the just-uncovered player is absorbed.
   #scheduleGuardRelease() {
     if (this.guardReleaseTimer) clearTimeout(this.guardReleaseTimer);
     this.guardReleaseTimer = setTimeout(() => {
@@ -392,36 +350,19 @@ class Drawer {
       this.dragHeightPx = pendingHeight;
       this.el.style.maxHeight = `${pendingHeight}px`;
     };
-    let loggedFirstMove = false;
-    let moveCount = 0;
     const onPointerMove = (event) => {
       if (dragStartY == null) return;
-      moveCount += 1;
-      if (!loggedFirstMove) {
-        loggedFirstMove = true;
-        // eslint-disable-next-line no-console
-        console.log(`[VPL-DBG] first pointermove y=${Math.round(event.clientY)} capture=${this.handleEl.hasPointerCapture?.(activePointerId)} t=${Math.round(performance.now())}`);
-      }
       const cap = this.measureDragCapPx();
       const delta = dragStartY - event.clientY;
-      // pointermove fires far faster than paint; coalescing to one style write per frame
-      // keeps the drag tracking the finger without queuing a backlog of layout work.
+      // Coalesce to one style write per frame so moves don't queue a backlog of layout.
       pendingHeight = Math.min(Math.max(dragStartHeight + delta, DRAWER_FLOOR_PX), cap);
       if (rafId == null) rafId = requestAnimationFrame(flush);
     };
 
-    // Free-form: the drawer stays exactly where the user drags it to, clamped only
-    // between DRAWER_FLOOR_PX and measureDragCapPx() (the full viewport, not the
-    // toggle's own title/player-avoiding cap) — no snapping to a fixed
-    // expanded/collapsed state on release. `expanded` still tracks whether the drawer
-    // ended up past the (unrelated) chevron-toggle cap's own midpoint, purely so
-    // aria-expanded/the chevron's rotation reflect "open" vs "closed" correctly; it no
-    // longer drives the actual rendered height once a drag height is set (see
-    // applyMobileHeight's own dragHeightPx branch).
-    const onPointerUp = (event) => {
+    // Free-form: the drawer keeps its dragged height; `expanded` only tracks past-midpoint
+    // for aria/chevron state, not the rendered height (see applyMobileHeight).
+    const onPointerUp = () => {
       if (dragStartY == null) return;
-      // eslint-disable-next-line no-console
-      console.log(`[VPL-DBG] ${event?.type === 'pointercancel' ? 'POINTERCANCEL' : 'pointerup'} y=${Math.round(event?.clientY ?? -1)} moves=${moveCount} dragHeightPx=${this.dragHeightPx == null ? 'null' : Math.round(this.dragHeightPx)} t=${Math.round(performance.now())}`);
       dragStartY = null;
       if (rafId != null) { cancelAnimationFrame(rafId); flush(); }
       if (activePointerId != null && captureEl?.hasPointerCapture?.(activePointerId)) {
@@ -433,29 +374,20 @@ class Drawer {
       captureEl?.removeEventListener('pointerup', onPointerUp);
       captureEl?.removeEventListener('pointercancel', onPointerUp);
       captureEl = null;
-      // Re-enable the max-height transition (suppressed during the drag) so this settle
-      // animates rather than the live per-frame writes above.
+      // Re-enable the max-height transition (suppressed during drag) so the settle animates.
       this.el.classList.remove('is-dragging');
       const toggleCap = this.measureCapPx();
       const midpoint = (DRAWER_FLOOR_PX + toggleCap) / 2;
       const endedHeight = this.dragHeightPx ?? dragStartHeight;
       this.expanded = endedHeight >= midpoint;
-      // Ended below the midpoint: the user is closing the drawer. Drop the free-form drag
-      // height entirely so applyMobileHeight() renders the collapsed peek (DRAWER_FLOOR_PX
-      // + collapsed padding) — otherwise the height would stay pinned near the floor while
-      // is-expanded flips off underneath it, jumping the padding/handle out of sync with
-      // the height (the "it toggles" glitch). Above the midpoint the free-form height is
-      // kept, matching the expanded chrome.
+      // Closing: drop the drag height so it settles to the collapsed peek, keeping height
+      // and is-expanded chrome in sync (otherwise the padding/handle jump out of step).
       if (!this.expanded) this.dragHeightPx = null;
       this.#apply();
     };
 
-    // A press on the header band counts as a drag ONLY when the drawer is already expanded
-    // (collapsed uses tap-to-open via the header click handler) and NOT on one of the
-    // header's own interactive controls — the toggle chevron and the "Play all" switch must
-    // still take their taps. The thin handle bar is always a drag surface. Widening the
-    // target this way is the fix for "drag down does nothing": the 24px handle alone was too
-    // small to reliably grab, so presses landed on the player behind/beside it instead.
+    // The header band is a drag surface too (the 24px handle alone was too small to grab
+    // reliably) — but only while expanded and not on its own controls (toggle, "Play all").
     const interactiveInHeader = (target) => Boolean(
       target.closest?.('button, a, input, label, [role="switch"], [role="button"]'),
     );
@@ -464,21 +396,14 @@ class Drawer {
       if (dragStartY != null) return;
       const surface = event.currentTarget;
       if (surface === this.headerEl && (!this.expanded || interactiveInHeader(event.target))) return;
-      // eslint-disable-next-line no-console
-      console.log(`[VPL-DBG] pointerdown surface=${surface === this.headerEl ? 'header' : 'handle'} type=${event.pointerType} y=${Math.round(event.clientY)} t=${Math.round(performance.now())}`);
       dragStartY = event.clientY;
       dragStartHeight = this.el.getBoundingClientRect().height;
-      // Capture the pointer so the whole gesture is delivered to this surface even while the
-      // pointer travels over the player <iframe>: without capture the iframe swallows the
-      // stream mid-drag. Capture also lets the move/up/cancel listeners live on the surface
-      // rather than window.
-      loggedFirstMove = false;
-      moveCount = 0;
+      // Capture keeps the gesture on this surface even as the pointer travels over the
+      // player <iframe>, which would otherwise swallow the stream mid-drag.
       activePointerId = event.pointerId;
       captureEl = surface;
       captureEl.setPointerCapture?.(activePointerId);
-      // Suppress the max-height transition while dragging so the drawer tracks the finger
-      // 1:1 instead of easing 0.3s behind every pointermove write; onPointerUp restores it.
+      // Suppress the max-height transition while dragging so it tracks the finger 1:1.
       this.el.classList.add('is-dragging');
       this.#addPlayerGuard();
       captureEl.addEventListener('pointermove', onPointerMove);
@@ -487,17 +412,13 @@ class Drawer {
     };
 
     this.handleEl.addEventListener('pointerdown', startDrag);
-    // touch-action:none on the header band too (see CSS) so a vertical drag here resizes the
-    // drawer instead of the browser claiming it as a scroll.
     this.headerEl?.addEventListener('pointerdown', startDrag);
   }
 }
 
 const PLAY_ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M3.79922 14.4001C3.48086 14.4001 3.16289 14.3141 2.87656 14.1431C2.32773 13.8149 2 13.2368 2 12.5977V3.39617C2 2.75711 2.32774 2.17899 2.87656 1.85086C3.425 1.52352 4.08867 1.50711 4.65195 1.81102L13.2129 6.41181C13.7973 6.72587 14.1602 7.33368 14.1602 7.99696C14.1602 8.66025 13.7973 9.26806 13.2129 9.58212L4.65195 14.1829C4.38281 14.3282 4.09062 14.4001 3.79922 14.4001ZM3.80195 2.79383C3.65938 2.79383 3.54726 2.84852 3.49218 2.88133C3.4043 2.93368 3.2 3.08915 3.2 3.39617V12.5977C3.2 12.9048 3.4043 13.0602 3.49218 13.1126C3.58007 13.1649 3.81328 13.2712 4.08398 13.1266L12.6445 8.52585C12.9293 8.37195 12.9602 8.10476 12.9602 7.99695C12.9602 7.88914 12.9293 7.62195 12.6445 7.46804L4.08398 2.86727C3.98282 2.81336 3.88711 2.79383 3.80195 2.79383Z" fill="currentColor"/></svg>';
 const THUMB_PLAY_ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="13" height="15" viewBox="0 0 13 15" fill="none" aria-hidden="true"><path d="M11.925 6.11782C12.625 6.52196 12.625 7.53232 11.925 7.93647L1.575 13.912C0.875 14.3162 0 13.811 0 13.0027V1.05157C0 0.243276 0.875 -0.261905 1.575 0.14224L11.925 6.11782Z" fill="currentColor"/></svg>';
-// Favorited state is conveyed by SWAPPING to a solid heart, not by tinting the outline —
-// same treatment (and the same two paths) event-session-details/favorite.js uses, so the
-// two blocks' favorite buttons read identically.
+// Favorited state swaps to a solid heart (matching event-session-details/favorite.js).
 const FAVORITE_ICON_OUTLINE_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M7.99957 14.3999C7.60855 14.3999 7.21753 14.2717 6.89097 14.0155C5.62222 13.0202 2.72886 10.4061 1.79137 8.87253C1.04527 7.65222 0.789022 6.14206 1.10582 4.83346C1.37769 3.71002 2.03551 2.80378 3.00856 2.21081C4.10777 1.53971 5.42692 1.41315 6.44997 1.88034C6.97809 2.12174 7.54059 2.54206 7.99293 3.01706C8.45543 2.51315 9.01129 2.10534 9.56677 1.8733C10.616 1.4319 11.9289 1.56314 12.991 2.21081C13.9636 2.80378 14.6215 3.71002 14.8933 4.83346C15.2101 6.14206 14.9539 7.65222 14.2078 8.87253C13.2722 10.403 10.3781 13.0186 9.10817 14.0155C8.78201 14.2717 8.39058 14.3999 7.99957 14.3999ZM5.10933 2.79909C4.62417 2.79909 4.10504 2.94753 3.63317 3.23581C2.93785 3.65925 2.46754 4.30925 2.27223 5.1155C2.02848 6.12174 2.23161 7.29206 2.81481 8.24597C3.5773 9.49284 6.13433 11.8968 7.63161 13.0718C7.84801 13.2421 8.15075 13.2421 8.36716 13.0718C9.86599 11.8952 12.4234 9.4905 13.184 8.24597C13.7675 7.29206 13.9707 6.12175 13.7269 5.1155C13.5316 4.30925 13.0613 3.65925 12.3664 3.23581C11.6258 2.78425 10.7304 2.68659 10.0304 2.97956C9.48474 3.20846 8.88396 3.72956 8.4992 4.30769C8.27654 4.64206 7.72264 4.64206 7.49998 4.30769C7.15193 3.78503 6.50077 3.22331 5.95154 2.97253C5.69685 2.85612 5.40972 2.79909 5.10933 2.79909Z" fill="currentColor"/></svg>';
 const FAVORITE_ICON_FILLED_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M8.61426 17.5195C9.02246 17.8398 9.51123 18 10 18C10.4888 18 10.9781 17.8398 11.3858 17.5195C12.9732 16.2734 16.5908 13.0039 17.7603 11.0908C18.6929 9.56543 19.0132 7.67773 18.6172 6.04199C18.2774 4.63769 17.4551 3.50488 16.2393 2.76367C14.9116 1.95409 13.2705 1.79003 11.959 2.34179C11.2647 2.63183 10.5698 3.1416 9.99171 3.77148C9.42628 3.17773 8.72316 2.65234 8.063 2.35058C6.78419 1.7666 5.13526 1.9248 3.76124 2.76367C2.54493 3.50488 1.72266 4.63769 1.38282 6.04199C0.98682 7.67773 1.30713 9.56543 2.23975 11.0908C3.41162 13.0078 7.02832 16.2754 8.61426 17.5195Z" fill="currentColor"/></svg>';
 const TOGGLE_CHEVRON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="17" height="10" viewBox="0 0 17 10" fill="none" aria-hidden="true"><path d="M16.7969 0.992758C16.7969 1.24793 16.6966 1.50437 16.4973 1.69481L9.08321 8.8283C8.70616 9.19265 8.10948 9.19265 7.73243 8.8283L0.300593 1.6783C-0.0878861 1.30505 -0.0993168 0.686787 0.273927 0.300856C0.64717 -0.0876221 1.26416 -0.10031 1.65137 0.274194L8.40782 6.77292L15.1465 0.290691C15.5337 -0.0838252 16.1507 -0.0711232 16.5239 0.317355C16.7067 0.505244 16.7969 0.748995 16.7969 0.992758Z" fill="#DBDBDB"/></svg>';
@@ -520,15 +441,8 @@ function buildFavoriteButton(item) {
 
   button.addEventListener('click', async (event) => {
     event.stopPropagation();
-    // A mouse/touch click reports a nonzero event.detail (the click count); a
-    // keyboard-triggered click (Enter/Space) always reports 0. Blurring only in the
-    // mouse case clears the lingering :focus-within that otherwise keeps
-    // .video-playlist-row-actions visible after the pointer leaves — clicking the
-    // button focuses it by default, and CSS treats focus the same as hover for
-    // revealing the actions column, so without this a mouse click leaves the row
-    // looking "stuck" open until something else steals focus. Keyboard users still
-    // keep the actions column visible while tabbed to it, which is the correct,
-    // intentional behavior for that input method.
+    // Blur only on mouse clicks (event.detail > 0, unlike keyboard's 0) so the row's
+    // :focus-within doesn't keep the actions column stuck open after the pointer leaves.
     if (event.detail > 0) button.blur();
     if (pendingActions.value.has(item.id)) return;
     await toggleFavoriteWithFeedback(item, {
@@ -539,11 +453,8 @@ function buildFavoriteButton(item) {
   return button;
 }
 
-// Per Figma's accessibility spec: a real, focusable button with its own name ("Play
-// [session title]") — not aria-hidden/tabindex="-1" as before. Its own click still does
-// exactly what clicking the row itself does (see `activate` in buildRow); this only
-// gives keyboard/assistive-tech users an explicit, separately-labeled way to trigger the
-// same action, rather than relying solely on the row's own (differently-labeled) link.
+// A real, focusable, separately-named ("Play [title]") button; its click does the same as
+// activating the row, giving keyboard/AT users an explicit labeled control.
 function buildPlayButton(activate, title) {
   const button = createTag('button', {
     type: 'button',
@@ -602,17 +513,9 @@ function highlightRow(list, activeId) {
 }
 
 /**
- * Caps how TALL the expanded list may grow, in whole rows, so `maximum-sessions` limits
- * what's visible at once while the list scrolls to reach the rest.
- *
- * A max-height (not a fixed height) so the list still sizes to its content when there are
- * fewer rows than the cap — 9 authored with 5 available renders 5 rows, no scrollbar and
- * no empty space. Measured from a real row because row height differs per breakpoint.
- *
- * Desktop only: below 1024px the block is a drag-resizable bottom sheet whose height the
- * viewer sets directly (see Drawer), and a second cap would fight that. `isDesktop` is a
- * parameter rather than read inline so the measurement can be exercised at any viewport
- * width — the test runner's own window is narrower than the breakpoint.
+ * Caps the expanded list at `maximum-sessions` whole rows (a max-height, so a shorter list
+ * keeps its natural height and doesn't scroll). Desktop only; `isDesktop` is a parameter so
+ * the measurement is testable below the breakpoint.
  */
 export function applyExpandedHeightCap(
   list,
@@ -637,15 +540,9 @@ export function applyExpandedHeightCap(
   // N rows plus the N-1 gaps between them, plus the list's own padding.
   const rowsCap = (rowHeight * maxSessions) + (gap * (maxSessions - 1)) + verticalPadding;
 
-  // Also clamp to what the list can actually occupy on screen. Without this, a large
-  // `maximum-sessions` produces a cap taller than the viewport: the whole .video-playlist
-  // card then overflows the viewport bottom, so the wheel scrolls the PAGE to reveal the
-  // rest of the card and the inner list never overflows its own box — which is why the
-  // scrollbar appeared over the page/thumbnails instead of inside the list and the list
-  // wouldn't scroll. Bounding the cap to the space between the list's top and the viewport
-  // bottom (leaving a small gutter) guarantees the list itself is the overflowing element,
-  // so it owns the scroll and shows its own scrollbar. Falls back to rowsCap if the list
-  // isn't laid out yet (top === 0).
+  // Also clamp to the space left on screen, so a large `maximum-sessions` can't push the
+  // card past the viewport (which makes the PAGE scroll instead of the list). Falls back to
+  // rowsCap if the list isn't laid out yet (top === 0).
   const listTop = list.getBoundingClientRect().top;
   const viewportCap = window.innerHeight - listTop - VIEWPORT_CAP_GUTTER_PX;
   const cap = listTop > 0 && viewportCap > rowHeight
@@ -758,11 +655,8 @@ function buildAutoplayToggle(el) {
   checkbox.addEventListener('change', () => setShouldAutoPlay(checkbox.checked));
 }
 
-// Matches the collapse transition in video-playlist.css. Only a safety net: the real
-// removal is driven by transitionend, which never fires when the element has no
-// transition to run (reduced-motion, an already-hidden element, CSS not yet applied) —
-// without this fallback such an element would keep its `is-collapsing` class forever and
-// never actually leave the DOM.
+// Matches the CSS collapse transition. Safety net for when transitionend never fires
+// (reduced-motion, already-hidden, CSS not yet applied) so the element still leaves the DOM.
 const COLLAPSE_TRANSITION_MS = 250;
 const COLLAPSE_FALLBACK_MS = COLLAPSE_TRANSITION_MS + 100;
 
@@ -787,25 +681,16 @@ function collapseAndRemove(target) {
 }
 
 /**
- * `data-embedded="true"` is set by video-player.js's own loadVideoPlayer() the moment an
- * instance actually commits and embeds a real video — NOT at "decided to try", but after
- * the fact. Checked for exactly one reason: a LATE-arriving decision (this block's own
- * catalog fetch responding after that instance's own fallback timeout already resolved it
- * as the winner) must never tear an already-playing video out with nothing to replace it.
- * The visitor keeps watching whatever won the race, even if it turns out to be the
- * "wrong" side for this page load, rather than the video vanishing entirely.
+ * Whether an instance already embedded a real video (data-embedded set by loadVideoPlayer).
+ * A late-arriving decision must never tear out an already-playing video.
  */
 function hasEmbeddedVideoPlayer(container) {
   return container?.querySelector('.video-player')?.dataset.embedded === 'true';
 }
 
 /**
- * Publishes the page-wide layout decision and tears down whichever side lost.
- *
- * Both candidate sections are found by their author-applied marker class (see the
- * README's Authoring section), never by inferred DOM structure — a prior
- * `.closest('.section')`/`.grid-column` walk broke outright once the two columns turned
- * out to be separate `.fragment > .section` trees.
+ * Publishes the page-wide layout decision and tears down whichever side lost. Sections are
+ * found by their author-applied marker class, never by inferred DOM structure.
  */
 function announceVideoDecision(hasPlaylist) {
   BlockMediator.set(VIDEO_LAYOUT_DECISION_KEY, { hasPlaylist });
@@ -835,16 +720,9 @@ function removeBlock(el) {
 }
 
 /**
- * The event's own start time, used by hasPremiered() for IPOD sessions (which have no
- * scheduled session-times of their own and premiere `dvrTimingHours` after the EVENT
- * starts). Read from the Tier 1 Event Configurator's authored `eventStartDateTime` — the
- * same config session-store.js reads `eventEndDateTime` from — NOT the page-level
- * `local-start-time-millis` metadata, which carries an individual page's own local
- * timing rather than the event's.
- *
- * initTierOneEventConfig() is idempotent and normally already ran during decorateEvent;
- * called again here so this block doesn't depend on that ordering (same defensive
- * pattern event-session-details/event-featured-products already use).
+ * The event's start time (for hasPremiered's IPOD path), read from the Tier 1 Event
+ * Configurator's authored `eventStartDateTime`, not page-level `local-start-time-millis`.
+ * initTierOneEventConfig() is idempotent, so calling it again here is order-independent.
  */
 function resolveEventStartMs() {
   initTierOneEventConfig();
@@ -945,12 +823,8 @@ export default async function init(el) {
 
   initSessionState();
 
-  /**
-   * The current session isn't guaranteed to be in the fetched catalog at all (confirmed
-   * live: an IPOD test session's own entry was simply absent). Without a stand-in, its
-   * row would never render and the "now playing" highlight would find nothing to mark, so
-   * this builds a minimal one straight from page metadata and the DOM.
-   */
+  // The current session may be absent from the catalog (e.g. IPOD); build a minimal
+  // stand-in from page metadata so its row and "now playing" highlight still render.
   function synthesizeCurrentSession() {
     const startTimeMillis = (sessionTimes || [])[0]?.startTimeMillis;
     return {
@@ -1055,15 +929,9 @@ export default async function init(el) {
     el.dispatchEvent(new CustomEvent('video-playlist:view', { bubbles: true }));
   };
 
-  // A catalog fetch that errors out, or genuinely resolves with zero sessions, never
-  // makes `sessions.value` non-empty — without this, the block below would wait on
-  // `sessions.subscribe` forever, leaving a stray, unstyled, never-decided
-  // `.video-playlist` stuck in the layout indefinitely (confirmed live: the raw block
-  // sits in its two-column section with no rows, no removal, and video-player's own
-  // instances never resolve their embed decision either, since announceVideoDecision()
-  // is never reached). sessionsStatus reaching 'ready' (even with an empty list) or
-  // 'error' is the fetch's own terminal signal — either one means no more sessions are
-  // ever coming, so this block has definitively nothing to show.
+  // sessionsStatus reaching 'ready' (even empty) or 'error' is the fetch's terminal signal:
+  // without handling it, an errored/empty fetch would leave the block waiting on
+  // sessions.subscribe forever, stuck undecided in the layout.
   const existing = sessions.value;
   if (existing.length) {
     render(existing);

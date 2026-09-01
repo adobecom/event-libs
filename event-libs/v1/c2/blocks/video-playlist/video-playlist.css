@@ -6,13 +6,8 @@
    block sharing one .section, which a two-fragment page layout no longer guarantees.
    Revisit once the actual page-template grid-column DOM is confirmed. */
 @media (min-width: 1024px) {
-  /* Desktop card is light (per Figma inspect: background:#FFF) — the inverse of the
-     mobile bottom-sheet's dark theme below. Every color that needs to contrast against
-     the card is expressed as a --vp-* custom property so this is the only place the
-     theme needs to flip; the mobile block below defines the same set for its own (dark)
-     theme. --vp-authored-bg (set inline by readBackgroundConfig() in the JS) overrides
-     the default here ONLY — deliberately not referenced at all in the mobile block
-     below, so an authored Background row never bleeds into the dark bottom-sheet. */
+  /* Desktop light theme — the --vp-* tokens flip here vs the mobile dark block below.
+     --vp-authored-bg (from readBackgroundConfig) overrides the default here only. */
   .video-playlist {
     --vp-bg: var(--vp-authored-bg, var(--s2a-color-gray-25));
     --vp-fg: var(--s2a-color-gray-900);
@@ -36,17 +31,9 @@
     max-height: 100%;
   }
 
-  /* Favorite + play (stacked in .video-playlist-row-actions) are hover/focus-revealed
-     only on desktop (per the Figma "Session tile states" spec: Default shows neither,
-     Hover shows both) — mobile has no hover concept, so they stay always-visible there
-     (see the max-width block). Collapsed to width:0 (not just opacity:0) when hidden —
-     otherwise the reserved 32px would sit unused and the title couldn't reclaim it, per
-     Figma's own Default (92-char truncation) vs Hover (65-char) row measurements.
-     margin-left cancels the row's own `gap`, which would otherwise still reserve space
-     next to a zero-width column. min-width:0 overrides flexbox's automatic minimum size
-     (which defaults to the content's — here the 32px buttons' — min-content width) that
-     would otherwise silently keep this column from ever actually shrinking below ~32px
-     despite width:0, leaving meta with nothing to reclaim. */
+  /* Favorite + play are hover/focus-revealed on desktop only (per Figma; mobile keeps
+     them visible). width:0 + min-width:0 (not opacity) so the title reclaims the space;
+     margin-left cancels the row gap next to the zero-width column. */
   .video-playlist-row-actions {
     width: 0;
     min-width: 0;
@@ -81,21 +68,9 @@
   }
 }
 
-/* Flex column so the header (handle + title/toggle/play-all row) and the "Show more"
-   button stay pinned in place while only .video-playlist-list itself scrolls between
-   them — previously overflow-y/max-height lived on this element directly, which
-   scrolled the header away along with the rows.
-
-   --vp-bg/--vp-fg are only ever DEFINED inside the min-width:1024px/max-width:1023px
-   theme blocks above — this base rule has no unconditional fallback of its own, unlike
-   sibling blocks (event-featured-products, event-speakers) which hardcode a static
-   background at their own base selector. Confirmed live: before either media query has
-   resolved a value (or if it briefly doesn't), background/color fall back to their
-   initial transparent/inherited values, letting the raw authored table (session-id,
-   minimum-sessions, playlist-title, ...) show through until init()'s own
-   el.replaceChildren() repaints it — a real, visible flash of unstyled content other
-   blocks don't have. var(..., fallback) gives this the same guaranteed paint the other
-   blocks get, before either theme block or any JS has run at all. */
+/* Flex column so the header and "Show more" stay pinned while only the list scrolls. The
+   var(..., fallback) backgrounds give a guaranteed paint before the theme media queries
+   (which alone DEFINE --vp-bg/--vp-fg) resolve, avoiding a flash of the raw authored table. */
 .video-playlist {
   display: flex;
   flex-direction: column;
@@ -115,31 +90,16 @@
   flex-shrink: 0;
 }
 
-/* Same convention mobile-rider.css already uses for its own raw authoring table: hides
-   the authored key/value rows (session-id, minimum-sessions, playlist-title, ...) that
-   would otherwise sit as plain-text direct children of this block from first paint,
-   before init()'s own el.replaceChildren() wipes them out and rebuilds the real
-   handle/top/list/show-more children below. Scoped to :not(...) rather than a blanket
-   "hide everything until JS runs" so the real rebuilt children (all carrying one of
-   these classes) are never accidentally caught by the same rule. */
+/* Hides the raw authored key/value rows until init() rebuilds the block. Scoped to
+   :not(...) so the real rebuilt children (which carry these classes) aren't caught. */
 .video-playlist > :not(.video-playlist-handle, .video-playlist-top, .video-playlist-list, .video-playlist-show-more) {
   display: none;
 }
 
-/* Applied by announceVideoDecision() in video-playlist.js directly to whichever
-   element(s) lose the layout decision — never a shared containing section, which
-   carries other, unrelated blocks (event-featured-products, event-speakers,
-   event-session-details, event-session-resources, ...) authored alongside the video
-   ones; collapsing/removing that would wipe those out too. Three possible targets:
-   the whole `.video-container` (full-width, player-only layout, when
-   video-playlist.js wins) or the specific `.video-player`/`.video-playlist` elements
-   inside `.video-playlist-container` (when it loses) — never the container itself in
-   that second case, since it's shared with other blocks. The losing video-player.js
-   instance never even embeds a video in the first place (see that block's own
-   awaitEmbedDecision), so this only ever fades out an empty, never-populated element
-   before removing it, not a populated one. transitionend (not a timer) triggers the
-   actual el.remove(), so this duration is the only thing that needs to stay in sync
-   between the two files. */
+/* Fade-out applied by announceVideoDecision() to the losing element(s) — the whole
+   `.video-container`, or the specific `.video-player`/`.video-playlist` inside
+   `.video-playlist-container`, never a shared section. transitionend triggers el.remove(),
+   so this duration must stay in sync with the JS. */
 .video-container.is-collapsing,
 .video-player.is-collapsing,
 .video-playlist.is-collapsing {
@@ -155,11 +115,8 @@
   display: none;
 }
 
-/* Title + collapse toggle (mobile) + "Play all" switch all share one flex-wrap row so
-   the same DOM order can lay out two different ways per breakpoint: desktop keeps the
-   switch on the title's own row (flex-basis:auto, pushed right via margin-left:auto);
-   mobile forces it to wrap onto its own row (flex-basis:100%, see the max-width block
-   below) below the title+toggle row. */
+/* Title + toggle + "Play all" share one flex-wrap row: desktop keeps the switch on the
+   title's row; mobile wraps it to its own line (see the max-width block). */
 .video-playlist-top {
   display: flex;
   flex-wrap: wrap;
@@ -169,12 +126,8 @@
 }
 
 .video-playlist-title {
-  /* flex-basis:0 (not auto) — with a very long title (e.g. authored text with no
-     natural break opportunities), -webkit-box's own intrinsic-size computation combined
-     with an `auto` flex-basis can size this flex item to its full max-content width
-     BEFORE line-clamp/wrap ever gets a chance to constrain it, blowing the title out to
-     many un-clamped, un-ellipsized lines spanning far past the card. Starting from a
-     zero basis and growing via flex-grow sidesteps that content-based sizing entirely. */
+  /* flex-basis:0 (not auto): an auto basis lets -webkit-box size to max-content before
+     line-clamp constrains it, blowing a long title past the card. */
   flex: 1 0 0%;
   min-width: 0;
   margin: 0;
@@ -193,10 +146,7 @@
   display: none;
 }
 
-/* Mobile-only collapsed "Up next" peek — see the max-width:1023px block below for its
-   actual visibility rules (shown collapsed, hidden once expanded) and the mobile-only
-   title/toggle it swaps places with. No rule needed at this (desktop) scope: the peek
-   is never even shown outside that block. */
+/* Collapsed "Up next" peek — mobile-only; visibility rules live in the max-width block. */
 .video-playlist-up-next {
   display: none;
 }
@@ -269,30 +219,14 @@
   box-sizing: border-box;
 }
 
-/* Persistently visible, styled scrollbar on the actual scroll container
-   (.video-playlist-list, not the whole block — see the flex-column restructure at the
-   top of this file). The OS default is an auto-hiding overlay scrollbar on macOS/some
-   browsers: it only surfaces mid-gesture, which both reads as "there's nothing more to
-   see" and gives no stable target to grab.
-
-   Chrome only. Firefox styling (scrollbar-width/scrollbar-color) is deliberately omitted:
-   scrollbar-width would put Chrome on the standard scrollbar path where every ::-webkit-*
-   rule below is ignored. */
+/* Persistently visible scrollbar on the list, replacing the auto-hiding overlay default.
+   Chrome only: scrollbar-width is omitted deliberately, as it would disable the ::-webkit-*
+   rules below. */
 @media (min-width: 1024px) {
-  /* `-webkit-appearance: none` is the declaration that actually pins the scrollbar on
-     screen, and it must stay PREFIXED: inside ::-webkit-scrollbar, Chrome honours only
-     the prefixed form and silently ignores unprefixed `appearance`, which is what
-     stylelint's autofix will rewrite it to given the chance (hence the stylelint-disable
-     below — without it `npm run lint:fix` quietly reverts this fix).
-
-     Without it, WebKit keeps its overlay scrollbar behaviour — fades ~1s after
-     scrolling, and on macOS set to "Show scroll bars: automatically" it never appears
-     until a scroll gesture is already underway — and ignores the thumb styling below
-     entirely. Declaring it switches this container to a legacy, always-present scrollbar
-     that occupies real layout width, hence the gutter reserved above.
-
-     10px, not 6px: 6px is under the ~10px minimum comfortable pointer target, which is
-     what made the bar hard to grab even when it was on screen. */
+  /* -webkit-appearance:none switches WebKit to a legacy always-present scrollbar (and
+     enables the thumb styling below). Must stay PREFIXED — Chrome ignores the unprefixed
+     form inside ::-webkit-scrollbar, hence the stylelint-disable so lint:fix can't revert
+     it. 10px for a comfortable pointer target. */
   .video-playlist-list::-webkit-scrollbar {
     /* stylelint-disable-next-line property-no-vendor-prefix */
     -webkit-appearance: none;
@@ -667,14 +601,9 @@
     padding: var(--s2a-spacing-md) var(--s2a-spacing-md) var(--s2a-spacing-lg);
   }
 
-  /* Real drag target now (see Drawer's #bindDrag), not just decorative — sized to a
-     comfortable touch target (the visible bar is drawn via ::before, kept at its
-     original small size) with touch-action:none so a vertical drag gesture here
-     resizes the drawer instead of also trying to scroll the page underneath it.
-     Collapsed state has no drag affordance at all — per Figma, only "Up next" + the
-     chevron show there (see .video-playlist-up-next); the handle only appears once
-     expanded, where dragging it back down all the way is how the viewer returns to
-     collapsed (in addition to tapping the chevron). */
+  /* Real drag target (see Drawer's #bindDrag): a comfortable touch target with the bar
+     drawn via ::before, touch-action:none so the drag resizes the drawer rather than
+     scrolling the page. Only shown once expanded. */
   .video-playlist-handle {
     display: none;
     align-items: center;
@@ -733,15 +662,9 @@
     transform: rotate(180deg);
   }
 
-  /* Collapsed row must never wrap — .video-playlist-top's own base rule is flex-wrap:
-     wrap (needed so .video-playlist-autoplay can drop to its own line once expanded,
-     via flex-basis:100% below), but while collapsed only .video-playlist-up-next and
-     the toggle are actually visible; without this, the up-next block's own 2-line
-     clamped title grows tall/wide enough to push the toggle onto a wrapped second line,
-     which then gets clipped off entirely by the collapsed drawer's fixed max-height
-     (confirmed live: the chevron disappeared, not just visually hidden). Whole
-     collapsed peek is also tappable to open (see the JS's own top.addEventListener) —
-     a pointer cursor communicates that before the tap, same as the handle/toggle. */
+  /* Collapsed must not wrap (the base rule is flex-wrap:wrap for the expanded autoplay
+     row): a wrapped toggle would be clipped by the collapsed max-height. The whole peek
+     is tappable to open, hence the pointer cursor. */
   .video-playlist-top {
     flex-wrap: nowrap;
     cursor: pointer;
