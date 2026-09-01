@@ -65,6 +65,14 @@ three relevant methods:
   for a rule that was actually registered via `UpsertReminderFeatureFlag` first — there
   is no way to remove a notification that was never registered as a rule.
 
+**Correction (superseded by `docs/swan-unc-investigation-summary.md`):** these three are
+defined on the engine class's *prototype*, and the `instance` object `getComponent()`
+actually hands to external callers (see below) does not carry prototype methods — only
+its own properties. `unc-client.js` reaches these three calls through
+`instance._uncContainer.handleMessageFromInterface(methodName, payload)` instead, which
+was confirmed live to route to the same internal handlers described above
+(`ReminderTracker.handleReminderFeatureData`, etc.).
+
 **A single rule can only ever deliver one notification, ever** — confirmed by reading
 `ReminderManager.isValidStageSequence()`/`isLastEventOfJourney()`/`scheduleNextReminderProcess()`:
 multi-stage rule chaining is a drop-off/escalation model (only the terminal stage's content
@@ -108,10 +116,14 @@ source repos):
   `LoadJS`-injects the real engine bundle at
   `https://prod.adobeccstatic.com/unc/10.0/UNC-shared.js` (matching `ccxi-unc`'s own
   webpack build output naming), constructs it as `new window.UNC.default(config)`, and
-  resolves `getComponent('notifications')` to `{ instance }`. Confirmed `instance` exposes
-  the engine's methods directly — the same bundle calls `instance.ShowNotification`/
-  `HideNotification` this way — so `instance.UpsertReminderFeatureFlag`/
-  `DeleteReminderFeatureFlag`/`AnalyticsEventFromHost` are the same calls documented above.
+  resolves `getComponent('notifications')` to `{ instance }`. **Correction:** `instance`
+  is a shallow copy of only the engine's *own* properties (`appContext`, `initializeUNC`,
+  `_uncContainer`, etc.) — it does not preserve prototype methods, so
+  `instance.UpsertReminderFeatureFlag`/`DeleteReminderFeatureFlag`/`AnalyticsEventFromHost`
+  are never present on it. `_uncContainer` is one of the surviving own properties, and each
+  of those three methods is, on the real engine, a one-line pass-through to
+  `_uncContainer.handleMessageFromInterface(methodName, data)` — confirmed live to reach
+  the real handler. See `docs/swan-unc-investigation-summary.md` for the full writeup.
 - No dedicated "ready" event exists for this (checked milo's `global-navigation.js` for
   any `dispatchEvent` around gnav/unav decoration — found none for this specifically), and
   `getComponent()` itself resolves `undefined` (caught internally, not thrown) if called

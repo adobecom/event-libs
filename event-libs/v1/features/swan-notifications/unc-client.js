@@ -11,11 +11,19 @@
 // UniversalNav.js, which exposes `window.UniversalNav.getComponent('notifications')` — an
 // async method that lazily loads the real UNC engine bundle
 // (adobeccstatic.com/unc/<version>/UNC-shared.js), constructs it as
-// `new window.UNC.default(config)`, and resolves `{ instance }`. Confirmed `instance`
-// exposes the same method surface as UNC's engine class directly (the bundle itself calls
-// `instance.ShowNotification`/`HideNotification` the same way). This only ever resolves a
+// `new window.UNC.default(config)`, and resolves `{ instance }`. This only ever resolves a
 // real instance once the page's gnav has "notifications" configured as an active component
 // (`universal-nav` metadata) — see docs/swan-unc-dependencies.md for that dependency.
+//
+// The `instance` UNAV hands back is a shallow copy of only the engine's *own* properties
+// (`appContext`, `initializeUNC`, `_uncContainer`, etc.) — it does NOT preserve prototype
+// methods, so UpsertReminderFeatureFlag/DeleteReminderFeatureFlag/AnalyticsEventFromHost
+// (defined on the engine class's prototype) are never present on it directly. Each of those
+// three is, on the real engine, a one-line pass-through to
+// `_uncContainer.handleMessageFromInterface(methodName, data)` — and `_uncContainer` is one
+// of the surviving own properties, so this file calls through that path directly instead.
+// Verified live against the real engine. See docs/swan-unc-investigation-summary.md and
+// docs/swan-unc-dependencies.md.
 //
 // getComponent() itself internally awaits the chunk load + engine construction once called,
 // but resolves `undefined` (caught internally, not thrown) if called before milo's own gnav
@@ -26,9 +34,13 @@ const POLL_INTERVAL_MS = 250;
 
 function isUncInstance(candidate) {
   return !!candidate
-    && typeof candidate.UpsertReminderFeatureFlag === 'function'
-    && typeof candidate.DeleteReminderFeatureFlag === 'function'
-    && typeof candidate.AnalyticsEventFromHost === 'function';
+    && typeof candidate._uncContainer?.handleMessageFromInterface === 'function';
+}
+
+// `_uncContainer` is an undocumented, underscore-prefixed internal field, not a published
+// contract — kept behind one call site so a future change to this path only touches one line.
+function callUnc(instance, methodName, payload) {
+  instance._uncContainer.handleMessageFromInterface(methodName, payload);
 }
 
 async function tryResolveInstance() {
@@ -73,7 +85,7 @@ export async function registerReminderRule(campaignId, campaignRule) {
   try {
     const uncInstance = await whenUncReady();
     if (!uncInstance) return false;
-    uncInstance.UpsertReminderFeatureFlag({ campaignRules: [{ campaignID: campaignId, campaignRule }] });
+    callUnc(uncInstance, 'UpsertReminderFeatureFlag', { campaignRules: [{ campaignID: campaignId, campaignRule }] });
     return true;
   } catch (err) {
     window.lana?.log(`[unc-client] registerReminderRule failed for ${campaignId}: ${err.message}`);
@@ -85,7 +97,7 @@ export async function deleteReminderRule(campaignId) {
   try {
     const uncInstance = await whenUncReady();
     if (!uncInstance) return false;
-    uncInstance.DeleteReminderFeatureFlag({ campaignRules: [{ campaignID: campaignId }] });
+    callUnc(uncInstance, 'DeleteReminderFeatureFlag', { campaignRules: [{ campaignID: campaignId }] });
     return true;
   } catch (err) {
     window.lana?.log(`[unc-client] deleteReminderRule failed for ${campaignId}: ${err.message}`);
@@ -97,7 +109,7 @@ export async function fireHostEvent(eventData) {
   try {
     const uncInstance = await whenUncReady();
     if (!uncInstance) return false;
-    uncInstance.AnalyticsEventFromHost(eventData);
+    callUnc(uncInstance, 'AnalyticsEventFromHost', eventData);
     return true;
   } catch (err) {
     window.lana?.log(`[unc-client] fireHostEvent failed: ${err.message}`);

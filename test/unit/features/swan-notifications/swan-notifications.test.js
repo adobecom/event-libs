@@ -42,16 +42,21 @@ describe('swan-notifications', () => {
     originalUniversalNav = window.UniversalNav;
     calls = [];
     const uncInstance = {
-      UpsertReminderFeatureFlag: (data) => calls.push({
-        method: 'UpsertReminderFeatureFlag',
-        campaignID: data.campaignRules[0].campaignID,
-        campaignRule: data.campaignRules[0].campaignRule,
-      }),
-      DeleteReminderFeatureFlag: (data) => calls.push({
-        method: 'DeleteReminderFeatureFlag',
-        campaignID: data.campaignRules[0].campaignID,
-      }),
-      AnalyticsEventFromHost: (eventData) => calls.push({ method: 'AnalyticsEventFromHost', eventData }),
+      _uncContainer: {
+        handleMessageFromInterface: (methodName, data) => {
+          if (methodName === 'UpsertReminderFeatureFlag') {
+            calls.push({
+              method: 'UpsertReminderFeatureFlag',
+              campaignID: data.campaignRules[0].campaignID,
+              campaignRule: data.campaignRules[0].campaignRule,
+            });
+          } else if (methodName === 'DeleteReminderFeatureFlag') {
+            calls.push({ method: 'DeleteReminderFeatureFlag', campaignID: data.campaignRules[0].campaignID });
+          } else if (methodName === 'AnalyticsEventFromHost') {
+            calls.push({ method: 'AnalyticsEventFromHost', eventData: data });
+          }
+        },
+      },
     };
     window.UniversalNav = makeUniversalNav(uncInstance);
     window.localStorage.removeItem(LOCAL_STATE_KEY);
@@ -156,11 +161,16 @@ describe('swan-notifications', () => {
 
       // Once UNC is available, the very next reconcile should succeed.
       window.UniversalNav = makeUniversalNav({
-        UpsertReminderFeatureFlag: (data) => calls.push({
-          method: 'UpsertReminderFeatureFlag', campaignID: data.campaignRules[0].campaignID,
-        }),
-        DeleteReminderFeatureFlag: () => {},
-        AnalyticsEventFromHost: (eventData) => calls.push({ method: 'AnalyticsEventFromHost', eventData }),
+        _uncContainer: {
+          handleMessageFromInterface: (methodName, data) => {
+            if (methodName === 'UpsertReminderFeatureFlag') {
+              calls.push({ method: 'UpsertReminderFeatureFlag', campaignID: data.campaignRules[0].campaignID });
+            } else if (methodName === 'AnalyticsEventFromHost') {
+              calls.push({ method: 'AnalyticsEventFromHost', eventData: data });
+            }
+            // DeleteReminderFeatureFlag intentionally left a no-op here, matching the original mock.
+          },
+        },
       });
       calls = [];
       await reconcileSwanNotifications(() => [session], () => new Set([session.id]));

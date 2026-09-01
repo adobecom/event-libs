@@ -3,12 +3,13 @@ import sinon from 'sinon';
 import {
   whenUncReady, registerReminderRule, deleteReminderRule, fireHostEvent,
 } from '../../../../event-libs/v1/features/swan-notifications/unc-client.js';
+import { buildStageCampaignRule } from '../../../../event-libs/v1/features/swan-notifications/swan-payload.js';
 
 function makeUncInstance() {
   return {
-    UpsertReminderFeatureFlag: sinon.stub(),
-    DeleteReminderFeatureFlag: sinon.stub(),
-    AnalyticsEventFromHost: sinon.stub(),
+    _uncContainer: {
+      handleMessageFromInterface: sinon.stub(),
+    },
   };
 }
 
@@ -44,14 +45,10 @@ describe('unc-client', () => {
       expect(await promise).to.equal(null);
     });
 
-    it('does not trust an instance missing even just one of the three expected methods', async () => {
+    it('does not trust an instance whose _uncContainer is missing handleMessageFromInterface', async () => {
       const clock = sinon.useFakeTimers();
       stubUniversalNav(async () => ({
-        instance: {
-          UpsertReminderFeatureFlag: sinon.stub(),
-          DeleteReminderFeatureFlag: sinon.stub(),
-          // AnalyticsEventFromHost deliberately missing.
-        },
+        instance: { _uncContainer: { someOtherMethod: sinon.stub() } },
       }));
       const promise = whenUncReady(1000);
       await clock.tickAsync(1000);
@@ -98,24 +95,48 @@ describe('unc-client', () => {
       const campaignRule = { events: [] };
       const result = await registerReminderRule('swan-RF-1-reminder', campaignRule);
       expect(result).to.equal(true);
-      expect(uncInstance.UpsertReminderFeatureFlag.calledOnceWith({
-        campaignRules: [{ campaignID: 'swan-RF-1-reminder', campaignRule }],
-      })).to.equal(true);
+      expect(uncInstance._uncContainer.handleMessageFromInterface.calledOnceWith(
+        'UpsertReminderFeatureFlag',
+        { campaignRules: [{ campaignID: 'swan-RF-1-reminder', campaignRule }] },
+      )).to.equal(true);
     });
 
     it('deleteReminderRule sends only {campaignID}, no rule body', async () => {
       const result = await deleteReminderRule('swan-RF-1-reminder');
       expect(result).to.equal(true);
-      expect(uncInstance.DeleteReminderFeatureFlag.calledOnceWith({
-        campaignRules: [{ campaignID: 'swan-RF-1-reminder' }],
-      })).to.equal(true);
+      expect(uncInstance._uncContainer.handleMessageFromInterface.calledOnceWith(
+        'DeleteReminderFeatureFlag',
+        { campaignRules: [{ campaignID: 'swan-RF-1-reminder' }] },
+      )).to.equal(true);
     });
 
     it('fireHostEvent forwards the event object as-is to AnalyticsEventFromHost', async () => {
       const eventData = { swan_campaign_id: 'swan-RF-1-reminder' };
       const result = await fireHostEvent(eventData);
       expect(result).to.equal(true);
-      expect(uncInstance.AnalyticsEventFromHost.calledOnceWith(eventData)).to.equal(true);
+      expect(uncInstance._uncContainer.handleMessageFromInterface.calledOnceWith(
+        'AnalyticsEventFromHost',
+        eventData,
+      )).to.equal(true);
+    });
+
+    it("carries buildStageCampaignRule()'s real payload shape through to _uncContainer unchanged", async () => {
+      const session = {
+        rfCode: 'RF-200',
+        title: 'Real Session',
+        sessionPageUrl: '/sessions/real',
+        startTimeUtc: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+        endTimeUtc: new Date(Date.now() + 120 * 60 * 1000).toISOString(),
+      };
+      const swanConfig = { eventName: 'MAX', scheduleTimeBufferSeconds: 3600 };
+      const { campaignId, campaignRule } = buildStageCampaignRule(session, 'reminder', swanConfig, {});
+
+      const result = await registerReminderRule(campaignId, campaignRule);
+      expect(result).to.equal(true);
+      expect(uncInstance._uncContainer.handleMessageFromInterface.calledOnceWith(
+        'UpsertReminderFeatureFlag',
+        { campaignRules: [{ campaignID: campaignId, campaignRule }] },
+      )).to.equal(true);
     });
 
     it('all three resolve false without throwing when no UNC instance is available', async () => {
@@ -131,7 +152,7 @@ describe('unc-client', () => {
     });
 
     it('resolves false without throwing when the underlying engine call itself throws', async () => {
-      uncInstance.UpsertReminderFeatureFlag.throws(new Error('engine exploded'));
+      uncInstance._uncContainer.handleMessageFromInterface.throws(new Error('engine exploded'));
       const result = await registerReminderRule('swan-RF-1-reminder', {});
       expect(result).to.equal(false);
     });
