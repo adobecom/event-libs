@@ -384,6 +384,16 @@
   color: var(--vp-playing-fg);
 }
 
+/* Mobile: hovering a row flips its background to the playing look (--vp-playing-bg), so the
+   favorite/play chip matches the row background there too. Gated to hover-capable devices
+   so it can't latch on touch, matching the row's own hover flip. */
+@media (max-width: 1023px) and (hover: hover) {
+  .session-video-playlist-row:hover .session-video-playlist-row-favorite,
+  .session-video-playlist-row:hover .session-video-playlist-row-play {
+    background: var(--vp-playing-bg);
+  }
+}
+
 .session-video-playlist-row-favorite svg,
 .session-video-playlist-row-play svg {
   width: 16px;
