@@ -262,6 +262,7 @@ describe('event-marquee', () => {
       const el = document.querySelector('.event-marquee');
       await init(el);
       expect(el.querySelector('.event-marquee-share')).to.exist;
+      expect(el.querySelector('.event-marquee-share').getAttribute('daa-ll')).to.equal('Share');
     });
 
     it('omits the share button when share-enabled is explicitly false', async () => {

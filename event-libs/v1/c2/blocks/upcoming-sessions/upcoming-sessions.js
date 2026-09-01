@@ -105,7 +105,7 @@ function buildIconButton({
     type: 'button',
     'aria-label': label,
     'aria-pressed': String(pressed),
-    'daa-ll': daaLl,
+    ...(daaLl ? { 'daa-ll': daaLl } : {}),
   });
   if (disabled) btn.disabled = true;
   createTag('span', { class: 'sg-icon-btn__icon', 'aria-hidden': 'true' }, iconSvg, { parent: btn });
