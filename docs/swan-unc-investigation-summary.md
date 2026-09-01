@@ -95,8 +95,19 @@ were updated to mock and assert against the new shape; full suite and lint are g
 Item 1 is partially done: `unc-client.test.js` gained a test that pipes
 `buildStageCampaignRule()`'s real output through `registerReminderRule()` and asserts the
 exact production payload reaches `_uncContainer.handleMessageFromInterface` unchanged.
-Live confirmation in a real signed-in browser session (QA Test Plan case J / #24 in PR
-#276) is still outstanding — no environment available to this work to perform it.
+That was additionally exercised on a real stage page (`gnav-notification-test-1`) using
+the PR's devtools stub in place of the real engine: scheduling a session there produced
+the expected `REGISTER`/`FIRE` console output and a correct `swan-notification-state-v2`
+localStorage entry, confirming the full `session-store.js` → `swan-notifications.js` →
+`unc-client.js` chain wires together correctly against real page metadata and DOM — but
+this still stubs out the engine itself, so it doesn't confirm the real `_uncContainer`
+path. On that same page, the real UNC bell panel did not visibly render anything;
+`UNC-shared.js` was independently failing `ans/v2/notifications/timeline` and
+`ans/v2/notifications/search` with 401s in that stage session — an ANS auth issue in that
+environment, unrelated to this fix (SWAN's reminder is a `local: true` rule and never
+calls ANS), but it means the bell panel couldn't be used there to visually confirm the
+real engine either. Live confirmation against the real, unstubbed engine (QA Test Plan
+case J / #24 in PR #276) is still outstanding.
 
 Items 3 and 4 remain open and are not code changes: 3 is a content-authoring task on the
 event pages' own metadata sheet (outside both this repo and milo); 4 is a cross-team ask
