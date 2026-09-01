@@ -1166,8 +1166,24 @@
     margin-right: calc((100vw - 1192px) / -2);
   }
 
+  /* Per follow-up: sessions-guide's own "Upcoming"-style row (.sg-time-row__cards, a different
+     row component from this shared carousel one) also fixes its own height at 124px — the
+     RESTING card height, not the hovered one — so when align-items: center (added above)
+     re-centers a hovered, taller (150px) card within that unchanging 124px line, the extra
+     height simply overflows the row's own box symmetrically above/below (overflow: visible;
+     sessions-guide.css's own native 1280px+ rule for .sg-carousel__cards already sets this,
+     unscoped, so it's already in effect here) — nothing about the row's own size changes, so
+     sibling cards never need to shift position at all. Without an explicit height here, this
+     row is auto-sized to its tallest child instead, so a hovered card growing taller genuinely
+     grows the row itself, and align-items: center re-centers every *other* card within that
+     now-taller line too — the "pushes all cards down" the user was seeing. Height, not just
+     alignment, is the fix; horizontal reflow (siblings shifting right as the hovered card's
+     width grows) is expected either way — sessions-guide's own row does the exact same thing,
+     it just isn't fighting a growing vertical size at the same time. */
   .sb-carousel-section--up-next .sg-carousel__cards {
     padding-right: 0;
+    align-items: center;
+    height: 124px;
   }
 
   /* Per explicit follow-up ("go with upcoming card styling and behavior from session guide"):

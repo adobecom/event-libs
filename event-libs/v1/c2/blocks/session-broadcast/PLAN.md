@@ -1895,6 +1895,49 @@ untouched.
 
 Verified: lint clean, 144/144 tests pass unchanged (CSS-only, no behavior touched).
 
+### Card hover-growth expands only downward, not "in every direction" like session guide (2026-09-01)
+
+User: "in broadcast the card only expands down but if you hover in the session guide upcoming
+it expand in place in every direction. Could we do this with the broadcast desktop upcoming
+cards?" Traced the mechanism in sessions-guide's own "Upcoming"-style row
+(`.sg-time-row__cards`, a *different* row component from the shared carousel this file reuses):
+it sets `align-items: center` (`sessions-guide.css:1173`, unchanged at 1280px+), so when a
+card's `min-height` grows 124px→150px on hover, the extra 26px splits ~evenly above/below since
+the card stays vertically centered in the flex line — that alignment property is the entire
+mechanism. Confirmed there's no `transform`/`scale` anywhere in the hover chain, and — notably —
+sessions-guide's own width growth (379px→427px) is *not* horizontally centered even there
+(`.sg-time-row__cards` never sets `justify-content: center`); only the vertical centering
+creates the "every direction" impression.
+
+`.sg-carousel__cards` (the shared row this file's Up Next reuses) uses `align-items: flex-start`
+instead, top-anchoring every card — hence the downward-only growth. Added `align-items: center`
+to the existing desktop block, matching sessions-guide's other row exactly (same property, same
+value, applied here since the two components otherwise differ).
+
+Verified: lint clean, 144/144 tests pass unchanged (CSS-only, no behavior touched).
+
+### Correction: fix the row's height too, not just alignment — sibling cards were shifting down (2026-09-01)
+
+User: "Better but not quite there yet... in session guide it only push the other cards to the
+right. Currently in the desktop broadcast hovering over a card push all cards down and right."
+The `align-items: center` fix alone was incomplete: `.sg-carousel__cards`' height is `auto`
+(sized to its tallest child) unless overridden, so when a hovered card grows from 124px to
+150px the *row itself* grows too, and centering re-positions every *other*, still-124px card
+within that now-taller line — shifting them down even though their own size never changed.
+
+sessions-guide's own "Upcoming" row (`.sg-time-row__cards`) avoids this by fixing its own
+height at 124px — the *resting* card height, not the hovered one. With the row's height pinned,
+a hovered card growing to 150px just overflows the row's box symmetrically above/below
+(`overflow: visible`, confirmed already active here via sessions-guide.css's own bare, unscoped
+1280px+ rule for `.sg-carousel__cards`, `sessions-guide.css:2274-2278` — no override of our own
+needed for that part) without the row's reported size ever changing, so siblings never move
+vertically. Added `height: 124px` alongside the existing `align-items: center`. Horizontal
+reflow (siblings shifting right as the hovered card's width grows) is expected and matches
+sessions-guide's own row exactly — the difference was never the horizontal push, only the
+vertical one.
+
+Verified: lint clean, 144/144 tests pass unchanged (CSS-only, no behavior touched).
+
 ## Explicitly out of scope (fast-follow)
 
 - MobileRider real playback (stub adapter only)
