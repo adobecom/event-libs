@@ -350,22 +350,36 @@ class Drawer {
     let dragStartY = null;
     let dragStartHeight = null;
     let activePointerId = null;
-    let shield = null;
+    let guardedPlayers = [];
+    let guardReleaseTimer = null;
 
-    // A transparent full-viewport overlay inserted above the player <iframe> (but below the
-    // drawer, which is z-index:2) for the life of the drag. setPointerCapture keeps the
-    // drag events flowing to the handle, but a cross-origin iframe can still pick up the
-    // OS-level mouse/touch under the cursor and read it as a click — toggling play/pause
-    // when the drag passes over the player. The shield makes the iframe physically
-    // unhittable while dragging; it's removed the instant the gesture ends.
-    const addShield = () => {
-      if (shield) return;
-      shield = createTag('div', { class: 'video-playlist-drag-shield' });
-      document.body.append(shield);
+    // Neutralise the player <iframe>(s) for the life of the drag by setting pointer-events:
+    // none directly on each `.video-player`. setPointerCapture keeps the drag events flowing
+    // to the handle, but a cross-origin iframe still picks up the OS-level touch/mouse under
+    // the finger and reads it as a click — toggling play/pause whenever the drag passes over
+    // the player. pointer-events:none makes the iframe untouchable regardless of stacking
+    // context (a z-index overlay can't guarantee it paints above a player in another
+    // fragment). Applied to the block, it covers the iframe within.
+    const addPlayerGuard = () => {
+      if (guardReleaseTimer) { clearTimeout(guardReleaseTimer); guardReleaseTimer = null; }
+      if (guardedPlayers.length) return;
+      guardedPlayers = [...document.querySelectorAll('.video-player')];
+      guardedPlayers.forEach((player) => { player.style.pointerEvents = 'none'; });
     };
-    const removeShield = () => {
-      shield?.remove();
-      shield = null;
+    const releasePlayerGuard = () => {
+      guardedPlayers.forEach((player) => { player.style.pointerEvents = ''; });
+      guardedPlayers = [];
+    };
+    // Held ~350ms past pointerup: dragging down collapses the drawer out from under the
+    // finger, so the player ends up beneath the release point and touch synthesises a click
+    // there right after pointerup. Keeping the guard on absorbs that one stray tap; the
+    // player becomes interactive again a moment later.
+    const scheduleGuardRelease = () => {
+      if (guardReleaseTimer) clearTimeout(guardReleaseTimer);
+      guardReleaseTimer = setTimeout(() => {
+        guardReleaseTimer = null;
+        releasePlayerGuard();
+      }, 350);
     };
 
     let rafId = null;
@@ -402,7 +416,7 @@ class Drawer {
         this.handleEl.releasePointerCapture(activePointerId);
       }
       activePointerId = null;
-      removeShield();
+      scheduleGuardRelease();
       this.handleEl.removeEventListener('pointermove', onPointerMove);
       this.handleEl.removeEventListener('pointerup', onPointerUp);
       this.handleEl.removeEventListener('pointercancel', onPointerUp);
@@ -437,7 +451,7 @@ class Drawer {
       // Suppress the max-height transition while dragging so the drawer tracks the finger
       // 1:1 instead of easing 0.3s behind every pointermove write; onPointerUp restores it.
       this.el.classList.add('is-dragging');
-      addShield();
+      addPlayerGuard();
       this.handleEl.addEventListener('pointermove', onPointerMove);
       this.handleEl.addEventListener('pointerup', onPointerUp, { once: true });
       this.handleEl.addEventListener('pointercancel', onPointerUp, { once: true });
