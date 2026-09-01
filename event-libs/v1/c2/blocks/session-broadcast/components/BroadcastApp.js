@@ -146,8 +146,11 @@ export function BroadcastBody({ config }) {
     }
   });
 
+  // pendingCandidates counts as "something" — it resolves to an activeSession within the same
+  // tick via the auto-commit effect above, so the empty state must not flash in between (alsoLive
+  // now correctly excludes pending candidates, so this can't be inferred from alsoLive alone).
   const nothingAtAll = !schedule.activeSession && !schedule.endedSession
-    && !schedule.alsoLive.length && !schedule.upNext.length;
+    && !schedule.pendingCandidates?.length && !schedule.alsoLive.length && !schedule.upNext.length;
 
   // Feeds session-broadcast.css's .sb-app:has(.sb-ended) background rules (lives on .sb-app,
   // not EndedState.js). --sb-app-ended-bg-lg is optional — set only when a bigger source exists;

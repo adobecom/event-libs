@@ -2359,6 +2359,46 @@ vendor-prefix violation at line 213 predates this change); new `showDescription`
 594/594 tests pass across sessions-guide/session-broadcast. **Needs manual hover verification**
 in a real browser — MCP browser tools were disconnected this session.
 
+## PR #315 review response (sharmeebuilds, 2026-09-02)
+
+Four findings, each verified against the real code (not taken at face value) before acting:
+
+1. **Fixed — real bug.** `alsoLive: allLive.filter((s) => s.id !== result.activeSession?.id)`
+   only excluded the already-committed session, not anything in `result.pendingCandidates`.
+   While a pick is pending (`activeSession` is null in that window), every candidate — including
+   whichever one `BroadcastApp`'s auto-commit effect is about to pick — briefly rendered in Also
+   Live too. Added a `pendingIds` exclusion alongside the existing one. This also **exposed** a
+   related, pre-existing gap in `BroadcastApp.js`'s `nothingAtAll` empty-state check: it never
+   accounted for `pendingCandidates`, so with exactly one live session and nothing committed yet
+   it would flash "No sessions are live right now" for a render (previously masked, since the old
+   bug had accidentally kept that one session in `alsoLive` too). Fixed both together. New
+   regression test in `broadcast-schedule.test.js`; caught the `BroadcastBody.test.js` regression
+   this surfaced and fixed it in the same pass. 595/595 tests pass.
+2. **Fixed — real bug, same class as the carousel-blank fix a few commits back.**
+   `Carousel.js`'s session-count-shrink clamp effect (`useEffect(..., [sessionCount])`) didn't
+   cover a *resize* that changes `visibleCountRef.current` (how many cards fit) without the
+   session count itself changing — that path only ran `measure()`/`refreshEdges()`, never
+   re-clamping `offset`, and since `setPaged` bails out when the boolean doesn't flip, the
+   component might not even re-render, leaving `offset` stale until some unrelated re-render.
+   Added a `sessionsRef` (kept current every render, avoiding the stale-closure trap that a
+   directly-defined clamp function would hit inside the mount-only effect's resize handler) and
+   a ref-only `clampOffset()` helper, called from both the resize handler and the sessionCount
+   effect.
+3. **Already known, deliberately deferred — not re-opened.** `EndedState.js`'s
+   `handleFavorite`/`handleShare` duplicating `SessionInfoPanel.js`'s were already flagged in the
+   PR/accessibility review write-up above ("Left for follow-up, not fixed") before this comment;
+   independently re-found, not new. Left as a fast-follow per that earlier decision — a shared
+   extraction is a bigger, more invasive refactor than this pass's scope.
+4. **Low-confidence, correctly a non-issue.** The `safeUrl()`/protocol-relative concern
+   (`//evil.com` satisfying `startsWith('/')`) is exactly the case the `new URL(...).origin`
+   comparison already exists to catch — verified: `new URL('//evil.com', 'https://mysite.com').origin`
+   resolves to `https://evil.com`, correctly failing the same-origin check. Already has a passing
+   regression test (`blocks a protocol-relative URL (//host/path)`, `utils.test.js`). No change
+   needed; the comment's own text acknowledges the origin check already handles it.
+
+`npx eslint` clean; full `npm test` green (2236/2237, the one failure being the already-documented,
+unrelated `toast.test.js` ARIA-timing flake).
+
 ## Explicitly out of scope (fast-follow)
 
 - MobileRider real playback (stub adapter only)

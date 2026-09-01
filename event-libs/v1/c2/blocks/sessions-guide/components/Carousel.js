@@ -21,6 +21,18 @@ export function Carousel({
   const stripRef = useRef(null);
   const cardWidthRef = useRef(0);
   const visibleCountRef = useRef(1);
+  // Kept current every render so the resize handler below (captured once, on mount) can read
+  // the latest session count without closing over the stale `sessions` prop from mount time.
+  const sessionsRef = useRef(sessions);
+  sessionsRef.current = sessions;
+
+  // Reads only refs, so it's safe to call from a closure captured on mount (resize handler)
+  // as well as from a fresh per-render closure (the sessionCount effect below) — either way it
+  // always clamps against the current session count and current visibleCountRef.
+  const clampOffset = () => {
+    const maxOffset = Math.max(0, (sessionsRef.current?.length || 0) - visibleCountRef.current);
+    setOffset((o) => Math.min(o, maxOffset));
+  };
 
   const refreshEdges = () => {
     const strip = stripRef.current;
@@ -50,7 +62,11 @@ export function Carousel({
   useEffect(() => {
     measure();
     refreshEdges();
-    const onResize = () => { measure(); refreshEdges(); };
+    clampOffset();
+    // A resize can change visibleCountRef (how many cards fit) without the session count ever
+    // changing — re-clamp here too, not just on the sessionCount effect below, otherwise offset
+    // stays stale until some other render happens to fire.
+    const onResize = () => { measure(); refreshEdges(); clampOffset(); };
     window.addEventListener('resize', onResize);
     return () => window.removeEventListener('resize', onResize);
   }, []);
@@ -65,7 +81,7 @@ export function Carousel({
   // this corrects the underlying state so the next click doesn't silently no-op.
   useEffect(() => {
     refreshEdges();
-    setOffset((o) => Math.min(o, maxOffset));
+    clampOffset();
   }, [sessionCount]);
 
   if (!sessions || !sessionCount) return null;

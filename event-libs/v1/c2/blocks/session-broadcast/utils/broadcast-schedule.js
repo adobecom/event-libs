@@ -201,10 +201,14 @@ export function getBroadcastSchedule(sessionList, liveStreamActiveIds, nowMs, {
   }
 
   const allLive = eligible.filter((s) => isSessionLiveNow(s, liveStreamActiveIds, nowMs));
+  // Excludes activeSession (already committed) and every pendingCandidate (about to be one) —
+  // otherwise the session BroadcastApp's effect is about to commit briefly renders in both the
+  // pending pick and Also Live for the one render before that effect flushes.
+  const pendingIds = new Set((result.pendingCandidates || []).map((s) => s.id));
   return {
     activeSession: result.activeSession,
     pendingCandidates: result.pendingCandidates,
-    alsoLive: allLive.filter((s) => s.id !== result.activeSession?.id),
+    alsoLive: allLive.filter((s) => s.id !== result.activeSession?.id && !pendingIds.has(s.id)),
     upNext,
     endedSession: result.endedSession,
   };

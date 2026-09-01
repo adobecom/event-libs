@@ -352,6 +352,25 @@ describe('broadcast-schedule', () => {
       expect(result.endedSession).to.equal(null);
     });
 
+    // Regression: alsoLive used to only exclude activeSession, so while a pick was pending
+    // (nothing committed yet) every candidate — including whichever one is about to be
+    // committed by BroadcastApp's effect — also rendered in Also Live for that one render.
+    it('excludes every pendingCandidate from alsoLive, not just the eventual activeSession', () => {
+      const endedMpc = mpcSession('m1', -60, 30); // ended 30 min ago
+      const nextGroupMpc = mpcSession('m2', -10, 30); // next MPC group, live — becomes a pendingCandidate
+      const liveYt = ytSession('y', -5, 20); // different bucket, live, uninvolved in the MPC transition
+      const result = getBroadcastSchedule(
+        [endedMpc, nextGroupMpc, liveYt],
+        liveStreamActiveIds,
+        nowMs,
+        { activeSessionId: 'm1' },
+      );
+      expect(result.pendingCandidates.map((s) => s.id)).to.deep.equal(['m2']);
+      // Without the fix this would incorrectly include 'm2' too — activeSession is null while a
+      // pick is pending, so the old `s.id !== result.activeSession?.id` check excluded nothing.
+      expect(result.alsoLive.map((s) => s.id)).to.deep.equal(['y']);
+    });
+
     it('returns null activeSession/pendingCandidates when nothing is live and nothing was ever committed', () => {
       const result = getBroadcastSchedule([session('a', 10, 20)], liveStreamActiveIds, nowMs, {});
       expect(result.activeSession).to.equal(null);
