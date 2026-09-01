@@ -2135,12 +2135,26 @@ assertion confirmed unrelated — passes cleanly in isolation, only flakes in th
 suite due to shared browser `history` state across tests).
 
 **Left for follow-up, not fixed** (warn/nit severity, not blocking): Up Next's possible
-missing background below 1280px (flagged once already, unaddressed); `getUpNextSessions`'
-per-render random tiebreak reshuffling same-start-time sessions; `EndedState.js`'s "View
+missing background below 1280px (flagged once already, unaddressed); `EndedState.js`'s "View
 more" toggle missing `aria-expanded`/`aria-controls`; `SessionInfoPanel.js`'s dangling
 `aria-controls` for descriptionless sessions; duplicated favorite/share handlers between
-`EndedState.js`/`SessionInfoPanel.js`; unguarded dynamic import in `MpcPlayerAdapter.js`;
-`tier-1-event-config.js`'s ungated URL-param path override.
+`EndedState.js`/`SessionInfoPanel.js`; unguarded dynamic import in `MpcPlayerAdapter.js`.
+
+`tier-1-event-config.js`'s ungated URL-param path override and `getUpNextSessions`' per-render
+random tiebreak were both fixed later (2026-09-01, see below).
+
+### Fixed later: `getUpNextSessions` random tiebreak reshuffling every ~15s
+
+Same-start-time sessions in Up Next were ordered by a `Math.random()` tiebreak re-rolled on
+every call — and since `getBroadcastSchedule` runs unmemoized in `BroadcastApp`'s render body,
+any re-render (e.g. the 15s `session-state-ticker.js` poll firing `onChange()` on a state
+transition) reshuffled their visible order for no reason. Replaced the random tiebreak with a
+stable one: sort by `id` ascending. No randomness needed here — this only breaks ties within
+an identical start time, not the actual scheduling logic. `getUpNextSessions`'/
+`getBroadcastSchedule`'s `random` option removed entirely (only call site, `BroadcastApp.js`,
+never passed one). Updated the one test that injected a fake `random` to instead assert
+id-ordering is stable across repeated calls. `npx eslint` clean; 144/144 session-broadcast
+tests pass.
 
 ## Security fix: open redirect via backslash-based origin bypass (2026-09-01)
 

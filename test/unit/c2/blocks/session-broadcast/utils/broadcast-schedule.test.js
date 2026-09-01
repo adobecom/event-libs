@@ -312,14 +312,13 @@ describe('broadcast-schedule', () => {
       expect(getUpNextSessions(sessionList, liveStreamActiveIds, nowMs)).to.have.length(2);
     });
 
-    it('breaks ties between same-start-time sessions using the injected random function', () => {
-      const s1 = session('a', 10, 20);
-      const s2 = session('b', 10, 20); // identical start time
-      let calls = 0;
-      // First call (for s1) returns 0.9, second (for s2) returns 0.1 — s2 should sort first.
-      const random = () => { calls += 1; return calls === 1 ? 0.9 : 0.1; };
-      const result = getUpNextSessions([s1, s2], liveStreamActiveIds, nowMs, { random });
-      expect(result.map((s) => s.id)).to.deep.equal(['b', 'a']);
+    it('breaks ties between same-start-time sessions by id, stably across repeated calls', () => {
+      const s1 = session('b', 10, 20);
+      const s2 = session('a', 10, 20); // identical start time, lower id
+      const first = getUpNextSessions([s1, s2], liveStreamActiveIds, nowMs);
+      const second = getUpNextSessions([s1, s2], liveStreamActiveIds, nowMs);
+      expect(first.map((s) => s.id)).to.deep.equal(['a', 'b']);
+      expect(second.map((s) => s.id)).to.deep.equal(['a', 'b']);
     });
 
     it('accepts a custom cap', () => {

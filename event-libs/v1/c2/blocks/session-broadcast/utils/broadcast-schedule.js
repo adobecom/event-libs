@@ -59,18 +59,15 @@ function byStartTimeAsc(a, b) {
   return Date.parse(a.startTimeUtc) - Date.parse(b.startTimeUtc);
 }
 
-// Upcoming sessions, capped and chronological, with a random tiebreak for same-start-time ties.
-// `random` is injectable so tests can assert a fixed order. Cross-bucket — not part of the
-// automatic advancement model below.
-export function getUpNextSessions(sessionList, liveStreamActiveIds, nowMs, {
-  cap = UP_NEXT_CAP, random = Math.random,
-} = {}) {
+// Upcoming sessions, capped and chronological, with a stable tiebreak (by id) for
+// same-start-time ties — a random tiebreak reshuffled on every re-render since this isn't
+// memoized, visibly swapping card order every ~15s ticker tick for no reason. Cross-bucket —
+// not part of the automatic advancement model below.
+export function getUpNextSessions(sessionList, liveStreamActiveIds, nowMs, { cap = UP_NEXT_CAP } = {}) {
   return sessionList
     .filter((s) => isUpcoming(s, liveStreamActiveIds, nowMs))
-    .map((session) => ({ session, tiebreak: random() }))
-    .sort((a, b) => byStartTimeAsc(a.session, b.session) || (a.tiebreak - b.tiebreak))
-    .slice(0, cap)
-    .map(({ session }) => session);
+    .sort((a, b) => byStartTimeAsc(a, b) || a.id.localeCompare(b.id))
+    .slice(0, cap);
 }
 
 // Groups = sessions sharing an identical start time, sorted ascending. Grouped by parsed
@@ -156,11 +153,11 @@ export function resolveBucketSchedule(bucketSessions, committedSession, nowMs, l
 // but only a manual switch (handleSwitchSession) can move it cross-bucket — supersedes the
 // earlier "no auto-switching" PRD decision for the in-bucket case (see PLAN.md).
 export function getBroadcastSchedule(sessionList, liveStreamActiveIds, nowMs, {
-  activeSessionId, cap, random,
+  activeSessionId, cap,
 } = {}) {
   const validSessions = sessionList.filter((s) => !Number.isNaN(Date.parse(s.startTimeUtc)));
   const eligible = validSessions.filter((s) => isBroadcastEligible(s) && hasPlayableVideoSource(s));
-  const upNext = getUpNextSessions(sessionList, liveStreamActiveIds, nowMs, { cap, random });
+  const upNext = getUpNextSessions(sessionList, liveStreamActiveIds, nowMs, { cap });
 
   const mpcSessions = eligible.filter((s) => getSessionBucket(s) === 'mpc');
   const ytSessions = eligible.filter((s) => getSessionBucket(s) === 'youtube');
