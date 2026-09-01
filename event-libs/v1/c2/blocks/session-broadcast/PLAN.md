@@ -2023,6 +2023,40 @@ source order once `.sb-ended` is present).
 
 Verified: lint clean, 144/144 tests pass unchanged (CSS-only, no behavior touched).
 
+### .sb-info: no left/right padding at desktop (2026-09-01)
+
+User: "On desktop sb-info should not have padding left or right." Added `padding-right: 0;
+padding-left: 0;` to the existing shared desktop `max-width: 1192px; margin: 0 auto;` block —
+same reasoning as Also Live/Up Next/`.sb-ended` clearing their own side padding once they
+switch to this centered-content pattern (the centering itself already provides the breathing
+room). Top/bottom (the base rule's `--s2a-spacing-lg`) untouched.
+
+Verified: lint clean, 144/144 tests pass unchanged (CSS-only, no behavior touched).
+
+### Correction: section title is 18px live, 24px only once ended (2026-09-01)
+
+User: "On desktop sg-section-title should be 18px and on session ended state 24px." The
+previous entry above ("Also Live/Upcoming section title: 24px at desktop") wrongly applied
+24px unconditionally at desktop — including the live state, which should have stayed at the
+general 18px rule (unbounded from 768px). Removed both unconditional 24px overrides (Also
+Live's standalone rule, and the font-size/line-height half of Up Next's dark-theme rule, whose
+`color` override is legitimately unconditional and stayed) and added the 24px/24px sizing to
+the existing ended-state-only sibling block instead, alongside its already-correct
+`margin-bottom: 32px` and `color` overrides.
+
+Verified: lint clean, 144/144 tests pass unchanged (CSS-only, no behavior touched).
+
+### Ended-state background image: desktop reuses tablet's gradient, taller bleed (2026-09-01)
+
+User: "For desktop session ended background image let use the same background as tablet but
+lets make the height of the image 90%." Desktop previously kept the base rule's 60/60/75%
+gradient (no desktop-specific redesign had been given for it before); now reuses tablet's own
+60/60/90/100% stops exactly, with a 90vh bleed height (vs. tablet's 80vh) — same "percentage
+height collapses to nothing without an explicit-height containing block" reasoning as tablet's
+own comment for why vh, not a literal %, is used.
+
+Verified: lint clean, 144/144 tests pass unchanged (CSS-only, no behavior touched).
+
 ## Explicitly out of scope (fast-follow)
 
 - MobileRider real playback (stub adapter only)

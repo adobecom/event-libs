@@ -640,14 +640,15 @@
   }
 }
 
-/* Desktop keeps the base 480px height/60-60-75% gradient (no desktop-specific redesign spec has
-   been given for those) but should prefer the larger picture source too, same reasoning as
-   tablet above — a report confirmed the small (750px) image was loading everywhere since nothing
-   at this breakpoint referenced --sb-app-ended-bg-lg at all before this rule existed. */
+/* Per follow-up: desktop reuses tablet's own gradient exactly (60%/60%/90%/100% stops, not the
+   base rule's 60/60/75), just a taller bleed — 90vh instead of tablet's 80vh. Same 100%-height-
+   collapses-to-nothing reasoning as tablet's own comment above (percentage height needs an
+   explicit-height containing block .sb-app never has; vh has no such dependency). */
 @media (min-width: 1280px) {
   .sb-app:has(.sb-ended)::before {
+    height: 90vh;
     background-image:
-      linear-gradient(180deg, rgb(0 0 0 / 60%) 0%, rgb(0 0 0 / 60%) 50%, rgb(0 0 0 / 75%) 75%),
+      linear-gradient(180deg, rgb(0 0 0 / 60%) 0%, rgb(0 0 0 / 60%) 50%, rgb(0 0 0 / 90%) 90%, rgb(0 0 0 / 100%) 100%),
       linear-gradient(0deg, rgb(0 0 0 / 60%), rgb(0 0 0 / 60%)),
       var(--sb-app-ended-bg-lg, var(--sb-app-ended-bg, none));
   }
@@ -882,15 +883,6 @@
      depends on. */
   .sb-carousel-section--also-live {
     padding: var(--s2a-spacing-xl, 32px) 0;
-  }
-
-  /* Per follow-up: "More live sessions" grows to 24px at desktop — the general 18px rule
-     (unbounded from 768px, tablet's own value) otherwise wins here too, since this element's
-     color is already unconditional/dark at every width and has no desktop-scoped block of its
-     own to piggyback the size onto. */
-  .sb-carousel-section--also-live .sg-section-title {
-    font-size: var(--s2a-font-size-2xl, 24px);
-    line-height: var(--s2a-font-line-height-md, 24px);
   }
 
   .sb-carousel-section--also-live .sg-carousel {
@@ -1143,6 +1135,17 @@
   .sb-ended ~ .sb-carousel-section--up-next .sg-carousel__header {
     margin-bottom: var(--s2a-spacing-xl, 32px);
   }
+
+  /* Correction: "More live sessions"/"Upcoming sessions" stays 18px at desktop while the
+     session is still live (the general rule, unbounded from 768px, already gives that) — it
+     only grows to 24px once ended. An earlier pass wrongly applied 24px unconditionally at
+     desktop; scoped here to the ended-state sibling selector instead, alongside the existing
+     color override above. */
+  .sb-ended ~ .sb-carousel-section--also-live .sg-section-title,
+  .sb-ended ~ .sb-carousel-section--up-next .sg-section-title {
+    font-size: var(--s2a-font-size-2xl, 24px);
+    line-height: var(--s2a-font-line-height-md, 24px);
+  }
 }
 
 /* Carousel nav arrows (both sections): sessions-guide.css's own desktop rule takes them out of
@@ -1192,6 +1195,15 @@
     margin: 0 auto;
   }
 
+  /* Per follow-up: no left/right padding at desktop — the max-width/margin: auto centering
+     above already provides the breathing room, same reasoning as Also Live/Up Next clearing
+     their own side padding once they switch to this centered-content pattern. Top/bottom
+     (the base rule's --s2a-spacing-lg) stay untouched. */
+  .sb-info {
+    padding-right: 0;
+    padding-left: 0;
+  }
+
   /* Per node 24:22746 — 24px, not tablet's 20px (see the tablet-scoped rule above; letter-
      spacing is shared/unbounded and lives on the base title rule). */
   .sb-info__title {
@@ -1230,8 +1242,6 @@
 
   .sb-carousel-section--up-next .sg-section-title {
     color: var(--s2a-color-content-inverse, #fff);
-    font-size: var(--s2a-font-size-2xl, 24px);
-    line-height: var(--s2a-font-line-height-md, 24px);
   }
 
   /* Same reasoning as Also Live's own identical fix: sessions-guide.css's track only ever
