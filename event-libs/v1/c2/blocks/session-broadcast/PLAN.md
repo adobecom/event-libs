@@ -1302,6 +1302,440 @@ catalog data (not just synthetic fixtures) via a standalone script importing the
 Comprehend, Collaborate, and Create" instead of the stale "Craft in the Age of AI." New regression
 test added; 133/133 session-broadcast tests pass, lint clean.
 
+## Desktop visual redesign — players (2026-09-01)
+
+User: "We are in a good place to start with desktop. FYI we will have 2 desktop 1280px-1440px
+and the xl desktop is going to be +1440px. Lets start with the players." Two frames provided
+from "Session Broadcast VizD R1 8.17.26" (`wCEc6vE23plJU9a3njdtG1`): the overall desktop page
+(`24:22726`) and the session-info-panel-plus-player combo specifically (`24:22744`, containing
+`HP_Player` at `24:22745` and the info panel wrapper at `24:22746`).
+
+**Player**: Figma shows the player at `1192px` wide, `24px`-rounded corners — a *contained*
+treatment, not this block's tablet-only full-bleed/square-corner one. Tracing the existing
+`@media (min-width: 1024px)` override in `session-broadcast.css` (added in Phase 6 for tablet)
+showed it had no upper bound, so it was also suppressing the foundation's own default player
+styling at desktop widths. That foundation default — `c2-global.css`'s `.milo-video` rule and
+`event-youtube.css`'s `.youtube-video-container` rule, both keyed off the same responsive
+`--s2a-layout-rich-media-content-measure-wide` token (`tokens.css`: 848px at 1024-1279px, 1192px
+at 1280-1440px, 1480px at 1441px+) — already produces exactly the Figma-specified 1192px/24px
+treatment at the desktop tier, and will automatically grow to 1480px at xl-desktop too, with zero
+new code. **Fix**: bounded the existing override to `(min-width: 1024px) and (max-width:
+1279px)` (tablet only) instead of adding a new desktop-specific rule — letting the pre-existing
+foundation cascade handle both new tiers for free.
+
+**Info panel**: Figma's `24:22746` shows the panel sitting flush under the player with only its
+bottom corners rounded (`32px`) — paired with the player's now-restored all-4-corner rounding,
+the two read as one merged card. The existing tablet rule (`@media (min-width: 768px)`,
+unbounded) sets `.sb-info`'s `border-radius: 0`; added a `.sb-info { border-radius: 0 0 32px
+32px; }` inside the existing `@media (min-width: 1280px)` block (which already caps `.sb-info`/
+`.sb-carousel-section` at `1192px`) to re-round from desktop onward.
+
+**Known deliberate gap**: `.sb-info`/`.sb-carousel-section`'s `max-width: 1192px` stays flat even
+at 1441px+, while the player above grows to 1480px there via the foundation token — no
+xl-desktop frame has been reviewed for the info panel yet, so this mismatch is left as-is
+pending that frame, per this file's own convention of not speculatively extending styling beyond
+a reviewed spec.
+
+Verified: `npx stylelint` on the file clean (only the pre-existing `-webkit-box` finding);
+144/144 session-broadcast unit tests pass unchanged (no behavior touched, CSS-only).
+
+### Also Live / Upcoming sections go dark at desktop, unconditionally (2026-09-01)
+
+User: "The new designs has a black background all across the broadcast page," pointing at the
+live-state desktop frame (node `24:22727`). Mobile/tablet's Also Live/Upcoming sections are
+light (light-gray `#f8f8f8`/white, per the mobile Figma frames Phase 6 was built from) — this
+frame shows both staying dark at desktop instead, matching the player/info panel above: Also
+Live's section background is a dark gray (Figma's own "maxcolor/darkgrey" variable, `#262626`,
+no equivalent `--s2a-*` scale token — closest, gray-800, is `#292929`), Upcoming's is black
+(`var(--s2a-color-gray-1000, #000)`). The cards inside stay exactly as they were (still light,
+per the screenshot) — only the section background and the "More live sessions"/"Upcoming
+sessions" title color (flipped to `var(--s2a-color-content-inverse, #fff)`, otherwise illegible
+dark-on-dark) change.
+
+Added as a new, unconditional `@media (min-width: 1280px)` rule — deliberately NOT merged into
+the existing `.sb-ended ~ .sb-carousel-section--*` sibling rules (which handle the ended-state
+photo-bleed transparency), since this frame shows State 1 (live), not ended. The two don't
+conflict: the sibling selectors are more specific and still win when a session has ended at
+desktop width, keeping the transparent-photo-bleed treatment intact there.
+
+Left unbounded above 1280px (applies to xl-desktop too) — no xl-desktop frame contradicts it,
+and a black page background reverting to light at a wider breakpoint has no support in anything
+reviewed so far; flagged as an assumption, not silently guessed.
+
+Verified: lint clean, 144/144 tests pass unchanged (CSS-only, no behavior touched).
+
+### Correction: Also Live's dark background is unconditional, not desktop-only (2026-09-01)
+
+User: "'Also live' background theme in the broadcast page has changed to #262626," pointing at
+node `24:20683` ("Session Broadcast/Also Live Section") — a frame with no breakpoint constraint,
+using the same fixed 311px card width this block already uses unconditionally at every
+breakpoint. That, plus the `.sb-app` base rule already carrying a permanent black background
+(added directly to the file, not by this session — the whole page's theme has moved to
+always-dark), means Also Live's `#262626` background is NOT desktop-only the way the entry
+above assumed — it's the section's new base color at every width, superseding the original
+mobile light-gray it was built from (node 9931:12217).
+
+**Moved the `background: #262626`/white-title rule out of the `@media (min-width: 1280px)`
+block and into `.sb-carousel-section--also-live`'s own base rule** (removing it from the
+desktop block, which now only handles Upcoming — no frame has shown Upcoming going dark below
+1280px, so that half stays desktop-scoped as originally implemented).
+
+**User's live follow-up, same message**: "That applies when the player is up. on session ended
+background is transparent again for that section" — confirming the *existing*
+`.sb-ended ~ .sb-carousel-section--also-live { background: transparent; }` sibling rule (added
+in Phase 6, for the ended-state photo bleed) is exactly right and needs no change: it's a
+higher-specificity selector than the new plain base rule, so it already wins once `.sb-ended` is
+present, regardless of viewport width. Verified by re-reading the cascade, not by guessing.
+
+Verified: lint clean, 144/144 tests pass unchanged (CSS-only, no behavior touched).
+
+### Also Live "Watch now" button reverted to #292929 on Favorite click (2026-09-01)
+
+User: updated `.sb-carousel-section--also-live .sg-live-card__btn--watch` to `background: #000`,
+but clicking the adjacent Favorite button made it flash back to `#292929` — traced to
+sessions-guide.css's own unconditional (no breakpoint gate) rule,
+`.sg-live-card:is(:hover, :focus-within) .sg-live-card__btn--watch { background: #292929; }`.
+Clicking Favorite gives it focus, which satisfies `:focus-within` on the whole `.sg-live-card`
+ancestor, not just literal mouse-hover on Watch itself. That selector has 3 selector segments
+vs. the broadcast override's 2, so it out-specifies the plain black rule the moment focus-within
+fires, regardless of viewport width.
+
+**Fix**: added a matching `.sb-carousel-section--also-live .sg-live-card:is(:hover,
+:focus-within) .sg-live-card__btn--watch { background: #000; }` right after the plain rule, at
+the same specificity as sessions-guide's version. Placed *before* the existing `@media
+(min-width: 1024px)` block's own hover rule (which deliberately sets `#292929` for its own,
+different desktop hover-card treatment) — same specificity there too, so source order decides
+and the desktop block (later in the file) still wins unchanged above 1024px. Below 1024px, only
+the new rule applies, so Watch now stays black through hover and Favorite-click alike.
+
+**Left untouched**: desktop's (1024px+) own resting-state Watch button is already `#292929` (a
+pre-existing, separate rule, not part of this fix) — not changed here since the user's report
+and fix were scoped to the black-background behavior below that breakpoint; flag if desktop
+should also go black at rest.
+
+Verified: lint clean, 144/144 tests pass unchanged (CSS-only, no behavior touched).
+
+### Also Live / Up Next card gap: 16px, not sessions-guide's 8px default (2026-09-01)
+
+User: "The gap for 'also live' and 'upcoming' cards within session broadcast mobile and tablet
+should be 16px in contrast with the current 8px we use in the session guide." sessions-guide.css's
+own `.sg-carousel__cards` base rule (unconditional, not breakpoint-gated) sets `gap:
+var(--s2a-spacing-xs)` (8px). Also Live already had its own override to `var(--s2a-spacing-md)`
+(16px) — added earlier in Phase 6, unconditional, so it was already correct at every breakpoint.
+Up Next had no equivalent override at all, so it was silently inheriting sessions-guide's 8px.
+
+**Fix**: added `.sb-carousel-section--up-next .sg-carousel__cards { gap: var(--s2a-spacing-md,
+16px); }`, mirroring Also Live's existing rule exactly (same token, same unconditional scope —
+not media-gated, since Also Live's own working rule isn't either and the user's ask covers both
+mobile and tablet with no indication desktop should differ).
+
+Verified: lint clean, 144/144 tests pass unchanged (CSS-only, no behavior touched).
+
+### Tablet info panel updated to match desktop's merged-card treatment (2026-09-01)
+
+User: "There has been an update to the styling of session info panel when in tablet mode," per
+node `24:20749` ("Session Broadcast Page"). This frame turned out to be visually identical to
+the desktop info panel (node `24:22746`) implemented earlier this session — same bottom-only
+32px rounding, same 24px/24px/-0.48px title treatment — just now confirmed to extend down into
+tablet (768-1279px) too, not desktop-only as originally scoped.
+
+Two changes, both to the existing `@media (min-width: 768px)` tablet block for `.sb-info`:
+- **Corner rounding**: was `border-radius: 0` (square, per the original tablet frame); changed
+  to `0 0 var(--s2a-border-radius-lg, 32px) var(--s2a-border-radius-lg, 32px)`, matching
+  desktop's merged-card look under the player. Removed the now-redundant duplicate rule from
+  the desktop-only `@media (min-width: 1280px)` block below, since this is unbounded from 768px
+  and already covers desktop.
+- **Title size**: `.sb-info__title` had never actually picked up 24px at any breakpoint —
+  desktop's own pass (node `24:22746`) only touched `.sb-info`'s max-width/rounding, not the
+  title text itself, so it was still rendering at the base 18px (`--s2a-font-size-lg`,
+  mobile's own spec) everywhere. Added `font-size: var(--s2a-font-size-2xl, 24px); line-height:
+  var(--s2a-font-line-height-md, 24px); letter-spacing: var(--s2a-font-letter-spacing-4xl,
+  -0.48px);` to the tablet block's existing title rule. Deliberately the fixed-value scale
+  tokens, not the semantic `--s2a-typography-*-heading-5` aliases — those resolve to 20px across
+  most of this block's own 768-1279px range (only hitting 24px at 1280px+ per tokens.css's own
+  tiering), the same semantic-alias trap documented multiple times earlier in this file. Left
+  unbounded from 768px, fixing desktop's title size as a side effect (it needed the identical
+  value and had no override of its own yet).
+
+Verified: lint clean, 144/144 tests pass unchanged (CSS-only, no behavior touched).
+
+### Correction: info panel corners are square again, not rounded (2026-09-01)
+
+User: "Session info panel should have square corners not rounded" — reverses the merged-card
+bottom-32px rounding added just above (base rule's original 16px mobile rounding included).
+Given no breakpoint qualifier, treated as universal: `.sb-info`'s base `border-radius` changed
+from `0 0 var(--s2a-border-radius-md, 16px) var(--s2a-border-radius-md, 16px)` to `0`; removed
+the now-redundant tablet-block override entirely (it only set the 32px rounding, nothing else
+unique to it). Player above keeps its own independent rounding (24px, all corners) — unaffected,
+that's a separate element.
+
+Verified: lint clean, 144/144 tests pass unchanged (CSS-only, no behavior touched).
+
+### Info panel loses its background at tablet only (2026-09-01)
+
+User: "sb-info should not have background color at tablet breakpoint" — unlike the square-
+corners fix just above (left unqualified, applied universally), this one names "tablet"
+specifically, so scoped to exactly this file's own tablet range, `(min-width: 768px) and
+(max-width: 1279px)`, as its own new block — mobile and desktop both keep the dark background
+from `.sb-info`'s base rule. At tablet the panel now sits directly on `.sb-app`'s black
+background instead of painting its own, reading as part of the page rather than a distinct
+card. Box-shadow was left untouched — only background was named.
+
+Verified: lint clean, 144/144 tests pass unchanged (CSS-only, no behavior touched).
+
+### Correction: title is 20px at tablet, 24px stays desktop-only (2026-09-01)
+
+User: "At tablet endpoint sb-info__title should have font size 20px not 24px like now." Both
+reviewed Figma frames (24:20749 tablet, 24:22746 desktop) exported the same literal 24px
+fallback, which is why the earlier pass pinned 24px unbounded from 768px — same category of
+mistake as the ended-state eyebrow/title fixes: a raw Figma-export fallback isn't ground truth
+for a given breakpoint, only a hypothesis to verify. 20px/20px is this codebase's own
+1024-1279px tier value for the semantic heading-5 alias (`--s2a-font-size-xl`/
+`--s2a-font-line-height-sm`), pinned as fixed tokens across the whole 768-1279px tablet range —
+same "one value for the whole tablet bucket" precedent used elsewhere in this file.
+
+Split the title's font-size/line-height out of the unbounded 768px+ block into two
+breakpoint-scoped rules: 20px/20px added to the existing tablet-only (768-1279px) block (next to
+the no-background rule above), 24px/24px added to the existing desktop `@media (min-width:
+1280px)` block. Letter-spacing (`-0.48px`, identical at both breakpoints per both frames) stays
+on the original unbounded 768px+ title rule, now holding only that one property plus the
+existing ellipsis/truncation layout.
+
+Verified: lint clean, 144/144 tests pass unchanged (CSS-only, no behavior touched).
+
+### Also Live "Watch now" is black at desktop too, resolving an earlier flagged gap (2026-09-01)
+
+User: "sg-live-card__btn sg-live-card__btn--watch in the broadcast page should always be black
+instead of #292929" — resolves the gap explicitly flagged in the earlier hover/focus-within fix
+("desktop's own resting-state Watch button is already #292929 ... flag if desktop should also
+go black at rest"). Changed the desktop (1024px+) block's `.sg-live-card__btn--watch` rule
+(covering both its resting and hover/focus-within states, comma-listed together) from `#292929`
+to `#000`, matching the plain/hover rules already black below that breakpoint. Favorite's own
+`#292929` border/color (a separate button, not named in this request) was left untouched.
+
+Verified: lint clean, 144/144 tests pass unchanged (CSS-only, no behavior touched).
+
+### Also Live cards: audited every sessions-guide hover effect across the tablet range (2026-09-01)
+
+User: "sg-live-card inside broadcast should not inherit any of the hover effects it uses in
+the session guide during the tablet breakpoints." Rather than guessing at one property, read
+every `.sg-live-card:is(:hover, :focus-within)` rule in sessions-guide.css (base/unconditional,
+768px+, and the "Intermediate Tablet" 1024-1279px block) and checked each against what
+session-broadcast.css already resets:
+
+- Card background/border-color hover fill (`#fff→#fff` at rest, `#000` at 1024-1279): already
+  neutralized by the existing unbounded `@media (min-width: 1024px)` reset. At 768-1023, sessions-
+  guide's own resting and hover values are identical anyway (`#fff` both ways, `border: none`) —
+  no leak there to begin with.
+- Track/time color flip to white at 1024-1279: already neutralized (existing rule forces
+  `var(--s2a-color-content-default)` on both states).
+- Category badge icon color flip: already neutralized (`color: inherit`).
+- Description color flip: moot — `.sg-live-card__desc` is hidden entirely under broadcast.
+- Watch/Favorite button hover recolor: already neutralized (Watch by the all-widths black fix a
+  few requests ago; Favorite by the existing unbounded 1024px+ block). Neither has a
+  hover-specific rule in sessions-guide below 1024px, so no gap there either.
+- **Gap found**: `.sg-live-card__title` hover color (flips to white at 1024-1279px, node
+  `sessions-guide.css:1941`) had no counterpart in session-broadcast.css at all — this one
+  actually leaked through. Fixed by adding it to the same existing unbounded 1024px+ reset
+  block, forcing `var(--s2a-color-content-default)` on hover, next to the track/time rules it
+  mirrors.
+
+**Side effect, flagged not silently fixed**: this same title-hover-color rule also exists in
+sessions-guide.css's desktop (1280px+) block (`sessions-guide.css:2411`) and is fixed too, since
+the reset block is unbounded from 1024px — the user only asked about tablet, so this wasn't
+independently verified against a desktop frame, just noted as a natural consequence of using
+the same shared block.
+
+Verified: lint clean, 144/144 tests pass unchanged (CSS-only, no behavior touched).
+
+### Correction: badge icon color fix used the wrong value (`inherit`) (2026-09-01)
+
+User: "the badge is still changing to white on hover" — the fix in the audit above
+(`.sg-category-badge__icon-color { color: inherit; }`) was itself wrong, not just missing.
+`inherit` takes the *computed* color from the immediate parent (`.sg-category-badge`, which
+sets no `color` of its own), so it climbs further up to whatever ambient text color the card
+resolves to — not the badge's own per-track color. `CategoryBadge.js` sets `--sg-badge-icon-color`
+inline per track, and sessions-guide.css's own base rule reads it via `color: var(--sg-badge-
+icon-color, currentcolor)`. Fixed by restoring that exact fallback chain instead of `inherit`,
+so the icon keeps its actual per-track color through hover rather than drifting to an unrelated
+ambient value.
+
+Verified: lint clean, 144/144 tests pass unchanged (CSS-only, no behavior touched).
+
+### Badge label was still turning white — traced to the row, not the label itself (2026-09-01)
+
+User: "sg-category-badge__label still changing to white on hover on tablet." Unlike the icon
+(which reads its own `--sg-badge-icon-color` custom property), `.sg-category-badge__label`'s
+CSS is just `color: currentcolor` — it has no color of its own, so it inherits whatever its
+ancestor resolves to. That ancestor is `.sg-live-card__track-row` (CategoryBadge's actual parent
+per `LiveCard.js`, not `.sg-live-card__track`, a sibling class), and sessions-guide.css's
+"Intermediate Tablet" tier explicitly flips `.sg-live-card__track-row`/`__track-extra` to white
+on hover — a rule this file had never reset at all, so the label kept picking it up even after
+the icon's own color was fixed last request.
+
+Added a matching reset for `.sg-live-card__track-row`/`__track-extra`'s hover color, forcing
+`var(--s2a-color-content-default)`, same pattern as the existing `__track`/`__time`/`__title`
+resets right next to it.
+
+Verified: lint clean, 144/144 tests pass unchanged (CSS-only, no behavior touched).
+
+### No-background extended from tablet to desktop too (2026-09-01)
+
+User: ".sb-info should also not have background color on desktop" — widens the earlier
+tablet-only (768-1279px) transparent-background fix. Split it out of the bounded 768-1279px
+block into its own unbounded `@media (min-width: 768px)` rule (mobile below 768px still keeps
+the dark background from the base rule), since that bounded block's *other* rule — the
+tablet-only 20px title size — must stay capped at 1279px and not also leak into desktop.
+
+Verified: lint clean, 144/144 tests pass unchanged (CSS-only, no behavior touched).
+
+### Also Live: full-bleed section + desktop "long card" (Figma node 24:22750) (2026-09-01)
+
+User: "On desktop sb-carousel-section sb-carousel-section--also-live container and background
+should extend all the way to the edge of the page, while its content should still align 1192
+used for content. We should also start using the long cards use for desktop."
+
+**Container split**: the shared `@media (min-width: 1280px) { .sb-info, .sb-carousel-section {
+max-width: 1192px; margin: 0 auto; } }` rule capped the section's own element directly (its
+outer wrapper carries both `.sb-carousel-section` and `.sb-carousel-section--also-live` per
+`AlsoLiveCarousel.js`), which is what was constraining the #262626 background along with the
+content. Excluded Also Live via `:not(.sb-carousel-section--also-live)` on that rule, then
+capped `.sg-carousel` (the header+cards wrapper *inside* the section, per `Carousel.js`) at
+1192px/auto-margin instead — background now spans edge to edge, content stays aligned with
+everything else.
+
+**Long card**: read sessions-guide.css's own native 1280px+ "Desktop" block for `.sg-live-card`
+and found it already very close to Figma's "Events calendar card - large - v3" spec (560x316
+image and 1104px card max-width match exactly) — it had been getting suppressed entirely by
+this file's own unconditional base rules (311px width, aspect-ratio image, top-positioned
+progress bar, 16px title) and the 1024px+ reset block, both more specific than sessions-guide's
+bare selectors. Restructured in two parts:
+- Split the old unbounded `@media (min-width: 1024px)` reset block in two: the purely
+  *structural* resets (flex-direction, image/body sizing, meta gaps, hiding the description)
+  are now bounded to 1024-1279px only, so they stop suppressing the native desktop shape;
+  the *color/hover-state* corrections (track/time/title/track-row/badge-icon/watch/favorite —
+  all the bug fixes from the last several requests) stay unbounded from 1024px, since
+  sessions-guide's own desktop block has the identical white-on-hover behavior for the same
+  properties and needs the same fix.
+- Added a new `@media (min-width: 1280px)` block providing the few corrections Figma's card
+  needs beyond what sessions-guide's native rule already gives for free: `border`/`border-radius`
+  (32px, no border — native gives a 4px white border/20px radius), `width`/`max-width` (this
+  file's own unconditional 311px override otherwise wins even at 1280px+), the image's fixed
+  560x316 (this file's own unconditional aspect-ratio box otherwise wins), progress-row back to
+  the image's bottom edge (this file's own unconditional rule moves it to the top, a narrow-card-
+  only design choice), title size (32px, `--s2a-font-size-3xl`, matching sessions-guide's own
+  native value — this file's own unconditional 16px override otherwise wins), showing the
+  description (hidden by the narrow card's own base rule), and hiding the narrow card's trailing
+  `__actions-time` label (not part of this design). Watch button already renders its play icon
+  via `LiveCard.js` — no JS changes needed.
+
+**Approximated, not independently re-verified against a zoomed screenshot**: button padding/
+height (`24px`/`40px`, read from the literal Figma export and sessions-guide's own matching
+native values) and the meta row's flex-start/12px-gap layout (matches sessions-guide's native
+rule, closer to Figma's packed icon+label+divider+time look than this file's own
+justify-content:space-between). Also left untouched: the exact card-to-card carousel gap
+(currently 16px from an earlier request, vs. Figma's 55px) — not part of what was asked this
+time; flag if it looks off once viewed.
+
+Verified: lint clean, 144/144 tests pass unchanged (CSS-only, no behavior touched).
+
+### Carousel nav: 24px clearance to cards, top aligned with the section title (2026-09-01)
+
+User: "in desktop between sg-carousel__nav and the cards we should have 24px of spacing. Also
+the top sg-carousel__nav should match the top of sg-section-title." sessions-guide.css's own
+1280px+ rule takes the nav out of flow (`position: absolute; top: 0; right: 0;`, anchored to
+`.sg-carousel`) so it sits beside the title instead of beside the cards — but nothing sizes
+`.sg-carousel__header` to actually match the nav's own fixed 40px button height
+(`.sg-carousel__arrow`), so `top: 0` only lines up with the title's own (much shorter) line box,
+and the gap to the cards below is whatever's left over from the title's height alone, not a
+deliberate value.
+
+Fixed by giving `.sg-carousel__header` a `min-height: 40px` (matching the nav buttons exactly)
+plus `margin-bottom: var(--s2a-spacing-lg, 24px)`, applied to both Also Live and Up Next (nav
+positioning is shared/generic, not specific to Also Live's long-card work). With the header now
+a real 40px box, its top genuinely aligns with the nav's own 40px `top: 0` (re-asserted
+explicitly rather than relying on it staying correct in sessions-guide.css unreviewed), and the
+24px clearance to the cards becomes a plain margin rather than depending on which title token
+happens to be in effect.
+
+Verified: lint clean, 144/144 tests pass unchanged (CSS-only, no behavior touched).
+
+### Regression from the long-card restructuring: card hover-fill fix lost at desktop (2026-09-01)
+
+User: "title, category badge and 'watch now' button are not very legible on hover currently on
+desktop." Self-caused regression from the long-card restructuring a few requests ago: when the
+old unbounded `@media (min-width: 1024px)` reset block was split into a *structural* half
+(bounded to 1024-1279px) and a *color/hover* half (kept unbounded), the card's own hover
+background/border-color fix (`.sg-live-card:is(:hover, :focus-within) { background: #fff;
+border-color: transparent; }`) was miscategorized into the bounded structural half — it reads
+like a structural rule but is actually the root fix everything else in the color/hover half
+depends on. Left bounded, it stopped applying at 1280px+, so sessions-guide's native desktop
+rule (`background: #000`) took over uncountered: the title/track/badge/time colors (all pinned
+dark, via `var(--s2a-color-content-default)`) were then landing on a black hover background —
+illegible, exactly as reported. Watch now's own black button was technically still legible on
+its own terms, but read as blending into the now-black card around it.
+
+Moved the rule into the unbounded color/hover block, at the top with a comment flagging it as
+the dependency the rest of the block relies on, so this doesn't get miscategorized again.
+
+Verified: lint clean, 144/144 tests pass unchanged (CSS-only, no behavior touched).
+
+### Correction: desktop hover should match sessions-guide natively, not fight it (2026-09-01)
+
+User: "Not fixed. upon hover we should display the card background as black like we do on
+session guide and the content inside the cards should changes to white." This reverses the
+previous fix's premise — the goal isn't to keep the card light and force text dark on hover at
+desktop, it's to let sessions-guide's own native "card fill goes black, content turns white"
+long-card hover treatment through *unfought*, matching the rest of that card's borrowed styling.
+
+Two changes:
+- Reverted the previous entry's "unbounding" of the color/hover-state neutralization block back
+  to tablet-only (`min-width: 1024px` **and** `max-width: 1279px`) — at 1280px+, sessions-guide's
+  native hover rules (background→black, title/track/time/badge→white) now apply cleanly. The
+  plain/resting Watch-is-black rule is untouched (a separate, always-unconditional rule earlier
+  in the file) — that one's about the resting button, not the hover fill.
+- Found a second, previously-untouched offender: a standalone, unconditional (no media query at
+  all) rule forcing Watch's *hover* state to stay black at every width — added several requests
+  ago to counter sessions-guide's own hover override, before the desktop long card existed. Left
+  as-is, it would have made the button invisible against the now-black hover fill at desktop.
+  Bounded it to `max-width: 1279px` so 1280px+ falls through to sessions-guide's own native hover
+  inversion (white background, dark text) instead — same treatment as the rest of the card's
+  content, staying visible against the black fill.
+
+Verified: lint clean, 144/144 tests pass unchanged (CSS-only, no behavior touched).
+
+### Also Live: peeking card now bleeds to the true viewport edge, not .sg-carousel's edge (2026-09-01)
+
+User: "The peeking cards is currently being cut off my margin or something else. The peeking
+cards should show completely all the way to the right edge of the screen." Root cause: capping
+`.sg-carousel` at 1192px (the earlier full-bleed-background fix) also caps the cards row inside
+it — the peek could only reach *that* box's edge, not the actual screen edge.
+`.sg-carousel__track`'s own sessions-guide.css bleed (`margin-right: -20px`) is a small fixed
+value sized for a different, non-full-bleed section, and `.sg-carousel__cards`'s own 16px
+`padding-right` ate further into whatever bleed there was.
+
+Two changes, both in the existing desktop long-card block:
+- Cleared `.sb-carousel-section--also-live`'s own left padding at 1280px+ (kept top/bottom).
+  The base rule's 32px-left/0-right padding is a mobile/tablet peek-to-edge convention that,
+  left in place, would offset `.sg-carousel`'s `margin: 0 auto` centering asymmetrically —
+  clearing it lets `.sg-carousel` center symmetrically in the *full* viewport width, which the
+  next fix depends on being true.
+- With that guaranteed, the exact gap from `.sg-carousel`'s right edge to the true viewport edge
+  is `(100vw - 1192px) / 2` — pulled `.sg-carousel__track` out by exactly that via a calculated
+  negative `margin-right`, and zeroed `.sg-carousel__cards`'s own `padding-right` so nothing
+  eats back into the bleed. The peek now reaches the actual screen edge.
+
+Verified: lint clean, 144/144 tests pass unchanged (CSS-only, no behavior touched).
+
+### Also Live card-to-card gap: 24px at desktop (2026-09-01)
+
+User: "at desktop the gap between cards in .sb-carousel-section--also-live .sg-carousel__cards
+should be 24px." The base rule (unconditional, set earlier this session) uses `var(--s2a-
+spacing-md)` (16px), correct for mobile/tablet. Added `gap: var(--s2a-spacing-lg, 24px)` to the
+existing desktop long-card block, alongside the bleed-to-edge fix already there.
+
+Verified: lint clean, 144/144 tests pass unchanged (CSS-only, no behavior touched).
+
 ## Explicitly out of scope (fast-follow)
 
 - MobileRider real playback (stub adapter only)
