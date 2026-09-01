@@ -477,16 +477,17 @@ function resolveRenderContext(el) {
     return null;
   }
 
+  
   const sessionTimes = parseJsonMetadata('session-times');
-
-  const currentVideo = pickEmbeddableVideo(sessionTimes);
-  if (!currentVideo) {
-    logError('no embeddable video in session-times — nothing to render');
-    return null;
-  }
 
   if (!currentSessionHasEnded(sessionTimes, getNowMs())) {
     logError('current session has not ended yet — nothing to render');
+    return null;
+  }
+  
+  const currentVideo = pickEmbeddableVideo(sessionTimes);
+  if (!currentVideo) {
+    logError('no embeddable video in session-times — nothing to render');
     return null;
   }
 

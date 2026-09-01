@@ -80,14 +80,14 @@ export function getVideoProgress(sessionId, scope) {
 
 export function currentSessionHasEnded(sessionTimes, nowMs) {
   const firstEntry = (sessionTimes || [])[0];
-  if (!firstEntry || !Number.isFinite(firstEntry.endTimeMillis)) return true;
+  if (!firstEntry || !Number.isFinite(firstEntry.endTimeMillis)) return false;
   return nowMs >= firstEntry.endTimeMillis;
 }
 
 export function findOnDemandVideos(sessionTimes) {
   return (sessionTimes || [])
     .flatMap((entry) => entry?.videos || [])
-    .filter((video) => EMBEDDABLE_PROVIDERS.includes(video?.provider) && video?.kind === 'onDemand');
+    .filter((video) => EMBEDDABLE_PROVIDERS.includes(video?.provider));
 }
 
 export function readAuthoredConfig(el) {
