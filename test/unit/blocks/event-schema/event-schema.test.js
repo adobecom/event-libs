@@ -68,6 +68,7 @@ describe('Event Schema Module', () => {
       document.head.appendChild(canonical);
       setMetadata('event-title', 'Sample Event');
       setMetadata('start-date', '2024-08-01T00:00:00Z');
+      setMetadata('venue', JSON.stringify({ venueName: 'Sample Venue' }));
 
       injectEventSchema();
 
@@ -79,7 +80,7 @@ describe('Event Schema Module', () => {
       });
     });
 
-    it('should still inject schema when venue and photos metadata are missing', () => {
+    it('should not inject schema when venue metadata is missing', () => {
       setMetadata('event-title', 'Sample Event');
       setMetadata('start-date', '2024-08-01T00:00:00Z');
       setMetadata('end-date', '2024-08-02T00:00:00Z');
@@ -87,32 +88,13 @@ describe('Event Schema Module', () => {
       injectEventSchema();
 
       const script = document.querySelector('script[type="application/ld+json"]');
-      expect(script).to.not.be.null;
-      const schemaData = JSON.parse(script.textContent);
-      expect(schemaData.location).to.be.undefined;
-      expect(schemaData.image).to.be.undefined;
-      expect(schemaData).to.deep.equal({
-        '@context': 'https://schema.org',
-        '@type': 'Event',
-        name: 'Sample Event',
-        startDate: '2024-08-01T00:00:00Z',
-        endDate: '2024-08-02T00:00:00Z',
-        description: '',
-        organizer: {
-          '@type': 'Organization',
-          name: 'Adobe',
-          url: window.location.href,
-        },
-        offers: {
-          '@type': 'Offer',
-          url: window.location.href,
-        },
-      });
+      expect(script).to.be.null;
     });
 
     it('should fall back to the event-card-image when no event-hero-image is present', () => {
       setMetadata('event-title', 'Sample Event');
       setMetadata('start-date', '2024-08-01T00:00:00Z');
+      setMetadata('venue', JSON.stringify({ venueName: 'Sample Venue' }));
       setMetadata('photos', JSON.stringify([
         { imageKind: 'event-card-image', imageUrl: 'http://example.com/card.jpg' },
       ]));
@@ -124,7 +106,7 @@ describe('Event Schema Module', () => {
       expect(schemaData.image).to.equal('http://example.com/card.jpg');
     });
 
-    it('should still build image from valid photos when venue metadata is malformed', () => {
+    it('should not inject schema when venue metadata is malformed, even if photos parses fine', () => {
       setMetadata('event-title', 'Sample Event');
       setMetadata('start-date', '2024-08-01T00:00:00Z');
       setMetadata('venue', 'invalid JSON');
@@ -135,9 +117,7 @@ describe('Event Schema Module', () => {
       injectEventSchema();
 
       const script = document.querySelector('script[type="application/ld+json"]');
-      const schemaData = JSON.parse(script.textContent);
-      expect(schemaData.image).to.equal('http://example.com/hero.jpg');
-      expect(schemaData.location).to.be.undefined;
+      expect(script).to.be.null;
     });
 
     it('should still build location from valid venue when photos metadata is malformed', () => {
@@ -164,6 +144,7 @@ describe('Event Schema Module', () => {
     it('should omit image when photos metadata parses to a non-array value', () => {
       setMetadata('event-title', 'Sample Event');
       setMetadata('start-date', '2024-08-01T00:00:00Z');
+      setMetadata('venue', JSON.stringify({ venueName: 'Sample Venue' }));
       setMetadata('photos', JSON.stringify({ imageKind: 'event-hero-image', imageUrl: 'http://example.com/hero.jpg' }));
 
       injectEventSchema();
@@ -313,7 +294,7 @@ describe('Event Schema Module', () => {
       expect(script).to.be.null;
     });
 
-    it('should log an error if metadata parsing fails but still inject schema from remaining metadata', () => {
+    it('should log an error and remove the element without injecting schema when venue metadata fails to parse', () => {
       setMetadata('event-title', 'Sample Event');
       setMetadata('start-date', '2024-08-01T00:00:00Z');
       setMetadata('venue', 'invalid JSON');
@@ -324,10 +305,7 @@ describe('Event Schema Module', () => {
       expect(el.parentNode).to.be.null;
 
       const script = document.querySelector('script[type="application/ld+json"]');
-      expect(script).to.not.be.null;
-      const schemaData = JSON.parse(script.textContent);
-      expect(schemaData.location).to.be.undefined;
-      expect(schemaData.image).to.be.undefined;
+      expect(script).to.be.null;
     });
   });
 });

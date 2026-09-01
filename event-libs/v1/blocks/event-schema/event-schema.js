@@ -18,7 +18,7 @@ export function injectEventSchema() {
 
   const name = getMetadata('event-title');
   const startDate = getMetadata('start-date');
-  if (!name || !startDate) return;
+  if (!name || !startDate || !venueObject) return;
 
   const canonicalUrl = document.head.querySelector('link[rel="canonical"]')?.href
     || window.location.href;
@@ -29,6 +29,18 @@ export function injectEventSchema() {
     name,
     startDate,
     endDate: getMetadata('end-date'),
+    location: {
+      '@type': 'Place',
+      name: venueObject.venueName,
+      address: {
+        '@type': 'PostalAddress',
+        streetAddress: venueObject.address,
+        addressLocality: venueObject.city,
+        addressRegion: venueObject.stateCode,
+        postalCode: venueObject.postalCode,
+        addressCountry: venueObject.country,
+      },
+    },
     description: getMetadata('description') || '',
     organizer: {
       '@type': 'Organization',
@@ -40,21 +52,6 @@ export function injectEventSchema() {
       url: canonicalUrl,
     },
   };
-
-  if (venueObject) {
-    schemaData.location = {
-      '@type': 'Place',
-      name: venueObject.venueName,
-      address: {
-        '@type': 'PostalAddress',
-        streetAddress: venueObject.address,
-        addressLocality: venueObject.city,
-        addressRegion: venueObject.stateCode,
-        postalCode: venueObject.postalCode,
-        addressCountry: venueObject.country,
-      },
-    };
-  }
 
   if (Array.isArray(photos)) {
     const heroOrCardImage = photos.find((photo) => photo.imageKind === 'event-hero-image')
