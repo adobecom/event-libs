@@ -394,8 +394,14 @@ class Drawer {
       this.dragHeightPx = pendingHeight;
       this.el.style.maxHeight = `${pendingHeight}px`;
     };
+    let loggedFirstMove = false;
     const onPointerMove = (event) => {
       if (dragStartY == null) return;
+      if (!loggedFirstMove) {
+        loggedFirstMove = true;
+        // eslint-disable-next-line no-console
+        console.log(`[VPL-DBG] first pointermove y=${Math.round(event.clientY)} capture=${this.handleEl.hasPointerCapture?.(activePointerId)} t=${Math.round(performance.now())}`);
+      }
       const cap = this.measureDragCapPx();
       const delta = dragStartY - event.clientY;
       // pointermove fires far faster than paint; coalescing to one style write per frame
@@ -415,7 +421,7 @@ class Drawer {
     const onPointerUp = (event) => {
       if (dragStartY == null) return;
       // eslint-disable-next-line no-console
-      console.log(`[VPL-DBG] pointerup type=${event?.type} y=${Math.round(event?.clientY ?? -1)} t=${Math.round(performance.now())}`);
+      console.log(`[VPL-DBG] ${event?.type === 'pointercancel' ? 'POINTERCANCEL' : 'pointerup'} type=${event?.type} y=${Math.round(event?.clientY ?? -1)} t=${Math.round(performance.now())}`);
       dragStartY = null;
       if (rafId != null) { cancelAnimationFrame(rafId); flush(); }
       if (activePointerId != null && this.handleEl.hasPointerCapture?.(activePointerId)) {
@@ -454,6 +460,7 @@ class Drawer {
       // pointer stream mid-drag — pointermove stops firing, and the raw down/up land on the
       // player, which reads them as a click and toggles play/pause. Capture also lets the
       // move/up/cancel listeners live on the handle itself rather than window.
+      loggedFirstMove = false;
       activePointerId = event.pointerId;
       this.handleEl.setPointerCapture?.(activePointerId);
       // Suppress the max-height transition while dragging so the drawer tracks the finger
