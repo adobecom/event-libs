@@ -1,9 +1,9 @@
 import { createTag } from '../../utils/utils.js';
 
-// Owns the single, page-wide loader shown while the video-player/video-playlist layout
+// Owns the single, page-wide loader shown while the session-video-player/session-video-playlist layout
 // decision (see BlockMediator's videoLayoutDecision store) is still pending — both blocks
 // import this instead of each managing their own loader element, so there is exactly one
-// source of truth for "is a loader currently showing" regardless of how many .video-player
+// source of truth for "is a loader currently showing" regardless of how many .session-video-player
 // instances exist on the page.
 let loaderEl = null;
 
@@ -12,7 +12,7 @@ let loaderEl = null;
 // hidden are no-ops.
 export function showVideoLayoutLoader(el) {
   if (loaderEl) return;
-  loaderEl = createTag('div', { class: 'video-player-loader', 'aria-hidden': 'true' }, '', { parent: el });
+  loaderEl = createTag('div', { class: 'session-video-player-loader', 'aria-hidden': 'true' }, '', { parent: el });
 }
 
 export function hideVideoLayoutLoader() {

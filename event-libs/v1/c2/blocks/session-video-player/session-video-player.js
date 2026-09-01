@@ -17,8 +17,8 @@ import {
   ensureStylesheet,
 } from '../../utils/video-session.js';
 
-const LOG_SCOPE = 'video-player';
-const BLOCK_CSS_URL = new URL('./video-player.css', import.meta.url).href;
+const LOG_SCOPE = 'session-video-player';
+const BLOCK_CSS_URL = new URL('./session-video-player.css', import.meta.url).href;
 const MILO_IFRAME_CSS_URL = `${LIBS}/styles/iframe.css`;
 
 function logError(message) {
@@ -98,7 +98,7 @@ function buildMiloVideo(video) {
     createTag('iframe', {
       src,
       class: 'youtube',
-      id: youtubeId ? `video-player-yt-${youtubeId}` : '',
+      id: youtubeId ? `session-video-player-yt-${youtubeId}` : '',
       webkitallowfullscreen: '',
       mozallowfullscreen: '',
       allowfullscreen: '',
@@ -179,11 +179,11 @@ async function fetchMpcVideoDuration(mpcVideoId) {
 }
 
 function notifyProgressChanged(sessionId) {
-  window.dispatchEvent(new CustomEvent('video-player:progress', { detail: { sessionId } }));
+  window.dispatchEvent(new CustomEvent('session-video-player:progress', { detail: { sessionId } }));
 }
 
 function notifyStateChanged(sessionId, state) {
-  window.dispatchEvent(new CustomEvent('video-player:state', { detail: { sessionId, state } }));
+  window.dispatchEvent(new CustomEvent('session-video-player:state', { detail: { sessionId, state } }));
 }
 
 function ensureMpcLength(sessionId, mpcVideoId, currentTime, length) {
@@ -480,7 +480,7 @@ function resolveRenderContext(el) {
 }
 
 export default async function init(el) {
-  ensureStylesheet('video-player-css', BLOCK_CSS_URL);
+  ensureStylesheet('session-video-player-css', BLOCK_CSS_URL);
 
   const context = resolveRenderContext(el);
   if (!context) {

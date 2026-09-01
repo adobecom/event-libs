@@ -2,12 +2,12 @@
 
 Authored on an Individual Session Page. This block handles embedding and
 tracking the current session's own video only; it does not resolve or
-render any playlist itself (see the separate `video-playlist` block's own
+render any playlist itself (see the separate `session-video-playlist` block's own
 README for the topic playlist).
 
-**Two separate `.video-player` instances are authored on every session
+**Two separate `.session-video-player` instances are authored on every session
 page** — one inside a full-width, player-only section, one inside a
-two-column section alongside `video-playlist` (see that block's own
+two-column section alongside `session-video-playlist` (see that block's own
 README) — and only ONE of them ever actually embeds/plays a video. See
 "Which instance actually plays" below for how the two coordinate. They
 communicate only through `localStorage`, page-wide `CustomEvent`s, and one
@@ -32,30 +32,30 @@ on the block itself:
 
 **Each of the two containing SECTIONS also needs one marker class**, authored
 via that Section Metadata block's own "Style" row (standard Milo
-convention — adds the given class(es) to the section) — `video-container`
-on the full-width, player-only section; `video-playlist-container` on the
-two-column section shared with `video-playlist` (and any other blocks
+convention — adds the given class(es) to the section) — `session-video-container`
+on the full-width, player-only section; `session-video-playlist-container` on the
+two-column section shared with `session-video-playlist` (and any other blocks
 authored alongside it, e.g. `event-featured-products`/`event-speakers`/
-`event-session-resources`). See `video-playlist`'s own README, "Which
+`event-session-resources`). See `session-video-playlist`'s own README, "Which
 instance actually plays," for exactly how these drive the winner/loser
 removal.
 
 Both sections are also commonly authored with a `spacing-sm` Style value
-(external, section-level vertical padding) — `.video-container`'s own
-default is too generous for this specific layout, so `video-player.css`
-overrides it directly (`padding-bottom: 10px`) scoped to `.section.video-container`.
+(external, section-level vertical padding) — `.session-video-container`'s own
+default is too generous for this specific layout, so `session-video-player.css`
+overrides it directly (`padding-bottom: 10px`) scoped to `.section.session-video-container`.
 Since that rule targets the class, not any inferred structure, it only ever
 applies when this section is actually present (the winning instance); when
-`video-playlist` wins instead, `.video-container` is removed from the DOM
+`session-video-playlist` wins instead, `.session-video-container` is removed from the DOM
 entirely, leaving nothing for the override to match — the other section's
 own `spacing-sm` padding is never affected either way.
 
-The same file also zeroes `.video-playlist-container`'s own `padding-top`
-(`.section.video-container ~ .section.video-playlist-container`), but only
+The same file also zeroes `.session-video-playlist-container`'s own `padding-top`
+(`.section.session-video-container ~ .section.session-video-playlist-container`), but only
 via a real CSS sibling combinator — so it too only ever applies when
-`.video-container` is actually present, tracking the DOM live as it's
+`.session-video-container` is actually present, tracking the DOM live as it's
 removed, with no extra JS coordination needed. This assumes
-`.video-container` is authored **before** `.video-playlist-container`
+`.session-video-container` is authored **before** `.session-video-playlist-container`
 in the page (the current template's own order — a general sibling
 combinator only matches a *following* sibling); if that order were ever
 reversed, this rule simply stops applying rather than doing anything
@@ -113,20 +113,20 @@ MPC and YouTube signal it completely differently:
   iframe_api`, only if not already present) and watches `YT.Player`'s
   `onReady`/`onStateChange`, mapping `PLAYING`/`PAUSED`/`ENDED` the same way.
 
-Either path dispatches a page-wide `video-player:state` `CustomEvent`
+Either path dispatches a page-wide `session-video-player:state` `CustomEvent`
 (detail: `{ sessionId, state }`) on `window` for each transition. The
-`video-playlist` block (a separate block/fragment, if present on this
+`session-video-playlist` block (a separate block/fragment, if present on this
 page) is the one that actually owns the "Play all" decision — it listens
-for this event, reads its own `video-playlist:play-all` toggle state on
+for this event, reads its own `session-video-playlist:play-all` toggle state on
 `'ended'`, and resolves/navigates to the next session by reading
 `data-href` off its own rendered rows. This block has no knowledge of
 "Play all," the topic playlist, or where "next" even is — see
-`video-playlist`'s own README for that logic.
+`session-video-playlist`'s own README for that logic.
 
 ## Watch progress + resume
 
 This block saves the current session's own watch progress to
-`localStorage` (`video-playlist:progress`, keyed by **session id**, not
+`localStorage` (`session-video-playlist:progress`, keyed by **session id**, not
 any provider's video id — only the session's own page ever embeds its
 video, so which session is playing is always unambiguous). `saveVideoProgress`/
 `getVideoProgress` here read/write this map; the same data drives two things:
@@ -136,8 +136,8 @@ video, so which session is playing is always unambiguous). `saveVideoProgress`/
    position is within `RESUME_RESTART_THRESHOLD_SECONDS` (30s) of the end
    (a finished session shouldn't "resume" 1s before its own end).
 2. **Live progress updates elsewhere on the page** — whenever progress is
-   saved, this block dispatches a page-wide `video-player:progress`
-   `CustomEvent` (detail: `{ sessionId }`) on `window`. `video-playlist.js`
+   saved, this block dispatches a page-wide `session-video-player:progress`
+   `CustomEvent` (detail: `{ sessionId }`) on `window`. `session-video-playlist.js`
    (a separate block, if present) listens for this to update its own
    "now playing" row's progress bar/duration live, without either block
    referencing the other directly.
@@ -152,47 +152,47 @@ progress today).
 
 ## Which instance actually plays
 
-Because two `.video-player` instances exist on the page, embedding a video
+Because two `.session-video-player` instances exist on the page, embedding a video
 immediately in each one's own `init()` would start both playing at once —
 visibly, briefly, until one is torn down. Instead, neither instance embeds
 right away; each registers as pending and waits for a single page-wide
-decision, made by `video-playlist.js`, about whether a real topic playlist
+decision, made by `session-video-playlist.js`, about whether a real topic playlist
 is actually going to render:
 
-- If `video-playlist` has something to show, the **`video-playlist-container`
-  instance** wins (embeds); the whole `.video-container` section is removed
+- If `session-video-playlist` has something to show, the **`session-video-playlist-container`
+  instance** wins (embeds); the whole `.session-video-container` section is removed
   (with a fade-out — see `.is-collapsing` in the CSS) so no empty space is
-  left behind. `.video-container` only ever holds a `.video-player`, so
+  left behind. `.session-video-container` only ever holds a `.session-video-player`, so
   removing the whole thing is safe.
-- If `video-playlist` has nothing to show (any of its own gates failing, or
-  removed for having no video to recommend from), the **`video-container`
-  instance** wins instead. Only the specific `.video-player` and
-  `.video-playlist` elements inside `.video-playlist-container` are
+- If `session-video-playlist` has nothing to show (any of its own gates failing, or
+  removed for having no video to recommend from), the **`session-video-container`
+  instance** wins instead. Only the specific `.session-video-player` and
+  `.session-video-playlist` elements inside `.session-video-playlist-container` are
   removed — never the container itself, since it's shared with other
   unrelated blocks (confirmed live: `event-featured-products`/
   `event-speakers`/`event-session-resources`).
-- If no `video-playlist` block is authored on the page at all, the
-  `video-container` instance still wins after a `DECISION_FALLBACK_MS` (4s)
+- If no `session-video-playlist` block is authored on the page at all, the
+  `session-video-container` instance still wins after a `DECISION_FALLBACK_MS` (4s)
   timeout — nothing will ever announce a decision in that case.
 
 **A late-arriving decision never tears out an already-playing video.** The
-session catalog fetch `video-playlist.js`'s own decision depends on can be
+session catalog fetch `session-video-playlist.js`'s own decision depends on can be
 slow enough that BOTH instances' `DECISION_FALLBACK_MS` timers fire first —
-per the fallback logic above, `video-container` always wins that race (it
+per the fallback logic above, `session-video-container` always wins that race (it
 resolves `true` on timeout regardless of the other instance), embeds, and
 moves on. If the catalog call then finally responds afterward and
 `announceVideoDecision` runs for real, it would otherwise remove
-`video-container` a second time — visibly tearing out a video the visitor
-is already watching, with nothing to replace it (the `video-playlist`-
+`session-video-container` a second time — visibly tearing out a video the visitor
+is already watching, with nothing to replace it (the `session-video-playlist`-
 container instance already gave up at its own timeout and never
 re-subscribes). `loadVideoPlayer()` sets `el.dataset.embedded = 'true'` the
 moment an instance actually commits to embedding (not merely "decided to
 try"); `announceVideoDecision` checks this before removing either side's
-`.video-player`, and leaves an already-embedded one alone even if the
+`.session-video-player`, and leaves an already-embedded one alone even if the
 decision technically says it should have lost. The visitor keeps watching
 whatever won the race, rather than the video disappearing entirely.
 
-The decision is set exactly once by `video-playlist.js`
+The decision is set exactly once by `session-video-playlist.js`
 (`announceVideoDecision`) on a shared `BlockMediator` store
 (`videoLayoutDecision`), read via `BlockMediator.get`/`.subscribe` — the
 same getter/setter/subscriber pattern `session-store.js` already uses for
@@ -200,20 +200,20 @@ same getter/setter/subscriber pattern `session-store.js` already uses for
 subscribe to it regardless of load order, with no direct reference between
 the two files.
 
-Each instance determines whether it's the `video-playlist-container` one
-via `isInsidePlaylistContainer()` — `el.closest('.video-playlist-container')`,
+Each instance determines whether it's the `session-video-playlist-container` one
+via `isInsidePlaylistContainer()` — `el.closest('.session-video-playlist-container')`,
 the author-applied marker class (see Authoring above), not an inferred DOM
 structure. An earlier version of this check walked up through
 `.grid-column`/`.closest('.section')` to find a sibling column's own
-`.video-playlist` — that broke outright once the two columns turned out to
+`.session-video-playlist` — that broke outright once the two columns turned out to
 be separate `.fragment > .section` trees with no section reachable from
 either side via `.closest()`, so the explicit marker class replaced it
 entirely.
 
 While waiting, only the full-width instance shows a lightweight loader
-(`.video-player-loader`) in its own place, since `video-playlist.js`'s own
+(`.session-video-player-loader`) in its own place, since `session-video-playlist.js`'s own
 catalog fetch (driving this decision) has been measured at ~3.5s and that
-instance is otherwise the more common winner; the `video-playlist`-container
+instance is otherwise the more common winner; the `session-video-playlist`-container
 instance just stays empty until confirmed the winner. The decision flow
 itself is **not awaited** by `init()` — Milo decorates sections
 sequentially, so blocking on this would stall every later section on the

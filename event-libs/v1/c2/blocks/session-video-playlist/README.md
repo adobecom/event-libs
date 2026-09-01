@@ -1,35 +1,35 @@
 # Video Playlist (C2)
 
 Authored on an Individual Session Page as a sibling of a separate
-`video-player` block, inside the same `.section` (see that block's own
+`session-video-player` block, inside the same `.section` (see that block's own
 README for embedding/tracking). This block handles the topic-playlist list
 only; it does not embed or track the current session's own video itself —
 including deciding whether to render at all: it requires a real,
 **on-demand** embeddable video to exist on the page (same onDemand-only
-check `video-player.js`'s own `pickEmbeddableVideo()` uses; see "No video,
+check `session-video-player.js`'s own `pickEmbeddableVideo()` uses; see "No video,
 no playlist" below), not merely that the session has ended. A page whose
 only video entry is, say, a `liveStream` kind is treated the same as having
 no video at all — this block never renders "more like this" next to a
 player that itself has nothing to embed.
 
 The two blocks communicate only through `localStorage`
-(`video-playlist:progress`, `video-playlist:play-all`), page-wide
+(`session-video-playlist:progress`, `session-video-playlist:play-all`), page-wide
 `CustomEvent`s, and one shared `BlockMediator` store — never a direct
 reference — so either can load independently, in either order:
 
-- `video-player:progress` / `video-player:state` — dispatched by
-  `video-player.js`, reporting progress and raw playback state
+- `session-video-player:progress` / `session-video-player:state` — dispatched by
+  `session-video-player.js`, reporting progress and raw playback state
   (play/pause/ended). This block owns every decision about what to do with
   that state (e.g. "Play all" advancing on `ended` — see Play all below);
-  `video-player.js` makes none of those decisions itself.
+  `session-video-player.js` makes none of those decisions itself.
 - `videoLayoutDecision` — a `BlockMediator` store (get/set/subscribe, same
   pattern `session-store.js` uses for `imsProfile`/`rsvpData`) set by
   **this** block (`announceVideoDecision()`) once it knows whether it has
-  anything to show at all (`hasPlaylist: true`/`false`). The `video-player`
+  anything to show at all (`hasPlaylist: true`/`false`). The `session-video-player`
   instance on the page (see that block's own "Which instance actually
   plays" section) reads/subscribes to this to know whether it should
   actually embed. This block also acts directly on the two author-applied
-  marker classes (`.video-container`/`.video-playlist-container` — see
+  marker classes (`.session-video-container`/`.session-video-playlist-container` — see
   Authoring below) to remove whichever side lost.
 
 Renders exactly one variant — a topic playlist: a list of other on-demand
@@ -39,7 +39,7 @@ session-catalog data.
 If there's nothing to show — no on-demand embeddable video on the page,
 the session hasn't ended yet, or fewer than the configured minimum
 on-demand sessions match the current session's topic — the block removes
-itself (via `removeBlock()`, so `video-player.js` is always notified).
+itself (via `removeBlock()`, so `session-video-player.js` is always notified).
 There's no empty state.
 
 ## Authoring
@@ -70,32 +70,32 @@ not the primary path):
 **This block's own containing SECTION also needs a marker class**, authored
 via that Section Metadata block's own "Style" row (standard Milo
 convention — adds the given class(es) to the section) —
-`video-playlist-container`. See `video-player`'s own README, "Authoring,"
-for the matching `video-container` class on the other, full-width section —
+`session-video-playlist-container`. See `session-video-player`'s own README, "Authoring,"
+for the matching `session-video-container` class on the other, full-width section —
 these two are how `announceVideoDecision()` below finds each side without
 depending on the page's actual DOM/fragment structure.
 
-## Which video-player wins, and what gets removed
+## Which session-video-player wins, and what gets removed
 
 Full mechanism (both instances, the shared `BlockMediator` decision store,
-timing) lives in `video-player`'s own README — this section covers only
+timing) lives in `session-video-player`'s own README — this section covers only
 what THIS block does once it knows whether it has anything to show:
 
 - **Has a playlist** (`announceVideoDecision(true)`): the whole
-  `.video-container` section is collapsed/removed (fade-out via
-  `.is-collapsing` — see the CSS) — it only ever holds a `.video-player`,
+  `.session-video-container` section is collapsed/removed (fade-out via
+  `.is-collapsing` — see the CSS) — it only ever holds a `.session-video-player`,
   so removing all of it is safe.
 - **No playlist** (`announceVideoDecision(false)`, via `removeBlock()`):
-  only the specific `.video-player` and `.video-playlist` elements inside
-  `.video-playlist-container` are collapsed/removed — never the container
+  only the specific `.session-video-player` and `.session-video-playlist` elements inside
+  `.session-video-playlist-container` are collapsed/removed — never the container
   itself, since it's shared with other, unrelated blocks authored
   alongside it (event-featured-products, event-speakers,
   event-session-resources, ...). This block's own `el.remove()` (from
   `removeBlock()`) handles removing itself; `announceVideoDecision` here
-  additionally removes the sibling `.video-player` in the same container.
+  additionally removes the sibling `.session-video-player` in the same container.
 
-Both branches look up their target via `document.querySelector('.video-container')`/
-`.querySelector('.video-playlist-container')` — the author-applied marker
+Both branches look up their target via `document.querySelector('.session-video-container')`/
+`.querySelector('.session-video-playlist-container')` — the author-applied marker
 classes, not inferred DOM structure. This replaced an earlier
 `.grid-column`/`.closest('.section')` structural walk that broke once the
 two columns turned out to live in separate `.fragment > .section` trees
@@ -169,7 +169,7 @@ field supports fixing this today.
 
 ## Loading the current session's own video
 
-Handled entirely by the separate `video-player` block — see its own README
+Handled entirely by the separate `session-video-player` block — see its own README
 for embedding, provider handling, and resume-on-load. This block never
 embeds a player itself.
 
@@ -179,7 +179,7 @@ embeds a player itself.
 embeddable video (`hasEmbeddableVideo()`, checking `session-times`
 metadata for an `mpc`/`youtube` provider entry whose `kind` is
 `'onDemand'`) before rendering anything at all — the same onDemand-only
-check `video-player.js`'s own `pickEmbeddableVideo()` uses, deliberately
+check `session-video-player.js`'s own `pickEmbeddableVideo()` uses, deliberately
 duplicated here rather than shared via a cross-block signal (per product:
 this block should use the same underlying logic the player itself uses,
 not depend on whether that block actually loaded/rendered successfully as
@@ -192,12 +192,12 @@ independently, and either one failing removes this block.
 ## Play all
 
 A "Play all" toggle is rendered alongside the topic-playlist title. Its
-state persists to `localStorage` (`video-playlist:play-all`) —
+state persists to `localStorage` (`session-video-playlist:play-all`) —
 a plain in-memory flag wouldn't survive the full-page navigation that
 advancing to the next session's own page requires.
 
-**This block owns the entire advance decision** — `video-player.js` only
-reports raw playback state (a page-wide `video-player:state` `CustomEvent`,
+**This block owns the entire advance decision** — `session-video-player.js` only
+reports raw playback state (a page-wide `session-video-player:state` `CustomEvent`,
 detail `{ sessionId, state }` where `state` is `'play'`/`'pause'`/`'ended'`);
 it makes no decision about what should happen on `ended`. `init()` here
 listens for that event, and on `ended` for the *current* session
@@ -212,9 +212,9 @@ and don't share JS scope.
 ## Watch progress + resume
 
 Every session's own page saves its own watch progress to `localStorage`
-(`video-playlist:progress`, keyed by **session id**, not any provider's
+(`session-video-playlist:progress`, keyed by **session id**, not any provider's
 video id — only the session's own page ever embeds its video, so which
-session is playing is always unambiguous) — written by `video-player.js`,
+session is playing is always unambiguous) — written by `session-video-player.js`,
 not this block. `getVideoProgress`/`computeProgressPercent` here only
 **read** that map:
 
@@ -223,14 +223,14 @@ not this block. `getVideoProgress`/`computeProgressPercent` here only
   to the duration. Since a row's own session isn't embedded on THIS page
   (except the current session's own row), this is a snapshot from the last
   time the viewer was on that session's own page, not live for those rows.
-- **Live updates for the current session's own row** — `video-player.js`
-  dispatches a page-wide `video-player:progress` `CustomEvent` (detail:
+- **Live updates for the current session's own row** — `session-video-player.js`
+  dispatches a page-wide `session-video-player:progress` `CustomEvent` (detail:
   `{ sessionId }`) whenever it saves new progress; this block listens for
   it in `init()` and re-reads/re-renders that one row's progress bar and
   duration label, so the "now playing" row updates live as the video
   actually plays, without the two blocks referencing each other directly.
 
-Resume-on-load is handled entirely in `video-player.js`.
+Resume-on-load is handled entirely in `session-video-player.js`.
 
 Client-only persistence (no backend field exists for per-viewer watch
 progress today).
@@ -250,7 +250,7 @@ navigates to it.
 ## The current session's own row
 
 The current session is merged into the topic playlist's displayed rows
-(`render()` in `video-playlist.js`, sorted into its correct chronological
+(`render()` in `session-video-playlist.js`, sorted into its correct chronological
 position, not force-prepended) and highlighted via `highlightRow` so the
 viewer can tell which row is theirs while browsing "more like this". This
 is purely a **display** concern: `resolveTopicPlaylist`'s own return value
@@ -258,7 +258,7 @@ is purely a **display** concern: `resolveTopicPlaylist`'s own return value
 qualifying sessions, unaffected — the current session never counts toward
 it. It does occupy one of the `maximum-sessions` display slots, though,
 since that cap applies to the final, current-session-included display
-list. (See Play all above for how `video-player.js` determines the actual
+list. (See Play all above for how `session-video-player.js` determines the actual
 next-session target from these rendered rows.)
 
 ## Row selection
@@ -281,9 +281,9 @@ siblings, since a `<button>` can never validly nest inside a real `<a>`
 
 **Known gap, not yet solved**: the previous desktop right-rail treatment
 depended on this block and its player sharing one `.section`
-(`.section:has(> .video-playlist)`), so the player took the remaining flex
+(`.section:has(> .session-video-playlist)`), so the player took the remaining flex
 space and this block became a fixed-width rail beside it. Now that the
-player lives in a separate `video-player` block/fragment (see the top of
+player lives in a separate `session-video-player` block/fragment (see the top of
 this README), that `:has()`-based layout no longer applies — this block
 currently only has its own standalone width per breakpoint (349px at
 1024px, 392px at 1440px, 487px at 1920px, per Figma inspect), with no
@@ -302,7 +302,7 @@ DOM is confirmed.
   mobile-drawer-height-only; see Drawer).
 - **Mobile (<1024px)**: a `position: fixed` bottom sheet, open on load.
   Collapsing/expanding is governed by `computeDrawerCapPx`/
-  `clampedTitleBottom` in `video-playlist.js` — the drawer's expanded height
+  `clampedTitleBottom` in `session-video-playlist.js` — the drawer's expanded height
   is capped by whichever is more restrictive of two constraints (never
   fully covers the session title's first 2 lines; never covers the video
   player either, wherever its own bottom edge is, since it may live in a
@@ -313,7 +313,7 @@ DOM is confirmed.
   title/player avoidance.
   - The chevron toggle jumps between two fixed states: fully collapsed
     (`DRAWER_FLOOR_PX`, 75px) and the cap above.
-  - The handle bar (`.video-playlist-handle`) supports real drag-to-resize
+  - The handle bar (`.session-video-playlist-handle`) supports real drag-to-resize
     via Pointer Events (`Drawer`'s own `#bindDrag`) — dragging moves the
     drawer freely between those same two bounds, snapping to whichever
     fixed state is closer once released, so the toggle button's own

@@ -23,7 +23,7 @@ import {
   ensureStylesheet,
 } from '../../utils/video-session.js';
 
-const LOG_SCOPE = 'video-playlist';
+const LOG_SCOPE = 'session-video-playlist';
 
 function logError(message) {
   window.lana?.log(`[${LOG_SCOPE}] ${message}`);
@@ -33,7 +33,7 @@ const parseJsonMetadata = (name) => parseSharedJsonMetadata(name, LOG_SCOPE);
 
 const EVENT_CONFIG = { title: '', registerUrl: '/register' };
 
-const BLOCK_CSS_URL = new URL('./video-playlist.css', import.meta.url).href;
+const BLOCK_CSS_URL = new URL('./session-video-playlist.css', import.meta.url).href;
 
 const DEFAULT_MIN_SESSIONS = 4;
 
@@ -44,7 +44,7 @@ const DRAWER_GAP_PX = 16;
 const DRAWER_FLOOR_PX = 75;
 const DRAWER_MIN_EXPANDED_PX = 150;
 const TITLE_LINE_CAP = 2;
-const AUTOPLAY_STORAGE_KEY = 'video-playlist:play-all';
+const AUTOPLAY_STORAGE_KEY = 'session-video-playlist:play-all';
 const SHOW_MORE_INITIAL_ROWS = 4;
 const DEFAULT_MAX_SESSIONS = 7;
 
@@ -168,13 +168,13 @@ function analyticsAttrs(linkName) {
 }
 
 function updateRowProgressUI(sessionId) {
-  const row = [...document.querySelectorAll('.video-playlist-row')]
+  const row = [...document.querySelectorAll('.session-video-playlist-row')]
     .find((r) => r.dataset.itemId === sessionId);
   if (!row) return;
   const progress = getVideoProgress(sessionId);
-  const fill = row.querySelector('.video-playlist-row-progress-fill');
+  const fill = row.querySelector('.session-video-playlist-row-progress-fill');
   if (fill) fill.style.width = `${computeProgressPercent(progress)}%`;
-  const durationEl = row.querySelector('.video-playlist-row-duration');
+  const durationEl = row.querySelector('.session-video-playlist-row-duration');
   if (durationEl && progress?.length) durationEl.textContent = formatDuration(Math.round(progress.length / 60));
 }
 
@@ -192,7 +192,7 @@ function findSessionHeadingText(el) {
 }
 
 function findPlayerBottom(el) {
-  const player = findEnclosingSection(el)?.querySelector('.video-player');
+  const player = findEnclosingSection(el)?.querySelector('.session-video-player');
   return player ? player.getBoundingClientRect().bottom : null;
 }
 
@@ -276,7 +276,7 @@ class Drawer {
   #addPlayerGuard() {
     if (this.guardReleaseTimer) { clearTimeout(this.guardReleaseTimer); this.guardReleaseTimer = null; }
     if (this.guardedPlayers?.length) return;
-    this.guardedPlayers = [...document.querySelectorAll('.video-player')];
+    this.guardedPlayers = [...document.querySelectorAll('.session-video-player')];
     this.guardedPlayers.forEach((player) => { player.style.pointerEvents = 'none'; });
   }
 
@@ -386,7 +386,7 @@ function setFavoriteButtonState(button, item, isFav) {
 
 function buildFavoriteButton(item) {
 
-  const button = createTag('button', { type: 'button', class: 'video-playlist-row-favorite' });
+  const button = createTag('button', { type: 'button', class: 'session-video-playlist-row-favorite' });
   setFavoriteButtonState(button, item, favorited.value.has(item.id));
 
   button.addEventListener('click', async (event) => {
@@ -405,7 +405,7 @@ function buildFavoriteButton(item) {
 function buildPlayButton(activate, title) {
   const button = createTag('button', {
     type: 'button',
-    class: 'video-playlist-row-play',
+    class: 'session-video-playlist-row-play',
     'aria-label': `Play ${title}`,
   }, PLAY_ICON_SVG);
   button.addEventListener('click', (event) => {
@@ -418,32 +418,32 @@ function buildPlayButton(activate, title) {
 
 function buildRow(item, { onSelect }) {
   const row = createTag('div', {
-    class: 'video-playlist-row',
+    class: 'session-video-playlist-row',
     role: 'listitem',
     'data-item-id': item.id,
     'data-href': item.href,
     ...analyticsAttrs('playlist-item-select'),
   });
 
-  const content = createTag('a', { class: 'video-playlist-row-content', href: item.href }, '', { parent: row });
+  const content = createTag('a', { class: 'session-video-playlist-row-content', href: item.href }, '', { parent: row });
 
   if (item.thumbnailUrl) {
-    const thumbWrap = createTag('div', { class: 'video-playlist-row-thumb-wrap' }, '', { parent: content });
-    createTag('img', { class: 'video-playlist-row-thumb', src: item.thumbnailUrl, alt: '' }, '', { parent: thumbWrap });
-    createTag('span', { class: 'video-playlist-row-play-icon' }, THUMB_PLAY_ICON_SVG, { parent: thumbWrap });
+    const thumbWrap = createTag('div', { class: 'session-video-playlist-row-thumb-wrap' }, '', { parent: content });
+    createTag('img', { class: 'session-video-playlist-row-thumb', src: item.thumbnailUrl, alt: '' }, '', { parent: thumbWrap });
+    createTag('span', { class: 'session-video-playlist-row-play-icon' }, THUMB_PLAY_ICON_SVG, { parent: thumbWrap });
   }
 
-  const meta = createTag('div', { class: 'video-playlist-row-meta' }, '', { parent: content });
-  createTag('span', { class: 'video-playlist-row-title' }, item.title, { parent: meta });
+  const meta = createTag('div', { class: 'session-video-playlist-row-meta' }, '', { parent: content });
+  createTag('span', { class: 'session-video-playlist-row-title' }, item.title, { parent: meta });
 
-  const progress = createTag('div', { class: 'video-playlist-row-progress' }, '', { parent: meta });
-  const track = createTag('div', { class: 'video-playlist-row-progress-track' }, '', { parent: progress });
-  const fill = createTag('div', { class: 'video-playlist-row-progress-fill' }, '', { parent: track });
+  const progress = createTag('div', { class: 'session-video-playlist-row-progress' }, '', { parent: meta });
+  const track = createTag('div', { class: 'session-video-playlist-row-progress-track' }, '', { parent: progress });
+  const fill = createTag('div', { class: 'session-video-playlist-row-progress-fill' }, '', { parent: track });
   fill.style.width = `${computeProgressPercent(getVideoProgress(item.id))}%`;
-  if (item.durationLabel) createTag('span', { class: 'video-playlist-row-duration' }, item.durationLabel, { parent: progress });
+  if (item.durationLabel) createTag('span', { class: 'session-video-playlist-row-duration' }, item.durationLabel, { parent: progress });
 
   const activate = () => onSelect(item, row);
-  const actions = createTag('div', { class: 'video-playlist-row-actions' }, '', { parent: row });
+  const actions = createTag('div', { class: 'session-video-playlist-row-actions' }, '', { parent: row });
   actions.appendChild(buildFavoriteButton(item));
   actions.appendChild(buildPlayButton(activate, item.title));
 
@@ -470,7 +470,7 @@ export function applyExpandedHeightCap(
     return;
   }
 
-  const firstRow = list.querySelector('.video-playlist-row');
+  const firstRow = list.querySelector('.session-video-playlist-row');
   if (!firstRow) return;
 
   const rowHeight = firstRow.getBoundingClientRect().height;
@@ -495,7 +495,7 @@ function buildTopicView(el, allRows, {
 } = {}) {
 
   const rows = allRows;
-  const list = createTag('div', { class: 'video-playlist-list', role: 'list' }, '', { parent: el });
+  const list = createTag('div', { class: 'session-video-playlist-list', role: 'list' }, '', { parent: el });
   rows.forEach((session) => {
     const row = buildRow(
       {
@@ -524,12 +524,12 @@ function buildTopicView(el, allRows, {
 
   if (currentSessionId) highlightRow(list, currentSessionId);
 
-  const favoriteButtons = [...list.querySelectorAll('.video-playlist-row-favorite')];
+  const favoriteButtons = [...list.querySelectorAll('.session-video-playlist-row-favorite')];
   if (favoriteButtons.length) {
     favorited.subscribe(() => {
       favoriteButtons.forEach((button) => {
-        const row = button.closest('.video-playlist-row');
-        const title = row.querySelector('.video-playlist-row-title')?.textContent || '';
+        const row = button.closest('.session-video-playlist-row');
+        const title = row.querySelector('.session-video-playlist-row-title')?.textContent || '';
         setFavoriteButtonState(button, { id: row.dataset.itemId, title }, favorited.value.has(row.dataset.itemId));
       });
     });
@@ -538,14 +538,14 @@ function buildTopicView(el, allRows, {
   if (rows.length > SHOW_MORE_INITIAL_ROWS) {
     const showMore = createTag('button', {
       type: 'button',
-      class: 'video-playlist-show-more',
+      class: 'session-video-playlist-show-more',
       'aria-expanded': 'false',
 
       'aria-label': 'Show more sessions',
       ...analyticsAttrs('playlist-show-more'),
     }, '', { parent: el });
     const label = createTag('span', {}, 'Show more', { parent: showMore });
-    createTag('span', { class: 'video-playlist-show-more-chevron' }, SHOW_MORE_CHEVRON_SVG, { parent: showMore });
+    createTag('span', { class: 'session-video-playlist-show-more-chevron' }, SHOW_MORE_CHEVRON_SVG, { parent: showMore });
 
     showMore.addEventListener('click', () => {
       const expanded = list.classList.toggle('is-showing-more');
@@ -574,10 +574,10 @@ function buildTopicView(el, allRows, {
 }
 
 function buildAutoplayToggle(el) {
-  const label = createTag('label', { class: 'video-playlist-autoplay' }, '', { parent: el });
+  const label = createTag('label', { class: 'session-video-playlist-autoplay' }, '', { parent: el });
   const checkbox = createTag('input', {
     type: 'checkbox',
-    class: 'video-playlist-autoplay-toggle',
+    class: 'session-video-playlist-autoplay-toggle',
     ...analyticsAttrs('playlist-play-all-toggle'),
   }, '', { parent: label });
   checkbox.checked = getShouldAutoPlay();
@@ -605,7 +605,7 @@ function collapseAndRemove(target) {
 }
 
 function hasEmbeddedVideoPlayer(container) {
-  return container?.querySelector('.video-player')?.dataset.embedded === 'true';
+  return container?.querySelector('.session-video-player')?.dataset.embedded === 'true';
 }
 
 function announceVideoDecision(hasPlaylist) {
@@ -620,13 +620,13 @@ function announceVideoDecision(hasPlaylist) {
 
   const playlistContainer = findSectionWithStyle(VIDEO_PLAYLIST_CONTAINER_CLASS);
   if (!hasEmbeddedVideoPlayer(playlistContainer)) {
-    collapseAndRemove(playlistContainer?.querySelector('.video-player'));
+    collapseAndRemove(playlistContainer?.querySelector('.session-video-player'));
   }
-  collapseAndRemove(playlistContainer?.querySelector('.video-playlist'));
+  collapseAndRemove(playlistContainer?.querySelector('.session-video-playlist'));
 }
 
 function removeBlock(el) {
-  window.dispatchEvent(new CustomEvent('video-playlist:removed'));
+  window.dispatchEvent(new CustomEvent('session-video-playlist:removed'));
   announceVideoDecision(false);
   el.remove();
 }
@@ -676,7 +676,7 @@ function listenForPlayerEvents(el, sessionId) {
     if (event.detail.state !== 'ended') return;
     if (!getShouldAutoPlay()) return;
 
-    const nextRow = [...el.querySelectorAll('.video-playlist-row[data-href]')]
+    const nextRow = [...el.querySelectorAll('.session-video-playlist-row[data-href]')]
       .find((row) => row.dataset.itemId !== sessionId);
     if (!nextRow?.dataset.href) return;
 
@@ -684,17 +684,17 @@ function listenForPlayerEvents(el, sessionId) {
     window.location.assign(nextRow.dataset.href);
   };
 
-  window.addEventListener('video-player:progress', handleProgress);
-  window.addEventListener('video-player:state', handleState);
+  window.addEventListener('session-video-player:progress', handleProgress);
+  window.addEventListener('session-video-player:state', handleState);
 
   return () => {
-    window.removeEventListener('video-player:progress', handleProgress);
-    window.removeEventListener('video-player:state', handleState);
+    window.removeEventListener('session-video-player:progress', handleProgress);
+    window.removeEventListener('session-video-player:state', handleState);
   };
 }
 
 export default async function init(el) {
-  ensureStylesheet('video-playlist-css', BLOCK_CSS_URL);
+  ensureStylesheet('session-video-playlist-css', BLOCK_CSS_URL);
 
   const background = readBackgroundConfig(el);
   if (background) el.style.setProperty('--vp-authored-bg', background);
@@ -728,20 +728,20 @@ export default async function init(el) {
   }
 
   function buildHeader(displayRows) {
-    const header = createTag('div', { class: 'video-playlist-top' }, '', { parent: el });
+    const header = createTag('div', { class: 'session-video-playlist-top' }, '', { parent: el });
 
     const currentIndex = displayRows.findIndex((row) => row.id === sessionId);
     const nextSession = displayRows[currentIndex + 1] || displayRows[0];
-    const upNext = createTag('div', { class: 'video-playlist-up-next' }, '', { parent: header });
-    createTag('span', { class: 'video-playlist-up-next-label' }, 'Up next', { parent: upNext });
-    createTag('span', { class: 'video-playlist-up-next-title' }, nextSession.title, { parent: upNext });
+    const upNext = createTag('div', { class: 'session-video-playlist-up-next' }, '', { parent: header });
+    createTag('span', { class: 'session-video-playlist-up-next-label' }, 'Up next', { parent: upNext });
+    createTag('span', { class: 'session-video-playlist-up-next-title' }, nextSession.title, { parent: upNext });
 
     const title = resolvePlaylistTitle(pageCustomAttributes, cfg['playlist-title']);
-    createTag('h3', { class: 'video-playlist-title' }, title, { parent: header });
+    createTag('h3', { class: 'session-video-playlist-title' }, title, { parent: header });
 
     const toggle = createTag('button', {
       type: 'button',
-      class: 'video-playlist-toggle',
+      class: 'session-video-playlist-toggle',
       'aria-expanded': 'false',
       ...analyticsAttrs('playlist-toggle-switch'),
     }, TOGGLE_CHEVRON_SVG, { parent: header });
@@ -799,12 +799,12 @@ export default async function init(el) {
     const displayRows = [current, ...rows].sort(compareByStartTime);
 
     el.replaceChildren();
-    const handle = createTag('div', { class: 'video-playlist-handle', 'aria-hidden': 'true' }, '', { parent: el });
+    const handle = createTag('div', { class: 'session-video-playlist-handle', 'aria-hidden': 'true' }, '', { parent: el });
     const { header, toggle } = buildHeader(displayRows);
     buildTopicView(el, displayRows, { maxSessions, defaultThumbnail, currentSessionId: sessionId });
     setUpDrawer({ header, toggle, handle });
 
-    el.dispatchEvent(new CustomEvent('video-playlist:view', { bubbles: true }));
+    el.dispatchEvent(new CustomEvent('session-video-playlist:view', { bubbles: true }));
   };
 
   const existing = sessions.value;

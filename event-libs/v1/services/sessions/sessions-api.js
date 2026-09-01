@@ -69,7 +69,7 @@ export function normalizeSessions(rawSessions) {
     isOnline: Boolean(s.isOnline),
     hasOnDemandFormat: Boolean(s.hasOnDemandFormat),
     dvrDelayHours: s.dvrDelayHours ?? null,
-    // video-playlist's topic filter: the CURRENT session's own playlistOnSessionPage
+    // session-video-playlist's topic filter: the CURRENT session's own playlistOnSessionPage
     // value(s) are matched against every OTHER session's playlistAssignment. No mapping
     // table between the two is needed — both draw from the same slug vocabulary.
     playlistAssignment: coerceArray(s.playlistAssignment),
@@ -228,7 +228,7 @@ function extractCustomAttributeValues(session, name) {
   return (attr?.values || []).map((v) => v?.label ?? v?.value).filter(Boolean);
 }
 
-// Exported so video-playlist.js can run this directly on an Individual Session Page's own
+// Exported so session-video-playlist.js can run this directly on an Individual Session Page's own
 // `custom-attributes` metadata (that session's raw customAttributes blob, embedded
 // page-side) without waiting for it to appear in the fetched catalog.
 export function extractCustomAttributeValue(session, name) {
@@ -237,7 +237,7 @@ export function extractCustomAttributeValue(session, name) {
 
 // Same lookup, but returns the machine-readable slug (`v.value`) instead of preferring the
 // display label — needed when matching one session's attribute values against another's
-// (video-playlist's topic filter), where a human-readable label would never match the slug
+// (session-video-playlist's topic filter), where a human-readable label would never match the slug
 // the page actually filters on.
 export function extractCustomAttributeSlugs(session, name) {
   const candidates = Array.isArray(name) ? name : [name];

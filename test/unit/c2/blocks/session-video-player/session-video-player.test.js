@@ -5,10 +5,10 @@ import init, {
   saveVideoProgress,
   resumeMpcVideo,
   convertIsoDurationToSeconds,
-} from '../../../../../event-libs/v1/c2/blocks/video-player/video-player.js';
+} from '../../../../../event-libs/v1/c2/blocks/session-video-player/session-video-player.js';
 import BlockMediator from '../../../../../event-libs/v1/deps/block-mediator.min.js';
 
-const PROGRESS_STORAGE_KEY = 'video-playlist:progress';
+const PROGRESS_STORAGE_KEY = 'session-video-playlist:progress';
 const DECISION_KEY = 'videoLayoutDecision';
 const ADOBE_TV_ORIGIN = 'https://video.tv.adobe.com';
 
@@ -31,29 +31,29 @@ function sessionTimes({ endTimeMillis = Date.now() - HOUR_MS, videos } = {}) {
 }
 
 /**
- * Builds the real two-section page shape: a full-width `.video-container` section and a
- * `.video-playlist-container` section, each holding its own `.video-player` instance.
+ * Builds the real two-section page shape: a full-width `.session-video-container` section and a
+ * `.session-video-playlist-container` section, each holding its own `.session-video-player` instance.
  */
 function buildPage({ withPlaylistContainer = true, withPlaylistBlock = false } = {}) {
   const main = document.createElement('main');
 
   const videoSection = document.createElement('div');
-  videoSection.className = 'section video-container';
+  videoSection.className = 'section session-video-container';
   const fullWidthPlayer = document.createElement('div');
-  fullWidthPlayer.className = 'video-player';
+  fullWidthPlayer.className = 'session-video-player';
   videoSection.append(fullWidthPlayer);
   main.append(videoSection);
 
   let playlistPlayer = null;
   if (withPlaylistContainer) {
     const playlistSection = document.createElement('div');
-    playlistSection.className = 'section video-playlist-container';
+    playlistSection.className = 'section session-video-playlist-container';
     playlistPlayer = document.createElement('div');
-    playlistPlayer.className = 'video-player';
+    playlistPlayer.className = 'session-video-player';
     playlistSection.append(playlistPlayer);
     if (withPlaylistBlock) {
       const playlist = document.createElement('div');
-      playlist.className = 'video-playlist';
+      playlist.className = 'session-video-playlist';
       playlistSection.append(playlist);
     }
     main.append(playlistSection);
@@ -77,7 +77,7 @@ function addConfigRow(el, key, value) {
 /** Lets the not-awaited async decision flow inside init() settle. */
 const flush = () => new Promise((resolve) => { setTimeout(resolve, 0); });
 
-describe('video-player', () => {
+describe('session-video-player', () => {
   let clock;
 
   beforeEach(() => {
@@ -109,8 +109,8 @@ describe('video-player', () => {
       await init(fullWidthPlayer);
       await init(playlistPlayer);
 
-      expect(fullWidthPlayer.querySelector('.video-player-loader')).to.exist;
-      expect(playlistPlayer.querySelector('.video-player-loader')).to.not.exist;
+      expect(fullWidthPlayer.querySelector('.session-video-player-loader')).to.exist;
+      expect(playlistPlayer.querySelector('.session-video-player-loader')).to.not.exist;
     });
 
     it('embeds nothing until the decision arrives', async () => {
@@ -310,7 +310,7 @@ describe('video-player', () => {
       await init(playlistPlayer);
       await flush();
 
-      expect(document.querySelectorAll('#video-player-css')).to.have.lengthOf(1);
+      expect(document.querySelectorAll('#session-video-player-css')).to.have.lengthOf(1);
     });
 
     it('preconnects to the mpc origin, deduped across both instances', async () => {
@@ -378,7 +378,7 @@ describe('video-player', () => {
       BlockMediator.set(DECISION_KEY, { hasPlaylist: true });
       await initBoth();
 
-      expect(document.querySelector('.video-player-loader')).to.not.exist;
+      expect(document.querySelector('.session-video-player-loader')).to.not.exist;
     });
 
     it('marks the winning instance with data-embedded', async () => {
@@ -407,23 +407,23 @@ describe('video-player', () => {
       const main = document.createElement('main');
 
       const videoSection = document.createElement('div');
-      videoSection.className = 'section video-container';
+      videoSection.className = 'section session-video-container';
       const fullWidthPlayer = document.createElement('div');
-      fullWidthPlayer.className = 'video-player';
+      fullWidthPlayer.className = 'session-video-player';
       videoSection.append(fullWidthPlayer);
 
-      // Not yet decorated: no video-playlist-container class, only the authored table.
+      // Not yet decorated: no session-video-playlist-container class, only the authored table.
       const undecoratedSection = document.createElement('div');
       undecoratedSection.className = 'section';
       const playlistPlayer = document.createElement('div');
-      playlistPlayer.className = 'video-player';
+      playlistPlayer.className = 'session-video-player';
       const metadata = document.createElement('div');
       metadata.className = 'section-metadata';
       const row = document.createElement('div');
       const label = document.createElement('div');
       label.textContent = 'style';
       const value = document.createElement('div');
-      value.textContent = 'spacing-sm, grid, container-desktop, video-playlist-container';
+      value.textContent = 'spacing-sm, grid, container-desktop, session-video-playlist-container';
       row.append(label, value);
       metadata.append(row);
       undecoratedSection.append(playlistPlayer, metadata);
@@ -440,7 +440,7 @@ describe('video-player', () => {
       // one must recognise itself as the playlist container and stand down.
       expect(fullWidthPlayer.dataset.embedded).to.equal('true');
       expect(playlistPlayer.dataset.embedded).to.equal(undefined);
-      expect(document.querySelectorAll('.video-player iframe')).to.have.lengthOf(1);
+      expect(document.querySelectorAll('.session-video-player iframe')).to.have.lengthOf(1);
     });
   });
 
@@ -526,7 +526,7 @@ describe('video-player', () => {
         const el = await embedFullWidth();
 
         const iframe = el.querySelector('iframe.youtube');
-        expect(iframe.id).to.equal('video-player-yt-abcdefghijk');
+        expect(iframe.id).to.equal('session-video-player-yt-abcdefghijk');
         expect(iframe.getAttribute('src')).to.contain('/embed/abcdefghijk');
         expect(iframe.getAttribute('src')).to.contain('enablejsapi=1');
       });
@@ -590,7 +590,7 @@ describe('video-player', () => {
     }
 
     it('emits a play state on every tick, even ones that skip the progress save', () => {
-      const states = captureStates('video-player:state', () => {
+      const states = captureStates('session-video-player:state', () => {
         postMpc({ type: 'mpcStatus', state: 'tick', currentTime: 7, length: 100 });
       });
 
@@ -598,7 +598,7 @@ describe('video-player', () => {
     });
 
     it('saves progress and emits pause on a pause event', () => {
-      const states = captureStates('video-player:state', () => {
+      const states = captureStates('session-video-player:state', () => {
         postMpc({ type: 'mpcStatus', state: 'pause', currentTime: 33, length: 100 });
       });
 
@@ -607,7 +607,7 @@ describe('video-player', () => {
     });
 
     it('emits progress notifications listeners can react to', () => {
-      const progress = captureStates('video-player:progress', () => {
+      const progress = captureStates('session-video-player:progress', () => {
         postMpc({ type: 'mpcStatus', state: 'pause', currentTime: 33, length: 100 });
       });
 
@@ -615,7 +615,7 @@ describe('video-player', () => {
     });
 
     it('marks the session complete and emits ended', () => {
-      const states = captureStates('video-player:state', () => {
+      const states = captureStates('session-video-player:state', () => {
         postMpc({ type: 'mpcStatus', state: 'complete', length: 100 });
       });
 
@@ -624,7 +624,7 @@ describe('video-player', () => {
     });
 
     it('emits ended without clobbering progress when no length is known', () => {
-      const states = captureStates('video-player:state', () => {
+      const states = captureStates('session-video-player:state', () => {
         postMpc({ type: 'mpcStatus', state: 'complete' });
       });
 

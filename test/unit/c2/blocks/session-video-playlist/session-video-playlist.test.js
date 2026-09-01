@@ -9,13 +9,13 @@ import init, {
   resolveCurrentSessionTopics,
   resolvePlaylistTitle,
   applyExpandedHeightCap,
-} from '../../../../../event-libs/v1/c2/blocks/video-playlist/video-playlist.js';
+} from '../../../../../event-libs/v1/c2/blocks/session-video-playlist/session-video-playlist.js';
 import {
   sessions, sessionsStatus, favorited, pendingActions, liveStreamActiveIds,
 } from '../../../../../event-libs/v1/utils/session-store.js';
 
-const PROGRESS_STORAGE_KEY = 'video-playlist:progress';
-const AUTOPLAY_STORAGE_KEY = 'video-playlist:play-all';
+const PROGRESS_STORAGE_KEY = 'session-video-playlist:progress';
+const AUTOPLAY_STORAGE_KEY = 'session-video-playlist:play-all';
 const ADOBE_TV_ORIGIN = 'https://video.tv.adobe.com';
 const HOUR_MS = 3_600_000;
 
@@ -71,19 +71,19 @@ function buildPage() {
   const main = document.createElement('main');
 
   const videoSection = document.createElement('div');
-  videoSection.className = 'section video-container';
+  videoSection.className = 'section session-video-container';
   const fullWidthPlayer = document.createElement('div');
-  fullWidthPlayer.className = 'video-player';
+  fullWidthPlayer.className = 'session-video-player';
   videoSection.append(fullWidthPlayer);
 
   const playlistSection = document.createElement('div');
-  playlistSection.className = 'section video-playlist-container';
+  playlistSection.className = 'section session-video-playlist-container';
   const heading = document.createElement('h1');
   heading.textContent = 'Current Session Title';
   const playlistPlayer = document.createElement('div');
-  playlistPlayer.className = 'video-player';
+  playlistPlayer.className = 'session-video-player';
   const playlist = document.createElement('div');
-  playlist.className = 'video-playlist';
+  playlist.className = 'session-video-playlist';
   const sibling = document.createElement('div');
   sibling.className = 'event-featured-products';
   playlistSection.append(heading, playlistPlayer, playlist, sibling);
@@ -107,7 +107,7 @@ function addConfigRow(el, key, value) {
 
 const flush = () => new Promise((resolve) => { setTimeout(resolve, 0); });
 
-describe('video-playlist', () => {
+describe('session-video-playlist', () => {
   beforeEach(() => {
     document.body.innerHTML = '';
     document.head.innerHTML = '';
@@ -335,7 +335,7 @@ describe('video-playlist', () => {
       await init(playlist);
       await flush();
 
-      const renderedIds = [...playlist.querySelectorAll('.video-playlist-row')]
+      const renderedIds = [...playlist.querySelectorAll('.session-video-playlist-row')]
         .map((row) => row.dataset.itemId);
       expect(renderedIds).to.include('ipod-a');
       expect(renderedIds).to.include('ipod-b');
@@ -436,14 +436,14 @@ describe('video-playlist', () => {
       expect(playlist.isConnected).to.be.false;
     });
 
-    it('dispatches video-playlist:removed when it removes itself', async () => {
+    it('dispatches session-video-playlist:removed when it removes itself', async () => {
       const { playlist } = buildPage();
       setMeta('session-times', sessionTimesMeta());
       const onRemoved = sinon.stub();
-      window.addEventListener('video-playlist:removed', onRemoved);
+      window.addEventListener('session-video-playlist:removed', onRemoved);
 
       await init(playlist);
-      window.removeEventListener('video-playlist:removed', onRemoved);
+      window.removeEventListener('session-video-playlist:removed', onRemoved);
 
       expect(onRemoved.called).to.be.true;
     });
@@ -455,7 +455,7 @@ describe('video-playlist', () => {
       setMeta('session-times', sessionTimesMeta());
     });
 
-    it('collapses the losing video-container when a playlist renders', async () => {
+    it('collapses the losing session-video-container when a playlist renders', async () => {
       setMeta('custom-attributes', playlistAttribute());
       const { playlist, videoSection } = buildPage();
       sessions.value = [catalogSession({ id: 'a' }), catalogSession({ id: 'b' })];
@@ -515,53 +515,53 @@ describe('video-playlist', () => {
     });
 
     it('renders one row per qualifying session plus the current one', () => {
-      expect(playlist.querySelectorAll('.video-playlist-row')).to.have.lengthOf(3);
+      expect(playlist.querySelectorAll('.session-video-playlist-row')).to.have.lengthOf(3);
     });
 
     it('uses the attribute label as the playlist title', () => {
-      expect(playlist.querySelector('.video-playlist-title').textContent)
+      expect(playlist.querySelector('.session-video-playlist-title').textContent)
         .to.equal('Social Media and Marketing');
     });
 
     it('shows the next session in the collapsed "Up next" peek', () => {
-      expect(playlist.querySelector('.video-playlist-up-next-label').textContent)
+      expect(playlist.querySelector('.session-video-playlist-up-next-label').textContent)
         .to.equal('Up next');
-      expect(playlist.querySelector('.video-playlist-up-next-title').textContent)
+      expect(playlist.querySelector('.session-video-playlist-up-next-title').textContent)
         .to.not.equal('');
     });
 
     it('marks the current session\'s row as now playing', () => {
-      const playing = playlist.querySelector('.video-playlist-row.is-playing');
+      const playing = playlist.querySelector('.session-video-playlist-row.is-playing');
       expect(playing.dataset.itemId).to.equal('cur');
       expect(playing.getAttribute('aria-current')).to.equal('true');
     });
 
     it('links each row to its own session page', () => {
-      const row = [...playlist.querySelectorAll('.video-playlist-row')]
+      const row = [...playlist.querySelectorAll('.session-video-playlist-row')]
         .find((r) => r.dataset.itemId === 'a');
-      expect(row.querySelector('a.video-playlist-row-content').getAttribute('href'))
+      expect(row.querySelector('a.session-video-playlist-row-content').getAttribute('href'))
         .to.equal('/sessions/another-session');
     });
 
     it('gives the favorite button an accessible name per the Figma spec', () => {
-      const row = [...playlist.querySelectorAll('.video-playlist-row')]
+      const row = [...playlist.querySelectorAll('.session-video-playlist-row')]
         .find((r) => r.dataset.itemId === 'a');
-      expect(row.querySelector('.video-playlist-row-favorite').getAttribute('aria-label'))
+      expect(row.querySelector('.session-video-playlist-row-favorite').getAttribute('aria-label'))
         .to.equal('Favorite Session A');
     });
 
     it('gives the play button its own accessible name', () => {
-      const row = [...playlist.querySelectorAll('.video-playlist-row')]
+      const row = [...playlist.querySelectorAll('.session-video-playlist-row')]
         .find((r) => r.dataset.itemId === 'a');
-      expect(row.querySelector('.video-playlist-row-play').getAttribute('aria-label'))
+      expect(row.querySelector('.session-video-playlist-row-play').getAttribute('aria-label'))
         .to.equal('Play Session A');
     });
 
     it('reflects a favorited session in the button state', () => {
       favorited.value = new Set(['a']);
-      const row = [...playlist.querySelectorAll('.video-playlist-row')]
+      const row = [...playlist.querySelectorAll('.session-video-playlist-row')]
         .find((r) => r.dataset.itemId === 'a');
-      const button = row.querySelector('.video-playlist-row-favorite');
+      const button = row.querySelector('.session-video-playlist-row-favorite');
 
       expect(button.getAttribute('aria-pressed')).to.equal('true');
       expect(button.getAttribute('aria-label')).to.equal('Unfavorite Session A');
@@ -573,9 +573,9 @@ describe('video-playlist', () => {
      * (its second `M` cuts the hollow centre). Matching event-session-details' own button.
      */
     it('swaps the outline heart for a solid one when favorited', () => {
-      const row = [...playlist.querySelectorAll('.video-playlist-row')]
+      const row = [...playlist.querySelectorAll('.session-video-playlist-row')]
         .find((r) => r.dataset.itemId === 'a');
-      const button = row.querySelector('.video-playlist-row-favorite');
+      const button = row.querySelector('.session-video-playlist-row-favorite');
       const subpathCount = () => (button.querySelector('path').getAttribute('d').match(/M/g) || []).length;
 
       expect(subpathCount(), 'unfavorited heart should be a hollow outline').to.be.greaterThan(1);
@@ -594,9 +594,9 @@ describe('video-playlist', () => {
       await init(fresh);
       await flush();
 
-      const row = [...fresh.querySelectorAll('.video-playlist-row')]
+      const row = [...fresh.querySelectorAll('.session-video-playlist-row')]
         .find((r) => r.dataset.itemId === 'a');
-      expect(row.querySelector('.video-playlist-row-progress-fill').style.width).to.equal('50%');
+      expect(row.querySelector('.session-video-playlist-row-progress-fill').style.width).to.equal('50%');
     });
 
     it('exposes the saved progress through getVideoProgress', () => {
@@ -612,7 +612,7 @@ describe('video-playlist', () => {
     });
 
     it('toggles expansion via the chevron', () => {
-      const toggle = playlist.querySelector('.video-playlist-toggle');
+      const toggle = playlist.querySelector('.session-video-playlist-toggle');
       const before = playlist.classList.contains('is-expanded');
 
       toggle.click();
@@ -642,24 +642,24 @@ describe('video-playlist', () => {
 
     it('is absent with four rows or fewer', async () => {
       const playlist = await renderWithRows(3);
-      expect(playlist.querySelector('.video-playlist-show-more')).to.not.exist;
+      expect(playlist.querySelector('.session-video-playlist-show-more')).to.not.exist;
     });
 
     it('appears once there are more than four rows', async () => {
       const playlist = await renderWithRows(6);
-      expect(playlist.querySelector('.video-playlist-show-more')).to.exist;
+      expect(playlist.querySelector('.session-video-playlist-show-more')).to.exist;
     });
 
     it('toggles label, aria-expanded and aria-label on click', async () => {
       const playlist = await renderWithRows(6);
-      const button = playlist.querySelector('.video-playlist-show-more');
+      const button = playlist.querySelector('.session-video-playlist-show-more');
 
       button.click();
 
       expect(button.getAttribute('aria-expanded')).to.equal('true');
       expect(button.getAttribute('aria-label')).to.equal('Show less sessions');
       expect(button.querySelector('span').textContent).to.equal('Show less');
-      expect(playlist.querySelector('.video-playlist-list').classList.contains('is-showing-more'))
+      expect(playlist.querySelector('.session-video-playlist-list').classList.contains('is-showing-more'))
         .to.be.true;
     });
 
@@ -680,7 +680,7 @@ describe('video-playlist', () => {
       await init(playlist);
       await flush();
 
-      expect(playlist.querySelectorAll('.video-playlist-row')).to.have.lengthOf(9);
+      expect(playlist.querySelectorAll('.session-video-playlist-row')).to.have.lengthOf(9);
     });
 
     // The cap is a max-height, not a fixed height, so a list shorter than the cap sizes to
@@ -688,9 +688,9 @@ describe('video-playlist', () => {
     it('leaves the expanded list uncapped when there are fewer rows than the maximum', async () => {
       const playlist = await renderWithRows(6);
       addConfigRow(playlist, 'maximum-sessions', '20');
-      const list = playlist.querySelector('.video-playlist-list');
+      const list = playlist.querySelector('.session-video-playlist-list');
 
-      playlist.querySelector('.video-playlist-show-more').click();
+      playlist.querySelector('.session-video-playlist-show-more').click();
 
       expect(list.style.maxHeight === '' || parseFloat(list.style.maxHeight) > list.scrollHeight)
         .to.be.true;
@@ -708,12 +708,12 @@ describe('video-playlist', () => {
 
     function buildList({ rowCount, expanded }) {
       const list = document.createElement('div');
-      list.className = `video-playlist-list${expanded ? ' is-showing-more' : ''}`;
+      list.className = `session-video-playlist-list${expanded ? ' is-showing-more' : ''}`;
       // Inline so the real block CSS (not loaded here) isn't needed for the measurement.
       list.style.cssText = 'display: flex; flex-direction: column; row-gap: 0; padding: 0;';
       Array.from({ length: rowCount }).forEach(() => {
         const row = document.createElement('div');
-        row.className = 'video-playlist-row';
+        row.className = 'session-video-playlist-row';
         row.style.cssText = `height: ${ROW_HEIGHT}px; flex: 0 0 auto;`;
         list.append(row);
       });
@@ -794,7 +794,7 @@ describe('video-playlist', () => {
     });
 
     it('persists the toggle to localStorage', () => {
-      const checkbox = playlist.querySelector('.video-playlist-autoplay-toggle');
+      const checkbox = playlist.querySelector('.session-video-playlist-autoplay-toggle');
 
       checkbox.checked = true;
       checkbox.dispatchEvent(new Event('change'));
@@ -809,7 +809,7 @@ describe('video-playlist', () => {
       await init(fresh);
       await flush();
 
-      expect(fresh.querySelector('.video-playlist-autoplay-toggle').checked).to.be.true;
+      expect(fresh.querySelector('.session-video-playlist-autoplay-toggle').checked).to.be.true;
     });
 
     // window.location.assign is non-configurable and cannot be stubbed in a real browser,
@@ -829,7 +829,7 @@ describe('video-playlist', () => {
       await flush();
 
       localStorage.setItem(AUTOPLAY_STORAGE_KEY, 'true');
-      window.dispatchEvent(new CustomEvent('video-player:state', {
+      window.dispatchEvent(new CustomEvent('session-video-player:state', {
         detail: { sessionId: 'cur', state: 'ended' },
       }));
 
@@ -839,7 +839,7 @@ describe('video-playlist', () => {
     it('does not advance when autoplay is off', () => {
       localStorage.setItem(AUTOPLAY_STORAGE_KEY, 'false');
 
-      window.dispatchEvent(new CustomEvent('video-player:state', {
+      window.dispatchEvent(new CustomEvent('session-video-player:state', {
         detail: { sessionId: 'cur', state: 'ended' },
       }));
 
@@ -849,7 +849,7 @@ describe('video-playlist', () => {
     it('ignores ended events for a different session', () => {
       localStorage.setItem(AUTOPLAY_STORAGE_KEY, 'true');
 
-      window.dispatchEvent(new CustomEvent('video-player:state', {
+      window.dispatchEvent(new CustomEvent('session-video-player:state', {
         detail: { sessionId: 'someone-else', state: 'ended' },
       }));
 
@@ -859,7 +859,7 @@ describe('video-playlist', () => {
     it('ignores non-ended states', () => {
       localStorage.setItem(AUTOPLAY_STORAGE_KEY, 'true');
 
-      window.dispatchEvent(new CustomEvent('video-player:state', {
+      window.dispatchEvent(new CustomEvent('session-video-player:state', {
         detail: { sessionId: 'cur', state: 'pause' },
       }));
 
@@ -868,7 +868,7 @@ describe('video-playlist', () => {
   });
 
   describe('live progress updates', () => {
-    it('updates a row\'s progress bar on a video-player:progress event', async () => {
+    it('updates a row\'s progress bar on a session-video-player:progress event', async () => {
       setMeta('session-id', 'cur');
       setMeta('session-times', sessionTimesMeta());
       setMeta('custom-attributes', playlistAttribute());
@@ -881,13 +881,13 @@ describe('video-playlist', () => {
       localStorage.setItem(PROGRESS_STORAGE_KEY, JSON.stringify({
         a: { secondsWatched: 75, length: 100, completed: false },
       }));
-      window.dispatchEvent(new CustomEvent('video-player:progress', {
+      window.dispatchEvent(new CustomEvent('session-video-player:progress', {
         detail: { sessionId: 'a' },
       }));
 
-      const row = [...playlist.querySelectorAll('.video-playlist-row')]
+      const row = [...playlist.querySelectorAll('.session-video-playlist-row')]
         .find((r) => r.dataset.itemId === 'a');
-      expect(row.querySelector('.video-playlist-row-progress-fill').style.width).to.equal('75%');
+      expect(row.querySelector('.session-video-playlist-row-progress-fill').style.width).to.equal('75%');
     });
   });
 });

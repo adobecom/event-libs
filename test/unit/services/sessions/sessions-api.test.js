@@ -302,7 +302,7 @@ describe('services/sessions/sessions-api', () => {
       expect(bare.playlistOnSessionPage).to.deep.equal([]);
     });
 
-    // Slugs, not labels: video-playlist matches one session's playlistOnSessionPage
+    // Slugs, not labels: session-video-playlist matches one session's playlistOnSessionPage
     // against every other session's playlistAssignment, and a display label would never
     // match the slug the page actually filters on.
     it('maps the playlist attributes to slugs rather than labels', () => {

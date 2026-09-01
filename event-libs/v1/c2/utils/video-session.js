@@ -1,7 +1,7 @@
 import { getMetadata } from '../../utils/utils.js';
 
 /**
- * Shared foundation for the `video-player` / `video-playlist` block pair. Both blocks
+ * Shared foundation for the `session-video-player` / `session-video-playlist` block pair. Both blocks
  * read the same page metadata, the same localStorage progress map, and the same
  * layout-decision store, so these live here rather than being maintained as two
  * hand-synced copies.
@@ -11,14 +11,14 @@ import { getMetadata } from '../../utils/utils.js';
 export const VIDEO_LAYOUT_DECISION_KEY = 'videoLayoutDecision';
 
 /** localStorage key for the per-session watch-progress map. */
-export const PROGRESS_STORAGE_KEY = 'video-playlist:progress';
+export const PROGRESS_STORAGE_KEY = 'session-video-playlist:progress';
 
 /** Providers either block knows how to embed. */
 export const EMBEDDABLE_PROVIDERS = ['mpc', 'youtube'];
 
 /** Author-applied Section Metadata "Style" classes marking each candidate layout. */
-export const VIDEO_CONTAINER_CLASS = 'video-container';
-export const VIDEO_PLAYLIST_CONTAINER_CLASS = 'video-playlist-container';
+export const VIDEO_CONTAINER_CLASS = 'session-video-container';
+export const VIDEO_PLAYLIST_CONTAINER_CLASS = 'session-video-playlist-container';
 
 function logError(scope, message) {
   window.lana?.log(`[${scope}] ${message}`);
@@ -32,7 +32,7 @@ function logError(scope, message) {
  * are re-applied later by the `section-metadata` BLOCK, on the normal block-loading
  * schedule. So a section can legitimately be mid-decoration — `class="section"
  * data-status="decorated"` with nothing else — at the moment these blocks run, which made
- * both video-player instances conclude they were the full-width one and both embed.
+ * both session-video-player instances conclude they were the full-width one and both embed.
  *
  * The authored `.section-metadata` table is in the DOM from the start either way, so it's
  * read directly as the fallback (same approach event-marquee.js already uses for its own
