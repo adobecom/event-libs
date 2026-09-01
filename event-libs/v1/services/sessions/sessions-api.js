@@ -69,9 +69,6 @@ export function normalizeSessions(rawSessions) {
     isOnline: Boolean(s.isOnline),
     hasOnDemandFormat: Boolean(s.hasOnDemandFormat),
     dvrDelayHours: s.dvrDelayHours ?? null,
-    // session-video-playlist's topic filter: the CURRENT session's own playlistOnSessionPage
-    // value(s) are matched against every OTHER session's playlistAssignment. No mapping
-    // table between the two is needed — both draw from the same slug vocabulary.
     playlistAssignment: coerceArray(s.playlistAssignment),
     playlistOnSessionPage: coerceArray(s.playlistOnSessionPage),
     // One field per video source, named for its player. Alternatives, not a fallback chain.
@@ -228,17 +225,12 @@ function extractCustomAttributeValues(session, name) {
   return (attr?.values || []).map((v) => v?.label ?? v?.value).filter(Boolean);
 }
 
-// Exported so session-video-playlist.js can run this directly on an Individual Session Page's own
-// `custom-attributes` metadata (that session's raw customAttributes blob, embedded
-// page-side) without waiting for it to appear in the fetched catalog.
+// Exported so session-video-playlist.js can run this directly on an Individual Session Page's own session object, without having to normalize it first.
 export function extractCustomAttributeValue(session, name) {
   return extractCustomAttributeValues(session, name)[0] || '';
 }
 
-// Same lookup, but returns the machine-readable slug (`v.value`) instead of preferring the
-// display label — needed when matching one session's attribute values against another's
-// (session-video-playlist's topic filter), where a human-readable label would never match the slug
-// the page actually filters on.
+// Same lookup, but returns the machine-readable slug (`v.value`) instead of preferring the human-readable label. Used for playlist assignment and playlist on session page, which are matched against each other across sessions.
 export function extractCustomAttributeSlugs(session, name) {
   const candidates = Array.isArray(name) ? name : [name];
   const attr = (session.customAttributes || []).find((a) => candidates.includes(a?.name));
@@ -404,7 +396,6 @@ export function mapEslPayloadToRawSessions(payload) {
       mrDvrVideoId: extractCustomAttributeValue(session, 'Mobilerider Video ID (DVR)'),
       mrSkinId: extractCustomAttributeValue(session, 'Skin ID'),
       videoDuration: extractCustomAttributeValue(session, 'Video Duration'),
-      // Slugs, not labels: these two are matched against each other across sessions.
       playlistAssignment: extractCustomAttributeSlugs(session, 'Playlist assignment/name'),
       playlistOnSessionPage: extractCustomAttributeSlugs(session, 'Playlist on session page'),
       ...formatFlags,
