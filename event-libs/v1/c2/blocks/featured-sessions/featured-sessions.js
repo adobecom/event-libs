@@ -35,28 +35,15 @@ function setRoutingData(card, entry) {
 // never gets safeUrl's own re-check) and would otherwise navigate a raw click straight
 // off the unsanitized href.
 // Default wording, used when the configurator's own three CTA text boxes (config.cta)
-// are left blank for a given state.
+// are left blank for a given state. event-card.js is the single source of truth for
+// *which* state applies and *when* the text updates (deriveSessionState + getNowMs, so
+// it honors ?serverTime=) — this module only supplies the authored strings per state
+// and a safe static seed (prior) to paint before that logic takes over.
 const DEFAULT_CTA_TEXT = {
   prior: 'Learn more',
   during: 'Watch now',
   after: 'Watch on-demand',
 };
-
-// A session with no sessionTime (time unknown) is treated as "prior" — the same
-// "Learn more" wording it always showed before per-state CTAs existed.
-function getSessionCtaState(entry) {
-  const { startTimeMillis, endTimeMillis } = entry.sessionTime || {};
-  if (!startTimeMillis) return 'prior';
-  const now = Date.now();
-  if (now < startTimeMillis) return 'prior';
-  if (endTimeMillis && now > endTimeMillis) return 'after';
-  return 'during';
-}
-
-function getCtaText(entry, cta) {
-  const state = getSessionCtaState(entry);
-  return cta?.[state] || DEFAULT_CTA_TEXT[state];
-}
 
 // No theme wiring here — event-card.js's own getTheme() reads dark/light straight off
 // the containing DA section's "dark" style-metadata class, so a card built here themes
@@ -74,7 +61,12 @@ function buildAuthoredCard(entry, cta) {
   createTag('p', {}, '', { parent: textRoot }).textContent = entry.track || '';
   const ctaP = createTag('p', {}, '', { parent: textRoot });
   const ctaHref = safeUrl(entry.url);
-  if (ctaHref) createTag('a', { href: ctaHref }, getCtaText(entry, cta), { parent: ctaP });
+  if (ctaHref) {
+    const ctaLink = createTag('a', { href: ctaHref }, cta?.prior || DEFAULT_CTA_TEXT.prior, { parent: ctaP });
+    ctaLink.dataset.ctaPrior = cta?.prior || DEFAULT_CTA_TEXT.prior;
+    ctaLink.dataset.ctaDuring = cta?.during || DEFAULT_CTA_TEXT.during;
+    ctaLink.dataset.ctaAfter = cta?.after || DEFAULT_CTA_TEXT.after;
+  }
 
   setRoutingData(card, entry);
   return card;

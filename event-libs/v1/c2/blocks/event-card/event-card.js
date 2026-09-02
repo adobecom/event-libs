@@ -6,9 +6,10 @@ const VARIANTS = ['media-square', 'media-standard', 'media-standard-rev', 'stand
 const DEFAULT_VARIANT = 'media-standard';
 const BLOCK_CSS_URL = new URL('./event-card.css', import.meta.url).href;
 
-// live/on-demand swap the authored CTA copy to reflect session state; upcoming keeps
-// whatever was authored (e.g. "Add to calendar"), since it isn't a watch action yet.
-const LIVE_CTA_TEXT = { live: 'Watch now', 'on-demand': 'Watch on demand' };
+// deriveSessionState's three states map onto the CTA's own authored strings (set as
+// data-cta-prior/during/after by featured-sessions.js's buildAuthoredCard) — this is the
+// only place that reads the clock (via getNowMs, which honors ?serverTime=) to pick one.
+const CTA_STATE_ATTR = { upcoming: 'ctaPrior', live: 'ctaDuring', 'on-demand': 'ctaAfter' };
 
 function refreshCtaText(el, cta, getLiveStreamActiveIds) {
   const state = deriveSessionState({
@@ -16,7 +17,7 @@ function refreshCtaText(el, cta, getLiveStreamActiveIds) {
     endTimeUtc: el.dataset.endTimeUtc,
     mrStreamId: el.dataset.mrStreamId,
   }, getLiveStreamActiveIds(), getNowMs());
-  const text = LIVE_CTA_TEXT[state];
+  const text = cta.dataset[CTA_STATE_ATTR[state]];
   if (text) cta.textContent = text;
   return state;
 }
@@ -121,10 +122,14 @@ function buildBody(contentWrapper) {
   const body = createTag('div', { class: 'card-body' }, nodes);
   const cta = ctaP?.querySelector('a');
   if (cta) {
-    body.append(createTag('a', {
+    const cardCta = createTag('a', {
       class: 'card-cta',
       href: cta.href,
-    }, cta.textContent.trim()));
+    }, cta.textContent.trim());
+    // Carries over featured-sessions.js's data-cta-prior/during/after (the authored
+    // per-state wording) so refreshCtaText() below has it once the card is live.
+    Object.assign(cardCta.dataset, cta.dataset);
+    body.append(cardCta);
   }
   return body;
 }
