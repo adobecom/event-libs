@@ -92,8 +92,8 @@ export function renderStatus(state, times, doc = document) {
     el.append(createTag('span', {}, 'Live'));
   } else if (state === 'on-demand') {
     const pending = isIpodSession(doc) && !hasPlayableVideo(doc);
-    el.classList.toggle('session-status--coming-soon', pending);
-    el.textContent = pending ? 'Coming soon' : 'On-demand';
+    el.classList.toggle('session-status--available-soon', pending);
+    el.textContent = pending ? 'Available soon' : 'On-demand';
   } else {
     el.textContent = formatDateTime(times.start, times.timezone);
   }

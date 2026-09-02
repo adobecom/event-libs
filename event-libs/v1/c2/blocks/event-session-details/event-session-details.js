@@ -1,7 +1,6 @@
 import { createTag, getMetadata } from '../../../utils/utils.js';
 import { initTierOneEventConfig } from '../../../utils/tier-1-event-config.js';
 import { readBackgroundConfig } from '../../utils/background-config.js';
-import { renderTrackTags } from './track-tags.js';
 import { renderGdprCopy, renderClosedCaption, renderLegalDisclaimer } from './disclaimer-cc-legal.js';
 import { renderDescriptionClamp } from './description-clamp.js';
 import { renderQuickFacts } from './quick-facts.js';
@@ -17,8 +16,6 @@ export default async function init(el) {
   initTierOneEventConfig();
 
   const eyebrow = createTag('div', { class: 'session-eyebrow' });
-  const trackTags = renderTrackTags();
-  if (trackTags) eyebrow.append(trackTags);
   const statusSlot = createTag('span', {
     class: 'session-status-slot', role: 'status', 'aria-live': 'polite',
   });

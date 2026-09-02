@@ -176,7 +176,7 @@ describe('session-state-view', () => {
     });
   });
 
-  describe('renderStatus on-demand: Coming soon for an IPOD session with no recording yet', () => {
+  describe('renderStatus on-demand: Available soon for an IPOD session with no recording yet', () => {
     const times = { start: 1794518100000, timezone: 'America/Los_Angeles' };
     // Real page shapes. IPOD = Format carrying both in-person and on-demand-post-event.
     const IPOD = [{ value: 'in-person', label: 'In-Person' }, { value: 'on-demand-post-event', label: 'On demand, post event' }];
@@ -190,11 +190,11 @@ describe('session-state-view', () => {
       setMetadata('custom-attributes', JSON.stringify([{ name: 'Format', values: format }]));
     };
 
-    it('IPOD with no recording yet -> Coming soon', () => {
+    it('IPOD with no recording yet -> Available soon', () => {
       setPage({ videos: [], format: IPOD });
       const el = renderStatus('on-demand', times);
-      expect(el.textContent).to.equal('Coming soon');
-      expect(el.classList.contains('session-status--coming-soon')).to.be.true;
+      expect(el.textContent).to.equal('Available soon');
+      expect(el.classList.contains('session-status--available-soon')).to.be.true;
     });
 
     it('IPOD once the recording is attached -> On-demand', () => {
@@ -202,25 +202,25 @@ describe('session-state-view', () => {
       expect(renderStatus('on-demand', times).textContent).to.equal('On-demand');
     });
 
-    it('IPOD with only a leftover liveStream entry -> Coming soon', () => {
+    it('IPOD with only a leftover liveStream entry -> Available soon', () => {
       setPage({
         videos: [{ provider: 'youtube', url: 'https://youtube.com/watch?v=x', kind: 'liveStream' }],
         format: IPOD,
       });
-      expect(renderStatus('on-demand', times).textContent).to.equal('Coming soon');
+      expect(renderStatus('on-demand', times).textContent).to.equal('Available soon');
     });
 
-    it('IPOD with a non-embeddable provider only -> Coming soon', () => {
+    it('IPOD with a non-embeddable provider only -> Available soon', () => {
       setPage({ videos: [{ provider: 'mobilerider', url: 'x', kind: 'dvr' }], format: IPOD });
-      expect(renderStatus('on-demand', times).textContent).to.equal('Coming soon');
+      expect(renderStatus('on-demand', times).textContent).to.equal('Available soon');
     });
 
     // Matches session-video-player's `pickEmbeddableVideo`, which requires kind === 'onDemand'
     // exactly. An embeddable provider under any other kind gets no player, so claiming
     // "On-demand" here would promise a video the page cannot play.
-    it('IPOD with an embeddable provider but a non-onDemand kind -> Coming soon', () => {
+    it('IPOD with an embeddable provider but a non-onDemand kind -> Available soon', () => {
       setPage({ videos: [{ provider: 'mpc', url: 'x', kind: 'dvr' }], format: IPOD });
-      expect(renderStatus('on-demand', times).textContent).to.equal('Coming soon');
+      expect(renderStatus('on-demand', times).textContent).to.equal('Available soon');
     });
 
     it('matches the Format slug even with no display label', () => {
@@ -228,7 +228,7 @@ describe('session-state-view', () => {
         videos: [],
         format: [{ value: 'in-person', label: '' }, { value: 'on-demand-post-event', label: '' }],
       });
-      expect(renderStatus('on-demand', times).textContent).to.equal('Coming soon');
+      expect(renderStatus('on-demand', times).textContent).to.equal('Available soon');
     });
 
     // Everything below is NOT IPOD, so it stays On-demand regardless of video presence.

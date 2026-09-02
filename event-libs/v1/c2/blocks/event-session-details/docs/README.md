@@ -34,23 +34,16 @@ upgrade to the real catalog object when it lands.
 `init()` mounts sub-features in mobile stack order:
 
 ```
-eyebrow (track tags | status) → title → GDPR/IPOD copy → closed caption
+eyebrow (status) → title → GDPR/IPOD copy → closed caption
 → [primary CTA + favorite + share] → description clamp → quick facts → legal disclaimer
 ```
 
-It calls `initTierOneEventConfig()` first so `getTrackIcon`/`getProduct` can read the
-Tier 1 Event Configurator config; the call is idempotent and no-ops if `decorateEvent`
-already ran it.
+It calls `initTierOneEventConfig()` first so `getProduct` can read the Tier 1 Event
+Configurator config; the call is idempotent and no-ops if `decorateEvent` already ran it.
 
-The status slot is created as a **persistent live region**
-(`role="status" aria-live="polite"`) — see Accessibility below.
-
-The eyebrow's vertical divider is a `border-left` on the status slot, applied through
-`.session-eyebrow > * + .session-status-slot` — **only when something precedes it**. A session
-with no eyebrow tracks would otherwise render a stray leading pipe and 24px of indent before
-the date. Note this is about the *eyebrow* track attributes (`Primary Event Site Track`,
-`Additional Event Site Tracks`, `Override Primary Event Site Track`); a session can carry a
-`Track` or `Primary Track for Agenda (Digital Agenda)` value and still have no eyebrow tags.
+The eyebrow now holds only the status slot, created as a **persistent live region**
+(`role="status" aria-live="polite"`) — see Accessibility below. Track tags were removed
+from the eyebrow (they are no longer part of the design).
 
 ## Session state engine (`session-state-view.js`)
 
@@ -61,7 +54,7 @@ field to read, so it never waits on the catalog:
 |---|---|---|---|
 | `upcoming` | `now` is before every slot's start | `Nov 11, 9:00 AM PST` | hidden |
 | `live` | `now` is inside **any** slot (inclusive) | red dot + `Live` | hidden |
-| `on-demand` | anything else — after a slot, or between slots | `On-demand` / `Coming soon` | shown |
+| `on-demand` | anything else — after a slot, or between slots | `On-demand` / `Available soon` | shown |
 
 The **primary CTA is resolved separately from the state**, because "can I still schedule
 this?" is not the same question as "is it on now?":
@@ -142,9 +135,9 @@ changes across a premiere boundary is the eyebrow status and the primary CTA.
 compares against 7pm, so the 10:45–18:00 on-demand window would render **no player at all**,
 contradicting the intended behavior. Sorting there is a prerequisite; owner Hari.
 
-### "Coming soon" — IPOD sessions with no recording yet
+### "Available soon" — IPOD sessions with no recording yet
 
-An `on-demand` session reads **"Coming soon"** instead of "On-demand" when it is an IPOD
+An `on-demand` session reads **"Available soon"** instead of "On-demand" when it is an IPOD
 session whose recording has not been attached. Both signals come from page metadata.
 
 **IPOD (In-Person On Demand)** — delivered in person, then posted as a recording. There
@@ -180,11 +173,11 @@ Behavior matrix:
 
 | Format | Recording | Status |
 |---|---|---|
-| in-person + on-demand-post-event | none | **Coming soon** |
+| in-person + on-demand-post-event | none | **Available soon** |
 | in-person + on-demand-post-event | present | On-demand |
 | online / post-event only / in-person only / no Format | either | On-demand |
 
-`renderStatus` adds `session-status--coming-soon` for the pending case; it carries no
+`renderStatus` adds `session-status--available-soon` for the pending case; it carries no
 styling of its own, so the state is targetable if design wants it differentiated.
 
 See [known-issues.md](known-issues.md) for the `liveStream` divergence from
@@ -273,22 +266,6 @@ The three that still try `navigator.share` first all carry the defect
 [MWPW-205502](https://jira.corp.adobe.com/browse/MWPW-205502) describes: the OS share sheet,
 and no toast on the path that succeeds. Consolidating into one shared helper would fix all
 three and settle the wording in a single place.
-
-## Track tags (`track-tags.js`)
-
-Eyebrow labels — leading icon + track name, one per row, stacked for multiple tracks, no
-pill/badge background. Order:
-
-1. `Override Primary Event Site Track` (free text) **replaces** Primary when present
-2. else `Primary Event Site Track` (single-select label)
-3. then `Additional Event Site Tracks` (multi-select labels), stacked after
-
-Icons and colors come from the Tier 1 Event Configurator: `getOverrideTrackIcon()` for
-override tracks (per-text map, then the event-wide default), `getTrackIcon()` for regular
-ones, with `DEFAULT_ICON_COLOR` as the color fallback — the same model as
-`resolveTrackBadge` in `sessions-guide`. The slug resolves through `resolveIcon` (Milo
-icons → `track-icons.svg` sprite). A generic star is the fallback for an Override with no
-Primary behind it and no configured icon.
 
 ## Quick facts, disclaimers
 
