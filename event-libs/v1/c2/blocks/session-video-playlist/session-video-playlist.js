@@ -268,6 +268,21 @@ class Drawer {
   setInitial({ expanded }) {
     this.expanded = expanded;
     this.#apply();
+    // TEMP DIAGNOSTIC: find which ancestor establishes a containing block that breaks the
+    // drawer's position:fixed. Remove once confirmed.
+    let node = this.el.parentElement;
+    while (node && node !== document.documentElement) {
+      const cs = getComputedStyle(node);
+      if (cs.transform !== 'none' || cs.containerType !== 'normal' || cs.contain !== 'none'
+        || cs.filter !== 'none' || cs.perspective !== 'none' || cs.willChange.includes('transform')) {
+        // eslint-disable-next-line no-console
+        console.log('[DRAWER-DBG] containing block:', node.className, {
+          transform: cs.transform, containerType: cs.containerType, contain: cs.contain,
+          filter: cs.filter, perspective: cs.perspective, willChange: cs.willChange,
+        });
+      }
+      node = node.parentElement;
+    }
   }
 
   #addPlayerGuard() {
