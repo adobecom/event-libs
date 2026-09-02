@@ -1,10 +1,13 @@
 import {
-  getSessionTrack, extractDistinctTracks, getSessionOverrideText, extractDistinctOverrideTexts,
+  getSessionPrimaryTrack, extractDistinctPrimaryTracks, extractDistinctAllTracks,
+  getSessionAdditionalTracks, getSessionOverrideText, extractDistinctOverrideTexts,
   getSessionProducts, extractDistinctProducts,
 } from '../v1/services/sessions/sessions-api.js';
+import { DA_ORIGIN, DA_APP_PATH, HOMEPAGE_LINK_HASH_KEY } from './constants.js';
 
 export {
-  getSessionTrack, extractDistinctTracks, getSessionOverrideText, extractDistinctOverrideTexts,
+  getSessionPrimaryTrack, extractDistinctPrimaryTracks, extractDistinctAllTracks,
+  getSessionAdditionalTracks, getSessionOverrideText, extractDistinctOverrideTexts,
   getSessionProducts, extractDistinctProducts,
 };
 
@@ -109,11 +112,10 @@ export function stringifyConfig(value, indent = '') {
 }
 
 // Mirrors upcoming-sessions/docs/build-author-data.mjs's toAuthorEntry() shape —
-// the small per-session object a homepage block (upcoming-sessions.js, or
-// card-c2's Featured Sessions hydrator) reads directly from its own authored
-// section-metadata (not the tier-1-event-config metadata this app otherwise
-// writes to), so it's built here rather than looked up at render time. Shared
-// by both Homepage config types — they need the identical shape.
+// the small per-session object a homepage block (upcoming-sessions.js or
+// featured-sessions.js) decodes directly from the authored link's hash payload
+// (see buildHomepageConfigURL below), so it's built here rather than looked up at
+// render time. Shared by both Homepage config types — they need the identical shape.
 // `meta` is an optional { watchUrl, mrStreamId, imageUrl } hand-authored override (see
 // MOBILE-RIDER-STREAM-ID-GAP.md) — all three omitted entirely from the entry when
 // blank, matching upcoming-sessions.js's own authored-data shape, where an
@@ -124,7 +126,9 @@ export function buildSessionAuthorEntry(session, sessionTimes, meta) {
     sessionId: session.sessionId,
     sessionCode: session.sessionCode,
     enTitle: session.enTitle,
-    track: getSessionTrack(session) || '',
+    // Key stays `track` — this mirrors upcoming-sessions.js/featured-sessions.js's own
+    // authored-entry shape (see comment above), not the ESL session model's `primaryTrack`.
+    track: getSessionPrimaryTrack(session) || '',
     url: session.url,
   };
   if (meta?.watchUrl) entry.watchUrl = meta.watchUrl;
@@ -164,6 +168,89 @@ function getTimezoneOffsetMinutes(timeZone, utcDate) {
     Number(parts.hour), Number(parts.minute), Number(parts.second),
   );
   return (asUtc - utcDate.getTime()) / 60000;
+}
+
+// Mirrors Schedule Maker's ScheduleURLUtility.createScheduleURL (schedule-maker/utils.js) —
+// the full entries payload, base64-encoded, lives entirely in the URL hash rather than a
+// server-side sheet, so decorate.js's tec-homepage auto-block builder can decode it straight
+// off the authored link and render upcoming-sessions.js / featured-sessions.js with no extra
+// lookup. `unescape(encodeURIComponent(...))` keeps btoa from choking on non-Latin1 characters
+// (e.g. accented session titles).
+export function buildHomepageConfigURL(org, repo, configType, eventId, heading, theme, entries) {
+  const payload = {
+    eventId, configType, heading, theme, generatedTime: new Date().toISOString(), entries,
+  };
+  const base64 = btoa(unescape(encodeURIComponent(JSON.stringify(payload))));
+  const url = new URL(`${DA_ORIGIN}/app/${org}/${repo}/${DA_APP_PATH}`);
+  url.hash = `${HOMEPAGE_LINK_HASH_KEY}=${base64}`;
+  return url.toString();
+}
+
+// Reverse of buildHomepageConfigURL. Tries a few decode variants (mirroring Schedule Maker's
+// decodeScheduleParam) so a link that's been through an extra layer of URL-encoding (e.g.
+// pasted somewhere that percent-encodes hash fragments) still decodes.
+export function decodeHomepageConfigParam(raw) {
+  const attempts = [
+    () => atob(decodeURIComponent(raw)),
+    () => atob(decodeURIComponent(decodeURIComponent(raw))),
+    () => atob(raw),
+  ];
+  for (let i = 0; i < attempts.length; i += 1) {
+    try {
+      const obj = JSON.parse(attempts[i]());
+      if (obj && obj.eventId && obj.configType) return obj;
+    } catch {
+      // try next decode variant
+    }
+  }
+  return null;
+}
+
+// Copies a real hyperlink (not just the bare URL string) to the clipboard, so pasting into
+// DA's rich-text doc body lands as a clickable link with real link text — the ClipboardItem
+// HTML path is what makes that possible; copyTextToClipboard's plain-text fallback can't
+// carry an href at all, so it appends the URL after the text instead.
+export async function copyLinkToClipboard(url, text) {
+  try {
+    if (navigator.clipboard && navigator.clipboard.write && window.ClipboardItem) {
+      const linkElement = document.createElement('a');
+      linkElement.href = url;
+      linkElement.textContent = text;
+      const blob = new Blob([linkElement.outerHTML], { type: 'text/html' });
+      await navigator.clipboard.write([new window.ClipboardItem({ [blob.type]: blob })]);
+      return true;
+    }
+    return await copyTextToClipboard(`${text} (${url})`);
+  } catch (error) {
+    window.lana?.log(`Error copying link to clipboard: ${error}`);
+    return false;
+  }
+}
+
+// Builds the shareable Homepage config link for `row` and copies it to the clipboard — the
+// single implementation ConfigEditor.js's "Copy Link" button and Library.js's per-row
+// "Copy Link" action both call, so a link copied from either place is built identically.
+// `sessions`/`sessionTimes` are the row's event's live ESP session catalog (Library.js fetches
+// it on demand since it doesn't keep one loaded per row the way ConfigEditor does for the
+// single active config).
+export async function copyHomepageConfigLink(org, repo, row, homepageMeta, sessions, sessionTimes) {
+  const sessionsById = new Map((sessions || []).map((s) => [s.sessionId, s]));
+  const metaById = row.config[homepageMeta.metaField] || {};
+  const entries = (row.config[homepageMeta.field] || [])
+    .filter((id) => sessionsById.has(id))
+    .map((id) => buildSessionAuthorEntry(sessionsById.get(id), sessionTimes, metaById[id]));
+  const heading = homepageMeta.headingField
+    ? (row.config[homepageMeta.headingField] || homepageMeta.label)
+    : undefined;
+  const theme = homepageMeta.themeField
+    ? (row.config[homepageMeta.themeField] || 'light')
+    : undefined;
+  const url = buildHomepageConfigURL(org, repo, row.configType, row.eventId, heading, theme, entries);
+  const formattedDate = new Date().toLocaleString('en-US', {
+    weekday: 'long', month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit',
+  });
+  const linkText = `${homepageMeta.linkPrefix}: ${getDisplayTitle(row)} – ${formattedDate}`;
+  return copyLinkToClipboard(url, linkText);
 }
 
 // Converts a "YYYY-MM-DDTHH:mm" <input type="datetime-local"> value, interpreted as wall-clock

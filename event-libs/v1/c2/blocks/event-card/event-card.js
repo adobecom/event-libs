@@ -7,17 +7,34 @@ function getVariant(el) {
   return VARIANTS.find((variant) => el.classList.contains(variant)) || DEFAULT_VARIANT;
 }
 
+function isSameOrigin(url) {
+  try {
+    return new URL(url, window.location.href).origin === window.location.origin;
+  } catch {
+    return false;
+  }
+}
+
+// createOptimizedPicture's relative=true mode drops everything but the URL's pathname —
+// correct for same-origin, Helix-optimized authored images, but it silently requests the
+// wrong host for a cross-origin one (e.g. a DA content.da.live upload, or any other full
+// URL a data-driven card carries). Cross-origin sources get a plain <img> at the real
+// absolute URL instead, trading away responsive width variants for the image loading at
+// all regardless of where it's hosted.
+function buildPicture(url, alt) {
+  if (isSameOrigin(url)) return createOptimizedPicture(url, alt, true, false);
+  return createTag('picture', {}, createTag('img', { src: url, loading: 'lazy', alt }));
+}
+
 function buildMedia(mediaWrapper) {
   const img = mediaWrapper?.querySelector('img');
   if (img) {
-    const picture = createOptimizedPicture(img.src, img.alt || '', true, false);
-    return createTag('div', { class: 'card-media' }, picture);
+    return createTag('div', { class: 'card-media' }, buildPicture(img.src, img.alt || ''));
   }
 
   const url = mediaWrapper?.querySelector(':scope > div')?.textContent.trim();
   if (!url) return null;
-  const picture = createTag('picture', {}, createTag('img', { src: url, loading: 'lazy', alt: '' }));
-  return createTag('div', { class: 'card-media' }, picture);
+  return createTag('div', { class: 'card-media' }, buildPicture(url, ''));
 }
 
 function buildTextNodes(contentWrapper) {

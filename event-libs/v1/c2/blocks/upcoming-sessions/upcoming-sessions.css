@@ -1,6 +1,5 @@
 .upcoming-sessions {
   position: relative;
-  padding: var(--s2a-spacing-md, 16px);
 }
 
 .upcoming-sessions--attached {
@@ -57,7 +56,6 @@
   padding-block: var(--s2a-spacing-xs, 8px);
   scroll-snap-type: x proximity;
   scrollbar-width: none;
-  padding-inline: var(--s2a-spacing-md, 16px);
 }
 
 .upcoming-sessions-track::-webkit-scrollbar {
@@ -112,6 +110,7 @@
 @media (min-width: 1280px) {
   .upcoming-sessions-controls {
     display: flex;
+    margin-right: var(--s2a-spacing-lg, 24px);
     flex-shrink: 0;
     align-items: center;
     gap: var(--s2a-spacing-md, 16px);
@@ -310,7 +309,7 @@
     width: 375px;
     height: 108px;
     padding: var(--s2a-spacing-lg, 24px);
-    gap: 0;
+    gap: var(--s2a-spacing-md, 16px);
   }
 
   .upcoming-sessions .sg-card__body {
@@ -332,7 +331,12 @@
     align-items: flex-start;
     justify-content: space-between;
     gap: var(--s2a-spacing-xs, 8px);
-    margin-top: var(--s2a-spacing-md, 16px);
+    margin-top: auto;
+    padding-top: var(--s2a-spacing-md);
+    position: absolute;
+    left: var(--s2a-spacing-lg, 24px);
+    right: var(--s2a-spacing-lg, 24px);
+    bottom: var(--s2a-spacing-lg, 24px);
   }
 
   .upcoming-sessions .sg-card__track--footer {
@@ -350,7 +354,6 @@
   .upcoming-sessions .sg-card__actions {
     flex-direction: column;
     width: var(--s2a-spacing-2xl, 48px);
-    padding-left: var(--s2a-spacing-md, 16px);
     margin-top: 0;
     opacity: 1;
     pointer-events: auto;

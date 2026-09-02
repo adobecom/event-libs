@@ -1,6 +1,8 @@
-import { createTag } from '../../../utils/utils.js';
+import { createTag, loadStyle } from '../../../utils/utils.js';
 
 const ICON_ARROW_RIGHT = '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false"><path d="M3.5 8H12.5M12.5 8L8.5 4M12.5 8L8.5 12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+
+const BLOCK_CSS_URL = new URL('./event-carousel.css', import.meta.url).href;
 
 let autoId = 0;
 
@@ -72,18 +74,39 @@ function buildPills(pillsRow) {
       type: 'button',
       role: 'tab',
       'aria-selected': i === 0 ? 'true' : 'false',
+      tabindex: i === 0 ? '0' : '-1',
     }, label);
     if (i === 0) pill.classList.add('is-active');
-    pill.addEventListener('click', () => {
-      pillsContainer.querySelectorAll('.carousel-pill').forEach((btn) => {
-        btn.classList.remove('is-active');
-        btn.setAttribute('aria-selected', 'false');
-      });
-      pill.classList.add('is-active');
-      pill.setAttribute('aria-selected', 'true');
-    });
     pillsContainer.append(pill);
   });
+
+  const selectPill = (pill, { focus } = {}) => {
+    pillsContainer.querySelectorAll('.carousel-pill').forEach((btn) => {
+      const isTarget = btn === pill;
+      btn.classList.toggle('is-active', isTarget);
+      btn.setAttribute('aria-selected', String(isTarget));
+      btn.tabIndex = isTarget ? 0 : -1;
+    });
+    if (focus) pill.focus();
+  };
+
+  const tabs = [...pillsContainer.querySelectorAll('.carousel-pill')];
+  tabs.forEach((pill, i) => {
+    pill.addEventListener('click', () => selectPill(pill));
+    pill.addEventListener('keydown', (e) => {
+      const keyToIndex = {
+        ArrowRight: (i + 1) % tabs.length,
+        ArrowLeft: (i - 1 + tabs.length) % tabs.length,
+        Home: 0,
+        End: tabs.length - 1,
+      };
+      const nextIndex = keyToIndex[e.key];
+      if (nextIndex === undefined) return;
+      e.preventDefault();
+      selectPill(tabs[nextIndex], { focus: true });
+    });
+  });
+
   return pillsContainer;
 }
 
@@ -140,6 +163,8 @@ function buildArrows(track) {
 }
 
 export default async function init(el) {
+  loadStyle(BLOCK_CSS_URL);
+
   const track = locateTrack(el);
   if (!track) {
     el.remove();

@@ -1,4 +1,4 @@
-import { html } from '../../../../deps/htm-preact.js';
+import { html, useEffect, useState } from '../../../../deps/htm-preact.js';
 import { useSessionGuide } from '../store/index.js';
 import { formatShortTime, formatDuration, getNowMs } from '../utils/time.js';
 import { deriveSessionState, getWatchDestination } from '../../../../utils/session-state.js';
@@ -7,12 +7,28 @@ import {
 } from '../../../../utils/session-store.js';
 import { toggleScheduleWithFeedback, toggleFavoriteWithFeedback } from '../../../../services/sessions/action-feedback.js';
 import { IconPlay, IconCalendarCheck, IconCalendarPlus, IconHeartFilled, IconHeartOutline } from './icons.js';
-import { setSessionParam, clearSessionParams, safeUrl, isSamePage } from '../utils/url.js';
+import { setSessionParam, sessionParamValue, clearSessionParams, safeUrl, isSamePage } from '../utils/url.js';
 import { CategoryBadge } from './CategoryBadge.js';
+import { scrollBehavior } from '../utils/motion.js';
 import { getTrackIcon } from '../../../../utils/tier-1-event-config.js';
 import { isBehaviorEnabled } from '../utils/behavior-flags.js';
 
 export const buildLiveCard = () => LiveCard;
+
+// A non-MR session only gets a fresh render from the shared session-state ticker when some
+// session's live/upcoming/on-demand bucket actually flips — which can go untriggered for a
+// while if nothing else on the page is transitioning, leaving the progress bar visibly stuck.
+// An MR session gets an equivalent refresh for free every ~30s from the poller reassigning
+// liveStreamActiveIds. Exported so the cadence is one shared constant, not a magic number.
+export const PROGRESS_REFRESH_MS = 30_000;
+
+export function computeProgressPct(session, nowMs) {
+  const startMs = Date.parse(session.startTimeUtc);
+  const endMs = Date.parse(session.endTimeUtc);
+  const duration = endMs - startMs;
+  const elapsed = Math.min(Math.max(nowMs - startMs, 0), duration);
+  return duration > 0 ? Math.round((elapsed / duration) * 100) : 0;
+}
 
 export function LiveCard({ session, variant = 'live' }) {
   const { state, dispatch } = useSessionGuide();
@@ -29,19 +45,34 @@ export function LiveCard({ session, variant = 'live' }) {
   const nowMs = getNowMs();
   const sessionState = deriveSessionState(session, liveStreamActiveIds.value, nowMs);
 
-  const startMs = Date.parse(session.startTimeUtc);
-  const endMs = Date.parse(session.endTimeUtc);
-  const duration = endMs - startMs;
-  const elapsed = Math.min(Math.max(nowMs - startMs, 0), duration);
-  const progressPct = duration > 0 ? Math.round((elapsed / duration) * 100) : 0;
+  // Forces a re-render every PROGRESS_REFRESH_MS while live, purely so progressPct below gets
+  // recomputed against the current clock — see PROGRESS_REFRESH_MS for why this can't rely on
+  // the shared session-state ticker alone.
+  const [, forceProgressTick] = useState(0);
+  useEffect(() => {
+    if (sessionState !== 'live') return undefined;
+    const id = setInterval(() => forceProgressTick((n) => n + 1), PROGRESS_REFRESH_MS);
+    return () => clearInterval(id);
+  }, [sessionState]);
+
+  const duration = Date.parse(session.endTimeUtc) - Date.parse(session.startTimeUtc);
+  const progressPct = computeProgressPct(session, nowMs);
   const durationLabel = duration >= 0
     ? formatDuration(session.startTimeUtc, session.endTimeUtc, { short: true })
     : '';
 
-  const trackColor = getTrackIcon(session.track)?.color || '';
+  const trackColor = getTrackIcon(session.primaryTrack)?.color || '';
   const startTime = formatShortTime(session.startTimeUtc, userTz);
   const endTime = session.endTimeUtc ? formatShortTime(session.endTimeUtc, userTz) : '';
   const timeRange = endTime ? `${startTime} – ${endTime}` : startTime;
+  // The meta row's second slot is shared. An upcoming Recommended card states its time
+  // there; every other card badges its first additional event-site track instead, so live
+  // and past Recommended cards get the same two-badge treatment. A live card never needs the
+  // time (it has a progress bar and remaining duration), and a start time says nothing once a
+  // session is on demand. Only the first additional track is used — the ESP field is
+  // multi-select but the badge model supports one (see resolveTrackBadge).
+  const showTime = variant === 'recommended' && sessionState === 'upcoming';
+  const secondTrack = showTime ? undefined : (session.additionalTracks || [])[0];
 
   const cardClass = [
     'sg-live-card',
@@ -69,7 +100,7 @@ export function LiveCard({ session, variant = 'live' }) {
     if (isSamePage(watchHref)) {
       dispatch({ type: 'CLOSE_DRAWER' });
       history.pushState({}, '', clearSessionParams());
-      window.scrollTo({ top: 0, behavior: 'smooth' });
+      window.scrollTo({ top: 0, behavior: scrollBehavior() });
       return;
     }
     window.location.href = watchHref;
@@ -79,7 +110,7 @@ export function LiveCard({ session, variant = 'live' }) {
   if (sessionState === 'upcoming') {
     if (variant === 'recommended' && schedulingEnabled) {
       primaryCta = html`<button
-        class=${'sg-live-card__btn sg-live-card__btn--watch' + (isScheduled ? ' is-scheduled' : '') + (isPending ? ' is-pending' : '')}
+        class=${'sg-live-card__btn sg-live-card__btn--schedule-cta' + (isScheduled ? ' is-scheduled' : '') + (isPending ? ' is-pending' : '')}
         onclick=${handleSchedule}
         disabled=${isPending}
         daa-ll=${isScheduled ? 'Remove-from-Schedule' : 'Add-to-Schedule'}
@@ -90,20 +121,22 @@ export function LiveCard({ session, variant = 'live' }) {
         }</button>`;
     }
   } else if (watchHref && watchNowEnabled) {
+    const isOnDemand = sessionState === 'on-demand';
     primaryCta = html`<button
       class="sg-live-card__btn sg-live-card__btn--watch"
       onclick=${handleWatch}
-      daa-ll="Watch-Now"
+      daa-ll=${isOnDemand ? 'Watch-On-Demand' : 'Watch-Now'}
       type="button"
-    ><${IconPlay} />Watch now</button>`;
+    ><${IconPlay} />${isOnDemand ? 'Watch on demand' : 'Watch now'}</button>`;
   }
 
-  function handleCardClick() {
+  // On demand: match SessionCard/TrackRow — the whole card always navigates straight to
+  // the session page, regardless of surface, instead of opening the in-widget overlay.
+  function handleCardClick(e) {
+    if (sessionState === 'on-demand') { handleWatch(e); return; }
     if (surface !== 'widget') return;
     dispatch({ type: 'SET_ACTIVE_SESSION', sessionId: session.id });
-    const slug = session.slug || session.id;
-    const rfCode = session.rfCode || session.id;
-    history.pushState({}, '', setSessionParam(`${slug}-${rfCode}`));
+    history.pushState({}, '', setSessionParam(sessionParamValue(session)));
   }
 
   return html`
@@ -122,15 +155,18 @@ export function LiveCard({ session, variant = 'live' }) {
       <div class="sg-live-card__body">
         <div class="sg-live-card__meta">
           <div class="sg-live-card__track-row">
-            ${html`<${CategoryBadge} session=${session} />`}
+            ${html`<${CategoryBadge} session=${session} hideCount=${!!secondTrack} />`}
           </div>
-          <p class="sg-live-card__time">${timeRange}</p>
+          ${secondTrack && html`<span class="sg-live-card__track-extra">
+            <${CategoryBadge} track=${secondTrack} />
+          </span>`}
+          ${showTime && html`<p class="sg-live-card__time">${timeRange}</p>`}
         </div>
         ${surface === 'widget'
     ? html`<button
               class="sg-live-card__title sg-live-card__title-btn"
               type="button"
-              onclick=${(e) => { e.stopPropagation(); handleCardClick(); }}
+              onclick=${(e) => { e.stopPropagation(); handleCardClick(e); }}
               daa-ll="Session-Card-Open"
             >${session.title}</button>`
     : html`<p class="sg-live-card__title">${session.title}</p>`}
@@ -140,7 +176,7 @@ export function LiveCard({ session, variant = 'live' }) {
           ${schedulingEnabled && html`<button
             class=${'sg-live-card__btn sg-live-card__btn--schedule' + (isScheduled ? ' is-scheduled' : '') + (isPending ? ' is-pending' : '')}
             onclick=${handleSchedule}
-            aria-label=${isScheduled ? 'Remove from schedule' : 'Add to schedule'}
+            aria-label=${isScheduled ? `Remove ${session.title} from schedule` : `Add ${session.title} to schedule`}
             aria-pressed=${String(isScheduled)}
             disabled=${isPending}
             daa-ll=${isScheduled ? 'Remove-from-Schedule' : 'Add-to-Schedule'}
@@ -149,13 +185,12 @@ export function LiveCard({ session, variant = 'live' }) {
           ${favoritingEnabled && html`<button
             class=${'sg-live-card__btn sg-live-card__btn--favorite' + (isFavorited ? ' is-favorited' : '') + (isPending ? ' is-pending' : '')}
             onclick=${handleFavorite}
-            aria-label=${isFavorited ? 'Remove from favorites' : 'Add to favorites'}
+            aria-label=${isFavorited ? `Remove ${session.title} from favorites` : `Add ${session.title} to favorites`}
             aria-pressed=${String(isFavorited)}
             disabled=${isPending}
             daa-ll=${isFavorited ? 'Remove-from-Favorites' : 'Add-to-Favorites'}
             type="button"
-          >${isFavorited ? html`<${IconHeartFilled} />` : html`<${IconHeartOutline} />`
-          }<span class="sg-live-card__btn-label">${isFavorited ? 'Favorited' : 'Favorite'}</span></button>`}
+          >${isFavorited ? html`<${IconHeartFilled} />` : html`<${IconHeartOutline} />`}</button>`}
         </div>
       </div>
     </div>

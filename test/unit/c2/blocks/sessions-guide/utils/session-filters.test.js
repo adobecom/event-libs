@@ -1,8 +1,8 @@
 import { expect } from '@esm-bundle/chai';
 import {
-  sessionsForDay, groupByStartTime, groupByTrack, resolveTrackBadge,
+  sessionsForDay, groupByStartTime, groupByTrack, resolveTrackBadge, resolveSwimlanes,
   liveSessions, upcomingSessions, onDemandSessions, getRecommendedSessions,
-  getOnDemandRecommendedSessions, getFilterValue, filterSessions,
+  getOnDemandRecommendedSessions, getFilterValue, filterSessions, excludeOnDemandFormat,
 } from '../../../../../../event-libs/v1/c2/blocks/sessions-guide/utils/session-filters.js';
 import { getSessionDayKey } from '../../../../../../event-libs/v1/c2/blocks/sessions-guide/utils/time.js';
 
@@ -13,25 +13,43 @@ function h(offsetHours) {
 }
 
 const LIVE = {
-  id: 'live', track: 'Design',
+  id: 'live', primaryTrack: 'Design',
   startTimeUtc: h(-0.5), endTimeUtc: h(1),
   mrStreamId: null,
 };
 const UPCOMING = {
-  id: 'upcoming', track: 'Video',
+  id: 'upcoming', primaryTrack: 'Video',
   startTimeUtc: h(1), endTimeUtc: h(2),
   mrStreamId: null,
 };
 const PAST = {
-  id: 'past', track: 'Design',
+  id: 'past', primaryTrack: 'Design',
   startTimeUtc: h(-4), endTimeUtc: h(-3),
   mrStreamId: null,
 };
 const UPCOMING_2 = {
-  id: 'upcoming-2', track: 'Video',
+  id: 'upcoming-2', primaryTrack: 'Video',
   startTimeUtc: h(1), endTimeUtc: h(2),
   mrStreamId: null,
 };
+// Slot is in the future, so every time-window check would otherwise call it upcoming.
+const ON_DEMAND_FORMAT = {
+  id: 'ipod', primaryTrack: 'Design',
+  startTimeUtc: h(1), endTimeUtc: h(2),
+  mrStreamId: null,
+  hasOnDemandFormat: true,
+};
+const ON_DEMAND_FORMAT_LIVE_SLOT = { ...ON_DEMAND_FORMAT, id: 'ipod-live-slot', startTimeUtc: h(-0.5) };
+// Also online, livestreamed, inside its own slot and streaming — still On Demand alone.
+const ON_DEMAND_FORMAT_ALSO_AIRING = {
+  ...ON_DEMAND_FORMAT,
+  id: 'ipod-also-airing',
+  startTimeUtc: h(-0.5),
+  isOnline: true,
+  isLivestreamed: true,
+  mrStreamId: 'stream-1',
+};
+const AIRING_STREAM_IDS = new Set(['stream-1']);
 
 // Derive day keys directly from session times so tests pass in any system timezone
 const LIVE_DAY = getSessionDayKey(LIVE, TZ);
@@ -97,12 +115,37 @@ describe('session-filters/liveSessions', () => {
     expect(result.map((s) => s.id)).to.deep.equal(['live']);
   });
 
+  it('never treats a session carrying the on-demand Format as live, even inside its own slot', () => {
+    const day = getSessionDayKey(ON_DEMAND_FORMAT_LIVE_SLOT, TZ);
+    const result = liveSessions([ON_DEMAND_FORMAT_LIVE_SLOT], new Set(), day, TZ, NOW);
+    expect(result).to.deep.equal([]);
+  });
+
+  it('keeps it out of Live Now even when it also airs online with an active stream', () => {
+    const day = getSessionDayKey(ON_DEMAND_FORMAT_ALSO_AIRING, TZ);
+    const result = liveSessions([ON_DEMAND_FORMAT_ALSO_AIRING], AIRING_STREAM_IDS, day, TZ, NOW);
+    expect(result).to.deep.equal([]);
+  });
 });
 
 describe('session-filters/upcomingSessions', () => {
   it('returns sessions starting in the future for the active day', () => {
     const result = upcomingSessions([LIVE, UPCOMING, PAST], new Set(), UPCOMING_DAY, TZ, NOW);
     expect(result.map((s) => s.id)).to.deep.equal(['upcoming']);
+  });
+
+  it('excludes a session carrying the on-demand Format whose slot is still in the future', () => {
+    const result = upcomingSessions([UPCOMING, ON_DEMAND_FORMAT], new Set(), UPCOMING_DAY, TZ, NOW);
+    expect(result.map((s) => s.id)).to.deep.equal(['upcoming']);
+  });
+
+  it('excludes one that also airs online, stream active or not', () => {
+    const futureAlsoAiring = { ...ON_DEMAND_FORMAT_ALSO_AIRING, startTimeUtc: h(1), endTimeUtc: h(2) };
+    const sessions = [UPCOMING, futureAlsoAiring];
+    expect(upcomingSessions(sessions, AIRING_STREAM_IDS, UPCOMING_DAY, TZ, NOW).map((s) => s.id))
+      .to.deep.equal(['upcoming']);
+    expect(upcomingSessions(sessions, new Set(), UPCOMING_DAY, TZ, NOW).map((s) => s.id))
+      .to.deep.equal(['upcoming']);
   });
 });
 
@@ -111,12 +154,52 @@ describe('session-filters/onDemandSessions', () => {
     const result = onDemandSessions([LIVE, UPCOMING, PAST], new Set(), NOW);
     expect(result.map((s) => s.id)).to.deep.equal(['past']);
   });
+
+  it('includes sessions carrying the on-demand Format regardless of their scheduled slot', () => {
+    const result = onDemandSessions([UPCOMING, ON_DEMAND_FORMAT, ON_DEMAND_FORMAT_LIVE_SLOT], new Set(), NOW);
+    expect(result.map((s) => s.id)).to.deep.equal(['ipod', 'ipod-live-slot']);
+  });
+
+  // DVR Timing (in hours) is no longer part of this gate (PM, 2026-08-26) — a session with
+  // dvrDelayHours authored is treated exactly like one without it. The field is still
+  // carried on the session for a later "Recording coming soon" display treatment, just not
+  // read here. See docs/sessions-guide-implementation-notes.md.
+  it('ignores dvrDelayHours entirely for an ended session', () => {
+    const result = onDemandSessions([{ ...PAST, dvrDelayHours: 999 }], new Set(), NOW);
+    expect(result.map((s) => s.id)).to.deep.equal(['past']);
+  });
+
+  it('ignores dvrDelayHours entirely for an on-demand-Format session', () => {
+    const result = onDemandSessions([{ ...ON_DEMAND_FORMAT, dvrDelayHours: 999 }], new Set(), NOW);
+    expect(result.map((s) => s.id)).to.deep.equal(['ipod']);
+  });
+});
+
+describe('session-filters/excludeOnDemandFormat', () => {
+  it('drops only the sessions carrying the on-demand Format', () => {
+    const result = excludeOnDemandFormat([LIVE, ON_DEMAND_FORMAT, UPCOMING]);
+    expect(result.map((s) => s.id)).to.deep.equal(['live', 'upcoming']);
+  });
 });
 
 describe('session-filters/getRecommendedSessions', () => {
   it('returns sessions matching recommendedIds for the active day', () => {
     const result = getRecommendedSessions([LIVE, UPCOMING, PAST], ['live', 'past'], LIVE_DAY, TZ);
     expect(result.map((s) => s.id)).to.include('live');
+  });
+
+  it('never recommends a session carrying the on-demand Format in the live carousel', () => {
+    const day = getSessionDayKey(ON_DEMAND_FORMAT, TZ);
+    const result = getRecommendedSessions([ON_DEMAND_FORMAT], ['ipod'], day, TZ);
+    expect(result).to.deep.equal([]);
+  });
+
+  // Being hand-picked doesn't buy a way back in, authored path or random fallback.
+  it('never recommends one that also airs online, authored or filled in', () => {
+    const day = getSessionDayKey(ON_DEMAND_FORMAT_ALSO_AIRING, TZ);
+    expect(getRecommendedSessions([ON_DEMAND_FORMAT_ALSO_AIRING], ['ipod-also-airing'], day, TZ))
+      .to.deep.equal([]);
+    expect(getRecommendedSessions([ON_DEMAND_FORMAT_ALSO_AIRING], [], day, TZ)).to.deep.equal([]);
   });
 
   it('excludes recommended ids not on the active day', () => {
@@ -248,7 +331,7 @@ describe('session-filters/filterSessions', () => {
 // one value.
 describe('session-filters/resolveTrackBadge', () => {
   it('1. Primary, no additional, no override — primary lane, primary badge icon', () => {
-    const badge = resolveTrackBadge({ id: 's-1', track: 'Mainstage', trackOverride: '', additionalTracks: [] });
+    const badge = resolveTrackBadge({ id: 's-1', primaryTrack: 'Mainstage', trackOverride: '', additionalTracks: [] });
     expect(badge.label).to.equal('Mainstage');
     // No built-in defaults — an unconfigured track gets no icon and the universal
     // black fallback color, not any curated slug/color.
@@ -262,7 +345,7 @@ describe('session-filters/resolveTrackBadge', () => {
 
   it('2. Primary, additional, no override — primary + additional lane, primary badge + "+1"', () => {
     const badge = resolveTrackBadge({
-      id: 's-1', track: 'Design', trackOverride: '', additionalTracks: ['Video'],
+      id: 's-1', primaryTrack: 'Design', trackOverride: '', additionalTracks: ['Video'],
     });
     expect(badge.isOverride).to.be.false;
     expect(badge.swimlanes).to.deep.equal(['Design', 'Video']);
@@ -272,7 +355,7 @@ describe('session-filters/resolveTrackBadge', () => {
 
   it('3/6. No primary, no additional, override only — override-text lane, override badge icon', () => {
     const badge = resolveTrackBadge({
-      id: 's-1', track: '', trackOverride: 'custom label', additionalTracks: [],
+      id: 's-1', primaryTrack: '', trackOverride: 'custom label', additionalTracks: [],
     });
     expect(badge.isOverride).to.be.true;
     expect(badge.label).to.equal('custom label');
@@ -287,7 +370,7 @@ describe('session-filters/resolveTrackBadge', () => {
 
   it('4. Primary, no additional, override — override lane (not primary lane), override badge icon', () => {
     const badge = resolveTrackBadge({
-      id: 's-1', track: 'Design', trackOverride: 'custom label', additionalTracks: [],
+      id: 's-1', primaryTrack: 'Design', trackOverride: 'custom label', additionalTracks: [],
     });
     expect(badge.isOverride).to.be.true;
     expect(badge.label).to.equal('custom label');
@@ -297,7 +380,7 @@ describe('session-filters/resolveTrackBadge', () => {
 
   it('5. No primary, additional, override — override lane + additional lane, override icon + "+1"', () => {
     const badge = resolveTrackBadge({
-      id: 's-1', track: '', trackOverride: 'custom label', additionalTracks: ['Video'],
+      id: 's-1', primaryTrack: '', trackOverride: 'custom label', additionalTracks: ['Video'],
     });
     expect(badge.isOverride).to.be.true;
     expect(badge.swimlanes).to.deep.equal(['custom label', 'Video']);
@@ -306,7 +389,7 @@ describe('session-filters/resolveTrackBadge', () => {
 
   it('Primary, additional, and override all present — override lane + additional lane, override badge icon', () => {
     const badge = resolveTrackBadge({
-      id: 's-1', track: 'Design', trackOverride: 'custom label', additionalTracks: ['Video'],
+      id: 's-1', primaryTrack: 'Design', trackOverride: 'custom label', additionalTracks: ['Video'],
     });
     expect(badge.isOverride).to.be.true;
     expect(badge.label).to.equal('custom label');
@@ -318,45 +401,71 @@ describe('session-filters/resolveTrackBadge', () => {
 
   it('only ever applies one additional track even if more are somehow present', () => {
     const badge = resolveTrackBadge({
-      id: 's-1', track: 'Design', trackOverride: '', additionalTracks: ['Video', 'Business', 'Photography'],
+      id: 's-1', primaryTrack: 'Design', trackOverride: '', additionalTracks: ['Video', 'Business', 'Photography'],
     });
     expect(badge.swimlanes).to.deep.equal(['Design', 'Video']);
     expect(badge.count).to.equal(1);
   });
 
   it('returns null when there is no primary track and no override', () => {
-    expect(resolveTrackBadge({ id: 's-1', track: '', trackOverride: '', additionalTracks: [] })).to.be.null;
+    expect(resolveTrackBadge({ id: 's-1', primaryTrack: '', trackOverride: '', additionalTracks: [] })).to.be.null;
+  });
+
+  // A session with no primary track and no override gets no badge, but an additional track
+  // still places it in that lane -- badge and lane are separate questions.
+  it('gives no badge with neither a primary track nor an override, even with an additional', () => {
+    const session = { id: 's-1', primaryTrack: '', trackOverride: '', additionalTracks: ['Video'] };
+    expect(resolveTrackBadge(session)).to.be.null;
+    expect(resolveSwimlanes(session)).to.deep.equal(['Video']);
+  });
+
+  it('places a badge-less session in its additional track lane', () => {
+    const session = { id: 's-1', primaryTrack: '', trackOverride: '', additionalTracks: ['Video'] };
+    const lanes = groupByTrack([session]);
+    expect(lanes.map(([track]) => track)).to.deep.equal(['Video']);
+    expect(lanes[0][1]).to.deep.equal([session]);
+  });
+
+  it('leaves a session with no track of any kind out of every lane', () => {
+    const session = { id: 's-1', primaryTrack: '', trackOverride: '', additionalTracks: [] };
+    expect(resolveSwimlanes(session)).to.deep.equal([]);
+    expect(groupByTrack([session])).to.deep.equal([]);
+  });
+
+  it('still caps additional tracks at one, since the field was meant to be single-valued', () => {
+    const session = { id: 's-1', primaryTrack: '', trackOverride: '', additionalTracks: ['Video', 'Design'] };
+    expect(resolveSwimlanes(session)).to.deep.equal(['Video']);
   });
 });
 
 describe('session-filters/groupByTrack — Digital Agenda track badge model', () => {
   it('groups sessions by their primary track', () => {
-    const a = { id: 'a', track: 'Design', trackOverride: '', additionalTracks: [] };
-    const b = { id: 'b', track: 'Video', trackOverride: '', additionalTracks: [] };
-    const c = { id: 'c', track: 'Design', trackOverride: '', additionalTracks: [] };
+    const a = { id: 'a', primaryTrack: 'Design', trackOverride: '', additionalTracks: [] };
+    const b = { id: 'b', primaryTrack: 'Video', trackOverride: '', additionalTracks: [] };
+    const c = { id: 'c', primaryTrack: 'Design', trackOverride: '', additionalTracks: [] };
     const result = groupByTrack([a, b, c]);
     expect(result.map(([track]) => track)).to.have.members(['Design', 'Video']);
     expect(result.find(([track]) => track === 'Design')[1].map((s) => s.id)).to.deep.equal(['a', 'c']);
   });
 
   it('excludes sessions with no primary track and no override — no "Other" bucket', () => {
-    const noTrack = { id: 'no-track', track: '', trackOverride: '', additionalTracks: [] };
-    const withTrack = { id: 'with-track', track: 'Design', trackOverride: '', additionalTracks: [] };
+    const noTrack = { id: 'no-track', primaryTrack: '', trackOverride: '', additionalTracks: [] };
+    const withTrack = { id: 'with-track', primaryTrack: 'Design', trackOverride: '', additionalTracks: [] };
     const result = groupByTrack([noTrack, withTrack]);
     expect(result.map(([track]) => track)).to.deep.equal(['Design']);
   });
 
   it('places a session with additional tracks into every one of its swimlanes', () => {
-    const s = { id: 's-1', track: 'Design', trackOverride: '', additionalTracks: ['Video'] };
+    const s = { id: 's-1', primaryTrack: 'Design', trackOverride: '', additionalTracks: ['Video'] };
     const result = groupByTrack([s]);
     expect(result.map(([track]) => track)).to.have.members(['Design', 'Video']);
     result.forEach(([, sessions]) => expect(sessions.map((x) => x.id)).to.deep.equal(['s-1']));
   });
 
   it('orders swimlanes per the authored swimlaneOrder ([{track,displayName,enabled}], not a plain string array), unlisted tracks appended after', () => {
-    const a = { id: 'a', track: 'Design', trackOverride: '', additionalTracks: [] };
-    const b = { id: 'b', track: 'Video', trackOverride: '', additionalTracks: [] };
-    const c = { id: 'c', track: 'Business', trackOverride: '', additionalTracks: [] };
+    const a = { id: 'a', primaryTrack: 'Design', trackOverride: '', additionalTracks: [] };
+    const b = { id: 'b', primaryTrack: 'Video', trackOverride: '', additionalTracks: [] };
+    const c = { id: 'c', primaryTrack: 'Business', trackOverride: '', additionalTracks: [] };
     const swimlaneOrder = [
       { track: 'Video', displayName: 'Video', enabled: true },
       { track: 'Business', displayName: 'Business', enabled: true },
@@ -366,22 +475,22 @@ describe('session-filters/groupByTrack — Digital Agenda track badge model', ()
   });
 
   it('falls back to first-seen order when no swimlaneOrder is authored', () => {
-    const a = { id: 'a', track: 'Design', trackOverride: '', additionalTracks: [] };
-    const b = { id: 'b', track: 'Video', trackOverride: '', additionalTracks: [] };
+    const a = { id: 'a', primaryTrack: 'Design', trackOverride: '', additionalTracks: [] };
+    const b = { id: 'b', primaryTrack: 'Video', trackOverride: '', additionalTracks: [] };
     const result = groupByTrack([a, b]);
     expect(result.map(([track]) => track)).to.deep.equal(['Design', 'Video']);
   });
 
   it('drops a swimlane entirely when its swimlaneOrder entry is disabled', () => {
-    const a = { id: 'a', track: 'Design', trackOverride: '', additionalTracks: [] };
-    const b = { id: 'b', track: 'Video', trackOverride: '', additionalTracks: [] };
+    const a = { id: 'a', primaryTrack: 'Design', trackOverride: '', additionalTracks: [] };
+    const b = { id: 'b', primaryTrack: 'Video', trackOverride: '', additionalTracks: [] };
     const swimlaneOrder = [{ track: 'Video', displayName: 'Video', enabled: false }];
     const result = groupByTrack([a, b], swimlaneOrder);
     expect(result.map(([track]) => track)).to.deep.equal(['Design']);
   });
 
   it('returns the authored displayName as the 3rd tuple element, without changing the grouping key', () => {
-    const a = { id: 'a', track: 'Design', trackOverride: '', additionalTracks: [] };
+    const a = { id: 'a', primaryTrack: 'Design', trackOverride: '', additionalTracks: [] };
     const swimlaneOrder = [{ track: 'Design', displayName: 'Creativity', enabled: true }];
     const result = groupByTrack([a], swimlaneOrder);
     expect(result[0][0]).to.equal('Design');
@@ -389,13 +498,13 @@ describe('session-filters/groupByTrack — Digital Agenda track badge model', ()
   });
 
   it('defaults the label to the raw swimlane name when no swimlaneOrder entry exists for it', () => {
-    const a = { id: 'a', track: 'Design', trackOverride: '', additionalTracks: [] };
+    const a = { id: 'a', primaryTrack: 'Design', trackOverride: '', additionalTracks: [] };
     expect(groupByTrack([a])[0][2]).to.equal('Design');
   });
 
   it('treats an override-lane name identically to a track name in swimlaneOrder', () => {
-    const overridden = { id: 'o', track: '', trackOverride: 'Community Spotlight', additionalTracks: [] };
-    const tracked = { id: 't', track: 'Design', trackOverride: '', additionalTracks: [] };
+    const overridden = { id: 'o', primaryTrack: '', trackOverride: 'Community Spotlight', additionalTracks: [] };
+    const tracked = { id: 't', primaryTrack: 'Design', trackOverride: '', additionalTracks: [] };
     const swimlaneOrder = [
       { track: 'Community Spotlight', displayName: 'Community', enabled: true },
       { track: 'Design', displayName: 'Design', enabled: true },

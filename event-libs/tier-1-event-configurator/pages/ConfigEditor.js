@@ -1,13 +1,15 @@
 import { useState, useEffect, useMemo, html } from '../../v1/deps/htm-preact.js';
-import { getEventSessionCatalog } from '../../v1/utils/esp-controller.js';
 import { useNavigation } from '../context/NavigationContext.js';
 import { useConfigs } from '../context/ConfigsContext.js';
+import { useDA } from '../context/DAContext.js';
 import {
-  copyTextToClipboard, extractDistinctTracks, extractDistinctOverrideTexts, extractDistinctProducts,
-  isTrackIconEntryComplete, getDisplayTitle, stringifyConfig,
-  buildSessionAuthorEntry,
+  copyTextToClipboard, extractDistinctPrimaryTracks, extractDistinctAllTracks,
+  extractDistinctOverrideTexts, extractDistinctProducts,
+  isTrackIconEntryComplete, getDisplayTitle, stringifyConfig, copyHomepageConfigLink,
 } from '../utils.js';
-import { CONFIG_TYPES, HOMEPAGE_SESSION_FIELDS, isHomepageConfigType } from '../constants.js';
+import {
+  CONFIG_TYPES, HOMEPAGE_FIELD_BY_TYPE, isHomepageConfigType, HOMEPAGE_THEME_OPTIONS,
+} from '../constants.js';
 import TrackIconEditor from '../components/TrackIconEditor.js';
 import OverrideTrackIconEditor from '../components/OverrideTrackIconEditor.js';
 import ProductIconEditor from '../components/ProductIconEditor.js';
@@ -15,44 +17,14 @@ import FeaturedSessionsEditor from '../components/FeaturedSessionsEditor.js';
 import EpochDateTimeField from '../components/EpochDateTimeField.js';
 import LoadingInline from '../components/LoadingInline.js';
 
-// UI-only labels/hints per Homepage config type, layered onto the shared field/metaField
-// names from constants.js (the single source of truth ConfigsContext.js's emptyConfig()/
-// startDuplicateConfig() also key off) rather than redeclaring them here.
-const HOMEPAGE_FIELD_BY_TYPE = {
-  [CONFIG_TYPES.HOMEPAGE_UPCOMING_SESSIONS]: {
-    ...HOMEPAGE_SESSION_FIELDS[CONFIG_TYPES.HOMEPAGE_UPCOMING_SESSIONS],
-    // upcoming-sessions.js reads mrStreamId (drives its Mobile Rider live-drop
-    // polling) but never reads watchUrl anywhere — leave that field out.
-    // imageUrl has no reader yet either, but authors need to attach one now so
-    // it's captured in the JSON ahead of the consuming-side wiring.
-    metaFields: ['mrStreamId', 'imageUrl'],
-    metaHint: 'Mobile Rider stream ID and image are optional per-session overrides',
-    label: 'Upcoming Sessions',
-    metadataKey: 'upcoming-sessions',
-    blockHint: 'the upcoming-sessions block',
-  },
-  [CONFIG_TYPES.HOMEPAGE_FEATURED_SESSIONS]: {
-    ...HOMEPAGE_SESSION_FIELDS[CONFIG_TYPES.HOMEPAGE_FEATURED_SESSIONS],
-    // utils/session-routing.js reads both — watchUrl is where a click
-    // routes once the session goes live, mrStreamId is what tells it a
-    // session is Mobile-Rider-backed at all. imageUrl has no reader yet
-    // either, but authors need to attach one now so it's captured in the
-    // JSON ahead of the consuming-side wiring.
-    metaFields: ['watchUrl', 'mrStreamId', 'imageUrl'],
-    metaHint: 'Watch URL / Mobile Rider stream ID / image are optional per-session overrides',
-    label: 'Featured Sessions',
-    metadataKey: 'featured-sessions',
-    blockHint: 'each card-c2 Featured Sessions card',
-  },
-};
-
 export default function ConfigEditor() {
   const { goToLibrary } = useNavigation();
   const {
     activeConfig, saveActiveConfig, clearActiveConfig, updateTrackIcon,
-    updateOverrideTrackIcon, updateOverrideDefaultIcon, updateProduct, updateConfigField,
-    setToastSuccess, setToastError,
+    updateOverrideTrackIcon, updateProduct, updateConfigField,
+    setToastSuccess, setToastError, getSessionCatalogForRow,
   } = useConfigs();
+  const { org, repo } = useDA();
 
   const [sessions, setSessions] = useState([]);
   const [sessionTimes, setSessionTimes] = useState([]);
@@ -61,16 +33,20 @@ export default function ConfigEditor() {
   const [isSaving, setIsSaving] = useState(false);
 
   const eventId = activeConfig?.eventId;
+  const eventServiceEnv = activeConfig?.eventServiceEnv;
   const configType = activeConfig?.configType || CONFIG_TYPES.GLOBAL;
   const isHomepage = isHomepageConfigType(configType);
   const homepageMeta = HOMEPAGE_FIELD_BY_TYPE[configType];
 
+  // getSessionCatalogForRow caches by (eventId, env) — if Library.js already prefetched this
+  // row (Homepage rows are prefetched as soon as the library loads), opening it for edit right
+  // after reuses that result instead of hitting ESP a second time.
   useEffect(() => {
     if (!eventId) return undefined;
     let cancelled = false;
     setIsLoadingSessions(true);
     setSessionsError(null);
-    getEventSessionCatalog(eventId).then((result) => {
+    getSessionCatalogForRow({ eventId, eventServiceEnv }).then((result) => {
       if (cancelled) return;
       if (!result.ok) {
         setSessionsError(result.error || 'Failed to load sessions for this event');
@@ -82,9 +58,13 @@ export default function ConfigEditor() {
       if (!cancelled) setIsLoadingSessions(false);
     });
     return () => { cancelled = true; };
-  }, [eventId]);
+  }, [eventId, eventServiceEnv, getSessionCatalogForRow]);
 
-  const tracks = useMemo(() => extractDistinctTracks(sessions), [sessions]);
+  const primaryTracks = useMemo(() => extractDistinctPrimaryTracks(sessions), [sessions]);
+  // Track icons/colors map every track a session can badge, so it covers Additional Event
+  // Site Tracks too — `primaryTracks` above stays primary-only for the featured-sessions
+  // picker, whose filter matches on the primary track alone.
+  const iconTracks = useMemo(() => extractDistinctAllTracks(sessions), [sessions]);
   const overrideTexts = useMemo(() => extractDistinctOverrideTexts(sessions), [sessions]);
   const products = useMemo(() => extractDistinctProducts(sessions), [sessions]);
 
@@ -99,8 +79,8 @@ export default function ConfigEditor() {
   // Global-only: Homepage configs don't author track icons at all.
   const incompleteTracks = useMemo(() => {
     if (!activeConfig || isHomepage) return [];
-    return tracks.filter((track) => !isTrackIconEntryComplete(activeConfig.config.trackIcons?.[track]));
-  }, [tracks, activeConfig, isHomepage]);
+    return iconTracks.filter((track) => !isTrackIconEntryComplete(activeConfig.config.trackIcons?.[track]));
+  }, [iconTracks, activeConfig, isHomepage]);
 
   const handleCancel = () => {
     clearActiveConfig();
@@ -126,15 +106,10 @@ export default function ConfigEditor() {
     });
   };
 
-  const handleCopyHomepageJson = async () => {
-    const sessionsById = new Map(sessions.map((s) => [s.sessionId, s]));
-    const metaById = activeConfig.config[homepageMeta.metaField] || {};
-    const entries = (activeConfig.config[homepageMeta.field] || [])
-      .filter((id) => sessionsById.has(id))
-      .map((id) => buildSessionAuthorEntry(sessionsById.get(id), sessionTimes, metaById[id]));
-    const ok = await copyTextToClipboard(JSON.stringify(entries));
-    if (ok) setToastSuccess(`${homepageMeta.label} JSON copied — paste it into ${homepageMeta.blockHint}'s section-metadata row`);
-    else setToastError('Could not copy — select and copy the JSON block manually');
+  const handleCopyHomepageLink = async () => {
+    const ok = await copyHomepageConfigLink(org, repo, activeConfig, homepageMeta, sessions, sessionTimes);
+    if (ok) setToastSuccess(`Link copied — paste it directly into ${homepageMeta.blockHint}'s doc body`);
+    else setToastError('Could not copy the link — please retry');
   };
 
   const handleCopy = async () => {
@@ -209,7 +184,7 @@ export default function ConfigEditor() {
         ${isLoadingSessions && html`<${LoadingInline} label="Loading sessions…" />`}
         ${sessionsError && html`<p class="tec-editor__error">${sessionsError}</p>`}
         ${!isLoadingSessions && !sessionsError && html`
-          <p class="tec-editor__section-hint">${sessions.length} session(s) found — ${tracks.length} distinct track(s), ${products.length} distinct product(s).</p>
+          <p class="tec-editor__section-hint">${sessions.length} session(s) found — ${iconTracks.length} distinct track(s) (primary + additional), ${products.length} distinct product(s).</p>
         `}
       </section>
 
@@ -226,7 +201,7 @@ export default function ConfigEditor() {
           `}
           ${!isLoadingSessions && !sessionsError && html`
             <${TrackIconEditor}
-              tracks=${tracks}
+              tracks=${iconTracks}
               trackIcons=${activeConfig.config.trackIcons}
               onChange=${updateTrackIcon}
             />
@@ -241,9 +216,7 @@ export default function ConfigEditor() {
             <${OverrideTrackIconEditor}
               overrideTexts=${overrideTexts}
               overrideTrackIcons=${activeConfig.config.overrideTrackIcons?.byText}
-              defaultOverrideIcon=${activeConfig.config.overrideTrackIcons?.default}
               onChangeMapped=${updateOverrideTrackIcon}
-              onChangeDefault=${updateOverrideDefaultIcon}
             />
           `}
         </section>
@@ -318,6 +291,29 @@ export default function ConfigEditor() {
         </section>
 
         <section class="tec-editor__section">
+          <h2>Event pages</h2>
+          <p class="tec-editor__section-hint">Where a session's "Watch now" CTA sends attendees while it's live: the event homepage for livestreamed sessions, the broadcast page for online-only ones. Root-relative paths on this event's own site. Leave blank and the page falls back to MAX's paths.</p>
+          <label class="tec-editor__field-label" for="tec-homepage-path">Homepage path</label>
+          <input
+            id="tec-homepage-path"
+            type="text"
+            class="tec-field tec-editor__rf-input"
+            placeholder="/max.html"
+            value=${activeConfig.config.homepagePath || ''}
+            onInput=${(e) => updateConfigField('homepagePath', e.target.value)}
+          />
+          <label class="tec-editor__field-label" for="tec-broadcast-path">Broadcast page path</label>
+          <input
+            id="tec-broadcast-path"
+            type="text"
+            class="tec-field tec-editor__rf-input"
+            placeholder="/max/2026/broadcast.html"
+            value=${activeConfig.config.broadcastPath || ''}
+            onInput=${(e) => updateConfigField('broadcastPath', e.target.value)}
+          />
+        </section>
+
+        <section class="tec-editor__section">
           <h2>Config JSON</h2>
           <p class="tec-editor__section-hint">This is what gets saved to the row, and what you'll paste into the page's <strong><code>tier-1-event-config</code></strong> metadata after saving.</p>
           <pre class="tec-editor__config-preview">${configPreview}</pre>
@@ -331,19 +327,40 @@ export default function ConfigEditor() {
           <p class="tec-editor__section-hint">
             Pick which sessions appear, and set their order. Your picks are saved with this
             row so you can come back and edit them, but ${homepageMeta.blockHint} doesn't read
-            this row directly — it reads its own section-metadata. Use "Copy ${homepageMeta.label} JSON"
-            and paste the result into that block's own section-metadata row (key
-            <code>${homepageMeta.metadataKey}</code>) instead. ${homepageMeta.metaHint} — none of
+            this row directly — it reads the link generated by "Copy Link" below once that's
+            pasted into the homepage page's doc body. ${homepageMeta.metaHint} — none of
             them has a source in the session catalog, so fill them in only for sessions that
             actually need one.
           </p>
+          ${homepageMeta.headingField && html`
+            <label class="tec-editor__field-label" for="tec-homepage-heading">Section heading</label>
+            <input
+              id="tec-homepage-heading"
+              type="text"
+              class="tec-field tec-editor__heading-input"
+              placeholder=${homepageMeta.label}
+              value=${activeConfig.config[homepageMeta.headingField] || ''}
+              onInput=${(e) => updateConfigField(homepageMeta.headingField, e.target.value)}
+            />
+          `}
+          ${homepageMeta.themeField && html`
+            <label class="tec-editor__field-label" for="tec-homepage-theme">Card theme</label>
+            <select
+              id="tec-homepage-theme"
+              class="tec-field"
+              value=${activeConfig.config[homepageMeta.themeField] || 'light'}
+              onChange=${(e) => updateConfigField(homepageMeta.themeField, e.target.value)}
+            >
+              ${HOMEPAGE_THEME_OPTIONS.map((opt) => html`<option value=${opt.value} key=${opt.value}>${opt.label}</option>`)}
+            </select>
+          `}
           ${isLoadingSessions && html`<${LoadingInline} label="Loading sessions…" />`}
           ${sessionsError && html`<p class="tec-editor__error">${sessionsError}</p>`}
           ${!isLoadingSessions && !sessionsError && html`
             <${FeaturedSessionsEditor} \
               sessions=${sessions} \
               sessionTimes=${sessionTimes} \
-              tracks=${tracks} \
+              tracks=${primaryTracks} \
               featuredSessions=${activeConfig.config[homepageMeta.field]} \
               onChange=${(next) => updateConfigField(homepageMeta.field, next)} \
               heading="${homepageMeta.label} (display order)" \
@@ -352,7 +369,7 @@ export default function ConfigEditor() {
               onMetaChange=${handleMetaChange} \
               metaFields=${homepageMeta.metaFields} \
             />
-            <button type="button" class="tec-btn tec-btn--outline" onClick=${handleCopyHomepageJson}>Copy ${homepageMeta.label} JSON</button>
+            <button type="button" class="tec-btn tec-btn--outline" onClick=${handleCopyHomepageLink}>Copy Link</button>
           `}
         </section>
       `}

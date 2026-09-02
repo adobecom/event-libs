@@ -73,7 +73,7 @@ After removal, `syncAuth()` falls through directly to reading `imsProfile` and `
 <meta name="rainfocus-api-profile-id" content="...">
 ```
 
-These already live in page metadata (not this block's authoring table) so the shared bootstrap can start fetching before any block mounts — just point them at the real Rainfocus endpoint/profile once it exists. `register-url` now lives in the Tier 1 Event Configurator instead of flat metadata (see the status note above); `manual-on-demand-transition-time` metadata is gone entirely — post-event state is driven solely by the Tier 1 Event Configurator's `eventEndDateTime` (`getApiConfig().eventEndMs`, consumed by `isPostEvent()` in `session-state.js`).
+These already live in page metadata (not this block's authoring table) so the shared bootstrap can start fetching before any block mounts — just point them at the real Rainfocus endpoint/profile once it exists. `register-url` now lives in the Tier 1 Event Configurator instead of flat metadata (see the status note above); `manual-on-demand-transition-time` metadata is gone entirely — post-event state is driven solely by the Tier 1 Event Configurator's `eventEndDateTime` (`getEventApiConfig().eventEndMs`, consumed by `isPostEvent()` in `session-state.js`).
 
 **Also required:** `tier-1-event-config` metadata — `decorateEvent()` (`event-libs/v1/utils/decorate.js`) gates both `initTierOneEventConfig()` and `initSessionState()` on it being present, so pages must author that config before the shared store bootstraps at all. (The standalone `tier-1-event-state-enabled` opt-in flag this section used to describe was retired — presence of `tier-1-event-config` is the gate now.)
 
@@ -85,7 +85,7 @@ These already live in page metadata (not this block's authoring table) so the sh
 
 Every function is currently a stub returning hardcoded data. Replace with real `fetch` calls to the Rainfocus API.
 
-Credentials needed per call: `rfAuthToken` (from FEDS/IMS), `clientId` (IMS userId), `rfApiProfileId` and `rfApiUrl` (from `session-store.js`'s `getApiConfig()`).
+Credentials needed per call: `rfAuthToken` (from FEDS/IMS), `clientId` (IMS userId), `rfProfileId` and `rfApiUrl` (from `session-store.js`'s `getEventApiConfig()`).
 
 ---
 
@@ -110,14 +110,33 @@ has none.
 
 Known gaps in the real mapping (not blockers, just incomplete real-data coverage):
 - `resources[]` always `[]` — backend hasn't shipped this field yet.
-- `mrStreamId` always `null` — video/stream data is deliberately stripped from this public
-  endpoint until a session goes live; needs a different, likely time-gated/authenticated
-  fetch once that's designed.
+- `mrStreamId` always `null` — the catalog carries no attribute for it yet. It is the Mobile
+  Rider **live** stream id that `poller.js` keys on, authored in RainFocus and inbound as a new
+  attribute, tentatively named **`Mobilerider Live Stream ID`**. Mapping it in
+  `mapEslPayloadToRawSessions()` is the single change that turns stream polling on, so it stays
+  unmapped until the name is confirmed.
+
 - Sessions with multiple `sessionTimes` (recurring/repeated) only surface their earliest
   occurrence.
 - `CategoryBadge`'s icon set — `getTrackIcon()` has no built-in default map anymore (see
   `event-libs/v1/utils/tier-1-event-config.js`); every Track needs an authored
   `track-icon-config` entry to show a badge at all — a content/authoring task, not a code gap.
+
+### Video sources
+
+A session's video comes from one of **four** attributes, each its own player. These are
+alternatives, not a fallback chain — a session carries whichever it was produced for, so an
+empty field means "not this source", never "try another".
+
+| Attribute | Field | Player | State |
+|---|---|---|---|
+| `Mobilerider Live Stream ID` | `mrStreamId` | Mobile Rider **live** | inbound; name tentative |
+| `MPC ID` | `mpcId` | **Adobe Video TV** | mapped, unread |
+| `YouTube ID` | `youTubeId` | **YouTube** | mapped, unread |
+| `Mobilerider Video ID (DVR)` | `mrDvrVideoId` | Mobile Rider **post-stream recording**, gated by `DVR Timing (in hours)` | mapped, unread |
+
+`Skin ID` → `mrSkinId` is the Mobile Rider player skin, and applies only to the two Mobile
+Rider sources. All of the above are mapped ahead of the playback work and read by nothing yet.
 
 ---
 

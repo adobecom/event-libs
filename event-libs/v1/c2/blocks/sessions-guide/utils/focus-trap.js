@@ -1,19 +1,23 @@
-// Milo's shared focus trap (blocks/modal/modal.js) is baked into its own imperative,
-// append-to-body dialog and can't target an already-mounted, Preact-managed container —
-// hence this lighter, standalone version (see trapFocus() below).
+// Milo's trap is baked into its own append-to-body dialog and can't target an
+// already-mounted, Preact-managed container.
 
 const FOCUSABLE_SELECTOR = 'a[href], button:not([disabled]), input:not([disabled]), '
   + 'select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
-function getFocusables(containerEl) {
-  return [...containerEl.querySelectorAll(FOCUSABLE_SELECTOR)].filter((el) => el.offsetParent !== null);
+// An element the browser refuses to focus becomes a phantom boundary: it can never be
+// document.activeElement, so the wrap-around below lets Tab walk out of the trap.
+// The live case is BackToTop.js, mounted-but-inert while faded out.
+function isFocusable(el) {
+  if (el.offsetParent === null) return false;
+  if (el.closest('[inert]')) return false;
+  return getComputedStyle(el).visibility !== 'hidden';
 }
 
-/**
- * Traps Tab/Shift+Tab focus cycling within `containerEl`, calls `onEscape` on Escape,
- * and restores focus on cleanup to whatever was focused before the trap activated.
- * Returns a cleanup function.
- */
+function getFocusables(containerEl) {
+  return [...containerEl.querySelectorAll(FOCUSABLE_SELECTOR)].filter(isFocusable);
+}
+
+// Cycles Tab within containerEl, calls onEscape, and restores prior focus on cleanup.
 export function trapFocus(containerEl, onEscape) {
   if (!containerEl) return () => {};
   const previouslyFocused = document.activeElement;
@@ -21,8 +25,10 @@ export function trapFocus(containerEl, onEscape) {
   const [first] = getFocusables(containerEl);
   (first || containerEl).focus?.({ preventScroll: true });
 
+  // Traps nest, so an unstopped Escape would bubble out and dismiss the outer one too.
   function onKeydown(e) {
     if (e.key === 'Escape') {
+      e.stopPropagation();
       onEscape?.();
       return;
     }
@@ -33,9 +39,11 @@ export function trapFocus(containerEl, onEscape) {
     const lastItem = items[items.length - 1];
     if (e.shiftKey && document.activeElement === firstItem) {
       e.preventDefault();
+      e.stopPropagation();
       lastItem.focus();
     } else if (!e.shiftKey && document.activeElement === lastItem) {
       e.preventDefault();
+      e.stopPropagation();
       firstItem.focus();
     }
   }

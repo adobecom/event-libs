@@ -217,6 +217,9 @@ const ConfigsProvider = ({ children }) => {
   const value = {
     configs,
     isInitialLoading,
+    // Exposed so the copied-link re-open can wait for the library before checking whether
+    // the link's configId matches a saved row.
+    hasLoaded,
     error,
     toastSuccess,
     toastError,

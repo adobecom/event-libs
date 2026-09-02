@@ -1,0 +1,32 @@
+.track-tags {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s2a-spacing-4, 4px);
+}
+
+.track-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  color: var(--s2a-color-gray-1000, #000);
+  font-size: var(--s2a-typography-font-size-body-sm);
+  line-height: var(--s2a-typography-line-height-body-sm);
+  letter-spacing: var(--s2a-typography-letter-spacing-body-sm);
+}
+
+.track-tag-icon {
+  display: inline-flex;
+  flex: 0 0 auto;
+  width: var(--s2a-spacing-16, 16px);
+  height: var(--s2a-spacing-16, 16px);
+}
+
+.track-tag-icon:empty {
+  display: none;
+}
+
+.track-tag-icon svg {
+  width: 100%;
+  height: 100%;
+  fill: currentcolor;
+}

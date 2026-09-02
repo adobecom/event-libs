@@ -1,9 +1,12 @@
 import {
   setDaToken, setDaFetch, readSheet, mutateSheet, parseRowConfig, listFolder, uploadMedia, getContentUrl,
+  getAemLiveUrl, uploadAndPublishMedia,
 } from '../../v1/utils/da-sheet-controller.js';
 import { CONFIGS_SHEET_PATH, CONFIG_TYPES } from '../constants.js';
 
-export { setDaToken, setDaFetch, listFolder, uploadMedia, getContentUrl };
+export {
+  setDaToken, setDaFetch, listFolder, uploadMedia, getContentUrl, getAemLiveUrl, uploadAndPublishMedia,
+};
 
 // Global rows live in the shared utility's default-owned sheet ('data') —
 // unchanged from before Homepage configs existed, so a concurrent
@@ -17,11 +20,20 @@ const GLOBAL_SHEET_NAME = 'data';
 const HOMEPAGE_SHEET_NAME = 'homepage';
 const ALL_SHEET_NAMES = [GLOBAL_SHEET_NAME, HOMEPAGE_SHEET_NAME];
 
-// Rows within the homepage sheet are keyed on (eventId, configType) together,
-// not eventId alone — the same event can carry both an Upcoming Sessions row
-// and a Featured Sessions row side by side, in that one sheet.
+// Rows within the homepage sheet are keyed on `configId` — a single event can
+// carry any number of Upcoming/Featured Sessions rows side by side (each its
+// own named config, see `configName`), so (eventId, configType) alone isn't
+// a unique row identity there the way it is for Global rows.
 function rowConfigType(row) {
   return row.configType || CONFIG_TYPES.GLOBAL;
+}
+
+// Global rows have no configId (identity is eventId+configType); Homepage
+// rows always do (identity is configId alone, stamped by ConfigsContext's
+// startNewConfig/startDuplicateConfig).
+function rowMatches(row, target) {
+  if (target.configId) return row.configId === target.configId;
+  return row.eventId === target.eventId && rowConfigType(row) === rowConfigType(target);
 }
 
 function sheetNameForConfigType(configType) {
@@ -70,16 +82,19 @@ export async function getConfigs(org, repo) {
   return { ok: true, data: [...globalRows, ...homepageRows] };
 }
 
-// Upsert-by-(Event-ID, config type): replaces the existing row matching both,
-// or appends a new one — a single write path rather than separate
-// create/update calls, so re-picking an already-configured event+type can
-// never create a duplicate row. The same event can carry a Global row and
-// separate Homepage rows side by side, since they're keyed independently and
-// stored in separate sheets of the same file — a Homepage save never
-// rewrites the Global sheet's rows, only leaves them untouched (and
-// vice versa), via da-sheet-controller.js's otherSheets round-tripping.
+// Upsert-by-identity (rowMatches: configId for Homepage rows, Event-ID+config
+// type for Global rows): replaces the existing row matching that identity, or
+// appends a new one — a single write path rather than separate create/update
+// calls. For Global this means re-picking an already-configured event can
+// never create a duplicate row; for Homepage, each row's own configId keeps
+// it independent even when another row shares the same event+type. The same
+// event can carry a Global row and separate Homepage rows side by side, since
+// they're keyed independently and stored in separate sheets of the same
+// file — a Homepage save never rewrites the Global sheet's rows, only leaves
+// them untouched (and vice versa), via da-sheet-controller.js's otherSheets
+// round-tripping.
 export async function upsertConfig(org, repo, {
-  eventId, backendEventTitle, eventServiceEnv, configType, config,
+  eventId, backendEventTitle, eventServiceEnv, configType, configId, config,
 }) {
   const updated = new Date().toISOString();
   const stampedConfig = {
@@ -88,17 +103,17 @@ export async function upsertConfig(org, repo, {
     backendEventTitle,
     updated,
   };
-  // eventServiceEnv/configType are row-level only, not stamped into config —
-  // they're authoring-time detail (which ESP tier this came from, which
-  // surface this row targets), irrelevant to the page that eventually
+  // eventServiceEnv/configType/configId are row-level only, not stamped into
+  // config — they're authoring-time detail (which ESP tier this came from,
+  // which surface/row this targets), irrelevant to the page that eventually
   // consumes the pasted Config.
   const newRow = {
-    eventId, backendEventTitle, eventServiceEnv, configType, config: stampedConfig, updated,
+    eventId, backendEventTitle, eventServiceEnv, configType, configId, config: stampedConfig, updated,
   };
   const targetSheet = sheetNameForConfigType(configType);
 
   const result = await mutateSheet(org, repo, CONFIGS_SHEET_PATH, (rows) => {
-    const idx = rows.findIndex((r) => r.eventId === eventId && rowConfigType(r) === rowConfigType(newRow));
+    const idx = rows.findIndex((r) => rowMatches(r, newRow));
     if (idx === -1) return { rows: [newRow, ...rows], result: newRow };
     const next = [...rows];
     next[idx] = newRow;
@@ -108,12 +123,13 @@ export async function upsertConfig(org, repo, {
   return { ok: true, data: result.data };
 }
 
-export async function deleteConfig(org, repo, eventId, configType) {
+export async function deleteConfig(org, repo, { eventId, configType, configId }) {
   let found = false;
   const targetType = configType || CONFIG_TYPES.GLOBAL;
   const targetSheet = sheetNameForConfigType(targetType);
+  const target = { eventId, configType: targetType, configId };
   const result = await mutateSheet(org, repo, CONFIGS_SHEET_PATH, (rows) => {
-    const next = rows.filter((r) => !(r.eventId === eventId && rowConfigType(r) === targetType));
+    const next = rows.filter((r) => !rowMatches(r, target));
     if (next.length === rows.length) return { rows, result: null, skip: true };
     found = true;
     return { rows: next, result: null };

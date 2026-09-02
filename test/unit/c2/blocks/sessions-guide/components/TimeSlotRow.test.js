@@ -16,14 +16,14 @@ const BASE_CONFIG = {
 };
 
 const SESSION_A = {
-  id: 'a', title: 'Session A', description: 'Desc A', track: 'Design',
+  id: 'a', title: 'Session A', description: 'Desc A', primaryTrack: 'Design',
   startTimeUtc: '2099-10-28T17:00:00Z', endTimeUtc: '2099-10-28T18:00:00Z',
-  videoAvailable: false, inPerson: false, sessionPageUrl: '/a',
+  inPerson: false, sessionPageUrl: '/a',
 };
 const SESSION_B = {
-  id: 'b', title: 'Session B', description: 'Desc B', track: 'Video',
+  id: 'b', title: 'Session B', description: 'Desc B', primaryTrack: 'Video',
   startTimeUtc: '2099-10-28T17:00:00Z', endTimeUtc: '2099-10-28T18:00:00Z',
-  videoAvailable: false, inPerson: false, sessionPageUrl: '/b',
+  inPerson: false, sessionPageUrl: '/b',
 };
 
 function makeStore() {
@@ -77,11 +77,14 @@ describe('TimeSlotRow', () => {
     expect(count).to.equal(2);
   });
 
-  it('does not show prev arrow at initial offset 0', () => {
+  // Arrows stay mounted and disable at the ends — conditionally unmounting them
+  // destroyed focus when a keyboard user paged to either end.
+  it('renders the prev arrow disabled at initial offset 0', () => {
     const store = makeStore();
     const TimeSlotRow = buildTimeSlotRow(preact, store);
     const html = TimeSlotRow({ sessions: [SESSION_A, SESSION_B] });
-    expect(html).to.not.include('sg-time-row__arrow--prev');
+    expect(html).to.include('sg-time-row__arrow--prev');
+    expect(html).to.include('disabled="true"');
   });
 
   it('renders card wraps for multiple sessions (next arrow requires real layout)', () => {
@@ -94,10 +97,11 @@ describe('TimeSlotRow', () => {
     expect(count).to.equal(2);
   });
 
-  it('does not show next arrow for a single session', () => {
+  it('renders the next arrow disabled for a single session', () => {
     const store = makeStore();
     const TimeSlotRow = buildTimeSlotRow(preact, store);
     const html = TimeSlotRow({ sessions: [SESSION_A] });
-    expect(html).to.not.include('sg-time-row__arrow--next');
+    expect(html).to.include('sg-time-row__arrow--next');
+    expect(html).to.include('disabled="true"');
   });
 });

@@ -77,7 +77,10 @@ decorateArea();
  */
 
 (function loadStyles() {
-  const paths = [`${LIBS}/styles/styles.css`];
+  // On a `foundation: c2` page, load Milo's C2 base styles (/c2/styles/styles.css)
+  // to match the C2 blocks — otherwise the page renders in a C1 styling context.
+  const stylesPrefix = IS_C2 ? '/c2' : '';
+  const paths = [`${LIBS}${stylesPrefix}/styles/styles.css`];
   if (STYLES) { paths.push(STYLES); }
   paths.forEach((path) => {
     const link = document.createElement('link');

@@ -2,9 +2,28 @@
 // Supports component templates with props and children, string interpolation,
 // createContext/useContext, useReducer, and h().
 
+const ATTR_POSITION = /\s+([\w-]+)=$/;
+
 function parsePropName(str) {
-  const m = str.match(/\s+([\w-]+)=$/);
+  const m = str.match(ATTR_POSITION);
   return m ? m[1] : null;
+}
+
+function escapeAttr(value) {
+  return String(value).replace(/&/g, '&amp;').replace(/"/g, '&quot;');
+}
+
+// Real htm quotes an unquoted interpolated attribute value (`aria-label=${label}`) for you.
+// Without this, a value containing spaces spills into bogus sibling attributes and the
+// attribute itself is lost — which silently drops accessible names from the rendered output.
+function appendAttr(acc, str, match, val) {
+  // htm omits the attribute entirely for these, rather than emitting an empty one —
+  // `disabled=${undefined}` must not render as a disabled button.
+  if (val === undefined || val === null || val === false) {
+    return acc + str.slice(0, str.length - match[0].length);
+  }
+  if (typeof val === 'function' || typeof val === 'object') return `${acc + str}""`;
+  return `${acc + str}"${escapeAttr(val)}"`;
 }
 
 export function html(strings, ...values) {
@@ -28,6 +47,8 @@ export function html(strings, ...values) {
   }
   return strings.reduce((acc, str, i) => {
     const val = values[i];
+    const attr = i < values.length ? str.match(ATTR_POSITION) : null;
+    if (attr) return appendAttr(acc, str, attr, val);
     if (val === undefined || val === null || val === false) return acc + str;
     if (typeof val === 'function') return acc + str;
     if (Array.isArray(val)) return acc + str + val.join('');
@@ -64,7 +85,10 @@ export function createContext(defaultValue) {
   return ctx;
 }
 
-export function useState(initial) { return [initial, () => {}]; }
+// Matches real React/Preact: a function initial is treated as a lazy initializer.
+export function useState(initial) {
+  return [typeof initial === 'function' ? initial() : initial, () => {}];
+}
 export function useEffect() {}
 export function useLayoutEffect() {}
 export function useRef(val) { return { current: val }; }

@@ -7,7 +7,7 @@ import { Carousel } from './Carousel.js';
 import { TimeSlotRow } from './TimeSlotRow.js';
 import {
   liveSessions, upcomingSessions, groupByStartTime, filterSessions, getRecommendedSessions,
-  sessionsForDay,
+  sessionsForDay, excludeOnDemandFormat,
 } from '../utils/session-filters.js';
 import { getNowMs, formatShortTime, formatTimezoneAbbr } from '../utils/time.js';
 
@@ -41,9 +41,10 @@ export function LiveUpcomingView() {
   const upcoming = filterSessions(upcomingRaw, activeFilters, searchQuery);
   const timeSlots = groupByStartTime(upcoming);
 
-  // Previously aired: all sessions for the day, shown when nothing is upcoming or live
+  // Previously aired: all sessions for the day, shown when nothing is upcoming or live.
+  // On-demand-only sessions never aired, so they stay out of here too — On Demand owns them.
   const previouslyAiredSlots = (timeSlots.length === 0 && live.length === 0)
-    ? groupByStartTime(sessionsForDay(sessions, activeDay, userTz))
+    ? groupByStartTime(excludeOnDemandFormat(sessionsForDay(sessions, activeDay, userTz)))
     : [];
 
   return html`
@@ -52,7 +53,7 @@ export function LiveUpcomingView() {
         <div class="sg-carousel-section sg-carousel-section--live">
           <${Carousel}
             sessions=${live}
-            title="Live now"
+            title="Live sessions"
             formatTime=${(s) => formatShortTime(s.startTimeUtc, userTz)}
             formatTimezone=${(s) => formatTimezoneAbbr(s.startTimeUtc, userTz)}
             variant="live"
@@ -64,7 +65,6 @@ export function LiveUpcomingView() {
           <${Carousel}
             sessions=${recommended}
             title="Recommended"
-            formatTime=${() => 'Trending'}
             variant="recommended"
           />
         </div>
