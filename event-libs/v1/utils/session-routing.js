@@ -22,6 +22,12 @@ function startMobileRiderPolling() {
   registerStreamIds(streamIds);
 }
 
+// Exposed so callers (e.g. event-card's live CTA text) can read the same MR poll
+// results this module already maintains, instead of running a second poller.
+export function getLiveStreamActiveIds() {
+  return liveStreamActiveIds;
+}
+
 export function resolveCardAction(dataset, nowMs = getNowMs(), activeStreamIds = liveStreamActiveIds) {
   const { sessionId, sessionUrl, mrStreamId } = dataset;
   const state = deriveSessionState(

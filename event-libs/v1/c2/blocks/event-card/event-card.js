@@ -1,8 +1,55 @@
 import { createTag, createOptimizedPicture, loadStyle } from '../../../utils/utils.js';
+import { deriveSessionState, getNowMs } from '../../../utils/session-state.js';
+import { subscribe } from '../../../services/sessions/poller.js';
 
 const VARIANTS = ['media-square', 'media-standard', 'media-standard-rev', 'standard-m', 'media-wide', 'media-tall'];
 const DEFAULT_VARIANT = 'media-standard';
 const BLOCK_CSS_URL = new URL('./event-card.css', import.meta.url).href;
+
+// live/on-demand swap the authored CTA copy to reflect session state; upcoming keeps
+// whatever was authored (e.g. "Add to calendar"), since it isn't a watch action yet.
+const LIVE_CTA_TEXT = { live: 'Watch now', 'on-demand': 'Watch on demand' };
+
+function refreshCtaText(el, cta, getLiveStreamActiveIds) {
+  const state = deriveSessionState({
+    startTimeUtc: el.dataset.startTimeUtc,
+    endTimeUtc: el.dataset.endTimeUtc,
+    mrStreamId: el.dataset.mrStreamId,
+  }, getLiveStreamActiveIds(), getNowMs());
+  const text = LIVE_CTA_TEXT[state];
+  if (text) cta.textContent = text;
+  return state;
+}
+
+// Mirrors upcoming-sessions.js's scheduleStateTimers: an exact setTimeout fired right at
+// the boundary instant, not a shared poll, so the CTA text flips in lockstep with that
+// block instead of lagging behind on some independent interval.
+function scheduleBoundary(atMs, onBoundary) {
+  if (!Number.isFinite(atMs)) return;
+  const delay = atMs - getNowMs();
+  setTimeout(onBoundary, Math.max(delay, 0));
+}
+
+function attachLiveCtaText(el, cta, getLiveStreamActiveIds) {
+  const mrStreamId = el.dataset.mrStreamId;
+  const startMs = Date.parse(el.dataset.startTimeUtc);
+  const endMs = Date.parse(el.dataset.endTimeUtc);
+
+  const state = refreshCtaText(el, cta, getLiveStreamActiveIds);
+
+  if (state === 'upcoming') {
+    scheduleBoundary(startMs, () => refreshCtaText(el, cta, getLiveStreamActiveIds));
+  }
+
+  if (mrStreamId) {
+    // MR sessions have no fixed end instant to schedule against — the poller (already
+    // registered by session-routing.js's attachSessionRouting) is the only signal for
+    // when the stream actually goes inactive, so re-check on every one of its updates.
+    subscribe(() => refreshCtaText(el, cta, getLiveStreamActiveIds), [mrStreamId]);
+  } else if (state !== 'on-demand') {
+    scheduleBoundary(endMs, () => refreshCtaText(el, cta, getLiveStreamActiveIds));
+  }
+}
 
 function getVariant(el) {
   return VARIANTS.find((variant) => el.classList.contains(variant)) || DEFAULT_VARIANT;
@@ -102,7 +149,10 @@ export default async function init(el) {
   el.dataset.cardTheme = theme;
 
   if (el.dataset.sessionId) {
-    const { default: attachSessionRouting } = await import('../../../utils/session-routing.js');
+    const { default: attachSessionRouting, getLiveStreamActiveIds } = await import('../../../utils/session-routing.js');
     attachSessionRouting(el);
+
+    const cta = body.querySelector('.card-cta');
+    if (cta) attachLiveCtaText(el, cta, getLiveStreamActiveIds);
   }
 }
