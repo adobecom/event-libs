@@ -103,10 +103,10 @@ exists for this.
 - No fixed placement — the block behaves the same regardless of where an author puts
   it on the page (mid-page, etc.), rendering as a normal in-flow block. The one
   exception: a banner placed at the very top of the page — that's what the
-  `nav-overlay` config row opts into. It fixes the banner above GNAV (min-height
-  reading GNAV's own `--global-height-nav`, falling back to `80px`) and pushes
-  `header.global-navigation`'s own sticky `top` down by the banner's *actual
-  rendered* height via a sibling-selector override
+  `nav-overlay` config row opts into. It fixes the banner above GNAV at its own
+  natural, content-driven height (no min-height tying it to GNAV's height) and
+  pushes `header.global-navigation`'s own sticky `top` down by the banner's
+  *actual rendered* height via a sibling-selector override
   (`.in-person-banner-nav-overlay ~ header.global-navigation { top: ... }`) — no
   edit to GNAV's source, GNAV just renders directly below the banner and stays
   visible the whole time, not covered. Once the visitor scrolls past
