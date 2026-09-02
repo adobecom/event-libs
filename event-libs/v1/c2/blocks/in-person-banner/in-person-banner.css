@@ -5,28 +5,30 @@
   width: 100%;
 }
 
-/* Nav overlay: fix the banner above the sticky GNAV header (z-index above
-   header.global-navigation's z-index: 10) at the very top of the page, at
-   its own natural (content-driven) height — no min-height tying it to
-   GNAV's height. GNAV itself is NOT covered — the sibling-selector rule
-   below pushes its own sticky `top` down by the banner's actual rendered
-   height (--in-person-banner-height, kept in sync by in-person-banner.js
-   via ResizeObserver — never assume a fixed height, mobile wraps to a
-   taller banner) so it renders directly below the banner instead of
-   underneath it, staying visible the whole time. No edit to the
-   global-navigation source: this is purely an override from
+/* Nav overlay: fix the banner above the sticky GNAV header at the very top
+   of the page, at its own natural (content-driven) height — no min-height
+   tying it to GNAV's height. GNAV itself is NOT covered — the
+   sibling-selector rule below pushes its own sticky `top` down by the
+   banner's actual rendered height (--in-person-banner-height, kept in
+   sync by in-person-banner.js via ResizeObserver — never assume a fixed
+   height, mobile wraps to a taller banner) so it renders directly below
+   the banner instead of underneath it, staying visible the whole time. No
+   edit to the global-navigation source: this is purely an override from
    in-person-banner's own stylesheet, using the sibling combinator since
    in-person-banner.js reparents the block to be a direct child of <body>
    (same parent as <header class="global-navigation">). Sliding the banner
    away on scroll (in-person-banner.js toggles in-person-banner-scrolled)
    hands GNAV back its normal top: 0, so it slides up to reclaim the
-   vacated space. */
+   vacated space. No z-index here: GNAV and the banner are stacked
+   (banner above, GNAV pushed below it), never overlapping, so stacking
+   order doesn't need to be forced — leaving it out lets sections that
+   need to render above the banner (e.g. a marquee with rounded top
+   corners) do so without having to out-rank an arbitrary z-index. */
 .in-person-banner.in-person-banner-nav-overlay {
   position: fixed;
   top: 0;
   left: 0;
   right: 0;
-  z-index: 15;
   transition: transform 300ms cubic-bezier(0.42, 0, 0, 1);
 }
 
