@@ -56,20 +56,21 @@ function buildBanner(contentEl, bannerId) {
   return banner;
 }
 
-const SCROLL_REVEAL_THRESHOLD = 10;
-
 function observeScrollReveal(el) {
   let ticking = false;
-  const updateScrolledState = () => {
-    el.classList.toggle('in-person-banner-scrolled', window.scrollY > SCROLL_REVEAL_THRESHOLD);
+  const update = () => {
+    const bannerHeight = el.offsetHeight;
+    const progress = Math.min(window.scrollY, bannerHeight);
+    document.documentElement.style.setProperty('--in-person-banner-scroll-progress', `${progress}px`);
+    el.classList.toggle('in-person-banner-scrolled', progress >= bannerHeight);
     ticking = false;
   };
   window.addEventListener('scroll', () => {
     if (ticking) return;
     ticking = true;
-    window.requestAnimationFrame(updateScrolledState);
+    window.requestAnimationFrame(update);
   }, { passive: true });
-  updateScrolledState();
+  update();
 }
 
 function syncBannerHeightVar(el) {

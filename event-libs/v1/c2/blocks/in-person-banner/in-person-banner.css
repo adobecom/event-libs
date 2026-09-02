@@ -11,19 +11,17 @@
   left: 0;
   right: 0;
   height: var(--global-height-nav, 80px);
+  transform: translateY(calc(-1 * var(--in-person-banner-scroll-progress, 0px)));
 }
 
 .in-person-banner.in-person-banner-nav-overlay.in-person-banner-scrolled {
-  transform: translateY(-100%);
   pointer-events: none;
 }
 
 .in-person-banner.in-person-banner-nav-overlay ~ header.global-navigation {
-  top: var(--in-person-banner-height, var(--global-height-nav, 80px));
-}
-
-.in-person-banner.in-person-banner-nav-overlay.in-person-banner-scrolled ~ header.global-navigation {
-  top: 0;
+  transform: translateY(calc(
+    var(--in-person-banner-height, var(--global-height-nav, 80px)) - var(--in-person-banner-scroll-progress, 0px)
+  ));
 }
 
 body:has(.in-person-banner-nav-overlay:not(.in-person-banner-scrolled)) main {
