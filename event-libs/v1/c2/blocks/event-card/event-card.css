@@ -121,10 +121,6 @@
   text-decoration: underline;
 }
 
-/* Dark theme — data-card-theme is set by init() from the presence of a "dark-card"
-   class on the authored/generated card, mirroring the "dark-card" class name other
-   blocks (upcoming-sessions, decorate.js's tec-homepage builder) already use for their
-   own dark surfaces. Light (the default, no class needed) is untouched above. */
 .event-card[data-card-theme="dark"] .card-title {
   color: #fff;
 }
@@ -133,9 +129,6 @@
   color: rgb(255 255 255 / 64%);
 }
 
-/* card-cta::after's mask only reads the SVG's alpha shape, not its stroke color, so its
-   background-color: currentcolor (base rule above) already follows this override with
-   no separate ::after rule needed. */
 .event-card[data-card-theme="dark"] .card-cta {
   color: #fff;
 }
