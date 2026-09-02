@@ -29,7 +29,6 @@
   top: 0;
   left: 0;
   right: 0;
-  transition: transform 300ms cubic-bezier(0.42, 0, 0, 1);
 }
 
 .in-person-banner.in-person-banner-nav-overlay.in-person-banner-scrolled {
@@ -39,7 +38,6 @@
 
 .in-person-banner.in-person-banner-nav-overlay ~ header.global-navigation {
   top: var(--in-person-banner-height, var(--global-height-nav, 80px));
-  transition: top 300ms cubic-bezier(0.42, 0, 0, 1);
 }
 
 .in-person-banner.in-person-banner-nav-overlay.in-person-banner-scrolled ~ header.global-navigation {
