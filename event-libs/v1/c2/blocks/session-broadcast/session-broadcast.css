@@ -28,8 +28,15 @@
   border: 0;
 }
 
+/* --sb-fill-height is kept in sync with the footer's top edge by session-broadcast.js — a
+   short state (e.g. Ended with no Also Live/Upcoming sessions) then still reaches the footer
+   instead of leaving a gap of the page's default background under it. Falls back to 0 (no
+   effect) before JS runs or if the footer can't be found. A floor, not a fixed height — taller
+   content is unaffected, and unlike a static 100vh it never pads the page out past the
+   viewport or pushes the footer below the fold. */
 .sb-app {
   display: block;
+  min-height: var(--sb-fill-height, 0);
   background: var(--s2a-color-gray-1000, #000);
 }
 
