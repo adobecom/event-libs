@@ -60,6 +60,26 @@ function buildBanner(contentEl, bannerId) {
   return banner;
 }
 
+// Threshold, in px, past which the overlaying banner slides away to reveal
+// the sticky GNAV header underneath. A small value rather than the banner's
+// own height — it should get out of the way as soon as the visitor starts
+// reading the page, not only once fully scrolled past.
+const SCROLL_REVEAL_THRESHOLD = 10;
+
+function observeScrollReveal(el) {
+  let ticking = false;
+  const updateScrolledState = () => {
+    el.classList.toggle('in-person-banner-scrolled', window.scrollY > SCROLL_REVEAL_THRESHOLD);
+    ticking = false;
+  };
+  window.addEventListener('scroll', () => {
+    if (ticking) return;
+    ticking = true;
+    window.requestAnimationFrame(updateScrolledState);
+  }, { passive: true });
+  updateScrolledState();
+}
+
 const CONFIG_KEYS = new Set(['banner-id', 'rf-data-check', 'below-nav', 'message']);
 
 // Authors write the literal word "false" for an off boolean row (see below-nav in the
@@ -104,4 +124,6 @@ export default async function init(el) {
 
   const banner = buildBanner(contentCell, bannerId);
   el.replaceChildren(banner);
+
+  if (belowNav) observeScrollReveal(el);
 }

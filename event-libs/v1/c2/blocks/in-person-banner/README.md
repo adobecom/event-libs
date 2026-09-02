@@ -42,9 +42,11 @@ need to remember which shape to use:
 - `rf-data-check` — exactly `true` (case-insensitive) to gate visibility on in-person
   registration (see below); `false` or omitted shows unconditionally to everyone.
 - `below-nav` — exactly `true` (case-insensitive) when this banner is placed at the
-  very top of the page, so it needs a top offset to clear the sticky GNAV header
-  instead of rendering underneath it. `false` or omitted for any other placement —
-  see Layout below for why this isn't automatic.
+  very top of the page: the banner overlays the sticky GNAV header (`position: fixed`,
+  above it) instead of rendering as a normal block, so it's the only thing visible at
+  first paint. It slides away once the visitor scrolls a small amount, revealing the
+  GNAV header underneath. `false` or omitted for any other placement — see Layout
+  below for why this isn't automatic.
 - `message` — **required** (whether authored under this label or as a bare row).
   Rich content, same authoring conventions as any other block (links via markdown,
   bold/italic, etc.) — no new authoring paradigm.
@@ -98,8 +100,14 @@ exists for this.
 - Mobile (`max-width: 767px`): copy left-aligns and the `×` sits at the top-right of a
   taller, stacked layout, matching the Figma mobile frames.
 - No fixed placement — the block behaves the same regardless of where an author puts
-  it on the page (top of page, below nav, mid-page, etc.). The one exception: a
-  banner placed at the very top of the page can render underneath the sticky GNAV
-  header, since this generic block has no way to detect GNAV's own height on its
-  own — that's what the `below-nav` config row opts into (reads GNAV's own
-  `--global-height-nav`, falling back to `80px` if that variable isn't set).
+  it on the page (mid-page, etc.), rendering as a normal in-flow block. The one
+  exception: a banner placed at the very top of the page — that's what the
+  `below-nav` config row opts into. It fixes the banner over the GNAV header
+  (reading GNAV's own `--global-height-nav`, falling back to `80px`, for its
+  minimum height so it fully covers the nav) and slides it away
+  (`transform: translateY(-100%)`) once the visitor scrolls past
+  `SCROLL_REVEAL_THRESHOLD` (10px, in `in-person-banner.js`), revealing GNAV — the
+  same overlay-then-reveal pattern GNAV's own PromoBar uses for its promo bar over
+  `header.global-navigation`. Scroll position is polled via a single passive
+  `scroll` listener throttled to one check per animation frame, not per-event, to
+  avoid layout thrash.
