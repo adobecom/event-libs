@@ -919,16 +919,11 @@ async function addConsentSuite(form) {
 export function addTerms(form, terms) {
   if (!terms || terms.textContent === '') return;
   const submitWrapper = form.querySelector('.events-form-submit-wrapper');
-  const termsWrapper = createTag('div', { class: 'field-wrapper events-form-full-width event-terms-wrapper' });
-  const termsTexts = terms.querySelectorAll('p');
-  const lis = terms.querySelectorAll('li');
+  const termsWrapper = createTag('div', { class: 'field-wrapper events-form-full-width event-terms-wrapper field-group-wrapper' });
+  const termsContent = terms.querySelectorAll(':scope > p, :scope > ul, :scope > ol');
 
-  termsTexts.forEach((t) => {
-    termsWrapper.append(t);
-  });
-
-  lis.forEach((li) => {
-    li.remove();
+  termsContent.forEach((el) => {
+    termsWrapper.append(el);
   });
 
   terms.remove();
