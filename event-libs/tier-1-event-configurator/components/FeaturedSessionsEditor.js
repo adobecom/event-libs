@@ -57,7 +57,6 @@ function DragHandleIcon() {
 // callers pick a subset via `metaFields` (below) to match what their own
 // consuming block actually reads, rather than always showing both.
 const META_FIELD_DEFS = {
-  watchUrl: { label: 'Watch URL', placeholder: 'Watch URL (optional)' },
   mrStreamId: { label: 'Mobile Rider stream ID', placeholder: 'Mobile Rider stream ID (optional)' },
   // type: 'image' additionally gets a thumbnail + "Upload…" button (see the meta-fields
   // render below) — the text input still works standalone for pasting an already-uploaded

@@ -2,6 +2,7 @@ import {
   getSessionPrimaryTrack, extractDistinctPrimaryTracks, extractDistinctAllTracks,
   getSessionAdditionalTracks, getSessionOverrideText, extractDistinctOverrideTexts,
   getSessionProducts, extractDistinctProducts,
+  getSessionIsLivestreamed, getSessionIsOnline,
 } from '../v1/services/sessions/sessions-api.js';
 import { DA_ORIGIN, DA_APP_PATH, HOMEPAGE_LINK_HASH_KEY } from './constants.js';
 
@@ -116,10 +117,12 @@ export function stringifyConfig(value, indent = '') {
 // featured-sessions.js) decodes directly from the authored link's hash payload
 // (see buildHomepageConfigURL below), so it's built here rather than looked up at
 // render time. Shared by both Homepage config types — they need the identical shape.
-// `meta` is an optional { watchUrl, mrStreamId, imageUrl } hand-authored override (see
-// MOBILE-RIDER-STREAM-ID-GAP.md) — all three omitted entirely from the entry when
+// `meta` is an optional { mrStreamId, imageUrl } hand-authored override (see
+// MOBILE-RIDER-STREAM-ID-GAP.md) — both omitted entirely from the entry when
 // blank, matching upcoming-sessions.js's own authored-data shape, where an
-// absent key (not an empty string) means "not applicable to this session".
+// absent key (not an empty string) means "not applicable to this session". No
+// watchUrl here — session-routing.js's resolveCardAction resolves the live
+// destination itself via getWatchDestination, off isLivestreamed/isOnline below.
 export function buildSessionAuthorEntry(session, sessionTimes, meta) {
   const match = (sessionTimes || []).find((st) => st.sessionId === session.sessionId);
   const entry = {
@@ -131,7 +134,8 @@ export function buildSessionAuthorEntry(session, sessionTimes, meta) {
     track: getSessionPrimaryTrack(session) || '',
     url: session.url,
   };
-  if (meta?.watchUrl) entry.watchUrl = meta.watchUrl;
+  if (getSessionIsLivestreamed(session)) entry.isLivestreamed = true;
+  if (getSessionIsOnline(session)) entry.isOnline = true;
   if (meta?.mrStreamId) entry.mrStreamId = meta.mrStreamId;
   if (meta?.imageUrl) entry.imageUrl = meta.imageUrl;
   if (match) {

@@ -11,7 +11,8 @@ function setRoutingData(card, entry) {
   if (entry.sessionId) card.dataset.sessionId = entry.sessionId;
   if (entry.mrStreamId) card.dataset.mrStreamId = entry.mrStreamId;
   if (entry.url) card.dataset.sessionUrl = entry.url;
-  if (entry.watchUrl) card.dataset.watchUrl = entry.watchUrl;
+  if (entry.isLivestreamed) card.dataset.isLivestreamed = 'true';
+  if (entry.isOnline) card.dataset.isOnline = 'true';
 
   const { startTimeMillis, endTimeMillis } = entry.sessionTime || {};
   if (startTimeMillis) card.dataset.startTimeUtc = new Date(startTimeMillis).toISOString();

@@ -1,6 +1,7 @@
 import { expect } from '@esm-bundle/chai';
 import attachSessionRouting, { resolveCardAction } from '../../../event-libs/v1/utils/session-routing.js';
 import { sessionGuideRequest } from '../../../event-libs/v1/utils/session-store.js';
+import { MAX_EVENT_PAGES } from '../../../event-libs/v1/utils/constances.js';
 
 const HOUR = 60 * 60 * 1000;
 const NOW = Date.parse('2026-07-21T10:00:00.000Z');
@@ -20,32 +21,43 @@ describe('event-card session routing', () => {
       expect(action).to.deep.equal({ type: 'session-guide', sessionId: 'sess-1' });
     });
 
-    it('routes a live session to its watch URL', () => {
+    it('routes a live, livestreamed session to the homepage', () => {
       const action = resolveCardAction({
         sessionId: 'sess-1',
         sessionUrl: 'https://adobe.com/sessions/s1',
-        watchUrl: 'https://adobe.com/watch/s1',
+        isLivestreamed: 'true',
         startTimeUtc: iso(NOW - HOUR),
         endTimeUtc: iso(NOW + HOUR),
       }, NOW);
-      expect(action).to.deep.equal({ type: 'navigate', url: 'https://adobe.com/watch/s1' });
+      expect(action).to.deep.equal({ type: 'navigate', url: MAX_EVENT_PAGES.homepage });
     });
 
-    it('falls back to the session URL for a live session without a watch URL', () => {
+    it('routes a live, online (not livestreamed) session to the broadcast page', () => {
+      const action = resolveCardAction({
+        sessionId: 'sess-1',
+        sessionUrl: 'https://adobe.com/sessions/s1',
+        isOnline: 'true',
+        startTimeUtc: iso(NOW - HOUR),
+        endTimeUtc: iso(NOW + HOUR),
+      }, NOW);
+      expect(action).to.deep.equal({ type: 'navigate', url: MAX_EVENT_PAGES.broadcast });
+    });
+
+    it('resolves to no action for a live session that is neither livestreamed nor online', () => {
       const action = resolveCardAction({
         sessionId: 'sess-1',
         sessionUrl: 'https://adobe.com/sessions/s1',
         startTimeUtc: iso(NOW - HOUR),
         endTimeUtc: iso(NOW + HOUR),
       }, NOW);
-      expect(action).to.deep.equal({ type: 'navigate', url: 'https://adobe.com/sessions/s1' });
+      expect(action).to.deep.equal({ type: 'none' });
     });
 
     it('routes an on-demand session to its session page', () => {
       const action = resolveCardAction({
         sessionId: 'sess-1',
         sessionUrl: 'https://adobe.com/sessions/s1',
-        watchUrl: 'https://adobe.com/watch/s1',
+        isLivestreamed: 'true',
         startTimeUtc: iso(NOW - 2 * HOUR),
         endTimeUtc: iso(NOW - HOUR),
       }, NOW);
@@ -66,7 +78,7 @@ describe('event-card session routing', () => {
       const action = resolveCardAction({
         sessionId: 'sess-1',
         sessionUrl: 'https://adobe.com/sessions/s1',
-        watchUrl: 'https://adobe.com/watch/s1',
+        isLivestreamed: 'true',
         mrStreamId: 'mr-1',
         startTimeUtc: iso(NOW - HOUR),
         endTimeUtc: iso(NOW + HOUR),
@@ -74,16 +86,16 @@ describe('event-card session routing', () => {
       expect(action).to.deep.equal({ type: 'navigate', url: 'https://adobe.com/sessions/s1' });
     });
 
-    it('routes an MR session that is active in the poll set to its watch URL (live)', () => {
+    it('routes an MR session that is active in the poll set to the homepage (live)', () => {
       const action = resolveCardAction({
         sessionId: 'sess-1',
         sessionUrl: 'https://adobe.com/sessions/s1',
-        watchUrl: 'https://adobe.com/watch/s1',
+        isLivestreamed: 'true',
         mrStreamId: 'mr-1',
         startTimeUtc: iso(NOW - HOUR),
         endTimeUtc: iso(NOW + HOUR),
       }, NOW, new Set(['mr-1']));
-      expect(action).to.deep.equal({ type: 'navigate', url: 'https://adobe.com/watch/s1' });
+      expect(action).to.deep.equal({ type: 'navigate', url: MAX_EVENT_PAGES.homepage });
     });
 
     it('resolves to no action for an upcoming session missing a sessionId', () => {
@@ -110,16 +122,16 @@ describe('event-card session routing', () => {
       sessionGuideRequest.value = null;
     });
 
-    function buildCard({ startTimeUtc, endTimeUtc, sessionUrl, watchUrl }) {
+    function buildCard({ startTimeUtc, endTimeUtc, sessionUrl, isLivestreamed }) {
       const card = document.createElement('div');
       card.dataset.sessionId = 'sess-1';
       card.dataset.startTimeUtc = startTimeUtc;
       card.dataset.endTimeUtc = endTimeUtc;
       if (sessionUrl) card.dataset.sessionUrl = sessionUrl;
-      if (watchUrl) card.dataset.watchUrl = watchUrl;
+      if (isLivestreamed) card.dataset.isLivestreamed = 'true';
       const cta = document.createElement('a');
       cta.className = 'card-cta';
-      cta.href = sessionUrl || watchUrl || '#';
+      cta.href = sessionUrl || '#';
       card.append(cta);
       document.body.append(card);
       attachSessionRouting(card);
@@ -151,7 +163,7 @@ describe('event-card session routing', () => {
         startTimeUtc: iso(realNow - HOUR),
         endTimeUtc: iso(realNow + HOUR),
         sessionUrl: 'https://adobe.com/sessions/s1',
-        watchUrl: 'https://adobe.com/watch/s1',
+        isLivestreamed: true,
       });
       cta.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
       expect(sessionGuideRequest.value).to.equal(null);
@@ -162,7 +174,7 @@ describe('event-card session routing', () => {
         startTimeUtc: iso(realNow - 2 * HOUR),
         endTimeUtc: iso(realNow - HOUR),
         sessionUrl: 'https://adobe.com/sessions/s1',
-        watchUrl: 'https://adobe.com/watch/s1',
+        isLivestreamed: true,
       });
       card.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
       expect(sessionGuideRequest.value).to.equal(null);

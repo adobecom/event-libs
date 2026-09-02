@@ -1,5 +1,5 @@
 import { safeUrl } from './utils.js';
-import { deriveSessionState, getNowMs } from './session-state.js';
+import { deriveSessionState, getNowMs, getWatchDestination } from './session-state.js';
 import { openSessionGuideDetail } from './session-store.js';
 import { registerStreamIds, subscribe } from '../services/sessions/poller.js';
 
@@ -23,7 +23,7 @@ function startMobileRiderPolling() {
 }
 
 export function resolveCardAction(dataset, nowMs = getNowMs(), activeStreamIds = liveStreamActiveIds) {
-  const { sessionId, sessionUrl, watchUrl, mrStreamId } = dataset;
+  const { sessionId, sessionUrl, mrStreamId } = dataset;
   const state = deriveSessionState(
     { startTimeUtc: dataset.startTimeUtc, endTimeUtc: dataset.endTimeUtc, mrStreamId },
     activeStreamIds,
@@ -34,7 +34,11 @@ export function resolveCardAction(dataset, nowMs = getNowMs(), activeStreamIds =
     return sessionId ? { type: 'session-guide', sessionId } : { type: 'none' };
   }
 
-  const url = safeUrl(state === 'live' ? (watchUrl || sessionUrl) : sessionUrl);
+  const url = safeUrl(getWatchDestination({
+    sessionPageUrl: sessionUrl,
+    isLivestreamed: dataset.isLivestreamed === 'true',
+    isOnline: dataset.isOnline === 'true',
+  }, state));
   return url ? { type: 'navigate', url } : { type: 'none' };
 }
 

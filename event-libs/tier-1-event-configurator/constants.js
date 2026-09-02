@@ -75,13 +75,14 @@ const HOMEPAGE_FIELD_BY_TYPE = {
     // straight off the containing DA section's own "dark" style metadata (see
     // event-card.js's getTheme()), so authoring a Featured Sessions link inside a
     // Section Metadata "style: dark" section is enough — no per-link toggle needed.
-    // The featured-sessions block's generated event-card markup + session-routing.js
-    // read all three — watchUrl is where a click routes once the session goes live,
-    // mrStreamId is what tells it a session is Mobile-Rider-backed at all, and
+    // The featured-sessions block's generated event-card markup + session-routing.js read
+    // both — mrStreamId is what tells it a session is Mobile-Rider-backed at all, and
     // imageUrl is required for a session to render as a card at all (event-card.js
-    // removes any card with no resolvable image).
-    metaFields: ['watchUrl', 'mrStreamId', 'imageUrl'],
-    metaHint: 'Watch URL / Mobile Rider stream ID are optional per-session overrides — image is required for a session to appear',
+    // removes any card with no resolvable image). No watchUrl — session-routing.js's
+    // resolveCardAction derives the live-click destination itself via getWatchDestination,
+    // off the isLivestreamed/isOnline flags buildSessionAuthorEntry already puts on the entry.
+    metaFields: ['mrStreamId', 'imageUrl'],
+    metaHint: 'Mobile Rider stream ID is an optional per-session override — image is required for a session to appear',
     label: 'Featured Sessions',
     blockHint: 'the featured-sessions block',
     linkPrefix: 'event-featured-sessions',

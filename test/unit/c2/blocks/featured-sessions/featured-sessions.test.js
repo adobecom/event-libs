@@ -56,7 +56,8 @@ describe('featured-sessions', () => {
     const el = buildBlock({
       entries: [entry({
         mrStreamId: 'mr-1',
-        watchUrl: 'https://example.com/watch',
+        isLivestreamed: true,
+        isOnline: true,
         sessionTime: { startTimeMillis: 1750000000000, endTimeMillis: 1750003600000 },
       })],
     });
@@ -65,7 +66,8 @@ describe('featured-sessions', () => {
     const card = el.querySelector('.event-card');
     expect(card.dataset.sessionId).to.equal('session-1');
     expect(card.dataset.mrStreamId).to.equal('mr-1');
-    expect(card.dataset.watchUrl).to.equal('https://example.com/watch');
+    expect(card.dataset.isLivestreamed).to.equal('true');
+    expect(card.dataset.isOnline).to.equal('true');
     expect(card.dataset.sessionUrl).to.equal('https://example.com/sessions/s-001');
     expect(card.dataset.startTimeUtc).to.equal(new Date(1750000000000).toISOString());
     expect(card.dataset.endTimeUtc).to.equal(new Date(1750003600000).toISOString());
