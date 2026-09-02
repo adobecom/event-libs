@@ -23,8 +23,7 @@ function setDismissed(bannerId) {
     all[bannerId] = true;
     window.localStorage.setItem(DISMISSED_STORAGE_KEY, JSON.stringify(all));
   } catch {
-    // storage unavailable (private browsing, quota) — non-fatal, banner just
-    // reappears next visit rather than blocking dismissal of the current one.
+    return;
   }
 }
 
@@ -40,9 +39,6 @@ async function isRegisteredInPerson() {
 }
 
 function buildBanner(contentEl, bannerId) {
-  // role="status" + aria-live="polite" — same live-region primitive as
-  // features/toast/toast.js — so assistive tech both perceives the message on render
-  // and gets an announcement when dismissal removes this container from the DOM.
   const banner = createTag('div', { class: 'in-person-banner-inner', role: 'status', 'aria-live': 'polite' });
   const copy = createTag('div', { class: 'in-person-banner-copy' }, contentEl.innerHTML, { parent: banner });
   copy.querySelectorAll('a').forEach((a) => a.classList.add('in-person-banner-link'));
@@ -60,10 +56,6 @@ function buildBanner(contentEl, bannerId) {
   return banner;
 }
 
-// Threshold, in px, past which the overlaying banner slides away to reveal
-// the sticky GNAV header underneath. A small value rather than the banner's
-// own height — it should get out of the way as soon as the visitor starts
-// reading the page, not only once fully scrolled past.
 const SCROLL_REVEAL_THRESHOLD = 10;
 
 function observeScrollReveal(el) {
@@ -80,16 +72,6 @@ function observeScrollReveal(el) {
   updateScrolledState();
 }
 
-// GNAV's own CSS pulls <main> up by --feds-nav-total-height so hero content
-// bleeds under the (transparent) nav. Pushing GNAV down to clear this banner
-// (in-person-banner.css's sibling-selector `top` override) shifts GNAV's
-// visual position but leaves that pull-up unaware of the banner's height, so
-// hero content stays put and ends up hugging the taller combined bar. Fixing
-// it means main's pull-up needs to shrink by exactly the banner's rendered
-// height (see the `--in-person-banner-height`-driven override in
-// in-person-banner.css) — measured live via ResizeObserver, not a hard-coded
-// constant, since the banner's height varies by viewport (mobile wrapping)
-// and content length.
 function syncBannerHeightVar(el) {
   const setHeightVar = () => {
     document.documentElement.style.setProperty('--in-person-banner-height', `${el.offsetHeight}px`);
@@ -100,9 +82,6 @@ function syncBannerHeightVar(el) {
 
 const CONFIG_KEYS = new Set(['banner-id', 'rf-data-check', 'nav-overlay', 'message']);
 
-// Authors write the literal word "false" for an off boolean row (see nav-overlay in the
-// README example) — Boolean(str) can't tell that apart from any other non-empty string,
-// so this parses the actual authored value instead of just checking presence.
 function isTruthyConfigValue(value) {
   return (value ?? '').trim().toLowerCase() === 'true';
 }
@@ -144,13 +123,6 @@ export default async function init(el) {
   el.replaceChildren(banner);
 
   if (navOverlay) {
-    // position: fixed only pins to the true viewport if every ancestor is a
-    // plain, non-transformed box — a transform/filter/will-change anywhere
-    // between here and <body> (common on animated hero/marquee sections)
-    // turns this element's containing block into that ancestor instead,
-    // making it track that box's position rather than overlay the GNAV
-    // header at the true top of the viewport. Reparenting to <body> removes
-    // that risk regardless of what the rest of the page does.
     document.body.prepend(el);
     syncBannerHeightVar(el);
     observeScrollReveal(el);
