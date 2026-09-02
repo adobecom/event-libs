@@ -77,16 +77,6 @@ body:has(.in-person-banner-nav-overlay:not(.in-person-banner-scrolled)) main {
   font-family: var(--body-font-family, "Adobe Clean", sans-serif);
 }
 
-/* Extra black beneath the message row so the banner extends down behind
-   the marquee's rounded top corners (which render in front via the
-   marquee's own higher z-index) instead of stopping flush at the text —
-   a thin sliver of banner peeking past the rounded corners, matching the
-   promo-bar-over-rounded-hero look. Scoped to nav-overlay only: a
-   non-overlay, in-flow banner has no reason to be taller than its text. */
-.in-person-banner-nav-overlay .in-person-banner-inner {
-  padding-bottom: var(--s2a-spacing-2xl);
-}
-
 .in-person-banner-copy {
   max-width: 800px;
   margin: 0 auto;
