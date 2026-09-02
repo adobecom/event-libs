@@ -4,8 +4,12 @@ import { scrollBehavior } from '../utils/motion.js';
 
 export const buildCarousel = () => Carousel;
 
+// CardComponent defaults to LiveCard — session-broadcast passes SessionCard for its Upcoming
+// section instead, whose "no image" styling is a closer match. Both accept the same
+// session/onCardClick shape; SessionCard ignores the props it doesn't use.
 export function Carousel({
-  sessions, title, formatTime, formatTimezone, variant = 'live',
+  sessions, title, formatTime, formatTimezone, variant = 'live', onCardClick, onWatchSamePage,
+  CardComponent = LiveCard, timeDisplay, showDurationBadge, showDescription,
 }) {
   // Hooks run before the empty-list bail-out — returning first would change hook order
   // between an empty and a populated render.
@@ -17,6 +21,18 @@ export function Carousel({
   const stripRef = useRef(null);
   const cardWidthRef = useRef(0);
   const visibleCountRef = useRef(1);
+  // Kept current every render so the resize handler below (captured once, on mount) can read
+  // the latest session count without closing over the stale `sessions` prop from mount time.
+  const sessionsRef = useRef(sessions);
+  sessionsRef.current = sessions;
+
+  // Reads only refs, so it's safe to call from a closure captured on mount (resize handler)
+  // as well as from a fresh per-render closure (the sessionCount effect below) — either way it
+  // always clamps against the current session count and current visibleCountRef.
+  const clampOffset = () => {
+    const maxOffset = Math.max(0, (sessionsRef.current?.length || 0) - visibleCountRef.current);
+    setOffset((o) => Math.min(o, maxOffset));
+  };
 
   const refreshEdges = () => {
     const strip = stripRef.current;
@@ -46,17 +62,34 @@ export function Carousel({
   useEffect(() => {
     measure();
     refreshEdges();
-    const onResize = () => { measure(); refreshEdges(); };
+    clampOffset();
+    // A resize can change visibleCountRef (how many cards fit) without the session count ever
+    // changing — re-clamp here too, not just on the sessionCount effect below, otherwise offset
+    // stays stale until some other render happens to fire.
+    const onResize = () => { measure(); refreshEdges(); clampOffset(); };
     window.addEventListener('resize', onResize);
     return () => window.removeEventListener('resize', onResize);
   }, []);
 
-  if (!sessions || !sessions.length) return null;
+  const sessionCount = sessions?.length || 0;
+  const maxOffset = Math.max(0, sessionCount - visibleCountRef.current);
 
-  const maxOffset = Math.max(0, sessions.length - visibleCountRef.current);
-  const translateX = paged ? offset * (cardWidthRef.current || 576) : 0;
-  const atStart = paged ? offset <= 0 : edges.atStart;
-  const atEnd = paged ? offset >= maxOffset : edges.atEnd;
+  // The list can shrink out from under an already-paged-forward carousel (e.g. several live
+  // sessions ending within the same ~15s tick) — pull `offset` back into range so a stale value
+  // doesn't keep rendering translateX past the remaining content, and re-measure the native-
+  // scroll edges too. `clampedOffset` below covers the same render's visual output immediately;
+  // this corrects the underlying state so the next click doesn't silently no-op.
+  useEffect(() => {
+    refreshEdges();
+    clampOffset();
+  }, [sessionCount]);
+
+  if (!sessions || !sessionCount) return null;
+
+  const clampedOffset = Math.min(offset, maxOffset);
+  const translateX = paged ? clampedOffset * (cardWidthRef.current || 576) : 0;
+  const atStart = paged ? clampedOffset <= 0 : edges.atStart;
+  const atEnd = paged ? clampedOffset >= maxOffset : edges.atEnd;
 
   const goPrev = () => {
     if (paged) { setOffset((o) => Math.max(0, o - 1)); return; }
@@ -69,7 +102,7 @@ export function Carousel({
 
   // Desktop shows the focused card's time in the left gutter; mobile (offset
   // stays 0 with native scroll) shows the first session's time inline.
-  const focused = sessions[Math.min(offset, sessions.length - 1)];
+  const focused = sessions[Math.min(clampedOffset, sessionCount - 1)];
   const timeLabel = formatTime ? formatTime(focused) : '';
   const tzLabel = formatTimezone ? formatTimezone(focused) : '';
 
@@ -93,8 +126,8 @@ export function Carousel({
             ${sessions.map((s, i) => html`<div
               class="sg-carousel__card-wrap"
               key=${s.id}
-              inert=${paged && (i < offset || i >= offset + visibleCountRef.current) ? true : undefined}
-            ><${LiveCard} session=${s} variant=${variant} /></div>`)}
+              inert=${paged && (i < clampedOffset || i >= clampedOffset + visibleCountRef.current) ? true : undefined}
+            ><${CardComponent} session=${s} variant=${variant} onCardClick=${onCardClick} onWatchSamePage=${onWatchSamePage} timeDisplay=${timeDisplay} showDurationBadge=${showDurationBadge} showDescription=${showDescription} /></div>`)}
           </div>
         </div>
         ${sessions.length > 1 && html`
