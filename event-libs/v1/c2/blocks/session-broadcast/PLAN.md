@@ -2399,6 +2399,49 @@ Four findings, each verified against the real code (not taken at face value) bef
 `npx eslint` clean; full `npm test` green (2236/2237, the one failure being the already-documented,
 unrelated `toast.test.js` ARIA-timing flake).
 
+## Ended-state bleed: self-matching height instead of fixed/vh (2026-09-02)
+
+User-reported: on a short Ended state (no Also Live/Upcoming, or only one of them), the bleed's
+fixed height (480px/80vh/90vh) overshot `.sb-app`'s own real content height, so it got cut off
+by whatever came right after the block while still visibly a photo, not yet faded to black.
+This matters because `.sb-ended ~ .sb-carousel-section` is deliberately made `transparent`
+specifically so the bleed shows through it — nothing else masks an unfinished fade.
+
+First attempt: `min-height` on `.sb-app` matching the bleed's own height — reverted, since a
+static floor pads the page out past the viewport and forces a scroll to reach the footer even
+on short content (the same class of regression as the earlier `--sb-fill-height` work above).
+
+Second attempt: cap the bleed height via `:not(:has(.sb-carousel-section))`, sized from real
+measured content heights. Worked for "nothing after Ended," but testing "exactly one carousel"
+(common — any gap between live groups) reproduced the same overshoot at a smaller scale, and
+fixing that meant yet another hand-measured tier (and its own future drift risk as card designs
+change) — rejected per explicit follow-up: no fixed/measured heights, screen sizes and
+conditionally-rendered content vary too much to hand-tune.
+
+Landed on `top: 0; bottom: 0;` instead of an explicit `height` on the pseudo-element. This is a
+well-established technique: for an absolutely-positioned element inside a `position: relative`
+parent whose own height is `auto`, top+bottom with no height stretches it to exactly match the
+parent's real rendered height — no circularity, since `.sb-app`'s auto height is fixed by its
+normal-flow content alone (the pseudo is out of flow, so it can't factor into that calculation).
+The gradient's stops are percentages of that same box and the last stop is always 100% opacity,
+so the fade now always completes exactly at `.sb-app`'s edge — Ended alone, plus one carousel,
+plus both, any screen size — automatically, with nothing to measure or keep in sync.
+
+Verified live via the local dev server (`?eventlibs=local`, no push needed per iteration) against
+`not-tracked/session-catalog-response-with-video.json` seeded straight into `session-store`
+through the real `mapEslPayloadToRawSessions`/`normalizeSessions` pipeline (not hand-invented
+data), forcing specific schedule states via `sessionStorage`'s `sb:active-session` key +
+`?serverTime=`. Confirmed `.sb-app`'s rendered height exactly equals the `::before`'s computed
+height in every case tested: mobile Ended-only-equivalent, desktop Ended+Upcoming-only,
+desktop Ended+Also Live+Upcoming, and real (unseeded) live-drifted data.
+
+Also fixed while in there: mobile's own gradient never reached full opacity (held at 75% past
+its last stop, no matter how tall the box) — added the missing 100% stop. And merged tablet's
+and desktop's `::before` rules — identical except for the height difference this fix removed —
+into one `min-width: 768px` block.
+
+Lint clean, 150/150 tests pass (CSS-only change, no test behavior affected).
+
 ## Explicitly out of scope (fast-follow)
 
 - MobileRider real playback (stub adapter only)

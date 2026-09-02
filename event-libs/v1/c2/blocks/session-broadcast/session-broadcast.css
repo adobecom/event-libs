@@ -522,18 +522,8 @@
   background: var(--s2a-color-gray-1000, #000);
 }
 
-/* --sb-app-ended-bg is set inline by BroadcastApp.js. Three layers: flat tint + vertical
-   fade + the photo itself.
-   No explicit height: top+bottom:0 stretches this to exactly match .sb-app's own real
-   rendered height instead — a well-defined value even though that height is itself "auto",
-   since it's fixed by .sb-app's normal-flow content alone (this pseudo is absolutely
-   positioned, so it can't factor into that calculation itself — no circularity). The
-   gradient's stops are percentages of that same box, always finishing at 100% → fully opaque
-   black by its last stop, so the fade completes exactly at .sb-app's edge every time —
-   whether that's Ended alone, plus one carousel, plus both, or any screen size — with no
-   measuring or fixed height needed. This is load-bearing: .sb-ended ~ .sb-carousel-section
-   below is made fully transparent specifically so this bleed shows through it, so nothing
-   else masks an unfinished fade. */
+/* No height: top+bottom:0 matches .sb-app's own real height exactly, so the gradient (100%
+   opacity by its last stop) always finishes right at that edge. See PLAN.md. */
 .sb-app:has(.sb-ended)::before {
   content: '';
   position: absolute;
@@ -554,9 +544,7 @@
     cover;
 }
 
-/* Tablet and desktop share one darker, later-fading curve (tuned together, see PLAN.md) —
-   one rule for both now that height no longer differs between them (both just match
-   .sb-app's own height per the base rule above). Prefers the larger --sb-app-ended-bg-lg. */
+/* Tablet+desktop share one darker curve — merged since height no longer differs between them. */
 @media (min-width: 768px) {
   .sb-app:has(.sb-ended)::before {
     background-image:
