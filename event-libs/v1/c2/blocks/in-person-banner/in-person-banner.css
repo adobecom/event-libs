@@ -29,6 +29,14 @@
   top: 0;
   left: 0;
   right: 0;
+
+  /* An inline height (e.g. Milo's own CLS-prevention placeholder height
+     set while the block loads) outlives loading and pins the block to a
+     stale value once nav-overlay makes it position: fixed. Nothing in
+     this repo sets that inline style, so only an !important override from
+     our own stylesheet can defeat it and let the box size to its actual
+     content instead. */
+  height: auto !important;
 }
 
 .in-person-banner.in-person-banner-nav-overlay.in-person-banner-scrolled {
