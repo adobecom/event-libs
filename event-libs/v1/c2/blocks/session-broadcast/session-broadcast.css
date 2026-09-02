@@ -523,17 +523,27 @@
 }
 
 /* --sb-app-ended-bg is set inline by BroadcastApp.js. Three layers: flat tint + vertical
-   fade + the photo itself. */
+   fade + the photo itself.
+   No explicit height: top+bottom:0 stretches this to exactly match .sb-app's own real
+   rendered height instead — a well-defined value even though that height is itself "auto",
+   since it's fixed by .sb-app's normal-flow content alone (this pseudo is absolutely
+   positioned, so it can't factor into that calculation itself — no circularity). The
+   gradient's stops are percentages of that same box, always finishing at 100% → fully opaque
+   black by its last stop, so the fade completes exactly at .sb-app's edge every time —
+   whether that's Ended alone, plus one carousel, plus both, or any screen size — with no
+   measuring or fixed height needed. This is load-bearing: .sb-ended ~ .sb-carousel-section
+   below is made fully transparent specifically so this bleed shows through it, so nothing
+   else masks an unfinished fade. */
 .sb-app:has(.sb-ended)::before {
   content: '';
   position: absolute;
   top: 0;
+  bottom: 0;
   left: 0;
   z-index: -1;
   width: 100%;
-  height: 480px;
   background-image:
-    linear-gradient(180deg, rgb(0 0 0 / 60%) 0%, rgb(0 0 0 / 60%) 50%, rgb(0 0 0 / 75%) 75%),
+    linear-gradient(180deg, rgb(0 0 0 / 60%) 0%, rgb(0 0 0 / 60%) 50%, rgb(0 0 0 / 75%) 75%, rgb(0 0 0 / 100%) 100%),
     linear-gradient(0deg, rgb(0 0 0 / 60%), rgb(0 0 0 / 60%)),
     var(--sb-app-ended-bg, none);
   background-repeat: no-repeat;
@@ -544,22 +554,11 @@
     cover;
 }
 
-/* Extends to 80vh on tablet, darkening more toward the bottom. vh not %, since .sb-app has no
-   explicit height. Prefers the larger --sb-app-ended-bg-lg when available. */
-@media (min-width: 768px) and (max-width: 1279px) {
+/* Tablet and desktop share one darker, later-fading curve (tuned together, see PLAN.md) —
+   one rule for both now that height no longer differs between them (both just match
+   .sb-app's own height per the base rule above). Prefers the larger --sb-app-ended-bg-lg. */
+@media (min-width: 768px) {
   .sb-app:has(.sb-ended)::before {
-    height: 80vh;
-    background-image:
-      linear-gradient(180deg, rgb(0 0 0 / 60%) 0%, rgb(0 0 0 / 60%) 50%, rgb(0 0 0 / 90%) 90%, rgb(0 0 0 / 100%) 100%),
-      linear-gradient(0deg, rgb(0 0 0 / 60%), rgb(0 0 0 / 60%)),
-      var(--sb-app-ended-bg-lg, var(--sb-app-ended-bg, none));
-  }
-}
-
-/* Desktop reuses tablet's gradient exactly, with a taller 90vh bleed. */
-@media (min-width: 1280px) {
-  .sb-app:has(.sb-ended)::before {
-    height: 90vh;
     background-image:
       linear-gradient(180deg, rgb(0 0 0 / 60%) 0%, rgb(0 0 0 / 60%) 50%, rgb(0 0 0 / 90%) 90%, rgb(0 0 0 / 100%) 100%),
       linear-gradient(0deg, rgb(0 0 0 / 60%), rgb(0 0 0 / 60%)),
