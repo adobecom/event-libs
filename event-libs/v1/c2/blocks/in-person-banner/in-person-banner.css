@@ -14,7 +14,7 @@
   display: flex;
   align-items: flex-start;
   justify-content: center;
-  gap: var(--s2a-spacing-none);
+  gap: var(--s2a-spacing-md);
   box-sizing: border-box;
   width: 100%;
   max-width: 1440px;
@@ -22,18 +22,18 @@
   padding: var(--s2a-spacing-md) 64px;
   background: var(--s2a-color-background-default);
   color: var(--s2a-color-content-default);
-  font-family: var(--body-font-family);
+  font-family: var(--body-font-family, "Adobe Clean", sans-serif);
 }
 
 .in-person-banner-copy {
   max-width: 800px;
   margin: 0 auto;
   color: var(--s2a-color-content-default);
-  font-family: var(--heading-font-family);
-  font-size: var(--s2a-typography-font-size-heading-6);
-  font-weight: 900;
-  line-height: var(--s2a-typography-line-height-title-6, 18px);
-  letter-spacing: var(--s2a-typography-letter-spacing-heading-6);
+  font-family: var(--body-font-family, "Adobe Clean", sans-serif);
+  font-size: var(--s2a-typography-font-size-label);
+  line-height: var(--s2a-typography-line-height-label);
+  font-weight: var(--s2a-font-weight-adobe-clean-bold);
+  letter-spacing: var(--s2a-typography-letter-spacing-label);
   text-align: center;
 }
 
@@ -42,12 +42,12 @@
 }
 
 .in-person-banner-link {
-  color: var(--s2a-color-content-default);
-  font-family: var(--heading-font-family);
-  font-size: var(--s2a-typography-font-size-heading-6);
-  font-weight: 900;
-  line-height: var(--s2a-typography-line-height-title-6, 18px);
-  letter-spacing: var(--s2a-typography-letter-spacing-heading-6);
+  color: inherit;
+  font-family: var(--body-font-family, "Adobe Clean", sans-serif);
+  font-size: var(--s2a-typography-font-size-label);
+  line-height: var(--s2a-typography-line-height-label);
+  font-weight: var(--s2a-font-weight-adobe-clean-bold);
+  letter-spacing: var(--s2a-typography-letter-spacing-label);
   text-decoration-line: underline;
   text-decoration-style: solid;
   text-decoration-skip-ink: auto;
@@ -65,9 +65,19 @@
   height: 24px;
   padding: 0;
   border: none;
+  border-radius: var(--s2a-border-radius-round);
   background: none;
   color: inherit;
   cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.in-person-banner-close:hover {
+  background-color: var(--s2a-color-transparent-black-08);
+}
+
+.in-person-banner[data-theme="dark"] .in-person-banner-close:hover {
+  background-color: var(--s2a-color-transparent-white-16);
 }
 
 .in-person-banner-close svg {
