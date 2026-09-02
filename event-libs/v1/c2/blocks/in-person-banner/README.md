@@ -111,3 +111,10 @@ exists for this.
   `header.global-navigation`. Scroll position is polled via a single passive
   `scroll` listener throttled to one check per animation frame, not per-event, to
   avoid layout thrash.
+- When `below-nav` is active, `init()` reparents the block element to be a direct
+  child of `<body>`. `position: fixed` only pins an element to the true viewport if
+  every ancestor is a plain box — a `transform`/`filter`/`will-change: transform`
+  on any ancestor between the block's original DOM position and `<body>` (common on
+  animated hero/marquee sections) would otherwise make the fixed banner track that
+  ancestor's box instead of overlaying the header. Reparenting removes that
+  dependency on the rest of the page's CSS.

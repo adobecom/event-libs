@@ -125,5 +125,15 @@ export default async function init(el) {
   const banner = buildBanner(contentCell, bannerId);
   el.replaceChildren(banner);
 
-  if (belowNav) observeScrollReveal(el);
+  if (belowNav) {
+    // position: fixed only pins to the true viewport if every ancestor is a
+    // plain, non-transformed box — a transform/filter/will-change anywhere
+    // between here and <body> (common on animated hero/marquee sections)
+    // turns this element's containing block into that ancestor instead,
+    // making it track that box's position rather than overlay the GNAV
+    // header at the true top of the viewport. Reparenting to <body> removes
+    // that risk regardless of what the rest of the page does.
+    document.body.prepend(el);
+    observeScrollReveal(el);
+  }
 }
