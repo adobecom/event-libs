@@ -5,11 +5,18 @@
   width: 100%;
 }
 
-/* Nav overlay: overlay the sticky GNAV header (position: fixed, higher
-   z-index than header.global-navigation's z-index: 10) instead of pushing
-   it down, so the banner is the only thing visible at the very top of the
-   page. Sliding the banner up on scroll (in-person-banner.js) reveals the
-   header underneath, which was there the whole time. */
+/* Nav overlay: fix the banner above the sticky GNAV header (z-index above
+   header.global-navigation's z-index: 10) at the very top of the page.
+   GNAV itself is NOT covered — the sibling-selector rule below pushes its
+   own sticky `top` down by the banner's height so it renders directly
+   below the banner instead of underneath it, staying visible the whole
+   time. No edit to the global-navigation source: this is purely an
+   override from in-person-banner's own stylesheet, using the sibling
+   combinator since in-person-banner.js reparents the block to be a
+   direct child of <body> (same parent as <header class="global-navigation">).
+   Sliding the banner away on scroll (in-person-banner.js toggles
+   in-person-banner-scrolled) hands GNAV back its normal top: 0, so it
+   slides up to reclaim the vacated space. */
 .in-person-banner.in-person-banner-nav-overlay {
   position: fixed;
   top: 0;
@@ -25,6 +32,15 @@
 .in-person-banner.in-person-banner-nav-overlay.in-person-banner-scrolled {
   transform: translateY(-100%);
   pointer-events: none;
+}
+
+.in-person-banner.in-person-banner-nav-overlay ~ header.global-navigation {
+  top: var(--global-height-nav, 80px);
+  transition: top 300ms cubic-bezier(0.42, 0, 0, 1);
+}
+
+.in-person-banner.in-person-banner-nav-overlay.in-person-banner-scrolled ~ header.global-navigation {
+  top: 0;
 }
 
 .in-person-banner-inner {

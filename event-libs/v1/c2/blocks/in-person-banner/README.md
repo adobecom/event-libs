@@ -42,11 +42,12 @@ need to remember which shape to use:
 - `rf-data-check` — exactly `true` (case-insensitive) to gate visibility on in-person
   registration (see below); `false` or omitted shows unconditionally to everyone.
 - `nav-overlay` — exactly `true` (case-insensitive) when this banner is placed at the
-  very top of the page: the banner overlays the sticky GNAV header (`position: fixed`,
-  above it) instead of rendering as a normal block, so it's the only thing visible at
-  first paint. It slides away once the visitor scrolls a small amount, revealing the
-  GNAV header underneath. `false` or omitted for any other placement — see Layout
-  below for why this isn't automatic.
+  very top of the page: the banner fixes itself above the GNAV header instead of
+  rendering as a normal block, and GNAV renders directly below it — both stay
+  visible together, stacked, not overlapping. Once the visitor scrolls a small
+  amount, the banner slides away and GNAV reclaims the space, sliding up to
+  `top: 0`. `false` or omitted for any other placement — see Layout below for why
+  this isn't automatic.
 - `message` — **required** (whether authored under this label or as a bare row).
   Rich content, same authoring conventions as any other block (links via markdown,
   bold/italic, etc.) — no new authoring paradigm.
@@ -102,19 +103,23 @@ exists for this.
 - No fixed placement — the block behaves the same regardless of where an author puts
   it on the page (mid-page, etc.), rendering as a normal in-flow block. The one
   exception: a banner placed at the very top of the page — that's what the
-  `nav-overlay` config row opts into. It fixes the banner over the GNAV header
-  (reading GNAV's own `--global-height-nav`, falling back to `80px`, for its
-  minimum height so it fully covers the nav) and slides it away
-  (`transform: translateY(-100%)`) once the visitor scrolls past
-  `SCROLL_REVEAL_THRESHOLD` (10px, in `in-person-banner.js`), revealing GNAV — the
-  same overlay-then-reveal pattern GNAV's own PromoBar uses for its promo bar over
-  `header.global-navigation`. Scroll position is polled via a single passive
-  `scroll` listener throttled to one check per animation frame, not per-event, to
-  avoid layout thrash.
+  `nav-overlay` config row opts into. It fixes the banner above GNAV (reading
+  GNAV's own `--global-height-nav`, falling back to `80px`, for its minimum
+  height) and pushes `header.global-navigation`'s own sticky `top` down by that
+  same amount via a sibling-selector override
+  (`.in-person-banner-nav-overlay ~ header.global-navigation { top: ... }`) — no
+  edit to GNAV's source, GNAV just renders directly below the banner and stays
+  visible the whole time, not covered. Once the visitor scrolls past
+  `SCROLL_REVEAL_THRESHOLD` (10px, in `in-person-banner.js`), the banner slides
+  away (`transform: translateY(-100%)`) and the same sibling selector hands GNAV
+  back `top: 0`, so it slides up to reclaim the vacated space. Scroll position is
+  polled via a single passive `scroll` listener throttled to one check per
+  animation frame, not per-event, to avoid layout thrash.
 - When `nav-overlay` is active, `init()` reparents the block element to be a direct
-  child of `<body>`. `position: fixed` only pins an element to the true viewport if
-  every ancestor is a plain box — a `transform`/`filter`/`will-change: transform`
-  on any ancestor between the block's original DOM position and `<body>` (common on
-  animated hero/marquee sections) would otherwise make the fixed banner track that
-  ancestor's box instead of overlaying the header. Reparenting removes that
-  dependency on the rest of the page's CSS.
+  child of `<body>` — both so `position: fixed` reliably pins to the true viewport
+  (a `transform`/`filter`/`will-change: transform` on any ancestor between the
+  block's original DOM position and `<body>`, common on animated hero/marquee
+  sections, would otherwise make the fixed banner track that ancestor's box
+  instead of the viewport) and so the sibling-selector override that pushes GNAV
+  down can reach `header.global-navigation`, which is itself a direct child of
+  `<body>`.
