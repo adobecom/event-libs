@@ -9,6 +9,8 @@
   position: fixed;
   z-index: 10;
   top: var(--global-height-nav, 80px);
+  left: 0;
+  right: 0;
 }
 
 .in-person-banner-inner {
