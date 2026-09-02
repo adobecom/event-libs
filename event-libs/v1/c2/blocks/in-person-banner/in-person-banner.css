@@ -29,14 +29,7 @@
   top: 0;
   left: 0;
   right: 0;
-
-  /* An inline height (e.g. Milo's own CLS-prevention placeholder height
-     set while the block loads) outlives loading and pins the block to a
-     stale value once nav-overlay makes it position: fixed. Nothing in
-     this repo sets that inline style, so only an !important override from
-     our own stylesheet can defeat it and let the box size to its actual
-     content instead. */
-  height: auto !important;
+  height: var(--global-height-nav, 80px);
 }
 
 .in-person-banner.in-person-banner-nav-overlay.in-person-banner-scrolled {
@@ -52,17 +45,6 @@
   top: 0;
 }
 
-/* GNAV's own CSS (federal/global-navigation styles.css) pulls <main> up by
-   -var(--feds-nav-total-height) so hero sections bleed under the
-   transparent nav. That pull-up has no idea GNAV just got pushed down by
-   the banner's height above — left alone, hero content stays exactly
-   where it always rendered and ends up hugging the taller combined
-   banner+nav bar. Shrinking the pull-up by the banner's height restores
-   the original "hero starts right at the nav's (new) top edge" alignment.
-   Only applies pre-scroll: once in-person-banner-scrolled is set, this
-   selector no longer matches and GNAV's own default -80px pull-up (set by
-   its own CSS, not overridden here) takes back over, matching GNAV's
-   top: 0 reset in the rule above. */
 body:has(.in-person-banner-nav-overlay:not(.in-person-banner-scrolled)) main {
   margin-top: calc(
     var(--in-person-banner-height, var(--global-height-nav, 80px)) - var(--feds-nav-total-height, 80px)
