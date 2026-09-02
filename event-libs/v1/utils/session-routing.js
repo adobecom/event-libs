@@ -22,8 +22,6 @@ function startMobileRiderPolling() {
   registerStreamIds(streamIds);
 }
 
-// Exposed so callers (e.g. event-card's live CTA text) can read the same MR poll
-// results this module already maintains, instead of running a second poller.
 export function getLiveStreamActiveIds() {
   return liveStreamActiveIds;
 }
@@ -67,11 +65,6 @@ export default function attachSessionRouting(el) {
 
   const activate = () => runAction(resolveCardAction(el.dataset));
 
-  // The card's own CTA <a> (card-cta / featured-sessions' entry.url link) is part of
-  // this same clickable card, not an independent link — routing it through
-  // resolveCardAction (rather than letting its href navigate directly) keeps an
-  // "upcoming" session's CTA opening the session guide detail overlay too, same as
-  // clicking anywhere else on the card.
   el.addEventListener('click', (e) => {
     e.preventDefault();
     activate();

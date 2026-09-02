@@ -107,11 +107,6 @@
   background: var(--s2a-color-transparent-black-80, rgb(0 0 0 / 80%));
 }
 
-/* Mirrors event-carousel.css's own dark-theme .carousel-arrow override: the default
-   (light, above) glass is a dark/frosted circle with a white icon, built to sit on a
-   light section; on a dark section (`.dark-card`, set from the ancestor .section's
-   own "dark" style-metadata class — see decorate() above) that same glass would
-   disappear, so this inverts it to a light/frosted circle with a black icon instead. */
 .upcoming-sessions.dark-card .upcoming-sessions-arrow {
   border-color: #e1e1e1;
   background: #f3f3f3;

@@ -54,14 +54,6 @@ const HOMEPAGE_FIELD_BY_TYPE = {
   [CONFIG_TYPES.HOMEPAGE_UPCOMING_SESSIONS]: {
     ...HOMEPAGE_SESSION_FIELDS[CONFIG_TYPES.HOMEPAGE_UPCOMING_SESSIONS],
     headingField: 'upcomingSessionsHeading',
-    // No themeField — dark/light isn't config-driven: upcoming-sessions.js's own
-    // decorate() reads it straight off the containing DA section's own "dark" style
-    // metadata (the same signal event-card.js/event-carousel.js key off), so a
-    // Homepage link needs no Theme pick — placing it in a Section Metadata
-    // "style: dark" section is enough.
-    // upcoming-sessions.js reads mrStreamId (drives its Mobile Rider live-drop
-    // polling) but never reads watchUrl or imageUrl — its cards are text-only,
-    // no structural change from the pre-link-authoring version.
     metaFields: ['mrStreamId'],
     metaHint: 'Mobile Rider stream ID is an optional per-session override',
     label: 'Upcoming Sessions',
@@ -70,26 +62,11 @@ const HOMEPAGE_FIELD_BY_TYPE = {
   },
   [CONFIG_TYPES.HOMEPAGE_FEATURED_SESSIONS]: {
     ...HOMEPAGE_SESSION_FIELDS[CONFIG_TYPES.HOMEPAGE_FEATURED_SESSIONS],
-    // No headingField/themeField — featured-sessions.js doesn't author a heading, and
-    // its cards' dark/light theme isn't config-driven at all: event-card.js reads it
-    // straight off the containing DA section's own "dark" style metadata (see
-    // event-card.js's getTheme()), so authoring a Featured Sessions link inside a
-    // Section Metadata "style: dark" section is enough — no per-link toggle needed.
-    // The featured-sessions block's generated event-card markup + session-routing.js read
-    // both — mrStreamId is what tells it a session is Mobile-Rider-backed at all, and
-    // imageUrl is required for a session to render as a card at all (event-card.js
-    // removes any card with no resolvable image). No watchUrl — session-routing.js's
-    // resolveCardAction derives the live-click destination itself via getWatchDestination,
-    // off the isLivestreamed/isOnline flags buildSessionAuthorEntry already puts on the entry.
     metaFields: ['mrStreamId', 'imageUrl'],
     metaHint: 'Mobile Rider stream ID is an optional per-session override — image is required for a session to appear',
     label: 'Featured Sessions',
     blockHint: 'the featured-sessions block',
     linkPrefix: 'event-featured-sessions',
-    // Card CTA text, authored once per config (not per-session) and applied to every
-    // card — featured-sessions.js picks one of the three at render time based on each
-    // entry's own sessionTime vs. the viewer's clock. Config-level keys, not part of
-    // HOMEPAGE_SESSION_FIELDS since they aren't per-session overrides.
     ctaFields: {
       prior: 'ctaTextPrior',
       during: 'ctaTextDuring',

@@ -153,9 +153,6 @@ const ConfigsProvider = ({ children }) => {
     const config = isHomepageConfigType(configType)
       ? {
         ...emptyConfig(configType),
-        // CTA text is a reusable style setting (same wording across events), not
-        // event-specific identity data, so it carries forward like Global's trackIcons
-        // etc. do below — unlike the session picks, which reset per event.
         ...Object.fromEntries(
           Object.values(HOMEPAGE_FIELD_BY_TYPE[configType]?.ctaFields || {})
             .filter((field) => sourceConfig[field])

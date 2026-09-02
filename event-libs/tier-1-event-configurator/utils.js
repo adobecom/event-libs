@@ -112,17 +112,6 @@ export function stringifyConfig(value, indent = '') {
   return JSON.stringify(value);
 }
 
-// Mirrors upcoming-sessions/docs/build-author-data.mjs's toAuthorEntry() shape —
-// the small per-session object a homepage block (upcoming-sessions.js or
-// featured-sessions.js) decodes directly from the authored link's hash payload
-// (see buildHomepageConfigURL below), so it's built here rather than looked up at
-// render time. Shared by both Homepage config types — they need the identical shape.
-// `meta` is an optional { mrStreamId, imageUrl } hand-authored override (see
-// MOBILE-RIDER-STREAM-ID-GAP.md) — both omitted entirely from the entry when
-// blank, matching upcoming-sessions.js's own authored-data shape, where an
-// absent key (not an empty string) means "not applicable to this session". No
-// watchUrl here — session-routing.js's resolveCardAction resolves the live
-// destination itself via getWatchDestination, off isLivestreamed/isOnline below.
 export function buildSessionAuthorEntry(session, sessionTimes, meta) {
   const match = (sessionTimes || []).find((st) => st.sessionId === session.sessionId);
   const entry = {

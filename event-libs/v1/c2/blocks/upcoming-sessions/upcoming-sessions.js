@@ -331,11 +331,6 @@ async function decorate(el) {
 
   attachToPrecedingBlock(el);
 
-  // Mirrors event-card.js's/event-carousel.js's own section-driven getTheme(): a
-  // "dark" class on the ancestor .section (decorate.js's applyAreaTheme() / DA's own
-  // Section Metadata "style: dark" authoring) opts this block into dark-card the same
-  // generic way — there's no Theme pick in the Upcoming Sessions configurator to author
-  // this from instead.
   if (!el.classList.contains('dark-card') && el.closest('.section')?.classList.contains('dark')) {
     el.classList.add('dark-card');
   }
