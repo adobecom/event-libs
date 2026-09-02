@@ -6,11 +6,7 @@
 }
 
 .in-person-banner.in-person-banner-below-nav {
-  position: fixed;
-  z-index: 10;
-  top: var(--global-height-nav, 80px);
-  left: 0;
-  right: 0;
+  margin-top: var(--global-height-nav, 80px);
 }
 
 .in-person-banner-inner {
