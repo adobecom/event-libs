@@ -80,6 +80,24 @@ function observeScrollReveal(el) {
   updateScrolledState();
 }
 
+// GNAV's own CSS pulls <main> up by --feds-nav-total-height so hero content
+// bleeds under the (transparent) nav. Pushing GNAV down to clear this banner
+// (in-person-banner.css's sibling-selector `top` override) shifts GNAV's
+// visual position but leaves that pull-up unaware of the banner's height, so
+// hero content stays put and ends up hugging the taller combined bar. Fixing
+// it means main's pull-up needs to shrink by exactly the banner's rendered
+// height (see the `--in-person-banner-height`-driven override in
+// in-person-banner.css) — measured live via ResizeObserver, not a hard-coded
+// constant, since the banner's height varies by viewport (mobile wrapping)
+// and content length.
+function syncBannerHeightVar(el) {
+  const setHeightVar = () => {
+    document.documentElement.style.setProperty('--in-person-banner-height', `${el.offsetHeight}px`);
+  };
+  setHeightVar();
+  new ResizeObserver(setHeightVar).observe(el);
+}
+
 const CONFIG_KEYS = new Set(['banner-id', 'rf-data-check', 'nav-overlay', 'message']);
 
 // Authors write the literal word "false" for an off boolean row (see nav-overlay in the
@@ -134,6 +152,7 @@ export default async function init(el) {
     // header at the true top of the viewport. Reparenting to <body> removes
     // that risk regardless of what the rest of the page does.
     document.body.prepend(el);
+    syncBannerHeightVar(el);
     observeScrollReveal(el);
   }
 }

@@ -8,15 +8,17 @@
 /* Nav overlay: fix the banner above the sticky GNAV header (z-index above
    header.global-navigation's z-index: 10) at the very top of the page.
    GNAV itself is NOT covered — the sibling-selector rule below pushes its
-   own sticky `top` down by the banner's height so it renders directly
-   below the banner instead of underneath it, staying visible the whole
-   time. No edit to the global-navigation source: this is purely an
-   override from in-person-banner's own stylesheet, using the sibling
-   combinator since in-person-banner.js reparents the block to be a
-   direct child of <body> (same parent as <header class="global-navigation">).
-   Sliding the banner away on scroll (in-person-banner.js toggles
-   in-person-banner-scrolled) hands GNAV back its normal top: 0, so it
-   slides up to reclaim the vacated space. */
+   own sticky `top` down by the banner's actual rendered height
+   (--in-person-banner-height, kept in sync by in-person-banner.js via
+   ResizeObserver — never assume a fixed height, mobile wraps to a taller
+   banner) so it renders directly below the banner instead of underneath
+   it, staying visible the whole time. No edit to the global-navigation
+   source: this is purely an override from in-person-banner's own
+   stylesheet, using the sibling combinator since in-person-banner.js
+   reparents the block to be a direct child of <body> (same parent as
+   <header class="global-navigation">). Sliding the banner away on scroll
+   (in-person-banner.js toggles in-person-banner-scrolled) hands GNAV back
+   its normal top: 0, so it slides up to reclaim the vacated space. */
 .in-person-banner.in-person-banner-nav-overlay {
   position: fixed;
   top: 0;
@@ -35,12 +37,29 @@
 }
 
 .in-person-banner.in-person-banner-nav-overlay ~ header.global-navigation {
-  top: var(--global-height-nav, 80px);
+  top: var(--in-person-banner-height, var(--global-height-nav, 80px));
   transition: top 300ms cubic-bezier(0.42, 0, 0, 1);
 }
 
 .in-person-banner.in-person-banner-nav-overlay.in-person-banner-scrolled ~ header.global-navigation {
   top: 0;
+}
+
+/* GNAV's own CSS (federal/global-navigation styles.css) pulls <main> up by
+   -var(--feds-nav-total-height) so hero sections bleed under the
+   transparent nav. That pull-up has no idea GNAV just got pushed down by
+   the banner's height above — left alone, hero content stays exactly
+   where it always rendered and ends up hugging the taller combined
+   banner+nav bar. Shrinking the pull-up by the banner's height restores
+   the original "hero starts right at the nav's (new) top edge" alignment.
+   Only applies pre-scroll: once in-person-banner-scrolled is set, this
+   selector no longer matches and GNAV's own default -80px pull-up (set by
+   its own CSS, not overridden here) takes back over, matching GNAV's
+   top: 0 reset in the rule above. */
+body:has(.in-person-banner-nav-overlay:not(.in-person-banner-scrolled)) main {
+  margin-top: calc(
+    var(--in-person-banner-height, var(--global-height-nav, 80px)) - var(--feds-nav-total-height, 80px)
+  );
 }
 
 .in-person-banner-inner {

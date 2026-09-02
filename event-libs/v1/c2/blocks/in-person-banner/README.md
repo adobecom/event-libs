@@ -103,10 +103,10 @@ exists for this.
 - No fixed placement — the block behaves the same regardless of where an author puts
   it on the page (mid-page, etc.), rendering as a normal in-flow block. The one
   exception: a banner placed at the very top of the page — that's what the
-  `nav-overlay` config row opts into. It fixes the banner above GNAV (reading
-  GNAV's own `--global-height-nav`, falling back to `80px`, for its minimum
-  height) and pushes `header.global-navigation`'s own sticky `top` down by that
-  same amount via a sibling-selector override
+  `nav-overlay` config row opts into. It fixes the banner above GNAV (min-height
+  reading GNAV's own `--global-height-nav`, falling back to `80px`) and pushes
+  `header.global-navigation`'s own sticky `top` down by the banner's *actual
+  rendered* height via a sibling-selector override
   (`.in-person-banner-nav-overlay ~ header.global-navigation { top: ... }`) — no
   edit to GNAV's source, GNAV just renders directly below the banner and stays
   visible the whole time, not covered. Once the visitor scrolls past
@@ -123,3 +123,21 @@ exists for this.
   instead of the viewport) and so the sibling-selector override that pushes GNAV
   down can reach `header.global-navigation`, which is itself a direct child of
   `<body>`.
+- `init()` also measures the banner's rendered height (`syncBannerHeightVar`) and
+  keeps a `--in-person-banner-height` custom property on `<html>` in sync via
+  `ResizeObserver` — never a hard-coded constant, since the banner's height
+  varies by viewport (mobile wraps to a taller layout) and by how long the
+  authored message is. Both the GNAV `top` push above and the `<main>`
+  margin-top compensation below read this same variable, so they can never
+  drift out of sync with each other or with the actual banner.
+- GNAV's own CSS (`federal/global-navigation`'s `styles.css`) pulls `<main>` up
+  by `-var(--feds-nav-total-height)` so hero sections bleed under the
+  (transparent) nav — that pull-up has no idea GNAV just got pushed down by the
+  banner's height, so left alone, hero content stays exactly where it always
+  rendered and ends up hugging the taller combined banner+nav bar instead of
+  clearing it. `in-person-banner.css` shrinks that pull-up by the banner's
+  height while `nav-overlay` is active and pre-scroll
+  (`margin-top: calc(var(--in-person-banner-height) - var(--feds-nav-total-height, 80px))`),
+  restoring the original "hero starts right at the nav's (now lower) top edge"
+  alignment. This selector stops matching once `in-person-banner-scrolled` is
+  set, handing `<main>`'s margin back to GNAV's own default.
