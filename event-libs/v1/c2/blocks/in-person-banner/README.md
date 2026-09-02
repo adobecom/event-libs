@@ -25,7 +25,7 @@ per instance — never inherited from the page's own theme.
 | --- | --- |
 | banner-id | in-person-2026 |
 | rf-data-check | true |
-| below-nav | false |
+| nav-overlay | false |
 | message | Registered for in-person MAX? Find detailed information on your [attendee dashboard](https://...). |
 ```
 
@@ -41,7 +41,7 @@ need to remember which shape to use:
   banner its own id.
 - `rf-data-check` — exactly `true` (case-insensitive) to gate visibility on in-person
   registration (see below); `false` or omitted shows unconditionally to everyone.
-- `below-nav` — exactly `true` (case-insensitive) when this banner is placed at the
+- `nav-overlay` — exactly `true` (case-insensitive) when this banner is placed at the
   very top of the page: the banner overlays the sticky GNAV header (`position: fixed`,
   above it) instead of rendering as a normal block, so it's the only thing visible at
   first paint. It slides away once the visitor scrolls a small amount, revealing the
@@ -51,10 +51,10 @@ need to remember which shape to use:
   Rich content, same authoring conventions as any other block (links via markdown,
   bold/italic, etc.) — no new authoring paradigm.
 
-Both `rf-data-check` and `below-nav` are parsed, not just presence-checked — writing
+Both `rf-data-check` and `nav-overlay` are parsed, not just presence-checked — writing
 the row with the value `false` correctly means off, the same as omitting the row.
 
-If `banner-id`/`rf-data-check`/`below-nav` aren't authored as a row, `init()` falls
+If `banner-id`/`rf-data-check`/`nav-overlay` aren't authored as a row, `init()` falls
 back to page-level metadata of the same name (`getMetadata('banner-id')`, etc.), so a
 page-wide default can be set once instead of repeating it on every instance.
 
@@ -102,7 +102,7 @@ exists for this.
 - No fixed placement — the block behaves the same regardless of where an author puts
   it on the page (mid-page, etc.), rendering as a normal in-flow block. The one
   exception: a banner placed at the very top of the page — that's what the
-  `below-nav` config row opts into. It fixes the banner over the GNAV header
+  `nav-overlay` config row opts into. It fixes the banner over the GNAV header
   (reading GNAV's own `--global-height-nav`, falling back to `80px`, for its
   minimum height so it fully covers the nav) and slides it away
   (`transform: translateY(-100%)`) once the visitor scrolls past
@@ -111,7 +111,7 @@ exists for this.
   `header.global-navigation`. Scroll position is polled via a single passive
   `scroll` listener throttled to one check per animation frame, not per-event, to
   avoid layout thrash.
-- When `below-nav` is active, `init()` reparents the block element to be a direct
+- When `nav-overlay` is active, `init()` reparents the block element to be a direct
   child of `<body>`. `position: fixed` only pins an element to the true viewport if
   every ancestor is a plain box — a `transform`/`filter`/`will-change: transform`
   on any ancestor between the block's original DOM position and `<body>` (common on

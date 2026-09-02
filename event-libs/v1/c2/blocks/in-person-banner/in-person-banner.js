@@ -80,9 +80,9 @@ function observeScrollReveal(el) {
   updateScrolledState();
 }
 
-const CONFIG_KEYS = new Set(['banner-id', 'rf-data-check', 'below-nav', 'message']);
+const CONFIG_KEYS = new Set(['banner-id', 'rf-data-check', 'nav-overlay', 'message']);
 
-// Authors write the literal word "false" for an off boolean row (see below-nav in the
+// Authors write the literal word "false" for an off boolean row (see nav-overlay in the
 // README example) — Boolean(str) can't tell that apart from any other non-empty string,
 // so this parses the actual authored value instead of just checking presence.
 function isTruthyConfigValue(value) {
@@ -107,7 +107,7 @@ export default async function init(el) {
 
   const bannerId = config['banner-id'] || getMetadata('banner-id') || '';
   const rfGateEnabled = isTruthyConfigValue(config['rf-data-check'] ?? getMetadata('rf-data-check'));
-  const belowNav = isTruthyConfigValue(config['below-nav'] ?? getMetadata('below-nav'));
+  const navOverlay = isTruthyConfigValue(config['nav-overlay'] ?? getMetadata('nav-overlay'));
 
   if (isDismissed(bannerId)) {
     el.remove();
@@ -120,12 +120,12 @@ export default async function init(el) {
   }
 
   el.dataset.theme = el.classList.contains('dark') ? 'dark' : 'light';
-  el.classList.toggle('in-person-banner-below-nav', belowNav);
+  el.classList.toggle('in-person-banner-nav-overlay', navOverlay);
 
   const banner = buildBanner(contentCell, bannerId);
   el.replaceChildren(banner);
 
-  if (belowNav) {
+  if (navOverlay) {
     // position: fixed only pins to the true viewport if every ancestor is a
     // plain, non-transformed box — a transform/filter/will-change anywhere
     // between here and <body> (common on animated hero/marquee sections)
