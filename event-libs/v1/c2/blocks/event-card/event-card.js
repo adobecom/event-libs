@@ -84,18 +84,19 @@ function buildTextNodes(contentWrapper) {
   const paragraphs = [...(textRoot?.querySelectorAll(':scope > p') || [])];
   const [titleEl, descEl, ctaP] = paragraphs;
   const nodes = [];
+  const title = titleEl?.textContent.trim() || '';
 
-  if (titleEl?.textContent.trim()) {
-    nodes.push(createTag('p', { class: 'card-title' }, titleEl.textContent.trim()));
+  if (title) {
+    nodes.push(createTag('p', { class: 'card-title' }, title));
   }
   if (descEl?.textContent.trim()) {
     nodes.push(createTag('p', { class: 'card-description' }, descEl.textContent.trim()));
   }
-  return { nodes, ctaP };
+  return { nodes, ctaP, title };
 }
 
 function buildBody(contentWrapper) {
-  const { nodes, ctaP } = buildTextNodes(contentWrapper);
+  const { nodes, ctaP, title } = buildTextNodes(contentWrapper);
   const body = createTag('div', { class: 'card-body' }, nodes);
   const cta = ctaP?.querySelector('a');
   if (cta) {
@@ -104,6 +105,10 @@ function buildBody(contentWrapper) {
       href: cta.href,
     }, cta.textContent.trim());
     Object.assign(cardCta.dataset, cta.dataset);
+    const daaLl = cta.hasAttribute('daa-ll')
+      ? cta.getAttribute('daa-ll')
+      : `${cta.textContent.trim()}-1|${title}`;
+    cardCta.setAttribute('daa-ll', daaLl);
     body.append(cardCta);
   }
   return body;
@@ -131,6 +136,11 @@ export default async function init(el) {
   if (el.dataset.sessionId) {
     const { default: attachSessionRouting, getLiveStreamActiveIds } = await import('../../../utils/session-routing.js');
     attachSessionRouting(el);
+
+    if (!el.hasAttribute('daa-ll')) {
+      const title = body.querySelector('.card-title')?.textContent.trim() || '';
+      el.setAttribute('daa-ll', `Session-Card-1|${title}`);
+    }
 
     const cta = body.querySelector('.card-cta');
     if (cta) attachLiveCtaText(el, cta, getLiveStreamActiveIds);
