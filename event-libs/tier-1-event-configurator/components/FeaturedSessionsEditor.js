@@ -83,10 +83,10 @@ const META_FIELD_DEFS = {
   // or externally hosted URL directly, no upload required.
   imageUrl: { label: 'Image', placeholder: 'Image URL (optional)', type: 'image' },
   watchDestination: {
-    label: 'Broadcast Type', type: 'select', icon: GlobeIcon, options: WATCH_DESTINATION_OPTIONS,
+    label: 'Watch destination', type: 'select', icon: GlobeIcon, options: WATCH_DESTINATION_OPTIONS,
   },
   homepageAnchorId: {
-    label: 'Homepage',
+    label: 'Homepage jump id',
     placeholder: 'e.g. live-marquee',
     tooltip: 'The id set on that section\'s own Section Metadata "anchor" row — the homepage jumps there once this session goes live.',
   },
@@ -443,13 +443,20 @@ export default function FeaturedSessionsEditor({
                   <span class="tec-featured-editor__title">${title}</span>
                   <span class="tec-featured-editor__track">${session ? getSessionMeta(session) : 'Not found in current session catalog'}</span>
                   ${onMetaChange && metaFields.length > 0 && html`
-                    <div class="tec-featured-editor__meta-fields">
-                      ${metaFields
-                        .filter((field) => META_FIELD_DEFS[field].type !== 'image')
-                        .filter((field) => field !== 'homepageAnchorId'
-                          || getEffectiveSelectValue('watchDestination', sessionId) === 'homepage')
-                        .map((field) => renderMetaField(field, sessionId, title))}
-                    </div>
+                    ${metaFields.includes('mrStreamId') && html`
+                      <div class="tec-featured-editor__meta-fields">
+                        ${renderMetaField('mrStreamId', sessionId, title)}
+                      </div>
+                    `}
+                    ${(metaFields.includes('watchDestination') || metaFields.includes('homepageAnchorId')) && html`
+                      <div class="tec-featured-editor__meta-fields">
+                        ${metaFields
+                          .filter((field) => field === 'watchDestination' || field === 'homepageAnchorId')
+                          .filter((field) => field !== 'homepageAnchorId'
+                            || getEffectiveSelectValue('watchDestination', sessionId) === 'homepage')
+                          .map((field) => renderMetaField(field, sessionId, title))}
+                      </div>
+                    `}
                     ${metaFields.some((field) => META_FIELD_DEFS[field].type === 'image') && html`
                       <div class="tec-featured-editor__meta-fields">
                         ${metaFields.filter((field) => META_FIELD_DEFS[field].type === 'image').map(

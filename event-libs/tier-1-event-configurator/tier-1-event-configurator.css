@@ -1313,7 +1313,7 @@ select.tec-field {
 .tec-featured-editor__meta-fields {
   display: flex;
   gap: 6px;
-  margin-top: 4px;
+  margin-top: 8px;
 }
 
 .tec-featured-editor__meta-field {
