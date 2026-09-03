@@ -4,13 +4,10 @@
 @import url('./components/Modal.css');
 
 :root {
-  /* Brand */
   --tec-color-primary: var(--s2a-color-blue-900);
   --tec-color-primary-hover: var(--s2a-color-blue-1000);
   --tec-color-primary-down: var(--s2a-color-blue-1100);
   --tec-color-on-primary: var(--s2a-color-content-knockout);
-
-  /* Neutrals */
   --tec-color-text-primary: var(--s2a-color-content-default);
   --tec-color-text-secondary: var(--s2a-color-content-subtle);
   --tec-color-text-placeholder: var(--s2a-color-gray-500);
@@ -19,8 +16,6 @@
   --tec-color-background: var(--s2a-color-background-subtle);
   --tec-color-surface: var(--s2a-color-background-default);
   --tec-color-surface-hover: var(--s2a-color-gray-75);
-
-  /* Semantic */
   --tec-color-error: var(--s2a-color-content-utility-error);
   --tec-color-error-bg: var(--s2a-color-red-100);
   --tec-color-success: var(--s2a-color-green-900);
@@ -29,25 +24,17 @@
   --tec-color-warning-bg: var(--s2a-color-orange-100);
   --tec-color-warning-border: var(--s2a-color-orange-300);
   --tec-color-focus-ring: rgb(59 99 251 / 15%);
-
-  /* Shape */
   --tec-border-radius-sm: var(--s2a-border-radius-xs);
   --tec-border-radius: var(--s2a-border-radius-sm);
   --tec-border-radius-lg: var(--s2a-border-radius-md);
-
-  /* Spacing */
   --tec-spacing-xs: var(--s2a-spacing-xs);
   --tec-spacing-sm: var(--s2a-spacing-sm);
   --tec-spacing-md: var(--s2a-spacing-md);
   --tec-spacing-lg: var(--s2a-spacing-lg);
   --tec-spacing-xl: var(--s2a-spacing-xl);
-
-  /* Elevation */
   --tec-shadow-sm: var(--s2a-shadow-level-1-x) var(--s2a-shadow-level-1-y) var(--s2a-shadow-level-1-blur) var(--s2a-shadow-level-1-color);
   --tec-shadow-md: var(--s2a-shadow-level-2-x) var(--s2a-shadow-level-2-y) var(--s2a-shadow-level-2-blur) var(--s2a-shadow-level-2-color);
   --tec-shadow-lg: var(--s2a-shadow-level-4-x) var(--s2a-shadow-level-4-y) var(--s2a-shadow-level-4-blur) var(--s2a-shadow-level-4-color);
-
-  /* Typography */
   --tec-font-family: var(--body-font-family, var(--s2a-font-family-adobe-clean));
 }
 
@@ -59,8 +46,6 @@ body {
   margin: 0;
 }
 
-/* Visually hidden but still announced by screen readers — used for
-   aria-live reorder announcements that shouldn't take up layout space. */
 .tec-sr-only {
   position: absolute;
   width: 1px;
@@ -149,10 +134,6 @@ body {
   margin: 4px 0 0;
 }
 
-/* Non-prod environment banner — deliberately loud (unlike everything else
-   in this app) so it's impossible to miss that ESP/ESL calls aren't
-   hitting prod. Never rendered at all when targeting prod, so there's no
-   visual noise in the common case. */
 .tec-env-banner {
   background: var(--tec-color-warning-bg);
   color: var(--tec-color-warning);
@@ -162,7 +143,6 @@ body {
   text-align: center;
 }
 
-/* Spinner */
 
 .tec-spinner {
   display: inline-block;
@@ -196,7 +176,6 @@ body {
   .tec-spinner { animation-duration: 1.6s; }
 }
 
-/* Buttons */
 
 .tec-btn {
   display: inline-flex;
@@ -318,7 +297,6 @@ body {
   width: 100%;
 }
 
-/* Form controls (shared: search, selects, text inputs, textareas) */
 
 .tec-field {
   padding: 8px 12px;
@@ -355,7 +333,6 @@ select.tec-field {
   cursor: pointer;
 }
 
-/* Toasts */
 
 .tec-toast {
   position: fixed;
@@ -404,7 +381,6 @@ select.tec-field {
   .tec-toast { animation: none; }
 }
 
-/* Library */
 
 .tec-library__header {
   display: flex;
@@ -474,8 +450,6 @@ select.tec-field {
   min-width: 0;
 }
 
-/* Same warning palette as .tec-env-banner — only rendered for a non-prod
-   row, so it stays quiet in the common (prod) case. */
 .tec-library__item-env {
   flex-shrink: 0;
   background: var(--tec-color-warning-bg);
@@ -499,7 +473,6 @@ select.tec-field {
   flex-shrink: 0;
 }
 
-/* Search input */
 
 .tec-search-input {
   display: flex;
@@ -537,7 +510,6 @@ select.tec-field {
   color: var(--tec-color-text-placeholder);
 }
 
-/* Event picker */
 
 .tec-event-picker__env-row {
   display: flex;
@@ -656,7 +628,6 @@ select.tec-field {
   list-style: none;
 }
 
-/* Manual event lookup */
 
 .tec-manual-lookup__hint {
   color: var(--tec-color-text-secondary);
@@ -714,7 +685,6 @@ select.tec-field {
   margin: 0 0 var(--tec-spacing-sm);
 }
 
-/* Editor */
 
 .tec-editor__header {
   display: flex;
@@ -1074,11 +1044,6 @@ select.tec-field {
   border-radius: var(--tec-border-radius-sm);
 }
 
-/* Selected-session rows (left column) can grow tall once meta-field inputs are
-   showing, so align to the top instead of center — puts the remove button in
-   the row's top-right corner rather than vertically centered against the
-   whole (now potentially multi-line) row. Available-session rows (right
-   column, no meta fields) keep the base center alignment untouched. */
 .tec-featured-editor__row.tec-featured-editor__row--selected {
   align-items: flex-start;
   cursor: grab;
@@ -1184,7 +1149,6 @@ select.tec-field {
   border-top: 1px solid var(--tec-color-border);
 }
 
-/* Library — grouped by config type (Global / Homepage) */
 
 .tec-library__group {
   margin-bottom: var(--tec-spacing-xl);
@@ -1306,9 +1270,6 @@ select.tec-field {
   font-size: 13px;
 }
 
-/* Per-session Watch URL / Mobile Rider stream ID / Image overrides — see
-   MOBILE-RIDER-STREAM-ID-GAP.md for why these are hand-authored here rather
-   than sourced from the ESP session catalog. */
 
 .tec-featured-editor__meta-fields {
   display: flex;
@@ -1329,9 +1290,6 @@ select.tec-field {
   align-items: center;
 }
 
-/* Fixed width so the Watch destination select doesn't stretch to fill the row when
-   Homepage jump id isn't rendered alongside it (Broadcast Page selected) — only the
-   sibling field should grow/shrink. */
 .tec-featured-editor__meta-field--fixed {
   flex: 0 0 200px;
 }
@@ -1398,9 +1356,6 @@ select.tec-field {
   font-size: 12px;
 }
 
-/* ==========================================================================
-    DA Folder Browser + Image Upload (ImagePickerModal)
-   ========================================================================== */
 
 .tec-fb-wrapper {
   display: flex;

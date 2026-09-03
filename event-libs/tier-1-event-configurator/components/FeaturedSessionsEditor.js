@@ -64,23 +64,8 @@ function InfoIcon() {
   `;
 }
 
-// Pointer-based drag reorder. Each handle also responds to ArrowUp/ArrowDown
-// when focused, since native drag isn't keyboard-operable.
-//
-// Tracks pointermove/up on window, not via setPointerCapture on the handle —
-// capture doesn't survive the handle's DOM node moving mid-drag (which
-// happens every reorder swap), so it was ending drags after one swap.
-//
-// Assumes every row is the same height: the dragged row's target slot is
-// arithmetic on the pointer delta, and other rows FLIP-animate into place.
-// Every possible per-session override field this editor knows how to render —
-// callers pick a subset via `metaFields` (below) to match what their own
-// consuming block actually reads, rather than always showing both.
 const META_FIELD_DEFS = {
   mrStreamId: { label: 'Mobile Rider stream ID', placeholder: 'Mobile Rider stream ID (optional)' },
-  // type: 'image' additionally gets a thumbnail + "Upload…" button (see the meta-fields
-  // render below) — the text input still works standalone for pasting an already-uploaded
-  // or externally hosted URL directly, no upload required.
   imageUrl: { label: 'Image', placeholder: 'Image URL (optional)', type: 'image' },
   watchDestination: {
     label: 'Watch destination', type: 'select', icon: GlobeIcon, options: WATCH_DESTINATION_OPTIONS,
@@ -95,20 +80,12 @@ const META_FIELD_DEFS = {
 export default function FeaturedSessionsEditor({
   sessions, sessionTimes, tracks, featuredSessions, onChange,
   heading = 'Featured (display order)', emptyHint = 'No sessions featured yet — add some from the list on the right.',
-  // Optional per-session overrides — neither field has a source in the ESP
-  // session catalog (see MOBILE-RIDER-STREAM-ID-GAP.md), so when a caller
-  // needs one in its output JSON, it's authored here by hand instead.
-  // `metaFields` (e.g. ['mrStreamId']) picks which of META_FIELD_DEFS to
-  // show — only the ones the caller's own block actually reads. Omitted
-  // entirely (along with onMetaChange) for callers that don't need any.
   meta, onMetaChange, metaFields = [],
 }) {
   const [search, setSearch] = useState('');
   const [trackFilter, setTrackFilter] = useState('');
   const [draggedId, setDraggedId] = useState(null);
   const [announcement, setAnnouncement] = useState('');
-  // Which row's image-upload modal is open — one shared modal instance rather than one per
-  // row, since at most one can be open at a time.
   const [imagePickerFor, setImagePickerFor] = useState(null);
 
   const sessionsById = useMemo(() => {
@@ -117,7 +94,6 @@ export default function FeaturedSessionsEditor({
     return map;
   }, [sessions]);
 
-  // A session can have more than one sessionTime (e.g. live + on-demand) — use the earliest.
   const earliestTimeBySessionId = useMemo(() => {
     const map = new Map();
     (sessionTimes || []).forEach((time) => {
@@ -140,13 +116,9 @@ export default function FeaturedSessionsEditor({
     [sessionsById],
   );
 
-  // Memoized so the FLIP effect's prevOrder !== featuredIds check reflects a
-  // real order change, not a fresh [] recreated whenever featuredSessions is falsy.
   const featuredIds = useMemo(() => featuredSessions || [], [featuredSessions]);
   const featuredSet = useMemo(() => new Set(featuredIds), [featuredIds]);
 
-  // Full client-side filter over the already-fetched catalog — no second
-  // /session-facets call, no pagination.
   const availableSessions = useMemo(() => {
     const term = search.trim().toLowerCase();
     return (sessions || []).filter((session) => {
@@ -185,10 +157,9 @@ export default function FeaturedSessionsEditor({
     }
   }, [handleMove]);
 
-  // Refs, not state — pointermove reads/writes these without re-rendering per pixel.
   const listRef = useRef(null);
   const itemRefs = useRef(new Map());
-  const dragInfo = useRef(null); // { sessionId, startClientY, startIndex, rowHeight }
+  const dragInfo = useRef(null);
   const orderRef = useRef(featuredIds);
   orderRef.current = featuredIds;
 
@@ -206,8 +177,6 @@ export default function FeaturedSessionsEditor({
     return rect.height + gap;
   }, []);
 
-  // Latest-ref pattern: stableMove/stableEnd never change identity, so a
-  // listener added at drag-start stays removable later even if the handlers do.
   const handlePointerMoveRef = useRef(() => {});
   const endDragRef = useRef(() => {});
   const stableMove = useRef((e) => handlePointerMoveRef.current(e)).current;
@@ -247,8 +216,6 @@ export default function FeaturedSessionsEditor({
 
     const draggedNode = itemRefs.current.get(info.sessionId);
     if (draggedNode) {
-      // Layout already covers whole-slot shifts from the reorder above; this
-      // only supplies the remaining sub-slot distance.
       const visualOffset = deltaY - (targetIndex - info.startIndex) * info.rowHeight;
       draggedNode.style.transform = `translateY(${visualOffset}px)`;
     }
@@ -274,23 +241,18 @@ export default function FeaturedSessionsEditor({
     setDraggedId(null);
   };
 
-  // Safety net: don't leave window listeners registered if unmounted mid-drag.
   useEffect(() => () => {
     window.removeEventListener('pointermove', stableMove);
     window.removeEventListener('pointerup', stableEnd);
     window.removeEventListener('pointercancel', stableEnd);
   }, [stableMove, stableEnd]);
 
-  // FLIP-lite: when the order changes, animate every row except the one
-  // being dragged (already positioned above) from its old slot to its new one.
   const prevOrderRef = useRef(featuredIds);
   useLayoutEffect(() => {
     const prevOrder = prevOrderRef.current;
     if (prevOrder !== featuredIds) {
       const rowHeight = measureRowHeight();
       if (rowHeight) {
-        // Two passes (write all "from", one reflow, write all "to") to avoid
-        // layout thrashing from interleaving reads/writes per row.
         const movedNodes = [];
         prevOrder.forEach((sessionId) => {
           if (sessionId === dragInfo.current?.sessionId) return;
@@ -306,7 +268,7 @@ export default function FeaturedSessionsEditor({
 
         if (movedNodes.length > 0) {
           // eslint-disable-next-line no-unused-expressions
-          document.body.offsetHeight; // one shared reflow for the whole batch
+          document.body.offsetHeight;
           movedNodes.forEach((node) => {
             node.style.transition = 'transform 0.2s ease';
             node.style.transform = '';

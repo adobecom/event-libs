@@ -10,9 +10,6 @@ function normalizePath(path) {
 }
 
 function resolveHomepageAction(dataset) {
-  // No hardcoded fallback path: an unauthored homepagePath means "wherever this card
-  // is currently rendered is the homepage" — lets this be tested from any page rather
-  // than only ever resolving to a single hardcoded production path.
   const homepagePath = getHomepagePath() || window.location.pathname;
   const anchorId = dataset.homepageAnchorId;
 
