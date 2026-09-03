@@ -158,6 +158,14 @@ const ConfigsProvider = ({ children }) => {
             .filter((field) => sourceConfig[field])
             .map((field) => [field, sourceConfig[field]]),
         ),
+        ...Object.fromEntries(
+          [
+            HOMEPAGE_FIELD_BY_TYPE[configType]?.watchDestinationField,
+            HOMEPAGE_FIELD_BY_TYPE[configType]?.homepageAnchorIdField,
+          ]
+            .filter((field) => field && sourceConfig[field])
+            .map((field) => [field, sourceConfig[field]]),
+        ),
       }
       : {
         ...emptyConfig(configType),

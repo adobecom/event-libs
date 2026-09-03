@@ -23,6 +23,11 @@ const HOMEPAGE_CONFIG_TYPE_OPTIONS = [
   { value: CONFIG_TYPES.HOMEPAGE_FEATURED_SESSIONS, label: 'Featured Sessions' },
 ];
 
+const WATCH_DESTINATION_OPTIONS = [
+  { value: 'homepage', label: 'Homepage' },
+  { value: 'broadcast', label: 'Broadcast' },
+];
+
 // Same shape as Schedule Maker's DA_ORIGIN/DA_APP_PATH (event-libs/schedule-maker/constants.js).
 const DA_ORIGIN = 'https://da.live';
 const DA_APP_PATH = 'tools/da-apps/tier-1-event-configurator';
@@ -78,6 +83,9 @@ const HOMEPAGE_FIELD_BY_TYPE = {
       after: 'Watch on-demand',
     },
     ctaHint: 'CTA text shown on every card, chosen per-session by comparing the session\'s own time to the viewer\'s clock — before it starts, while it\'s live, and after it ends. Leave any blank to fall back to its default.',
+    watchDestinationField: 'watchDestination',
+    homepageAnchorIdField: 'homepageAnchorId',
+    watchDestinationHint: 'Where a card routes once its session goes live. Homepage jumps to (or navigates to) the anchor ID below — set via that section\'s own Section Metadata "anchor" row. Broadcast goes to the Broadcast page.',
   },
 };
 
@@ -105,6 +113,7 @@ export {
   EVENT_SERVICE_ENV_OPTIONS,
   CONFIG_TYPES,
   HOMEPAGE_CONFIG_TYPE_OPTIONS,
+  WATCH_DESTINATION_OPTIONS,
   HOMEPAGE_SESSION_FIELDS,
   HOMEPAGE_FIELD_BY_TYPE,
   isHomepageConfigType,

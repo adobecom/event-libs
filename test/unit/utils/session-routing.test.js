@@ -106,6 +106,71 @@ describe('event-card session routing', () => {
       }, NOW);
       expect(action).to.deep.equal({ type: 'none' });
     });
+
+    describe('authored watchDestination (overrides tag-derived isLivestreamed/isOnline)', () => {
+      const originalPath = window.location.pathname + window.location.search;
+
+      afterEach(() => {
+        window.history.pushState(null, '', originalPath);
+      });
+
+      it('navigates to the homepage with the authored anchor id when elsewhere on the site', () => {
+        window.history.pushState(null, '', '/some/other/page.html');
+        const action = resolveCardAction({
+          sessionId: 'sess-1',
+          watchDestination: 'homepage',
+          homepageAnchorId: 'live-marquee',
+          startTimeUtc: iso(NOW - HOUR),
+          endTimeUtc: iso(NOW + HOUR),
+        }, NOW);
+        expect(action).to.deep.equal({ type: 'navigate', url: `${MAX_EVENT_PAGES.homepage}#live-marquee` });
+      });
+
+      it('navigates to the bare homepage path when no anchor id is authored', () => {
+        window.history.pushState(null, '', '/some/other/page.html');
+        const action = resolveCardAction({
+          sessionId: 'sess-1',
+          watchDestination: 'homepage',
+          startTimeUtc: iso(NOW - HOUR),
+          endTimeUtc: iso(NOW + HOUR),
+        }, NOW);
+        expect(action).to.deep.equal({ type: 'navigate', url: MAX_EVENT_PAGES.homepage });
+      });
+
+      it('scrolls instead of navigating when already on the homepage path', () => {
+        window.history.pushState(null, '', MAX_EVENT_PAGES.homepage);
+        const action = resolveCardAction({
+          sessionId: 'sess-1',
+          watchDestination: 'homepage',
+          homepageAnchorId: 'live-marquee',
+          startTimeUtc: iso(NOW - HOUR),
+          endTimeUtc: iso(NOW + HOUR),
+        }, NOW);
+        expect(action).to.deep.equal({ type: 'scroll', anchorId: 'live-marquee' });
+      });
+
+      it('resolves to no action when already on the homepage path with no anchor id authored', () => {
+        window.history.pushState(null, '', MAX_EVENT_PAGES.homepage);
+        const action = resolveCardAction({
+          sessionId: 'sess-1',
+          watchDestination: 'homepage',
+          startTimeUtc: iso(NOW - HOUR),
+          endTimeUtc: iso(NOW + HOUR),
+        }, NOW);
+        expect(action).to.deep.equal({ type: 'none' });
+      });
+
+      it('navigates to the broadcast page for watchDestination "broadcast", ignoring isLivestreamed', () => {
+        const action = resolveCardAction({
+          sessionId: 'sess-1',
+          watchDestination: 'broadcast',
+          isLivestreamed: 'true',
+          startTimeUtc: iso(NOW - HOUR),
+          endTimeUtc: iso(NOW + HOUR),
+        }, NOW);
+        expect(action).to.deep.equal({ type: 'navigate', url: MAX_EVENT_PAGES.broadcast });
+      });
+    });
   });
 
   describe('attachSessionRouting', () => {

@@ -73,6 +73,38 @@ describe('featured-sessions', () => {
     expect(card.dataset.endTimeUtc).to.equal(new Date(1750003600000).toISOString());
   });
 
+  describe('authored watchDestination', () => {
+    it('sets data-watch-destination and data-homepage-anchor-id from config when "homepage" is chosen', async () => {
+      const el = buildBlock({
+        watchDestination: 'homepage',
+        homepageAnchorId: 'live-marquee',
+        entries: [entry()],
+      });
+      await init(el);
+
+      const card = el.querySelector('.event-card');
+      expect(card.dataset.watchDestination).to.equal('homepage');
+      expect(card.dataset.homepageAnchorId).to.equal('live-marquee');
+    });
+
+    it('sets data-watch-destination without an anchor id when "broadcast" is chosen', async () => {
+      const el = buildBlock({ watchDestination: 'broadcast', entries: [entry()] });
+      await init(el);
+
+      const card = el.querySelector('.event-card');
+      expect(card.dataset.watchDestination).to.equal('broadcast');
+      expect(card.dataset.homepageAnchorId).to.equal(undefined);
+    });
+
+    it('leaves data-watch-destination unset when the config authors none', async () => {
+      const el = buildBlock({ entries: [entry()] });
+      await init(el);
+
+      const card = el.querySelector('.event-card');
+      expect(card.dataset.watchDestination).to.equal(undefined);
+    });
+  });
+
   it('does not author a heading — aria-label is a fixed label regardless of config', async () => {
     const el = buildBlock({ heading: 'Ignored Custom Heading', entries: [entry()] });
     await init(el);
