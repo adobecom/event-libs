@@ -121,15 +121,18 @@
   text-decoration: underline;
 }
 
-.event-card[data-card-theme="dark"] .card-title {
+.event-card.dark-card .card-title,
+.section.dark .event-card .card-title {
   color: #fff;
 }
 
-.event-card[data-card-theme="dark"] .card-description {
+.event-card.dark-card .card-description,
+.section.dark .event-card .card-description {
   color: rgb(255 255 255 / 64%);
 }
 
-.event-card[data-card-theme="dark"] .card-cta {
+.event-card.dark-card .card-cta,
+.section.dark .event-card .card-cta {
   color: #fff;
 }
 

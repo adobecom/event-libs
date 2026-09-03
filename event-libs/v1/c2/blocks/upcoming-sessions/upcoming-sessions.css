@@ -107,13 +107,18 @@
   background: var(--s2a-color-transparent-black-80, rgb(0 0 0 / 80%));
 }
 
-.upcoming-sessions.dark-card .upcoming-sessions-arrow {
+/* Mirrors event-carousel.css's own dark-section override: same light/frosted circle
+   with a black icon, so Upcoming Sessions' controls match Featured Sessions' carousel
+   controls in a dark section instead of keeping the on-dark glass look. */
+.upcoming-sessions.dark-card .upcoming-sessions-arrow,
+.section.dark .upcoming-sessions .upcoming-sessions-arrow {
   border-color: #e1e1e1;
   background: #f3f3f3;
   color: #000;
 }
 
-.upcoming-sessions.dark-card .upcoming-sessions-arrow:hover {
+.upcoming-sessions.dark-card .upcoming-sessions-arrow:hover,
+.section.dark .upcoming-sessions .upcoming-sessions-arrow:hover {
   background: #e1e1e1;
 }
 

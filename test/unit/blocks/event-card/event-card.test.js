@@ -93,25 +93,24 @@ describe('event-card', () => {
     expect(img.src).to.equal('https://example.com/media/session.jpg');
   });
 
-  it('defaults to light theme when no dark-card class is authored', async () => {
+  it('sets no theme attribute — dark/light is pure CSS off the ancestor .section.dark or a dark-card class', async () => {
     document.body.innerHTML = await readFile({ path: './mocks/media-standard.html' });
     const el = document.querySelector('.event-card');
     await init(el);
 
-    expect(el.dataset.cardTheme).to.equal('light');
+    expect(el.dataset.cardTheme).to.equal(undefined);
   });
 
-  it('sets dark theme from a dark-card class present before init', async () => {
+  it('leaves an authored dark-card class in place for event-card.css to key off', async () => {
     document.body.innerHTML = await readFile({ path: './mocks/media-standard.html' });
     const el = document.querySelector('.event-card');
     el.classList.add('dark-card');
     await init(el);
 
-    expect(el.dataset.cardTheme).to.equal('dark');
     expect(el.classList.contains('dark-card')).to.equal(true);
   });
 
-  it('inherits dark theme from an ancestor .section.dark, with no card-level class needed', async () => {
+  it('leaves the card under its ancestor .section.dark for event-card.css to key off, with no card-level class added', async () => {
     document.body.innerHTML = await readFile({ path: './mocks/media-standard.html' });
     const el = document.querySelector('.event-card');
     const section = document.createElement('div');
@@ -120,7 +119,7 @@ describe('event-card', () => {
     document.body.append(section);
     await init(el);
 
-    expect(el.dataset.cardTheme).to.equal('dark');
+    expect(el.closest('.section.dark')).to.equal(section);
     expect(el.classList.contains('dark-card')).to.equal(false);
   });
 
@@ -133,7 +132,9 @@ describe('event-card', () => {
     document.body.append(section);
     await init(el);
 
-    expect(el.dataset.cardTheme).to.equal('light');
+    expect(el.closest('.section.dark')).to.equal(null);
+    expect(el.classList.contains('dark-card')).to.equal(false);
+    expect(el.dataset.cardTheme).to.equal(undefined);
   });
 
   it('keeps a cross-origin authored <img> at its real absolute URL, not a same-origin pathname', async () => {

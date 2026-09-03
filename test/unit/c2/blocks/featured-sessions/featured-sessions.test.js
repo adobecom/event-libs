@@ -73,6 +73,52 @@ describe('featured-sessions', () => {
     expect(card.dataset.endTimeUtc).to.equal(new Date(1750003600000).toISOString());
   });
 
+  describe('authored watchDestination (per session)', () => {
+    it('sets data-watch-destination and data-homepage-anchor-id from the entry when "homepage" is chosen', async () => {
+      const el = buildBlock({
+        entries: [entry({ watchDestination: 'homepage', homepageAnchorId: 'live-marquee' })],
+      });
+      await init(el);
+
+      const card = el.querySelector('.event-card');
+      expect(card.dataset.watchDestination).to.equal('homepage');
+      expect(card.dataset.homepageAnchorId).to.equal('live-marquee');
+    });
+
+    it('sets data-watch-destination without an anchor id when "broadcast" is chosen', async () => {
+      const el = buildBlock({ entries: [entry({ watchDestination: 'broadcast' })] });
+      await init(el);
+
+      const card = el.querySelector('.event-card');
+      expect(card.dataset.watchDestination).to.equal('broadcast');
+      expect(card.dataset.homepageAnchorId).to.equal(undefined);
+    });
+
+    it('leaves data-watch-destination unset when the entry authors none', async () => {
+      const el = buildBlock({ entries: [entry()] });
+      await init(el);
+
+      const card = el.querySelector('.event-card');
+      expect(card.dataset.watchDestination).to.equal(undefined);
+    });
+
+    it('lets each session in the same config pick a different watch destination', async () => {
+      const el = buildBlock({
+        entries: [
+          entry({ watchDestination: 'homepage', homepageAnchorId: 'live-marquee' }),
+          entry({ sessionId: 'session-2', watchDestination: 'broadcast' }),
+        ],
+      });
+      await init(el);
+
+      const [first, second] = el.querySelectorAll('.event-card');
+      expect(first.dataset.watchDestination).to.equal('homepage');
+      expect(first.dataset.homepageAnchorId).to.equal('live-marquee');
+      expect(second.dataset.watchDestination).to.equal('broadcast');
+      expect(second.dataset.homepageAnchorId).to.equal(undefined);
+    });
+  });
+
   it('does not author a heading — aria-label is a fixed label regardless of config', async () => {
     const el = buildBlock({ heading: 'Ignored Custom Heading', entries: [entry()] });
     await init(el);
@@ -141,16 +187,17 @@ describe('featured-sessions', () => {
 
       const card = el.querySelector('.event-card');
       expect(card.classList.contains('dark-card')).to.equal(false);
-      expect(card.dataset.cardTheme).to.equal('light');
+      expect(card.dataset.cardTheme).to.equal(undefined);
     });
 
-    it('inherits dark from the containing section, with no config.theme or per-card wiring', async () => {
+    it('inherits dark from the containing section, with no config.theme or per-card wiring — pure CSS, no card-level class or attribute', async () => {
       const el = buildBlock({ entries: [entry()] }, { dark: true });
       await init(el);
 
       const card = el.querySelector('.event-card');
+      expect(card.closest('.section.dark')).to.exist;
       expect(card.classList.contains('dark-card')).to.equal(false);
-      expect(card.dataset.cardTheme).to.equal('dark');
+      expect(card.dataset.cardTheme).to.equal(undefined);
     });
   });
 

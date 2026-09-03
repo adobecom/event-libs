@@ -44,13 +44,14 @@ Same right-arrow icon SVG is reused for both buttons — "prev" is rotated 180de
 
 ## Theme
 
-Light (the default) or dark, section-driven — mirrors `event-card.js`'s own `getTheme()`.
-`init()`'s `getTheme()` checks `el.closest('.section')` for a `dark` class (the same
-plain class `decorate.js`'s `applyAreaTheme()`/DA's Section Metadata `style: dark`
-authoring already lands on the section) and sets `data-carousel-theme` on `el`
-accordingly — nothing to configure per block or per link. The default arrow is a
-dark/frosted glass circle with a white icon, built to sit on a light section;
-`event-carousel.css`'s `.carousel-controls[data-carousel-theme="dark"] .carousel-arrow`
-rules invert that to a light/frosted circle with a black icon so it stays visible
-against a dark section instead. A `dark-carousel` class present on `el` itself before
-`init()` runs is honored too, as a manual override.
+Light (the default) or dark. Pure CSS, no JS involved — mirrors `event-card.css`'s own
+approach. `event-carousel.css` styles `.section.dark .carousel-controls .carousel-arrow`
+directly off the ancestor `.section`'s own `dark` class (the same plain class
+`decorate.js`'s `applyAreaTheme()`/DA's Section Metadata `style: dark` authoring already
+lands on the section) — nothing to configure per block or per link, and no dependency on
+`init()` having run yet. The default arrow is a dark/frosted glass circle with a white
+icon, built to sit on a light section; the dark-section rules invert that to a
+light/frosted circle with a black icon so it stays visible against a dark section
+instead. A `dark-carousel` class present on the carousel container itself is honored
+too, as a manual override — `event-carousel.css` matches `.carousel-controls.dark-carousel`
+the same way.

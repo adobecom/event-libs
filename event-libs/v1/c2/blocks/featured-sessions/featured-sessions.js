@@ -10,6 +10,13 @@ function setRoutingData(card, entry) {
   if (entry.isLivestreamed) card.dataset.isLivestreamed = 'true';
   if (entry.isOnline) card.dataset.isOnline = 'true';
 
+  if (entry.watchDestination === 'homepage' || entry.watchDestination === 'broadcast') {
+    card.dataset.watchDestination = entry.watchDestination;
+    if (entry.watchDestination === 'homepage' && entry.homepageAnchorId) {
+      card.dataset.homepageAnchorId = entry.homepageAnchorId;
+    }
+  }
+
   const { startTimeMillis, endTimeMillis } = entry.sessionTime || {};
   if (startTimeMillis) card.dataset.startTimeUtc = new Date(startTimeMillis).toISOString();
   if (endTimeMillis) card.dataset.endTimeUtc = new Date(endTimeMillis).toISOString();

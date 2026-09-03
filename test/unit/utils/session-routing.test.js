@@ -1,6 +1,7 @@
 import { expect } from '@esm-bundle/chai';
 import attachSessionRouting, { resolveCardAction } from '../../../event-libs/v1/utils/session-routing.js';
 import { sessionGuideRequest } from '../../../event-libs/v1/utils/session-store.js';
+import { initTierOneEventConfig } from '../../../event-libs/v1/utils/tier-1-event-config.js';
 import { MAX_EVENT_PAGES } from '../../../event-libs/v1/utils/constances.js';
 
 const HOUR = 60 * 60 * 1000;
@@ -105,6 +106,75 @@ describe('event-card session routing', () => {
         endTimeUtc: iso(NOW + 2 * HOUR),
       }, NOW);
       expect(action).to.deep.equal({ type: 'none' });
+    });
+
+    describe('authored watchDestination (overrides tag-derived isLivestreamed/isOnline)', () => {
+      const originalPath = window.location.pathname + window.location.search;
+
+      afterEach(() => {
+        window.history.pushState(null, '', originalPath);
+      });
+
+      // No tier-1-event-config homepagePath authored anywhere in this file yet (see the
+      // dedicated test below, which authors one and runs last so it doesn't leak into
+      // these) — resolveHomepageAction has nothing to fall back to but the current page
+      // itself, so wherever the card happens to be rendered *is* "the homepage".
+
+      it('scrolls to the authored anchor id when no homepagePath is authored (falls back to the current page)', () => {
+        window.history.pushState(null, '', '/some/page.html');
+        const action = resolveCardAction({
+          sessionId: 'sess-1',
+          watchDestination: 'homepage',
+          homepageAnchorId: 'live-marquee',
+          startTimeUtc: iso(NOW - HOUR),
+          endTimeUtc: iso(NOW + HOUR),
+        }, NOW);
+        expect(action).to.deep.equal({ type: 'scroll', anchorId: 'live-marquee' });
+      });
+
+      it('resolves to no action with no homepagePath authored and no anchor id either', () => {
+        window.history.pushState(null, '', '/some/page.html');
+        const action = resolveCardAction({
+          sessionId: 'sess-1',
+          watchDestination: 'homepage',
+          startTimeUtc: iso(NOW - HOUR),
+          endTimeUtc: iso(NOW + HOUR),
+        }, NOW);
+        expect(action).to.deep.equal({ type: 'none' });
+      });
+
+      it('navigates to the broadcast page for watchDestination "broadcast", ignoring isLivestreamed', () => {
+        const action = resolveCardAction({
+          sessionId: 'sess-1',
+          watchDestination: 'broadcast',
+          isLivestreamed: 'true',
+          startTimeUtc: iso(NOW - HOUR),
+          endTimeUtc: iso(NOW + HOUR),
+        }, NOW);
+        expect(action).to.deep.equal({ type: 'navigate', url: MAX_EVENT_PAGES.broadcast });
+      });
+
+      // Runs last: initTierOneEventConfig() is idempotent module state with no reset —
+      // once a homepagePath is authored here, it stays authored for the rest of this
+      // file's test run, so every case above (which relies on *no* homepagePath being
+      // configured) has to come first.
+      it('prefers an authored tier-1-event-config homepagePath over the current page', () => {
+        const meta = document.createElement('meta');
+        meta.name = 'tier-1-event-config';
+        meta.content = JSON.stringify({ homepagePath: '/configured-homepage.html' });
+        document.head.appendChild(meta);
+        initTierOneEventConfig();
+
+        window.history.pushState(null, '', '/some/other/page.html');
+        const action = resolveCardAction({
+          sessionId: 'sess-1',
+          watchDestination: 'homepage',
+          homepageAnchorId: 'live-marquee',
+          startTimeUtc: iso(NOW - HOUR),
+          endTimeUtc: iso(NOW + HOUR),
+        }, NOW);
+        expect(action).to.deep.equal({ type: 'navigate', url: '/configured-homepage.html#live-marquee' });
+      });
     });
   });
 
