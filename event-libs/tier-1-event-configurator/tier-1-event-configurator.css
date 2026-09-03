@@ -1318,10 +1318,61 @@ select.tec-field {
 
 .tec-featured-editor__meta-field {
   display: flex;
-  align-items: center;
-  gap: 6px;
+  flex-direction: column;
+  gap: 4px;
   flex: 1;
   min-width: 0;
+}
+
+.tec-featured-editor__meta-field--inline {
+  flex-direction: row;
+  align-items: center;
+}
+
+.tec-featured-editor__meta-label {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--tec-color-text-primary);
+}
+
+.tec-featured-editor__field-control {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.tec-featured-editor__field-control input {
+  width: 100%;
+  padding-right: 26px;
+}
+
+.tec-featured-editor__field-control--select {
+  gap: 6px;
+  padding: 0 8px;
+  border: 1px solid var(--tec-color-border);
+  border-radius: var(--tec-border-radius);
+  background: var(--tec-color-surface);
+  color: var(--tec-color-text-secondary);
+}
+
+.tec-featured-editor__field-control--select select {
+  flex: 1;
+  border: none;
+  padding-left: 0;
+}
+
+.tec-featured-editor__field-control--select:focus-within {
+  border-color: var(--tec-color-focus, #1473e6);
+}
+
+.tec-featured-editor__info-icon {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--tec-color-text-secondary);
+  display: flex;
+  cursor: help;
 }
 
 .tec-featured-editor__thumb {

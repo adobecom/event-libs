@@ -24,8 +24,8 @@ const HOMEPAGE_CONFIG_TYPE_OPTIONS = [
 ];
 
 const WATCH_DESTINATION_OPTIONS = [
-  { value: 'homepage', label: 'Homepage' },
-  { value: 'broadcast', label: 'Broadcast' },
+  { value: 'homepage', label: 'Homepage Broadcast' },
+  { value: 'broadcast', label: 'Broadcast Page' },
 ];
 
 // Same shape as Schedule Maker's DA_ORIGIN/DA_APP_PATH (event-libs/schedule-maker/constants.js).

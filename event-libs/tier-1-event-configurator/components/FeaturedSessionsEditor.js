@@ -45,6 +45,25 @@ function DragHandleIcon() {
   `;
 }
 
+function GlobeIcon() {
+  return html`
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true" focusable="false">
+      <circle cx="8" cy="8" r="6.5" stroke="currentColor" stroke-width="1.3" />
+      <ellipse cx="8" cy="8" rx="2.75" ry="6.5" stroke="currentColor" stroke-width="1.3" />
+      <path d="M1.7 6h12.6M1.7 10h12.6" stroke="currentColor" stroke-width="1.3" />
+    </svg>
+  `;
+}
+
+function InfoIcon() {
+  return html`
+    <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true" focusable="false">
+      <circle cx="8" cy="8" r="6.5" stroke="currentColor" stroke-width="1.3" />
+      <path d="M8 7.25v4M8 5v.01" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" />
+    </svg>
+  `;
+}
+
 // Pointer-based drag reorder. Each handle also responds to ArrowUp/ArrowDown
 // when focused, since native drag isn't keyboard-operable.
 //
@@ -63,8 +82,14 @@ const META_FIELD_DEFS = {
   // render below) — the text input still works standalone for pasting an already-uploaded
   // or externally hosted URL directly, no upload required.
   imageUrl: { label: 'Image', placeholder: 'Image URL (optional)', type: 'image' },
-  watchDestination: { label: 'Watch destination', type: 'radio', options: WATCH_DESTINATION_OPTIONS },
-  homepageAnchorId: { label: 'Homepage anchor ID', placeholder: 'e.g. live-marquee' },
+  watchDestination: {
+    label: 'Broadcast Type', type: 'select', icon: GlobeIcon, options: WATCH_DESTINATION_OPTIONS,
+  },
+  homepageAnchorId: {
+    label: 'Homepage Broadcast',
+    placeholder: 'e.g. live-marquee',
+    tooltip: 'The id set on that section\'s own Section Metadata "anchor" row — the homepage jumps there once this session goes live.',
+  },
 };
 
 export default function FeaturedSessionsEditor({
@@ -294,61 +319,87 @@ export default function FeaturedSessionsEditor({
 
   const renderMetaField = (field, sessionId, title) => {
     const value = meta?.[sessionId]?.[field] || '';
-    const isImage = META_FIELD_DEFS[field].type === 'image';
-    const isRadio = META_FIELD_DEFS[field].type === 'radio';
+    const def = META_FIELD_DEFS[field];
+    const isImage = def.type === 'image';
+    const isSelect = def.type === 'select';
+    const fieldId = `tec-meta-${field}-${sessionId}`;
 
-    if (isRadio) {
+    if (isSelect) {
       return html`
-        <fieldset key=${field} class="tec-featured-editor__meta-field tec-featured-editor__meta-field--radio">
-          <legend class="tec-sr-only">${META_FIELD_DEFS[field].label} for ${title}</legend>
-          ${META_FIELD_DEFS[field].options.map((opt) => html`
-            <label key=${opt.value}>
-              <input \
-                type="radio" \
-                name="tec-${field}-${sessionId}" \
-                value=${opt.value} \
-                checked=${value === opt.value} \
-                onChange=${() => onMetaChange(sessionId, { [field]: opt.value })} \
-              />
-              ${opt.label}
-            </label>
-          `)}
-        </fieldset>
+        <div key=${field} class="tec-featured-editor__meta-field">
+          <label class="tec-featured-editor__meta-label" for=${fieldId}>${def.label}</label>
+          <div class="tec-featured-editor__field-control tec-featured-editor__field-control--select">
+            <${def.icon} />
+            <select \
+              id=${fieldId} \
+              class="tec-field tec-field--s" \
+              aria-label="${def.label} for ${title}" \
+              value=${value || def.options[0].value} \
+              onChange=${(e) => onMetaChange(sessionId, { [field]: e.target.value })} \
+            >
+              ${def.options.map((opt) => html`<option value=${opt.value} key=${opt.value}>${opt.label}</option>`)}
+            </select>
+          </div>
+        </div>
+      `;
+    }
+
+    if (isImage) {
+      return html`
+        <div key=${field} class="tec-featured-editor__meta-field tec-featured-editor__meta-field--inline">
+          ${value && html`<img class="tec-featured-editor__thumb" src=${value} alt="" />`}
+          <input \
+            type="text" \
+            class="tec-field tec-field--s" \
+            placeholder=${def.placeholder} \
+            aria-label="${def.label} for ${title}" \
+            value=${value} \
+            onInput=${(e) => onMetaChange(sessionId, { [field]: e.target.value })} \
+          />
+          ${!value && html`
+            <button \
+              type="button" \
+              class="tec-btn tec-btn--outline tec-btn--s" \
+              onClick=${() => setImagePickerFor(sessionId)} \
+            >Add image…</button>
+          `}
+          ${value && html`
+            <button \
+              type="button" \
+              class="tec-btn tec-btn--icon tec-btn--icon-s" \
+              aria-label="Replace ${def.label} for ${title}" \
+              onClick=${() => setImagePickerFor(sessionId)} \
+            ><${ReplaceIcon} /></button>
+            <button \
+              type="button" \
+              class="tec-btn tec-btn--icon tec-btn--icon-s tec-btn--danger" \
+              aria-label="Remove ${def.label} for ${title}" \
+              onClick=${() => onMetaChange(sessionId, { [field]: '' })} \
+            ><${TrashIcon} /></button>
+          `}
+        </div>
       `;
     }
 
     return html`
       <div key=${field} class="tec-featured-editor__meta-field">
-        ${isImage && value && html`<img class="tec-featured-editor__thumb" src=${value} alt="" />`}
-        <input \
-          type="text" \
-          class="tec-field tec-field--s" \
-          placeholder=${META_FIELD_DEFS[field].placeholder} \
-          aria-label="${META_FIELD_DEFS[field].label} for ${title}" \
-          value=${value} \
-          onInput=${(e) => onMetaChange(sessionId, { [field]: e.target.value })} \
-        />
-        ${isImage && !value && html`
-          <button \
-            type="button" \
-            class="tec-btn tec-btn--outline tec-btn--s" \
-            onClick=${() => setImagePickerFor(sessionId)} \
-          >Add image…</button>
-        `}
-        ${isImage && value && html`
-          <button \
-            type="button" \
-            class="tec-btn tec-btn--icon tec-btn--icon-s" \
-            aria-label="Replace ${META_FIELD_DEFS[field].label} for ${title}" \
-            onClick=${() => setImagePickerFor(sessionId)} \
-          ><${ReplaceIcon} /></button>
-          <button \
-            type="button" \
-            class="tec-btn tec-btn--icon tec-btn--icon-s tec-btn--danger" \
-            aria-label="Remove ${META_FIELD_DEFS[field].label} for ${title}" \
-            onClick=${() => onMetaChange(sessionId, { [field]: '' })} \
-          ><${TrashIcon} /></button>
-        `}
+        <label class="tec-featured-editor__meta-label" for=${fieldId}>${def.label}</label>
+        <div class="tec-featured-editor__field-control">
+          <input \
+            id=${fieldId} \
+            type="text" \
+            class="tec-field tec-field--s" \
+            placeholder=${def.placeholder} \
+            aria-label="${def.label} for ${title}" \
+            value=${value} \
+            onInput=${(e) => onMetaChange(sessionId, { [field]: e.target.value })} \
+          />
+          ${def.tooltip && html`
+            <span class="tec-featured-editor__info-icon" title=${def.tooltip}>
+              <${InfoIcon} />
+            </span>
+          `}
+        </div>
       </div>
     `;
   };
