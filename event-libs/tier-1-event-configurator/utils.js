@@ -127,15 +127,8 @@ export function buildSessionAuthorEntry(session, sessionTimes, meta) {
   if (getSessionIsOnline(session)) entry.isOnline = true;
   if (meta?.mrStreamId) entry.mrStreamId = meta.mrStreamId;
   if (meta?.imageUrl) entry.imageUrl = meta.imageUrl;
-  // meta.watchDestination only gets written once the author actually changes the select
-  // away from its displayed default ("Homepage", the first option) — leaving it
-  // untouched on that default never persists it. homepageAnchorId is only ever visible
-  // to edit when the *effective* (displayed) destination is "homepage" in the first
-  // place, so its mere presence is itself proof the author meant "homepage", even if
-  // meta.watchDestination was never explicitly set.
-  const effectiveWatchDestination = meta?.watchDestination || (meta?.homepageAnchorId ? 'homepage' : '');
-  if (effectiveWatchDestination) entry.watchDestination = effectiveWatchDestination;
-  if (effectiveWatchDestination === 'homepage' && meta?.homepageAnchorId) {
+  if (meta?.watchDestination) entry.watchDestination = meta.watchDestination;
+  if (meta?.watchDestination === 'homepage' && meta?.homepageAnchorId) {
     entry.homepageAnchorId = meta.homepageAnchorId;
   }
   if (match) {

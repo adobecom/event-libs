@@ -317,16 +317,6 @@ export default function FeaturedSessionsEditor({
     prevOrderRef.current = featuredIds;
   }, [featuredIds, measureRowHeight]);
 
-  // A `select` meta field always shows some value — the browser picks its first
-  // <option> when nothing's stored yet — so "no meta value" and "first option
-  // explicitly chosen" render identically. Anything that needs to know the select's
-  // effective (displayed) value, not just what's actually persisted in `meta`, reads
-  // through here instead of `meta[sessionId][field]` directly.
-  const getEffectiveSelectValue = useCallback(
-    (field, sessionId) => meta?.[sessionId]?.[field] || META_FIELD_DEFS[field].options[0].value,
-    [meta],
-  );
-
   const renderMetaField = (field, sessionId, title) => {
     const value = meta?.[sessionId]?.[field] || '';
     const def = META_FIELD_DEFS[field];
@@ -344,9 +334,10 @@ export default function FeaturedSessionsEditor({
               id=${fieldId} \
               class="tec-field tec-field--s" \
               aria-label="${def.label} for ${title}" \
-              value=${getEffectiveSelectValue(field, sessionId)} \
+              value=${value} \
               onChange=${(e) => onMetaChange(sessionId, { [field]: e.target.value })} \
             >
+              <option value="" disabled selected=${!value}>Select…</option>
               ${def.options.map((opt) => html`<option value=${opt.value} key=${opt.value}>${opt.label}</option>`)}
             </select>
           </div>
@@ -453,7 +444,7 @@ export default function FeaturedSessionsEditor({
                         ${metaFields
                           .filter((field) => field === 'watchDestination' || field === 'homepageAnchorId')
                           .filter((field) => field !== 'homepageAnchorId'
-                            || getEffectiveSelectValue('watchDestination', sessionId) === 'homepage')
+                            || meta?.[sessionId]?.watchDestination === 'homepage')
                           .map((field) => renderMetaField(field, sessionId, title))}
                       </div>
                     `}
