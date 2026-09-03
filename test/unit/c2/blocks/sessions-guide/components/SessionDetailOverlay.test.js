@@ -204,6 +204,22 @@ describe('SessionDetailOverlay', () => {
     });
   });
 
+  describe('session details heading', () => {
+    it('renders the "Session details" heading above the description', () => {
+      const out = render({ description: 'A session about everything.' });
+      const headingIndex = out.indexOf('Session details');
+      const descIndex = out.indexOf('sg-detail__desc-wrap');
+      expect(headingIndex).to.be.greaterThan(-1);
+      expect(descIndex).to.be.greaterThan(-1);
+      expect(headingIndex).to.be.lessThan(descIndex);
+    });
+
+    it('omits the heading when the session has no description', () => {
+      const out = render({ description: '' });
+      expect(out).to.not.include('Session details');
+    });
+  });
+
   // The count is only meaningful when the list is truncated, so it appears under exactly the
   // condition that grows the Show more toggle -- over 6 products, over 5 speakers.
   describe('pod heading counts', () => {
@@ -306,13 +322,33 @@ describe('SessionDetailOverlay', () => {
       expect(out).to.not.include('Watch now');
     });
 
-    it('offers Watch now once the session is on demand', () => {
+    it('offers Watch now for a live session, linking to the broadcast page', () => {
+      const session = makeSession({
+        startTimeUtc: new Date(Date.now() - 0.5 * HOUR).toISOString(),
+        endTimeUtc: new Date(Date.now() + 0.5 * HOUR).toISOString(),
+        isOnline: true,
+      });
+      setState(session);
+      liveStreamActiveIds.value = new Set([session.id]);
+      const out = SessionDetailOverlay({ onBack: () => {} });
+      expect(out).to.include('Watch now');
+      expect(out).to.not.include('Watch on demand');
+      expect(out).to.not.include('Add to schedule');
+    });
+
+    // Regression: a viewer can be sitting on the detail overlay when the session
+    // transitions from live to on-demand — the CTA must pick up the on-demand copy
+    // and destination (the individual session page) reactively, not just on next open.
+    it('offers Watch on demand once the session is on demand, linking to the session page', () => {
       const out = render({
         startTimeUtc: new Date(Date.now() - 3 * HOUR).toISOString(),
         endTimeUtc: new Date(Date.now() - 2 * HOUR).toISOString(),
+        sessionPageUrl: '/max/2026/sessions/s-1',
       });
-      expect(out).to.include('Watch now');
+      expect(out).to.include('Watch on demand');
+      expect(out).to.not.include('Watch now');
       expect(out).to.not.include('Add to schedule');
+      expect(out).to.include('href="/max/2026/sessions/s-1"');
     });
   });
 });

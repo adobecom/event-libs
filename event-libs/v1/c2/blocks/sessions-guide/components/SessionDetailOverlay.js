@@ -87,7 +87,11 @@ export function SessionDetailOverlay({ onBack }) {
     // requestWatchSameSession() asks that page to actually switch, if it's the kind that can
     // (e.g. Broadcast, with multiple concurrent live sessions) — a no-op on pages with nothing
     // subscribed (e.g. the homepage, which has only one live stream).
-    if (isSamePage(watchHref)) {
+    // Live-only: once on-demand, watchHref points at the individual session page — a real
+    // navigation is always correct there, so isLive gates this before isSamePage (which
+    // pretend-broadcast=true forces true unconditionally for manual QA on draft pages,
+    // and would otherwise swallow the on-demand navigation too).
+    if (isLive && isSamePage(watchHref)) {
       e.preventDefault();
       requestWatchSameSession(session.id);
       dispatch({ type: 'CLOSE_DRAWER' });
@@ -195,10 +199,10 @@ export function SessionDetailOverlay({ onBack }) {
                           href=${watchHref}
                           onclick=${handleWatch}
                           aria-disabled=${watchHref ? undefined : 'true'}
-                          daa-ll="Watch-Now"
+                          daa-ll=${onDemand ? 'Watch-On-Demand' : 'Watch-Now'}
                         >
                           <span class="sg-detail__btn-icon sg-detail__btn-icon--play" aria-hidden="true"></span>
-                          Watch now
+                          ${onDemand ? 'Watch on demand' : 'Watch now'}
                         </a>
                       `
     : showScheduleCta && html`
@@ -242,6 +246,7 @@ export function SessionDetailOverlay({ onBack }) {
 
               ${session.description && html`
                 <div class="sg-detail__details">
+                  <h3 class="sg-detail__section-label">Session details</h3>
                   <div class=${'sg-detail__desc-wrap' + (descExpanded ? ' is-expanded' : '')} id="sg-detail-desc">
                     <p class="sg-detail__desc">${session.description}</p>
                   </div>

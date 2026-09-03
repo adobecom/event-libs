@@ -103,7 +103,11 @@ export function LiveCard({
     // Already on the destination page — let the caller decide what "already here" means
     // (session-broadcast switches its own player instead of closing a drawer that doesn't
     // exist there), rather than reloading the page out from under what's already playing.
-    if (isSamePage(watchHref)) {
+    // Live-only: once on-demand, watchHref points at the individual session page — a real
+    // navigation is always correct there, so sessionState gates this before isSamePage
+    // (which pretend-broadcast=true forces true unconditionally for manual QA on draft
+    // pages, and would otherwise swallow the on-demand navigation too).
+    if (sessionState === 'live' && isSamePage(watchHref)) {
       if (onWatchSamePage) { onWatchSamePage(session); return; }
       // The widget's own instance has no prop-level switch path — ask whatever page this is
       // to switch itself (a no-op on pages with nothing subscribed, e.g. the homepage).
