@@ -17,7 +17,7 @@ import {
 import { Icon } from '../../../../features/icons/Icon.js';
 import { fetchFederalProductIcon } from '../../../../features/icons/federal-icons.js';
 import { getProduct } from '../../../../utils/tier-1-event-config.js';
-import { resolveTrackBadge } from '../utils/session-filters.js';
+import { resolveTrackBadge, resolveNamedTrackBadge } from '../utils/session-filters.js';
 import { isBehaviorEnabled } from '../utils/behavior-flags.js';
 import { scrollBehavior } from '../utils/motion.js';
 
@@ -103,6 +103,12 @@ export function SessionDetailOverlay({ onBack }) {
   // null for a session with neither a primary track nor an override — no "Other" badge,
   // matching swimlane placement.
   const trackBadge = resolveTrackBadge(session);
+  // Primary/override track badge + an additional track stack as two full rows (Figma's
+  // "Status tag" component) instead of the single-row badge + count used everywhere else --
+  // stackedTracks[0] is always trackBadge itself; only the rest need a fresh icon lookup.
+  const stackedTrackBadges = trackBadge?.stackedTracks?.map(
+    (name, i) => (i === 0 ? trackBadge : resolveNamedTrackBadge(name)),
+  ).filter(Boolean);
   const startShort = session.startTimeUtc ? formatShortTime(session.startTimeUtc, userTz) : '';
   const endShort = session.endTimeUtc ? formatShortTime(session.endTimeUtc, userTz) : '';
   const timeRange = showWatch && !endShort
@@ -173,7 +179,16 @@ export function SessionDetailOverlay({ onBack }) {
             <div class="sg-detail__group sg-detail__group--summary">
               <div class="sg-detail__summary">
                 <div class="sg-detail__summary-top">
-                  ${trackBadge && html`
+                  ${stackedTrackBadges?.length > 1 ? html`
+                    <div class="sg-detail__channels sg-detail__channels--stacked">
+                      ${stackedTrackBadges.map((badge) => html`
+                        <div class="sg-detail__channel" key=${badge.label}>
+                          <${Icon} name=${badge.icon} size=${16} className="sg-detail__channel-icon sg-detail__channel-icon--sm" />
+                          <span class="sg-detail__channel-name">${badge.label}</span>
+                        </div>
+                      `)}
+                    </div>
+                  ` : trackBadge && html`
                     <div class="sg-detail__channel">
                       <${Icon} name=${trackBadge.icon} size=${20} className="sg-detail__channel-icon" />
                       <span class="sg-detail__channel-name">${trackBadge.label}</span>

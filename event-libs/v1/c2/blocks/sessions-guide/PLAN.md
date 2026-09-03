@@ -934,11 +934,13 @@ Key rules, not obvious from the table alone:
   (`tier-1-event-config.js`) — a **per-override-text map** (`overrideTrackIcons.byText`),
   authored explicitly per text. No event-wide default and no built-in default (both dropped
   2026-08-24): an unmapped text gets no icon and `DEFAULT_ICON_COLOR` at render time.
-- `stackedTracks` (for the detail/session-page stacked-badge display) is the *additional*
-  track(s) only when an override applies (the override text isn't a real track, so it isn't
-  itself "stacked", and the primary track — if any — is also dropped from the stack once
-  overridden), or `[primary, ...additional]` when there's no override. Confirmed with
-  Daniel (2026-08-11): this is the intended behavior.
+- `stackedTracks` (for the detail/session-page stacked-badge display) is
+  `[primary, ...additional]` when there's no override, or `[override, ...additional]` when
+  there is — either way, whichever badge wins placement (16.2's table) leads the stack, with
+  any additional track(s) after it. **Superseded 2026-09-03** (Daniel): originally confirmed
+  2026-08-11 as override-excluded (`additional` only, on the theory that override text isn't
+  a real track so isn't itself "stacked") — reversed once Phase 18 actually needed the
+  override+additional case to render the same two-full-rows treatment as primary+additional.
 
 ### 16.3 Swimlane placement + ordering — `groupByTrack(sessions, swimlaneOrder)` ✅
 
@@ -1111,6 +1113,34 @@ this block right now, but cheap, already-authored data worth keeping available.
   (Milo's page-level config).
 - `profileId` → `rfProfileId` on the same object, so it's unambiguous which system's profile
   id this is without having to chase the assignment back to `rainfocus.js`.
+
+## Phase 18 — Detail overlay summary-top badge redesign ✅ (2026-09-03)
+
+Figma reintroduced a stacked-badge treatment for the channel line (`.sg-detail__summary-top`)
+that 16.9 had explicitly removed as "not a thing in the design" — the design changed again,
+this doesn't reopen that decision retroactively.
+
+- `SessionDetailOverlay.js`: when `resolveTrackBadge()`'s `stackedTracks` has more than one
+  entry (primary or override track + a real additional track — see 16.2's table), the
+  channel line renders both as two full rows (icon + label each,
+  `.sg-detail__channels--stacked`) instead of the single-row badge. `stackedTracks[0]` is
+  always `trackBadge` itself; the rest resolve their own icon via `resolveNamedTrackBadge()`
+  (same helper `CategoryBadge.js`'s `track` prop already uses). Single-track sessions (no
+  additional track either way) are unaffected, keeping the pre-existing single-row badge.
+  **2026-09-03, later same day:** override + additional was initially left on the single-row
+  badge per 16.2's original (2026-08-11) call that override text isn't itself "stacked" —
+  reversed on request to match primary + additional's treatment exactly; see 16.2's updated
+  entry.
+- `sessions-guide-overlays.css`: new `.sg-detail__channels--stacked` (flex column,
+  `--s2a-spacing-2xs` gap on mobile; row + `--s2a-spacing-md` gap from 768px) and
+  `.sg-detail__channel-icon--sm` (16px, vs. the single-row badge's 24px, per the "Status tag"
+  Figma component). `.sg-detail__meta-divider` switched from a fixed 20px height to
+  `align-self: stretch` so it still spans the full column when paired with the taller
+  two-row stack.
+- Out of scope, left for a separate ticket: the same Figma frames also showed a "Recording
+  coming soon" status replacing the time range in this row — that's the pre-existing,
+  not-yet-scoped `dvrDelayHours` display treatment flagged at Phase 17's DVR Timing section,
+  not something this pass touches.
 
 ---
 

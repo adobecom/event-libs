@@ -29,6 +29,21 @@ export const sessionGuideRequest = signal(null);
 // page's own player state.
 export const watchSameSessionRequest = signal(null);
 
+// Console debugging only — never runs on a real prod hit. getEventServiceEnv() defaults to
+// 'prod' unless a param/metadata explicitly overrides it (that's the ESL/ESP *backend* env,
+// not this page's own surface), so it alone would wrongly hide this on any preview/draft
+// page that doesn't happen to pass one — e.g. a .aem.page draft with no `espenv` param.
+// Same .hlx./.aem./local hostname check LIBS above already uses to tell a real custom-domain
+// prod hit apart from every other (preview, staging, local) surface.
+const { hostname } = window.location;
+const isPreviewOrDevHost = hostname.includes('.hlx.') || hostname.includes('.aem.') || hostname.includes('local');
+if (isPreviewOrDevHost || getEventServiceEnv()?.name !== 'prod') {
+  window.__sessionStore = {
+    sessions, sessionsStatus, liveStreamActiveIds, favorited, scheduled, auth, pendingActions,
+    sessionStateVersion, sessionGuideRequest, watchSameSessionRequest, getEventApiConfig,
+  };
+}
+
 let initialized = false;
 let eventApiConfig = null;
 let myDataAttempted = false;

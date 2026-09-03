@@ -100,6 +100,32 @@ describe('SessionDetailOverlay', () => {
     expect(out).to.include('sg-detail__meta-divider');
   });
 
+  describe('summary-top track badge', () => {
+    it('renders a single-row badge when there is only a primary track', () => {
+      const out = render({ additionalTracks: [] });
+      expect(out).to.include('Photography');
+      expect(out).to.not.include('sg-detail__channels--stacked');
+    });
+
+    // Figma's "Status tag" component: primary + additional track stack as two full rows
+    // instead of the single-row badge + "+N" count used elsewhere (CategoryBadge.js).
+    it('stacks primary and additional track as two rows when both are present', () => {
+      const out = render({ primaryTrack: 'Photography', additionalTracks: ['Business'] });
+      expect(out).to.include('sg-detail__channels--stacked');
+      expect(out).to.include('Photography');
+      expect(out).to.include('Business');
+    });
+
+    // 2026-09-03: override + additional now stacks the same way primary + additional does --
+    // supersedes PLAN.md 16.2's original "override text is never itself stacked" call.
+    it('stacks the override and additional track as two rows when both are present', () => {
+      const out = render({ trackOverride: 'Featured', additionalTracks: ['Business'] });
+      expect(out).to.include('sg-detail__channels--stacked');
+      expect(out).to.include('Featured');
+      expect(out).to.include('Business');
+    });
+  });
+
   // Authored HTML like the disclaimer below -- the catalog sends
   // `<p><strong>Bold test. Favorite this session…</strong></p>` -- so the same htm-stub caveat
   // applies: only the wrapper is assertable here, the markup itself in utils/rich-text.test.js.
@@ -181,9 +207,12 @@ describe('SessionDetailOverlay', () => {
     // Event Site Track (`session.primaryTrack`, rendered separately as the channel badge)
     // or `additionalTracks` — see sessions-api.js.
     it('renders the Track row from tracks, not additionalTracks', () => {
+      // additionalTracks legitimately surfaces elsewhere now too (the summary-top channel
+      // badge stacks it alongside the primary track) -- assert the attrs row specifically,
+      // not merely that "Storytelling" is absent from the whole output.
       const out = render({ tracks: ['Business', 'Creativity'], additionalTracks: ['Storytelling'] });
-      expect(out).to.include('Business, Creativity');
-      expect(out).to.not.include('Storytelling');
+      expect(out).to.include('<dd>Business, Creativity</dd>');
+      expect(out).to.not.include('<dd>Storytelling</dd>');
     });
 
     it('omits the Track row when tracks has no values', () => {

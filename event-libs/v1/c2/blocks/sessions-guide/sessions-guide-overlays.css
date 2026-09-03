@@ -163,13 +163,20 @@
 .sg-detail__summary-top {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: var(--s2a-spacing-sm);
 }
 
 .sg-detail__channel {
   display: flex;
   align-items: center;
+  gap: var(--s2a-spacing-2xs);
+}
+
+/* Primary + additional track: two full rows stacked instead of the single-row badge + count
+   used elsewhere (see CategoryBadge.js's hideCount) -- Figma's "Status tag" component. */
+.sg-detail__channels--stacked {
+  display: flex;
+  flex-direction: column;
   gap: var(--s2a-spacing-2xs);
 }
 
@@ -180,16 +187,24 @@
   flex-shrink: 0;
 }
 
+/* Smaller glyph for each row of the stacked primary + additional track variant. */
+.sg-detail__channel-icon--sm {
+  width: 16px;
+  height: 16px;
+}
+
 .sg-detail__channel-name {
   font-size: var(--s2a-font-size-sm);
   font-weight: var(--s2a-font-weight-adobe-clean-medium);
   color: var(--s2a-color-content-default);
 }
 
-/* Separates the channel badge from the time — only rendered when both are present. */
+/* Separates the channel badge from the time — only rendered when both are present.
+   Stretches to the tallest sibling (rather than a fixed height) so it still spans the
+   full column when the badge is the two-row stacked variant. */
 .sg-detail__meta-divider {
+  align-self: stretch;
   width: 1px;
-  height: 20px;
   flex-shrink: 0;
   background: var(--s2a-color-border-subtle);
 }
@@ -198,6 +213,7 @@
   font-size: var(--s2a-font-size-sm);
   color: var(--s2a-color-content-default);
   white-space: nowrap;
+  align-self: flex-start;
 }
 
 .sg-detail__title {
@@ -343,6 +359,14 @@
   display: flex;
   flex-direction: column;
   gap: var(--s2a-spacing-md);
+}
+
+/* Tops up .sg-detail__group--summary's own 16px gap to a 48px summary-to-details gap,
+   scoped to just this adjacency rather than the shared container's `gap` — that's read by
+   every pod (Featured products, Speakers, etc), not only this one. Recalculated at 768px+
+   below since .sg-detail__group--summary's own gap widens to 24px there. */
+.sg-detail__summary + .sg-detail__details {
+  margin-top: calc(var(--s2a-spacing-3xl) - var(--s2a-spacing-md));
 }
 
 .sg-detail__section-label {
@@ -573,10 +597,22 @@
     border-radius: 20px;
   }
 
+  .sg-detail__summary + .sg-detail__details {
+    margin-top: calc(var(--s2a-spacing-3xl) - var(--s2a-spacing-lg));
+  }
+
   /* Badge and time hug the left together, rather than sitting at opposite ends. */
   .sg-detail__summary-top {
     justify-content: flex-start;
     gap: var(--s2a-spacing-sm);
+  }
+
+  /* Primary + additional track sit side by side from tablet up, rather than the mobile
+     vertical stack. */
+  .sg-detail__channels--stacked {
+    flex-direction: row;
+    align-items: center;
+    gap: var(--s2a-spacing-md);
   }
 
   .sg-detail__title {

@@ -93,7 +93,9 @@ export function toggleFavoriteWithFeedback(session, {
   );
 }
 
-const GATED_VIEW_LABELS = { 'my-sessions': 'My sessions', 'my-favorites': 'My favorites' };
+// Lowercase mid-sentence -- these only ever appear inside the toast copy ("...to view my
+// sessions."), never as a standalone label (ViewDropdown.js keeps its own Title Case copy).
+const GATED_VIEW_LABELS = { 'my-sessions': 'my sessions', 'my-favorites': 'my favorites' };
 
 // Where an unauthorized visitor should land instead of a gated view — Live & upcoming
 // during the event, On demand once isPostEvent() (shared with the auto-transition below).

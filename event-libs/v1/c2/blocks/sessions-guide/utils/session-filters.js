@@ -57,7 +57,7 @@ export function resolveTrackBadge(session) {
       count: additional.length,
       isOverride: true,
       swimlanes: [session.trackOverride, ...additional],
-      stackedTracks: additional.length > 0 ? additional : null,
+      stackedTracks: additional.length > 0 ? [session.trackOverride, ...additional] : null,
     };
   }
 

@@ -385,6 +385,9 @@ describe('session-filters/resolveTrackBadge', () => {
     expect(badge.isOverride).to.be.true;
     expect(badge.swimlanes).to.deep.equal(['custom label', 'Video']);
     expect(badge.count).to.equal(1);
+    // Override + additional stack the same way primary + additional does (2026-09-03) --
+    // supersedes 16.2's original "override text is never itself stacked" call.
+    expect(badge.stackedTracks).to.deep.equal(['custom label', 'Video']);
   });
 
   it('Primary, additional, and override all present — override lane + additional lane, override badge icon', () => {
@@ -397,6 +400,7 @@ describe('session-filters/resolveTrackBadge', () => {
     // one present — the primary track still never appears in swimlanes.
     expect(badge.swimlanes).to.deep.equal(['custom label', 'Video']);
     expect(badge.count).to.equal(1);
+    expect(badge.stackedTracks).to.deep.equal(['custom label', 'Video']);
   });
 
   it('only ever applies one additional track even if more are somehow present', () => {

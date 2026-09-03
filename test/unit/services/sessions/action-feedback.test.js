@@ -150,7 +150,7 @@ describe('services/sessions/action-feedback', () => {
       auth.value = { isLoggedIn: false, isRegistered: false, userFirstName: null };
       const fallback = checkViewAccess('my-sessions', { eventConfig });
       expect(fallback).to.equal('live-upcoming');
-      expect(toasts.value[0].message).to.equal('Register or sign in to view My sessions.');
+      expect(toasts.value[0].message).to.equal('Register or sign in to view my sessions.');
       expect(toasts.value[0].ctaLabel).to.equal('Register/Sign in');
       expect(toasts.value[0].ctaHref).to.equal('/register');
     });
@@ -159,7 +159,7 @@ describe('services/sessions/action-feedback', () => {
       auth.value = { isLoggedIn: true, isRegistered: false, userFirstName: null };
       const fallback = checkViewAccess('my-favorites', { eventConfig });
       expect(fallback).to.equal('live-upcoming');
-      expect(toasts.value[0].message).to.equal('Register or sign in to view My favorites.');
+      expect(toasts.value[0].message).to.equal('Register or sign in to view my favorites.');
       expect(toasts.value[0].ctaLabel).to.equal('Register/Sign in');
       expect(toasts.value[0].ctaHref).to.equal('/register');
     });

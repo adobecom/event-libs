@@ -1158,6 +1158,21 @@
   margin: 0;
 }
 
+/* TrackRow's category name sits directly in .sg-time-row__label (no separate time-value/
+   time-tz split like TimeSlotRow's), so it needs its own font declarations here to match
+   .sg-time-row__time-value -- the text that's actually visible in the Live & upcoming view.
+   font-family is explicit too: this is a real <h3>, which inherits Milo's heading-font-family
+   (Adobe Clean Display) -- .sg-time-row__time-value is a <span>, so it just inherits the
+   page's body-font-family (Adobe Clean) instead. Without this override the two fonts diverge
+   even once every other property here matches. */
+.sg-time-row__label--category {
+  font-family: var(--body-font-family);
+  font-size: var(--s2a-font-size-lg);
+  font-weight: var(--s2a-font-weight-adobe-clean-bold);
+  color: var(--s2a-color-gray-800);
+  line-height: var(--s2a-font-line-height-sm);
+}
+
 .sg-time-row__time-value {
   color: var(--s2a-color-gray-800);
   font-size: var(--s2a-font-size-lg);
@@ -1671,9 +1686,14 @@
   }
 
   .sg-time-row__label--category {
-    width: 93px;
+    width: 98px;
     white-space: normal;
     overflow-wrap: break-word;
+
+    /* .sg-time-row__label's own font-size/color changes at this width -- restate
+       .sg-time-row__time-value's values so the category label keeps matching it. */
+    font-size: var(--s2a-font-size-lg);
+    color: var(--s2a-color-gray-800);
   }
 
   .sg-carousel__header {
@@ -1969,7 +1989,7 @@
 
   .sg-live-card__desc {
     font-size: var(--s2a-font-size-sm);
-    color: #000;
+    color: var(--s2a-color-gray-600, #717171);
     letter-spacing: -0.14px;
     white-space: normal;
     text-overflow: clip;
@@ -1987,7 +2007,10 @@
 
   .sg-live-card:is(:hover, :focus-within) .sg-live-card__desc { color: #fff; }
 
-  .sg-live-card__actions { gap: var(--s2a-spacing-sm); }
+  .sg-live-card__actions {
+    gap: var(--s2a-spacing-sm);
+    margin-top: auto;
+  }
 
   .sg-live-card__btn--watch {
     background: var(--s2a-color-gray-800);
@@ -2547,9 +2570,17 @@
   }
 
   .sg-time-row__label--category {
-    width: 93px;
+    width: 98px;
     white-space: normal;
     overflow-wrap: break-word;
+
+    /* .sg-time-row__label's own font-size/color changes at this width -- restate
+       .sg-time-row__time-value's values so the category label keeps matching it. */
+    color: var(--s2a-color-gray-800);
+    font-size: var(--s2a-font-size-lg);
+    font-style: normal;
+    font-weight: var(--s2a-font-weight-adobe-clean-bold);
+    line-height: var(--s2a-font-line-height-sm);
   }
 
   .sg-time-row__track {
