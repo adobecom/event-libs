@@ -10,7 +10,10 @@ function normalizePath(path) {
 }
 
 function resolveHomepageAction(dataset) {
-  const homepagePath = getHomepagePath() || MAX_EVENT_PAGES.homepage;
+  // No hardcoded fallback path: an unauthored homepagePath means "wherever this card
+  // is currently rendered is the homepage" — lets this be tested from any page rather
+  // than only ever resolving to a single hardcoded production path.
+  const homepagePath = getHomepagePath() || window.location.pathname;
   const anchorId = dataset.homepageAnchorId;
 
   if (normalizePath(window.location.pathname) === normalizePath(homepagePath)) {
