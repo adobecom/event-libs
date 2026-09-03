@@ -56,6 +56,32 @@ describe('features/toast', () => {
       expect(toasts.value[1].message).to.equal('First');
     });
 
+    it('caps actionable toasts sharing a key at one — a repeat trigger is a no-op', () => {
+      const firstId = showToast({ message: 'Register to favorite.', ctaLabel: 'Register', key: 'favorite' });
+      const secondId = showToast({ message: 'Register to favorite.', ctaLabel: 'Register', key: 'favorite' });
+      expect(secondId).to.be.null;
+      expect(toasts.value).to.have.lengthOf(1);
+      expect(toasts.value[0].id).to.equal(firstId);
+    });
+
+    it('lets a different key stack alongside an existing actionable toast', () => {
+      showToast({ message: 'Register to favorite.', ctaLabel: 'Register', key: 'favorite' });
+      showToast({ message: 'Register to add to schedule.', ctaLabel: 'Register', key: 'schedule' });
+      expect(toasts.value).to.have.lengthOf(2);
+    });
+
+    it('does not cap toasts without a key, even with the same message/ctaLabel', () => {
+      showToast({ message: 'Register.', ctaLabel: 'Register' });
+      showToast({ message: 'Register.', ctaLabel: 'Register' });
+      expect(toasts.value).to.have.lengthOf(2);
+    });
+
+    it('does not cap non-actionable (no ctaLabel) toasts sharing a key', () => {
+      showToast({ message: 'Added to favorites', key: 'favorite' });
+      showToast({ message: 'Added to favorites', key: 'favorite' });
+      expect(toasts.value).to.have.lengthOf(2);
+    });
+
     it('hideToast(id) removes only the matching toast', () => {
       const firstId = showToast({ message: 'First' });
       showToast({ message: 'Second' });

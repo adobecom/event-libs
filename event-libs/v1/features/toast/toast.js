@@ -21,8 +21,16 @@ function resolveDuration({ ctaLabel, duration }) {
 }
 
 export function showToast({
-  message, variant = 'neutral', ctaLabel = null, ctaAction = null, ctaHref = null, duration,
+  message, variant = 'neutral', ctaLabel = null, ctaAction = null, ctaHref = null, duration, key = null,
 } = {}) {
+  // Actionable toasts (ctaLabel set — never auto-dismiss, so the user has to dismiss them
+  // manually) cap at one per `key`: a repeat trigger of the same kind (e.g. mashing an
+  // unauth'd favorite button) is a no-op while one's already showing, rather than stacking a
+  // duplicate or re-announcing an unchanged message to screen readers. A *different* key
+  // (e.g. favorite vs. add to schedule) still gets its own toast. Toasts without a key, or
+  // without ctaLabel (already auto-dismiss on their own), are unaffected and always stack.
+  if (key && ctaLabel && toasts.value.some((t) => t.key === key)) return null;
+
   nextId += 1;
   const id = nextId;
   toasts.value = [{
@@ -32,6 +40,7 @@ export function showToast({
     ctaLabel,
     ctaAction,
     ctaHref,
+    key,
     duration: resolveDuration({ ctaLabel, duration }),
   }, ...toasts.value];
   return id;

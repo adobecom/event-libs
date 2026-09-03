@@ -54,6 +54,20 @@ describe('services/sessions/action-feedback', () => {
     expect(toasts.value[0].ctaHref).to.equal('/register');
   });
 
+  it('caps repeated blocked triggers of the same gated action at one toast', async () => {
+    const authFn = () => Promise.reject(new SessionActionError('auth-required'));
+    await runSessionAction(authFn, { eventConfig, actionLabel: 'favorite' });
+    await runSessionAction(authFn, { eventConfig, actionLabel: 'favorite' });
+    expect(toasts.value).to.have.lengthOf(1);
+  });
+
+  it('still shows a separate toast for a different gated action while one is already showing', async () => {
+    const authFn = () => Promise.reject(new SessionActionError('auth-required'));
+    await runSessionAction(authFn, { eventConfig, actionLabel: 'favorite' });
+    await runSessionAction(authFn, { eventConfig, actionLabel: 'add to schedule' });
+    expect(toasts.value).to.have.lengthOf(2);
+  });
+
   it('invokes onBlocked when the action is gated on auth-required or registration-required, not on other failures', async () => {
     let blockedCount = 0;
     const onBlocked = () => { blockedCount += 1; };
@@ -162,6 +176,20 @@ describe('services/sessions/action-feedback', () => {
       expect(toasts.value[0].message).to.equal('Register or sign in to view my favorites.');
       expect(toasts.value[0].ctaLabel).to.equal('Register/Sign in');
       expect(toasts.value[0].ctaHref).to.equal('/register');
+    });
+
+    it('caps repeated blocked view-gate triggers of the same view at one toast', () => {
+      auth.value = { isLoggedIn: false, isRegistered: false, userFirstName: null };
+      checkViewAccess('my-sessions', { eventConfig });
+      checkViewAccess('my-sessions', { eventConfig });
+      expect(toasts.value).to.have.lengthOf(1);
+    });
+
+    it('shows a separate toast when a different gated view is blocked while one is already showing', () => {
+      auth.value = { isLoggedIn: false, isRegistered: false, userFirstName: null };
+      checkViewAccess('my-sessions', { eventConfig });
+      checkViewAccess('my-favorites', { eventConfig });
+      expect(toasts.value).to.have.lengthOf(2);
     });
 
     it('falls back to live-upcoming when sessions have not loaded yet', () => {
