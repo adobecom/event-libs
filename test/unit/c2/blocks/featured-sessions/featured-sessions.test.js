@@ -73,12 +73,10 @@ describe('featured-sessions', () => {
     expect(card.dataset.endTimeUtc).to.equal(new Date(1750003600000).toISOString());
   });
 
-  describe('authored watchDestination', () => {
-    it('sets data-watch-destination and data-homepage-anchor-id from config when "homepage" is chosen', async () => {
+  describe('authored watchDestination (per session)', () => {
+    it('sets data-watch-destination and data-homepage-anchor-id from the entry when "homepage" is chosen', async () => {
       const el = buildBlock({
-        watchDestination: 'homepage',
-        homepageAnchorId: 'live-marquee',
-        entries: [entry()],
+        entries: [entry({ watchDestination: 'homepage', homepageAnchorId: 'live-marquee' })],
       });
       await init(el);
 
@@ -88,7 +86,7 @@ describe('featured-sessions', () => {
     });
 
     it('sets data-watch-destination without an anchor id when "broadcast" is chosen', async () => {
-      const el = buildBlock({ watchDestination: 'broadcast', entries: [entry()] });
+      const el = buildBlock({ entries: [entry({ watchDestination: 'broadcast' })] });
       await init(el);
 
       const card = el.querySelector('.event-card');
@@ -96,12 +94,28 @@ describe('featured-sessions', () => {
       expect(card.dataset.homepageAnchorId).to.equal(undefined);
     });
 
-    it('leaves data-watch-destination unset when the config authors none', async () => {
+    it('leaves data-watch-destination unset when the entry authors none', async () => {
       const el = buildBlock({ entries: [entry()] });
       await init(el);
 
       const card = el.querySelector('.event-card');
       expect(card.dataset.watchDestination).to.equal(undefined);
+    });
+
+    it('lets each session in the same config pick a different watch destination', async () => {
+      const el = buildBlock({
+        entries: [
+          entry({ watchDestination: 'homepage', homepageAnchorId: 'live-marquee' }),
+          entry({ sessionId: 'session-2', watchDestination: 'broadcast' }),
+        ],
+      });
+      await init(el);
+
+      const [first, second] = el.querySelectorAll('.event-card');
+      expect(first.dataset.watchDestination).to.equal('homepage');
+      expect(first.dataset.homepageAnchorId).to.equal('live-marquee');
+      expect(second.dataset.watchDestination).to.equal('broadcast');
+      expect(second.dataset.homepageAnchorId).to.equal(undefined);
     });
   });
 

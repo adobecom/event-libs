@@ -3,17 +3,17 @@ import { safeUrl } from '../sessions-guide/utils/url.js';
 import initEventCard from '../event-card/event-card.js';
 import initEventCarousel from '../event-carousel/event-carousel.js';
 
-function setRoutingData(card, entry, watchDestination) {
+function setRoutingData(card, entry) {
   if (entry.sessionId) card.dataset.sessionId = entry.sessionId;
   if (entry.mrStreamId) card.dataset.mrStreamId = entry.mrStreamId;
   if (entry.url) card.dataset.sessionUrl = entry.url;
   if (entry.isLivestreamed) card.dataset.isLivestreamed = 'true';
   if (entry.isOnline) card.dataset.isOnline = 'true';
 
-  if (watchDestination?.type === 'homepage' || watchDestination?.type === 'broadcast') {
-    card.dataset.watchDestination = watchDestination.type;
-    if (watchDestination.type === 'homepage' && watchDestination.anchorId) {
-      card.dataset.homepageAnchorId = watchDestination.anchorId;
+  if (entry.watchDestination === 'homepage' || entry.watchDestination === 'broadcast') {
+    card.dataset.watchDestination = entry.watchDestination;
+    if (entry.watchDestination === 'homepage' && entry.homepageAnchorId) {
+      card.dataset.homepageAnchorId = entry.homepageAnchorId;
     }
   }
 
@@ -28,7 +28,7 @@ const DEFAULT_CTA_TEXT = {
   after: 'Watch on-demand',
 };
 
-function buildAuthoredCard(entry, cta, watchDestination) {
+function buildAuthoredCard(entry, cta) {
   const card = createTag('div', { class: 'event-card media-wide' });
   const mediaWrapper = createTag('div', {}, '', { parent: card });
   if (entry.imageUrl) {
@@ -48,7 +48,7 @@ function buildAuthoredCard(entry, cta, watchDestination) {
     ctaLink.dataset.ctaAfter = cta?.after || DEFAULT_CTA_TEXT.after;
   }
 
-  setRoutingData(card, entry, watchDestination);
+  setRoutingData(card, entry);
   return card;
 }
 
@@ -72,12 +72,8 @@ export default async function init(el) {
   el.setAttribute('role', 'region');
   el.setAttribute('aria-label', 'Featured Sessions');
 
-  const watchDestination = config.watchDestination
-    ? { type: config.watchDestination, anchorId: config.homepageAnchorId }
-    : null;
-
   const track = createTag('div', { class: 'carousel-track' });
-  const cards = entries.map((entry) => buildAuthoredCard(entry, config.cta, watchDestination));
+  const cards = entries.map((entry) => buildAuthoredCard(entry, config.cta));
   cards.forEach((card) => track.append(card));
 
   const marker = createTag('div', { class: 'event-carousel' });

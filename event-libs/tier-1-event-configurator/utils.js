@@ -127,6 +127,10 @@ export function buildSessionAuthorEntry(session, sessionTimes, meta) {
   if (getSessionIsOnline(session)) entry.isOnline = true;
   if (meta?.mrStreamId) entry.mrStreamId = meta.mrStreamId;
   if (meta?.imageUrl) entry.imageUrl = meta.imageUrl;
+  if (meta?.watchDestination) entry.watchDestination = meta.watchDestination;
+  if (meta?.watchDestination === 'homepage' && meta?.homepageAnchorId) {
+    entry.homepageAnchorId = meta.homepageAnchorId;
+  }
   if (match) {
     entry.sessionTime = {
       startTimeMillis: match.startTimeMillis,
@@ -169,17 +173,11 @@ function getTimezoneOffsetMinutes(timeZone, utcDate) {
 // off the authored link and render upcoming-sessions.js / featured-sessions.js with no extra
 // lookup. `unescape(encodeURIComponent(...))` keeps btoa from choking on non-Latin1 characters
 // (e.g. accented session titles).
-export function buildHomepageConfigURL(org, repo, configType, eventId, heading, entries, cta, watchDestination) {
+export function buildHomepageConfigURL(org, repo, configType, eventId, heading, entries, cta) {
   const payload = {
     eventId, configType, heading, generatedTime: new Date().toISOString(), entries,
   };
   if (cta) payload.cta = cta;
-  if (watchDestination?.type) {
-    payload.watchDestination = watchDestination.type;
-    if (watchDestination.type === 'homepage' && watchDestination.anchorId) {
-      payload.homepageAnchorId = watchDestination.anchorId;
-    }
-  }
   const base64 = btoa(unescape(encodeURIComponent(JSON.stringify(payload))));
   const url = new URL(`${DA_ORIGIN}/app/${org}/${repo}/${DA_APP_PATH}`);
   url.hash = `${HOMEPAGE_LINK_HASH_KEY}=${base64}`;
@@ -250,14 +248,7 @@ export async function copyHomepageConfigLink(org, repo, row, homepageMeta, sessi
       if (value) cta[state] = value;
     });
   }
-  let watchDestination;
-  if (homepageMeta.watchDestinationField) {
-    const type = row.config[homepageMeta.watchDestinationField];
-    if (type) {
-      watchDestination = { type, anchorId: row.config[homepageMeta.homepageAnchorIdField] };
-    }
-  }
-  const url = buildHomepageConfigURL(org, repo, row.configType, row.eventId, heading, entries, cta, watchDestination);
+  const url = buildHomepageConfigURL(org, repo, row.configType, row.eventId, heading, entries, cta);
   const formattedDate = new Date().toLocaleString('en-US', {
     weekday: 'long', month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit',
   });

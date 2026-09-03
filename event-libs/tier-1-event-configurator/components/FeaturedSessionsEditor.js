@@ -2,6 +2,7 @@ import {
   useState, useMemo, useCallback, useRef, useLayoutEffect, useEffect, html,
 } from '../../v1/deps/htm-preact.js';
 import { getSessionPrimaryTrack, formatSessionTime } from '../utils.js';
+import { WATCH_DESTINATION_OPTIONS } from '../constants.js';
 import SearchInput from './SearchInput.js';
 import ImagePickerModal from './ImagePickerModal.js';
 
@@ -62,6 +63,8 @@ const META_FIELD_DEFS = {
   // render below) — the text input still works standalone for pasting an already-uploaded
   // or externally hosted URL directly, no upload required.
   imageUrl: { label: 'Image', placeholder: 'Image URL (optional)', type: 'image' },
+  watchDestination: { label: 'Watch destination', type: 'radio', options: WATCH_DESTINATION_OPTIONS },
+  homepageAnchorId: { label: 'Homepage anchor ID', placeholder: 'e.g. live-marquee' },
 };
 
 export default function FeaturedSessionsEditor({
@@ -292,6 +295,28 @@ export default function FeaturedSessionsEditor({
   const renderMetaField = (field, sessionId, title) => {
     const value = meta?.[sessionId]?.[field] || '';
     const isImage = META_FIELD_DEFS[field].type === 'image';
+    const isRadio = META_FIELD_DEFS[field].type === 'radio';
+
+    if (isRadio) {
+      return html`
+        <fieldset key=${field} class="tec-featured-editor__meta-field tec-featured-editor__meta-field--radio">
+          <legend class="tec-sr-only">${META_FIELD_DEFS[field].label} for ${title}</legend>
+          ${META_FIELD_DEFS[field].options.map((opt) => html`
+            <label key=${opt.value}>
+              <input \
+                type="radio" \
+                name="tec-${field}-${sessionId}" \
+                value=${opt.value} \
+                checked=${value === opt.value} \
+                onChange=${() => onMetaChange(sessionId, { [field]: opt.value })} \
+              />
+              ${opt.label}
+            </label>
+          `)}
+        </fieldset>
+      `;
+    }
+
     return html`
       <div key=${field} class="tec-featured-editor__meta-field">
         ${isImage && value && html`<img class="tec-featured-editor__thumb" src=${value} alt="" />`}
@@ -358,9 +383,11 @@ export default function FeaturedSessionsEditor({
                   <span class="tec-featured-editor__track">${session ? getSessionMeta(session) : 'Not found in current session catalog'}</span>
                   ${onMetaChange && metaFields.length > 0 && html`
                     <div class="tec-featured-editor__meta-fields">
-                      ${metaFields.filter((field) => META_FIELD_DEFS[field].type !== 'image').map(
-                        (field) => renderMetaField(field, sessionId, title),
-                      )}
+                      ${metaFields
+                        .filter((field) => META_FIELD_DEFS[field].type !== 'image')
+                        .filter((field) => field !== 'homepageAnchorId'
+                          || meta?.[sessionId]?.watchDestination === 'homepage')
+                        .map((field) => renderMetaField(field, sessionId, title))}
                     </div>
                     ${metaFields.some((field) => META_FIELD_DEFS[field].type === 'image') && html`
                       <div class="tec-featured-editor__meta-fields">

@@ -8,7 +8,7 @@ import {
   isTrackIconEntryComplete, getDisplayTitle, stringifyConfig, copyHomepageConfigLink,
 } from '../utils.js';
 import {
-  CONFIG_TYPES, HOMEPAGE_FIELD_BY_TYPE, isHomepageConfigType, WATCH_DESTINATION_OPTIONS,
+  CONFIG_TYPES, HOMEPAGE_FIELD_BY_TYPE, isHomepageConfigType,
 } from '../constants.js';
 import TrackIconEditor from '../components/TrackIconEditor.js';
 import OverrideTrackIconEditor from '../components/OverrideTrackIconEditor.js';
@@ -360,35 +360,6 @@ export default function ConfigEditor() {
                 />
               `)}
             </div>
-          `}
-          ${homepageMeta.watchDestinationField && html`
-            <p class="tec-editor__section-hint">${homepageMeta.watchDestinationHint}</p>
-            <fieldset class="tec-editor__watch-destination">
-              <legend class="tec-editor__field-label">Watch destination</legend>
-              ${WATCH_DESTINATION_OPTIONS.map((opt) => html`
-                <label key=${opt.value}>
-                  <input
-                    type="radio"
-                    name="tec-watch-destination"
-                    value=${opt.value}
-                    checked=${(activeConfig.config[homepageMeta.watchDestinationField] || 'broadcast') === opt.value}
-                    onChange=${() => updateConfigField(homepageMeta.watchDestinationField, opt.value)}
-                  />
-                  ${opt.label}
-                </label>
-              `)}
-            </fieldset>
-            ${activeConfig.config[homepageMeta.watchDestinationField] === 'homepage' && html`
-              <label class="tec-editor__field-label" for="tec-homepage-anchor-id">Homepage anchor ID</label>
-              <input
-                id="tec-homepage-anchor-id"
-                type="text"
-                class="tec-field tec-editor__heading-input"
-                placeholder="e.g. live-marquee"
-                value=${activeConfig.config[homepageMeta.homepageAnchorIdField] || ''}
-                onInput=${(e) => updateConfigField(homepageMeta.homepageAnchorIdField, e.target.value)}
-              />
-            `}
           `}
           ${isLoadingSessions && html`<${LoadingInline} label="Loading sessions…" />`}
           ${sessionsError && html`<p class="tec-editor__error">${sessionsError}</p>`}
