@@ -86,7 +86,7 @@ const META_FIELD_DEFS = {
     label: 'Broadcast Type', type: 'select', icon: GlobeIcon, options: WATCH_DESTINATION_OPTIONS,
   },
   homepageAnchorId: {
-    label: 'Homepage Broadcast',
+    label: 'Homepage',
     placeholder: 'e.g. live-marquee',
     tooltip: 'The id set on that section\'s own Section Metadata "anchor" row — the homepage jumps there once this session goes live.',
   },

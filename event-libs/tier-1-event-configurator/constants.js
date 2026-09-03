@@ -24,7 +24,7 @@ const HOMEPAGE_CONFIG_TYPE_OPTIONS = [
 ];
 
 const WATCH_DESTINATION_OPTIONS = [
-  { value: 'homepage', label: 'Homepage Broadcast' },
+  { value: 'homepage', label: 'Homepage' },
   { value: 'broadcast', label: 'Broadcast Page' },
 ];
 
