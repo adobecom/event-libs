@@ -4,6 +4,7 @@ import { useSessionGuide } from '../store/index.js';
 import { formatSessionTime, formatShortTime, getNowMs } from '../utils/time.js';
 import {
   sessions, scheduled, favorited, pendingActions, liveStreamActiveIds, sessionStateVersion,
+  requestWatchSameSession,
 } from '../../../../utils/session-store.js';
 import { toggleScheduleWithFeedback, toggleFavoriteWithFeedback } from '../../../../services/sessions/action-feedback.js';
 import { showToast } from '../../../../features/toast/toast.js';
@@ -83,8 +84,12 @@ export function SessionDetailOverlay({ onBack }) {
   function handleWatch(e) {
     // Already on the destination page (e.g. the widget is embedded on the homepage/broadcast
     // page itself) — close the widget instead of reloading the page out from under the player.
+    // requestWatchSameSession() asks that page to actually switch, if it's the kind that can
+    // (e.g. Broadcast, with multiple concurrent live sessions) — a no-op on pages with nothing
+    // subscribed (e.g. the homepage, which has only one live stream).
     if (isSamePage(watchHref)) {
       e.preventDefault();
+      requestWatchSameSession(session.id);
       dispatch({ type: 'CLOSE_DRAWER' });
       history.pushState({}, '', clearSessionParams());
       window.scrollTo({ top: 0, behavior: scrollBehavior() });

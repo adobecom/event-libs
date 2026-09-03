@@ -351,6 +351,33 @@ describe('upcoming-sessions', () => {
       expect(card.querySelector('.sg-card__btn--schedule')).to.not.equal(null);
       expect(card.querySelector('.sg-card__btn--favorite')).to.not.equal(null);
     });
+
+    it('tags the schedule and favorite buttons as add actions when the session is not yet scheduled/favorited', () => {
+      const card = buildCard(session());
+      const scheduleBtn = card.querySelector('.sg-card__btn--schedule');
+      const favoriteBtn = card.querySelector('.sg-card__btn--favorite');
+      expect(scheduleBtn.getAttribute('aria-pressed')).to.equal('false');
+      expect(scheduleBtn.getAttribute('daa-ll')).to.equal('Add-to-Schedule');
+      expect(favoriteBtn.getAttribute('aria-pressed')).to.equal('false');
+      expect(favoriteBtn.getAttribute('daa-ll')).to.equal('Add-to-Favorites');
+    });
+
+    it('tags the schedule and favorite buttons as remove actions when the session is already scheduled/favorited', () => {
+      scheduled.value = new Set(['session-1']);
+      favorited.value = new Set(['session-1']);
+      const card = buildCard(session());
+      const scheduleBtn = card.querySelector('.sg-card__btn--schedule');
+      const favoriteBtn = card.querySelector('.sg-card__btn--favorite');
+      expect(scheduleBtn.getAttribute('aria-pressed')).to.equal('true');
+      expect(scheduleBtn.getAttribute('daa-ll')).to.equal('Remove-from-Schedule');
+      expect(favoriteBtn.getAttribute('aria-pressed')).to.equal('true');
+      expect(favoriteBtn.getAttribute('daa-ll')).to.equal('Remove-from-Favorites');
+    });
+
+    it('tags the card itself for open-session-detail tracking', () => {
+      const card = buildCard(session());
+      expect(card.getAttribute('daa-ll')).to.equal('Session-Card-Open');
+    });
   });
 
   describe('theme', () => {

@@ -215,7 +215,7 @@ describe('session-state-view', () => {
       expect(renderStatus('on-demand', times).textContent).to.equal('Coming soon');
     });
 
-    // Matches video-player's `pickEmbeddableVideo`, which requires kind === 'onDemand'
+    // Matches session-video-player's `pickEmbeddableVideo`, which requires kind === 'onDemand'
     // exactly. An embeddable provider under any other kind gets no player, so claiming
     // "On-demand" here would promise a video the page cannot play.
     it('IPOD with an embeddable provider but a non-onDemand kind -> Coming soon', () => {
