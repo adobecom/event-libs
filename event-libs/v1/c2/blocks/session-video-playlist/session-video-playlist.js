@@ -46,6 +46,7 @@ const FALLBACK_EVENT_START_MS = new Date('2026-11-08T08:00:00-04:00').getTime();
 const DESKTOP_BREAKPOINT_PX = 1024;
 const VIEWPORT_CAP_GUTTER_PX = 24;
 const DRAWER_GAP_PX = 16;
+const DRAWER_TOP_GAP_PX = 100;
 const DRAWER_FLOOR_PX = 75;
 const DRAWER_MIN_EXPANDED_PX = 150;
 const TITLE_LINE_CAP = 2;
@@ -81,12 +82,17 @@ export function computeProgressPercent(progress) {
 }
 
 export function computeDrawerCapPx(viewportHeight, titleBottom, {
-  floor = 0, gap = 0, playerBottom = null, minExpanded = 0,
+  floor = 0, gap = 0, playerBottom = null, minExpanded = 0, topGap = gap,
 } = {}) {
-  if (titleBottom == null) return Math.max(floor, viewportHeight * 0.7);
+  // Ceiling: the expanded drawer must never be taller than the viewport (leaving `topGap`
+  // clear at the top). When the page is scrolled so the title/player sit above the
+  // viewport, their getBoundingClientRect tops go negative and titleCap/playerCap balloon
+  // past the viewport height — without this clamp the drawer's top would spill off-screen.
+  const viewportCap = viewportHeight - topGap;
+  if (titleBottom == null) return Math.max(floor, Math.min(viewportHeight * 0.7, viewportCap));
   const titleCap = viewportHeight - titleBottom - gap;
   const playerCap = playerBottom == null ? Infinity : viewportHeight - playerBottom - gap;
-  return Math.max(floor, minExpanded, Math.min(titleCap, playerCap));
+  return Math.max(floor, minExpanded, Math.min(titleCap, playerCap, viewportCap));
 }
 
 export function clampedTitleBottom(titleTop, titleHeight, lineHeight, lineCap) {
@@ -237,6 +243,7 @@ class Drawer {
     return computeDrawerCapPx(window.innerHeight, this.measureTitleBottom(), {
       floor: DRAWER_FLOOR_PX,
       gap: DRAWER_GAP_PX,
+      topGap: DRAWER_TOP_GAP_PX,
       playerBottom: findPlayerBottom(this.el),
       minExpanded: DRAWER_MIN_EXPANDED_PX,
     });

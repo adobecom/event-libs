@@ -176,6 +176,12 @@ describe('session-video-playlist', () => {
     it('respects minExpanded even when both constraints would squeeze smaller', () => {
       expect(computeDrawerCapPx(1000, 980, { gap: 16, minExpanded: 150 })).to.equal(150);
     });
+
+    it('never exceeds the viewport when the title is scrolled above it (negative bottom)', () => {
+      // Scrolled down: title's getBoundingClientRect top/bottom go negative, so titleCap
+      // would balloon past the viewport — the drawer must stay within viewport - gap.
+      expect(computeDrawerCapPx(1000, -300, { gap: 16, topGap: 100 })).to.equal(900);
+    });
   });
 
   describe('resolveCurrentSessionTopics', () => {
