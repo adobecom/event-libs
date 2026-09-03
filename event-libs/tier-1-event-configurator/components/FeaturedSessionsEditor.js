@@ -336,7 +336,7 @@ export default function FeaturedSessionsEditor({
 
     if (isSelect) {
       return html`
-        <div key=${field} class="tec-featured-editor__meta-field">
+        <div key=${field} class="tec-featured-editor__meta-field tec-featured-editor__meta-field--fixed">
           <label class="tec-featured-editor__meta-label" for=${fieldId}>${def.label}</label>
           <div class="tec-featured-editor__field-control tec-featured-editor__field-control--select">
             <${def.icon} />

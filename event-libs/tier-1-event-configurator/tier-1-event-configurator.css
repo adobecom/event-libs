@@ -1329,6 +1329,13 @@ select.tec-field {
   align-items: center;
 }
 
+/* Fixed width so the Watch destination select doesn't stretch to fill the row when
+   Homepage jump id isn't rendered alongside it (Broadcast Page selected) — only the
+   sibling field should grow/shrink. */
+.tec-featured-editor__meta-field--fixed {
+  flex: 0 0 200px;
+}
+
 .tec-featured-editor__meta-label {
   font-size: 12px;
   font-weight: 700;
