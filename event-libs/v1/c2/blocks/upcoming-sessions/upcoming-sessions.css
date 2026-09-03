@@ -107,15 +107,8 @@
   background: var(--s2a-color-transparent-black-80, rgb(0 0 0 / 80%));
 }
 
-.upcoming-sessions.dark-card .upcoming-sessions-arrow {
-  border-color: #e1e1e1;
-  background: #f3f3f3;
-  color: #000;
-}
-
-.upcoming-sessions.dark-card .upcoming-sessions-arrow:hover {
-  background: #e1e1e1;
-}
+/* ControlButton's on-dark glass/white variant (see .upcoming-sessions-arrow above) is
+   already correct for a dark section — no inverted light-circle override needed here. */
 
 @media (min-width: 1280px) {
   .upcoming-sessions-controls {

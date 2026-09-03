@@ -99,13 +99,15 @@
   transform: rotate(180deg);
 }
 
-.carousel-controls[data-carousel-theme="dark"] .carousel-arrow {
+.carousel-controls.dark-carousel .carousel-arrow,
+.section.dark .carousel-controls .carousel-arrow {
   border-color: #e1e1e1;
   background: #f3f3f3;
   color: #000;
 }
 
-.carousel-controls[data-carousel-theme="dark"] .carousel-arrow:hover {
+.carousel-controls.dark-carousel .carousel-arrow:hover,
+.section.dark .carousel-controls .carousel-arrow:hover {
   background: #e1e1e1;
 }
 

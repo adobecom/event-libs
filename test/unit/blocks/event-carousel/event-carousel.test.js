@@ -82,26 +82,30 @@ describe('event-carousel', () => {
       return section.querySelector('.event-carousel');
     }
 
-    it('defaults to light in a section with no dark style metadata', async () => {
+    it('sets no theme attribute in a section with no dark style metadata — pure CSS, nothing for JS to compute', async () => {
       const el = buildStandaloneCarousel();
       await init(el);
 
-      expect(el.dataset.carouselTheme).to.equal('light');
+      expect(el.dataset.carouselTheme).to.equal(undefined);
+      expect(el.classList.contains('dark-carousel')).to.equal(false);
     });
 
-    it('inherits dark from the containing section, with no per-carousel wiring', async () => {
+    it('leaves the carousel under its ancestor .section.dark for event-carousel.css to key off, with no card-level class added', async () => {
       const el = buildStandaloneCarousel({ dark: true });
       await init(el);
 
-      expect(el.dataset.carouselTheme).to.equal('dark');
+      expect(el.closest('.section.dark')).to.exist;
+      expect(el.dataset.carouselTheme).to.equal(undefined);
+      expect(el.classList.contains('dark-carousel')).to.equal(false);
     });
 
-    it('honors a dark-carousel class as a manual override', async () => {
+    it('leaves an authored dark-carousel class in place for event-carousel.css to key off', async () => {
       const el = buildStandaloneCarousel();
       el.classList.add('dark-carousel');
       await init(el);
 
-      expect(el.dataset.carouselTheme).to.equal('dark');
+      expect(el.classList.contains('dark-carousel')).to.equal(true);
+      expect(el.dataset.carouselTheme).to.equal(undefined);
     });
   });
 });
