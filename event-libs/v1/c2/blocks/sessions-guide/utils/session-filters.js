@@ -199,6 +199,14 @@ export function filterSessions(sessions, activeFilters, searchQuery) {
   return result;
 }
 
+// True when the viewer has search text or at least one filter checked — the signal for
+// showing "No results found" instead of a view's default (no-data) empty state.
+export function hasActiveSearchOrFilters(activeFilters, searchQuery) {
+  if (searchQuery) return true;
+  if (!activeFilters) return false;
+  return Object.values(activeFilters).some((values) => values?.size > 0);
+}
+
 function matchesSearch(session, q) {
   return (
     session.title?.toLowerCase().includes(q)

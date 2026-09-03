@@ -32,14 +32,14 @@ const BASE_CONFIG = {
   title: '', filterCategories: [], theme: 'dark',
 };
 
-function makeStore(sessionList) {
+function makeStore(sessionList, extraState = {}) {
   sessions.value = sessionList;
   liveStreamActiveIds.value = new Set();
   const store = buildStore(preact);
   store.SessionGuideContext._current = {
     state: {
       activeView: 'on-demand', activeFilters: {}, searchQuery: '',
-      guideConfig: { ...BASE_CONFIG },
+      guideConfig: { ...BASE_CONFIG }, ...extraState,
     },
     dispatch: () => {},
   };
@@ -87,5 +87,21 @@ describe('OnDemandView', () => {
     const store = makeStore([PAST_DESIGN, PAST_VIDEO]);
     const View = buildOnDemandView(preact, store);
     expect(View({})).to.not.include('sg-carousel-section--recommended');
+  });
+
+  it('shows "No results found" instead of the default empty state when search matches nothing', () => {
+    const store = makeStore([PAST_DESIGN], { searchQuery: 'nonexistent term' });
+    const View = buildOnDemandView(preact, store);
+    const html = View({});
+    expect(html).to.include('No results found');
+    expect(html).to.not.include('Sessions will be available on demand after the event.');
+  });
+
+  it('shows "No results found" instead of the default empty state when a filter excludes everything', () => {
+    const store = makeStore([PAST_DESIGN], { activeFilters: { primaryTrack: new Set(['Video']) } });
+    const View = buildOnDemandView(preact, store);
+    const html = View({});
+    expect(html).to.include('No results found');
+    expect(html).to.not.include('Sessions will be available on demand after the event.');
   });
 });

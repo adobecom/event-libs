@@ -147,6 +147,7 @@
    discards — keep a visible boundary so the control is still findable. */
 @media (forced-colors: active) {
   .sg-close-btn,
+  .sg-filter-panel__close,
   .sg-filter-btn,
   .sg-search-btn,
   .sg-search-inline,
@@ -423,7 +424,8 @@
 
 /* ── Close Button ────────────────────────────────────────── */
 
-.sg-close-btn {
+.sg-close-btn,
+.sg-filter-panel__close {
   position: absolute;
   right: 16px;
   top: 16px;
@@ -438,6 +440,11 @@
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 19 19' fill='none'%3E%3Crect width='19' height='19' rx='9.5' fill='%23292929'/%3E%3Cpath d='M10.5606 9.50001L12.7803 7.28028C13.0733 6.98731 13.0733 6.5127 12.7803 6.21973C12.4873 5.92676 12.0127 5.92676 11.7197 6.21973L9.50001 8.43946L7.28028 6.21973C6.98731 5.92676 6.5127 5.92676 6.21973 6.21973C5.92676 6.5127 5.92676 6.98731 6.21973 7.28028L8.43946 9.50001L6.21973 11.7197C5.92676 12.0127 5.92676 12.4873 6.21973 12.7803C6.36621 12.9268 6.55762 13 6.75 13C6.94238 13 7.13379 12.9268 7.28027 12.7803L9.5 10.5606L11.7197 12.7803C11.8662 12.9268 12.0576 13 12.25 13C12.4424 13 12.6338 12.9268 12.7803 12.7803C13.0732 12.4873 13.0732 12.0127 12.7803 11.7197L10.5606 9.50001Z' fill='white'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
   background-size: contain;
+}
+
+.sg-filter-panel__close {
+  top: var(--s2a-spacing-xs);
+  right: var(--s2a-spacing-xs);
 }
 
 /* ── Filter & Search Controls ────────────────────────────── */
@@ -718,6 +725,26 @@
   padding: var(--s2a-spacing-2xl) var(--s2a-spacing-lg);
   color: var(--s2a-color-content-subtle);
   font-size: var(--s2a-font-size-sm);
+}
+
+.sg-empty--no-results {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--s2a-spacing-lg);
+  padding: var(--s2a-spacing-4xl) var(--s2a-spacing-lg);
+  text-align: center;
+  color: var(--s2a-color-content-default);
+  font-size: var(--s2a-font-size-md);
+}
+
+.sg-empty--no-results p {
+  margin: 0;
+}
+
+.sg-empty__title {
+  font-weight: var(--s2a-font-weight-adobe-clean-bold);
 }
 
 /* ── Carousel ────────────────────────────────────────────── */

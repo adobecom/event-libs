@@ -5,9 +5,10 @@ import {
 } from '../../../../utils/session-store.js';
 import { Carousel } from './Carousel.js';
 import { TimeSlotRow } from './TimeSlotRow.js';
+import { NoResultsFound } from './NoResultsFound.js';
 import {
   liveSessions, upcomingSessions, groupByStartTime, filterSessions, getRecommendedSessions,
-  sessionsForDay, excludeOnDemandFormat,
+  sessionsForDay, excludeOnDemandFormat, hasActiveSearchOrFilters,
 } from '../utils/session-filters.js';
 import { getNowMs, formatShortTime, formatTimezoneAbbr } from '../utils/time.js';
 
@@ -78,9 +79,17 @@ export function LiveUpcomingView() {
           <h3 class="sg-upcoming-title">Previously aired</h3>
           ${previouslyAiredSlots.map((slot) => html`<${TimeSlotRow} key=${slot[0].startTimeUtc} sessions=${slot} forceOnDemand=${true} />`)}
         `}
-        ${timeSlots.length === 0 && !live.length && !recommended.length && !previouslyAiredSlots.length && html`
-          <div class="sg-empty" role="status" aria-live="polite">No sessions scheduled for this day.</div>
-        `}
+        ${timeSlots.length === 0 && previouslyAiredSlots.length === 0 && (() => {
+          // Live/Recommended are exempt from search + filters (see comments above), so
+          // they can still be showing above this section even when the search/filter
+          // combination itself matches nothing here — that's still a "no results" case,
+          // not the "day has nothing at all" case, and takes priority whenever active.
+          if (hasActiveSearchOrFilters(activeFilters, searchQuery)) return html`<${NoResultsFound} />`;
+          if (!live.length && !recommended.length) {
+            return html`<div class="sg-empty" role="status" aria-live="polite">No sessions scheduled for this day.</div>`;
+          }
+          return null;
+        })()}
       </div>
     </div>
   `;

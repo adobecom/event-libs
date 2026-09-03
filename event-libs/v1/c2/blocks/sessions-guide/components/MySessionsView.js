@@ -8,8 +8,10 @@ import { checkViewAccess } from '../../../../services/sessions/action-feedback.j
 import { TimeSlotRow } from './TimeSlotRow.js';
 import { TrackRow } from './TrackRow.js';
 import { Carousel } from './Carousel.js';
+import { NoResultsFound } from './NoResultsFound.js';
 import {
   groupByStartTime, groupByTrack, onDemandSessions, filterSessions, sessionsForDay, liveSessions,
+  hasActiveSearchOrFilters,
 } from '../utils/session-filters.js';
 import { getNowMs, formatShortTime, formatTimezoneAbbr } from '../utils/time.js';
 import { useIsPostEvent } from '../utils/use-post-event.js';
@@ -90,16 +92,20 @@ export function MySessionsView() {
           />
         </div>
       `}
-      ${bothEmpty ? html`
-        <div class="sg-my-sessions__empty" role="status" aria-live="polite">
-          <p>You currently have no scheduled sessions.</p>
-          <button
-            class="sg-my-sessions__see-live-btn"
-            type="button"
-            onclick=${() => dispatch({ type: 'SET_VIEW', view: isPost ? 'on-demand' : 'live-upcoming' })}
-          >${isPost ? 'See On demand' : 'See Live & upcoming'}</button>
-        </div>
-      ` : html`
+      ${bothEmpty ? (
+        hasActiveSearchOrFilters(activeFilters, searchQuery)
+          ? html`<${NoResultsFound} />`
+          : html`
+            <div class="sg-my-sessions__empty" role="status" aria-live="polite">
+              <p>You currently have no scheduled sessions.</p>
+              <button
+                class="sg-my-sessions__see-live-btn"
+                type="button"
+                onclick=${() => dispatch({ type: 'SET_VIEW', view: isPost ? 'on-demand' : 'live-upcoming' })}
+              >${isPost ? 'See On demand' : 'See Live & upcoming'}</button>
+            </div>
+          `
+      ) : html`
         <div class="sg-my-sessions-tab-bar">
           ${hasUpcoming && html`<button
             class=${'sg-my-sessions-tab' + (effectiveTab === 'upcoming' ? ' sg-my-sessions-tab--active' : '')}

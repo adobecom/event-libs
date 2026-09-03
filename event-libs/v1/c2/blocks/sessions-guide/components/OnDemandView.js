@@ -5,8 +5,9 @@ import {
 } from '../../../../utils/session-store.js';
 import { TrackRow } from './TrackRow.js';
 import { Carousel } from './Carousel.js';
+import { NoResultsFound } from './NoResultsFound.js';
 import {
-  onDemandSessions, groupByTrack, filterSessions, getOnDemandRecommendedSessions,
+  onDemandSessions, groupByTrack, filterSessions, getOnDemandRecommendedSessions, hasActiveSearchOrFilters,
 } from '../utils/session-filters.js';
 import { getNowMs } from '../utils/time.js';
 
@@ -43,9 +44,11 @@ export function OnDemandView() {
         </div>
       `}
       ${byTrack.map(([track, trackSessions, label]) => html`<${TrackRow} key=${track} track=${label} sessions=${trackSessions} />`)}
-      ${byTrack.length === 0 && html`
-        <div class="sg-empty" role="status" aria-live="polite">Sessions will be available on demand after the event.</div>
-      `}
+      ${byTrack.length === 0 && (
+        hasActiveSearchOrFilters(activeFilters, searchQuery)
+          ? html`<${NoResultsFound} />`
+          : html`<div class="sg-empty" role="status" aria-live="polite">Sessions will be available on demand after the event.</div>`
+      )}
     </div>
   `;
 }

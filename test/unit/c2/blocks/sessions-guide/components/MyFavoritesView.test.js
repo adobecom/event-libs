@@ -1,7 +1,7 @@
 import { expect } from '@esm-bundle/chai';
 import * as preact from '../../../../mocks/deps/htm-preact.js';
 import { buildStore } from '../../../../../../event-libs/v1/c2/blocks/sessions-guide/store/index.js';
-import { buildMySessionsView } from '../../../../../../event-libs/v1/c2/blocks/sessions-guide/components/MySessionsView.js';
+import { buildMyFavoritesView } from '../../../../../../event-libs/v1/c2/blocks/sessions-guide/components/MyFavoritesView.js';
 import {
   sessions, scheduled, favorited, liveStreamActiveIds, auth,
 } from '../../../../../../event-libs/v1/utils/session-store.js';
@@ -48,109 +48,74 @@ function makeStore({
   isRegistered = true,
   isLoggedIn = true,
   sessionList = [],
-  scheduledIds = new Set(),
-  mySessionsTab = 'upcoming',
+  favoritedIds = new Set(),
+  myFavoritesTab = 'upcoming',
   activeDay = new Intl.DateTimeFormat('en-CA', { timeZone: BASE_CONFIG.userTz }).format(new Date()),
   activeFilters = {},
   searchQuery = '',
 } = {}) {
   auth.value = { isLoggedIn, isRegistered, userFirstName: null };
   sessions.value = sessionList;
-  scheduled.value = scheduledIds;
-  favorited.value = new Set();
+  scheduled.value = new Set();
+  favorited.value = favoritedIds;
   liveStreamActiveIds.value = new Set();
 
   const store = buildStore(preact);
   store.SessionGuideContext._current = {
     state: {
-      mySessionsTab, activeDay, activeFilters, searchQuery, guideConfig: { ...BASE_CONFIG },
+      myFavoritesTab, activeDay, activeFilters, searchQuery, guideConfig: { ...BASE_CONFIG },
     },
     dispatch: () => {},
   };
   return store;
 }
 
-describe('MySessionsView', () => {
-  // The actual login/registration toast + redirect-to-fallback is fired by
-  // checkViewAccess() (see action-feedback.test.js and ViewDropdown.test.js) from a
-  // useEffect, which this test harness's htm-preact mock no-ops — so all that's directly
-  // observable here is that the view renders nothing while unauthorized, not the toast.
+describe('MyFavoritesView', () => {
   it('renders nothing when logged out', () => {
     const store = makeStore({ isRegistered: false, isLoggedIn: false });
-    const View = buildMySessionsView(preact, store);
+    const View = buildMyFavoritesView(preact, store);
     expect(View({})).to.be.null;
   });
 
-  it('renders nothing when logged in but not registered', () => {
-    const store = makeStore({ isRegistered: false, isLoggedIn: true });
-    const View = buildMySessionsView(preact, store);
-    expect(View({})).to.be.null;
-  });
-
-  it('renders the my-sessions view when registered', () => {
+  it('renders the my-favorites view when registered', () => {
     const store = makeStore();
-    const View = buildMySessionsView(preact, store);
-    expect(View({})).to.include('sg-view--my-sessions');
+    const View = buildMyFavoritesView(preact, store);
+    expect(View({})).to.include('sg-view--my-favorites');
   });
 
-  it('shows sub-tabs when both upcoming and on-demand sessions are scheduled', () => {
-    const store = makeStore({
-      sessionList: [UPCOMING_SESSION, PAST_SESSION],
-      scheduledIds: new Set(['u-1', 'p-1']),
-    });
-    const View = buildMySessionsView(preact, store);
-    const html = View({});
-    expect(html).to.include('Upcoming');
-    expect(html).to.include('On demand');
-  });
-
-  it('shows empty state when no sessions are scheduled', () => {
+  it('shows empty state when no sessions are favorited', () => {
     const store = makeStore({ sessionList: [UPCOMING_SESSION] });
-    const View = buildMySessionsView(preact, store);
-    expect(View({})).to.include('sg-my-sessions__empty');
+    const View = buildMyFavoritesView(preact, store);
+    expect(View({})).to.include('sg-my-favorites__empty');
   });
 
-  it('shows scheduled upcoming sessions', () => {
-    const store = makeStore({ sessionList: [UPCOMING_SESSION], scheduledIds: new Set(['u-1']) });
-    const View = buildMySessionsView(preact, store);
+  it('shows favorited upcoming sessions', () => {
+    const store = makeStore({ sessionList: [UPCOMING_SESSION], favoritedIds: new Set(['u-1']) });
+    const View = buildMyFavoritesView(preact, store);
     expect(View({})).to.include('sg-time-row');
   });
 
-  it('shows on-demand tab content when mySessionsTab is on-demand', () => {
-    const store = makeStore({
-      sessionList: [PAST_SESSION], scheduledIds: new Set(['p-1']), mySessionsTab: 'on-demand',
-    });
-    const View = buildMySessionsView(preact, store);
-    expect(View({})).to.include('sg-my-sessions__on-demand');
-  });
-
-  it('shows empty state when no sessions are scheduled on the on-demand tab', () => {
-    const store = makeStore({ mySessionsTab: 'on-demand' });
-    const View = buildMySessionsView(preact, store);
-    expect(View({})).to.include('sg-my-sessions__empty');
-  });
-
-  it('shows "No results found" instead of the default empty state when search excludes every scheduled session', () => {
+  it('shows "No results found" instead of the default empty state when search excludes every favorited session', () => {
     const store = makeStore({
       sessionList: [UPCOMING_SESSION, PAST_SESSION],
-      scheduledIds: new Set(['u-1', 'p-1']),
+      favoritedIds: new Set(['u-1', 'p-1']),
       searchQuery: 'nonexistent term',
     });
-    const View = buildMySessionsView(preact, store);
+    const View = buildMyFavoritesView(preact, store);
     const html = View({});
     expect(html).to.include('No results found');
-    expect(html).to.not.include('sg-my-sessions__empty');
+    expect(html).to.not.include('sg-my-favorites__empty');
   });
 
-  it('shows "No results found" instead of the default empty state when a filter excludes every scheduled session', () => {
+  it('shows "No results found" instead of the default empty state when a filter excludes every favorited session', () => {
     const store = makeStore({
       sessionList: [UPCOMING_SESSION, PAST_SESSION],
-      scheduledIds: new Set(['u-1', 'p-1']),
+      favoritedIds: new Set(['u-1', 'p-1']),
       activeFilters: { primaryTrack: new Set(['Nonexistent']) },
     });
-    const View = buildMySessionsView(preact, store);
+    const View = buildMyFavoritesView(preact, store);
     const html = View({});
     expect(html).to.include('No results found');
-    expect(html).to.not.include('sg-my-sessions__empty');
+    expect(html).to.not.include('sg-my-favorites__empty');
   });
 });
