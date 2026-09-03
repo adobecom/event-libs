@@ -187,16 +187,17 @@ describe('featured-sessions', () => {
 
       const card = el.querySelector('.event-card');
       expect(card.classList.contains('dark-card')).to.equal(false);
-      expect(card.dataset.cardTheme).to.equal('light');
+      expect(card.dataset.cardTheme).to.equal(undefined);
     });
 
-    it('inherits dark from the containing section, with no config.theme or per-card wiring', async () => {
+    it('inherits dark from the containing section, with no config.theme or per-card wiring — pure CSS, no card-level class or attribute', async () => {
       const el = buildBlock({ entries: [entry()] }, { dark: true });
       await init(el);
 
       const card = el.querySelector('.event-card');
+      expect(card.closest('.section.dark')).to.exist;
       expect(card.classList.contains('dark-card')).to.equal(false);
-      expect(card.dataset.cardTheme).to.equal('dark');
+      expect(card.dataset.cardTheme).to.equal(undefined);
     });
   });
 

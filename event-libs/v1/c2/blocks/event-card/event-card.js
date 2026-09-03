@@ -47,14 +47,6 @@ function getVariant(el) {
   return VARIANTS.find((variant) => el.classList.contains(variant)) || DEFAULT_VARIANT;
 }
 
-const DEFAULT_THEME = 'light';
-
-function getTheme(el) {
-  if (el.classList.contains('dark-card')) return 'dark';
-  if (el.closest('.section')?.classList.contains('dark')) return 'dark';
-  return DEFAULT_THEME;
-}
-
 function isSameOrigin(url) {
   try {
     return new URL(url, window.location.href).origin === window.location.origin;
@@ -119,7 +111,6 @@ export default async function init(el) {
 
   const [mediaWrapper, contentWrapper] = [...el.querySelectorAll(':scope > div')];
   const variant = getVariant(el);
-  const theme = getTheme(el);
   const media = buildMedia(mediaWrapper);
 
   if (!media) {
@@ -131,7 +122,6 @@ export default async function init(el) {
   el.innerHTML = '';
   el.append(media, body);
   el.dataset.cardVariant = variant;
-  el.dataset.cardTheme = theme;
 
   if (el.dataset.sessionId) {
     const { default: attachSessionRouting, getLiveStreamActiveIds } = await import('../../../utils/session-routing.js');
