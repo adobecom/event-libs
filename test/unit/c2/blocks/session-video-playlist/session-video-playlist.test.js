@@ -9,6 +9,7 @@ import init, {
   resolveCurrentSessionTopics,
   resolvePlaylistTitle,
   applyExpandedHeightCap,
+  _internals,
 } from '../../../../../event-libs/v1/c2/blocks/session-video-playlist/session-video-playlist.js';
 import {
   sessions, sessionsStatus, favorited, pendingActions, liveStreamActiveIds,
@@ -813,28 +814,33 @@ describe('session-video-playlist', () => {
       expect(fresh.querySelector('.session-video-playlist-autoplay-toggle').checked).to.be.true;
     });
 
-    // window.location.assign is non-configurable and cannot be stubbed in a real browser,
-    // which is exactly why the source records its resolved target on the element first —
-    // that dataset attribute is the assertable part of this behavior. The rows here point
-    // at the CURRENT url so the real assign() call is a same-document no-op rather than
-    // navigating the test runner away mid-suite.
-    it('records the next href when the current session ends and autoplay is on', async () => {
-      const selfUrl = window.location.pathname + window.location.search;
-      const { playlist: selfLinked } = buildPage();
-      addConfigRow(selfLinked, 'minimum-sessions', '2');
-      sessions.value = [
-        catalogSession({ id: 'a', sessionPageUrl: selfUrl }),
-        catalogSession({ id: 'b', sessionPageUrl: selfUrl }),
-      ];
-      await init(selfLinked);
-      await flush();
+    // Navigation is routed through the overridable `_internals.navigate` seam because
+    // window.location.assign is non-configurable and firing it for real triggers a full
+    // reload that severs the Web Test Runner reporting channel (wiping the whole file's
+    // results). Stubbing the seam lets us assert the navigation without any real reload.
+    it('records the next href and navigates when the current session ends and autoplay is on', async () => {
+      const navigate = sinon.stub(_internals, 'navigate');
+      try {
+        const nextUrl = '/drafts/hnv/sessions/a';
+        const { playlist: selfLinked } = buildPage();
+        addConfigRow(selfLinked, 'minimum-sessions', '2');
+        sessions.value = [
+          catalogSession({ id: 'a', sessionPageUrl: nextUrl }),
+          catalogSession({ id: 'b', sessionPageUrl: '/drafts/hnv/sessions/b' }),
+        ];
+        await init(selfLinked);
+        await flush();
 
-      localStorage.setItem(AUTOPLAY_STORAGE_KEY, 'true');
-      window.dispatchEvent(new CustomEvent('session-video-player:state', {
-        detail: { sessionId: 'cur', state: 'ended' },
-      }));
+        localStorage.setItem(AUTOPLAY_STORAGE_KEY, 'true');
+        window.dispatchEvent(new CustomEvent('session-video-player:state', {
+          detail: { sessionId: 'cur', state: 'ended' },
+        }));
 
-      expect(selfLinked.dataset.autoAdvanceHref).to.equal(selfUrl);
+        expect(selfLinked.dataset.autoAdvanceHref).to.equal(nextUrl);
+        expect(navigate.calledWith(nextUrl)).to.equal(true);
+      } finally {
+        navigate.restore();
+      }
     });
 
     it('does not advance when autoplay is off', () => {

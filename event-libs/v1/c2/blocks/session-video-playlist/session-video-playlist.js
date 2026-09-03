@@ -32,6 +32,12 @@ const parseJsonMetadata = (name) => parseSharedJsonMetadata(name, LOG_SCOPE);
 
 const EVENT_CONFIG = { title: '', registerUrl: '/register' };
 
+// `window.location.assign` is non-configurable and can't be stubbed, so tests can't
+// exercise the auto-advance/row-select navigation without a real full-page reload (which
+// severs the Web Test Runner reporting channel and wipes the whole file's results). Route
+// navigation through this overridable seam so tests can stub `_internals.navigate` instead.
+export const _internals = { navigate: (href) => window.location.assign(href) };
+
 const BLOCK_CSS_URL = new URL('./session-video-playlist.css', import.meta.url).href;
 
 const DEFAULT_MIN_SESSIONS = 4;
@@ -205,6 +211,8 @@ function onElementDetached(element, teardown) {
 class Drawer {
   constructor(el, { titleEl, toggleEl, handleEl, headerEl }) {
     this.el = el;
+    this.originalParent = el.parentElement;
+    this.originalNextSibling = el.nextSibling;
     this.titleEl = titleEl;
     this.toggleEl = toggleEl;
     this.handleEl = handleEl;
@@ -238,6 +246,25 @@ class Drawer {
     return window.innerHeight;
   }
 
+  // The mobile drawer is position:fixed, but Milo's `container-*` grid section establishes a
+  // containing block (container-type/contain), which makes fixed positioning resolve against
+  // that section instead of the viewport. Move the drawer to <body> in mobile mode so
+  // bottom:0 pins to the viewport; restore it to its authored grid slot on desktop (where
+  // it's a normal side-by-side card, not fixed).
+  #reconcilePlacement() {
+    const inBody = this.el.parentElement === document.body;
+    if (!this.isDesktop() && !inBody) {
+      document.body.append(this.el);
+    } else if (this.isDesktop() && inBody) {
+      this.originalParent?.insertBefore(this.el, this.originalNextSibling);
+    }
+  }
+
+  reflow() {
+    this.#reconcilePlacement();
+    this.applyMobileHeight();
+  }
+
   applyMobileHeight() {
     if (this.isDesktop()) {
       this.el.style.maxHeight = '';
@@ -256,7 +283,8 @@ class Drawer {
     this.el.classList.toggle('is-expanded', this.expanded);
     this.toggleEl?.setAttribute('aria-expanded', String(this.expanded));
     this.toggleEl?.setAttribute('aria-label', this.expanded ? 'Collapse playlist' : 'Expand playlist');
-    if (!this.isDesktop()) this.applyMobileHeight();
+    this.#reconcilePlacement();
+    this.applyMobileHeight();
   }
 
   toggle() {
@@ -512,7 +540,7 @@ function buildTopicView(el, allRows, {
       },
       {
         onSelect: (item) => {
-          if (item.href) window.location.assign(item.href);
+          if (item.href) _internals.navigate(item.href);
         },
       },
     );
@@ -688,7 +716,7 @@ function listenForPlayerEvents(el, sessionId) {
     if (!nextRow?.dataset.href) return;
 
     el.dataset.autoAdvanceHref = nextRow.dataset.href;
-    window.location.assign(nextRow.dataset.href);
+    _internals.navigate(nextRow.dataset.href);
   };
 
   window.addEventListener('session-video-player:progress', handleProgress);
@@ -780,7 +808,7 @@ export default async function init(el) {
       if (pendingResizeFrame != null) return;
       pendingResizeFrame = requestAnimationFrame(() => {
         pendingResizeFrame = null;
-        drawer.applyMobileHeight();
+        drawer.reflow();
       });
     };
     window.addEventListener('resize', handleResize);
