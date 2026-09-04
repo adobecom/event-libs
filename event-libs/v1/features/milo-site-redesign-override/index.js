@@ -1,4 +1,4 @@
-import { loadStyle } from '../../utils/utils.js';
+import { LIBS, getEventConfig, loadStyle } from '../../utils/utils.js';
 
 const SELECTOR = '.section.bento.stack-mobile';
 
@@ -7,9 +7,10 @@ let observer;
 
 function loadBentoStack() {
   if (!bentoStackPromise) {
+    const miloLibs = getEventConfig()?.miloConfig?.miloLibs || LIBS;
     const bentoStackCssUrl = new URL('./bento-stack.css', import.meta.url).href;
     bentoStackPromise = Promise.all([
-      import('./bento-stack.js'),
+      import(`${miloLibs}/features/bento-stack.js`),
       new Promise((resolve) => { loadStyle(bentoStackCssUrl, resolve); }),
     ]).then(([{ default: initBentoStack }]) => initBentoStack);
   }

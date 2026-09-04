@@ -1,10 +1,15 @@
 import { expect } from '@esm-bundle/chai';
 import { readFile } from '@web/test-runner-commands';
+import { setEventConfig } from '../../../../event-libs/v1/utils/utils.js';
 import initMiloSiteRedesignOverride from '../../../../event-libs/v1/features/milo-site-redesign-override/index.js';
 
 const body = await readFile({ path: './mocks/default.html' });
 
 describe('Milo site-redesign-override: bento-stack', () => {
+  before(() => {
+    setEventConfig({}, { miloLibs: '/test/unit/features/milo-site-redesign-override/mocks/libs' });
+  });
+
   beforeEach(() => {
     document.body.innerHTML = '';
     document.head.innerHTML = '';

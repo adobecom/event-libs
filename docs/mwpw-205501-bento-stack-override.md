@@ -2,6 +2,16 @@
 
 **Status:** implemented — [PR #289](https://github.com/adobecom/event-libs/pull/289).
 
+**Update (2026-09-04):** Milo merged `site-redesign-foundation` into `main` via
+[PR #6614](https://github.com/adobecom/milo/pull/6614) on 2026-09-02. `libs/features/bento-stack.js`
+now ships on `main` unconditionally, so it's no longer vendored as a local copy —
+`index.js` imports it live from Milo instead (same `LIBS`/`miloConfig.miloLibs` pattern
+as `event-libs/v1/features/icons/icon-resolver.js`). The CSS block is still vendored:
+`handleBentoStack()` and the `.section.bento.stack-mobile` styles only exist in `main`'s
+`libs/mep/ace1209/section-metadata/` (an MEP-experiment copy), not in the default
+`libs/c2/blocks/section-metadata.css` that Milo's block loader uses without an active
+experiment. See "Decision" and "Opting out later" below for the updated state.
+
 ## Problem
 
 [MWPW-205501](https://jira.corp.adobe.com/browse/MWPW-205501) asks for the "Explore
@@ -59,6 +69,12 @@ already ships everything except two pieces:
 | `libs/c2/blocks/section-metadata/` (incl. some `.bento` desktop grid styling) | The `.section.bento.stack-mobile` CSS block in `section-metadata.css` (keyframes, custom properties, both fallbacks) |
 | C2 `--s2a-*` design tokens, `--parallax-easing` | A 6-line hook in `section-metadata.js` (`handleBentoStack()` + one call site) |
 
+_(As of the 2026-09-04 update above: `libs/features/bento-stack.js` has since shipped
+to `main` directly and is imported live rather than vendored. The CSS block and the
+`handleBentoStack()` hook still only exist in `main`'s `ace1209` MEP-experiment copy of
+`section-metadata`, not its default `libs/c2/blocks/` version, so those two remain
+vendored.)_
+
 Because `section-metadata.js` on `main` already applies whatever classes an author
 supplies, a da-events page can author a `section-metadata` + `explore-card` section
 with `bento, stack-mobile` styles today, using stock Milo — the authoring experience
@@ -108,16 +124,18 @@ image/video column). Any number of cards works; this implementation computes
 per-card stacking depth generically, unlike the unrelated `elastic-carousel` block,
 which hardcodes exactly 5.
 
-## Decision: vendor a flagged override
+## Decision: vendor only what's still missing, import the rest live
 
-Vendor only the two confirmed-missing pieces into event-libs, gated by a metadata
-flag, as a page-level feature — not a block, since `explore-card`/`section-metadata`
+Vendor only what's still confirmed-missing from Milo `main` into event-libs, gated by a
+metadata flag, as a page-level feature — not a block, since `explore-card`/`section-metadata`
 are Milo's own blocks and already render correctly on `main` with zero changes. No
 Milo block is forked or shadowed.
 
-- `event-libs/v1/features/milo-site-redesign-override/bento-stack.js` — verbatim copy
-  of Milo's `libs/features/bento-stack.js`. Zero dependencies, so this is a pure,
-  low-risk drop-in.
+- `libs/features/bento-stack.js` now ships on Milo `main`, so it's no longer vendored —
+  `index.js` imports it live at runtime via `${getEventConfig()?.miloConfig?.miloLibs || LIBS}/features/bento-stack.js`,
+  the same pattern `icon-resolver.js` already uses for Milo's icon sprite. This means the
+  module can never drift out of sync locally (it's fetched fresh from Milo every time),
+  at the cost of depending on Milo not moving/removing that path without notice.
 - `event-libs/v1/features/milo-site-redesign-override/bento-stack.css` — just the
   `.section.bento.stack-mobile` block extracted from Milo's `section-metadata.css`
   (keyframes, custom properties, both fallbacks). Every token it references
@@ -138,16 +156,15 @@ Milo block is forked or shadowed.
   companion change in the `da-events` repo (separate PR) — not a workaround to avoid
   one.
 
-### base-card CSS override
+### base-card CSS override (removed)
 
-A second, unrelated feature is stacked on top of this one, using the same
+A second, unrelated feature was briefly stacked on top of this one, using the same
 `initMiloSiteRedesignOverride()` entry point and `override-milo-ace1209` flag: a
-token-only CSS fix for `base-card` (`libs/c2/blocks/base-card/`) so its text goes
-white/light inside a `dark`-styled section. See
+token-only CSS fix for `base-card` (`libs/c2/blocks/base-card/`). It was removed on
+2026-09-04 because Milo `main`'s own `base-card.css` already ships the identical fix as
+of PR #6614 — see
 [docs/mwpw-205498-base-card-override.md](./mwpw-205498-base-card-override.md) for the
-full writeup — it's a much smaller diff than bento-stack (`base-card.js` is unmodified
-upstream; only four CSS rules differ), but it hits a CSS cascade race against Milo's
-own `base-card.css` that bento-stack never had to deal with.
+full history.
 
 ### Integration point
 
@@ -173,47 +190,50 @@ call site in da-events).
 The fix is a dedicated function with its own name and its own contract
 (`initMiloSiteRedesignOverride()`), explicitly wired into da-events' bootstrap rather
 than folded into a function whose purpose it doesn't share. It still runs before
-Milo's own block loader decorates `section-metadata`/`explore-card` — the vendored
+Milo's own block loader decorates `section-metadata`/`explore-card` — the live-imported
 `bento-stack.js` already tolerates cards not being ready yet (bounded polling for
 `.explore-card-content`), but the *section* itself doesn't have `bento`/`stack-mobile`
 classes yet at this point either, so the feature module can't rely on a one-shot scan —
 it registers a `MutationObserver` to catch the classes whenever `section-metadata`'s
 own `init()` actually applies them, later, during Milo's normal block decoration.
 
-The vendored `bento-stack.js` is kept byte-for-byte identical to its Milo source,
-including its inline comments — this is a deliberate exception to this repo's
-no-comments convention, made to preserve exact diffability against upstream for
-future re-sync or removal.
-
 ### Opting out later
 
-Once Milo ships `handleBentoStack()` and the CSS to `main`, remove: the
-`milo-site-redesign-override` folder and the `initMiloSiteRedesignOverride()` export
-from event-libs; the one call to it in `da-events`'s `decorateArea()`; and the
-`override-milo-ace1209` metadata flag from opted-in pages. No markup changes are
-needed — the DOM and classes authors use are identical whether the override or Milo's
-native support is doing the work.
+Once Milo ships `handleBentoStack()` and the `.section.bento.stack-mobile` CSS to the
+*default* `libs/c2/blocks/section-metadata.css` (not just the `ace1209` MEP-experiment
+copy), remove: `event-libs/v1/features/milo-site-redesign-override/bento-stack.css` and
+its load call in `index.js`; the `milo-site-redesign-override` folder and the
+`initMiloSiteRedesignOverride()` export from event-libs; the one call to it in
+`da-events`'s `decorateArea()`; and the `override-milo-ace1209` metadata flag from
+opted-in pages. No markup changes are needed — the DOM and classes authors use are
+identical whether the override or Milo's native support is doing the work.
 
 ### Known risk
 
-`bento-stack.js` is effectively zero-risk (no imports, verbatim copy). `bento-stack.css`
-is a literal excerpt of a file that's still actively changing upstream — the exact
-source commit SHA is recorded in the PR, so a future re-sync or removal is traceable.
+`bento-stack.js` is no longer vendored — it's imported live from Milo `main` on every
+page load, so it can't drift out of sync, but a future Milo rename/removal of
+`libs/features/bento-stack.js` would break this override at runtime (caught by the
+existing `try`/`catch` in `handleSection()`, which logs via `window.lana?.log` and lets
+the section degrade to its normal static grid) rather than at review time. `bento-stack.css`
+is a literal excerpt of a file that's still only shipped behind an MEP experiment on
+`main` — the exact source commit SHA is recorded in the PR, so a future re-sync or
+removal is traceable.
 
-A handful of narrow-edge-case behaviors inherited from the vendored `bento-stack.js`
-(a `measuring`-guard race that can drop a resize event, a `--gnav-offset` fallback that
+A handful of narrow-edge-case behaviors in Milo's own `bento-stack.js` (a
+`measuring`-guard race that can drop a resize event, a `--gnav-offset` fallback that
 can stick to a stale value, a `bento-stack-ready` check/set race, an idle
-`ResizeObserver` if a section is detached outside Milo's own `replaceInner()` cycle)
-are accepted as-is rather than patched locally, to avoid forking the vendor copy.
+`ResizeObserver` if a section is detached outside Milo's own `replaceInner()` cycle) are
+Milo's to fix upstream now, not something event-libs can patch locally.
 
 ## Open questions for alignment
 
 - Is `override-milo-ace1209` the right flag name, or should it be named after the
-  feature rather than the Milo experiment ID (e.g. `bento-stack-mobile`), given the
-  experiment ID is an implementation detail that may not mean anything once this is
-  standard?
+  feature rather than the Milo experiment ID (e.g. `bento-stack-mobile`)? Now less
+  theoretical than when this was first asked — `ace1209` is a real, still-live MEP
+  experiment ID on Milo `main`, not just a WIP branch identifier.
 - Does da-events want to author "Explore Sessions by Topic" using `section-metadata` +
   `explore-card` directly (bypassing event-libs blocks entirely for this section), or
   should event-libs eventually offer a more opinionated wrapper?
-- Who owns watching `site-redesign-foundation` for when this graduates to `main`, so the
-  override gets removed promptly rather than lingering?
+- Who owns watching Milo `main`'s default `libs/c2/blocks/section-metadata.css` for when
+  the `ace1209` experiment's bento-stack CSS/hook graduates out of the MEP-gated copy, so
+  the remaining override gets removed promptly rather than lingering?
