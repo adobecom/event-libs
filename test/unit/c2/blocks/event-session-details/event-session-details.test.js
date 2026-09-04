@@ -30,9 +30,7 @@ describe('Session Details', () => {
     expect(el.querySelector('.session-title').textContent).to.equal('My Session');
   });
 
-  // Track tags were removed from the eyebrow; the status slot is now its only child even when
-  // the session carries Track attributes.
-  it('renders no track tags in the eyebrow', async () => {
+  it('renders no track tags in the eyebrow even when the session carries Track attributes', async () => {
     setMetadata('custom-attributes', JSON.stringify([
       {
         name: 'Primary Event Site Track',
