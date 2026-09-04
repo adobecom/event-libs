@@ -142,6 +142,15 @@ describe('Carousel', () => {
     })).to.not.throw();
   });
 
+  // forceLive is threaded straight through to LiveCard for session-broadcast's Also Live
+  // carousel (see AlsoLiveCarousel.js) — same render-contract-only caveat as onCardClick/
+  // onWatchSamePage above; real behavior is verified directly in LiveCard.test.js.
+  it('accepts forceLive without throwing', () => {
+    const store = makeStore();
+    const Carousel = buildCarousel(preact, store);
+    expect(() => Carousel({ sessions: [SESSION_A], forceLive: true })).to.not.throw();
+  });
+
   // session-broadcast's Upcoming section passes SessionCard instead of the default LiveCard —
   // see UpNextCarousel.js. Like the onCardClick/onWatchSamePage tests above, the card itself
   // sits inside a multi-sibling template whose first literal isn't a bare `<`, so this mock

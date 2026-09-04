@@ -9,7 +9,7 @@ export const buildCarousel = () => Carousel;
 // session/onCardClick shape; SessionCard ignores the props it doesn't use.
 export function Carousel({
   sessions, title, formatTime, formatTimezone, variant = 'live', onCardClick, onWatchSamePage,
-  CardComponent = LiveCard, timeDisplay, showDurationBadge, showDescription,
+  CardComponent = LiveCard, timeDisplay, showDurationBadge, showDescription, forceLive,
 }) {
   // Hooks run before the empty-list bail-out — returning first would change hook order
   // between an empty and a populated render.
@@ -127,7 +127,7 @@ export function Carousel({
               class="sg-carousel__card-wrap"
               key=${s.id}
               inert=${paged && (i < clampedOffset || i >= clampedOffset + visibleCountRef.current) ? true : undefined}
-            ><${CardComponent} session=${s} variant=${variant} onCardClick=${onCardClick} onWatchSamePage=${onWatchSamePage} timeDisplay=${timeDisplay} showDurationBadge=${showDurationBadge} showDescription=${showDescription} /></div>`)}
+            ><${CardComponent} session=${s} variant=${variant} onCardClick=${onCardClick} onWatchSamePage=${onWatchSamePage} timeDisplay=${timeDisplay} showDurationBadge=${showDurationBadge} showDescription=${showDescription} forceLive=${forceLive} /></div>`)}
           </div>
         </div>
         ${sessions.length > 1 && html`

@@ -29,7 +29,7 @@ export function computeProgressPct(session, nowMs) {
 }
 
 export function LiveCard({
-  session, variant = 'live', onCardClick, onWatchSamePage, showDurationBadge = false,
+  session, variant = 'live', onCardClick, onWatchSamePage, showDurationBadge = false, forceLive = false,
 }) {
   const { state, dispatch } = useSessionGuide();
   const { guideConfig } = state;
@@ -43,7 +43,12 @@ export function LiveCard({
   const watchNowEnabled = isBehaviorEnabled(guideConfig, 'enableWatchNowCtas');
 
   const nowMs = getNowMs();
-  const sessionState = deriveSessionState(session, liveStreamActiveIds.value, nowMs);
+  // forceLive: session-broadcast's Also Live carousel already vetted these via its own,
+  // MPC-video-duration-aware isSessionLiveNow() (broadcast-schedule.js) -- deriveSessionState
+  // only knows endTimeUtc, so an MPC session whose real video runs longer than its authored
+  // slot would otherwise flip to 'on-demand' here well before broadcast-schedule agrees, and
+  // this section must only ever show live sessions.
+  const sessionState = forceLive ? 'live' : deriveSessionState(session, liveStreamActiveIds.value, nowMs);
 
   // Forces a re-render every PROGRESS_REFRESH_MS while live so progressPct recomputes against
   // the current clock — the shared session-state ticker alone isn't enough (see above).
