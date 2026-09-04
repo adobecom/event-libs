@@ -191,16 +191,21 @@ item with no toggle, then per Figma ("no number listed" when the module cannot e
 should show no count either, which makes the count condition width-dependent rather than
 purely count-based.
 
-## 8. Toggle labels are not internationalized
+## 8. Most user-facing strings are not internationalized
 
 **Files:** all four blocks ("Show more" / "Show less"), `session-state-view.js`
-("Live", "On-demand", "Available soon", "Watch now"), `event-session-resources.js`
-("Download", "Open", "No materials available for this session", "Session resources")
+(the `Watch now` CTA), `schedule.js` (`Add to schedule` / `Added to schedule`),
+`event-session-resources.js` ("Download", "Open", "No materials available for this session",
+"Session resources")
 
-**Impact:** every user-facing string is a hardcoded English placeholder.
+**Impact:** most user-facing strings are hardcoded English placeholders. The three eyebrow
+**status** labels (`Live`, `On-demand`, `Available soon`) are now author-overridable via block
+rows (see README) — but **CTA** strings are not.
 
-**Fix:** route through the project's localization mechanism once one is established for
-C2 blocks.
+**Fix:** the CTA strings (`Watch now`, `Add to schedule`) are shared with `sessions-guide` and
+already disagree across surfaces (`Added to schedule` vs `Scheduled`), so they belong in the
+**Tier 1 Configurator** as event-wide copy rather than per-block rows — a follow-up. The rest
+should route through the project's localization mechanism once one is established for C2 blocks.
 
 ## 9. IPOD-only scoping for the "Available soon" state is an assumption
 

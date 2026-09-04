@@ -56,6 +56,28 @@ field to read, so it never waits on the catalog:
 | `live` | `now` is inside **any** slot (inclusive) | red dot + `Live` | hidden |
 | `on-demand` | anything else — after a slot, or between slots | `On-demand` / `Available soon` | shown |
 
+#### Authored status labels
+
+The three status **labels** are author-overridable via optional rows on the
+`event-session-details` block (same authored-row pattern as `Background`). The key is
+case-insensitive; an absent or empty row falls back to the default:
+
+| Row key | Default | Shown when |
+|---|---|---|
+| `Live label` | `Live` | state is `live` |
+| `On-demand label` | `On-demand` | state is `on-demand` and a recording exists |
+| `IPOD pending label` | `Available soon` | IPOD session whose recording isn't posted yet |
+
+`readStatusLabels(el)` reads these before the block clears its children; `mountSessionState`
+threads them into `renderStatus`. Because session pages are template-generated, putting these
+rows in the template propagates a wording change to every session on the next regeneration.
+
+The `upcoming` state renders a formatted date, not a fixed word, so it has no label row. The
+**CTA** strings (`Watch now`, `Add to schedule`) are deliberately **not** authored here — they
+are shared across `event-session-details` and `sessions-guide` (and already disagree:
+`Added to schedule` vs `Scheduled`), so they belong in the Tier 1 Configurator as event-wide
+copy. Tracked as a follow-up; see [known-issues.md](known-issues.md).
+
 The **primary CTA is resolved separately from the state**, because "can I still schedule
 this?" is not the same question as "is it on now?":
 

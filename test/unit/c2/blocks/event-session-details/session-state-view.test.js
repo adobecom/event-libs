@@ -2,7 +2,7 @@ import { expect } from '@esm-bundle/chai';
 import { setMetadata } from '../../../../../event-libs/v1/utils/utils.js';
 import {
   getSessionTimes, getAllSessionTimes, getState, nextBoundary, formatDateTime, renderStatus,
-  mountSessionState,
+  mountSessionState, readStatusLabels,
 } from '../../../../../event-libs/v1/c2/blocks/event-session-details/session-state-view.js';
 
 const SESSION_TIMES = '[{"startTimeMillis":1794518100000,"endTimeMillis":1794520800000,"timezone":"America/Los_Angeles","sessionId":"x"}]';
@@ -263,6 +263,52 @@ describe('session-state-view', () => {
         format: IPOD,
       });
       expect(renderStatus('on-demand', times).textContent).to.equal('On-demand');
+    });
+  });
+
+  describe('authored status labels', () => {
+    const blockWithRows = (rows) => {
+      const el = document.createElement('div');
+      Object.entries(rows).forEach(([k, v]) => {
+        const row = document.createElement('div');
+        const key = document.createElement('div');
+        key.textContent = k;
+        const val = document.createElement('div');
+        val.textContent = v;
+        row.append(key, val);
+        el.append(row);
+      });
+      return el;
+    };
+
+    it('readStatusLabels returns the defaults when no rows are authored', () => {
+      expect(readStatusLabels(document.createElement('div'))).to.deep.equal({
+        live: 'Live', onDemand: 'On-demand', ipodPending: 'Available soon',
+      });
+    });
+
+    it('readStatusLabels reads overrides case-insensitively and falls back per-label', () => {
+      const el = blockWithRows({ 'Live label': 'On air', 'IPOD Pending Label': 'Coming up' });
+      expect(readStatusLabels(el)).to.deep.equal({
+        live: 'On air', onDemand: 'On-demand', ipodPending: 'Coming up',
+      });
+    });
+
+    it('renderStatus uses the authored live and on-demand labels', () => {
+      const labels = { live: 'On air', onDemand: 'Recording', ipodPending: 'Coming up' };
+      expect(renderStatus('live', {}, labels).textContent).to.equal('On air');
+      setMetadata('custom-attributes', JSON.stringify([{ name: 'Format', values: [{ value: 'online', label: 'Online' }] }]));
+      expect(renderStatus('on-demand', {}, labels).textContent).to.equal('Recording');
+    });
+
+    it('renderStatus uses the authored IPOD-pending label for a pending IPOD session', () => {
+      setMetadata('session-times', JSON.stringify([{ endTimeMillis: 1, videos: [] }]));
+      setMetadata('custom-attributes', JSON.stringify([{
+        name: 'Format',
+        values: [{ value: 'in-person' }, { value: 'on-demand-post-event' }],
+      }]));
+      const labels = { live: 'Live', onDemand: 'On-demand', ipodPending: 'Coming up' };
+      expect(renderStatus('on-demand', {}, labels).textContent).to.equal('Coming up');
     });
   });
 

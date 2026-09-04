@@ -85,15 +85,32 @@ function isSchedulableSession(doc = document) {
   return hasFormat(doc, 'online');
 }
 
-export function renderStatus(state, times, doc = document) {
+export const DEFAULT_STATUS_LABELS = { live: 'Live', onDemand: 'On-demand', ipodPending: 'Available soon' };
+
+const STATUS_LABEL_ROWS = { live: 'live label', onDemand: 'on-demand label', ipodPending: 'ipod pending label' };
+
+export function readStatusLabels(el) {
+  const rows = [...(el?.children || [])];
+  const value = (rowKey) => rows
+    .find((r) => r.children[0]?.textContent.trim().toLowerCase() === rowKey)
+    ?.children[1]?.textContent.trim();
+  const labels = { ...DEFAULT_STATUS_LABELS };
+  Object.entries(STATUS_LABEL_ROWS).forEach(([k, rowKey]) => {
+    const authored = value(rowKey);
+    if (authored) labels[k] = authored;
+  });
+  return labels;
+}
+
+export function renderStatus(state, times, labels = DEFAULT_STATUS_LABELS, doc = document) {
   const el = createTag('span', { class: `session-status session-status--${state}` });
   if (state === 'live') {
     el.append(createTag('span', { class: 'session-status-dot', 'aria-hidden': 'true' }));
-    el.append(createTag('span', {}, 'Live'));
+    el.append(createTag('span', {}, labels.live));
   } else if (state === 'on-demand') {
     const pending = isIpodSession(doc) && !hasPlayableVideo(doc);
     el.classList.toggle('session-status--available-soon', pending);
-    el.textContent = pending ? 'Available soon' : 'On-demand';
+    el.textContent = pending ? labels.ipodPending : labels.onDemand;
   } else {
     el.textContent = formatDateTime(times.start, times.timezone);
   }
@@ -117,7 +134,9 @@ function renderWatchNow() {
   return a;
 }
 
-export function mountSessionState({ statusSlot, primaryCtaSlot, ccEl }) {
+export function mountSessionState({
+  statusSlot, primaryCtaSlot, ccEl, statusLabels = DEFAULT_STATUS_LABELS,
+}) {
   const slots = getAllSessionTimes();
   if (!slots.length) return;
   const earliest = slots[0];
@@ -154,7 +173,7 @@ export function mountSessionState({ statusSlot, primaryCtaSlot, ccEl }) {
 
   const apply = (state, nowMs) => {
     if (primaryCtaSlot) setCta(ctaFor(state, nowMs));
-    if (statusSlot) statusSlot.replaceChildren(renderStatus(state, earliest));
+    if (statusSlot) statusSlot.replaceChildren(renderStatus(state, earliest, statusLabels));
     if (ccEl) ccEl.hidden = state !== 'on-demand';
   };
 
