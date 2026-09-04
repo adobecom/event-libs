@@ -37,6 +37,8 @@ function stripRfPrefix(id) {
 export function normalizeSessions(rawSessions) {
   return rawSessions.map((s) => ({
     id: s.id || '',
+    // What an author searches RainFocus by; not to be confused with rfCode/rfSessionId.
+    sessionCode: s.sessionCode || '',
     rfCode: s.rfCode || '',
     // Session-level id; favoriting keys on this, scheduling on rfCode.
     rfSessionId: s.rfSessionId || '',
@@ -368,6 +370,7 @@ export function mapEslPayloadToRawSessions(payload) {
 
     return {
       id: session.sessionId,
+      sessionCode: session.sessionCode || '',
       // Per-time-slot id, used for scheduling. Favoriting uses rfSessionId.
       rfCode: stripRfPrefix(firstTime?.externalSessionTimeId),
       rfSessionId: stripRfPrefix(session.externalSessionId),

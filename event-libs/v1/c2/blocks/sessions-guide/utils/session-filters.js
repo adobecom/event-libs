@@ -214,5 +214,6 @@ function matchesSearch(session, q) {
     || session.speakers?.some((sp) => sp.name?.toLowerCase().includes(q))
     || session.primaryTrack?.toLowerCase().includes(q)
     || session.type?.toLowerCase().includes(q)
+    || session.sessionCode?.toLowerCase().includes(q)
   );
 }

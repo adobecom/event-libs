@@ -124,6 +124,16 @@ describe('services/sessions/sessions-api', () => {
       expect(withExt.sessionPageUrl).to.equal(url);
     });
 
+    it('carries sessionCode straight from the catalog, defaulting to empty when absent', () => {
+      expect(full.sessionCode).to.equal('S001');
+      const [noCode] = mapEslPayloadToRawSessions({
+        sessions: [{ sessionId: 's-5', customAttributes: [ONLINE_FORMAT] }],
+        sessionTimes: [],
+        speakers: [],
+      });
+      expect(noCode.sessionCode).to.equal('');
+    });
+
     it('takes rfCode from the earliest sessionTime\'s externalSessionTimeId, "rf-" prefix stripped', () => {
       expect(full.rfCode).to.equal('earlier');
     });
@@ -1016,6 +1026,13 @@ describe('services/sessions/sessions-api', () => {
       const [normalized] = normalizeSessions([{ id: 's-1', audience: ['Designer'] }]);
       expect(normalized.resources).to.deep.equal([]);
       expect(normalized.mrStreamId).to.be.null;
+    });
+
+    it('defaults sessionCode to empty when the raw session provides none', () => {
+      const [withCode] = normalizeSessions([{ id: 's-1', sessionCode: 'S001' }]);
+      const [absent] = normalizeSessions([{ id: 's-2' }]);
+      expect(withCode.sessionCode).to.equal('S001');
+      expect(absent.sessionCode).to.equal('');
     });
 
     it('carries the mapper-derived hasOnDemandFormat flag through, defaulting to false', () => {

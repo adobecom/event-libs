@@ -324,6 +324,15 @@ describe('session-filters/filterSessions', () => {
     expect(filterSessions(sessions, {}).length).to.equal(3);
     expect(filterSessions(sessions, null).length).to.equal(3);
   });
+
+  it('matches searchQuery against sessionCode, case-insensitively', () => {
+    const withCodes = [
+      { id: 'a', sessionCode: 'S001', title: 'Foo' },
+      { id: 'b', sessionCode: 'S002', title: 'Bar' },
+    ];
+    expect(filterSessions(withCodes, null, 's001').map((s) => s.id)).to.deep.equal(['a']);
+    expect(filterSessions(withCodes, null, 'S002').map((s) => s.id)).to.deep.equal(['b']);
+  });
 });
 
 // Override, when present, always wins swimlane placement and the badge regardless of
