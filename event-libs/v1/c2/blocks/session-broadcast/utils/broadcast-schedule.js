@@ -29,7 +29,7 @@ export function parseVideoDurationMs(videoDuration) {
 
 // MPC ends at start + video duration, not endTimeUtc — falls back to the authored window if
 // duration is missing. YouTube uses endTimeUtc unchanged.
-function sessionEndsAtMs(session) {
+export function sessionEndsAtMs(session) {
   const startMs = Date.parse(session.startTimeUtc);
   if (getSessionBucket(session) === 'mpc') {
     const durMs = parseVideoDurationMs(session.videoDuration);

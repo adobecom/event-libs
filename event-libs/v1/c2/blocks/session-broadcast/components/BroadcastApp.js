@@ -19,7 +19,7 @@ import {
   readWatchParam, stripWatchParam, pushSessionState, getHistorySessionId,
   persistActiveSession, getPersistedSessionId, clearPersistedSession,
 } from '../utils/broadcast-url.js';
-import { logBroadcastSchedule, logBucketGroups } from '../utils/broadcast-debug.js';
+import { logBucketGroups, logActiveSession } from '../utils/broadcast-debug.js';
 import { trackBroadcastEvent, getEntryPoint } from '../utils/broadcast-analytics.js';
 import { PlayerHost } from './PlayerHost.js';
 import { SessionInfoPanel } from './SessionInfoPanel.js';
@@ -30,6 +30,10 @@ import { UpNextCarousel } from './UpNextCarousel.js';
 // LiveCard/Carousel hard-depend on useSessionGuide(); surface: 'page' routes click/watch
 // handling through onCardClick/onWatchSamePage below instead of LiveCard's own.
 const GUIDE_CONFIG = { userTz: detectUserTimezone(), surface: 'page', theme: 'light' };
+
+// See the SCHEDULE_REFRESH_MS effect below for why this page needs its own tick separate from
+// the shared sessionStateVersion one. Exported for tests, same as LiveCard.js's PROGRESS_REFRESH_MS.
+export const SCHEDULE_REFRESH_MS = 5_000;
 
 // Exported separately so tests can call it without mounting the Provider tree.
 export function BroadcastBody({ config }) {
@@ -94,6 +98,23 @@ export function BroadcastBody({ config }) {
     }
   }), []);
 
+  // sessionStateVersion (below) only catches transitions the shared session-state ticker can
+  // see -- and that ticker diffs deriveSessionState(), which is endTimeUtc-only. It never looks
+  // at videoDuration, so an MPC session whose real video ends before/after its authored
+  // endTimeUtc can sit stuck in `schedule.activeSession`/`alsoLive` indefinitely: this page's own
+  // isSessionLiveNow()/sessionEndsAtMs() (broadcast-schedule.js) *are* videoDuration-aware, but
+  // nothing re-runs them once deriveSessionState's own verdict for that session stops changing
+  // (which can be forever, if the session's endTimeUtc has already passed before its video has).
+  // This dedicated, page-local tick forces a re-render regardless, so that check actually gets
+  // re-evaluated on a short cadence -- same pattern as LiveCard.js's PROGRESS_REFRESH_MS, just
+  // scoped to this page instead of touching the shared ticker every other surface also depends on.
+  const [, forceScheduleTick] = useState(0);
+  useEffect(() => {
+    if (sessionsStatus.value !== 'ready') return undefined;
+    const id = setInterval(() => forceScheduleTick((n) => n + 1), SCHEDULE_REFRESH_MS);
+    return () => clearInterval(id);
+  }, [sessionsStatus.value]);
+
   // Forces a re-render on time-driven state transitions; value itself unused.
   // eslint-disable-next-line no-unused-expressions
   sessionStateVersion.value;
@@ -101,8 +122,8 @@ export function BroadcastBody({ config }) {
   const schedule = getBroadcastSchedule(sessions.value, liveStreamActiveIds.value, nowMs, {
     activeSessionId: manualSessionId,
   });
-  logBroadcastSchedule(schedule);
   logBucketGroups(sessions.value, liveStreamActiveIds.value, nowMs);
+  logActiveSession(schedule, nowMs);
 
   // getBroadcastSchedule returns pendingCandidates instead of picking — this is the one place
   // Math.random() runs. Depends on length, not the array, since a fresh reference every render
