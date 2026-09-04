@@ -19,7 +19,9 @@ import {
   readWatchParam, stripWatchParam, pushSessionState, getHistorySessionId,
   persistActiveSession, getPersistedSessionId, clearPersistedSession,
 } from '../utils/broadcast-url.js';
-import { logBucketGroups, logActiveSession } from '../utils/broadcast-debug.js';
+import {
+  logBucketGroups, logActiveSession, logTickStart, logTickEnd,
+} from '../utils/broadcast-debug.js';
 import { trackBroadcastEvent, getEntryPoint } from '../utils/broadcast-analytics.js';
 import { PlayerHost } from './PlayerHost.js';
 import { SessionInfoPanel } from './SessionInfoPanel.js';
@@ -122,8 +124,10 @@ export function BroadcastBody({ config }) {
   const schedule = getBroadcastSchedule(sessions.value, liveStreamActiveIds.value, nowMs, {
     activeSessionId: manualSessionId,
   });
+  logTickStart(nowMs);
   logBucketGroups(sessions.value, liveStreamActiveIds.value, nowMs);
   logActiveSession(schedule, nowMs);
+  logTickEnd();
 
   // getBroadcastSchedule returns pendingCandidates instead of picking — this is the one place
   // Math.random() runs. Depends on length, not the array, since a fresh reference every render

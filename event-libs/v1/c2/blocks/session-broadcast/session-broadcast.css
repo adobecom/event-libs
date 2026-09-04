@@ -914,6 +914,16 @@
   }
 }
 
+/* Fixed 16px here instead of sessions-guide's own margin-top: auto (1024-1279px only) --
+   that auto relies on .sg-live-card__body's flex column to push actions to the card's
+   bottom edge, which this card's own layout tweaks above don't reproduce. Scoped to
+   .sb-carousel-section--also-live, so sessions-guide's own live card keeps its auto. */
+@media (min-width: 768px) and (max-width: 1279px) {
+  .sb-carousel-section--also-live .sg-live-card__actions {
+    margin-top: 16px;
+  }
+}
+
 /* Kept here, after both sections' base rules, for ascending specificity
    (stylelint no-descending-specificity). */
 .sb-ended ~ .sb-carousel-section--also-live,

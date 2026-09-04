@@ -71,6 +71,23 @@ export function logBucketGroups(sessionList, liveStreamActiveIds, nowMs) {
   });
 }
 
+// Brackets one tick's worth of logBucketGroups/logActiveSession output -- SCHEDULE_REFRESH_MS
+// (BroadcastApp.js) re-fires these every 5s, so without a visible boundary each tick's console
+// output blurs into the previous one.
+const TICK_DIVIDER = '='.repeat(20);
+
+export function logTickStart(nowMs) {
+  if (!DEBUG_ENABLED) return;
+  // eslint-disable-next-line no-console
+  console.log(`\n${TICK_DIVIDER}\n[broadcast-debug] TICK ${new Date(nowMs).toISOString()}\n${TICK_DIVIDER}`);
+}
+
+export function logTickEnd() {
+  if (!DEBUG_ENABLED) return;
+  // eslint-disable-next-line no-console
+  console.log(`${TICK_DIVIDER}\n`);
+}
+
 // The committed/selected session (whichever of the two the schedule is actually surfacing) and
 // its relative time to the *next* state — "ends" while still playing, "next session" once it
 // has ended and something else is queued up in upNext.
