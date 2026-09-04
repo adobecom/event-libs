@@ -1,5 +1,27 @@
-import { useState, useRef, useLayoutEffect } from '../../../../deps/htm-preact.js';
+import {
+  useState, useRef, useEffect, useLayoutEffect,
+} from '../../../../deps/htm-preact.js';
 import { useSessionGuide } from '../store/index.js';
+
+// Same 1280px breakpoint sessions-guide.css switches the row into its transform-clipped
+// desktop carousel at (.sg-time-row__viewport's overflow-x: clip, .sg-time-row__arrow's
+// display: flex). Below it the row falls back to native horizontal scroll — see the
+// "Mobile: transparent passthrough" comment on .sg-time-row__viewport in the CSS.
+const DESKTOP_CAROUSEL_QUERY = '(min-width: 1280px)';
+const matchesDesktopCarousel = () => !!window.matchMedia?.(DESKTOP_CAROUSEL_QUERY).matches;
+
+// Same hook shape as SessionDetailOverlay.js's useIsDesktop() / FilterPanel.js's useIsMobile().
+function useIsDesktopCarousel() {
+  const [isDesktop, setIsDesktop] = useState(matchesDesktopCarousel);
+  useEffect(() => {
+    const mq = window.matchMedia?.(DESKTOP_CAROUSEL_QUERY);
+    if (!mq) return undefined;
+    const onChange = (e) => setIsDesktop(e.matches);
+    mq.addEventListener('change', onChange);
+    return () => mq.removeEventListener('change', onChange);
+  }, []);
+  return isDesktop;
+}
 
 // Shared by TrackRow.js and TimeSlotRow.js: both render a horizontally-paged strip of
 // SessionCards with prev/next arrows, a "reserve room for the last card's hover-expanded
@@ -11,6 +33,7 @@ export function useCarouselRow(sessions, cardStateKey) {
   const { state } = useSessionGuide();
   const dismissingIds = state.dismissingIds || new Set();
   const allDismissing = sessions?.every((s) => dismissingIds.has(s.id)) || false;
+  const isDesktopCarousel = useIsDesktopCarousel();
 
   const [offset, setOffset] = useState(0);
   // lastVisible is the index of the last card fully inside the viewport. Cards outside
@@ -49,6 +72,15 @@ export function useCarouselRow(sessions, cardStateKey) {
     const strip = stripRef.current;
     const viewport = viewportRef.current;
     if (!strip || !viewport) return;
+    // Below 1280px the row scrolls natively and the arrows are display:none, so `offset`
+    // can never advance past 0 — gating on a one-screenful `lastVisible` there would
+    // permanently strand every card past the first as `inert`: unreachable by touch,
+    // click, or Tab even once the user has scrolled it into view. Only the desktop
+    // transform-carousel needs the clip-aware gate.
+    if (!isDesktopCarousel) {
+      setMeasure({ tx: 0, showNext: false, lastVisible: Infinity });
+      return;
+    }
     const cards = [...strip.children];
     if (!cards.length) return;
     const gap = parseFloat(getComputedStyle(strip).columnGap) || 0;
@@ -77,7 +109,7 @@ export function useCarouselRow(sessions, cardStateKey) {
       showNext: effectiveTotal - newTx > viewport.offsetWidth + 1,
       lastVisible: last,
     });
-  }, [offset, cardStateKey]);
+  }, [offset, cardStateKey, isDesktopCarousel]);
 
   return {
     dismissingIds,
