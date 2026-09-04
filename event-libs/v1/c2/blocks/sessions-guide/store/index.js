@@ -6,13 +6,22 @@ import {
 } from '../../../../utils/session-store.js';
 import { isPostEvent } from '../../../../utils/session-state.js';
 import { getNowMs, getSessionDayKey } from '../utils/time.js';
+import { excludeOnDemandFormat } from '../utils/session-filters.js';
 
 const SS_LAST_VIEW = 'sg:last-view';
 
-function deriveEventDays(sessionList, userTz) {
+// Excludes hasOnDemandFormat sessions the same way every date-scoped filter already does
+// (liveSessions/upcomingSessions/getRecommendedSessions in session-filters.js) — that
+// format is permanently routed to On demand regardless of its startTimeUtc (see
+// deriveSessionState()), so it never surfaces under Live & upcoming/My sessions/My
+// favorites for any day. A day tab whose only sessions are that format would otherwise
+// show up with nothing to show once selected.
+export function deriveEventDays(sessionList, userTz) {
   const tz = userTz || Intl.DateTimeFormat().resolvedOptions().timeZone;
   const daySet = new Set();
-  sessionList.forEach((s) => { if (s.startTimeUtc) daySet.add(getSessionDayKey(s, tz)); });
+  excludeOnDemandFormat(sessionList).forEach((s) => {
+    if (s.startTimeUtc) daySet.add(getSessionDayKey(s, tz));
+  });
   return [...daySet].sort();
 }
 

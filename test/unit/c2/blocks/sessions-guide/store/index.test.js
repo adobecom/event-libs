@@ -1,5 +1,5 @@
 import { expect } from '@esm-bundle/chai';
-import { buildInitialState, reducer } from '../../../../../../event-libs/v1/c2/blocks/sessions-guide/store/index.js';
+import { buildInitialState, reducer, deriveEventDays } from '../../../../../../event-libs/v1/c2/blocks/sessions-guide/store/index.js';
 import { auth } from '../../../../../../event-libs/v1/utils/session-store.js';
 
 const MOCK_CONFIG = {
@@ -40,6 +40,46 @@ describe('store/buildInitialState', () => {
   it('carries guideConfig through', () => {
     const state = buildInitialState(MOCK_CONFIG);
     expect(state.guideConfig).to.deep.equal(MOCK_CONFIG);
+  });
+});
+
+describe('store/deriveEventDays', () => {
+  const userTz = 'America/Los_Angeles';
+
+  it('collects the distinct days sessions start on', () => {
+    const days = deriveEventDays([
+      { startTimeUtc: '2026-11-10T18:00:00.000Z' },
+      { startTimeUtc: '2026-11-11T18:00:00.000Z' },
+      { startTimeUtc: '2026-11-10T20:00:00.000Z' },
+    ], userTz);
+    expect(days).to.deep.equal(['2026-11-10', '2026-11-11']);
+  });
+
+  // Regression: a day whose only session(s) carry hasOnDemandFormat would otherwise get a
+  // tab with nothing to show once selected — every date-scoped filter (liveSessions/
+  // upcomingSessions/getRecommendedSessions in session-filters.js) already excludes that
+  // format regardless of startTimeUtc, since deriveSessionState() routes it straight to
+  // On demand no matter what.
+  it('excludes a day whose only session has hasOnDemandFormat', () => {
+    const days = deriveEventDays([
+      { startTimeUtc: '2026-11-10T18:00:00.000Z' },
+      { startTimeUtc: '2026-11-12T21:15:00.000Z', hasOnDemandFormat: true },
+    ], userTz);
+    expect(days).to.deep.equal(['2026-11-10']);
+  });
+
+  // A day stays listed as long as at least one of its sessions isn't on-demand-only.
+  it('keeps a day that mixes an on-demand-format session with a regular one', () => {
+    const days = deriveEventDays([
+      { startTimeUtc: '2026-11-12T15:00:00.000Z' },
+      { startTimeUtc: '2026-11-12T21:15:00.000Z', hasOnDemandFormat: true },
+    ], userTz);
+    expect(days).to.deep.equal(['2026-11-12']);
+  });
+
+  it('ignores sessions with no startTimeUtc', () => {
+    const days = deriveEventDays([{ startTimeUtc: '' }, { startTimeUtc: '2026-11-10T18:00:00.000Z' }], userTz);
+    expect(days).to.deep.equal(['2026-11-10']);
   });
 });
 
