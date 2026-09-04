@@ -1,12 +1,17 @@
 # base-card CSS token override (MWPW-205498)
 
-**Status:** implemented — [PR #292](https://github.com/adobecom/event-libs/pull/292),
-stacked on [PR #289](https://github.com/adobecom/event-libs/pull/289) /
-`mwpw-205501-bento-stack-override`. See
+**Status:** superseded — removed. Originally implemented in
+[PR #292](https://github.com/adobecom/event-libs/pull/292), stacked on
+[PR #289](https://github.com/adobecom/event-libs/pull/289) /
+`mwpw-205501-bento-stack-override`. Milo `main`'s own `libs/c2/blocks/base-card/base-card.css`
+shipped the identical fix — the same `--s2a-color-content-heading`/`-default`/`-subtle`
+tokens and the `:has(a)` hover guard described below — in
+[PR #6614](https://github.com/adobecom/milo/pull/6614) on 2026-09-02, meeting this
+doc's own "Opting out later" criteria. Removed on 2026-09-04: `base-card.css`,
+`loadBaseCardOverride()`, and the `body.milo-site-redesign-override` marker logic in
+`index.js` are gone. Kept below as a historical record of the investigation. See
 [docs/mwpw-205501-bento-stack-override.md](./mwpw-205501-bento-stack-override.md) for
-the bento-stack feature this is stacked on, including the shared
-`initMiloSiteRedesignOverride()` entry point and `override-milo-ace1209` authoring flag
-both features gate behind.
+the bento-stack feature this was stacked on.
 
 ## Problem
 
