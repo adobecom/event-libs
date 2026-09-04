@@ -77,6 +77,19 @@ describe('MyFavoritesView', () => {
     expect(View({})).to.be.null;
   });
 
+  // Regression for the refresh-on-My-favorites bounce: while auth is still resolving
+  // (isLoggedIn null, isRegistered undefined — see isAuthResolved()'s own comment), the
+  // view must render nothing without asserting the visitor is unauthorized either way.
+  // makeStore()'s own default would coerce an explicit `isRegistered: undefined` back to
+  // `true` (a destructuring default triggers on undefined, not just a missing key), so
+  // isRegistered is reset directly on the signal after construction instead.
+  it('renders nothing while auth is still resolving, not yet an unauthorized verdict', () => {
+    const store = makeStore({ isLoggedIn: null });
+    auth.value = { ...auth.value, isRegistered: undefined };
+    const View = buildMyFavoritesView(preact, store);
+    expect(View({})).to.be.null;
+  });
+
   it('renders the my-favorites view when registered', () => {
     const store = makeStore();
     const View = buildMyFavoritesView(preact, store);

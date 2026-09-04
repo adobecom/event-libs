@@ -1,6 +1,8 @@
 import { expect } from '@esm-bundle/chai';
 
-import { runSessionAction, toggleScheduleWithFeedback, checkViewAccess } from '../../../../event-libs/v1/services/sessions/action-feedback.js';
+import {
+  runSessionAction, toggleScheduleWithFeedback, checkViewAccess, isAuthResolved,
+} from '../../../../event-libs/v1/services/sessions/action-feedback.js';
 import { SessionActionError } from '../../../../event-libs/v1/services/sessions/session-actions.js';
 import { toasts } from '../../../../event-libs/v1/features/toast/toast.js';
 import { conflict } from '../../../../event-libs/v1/features/conflict-modal/conflict-modal.js';
@@ -217,6 +219,32 @@ describe('services/sessions/action-feedback', () => {
       ];
       liveStreamActiveIds.value = new Set();
       expect(checkViewAccess('my-sessions', { eventConfig })).to.equal('live-upcoming');
+    });
+  });
+
+  describe('isAuthResolved', () => {
+    it('is false while isLoggedIn has not resolved yet (IMS still pending)', () => {
+      expect(isAuthResolved({ isLoggedIn: null, isRegistered: undefined })).to.be.false;
+    });
+
+    it('is true once logged-out is confirmed — isRegistered will never arrive', () => {
+      expect(isAuthResolved({ isLoggedIn: false, isRegistered: undefined })).to.be.true;
+    });
+
+    // The exact refresh-on-My-sessions/My-favorites scenario this guards against: logged
+    // in confirmed, but isRegistered is still mid-flight (RF token exchange / myData
+    // fetch not settled yet) — must not read as resolved, or the caller bounces an
+    // about-to-be-confirmed-registered visitor away before the real answer arrives.
+    it('is false when logged in but isRegistered is still unsettled', () => {
+      expect(isAuthResolved({ isLoggedIn: true, isRegistered: undefined })).to.be.false;
+    });
+
+    it('is true once logged in and isRegistered has settled true', () => {
+      expect(isAuthResolved({ isLoggedIn: true, isRegistered: true })).to.be.true;
+    });
+
+    it('is true once logged in and isRegistered has settled false', () => {
+      expect(isAuthResolved({ isLoggedIn: true, isRegistered: false })).to.be.true;
     });
   });
 });

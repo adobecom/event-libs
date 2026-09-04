@@ -4,7 +4,7 @@ import {
   sessions as sessionsSignal, favorited as favoritedSignal,
   liveStreamActiveIds as liveStreamActiveIdsSignal, auth, sessionStateVersion,
 } from '../../../../utils/session-store.js';
-import { checkViewAccess } from '../../../../services/sessions/action-feedback.js';
+import { checkViewAccess, isAuthResolved } from '../../../../services/sessions/action-feedback.js';
 import { TimeSlotRow } from './TimeSlotRow.js';
 import { TrackRow } from './TrackRow.js';
 import { Carousel } from './Carousel.js';
@@ -38,12 +38,17 @@ export function MyFavoritesView() {
   // Logged-out/unregistered visitors never see this view's content — a toast fires and
   // they're bounced to a fallback view instead. Re-checked on every auth change, not just
   // mount, so it also catches URL-driven navigation and a session expiring mid-view.
+  // Gated behind isAuthResolved() so a refresh landing straight on this view (e.g. a
+  // restored ?view=my-favorites) doesn't bounce an already-registered visitor away before
+  // auth has actually finished resolving — see isAuthResolved()'s own comment.
   const { isLoggedIn, isRegistered } = auth.value;
+  const authResolved = isAuthResolved(auth.value);
   useEffect(() => {
+    if (!authResolved) return;
     const fallback = checkViewAccess('my-favorites', { eventConfig: state.guideConfig });
     if (fallback) dispatch({ type: 'SET_VIEW', view: fallback });
-  }, [isLoggedIn, isRegistered]);
-  if (!isLoggedIn || isRegistered !== true) return null;
+  }, [authResolved, isLoggedIn, isRegistered]);
+  if (!authResolved || !isLoggedIn || isRegistered !== true) return null;
 
   // Memoized: this component re-renders on every context dispatch (e.g. opening the
   // detail overlay), not just when the inputs below actually change.
