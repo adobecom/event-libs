@@ -24,25 +24,37 @@ function safeDate(value) {
   return Number.isNaN(date.getTime()) ? null : date;
 }
 
+// Intl always renders dayPeriod as "AM"/"PM" with a preceding space (e.g. "11:00 AM"); we
+// want it lowercase and attached to the time instead ("11:00am"), so build the string from
+// parts rather than the formatted output.
+function joinTimeParts(parts) {
+  return parts.reduce((out, part, i) => {
+    if (part.type === 'literal' && part.value === ' ' && parts[i + 1]?.type === 'dayPeriod') return out;
+    return out + (part.type === 'dayPeriod' ? part.value.toLowerCase() : part.value);
+  }, '');
+}
+
 export function formatSessionTime(utcIso, userTz) {
   const date = safeDate(utcIso);
   if (!date) return '';
-  return new Intl.DateTimeFormat('en-US', {
+  const parts = new Intl.DateTimeFormat('en-US', {
     hour: 'numeric',
     minute: '2-digit',
     timeZone: userTz,
     timeZoneName: 'short',
-  }).format(date);
+  }).formatToParts(date);
+  return joinTimeParts(parts);
 }
 
 export function formatShortTime(utcIso, userTz) {
   const date = safeDate(utcIso);
   if (!date) return '';
-  return new Intl.DateTimeFormat('en-US', {
+  const parts = new Intl.DateTimeFormat('en-US', {
     hour: 'numeric',
     minute: '2-digit',
     timeZone: userTz,
-  }).format(date);
+  }).formatToParts(date);
+  return joinTimeParts(parts);
 }
 
 export function formatTimezoneAbbr(utcIso, userTz) {
