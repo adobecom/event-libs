@@ -31,6 +31,10 @@ export function dvrAvailableAtMs(session, eventStartMs) {
 // sessions-guide/utils/session-filters.js) — kept as a shared utility for any block that
 // needs it. Fails open when either input is missing.
 export function isDvrPending(session, nowMs, eventStartMs) {
+  // Mobile Rider livestreamed sessions (mrStreamId) go straight from live to their DVR
+  // recording once the stream ends — there's no separate delay window to wait out, so
+  // `dvrDelayHours` never applies to them.
+  if (session?.mrStreamId) return false;
   const availableAt = dvrAvailableAtMs(session, eventStartMs);
   return availableAt !== null && nowMs < availableAt;
 }
