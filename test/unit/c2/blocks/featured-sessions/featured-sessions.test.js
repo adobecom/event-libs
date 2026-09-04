@@ -25,13 +25,13 @@ describe('featured-sessions', () => {
     document.body.innerHTML = '';
   });
 
-  it('renders a card per entry with an image, ratio-16-9', async () => {
+  it('renders a card per entry with an image, media-wide', async () => {
     const el = buildBlock({ entries: [entry()] });
     await init(el);
 
     const cards = el.querySelectorAll('.event-card');
     expect(cards.length).to.equal(1);
-    expect(cards[0].classList.contains('ratio-16-9')).to.equal(true);
+    expect(cards[0].classList.contains('media-wide')).to.equal(true);
     expect(cards[0].querySelector('.card-title').textContent).to.equal('Intro to Adobe Express');
     expect(cards[0].querySelector('.card-description').textContent).to.equal('Video');
     expect(cards[0].querySelector('.card-cta').textContent).to.equal('Learn more');
