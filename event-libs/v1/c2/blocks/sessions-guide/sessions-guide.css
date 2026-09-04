@@ -3202,12 +3202,25 @@
   padding: var(--s2a-spacing-xs);
   border: none;
   border-radius: var(--s2a-border-radius-sm);
-  background: rgb(255 255 255 / 20%);
-  backdrop-filter: blur(3px);
   cursor: pointer;
   opacity: 0;
   visibility: hidden;
   transition: opacity 0.2s ease, visibility 0.2s ease;
+}
+
+/* Glass fill lives on a pseudo-element (Figma 11889:43436) rather than on the button
+   itself, so its own blur doesn't also soften the arrow/label painted on top of it.
+   z-index: -1 keeps it behind those (non-positioned) children despite painting order. */
+.sg-back-to-top::before {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  border-radius: inherit;
+  background: rgb(255 255 255 / 20%);
+  backdrop-filter: blur(15px);
+  filter: blur(5px);
+  pointer-events: none;
 }
 
 /* Fades in once the list has been scrolled (see shouldShowBackToTop). */
