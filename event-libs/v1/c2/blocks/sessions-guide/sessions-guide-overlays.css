@@ -37,6 +37,60 @@
 .sg-download-btn:hover:not(:disabled) { background: var(--s2a-color-transparent-black-12, rgb(0 0 0 / 12%)); }
 .sg-download-btn:active:not(:disabled) { background: var(--s2a-color-transparent-black-16, rgb(0 0 0 / 16%)); }
 
+/* ── Download Button tooltip (Figma 11884:55569) ───────────────
+   Desktop only (matches this block's 1280px breakpoint elsewhere — FilterPanel.js,
+   SessionDetailOverlay.js, use-carousel-row.js): a hover affordance has no equivalent on
+   touch, so it stays off below that width. Pure CSS via the ~ sibling combinator — a
+   disabled <button> never fires :hover/:focus-visible, so it's naturally excluded too. */
+.sg-download-btn-wrap {
+  position: relative;
+
+  /* inline-flex, not flex: this must hug the button's own width so the tooltip's
+     left: 50% centers on the button, not on whatever width a block box would stretch
+     to fill in its parent (only harmless in the real header because .sg-right-controls
+     happens to be a flex row already sizing it to content — this holds regardless). */
+  display: inline-flex;
+}
+
+.sg-download-btn__tooltip {
+  display: none;
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  margin-bottom: var(--s2a-spacing-2xs, 4px);
+  flex-direction: column;
+  align-items: center;
+  max-width: 160px;
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+.sg-download-btn__tooltip-label {
+  background: var(--s2a-color-gray-800, #292929);
+  color: var(--s2a-color-gray-25, #fff);
+  font-size: var(--s2a-font-size-xs, 12px);
+  font-weight: var(--s2a-font-weight-body, 400);
+  line-height: var(--s2a-font-line-height-2xs, 16px);
+  border-radius: 7px;
+  padding: var(--s2a-spacing-2xs, 4px) 10px;
+}
+
+.sg-download-btn__tooltip-tip {
+  width: 0;
+  height: 0;
+  border-left: 5px solid transparent;
+  border-right: 5px solid transparent;
+  border-top: 5px solid var(--s2a-color-gray-800, #292929);
+}
+
+@media (min-width: 1280px) {
+  .sg-download-btn:hover ~ .sg-download-btn__tooltip,
+  .sg-download-btn:focus-visible ~ .sg-download-btn__tooltip {
+    display: flex;
+  }
+}
+
 /* ── Session Detail Overlay (Phase 6) ────────────────────────── */
 
 .sg-detail-panel {
