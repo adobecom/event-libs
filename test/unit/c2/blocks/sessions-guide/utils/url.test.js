@@ -22,6 +22,13 @@ describe('sessions-guide/utils/url', () => {
     it('ignores query/hash when comparing', () => {
       expect(isSamePage(`${window.location.pathname}?foo=bar#baz`)).to.be.true;
     });
+
+    it('is true for a different pathname when ?pretend-broadcast=true is set', () => {
+      const basePath = window.location.pathname;
+      history.replaceState(null, '', `${basePath}?pretend-broadcast=true`);
+      expect(isSamePage('/some-other-page.html')).to.be.true;
+      history.replaceState(null, '', basePath);
+    });
   });
 
   // ?session= carries the last path segment of the session's own page url, which the

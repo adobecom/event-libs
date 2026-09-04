@@ -308,6 +308,74 @@ describe('LiveCard', () => {
     });
   });
 
+  // Per the Figma "Also Live" card (session-broadcast's carousel), the live variant shows a
+  // trailing duration next to Watch Now/Favorite — a different slot than the progress-bar
+  // overlay's own duration label (sg-live-card__duration), which already existed. Gated on
+  // showDurationBadge specifically (not variant === 'live', which is sessions-guide's own
+  // pre-existing default and would otherwise leak this into its unrelated Live/My Favorites
+  // carousels) — see LiveUpcomingView.js/MyFavoritesView.js, neither of which opts in.
+  describe('actions-row duration (opt-in via showDurationBadge)', () => {
+    it('shows the session duration when showDurationBadge is true', () => {
+      const LiveCard = buildLiveCard(preact, makeStore());
+      const out = LiveCard({ session: LIVE_SESSION, variant: 'live', showDurationBadge: true });
+      expect(out).to.include('sg-live-card__actions-time');
+    });
+
+    it('omits it by default for the live variant', () => {
+      const LiveCard = buildLiveCard(preact, makeStore());
+      const out = LiveCard({ session: LIVE_SESSION, variant: 'live' });
+      expect(out).to.not.include('sg-live-card__actions-time');
+    });
+
+    it('omits it for the recommended variant even with showDurationBadge', () => {
+      const LiveCard = buildLiveCard(preact, makeStore());
+      const out = LiveCard({ session: UPCOMING_SESSION, variant: 'recommended', showDurationBadge: true });
+      expect(out).to.not.include('sg-live-card__actions-time');
+    });
+  });
+
+  // Real click-triggered branching (which path handleCardClick/handleWatch take) can't be
+  // exercised by this string-render harness — no test in this suite simulates a real click,
+  // since the htm-preact stub renders function attrs as `""`, losing the reference entirely.
+  // These guard the render contract for session-broadcast's integration: the new optional
+  // props are accepted without throwing and don't change markup on the surfaces that ignore
+  // them. Interactive verification happens via a preview harness in a real browser instead.
+  describe('onCardClick / onWatchSamePage (session-broadcast integration)', () => {
+    function pageSurfaceStore() {
+      const store = buildStore(preact);
+      store.SessionGuideContext._current = {
+        state: { guideConfig: { ...BASE_CONFIG, surface: 'page' } },
+        dispatch: () => {},
+      };
+      return store;
+    }
+
+    it('accepts onCardClick/onWatchSamePage without throwing, on the page surface', () => {
+      const LiveCard = buildLiveCard(preact, pageSurfaceStore());
+      expect(() => LiveCard({
+        session: LIVE_SESSION, onCardClick: () => {}, onWatchSamePage: () => {},
+      })).to.not.throw();
+    });
+
+    // Deliberately NOT identical: the title becomes a real, keyboard-focusable <button> when
+    // onCardClick is supplied on the page surface (matching the widget surface's own already-
+    // accessible pattern) — a bare <div onclick> with no focusable equivalent inside it would
+    // otherwise make "open session detail" mouse/pointer-only for session-broadcast's cards.
+    it('renders the title as a button when onCardClick is supplied on the page surface', () => {
+      const LiveCard = buildLiveCard(preact, pageSurfaceStore());
+      const withCallback = LiveCard({ session: LIVE_SESSION, onCardClick: () => {} });
+      const without = LiveCard({ session: LIVE_SESSION });
+      expect(withCallback).to.include('sg-live-card__title-btn');
+      expect(without).to.not.include('sg-live-card__title-btn');
+    });
+
+    it('onWatchSamePage alone does not affect the title markup', () => {
+      const LiveCard = buildLiveCard(preact, pageSurfaceStore());
+      const out = LiveCard({ session: LIVE_SESSION, onWatchSamePage: () => {} });
+      expect(out).to.not.include('sg-live-card__title-btn');
+    });
+  });
+
   describe('computeProgressPct', () => {
     const session = { startTimeUtc: '2026-01-01T00:00:00.000Z', endTimeUtc: '2026-01-01T01:00:00.000Z' };
 

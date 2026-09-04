@@ -52,7 +52,7 @@ describe('Featured Products', () => {
     setProducts(['Photoshop', 'Illustrator', 'Fresco']);
     const el = block();
     await init(el);
-    expect(el.querySelector('.featured-products-title').textContent).to.equal('Featured products (3)');
+    expect(el.querySelector('.featured-products-title').textContent).to.equal('Featured products');
     const names = [...el.querySelectorAll('.featured-product-name')].map((n) => n.textContent);
     expect(names).to.deep.equal(['Photoshop', 'Illustrator', 'Fresco']);
   });
@@ -96,16 +96,38 @@ describe('Featured Products', () => {
     const toggle = el.querySelector('.featured-products-toggle');
     expect(toggle).to.not.be.null;
     expect(el.querySelectorAll('.featured-product.is-overflow')).to.have.lengthOf(1);
+    expect(toggle.getAttribute('daa-ll')).to.equal('Show-More-Products');
     toggle.click();
     expect(el.classList.contains('is-expanded')).to.be.true;
     expect(toggle.textContent).to.equal('Show less');
+    expect(toggle.getAttribute('daa-ll')).to.equal('Show-Less-Products');
+    toggle.click();
+    expect(el.classList.contains('is-expanded')).to.be.false;
+    expect(toggle.textContent).to.equal('Show more');
+    expect(toggle.getAttribute('daa-ll')).to.equal('Show-More-Products');
   });
 
-  it('renders nothing when there are no products', async () => {
+  it('omits the count at the visible limit and shows it just above', async () => {
+    let el = block();
+    setProducts(Array.from({ length: 6 }, (_, i) => `Product ${i}`));
+    await init(el);
+    expect(el.querySelector('.featured-products-title').textContent).to.equal('Featured products');
+    expect(el.querySelector('.featured-products-count')).to.be.null;
+
+    el = block();
+    setProducts(Array.from({ length: 7 }, (_, i) => `Product ${i}`));
+    await init(el);
+    expect(el.querySelector('.featured-products-count').textContent).to.equal(' (7)');
+  });
+
+  it('removes the block entirely when there are no products', async () => {
     setProducts([]);
     const el = block();
+    const parent = document.createElement('div');
+    parent.append(el);
     await init(el);
-    expect(el.children).to.have.lengthOf(0);
+    expect(el.parentNode).to.be.null;
+    expect(parent.children).to.have.lengthOf(0);
   });
 
   it('applies an authored Background row as the block background and removes the row', async () => {

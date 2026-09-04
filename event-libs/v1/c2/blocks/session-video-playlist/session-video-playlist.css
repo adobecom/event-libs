@@ -1,0 +1,647 @@
+@import '../../styles/tokens.css';
+
+@media (min-width: 1024px) {
+  .session-video-playlist {
+    --vp-bg: var(--vp-authored-bg, var(--s2a-color-gray-25));
+    --vp-fg: var(--s2a-color-gray-900);
+    --vp-row-bg: var(--s2a-color-gray-50);
+    --vp-track-bg: var(--s2a-color-transparent-black-16);
+    --vp-muted: var(--s2a-color-transparent-black-64);
+    --vp-playing-bg: var(--s2a-color-gray-900);
+    --vp-playing-fg: var(--s2a-color-gray-25);
+    --vp-playing-track-bg: var(--s2a-color-gray-700);
+    --vp-playing-muted: var(--s2a-color-transparent-white-64);
+
+    flex: 0 0 349px;
+    align-self: flex-start;
+    max-height: 100%;
+  }
+
+  .session-video-playlist-row-actions {
+    width: 0;
+    min-width: 0;
+    overflow: hidden;
+    opacity: 0;
+    margin-left: calc(-1 * var(--s2a-spacing-sm));
+    transition: opacity 0.15s ease, width 0.15s ease, margin-left 0.15s ease;
+  }
+
+  .session-video-playlist-row:hover .session-video-playlist-row-actions,
+  .session-video-playlist-row:focus-within .session-video-playlist-row-actions {
+    width: 32px;
+    margin-left: 0;
+    opacity: 1;
+  }
+}
+
+@media (min-width: 1440px) {
+  .session-video-playlist {
+    flex-basis: 392px;
+  }
+}
+
+@media (min-width: 1920px) {
+  .session-video-playlist {
+    flex-basis: 487px;
+  }
+}
+
+.session-video-playlist {
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  background: var(--vp-bg, var(--s2a-color-gray-25, #fff));
+  color: var(--vp-fg, var(--s2a-color-gray-900, #1e1e1e));
+  border-radius: var(--s2a-border-radius-md, 16px);
+  padding: var(--s2a-spacing-md) var(--s2a-spacing-md) var(--s2a-spacing-lg);
+  margin-bottom: var(--s2a-spacing-8, 8px);
+  overflow: hidden;
+}
+
+.session-video-playlist-handle,
+.session-video-playlist-top,
+.session-video-playlist-show-more {
+  flex-shrink: 0;
+}
+
+.session-video-playlist > :not(.session-video-playlist-handle, .session-video-playlist-top, .session-video-playlist-list, .session-video-playlist-show-more) {
+  display: none;
+}
+
+.session-video-container.is-collapsing,
+.session-video-player.is-collapsing,
+.session-video-playlist.is-collapsing {
+  overflow: hidden;
+  opacity: 0;
+  max-height: 0;
+  margin-bottom: 0;
+  transition: opacity 0.25s ease, max-height 0.25s ease, margin-bottom 0.25s ease;
+}
+
+.session-video-playlist-handle {
+  display: none;
+}
+
+.session-video-playlist-top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: var(--s2a-spacing-xs) var(--s2a-spacing-md);
+  padding-bottom: var(--s2a-spacing-8, 8px);
+}
+
+.session-video-playlist-title {
+  flex: 1 0 0%;
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  font-size: var(--s2a-font-size-lg);
+  font-weight: var(--s2a-font-weight-adobe-clean-black, 900);
+  line-height: 98%;
+  letter-spacing: -0.54px;
+  /* stylelint-disable-next-line value-no-vendor-prefix -- required for -webkit-line-clamp */
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+
+.session-video-playlist-toggle {
+  display: none;
+}
+
+.session-video-playlist-up-next {
+  display: none;
+}
+
+.session-video-playlist-autoplay {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: var(--s2a-spacing-xs);
+  margin: 0 0 0 auto;
+  font-size: var(--s2a-font-size-sm);
+  cursor: pointer;
+}
+
+.session-video-playlist-autoplay-toggle {
+  appearance: none;
+  position: relative;
+  width: 32px;
+  height: 18px;
+  margin: 0;
+  border-radius: var(--s2a-border-radius-round);
+  /* stylelint-disable-next-line color-no-hex -- no matching --s2a- token for this exact
+     Figma off-track color */
+  background: var(--s2a-color-gray-500);
+  flex-shrink: 0;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.session-video-playlist-autoplay-toggle::before {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 14px;
+  height: 14px;
+  border-radius: var(--s2a-border-radius-round);
+  background: var(--s2a-color-gray-25, #fff);
+  transition: transform 0.2s ease;
+}
+
+.session-video-playlist-autoplay-toggle:checked {
+  background: var(--s2a-color-gray-800);
+}
+
+.session-video-playlist-autoplay-toggle:checked::before {
+  transform: translateX(14px);
+}
+
+.session-video-playlist-list {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--s2a-spacing-xs);
+  min-height: 0;
+  padding: 0;
+  overflow-y: auto;
+  box-sizing: border-box;
+}
+
+@media (min-width: 1024px) {
+  .session-video-playlist-list::-webkit-scrollbar {
+    /* stylelint-disable-next-line property-no-vendor-prefix -- prefixed form required; Chrome ignores unprefixed appearance in ::-webkit-scrollbar */
+    -webkit-appearance: none;
+    width: 10px;
+  }
+
+  .session-video-playlist-list::-webkit-scrollbar-track {
+    background: var(--s2a-color-transparent-black-16);
+    border-radius: var(--s2a-border-radius-round);
+  }
+
+  .session-video-playlist-list::-webkit-scrollbar-thumb {
+    border: 2px solid transparent;
+    border-radius: var(--s2a-border-radius-round);
+    background: var(--s2a-color-gray-500);
+    background-clip: content-box;
+  }
+
+  .session-video-playlist-list::-webkit-scrollbar-thumb:hover {
+    background: var(--s2a-color-gray-700);
+    background-clip: content-box;
+  }
+}
+
+.session-video-playlist-row {
+  display: flex;
+  align-items: stretch;
+  gap: var(--s2a-spacing-sm);
+  width: 100%;
+  box-sizing: border-box;
+  border-radius: var(--s2a-border-radius-sm, 8px);
+  padding: var(--s2a-spacing-xs);
+  background: var(--vp-row-bg);
+  cursor: pointer;
+}
+
+.session-video-playlist-row-content {
+  display: flex;
+  flex: 1 1 auto;
+  align-items: stretch;
+  gap: var(--s2a-spacing-sm);
+  min-width: 0;
+  text-decoration: none;
+}
+
+.session-video-playlist-row.is-playing {
+  background: var(--vp-playing-bg);
+  color: var(--vp-playing-fg);
+}
+
+@media (hover: hover) {
+  .session-video-playlist-row:hover {
+    background: var(--vp-playing-bg);
+    color: var(--vp-playing-fg);
+  }
+}
+
+.session-video-playlist-row:focus-visible,
+.session-video-playlist-row-content:focus-visible {
+  outline: 1px solid var(--s2a-color-focus-ring-default, #3b63fb);
+  outline-offset: 2px;
+}
+
+.session-video-playlist-row-thumb-wrap {
+  position: relative;
+  flex-shrink: 0;
+  line-height: 0;
+}
+
+.session-video-playlist-row-thumb {
+  width: 96px;
+  aspect-ratio: 16 / 9;
+  border-radius: 6px;
+  object-fit: cover;
+}
+
+@media (min-width: 1024px) {
+  .session-video-playlist-row-thumb {
+    width: 117.19px;
+  }
+}
+
+@media (min-width: 1440px) {
+  .session-video-playlist-row-thumb {
+    width: 136.889px;
+  }
+}
+
+.session-video-playlist-row-play-icon {
+  display: flex;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  align-items: center;
+  justify-content: center;
+  margin: 7px 2px;
+  padding: 9px;
+  transform: translate(-50%, -50%);
+  border-radius: 20px;
+  background: var(--s2a-color-button-background-primary-solid-on-dark-hover);
+  color: #000;
+  pointer-events: none;
+}
+
+.session-video-playlist-row-play-icon svg {
+  width: 14px;
+  height: 14px;
+}
+
+@media (min-width: 1024px) {
+  .session-video-playlist-row-play-icon {
+    display: none;
+  }
+}
+
+.session-video-playlist-row-meta {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: var(--s2a-spacing-3xs);
+  min-width: 0;
+}
+
+.session-video-playlist-row-title {
+  overflow: hidden;
+  font-size: var(--s2a-font-size-sm);
+  font-weight: 700;
+  line-height: 18px;
+  letter-spacing: 0;
+  /* stylelint-disable-next-line value-no-vendor-prefix -- required for -webkit-line-clamp */
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  flex: 1 0 0;
+  align-self: stretch;
+}
+
+.session-video-playlist-row-progress {
+  display: flex;
+  align-items: center;
+  gap: var(--s2a-spacing-xs);
+}
+
+.session-video-playlist-row-progress-track {
+  flex: 1 1 auto;
+  height: 4px;
+  border-radius: var(--s2a-border-radius-round);
+  background: var(--vp-track-bg);
+  overflow: hidden;
+}
+
+.session-video-playlist-row.is-playing .session-video-playlist-row-progress-track {
+  background: var(--vp-playing-track-bg);
+}
+
+@media (hover: hover) {
+  .session-video-playlist-row:hover .session-video-playlist-row-progress-track {
+    background: var(--vp-playing-track-bg);
+  }
+}
+
+.session-video-playlist-row-progress-fill {
+  height: 100%;
+  background: currentcolor;
+}
+
+.session-video-playlist-row-duration {
+  flex-shrink: 0;
+  text-align: right;
+  font-size: 11px;
+  font-weight: 400;
+  line-height: 14px;
+  letter-spacing: 0;
+  color: var(--vp-muted);
+}
+
+.session-video-playlist-row.is-playing .session-video-playlist-row-duration {
+  color: var(--vp-playing-muted);
+}
+
+@media (hover: hover) {
+  .session-video-playlist-row:hover .session-video-playlist-row-duration {
+    color: var(--vp-playing-muted);
+  }
+}
+
+.session-video-playlist-row-actions {
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  gap: var(--s2a-spacing-xs);
+}
+
+.session-video-playlist-row-favorite,
+.session-video-playlist-row-play {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: var(--s2a-border-width-sm, 1px) solid currentcolor;
+  border-radius: var(--s2a-border-radius-round);
+  background: var(--s2a-color-gray-100);
+  color: var(--vp-fg);
+  cursor: pointer;
+}
+
+.session-video-playlist-row.is-playing .session-video-playlist-row-favorite {
+  color: var(--vp-playing-fg);
+}
+
+/* Mobile: hovering a row flips its background to the playing look (--vp-playing-bg), so the
+   favorite/play chip matches the row background there too. Gated to hover-capable devices
+   so it can't latch on touch, matching the row's own hover flip. */
+@media (max-width: 1023px) and (hover: hover) {
+  .session-video-playlist-row:hover .session-video-playlist-row-favorite,
+  .session-video-playlist-row:hover .session-video-playlist-row-play {
+    background: var(--vp-playing-bg);
+  }
+}
+
+.session-video-playlist-row-favorite svg,
+.session-video-playlist-row-play svg {
+  width: 16px;
+  height: 16px;
+  color: var(--s2a-color-button-content-primary-outlined-default);
+}
+
+.session-video-playlist-row-play {
+  display: none;
+}
+
+@media (min-width: 1024px) {
+  .session-video-playlist-row-play {
+    display: flex;
+  }
+}
+
+.session-video-playlist-row:focus-within .session-video-playlist-row-favorite,
+.session-video-playlist-row:focus-within .session-video-playlist-row-play {
+  color: var(--vp-playing-fg);
+}
+
+@media (hover: hover) {
+  .session-video-playlist-row:hover .session-video-playlist-row-favorite,
+  .session-video-playlist-row:hover .session-video-playlist-row-play {
+    color: var(--vp-playing-fg);
+  }
+}
+
+.session-video-playlist-show-more {
+  display: none;
+}
+
+@media (min-width: 1024px) {
+  .session-video-playlist-show-more {
+    display: flex;
+    padding-top: var(--s2a-spacing-lg, 24px);
+    align-items: center;
+    align-self: flex-start;
+    gap: var(--s2a-spacing-xs);
+    width: fit-content;
+    border: none;
+    background: none;
+    text-align: center;
+    font-family: inherit;
+    font-size: var(--s2a-font-size-sm);
+    font-style: normal;
+    font-weight: 700;
+    line-height: 120%;
+    cursor: pointer;
+  }
+
+  .session-video-playlist-show-more-chevron {
+    transition: transform 0.2s ease;
+  }
+
+  .session-video-playlist-show-more-chevron svg {
+    width: 100%;
+    height: 100%;
+  }
+
+  .session-video-playlist-show-more[aria-expanded='true'] .session-video-playlist-show-more-chevron {
+    transform: rotate(180deg);
+  }
+
+  .session-video-playlist-list:not(.is-showing-more) .session-video-playlist-row:nth-child(n+5) {
+    display: none;
+  }
+}
+
+@media (max-width: 1023px) {
+  .session-video-playlist {
+    --vp-bg: var(--s2a-color-gray-900);
+    --vp-fg: var(--s2a-color-gray-25);
+    --vp-row-bg: transparent;
+    --vp-track-bg: var(--s2a-color-transparent-white-24);
+    --vp-muted: var(--s2a-color-transparent-white-64);
+    --vp-playing-bg: var(--s2a-color-gray-25);
+    --vp-playing-fg: var(--s2a-color-gray-900);
+    --vp-playing-track-bg: var(--s2a-color-gray-300);
+    --vp-playing-muted: var(--s2a-color-gray-700);
+
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 2;
+    border-radius: var(--s2a-border-radius-md, 16px) var(--s2a-border-radius-md, 16px) 0 0;
+    transition: max-height 0.3s ease;
+    padding: 9px var(--s2a-spacing-md) var(--s2a-spacing-md);
+  }
+
+  .session-video-playlist.is-dragging {
+    transition: none;
+  }
+
+  .session-video-playlist.is-expanded {
+    padding: var(--s2a-spacing-md) var(--s2a-spacing-md) var(--s2a-spacing-lg);
+  }
+
+  .session-video-playlist-row.is-playing .session-video-playlist-row-favorite,
+  .session-video-playlist-row.is-playing .session-video-playlist-row-play {
+    background: var(--vp-playing-bg);
+  }
+
+  .session-video-playlist-handle {
+    display: none;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 24px;
+    margin-bottom: var(--s2a-spacing-sm);
+    touch-action: none;
+    cursor: grab;
+  }
+
+  .session-video-playlist-handle:active {
+    cursor: grabbing;
+  }
+
+  .session-video-playlist-handle::before {
+    content: '';
+    width: 36px;
+    height: 4px;
+    border-radius: var(--s2a-border-radius-round);
+    background: var(--s2a-color-transparent-white-24, rgb(255 255 255 / 24%));
+  }
+
+  .session-video-playlist.is-expanded .session-video-playlist-handle {
+    display: flex;
+  }
+
+  .session-video-playlist-autoplay {
+    flex-basis: 100%;
+    margin-left: 0;
+  }
+
+  .session-video-playlist-toggle {
+    display: flex;
+    flex: 0 0 auto;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border: none;
+    border-radius: var(--s2a-border-radius-round);
+    background: none;
+    cursor: pointer;
+  }
+
+  .session-video-playlist-toggle svg {
+    width: 17px;
+    height: 10px;
+    transition: transform 0.2s ease;
+  }
+
+  .session-video-playlist-toggle[aria-expanded='true'] svg {
+    transform: rotate(180deg);
+  }
+
+  .session-video-playlist-top {
+    flex-wrap: nowrap;
+    cursor: pointer;
+  }
+
+  .session-video-playlist.is-expanded .session-video-playlist-top {
+    flex-wrap: wrap;
+    cursor: grab;
+    touch-action: none;
+  }
+
+  .session-video-playlist.is-expanded .session-video-playlist-top:active {
+    cursor: grabbing;
+  }
+
+  .session-video-playlist-up-next {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s2a-spacing-xs, 8px);
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  .session-video-playlist.is-expanded .session-video-playlist-up-next {
+    display: none;
+  }
+
+  .session-video-playlist-up-next-label {
+    font-size: var(--s2a-typography-font-size-eyebrow);
+    font-weight: var(--s2a-font-weight-eyebrow);
+    line-height: var(--s2a-typography-line-height-eyebrow);
+    letter-spacing: var(--s2a-typography-letter-spacing-eyebrow);
+  }
+
+  .session-video-playlist-up-next-title {
+    overflow: hidden;
+    font-size: var(--s2a-typography-font-size-heading-6);
+    font-weight: 900;
+    line-height: var(--s2a-typography-line-height-title-6, 18px);
+    letter-spacing: var(--s2a-typography-letter-spacing-heading-6);
+    text-overflow: ellipsis;
+    /* stylelint-disable-next-line value-no-vendor-prefix -- required for -webkit-line-clamp */
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+  }
+
+  .session-video-playlist-title,
+  .session-video-playlist-autoplay {
+    display: none;
+  }
+
+  .session-video-playlist.is-expanded .session-video-playlist-autoplay {
+    display: flex;
+  }
+
+  .session-video-playlist-autoplay-toggle {
+    /* stylelint-disable-next-line color-no-hex -- no matching --s2a- token for this
+       exact Figma mobile track color */
+    background: #7d7d7d;
+  }
+
+  .session-video-playlist-autoplay-toggle::before {
+    /* stylelint-disable-next-line color-no-hex -- no matching --s2a- token for this
+       exact Figma mobile thumb color */
+    background: #111;
+  }
+
+  .session-video-playlist-autoplay-toggle:checked {
+    /* stylelint-disable-next-line color-no-hex -- no matching --s2a- token for this
+       exact Figma mobile track color */
+    background: #dbdbdb;
+  }
+
+  .session-video-playlist-title {
+    font-size: var(--s2a-typography-font-size-heading-6);
+    font-weight: 900;
+    line-height: var(--s2a-typography-line-height-title-6, 18px);
+    letter-spacing: var(--s2a-typography-letter-spacing-heading-6);
+  }
+
+  .session-video-playlist.is-expanded .session-video-playlist-title {
+    /* stylelint-disable-next-line value-no-vendor-prefix -- required for -webkit-line-clamp */
+    display: -webkit-box;
+  }
+
+  .session-video-playlist-row-thumb {
+    width: 136px;
+    aspect-ratio: 136 / 77;
+  }
+}

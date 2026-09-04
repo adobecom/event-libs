@@ -27,10 +27,9 @@ export function dvrAvailableAtMs(session, eventStartMs) {
   return eventStartMs + session.dvrDelayHours * HOUR_MS;
 }
 
-// Not read by the sessions-guide's own filtering (PM decision, 2026-08-26 — see
-// onDemandSessions() in sessions-guide/utils/session-filters.js) — kept as a shared utility
-// for any other block that needs to know whether a session's recording window has opened.
-// Fails open when either input is missing.
+// Not read by sessions-guide's own filtering (see onDemandSessions() in
+// sessions-guide/utils/session-filters.js) — kept as a shared utility for any block that
+// needs it. Fails open when either input is missing.
 export function isDvrPending(session, nowMs, eventStartMs) {
   const availableAt = dvrAvailableAtMs(session, eventStartMs);
   return availableAt !== null && nowMs < availableAt;
@@ -75,12 +74,28 @@ export function isPostEvent(sessionList, liveStreamActiveIds, nowMs, eventEndMs)
   return allEnded || pastEventEnd;
 }
 
+// A session belongs on the Broadcast page only if getWatchDestination() would actually route
+// there once live — mainstage/keynote sessions (isLivestreamed) are homepage content
+// regardless of isOnline. broadcast-schedule.js filters its pool through this so a live
+// keynote never occupies a Broadcast slot.
+export function isBroadcastEligible(session) {
+  return !session.isLivestreamed && !!session.isOnline;
+}
+
 // Root-relative: the destinations live on whatever domain is serving this page. Falls back
-// to MAX's pages for configs predating the authorable homepagePath/broadcastPath.
+// to MAX's pages for configs predating the authorable homepagePath/broadcastPath. The
+// Broadcast page hosts many sessions at once, so `?watch=<id>` (broadcast-url.js's
+// ENTRY_PARAM) tells it which one to commit to on arrival — without it, Broadcast falls back
+// to its own default schedule pick, which may not be the session the viewer actually clicked.
+// `session.id` is absent for event-session-details' metadata-scraped pseudo-session, which
+// has no catalog id to send — that caller keeps landing on the bare broadcast path.
 export function getWatchDestination(session, sessionState) {
   if (sessionState === 'on-demand') return session.sessionPageUrl || '';
   if (sessionState !== 'live') return '';
   if (session.isLivestreamed) return getHomepagePath() || MAX_EVENT_PAGES.homepage;
-  if (session.isOnline) return getBroadcastPath() || MAX_EVENT_PAGES.broadcast;
+  if (session.isOnline) {
+    const path = getBroadcastPath() || MAX_EVENT_PAGES.broadcast;
+    return session.id ? `${path}?${new URLSearchParams({ watch: session.id })}` : path;
+  }
   return '';
 }
