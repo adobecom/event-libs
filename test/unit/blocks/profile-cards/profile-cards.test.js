@@ -204,6 +204,29 @@ describe('Profile Cards Module', () => {
       expect(el.querySelectorAll('.card-container')).to.have.lengthOf(2);
     });
 
+    it('renders a first-name-only speaker without a trailing space or "undefined"', () => {
+      setMetadata('speakers', JSON.stringify([
+        { firstName: 'Cher', lastName: '', title: 'Performer', bio: '', socialLinks: [], speakerType: 'Speaker' },
+        { firstName: 'Bono', title: 'Musician', bio: '', socialLinks: [], speakerType: 'Speaker' },
+      ]));
+
+      const container = document.createElement('div');
+      container.innerHTML = `
+        <div id="single-name-cards" class="profile-cards">
+          <div><div><h2>Speakers</h2></div></div>
+          <div><div>type</div><div>speaker</div></div>
+        </div>
+      `;
+      document.body.appendChild(container);
+      const el = container.querySelector('#single-name-cards');
+
+      expect(() => init(el)).to.not.throw();
+      const names = [...el.querySelectorAll('.card-name')].map((n) => n.textContent);
+      expect(names).to.include('Cher');
+      expect(names).to.include('Bono');
+      names.forEach((name) => expect(name).to.not.include('undefined'));
+    });
+
     it('should make static-authored modal cards interactive', () => {
       const el = document.querySelector('#static-modal-cards');
       init(el);
