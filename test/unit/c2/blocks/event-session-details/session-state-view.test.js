@@ -294,6 +294,11 @@ describe('session-state-view', () => {
       });
     });
 
+    it('decodes HTML entities in an authored label (readBlockConfig yields innerHTML)', () => {
+      const el = blockWithRows({ 'Live label': 'Q&A' });
+      expect(readStatusLabels(el).live).to.equal('Q&A');
+    });
+
     it('renderStatus uses the authored live and on-demand labels', () => {
       const labels = { live: 'On air', onDemand: 'Recording', ipodPending: 'Coming up' };
       expect(renderStatus('live', {}, labels).textContent).to.equal('On air');

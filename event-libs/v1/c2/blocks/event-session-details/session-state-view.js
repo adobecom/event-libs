@@ -1,4 +1,4 @@
-import { createTag, getMetadata } from '../../../utils/utils.js';
+import { createTag, getMetadata, readBlockConfig } from '../../../utils/utils.js';
 import { getNowMs, getWatchDestination } from '../../../utils/session-state.js';
 import { getAttrText, getAttrValues } from '../../utils/custom-attributes.js';
 import { renderSchedule } from './schedule.js';
@@ -87,16 +87,13 @@ function isSchedulableSession(doc = document) {
 
 export const DEFAULT_STATUS_LABELS = { live: 'Live', onDemand: 'On-demand', ipodPending: 'Available soon' };
 
-const STATUS_LABEL_ROWS = { live: 'live label', onDemand: 'on-demand label', ipodPending: 'ipod pending label' };
+const STATUS_LABEL_ROWS = { live: 'live-label', onDemand: 'on-demand-label', ipodPending: 'ipod-pending-label' };
 
 export function readStatusLabels(el) {
-  const rows = [...(el?.children || [])];
-  const value = (rowKey) => rows
-    .find((r) => r.children[0]?.textContent.trim().toLowerCase() === rowKey)
-    ?.children[1]?.textContent.trim();
+  const config = readBlockConfig(el);
   const labels = { ...DEFAULT_STATUS_LABELS };
-  Object.entries(STATUS_LABEL_ROWS).forEach(([k, rowKey]) => {
-    const authored = value(rowKey);
+  Object.entries(STATUS_LABEL_ROWS).forEach(([k, key]) => {
+    const authored = createTag('div', {}, config[key] || '').textContent.trim();
     if (authored) labels[k] = authored;
   });
   return labels;
