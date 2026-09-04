@@ -99,6 +99,18 @@
   transform: rotate(180deg);
 }
 
+.carousel-controls.dark-carousel .carousel-arrow,
+.section.dark .carousel-controls .carousel-arrow {
+  border-color: #e1e1e1;
+  background: #f3f3f3;
+  color: #000;
+}
+
+.carousel-controls.dark-carousel .carousel-arrow:hover,
+.section.dark .carousel-controls .carousel-arrow:hover {
+  background: #e1e1e1;
+}
+
 @media (width <= 767px) {
   .carousel-arrows {
     padding-inline: 16px;

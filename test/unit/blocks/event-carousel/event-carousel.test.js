@@ -65,4 +65,47 @@ describe('event-carousel', () => {
 
     expect(document.querySelector('.event-carousel')).to.not.exist;
   });
+
+  describe('theme', () => {
+    function buildStandaloneCarousel({ dark = false } = {}) {
+      document.body.innerHTML = '';
+      const section = document.createElement('div');
+      section.className = dark ? 'section dark' : 'section';
+      section.innerHTML = `
+        <div class="event-carousel"><div><div></div></div></div>
+        <div class="event-card ratio-4-3">
+          <div><div><picture><img src="/test/unit/mocks/media/session.jpg" alt="Session 1"></picture></div></div>
+          <div><div><p>Session One</p><p>Description one</p></div></div>
+        </div>
+      `;
+      document.body.append(section);
+      return section.querySelector('.event-carousel');
+    }
+
+    it('sets no theme attribute in a section with no dark style metadata — pure CSS, nothing for JS to compute', async () => {
+      const el = buildStandaloneCarousel();
+      await init(el);
+
+      expect(el.dataset.carouselTheme).to.equal(undefined);
+      expect(el.classList.contains('dark-carousel')).to.equal(false);
+    });
+
+    it('leaves the carousel under its ancestor .section.dark for event-carousel.css to key off, with no card-level class added', async () => {
+      const el = buildStandaloneCarousel({ dark: true });
+      await init(el);
+
+      expect(el.closest('.section.dark')).to.exist;
+      expect(el.dataset.carouselTheme).to.equal(undefined);
+      expect(el.classList.contains('dark-carousel')).to.equal(false);
+    });
+
+    it('leaves an authored dark-carousel class in place for event-carousel.css to key off', async () => {
+      const el = buildStandaloneCarousel();
+      el.classList.add('dark-carousel');
+      await init(el);
+
+      expect(el.classList.contains('dark-carousel')).to.equal(true);
+      expect(el.dataset.carouselTheme).to.equal(undefined);
+    });
+  });
 });
