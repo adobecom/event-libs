@@ -288,7 +288,8 @@
 .upcoming-sessions.dark-card .sg-card,
 .upcoming-sessions.dark-card .sg-card.is-scheduled,
 .upcoming-sessions.dark-card .sg-card.is-favorited {
-  background: rgb(0 0 0 / 64%);
+  background: rgb(10 10 10 / 50%);
+  border: 1px solid #505050;
   box-shadow: none;
 }
 
@@ -314,6 +315,7 @@
 
 .upcoming-sessions.dark-card .sg-category-badge {
   color: #f2f2f2;
+  gap: var(--s2a-spacing-2xs, 4px);
 }
 /* stylelint-enable no-descending-specificity */
 
@@ -343,9 +345,9 @@
 
   .upcoming-sessions .sg-card__footer {
     display: flex;
-    align-items: flex-start;
+    align-items: center;
     justify-content: space-between;
-    gap: var(--s2a-spacing-xs, 8px);
+    gap: var(--s2a-spacing-lg, 24px);
     margin-top: auto;
     padding-top: var(--s2a-spacing-md);
     position: absolute;
@@ -383,8 +385,18 @@
   .upcoming-sessions.dark-card .sg-card,
   .upcoming-sessions.dark-card .sg-card.is-scheduled,
   .upcoming-sessions.dark-card .sg-card.is-favorited {
-    background: linear-gradient(0deg, rgb(0 0 0 / 64%), rgb(0 0 0 / 64%)), rgb(0 0 0 / 75%);
-    backdrop-filter: blur(2px);
+    width: 431px;
+    height: 128px;
+    align-items: flex-start;
+    padding: var(--s2a-spacing-lg, 24px);
+    gap: var(--s2a-spacing-lg, 24px);
+    background: rgb(10 10 10 / 35%);
+    border: 1px solid #505050;
+    backdrop-filter: none;
+  }
+
+  .upcoming-sessions.dark-card .sg-card__body {
+    gap: var(--s2a-spacing-md, 16px);
   }
 
   .upcoming-sessions.dark-card .sg-card:hover {
@@ -472,6 +484,21 @@
 .upcoming-sessions .sg-icon-btn--solid.sg-icon-btn--on-dark:active:not(:disabled) {
   background: var(--s2a-color-background-default, #fff);
   border-color: transparent;
+}
+
+.upcoming-sessions .sg-icon-btn--outlined.sg-icon-btn--on-dark {
+  background: transparent;
+  border-color: var(--s2a-color-border-inverse, #fff);
+  color: var(--s2a-color-content-knockout, #fff);
+  backdrop-filter: blur(16px);
+}
+
+.upcoming-sessions .sg-icon-btn--outlined.sg-icon-btn--on-dark:hover:not(:disabled) {
+  background: var(--s2a-color-transparent-white-12, rgb(255 255 255 / 12%));
+}
+
+.upcoming-sessions .sg-icon-btn--outlined.sg-icon-btn--on-dark:active:not(:disabled) {
+  background: var(--s2a-color-transparent-white-16, rgb(255 255 255 / 16%));
 }
 
 /* stylelint-disable-next-line no-descending-specificity */
