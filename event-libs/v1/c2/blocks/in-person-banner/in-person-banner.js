@@ -39,7 +39,12 @@ function resolveProfile() {
   const profile = BlockMediator.get('imsProfile');
   if (profile !== undefined) return Promise.resolve(profile);
   return new Promise((resolve) => {
-    BlockMediator.subscribe('imsProfile', ({ newValue }) => resolve(newValue), { once: true });
+    // subscribe returns an unsubscribe fn; call it so this one-shot listener doesn't leak
+    // and fire on every later imsProfile write.
+    const unsubscribe = BlockMediator.subscribe('imsProfile', ({ newValue }) => {
+      unsubscribe();
+      resolve(newValue);
+    });
   });
 }
 
