@@ -33,33 +33,20 @@ function setDismissed(bannerId) {
   }
 }
 
-// `imsProfile` is populated late (by lazyCaptureProfile), and on some pages never at all
-// (non-event pages, or if IMS times out). Bound the wait so a signed-in/in-person banner
-// can't hang invisibly: if the profile is still unresolved after this window, treat it as
-// signed-out (fail-closed) rather than waiting forever.
-const PROFILE_WAIT_MS = 5000;
-
 // Resolves the IMS profile, waiting for it if BlockMediator hasn't populated it yet.
-// Signed-out users resolve to `{ noProfile: true }` or a `guest` account; a timeout
-// resolves to `null` (treated as signed-out downstream).
+// Signed-out users resolve to `{ noProfile: true }` or a `guest` account. Init doesn't
+// block on this, so if `imsProfile` is never set (non-event page, IMS never loads) a gated
+// banner simply stays hidden — which is the intended fail-closed outcome.
 function resolveProfile() {
   const profile = BlockMediator.get('imsProfile');
   if (profile !== undefined) return Promise.resolve(profile);
   return new Promise((resolve) => {
-    let settled = false;
-    let timer = null;
-    // subscribe returns an unsubscribe fn; capturing it lets the one-shot listener remove
-    // itself so it doesn't leak and fire on every later imsProfile write.
-    let unsubscribe = () => {};
-    const finish = (value) => {
-      if (settled) return;
-      settled = true;
+    // subscribe returns an unsubscribe fn; call it so this one-shot listener doesn't leak
+    // and fire on every later imsProfile write.
+    const unsubscribe = BlockMediator.subscribe('imsProfile', ({ newValue }) => {
       unsubscribe();
-      clearTimeout(timer);
-      resolve(value);
-    };
-    unsubscribe = BlockMediator.subscribe('imsProfile', ({ newValue }) => finish(newValue));
-    timer = setTimeout(() => finish(null), PROFILE_WAIT_MS);
+      resolve(newValue);
+    });
   });
 }
 
@@ -148,7 +135,21 @@ function isTruthyConfigValue(value) {
   return (value ?? '').trim().toLowerCase() === 'true';
 }
 
-export default async function init(el) {
+function renderBanner(el, contentCell, bannerId, navOverlay) {
+  el.dataset.theme = el.classList.contains('dark') ? 'dark' : 'light';
+  el.classList.toggle('in-person-banner-nav-overlay', navOverlay);
+
+  const banner = buildBanner(contentCell, bannerId);
+  el.replaceChildren(banner);
+
+  if (navOverlay) {
+    document.body.prepend(el);
+    syncBannerHeightVar(el);
+    observeScrollReveal(el);
+  }
+}
+
+export default function init(el) {
   const rows = [...el.querySelectorAll(':scope > div')];
   const config = {};
   let contentCell = null;
@@ -173,20 +174,22 @@ export default async function init(el) {
     return;
   }
 
-  if (!(await isAudienceMatch(audience))) {
-    el.remove();
+  // `all` is known synchronously, so render immediately with no wait. Gated modes need an
+  // async sign-in / registration check — never await it in init (that would block the block
+  // from decorating and hold up the page). Keep the banner hidden until the check passes so
+  // it doesn't flash for users who shouldn't see it, then reveal or remove once resolved.
+  if (audience === AUDIENCE.ALL) {
+    renderBanner(el, contentCell, bannerId, navOverlay);
     return;
   }
 
-  el.dataset.theme = el.classList.contains('dark') ? 'dark' : 'light';
-  el.classList.toggle('in-person-banner-nav-overlay', navOverlay);
-
-  const banner = buildBanner(contentCell, bannerId);
-  el.replaceChildren(banner);
-
-  if (navOverlay) {
-    document.body.prepend(el);
-    syncBannerHeightVar(el);
-    observeScrollReveal(el);
-  }
+  el.hidden = true;
+  isAudienceMatch(audience).then((matches) => {
+    if (!matches) {
+      el.remove();
+      return;
+    }
+    el.hidden = false;
+    renderBanner(el, contentCell, bannerId, navOverlay);
+  });
 }
