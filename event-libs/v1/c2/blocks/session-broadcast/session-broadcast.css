@@ -28,8 +28,15 @@
   border: 0;
 }
 
+/* --sb-fill-height is kept in sync with the footer's top edge by session-broadcast.js — a
+   short state (e.g. Ended with no Also Live/Upcoming sessions) then still reaches the footer
+   instead of leaving a gap of the page's default background under it. Falls back to 0 (no
+   effect) before JS runs or if the footer can't be found. A floor, not a fixed height — taller
+   content is unaffected, and unlike a static 100vh it never pads the page out past the
+   viewport or pushes the footer below the fold. */
 .sb-app {
   display: block;
+  min-height: var(--sb-fill-height, 0);
   background: var(--s2a-color-gray-1000, #000);
 }
 
@@ -515,18 +522,18 @@
   background: var(--s2a-color-gray-1000, #000);
 }
 
-/* --sb-app-ended-bg is set inline by BroadcastApp.js. Three layers: flat tint + vertical
-   fade + the photo itself. */
+/* No height: top+bottom:0 matches .sb-app's own real height exactly, so the gradient (100%
+   opacity by its last stop) always finishes right at that edge. See PLAN.md. */
 .sb-app:has(.sb-ended)::before {
   content: '';
   position: absolute;
   top: 0;
+  bottom: 0;
   left: 0;
   z-index: -1;
   width: 100%;
-  height: 480px;
   background-image:
-    linear-gradient(180deg, rgb(0 0 0 / 60%) 0%, rgb(0 0 0 / 60%) 50%, rgb(0 0 0 / 75%) 75%),
+    linear-gradient(180deg, rgb(0 0 0 / 60%) 0%, rgb(0 0 0 / 60%) 50%, rgb(0 0 0 / 75%) 75%, rgb(0 0 0 / 100%) 100%),
     linear-gradient(0deg, rgb(0 0 0 / 60%), rgb(0 0 0 / 60%)),
     var(--sb-app-ended-bg, none);
   background-repeat: no-repeat;
@@ -537,22 +544,9 @@
     cover;
 }
 
-/* Extends to 80vh on tablet, darkening more toward the bottom. vh not %, since .sb-app has no
-   explicit height. Prefers the larger --sb-app-ended-bg-lg when available. */
-@media (min-width: 768px) and (max-width: 1279px) {
+/* Tablet+desktop share one darker curve — merged since height no longer differs between them. */
+@media (min-width: 768px) {
   .sb-app:has(.sb-ended)::before {
-    height: 80vh;
-    background-image:
-      linear-gradient(180deg, rgb(0 0 0 / 60%) 0%, rgb(0 0 0 / 60%) 50%, rgb(0 0 0 / 90%) 90%, rgb(0 0 0 / 100%) 100%),
-      linear-gradient(0deg, rgb(0 0 0 / 60%), rgb(0 0 0 / 60%)),
-      var(--sb-app-ended-bg-lg, var(--sb-app-ended-bg, none));
-  }
-}
-
-/* Desktop reuses tablet's gradient exactly, with a taller 90vh bleed. */
-@media (min-width: 1280px) {
-  .sb-app:has(.sb-ended)::before {
-    height: 90vh;
     background-image:
       linear-gradient(180deg, rgb(0 0 0 / 60%) 0%, rgb(0 0 0 / 60%) 50%, rgb(0 0 0 / 90%) 90%, rgb(0 0 0 / 100%) 100%),
       linear-gradient(0deg, rgb(0 0 0 / 60%), rgb(0 0 0 / 60%)),
