@@ -645,6 +645,18 @@
   z-index: 48;
 }
 
+/* Intentional, engineering-owned exception to "no hard-coded vertical spacing" (see
+   MWPW-201396 in CLAUDE.md) — narrowly scoped to real Mobile Safari (class applied by
+   isSafariMobile() in utils/browser.js, never on other browsers, including other iOS
+   browsers). Safari's own floating compact/single-tab address bar paints on top of the
+   page, outside our stacking context entirely, and can overlap this button at its default
+   24px offset. 64px is a starting estimate, not a measured value — Safari's native chrome
+   isn't reachable by any browser-automation tooling, so this needs eyes-on confirmation on
+   a real device and may need tuning. */
+.sg-cta-btn--safari-mobile {
+  bottom: 64px;
+}
+
 /* ── Placeholders ────────────────────────────────────────── */
 
 .sg-error {
