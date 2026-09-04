@@ -33,18 +33,33 @@ function setDismissed(bannerId) {
   }
 }
 
+// `imsProfile` is populated late (by lazyCaptureProfile), and on some pages never at all
+// (non-event pages, or if IMS times out). Bound the wait so a signed-in/in-person banner
+// can't hang invisibly: if the profile is still unresolved after this window, treat it as
+// signed-out (fail-closed) rather than waiting forever.
+const PROFILE_WAIT_MS = 5000;
+
 // Resolves the IMS profile, waiting for it if BlockMediator hasn't populated it yet.
-// Signed-out users resolve to `{ noProfile: true }` or a `guest` account.
+// Signed-out users resolve to `{ noProfile: true }` or a `guest` account; a timeout
+// resolves to `null` (treated as signed-out downstream).
 function resolveProfile() {
   const profile = BlockMediator.get('imsProfile');
   if (profile !== undefined) return Promise.resolve(profile);
   return new Promise((resolve) => {
-    // subscribe returns an unsubscribe fn; call it so this one-shot listener doesn't leak
-    // and fire on every later imsProfile write.
-    const unsubscribe = BlockMediator.subscribe('imsProfile', ({ newValue }) => {
+    let settled = false;
+    let timer = null;
+    // subscribe returns an unsubscribe fn; capturing it lets the one-shot listener remove
+    // itself so it doesn't leak and fire on every later imsProfile write.
+    let unsubscribe = () => {};
+    const finish = (value) => {
+      if (settled) return;
+      settled = true;
       unsubscribe();
-      resolve(newValue);
-    });
+      clearTimeout(timer);
+      resolve(value);
+    };
+    unsubscribe = BlockMediator.subscribe('imsProfile', ({ newValue }) => finish(newValue));
+    timer = setTimeout(() => finish(null), PROFILE_WAIT_MS);
   });
 }
 
