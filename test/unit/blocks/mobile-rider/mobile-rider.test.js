@@ -1057,7 +1057,9 @@ function runMobileRiderSuite(modulePath, variantLabel) {
       await new Promise((resolve) => { setTimeout(resolve, 50); });
 
       // sessions.value is left at [] for this test — Share must not depend on it resolving.
-      expect(el.querySelector('.mobile-rider-info-bar-share')).to.exist;
+      const shareBtn = el.querySelector('.mobile-rider-info-bar-share');
+      expect(shareBtn).to.exist;
+      expect(shareBtn.getAttribute('daa-ll')).to.equal('Share');
     });
 
     it('copies a session detail link to the clipboard when Share is clicked', async () => {
@@ -1098,10 +1100,12 @@ function runMobileRiderSuite(modulePath, variantLabel) {
       const favoriteBtn = el.querySelector('.mobile-rider-info-bar-favorite');
       expect(favoriteBtn).to.exist;
       expect(favoriteBtn.getAttribute('aria-label')).to.equal('Add to favorites');
+      expect(favoriteBtn.getAttribute('daa-ll')).to.equal('Add-to-Favorites');
 
       favorited.value = new Set(['s-100']);
       expect(favoriteBtn.classList.contains('is-favorited')).to.be.true;
       expect(favoriteBtn.getAttribute('aria-label')).to.equal('Remove from favorites');
+      expect(favoriteBtn.getAttribute('daa-ll')).to.equal('Remove-from-Favorites');
     });
   });
   });
