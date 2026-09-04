@@ -63,7 +63,6 @@ export function normalizeSessions(rawSessions) {
     products: s.products || [],
     productAttributeId: s.productAttributeId || '',
     resources: s.resources || [],
-    mrStreamId: s.mrStreamId ?? null,
     inPerson: Boolean(s.inPerson),
     isLivestreamed: Boolean(s.isLivestreamed),
     isOnline: Boolean(s.isOnline),
@@ -72,7 +71,10 @@ export function normalizeSessions(rawSessions) {
     playlistAssignment: coerceArray(s.playlistAssignment),
     playlistOnSessionPage: coerceArray(s.playlistOnSessionPage),
     // One field per video source, named for its player. Alternatives, not a fallback chain.
-    // See "Video sources" in docs/sessions-guide-implementation-notes.md.
+    // See "Video sources" in docs/sessions-guide-implementation-notes.md. mrStreamId is the
+    // Mobile Rider *live* stream id (Mobilerider Video ID (Livestream) attribute) — poller.js
+    // polls it for on-air status; mrDvrVideoId below is the separate post-stream recording.
+    mrStreamId: s.mrStreamId ?? null,
     mpcId: s.mpcId || '',
     youTubeId: s.youTubeId || '',
     mrDvrVideoId: s.mrDvrVideoId || '',
@@ -383,7 +385,7 @@ export function mapEslPayloadToRawSessions(payload) {
       technicalLevel: extractCustomAttributeValue(session, 'Technical Level'),
       audience: extractCustomAttributeValues(session, 'Audience'),
       industry: extractCustomAttributeValues(session, 'Industry'),
-      // Not in the catalog yet; both casings tried since names match exactly.
+      // Both casings tried since names match exactly; the real attribute is 'AI Focus'.
       aiFocus: extractCustomAttributeValues(session, ['AI Focus', 'AI focus']),
       closedCaptions: extractCustomAttributeValue(session, 'Closed Caption Information'),
       ipodOrGdprCopy: extractCustomAttributeValue(session, ['IPOD or GDPR Copy', 'IPOD/GDPR Copy']),
@@ -393,6 +395,7 @@ export function mapEslPayloadToRawSessions(payload) {
       dvrDelayHours: parseDvrDelayHours(extractCustomAttributeValue(session, 'DVR Timing (in hours)')),
       mpcId: extractCustomAttributeValue(session, 'MPC ID'),
       youTubeId: extractCustomAttributeValue(session, 'YouTube ID'),
+      mrStreamId: extractCustomAttributeValue(session, 'Mobilerider Video ID (Livestream)'),
       mrDvrVideoId: extractCustomAttributeValue(session, 'Mobilerider Video ID (DVR)'),
       mrSkinId: extractCustomAttributeValue(session, 'Skin ID'),
       videoDuration: extractCustomAttributeValue(session, 'Video Duration'),

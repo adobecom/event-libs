@@ -502,6 +502,31 @@ describe('services/sessions/sessions-api', () => {
       expect(normalized.videoDuration).to.equal('00:60:00');
     });
 
+    // Mobile Rider live stream id — arrived in the catalog 2026-09-03 as
+    // `Mobilerider Video ID (Livestream)`, mapping it is what switches MR polling on.
+    it('maps the Mobile Rider live stream id to mrStreamId', () => {
+      const [session] = mapEslPayloadToRawSessions({
+        sessions: [{
+          sessionId: 'live-stream',
+          customAttributes: [
+            ONLINE_FORMAT,
+            customAttr('Mobilerider Video ID (Livestream)', [textValue('eCFYKA8QyX')]),
+          ],
+        }],
+      });
+      expect(session.mrStreamId).to.equal('eCFYKA8QyX');
+
+      const [normalized] = normalizeSessions([session]);
+      expect(normalized.mrStreamId).to.equal('eCFYKA8QyX');
+    });
+
+    it('is an empty string, not null, when the mapper runs but the attribute is absent', () => {
+      const [noStream] = mapEslPayloadToRawSessions({
+        sessions: [{ sessionId: 'no-stream', customAttributes: [ONLINE_FORMAT] }],
+      });
+      expect(noStream.mrStreamId).to.equal('');
+    });
+
     it('defaults the playback fields to empty strings when unauthored', () => {
       const [normalized] = normalizeSessions([{ id: 's-1' }]);
       expect(normalized.mrDvrVideoId).to.equal('');
@@ -987,7 +1012,7 @@ describe('services/sessions/sessions-api', () => {
   });
 
   describe('normalizeSessions', () => {
-    it('defaults resources/mrStreamId even when the real-data mapper omits them', () => {
+    it('defaults resources/mrStreamId to [] / null when the raw session provides neither', () => {
       const [normalized] = normalizeSessions([{ id: 's-1', audience: ['Designer'] }]);
       expect(normalized.resources).to.deep.equal([]);
       expect(normalized.mrStreamId).to.be.null;

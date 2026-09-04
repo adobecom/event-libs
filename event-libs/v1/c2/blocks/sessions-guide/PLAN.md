@@ -219,18 +219,22 @@ interface Session {
   technicalLevel: string;
   category: string;
   audience: string;
-  aiFocus: string[];             // `AI Focus` -- no catalog attribute yet, so [] today
+  aiFocus: string[];             // `AI Focus` -- in the catalog since ~2026-08-27
   speakers: Speaker[];
   products: string[];
-  resources: Resource[];
+  resources: Resource[];         // still absent from the catalog entirely (no backend field yet)
   // Four video sources, one field each, named for the player. Alternatives, not a fallback
   // chain — a session carries whichever it was produced for.
-  mrStreamId: string | null;     // Mobile Rider LIVE; non-null = MR session. Always null
-                                 // today: inbound as `Mobilerider Live Stream ID` (tentative).
-  mpcId: string;                 // `MPC ID` -> Adobe Video TV. Mapped, unread.
-  youTubeId: string;             // `YouTube ID` -> YouTube. Mapped, unread.
+  mrStreamId: string | null;     // Mobile Rider LIVE; non-null = MR session. Mapped 2026-09-03
+                                 // from `Mobilerider Video ID (Livestream)` (real name, not the
+                                 // earlier tentative `Mobilerider Live Stream ID` guess).
+  mpcId: string;                 // `MPC ID` -> Adobe Video TV. Mapped; read by session-broadcast's
+                                 // PlayerHost.js/MpcPlayerAdapter.js.
+  youTubeId: string;             // `YouTube ID` -> YouTube. Mapped; read by session-broadcast's
+                                 // PlayerHost.js/YouTubePlayerAdapter.js.
   mrDvrVideoId: string;          // `Mobilerider Video ID (DVR)` -> post-stream recording,
-                                 // gated by `DVR Timing (in hours)`. Mapped, unread.
+                                 // gated by `DVR Timing (in hours)`. Mapped, read for presence
+                                 // only (session-video-playlist.js) -- no DVR player built yet.
   mrSkinId: string;              // `Skin ID` -> Mobile Rider player skin (mr* sources only).
   inPerson: boolean;             // Format carries `In person`
   isOnline: boolean;             // Format carries `Online`
@@ -1173,7 +1177,7 @@ Phase 15 (PR Readiness) ⬜ — final gate
 | FEDS event name / attribute path differs from what's documented | `getFedsToken()` implemented with timeout; FEDS integration not yet activated — confirm before shipping Phase 0.7 |
 | `isRegistered` source wiring | Wired via `BlockMediator.get('rsvpData').registered` inside `session-store.js`'s `syncAuth()`; dev state via `sg:dev-auth` localStorage; production wiring blocked on real Rainfocus integration |
 | Real Rainfocus API calls not wired | All RF service methods are stubs; `null` credentials passed in `services/sessions/session-actions.js`; must replace before shipping |
-| Real Mobile Rider API not wired | `fetchLiveStatus` returns all-inactive mock; polling runs but no live sessions will appear |
+| Real Mobile Rider API not wired | **Stale as of 2026-09-03** — `fetchLiveStatus` already hits Mobile Rider's real `media-status` endpoint (`mobile-rider.js`), not a mock. The actual blocker was `mrStreamId` always being `null` (the `Mobilerider Video ID (Livestream)` attribute wasn't in the catalog yet); that attribute has now arrived and `sessions-api.js` maps it — see `docs/sessions-guide-implementation-notes.md`'s Video sources section. Not yet verified against a real live stream in the browser. |
 | Real sessions API | ✅ wired (`fetchEslSessions`/`mapEslPayloadToRawSessions`); `MOCK_ESL_PAYLOAD` used only when no `eventId` is present |
 | Dev scaffolding (`seedDevData()` in `session-store.js`) in production path | `TODO` comments present; must remove or gate before PR — now runs page-wide via `decorateEvent`, not just for this block, so removal affects any page with `rainfocus-api-url` metadata |
 | 30 s polling causes excessive re-renders | Preact diffing handles; `useMemo` guards in view components on filter-derived lists |
