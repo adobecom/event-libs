@@ -9,6 +9,7 @@ import { TimeSlotRow } from './TimeSlotRow.js';
 import { TrackRow } from './TrackRow.js';
 import { Carousel } from './Carousel.js';
 import { NoResultsFound } from './NoResultsFound.js';
+import { LoadingState } from './LoadingState.js';
 import {
   groupByStartTime, groupByTrack, onDemandSessions, filterSessions, sessionsForDay, liveSessions,
   hasActiveSearchOrFilters,
@@ -48,7 +49,13 @@ export function MySessionsView() {
     const fallback = checkViewAccess('my-sessions', { eventConfig: state.guideConfig });
     if (fallback) dispatch({ type: 'SET_VIEW', view: fallback });
   }, [authResolved, isLoggedIn, isRegistered]);
-  if (!authResolved || !isLoggedIn || isRegistered !== true) return null;
+  // Same loading treatment as the shells' own sessionsStatus gate (FullPageShell.js/
+  // DrawerShell.js) — the session catalog can resolve well before registration does, and a
+  // bare blank view in that gap read as broken. Once authResolved is true the visitor is
+  // either confirmed unauthorized (about to be bounced by the effect above) or confirmed
+  // registered (falls through below), so only the pending case gets the loading state.
+  if (!authResolved) return html`<${LoadingState} />`;
+  if (!isLoggedIn || isRegistered !== true) return null;
 
   // Memoized: this component re-renders on every context dispatch (e.g. opening the
   // detail overlay), not just when the inputs below actually change.
