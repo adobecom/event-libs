@@ -77,9 +77,40 @@ describe('store/reducer', () => {
     expect(next.activeView).to.equal('on-demand');
   });
 
+  it('SET_VIEW clears activeFilters and searchQuery on a real view change', () => {
+    const filtered = {
+      ...baseState,
+      activeView: 'my-sessions',
+      activeFilters: { track: new Set(['design']) },
+      searchQuery: 'typography',
+    };
+    const next = reducer(filtered, { type: 'SET_VIEW', view: 'my-favorites' });
+    expect(next.activeView).to.equal('my-favorites');
+    expect(next.activeFilters).to.deep.equal({});
+    expect(next.searchQuery).to.equal('');
+  });
+
+  it('SET_VIEW leaves activeFilters and searchQuery alone when re-selecting the active view', () => {
+    const filters = { track: new Set(['design']) };
+    const filtered = {
+      ...baseState, activeView: 'on-demand', activeFilters: filters, searchQuery: 'typography',
+    };
+    const next = reducer(filtered, { type: 'SET_VIEW', view: 'on-demand' });
+    expect(next.activeFilters).to.equal(filters);
+    expect(next.searchQuery).to.equal('typography');
+  });
+
   it('SET_DAY changes activeDay', () => {
     const next = reducer(baseState, { type: 'SET_DAY', day: '2026-10-29' });
     expect(next.activeDay).to.equal('2026-10-29');
+  });
+
+  it('SET_DAY keeps activeFilters and searchQuery — only a view change clears them', () => {
+    const filters = { track: new Set(['design']) };
+    const filtered = { ...baseState, activeFilters: filters, searchQuery: 'typography' };
+    const next = reducer(filtered, { type: 'SET_DAY', day: '2026-10-29' });
+    expect(next.activeFilters).to.equal(filters);
+    expect(next.searchQuery).to.equal('typography');
   });
 
   it('SET_FILTERS changes activeFilters', () => {

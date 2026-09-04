@@ -57,7 +57,15 @@ export function reducer(state, action) {
 
     case 'SET_VIEW': {
       try { sessionStorage.setItem(SS_LAST_VIEW, action.view); } catch { /* unavailable */ }
-      return { ...state, activeView: action.view };
+      // A real view change (Live & upcoming / On demand / My sessions / My favorites, in any
+      // combination) starts the new view fresh — filters and search are scoped to "what was I
+      // looking at", not a global setting the user meant to carry over. Re-selecting the
+      // already-active view is a no-op, not a change, so it leaves them alone. Date tabs
+      // (SET_DAY) are a different axis entirely and keep both across day changes.
+      if (action.view === state.activeView) return { ...state, activeView: action.view };
+      return {
+        ...state, activeView: action.view, activeFilters: {}, searchQuery: '',
+      };
     }
     case 'SET_DAY':
       return { ...state, activeDay: action.day };
