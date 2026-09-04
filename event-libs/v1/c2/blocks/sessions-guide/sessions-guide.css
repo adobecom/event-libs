@@ -3202,6 +3202,10 @@
   padding: var(--s2a-spacing-xs);
   border: none;
   border-radius: var(--s2a-border-radius-sm);
+
+  /* Otherwise the button's UA default background-color paints solid behind the glass
+     ::before below, and the translucency/blur have nothing to show through. */
+  background: transparent;
   cursor: pointer;
   opacity: 0;
   visibility: hidden;
