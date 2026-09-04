@@ -1,4 +1,10 @@
 import { createTag, getMetadata } from '../../../utils/utils.js';
+import BlockMediator from '../../../deps/block-mediator.min.js';
+
+// Authored audience gate. Each mode is a superset of the next: `all` shows to everyone,
+// `signed-in` narrows to authenticated users, `in-person` narrows further to confirmed
+// in-person attendees. Legacy `rf-data-check: true` maps onto `in-person`.
+const AUDIENCE = { ALL: 'all', SIGNED_IN: 'signed-in', IN_PERSON: 'in-person' };
 
 const DISMISSED_STORAGE_KEY = 'in-person-banner:dismissed';
 const CLOSE_ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M8.84849 8.0001L13.0137 3.83526C13.248 3.60088 13.248 3.22119 13.0137 2.98682C12.7793 2.75244 12.3996 2.75244 12.1652 2.98682L8 7.15166L3.83477 2.98682C3.60039 2.75244 3.2207 2.75244 2.98633 2.98682C2.75195 3.22119 2.75195 3.60088 2.98633 3.83526L7.15151 8.0001L2.98633 12.1649C2.75195 12.3993 2.75195 12.779 2.98633 13.0134C3.10351 13.1306 3.25703 13.1892 3.41054 13.1892C3.56406 13.1892 3.71758 13.1306 3.83476 13.0134L7.99999 8.84854L12.1652 13.0134C12.2824 13.1306 12.4359 13.1892 12.5894 13.1892C12.743 13.1892 12.8965 13.1306 13.0137 13.0134C13.248 12.779 13.248 12.3993 13.0137 12.1649L8.84849 8.0001Z" fill="currentColor"/></svg>';
@@ -27,15 +33,40 @@ function setDismissed(bannerId) {
   }
 }
 
+// Resolves the IMS profile, waiting for it if BlockMediator hasn't populated it yet.
+// Signed-out users resolve to `{ noProfile: true }` or a `guest` account.
+function resolveProfile() {
+  const profile = BlockMediator.get('imsProfile');
+  if (profile !== undefined) return Promise.resolve(profile);
+  return new Promise((resolve) => {
+    BlockMediator.subscribe('imsProfile', ({ newValue }) => resolve(newValue), { once: true });
+  });
+}
+
+function isSignedIn(profile) {
+  return Boolean(profile) && !profile.noProfile && profile.account_type !== 'guest';
+}
+
+// Fail-closed: hide the banner unless the external signal explicitly confirms an in-person
+// attendee. A missing `window.events` (e.g. outside the da-events GNAV) or a throw means
+// we cannot confirm, so we do not show.
 async function isRegisteredInPerson() {
-  if (!window.events?.getRegistrationStatus) return true;
+  if (!window.events?.getRegistrationStatus) return false;
   try {
     const { isRegistered, inPersonAttendee } = await window.events.getRegistrationStatus();
-    return isRegistered !== false && inPersonAttendee !== false;
+    return isRegistered === true && inPersonAttendee === true;
   } catch (e) {
     window.lana?.log(`[in-person-banner] registration status check failed: ${e.message}`);
-    return true;
+    return false;
   }
+}
+
+async function isAudienceMatch(audience) {
+  if (audience === AUDIENCE.ALL) return true;
+  const profile = await resolveProfile();
+  if (!isSignedIn(profile)) return false;
+  if (audience === AUDIENCE.SIGNED_IN) return true;
+  return isRegisteredInPerson();
 }
 
 function buildBanner(contentEl, bannerId) {
@@ -81,7 +112,17 @@ function syncBannerHeightVar(el) {
   new ResizeObserver(setHeightVar).observe(el);
 }
 
-const CONFIG_KEYS = new Set(['banner-id', 'rf-data-check', 'nav-overlay', 'message']);
+const CONFIG_KEYS = new Set(['banner-id', 'audience', 'rf-data-check', 'nav-overlay', 'message']);
+
+// `audience` is authoritative; legacy `rf-data-check: true` is sugar for `in-person`.
+function resolveAudience(config) {
+  const authored = (config.audience ?? getMetadata('audience') ?? '').trim().toLowerCase();
+  if (authored === AUDIENCE.SIGNED_IN || authored === AUDIENCE.IN_PERSON) return authored;
+  if (isTruthyConfigValue(config['rf-data-check'] ?? getMetadata('rf-data-check'))) {
+    return AUDIENCE.IN_PERSON;
+  }
+  return AUDIENCE.ALL;
+}
 
 function isTruthyConfigValue(value) {
   return (value ?? '').trim().toLowerCase() === 'true';
@@ -104,7 +145,7 @@ export default async function init(el) {
   if (!contentCell) return;
 
   const bannerId = config['banner-id'] || getMetadata('banner-id') || '';
-  const rfGateEnabled = isTruthyConfigValue(config['rf-data-check'] ?? getMetadata('rf-data-check'));
+  const audience = resolveAudience(config);
   const navOverlay = isTruthyConfigValue(config['nav-overlay'] ?? getMetadata('nav-overlay'));
 
   if (isDismissed(bannerId)) {
@@ -112,7 +153,7 @@ export default async function init(el) {
     return;
   }
 
-  if (rfGateEnabled && !(await isRegisteredInPerson())) {
+  if (!(await isAudienceMatch(audience))) {
     el.remove();
     return;
   }
