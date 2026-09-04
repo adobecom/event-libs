@@ -10,8 +10,8 @@
   top: 0;
   left: 0;
   right: 0;
-  height: var(--global-height-nav, 80px);
   transform: translateY(calc(-1 * var(--in-person-banner-scroll-progress, 0px)));
+  z-index: 1;
 }
 
 .in-person-banner.in-person-banner-nav-overlay.in-person-banner-scrolled {
