@@ -194,7 +194,7 @@ describe('session-state-view', () => {
       setPage({ videos: [], format: IPOD });
       const el = renderStatus('on-demand', times);
       expect(el.textContent).to.equal('Available soon');
-      expect(el.classList.contains('session-status--available-soon')).to.be.true;
+      expect(el.classList.contains('session-status--ipod-pending')).to.be.true;
     });
 
     it('IPOD once the recording is attached -> On-demand', () => {

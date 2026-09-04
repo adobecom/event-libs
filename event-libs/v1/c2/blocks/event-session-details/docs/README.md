@@ -199,8 +199,10 @@ Behavior matrix:
 | in-person + on-demand-post-event | present | On-demand |
 | online / post-event only / in-person only / no Format | either | On-demand |
 
-`renderStatus` adds `session-status--available-soon` for the pending case; it carries no
-styling of its own, so the state is targetable if design wants it differentiated.
+`renderStatus` adds `session-status--ipod-pending` for the pending case; it carries no
+styling of its own, so the state is targetable if design wants it differentiated. It is named
+for the state (not the label text), so it stays accurate when the `IPOD pending label` is
+re-authored.
 
 See [known-issues.md](known-issues.md) for the `liveStream` divergence from
 `video-player` and the `mobilerider`/`dvr` question.

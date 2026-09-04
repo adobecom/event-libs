@@ -106,7 +106,7 @@ export function renderStatus(state, times, labels = DEFAULT_STATUS_LABELS, doc =
     el.append(createTag('span', {}, labels.live));
   } else if (state === 'on-demand') {
     const pending = isIpodSession(doc) && !hasPlayableVideo(doc);
-    el.classList.toggle('session-status--available-soon', pending);
+    el.classList.toggle('session-status--ipod-pending', pending);
     el.textContent = pending ? labels.ipodPending : labels.onDemand;
   } else {
     el.textContent = formatDateTime(times.start, times.timezone);
