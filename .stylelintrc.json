@@ -6,5 +6,17 @@
       { "message": "Expected class selector to be kebab-case or BEM (block__element--modifier)" }
     ],
     "selector-id-pattern": null
-  }
+  },
+  "overrides": [
+    {
+      "files": ["event-libs/v1/features/milo-site-redesign-override/**/*.css"],
+      "rules": {
+        "property-no-unknown": [
+          true,
+          { "ignoreProperties": ["view-timeline-name", "view-timeline-axis", "animation-timeline", "animation-range"] }
+        ],
+        "function-no-unknown": [true, { "ignoreFunctions": ["view"] }]
+      }
+    }
+  ]
 }
