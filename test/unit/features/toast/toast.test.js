@@ -104,18 +104,26 @@ describe('features/toast', () => {
     });
 
     it('sets alertdialog/status roles and reveals content to assistive tech after mount', async () => {
-      showToast({ message: 'Link copied', variant: 'positive' });
-      const el = region.querySelector('.sg-toast');
-      expect(el.getAttribute('role')).to.equal('alertdialog');
-      expect(el.getAttribute('tabindex')).to.equal('0');
+      // Real rAF can be suspended indefinitely on a backgrounded page when many WTR sessions
+      // share a browser (see profile-cards.test.js's own stubRaf note) — stub it so the
+      // double-rAF reveal in mountToast() resolves deterministically instead of racing that.
+      const raf = sinon.stub(window, 'requestAnimationFrame').callsFake((cb) => setTimeout(cb, 0));
+      try {
+        showToast({ message: 'Link copied', variant: 'positive' });
+        const el = region.querySelector('.sg-toast');
+        expect(el.getAttribute('role')).to.equal('alertdialog');
+        expect(el.getAttribute('tabindex')).to.equal('0');
 
-      const content = el.querySelector('.sg-toast__body');
-      expect(content.getAttribute('role')).to.equal('status');
-      expect(content.getAttribute('aria-hidden')).to.equal('true');
+        const content = el.querySelector('.sg-toast__body');
+        expect(content.getAttribute('role')).to.equal('status');
+        expect(content.getAttribute('aria-hidden')).to.equal('true');
 
-      await nextFrames();
-      expect(el.classList.contains('sg-toast--visible')).to.be.true;
-      expect(content.hasAttribute('aria-hidden')).to.be.false;
+        await nextFrames();
+        expect(el.classList.contains('sg-toast--visible')).to.be.true;
+        expect(content.hasAttribute('aria-hidden')).to.be.false;
+      } finally {
+        raf.restore();
+      }
     });
 
     it('uses role="status" (polite) for informative/positive/neutral, reserving role="alert" (assertive) for negative', () => {
