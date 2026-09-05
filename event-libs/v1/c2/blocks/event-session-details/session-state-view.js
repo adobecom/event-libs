@@ -93,7 +93,8 @@ export function readStatusLabels(el) {
   const config = readBlockConfig(el);
   const labels = { ...DEFAULT_STATUS_LABELS };
   Object.entries(STATUS_LABEL_ROWS).forEach(([k, key]) => {
-    const authored = createTag('div', {}, config[key] || '').textContent.trim();
+    const authored = new DOMParser()
+      .parseFromString(config[key] || '', 'text/html').body.textContent.trim();
     if (authored) labels[k] = authored;
   });
   return labels;
@@ -103,7 +104,9 @@ export function renderStatus(state, times, labels = DEFAULT_STATUS_LABELS, doc =
   const el = createTag('span', { class: `session-status session-status--${state}` });
   if (state === 'live') {
     el.append(createTag('span', { class: 'session-status-dot', 'aria-hidden': 'true' }));
-    el.append(createTag('span', {}, labels.live));
+    const liveLabel = createTag('span');
+    liveLabel.textContent = labels.live;
+    el.append(liveLabel);
   } else if (state === 'on-demand') {
     const pending = isIpodSession(doc) && !hasPlayableVideo(doc);
     el.classList.toggle('session-status--ipod-pending', pending);

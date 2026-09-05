@@ -299,6 +299,25 @@ describe('session-state-view', () => {
       expect(readStatusLabels(el).live).to.equal('Q&A');
     });
 
+    it('extracts plain text from authored markup, inertly (no live parsing)', () => {
+      const el = document.createElement('div');
+      const row = document.createElement('div');
+      const k = document.createElement('div');
+      k.textContent = 'On-demand label';
+      const v = document.createElement('div');
+      v.innerHTML = '<b>Recorded</b>';
+      row.append(k, v);
+      el.append(row);
+      expect(readStatusLabels(el).onDemand).to.equal('Recorded');
+    });
+
+    it('renders an authored label as text, never as markup (MWPW-206528 CodeQL fix)', () => {
+      const el = blockWithRows({ 'Live label': '<img src=x onerror="throwXss()">' });
+      const rendered = renderStatus('live', {}, readStatusLabels(el));
+      expect(rendered.querySelector('img')).to.be.null;
+      expect(rendered.textContent).to.contain('<img');
+    });
+
     it('renderStatus uses the authored live and on-demand labels', () => {
       const labels = { live: 'On air', onDemand: 'Recording', ipodPending: 'Coming up' };
       expect(renderStatus('live', {}, labels).textContent).to.equal('On air');
