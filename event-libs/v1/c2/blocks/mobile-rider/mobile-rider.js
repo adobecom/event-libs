@@ -3,7 +3,7 @@ import { createTag, getEventConfig } from '../../../utils/utils.js';
 import {
   sessions, favorited, initSessionState, openSessionGuideDetail, getEventApiConfig,
 } from '../../../utils/session-store.js';
-import { getTrackIcon } from '../../../utils/tier-1-event-config.js';
+import { getTrackIcon, initTierOneEventConfig } from '../../../utils/tier-1-event-config.js';
 import { resolveIcon } from '../../../features/icons/icon-resolver.js';
 import { toggleFavoriteWithFeedback } from '../../../services/sessions/action-feedback.js';
 import { showToast } from '../../../features/toast/toast.js';
@@ -205,7 +205,13 @@ class MobileRider {
       // avoids making the author repeat session-id on the mobile-rider block itself when
       // it's already authored there.
       const sessionId = this.cfg['session-id'] || readSectionMetadata(this.el, 'session-id');
-      if (sessionId) this.#initInfoBar(this.cfg, sessionId);
+      if (sessionId) {
+        // Idempotent; other blocks that read getTrackIcon (event-featured-products,
+        // event-session-details) call this defensively too, in case decorateEvent hasn't
+        // run it yet — otherwise the category badge silently no-ops with no trackIcons map.
+        initTierOneEventConfig();
+        this.#initInfoBar(this.cfg, sessionId);
+      }
     } catch (e) { this.log(e.message); }
   }
 
