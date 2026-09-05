@@ -44,6 +44,15 @@
   overflow: hidden;
 }
 
+/* An authored background turns this into a visible card, so it needs horizontal breathing
+   room; transparent (the default) stays flush with the player above it. */
+@media (min-width: 1024px) {
+  .mobile-rider-info-bar[style*="background"] {
+    padding-left: var(--s2a-spacing-lg);
+    padding-right: var(--s2a-spacing-lg);
+  }
+}
+
 .mobile-rider.dark {
   background-color: transparent;
 }
@@ -150,6 +159,16 @@
 
 .mobile-rider-info-bar-panel {
   min-height: 0;
+
+  /* padding-top isn't scaled by the wrap's grid-template-rows animation (0fr still renders
+     full padding), so it's applied only while expanded to avoid a visible gap when
+     collapsed. Transition matches the wrap's grid-template-rows timing so both settle
+     together. */
+  padding-top: 0;
+  transition: padding-top 0.25s ease;
+}
+
+.mobile-rider-info-bar.is-expanded .mobile-rider-info-bar-panel {
   padding-top: var(--s2a-spacing-md);
 }
 
