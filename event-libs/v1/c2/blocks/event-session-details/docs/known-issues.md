@@ -91,7 +91,7 @@ pass the gate.
 **Files:** `event-session-details/session-state-view.js` (`EMBEDDABLE_PROVIDERS`)
 
 **Impact:** a `dvr` entry is a real recording, but `mobilerider` is not one of
-`video-player`'s embeddable providers, so a DVR-only session reads **"Coming soon"**
+`video-player`'s embeddable providers, so a DVR-only session reads **"Available soon"**
 indefinitely. That is honest about what *this page* can play — the `mobile-rider` block
 takes an **authored** video id via its own `cfg` and does **not** read `session-times` — but
 it is wrong if an author places a `mobile-rider` block on the page, since there would then
@@ -191,26 +191,32 @@ item with no toggle, then per Figma ("no number listed" when the module cannot e
 should show no count either, which makes the count condition width-dependent rather than
 purely count-based.
 
-## 8. Toggle labels are not internationalized
+## 8. Most user-facing strings are not internationalized
 
 **Files:** all four blocks ("Show more" / "Show less"), `session-state-view.js`
-("Live", "On-demand", "Coming soon", "Watch now"), `event-session-resources.js`
-("Download", "Open", "No materials available for this session", "Session resources")
+(the `Watch now` CTA), `schedule.js` (`Add to schedule` / `Added to schedule`),
+`event-session-resources.js` ("Download", "Open", "No materials available for this session",
+"Session resources")
 
-**Impact:** every user-facing string is a hardcoded English placeholder.
+**Impact:** most user-facing strings are hardcoded English placeholders. The three eyebrow
+**status** labels (`Live`, `On-demand`, `Available soon`) are now author-overridable via block
+rows (see README) — but **CTA** strings are not.
 
-**Fix:** route through the project's localization mechanism once one is established for
-C2 blocks.
+**Fix:** the CTA strings (`Watch now`, `Add to schedule`) are shared with `sessions-guide` and
+already disagree across surfaces (`Added to schedule` vs `Scheduled`), so they belong in the
+**Tier 1 Configurator** as event-wide copy rather than per-block rows — a follow-up. The rest
+should route through the project's localization mechanism once one is established for C2 blocks.
 
-## 9. "Coming soon" wording is unconfirmed
+## 9. IPOD-only scoping for the "Available soon" state is an assumption
 
 **Files:** `session-state-view.js` (`renderStatus`)
 
-**Impact:** "Coming soon" is proposed, not signed off. The IPOD-only scoping also rests on
-the assumption that online sessions never sit recording-less for long — if they can, they
-need the same treatment (a one-line change to the test).
+**Impact:** the wording is now confirmed as **"Available soon"** (was "Coming soon"). What
+remains unconfirmed is the IPOD-only scoping: it rests on the assumption that online sessions
+never sit recording-less for long — if they can, they need the same treatment (a one-line
+change to the test).
 
-**Fix:** confirm both with Kat.
+**Fix:** confirm the scoping with Kat.
 
 ## 10. Broadcast URL is a hardcoded fallback
 

@@ -2,7 +2,7 @@ import { expect } from '@esm-bundle/chai';
 import { setMetadata } from '../../../../../event-libs/v1/utils/utils.js';
 import {
   getSessionTimes, getAllSessionTimes, getState, nextBoundary, formatDateTime, renderStatus,
-  mountSessionState,
+  mountSessionState, readStatusLabels,
 } from '../../../../../event-libs/v1/c2/blocks/event-session-details/session-state-view.js';
 
 const SESSION_TIMES = '[{"startTimeMillis":1794518100000,"endTimeMillis":1794520800000,"timezone":"America/Los_Angeles","sessionId":"x"}]';
@@ -176,7 +176,7 @@ describe('session-state-view', () => {
     });
   });
 
-  describe('renderStatus on-demand: Coming soon for an IPOD session with no recording yet', () => {
+  describe('renderStatus on-demand: Available soon for an IPOD session with no recording yet', () => {
     const times = { start: 1794518100000, timezone: 'America/Los_Angeles' };
     // Real page shapes. IPOD = Format carrying both in-person and on-demand-post-event.
     const IPOD = [{ value: 'in-person', label: 'In-Person' }, { value: 'on-demand-post-event', label: 'On demand, post event' }];
@@ -190,11 +190,11 @@ describe('session-state-view', () => {
       setMetadata('custom-attributes', JSON.stringify([{ name: 'Format', values: format }]));
     };
 
-    it('IPOD with no recording yet -> Coming soon', () => {
+    it('IPOD with no recording yet -> Available soon', () => {
       setPage({ videos: [], format: IPOD });
       const el = renderStatus('on-demand', times);
-      expect(el.textContent).to.equal('Coming soon');
-      expect(el.classList.contains('session-status--coming-soon')).to.be.true;
+      expect(el.textContent).to.equal('Available soon');
+      expect(el.classList.contains('session-status--ipod-pending')).to.be.true;
     });
 
     it('IPOD once the recording is attached -> On-demand', () => {
@@ -202,25 +202,25 @@ describe('session-state-view', () => {
       expect(renderStatus('on-demand', times).textContent).to.equal('On-demand');
     });
 
-    it('IPOD with only a leftover liveStream entry -> Coming soon', () => {
+    it('IPOD with only a leftover liveStream entry -> Available soon', () => {
       setPage({
         videos: [{ provider: 'youtube', url: 'https://youtube.com/watch?v=x', kind: 'liveStream' }],
         format: IPOD,
       });
-      expect(renderStatus('on-demand', times).textContent).to.equal('Coming soon');
+      expect(renderStatus('on-demand', times).textContent).to.equal('Available soon');
     });
 
-    it('IPOD with a non-embeddable provider only -> Coming soon', () => {
+    it('IPOD with a non-embeddable provider only -> Available soon', () => {
       setPage({ videos: [{ provider: 'mobilerider', url: 'x', kind: 'dvr' }], format: IPOD });
-      expect(renderStatus('on-demand', times).textContent).to.equal('Coming soon');
+      expect(renderStatus('on-demand', times).textContent).to.equal('Available soon');
     });
 
     // Matches session-video-player's `pickEmbeddableVideo`, which requires kind === 'onDemand'
     // exactly. An embeddable provider under any other kind gets no player, so claiming
     // "On-demand" here would promise a video the page cannot play.
-    it('IPOD with an embeddable provider but a non-onDemand kind -> Coming soon', () => {
+    it('IPOD with an embeddable provider but a non-onDemand kind -> Available soon', () => {
       setPage({ videos: [{ provider: 'mpc', url: 'x', kind: 'dvr' }], format: IPOD });
-      expect(renderStatus('on-demand', times).textContent).to.equal('Coming soon');
+      expect(renderStatus('on-demand', times).textContent).to.equal('Available soon');
     });
 
     it('matches the Format slug even with no display label', () => {
@@ -228,7 +228,7 @@ describe('session-state-view', () => {
         videos: [],
         format: [{ value: 'in-person', label: '' }, { value: 'on-demand-post-event', label: '' }],
       });
-      expect(renderStatus('on-demand', times).textContent).to.equal('Coming soon');
+      expect(renderStatus('on-demand', times).textContent).to.equal('Available soon');
     });
 
     // Everything below is NOT IPOD, so it stays On-demand regardless of video presence.
@@ -263,6 +263,76 @@ describe('session-state-view', () => {
         format: IPOD,
       });
       expect(renderStatus('on-demand', times).textContent).to.equal('On-demand');
+    });
+  });
+
+  describe('authored status labels', () => {
+    const blockWithRows = (rows) => {
+      const el = document.createElement('div');
+      Object.entries(rows).forEach(([k, v]) => {
+        const row = document.createElement('div');
+        const key = document.createElement('div');
+        key.textContent = k;
+        const val = document.createElement('div');
+        val.textContent = v;
+        row.append(key, val);
+        el.append(row);
+      });
+      return el;
+    };
+
+    it('readStatusLabels returns the defaults when no rows are authored', () => {
+      expect(readStatusLabels(document.createElement('div'))).to.deep.equal({
+        live: 'Live', onDemand: 'On-demand', ipodPending: 'Available soon',
+      });
+    });
+
+    it('readStatusLabels reads overrides case-insensitively and falls back per-label', () => {
+      const el = blockWithRows({ 'Live label': 'On air', 'IPOD Pending Label': 'Coming up' });
+      expect(readStatusLabels(el)).to.deep.equal({
+        live: 'On air', onDemand: 'On-demand', ipodPending: 'Coming up',
+      });
+    });
+
+    it('decodes HTML entities in an authored label (readBlockConfig yields innerHTML)', () => {
+      const el = blockWithRows({ 'Live label': 'Q&A' });
+      expect(readStatusLabels(el).live).to.equal('Q&A');
+    });
+
+    it('extracts plain text from authored markup, inertly (no live parsing)', () => {
+      const el = document.createElement('div');
+      const row = document.createElement('div');
+      const k = document.createElement('div');
+      k.textContent = 'On-demand label';
+      const v = document.createElement('div');
+      v.innerHTML = '<b>Recorded</b>';
+      row.append(k, v);
+      el.append(row);
+      expect(readStatusLabels(el).onDemand).to.equal('Recorded');
+    });
+
+    it('renders an authored label as text, never as markup (MWPW-206528 CodeQL fix)', () => {
+      const el = blockWithRows({ 'Live label': '<img src=x onerror="throwXss()">' });
+      const rendered = renderStatus('live', {}, readStatusLabels(el));
+      expect(rendered.querySelector('img')).to.be.null;
+      expect(rendered.textContent).to.contain('<img');
+    });
+
+    it('renderStatus uses the authored live and on-demand labels', () => {
+      const labels = { live: 'On air', onDemand: 'Recording', ipodPending: 'Coming up' };
+      expect(renderStatus('live', {}, labels).textContent).to.equal('On air');
+      setMetadata('custom-attributes', JSON.stringify([{ name: 'Format', values: [{ value: 'online', label: 'Online' }] }]));
+      expect(renderStatus('on-demand', {}, labels).textContent).to.equal('Recording');
+    });
+
+    it('renderStatus uses the authored IPOD-pending label for a pending IPOD session', () => {
+      setMetadata('session-times', JSON.stringify([{ endTimeMillis: 1, videos: [] }]));
+      setMetadata('custom-attributes', JSON.stringify([{
+        name: 'Format',
+        values: [{ value: 'in-person' }, { value: 'on-demand-post-event' }],
+      }]));
+      const labels = { live: 'Live', onDemand: 'On-demand', ipodPending: 'Coming up' };
+      expect(renderStatus('on-demand', {}, labels).textContent).to.equal('Coming up');
     });
   });
 
