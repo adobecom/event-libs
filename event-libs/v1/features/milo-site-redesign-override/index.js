@@ -3,16 +3,22 @@ import { LIBS, getEventConfig, loadStyle } from '../../utils/utils.js';
 const SELECTOR = '.section.bento.stack-mobile';
 
 let bentoStackPromise;
+let bentoStackMiloLibs;
 let observer;
 
 function loadBentoStack() {
-  if (!bentoStackPromise) {
-    const miloLibs = getEventConfig()?.miloConfig?.miloLibs || LIBS;
+  const miloLibs = getEventConfig()?.miloConfig?.miloLibs || LIBS;
+  if (!bentoStackPromise || bentoStackMiloLibs !== miloLibs) {
+    bentoStackMiloLibs = miloLibs;
     const bentoStackCssUrl = new URL('./bento-stack.css', import.meta.url).href;
     bentoStackPromise = Promise.all([
       import(`${miloLibs}/features/bento-stack.js`),
       new Promise((resolve) => { loadStyle(bentoStackCssUrl, resolve); }),
-    ]).then(([{ default: initBentoStack }]) => initBentoStack);
+    ]).then(([{ default: initBentoStack }]) => initBentoStack)
+      .catch((e) => {
+        bentoStackPromise = undefined;
+        throw e;
+      });
   }
   return bentoStackPromise;
 }
@@ -33,10 +39,6 @@ function handleMatches(root) {
   return Promise.all(matches.map(handleSection));
 }
 
-// Called from processAutoBlockLinks(), which runs before Milo's own block decoration —
-// section-metadata hasn't added the bento/stack-mobile classes yet at call time, so an
-// upfront scan alone would miss everything. The observer catches them whenever
-// section-metadata's own init() actually applies them.
 export default function initMiloSiteRedesignOverride() {
   if (document.body.dataset.bentoStackOverrideStarted) return Promise.resolve();
   document.body.dataset.bentoStackOverrideStarted = 'true';

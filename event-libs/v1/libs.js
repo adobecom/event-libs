@@ -102,5 +102,5 @@ export const eventsDelayedActions = async () => {
 export const initMiloSiteRedesignOverride = async () => {
   if (getMetadata('override-milo-ace1209') !== 'true') return;
   const { default: init } = await import('./features/milo-site-redesign-override/index.js');
-  init();
+  return init();
 };

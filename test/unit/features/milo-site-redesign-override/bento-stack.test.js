@@ -62,4 +62,42 @@ describe('Milo site-redesign-override: bento-stack', () => {
 
     expect(section.style.getPropertyValue('--slides')).to.equal('3');
   });
+
+  it('retries on the next matching section after a failed import', async () => {
+    document.body.innerHTML = '<div id="host"></div>';
+    setEventConfig({}, { miloLibs: '/test/unit/features/milo-site-redesign-override/mocks/libs-missing' });
+
+    await initMiloSiteRedesignOverride();
+    document.getElementById('host').innerHTML = body;
+    const section = document.querySelector('.section.bento.stack-mobile');
+
+    await new Promise((resolve) => { setTimeout(resolve, 50); });
+    expect(section.style.getPropertyValue('--slides')).to.equal('');
+
+    setEventConfig({}, { miloLibs: '/test/unit/features/milo-site-redesign-override/mocks/libs' });
+    section.classList.add('retry-me');
+
+    await new Promise((resolve) => { setTimeout(resolve, 50); });
+    expect(section.style.getPropertyValue('--slides')).to.equal('3');
+  });
+
+  it('re-imports bento-stack.js when miloLibs changes mid-session', async () => {
+    document.body.innerHTML = '<div id="host"></div>';
+    setEventConfig({}, { miloLibs: '/test/unit/features/milo-site-redesign-override/mocks/libs' });
+
+    await initMiloSiteRedesignOverride();
+    document.getElementById('host').innerHTML = body;
+    await new Promise((resolve) => { setTimeout(resolve, 50); });
+    expect(document.querySelector('.section.bento.stack-mobile').style.getPropertyValue('--slides')).to.equal('3');
+
+    setEventConfig({}, { miloLibs: '/test/unit/features/milo-site-redesign-override/mocks/libs-v2' });
+    const secondHost = document.createElement('div');
+    document.body.appendChild(secondHost);
+    secondHost.innerHTML = body;
+    const secondSection = secondHost.querySelector('.section.bento.stack-mobile');
+
+    await new Promise((resolve) => { setTimeout(resolve, 50); });
+    expect(secondSection.dataset.bentoStackVariant).to.equal('v2');
+    expect(secondSection.style.getPropertyValue('--slides')).to.equal('');
+  });
 });
