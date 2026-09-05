@@ -9,6 +9,9 @@ import {
   DEFAULT_RF_API_URL, STAGE_RF_API_URL, DEFAULT_RF_PROFILE_ID,
 } from '../services/sessions/rainfocus.js';
 import { mountToast } from '../features/toast/toast.js';
+import {
+  reconcileSwanNotifications, notifySessionScheduled, notifySessionUnscheduled,
+} from '../features/swan-notifications/swan-notifications.js';
 
 // Shared, page-level state. Preact components read `.value` directly during
 // render for fine-grained reactivity; non-Preact code uses `.subscribe()`/`.peek()`.
@@ -103,6 +106,11 @@ async function loadMyData() {
       favorited.value = new Set(mapToSessionIds(data.favorited, 'sessionID', 'rfSessionId'));
       auth.value = { ...auth.value, isRegistered: !!(data.loggedInUser && Object.keys(data.loggedInUser).length > 0) };
     });
+    // Immediate reconciliation now that both the session catalog and the user's
+    // confirmed schedule have settled, rather than waiting for the next
+    // session-state-ticker.js tick (up to intervalMs away) to apply any stage
+    // transition that's already due.
+    reconcileSwanNotifications(() => sessions.value, () => scheduled.value);
   } catch (err) {
     window.lana?.log(`[session-store] myData fetch failed: ${err.message}`);
   }
@@ -140,6 +148,15 @@ async function loadSessions() {
       () => sessions.value,
       () => liveStreamActiveIds.value,
       () => { sessionStateVersion.value += 1; },
+      {
+        // Must be onTick, not onChange: onChange only fires when a session's coarse
+        // upcoming/live/on-demand bucket flips, which has no boundary at SWAN's
+        // reminder lead time (start minus a few minutes) — gating reconcile on it would
+        // mean the T-5-minute reminder is never applied by the periodic tick at all,
+        // only ever by the one-shot call below or by a schedule action that happens to
+        // land after the trigger time already passed.
+        onTick: () => reconcileSwanNotifications(() => sessions.value, () => scheduled.value),
+      },
     );
     maybeLoadMyData();
   } catch (err) {
@@ -251,6 +268,10 @@ export async function toggleSchedule(session) {
     else addToSet(scheduled, session.id);
     setPending(session.id, false);
   });
+  // Fire-and-forget: a SWAN/ANS failure must never fail or roll back an already-
+  // successful RainFocus schedule mutation — each function swallows its own errors.
+  if (isScheduled) notifySessionUnscheduled(session);
+  else notifySessionScheduled(session);
 }
 
 export async function toggleFavorite(session) {
