@@ -957,10 +957,10 @@ function runMobileRiderSuite(modulePath, variantLabel) {
 
   // MVP-scoped to the C2 copy only — classic mobile-rider doesn't get this bar.
   (variantLabel === 'C2' ? describe : describe.skip)('Live Stream Session Info Bar', () => {
-    // Title/category/description are authored fields now, not pulled from the sessions
-    // store — only Favorite (via rfCode) still needs the store to resolve session-id.
+    // Title/category/description are authored fallbacks — the store's own session fields
+    // win once it resolves; only Favorite (via rfCode) strictly needs the store.
     function sessionInfoBarHtml({
-      title = 'Watch Day 1 Keynote', aboutEnabled, category, description, viewAllDetailsDevices,
+      title = 'Watch Day 1 Keynote', aboutEnabled, category, description, viewAllDetailsLabel,
     } = {}) {
       const row = (key, val) => (val === undefined ? '' : `<div><div>${key}</div><div>${val}</div></div>`);
       return `
@@ -968,10 +968,10 @@ function runMobileRiderSuite(modulePath, variantLabel) {
           <div><div>video-id</div><div>test-video-123</div></div>
           <div><div>session-id</div><div>s-100</div></div>
           ${row('session-title', title)}
-          ${row('about-session-enabled', aboutEnabled)}
+          ${row('show-info-bar', aboutEnabled)}
           ${row('session-category', category)}
           ${row('session-description', description)}
-          ${row('view-all-details-devices', viewAllDetailsDevices)}
+          ${row('view-all-details-label', viewAllDetailsLabel)}
         </div>
       `;
     }
@@ -985,7 +985,7 @@ function runMobileRiderSuite(modulePath, variantLabel) {
       expect(el.querySelector('.mobile-rider-info-bar')).to.not.exist;
     });
 
-    it('renders nothing at all when about-session-enabled is not set — it gates the whole bar, not just the panel', async () => {
+    it('renders nothing at all when show-info-bar is not set — it gates the whole bar, not just the panel', async () => {
       document.body.innerHTML = sessionInfoBarHtml();
       const el = document.querySelector('.mobile-rider');
       riderInstance = init(el);
@@ -994,7 +994,7 @@ function runMobileRiderSuite(modulePath, variantLabel) {
       expect(el.querySelector('.mobile-rider-info-bar')).to.not.exist;
     });
 
-    it('renders the toggle, category, and description when about-session-enabled is true', async () => {
+    it('renders the toggle, category, and description when show-info-bar is true', async () => {
       document.body.innerHTML = sessionInfoBarHtml({
         aboutEnabled: 'true', category: 'Education', description: 'Lorem ipsum',
       });
@@ -1007,7 +1007,7 @@ function runMobileRiderSuite(modulePath, variantLabel) {
       expect(el.querySelector('.mobile-rider-info-bar-category-label').textContent).to.equal('Education');
     });
 
-    it('renders nothing when about-session-enabled is false, even with category/description authored', async () => {
+    it('renders nothing when show-info-bar is false, even with category/description authored', async () => {
       document.body.innerHTML = sessionInfoBarHtml({
         aboutEnabled: 'false', category: 'Education', description: 'Lorem ipsum',
       });
@@ -1039,7 +1039,7 @@ function runMobileRiderSuite(modulePath, variantLabel) {
 
     it('opens the Session Guide detail view for this session when View all details is clicked', async () => {
       document.body.innerHTML = sessionInfoBarHtml({
-        aboutEnabled: 'true', description: 'Lorem ipsum', viewAllDetailsDevices: 'mobile, tablet, desktop',
+        aboutEnabled: 'true', description: 'Lorem ipsum', viewAllDetailsLabel: 'View all details',
       });
       const el = document.querySelector('.mobile-rider');
       riderInstance = init(el);

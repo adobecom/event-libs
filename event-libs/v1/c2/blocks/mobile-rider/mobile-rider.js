@@ -224,7 +224,7 @@ class MobileRider {
   }
 
   #initInfoBar(cfg, sessionId) {
-    const aboutEnabled = cfg['about-session-enabled'] === true;
+    const aboutEnabled = cfg['show-info-bar'] === true;
     if (!aboutEnabled) return;
 
     const bar = createTag('div', {
