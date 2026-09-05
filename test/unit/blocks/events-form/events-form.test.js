@@ -1466,6 +1466,20 @@ describe('addTerms', () => {
 
     expect(form.querySelector('.event-terms-wrapper')).to.equal(null);
   });
+
+  it('resolves content wrapped in a cell div, matching authored block markup', () => {
+    const form = buildForm();
+    const terms = document.createElement('div');
+    terms.innerHTML = '<div><p>First.</p><p>Second.</p><ul><li>One</li><li>Two</li></ul></div>';
+
+    addTerms(form, terms);
+
+    const wrapper = form.querySelector('.event-terms-wrapper');
+    const tagOrder = [...wrapper.children].map((el) => el.tagName);
+    expect(tagOrder).to.deep.equal(['P', 'P', 'UL']);
+    expect(wrapper.children.length).to.equal(3);
+    expect(wrapper.querySelectorAll('li').length).to.equal(2);
+  });
 });
 
 describe('createSelect - multi-select combobox condensed view', () => {

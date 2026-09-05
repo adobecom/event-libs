@@ -920,7 +920,8 @@ export function addTerms(form, terms) {
   if (!terms || terms.textContent === '') return;
   const submitWrapper = form.querySelector('.events-form-submit-wrapper');
   const termsWrapper = createTag('div', { class: 'field-wrapper events-form-full-width event-terms-wrapper field-group-wrapper' });
-  const termsContent = terms.querySelectorAll(':scope > p, :scope > ul, :scope > ol');
+  const cell = terms.querySelector(':scope > div') || terms;
+  const termsContent = cell.querySelectorAll(':scope > p, :scope > ul, :scope > ol');
 
   termsContent.forEach((el) => {
     termsWrapper.append(el);
