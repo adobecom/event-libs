@@ -16,6 +16,12 @@
   .mobile-rider {
     max-width: var(--s2a-layout-rich-media-content-measure-wide, 1192px);
   }
+
+  /* Live/broadcast pages: the player should fill the full section width instead of the
+     default rich-media measure cap. */
+  .livestream-layout .mobile-rider {
+    max-width: none;
+  }
 }
 
 .mobile-rider .mobile-rider-container {
