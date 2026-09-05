@@ -276,17 +276,12 @@ class MobileRider {
     };
     paintDescription(null);
 
-    const viewAllDetailsDevices = new Set(
-      (cfg['view-all-details-devices'] || '').split(',').map((d) => d.trim().toLowerCase()).filter(Boolean),
-    );
-    if (viewAllDetailsDevices.size) {
+    const viewAllDetailsLabel = cfg['view-all-details-label'];
+    if (viewAllDetailsLabel) {
       const more = createTag('button', {
         type: 'button',
         class: 'mobile-rider-info-bar-more',
-        'data-view-all-mobile': String(viewAllDetailsDevices.has('mobile')),
-        'data-view-all-tablet': String(viewAllDetailsDevices.has('tablet')),
-        'data-view-all-desktop': String(viewAllDetailsDevices.has('desktop')),
-      }, 'View all details', { parent: panel });
+      }, viewAllDetailsLabel, { parent: panel });
       more.addEventListener('click', () => openSessionGuideDetail(sessionId));
     }
 
