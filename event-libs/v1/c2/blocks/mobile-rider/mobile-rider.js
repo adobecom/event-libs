@@ -227,9 +227,15 @@ class MobileRider {
     const aboutEnabled = cfg['show-info-bar'] === true;
     if (!aboutEnabled) return;
 
+    // "transparent"/"none" mean no visible card, so no horizontal padding should kick in —
+    // only treat this as a real background when it'd actually paint something.
+    const background = cfg.background && !['transparent', 'none'].includes(cfg.background.toLowerCase())
+      ? cfg.background
+      : '';
+
     const bar = createTag('div', {
       class: 'mobile-rider-info-bar',
-      style: cfg.background ? `background:${cfg.background}` : '',
+      style: background ? `background:${background}` : '',
     }, '', { parent: this.root });
     const header = createTag('div', { class: 'mobile-rider-info-bar-header' }, '', { parent: bar });
     // Prefer the catalog's own title so authors don't have to duplicate it; the authored
