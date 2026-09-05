@@ -176,7 +176,7 @@
   display: inline-flex;
   align-items: center;
   gap: var(--s2a-spacing-xs);
-  margin-bottom: var(--s2a-spacing-sm);
+  margin-bottom: var(--s2a-spacing-2xs);
 }
 
 .mobile-rider-info-bar-category-icon-color {
@@ -230,7 +230,6 @@
   font-size: var(--s2a-font-size-md);
   font-weight: 700;
   padding: 0;
-  margin-top: var(--s2a-spacing-sm);
   cursor: pointer;
 }
 
