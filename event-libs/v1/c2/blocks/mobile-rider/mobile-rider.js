@@ -226,7 +226,12 @@ class MobileRider {
       style: cfg.background ? `background:${cfg.background}` : '',
     }, '', { parent: this.root });
     const header = createTag('div', { class: 'mobile-rider-info-bar-header' }, '', { parent: bar });
-    createTag('h3', { class: 'mobile-rider-info-bar-title' }, cfg['session-title'] || '', { parent: header });
+    // Prefer the catalog's own title so authors don't have to duplicate it; the authored
+    // value is only a fallback for when the session hasn't resolved yet.
+    const titleEl = createTag('h3', { class: 'mobile-rider-info-bar-title' }, cfg['session-title'] || '', { parent: header });
+    const paintTitle = (session) => {
+      titleEl.textContent = session?.title || cfg['session-title'] || '';
+    };
 
     const toggle = createTag('button', {
       type: 'button',
@@ -245,11 +250,26 @@ class MobileRider {
     const panelWrap = createTag('div', { class: 'mobile-rider-info-bar-panel-wrap' }, '', { parent: bar });
     const panel = createTag('div', { class: 'mobile-rider-info-bar-panel' }, '', { parent: panelWrap });
 
-    const badge = buildCategoryBadge(cfg['session-category']);
-    if (badge) panel.append(badge);
-    if (cfg['session-description']) {
-      createTag('p', { class: 'mobile-rider-info-bar-description' }, cfg['session-description'], { parent: panel });
-    }
+    // Category badge and description are rebuilt/repainted once the real session resolves
+    // (prefer the catalog's track/description so authors don't have to duplicate them); the
+    // authored values are only a fallback for when the session hasn't resolved yet.
+    const badgeSlot = createTag('span', { class: 'mobile-rider-info-bar-category-slot' }, '', { parent: panel });
+    const paintCategory = (session) => {
+      const track = session?.primaryTrack || cfg['session-category'] || '';
+      badgeSlot.replaceChildren();
+      const badge = buildCategoryBadge(track);
+      if (badge) badgeSlot.append(badge);
+    };
+    paintCategory(null);
+
+    const descriptionEl = createTag('p', { class: 'mobile-rider-info-bar-description' }, cfg['session-description'] || '', { parent: panel });
+    const paintDescription = (session) => {
+      const text = session?.description || cfg['session-description'] || '';
+      descriptionEl.textContent = text;
+      descriptionEl.classList.toggle('is-hidden', !text);
+    };
+    paintDescription(null);
+
     const viewAllDetailsDevices = new Set(
       (cfg['view-all-details-devices'] || '').split(',').map((d) => d.trim().toLowerCase()).filter(Boolean),
     );
@@ -268,16 +288,21 @@ class MobileRider {
     actions.append(buildShareButton({ id: sessionId, title: cfg['session-title'] || '' }));
 
     initSessionState();
-    const addFavorite = (session) => actions.prepend(buildFavoriteButton(session));
+    const onSessionResolved = (session) => {
+      paintTitle(session);
+      paintCategory(session);
+      paintDescription(session);
+      actions.prepend(buildFavoriteButton(session));
+    };
     const existing = sessions.value.find((s) => s.id === sessionId);
     if (existing) {
-      addFavorite(existing);
+      onSessionResolved(existing);
       return;
     }
     const unsubscribe = sessions.subscribe((list) => {
       const found = list.find((s) => s.id === sessionId);
       if (found) {
-        addFavorite(found);
+        onSessionResolved(found);
         unsubscribe();
       }
     });

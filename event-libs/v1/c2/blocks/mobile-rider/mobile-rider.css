@@ -181,6 +181,10 @@
 }
 
 /* Figma: "Body/S" */
+.mobile-rider-info-bar-description.is-hidden {
+  display: none;
+}
+
 .mobile-rider-info-bar-description {
   overflow: hidden;
   margin: 0 0 var(--s2a-spacing-md);
