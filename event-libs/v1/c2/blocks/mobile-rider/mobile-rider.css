@@ -12,11 +12,11 @@
   box-sizing: border-box;
 }
 
-/* Live/broadcast pages: the player should fill the full section width. Below 1024px
-   .mobile-rider itself has no max-width (see base rule above) — the constraint at tablet
-   is the section's own .container padding-inline (--grid-padding), which has no breakpoint
-   gate of its own, so it's cancelled here for this section layout specifically. */
-@media (min-width: 768px) and (max-width: 1023px) {
+/* Live/broadcast pages: the player should fill the full section width from tablet up.
+   The section's own .container padding-inline (--grid-padding) has no breakpoint gate of
+   its own, so it's cancelled here for this section layout specifically at every width
+   we want fullscreen at (768px+). */
+@media (min-width: 768px) {
   .livestream-layout.container {
     --grid-padding: 0;
   }
