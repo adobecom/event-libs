@@ -1056,26 +1056,43 @@ function runMobileRiderSuite(modulePath, variantLabel) {
       riderInstance = init(el);
       await new Promise((resolve) => { setTimeout(resolve, 50); });
 
-      // sessions.value is left at [] for this test — Share must not depend on it resolving.
+      // sessions.value is left at [] for this test — the button itself must not depend on
+      // it resolving, even though clicking it before resolution is a no-op (no sessionPageUrl).
       const shareBtn = el.querySelector('.mobile-rider-info-bar-share');
       expect(shareBtn).to.exist;
       expect(shareBtn.getAttribute('daa-ll')).to.equal('Share');
     });
 
-    it('copies a session detail link to the clipboard when Share is clicked', async () => {
+    // Same copy-to-clipboard behavior as session-broadcast's EndedState.js Share action:
+    // clipboard-only (no navigator.share), sharing the session's own page URL.
+    it('copies the session page URL to the clipboard when Share is clicked', async () => {
+      sessions.value = [{ id: 's-100', rfCode: 'rf-100', sessionPageUrl: '/sessions/s-100' }];
       document.body.innerHTML = sessionInfoBarHtml({ aboutEnabled: 'true' });
       const el = document.querySelector('.mobile-rider');
       riderInstance = init(el);
       await new Promise((resolve) => { setTimeout(resolve, 50); });
 
-      if (navigator.share) sinon.stub(navigator, 'share').value(undefined);
       sinon.stub(navigator.clipboard, 'writeText').resolves();
 
       el.querySelector('.mobile-rider-info-bar-share').click();
       await new Promise((resolve) => { setTimeout(resolve, 50); });
 
       expect(navigator.clipboard.writeText.calledOnce).to.be.true;
-      expect(navigator.clipboard.writeText.firstCall.args[0]).to.include('session=s-100');
+      expect(navigator.clipboard.writeText.firstCall.args[0]).to.include('/sessions/s-100');
+    });
+
+    it('does not attempt to share before the session resolves (no sessionPageUrl yet)', async () => {
+      document.body.innerHTML = sessionInfoBarHtml({ aboutEnabled: 'true' });
+      const el = document.querySelector('.mobile-rider');
+      riderInstance = init(el);
+      await new Promise((resolve) => { setTimeout(resolve, 50); });
+
+      sinon.stub(navigator.clipboard, 'writeText').resolves();
+
+      el.querySelector('.mobile-rider-info-bar-share').click();
+      await new Promise((resolve) => { setTimeout(resolve, 50); });
+
+      expect(navigator.clipboard.writeText.called).to.be.false;
     });
 
     it('does not render a Favorite button until the session resolves from the store', async () => {

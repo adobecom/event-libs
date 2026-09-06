@@ -1,5 +1,5 @@
 /* eslint-disable no-underscore-dangle */
-import { createTag, getEventConfig } from '../../../utils/utils.js';
+import { createTag, getEventConfig, safeUrl } from '../../../utils/utils.js';
 import {
   sessions, favorited, initSessionState, openSessionGuideDetail, getEventApiConfig,
 } from '../../../utils/session-store.js';
@@ -7,7 +7,6 @@ import { getTrackIcon, initTierOneEventConfig } from '../../../utils/tier-1-even
 import { resolveIcon } from '../../../features/icons/icon-resolver.js';
 import { toggleFavoriteWithFeedback } from '../../../services/sessions/action-feedback.js';
 import { showToast } from '../../../features/toast/toast.js';
-import { setSessionParam } from '../sessions-guide/utils/url.js';
 
 const BLOCK_CSS_URL = new URL('./mobile-rider.css', import.meta.url).href;
 
@@ -79,7 +78,11 @@ function buildFavoriteButton(session) {
   return btn;
 }
 
-function buildShareButton(session) {
+// `getSession` is read at click time, not closed over at build time — the share button is
+// built before the real session resolves from the store, so a static snapshot would keep
+// sharing the placeholder title (falling back all the way to document.title) forever.
+// Same copy-to-clipboard behavior as session-broadcast's EndedState.js Share action.
+function buildShareButton(getSession) {
   const btn = createTag('button', {
     type: 'button',
     class: 'mobile-rider-action mobile-rider-info-bar-share',
@@ -88,19 +91,15 @@ function buildShareButton(session) {
   }, ICON_SHARE);
 
   btn.addEventListener('click', async () => {
-    // setSessionParam builds the same `?session=<id>` deep link Session Guide's own
-    // cards use — opens straight to this session's detail view, not a generic page URL.
-    const url = new URL(setSessionParam(session.id), window.location.origin).toString();
-    const shareData = { url, title: session.title || document.title };
+    const session = getSession();
+    const shareUrl = safeUrl(session.sessionPageUrl);
+    if (!shareUrl) return;
     try {
-      if (navigator.share) {
-        await navigator.share(shareData);
-        return;
-      }
-      await navigator.clipboard.writeText(url);
-      showToast({ message: 'Link copied to clipboard', variant: 'positive' });
+      if (!navigator.clipboard) throw new Error('Clipboard API unavailable');
+      await navigator.clipboard.writeText(shareUrl);
+      showToast({ message: 'Link copied!', variant: 'positive' });
     } catch (e) {
-      if (e.name !== 'AbortError') window.lana?.log(`[MobileRider] share failed: ${e.message}`);
+      window.lana?.log(`[MobileRider] share failed: ${e.message}`);
     }
   });
 
@@ -291,11 +290,13 @@ class MobileRider {
       more.addEventListener('click', () => openSessionGuideDetail(sessionId));
     }
 
+    let resolvedSession = { id: sessionId, title: cfg['session-title'] || '' };
     const actions = createTag('div', { class: 'mobile-rider-info-bar-actions' }, '', { parent: panel });
-    actions.append(buildShareButton({ id: sessionId, title: cfg['session-title'] || '' }));
+    actions.append(buildShareButton(() => resolvedSession));
 
     initSessionState();
     const onSessionResolved = (session) => {
+      resolvedSession = session;
       paintTitle(session);
       paintCategory(session);
       paintDescription(session);
