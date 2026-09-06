@@ -81,10 +81,6 @@ function buildFavoriteButton(session) {
   return btn;
 }
 
-// `getSession` is read at click time, not closed over at build time — the share button is
-// built before the real session resolves from the store, so a static snapshot would keep
-// sharing the placeholder title (falling back all the way to document.title) forever.
-// Same copy-to-clipboard behavior as session-broadcast's EndedState.js Share action.
 function buildShareButton(getSession) {
   const btn = createTag('button', {
     type: 'button',
@@ -202,15 +198,8 @@ class MobileRider {
       }
 
       await this.injectPlayer(videoId, this.cfg.skinid, this.cfg.aslid);
-
-      // Same section-metadata table upcoming-sessions.js already reads for this page —
-      // avoids making the author repeat session-id on the mobile-rider block itself when
-      // it's already authored there.
       const sessionId = this.cfg['session-id'] || readSectionMetadata(this.el, 'session-id');
       if (sessionId) {
-        // Idempotent; other blocks that read getTrackIcon (event-featured-products,
-        // event-session-details) call this defensively too, in case decorateEvent hasn't
-        // run it yet — otherwise the category badge silently no-ops with no trackIcons map.
         initTierOneEventConfig();
         this.#initInfoBar(this.cfg, sessionId);
       }
