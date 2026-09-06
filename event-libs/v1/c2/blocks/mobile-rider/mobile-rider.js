@@ -218,8 +218,6 @@ class MobileRider {
     const aboutEnabled = cfg['show-info-bar'] === true;
     if (!aboutEnabled) return;
 
-    // "transparent"/"none" mean no visible card, so no horizontal padding should kick in —
-    // only treat this as a real background when it'd actually paint something.
     const background = cfg.background && !['transparent', 'none'].includes(cfg.background.toLowerCase())
       ? cfg.background
       : '';
@@ -233,8 +231,6 @@ class MobileRider {
       'aria-label': 'Session info',
     }, '', { parent: this.root });
     const header = createTag('div', { class: 'mobile-rider-info-bar-header' }, '', { parent: bar });
-    // Prefer the catalog's own title so authors don't have to duplicate it; the authored
-    // value is only a fallback for when the session hasn't resolved yet.
     const titleEl = createTag('h3', { class: 'mobile-rider-info-bar-title' }, cfg['session-title'] || '', { parent: header });
     const paintTitle = (session) => {
       titleEl.textContent = session?.title || cfg['session-title'] || '';
@@ -260,10 +256,6 @@ class MobileRider {
 
     const panelWrap = createTag('div', { class: 'mobile-rider-info-bar-panel-wrap' }, '', { parent: bar });
     const panel = createTag('div', { class: 'mobile-rider-info-bar-panel', id: panelId }, '', { parent: panelWrap });
-
-    // Category badge and description are rebuilt/repainted once the real session resolves
-    // (prefer the catalog's track/description so authors don't have to duplicate them); the
-    // authored values are only a fallback for when the session hasn't resolved yet.
     const badgeSlot = createTag('span', { class: 'mobile-rider-info-bar-category-slot' }, '', { parent: panel });
     const paintCategory = (session) => {
       const track = session?.primaryTrack || cfg['session-category'] || '';
