@@ -12,13 +12,21 @@
   box-sizing: border-box;
 }
 
+/* Live/broadcast pages: the player should fill the full section width. Below 1024px
+   .mobile-rider itself has no max-width (see base rule above) — the constraint at tablet
+   is the section's own .container padding-inline (--grid-padding), which has no breakpoint
+   gate of its own, so it's cancelled here for this section layout specifically. */
+@media (min-width: 768px) and (max-width: 1023px) {
+  .livestream-layout.container {
+    --grid-padding: 0;
+  }
+}
+
 @media (min-width: 1024px) {
   .mobile-rider {
     max-width: var(--s2a-layout-rich-media-content-measure-wide, 1192px);
   }
 
-  /* Live/broadcast pages: the player should fill the full section width instead of the
-     default rich-media measure cap. */
   .livestream-layout .mobile-rider {
     max-width: none;
   }
