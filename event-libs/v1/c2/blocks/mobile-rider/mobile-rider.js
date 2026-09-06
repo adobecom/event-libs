@@ -1,7 +1,7 @@
 /* eslint-disable no-underscore-dangle */
 import { createTag, getEventConfig, safeUrl } from '../../../utils/utils.js';
 import {
-  sessions, favorited, initSessionState, openSessionGuideDetail, getEventApiConfig,
+  sessions, favorited, pendingActions, initSessionState, openSessionGuideDetail, getEventApiConfig,
 } from '../../../utils/session-store.js';
 import { getTrackIcon, initTierOneEventConfig } from '../../../utils/tier-1-event-config.js';
 import { resolveIcon } from '../../../features/icons/icon-resolver.js';
@@ -59,14 +59,17 @@ function buildFavoriteButton(session) {
 
   const paint = () => {
     const isFavorited = favorited.value.has(session.id);
+    const isPending = pendingActions.value.has(session.id);
     btn.innerHTML = isFavorited ? ICON_HEART_FILLED : ICON_HEART_OUTLINE;
-    btn.setAttribute('aria-label', isFavorited ? 'Remove from favorites' : 'Add to favorites');
+    btn.setAttribute('aria-label', isFavorited ? `Remove ${session.title} from favorites` : `Add ${session.title} to favorites`);
     btn.setAttribute('aria-pressed', String(isFavorited));
     btn.setAttribute('daa-ll', isFavorited ? 'Remove-from-Favorites' : 'Add-to-Favorites');
+    btn.toggleAttribute('disabled', isPending);
     btn.classList.toggle('is-favorited', isFavorited);
   };
   paint();
   favorited.subscribe(paint);
+  pendingActions.subscribe(paint);
 
   btn.addEventListener('click', () => {
     toggleFavoriteWithFeedback(session, {
@@ -232,9 +235,13 @@ class MobileRider {
       ? cfg.background
       : '';
 
+    const panelId = `mobile-rider-info-bar-panel-${sessionId}`;
+
     const bar = createTag('div', {
       class: 'mobile-rider-info-bar',
       style: background ? `background:${background}` : '',
+      role: 'region',
+      'aria-label': 'Session info',
     }, '', { parent: this.root });
     const header = createTag('div', { class: 'mobile-rider-info-bar-header' }, '', { parent: bar });
     // Prefer the catalog's own title so authors don't have to duplicate it; the authored
@@ -248,18 +255,22 @@ class MobileRider {
       type: 'button',
       class: 'mobile-rider-info-bar-toggle',
       'aria-expanded': 'false',
-      'aria-label': 'About this session',
+      'aria-controls': panelId,
+      'daa-ll': 'Session-Info-Toggle',
     }, '', { parent: header });
-    createTag('span', { class: 'mobile-rider-info-bar-chevron' }, ICON_CHEVRON_DOWN, { parent: toggle });
+    createTag('span', { class: 'mobile-rider-info-bar-toggle-label' }, 'Show more session info', { parent: toggle });
+    createTag('span', { class: 'mobile-rider-info-bar-chevron', 'aria-hidden': 'true' }, ICON_CHEVRON_DOWN, { parent: toggle });
 
+    const toggleLabel = toggle.querySelector('.mobile-rider-info-bar-toggle-label');
     toggle.addEventListener('click', () => {
       const expanded = toggle.getAttribute('aria-expanded') === 'true';
       toggle.setAttribute('aria-expanded', String(!expanded));
+      toggleLabel.textContent = expanded ? 'Show more session info' : 'Show less session info';
       bar.classList.toggle('is-expanded', !expanded);
     });
 
     const panelWrap = createTag('div', { class: 'mobile-rider-info-bar-panel-wrap' }, '', { parent: bar });
-    const panel = createTag('div', { class: 'mobile-rider-info-bar-panel' }, '', { parent: panelWrap });
+    const panel = createTag('div', { class: 'mobile-rider-info-bar-panel', id: panelId }, '', { parent: panelWrap });
 
     // Category badge and description are rebuilt/repainted once the real session resolves
     // (prefer the catalog's track/description so authors don't have to duplicate them); the
@@ -286,13 +297,15 @@ class MobileRider {
       const more = createTag('button', {
         type: 'button',
         class: 'mobile-rider-info-bar-more',
+        'daa-ll': 'View-All-Details',
       }, viewAllDetailsLabel, { parent: panel });
       more.addEventListener('click', () => openSessionGuideDetail(sessionId));
     }
 
     let resolvedSession = { id: sessionId, title: cfg['session-title'] || '' };
     const actions = createTag('div', { class: 'mobile-rider-info-bar-actions' }, '', { parent: panel });
-    actions.append(buildShareButton(() => resolvedSession));
+    const shareBtn = buildShareButton(() => resolvedSession);
+    actions.append(shareBtn);
 
     initSessionState();
     const onSessionResolved = (session) => {
@@ -300,6 +313,7 @@ class MobileRider {
       paintTitle(session);
       paintCategory(session);
       paintDescription(session);
+      shareBtn.setAttribute('aria-label', session.title ? `Share ${session.title}` : 'Share');
       actions.prepend(buildFavoriteButton(session));
     };
     const existing = sessions.value.find((s) => s.id === sessionId);
