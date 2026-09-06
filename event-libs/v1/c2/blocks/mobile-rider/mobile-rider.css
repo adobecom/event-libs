@@ -13,16 +13,15 @@
 }
 
 /* Live/broadcast pages: the player should be fullscreen (no section inset, no measure cap)
-   at every width up to and including 1024px. The section's own .container padding-inline
-   (--grid-padding) has no breakpoint gate of its own, so it's cancelled here for this
-   section layout specifically, at mobile/tablet sizes and up through 1024px. */
+   at every width up to and including 1024px. The section's own .container applies its
+   padding-inline (--grid-padding) to the whole section — other blocks in the same
+   .livestream-layout section (e.g. upcoming-sessions) need to keep that inset, so instead
+   of zeroing --grid-padding on the container (which would strip it from every sibling too),
+   pull just this block back out to the edges with a matching negative margin. */
 @media (max-width: 1024px) {
-  .livestream-layout.container {
-    --grid-padding: 0;
-  }
-
   .livestream-layout .mobile-rider {
     max-width: none;
+    margin-inline: calc(-1 * var(--grid-padding, 0px));
   }
 }
 
