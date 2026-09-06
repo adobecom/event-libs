@@ -12,26 +12,6 @@
   box-sizing: border-box;
 }
 
-/* Live/broadcast pages: the player should be fullscreen (no section inset, no measure cap)
-   at every width up to and including 1024px. The section's own .container applies its
-   padding-inline (--grid-padding) to the whole section — other blocks in the same
-   .livestream-layout section (e.g. upcoming-sessions) need to keep that inset, so instead
-   of zeroing --grid-padding on the container (which would strip it from every sibling too),
-   pull just this block back out to the edges with a matching negative margin. */
-@media (max-width: 1024px) {
-  .livestream-layout .mobile-rider {
-    max-width: none;
-
-    /* width: 100% alone resolves against the container's content box, which is already
-       narrowed by --grid-padding — pulling the margins out without widening the box just
-       repositions it, leaving a gap on the far side. Growing width by 2x the padding (on
-       top of box-sizing: border-box) makes it actually reach both edges. */
-    width: calc(100% + (2 * var(--grid-padding, 0px)));
-    margin-inline: calc(-1 * var(--grid-padding, 0px));
-  }
-}
-
-/* Above 1024px, normal container/measure-cap behavior resumes. */
 @media (min-width: 1024px) {
   .mobile-rider {
     max-width: var(--s2a-layout-rich-media-content-measure-wide, 1192px);
