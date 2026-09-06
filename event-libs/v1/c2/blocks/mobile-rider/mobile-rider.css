@@ -21,6 +21,12 @@
 @media (max-width: 1024px) {
   .livestream-layout .mobile-rider {
     max-width: none;
+
+    /* width: 100% alone resolves against the container's content box, which is already
+       narrowed by --grid-padding — pulling the margins out without widening the box just
+       repositions it, leaving a gap on the far side. Growing width by 2x the padding (on
+       top of box-sizing: border-box) makes it actually reach both edges. */
+    width: calc(100% + (2 * var(--grid-padding, 0px)));
     margin-inline: calc(-1 * var(--grid-padding, 0px));
   }
 }
