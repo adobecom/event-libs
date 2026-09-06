@@ -256,49 +256,76 @@ describe('session-video-playlist', () => {
 
     it('sorts sessions with no start time (IPOD) after scheduled ones', () => {
       const scheduled = catalogSession({ id: 'scheduled' });
-      const ipod = catalogSession({ id: 'ipod', startTimeUtc: '', endTimeUtc: '', dvrDelayHours: 1 });
+      const ipod = catalogSession({ id: 'ipod', startTimeUtc: '', endTimeUtc: '', hasOnDemandFormat: true, dvrDelayHours: 1 });
       const eventStartMs = Date.now() - 5 * HOUR_MS;
       expect(resolveTopicPlaylist('cur', topics, [ipod, scheduled], 2, eventStartMs).map((s) => s.id))
         .to.deep.equal(['scheduled', 'ipod']);
     });
 
-    it('excludes an IPOD session with no authored DVR delay', () => {
-      const ipod = catalogSession({ id: 'ipod', startTimeUtc: '', endTimeUtc: '', dvrDelayHours: null });
+    // dvrDelayHours is removed from the catalog once the on-demand asset is actually
+    // available — its absence is a ready-now signal, not "gate forever".
+    it('includes an IPOD session with no authored DVR delay once the event has started', () => {
+      const ipod = catalogSession({ id: 'ipod', startTimeUtc: '', endTimeUtc: '', hasOnDemandFormat: true, dvrDelayHours: null });
       const eventStartMs = Date.now() - HOUR_MS;
-      expect(resolveTopicPlaylist('cur', topics, [ipod], 1, eventStartMs)).to.deep.equal([]);
+      expect(resolveTopicPlaylist('cur', topics, [ipod], 1, eventStartMs).map((s) => s.id))
+        .to.deep.equal(['ipod']);
     });
 
     // A real 0 is not the same as "unset": it means available from the event's start, so
     // it still has to be measured against eventStartMs rather than passing unconditionally.
     it('includes an IPOD session with a 0h DVR delay once the event has started', () => {
-      const ipod = catalogSession({ id: 'ipod', startTimeUtc: '', endTimeUtc: '', dvrDelayHours: 0 });
+      const ipod = catalogSession({ id: 'ipod', startTimeUtc: '', endTimeUtc: '', hasOnDemandFormat: true, dvrDelayHours: 0 });
       const eventStartMs = Date.now() - HOUR_MS;
       expect(resolveTopicPlaylist('cur', topics, [ipod], 1, eventStartMs).map((s) => s.id))
         .to.deep.equal(['ipod']);
     });
 
     it('excludes an IPOD session with a 0h DVR delay before the event starts', () => {
-      const ipod = catalogSession({ id: 'ipod', startTimeUtc: '', endTimeUtc: '', dvrDelayHours: 0 });
+      const ipod = catalogSession({ id: 'ipod', startTimeUtc: '', endTimeUtc: '', hasOnDemandFormat: true, dvrDelayHours: 0 });
       const eventStartMs = Date.now() + HOUR_MS;
       expect(resolveTopicPlaylist('cur', topics, [ipod], 1, eventStartMs)).to.deep.equal([]);
     });
 
     it('excludes an IPOD session whose DVR delay has not elapsed', () => {
-      const ipod = catalogSession({ id: 'ipod', startTimeUtc: '', endTimeUtc: '', dvrDelayHours: 5 });
+      const ipod = catalogSession({ id: 'ipod', startTimeUtc: '', endTimeUtc: '', hasOnDemandFormat: true, dvrDelayHours: 5 });
       const eventStartMs = Date.now() - HOUR_MS;
       expect(resolveTopicPlaylist('cur', topics, [ipod], 1, eventStartMs)).to.deep.equal([]);
     });
 
     it('includes an IPOD session once its DVR delay has elapsed', () => {
-      const ipod = catalogSession({ id: 'ipod', startTimeUtc: '', endTimeUtc: '', dvrDelayHours: 1 });
+      const ipod = catalogSession({ id: 'ipod', startTimeUtc: '', endTimeUtc: '', hasOnDemandFormat: true, dvrDelayHours: 1 });
       const eventStartMs = Date.now() - 5 * HOUR_MS;
       expect(resolveTopicPlaylist('cur', topics, [ipod], 1, eventStartMs).map((s) => s.id))
         .to.deep.equal(['ipod']);
     });
 
     it('excludes an IPOD session when no event start time is known at all', () => {
-      const ipod = catalogSession({ id: 'ipod', startTimeUtc: '', endTimeUtc: '', dvrDelayHours: 5 });
+      const ipod = catalogSession({ id: 'ipod', startTimeUtc: '', endTimeUtc: '', hasOnDemandFormat: true, dvrDelayHours: 5 });
       expect(resolveTopicPlaylist('cur', topics, [ipod], 1, null)).to.deep.equal([]);
+    });
+
+    // Its own sessionStart/sessionEnd window still gates it while running, regardless of
+    // dvrDelayHours — DVR removal only signals readiness once the session has actually ended.
+    it('excludes an IPOD session with its own schedule that is still running, even with no DVR delay', () => {
+      const ipod = catalogSession({
+        id: 'ipod',
+        startTimeUtc: new Date(Date.now() - HOUR_MS).toISOString(),
+        endTimeUtc: new Date(Date.now() + HOUR_MS).toISOString(),
+        hasOnDemandFormat: true,
+        dvrDelayHours: null,
+      });
+      expect(resolveTopicPlaylist('cur', topics, [ipod], 1)).to.deep.equal([]);
+    });
+
+    it('includes an IPOD session with its own schedule once sessionEnd has passed and DVR delay is unset', () => {
+      const ipod = catalogSession({
+        id: 'ipod',
+        startTimeUtc: new Date(Date.now() - 2 * HOUR_MS).toISOString(),
+        endTimeUtc: new Date(Date.now() - HOUR_MS).toISOString(),
+        hasOnDemandFormat: true,
+        dvrDelayHours: null,
+      });
+      expect(resolveTopicPlaylist('cur', topics, [ipod], 1).map((s) => s.id)).to.deep.equal(['ipod']);
     });
 
     it('excludes a scheduled session that has not ended yet', () => {

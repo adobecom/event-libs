@@ -1,5 +1,9 @@
 import { createTag, LIBS } from '../../../utils/utils.js';
 import { getNowMs } from '../../../utils/session-state.js';
+import { getEventStartMs, initTierOneEventConfig } from '../../../utils/tier-1-event-config.js';
+import {
+  sessions, liveStreamActiveIds, initSessionState,
+} from '../../../utils/session-store.js';
 import BlockMediator from '../../../deps/block-mediator.min.js';
 import { showVideoLayoutLoader, hideVideoLayoutLoader } from '../../utils/video-layout-loader.js';
 import {
@@ -11,11 +15,12 @@ import {
   writeJsonToStorage,
   getVideoProgress as readVideoProgress,
   parseJsonMetadata as parseSharedJsonMetadata,
-  currentSessionHasEnded,
   findEmbeddableVideos,
   readAuthoredConfig,
   resolveSessionId,
   ensureStylesheet,
+  getPlaybackPhase,
+  PLAYBACK_PHASE,
 } from '../../utils/video-session.js';
 
 const LOG_SCOPE = 'session-video-player';
@@ -67,6 +72,21 @@ export function saveVideoProgress(sessionId, secondsWatched, length = null) {
 
 function pickEmbeddableVideo(sessionTimes) {
   return findEmbeddableVideos(sessionTimes)[0] || null;
+}
+
+// session-times page metadata only ever carries a ready-to-embed onDemand-kind entry (see
+// README) — it has no representation of a simulive-playing or DVR-buffer video at all. For
+// those phases (and as a fallback when session-times has nothing for the on-demand phase
+// either), build the same shape directly from the catalog session's raw ids — the same
+// pattern session-broadcast's MpcPlayerAdapter/YouTubePlayerAdapter already use.
+function buildVideoFromCatalog(session) {
+  if (session?.mpcId) {
+    return { provider: 'mpc', url: `${ADOBE_TV_ORIGIN}/v/${session.mpcId}?autoplay=true` };
+  }
+  if (session?.youTubeId) {
+    return { provider: 'youtube', url: session.youTubeId };
+  }
+  return null;
 }
 
 const ADOBE_TV_ORIGIN = 'https://video.tv.adobe.com';
@@ -418,7 +438,28 @@ async function watchYouTubePlayback(sessionId, iframe) {
   }
 }
 
+// DVR-buffer plays the dedicated MobileRider DVR/replay asset via the standalone mobile-rider
+// block's own init — reused wholesale (script loading, mobilerider.embed()) rather than
+// reimplementing that SDK integration here. `dataset.extractedVideoId` is the same seam
+// handleAnchorElement() uses to convert an authored link into a MobileRider embed; feeding
+// it directly skips the anchor/URL round-trip since we already have the raw video id.
+async function loadMobileRiderPlayer(el, video) {
+  const { default: initMobileRider } = await import('../mobile-rider/mobile-rider.js');
+  el.querySelector('.milo-video')?.remove();
+  const rider = createTag('div', { class: 'mobile-rider' }, '', { parent: el });
+  rider.dataset.extractedVideoId = video.videoId;
+  initMobileRider(rider);
+  el.dataset.embedded = 'true';
+}
+
 function loadVideoPlayer(el, sessionId, video) {
+  if (video.provider === 'mobilerider') {
+    loadMobileRiderPlayer(el, video).catch((error) => {
+      logError(`could not load MobileRider DVR player: ${error.message}`);
+    });
+    return;
+  }
+
   const builtContainer = buildMiloVideo(video);
   const iframe = builtContainer.firstElementChild;
 
@@ -475,7 +516,45 @@ function awaitEmbedDecision(el) {
   });
 }
 
-function resolveRenderContext(el) {
+// The catalog is fetched async — resolve immediately if it's already loaded, otherwise wait
+// for the one `sessions` update that includes this id. Same pattern as mobile-rider.js.
+function resolveCatalogSession(sessionId) {
+  initSessionState();
+  const existing = sessions.value.find((s) => s.id === sessionId);
+  if (existing) return Promise.resolve(existing);
+  return new Promise((resolve) => {
+    const unsubscribe = sessions.subscribe((list) => {
+      const found = list.find((s) => s.id === sessionId);
+      if (found) {
+        unsubscribe();
+        resolve(found);
+      }
+    });
+  });
+}
+
+// session-times' onDemand-only entry is preferred when present (it may carry provider query
+// params/tokens baked in server-side that a client-built URL can't replicate); everything
+// else — simulive, dvr-buffer, and on-demand once session-times has nothing — is built
+// directly from the catalog session's own ids.
+function resolveVideoForPhase(phase, sessionTimes, session) {
+  if (phase === PLAYBACK_PHASE.ON_DEMAND) {
+    return pickEmbeddableVideo(sessionTimes) || buildVideoFromCatalog(session);
+  }
+  if (phase === PLAYBACK_PHASE.SIMULIVE) {
+    return buildVideoFromCatalog(session);
+  }
+  // DVR_BUFFER plays the dedicated MobileRider DVR/replay asset — a distinct mechanism from
+  // buildMiloVideo's iframe embeds (mobilerider.embed(), not a src URL), handled by
+  // loadMobileRiderPlayer() instead.
+  if (phase === PLAYBACK_PHASE.DVR_BUFFER) {
+    if (!session?.mrDvrVideoId) return null;
+    return { provider: 'mobilerider', videoId: session.mrDvrVideoId };
+  }
+  return null;
+}
+
+async function resolveRenderContext(el) {
   const config = readAuthoredConfig(el);
 
   const sessionId = resolveSessionId(config);
@@ -484,17 +563,30 @@ function resolveRenderContext(el) {
     return null;
   }
 
-  
-  const sessionTimes = parseJsonMetadata('session-times');
+  const session = await resolveCatalogSession(sessionId);
 
-  if (!currentSessionHasEnded(sessionTimes, getNowMs())) {
-    logError('current session has not ended yet — nothing to render');
+  // Idempotent; other blocks that read event-start-anchored config (session-video-playlist,
+  // mobile-rider) call this defensively too, in case decorateEvent hasn't run it yet —
+  // otherwise getEventStartMs() silently returns null and IPOD/live DVR gates never open.
+  initTierOneEventConfig();
+  const phase = getPlaybackPhase(session, {
+    nowMs: getNowMs(),
+    eventStartMs: getEventStartMs(),
+    liveStreamActiveIds: liveStreamActiveIds.value,
+  });
+  // pre-event and watch-live are deliberately not this block's job — session-broadcast/
+  // mobile-rider own the live-watching experience; this block only ever plays a video.
+  if (phase !== PLAYBACK_PHASE.SIMULIVE
+    && phase !== PLAYBACK_PHASE.DVR_BUFFER
+    && phase !== PLAYBACK_PHASE.ON_DEMAND) {
+    logError(`session is in "${phase}" phase — nothing to render`);
     return null;
   }
-  
-  const currentVideo = pickEmbeddableVideo(sessionTimes);
+
+  const sessionTimes = parseJsonMetadata('session-times');
+  const currentVideo = resolveVideoForPhase(phase, sessionTimes, session);
   if (!currentVideo) {
-    logError('no embeddable video in session-times — nothing to render');
+    logError('no embeddable video available for the current phase — nothing to render');
     return null;
   }
 
@@ -504,7 +596,7 @@ function resolveRenderContext(el) {
 export default async function init(el) {
   ensureStylesheet('session-video-player-css', BLOCK_CSS_URL);
 
-  const context = resolveRenderContext(el);
+  const context = await resolveRenderContext(el);
   if (!context) {
     el.remove();
     return;

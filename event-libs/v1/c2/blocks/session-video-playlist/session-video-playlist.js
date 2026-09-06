@@ -2,7 +2,7 @@ import { createTag, getMetadata } from '../../../utils/utils.js';
 import {
   sessions, sessionsStatus, initSessionState, liveStreamActiveIds, favorited, pendingActions,
 } from '../../../utils/session-store.js';
-import { deriveSessionState, getNowMs, dvrAvailableAtMs } from '../../../utils/session-state.js';
+import { getNowMs } from '../../../utils/session-state.js';
 import { extractCustomAttributeSlugs, extractCustomAttributeValue } from '../../../services/sessions/sessions-api.js';
 import { toggleFavoriteWithFeedback } from '../../../services/sessions/action-feedback.js';
 import { initTierOneEventConfig, getEventStartMs } from '../../../utils/tier-1-event-config.js';
@@ -20,6 +20,8 @@ import {
   readAuthoredConfig,
   resolveSessionId,
   ensureStylesheet,
+  getPlaybackPhase,
+  PLAYBACK_PHASE,
 } from '../../utils/video-session.js';
 
 const LOG_SCOPE = 'session-video-playlist';
@@ -100,15 +102,17 @@ export function clampedTitleBottom(titleTop, titleHeight, lineHeight, lineCap) {
   return titleTop + Math.min(titleHeight, capHeight);
 }
 
-function isOnDemand(session, nowMs) {
-  return deriveSessionState(session, liveStreamActiveIds.value, nowMs) === 'on-demand';
-}
-
+// Classifies the session as IPOD/Simulive/Live (see video-session.js) and resolves its
+// current playback phase against that case's own pre-event/simulive/dvr-buffer/on-demand
+// rules — replaces the old blunt "has a time window passed" check, which didn't distinguish
+// these three cases (e.g. it let a still-DVR-pending live session premiere immediately once
+// its time window ended).
 function hasPremiered(session, eventStartMs, nowMs) {
-  if (session.startTimeUtc && session.endTimeUtc) return isOnDemand(session, nowMs);
-  const availableAt = dvrAvailableAtMs(session, eventStartMs);
-  if (availableAt == null) return false;
-  return nowMs >= availableAt;
+  return getPlaybackPhase(session, {
+    nowMs,
+    eventStartMs,
+    liveStreamActiveIds: liveStreamActiveIds.value,
+  }) === PLAYBACK_PHASE.ON_DEMAND;
 }
 
 function hasEmbeddableVideo(sessionTimes) {
