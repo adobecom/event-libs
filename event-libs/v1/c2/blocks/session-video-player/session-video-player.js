@@ -1,9 +1,8 @@
 import { createTag, LIBS } from '../../../utils/utils.js';
 import { getNowMs } from '../../../utils/session-state.js';
 import { getEventStartMs, initTierOneEventConfig } from '../../../utils/tier-1-event-config.js';
-import {
-  sessions, liveStreamActiveIds, initSessionState,
-} from '../../../utils/session-store.js';
+import { deriveMrEnv } from '../../../utils/session-store.js';
+import { registerStreamIds, unregisterStreamIds, subscribe as subscribeToPoller } from '../../../services/sessions/poller.js';
 import BlockMediator from '../../../deps/block-mediator.min.js';
 import { showVideoLayoutLoader, hideVideoLayoutLoader } from '../../utils/video-layout-loader.js';
 import {
@@ -21,6 +20,7 @@ import {
   ensureStylesheet,
   getPlaybackPhase,
   PLAYBACK_PHASE,
+  buildSessionFromMetadata,
 } from '../../utils/video-session.js';
 
 const LOG_SCOPE = 'session-video-player';
@@ -524,20 +524,20 @@ function awaitEmbedDecision(el) {
   });
 }
 
-// The catalog is fetched async — resolve immediately if it's already loaded, otherwise wait
-// for the one `sessions` update that includes this id. Same pattern as mobile-rider.js.
-function resolveCatalogSession(sessionId) {
-  initSessionState();
-  const existing = sessions.value.find((s) => s.id === sessionId);
-  if (existing) return Promise.resolve(existing);
+// A live poll is only meaningful for a session with its own mrStreamId — same registry
+// session-routing.js's card-level polling uses, so this batches into the same underlying
+// fetchLiveStatus() call rather than starting a second, independent poller. Deliberately NOT
+// routed through session-store.js's initSessionState()/startPolling() — those require the
+// full session catalog fetch, which this metadata-only block has no other reason to make.
+function waitForLiveStatus(mrStreamId) {
+  if (!mrStreamId) return Promise.resolve(new Set());
   return new Promise((resolve) => {
-    const unsubscribe = sessions.subscribe((list) => {
-      const found = list.find((s) => s.id === sessionId);
-      if (found) {
-        unsubscribe();
-        resolve(found);
-      }
-    });
+    const unsubscribe = subscribeToPoller(({ active }) => {
+      unsubscribe();
+      unregisterStreamIds([mrStreamId]);
+      resolve(new Set(active));
+    }, [mrStreamId]);
+    registerStreamIds([mrStreamId], { env: deriveMrEnv() });
   });
 }
 
@@ -571,16 +571,25 @@ async function resolveRenderContext(el) {
     return null;
   }
 
-  const session = await resolveCatalogSession(sessionId);
+  // Metadata-only — no session catalog fetch. `custom-attributes`/`session-times` are
+  // already authored on this page (same source session-video-playlist.js already reads),
+  // so this block never has to wait on the async catalog just to learn about the one
+  // session its own page is already about.
+  const sessionTimes = parseJsonMetadata('session-times');
+  const session = buildSessionFromMetadata(sessionTimes);
 
   // Idempotent; other blocks that read event-start-anchored config (session-video-playlist,
   // mobile-rider) call this defensively too, in case decorateEvent hasn't run it yet —
   // otherwise getEventStartMs() silently returns null and IPOD/live DVR gates never open.
   initTierOneEventConfig();
+
+  // A poll is only relevant/started for a genuinely live-identified session — resolves
+  // immediately (empty set) for IPOD/Simulive sessions, which never read it anyway.
+  const liveStreamActiveIds = await waitForLiveStatus(session.mrStreamId);
   const phase = getPlaybackPhase(session, {
     nowMs: getNowMs(),
     eventStartMs: getEventStartMs(),
-    liveStreamActiveIds: liveStreamActiveIds.value,
+    liveStreamActiveIds,
   });
   // pre-event and watch-live are deliberately not this block's job — session-broadcast/
   // mobile-rider own the live-watching experience; this block only ever plays a video.
@@ -591,7 +600,6 @@ async function resolveRenderContext(el) {
     return null;
   }
 
-  const sessionTimes = parseJsonMetadata('session-times');
   const currentVideo = resolveVideoForPhase(phase, sessionTimes, session);
   if (!currentVideo) {
     logError('no embeddable video available for the current phase — nothing to render');

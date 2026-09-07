@@ -10,7 +10,7 @@ function group(intervalMs) {
   let g = groups.get(intervalMs);
   if (!g) {
     g = {
-      refCounts: new Map(), intervalId: null, inFlight: false, refetchNeeded: false, immediatePending: false,
+      refCounts: new Map(), intervalId: null, inFlight: false, refetchNeeded: false, immediatePending: false, env: null,
     };
     groups.set(intervalMs, g);
   }
@@ -26,7 +26,11 @@ async function tick(g) {
   if (!ids.length) return;
   g.inFlight = true;
   try {
-    const { active, inactive } = await fetchLiveStatus(ids, getEventApiConfig()?.mrEnv);
+    // mrEnv is event-wide, never per-stream — the first caller to supply one for this
+    // interval group wins; getEventApiConfig() is only a fallback for callers (e.g.
+    // session-routing.js) that never supply their own, relying on some other block having
+    // already run initSessionState().
+    const { active, inactive } = await fetchLiveStatus(ids, g.env ?? getEventApiConfig()?.mrEnv);
     const result = { active: [...active], inactive: [...inactive] };
     listeners.forEach((entry) => entry.notify(result, ids));
   } catch (error) {
@@ -66,9 +70,10 @@ function stopPollingIfIdle(g, intervalMs) {
   groups.delete(intervalMs);
 }
 
-export function registerStreamIds(ids, { intervalMs = DEFAULT_POLL_INTERVAL_MS } = {}) {
+export function registerStreamIds(ids, { intervalMs = DEFAULT_POLL_INTERVAL_MS, env = null } = {}) {
   if (!ids?.length) return;
   const g = group(intervalMs);
+  if (env && !g.env) g.env = env;
   const hasNewIds = ids.some((id) => !g.refCounts.has(id));
   ids.forEach((id) => g.refCounts.set(id, (g.refCounts.get(id) || 0) + 1));
   if (g.intervalId && hasNewIds) {

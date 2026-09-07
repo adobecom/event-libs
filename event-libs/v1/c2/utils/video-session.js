@@ -1,5 +1,7 @@
 import { getMetadata } from '../../utils/utils.js';
 import { dvrAvailableAtMs } from '../../utils/session-state.js';
+import { getAttrText, getAttrValues } from './custom-attributes.js';
+import { hasOnDemandFormat, parseDvrDelayHours } from '../../services/sessions/sessions-api.js';
 
 export const VIDEO_LAYOUT_DECISION_KEY = 'videoLayoutDecision';
 
@@ -238,4 +240,34 @@ export function getPlaybackPhase(session, {
   if (playbackCase === PLAYBACK_CASE.SIMULIVE) return simulivePhase(session, nowMs);
   if (playbackCase === PLAYBACK_CASE.LIVE) return livePhase(session, nowMs, liveStreamActiveIds);
   return null;
+}
+
+// --- Metadata-driven session shape (no catalog fetch) -----------------------------------
+//
+// `custom-attributes` (the raw RF/ESP attribute array) is already authored as page metadata
+// on an Individual Session Page, sibling to `session-times` — session-video-playlist.js
+// already reads it this same way (`extractCustomAttributeSlugs`/`extractCustomAttributeValue`
+// against `{ customAttributes: pageCustomAttributes }`). This builds the subset of fields
+// classifySessionPlayback()/getPlaybackPhase() need, directly from that page metadata, so a
+// single-session consumer never has to wait on the async session catalog just to learn about
+// the one session its own page is already about.
+export function buildSessionFromMetadata(sessionTimes) {
+  const firstEntry = (sessionTimes || [])[0] || null;
+  const formatValues = getAttrValues('Format').map((v) => v.label || v.value);
+
+  return {
+    startTimeUtc: firstEntry?.startTimeMillis ? new Date(firstEntry.startTimeMillis).toISOString() : '',
+    endTimeUtc: firstEntry?.endTimeMillis ? new Date(firstEntry.endTimeMillis).toISOString() : '',
+    hasOnDemandFormat: hasOnDemandFormat(formatValues),
+    isLivestreamed: getAttrValues('Livestreamed Content').some((v) => (v.label || v.value) === 'Live'),
+    mrStreamId: getAttrText('Mobilerider Video ID (Livestream)') || null,
+    mpcId: getAttrText('MPC ID'),
+    youTubeId: getAttrText('YouTube ID'),
+    mrDvrVideoId: getAttrText('Mobilerider Video ID (DVR)'),
+    mrSkinId: getAttrText('Skin ID'),
+    // 'Video Duration' is the name sessions-api.js looks for; some real payloads carry it as
+    // 'Video Duration (hr:min:sec)' instead — try both rather than repeat that mismatch here.
+    videoDuration: getAttrText('Video Duration') || getAttrText('Video Duration (hr:min:sec)'),
+    dvrDelayHours: parseDvrDelayHours(getAttrText('DVR Timing (in hours)')),
+  };
 }
