@@ -66,7 +66,7 @@ async function isAudienceMatch(audience) {
   return isRegisteredInPerson();
 }
 
-function buildBanner(contentEl, bannerId) {
+function buildBanner(contentEl, bannerId, onDismiss) {
   const banner = createTag('div', { class: 'in-person-banner-inner', role: 'status', 'aria-live': 'polite' });
   const copy = createTag('div', { class: 'in-person-banner-copy' }, contentEl.innerHTML, { parent: banner });
   copy.querySelectorAll('a').forEach((a) => a.classList.add('in-person-banner-link'));
@@ -78,12 +78,16 @@ function buildBanner(contentEl, bannerId) {
   }, CLOSE_ICON_SVG, { parent: banner });
   closeBtn.addEventListener('click', () => {
     setDismissed(bannerId);
+    onDismiss?.();
     banner.closest('.in-person-banner')?.remove();
   });
 
   return banner;
 }
 
+// Returns a teardown fn — callers must invoke it once the banner is dismissed/removed, or
+// this listener keeps firing on every scroll indefinitely, reading offsetHeight on a
+// detached element and writing stale CSS custom properties forever.
 function observeScrollReveal(el) {
   let ticking = false;
   const update = () => {
@@ -93,12 +97,14 @@ function observeScrollReveal(el) {
     el.classList.toggle('in-person-banner-scrolled', progress >= bannerHeight);
     ticking = false;
   };
-  window.addEventListener('scroll', () => {
+  const onScroll = () => {
     if (ticking) return;
     ticking = true;
     window.requestAnimationFrame(update);
-  }, { passive: true });
+  };
+  window.addEventListener('scroll', onScroll, { passive: true });
   update();
+  return () => window.removeEventListener('scroll', onScroll);
 }
 
 function syncBannerHeightVar(el) {
@@ -129,13 +135,14 @@ function renderBanner(el, contentCell, bannerId, navOverlay) {
   el.dataset.theme = el.classList.contains('dark') ? 'dark' : 'light';
   el.classList.toggle('in-person-banner-nav-overlay', navOverlay);
 
-  const banner = buildBanner(contentCell, bannerId);
+  let stopScrollReveal;
+  const banner = buildBanner(contentCell, bannerId, () => stopScrollReveal?.());
   el.replaceChildren(banner);
 
   if (navOverlay) {
     document.body.prepend(el);
     syncBannerHeightVar(el);
-    observeScrollReveal(el);
+    stopScrollReveal = observeScrollReveal(el);
   }
 }
 
@@ -175,7 +182,9 @@ export default function init(el) {
 
   el.hidden = true;
   isAudienceMatch(audience).then((matches) => {
-    if (!matches) {
+    // Re-check: a duplicate instance of this same banner elsewhere on the page could have
+    // been dismissed while this instance's async audience check was still pending.
+    if (!matches || isDismissed(bannerId)) {
       el.remove();
       return;
     }

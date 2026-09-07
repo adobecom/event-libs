@@ -166,6 +166,23 @@ describe('in-person-banner', () => {
       expect(el.hidden).to.be.false;
       expect(el.querySelector('.in-person-banner-inner')).to.exist;
     });
+
+    it('re-checks dismissal after the async audience check, so a dismissal during the wait still wins', async () => {
+      // Simulates a duplicate instance of the same banner-id being dismissed elsewhere on
+      // the page while this instance's own audience check is still pending.
+      const el = buildBlock({ config: { audience: 'signed-in', 'banner-id': 'promo-race' } });
+      init(el);
+      expect(el.hidden).to.be.true;
+
+      window.localStorage.setItem(
+        DISMISSED_STORAGE_KEY,
+        JSON.stringify({ 'promo-race': true }),
+      );
+      BlockMediator.set('imsProfile', signedInProfile);
+      await flush();
+
+      expect(el.isConnected).to.be.false;
+    });
   });
 
   describe('audience: in-person', () => {
@@ -285,6 +302,28 @@ describe('in-person-banner', () => {
       const el = buildBlock({ config: { 'nav-overlay': 'false' } });
       init(el);
       expect(el.classList.contains('in-person-banner-nav-overlay')).to.be.false;
+    });
+
+    it('removes the scroll listener once the banner is dismissed, so it stops updating after removal', () => {
+      const el = buildBlock({ config: { 'nav-overlay': 'true', 'banner-id': 'promo-nav' } });
+      init(el);
+
+      // Confirm the listener is live before dismissal.
+      window.scrollY = 5;
+      window.dispatchEvent(new Event('scroll'));
+      const before = document.documentElement.style.getPropertyValue('--in-person-banner-scroll-progress');
+      expect(before).to.not.equal('');
+
+      el.querySelector('.in-person-banner-close').click();
+      expect(el.isConnected).to.be.false;
+
+      // A leaked listener would still update the CSS var (and throw on el.offsetHeight
+      // only if truly detached from a document — here we assert it simply stops changing).
+      document.documentElement.style.removeProperty('--in-person-banner-scroll-progress');
+      window.scrollY = 50;
+      window.dispatchEvent(new Event('scroll'));
+      const after = document.documentElement.style.getPropertyValue('--in-person-banner-scroll-progress');
+      expect(after).to.equal('');
     });
   });
 
