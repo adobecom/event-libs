@@ -130,6 +130,14 @@ export function extractDistinctPrimaryTracks(sessions) {
   return [...tracks].sort();
 }
 
+export function getSessionIsLivestreamed(session) {
+  return extractCustomAttributeValues(session, 'Livestreamed Content').includes('Live');
+}
+
+export function getSessionIsOnline(session) {
+  return hasFormatValue(extractCustomAttributeValues(session, 'Format'), FORMAT_ONLINE);
+}
+
 const ADDITIONAL_TRACK_ATTRIBUTE_NAME = 'Additional Event Site Tracks';
 
 // All values, not just the first — the runtime treats these as real tracks.
@@ -360,7 +368,7 @@ export function mapEslPayloadToRawSessions(payload) {
         photo: null,
       }));
 
-    const isLivestreamed = extractCustomAttributeValues(session, 'Livestreamed Content').includes('Live');
+    const isLivestreamed = getSessionIsLivestreamed(session);
     const type = extractCustomAttributeValue(session, ['Type', 'Session Type']);
     const thumbnail = (session.images || []).find((img) => img.imageKind === 'session-card-image');
 

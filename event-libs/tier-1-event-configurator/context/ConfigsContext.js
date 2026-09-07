@@ -10,7 +10,9 @@ import { getEventSessionCatalog } from '../../v1/utils/esp-controller.js';
 import { useDA } from './DAContext.js';
 import { useEventEnv } from './EventEnvContext.js';
 import { getDisplayTitle } from '../utils.js';
-import { CONFIG_TYPES, HOMEPAGE_SESSION_FIELDS, isHomepageConfigType } from '../constants.js';
+import {
+  CONFIG_TYPES, HOMEPAGE_SESSION_FIELDS, HOMEPAGE_FIELD_BY_TYPE, isHomepageConfigType,
+} from '../constants.js';
 
 const ConfigsContext = createContext();
 
@@ -149,7 +151,14 @@ const ConfigsProvider = ({ children }) => {
     const configType = sourceRow.configType || CONFIG_TYPES.GLOBAL;
     const sourceConfig = sourceRow.config || {};
     const config = isHomepageConfigType(configType)
-      ? emptyConfig(configType)
+      ? {
+        ...emptyConfig(configType),
+        ...Object.fromEntries(
+          Object.values(HOMEPAGE_FIELD_BY_TYPE[configType]?.ctaFields || {})
+            .filter((field) => sourceConfig[field])
+            .map((field) => [field, sourceConfig[field]]),
+        ),
+      }
       : {
         ...emptyConfig(configType),
         trackIcons: sourceConfig.trackIcons || {},

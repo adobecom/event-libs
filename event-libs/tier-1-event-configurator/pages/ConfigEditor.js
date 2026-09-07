@@ -8,7 +8,7 @@ import {
   isTrackIconEntryComplete, getDisplayTitle, stringifyConfig, copyHomepageConfigLink,
 } from '../utils.js';
 import {
-  CONFIG_TYPES, HOMEPAGE_FIELD_BY_TYPE, isHomepageConfigType, HOMEPAGE_THEME_OPTIONS,
+  CONFIG_TYPES, HOMEPAGE_FIELD_BY_TYPE, isHomepageConfigType,
 } from '../constants.js';
 import TrackIconEditor from '../components/TrackIconEditor.js';
 import OverrideTrackIconEditor from '../components/OverrideTrackIconEditor.js';
@@ -343,16 +343,23 @@ export default function ConfigEditor() {
               onInput=${(e) => updateConfigField(homepageMeta.headingField, e.target.value)}
             />
           `}
-          ${homepageMeta.themeField && html`
-            <label class="tec-editor__field-label" for="tec-homepage-theme">Card theme</label>
-            <select
-              id="tec-homepage-theme"
-              class="tec-field"
-              value=${activeConfig.config[homepageMeta.themeField] || 'light'}
-              onChange=${(e) => updateConfigField(homepageMeta.themeField, e.target.value)}
-            >
-              ${HOMEPAGE_THEME_OPTIONS.map((opt) => html`<option value=${opt.value} key=${opt.value}>${opt.label}</option>`)}
-            </select>
+          ${homepageMeta.ctaFields && html`
+            <p class="tec-editor__section-hint">${homepageMeta.ctaHint}</p>
+            <div class="tec-editor__cta-fields">
+              ${Object.entries(homepageMeta.ctaFields).map(([state, field]) => html`
+                <label class="tec-editor__field-label" for="tec-cta-${state}" key=${state}>
+                  CTA text — ${state}
+                </label>
+                <input
+                  id="tec-cta-${state}"
+                  type="text"
+                  class="tec-field tec-editor__heading-input"
+                  placeholder=${homepageMeta.ctaDefaults?.[state] || ''}
+                  value=${activeConfig.config[field] || ''}
+                  onInput=${(e) => updateConfigField(field, e.target.value)}
+                />
+              `)}
+            </div>
           `}
           ${isLoadingSessions && html`<${LoadingInline} label="Loading sessions…" />`}
           ${sessionsError && html`<p class="tec-editor__error">${sessionsError}</p>`}
