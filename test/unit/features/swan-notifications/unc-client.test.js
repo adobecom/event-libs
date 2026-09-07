@@ -13,6 +13,14 @@ function makeUncInstance() {
   };
 }
 
+function makeDirectMethodInstance() {
+  return {
+    UpsertReminderFeatureFlag: sinon.stub(),
+    DeleteReminderFeatureFlag: sinon.stub(),
+    AnalyticsEventFromHost: sinon.stub(),
+  };
+}
+
 function stubUniversalNav(getComponent) {
   window.UniversalNav = { getComponent };
 }
@@ -35,6 +43,22 @@ describe('unc-client', () => {
       const uncInstance = makeUncInstance();
       stubUniversalNav(async (name) => (name === 'notifications' ? { instance: uncInstance } : undefined));
       expect(await whenUncReady()).to.equal(uncInstance);
+    });
+
+    it('trusts an instance exposing the three reminder methods directly, with no _uncContainer', async () => {
+      const uncInstance = makeDirectMethodInstance();
+      stubUniversalNav(async (name) => (name === 'notifications' ? { instance: uncInstance } : undefined));
+      expect(await whenUncReady()).to.equal(uncInstance);
+    });
+
+    it('does not trust an instance exposing only some of the three reminder methods directly', async () => {
+      const clock = sinon.useFakeTimers();
+      stubUniversalNav(async () => ({
+        instance: { AnalyticsEventFromHost: sinon.stub() },
+      }));
+      const promise = whenUncReady(1000);
+      await clock.tickAsync(1000);
+      expect(await promise).to.equal(null);
     });
 
     it('does not trust an instance missing all of the expected methods', async () => {
@@ -151,10 +175,90 @@ describe('unc-client', () => {
       expect(await results).to.deep.equal([false, false, false]);
     });
 
-    it('resolves false without throwing when the underlying engine call itself throws', async () => {
+    it('resolves false without throwing when the underlying engine call itself throws on every retry', async () => {
+      const clock = sinon.useFakeTimers();
       uncInstance._uncContainer.handleMessageFromInterface.throws(new Error('engine exploded'));
-      const result = await registerReminderRule('swan-RF-1-reminder', {});
-      expect(result).to.equal(false);
+      const promise = registerReminderRule('swan-RF-1-reminder', {});
+      await clock.tickAsync(8 * 500);
+      expect(await promise).to.equal(false);
+      expect(uncInstance._uncContainer.handleMessageFromInterface.callCount).to.equal(9);
+    });
+
+    it('retries a transient call failure and succeeds once the engine recovers', async () => {
+      const clock = sinon.useFakeTimers();
+      uncInstance._uncContainer.handleMessageFromInterface
+        .onCall(0).throws(new Error('not ready'))
+        .onCall(1).throws(new Error('not ready'))
+        .onCall(2).returns(undefined);
+      const promise = registerReminderRule('swan-RF-1-reminder', {});
+      await clock.tickAsync(2 * 500);
+      expect(await promise).to.equal(true);
+      expect(uncInstance._uncContainer.handleMessageFromInterface.callCount).to.equal(3);
+    });
+
+    it('deleteReminderRule also retries a transient call failure', async () => {
+      const clock = sinon.useFakeTimers();
+      uncInstance._uncContainer.handleMessageFromInterface
+        .onCall(0).throws(new Error('not ready'))
+        .onCall(1).returns(undefined);
+      const promise = deleteReminderRule('swan-RF-1-reminder');
+      await clock.tickAsync(500);
+      expect(await promise).to.equal(true);
+      expect(uncInstance._uncContainer.handleMessageFromInterface.callCount).to.equal(2);
+    });
+
+    it('fireHostEvent also retries a transient call failure', async () => {
+      const clock = sinon.useFakeTimers();
+      uncInstance._uncContainer.handleMessageFromInterface
+        .onCall(0).throws(new Error('not ready'))
+        .onCall(1).returns(undefined);
+      const promise = fireHostEvent({});
+      await clock.tickAsync(500);
+      expect(await promise).to.equal(true);
+      expect(uncInstance._uncContainer.handleMessageFromInterface.callCount).to.equal(2);
+    });
+  });
+
+  describe('resolution against an instance exposing the reminder methods directly', () => {
+    let directInstance;
+
+    beforeEach(() => {
+      directInstance = makeDirectMethodInstance();
+      stubUniversalNav(async (name) => (name === 'notifications' ? { instance: directInstance } : undefined));
+    });
+
+    it('registerReminderRule calls UpsertReminderFeatureFlag directly, never touching _uncContainer', async () => {
+      const campaignRule = { events: [] };
+      const result = await registerReminderRule('swan-RF-1-reminder', campaignRule);
+      expect(result).to.equal(true);
+      expect(directInstance.UpsertReminderFeatureFlag.calledOnceWith(
+        { campaignRules: [{ campaignID: 'swan-RF-1-reminder', campaignRule }] },
+      )).to.equal(true);
+      expect(directInstance._uncContainer).to.equal(undefined);
+    });
+
+    it('deleteReminderRule calls DeleteReminderFeatureFlag directly', async () => {
+      const result = await deleteReminderRule('swan-RF-1-reminder');
+      expect(result).to.equal(true);
+      expect(directInstance.DeleteReminderFeatureFlag.calledOnceWith(
+        { campaignRules: [{ campaignID: 'swan-RF-1-reminder' }] },
+      )).to.equal(true);
+    });
+
+    it('fireHostEvent calls AnalyticsEventFromHost directly', async () => {
+      const eventData = { swan_campaign_id: 'swan-RF-1-reminder' };
+      const result = await fireHostEvent(eventData);
+      expect(result).to.equal(true);
+      expect(directInstance.AnalyticsEventFromHost.calledOnceWith(eventData)).to.equal(true);
+    });
+
+    it('prefers the direct method over a working _uncContainer when both are present', async () => {
+      directInstance._uncContainer = { handleMessageFromInterface: sinon.stub() };
+      const eventData = { swan_campaign_id: 'swan-RF-1-reminder' };
+      const result = await fireHostEvent(eventData);
+      expect(result).to.equal(true);
+      expect(directInstance.AnalyticsEventFromHost.calledOnceWith(eventData)).to.equal(true);
+      expect(directInstance._uncContainer.handleMessageFromInterface.called).to.equal(false);
     });
   });
 });

@@ -115,3 +115,21 @@ to the UNC/UniversalNav team. Neither blocks item 5.
 
 Item 5: PR #276's description has been updated to reflect this resolution. Taking it out
 of draft is left as an explicit call for the PR author, pending the live QA in item 1.
+
+## Open question: Photoshop/Adobe Home team's direct-call pattern
+
+The Adobe Home team's `nest/nest` PR #5275 ("[Analytics] Send events to UNC") resolves the
+same `window.UniversalNav.getComponent('notifications')` instance and calls
+`AnalyticsEventFromHost` directly on it (`instance.AnalyticsEventFromHost(event)`), with no
+`_uncContainer` involved — contradicting this doc's live-verified finding that the instance
+UNAV hands back strips prototype methods. Their own verification was against a local
+remapping of the UNC script (a stub), not the real production bundle, so it's unclear
+whether UNC's contract has since changed to restore these methods, or whether their
+integration is equally unverified against the real engine. Worth raising alongside Action
+Item 4 above when asking the UNC/UniversalNav team to bless a path officially — cite PR #5275
+as evidence that at least one other team is already relying on an unconfirmed assumption
+about this same instance shape.
+
+`unc-client.js` now tries a direct method call first and falls back to
+`_uncContainer.handleMessageFromInterface` if the direct method isn't present, so it's
+compatible with either shape without depending on this question being resolved first.

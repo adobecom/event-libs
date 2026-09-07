@@ -31,16 +31,51 @@
 // "ready" event for this seam (checked milo's global-navigation.js), so this polls rather
 // than waiting on one.
 const POLL_INTERVAL_MS = 250;
+const CALL_MAX_RETRIES = 8;
+const CALL_RETRY_DELAY_MS = 500;
 
-function isUncInstance(candidate) {
-  return !!candidate
-    && typeof candidate._uncContainer?.handleMessageFromInterface === 'function';
+function hasDirectMethods(candidate) {
+  return typeof candidate?.UpsertReminderFeatureFlag === 'function'
+    && typeof candidate?.DeleteReminderFeatureFlag === 'function'
+    && typeof candidate?.AnalyticsEventFromHost === 'function';
 }
 
-// `_uncContainer` is an undocumented, underscore-prefixed internal field, not a published
-// contract — kept behind one call site so a future change to this path only touches one line.
+function hasContainerPath(candidate) {
+  return typeof candidate?._uncContainer?.handleMessageFromInterface === 'function';
+}
+
+function isUncInstance(candidate) {
+  return !!candidate && (hasDirectMethods(candidate) || hasContainerPath(candidate));
+}
+
+// Tries a direct method on the instance first, falling back to `_uncContainer` — an
+// undocumented, underscore-prefixed internal field, not a published contract — kept behind
+// this one call site so a future contract change only touches one function.
 function callUnc(instance, methodName, payload) {
+  if (typeof instance[methodName] === 'function') {
+    instance[methodName](payload);
+    return;
+  }
   instance._uncContainer.handleMessageFromInterface(methodName, payload);
+}
+
+function delay(ms) {
+  return new Promise((resolve) => { setTimeout(resolve, ms); });
+}
+
+async function callUncWithRetry(instance, methodName, payload) {
+  let lastErr;
+  for (let attempt = 0; attempt <= CALL_MAX_RETRIES; attempt += 1) {
+    try {
+      callUnc(instance, methodName, payload);
+      return;
+    } catch (err) {
+      lastErr = err;
+      // eslint-disable-next-line no-await-in-loop
+      if (attempt < CALL_MAX_RETRIES) await delay(CALL_RETRY_DELAY_MS);
+    }
+  }
+  throw lastErr;
 }
 
 async function tryResolveInstance() {
@@ -85,7 +120,8 @@ export async function registerReminderRule(campaignId, campaignRule) {
   try {
     const uncInstance = await whenUncReady();
     if (!uncInstance) return false;
-    callUnc(uncInstance, 'UpsertReminderFeatureFlag', { campaignRules: [{ campaignID: campaignId, campaignRule }] });
+    const payload = { campaignRules: [{ campaignID: campaignId, campaignRule }] };
+    await callUncWithRetry(uncInstance, 'UpsertReminderFeatureFlag', payload);
     return true;
   } catch (err) {
     window.lana?.log(`[unc-client] registerReminderRule failed for ${campaignId}: ${err.message}`);
@@ -97,7 +133,8 @@ export async function deleteReminderRule(campaignId) {
   try {
     const uncInstance = await whenUncReady();
     if (!uncInstance) return false;
-    callUnc(uncInstance, 'DeleteReminderFeatureFlag', { campaignRules: [{ campaignID: campaignId }] });
+    const payload = { campaignRules: [{ campaignID: campaignId }] };
+    await callUncWithRetry(uncInstance, 'DeleteReminderFeatureFlag', payload);
     return true;
   } catch (err) {
     window.lana?.log(`[unc-client] deleteReminderRule failed for ${campaignId}: ${err.message}`);
@@ -109,7 +146,7 @@ export async function fireHostEvent(eventData) {
   try {
     const uncInstance = await whenUncReady();
     if (!uncInstance) return false;
-    callUnc(uncInstance, 'AnalyticsEventFromHost', eventData);
+    await callUncWithRetry(uncInstance, 'AnalyticsEventFromHost', eventData);
     return true;
   } catch (err) {
     window.lana?.log(`[unc-client] fireHostEvent failed: ${err.message}`);

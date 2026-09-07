@@ -106,12 +106,13 @@ export async function notifySessionUnscheduled(session) {
 }
 
 // Guards against two reconcile passes overlapping: each applyStage() call can take up to
-// ~24s in the worst case (three sequential unc-client.js calls, each with its own 8s
-// whenUncReady() timeout if UNC is slow to initialize) — longer than the ~15s ticker
-// interval that drives this. Without this guard, a slow pass still in flight when the next
-// tick fires would race the new pass's read-modify-write of the same localStorage key;
-// whichever writes last would silently clobber the other's update. Skipping an overlapping
-// tick is harmless — the next one 15s later picks up wherever the in-flight pass left off.
+// ~36s in the worst case (three sequential unc-client.js calls, each with its own 8s
+// whenUncReady() timeout plus up to 8x500ms of call retries if UNC is slow to initialize or
+// its internal state isn't ready yet) — longer than the ~15s ticker interval that drives
+// this. Without this guard, a slow pass still in flight when the next tick fires would race
+// the new pass's read-modify-write of the same localStorage key; whichever writes last would
+// silently clobber the other's update. Skipping an overlapping tick is harmless — the next
+// one 15s later picks up wherever the in-flight pass left off.
 let reconcileInFlight = false;
 
 // getSessions/getScheduled are getter callbacks (not signal imports), matching
