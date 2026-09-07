@@ -283,18 +283,19 @@ class MobileRider {
       more.addEventListener('click', () => openSessionGuideDetail(sessionId));
     }
 
-    let resolvedSession = { id: sessionId, title: cfg['session-title'] || '' };
     const actions = createTag('div', { class: 'mobile-rider-info-bar-actions' }, '', { parent: panel });
-    const shareBtn = buildShareButton(() => resolvedSession);
-    actions.append(shareBtn);
 
     initSessionState();
+    // Share needs the real session's sessionPageUrl — building the button before that
+    // resolves would let a click silently no-op (safeUrl(undefined) is falsy), so it's only
+    // created once the session is known, same as the Favorite button below.
     const onSessionResolved = (session) => {
-      resolvedSession = session;
       paintTitle(session);
       paintCategory(session);
       paintDescription(session);
+      const shareBtn = buildShareButton(() => session);
       shareBtn.setAttribute('aria-label', session.title ? `Share ${session.title}` : 'Share');
+      actions.append(shareBtn);
       actions.prepend(buildFavoriteButton(session));
     };
     const existing = sessions.value.find((s) => s.id === sessionId);
