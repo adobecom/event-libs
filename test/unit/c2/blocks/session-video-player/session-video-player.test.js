@@ -29,6 +29,7 @@ function catalogSession(overrides = {}) {
     mpcId: '3458940',
     youTubeId: '',
     mrDvrVideoId: '',
+    mrSkinId: '',
     mrStreamId: null,
     isLivestreamed: false,
     hasOnDemandFormat: false,
@@ -448,6 +449,7 @@ describe('session-video-player', () => {
         isLivestreamed: true,
         mpcId: '',
         mrDvrVideoId: 'dvr-asset-1',
+        mrSkinId: 'adobe',
         startTimeUtc: new Date(Date.now() - 2 * HOUR_MS).toISOString(),
         endTimeUtc: new Date(Date.now() - HOUR_MS).toISOString(),
         dvrDelayHours: 5,
@@ -459,7 +461,12 @@ describe('session-video-player', () => {
       // whose settling time isn't bounded by a fixed number of flush() ticks.
       await waitFor(() => fullWidthPlayer.querySelector('.mobile-rider'));
 
-      expect(fullWidthPlayer.querySelector('.mobile-rider')).to.exist;
+      const rider = fullWidthPlayer.querySelector('.mobile-rider');
+      expect(rider).to.exist;
+      // Without a skin id, mobilerider.embed() mounts the player but playback never starts.
+      expect(rider.dataset.extractedVideoId).to.equal('dvr-asset-1');
+      expect(rider.dataset.extractedSkinId).to.equal('adobe');
+      expect(rider.dataset.extractedAutoplay).to.equal('true');
       delete globalThis.mobilerider;
     });
 

@@ -448,6 +448,11 @@ async function loadMobileRiderPlayer(el, video) {
   el.querySelector('.milo-video')?.remove();
   const rider = createTag('div', { class: 'mobile-rider' }, '', { parent: el });
   rider.dataset.extractedVideoId = video.videoId;
+  // Without a skin id, mobilerider.embed() mounts the player but never actually starts
+  // playback — this is the session's own authored skin (Kat's real sample: "adobe"), not a
+  // hardcoded default.
+  if (video.skinId) rider.dataset.extractedSkinId = video.skinId;
+  rider.dataset.extractedAutoplay = 'true';
   initMobileRider(rider);
   el.dataset.embedded = 'true';
 }
@@ -549,7 +554,7 @@ function resolveVideoForPhase(phase, sessionTimes, session) {
   // loadMobileRiderPlayer() instead.
   if (phase === PLAYBACK_PHASE.DVR_BUFFER) {
     if (!session?.mrDvrVideoId) return null;
-    return { provider: 'mobilerider', videoId: session.mrDvrVideoId };
+    return { provider: 'mobilerider', videoId: session.mrDvrVideoId, skinId: session.mrSkinId };
   }
   return null;
 }
