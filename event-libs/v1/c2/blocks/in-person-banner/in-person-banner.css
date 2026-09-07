@@ -38,7 +38,6 @@ body:has(.in-person-banner-nav-overlay:not(.in-person-banner-scrolled)) main {
   gap: var(--s2a-spacing-md);
   box-sizing: border-box;
   width: 100%;
-  max-width: 1440px;
   margin: 0 auto;
   padding: var(--s2a-spacing-md) 64px;
   background: var(--s2a-color-background-default);

@@ -105,16 +105,17 @@ exists for this.
   exception: a banner placed at the very top of the page — that's what the
   `nav-overlay` config row opts into. It fixes the banner above GNAV at its own
   natural, content-driven height (no min-height tying it to GNAV's height) and
-  pushes `header.global-navigation`'s own sticky `top` down by the banner's
-  *actual rendered* height via a sibling-selector override
-  (`.in-person-banner-nav-overlay ~ header.global-navigation { top: ... }`) — no
-  edit to GNAV's source, GNAV just renders directly below the banner and stays
-  visible the whole time, not covered. Once the visitor scrolls past
-  `SCROLL_REVEAL_THRESHOLD` (10px, in `in-person-banner.js`), the banner slides
-  away (`transform: translateY(-100%)`) and the same sibling selector hands GNAV
-  back `top: 0`, so it slides up to reclaim the vacated space. Scroll position is
-  polled via a single passive `scroll` listener throttled to one check per
-  animation frame, not per-event, to avoid layout thrash.
+  pushes `header.global-navigation` down by the banner's *actual rendered* height
+  via a sibling-selector override
+  (`.in-person-banner-nav-overlay ~ header.global-navigation { transform: translateY(...) }`)
+  — no edit to GNAV's source, GNAV just renders directly below the banner and stays
+  visible the whole time, not covered. As the visitor scrolls, the banner
+  progressively slides up (`transform: translateY(-scrollProgress)`, capped at the
+  banner's own height) and the same sibling selector shrinks GNAV's push by that same
+  amount in lockstep, so GNAV reclaims the vacated space smoothly rather than at a
+  single fixed threshold. Scroll position is polled via a single passive `scroll`
+  listener throttled to one check per animation frame, not per-event, to avoid layout
+  thrash.
 - When `nav-overlay` is active, `init()` reparents the block element to be a direct
   child of `<body>` — both so `position: fixed` reliably pins to the true viewport
   (a `transform`/`filter`/`will-change: transform` on any ancestor between the
