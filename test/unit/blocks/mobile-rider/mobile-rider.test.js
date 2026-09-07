@@ -1073,14 +1073,15 @@ function runMobileRiderSuite(modulePath, variantLabel) {
       expect(sessionGuideRequest.value).to.deep.equal({ sessionId: 's-100' });
     });
 
-    it('renders the Share button immediately, without waiting on the sessions store', async () => {
+    it('does not render a Share button until the session resolves from the store', async () => {
       document.body.innerHTML = sessionInfoBarHtml({ aboutEnabled: 'true' });
       const el = document.querySelector('.mobile-rider');
       riderInstance = init(el);
       await new Promise((resolve) => { setTimeout(resolve, 50); });
 
-      // sessions.value is left at [] for this test — the button itself must not depend on
-      // it resolving, even though clicking it before resolution is a no-op (no sessionPageUrl).
+      expect(el.querySelector('.mobile-rider-info-bar-share')).to.not.exist;
+
+      sessions.value = [{ id: 's-100', rfCode: 'rf-100' }];
       const shareBtn = el.querySelector('.mobile-rider-info-bar-share');
       expect(shareBtn).to.exist;
       expect(shareBtn.getAttribute('daa-ll')).to.equal('Share');
@@ -1104,30 +1105,26 @@ function runMobileRiderSuite(modulePath, variantLabel) {
       expect(navigator.clipboard.writeText.firstCall.args[0]).to.include('/sessions/s-100');
     });
 
-    it('does not attempt to share before the session resolves (no sessionPageUrl yet)', async () => {
+    it('renders the Share button immediately when the session is already resolved', async () => {
+      sessions.value = [{ id: 's-100', rfCode: 'rf-100', sessionPageUrl: '/sessions/s-100' }];
       document.body.innerHTML = sessionInfoBarHtml({ aboutEnabled: 'true' });
       const el = document.querySelector('.mobile-rider');
       riderInstance = init(el);
       await new Promise((resolve) => { setTimeout(resolve, 50); });
 
-      sinon.stub(navigator.clipboard, 'writeText').resolves();
-
-      el.querySelector('.mobile-rider-info-bar-share').click();
-      await new Promise((resolve) => { setTimeout(resolve, 50); });
-
-      expect(navigator.clipboard.writeText.called).to.be.false;
+      expect(el.querySelector('.mobile-rider-info-bar-share')).to.exist;
     });
 
-    it('updates the Share button\'s accessible name once the session title resolves', async () => {
+    it('sets the Share button\'s accessible name from the session title once resolved', async () => {
       document.body.innerHTML = sessionInfoBarHtml({ aboutEnabled: 'true' });
       const el = document.querySelector('.mobile-rider');
       riderInstance = init(el);
       await new Promise((resolve) => { setTimeout(resolve, 50); });
 
-      const shareBtn = el.querySelector('.mobile-rider-info-bar-share');
-      expect(shareBtn.getAttribute('aria-label')).to.equal('Share');
+      expect(el.querySelector('.mobile-rider-info-bar-share')).to.not.exist;
 
       sessions.value = [{ id: 's-100', rfCode: 'rf-100', title: 'Opening Keynote' }];
+      const shareBtn = el.querySelector('.mobile-rider-info-bar-share');
       expect(shareBtn.getAttribute('aria-label')).to.equal('Share Opening Keynote');
     });
 
