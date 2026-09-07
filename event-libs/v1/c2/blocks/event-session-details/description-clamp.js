@@ -5,7 +5,7 @@ const CHEVRON_ICON = '<svg xmlns="http://www.w3.org/2000/svg" width="8" height="
 let instances = 0;
 
 export function renderDescriptionClamp(doc = document) {
-  const text = (getMetadata('description', doc) || '').trim();
+  const text = (getMetadata('event-details', doc) || '').trim();
   if (!text) return null;
 
   const el = createTag('div', { class: 'session-description' });
