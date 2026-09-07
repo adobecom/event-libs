@@ -1,9 +1,6 @@
 import { createTag, getMetadata } from '../../../utils/utils.js';
 import BlockMediator from '../../../deps/block-mediator.min.js';
 
-// Authored audience gate. Each mode is a superset of the next: `all` shows to everyone,
-// `signed-in` narrows to authenticated users, `in-person` narrows further to confirmed
-// in-person attendees. Legacy `rf-data-check: true` maps onto `in-person`.
 const AUDIENCE = { ALL: 'all', SIGNED_IN: 'signed-in', IN_PERSON: 'in-person' };
 
 const DISMISSED_STORAGE_KEY = 'in-person-banner:dismissed';
@@ -33,10 +30,6 @@ function setDismissed(bannerId) {
   }
 }
 
-// Resolves the IMS profile, waiting for it if BlockMediator hasn't populated it yet.
-// Signed-out users resolve to `{ noProfile: true }` or a `guest` account. Init doesn't
-// block on this, so if `imsProfile` is never set (non-event page, IMS never loads) a gated
-// banner simply stays hidden — which is the intended fail-closed outcome.
 function resolveProfile() {
   const profile = BlockMediator.get('imsProfile');
   if (profile !== undefined) return Promise.resolve(profile);
@@ -54,9 +47,6 @@ function isSignedIn(profile) {
   return Boolean(profile) && !profile.noProfile && profile.account_type !== 'guest';
 }
 
-// Fail-closed: hide the banner unless the external signal explicitly confirms an in-person
-// attendee. A missing `window.events` (e.g. outside the da-events GNAV) or a throw means
-// we cannot confirm, so we do not show.
 async function isRegisteredInPerson() {
   if (!window.events?.getRegistrationStatus) return false;
   try {
