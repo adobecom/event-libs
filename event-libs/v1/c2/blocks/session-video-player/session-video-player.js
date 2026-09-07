@@ -447,7 +447,10 @@ async function loadMobileRiderPlayer(el, video) {
   const { default: initMobileRider } = await import('../mobile-rider/mobile-rider.js');
   el.querySelector('.milo-video')?.remove();
   const rider = createTag('div', { class: 'mobile-rider' }, '', { parent: el });
-  rider.dataset.extractedVideoId = video.videoId;
+  // TEMP DEBUG — hardcoded to isolate whether the embed mechanism itself works,
+  // independent of whether the catalog's mrDvrVideoId is a currently-active DVR asset.
+  // REVERT before merging: restore to `video.videoId`.
+  rider.dataset.extractedVideoId = 'BmBeRvg5wV';
   // Without a skin id, mobilerider.embed() mounts the player but never actually starts
   // playback — this is the session's own authored skin (Kat's real sample: "adobe"), not a
   // hardcoded default.
