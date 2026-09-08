@@ -25,7 +25,7 @@ per instance — never inherited from the page's own theme.
 | --- | --- |
 | banner-id | in-person-2026 |
 | rf-data-check | true |
-| below-nav | false |
+| nav-overlay | false |
 | message | Registered for in-person MAX? Find detailed information on your [attendee dashboard](https://...). |
 ```
 
@@ -41,18 +41,21 @@ need to remember which shape to use:
   banner its own id.
 - `rf-data-check` — exactly `true` (case-insensitive) to gate visibility on in-person
   registration (see below); `false` or omitted shows unconditionally to everyone.
-- `below-nav` — exactly `true` (case-insensitive) when this banner is placed at the
-  very top of the page, so it needs a top offset to clear the sticky GNAV header
-  instead of rendering underneath it. `false` or omitted for any other placement —
-  see Layout below for why this isn't automatic.
+- `nav-overlay` — exactly `true` (case-insensitive) when this banner is placed at the
+  very top of the page: the banner fixes itself above the GNAV header instead of
+  rendering as a normal block, and GNAV renders directly below it — both stay
+  visible together, stacked, not overlapping. Once the visitor scrolls a small
+  amount, the banner slides away and GNAV reclaims the space, sliding up to
+  `top: 0`. `false` or omitted for any other placement — see Layout below for why
+  this isn't automatic.
 - `message` — **required** (whether authored under this label or as a bare row).
   Rich content, same authoring conventions as any other block (links via markdown,
   bold/italic, etc.) — no new authoring paradigm.
 
-Both `rf-data-check` and `below-nav` are parsed, not just presence-checked — writing
+Both `rf-data-check` and `nav-overlay` are parsed, not just presence-checked — writing
 the row with the value `false` correctly means off, the same as omitting the row.
 
-If `banner-id`/`rf-data-check`/`below-nav` aren't authored as a row, `init()` falls
+If `banner-id`/`rf-data-check`/`nav-overlay` aren't authored as a row, `init()` falls
 back to page-level metadata of the same name (`getMetadata('banner-id')`, etc.), so a
 page-wide default can be set once instead of repeating it on every instance.
 
@@ -98,8 +101,44 @@ exists for this.
 - Mobile (`max-width: 767px`): copy left-aligns and the `×` sits at the top-right of a
   taller, stacked layout, matching the Figma mobile frames.
 - No fixed placement — the block behaves the same regardless of where an author puts
-  it on the page (top of page, below nav, mid-page, etc.). The one exception: a
-  banner placed at the very top of the page can render underneath the sticky GNAV
-  header, since this generic block has no way to detect GNAV's own height on its
-  own — that's what the `below-nav` config row opts into (reads GNAV's own
-  `--global-height-nav`, falling back to `80px` if that variable isn't set).
+  it on the page (mid-page, etc.), rendering as a normal in-flow block. The one
+  exception: a banner placed at the very top of the page — that's what the
+  `nav-overlay` config row opts into. It fixes the banner above GNAV at its own
+  natural, content-driven height (no min-height tying it to GNAV's height) and
+  pushes `header.global-navigation` down by the banner's *actual rendered* height
+  via a sibling-selector override
+  (`.in-person-banner-nav-overlay ~ header.global-navigation { transform: translateY(...) }`)
+  — no edit to GNAV's source, GNAV just renders directly below the banner and stays
+  visible the whole time, not covered. As the visitor scrolls, the banner
+  progressively slides up (`transform: translateY(-scrollProgress)`, capped at the
+  banner's own height) and the same sibling selector shrinks GNAV's push by that same
+  amount in lockstep, so GNAV reclaims the vacated space smoothly rather than at a
+  single fixed threshold. Scroll position is polled via a single passive `scroll`
+  listener throttled to one check per animation frame, not per-event, to avoid layout
+  thrash.
+- When `nav-overlay` is active, `init()` reparents the block element to be a direct
+  child of `<body>` — both so `position: fixed` reliably pins to the true viewport
+  (a `transform`/`filter`/`will-change: transform` on any ancestor between the
+  block's original DOM position and `<body>`, common on animated hero/marquee
+  sections, would otherwise make the fixed banner track that ancestor's box
+  instead of the viewport) and so the sibling-selector override that pushes GNAV
+  down can reach `header.global-navigation`, which is itself a direct child of
+  `<body>`.
+- `init()` also measures the banner's rendered height (`syncBannerHeightVar`) and
+  keeps a `--in-person-banner-height` custom property on `<html>` in sync via
+  `ResizeObserver` — never a hard-coded constant, since the banner's height
+  varies by viewport (mobile wraps to a taller layout) and by how long the
+  authored message is. Both the GNAV `top` push above and the `<main>`
+  margin-top compensation below read this same variable, so they can never
+  drift out of sync with each other or with the actual banner.
+- GNAV's own CSS (`federal/global-navigation`'s `styles.css`) pulls `<main>` up
+  by `-var(--feds-nav-total-height)` so hero sections bleed under the
+  (transparent) nav — that pull-up has no idea GNAV just got pushed down by the
+  banner's height, so left alone, hero content stays exactly where it always
+  rendered and ends up hugging the taller combined banner+nav bar instead of
+  clearing it. `in-person-banner.css` shrinks that pull-up by the banner's
+  height while `nav-overlay` is active and pre-scroll
+  (`margin-top: calc(var(--in-person-banner-height) - var(--feds-nav-total-height, 80px))`),
+  restoring the original "hero starts right at the nav's (now lower) top edge"
+  alignment. This selector stops matching once `in-person-banner-scrolled` is
+  set, handing `<main>`'s margin back to GNAV's own default.
