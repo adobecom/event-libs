@@ -5,7 +5,7 @@ import {
   getEventAttendeePayload,
   getUnrecognizedAttendeeFields,
 } from './data-utils.js';
-import { ENV_MAP } from './constances.js';
+import { ENV_MAP, sessionCatalogHost } from './constances.js';
 import { getEventConfig, getEventServiceEnv, waitForAdobeIMS } from './utils.js';
 
 export const getCaasTags = (() => {
@@ -227,13 +227,13 @@ export async function listAllEvents({ fromDate } = {}) {
 // sessionId-keyed array (a session can have more than one, e.g. live +
 // on-demand), not embedded on the session itself. Once MWPW-200314 merges,
 // prefer sessions-api.js's fetchSessions(), which normalizes this same data.
+// Fronted by a CDN (MWPW-206486) — see sessionCatalogHost() in constances.js.
 export async function getEventSessionCatalog(eventId) {
   const eventServiceEnv = getEventServiceEnv();
-  const { serviceApiEndpoints } = ENV_MAP[eventServiceEnv.name];
   const options = await constructRequestOptions('GET', null, false, true);
 
   try {
-    const response = await fetch(`${serviceApiEndpoints.esp}/v1/events/${eventId}/session-catalog`, options);
+    const response = await fetch(`${sessionCatalogHost(eventServiceEnv.name)}/v1/events/${eventId}/session-catalog`, options);
     const data = await response.json();
 
     if (!response.ok) {

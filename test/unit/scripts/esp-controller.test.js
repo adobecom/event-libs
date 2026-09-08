@@ -1,7 +1,7 @@
 import { expect } from '@esm-bundle/chai';
 import sinon from 'sinon';
 import BlockMediator from '../../../event-libs/v1/deps/block-mediator.min.js';
-import { waitForAdobeIMS, resetAdobeIMSWatcher } from '../../../event-libs/v1/utils/utils.js';
+import { waitForAdobeIMS, resetAdobeIMSWatcher, setEventServiceEnvOverride } from '../../../event-libs/v1/utils/utils.js';
 
 describe('Adobe Event Service API', () => {
   let api;
@@ -806,6 +806,63 @@ describe('Adobe Event Service API', () => {
       } finally {
         api.setEspAuthToken(null);
       }
+    });
+
+    // MWPW-206486: session-catalog is fronted by a CDN, per env — every other ESP call
+    // (getEspEvent/listEvents/etc., covered elsewhere in this file) is unaffected and keeps
+    // hitting the origin host.
+    describe('CDN routing (MWPW-206486)', () => {
+      afterEach(() => setEventServiceEnvOverride(null));
+
+      it('fetches from the prod CDN domain on prod', async () => {
+        setEventServiceEnvOverride('prod');
+        const fetchStub = sandbox.stub(window, 'fetch').resolves({ json: () => ({}), ok: true });
+        await api.getEventSessionCatalog('event-1');
+        const [url] = fetchStub.firstCall.args;
+        expect(url).to.equal('https://events-platform-cdn.aws122.adobeitc.com/v1/events/event-1/session-catalog');
+      });
+
+      it('fetches from the stage CDN domain on stage', async () => {
+        setEventServiceEnvOverride('stage');
+        const fetchStub = sandbox.stub(window, 'fetch').resolves({ json: () => ({}), ok: true });
+        await api.getEventSessionCatalog('event-1');
+        const [url] = fetchStub.firstCall.args;
+        expect(url).to.include('events-platform-stage-cdn.aws125.adobeitc.com');
+      });
+
+      it('fetches from the dev CDN domain on dev', async () => {
+        setEventServiceEnvOverride('dev');
+        const fetchStub = sandbox.stub(window, 'fetch').resolves({ json: () => ({}), ok: true });
+        await api.getEventSessionCatalog('event-1');
+        const [url] = fetchStub.firstCall.args;
+        expect(url).to.include('events-platform-dev-cdn.aws125.adobeitc.com');
+      });
+
+      it('reuses the dev CDN domain on local, same as its origin ESP alias', async () => {
+        setEventServiceEnvOverride('local');
+        const fetchStub = sandbox.stub(window, 'fetch').resolves({ json: () => ({}), ok: true });
+        await api.getEventSessionCatalog('event-1');
+        const [url] = fetchStub.firstCall.args;
+        expect(url).to.include('events-platform-dev-cdn.aws125.adobeitc.com');
+      });
+
+      // dev02/stage02 are one-off ethos test deploys with no CDN distribution of their
+      // own — session-catalog falls back to their existing origin, unchanged.
+      it('falls back to the origin ESP host on dev02, which has no CDN', async () => {
+        setEventServiceEnvOverride('dev02');
+        const fetchStub = sandbox.stub(window, 'fetch').resolves({ json: () => ({}), ok: true });
+        await api.getEventSessionCatalog('event-1');
+        const [url] = fetchStub.firstCall.args;
+        expect(url).to.include('wcms-events-service-platform-deploy-ethos102-stage-c81eb6.stage.cloud.adobe.io');
+      });
+
+      it('falls back to the origin ESP host on stage02, which has no CDN', async () => {
+        setEventServiceEnvOverride('stage02');
+        const fetchStub = sandbox.stub(window, 'fetch').resolves({ json: () => ({}), ok: true });
+        await api.getEventSessionCatalog('event-1');
+        const [url] = fetchStub.firstCall.args;
+        expect(url).to.include('wcms-events-service-platform-deploy-ethos105-stage-9a5fdc.stage.cloud.adobe.io');
+      });
     });
   });
 });

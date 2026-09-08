@@ -72,6 +72,28 @@ export const ENV_MAP = {
     },
   },
 };
+// Session Catalog CDN domains (MWPW-206486). The origin ESP host above couldn't sustain
+// expected MAX 2026 traffic, so this CDN now fronts session-catalog specifically — the
+// distribution only allows GET/HEAD/OPTIONS, which matches every existing call to it.
+// Every other ESP call (auth, myData, add/removeSession, listEvents, ...) is unaffected and
+// keeps calling serviceApiEndpoints.esp directly; use sessionCatalogHost() below rather than
+// reading this map directly. dev02/stage02 (separate one-off ethos test deploys) have no
+// CDN distribution of their own and fall back to their origin; local reuses dev's CDN since
+// it's already an exact alias of dev's ESP origin above.
+const SESSION_CATALOG_CDN_MAP = {
+  dev: 'https://events-platform-dev-cdn.aws125.adobeitc.com',
+  local: 'https://events-platform-dev-cdn.aws125.adobeitc.com',
+  stage: 'https://events-platform-stage-cdn.aws125.adobeitc.com',
+  prod: 'https://events-platform-cdn.aws122.adobeitc.com',
+};
+
+// The only call sites that should ever read SESSION_CATALOG_CDN_MAP — every session-catalog
+// fetch (sessions-api.js's fetchEslSessions, esp-controller.js's getEventSessionCatalog)
+// resolves its host through this, never ENV_MAP.<env>.serviceApiEndpoints.esp directly.
+export function sessionCatalogHost(envName) {
+  return SESSION_CATALOG_CDN_MAP[envName] || ENV_MAP[envName].serviceApiEndpoints.esp;
+}
+
 export const FALLBACK_LOCALES = {
   '': { ietf: 'en-US', tk: 'hah7vzn.css' },
   ae_ar: { ietf: 'ar', tk: 'qxw8hzm.css', dir: 'rtl' },
