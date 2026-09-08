@@ -452,7 +452,7 @@ function buildPlayButton(activate, title) {
   return button;
 }
 
-function buildRow(item, { onSelect }) {
+function buildRow(item, { onSelect, hideProgressBar = false }) {
   const row = createTag('div', {
     class: 'session-video-playlist-row',
     role: 'listitem',
@@ -474,12 +474,15 @@ function buildRow(item, { onSelect }) {
 
   // Inside .row-meta (beside the thumbnail) so it aligns to the thumbnail's bottom edge, with
   // the title above it — .row-meta uses space-between to push the title to the top and this to
-  // the bottom of that thumbnail-height column.
-  const progress = createTag('div', { class: 'session-video-playlist-row-progress' }, '', { parent: meta });
-  const track = createTag('div', { class: 'session-video-playlist-row-progress-track' }, '', { parent: progress });
-  const fill = createTag('div', { class: 'session-video-playlist-row-progress-fill' }, '', { parent: track });
-  fill.style.width = `${computeProgressPercent(getVideoProgress(item.id))}%`;
-  createTag('span', { class: 'session-video-playlist-row-duration' }, item.durationLabel || '', { parent: progress });
+  // the bottom of that thumbnail-height column. Skipped entirely (bar + duration) when the
+  // block is authored with hide-progress-bar: true.
+  if (!hideProgressBar) {
+    const progress = createTag('div', { class: 'session-video-playlist-row-progress' }, '', { parent: meta });
+    const track = createTag('div', { class: 'session-video-playlist-row-progress-track' }, '', { parent: progress });
+    const fill = createTag('div', { class: 'session-video-playlist-row-progress-fill' }, '', { parent: track });
+    fill.style.width = `${computeProgressPercent(getVideoProgress(item.id))}%`;
+    createTag('span', { class: 'session-video-playlist-row-duration' }, item.durationLabel || '', { parent: progress });
+  }
 
   const activate = () => onSelect(item, row);
   const actions = createTag('div', { class: 'session-video-playlist-row-actions' }, '', { parent: row });
@@ -531,6 +534,7 @@ export function applyExpandedHeightCap(
 
 function buildTopicView(el, allRows, {
   maxSessions = DEFAULT_MAX_SESSIONS, defaultThumbnail = '', currentSessionId = null,
+  hideProgressBar = false,
 } = {}) {
 
   const rows = allRows;
@@ -557,6 +561,7 @@ function buildTopicView(el, allRows, {
         onSelect: (item) => {
           if (item.href) _internals.navigate(item.href);
         },
+        hideProgressBar,
       },
     );
     list.append(row);
@@ -721,6 +726,7 @@ function resolveRenderContext(el) {
     minSessions: Number.parseInt(config['minimum-sessions'], 10) || DEFAULT_MIN_SESSIONS,
     maxSessions: Number.parseInt(config['maximum-sessions'], 10) || DEFAULT_MAX_SESSIONS,
     defaultThumbnail: readDefaultThumbnail(el) || config['default-thumbnail'] || '',
+    hideProgressBar: (config['hide-progress-bar'] ?? '').trim().toLowerCase() === 'true',
   };
 }
 
@@ -764,7 +770,7 @@ export default async function init(el) {
   }
   const {
     sessionId, sessionTimes, pageCustomAttributes, eventStartMs,
-    minSessions, maxSessions, defaultThumbnail, config: cfg,
+    minSessions, maxSessions, defaultThumbnail, hideProgressBar, config: cfg,
   } = context;
 
   const stopListeningForPlayerEvents = listenForPlayerEvents(el, sessionId);
@@ -860,7 +866,9 @@ export default async function init(el) {
     el.replaceChildren();
     const handle = createTag('div', { class: 'session-video-playlist-handle', 'aria-hidden': 'true' }, '', { parent: el });
     const { header, toggle } = buildHeader(displayRows);
-    buildTopicView(el, displayRows, { maxSessions, defaultThumbnail, currentSessionId: sessionId });
+    buildTopicView(el, displayRows, {
+      maxSessions, defaultThumbnail, currentSessionId: sessionId, hideProgressBar,
+    });
     el.querySelector('.session-video-playlist-list')?.setAttribute('id', LIST_ID);
     setUpDrawer({ header, toggle, handle });
 

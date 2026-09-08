@@ -657,6 +657,49 @@ describe('session-video-playlist', () => {
     });
   });
 
+  describe('hide-progress-bar', () => {
+    async function renderWithHideProgress(hideValue) {
+      setMeta('session-id', 'cur');
+      setMeta('session-times', sessionTimesMeta());
+      setMeta('custom-attributes', playlistAttribute());
+      const { playlist } = buildPage();
+      addConfigRow(playlist, 'minimum-sessions', '2');
+      if (hideValue != null) addConfigRow(playlist, 'hide-progress-bar', hideValue);
+      sessions.value = [
+        catalogSession({ id: 'a', title: 'Session A' }),
+        catalogSession({ id: 'b', title: 'Session B' }),
+      ];
+      await init(playlist);
+      await flush();
+      return playlist;
+    }
+
+    it('shows the progress bar and duration by default', async () => {
+      const playlist = await renderWithHideProgress(null);
+      expect(playlist.querySelector('.session-video-playlist-row-progress')).to.exist;
+      expect(playlist.querySelector('.session-video-playlist-row-duration')).to.exist;
+    });
+
+    it('omits the progress bar and duration from every row when true', async () => {
+      const playlist = await renderWithHideProgress('true');
+      expect(playlist.querySelector('.session-video-playlist-row-progress')).to.not.exist;
+      expect(playlist.querySelector('.session-video-playlist-row-progress-track')).to.not.exist;
+      expect(playlist.querySelector('.session-video-playlist-row-duration')).to.not.exist;
+      // Rows themselves still render — only the progress element is skipped.
+      expect(playlist.querySelectorAll('.session-video-playlist-row')).to.have.lengthOf(3);
+    });
+
+    it('still shows the progress bar when the value is not exactly "true"', async () => {
+      const playlist = await renderWithHideProgress('false');
+      expect(playlist.querySelector('.session-video-playlist-row-progress')).to.exist;
+    });
+
+    it('parses the value case-insensitively', async () => {
+      const playlist = await renderWithHideProgress('TRUE');
+      expect(playlist.querySelector('.session-video-playlist-row-progress')).to.not.exist;
+    });
+  });
+
   describe('show more', () => {
     async function renderWithRows(count) {
       setMeta('session-id', 'cur');
