@@ -575,12 +575,17 @@ function buildTopicView(el, allRows, {
     });
   }
 
-  // Cap goes on the wrapper (the scroll container); the list stays uncapped so it grows past
-  // the wrapper and the wrapper overflows/scrolls. applyExpandedHeightCap computes off the
-  // list's row measurements and writes there, so move that value to the wrapper.
+  // Give the playlist container (el) a definite HEIGHT (not max-height) when expanded, so the
+  // wrapper (flex: 1 1 auto, overflow-y: auto) has a real bounded height to overflow and scrolls
+  // internally — a wheel/trackpad gesture then scrolls the list instead of the page. Without a
+  // definite height anywhere in the chain, the wrapper just grows to its content and never
+  // overflows. applyExpandedHeightCap computes the cap off the list's row measurements and
+  // writes it to list.style.maxHeight; move that value onto el as a fixed height, then clear the
+  // list's own cap so it fills and overflows the wrapper. Collapsed/mobile => value is '' => no
+  // forced height, natural layout.
   const capWrapperHeight = () => {
     applyExpandedHeightCap(list, maxSessions);
-    wrapper.style.maxHeight = list.style.maxHeight;
+    el.style.height = list.style.maxHeight;
     list.style.maxHeight = '';
   };
 
