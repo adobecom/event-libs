@@ -1,4 +1,6 @@
-import { useState, useEffect, useMemo, html } from '../../v1/deps/htm-preact.js';
+import {
+  useState, useEffect, useMemo, useRef, html,
+} from '../../v1/deps/htm-preact.js';
 import { useNavigation } from '../context/NavigationContext.js';
 import { useConfigs } from '../context/ConfigsContext.js';
 import { useDA } from '../context/DAContext.js';
@@ -21,7 +23,7 @@ export default function ConfigEditor() {
   const { goToLibrary } = useNavigation();
   const {
     activeConfig, saveActiveConfig, clearActiveConfig, updateTrackIcon,
-    updateOverrideTrackIcon, updateProduct, updateConfigField,
+    updateOverrideTrackIcon, updateProduct, updateConfigField, syncActiveConfigWithCatalog,
     setToastSuccess, setToastError, getSessionCatalogForRow,
   } = useConfigs();
   const { org, repo } = useDA();
@@ -67,6 +69,30 @@ export default function ConfigEditor() {
   const iconTracks = useMemo(() => extractDistinctAllTracks(sessions), [sessions]);
   const overrideTexts = useMemo(() => extractDistinctOverrideTexts(sessions), [sessions]);
   const products = useMemo(() => extractDistinctProducts(sessions), [sessions]);
+
+  // Syncs trackIcons/overrideTrackIcons/products against the freshly loaded catalog, once
+  // per (eventId, env) — not on every render, since syncing mutates activeConfig itself.
+  // Skipped while sessions are loading/errored, and skipped on a catalog that comes back
+  // completely empty (more likely a transient fetch issue than a real "this event has zero
+  // sessions" state — safer to leave authored entries alone than prune against that).
+  const syncedCatalogKey = useRef(null);
+  useEffect(() => {
+    if (isHomepage || isLoadingSessions || sessionsError || sessions.length === 0) return;
+    const catalogKey = `${eventId}:${eventServiceEnv}`;
+    if (syncedCatalogKey.current === catalogKey) return;
+    syncedCatalogKey.current = catalogKey;
+    const result = syncActiveConfigWithCatalog({ tracks: iconTracks, overrideTexts, products });
+    if (!result?.hasChanges) return;
+    const removedParts = [
+      result.removed.trackIcons.length && `${result.removed.trackIcons.length} track icon${result.removed.trackIcons.length === 1 ? '' : 's'}`,
+      result.removed.overrideTrackIcons.length && `${result.removed.overrideTrackIcons.length} override icon${result.removed.overrideTrackIcons.length === 1 ? '' : 's'}`,
+      result.removed.products.length && `${result.removed.products.length} product icon${result.removed.products.length === 1 ? '' : 's'}`,
+    ].filter(Boolean);
+    setToastSuccess(`Removed ${removedParts.join(', ')} no longer found in this event's sessions — save to apply`);
+  }, [
+    isHomepage, isLoadingSessions, sessionsError, sessions.length, eventId, eventServiceEnv,
+    iconTracks, overrideTexts, products, syncActiveConfigWithCatalog, setToastSuccess,
+  ]);
 
   const configPreview = useMemo(() => {
     if (!activeConfig) return '';
@@ -132,19 +158,19 @@ export default function ConfigEditor() {
         </div>
       </div>
 
-      ${isHomepage && html`
-        <section class="tec-editor__section">
-          <h2>Config name</h2>
-          <p class="tec-editor__section-hint">Name this config so it's easy to find in the library later. Purely a label — never pasted anywhere.</p>
-          <input
-            type="text"
-            class="tec-field tec-editor__title-input"
-            placeholder=${`e.g. "${activeConfig.backendEventTitle} homepage config"`}
-            value=${activeConfig.config.configName || ''}
-            onInput=${(e) => updateConfigField('configName', e.target.value)}
-          />
-        </section>
-      `}
+      <section class="tec-editor__section">
+        <h2>Config name</h2>
+        <p class="tec-editor__section-hint">
+          Name this config so it's easy to find in the library later${!isHomepage ? ' — especially useful now that an event can have more than one Global config' : ''}. Purely a label — never pasted anywhere.
+        </p>
+        <input
+          type="text"
+          class="tec-field tec-editor__title-input"
+          placeholder=${`e.g. "${activeConfig.backendEventTitle}${isHomepage ? ' homepage' : ''} config"`}
+          value=${activeConfig.config.configName || ''}
+          onInput=${(e) => updateConfigField('configName', e.target.value)}
+        />
+      </section>
 
       ${!isHomepage && html`
         <section class="tec-editor__section">

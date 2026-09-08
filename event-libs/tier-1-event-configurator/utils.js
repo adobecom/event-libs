@@ -87,6 +87,61 @@ export function extractProductIconSlug(value) {
   return match ? match[1] : trimmed;
 }
 
+// Drops any key from `map` that isn't in `validKeys`, preserving every entry that is.
+// Returns the same `map` reference when nothing changed, so callers can cheaply skip a
+// state update when there's nothing to prune.
+function pruneStaleKeys(map, validKeys) {
+  if (!map) return { next: map, removed: [] };
+  const validSet = new Set(validKeys);
+  const removed = Object.keys(map).filter((key) => !validSet.has(key));
+  if (removed.length === 0) return { next: map, removed: [] };
+  const next = {};
+  Object.keys(map).forEach((key) => {
+    if (validSet.has(key)) next[key] = map[key];
+  });
+  return { next, removed };
+}
+
+// Config.trackIcons/overrideTrackIcons.byText/products are grow-only maps (see
+// ConfigsContext.js's updateTrackIcon/updateOverrideTrackIcon/updateProduct) — an entry
+// authored for a track/override-text/product that later disappears from the event's
+// sessions (renamed, removed, session deleted) sticks around in the saved config forever,
+// invisible in the editor since those components only ever render the *current* catalog's
+// keys. This is the sync: called once per catalog load with the live track/override-text/
+// product lists, it drops any authored key that no longer matches anything in the current
+// catalog. Deliberately does NOT add entries for new keys — those already show up
+// automatically next time the editor renders (TrackIconEditor etc. iterate the live list),
+// with no icon authored yet, same as any other never-configured entry.
+// Returns the same `config` reference (and `hasChanges: false`) when there's nothing stale,
+// so a no-op sync doesn't trigger a state update.
+export function syncIconConfigWithCatalog(config, { tracks = [], overrideTexts = [], products = [] } = {}) {
+  const trackResult = pruneStaleKeys(config.trackIcons, tracks);
+  const overrideResult = pruneStaleKeys(config.overrideTrackIcons?.byText, overrideTexts);
+  const productResult = pruneStaleKeys(config.products, products);
+
+  const removed = {
+    trackIcons: trackResult.removed,
+    overrideTrackIcons: overrideResult.removed,
+    products: productResult.removed,
+  };
+  const hasChanges = removed.trackIcons.length > 0
+    || removed.overrideTrackIcons.length > 0
+    || removed.products.length > 0;
+
+  if (!hasChanges) return { config, removed, hasChanges };
+
+  return {
+    config: {
+      ...config,
+      trackIcons: trackResult.next,
+      overrideTrackIcons: { ...config.overrideTrackIcons, byText: overrideResult.next },
+      products: productResult.next,
+    },
+    removed,
+    hasChanges,
+  };
+}
+
 // Display title for a row: the author-set config name if set, else the
 // author's alternative event title (Global rows only), else the real
 // backend/ESP title, else the raw Event ID.

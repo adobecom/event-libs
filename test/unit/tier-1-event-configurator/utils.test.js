@@ -1,5 +1,7 @@
 import { expect } from '@esm-bundle/chai';
-import { extractTrackIconSlug, extractProductIconSlug } from '../../../event-libs/tier-1-event-configurator/utils.js';
+import {
+  extractTrackIconSlug, extractProductIconSlug, syncIconConfigWithCatalog,
+} from '../../../event-libs/tier-1-event-configurator/utils.js';
 
 describe('tier-1-event-configurator/utils extractTrackIconSlug', () => {
   it('extracts the slug from a full production federal icon URL', () => {
@@ -95,5 +97,87 @@ describe('tier-1-event-configurator/utils extractProductIconSlug', () => {
     expect(extractProductIconSlug('')).to.equal('');
     expect(extractProductIconSlug(null)).to.equal('');
     expect(extractProductIconSlug(undefined)).to.equal('');
+  });
+});
+
+describe('tier-1-event-configurator/utils syncIconConfigWithCatalog', () => {
+  function baseConfig() {
+    return {
+      trackIcons: {
+        branding: { icon: 'branding', color: '#000000' },
+        'stale-track': { icon: 'ai-generate', color: '#000000' },
+      },
+      overrideTrackIcons: {
+        byText: {
+          'Adobe Live Session': { icon: 'max-accelerating-creativity-ai-track-icon', color: '#000000' },
+          'stale override text': { icon: 'ai-generate', color: '#000000' },
+        },
+      },
+      products: {
+        'creative-cloud-64': { icon: 'creative-cloud-64', pageUrl: '/products/cc' },
+        'stale-product': { icon: 'photoshop-64', pageUrl: '/products/ps' },
+      },
+    };
+  }
+
+  const liveLists = {
+    tracks: ['branding'],
+    overrideTexts: ['Adobe Live Session'],
+    products: ['creative-cloud-64'],
+  };
+
+  it('drops trackIcons/overrideTrackIcons/products keys absent from the live catalog', () => {
+    const result = syncIconConfigWithCatalog(baseConfig(), liveLists);
+    expect(result.hasChanges).to.be.true;
+    expect(result.config.trackIcons).to.deep.equal({ branding: { icon: 'branding', color: '#000000' } });
+    expect(result.config.overrideTrackIcons.byText).to.deep.equal({
+      'Adobe Live Session': { icon: 'max-accelerating-creativity-ai-track-icon', color: '#000000' },
+    });
+    expect(result.config.products).to.deep.equal({ 'creative-cloud-64': { icon: 'creative-cloud-64', pageUrl: '/products/cc' } });
+  });
+
+  it('reports exactly which keys were removed, per section', () => {
+    const result = syncIconConfigWithCatalog(baseConfig(), liveLists);
+    expect(result.removed.trackIcons).to.deep.equal(['stale-track']);
+    expect(result.removed.overrideTrackIcons).to.deep.equal(['stale override text']);
+    expect(result.removed.products).to.deep.equal(['stale-product']);
+  });
+
+  it('keeps every key that is still in the catalog, untouched', () => {
+    const config = baseConfig();
+    const result = syncIconConfigWithCatalog(config, liveLists);
+    expect(result.config.trackIcons.branding).to.deep.equal(config.trackIcons.branding);
+  });
+
+  it('is a no-op — same config reference, hasChanges false — when nothing is stale', () => {
+    const config = {
+      trackIcons: { branding: { icon: 'branding', color: '#000000' } },
+      overrideTrackIcons: { byText: { 'Adobe Live Session': { icon: 'x', color: '#000000' } } },
+      products: { 'creative-cloud-64': { icon: 'creative-cloud-64', pageUrl: '' } },
+    };
+    const result = syncIconConfigWithCatalog(config, liveLists);
+    expect(result.hasChanges).to.be.false;
+    expect(result.config).to.equal(config);
+    expect(result.removed).to.deep.equal({ trackIcons: [], overrideTrackIcons: [], products: [] });
+  });
+
+  it('handles an event with no sessions left at all — everything authored gets pruned', () => {
+    const result = syncIconConfigWithCatalog(baseConfig(), { tracks: [], overrideTexts: [], products: [] });
+    expect(result.config.trackIcons).to.deep.equal({});
+    expect(result.config.overrideTrackIcons.byText).to.deep.equal({});
+    expect(result.config.products).to.deep.equal({});
+    expect(result.removed.trackIcons).to.have.members(['branding', 'stale-track']);
+  });
+
+  it('tolerates a config with no trackIcons/overrideTrackIcons/products yet authored', () => {
+    const result = syncIconConfigWithCatalog({}, liveLists);
+    expect(result.hasChanges).to.be.false;
+  });
+
+  it('defaults to empty lists when none are passed', () => {
+    const result = syncIconConfigWithCatalog(baseConfig());
+    expect(result.config.trackIcons).to.deep.equal({});
+    expect(result.config.overrideTrackIcons.byText).to.deep.equal({});
+    expect(result.config.products).to.deep.equal({});
   });
 });

@@ -85,7 +85,6 @@ export default function Library() {
   const { goToEditor } = useNavigation();
   const {
     configs,
-    findConfigByEventId,
     startNewConfig,
     startDuplicateConfig,
     startEditConfig,
@@ -201,21 +200,23 @@ export default function Library() {
     goToEditor();
   }, [setEnv, startEditConfig, goToEditor]);
 
-  // Event-ID+type collision guard: picking an event that already has a Global
-  // row routes to Edit for that row instead of creating a second one — Global
-  // is genuinely one config per Event ID (PLAN.md Phase 4). Homepage config
-  // types are exempt: a single event can carry several named Upcoming/Featured
-  // Sessions configs side by side (see `configName`), so New always creates a
-  // fresh row there regardless of what already exists for that event+type.
+  // New always creates a fresh row, Global included — a single Event ID can carry more than
+  // one Global config now (each gets its own configId, see ConfigsContext.js's
+  // startNewConfig/startDuplicateConfig), same as Homepage's long-standing support for
+  // several named Upcoming/Featured Sessions configs per event. Global still gets a
+  // heads-up when this isn't the event's first config, since unlike Homepage rows (which
+  // are always named up front via `configName`) it's easy to forget you're about to create
+  // a second one — the toast is informational only, never blocking.
   const handlePickEvent = useCallback((event) => {
     setPickerOpen(false);
     const isNewFlow = pickerMode !== 'duplicate' || !duplicateSource;
-    const guardApplies = isNewFlow && pendingConfigType === CONFIG_TYPES.GLOBAL;
-    const existing = guardApplies ? findConfigByEventId(event.eventId, pendingConfigType) : null;
-    if (existing) {
-      setToastSuccess('A config already exists for this event — editing it');
-      openEdit(existing);
-      return;
+    if (isNewFlow && pendingConfigType === CONFIG_TYPES.GLOBAL) {
+      const existingCount = configs.filter(
+        (row) => row.eventId === event.eventId && (row.configType || CONFIG_TYPES.GLOBAL) === CONFIG_TYPES.GLOBAL,
+      ).length;
+      if (existingCount > 0) {
+        setToastSuccess(`This event already has ${existingCount} Global config${existingCount === 1 ? '' : 's'} — creating another one. Give it a name so it's easy to tell them apart.`);
+      }
     }
     if (pickerMode === 'duplicate' && duplicateSource) {
       startDuplicateConfig(duplicateSource, event, envName);
@@ -224,7 +225,7 @@ export default function Library() {
     }
     goToEditor();
   }, [
-    findConfigByEventId, openEdit, pickerMode, pendingConfigType, duplicateSource, envName,
+    configs, pickerMode, pendingConfigType, duplicateSource, envName,
     startDuplicateConfig, startNewConfig, goToEditor, setToastSuccess,
   ]);
 
@@ -291,7 +292,7 @@ export default function Library() {
           <span class="tec-library__group-icon" aria-hidden="true">🌐</span>
           <div class="tec-library__group-heading">
             <h2>Global Configs <span class="tec-library__group-badge tec-library__group-badge--global">Global</span></h2>
-            <p class="tec-library__group-desc">Per-event configs used across the event experience (e.g., Session Guide, Event App, etc.).</p>
+            <p class="tec-library__group-desc">Per-event configs used across the event experience (e.g., Session Guide, Event App, etc.). An event can have more than one — name each one (Config name) to tell them apart.</p>
           </div>
           <button type="button" class="tec-btn tec-btn--primary" onClick=${openNewGlobalPicker}>New config</button>
         </div>
