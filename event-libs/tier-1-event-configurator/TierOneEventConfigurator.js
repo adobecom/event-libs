@@ -6,9 +6,8 @@ import ConfigEditor from './pages/ConfigEditor.js';
 import { useNavigation } from './context/NavigationContext.js';
 import { useConfigs } from './context/ConfigsContext.js';
 import { useDA } from './context/DAContext.js';
-import { useEventEnv } from './context/EventEnvContext.js';
 import { decodeHomepageConfigParam } from './utils.js';
-import { PAGES, EVENT_SERVICE_ENV_OPTIONS, HOMEPAGE_LINK_HASH_KEY } from './constants.js';
+import { PAGES, HOMEPAGE_LINK_HASH_KEY } from './constants.js';
 
 import { DAProvider as SgcDAProvider } from '../session-guide-configurator/context/DAContext.js';
 import { EventEnvProvider as SgcEventEnvProvider } from '../session-guide-configurator/context/EventEnvContext.js';
@@ -60,13 +59,10 @@ function SessionGuideTab() {
 function EventConfigTab() {
   const { isLoading: isDaLoading, error: daError } = useDA();
   const { activePage, goToEditor } = useNavigation();
-  const { envName } = useEventEnv();
   const {
     toastError, clearToastError, toastSuccess, clearToastSuccess, isInitialLoading, error,
     findConfigByEventId, startEditConfig, setToastError,
   } = useConfigs();
-
-  const envLabel = EVENT_SERVICE_ENV_OPTIONS.find((opt) => opt.value === envName)?.label || envName;
 
   // sp-toast owned its own auto-dismiss timeout; a plain div needs its own.
   useEffect(() => {
@@ -119,13 +115,6 @@ function EventConfigTab() {
 
   return html`
     <${Fragment}>
-      ${envName !== 'prod' && html`
-        <div class="tec-env-banner" role="status">
-          <strong>Non-production environment: ${envLabel}.</strong>
-          ESP/ESL calls are targeting ${envName}, not prod — set via the manual Event ID lookup's environment picker.
-        </div>
-      `}
-
       ${isInitialLoading && html`
         <div class="tec-loading">
           <div class="tec-spinner" role="status" aria-label="Loading config library…"></div>

@@ -149,19 +149,6 @@ body {
   margin: 4px 0 0;
 }
 
-/* Non-prod environment banner — deliberately loud (unlike everything else
-   in this app) so it's impossible to miss that ESP/ESL calls aren't
-   hitting prod. Never rendered at all when targeting prod, so there's no
-   visual noise in the common case. */
-.tec-env-banner {
-  background: var(--tec-color-warning-bg);
-  color: var(--tec-color-warning);
-  border-bottom: 1px solid var(--tec-color-warning-border);
-  padding: 10px var(--tec-spacing-lg);
-  font-size: 13px;
-  text-align: center;
-}
-
 /* Spinner */
 
 .tec-spinner {
@@ -474,8 +461,8 @@ select.tec-field {
   min-width: 0;
 }
 
-/* Same warning palette as .tec-env-banner — only rendered for a non-prod
-   row, so it stays quiet in the common (prod) case. */
+/* Warning palette, reused for anything flagging a non-prod row — only
+   rendered for a non-prod row, so it stays quiet in the common (prod) case. */
 .tec-library__item-env {
   flex-shrink: 0;
   background: var(--tec-color-warning-bg);

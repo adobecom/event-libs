@@ -87,7 +87,7 @@ unchanged).
 - `context/ConfigsContext.js` — config-library list state, CRUD actions, toasts.
 - `context/EventEnvContext.js` — reactive wrapper around
   `setEventServiceEnvOverride()`; backs `ManualEventLookup.js`'s environment
-  picker and the app-wide non-prod banner.
+  picker and each row's non-prod badge in the library list (`tec-library__item-env`).
 - `scripts/da-controller.js` — `readSheet`/`writeSheet`/`mutateSheet` (ETag optimistic
   locking, ported from Schedule Maker's pre-link-first-pivot implementation) plus
   `getConfigs`/`upsertConfig`/`deleteConfig` on top.
