@@ -508,7 +508,7 @@
 
   .session-video-playlist-wrapper {
     padding: 0 0 var(--s2a-spacing-lg) var(--s2a-spacing-md);
-    margin: 0 var(--s2a-spacing-2xs) 0 0;
+    margin: 0 var(--s2a-spacing-xs) 0 0;
   }
 
   .session-video-playlist-row {
