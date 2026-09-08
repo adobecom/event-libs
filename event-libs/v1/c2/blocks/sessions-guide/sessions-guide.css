@@ -270,8 +270,16 @@
   display: flex;
   flex-direction: column;
   gap: var(--s2a-spacing-lg);
-  overflow: hidden;
   min-height: 0;
+}
+
+/* overflow: hidden only while a detail is open/collapsing — not on the base rule. The
+   Filter panel and View dropdown menus are real overflow content that renders well past
+   this row's own height (same reason .sg-drawer::before clips corners without clipping
+   dropdown panels), and both are only ever open while the controls are in their normal,
+   non-collapsed state anyway — inert already blocks interacting with either mid-collapse. */
+.sg-drawer--detail-open .sg-header-controls-collapse-inner {
+  overflow: hidden;
 }
 
 .sg-drawer--detail-open .sg-header-controls-collapse {
