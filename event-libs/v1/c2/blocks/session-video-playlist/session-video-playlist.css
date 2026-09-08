@@ -26,6 +26,12 @@
     transition: opacity 0.15s ease, width 0.15s ease, margin-left 0.15s ease;
   }
 
+  /* Reserves room below the thumbnail for the absolutely-positioned .row-progress (see its
+     own rule) so it never overlaps the title/meta content regardless of title length. */
+  .session-video-playlist-row-content {
+    padding-bottom: 20px;
+  }
+
   .session-video-playlist-row:hover .session-video-playlist-row-actions,
   .session-video-playlist-row:focus-within .session-video-playlist-row-actions {
     width: 32px;
@@ -205,6 +211,8 @@
 
 .session-video-playlist-row {
   display: flex;
+  flex-wrap: wrap;
+  position: relative;
   align-items: stretch;
   gap: var(--s2a-spacing-sm);
   width: 100%;
@@ -326,10 +334,32 @@
   align-self: stretch;
 }
 
+/* Lives at the row level (not nested under .row-meta) so it can span the full row width on
+   mobile — flex children can't visually escape their parent's box, so reaching past the
+   thumbnail/actions columns requires it to sit outside them in the DOM. Desktop restores its
+   original "under the title, beside the thumbnail" position by absolutely positioning it back
+   over that reserved space (left offset matches the thumbnail's own width at each breakpoint). */
 .session-video-playlist-row-progress {
   display: flex;
+  flex-basis: 100%;
+  order: 3;
   align-items: center;
   gap: var(--s2a-spacing-xs);
+}
+
+@media (min-width: 1024px) {
+  .session-video-playlist-row-progress {
+    position: absolute;
+    right: var(--s2a-spacing-xs);
+    bottom: var(--s2a-spacing-xs);
+    left: calc(117.19px + var(--s2a-spacing-sm) + var(--s2a-spacing-xs));
+  }
+}
+
+@media (min-width: 1440px) {
+  .session-video-playlist-row-progress {
+    left: calc(136.889px + var(--s2a-spacing-sm) + var(--s2a-spacing-xs));
+  }
 }
 
 .session-video-playlist-row-progress-track {
