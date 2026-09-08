@@ -96,7 +96,6 @@
   flex: 1 1 auto;
   padding: 0 var(--s2a-spacing-md);
   overflow-y: auto;
-  overscroll-behavior: contain;
   box-sizing: border-box;
 }
 
