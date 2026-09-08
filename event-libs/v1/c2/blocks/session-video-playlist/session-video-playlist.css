@@ -175,6 +175,7 @@
   gap: var(--s2a-spacing-xs);
   min-height: 0;
   box-sizing: border-box;
+  margin-right: var(--s2a-spacing-xs);
 }
 
 @media (min-width: 1024px) {
@@ -506,7 +507,8 @@
   }
 
   .session-video-playlist-wrapper {
-    padding-bottom: var(--s2a-spacing-lg);
+    padding: 0 0 var(--s2a-spacing-lg) 0;
+    margin: 0 var(--s2a-spacing-2xs) 0 0;
   }
 
   .session-video-playlist-row {
@@ -524,6 +526,7 @@
   .session-video-playlist-row.is-playing .session-video-playlist-row-favorite,
   .session-video-playlist-row.is-playing .session-video-playlist-row-play {
     background: var(--vp-playing-bg);
+    margin: var(--s2a-spacing-xs) 0 var(--s2a-spacing-3xs) 0;
   }
 
   .session-video-playlist-handle {
