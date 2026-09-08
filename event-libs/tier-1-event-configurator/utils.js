@@ -61,6 +61,32 @@ export function isTrackIconEntryComplete(entry) {
   return !entry.color || !!entry.icon;
 }
 
+// Authors often copy the full federal asset URL instead of just the slug
+// fetchFederalTrackIcon() actually needs (e.g. pasting
+// ".../federal/assets/icons/track-icons/max-accelerating-creativity-ai-track-icon.svg"
+// instead of typing "max-accelerating-creativity-ai-track-icon"). Recognizes any URL
+// whose path ends in /track-icons/<slug>.svg — host-agnostic (prod's www.adobe.com and a
+// staging .aem.page/.aem.live preview both work) — and returns just the slug; anything
+// else (a plain slug already, or an unrelated/mistyped URL) passes through untouched, so
+// a mistake stays visibly wrong rather than silently resolving to the wrong icon.
+export function extractTrackIconSlug(value) {
+  const trimmed = (value || '').trim();
+  const match = trimmed.match(/\/track-icons\/([^/]+)\.svg(?:[?#].*)?$/i);
+  return match ? match[1] : trimmed;
+}
+
+// Same idea as extractTrackIconSlug above, for the product-logo namespace instead
+// (.../federal/assets/svgs/<slug>.svg, see fetchFederalProductIcon) — an author pastes
+// the full URL instead of typing e.g. "creative-cloud-64". The distinguishing path is
+// "/assets/svgs/" with nothing between "assets" and "svgs" — the generic icon namespace
+// (/federal/assets/icons/svgs/) and the track-icon one (/federal/assets/icons/
+// track-icons/) both have a segment in between, so neither can collide with this match.
+export function extractProductIconSlug(value) {
+  const trimmed = (value || '').trim();
+  const match = trimmed.match(/\/assets\/svgs\/([^/]+)\.svg(?:[?#].*)?$/i);
+  return match ? match[1] : trimmed;
+}
+
 // Display title for a row: the author-set config name if set, else the
 // author's alternative event title (Global rows only), else the real
 // backend/ESP title, else the raw Event ID.

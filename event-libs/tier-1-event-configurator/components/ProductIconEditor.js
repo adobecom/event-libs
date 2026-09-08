@@ -1,6 +1,7 @@
 import { html } from '../../v1/deps/htm-preact.js';
 import { Icon } from '../../v1/features/icons/Icon.js';
 import { fetchFederalProductIcon } from '../../v1/features/icons/federal-icons.js';
+import { extractProductIconSlug } from '../utils.js';
 
 // Simpler than TrackIconEditor — products already have colored SVGs, so there's no
 // color field to author. Icon slug is a plain text field, not a searchable list —
@@ -29,9 +30,9 @@ export default function ProductIconEditor({ products, productConfig, onChange })
             <input
               type="text"
               class="tec-field tec-track-editor__icon-input"
-              placeholder="Icon slug (e.g. photoshop-64)"
+              placeholder="Icon slug (e.g. photoshop-64), or paste the full federal icon URL"
               value=${icon}
-              onInput=${(e) => onChange(product, { icon: e.target.value })}
+              onInput=${(e) => onChange(product, { icon: extractProductIconSlug(e.target.value) })}
               aria-label="Icon slug for ${product}"
             />
             <input

@@ -2,7 +2,7 @@ import { html } from '../../v1/deps/htm-preact.js';
 import { Icon } from '../../v1/features/icons/Icon.js';
 import { fetchFederalTrackIcon } from '../../v1/features/icons/federal-icons.js';
 import { DEFAULT_ICON_COLOR } from '../default-track-icons.js';
-import { isTrackIconEntryComplete } from '../utils.js';
+import { isTrackIconEntryComplete, extractTrackIconSlug } from '../utils.js';
 
 // Icon slug is a plain text field, not a searchable picker — federal's track-icon
 // namespace (/federal/assets/icons/track-icons/) has no manifest to search, unlike the
@@ -32,9 +32,9 @@ export default function TrackIconEditor({ tracks, trackIcons, onChange }) {
             <input
               type="text"
               class="tec-field tec-track-editor__icon-input"
-              placeholder="Icon slug (e.g. branding)"
+              placeholder="Icon slug (e.g. branding), or paste the full federal icon URL"
               value=${icon}
-              onInput=${(e) => onChange(track, { icon: e.target.value })}
+              onInput=${(e) => onChange(track, { icon: extractTrackIconSlug(e.target.value) })}
               aria-label="Icon slug for ${track}"
             />
             <input

@@ -2,7 +2,7 @@ import { html } from '../../v1/deps/htm-preact.js';
 import { Icon } from '../../v1/features/icons/Icon.js';
 import { fetchFederalTrackIcon } from '../../v1/features/icons/federal-icons.js';
 import { DEFAULT_ICON_COLOR } from '../default-track-icons.js';
-import { isTrackIconEntryComplete } from '../utils.js';
+import { isTrackIconEntryComplete, extractTrackIconSlug } from '../utils.js';
 
 // Override text is free text, not a real track, and each distinct value is its own swimlane.
 // Mirrors TrackIconEditor: every value is authored explicitly, with no event-wide fallback,
@@ -31,9 +31,9 @@ export default function OverrideTrackIconEditor({
                   <input
                     type="text"
                     class="tec-field tec-track-editor__icon-input"
-                    placeholder="Icon slug (e.g. branding)"
+                    placeholder="Icon slug (e.g. branding), or paste the full federal icon URL"
                     value=${icon}
-                    onInput=${(e) => onChangeMapped(text, { icon: e.target.value, color })}
+                    onInput=${(e) => onChangeMapped(text, { icon: extractTrackIconSlug(e.target.value), color })}
                     aria-label="Icon slug for ${text}"
                   />
                   <input
