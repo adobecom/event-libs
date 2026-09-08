@@ -1,15 +1,16 @@
 import { html } from '../../v1/deps/htm-preact.js';
+import { Icon } from '../../v1/features/icons/Icon.js';
+import { fetchFederalTrackIcon } from '../../v1/features/icons/federal-icons.js';
 import { DEFAULT_ICON_COLOR } from '../default-track-icons.js';
-import IconPicker, { useIconSlugOptions } from './IconPicker.js';
 import { isTrackIconEntryComplete } from '../utils.js';
 
 // Override text is free text, not a real track, and each distinct value is its own swimlane.
-// Mirrors TrackIconEditor: every value is authored explicitly, with no event-wide fallback.
+// Mirrors TrackIconEditor: every value is authored explicitly, with no event-wide fallback,
+// and icon slug is a plain text field (not a searchable picker) resolved against federal's
+// track-icon namespace only — see TrackIconEditor.js's own comment for why.
 export default function OverrideTrackIconEditor({
   overrideTexts, overrideTrackIcons, onChangeMapped,
 }) {
-  const iconSlugs = useIconSlugOptions();
-
   return html`
     <div class="tec-override-editor">
       ${overrideTexts.length === 0
@@ -23,13 +24,17 @@ export default function OverrideTrackIconEditor({
     const complete = isTrackIconEntryComplete(authored);
     return html`
                 <li class="tec-track-editor__row ${complete ? '' : 'is-incomplete'}" key=${text}>
+                  <div class="tec-track-editor__preview-wrap" style="color:${color}">
+                    ${icon && html`<${Icon} name=${icon} size=${20} resolve=${fetchFederalTrackIcon} />`}
+                  </div>
                   <span class="tec-track-editor__name">${text}</span>
-                  <${IconPicker}
+                  <input
+                    type="text"
+                    class="tec-field tec-track-editor__icon-input"
+                    placeholder="Icon slug (e.g. branding)"
                     value=${icon}
-                    color=${color}
-                    options=${iconSlugs}
-                    onChange=${(newIcon) => onChangeMapped(text, { icon: newIcon, color })}
-                    ariaLabel="Icon for ${text}"
+                    onInput=${(e) => onChangeMapped(text, { icon: e.target.value, color })}
+                    aria-label="Icon slug for ${text}"
                   />
                   <input
                     type="color"

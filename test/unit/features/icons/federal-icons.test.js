@@ -4,6 +4,7 @@ import {
   fetchFederalIcon,
   fetchFederalIconList,
   fetchFederalProductIcon,
+  fetchFederalTrackIcon,
 } from '../../../../event-libs/v1/features/icons/federal-icons.js';
 
 describe('federal-icons', () => {
@@ -74,6 +75,36 @@ describe('federal-icons — fetchFederalProductIcon (product-logo namespace only
 
   it('returns null for an empty icon name', async () => {
     expect(await fetchFederalProductIcon('')).to.equal(null);
+  });
+});
+
+describe('federal-icons — fetchFederalTrackIcon (track-icon namespace only)', () => {
+  before(() => {
+    setFederalRootOverride('/test/unit/features/icons/mocks/federal');
+  });
+
+  it('resolves a track icon federal has', async () => {
+    const svg = await fetchFederalTrackIcon('branding');
+    expect(svg).to.not.equal(null);
+    expect(svg.classList.contains('icon-federal-branding')).to.equal(true);
+  });
+
+  it('does not fall back to the generic icon namespace', async () => {
+    // 'thumbs-up' exists under the generic /assets/icons/svgs/ path (see above), not
+    // under /assets/icons/track-icons/ — fetchFederalTrackIcon must not find it there.
+    const svg = await fetchFederalTrackIcon('thumbs-up');
+    expect(svg).to.equal(null);
+  });
+
+  it('does not fall back to the product-logo namespace either', async () => {
+    // 'photoshop-64' exists under /assets/svgs/ (see fetchFederalProductIcon above),
+    // not under /assets/icons/track-icons/.
+    const svg = await fetchFederalTrackIcon('photoshop-64');
+    expect(svg).to.equal(null);
+  });
+
+  it('returns null for an empty icon name', async () => {
+    expect(await fetchFederalTrackIcon('')).to.equal(null);
   });
 });
 

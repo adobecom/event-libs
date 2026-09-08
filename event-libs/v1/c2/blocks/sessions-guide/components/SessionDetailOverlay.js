@@ -15,7 +15,7 @@ import {
   IconHeartFilled, IconHeartOutline, IconLinkOut, IconCalendarCheck, IconCalendarPlus,
 } from './icons.js';
 import { Icon } from '../../../../features/icons/Icon.js';
-import { fetchFederalProductIcon } from '../../../../features/icons/federal-icons.js';
+import { fetchFederalProductIcon, fetchFederalTrackIcon } from '../../../../features/icons/federal-icons.js';
 import { getProduct } from '../../../../utils/tier-1-event-config.js';
 import { resolveTrackBadge, resolveNamedTrackBadge } from '../utils/session-filters.js';
 import { isBehaviorEnabled } from '../utils/behavior-flags.js';
@@ -183,14 +183,14 @@ export function SessionDetailOverlay({ onBack }) {
                     <div class="sg-detail__channels sg-detail__channels--stacked">
                       ${stackedTrackBadges.map((badge) => html`
                         <div class="sg-detail__channel" key=${badge.label}>
-                          <${Icon} name=${badge.icon} size=${16} className="sg-detail__channel-icon sg-detail__channel-icon--sm" />
+                          <${Icon} name=${badge.icon} size=${16} resolve=${fetchFederalTrackIcon} className="sg-detail__channel-icon sg-detail__channel-icon--sm" />
                           <span class="sg-detail__channel-name">${badge.label}</span>
                         </div>
                       `)}
                     </div>
                   ` : trackBadge && html`
                     <div class="sg-detail__channel">
-                      <${Icon} name=${trackBadge.icon} size=${20} className="sg-detail__channel-icon" />
+                      <${Icon} name=${trackBadge.icon} size=${20} resolve=${fetchFederalTrackIcon} className="sg-detail__channel-icon" />
                       <span class="sg-detail__channel-name">${trackBadge.label}</span>
                     </div>
                   `}

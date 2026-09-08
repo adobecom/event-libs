@@ -4,6 +4,7 @@ import sinon from 'sinon';
 import { sessions, favorited } from '../../../../event-libs/v1/utils/session-store.js';
 import { setEventConfig } from '../../../../event-libs/v1/utils/utils.js';
 import { initTierOneEventConfig } from '../../../../event-libs/v1/utils/tier-1-event-config.js';
+import { setFederalRootOverride } from '../../../../event-libs/v1/features/icons/federal-icons.js';
 
 const defaultHtml = `
 <div class="mobile-rider">
@@ -51,6 +52,10 @@ function runMobileRiderSuite(modulePath, variantLabel) {
     before(async () => {
       ({ default: init } = await import(modulePath));
       setEventConfig({}, { miloLibs: '/test/unit/features/icons/mocks/libs' });
+      // The track icon this suite authors (see trackIcons below) now resolves against
+      // federal's dedicated track-icon namespace, not the generic/Milo cascade — see
+      // fetchFederalTrackIcon() in federal-icons.js.
+      setFederalRootOverride('/test/unit/features/icons/mocks/federal');
       const meta = document.createElement('meta');
       meta.name = 'tier-1-event-config';
       meta.content = JSON.stringify({ trackIcons: { Education: { icon: 'video', color: '#F44336' } } });

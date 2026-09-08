@@ -8,7 +8,7 @@ import {
 } from '../../../utils/session-store.js';
 import { getNowMs } from '../../../utils/session-state.js';
 import { getTrackIcon } from '../../../utils/tier-1-event-config.js';
-import { resolveIcon } from '../../../features/icons/icon-resolver.js';
+import { fetchFederalTrackIcon } from '../../../features/icons/federal-icons.js';
 import { toggleScheduleWithFeedback, toggleFavoriteWithFeedback } from '../../../services/sessions/action-feedback.js';
 
 const ROTATE_OUT_MS = 350;
@@ -35,7 +35,7 @@ function buildCategoryBadge(track) {
   }, '', { parent: badge });
   createTag('span', { class: 'sg-category-badge__label' }, track, { parent: badge });
 
-  resolveIcon(entry.icon).then((svg) => {
+  fetchFederalTrackIcon(entry.icon).then((svg) => {
     if (!svg) return;
     svg.classList.add('sg-category-badge__icon');
     iconColor.append(svg);

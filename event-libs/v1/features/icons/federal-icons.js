@@ -82,14 +82,19 @@ async function fetchSvgFrom(url) {
   }
 }
 
-// Federal has two separate SVG namespaces: /assets/icons/svgs/ here, for generic
-// UI/track icons (has its own icons.json manifest, see fetchFederalIconList below);
-// /assets/svgs/ (fetchFederalProductIcon below) for product logos, curated per-product
-// by the product team, no manifest. Deliberately not merged into one fallback chain —
-// nothing today ever needs to resolve a name against both namespaces (tracks/overrides
-// only ever live in this one; products only ever live in the other, via a separate,
-// not-yet-built consumer), so checking both here would just double the 404s for every
-// track/override name federal doesn't have yet.
+// Federal has three separate SVG namespaces, each with its own function below and never
+// merged into one fallback chain (checking more than one would just double the 404s for
+// a name the wrong namespace doesn't have):
+//   /assets/icons/svgs/    generic UI icons — this function. Has its own icons.json
+//                          manifest (see fetchFederalIconList below).
+//   /assets/svgs/          product logos, curated per-product by the product team, no
+//                          manifest — fetchFederalProductIcon below.
+//   /assets/icons/track-icons/
+//                          track icons, curated per-event by whoever authors the Tier 1
+//                          Event Config — fetchFederalTrackIcon below. Also no manifest:
+//                          same reason as products, an author types the slug rather than
+//                          picking from a list (see TrackIconEditor.js/
+//                          OverrideTrackIconEditor.js in the T1 Event Configurator).
 export async function fetchFederalIcon(iconName) {
   if (!iconName) return null;
   if (federalIconCache.has(iconName)) {
@@ -120,6 +125,29 @@ export async function fetchFederalProductIcon(iconName) {
   if (svg) svg.classList.add('icon-federal', `icon-federal-${iconName}`);
 
   federalProductIconCache.set(iconName, svg);
+  return svg ? namespaceSvgIds(svg.cloneNode(true)) : null;
+}
+
+const federalTrackIconCache = new Map();
+
+// Track-icon namespace only — used by the T1 Event Configurator's TrackIconEditor/
+// OverrideTrackIconEditor previews and the live sessions-guide's CategoryBadge/
+// SessionDetailOverlay (whatever renders a track's icon), same pattern as
+// fetchFederalProductIcon above: no manifest to search, so callers resolve a typed slug
+// against this namespace directly instead of cascading through fetchFederalIcon (which
+// would 404 there — track icons never lived in the generic namespace — then fall through
+// to Milo's sprite, which won't have them either).
+export async function fetchFederalTrackIcon(iconName) {
+  if (!iconName) return null;
+  if (federalTrackIconCache.has(iconName)) {
+    const cached = federalTrackIconCache.get(iconName);
+    return cached ? namespaceSvgIds(cached.cloneNode(true)) : null;
+  }
+
+  const svg = await fetchSvgFrom(`${resolveFederalRoot()}/federal/assets/icons/track-icons/${iconName}.svg`);
+  if (svg) svg.classList.add('icon-federal', `icon-federal-${iconName}`);
+
+  federalTrackIconCache.set(iconName, svg);
   return svg ? namespaceSvgIds(svg.cloneNode(true)) : null;
 }
 

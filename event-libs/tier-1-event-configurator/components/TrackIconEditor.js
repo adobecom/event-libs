@@ -1,13 +1,16 @@
 import { html } from '../../v1/deps/htm-preact.js';
-import IconPicker, { useIconSlugOptions } from './IconPicker.js';
+import { Icon } from '../../v1/features/icons/Icon.js';
+import { fetchFederalTrackIcon } from '../../v1/features/icons/federal-icons.js';
 import { DEFAULT_ICON_COLOR } from '../default-track-icons.js';
 import { isTrackIconEntryComplete } from '../utils.js';
 
+// Icon slug is a plain text field, not a searchable picker — federal's track-icon
+// namespace (/federal/assets/icons/track-icons/) has no manifest to search, unlike the
+// generic icon system (see federal-icons.js). Preview resolves from that namespace only
+// (fetchFederalTrackIcon), so a typed slug never accidentally matches an unrelated icon.
+// Mirrors ProductIconEditor.js's pattern; unlike products, tracks still carry an
+// author-set color (the icon's own art is monochrome, tinted via the color input).
 export default function TrackIconEditor({ tracks, trackIcons, onChange }) {
-  // Called unconditionally, before the early return below — Preact hooks must run in
-  // the same order on every render.
-  const iconSlugs = useIconSlugOptions();
-
   if (!tracks || tracks.length === 0) {
     return html`<p class="tec-track-editor__empty">No tracks found in this event's sessions yet.</p>`;
   }
@@ -22,13 +25,17 @@ export default function TrackIconEditor({ tracks, trackIcons, onChange }) {
 
         return html`
           <li class="tec-track-editor__row ${complete ? '' : 'is-incomplete'}" key=${track}>
+            <div class="tec-track-editor__preview-wrap" style="color:${color}">
+              ${icon && html`<${Icon} name=${icon} size=${20} resolve=${fetchFederalTrackIcon} />`}
+            </div>
             <span class="tec-track-editor__name">${track}</span>
-            <${IconPicker}
+            <input
+              type="text"
+              class="tec-field tec-track-editor__icon-input"
+              placeholder="Icon slug (e.g. branding)"
               value=${icon}
-              color=${color}
-              options=${iconSlugs}
-              onChange=${(newIcon) => onChange(track, { icon: newIcon })}
-              ariaLabel="Icon for ${track}"
+              onInput=${(e) => onChange(track, { icon: e.target.value })}
+              aria-label="Icon slug for ${track}"
             />
             <input
               type="color"

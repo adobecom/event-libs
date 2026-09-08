@@ -3,11 +3,11 @@ import { Icon } from '../../v1/features/icons/Icon.js';
 import { fetchFederalProductIcon } from '../../v1/features/icons/federal-icons.js';
 
 // Simpler than TrackIconEditor — products already have colored SVGs, so there's no
-// color field to author. Icon slug is a plain text field, not IconPicker's searchable
-// list — federal's product-logo namespace (/federal/assets/svgs/) has no manifest to
-// search, unlike the generic icon system (see federal-icons.js). Preview resolves from
-// that namespace only (fetchFederalProductIcon), not the shared generic/track chain, so
-// a typed slug never accidentally matches an unrelated icon. Each product also gets a
+// color field to author. Icon slug is a plain text field, not a searchable list —
+// federal's product-logo namespace (/federal/assets/svgs/) has no manifest to search,
+// unlike the generic icon system (see federal-icons.js). Preview resolves from that
+// namespace only (fetchFederalProductIcon), not the shared generic/track chain, so a
+// typed slug never accidentally matches an unrelated icon. Each product also gets a
 // page URL for its CTA link.
 export default function ProductIconEditor({ products, productConfig, onChange }) {
   if (!products || products.length === 0) {

@@ -4,7 +4,7 @@ import {
   sessions, favorited, initSessionState, openSessionGuideDetail, getEventApiConfig,
 } from '../../../utils/session-store.js';
 import { getTrackIcon } from '../../../utils/tier-1-event-config.js';
-import { resolveIcon } from '../../../features/icons/icon-resolver.js';
+import { fetchFederalTrackIcon } from '../../../features/icons/federal-icons.js';
 import { toggleFavoriteWithFeedback } from '../../../services/sessions/action-feedback.js';
 import { showToast } from '../../../features/toast/toast.js';
 import { setSessionParam } from '../sessions-guide/utils/url.js';
@@ -41,7 +41,7 @@ function buildCategoryBadge(track) {
   }, '', { parent: badge });
   createTag('span', { class: 'mobile-rider-info-bar-category-label' }, track, { parent: badge });
 
-  resolveIcon(entry.icon).then((svg) => {
+  fetchFederalTrackIcon(entry.icon).then((svg) => {
     if (!svg) return;
     svg.classList.add('mobile-rider-info-bar-category-icon');
     iconColor.append(svg);

@@ -1,14 +1,14 @@
 import { createTag } from '../../../utils/utils.js';
 import { getAttrLabel, getAttrText, getAttrValues } from '../../utils/custom-attributes.js';
 import { getTrackIcon, getOverrideTrackIcon, DEFAULT_ICON_COLOR } from '../../../utils/tier-1-event-config.js';
-import { resolveIcon } from '../../../features/icons/icon-resolver.js';
+import { fetchFederalTrackIcon } from '../../../features/icons/federal-icons.js';
 
 const STAR_ICON = '<svg viewBox="0 0 16 16" width="16" height="16" fill="currentColor" aria-hidden="true"><path d="M8 1.2l1.98 4.02 4.44.64-3.21 3.13.76 4.42L8 11.34l-3.97 2.07.76-4.42L1.58 5.86l4.44-.64L8 1.2z"/></svg>';
 
 async function paintTrackIcon(slot, iconName) {
   if (!iconName) return;
   try {
-    const svg = await resolveIcon(iconName);
+    const svg = await fetchFederalTrackIcon(iconName);
     if (!svg) return;
     svg.setAttribute('width', '16');
     svg.setAttribute('height', '16');
