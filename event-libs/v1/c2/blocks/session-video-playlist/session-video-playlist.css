@@ -96,6 +96,11 @@
   flex: 1 1 auto;
   padding: 0 var(--s2a-spacing-md);
   overflow-y: auto;
+
+  /* Firefox: keep a thin scrollbar always shown (Chrome/Safari use the ::-webkit-scrollbar
+     rules below, where an explicit width + appearance:none already forces it always-on). */
+  scrollbar-width: thin;
+  scrollbar-color: var(--s2a-color-gray-500) var(--s2a-color-transparent-black-16);
   box-sizing: border-box;
 }
 
