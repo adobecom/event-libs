@@ -575,6 +575,17 @@ function buildTopicView(el, allRows, {
     });
   }
 
+  // The cap must sit on the SCROLL container (wrapper), not the list: capping the list to the
+  // same height leaves the wrapper's content exactly filling it, so it never overflows and the
+  // wheel scrolls the page instead of the list. applyExpandedHeightCap computes off the list's
+  // measurements (gap/rows) and writes there; move that value to the wrapper and leave the list
+  // uncapped so it grows past the wrapper and the wrapper actually scrolls.
+  const capWrapperHeight = () => {
+    applyExpandedHeightCap(list, maxSessions);
+    wrapper.style.maxHeight = list.style.maxHeight;
+    list.style.maxHeight = '';
+  };
+
   if (rows.length > SHOW_MORE_INITIAL_ROWS) {
     const showMore = createTag('button', {
       type: 'button',
@@ -592,21 +603,18 @@ function buildTopicView(el, allRows, {
       showMore.setAttribute('aria-expanded', String(expanded));
       showMore.setAttribute('aria-label', expanded ? 'Show less sessions' : 'Show more sessions');
       label.textContent = expanded ? 'Show less' : 'Show more';
-      applyExpandedHeightCap(list, maxSessions);
-      wrapper.style.maxHeight = list.style.maxHeight;
+      capWrapperHeight();
     });
   }
 
-  applyExpandedHeightCap(list, maxSessions);
-  wrapper.style.maxHeight = list.style.maxHeight;
+  capWrapperHeight();
 
   let pendingFrame = null;
   const handleResize = () => {
     if (pendingFrame != null) return;
     pendingFrame = requestAnimationFrame(() => {
       pendingFrame = null;
-      applyExpandedHeightCap(list, maxSessions);
-      wrapper.style.maxHeight = list.style.maxHeight;
+      capWrapperHeight();
     });
   };
   window.addEventListener('resize', handleResize);
