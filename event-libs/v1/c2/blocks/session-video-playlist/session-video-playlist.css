@@ -10,7 +10,20 @@
     --vp-playing-bg: var(--s2a-color-gray-900);
     --vp-playing-fg: var(--s2a-color-gray-25);
     --vp-playing-track-bg: var(--s2a-color-gray-700);
-    --vp-playing-muted: var(--s2a-color-transparent-white-64);
+    /* stylelint-disable-next-line color-no-hex -- Figma "S2AC/Palette/gray/700" resolved in
+       dark mode (the is-playing/hover row is dark even on desktop) = #AFAFAF. Our --s2a-color-
+       gray-700 only carries the light value (#505050), so the dark-mode hex is inlined here. */
+    --vp-playing-muted: #afafaf;
+
+    /* Figma "neutral-subdued-content" (gray-800): resolves to #292929 in light mode here and
+       #DBDBDB in the dark mobile block below — same design token, flipped by theme mode. */
+    --vp-subdued-content: var(--s2a-color-gray-800);
+
+    /* Figma "content-default": gray-1000 (#000) in light mode here, gray-25 (#fff) in the dark
+       mobile block. --s2a-color-content-default itself is root-theme-scoped and our block sits
+       under the light root on both viewports, so it can't be used directly — this slot carries
+       content-default's two mode values so the row title flips correctly. */
+    --vp-title: var(--s2a-color-gray-1000);
 
     flex: 0 0 349px;
     align-self: flex-start;
@@ -129,7 +142,7 @@
   gap: var(--s2a-spacing-xs);
   margin: 0 0 0 auto;
   font-size: var(--s2a-font-size-sm);
-  color: var(--s2a-color-gray-800);
+  color: var(--vp-subdued-content);
   cursor: pointer;
 }
 
@@ -209,8 +222,8 @@
   gap: var(--s2a-spacing-sm);
   width: 100%;
   box-sizing: border-box;
-  border-radius: var(--s2a-border-radius-sm, 8px);
-  padding: var(--s2a-spacing-xs);
+  border-radius: var(--s2a-border-radius-8, 8px);
+  padding: var(--s2a-spacing-2xs) var(--s2a-spacing-12, 12px) var(--s2a-spacing-2xs) var(--s2a-spacing-2xs);
   background: var(--vp-row-bg);
   cursor: pointer;
 }
@@ -322,12 +335,26 @@
   font-weight: 700;
   line-height: 18px;
   letter-spacing: 0;
+  color: var(--vp-title);
   /* stylelint-disable-next-line value-no-vendor-prefix -- required for -webkit-line-clamp */
   display: -webkit-box;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 3;
   flex: 0 1 auto;
   align-self: stretch;
+}
+
+/* The title sets its own color (--vp-title), so it doesn't inherit .row-content's playing-row
+   color swap — restore it here so the title flips to --vp-playing-fg on the is-playing/hover
+   row too. */
+.session-video-playlist-row.is-playing .session-video-playlist-row-title {
+  color: var(--vp-playing-fg);
+}
+
+@media (hover: hover) {
+  .session-video-playlist-row:hover .session-video-playlist-row-title {
+    color: var(--vp-playing-fg);
+  }
 }
 
 .session-video-playlist-row-progress {
@@ -339,8 +366,8 @@
 
 .session-video-playlist-row-progress-track {
   flex: 1 1 auto;
-  height: 4px;
-  border-radius: var(--s2a-border-radius-round);
+  height: 6px;
+  border-radius: 3px;
   background: var(--vp-track-bg);
   overflow: hidden;
 }
@@ -503,6 +530,13 @@
     --vp-playing-track-bg: var(--s2a-color-gray-300);
     --vp-playing-muted: var(--s2a-color-gray-700);
 
+    /* stylelint-disable-next-line color-no-hex -- dark-mode value of Figma "neutral-subdued-
+       content" (gray-800 → #DBDBDB); no --s2a- token resolves to this exact hex */
+    --vp-subdued-content: #dbdbdb;
+
+    /* Figma "content-default" dark-mode value (gray-25 / #fff), see desktop block. */
+    --vp-title: var(--s2a-color-gray-25);
+
     position: fixed;
     left: 0;
     right: 0;
@@ -527,7 +561,6 @@
 
   .session-video-playlist-row {
     position: relative;
-    padding: var(--s2a-spacing-2xs) var(--s2a-spacing-12, 12px) var(--s2a-spacing-2xs) var(--s2a-spacing-2xs);
   }
 
   /* Heart is lifted out of the flex flow to the top-right corner, so .row-content (and the
@@ -590,10 +623,6 @@
   .session-video-playlist-autoplay {
     flex-basis: 100%;
     margin-left: 0;
-
-    /* --vp-fg is the theme-aware foreground (light gray-25 on the dark mobile drawer), so the
-       "Play all" label stays readable instead of the desktop's dark gray-800. */
-    color: var(--vp-fg);
   }
 
   .session-video-playlist-toggle {
