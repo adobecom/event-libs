@@ -524,6 +524,10 @@
     border-radius: 50%;
   }
 
+  .session-video-playlist-row-progress {
+    width: 100%;
+  }
+
   .session-video-playlist-row.is-playing .session-video-playlist-row-favorite,
   .session-video-playlist-row.is-playing .session-video-playlist-row-play {
     background: var(--vp-playing-bg);
