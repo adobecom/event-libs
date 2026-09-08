@@ -24,6 +24,46 @@ function resolveFederalRoot() {
   return PROD_ROOT;
 }
 
+// Federal's SVGs are Illustrator exports that reuse generic ids (clip-path, clip-path-2,
+// linear-gradient, ...) across unrelated icons — cloneNode(true) preserves those ids
+// verbatim, so inlining more than one icon on the same page (or the same icon twice)
+// collides: a <clipPath id="clip-path"> from one icon can silently satisfy another
+// icon's (or another instance's) url(#clip-path) reference instead of its own. The
+// result renders broken — wrong clip region, missing gradient — with nothing throwing
+// to explain why. Rewriting every id to be unique per returned instance, and every
+// reference to it within the same tree, makes each clone safe to inline alongside any
+// other. See MWPW ticket for the reported symptom (creative-cloud-64/frame-io-64
+// rendering as a flat, mostly-monochrome smudge instead of their real multi-color art).
+let nextSvgIdSuffix = 0;
+
+function namespaceSvgIds(svg) {
+  const idEls = [...svg.querySelectorAll('[id]')];
+  if (!idEls.length) return svg;
+
+  nextSvgIdSuffix += 1;
+  const suffix = `-fedicon${nextSvgIdSuffix}`;
+  const idMap = new Map(idEls.map((el) => [el.id, `${el.id}${suffix}`]));
+  idEls.forEach((el) => { el.id = idMap.get(el.id); });
+
+  // Covers every attribute that can reference an id: url(#id) (fill, stroke, clip-path,
+  // mask, filter, ...) and the bare #id form (href/xlink:href on <use>, gradient
+  // xlink:href chaining). Attribute-by-attribute rather than a fixed allowlist, so this
+  // doesn't need updating if federal's export starts referencing ids some other way.
+  svg.querySelectorAll('*').forEach((el) => {
+    [...el.attributes].forEach(({ name, value }) => {
+      const urlMatch = value.match(/^url\(#(.+)\)$/);
+      if (urlMatch && idMap.has(urlMatch[1])) {
+        el.setAttribute(name, `url(#${idMap.get(urlMatch[1])})`);
+        return;
+      }
+      if (/^(xlink:)?href$/.test(name) && value.startsWith('#') && idMap.has(value.slice(1))) {
+        el.setAttribute(name, `#${idMap.get(value.slice(1))}`);
+      }
+    });
+  });
+  return svg;
+}
+
 // Map<name, SVGElement|null> — caches misses too, not just hits, since federal is one
 // HTTP request per icon name (no manifest); without this, rendering an icon not yet
 // uploaded to federal would re-fetch a 404 on every render.
@@ -54,33 +94,33 @@ export async function fetchFederalIcon(iconName) {
   if (!iconName) return null;
   if (federalIconCache.has(iconName)) {
     const cached = federalIconCache.get(iconName);
-    return cached ? cached.cloneNode(true) : null;
+    return cached ? namespaceSvgIds(cached.cloneNode(true)) : null;
   }
 
   const svg = await fetchSvgFrom(`${resolveFederalRoot()}/federal/assets/icons/svgs/${iconName}.svg`);
   if (svg) svg.classList.add('icon-federal', `icon-federal-${iconName}`);
 
   federalIconCache.set(iconName, svg);
-  return svg ? svg.cloneNode(true) : null;
+  return svg ? namespaceSvgIds(svg.cloneNode(true)) : null;
 }
 
 const federalProductIconCache = new Map();
 
 // Product-logo namespace only — used by the Tier 1 Event Configurator's product-icon
-// preview today; whatever eventually renders products on the live page (a separate,
-// not-yet-built ticket) should call this directly too, rather than fetchFederalIcon above.
+// preview and the sessions-guide FilterPanel's product filter options, both of which
+// call this directly rather than fetchFederalIcon above.
 export async function fetchFederalProductIcon(iconName) {
   if (!iconName) return null;
   if (federalProductIconCache.has(iconName)) {
     const cached = federalProductIconCache.get(iconName);
-    return cached ? cached.cloneNode(true) : null;
+    return cached ? namespaceSvgIds(cached.cloneNode(true)) : null;
   }
 
   const svg = await fetchSvgFrom(`${resolveFederalRoot()}/federal/assets/svgs/${iconName}.svg`);
   if (svg) svg.classList.add('icon-federal', `icon-federal-${iconName}`);
 
   federalProductIconCache.set(iconName, svg);
-  return svg ? svg.cloneNode(true) : null;
+  return svg ? namespaceSvgIds(svg.cloneNode(true)) : null;
 }
 
 // icons.json is federal's own manifest of every icon it hosts (a standard Helix sheet

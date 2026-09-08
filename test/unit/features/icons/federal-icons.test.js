@@ -76,3 +76,64 @@ describe('federal-icons — fetchFederalProductIcon (product-logo namespace only
     expect(await fetchFederalProductIcon('')).to.equal(null);
   });
 });
+
+// MWPW: creative-cloud-64/frame-io-64 rendered as a flat, mostly-monochrome smudge
+// instead of their real multi-color art. Root cause: federal's SVGs are Illustrator
+// exports that reuse generic ids (clip-path, linear-gradient, ...) across unrelated
+// icons — cloneNode(true) preserves those ids verbatim, so a page rendering more than
+// one such icon (or the same icon twice) gets url(#clip-path)/url(#linear-gradient)
+// references that resolve to whichever element with that id comes first in the DOM,
+// not necessarily the icon's own — silently breaking the clip/gradient with nothing to
+// throw. Both fixtures below deliberately share the same generic ids, mirroring the
+// real creative-cloud-64/frame-io-64 collision.
+describe('federal-icons — id collisions across inlined SVGs', () => {
+  before(() => {
+    setFederalRootOverride('/test/unit/features/icons/mocks/federal');
+  });
+
+  it('gives every returned instance its own unique ids, not the ids as-authored', async () => {
+    const svg = await fetchFederalProductIcon('frame-io-64');
+    const clipPath = svg.querySelector('clipPath');
+    expect(clipPath.id).to.not.equal('clip-path');
+    expect(clipPath.id).to.match(/^clip-path-fedicon\d+$/);
+  });
+
+  it('rewrites every url(#id) reference within the tree to the new id', async () => {
+    const svg = await fetchFederalProductIcon('frame-io-64');
+    const clipPath = svg.querySelector('clipPath');
+    const gradient = svg.querySelector('linearGradient');
+    const group = svg.querySelector('g');
+    const rect = svg.querySelector('rect[fill]');
+    expect(group.getAttribute('clip-path')).to.equal(`url(#${clipPath.id})`);
+    expect(rect.getAttribute('fill')).to.equal(`url(#${gradient.id})`);
+  });
+
+  it('rewrites bare #id references (xlink:href) too', async () => {
+    const svg = await fetchFederalProductIcon('frame-io-64');
+    const clipPath = svg.querySelector('clipPath');
+    const use = svg.querySelector('use');
+    expect(use.getAttribute('xlink:href')).to.equal(`#${clipPath.id}`);
+  });
+
+  it('gives two different icons that happen to share generic ids independent ids', async () => {
+    const frameIo = await fetchFederalProductIcon('frame-io-64');
+    const creativeCloud = await fetchFederalProductIcon('creative-cloud-64');
+    const frameIoClipId = frameIo.querySelector('clipPath').id;
+    const ccClipId = creativeCloud.querySelector('clipPath').id;
+    expect(frameIoClipId).to.not.equal(ccClipId);
+    // And each one's own reference still points at its own (rewritten) id, not the other's.
+    expect(frameIo.querySelector('g').getAttribute('clip-path')).to.equal(`url(#${frameIoClipId})`);
+    expect(creativeCloud.querySelector('g').getAttribute('clip-path')).to.equal(`url(#${ccClipId})`);
+  });
+
+  it('gives two clones of the same icon independent ids too, not just different icons', async () => {
+    const first = await fetchFederalProductIcon('frame-io-64');
+    const second = await fetchFederalProductIcon('frame-io-64');
+    expect(first.querySelector('clipPath').id).to.not.equal(second.querySelector('clipPath').id);
+  });
+
+  it('leaves an id-free icon untouched', async () => {
+    const svg = await fetchFederalProductIcon('photoshop-64');
+    expect(svg.querySelectorAll('[id]')).to.have.lengthOf(0);
+  });
+});
