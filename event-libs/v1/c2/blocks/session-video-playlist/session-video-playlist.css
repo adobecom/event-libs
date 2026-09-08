@@ -96,11 +96,6 @@
   flex: 1 1 auto;
   padding: 0 var(--s2a-spacing-md);
   overflow-y: auto;
-
-  /* Firefox: keep a thin scrollbar always shown (Chrome/Safari use the ::-webkit-scrollbar
-     rules below, where an explicit width + appearance:none already forces it always-on). */
-  scrollbar-width: thin;
-  scrollbar-color: var(--s2a-color-gray-500) var(--s2a-color-transparent-black-16);
   box-sizing: border-box;
 }
 
@@ -183,6 +178,12 @@
 }
 
 @media (min-width: 1024px) {
+  /* overflow-y: scroll (not auto) keeps the scrollbar track/gutter always rendered, even when
+     the list isn't tall enough to overflow — so the scrollbar is always visible on desktop. */
+  .session-video-playlist-wrapper {
+    overflow-y: scroll;
+  }
+
   .session-video-playlist-wrapper::-webkit-scrollbar {
     /* stylelint-disable-next-line property-no-vendor-prefix -- prefixed form required; Chrome ignores unprefixed appearance in ::-webkit-scrollbar */
     -webkit-appearance: none;
