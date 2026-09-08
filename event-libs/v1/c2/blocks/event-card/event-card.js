@@ -8,7 +8,7 @@ const BLOCK_CSS_URL = new URL('./event-card.css', import.meta.url).href;
 
 const CTA_STATE_ATTR = { upcoming: 'ctaPrior', live: 'ctaDuring', 'on-demand': 'ctaAfter' };
 
-function refreshCtaText(el, cta, getLiveStreamActiveIds) {
+function refreshCtaText(el, cta, getLiveStreamActiveIds, resolveCardAction) {
   const state = deriveSessionState({
     startTimeUtc: el.dataset.startTimeUtc,
     endTimeUtc: el.dataset.endTimeUtc,
@@ -16,6 +16,10 @@ function refreshCtaText(el, cta, getLiveStreamActiveIds) {
   }, getLiveStreamActiveIds(), getNowMs());
   const text = cta.dataset[CTA_STATE_ATTR[state]];
   if (text) cta.textContent = text;
+
+  const action = resolveCardAction(el.dataset);
+  if (action.type === 'navigate') cta.href = action.url;
+
   return state;
 }
 
@@ -25,22 +29,23 @@ function scheduleBoundary(atMs, onBoundary) {
   setTimeout(onBoundary, Math.max(delay, 0));
 }
 
-function attachLiveCtaText(el, cta, getLiveStreamActiveIds) {
+function attachLiveCtaText(el, cta, getLiveStreamActiveIds, resolveCardAction) {
   const mrStreamId = el.dataset.mrStreamId;
   const startMs = Date.parse(el.dataset.startTimeUtc);
   const endMs = Date.parse(el.dataset.endTimeUtc);
+  const refresh = () => refreshCtaText(el, cta, getLiveStreamActiveIds, resolveCardAction);
 
-  const state = refreshCtaText(el, cta, getLiveStreamActiveIds);
+  const state = refresh();
 
   if (state === 'upcoming') {
-    scheduleBoundary(startMs, () => refreshCtaText(el, cta, getLiveStreamActiveIds));
+    scheduleBoundary(startMs, refresh);
   }
 
   if (mrStreamId) {
     registerStreamIds([mrStreamId]);
-    subscribe(() => refreshCtaText(el, cta, getLiveStreamActiveIds), [mrStreamId]);
+    subscribe(refresh, [mrStreamId]);
   } else if (state !== 'on-demand') {
-    scheduleBoundary(endMs, () => refreshCtaText(el, cta, getLiveStreamActiveIds));
+    scheduleBoundary(endMs, refresh);
   }
 }
 
@@ -125,7 +130,11 @@ export default async function init(el) {
   el.dataset.cardVariant = variant;
 
   if (el.dataset.sessionId) {
-    const { default: attachSessionRouting, getLiveStreamActiveIds } = await import('../../../utils/session-routing.js');
+    const {
+      default: attachSessionRouting,
+      getLiveStreamActiveIds,
+      resolveCardAction,
+    } = await import('../../../utils/session-routing.js');
     attachSessionRouting(el);
 
     if (!el.hasAttribute('daa-ll')) {
@@ -134,6 +143,6 @@ export default async function init(el) {
     }
 
     const cta = body.querySelector('.card-cta');
-    if (cta) attachLiveCtaText(el, cta, getLiveStreamActiveIds);
+    if (cta) attachLiveCtaText(el, cta, getLiveStreamActiveIds, resolveCardAction);
   }
 }
