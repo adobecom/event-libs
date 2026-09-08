@@ -472,19 +472,19 @@ function buildRow(item, { onSelect }) {
   const meta = createTag('div', { class: 'session-video-playlist-row-meta' }, '', { parent: content });
   createTag('span', { class: 'session-video-playlist-row-title' }, item.title, { parent: meta });
 
-  const activate = () => onSelect(item, row);
-  const actions = createTag('div', { class: 'session-video-playlist-row-actions' }, '', { parent: row });
-  actions.appendChild(buildFavoriteButton(item));
-  actions.appendChild(buildPlayButton(activate, item.title));
-
-  // A direct child of `row` (not nested under `.row-meta`/`.row-content`) so it can span the
-  // full row width on mobile — nesting it beside the thumbnail would cap it to the meta
-  // column's narrower width, which can't be escaped with CSS alone.
-  const progress = createTag('div', { class: 'session-video-playlist-row-progress' }, '', { parent: row });
+  // Inside .row-meta (beside the thumbnail) so it aligns to the thumbnail's bottom edge, with
+  // the title above it — .row-meta uses space-between to push the title to the top and this to
+  // the bottom of that thumbnail-height column.
+  const progress = createTag('div', { class: 'session-video-playlist-row-progress' }, '', { parent: meta });
   const track = createTag('div', { class: 'session-video-playlist-row-progress-track' }, '', { parent: progress });
   const fill = createTag('div', { class: 'session-video-playlist-row-progress-fill' }, '', { parent: track });
   fill.style.width = `${computeProgressPercent(getVideoProgress(item.id))}%`;
   createTag('span', { class: 'session-video-playlist-row-duration' }, item.durationLabel || '', { parent: progress });
+
+  const activate = () => onSelect(item, row);
+  const actions = createTag('div', { class: 'session-video-playlist-row-actions' }, '', { parent: row });
+  actions.appendChild(buildFavoriteButton(item));
+  actions.appendChild(buildPlayButton(activate, item.title));
 
   return row;
 }

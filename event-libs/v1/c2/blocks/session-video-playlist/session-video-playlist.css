@@ -204,10 +204,7 @@
 }
 
 .session-video-playlist-row {
-  --row-thumb-w: 96px;
-
   display: flex;
-  flex-wrap: wrap;
   align-items: stretch;
   gap: var(--s2a-spacing-sm);
   width: 100%;
@@ -220,11 +217,7 @@
 
 .session-video-playlist-row-content {
   display: flex;
-
-  /* basis:0 (not auto) so it shrinks fully and always leaves room for the heart beside it on
-     line 1 — with an auto/content basis the thumbnail+title width pushes the actions column
-     onto its own wrapped line. Only .row-progress (flex-basis:100%) is meant to wrap below. */
-  flex: 1 1 0;
+  flex: 1 1 auto;
   align-items: stretch;
   gap: var(--s2a-spacing-sm);
   min-width: 0;
@@ -264,26 +257,23 @@
   line-height: 0;
 }
 
-/* --row-thumb-w (defined on .row) is the single source of truth for the thumbnail width at
-   each breakpoint: the thumbnail sizes off it, and .row-progress offsets its left inset off it
-   so the progress line always starts exactly where the thumbnail ends. One value, no dupes. */
+.session-video-playlist-row-thumb {
+  width: 96px;
+  aspect-ratio: 16 / 9;
+  border-radius: 6px;
+  object-fit: cover;
+}
+
 @media (min-width: 1024px) {
-  .session-video-playlist-row {
-    --row-thumb-w: 117.19px;
+  .session-video-playlist-row-thumb {
+    width: 117.19px;
   }
 }
 
 @media (min-width: 1440px) {
-  .session-video-playlist-row {
-    --row-thumb-w: 136.889px;
+  .session-video-playlist-row-thumb {
+    width: 136.889px;
   }
-}
-
-.session-video-playlist-row-thumb {
-  width: var(--row-thumb-w);
-  aspect-ratio: 16 / 9;
-  border-radius: 6px;
-  object-fit: cover;
 }
 
 .session-video-playlist-row-play-icon {
@@ -313,10 +303,14 @@
   }
 }
 
+/* space-between pins the title to the top of this column and the progress bar to the bottom,
+   so the progress aligns with the thumbnail's bottom edge (this column stretches to the
+   thumbnail's height via the row's align-items: stretch). */
 .session-video-playlist-row-meta {
   display: flex;
   flex: 1 1 auto;
   flex-direction: column;
+  justify-content: space-between;
   gap: var(--s2a-spacing-3xs);
   min-width: 0;
 }
@@ -332,23 +326,15 @@
   display: -webkit-box;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 3;
-  flex: 1 0 0;
+  flex: 0 1 auto;
   align-self: stretch;
 }
 
-/* Lives at the row level (not nested under .row-meta) so it can wrap onto its own line below
-   the thumbnail+title. `flex-basis: 100%` forces that wrap; the left inset aligns its start
-   with the title (past the thumbnail) using the shared --row-thumb-w token — kept in sync with
-   the thumbnail's own width at each breakpoint through that one variable, no duplicated value. */
 .session-video-playlist-row-progress {
   display: flex;
-  flex-basis: 100%;
-  min-width: 0;
-  order: 3;
+  flex-shrink: 0;
   align-items: center;
   gap: var(--s2a-spacing-xs);
-  padding-left: calc(var(--row-thumb-w) + var(--s2a-spacing-sm));
-  box-sizing: border-box;
 }
 
 .session-video-playlist-row-progress-track {
@@ -535,9 +521,8 @@
     padding: var(--s2a-spacing-2xs) var(--s2a-spacing-12, 12px) var(--s2a-spacing-2xs) var(--s2a-spacing-2xs);
   }
 
-  /* Heart pins to the top-right, on the same line as the title, rather than stretching the
-     full row height — so the progress line below can run under it into the (hidden) play
-     button's freed space. */
+  /* Heart pins to the top-right corner rather than stretching/centering the full row height,
+     since on mobile only the favorite shows (play is hidden) and it belongs at the top. */
   .session-video-playlist-row-actions {
     align-self: flex-start;
   }
