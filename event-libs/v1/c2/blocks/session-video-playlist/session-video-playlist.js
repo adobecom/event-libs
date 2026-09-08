@@ -531,7 +531,8 @@ function buildTopicView(el, allRows, {
 } = {}) {
 
   const rows = allRows;
-  const list = createTag('div', { class: 'session-video-playlist-list', role: 'list' }, '', { parent: el });
+  const wrapper = createTag('div', { class: 'session-video-playlist-wrapper' }, '', { parent: el });
+  const list = createTag('div', { class: 'session-video-playlist-list', role: 'list' }, '', { parent: wrapper });
   rows.forEach((session) => {
     const row = buildRow(
       {
@@ -579,7 +580,7 @@ function buildTopicView(el, allRows, {
 
       'aria-label': 'Show more sessions',
       ...analyticsAttrs('playlist-show-more'),
-    }, '', { parent: el });
+    }, '', { parent: wrapper });
     const label = createTag('span', {}, 'Show more', { parent: showMore });
     createTag('span', { class: 'session-video-playlist-show-more-chevron' }, SHOW_MORE_CHEVRON_SVG, { parent: showMore });
 
@@ -589,10 +590,12 @@ function buildTopicView(el, allRows, {
       showMore.setAttribute('aria-label', expanded ? 'Show less sessions' : 'Show more sessions');
       label.textContent = expanded ? 'Show less' : 'Show more';
       applyExpandedHeightCap(list, maxSessions);
+      wrapper.style.maxHeight = list.style.maxHeight;
     });
   }
 
   applyExpandedHeightCap(list, maxSessions);
+  wrapper.style.maxHeight = list.style.maxHeight;
 
   let pendingFrame = null;
   const handleResize = () => {
@@ -600,6 +603,7 @@ function buildTopicView(el, allRows, {
     pendingFrame = requestAnimationFrame(() => {
       pendingFrame = null;
       applyExpandedHeightCap(list, maxSessions);
+      wrapper.style.maxHeight = list.style.maxHeight;
     });
   };
   window.addEventListener('resize', handleResize);
