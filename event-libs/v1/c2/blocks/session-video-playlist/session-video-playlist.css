@@ -313,6 +313,7 @@
 
 .session-video-playlist-row-title {
   overflow: hidden;
+  max-height: 56px;
   font-size: var(--s2a-font-size-sm);
   font-weight: 700;
   line-height: 18px;
