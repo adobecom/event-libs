@@ -95,7 +95,12 @@
   min-height: 0;
   flex: 1 1 auto;
   padding: 0 var(--s2a-spacing-md);
+
+  /* overscroll-behavior keeps a trackpad/wheel gesture inside this scroll container instead of
+     chaining to the page once the list is scrollable — without it the browser can route the
+     gesture straight to the page even while this div overflows. */
   overflow-y: auto;
+  overscroll-behavior: contain;
   box-sizing: border-box;
 }
 
