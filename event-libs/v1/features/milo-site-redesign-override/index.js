@@ -1,0 +1,58 @@
+import { LIBS, getEventConfig, loadStyle } from '../../utils/utils.js';
+
+const SELECTOR = '.section.bento.stack-mobile';
+
+let bentoStackPromise;
+let bentoStackMiloLibs;
+let observer;
+
+function loadBentoStack() {
+  const miloLibs = getEventConfig()?.miloConfig?.miloLibs || LIBS;
+  if (!bentoStackPromise || bentoStackMiloLibs !== miloLibs) {
+    bentoStackMiloLibs = miloLibs;
+    const bentoStackCssUrl = new URL('./bento-stack.css', import.meta.url).href;
+    bentoStackPromise = Promise.all([
+      import(`${miloLibs}/features/bento-stack.js`),
+      new Promise((resolve) => { loadStyle(bentoStackCssUrl, resolve); }),
+    ]).then(([{ default: initBentoStack }]) => initBentoStack)
+      .catch((e) => {
+        bentoStackPromise = undefined;
+        throw e;
+      });
+  }
+  return bentoStackPromise;
+}
+
+async function handleSection(section) {
+  try {
+    const initBentoStack = await loadBentoStack();
+    initBentoStack(section);
+  } catch (e) {
+    window.lana?.log(`milo-site-redesign-override failed: ${e}`, { tags: 'bento-stack', severity: 'info' });
+  }
+}
+
+function handleMatches(root) {
+  const matches = [];
+  if (root.matches?.(SELECTOR)) matches.push(root);
+  if (root.querySelectorAll) matches.push(...root.querySelectorAll(SELECTOR));
+  return Promise.all(matches.map(handleSection));
+}
+
+export default function initMiloSiteRedesignOverride() {
+  if (document.body.dataset.bentoStackOverrideStarted) return Promise.resolve();
+  document.body.dataset.bentoStackOverrideStarted = 'true';
+
+  observer?.disconnect();
+  const initialScan = handleMatches(document.body);
+
+  observer = new MutationObserver((mutations) => {
+    mutations.forEach(({ type, target, addedNodes }) => {
+      if (type === 'attributes') handleMatches(target);
+      else addedNodes.forEach((node) => { if (node.nodeType === 1) handleMatches(node); });
+    });
+  });
+  observer.observe(document.body, { attributes: true, attributeFilter: ['class'], childList: true, subtree: true });
+
+  return initialScan;
+}
