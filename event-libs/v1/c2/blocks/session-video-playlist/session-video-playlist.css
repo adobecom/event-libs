@@ -26,12 +26,6 @@
     transition: opacity 0.15s ease, width 0.15s ease, margin-left 0.15s ease;
   }
 
-  /* Reserves room below the thumbnail for the absolutely-positioned .row-progress (see its
-     own rule) so it never overlaps the title/meta content regardless of title length. */
-  .session-video-playlist-row-content {
-    padding-bottom: 20px;
-  }
-
   .session-video-playlist-row:hover .session-video-playlist-row-actions,
   .session-video-playlist-row:focus-within .session-video-playlist-row-actions {
     width: 32px;
@@ -210,9 +204,10 @@
 }
 
 .session-video-playlist-row {
+  --row-thumb-w: 96px;
+
   display: flex;
   flex-wrap: wrap;
-  position: relative;
   align-items: stretch;
   gap: var(--s2a-spacing-sm);
   width: 100%;
@@ -265,23 +260,26 @@
   line-height: 0;
 }
 
-.session-video-playlist-row-thumb {
-  width: 96px;
-  aspect-ratio: 16 / 9;
-  border-radius: 6px;
-  object-fit: cover;
-}
-
+/* --row-thumb-w (defined on .row) is the single source of truth for the thumbnail width at
+   each breakpoint: the thumbnail sizes off it, and .row-progress offsets its left inset off it
+   so the progress line always starts exactly where the thumbnail ends. One value, no dupes. */
 @media (min-width: 1024px) {
-  .session-video-playlist-row-thumb {
-    width: 117.19px;
+  .session-video-playlist-row {
+    --row-thumb-w: 117.19px;
   }
 }
 
 @media (min-width: 1440px) {
-  .session-video-playlist-row-thumb {
-    width: 136.889px;
+  .session-video-playlist-row {
+    --row-thumb-w: 136.889px;
   }
+}
+
+.session-video-playlist-row-thumb {
+  width: var(--row-thumb-w);
+  aspect-ratio: 16 / 9;
+  border-radius: 6px;
+  object-fit: cover;
 }
 
 .session-video-playlist-row-play-icon {
@@ -334,32 +332,19 @@
   align-self: stretch;
 }
 
-/* Lives at the row level (not nested under .row-meta) so it can span the full row width on
-   mobile — flex children can't visually escape their parent's box, so reaching past the
-   thumbnail/actions columns requires it to sit outside them in the DOM. Desktop restores its
-   original "under the title, beside the thumbnail" position by absolutely positioning it back
-   over that reserved space (left offset matches the thumbnail's own width at each breakpoint). */
+/* Lives at the row level (not nested under .row-meta) so it can wrap onto its own line below
+   the thumbnail+title. `flex-basis: 100%` forces that wrap; the left inset aligns its start
+   with the title (past the thumbnail) using the shared --row-thumb-w token — kept in sync with
+   the thumbnail's own width at each breakpoint through that one variable, no duplicated value. */
 .session-video-playlist-row-progress {
   display: flex;
   flex-basis: 100%;
+  min-width: 0;
   order: 3;
   align-items: center;
   gap: var(--s2a-spacing-xs);
-}
-
-@media (min-width: 1024px) {
-  .session-video-playlist-row-progress {
-    position: absolute;
-    right: var(--s2a-spacing-xs);
-    bottom: var(--s2a-spacing-xs);
-    left: calc(117.19px + var(--s2a-spacing-sm) + var(--s2a-spacing-xs));
-  }
-}
-
-@media (min-width: 1440px) {
-  .session-video-playlist-row-progress {
-    left: calc(136.889px + var(--s2a-spacing-sm) + var(--s2a-spacing-xs));
-  }
+  padding-left: calc(var(--row-thumb-w) + var(--s2a-spacing-sm));
+  box-sizing: border-box;
 }
 
 .session-video-playlist-row-progress-track {
@@ -552,10 +537,6 @@
     margin: 0;
     padding: 9px;
     border-radius: 50%;
-  }
-
-  .session-video-playlist-row-progress {
-    width: 100%;
   }
 
   .session-video-playlist-row.is-playing .session-video-playlist-row-favorite,
