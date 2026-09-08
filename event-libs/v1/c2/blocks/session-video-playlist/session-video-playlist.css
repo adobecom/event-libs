@@ -509,6 +509,18 @@
     padding-bottom: var(--s2a-spacing-lg);
   }
 
+  .session-video-playlist-row {
+    padding: var(--s2a-spacing-2xs) var(--s2a-spacing-12, 12px) var(--s2a-spacing-2xs) var(--s2a-spacing-2xs);
+  }
+
+  .session-video-playlist-row-play-icon {
+    align-items: unset;
+    justify-content: unset;
+    margin: 0;
+    padding: 9px;
+    border-radius: 50%;
+  }
+
   .session-video-playlist-row.is-playing .session-video-playlist-row-favorite,
   .session-video-playlist-row.is-playing .session-video-playlist-row-play {
     background: var(--vp-playing-bg);
