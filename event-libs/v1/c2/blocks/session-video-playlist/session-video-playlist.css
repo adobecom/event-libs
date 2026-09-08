@@ -95,9 +95,7 @@
   min-height: 0;
   flex: 1 1 auto;
   padding: 0 var(--s2a-spacing-md);
-  overflow-y: scroll;
-  scrollbar-width: thin;
-  scrollbar-color: var(--s2a-color-gray-500) var(--s2a-color-transparent-black-16);
+  overflow-y: auto;
   box-sizing: border-box;
 }
 
@@ -183,7 +181,6 @@
   .session-video-playlist-wrapper::-webkit-scrollbar {
     /* stylelint-disable-next-line property-no-vendor-prefix -- prefixed form required; Chrome ignores unprefixed appearance in ::-webkit-scrollbar */
     -webkit-appearance: none;
-    display: block;
     width: 10px;
   }
 
