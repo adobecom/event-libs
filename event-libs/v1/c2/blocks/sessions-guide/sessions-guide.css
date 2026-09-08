@@ -414,11 +414,9 @@
 }
 
 /* tabindex="-1" is only a Back-to-top landing target, so the UA ring around the whole
-   list is noise. */
+   list is noise. .sg-full-page's own version of this lives with its other rules below. */
 .sg-body-scroll:focus,
-.sg-body-scroll:focus-visible,
-.sg-full-page:focus,
-.sg-full-page:focus-visible {
+.sg-body-scroll:focus-visible {
   outline: none;
 }
 
@@ -1982,6 +1980,7 @@
   }
 
   .sg-live-card:is(:hover, :focus-within) .sg-live-card__track { color: #fff; }
+
   .sg-live-card:is(:hover, :focus-within) .sg-live-card__track-row,
   .sg-live-card:is(:hover, :focus-within) .sg-live-card__track-extra { color: #fff; }
 
@@ -2947,6 +2946,13 @@
   min-height: 100px;
   position: relative;
   background: var(--s2a-color-background-default);
+}
+
+/* tabindex="-1" is only a Back-to-top landing target, so the UA ring around the whole
+   page is noise — see .sg-body-scroll's own version of this rule above. */
+.sg-full-page:focus,
+.sg-full-page:focus-visible {
+  outline: none;
 }
 
 .sg-full-page__header-wrap {

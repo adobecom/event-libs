@@ -214,6 +214,7 @@
 
 .sb-info__desc-wrap {
   grid-area: desc;
+  /* stylelint-disable-next-line value-no-vendor-prefix -- Safari needs -webkit-box for line clamp */
   display: -webkit-box;
   overflow: hidden;
   -webkit-box-orient: vertical;

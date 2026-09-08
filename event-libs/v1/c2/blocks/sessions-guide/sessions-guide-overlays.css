@@ -152,6 +152,7 @@
 }
 
 /* Tinted body holding white pods. See docs/sessions-guide-implementation-notes.md. */
+
 /* gray-75 is the authored tint and is a primitive, so it does not flip with the theme —
    the dark override at the bottom of this file swaps it for the darkest surface. */
 
@@ -182,6 +183,7 @@
 
 /* Below 1280px SessionDetailOverlay.js renders the pods as one flat stack, so there are no
    column wrappers to style here — see .sg-detail__cols--split for the desktop layout. */
+
 /* 16px between a pod's heading and its content, every pod, every breakpoint. */
 .sg-detail__group {
   display: flex;
@@ -190,6 +192,21 @@
   padding: var(--s2a-spacing-lg);
   background: var(--s2a-color-background-default);
   border-radius: 24px;
+}
+
+.sg-detail__more {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s2a-spacing-xs);
+  align-self: flex-start;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  font-family: var(--body-font-family);
+  font-weight: var(--s2a-font-weight-adobe-clean-bold);
+  font-size: var(--s2a-font-size-sm);
+  color: var(--s2a-color-content-default);
 }
 
 /* Tops up the pod gap to Figma's wider list-to-toggle gap. */
@@ -455,21 +472,6 @@
   letter-spacing: 0.16px;
   color: var(--s2a-color-content-default);
   margin: 0;
-}
-
-.sg-detail__more {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--s2a-spacing-xs);
-  align-self: flex-start;
-  background: transparent;
-  border: none;
-  cursor: pointer;
-  padding: 0;
-  font-family: var(--body-font-family);
-  font-weight: var(--s2a-font-weight-adobe-clean-bold);
-  font-size: var(--s2a-font-size-sm);
-  color: var(--s2a-color-content-default);
 }
 
 .sg-detail__more-icon {
@@ -918,8 +920,8 @@
   margin-left: var(--s2a-spacing-xs);
 }
 
-/* A horizontally scrolling strip on mobile; a vertical list from 768px up. */
-/* Mobile: full-width drill-in rows. From 768px the same list becomes the sidebar. */
+/* A horizontally scrolling strip on mobile; a vertical list from 768px up.
+Mobile: full-width drill-in rows. From 768px the same list becomes the sidebar. */
 .sg-filter-panel__cats {
   list-style: none;
   margin: 0;
@@ -1031,6 +1033,22 @@
   text-align: center;
 }
 
+/* Options card. One column on mobile so long product names aren't truncated,
+   widening to 2/3/4 as room allows. */
+.sg-filter-panel__options {
+  grid-area: options;
+  min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
+  padding: var(--s2a-spacing-md);
+  background: var(--s2a-color-background-subtle);
+  border-radius: var(--s2a-border-radius-16);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--s2a-spacing-xs);
+  align-content: start;
+}
+
 /* The options own the scroll; the Save bar stays pinned under them. */
 .sg-filter-panel--drilled .sg-filter-panel__options {
   flex: 1;
@@ -1061,22 +1079,6 @@
   font-size: 11px;
   font-weight: var(--s2a-font-weight-adobe-clean-bold);
   padding: 0 4px;
-}
-
-/* Options card. One column on mobile so long product names aren't truncated,
-   widening to 2/3/4 as room allows. */
-.sg-filter-panel__options {
-  grid-area: options;
-  min-width: 0;
-  min-height: 0;
-  overflow-y: auto;
-  padding: var(--s2a-spacing-md);
-  background: var(--s2a-color-background-subtle);
-  border-radius: var(--s2a-border-radius-16);
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: var(--s2a-spacing-xs);
-  align-content: start;
 }
 
 .sg-filter-panel__empty {
