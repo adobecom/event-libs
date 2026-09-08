@@ -3224,18 +3224,19 @@
   transition: opacity 0.2s ease, visibility 0.2s ease;
 }
 
-/* Glass fill lives on a pseudo-element (Figma 11889:43436) rather than on the button
-   itself, so its own blur doesn't also soften the arrow/label painted on top of it.
-   z-index: -1 keeps it behind those (non-positioned) children despite painting order. */
+/* Glass fill lives on a pseudo-element (Figma 11889:43436), not the button itself, so its
+   blur/mask don't soften the arrow/label painted on top of it (z-index: -1 keeps it behind
+   them despite painting order). The box extends past the visible content and fades out via
+   a radial mask, rather than blurring the box's own edges — that's what keeps it blending
+   in instead of reading as a soft-but-visible rounded-rect. */
 .sg-back-to-top::before {
   content: '';
   position: absolute;
   z-index: -1;
-  inset: 0;
-  border-radius: inherit;
+  inset: -20px;
   background: rgb(255 255 255 / 20%);
   backdrop-filter: blur(15px);
-  filter: blur(5px);
+  mask-image: radial-gradient(ellipse at center, #000 30%, transparent 70%);
   pointer-events: none;
 }
 
