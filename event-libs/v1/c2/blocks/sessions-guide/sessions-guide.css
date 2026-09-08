@@ -674,8 +674,13 @@
 
 /* ── View layouts ────────────────────────────────────────── */
 
+/* padding-bottom clears the floating Back to Top button (position: absolute/fixed,
+   bottom: 20px + ~78px tall — see .sg-back-to-top below), which otherwise sits on top of
+   the last row once scrolled to the end. Measured against the real broadcast page via
+   Chrome DevTools MCP; not a spacing token because it's sized to that specific overlay
+   control, not generic page-end spacing. */
 .sg-view {
-  padding: 0 0 var(--s2a-spacing-3xl);
+  padding: 0 0 var(--s2a-spacing-80);
 }
 
 .sg-carousel-section {
