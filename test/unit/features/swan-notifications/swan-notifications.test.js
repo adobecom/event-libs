@@ -47,13 +47,13 @@ describe('swan-notifications', () => {
           if (methodName === 'UpsertReminderFeatureFlag') {
             calls.push({
               method: 'UpsertReminderFeatureFlag',
-              campaignID: data.campaignRules[0].campaignID,
+              campaignId: data.campaignRules[0].campaignId,
               campaignRule: data.campaignRules[0].campaignRule,
             });
           } else if (methodName === 'DeleteReminderFeatureFlag') {
-            calls.push({ method: 'DeleteReminderFeatureFlag', campaignID: data.campaignRules[0].campaignID });
-          } else if (methodName === 'AnalyticsEventFromHost') {
-            calls.push({ method: 'AnalyticsEventFromHost', eventData: data });
+            calls.push({ method: 'DeleteReminderFeatureFlag', campaignId: data.campaignRules[0].campaignId });
+          } else {
+            calls.push({ method: methodName, data });
           }
         },
       },
@@ -75,12 +75,10 @@ describe('swan-notifications', () => {
       await notifySessionScheduled(session);
 
       const upsert = calls.find((c) => c.method === 'UpsertReminderFeatureFlag');
-      expect(upsert.campaignID).to.equal(buildCampaignId('RF-100', 'reminder'));
+      expect(upsert.campaignId).to.equal(buildCampaignId('RF-100', 'reminder'));
       const channelDetails = upsert.campaignRule.events[0].notification_channels[0].channel_details;
-      expect(channelDetails.schedule_at).to.be.a('number');
-
-      const fire = calls.find((c) => c.method === 'AnalyticsEventFromHost');
-      expect(fire.eventData).to.deep.equal({ swan_campaign_id: upsert.campaignID });
+      const nowSeconds = Math.floor(Date.now() / 1000);
+      expect(channelDetails.schedule_at).to.be.within(nowSeconds, nowSeconds + 3600);
 
       expect(calls.some((c) => c.method === 'DeleteReminderFeatureFlag')).to.equal(false);
     });
@@ -98,7 +96,7 @@ describe('swan-notifications', () => {
       const session = makeSession('RF-102', { startOffsetMs: -MIN, endOffsetMs: 30 * MIN });
       await notifySessionScheduled(session);
       const upsert = calls.find((c) => c.method === 'UpsertReminderFeatureFlag');
-      expect(upsert.campaignID).to.equal(buildCampaignId('RF-102', 'live'));
+      expect(upsert.campaignId).to.equal(buildCampaignId('RF-102', 'live'));
     });
 
     it('deletes whatever stage is currently active on unschedule', async () => {
@@ -108,7 +106,7 @@ describe('swan-notifications', () => {
 
       await notifySessionUnscheduled(session);
       const del = calls.find((c) => c.method === 'DeleteReminderFeatureFlag');
-      expect(del.campaignID).to.equal(buildCampaignId('RF-103', 'live'));
+      expect(del.campaignId).to.equal(buildCampaignId('RF-103', 'live'));
     });
 
     it('no-ops on unschedule when there is no known active stage for the session', async () => {
@@ -140,8 +138,8 @@ describe('swan-notifications', () => {
     });
 
     it('does not persist state for a failed transition, so it can be retried once UNC becomes available', async () => {
-      // No UNC instance available on this page load — registerReminderRule/fireHostEvent
-      // both resolve false (via whenUncReady()'s own polling timeout) rather than throw.
+      // No UNC instance available on this page load — registerReminderRule
+      // resolves false (via whenUncReady()'s own polling timeout) rather than throw.
       delete window.UniversalNav;
       const session = makeSession('RF-retry', { startOffsetMs: -MIN, endOffsetMs: 30 * MIN });
       // Anchored to the real current time — whenUncReady()'s deadline check uses Date.now(),
@@ -164,9 +162,7 @@ describe('swan-notifications', () => {
         _uncContainer: {
           handleMessageFromInterface: (methodName, data) => {
             if (methodName === 'UpsertReminderFeatureFlag') {
-              calls.push({ method: 'UpsertReminderFeatureFlag', campaignID: data.campaignRules[0].campaignID });
-            } else if (methodName === 'AnalyticsEventFromHost') {
-              calls.push({ method: 'AnalyticsEventFromHost', eventData: data });
+              calls.push({ method: 'UpsertReminderFeatureFlag', campaignId: data.campaignRules[0].campaignId });
             }
             // DeleteReminderFeatureFlag intentionally left a no-op here, matching the original mock.
           },
@@ -182,7 +178,7 @@ describe('swan-notifications', () => {
   });
 
   describe('reconcileSwanNotifications', () => {
-    it('advances a session from reminder to live in the correct order: register new, fire, then delete the previous stage', async () => {
+    it('advances a session from reminder to live in the correct order: register new, then delete the previous stage', async () => {
       const reminderSession = makeSession('RF-progress', { startOffsetMs: 60 * MIN, endOffsetMs: 120 * MIN });
       await notifySessionScheduled(reminderSession);
       calls = [];
@@ -191,10 +187,10 @@ describe('swan-notifications', () => {
       await reconcileSwanNotifications(() => [liveSession], () => new Set([liveSession.id]));
 
       expect(calls.map((c) => c.method)).to.deep.equal([
-        'UpsertReminderFeatureFlag', 'AnalyticsEventFromHost', 'DeleteReminderFeatureFlag',
+        'UpsertReminderFeatureFlag', 'DeleteReminderFeatureFlag',
       ]);
-      expect(calls[0].campaignID).to.equal(buildCampaignId('RF-progress', 'live'));
-      expect(calls[2].campaignID).to.equal(buildCampaignId('RF-progress', 'reminder'));
+      expect(calls[0].campaignId).to.equal(buildCampaignId('RF-progress', 'live'));
+      expect(calls[1].campaignId).to.equal(buildCampaignId('RF-progress', 'reminder'));
     });
 
     it('never re-applies a stage already reached, even across repeated reconcile calls at the same time', async () => {
@@ -214,7 +210,7 @@ describe('swan-notifications', () => {
 
       await reconcileSwanNotifications(() => [], () => new Set());
       const del = calls.find((c) => c.method === 'DeleteReminderFeatureFlag');
-      expect(del.campaignID).to.equal(buildCampaignId('RF-orphan', 'live'));
+      expect(del.campaignId).to.equal(buildCampaignId('RF-orphan', 'live'));
 
       const state = JSON.parse(window.localStorage.getItem(LOCAL_STATE_KEY) || '{}');
       expect(state).to.deep.equal({});
@@ -260,7 +256,7 @@ describe('swan-notifications', () => {
 
       // Exactly one delete per completed transition (reminder->live, live->on-demand) — never
       // more than one stage's campaign registered/active at a time.
-      const deletes = calls.filter((c) => c.method === 'DeleteReminderFeatureFlag').map((c) => c.campaignID);
+      const deletes = calls.filter((c) => c.method === 'DeleteReminderFeatureFlag').map((c) => c.campaignId);
       expect(deletes).to.deep.equal([
         buildCampaignId(rfCode, 'reminder'),
         buildCampaignId(rfCode, 'live'),

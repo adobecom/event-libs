@@ -116,20 +116,32 @@ to the UNC/UniversalNav team. Neither blocks item 5.
 Item 5: PR #276's description has been updated to reflect this resolution. Taking it out
 of draft is left as an explicit call for the PR author, pending the live QA in item 1.
 
-## Open question: Photoshop/Adobe Home team's direct-call pattern
+## Resolved: direct-call pattern is the documented primary path for web hosts
 
-The Adobe Home team's `nest/nest` PR #5275 ("[Analytics] Send events to UNC") resolves the
-same `window.UniversalNav.getComponent('notifications')` instance and calls
-`AnalyticsEventFromHost` directly on it (`instance.AnalyticsEventFromHost(event)`), with no
-`_uncContainer` involved — contradicting this doc's live-verified finding that the instance
-UNAV hands back strips prototype methods. Their own verification was against a local
-remapping of the UNC script (a stub), not the real production bundle, so it's unclear
-whether UNC's contract has since changed to restore these methods, or whether their
-integration is equally unverified against the real engine. Worth raising alongside Action
-Item 4 above when asking the UNC/UniversalNav team to bless a path officially — cite PR #5275
-as evidence that at least one other team is already relying on an unconfirmed assumption
-about this same instance shape.
+UNC's own official web-host integration wiki ("Local Storage Reminder Campaigns in UNC Web
+Host Integration") now documents named methods called directly on the resolved instance
+(`unc.UpsertReminderFeatureFlag(payload)`, etc.) as the primary contract for web hosts. This
+settles the question raised in an earlier draft of this doc — not by cross-referencing the
+Photoshop/Adobe Home `nest/nest` PR #5275, which was a different client on a different stack
+(CCD/native, not web) and was only ever a loose, unverified hint, never evidence. The wiki is
+the authoritative source for this repo's integration.
 
-`unc-client.js` now tries a direct method call first and falls back to
-`_uncContainer.handleMessageFromInterface` if the direct method isn't present, so it's
-compatible with either shape without depending on this question being resolved first.
+Reading UNC's actual engine source (`OneAdobe/unc`, branch `anjali1/MAX`) directly confirms
+`unc.UpsertReminderFeatureFlag(data)`/`DeleteReminderFeatureFlag(data)` are one-line
+pass-throughs to `_uncContainer.handleMessageFromInterface(methodName, data)` — the exact
+same internal handler, byte-identical dispatch. `unc-client.js`'s existing dual-path
+`callUnc()` (try the direct method first, fall back to `_uncContainer`) already handles this
+correctly with no code change needed — it was designed for exactly this kind of contract
+ambiguity before the ambiguity was resolved.
+
+The general-purpose `AnalyticsEventFromHost` host-driven-trigger mechanism this doc
+previously discussed for reminder campaigns is now moot for SWAN specifically — this feature
+no longer uses it, having switched to `generateNotification: true` +
+`schedule_at`/`schedule_after` per the wiki's own demonstrated pattern (see
+`docs/swan-unc-dependencies.md`). The general `_uncContainer`-fallback finding for
+`UpsertReminderFeatureFlag`/`DeleteReminderFeatureFlag` themselves remains valid and in use.
+
+See `docs/swan-unc-dependencies.md`'s "Known upstream bug" section for a real
+`DeleteReminderFeatureFlag` cleanup bug found while cross-checking the wiki against engine
+source on `anjali1/MAX` — unrelated to the direct-call-path question above, but discovered
+during the same source-verification pass.

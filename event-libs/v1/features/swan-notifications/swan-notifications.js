@@ -2,11 +2,13 @@
 // calls notifySessionScheduled/notifySessionUnscheduled directly, fire-and-forget, on
 // every user-initiated add/remove. reconcileSwanNotifications() runs on every
 // session-state-ticker.js tick (plus once right after loadMyData() resolves) to catch a
-// live/on-demand transition, which needs host-driven timing — only the reminder stage can
-// lean on UNC's own schedule_at + internal poller (see swan-payload.js).
+// live/on-demand transition, which needs host-driven timing — every stage's rule sets
+// generateNotification: true, so UNC itself fires the notification immediately upon
+// registration; schedule_at/schedule_after (see swan-payload.js) only control *when* it's
+// shown, letting the reminder stage lean on UNC's own internal poller for a future trigger.
 import { isSwanEnabled, getSwanConfig } from './swan-config.js';
 import { calculateSessionTimes, buildStageCampaignRule } from './swan-payload.js';
-import { registerReminderRule, deleteReminderRule, fireHostEvent } from './unc-client.js';
+import { registerReminderRule, deleteReminderRule } from './unc-client.js';
 
 // Per-rfCode: which single stage's rule is currently registered/active, and its campaignId
 // (needed to delete it once superseded). v2 because the shape changed from the previous
@@ -44,15 +46,15 @@ function desiredStage(timingProperties, now) {
   return 'reminder';
 }
 
-// Registers the newly-desired stage's rule, fires its matching host event, then deletes
-// whatever stage was previously registered — in that order, so there's never a moment with
-// nothing registered for an already-scheduled session. No-ops if already at (or,
-// defensively, past) the desired stage: forward-only is the only guard against duplicate
-// bell entries this design has, since there's no way to read back what UNC is currently
-// showing. That guard is exactly why state must only be updated once register+fire are
-// actually confirmed to have gone through — both resolve `false` rather than throw (e.g.
-// UNC isn't ready yet on this page load), and marking a stage "done" that never actually
-// reached UNC would permanently block ever retrying it.
+// Registers the newly-desired stage's rule, then deletes whatever stage was previously
+// registered — in that order, so there's never a moment with nothing registered for an
+// already-scheduled session. No-ops if already at (or, defensively, past) the desired stage:
+// forward-only is the only guard against duplicate bell entries this design has, since
+// there's no way to read back what UNC is currently showing. That guard is exactly why state
+// must only be updated once register is actually confirmed to have gone through — it
+// resolves `false` rather than throws (e.g. UNC isn't ready yet on this page load), and
+// marking a stage "done" that never actually reached UNC would permanently block ever
+// retrying it.
 async function applyStage(session, swanConfig, now, state) {
   const timingProperties = calculateSessionTimes(session, swanConfig.upcomingOffsetMinutes);
   if (!Number.isFinite(timingProperties.triggerNotificationTime)
@@ -68,11 +70,10 @@ async function applyStage(session, swanConfig, now, state) {
   const scheduleAtSeconds = stage === 'reminder' && now < timingProperties.triggerNotificationTime
     ? Math.floor(timingProperties.triggerNotificationTime / 1000)
     : undefined;
-  const { campaignId, campaignRule, hostEvent } = buildStageCampaignRule(session, stage, swanConfig, { scheduleAtSeconds });
+  const { campaignId, campaignRule } = buildStageCampaignRule(session, stage, swanConfig, { scheduleAtSeconds });
 
   const registered = await registerReminderRule(campaignId, campaignRule);
-  const fired = registered && await fireHostEvent(hostEvent);
-  if (!registered || !fired) {
+  if (!registered) {
     window.lana?.log(`[swan-notifications] failed to apply stage "${stage}" for ${session.rfCode} — will retry next reconcile`);
     return;
   }
@@ -106,7 +107,7 @@ export async function notifySessionUnscheduled(session) {
 }
 
 // Guards against two reconcile passes overlapping: each applyStage() call can take up to
-// ~36s in the worst case (three sequential unc-client.js calls, each with its own 8s
+// ~24s in the worst case (two sequential unc-client.js calls, each with its own 8s
 // whenUncReady() timeout plus up to 8x500ms of call retries if UNC is slow to initialize or
 // its internal state isn't ready yet) — longer than the ~15s ticker interval that drives
 // this. Without this guard, a slow pass still in flight when the next tick fires would race

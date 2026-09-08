@@ -93,10 +93,10 @@ describe('session-store: toggleSchedule fires SWAN notification hooks without bl
           _uncContainer: {
             handleMessageFromInterface: (methodName, data) => {
               if (methodName === 'UpsertReminderFeatureFlag') {
-                calls.push({ method: 'UpsertReminderFeatureFlag', campaignID: data.campaignRules[0].campaignID });
+                calls.push({ method: 'UpsertReminderFeatureFlag', campaignId: data.campaignRules[0].campaignId });
               }
-              // DeleteReminderFeatureFlag / AnalyticsEventFromHost intentionally no-op here —
-              // this test only asserts on the reminder registration reaching UNC.
+              // DeleteReminderFeatureFlag intentionally no-op here — this test only
+              // asserts on the reminder registration reaching UNC.
             },
           },
         },
@@ -106,6 +106,6 @@ describe('session-store: toggleSchedule fires SWAN notification hooks without bl
     // whenUncReady() polls every 250ms — give the next attempt a chance to run.
     await new Promise((resolve) => setTimeout(resolve, 300));
     const upsert = calls.find((c) => c.method === 'UpsertReminderFeatureFlag');
-    expect(upsert?.campaignID).to.equal(buildCampaignId('RF-1', 'live'));
+    expect(upsert?.campaignId).to.equal(buildCampaignId('RF-1', 'live'));
   });
 });

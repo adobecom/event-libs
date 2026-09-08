@@ -1,8 +1,6 @@
-// Thin client for the real UNC (Universal Notification Client) engine instance, replacing
-// an earlier placeholder that guessed a CRUD "store" API — confirmed against UNC's actual
-// engine source not to exist. The real contract is three imperative calls on a `UNC`
-// instance: UpsertReminderFeatureFlag (register a rule), AnalyticsEventFromHost (host-driven
-// trigger), DeleteReminderFeatureFlag (remove). This file's only job is resolving that
+// Thin client for the real UNC (Universal Notification Client) engine instance. The real
+// contract is two imperative calls on a `UNC` instance: UpsertReminderFeatureFlag (register
+// a rule), DeleteReminderFeatureFlag (remove). This file's only job is resolving that
 // instance and hiding its raw message shapes from swan-notifications.js.
 //
 // How the instance is exposed is now CONFIRMED, not guessed — fetched and inspected the
@@ -15,14 +13,13 @@
 // real instance once the page's gnav has "notifications" configured as an active component
 // (`universal-nav` metadata) — see docs/swan-unc-dependencies.md for that dependency.
 //
-// The `instance` UNAV hands back is a shallow copy of only the engine's *own* properties
-// (`appContext`, `initializeUNC`, `_uncContainer`, etc.) — it does NOT preserve prototype
-// methods, so UpsertReminderFeatureFlag/DeleteReminderFeatureFlag/AnalyticsEventFromHost
-// (defined on the engine class's prototype) are never present on it directly. Each of those
-// three is, on the real engine, a one-line pass-through to
-// `_uncContainer.handleMessageFromInterface(methodName, data)` — and `_uncContainer` is one
-// of the surviving own properties, so this file calls through that path directly instead.
-// Verified live against the real engine. See docs/swan-unc-investigation-summary.md and
+// UNC's own web-host wiki documents named methods directly on the instance as the primary
+// contract. An earlier live investigation against the instance UNav hands back found only a
+// shallow copy of the engine's *own* properties (missing prototype methods), reaching the
+// same internal handlers only through `_uncContainer.handleMessageFromInterface(methodName,
+// data)`. Both paths are confirmed (by reading the engine source directly) to dispatch to the
+// exact same internal handler, so this file tries the direct method first and falls back to
+// `_uncContainer` — compatible either way. See docs/swan-unc-investigation-summary.md and
 // docs/swan-unc-dependencies.md.
 //
 // getComponent() itself internally awaits the chunk load + engine construction once called,
@@ -36,8 +33,7 @@ const CALL_RETRY_DELAY_MS = 500;
 
 function hasDirectMethods(candidate) {
   return typeof candidate?.UpsertReminderFeatureFlag === 'function'
-    && typeof candidate?.DeleteReminderFeatureFlag === 'function'
-    && typeof candidate?.AnalyticsEventFromHost === 'function';
+    && typeof candidate?.DeleteReminderFeatureFlag === 'function';
 }
 
 function hasContainerPath(candidate) {
@@ -120,7 +116,7 @@ export async function registerReminderRule(campaignId, campaignRule) {
   try {
     const uncInstance = await whenUncReady();
     if (!uncInstance) return false;
-    const payload = { campaignRules: [{ campaignID: campaignId, campaignRule }] };
+    const payload = { type: 'rule', action: 'upsert', campaignRules: [{ campaignId, campaignRule }] };
     await callUncWithRetry(uncInstance, 'UpsertReminderFeatureFlag', payload);
     return true;
   } catch (err) {
@@ -133,23 +129,11 @@ export async function deleteReminderRule(campaignId) {
   try {
     const uncInstance = await whenUncReady();
     if (!uncInstance) return false;
-    const payload = { campaignRules: [{ campaignID: campaignId }] };
+    const payload = { type: 'rule', action: 'delete', campaignRules: [{ campaignId }] };
     await callUncWithRetry(uncInstance, 'DeleteReminderFeatureFlag', payload);
     return true;
   } catch (err) {
     window.lana?.log(`[unc-client] deleteReminderRule failed for ${campaignId}: ${err.message}`);
-    return false;
-  }
-}
-
-export async function fireHostEvent(eventData) {
-  try {
-    const uncInstance = await whenUncReady();
-    if (!uncInstance) return false;
-    await callUncWithRetry(uncInstance, 'AnalyticsEventFromHost', eventData);
-    return true;
-  } catch (err) {
-    window.lana?.log(`[unc-client] fireHostEvent failed: ${err.message}`);
     return false;
   }
 }
