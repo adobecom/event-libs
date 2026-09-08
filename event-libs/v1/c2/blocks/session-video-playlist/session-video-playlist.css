@@ -590,6 +590,10 @@
   .session-video-playlist-autoplay {
     flex-basis: 100%;
     margin-left: 0;
+
+    /* --vp-fg is the theme-aware foreground (light gray-25 on the dark mobile drawer), so the
+       "Play all" label stays readable instead of the desktop's dark gray-800. */
+    color: var(--vp-fg);
   }
 
   .session-video-playlist-toggle {
