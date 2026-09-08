@@ -88,7 +88,13 @@ export default function ConfigEditor() {
       result.removed.overrideTrackIcons.length && `${result.removed.overrideTrackIcons.length} override icon${result.removed.overrideTrackIcons.length === 1 ? '' : 's'}`,
       result.removed.products.length && `${result.removed.products.length} product icon${result.removed.products.length === 1 ? '' : 's'}`,
     ].filter(Boolean);
-    setToastSuccess(`Removed ${removedParts.join(', ')} no longer found in this event's sessions — save to apply`);
+    // Persistent — an author needs to actually notice this and either Save or investigate,
+    // not have it vanish after 6s like a routine confirmation toast (see
+    // TierOneEventConfigurator.js's isToastPersistent).
+    setToastSuccess({
+      message: `Removed ${removedParts.join(', ')} no longer found in this event's sessions — save to apply`,
+      persistent: true,
+    });
   }, [
     isHomepage, isLoadingSessions, sessionsError, sessions.length, eventId, eventServiceEnv,
     iconTracks, overrideTexts, products, syncActiveConfigWithCatalog, setToastSuccess,

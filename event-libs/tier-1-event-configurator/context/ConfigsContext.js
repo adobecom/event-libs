@@ -78,6 +78,9 @@ const ConfigsProvider = ({ children }) => {
   const [isInitialLoading, setIsInitialLoading] = useState(false);
   const [hasLoaded, setHasLoaded] = useState(false);
   const [error, setError] = useState(null);
+  // A plain string auto-dismisses after TierOneEventConfigurator.js's TOAST_TIMEOUT_MS;
+  // pass { message, persistent: true } instead to keep it up until manually dismissed —
+  // see that file's toastMessage/isToastPersistent.
   const [toastSuccess, setToastSuccess] = useState(null);
   const [toastError, setToastError] = useState(null);
 

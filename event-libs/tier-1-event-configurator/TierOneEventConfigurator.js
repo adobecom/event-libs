@@ -20,6 +20,19 @@ import { readConfigLinkPayload } from '../session-guide-configurator/utils.js';
 const TOAST_TIMEOUT_MS = 6000;
 const HOMEPAGE_LINK_HASH_RE = new RegExp(`[#&]${HOMEPAGE_LINK_HASH_KEY}=([A-Za-z0-9+/=%-]{20,})`);
 
+// setToastSuccess/setToastError normally take a plain string (auto-dismissed after
+// TOAST_TIMEOUT_MS, e.g. "Config deleted"). Passing { message, persistent: true } instead
+// opts out of that timeout — for a toast reporting something the author needs to actually
+// read and act on (e.g. ConfigEditor.js's catalog-sync notice), not just a quick confirmation
+// that's fine to miss. Still dismissible via the toast's own ✕ button either way.
+function toastMessage(toast) {
+  return typeof toast === 'object' && toast !== null ? toast.message : toast;
+}
+
+function isToastPersistent(toast) {
+  return typeof toast === 'object' && toast !== null && !!toast.persistent;
+}
+
 const TABS = [
   { id: 'event', label: 'Event Config' },
   { id: 'session-guide', label: 'Session Guide Config' },
@@ -63,7 +76,7 @@ function EventConfigTab() {
   }, [toastError, clearToastError]);
 
   useEffect(() => {
-    if (!toastSuccess) return undefined;
+    if (!toastSuccess || isToastPersistent(toastSuccess)) return undefined;
     const timer = setTimeout(clearToastSuccess, TOAST_TIMEOUT_MS);
     return () => clearTimeout(timer);
   }, [toastSuccess, clearToastSuccess]);
@@ -139,7 +152,7 @@ function EventConfigTab() {
       `}
       ${toastSuccess && html`
         <div class="tec-toast tec-toast--success" role="status">
-          <span class="tec-toast__message">${toastSuccess}</span>
+          <span class="tec-toast__message">${toastMessage(toastSuccess)}</span>
           <button type="button" class="tec-btn tec-btn--icon" onClick=${clearToastSuccess} aria-label="Dismiss">✕</button>
         </div>
       `}
