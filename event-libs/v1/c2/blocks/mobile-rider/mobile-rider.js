@@ -1,13 +1,12 @@
 /* eslint-disable no-underscore-dangle */
-import { createTag, getEventConfig } from '../../../utils/utils.js';
+import { createTag, getEventConfig, safeUrl } from '../../../utils/utils.js';
 import {
-  sessions, favorited, initSessionState, openSessionGuideDetail, getEventApiConfig,
+  sessions, favorited, pendingActions, initSessionState, openSessionGuideDetail, getEventApiConfig,
 } from '../../../utils/session-store.js';
-import { getTrackIcon } from '../../../utils/tier-1-event-config.js';
+import { getTrackIcon, initTierOneEventConfig } from '../../../utils/tier-1-event-config.js';
 import { resolveIcon } from '../../../features/icons/icon-resolver.js';
 import { toggleFavoriteWithFeedback } from '../../../services/sessions/action-feedback.js';
 import { showToast } from '../../../features/toast/toast.js';
-import { setSessionParam } from '../sessions-guide/utils/url.js';
 
 const BLOCK_CSS_URL = new URL('./mobile-rider.css', import.meta.url).href;
 
@@ -60,14 +59,17 @@ function buildFavoriteButton(session) {
 
   const paint = () => {
     const isFavorited = favorited.value.has(session.id);
+    const isPending = pendingActions.value.has(session.id);
     btn.innerHTML = isFavorited ? ICON_HEART_FILLED : ICON_HEART_OUTLINE;
-    btn.setAttribute('aria-label', isFavorited ? 'Remove from favorites' : 'Add to favorites');
+    btn.setAttribute('aria-label', isFavorited ? `Remove ${session.title} from favorites` : `Add ${session.title} to favorites`);
     btn.setAttribute('aria-pressed', String(isFavorited));
     btn.setAttribute('daa-ll', isFavorited ? 'Remove-from-Favorites' : 'Add-to-Favorites');
+    btn.toggleAttribute('disabled', isPending);
     btn.classList.toggle('is-favorited', isFavorited);
   };
   paint();
   favorited.subscribe(paint);
+  pendingActions.subscribe(paint);
 
   btn.addEventListener('click', () => {
     toggleFavoriteWithFeedback(session, {
@@ -79,7 +81,7 @@ function buildFavoriteButton(session) {
   return btn;
 }
 
-function buildShareButton(session) {
+function buildShareButton(getSession) {
   const btn = createTag('button', {
     type: 'button',
     class: 'mobile-rider-action mobile-rider-info-bar-share',
@@ -88,19 +90,15 @@ function buildShareButton(session) {
   }, ICON_SHARE);
 
   btn.addEventListener('click', async () => {
-    // setSessionParam builds the same `?session=<id>` deep link Session Guide's own
-    // cards use — opens straight to this session's detail view, not a generic page URL.
-    const url = new URL(setSessionParam(session.id), window.location.origin).toString();
-    const shareData = { url, title: session.title || document.title };
+    const session = getSession();
+    const shareUrl = safeUrl(session.sessionPageUrl);
+    if (!shareUrl) return;
     try {
-      if (navigator.share) {
-        await navigator.share(shareData);
-        return;
-      }
-      await navigator.clipboard.writeText(url);
-      showToast({ message: 'Link copied to clipboard', variant: 'positive' });
+      if (!navigator.clipboard) throw new Error('Clipboard API unavailable');
+      await navigator.clipboard.writeText(shareUrl);
+      showToast({ message: 'Link copied!', variant: 'positive' });
     } catch (e) {
-      if (e.name !== 'AbortError') window.lana?.log(`[MobileRider] share failed: ${e.message}`);
+      window.lana?.log(`[MobileRider] share failed: ${e.message}`);
     }
   });
 
@@ -200,12 +198,11 @@ class MobileRider {
       }
 
       await this.injectPlayer(videoId, this.cfg.skinid, this.cfg.aslid);
-
-      // Same section-metadata table upcoming-sessions.js already reads for this page —
-      // avoids making the author repeat session-id on the mobile-rider block itself when
-      // it's already authored there.
       const sessionId = this.cfg['session-id'] || readSectionMetadata(this.el, 'session-id');
-      if (sessionId) this.#initInfoBar(this.cfg, sessionId);
+      if (sessionId) {
+        initTierOneEventConfig();
+        this.#initInfoBar(this.cfg, sessionId);
+      }
     } catch (e) { this.log(e.message); }
   }
 
@@ -218,66 +215,98 @@ class MobileRider {
   }
 
   #initInfoBar(cfg, sessionId) {
-    const aboutEnabled = cfg['about-session-enabled'] === true;
+    const aboutEnabled = cfg['show-info-bar'] === true;
     if (!aboutEnabled) return;
+
+    const background = cfg.background && !['transparent', 'none'].includes(cfg.background.toLowerCase())
+      ? cfg.background
+      : '';
+
+    const panelId = `mobile-rider-info-bar-panel-${sessionId}`;
 
     const bar = createTag('div', {
       class: 'mobile-rider-info-bar',
-      style: cfg.background ? `background:${cfg.background}` : '',
+      style: background ? `background:${background}` : '',
+      role: 'region',
+      'aria-label': 'Session info',
     }, '', { parent: this.root });
     const header = createTag('div', { class: 'mobile-rider-info-bar-header' }, '', { parent: bar });
-    createTag('h3', { class: 'mobile-rider-info-bar-title' }, cfg['session-title'] || '', { parent: header });
+    const titleEl = createTag('h3', { class: 'mobile-rider-info-bar-title' }, cfg['session-title'] || '', { parent: header });
+    const paintTitle = (session) => {
+      titleEl.textContent = session?.title || cfg['session-title'] || '';
+    };
 
     const toggle = createTag('button', {
       type: 'button',
       class: 'mobile-rider-info-bar-toggle',
       'aria-expanded': 'false',
-      'aria-label': 'About this session',
+      'aria-controls': panelId,
+      'daa-ll': 'Session-Info-Toggle',
     }, '', { parent: header });
-    createTag('span', { class: 'mobile-rider-info-bar-chevron' }, ICON_CHEVRON_DOWN, { parent: toggle });
+    createTag('span', { class: 'mobile-rider-info-bar-toggle-label' }, 'Show more session info', { parent: toggle });
+    createTag('span', { class: 'mobile-rider-info-bar-chevron', 'aria-hidden': 'true' }, ICON_CHEVRON_DOWN, { parent: toggle });
 
+    const toggleLabel = toggle.querySelector('.mobile-rider-info-bar-toggle-label');
     toggle.addEventListener('click', () => {
       const expanded = toggle.getAttribute('aria-expanded') === 'true';
       toggle.setAttribute('aria-expanded', String(!expanded));
+      toggleLabel.textContent = expanded ? 'Show more session info' : 'Show less session info';
       bar.classList.toggle('is-expanded', !expanded);
     });
 
     const panelWrap = createTag('div', { class: 'mobile-rider-info-bar-panel-wrap' }, '', { parent: bar });
-    const panel = createTag('div', { class: 'mobile-rider-info-bar-panel' }, '', { parent: panelWrap });
+    const panel = createTag('div', { class: 'mobile-rider-info-bar-panel', id: panelId }, '', { parent: panelWrap });
+    const badgeSlot = createTag('span', { class: 'mobile-rider-info-bar-category-slot' }, '', { parent: panel });
+    const paintCategory = (session) => {
+      const track = session?.primaryTrack || cfg['session-category'] || '';
+      badgeSlot.replaceChildren();
+      const badge = buildCategoryBadge(track);
+      if (badge) badgeSlot.append(badge);
+    };
+    paintCategory(null);
 
-    const badge = buildCategoryBadge(cfg['session-category']);
-    if (badge) panel.append(badge);
-    if (cfg['session-description']) {
-      createTag('p', { class: 'mobile-rider-info-bar-description' }, cfg['session-description'], { parent: panel });
-    }
-    const viewAllDetailsDevices = new Set(
-      (cfg['view-all-details-devices'] || '').split(',').map((d) => d.trim().toLowerCase()).filter(Boolean),
-    );
-    if (viewAllDetailsDevices.size) {
+    const descriptionEl = createTag('p', { class: 'mobile-rider-info-bar-description' }, cfg['session-description'] || '', { parent: panel });
+    const paintDescription = (session) => {
+      const text = session?.description || cfg['session-description'] || '';
+      descriptionEl.textContent = text;
+      descriptionEl.classList.toggle('is-hidden', !text);
+    };
+    paintDescription(null);
+
+    const viewAllDetailsLabel = cfg['view-all-details-label'];
+    if (viewAllDetailsLabel) {
       const more = createTag('button', {
         type: 'button',
         class: 'mobile-rider-info-bar-more',
-        'data-view-all-mobile': String(viewAllDetailsDevices.has('mobile')),
-        'data-view-all-tablet': String(viewAllDetailsDevices.has('tablet')),
-        'data-view-all-desktop': String(viewAllDetailsDevices.has('desktop')),
-      }, 'View all details', { parent: panel });
+        'daa-ll': 'View-All-Details',
+      }, viewAllDetailsLabel, { parent: panel });
       more.addEventListener('click', () => openSessionGuideDetail(sessionId));
     }
 
     const actions = createTag('div', { class: 'mobile-rider-info-bar-actions' }, '', { parent: panel });
-    actions.append(buildShareButton({ id: sessionId, title: cfg['session-title'] || '' }));
 
     initSessionState();
-    const addFavorite = (session) => actions.prepend(buildFavoriteButton(session));
+    // Share needs the real session's sessionPageUrl — building the button before that
+    // resolves would let a click silently no-op (safeUrl(undefined) is falsy), so it's only
+    // created once the session is known, same as the Favorite button below.
+    const onSessionResolved = (session) => {
+      paintTitle(session);
+      paintCategory(session);
+      paintDescription(session);
+      const shareBtn = buildShareButton(() => session);
+      shareBtn.setAttribute('aria-label', session.title ? `Share ${session.title}` : 'Share');
+      actions.append(shareBtn);
+      actions.prepend(buildFavoriteButton(session));
+    };
     const existing = sessions.value.find((s) => s.id === sessionId);
     if (existing) {
-      addFavorite(existing);
+      onSessionResolved(existing);
       return;
     }
     const unsubscribe = sessions.subscribe((list) => {
       const found = list.find((s) => s.id === sessionId);
       if (found) {
-        addFavorite(found);
+        onSessionResolved(found);
         unsubscribe();
       }
     });
