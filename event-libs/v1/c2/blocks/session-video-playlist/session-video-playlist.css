@@ -5,8 +5,13 @@
     --vp-bg: var(--vp-authored-bg, var(--s2a-color-gray-25));
     --vp-fg: var(--s2a-color-gray-900);
     --vp-row-bg: var(--s2a-color-gray-50);
-    --vp-track-bg: var(--s2a-color-transparent-black-16);
-    --vp-muted: var(--s2a-color-transparent-black-64);
+    /* stylelint-disable-next-line color-no-hex -- exact Figma progress-track color on the light
+       desktop pod; no --s2a- token resolves to #D3D3D3 */
+    --vp-track-bg: #d3d3d3;
+
+    /* Figma "S2AC/Palette/gray/700" light value = #505050 (the non-playing row duration on the
+       light desktop pod). */
+    --vp-muted: var(--s2a-color-gray-700);
     --vp-playing-bg: var(--s2a-color-gray-900);
     --vp-playing-fg: var(--s2a-color-gray-25);
     --vp-playing-track-bg: var(--s2a-color-gray-700);
@@ -412,6 +417,7 @@
   flex-direction: column;
   flex-shrink: 0;
   gap: var(--s2a-spacing-xs);
+  padding: var(--s2a-spacing-3xs) 0;
 }
 
 .session-video-playlist-row-favorite,
@@ -423,9 +429,11 @@
   width: 32px;
   height: 32px;
   padding: 0;
-  border: var(--s2a-border-width-sm, 1px) solid currentcolor;
+  border: var(--s2a-border-width-sm, 1px) solid var(--s2a-color-gray-100);
   border-radius: var(--s2a-border-radius-round);
-  background: var(--s2a-color-gray-100);
+  /* stylelint-disable-next-line color-no-hex -- exact Figma favorite/play chip fill; no --s2a-
+     token resolves to #D0D0D0 */
+  background: #d0d0d0;
   color: var(--vp-fg);
   cursor: pointer;
 }
