@@ -56,6 +56,9 @@ field to read, so it never waits on the catalog:
 | `live` | `now` is inside **any** slot (inclusive) | red dot + `Live` | hidden |
 | `on-demand` | anything else — after a slot, or between slots | `On-demand` / `Available soon` | shown |
 
+**Pure in-person IPOD sessions override this table entirely** — no date, no `Live`, and no CTA;
+the eyebrow reflects only whether the recording exists yet. See *In-person IPOD sessions* below.
+
 #### Authored status labels
 
 The three status **labels** are author-overridable via optional rows on the
@@ -66,7 +69,7 @@ case-insensitive; an absent or empty row falls back to the default:
 |---|---|---|
 | `Live label` | `Live` | state is `live` |
 | `On-demand label` | `On-demand` | state is `on-demand` and a recording exists |
-| `IPOD pending label` | `Available soon` | IPOD session whose recording isn't posted yet |
+| `IPOD pending label` | `Available soon` | in-person IPOD session whose recording isn't posted yet |
 
 `readStatusLabels(el)` reads these before the block clears its children; `mountSessionState`
 threads them into `renderStatus`. Because session pages are template-generated, putting these
@@ -87,6 +90,10 @@ this?" is not the same question as "is it on now?":
 | **Format has no `online`** | **none** — see below |
 | `now < finalEnd` (the latest slot's end) | Add to schedule |
 | otherwise | none |
+
+A **pure in-person IPOD** session (IPOD **and not** `online`) short-circuits this table: its CTA
+is always **none**. An IPOD session that is *also* `online` is a hybrid — it keeps the normal
+CTA logic and stays schedulable (its session time is virtual).
 
 ### Add to schedule is gated on Format `online`
 
@@ -157,21 +164,34 @@ changes across a premiere boundary is the eyebrow status and the primary CTA.
 compares against 7pm, so the 10:45–18:00 on-demand window would render **no player at all**,
 contradicting the intended behavior. Sorting there is a prerequisite; owner Hari.
 
-### "Available soon" — IPOD sessions with no recording yet
+### In-person IPOD sessions
 
-An `on-demand` session reads **"Available soon"** instead of "On-demand" when it is an IPOD
-session whose recording has not been attached. Both signals come from page metadata.
+A **pure in-person IPOD** session (`isInPersonIpodSession`) is handled specially: it **ignores the
+time state machine entirely**. No date pre-live, no `Live` during the session window, and **no CTA**
+(no Watch now, no Add to schedule). The eyebrow is binary — it reflects only whether the recording
+exists yet:
 
-**IPOD (In-Person On Demand)** — delivered in person, then posted as a recording. There
-is **no explicit IPOD attribute**; the classifier is the `Format` custom attribute
-carrying **both** `in-person` **and** `on-demand-post-event`. Format values are compared
-on an alphanumeric-only normalization, because the same value appears as the slug
-`on-demand-post-event` and the label `On demand, post event`, and real data includes
-values with an empty label.
+| Recording | Eyebrow | CTA | Closed captions |
+|---|---|---|---|
+| none (at any time) | `Available soon` (`IPOD pending label`) | none | hidden |
+| present | `On-demand` (`On-demand label`) | none | shown |
 
-Only IPOD qualifies because only IPOD has a real gap: an online session's recording is
-essentially its stream archive and lands immediately, whereas the real MPC template
-carries `DVR Timing (in hours)` of **772** (~32 days).
+It flips on **video availability, not a clock** — so it updates on the next page load/regen once the
+recording lands, not on a live timer (the block schedules no ticker for these sessions).
+
+**IPOD (In-Person On Demand)** — delivered in person, then posted as a recording. There is **no
+explicit IPOD attribute**; the classifier is the `Format` custom attribute carrying **both**
+`in-person` **and** `on-demand-post-event`. Format values are compared on an alphanumeric-only
+normalization, because the same value appears as the slug `on-demand-post-event` and the label
+`On demand, post event`, and real data includes values with an empty label.
+
+**"Pure" means not `online`.** An IPOD session that is *also* `online` is a hybrid with a virtual
+session time — it stays on the normal state machine (date → live/Watch now → on-demand) and is
+schedulable, so it is **excluded** here: the gate is `isIpodSession && !isSchedulableSession`.
+
+Only IPOD needs this because only IPOD has a real gap: an online session's recording is essentially
+its stream archive and lands immediately, whereas the real MPC template carries
+`DVR Timing (in hours)` of **772** (~32 days).
 
 **Has a recording** — `hasPlayableVideo()` looks for an entry in `session-times[].videos[]`
 whose `provider` is `mpc` or `youtube` **and** whose `kind` is exactly **`onDemand`**.
@@ -190,14 +210,6 @@ session:
   { "provider": "mpc",         "kind": "onDemand",   "url": "…/v/3433462?…" },
   { "provider": "mobilerider", "kind": "dvr",        "url": "…/video/…" } ]
 ```
-
-Behavior matrix:
-
-| Format | Recording | Status |
-|---|---|---|
-| in-person + on-demand-post-event | none | **Available soon** |
-| in-person + on-demand-post-event | present | On-demand |
-| online / post-event only / in-person only / no Format | either | On-demand |
 
 `renderStatus` adds `session-status--ipod-pending` for the pending case; it carries no
 styling of its own, so the state is targetable if design wants it differentiated. It is named

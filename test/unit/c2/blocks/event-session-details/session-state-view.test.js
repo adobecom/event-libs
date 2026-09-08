@@ -264,6 +264,26 @@ describe('session-state-view', () => {
       });
       expect(renderStatus('on-demand', times).textContent).to.equal('On-demand');
     });
+
+    it('IPOD upcoming with no recording -> Available soon, not the date', () => {
+      setPage({ videos: [], format: IPOD });
+      const el = renderStatus('upcoming', times);
+      expect(el.textContent).to.equal('Available soon');
+      expect(el.classList.contains('session-status--ipod-pending')).to.be.true;
+    });
+
+    it('IPOD live with no recording -> Available soon, no live dot', () => {
+      setPage({ videos: [], format: IPOD });
+      const el = renderStatus('live', times);
+      expect(el.textContent).to.equal('Available soon');
+      expect(el.querySelector('.session-status-dot')).to.be.null;
+    });
+
+    it('IPOD with a recording -> On-demand regardless of the time state', () => {
+      setPage({ videos: [MPC_RECORDING], format: IPOD });
+      expect(renderStatus('upcoming', times).textContent).to.equal('On-demand');
+      expect(renderStatus('live', times).textContent).to.equal('On-demand');
+    });
   });
 
   describe('authored status labels', () => {
@@ -358,7 +378,40 @@ describe('session-state-view', () => {
       { name: 'Format', inputType: 'multi-select', enabled: true, values: [{ value: 'online', label: 'Online' }] },
     ]));
 
+    const ipodFormat = () => setMetadata('custom-attributes', JSON.stringify([
+      {
+        name: 'Format',
+        inputType: 'multi-select',
+        enabled: true,
+        values: [{ value: 'in-person' }, { value: 'on-demand-post-event' }],
+      },
+    ]));
+
     beforeEach(() => { document.body.innerHTML = ''; });
+
+    it('IPOD session shows no CTA and an Available-soon eyebrow', () => {
+      ipodFormat();
+      soonLive();
+      const { statusSlot, primaryCtaSlot } = slots();
+      mountSessionState({ statusSlot, primaryCtaSlot });
+      expect(primaryCtaSlot.children.length).to.equal(0);
+      expect(statusSlot.textContent).to.equal('Available soon');
+    });
+
+    it('IPOD session with a recording shows On-demand and still no CTA', () => {
+      ipodFormat();
+      const start = Date.now() + 150;
+      setMetadata('session-times', JSON.stringify([{
+        startTimeMillis: start,
+        endTimeMillis: start + 3600000,
+        timezone: 'UTC',
+        videos: [{ provider: 'mpc', url: 'x', kind: 'onDemand' }],
+      }]));
+      const { statusSlot, primaryCtaSlot } = slots();
+      mountSessionState({ statusSlot, primaryCtaSlot });
+      expect(primaryCtaSlot.children.length).to.equal(0);
+      expect(statusSlot.textContent).to.equal('On-demand');
+    });
 
     it('does nothing without session-times', () => {
       const { statusSlot, primaryCtaSlot } = slots();
@@ -486,9 +539,10 @@ describe('session-state-view', () => {
           .to.not.be.null;
       });
 
-      it('withholds it for a pure IPOD session', () => {
+      it('withholds the CTA for a pure IPOD session and shows Available soon, not the date', () => {
         const { statusSlot, primaryCtaSlot } = mount([IN_PERSON, POST_EVENT]);
-        expect(statusSlot.querySelector('.session-status--upcoming')).to.not.be.null;
+        expect(statusSlot.querySelector('.session-status--ipod-pending')).to.not.be.null;
+        expect(statusSlot.querySelector('.session-status--upcoming')).to.be.null;
         expect(primaryCtaSlot.children.length).to.equal(0);
       });
 
@@ -502,10 +556,11 @@ describe('session-state-view', () => {
         expect(mount([]).primaryCtaSlot.children.length).to.equal(0);
       });
 
-      it('still shows Watch now once an unschedulable session is live', async () => {
-        const { primaryCtaSlot } = mount([IN_PERSON, POST_EVENT]);
+      it('shows no CTA and Available soon for a pure IPOD session even once it is live', async () => {
+        const { statusSlot, primaryCtaSlot } = mount([IN_PERSON, POST_EVENT]);
         await new Promise((r) => { setTimeout(r, 800); });
-        expect(primaryCtaSlot.querySelector('.session-watch-now')).to.not.be.null;
+        expect(primaryCtaSlot.children.length).to.equal(0);
+        expect(statusSlot.textContent).to.equal('Available soon');
       });
     });
 

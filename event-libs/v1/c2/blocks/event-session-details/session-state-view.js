@@ -85,6 +85,10 @@ function isSchedulableSession(doc = document) {
   return hasFormat(doc, 'online');
 }
 
+function isInPersonIpodSession(doc = document) {
+  return isIpodSession(doc) && !isSchedulableSession(doc);
+}
+
 export const DEFAULT_STATUS_LABELS = { live: 'Live', onDemand: 'On-demand', ipodPending: 'Available soon' };
 
 const STATUS_LABEL_ROWS = { live: 'live-label', onDemand: 'on-demand-label', ipodPending: 'ipod-pending-label' };
@@ -101,6 +105,14 @@ export function readStatusLabels(el) {
 }
 
 export function renderStatus(state, times, labels = DEFAULT_STATUS_LABELS, doc = document) {
+  if (isInPersonIpodSession(doc)) {
+    const available = hasPlayableVideo(doc);
+    const el = createTag('span', {
+      class: `session-status session-status--${available ? 'on-demand' : 'ipod-pending'}`,
+    });
+    el.textContent = available ? labels.onDemand : labels.ipodPending;
+    return el;
+  }
   const el = createTag('span', { class: `session-status session-status--${state}` });
   if (state === 'live') {
     el.append(createTag('span', { class: 'session-status-dot', 'aria-hidden': 'true' }));
@@ -108,9 +120,7 @@ export function renderStatus(state, times, labels = DEFAULT_STATUS_LABELS, doc =
     liveLabel.textContent = labels.live;
     el.append(liveLabel);
   } else if (state === 'on-demand') {
-    const pending = isIpodSession(doc) && !hasPlayableVideo(doc);
-    el.classList.toggle('session-status--ipod-pending', pending);
-    el.textContent = pending ? labels.ipodPending : labels.onDemand;
+    el.textContent = labels.onDemand;
   } else {
     el.textContent = formatDateTime(times.start, times.timezone);
   }
@@ -140,6 +150,14 @@ export function mountSessionState({
   const slots = getAllSessionTimes();
   if (!slots.length) return;
   const earliest = slots[0];
+
+  if (isInPersonIpodSession()) {
+    if (primaryCtaSlot) primaryCtaSlot.replaceChildren();
+    if (statusSlot) statusSlot.replaceChildren(renderStatus(null, earliest, statusLabels));
+    if (ccEl) ccEl.hidden = !hasPlayableVideo();
+    return;
+  }
+
   const finalEnd = Math.max(...slots.map(({ end }) => end));
 
   const scheduleBtn = isSchedulableSession() ? renderSchedule() : null;
