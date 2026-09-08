@@ -93,12 +93,13 @@
   display: flex;
   flex-direction: column;
   min-height: 0;
-  flex: 1 1 auto;
-  padding: 0 var(--s2a-spacing-md);
 
-  /* overscroll-behavior keeps a trackpad/wheel gesture inside this scroll container instead of
-     chaining to the page once the list is scrollable — without it the browser can route the
-     gesture straight to the page even while this div overflows. */
+  /* flex-basis 0 (not auto) so the wrapper's height comes from flex-distributing its parent's
+     bounded height rather than from its own content clamped by max-height — the latter leaves
+     it in a state where macOS trackpad/wheel gestures route to the page instead of scrolling
+     this container, even though it overflows. */
+  flex: 1 1 0;
+  padding: 0 var(--s2a-spacing-md);
   overflow-y: auto;
   overscroll-behavior: contain;
   box-sizing: border-box;

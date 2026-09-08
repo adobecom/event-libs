@@ -575,14 +575,16 @@ function buildTopicView(el, allRows, {
     });
   }
 
-  // The cap must sit on the SCROLL container (wrapper), not the list: capping the list to the
-  // same height leaves the wrapper's content exactly filling it, so it never overflows and the
-  // wheel scrolls the page instead of the list. applyExpandedHeightCap computes off the list's
-  // measurements (gap/rows) and writes there; move that value to the wrapper and leave the list
-  // uncapped so it grows past the wrapper and the wrapper actually scrolls.
+  // The cap is applied to the playlist container (el, the flex parent), NOT the wrapper: the
+  // wrapper uses flex: 1 1 0, so it derives a real distributed height from el's bounded height
+  // and becomes a clean scroll container (matching the working reference playlist). Capping the
+  // wrapper directly instead — via max-height on a flex-basis:auto box — leaves it in a state
+  // where macOS trackpad gestures scroll the page instead of the list. applyExpandedHeightCap
+  // computes off the list's row measurements and writes there; move that value to el and clear
+  // the list's own cap so the list grows to fill and overflow the bounded wrapper.
   const capWrapperHeight = () => {
     applyExpandedHeightCap(list, maxSessions);
-    wrapper.style.maxHeight = list.style.maxHeight;
+    el.style.maxHeight = list.style.maxHeight;
     list.style.maxHeight = '';
   };
 
