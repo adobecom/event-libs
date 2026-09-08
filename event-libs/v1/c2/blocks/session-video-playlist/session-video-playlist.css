@@ -86,7 +86,7 @@
   flex-wrap: wrap;
   align-items: flex-start;
   gap: var(--s2a-spacing-xs) var(--s2a-spacing-md);
-  padding: var(--s2a-spacing-md) var(--s2a-spacing-md) var(--s2a-spacing-8, 8px);
+  padding: var(--s2a-spacing-md) var(--s2a-spacing-md) var(--s2a-spacing-md);
 }
 
 .session-video-playlist-wrapper {
@@ -129,14 +129,15 @@
   gap: var(--s2a-spacing-xs);
   margin: 0 0 0 auto;
   font-size: var(--s2a-font-size-sm);
+  color: var(--s2a-color-gray-800);
   cursor: pointer;
 }
 
 .session-video-playlist-autoplay-toggle {
   appearance: none;
   position: relative;
-  width: 32px;
-  height: 18px;
+  width: 22px;
+  height: 14px;
   margin: 0;
   border-radius: var(--s2a-border-radius-round);
   /* stylelint-disable-next-line color-no-hex -- no matching --s2a- token for this exact
@@ -150,10 +151,10 @@
 .session-video-playlist-autoplay-toggle::before {
   content: '';
   position: absolute;
-  top: 2px;
-  left: 2px;
-  width: 14px;
-  height: 14px;
+  top: 3px;
+  left: 3px;
+  width: 8px;
+  height: 8px;
   border-radius: var(--s2a-border-radius-round);
   background: var(--s2a-color-gray-25, #fff);
   transition: transform 0.2s ease;
@@ -164,7 +165,7 @@
 }
 
 .session-video-playlist-autoplay-toggle:checked::before {
-  transform: translateX(14px);
+  transform: translateX(8px);
 }
 
 .session-video-playlist-list {
