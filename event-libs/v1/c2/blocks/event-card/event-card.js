@@ -1,6 +1,6 @@
 import { createTag, createOptimizedPicture, loadStyle } from '../../../utils/utils.js';
 import { deriveSessionState, getNowMs } from '../../../utils/session-state.js';
-import { subscribe } from '../../../services/sessions/poller.js';
+import { subscribe, registerStreamIds } from '../../../services/sessions/poller.js';
 
 const VARIANTS = ['media-square', 'media-standard', 'media-standard-rev', 'standard-m', 'media-wide', 'media-tall'];
 const DEFAULT_VARIANT = 'media-standard';
@@ -37,6 +37,7 @@ function attachLiveCtaText(el, cta, getLiveStreamActiveIds) {
   }
 
   if (mrStreamId) {
+    registerStreamIds([mrStreamId]);
     subscribe(() => refreshCtaText(el, cta, getLiveStreamActiveIds), [mrStreamId]);
   } else if (state !== 'on-demand') {
     scheduleBoundary(endMs, () => refreshCtaText(el, cta, getLiveStreamActiveIds));
