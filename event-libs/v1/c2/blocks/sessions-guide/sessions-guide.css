@@ -130,6 +130,7 @@
   .sg-time-row__cards,
   .sg-carousel__cards,
   .sg-detail-panel,
+  .sg-header-controls-collapse,
   .sg-backdrop,
   .sg-search-inline,
   .sg-search-inline__input {
@@ -138,7 +139,8 @@
 
   .sg-card__btn--favorite,
   .sg-card__btn--schedule,
-  .sg-card__btn--play {
+  .sg-card__btn--play,
+  .sg-detail-panel--open {
     animation: none;
   }
 }
@@ -250,6 +252,32 @@
   align-items: stretch;
   justify-content: space-between;
   gap: var(--s2a-spacing-lg);
+}
+
+/* Collapses the whole controls row away when a session detail opens (replaces the old
+   slide-in-panel transition — see .sg-detail-panel below). A grid-row collapse, not a
+   fixed max-height: .sg-header-controls is a single row on tablet/desktop but stacks
+   taller on mobile, and a hardcoded max-height would either clip the taller mobile layout
+   or animate needlessly slow everywhere else. */
+.sg-header-controls-collapse {
+  display: grid;
+  grid-template-rows: 1fr;
+  opacity: 1;
+  transition: grid-template-rows 0.3s ease, opacity 0.25s ease;
+}
+
+.sg-header-controls-collapse-inner {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s2a-spacing-lg);
+  overflow: hidden;
+  min-height: 0;
+}
+
+.sg-drawer--detail-open .sg-header-controls-collapse {
+  grid-template-rows: 0fr;
+  opacity: 0;
+  pointer-events: none;
 }
 
 /* ── Date Tabs ───────────────────────────────────────────── */

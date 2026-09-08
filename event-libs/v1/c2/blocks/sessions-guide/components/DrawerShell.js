@@ -295,7 +295,7 @@ export function DrawerShell() {
           onFilterToggle=${handleFilterToggle}
           onFilterClose=${handleFilterClose}
           filterOpen=${filterOpen}
-          hideControls=${hasDetail}
+          controlsInert=${hasDetail}
         />
         <div class="sg-drawer__body">
           <div

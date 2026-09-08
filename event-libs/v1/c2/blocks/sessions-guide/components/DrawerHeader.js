@@ -52,7 +52,7 @@ function isDesktopSearchLayout() {
 }
 
 export function DrawerHeader({
-  onClose, onFilterToggle, onFilterClose, filterOpen, hideClose, hideControls,
+  onClose, onFilterToggle, onFilterClose, filterOpen, hideClose, controlsInert,
 }) {
   const { state, dispatch } = useSessionGuide();
   const [searchOpen, setSearchOpen] = useState(false);
@@ -157,108 +157,110 @@ export function DrawerHeader({
         <h2 class="sg-header-title">${title}</h2>
       </div>
 
-      ${!hideControls && html`
-        <div class=${`sg-header-controls${searchOpen ? ' sg-header-controls--search-active' : ''}`}>
-          <${DateTabs} />
-          <div class="sg-right-controls">
-            ${activeView === 'my-sessions' && html`<${DownloadButton} />`}
-            <${ViewDropdown} />
-            <div class="sg-filter-wrap" ref=${filterWrapRef}>
-              <button
-                class=${'sg-filter-btn' + (filterOpen ? ' sg-filter-btn--open' : '') + (activeFilterCount > 0 ? ' sg-filter-btn--active' : '')}
-                onclick=${onFilterToggle}
-                aria-label=${filterButtonLabel(activeFilterCount)}
-                aria-haspopup="dialog"
-                aria-expanded=${String(!!filterOpen)}
-                aria-controls=${filterOpen ? 'sg-filter-panel-options' : undefined}
-                daa-ll="Filter-Open"
-                type="button"
-              >
-                <span class="sg-filter-icon" aria-hidden="true"></span>
-                <span class="sg-filter-btn-label">Filter</span>
-                ${activeFilterCount > 0 && html`<span class="sg-filter-count-badge" aria-hidden="true">${activeFilterCount}</span>`}
-              </button>
+      <div class="sg-header-controls-collapse" inert=${controlsInert ? true : undefined}>
+        <div class="sg-header-controls-collapse-inner">
+          <div class=${`sg-header-controls${searchOpen ? ' sg-header-controls--search-active' : ''}`}>
+            <${DateTabs} />
+            <div class="sg-right-controls">
+              ${activeView === 'my-sessions' && html`<${DownloadButton} />`}
+              <${ViewDropdown} />
+              <div class="sg-filter-wrap" ref=${filterWrapRef}>
+                <button
+                  class=${'sg-filter-btn' + (filterOpen ? ' sg-filter-btn--open' : '') + (activeFilterCount > 0 ? ' sg-filter-btn--active' : '')}
+                  onclick=${onFilterToggle}
+                  aria-label=${filterButtonLabel(activeFilterCount)}
+                  aria-haspopup="dialog"
+                  aria-expanded=${String(!!filterOpen)}
+                  aria-controls=${filterOpen ? 'sg-filter-panel-options' : undefined}
+                  daa-ll="Filter-Open"
+                  type="button"
+                >
+                  <span class="sg-filter-icon" aria-hidden="true"></span>
+                  <span class="sg-filter-btn-label">Filter</span>
+                  ${activeFilterCount > 0 && html`<span class="sg-filter-count-badge" aria-hidden="true">${activeFilterCount}</span>`}
+                </button>
 
-              <button
-                ref=${mobileSearchToggleRef}
-                class=${`sg-search-btn${searchOpen ? ' active' : ''}`}
-                onclick=${openSearch}
-                aria-label="Search sessions"
-                aria-expanded=${String(searchOpen)}
-                type="button"
-              >
-                <span class="sg-search-icon" aria-hidden="true"></span>
-              </button>
+                <button
+                  ref=${mobileSearchToggleRef}
+                  class=${`sg-search-btn${searchOpen ? ' active' : ''}`}
+                  onclick=${openSearch}
+                  aria-label="Search sessions"
+                  aria-expanded=${String(searchOpen)}
+                  type="button"
+                >
+                  <span class="sg-search-icon" aria-hidden="true"></span>
+                </button>
 
-              <div
-                class=${`sg-search-inline${searchOpen ? ' sg-search-inline--open' : ''}`}
-                ref=${desktopSearchWrapRef}
-                onclick=${() => { if (searchOpen) desktopSearchRef.current?.focus(); }}
-              >
-                ${searchOpen
+                <div
+                  class=${`sg-search-inline${searchOpen ? ' sg-search-inline--open' : ''}`}
+                  ref=${desktopSearchWrapRef}
+                  onclick=${() => { if (searchOpen) desktopSearchRef.current?.focus(); }}
+                >
+                  ${searchOpen
     ? html`<span class="sg-search-inline__icon" aria-hidden="true"><span class="sg-search-icon" aria-hidden="true"></span></span>`
     : html`<button
-                    ref=${desktopSearchToggleRef}
-                    class="sg-search-inline__icon-btn"
-                    onclick=${openSearch}
+                      ref=${desktopSearchToggleRef}
+                      class="sg-search-inline__icon-btn"
+                      onclick=${openSearch}
+                      aria-label="Search sessions"
+                      aria-expanded="false"
+                      aria-controls="sg-search-inline-input"
+                      type="button"
+                    ><span class="sg-search-icon" aria-hidden="true"></span></button>`}
+                  <input
+                    id="sg-search-inline-input"
+                    class="sg-search-inline__input"
+                    ref=${desktopSearchRef}
+                    type="search"
                     aria-label="Search sessions"
-                    aria-expanded="false"
-                    aria-controls="sg-search-inline-input"
+                    aria-hidden=${searchOpen ? undefined : 'true'}
+                    placeholder="Search sessions..."
+                    autocomplete="off"
+                    spellcheck="false"
+                    tabindex=${searchOpen ? undefined : '-1'}
+                    value=${state.searchQuery}
+                    oninput=${onSearchInput}
+                    onkeydown=${onSearchEscape}
+                    onblur=${onDesktopSearchBlur}
+                  />
+                  ${searchOpen && html`<button
+                    class="sg-search-inline__clear"
+                    onclick=${closeSearch}
+                    aria-label="Clear search"
                     type="button"
-                  ><span class="sg-search-icon" aria-hidden="true"></span></button>`}
-                <input
-                  id="sg-search-inline-input"
-                  class="sg-search-inline__input"
-                  ref=${desktopSearchRef}
-                  type="search"
-                  aria-label="Search sessions"
-                  aria-hidden=${searchOpen ? undefined : 'true'}
-                  placeholder="Search sessions..."
-                  autocomplete="off"
-                  spellcheck="false"
-                  tabindex=${searchOpen ? undefined : '-1'}
-                  value=${state.searchQuery}
-                  oninput=${onSearchInput}
-                  onkeydown=${onSearchEscape}
-                  onblur=${onDesktopSearchBlur}
-                />
-                ${searchOpen && html`<button
-                  class="sg-search-inline__clear"
-                  onclick=${closeSearch}
-                  aria-label="Clear search"
-                  type="button"
-                >✕</button>`}
-              </div>
+                  >✕</button>`}
+                </div>
 
-              ${filterOpen && html`<${FilterPanel} onClose=${closeFilter} />`}
+                ${filterOpen && html`<${FilterPanel} onClose=${closeFilter} />`}
+              </div>
+            </div>
+          </div>
+
+          <div class=${`sg-mobile-search-row${searchOpen ? ' sg-mobile-search-row--open' : ''}`}>
+            <div class="sg-mobile-search-wrap">
+              <span class="sg-search-field-icon" aria-hidden="true"></span>
+              <input
+                class="sg-mobile-search-input"
+                ref=${mobileSearchRef}
+                type="search"
+                aria-label="Search sessions"
+                placeholder="Search sessions..."
+                autocomplete="off"
+                spellcheck="false"
+                value=${state.searchQuery}
+                oninput=${onSearchInput}
+                onkeydown=${onSearchEscape}
+              />
+              <button
+                class="sg-search-clear-btn"
+                onclick=${closeSearch}
+                aria-label="Clear search"
+                type="button"
+              >✕</button>
             </div>
           </div>
         </div>
-
-        <div class=${`sg-mobile-search-row${searchOpen ? ' sg-mobile-search-row--open' : ''}`}>
-          <div class="sg-mobile-search-wrap">
-            <span class="sg-search-field-icon" aria-hidden="true"></span>
-            <input
-              class="sg-mobile-search-input"
-              ref=${mobileSearchRef}
-              type="search"
-              aria-label="Search sessions"
-              placeholder="Search sessions..."
-              autocomplete="off"
-              spellcheck="false"
-              value=${state.searchQuery}
-              oninput=${onSearchInput}
-              onkeydown=${onSearchEscape}
-            />
-            <button
-              class="sg-search-clear-btn"
-              onclick=${closeSearch}
-              aria-label="Clear search"
-              type="button"
-            >✕</button>
-          </div>
-        </div>
-      `}
+      </div>
     </header>
   `;
 }

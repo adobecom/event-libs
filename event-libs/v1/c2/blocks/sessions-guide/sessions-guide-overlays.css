@@ -93,20 +93,36 @@
 
 /* ── Session Detail Overlay (Phase 6) ────────────────────────── */
 
+/* Replaces the old slide-in-from-the-right panel: the header's controls row collapses
+   away (.sg-header-controls-collapse in sessions-guide.css) while this fades/slides up
+   into the same space, instead of a separate panel sliding over the list. Closing (Back)
+   is intentionally instant, no reverse animation — matches the reference prototype, and
+   keeps a rapid back-and-forth from queuing up an exit animation behind the next open. */
 .sg-detail-panel {
   position: absolute;
   inset: 0;
   background: var(--s2a-color-background-default, #fff);
-  transform: translateX(100%);
-  transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);
   overflow-y: auto;
   z-index: 70;
-  display: flex;
+  display: none;
   flex-direction: column;
 }
 
 .sg-detail-panel--open {
-  transform: translateX(0);
+  display: flex;
+  animation: sg-detail-in 0.25s ease forwards;
+}
+
+@keyframes sg-detail-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .sg-detail {
