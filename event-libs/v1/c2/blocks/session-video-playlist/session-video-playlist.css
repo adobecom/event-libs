@@ -220,7 +220,11 @@
 
 .session-video-playlist-row-content {
   display: flex;
-  flex: 1 1 auto;
+
+  /* basis:0 (not auto) so it shrinks fully and always leaves room for the heart beside it on
+     line 1 — with an auto/content basis the thumbnail+title width pushes the actions column
+     onto its own wrapped line. Only .row-progress (flex-basis:100%) is meant to wrap below. */
+  flex: 1 1 0;
   align-items: stretch;
   gap: var(--s2a-spacing-sm);
   min-width: 0;
@@ -529,6 +533,13 @@
 
   .session-video-playlist-row {
     padding: var(--s2a-spacing-2xs) var(--s2a-spacing-12, 12px) var(--s2a-spacing-2xs) var(--s2a-spacing-2xs);
+  }
+
+  /* Heart pins to the top-right, on the same line as the title, rather than stretching the
+     full row height — so the progress line below can run under it into the (hidden) play
+     button's freed space. */
+  .session-video-playlist-row-actions {
+    align-self: flex-start;
   }
 
   .session-video-playlist-row-play-icon {
