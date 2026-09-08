@@ -583,7 +583,7 @@ function buildTopicView(el, allRows, {
 
       'aria-label': 'Show more sessions',
       ...analyticsAttrs('playlist-show-more'),
-    }, '', { parent: wrapper });
+    }, '', { parent: el });
     const label = createTag('span', {}, 'Show more', { parent: showMore });
     createTag('span', { class: 'session-video-playlist-show-more-chevron' }, SHOW_MORE_CHEVRON_SVG, { parent: showMore });
 

@@ -32,6 +32,13 @@
     margin-left: 0;
     opacity: 1;
   }
+
+  /* On desktop the "Show more" button (a sibling below) provides the bottom spacing via its
+     own padding-top, so the wrapper doesn't also add a bottom gap. Mobile keeps the wrapper's
+     bottom padding since it has no "Show more". */
+  .session-video-playlist-wrapper {
+    padding-bottom: 0;
+  }
 }
 
 @media (min-width: 1440px) {
@@ -63,7 +70,7 @@
   flex-shrink: 0;
 }
 
-.session-video-playlist > :not(.session-video-playlist-handle, .session-video-playlist-top, .session-video-playlist-wrapper) {
+.session-video-playlist > :not(.session-video-playlist-handle, .session-video-playlist-top, .session-video-playlist-wrapper, .session-video-playlist-show-more) {
   display: none;
 }
 
@@ -451,9 +458,13 @@
 }
 
 @media (min-width: 1024px) {
+  /* Sibling of .session-video-playlist-wrapper (not inside it) so it stays visible below the
+     scrollable list when expanded — inside the wrapper it would be clipped by the wrapper's
+     capped max-height/overflow once "Show more" scrolls the list. Its own left padding matches
+     the wrapper's so it lines up with the rows. */
   .session-video-playlist-show-more {
     display: flex;
-    padding-top: var(--s2a-spacing-lg, 24px);
+    padding: var(--s2a-spacing-lg, 24px) var(--s2a-spacing-md) 0;
     align-items: center;
     align-self: flex-start;
     gap: var(--s2a-spacing-xs);
