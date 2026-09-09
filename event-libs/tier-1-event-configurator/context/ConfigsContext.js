@@ -214,15 +214,21 @@ const ConfigsProvider = ({ children }) => {
     });
   }, []);
 
+  // Read via a ref (not a reactive dep) so this callback's identity stays stable across
+  // every keystroke — ConfigEditor.js's effect lists it as a dependency.
+  const activeConfigRef = useRef(activeConfig);
+  activeConfigRef.current = activeConfig;
+
   // Global only — Homepage configs don't author trackIcons/overrideTrackIcons/products.
   const syncActiveConfigWithCatalog = useCallback((lists) => {
-    if (!activeConfig || isHomepageConfigType(activeConfig.configType || CONFIG_TYPES.GLOBAL)) return null;
-    const result = syncIconConfigWithCatalog(activeConfig.config, lists);
+    const current = activeConfigRef.current;
+    if (!current || isHomepageConfigType(current.configType || CONFIG_TYPES.GLOBAL)) return null;
+    const result = syncIconConfigWithCatalog(current.config, lists);
     if (result.hasChanges) {
       setActiveConfig((prev) => (prev ? { ...prev, config: result.config } : prev));
     }
     return result;
-  }, [activeConfig]);
+  }, []);
 
   const saveActiveConfig = useCallback(async () => {
     if (!activeConfig || !org || !repo) return { ok: false };

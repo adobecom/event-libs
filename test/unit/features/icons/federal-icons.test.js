@@ -107,6 +107,11 @@ describe('federal-icons — fetchFederalTrackIcon (track-icon namespace only)', 
     expect(await fetchFederalTrackIcon('')).to.equal(null);
   });
 
+  it('rewrites a black fill/stroke set directly on the root <svg>, not just descendants', async () => {
+    const svg = await fetchFederalTrackIcon('root-black-fill');
+    expect(svg.getAttribute('fill')).to.equal('currentColor');
+  });
+
   // Real track-icon artwork ships literal fill="black"/stroke="black" (Illustrator export),
   // not fill="currentcolor" like the generic /assets/icons/svgs/ namespace — so neither an
   // author's chosen track color nor a card's hover-to-white state had anything to actually

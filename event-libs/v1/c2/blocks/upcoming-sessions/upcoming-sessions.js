@@ -35,13 +35,16 @@ function buildCategoryBadge(track) {
   }, '', { parent: badge });
   createTag('span', { class: 'sg-category-badge__label' }, track, { parent: badge });
 
-  fetchFederalTrackIcon(entry.icon).then((svg) => {
-    if (!svg) return;
-    svg.classList.add('sg-category-badge__icon');
-    iconColor.append(svg);
-  }).catch((error) => {
-    window.lana?.log(`upcoming-sessions: icon resolution failed for "${entry.icon}": ${error.message}`);
-  });
+  (async () => {
+    try {
+      const svg = await fetchFederalTrackIcon(entry.icon);
+      if (!svg) return;
+      svg.classList.add('sg-category-badge__icon');
+      iconColor.append(svg);
+    } catch (error) {
+      window.lana?.log(`upcoming-sessions: icon resolution failed for "${entry.icon}": ${error.message}`);
+    }
+  })();
 
   return badge;
 }

@@ -43,16 +43,10 @@ export function MyFavoritesView() {
     const fallback = checkViewAccess('my-favorites', { eventConfig: state.guideConfig });
     if (fallback) dispatch({ type: 'SET_VIEW', view: fallback });
   }, [authResolved, isLoggedIn, isRegistered]);
-  // Avoids a blank view in the gap between the catalog resolving and registration resolving.
-  if (!authResolved) {
-    return html`
-      <div class="sg-sr-only" role="status" aria-live="polite">Loading your favorited sessions…</div>
-      ${html`<${LoadingState} />`}
-    `;
-  }
-  if (!isLoggedIn || isRegistered !== true) return null;
 
-  // Memoized: this component re-renders on every context dispatch, not just input changes.
+  // Computed unconditionally (even while loading/unauthorized) so every hook below runs on
+  // every render, not just once auth resolves — a conditional hook count corrupts Preact's
+  // hook state across renders.
   const { live, timeSlots, filteredOnDemand } = useMemo(() => {
     const favoritedSessions = sessions.filter((s) => favorited.has(s.id));
     const dayFavorited = sessionsForDay(favoritedSessions, activeDay, userTz);
@@ -73,6 +67,15 @@ export function MyFavoritesView() {
       filteredOnDemand: filterSessions(onDemandRaw, activeFilters, searchQuery),
     };
   }, [sessions, favorited, liveStreamActiveIds, activeDay, userTz, nowMs, activeFilters, searchQuery]);
+
+  // Avoids a blank view in the gap between the catalog resolving and registration resolving.
+  if (!authResolved) {
+    return html`
+      <div class="sg-sr-only" role="status" aria-live="polite">Loading your favorited sessions…</div>
+      ${html`<${LoadingState} />`}
+    `;
+  }
+  if (!isLoggedIn || isRegistered !== true) return null;
 
   const hasUpcoming = timeSlots.length > 0;
   const hasOnDemand = filteredOnDemand.length > 0;

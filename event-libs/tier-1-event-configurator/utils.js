@@ -55,18 +55,20 @@ export function isTrackIconEntryComplete(entry) {
   return !entry.color || !!entry.icon;
 }
 
-// Extracts the slug from a pasted federal track-icon URL; passes a plain slug through untouched.
-export function extractTrackIconSlug(value) {
+// Extracts the slug from a pasted federal icon URL under the given namespace path segment;
+// passes a plain slug (or anything not matching that namespace) through untouched.
+function extractIconSlugFromUrl(value, pathSegment) {
   const trimmed = (value || '').trim();
-  const match = trimmed.match(/\/track-icons\/([^/]+)\.svg(?:[?#].*)?$/i);
+  const match = trimmed.match(new RegExp(`/${pathSegment}/([^/]+)\\.svg(?:[?#].*)?$`, 'i'));
   return match ? match[1] : trimmed;
 }
 
-// Same as extractTrackIconSlug, for the product-logo namespace (.../federal/assets/svgs/<slug>.svg).
+export function extractTrackIconSlug(value) {
+  return extractIconSlugFromUrl(value, 'track-icons');
+}
+
 export function extractProductIconSlug(value) {
-  const trimmed = (value || '').trim();
-  const match = trimmed.match(/\/assets\/svgs\/([^/]+)\.svg(?:[?#].*)?$/i);
-  return match ? match[1] : trimmed;
+  return extractIconSlugFromUrl(value, 'assets/svgs');
 }
 
 // Returns the same `map` reference when nothing changed, so callers can skip a state update.

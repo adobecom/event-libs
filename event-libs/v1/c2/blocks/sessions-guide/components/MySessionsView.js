@@ -43,16 +43,10 @@ export function MySessionsView() {
     const fallback = checkViewAccess('my-sessions', { eventConfig: state.guideConfig });
     if (fallback) dispatch({ type: 'SET_VIEW', view: fallback });
   }, [authResolved, isLoggedIn, isRegistered]);
-  // Avoids a blank view in the gap between the catalog resolving and registration resolving.
-  if (!authResolved) {
-    return html`
-      <div class="sg-sr-only" role="status" aria-live="polite">Loading your scheduled sessions…</div>
-      ${html`<${LoadingState} />`}
-    `;
-  }
-  if (!isLoggedIn || isRegistered !== true) return null;
 
-  // Memoized: this component re-renders on every context dispatch, not just input changes.
+  // Computed unconditionally (even while loading/unauthorized) so every hook below runs on
+  // every render, not just once auth resolves — a conditional hook count corrupts Preact's
+  // hook state across renders.
   const { live, timeSlots, filteredOnDemand } = useMemo(() => {
     const scheduledSessions = sessions.filter((s) => scheduled.has(s.id));
     const dayScheduled = sessionsForDay(scheduledSessions, activeDay, userTz);
@@ -73,6 +67,15 @@ export function MySessionsView() {
       filteredOnDemand: filterSessions(onDemandRaw, activeFilters, searchQuery),
     };
   }, [sessions, scheduled, liveStreamActiveIds, activeDay, userTz, nowMs, activeFilters, searchQuery]);
+
+  // Avoids a blank view in the gap between the catalog resolving and registration resolving.
+  if (!authResolved) {
+    return html`
+      <div class="sg-sr-only" role="status" aria-live="polite">Loading your scheduled sessions…</div>
+      ${html`<${LoadingState} />`}
+    `;
+  }
+  if (!isLoggedIn || isRegistered !== true) return null;
 
   const hasUpcoming = timeSlots.length > 0;
   const hasOnDemand = filteredOnDemand.length > 0;

@@ -46,9 +46,6 @@ function namespaceSvgIds(svg) {
   return svg;
 }
 
-// Caches misses too, since federal has no manifest and a miss would otherwise re-fetch every render.
-const federalIconCache = new Map();
-
 async function fetchSvgFrom(url) {
   try {
     const resp = await fetch(url);
@@ -62,40 +59,42 @@ async function fetchSvgFrom(url) {
   }
 }
 
+// Shared shape for all three federal namespaces below: cache (misses too, since federal has
+// no manifest and a miss would otherwise re-fetch every render), fetch, tag, optional
+// per-namespace transform, then a freshly id-namespaced clone per call.
+function createFederalIconFetcher(buildUrl, { transform } = {}) {
+  const cache = new Map();
+  return async function fetchIcon(iconName) {
+    if (!iconName) return null;
+    if (cache.has(iconName)) {
+      const cached = cache.get(iconName);
+      return cached ? namespaceSvgIds(cached.cloneNode(true)) : null;
+    }
+
+    const svg = await fetchSvgFrom(buildUrl(iconName));
+    if (svg) {
+      svg.classList.add('icon-federal', `icon-federal-${iconName}`);
+      transform?.(svg);
+    }
+
+    cache.set(iconName, svg);
+    return svg ? namespaceSvgIds(svg.cloneNode(true)) : null;
+  };
+}
+
 // Three separate federal SVG namespaces below - not merged into one fallback chain.
-export async function fetchFederalIcon(iconName) {
-  if (!iconName) return null;
-  if (federalIconCache.has(iconName)) {
-    const cached = federalIconCache.get(iconName);
-    return cached ? namespaceSvgIds(cached.cloneNode(true)) : null;
-  }
+export const fetchFederalIcon = createFederalIconFetcher(
+  (iconName) => `${resolveFederalRoot()}/federal/assets/icons/svgs/${iconName}.svg`,
+);
 
-  const svg = await fetchSvgFrom(`${resolveFederalRoot()}/federal/assets/icons/svgs/${iconName}.svg`);
-  if (svg) svg.classList.add('icon-federal', `icon-federal-${iconName}`);
+export const fetchFederalProductIcon = createFederalIconFetcher(
+  (iconName) => `${resolveFederalRoot()}/federal/assets/svgs/${iconName}.svg`,
+);
 
-  federalIconCache.set(iconName, svg);
-  return svg ? namespaceSvgIds(svg.cloneNode(true)) : null;
-}
-
-const federalProductIconCache = new Map();
-
-export async function fetchFederalProductIcon(iconName) {
-  if (!iconName) return null;
-  if (federalProductIconCache.has(iconName)) {
-    const cached = federalProductIconCache.get(iconName);
-    return cached ? namespaceSvgIds(cached.cloneNode(true)) : null;
-  }
-
-  const svg = await fetchSvgFrom(`${resolveFederalRoot()}/federal/assets/svgs/${iconName}.svg`);
-  if (svg) svg.classList.add('icon-federal', `icon-federal-${iconName}`);
-
-  federalProductIconCache.set(iconName, svg);
-  return svg ? namespaceSvgIds(svg.cloneNode(true)) : null;
-}
-
-// Recolors literal black fill/stroke to currentColor; skips white/none (intentional cutouts).
+// Recolors literal black fill/stroke to currentColor (root element included); skips
+// white/none (intentional cutouts).
 function useCurrentColorForBlack(svg) {
-  svg.querySelectorAll('*').forEach((el) => {
+  [svg, ...svg.querySelectorAll('*')].forEach((el) => {
     ['fill', 'stroke'].forEach((attr) => {
       if ((el.getAttribute(attr) || '').toLowerCase() === 'black') {
         el.setAttribute(attr, 'currentColor');
@@ -105,24 +104,10 @@ function useCurrentColorForBlack(svg) {
   return svg;
 }
 
-const federalTrackIconCache = new Map();
-
-export async function fetchFederalTrackIcon(iconName) {
-  if (!iconName) return null;
-  if (federalTrackIconCache.has(iconName)) {
-    const cached = federalTrackIconCache.get(iconName);
-    return cached ? namespaceSvgIds(cached.cloneNode(true)) : null;
-  }
-
-  const svg = await fetchSvgFrom(`${resolveFederalRoot()}/federal/assets/icons/track-icons/${iconName}.svg`);
-  if (svg) {
-    svg.classList.add('icon-federal', `icon-federal-${iconName}`);
-    useCurrentColorForBlack(svg);
-  }
-
-  federalTrackIconCache.set(iconName, svg);
-  return svg ? namespaceSvgIds(svg.cloneNode(true)) : null;
-}
+export const fetchFederalTrackIcon = createFederalIconFetcher(
+  (iconName) => `${resolveFederalRoot()}/federal/assets/icons/track-icons/${iconName}.svg`,
+  { transform: useCurrentColorForBlack },
+);
 
 // icons.json is federal's manifest of hosted icons, used to populate icon pickers live.
 let federalIconListPromise = null;

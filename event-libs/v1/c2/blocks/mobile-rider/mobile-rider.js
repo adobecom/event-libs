@@ -39,13 +39,16 @@ function buildCategoryBadge(track) {
   }, '', { parent: badge });
   createTag('span', { class: 'mobile-rider-info-bar-category-label' }, track, { parent: badge });
 
-  fetchFederalTrackIcon(entry.icon).then((svg) => {
-    if (!svg) return;
-    svg.classList.add('mobile-rider-info-bar-category-icon');
-    iconColor.append(svg);
-  }).catch((error) => {
-    window.lana?.log(`[MobileRider] category icon resolution failed for "${entry.icon}": ${error.message}`);
-  });
+  (async () => {
+    try {
+      const svg = await fetchFederalTrackIcon(entry.icon);
+      if (!svg) return;
+      svg.classList.add('mobile-rider-info-bar-category-icon');
+      iconColor.append(svg);
+    } catch (error) {
+      window.lana?.log(`[MobileRider] category icon resolution failed for "${entry.icon}": ${error.message}`);
+    }
+  })();
 
   return badge;
 }
