@@ -55,6 +55,65 @@ export function isTrackIconEntryComplete(entry) {
   return !entry.color || !!entry.icon;
 }
 
+// Extracts the slug from a pasted federal icon URL under the given namespace path segment;
+// passes a plain slug (or anything not matching that namespace) through untouched.
+function extractIconSlugFromUrl(value, pathSegment) {
+  const trimmed = (value || '').trim();
+  const match = trimmed.match(new RegExp(`/${pathSegment}/([^/]+)\\.svg(?:[?#].*)?$`, 'i'));
+  return match ? match[1] : trimmed;
+}
+
+export function extractTrackIconSlug(value) {
+  return extractIconSlugFromUrl(value, 'track-icons');
+}
+
+export function extractProductIconSlug(value) {
+  return extractIconSlugFromUrl(value, 'assets/svgs');
+}
+
+// Returns the same `map` reference when nothing changed, so callers can skip a state update.
+function pruneStaleKeys(map, validKeys) {
+  if (!map) return { next: map, removed: [] };
+  const validSet = new Set(validKeys);
+  const removed = Object.keys(map).filter((key) => !validSet.has(key));
+  if (removed.length === 0) return { next: map, removed: [] };
+  const next = {};
+  Object.keys(map).forEach((key) => {
+    if (validSet.has(key)) next[key] = map[key];
+  });
+  return { next, removed };
+}
+
+// Drops authored trackIcons/overrideTrackIcons/products keys no longer in the live catalog;
+// never adds new keys. Returns the same `config` reference (hasChanges: false) when nothing's stale.
+export function syncIconConfigWithCatalog(config, { tracks = [], overrideTexts = [], products = [] } = {}) {
+  const trackResult = pruneStaleKeys(config.trackIcons, tracks);
+  const overrideResult = pruneStaleKeys(config.overrideTrackIcons?.byText, overrideTexts);
+  const productResult = pruneStaleKeys(config.products, products);
+
+  const removed = {
+    trackIcons: trackResult.removed,
+    overrideTrackIcons: overrideResult.removed,
+    products: productResult.removed,
+  };
+  const hasChanges = removed.trackIcons.length > 0
+    || removed.overrideTrackIcons.length > 0
+    || removed.products.length > 0;
+
+  if (!hasChanges) return { config, removed, hasChanges };
+
+  return {
+    config: {
+      ...config,
+      trackIcons: trackResult.next,
+      overrideTrackIcons: { ...config.overrideTrackIcons, byText: overrideResult.next },
+      products: productResult.next,
+    },
+    removed,
+    hasChanges,
+  };
+}
+
 export function getDisplayTitle(row) {
   return row?.config?.configName || row?.config?.eventTitle || row?.backendEventTitle || row?.eventId || '';
 }

@@ -20,26 +20,25 @@ function waitForSessionsReady() {
   });
 }
 
-describe('session-store: myData is skipped without an rfAuthToken', () => {
+describe('session-store: myData fetch failure settles isRegistered instead of hanging forever', () => {
   let originalFetch;
-  let myDataCalled;
 
   before(async () => {
     originalFetch = window.fetch;
-    myDataCalled = false;
     window.fetch = async (url) => {
-      // jwt exchange returns no recognizable token field — rfAuthToken stays null.
       if (url.includes('/jwt')) {
-        return { ok: true, status: 200, json: async () => ({}) };
+        return { ok: true, status: 200, json: async () => ({ rfAuthToken: 'exchanged-token' }) };
       }
       if (url.includes('session-catalog')) {
         return { ok: true, status: 200, json: async () => ({ sessions: [], sessionTimes: [], speakers: [] }) };
       }
-      myDataCalled = true;
-      return { ok: true, status: 200, json: async () => ({ mySchedule: [], sessionInterests: [], loggedInUser: {} }) };
+      // A real rfAuthToken was granted, but the myData call itself fails outright (network
+      // error, 5xx, etc.) — this is what maybeLoadMyData()'s no-token branch does NOT cover,
+      // since a token was obtained; loadMyData()'s own catch is what has to settle isRegistered.
+      throw new Error('network error');
     };
 
-    BlockMediator.set('imsProfile', { first_name: 'Test', account_type: 'type1', userId: 'user-3' });
+    BlockMediator.set('imsProfile', { first_name: 'Test', account_type: 'type1', userId: 'user-4' });
 
     setMetadata('tier-1-event-config', JSON.stringify({ rfApiUrl: 'https://mock.example/api' }));
     initSessionState();
@@ -50,13 +49,7 @@ describe('session-store: myData is skipped without an rfAuthToken', () => {
   after(() => {
     window.fetch = originalFetch;
     document.head.querySelector('meta[name="tier-1-event-config"]')?.remove();
-    // BlockMediator is a real, shared singleton across test files (unlike session-store.js's
-    // cache-busted copy) — reset so this profile doesn't leak into whichever test runs next.
     BlockMediator.set('imsProfile', undefined);
-  });
-
-  it('never calls myData when the jwt exchange returns no token', () => {
-    expect(myDataCalled).to.be.false;
   });
 
   it('settles isRegistered to null (checked, unknown) rather than leaving it undefined forever', () => {

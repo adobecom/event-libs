@@ -1,5 +1,5 @@
 import { expect } from '@esm-bundle/chai';
-import { buildInitialState, reducer } from '../../../../../../event-libs/v1/c2/blocks/sessions-guide/store/index.js';
+import { buildInitialState, reducer, deriveEventDays } from '../../../../../../event-libs/v1/c2/blocks/sessions-guide/store/index.js';
 import { auth } from '../../../../../../event-libs/v1/utils/session-store.js';
 
 const MOCK_CONFIG = {
@@ -43,6 +43,46 @@ describe('store/buildInitialState', () => {
   });
 });
 
+describe('store/deriveEventDays', () => {
+  const userTz = 'America/Los_Angeles';
+
+  it('collects the distinct days sessions start on', () => {
+    const days = deriveEventDays([
+      { startTimeUtc: '2026-11-10T18:00:00.000Z' },
+      { startTimeUtc: '2026-11-11T18:00:00.000Z' },
+      { startTimeUtc: '2026-11-10T20:00:00.000Z' },
+    ], userTz);
+    expect(days).to.deep.equal(['2026-11-10', '2026-11-11']);
+  });
+
+  // Regression: a day whose only session(s) carry hasOnDemandFormat would otherwise get a
+  // tab with nothing to show once selected — every date-scoped filter (liveSessions/
+  // upcomingSessions/getRecommendedSessions in session-filters.js) already excludes that
+  // format regardless of startTimeUtc, since deriveSessionState() routes it straight to
+  // On demand no matter what.
+  it('excludes a day whose only session has hasOnDemandFormat', () => {
+    const days = deriveEventDays([
+      { startTimeUtc: '2026-11-10T18:00:00.000Z' },
+      { startTimeUtc: '2026-11-12T21:15:00.000Z', hasOnDemandFormat: true },
+    ], userTz);
+    expect(days).to.deep.equal(['2026-11-10']);
+  });
+
+  // A day stays listed as long as at least one of its sessions isn't on-demand-only.
+  it('keeps a day that mixes an on-demand-format session with a regular one', () => {
+    const days = deriveEventDays([
+      { startTimeUtc: '2026-11-12T15:00:00.000Z' },
+      { startTimeUtc: '2026-11-12T21:15:00.000Z', hasOnDemandFormat: true },
+    ], userTz);
+    expect(days).to.deep.equal(['2026-11-12']);
+  });
+
+  it('ignores sessions with no startTimeUtc', () => {
+    const days = deriveEventDays([{ startTimeUtc: '' }, { startTimeUtc: '2026-11-10T18:00:00.000Z' }], userTz);
+    expect(days).to.deep.equal(['2026-11-10']);
+  });
+});
+
 describe('store/reducer', () => {
   let baseState;
 
@@ -77,9 +117,40 @@ describe('store/reducer', () => {
     expect(next.activeView).to.equal('on-demand');
   });
 
+  it('SET_VIEW clears activeFilters and searchQuery on a real view change', () => {
+    const filtered = {
+      ...baseState,
+      activeView: 'my-sessions',
+      activeFilters: { track: new Set(['design']) },
+      searchQuery: 'typography',
+    };
+    const next = reducer(filtered, { type: 'SET_VIEW', view: 'my-favorites' });
+    expect(next.activeView).to.equal('my-favorites');
+    expect(next.activeFilters).to.deep.equal({});
+    expect(next.searchQuery).to.equal('');
+  });
+
+  it('SET_VIEW leaves activeFilters and searchQuery alone when re-selecting the active view', () => {
+    const filters = { track: new Set(['design']) };
+    const filtered = {
+      ...baseState, activeView: 'on-demand', activeFilters: filters, searchQuery: 'typography',
+    };
+    const next = reducer(filtered, { type: 'SET_VIEW', view: 'on-demand' });
+    expect(next.activeFilters).to.equal(filters);
+    expect(next.searchQuery).to.equal('typography');
+  });
+
   it('SET_DAY changes activeDay', () => {
     const next = reducer(baseState, { type: 'SET_DAY', day: '2026-10-29' });
     expect(next.activeDay).to.equal('2026-10-29');
+  });
+
+  it('SET_DAY keeps activeFilters and searchQuery — only a view change clears them', () => {
+    const filters = { track: new Set(['design']) };
+    const filtered = { ...baseState, activeFilters: filters, searchQuery: 'typography' };
+    const next = reducer(filtered, { type: 'SET_DAY', day: '2026-10-29' });
+    expect(next.activeFilters).to.equal(filters);
+    expect(next.searchQuery).to.equal('typography');
   });
 
   it('SET_FILTERS changes activeFilters', () => {

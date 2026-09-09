@@ -1,6 +1,8 @@
 import { expect } from '@esm-bundle/chai';
 
-import { runSessionAction, toggleScheduleWithFeedback, checkViewAccess } from '../../../../event-libs/v1/services/sessions/action-feedback.js';
+import {
+  runSessionAction, toggleScheduleWithFeedback, checkViewAccess, isAuthResolved,
+} from '../../../../event-libs/v1/services/sessions/action-feedback.js';
 import { SessionActionError } from '../../../../event-libs/v1/services/sessions/session-actions.js';
 import { toasts } from '../../../../event-libs/v1/features/toast/toast.js';
 import { conflict } from '../../../../event-libs/v1/features/conflict-modal/conflict-modal.js';
@@ -52,6 +54,20 @@ describe('services/sessions/action-feedback', () => {
     expect(toasts.value[0].message).to.equal('Register or sign in to add to schedule.');
     expect(toasts.value[0].ctaLabel).to.equal('Register/Sign in');
     expect(toasts.value[0].ctaHref).to.equal('/register');
+  });
+
+  it('caps repeated blocked triggers of the same gated action at one toast', async () => {
+    const authFn = () => Promise.reject(new SessionActionError('auth-required'));
+    await runSessionAction(authFn, { eventConfig, actionLabel: 'favorite' });
+    await runSessionAction(authFn, { eventConfig, actionLabel: 'favorite' });
+    expect(toasts.value).to.have.lengthOf(1);
+  });
+
+  it('still shows a separate toast for a different gated action while one is already showing', async () => {
+    const authFn = () => Promise.reject(new SessionActionError('auth-required'));
+    await runSessionAction(authFn, { eventConfig, actionLabel: 'favorite' });
+    await runSessionAction(authFn, { eventConfig, actionLabel: 'add to schedule' });
+    expect(toasts.value).to.have.lengthOf(2);
   });
 
   it('invokes onBlocked when the action is gated on auth-required or registration-required, not on other failures', async () => {
@@ -150,7 +166,7 @@ describe('services/sessions/action-feedback', () => {
       auth.value = { isLoggedIn: false, isRegistered: false, userFirstName: null };
       const fallback = checkViewAccess('my-sessions', { eventConfig });
       expect(fallback).to.equal('live-upcoming');
-      expect(toasts.value[0].message).to.equal('Register or sign in to view My sessions.');
+      expect(toasts.value[0].message).to.equal('Register or sign in to view my sessions.');
       expect(toasts.value[0].ctaLabel).to.equal('Register/Sign in');
       expect(toasts.value[0].ctaHref).to.equal('/register');
     });
@@ -159,9 +175,23 @@ describe('services/sessions/action-feedback', () => {
       auth.value = { isLoggedIn: true, isRegistered: false, userFirstName: null };
       const fallback = checkViewAccess('my-favorites', { eventConfig });
       expect(fallback).to.equal('live-upcoming');
-      expect(toasts.value[0].message).to.equal('Register or sign in to view My favorites.');
+      expect(toasts.value[0].message).to.equal('Register or sign in to view my favorites.');
       expect(toasts.value[0].ctaLabel).to.equal('Register/Sign in');
       expect(toasts.value[0].ctaHref).to.equal('/register');
+    });
+
+    it('caps repeated blocked view-gate triggers of the same view at one toast', () => {
+      auth.value = { isLoggedIn: false, isRegistered: false, userFirstName: null };
+      checkViewAccess('my-sessions', { eventConfig });
+      checkViewAccess('my-sessions', { eventConfig });
+      expect(toasts.value).to.have.lengthOf(1);
+    });
+
+    it('shows a separate toast when a different gated view is blocked while one is already showing', () => {
+      auth.value = { isLoggedIn: false, isRegistered: false, userFirstName: null };
+      checkViewAccess('my-sessions', { eventConfig });
+      checkViewAccess('my-favorites', { eventConfig });
+      expect(toasts.value).to.have.lengthOf(2);
     });
 
     it('falls back to live-upcoming when sessions have not loaded yet', () => {
@@ -189,6 +219,39 @@ describe('services/sessions/action-feedback', () => {
       ];
       liveStreamActiveIds.value = new Set();
       expect(checkViewAccess('my-sessions', { eventConfig })).to.equal('live-upcoming');
+    });
+  });
+
+  describe('isAuthResolved', () => {
+    it('is false while isLoggedIn has not resolved yet (IMS still pending)', () => {
+      expect(isAuthResolved({ isLoggedIn: null, isRegistered: undefined })).to.be.false;
+    });
+
+    it('is true once logged-out is confirmed — isRegistered will never arrive', () => {
+      expect(isAuthResolved({ isLoggedIn: false, isRegistered: undefined })).to.be.true;
+    });
+
+    // The exact refresh-on-My-sessions/My-favorites scenario this guards against: logged
+    // in confirmed, but isRegistered is still mid-flight (RF token exchange / myData
+    // fetch not settled yet) — must not read as resolved, or the caller bounces an
+    // about-to-be-confirmed-registered visitor away before the real answer arrives.
+    it('is false when logged in but isRegistered is still unsettled', () => {
+      expect(isAuthResolved({ isLoggedIn: true, isRegistered: undefined })).to.be.false;
+    });
+
+    it('is true once logged in and isRegistered has settled true', () => {
+      expect(isAuthResolved({ isLoggedIn: true, isRegistered: true })).to.be.true;
+    });
+
+    it('is true once logged in and isRegistered has settled false', () => {
+      expect(isAuthResolved({ isLoggedIn: true, isRegistered: false })).to.be.true;
+    });
+
+    // null is what session-store.js settles isRegistered to when the RF token exchange or
+    // myData fetch fails outright (see maybeLoadMyData()/loadMyData()) — a final answer,
+    // just not true/false, so this must resolve rather than spin forever like `undefined`.
+    it('is true once logged in and isRegistered has settled null (checked, couldn\'t determine)', () => {
+      expect(isAuthResolved({ isLoggedIn: true, isRegistered: null })).to.be.true;
     });
   });
 });

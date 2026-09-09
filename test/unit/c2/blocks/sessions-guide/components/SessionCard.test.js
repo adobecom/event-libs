@@ -325,5 +325,16 @@ describe('SessionCard', () => {
       expect(html).to.include('ON DEMAND');
       expect(html).to.not.include('AVAILABLE SOON');
     });
+
+    // Mobile Rider livestreamed sessions skip the delay window entirely — their DVR
+    // recording is live the moment the stream ends, so they never show AVAILABLE SOON.
+    it('shows ON DEMAND for a Mobile Rider livestreamed session, even mid-DVR-delay-window', () => {
+      const mrPending = {
+        ...ONDEMAND_SESSION, id: 'session-mr-pending', dvrDelayHours: 10, mrStreamId: 'QqsopWFnrC',
+      };
+      const html = renderCard(mrPending);
+      expect(html).to.include('ON DEMAND');
+      expect(html).to.not.include('AVAILABLE SOON');
+    });
   });
 });

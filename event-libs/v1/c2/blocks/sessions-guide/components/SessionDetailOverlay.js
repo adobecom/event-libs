@@ -1,4 +1,6 @@
-import { html, useState, useEffect } from '../../../../deps/htm-preact.js';
+import {
+  html, useState, useEffect, useLayoutEffect, useRef,
+} from '../../../../deps/htm-preact.js';
 import { IconButton } from './IconButton.js';
 import { useSessionGuide } from '../store/index.js';
 import { formatSessionTime, formatShortTime, getNowMs } from '../utils/time.js';
@@ -15,22 +17,18 @@ import {
   IconHeartFilled, IconHeartOutline, IconLinkOut, IconCalendarCheck, IconCalendarPlus,
 } from './icons.js';
 import { Icon } from '../../../../features/icons/Icon.js';
-import { fetchFederalProductIcon } from '../../../../features/icons/federal-icons.js';
+import { fetchFederalProductIcon, fetchFederalTrackIcon } from '../../../../features/icons/federal-icons.js';
 import { getProduct } from '../../../../utils/tier-1-event-config.js';
-import { resolveTrackBadge } from '../utils/session-filters.js';
+import { resolveTrackBadge, resolveNamedTrackBadge } from '../utils/session-filters.js';
 import { isBehaviorEnabled } from '../utils/behavior-flags.js';
 import { scrollBehavior } from '../utils/motion.js';
 
-// Collapsed lengths of the list pods, per the Figma frames (products 1325:141847,
-// speakers 1325:141990). A pod only grows a "Show more" toggle when it actually has more
-// than this.
+// Collapsed list-pod lengths (Figma products 1325:141847, speakers 1325:141990).
 const COLLAPSED_PRODUCTS = 6;
 const COLLAPSED_SPEAKERS = 5;
 
-// Only the desktop frame splits the pods into two columns (1323:139140). Tracked reactively
-// — and used to pick the DOM order rather than CSS `order`, so tab order always follows what
-// is on screen: summary → products → speakers when stacked, column by column when split.
-// Same hook shape as FilterPanel.js's useIsMobile().
+// Desktop splits pods into two columns (1323:139140); tracked reactively so DOM order
+// (used for tab order, not CSS `order`) always matches what's on screen.
 const DESKTOP_QUERY = '(min-width: 1280px)';
 const matchesDesktop = () => !!window.matchMedia?.(DESKTOP_QUERY).matches;
 
@@ -56,11 +54,23 @@ export function SessionDetailOverlay({ onBack }) {
   const [speakersExpanded, setSpeakersExpanded] = useState(false);
   const isDesktop = useIsDesktop();
 
+  // On open, move focus to Back before paint (pre-empts the browser's own blur-to-<body>
+  // fixup); on unmount (Back), restore focus to whatever was focused before this opened.
+  const backBtnRef = useRef(null);
+  useLayoutEffect(() => {
+    const previouslyFocused = document.activeElement;
+    backBtnRef.current?.focus({ preventScroll: true });
+    return () => {
+      if (previouslyFocused?.focus && document.contains(previouslyFocused)) {
+        previouslyFocused.focus({ preventScroll: true });
+      }
+    };
+  }, []);
+
   const session = sessions.value.find((s) => s.id === activeSessionId);
   if (!session) return null;
 
-  // Read purely to establish a re-render dependency on time-driven session-state
-  // transitions (see sessionStateVersion in session-store.js) — value itself is unused.
+  // Establishes a re-render dependency on time-driven session-state transitions.
   // eslint-disable-next-line no-unused-expressions
   sessionStateVersion.value;
   const nowMs = getNowMs();
@@ -74,20 +84,16 @@ export function SessionDetailOverlay({ onBack }) {
   const isLive = sessionState === 'live';
   const onDemand = sessionState === 'on-demand';
   const watchHref = safeUrl(getWatchDestination(session, sessionState));
-  // Live / on-demand sessions surface "Watch now" (disabled if there's no real
-  // destination); upcoming sessions surface "Add to schedule". Either can be turned off
-  // entirely via behaviorFlags — showWatchCta/showScheduleCta below gate on that too.
+  // Live/on-demand sessions show "Watch now"; upcoming shows "Add to schedule". Either can
+  // be disabled entirely via behaviorFlags.
   const showWatch = isLive || onDemand;
   const showWatchCta = showWatch && watchNowEnabled;
   const showScheduleCta = !showWatch && schedulingEnabled;
 
   function handleWatch(e) {
-    // Already on the destination page (e.g. the widget is embedded on the homepage/broadcast
-    // page itself) — close the widget instead of reloading the page out from under the player.
-    // requestWatchSameSession() asks that page to actually switch, if it's the kind that can
-    // (e.g. Broadcast, with multiple concurrent live sessions) — a no-op on pages with nothing
-    // subscribed (e.g. the homepage, which has only one live stream).
-    if (isSamePage(watchHref)) {
+    // Already on the destination page — close the widget and ask it to switch instead of
+    // reloading the page out from under the player.
+    if (isLive && isSamePage(watchHref)) {
       e.preventDefault();
       requestWatchSameSession(session.id);
       dispatch({ type: 'CLOSE_DRAWER' });
@@ -96,9 +102,12 @@ export function SessionDetailOverlay({ onBack }) {
     }
   }
 
-  // null for a session with neither a primary track nor an override — no "Other" badge,
-  // matching swimlane placement.
   const trackBadge = resolveTrackBadge(session);
+  // Primary/override track + additional tracks render as two full rows (Figma's "Status
+  // tag"); stackedTracks[0] is always trackBadge itself.
+  const stackedTrackBadges = trackBadge?.stackedTracks?.map(
+    (name, i) => (i === 0 ? trackBadge : resolveNamedTrackBadge(name)),
+  ).filter(Boolean);
   const startShort = session.startTimeUtc ? formatShortTime(session.startTimeUtc, userTz) : '';
   const endShort = session.endTimeUtc ? formatShortTime(session.endTimeUtc, userTz) : '';
   const timeRange = showWatch && !endShort
@@ -119,9 +128,8 @@ export function SessionDetailOverlay({ onBack }) {
     e.stopPropagation();
     const shareUrl = window.location.origin + setSessionParam(sessionParamValue(session));
     try {
-      // Checked explicitly rather than navigator.clipboard?.writeText(...): optional-chaining
-      // past a missing clipboard API would resolve `await undefined` immediately and fall
-      // through to the success toast below without ever having copied anything.
+      // Explicit check: optional-chaining past a missing clipboard API would resolve
+      // `await undefined` and still show the success toast.
       if (!navigator.clipboard) throw new Error('Clipboard API unavailable');
       await navigator.clipboard.writeText(shareUrl);
       showToast({ message: 'Link copied!', variant: 'positive' });
@@ -130,9 +138,7 @@ export function SessionDetailOverlay({ onBack }) {
     }
   }
 
-  // Fixed order, per design. `AI focus` has no catalog attribute yet, so its row simply does
-  // not render until one is authored — same as any other unauthored attribute here. `Industry`
-  // is deliberately absent: it is not in this list and does not exist in the real catalog.
+  // Fixed order, per design. A row simply doesn't render until its attribute is authored.
   const attrs = [
     ['Technical level', session.technicalLevel],
     ['Track', session.tracks?.join(', ')],
@@ -141,16 +147,12 @@ export function SessionDetailOverlay({ onBack }) {
     ['Category', session.contentCategory?.join(', ')],
   ].filter(([, value]) => value);
 
-  // Each list pod renders its collapsed slice with the full count in the heading, so the
-  // toggle is only offered when it changes what's on screen.
   const products = session.products || [];
   const speakers = session.speakers || [];
   const shownProducts = productsExpanded ? products : products.slice(0, COLLAPSED_PRODUCTS);
   const shownSpeakers = speakersExpanded ? speakers : speakers.slice(0, COLLAPSED_SPEAKERS);
 
-  // Shared "Show more"/"Show less" affordance for the list pods — same markup as the
-  // description's More/Less toggle, with an explicit label for screen readers since the
-  // visible text alone doesn't say what expands.
+  // Shared "Show more"/"Show less" toggle for the list pods.
   const showMoreToggle = (expanded, setExpanded, label, controls) => html`
     <button
       class="sg-detail__more"
@@ -169,9 +171,18 @@ export function SessionDetailOverlay({ onBack }) {
             <div class="sg-detail__group sg-detail__group--summary">
               <div class="sg-detail__summary">
                 <div class="sg-detail__summary-top">
-                  ${trackBadge && html`
+                  ${stackedTrackBadges?.length > 1 ? html`
+                    <div class="sg-detail__channels sg-detail__channels--stacked">
+                      ${stackedTrackBadges.map((badge) => html`
+                        <div class="sg-detail__channel" key=${badge.label}>
+                          <${Icon} name=${badge.icon} size=${16} resolve=${fetchFederalTrackIcon} className="sg-detail__channel-icon sg-detail__channel-icon--sm" />
+                          <span class="sg-detail__channel-name">${badge.label}</span>
+                        </div>
+                      `)}
+                    </div>
+                  ` : trackBadge && html`
                     <div class="sg-detail__channel">
-                      <${Icon} name=${trackBadge.icon} size=${20} className="sg-detail__channel-icon" />
+                      <${Icon} name=${trackBadge.icon} size=${20} resolve=${fetchFederalTrackIcon} className="sg-detail__channel-icon" />
                       <span class="sg-detail__channel-name">${trackBadge.label}</span>
                     </div>
                   `}
@@ -195,10 +206,10 @@ export function SessionDetailOverlay({ onBack }) {
                           href=${watchHref}
                           onclick=${handleWatch}
                           aria-disabled=${watchHref ? undefined : 'true'}
-                          daa-ll="Watch-Now"
+                          daa-ll=${onDemand ? 'Watch-On-Demand' : 'Watch-Now'}
                         >
                           <span class="sg-detail__btn-icon sg-detail__btn-icon--play" aria-hidden="true"></span>
-                          Watch now
+                          ${onDemand ? 'Watch on demand' : 'Watch now'}
                         </a>
                       `
     : showScheduleCta && html`
@@ -242,6 +253,7 @@ export function SessionDetailOverlay({ onBack }) {
 
               ${session.description && html`
                 <div class="sg-detail__details">
+                  <h3 class="sg-detail__section-label">Session details</h3>
                   <div class=${'sg-detail__desc-wrap' + (descExpanded ? ' is-expanded' : '')} id="sg-detail-desc">
                     <p class="sg-detail__desc">${session.description}</p>
                   </div>
@@ -279,9 +291,6 @@ export function SessionDetailOverlay({ onBack }) {
                 </h3>
                 <div class="sg-detail__products" id="sg-detail-products">
                   ${shownProducts.map((p) => {
-    // Product icon and destination both come from the Tier 1 Event Configurator's
-    // authored products map — same resolution FilterPanel.js uses for its pills.
-    // An unmapped product has nowhere to link, so it stays a plain tile.
     const product = getProduct(p);
     const href = safeUrl(product?.pageUrl);
     const inner = html`
@@ -325,14 +334,8 @@ export function SessionDetailOverlay({ onBack }) {
               </div>
   `;
 
-  // Desktop splits into a wide main column and a 383px side column, each stacking its own
-  // pods; every narrower width is one stack in reading order. The order lives here rather
-  // than in CSS so the tab order matches what is on screen at both layouts.
-  //
-  // Session resources and the legal disclaimer are deliberately not rendered here: both are
-  // sourced from the public sessions catalog, which is reachable before an event goes live.
-  // Individual session pages hydrate them directly on page creation instead, where exposure
-  // isn't a pre-event leak.
+  // Desktop splits into a wide main column and a 383px side column; narrower widths are
+  // one stack in reading order. Order lives here, not CSS, so tab order matches the DOM.
   const pods = isDesktop
     ? html`
           <div class="sg-detail__col sg-detail__col--main">
@@ -353,7 +356,7 @@ export function SessionDetailOverlay({ onBack }) {
     <div class="sg-detail" role="region" aria-label="Session detail">
       <div class="sg-detail__body">
         <div class="sg-detail__back-wrap">
-          <button class="sg-detail__back" onclick=${onBack} type="button" aria-label="Back to sessions list">
+          <button ref=${backBtnRef} class="sg-detail__back" onclick=${onBack} type="button" aria-label="Back to sessions list">
             <span class="sg-detail__back-icon" aria-hidden="true"></span>
             Back
           </button>

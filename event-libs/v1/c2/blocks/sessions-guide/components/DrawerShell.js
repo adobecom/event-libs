@@ -13,12 +13,15 @@ import {
 } from '../utils/url.js';
 import { trapFocus } from '../utils/focus-trap.js';
 import { prefersReducedMotion } from '../utils/motion.js';
+import { isSafariMobile } from '../utils/browser.js';
 
 // No top gap on mobile/tablet (drawer covers the full screen); 20px gap on desktop.
 const getTopMargin = () => (window.matchMedia('(max-width: 1279px)').matches ? 0 : 20);
 
-// Both html and body: which one scrolls depends on the host page, and body's overflow
-// doesn't propagate to the viewport when html is the scroller.
+// UA never changes mid-session, so this is read once rather than on every render.
+const isOnSafariMobile = isSafariMobile();
+
+// Sets both html and body: which one scrolls depends on the host page.
 function lockPageScroll(locked) {
   const value = locked ? 'hidden' : '';
   document.documentElement.style.overflow = value;
@@ -36,7 +39,6 @@ export function resolveSessionGuideRequest(request, { sessionsStatusValue, sessi
   return {
     found: true,
     sessionId: found.id,
-    // Resolved here so the caller doesn't search the same list by the same key again.
     sessionParam: sessionParamValue(found),
     defaultView: getDefaultView(authValue.isRegistered),
   };
@@ -52,7 +54,6 @@ export function DrawerShell() {
   const drawerStateRef = useRef(state.drawerState);
   const [filterOpen, setFilterOpen] = useState(false);
 
-  // Keep drawerStateRef in sync so gesture handlers always have current value
   useEffect(() => {
     drawerStateRef.current = state.drawerState;
   }, [state.drawerState]);
@@ -71,14 +72,11 @@ export function DrawerShell() {
     currentTopRef.current = top;
   }
 
-  // Animate drawer in response to committed drawerState changes
   useEffect(() => {
     const el = drawerRef.current;
     if (!el) return;
     const { drawerState } = state;
 
-    // Outside the branches below: the expanded branch is skipped when a gesture handler
-    // already flipped expandedRef, which left the page unlocked.
     lockPageScroll(drawerState !== 'hidden');
 
     if (drawerState === 'peek') {
@@ -110,15 +108,13 @@ export function DrawerShell() {
   // Never leave the host page locked if the block unmounts while the drawer is open.
   useEffect(() => () => lockPageScroll(false), []);
 
-  // Commit the peek -> expanded transition. Shared by the drag gestures and the
-  // focus-driven path below so they can't drift apart.
+  // Shared by the drag gestures and the focus-driven path below so they can't drift apart.
   function commitExpanded() {
     expandedRef.current = true;
     setTop(getTopMargin(), true);
     dispatch({ type: 'SET_DRAWER', drawer: 'expanded' });
   }
 
-  // Drag the drawer up by `distance` px, committing to expanded once it reaches the top.
   function dragUpBy(distance) {
     const topMargin = getTopMargin();
     const newTop = Math.max(topMargin, currentTopRef.current - distance);
@@ -126,9 +122,8 @@ export function DrawerShell() {
     else setTop(newTop, false);
   }
 
-  // Bound to the window: in peek a wheel over the backdrop never reaches the drawer.
-  // Attached only in peek, and re-checked in the handlers — these are non-passive and
-  // preventDefault, so any wider gate swallows the wheel the expanded drawer needs.
+  // Non-passive + preventDefault, so this only attaches in peek to avoid swallowing the
+  // wheel/touch scroll the expanded drawer needs.
   useEffect(() => {
     if (state.drawerState !== 'peek') return undefined;
 
@@ -163,7 +158,7 @@ export function DrawerShell() {
     };
   }, [state.drawerState]);
 
-  // URL deep-linking on mount: open drawer for ?sessions, open detail for ?session=<url-slug>
+  // Deep-linking on mount: open drawer for ?sessions, open detail for ?session=<url-slug>
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     if (params.has('sessions') || params.has('session')) {
@@ -175,7 +170,7 @@ export function DrawerShell() {
     }
   }, []);
 
-  // URL deep-linking: resolve ?session=<url-slug> once sessions are loaded.
+  // Deep-linking: resolve ?session=<url-slug> once sessions are loaded.
   useEffect(() => {
     if (sessionsStatus.value !== 'ready') return;
     const sessionParam = new URLSearchParams(window.location.search).get('session');
@@ -186,8 +181,7 @@ export function DrawerShell() {
     else window.lana?.log(`[sessions-guide] ?session=${encodeURIComponent(sessionParam).slice(0, 100)} matched no session`);
   }, [sessionsStatus.value]);
 
-  // openSessionGuideDetail() from another block. Callers read the same page-level signals,
-  // so sessions are already 'ready' by the time one can be clicked — no buffering needed.
+  // openSessionGuideDetail() from another block.
   useEffect(() => sessionGuideRequest.subscribe((request) => {
     const result = resolveSessionGuideRequest(request, {
       sessionsStatusValue: sessionsStatus.value,
@@ -201,16 +195,13 @@ export function DrawerShell() {
     }
     dispatch({ type: 'SET_DRAWER', drawer: 'expanded', defaultView: result.defaultView });
     dispatch({ type: 'SET_ACTIVE_SESSION', sessionId: result.sessionId });
-    // The url slug, like every other entry point, so the param has one shape.
     history.pushState({}, '', setSessionParam(result.sessionParam));
   }), []);
 
-  // Keep sessionsRef current so the popstate handler always sees the latest list
   const sessionsRef = useRef(sessions.value);
   useEffect(() => sessions.subscribe((v) => { sessionsRef.current = v; }), []);
 
-  // popstate listener — restores state from URL without pushing new history entries
-  // Registered once; reads sessions via ref to avoid re-registering on every poll.
+  // popstate listener — restores state from URL without pushing new history entries.
   useEffect(() => {
     function handlePopState() {
       const params = new URLSearchParams(window.location.search);
@@ -272,9 +263,6 @@ export function DrawerShell() {
     setFilterOpen(false);
   }
 
-  // tabindex="-1" is not a tab stop, but takes BackToTop's programmatic focus after a jump.
-  // data-lenis-prevent opts the whole subtree out of Milo's Lenis smooth-scroll, which
-  // preventDefault()s every wheel and would starve the scroll containers in here.
   return html`
     <div class="sg-shell">
       ${isOpen && html`<div class="sg-backdrop" onclick=${closeDrawer} aria-hidden="true" data-lenis-prevent></div>`}
@@ -291,7 +279,7 @@ export function DrawerShell() {
           onFilterToggle=${handleFilterToggle}
           onFilterClose=${handleFilterClose}
           filterOpen=${filterOpen}
-          hideControls=${hasDetail}
+          controlsInert=${hasDetail}
         />
         <div class="sg-drawer__body">
           <div
@@ -299,6 +287,7 @@ export function DrawerShell() {
             ref=${bodyScrollRef}
             tabindex="-1"
             aria-busy=${String(sessionsStatus.value === 'loading')}
+            inert=${hasDetail ? true : undefined}
             onfocusin=${() => { if (!expandedRef.current && drawerStateRef.current === 'peek') commitExpanded(); }}
           >
             <div class="sg-sr-only" role="status" aria-live="polite">${sessionsStatusMessage(sessionsStatus.value)}</div>
@@ -312,7 +301,7 @@ export function DrawerShell() {
           ${!hasDetail && html`<${BackToTop} scrollerRef=${bodyScrollRef} />`}
         </div>
       </div>
-      ${!isOpen && html`<button class="sg-cta-btn" onclick=${openDrawer} daa-ll="Session-Guide-Open" type="button">
+      ${!isOpen && html`<button class=${'sg-cta-btn' + (isOnSafariMobile ? ' sg-cta-btn--safari-mobile' : '')} onclick=${openDrawer} daa-ll="Session-Guide-Open" type="button">
         View all sessions
         <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false">
           <path d="M15.75 3H13.75V2C13.75 1.58594 13.4141 1.25 13 1.25C12.5859 1.25 12.25 1.58594 12.25 2V3H7.75V2C7.75 1.58594 7.41406 1.25 7 1.25C6.58594 1.25 6.25 1.58594 6.25 2V3H4.25C3.00928 3 2 4.00977 2 5.25V15.75C2 16.9902 3.00928 18 4.25 18H15.75C16.9907 18 18 16.9902 18 15.75V5.25C18 4.00977 16.9907 3 15.75 3ZM4.25 4.5H6.25V5C6.25 5.41406 6.58594 5.75 7 5.75C7.41406 5.75 7.75 5.41406 7.75 5V4.5H12.25V5C12.25 5.41406 12.5859 5.75 13 5.75C13.4141 5.75 13.75 5.41406 13.75 5V4.5H15.75C16.1636 4.5 16.5 4.83691 16.5 5.25V7H3.5V5.25C3.5 4.83691 3.83643 4.5 4.25 4.5ZM15.75 16.5H4.25C3.83643 16.5 3.5 16.1631 3.5 15.75V8.5H16.5V15.75C16.5 16.1631 16.1636 16.5 15.75 16.5Z" fill="currentColor"/>

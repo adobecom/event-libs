@@ -6,9 +6,8 @@ import ConfigEditor from './pages/ConfigEditor.js';
 import { useNavigation } from './context/NavigationContext.js';
 import { useConfigs } from './context/ConfigsContext.js';
 import { useDA } from './context/DAContext.js';
-import { useEventEnv } from './context/EventEnvContext.js';
 import { decodeHomepageConfigParam } from './utils.js';
-import { PAGES, EVENT_SERVICE_ENV_OPTIONS, HOMEPAGE_LINK_HASH_KEY } from './constants.js';
+import { PAGES, HOMEPAGE_LINK_HASH_KEY } from './constants.js';
 
 import { DAProvider as SgcDAProvider } from '../session-guide-configurator/context/DAContext.js';
 import { EventEnvProvider as SgcEventEnvProvider } from '../session-guide-configurator/context/EventEnvContext.js';
@@ -20,14 +19,20 @@ import { readConfigLinkPayload } from '../session-guide-configurator/utils.js';
 const TOAST_TIMEOUT_MS = 6000;
 const HOMEPAGE_LINK_HASH_RE = new RegExp(`[#&]${HOMEPAGE_LINK_HASH_KEY}=([A-Za-z0-9+/=%-]{20,})`);
 
+// { message, persistent: true } skips the toast's auto-dismiss timeout.
+function toastMessage(toast) {
+  return typeof toast === 'object' && toast !== null ? toast.message : toast;
+}
+
+function isToastPersistent(toast) {
+  return typeof toast === 'object' && toast !== null && !!toast.persistent;
+}
+
 const TABS = [
   { id: 'event', label: 'Event Config' },
   { id: 'session-guide', label: 'Session Guide Config' },
 ];
 
-// Mounts Session Guide Configurator's own, unmodified provider stack + component — same
-// nesting order its own standalone entry point uses. No data/context sharing with the
-// Tier 1 config below; this tab only co-locates the two apps under one page/URL.
 function SessionGuideTab() {
   return html`
     <${SgcDAProvider}>
@@ -42,18 +47,13 @@ function SessionGuideTab() {
   `;
 }
 
-// Everything TierOneEventConfigurator rendered before the tab bar existed — unchanged,
-// just extracted so it can live inside a tab instead of owning the whole page.
 function EventConfigTab() {
   const { isLoading: isDaLoading, error: daError } = useDA();
   const { activePage, goToEditor } = useNavigation();
-  const { envName } = useEventEnv();
   const {
     toastError, clearToastError, toastSuccess, clearToastSuccess, isInitialLoading, error,
     findConfigByEventId, startEditConfig, setToastError,
   } = useConfigs();
-
-  const envLabel = EVENT_SERVICE_ENV_OPTIONS.find((opt) => opt.value === envName)?.label || envName;
 
   // sp-toast owned its own auto-dismiss timeout; a plain div needs its own.
   useEffect(() => {
@@ -63,16 +63,12 @@ function EventConfigTab() {
   }, [toastError, clearToastError]);
 
   useEffect(() => {
-    if (!toastSuccess) return undefined;
+    if (!toastSuccess || isToastPersistent(toastSuccess)) return undefined;
     const timer = setTimeout(clearToastSuccess, TOAST_TIMEOUT_MS);
     return () => clearTimeout(timer);
   }, [toastSuccess, clearToastSuccess]);
 
-  // Deep-link back into a Homepage config from a "Copy Link" URL (see ConfigEditor.js's
-  // handleCopyHomepageLink) — only once the config library has actually loaded, so
-  // findConfigByEventId isn't run against an empty, not-yet-fetched configs array. Reads only
-  // window.location.hash, never .search — DA's iframe only forwards the hash through to this
-  // app (same constraint Schedule Maker documents for its own `schedule=` links).
+  // Reads only location.hash — DA's iframe only forwards the hash to this app.
   useEffect(() => {
     if (isInitialLoading || error) return;
     const match = window.location.hash.match(HOMEPAGE_LINK_HASH_RE);
@@ -106,13 +102,6 @@ function EventConfigTab() {
 
   return html`
     <${Fragment}>
-      ${envName !== 'prod' && html`
-        <div class="tec-env-banner" role="status">
-          <strong>Non-production environment: ${envLabel}.</strong>
-          ESP/ESL calls are targeting ${envName}, not prod — set via the manual Event ID lookup's environment picker.
-        </div>
-      `}
-
       ${isInitialLoading && html`
         <div class="tec-loading">
           <div class="tec-spinner" role="status" aria-label="Loading config library…"></div>
@@ -139,7 +128,7 @@ function EventConfigTab() {
       `}
       ${toastSuccess && html`
         <div class="tec-toast tec-toast--success" role="status">
-          <span class="tec-toast__message">${toastSuccess}</span>
+          <span class="tec-toast__message">${toastMessage(toastSuccess)}</span>
           <button type="button" class="tec-btn tec-btn--icon" onClick=${clearToastSuccess} aria-label="Dismiss">✕</button>
         </div>
       `}
@@ -148,8 +137,7 @@ function EventConfigTab() {
 }
 
 export default function TierOneEventConfigurator() {
-  // A copied Session Guide link lands here with its config in the hash, so open on that tab
-  // — SessionGuideConfigurator opens the config itself. Lazy, so the hash is read once.
+  // Opens on the session-guide tab if the hash carries a copied config link.
   const [activeTabId, setActiveTabId] = useState(
     () => (readConfigLinkPayload() ? 'session-guide' : TABS[0].id),
   );
