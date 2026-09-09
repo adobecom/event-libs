@@ -4,7 +4,6 @@ import { getEventStartMs, initTierOneEventConfig } from '../../../utils/tier-1-e
 import { deriveMrEnv } from '../../../utils/session-store.js';
 import { registerStreamIds, unregisterStreamIds, subscribe as subscribeToPoller } from '../../../services/sessions/poller.js';
 import BlockMediator from '../../../deps/block-mediator.min.js';
-import { showVideoLayoutLoader, hideVideoLayoutLoader } from '../../utils/video-layout-loader.js';
 import {
   VIDEO_LAYOUT_DECISION_KEY,
   PROGRESS_STORAGE_KEY,
@@ -574,28 +573,18 @@ function evaluatePhase({ session, sessionTimes }, liveStreamActiveIds) {
   return { phase, video };
 }
 
-// The current tail of init() — preconnect, loader, layout-decision wait, embed — kept as a
-// one-shot so the evaluate loop can call it exactly once at the transition to a playable phase.
-// showLoader is true only on a cold page load (the loader covers the brief full-width-vs-playlist
-// layout race); on a later on-demand transition we show nothing and just reveal the player.
-function loadWhenDecided(el, sessionId, video, { showLoader = false } = {}) {
+// The current tail of init() — preconnect, layout-decision wait, embed — kept as a one-shot so
+// the evaluate loop can call it exactly once at the transition to a playable phase. No loader is
+// shown at any point: nothing appears until the player is actually ready to embed.
+function loadWhenDecided(el, sessionId, video) {
   preconnectVideoProvider(video.provider);
-
-  // TEMP DEBUG
-  console.log('[svp] loadWhenDecided', { showLoader, insidePlaylist: isInsidePlaylistContainer(el), willShowLoader: showLoader && !isInsidePlaylistContainer(el) });
-
-  if (showLoader && !isInsidePlaylistContainer(el)) {
-    showVideoLayoutLoader(el);
-  }
 
   (async () => {
     try {
       const isWinner = await awaitEmbedDecision(el);
-      hideVideoLayoutLoader();
       if (!isWinner) return;
       loadVideoPlayer(el, sessionId, video);
     } catch (error) {
-      hideVideoLayoutLoader();
       logError(`could not resolve the video layout decision: ${error.message}`);
     }
   })();
@@ -619,15 +608,9 @@ export default async function init(el) {
   // Re-evaluate the phase against the current clock/live state. Called on load, on each
   // session-state:changed tick (from event-session-details, the single shared schedule timer), and
   // on each live-poll result. embedded/isConnected guards keep it idempotent across all triggers.
-  // `isInitialLoad` is true only for the first, synchronous call: the layout-decision loader is a
-  // cold-page-load affordance (covers the brief player-vs-playlist race so the page doesn't jump).
-  // On a LATER transition (session flips to on-demand while the user waits), we show nothing —
-  // the player just appears when ready — so the loader is suppressed for those.
-  const evaluate = (isInitialLoad = false) => {
+  const evaluate = () => {
     if (embedded || !el.isConnected) return;
     const { phase, video } = evaluatePhase({ session, sessionTimes }, liveStreamActiveIds);
-    // TEMP DEBUG
-    console.log('[svp] evaluate', { isInitialLoad, phase, hasVideo: Boolean(video), insidePlaylist: isInsidePlaylistContainer(el), nowMs: getNowMs() });
 
     if (video) {
       embedded = true;
@@ -635,7 +618,7 @@ export default async function init(el) {
       // tick. Fired before the layout-decision wait so the playlist can announce the decision this
       // block is about to await.
       window.dispatchEvent(new CustomEvent('session-video-player:playable', { detail: { sessionId } }));
-      loadWhenDecided(el, sessionId, video, { showLoader: isInitialLoad });
+      loadWhenDecided(el, sessionId, video);
       return;
     }
 
@@ -676,8 +659,6 @@ export default async function init(el) {
     }
   });
 
-  // Only this first, synchronous evaluation is a cold page load — pass the flag so its loader can
-  // show. The onStateChanged/poll re-evaluations are transitions and show nothing until ready.
-  evaluate(true);
+  evaluate();
 }
 
