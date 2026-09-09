@@ -546,12 +546,23 @@
     --vp-title: var(--s2a-color-gray-25);
 
     position: fixed;
+    left: var(--s2a-spacing-xs);
+    right: var(--s2a-spacing-xs);
+    bottom: var(--s2a-spacing-xs);
+    z-index: 2;
+
+    /* Collapsed: a floating card inset from all edges with all four corners rounded. Expanded
+       overrides this to sit flush to the left/right/bottom edges with only the top corners
+       rounded (a bottom sheet). */
+    border-radius: var(--s2a-border-radius-md, 16px);
+    transition: max-height 0.3s ease, inset 0.3s ease, border-radius 0.3s ease;
+  }
+
+  .session-video-playlist.is-expanded {
     left: 0;
     right: 0;
     bottom: 0;
-    z-index: 2;
     border-radius: var(--s2a-border-radius-md, 16px) var(--s2a-border-radius-md, 16px) 0 0;
-    transition: max-height 0.3s ease;
   }
 
   .session-video-playlist.is-dragging {
