@@ -120,6 +120,9 @@ async function loadMyData() {
     });
   } catch (err) {
     window.lana?.log(`[session-store] myData fetch failed: ${err.message}`);
+    // Same settling as the no-token branch above in maybeLoadMyData() — a failed fetch is
+    // also a final, non-retried answer, so isRegistered must not stay undefined forever.
+    auth.value = { ...auth.value, isRegistered: null };
   }
 }
 
@@ -132,8 +135,13 @@ function maybeLoadMyData() {
   if (!rfAuthTokenSettled) return;
   myDataAttempted = true;
   if (!rfAuthToken) {
-    // No token means guaranteed failure. isRegistered stays undefined, not false.
+    // No token means guaranteed failure. Settle isRegistered to null (checked, but
+    // couldn't be determined) rather than leaving it undefined (still pending) forever —
+    // isAuthResolved() (action-feedback.js) only treats non-undefined as settled, so a
+    // gated view (MySessionsView/MyFavoritesView) would otherwise spin on its loading
+    // state indefinitely instead of ever bouncing the visitor out.
     window.lana?.log('[session-store] no RF auth token — skipping myData, registration status unknown');
+    auth.value = { ...auth.value, isRegistered: null };
     return;
   }
   loadMyData();

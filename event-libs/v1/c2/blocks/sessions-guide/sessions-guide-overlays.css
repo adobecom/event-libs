@@ -94,10 +94,14 @@
 /* ── Session Detail Overlay (Phase 6) ────────────────────────── */
 
 /* Replaces the old slide-in-from-the-right panel: the header's controls row collapses
-   away (.sg-header-controls-collapse in sessions-guide.css) while this fades/slides up
-   into the same space, instead of a separate panel sliding over the list. Closing (Back)
-   is intentionally instant, no reverse animation — matches the reference prototype, and
-   keeps a rapid back-and-forth from queuing up an exit animation behind the next open. */
+   away first (.sg-header-controls-collapse in sessions-guide.css), then this fades/slides
+   up into the same space, instead of a separate panel sliding over the list — matching the
+   reference prototype's "dismiss the header controls, then display the detail overlay"
+   sequencing rather than animating both at once. The delay below is short enough to read as
+   "right after" rather than a sluggish wait, without literally chaining off the header
+   collapse's own transitionend. Closing (Back) is intentionally instant, no reverse
+   animation — also matches the prototype, and keeps a rapid back-and-forth from queuing up
+   an exit animation behind the next open. */
 .sg-detail-panel {
   position: absolute;
   inset: 0;
@@ -108,9 +112,13 @@
   flex-direction: column;
 }
 
+/* `both` fill-mode holds the "from" keyframe (opacity: 0) during the delay too, instead of
+   flashing the panel's normal (fully visible) style before the animation starts — with no
+   static opacity set outside the keyframes, so prefers-reduced-motion's `animation: none`
+   below just shows the panel instantly rather than stuck invisible. */
 .sg-detail-panel--open {
   display: flex;
-  animation: sg-detail-in 0.25s ease forwards;
+  animation: sg-detail-in 0.25s ease 0.15s both;
 }
 
 @keyframes sg-detail-in {

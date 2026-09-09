@@ -26,10 +26,12 @@ function safeDate(value) {
 
 // Intl always renders dayPeriod as "AM"/"PM" with a preceding space (e.g. "11:00 AM"); we
 // want it lowercase and attached to the time instead ("11:00am"), so build the string from
-// parts rather than the formatted output.
+// parts rather than the formatted output. That separator isn't always a plain ASCII space —
+// modern ICU data renders it as a narrow no-break space (U+202F) in many environments — so
+// match on "blank" rather than an exact character to strip it regardless.
 function joinTimeParts(parts) {
   return parts.reduce((out, part, i) => {
-    if (part.type === 'literal' && part.value === ' ' && parts[i + 1]?.type === 'dayPeriod') return out;
+    if (part.type === 'literal' && part.value.trim() === '' && parts[i + 1]?.type === 'dayPeriod') return out;
     return out + (part.type === 'dayPeriod' ? part.value.toLowerCase() : part.value);
   }, '');
 }

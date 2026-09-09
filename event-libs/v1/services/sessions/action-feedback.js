@@ -110,21 +110,12 @@ function fallbackViewForUnauthorized() {
     : 'live-upcoming';
 }
 
-// Auth resolves in two async steps (see syncAuth()/loadMyData() in session-store.js):
-// isLoggedIn starts `null` until IMS responds; once it's `true`, isRegistered stays
-// `undefined` until the RF token exchange + myData fetch settle it — which can easily
-// take longer than this component's first render. checkViewAccess()'s
-// registration-required branch fires on `!== true`, and "not yet known" satisfies that
-// same test, so gating while either is still unsettled bounces an about-to-be-confirmed
-// visitor away (with a "register or sign in" toast) before the real answer ever arrives —
-// and since the bounce also changes the active view, the gating component unmounts and
-// never gets a chance to reconsider once auth actually resolves.
-// Only gate once there's a real answer: confirmed logged out (isRegistered will never
-// arrive for this visitor), or confirmed logged in with isRegistered itself settled
-// either way. Note: a visitor whose RF token exchange itself fails permanently (see
-// "isRegistered stays undefined, not false" in session-store.js's maybeLoadMyData())
-// never resolves here either — this trades a rare, permanently-blank gated view for not
-// falsely bouncing the far more common "still loading" case.
+// isRegistered stays `undefined` (not yet known) until session-store.js's RF token
+// exchange + myData fetch settle it one way or another — including to `null` if that
+// exchange/fetch fails outright, still a final answer, just not true/false. "not yet known"
+// also satisfies checkViewAccess()'s `!== true` gate, so resolving too early bounces an
+// about-to-be-confirmed visitor away before the real answer arrives. Gate only once there's
+// a real answer: confirmed logged out, or confirmed logged in with isRegistered settled.
 export function isAuthResolved({ isLoggedIn, isRegistered }) {
   return isLoggedIn === false || (isLoggedIn === true && isRegistered !== undefined);
 }

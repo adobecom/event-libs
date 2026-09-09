@@ -246,5 +246,12 @@ describe('services/sessions/action-feedback', () => {
     it('is true once logged in and isRegistered has settled false', () => {
       expect(isAuthResolved({ isLoggedIn: true, isRegistered: false })).to.be.true;
     });
+
+    // null is what session-store.js settles isRegistered to when the RF token exchange or
+    // myData fetch fails outright (see maybeLoadMyData()/loadMyData()) — a final answer,
+    // just not true/false, so this must resolve rather than spin forever like `undefined`.
+    it('is true once logged in and isRegistered has settled null (checked, couldn\'t determine)', () => {
+      expect(isAuthResolved({ isLoggedIn: true, isRegistered: null })).to.be.true;
+    });
   });
 });
