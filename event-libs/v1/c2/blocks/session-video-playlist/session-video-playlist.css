@@ -626,8 +626,7 @@
     justify-content: center;
     width: 100%;
     height: 24px;
-    padding: 0 var(--s2a-spacing-md);
-    margin-bottom: var(--s2a-spacing-sm);
+    padding: var(--s2a-spacing-12, 12px) var(--s2a-spacing-md) var(--s2a-spacing-xs);
     box-sizing: border-box;
     touch-action: none;
     cursor: grab;
@@ -659,8 +658,8 @@
     flex: 0 0 auto;
     align-items: center;
     justify-content: center;
-    width: 32px;
-    height: 32px;
+    width: 26px;
+    height: 26px;
     border: none;
     border-radius: var(--s2a-border-radius-round);
     background: none;
@@ -686,7 +685,6 @@
 
   .session-video-playlist.is-expanded .session-video-playlist-top {
     flex-wrap: wrap;
-    padding-top: var(--s2a-spacing-md);
     cursor: grab;
     touch-action: none;
   }
@@ -749,15 +747,13 @@
   }
 
   .session-video-playlist-autoplay-toggle:checked {
-    /* stylelint-disable-next-line color-no-hex -- no matching --s2a- token for this
-       exact Figma mobile track color */
-    background: #dbdbdb;
+    background: var(--vp-subdued-content);
   }
 
   .session-video-playlist-title {
-    font-size: var(--s2a-typography-font-size-heading-6);
+    font-size: var(--s2a-font-size-lg, 18px);
     font-weight: 900;
-    line-height: var(--s2a-typography-line-height-title-6, 18px);
+    line-height: var(--s2a-font-line-height-18, 18px);
     letter-spacing: var(--s2a-typography-letter-spacing-heading-6);
   }
 
