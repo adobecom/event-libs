@@ -581,6 +581,9 @@ function evaluatePhase({ session, sessionTimes }, liveStreamActiveIds) {
 function loadWhenDecided(el, sessionId, video, { showLoader = false } = {}) {
   preconnectVideoProvider(video.provider);
 
+  // TEMP DEBUG
+  console.log('[svp] loadWhenDecided', { showLoader, insidePlaylist: isInsidePlaylistContainer(el), willShowLoader: showLoader && !isInsidePlaylistContainer(el) });
+
   if (showLoader && !isInsidePlaylistContainer(el)) {
     showVideoLayoutLoader(el);
   }
@@ -623,6 +626,8 @@ export default async function init(el) {
   const evaluate = (isInitialLoad = false) => {
     if (embedded || !el.isConnected) return;
     const { phase, video } = evaluatePhase({ session, sessionTimes }, liveStreamActiveIds);
+    // TEMP DEBUG
+    console.log('[svp] evaluate', { isInitialLoad, phase, hasVideo: Boolean(video), insidePlaylist: isInsidePlaylistContainer(el), nowMs: getNowMs() });
 
     if (video) {
       embedded = true;
