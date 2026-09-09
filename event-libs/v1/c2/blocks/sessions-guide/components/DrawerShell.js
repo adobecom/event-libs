@@ -163,7 +163,8 @@ export function DrawerShell() {
     };
   }, [state.drawerState]);
 
-  // URL deep-linking on mount: open drawer for ?sessions, open detail for ?session=<url-slug>
+  // URL deep-linking on mount: open drawer for ?sessions, open detail for ?session=<url-slug>,
+  // and land on a specific view for ?view=<my-sessions|my-favorites> (e.g. from the Account Menu).
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     if (params.has('sessions') || params.has('session')) {
@@ -172,6 +173,13 @@ export function DrawerShell() {
         drawer: 'expanded',
         defaultView: getDefaultView(auth.value.isRegistered),
       });
+      // Explicit dispatch, not just `defaultView` above: SET_DRAWER prefers the
+      // sessionStorage-cached last view over defaultView, which would otherwise
+      // silently win over an explicit ?view= request.
+      const view = params.get('view');
+      if (view === 'my-sessions' || view === 'my-favorites') {
+        dispatch({ type: 'SET_VIEW', view });
+      }
     }
   }, []);
 
